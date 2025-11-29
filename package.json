@@ -10,6 +10,9 @@
     "start": "node dist/orchestrator/index.js",
     "add-task": "tsx src/cli/entry-point.ts",
     "worker:dev": "tsx src/workers/dev-worker.ts",
+    "worker:dev:i": "tsx src/workers/dev-worker.ts --interactive",
+    "worker:dev:interactive": "tsx src/workers/dev-worker.ts --interactive",
+    "worker:dev:test": "tsx src/workers/dev-worker.ts --interactive --test",
     "test": "tsx test/simple-task.ts"
   },
   "keywords": ["ai", "agents", "orchestration", "claude"],

@@ -6,13 +6,13 @@ import { Task } from './types.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Racine du projet
+// Project root
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 const DATA_DIR = path.join(PROJECT_ROOT, 'data');
 const TASKS_DIR = path.join(DATA_DIR, 'tasks');
 const KNOWLEDGE_DIR = path.join(DATA_DIR, 'knowledge');
 
-// Assurer que les dossiers existent
+// Ensure directories exist
 [DATA_DIR, TASKS_DIR, KNOWLEDGE_DIR].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -26,13 +26,13 @@ export interface KnowledgeEntry {
 }
 
 /**
- * Couche d'abstraction pour le stockage
- * Pour commencer: fichiers JSON plats
- * Peut évoluer vers SQLite/PostgreSQL plus tard
+ * Storage abstraction layer
+ * Initial implementation: flat JSON files
+ * Can evolve to SQLite/PostgreSQL later
  */
 export class Storage {
   /**
-   * Sauvegarder une tâche
+   * Save a task
    */
   static saveTask(task: Task): void {
     const filePath = path.join(TASKS_DIR, `${task.id}.json`);
@@ -40,7 +40,7 @@ export class Storage {
   }
 
   /**
-   * Charger une tâche par ID
+   * Load a task by ID
    */
   static loadTask(taskId: string): Task | null {
     const filePath = path.join(TASKS_DIR, `${taskId}.json`);
@@ -52,7 +52,7 @@ export class Storage {
   }
 
   /**
-   * Lister toutes les tâches
+   * List all tasks
    */
   static listTasks(): Task[] {
     const files = fs.readdirSync(TASKS_DIR)
@@ -65,7 +65,7 @@ export class Storage {
   }
 
   /**
-   * Supprimer une tâche
+   * Delete a task
    */
   static deleteTask(taskId: string): void {
     const filePath = path.join(TASKS_DIR, `${taskId}.json`);
@@ -75,7 +75,7 @@ export class Storage {
   }
 
   /**
-   * Ajouter une entrée à la base de connaissance
+   * Add an entry to the knowledge base
    */
   static addKnowledge(category: string, entry: Omit<KnowledgeEntry, 'timestamp' | 'category'>): void {
     const filePath = path.join(KNOWLEDGE_DIR, `${category}.jsonl`);
@@ -88,7 +88,7 @@ export class Storage {
   }
 
   /**
-   * Lire la base de connaissance pour une catégorie
+   * Read the knowledge base for a category
    */
   static readKnowledge(category: string): KnowledgeEntry[] {
     const filePath = path.join(KNOWLEDGE_DIR, `${category}.jsonl`);
@@ -103,7 +103,7 @@ export class Storage {
   }
 
   /**
-   * Obtenir le chemin du dossier de contexte pour une tâche
+   * Get the context directory path for a task
    */
   static getTaskContextDir(taskId: string): string {
     const dir = path.join(DATA_DIR, 'contexts', taskId);
@@ -114,7 +114,7 @@ export class Storage {
   }
 
   /**
-   * Obtenir le chemin vers le dossier data
+   * Get the data directory path
    */
   static getDataDir(): string {
     return DATA_DIR;

@@ -11,7 +11,7 @@ export class TaskManager {
   }
 
   /**
-   * Charger toutes les tâches depuis le stockage
+   * Load all tasks from storage
    */
   private loadTasks(): void {
     const tasks = Storage.listTasks();
@@ -22,7 +22,7 @@ export class TaskManager {
   }
 
   /**
-   * Créer une nouvelle tâche
+   * Create a new task
    */
   createTask(
     description: string,
@@ -54,7 +54,7 @@ export class TaskManager {
   }
 
   /**
-   * Mettre à jour le statut d'une tâche
+   * Update task status
    */
   updateTaskStatus(
     taskId: string,
@@ -70,7 +70,7 @@ export class TaskManager {
     task.status = newStatus;
     task.updatedAt = new Date().toISOString();
 
-    // Ajouter à l'historique
+    // Add to history
     task.history.push({
       timestamp: task.updatedAt,
       event: 'status_change',
@@ -84,7 +84,7 @@ export class TaskManager {
   }
 
   /**
-   * Assigner une tâche à un worker
+   * Assign a task to a worker
    */
   assignTask(taskId: string, workerId: string, workerType: WorkerType): void {
     const task = this.tasks.get(taskId);
@@ -107,7 +107,7 @@ export class TaskManager {
   }
 
   /**
-   * Libérer une tâche (retirer l'assignation)
+   * Unassign a task (remove assignment)
    */
   unassignTask(taskId: string): void {
     const task = this.tasks.get(taskId);
@@ -128,7 +128,7 @@ export class TaskManager {
   }
 
   /**
-   * Ajouter un commentaire à une tâche
+   * Add a comment to a task
    */
   addComment(taskId: string, author: string, content: string): void {
     const task = this.tasks.get(taskId);
@@ -147,21 +147,22 @@ export class TaskManager {
   }
 
   /**
-   * Obtenir la prochaine tâche pour un type de worker
+   * Get the next task for a worker type
    */
   getNextTaskForWorker(workerType: WorkerType): Task | null {
-    // Déterminer quel statut chercher selon le type de worker
+    // Determine which status to look for based on worker type
     const statusMap: Record<WorkerType, TaskStatus[]> = {
       [WorkerType.PM]: [TaskStatus.BACKLOG],
       [WorkerType.PO]: [TaskStatus.REFINED],
-      [WorkerType.DEV]: [TaskStatus.TODO, TaskStatus.CHANGES_REQUESTED],
+      // DEV accepts BACKLOG for MVP (until we have PM workers)
+      [WorkerType.DEV]: [TaskStatus.BACKLOG, TaskStatus.TODO, TaskStatus.CHANGES_REQUESTED],
       [WorkerType.REVIEWER]: [TaskStatus.REVIEW]
     };
 
     const targetStatuses = statusMap[workerType] || [];
 
-    // Trouver la première tâche non assignée avec le bon statut
-    // Prioriser par priority: urgent > high > medium > low
+    // Find the first unassigned task with the right status
+    // Prioritize by priority: urgent > high > medium > low
     const priorityOrder: Task['priority'][] = ['urgent', 'high', 'medium', 'low'];
 
     for (const priority of priorityOrder) {
@@ -180,7 +181,7 @@ export class TaskManager {
   }
 
   /**
-   * Obtenir toutes les tâches avec un statut donné
+   * Get all tasks with a given status
    */
   getTasksByStatus(status: TaskStatus): Task[] {
     return Array.from(this.tasks.values())
@@ -188,21 +189,58 @@ export class TaskManager {
   }
 
   /**
-   * Obtenir une tâche par ID
+   * Get a task by ID
    */
   getTask(taskId: string): Task | undefined {
     return this.tasks.get(taskId);
   }
 
   /**
-   * Obtenir toutes les tâches
+   * Get all tasks
    */
   getAllTasks(): Task[] {
     return Array.from(this.tasks.values());
   }
 
   /**
-   * Obtenir des statistiques
+   * Delete a task
+   */
+  deleteTask(taskId: string): boolean {
+    const task = this.tasks.get(taskId);
+    if (!task) {
+      return false;
+    }
+
+    // Remove from storage
+    Storage.deleteTask(taskId);
+
+    // Remove from memory
+    this.tasks.delete(taskId);
+
+    console.log(`[TaskManager] Deleted task ${taskId}`);
+    return true;
+  }
+
+  /**
+   * Clear all tasks
+   */
+  clearAllTasks(): number {
+    const count = this.tasks.size;
+
+    // Delete all from storage
+    for (const taskId of this.tasks.keys()) {
+      Storage.deleteTask(taskId);
+    }
+
+    // Clear memory
+    this.tasks.clear();
+
+    console.log(`[TaskManager] Cleared ${count} tasks`);
+    return count;
+  }
+
+  /**
+   * Get statistics
    */
   getStats() {
     const byStatus: Record<string, number> = {};

@@ -21,7 +21,7 @@ class Orchestrator {
   async start(): Promise<void> {
     console.log('[Orchestrator] Starting servers...');
 
-    // Le WebSocket server démarre automatiquement dans son constructeur
+    // WebSocket server starts automatically in its constructor
     await this.restAPI.start();
 
     console.log('\n=================================================');
@@ -49,7 +49,7 @@ class Orchestrator {
   }
 }
 
-// Point d'entrée
+// Entry point
 const orchestrator = new Orchestrator();
 
 orchestrator.start().catch((error) => {
@@ -57,7 +57,7 @@ orchestrator.start().catch((error) => {
   process.exit(1);
 });
 
-// Gestion des signaux de terminaison
+// Handle termination signals
 process.on('SIGINT', async () => {
   console.log('\n[Orchestrator] Received SIGINT, shutting down gracefully...');
   await orchestrator.stop();

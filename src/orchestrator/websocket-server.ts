@@ -55,7 +55,7 @@ export class WorkerWebSocketServer {
       try {
         const message = parseMessage(data.toString());
 
-        // Si c'est un WORKER_READY, enregistrer le worker
+        // If it's a WORKER_READY, register the worker
         if (message.type === MessageType.WORKER_READY) {
           workerId = (message as WorkerReadyMessage).workerId;
         }
@@ -74,7 +74,7 @@ export class WorkerWebSocketServer {
         console.log(`[WS] Worker ${workerId} disconnected`);
         const worker = this.workers.get(workerId);
 
-        // Libérer la tâche si le worker était en train de travailler
+        // Release the task if the worker was working on it
         if (worker?.taskId) {
           try {
             this.taskManager.unassignTask(worker.taskId);
@@ -151,10 +151,10 @@ export class WorkerWebSocketServer {
     this.workers.set(workerId, worker);
     console.log(`[WS] Worker ${workerId} (${workerType}) is ready`);
 
-    // Envoyer ACK
+    // Send ACK
     this.sendMessage(socket, createMessage(MessageType.ACK, { workerId }));
 
-    // Assigner une tâche si disponible
+    // Assign a task if available
     this.tryAssignTask(workerId, workerType);
   }
 
@@ -171,11 +171,11 @@ export class WorkerWebSocketServer {
       return;
     }
 
-    // Assigner la tâche
+    // Assign the task
     this.taskManager.assignTask(task.id, workerId, workerType);
     worker.taskId = task.id;
 
-    // Envoyer la tâche au worker
+    // Send the task to the worker
     this.sendMessage(worker.socket, createMessage(MessageType.ASSIGN_TASK, {
       task
     }));
@@ -212,11 +212,11 @@ export class WorkerWebSocketServer {
       result
     });
 
-    // Libérer le worker
+    // Release the worker
     const worker = this.workers.get(workerId);
     if (worker) {
       worker.taskId = null;
-      // Essayer d'assigner une nouvelle tâche
+      // Try to assign a new task
       this.tryAssignTask(workerId, worker.type);
     }
   }
@@ -233,7 +233,7 @@ export class WorkerWebSocketServer {
 
     this.taskManager.addComment(taskId, 'system', `Task failed: ${error}`);
 
-    // Libérer le worker
+    // Release the worker
     const worker = this.workers.get(workerId);
     if (worker) {
       worker.taskId = null;
@@ -269,7 +269,7 @@ export class WorkerWebSocketServer {
     const { workerId, hookName, data } = message;
     console.log(`[WS] Hook event ${hookName} from worker ${workerId}`);
 
-    // TODO: Logger dans la base de connaissance si pertinent
+    // TODO: Log to knowledge base if relevant
   }
 
   private sendMessage(socket: WebSocket, message: Message): void {
@@ -285,6 +285,19 @@ export class WorkerWebSocketServer {
       taskId: w.taskId,
       connectedAt: w.connectedAt
     }));
+  }
+
+  /**
+   * Try to assign tasks to idle workers
+   */
+  tryAssignTasksToIdleWorkers(): void {
+    // Find all idle workers (not currently working on a task)
+    const idleWorkers = Array.from(this.workers.values()).filter(w => w.taskId === null);
+
+    // Try to assign a task to each idle worker
+    for (const worker of idleWorkers) {
+      this.tryAssignTask(worker.id, worker.type);
+    }
   }
 
   getPort(): number {

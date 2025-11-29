@@ -1,4 +1,4 @@
-// Types partagés pour tout le système
+// Shared types for the entire system
 
 export enum TaskStatus {
   BACKLOG = 'backlog',

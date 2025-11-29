@@ -39,7 +39,7 @@ export class RestAPI {
       res.json({ status: 'ok' });
     });
 
-    // Statistiques
+    // Statistics
     this.app.get('/stats', (req: Request, res: Response) => {
       const taskStats = this.taskManager.getStats();
       const workers = this.wsServer.getWorkers();
@@ -53,7 +53,7 @@ export class RestAPI {
       });
     });
 
-    // Créer une tâche
+    // Create a task
     this.app.post('/tasks', (req: Request, res: Response) => {
       try {
         const { description, priority, metadata } = req.body;
@@ -68,6 +68,9 @@ export class RestAPI {
           ...metadata
         });
 
+        // Try to assign the task to an available worker
+        this.wsServer.tryAssignTasksToIdleWorkers();
+
         res.status(201).json(task);
       } catch (error) {
         console.error('[API] Error creating task:', error);
@@ -75,7 +78,7 @@ export class RestAPI {
       }
     });
 
-    // Lister toutes les tâches
+    // List all tasks
     this.app.get('/tasks', (req: Request, res: Response) => {
       try {
         const { status } = req.query;
@@ -94,7 +97,7 @@ export class RestAPI {
       }
     });
 
-    // Obtenir une tâche spécifique
+    // Get a specific task
     this.app.get('/tasks/:id', (req: Request, res: Response) => {
       try {
         const task = this.taskManager.getTask(req.params.id);
@@ -111,7 +114,7 @@ export class RestAPI {
       }
     });
 
-    // Mettre à jour le statut d'une tâche
+    // Update task status
     this.app.patch('/tasks/:id/status', (req: Request, res: Response) => {
       try {
         const { status } = req.body;
@@ -131,7 +134,7 @@ export class RestAPI {
       }
     });
 
-    // Ajouter un commentaire à une tâche
+    // Add a comment to a task
     this.app.post('/tasks/:id/comments', (req: Request, res: Response) => {
       try {
         const { author, content } = req.body;
@@ -151,7 +154,35 @@ export class RestAPI {
       }
     });
 
-    // Lister les workers
+    // Delete a task
+    this.app.delete('/tasks/:id', (req: Request, res: Response) => {
+      try {
+        const deleted = this.taskManager.deleteTask(req.params.id);
+
+        if (!deleted) {
+          res.status(404).json({ error: 'Task not found' });
+          return;
+        }
+
+        res.json({ message: 'Task deleted successfully' });
+      } catch (error) {
+        console.error('[API] Error deleting task:', error);
+        res.status(500).json({ error: (error as Error).message });
+      }
+    });
+
+    // Clear all tasks
+    this.app.delete('/tasks', (req: Request, res: Response) => {
+      try {
+        const count = this.taskManager.clearAllTasks();
+        res.json({ message: `Cleared ${count} tasks` });
+      } catch (error) {
+        console.error('[API] Error clearing tasks:', error);
+        res.status(500).json({ error: (error as Error).message });
+      }
+    });
+
+    // List workers
     this.app.get('/workers', (req: Request, res: Response) => {
       try {
         const workers = this.wsServer.getWorkers();

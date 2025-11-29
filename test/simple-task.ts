@@ -2,6 +2,9 @@
  * Simple test script to create a task and verify the system works
  */
 
+// Mark as ES module to allow top-level await
+export {};
+
 const REST_API_URL = 'http://localhost:3737';
 
 async function createTestTask(): Promise<void> {

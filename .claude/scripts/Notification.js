@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 // @formatter:off
-// Récupérer tous les arguments
+// Get all arguments
 const args = process.argv.slice(2);
 const env = process.env;
 
@@ -16,15 +16,15 @@ process.stdin.on('data', (chunk) => {
 });
 
 process.stdin.on('end', () => {
-  // Parser le JSON du stdin
+  // Parse stdin JSON
   let parsedStdin = null;
   try {
     parsedStdin = JSON.parse(stdinData);
   } catch (e) {
-    parsedStdin = stdinData; // Garder comme string si le parsing échoue
+    parsedStdin = stdinData; // Keep as string if parsing fails
   }
 
-  // Préparer le contenu à écrire avec stdin, args et env
+  // Prepare content to write with stdin, args and env
   const content = {
     timestamp: new Date().toISOString(),
     stdin: parsedStdin,
@@ -37,7 +37,7 @@ process.stdin.on('end', () => {
       }, {})
   };
 
-  // Écrire dans la racine du projet (utiliser CLAUDE_PROJECT_DIR)
+  // Write to project root (use CLAUDE_PROJECT_DIR)
   const projectDir = env.CLAUDE_PROJECT_DIR || path.join(__dirname, '..', '..');
   fs.appendFileSync(
     path.join(projectDir, 'Notification.json'),
