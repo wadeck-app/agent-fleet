@@ -16,6 +16,8 @@ import {
 } from '../shared/types.js';
 import { createMessage, parseMessage, serializeMessage } from '../shared/protocol.js';
 import { TaskManager } from './task-manager.js';
+import { StateManager } from '../shared/state-manager.js';
+import { Logger } from '../shared/logger.js';
 
 interface WorkerConnection extends WorkerInfo {
   socket: WebSocket;
@@ -26,10 +28,12 @@ export class WorkerWebSocketServer {
   private workers: Map<string, WorkerConnection>;
   private nextWorkerNum: number = 1;
   private taskManager: TaskManager;
+  private stateManager: StateManager;
   private port: number;
 
   constructor(taskManager: TaskManager, port: number = 3738) {
     this.taskManager = taskManager;
+    this.stateManager = StateManager.getInstance();
     this.port = port;
     this.workers = new Map();
     this.wss = new WebSocketServer({ port: this.port });
@@ -38,15 +42,15 @@ export class WorkerWebSocketServer {
 
   private setupServer(): void {
     this.wss.on('connection', (socket: WebSocket) => {
-      console.log('[WS] New worker connection');
+      Logger.log('[WS] New worker connection');
       this.handleConnection(socket);
     });
 
     this.wss.on('error', (error) => {
-      console.error('[WS] Server error:', error);
+      Logger.error('[WS] Server error:', error);
     });
 
-    console.log(`[WS] WebSocket server listening on port ${this.port}`);
+    Logger.log(`[WS] WebSocket server listening on port ${this.port}`);
   }
 
   private handleConnection(socket: WebSocket): void {
@@ -56,14 +60,13 @@ export class WorkerWebSocketServer {
       try {
         const message = parseMessage(data.toString());
 
-        // If it's a WORKER_READY, register the worker
-        if (message.type === MessageType.WORKER_READY) {
-          workerId = (message as WorkerReadyMessage).workerId;
+        const result = this.handleMessage(socket, message, workerId);
+        // If handleMessage returns a workerId, update it
+        if (result && typeof result === 'string') {
+          workerId = result;
         }
-
-        this.handleMessage(socket, message, workerId);
       } catch (error) {
-        console.error('[WS] Error parsing message:', (error as Error).message);
+        Logger.error('[WS] Error parsing message:', (error as Error).message);
         this.sendMessage(socket, createMessage(MessageType.ERROR, {
           error: (error as Error).message
         }));
@@ -72,7 +75,7 @@ export class WorkerWebSocketServer {
 
     socket.on('close', () => {
       if (workerId) {
-        console.log(`[WS] Worker ${workerId} disconnected`);
+        Logger.log(`[WS] Worker ${workerId} disconnected`);
         const worker = this.workers.get(workerId);
 
         // Release the task if the worker was working on it
@@ -80,25 +83,27 @@ export class WorkerWebSocketServer {
           try {
             this.taskManager.unassignTask(worker.taskId);
           } catch (error) {
-            console.error(`[WS] Error unassigning task: ${(error as Error).message}`);
+            Logger.error(`[WS] Error unassigning task: ${(error as Error).message}`);
           }
         }
 
         this.workers.delete(workerId);
+
+        this.stateManager.emitWorkerDisconnected(workerId);
       }
     });
 
     socket.on('error', (error) => {
-      console.error('[WS] Socket error:', error);
+      Logger.error('[WS] Socket error:', error);
     });
   }
 
-  private handleMessage(socket: WebSocket, message: Message, workerId: string | null): void {
-    console.log(`[WS] Received ${message.type} from ${workerId || 'unknown'}`);
+  private handleMessage(socket: WebSocket, message: Message, workerId: string | null): string | void {
+    Logger.log(`[WS] Received ${message.type} from ${workerId || 'unknown'}`);
 
     switch (message.type) {
       case MessageType.WORKER_READY:
-        this.handleWorkerReady(socket, message as WorkerReadyMessage);
+        return this.handleWorkerReady(socket, message as WorkerReadyMessage);
         break;
 
       case MessageType.WORKER_HEARTBEAT:
@@ -138,7 +143,7 @@ export class WorkerWebSocketServer {
     }
   }
 
-  private handleWorkerReady(socket: WebSocket, message: WorkerReadyMessage): void {
+  private handleWorkerReady(socket: WebSocket, message: WorkerReadyMessage): string {
     const { workerType } = message;
 
     const workerId = '' + ++this.nextWorkerNum;
@@ -152,26 +157,35 @@ export class WorkerWebSocketServer {
     };
 
     this.workers.set(workerId, worker);
-    
-    console.log(`[WS] Worker ${workerId} (${workerType}) is ready`);
+
+    Logger.log(`[WS] Worker ${workerId} (${workerType}) is ready`);
+
+    this.stateManager.emitWorkerConnected({
+      id: workerId,
+      type: workerType,
+      taskId: null,
+      connectedAt: worker.connectedAt
+    });
 
     // Send Welcome
     this.sendMessage(socket, createMessage(MessageType.WORKER_WELCOME, { workerId }));
 
     // Assign a task if available
     this.tryAssignTask(workerId, workerType);
+
+    return workerId;
   }
 
   private tryAssignTask(workerId: string, workerType: WorkerType): void {
     const task = this.taskManager.getNextTaskForWorker(workerType);
     if (!task) {
-      console.log(`[WS] No task available for ${workerType} worker ${workerId}`);
+      Logger.log(`[WS] No task available for ${workerType} worker ${workerId}`);
       return;
     }
 
     const worker = this.workers.get(workerId);
     if (!worker) {
-      console.error(`[WS] Worker ${workerId} not found`);
+      Logger.error(`[WS] Worker ${workerId} not found`);
       return;
     }
 
@@ -179,17 +193,19 @@ export class WorkerWebSocketServer {
     this.taskManager.assignTask(task.id, workerId, workerType);
     worker.taskId = task.id;
 
+    this.stateManager.emitWorkerTaskAssigned(workerId, task.id);
+
     // Send the task to the worker
     this.sendMessage(worker.socket, createMessage(MessageType.ASSIGN_TASK, {
       task
     }));
 
-    console.log(`[WS] Assigned task ${task.id} to worker ${workerId}`);
+    Logger.log(`[WS] Assigned task ${task.id} to worker ${workerId}`);
   }
 
   private handleTaskStarted(message: TaskStartedMessage): void {
     const { workerId, taskId, newStatus } = message;
-    console.log(`[WS] Worker ${workerId} started task ${taskId}`);
+    Logger.log(`[WS] Worker ${workerId} started task ${taskId}`);
 
     const status = newStatus || TaskStatus.IN_PROGRESS;
     this.taskManager.updateTaskStatus(taskId, status, {
@@ -200,14 +216,14 @@ export class WorkerWebSocketServer {
 
   private handleTaskProgress(message: TaskProgressMessage): void {
     const { workerId, taskId, progress } = message;
-    console.log(`[WS] Worker ${workerId} progress on task ${taskId}: ${progress}`);
+    Logger.log(`[WS] Worker ${workerId} progress on task ${taskId}: ${progress}`);
 
     this.taskManager.addComment(taskId, `worker-${workerId}`, progress);
   }
 
   private handleTaskCompleted(message: TaskCompletedMessage): void {
     const { workerId, taskId, result, newStatus } = message;
-    console.log(`[WS] Worker ${workerId} completed task ${taskId}`);
+    Logger.log(`[WS] Worker ${workerId} completed task ${taskId}`);
 
     const status = newStatus || TaskStatus.REVIEW;
     this.taskManager.updateTaskStatus(taskId, status, {
@@ -220,6 +236,9 @@ export class WorkerWebSocketServer {
     const worker = this.workers.get(workerId);
     if (worker) {
       worker.taskId = null;
+
+      this.stateManager.emitWorkerTaskReleased(workerId);
+
       // Try to assign a new task
       this.tryAssignTask(workerId, worker.type);
     }
@@ -227,7 +246,7 @@ export class WorkerWebSocketServer {
 
   private handleTaskFailed(message: TaskFailedMessage): void {
     const { workerId, taskId, error } = message;
-    console.error(`[WS] Worker ${workerId} failed task ${taskId}: ${error}`);
+    Logger.error(`[WS] Worker ${workerId} failed task ${taskId}: ${error}`);
 
     this.taskManager.updateTaskStatus(taskId, TaskStatus.BLOCKED, {
       event: 'failed',
@@ -241,12 +260,14 @@ export class WorkerWebSocketServer {
     const worker = this.workers.get(workerId);
     if (worker) {
       worker.taskId = null;
+
+      this.stateManager.emitWorkerTaskReleased(workerId);
     }
   }
 
   private handleTaskQuestion(message: TaskQuestionMessage): void {
     const { workerId, taskId, question } = message;
-    console.log(`[WS] Worker ${workerId} has a question on task ${taskId}`);
+    Logger.log(`[WS] Worker ${workerId} has a question on task ${taskId}`);
 
     this.taskManager.updateTaskStatus(taskId, TaskStatus.BLOCKED, {
       event: 'question_raised',
@@ -259,7 +280,7 @@ export class WorkerWebSocketServer {
 
   private handleStopRequested(message: StopRequestedMessage): void {
     const { workerId, taskId } = message;
-    console.log(`[WS] Stop requested from worker ${workerId}, task ${taskId}`);
+    Logger.log(`[WS] Stop requested from worker ${workerId}, task ${taskId}`);
 
     const worker = this.workers.get(workerId);
     if (worker) {
@@ -271,7 +292,7 @@ export class WorkerWebSocketServer {
 
   private handleHookEvent(message: HookEventMessage): void {
     const { workerId, hookName, data } = message;
-    console.log(`[WS] Hook event ${hookName} from worker ${workerId}`);
+    Logger.log(`[WS] Hook event ${hookName} from worker ${workerId}`);
 
     // TODO: Log to knowledge base if relevant
   }
@@ -317,7 +338,7 @@ export class WorkerWebSocketServer {
       this.workers.clear();
 
       this.wss.close(() => {
-        console.log('[WS] WebSocket server stopped');
+        Logger.log('[WS] WebSocket server stopped');
         resolve();
       });
     });

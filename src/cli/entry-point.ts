@@ -103,9 +103,43 @@ async function showStats(): Promise<void> {
   }
 }
 
+// @formatter:off
+async function resolvePartialTaskId(partialId: string): Promise<string> {
+  try {
+    const response = await fetch(`${REST_API_URL}/tasks`);
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch tasks');
+    }
+
+    const tasks = await response.json() as Task[];
+    const matches = tasks.filter(task => task.id.startsWith(partialId));
+
+    if (matches.length === 0) {
+      throw new Error(`No task found with ID starting with "${partialId}"`);
+    }
+
+    if (matches.length > 1) {
+      console.error(`❌ Ambiguous task ID "${partialId}". Multiple matches found:`);
+      matches.forEach(task => {
+        console.error(`   ${task.id} - ${task.description.substring(0, 60)}${task.description.length > 60 ? '...' : ''}`);
+      });
+      throw new Error('Please provide a more specific task ID');
+    }
+
+    return matches[0].id;
+  } catch (error) {
+    throw error;
+  }
+}
+// @formatter:on
+
 async function deleteTask(taskId: string): Promise<void> {
   try {
-    const response = await fetch(`${REST_API_URL}/tasks/${taskId}`, {
+    // Resolve partial ID to full ID
+    const fullTaskId = await resolvePartialTaskId(taskId);
+
+    const response = await fetch(`${REST_API_URL}/tasks/${fullTaskId}`, {
       method: 'DELETE'
     });
 
@@ -114,7 +148,7 @@ async function deleteTask(taskId: string): Promise<void> {
       throw new Error(error.error || 'Failed to delete task');
     }
 
-    console.log(`✅ Task ${taskId} deleted successfully`);
+    console.log(`✅ Task ${fullTaskId.substring(0, 8)}... deleted successfully`);
   } catch (error) {
     console.error('❌ Error deleting task:', (error as Error).message);
     process.exit(1);
@@ -150,11 +184,14 @@ if (!command) {
   console.log('  npm run add-task stats');
   console.log('  npm run add-task delete <taskId>');
   console.log('  npm run add-task clear');
+  console.log('\nNote: Task IDs support partial matching (like git commit hashes).');
+  console.log('      You can use just the first few characters if unique.');
   console.log('\nExamples:');
   console.log('  npm run add-task create "Add authentication system" high');
   console.log('  npm run add-task list');
   console.log('  npm run add-task stats');
-  console.log('  npm run add-task delete abc123...');
+  console.log('  npm run add-task delete abc123    # partial ID');
+  console.log('  npm run add-task delete abc123-456-789...  # full ID also works');
   console.log('  npm run add-task clear');
   process.exit(0);
 }
@@ -184,6 +221,7 @@ switch (command) {
     if (!args[1]) {
       console.error('❌ Error: Task ID is required');
       console.log('Usage: npm run add-task delete <taskId>');
+      console.log('Note: You can use a partial ID (e.g., first 6-8 characters)');
       process.exit(1);
     }
     await deleteTask(args[1]);

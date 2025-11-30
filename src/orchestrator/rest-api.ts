@@ -2,6 +2,7 @@ import express, { Express, Request, Response } from 'express';
 import { TaskManager } from './task-manager.js';
 import { WorkerWebSocketServer } from './websocket-server.js';
 import { TaskStatus } from '../shared/types.js';
+import { Logger } from '../shared/logger.js';
 
 export class RestAPI {
   private app: Express;
@@ -28,7 +29,7 @@ export class RestAPI {
 
     // Logger middleware
     this.app.use((req, res, next) => {
-      console.log(`[API] ${req.method} ${req.path}`);
+      Logger.log(`[API] ${req.method} ${req.path}`);
       next();
     });
   }
@@ -73,7 +74,7 @@ export class RestAPI {
 
         res.status(201).json(task);
       } catch (error) {
-        console.error('[API] Error creating task:', error);
+        Logger.error('[API] Error creating task:', error);
         res.status(500).json({ error: (error as Error).message });
       }
     });
@@ -92,7 +93,7 @@ export class RestAPI {
 
         res.json(tasks);
       } catch (error) {
-        console.error('[API] Error listing tasks:', error);
+        Logger.error('[API] Error listing tasks:', error);
         res.status(500).json({ error: (error as Error).message });
       }
     });
@@ -109,7 +110,7 @@ export class RestAPI {
 
         res.json(task);
       } catch (error) {
-        console.error('[API] Error getting task:', error);
+        Logger.error('[API] Error getting task:', error);
         res.status(500).json({ error: (error as Error).message });
       }
     });
@@ -129,7 +130,7 @@ export class RestAPI {
 
         res.json(task);
       } catch (error) {
-        console.error('[API] Error updating task status:', error);
+        Logger.error('[API] Error updating task status:', error);
         res.status(500).json({ error: (error as Error).message });
       }
     });
@@ -149,7 +150,7 @@ export class RestAPI {
 
         res.json(task);
       } catch (error) {
-        console.error('[API] Error adding comment:', error);
+        Logger.error('[API] Error adding comment:', error);
         res.status(500).json({ error: (error as Error).message });
       }
     });
@@ -166,7 +167,7 @@ export class RestAPI {
 
         res.json({ message: 'Task deleted successfully' });
       } catch (error) {
-        console.error('[API] Error deleting task:', error);
+        Logger.error('[API] Error deleting task:', error);
         res.status(500).json({ error: (error as Error).message });
       }
     });
@@ -177,7 +178,7 @@ export class RestAPI {
         const count = this.taskManager.clearAllTasks();
         res.json({ message: `Cleared ${count} tasks` });
       } catch (error) {
-        console.error('[API] Error clearing tasks:', error);
+        Logger.error('[API] Error clearing tasks:', error);
         res.status(500).json({ error: (error as Error).message });
       }
     });
@@ -188,7 +189,7 @@ export class RestAPI {
         const workers = this.wsServer.getWorkers();
         res.json(workers);
       } catch (error) {
-        console.error('[API] Error listing workers:', error);
+        Logger.error('[API] Error listing workers:', error);
         res.status(500).json({ error: (error as Error).message });
       }
     });
@@ -197,7 +198,7 @@ export class RestAPI {
   start(): Promise<void> {
     return new Promise((resolve) => {
       this.server = this.app.listen(this.port, () => {
-        console.log(`[API] REST API listening on port ${this.port}`);
+        Logger.log(`[API] REST API listening on port ${this.port}`);
         resolve();
       });
     });
@@ -207,7 +208,7 @@ export class RestAPI {
     return new Promise((resolve) => {
       if (this.server) {
         this.server.close(() => {
-          console.log('[API] REST API stopped');
+          Logger.log('[API] REST API stopped');
           resolve();
         });
       } else {

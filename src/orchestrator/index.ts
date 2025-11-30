@@ -1,6 +1,8 @@
 import { TaskManager } from './task-manager.js';
 import { WorkerWebSocketServer } from './websocket-server.js';
 import { RestAPI } from './rest-api.js';
+import { renderUI } from './ui.js';
+import { Logger } from '../shared/logger.js';
 
 const REST_PORT = 3737;
 const WS_PORT = 3738;
@@ -9,9 +11,10 @@ class Orchestrator {
   private taskManager: TaskManager;
   private wsServer: WorkerWebSocketServer;
   private restAPI: RestAPI;
+  private uiInstance: any;
 
   constructor() {
-    console.log('[Orchestrator] Initializing...');
+    Logger.log('[Orchestrator] Initializing...');
 
     this.taskManager = new TaskManager();
     this.wsServer = new WorkerWebSocketServer(this.taskManager, WS_PORT);
@@ -21,33 +24,23 @@ class Orchestrator {
   async start(): Promise<void> {
     process.title = 'Orchestrator';
 
-    console.log('[Orchestrator] Starting servers...');
-
     // WebSocket server starts automatically in its constructor
     await this.restAPI.start();
 
-    console.log('\n=================================================');
-    console.log('🚀 Agent Fleet Orchestrator is running!');
-    console.log('=================================================');
-    console.log(`📡 REST API:     http://localhost:${REST_PORT}`);
-    console.log(`🔌 WebSocket:    ws://localhost:${WS_PORT}`);
-    console.log('=================================================\n');
-    console.log('Available endpoints:');
-    console.log(`  GET    /health                - Health check`);
-    console.log(`  GET    /stats                 - System statistics`);
-    console.log(`  POST   /tasks                 - Create a new task`);
-    console.log(`  GET    /tasks                 - List all tasks`);
-    console.log(`  GET    /tasks/:id             - Get task details`);
-    console.log(`  PATCH  /tasks/:id/status      - Update task status`);
-    console.log(`  POST   /tasks/:id/comments    - Add comment to task`);
-    console.log(`  GET    /workers               - List connected workers\n`);
+    // Render the UI
+    this.uiInstance = renderUI(this.taskManager, this.wsServer);
   }
 
   async stop(): Promise<void> {
-    console.log('[Orchestrator] Shutting down...');
+    // Unmount the UI first
+    if (this.uiInstance) {
+      this.uiInstance.unmount();
+    }
+
+    Logger.log('[Orchestrator] Shutting down...');
     await this.restAPI.stop();
     await this.wsServer.stop();
-    console.log('[Orchestrator] Stopped');
+    Logger.log('[Orchestrator] Stopped');
   }
 }
 

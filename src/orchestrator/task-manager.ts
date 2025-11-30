@@ -1,12 +1,16 @@
 import { Storage } from '../shared/storage.js';
 import { Task, TaskStatus, WorkerType, TaskHistoryEntry } from '../shared/types.js';
+import { StateManager } from '../shared/state-manager.js';
+import { Logger } from '../shared/logger.js';
 import { v4 as uuidv4 } from 'uuid';
 
 export class TaskManager {
   private tasks: Map<string, Task>;
+  private stateManager: StateManager;
 
   constructor() {
     this.tasks = new Map();
+    this.stateManager = StateManager.getInstance();
     this.loadTasks();
   }
 
@@ -18,7 +22,7 @@ export class TaskManager {
     tasks.forEach(task => {
       this.tasks.set(task.id, task);
     });
-    console.log(`[TaskManager] Loaded ${this.tasks.size} tasks`);
+    Logger.log(`[TaskManager] Loaded ${this.tasks.size} tasks`);
   }
 
   /**
@@ -49,7 +53,9 @@ export class TaskManager {
 
     this.tasks.set(task.id, task);
     Storage.saveTask(task);
-    console.log(`[TaskManager] Created task ${task.id}: ${description.substring(0, 50)}...`);
+    Logger.log(`[TaskManager] Created task ${task.id}: ${description.substring(0, 50)}...`);
+
+    this.stateManager.emitTaskCreated(task);
     return task;
   }
 
@@ -80,7 +86,9 @@ export class TaskManager {
     });
 
     Storage.saveTask(task);
-    console.log(`[TaskManager] Task ${taskId} status: ${oldStatus} → ${newStatus}`);
+    Logger.log(`[TaskManager] Task ${taskId} status: ${oldStatus} → ${newStatus}`);
+
+    this.stateManager.emitTaskUpdated(task);
   }
 
   /**
@@ -103,7 +111,9 @@ export class TaskManager {
     });
 
     Storage.saveTask(task);
-    console.log(`[TaskManager] Task ${taskId} assigned to ${workerType} worker ${workerId}`);
+    Logger.log(`[TaskManager] Task ${taskId} assigned to ${workerType} worker ${workerId}`);
+
+    this.stateManager.emitTaskUpdated(task);
   }
 
   /**
@@ -124,7 +134,9 @@ export class TaskManager {
     });
 
     Storage.saveTask(task);
-    console.log(`[TaskManager] Task ${taskId} unassigned`);
+    Logger.log(`[TaskManager] Task ${taskId} unassigned`);
+
+    this.stateManager.emitTaskUpdated(task);
   }
 
   /**
@@ -144,6 +156,8 @@ export class TaskManager {
 
     task.updatedAt = new Date().toISOString();
     Storage.saveTask(task);
+
+    this.stateManager.emitTaskUpdated(task);
   }
 
   /**
@@ -217,7 +231,9 @@ export class TaskManager {
     // Remove from memory
     this.tasks.delete(taskId);
 
-    console.log(`[TaskManager] Deleted task ${taskId}`);
+    Logger.log(`[TaskManager] Deleted task ${taskId}`);
+
+    this.stateManager.emitTaskDeleted(taskId);
     return true;
   }
 
@@ -227,15 +243,16 @@ export class TaskManager {
   clearAllTasks(): number {
     const count = this.tasks.size;
 
-    // Delete all from storage
+    // Delete all from storage and emit events
     for (const taskId of this.tasks.keys()) {
       Storage.deleteTask(taskId);
+      this.stateManager.emitTaskDeleted(taskId);
     }
 
     // Clear memory
     this.tasks.clear();
 
-    console.log(`[TaskManager] Cleared ${count} tasks`);
+    Logger.log(`[TaskManager] Cleared ${count} tasks`);
     return count;
   }
 
