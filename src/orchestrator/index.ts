@@ -19,6 +19,8 @@ class Orchestrator {
   }
 
   async start(): Promise<void> {
+    process.title = 'Orchestrator';
+
     console.log('[Orchestrator] Starting servers...');
 
     // WebSocket server starts automatically in its constructor

@@ -1,14 +1,14 @@
 import WebSocket from 'ws';
-import { v4 as uuidv4 } from 'uuid';
 import {
-  Message,
-  MessageType,
-  WorkerType,
-  Task,
-  AssignTaskMessage,
-  KillClaudeMessage
+	AssignTaskMessage,
+	KillClaudeMessage,
+	Message,
+	MessageType,
+	Task,
+	WorkerType,
+	WorkerWelcomeMessage
 } from '../shared/types.js';
-import { createMessage, parseMessage, serializeMessage } from '../shared/protocol.js';
+import {createMessage, parseMessage, serializeMessage} from '../shared/protocol.js';
 
 export abstract class BaseWorker {
   protected workerId: string;
@@ -21,7 +21,8 @@ export abstract class BaseWorker {
   private heartbeatTimer: NodeJS.Timeout | null = null;
 
   constructor(workerType: WorkerType, wsUrl: string = 'ws://localhost:3738') {
-    this.workerId = uuidv4();
+    // Actual value will be assigned by the orchestrator during Welcome
+    this.workerId = '?';
     this.workerType = workerType;
     this.wsUrl = wsUrl;
   }
@@ -30,13 +31,15 @@ export abstract class BaseWorker {
    * Connect to the orchestrator
    */
   async connect(): Promise<void> {
+    process.title = 'Worker X';
+    
     return new Promise((resolve, reject) => {
-      console.log(`[Worker ${this.workerId}] Connecting to ${this.wsUrl}...`);
+      console.log(`${this.logPrefix()} Connecting to ${this.wsUrl}...`);
 
       this.ws = new WebSocket(this.wsUrl);
 
       this.ws.on('open', () => {
-        console.log(`[Worker ${this.workerId}] Connected`);
+        console.log(`${this.logPrefix()} Connected`);
         this.sendWorkerReady();
         this.startHeartbeat();
         resolve();
@@ -47,18 +50,18 @@ export abstract class BaseWorker {
           const message = parseMessage(data.toString());
           this.handleMessage(message);
         } catch (error) {
-          console.error(`[Worker ${this.workerId}] Error parsing message:`, (error as Error).message);
+          console.error(`${this.logPrefix()} Error parsing message:`, (error as Error).message);
         }
       });
 
       this.ws.on('close', () => {
-        console.log(`[Worker ${this.workerId}] Disconnected`);
+        console.log(`${this.logPrefix()} Disconnected`);
         this.stopHeartbeat();
         this.scheduleReconnect();
       });
 
       this.ws.on('error', (error) => {
-        console.error(`[Worker ${this.workerId}] WebSocket error:`, error);
+        console.error(`${this.logPrefix()} WebSocket error:`, error);
         reject(error);
       });
     });
@@ -69,7 +72,6 @@ export abstract class BaseWorker {
    */
   private sendWorkerReady(): void {
     this.sendMessage(createMessage(MessageType.WORKER_READY, {
-      workerId: this.workerId,
       workerType: this.workerType
     }));
   }
@@ -99,10 +101,10 @@ export abstract class BaseWorker {
    * Schedule reconnection
    */
   private scheduleReconnect(): void {
-    console.log(`[Worker ${this.workerId}] Reconnecting in ${this.reconnectDelay}ms...`);
+    console.log(`${this.logPrefix()} Reconnecting in ${this.reconnectDelay}ms...`);
     setTimeout(() => {
       this.connect().catch((error) => {
-        console.error(`[Worker ${this.workerId}] Reconnection failed:`, error);
+        console.error(`${this.logPrefix()} Reconnection failed:`, error);
       });
     }, this.reconnectDelay);
   }
@@ -116,6 +118,10 @@ export abstract class BaseWorker {
         // Acknowledgment received
         break;
 
+      case MessageType.WORKER_WELCOME:
+        this.handleWelcome(message as WorkerWelcomeMessage);
+        break;
+
       case MessageType.ASSIGN_TASK:
         this.handleAssignTask(message as AssignTaskMessage);
         break;
@@ -125,23 +131,33 @@ export abstract class BaseWorker {
         break;
 
       case MessageType.PAUSE:
-        console.log(`[Worker ${this.workerId}] Received PAUSE`);
+        console.log(`${this.logPrefix()} Received PAUSE`);
         // TODO: Implement pause logic
         break;
 
       case MessageType.RESUME:
-        console.log(`[Worker ${this.workerId}] Received RESUME`);
+        console.log(`${this.logPrefix()} Received RESUME`);
         // TODO: Implement resume logic
         break;
 
       case MessageType.SHUTDOWN:
-        console.log(`[Worker ${this.workerId}] Received SHUTDOWN`);
+        console.log(`${this.logPrefix()} Received SHUTDOWN`);
         this.shutdown();
         break;
 
       default:
-        console.warn(`[Worker ${this.workerId}] Unknown message type: ${message.type}`);
+        console.warn(`${this.logPrefix()} Unknown message type: ${message.type}`);
     }
+  }
+
+  /**
+   * Handle task assignment
+   */
+  private async handleWelcome(message: WorkerWelcomeMessage): Promise<void> {
+    this.workerId = message.workerId;
+    process.title = `Worker ${this.workerId}`;
+
+    console.log(`${this.logPrefix()} Welcome received with assigned id=${message.workerId}`);
   }
 
   /**
@@ -149,12 +165,12 @@ export abstract class BaseWorker {
    */
   private async handleAssignTask(message: AssignTaskMessage): Promise<void> {
     this.currentTask = message.task;
-    console.log(`[Worker ${this.workerId}] Assigned task ${this.currentTask.id}: ${this.currentTask.description}`);
+    console.log(`${this.logPrefix()} Assigned task ${this.currentTask.id}: ${this.currentTask.description}`);
 
     try {
       await this.executeTask(this.currentTask);
     } catch (error) {
-      console.error(`[Worker ${this.workerId}] Task execution error:`, error);
+      console.error(`${this.logPrefix()} Task execution error:`, error);
       this.sendTaskFailed((error as Error).message);
     }
   }
@@ -163,7 +179,7 @@ export abstract class BaseWorker {
    * Handle kill Claude request
    */
   private handleKillClaude(message: KillClaudeMessage): void {
-    console.log(`[Worker ${this.workerId}] Kill Claude requested: ${message.reason}`);
+    console.log(`${this.logPrefix()} Kill Claude requested: ${message.reason}`);
     // TODO: Implement Claude process killing
   }
 
@@ -273,15 +289,19 @@ export abstract class BaseWorker {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(serializeMessage(message));
     } else {
-      console.error(`[Worker ${this.workerId}] Cannot send message, not connected`);
+      console.error(`${this.logPrefix()} Cannot send message, not connected`);
     }
   }
 
+  protected logPrefix() {
+    return `[Worker ${this.workerId}] `;
+  }
+  
   /**
    * Shutdown the worker
    */
   shutdown(): void {
-    console.log(`[Worker ${this.workerId}] Shutting down...`);
+    console.log(`${this.logPrefix()} Shutting down...`);
     this.stopHeartbeat();
     if (this.ws) {
       this.ws.close();

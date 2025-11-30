@@ -26,7 +26,7 @@ export class DevWorker extends BaseWorker {
   }
 
   protected async executeTask(task: Task): Promise<void> {
-    console.log(`[DevWorker ${this.workerId}] Starting task execution...`);
+    console.log(`${this.logPrefix()} Starting task execution...`);
 
     this.sendTaskStarted(TaskStatus.IN_PROGRESS);
 
@@ -50,9 +50,9 @@ export class DevWorker extends BaseWorker {
         TaskStatus.REVIEW
       );
 
-      console.log(`[DevWorker ${this.workerId}] Task completed successfully`);
+      console.log(`${this.logPrefix()} Task completed successfully`);
     } catch (error) {
-      console.error(`[DevWorker ${this.workerId}] Task failed:`, error);
+      console.error(`${this.logPrefix()} Task failed:`, error);
       throw error;
     }
   }
@@ -68,12 +68,12 @@ export class DevWorker extends BaseWorker {
       const address = this.claudeWss!.address();
       if (typeof address === 'object' && address !== null) {
         this.claudeWsPort = address.port;
-        console.log(`[DevWorker ${this.workerId}] Claude WebSocket server listening on port ${this.claudeWsPort}`);
+        console.log(`${this.logPrefix()} Claude WebSocket server listening on port ${this.claudeWsPort}`);
       }
     });
 
     this.claudeWss.on('connection', (socket: WebSocket) => {
-      console.log(`[DevWorker ${this.workerId}] Claude process connected to worker socket`);
+      console.log(`${this.logPrefix()} Claude process connected to worker socket`);
       this.claudeSocket = socket;
 
       socket.on('message', (data: Buffer) => {
@@ -81,22 +81,22 @@ export class DevWorker extends BaseWorker {
           const message = JSON.parse(data.toString());
           this.handleClaudeMessage(message);
         } catch (error) {
-          console.error(`[DevWorker ${this.workerId}] Error parsing Claude message:`, error);
+          console.error(`${this.logPrefix()} Error parsing Claude message:`, error);
         }
       });
 
       socket.on('close', () => {
-        console.log(`[DevWorker ${this.workerId}] Claude socket disconnected`);
+        console.log(`${this.logPrefix()} Claude socket disconnected`);
         this.claudeSocket = null;
       });
 
       socket.on('error', (error) => {
-        console.error(`[DevWorker ${this.workerId}] Claude socket error:`, error);
+        console.error(`${this.logPrefix()} Claude socket error:`, error);
       });
     });
 
     this.claudeWss.on('error', (error) => {
-      console.error(`[DevWorker ${this.workerId}] Claude WebSocket server error:`, error);
+      console.error(`${this.logPrefix()} Claude WebSocket server error:`, error);
     });
   }
 
@@ -106,16 +106,16 @@ export class DevWorker extends BaseWorker {
   private handleClaudeMessage(message: any): void {
     switch (message.type) {
       case 'STOP_REQUESTED':
-        console.log(`[DevWorker ${this.workerId}] Stop requested by Claude, killing process...`);
+        console.log(`${this.logPrefix()} Stop requested by Claude, killing process...`);
         this.killClaude();
         break;
 
       case 'HOOK_EVENT':
-        console.log(`[DevWorker ${this.workerId}] Hook event: ${message.hookName}`);
+        console.log(`${this.logPrefix()} Hook event: ${message.hookName}`);
         break;
 
       default:
-        console.log(`[DevWorker ${this.workerId}] Unknown message type: ${message.type}`);
+        console.log(`${this.logPrefix()} Unknown message type: ${message.type}`);
     }
   }
 
@@ -140,7 +140,7 @@ export class DevWorker extends BaseWorker {
         return execSync('which claude', { encoding: 'utf8' }).trim();
       }
     } catch (error) {
-      console.warn(`[DevWorker ${this.workerId}] Could not find claude in PATH, using 'claude' as fallback`);
+      console.warn(`${this.logPrefix()} Could not find claude in PATH, using 'claude' as fallback`);
       return 'claude';
     }
   }
@@ -182,7 +182,7 @@ export class DevWorker extends BaseWorker {
    */
   private async launchClaude(promptFile: string, contextDir: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      console.log(`[DevWorker ${this.workerId}] Launching Claude in ${this.interactive ? 'INTERACTIVE' : 'BACKGROUND'} mode...`);
+      console.log(`${this.logPrefix()} Launching Claude in ${this.interactive ? 'INTERACTIVE' : 'BACKGROUND'} mode...`);
 
       // Set environment variables for Claude hooks
       const env = {
@@ -232,8 +232,8 @@ export class DevWorker extends BaseWorker {
 
         this.claudeProcess.on('close', (code) => {
           const duration = ((Date.now() - this.claudeStartTime) / 1000).toFixed(2);
-          console.log(`[DevWorker ${this.workerId}] Claude exited with code ${code}`);
-          console.log(`[DevWorker ${this.workerId}] Execution time: ${duration}s`);
+          console.log(`${this.logPrefix()} Claude exited with code ${code}`);
+          console.log(`${this.logPrefix()} Execution time: ${duration}s`);
           this.claudeProcess = null;
 
           // In interactive mode, accept normal exit (0), taskkill (1), or signal (null)
@@ -245,7 +245,7 @@ export class DevWorker extends BaseWorker {
         });
 
         this.claudeProcess.on('error', (error) => {
-          console.error(`[DevWorker ${this.workerId}] Claude process error:`, error);
+          console.error(`${this.logPrefix()} Claude process error:`, error);
           this.claudeProcess = null;
           reject(error);
         });
@@ -302,8 +302,8 @@ export class DevWorker extends BaseWorker {
 
         this.claudeProcess.on('close', (code, signal) => {
           const duration = ((Date.now() - this.claudeStartTime) / 1000).toFixed(2);
-          console.log(`[DevWorker ${this.workerId}] Claude exited with code ${code}`);
-          console.log(`[DevWorker ${this.workerId}] Execution time: ${duration}s`);
+          console.log(`${this.logPrefix()} Claude exited with code ${code}`);
+          console.log(`${this.logPrefix()} Execution time: ${duration}s`);
           this.claudeProcess = null;
 
           if (code === 0) {
@@ -314,7 +314,7 @@ export class DevWorker extends BaseWorker {
         });
 
         this.claudeProcess.on('error', (error) => {
-          console.error(`[DevWorker ${this.workerId}] Claude process error:`, error);
+          console.error(`${this.logPrefix()} Claude process error:`, error);
           this.claudeProcess = null;
           reject(error);
         });
@@ -328,7 +328,7 @@ export class DevWorker extends BaseWorker {
   killClaude(): void {
     if (this.claudeProcess) {
       const pid = this.claudeProcess.pid;
-      console.log(`[DevWorker ${this.workerId}] Killing Claude process (PID: ${pid})...`);
+      console.log(`${this.logPrefix()} Killing Claude process (PID: ${pid})...`);
 
       try {
         if (pid && process.platform === 'win32') {
@@ -339,11 +339,11 @@ export class DevWorker extends BaseWorker {
               stdio: 'inherit', // Important: helps reset terminal state for Ctrl+C
               windowsHide: false
             });
-            console.log(`[DevWorker ${this.workerId}] Process killed successfully`);
+            console.log(`${this.logPrefix()} Process killed successfully`);
           } catch (killError: any) {
             // Process may have already exited
             if (!killError.message?.includes('not found')) {
-              console.error(`[DevWorker ${this.workerId}] Kill error:`, killError.message);
+              console.error(`${this.logPrefix()} Kill error:`, killError.message);
             }
           }
         } else if (this.claudeProcess) {
@@ -353,10 +353,14 @@ export class DevWorker extends BaseWorker {
 
         this.claudeProcess = null;
       } catch (error) {
-        console.error(`[DevWorker ${this.workerId}] Error killing process:`, error);
+        console.error(`${this.logPrefix()} Error killing process:`, error);
         this.claudeProcess = null;
       }
     }
+  }
+
+  protected logPrefix():string {
+    return `[DevWorker ${this.workerId}] `;
   }
 
   shutdown(): void {
@@ -364,9 +368,9 @@ export class DevWorker extends BaseWorker {
 
     // Close Claude WebSocket server
     if (this.claudeWss) {
-      console.log(`[DevWorker ${this.workerId}] Closing Claude WebSocket server...`);
+      console.log(`${this.logPrefix()} Closing Claude WebSocket server...`);
       this.claudeWss.close(() => {
-        console.log(`[DevWorker ${this.workerId}] Claude WebSocket server closed`);
+        console.log(`${this.logPrefix()} Claude WebSocket server closed`);
       });
       this.claudeWss = null;
     }

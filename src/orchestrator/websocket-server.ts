@@ -24,6 +24,7 @@ interface WorkerConnection extends WorkerInfo {
 export class WorkerWebSocketServer {
   private wss: WebSocketServer;
   private workers: Map<string, WorkerConnection>;
+  private nextWorkerNum: number = 1;
   private taskManager: TaskManager;
   private port: number;
 
@@ -138,7 +139,9 @@ export class WorkerWebSocketServer {
   }
 
   private handleWorkerReady(socket: WebSocket, message: WorkerReadyMessage): void {
-    const { workerId, workerType } = message;
+    const { workerType } = message;
+
+    const workerId = '' + ++this.nextWorkerNum;
 
     const worker: WorkerConnection = {
       id: workerId,
@@ -149,10 +152,11 @@ export class WorkerWebSocketServer {
     };
 
     this.workers.set(workerId, worker);
+    
     console.log(`[WS] Worker ${workerId} (${workerType}) is ready`);
 
-    // Send ACK
-    this.sendMessage(socket, createMessage(MessageType.ACK, { workerId }));
+    // Send Welcome
+    this.sendMessage(socket, createMessage(MessageType.WORKER_WELCOME, { workerId }));
 
     // Assign a task if available
     this.tryAssignTask(workerId, workerType);

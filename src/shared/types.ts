@@ -35,11 +35,15 @@ export enum MessageType {
   TASK_QUESTION = 'task_question',
 
   // Hook → Orchestrator (via Worker)
+  /** TODO Depreacated no?*/
   STOP_REQUESTED = 'stop_requested',
+  /** TODO Depreacated no?*/
   HOOK_EVENT = 'hook_event',
+  /** TODO Depreacated no?*/
   TOOL_RESULT = 'tool_result',
 
   // Orchestrator → Worker
+  WORKER_WELCOME = 'worker_welcome',
   ASSIGN_TASK = 'assign_task',
   KILL_CLAUDE = 'kill_claude',
   PAUSE = 'pause',
@@ -86,7 +90,6 @@ export interface BaseMessage {
 
 export interface WorkerReadyMessage extends BaseMessage {
   type: MessageType.WORKER_READY;
-  workerId: string;
   workerType: WorkerType;
 }
 
@@ -145,6 +148,11 @@ export interface HookEventMessage extends BaseMessage {
   data: any;
 }
 
+export interface WorkerWelcomeMessage extends BaseMessage {
+  type:MessageType.WORKER_WELCOME;
+  workerId: string;
+}
+
 export interface AssignTaskMessage extends BaseMessage {
   type: MessageType.ASSIGN_TASK;
   task: Task;
@@ -187,6 +195,8 @@ export type Message =
   | TaskQuestionMessage
   | StopRequestedMessage
   | HookEventMessage
+// Orchestrator → Worker
+  | WorkerWelcomeMessage
   | AssignTaskMessage
   | KillClaudeMessage
   | PauseMessage
