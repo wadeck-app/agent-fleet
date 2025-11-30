@@ -1,10 +1,8 @@
-import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import WebSocket from 'ws';
 
-// @formatter:off
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -46,10 +44,10 @@ process.stdin.on('end', () => {
 
   // Write to project root (use CLAUDE_PROJECT_DIR)
   const projectDir = env.CLAUDE_PROJECT_DIR || path.join(__dirname, '..', '..');
-  fs.appendFileSync(
-    path.join(projectDir, 'Stop.json'),
-    JSON.stringify(content, null, 2) + '\n---\n'
-  );
+  // fs.appendFileSync(
+  //   path.join(projectDir, 'Stop.json'),
+  //   JSON.stringify(content, null, 2) + '\n---\n'
+  // );
 
   console.log('Stop hook: data written to Stop.json');
 
@@ -57,7 +55,7 @@ process.stdin.on('end', () => {
   const logToFile = (message) => {
     const logPath = path.join(projectDir, 'Stop.txt');
     const timestamp = new Date().toISOString();
-    fs.appendFileSync(logPath, `[${timestamp}] ${message}\n`);
+//    fs.appendFileSync(logPath, `[${timestamp}] ${message}\n`);
   };
 
   // Check if stoppable mode is enabled
@@ -125,4 +123,3 @@ process.stdin.on('end', () => {
     logToFile('No CLAUDE_WORKER_SOCKET environment variable found');
   }
 });
-// @formatter:on

@@ -95,80 +95,29 @@ Provide:
           filesToModify: { type: 'object', transform: 'parseJSON' },
           complexity: { type: 'string', required: true },
         },
-        next: {
-          conditions: [
-            {
-              when: "output.complexity === 'high'",
-              goto: 'validate',
-            },
-          ],
-          default: 'implement',
-        },
-      },
-      {
-        type: 'model',
-        id: 'validate',
-        name: 'Validate with User',
-        model: 'haiku',
-        prompt: `High complexity detected. Review needed:
-\${{ steps.analyze.outputs.approach }}
-
-Proceed? (yes/no)`,
-        output: {
-          approved: { type: 'boolean', transform: 'parseBoolean' },
-        },
-        next: {
-          conditions: [
-            {
-              when: 'output.approved === false',
-              goto: 'end',
-            },
-          ],
-          default: 'implement',
-        },
       },
       {
         type: 'model',
         id: 'implement',
         name: 'Implement Solution',
         model: 'sonnet',
+        depends: ['analyze'],
         prompt: `Implement based on:
 \${{ steps.analyze.outputs.approach }}
 Files: \${{ steps.analyze.outputs.filesToModify }}`,
         context: {
           previousOutputs: ['analyze'],
         },
-        next: {
-          default: 'run-tests',
-        },
       },
       {
         type: 'script',
         id: 'run-tests',
         name: 'Run Tests',
+        depends: ['implement'],
         script: 'npm test',
         output: {
           exitCode: { type: 'number' },
           passed: { type: 'boolean' },
-        },
-        next: {
-          conditions: [
-            {
-              when: 'output.exitCode !== 0',
-              goto: 'fix',
-            },
-          ],
-          default: 'end',
-        },
-      },
-      {
-        type: 'model',
-        id: 'fix',
-        name: 'Fix Issues',
-        model: 'sonnet',
-        prompt: 'Fix test failures: ${{ steps.run-tests.outputs.stderr }}',
-        next: {
-          default: 'run-tests',
         },
       },
       {
@@ -176,6 +125,7 @@ Files: \${{ steps.analyze.outputs.filesToModify }}`,
         id: 'end',
         name: 'Complete',
         model: 'haiku',
+        depends: ['run-tests'],
         prompt: 'Summarize work done',
       },
     ],
@@ -322,7 +272,8 @@ export class FlowRegistry {
       name: data.name || data.id,
       context: data.context,
       output: data.output,
-      next: data.next,
+      depends: data.depends,
+      when: data.when,
       retry: data.retry,
       contract: data.contract,
     };

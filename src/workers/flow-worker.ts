@@ -13,20 +13,32 @@ import { WorkspaceManager } from '../flow/workspace-manager.js';
 import type { Workspace } from '../flow/types.js';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import { WebSocketServer, WebSocket } from 'ws';
+import { ChildProcess, execSync } from 'child_process';
 
 export class FlowWorker extends BaseWorker {
   private flowRegistry: FlowRegistry;
   private flowExecutor: FlowExecutor;
   private workspaceManager: WorkspaceManager;
+  private interactive: boolean;
+  private claudeWss: WebSocketServer | null = null;
+  private claudeWsPort: number = 0;
+  private claudeSocket: WebSocket | null = null;
+  private claudeProcess: ChildProcess | null = null;
 
-  constructor(wsUrl?: string, projectRoot: string = process.cwd()) {
+  constructor(wsUrl?: string, projectRoot: string = process.cwd(), interactive: boolean = false) {
     super(WorkerType.DEV, wsUrl);
 
+    this.interactive = interactive;
     console.log(`[FlowWorker] Initializing with project root: ${projectRoot}`);
+    if (interactive) console.log(`[FlowWorker] Interactive mode enabled`);
+
+    // Setup WebSocket server for Claude to communicate with this worker
+    this.setupClaudeWebSocketServer();
 
     // Initialize Flow Engine components
     this.flowRegistry = new FlowRegistry(projectRoot);
-    this.flowExecutor = new FlowExecutor();
+    this.flowExecutor = new FlowExecutor(interactive);
     this.workspaceManager = new WorkspaceManager(projectRoot);
 
     // Load project flows
@@ -67,6 +79,12 @@ export class FlowWorker extends BaseWorker {
       throw new Error(error);
     }
 
+    // Determine status transitions based on flow configuration
+    const defaultOnSuccess = TaskStatus.REVIEW;
+    const defaultOnFailure = TaskStatus.CHANGES_REQUESTED;
+    const successStatus = flow.statusTransitions?.onSuccess ?? defaultOnSuccess;
+    const failureStatus = flow.statusTransitions?.onFailure ?? defaultOnFailure;
+
     console.log(`${this.logPrefix()} Executing flow: ${flow.name} (${flow.id})`);
     this.sendTaskStarted(TaskStatus.IN_PROGRESS);
 
@@ -75,9 +93,20 @@ export class FlowWorker extends BaseWorker {
     try {
       // Allocate workspace based on flow configuration
       this.sendTaskProgress('Allocating workspace...');
+
+      // Determine workspace path
+      let existingPath: string | undefined = task.workspacePath;
+
+      // If manual mode but no path specified, use current working directory
+      if (flow.workspace.mode === 'manual' && !existingPath) {
+        existingPath = process.cwd();
+        console.log(`${this.logPrefix()} Using current working directory as manual workspace: ${existingPath}`);
+      }
+
       workspace = await this.workspaceManager.allocate({
         taskId: task.id,
         config: flow.workspace,
+        existingPath,
         taskMetadata: {
           description: task.description,
           priority: task.priority,
@@ -89,6 +118,7 @@ export class FlowWorker extends BaseWorker {
       this.sendTaskProgress(`Workspace ready: ${workspace.path}`);
 
       // Prepare execution options
+      console.log(`${this.logPrefix()} Task flowInputs:`, JSON.stringify(task.flowInputs));
       const executionOptions: FlowExecutionOptions = {
         taskId: task.id,
         flow,
@@ -100,6 +130,18 @@ export class FlowWorker extends BaseWorker {
           description: task.description,
           ...task.metadata,
         },
+        // Pass Claude environment variables for hooks
+        claudeEnv: {
+          CLAUDE_WORKER_ID: this.workerId,
+          CLAUDE_WORKER_SOCKET: `ws://localhost:${this.claudeWsPort}`,
+          CLAUDE_TASK_ID: task.id,
+          CLAUDE_CONTEXT_DIR: workspace.path,
+          CLAUDE_CODE_STOPPABLE: this.interactive ? 'true' : 'false'
+        },
+        // Callback to store Claude process reference
+        onClaudeProcessStarted: (process) => {
+          this.claudeProcess = process;
+        }
       };
 
       // Execute the flow
@@ -122,11 +164,11 @@ export class FlowWorker extends BaseWorker {
             outputs: result.outputs,
             trace: result.trace,
           },
-          TaskStatus.REVIEW
+          successStatus
         );
       } else {
         console.error(`${this.logPrefix()} Flow failed: ${result.error}`);
-        throw new Error(result.error || 'Flow execution failed');
+        this.sendTaskFailed(result.error || 'Flow execution failed', failureStatus);
       }
 
     } catch (error) {
@@ -138,7 +180,8 @@ export class FlowWorker extends BaseWorker {
         error: (error as Error).message,
       };
 
-      throw error;
+      // Send failure with configured status
+      this.sendTaskFailed((error as Error).message, failureStatus);
     } finally {
       // Release workspace
       if (workspace) {
@@ -158,10 +201,117 @@ export class FlowWorker extends BaseWorker {
   }
 
   /**
+   * Setup WebSocket server for Claude processes to communicate with this worker
+   */
+  private setupClaudeWebSocketServer(): void {
+    // Create WebSocket server on a random available port
+    this.claudeWss = new WebSocketServer({ port: 0 });
+
+    this.claudeWss.on('listening', () => {
+      const address = this.claudeWss!.address();
+      if (typeof address === 'object' && address !== null) {
+        this.claudeWsPort = address.port;
+        console.log(`${this.logPrefix()} Claude WebSocket server listening on port ${this.claudeWsPort}`);
+      }
+    });
+
+    this.claudeWss.on('connection', (socket: WebSocket) => {
+      console.log(`${this.logPrefix()} Claude process connected to worker socket`);
+      this.claudeSocket = socket;
+
+      socket.on('message', (data: Buffer) => {
+        try {
+          const message = JSON.parse(data.toString());
+          this.handleClaudeMessage(message);
+        } catch (error) {
+          console.error(`${this.logPrefix()} Error parsing Claude message:`, error);
+        }
+      });
+
+      socket.on('close', () => {
+        console.log(`${this.logPrefix()} Claude socket disconnected`);
+        this.claudeSocket = null;
+      });
+
+      socket.on('error', (error) => {
+        console.error(`${this.logPrefix()} Claude socket error:`, error);
+      });
+    });
+
+    this.claudeWss.on('error', (error) => {
+      console.error(`${this.logPrefix()} Claude WebSocket server error:`, error);
+    });
+  }
+
+  /**
+   * Handle messages from Claude processes (via hooks)
+   */
+  private handleClaudeMessage(message: any): void {
+    switch (message.type) {
+      case 'STOP_REQUESTED':
+        console.log(`${this.logPrefix()} Stop requested by Claude, killing process...`);
+        this.killClaude();
+        break;
+
+      case 'HOOK_EVENT':
+        console.log(`${this.logPrefix()} Hook event: ${message.hookName}`);
+        break;
+
+      default:
+        console.log(`${this.logPrefix()} Unknown message type: ${message.type}`);
+    }
+  }
+
+  /**
+   * Kill Claude process if running
+   */
+  killClaude(): void {
+    if (this.claudeProcess) {
+      const pid = this.claudeProcess.pid;
+      console.log(`${this.logPrefix()} Killing Claude process (PID: ${pid})...`);
+
+      try {
+        if (pid && process.platform === 'win32') {
+          try {
+            execSync(`taskkill /PID ${pid} /T /F`, {
+              stdio: 'inherit',
+              windowsHide: false
+            });
+            console.log(`${this.logPrefix()} Process killed successfully`);
+          } catch (killError: any) {
+            if (!killError.message?.includes('not found')) {
+              console.error(`${this.logPrefix()} Kill error:`, killError.message);
+            }
+          }
+        } else if (this.claudeProcess) {
+          this.claudeProcess.kill('SIGKILL');
+        }
+
+        this.claudeProcess = null;
+      } catch (error) {
+        console.error(`${this.logPrefix()} Error killing process:`, error);
+        this.claudeProcess = null;
+      }
+    }
+  }
+
+  /**
    * Cleanup on shutdown
    */
   shutdown(): void {
     console.log(`${this.logPrefix()} Shutting down...`);
+
+    // Kill Claude if running
+    this.killClaude();
+
+    // Close Claude WebSocket server
+    if (this.claudeWss) {
+      console.log(`${this.logPrefix()} Closing Claude WebSocket server...`);
+      this.claudeWss.close(() => {
+        console.log(`${this.logPrefix()} Claude WebSocket server closed`);
+      });
+      this.claudeWss = null;
+    }
 
     // Cleanup all workspaces
     this.workspaceManager.cleanupAll();
@@ -178,8 +328,13 @@ const isMainModule = currentFilePath === mainFilePath;
 if (isMainModule) {
   console.log('[FlowWorker] Starting Flow Worker...');
 
+  // Check for interactive mode from CLI args or environment variable
+  const interactiveArg = process.argv.includes('--interactive') || process.argv.includes('-i');
+  const interactiveEnv = process.env.WORKER_INTERACTIVE === 'true';
+  const interactive = interactiveArg || interactiveEnv;
+
   const projectRoot = process.cwd();
-  const worker = new FlowWorker(undefined, projectRoot);
+  const worker = new FlowWorker(undefined, projectRoot, interactive);
 
   worker.connect().then(() => {
     console.log('[FlowWorker] Worker started and connected');

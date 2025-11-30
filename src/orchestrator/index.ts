@@ -25,7 +25,6 @@ class Orchestrator {
 
     // Initialize Flow Registry
     this.flowRegistry = new FlowRegistry(process.cwd());
-    this.loadFlows();
 
     // Initialize Workspace Manager
     this.workspaceManager = new WorkspaceManager(process.cwd());
@@ -54,6 +53,9 @@ class Orchestrator {
 
   async start(): Promise<void> {
     process.title = 'Orchestrator';
+
+    // Load flows before starting API
+    await this.loadFlows();
 
     // WebSocket server starts automatically in its constructor
     await this.restAPI.start();

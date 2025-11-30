@@ -270,10 +270,13 @@ export class WorkerWebSocketServer {
   }
 
   private handleTaskFailed(message: TaskFailedMessage): void {
-    const { workerId, taskId, error } = message;
+    const { workerId, taskId, error, newStatus } = message;
     Logger.error(`[WS] Worker ${workerId} failed task ${taskId}: ${error}`);
 
-    this.taskManager.updateTaskStatus(taskId, TaskStatus.BLOCKED, {
+    // Use the provided status or default to BLOCKED
+    const failureStatus = newStatus || TaskStatus.BLOCKED;
+
+    this.taskManager.updateTaskStatus(taskId, failureStatus, {
       event: 'failed',
       workerId,
       error

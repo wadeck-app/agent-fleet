@@ -5,6 +5,8 @@
  * including flow definitions, steps, workspaces, and execution traces.
  */
 
+import { TaskStatus } from '../shared/types.js';
+
 /**
  * Supported model types for step execution
  */
@@ -217,8 +219,11 @@ export interface BaseFlowStep {
   /** Output parsing and extraction */
   output?: StepOutput;
 
-  /** Conditional transitions to next steps */
-  next?: NextStepConfig;
+  /** Step IDs this step depends on (must complete before this step runs) */
+  depends?: string[];
+
+  /** Conditional execution expression (evaluated to boolean) */
+  when?: string;
 
   /** Retry configuration */
   retry?: RetryConfig;
@@ -281,6 +286,17 @@ export interface FlowHooks {
 }
 
 /**
+ * Status transitions configuration for flow completion
+ */
+export interface StatusTransitions {
+  /** Task status to set when flow completes successfully */
+  onSuccess: TaskStatus;
+
+  /** Task status to set when flow fails */
+  onFailure: TaskStatus;
+}
+
+/**
  * Complete flow definition
  */
 export interface FlowDefinition {
@@ -304,6 +320,9 @@ export interface FlowDefinition {
 
   /** Optional lifecycle hooks */
   hooks?: FlowHooks;
+
+  /** Optional status transitions configuration (defaults: onSuccess=review, onFailure=changes_requested) */
+  statusTransitions?: StatusTransitions;
 }
 
 /**
@@ -509,4 +528,32 @@ export interface FlowExecutionResult {
 
   /** Final outputs from all steps */
   outputs: Record<string, Record<string, any>>;
+}
+
+/**
+ * DAG (Directed Acyclic Graph) representation of flow steps
+ */
+export interface DAG {
+  /** All nodes in the graph, keyed by step ID */
+  nodes: Map<string, DAGNode>;
+
+  /** Root nodes (steps with no dependencies) */
+  roots: string[];
+
+  /** Leaf nodes (steps with no dependents) */
+  leaves: string[];
+}
+
+/**
+ * A node in the DAG representing a single step
+ */
+export interface DAGNode {
+  /** The step this node represents */
+  step: FlowStep;
+
+  /** Step IDs this step depends on (incoming edges) */
+  dependencies: string[];
+
+  /** Step IDs that depend on this step (outgoing edges) */
+  dependents: string[];
 }

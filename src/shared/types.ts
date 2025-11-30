@@ -88,6 +88,9 @@ export interface Task {
     error?: string;
     trace?: any;
   };
+
+  // Workspace configuration
+  workspacePath?: string; // For manual workspace mode
 }
 
 export interface TaskComment {
@@ -144,6 +147,7 @@ export interface TaskFailedMessage extends BaseMessage {
   workerId: string;
   taskId: string;
   error: string;
+  newStatus?: TaskStatus;
 }
 
 export interface TaskQuestionMessage extends BaseMessage {

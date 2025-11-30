@@ -5,6 +5,7 @@ import {
 	Message,
 	MessageType,
 	Task,
+	TaskStatus,
 	WorkerType,
 	WorkerWelcomeMessage
 } from '../shared/types.js';
@@ -233,13 +234,14 @@ export abstract class BaseWorker {
   /**
    * Send task failed notification
    */
-  protected sendTaskFailed(error: string): void {
+  protected sendTaskFailed(error: string, newStatus?: TaskStatus): void {
     if (!this.currentTask) return;
 
     this.sendMessage(createMessage(MessageType.TASK_FAILED, {
       workerId: this.workerId,
       taskId: this.currentTask.id,
-      error
+      error,
+      newStatus
     }));
 
     this.currentTask = null;

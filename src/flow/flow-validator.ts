@@ -20,7 +20,9 @@ import type {
   ReusePolicy,
   ModelType,
   VariableType,
+  StatusTransitions,
 } from './types.js';
+import { TaskStatus } from '../shared/types.js';
 
 /**
  * Validation issue severity
@@ -251,11 +253,78 @@ export class FlowValidator {
     // Validate workspace config
     this.validateWorkspaceConfig(flow.workspace, flow.id);
 
+    // Validate status transitions (optional)
+    if (flow.statusTransitions) {
+      this.validateStatusTransitions(flow.statusTransitions, flow.id);
+    }
+
     // Validate inputs
     this.validateInputs(flow.inputs, flow.id);
 
     // Validate steps
     this.validateSteps(flow.steps, flow.id);
+  }
+
+  /**
+   * Validate status transitions configuration
+   */
+  private validateStatusTransitions(config: any, flowId: string): void {
+    if (!config) {
+      return; // Optional field, no error if missing
+    }
+
+    // Get all valid task statuses
+    const validStatuses = Object.values(TaskStatus);
+
+    // Validate onSuccess
+    if (!config.onSuccess) {
+      this.addIssue({
+        severity: 'error',
+        code: ValidationCode.MISSING_FIELD,
+        message: 'statusTransitions must have onSuccess field',
+        location: { field: 'statusTransitions.onSuccess' },
+        suggestion: `Choose one of: ${validStatuses.join(', ')}`,
+        context: { related: validStatuses },
+      });
+    } else if (!validStatuses.includes(config.onSuccess)) {
+      this.addIssue({
+        severity: 'error',
+        code: ValidationCode.INVALID_VALUE,
+        message: `Invalid onSuccess status: ${config.onSuccess}`,
+        location: { field: 'statusTransitions.onSuccess' },
+        suggestion: `Must be a valid TaskStatus: ${validStatuses.join(', ')}`,
+        context: {
+          actual: config.onSuccess,
+          expected: validStatuses,
+          related: validStatuses,
+        },
+      });
+    }
+
+    // Validate onFailure
+    if (!config.onFailure) {
+      this.addIssue({
+        severity: 'error',
+        code: ValidationCode.MISSING_FIELD,
+        message: 'statusTransitions must have onFailure field',
+        location: { field: 'statusTransitions.onFailure' },
+        suggestion: `Choose one of: ${validStatuses.join(', ')}`,
+        context: { related: validStatuses },
+      });
+    } else if (!validStatuses.includes(config.onFailure)) {
+      this.addIssue({
+        severity: 'error',
+        code: ValidationCode.INVALID_VALUE,
+        message: `Invalid onFailure status: ${config.onFailure}`,
+        location: { field: 'statusTransitions.onFailure' },
+        suggestion: `Must be a valid TaskStatus: ${validStatuses.join(', ')}`,
+        context: {
+          actual: config.onFailure,
+          expected: validStatuses,
+          related: validStatuses,
+        },
+      });
+    }
   }
 
   /**
@@ -598,36 +667,19 @@ export class FlowValidator {
    */
   private validateStepReferences(steps: FlowStep[], stepIds: Set<string>): void {
     for (const step of steps) {
-      // Validate next.default
-      if (step.next?.default) {
-        if (!stepIds.has(step.next.default)) {
-          this.addIssue({
-            severity: 'error',
-            code: ValidationCode.UNDEFINED_STEP,
-            message: `Step '${step.id}' references non-existent step: ${step.next.default}`,
-            location: { stepId: step.id, field: 'next.default' },
-            suggestion: `Choose an existing step: ${Array.from(stepIds).join(', ')}`,
-            context: {
-              actual: step.next.default,
-              related: Array.from(stepIds),
-            },
-          });
-        }
-      }
-
-      // Validate conditions
-      if (step.next?.conditions) {
-        for (let i = 0; i < step.next.conditions.length; i++) {
-          const condition = step.next.conditions[i];
-          if (!stepIds.has(condition.goto)) {
+      // Validate depends
+      if (step.depends) {
+        for (let i = 0; i < step.depends.length; i++) {
+          const depId = step.depends[i];
+          if (!stepIds.has(depId)) {
             this.addIssue({
               severity: 'error',
               code: ValidationCode.UNDEFINED_STEP,
-              message: `Step '${step.id}' condition references non-existent step: ${condition.goto}`,
-              location: { stepId: step.id, field: `next.conditions[${i}].goto` },
+              message: `Step '${step.id}' depends on non-existent step: ${depId}`,
+              location: { stepId: step.id, field: `depends[${i}]` },
               suggestion: `Choose an existing step: ${Array.from(stepIds).join(', ')}`,
               context: {
-                actual: condition.goto,
+                actual: depId,
                 related: Array.from(stepIds),
               },
             });
@@ -784,10 +836,13 @@ export class FlowValidator {
   }
 
   /**
-   * Detect cycles in flow transitions using DFS
+   * Detect cycles in flow dependencies using DFS
+   *
+   * Note: This is a basic cycle check. Full DAG validation is done by DAGValidator
+   * in the FlowExecutor. This is here for early detection during flow definition.
    */
   private detectCycles(steps: FlowStep[]): void {
-    const graph = this.buildTransitionGraph(steps);
+    const graph = this.buildDependencyGraph(steps);
     const visited = new Set<string>();
     const recursionStack = new Set<string>();
 
@@ -800,7 +855,7 @@ export class FlowValidator {
             code: ValidationCode.CIRCULAR_DEPENDENCY,
             message: `Circular dependency detected: ${cycle.join(' → ')}`,
             location: { stepId: cycle[0] },
-            suggestion: 'Remove or modify transitions to break the cycle',
+            suggestion: 'Remove or modify dependencies to break the cycle',
             context: { related: cycle },
           });
           return; // Report only first cycle
@@ -810,25 +865,21 @@ export class FlowValidator {
   }
 
   /**
-   * Build transition graph
+   * Build dependency graph for cycle detection
    */
-  private buildTransitionGraph(steps: FlowStep[]): Map<string, Set<string>> {
+  private buildDependencyGraph(steps: FlowStep[]): Map<string, Set<string>> {
     const graph = new Map<string, Set<string>>();
 
     for (const step of steps) {
-      const transitions = new Set<string>();
+      const dependencies = new Set<string>();
 
-      if (step.next?.default) {
-        transitions.add(step.next.default);
-      }
-
-      if (step.next?.conditions) {
-        for (const condition of step.next.conditions) {
-          transitions.add(condition.goto);
+      if (step.depends) {
+        for (const depId of step.depends) {
+          dependencies.add(depId);
         }
       }
 
-      graph.set(step.id, transitions);
+      graph.set(step.id, dependencies);
     }
 
     return graph;
@@ -848,15 +899,15 @@ export class FlowValidator {
     recursionStack.add(stepId);
     path.push(stepId);
 
-    const neighbors = graph.get(stepId) || new Set();
-    for (const neighbor of neighbors) {
-      if (!visited.has(neighbor)) {
-        const cycle = this.detectCycleDFS(neighbor, graph, visited, recursionStack, path);
+    const dependencies = graph.get(stepId) || new Set();
+    for (const depId of dependencies) {
+      if (!visited.has(depId)) {
+        const cycle = this.detectCycleDFS(depId, graph, visited, recursionStack, path);
         if (cycle) return cycle;
-      } else if (recursionStack.has(neighbor)) {
+      } else if (recursionStack.has(depId)) {
         // Found cycle
-        const cycleStart = path.indexOf(neighbor);
-        return path.slice(cycleStart).concat(neighbor);
+        const cycleStart = path.indexOf(depId);
+        return path.slice(cycleStart).concat(depId);
       }
     }
 
@@ -867,46 +918,84 @@ export class FlowValidator {
 
   /**
    * Check for unreachable steps
+   *
+   * In DAG-based flows, a step is unreachable if it has no path from any root node.
+   * Root nodes are steps with no dependencies.
    */
   private checkReachability(steps: FlowStep[]): void {
     if (steps.length === 0) return;
 
-    const graph = this.buildTransitionGraph(steps);
-    const reachable = new Set<string>();
+    // Find root nodes (steps with no dependencies)
+    const roots: string[] = [];
+    for (const step of steps) {
+      if (!step.depends || step.depends.length === 0) {
+        roots.push(step.id);
+      }
+    }
 
-    // Start from first step
-    const firstStepId = steps[0].id;
-    this.markReachable(firstStepId, graph, reachable);
+    if (roots.length === 0) {
+      // All steps have dependencies - likely a cycle
+      this.addIssue({
+        severity: 'error',
+        code: ValidationCode.CIRCULAR_DEPENDENCY,
+        message: 'No root steps found - all steps have dependencies (likely a circular dependency)',
+        suggestion: 'At least one step should have no dependencies',
+      });
+      return;
+    }
+
+    // Build reverse graph (dependents)
+    const dependents = new Map<string, Set<string>>();
+    for (const step of steps) {
+      dependents.set(step.id, new Set());
+    }
+
+    for (const step of steps) {
+      if (step.depends) {
+        for (const depId of step.depends) {
+          const depsSet = dependents.get(depId);
+          if (depsSet) {
+            depsSet.add(step.id);
+          }
+        }
+      }
+    }
+
+    // Mark all reachable steps from roots
+    const reachable = new Set<string>();
+    for (const rootId of roots) {
+      this.markReachableFromRoot(rootId, dependents, reachable);
+    }
 
     // Find unreachable steps
     for (const step of steps) {
-      if (!reachable.has(step.id) && step.id !== firstStepId) {
+      if (!reachable.has(step.id)) {
         this.addIssue({
           severity: 'warning',
           code: ValidationCode.UNREACHABLE_STEP,
-          message: `Step '${step.id}' is unreachable`,
+          message: `Step '${step.id}' is unreachable (no path from root nodes)`,
           location: { stepId: step.id },
-          suggestion: 'Add a transition to this step or remove it',
+          suggestion: 'Ensure this step has a dependency path from at least one root step, or remove it',
         });
       }
     }
   }
 
   /**
-   * Mark all reachable steps from a starting point
+   * Mark all reachable steps from a root node (following dependents)
    */
-  private markReachable(
+  private markReachableFromRoot(
     stepId: string,
-    graph: Map<string, Set<string>>,
+    dependents: Map<string, Set<string>>,
     reachable: Set<string>
   ): void {
     if (reachable.has(stepId)) return;
 
     reachable.add(stepId);
 
-    const neighbors = graph.get(stepId) || new Set();
-    for (const neighbor of neighbors) {
-      this.markReachable(neighbor, graph, reachable);
+    const deps = dependents.get(stepId) || new Set();
+    for (const depId of deps) {
+      this.markReachableFromRoot(depId, dependents, reachable);
     }
   }
 }

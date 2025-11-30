@@ -8,6 +8,9 @@ interface CreateTaskRequest {
   description: string;
   priority?: 'low' | 'medium' | 'high' | 'urgent';
   metadata?: Record<string, any>;
+  flowId?: string;
+  flowInputs?: Record<string, any>;
+  workspacePath?: string;
 }
 
 async function createTask(request: CreateTaskRequest): Promise<void> {
@@ -31,6 +34,9 @@ async function createTask(request: CreateTaskRequest): Promise<void> {
     console.log(`   Description: ${task.description}`);
     console.log(`   Status: ${task.status}`);
     console.log(`   Priority: ${task.priority}`);
+    if (task.flowId) {
+      console.log(`   Flow: ${task.flowId}`);
+    }
   } catch (error) {
     console.error('❌ Error creating task:', (error as Error).message);
     process.exit(1);
@@ -179,15 +185,22 @@ const command = args[0];
 
 if (!command) {
   console.log('Usage:');
-  console.log('  npm run add-task create <description> [priority]');
+  console.log('  npm run add-task create <description> [priority] [flowId] [--workspace <path>] [-i:key=value]');
   console.log('  npm run add-task list');
   console.log('  npm run add-task stats');
   console.log('  npm run add-task delete <taskId>');
   console.log('  npm run add-task clear');
+  console.log('\nOptions:');
+  console.log('  --workspace <path>    Specify a manual workspace path (for mode: manual flows)');
+  console.log('  -i:key=value          Set flow input (can be used multiple times)');
   console.log('\nNote: Task IDs support partial matching (like git commit hashes).');
   console.log('      You can use just the first few characters if unique.');
   console.log('\nExamples:');
   console.log('  npm run add-task create "Add authentication system" high');
+  console.log('  npm run add-task create "Implement fibonacci" high simple-implement');
+  console.log('  npm run add-task create "Test diamond" high test-diamond -i:message="Hello World"');
+  console.log('  npm run add-task create "Test fork" high test-fork -i:task="Run tests"');
+  console.log('  npm run add-task create "Debug issue" high debug-flow --workspace C:/my-workspace');
   console.log('  npm run add-task list');
   console.log('  npm run add-task stats');
   console.log('  npm run add-task delete abc123    # partial ID');
@@ -200,13 +213,51 @@ switch (command) {
   case 'create':
     if (!args[1]) {
       console.error('❌ Error: Description is required');
-      console.log('Usage: npm run add-task create <description> [priority]');
+      console.log('Usage: npm run add-task create <description> [priority] [flowId] [--workspace <path>] [-i:key=value]');
       process.exit(1);
     }
-    await createTask({
+
+    // Parse --workspace flag
+    const workspaceIndex = args.indexOf('--workspace');
+    let workspacePath: string | undefined;
+    if (workspaceIndex !== -1 && args[workspaceIndex + 1]) {
+      workspacePath = args[workspaceIndex + 1];
+    }
+
+    // Parse -i:key=value inputs
+    const flowInputs: Record<string, string> = {};
+    for (const arg of args) {
+      if (arg.startsWith('-i:')) {
+        const inputPart = arg.substring(3); // Remove '-i:'
+        const [key, ...valueParts] = inputPart.split('=');
+        if (key && valueParts.length > 0) {
+          flowInputs[key] = valueParts.join('='); // Join back in case value contains '='
+        }
+      }
+    }
+
+    const taskRequest: CreateTaskRequest = {
       description: args[1],
       priority: (args[2] as any) || 'medium'
-    });
+    };
+
+    if (args[3] && !args[3].startsWith('--') && !args[3].startsWith('-i:')) {
+      taskRequest.flowId = args[3];
+
+      // If flowInputs were provided via -i: flags, use them
+      // Otherwise, for backward compatibility, use description as 'task' input
+      if (Object.keys(flowInputs).length > 0) {
+        taskRequest.flowInputs = flowInputs;
+      } else {
+        taskRequest.flowInputs = { task: args[1] };
+      }
+    }
+
+    if (workspacePath) {
+      taskRequest.workspacePath = workspacePath;
+    }
+
+    await createTask(taskRequest);
     break;
 
   case 'list':

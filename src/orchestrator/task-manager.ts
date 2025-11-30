@@ -243,14 +243,12 @@ export class TaskManager {
   clearAllTasks(): number {
     const count = this.tasks.size;
 
-    // Delete all from storage and emit events
-    for (const taskId of this.tasks.keys()) {
+    // Delete all from storage, memory, and emit events
+    for (const taskId of Array.from(this.tasks.keys())) {
       Storage.deleteTask(taskId);
+      this.tasks.delete(taskId);
       this.stateManager.emitTaskDeleted(taskId);
     }
-
-    // Clear memory
-    this.tasks.clear();
 
     Logger.log(`[TaskManager] Cleared ${count} tasks`);
     return count;

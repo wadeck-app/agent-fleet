@@ -65,7 +65,10 @@ export class RestAPI {
     // Create a task (supports both regular and flow-based tasks)
     this.app.post('/tasks', (req: Request, res: Response) => {
       try {
-        const { description, priority, metadata, flowId, flowInputs } = req.body;
+        const { description, priority, metadata, flowId, flowInputs, workspacePath } = req.body;
+
+        // Debug: Log the received request
+        Logger.log(`[API] POST /tasks - flowId: ${flowId}, flowInputs:`, JSON.stringify(flowInputs));
 
         if (!description) {
           res.status(400).json({ error: 'Description is required' });
@@ -87,6 +90,12 @@ export class RestAPI {
         if (flowId) {
           task.flowId = flowId;
           task.flowInputs = flowInputs || {};
+          Logger.log(`[API] Task ${task.id} - Set flowInputs:`, JSON.stringify(task.flowInputs));
+        }
+
+        // Add workspace path if provided (for manual workspace mode)
+        if (workspacePath) {
+          task.workspacePath = workspacePath;
         }
 
         // Try to assign the task to an available worker

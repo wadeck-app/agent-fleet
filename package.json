@@ -13,6 +13,9 @@
     "worker:dev:i": "tsx src/workers/dev-worker.ts --interactive",
     "worker:dev:interactive": "tsx src/workers/dev-worker.ts --interactive",
     "worker:dev:test": "tsx src/workers/dev-worker.ts --interactive --test",
+    "worker:flow": "tsx src/workers/flow-worker.ts",
+    "worker:flow:i": "tsx src/workers/flow-worker.ts --interactive",
+    "worker:flow:interactive": "tsx src/workers/flow-worker.ts --interactive",
     "test:old": "tsx test/simple-task.ts",
     "test": "vitest run",
     "test:watch": "vitest"

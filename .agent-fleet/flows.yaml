@@ -1,0 +1,159 @@
+simple-implement:
+  name: "(Dummy) Simple Implementation"
+  description: "Ask Claude to implement something"
+  workspace:
+    mode: isolated
+#    gitStrategy: feature-branch
+    gitStrategy: main-only
+#    reusePolicy: never
+    reusePolicy: always
+  statusTransitions:
+    onSuccess: review
+    onFailure: changes_requested
+  inputs:
+    task: string
+  steps:
+    - type: model
+      id: implement
+      name: "Implement Task"
+#      model: sonnet
+      model: haiku
+      prompt: "${{ inputs.task }}"
+
+debug-local:
+  name: "Debug in Current Workspace"
+  description: "Work directly in the current directory (follow progress in your IDE)"
+  workspace:
+    mode: manual
+    gitStrategy: any
+    reusePolicy: always
+  statusTransitions:
+    onSuccess: approved
+    onFailure: todo
+  inputs:
+    task: string
+  steps:
+    - type: model
+      id: implement
+      name: "Implement Task Locally"
+      model: haiku
+      prompt: "${{ inputs.task }}"
+
+# Test Flow 1: Diamond Pattern (fork-join) - Windows CMD compatible
+#     A
+#    / \
+#   B   C
+#    \ /
+#     D
+test-diamond:
+  name: "Test: Diamond Pattern"
+  description: "Tests fork-join with diamond shape (A splits to B+C, then joins at D)"
+  workspace:
+    mode: manual
+    gitStrategy: any
+    reusePolicy: always
+  statusTransitions:
+    onSuccess: approved
+    onFailure: todo
+  inputs:
+    message: string
+  steps:
+    # Root: A
+    - type: script
+      id: step-a
+      name: "Step A (Start)"
+      script: |
+        echo [A] Starting diamond flow: ${{ inputs.message }}
+        echo [A] Sleeping for 2 seconds...
+        timeout /t 2 /nobreak >nul 2>&1
+        echo [A] Done!
+
+    # Fork: B and C run in parallel
+    - type: script
+      id: step-b
+      name: "Step B (Left Branch)"
+      depends: [step-a]
+      script: |
+        echo [B] Processing left branch...
+        echo [B] Sleeping for 3 seconds...
+        timeout /t 3 /nobreak >nul 2>&1
+        echo [B] Left branch complete!
+
+    - type: script
+      id: step-c
+      name: "Step C (Right Branch)"
+      depends: [step-a]
+      script: |
+        echo [C] Processing right branch...
+        echo [C] Sleeping for 2 seconds...
+        timeout /t 2 /nobreak >nul 2>&1
+        echo [C] Right branch complete!
+
+    # Join: D waits for both B and C
+    - type: script
+      id: step-d
+      name: "Step D (Join)"
+      depends: [step-b, step-c]
+      script: |
+        echo [D] Merging results from B and C...
+        echo [D] Sleeping for 2 seconds...
+        timeout /t 2 /nobreak >nul 2>&1
+        echo [D] Diamond flow complete!
+
+# Test Flow 2: Fork Pattern (parallel split) - Windows CMD compatible
+#     A
+#    /|\
+#   B C D
+test-fork:
+  name: "Test: Fork Pattern"
+  description: "Tests parallel execution with 3-way fork (A splits to B+C+D)"
+  workspace:
+    mode: manual
+    gitStrategy: any
+    reusePolicy: always
+  statusTransitions:
+    onSuccess: approved
+    onFailure: todo
+  inputs:
+    task: string
+  steps:
+    # Root: A
+    - type: script
+      id: step-a
+      name: "Step A (Initialize)"
+      script: |
+        echo [A] Initializing fork flow: ${{ inputs.task }}
+        echo [A] Sleeping for 2 seconds...
+        timeout /t 2 /nobreak >nul 2>&1
+        echo [A] Ready to fork!
+
+    # Fork: B, C, and D run in parallel
+    - type: script
+      id: step-b
+      name: "Step B (Security)"
+      depends: [step-a]
+      script: |
+        echo [B] Running security checks...
+        echo [B] Sleeping for 3 seconds...
+        timeout /t 3 /nobreak >nul 2>&1
+        echo [B] Security checks passed!
+
+    - type: script
+      id: step-c
+      name: "Step C (Linting)"
+      depends: [step-a]
+      script: |
+        echo [C] Running linters...
+        echo [C] Sleeping for 2 seconds...
+        timeout /t 2 /nobreak >nul 2>&1
+        echo [C] Linting passed!
+
+    - type: script
+      id: step-d
+      name: "Step D (Tests)"
+      depends: [step-a]
+      script: |
+        echo [D] Running tests...
+        echo [D] Sleeping for 4 seconds...
+        timeout /t 4 /nobreak >nul 2>&1
+        echo [D] All tests passed!
