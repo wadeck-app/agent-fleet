@@ -3,6 +3,7 @@ import { WorkerWebSocketServer } from './websocket-server.js';
 import { RestAPI } from './rest-api.js';
 import { renderUI } from './ui.js';
 import { Logger } from '../shared/logger.js';
+import { FlowRegistry } from '../flow/flow-registry.js';
 
 const REST_PORT = 3737;
 const WS_PORT = 3738;
@@ -11,6 +12,7 @@ class Orchestrator {
   private taskManager: TaskManager;
   private wsServer: WorkerWebSocketServer;
   private restAPI: RestAPI;
+  private flowRegistry: FlowRegistry;
   private uiInstance: any;
 
   constructor() {
@@ -18,7 +20,25 @@ class Orchestrator {
 
     this.taskManager = new TaskManager();
     this.wsServer = new WorkerWebSocketServer(this.taskManager, WS_PORT);
-    this.restAPI = new RestAPI(this.taskManager, this.wsServer, REST_PORT);
+
+    // Initialize Flow Registry
+    this.flowRegistry = new FlowRegistry(process.cwd());
+    this.loadFlows();
+
+    this.restAPI = new RestAPI(this.taskManager, this.wsServer, REST_PORT, this.flowRegistry);
+  }
+
+  /**
+   * Load flows from project configuration
+   */
+  private async loadFlows(): Promise<void> {
+    try {
+      await this.flowRegistry.loadProjectFlows();
+      const flowIds = this.flowRegistry.getFlowIds();
+      Logger.log(`[Orchestrator] Loaded ${flowIds.length} flows: ${flowIds.join(', ')}`);
+    } catch (error) {
+      Logger.error('[Orchestrator] Failed to load flows:', error);
+    }
   }
 
   async start(): Promise<void> {

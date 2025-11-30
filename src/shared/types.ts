@@ -69,6 +69,16 @@ export interface Task {
   comments: TaskComment[];
   metadata: Record<string, any>;
   history: TaskHistoryEntry[];
+
+  // Flow Engine integration
+  flowId?: string;
+  flowInputs?: Record<string, any>;
+  flowResult?: {
+    status: 'completed' | 'failed';
+    outputs?: Record<string, any>;
+    error?: string;
+    trace?: any;
+  };
 }
 
 export interface TaskComment {

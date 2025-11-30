@@ -25,11 +25,32 @@ describe('WorkspaceManager', () => {
     // Cleanup all workspaces
     await manager.cleanupAll();
 
-    // Remove test directory
-    if (fs.existsSync(testRoot)) {
-      fs.rmSync(testRoot, { recursive: true, force: true });
-    }
+    // Wait a bit for Windows to release file handles
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Remove test directory with retry for Windows file locking
+    await removeTestDirectory(testRoot);
   });
+
+  // Helper function to remove directory with retry (Windows file locking workaround)
+  async function removeTestDirectory(dir: string, retries = 3): Promise<void> {
+    for (let i = 0; i < retries; i++) {
+      try {
+        if (fs.existsSync(dir)) {
+          fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+        }
+        return;
+      } catch (error: any) {
+        if (i === retries - 1) {
+          // Last attempt failed, but don't fail the test
+          console.warn(`Warning: Could not remove test directory: ${error.message}`);
+          return;
+        }
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
+  }
 
   describe('Isolated Workspaces', () => {
     it('should create an isolated workspace', async () => {

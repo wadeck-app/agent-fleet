@@ -600,20 +600,30 @@ export class WorkspaceManager {
         console.log(`Removed worktree at ${workspace.path}`);
       } catch (error) {
         console.error(`Failed to remove worktree: ${error}`);
-        // Fallback to manual removal
+        // Fallback to manual removal with retry
         try {
           if (fs.existsSync(workspace.path)) {
-            fs.rmSync(workspace.path, { recursive: true, force: true });
+            fs.rmSync(workspace.path, {
+              recursive: true,
+              force: true,
+              maxRetries: 3,
+              retryDelay: 100
+            });
           }
         } catch (cleanupError) {
           console.error(`Failed to manually remove worktree directory: ${cleanupError}`);
         }
       }
     } else {
-      // Regular directory removal
+      // Regular directory removal with retry for Windows file locking
       try {
         if (fs.existsSync(workspace.path)) {
-          fs.rmSync(workspace.path, { recursive: true, force: true });
+          fs.rmSync(workspace.path, {
+            recursive: true,
+            force: true,
+            maxRetries: 3,
+            retryDelay: 100
+          });
         }
       } catch (error) {
         console.error(`Failed to remove workspace directory: ${error}`);
@@ -708,6 +718,8 @@ export class WorkspaceManager {
     const workspaceIds = Array.from(this.workspaces.keys());
     for (const workspaceId of workspaceIds) {
       await this.cleanup(workspaceId);
+      // Small delay to let Windows release file handles between cleanups
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
   }
 

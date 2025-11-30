@@ -3,21 +3,25 @@ import { TaskManager } from './task-manager.js';
 import { WorkerWebSocketServer } from './websocket-server.js';
 import { TaskStatus } from '../shared/types.js';
 import { Logger } from '../shared/logger.js';
+import { FlowRegistry } from '../flow/flow-registry.js';
 
 export class RestAPI {
   private app: Express;
   private taskManager: TaskManager;
   private wsServer: WorkerWebSocketServer;
+  private flowRegistry: FlowRegistry | null;
   private port: number;
   private server: any;
 
   constructor(
     taskManager: TaskManager,
     wsServer: WorkerWebSocketServer,
-    port: number = 3737
+    port: number = 3737,
+    flowRegistry: FlowRegistry | null = null
   ) {
     this.taskManager = taskManager;
     this.wsServer = wsServer;
+    this.flowRegistry = flowRegistry;
     this.port = port;
     this.app = express();
     this.setupMiddleware();
@@ -54,13 +58,19 @@ export class RestAPI {
       });
     });
 
-    // Create a task
+    // Create a task (supports both regular and flow-based tasks)
     this.app.post('/tasks', (req: Request, res: Response) => {
       try {
-        const { description, priority, metadata } = req.body;
+        const { description, priority, metadata, flowId, flowInputs } = req.body;
 
         if (!description) {
           res.status(400).json({ error: 'Description is required' });
+          return;
+        }
+
+        // Validate flowId if provided
+        if (flowId && this.flowRegistry && !this.flowRegistry.hasFlow(flowId)) {
+          res.status(400).json({ error: `Flow '${flowId}' not found` });
           return;
         }
 
@@ -68,6 +78,12 @@ export class RestAPI {
           priority,
           ...metadata
         });
+
+        // Add flow-specific fields if flowId is provided
+        if (flowId) {
+          task.flowId = flowId;
+          task.flowInputs = flowInputs || {};
+        }
 
         // Try to assign the task to an available worker
         this.wsServer.tryAssignTasksToIdleWorkers();
@@ -190,6 +206,44 @@ export class RestAPI {
         res.json(workers);
       } catch (error) {
         Logger.error('[API] Error listing workers:', error);
+        res.status(500).json({ error: (error as Error).message });
+      }
+    });
+
+    // List available flows
+    this.app.get('/flows', (req: Request, res: Response) => {
+      try {
+        if (!this.flowRegistry) {
+          res.status(503).json({ error: 'Flow registry not available' });
+          return;
+        }
+
+        const flows = this.flowRegistry.getAllFlows();
+        res.json(flows);
+      } catch (error) {
+        Logger.error('[API] Error listing flows:', error);
+        res.status(500).json({ error: (error as Error).message });
+      }
+    });
+
+    // Get a specific flow
+    this.app.get('/flows/:id', (req: Request, res: Response) => {
+      try {
+        if (!this.flowRegistry) {
+          res.status(503).json({ error: 'Flow registry not available' });
+          return;
+        }
+
+        const flow = this.flowRegistry.getFlow(req.params.id);
+
+        if (!flow) {
+          res.status(404).json({ error: 'Flow not found' });
+          return;
+        }
+
+        res.json(flow);
+      } catch (error) {
+        Logger.error('[API] Error getting flow:', error);
         res.status(500).json({ error: (error as Error).message });
       }
     });

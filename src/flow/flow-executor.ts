@@ -377,7 +377,7 @@ export class FlowExecutor {
     map: Map<string, Record<string, any>>
   ): Record<string, Record<string, any>> {
     const obj: Record<string, Record<string, any>> = {};
-    for (const [key, value] of map.entries()) {
+    for (const [key, value] of Array.from(map.entries())) {
       obj[key] = value;
     }
     return obj;

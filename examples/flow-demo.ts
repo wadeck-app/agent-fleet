@@ -19,6 +19,11 @@ function createMockWorkspace(): Workspace {
     id: 'demo-workspace',
     path: process.cwd(),
     mode: 'isolated',
+    concurrency: {
+      key: 'demo',
+      activeTasks: new Set(['demo-task']),
+      locked: false,
+    },
     createdAt: new Date().toISOString(),
     lastUsedAt: new Date().toISOString(),
     usageCount: 1,
