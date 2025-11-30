@@ -10,6 +10,11 @@ import {
   TaskCompletedMessage,
   TaskFailedMessage,
   TaskQuestionMessage,
+  FlowStepStartedMessage,
+  FlowStepCompletedMessage,
+  FlowStepFailedMessage,
+  WorkspaceAllocatedMessage,
+  WorkspaceReleasedMessage,
   StopRequestedMessage,
   HookEventMessage,
   TaskStatus
@@ -128,6 +133,26 @@ export class WorkerWebSocketServer {
 
       case MessageType.TASK_QUESTION:
         this.handleTaskQuestion(message as TaskQuestionMessage);
+        break;
+
+      case MessageType.FLOW_STEP_STARTED:
+        this.handleFlowStepStarted(message as FlowStepStartedMessage);
+        break;
+
+      case MessageType.FLOW_STEP_COMPLETED:
+        this.handleFlowStepCompleted(message as FlowStepCompletedMessage);
+        break;
+
+      case MessageType.FLOW_STEP_FAILED:
+        this.handleFlowStepFailed(message as FlowStepFailedMessage);
+        break;
+
+      case MessageType.WORKSPACE_ALLOCATED:
+        this.handleWorkspaceAllocated(message as WorkspaceAllocatedMessage);
+        break;
+
+      case MessageType.WORKSPACE_RELEASED:
+        this.handleWorkspaceReleased(message as WorkspaceReleasedMessage);
         break;
 
       case MessageType.STOP_REQUESTED:
@@ -295,6 +320,71 @@ export class WorkerWebSocketServer {
     Logger.log(`[WS] Hook event ${hookName} from worker ${workerId}`);
 
     // TODO: Log to knowledge base if relevant
+  }
+
+  private handleFlowStepStarted(message: FlowStepStartedMessage): void {
+    const { workerId, taskId, stepId, stepName } = message;
+    Logger.log(`[WS] Worker ${workerId} started flow step ${stepId} (${stepName}) for task ${taskId}`);
+
+    this.taskManager.addComment(taskId, 'system', `Flow step started: ${stepName || stepId}`);
+
+    const task = this.taskManager.getTask(taskId);
+    if (task) {
+      this.stateManager.emitTaskUpdated(task);
+    }
+  }
+
+  private handleFlowStepCompleted(message: FlowStepCompletedMessage): void {
+    const { workerId, taskId, stepId, outputs } = message;
+    Logger.log(`[WS] Worker ${workerId} completed flow step ${stepId} for task ${taskId}`);
+
+    const outputInfo = outputs ? ` with ${Object.keys(outputs).length} output(s)` : '';
+    this.taskManager.addComment(taskId, 'system', `Flow step completed: ${stepId}${outputInfo}`);
+
+    const task = this.taskManager.getTask(taskId);
+    if (task) {
+      this.stateManager.emitTaskUpdated(task);
+    }
+  }
+
+  private handleFlowStepFailed(message: FlowStepFailedMessage): void {
+    const { workerId, taskId, stepId, error } = message;
+    Logger.error(`[WS] Worker ${workerId} flow step ${stepId} failed for task ${taskId}: ${error}`);
+
+    this.taskManager.addComment(taskId, 'system', `Flow step failed: ${stepId} - ${error}`);
+
+    const task = this.taskManager.getTask(taskId);
+    if (task) {
+      this.stateManager.emitTaskUpdated(task);
+    }
+  }
+
+  private handleWorkspaceAllocated(message: WorkspaceAllocatedMessage): void {
+    const { workerId, taskId, workspaceId, workspacePath } = message;
+    Logger.log(`[WS] Worker ${workerId} allocated workspace ${workspaceId} at ${workspacePath} for task ${taskId}`);
+
+    this.taskManager.addComment(taskId, 'system', `Workspace allocated: ${workspacePath}`);
+
+    // Store workspace info in task metadata
+    const task = this.taskManager.getTask(taskId);
+    if (task) {
+      task.metadata = task.metadata || {};
+      task.metadata.workspaceId = workspaceId;
+      task.metadata.workspacePath = workspacePath;
+      this.stateManager.emitTaskUpdated(task);
+    }
+  }
+
+  private handleWorkspaceReleased(message: WorkspaceReleasedMessage): void {
+    const { workerId, taskId, workspaceId } = message;
+    Logger.log(`[WS] Worker ${workerId} released workspace ${workspaceId} for task ${taskId}`);
+
+    this.taskManager.addComment(taskId, 'system', `Workspace released: ${workspaceId}`);
+
+    const task = this.taskManager.getTask(taskId);
+    if (task) {
+      this.stateManager.emitTaskUpdated(task);
+    }
   }
 
   private sendMessage(socket: WebSocket, message: Message): void {

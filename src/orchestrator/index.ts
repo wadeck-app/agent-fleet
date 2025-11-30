@@ -4,6 +4,7 @@ import { RestAPI } from './rest-api.js';
 import { renderUI } from './ui.js';
 import { Logger } from '../shared/logger.js';
 import { FlowRegistry } from '../flow/flow-registry.js';
+import { WorkspaceManager } from '../flow/workspace-manager.js';
 
 const REST_PORT = 3737;
 const WS_PORT = 3738;
@@ -13,6 +14,7 @@ class Orchestrator {
   private wsServer: WorkerWebSocketServer;
   private restAPI: RestAPI;
   private flowRegistry: FlowRegistry;
+  private workspaceManager: WorkspaceManager;
   private uiInstance: any;
 
   constructor() {
@@ -25,7 +27,16 @@ class Orchestrator {
     this.flowRegistry = new FlowRegistry(process.cwd());
     this.loadFlows();
 
-    this.restAPI = new RestAPI(this.taskManager, this.wsServer, REST_PORT, this.flowRegistry);
+    // Initialize Workspace Manager
+    this.workspaceManager = new WorkspaceManager(process.cwd());
+
+    this.restAPI = new RestAPI(
+      this.taskManager,
+      this.wsServer,
+      REST_PORT,
+      this.flowRegistry,
+      this.workspaceManager
+    );
   }
 
   /**

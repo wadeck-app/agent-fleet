@@ -34,6 +34,15 @@ export enum MessageType {
   TASK_FAILED = 'task_failed',
   TASK_QUESTION = 'task_question',
 
+  // Flow execution events (Worker → Orchestrator)
+  FLOW_STEP_STARTED = 'flow_step_started',
+  FLOW_STEP_COMPLETED = 'flow_step_completed',
+  FLOW_STEP_FAILED = 'flow_step_failed',
+
+  // Workspace events (Worker → Orchestrator)
+  WORKSPACE_ALLOCATED = 'workspace_allocated',
+  WORKSPACE_RELEASED = 'workspace_released',
+
   // Hook → Orchestrator (via Worker)
   /** TODO Depreacated no?*/
   STOP_REQUESTED = 'stop_requested',
@@ -158,6 +167,45 @@ export interface HookEventMessage extends BaseMessage {
   data: any;
 }
 
+export interface FlowStepStartedMessage extends BaseMessage {
+  type: MessageType.FLOW_STEP_STARTED;
+  workerId: string;
+  taskId: string;
+  stepId: string;
+  stepName?: string;
+}
+
+export interface FlowStepCompletedMessage extends BaseMessage {
+  type: MessageType.FLOW_STEP_COMPLETED;
+  workerId: string;
+  taskId: string;
+  stepId: string;
+  outputs?: Record<string, any>;
+}
+
+export interface FlowStepFailedMessage extends BaseMessage {
+  type: MessageType.FLOW_STEP_FAILED;
+  workerId: string;
+  taskId: string;
+  stepId: string;
+  error: string;
+}
+
+export interface WorkspaceAllocatedMessage extends BaseMessage {
+  type: MessageType.WORKSPACE_ALLOCATED;
+  workerId: string;
+  taskId: string;
+  workspaceId: string;
+  workspacePath: string;
+}
+
+export interface WorkspaceReleasedMessage extends BaseMessage {
+  type: MessageType.WORKSPACE_RELEASED;
+  workerId: string;
+  taskId: string;
+  workspaceId: string;
+}
+
 export interface WorkerWelcomeMessage extends BaseMessage {
   type:MessageType.WORKER_WELCOME;
   workerId: string;
@@ -203,6 +251,11 @@ export type Message =
   | TaskCompletedMessage
   | TaskFailedMessage
   | TaskQuestionMessage
+  | FlowStepStartedMessage
+  | FlowStepCompletedMessage
+  | FlowStepFailedMessage
+  | WorkspaceAllocatedMessage
+  | WorkspaceReleasedMessage
   | StopRequestedMessage
   | HookEventMessage
 // Orchestrator → Worker

@@ -4,12 +4,14 @@ import { WorkerWebSocketServer } from './websocket-server.js';
 import { TaskStatus } from '../shared/types.js';
 import { Logger } from '../shared/logger.js';
 import { FlowRegistry } from '../flow/flow-registry.js';
+import { WorkspaceManager } from '../flow/workspace-manager.js';
 
 export class RestAPI {
   private app: Express;
   private taskManager: TaskManager;
   private wsServer: WorkerWebSocketServer;
   private flowRegistry: FlowRegistry | null;
+  private workspaceManager: WorkspaceManager | null;
   private port: number;
   private server: any;
 
@@ -17,11 +19,13 @@ export class RestAPI {
     taskManager: TaskManager,
     wsServer: WorkerWebSocketServer,
     port: number = 3737,
-    flowRegistry: FlowRegistry | null = null
+    flowRegistry: FlowRegistry | null = null,
+    workspaceManager: WorkspaceManager | null = null
   ) {
     this.taskManager = taskManager;
     this.wsServer = wsServer;
     this.flowRegistry = flowRegistry;
+    this.workspaceManager = workspaceManager;
     this.port = port;
     this.app = express();
     this.setupMiddleware();
@@ -244,6 +248,73 @@ export class RestAPI {
         res.json(flow);
       } catch (error) {
         Logger.error('[API] Error getting flow:', error);
+        res.status(500).json({ error: (error as Error).message });
+      }
+    });
+
+    // Get detailed execution trace for a task
+    this.app.get('/tasks/:id/trace', (req: Request, res: Response) => {
+      try {
+        const task = this.taskManager.getTask(req.params.id);
+
+        if (!task) {
+          res.status(404).json({ error: 'Task not found' });
+          return;
+        }
+
+        if (!task.flowResult || !task.flowResult.trace) {
+          res.status(404).json({ error: 'No execution trace available for this task' });
+          return;
+        }
+
+        res.json({
+          taskId: task.id,
+          flowId: task.flowId,
+          status: task.flowResult.status,
+          trace: task.flowResult.trace,
+          outputs: task.flowResult.outputs,
+          error: task.flowResult.error
+        });
+      } catch (error) {
+        Logger.error('[API] Error getting task trace:', error);
+        res.status(500).json({ error: (error as Error).message });
+      }
+    });
+
+    // List all active workspaces
+    this.app.get('/workspaces', (req: Request, res: Response) => {
+      try {
+        if (!this.workspaceManager) {
+          res.status(503).json({ error: 'Workspace manager not available' });
+          return;
+        }
+
+        const workspaces = this.workspaceManager.getAllWorkspaces();
+        res.json(workspaces);
+      } catch (error) {
+        Logger.error('[API] Error listing workspaces:', error);
+        res.status(500).json({ error: (error as Error).message });
+      }
+    });
+
+    // Get a specific workspace by ID
+    this.app.get('/workspaces/:id', (req: Request, res: Response) => {
+      try {
+        if (!this.workspaceManager) {
+          res.status(503).json({ error: 'Workspace manager not available' });
+          return;
+        }
+
+        const workspace = this.workspaceManager.getWorkspace(req.params.id);
+
+        if (!workspace) {
+          res.status(404).json({ error: 'Workspace not found' });
+          return;
+        }
+
+        res.json(workspace);
+      } catch (error) {
+        Logger.error('[API] Error getting workspace:', error);
         res.status(500).json({ error: (error as Error).message });
       }
     });

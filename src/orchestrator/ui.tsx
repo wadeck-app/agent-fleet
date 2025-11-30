@@ -148,7 +148,7 @@ const OrchestratorUI: React.FC<OrchestratorUIProps> = ({ taskManager, wsServer }
                   {status.toUpperCase()} ({statusTasks.length})
                 </Text>
                 {statusTasks.map((task) => (
-                  <Box key={task.id} paddingLeft={2}>
+                  <Box key={task.id} paddingLeft={2} flexDirection="column">
                     <Text>
                       <Text dimColor>[{task.id.substring(0, 8)}]</Text> {task.description.substring(0, 40)}
                       {task.description.length > 40 ? '...' : ''}
@@ -156,6 +156,36 @@ const OrchestratorUI: React.FC<OrchestratorUIProps> = ({ taskManager, wsServer }
                         <Text dimColor> [Worker {task.assignedTo.workerId}]</Text>
                       )}
                     </Text>
+                    {/* Show flow info if it's a flow-based task */}
+                    {task.flowId && (
+                      <Box paddingLeft={2}>
+                        <Text dimColor>
+                          Flow: {task.flowId}
+                          {task.flowResult && (
+                            <Text color={task.flowResult.status === 'completed' ? 'green' : 'red'}>
+                              {' '}[{task.flowResult.status}]
+                            </Text>
+                          )}
+                        </Text>
+                      </Box>
+                    )}
+                    {/* Show workspace info if allocated */}
+                    {task.metadata?.workspacePath && (
+                      <Box paddingLeft={2}>
+                        <Text dimColor>
+                          Workspace: {task.metadata.workspacePath.substring(task.metadata.workspacePath.lastIndexOf('/') + 1)}
+                        </Text>
+                      </Box>
+                    )}
+                    {/* Show recent comments (last one only) */}
+                    {task.comments.length > 0 && (
+                      <Box paddingLeft={2}>
+                        <Text dimColor italic>
+                          {task.comments[task.comments.length - 1].content.substring(0, 50)}
+                          {task.comments[task.comments.length - 1].content.length > 50 ? '...' : ''}
+                        </Text>
+                      </Box>
+                    )}
                   </Box>
                 ))}
               </Box>
