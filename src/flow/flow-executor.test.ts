@@ -1,0 +1,377 @@
+/**
+ * Flow Executor Tests
+ *
+ * Tests for the minimal flow executor with script steps
+ */
+
+import { describe, it, expect, beforeEach } from 'vitest';
+import { FlowExecutor } from './flow-executor.js';
+import type { FlowDefinition, Workspace } from './types.js';
+import * as path from 'path';
+import * as os from 'os';
+
+describe('FlowExecutor', () => {
+  let executor: FlowExecutor;
+  let mockWorkspace: Workspace;
+
+  beforeEach(() => {
+    executor = new FlowExecutor();
+
+    // Create a mock workspace
+    mockWorkspace = {
+      id: 'test-workspace-1',
+      path: process.cwd(),
+      mode: 'isolated',
+      concurrency: {
+        key: 'test',
+        activeTasks: new Set(['task-1']),
+        locked: true,
+      },
+      createdAt: new Date().toISOString(),
+      lastUsedAt: new Date().toISOString(),
+      usageCount: 1,
+    };
+  });
+
+  describe('Simple script execution', () => {
+    it('should execute a simple echo command', async () => {
+      const flow: FlowDefinition = {
+        id: 'test-echo',
+        name: 'Test Echo',
+        description: 'Simple echo test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'script',
+            id: 'echo-hello',
+            name: 'Echo Hello',
+            script: 'echo "Hello World"',
+          },
+        ],
+      };
+
+      const result = await executor.execute({
+        taskId: 'task-1',
+        flow,
+        workspace: mockWorkspace,
+        inputs: {},
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.trace.steps).toHaveLength(1);
+      expect(result.trace.steps[0].stdout).toContain('Hello World');
+      expect(result.trace.steps[0].exitCode).toBe(0);
+    });
+
+    it('should capture exit codes from failed scripts', async () => {
+      const flow: FlowDefinition = {
+        id: 'test-fail',
+        name: 'Test Fail',
+        description: 'Test script failure',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'script',
+            id: 'fail-script',
+            name: 'Fail Script',
+            script: 'exit 42',
+          },
+        ],
+      };
+
+      const result = await executor.execute({
+        taskId: 'task-1',
+        flow,
+        workspace: mockWorkspace,
+        inputs: {},
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.trace.steps[0].exitCode).toBe(42);
+      expect(result.trace.steps[0].error).toContain('42');
+    });
+  });
+
+  describe('Variable interpolation', () => {
+    it('should interpolate input variables', async () => {
+      const flow: FlowDefinition = {
+        id: 'test-vars',
+        name: 'Test Variables',
+        description: 'Test variable interpolation',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {
+          message: 'string',
+        },
+        steps: [
+          {
+            type: 'script',
+            id: 'echo-var',
+            name: 'Echo Variable',
+            script: 'echo "${{ inputs.message }}"',
+          },
+        ],
+      };
+
+      const result = await executor.execute({
+        taskId: 'task-1',
+        flow,
+        workspace: mockWorkspace,
+        inputs: {
+          message: 'Custom Message',
+        },
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.trace.steps[0].stdout).toContain('Custom Message');
+    });
+
+    it('should interpolate task metadata', async () => {
+      const flow: FlowDefinition = {
+        id: 'test-metadata',
+        name: 'Test Metadata',
+        description: 'Test metadata access',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'script',
+            id: 'echo-priority',
+            name: 'Echo Priority',
+            script: 'echo "Priority: ${{ task.priority }}"',
+          },
+        ],
+      };
+
+      const result = await executor.execute({
+        taskId: 'task-1',
+        flow,
+        workspace: mockWorkspace,
+        inputs: {},
+        taskMetadata: {
+          priority: 'high',
+        },
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.trace.steps[0].stdout).toContain('Priority: high');
+    });
+  });
+
+  describe('Multi-step flows', () => {
+    it('should execute multiple steps in sequence', async () => {
+      const flow: FlowDefinition = {
+        id: 'test-multi',
+        name: 'Test Multi-Step',
+        description: 'Test multiple steps',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'script',
+            id: 'step1',
+            name: 'Step 1',
+            script: 'echo "Step 1"',
+            next: {
+              default: 'step2',
+            },
+          },
+          {
+            type: 'script',
+            id: 'step2',
+            name: 'Step 2',
+            script: 'echo "Step 2"',
+            next: {
+              default: 'step3',
+            },
+          },
+          {
+            type: 'script',
+            id: 'step3',
+            name: 'Step 3',
+            script: 'echo "Step 3"',
+          },
+        ],
+      };
+
+      const result = await executor.execute({
+        taskId: 'task-1',
+        flow,
+        workspace: mockWorkspace,
+        inputs: {},
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.trace.steps).toHaveLength(3);
+      expect(result.trace.steps[0].stdout).toContain('Step 1');
+      expect(result.trace.steps[1].stdout).toContain('Step 2');
+      expect(result.trace.steps[2].stdout).toContain('Step 3');
+    });
+
+    it('should stop execution on step failure', async () => {
+      const flow: FlowDefinition = {
+        id: 'test-stop-on-fail',
+        name: 'Test Stop on Failure',
+        description: 'Test that execution stops on failure',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'script',
+            id: 'step1',
+            name: 'Step 1',
+            script: 'echo "Step 1"',
+            next: {
+              default: 'step2',
+            },
+          },
+          {
+            type: 'script',
+            id: 'step2',
+            name: 'Step 2 (fails)',
+            script: 'exit 1',
+            next: {
+              default: 'step3',
+            },
+          },
+          {
+            type: 'script',
+            id: 'step3',
+            name: 'Step 3 (should not run)',
+            script: 'echo "Step 3"',
+          },
+        ],
+      };
+
+      const result = await executor.execute({
+        taskId: 'task-1',
+        flow,
+        workspace: mockWorkspace,
+        inputs: {},
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.trace.steps).toHaveLength(2); // Only step1 and step2
+      expect(result.trace.steps[1].exitCode).toBe(1);
+    });
+  });
+
+  describe('Step output passing', () => {
+    it('should make step outputs available to subsequent steps', async () => {
+      const flow: FlowDefinition = {
+        id: 'test-outputs',
+        name: 'Test Outputs',
+        description: 'Test output passing',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'script',
+            id: 'generate',
+            name: 'Generate Value',
+            script: 'echo "generated-value"',
+            next: {
+              default: 'use',
+            },
+          },
+          {
+            type: 'script',
+            id: 'use',
+            name: 'Use Value',
+            script: 'echo "Using: ${{ steps.generate.outputs.stdout }}"',
+          },
+        ],
+      };
+
+      const result = await executor.execute({
+        taskId: 'task-1',
+        flow,
+        workspace: mockWorkspace,
+        inputs: {},
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.trace.steps).toHaveLength(2);
+      expect(result.trace.steps[1].stdout).toContain('Using:');
+      expect(result.trace.steps[1].stdout).toContain('generated-value');
+    });
+  });
+
+  describe('Execution traces', () => {
+    it('should create complete execution traces', async () => {
+      const flow: FlowDefinition = {
+        id: 'test-trace',
+        name: 'Test Trace',
+        description: 'Test trace creation',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'script',
+            id: 'traced-step',
+            name: 'Traced Step',
+            script: 'echo "test"',
+          },
+        ],
+      };
+
+      const result = await executor.execute({
+        taskId: 'task-1',
+        flow,
+        workspace: mockWorkspace,
+        inputs: {},
+      });
+
+      expect(result.trace).toBeDefined();
+      expect(result.trace.id).toBeDefined();
+      expect(result.trace.taskId).toBe('task-1');
+      expect(result.trace.flowId).toBe('test-trace');
+      expect(result.trace.workspaceId).toBe('test-workspace-1');
+      expect(result.trace.startTime).toBeDefined();
+      expect(result.trace.endTime).toBeDefined();
+      expect(result.trace.status).toBe('completed');
+      expect(result.trace.steps).toHaveLength(1);
+
+      const stepTrace = result.trace.steps[0];
+      expect(stepTrace.stepId).toBe('traced-step');
+      expect(stepTrace.stepName).toBe('Traced Step');
+      expect(stepTrace.stepType).toBe('script');
+      expect(stepTrace.startTime).toBeDefined();
+      expect(stepTrace.endTime).toBeDefined();
+      expect(stepTrace.durationMs).toBeGreaterThan(0);
+    });
+  });
+});

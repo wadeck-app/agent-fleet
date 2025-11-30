@@ -1,0 +1,329 @@
+/**
+ * Integration Tests
+ *
+ * Tests complex flows that use all features together:
+ * - Multiple steps with variable interpolation
+ * - Output extraction with transforms
+ * - Conditional transitions
+ * - Retry logic
+ */
+
+import { describe, it, expect, beforeEach } from 'vitest';
+import { FlowExecutor } from './flow-executor.js';
+import type { FlowDefinition, Workspace } from './types.js';
+
+describe('Integration Tests', () => {
+  let executor: FlowExecutor;
+  let mockWorkspace: Workspace;
+
+  beforeEach(() => {
+    executor = new FlowExecutor();
+
+    mockWorkspace = {
+      id: 'test-workspace',
+      path: process.cwd(),
+      mode: 'isolated',
+      concurrency: {
+        key: 'test',
+        activeTasks: new Set(['task-1']),
+        locked: true,
+      },
+      createdAt: new Date().toISOString(),
+      lastUsedAt: new Date().toISOString(),
+      usageCount: 1,
+    };
+  });
+
+  it('should execute flow with variable interpolation and conditional branching', async () => {
+    const flow: FlowDefinition = {
+      id: 'conditional-flow',
+      name: 'Conditional Flow Test',
+      description: 'Test flow with conditions',
+      workspace: {
+        mode: 'isolated',
+        gitStrategy: 'main-only',
+        reusePolicy: 'never',
+      },
+      inputs: {
+        threshold: 'number',
+      },
+      steps: [
+        {
+          type: 'script',
+          id: 'check-value',
+          name: 'Check Value',
+          script: 'echo 10',
+          output: {
+            value: { type: 'number', transform: 'parseInt' },
+          },
+          next: {
+            conditions: [
+              { when: 'output.value > inputs.threshold', goto: 'high-path' },
+              { when: 'output.value < inputs.threshold', goto: 'low-path' },
+            ],
+            default: 'equal-path',
+          },
+        },
+        {
+          type: 'script',
+          id: 'high-path',
+          name: 'High Value Path',
+          script: 'echo "Value is high"',
+        },
+        {
+          type: 'script',
+          id: 'low-path',
+          name: 'Low Value Path',
+          script: 'echo "Value is low"',
+        },
+        {
+          type: 'script',
+          id: 'equal-path',
+          name: 'Equal Value Path',
+          script: 'echo "Value is equal"',
+        },
+      ],
+    };
+
+    // Test high path
+    const resultHigh = await executor.execute({
+      taskId: 'task-1',
+      flow,
+      workspace: mockWorkspace,
+      inputs: { threshold: 5 },
+    });
+
+    expect(resultHigh.success).toBe(true);
+    expect(resultHigh.trace.steps).toHaveLength(2);
+    expect(resultHigh.trace.steps[1].stepId).toBe('high-path');
+    expect(resultHigh.trace.steps[1].stdout).toContain('high');
+
+    // Test low path
+    const resultLow = await executor.execute({
+      taskId: 'task-1',
+      flow,
+      workspace: mockWorkspace,
+      inputs: { threshold: 15 },
+    });
+
+    expect(resultLow.success).toBe(true);
+    expect(resultLow.trace.steps).toHaveLength(2);
+    expect(resultLow.trace.steps[1].stdout).toContain('low');
+
+    // Test equal path
+    const resultEqual = await executor.execute({
+      taskId: 'task-1',
+      flow,
+      workspace: mockWorkspace,
+      inputs: { threshold: 10 },
+    });
+
+    expect(resultEqual.success).toBe(true);
+    expect(resultEqual.trace.steps).toHaveLength(2);
+    expect(resultEqual.trace.steps[1].stdout).toContain('equal');
+  });
+
+  it('should handle complex output extraction and pass between steps', async () => {
+    const flow: FlowDefinition = {
+      id: 'output-chain',
+      name: 'Output Chain Test',
+      description: 'Test output passing',
+      workspace: {
+        mode: 'isolated',
+        gitStrategy: 'main-only',
+        reusePolicy: 'never',
+      },
+      inputs: {},
+      steps: [
+        {
+          type: 'script',
+          id: 'generate-json',
+          name: 'Generate JSON',
+          script: 'echo "{\\"name\\":\\"test\\",\\"count\\":42}"',
+          output: {
+            data: { type: 'object', transform: 'parseJSON' },
+          },
+          next: { default: 'extract-fields' },
+        },
+        {
+          type: 'script',
+          id: 'extract-fields',
+          name: 'Extract Fields',
+          script: 'echo "Name: test, Count: 42"',
+          output: {
+            name: { type: 'string', pattern: 'Name: (\\w+)' },
+            count: { type: 'number', pattern: 'Count: (\\d+)', transform: 'parseInt' },
+          },
+          next: { default: 'use-extracted' },
+        },
+        {
+          type: 'script',
+          id: 'use-extracted',
+          name: 'Use Extracted Data',
+          script: 'echo "Processing ${{ steps.extract-fields.outputs.name }} with ${{ steps.extract-fields.outputs.count }}"',
+        },
+      ],
+    };
+
+    const result = await executor.execute({
+      taskId: 'task-1',
+      flow,
+      workspace: mockWorkspace,
+      inputs: {},
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.trace.steps).toHaveLength(3);
+
+    // Check first step output
+    expect(result.outputs['generate-json'].data).toEqual({
+      name: 'test',
+      count: 42,
+    });
+
+    // Check second step extraction
+    expect(result.outputs['extract-fields'].name).toBe('test');
+    expect(result.outputs['extract-fields'].count).toBe(42);
+
+    // Check third step used the values
+    expect(result.trace.steps[2].stdout).toContain('test');
+    expect(result.trace.steps[2].stdout).toContain('42');
+  });
+
+  it('should use task metadata in conditions', async () => {
+    const flow: FlowDefinition = {
+      id: 'metadata-flow',
+      name: 'Metadata Flow Test',
+      description: 'Test task metadata usage',
+      workspace: {
+        mode: 'isolated',
+        gitStrategy: 'main-only',
+        reusePolicy: 'never',
+      },
+      inputs: {},
+      steps: [
+        {
+          type: 'script',
+          id: 'check-priority',
+          name: 'Check Priority',
+          script: 'echo "${{ task.priority }}"',
+          next: {
+            conditions: [
+              { when: "task.priority === 'high'", goto: 'urgent' },
+            ],
+            default: 'normal',
+          },
+        },
+        {
+          type: 'script',
+          id: 'urgent',
+          name: 'Urgent Processing',
+          script: 'echo "URGENT processing"',
+        },
+        {
+          type: 'script',
+          id: 'normal',
+          name: 'Normal Processing',
+          script: 'echo "Normal processing"',
+        },
+      ],
+    };
+
+    const result = await executor.execute({
+      taskId: 'task-1',
+      flow,
+      workspace: mockWorkspace,
+      inputs: {},
+      taskMetadata: {
+        priority: 'high',
+        createdAt: '2024-01-01',
+      },
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.trace.steps).toHaveLength(2);
+    expect(result.trace.steps[0].stdout).toContain('high');
+    expect(result.trace.steps[1].stdout).toContain('URGENT');
+  });
+
+  it('should handle multi-step flow with all features combined', async () => {
+    const flow: FlowDefinition = {
+      id: 'complex-flow',
+      name: 'Complex Flow Test',
+      description: 'Complex flow with all features',
+      workspace: {
+        mode: 'isolated',
+        gitStrategy: 'main-only',
+        reusePolicy: 'never',
+      },
+      inputs: {
+        input: 'string',
+      },
+      steps: [
+        {
+          type: 'script',
+          id: 'step1',
+          name: 'Step 1: Process Input',
+          script: 'echo "Processing: ${{ inputs.input }}"',
+          output: {
+            processed: { type: 'string', pattern: 'Processing: (.*)' },
+          },
+          next: { default: 'step2' },
+        },
+        {
+          type: 'script',
+          id: 'step2',
+          name: 'Step 2: Generate Count',
+          script: 'echo "Count: 5"',
+          output: {
+            count: { type: 'number', pattern: 'Count: (\\d+)', transform: 'parseInt' },
+          },
+          next: {
+            conditions: [
+              { when: 'output.count > 3', goto: 'step3-high' },
+            ],
+            default: 'step3-low',
+          },
+        },
+        {
+          type: 'script',
+          id: 'step3-high',
+          name: 'Step 3: High Count Path',
+          script: 'echo "High count: ${{ steps.step2.outputs.count }}"',
+          next: { default: 'step4' },
+        },
+        {
+          type: 'script',
+          id: 'step3-low',
+          name: 'Step 3: Low Count Path',
+          script: 'echo "Low count: ${{ steps.step2.outputs.count }}"',
+          next: { default: 'step4' },
+        },
+        {
+          type: 'script',
+          id: 'step4',
+          name: 'Step 4: Final',
+          script: 'echo "Final: ${{ steps.step1.outputs.processed }}"',
+        },
+      ],
+    };
+
+    const result = await executor.execute({
+      taskId: 'task-1',
+      flow,
+      workspace: mockWorkspace,
+      inputs: { input: 'test-data' },
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.trace.steps).toHaveLength(4);
+
+    // Verify the flow went through high path
+    expect(result.trace.steps[2].stepId).toBe('step3-high');
+
+    // Verify variable interpolation worked throughout
+    expect(result.trace.steps[0].stdout).toContain('test-data');
+    expect(result.trace.steps[2].stdout).toContain('5');
+    expect(result.trace.steps[3].stdout).toContain('test-data');
+  });
+});
