@@ -13,12 +13,12 @@ export type ModelType = 'sonnet' | 'haiku' | 'opus';
 /**
  * Workspace modes determine isolation and concurrency behavior
  */
-export type WorkspaceMode = 'isolated' | 'shared';
+export type WorkspaceMode = 'isolated' | 'shared' | 'manual';
 
 /**
  * Git strategy defines which branches can be used
  */
-export type GitStrategy = 'main-only' | 'feature-branch' | 'any';
+export type GitStrategy = 'main-only' | 'feature-branch' | 'any' | 'worktree';
 
 /**
  * Reuse policy determines when workspaces can be reused
