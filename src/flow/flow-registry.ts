@@ -14,6 +14,8 @@ import type {
   WorkspaceConfig,
   VariableType,
 } from './types.js';
+import { FlowValidator } from './flow-validator.js';
+import type { ValidationResult } from './flow-validator.js';
 
 /**
  * Validation error for flow definitions
@@ -186,6 +188,7 @@ Files: \${{ steps.analyze.outputs.filesToModify }}`,
 export class FlowRegistry {
   private flows: Map<string, FlowDefinition> = new Map();
   private configPath: string;
+  private validator: FlowValidator;
 
   /**
    * Create a new flow registry
@@ -193,6 +196,7 @@ export class FlowRegistry {
    */
   constructor(projectRoot: string) {
     this.configPath = path.join(projectRoot, '.agent-fleet', 'flows.yaml');
+    this.validator = new FlowValidator();
     this.loadDefaultFlows();
   }
 
@@ -226,9 +230,45 @@ export class FlowRegistry {
       for (const [id, flowData] of Object.entries(parsed)) {
         try {
           const flow = this.parseFlowDefinition(id, flowData);
-          this.validateFlow(flow);
+
+          // Use new validator for comprehensive validation
+          const validationResult = this.validator.validate(flow);
+
+          if (!validationResult.valid) {
+            // Log all validation errors
+            console.error(`\nValidation failed for flow '${id}':`);
+            console.error(`  Errors: ${validationResult.summary.errors}`);
+            console.error(`  Warnings: ${validationResult.summary.warnings}\n`);
+
+            for (const issue of validationResult.issues) {
+              if (issue.severity === 'error') {
+                console.error(`  [ERROR] ${issue.message}`);
+                if (issue.location?.stepId) {
+                  console.error(`    at step: ${issue.location.stepId}`);
+                }
+                if (issue.suggestion) {
+                  console.error(`    suggestion: ${issue.suggestion}`);
+                }
+              }
+            }
+
+            throw new FlowValidationError(id, 'Flow validation failed. See errors above.');
+          }
+
+          // Log warnings (non-blocking)
+          const warnings = validationResult.issues.filter((i) => i.severity === 'warning');
+          if (warnings.length > 0) {
+            console.warn(`\nWarnings for flow '${id}':`);
+            for (const warning of warnings) {
+              console.warn(`  [WARN] ${warning.message}`);
+              if (warning.suggestion) {
+                console.warn(`    suggestion: ${warning.suggestion}`);
+              }
+            }
+          }
+
           this.flows.set(id, flow);
-          console.log(`Loaded flow: ${id}`);
+          console.log(`✓ Loaded flow: ${id}`);
         } catch (error) {
           if (error instanceof FlowValidationError) {
             console.error(`Failed to load flow '${id}':`, error.message);
@@ -309,134 +349,11 @@ export class FlowRegistry {
   }
 
   /**
-   * Validate a flow definition
-   * @throws FlowValidationError if validation fails
+   * Validate a flow definition using the new validator
+   * @returns Validation result with detailed errors
    */
-  private validateFlow(flow: FlowDefinition): void {
-    // Validate basic structure
-    if (!flow.id) {
-      throw new FlowValidationError(flow.id, 'Flow ID is required');
-    }
-
-    if (!flow.steps || flow.steps.length === 0) {
-      throw new FlowValidationError(flow.id, 'Flow must have at least one step');
-    }
-
-    // Validate steps
-    const stepIds = new Set<string>();
-    for (const step of flow.steps) {
-      // Check for duplicate step IDs
-      if (stepIds.has(step.id)) {
-        throw new FlowValidationError(
-          flow.id,
-          `Duplicate step ID: ${step.id}`
-        );
-      }
-      stepIds.add(step.id);
-
-      // Validate step has required fields
-      if (!step.id) {
-        throw new FlowValidationError(flow.id, 'Step ID is required');
-      }
-
-      // Type-specific validation
-      switch (step.type) {
-        case 'model':
-          // Model step validation
-          if (!step.prompt) {
-            throw new FlowValidationError(
-              flow.id,
-              `Model step ${step.id} must have a prompt`
-            );
-          }
-
-          if (!['sonnet', 'haiku', 'opus'].includes(step.model)) {
-            throw new FlowValidationError(
-              flow.id,
-              `Step ${step.id} has invalid model: ${step.model}`
-            );
-          }
-          break;
-
-        case 'script':
-          // Script step validation
-          if (!step.script) {
-            throw new FlowValidationError(
-              flow.id,
-              `Script step ${step.id} must have a script command`
-            );
-          }
-          break;
-
-        default:
-          // This should never happen if types are correct
-          const exhaustiveCheck: never = step;
-          throw new FlowValidationError(
-            flow.id,
-            `Step has invalid type: ${(exhaustiveCheck as any).type}`
-          );
-      }
-    }
-
-    // Validate step references
-    for (const step of flow.steps) {
-      // Validate next.default references
-      if (step.next?.default && !stepIds.has(step.next.default)) {
-        throw new FlowValidationError(
-          flow.id,
-          `Step ${step.id} references non-existent step: ${step.next.default}`
-        );
-      }
-
-      // Validate condition goto references
-      if (step.next?.conditions) {
-        for (const condition of step.next.conditions) {
-          if (!stepIds.has(condition.goto)) {
-            throw new FlowValidationError(
-              flow.id,
-              `Step ${step.id} condition references non-existent step: ${condition.goto}`
-            );
-          }
-        }
-      }
-
-      // Validate previousOutputs references
-      if (step.context?.previousOutputs) {
-        for (const refStepId of step.context.previousOutputs) {
-          if (!stepIds.has(refStepId)) {
-            throw new FlowValidationError(
-              flow.id,
-              `Step ${step.id} references non-existent step in previousOutputs: ${refStepId}`
-            );
-          }
-        }
-      }
-    }
-
-    // Validate workspace config
-    const validModes = ['isolated', 'shared'];
-    if (!validModes.includes(flow.workspace.mode)) {
-      throw new FlowValidationError(
-        flow.id,
-        `Invalid workspace mode: ${flow.workspace.mode}`
-      );
-    }
-
-    const validGitStrategies = ['main-only', 'feature-branch', 'any'];
-    if (!validGitStrategies.includes(flow.workspace.gitStrategy)) {
-      throw new FlowValidationError(
-        flow.id,
-        `Invalid git strategy: ${flow.workspace.gitStrategy}`
-      );
-    }
-
-    const validReusePolicies = ['never', 'if-available', 'always'];
-    if (!validReusePolicies.includes(flow.workspace.reusePolicy)) {
-      throw new FlowValidationError(
-        flow.id,
-        `Invalid reuse policy: ${flow.workspace.reusePolicy}`
-      );
-    }
+  public validateFlow(flow: FlowDefinition): ValidationResult {
+    return this.validator.validate(flow);
   }
 
   /**
@@ -479,7 +396,13 @@ export class FlowRegistry {
    * @throws FlowValidationError if validation fails
    */
   public registerFlow(flow: FlowDefinition): void {
-    this.validateFlow(flow);
+    const result = this.validateFlow(flow);
+    if (!result.valid) {
+      throw new FlowValidationError(
+        flow.id,
+        `Flow validation failed with ${result.summary.errors} error(s)`
+      );
+    }
     this.flows.set(flow.id, flow);
   }
 

@@ -1,0 +1,962 @@
+/**
+ * Tests for FlowValidator
+ */
+
+import { describe, it, expect } from 'vitest';
+import { FlowValidator, ValidationCode } from './flow-validator.js';
+import type { FlowDefinition } from './types.js';
+
+describe('FlowValidator', () => {
+  const validator = new FlowValidator();
+
+  describe('Schema Validation', () => {
+    it('should validate a correct flow', () => {
+      const flow: FlowDefinition = {
+        id: 'test-flow',
+        name: 'Test Flow',
+        description: 'A test flow',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {
+          foo: 'string',
+        },
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'Test prompt',
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      expect(result.valid).toBe(true);
+      expect(result.issues).toHaveLength(0);
+      expect(result.summary.errors).toBe(0);
+    });
+
+    it('should detect missing flow ID', () => {
+      const flow: any = {
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'Test',
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      expect(result.valid).toBe(false);
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({
+          code: ValidationCode.MISSING_FIELD,
+          severity: 'error',
+          location: expect.objectContaining({ field: 'id' }),
+        })
+      );
+    });
+
+    it('should detect missing flow name', () => {
+      const flow: any = {
+        id: 'test',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'Test',
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      expect(result.valid).toBe(false);
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({
+          code: ValidationCode.MISSING_FIELD,
+          severity: 'error',
+          location: expect.objectContaining({ field: 'name' }),
+        })
+      );
+    });
+
+    it('should warn about missing description', () => {
+      const flow: any = {
+        id: 'test',
+        name: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'Test',
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({
+          code: ValidationCode.MISSING_FIELD,
+          severity: 'warning',
+          location: expect.objectContaining({ field: 'description' }),
+        })
+      );
+    });
+
+    it('should detect invalid workspace mode', () => {
+      const flow: any = {
+        id: 'test',
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'invalid',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'Test',
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      expect(result.valid).toBe(false);
+      const error = result.issues.find((i) => i.code === ValidationCode.INVALID_VALUE);
+      expect(error).toBeDefined();
+      expect(error?.context?.related).toContain('isolated');
+      expect(error?.context?.related).toContain('shared');
+    });
+
+    it('should detect invalid git strategy', () => {
+      const flow: any = {
+        id: 'test',
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'invalid-strategy',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'Test',
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      expect(result.valid).toBe(false);
+      const error = result.issues.find(
+        (i) => i.code === ValidationCode.INVALID_VALUE && i.location?.field === 'workspace.gitStrategy'
+      );
+      expect(error).toBeDefined();
+      expect(error?.context?.related).toContain('main-only');
+      expect(error?.context?.related).toContain('worktree');
+    });
+
+    it('should detect empty steps array', () => {
+      const flow: any = {
+        id: 'test',
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [],
+      };
+
+      const result = validator.validate(flow);
+
+      expect(result.valid).toBe(false);
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({
+          code: ValidationCode.EMPTY_COLLECTION,
+          severity: 'error',
+        })
+      );
+    });
+
+    it('should detect duplicate step IDs', () => {
+      const flow: FlowDefinition = {
+        id: 'test',
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'Test',
+          },
+          {
+            type: 'model',
+            id: 'step1', // Duplicate!
+            name: 'Step 2',
+            model: 'haiku',
+            prompt: 'Test',
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      expect(result.valid).toBe(false);
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({
+          code: ValidationCode.DUPLICATE_ID,
+          severity: 'error',
+        })
+      );
+    });
+
+    it('should detect missing prompt in model step', () => {
+      const flow: any = {
+        id: 'test',
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            // prompt missing
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      expect(result.valid).toBe(false);
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({
+          code: ValidationCode.MISSING_FIELD,
+          severity: 'error',
+          location: expect.objectContaining({
+            stepId: 'step1',
+            field: 'prompt',
+          }),
+        })
+      );
+    });
+
+    it('should detect invalid model type', () => {
+      const flow: any = {
+        id: 'test',
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'gpt-4', // Invalid!
+            prompt: 'Test',
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      expect(result.valid).toBe(false);
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({
+          code: ValidationCode.INVALID_VALUE,
+          severity: 'error',
+          location: expect.objectContaining({
+            stepId: 'step1',
+            field: 'model',
+          }),
+        })
+      );
+    });
+
+    it('should detect missing script in script step', () => {
+      const flow: any = {
+        id: 'test',
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'script',
+            id: 'step1',
+            name: 'Step 1',
+            // script missing
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      expect(result.valid).toBe(false);
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({
+          code: ValidationCode.MISSING_FIELD,
+          severity: 'error',
+          location: expect.objectContaining({
+            stepId: 'step1',
+            field: 'script',
+          }),
+        })
+      );
+    });
+  });
+
+  describe('Step References Validation', () => {
+    it('should detect undefined step in next.default', () => {
+      const flow: FlowDefinition = {
+        id: 'test',
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'Test',
+            next: {
+              default: 'nonexistent', // Undefined step!
+            },
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      expect(result.valid).toBe(false);
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({
+          code: ValidationCode.UNDEFINED_STEP,
+          severity: 'error',
+          location: expect.objectContaining({
+            stepId: 'step1',
+            field: 'next.default',
+          }),
+        })
+      );
+    });
+
+    it('should detect undefined step in condition goto', () => {
+      const flow: FlowDefinition = {
+        id: 'test',
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'Test',
+            next: {
+              conditions: [
+                {
+                  when: 'true',
+                  goto: 'nonexistent', // Undefined step!
+                },
+              ],
+            },
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      expect(result.valid).toBe(false);
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({
+          code: ValidationCode.UNDEFINED_STEP,
+          severity: 'error',
+        })
+      );
+    });
+
+    it('should detect undefined step in previousOutputs', () => {
+      const flow: FlowDefinition = {
+        id: 'test',
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'Test',
+            context: {
+              previousOutputs: ['nonexistent'], // Undefined step!
+            },
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      expect(result.valid).toBe(false);
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({
+          code: ValidationCode.UNDEFINED_STEP,
+          severity: 'error',
+          location: expect.objectContaining({
+            stepId: 'step1',
+            field: 'context.previousOutputs',
+          }),
+        })
+      );
+    });
+  });
+
+  describe('Template Variable Validation', () => {
+    it('should detect undefined input reference', () => {
+      const flow: FlowDefinition = {
+        id: 'test',
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {
+          foo: 'string',
+        },
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'Use input: ${{ inputs.bar }}', // 'bar' not defined!
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      expect(result.valid).toBe(false);
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({
+          code: ValidationCode.UNDEFINED_INPUT,
+          severity: 'error',
+          location: expect.objectContaining({
+            stepId: 'step1',
+          }),
+        })
+      );
+    });
+
+    it('should detect undefined step reference in template', () => {
+      const flow: FlowDefinition = {
+        id: 'test',
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'Use output: ${{ steps.nonexistent.outputs.foo }}', // step doesn't exist!
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      expect(result.valid).toBe(false);
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({
+          code: ValidationCode.UNDEFINED_STEP,
+          severity: 'error',
+        })
+      );
+    });
+
+    it('should accept valid input reference', () => {
+      const flow: FlowDefinition = {
+        id: 'test',
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {
+          foo: 'string',
+        },
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'Use input: ${{ inputs.foo }}',
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      // Should have no errors related to undefined inputs
+      const inputErrors = result.issues.filter((i) => i.code === ValidationCode.UNDEFINED_INPUT);
+      expect(inputErrors).toHaveLength(0);
+    });
+
+    it('should accept valid step output reference', () => {
+      const flow: FlowDefinition = {
+        id: 'test',
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'First step',
+            output: {
+              result: { type: 'string' },
+            },
+          },
+          {
+            type: 'model',
+            id: 'step2',
+            name: 'Step 2',
+            model: 'haiku',
+            prompt: 'Use output: ${{ steps.step1.outputs.result }}',
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      // Should have no errors related to undefined steps
+      const stepErrors = result.issues.filter(
+        (i) => i.code === ValidationCode.UNDEFINED_STEP && i.severity === 'error'
+      );
+      expect(stepErrors).toHaveLength(0);
+    });
+  });
+
+  describe('Cycle Detection', () => {
+    it('should detect simple cycle', () => {
+      const flow: FlowDefinition = {
+        id: 'test',
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'Test',
+            next: { default: 'step2' },
+          },
+          {
+            type: 'model',
+            id: 'step2',
+            name: 'Step 2',
+            model: 'haiku',
+            prompt: 'Test',
+            next: { default: 'step1' }, // Cycle!
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      expect(result.valid).toBe(false);
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({
+          code: ValidationCode.CIRCULAR_DEPENDENCY,
+          severity: 'error',
+        })
+      );
+    });
+
+    it('should detect complex cycle', () => {
+      const flow: FlowDefinition = {
+        id: 'test',
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'Test',
+            next: { default: 'step2' },
+          },
+          {
+            type: 'model',
+            id: 'step2',
+            name: 'Step 2',
+            model: 'haiku',
+            prompt: 'Test',
+            next: { default: 'step3' },
+          },
+          {
+            type: 'model',
+            id: 'step3',
+            name: 'Step 3',
+            model: 'haiku',
+            prompt: 'Test',
+            next: { default: 'step1' }, // Cycle through 3 steps!
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      expect(result.valid).toBe(false);
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({
+          code: ValidationCode.CIRCULAR_DEPENDENCY,
+          severity: 'error',
+        })
+      );
+    });
+
+    it('should allow valid flow without cycles', () => {
+      const flow: FlowDefinition = {
+        id: 'test',
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'Test',
+            next: { default: 'step2' },
+          },
+          {
+            type: 'model',
+            id: 'step2',
+            name: 'Step 2',
+            model: 'haiku',
+            prompt: 'Test',
+            next: { default: 'step3' },
+          },
+          {
+            type: 'model',
+            id: 'step3',
+            name: 'Step 3',
+            model: 'haiku',
+            prompt: 'Test',
+            // No next - terminal step
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      const cycleErrors = result.issues.filter((i) => i.code === ValidationCode.CIRCULAR_DEPENDENCY);
+      expect(cycleErrors).toHaveLength(0);
+    });
+  });
+
+  describe('Reachability Check', () => {
+    it('should detect unreachable step', () => {
+      const flow: FlowDefinition = {
+        id: 'test',
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'Test',
+            next: { default: 'step2' },
+          },
+          {
+            type: 'model',
+            id: 'step2',
+            name: 'Step 2',
+            model: 'haiku',
+            prompt: 'Test',
+            // No transition to step3
+          },
+          {
+            type: 'model',
+            id: 'step3', // Unreachable!
+            name: 'Step 3',
+            model: 'haiku',
+            prompt: 'Test',
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({
+          code: ValidationCode.UNREACHABLE_STEP,
+          severity: 'warning',
+          location: expect.objectContaining({
+            stepId: 'step3',
+          }),
+        })
+      );
+    });
+  });
+
+  describe('Multiple Errors Collection', () => {
+    it('should collect multiple errors at once', () => {
+      const flow: any = {
+        // Missing ID
+        name: 'Test',
+        // Missing description
+        workspace: {
+          mode: 'invalid-mode', // Invalid
+          gitStrategy: 'invalid-strategy', // Invalid
+          reusePolicy: 'invalid-policy', // Invalid
+        },
+        inputs: {
+          foo: 'invalid-type', // Invalid
+        },
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            // Missing prompt
+            model: 'invalid-model', // Invalid
+          },
+          {
+            type: 'model',
+            id: 'step1', // Duplicate ID
+            name: 'Step 2',
+            model: 'haiku',
+            prompt: 'Test',
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      // Should have multiple errors
+      expect(result.summary.errors).toBeGreaterThan(5);
+      expect(result.valid).toBe(false);
+
+      // Check that various error types are present
+      const errorCodes = result.issues.map((i) => i.code);
+      expect(errorCodes).toContain(ValidationCode.MISSING_FIELD);
+      expect(errorCodes).toContain(ValidationCode.INVALID_VALUE);
+      expect(errorCodes).toContain(ValidationCode.DUPLICATE_ID);
+    });
+  });
+
+  describe('Error Structure for UI', () => {
+    it('should provide rich error information', () => {
+      const flow: any = {
+        id: 'test',
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'invalid-mode',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'Test',
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      const error = result.issues.find((i) => i.code === ValidationCode.INVALID_VALUE);
+
+      expect(error).toBeDefined();
+      expect(error).toHaveProperty('severity');
+      expect(error).toHaveProperty('code');
+      expect(error).toHaveProperty('message');
+      expect(error).toHaveProperty('location');
+      expect(error).toHaveProperty('suggestion');
+      expect(error).toHaveProperty('context');
+
+      // Context should have useful information for UI
+      expect(error?.context).toHaveProperty('actual');
+      expect(error?.context).toHaveProperty('expected');
+      expect(error?.context?.related).toBeDefined();
+    });
+
+    it('should provide location information', () => {
+      const flow: FlowDefinition = {
+        id: 'test',
+        name: 'Test',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'Test',
+            next: {
+              default: 'nonexistent',
+            },
+          },
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      const error = result.issues.find((i) => i.code === ValidationCode.UNDEFINED_STEP);
+
+      expect(error?.location).toBeDefined();
+      expect(error?.location?.stepId).toBe('step1');
+      expect(error?.location?.field).toBe('next.default');
+    });
+  });
+});
