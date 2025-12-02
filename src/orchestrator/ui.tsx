@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, render } from 'ink';
 import { Task, WorkerInfo, TaskStatus } from '../shared/types.js';
-import { StateManager, StateEvent } from '../shared/state-manager.js';
-import { TaskManager } from './task-manager.js';
-import { WorkerWebSocketServer } from './websocket-server.js';
+import { StateManager, StateEvent } from '../shared/StateManager.js';
+import { TaskManager } from './core/TaskManager.js';
+import { WorkerWebSocketServer } from './websocket/WorkerWebSocketServer.js';
 
 interface OrchestratorUIProps {
   taskManager: TaskManager;

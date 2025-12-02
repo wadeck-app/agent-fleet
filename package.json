@@ -4,21 +4,30 @@
   "description": "Multi-agent orchestration system for autonomous development",
   "main": "dist/orchestrator/index.js",
   "type": "module",
+  "bin": {
+    "fleet-orchestrator": "./bin/fleet-orchestrator.js",
+    "fleet-worker": "./bin/fleet-worker.js",
+    "fleet-task": "./bin/fleet-task.js"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/orchestrator/index.ts",
+    "orch:dev": "tsx watch src/orchestrator/index.ts",
+    "orch:dev:no-watch": "tsx src/orchestrator/index.ts",
     "start": "node dist/orchestrator/index.js",
     "add-task": "tsx src/cli/entry-point.ts",
-    "worker:dev": "tsx src/workers/dev-worker.ts",
+    "worker:dev": "tsx watch src/workers/dev-worker.ts",
+    "worker:dev:no-watch": "tsx src/workers/dev-worker.ts",
     "worker:dev:i": "tsx src/workers/dev-worker.ts --interactive",
-    "worker:dev:interactive": "tsx src/workers/dev-worker.ts --interactive",
     "worker:dev:test": "tsx src/workers/dev-worker.ts --interactive --test",
-    "worker:flow": "tsx src/workers/flow-worker.ts",
-    "worker:flow:i": "tsx src/workers/flow-worker.ts --interactive",
-    "worker:flow:interactive": "tsx src/workers/flow-worker.ts --interactive",
+    "worker:flow": "tsx watch src/workers/flow-worker.ts",
+    "worker:flow:no-watch": "tsx src/workers/flow-worker.ts",
+    "worker:flow:i": "tsx watch src/workers/flow-worker.ts --interactive",
+    "worker:flow:i:no-watch": "tsx src/workers/flow-worker.ts --interactive",
     "test:old": "tsx test/simple-task.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [
     "ai",
@@ -42,8 +51,11 @@
     "@types/express": "^4.17.21",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.11.0",
+    "@types/supertest": "^6.0.3",
     "@types/uuid": "^9.0.7",
     "@types/ws": "^8.5.10",
+    "@vitest/coverage-v8": "^4.0.14",
+    "supertest": "^7.1.4",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3",
     "vitest": "^4.0.14"

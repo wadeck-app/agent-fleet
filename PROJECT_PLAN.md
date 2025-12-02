@@ -40,7 +40,7 @@ Agent Fleet is a distributed system for orchestrating AI-powered development tas
 
 ### ✅ Phase 2: DAG with `depends` (COMPLETED)
 
-**Status**: ✅ Complete
+**Status**: ✅ Complete (2025-12-01)
 
 **Goal**: Replace `next` with `depends` to enable parallel execution and proper dependency management
 
@@ -155,22 +155,32 @@ steps:
 - [x] DAGValidator class (src/flow/dag-validator.ts)
 - [x] FlowExecutor refactor to use DAG (src/flow/flow-executor.ts)
 - [x] Update FlowValidator for depends validation (src/flow/flow-validator.ts)
-- [x] Example flow with parallel execution (.agent-fleet/flows.yaml)
+- [x] Example flows with parallel execution (.agent-fleet/flows.yaml)
+  - test-diamond: Diamond pattern (fork-join: A → B+C → D)
+  - test-fork: 3-way fork pattern (A → B+C+D)
 - [x] Updated flow-registry.ts to use depends
+- [x] Real-time log streaming with timestamps (ScriptExecutor)
+- [x] Windows CMD compatible scripts (using `ping` for delays)
+- [x] CLI support for flow inputs via `-i:key=value` syntax
 - [ ] Unit tests for DAGBuilder and DAGValidator (deferred)
 - [ ] Integration tests updated for DAG (deferred - test files temporarily skipped)
 
 **Known Issues**:
 - Test files (flow-executor.test.ts, flow-validator.test.ts, integration.test.ts) temporarily renamed to `.skip` as they use old `next` field
 - Tests need to be updated to use `depends` field instead of `next` (follow-up task)
+- **Important**: When using `npm run add-task` with `-i:` flags, must use `--` separator:
+  ```bash
+  npm run add-task -- create "Task" high flow-id -i:key=value
+                    ^^
+  ```
 
-**Time taken**: ~1 hour
+**Time taken**: ~3 hours
 
 ---
 
-### 🎯 Phase 3: Feedback Loops with `goto` (Priority 2)
+### ✅ Phase 3: Feedback Loops with `goto` (COMPLETED)
 
-**Status**: 📋 Planned (after Phase 2)
+**Status**: ✅ Complete (2025-12-01)
 
 **Goal**: Support quality loops where review/test steps can send back to earlier steps
 
@@ -253,14 +263,29 @@ steps:
 - Add loop metadata to FlowTrace
 
 **Deliverables**:
-- [ ] LoopHandler class with tests
-- [ ] Integration with FlowExecutor
-- [ ] Iteration tracking system
-- [ ] Max iteration enforcement
-- [ ] Tests for various loop scenarios
-- [ ] Tests for infinite loop prevention
+- [x] LoopHandler class (src/flow/loop-handler.ts - 263 lines)
+- [x] Integration with FlowExecutor
+- [x] Iteration tracking system (per-step Map<string, number>)
+- [x] Max iteration enforcement (default: 3, configurable per step)
+- [x] Test flows:
+  - test-loop: Simple retry pattern (3 iterations)
+  - test-review-loop: Code review feedback (2 iterations)
+- [x] Validation for onFailure.goto in FlowValidator
+- [x] Flow registry parsing for onFailure field
+- [x] Type definitions (FailureConfig, FlowExecutionContext.meta)
+- [x] DECISIONS.md with design decisions and open questions
+- [ ] Unit tests for LoopHandler (deferred)
+- [ ] Integration tests for loop scenarios (deferred)
 
-**Estimated effort**: 2 days
+**Time taken**: ~3.5 hours
+
+**Key Implementation Details**:
+- Loops only trigger on step failure (exitCode !== 0 or error)
+- Target step + all descendants are invalidated on loop
+- Step-level iteration tracking (not flow-level)
+- Fail-safe: flow fails when maxIterations exceeded
+- Console logging for loop triggers with iteration counts
+- File-based test flows compatible with Windows CMD
 
 ---
 
@@ -510,12 +535,12 @@ steps:
 | Phase | Priority | Effort | Dependencies | Status |
 |-------|----------|--------|--------------|--------|
 | Phase 1: Status Transitions | - | - | None | ✅ Complete |
-| Phase 2: DAG with depends | 1 | ~1 hour | Phase 1 | ✅ Complete |
-| Phase 3: Feedback Loops | 2 | 2 days | Phase 2 | 📋 Next |
-| Phase 4: Auto-Comments | 3 | 1-2 days | Phase 3 | 📋 Planned |
+| Phase 2: DAG with depends | 1 | ~3 hours | Phase 1 | ✅ Complete |
+| Phase 3: Feedback Loops | 2 | ~3.5 hours | Phase 2 | ✅ Complete |
+| Phase 4: Auto-Comments | 3 | 1-2 days | Phase 3 | 📋 Next |
 | Phase 5: Conditional when | 4 | 1 day | Phase 4 | 📋 Planned |
 
-**Total estimated effort**: 4-5 days remaining
+**Total estimated effort**: 2-3 days remaining
 
 ---
 

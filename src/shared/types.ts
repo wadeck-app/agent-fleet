@@ -113,6 +113,7 @@ export interface BaseMessage {
 export interface WorkerReadyMessage extends BaseMessage {
   type: MessageType.WORKER_READY;
   workerType: WorkerType;
+  preferredId?: string;
 }
 
 export interface WorkerHeartbeatMessage extends BaseMessage {

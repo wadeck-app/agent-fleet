@@ -157,6 +157,23 @@ export interface RetryConfig {
 }
 
 /**
+ * Failure handling configuration with goto loop support
+ */
+export interface FailureConfig {
+  /** Step ID to jump back to on failure (creates a feedback loop) */
+  goto?: string;
+
+  /** Maximum iterations for this step (default: 3) */
+  maxIterations?: number;
+
+  /** Reset iteration counter when target step succeeds (default: false) */
+  resetOnSuccess?: boolean;
+
+  /** Auto-comment to add when loop is triggered (Phase 4 feature) */
+  addComment?: string;
+}
+
+/**
  * Context gathering configuration for a step
  */
 export interface StepContext {
@@ -225,8 +242,14 @@ export interface BaseFlowStep {
   /** Conditional execution expression (evaluated to boolean) */
   when?: string;
 
+  /** Skip this step when a loop is triggered (useful for one-time setup steps) */
+  skipOnLoop?: boolean;
+
   /** Retry configuration */
   retry?: RetryConfig;
+
+  /** Failure handling configuration (feedback loops with goto) */
+  onFailure?: FailureConfig;
 
   /** Input/output validation contract */
   contract?: StepContract;
@@ -491,6 +514,18 @@ export interface FlowExecutionContext {
 
   /** Current execution trace */
   trace: FlowTrace;
+
+  /** Loop metadata for tracking iterations and preventing infinite loops */
+  meta: {
+    /** Per-step iteration count (how many times each step has been executed) */
+    iterations: Map<string, number>;
+
+    /** Total number of loops triggered in this flow execution */
+    totalLoops: number;
+
+    /** Whether currently in a loop (true after goto triggered, false on fresh execution) */
+    inLoop: boolean;
+  };
 }
 
 /**

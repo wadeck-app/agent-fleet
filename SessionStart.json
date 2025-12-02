@@ -1,0 +1,114 @@
+{
+  "timestamp": "2025-12-01T17:07:21.144Z",
+  "stdin": {
+    "session_id": "02cf519d-c41d-4743-9e4c-28fedd8246f0",
+    "transcript_path": "C:\\Users\\Wadeck\\.claude\\projects\\C--Workspace-Tooling-agent-fleet\\02cf519d-c41d-4743-9e4c-28fedd8246f0.jsonl",
+    "cwd": "C:\\Workspace_Tooling\\agent-fleet",
+    "hook_event_name": "SessionStart",
+    "source": "compact"
+  },
+  "args": [],
+  "env": {
+    "CLAUDE_CODE_ENTRYPOINT": "cli",
+    "CLAUDE_CODE_STOPPABLE": "true",
+    "CLAUDE_CODE_USE_BEDROCK": "true",
+    "CLAUDE_ENV_FILE": "C:\\Users\\Wadeck\\.claude\\session-env\\02cf519d-c41d-4743-9e4c-28fedd8246f0\\hook-0.sh",
+    "CLAUDE_PROJECT_DIR": "C:\\Workspace_Tooling\\agent-fleet"
+  }
+}
+---
+{
+  "timestamp": "2025-12-01T20:31:01.307Z",
+  "stdin": {
+    "session_id": "04b3e901-51e1-4a30-8b94-6f46dca7167e",
+    "transcript_path": "C:\\Users\\Wadeck\\.claude\\projects\\C--Workspace-Tooling-agent-fleet\\04b3e901-51e1-4a30-8b94-6f46dca7167e.jsonl",
+    "cwd": "C:\\Workspace_Tooling\\agent-fleet",
+    "hook_event_name": "SessionStart",
+    "source": "clear"
+  },
+  "args": [],
+  "env": {
+    "CLAUDE_CODE_ENTRYPOINT": "cli",
+    "CLAUDE_CODE_STOPPABLE": "true",
+    "CLAUDE_CODE_USE_BEDROCK": "true",
+    "CLAUDE_ENV_FILE": "C:\\Users\\Wadeck\\.claude\\session-env\\04b3e901-51e1-4a30-8b94-6f46dca7167e\\hook-0.sh",
+    "CLAUDE_PROJECT_DIR": "C:\\Workspace_Tooling\\agent-fleet"
+  }
+}
+---
+{
+  "timestamp": "2025-12-01T21:27:33.212Z",
+  "stdin": {
+    "session_id": "707cf22a-b46a-4fae-a6fa-25721bb0d827",
+    "transcript_path": "C:\\Users\\Wadeck\\.claude\\projects\\C--Workspace-Tooling-agent-fleet\\707cf22a-b46a-4fae-a6fa-25721bb0d827.jsonl",
+    "cwd": "C:\\Workspace_Tooling\\agent-fleet",
+    "hook_event_name": "SessionStart",
+    "source": "clear"
+  },
+  "args": [],
+  "env": {
+    "CLAUDE_CODE_ENTRYPOINT": "cli",
+    "CLAUDE_CODE_STOPPABLE": "true",
+    "CLAUDE_CODE_USE_BEDROCK": "true",
+    "CLAUDE_ENV_FILE": "C:\\Users\\Wadeck\\.claude\\session-env\\707cf22a-b46a-4fae-a6fa-25721bb0d827\\hook-0.sh",
+    "CLAUDE_PROJECT_DIR": "C:\\Workspace_Tooling\\agent-fleet"
+  }
+}
+---
+{
+  "timestamp": "2025-12-01T22:53:45.986Z",
+  "stdin": {
+    "session_id": "707cf22a-b46a-4fae-a6fa-25721bb0d827",
+    "transcript_path": "C:\\Users\\Wadeck\\.claude\\projects\\C--Workspace-Tooling-agent-fleet\\707cf22a-b46a-4fae-a6fa-25721bb0d827.jsonl",
+    "cwd": "C:\\Workspace_Tooling\\agent-fleet",
+    "hook_event_name": "SessionStart",
+    "source": "compact"
+  },
+  "args": [],
+  "env": {
+    "CLAUDE_CODE_ENTRYPOINT": "cli",
+    "CLAUDE_CODE_STOPPABLE": "true",
+    "CLAUDE_CODE_USE_BEDROCK": "true",
+    "CLAUDE_ENV_FILE": "C:\\Users\\Wadeck\\.claude\\session-env\\707cf22a-b46a-4fae-a6fa-25721bb0d827\\hook-0.sh",
+    "CLAUDE_PROJECT_DIR": "C:\\Workspace_Tooling\\agent-fleet"
+  }
+}
+---
+{
+  "timestamp": "2025-12-02T19:00:51.192Z",
+  "stdin": {
+    "session_id": "707cf22a-b46a-4fae-a6fa-25721bb0d827",
+    "transcript_path": "C:\\Users\\Wadeck\\.claude\\projects\\C--Workspace-Tooling-agent-fleet\\707cf22a-b46a-4fae-a6fa-25721bb0d827.jsonl",
+    "cwd": "C:\\Workspace_Tooling\\agent-fleet",
+    "hook_event_name": "SessionStart",
+    "source": "compact"
+  },
+  "args": [],
+  "env": {
+    "CLAUDE_CODE_ENTRYPOINT": "cli",
+    "CLAUDE_CODE_STOPPABLE": "true",
+    "CLAUDE_CODE_USE_BEDROCK": "true",
+    "CLAUDE_ENV_FILE": "C:\\Users\\Wadeck\\.claude\\session-env\\707cf22a-b46a-4fae-a6fa-25721bb0d827\\hook-0.sh",
+    "CLAUDE_PROJECT_DIR": "C:\\Workspace_Tooling\\agent-fleet"
+  }
+}
+---
+{
+  "timestamp": "2025-12-02T19:41:49.566Z",
+  "stdin": {
+    "session_id": "707cf22a-b46a-4fae-a6fa-25721bb0d827",
+    "transcript_path": "C:\\Users\\Wadeck\\.claude\\projects\\C--Workspace-Tooling-agent-fleet\\707cf22a-b46a-4fae-a6fa-25721bb0d827.jsonl",
+    "cwd": "C:\\Workspace_Tooling\\agent-fleet",
+    "hook_event_name": "SessionStart",
+    "source": "compact"
+  },
+  "args": [],
+  "env": {
+    "CLAUDE_CODE_ENTRYPOINT": "cli",
+    "CLAUDE_CODE_STOPPABLE": "true",
+    "CLAUDE_CODE_USE_BEDROCK": "true",
+    "CLAUDE_ENV_FILE": "C:\\Users\\Wadeck\\.claude\\session-env\\707cf22a-b46a-4fae-a6fa-25721bb0d827\\hook-0.sh",
+    "CLAUDE_PROJECT_DIR": "C:\\Workspace_Tooling\\agent-fleet"
+  }
+}
+---
