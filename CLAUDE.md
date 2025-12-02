@@ -130,3 +130,5 @@ Validation failed for flow 'your-flow':
 ```
 
 **STOP** and fix the errors immediately before continuing.
+- ensure that all documentation, code, test, are written in English
+- ensure that the documentation remains concise. All examples should be linked to existing code, not excerpt of code inside the .md
