@@ -12,16 +12,14 @@ import { FlowExecutor, FlowExecutionOptions } from '../../flow/executor/FlowExec
 import { WorkspaceManager } from '../../flow/workspace/WorkspaceManager.js';
 import type { Workspace, FlowStep } from '../../flow/types.js';
 import { fileURLToPath } from 'url';
-import path from 'path';
 import { WebSocketServer, WebSocket } from 'ws';
 import { ChildProcess, execSync } from 'child_process';
-import { FlowWorkerUI as InkFlowWorkerUI, createFlowWorkerUI as createInkUI } from './ui/ink/FlowWorkerUI.js';
 import { FlowWorkerUI as TerminalKitFlowWorkerUI, createFlowWorkerUI as createTerminalKitUI } from './ui/terminal-kit/FlowWorkerUI.js';
 import type { StepInfo } from './ui/shared/types.js';
 import {Shutdownable} from "../../shared/Shutdownable.js";
 
 // Type alias for UI interface (both implementations share the same interface)
-type FlowWorkerUI = InkFlowWorkerUI | TerminalKitFlowWorkerUI;
+type FlowWorkerUI = TerminalKitFlowWorkerUI;
 
 export class FlowWorker extends BaseWorker implements Shutdownable {
   private flowRegistry: FlowRegistry;
@@ -55,15 +53,7 @@ export class FlowWorker extends BaseWorker implements Shutdownable {
 
     // Initialize UI if enabled
     if (this.enableUI) {
-      // const uiEngine = process.env.UI_ENGINE || 'ink';
-      const uiEngine = process.env.UI_ENGINE || 'terminal-kit';
-      console.log(`[FlowWorker] Using UI engine: ${uiEngine}`);
-
-      if (uiEngine === 'terminal-kit') {
-        this.ui = createTerminalKitUI(this.workerId, wsUrl || 'ws://localhost:3738', this);
-      } else {
-        this.ui = createInkUI(this.workerId, wsUrl || 'ws://localhost:3738', this);
-      }
+      this.ui = createTerminalKitUI(this.workerId, wsUrl || 'ws://localhost:3738', this);
     }
 
     // Load project flows

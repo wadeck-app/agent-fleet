@@ -141,7 +141,7 @@ export class FlowWorkerUI {
     term.grabInput(true);
 
     term.on('key', (name: string) => {
-      console.info(`Key pressed: ${name}`);
+      //console.info(`Key pressed: ${name}`);
 
       switch (name) {
         // User pressed Q or CTRL+C - trigger graceful shutdown

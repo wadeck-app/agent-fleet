@@ -12,9 +12,9 @@ All TypeScript source files (`.ts`) must be named in **PascalCase** to **exactly
 
 ```typescript
 // ✅ CORRECT
-FlowExecutor.ts         → export class FlowExecutor
-WorkerWebSocketServer.ts → export class WorkerWebSocketServer
-TaskManager.ts          → export class TaskManager
+FlowExecutor.ts // → export class FlowExecutor
+WorkerWebSocketServer.ts // → export class WorkerWebSocketServer
+TaskManager.ts // → export class TaskManager
 ```
 
 #### Handling Name Collisions
@@ -23,8 +23,8 @@ If two classes have the same name but exist in different modules, add the **pare
 
 ```typescript
 // ✅ CORRECT - Two ClaudeProcessManager classes exist
-workers/dev/ClaudeProcessManager.ts         → Different responsibilities
-flow/processing/ClaudeProcessManager.ts     → Different responsibilities
+workers/dev/ClaudeProcessManager.ts // → Different responsibilities
+flow/processing/ClaudeProcessManager.ts // → Different responsibilities
 ```
 
 #### Exception: Utility Files
@@ -75,8 +75,8 @@ Proactively suggest refactoring when you encounter:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FlowExecutor.ts                     flow-executor.ts
 WorkerWebSocketServer.ts            server.ts
-DevWorkerWebSocketServer.ts         websocket-server.ts
-ClaudeProcessManager.ts             claude-pm.ts
+FlowWorker.ts                       flow-worker.ts
+TaskManager.ts                      task-mgr.ts
 ```
 
 ## Flow Development Guidelines

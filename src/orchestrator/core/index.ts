@@ -39,10 +39,10 @@ async function start() {
   
   // Load flows
   await flowRegistry.loadProjectFlows();
-//NOMERGE   flowRegistry.startWatching();
+   flowRegistry.startWatching();
 
   // Start REST API
-//NOMERGE  await restAPI.start();
+  await restAPI.start();
 
   // Start UI
   uiInstance = await renderUI(taskManager, orchestrator, wsServer);

@@ -58,10 +58,10 @@ This will start:
 - REST API on `http://localhost:3737`
 - WebSocket server on `ws://localhost:3738`
 
-### 3. Start a Dev Worker (in another terminal)
+### 3. Start a Flow Worker (in another terminal)
 
 ```bash
-npm run worker:dev
+npm run worker:flow
 ```
 
 ### 4. Create a Task
@@ -94,11 +94,10 @@ agent-fleet/
 │   │   ├── websocket-server.ts   # WebSocket server for workers
 │   │   └── rest-api.ts           # REST API with Express
 │   ├── workers/
-│   │   ├── base-worker.ts        # Base worker class
-│   │   ├── dev-worker.ts         # Development worker
-│   │   ├── pm-worker.ts          # Product Manager worker (TODO)
-│   │   ├── po-worker.ts          # Product Owner worker (TODO)
-│   │   └── reviewer-worker.ts    # Reviewer worker (TODO)
+│   │   ├── base/
+│   │   │   └── BaseWorker.ts     # Base worker class
+│   │   └── flow/
+│   │       └── FlowWorker.ts     # Flow-based worker
 │   ├── shared/
 │   │   ├── types.ts              # Shared TypeScript types
 │   │   ├── protocol.ts           # Message protocol
@@ -205,17 +204,8 @@ Tasks flow through these statuses:
 
 ## Worker Types
 
-### Dev Worker
-Implements features based on task descriptions. Uses Claude Code to write code, tests, and documentation.
-
-### PM Worker (TODO)
-Refines tasks by analyzing the codebase, breaking down large tasks, and identifying dependencies.
-
-### PO Worker (TODO)
-Prioritizes tasks based on business value, dependencies, and urgency.
-
-### Reviewer Worker (TODO)
-Reviews PRs for code quality, security, style consistency, and provides feedback.
+### Flow Worker
+Executes flows defined in `.agent-fleet/flows.yaml`. Each flow consists of multiple steps orchestrated through a DAG execution engine. Uses Claude Code to perform autonomous development tasks with workspace management.
 
 ## Development
 
@@ -236,11 +226,11 @@ npm run add-task create "Description" [priority]
 
 ### Run a Worker
 ```bash
-# Dev worker
-tsx src/workers/dev-worker.ts
+# Flow worker
+npm run worker:flow
 
-# Or use npm script (TODO: add to package.json)
-npm run worker:dev
+# Flow worker with interactive mode
+npm run worker:flow:i
 ```
 
 ## Environment Variables

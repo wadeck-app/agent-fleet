@@ -1,12 +1,12 @@
 // Terminal-Kit based Orchestrator UI
 
 import termkit from 'terminal-kit';
-import { Task, WorkerInfo, TaskStatus } from '../../../shared/types.js';
-import { StateManager, StateEvent } from '../../../shared/StateManager.js';
-import { TaskManager } from '../../core/TaskManager.js';
-import { WorkerWebSocketServer } from '../../websocket/WorkerWebSocketServer.js';
+import { Task, WorkerInfo, TaskStatus } from '../../shared/types.js';
+import { StateManager, StateEvent } from '../../shared/StateManager.js';
+import { TaskManager } from '../core/TaskManager.js';
+import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer.js';
 import * as fs from 'fs';
-import {Shutdownable} from "../../../shared/Shutdownable.js";
+import {Shutdownable} from "../../shared/Shutdownable.js";
 
 const term = termkit.terminal;
 // const DEBUG_LOG = 'C:\\temp\\orchestrator-ui-debug.log';

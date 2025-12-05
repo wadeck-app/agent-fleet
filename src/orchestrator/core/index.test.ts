@@ -78,7 +78,7 @@ class TestableOrchestrator {
     this.flowRegistry.startWatching();
     await this.restAPI.start();
 
-    this.uiInstance = await renderUI(this.taskManager, this.wsServer);
+    this.uiInstance = await renderUI(this.taskManager, {shutdown() {}}, this.wsServer);
   }
 
   async stop(): Promise<void> {
