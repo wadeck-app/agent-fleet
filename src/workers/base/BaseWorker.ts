@@ -162,6 +162,17 @@ export abstract class BaseWorker {
     process.title = `Worker ${this.workerId}`;
 
     console.log(`${this.logPrefix()} Welcome received with assigned id=${message.workerId}`);
+
+    // Call hook for subclasses
+    this.onWelcome(message.workerId);
+  }
+
+  /**
+   * Hook called when worker receives its ID from orchestrator
+   * Override in subclasses if needed
+   */
+  protected onWelcome(workerId: string): void {
+    // Default implementation does nothing
   }
 
   /**

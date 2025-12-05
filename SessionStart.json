@@ -112,3 +112,22 @@
   }
 }
 ---
+{
+  "timestamp": "2025-12-02T20:21:11.486Z",
+  "stdin": {
+    "session_id": "1cfab1b0-d3ef-4cd9-98de-cac14836c154",
+    "transcript_path": "C:\\Users\\Wadeck\\.claude\\projects\\C--Workspace-Tooling-agent-fleet\\1cfab1b0-d3ef-4cd9-98de-cac14836c154.jsonl",
+    "cwd": "C:\\Workspace_Tooling\\agent-fleet",
+    "hook_event_name": "SessionStart",
+    "source": "clear"
+  },
+  "args": [],
+  "env": {
+    "CLAUDE_CODE_ENTRYPOINT": "cli",
+    "CLAUDE_CODE_STOPPABLE": "true",
+    "CLAUDE_CODE_USE_BEDROCK": "true",
+    "CLAUDE_ENV_FILE": "C:\\Users\\Wadeck\\.claude\\session-env\\1cfab1b0-d3ef-4cd9-98de-cac14836c154\\hook-0.sh",
+    "CLAUDE_PROJECT_DIR": "C:\\Workspace_Tooling\\agent-fleet"
+  }
+}
+---

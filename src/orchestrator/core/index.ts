@@ -5,89 +5,68 @@ import { renderUI } from '../ui.js';
 import { Logger } from '../../shared/Logger.js';
 import { FlowRegistry } from '../../flow/registry/FlowRegistry.js';
 import { WorkspaceManager } from '../../flow/workspace/WorkspaceManager.js';
+import {Shutdownable} from "../../shared/Shutdownable.js";
 
 const REST_PORT = 3737;
 const WS_PORT = 3738;
 
-class Orchestrator {
-  private taskManager: TaskManager;
-  private wsServer: WorkerWebSocketServer;
-  private restAPI: RestAPI;
-  private flowRegistry: FlowRegistry;
-  private workspaceManager: WorkspaceManager;
-  private uiInstance: any;
+//TODO refactor into a class (like FlowWorker)
 
-  constructor() {
-    Logger.log('[Orchestrator] Initializing...');
+// Simple initialization like the working minimal test
+let uiInstance: any;
+let taskManager: TaskManager;
+let wsServer: WorkerWebSocketServer | undefined;
+let restAPI: RestAPI | undefined;
+let flowRegistry: FlowRegistry | undefined;
+let workspaceManager: WorkspaceManager | undefined;
 
-    this.taskManager = new TaskManager();
-    this.wsServer = new WorkerWebSocketServer(this.taskManager, WS_PORT);
-
-    // Initialize Flow Registry
-    this.flowRegistry = new FlowRegistry(process.cwd());
-
-    // Initialize Workspace Manager
-    this.workspaceManager = new WorkspaceManager(process.cwd());
-
-    this.restAPI = new RestAPI(
-      this.taskManager,
-      this.wsServer,
-      REST_PORT,
-      this.flowRegistry,
-      this.workspaceManager
-    );
-  }
-
-  /**
-   * Load flows from project configuration
-   */
-  private async loadFlows(): Promise<void> {
-    try {
-      await this.flowRegistry.loadProjectFlows();
-      const flowIds = this.flowRegistry.getFlowIds();
-      Logger.log(`[Orchestrator] Loaded ${flowIds.length} flows: ${flowIds.join(', ')}`);
-    } catch (error) {
-      Logger.error('[Orchestrator] Failed to load flows:', error);
-    }
-  }
-
-  async start(): Promise<void> {
-    process.title = 'Orchestrator';
-
-    // Load flows before starting API
-    await this.loadFlows();
-
-    // Start watching flows file for changes
-    this.flowRegistry.startWatching();
-
-    // WebSocket server starts automatically in its constructor
-    await this.restAPI.start();
-
-    // Render the UI
-    this.uiInstance = renderUI(this.taskManager, this.wsServer);
-  }
-
-  async stop(): Promise<void> {
-    // Unmount the UI first
-    if (this.uiInstance) {
-      this.uiInstance.unmount();
-    }
-
-    Logger.log('[Orchestrator] Shutting down...');
-
-    // Stop watching flows file
-    this.flowRegistry.stopWatching();
-
-    await this.restAPI.stop();
-    await this.wsServer.stop();
-    Logger.log('[Orchestrator] Stopped');
-  }
+const orchestrator = new class Orchestrator implements Shutdownable {
+	shutdown(): void {
+		const _ = stop();
+	}
 }
 
-// Entry point
-const orchestrator = new Orchestrator();
+async function start() {
+  console.log('Starting orchestrator...');
+  process.title = 'Orchestrator';
 
-orchestrator.start().catch((error) => {
+  // Create core components
+  taskManager = new TaskManager();
+  wsServer = new WorkerWebSocketServer(taskManager, WS_PORT);
+  flowRegistry = new FlowRegistry(process.cwd());
+  workspaceManager = new WorkspaceManager(process.cwd());
+  restAPI = new RestAPI(taskManager, wsServer, REST_PORT, flowRegistry, workspaceManager);
+
+  // Load flows
+  await flowRegistry.loadProjectFlows();
+  flowRegistry.startWatching();
+
+  // Start REST API
+  await restAPI.start();
+
+  // Start UI
+  uiInstance = await renderUI(taskManager, orchestrator, wsServer);
+  uiInstance.start();
+}
+
+async function stop() {
+  if (uiInstance) {
+    uiInstance.unmount();
+  }
+
+  Logger.log('[Orchestrator] Shutting down...');
+
+  // Stop components
+  flowRegistry?.stopWatching();
+  await restAPI?.stop();
+  await wsServer?.stop();
+
+  Logger.log('[Orchestrator] Stopped');
+}
+
+
+// Start the orchestrator
+start().catch((error) => {
   console.error('[Orchestrator] Failed to start:', error);
   process.exit(1);
 });
@@ -95,12 +74,14 @@ orchestrator.start().catch((error) => {
 // Handle termination signals
 process.on('SIGINT', async () => {
   console.log('\n[Orchestrator] Received SIGINT, shutting down gracefully...');
-  await orchestrator.stop();
+  // await stop();
+  orchestrator.shutdown();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
   console.log('\n[Orchestrator] Received SIGTERM, shutting down gracefully...');
-  await orchestrator.stop();
+  // await stop();
+  orchestrator.shutdown();
   process.exit(0);
 });

@@ -36,6 +36,9 @@ async function createTask(request: CreateTaskRequest): Promise<void> {
     console.log(`   Priority: ${task.priority}`);
     if (task.flowId) {
       console.log(`   Flow: ${task.flowId}`);
+      if (task.flowInputs) {
+        console.log(`   Inputs: ${JSON.stringify(task.flowInputs)}`);
+      }
     }
   } catch (error) {
     console.error('❌ Error creating task:', (error as Error).message);
@@ -185,27 +188,28 @@ const command = args[0];
 
 if (!command) {
   console.log('Usage:');
-  console.log('  npm run add-task create <description> [priority] [flowId] [--workspace <path>] [-i:key=value]');
-  console.log('  npm run add-task list');
-  console.log('  npm run add-task stats');
-  console.log('  npm run add-task delete <taskId>');
-  console.log('  npm run add-task clear');
+  console.log('  npm run add-task -- create <description> [priority] [flowId] [--workspace <path>] [-i:key=value]');
+  console.log('  npm run add-task -- list');
+  console.log('  npm run add-task -- stats');
+  console.log('  npm run add-task -- delete <taskId>');
+  console.log('  npm run add-task -- clear');
   console.log('\nOptions:');
   console.log('  --workspace <path>    Specify a manual workspace path (for mode: manual flows)');
   console.log('  -i:key=value          Set flow input (can be used multiple times)');
-  console.log('\nNote: Task IDs support partial matching (like git commit hashes).');
+  console.log('\nNote: The "--" separator is required to pass arguments with special characters to the script.');
+  console.log('      Task IDs support partial matching (like git commit hashes).');
   console.log('      You can use just the first few characters if unique.');
   console.log('\nExamples:');
-  console.log('  npm run add-task create "Add authentication system" high');
-  console.log('  npm run add-task create "Implement fibonacci" high simple-implement');
-  console.log('  npm run add-task create "Test diamond" high test-diamond -i:message="Hello World"');
-  console.log('  npm run add-task create "Test fork" high test-fork -i:task="Run tests"');
-  console.log('  npm run add-task create "Debug issue" high debug-flow --workspace C:/my-workspace');
-  console.log('  npm run add-task list');
-  console.log('  npm run add-task stats');
-  console.log('  npm run add-task delete abc123    # partial ID');
-  console.log('  npm run add-task delete abc123-456-789...  # full ID also works');
-  console.log('  npm run add-task clear');
+  console.log('  npm run add-task -- create "Add authentication system" high');
+  console.log('  npm run add-task -- create "Implement fibonacci" high simple-implement');
+  console.log('  npm run add-task -- create "Test diamond" high test-diamond -i:message="Hello World"');
+  console.log('  npm run add-task -- create "Test fork" high test-fork -i:task="Run tests"');
+  console.log('  npm run add-task -- create "Debug issue" high debug-flow --workspace C:/my-workspace');
+  console.log('  npm run add-task -- list');
+  console.log('  npm run add-task -- stats');
+  console.log('  npm run add-task -- delete abc123    # partial ID');
+  console.log('  npm run add-task -- delete abc123-456-789...  # full ID also works');
+  console.log('  npm run add-task -- clear');
   process.exit(0);
 }
 
@@ -213,7 +217,7 @@ switch (command) {
   case 'create':
     if (!args[1]) {
       console.error('❌ Error: Description is required');
-      console.log('Usage: npm run add-task create <description> [priority] [flowId] [--workspace <path>] [-i:key=value]');
+      console.log('Usage: npm run add-task -- create <description> [priority] [flowId] [--workspace <path>] [-i:key=value]');
       process.exit(1);
     }
 
@@ -271,7 +275,7 @@ switch (command) {
   case 'delete':
     if (!args[1]) {
       console.error('❌ Error: Task ID is required');
-      console.log('Usage: npm run add-task delete <taskId>');
+      console.log('Usage: npm run add-task -- delete <taskId>');
       console.log('Note: You can use a partial ID (e.g., first 6-8 characters)');
       process.exit(1);
     }

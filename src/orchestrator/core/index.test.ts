@@ -23,7 +23,7 @@ vi.mock('../../flow/registry/FlowRegistry.js');
 vi.mock('../../flow/workspace/WorkspaceManager.js');
 vi.mock('../../shared/Logger.js');
 vi.mock('../ui.js', () => ({
-  renderUI: vi.fn(() => ({
+  renderUI: vi.fn(async () => ({
     unmount: vi.fn(),
     waitUntilExit: vi.fn().mockResolvedValue(undefined),
   })),
@@ -78,7 +78,7 @@ class TestableOrchestrator {
     this.flowRegistry.startWatching();
     await this.restAPI.start();
 
-    this.uiInstance = renderUI(this.taskManager, this.wsServer);
+    this.uiInstance = await renderUI(this.taskManager, this.wsServer);
   }
 
   async stop(): Promise<void> {
@@ -122,7 +122,7 @@ describe('Orchestrator', () => {
   let mockWsServer: MockedObject<WorkerWebSocketServer>;
   let mockFlowRegistry: MockedObject<FlowRegistry>;
   let mockWorkspaceManager: MockedObject<WorkspaceManager>;
-  let mockRenderUI: ReturnType<typeof renderUI>;
+  let mockRenderUI: Awaited<ReturnType<typeof renderUI>>;
 
   // Store original process properties
   let originalTitle: string;
@@ -194,7 +194,7 @@ describe('Orchestrator', () => {
       unmount: vi.fn(),
       waitUntilExit: vi.fn().mockResolvedValue(undefined),
     } as any;
-    vi.mocked(renderUI).mockReturnValue(mockRenderUI);
+    vi.mocked(renderUI).mockResolvedValue(mockRenderUI);
   });
 
   afterEach(async () => {
@@ -433,7 +433,7 @@ describe('Orchestrator', () => {
         callOrder.push('3-restAPI.start');
       });
 
-      vi.mocked(renderUI).mockImplementation(() => {
+      vi.mocked(renderUI).mockImplementation(async () => {
         callOrder.push('4-renderUI');
         return mockRenderUI;
       });

@@ -41,7 +41,7 @@ export class WorkerWebSocketServer {
 
   private setupServer(): void {
     this.wss.on('connection', (socket: WebSocket) => {
-      Logger.log('[WS] New worker connection');
+      Logger.debug('[WS] New worker connection');
       this.handleConnection(socket);
     });
 
@@ -49,7 +49,7 @@ export class WorkerWebSocketServer {
       Logger.error('[WS] Server error:', error);
     });
 
-    Logger.log(`[WS] WebSocket server listening on port ${this.port}`);
+    Logger.debug(`[WS] WebSocket server listening on port ${this.port}`);
   }
 
   private handleConnection(socket: WebSocket): void {
@@ -107,7 +107,7 @@ export class WorkerWebSocketServer {
       this.connectionManager.closeAll();
 
       this.wss.close(() => {
-        Logger.log('[WS] WebSocket server stopped');
+        Logger.debug('[WS] WebSocket server stopped');
         resolve();
       });
     });

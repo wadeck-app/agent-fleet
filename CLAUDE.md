@@ -132,3 +132,22 @@ Validation failed for flow 'your-flow':
 **STOP** and fix the errors immediately before continuing.
 - ensure that all documentation, code, test, are written in English
 - ensure that the documentation remains concise. All examples should be linked to existing code, not excerpt of code inside the .md
+
+## NPM Scripts & Entry Points
+
+### Orchestrator Entry Point
+
+After the orchestrator refactoring (Dec 2024), the entry point was moved from:
+- ❌ OLD: `src/orchestrator/index.ts`
+- ✅ NEW: `src/orchestrator/core/index.ts`
+
+**Important:** When updating package.json scripts or documentation, use the correct path:
+- `npm run orch:dev` → `tsx watch src/orchestrator/core/index.ts`
+- `npm run orch:dev:no-watch` → `tsx src/orchestrator/core/index.ts`
+- Build output → `dist/orchestrator/core/index.js`
+
+This applies to:
+- package.json `scripts` section
+- package.json `main` field
+- bin files (fleet-orchestrator)
+- Documentation referencing the entry point

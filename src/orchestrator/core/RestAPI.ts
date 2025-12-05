@@ -94,6 +94,12 @@ export class RestAPI {
           task.workspacePath = workspacePath;
         }
 
+        // IMPORTANT: Update task in TaskManager's memory + storage
+        // (createTask() saves before we add flowInputs/workspacePath)
+        if (flowId || workspacePath) {
+          this.taskManager.updateTask(task);
+        }
+
         // Try to assign the task to an available worker
         this.wsServer.tryAssignTasksToIdleWorkers();
 

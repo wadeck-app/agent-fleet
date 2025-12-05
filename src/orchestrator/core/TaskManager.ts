@@ -60,6 +60,21 @@ export class TaskManager {
   }
 
   /**
+   * Update an existing task in memory and storage
+   * Useful when task properties are modified externally (e.g., adding flowInputs in RestAPI)
+   */
+  updateTask(task: Task): void {
+    if (!this.tasks.has(task.id)) {
+      throw new Error(`Task ${task.id} not found`);
+    }
+
+    task.updatedAt = new Date().toISOString();
+    this.tasks.set(task.id, task);
+    Storage.saveTask(task);
+    this.stateManager.emitTaskUpdated(task);
+  }
+
+  /**
    * Update task status
    */
   updateTaskStatus(

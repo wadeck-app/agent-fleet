@@ -10,13 +10,20 @@ import { Task, WorkerType, TaskStatus } from '../../shared/types.js';
 import { FlowRegistry } from '../../flow/registry/FlowRegistry.js';
 import { FlowExecutor, FlowExecutionOptions } from '../../flow/executor/FlowExecutor.js';
 import { WorkspaceManager } from '../../flow/workspace/WorkspaceManager.js';
-import type { Workspace } from '../../flow/types.js';
+import type { Workspace, FlowStep } from '../../flow/types.js';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { WebSocketServer, WebSocket } from 'ws';
 import { ChildProcess, execSync } from 'child_process';
+import { FlowWorkerUI as InkFlowWorkerUI, createFlowWorkerUI as createInkUI } from './ui/ink/FlowWorkerUI.js';
+import { FlowWorkerUI as TerminalKitFlowWorkerUI, createFlowWorkerUI as createTerminalKitUI } from './ui/terminal-kit/FlowWorkerUI.js';
+import type { StepInfo } from './ui/shared/types.js';
+import {Shutdownable} from "../../shared/Shutdownable.js";
 
-export class FlowWorker extends BaseWorker {
+// Type alias for UI interface (both implementations share the same interface)
+type FlowWorkerUI = InkFlowWorkerUI | TerminalKitFlowWorkerUI;
+
+export class FlowWorker extends BaseWorker implements Shutdownable {
   private flowRegistry: FlowRegistry;
   private flowExecutor: FlowExecutor;
   private workspaceManager: WorkspaceManager;
@@ -25,14 +32,18 @@ export class FlowWorker extends BaseWorker {
   private claudeWsPort: number = 0;
   private claudeSocket: WebSocket | null = null;
   private claudeProcess: ChildProcess | null = null;
+  private ui: FlowWorkerUI | null = null;
+  private enableUI: boolean;
 
-  constructor(wsUrl?: string, projectRoot: string = process.cwd(), interactive: boolean = false, preferredWorkerId?: string) {
+  constructor(wsUrl?: string, projectRoot: string = process.cwd(), interactive: boolean = false, preferredWorkerId?: string, enableUI: boolean = false) {
     super(WorkerType.DEV, wsUrl, preferredWorkerId);
 
     this.interactive = interactive;
+    this.enableUI = enableUI;
     console.log(`[FlowWorker] Initializing with project root: ${projectRoot}`);
     if (interactive) console.log(`[FlowWorker] Interactive mode enabled`);
     if (preferredWorkerId) console.log(`[FlowWorker] Preferred worker ID: ${preferredWorkerId}`);
+    if (enableUI) console.log(`[FlowWorker] UI enabled`);
 
     // Setup WebSocket server for Claude to communicate with this worker
     this.setupClaudeWebSocketServer();
@@ -42,8 +53,46 @@ export class FlowWorker extends BaseWorker {
     this.flowExecutor = new FlowExecutor(interactive);
     this.workspaceManager = new WorkspaceManager(projectRoot);
 
+    // Initialize UI if enabled
+    if (this.enableUI) {
+      // const uiEngine = process.env.UI_ENGINE || 'ink';
+      const uiEngine = process.env.UI_ENGINE || 'terminal-kit';
+      console.log(`[FlowWorker] Using UI engine: ${uiEngine}`);
+
+      if (uiEngine === 'terminal-kit') {
+        this.ui = createTerminalKitUI(this.workerId, wsUrl || 'ws://localhost:3738', this);
+      } else {
+        this.ui = createInkUI(this.workerId, wsUrl || 'ws://localhost:3738', this);
+      }
+    }
+
     // Load project flows
     this.loadFlows();
+  }
+
+  /**
+   * Start the UI (call after connection is established so workerId is set)
+   */
+  async connect(): Promise<void> {
+    await super.connect();
+
+    // Start UI after connection
+    if (this.enableUI && this.ui) {
+      const stateManager = this.ui.getStateManager();
+      stateManager.setConnected(true);
+      this.ui.start();
+    }
+  }
+
+  /**
+   * Hook called when worker receives its ID from orchestrator
+   */
+  protected onWelcome(workerId: string): void {
+    // Update UI with actual worker ID
+    if (this.enableUI && this.ui) {
+      const stateManager = this.ui.getStateManager();
+      stateManager.setWorkerId(workerId);
+    }
   }
 
   /**
@@ -60,6 +109,74 @@ export class FlowWorker extends BaseWorker {
     } catch (error) {
       console.error(`${this.logPrefix()} Failed to load flows:`, error);
     }
+  }
+
+  /**
+   * Convert FlowStep to StepInfo for UI
+   */
+  private convertStepToStepInfo(step: FlowStep): StepInfo {
+    return {
+      id: step.id,
+      name: step.name,
+      type: step.type,
+      status: 'pending',
+    };
+  }
+
+  /**
+   * Start monitoring execution trace and update UI
+   */
+  private startTraceMonitoring(taskId: string): NodeJS.Timeout {
+    const trackedSteps = new Set<string>();
+    let lastStepCount = 0;
+
+    return setInterval(() => {
+      if (!this.ui) return;
+
+      const stateManager = this.ui.getStateManager();
+
+      // Check current task and look for trace updates
+      // This is a simplified monitoring approach
+      // In a production system, you'd want FlowExecutor to emit events
+      const currentTask = this.currentTask;
+      if (currentTask && currentTask.flowResult?.trace) {
+        const trace = currentTask.flowResult.trace;
+
+        // Update steps based on trace
+        if (trace.steps && trace.steps.length > lastStepCount) {
+          const newSteps = trace.steps.slice(lastStepCount);
+
+          for (const traceStep of newSteps) {
+            const stepKey = `${traceStep.stepId}-${traceStep.startTime}`;
+
+            if (!trackedSteps.has(stepKey)) {
+              trackedSteps.add(stepKey);
+
+              // Step started
+              stateManager.stepStarted(traceStep.stepId, traceStep.retries);
+
+              // Add step output if available
+              if (traceStep.stdout) {
+                stateManager.addStepOutput(traceStep.stepId, traceStep.stdout);
+              }
+
+              // Step completed or failed
+              if (traceStep.endTime) {
+                const duration = traceStep.durationMs || (traceStep.endTime - traceStep.startTime);
+
+                if (traceStep.error) {
+                  stateManager.stepFailed(traceStep.stepId, traceStep.error, duration);
+                } else {
+                  stateManager.stepCompleted(traceStep.stepId, duration);
+                }
+              }
+            }
+          }
+
+          lastStepCount = trace.steps.length;
+        }
+      }
+    }, 200); // Poll every 200ms
   }
 
   /**
@@ -92,6 +209,13 @@ export class FlowWorker extends BaseWorker {
     console.log(`${this.logPrefix()} Executing flow: ${flow.name} (${flow.id})`);
     this.sendTaskStarted(TaskStatus.IN_PROGRESS);
 
+    // Initialize UI state if enabled
+    if (this.ui) {
+      const stateManager = this.ui.getStateManager();
+      const steps = flow.steps.map(step => this.convertStepToStepInfo(step));
+      stateManager.startTask(task.id, flow.id, flow.name, steps);
+    }
+
     let workspace: Workspace | null = null;
 
     try {
@@ -121,6 +245,12 @@ export class FlowWorker extends BaseWorker {
       console.log(`${this.logPrefix()} Workspace allocated: ${workspace.id} (${workspace.path})`);
       this.sendTaskProgress(`Workspace ready: ${workspace.path}`);
 
+      // Update UI with workspace info
+      if (this.ui) {
+        const stateManager = this.ui.getStateManager();
+        stateManager.setWorkspace(workspace.path);
+      }
+
       // Prepare execution options
       const executionOptions: FlowExecutionOptions = {
         taskId: task.id,
@@ -149,7 +279,19 @@ export class FlowWorker extends BaseWorker {
 
       // Execute the flow
       this.sendTaskProgress('Executing flow steps...');
+
+      // Start monitoring execution trace if UI is enabled
+      let monitorInterval: NodeJS.Timeout | null = null;
+      if (this.ui) {
+        monitorInterval = this.startTraceMonitoring(task.id);
+      }
+
       const result = await this.flowExecutor.execute(executionOptions);
+
+      // Stop monitoring
+      if (monitorInterval) {
+        clearInterval(monitorInterval);
+      }
 
       // Store result in task
       task.flowResult = {
@@ -161,6 +303,13 @@ export class FlowWorker extends BaseWorker {
 
       if (result.success) {
         console.log(`${this.logPrefix()} Flow completed successfully`);
+
+        // Update UI
+        if (this.ui) {
+          const stateManager = this.ui.getStateManager();
+          stateManager.taskCompleted();
+        }
+
         this.sendTaskCompleted(
           {
             message: 'Flow execution completed',
@@ -171,6 +320,13 @@ export class FlowWorker extends BaseWorker {
         );
       } else {
         console.error(`${this.logPrefix()} Flow failed: ${result.error}`);
+
+        // Update UI
+        if (this.ui) {
+          const stateManager = this.ui.getStateManager();
+          stateManager.taskFailed(result.error || 'Flow execution failed');
+        }
+
         this.sendTaskFailed(result.error || 'Flow execution failed', failureStatus);
       }
 
@@ -304,6 +460,13 @@ export class FlowWorker extends BaseWorker {
   shutdown(): void {
     console.log(`${this.logPrefix()} Shutting down...`);
 
+    // Stop UI
+    if (this.ui) {
+      console.log(`${this.logPrefix()} Stopping UI...`);
+      this.ui.stop();
+      this.ui = null;
+    }
+
     // Stop watching flows file
     this.flowRegistry.stopWatching();
 
@@ -339,6 +502,11 @@ if (isMainModule) {
   const interactiveEnv = process.env.WORKER_INTERACTIVE === 'true';
   const interactive = interactiveArg || interactiveEnv;
 
+  // Check for UI mode from CLI args or environment variable
+  const uiArg = process.argv.includes('--ui');
+  const uiEnv = process.env.WORKER_UI === 'true';
+  const enableUI = uiArg || uiEnv;
+
   // Parse worker ID from CLI args or environment variable
   const workerIdArg = process.argv.find(arg => arg.startsWith('--worker-id='));
   const preferredWorkerId = workerIdArg
@@ -346,7 +514,7 @@ if (isMainModule) {
     : process.env.WORKER_ID;
 
   const projectRoot = process.cwd();
-  const worker = new FlowWorker(undefined, projectRoot, interactive, preferredWorkerId);
+  const worker = new FlowWorker(undefined, projectRoot, interactive, preferredWorkerId, enableUI);
 
   worker.connect().then(() => {
     console.log('[FlowWorker] Worker started and connected');
