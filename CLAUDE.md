@@ -151,3 +151,51 @@ This applies to:
 - package.json `main` field
 - bin files (fleet-orchestrator)
 - Documentation referencing the entry point
+
+## Terminal-Kit UI & Watch Mode Limitation
+
+### ⚠️ CRITICAL: tsx watch Mode Breaks Keyboard Input
+
+**Problem:** When using `tsx watch` with terminal-kit-based UIs (OrchestratorUI, FlowWorkerUI), keyboard input does NOT work. Keys are "eaten" by tsx watch and never reach terminal-kit.
+
+**Root Cause:** `tsx watch` captures stdin to detect restart commands (like 'rs'). This interferes with terminal-kit's stdin capture, preventing keyboard events from being detected.
+
+**Solution:** Always use UI scripts WITHOUT watch mode:
+
+```bash
+# ✅ CORRECT - Keyboard input works
+npm run orch:ui              # Orchestrator with UI
+npm run worker:flow:ui       # Flow Worker with UI
+
+# Or directly:
+tsx src/orchestrator/core/index.ts
+tsx src/workers/flow/FlowWorker.ts --ui
+
+# ❌ WRONG - Keyboard input broken
+npm run orch:dev             # Uses tsx watch
+npm run worker:flow:ui:watch # Uses tsx watch
+```
+
+### Script Organization
+
+- **Development scripts** (`orch:dev`, `worker:flow`) - Use `tsx watch` for file watching, NO UI
+- **UI scripts** (`orch:ui`, `worker:flow:ui`) - Use `tsx` without watch, keyboard works
+- **Watch scripts** - For development without UI only
+
+### Warning Detection
+
+Both OrchestratorUI and FlowWorkerUI detect tsx watch mode and display a warning:
+```
+⚠️  WARNING: Detected stdin listeners (likely tsx watch mode)
+⚠️  Keyboard input will NOT work properly in the UI
+⚠️  Solution: Run without watch mode
+```
+
+This check happens at UI start by detecting existing stdin 'data' listeners.
+
+### Testing
+
+When testing UI keyboard input:
+1. Always use `tsx` (without watch)
+2. Test files created: `test-terminal-kit-*.ts` demonstrate the issue
+3. FlowWorkerUI works identically to OrchestratorUI for keyboard capture

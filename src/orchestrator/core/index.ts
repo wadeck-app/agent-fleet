@@ -36,13 +36,13 @@ async function start() {
   flowRegistry = new FlowRegistry(process.cwd());
   workspaceManager = new WorkspaceManager(process.cwd());
   restAPI = new RestAPI(taskManager, wsServer, REST_PORT, flowRegistry, workspaceManager);
-
+  
   // Load flows
   await flowRegistry.loadProjectFlows();
-  flowRegistry.startWatching();
+//NOMERGE   flowRegistry.startWatching();
 
   // Start REST API
-  await restAPI.start();
+//NOMERGE  await restAPI.start();
 
   // Start UI
   uiInstance = await renderUI(taskManager, orchestrator, wsServer);
@@ -58,10 +58,17 @@ async function stop() {
 
   // Stop components
   flowRegistry?.stopWatching();
+	Logger.log('[Orchestrator] flowRegistry Stopped');
   await restAPI?.stop();
+	Logger.log('[Orchestrator] restAPI Stopped');
   await wsServer?.stop();
+	Logger.log('[Orchestrator] wsServer Stopped');
+  
+  uiInstance.stop();
+	Logger.log('[Orchestrator] uiInstance Stopped');
 
   Logger.log('[Orchestrator] Stopped');
+  process.exit(0);
 }
 
 

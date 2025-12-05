@@ -28,6 +28,7 @@
     "worker:flow:ui": "tsx src/workers/flow/FlowWorker.ts --ui",
     "worker:flow:i:ui": "tsx src/workers/flow/FlowWorker.ts --ui --interactive",
     "worker:flow:ui:i": "tsx src/workers/flow/FlowWorker.ts --ui --interactive",
+    "worker:flow:ui:i:watch": "tsx watch src/workers/flow/FlowWorker.ts --ui --interactive",
     "test:old": "tsx test/simple-task.ts",
     "test": "vitest run",
     "test:watch": "vitest",

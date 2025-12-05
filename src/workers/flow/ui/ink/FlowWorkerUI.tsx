@@ -9,6 +9,7 @@ import { CompactDashboard } from './views/CompactDashboard.js';
 import { TimelineView } from './views/TimelineView.js';
 import { FullScreenLogs } from './views/FullScreenLogs.js';
 import { SidePanelView } from './views/SidePanelView.js';
+import {Shutdownable} from "../../../../shared/Shutdownable.js";
 
 interface FlowWorkerUIProps {
   stateManager: UIStateManager;
@@ -132,7 +133,7 @@ export class FlowWorkerUI {
 }
 
 // Export function to create and start UI
-export function createFlowWorkerUI(workerId: string, orchestratorUrl: string): FlowWorkerUI {
+export function createFlowWorkerUI(workerId: string, orchestratorUrl: string, shutdownable: Shutdownable): FlowWorkerUI {
   const stateManager = new UIStateManager(workerId, orchestratorUrl);
   const ui = new FlowWorkerUI(stateManager);
   return ui;

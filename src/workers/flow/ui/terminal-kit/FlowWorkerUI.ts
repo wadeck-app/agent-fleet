@@ -18,6 +18,16 @@ type ViewType = 'split' | 'compact' | 'timeline' | 'fullscreen' | 'sidepanel';
 
 const VIEW_PREFERENCE_FILE = path.join(os.homedir(), '.agent-fleet-view-preference');
 
+const DEBUG_LOG = 'C:\\Workspace_Tooling\\agent-fleet\\flowworker-ui-debug.log';
+
+function debugLog(msg: string): void {
+  try {
+    fs.appendFileSync(DEBUG_LOG, `${new Date().toISOString()} - ${msg}\n`);
+  } catch (e) {
+    // Ignore
+  }
+}
+
 // Load saved view preference
 function loadViewPreference(): ViewType {
   try {
@@ -107,6 +117,15 @@ export class FlowWorkerUI {
       height,
     });
 
+    debugLog(`STDIN state BEFORE grabInput: isTTY=${process.stdin.isTTY}, isRaw=${process.stdin.isRaw}, readable=${process.stdin.readable}`);
+    debugLog(`STDIN listeners: ${JSON.stringify(process.stdin.eventNames())}`);
+
+    // Remove "pause" and "end" listeners that might be blocking keyboard input
+    const pauseListeners = process.stdin.listeners('pause');
+    const endListeners = process.stdin.listeners('end');
+    debugLog(`Found ${pauseListeners.length} pause listeners and ${endListeners.length} end listeners`);
+    
+    
     // Handle terminal resize
     term.on('resize', (width: number, height: number) => {
       // Recreate screen buffer with new dimensions

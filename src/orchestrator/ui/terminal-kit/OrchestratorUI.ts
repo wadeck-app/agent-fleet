@@ -91,7 +91,7 @@ export class OrchestratorUI {
 
   start(): void {
     debugLog('=== START() CALLED ===');
-    debugLog(`Stack trace: ${new Error().stack}`);
+    debugLog(`(expected) Stack trace: ${new Error().stack}`);
 
     if (this.running) {
       debugLog('WARNING: start() called while already running!');
@@ -100,6 +100,36 @@ export class OrchestratorUI {
 
     this.running = true;
 
+    const isTsxWatch =
+        process.argv.includes("watch") &&
+        process.argv.some(arg => arg.includes("tsx"));
+
+    if (isTsxWatch) {
+      console.warn("⚠️ Attention : lancé avec `tsx watch` — le stdin est bloqué.");
+    } else {
+      console.info("⚠️ argv pas de watch.");
+    }
+
+    if (!process.stdin.isTTY) {
+      console.warn("⚠️ stdin n'est pas interactif — probable exécution via tsx watch.");
+    } else {
+      console.info("⚠️ stdin est interactif, pas de watch.");
+    }
+    
+    // Check for tsx watch mode BEFORE intercepting console
+    const dataListeners = process.stdin.listeners('data');
+    if (dataListeners.length > 0) {
+      console.warn('');
+      console.warn('⚠️  WARNING: Detected stdin listeners (likely tsx watch mode)');
+      console.warn('⚠️  Keyboard input will NOT work properly in the UI');
+      console.warn('⚠️  Solution: Run without watch mode:');
+      console.warn('⚠️    - Use: npm run orch:ui (without watch)');
+      console.warn('⚠️    - Or:  tsx src/orchestrator/core/index.ts');
+      console.warn('');
+    }
+
+    return
+    
     // Intercept console.log to prevent logs from pushing UI
     this.originalConsole = {
       log: console.log,
@@ -166,12 +196,20 @@ export class OrchestratorUI {
     debugLog(`STDIN state BEFORE grabInput: isTTY=${process.stdin.isTTY}, isRaw=${process.stdin.isRaw}, readable=${process.stdin.readable}`);
     debugLog(`STDIN listeners: ${JSON.stringify(process.stdin.eventNames())}`);
 
+    // Check if stdin already has 'data' listeners (indicates tsx watch or other tool is capturing stdin)
+    const dataListeners2 = process.stdin.listeners('data');
+    if (dataListeners2.length > 0) {
+      debugLog(`WARNING: ${dataListeners2.length} 'data' listeners already attached to stdin`);
+      debugLog('This usually indicates tsx watch mode is active, which will interfere with keyboard input');
+      debugLog('Solution: Use "tsx" (without watch) or "npm run orch:ui" to enable keyboard input');
+    }
+
     // Remove "pause" and "end" listeners that might be blocking keyboard input
     const pauseListeners = process.stdin.listeners('pause');
     const endListeners = process.stdin.listeners('end');
     debugLog(`Found ${pauseListeners.length} pause listeners and ${endListeners.length} end listeners`);
-    process.stdin.removeAllListeners('pause');
-    process.stdin.removeAllListeners('end');
+ //   process.stdin.removeAllListeners('pause');
+ //   process.stdin.removeAllListeners('end');
     debugLog('Removed pause and end listeners');
 
     debugLog('Calling term.grabInput(true)');
@@ -184,14 +222,20 @@ export class OrchestratorUI {
       debugLog(`KEY EVENT: ${name}`);
       if (name === 'q' || name === 'Q' || name === 'CTRL_C') {
         debugLog(`${name} pressed - sending SIGINT`);
-        
+
         this.shutdownable.shutdown();
-        
+
         // User pressed Q or CTRL+C - trigger graceful shutdown
         //process.kill(process.pid, 'SIGINT');
       }
     });
     debugLog('Key handler attached');
+
+    // DIAGNOSTIC: Test if stdin is actually emitting data events
+    process.stdin.on('data', (chunk) => {
+      debugLog(`[STDIN DATA EVENT] Received ${chunk.length} bytes: ${chunk.toString('hex').substring(0, 20)}...`);
+    });
+    debugLog('STDIN data listener attached for diagnostic');
 
     // Subscribe to state changes
     this.stateManager.on(StateEvent.TASK_CREATED, () => {
@@ -246,6 +290,23 @@ export class OrchestratorUI {
       this.render();
     }, 1000);
     debugLog('=== START() COMPLETED ===');
+
+    // DIAGNOSTIC: Monitor stdin state every 2 seconds to detect changes
+    let monitorCount = 0;
+    const stdinMonitor = setInterval(() => {
+      monitorCount++;
+      debugLog(`[STDIN MONITOR #${monitorCount}] isTTY=${process.stdin.isTTY}, isRaw=${process.stdin.isRaw}, readable=${process.stdin.readable}, listeners=${JSON.stringify(process.stdin.eventNames())}`);
+
+      // Check if terminal-kit instance still has the key handler
+      const termListeners = term.eventNames ? term.eventNames() : 'N/A';
+      debugLog(`[TERM MONITOR #${monitorCount}] term listeners: ${JSON.stringify(termListeners)}`);
+
+      // Stop monitoring after 10 checks (20 seconds)
+      if (monitorCount >= 10) {
+        clearInterval(stdinMonitor);
+        debugLog('[STDIN MONITOR] Monitoring stopped after 20 seconds');
+      }
+    }, 2000);
   }
 
   stop(): void {
@@ -273,6 +334,7 @@ export class OrchestratorUI {
     // debugLog('Terminal restored');
 
 
+    term.hideCursor(false);
     term.grabInput(false);
     term.fullscreen(false);
   }
@@ -282,7 +344,7 @@ export class OrchestratorUI {
   }
 
   private render(): void {
-    debugLog(`=== RENDER CALLED === running: ${this.running}`);
+    //debugLog(`=== RENDER CALLED === running: ${this.running}`);
     if (!this.running) {
       debugLog('RENDER: Skipped (not running)');
       return;
@@ -291,15 +353,15 @@ export class OrchestratorUI {
     // Get terminal dimensions
     const width = (term.width && isFinite(term.width)) ? term.width : 120;
     const height = (term.height && isFinite(term.height)) ? term.height : 30;
-    debugLog(`RENDER: Terminal size ${width}x${height}`);
+    //debugLog(`RENDER: Terminal size ${width}x${height}`);
 
     // Clear the screen buffer
-    debugLog('RENDER: Clearing screen buffer');
+    //debugLog('RENDER: Clearing screen buffer');
     this.screenBuffer.fill({
       char: ' ',
       attr: { color: 'default' }
     });
-    debugLog('RENDER: Screen buffer cleared');
+    //debugLog('RENDER: Screen buffer cleared');
 
     let currentY = 1;
 
@@ -444,9 +506,9 @@ export class OrchestratorUI {
     );
 
     // Draw the screen buffer to terminal (only changed cells)
-    debugLog('RENDER: Calling screenBuffer.draw()');
+    //debugLog('RENDER: Calling screenBuffer.draw()');
     this.screenBuffer.draw({ delta: true });
-    debugLog('RENDER: Completed');
+    //debugLog('RENDER: Completed');
   }
 }
 
