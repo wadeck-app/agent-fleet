@@ -35,7 +35,7 @@ export class FlowWorker extends BaseWorker implements Shutdownable {
   private ui: FlowWorkerUI | null = null;
   private enableUI: boolean;
 
-  constructor(wsUrl?: string, projectRoot: string = process.cwd(), interactive: boolean = false, preferredWorkerId?: string, enableUI: boolean = false) {
+  constructor(wsUrl?: string, projectRoot: string = process.cwd(), interactive: boolean = false, preferredWorkerId?: string, enableUI: boolean = true) {
     super(WorkerType.DEV, wsUrl, preferredWorkerId);
 
     this.interactive = interactive;
@@ -502,10 +502,10 @@ if (isMainModule) {
   const interactiveEnv = process.env.WORKER_INTERACTIVE === 'true';
   const interactive = interactiveArg || interactiveEnv;
 
-  // Check for UI mode from CLI args or environment variable
-  const uiArg = process.argv.includes('--ui');
-  const uiEnv = process.env.WORKER_UI === 'true';
-  const enableUI = uiArg || uiEnv;
+  // @formatter:off
+  // UI mode is always enabled (terminal-kit)
+  const enableUI = true;
+  // @formatter:on
 
   // Parse worker ID from CLI args or environment variable
   const workerIdArg = process.argv.find(arg => arg.startsWith('--worker-id='));
