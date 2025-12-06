@@ -1,0 +1,43 @@
+.stats-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-xs) var(--spacing-md);
+  background-color: var(--color-bg-tertiary);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-xs);
+}
+
+.stats-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.stats-label {
+  color: var(--color-text-dim);
+  font-weight: 600;
+}
+
+.stats-value {
+  color: var(--color-text-primary);
+}
+
+.stats-active {
+  color: var(--ansi-green);
+  font-weight: 600;
+}
+
+.stats-idle {
+  color: var(--ansi-yellow);
+  font-weight: 600;
+}
+
+.stats-error {
+  color: var(--ansi-red);
+  font-weight: 600;
+}
+
+.stats-separator {
+  color: var(--color-text-dim);
+}

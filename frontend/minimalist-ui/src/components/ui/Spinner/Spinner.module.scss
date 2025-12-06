@@ -1,0 +1,41 @@
+/**
+ * Spinner component styles
+ */
+
+.spinner {
+  display: inline-block;
+  position: relative;
+}
+
+.ring {
+  display: block;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-border-primary);
+  border-top-color: var(--color-accent);
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Sizes */
+.size-sm .ring {
+  width: 1rem;
+  height: 1rem;
+}
+
+.size-md .ring {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.size-lg .ring {
+  width: 2rem;
+  height: 2rem;
+}

@@ -1,0 +1,76 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+.dashboard-content {
+  display: flex;
+  flex: 1;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  overflow: hidden;
+}
+
+.dashboard-sidebar {
+  width: 300px;
+  flex-shrink: 0;
+}
+
+.dashboard-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.dashboard-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.dashboard-search {
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-primary);
+  outline: none;
+  transition: border-color 0.15s ease;
+  min-width: 200px;
+}
+
+.dashboard-search:focus {
+  border-color: var(--color-border-active);
+}
+
+.dashboard-search::placeholder {
+  color: var(--color-text-dim);
+}
+
+.dashboard-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.dashboard-checkbox input[type="checkbox"] {
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .dashboard-content {
+    flex-direction: column;
+  }
+
+  .dashboard-sidebar {
+    width: 100%;
+    max-height: 300px;
+  }
+}

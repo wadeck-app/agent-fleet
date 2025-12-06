@@ -1,0 +1,24 @@
+/**
+ * Card component styles
+ */
+
+.card {
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  transition: all var(--transition-fast);
+}
+
+.elevated {
+  box-shadow: var(--shadow-md);
+}
+
+.interactive {
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-border-secondary);
+    box-shadow: var(--shadow-lg);
+  }
+}
