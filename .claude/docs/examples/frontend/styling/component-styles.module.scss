@@ -1,0 +1,57 @@
+// @ts-nocheck - Example code, not compiled
+// SCSS Module Pattern
+// Each component has dedicated SCSS file
+
+.button {
+  // Base button styles
+  padding: var(--spacing-md);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  // Theme-dependent colors (references CSS custom properties)
+  background-color: var(--color-primary);
+  color: var(--color-text-on-primary);
+
+  &:hover:not(:disabled) {
+    background-color: var(--color-primary-hover);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  // Variant modifiers
+  &.secondary {
+    background-color: var(--color-secondary);
+    color: var(--color-text-on-secondary);
+
+    &:hover:not(:disabled) {
+      background-color: var(--color-secondary-hover);
+    }
+  }
+
+  &.destructive {
+    background-color: var(--color-destructive);
+    color: var(--color-text-on-destructive);
+
+    &:hover:not(:disabled) {
+      background-color: var(--color-destructive-hover);
+    }
+  }
+
+  // Size modifiers
+  &.small {
+    padding: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+  }
+
+  &.large {
+    padding: var(--spacing-lg);
+    font-size: var(--font-size-lg);
+  }
+}
