@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:survey.stackoverflow.co)",
+      "WebFetch(domain:npmtrends.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.radix-ui.com)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
