@@ -12,6 +12,7 @@ import type {
 import type { TemplateContext } from '../processing/TemplateRenderer.js';
 import { StepRunner } from './StepRunner.js';
 import { FlowOrchestrator } from './FlowOrchestrator.js';
+import type { FlowRegistry } from '../registry/FlowRegistry.js';
 
 /**
  * Options for flow execution
@@ -37,6 +38,9 @@ export interface FlowExecutionOptions {
 
   /** Callback when Claude process starts (to store reference for killing) */
   onClaudeProcessStarted?: (process: any) => void;
+
+  /** Nesting depth for SubFlowStep recursion tracking */
+  nestingDepth?: number;
 }
 
 /**
@@ -63,15 +67,33 @@ export class FlowExecutionError extends Error {
 export class FlowExecutor {
   private stepRunner: StepRunner;
   private orchestrator: FlowOrchestrator;
+  private flowRegistry?: FlowRegistry;
 
-  constructor(interactive: boolean = false) {
+  constructor(interactive: boolean = false, flowRegistry?: FlowRegistry) {
     // Create step runner with configuration
     this.stepRunner = new StepRunner({
       interactive,
     });
 
+    // Store flow registry reference
+    this.flowRegistry = flowRegistry;
+
+    // Configure StepRunner with FlowRegistry and self-reference for recursion
+    if (flowRegistry) {
+      this.stepRunner.setFlowRegistry(flowRegistry);
+    }
+    this.stepRunner.setFlowExecutor(this);
+
     // Create orchestrator
     this.orchestrator = new FlowOrchestrator(this.stepRunner);
+  }
+
+  /**
+   * Set the flow registry (useful if not provided in constructor)
+   */
+  public setFlowRegistry(flowRegistry: FlowRegistry): void {
+    this.flowRegistry = flowRegistry;
+    this.stepRunner.setFlowRegistry(flowRegistry);
   }
 
   /**
@@ -88,6 +110,7 @@ export class FlowExecutor {
       taskMetadata = {},
       claudeEnv,
       onClaudeProcessStarted,
+      nestingDepth = 0,
     } = options;
 
     // Update step runner configuration with Claude env and callback
@@ -95,6 +118,8 @@ export class FlowExecutor {
       interactive: this.stepRunner['config'].interactive,
       claudeEnv,
       onClaudeProcessStarted,
+      flowRegistry: this.flowRegistry,
+      flowExecutor: this,
     });
 
     // Recreate orchestrator with updated step runner
@@ -106,6 +131,10 @@ export class FlowExecutor {
       inputs,
       stepOutputs,
       taskMetadata,
+      nestingDepth,
+      taskId,
+      claudeEnv,
+      onClaudeProcessStarted,
     };
 
     // Orchestrate execution

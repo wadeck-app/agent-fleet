@@ -31,7 +31,7 @@ export interface UIState {
 export interface StepInfo {
   id: string;
   name: string;
-  type: 'script' | 'model';
+  type: 'script' | 'model' | 'subflow';
   status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
   startTime?: number;
   endTime?: number;

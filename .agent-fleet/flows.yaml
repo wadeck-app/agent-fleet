@@ -291,3 +291,70 @@ test-multi-review:
       depends: [review-quality, review-security, review-consistency, review-usability]
       script: |
         echo [deploy] All reviews passed! Deploying to production... && ping localhost -n 3 >nul && echo [deploy] Deployment complete!
+
+# SubFlowStep Test Flows (Phase 1 MVP)
+# Test basic flow composition with 'inherit' workspace strategy
+
+# Atomic flow: Simple echo
+test-echo:
+  name: "Test: Echo Flow"
+  description: "Simple echo flow used for testing subflow composition"
+  workspace:
+    mode: manual
+    gitStrategy: any
+    reusePolicy: always
+  inputs:
+    message: string
+  steps:
+    - type: script
+      id: echo
+      name: "Echo Message"
+      script: 'echo "${{ inputs.message }}"'
+      output:
+        result: { type: string }
+
+# Composite flow: Calls echo twice
+test-subflow-basic:
+  name: "Test: Basic SubFlow"
+  description: "Tests basic subflow execution with inherit strategy"
+  workspace:
+    mode: manual
+    gitStrategy: any
+    reusePolicy: always
+  inputs:
+    greeting: string
+  steps:
+    - type: subflow
+      id: first-echo
+      name: "First Echo"
+      flowId: test-echo
+      inputs:
+        message: "${{ inputs.greeting }}"
+      output:
+        echo1: "${{ steps.echo.outputs.result }}"
+
+    - type: subflow
+      id: second-echo
+      name: "Second Echo"
+      flowId: test-echo
+      depends: [first-echo]
+      inputs:
+        message: "Reply: ${{ steps.first-echo.outputs.echo1 }}"
+
+# Nested subflows: Test recursion depth tracking
+test-subflow-nested:
+  name: "Test: Nested SubFlows"
+  description: "Tests nested subflow execution (3 levels deep)"
+  workspace:
+    mode: manual
+    gitStrategy: any
+    reusePolicy: always
+  inputs:
+    msg: string
+  steps:
+    - type: subflow
+      id: call-basic
+      name: "Call Basic SubFlow"
+      flowId: test-subflow-basic
+      inputs:
+        greeting: "${{ inputs.msg }}"

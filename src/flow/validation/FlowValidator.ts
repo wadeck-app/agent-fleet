@@ -15,7 +15,9 @@ import type {
   FlowStep,
   ModelFlowStep,
   ScriptFlowStep,
+  SubFlowStep,
   WorkspaceMode,
+  WorkspaceStrategy,
   GitStrategy,
   ReusePolicy,
   ModelType,
@@ -23,6 +25,7 @@ import type {
   StatusTransitions,
 } from '../types.js';
 import { TaskStatus } from '../../shared/types.js';
+import type { FlowRegistry } from '../registry/FlowRegistry.js';
 
 /**
  * Validation issue severity
@@ -45,9 +48,11 @@ export enum ValidationCode {
   UNDEFINED_INPUT = 'UNDEFINED_INPUT',
   UNDEFINED_OUTPUT = 'UNDEFINED_OUTPUT',
   UNDEFINED_VARIABLE = 'UNDEFINED_VARIABLE',
+  UNDEFINED_FLOW = 'UNDEFINED_FLOW',
 
   // Semantic errors
   CIRCULAR_DEPENDENCY = 'CIRCULAR_DEPENDENCY',
+  CIRCULAR_SUBFLOW_REFERENCE = 'CIRCULAR_SUBFLOW_REFERENCE',
   UNREACHABLE_STEP = 'UNREACHABLE_STEP',
   NO_TERMINAL_STEP = 'NO_TERMINAL_STEP',
   TYPE_MISMATCH = 'TYPE_MISMATCH',
@@ -157,12 +162,24 @@ interface VariableReference {
  */
 export class FlowValidator {
   private issues: ValidationIssue[] = [];
+  private flowRegistry?: FlowRegistry;
+
+  /**
+   * Create a new FlowValidator
+   * @param flowRegistry - Optional FlowRegistry for subflow validation
+   */
+  constructor(flowRegistry?: FlowRegistry) {
+    this.flowRegistry = flowRegistry;
+  }
 
   /**
    * Validate a flow definition completely
    */
   public validate(flow: FlowDefinition): ValidationResult {
     this.issues = [];
+
+    // Store current flow ID for circular reference detection
+    (this as any)._currentFlowId = flow.id;
 
     // Phase 1: Schema validation
     this.validateSchema(flow);
@@ -542,16 +559,18 @@ export class FlowValidator {
       this.validateModelStep(step);
     } else if (step.type === 'script') {
       this.validateScriptStep(step);
+    } else if (step.type === 'subflow') {
+      this.validateSubFlowStep(step);
     } else {
       this.addIssue({
         severity: 'error',
         code: ValidationCode.INVALID_VALUE,
         message: `Invalid step type: ${(step as any).type}`,
         location: { stepId: (step as any).id, field: 'type' },
-        suggestion: 'Type must be either "model" or "script"',
+        suggestion: 'Type must be either "model", "script", or "subflow"',
         context: {
           actual: (step as any).type,
-          expected: ['model', 'script'],
+          expected: ['model', 'script', 'subflow'],
         },
       });
     }
@@ -638,6 +657,133 @@ export class FlowValidator {
         context: {
           expected: 'object',
           actual: typeof step.env,
+        },
+      });
+    }
+  }
+
+  /**
+   * Validate subflow step
+   */
+  private validateSubFlowStep(step: SubFlowStep): void {
+    // Validate flowId is provided
+    if (!step.flowId || typeof step.flowId !== 'string' || step.flowId.trim() === '') {
+      this.addIssue({
+        severity: 'error',
+        code: ValidationCode.MISSING_FIELD,
+        message: `SubFlow step '${step.id}' must have a non-empty flowId`,
+        location: { stepId: step.id, field: 'flowId' },
+        suggestion: 'Specify the ID of the flow to execute',
+      });
+      return; // Can't validate further without flowId
+    }
+
+    // Check for circular references FIRST (before checking if flow exists)
+    // This is important because a flow might reference itself before it's registered
+    const currentFlowId = (this as any)._currentFlowId as string | undefined;
+
+    // Check for direct circular reference (flow calling itself)
+    if (currentFlowId && step.flowId === currentFlowId) {
+      this.addIssue({
+        severity: 'error',
+        code: ValidationCode.CIRCULAR_SUBFLOW_REFERENCE,
+        message: `SubFlow step '${step.id}' creates circular reference (flow '${currentFlowId}' calls itself)`,
+        location: { stepId: step.id, field: 'flowId' },
+        suggestion: 'Remove self-referencing SubFlowStep or use a different flow',
+      });
+      return; // No point checking further for self-referencing flows
+    }
+
+    // Detect deep circular dependencies (if registry is available)
+    if (this.flowRegistry && currentFlowId) {
+      const visited = new Set<string>();
+      const path: string[] = [];
+      if (this.detectCircularSubFlowDependency(step.flowId, currentFlowId, visited, path)) {
+        this.addIssue({
+          severity: 'error',
+          code: ValidationCode.CIRCULAR_SUBFLOW_REFERENCE,
+          message: `SubFlow step '${step.id}' creates circular dependency chain: ${path.join(' → ')} → ${currentFlowId}`,
+          location: { stepId: step.id, field: 'flowId' },
+          suggestion: 'Break the circular chain by restructuring the flow composition',
+          context: { related: path },
+        });
+        return; // No point checking further for circular flows
+      }
+    }
+
+    // Now validate flowId references an existing flow (if registry is available)
+    if (this.flowRegistry) {
+      if (!this.flowRegistry.hasFlow(step.flowId)) {
+        const availableFlows = this.flowRegistry.getFlowIds();
+        this.addIssue({
+          severity: 'error',
+          code: ValidationCode.UNDEFINED_FLOW,
+          message: `SubFlow step '${step.id}' references non-existent flow '${step.flowId}'`,
+          location: { stepId: step.id, field: 'flowId' },
+          suggestion: availableFlows.length > 0
+            ? `Available flows: ${availableFlows.join(', ')}`
+            : 'No flows are currently registered',
+          context: {
+            actual: step.flowId,
+            related: availableFlows,
+          },
+        });
+        return; // Can't validate inputs without the flow
+      }
+
+      // Validate required inputs are provided
+      const referencedFlow = this.flowRegistry.getFlow(step.flowId);
+      if (referencedFlow && referencedFlow.inputs) {
+        const providedInputs = Object.keys(step.inputs || {});
+        const requiredInputs = Object.keys(referencedFlow.inputs);
+
+        for (const inputKey of requiredInputs) {
+          if (!providedInputs.includes(inputKey)) {
+            this.addIssue({
+              severity: 'warning',
+              code: ValidationCode.MISSING_FIELD,
+              message: `SubFlow step '${step.id}' missing required input '${inputKey}' for flow '${step.flowId}'`,
+              location: { stepId: step.id, field: 'inputs' },
+              suggestion: `Add input mapping: inputs.${inputKey}`,
+              context: {
+                expected: requiredInputs,
+                actual: providedInputs,
+              },
+            });
+          }
+        }
+      }
+    }
+
+    // Validate workspaceStrategy (optional, but should be valid if present)
+    if (step.workspaceStrategy !== undefined) {
+      const validStrategies: WorkspaceStrategy[] = ['inherit', 'separate'];
+      if (!validStrategies.includes(step.workspaceStrategy)) {
+        this.addIssue({
+          severity: 'error',
+          code: ValidationCode.INVALID_VALUE,
+          message: `SubFlow step '${step.id}' has invalid workspaceStrategy: ${step.workspaceStrategy}`,
+          location: { stepId: step.id, field: 'workspaceStrategy' },
+          suggestion: `Must be one of: ${validStrategies.join(', ')}`,
+          context: {
+            actual: step.workspaceStrategy,
+            expected: validStrategies,
+            related: validStrategies,
+          },
+        });
+      }
+    }
+
+    // Validate inputs is an object
+    if (step.inputs !== undefined && typeof step.inputs !== 'object') {
+      this.addIssue({
+        severity: 'error',
+        code: ValidationCode.INVALID_TYPE,
+        message: `SubFlow step '${step.id}' inputs must be an object`,
+        location: { stepId: step.id, field: 'inputs' },
+        context: {
+          expected: 'object',
+          actual: typeof step.inputs,
         },
       });
     }
@@ -1065,5 +1211,69 @@ export class FlowValidator {
     for (const depId of deps) {
       this.markReachableFromRoot(depId, dependents, reachable);
     }
+  }
+
+  /**
+   * Detect circular dependencies in SubFlowStep chains
+   *
+   * This performs a depth-first search through the flow composition graph to detect cycles.
+   * Example: Flow A calls Flow B, which calls Flow C, which calls Flow A → circular!
+   *
+   * @param flowId - The flow ID to check (starting point)
+   * @param targetFlowId - The flow ID we're looking for (to detect a cycle)
+   * @param visited - Set of already visited flow IDs (to avoid infinite loops)
+   * @param path - Current path through the flow graph (for error reporting)
+   * @returns true if a circular dependency is detected, false otherwise
+   */
+  private detectCircularSubFlowDependency(
+    flowId: string,
+    targetFlowId: string,
+    visited: Set<string>,
+    path: string[]
+  ): boolean {
+    // If we've already visited this flow in the current path, stop here
+    if (visited.has(flowId)) {
+      return false;
+    }
+
+    // If we found the target flow, we have a cycle!
+    if (flowId === targetFlowId) {
+      return true;
+    }
+
+    // Mark this flow as visited
+    visited.add(flowId);
+    path.push(flowId);
+
+    // Get the flow definition
+    if (!this.flowRegistry) {
+      return false;
+    }
+
+    const flow = this.flowRegistry.getFlow(flowId);
+    if (!flow) {
+      return false;
+    }
+
+    // Check all SubFlowSteps in this flow
+    for (const step of flow.steps) {
+      if (step.type === 'subflow') {
+        const subFlowStep = step as SubFlowStep;
+
+        // Recursively check if this subflow leads to the target
+        // Create a new visited set for each branch to allow multiple paths
+        const newVisited = new Set(visited);
+        const newPath = [...path];
+
+        if (this.detectCircularSubFlowDependency(subFlowStep.flowId, targetFlowId, newVisited, newPath)) {
+          // Copy the found path back
+          path.length = 0;
+          path.push(...newPath);
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 }

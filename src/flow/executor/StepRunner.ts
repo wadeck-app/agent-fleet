@@ -8,6 +8,7 @@ import type {
   FlowStep,
   ScriptFlowStep,
   ModelFlowStep,
+  SubFlowStep,
   StepTrace,
   Workspace,
 } from '../types.js';
@@ -15,6 +16,7 @@ import { TemplateRenderer, type TemplateContext } from '../processing/TemplateRe
 import { ScriptExecutor } from './ScriptExecutor.js';
 import { OutputExtractor } from '../processing/OutputExtractor.js';
 import { ClaudeProcessManager } from '../processing/ClaudeProcessManager.js';
+import type { FlowRegistry } from '../registry/FlowRegistry.js';
 
 /**
  * Step execution error
@@ -42,6 +44,12 @@ export interface StepRunnerConfig {
 
   /** Callback when Claude process starts */
   onClaudeProcessStarted?: (process: any) => void;
+
+  /** Flow registry for looking up subflows (optional, set after construction) */
+  flowRegistry?: FlowRegistry;
+
+  /** Flow executor for recursive subflow execution (optional, set after construction) */
+  flowExecutor?: any; // Using 'any' to avoid circular dependency
 }
 
 /**
@@ -60,6 +68,20 @@ export class StepRunner {
     this.outputExtractor = new OutputExtractor();
     this.claudeManager = new ClaudeProcessManager();
     this.config = config;
+  }
+
+  /**
+   * Set the flow registry (used for subflow lookups)
+   */
+  public setFlowRegistry(flowRegistry: FlowRegistry): void {
+    this.config.flowRegistry = flowRegistry;
+  }
+
+  /**
+   * Set the flow executor (used for recursive subflow execution)
+   */
+  public setFlowExecutor(flowExecutor: any): void {
+    this.config.flowExecutor = flowExecutor;
   }
 
   /**
@@ -94,6 +116,8 @@ export class StepRunner {
           result = await this.executeScriptStep(step, workspace, context, stepTrace);
         } else if (step.type === 'model') {
           result = await this.executeModelStep(step, workspace, context, stepTrace);
+        } else if (step.type === 'subflow') {
+          result = await this.executeSubFlowStep(step, workspace, context, stepTrace);
         } else {
           throw new StepExecutionError(
             `Unknown step type: ${(step as any).type}`,
@@ -306,5 +330,117 @@ export class StepRunner {
    */
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Execute a subflow step (flow composition)
+   */
+  private async executeSubFlowStep(
+    step: SubFlowStep,
+    workspace: Workspace,
+    context: TemplateContext,
+    stepTrace: StepTrace
+  ): Promise<StepTrace> {
+    // Phase 1: Only support 'inherit' strategy
+    const strategy = step.workspaceStrategy || 'inherit';
+    if (strategy === 'separate') {
+      stepTrace.endTime = Date.now();
+      stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
+      stepTrace.error = 'workspaceStrategy "separate" is not yet implemented (Phase 2)';
+      return stepTrace;
+    }
+
+    // Check if FlowRegistry and FlowExecutor are available
+    if (!this.config.flowRegistry) {
+      stepTrace.endTime = Date.now();
+      stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
+      stepTrace.error = 'FlowRegistry not configured in StepRunner';
+      return stepTrace;
+    }
+
+    if (!this.config.flowExecutor) {
+      stepTrace.endTime = Date.now();
+      stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
+      stepTrace.error = 'FlowExecutor not configured in StepRunner';
+      return stepTrace;
+    }
+
+    // Get referenced flow
+    const flow = this.config.flowRegistry.getFlow(step.flowId);
+    if (!flow) {
+      stepTrace.endTime = Date.now();
+      stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
+      stepTrace.error = `Flow '${step.flowId}' not found`;
+      return stepTrace;
+    }
+
+    // Check nesting depth
+    const nestingDepth = (context.nestingDepth || 0) + 1;
+    const MAX_NESTING_DEPTH = 10;
+    if (nestingDepth > MAX_NESTING_DEPTH) {
+      stepTrace.endTime = Date.now();
+      stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
+      stepTrace.error = `Maximum nesting depth (${MAX_NESTING_DEPTH}) exceeded`;
+      return stepTrace;
+    }
+
+    // Render inputs using template renderer
+    const renderedInputs: Record<string, any> = {};
+    for (const [key, template] of Object.entries(step.inputs)) {
+      try {
+        renderedInputs[key] = this.templateRenderer.render(template, context, true);
+      } catch (error) {
+        stepTrace.endTime = Date.now();
+        stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
+        stepTrace.error = `Failed to render input '${key}': ${error instanceof Error ? error.message : String(error)}`;
+        return stepTrace;
+      }
+    }
+
+    // Populate trace with subflow information
+    stepTrace.subFlowId = step.flowId;
+    stepTrace.workspaceStrategy = strategy;
+    stepTrace.nestingDepth = nestingDepth;
+
+    console.log(`[StepRunner] Executing SubFlowStep: ${step.id} → ${step.flowId}`);
+    console.log(`[StepRunner] Nesting depth: ${nestingDepth}`);
+    console.log(`[StepRunner] Inputs:`, renderedInputs);
+
+    try {
+      // Execute flow recursively in SAME workspace
+      const result = await this.config.flowExecutor.execute({
+        taskId: context.taskId || 'unknown',
+        flow,
+        workspace, // Same workspace (inherit strategy)
+        inputs: renderedInputs,
+        taskMetadata: context.taskMetadata || {},
+        claudeEnv: context.claudeEnv,
+        onClaudeProcessStarted: context.onClaudeProcessStarted,
+        nestingDepth, // Pass nesting depth
+      });
+
+      stepTrace.endTime = Date.now();
+      stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
+
+      if (result.success) {
+        console.log(`[StepRunner] SubFlowStep ${step.id} completed successfully`);
+
+        // Extract outputs from the subflow result
+        // The outputs from the subflow are in result.outputs (keyed by step ID)
+        // We need to flatten them or pass them through based on the step's output configuration
+        stepTrace.outputs = result.outputs;
+      } else {
+        console.log(`[StepRunner] SubFlowStep ${step.id} failed`);
+        stepTrace.error = result.error || 'SubFlow execution failed';
+      }
+
+      return stepTrace;
+    } catch (error) {
+      stepTrace.endTime = Date.now();
+      stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
+      stepTrace.error = error instanceof Error ? error.message : String(error);
+      console.error(`[StepRunner] SubFlowStep ${step.id} error:`, stepTrace.error);
+      return stepTrace;
+    }
   }
 }

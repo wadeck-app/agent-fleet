@@ -33,6 +33,11 @@ export type ReusePolicy = 'never' | 'if-available' | 'always';
 export type VariableType = 'string' | 'number' | 'boolean' | 'object';
 
 /**
+ * Workspace strategy for SubFlowStep execution
+ */
+export type WorkspaceStrategy = 'inherit' | 'separate';
+
+/**
  * Retry backoff strategies
  */
 export type BackoffStrategy = 'linear' | 'exponential';
@@ -290,9 +295,26 @@ export interface ScriptFlowStep extends BaseFlowStep {
 }
 
 /**
+ * Step that executes another flow (composition)
+ */
+export interface SubFlowStep extends BaseFlowStep {
+  /** Step type discriminator */
+  type: 'subflow';
+
+  /** ID of the flow to execute */
+  flowId: string;
+
+  /** Template inputs to pass to the subflow */
+  inputs: Record<string, string>;
+
+  /** Workspace strategy (default: 'inherit') */
+  workspaceStrategy?: WorkspaceStrategy;
+}
+
+/**
  * Union type for all step types (discriminated by 'type' field)
  */
-export type FlowStep = ModelFlowStep | ScriptFlowStep;
+export type FlowStep = ModelFlowStep | ScriptFlowStep | SubFlowStep;
 
 /**
  * Flow lifecycle hooks
@@ -416,7 +438,7 @@ export interface StepTrace {
   stepName: string;
 
   /** Step type */
-  stepType: 'model' | 'script';
+  stepType: 'model' | 'script' | 'subflow';
 
   /** Start time (Unix timestamp in ms) */
   startTime: number;
@@ -449,6 +471,16 @@ export interface StepTrace {
 
   /** Standard error (for type='script') */
   stderr?: string;
+
+  // SubFlow step fields
+  /** Flow ID executed (for type='subflow') */
+  subFlowId?: string;
+
+  /** Workspace strategy used (for type='subflow') */
+  workspaceStrategy?: WorkspaceStrategy;
+
+  /** Nesting depth (for type='subflow') */
+  nestingDepth?: number;
 
   // Common fields
   /** Extracted output variables */

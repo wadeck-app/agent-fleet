@@ -48,7 +48,7 @@ export class FlowWorker extends BaseWorker implements Shutdownable {
 
     // Initialize Flow Engine components
     this.flowRegistry = new FlowRegistry(projectRoot);
-    this.flowExecutor = new FlowExecutor(interactive);
+    this.flowExecutor = new FlowExecutor(interactive, this.flowRegistry);
     this.workspaceManager = new WorkspaceManager(projectRoot);
 
     // Initialize UI if enabled
@@ -213,21 +213,27 @@ export class FlowWorker extends BaseWorker implements Shutdownable {
       this.sendTaskProgress('Allocating workspace...');
 
       // Determine workspace path
-      let existingPath: string | undefined = task.workspacePath;
+      let workspacePath: string | undefined;
 
-      // If manual mode but no path specified, use current working directory
-      if (flow.workspace.mode === 'manual' && !existingPath) {
-        existingPath = process.cwd();
-        console.log(`${this.logPrefix()} Using current working directory as manual workspace: ${existingPath}`);
+      // If task specifies a workspace path, use it (OVERRIDE)
+      if (task.workspacePath) {
+        workspacePath = task.workspacePath;
+        console.log(`${this.logPrefix()} Using task-specified workspace override: ${workspacePath}`);
+      }
+      // Otherwise, if manual mode but no path specified, use current working directory
+      else if (flow.workspace.mode === 'manual') {
+        workspacePath = process.cwd();
+        console.log(`${this.logPrefix()} Using current working directory as manual workspace: ${workspacePath}`);
       }
 
       workspace = await this.workspaceManager.allocate({
         taskId: task.id,
         config: flow.workspace,
-        existingPath,
+        existingPath: workspacePath,
         taskMetadata: {
           description: task.description,
           priority: task.priority,
+          workspaceId: task.metadata?.workspaceId,  // Track workspace ID
           ...task.metadata,
         },
       });

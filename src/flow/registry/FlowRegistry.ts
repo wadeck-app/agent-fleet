@@ -148,7 +148,7 @@ export class FlowRegistry {
    */
   constructor(projectRoot: string) {
     this.configPath = path.join(projectRoot, '.agent-fleet', 'flows.yaml');
-    this.validator = new FlowValidator();
+    this.validator = new FlowValidator(this);
     this.loadDefaultFlows();
   }
 
@@ -263,7 +263,7 @@ export class FlowRegistry {
 
   /**
    * Parse a single flow step
-   * Supports both 'model' and 'script' step types
+   * Supports 'model', 'script', and 'subflow' step types
    */
   private parseFlowStep(data: any): FlowStep {
     const stepType = data.type || 'model'; // Default to model for backward compatibility
@@ -282,7 +282,16 @@ export class FlowRegistry {
       contract: data.contract,
     };
 
-    if (stepType === 'script') {
+    if (stepType === 'subflow') {
+      // SubFlow step
+      return {
+        ...baseStep,
+        type: 'subflow',
+        flowId: data.flowId || '',
+        inputs: data.inputs || {},
+        workspaceStrategy: data.workspaceStrategy || 'inherit',
+      };
+    } else if (stepType === 'script') {
       // Script step
       return {
         ...baseStep,

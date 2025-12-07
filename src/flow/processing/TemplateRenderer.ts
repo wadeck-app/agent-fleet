@@ -20,6 +20,18 @@ export interface TemplateContext {
 
   /** Task metadata (priority, createdAt, etc.) */
   taskMetadata: Record<string, any>;
+
+  /** Current nesting depth for SubFlowStep recursion tracking */
+  nestingDepth?: number;
+
+  /** Task ID for the current execution */
+  taskId?: string;
+
+  /** Claude environment variables */
+  claudeEnv?: Record<string, string>;
+
+  /** Callback when Claude process starts */
+  onClaudeProcessStarted?: (process: any) => void;
 }
 
 /**
