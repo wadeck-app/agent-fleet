@@ -5,7 +5,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trash2, X } from 'lucide-react';
-import { Button } from '@/components/ui/Button/Button';
+import { Button } from '@/components/ui/Button';
 
 export interface InventoryActionBarProps {
   selectedCount: number;

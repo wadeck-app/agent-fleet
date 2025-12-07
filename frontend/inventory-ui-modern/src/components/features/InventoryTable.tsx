@@ -6,12 +6,12 @@
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { ArrowUpDown, Trash2 } from 'lucide-react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table/Table';
-import { Checkbox } from '@/components/ui/Checkbox/Checkbox';
-import { Button } from '@/components/ui/Button/Button';
-import { Badge } from '@/components/ui/Badge/Badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
+import { Checkbox } from '@/components/ui/Checkbox';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
 import { InventoryItem, SortConfig, SortField } from '@/types/inventory';
-import { AnimationType } from '@/components/features/AnimationSettings/AnimationSettings';
+import { AnimationType } from '@/components/features/AnimationSettings';
 
 export interface InventoryTableProps {
   items: InventoryItem[];

@@ -2,8 +2,8 @@
  * DeleteConfirmDialog - Feature component for delete confirmation
  */
 
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog/Dialog';
-import { Button } from '@/components/ui/Button/Button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog';
+import { Button } from '@/components/ui/Button';
 
 export interface DeleteConfirmDialogProps {
   open: boolean;

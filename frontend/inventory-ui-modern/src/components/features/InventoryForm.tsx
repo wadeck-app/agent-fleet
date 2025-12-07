@@ -4,10 +4,10 @@
  */
 
 import { useState, FormEvent } from 'react';
-import { Input } from '@/components/ui/Input/Input';
-import { Label } from '@/components/ui/Label/Label';
-import { Button } from '@/components/ui/Button/Button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select/Select';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
+import { Button } from '@/components/ui/Button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
 import { CreateInventoryItemDto, DeliveryType } from '@/types/inventory';
 
 export interface InventoryFormProps {

@@ -37,17 +37,35 @@ apiClient → Repository → Service → Hook → Component
 
 ## File Conventions
 
+**Default: Flat structure with PascalCase files**
+
 ```
-components/ui/<Name>.tsx              # Generic (Shadcn/ui based)
-components/features/<Feature>/<Name>.tsx  # Feature-specific
-pages/<Name>Page.tsx                  # Pages
-layouts/<Name>.tsx                    # Layouts
-hooks/use<Feature>.ts                 # Custom hooks
-services/<Feature>Service.ts          # Business logic
-repositories/<Feature>Repository.ts   # Data access
+components/ui/Button.tsx              # Generic (Shadcn/ui based)
+components/features/InventoryTable.tsx  # Feature-specific
+pages/InventoryPage.tsx               # Pages
+layouts/MainLayout.tsx                # Layouts
+hooks/useInventory.ts                 # Custom hooks
+services/InventoryService.ts          # Business logic
+repositories/InventoryRepository.ts   # Data access
 <FileName>.test.tsx                   # Tests (co-located)
 <Name>.stories.tsx                    # Stories (co-located)
 ```
+
+**Use folder only when component needs multiple files:**
+
+```
+components/features/InventoryTable/
+├── InventoryTable.tsx        # Main component
+├── useInventoryTable.ts      # Associated hook
+├── types.ts                  # Specific types/schemas
+└── InventoryRow.tsx          # Sub-component
+```
+
+**When to create a folder:**
+- ✅ Component has custom hook: `useComponentName.ts`
+- ✅ Component has types/schemas: `types.ts`, `schema.ts`
+- ✅ Component has sub-components: `ComponentRow.tsx`
+- ❌ Component is standalone < 200 lines with Tailwind only
 
 ## Quick Decision Rules
 

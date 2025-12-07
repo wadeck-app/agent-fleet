@@ -4,8 +4,8 @@
  */
 
 import { motion } from 'framer-motion';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table/Table';
-import { Skeleton } from '@/components/ui/Skeleton/Skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 export interface TableSkeletonProps {
   /**

@@ -4,7 +4,7 @@
  */
 
 import { Settings } from 'lucide-react';
-import { Label } from '@/components/ui/Label/Label';
+import { Label } from '@/components/ui/Label';
 
 export type AnimationType = 'fade' | 'slide-up' | 'slide-down' | 'scale-center' | 'scale-left' | 'scale-right' | 'flip';
 
