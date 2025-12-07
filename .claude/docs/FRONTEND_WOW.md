@@ -5,8 +5,11 @@
 ### Core Framework
 - **React 19** - UI library with hooks
 - **TypeScript 5.3+** - Strict mode enforced
-- **Radix UI** - Accessible primitive components
-- **SCSS Modules** - Component-scoped styling
+- **Radix UI** - Accessible primitive components (via Shadcn/ui)
+- **Shadcn/ui** - Beautifully designed components built on Radix UI
+- **Tailwind CSS** - Utility-first CSS framework for styling
+- **Inter** - Primary font family
+- **Lucide Icons** - Icon library for consistent iconography
 - **Vitest + React Testing Library** - Unit and integration tests
 - **Storybook** - Component development and documentation
 - **Playwright** - E2E testing
@@ -23,7 +26,10 @@
 4. **Layout Components** - Handle structural positioning
 
 **MUST:**
-- Base all generic components on Radix UI primitives
+- Base all generic components on Shadcn/ui components (which use Radix UI primitives)
+- Use Tailwind CSS utility classes for all styling
+- Use Inter font family for all text
+- Use Lucide icons for all iconography
 - Keep business logic out of generic components
 - Make page components compositional only (no logic)
 - Handle all responsive behavior in layout components
@@ -81,7 +87,6 @@
 **Hooks:** `hooks/use<FeatureName>.ts` (e.g., `useTasks.ts`)
 **Services:** `services/<FeatureName>Service.ts`
 **Repositories:** `repositories/<FeatureName>Repository.ts`
-**Styles:** `<ComponentName>.module.scss` (co-located with component)
 **Tests:** `<FileName>.test.tsx` (co-located)
 **Stories:** `<ComponentName>.stories.tsx` (co-located)
 
@@ -106,7 +111,7 @@
 **Generic component when:**
 - UI pattern reusable across features
 - Zero business logic needed
-- Can be built on Radix UI primitive
+- Can be built on Shadcn/ui component or Radix UI primitive
 
 **Feature component when:**
 - Needs domain-specific logic
@@ -149,10 +154,31 @@
 ### Generic Components
 
 **MUST:**
-- Build on Radix UI primitives
+- Prefer using Shadcn/ui components as starting point (they're pre-built on Radix UI)
+- Customize Shadcn/ui components using Tailwind classes
+- Build on Radix UI primitives directly only when Shadcn/ui doesn't provide the pattern
 - Contain zero business logic
 - Accept only presentation props
 - Be fully reusable across features
+- Use Lucide icons for all iconography
+- Use Inter font via Tailwind's font utilities
+
+**Shadcn/ui Component Usage:**
+```tsx
+// Use Shadcn/ui components as base
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { Check } from "lucide-react"
+
+export function GenericCard({ title, children }) {
+  return (
+    <Card className="p-6">
+      <h3 className="text-lg font-semibold">{title}</h3>
+      <div className="mt-4">{children}</div>
+    </Card>
+  )
+}
+```
 
 **Reference:** See `docs/examples/frontend/components/generic-component.tsx`
 
@@ -187,7 +213,7 @@
 - Handle structural positioning only
 - Manage responsive behavior
 - Be reusable across pages
-- Use SCSS modules for styling
+- Use Tailwind CSS utility classes for styling
 
 **Reference:** See `docs/examples/frontend/components/layout-component.tsx`
 
@@ -299,65 +325,181 @@
 
 ## Styling Conventions
 
-### SCSS Modules
+### Tailwind CSS
 
 **MUST:**
-- Each component has dedicated `.module.scss` file
-- Use SCSS modules for scoping (not global styles)
-- Co-locate styles with components
-- Reference theme variables, never hardcode colors
+- Use Tailwind utility classes for all component styling
+- Use `cn()` utility (from `lib/utils.ts`) for conditional class merging
+- Follow mobile-first responsive design with Tailwind breakpoints
+- Use Tailwind theme colors (never hardcode colors)
+- Co-locate components with their TypeScript files (no separate style files)
 
 **AVOID:**
-- Global styles for components
-- Inline styles (use SCSS modules)
-- Hardcoded colors (use CSS custom properties)
+- Inline styles (use Tailwind utilities)
+- Hardcoded colors (use theme colors: `bg-primary`, `text-foreground`, etc.)
+- Creating custom CSS files (use Tailwind configuration instead)
+- Overly complex className strings (extract to components or use `cn()`)
 
-**Reference:** See `docs/examples/frontend/styling/component-styles.module.scss`
+**Example:**
+```tsx
+import { cn } from "@/lib/utils"
+
+export function Button({ variant = "default", className, ...props }) {
+  return (
+    <button
+      className={cn(
+        "inline-flex items-center justify-center rounded-md text-sm font-medium",
+        "transition-colors focus-visible:outline-none focus-visible:ring-2",
+        variant === "default" && "bg-primary text-primary-foreground hover:bg-primary/90",
+        variant === "outline" && "border border-input bg-background hover:bg-accent",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+```
+
+**Reference:** See `docs/examples/frontend/styling/tailwind-component.tsx`
+
+### Typography
+
+**MUST:**
+- Use Inter font family for all text (configured in Tailwind)
+- Use Tailwind typography classes: `text-sm`, `text-base`, `text-lg`, etc.
+- Use font weight utilities: `font-normal`, `font-medium`, `font-semibold`, `font-bold`
+- Maintain consistent line heights using Tailwind defaults
+
+**Example:**
+```tsx
+<h1 className="text-2xl font-bold tracking-tight">Heading</h1>
+<p className="text-sm text-muted-foreground">Description text</p>
+```
+
+### Icons
+
+**MUST:**
+- Use Lucide React icons exclusively
+- Import icons from `lucide-react`
+- Use consistent icon sizes via className: `h-4 w-4`, `h-5 w-5`, etc.
+- Apply text color classes to icons for theming: `text-foreground`, `text-muted-foreground`
+
+**Example:**
+```tsx
+import { Check, X, Loader2 } from "lucide-react"
+
+<Check className="h-4 w-4 text-green-600" />
+<Loader2 className="h-4 w-4 animate-spin" />
+```
+
+**Reference:** See `docs/examples/frontend/styling/icon-usage.tsx`
 
 ### Theme System
 
 **MUST:**
-- Implement both dark and light themes
-- Use CSS custom properties (`--color-*`) for all theme-dependent values
-- Define global variables in centralized theme file
-- Components reference variables, never hardcode
+- Implement both dark and light themes using Tailwind CSS variables
+- Define theme colors in `tailwind.config.js` and CSS variables in `globals.css`
+- Use semantic color names: `primary`, `secondary`, `accent`, `muted`, `destructive`
+- Components reference theme colors via Tailwind classes
+- Never hardcode color values in components
 
-**Theme affects:**
-- Brightness/contrast primarily
-- Background/surface colors
-- Text colors
-- Border colors
+**Theme configuration in `tailwind.config.js`:**
+```js
+module.exports = {
+  darkMode: ["class"],
+  theme: {
+    extend: {
+      colors: {
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        // ... other semantic colors
+      },
+      fontFamily: {
+        sans: ["Inter", "sans-serif"],
+      },
+    },
+  },
+}
+```
 
-**Reference:** See `docs/examples/frontend/styling/theme-system.scss`
+**CSS variables in `globals.css`:**
+```css
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    /* ... other light theme colors */
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    /* ... other dark theme colors */
+  }
+}
+```
+
+**Reference:** See `docs/examples/frontend/styling/theme-system-tailwind.css`
 
 ### Responsive Design
 
 **MUST:**
-- Use mobile-first approach
+- Use mobile-first approach with Tailwind breakpoints
 - Use Pixel 9a dimensions (393px × 851px) as mobile baseline
-- Standard desktop window sizes for desktop breakpoint
-- Use SCSS mixins for breakpoint management
+- Use Tailwind responsive prefixes: `sm:`, `md:`, `lg:`, `xl:`, `2xl:`
 
-**Breakpoints:**
-- Mobile: < 768px (default)
-- Desktop: >= 768px
-- Large Desktop: >= 1200px
+**Tailwind Breakpoints:**
+- Mobile: < 640px (default, no prefix)
+- Small: >= 640px (`sm:`)
+- Medium: >= 768px (`md:`)
+- Large: >= 1024px (`lg:`)
+- XL: >= 1280px (`xl:`)
+- 2XL: >= 1536px (`2xl:`)
 
 **MUST:**
-- Layout components handle responsive behavior
-- Use flexbox/grid for layout
-- Avoid fixed widths (use percentages/flex)
+- Layout components handle responsive behavior using Tailwind utilities
+- Use Flexbox/Grid utilities: `flex`, `grid`, `grid-cols-1 md:grid-cols-2`
+- Avoid fixed widths (use `w-full`, `max-w-*`, flex utilities)
 
-**Reference:** See `docs/examples/frontend/styling/responsive-layout.module.scss`
+**Example:**
+```tsx
+<div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+  <Card className="p-4" />
+  <Card className="p-4" />
+  <Card className="p-4" />
+</div>
+```
+
+**Reference:** See `docs/examples/frontend/styling/responsive-tailwind.tsx`
 
 ### Page Styling Rules
 
 **MUST:**
-- Pages contain minimal to zero styling (0-5 lines max)
-- Delegate all structural styling to layout components
-- Delegate all component styling to components themselves
+- Pages contain minimal inline styling (prefer layout components)
+- Use Tailwind container utilities: `container mx-auto px-4`
+- Delegate structural styling to layout components
+- Use spacing utilities consistently: `space-y-4`, `gap-6`, etc.
 
-**Reference:** See `docs/examples/frontend/styling/page-minimal-styling.tsx`
+**Example:**
+```tsx
+export function TasksPage() {
+  return (
+    <div className="container mx-auto px-4 py-6">
+      <TasksLayout>
+        <TaskList />
+      </TasksLayout>
+    </div>
+  )
+}
+```
+
+**Reference:** See `docs/examples/frontend/styling/page-minimal-styling-tailwind.tsx`
 
 ## Anti-Patterns
 
@@ -403,9 +545,52 @@
 
 **Problem:** Themes don't work, inconsistent design, hard to maintain.
 
-**Solution:** Use CSS custom properties (`--color-*`) for all colors.
+**Solution:** Use Tailwind theme colors (`bg-primary`, `text-foreground`, etc.) for all colors.
 
-**Reference:** See `docs/examples/frontend/styling/theme-system.scss`
+**Example:**
+```tsx
+// ❌ BAD - Hardcoded colors
+<div className="bg-[#3b82f6] text-[#ffffff]">
+
+// ✅ GOOD - Theme colors
+<div className="bg-primary text-primary-foreground">
+```
+
+**Reference:** See `docs/examples/frontend/styling/theme-system-tailwind.css`
+
+### ❌ Inline Styles Instead of Tailwind
+
+**Problem:** Breaks consistency, harder to maintain, no responsive/theme support.
+
+**Solution:** Use Tailwind utility classes for all styling.
+
+**Example:**
+```tsx
+// ❌ BAD - Inline styles
+<div style={{ padding: "16px", backgroundColor: "#fff" }}>
+
+// ✅ GOOD - Tailwind utilities
+<div className="p-4 bg-background">
+```
+
+### ❌ Not Using cn() for Conditional Classes
+
+**Problem:** Complex className strings, hard to read conditional styling.
+
+**Solution:** Use `cn()` utility from `lib/utils.ts` for merging classes.
+
+**Example:**
+```tsx
+// ❌ BAD - Complex conditional className
+<button className={`btn ${isActive ? 'bg-blue-500' : 'bg-gray-500'} ${isLarge ? 'text-lg' : 'text-sm'}`}>
+
+// ✅ GOOD - Using cn()
+<button className={cn(
+  "btn",
+  isActive ? "bg-primary" : "bg-secondary",
+  isLarge && "text-lg"
+)}>
+```
 
 ### ❌ Testing Implementation Details
 
@@ -462,7 +647,8 @@
 - `testing/storybook-interaction-test.stories.tsx` - Interaction tests
 
 ### Styling
-- `styling/component-styles.module.scss` - SCSS module pattern
-- `styling/theme-system.scss` - Dark/light theme with CSS variables
-- `styling/responsive-layout.module.scss` - Mobile-first responsive
-- `styling/page-minimal-styling.tsx` - Zero styling in pages
+- `styling/tailwind-component.tsx` - Tailwind CSS styling pattern with cn()
+- `styling/theme-system-tailwind.css` - Dark/light theme with Tailwind CSS variables
+- `styling/responsive-tailwind.tsx` - Mobile-first responsive with Tailwind
+- `styling/page-minimal-styling-tailwind.tsx` - Minimal styling in pages
+- `styling/icon-usage.tsx` - Lucide icons usage patterns
