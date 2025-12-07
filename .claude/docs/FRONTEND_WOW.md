@@ -1,654 +1,215 @@
-# Frontend Architecture - Best Practices Guide
+# Frontend Architecture - Quick Reference
 
-## Technology Stack
+**For agents:** This is the essential guide. Load detailed references only when needed.
 
-### Core Framework
-- **React 19** - UI library with hooks
-- **TypeScript 5.3+** - Strict mode enforced
-- **Radix UI** - Accessible primitive components (via Shadcn/ui)
-- **Shadcn/ui** - Beautifully designed components built on Radix UI
-- **Tailwind CSS** - Utility-first CSS framework for styling
-- **Inter** - Primary font family
-- **Lucide Icons** - Icon library for consistent iconography
-- **Vitest + React Testing Library** - Unit and integration tests
-- **Storybook** - Component development and documentation
-- **Playwright** - E2E testing
+## Tech Stack
+
+- React 19 + TypeScript 5.3+
+- Shadcn/ui (Radix UI) + Tailwind CSS
+- Inter font + Lucide icons
+- Vitest + Testing Library + Playwright + Storybook
 
 ## Core Principles
 
-### 1. Component Hierarchy
+### 1. Component Hierarchy (Strict)
 
-**MUST follow this strict hierarchy:**
+1. **Generic** - Pure UI, Shadcn/ui based, zero business logic
+2. **Feature** - Domain logic, compose generic components
+3. **Page** - Compositional only, manage shared state
+4. **Layout** - Structure + responsive behavior
 
-1. **Generic Components** - Pure UI, zero business logic, based on Radix UI
-2. **Feature Components** - Compose generic components with domain logic
-3. **Page Components** - Purely compositional, bring components together
-4. **Layout Components** - Handle structural positioning
+**Reference:** `docs/examples/frontend/components/`
 
-**MUST:**
-- Base all generic components on Shadcn/ui components (which use Radix UI primitives)
-- Use Tailwind CSS utility classes for all styling
-- Use Inter font family for all text
-- Use Lucide icons for all iconography
-- Keep business logic out of generic components
-- Make page components compositional only (no logic)
-- Handle all responsive behavior in layout components
+### 2. State Management
 
-**AVOID:**
-- Business logic in generic components
-- Direct styling in page components
-- Mixing presentation and business logic
+**Props** - Use for <4 components
+**Context** - Use for >4-5 components needing same state
 
-**Reference:** See `docs/examples/frontend/components/`
+**Reference:** `docs/examples/frontend/state/`
 
-### 2. State Management Strategy
+### 3. Data Flow (Required for each feature)
 
-**Component communication rules:**
+```
+apiClient → Repository → Service → Hook → Component
+```
 
-**MUST:**
-- Communicate between components ONLY through props
-- Lift shared state to parent page component
-- Create dedicated context when page manages state for >4-5 components
-- Justify and properly scope all context usage
-
-**AVOID:**
-- Direct component-to-component communication
-- Global state for local features
-- Context for <4 components (use props)
-
-**Reference:**
-- Props: `docs/examples/frontend/state/props-communication.tsx`
-- Context: `docs/examples/frontend/state/context-usage.tsx`
-
-### 3. Data Flow Architecture
-
-**Layered structure (MUST follow for each feature):**
-
-1. **apiClient** - Generic HTTP client (reusable)
-2. **xxxRepository** - Feature-specific data access
-3. **xxxService** - Business logic and data transformation
-4. **useXxx** - Custom hook exposing service functionality
-5. **Components** - Pure presentation consuming hooks via props
-
-**MUST:**
-- Keep components free of direct API calls
-- Transform API data in service layer
-- Expose functionality through custom hooks
-- Pass hook data to components via props
-
-**Reference:** See `docs/examples/frontend/data-flow/`
+**Reference:** `docs/examples/frontend/data-flow/`
 
 ## File Conventions
 
-**Generic Components:** `components/ui/<ComponentName>.tsx` (e.g., `Button.tsx`)
-**Feature Components:** `components/features/<FeatureName>/<ComponentName>.tsx`
-**Pages:** `pages/<PageName>Page.tsx` (e.g., `TasksPage.tsx`)
-**Layouts:** `layouts/<LayoutName>.tsx` (e.g., `MainLayout.tsx`)
-**Hooks:** `hooks/use<FeatureName>.ts` (e.g., `useTasks.ts`)
-**Services:** `services/<FeatureName>Service.ts`
-**Repositories:** `repositories/<FeatureName>Repository.ts`
-**Tests:** `<FileName>.test.tsx` (co-located)
-**Stories:** `<ComponentName>.stories.tsx` (co-located)
+```
+components/ui/<Name>.tsx              # Generic (Shadcn/ui based)
+components/features/<Feature>/<Name>.tsx  # Feature-specific
+pages/<Name>Page.tsx                  # Pages
+layouts/<Name>.tsx                    # Layouts
+hooks/use<Feature>.ts                 # Custom hooks
+services/<Feature>Service.ts          # Business logic
+repositories/<Feature>Repository.ts   # Data access
+<FileName>.test.tsx                   # Tests (co-located)
+<Name>.stories.tsx                    # Stories (co-located)
+```
 
-## Decision Rules
+## Quick Decision Rules
 
-### When to Create Context
+### Context vs Props?
+- **Props:** <4 components, <3 levels drilling
+- **Context:** >4-5 components, >3 levels drilling
 
-**Use context when:**
-- Page manages state for >4-5 components
-- Props drilling becomes unwieldy (>3 levels)
-- State is truly shared across component tree
+### Component Type?
+- **Generic:** Reusable UI, zero business logic, Shadcn/ui based
+- **Feature:** Domain-specific, combines generics
+- **Page:** Top-level route, compositional only
+- **Layout:** Structure + responsive only
 
-**Use props when:**
-- <4 components need the state
-- Props drilling is <3 levels
-- State is localized to section of page
+### Test Type?
+- **Unit (70%):** Hooks, services, utilities
+- **Integration (25%):** Component interactions
+- **E2E (5%):** Critical user journeys
 
-**Reference:** See `docs/examples/frontend/state/context-usage.tsx`
-
-### Component Type Selection
-
-**Generic component when:**
-- UI pattern reusable across features
-- Zero business logic needed
-- Can be built on Shadcn/ui component or Radix UI primitive
-
-**Feature component when:**
-- Needs domain-specific logic
-- Combines multiple generic components
-- Specific to one feature/domain
-
-**Page component when:**
-- Top-level route component
-- Needs to compose multiple features
-- Manages shared state for children
-
-**Layout component when:**
-- Handles structural positioning only
-- Manages responsive behavior
-- Reusable across multiple pages
-
-### Testing: Unit vs Integration vs E2E
-
-**Unit tests when:**
-- Testing hooks in isolation
-- Testing services/utilities
-- Testing data transformations
-- **Target: 70% of test suite**
-
-**Integration tests when:**
-- Testing component interactions
-- Testing data flow through hooks
-- Testing context behavior
-- **Target: 25% of test suite**
-
-**E2E tests when:**
-- Testing critical user journeys
-- Testing cross-page flows
-- **Target: 5% of test suite**
-
-**Reference:** See `docs/examples/frontend/testing/`
-
-## Component Architecture
+## Must/Avoid
 
 ### Generic Components
 
 **MUST:**
-- Prefer using Shadcn/ui components as starting point (they're pre-built on Radix UI)
-- Customize Shadcn/ui components using Tailwind classes
-- Build on Radix UI primitives directly only when Shadcn/ui doesn't provide the pattern
-- Contain zero business logic
-- Accept only presentation props
-- Be fully reusable across features
-- Use Lucide icons for all iconography
-- Use Inter font via Tailwind's font utilities
+- Start with Shadcn/ui components
+- Use Tailwind utilities only
+- Use Lucide icons
+- Use Inter font
+- Zero business logic
 
-**Shadcn/ui Component Usage:**
-```tsx
-// Use Shadcn/ui components as base
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Check } from "lucide-react"
+**AVOID:**
+- Business logic
+- Direct API calls
+- Feature-specific behavior
 
-export function GenericCard({ title, children }) {
-  return (
-    <Card className="p-6">
-      <h3 className="text-lg font-semibold">{title}</h3>
-      <div className="mt-4">{children}</div>
-    </Card>
-  )
-}
-```
-
-**Reference:** See `docs/examples/frontend/components/generic-component.tsx`
+**Reference:** `docs/examples/frontend/components/generic-component.tsx`
 
 ### Feature Components
 
 **MUST:**
 - Compose generic components
-- Receive data via props (from hooks)
-- Handle domain-specific logic
-- Maintain single responsibility
+- Receive data via props
+- Handle domain logic
+- Single responsibility
 
-**Reference:** See `docs/examples/frontend/components/feature-component.tsx`
+**Reference:** `docs/examples/frontend/components/feature-component.tsx`
 
 ### Page Components
 
 **MUST:**
-- Be purely compositional
-- Contain virtually zero styling (0-5 lines CSS max)
-- Delegate to layout components for structure
-- Manage shared state for children
+- Be compositional (just compose components)
+- Minimal styling (0-5 lines Tailwind max)
+- Delegate to layouts
+- Manage shared state if needed
 
 **AVOID:**
-- Business logic in pages
-- Direct API calls in pages
-- Styling logic in pages
+- Business logic
+- Direct API calls
+- Styling (use layouts)
 
-**Reference:** See `docs/examples/frontend/components/page-component.tsx`
+**Reference:** `docs/examples/frontend/styling/page-minimal-styling-tailwind.tsx`
 
-### Layout Components
-
-**MUST:**
-- Handle structural positioning only
-- Manage responsive behavior
-- Be reusable across pages
-- Use Tailwind CSS utility classes for styling
-
-**Reference:** See `docs/examples/frontend/components/layout-component.tsx`
-
-## Data Flow Patterns
-
-### API Client
-
-**Pattern:** Generic HTTP client reusable across all features.
+### Styling with Tailwind
 
 **MUST:**
-- Implement generic request methods (GET, POST, PATCH, DELETE)
-- Handle errors consistently
-- Be framework-agnostic
-
-**Reference:** See `docs/examples/frontend/data-flow/api-client.ts`
-
-### Repository
-
-**Pattern:** Feature-specific data access layer.
-
-**MUST:**
-- Encapsulate all API calls for a feature
-- Return raw API data (no transformation)
-- Have single responsibility (data fetching)
+- Use Tailwind utilities exclusively
+- Use `cn()` for conditional classes
+- Use theme colors (`bg-primary`, never `bg-[#3b82f6]`)
+- Use Inter via Tailwind font utilities
+- Mobile-first responsive (Pixel 9a baseline: 393px)
 
 **AVOID:**
-- Business logic in repositories
-- Data transformation in repositories
-- Calling other repositories
-
-**Reference:** See `docs/examples/frontend/data-flow/repository.ts`
-
-### Service
-
-**Pattern:** Business logic and data transformation layer.
-
-**MUST:**
-- Transform API data for UI consumption
-- Implement business rules
-- Coordinate multiple repository calls if needed
-
-**AVOID:**
-- Direct API calls (use repository)
-- UI concerns (formatting should be minimal)
-- Service-to-service calls (use composition)
-
-**Reference:** See `docs/examples/frontend/data-flow/service.ts`
-
-### Custom Hook
-
-**Pattern:** Expose service functionality to components.
-
-**MUST:**
-- Manage loading/error states
-- Provide data and actions to components
-- Be the only interface between service and UI
-
-**AVOID:**
-- Business logic in hooks (belongs in service)
-- Direct API calls (use service)
-- Side effects without cleanup
-
-**Reference:** See `docs/examples/frontend/data-flow/custom-hook.ts`
-
-## Testing Strategy
-
-### Test Pyramid
-
-**Distribution (MUST maintain):**
-- 70% Unit tests (hooks, services, utilities)
-- 25% Integration tests (component interactions)
-- 5% E2E tests (critical user journeys)
-
-### Unit Tests
-
-**MUST test:**
-- Hook behavior and state management
-- Service logic and data transformations
-- Utility functions
-
-**Mock:**
-- Service layer (when testing hooks)
-- External dependencies
-
-**Reference:** See `docs/examples/frontend/testing/unit-test-hook.test.ts`
-
-### Integration Tests
-
-**MUST test:**
-- Component interactions
-- Data flow through hooks
-- Context state management
-- User interactions with UI
-
-**Reference:** See `docs/examples/frontend/testing/integration-test-component.test.tsx`
-
-### Storybook Requirements
-
-**Every component MUST have:**
-- Corresponding `.stories.tsx` file
-- All variants demonstrated
-- Interaction tests using `@storybook/test`
-- Accessibility validation
-- Proper documentation and controls
-
-**Reference:**
-- Stories: `docs/examples/frontend/testing/storybook-stories.stories.tsx`
-- Interactions: `docs/examples/frontend/testing/storybook-interaction-test.stories.tsx`
-
-## Styling Conventions
-
-### Tailwind CSS
-
-**MUST:**
-- Use Tailwind utility classes for all component styling
-- Use `cn()` utility (from `lib/utils.ts`) for conditional class merging
-- Follow mobile-first responsive design with Tailwind breakpoints
-- Use Tailwind theme colors (never hardcode colors)
-- Co-locate components with their TypeScript files (no separate style files)
-
-**AVOID:**
-- Inline styles (use Tailwind utilities)
-- Hardcoded colors (use theme colors: `bg-primary`, `text-foreground`, etc.)
-- Creating custom CSS files (use Tailwind configuration instead)
-- Overly complex className strings (extract to components or use `cn()`)
-
-**Example:**
-```tsx
-import { cn } from "@/lib/utils"
-
-export function Button({ variant = "default", className, ...props }) {
-  return (
-    <button
-      className={cn(
-        "inline-flex items-center justify-center rounded-md text-sm font-medium",
-        "transition-colors focus-visible:outline-none focus-visible:ring-2",
-        variant === "default" && "bg-primary text-primary-foreground hover:bg-primary/90",
-        variant === "outline" && "border border-input bg-background hover:bg-accent",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-```
-
-**Reference:** See `docs/examples/frontend/styling/tailwind-component.tsx`
-
-### Typography
-
-**MUST:**
-- Use Inter font family for all text (configured in Tailwind)
-- Use Tailwind typography classes: `text-sm`, `text-base`, `text-lg`, etc.
-- Use font weight utilities: `font-normal`, `font-medium`, `font-semibold`, `font-bold`
-- Maintain consistent line heights using Tailwind defaults
-
-**Example:**
-```tsx
-<h1 className="text-2xl font-bold tracking-tight">Heading</h1>
-<p className="text-sm text-muted-foreground">Description text</p>
-```
-
-### Icons
-
-**MUST:**
-- Use Lucide React icons exclusively
-- Import icons from `lucide-react`
-- Use consistent icon sizes via className: `h-4 w-4`, `h-5 w-5`, etc.
-- Apply text color classes to icons for theming: `text-foreground`, `text-muted-foreground`
-
-**Example:**
-```tsx
-import { Check, X, Loader2 } from "lucide-react"
-
-<Check className="h-4 w-4 text-green-600" />
-<Loader2 className="h-4 w-4 animate-spin" />
-```
-
-**Reference:** See `docs/examples/frontend/styling/icon-usage.tsx`
-
-### Theme System
-
-**MUST:**
-- Implement both dark and light themes using Tailwind CSS variables
-- Define theme colors in `tailwind.config.js` and CSS variables in `globals.css`
-- Use semantic color names: `primary`, `secondary`, `accent`, `muted`, `destructive`
-- Components reference theme colors via Tailwind classes
-- Never hardcode color values in components
-
-**Theme configuration in `tailwind.config.js`:**
-```js
-module.exports = {
-  darkMode: ["class"],
-  theme: {
-    extend: {
-      colors: {
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
-        // ... other semantic colors
-      },
-      fontFamily: {
-        sans: ["Inter", "sans-serif"],
-      },
-    },
-  },
-}
-```
-
-**CSS variables in `globals.css`:**
-```css
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    /* ... other light theme colors */
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    /* ... other dark theme colors */
-  }
-}
-```
-
-**Reference:** See `docs/examples/frontend/styling/theme-system-tailwind.css`
-
-### Responsive Design
-
-**MUST:**
-- Use mobile-first approach with Tailwind breakpoints
-- Use Pixel 9a dimensions (393px × 851px) as mobile baseline
-- Use Tailwind responsive prefixes: `sm:`, `md:`, `lg:`, `xl:`, `2xl:`
-
-**Tailwind Breakpoints:**
-- Mobile: < 640px (default, no prefix)
-- Small: >= 640px (`sm:`)
-- Medium: >= 768px (`md:`)
-- Large: >= 1024px (`lg:`)
-- XL: >= 1280px (`xl:`)
-- 2XL: >= 1536px (`2xl:`)
-
-**MUST:**
-- Layout components handle responsive behavior using Tailwind utilities
-- Use Flexbox/Grid utilities: `flex`, `grid`, `grid-cols-1 md:grid-cols-2`
-- Avoid fixed widths (use `w-full`, `max-w-*`, flex utilities)
-
-**Example:**
-```tsx
-<div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-  <Card className="p-4" />
-  <Card className="p-4" />
-  <Card className="p-4" />
-</div>
-```
-
-**Reference:** See `docs/examples/frontend/styling/responsive-tailwind.tsx`
-
-### Page Styling Rules
-
-**MUST:**
-- Pages contain minimal inline styling (prefer layout components)
-- Use Tailwind container utilities: `container mx-auto px-4`
-- Delegate structural styling to layout components
-- Use spacing utilities consistently: `space-y-4`, `gap-6`, etc.
-
-**Example:**
-```tsx
-export function TasksPage() {
-  return (
-    <div className="container mx-auto px-4 py-6">
-      <TasksLayout>
-        <TaskList />
-      </TasksLayout>
-    </div>
-  )
-}
-```
-
-**Reference:** See `docs/examples/frontend/styling/page-minimal-styling-tailwind.tsx`
-
-## Anti-Patterns
-
-### ❌ Business Logic in Generic Components
-
-**Problem:** Generic components become feature-specific, not reusable.
-
-**Solution:** Extract logic to feature component, pass data via props.
-
-### ❌ Direct Component-to-Component Communication
-
-**Problem:** Tight coupling, hard to test, unpredictable data flow.
-
-**Solution:** Use props, lift state to parent component.
-
-**Reference:** See `docs/examples/frontend/state/props-communication.tsx`
-
-### ❌ API Calls Directly in Components
-
-**Problem:** Hard to test, violates separation of concerns, no data transformation.
-
-**Solution:** Use data flow architecture (repository → service → hook → component).
-
-**Reference:** See `docs/examples/frontend/data-flow/`
-
-### ❌ Using Context for <4 Components
-
-**Problem:** Unnecessary complexity, harder to understand data flow.
-
-**Solution:** Use props for <4 components, context only for >4-5.
-
-**Reference:** See `docs/examples/frontend/state/context-usage.tsx`
-
-### ❌ Styling in Page Components
-
-**Problem:** Pages become coupled to specific layouts, hard to reuse components.
-
-**Solution:** Zero styling in pages, delegate to layout components.
-
-**Reference:** See `docs/examples/frontend/styling/page-minimal-styling.tsx`
-
-### ❌ Hardcoded Colors
-
-**Problem:** Themes don't work, inconsistent design, hard to maintain.
-
-**Solution:** Use Tailwind theme colors (`bg-primary`, `text-foreground`, etc.) for all colors.
-
-**Example:**
-```tsx
-// ❌ BAD - Hardcoded colors
-<div className="bg-[#3b82f6] text-[#ffffff]">
-
-// ✅ GOOD - Theme colors
-<div className="bg-primary text-primary-foreground">
-```
-
-**Reference:** See `docs/examples/frontend/styling/theme-system-tailwind.css`
-
-### ❌ Inline Styles Instead of Tailwind
-
-**Problem:** Breaks consistency, harder to maintain, no responsive/theme support.
-
-**Solution:** Use Tailwind utility classes for all styling.
-
-**Example:**
-```tsx
-// ❌ BAD - Inline styles
-<div style={{ padding: "16px", backgroundColor: "#fff" }}>
-
-// ✅ GOOD - Tailwind utilities
-<div className="p-4 bg-background">
-```
-
-### ❌ Not Using cn() for Conditional Classes
-
-**Problem:** Complex className strings, hard to read conditional styling.
-
-**Solution:** Use `cn()` utility from `lib/utils.ts` for merging classes.
-
-**Example:**
-```tsx
-// ❌ BAD - Complex conditional className
-<button className={`btn ${isActive ? 'bg-blue-500' : 'bg-gray-500'} ${isLarge ? 'text-lg' : 'text-sm'}`}>
-
-// ✅ GOOD - Using cn()
-<button className={cn(
-  "btn",
-  isActive ? "bg-primary" : "bg-secondary",
-  isLarge && "text-lg"
-)}>
-```
-
-### ❌ Testing Implementation Details
-
-**Problem:** Tests break when refactoring, brittle test suite.
-
-**Solution:** Test behavior (user interactions, outputs), not implementation.
-
-**Reference:** See `docs/examples/frontend/testing/integration-test-component.test.tsx`
-
-### ❌ Missing Storybook Stories
-
-**Problem:** No visual documentation, no isolated component development.
-
-**Solution:** Create `.stories.tsx` for every component with all variants.
-
-**Reference:** See `docs/examples/frontend/testing/storybook-stories.stories.tsx`
-
-### ❌ Services with UI Concerns
-
-**Problem:** Services become coupled to UI, hard to reuse/test.
-
-**Solution:** Services return data, components handle formatting.
-
-### ❌ Global State for Local Features
-
-**Problem:** Unnecessary complexity, state pollution, hard to debug.
-
-**Solution:** Scope state to feature context or parent component.
-
-## Examples Reference
-
-**Path:** `docs/examples/frontend/`
-
-### Components
-- `components/generic-component.tsx` - Pure UI, Radix UI-based
-- `components/feature-component.tsx` - Domain logic with composition
-- `components/page-component.tsx` - Compositional, zero styling
-- `components/layout-component.tsx` - Structural positioning
-
-### State Management
-- `state/props-communication.tsx` - Component communication via props
-- `state/context-usage.tsx` - Context for >4-5 components
+- Inline styles
+- Hardcoded colors
+- CSS modules/separate style files
+- Fixed widths
+
+**References:**
+- `docs/examples/frontend/styling/tailwind-component.tsx` - cn() usage
+- `docs/examples/frontend/styling/theme-system-tailwind.css` - Theme setup
+- `docs/examples/frontend/styling/responsive-tailwind.tsx` - Responsive patterns
+- `docs/examples/frontend/styling/icon-usage.tsx` - Lucide icons
 
 ### Data Flow
-- `data-flow/api-client.ts` - Generic HTTP client
-- `data-flow/repository.ts` - Feature-specific data access
-- `data-flow/service.ts` - Business logic and transformation
-- `data-flow/custom-hook.ts` - Service to component interface
+
+**MUST:**
+- Keep components free of API calls
+- Transform data in service layer
+- Expose via custom hooks
+- Pass hook data to components via props
+
+**AVOID:**
+- Direct API calls in components
+- Business logic in hooks (use service)
+- Data transformation in repository
+
+**References:**
+- `docs/examples/frontend/data-flow/api-client.ts`
+- `docs/examples/frontend/data-flow/repository.ts`
+- `docs/examples/frontend/data-flow/service.ts`
+- `docs/examples/frontend/data-flow/custom-hook.ts`
 
 ### Testing
-- `testing/unit-test-hook.test.ts` - Hook unit tests (70%)
-- `testing/integration-test-component.test.tsx` - Component integration (25%)
-- `testing/storybook-stories.stories.tsx` - Storybook variants
+
+**MUST:**
+- Every component has `.stories.tsx`
+- Mock service layer when testing hooks
+- Test behavior, not implementation
+- Maintain 70/25/5 pyramid
+
+**References:**
+- `docs/examples/frontend/testing/unit-test-hook.test.ts`
+- `docs/examples/frontend/testing/integration-test-component.test.tsx`
+- `docs/examples/frontend/testing/storybook-stories.stories.tsx`
+- `docs/examples/frontend/testing/storybook-interaction-test.stories.tsx`
+
+## Common Anti-Patterns
+
+**For detailed anti-patterns with examples:** See `.claude/docs/FRONTEND_ANTIPATTERNS.md`
+
+Quick list:
+- Business logic in generic components
+- Direct component-to-component communication
+- API calls in components
+- Context for <4 components
+- Styling in page components
+- Hardcoded colors
+- Inline styles instead of Tailwind
+- Not using cn() for conditional classes
+- Testing implementation details
+- Missing Storybook stories
+- Services with UI concerns
+- Global state for local features
+
+## Example Files Reference
+
+All examples: `docs/examples/frontend/`
+
+**Components:**
+- `components/generic-component.tsx` - Shadcn/ui, Tailwind, Lucide
+- `components/feature-component.tsx` - Domain logic
+- `components/page-component.tsx` - Compositional
+- `components/layout-component.tsx` - Structure
+
+**State:**
+- `state/props-communication.tsx` - Props pattern
+- `state/context-usage.tsx` - Context pattern
+
+**Data Flow:**
+- `data-flow/api-client.ts` - HTTP client
+- `data-flow/repository.ts` - Data access
+- `data-flow/service.ts` - Business logic
+- `data-flow/custom-hook.ts` - Service interface
+
+**Testing:**
+- `testing/unit-test-hook.test.ts` - Hook tests
+- `testing/integration-test-component.test.tsx` - Integration tests
+- `testing/storybook-stories.stories.tsx` - Story variants
 - `testing/storybook-interaction-test.stories.tsx` - Interaction tests
 
-### Styling
-- `styling/tailwind-component.tsx` - Tailwind CSS styling pattern with cn()
-- `styling/theme-system-tailwind.css` - Dark/light theme with Tailwind CSS variables
-- `styling/responsive-tailwind.tsx` - Mobile-first responsive with Tailwind
-- `styling/page-minimal-styling-tailwind.tsx` - Minimal styling in pages
-- `styling/icon-usage.tsx` - Lucide icons usage patterns
+**Styling:**
+- `styling/tailwind-component.tsx` - cn() utility
+- `styling/theme-system-tailwind.css` - Dark/light themes
+- `styling/responsive-tailwind.tsx` - Mobile-first
+- `styling/page-minimal-styling-tailwind.tsx` - Minimal page styling
+- `styling/icon-usage.tsx` - Lucide patterns
