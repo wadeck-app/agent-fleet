@@ -1,0 +1,17 @@
+// Breakpoints
+$mobile-max: 767px;
+$desktop-min: 768px;
+$desktop-large-min: 1200px;
+
+// Mixins for responsive design (mobile-first)
+@mixin desktop {
+  @media (min-width: $desktop-min) {
+    @content;
+  }
+}
+
+@mixin desktop-large {
+  @media (min-width: $desktop-large-min) {
+    @content;
+  }
+}
