@@ -380,6 +380,7 @@ export class StepRunner {
     if (nestingDepth > MAX_NESTING_DEPTH) {
       stepTrace.endTime = Date.now();
       stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
+      stepTrace.nestingDepth = nestingDepth;
       stepTrace.error = `Maximum nesting depth (${MAX_NESTING_DEPTH}) exceeded`;
       return stepTrace;
     }

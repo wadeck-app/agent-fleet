@@ -4,11 +4,12 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { StepRunner } from './StepRunner.js';
-import type { ScriptFlowStep, ModelFlowStep, Workspace } from '../types.js';
+import type { ScriptFlowStep, ModelFlowStep, SubFlowStep, Workspace, FlowDefinition } from '../types.js';
 import { TemplateRenderer } from '../processing/TemplateRenderer.js';
 import { ScriptExecutor } from './ScriptExecutor.js';
 import { OutputExtractor } from '../processing/OutputExtractor.js';
 import { ClaudeProcessManager } from '../processing/ClaudeProcessManager.js';
+import type { FlowRegistry } from '../registry/FlowRegistry.js';
 
 // Mock dependencies
 vi.mock('../processing/TemplateRenderer.js');
@@ -322,6 +323,502 @@ describe('StepRunner', () => {
       expect(calculateBackoff(2, 'exponential')).toBe(2000);
       expect(calculateBackoff(3, 'exponential')).toBe(4000);
       expect(calculateBackoff(4, 'exponential')).toBe(8000);
+    });
+  });
+
+  describe('executeStep - SubFlow Steps', () => {
+    let mockFlowRegistry: FlowRegistry;
+    let mockFlowExecutor: any;
+    let mockFlow: FlowDefinition;
+
+    beforeEach(() => {
+      // Create mock flow
+      mockFlow = {
+        id: 'target-flow',
+        name: 'Target Flow',
+        description: 'Test flow for SubFlowStep tests',
+        inputs: {
+          message: 'string',
+        },
+        steps: [
+          {
+            id: 'step1',
+            name: 'Step 1',
+            type: 'script',
+            script: 'echo "${{ inputs.message }}"',
+          },
+        ],
+        workspace: {
+          mode: 'manual',
+          gitStrategy: 'any',
+          reusePolicy: 'never',
+        },
+      };
+
+      // Mock FlowRegistry
+      mockFlowRegistry = {
+        getFlow: vi.fn((flowId: string) => {
+          if (flowId === 'target-flow') return mockFlow;
+          return undefined;
+        }),
+      } as any;
+
+      // Mock FlowExecutor
+      mockFlowExecutor = {
+        execute: vi.fn(async () => ({
+          success: true,
+          outputs: {
+            step1: { result: 'Hello from subflow' },
+          },
+        })),
+      };
+
+      // Configure runner with dependencies
+      runner = new StepRunner({ interactive: false });
+      runner.setFlowRegistry(mockFlowRegistry);
+      runner.setFlowExecutor(mockFlowExecutor);
+    });
+
+    it('should execute a successful SubFlowStep with inherit strategy', async () => {
+      const step: SubFlowStep = {
+        id: 'subflow-step',
+        name: 'SubFlow Step',
+        type: 'subflow',
+        flowId: 'target-flow',
+        inputs: {
+          message: 'Hello',
+        },
+        workspaceStrategy: 'inherit',
+      };
+
+      const context = {
+        inputs: {},
+        stepOutputs: new Map(),
+        taskMetadata: {},
+        taskId: 'test-task',
+      };
+
+      vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('Hello');
+
+      const trace = await runner.executeStep(step, testWorkspace, context);
+
+      expect(trace.stepId).toBe('subflow-step');
+      expect(trace.stepType).toBe('subflow');
+      expect(trace.error).toBeUndefined();
+      expect(trace.subFlowId).toBe('target-flow');
+      expect(trace.workspaceStrategy).toBe('inherit');
+      expect(trace.nestingDepth).toBe(1);
+      expect(trace.outputs).toEqual({
+        step1: { result: 'Hello from subflow' },
+      });
+      expect(mockFlowExecutor.execute).toHaveBeenCalledWith({
+        taskId: 'test-task',
+        flow: mockFlow,
+        workspace: testWorkspace,
+        inputs: { message: 'Hello' },
+        taskMetadata: {},
+        claudeEnv: undefined,
+        onClaudeProcessStarted: undefined,
+        nestingDepth: 1,
+      });
+    });
+
+    it('should use default inherit strategy when not specified', async () => {
+      const step: SubFlowStep = {
+        id: 'subflow-default',
+        name: 'SubFlow Default',
+        type: 'subflow',
+        flowId: 'target-flow',
+        inputs: {
+          message: 'Test',
+        },
+      };
+
+      const context = {
+        inputs: {},
+        stepOutputs: new Map(),
+        taskMetadata: {},
+        taskId: 'test-task',
+      };
+
+      vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('Test');
+
+      const trace = await runner.executeStep(step, testWorkspace, context);
+
+      expect(trace.error).toBeUndefined();
+      expect(trace.workspaceStrategy).toBe('inherit');
+    });
+
+    it('should fail when workspaceStrategy is separate (Phase 2 not implemented)', async () => {
+      const step: SubFlowStep = {
+        id: 'subflow-separate',
+        name: 'SubFlow Separate',
+        type: 'subflow',
+        flowId: 'target-flow',
+        inputs: {
+          message: 'Test',
+        },
+        workspaceStrategy: 'separate',
+      };
+
+      const context = {
+        inputs: {},
+        stepOutputs: new Map(),
+        taskMetadata: {},
+      };
+
+      const trace = await runner.executeStep(step, testWorkspace, context);
+
+      expect(trace.error).toBe('workspaceStrategy "separate" is not yet implemented (Phase 2)');
+      expect(trace.stepId).toBe('subflow-separate');
+    });
+
+    it('should fail when FlowRegistry is not configured', async () => {
+      const runnerWithoutRegistry = new StepRunner({ interactive: false });
+      // Don't set FlowRegistry
+
+      const step: SubFlowStep = {
+        id: 'subflow-no-registry',
+        name: 'SubFlow No Registry',
+        type: 'subflow',
+        flowId: 'target-flow',
+        inputs: {},
+      };
+
+      const context = {
+        inputs: {},
+        stepOutputs: new Map(),
+        taskMetadata: {},
+      };
+
+      const trace = await runnerWithoutRegistry.executeStep(step, testWorkspace, context);
+
+      expect(trace.error).toBe('FlowRegistry not configured in StepRunner');
+    });
+
+    it('should fail when FlowExecutor is not configured', async () => {
+      const runnerWithoutExecutor = new StepRunner({ interactive: false });
+      runnerWithoutExecutor.setFlowRegistry(mockFlowRegistry);
+      // Don't set FlowExecutor
+
+      const step: SubFlowStep = {
+        id: 'subflow-no-executor',
+        name: 'SubFlow No Executor',
+        type: 'subflow',
+        flowId: 'target-flow',
+        inputs: {},
+      };
+
+      const context = {
+        inputs: {},
+        stepOutputs: new Map(),
+        taskMetadata: {},
+      };
+
+      const trace = await runnerWithoutExecutor.executeStep(step, testWorkspace, context);
+
+      expect(trace.error).toBe('FlowExecutor not configured in StepRunner');
+    });
+
+    it('should fail when referenced flow does not exist', async () => {
+      const step: SubFlowStep = {
+        id: 'subflow-not-found',
+        name: 'SubFlow Not Found',
+        type: 'subflow',
+        flowId: 'non-existent-flow',
+        inputs: {},
+      };
+
+      const context = {
+        inputs: {},
+        stepOutputs: new Map(),
+        taskMetadata: {},
+      };
+
+      const trace = await runner.executeStep(step, testWorkspace, context);
+
+      expect(trace.error).toBe("Flow 'non-existent-flow' not found");
+    });
+
+    it('should fail when nesting depth exceeds maximum (10)', async () => {
+      const step: SubFlowStep = {
+        id: 'subflow-deep',
+        name: 'SubFlow Deep',
+        type: 'subflow',
+        flowId: 'target-flow',
+        inputs: {},
+      };
+
+      const context = {
+        inputs: {},
+        stepOutputs: new Map(),
+        taskMetadata: {},
+        nestingDepth: 10, // Already at max depth
+      };
+
+      const trace = await runner.executeStep(step, testWorkspace, context);
+
+      expect(trace.error).toBe('Maximum nesting depth (10) exceeded');
+      expect(trace.nestingDepth).toBe(11);
+    });
+
+    it('should track nesting depth correctly', async () => {
+      const step: SubFlowStep = {
+        id: 'subflow-nested',
+        name: 'SubFlow Nested',
+        type: 'subflow',
+        flowId: 'target-flow',
+        inputs: {
+          message: 'Nested',
+        },
+      };
+
+      const context = {
+        inputs: {},
+        stepOutputs: new Map(),
+        taskMetadata: {},
+        taskId: 'test-task',
+        nestingDepth: 3, // Starting at depth 3
+      };
+
+      vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('Nested');
+
+      const trace = await runner.executeStep(step, testWorkspace, context);
+
+      expect(trace.error).toBeUndefined();
+      expect(trace.nestingDepth).toBe(4);
+      expect(mockFlowExecutor.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          nestingDepth: 4,
+        })
+      );
+    });
+
+    it('should render inputs with template context', async () => {
+      const step: SubFlowStep = {
+        id: 'subflow-template',
+        name: 'SubFlow Template',
+        type: 'subflow',
+        flowId: 'target-flow',
+        inputs: {
+          message: '${{ inputs.greeting }} ${{ inputs.name }}',
+        },
+      };
+
+      const context = {
+        inputs: { greeting: 'Hello', name: 'World' },
+        stepOutputs: new Map(),
+        taskMetadata: {},
+        taskId: 'test-task',
+      };
+
+      vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('Hello World');
+
+      const trace = await runner.executeStep(step, testWorkspace, context);
+
+      expect(trace.error).toBeUndefined();
+      expect(TemplateRenderer.prototype.render).toHaveBeenCalledWith(
+        '${{ inputs.greeting }} ${{ inputs.name }}',
+        context,
+        true
+      );
+      expect(mockFlowExecutor.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inputs: { message: 'Hello World' },
+        })
+      );
+    });
+
+    it('should fail when input template rendering fails', async () => {
+      const step: SubFlowStep = {
+        id: 'subflow-bad-template',
+        name: 'SubFlow Bad Template',
+        type: 'subflow',
+        flowId: 'target-flow',
+        inputs: {
+          message: '${{ invalid.reference }}',
+        },
+      };
+
+      const context = {
+        inputs: {},
+        stepOutputs: new Map(),
+        taskMetadata: {},
+      };
+
+      vi.mocked(TemplateRenderer.prototype.render).mockImplementation(() => {
+        throw new Error('Template rendering error');
+      });
+
+      const trace = await runner.executeStep(step, testWorkspace, context);
+
+      expect(trace.error).toContain("Failed to render input 'message'");
+      expect(trace.error).toContain('Template rendering error');
+    });
+
+    it('should propagate error when subflow execution fails', async () => {
+      const step: SubFlowStep = {
+        id: 'subflow-fail',
+        name: 'SubFlow Fail',
+        type: 'subflow',
+        flowId: 'target-flow',
+        inputs: {},
+      };
+
+      const context = {
+        inputs: {},
+        stepOutputs: new Map(),
+        taskMetadata: {},
+        taskId: 'test-task',
+      };
+
+      mockFlowExecutor.execute.mockResolvedValue({
+        success: false,
+        error: 'SubFlow execution failed',
+      });
+
+      const trace = await runner.executeStep(step, testWorkspace, context);
+
+      expect(trace.error).toBe('SubFlow execution failed');
+      expect(trace.outputs).toBeUndefined();
+    });
+
+    it('should handle exception during subflow execution', async () => {
+      const step: SubFlowStep = {
+        id: 'subflow-exception',
+        name: 'SubFlow Exception',
+        type: 'subflow',
+        flowId: 'target-flow',
+        inputs: {},
+      };
+
+      const context = {
+        inputs: {},
+        stepOutputs: new Map(),
+        taskMetadata: {},
+        taskId: 'test-task',
+      };
+
+      mockFlowExecutor.execute.mockRejectedValue(new Error('Unexpected error'));
+
+      const trace = await runner.executeStep(step, testWorkspace, context);
+
+      expect(trace.error).toBe('Unexpected error');
+    });
+
+    it('should pass taskMetadata and claudeEnv to subflow', async () => {
+      const step: SubFlowStep = {
+        id: 'subflow-metadata',
+        name: 'SubFlow Metadata',
+        type: 'subflow',
+        flowId: 'target-flow',
+        inputs: {},
+      };
+
+      const onClaudeProcessStarted = vi.fn();
+      const context = {
+        inputs: {},
+        stepOutputs: new Map(),
+        taskMetadata: { priority: 'high' },
+        claudeEnv: { API_KEY: 'test-key' },
+        onClaudeProcessStarted,
+        taskId: 'test-task',
+      };
+
+      const trace = await runner.executeStep(step, testWorkspace, context);
+
+      expect(trace.error).toBeUndefined();
+      expect(mockFlowExecutor.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          taskMetadata: { priority: 'high' },
+          claudeEnv: { API_KEY: 'test-key' },
+          onClaudeProcessStarted,
+        })
+      );
+    });
+
+    it('should handle multiple input keys correctly', async () => {
+      const step: SubFlowStep = {
+        id: 'subflow-multi-input',
+        name: 'SubFlow Multi Input',
+        type: 'subflow',
+        flowId: 'target-flow',
+        inputs: {
+          message: 'Hello',
+          name: 'World',
+          count: '42',
+        },
+      };
+
+      const context = {
+        inputs: {},
+        stepOutputs: new Map(),
+        taskMetadata: {},
+        taskId: 'test-task',
+      };
+
+      let renderCallCount = 0;
+      vi.mocked(TemplateRenderer.prototype.render).mockImplementation(() => {
+        const values = ['Hello', 'World', '42'];
+        return values[renderCallCount++];
+      });
+
+      const trace = await runner.executeStep(step, testWorkspace, context);
+
+      expect(trace.error).toBeUndefined();
+      expect(mockFlowExecutor.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inputs: {
+            message: 'Hello',
+            name: 'World',
+            count: '42',
+          },
+        })
+      );
+    });
+
+    it('should retry subflow step on failure', async () => {
+      const step: SubFlowStep = {
+        id: 'subflow-retry',
+        name: 'SubFlow Retry',
+        type: 'subflow',
+        flowId: 'target-flow',
+        inputs: {},
+        retry: {
+          maxAttempts: 3,
+          backoff: 'linear',
+        },
+      };
+
+      const context = {
+        inputs: {},
+        stepOutputs: new Map(),
+        taskMetadata: {},
+        taskId: 'test-task',
+      };
+
+      // Fail twice, then succeed
+      let callCount = 0;
+      mockFlowExecutor.execute.mockImplementation(async () => {
+        callCount++;
+        if (callCount < 3) {
+          return {
+            success: false,
+            error: 'Temporary failure',
+          };
+        }
+        return {
+          success: true,
+          outputs: { result: 'Success' },
+        };
+      });
+
+      const trace = await runner.executeStep(step, testWorkspace, context);
+
+      expect(callCount).toBe(3);
+      expect(trace.retries).toBe(2);
+      expect(trace.error).toBeUndefined();
+      expect(trace.outputs).toEqual({ result: 'Success' });
     });
   });
 });
