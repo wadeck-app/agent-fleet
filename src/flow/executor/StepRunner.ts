@@ -428,8 +428,49 @@ export class StepRunner {
 
         // Extract outputs from the subflow result
         // The outputs from the subflow are in result.outputs (keyed by step ID)
-        // We need to flatten them or pass them through based on the step's output configuration
-        stepTrace.outputs = result.outputs;
+        // If the step has an output configuration, we need to render the templates
+        if (step.output) {
+          // Build a Map with the subflow's outputs for template rendering
+          // result.outputs is structured as: { stepId: { outputKey: value } }
+          // TemplateContext.stepOutputs is a Map<stepId, outputs>
+          const subflowOutputsMap = new Map<string, Record<string, any>>();
+          for (const [stepId, outputs] of Object.entries(result.outputs)) {
+            subflowOutputsMap.set(stepId, outputs as Record<string, any>);
+          }
+
+          // Create a context for rendering output templates
+          const outputContext: TemplateContext = {
+            ...context,
+            stepOutputs: subflowOutputsMap,
+          };
+
+          // Render each output template
+          const extractedOutputs: Record<string, any> = {};
+          for (const [outputKey, template] of Object.entries(step.output)) {
+            if (typeof template === 'string') {
+              try {
+                extractedOutputs[outputKey] = this.templateRenderer.render(
+                  template,
+                  outputContext,
+                  true
+                );
+              } catch (error) {
+                stepTrace.error = `Failed to render output '${outputKey}': ${error instanceof Error ? error.message : String(error)}`;
+                return stepTrace;
+              }
+            } else {
+              // Non-string output config (OutputVariableConfig), not supported for SubFlowSteps yet
+              console.warn(
+                `[StepRunner] Complex output configuration for SubFlowStep '${step.id}' output '${outputKey}' is not supported. Use template strings.`
+              );
+            }
+          }
+
+          stepTrace.outputs = extractedOutputs;
+        } else {
+          // No output configuration, pass through all subflow outputs
+          stepTrace.outputs = result.outputs;
+        }
       } else {
         console.log(`[StepRunner] SubFlowStep ${step.id} failed`);
         stepTrace.error = result.error || 'SubFlow execution failed';

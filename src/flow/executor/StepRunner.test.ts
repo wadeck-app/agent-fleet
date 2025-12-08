@@ -820,5 +820,135 @@ describe('StepRunner', () => {
       expect(trace.error).toBeUndefined();
       expect(trace.outputs).toEqual({ result: 'Success' });
     });
+
+    it('should map subflow outputs using output configuration', async () => {
+      const step: SubFlowStep = {
+        id: 'subflow-with-output-mapping',
+        name: 'SubFlow With Output Mapping',
+        type: 'subflow',
+        flowId: 'target-flow',
+        inputs: {
+          message: 'Hello',
+        },
+        output: {
+          echo1: '${{ steps.step1.outputs.result }}',
+          greeting: '${{ steps.step1.outputs.result }}',
+        },
+      };
+
+      const context = {
+        inputs: {},
+        stepOutputs: new Map(),
+        taskMetadata: {},
+        taskId: 'test-task',
+      };
+
+      // Mock template renderer for input rendering
+      let renderCallIndex = 0;
+      vi.mocked(TemplateRenderer.prototype.render).mockImplementation((template: string) => {
+        if (renderCallIndex === 0) {
+          // First call: render input
+          renderCallIndex++;
+          return 'Hello';
+        } else {
+          // Subsequent calls: render output templates
+          // Both output templates reference steps.step1.outputs.result
+          return 'Hello from subflow';
+        }
+      });
+
+      // Mock FlowExecutor to return structured outputs
+      mockFlowExecutor.execute.mockResolvedValue({
+        success: true,
+        outputs: {
+          step1: { result: 'Hello from subflow' },
+        },
+      });
+
+      const trace = await runner.executeStep(step, testWorkspace, context);
+
+      expect(trace.error).toBeUndefined();
+      expect(trace.outputs).toEqual({
+        echo1: 'Hello from subflow',
+        greeting: 'Hello from subflow',
+      });
+    });
+
+    it('should handle output mapping errors gracefully', async () => {
+      const step: SubFlowStep = {
+        id: 'subflow-bad-output',
+        name: 'SubFlow Bad Output',
+        type: 'subflow',
+        flowId: 'target-flow',
+        inputs: {},
+        output: {
+          invalid: '${{ steps.nonexistent.outputs.value }}',
+        },
+      };
+
+      const context = {
+        inputs: {},
+        stepOutputs: new Map(),
+        taskMetadata: {},
+        taskId: 'test-task',
+      };
+
+      // Mock FlowExecutor to return outputs
+      mockFlowExecutor.execute.mockResolvedValue({
+        success: true,
+        outputs: {
+          step1: { result: 'data' },
+        },
+      });
+
+      // Mock template renderer to throw error when rendering invalid output reference
+      vi.mocked(TemplateRenderer.prototype.render).mockImplementation((template: string) => {
+        if (template.includes('nonexistent')) {
+          throw new Error("Step 'nonexistent' not found or has no outputs");
+        }
+        return 'rendered';
+      });
+
+      const trace = await runner.executeStep(step, testWorkspace, context);
+
+      expect(trace.error).toContain("Failed to render output 'invalid'");
+      expect(trace.error).toContain('nonexistent');
+    });
+
+    it('should pass through all subflow outputs when no output configuration', async () => {
+      const step: SubFlowStep = {
+        id: 'subflow-no-output-config',
+        name: 'SubFlow No Output Config',
+        type: 'subflow',
+        flowId: 'target-flow',
+        inputs: {},
+        // No output configuration
+      };
+
+      const context = {
+        inputs: {},
+        stepOutputs: new Map(),
+        taskMetadata: {},
+        taskId: 'test-task',
+      };
+
+      // Mock FlowExecutor to return multiple step outputs
+      mockFlowExecutor.execute.mockResolvedValue({
+        success: true,
+        outputs: {
+          step1: { result: 'data1', count: 42 },
+          step2: { message: 'Hello', status: 'ok' },
+        },
+      });
+
+      const trace = await runner.executeStep(step, testWorkspace, context);
+
+      expect(trace.error).toBeUndefined();
+      // Without output configuration, all outputs are passed through
+      expect(trace.outputs).toEqual({
+        step1: { result: 'data1', count: 42 },
+        step2: { message: 'Hello', status: 'ok' },
+      });
+    });
   });
 });

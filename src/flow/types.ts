@@ -295,9 +295,17 @@ export interface ScriptFlowStep extends BaseFlowStep {
 }
 
 /**
+ * Output configuration for a SubFlowStep (uses templates)
+ */
+export interface SubFlowStepOutput {
+  /** Map of variable names to template strings for extracting from subflow outputs */
+  [variableName: string]: string | OutputVariableConfig;
+}
+
+/**
  * Step that executes another flow (composition)
  */
-export interface SubFlowStep extends BaseFlowStep {
+export interface SubFlowStep extends Omit<BaseFlowStep, 'output'> {
   /** Step type discriminator */
   type: 'subflow';
 
@@ -309,6 +317,9 @@ export interface SubFlowStep extends BaseFlowStep {
 
   /** Workspace strategy (default: 'inherit') */
   workspaceStrategy?: WorkspaceStrategy;
+
+  /** Output mapping using templates (e.g., { result: '${{ steps.echo.outputs.value }}' }) */
+  output?: SubFlowStepOutput;
 }
 
 /**
