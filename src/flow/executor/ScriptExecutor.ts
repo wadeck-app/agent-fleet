@@ -7,6 +7,8 @@
 
 import { spawn } from 'child_process';
 import * as path from 'path';
+import * as fs from 'fs';
+import * as os from 'os';
 
 /**
  * Result of script execution
@@ -87,13 +89,45 @@ export class ScriptExecutor {
     const env = { ...process.env, ...options.env };
     const shell = options.shell !== undefined ? options.shell : true;
 
+    // Handle multiline scripts on Windows by creating a temporary .bat file
+    let scriptToExecute = options.script;
+    let tempFilePath: string | null = null;
+    const isWindows = process.platform === 'win32';
+    const isMultiline = options.script.includes('\n') || options.script.includes('\r\n');
+
+    if (isWindows && isMultiline && shell) {
+      // Create a temporary .bat file for multiline scripts
+      // This is necessary because cmd.exe via spawn() only executes the first line
+      const tempDir = os.tmpdir();
+      const timestamp = Date.now();
+      const random = Math.random().toString(36).substring(7);
+      tempFilePath = path.join(tempDir, `agent-fleet-script-${timestamp}-${random}.bat`);
+
+      // Write script to temp file with @echo off to suppress command echoing
+      fs.writeFileSync(tempFilePath, `@echo off\r\n${options.script}`, 'utf8');
+
+      // Execute the temp file instead of the raw script
+      scriptToExecute = tempFilePath;
+    }
+
     return new Promise((resolve, reject) => {
       let stdout = '';
       let stderr = '';
       let killed = false;
 
+      // Helper to clean up temp file
+      const cleanupTempFile = () => {
+        if (tempFilePath && fs.existsSync(tempFilePath)) {
+          try {
+            fs.unlinkSync(tempFilePath);
+          } catch (err) {
+            // Ignore cleanup errors
+          }
+        }
+      };
+
       // Spawn process
-      const child = spawn(options.script, [], {
+      const child = spawn(scriptToExecute, [], {
         cwd: workingDir,
         env,
         shell,
@@ -175,6 +209,9 @@ export class ScriptExecutor {
           success: exitCode === 0,
         };
 
+        // Clean up temp file if created
+        cleanupTempFile();
+
         if (killed) {
           reject(
             new ScriptExecutionError(
@@ -194,6 +231,9 @@ export class ScriptExecutor {
         if (timeoutId) {
           clearTimeout(timeoutId);
         }
+
+        // Clean up temp file if created
+        cleanupTempFile();
 
         reject(
           new ScriptExecutionError(

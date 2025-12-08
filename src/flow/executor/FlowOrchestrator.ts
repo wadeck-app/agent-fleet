@@ -16,6 +16,7 @@ import type {
   FlowExecutionResult,
 } from '../types.js';
 import type { TemplateContext } from '../processing/TemplateRenderer.js';
+import { TemplateRenderer } from '../processing/TemplateRenderer.js';
 import { DAGBuilder } from '../validation/DAGBuilder.js';
 import { DAGValidator } from '../validation/DAGValidator.js';
 import { LoopHandler } from '../processing/LoopHandler.js';
@@ -42,12 +43,14 @@ export class FlowOrchestrator {
   private dagValidator: DAGValidator;
   private loopHandler: LoopHandler;
   private stepRunner: StepRunner;
+  private templateRenderer: TemplateRenderer;
 
   constructor(stepRunner: StepRunner) {
     this.dagBuilder = new DAGBuilder();
     this.dagValidator = new DAGValidator();
     this.loopHandler = new LoopHandler();
     this.stepRunner = stepRunner;
+    this.templateRenderer = new TemplateRenderer();
   }
 
   /**
@@ -153,13 +156,37 @@ export class FlowOrchestrator {
         );
       }
 
+      // Filter steps based on 'when' condition
+      const toExecute: FlowStep[] = [];
+      const toSkip: string[] = [];
+
+      for (const step of ready) {
+        if (this.shouldExecuteStep(step, context)) {
+          toExecute.push(step);
+        } else {
+          // Mark as completed (skipped due to condition)
+          completed.add(step.id);
+          toSkip.push(step.id);
+        }
+      }
+
+      // Log skipped steps
+      if (toSkip.length > 0) {
+        console.log(`   ⏭️  Skipped ${toSkip.length} step(s) (condition not met): ${toSkip.join(', ')}`);
+      }
+
+      if (toExecute.length === 0) {
+        // No steps to execute, continue to next iteration
+        continue;
+      }
+
       // Log execution
       const startTime = Date.now();
-      this.logStepExecution(ready, startTime);
+      this.logStepExecution(toExecute, startTime);
 
       // Execute ready steps in parallel
       const stepTraces = await Promise.all(
-        ready.map((step) => this.stepRunner.executeStep(step, workspace, context))
+        toExecute.map((step) => this.stepRunner.executeStep(step, workspace, context))
       );
 
       // Log completion
@@ -168,7 +195,7 @@ export class FlowOrchestrator {
 
       // Process results
       const shouldContinue = this.processStepResults(
-        ready,
+        toExecute,
         stepTraces,
         flow,
         dag,
@@ -333,6 +360,64 @@ export class FlowOrchestrator {
 
     const duration = ((endTime - startTime) / 1000).toFixed(3);
     console.log(`   ⏱️  [${endTimeStr}] Completed in ${duration}s`);
+  }
+
+  /**
+   * Evaluate if a step should be executed based on its 'when' condition
+   */
+  private shouldExecuteStep(step: FlowStep, context: TemplateContext): boolean {
+    // If no 'when' condition, always execute
+    if (!step.when) {
+      return true;
+    }
+
+    try {
+      let condition = step.when.trim();
+
+      // Strip template syntax if present: ${{ expression }} → expression
+      if (condition.startsWith('${{') && condition.endsWith('}}')) {
+        condition = condition.slice(3, -2).trim();
+      }
+
+      // Build evaluation context with steps, inputs, task
+      // Convert Map to object for easier access
+      // Wrap outputs in 'outputs' property to match GitHub Actions syntax: steps.stepId.outputs.outputName
+      const stepsObj: Record<string, Record<string, any>> = {};
+      for (const [stepId, outputs] of context.stepOutputs.entries()) {
+        stepsObj[stepId] = { outputs };
+      }
+
+      // Evaluate the condition as JavaScript with context
+      // e.g., "steps.calculate.outputs.continue === 'true'"
+      const evalFunction = new Function(
+        'steps',
+        'inputs',
+        'task',
+        `"use strict"; return (${condition});`
+      );
+
+      const result = evalFunction(
+        stepsObj,
+        context.inputs || {},
+        context.taskMetadata || {}
+      );
+
+      if (typeof result !== 'boolean') {
+        console.warn(
+          `⚠️  Step '${step.id}' condition '${step.when}' evaluated to non-boolean: ${typeof result}. Treating as false.`
+        );
+        return false;
+      }
+
+      return result;
+    } catch (error) {
+      console.error(
+        `❌ Failed to evaluate condition for step '${step.id}': ${error instanceof Error ? error.message : String(error)}`
+      );
+      console.error(`   Condition: ${step.when}`);
+      // On error, skip the step (safe default)
+      return false;
+    }
   }
 
   /**

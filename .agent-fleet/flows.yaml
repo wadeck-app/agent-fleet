@@ -358,3 +358,40 @@ test-subflow-nested:
       flowId: test-subflow-basic
       inputs:
         greeting: "${{ inputs.msg }}"
+
+# Recursive flow: Countdown from N to 0
+test-recursive-countdown:
+  name: "Test: Recursive Countdown"
+  description: "Tests recursive SubFlowStep with exit condition (counts from N to 0)"
+  workspace:
+    mode: manual
+    gitStrategy: any
+    reusePolicy: always
+  inputs:
+    count: string
+  steps:
+    - type: script
+      id: display
+      name: "Display Count"
+      script: 'echo "Count: ${{ inputs.count }}"'
+
+    - type: script
+      id: calculate
+      name: "Calculate Next"
+      script: |
+        set /a next=${{ inputs.count }}-1 >nul
+        echo next=%next%
+        if %next% GEQ 0 (echo continue=true) else (echo continue=false)
+      output:
+        next: { type: string, pattern: "next=(.*)" }
+        continue: { type: string, pattern: "continue=(.*)" }
+
+    - type: subflow
+      id: recurse
+      name: "Recurse if count > 0"
+      flowId: test-recursive-countdown
+      allowRecursion: true
+      when: "${{ steps.calculate.outputs.continue === 'true' }}"
+      depends: [calculate]
+      inputs:
+        count: "${{ steps.calculate.outputs.next }}"
