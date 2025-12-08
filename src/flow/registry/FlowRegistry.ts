@@ -171,6 +171,8 @@ export class FlowRegistry {
       return;
     }
 
+    const validationErrors: Array<{ flowId: string; error: Error }> = [];
+
     try {
       const content = fs.readFileSync(this.configPath, 'utf-8');
       const parsed = yaml.load(content) as Record<string, any>;
@@ -204,7 +206,9 @@ export class FlowRegistry {
               }
             }
 
-            throw new FlowValidationError(id, 'Flow validation failed. See errors above.');
+            const error = new FlowValidationError(id, 'Flow validation failed. See errors above.');
+            validationErrors.push({ flowId: id, error });
+            continue; // Continue to validate other flows
           }
 
           // Log warnings (non-blocking)
@@ -222,14 +226,26 @@ export class FlowRegistry {
           this.flows.set(id, flow);
           console.log(`✓ Loaded flow: ${id}`);
         } catch (error) {
-          if (error instanceof FlowValidationError) {
-            console.error(`Failed to load flow '${id}':`, error.message);
-          } else {
-            throw error;
-          }
+          // Collect parsing errors too
+          console.error(`\nFailed to parse flow '${id}':`, error instanceof Error ? error.message : String(error));
+          validationErrors.push({ flowId: id, error: error instanceof Error ? error : new Error(String(error)) });
         }
       }
+
+      // If there were any validation errors, fail startup
+      if (validationErrors.length > 0) {
+        console.error(`\n❌ Flow validation failed! ${validationErrors.length} flow(s) have errors:\n`);
+        for (const { flowId, error } of validationErrors) {
+          console.error(`  ✗ ${flowId}: ${error.message}`);
+        }
+        console.error('\n🛑 Orchestrator cannot start with invalid flows. Please fix the errors above.\n');
+        throw new Error(`Flow validation failed for ${validationErrors.length} flow(s). See errors above.`);
+      }
     } catch (error) {
+      // Re-throw validation errors as-is
+      if (error instanceof Error && error.message.includes('Flow validation failed')) {
+        throw error;
+      }
       throw new Error(`Failed to load flows from ${this.configPath}: ${error}`);
     }
   }
@@ -290,6 +306,7 @@ export class FlowRegistry {
         flowId: data.flowId || '',
         inputs: data.inputs || {},
         workspaceStrategy: data.workspaceStrategy || 'inherit',
+        allowRecursion: data.allowRecursion,
       };
     } else if (stepType === 'script') {
       // Script step

@@ -684,18 +684,33 @@ export class FlowValidator {
 
     // Check for direct circular reference (flow calling itself)
     if (currentFlowId && step.flowId === currentFlowId) {
-      this.addIssue({
-        severity: 'error',
-        code: ValidationCode.CIRCULAR_SUBFLOW_REFERENCE,
-        message: `SubFlow step '${step.id}' creates circular reference (flow '${currentFlowId}' calls itself)`,
-        location: { stepId: step.id, field: 'flowId' },
-        suggestion: 'Remove self-referencing SubFlowStep or use a different flow',
-      });
-      return; // No point checking further for self-referencing flows
+      // Direct recursion detected
+      if (step.allowRecursion === true) {
+        // Recursion is explicitly allowed - just add a warning about best practices
+        this.addIssue({
+          severity: 'warning',
+          code: ValidationCode.CIRCULAR_SUBFLOW_REFERENCE,
+          message: `SubFlow step '${step.id}' is recursive (flow '${currentFlowId}' calls itself). Ensure proper exit condition via 'when' clause to prevent infinite loops.`,
+          location: { stepId: step.id, field: 'flowId' },
+          suggestion: 'Add a "when" condition to ensure recursion eventually stops',
+        });
+        // Continue validation - recursion is allowed
+      } else {
+        // Recursion is NOT allowed - error
+        this.addIssue({
+          severity: 'error',
+          code: ValidationCode.CIRCULAR_SUBFLOW_REFERENCE,
+          message: `SubFlow step '${step.id}' creates circular reference (flow '${currentFlowId}' calls itself)`,
+          location: { stepId: step.id, field: 'flowId' },
+          suggestion: 'Add "allowRecursion: true" if recursion is intentional, or use a different flow',
+        });
+        return; // No point checking further for self-referencing flows
+      }
     }
 
     // Detect deep circular dependencies (if registry is available)
-    if (this.flowRegistry && currentFlowId) {
+    // Skip this check for direct self-references (already handled above)
+    if (this.flowRegistry && currentFlowId && step.flowId !== currentFlowId) {
       const visited = new Set<string>();
       const path: string[] = [];
       if (this.detectCircularSubFlowDependency(step.flowId, currentFlowId, visited, path)) {
@@ -712,7 +727,8 @@ export class FlowValidator {
     }
 
     // Now validate flowId references an existing flow (if registry is available)
-    if (this.flowRegistry) {
+    // Skip this check for self-references (already handled above)
+    if (this.flowRegistry && step.flowId !== currentFlowId) {
       if (!this.flowRegistry.hasFlow(step.flowId)) {
         const availableFlows = this.flowRegistry.getFlowIds();
         this.addIssue({
@@ -785,6 +801,17 @@ export class FlowValidator {
           expected: 'object',
           actual: typeof step.inputs,
         },
+      });
+    }
+
+    // Validate allowRecursion flag is only used when actually recursive
+    if (step.allowRecursion === true && step.flowId !== currentFlowId) {
+      this.addIssue({
+        severity: 'error',
+        code: ValidationCode.INVALID_VALUE,
+        message: `SubFlow step '${step.id}' has allowRecursion=true but does not call itself (flowId='${step.flowId}')`,
+        location: { stepId: step.id, field: 'allowRecursion' },
+        suggestion: 'Remove the unnecessary allowRecursion flag or fix the flowId if recursion was intended',
       });
     }
   }

@@ -475,6 +475,150 @@ describe('FlowValidator - SubFlowStep Validation', () => {
     });
   });
 
+  describe('allowRecursion Flag Validation', () => {
+    test('should allow recursive flow with allowRecursion=true (warning only)', () => {
+      // Register a recursive flow with allowRecursion flag
+      const recursiveFlow: FlowDefinition = {
+        id: 'recursive-flow',
+        name: 'Recursive Flow',
+        description: 'A flow with explicit recursion',
+        workspace: {
+          mode: 'manual',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'subflow',
+            id: 'recursive-step',
+            name: 'Recursive Step',
+            flowId: 'recursive-flow', // Calls itself
+            inputs: {},
+            allowRecursion: true, // Explicitly allowed
+          } as SubFlowStep,
+        ],
+      };
+
+      // Register the flow so it can be found during validation
+      registry.registerFlow(recursiveFlow);
+
+      const result = validator.validate(recursiveFlow);
+
+      // Should pass validation (no errors)
+      expect(result.valid).toBe(true);
+      expect(result.summary.errors).toBe(0);
+
+      // But should have a warning about exit conditions
+      expect(result.summary.warnings).toBe(1);
+      const warning = result.issues.find((i) => i.severity === 'warning');
+      expect(warning).toBeDefined();
+      expect(warning?.code).toBe(ValidationCode.CIRCULAR_SUBFLOW_REFERENCE);
+      expect(warning?.message).toContain('recursive');
+      expect(warning?.message).toContain('exit condition');
+    });
+
+    test('should error when recursive flow missing allowRecursion flag', () => {
+      // Create a recursive flow WITHOUT allowRecursion flag
+      const recursiveFlow: FlowDefinition = {
+        id: 'recursive-flow-no-flag',
+        name: 'Recursive Flow No Flag',
+        description: 'A flow without allowRecursion',
+        workspace: {
+          mode: 'manual',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'subflow',
+            id: 'recursive-step',
+            name: 'Recursive Step',
+            flowId: 'recursive-flow-no-flag', // Calls itself
+            inputs: {},
+            // No allowRecursion flag
+          } as SubFlowStep,
+        ],
+      };
+
+      // Don't register - validation should fail due to circular reference
+      // (circular reference check happens BEFORE flow existence check)
+      const result = validator.validate(recursiveFlow);
+
+      // Should fail validation
+      expect(result.valid).toBe(false);
+      expect(result.summary.errors).toBe(1);
+
+      const error = result.issues.find((i) => i.severity === 'error');
+      expect(error).toBeDefined();
+      expect(error?.code).toBe(ValidationCode.CIRCULAR_SUBFLOW_REFERENCE);
+      expect(error?.message).toContain('circular reference');
+      expect(error?.suggestion).toContain('allowRecursion: true');
+    });
+
+    test('should error when allowRecursion=true but flow is NOT recursive', () => {
+      // Register a target flow
+      const targetFlow: FlowDefinition = {
+        id: 'target-flow',
+        name: 'Target Flow',
+        description: 'Target Flow',
+        workspace: {
+          mode: 'manual',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'model',
+            id: 'step1',
+            name: 'Step 1',
+            model: 'haiku',
+            prompt: 'test',
+          },
+        ],
+      };
+      registry.registerFlow(targetFlow);
+
+      // Register a flow with unnecessary allowRecursion flag
+      const flow: FlowDefinition = {
+        id: 'calling-flow',
+        name: 'Calling Flow',
+        description: 'Calling Flow',
+        workspace: {
+          mode: 'manual',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            type: 'subflow',
+            id: 'call-target',
+            name: 'Call Target',
+            flowId: 'target-flow', // NOT recursive
+            inputs: {},
+            allowRecursion: true, // Flag is unnecessary!
+          } as SubFlowStep,
+        ],
+      };
+
+      const result = validator.validate(flow);
+
+      // Should fail validation
+      expect(result.valid).toBe(false);
+      expect(result.summary.errors).toBe(1);
+
+      const error = result.issues.find((i) => i.severity === 'error');
+      expect(error).toBeDefined();
+      expect(error?.code).toBe(ValidationCode.INVALID_VALUE);
+      expect(error?.message).toContain('allowRecursion=true');
+      expect(error?.message).toContain('does not call itself');
+      expect(error?.suggestion).toContain('Remove the unnecessary allowRecursion flag');
+    });
+  });
+
   describe('Input Validation', () => {
     test('should warn when required input is missing', () => {
       // Register a flow with required inputs

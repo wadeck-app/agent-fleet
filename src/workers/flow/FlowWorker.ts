@@ -498,9 +498,11 @@ if (isMainModule) {
   const interactiveEnv = process.env.WORKER_INTERACTIVE === 'true';
   const interactive = interactiveArg || interactiveEnv;
 
+  const noUiArg = process.argv.includes('--no-ui');
+
   // @formatter:off
   // UI mode is always enabled (terminal-kit)
-  const enableUI = true;
+  const enableUI = !noUiArg;
   // @formatter:on
 
   // Parse worker ID from CLI args or environment variable

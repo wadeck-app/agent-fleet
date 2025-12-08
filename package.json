@@ -17,6 +17,8 @@
     "start": "node dist/orchestrator/core/index.js",
     "add-task": "tsx src/cli/entry-point.ts",
     "worker:flow": "tsx src/workers/flow/FlowWorker.ts",
+    "worker:flow:no-ui": "tsx src/workers/flow/FlowWorker.ts --no-ui",
+    "worker:flow:no-ui:i": "tsx src/workers/flow/FlowWorker.ts --no-ui --interactive",
     "worker:flow:i": "tsx src/workers/flow/FlowWorker.ts --interactive",
     "worker:flow:ui": "tsx src/workers/flow/FlowWorker.ts",
     "worker:flow:i:ui": "tsx src/workers/flow/FlowWorker.ts --interactive",

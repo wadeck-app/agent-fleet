@@ -320,6 +320,13 @@ export interface SubFlowStep extends Omit<BaseFlowStep, 'output'> {
 
   /** Output mapping using templates (e.g., { result: '${{ steps.echo.outputs.value }}' }) */
   output?: SubFlowStepOutput;
+
+  /**
+   * Allow recursive calls (flow calling itself)
+   * Must be explicitly set to true to enable recursion.
+   * Use with caution and ensure proper exit conditions via 'when' clause.
+   */
+  allowRecursion?: boolean;
 }
 
 /**
