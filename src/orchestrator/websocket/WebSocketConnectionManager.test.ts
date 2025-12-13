@@ -88,6 +88,9 @@ describe('WebSocketConnectionManager', () => {
     it('should register worker with auto-increment ID', () => {
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
 
       const workerId = connectionManager.handleWorkerReady(mockSocket as any, readyMessage);
@@ -106,6 +109,9 @@ describe('WebSocketConnectionManager', () => {
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
         preferredId: 'preferred-worker-1',
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
 
       const workerId = connectionManager.handleWorkerReady(mockSocket as any, readyMessage);
@@ -124,6 +130,9 @@ describe('WebSocketConnectionManager', () => {
       const readyMessage1: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
         preferredId: 'preferred-id',
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
       connectionManager.handleWorkerReady(mockSocket1 as any, readyMessage1);
 
@@ -131,6 +140,9 @@ describe('WebSocketConnectionManager', () => {
       const readyMessage2: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.PM,
         preferredId: 'preferred-id',
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
       const workerId = connectionManager.handleWorkerReady(mockSocket2 as any, readyMessage2);
 
@@ -143,6 +155,9 @@ describe('WebSocketConnectionManager', () => {
     it('should send WORKER_WELCOME message', () => {
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
 
       connectionManager.handleWorkerReady(mockSocket as any, readyMessage);
@@ -164,6 +179,9 @@ describe('WebSocketConnectionManager', () => {
     it('should try to assign task after worker ready', async () => {
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
 
       vi.mocked(mockTaskManager.assignTaskToWorker).mockResolvedValue(null);
@@ -183,6 +201,9 @@ describe('WebSocketConnectionManager', () => {
         const socket = new MockWebSocket();
         const message: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
           workerType: type,
+          projectId: 'test-project',
+          workspacePath: '/test/path',
+          availableFlows: [],
         });
         connectionManager.handleWorkerReady(socket as any, message);
 
@@ -204,6 +225,9 @@ describe('WebSocketConnectionManager', () => {
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
         preferredId: 'worker-1',
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
       connectionManager.handleWorkerReady(mockSocket as any, readyMessage);
       mockSocket.send.mockClear();
@@ -297,6 +321,9 @@ describe('WebSocketConnectionManager', () => {
       const readyMessage1: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
         preferredId: 'worker-1',
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
       connectionManager.handleWorkerReady(mockSocket1 as any, readyMessage1);
 
@@ -304,6 +331,9 @@ describe('WebSocketConnectionManager', () => {
       const readyMessage2: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.PM,
         preferredId: 'worker-2',
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
       connectionManager.handleWorkerReady(mockSocket2 as any, readyMessage2);
 
@@ -318,6 +348,9 @@ describe('WebSocketConnectionManager', () => {
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
         preferredId: 'worker-1',
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
       connectionManager.handleWorkerReady(mockSocket as any, readyMessage);
 
@@ -330,6 +363,9 @@ describe('WebSocketConnectionManager', () => {
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
         preferredId: 'worker-1',
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
       connectionManager.handleWorkerReady(mockSocket as any, readyMessage);
 
@@ -361,6 +397,9 @@ describe('WebSocketConnectionManager', () => {
         const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
           workerType: WorkerType.DEV,
           preferredId: `worker-${i}`,
+          projectId: 'test-project',
+          workspacePath: '/test/path',
+          availableFlows: [],
         });
         connectionManager.handleWorkerReady(mockSocket as any, readyMessage);
       }
@@ -394,6 +433,9 @@ describe('WebSocketConnectionManager', () => {
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
         preferredId: 'worker-1',
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
       connectionManager.handleWorkerReady(mockSocket as any, readyMessage);
 
@@ -429,6 +471,9 @@ describe('WebSocketConnectionManager', () => {
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
         preferredId: 'worker-1',
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
       connectionManager.handleWorkerReady(mockSocket as any, readyMessage);
     });
@@ -508,6 +553,9 @@ describe('WebSocketConnectionManager', () => {
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
         preferredId: 'worker-1',
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
       connectionManager.handleWorkerReady(mockSocket as any, readyMessage);
 
@@ -547,12 +595,18 @@ describe('WebSocketConnectionManager', () => {
       const mockSocket1 = new MockWebSocket();
       const readyMessage1: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
       connectionManager.handleWorkerReady(mockSocket1 as any, readyMessage1);
 
       const mockSocket2 = new MockWebSocket();
       const readyMessage2: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.PM,
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
       connectionManager.handleWorkerReady(mockSocket2 as any, readyMessage2);
 
@@ -566,6 +620,9 @@ describe('WebSocketConnectionManager', () => {
       const mockSocket = new MockWebSocket();
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
       connectionManager.handleWorkerReady(mockSocket as any, readyMessage);
 
@@ -583,6 +640,9 @@ describe('WebSocketConnectionManager', () => {
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
         preferredId: 'worker-1',
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
       connectionManager.handleWorkerReady(mockSocket as any, readyMessage);
 

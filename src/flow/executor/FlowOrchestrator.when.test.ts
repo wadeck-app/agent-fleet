@@ -63,6 +63,7 @@ describe('FlowOrchestrator - when condition', () => {
     it('should skip step when condition evaluates to false', async () => {
       const flow: FlowDefinition = {
         id: 'test-conditional',
+        version: '1.0.0',
         name: 'Test Conditional',
         description: 'Test when condition',
         workspace: {
@@ -119,6 +120,7 @@ describe('FlowOrchestrator - when condition', () => {
     it('should execute step when condition evaluates to true', async () => {
       const flow: FlowDefinition = {
         id: 'test-conditional-true',
+        version: '1.0.0',
         name: 'Test Conditional True',
         description: 'Test when condition = true',
         workspace: {
@@ -169,6 +171,7 @@ describe('FlowOrchestrator - when condition', () => {
     it('should stop recursion when condition becomes false', async () => {
       const flow: FlowDefinition = {
         id: 'test-countdown',
+        version: '1.0.0',
         name: 'Test Countdown',
         description: 'Test recursive flow with exit condition',
         workspace: {

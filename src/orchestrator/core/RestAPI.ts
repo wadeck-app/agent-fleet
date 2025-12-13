@@ -3,14 +3,12 @@ import { TaskManager } from './TaskManager.js';
 import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer.js';
 import { TaskStatus } from '../../shared/types.js';
 import { Logger } from '../../shared/Logger.js';
-import { FlowRegistry } from '../../flow/registry/FlowRegistry.js';
 import { WorkspaceManager } from '../../flow/workspace/WorkspaceManager.js';
 
 export class RestAPI {
   private app: Express;
   private taskManager: TaskManager;
   private wsServer: WorkerWebSocketServer;
-  private flowRegistry: FlowRegistry | null;
   private workspaceManager: WorkspaceManager | null;
   private port: number;
   private server: any;
@@ -19,12 +17,10 @@ export class RestAPI {
     taskManager: TaskManager,
     wsServer: WorkerWebSocketServer,
     port: number = 3737,
-    flowRegistry: FlowRegistry | null = null,
     workspaceManager: WorkspaceManager | null = null
   ) {
     this.taskManager = taskManager;
     this.wsServer = wsServer;
-    this.flowRegistry = flowRegistry;
     this.workspaceManager = workspaceManager;
     this.port = port;
     this.app = express();
@@ -72,11 +68,8 @@ export class RestAPI {
           return;
         }
 
-        // Validate flowId if provided
-        if (flowId && this.flowRegistry && !this.flowRegistry.hasFlow(flowId)) {
-          res.status(400).json({ error: `Flow '${flowId}' not found` });
-          return;
-        }
+        // Note: Flow validation is now done by workers, not orchestrator
+        // The orchestrator no longer validates flowId existence
 
         const task = await this.taskManager.createTask(description, {
           priority,
@@ -225,40 +218,41 @@ export class RestAPI {
       }
     });
 
-    // List available flows
+    // List available flows from all registered workers
     this.app.get('/flows', (req: Request, res: Response) => {
       try {
-        if (!this.flowRegistry) {
-          res.status(503).json({ error: 'Flow registry not available' });
-          return;
+        const flowDiscoveryRegistry = this.wsServer.getConnectionManager().getFlowDiscoveryRegistry();
+        const allProjects = flowDiscoveryRegistry.getAllProjects();
+
+        const flowsByProject: Record<string, any> = {};
+        for (const projectId of allProjects) {
+          const projectFlows = flowDiscoveryRegistry.getProjectFlows(projectId);
+          if (projectFlows) {
+            flowsByProject[projectId] = Object.fromEntries(projectFlows);
+          }
         }
 
-        const flows = this.flowRegistry.getAllFlows();
-        res.json(flows);
+        res.json(flowsByProject);
       } catch (error) {
         Logger.error('[API] Error listing flows:', error);
         res.status(500).json({ error: (error as Error).message });
       }
     });
 
-    // Get a specific flow
-    this.app.get('/flows/:id', (req: Request, res: Response) => {
+    // Get flows for a specific project
+    this.app.get('/flows/:projectId', (req: Request, res: Response) => {
       try {
-        if (!this.flowRegistry) {
-          res.status(503).json({ error: 'Flow registry not available' });
+        const flowDiscoveryRegistry = this.wsServer.getConnectionManager().getFlowDiscoveryRegistry();
+        const projectFlows = flowDiscoveryRegistry.getProjectFlows(req.params.projectId);
+
+        if (!projectFlows) {
+          res.status(404).json({ error: 'Project not found' });
           return;
         }
 
-        const flow = this.flowRegistry.getFlow(req.params.id);
-
-        if (!flow) {
-          res.status(404).json({ error: 'Flow not found' });
-          return;
-        }
-
-        res.json(flow);
+        res.json(Object.fromEntries(projectFlows));
       } catch (error) {
-        Logger.error('[API] Error getting flow:', error);
+        Logger.error('[API] Error getting project flows:', error);
         res.status(500).json({ error: (error as Error).message });
       }
     });

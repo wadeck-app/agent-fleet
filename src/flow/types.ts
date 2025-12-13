@@ -366,6 +366,9 @@ export interface FlowDefinition {
   /** Unique flow identifier */
   id: string;
 
+  /** Semantic version (e.g., "1.0.0") */
+  version: string;
+
   /** Human-readable flow name */
   name: string;
 
@@ -385,6 +388,36 @@ export interface FlowDefinition {
   hooks?: FlowHooks;
 
   /** Optional status transitions configuration (defaults: onSuccess=review, onFailure=changes_requested) */
+  statusTransitions?: StatusTransitions;
+}
+
+/**
+ * Flow metadata for discovery and synchronization
+ * Contains essential flow information without step details
+ */
+export interface FlowMetadata {
+  /** Unique flow identifier */
+  id: string;
+
+  /** Semantic version */
+  version: string;
+
+  /** 8-character SHA256 hash of flow content (steps, workspace, inputs) */
+  hash: string;
+
+  /** Human-readable flow name */
+  name: string;
+
+  /** Flow description */
+  description: string;
+
+  /** Input variables expected from task */
+  inputs: Record<string, VariableType>;
+
+  /** Workspace requirements */
+  workspace: WorkspaceConfig;
+
+  /** Optional status transitions configuration */
   statusTransitions?: StatusTransitions;
 }
 

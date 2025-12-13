@@ -12,6 +12,9 @@
 
 import WebSocket from 'ws';
 import { fileURLToPath } from 'url';
+import { exec } from 'child_process';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import {
   AssignTaskMessage,
   KillClaudeMessage,
@@ -26,7 +29,7 @@ import { createMessage, parseMessage, serializeMessage } from '../../shared/prot
 import { FlowRegistry } from '../../flow/registry/FlowRegistry.js';
 import { FlowExecutor, FlowExecutionOptions } from '../../flow/executor/FlowExecutor.js';
 import { WorkspaceManager } from '../../flow/workspace/WorkspaceManager.js';
-import type { Workspace } from '../../flow/types.js';
+import type { Workspace, FlowMetadata } from '../../flow/types.js';
 import { Shutdownable } from "../../shared/Shutdownable.js";
 import { ClaudeProcessManager } from './ClaudeProcessManager.js';
 import { FlowExecutionMonitor } from './FlowExecutionMonitor.js';
@@ -59,6 +62,7 @@ export class FlowWorker implements Shutdownable {
   private flowExecutor: FlowExecutor;
   private workspaceManager: WorkspaceManager;
   private interactive: boolean;
+  private projectRoot: string;
 
   // Specialized managers (extracted from god class)
   private claudeProcessManager: ClaudeProcessManager;
@@ -79,6 +83,7 @@ export class FlowWorker implements Shutdownable {
     this.preferredWorkerId = preferredWorkerId;
 
     this.interactive = interactive;
+    this.projectRoot = projectRoot;
     console.log(`[FlowWorker] Initializing with project root: ${projectRoot}`);
     if (interactive) console.log(`[FlowWorker] Interactive mode enabled`);
     if (preferredWorkerId) console.log(`[FlowWorker] Preferred worker ID: ${preferredWorkerId}`);
@@ -158,12 +163,79 @@ export class FlowWorker implements Shutdownable {
   }
 
   /**
-   * Send WORKER_READY message
+   * Detect project ID from package.json or git remote origin
+   * @throws Error if neither package.json nor git remote can be detected
+   */
+  private detectProjectId(): string {
+    // Try to read package.json name
+    try {
+      const packageJsonPath = join(this.projectRoot, 'package.json');
+      const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+      if (packageJson.name) {
+        console.log(`${this.logPrefix()} Detected project ID from package.json: ${packageJson.name}`);
+        return packageJson.name;
+      }
+    } catch (error) {
+      // package.json not found or doesn't have name, try git
+    }
+
+    // Try to get git remote origin
+    try {
+      const gitRemote = this.detectGitRemoteSync();
+      if (gitRemote) {
+        console.log(`${this.logPrefix()} Detected project ID from git remote: ${gitRemote}`);
+        return gitRemote;
+      }
+    } catch (error) {
+      // git command failed
+    }
+
+    throw new Error(
+      'Cannot detect project ID: neither package.json name nor git remote origin found. ' +
+      'Please ensure your project has a package.json with a "name" field or is a git repository with a remote.'
+    );
+  }
+
+  /**
+   * Synchronously detect git remote origin
+   * Returns the remote name (e.g., "owner/repo" from "https://github.com/owner/repo.git")
+   */
+  private detectGitRemoteSync(): string | null {
+    try {
+      const { execSync } = require('child_process');
+      const remoteUrl = execSync('git remote get-url origin', {
+        cwd: this.projectRoot,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'ignore'], // Suppress stderr
+      }).trim();
+
+      // Extract repository name from URL
+      // Handles both HTTPS and SSH formats
+      const match = remoteUrl.match(/[/:]([^/:]+\/[^/.]+)(\.git)?$/);
+      if (match) {
+        return match[1]; // Returns "owner/repo"
+      }
+
+      return null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Send WORKER_READY message with project info and available flows
    */
   private sendWorkerReady(): void {
+    const projectId = this.detectProjectId();
+    const workspacePath = this.projectRoot;
+    const availableFlows = this.buildFlowMetadata();
+
     this.sendMessage(createMessage(MessageType.WORKER_READY, {
       workerType: this.workerType,
-      preferredId: this.preferredWorkerId
+      preferredId: this.preferredWorkerId,
+      projectId,
+      workspacePath,
+      availableFlows
     }));
   }
 
@@ -264,6 +336,9 @@ export class FlowWorker implements Shutdownable {
 
     // Update UI with actual worker ID
     this.workerUIManager.updateWorkerId(message.workerId);
+
+    // Request a task now that we're connected
+    this.sendRequestTask();
   }
 
   /**
@@ -317,11 +392,93 @@ export class FlowWorker implements Shutdownable {
       const flowIds = this.flowRegistry.getFlowIds();
       console.log(`${this.logPrefix()} Loaded ${flowIds.length} flows: ${flowIds.join(', ')}`);
 
-      // Start watching flows file for changes
+      // Start watching flows file for changes with hot-reload callback
       this.flowRegistry.startWatching();
+
+      // Set up hot-reload callback (if FlowRegistry supports it)
+      // For now, we'll implement a polling mechanism to detect changes
+      this.setupFlowHotReload();
     } catch (error) {
       console.error(`${this.logPrefix()} Failed to load flows:`, error);
     }
+  }
+
+  /**
+   * Setup hot-reload mechanism to detect flow changes
+   * This polls the flow registry to detect changes and sends FLOWS_UPDATED
+   */
+  private setupFlowHotReload(): void {
+    // Store initial flow state
+    let lastFlowIds = new Set(this.flowRegistry.getFlowIds());
+
+    // Poll every 2 seconds to detect changes
+    setInterval(() => {
+      const currentFlowIds = new Set(this.flowRegistry.getFlowIds());
+
+      // Check if flows have changed
+      const added = [...currentFlowIds].filter(id => !lastFlowIds.has(id));
+      const removed = [...lastFlowIds].filter(id => !currentFlowIds.has(id));
+
+      if (added.length > 0 || removed.length > 0) {
+        console.log(`${this.logPrefix()} Flows changed - added: ${added.length}, removed: ${removed.length}`);
+
+        // Build updated flow metadata
+        const updatedFlows = this.buildFlowMetadata();
+
+        // Detect which flows were updated (same ID but different hash)
+        const updated: string[] = [];
+        // For now, we'll skip detailed update detection and just mark as updated
+        // This could be improved by storing previous hashes
+
+        // Send FLOWS_UPDATED message
+        this.sendFlowsUpdated(updatedFlows, {
+          added,
+          removed,
+          updated
+        });
+
+        // Update our snapshot
+        lastFlowIds = currentFlowIds;
+      }
+    }, 2000); // Poll every 2 seconds
+  }
+
+  /**
+   * Send FLOWS_UPDATED message
+   */
+  private sendFlowsUpdated(flows: any[], changes?: { added: string[]; removed: string[]; updated: string[] }): void {
+    const projectId = this.detectProjectId();
+
+    this.sendMessage(createMessage(MessageType.FLOWS_UPDATED, {
+      workerId: this.workerId,
+      projectId,
+      flows,
+      changes
+    }));
+  }
+
+  /**
+   * Build flow metadata for all loaded flows
+   * Metadata includes version and computed hash for each flow
+   * @returns Array of flow metadata objects
+   */
+  public buildFlowMetadata(): FlowMetadata[] {
+    const flows = this.flowRegistry.getAllFlows();
+
+    return flows.map(flow => {
+      const hash = this.flowRegistry.computeFlowHash(flow);
+
+      return {
+        id: flow.id,
+        version: flow.version,
+        hash,
+        name: flow.name,
+        description: flow.description,
+        inputs: flow.inputs,
+        workspace: flow.workspace,
+        statusTransitions: flow.statusTransitions,
+      };
+    });
   }
 
   /**
@@ -554,6 +711,9 @@ export class FlowWorker implements Shutdownable {
     }));
 
     this.currentTask = null;
+
+    // Request another task after completion
+    this.sendRequestTask();
   }
 
   /**
@@ -570,6 +730,9 @@ export class FlowWorker implements Shutdownable {
     }));
 
     this.currentTask = null;
+
+    // Request another task after failure
+    this.sendRequestTask();
   }
 
   /**
@@ -606,6 +769,15 @@ export class FlowWorker implements Shutdownable {
       workerId: this.workerId,
       hookName,
       data
+    }));
+  }
+
+  /**
+   * Send REQUEST_TASK message to request a new task
+   */
+  protected sendRequestTask(): void {
+    this.sendMessage(createMessage(MessageType.REQUEST_TASK, {
+      workerId: this.workerId
     }));
   }
 

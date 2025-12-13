@@ -3,7 +3,6 @@ import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer.js';
 import { RestAPI } from './RestAPI.js';
 import { renderUI } from '../ui.js';
 import { Logger } from '../../shared/Logger.js';
-import { FlowRegistry } from '../../flow/registry/FlowRegistry.js';
 import { WorkspaceManager } from '../../flow/workspace/WorkspaceManager.js';
 import { Shutdownable } from "../../shared/Shutdownable.js";
 import { StateManager } from '../../shared/StateManager.js';
@@ -20,7 +19,6 @@ export class Orchestrator implements Shutdownable {
   private taskManager: TaskManager;
   private wsServer?: WorkerWebSocketServer;
   private restAPI?: RestAPI;
-  private flowRegistry?: FlowRegistry;
   private workspaceManager?: WorkspaceManager;
   private uiInstance?: any;
   private isRunning: boolean = false;
@@ -50,8 +48,7 @@ export class Orchestrator implements Shutdownable {
     // Create WebSocket server
     this.wsServer = new WorkerWebSocketServer(this.taskManager, this.stateManager, this.wsPort);
 
-    // Create flow registry and workspace manager
-    this.flowRegistry = new FlowRegistry(this.projectRoot);
+    // Create workspace manager
     this.workspaceManager = new WorkspaceManager(this.projectRoot);
 
     // Create REST API
@@ -59,26 +56,8 @@ export class Orchestrator implements Shutdownable {
       this.taskManager,
       this.wsServer,
       this.restPort,
-      this.flowRegistry,
       this.workspaceManager
     );
-  }
-
-  /**
-   * Load flows from project directory
-   */
-  private async loadFlows(): Promise<void> {
-    if (!this.flowRegistry) {
-      return;
-    }
-
-    try {
-      await this.flowRegistry.loadProjectFlows();
-      const flowIds = this.flowRegistry.getFlowIds();
-      Logger.log(`[Orchestrator] Loaded ${flowIds.length} flows: ${flowIds.join(', ')}`);
-    } catch (error) {
-      Logger.error('[Orchestrator] Failed to load flows:', error);
-    }
   }
 
   /**
@@ -95,12 +74,6 @@ export class Orchestrator implements Shutdownable {
     try {
       // Initialize all components
       await this.initialize();
-
-      // Load flows
-      await this.loadFlows();
-
-      // Start flow watching
-      this.flowRegistry?.startWatching();
 
       // Start REST API
       await this.restAPI?.start();
@@ -134,10 +107,6 @@ export class Orchestrator implements Shutdownable {
       this.uiInstance.unmount();
     }
 
-    // Stop flow watching
-    this.flowRegistry?.stopWatching();
-    Logger.log('[Orchestrator] flowRegistry Stopped');
-
     // Stop REST API
     await this.restAPI?.stop();
     Logger.log('[Orchestrator] restAPI Stopped');
@@ -168,13 +137,6 @@ export class Orchestrator implements Shutdownable {
    */
   getRestAPI(): RestAPI | undefined {
     return this.restAPI;
-  }
-
-  /**
-   * Get the flow registry instance
-   */
-  getFlowRegistry(): FlowRegistry | undefined {
-    return this.flowRegistry;
   }
 
   /**

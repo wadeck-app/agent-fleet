@@ -98,6 +98,7 @@ describe('FlowRegistry', () => {
     it('should register a valid flow', () => {
       const validFlow: FlowDefinition = {
         id: 'test-flow',
+        version: '1.0.0',
         name: 'Test Flow',
         description: 'Test description',
         workspace: {
@@ -128,6 +129,7 @@ describe('FlowRegistry', () => {
     it('should reject invalid flow with validation error', () => {
       const invalidFlow: FlowDefinition = {
         id: 'invalid-flow',
+        version: '1.0.0',
         name: 'Invalid Flow',
         description: 'Has invalid step dependency',
         workspace: {
@@ -156,6 +158,7 @@ describe('FlowRegistry', () => {
     it('should unregister a flow', () => {
       const flow: FlowDefinition = {
         id: 'temp-flow',
+        version: '1.0.0',
         name: 'Temp',
         description: '',
         workspace: {
@@ -199,6 +202,7 @@ describe('FlowRegistry', () => {
     it('should load valid project flows from YAML', async () => {
       const yamlContent = `
 custom-flow:
+  version: 1.0.0
   name: Custom Flow
   description: A custom flow
   workspace:
@@ -219,6 +223,7 @@ custom-flow:
       vi.mocked(fs.readFileSync).mockReturnValue(yamlContent);
       vi.mocked(yaml.load).mockReturnValue({
         'custom-flow': {
+          version: '1.0.0',
           name: 'Custom Flow',
           description: 'A custom flow',
           workspace: {
@@ -271,6 +276,7 @@ custom-flow:
       vi.mocked(fs.readFileSync).mockReturnValue('yaml content');
       vi.mocked(yaml.load).mockReturnValue({
         'valid-flow': {
+          version: '1.0.0',
           name: 'Valid Flow',
           workspace: {
             mode: 'isolated',
@@ -287,6 +293,7 @@ custom-flow:
           ],
         },
         'invalid-flow': {
+          version: '1.0.0',
           name: 'Invalid Flow',
           workspace: {
             mode: 'isolated',
@@ -316,6 +323,7 @@ custom-flow:
       vi.mocked(fs.readFileSync).mockReturnValue('yaml');
       vi.mocked(yaml.load).mockReturnValue({
         'model-flow': {
+          version: '1.0.0',
           name: 'Model Flow',
           workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
           steps: [
@@ -351,6 +359,7 @@ custom-flow:
       vi.mocked(fs.readFileSync).mockReturnValue('yaml');
       vi.mocked(yaml.load).mockReturnValue({
         'script-flow': {
+          version: '1.0.0',
           name: 'Script Flow',
           workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
           steps: [
@@ -385,6 +394,7 @@ custom-flow:
       vi.mocked(fs.readFileSync).mockReturnValue('yaml');
       vi.mocked(yaml.load).mockReturnValue({
         'default-type-flow': {
+          version: '1.0.0',
           name: 'Default Type Flow',
           workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
           steps: [
@@ -411,6 +421,7 @@ custom-flow:
       vi.mocked(fs.readFileSync).mockReturnValue('yaml');
       vi.mocked(yaml.load).mockReturnValue({
         'workspace-flow': {
+          version: '1.0.0',
           name: 'Workspace Flow',
           workspace: {}, // Empty workspace config
           steps: [
@@ -439,6 +450,7 @@ custom-flow:
       vi.mocked(fs.readFileSync).mockReturnValue('yaml');
       vi.mocked(yaml.load).mockReturnValue({
         'dep-flow': {
+          version: '1.0.0',
           name: 'Dependency Flow',
           workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
           steps: [
@@ -470,6 +482,7 @@ custom-flow:
       vi.mocked(fs.readFileSync).mockReturnValue('yaml');
       vi.mocked(yaml.load).mockReturnValue({
         'cond-flow': {
+          version: '1.0.0',
           name: 'Conditional Flow',
           workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
           steps: [
@@ -496,6 +509,7 @@ custom-flow:
       vi.mocked(fs.readFileSync).mockReturnValue('yaml');
       vi.mocked(yaml.load).mockReturnValue({
         'retry-flow': {
+          version: '1.0.0',
           name: 'Retry Flow',
           workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
           steps: [
@@ -556,6 +570,7 @@ custom-flow:
     it('should validate a correct flow', () => {
       const validFlow: FlowDefinition = {
         id: 'valid',
+        version: '1.0.0',
         name: 'Valid',
         description: 'Valid flow',
         workspace: {
@@ -586,6 +601,7 @@ custom-flow:
     it('should detect validation errors', () => {
       const invalidFlow: FlowDefinition = {
         id: 'invalid',
+        version: '1.0.0',
         name: 'Invalid',
         description: 'Invalid flow',
         workspace: {
@@ -624,6 +640,7 @@ custom-flow:
     it('should clear but keep default flows', () => {
       const customFlow: FlowDefinition = {
         id: 'custom',
+        version: '1.0.0',
         name: 'Custom',
         description: 'Custom flow',
         workspace: {
@@ -777,6 +794,7 @@ custom-flow:
       vi.mocked(fs.readFileSync).mockReturnValue('yaml');
       vi.mocked(yaml.load).mockReturnValue({
         'empty-steps': {
+          version: '1.0.0',
           name: 'Empty Steps',
           workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
           steps: [],
@@ -792,6 +810,7 @@ custom-flow:
       vi.mocked(fs.readFileSync).mockReturnValue('yaml');
       vi.mocked(yaml.load).mockReturnValue({
         'no-name': {
+          version: '1.0.0',
           name: 'No Step Name',
           workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
           steps: [
@@ -818,6 +837,7 @@ custom-flow:
       vi.mocked(fs.readFileSync).mockReturnValue('yaml');
       vi.mocked(yaml.load).mockReturnValue({
         'flow-id': {
+          version: '1.0.0',
           workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
           steps: [
             {
@@ -842,6 +862,7 @@ custom-flow:
       vi.mocked(fs.readFileSync).mockReturnValue('yaml');
       vi.mocked(yaml.load).mockReturnValue({
         'no-inputs': {
+          version: '1.0.0',
           name: 'No Inputs',
           workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
           steps: [
@@ -867,6 +888,7 @@ custom-flow:
       vi.mocked(fs.readFileSync).mockReturnValue('yaml');
       vi.mocked(yaml.load).mockReturnValue({
         'concurrency-flow': {
+          version: '1.0.0',
           name: 'Concurrency Flow',
           workspace: {
             mode: 'shared',
@@ -898,6 +920,7 @@ custom-flow:
       vi.mocked(fs.readFileSync).mockReturnValue('yaml');
       vi.mocked(yaml.load).mockReturnValue({
         'complex-flow': {
+          version: '1.0.0',
           name: 'Complex Flow',
           workspace: { mode: 'isolated', gitStrategy: 'feature-branch', reusePolicy: 'never' },
           inputs: {
@@ -952,6 +975,7 @@ custom-flow:
       vi.mocked(fs.readFileSync).mockReturnValue('yaml');
       vi.mocked(yaml.load).mockReturnValue({
         'hooks-flow': {
+          version: '1.0.0',
           name: 'Hooks Flow',
           workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
           hooks: {
@@ -985,6 +1009,7 @@ custom-flow:
       // Mock external file content
       const externalContent = {
         'custom-flow': {
+          version: '1.0.0',
           name: 'Custom Flow',
           description: 'From external file',
           workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
@@ -1028,6 +1053,7 @@ custom-flow:
       // External file with base definition
       const externalContent = {
         'test-flow': {
+          version: '1.0.0',
           name: 'External Name',
           description: 'External desc',
           workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
@@ -1120,6 +1146,7 @@ custom-flow:
     it('should error if external file does not contain flow ID', async () => {
       const externalContent = {
         'different-flow': {
+          version: '1.0.0',
           name: 'Different',
           workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
           steps: [],
@@ -1155,12 +1182,13 @@ custom-flow:
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.watch).mockImplementation((path: any, callback: any) => {
         watchers.push({ path, callback });
-        return mockWatcher;
+        return mockWatcher as any;
       });
 
       // Load flows with external file
       const externalContent = {
         'custom-flow': {
+          version: '1.0.0',
           name: 'Custom',
           description: 'Test',
           workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
@@ -1194,6 +1222,274 @@ custom-flow:
       expect(watchers.some((w) => w.path.toString().endsWith('custom.yml'))).toBe(true);
 
       registry.stopWatching();
+    });
+  });
+
+  describe('Hash Computation (Phase 1)', () => {
+    it('Test 5.1: should compute deterministic hash for same flow', () => {
+      const flow: FlowDefinition = {
+        id: 'test-flow',
+        version: '1.0.0',
+        name: 'Test Flow',
+        description: 'Test description',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {
+          input1: 'string',
+        },
+        steps: [
+          {
+            id: 'step1',
+            name: 'Step 1',
+            type: 'model',
+            model: 'haiku',
+            prompt: 'Test prompt',
+          },
+        ],
+      };
+
+      const hash1 = registry.computeFlowHash(flow);
+      const hash2 = registry.computeFlowHash(flow);
+
+      expect(hash1).toBe(hash2);
+      expect(hash1).toHaveLength(8);
+    });
+
+    it('Test 5.2: should produce different hashes for different steps', () => {
+      const flow1: FlowDefinition = {
+        id: 'flow1',
+        version: '1.0.0',
+        name: 'Flow 1',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            id: 'step1',
+            name: 'Step 1',
+            type: 'model',
+            model: 'haiku',
+            prompt: 'Prompt A',
+          },
+        ],
+      };
+
+      const flow2: FlowDefinition = {
+        ...flow1,
+        steps: [
+          {
+            id: 'step1',
+            name: 'Step 1',
+            type: 'model',
+            model: 'haiku',
+            prompt: 'Prompt B', // Different prompt
+          },
+        ],
+      };
+
+      const hash1 = registry.computeFlowHash(flow1);
+      const hash2 = registry.computeFlowHash(flow2);
+
+      expect(hash1).not.toBe(hash2);
+    });
+
+    it('Test 5.3: should produce different hashes for different workspace configs', () => {
+      const flow1: FlowDefinition = {
+        id: 'flow1',
+        version: '1.0.0',
+        name: 'Flow 1',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {},
+        steps: [
+          {
+            id: 'step1',
+            name: 'Step 1',
+            type: 'model',
+            model: 'haiku',
+            prompt: 'Test',
+          },
+        ],
+      };
+
+      const flow2: FlowDefinition = {
+        ...flow1,
+        workspace: {
+          mode: 'shared', // Different mode
+          gitStrategy: 'main-only',
+          reusePolicy: 'always',
+        },
+      };
+
+      const hash1 = registry.computeFlowHash(flow1);
+      const hash2 = registry.computeFlowHash(flow2);
+
+      expect(hash1).not.toBe(hash2);
+    });
+
+    it('Test 5.4: should produce different hashes for different inputs', () => {
+      const flow1: FlowDefinition = {
+        id: 'flow1',
+        version: '1.0.0',
+        name: 'Flow 1',
+        description: 'Test',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {
+          input1: 'string',
+        },
+        steps: [
+          {
+            id: 'step1',
+            name: 'Step 1',
+            type: 'model',
+            model: 'haiku',
+            prompt: 'Test',
+          },
+        ],
+      };
+
+      const flow2: FlowDefinition = {
+        ...flow1,
+        inputs: {
+          input1: 'string',
+          input2: 'number', // Additional input
+        },
+      };
+
+      const hash1 = registry.computeFlowHash(flow1);
+      const hash2 = registry.computeFlowHash(flow2);
+
+      expect(hash1).not.toBe(hash2);
+    });
+
+    it('Test 5.5: should produce same hash when only name/description differ', () => {
+      const flow1: FlowDefinition = {
+        id: 'flow1',
+        version: '1.0.0',
+        name: 'Flow 1',
+        description: 'Description A',
+        workspace: {
+          mode: 'isolated',
+          gitStrategy: 'main-only',
+          reusePolicy: 'never',
+        },
+        inputs: {
+          input1: 'string',
+        },
+        steps: [
+          {
+            id: 'step1',
+            name: 'Step 1',
+            type: 'model',
+            model: 'haiku',
+            prompt: 'Test',
+          },
+        ],
+      };
+
+      const flow2: FlowDefinition = {
+        ...flow1,
+        name: 'Flow 2', // Different name
+        description: 'Description B', // Different description
+      };
+
+      const hash1 = registry.computeFlowHash(flow1);
+      const hash2 = registry.computeFlowHash(flow2);
+
+      // Hash should be identical because name/description are not included
+      expect(hash1).toBe(hash2);
+    });
+  });
+
+  describe('Version Validation (Phase 1)', () => {
+    it('Test 8.1: should reject flow without version field', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue('yaml');
+      vi.mocked(yaml.load).mockReturnValue({
+        'no-version': {
+          name: 'No Version',
+          workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+          steps: [{ id: 'step1', type: 'model', prompt: 'Test' }],
+          // Missing version field
+        },
+      });
+
+      await expect(registry.loadProjectFlows()).rejects.toThrow('Flow validation failed');
+    });
+
+    it('Test 8.2: should accept valid semver versions', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue('yaml');
+      vi.mocked(yaml.load).mockReturnValue({
+        'valid-version': {
+          version: '1.2.3',
+          name: 'Valid Version',
+          workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+          steps: [{ id: 'step1', type: 'model', prompt: 'Test' }],
+        },
+      });
+
+      await registry.loadProjectFlows();
+
+      const flow = registry.getFlow('valid-version');
+      expect(flow?.version).toBe('1.2.3');
+    });
+
+    it('Test 8.3: should reject invalid semver format', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue('yaml');
+      vi.mocked(yaml.load).mockReturnValue({
+        'invalid-version': {
+          version: 'v1.0', // Invalid format
+          name: 'Invalid Version',
+          workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+          steps: [{ id: 'step1', type: 'model', prompt: 'Test' }],
+        },
+      });
+
+      await expect(registry.loadProjectFlows()).rejects.toThrow('Flow validation failed');
+    });
+
+    it('Test 8.4: should accept different valid semver formats', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue('yaml');
+      vi.mocked(yaml.load).mockReturnValue({
+        'version-1': {
+          version: '0.0.1',
+          name: 'Version 1',
+          workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+          steps: [{ id: 'step1', type: 'model', prompt: 'Test' }],
+        },
+        'version-2': {
+          version: '10.20.30',
+          name: 'Version 2',
+          workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+          steps: [{ id: 'step1', type: 'model', prompt: 'Test' }],
+        },
+      });
+
+      await registry.loadProjectFlows();
+
+      const flow1 = registry.getFlow('version-1');
+      const flow2 = registry.getFlow('version-2');
+
+      expect(flow1?.version).toBe('0.0.1');
+      expect(flow2?.version).toBe('10.20.30');
     });
   });
 });

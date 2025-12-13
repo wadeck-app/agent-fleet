@@ -8,6 +8,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
+import * as crypto from 'crypto';
 import type {
   FlowDefinition,
   FlowStep,
@@ -36,6 +37,7 @@ export class FlowValidationError extends Error {
 const DEFAULT_FLOWS: Record<string, FlowDefinition> = {
   'simple-qa': {
     id: 'simple-qa',
+    version: '1.0.0',
     name: 'Simple Question & Answer',
     description: 'Answer questions using existing codebase knowledge',
     workspace: {
@@ -63,6 +65,7 @@ const DEFAULT_FLOWS: Record<string, FlowDefinition> = {
 
   'dev-full': {
     id: 'dev-full',
+    version: '1.0.0',
     name: 'Full Development Cycle',
     description: 'Analysis → Validation → Implementation → Quality → Review',
     workspace: {
@@ -273,14 +276,25 @@ export class FlowRegistry {
     // Merge local overrides with external definition
     const mergedData = this.mergeFlowDefinitions(baseDefinition, data);
 
+    // Validate version field
+    if (!mergedData.version) {
+      throw new Error(`Flow '${id}' is missing required 'version' field. Please add a semantic version (e.g., "1.0.0")`);
+    }
+
+    if (!this.isValidSemver(mergedData.version)) {
+      throw new Error(`Flow '${id}' has invalid version '${mergedData.version}'. Version must be in semantic version format (e.g., "1.0.0")`);
+    }
+
     return {
       id,
+      version: mergedData.version,
       name: mergedData.name || id,
       description: mergedData.description || '',
       workspace: this.parseWorkspaceConfig(mergedData.workspace),
       inputs: mergedData.inputs || {},
       steps: (mergedData.steps || []).map((step: any) => this.parseFlowStep(step)),
       hooks: mergedData.hooks,
+      statusTransitions: mergedData.statusTransitions,
     };
   }
 
@@ -663,5 +677,53 @@ export class FlowRegistry {
     } catch (error) {
       console.error('[FlowRegistry] Failed to reload flows:', error);
     }
+  }
+
+  /**
+   * Validate semantic version format
+   * Accepts formats like: "1.0.0", "2.1.3", "0.0.1"
+   * @param version - Version string to validate
+   * @returns True if valid semver format
+   */
+  private isValidSemver(version: string): boolean {
+    // Simple semver pattern: MAJOR.MINOR.PATCH
+    const semverPattern = /^\d+\.\d+\.\d+$/;
+    return semverPattern.test(version);
+  }
+
+  /**
+   * Compute a deterministic hash of flow content
+   * Hash includes: steps, workspace config, and inputs
+   * Hash excludes: id, name, description, hooks, statusTransitions
+   * @param flow - Flow definition to hash
+   * @returns 8-character hex digest of SHA256 hash
+   */
+  public computeFlowHash(flow: FlowDefinition): string {
+    // Create a normalized object with only the fields that affect flow execution
+    const hashableContent = {
+      steps: flow.steps,
+      workspace: flow.workspace,
+      inputs: flow.inputs,
+    };
+
+    // Serialize to JSON with sorted keys for determinism (deep sort)
+    const jsonString = JSON.stringify(hashableContent, (key, value) => {
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        return Object.keys(value)
+          .sort()
+          .reduce((sorted: any, k) => {
+            sorted[k] = value[k];
+            return sorted;
+          }, {});
+      }
+      return value;
+    });
+
+    // Compute SHA256 hash
+    const hash = crypto.createHash('sha256');
+    hash.update(jsonString);
+
+    // Return first 8 characters of hex digest
+    return hash.digest('hex').substring(0, 8);
   }
 }

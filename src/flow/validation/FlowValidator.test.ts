@@ -32,6 +32,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
     test('should error when flowId is missing', () => {
       const flow: FlowDefinition = {
         id: 'test-flow',
+        version: '1.0.0',
         name: 'Test Flow',
         description: 'Test',
         workspace: {
@@ -63,6 +64,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
     test('should error when flowId references non-existent flow', () => {
       const flow: FlowDefinition = {
         id: 'test-flow',
+        version: '1.0.0',
         name: 'Test Flow',
         description: 'Test',
         workspace: {
@@ -94,6 +96,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
     test('should error when workspaceStrategy is invalid', () => {
       const flow: FlowDefinition = {
         id: 'test-flow',
+        version: '1.0.0',
         name: 'Test Flow',
         description: 'Test',
         workspace: {
@@ -127,6 +130,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
     test('should error when inputs is not an object', () => {
       const flow: FlowDefinition = {
         id: 'test-flow',
+        version: '1.0.0',
         name: 'Test Flow',
         description: 'Test',
         workspace: {
@@ -159,6 +163,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
     test('should accept valid workspaceStrategy values', () => {
       const flowInherit: FlowDefinition = {
         id: 'test-flow-inherit',
+        version: '1.0.0',
         name: 'Test Flow Inherit',
         description: 'Test',
         workspace: {
@@ -187,6 +192,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
 
       const flowSeparate: FlowDefinition = {
         id: 'test-flow-separate',
+        version: '1.0.0',
         name: 'Test Flow Separate',
         description: 'Test',
         workspace: {
@@ -220,6 +226,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
       // Register a flow that calls itself
       const selfReferencingFlow: FlowDefinition = {
         id: 'self-reference',
+        version: '1.0.0',
         name: 'Self Referencing Flow',
         description: 'A flow that calls itself',
         workspace: {
@@ -252,6 +259,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
       // Register flow A
       const flowA: FlowDefinition = {
         id: 'flow-a',
+        version: '1.0.0',
         name: 'Flow A',
         description: 'Flow A',
         workspace: {
@@ -274,6 +282,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
       // Register flow B that calls back to A
       const flowB: FlowDefinition = {
         id: 'flow-b',
+        version: '1.0.0',
         name: 'Flow B',
         description: 'Flow B',
         workspace: {
@@ -312,6 +321,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
       // Register flow A
       const flowA: FlowDefinition = {
         id: 'flow-a',
+        version: '1.0.0',
         name: 'Flow A',
         description: 'Flow A',
         workspace: {
@@ -334,6 +344,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
       // Register flow B that calls C
       const flowB: FlowDefinition = {
         id: 'flow-b',
+        version: '1.0.0',
         name: 'Flow B',
         description: 'Flow B',
         workspace: {
@@ -356,6 +367,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
       // Register flow C that calls back to A
       const flowC: FlowDefinition = {
         id: 'flow-c',
+        version: '1.0.0',
         name: 'Flow C',
         description: 'Flow C',
         workspace: {
@@ -395,6 +407,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
       // Register base flow
       const baseFlow: FlowDefinition = {
         id: 'base-flow',
+        version: '1.0.0',
         name: 'Base Flow',
         description: 'Base Flow',
         workspace: {
@@ -417,6 +430,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
       // Register middle flow that calls base
       const middleFlow: FlowDefinition = {
         id: 'middle-flow',
+        version: '1.0.0',
         name: 'Middle Flow',
         description: 'Middle Flow',
         workspace: {
@@ -439,6 +453,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
       // Register top flow that calls middle
       const topFlow: FlowDefinition = {
         id: 'top-flow',
+        version: '1.0.0',
         name: 'Top Flow',
         description: 'Top Flow',
         workspace: {
@@ -480,6 +495,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
       // Register a recursive flow with allowRecursion flag
       const recursiveFlow: FlowDefinition = {
         id: 'recursive-flow',
+        version: '1.0.0',
         name: 'Recursive Flow',
         description: 'A flow with explicit recursion',
         workspace: {
@@ -522,6 +538,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
       // Create a recursive flow WITHOUT allowRecursion flag
       const recursiveFlow: FlowDefinition = {
         id: 'recursive-flow-no-flag',
+        version: '1.0.0',
         name: 'Recursive Flow No Flag',
         description: 'A flow without allowRecursion',
         workspace: {
@@ -561,6 +578,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
       // Register a target flow
       const targetFlow: FlowDefinition = {
         id: 'target-flow',
+        version: '1.0.0',
         name: 'Target Flow',
         description: 'Target Flow',
         workspace: {
@@ -584,6 +602,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
       // Register a flow with unnecessary allowRecursion flag
       const flow: FlowDefinition = {
         id: 'calling-flow',
+        version: '1.0.0',
         name: 'Calling Flow',
         description: 'Calling Flow',
         workspace: {
@@ -624,6 +643,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
       // Register a flow with required inputs
       const targetFlow: FlowDefinition = {
         id: 'target-flow',
+        version: '1.0.0',
         name: 'Target Flow',
         description: 'Target Flow',
         workspace: {
@@ -651,6 +671,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
       // Create a flow that calls target but doesn't provide all inputs
       const callerFlow: FlowDefinition = {
         id: 'caller-flow',
+        version: '1.0.0',
         name: 'Caller Flow',
         description: 'Caller Flow',
         workspace: {
@@ -687,6 +708,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
       // Register a flow with required inputs
       const targetFlow: FlowDefinition = {
         id: 'target-flow',
+        version: '1.0.0',
         name: 'Target Flow',
         description: 'Target Flow',
         workspace: {
@@ -714,6 +736,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
       // Create a flow that calls target and provides all inputs
       const callerFlow: FlowDefinition = {
         id: 'caller-flow',
+        version: '1.0.0',
         name: 'Caller Flow',
         description: 'Caller Flow',
         workspace: {
@@ -752,6 +775,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
 
       const flow: FlowDefinition = {
         id: 'test-flow',
+        version: '1.0.0',
         name: 'Test Flow',
         description: 'Test',
         workspace: {

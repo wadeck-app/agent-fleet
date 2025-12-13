@@ -10,24 +10,26 @@ import request from 'supertest';
 import { RestAPI } from './RestAPI.js';
 import { TaskManager } from './TaskManager.js';
 import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer.js';
-import { FlowRegistry } from '../../flow/registry/FlowRegistry.js';
 import { WorkspaceManager } from '../../flow/workspace/WorkspaceManager.js';
+import { StateManager } from '../../shared/StateManager.js';
 import { Task, TaskStatus, WorkerType, WorkerInfo } from '../../shared/types.js';
 import { Logger } from '../../shared/Logger.js';
 
 // Mock all dependencies
 vi.mock('./TaskManager.js');
 vi.mock('../websocket/WorkerWebSocketServer.js');
-vi.mock('../../flow/registry/FlowRegistry.js');
 vi.mock('../../flow/workspace/WorkspaceManager.js');
+vi.mock('../../shared/StateManager.js');
 vi.mock('../../shared/Logger.js');
 
 describe('RestAPI', () => {
   let api: RestAPI;
   let mockTaskManager: TaskManager;
   let mockWsServer: WorkerWebSocketServer;
-  let mockFlowRegistry: FlowRegistry;
   let mockWorkspaceManager: WorkspaceManager;
+  let mockStateManager: StateManager;
+  let mockConnectionManager: any;
+  let mockFlowDiscoveryRegistry: any;
   let app: any;
 
   // Helper to create a mock task
@@ -48,43 +50,70 @@ describe('RestAPI', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    // Mock StateManager
+    mockStateManager = {
+      emitTaskCreated: vi.fn(),
+      emitTaskUpdated: vi.fn(),
+      emitTaskDeleted: vi.fn(),
+      emitWorkerConnected: vi.fn(),
+      emitWorkerDisconnected: vi.fn(),
+      emitWorkerTaskAssigned: vi.fn(),
+      emitWorkerTaskReleased: vi.fn(),
+      emitLogMessage: vi.fn(),
+      on: vi.fn(),
+      off: vi.fn(),
+      once: vi.fn(),
+      emit: vi.fn(),
+      removeAllListeners: vi.fn(),
+    } as any;
+
     // Mock TaskManager
-    mockTaskManager = new TaskManager();
-    vi.mocked(mockTaskManager.createTask).mockReturnValue(createMockTask('task-1'));
-    vi.mocked(mockTaskManager.getAllTasks).mockReturnValue([]);
-    vi.mocked(mockTaskManager.getTasksByStatus).mockReturnValue([]);
-    vi.mocked(mockTaskManager.getTask).mockReturnValue(undefined);
-    vi.mocked(mockTaskManager.updateTaskStatus).mockImplementation(() => {});
-    vi.mocked(mockTaskManager.addComment).mockImplementation(() => {});
-    vi.mocked(mockTaskManager.deleteTask).mockReturnValue(false);
-    vi.mocked(mockTaskManager.clearAllTasks).mockReturnValue(0);
-    vi.mocked(mockTaskManager.getStats).mockReturnValue({
-      total: 0,
-      byStatus: {},
-    });
+    mockTaskManager = {
+      createTask: vi.fn().mockReturnValue(createMockTask('task-1')),
+      getAllTasks: vi.fn().mockReturnValue([]),
+      getTasksByStatus: vi.fn().mockReturnValue([]),
+      getTask: vi.fn().mockReturnValue(undefined),
+      updateTaskStatus: vi.fn().mockImplementation(() => {}),
+      updateTask: vi.fn().mockResolvedValue(undefined),
+      addComment: vi.fn().mockImplementation(() => {}),
+      deleteTask: vi.fn().mockReturnValue(false),
+      clearAllTasks: vi.fn().mockReturnValue(0),
+      getStats: vi.fn().mockReturnValue({
+        total: 0,
+        byStatus: {},
+      }),
+    } as any;
+
+    // Mock FlowDiscoveryRegistry
+    mockFlowDiscoveryRegistry = {
+      getAllProjects: vi.fn().mockReturnValue([]),
+      getProjectFlows: vi.fn().mockReturnValue(undefined),
+    };
+
+    // Mock ConnectionManager
+    mockConnectionManager = {
+      getFlowDiscoveryRegistry: vi.fn().mockReturnValue(mockFlowDiscoveryRegistry),
+    };
 
     // Mock WorkerWebSocketServer
-    mockWsServer = new WorkerWebSocketServer(mockTaskManager);
-    vi.mocked(mockWsServer.getWorkers).mockReturnValue([]);
-    vi.mocked(mockWsServer.getPort).mockReturnValue(3738);
-    vi.mocked(mockWsServer.tryAssignTasksToIdleWorkers).mockImplementation(() => {});
-
-    // Mock FlowRegistry
-    mockFlowRegistry = new FlowRegistry('/test/project');
-    vi.mocked(mockFlowRegistry.hasFlow).mockReturnValue(false);
-    vi.mocked(mockFlowRegistry.getAllFlows).mockReturnValue([]);
-    vi.mocked(mockFlowRegistry.getFlow).mockReturnValue(undefined);
+    mockWsServer = {
+      getWorkers: vi.fn().mockReturnValue([]),
+      getPort: vi.fn().mockReturnValue(3738),
+      getConnectionManager: vi.fn().mockReturnValue(mockConnectionManager),
+      tryAssignTasksToIdleWorkers: vi.fn().mockImplementation(() => {}),
+    } as any;
 
     // Mock WorkspaceManager
-    mockWorkspaceManager = new WorkspaceManager('/tmp/workspaces');
-    vi.mocked(mockWorkspaceManager.getAllWorkspaces).mockReturnValue([]);
-    vi.mocked(mockWorkspaceManager.getWorkspace).mockReturnValue(undefined);
+    mockWorkspaceManager = {
+      getAllWorkspaces: vi.fn().mockReturnValue([]),
+      getWorkspace: vi.fn().mockReturnValue(undefined),
+    } as any;
 
-    // Mock Logger
-    vi.mocked(Logger.log).mockImplementation(() => {});
-    vi.mocked(Logger.error).mockImplementation(() => {});
+    // Mock Logger static methods
+    Logger.log = vi.fn();
+    Logger.error = vi.fn();
 
-    // Create API instance without flow registry by default
+    // Create API instance without workspace manager by default
     api = new RestAPI(mockTaskManager, mockWsServer, 3737);
     app = (api as any).app;
   });
@@ -99,7 +128,7 @@ describe('RestAPI', () => {
 
     it('should always return 200 regardless of system state', async () => {
       // Simulate error in TaskManager
-      vi.mocked(mockTaskManager.getAllTasks).mockImplementation(() => {
+      mockTaskManager.getAllTasks = vi.fn().mockImplementation(() => {
         throw new Error('Database error');
       });
 
@@ -143,8 +172,8 @@ describe('RestAPI', () => {
         },
       ];
 
-      vi.mocked(mockWsServer.getWorkers).mockReturnValue(mockWorkers);
-      vi.mocked(mockTaskManager.getStats).mockReturnValue({
+      mockWsServer.getWorkers = vi.fn().mockReturnValue(mockWorkers);
+      mockTaskManager.getStats = vi.fn().mockReturnValue({
         total: 5,
         byStatus: {
           [TaskStatus.BACKLOG]: 2,
@@ -174,7 +203,7 @@ describe('RestAPI', () => {
   describe('POST /tasks', () => {
     it('should create a task with description only', async () => {
       const mockTask = createMockTask('task-1', { description: 'New task' });
-      vi.mocked(mockTaskManager.createTask).mockReturnValue(mockTask);
+      mockTaskManager.createTask = vi.fn().mockReturnValue(mockTask);
 
       const response = await request(app)
         .post('/tasks')
@@ -191,7 +220,7 @@ describe('RestAPI', () => {
         description: 'High priority task',
         priority: 'high',
       });
-      vi.mocked(mockTaskManager.createTask).mockReturnValue(mockTask);
+      mockTaskManager.createTask = vi.fn().mockReturnValue(mockTask);
 
       const response = await request(app)
         .post('/tasks')
@@ -209,17 +238,12 @@ describe('RestAPI', () => {
       });
     });
 
-    it('should create a task with flowId', async () => {
-      // Create API with flow registry
-      api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockFlowRegistry);
-      app = (api as any).app;
-
-      vi.mocked(mockFlowRegistry.hasFlow).mockReturnValue(true);
+    it('should create a task with flowId (no validation - workers handle this)', async () => {
       const mockTask = createMockTask('task-3', {
         description: 'Flow task',
         flowId: 'test-flow',
       });
-      vi.mocked(mockTaskManager.createTask).mockReturnValue(mockTask);
+      mockTaskManager.createTask = vi.fn().mockReturnValue(mockTask);
 
       const response = await request(app)
         .post('/tasks')
@@ -229,21 +253,17 @@ describe('RestAPI', () => {
         });
 
       expect(response.status).toBe(201);
-      expect(mockFlowRegistry.hasFlow).toHaveBeenCalledWith('test-flow');
       expect(response.body.flowId).toBe('test-flow');
+      expect(mockTaskManager.updateTask).toHaveBeenCalled();
     });
 
     it('should create a task with flowId and flowInputs', async () => {
-      api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockFlowRegistry);
-      app = (api as any).app;
-
-      vi.mocked(mockFlowRegistry.hasFlow).mockReturnValue(true);
       const mockTask = createMockTask('task-4', {
         description: 'Flow task with inputs',
         flowId: 'test-flow',
         flowInputs: { input1: 'value1' },
       });
-      vi.mocked(mockTaskManager.createTask).mockReturnValue(mockTask);
+      mockTaskManager.createTask = vi.fn().mockReturnValue(mockTask);
 
       const response = await request(app)
         .post('/tasks')
@@ -256,6 +276,7 @@ describe('RestAPI', () => {
       expect(response.status).toBe(201);
       expect(response.body.flowId).toBe('test-flow');
       expect(response.body.flowInputs).toEqual({ input1: 'value1' });
+      expect(mockTaskManager.updateTask).toHaveBeenCalled();
     });
 
     it('should create a task with workspacePath', async () => {
@@ -263,7 +284,7 @@ describe('RestAPI', () => {
         description: 'Task with workspace',
         workspacePath: '/path/to/workspace',
       });
-      vi.mocked(mockTaskManager.createTask).mockReturnValue(mockTask);
+      mockTaskManager.createTask = vi.fn().mockReturnValue(mockTask);
 
       const response = await request(app)
         .post('/tasks')
@@ -295,26 +316,9 @@ describe('RestAPI', () => {
       expect(response.body).toEqual({ error: 'Description is required' });
     });
 
-    it('should return 400 when flowId does not exist', async () => {
-      api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockFlowRegistry);
-      app = (api as any).app;
-
-      vi.mocked(mockFlowRegistry.hasFlow).mockReturnValue(false);
-
-      const response = await request(app)
-        .post('/tasks')
-        .send({
-          description: 'Task with invalid flow',
-          flowId: 'non-existent-flow',
-        });
-
-      expect(response.status).toBe(400);
-      expect(response.body).toEqual({ error: "Flow 'non-existent-flow' not found" });
-      expect(mockTaskManager.createTask).not.toHaveBeenCalled();
-    });
 
     it('should return 500 when task creation fails', async () => {
-      vi.mocked(mockTaskManager.createTask).mockImplementation(() => {
+      mockTaskManager.createTask = vi.fn().mockImplementation(() => {
         throw new Error('Database error');
       });
 
@@ -334,7 +338,7 @@ describe('RestAPI', () => {
         createMockTask('task-2'),
         createMockTask('task-3'),
       ];
-      vi.mocked(mockTaskManager.getAllTasks).mockReturnValue(mockTasks);
+      mockTaskManager.getAllTasks = vi.fn().mockReturnValue(mockTasks);
 
       const response = await request(app).get('/tasks');
 
@@ -344,7 +348,7 @@ describe('RestAPI', () => {
     });
 
     it('should return empty array when no tasks', async () => {
-      vi.mocked(mockTaskManager.getAllTasks).mockReturnValue([]);
+      mockTaskManager.getAllTasks = vi.fn().mockReturnValue([]);
 
       const response = await request(app).get('/tasks');
 
@@ -357,7 +361,7 @@ describe('RestAPI', () => {
         createMockTask('task-1', { status: TaskStatus.TODO }),
         createMockTask('task-2', { status: TaskStatus.TODO }),
       ];
-      vi.mocked(mockTaskManager.getTasksByStatus).mockReturnValue(mockTasks);
+      mockTaskManager.getTasksByStatus = vi.fn().mockReturnValue(mockTasks);
 
       const response = await request(app).get('/tasks?status=todo');
 
@@ -370,7 +374,7 @@ describe('RestAPI', () => {
       const mockTasks = [
         createMockTask('task-1', { status: TaskStatus.IN_PROGRESS }),
       ];
-      vi.mocked(mockTaskManager.getTasksByStatus).mockReturnValue(mockTasks);
+      mockTaskManager.getTasksByStatus = vi.fn().mockReturnValue(mockTasks);
 
       const response = await request(app).get('/tasks?status=in_progress');
 
@@ -380,7 +384,7 @@ describe('RestAPI', () => {
     });
 
     it('should return 500 when listing fails', async () => {
-      vi.mocked(mockTaskManager.getAllTasks).mockImplementation(() => {
+      mockTaskManager.getAllTasks = vi.fn().mockImplementation(() => {
         throw new Error('Database error');
       });
 
@@ -394,7 +398,7 @@ describe('RestAPI', () => {
   describe('GET /tasks/:id', () => {
     it('should return a specific task', async () => {
       const mockTask = createMockTask('task-1');
-      vi.mocked(mockTaskManager.getTask).mockReturnValue(mockTask);
+      mockTaskManager.getTask = vi.fn().mockReturnValue(mockTask);
 
       const response = await request(app).get('/tasks/task-1');
 
@@ -404,7 +408,7 @@ describe('RestAPI', () => {
     });
 
     it('should return 404 when task not found', async () => {
-      vi.mocked(mockTaskManager.getTask).mockReturnValue(undefined);
+      mockTaskManager.getTask = vi.fn().mockReturnValue(undefined);
 
       const response = await request(app).get('/tasks/non-existent');
 
@@ -413,7 +417,7 @@ describe('RestAPI', () => {
     });
 
     it('should return 500 when getting task fails', async () => {
-      vi.mocked(mockTaskManager.getTask).mockImplementation(() => {
+      mockTaskManager.getTask = vi.fn().mockImplementation(() => {
         throw new Error('Database error');
       });
 
@@ -427,7 +431,7 @@ describe('RestAPI', () => {
   describe('PATCH /tasks/:id/status', () => {
     it('should update task status', async () => {
       const mockTask = createMockTask('task-1', { status: TaskStatus.IN_PROGRESS });
-      vi.mocked(mockTaskManager.getTask).mockReturnValue(mockTask);
+      mockTaskManager.getTask = vi.fn().mockReturnValue(mockTask);
 
       const response = await request(app)
         .patch('/tasks/task-1/status')
@@ -440,7 +444,7 @@ describe('RestAPI', () => {
 
     it('should update task to completed status', async () => {
       const mockTask = createMockTask('task-1', { status: TaskStatus.MERGED });
-      vi.mocked(mockTaskManager.getTask).mockReturnValue(mockTask);
+      mockTaskManager.getTask = vi.fn().mockReturnValue(mockTask);
 
       const response = await request(app)
         .patch('/tasks/task-1/status')
@@ -470,7 +474,7 @@ describe('RestAPI', () => {
     });
 
     it('should return 500 when update fails', async () => {
-      vi.mocked(mockTaskManager.updateTaskStatus).mockImplementation(() => {
+      mockTaskManager.updateTaskStatus = vi.fn().mockImplementation(() => {
         throw new Error('Task not found');
       });
 
@@ -494,7 +498,7 @@ describe('RestAPI', () => {
           },
         ],
       });
-      vi.mocked(mockTaskManager.getTask).mockReturnValue(mockTask);
+      mockTaskManager.getTask = vi.fn().mockReturnValue(mockTask);
 
       const response = await request(app)
         .post('/tasks/task-1/comments')
@@ -544,7 +548,7 @@ describe('RestAPI', () => {
     });
 
     it('should return 500 when adding comment fails', async () => {
-      vi.mocked(mockTaskManager.addComment).mockImplementation(() => {
+      mockTaskManager.addComment = vi.fn().mockImplementation(() => {
         throw new Error('Task not found');
       });
 
@@ -559,7 +563,7 @@ describe('RestAPI', () => {
 
   describe('DELETE /tasks/:id', () => {
     it('should delete a task', async () => {
-      vi.mocked(mockTaskManager.deleteTask).mockReturnValue(true);
+      mockTaskManager.deleteTask = vi.fn().mockReturnValue(true);
 
       const response = await request(app).delete('/tasks/task-1');
 
@@ -569,7 +573,7 @@ describe('RestAPI', () => {
     });
 
     it('should return 404 when task not found', async () => {
-      vi.mocked(mockTaskManager.deleteTask).mockReturnValue(false);
+      mockTaskManager.deleteTask = vi.fn().mockReturnValue(false);
 
       const response = await request(app).delete('/tasks/non-existent');
 
@@ -578,7 +582,7 @@ describe('RestAPI', () => {
     });
 
     it('should return 500 when deletion fails', async () => {
-      vi.mocked(mockTaskManager.deleteTask).mockImplementation(() => {
+      mockTaskManager.deleteTask = vi.fn().mockImplementation(() => {
         throw new Error('Database error');
       });
 
@@ -591,7 +595,7 @@ describe('RestAPI', () => {
 
   describe('DELETE /tasks', () => {
     it('should clear all tasks', async () => {
-      vi.mocked(mockTaskManager.clearAllTasks).mockReturnValue(5);
+      mockTaskManager.clearAllTasks = vi.fn().mockReturnValue(5);
 
       const response = await request(app).delete('/tasks');
 
@@ -601,7 +605,7 @@ describe('RestAPI', () => {
     });
 
     it('should clear zero tasks when none exist', async () => {
-      vi.mocked(mockTaskManager.clearAllTasks).mockReturnValue(0);
+      mockTaskManager.clearAllTasks = vi.fn().mockReturnValue(0);
 
       const response = await request(app).delete('/tasks');
 
@@ -610,7 +614,7 @@ describe('RestAPI', () => {
     });
 
     it('should return 500 when clearing fails', async () => {
-      vi.mocked(mockTaskManager.clearAllTasks).mockImplementation(() => {
+      mockTaskManager.clearAllTasks = vi.fn().mockImplementation(() => {
         throw new Error('Database error');
       });
 
@@ -637,7 +641,7 @@ describe('RestAPI', () => {
           connectedAt: '2024-01-01T00:01:00.000Z',
         },
       ];
-      vi.mocked(mockWsServer.getWorkers).mockReturnValue(mockWorkers);
+      mockWsServer.getWorkers = vi.fn().mockReturnValue(mockWorkers);
 
       const response = await request(app).get('/workers');
 
@@ -647,7 +651,7 @@ describe('RestAPI', () => {
     });
 
     it('should return empty array when no workers', async () => {
-      vi.mocked(mockWsServer.getWorkers).mockReturnValue([]);
+      mockWsServer.getWorkers = vi.fn().mockReturnValue([]);
 
       const response = await request(app).get('/workers');
 
@@ -656,7 +660,7 @@ describe('RestAPI', () => {
     });
 
     it('should return 500 when listing workers fails', async () => {
-      vi.mocked(mockWsServer.getWorkers).mockImplementation(() => {
+      mockWsServer.getWorkers = vi.fn().mockImplementation(() => {
         throw new Error('WebSocket error');
       });
 
@@ -668,61 +672,46 @@ describe('RestAPI', () => {
   });
 
   describe('GET /flows', () => {
-    it('should return 503 when flow registry not available', async () => {
-      const response = await request(app).get('/flows');
-
-      expect(response.status).toBe(503);
-      expect(response.body).toEqual({ error: 'Flow registry not available' });
-    });
-
-    it('should return list of flows when registry available', async () => {
-      api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockFlowRegistry);
-      app = (api as any).app;
-
-      const mockFlows = [
-        {
-          id: 'flow-1',
-          name: 'Test Flow 1',
-          description: 'First test flow',
-          workspace: { mode: 'isolated' as const, gitStrategy: 'main-only' as const, reusePolicy: 'never' as const },
-          inputs: {},
-          steps: [],
-        },
-        {
-          id: 'flow-2',
-          name: 'Test Flow 2',
-          description: 'Second test flow',
-          workspace: { mode: 'shared' as const, gitStrategy: 'main-only' as const, reusePolicy: 'always' as const },
-          inputs: {},
-          steps: [],
-        },
-      ];
-      vi.mocked(mockFlowRegistry.getAllFlows).mockReturnValue(mockFlows);
+    it('should return empty object when no projects registered', async () => {
+      mockFlowDiscoveryRegistry.getAllProjects.mockReturnValue([]);
 
       const response = await request(app).get('/flows');
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual(mockFlows);
-      expect(mockFlowRegistry.getAllFlows).toHaveBeenCalled();
+      expect(response.body).toEqual({});
     });
 
-    it('should return empty array when no flows', async () => {
-      api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockFlowRegistry);
-      app = (api as any).app;
+    it('should return flows by project from discovery registry', async () => {
+      mockFlowDiscoveryRegistry.getAllProjects.mockReturnValue(['project1', 'project2']);
 
-      vi.mocked(mockFlowRegistry.getAllFlows).mockReturnValue([]);
+      const project1Flows = new Map([
+        ['flow-1', { id: 'flow-1', name: 'Flow 1', steps: [] }],
+        ['flow-2', { id: 'flow-2', name: 'Flow 2', steps: [] }],
+      ]);
+      const project2Flows = new Map([
+        ['flow-3', { id: 'flow-3', name: 'Flow 3', steps: [] }],
+      ]);
+
+      mockFlowDiscoveryRegistry.getProjectFlows
+        .mockReturnValueOnce(project1Flows)
+        .mockReturnValueOnce(project2Flows);
 
       const response = await request(app).get('/flows');
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual([]);
+      expect(response.body).toEqual({
+        project1: {
+          'flow-1': { id: 'flow-1', name: 'Flow 1', steps: [] },
+          'flow-2': { id: 'flow-2', name: 'Flow 2', steps: [] },
+        },
+        project2: {
+          'flow-3': { id: 'flow-3', name: 'Flow 3', steps: [] },
+        },
+      });
     });
 
     it('should return 500 when listing flows fails', async () => {
-      api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockFlowRegistry);
-      app = (api as any).app;
-
-      vi.mocked(mockFlowRegistry.getAllFlows).mockImplementation(() => {
+      mockFlowDiscoveryRegistry.getAllProjects.mockImplementation(() => {
         throw new Error('Registry error');
       });
 
@@ -733,56 +722,39 @@ describe('RestAPI', () => {
     });
   });
 
-  describe('GET /flows/:id', () => {
-    it('should return 503 when flow registry not available', async () => {
-      const response = await request(app).get('/flows/flow-1');
+  describe('GET /flows/:projectId', () => {
+    it('should return 404 when project not found', async () => {
+      mockFlowDiscoveryRegistry.getProjectFlows.mockReturnValue(undefined);
 
-      expect(response.status).toBe(503);
-      expect(response.body).toEqual({ error: 'Flow registry not available' });
-    });
-
-    it('should return a specific flow', async () => {
-      api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockFlowRegistry);
-      app = (api as any).app;
-
-      const mockFlow = {
-        id: 'flow-1',
-        name: 'Test Flow',
-        description: 'A test flow',
-        workspace: { mode: 'isolated' as const, gitStrategy: 'main-only' as const, reusePolicy: 'never' as const },
-        inputs: { param1: 'string' as const },
-        steps: [],
-      };
-      vi.mocked(mockFlowRegistry.getFlow).mockReturnValue(mockFlow);
-
-      const response = await request(app).get('/flows/flow-1');
-
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual(mockFlow);
-      expect(mockFlowRegistry.getFlow).toHaveBeenCalledWith('flow-1');
-    });
-
-    it('should return 404 when flow not found', async () => {
-      api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockFlowRegistry);
-      app = (api as any).app;
-
-      vi.mocked(mockFlowRegistry.getFlow).mockReturnValue(undefined);
-
-      const response = await request(app).get('/flows/non-existent');
+      const response = await request(app).get('/flows/non-existent-project');
 
       expect(response.status).toBe(404);
-      expect(response.body).toEqual({ error: 'Flow not found' });
+      expect(response.body).toEqual({ error: 'Project not found' });
     });
 
-    it('should return 500 when getting flow fails', async () => {
-      api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockFlowRegistry);
-      app = (api as any).app;
+    it('should return flows for a specific project', async () => {
+      const projectFlows = new Map([
+        ['flow-1', { id: 'flow-1', name: 'Test Flow 1', steps: [] }],
+        ['flow-2', { id: 'flow-2', name: 'Test Flow 2', steps: [] }],
+      ]);
+      mockFlowDiscoveryRegistry.getProjectFlows.mockReturnValue(projectFlows);
 
-      vi.mocked(mockFlowRegistry.getFlow).mockImplementation(() => {
+      const response = await request(app).get('/flows/test-project');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        'flow-1': { id: 'flow-1', name: 'Test Flow 1', steps: [] },
+        'flow-2': { id: 'flow-2', name: 'Test Flow 2', steps: [] },
+      });
+      expect(mockFlowDiscoveryRegistry.getProjectFlows).toHaveBeenCalledWith('test-project');
+    });
+
+    it('should return 500 when getting project flows fails', async () => {
+      mockFlowDiscoveryRegistry.getProjectFlows.mockImplementation(() => {
         throw new Error('Registry error');
       });
 
-      const response = await request(app).get('/flows/flow-1');
+      const response = await request(app).get('/flows/test-project');
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Registry error' });
@@ -802,7 +774,7 @@ describe('RestAPI', () => {
           ],
         },
       });
-      vi.mocked(mockTaskManager.getTask).mockReturnValue(mockTask);
+      mockTaskManager.getTask = vi.fn().mockReturnValue(mockTask);
 
       const response = await request(app).get('/tasks/task-1/trace');
 
@@ -832,7 +804,7 @@ describe('RestAPI', () => {
           ],
         },
       });
-      vi.mocked(mockTaskManager.getTask).mockReturnValue(mockTask);
+      mockTaskManager.getTask = vi.fn().mockReturnValue(mockTask);
 
       const response = await request(app).get('/tasks/task-1/trace');
 
@@ -842,7 +814,7 @@ describe('RestAPI', () => {
     });
 
     it('should return 404 when task not found', async () => {
-      vi.mocked(mockTaskManager.getTask).mockReturnValue(undefined);
+      mockTaskManager.getTask = vi.fn().mockReturnValue(undefined);
 
       const response = await request(app).get('/tasks/non-existent/trace');
 
@@ -852,7 +824,7 @@ describe('RestAPI', () => {
 
     it('should return 404 when task has no flowResult', async () => {
       const mockTask = createMockTask('task-1');
-      vi.mocked(mockTaskManager.getTask).mockReturnValue(mockTask);
+      mockTaskManager.getTask = vi.fn().mockReturnValue(mockTask);
 
       const response = await request(app).get('/tasks/task-1/trace');
 
@@ -867,7 +839,7 @@ describe('RestAPI', () => {
           outputs: {},
         },
       });
-      vi.mocked(mockTaskManager.getTask).mockReturnValue(mockTask);
+      mockTaskManager.getTask = vi.fn().mockReturnValue(mockTask);
 
       const response = await request(app).get('/tasks/task-1/trace');
 
@@ -876,7 +848,7 @@ describe('RestAPI', () => {
     });
 
     it('should return 500 when getting trace fails', async () => {
-      vi.mocked(mockTaskManager.getTask).mockImplementation(() => {
+      mockTaskManager.getTask = vi.fn().mockImplementation(() => {
         throw new Error('Database error');
       });
 
@@ -896,7 +868,7 @@ describe('RestAPI', () => {
     });
 
     it('should return list of workspaces when manager available', async () => {
-      api = new RestAPI(mockTaskManager, mockWsServer, 3737, null, mockWorkspaceManager);
+      api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockWorkspaceManager);
       app = (api as any).app;
 
       const mockWorkspaces = [
@@ -915,7 +887,7 @@ describe('RestAPI', () => {
           createdAt: '2024-01-01T00:01:00.000Z',
         },
       ];
-      vi.mocked(mockWorkspaceManager.getAllWorkspaces).mockReturnValue(mockWorkspaces as any);
+      mockWorkspaceManager.getAllWorkspaces = vi.fn().mockReturnValue(mockWorkspaces as any);
 
       const response = await request(app).get('/workspaces');
 
@@ -925,10 +897,10 @@ describe('RestAPI', () => {
     });
 
     it('should return empty array when no workspaces', async () => {
-      api = new RestAPI(mockTaskManager, mockWsServer, 3737, null, mockWorkspaceManager);
+      api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockWorkspaceManager);
       app = (api as any).app;
 
-      vi.mocked(mockWorkspaceManager.getAllWorkspaces).mockReturnValue([]);
+      mockWorkspaceManager.getAllWorkspaces = vi.fn().mockReturnValue([]);
 
       const response = await request(app).get('/workspaces');
 
@@ -937,10 +909,10 @@ describe('RestAPI', () => {
     });
 
     it('should return 500 when listing workspaces fails', async () => {
-      api = new RestAPI(mockTaskManager, mockWsServer, 3737, null, mockWorkspaceManager);
+      api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockWorkspaceManager);
       app = (api as any).app;
 
-      vi.mocked(mockWorkspaceManager.getAllWorkspaces).mockImplementation(() => {
+      mockWorkspaceManager.getAllWorkspaces = vi.fn().mockImplementation(() => {
         throw new Error('Workspace error');
       });
 
@@ -960,7 +932,7 @@ describe('RestAPI', () => {
     });
 
     it('should return a specific workspace', async () => {
-      api = new RestAPI(mockTaskManager, mockWsServer, 3737, null, mockWorkspaceManager);
+      api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockWorkspaceManager);
       app = (api as any).app;
 
       const mockWorkspace = {
@@ -971,7 +943,7 @@ describe('RestAPI', () => {
         createdAt: '2024-01-01T00:00:00.000Z',
         gitBranch: 'feature/test',
       };
-      vi.mocked(mockWorkspaceManager.getWorkspace).mockReturnValue(mockWorkspace as any);
+      mockWorkspaceManager.getWorkspace = vi.fn().mockReturnValue(mockWorkspace as any);
 
       const response = await request(app).get('/workspaces/ws-1');
 
@@ -981,10 +953,10 @@ describe('RestAPI', () => {
     });
 
     it('should return 404 when workspace not found', async () => {
-      api = new RestAPI(mockTaskManager, mockWsServer, 3737, null, mockWorkspaceManager);
+      api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockWorkspaceManager);
       app = (api as any).app;
 
-      vi.mocked(mockWorkspaceManager.getWorkspace).mockReturnValue(undefined);
+      mockWorkspaceManager.getWorkspace = vi.fn().mockReturnValue(undefined);
 
       const response = await request(app).get('/workspaces/non-existent');
 
@@ -993,10 +965,10 @@ describe('RestAPI', () => {
     });
 
     it('should return 500 when getting workspace fails', async () => {
-      api = new RestAPI(mockTaskManager, mockWsServer, 3737, null, mockWorkspaceManager);
+      api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockWorkspaceManager);
       app = (api as any).app;
 
-      vi.mocked(mockWorkspaceManager.getWorkspace).mockImplementation(() => {
+      mockWorkspaceManager.getWorkspace = vi.fn().mockImplementation(() => {
         throw new Error('Workspace error');
       });
 
@@ -1010,7 +982,7 @@ describe('RestAPI', () => {
   describe('Middleware', () => {
     it('should parse JSON request bodies', async () => {
       const mockTask = createMockTask('task-1');
-      vi.mocked(mockTaskManager.createTask).mockReturnValue(mockTask);
+      mockTaskManager.createTask = vi.fn().mockReturnValue(mockTask);
 
       const response = await request(app)
         .post('/tasks')
@@ -1029,7 +1001,7 @@ describe('RestAPI', () => {
 
     it('should log POST requests', async () => {
       const mockTask = createMockTask('task-1');
-      vi.mocked(mockTaskManager.createTask).mockReturnValue(mockTask);
+      mockTaskManager.createTask = vi.fn().mockReturnValue(mockTask);
 
       await request(app)
         .post('/tasks')
@@ -1060,7 +1032,7 @@ describe('RestAPI', () => {
           trace: [{ stepId: 'step1', status: 'completed' }],
         },
       });
-      vi.mocked(mockTaskManager.getTask).mockReturnValue(complexTask);
+      mockTaskManager.getTask = vi.fn().mockReturnValue(complexTask);
 
       const response = await request(app).get('/tasks/task-1');
 
@@ -1072,7 +1044,7 @@ describe('RestAPI', () => {
       const mockTask = createMockTask('task-1', {
         description: 'Task with "quotes", <tags>, & symbols!',
       });
-      vi.mocked(mockTaskManager.createTask).mockReturnValue(mockTask);
+      mockTaskManager.createTask = vi.fn().mockReturnValue(mockTask);
 
       const response = await request(app)
         .post('/tasks')
@@ -1085,7 +1057,7 @@ describe('RestAPI', () => {
     it('should handle very long task descriptions', async () => {
       const longDescription = 'A'.repeat(10000);
       const mockTask = createMockTask('task-1', { description: longDescription });
-      vi.mocked(mockTaskManager.createTask).mockReturnValue(mockTask);
+      mockTaskManager.createTask = vi.fn().mockReturnValue(mockTask);
 
       const response = await request(app)
         .post('/tasks')
@@ -1098,7 +1070,7 @@ describe('RestAPI', () => {
     it('should handle unicode characters in descriptions', async () => {
       const unicodeDesc = 'Task with 中文, العربية, Emoji 🚀';
       const mockTask = createMockTask('task-1', { description: unicodeDesc });
-      vi.mocked(mockTaskManager.createTask).mockReturnValue(mockTask);
+      mockTaskManager.createTask = vi.fn().mockReturnValue(mockTask);
 
       const response = await request(app)
         .post('/tasks')
@@ -1119,7 +1091,7 @@ describe('RestAPI', () => {
 
     it('should handle missing Content-Type header', async () => {
       const mockTask = createMockTask('task-1');
-      vi.mocked(mockTaskManager.createTask).mockReturnValue(mockTask);
+      mockTaskManager.createTask = vi.fn().mockReturnValue(mockTask);
 
       const response = await request(app)
         .post('/tasks')
@@ -1130,7 +1102,7 @@ describe('RestAPI', () => {
 
     it('should handle numeric task IDs', async () => {
       const mockTask = createMockTask('12345');
-      vi.mocked(mockTaskManager.getTask).mockReturnValue(mockTask);
+      mockTaskManager.getTask = vi.fn().mockReturnValue(mockTask);
 
       const response = await request(app).get('/tasks/12345');
 
@@ -1141,7 +1113,7 @@ describe('RestAPI', () => {
     it('should handle task IDs with special characters', async () => {
       const taskId = 'task-with-dashes_and_underscores';
       const mockTask = createMockTask(taskId);
-      vi.mocked(mockTaskManager.getTask).mockReturnValue(mockTask);
+      mockTaskManager.getTask = vi.fn().mockReturnValue(mockTask);
 
       const response = await request(app).get(`/tasks/${taskId}`);
 

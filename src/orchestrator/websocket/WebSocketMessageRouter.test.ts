@@ -84,6 +84,9 @@ describe('WebSocketMessageRouter', () => {
     it('should route WORKER_READY to connection manager', () => {
       const message: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
 
       vi.mocked(mockConnectionManager.handleWorkerReady).mockReturnValue('worker-1');
@@ -288,6 +291,9 @@ describe('WebSocketMessageRouter', () => {
     it('should log received messages without worker ID as unknown', () => {
       const message: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
 
       messageRouter.routeMessage(mockSocket as any, message, null);

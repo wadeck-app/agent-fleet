@@ -14,7 +14,9 @@ import {
   WorkspaceAllocatedMessage,
   WorkspaceReleasedMessage,
   StopRequestedMessage,
-  HookEventMessage
+  HookEventMessage,
+  RequestTaskMessage,
+  FlowsUpdatedMessage
 } from '../../shared/types.js';
 import { createMessage } from '../../shared/protocol.js';
 import { Logger } from '../../shared/Logger.js';
@@ -101,6 +103,14 @@ export class WebSocketMessageRouter {
 
       case MessageType.HOOK_EVENT:
         this.eventHandler.handleHookEvent(message as HookEventMessage);
+        break;
+
+      case MessageType.REQUEST_TASK:
+        this.connectionManager.handleRequestTask(socket, message as RequestTaskMessage);
+        break;
+
+      case MessageType.FLOWS_UPDATED:
+        this.connectionManager.handleFlowsUpdated(message as FlowsUpdatedMessage);
         break;
 
       default:

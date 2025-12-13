@@ -11,7 +11,6 @@ import { describe, it, expect, vi, beforeEach, afterEach, MockedObject } from 'v
 import { TaskManager } from './TaskManager.js';
 import { RestAPI } from './RestAPI.js';
 import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer.js';
-import { FlowRegistry } from '../../flow/registry/FlowRegistry.js';
 import { WorkspaceManager } from '../../flow/workspace/WorkspaceManager.js';
 import { Logger } from '../../shared/Logger.js';
 
@@ -19,7 +18,6 @@ import { Logger } from '../../shared/Logger.js';
 vi.mock('./TaskManager.js');
 vi.mock('./RestAPI.js');
 vi.mock('../websocket/WorkerWebSocketServer.js');
-vi.mock('../../flow/registry/FlowRegistry.js');
 vi.mock('../../flow/workspace/WorkspaceManager.js');
 vi.mock('../../shared/Logger.js');
 vi.mock('../ui.js', () => ({
@@ -40,7 +38,6 @@ describe('Orchestrator', () => {
   let mockTaskManager: MockedObject<TaskManager>;
   let mockRestAPI: MockedObject<RestAPI>;
   let mockWsServer: MockedObject<WorkerWebSocketServer>;
-  let mockFlowRegistry: MockedObject<FlowRegistry>;
   let mockWorkspaceManager: MockedObject<WorkspaceManager>;
   let mockRenderUI: Awaited<ReturnType<typeof renderUI>>;
 
@@ -87,18 +84,6 @@ describe('Orchestrator', () => {
     } as any;
     vi.mocked(WorkerWebSocketServer).mockImplementation(function(this: any) {
       return mockWsServer;
-    } as any);
-
-    // Mock FlowRegistry
-    mockFlowRegistry = {
-      loadProjectFlows: vi.fn().mockResolvedValue(undefined),
-      getFlowIds: vi.fn().mockReturnValue([]),
-      startWatching: vi.fn(),
-      stopWatching: vi.fn(),
-      getAllFlows: vi.fn().mockReturnValue([]),
-    } as any;
-    vi.mocked(FlowRegistry).mockImplementation(function(this: any) {
-      return mockFlowRegistry;
     } as any);
 
     // Mock WorkspaceManager
@@ -172,60 +157,8 @@ describe('Orchestrator', () => {
     });
   });
 
-  describe('Orchestrator Class - loadFlows', () => {
-    it('should load project flows successfully during start', async () => {
-      mockFlowRegistry.getFlowIds.mockReturnValue(['flow1', 'flow2', 'flow3']);
-
-      orchestrator = new Orchestrator();
-      await orchestrator.start();
-
-      expect(mockFlowRegistry.loadProjectFlows).toHaveBeenCalled();
-      expect(Logger.log).toHaveBeenCalledWith('[Orchestrator] Loaded 3 flows: flow1, flow2, flow3');
-    });
-
-    it('should handle empty flow list', async () => {
-      mockFlowRegistry.getFlowIds.mockReturnValue([]);
-
-      orchestrator = new Orchestrator();
-      await orchestrator.start();
-
-      expect(mockFlowRegistry.loadProjectFlows).toHaveBeenCalled();
-      // Empty flows still logs with empty string
-      expect(Logger.log).toHaveBeenCalledWith('[Orchestrator] Loaded 0 flows: ');
-    });
-
-    it('should handle flow loading errors gracefully', async () => {
-      const error = new Error('Failed to load flows');
-      mockFlowRegistry.loadProjectFlows.mockRejectedValue(error);
-
-      orchestrator = new Orchestrator();
-      await orchestrator.start();
-
-      expect(Logger.error).toHaveBeenCalledWith('[Orchestrator] Failed to load flows:', error);
-    });
-
-    it('should log loaded flows with names', async () => {
-      mockFlowRegistry.getFlowIds.mockReturnValue(['simple-qa', 'dev-full']);
-
-      orchestrator = new Orchestrator();
-      await orchestrator.start();
-
-      expect(Logger.log).toHaveBeenCalledWith('[Orchestrator] Loaded 2 flows: simple-qa, dev-full');
-    });
-
-    it('should continue startup even if flow loading fails', async () => {
-      const error = new Error('File not found');
-      mockFlowRegistry.loadProjectFlows.mockRejectedValue(error);
-
-      orchestrator = new Orchestrator();
-      await orchestrator.start();
-
-      // Should still start other services
-      expect(mockFlowRegistry.startWatching).toHaveBeenCalled();
-      expect(mockRestAPI.start).toHaveBeenCalled();
-      expect(Logger.error).toHaveBeenCalledWith('[Orchestrator] Failed to load flows:', error);
-    });
-  });
+  // NOTE: loadFlows tests removed - Orchestrator no longer loads flows directly
+  // Workers now announce their flows via FlowDiscoveryRegistry
 
   describe('Orchestrator Class - start', () => {
     it('should set process title to Orchestrator', async () => {
@@ -233,30 +166,6 @@ describe('Orchestrator', () => {
       await orchestrator.start();
 
       expect(process.title).toBe('Orchestrator');
-    });
-
-    it('should load flows before starting API', async () => {
-      const callOrder: string[] = [];
-
-      mockFlowRegistry.loadProjectFlows.mockImplementation(async () => {
-        callOrder.push('loadFlows');
-      });
-
-      mockRestAPI.start.mockImplementation(async () => {
-        callOrder.push('restAPI.start');
-      });
-
-      orchestrator = new Orchestrator();
-      await orchestrator.start();
-
-      expect(callOrder).toEqual(['loadFlows', 'restAPI.start']);
-    });
-
-    it('should start watching flows after loading', async () => {
-      orchestrator = new Orchestrator();
-      await orchestrator.start();
-
-      expect(mockFlowRegistry.startWatching).toHaveBeenCalled();
     });
 
     it('should start REST API', async () => {
@@ -295,20 +204,12 @@ describe('Orchestrator', () => {
     it('should perform startup steps in correct order', async () => {
       const callOrder: string[] = [];
 
-      mockFlowRegistry.loadProjectFlows.mockImplementation(async () => {
-        callOrder.push('1-loadFlows');
-      });
-
-      mockFlowRegistry.startWatching.mockImplementation(() => {
-        callOrder.push('2-startWatching');
-      });
-
       mockRestAPI.start.mockImplementation(async () => {
-        callOrder.push('3-restAPI.start');
+        callOrder.push('1-restAPI.start');
       });
 
       vi.mocked(renderUI).mockImplementation(async () => {
-        callOrder.push('4-renderUI');
+        callOrder.push('2-renderUI');
         return mockRenderUI;
       });
 
@@ -316,10 +217,8 @@ describe('Orchestrator', () => {
       await orchestrator.start();
 
       expect(callOrder).toEqual([
-        '1-loadFlows',
-        '2-startWatching',
-        '3-restAPI.start',
-        '4-renderUI',
+        '1-restAPI.start',
+        '2-renderUI',
       ]);
     });
   });
@@ -332,8 +231,8 @@ describe('Orchestrator', () => {
         callOrder.push('1-ui.unmount');
       });
 
-      mockFlowRegistry.stopWatching = vi.fn(() => {
-        callOrder.push('2-flowRegistry.stopWatching');
+      mockRestAPI.stop.mockImplementation(async () => {
+        callOrder.push('2-restAPI.stop');
       });
 
       orchestrator = new Orchestrator();
@@ -345,8 +244,8 @@ describe('Orchestrator', () => {
         callOrder.push('1-ui.unmount');
       });
 
-      mockFlowRegistry.stopWatching = vi.fn(() => {
-        callOrder.push('2-flowRegistry.stopWatching');
+      mockRestAPI.stop.mockImplementation(async () => {
+        callOrder.push('2-restAPI.stop');
       });
 
       await orchestrator.shutdown();
@@ -362,16 +261,6 @@ describe('Orchestrator', () => {
       await orchestrator.shutdown();
 
       expect(Logger.log).toHaveBeenCalledWith('[Orchestrator] Shutting down...');
-    });
-
-    it('should stop watching flows', async () => {
-      orchestrator = new Orchestrator();
-      await orchestrator.start();
-
-      vi.clearAllMocks();
-      await orchestrator.shutdown();
-
-      expect(mockFlowRegistry.stopWatching).toHaveBeenCalled();
     });
 
     it('should stop REST API', async () => {
@@ -465,25 +354,20 @@ describe('Orchestrator', () => {
         callOrder.push('1-ui.unmount');
       });
 
-      mockFlowRegistry.stopWatching = vi.fn(() => {
-        callOrder.push('2-stopWatching');
-      });
-
       mockRestAPI.stop.mockImplementation(async () => {
-        callOrder.push('3-restAPI.stop');
+        callOrder.push('2-restAPI.stop');
       });
 
       mockWsServer.stop.mockImplementation(async () => {
-        callOrder.push('4-wsServer.stop');
+        callOrder.push('3-wsServer.stop');
       });
 
       await orchestrator.shutdown();
 
       expect(callOrder).toEqual([
         '1-ui.unmount',
-        '2-stopWatching',
-        '3-restAPI.stop',
-        '4-wsServer.stop',
+        '2-restAPI.stop',
+        '3-wsServer.stop',
       ]);
     });
   });
@@ -511,16 +395,6 @@ describe('Orchestrator', () => {
       expect(wsServerOrder).toBeLessThan(restAPIOrder);
     });
 
-    it('should initialize FlowRegistry before REST API', async () => {
-      orchestrator = new Orchestrator();
-      await orchestrator.start();
-
-      const flowRegistryOrder = vi.mocked(FlowRegistry).mock.invocationCallOrder[0];
-      const restAPIOrder = vi.mocked(RestAPI).mock.invocationCallOrder[0];
-
-      expect(flowRegistryOrder).toBeLessThan(restAPIOrder);
-    });
-
     it('should initialize WorkspaceManager before REST API', async () => {
       orchestrator = new Orchestrator();
       await orchestrator.start();
@@ -538,7 +412,6 @@ describe('Orchestrator', () => {
       expect(orchestrator.getTaskManager()).toBe(mockTaskManager);
       expect(orchestrator.getWsServer()).toBe(mockWsServer);
       expect(orchestrator.getRestAPI()).toBe(mockRestAPI);
-      expect(orchestrator.getFlowRegistry()).toBe(mockFlowRegistry);
       expect(orchestrator.getWorkspaceManager()).toBe(mockWorkspaceManager);
     });
   });
@@ -572,16 +445,6 @@ describe('Orchestrator', () => {
       await expect(orchestrator.start()).rejects.toThrow('Port 3737 is already in use');
     });
 
-    it('should handle FlowRegistry initialization failure', async () => {
-      const error = new Error('Invalid project root');
-      vi.mocked(FlowRegistry).mockImplementation(function(this: any) {
-        throw error;
-      } as any);
-
-      orchestrator = new Orchestrator();
-      await expect(orchestrator.start()).rejects.toThrow('Invalid project root');
-    });
-
     it('should handle WorkspaceManager initialization failure', async () => {
       const error = new Error('Cannot create workspace directory');
       vi.mocked(WorkspaceManager).mockImplementation(function(this: any) {
@@ -590,41 +453,6 @@ describe('Orchestrator', () => {
 
       orchestrator = new Orchestrator();
       await expect(orchestrator.start()).rejects.toThrow('Cannot create workspace directory');
-    });
-  });
-
-  describe('Flow Management', () => {
-    it('should load multiple flows successfully during start', async () => {
-      mockFlowRegistry.getFlowIds.mockReturnValue([
-        'simple-qa',
-        'dev-full',
-        'custom-flow',
-      ]);
-
-      orchestrator = new Orchestrator();
-      await orchestrator.start();
-
-      expect(mockFlowRegistry.loadProjectFlows).toHaveBeenCalled();
-      expect(Logger.log).toHaveBeenCalledWith(
-        '[Orchestrator] Loaded 3 flows: simple-qa, dev-full, custom-flow'
-      );
-    });
-
-    it('should start flow watching during startup', async () => {
-      orchestrator = new Orchestrator();
-      await orchestrator.start();
-
-      expect(mockFlowRegistry.startWatching).toHaveBeenCalled();
-    });
-
-    it('should stop flow watching during shutdown', async () => {
-      orchestrator = new Orchestrator();
-      await orchestrator.start();
-
-      vi.clearAllMocks();
-      await orchestrator.shutdown();
-
-      expect(mockFlowRegistry.stopWatching).toHaveBeenCalled();
     });
   });
 
@@ -668,15 +496,6 @@ describe('Orchestrator', () => {
       expect(TaskManager).toHaveBeenCalled();
     });
 
-    it('should log loaded flows count', async () => {
-      mockFlowRegistry.getFlowIds.mockReturnValue(['flow1', 'flow2']);
-
-      orchestrator = new Orchestrator();
-      await orchestrator.start();
-
-      expect(Logger.log).toHaveBeenCalledWith('[Orchestrator] Loaded 2 flows: flow1, flow2');
-    });
-
     it('should log shutdown message', async () => {
       orchestrator = new Orchestrator();
       await orchestrator.start();
@@ -695,16 +514,6 @@ describe('Orchestrator', () => {
       await orchestrator.shutdown();
 
       expect(Logger.log).toHaveBeenCalledWith('[Orchestrator] Stopped');
-    });
-
-    it('should log errors during flow loading', async () => {
-      const error = new Error('Invalid YAML');
-      mockFlowRegistry.loadProjectFlows.mockRejectedValue(error);
-
-      orchestrator = new Orchestrator();
-      await orchestrator.start();
-
-      expect(Logger.error).toHaveBeenCalledWith('[Orchestrator] Failed to load flows:', error);
     });
   });
 });

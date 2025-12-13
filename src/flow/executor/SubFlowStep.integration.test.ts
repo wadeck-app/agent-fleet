@@ -64,6 +64,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Create a simple echo flow
       const echoFlow: FlowDefinition = {
         id: 'echo-flow',
+        version: '1.0.0',
         name: 'Echo Flow',
         description: 'Echoes a message',
         workspace: {
@@ -91,6 +92,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Create parent flow that calls echo flow
       const parentFlow: FlowDefinition = {
         id: 'parent-flow',
+        version: '1.0.0',
         name: 'Parent Flow',
         description: 'Calls echo flow',
         workspace: {
@@ -141,6 +143,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Create a flow that checks workspace path
       const checkWorkspaceFlow: FlowDefinition = {
         id: 'check-workspace',
+        version: '1.0.0',
         name: 'Check Workspace',
         description: 'Checks workspace path',
         workspace: {
@@ -165,6 +168,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Create parent flow
       const parentFlow: FlowDefinition = {
         id: 'parent-workspace-test',
+        version: '1.0.0',
         name: 'Parent Workspace Test',
         description: 'Tests workspace inheritance',
         workspace: {
@@ -210,6 +214,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Flow C: Innermost flow
       const flowC: FlowDefinition = {
         id: 'flow-c',
+        version: '1.0.0',
         name: 'Flow C',
         description: 'Innermost flow',
         workspace: {
@@ -236,6 +241,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Flow B: Middle flow
       const flowB: FlowDefinition = {
         id: 'flow-b',
+        version: '1.0.0',
         name: 'Flow B',
         description: 'Middle flow',
         workspace: {
@@ -262,6 +268,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Flow A: Outermost flow
       const flowA: FlowDefinition = {
         id: 'flow-a',
+        version: '1.0.0',
         name: 'Flow A',
         description: 'Outermost flow',
         workspace: {
@@ -310,6 +317,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Flow that adds a prefix
       const addPrefixFlow: FlowDefinition = {
         id: 'add-prefix',
+        version: '1.0.0',
         name: 'Add Prefix',
         description: 'Adds a prefix to input',
         workspace: {
@@ -337,6 +345,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Flow that wraps the prefix flow
       const wrapperFlow: FlowDefinition = {
         id: 'wrapper',
+        version: '1.0.0',
         name: 'Wrapper',
         description: 'Wraps add-prefix',
         workspace: {
@@ -364,6 +373,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Main flow
       const mainFlow: FlowDefinition = {
         id: 'main',
+        version: '1.0.0',
         name: 'Main',
         description: 'Main flow',
         workspace: {
@@ -410,6 +420,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Flow that captures workspace info
       const captureWorkspaceFlow: FlowDefinition = {
         id: 'capture-workspace',
+        version: '1.0.0',
         name: 'Capture Workspace',
         description: 'Captures workspace information',
         workspace: {
@@ -434,6 +445,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Parent flow
       const parentFlow: FlowDefinition = {
         id: 'parent',
+        version: '1.0.0',
         name: 'Parent',
         description: 'Parent flow',
         workspace: {
@@ -476,6 +488,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Simple flow that just succeeds
       const simpleFlow: FlowDefinition = {
         id: 'simple',
+        version: '1.0.0',
         name: 'Simple',
         description: 'Simple flow',
         workspace: {
@@ -497,6 +510,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Parent with workspace strategy set to inherit
       const parent: FlowDefinition = {
         id: 'parent-inherit',
+        version: '1.0.0',
         name: 'Parent Inherit',
         description: 'Parent with inherit strategy',
         workspace: {
@@ -538,6 +552,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       for (let i = 0; i <= 11; i++) {
         const flow: FlowDefinition = {
           id: `depth-${i}`,
+          version: '1.0.0',
           name: `Depth ${i}`,
           description: `Flow at depth ${i}`,
           workspace: {
@@ -591,6 +606,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       for (let i = 1; i <= 10; i++) {
         const flow: FlowDefinition = {
           id: `depth-ok-${i}`,
+          version: '1.0.0',
           name: `Depth OK ${i}`,
           description: `Flow at depth ${i}`,
           workspace: {
@@ -643,6 +659,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Subflow that expects a message
       const messageFlow: FlowDefinition = {
         id: 'message-flow',
+        version: '1.0.0',
         name: 'Message Flow',
         description: 'Processes a message',
         workspace: {
@@ -669,6 +686,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Parent flow that passes input
       const parentFlow: FlowDefinition = {
         id: 'parent-input',
+        version: '1.0.0',
         name: 'Parent Input',
         description: 'Parent with input',
         workspace: {
@@ -712,6 +730,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Subflow
       const subflow: FlowDefinition = {
         id: 'sub',
+        version: '1.0.0',
         name: 'Sub',
         description: 'Subflow',
         workspace: {
@@ -738,6 +757,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Parent flow with step output reference
       const parent: FlowDefinition = {
         id: 'parent-step-output',
+        version: '1.0.0',
         name: 'Parent Step Output',
         description: 'Parent with step output reference',
         workspace: {
@@ -787,6 +807,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Subflow that expects multiple inputs
       const multiInputFlow: FlowDefinition = {
         id: 'multi-input',
+        version: '1.0.0',
         name: 'Multi Input',
         description: 'Flow with multiple inputs',
         workspace: {
@@ -815,6 +836,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Parent with complex input mapping
       const parent: FlowDefinition = {
         id: 'parent-complex',
+        version: '1.0.0',
         name: 'Parent Complex',
         description: 'Parent with complex inputs',
         workspace: {
@@ -875,6 +897,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Failing subflow
       const failingFlow: FlowDefinition = {
         id: 'failing-flow',
+        version: '1.0.0',
         name: 'Failing Flow',
         description: 'A flow that fails',
         workspace: {
@@ -896,6 +919,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Parent flow
       const parentFlow: FlowDefinition = {
         id: 'parent-fail',
+        version: '1.0.0',
         name: 'Parent Fail',
         description: 'Parent that calls failing flow',
         workspace: {
@@ -934,6 +958,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Subflow with script error
       const errorFlow: FlowDefinition = {
         id: 'error-flow',
+        version: '1.0.0',
         name: 'Error Flow',
         description: 'Flow with script error',
         workspace: {
@@ -955,6 +980,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Parent flow
       const parent: FlowDefinition = {
         id: 'parent-error',
+        version: '1.0.0',
         name: 'Parent Error',
         description: 'Parent with error subflow',
         workspace: {
@@ -992,6 +1018,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Subflow that fails with specific error
       const specificErrorFlow: FlowDefinition = {
         id: 'specific-error',
+        version: '1.0.0',
         name: 'Specific Error',
         description: 'Flow with specific error',
         workspace: {
@@ -1013,6 +1040,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Parent flow
       const parent: FlowDefinition = {
         id: 'parent-specific-error',
+        version: '1.0.0',
         name: 'Parent Specific Error',
         description: 'Parent with specific error subflow',
         workspace: {
@@ -1051,6 +1079,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Parent flow that references non-existent subflow
       const parent: FlowDefinition = {
         id: 'parent-missing',
+        version: '1.0.0',
         name: 'Parent Missing',
         description: 'Parent with missing subflow reference',
         workspace: {
@@ -1091,6 +1120,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Subflow with no inputs
       const noInputFlow: FlowDefinition = {
         id: 'no-input',
+        version: '1.0.0',
         name: 'No Input',
         description: 'Flow with no inputs',
         workspace: {
@@ -1112,6 +1142,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Parent
       const parent: FlowDefinition = {
         id: 'parent-no-input',
+        version: '1.0.0',
         name: 'Parent No Input',
         description: 'Parent calling no-input flow',
         workspace: {
@@ -1148,6 +1179,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Subflow with no outputs
       const noOutputFlow: FlowDefinition = {
         id: 'no-output',
+        version: '1.0.0',
         name: 'No Output',
         description: 'Flow with no outputs',
         workspace: {
@@ -1169,6 +1201,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Parent
       const parent: FlowDefinition = {
         id: 'parent-no-output',
+        version: '1.0.0',
         name: 'Parent No Output',
         description: 'Parent calling no-output flow',
         workspace: {
@@ -1205,6 +1238,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Subflow
       const subflow: FlowDefinition = {
         id: 'sub-separate',
+        version: '1.0.0',
         name: 'Sub Separate',
         description: 'Subflow for separate workspace test',
         workspace: {
@@ -1226,6 +1260,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
       // Parent with separate workspace strategy
       const parent: FlowDefinition = {
         id: 'parent-separate',
+        version: '1.0.0',
         name: 'Parent Separate',
         description: 'Parent with separate workspace strategy',
         workspace: {

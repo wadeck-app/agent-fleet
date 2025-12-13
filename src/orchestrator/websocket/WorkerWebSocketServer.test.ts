@@ -162,6 +162,9 @@ describe('WorkerWebSocketServer Integration', () => {
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
         preferredId: 'worker-1',
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
 
       const mockTask: Task = {
@@ -210,6 +213,9 @@ describe('WorkerWebSocketServer Integration', () => {
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
         preferredId: 'worker-1',
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
 
       const mockTask1: Task = {
@@ -273,6 +279,9 @@ describe('WorkerWebSocketServer Integration', () => {
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
         preferredId: 'worker-1',
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
 
       const mockTask: Task = {
@@ -327,6 +336,9 @@ describe('WorkerWebSocketServer Integration', () => {
             createMessage(MessageType.WORKER_READY, {
               workerType: WorkerType.DEV,
               preferredId: 'dev-1',
+              projectId: 'test-project',
+              workspacePath: '/test/path',
+              availableFlows: [],
             })
           )
         )
@@ -339,6 +351,9 @@ describe('WorkerWebSocketServer Integration', () => {
             createMessage(MessageType.WORKER_READY, {
               workerType: WorkerType.PM,
               preferredId: 'pm-1',
+              projectId: 'test-project',
+              workspacePath: '/test/path',
+              availableFlows: [],
             })
           )
         )
@@ -351,6 +366,9 @@ describe('WorkerWebSocketServer Integration', () => {
             createMessage(MessageType.WORKER_READY, {
               workerType: WorkerType.REVIEWER,
               preferredId: 'reviewer-1',
+              projectId: 'test-project',
+              workspacePath: '/test/path',
+              availableFlows: [],
             })
           )
         )
@@ -382,6 +400,9 @@ describe('WorkerWebSocketServer Integration', () => {
             createMessage(MessageType.WORKER_READY, {
               workerType: WorkerType.DEV,
               preferredId: 'worker-1',
+              projectId: 'test-project',
+              workspacePath: '/test/path',
+              availableFlows: [],
             })
           )
         )
@@ -394,6 +415,9 @@ describe('WorkerWebSocketServer Integration', () => {
             createMessage(MessageType.WORKER_READY, {
               workerType: WorkerType.DEV,
               preferredId: 'worker-2',
+              projectId: 'test-project',
+              workspacePath: '/test/path',
+              availableFlows: [],
             })
           )
         )
@@ -512,6 +536,9 @@ describe('WorkerWebSocketServer Integration', () => {
       mockWss.emit('connection', mockSocket1);
       const readyMessage1: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
       mockSocket1.emit('message', Buffer.from(serializeMessage(readyMessage1)));
 
@@ -519,6 +546,9 @@ describe('WorkerWebSocketServer Integration', () => {
       mockWss.emit('connection', mockSocket2);
       const readyMessage2: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.PM,
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
       mockSocket2.emit('message', Buffer.from(serializeMessage(readyMessage2)));
 
@@ -539,6 +569,9 @@ describe('WorkerWebSocketServer Integration', () => {
       mockWss.emit('connection', mockSocket);
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
       mockSocket.emit('message', Buffer.from(serializeMessage(readyMessage)));
 
@@ -567,6 +600,9 @@ describe('WorkerWebSocketServer Integration', () => {
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
         preferredId: 'worker-1',
+        projectId: 'test-project',
+        workspacePath: '/test/path',
+        availableFlows: [],
       });
       mockSocket.emit('message', Buffer.from(serializeMessage(readyMessage)));
       mockSocket.send.mockClear();

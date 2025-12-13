@@ -4,10 +4,20 @@ import { StateManager } from '../../shared/StateManager.js';
 import { Logger } from '../../shared/Logger.js';
 import { v4 as uuidv4 } from 'uuid';
 
+interface WorkerIdleEntry {
+  workerId: string;
+  requestedAt: Date;
+}
+
 export class TaskManager {
   private tasks: Map<string, Task>;
   private stateManager: StateManager;
   private initialized: boolean = false;
+
+  // Queue system for task assignment
+  private globalBacklog: Task[] = [];
+  private workerQueues: Map<string, Task[]> = new Map();
+  private idleWorkers: WorkerIdleEntry[] = [];
 
   constructor(stateManager: StateManager) {
     this.tasks = new Map();
@@ -83,6 +93,16 @@ export class TaskManager {
 
     Logger.log(`[TaskManager] Created task ${task.id}: ${description.substring(0, 50)}...`);
     this.stateManager.emitTaskCreated(task);
+
+    // Route task to appropriate queue
+    if (task.assignedTo?.workerId) {
+      // Task is pre-assigned to a specific worker
+      this.addTaskToWorkerQueue(task.assignedTo.workerId, task);
+    } else {
+      // Add to global backlog
+      this.addTaskToBacklog(task);
+    }
+
     return task;
   }
 
@@ -432,5 +452,80 @@ export class TaskManager {
       total: this.tasks.size,
       byStatus
     };
+  }
+
+  /**
+   * Add a task to the global backlog
+   */
+  addTaskToBacklog(task: Task): void {
+    this.globalBacklog.push(task);
+    Logger.log(`[TaskManager] Added task ${task.id} to global backlog`);
+  }
+
+  /**
+   * Add a task to a specific worker's queue
+   */
+  addTaskToWorkerQueue(workerId: string, task: Task): void {
+    let queue = this.workerQueues.get(workerId);
+    if (!queue) {
+      queue = [];
+      this.workerQueues.set(workerId, queue);
+    }
+    queue.push(task);
+    Logger.log(`[TaskManager] Added task ${task.id} to worker ${workerId} queue`);
+  }
+
+  /**
+   * Mark a worker as idle (waiting for tasks)
+   */
+  markWorkerIdle(workerId: string): void {
+    // Check if worker is already in idle list
+    const existingIndex = this.idleWorkers.findIndex(w => w.workerId === workerId);
+    if (existingIndex === -1) {
+      this.idleWorkers.push({
+        workerId,
+        requestedAt: new Date()
+      });
+      Logger.log(`[TaskManager] Worker ${workerId} marked as idle`);
+    }
+  }
+
+  /**
+   * Mark a worker as busy (working on a task)
+   */
+  markWorkerBusy(workerId: string, task: Task): void {
+    // Remove from idle workers
+    const index = this.idleWorkers.findIndex(w => w.workerId === workerId);
+    if (index !== -1) {
+      this.idleWorkers.splice(index, 1);
+      Logger.log(`[TaskManager] Worker ${workerId} marked as busy with task ${task.id}`);
+    }
+  }
+
+  /**
+   * Find a matching task for a worker
+   * Checks worker's personal queue first, then global backlog
+   * @param workerId - The worker requesting a task
+   * @returns Task or null if no matching task found
+   */
+  findMatchingTask(workerId: string): Task | null {
+    // Check worker's personal queue first
+    const workerQueue = this.workerQueues.get(workerId);
+    if (workerQueue && workerQueue.length > 0) {
+      const task = workerQueue.shift()!;
+      Logger.log(`[TaskManager] Found task ${task.id} in worker ${workerId} personal queue`);
+      return task;
+    }
+
+    // Check global backlog
+    if (this.globalBacklog.length > 0) {
+      // For now, just return the first task (FIFO)
+      // In Phase 5, we'll add flow compatibility checking
+      const task = this.globalBacklog.shift()!;
+      Logger.log(`[TaskManager] Found task ${task.id} in global backlog for worker ${workerId}`);
+      return task;
+    }
+
+    return null;
   }
 }

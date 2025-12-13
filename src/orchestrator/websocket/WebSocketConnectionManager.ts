@@ -4,12 +4,15 @@ import {
   WorkerType,
   WorkerReadyMessage,
   Message,
-  MessageType
+  MessageType,
+  RequestTaskMessage,
+  FlowsUpdatedMessage
 } from '../../shared/types.js';
 import { createMessage, serializeMessage } from '../../shared/protocol.js';
 import { TaskManager } from '../core/TaskManager.js';
 import { StateManager } from '../../shared/StateManager.js';
 import { Logger } from '../../shared/Logger.js';
+import { FlowDiscoveryRegistry, FlowVersionMismatchError } from '../registry/FlowDiscoveryRegistry.js';
 
 interface WorkerConnection extends WorkerInfo {
   socket: WebSocket;
@@ -22,17 +25,20 @@ interface WorkerConnection extends WorkerInfo {
  * - Assign worker IDs
  * - Handle connection/disconnection lifecycle
  * - Assign tasks to workers
+ * - Manage flow discovery registry
  */
 export class WebSocketConnectionManager {
   private workers: Map<string, WorkerConnection>;
   private nextWorkerNum: number = 1;
   private taskManager: TaskManager;
   private stateManager: StateManager;
+  private flowDiscoveryRegistry: FlowDiscoveryRegistry;
 
   constructor(taskManager: TaskManager, stateManager: StateManager) {
     this.workers = new Map();
     this.taskManager = taskManager;
     this.stateManager = stateManager;
+    this.flowDiscoveryRegistry = new FlowDiscoveryRegistry();
   }
 
   /**
@@ -40,7 +46,7 @@ export class WebSocketConnectionManager {
    * Returns the assigned worker ID
    */
   handleWorkerReady(socket: WebSocket, message: WorkerReadyMessage): string {
-    const { workerType, preferredId } = message;
+    const { workerType, preferredId, projectId, workspacePath, availableFlows } = message;
 
     let workerId: string;
 
@@ -54,6 +60,22 @@ export class WebSocketConnectionManager {
       if (preferredId) {
         Logger.log(`[WS] Preferred ID '${preferredId}' already taken, assigned '${workerId}' instead`);
       }
+    }
+
+    // Register worker flows in discovery registry
+    try {
+      this.flowDiscoveryRegistry.registerWorker(workerId, projectId, workspacePath, availableFlows);
+      Logger.log(`[WS] Registered ${availableFlows.length} flows for worker ${workerId} (project: ${projectId})`);
+    } catch (error) {
+      if (error instanceof FlowVersionMismatchError) {
+        Logger.error(`[WS] Flow version mismatch for worker ${workerId}: ${error.message}`);
+        this.sendMessage(socket, createMessage(MessageType.ERROR, {
+          error: error.message
+        }));
+        socket.close();
+        throw error;
+      }
+      throw error;
     }
 
     const worker: WorkerConnection = {
@@ -105,6 +127,10 @@ export class WebSocketConnectionManager {
         Logger.error(`[WS] Error unassigning task: ${(error as Error).message}`);
       }
     }
+
+    // Unregister from flow discovery registry
+    this.flowDiscoveryRegistry.unregisterWorker(workerId);
+    Logger.log(`[WS] Unregistered worker ${workerId} from flow discovery registry`);
 
     this.workers.delete(workerId);
     this.stateManager.emitWorkerDisconnected(workerId);
@@ -205,5 +231,98 @@ export class WebSocketConnectionManager {
       worker.socket.close();
     }
     this.workers.clear();
+  }
+
+  /**
+   * Get the flow discovery registry
+   */
+  getFlowDiscoveryRegistry(): FlowDiscoveryRegistry {
+    return this.flowDiscoveryRegistry;
+  }
+
+  /**
+   * Handle REQUEST_TASK message from a worker
+   */
+  handleRequestTask(socket: WebSocket, message: RequestTaskMessage): void {
+    const { workerId } = message;
+    const worker = this.workers.get(workerId);
+
+    if (!worker) {
+      Logger.error(`[WS] REQUEST_TASK from unknown worker ${workerId}`);
+      return;
+    }
+
+    Logger.log(`[WS] Worker ${workerId} requesting task`);
+
+    // Mark worker as idle
+    this.taskManager.markWorkerIdle(workerId);
+
+    // Try to find a matching task
+    const task = this.taskManager.findMatchingTask(workerId);
+
+    if (task) {
+      // Assign the task to the worker
+      this.assignTaskToWorker(workerId, worker, task).catch(error => {
+        Logger.error(`[WS] Error assigning task to worker ${workerId}: ${(error as Error).message}`);
+      });
+    } else {
+      Logger.log(`[WS] No task available for worker ${workerId}, remains idle`);
+    }
+  }
+
+  /**
+   * Assign a task to a worker (used by REQUEST_TASK handler)
+   */
+  private async assignTaskToWorker(workerId: string, worker: WorkerConnection, task: any): Promise<void> {
+    // Mark worker as busy
+    this.taskManager.markWorkerBusy(workerId, task);
+
+    // Update task assignment
+    await this.taskManager.assignTask(task.id, workerId, worker.type);
+
+    // Update worker state
+    worker.taskId = task.id;
+
+    this.stateManager.emitWorkerTaskAssigned(workerId, task.id);
+
+    // Send the task to the worker
+    this.sendMessage(worker.socket, createMessage(MessageType.ASSIGN_TASK, {
+      task
+    }));
+
+    Logger.log(`[WS] Assigned task ${task.id} to worker ${workerId}`);
+  }
+
+  /**
+   * Handle FLOWS_UPDATED message from a worker
+   */
+  handleFlowsUpdated(message: FlowsUpdatedMessage): void {
+    const { workerId, projectId, flows, changes } = message;
+
+    Logger.log(`[WS] Worker ${workerId} updating flows (project: ${projectId})`);
+
+    try {
+      this.flowDiscoveryRegistry.updateWorkerFlows(workerId, flows);
+
+      if (changes) {
+        const changeDesc = [];
+        if (changes.added.length > 0) changeDesc.push(`${changes.added.length} added`);
+        if (changes.removed.length > 0) changeDesc.push(`${changes.removed.length} removed`);
+        if (changes.updated.length > 0) changeDesc.push(`${changes.updated.length} updated`);
+        Logger.log(`[WS] Flow update for worker ${workerId}: ${changeDesc.join(', ')}`);
+      }
+    } catch (error) {
+      if (error instanceof FlowVersionMismatchError) {
+        Logger.error(`[WS] Flow version mismatch for worker ${workerId}: ${error.message}`);
+        const worker = this.workers.get(workerId);
+        if (worker) {
+          this.sendMessage(worker.socket, createMessage(MessageType.ERROR, {
+            error: error.message
+          }));
+        }
+      } else {
+        Logger.error(`[WS] Error updating flows for worker ${workerId}: ${(error as Error).message}`);
+      }
+    }
   }
 }

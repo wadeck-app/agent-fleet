@@ -100,6 +100,13 @@ export class WorkerWebSocketServer {
     return this.port;
   }
 
+  /**
+   * Get the connection manager
+   */
+  getConnectionManager(): WebSocketConnectionManager {
+    return this.connectionManager;
+  }
+
   async stop(): Promise<void> {
     return new Promise((resolve) => {
       // Close all worker connections

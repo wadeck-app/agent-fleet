@@ -33,6 +33,8 @@ export enum MessageType {
   TASK_COMPLETED = 'task_completed',
   TASK_FAILED = 'task_failed',
   TASK_QUESTION = 'task_question',
+  FLOWS_UPDATED = 'flows_updated',
+  REQUEST_TASK = 'request_task',
 
   // Flow execution events (Worker → Orchestrator)
   FLOW_STEP_STARTED = 'flow_step_started',
@@ -114,6 +116,9 @@ export interface WorkerReadyMessage extends BaseMessage {
   type: MessageType.WORKER_READY;
   workerType: WorkerType;
   preferredId?: string;
+  projectId: string;
+  workspacePath: string;
+  availableFlows: import('../flow/types.js').FlowMetadata[];
 }
 
 export interface WorkerHeartbeatMessage extends BaseMessage {
@@ -248,6 +253,23 @@ export interface ErrorMessage extends BaseMessage {
   error: string;
 }
 
+export interface FlowsUpdatedMessage extends BaseMessage {
+  type: MessageType.FLOWS_UPDATED;
+  workerId: string;
+  projectId: string;
+  flows: import('../flow/types.js').FlowMetadata[];
+  changes?: {
+    added: string[];
+    removed: string[];
+    updated: string[];
+  };
+}
+
+export interface RequestTaskMessage extends BaseMessage {
+  type: MessageType.REQUEST_TASK;
+  workerId: string;
+}
+
 export type Message =
   | WorkerReadyMessage
   | WorkerHeartbeatMessage
@@ -263,6 +285,8 @@ export type Message =
   | WorkspaceReleasedMessage
   | StopRequestedMessage
   | HookEventMessage
+  | FlowsUpdatedMessage
+  | RequestTaskMessage
 // Orchestrator → Worker
   | WorkerWelcomeMessage
   | AssignTaskMessage

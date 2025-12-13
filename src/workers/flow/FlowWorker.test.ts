@@ -108,6 +108,7 @@ describe('FlowWorker', () => {
 
   const createMockFlow = (overrides?: Partial<FlowDefinition>): FlowDefinition => ({
     id: 'test-flow',
+    version: '1.0.0',
     name: 'Test Flow',
     description: 'Test flow description',
     workspace: {

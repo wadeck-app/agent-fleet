@@ -42,6 +42,7 @@ describe('FlowOrchestrator', () => {
     it('should orchestrate a simple single-step flow', async () => {
       const flow: FlowDefinition = {
         id: 'simple-flow',
+        version: '1.0.0',
         name: 'Simple Flow',
         description: 'Single step',
         workspace: {
@@ -94,6 +95,7 @@ describe('FlowOrchestrator', () => {
     it('should respect step dependencies', async () => {
       const flow: FlowDefinition = {
         id: 'deps-flow',
+        version: '1.0.0',
         name: 'Dependencies Flow',
         description: 'Steps with dependencies',
         workspace: {
@@ -149,6 +151,7 @@ describe('FlowOrchestrator', () => {
     it('should execute independent steps in parallel', async () => {
       const flow: FlowDefinition = {
         id: 'parallel-flow',
+        version: '1.0.0',
         name: 'Parallel Flow',
         description: 'Independent steps',
         workspace: {
@@ -214,6 +217,7 @@ describe('FlowOrchestrator', () => {
     it('should fail flow when step fails without retry', async () => {
       const flow: FlowDefinition = {
         id: 'fail-flow',
+        version: '1.0.0',
         name: 'Fail Flow',
         description: 'Step that fails',
         workspace: {
@@ -264,6 +268,7 @@ describe('FlowOrchestrator', () => {
     it('should detect circular dependencies', async () => {
       const flow: FlowDefinition = {
         id: 'circular-flow',
+        version: '1.0.0',
         name: 'Circular Flow',
         description: 'Circular dependency',
         workspace: {
@@ -310,6 +315,7 @@ describe('FlowOrchestrator', () => {
     it('should detect undefined step references', async () => {
       const flow: FlowDefinition = {
         id: 'undefined-ref-flow',
+        version: '1.0.0',
         name: 'Undefined Reference',
         description: 'Step depends on non-existent step',
         workspace: {
@@ -351,6 +357,7 @@ describe('FlowOrchestrator', () => {
     it('should collect and pass outputs between steps', async () => {
       const flow: FlowDefinition = {
         id: 'output-flow',
+        version: '1.0.0',
         name: 'Output Flow',
         description: 'Steps with outputs',
         workspace: {
@@ -427,6 +434,7 @@ describe('FlowOrchestrator', () => {
     it('should handle diamond dependency pattern', async () => {
       const flow: FlowDefinition = {
         id: 'diamond-flow',
+        version: '1.0.0',
         name: 'Diamond Flow',
         description: 'Diamond dependency pattern',
         workspace: {

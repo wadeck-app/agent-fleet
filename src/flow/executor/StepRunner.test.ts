@@ -335,6 +335,7 @@ describe('StepRunner', () => {
       // Create mock flow
       mockFlow = {
         id: 'target-flow',
+        version: '1.0.0',
         name: 'Target Flow',
         description: 'Test flow for SubFlowStep tests',
         inputs: {
