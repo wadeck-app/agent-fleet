@@ -2,7 +2,76 @@
 
 ## Overview
 
-Flows are defined in `.agent-fleet/flows.yaml` and executed as Directed Acyclic Graphs (DAGs) by the FlowExecutor.
+Flows are defined in `.agent-fleet/flows.yml` and executed as Directed Acyclic Graphs (DAGs) by the FlowExecutor.
+
+## External Flow Files
+
+For better organization and reusability, flows can be defined in separate files instead of being embedded directly in `flows.yml`.
+
+### Basic Usage
+
+Reference an external file using the `source` field:
+
+```yaml
+# .agent-fleet/flows.yml
+my-flow:
+  source: my-flow.yml
+```
+
+```yaml
+# .agent-fleet/my-flow.yml
+my-flow:
+  name: My Reusable Flow
+  description: Flow defined in external file
+  workspace:
+    mode: isolated
+    gitStrategy: main-only
+    reusePolicy: never
+  inputs:
+    task: string
+  steps:
+    - id: step1
+      type: model
+      model: sonnet
+      prompt: "${{ inputs.task }}"
+```
+
+### External File Requirements
+
+1. **Location**: External files must be in the same directory as `flows.yml` (the `.agent-fleet/` directory)
+2. **Format**: External files must use the `.yml` extension
+3. **Structure**: External files contain the complete flow definition with the flow ID as the root key
+4. **Multiple Flows**: External files can contain multiple flow definitions for reusability
+
+### Local Overrides
+
+You can override specific fields from the external file in `flows.yml`:
+
+```yaml
+# .agent-fleet/flows.yml
+my-flow:
+  source: my-flow.yml
+  name: Custom Name  # Overrides the name from external file
+  workspace:
+    reusePolicy: always  # Merges with workspace config from external file
+```
+
+**Merge behavior**:
+- Scalar fields (name, description): Local completely replaces external
+- Object fields (workspace, inputs, hooks): Deep merge (local fields override matching external fields)
+- Array fields (steps): Local completely replaces external
+
+### Security Constraints
+
+For security, external flow files have the following restrictions:
+- Must be in `.agent-fleet/` directory (no subdirectories)
+- Only `.yml` extension allowed
+- Path traversal (`../`) is blocked
+- Absolute paths are rejected
+
+### Hot-Reload
+
+External files are automatically watched for changes. When an external file is modified, the affected flows are reloaded without restarting the orchestrator.
 
 ## Flow Structure
 
@@ -723,7 +792,7 @@ View step execution in orchestrator logs:
 ### SubFlowStep Troubleshooting
 
 **Error: "Flow 'xyz' not found"**
-- Verify the flow is defined in `.agent-fleet/flows.yaml`
+- Verify the flow is defined in `.agent-fleet/flows.yml`
 - Check spelling of `flowId` (case-sensitive)
 - Restart the orchestrator to reload flows
 
@@ -759,6 +828,6 @@ View step execution in orchestrator logs:
 
 ## Example: Complete Flow
 
-See `.agent-fleet/flows.yaml` for real examples from the codebase. Key flows:
+See `.agent-fleet/flows.yml` for real examples from the codebase. Key flows:
 - `code-review` - Multi-step code review with dependency handling
 - `test-and-deploy` - Parallel testing with sequential deployment

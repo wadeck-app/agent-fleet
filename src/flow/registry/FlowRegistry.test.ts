@@ -15,7 +15,7 @@ vi.mock('js-yaml');
 describe('FlowRegistry', () => {
   let registry: FlowRegistry;
   const projectRoot = '/test/project';
-  const configPath = '/test/project/.agent-fleet/flows.yaml';
+  const configPath = '/test/project/.agent-fleet/flows.yml';
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -305,13 +305,8 @@ custom-flow:
         },
       });
 
-      await registry.loadProjectFlows();
-
-      // Valid flow should be loaded
-      expect(registry.hasFlow('valid-flow')).toBe(true);
-
-      // Invalid flow should not be loaded
-      expect(registry.hasFlow('invalid-flow')).toBe(false);
+      // FlowRegistry now throws errors for invalid flows
+      await expect(registry.loadProjectFlows()).rejects.toThrow('Flow validation failed');
     });
   });
 
@@ -689,7 +684,7 @@ custom-flow:
       const callArgs = vi.mocked(fs.watch).mock.calls[0];
       // Check that the path ends with the expected path (normalize for Windows vs Unix)
       expect(callArgs[0]).toContain('.agent-fleet');
-      expect(callArgs[0]).toContain('flows.yaml');
+      expect(callArgs[0]).toContain('flows.yml');
       expect(callArgs[1]).toBeInstanceOf(Function);
     });
 
@@ -734,9 +729,9 @@ custom-flow:
       registry.startWatching();
 
       // Trigger multiple change events rapidly
-      changeCallback('change', 'flows.yaml');
-      changeCallback('change', 'flows.yaml');
-      changeCallback('change', 'flows.yaml');
+      changeCallback('change', 'flows.yml');
+      changeCallback('change', 'flows.yml');
+      changeCallback('change', 'flows.yml');
 
       // Fast-forward time but not enough to trigger debounce
       vi.advanceTimersByTime(50);
@@ -788,10 +783,8 @@ custom-flow:
         },
       });
 
-      await registry.loadProjectFlows();
-
-      // Should not load flow with empty steps (validation should fail)
-      expect(registry.hasFlow('empty-steps')).toBe(false);
+      // FlowRegistry now throws errors for invalid flows (empty steps array is invalid)
+      await expect(registry.loadProjectFlows()).rejects.toThrow('Flow validation failed');
     });
 
     it('should handle missing step name', async () => {
@@ -984,6 +977,223 @@ custom-flow:
       expect(flow?.hooks?.onStart).toBe('echo "Starting"');
       expect(flow?.hooks?.onComplete).toBe('echo "Completed"');
       expect(flow?.hooks?.onError).toBe('echo "Error"');
+    });
+  });
+
+  describe('External Flow Files', () => {
+    it('should load flow from external file', async () => {
+      // Mock external file content
+      const externalContent = {
+        'custom-flow': {
+          name: 'Custom Flow',
+          description: 'From external file',
+          workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+          inputs: { input1: 'string' },
+          steps: [{ id: 'step1', type: 'model', model: 'sonnet', prompt: 'Test' }],
+        },
+      };
+
+      const flowsYmlContent = { 'custom-flow': { source: 'custom-flow.yml' } };
+
+      // Mock flows.yml referencing external file
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockImplementation((path: any) => {
+        if (path.toString().endsWith('flows.yml')) {
+          return 'flows content';
+        } else if (path.toString().endsWith('custom-flow.yml')) {
+          return 'external content';
+        }
+        throw new Error('Unexpected file read');
+      });
+
+      vi.mocked(yaml.load).mockImplementation((content: any) => {
+        if (content === 'flows content') {
+          return flowsYmlContent;
+        } else if (content === 'external content') {
+          return externalContent;
+        }
+        throw new Error('Unexpected yaml.load call');
+      });
+
+      await registry.loadProjectFlows();
+
+      expect(registry.hasFlow('custom-flow')).toBe(true);
+      const flow = registry.getFlow('custom-flow');
+      expect(flow?.name).toBe('Custom Flow');
+      expect(flow?.description).toBe('From external file');
+      expect(flow?.inputs).toEqual({ input1: 'string' });
+    });
+
+    it('should merge local overrides with external definition', async () => {
+      // External file with base definition
+      const externalContent = {
+        'test-flow': {
+          name: 'External Name',
+          description: 'External desc',
+          workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+          inputs: { input1: 'string' },
+          steps: [{ id: 'step1', type: 'model', model: 'sonnet', prompt: 'External' }],
+        },
+      };
+
+      // Local override (name and one step)
+      const localOverride = {
+        'test-flow': {
+          source: 'test-flow.yml',
+          name: 'Local Name', // Override
+          steps: [{ id: 'step2', type: 'model', model: 'haiku', prompt: 'Local' }], // Override
+          // description and inputs inherited from external
+        },
+      };
+
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockImplementation((path: any) => {
+        if (path.toString().endsWith('flows.yml')) {
+          return 'flows content';
+        } else if (path.toString().endsWith('test-flow.yml')) {
+          return 'external content';
+        }
+        throw new Error('Unexpected file read');
+      });
+
+      vi.mocked(yaml.load).mockImplementation((content: any) => {
+        if (content === 'flows content') {
+          return localOverride;
+        } else if (content === 'external content') {
+          return externalContent;
+        }
+        throw new Error('Unexpected yaml.load call');
+      });
+
+      await registry.loadProjectFlows();
+
+      const flow = registry.getFlow('test-flow');
+      expect(flow?.name).toBe('Local Name'); // Local override
+      expect(flow?.description).toBe('External desc'); // Inherited
+      expect(flow?.inputs).toEqual({ input1: 'string' }); // Inherited
+      expect(flow?.steps[0].id).toBe('step2'); // Local override
+    });
+
+    it('should reject external file with path traversal', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue('flows content');
+      vi.mocked(yaml.load).mockReturnValue({
+        'evil-flow': { source: '../evil.yml' },
+      });
+
+      await expect(registry.loadProjectFlows()).rejects.toThrow('Flow validation failed');
+    });
+
+    it('should reject external file not in same directory', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue('flows content');
+      vi.mocked(yaml.load).mockReturnValue({
+        'subdir-flow': { source: 'subdir/flow.yml' },
+      });
+
+      await expect(registry.loadProjectFlows()).rejects.toThrow('Flow validation failed');
+    });
+
+    it('should reject external file without .yml extension', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue('flows content');
+      vi.mocked(yaml.load).mockReturnValue({
+        'txt-flow': { source: 'flow.txt' },
+      });
+
+      await expect(registry.loadProjectFlows()).rejects.toThrow('Flow validation failed');
+    });
+
+    it('should error if external file missing', async () => {
+      vi.mocked(fs.existsSync).mockImplementation((path: any) => {
+        // flows.yml exists, but external file doesn't
+        return path.toString().endsWith('flows.yml');
+      });
+      vi.mocked(fs.readFileSync).mockReturnValue('flows content');
+      vi.mocked(yaml.load).mockReturnValue({
+        'missing-flow': { source: 'missing.yml' },
+      });
+
+      await expect(registry.loadProjectFlows()).rejects.toThrow('Flow validation failed');
+    });
+
+    it('should error if external file does not contain flow ID', async () => {
+      const externalContent = {
+        'different-flow': {
+          name: 'Different',
+          workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+          steps: [],
+        },
+      };
+
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockImplementation((path: any) => {
+        if (path.toString().endsWith('flows.yml')) {
+          return 'flows content';
+        } else if (path.toString().endsWith('other.yml')) {
+          return 'external content';
+        }
+        throw new Error('Unexpected file read');
+      });
+
+      vi.mocked(yaml.load).mockImplementation((content: any) => {
+        if (content === 'flows content') {
+          return { 'custom-flow': { source: 'other.yml' } };
+        } else if (content === 'external content') {
+          return externalContent;
+        }
+        throw new Error('Unexpected yaml.load call');
+      });
+
+      await expect(registry.loadProjectFlows()).rejects.toThrow('Flow validation failed');
+    });
+
+    it('should watch external files for changes', async () => {
+      const mockWatcher = { close: vi.fn() };
+      const watchers: any[] = [];
+
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.watch).mockImplementation((path: any, callback: any) => {
+        watchers.push({ path, callback });
+        return mockWatcher;
+      });
+
+      // Load flows with external file
+      const externalContent = {
+        'custom-flow': {
+          name: 'Custom',
+          description: 'Test',
+          workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+          steps: [{ id: 'step1', type: 'model', model: 'sonnet', prompt: 'Test' }],
+        },
+      };
+      vi.mocked(fs.readFileSync).mockImplementation((path: any) => {
+        if (path.toString().endsWith('flows.yml')) {
+          return 'flows content';
+        } else if (path.toString().endsWith('custom.yml')) {
+          return 'external content';
+        }
+        throw new Error('Unexpected file read');
+      });
+
+      vi.mocked(yaml.load).mockImplementation((content: any) => {
+        if (content === 'flows content') {
+          return { 'custom-flow': { source: 'custom.yml' } };
+        } else if (content === 'external content') {
+          return externalContent;
+        }
+        throw new Error('Unexpected yaml.load call');
+      });
+
+      await registry.loadProjectFlows();
+      registry.startWatching();
+
+      // Should watch both flows.yml and custom.yml
+      expect(watchers.length).toBeGreaterThanOrEqual(2);
+      expect(watchers.some((w) => w.path.toString().endsWith('flows.yml'))).toBe(true);
+      expect(watchers.some((w) => w.path.toString().endsWith('custom.yml'))).toBe(true);
+
+      registry.stopWatching();
     });
   });
 });

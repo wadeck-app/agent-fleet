@@ -26,17 +26,8 @@ export interface WorkerEventData {
  * Allows different parts of the system to emit and listen to state changes
  */
 export class StateManager extends EventEmitter {
-  private static instance: StateManager;
-
-  private constructor() {
+  constructor() {
     super();
-  }
-
-  static getInstance(): StateManager {
-    if (!StateManager.instance) {
-      StateManager.instance = new StateManager();
-    }
-    return StateManager.instance;
   }
 
   // Task events

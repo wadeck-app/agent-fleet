@@ -55,6 +55,7 @@ describe('WebSocketConnectionManager', () => {
     mockTaskManager = {
       getNextTaskForWorker: vi.fn(),
       assignTask: vi.fn(),
+      assignTaskToWorker: vi.fn(),
       unassignTask: vi.fn(),
       updateTaskStatus: vi.fn(),
       addComment: vi.fn(),
@@ -160,14 +161,19 @@ describe('WebSocketConnectionManager', () => {
       mockSocket = new MockWebSocket();
     });
 
-    it('should try to assign task after worker ready', () => {
+    it('should try to assign task after worker ready', async () => {
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
       });
 
+      vi.mocked(mockTaskManager.assignTaskToWorker).mockResolvedValue(null);
+
       connectionManager.handleWorkerReady(mockSocket as any, readyMessage);
 
-      expect(mockTaskManager.getNextTaskForWorker).toHaveBeenCalledWith(WorkerType.DEV);
+      // Give async operation time to complete
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith(expect.anything(), WorkerType.DEV);
     });
 
     it('should handle different worker types', () => {
@@ -205,33 +211,32 @@ describe('WebSocketConnectionManager', () => {
       mockTask = {
         id: 'task-1',
         description: 'Test task',
-        status: TaskStatus.TODO,
+        status: TaskStatus.IN_PROGRESS,
         priority: 'medium',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        assignedTo: null,
+        assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
         comments: [],
         metadata: {},
         history: [],
       };
     });
 
-    it('should assign task when available', () => {
-      vi.mocked(mockTaskManager.getNextTaskForWorker).mockReturnValue(mockTask);
+    it('should assign task when available', async () => {
+      vi.mocked(mockTaskManager.assignTaskToWorker).mockResolvedValue(mockTask);
 
-      connectionManager.tryAssignTasksToIdleWorkers();
+      await connectionManager.tryAssignTasksToIdleWorkers();
 
-      expect(mockTaskManager.assignTask).toHaveBeenCalledWith(
-        'task-1',
+      expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith(
         'worker-1',
         WorkerType.DEV
       );
     });
 
-    it('should send ASSIGN_TASK message to worker', () => {
-      vi.mocked(mockTaskManager.getNextTaskForWorker).mockReturnValue(mockTask);
+    it('should send ASSIGN_TASK message to worker', async () => {
+      vi.mocked(mockTaskManager.assignTaskToWorker).mockResolvedValue(mockTask);
 
-      connectionManager.tryAssignTasksToIdleWorkers();
+      await connectionManager.tryAssignTasksToIdleWorkers();
 
       expect(mockSocket.send).toHaveBeenCalled();
       const sentMessage = JSON.parse(mockSocket.send.mock.calls[0][0]);
@@ -239,46 +244,45 @@ describe('WebSocketConnectionManager', () => {
       expect(sentMessage.task).toEqual(mockTask);
     });
 
-    it('should emit worker task assigned event', () => {
-      vi.mocked(mockTaskManager.getNextTaskForWorker).mockReturnValue(mockTask);
+    it('should emit worker task assigned event', async () => {
+      vi.mocked(mockTaskManager.assignTaskToWorker).mockResolvedValue(mockTask);
 
-      connectionManager.tryAssignTasksToIdleWorkers();
+      await connectionManager.tryAssignTasksToIdleWorkers();
 
       expect(mockStateManager.emitWorkerTaskAssigned).toHaveBeenCalledWith('worker-1', 'task-1');
     });
 
-    it('should log task assignment', () => {
-      vi.mocked(mockTaskManager.getNextTaskForWorker).mockReturnValue(mockTask);
+    it('should log task assignment', async () => {
+      vi.mocked(mockTaskManager.assignTaskToWorker).mockResolvedValue(mockTask);
 
-      connectionManager.tryAssignTasksToIdleWorkers();
+      await connectionManager.tryAssignTasksToIdleWorkers();
 
       expect(Logger.log).toHaveBeenCalledWith(
         '[WS] Assigned task task-1 to worker worker-1'
       );
     });
 
-    it('should handle no available task', () => {
-      vi.mocked(mockTaskManager.getNextTaskForWorker).mockReturnValue(null);
+    it('should handle no available task', async () => {
+      vi.mocked(mockTaskManager.assignTaskToWorker).mockResolvedValue(null);
 
-      connectionManager.tryAssignTasksToIdleWorkers();
+      await connectionManager.tryAssignTasksToIdleWorkers();
 
-      expect(mockTaskManager.assignTask).not.toHaveBeenCalled();
       expect(Logger.log).toHaveBeenCalledWith(
         expect.stringContaining('No task available')
       );
     });
 
-    it('should not assign task to busy worker', () => {
+    it('should not assign task to busy worker', async () => {
       // Assign first task
-      vi.mocked(mockTaskManager.getNextTaskForWorker).mockReturnValue(mockTask);
-      connectionManager.tryAssignTasksToIdleWorkers();
+      vi.mocked(mockTaskManager.assignTaskToWorker).mockResolvedValue(mockTask);
+      await connectionManager.tryAssignTasksToIdleWorkers();
 
       vi.clearAllMocks();
 
       // Try to assign again - worker is busy
-      connectionManager.tryAssignTasksToIdleWorkers();
+      await connectionManager.tryAssignTasksToIdleWorkers();
 
-      expect(mockTaskManager.getNextTaskForWorker).not.toHaveBeenCalled();
+      expect(mockTaskManager.assignTaskToWorker).not.toHaveBeenCalled();
     });
   });
 
@@ -321,7 +325,7 @@ describe('WebSocketConnectionManager', () => {
       expect(workers[0]).not.toHaveProperty('socket');
     });
 
-    it('should track worker task assignment', () => {
+    it('should track worker task assignment', async () => {
       const mockSocket = new MockWebSocket();
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
@@ -332,17 +336,17 @@ describe('WebSocketConnectionManager', () => {
       const mockTask: Task = {
         id: 'task-1',
         description: 'Test task',
-        status: TaskStatus.TODO,
+        status: TaskStatus.IN_PROGRESS,
         priority: 'medium',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        assignedTo: null,
+        assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
         comments: [],
         metadata: {},
         history: [],
       };
-      vi.mocked(mockTaskManager.getNextTaskForWorker).mockReturnValue(mockTask);
-      connectionManager.tryAssignTasksToIdleWorkers();
+      vi.mocked(mockTaskManager.assignTaskToWorker).mockResolvedValue(mockTask);
+      await connectionManager.tryAssignTasksToIdleWorkers();
 
       const workers = connectionManager.getWorkers();
       expect(workers[0].taskId).toBe('task-1');
@@ -350,7 +354,7 @@ describe('WebSocketConnectionManager', () => {
   });
 
   describe('tryAssignTasksToIdleWorkers', () => {
-    it('should assign tasks to all idle workers', () => {
+    it('should assign tasks to all idle workers', async () => {
       // Create 3 workers
       for (let i = 1; i <= 3; i++) {
         const mockSocket = new MockWebSocket();
@@ -367,24 +371,24 @@ describe('WebSocketConnectionManager', () => {
       const mockTask: Task = {
         id: 'task-1',
         description: 'Test task',
-        status: TaskStatus.TODO,
+        status: TaskStatus.IN_PROGRESS,
         priority: 'medium',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        assignedTo: null,
+        assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
         comments: [],
         metadata: {},
         history: [],
       };
 
-      vi.mocked(mockTaskManager.getNextTaskForWorker).mockReturnValue(mockTask);
+      vi.mocked(mockTaskManager.assignTaskToWorker).mockResolvedValue(mockTask);
 
-      connectionManager.tryAssignTasksToIdleWorkers();
+      await connectionManager.tryAssignTasksToIdleWorkers();
 
-      expect(mockTaskManager.getNextTaskForWorker).toHaveBeenCalledTimes(3);
+      expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledTimes(3);
     });
 
-    it('should not assign tasks to busy workers', () => {
+    it('should not assign tasks to busy workers', async () => {
       // Create worker and assign task
       const mockSocket = new MockWebSocket();
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
@@ -396,24 +400,24 @@ describe('WebSocketConnectionManager', () => {
       const mockTask: Task = {
         id: 'task-1',
         description: 'Test task',
-        status: TaskStatus.TODO,
+        status: TaskStatus.IN_PROGRESS,
         priority: 'medium',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        assignedTo: null,
+        assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
         comments: [],
         metadata: {},
         history: [],
       };
-      vi.mocked(mockTaskManager.getNextTaskForWorker).mockReturnValue(mockTask);
-      connectionManager.tryAssignTasksToIdleWorkers();
+      vi.mocked(mockTaskManager.assignTaskToWorker).mockResolvedValue(mockTask);
+      await connectionManager.tryAssignTasksToIdleWorkers();
 
       vi.clearAllMocks();
 
       // Try to assign again
-      connectionManager.tryAssignTasksToIdleWorkers();
+      await connectionManager.tryAssignTasksToIdleWorkers();
 
-      expect(mockTaskManager.getNextTaskForWorker).not.toHaveBeenCalled();
+      expect(mockTaskManager.assignTaskToWorker).not.toHaveBeenCalled();
     });
   });
 
@@ -436,7 +440,7 @@ describe('WebSocketConnectionManager', () => {
       expect(Logger.log).toHaveBeenCalledWith('[WS] Worker worker-1 disconnected');
     });
 
-    it('should unassign task on worker disconnect with active task', () => {
+    it('should unassign task on worker disconnect with active task', async () => {
       // Simulate worker having a task
       const mockTask: Task = {
         id: 'task-1',
@@ -445,13 +449,13 @@ describe('WebSocketConnectionManager', () => {
         priority: 'medium',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        assignedTo: null,
+        assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
         comments: [],
         metadata: {},
         history: [],
       };
-      vi.mocked(mockTaskManager.getNextTaskForWorker).mockReturnValue(mockTask);
-      connectionManager.tryAssignTasksToIdleWorkers();
+      vi.mocked(mockTaskManager.assignTaskToWorker).mockResolvedValue(mockTask);
+      await connectionManager.tryAssignTasksToIdleWorkers();
 
       // Disconnect
       connectionManager.handleWorkerDisconnect('worker-1');
@@ -459,7 +463,7 @@ describe('WebSocketConnectionManager', () => {
       expect(mockTaskManager.unassignTask).toHaveBeenCalledWith('task-1');
     });
 
-    it('should handle unassign task error on disconnect', () => {
+    it('should handle unassign task error on disconnect', async () => {
       // Simulate worker having a task
       const mockTask: Task = {
         id: 'task-1',
@@ -468,13 +472,13 @@ describe('WebSocketConnectionManager', () => {
         priority: 'medium',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        assignedTo: null,
+        assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
         comments: [],
         metadata: {},
         history: [],
       };
-      vi.mocked(mockTaskManager.getNextTaskForWorker).mockReturnValue(mockTask);
-      connectionManager.tryAssignTasksToIdleWorkers();
+      vi.mocked(mockTaskManager.assignTaskToWorker).mockResolvedValue(mockTask);
+      await connectionManager.tryAssignTasksToIdleWorkers();
 
       vi.mocked(mockTaskManager.unassignTask).mockImplementation(() => {
         throw new Error('Unassign failed');
@@ -499,7 +503,7 @@ describe('WebSocketConnectionManager', () => {
   });
 
   describe('releaseWorker', () => {
-    it('should release worker and try to assign new task', () => {
+    it('should release worker and try to assign new task', async () => {
       const mockSocket = new MockWebSocket();
       const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
         workerType: WorkerType.DEV,
@@ -511,25 +515,30 @@ describe('WebSocketConnectionManager', () => {
       const mockTask: Task = {
         id: 'task-1',
         description: 'Test task',
-        status: TaskStatus.TODO,
+        status: TaskStatus.IN_PROGRESS,
         priority: 'medium',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        assignedTo: null,
+        assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
         comments: [],
         metadata: {},
         history: [],
       };
-      vi.mocked(mockTaskManager.getNextTaskForWorker).mockReturnValue(mockTask);
-      connectionManager.tryAssignTasksToIdleWorkers();
+      vi.mocked(mockTaskManager.assignTaskToWorker).mockResolvedValue(mockTask);
+      await connectionManager.tryAssignTasksToIdleWorkers();
 
       vi.clearAllMocks();
+      vi.mocked(mockTaskManager.assignTaskToWorker).mockResolvedValue(null);
 
       // Release worker
       connectionManager.releaseWorker('worker-1');
 
       expect(mockStateManager.emitWorkerTaskReleased).toHaveBeenCalledWith('worker-1');
-      expect(mockTaskManager.getNextTaskForWorker).toHaveBeenCalledWith(WorkerType.DEV);
+
+      // Give async operation time to complete
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith('worker-1', WorkerType.DEV);
     });
   });
 

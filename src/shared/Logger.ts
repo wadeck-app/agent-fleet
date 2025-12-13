@@ -12,8 +12,12 @@ export enum LogLevel {
  * Use this instead of console.log when running with UI
  */
 export class Logger {
-  private static stateManager = StateManager.getInstance();
+  private static stateManager: StateManager | null = null;
   private static logLevel: LogLevel = LogLevel.INFO; // Default: INFO and above
+
+  static initialize(stateManager: StateManager): void {
+    this.stateManager = stateManager;
+  }
 
   static setLogLevel(level: LogLevel): void {
     this.logLevel = level;
@@ -53,7 +57,9 @@ export class Logger {
       return String(arg);
     }).join(' ');
 
-    // Emit to state manager for UI
-    this.stateManager.emitLogMessage(message);
+    // Emit to state manager for UI (if initialized)
+    if (this.stateManager) {
+      this.stateManager.emitLogMessage(message);
+    }
   }
 }

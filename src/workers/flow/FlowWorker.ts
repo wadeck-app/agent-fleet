@@ -1,50 +1,98 @@
 /**
- * Flow Worker
+ * Flow Worker (Refactored)
  *
  * Executes flows defined in the Flow Engine via FlowExecutor.
  * Integrates WorkspaceManager, FlowRegistry, and FlowExecutor with the orchestrator.
+ *
+ * This class handles:
+ * - WebSocket communication with orchestrator
+ * - Task assignment and execution coordination
+ * - Flow execution orchestration
  */
 
-import { BaseWorker } from '../base/BaseWorker.js';
-import { Task, WorkerType, TaskStatus } from '../../shared/types.js';
+import WebSocket from 'ws';
+import { fileURLToPath } from 'url';
+import {
+  AssignTaskMessage,
+  KillClaudeMessage,
+  Message,
+  MessageType,
+  Task,
+  TaskStatus,
+  WorkerType,
+  WorkerWelcomeMessage
+} from '../../shared/types.js';
+import { createMessage, parseMessage, serializeMessage } from '../../shared/protocol.js';
 import { FlowRegistry } from '../../flow/registry/FlowRegistry.js';
 import { FlowExecutor, FlowExecutionOptions } from '../../flow/executor/FlowExecutor.js';
 import { WorkspaceManager } from '../../flow/workspace/WorkspaceManager.js';
-import type { Workspace, FlowStep } from '../../flow/types.js';
-import { fileURLToPath } from 'url';
-import { WebSocketServer, WebSocket } from 'ws';
-import { ChildProcess, execSync } from 'child_process';
-import { FlowWorkerUI as TerminalKitFlowWorkerUI, createFlowWorkerUI as createTerminalKitUI } from './ui/terminal-kit/FlowWorkerUI.js';
-import type { StepInfo } from './ui/shared/types.js';
-import {Shutdownable} from "../../shared/Shutdownable.js";
+import type { Workspace } from '../../flow/types.js';
+import { Shutdownable } from "../../shared/Shutdownable.js";
+import { ClaudeProcessManager } from './ClaudeProcessManager.js';
+import { FlowExecutionMonitor } from './FlowExecutionMonitor.js';
+import { WorkerUIManager } from './WorkerUIManager.js';
 
-// Type alias for UI interface (both implementations share the same interface)
-type FlowWorkerUI = TerminalKitFlowWorkerUI;
+/**
+ * Flow Worker class (Refactored)
+ */
+export class FlowWorker implements Shutdownable {
+  // Worker identity
+  protected workerId: string;
+  protected workerType: WorkerType;
+  protected preferredWorkerId?: string;
 
-export class FlowWorker extends BaseWorker implements Shutdownable {
+  // WebSocket connection to orchestrator
+  protected ws: WebSocket | null = null;
+  protected wsUrl: string;
+  protected reconnectDelay = 1000; // Start at 1 second
+  protected maxReconnectDelay = 30000; // Max 30 seconds
+  protected reconnectionAttempts = 0;
+  protected maxReconnectAttempts = 10; // Stop after 10 attempts
+  protected heartbeatInterval = 30000;
+  private heartbeatTimer: NodeJS.Timeout | null = null;
+
+  // Task management
+  protected currentTask: Task | null = null;
+
+  // Flow engine components
   private flowRegistry: FlowRegistry;
   private flowExecutor: FlowExecutor;
   private workspaceManager: WorkspaceManager;
   private interactive: boolean;
-  private claudeWss: WebSocketServer | null = null;
-  private claudeWsPort: number = 0;
-  private claudeSocket: WebSocket | null = null;
-  private claudeProcess: ChildProcess | null = null;
-  private ui: FlowWorkerUI | null = null;
-  private enableUI: boolean;
 
-  constructor(wsUrl?: string, projectRoot: string = process.cwd(), interactive: boolean = false, preferredWorkerId?: string, enableUI: boolean = true) {
-    super(WorkerType.DEV, wsUrl, preferredWorkerId);
+  // Specialized managers (extracted from god class)
+  private claudeProcessManager: ClaudeProcessManager;
+  private flowExecutionMonitor: FlowExecutionMonitor;
+  private workerUIManager: WorkerUIManager;
+
+  constructor(
+    wsUrl?: string,
+    projectRoot: string = process.cwd(),
+    interactive: boolean = false,
+    preferredWorkerId?: string,
+    enableUI: boolean = true
+  ) {
+    // Worker identity
+    this.workerId = '?'; // Will be assigned by orchestrator during Welcome
+    this.workerType = WorkerType.DEV;
+    this.wsUrl = wsUrl || 'ws://localhost:3738';
+    this.preferredWorkerId = preferredWorkerId;
 
     this.interactive = interactive;
-    this.enableUI = enableUI;
     console.log(`[FlowWorker] Initializing with project root: ${projectRoot}`);
     if (interactive) console.log(`[FlowWorker] Interactive mode enabled`);
     if (preferredWorkerId) console.log(`[FlowWorker] Preferred worker ID: ${preferredWorkerId}`);
     if (enableUI) console.log(`[FlowWorker] UI enabled`);
 
-    // Setup WebSocket server for Claude to communicate with this worker
-    this.setupClaudeWebSocketServer();
+    // Initialize specialized managers
+    this.claudeProcessManager = new ClaudeProcessManager(this.logPrefix());
+    this.flowExecutionMonitor = new FlowExecutionMonitor();
+    this.workerUIManager = new WorkerUIManager(enableUI);
+
+    // Setup Claude message handler
+    this.claudeProcessManager.setMessageHandler((message) => {
+      this.handleClaudeMessage(message);
+    });
 
     // Initialize Flow Engine components
     this.flowRegistry = new FlowRegistry(projectRoot);
@@ -52,8 +100,8 @@ export class FlowWorker extends BaseWorker implements Shutdownable {
     this.workspaceManager = new WorkspaceManager(projectRoot);
 
     // Initialize UI if enabled
-    if (this.enableUI) {
-      this.ui = createTerminalKitUI(this.workerId, wsUrl || 'ws://localhost:3738', this);
+    if (enableUI) {
+      this.workerUIManager.initialize(this.workerId, this.wsUrl, this);
     }
 
     // Load project flows
@@ -61,27 +109,202 @@ export class FlowWorker extends BaseWorker implements Shutdownable {
   }
 
   /**
-   * Start the UI (call after connection is established so workerId is set)
+   * Connect to the orchestrator
    */
   async connect(): Promise<void> {
-    await super.connect();
+    process.title = 'Worker X';
 
-    // Start UI after connection
-    if (this.enableUI && this.ui) {
-      const stateManager = this.ui.getStateManager();
-      stateManager.setConnected(true);
-      this.ui.start();
+    return new Promise((resolve, reject) => {
+      console.log(`${this.logPrefix()} Connecting to ${this.wsUrl}...`);
+
+      this.ws = new WebSocket(this.wsUrl);
+
+      this.ws.on('open', () => {
+        console.log(`${this.logPrefix()} Connected`);
+
+        // Reset reconnection attempts on successful connection
+        this.reconnectionAttempts = 0;
+
+        this.sendWorkerReady();
+        this.startHeartbeat();
+
+        // Start UI after connection
+        this.workerUIManager.start();
+
+        resolve();
+      });
+
+      this.ws.on('message', (data: Buffer) => {
+        try {
+          const message = parseMessage(data.toString());
+          this.handleMessage(message);
+        } catch (error) {
+          console.error(`${this.logPrefix()} Error parsing message:`, (error as Error).message);
+        }
+      });
+
+      this.ws.on('close', () => {
+        console.log(`${this.logPrefix()} Disconnected`);
+        this.stopHeartbeat();
+        this.workerUIManager.setConnected(false);
+        this.scheduleReconnect();
+      });
+
+      this.ws.on('error', (error) => {
+        console.error(`${this.logPrefix()} WebSocket error:`, error);
+        reject(error);
+      });
+    });
+  }
+
+  /**
+   * Send WORKER_READY message
+   */
+  private sendWorkerReady(): void {
+    this.sendMessage(createMessage(MessageType.WORKER_READY, {
+      workerType: this.workerType,
+      preferredId: this.preferredWorkerId
+    }));
+  }
+
+  /**
+   * Start heartbeat to keep connection alive
+   */
+  private startHeartbeat(): void {
+    this.heartbeatTimer = setInterval(() => {
+      this.sendMessage(createMessage(MessageType.WORKER_HEARTBEAT, {
+        workerId: this.workerId
+      }));
+    }, this.heartbeatInterval);
+  }
+
+  /**
+   * Stop heartbeat
+   */
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
     }
   }
 
   /**
-   * Hook called when worker receives its ID from orchestrator
+   * Schedule reconnection with exponential backoff
    */
-  protected onWelcome(workerId: string): void {
+  private scheduleReconnect(): void {
+    if (this.reconnectionAttempts >= this.maxReconnectAttempts) {
+      console.error(`${this.logPrefix()} Maximum reconnection attempts (${this.maxReconnectAttempts}) reached. Giving up.`);
+      process.exit(1);
+    }
+
+    this.reconnectionAttempts++;
+    const delay = Math.min(
+      this.reconnectDelay * Math.pow(2, this.reconnectionAttempts - 1),
+      this.maxReconnectDelay
+    );
+
+    console.log(`${this.logPrefix()} Reconnecting in ${delay}ms... (attempt ${this.reconnectionAttempts}/${this.maxReconnectAttempts})`);
+
+    setTimeout(() => {
+      this.connect().catch((error) => {
+        console.error(`${this.logPrefix()} Reconnection failed:`, error);
+      });
+    }, delay);
+  }
+
+  /**
+   * Handle incoming message from orchestrator
+   */
+  private handleMessage(message: Message): void {
+    switch (message.type) {
+      case MessageType.ACK:
+        // Acknowledgment received
+        break;
+
+      case MessageType.WORKER_WELCOME:
+        this.handleWelcome(message as WorkerWelcomeMessage);
+        break;
+
+      case MessageType.ASSIGN_TASK:
+        this.handleAssignTask(message as AssignTaskMessage);
+        break;
+
+      case MessageType.KILL_CLAUDE:
+        this.handleKillClaude(message as KillClaudeMessage);
+        break;
+
+      case MessageType.PAUSE:
+        console.log(`${this.logPrefix()} Received PAUSE`);
+        // TODO: Implement pause logic
+        break;
+
+      case MessageType.RESUME:
+        console.log(`${this.logPrefix()} Received RESUME`);
+        // TODO: Implement resume logic
+        break;
+
+      case MessageType.SHUTDOWN:
+        console.log(`${this.logPrefix()} Received SHUTDOWN`);
+        this.shutdown();
+        break;
+
+      default:
+        console.warn(`${this.logPrefix()} Unknown message type: ${message.type}`);
+    }
+  }
+
+  /**
+   * Handle WORKER_WELCOME message
+   */
+  private async handleWelcome(message: WorkerWelcomeMessage): Promise<void> {
+    this.workerId = message.workerId;
+    process.title = `Worker ${this.workerId}`;
+
+    console.log(`${this.logPrefix()} Welcome received with assigned id=${message.workerId}`);
+
     // Update UI with actual worker ID
-    if (this.enableUI && this.ui) {
-      const stateManager = this.ui.getStateManager();
-      stateManager.setWorkerId(workerId);
+    this.workerUIManager.updateWorkerId(message.workerId);
+  }
+
+  /**
+   * Handle ASSIGN_TASK message
+   */
+  private async handleAssignTask(message: AssignTaskMessage): Promise<void> {
+    this.currentTask = message.task;
+    console.log(`${this.logPrefix()} Assigned task ${this.currentTask.id}: ${this.currentTask.description}`);
+
+    try {
+      await this.executeTask(this.currentTask);
+    } catch (error) {
+      console.error(`${this.logPrefix()} Task execution error:`, error);
+      this.sendTaskFailed((error as Error).message);
+    }
+  }
+
+  /**
+   * Handle KILL_CLAUDE message
+   */
+  private handleKillClaude(message: KillClaudeMessage): void {
+    console.log(`${this.logPrefix()} Kill Claude requested: ${message.reason}`);
+    this.claudeProcessManager.kill();
+  }
+
+  /**
+   * Handle messages from Claude processes (via hooks)
+   */
+  private handleClaudeMessage(message: any): void {
+    switch (message.type) {
+      case 'STOP_REQUESTED':
+        console.log(`${this.logPrefix()} Stop requested by Claude, killing process...`);
+        this.claudeProcessManager.kill();
+        break;
+
+      case 'HOOK_EVENT':
+        console.log(`${this.logPrefix()} Hook event: ${message.hookName}`);
+        break;
+
+      default:
+        console.log(`${this.logPrefix()} Unknown message type: ${message.type}`);
     }
   }
 
@@ -102,69 +325,22 @@ export class FlowWorker extends BaseWorker implements Shutdownable {
   }
 
   /**
-   * Convert FlowStep to StepInfo for UI
-   */
-  private convertStepToStepInfo(step: FlowStep): StepInfo {
-    return {
-      id: step.id,
-      name: step.name,
-      type: step.type,
-      status: 'pending',
-    };
-  }
-
-  /**
    * Start monitoring execution trace and update UI
    */
   private startTraceMonitoring(taskId: string): NodeJS.Timeout {
-    const trackedSteps = new Set<string>();
-    let lastStepCount = 0;
+    const stateManager = this.workerUIManager.getStateManager();
+    if (!stateManager) {
+      // No UI, return dummy interval
+      return setInterval(() => {}, 1000);
+    }
+
+    // Set state manager for monitor
+    this.flowExecutionMonitor.setStateManager(stateManager);
 
     return setInterval(() => {
-      if (!this.ui) return;
-
-      const stateManager = this.ui.getStateManager();
-
-      // Check current task and look for trace updates
-      // This is a simplified monitoring approach
-      // In a production system, you'd want FlowExecutor to emit events
       const currentTask = this.currentTask;
-      if (currentTask && currentTask.flowResult?.trace) {
-        const trace = currentTask.flowResult.trace;
-
-        // Update steps based on trace
-        if (trace.steps && trace.steps.length > lastStepCount) {
-          const newSteps = trace.steps.slice(lastStepCount);
-
-          for (const traceStep of newSteps) {
-            const stepKey = `${traceStep.stepId}-${traceStep.startTime}`;
-
-            if (!trackedSteps.has(stepKey)) {
-              trackedSteps.add(stepKey);
-
-              // Step started
-              stateManager.stepStarted(traceStep.stepId, traceStep.retries);
-
-              // Add step output if available
-              if (traceStep.stdout) {
-                stateManager.addStepOutput(traceStep.stepId, traceStep.stdout);
-              }
-
-              // Step completed or failed
-              if (traceStep.endTime) {
-                const duration = traceStep.durationMs || (traceStep.endTime - traceStep.startTime);
-
-                if (traceStep.error) {
-                  stateManager.stepFailed(traceStep.stepId, traceStep.error, duration);
-                } else {
-                  stateManager.stepCompleted(traceStep.stepId, duration);
-                }
-              }
-            }
-          }
-
-          lastStepCount = trace.steps.length;
-        }
+      if (currentTask) {
+        this.flowExecutionMonitor.monitorTaskTrace(currentTask);
       }
     }, 200); // Poll every 200ms
   }
@@ -200,11 +376,7 @@ export class FlowWorker extends BaseWorker implements Shutdownable {
     this.sendTaskStarted(TaskStatus.IN_PROGRESS);
 
     // Initialize UI state if enabled
-    if (this.ui) {
-      const stateManager = this.ui.getStateManager();
-      const steps = flow.steps.map(step => this.convertStepToStepInfo(step));
-      stateManager.startTask(task.id, flow.id, flow.name, steps);
-    }
+    this.workerUIManager.startTask(task.id, flow.id, flow.name, flow.steps);
 
     let workspace: Workspace | null = null;
 
@@ -242,10 +414,7 @@ export class FlowWorker extends BaseWorker implements Shutdownable {
       this.sendTaskProgress(`Workspace ready: ${workspace.path}`);
 
       // Update UI with workspace info
-      if (this.ui) {
-        const stateManager = this.ui.getStateManager();
-        stateManager.setWorkspace(workspace.path);
-      }
+      this.workerUIManager.setWorkspace(workspace.path);
 
       // Prepare execution options
       const executionOptions: FlowExecutionOptions = {
@@ -262,14 +431,14 @@ export class FlowWorker extends BaseWorker implements Shutdownable {
         // Pass Claude environment variables for hooks
         claudeEnv: {
           CLAUDE_WORKER_ID: this.workerId,
-          CLAUDE_WORKER_SOCKET: `ws://localhost:${this.claudeWsPort}`,
+          CLAUDE_WORKER_SOCKET: `ws://localhost:${this.claudeProcessManager.getWebSocketPort()}`,
           CLAUDE_TASK_ID: task.id,
           CLAUDE_CONTEXT_DIR: workspace.path,
           CLAUDE_CODE_STOPPABLE: this.interactive ? 'true' : 'false'
         },
         // Callback to store Claude process reference
         onClaudeProcessStarted: (process) => {
-          this.claudeProcess = process;
+          this.claudeProcessManager.trackProcess(process);
         }
       };
 
@@ -278,7 +447,7 @@ export class FlowWorker extends BaseWorker implements Shutdownable {
 
       // Start monitoring execution trace if UI is enabled
       let monitorInterval: NodeJS.Timeout | null = null;
-      if (this.ui) {
+      if (this.workerUIManager.isEnabled()) {
         monitorInterval = this.startTraceMonitoring(task.id);
       }
 
@@ -301,10 +470,7 @@ export class FlowWorker extends BaseWorker implements Shutdownable {
         console.log(`${this.logPrefix()} Flow completed successfully`);
 
         // Update UI
-        if (this.ui) {
-          const stateManager = this.ui.getStateManager();
-          stateManager.taskCompleted();
-        }
+        this.workerUIManager.taskCompleted();
 
         this.sendTaskCompleted(
           {
@@ -318,10 +484,7 @@ export class FlowWorker extends BaseWorker implements Shutdownable {
         console.error(`${this.logPrefix()} Flow failed: ${result.error}`);
 
         // Update UI
-        if (this.ui) {
-          const stateManager = this.ui.getStateManager();
-          stateManager.taskFailed(result.error || 'Flow execution failed');
-        }
+        this.workerUIManager.taskFailed(result.error || 'Flow execution failed');
 
         this.sendTaskFailed(result.error || 'Flow execution failed', failureStatus);
       }
@@ -351,103 +514,121 @@ export class FlowWorker extends BaseWorker implements Shutdownable {
     }
   }
 
+  /**
+   * Send task started notification
+   */
+  protected sendTaskStarted(newStatus?: string): void {
+    if (!this.currentTask) return;
+
+    this.sendMessage(createMessage(MessageType.TASK_STARTED, {
+      workerId: this.workerId,
+      taskId: this.currentTask.id,
+      newStatus
+    }));
+  }
+
+  /**
+   * Send task progress update
+   */
+  protected sendTaskProgress(progress: string): void {
+    if (!this.currentTask) return;
+
+    this.sendMessage(createMessage(MessageType.TASK_PROGRESS, {
+      workerId: this.workerId,
+      taskId: this.currentTask.id,
+      progress
+    }));
+  }
+
+  /**
+   * Send task completed notification
+   */
+  protected sendTaskCompleted(result?: any, newStatus?: string): void {
+    if (!this.currentTask) return;
+
+    this.sendMessage(createMessage(MessageType.TASK_COMPLETED, {
+      workerId: this.workerId,
+      taskId: this.currentTask.id,
+      result,
+      newStatus
+    }));
+
+    this.currentTask = null;
+  }
+
+  /**
+   * Send task failed notification
+   */
+  protected sendTaskFailed(error: string, newStatus?: TaskStatus): void {
+    if (!this.currentTask) return;
+
+    this.sendMessage(createMessage(MessageType.TASK_FAILED, {
+      workerId: this.workerId,
+      taskId: this.currentTask.id,
+      error,
+      newStatus
+    }));
+
+    this.currentTask = null;
+  }
+
+  /**
+   * Send task question
+   */
+  protected sendTaskQuestion(question: string): void {
+    if (!this.currentTask) return;
+
+    this.sendMessage(createMessage(MessageType.TASK_QUESTION, {
+      workerId: this.workerId,
+      taskId: this.currentTask.id,
+      question
+    }));
+  }
+
+  /**
+   * Send stop requested (from Claude hook)
+   */
+  protected sendStopRequested(claudePid: number): void {
+    if (!this.currentTask) return;
+
+    this.sendMessage(createMessage(MessageType.STOP_REQUESTED, {
+      workerId: this.workerId,
+      taskId: this.currentTask.id,
+      claudePid
+    }));
+  }
+
+  /**
+   * Send hook event
+   */
+  protected sendHookEvent(hookName: string, data: any): void {
+    this.sendMessage(createMessage(MessageType.HOOK_EVENT, {
+      workerId: this.workerId,
+      hookName,
+      data
+    }));
+  }
+
+  /**
+   * Send a message to orchestrator
+   */
+  protected sendMessage(message: Message): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(serializeMessage(message));
+    } else {
+      console.error(`${this.logPrefix()} Cannot send message, not connected`);
+    }
+  }
+
   protected logPrefix(): string {
     return `[FlowWorker ${this.workerId}]`;
-  }
-
-  /**
-   * Setup WebSocket server for Claude processes to communicate with this worker
-   */
-  private setupClaudeWebSocketServer(): void {
-    // Create WebSocket server on a random available port
-    this.claudeWss = new WebSocketServer({ port: 0 });
-
-    this.claudeWss.on('listening', () => {
-      const address = this.claudeWss!.address();
-      if (typeof address === 'object' && address !== null) {
-        this.claudeWsPort = address.port;
-        console.log(`${this.logPrefix()} Claude WebSocket server listening on port ${this.claudeWsPort}`);
-      }
-    });
-
-    this.claudeWss.on('connection', (socket: WebSocket) => {
-      console.log(`${this.logPrefix()} Claude process connected to worker socket`);
-      this.claudeSocket = socket;
-
-      socket.on('message', (data: Buffer) => {
-        try {
-          const message = JSON.parse(data.toString());
-          this.handleClaudeMessage(message);
-        } catch (error) {
-          console.error(`${this.logPrefix()} Error parsing Claude message:`, error);
-        }
-      });
-
-      socket.on('close', () => {
-        console.log(`${this.logPrefix()} Claude socket disconnected`);
-        this.claudeSocket = null;
-      });
-
-      socket.on('error', (error) => {
-        console.error(`${this.logPrefix()} Claude socket error:`, error);
-      });
-    });
-
-    this.claudeWss.on('error', (error) => {
-      console.error(`${this.logPrefix()} Claude WebSocket server error:`, error);
-    });
-  }
-
-  /**
-   * Handle messages from Claude processes (via hooks)
-   */
-  private handleClaudeMessage(message: any): void {
-    switch (message.type) {
-      case 'STOP_REQUESTED':
-        console.log(`${this.logPrefix()} Stop requested by Claude, killing process...`);
-        this.killClaude();
-        break;
-
-      case 'HOOK_EVENT':
-        console.log(`${this.logPrefix()} Hook event: ${message.hookName}`);
-        break;
-
-      default:
-        console.log(`${this.logPrefix()} Unknown message type: ${message.type}`);
-    }
   }
 
   /**
    * Kill Claude process if running
    */
   killClaude(): void {
-    if (this.claudeProcess) {
-      const pid = this.claudeProcess.pid;
-      console.log(`${this.logPrefix()} Killing Claude process (PID: ${pid})...`);
-
-      try {
-        if (pid && process.platform === 'win32') {
-          try {
-            execSync(`taskkill /PID ${pid} /T /F`, {
-              stdio: 'inherit',
-              windowsHide: false
-            });
-            console.log(`${this.logPrefix()} Process killed successfully`);
-          } catch (killError: any) {
-            if (!killError.message?.includes('not found')) {
-              console.error(`${this.logPrefix()} Kill error:`, killError.message);
-            }
-          }
-        } else if (this.claudeProcess) {
-          this.claudeProcess.kill('SIGKILL');
-        }
-
-        this.claudeProcess = null;
-      } catch (error) {
-        console.error(`${this.logPrefix()} Error killing process:`, error);
-        this.claudeProcess = null;
-      }
-    }
+    this.claudeProcessManager.kill();
   }
 
   /**
@@ -457,31 +638,22 @@ export class FlowWorker extends BaseWorker implements Shutdownable {
     console.log(`${this.logPrefix()} Shutting down...`);
 
     // Stop UI
-    if (this.ui) {
-      console.log(`${this.logPrefix()} Stopping UI...`);
-      this.ui.stop();
-      this.ui = null;
-    }
+    this.workerUIManager.stop();
 
     // Stop watching flows file
     this.flowRegistry.stopWatching();
 
-    // Kill Claude if running
-    this.killClaude();
-
-    // Close Claude WebSocket server
-    if (this.claudeWss) {
-      console.log(`${this.logPrefix()} Closing Claude WebSocket server...`);
-      this.claudeWss.close(() => {
-        console.log(`${this.logPrefix()} Claude WebSocket server closed`);
-      });
-      this.claudeWss = null;
-    }
+    // Cleanup Claude process manager
+    this.claudeProcessManager.shutdown();
 
     // Cleanup all workspaces
     this.workspaceManager.cleanupAll();
 
-    super.shutdown();
+    // Close WebSocket connection
+    this.stopHeartbeat();
+    if (this.ws) {
+      this.ws.close();
+    }
   }
 }
 

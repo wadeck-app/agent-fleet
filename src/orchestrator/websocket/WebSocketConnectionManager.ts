@@ -78,8 +78,10 @@ export class WebSocketConnectionManager {
     // Send Welcome
     this.sendMessage(socket, createMessage(MessageType.WORKER_WELCOME, { workerId }));
 
-    // Assign a task if available
-    this.tryAssignTask(workerId, workerType);
+    // Assign a task if available (async, fire and forget)
+    this.tryAssignTask(workerId, workerType).catch(error => {
+      Logger.error(`[WS] Error assigning task to worker ${workerId}: ${(error as Error).message}`);
+    });
 
     return workerId;
   }
@@ -109,23 +111,23 @@ export class WebSocketConnectionManager {
   }
 
   /**
-   * Try to assign a task to a specific worker
+   * Try to assign a task to a specific worker using atomic assignment
    */
-  tryAssignTask(workerId: string, workerType: WorkerType): void {
-    const task = this.taskManager.getNextTaskForWorker(workerType);
-    if (!task) {
-      Logger.log(`[WS] No task available for ${workerType} worker ${workerId}`);
-      return;
-    }
-
+  async tryAssignTask(workerId: string, workerType: WorkerType): Promise<void> {
     const worker = this.workers.get(workerId);
     if (!worker) {
       Logger.error(`[WS] Worker ${workerId} not found`);
       return;
     }
 
-    // Assign the task
-    this.taskManager.assignTask(task.id, workerId, workerType);
+    // Use atomic assignment to prevent race conditions
+    const task = await this.taskManager.assignTaskToWorker(workerId, workerType);
+    if (!task) {
+      Logger.log(`[WS] No task available for ${workerType} worker ${workerId}`);
+      return;
+    }
+
+    // Update worker state
     worker.taskId = task.id;
 
     this.stateManager.emitWorkerTaskAssigned(workerId, task.id);
@@ -141,13 +143,13 @@ export class WebSocketConnectionManager {
   /**
    * Try to assign tasks to all idle workers
    */
-  tryAssignTasksToIdleWorkers(): void {
+  async tryAssignTasksToIdleWorkers(): Promise<void> {
     // Find all idle workers (not currently working on a task)
     const idleWorkers = Array.from(this.workers.values()).filter(w => w.taskId === null);
 
-    // Try to assign a task to each idle worker
+    // Try to assign a task to each idle worker (sequentially to avoid race conditions)
     for (const worker of idleWorkers) {
-      this.tryAssignTask(worker.id, worker.type);
+      await this.tryAssignTask(worker.id, worker.type);
     }
   }
 
@@ -160,8 +162,10 @@ export class WebSocketConnectionManager {
       worker.taskId = null;
       this.stateManager.emitWorkerTaskReleased(workerId);
 
-      // Try to assign a new task
-      this.tryAssignTask(workerId, worker.type);
+      // Try to assign a new task (async, fire and forget)
+      this.tryAssignTask(workerId, worker.type).catch(error => {
+        Logger.error(`[WS] Error assigning task to released worker ${workerId}: ${(error as Error).message}`);
+      });
     }
   }
 

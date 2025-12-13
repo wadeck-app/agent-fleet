@@ -671,7 +671,7 @@ npm run validate-flows
 ### 3. Use Test Flows
 
 ```yaml
-# In .agent-fleet/flows.yaml
+# In .agent-fleet/flows.yml
 test-subflow-composition:
   description: "Integration test for SubFlowStep feature"
   workspace: { mode: manual }
@@ -887,7 +887,7 @@ organized-workflow:
 
 - **Flow Development Guide:** `.agent-fleet/.claude/docs/flow-development.md`
 - **SubFlowStep Implementation Plan:** `.claude/temp/subflow-implementation-plan-FINAL.md`
-- **Example Flows:** `.agent-fleet/flows.yaml`
+- **Example Flows:** `.agent-fleet/flows.yml`
 
 ---
 

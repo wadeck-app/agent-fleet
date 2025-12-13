@@ -21,8 +21,8 @@ describe('FlowValidator - SubFlowStep Validation', () => {
     const flowsDir = path.join(tempDir, '.agent-fleet');
     fs.mkdirSync(flowsDir, { recursive: true });
 
-    // Create empty flows.yaml to avoid warnings
-    fs.writeFileSync(path.join(flowsDir, 'flows.yaml'), '');
+    // Create empty flows.yml to avoid warnings
+    fs.writeFileSync(path.join(flowsDir, 'flows.yml'), '');
 
     registry = new FlowRegistry(tempDir);
     validator = new FlowValidator(registry);

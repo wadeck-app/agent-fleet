@@ -141,13 +141,14 @@ export class FlowRegistry {
   private validator: FlowValidator;
   private watcher: fs.FSWatcher | null = null;
   private reloadTimeout: NodeJS.Timeout | null = null;
+  private externalFiles: Set<string> = new Set();
 
   /**
    * Create a new flow registry
    * @param projectRoot - Root directory of the project
    */
   constructor(projectRoot: string) {
-    this.configPath = path.join(projectRoot, '.agent-fleet', 'flows.yaml');
+    this.configPath = path.join(projectRoot, '.agent-fleet', 'flows.yml');
     this.validator = new FlowValidator(this);
     this.loadDefaultFlows();
   }
@@ -183,7 +184,7 @@ export class FlowRegistry {
 
       for (const [id, flowData] of Object.entries(parsed)) {
         try {
-          const flow = this.parseFlowDefinition(id, flowData);
+          const flow = await this.parseFlowDefinition(id, flowData);
 
           // Use new validator for comprehensive validation
           const validationResult = this.validator.validate(flow);
@@ -253,16 +254,149 @@ export class FlowRegistry {
   /**
    * Parse raw YAML data into a FlowDefinition
    */
-  private parseFlowDefinition(id: string, data: any): FlowDefinition {
+  private async parseFlowDefinition(id: string, data: any): Promise<FlowDefinition> {
+    let baseDefinition: any = {};
+
+    // Check for 'source' field to load from external file
+    if (data.source && typeof data.source === 'string') {
+      // Load and parse external file
+      const externalData = await this.loadExternalFlowFile(data.source, id);
+
+      // Extract flow by ID from external file
+      if (externalData[id]) {
+        baseDefinition = externalData[id];
+      } else {
+        throw new Error(`External file '${data.source}' does not contain flow definition for '${id}'`);
+      }
+    }
+
+    // Merge local overrides with external definition
+    const mergedData = this.mergeFlowDefinitions(baseDefinition, data);
+
     return {
       id,
-      name: data.name || id,
-      description: data.description || '',
-      workspace: this.parseWorkspaceConfig(data.workspace),
-      inputs: data.inputs || {},
-      steps: (data.steps || []).map((step: any) => this.parseFlowStep(step)),
-      hooks: data.hooks,
+      name: mergedData.name || id,
+      description: mergedData.description || '',
+      workspace: this.parseWorkspaceConfig(mergedData.workspace),
+      inputs: mergedData.inputs || {},
+      steps: (mergedData.steps || []).map((step: any) => this.parseFlowStep(step)),
+      hooks: mergedData.hooks,
     };
+  }
+
+  /**
+   * Load and parse an external flow file
+   * @param sourcePath - Relative path to external file (must be sibling of flows.yml)
+   * @param flowId - Flow ID being loaded (for error messages)
+   * @returns Parsed YAML content
+   * @throws Error if file doesn't exist, is outside allowed directory, or parse fails
+   */
+  private async loadExternalFlowFile(sourcePath: string, flowId: string): Promise<Record<string, any>> {
+    // Validate path security
+    this.validateExternalFilePath(sourcePath, flowId);
+
+    // Resolve path relative to flows.yml directory
+    const flowsDir = path.dirname(this.configPath);
+    const absolutePath = path.resolve(flowsDir, sourcePath);
+
+    // Check file exists
+    if (!fs.existsSync(absolutePath)) {
+      throw new Error(`External flow file not found for flow '${flowId}': ${sourcePath}`);
+    }
+
+    try {
+      const content = fs.readFileSync(absolutePath, 'utf-8');
+      const parsed = yaml.load(content) as Record<string, any>;
+
+      if (!parsed || typeof parsed !== 'object') {
+        throw new Error(`Invalid YAML structure in ${sourcePath}: expected object`);
+      }
+
+      // Track for hot-reload
+      this.trackExternalFile(absolutePath);
+
+      return parsed;
+    } catch (error) {
+      throw new Error(`Failed to load external flow file '${sourcePath}' for flow '${flowId}': ${error}`);
+    }
+  }
+
+  /**
+   * Validate external file path for security
+   * Must be a sibling file (no directory traversal)
+   * @throws Error if path is invalid or unsafe
+   */
+  private validateExternalFilePath(sourcePath: string, flowId: string): void {
+    // Reject absolute paths
+    if (path.isAbsolute(sourcePath)) {
+      throw new Error(`External flow file path must be relative for flow '${flowId}': ${sourcePath}`);
+    }
+
+    // Reject path traversal
+    const normalized = path.normalize(sourcePath);
+    if (normalized.includes('..') || normalized.startsWith('/') || normalized.startsWith('\\')) {
+      throw new Error(`External flow file path contains invalid characters for flow '${flowId}': ${sourcePath}`);
+    }
+
+    // Must be sibling (no subdirectories)
+    if (normalized.includes(path.sep)) {
+      throw new Error(`External flow file must be in the same directory as flows.yml for flow '${flowId}': ${sourcePath}`);
+    }
+
+    // Must have .yml extension
+    if (!sourcePath.endsWith('.yml')) {
+      throw new Error(`External flow file must have .yml extension for flow '${flowId}': ${sourcePath}`);
+    }
+  }
+
+  /**
+   * Merge flow definitions: local fields override external fields
+   * Deep merge for nested objects like workspace, inputs, hooks
+   * @param external - Base definition from external file
+   * @param local - Override definition from flows.yml
+   * @returns Merged definition
+   */
+  private mergeFlowDefinitions(external: any, local: any): any {
+    // Remove 'source' field from local (not part of flow definition)
+    const { source, ...localWithoutSource } = local;
+
+    // Start with external as base
+    const merged = { ...external };
+
+    // Override with local fields
+    for (const [key, value] of Object.entries(localWithoutSource)) {
+      if (value === undefined) {
+        continue; // Skip undefined values
+      }
+
+      // Deep merge for objects (workspace, inputs, hooks)
+      if (key === 'workspace' && typeof value === 'object' && typeof merged[key] === 'object') {
+        merged[key] = { ...merged[key], ...value };
+      } else if (key === 'inputs' && typeof value === 'object' && typeof merged[key] === 'object') {
+        merged[key] = { ...merged[key], ...value };
+      } else if (key === 'hooks' && typeof value === 'object' && typeof merged[key] === 'object') {
+        merged[key] = { ...merged[key], ...value };
+      } else if (
+        key === 'statusTransitions' &&
+        typeof value === 'object' &&
+        typeof merged[key] === 'object'
+      ) {
+        merged[key] = { ...merged[key], ...value };
+      } else {
+        // Simple override (including steps array)
+        merged[key] = value;
+      }
+    }
+
+    return merged;
+  }
+
+  /**
+   * Track an external file for hot-reload
+   * @param absolutePath - Absolute path to external file
+   */
+  private trackExternalFile(absolutePath: string): void {
+    this.externalFiles.add(absolutePath);
   }
 
   /**
@@ -434,22 +568,57 @@ export class FlowRegistry {
     try {
       this.watcher = fs.watch(this.configPath, (eventType, filename) => {
         if (eventType === 'change') {
-          // Debounce: clear existing timeout and set a new one
-          if (this.reloadTimeout) {
-            clearTimeout(this.reloadTimeout);
-          }
-
-          this.reloadTimeout = setTimeout(() => {
-            console.log('[FlowRegistry] Flows file changed, reloading...');
-            this.reloadFlows();
-          }, 100); // 100ms debounce
+          this.scheduleReload();
         }
       });
 
       console.log(`[FlowRegistry] Watching flows file: ${this.configPath}`);
+
+      // Watch external files (if any were loaded)
+      this.watchExternalFiles();
     } catch (error) {
       console.error('[FlowRegistry] Failed to start watching flows file:', error);
     }
+  }
+
+  /**
+   * Watch all tracked external flow files
+   */
+  private watchExternalFiles(): void {
+    for (const externalPath of this.externalFiles) {
+      if (!fs.existsSync(externalPath)) {
+        console.warn(`[FlowRegistry] External file no longer exists: ${externalPath}`);
+        continue;
+      }
+
+      try {
+        fs.watch(externalPath, (eventType, filename) => {
+          if (eventType === 'change') {
+            console.log(`[FlowRegistry] External flow file changed: ${externalPath}`);
+            this.scheduleReload();
+          }
+        });
+
+        console.log(`[FlowRegistry] Watching external file: ${externalPath}`);
+      } catch (error) {
+        console.error(`[FlowRegistry] Failed to watch external file ${externalPath}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Schedule a debounced reload
+   */
+  private scheduleReload(): void {
+    // Debounce: clear existing timeout and set a new one
+    if (this.reloadTimeout) {
+      clearTimeout(this.reloadTimeout);
+    }
+
+    this.reloadTimeout = setTimeout(() => {
+      console.log('[FlowRegistry] Flows file changed, reloading...');
+      this.reloadFlows();
+    }, 100); // 100ms debounce
   }
 
   /**
@@ -466,6 +635,9 @@ export class FlowRegistry {
       this.watcher = null;
       console.log('[FlowRegistry] Stopped watching flows file');
     }
+
+    // Clear external files tracking
+    this.externalFiles.clear();
   }
 
   /**
@@ -474,6 +646,9 @@ export class FlowRegistry {
    */
   private async reloadFlows(): Promise<void> {
     try {
+      // Clear external files (will be re-tracked during reload)
+      this.externalFiles.clear();
+
       // Clear only project flows (keep defaults)
       const defaultFlowIds = Object.keys(DEFAULT_FLOWS);
       const projectFlowIds = Array.from(this.flows.keys()).filter(

@@ -78,11 +78,11 @@ export class OrchestratorUI {
   private workers: WorkerInfo[] = [];
   private logs: string[] = [];
 
-  constructor(taskManager: TaskManager, shutdownable: Shutdownable, wsServer: WorkerWebSocketServer | null) {
+  constructor(taskManager: TaskManager, shutdownable: Shutdownable, wsServer: WorkerWebSocketServer | null, stateManager: StateManager) {
     this.taskManager = taskManager;
     this.shutdownable = shutdownable;
     this.wsServer = wsServer;
-    this.stateManager = StateManager.getInstance();
+    this.stateManager = stateManager;
 
     // Load initial data
     this.tasks = taskManager.getAllTasks();
@@ -422,7 +422,7 @@ export class OrchestratorUI {
 }
 
 // Export function to create UI (caller must call start())
-export function renderUI(taskManager: TaskManager, shutdownable: Shutdownable, wsServer: WorkerWebSocketServer | null): OrchestratorUI {
-  const ui = new OrchestratorUI(taskManager, shutdownable, wsServer);
+export function renderUI(taskManager: TaskManager, shutdownable: Shutdownable, wsServer: WorkerWebSocketServer | null, stateManager: StateManager): OrchestratorUI {
+  const ui = new OrchestratorUI(taskManager, shutdownable, wsServer, stateManager);
   return ui;
 }

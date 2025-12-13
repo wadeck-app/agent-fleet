@@ -63,7 +63,7 @@ export class RestAPI {
     });
 
     // Create a task (supports both regular and flow-based tasks)
-    this.app.post('/tasks', (req: Request, res: Response) => {
+    this.app.post('/tasks', async (req: Request, res: Response) => {
       try {
         const { description, priority, metadata, flowId, flowInputs, workspacePath } = req.body;
 
@@ -78,7 +78,7 @@ export class RestAPI {
           return;
         }
 
-        const task = this.taskManager.createTask(description, {
+        const task = await this.taskManager.createTask(description, {
           priority,
           ...metadata
         });
@@ -97,7 +97,7 @@ export class RestAPI {
         // IMPORTANT: Update task in TaskManager's memory + storage
         // (createTask() saves before we add flowInputs/workspacePath)
         if (flowId || workspacePath) {
-          this.taskManager.updateTask(task);
+          await this.taskManager.updateTask(task);
         }
 
         // Try to assign the task to an available worker
@@ -147,7 +147,7 @@ export class RestAPI {
     });
 
     // Update task status
-    this.app.patch('/tasks/:id/status', (req: Request, res: Response) => {
+    this.app.patch('/tasks/:id/status', async (req: Request, res: Response) => {
       try {
         const { status } = req.body;
 
@@ -156,7 +156,7 @@ export class RestAPI {
           return;
         }
 
-        this.taskManager.updateTaskStatus(req.params.id, status as TaskStatus);
+        await this.taskManager.updateTaskStatus(req.params.id, status as TaskStatus);
         const task = this.taskManager.getTask(req.params.id);
 
         res.json(task);
@@ -167,7 +167,7 @@ export class RestAPI {
     });
 
     // Add a comment to a task
-    this.app.post('/tasks/:id/comments', (req: Request, res: Response) => {
+    this.app.post('/tasks/:id/comments', async (req: Request, res: Response) => {
       try {
         const { author, content } = req.body;
 
@@ -176,7 +176,7 @@ export class RestAPI {
           return;
         }
 
-        this.taskManager.addComment(req.params.id, author, content);
+        await this.taskManager.addComment(req.params.id, author, content);
         const task = this.taskManager.getTask(req.params.id);
 
         res.json(task);
@@ -187,9 +187,9 @@ export class RestAPI {
     });
 
     // Delete a task
-    this.app.delete('/tasks/:id', (req: Request, res: Response) => {
+    this.app.delete('/tasks/:id', async (req: Request, res: Response) => {
       try {
-        const deleted = this.taskManager.deleteTask(req.params.id);
+        const deleted = await this.taskManager.deleteTask(req.params.id);
 
         if (!deleted) {
           res.status(404).json({ error: 'Task not found' });
@@ -204,9 +204,9 @@ export class RestAPI {
     });
 
     // Clear all tasks
-    this.app.delete('/tasks', (req: Request, res: Response) => {
+    this.app.delete('/tasks', async (req: Request, res: Response) => {
       try {
-        const count = this.taskManager.clearAllTasks();
+        const count = await this.taskManager.clearAllTasks();
         res.json({ message: `Cleared ${count} tasks` });
       } catch (error) {
         Logger.error('[API] Error clearing tasks:', error);

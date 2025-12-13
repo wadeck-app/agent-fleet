@@ -25,8 +25,7 @@ export class WorkerWebSocketServer {
   private eventHandler: WebSocketEventHandler;
   private messageRouter: WebSocketMessageRouter;
 
-  constructor(taskManager: TaskManager, port: number = 3738) {
-    const stateManager = StateManager.getInstance();
+  constructor(taskManager: TaskManager, stateManager: StateManager, port: number = 3738) {
     this.port = port;
 
     // Initialize components
