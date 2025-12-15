@@ -6,6 +6,10 @@ import { Logger } from '../../shared/Logger.js';
 import { WorkspaceManager } from '../../flow/workspace/WorkspaceManager.js';
 import { Shutdownable } from "../../shared/Shutdownable.js";
 import { StateManager } from '../../shared/StateManager.js';
+import { StateSnapshotService } from '../state/StateSnapshotService.js';
+import { MetricsCollector } from '../metrics/MetricsCollector.js';
+import { UIClientHook } from '../ui-client/UIClientHook.js';
+import { OrchestratorSnapshot } from '../ui-client/types.js';
 
 /**
  * Orchestrator class that coordinates all services
@@ -23,6 +27,12 @@ export class Orchestrator implements Shutdownable {
   private uiInstance?: any;
   private isRunning: boolean = false;
 
+  // New UI-related services
+  private snapshotService?: StateSnapshotService;
+  private metricsCollector?: MetricsCollector;
+  private uiClientHook?: UIClientHook;
+  private startTime: Date;
+
   constructor(config?: {
     restPort?: number;
     wsPort?: number;
@@ -33,6 +43,7 @@ export class Orchestrator implements Shutdownable {
     this.projectRoot = config?.projectRoot || process.cwd();
     this.stateManager = new StateManager();
     this.taskManager = new TaskManager(this.stateManager);
+    this.startTime = new Date();
 
     // Initialize Logger with StateManager
     Logger.initialize(this.stateManager);
@@ -42,6 +53,9 @@ export class Orchestrator implements Shutdownable {
    * Initialize all components
    */
   private async initialize(): Promise<void> {
+    // Emit orchestrator started event
+    this.stateManager.emitOrchestratorStarted();
+
     // Initialize TaskManager
     await this.taskManager.initialize();
 
@@ -58,6 +72,25 @@ export class Orchestrator implements Shutdownable {
       this.restPort,
       this.workspaceManager
     );
+
+    // Initialize new UI-related services
+    this.snapshotService = new StateSnapshotService(this.taskManager, this.wsServer);
+
+    this.metricsCollector = new MetricsCollector(
+      this.taskManager,
+      this.wsServer,
+      this.stateManager,
+      5000 // Collect metrics every 5 seconds
+    );
+
+    this.uiClientHook = new UIClientHook(this.stateManager);
+
+    // Enable UI client hook if configured
+    const uiClientEnabled = process.env.UI_CLIENT_ENABLED === 'true';
+    if (uiClientEnabled) {
+      this.uiClientHook.enable();
+      Logger.logStructured('info', 'Orchestrator', 'UI client hook enabled');
+    }
   }
 
   /**
@@ -78,11 +111,19 @@ export class Orchestrator implements Shutdownable {
       // Start REST API
       await this.restAPI?.start();
 
+      // Start metrics collector
+      this.metricsCollector?.start();
+
       // Render UI
       this.uiInstance = await renderUI(this.taskManager, this, this.wsServer!, this.stateManager);
 
       this.isRunning = true;
+
+      // Emit orchestrator ready event
+      this.stateManager.emitOrchestratorReady();
+
       console.log('[Orchestrator] Orchestrator started successfully');
+      Logger.logStructured('info', 'Orchestrator', 'All services started successfully');
     } catch (error) {
       console.error('[Orchestrator] Failed to start:', error);
       await this.shutdown();
@@ -100,9 +141,21 @@ export class Orchestrator implements Shutdownable {
     }
 
     Logger.log('[Orchestrator] Shutting down...');
+
+    // Emit orchestrator stopping event
+    this.stateManager.emitOrchestratorStopping();
+
     this.isRunning = false;
 
-    // Unmount UI first
+    // Stop metrics collector
+    this.metricsCollector?.stop();
+    Logger.log('[Orchestrator] MetricsCollector stopped');
+
+    // Disable UI client hook
+    this.uiClientHook?.disable();
+    Logger.log('[Orchestrator] UIClientHook disabled');
+
+    // Unmount UI
     if (this.uiInstance) {
       this.uiInstance.unmount();
     }
@@ -144,6 +197,34 @@ export class Orchestrator implements Shutdownable {
    */
   getWorkspaceManager(): WorkspaceManager | undefined {
     return this.workspaceManager;
+  }
+
+  /**
+   * Get the state snapshot service instance
+   */
+  getSnapshotService(): StateSnapshotService | undefined {
+    return this.snapshotService;
+  }
+
+  /**
+   * Get the metrics collector instance
+   */
+  getMetricsCollector(): MetricsCollector | undefined {
+    return this.metricsCollector;
+  }
+
+  /**
+   * Get the UI client hook instance
+   */
+  getUIClientHook(): UIClientHook | undefined {
+    return this.uiClientHook;
+  }
+
+  /**
+   * Get current state snapshot (for UI connections)
+   */
+  getStateSnapshot(): OrchestratorSnapshot | undefined {
+    return this.snapshotService?.getSnapshot();
   }
 }
 
