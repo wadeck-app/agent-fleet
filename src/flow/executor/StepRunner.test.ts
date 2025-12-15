@@ -8,14 +8,14 @@ import type { ScriptFlowStep, ModelFlowStep, SubFlowStep, Workspace, FlowDefinit
 import { TemplateRenderer } from '../processing/TemplateRenderer.js';
 import { ScriptExecutor } from './ScriptExecutor.js';
 import { OutputExtractor } from '../processing/OutputExtractor.js';
-import { ClaudeProcessManager } from '../processing/ClaudeProcessManager.js';
+import { ClaudeLauncher } from '../processing/ClaudeLauncher.js';
 import type { FlowRegistry } from '../registry/FlowRegistry.js';
 
 // Mock dependencies
 vi.mock('../processing/TemplateRenderer.js');
 vi.mock('./ScriptExecutor.js');
 vi.mock('../processing/OutputExtractor.js');
-vi.mock('../processing/ClaudeProcessManager.js');
+vi.mock('../processing/ClaudeLauncher.js');
 
 describe('StepRunner', () => {
   let runner: StepRunner;
@@ -165,7 +165,7 @@ describe('StepRunner', () => {
       };
 
       vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('Write a function');
-      vi.mocked(ClaudeProcessManager.prototype.launchBackground).mockResolvedValue({
+      vi.mocked(ClaudeLauncher.prototype.launchBackground).mockResolvedValue({
         stdout: 'function test() {}',
         stderr: '',
         exitCode: 0,
@@ -199,7 +199,7 @@ describe('StepRunner', () => {
       };
 
       vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('Test');
-      vi.mocked(ClaudeProcessManager.prototype.launchBackground).mockResolvedValue({
+      vi.mocked(ClaudeLauncher.prototype.launchBackground).mockResolvedValue({
         stdout: '',
         stderr: 'Claude error',
         exitCode: 1,

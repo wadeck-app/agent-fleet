@@ -333,7 +333,7 @@ export interface OrchestratorSnapshot {
  */
 export function createUIMessage<T extends UIMessage>(
   type: T['type'],
-  data: Omit<T, 'type' | 'timestamp'>
+  data: Omit<T, 'type' | 'timestamp'> | any
 ): T {
   return {
     type,

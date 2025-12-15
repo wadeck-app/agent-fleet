@@ -65,20 +65,14 @@ describe('MetricsCollector', () => {
     {
       id: 'worker-1',
       type: WorkerType.DEV,
-      projectId: 'project-1',
-      workspacePath: '/workspace1',
       connectedAt: '2024-01-01T00:00:00.000Z',
       taskId: 'task-1',
-      availableFlows: []
     },
     {
       id: 'worker-2',
       type: WorkerType.DEV,
-      projectId: 'project-1',
-      workspacePath: '/workspace2',
       connectedAt: '2024-01-01T00:00:00.000Z',
       taskId: null,
-      availableFlows: []
     }
   ];
 

@@ -1,7 +1,7 @@
 /**
- * Claude Process Manager
+ * Claude Launcher
  *
- * Manages launching and executing Claude Code processes in:
+ * Launches and executes Claude Code processes in:
  * - Interactive mode (stdio: inherit, terminal takeover)
  * - Background mode (capture stdout/stderr)
  */
@@ -51,9 +51,9 @@ export interface ClaudeLaunchOptions {
 }
 
 /**
- * Claude Process Manager
+ * Claude Launcher
  */
-export class ClaudeProcessManager {
+export class ClaudeLauncher {
   /**
    * Find Claude executable path
    */

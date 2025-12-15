@@ -31,7 +31,7 @@ import { FlowExecutor, FlowExecutionOptions } from '../../flow/executor/FlowExec
 import { WorkspaceManager } from '../../flow/workspace/WorkspaceManager.js';
 import type { Workspace, FlowMetadata } from '../../flow/types.js';
 import { Shutdownable } from "../../shared/Shutdownable.js";
-import { ClaudeProcessManager } from './ClaudeProcessManager.js';
+import { ClaudeLifecycleManager } from './ClaudeLifecycleManager.js';
 import { FlowExecutionMonitor } from './FlowExecutionMonitor.js';
 import { WorkerUIManager } from './WorkerUIManager.js';
 
@@ -65,7 +65,7 @@ export class FlowWorker implements Shutdownable {
   private projectRoot: string;
 
   // Specialized managers (extracted from god class)
-  private claudeProcessManager: ClaudeProcessManager;
+  private claudeProcessManager: ClaudeLifecycleManager;
   private flowExecutionMonitor: FlowExecutionMonitor;
   private workerUIManager: WorkerUIManager;
 
@@ -90,7 +90,7 @@ export class FlowWorker implements Shutdownable {
     if (enableUI) console.log(`[FlowWorker] UI enabled`);
 
     // Initialize specialized managers
-    this.claudeProcessManager = new ClaudeProcessManager(this.logPrefix());
+    this.claudeProcessManager = new ClaudeLifecycleManager(this.logPrefix());
     this.flowExecutionMonitor = new FlowExecutionMonitor();
     this.workerUIManager = new WorkerUIManager(enableUI);
 

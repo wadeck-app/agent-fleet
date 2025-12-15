@@ -1,5 +1,7 @@
 // Shared types for the entire system
 
+import type { FlowMetadata } from '../flow/types.js';
+
 export enum TaskStatus {
   BACKLOG = 'backlog',
   REFINING = 'refining',
@@ -118,7 +120,7 @@ export interface WorkerReadyMessage extends BaseMessage {
   preferredId?: string;
   projectId: string;
   workspacePath: string;
-  availableFlows: import('../flow/types.js').FlowMetadata[];
+  availableFlows: FlowMetadata[];
 }
 
 export interface WorkerHeartbeatMessage extends BaseMessage {
@@ -257,7 +259,7 @@ export interface FlowsUpdatedMessage extends BaseMessage {
   type: MessageType.FLOWS_UPDATED;
   workerId: string;
   projectId: string;
-  flows: import('../flow/types.js').FlowMetadata[];
+  flows: FlowMetadata[];
   changes?: {
     added: string[];
     removed: string[];

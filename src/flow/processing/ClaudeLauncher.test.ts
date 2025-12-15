@@ -1,19 +1,19 @@
 /**
- * Claude Process Manager Tests
+ * Claude Launcher Tests
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ClaudeProcessManager } from '../processing/ClaudeProcessManager.js';
+import { ClaudeLauncher } from '../processing/ClaudeLauncher.js';
 import * as child_process from 'child_process';
 
 // Mock child_process
 vi.mock('child_process');
 
-describe('ClaudeProcessManager', () => {
-  let manager: ClaudeProcessManager;
+describe('ClaudeLauncher', () => {
+  let manager: ClaudeLauncher;
 
   beforeEach(() => {
-    manager = new ClaudeProcessManager();
+    manager = new ClaudeLauncher();
     vi.clearAllMocks();
   });
 

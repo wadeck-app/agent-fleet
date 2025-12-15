@@ -15,7 +15,7 @@ import type {
 import { TemplateRenderer, type TemplateContext } from '../processing/TemplateRenderer.js';
 import { ScriptExecutor } from './ScriptExecutor.js';
 import { OutputExtractor } from '../processing/OutputExtractor.js';
-import { ClaudeProcessManager } from '../processing/ClaudeProcessManager.js';
+import { ClaudeLauncher } from '../processing/ClaudeLauncher.js';
 import type { FlowRegistry } from '../registry/FlowRegistry.js';
 
 /**
@@ -59,14 +59,14 @@ export class StepRunner {
   private templateRenderer: TemplateRenderer;
   private scriptExecutor: ScriptExecutor;
   private outputExtractor: OutputExtractor;
-  private claudeManager: ClaudeProcessManager;
+  private claudeManager: ClaudeLauncher;
   private config: StepRunnerConfig;
 
   constructor(config: StepRunnerConfig) {
     this.templateRenderer = new TemplateRenderer();
     this.scriptExecutor = new ScriptExecutor();
     this.outputExtractor = new OutputExtractor();
-    this.claudeManager = new ClaudeProcessManager();
+    this.claudeManager = new ClaudeLauncher();
     this.config = config;
   }
 

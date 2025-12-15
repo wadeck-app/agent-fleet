@@ -5,7 +5,7 @@
  * including flow definitions, steps, workspaces, and execution traces.
  */
 
-import { TaskStatus } from '../shared/types.js';
+import type { TaskStatus } from '../shared/types.js';
 
 /**
  * Supported model types for step execution

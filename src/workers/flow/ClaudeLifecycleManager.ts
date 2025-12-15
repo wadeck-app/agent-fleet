@@ -1,5 +1,5 @@
 /**
- * Claude Process Manager
+ * Claude Lifecycle Manager
  *
  * Manages Claude process lifecycle (spawn, kill, track).
  * Handles platform-specific process termination and WebSocket communication.
@@ -23,9 +23,9 @@ interface ClaudeMessage {
 export type ClaudeMessageHandler = (message: ClaudeMessage) => void;
 
 /**
- * Claude Process Manager class
+ * Claude Lifecycle Manager class
  */
-export class ClaudeProcessManager {
+export class ClaudeLifecycleManager {
   private claudeWss: WebSocketServer | null = null;
   private claudeWsPort: number = 0;
   private claudeSocket: WebSocket | null = null;
@@ -33,7 +33,7 @@ export class ClaudeProcessManager {
   private messageHandler: ClaudeMessageHandler | null = null;
   private logPrefix: string;
 
-  constructor(logPrefix: string = '[ClaudeProcessManager]') {
+  constructor(logPrefix: string = '[ClaudeLifecycleManager]') {
     this.logPrefix = logPrefix;
     this.setupWebSocketServer();
   }

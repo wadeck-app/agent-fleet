@@ -728,7 +728,7 @@ describe('FlowWorker', () => {
         kill: vi.fn()
       } as any;
 
-      // Access the ClaudeProcessManager and set the process
+      // Access the ClaudeLifecycleManager and set the process
       (worker as any).claudeProcessManager.trackProcess(mockProcess);
 
       // Mock platform
@@ -754,7 +754,7 @@ describe('FlowWorker', () => {
         })
       } as any;
 
-      // Access the ClaudeProcessManager and set the process
+      // Access the ClaudeLifecycleManager and set the process
       (worker as any).claudeProcessManager.trackProcess(mockProcess);
 
       worker.killClaude();
@@ -821,7 +821,7 @@ describe('FlowWorker', () => {
         kill: vi.fn()
       } as any;
 
-      // Access the ClaudeProcessManager and set the process
+      // Access the ClaudeLifecycleManager and set the process
       (worker as any).claudeProcessManager.trackProcess(mockProcess);
 
       worker.shutdown();
@@ -830,7 +830,7 @@ describe('FlowWorker', () => {
     });
 
     it('should close Claude WebSocket server', () => {
-      // The ClaudeProcessManager handles WebSocket server cleanup internally
+      // The ClaudeLifecycleManager handles WebSocket server cleanup internally
       // Just verify shutdown doesn't throw
       expect(() => {
         worker.shutdown();
@@ -844,14 +844,14 @@ describe('FlowWorker', () => {
     });
 
     it('should handle shutdown when WebSocket server is null', () => {
-      // ClaudeProcessManager handles this internally
+      // ClaudeLifecycleManager handles this internally
       expect(() => {
         worker.shutdown();
       }).not.toThrow();
     });
 
     it('should handle shutdown when Claude process is null', () => {
-      // ClaudeProcessManager handles this internally
+      // ClaudeLifecycleManager handles this internally
       expect(() => {
         worker.shutdown();
       }).not.toThrow();
