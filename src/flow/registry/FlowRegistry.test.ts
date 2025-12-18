@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { FlowRegistry, FlowValidationError } from './FlowRegistry.js';
 import type { FlowDefinition, WorkspaceConfig } from '../types.js';
+import { createMockFlow, createMockModelStep } from '../../test-utils/index.js';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 
@@ -96,9 +97,8 @@ describe('FlowRegistry', () => {
 
   describe('Flow Registration', () => {
     it('should register a valid flow', () => {
-      const validFlow: FlowDefinition = {
+      const validFlow = createMockFlow({
         id: 'test-flow',
-        version: '1.0.0',
         name: 'Test Flow',
         description: 'Test description',
         workspace: {
@@ -110,15 +110,14 @@ describe('FlowRegistry', () => {
           input1: 'string',
         },
         steps: [
-          {
+          createMockModelStep({
             id: 'step1',
             name: 'Step 1',
-            type: 'model',
             model: 'haiku',
             prompt: 'Test prompt',
-          },
+          }),
         ],
-      };
+      });
 
       registry.registerFlow(validFlow);
 
@@ -127,9 +126,8 @@ describe('FlowRegistry', () => {
     });
 
     it('should reject invalid flow with validation error', () => {
-      const invalidFlow: FlowDefinition = {
+      const invalidFlow = createMockFlow({
         id: 'invalid-flow',
-        version: '1.0.0',
         name: 'Invalid Flow',
         description: 'Has invalid step dependency',
         workspace: {
@@ -137,18 +135,16 @@ describe('FlowRegistry', () => {
           gitStrategy: 'main-only',
           reusePolicy: 'never',
         },
-        inputs: {},
         steps: [
-          {
+          createMockModelStep({
             id: 'step1',
             name: 'Step 1',
-            type: 'model',
             model: 'haiku',
             prompt: 'Test',
             depends: ['non-existent-step'], // Invalid dependency
-          },
+          }),
         ],
-      };
+      });
 
       expect(() => {
         registry.registerFlow(invalidFlow);
@@ -156,9 +152,8 @@ describe('FlowRegistry', () => {
     });
 
     it('should unregister a flow', () => {
-      const flow: FlowDefinition = {
+      const flow = createMockFlow({
         id: 'temp-flow',
-        version: '1.0.0',
         name: 'Temp',
         description: '',
         workspace: {
@@ -166,17 +161,15 @@ describe('FlowRegistry', () => {
           gitStrategy: 'main-only',
           reusePolicy: 'never',
         },
-        inputs: {},
         steps: [
-          {
+          createMockModelStep({
             id: 'step1',
             name: 'Step 1',
-            type: 'model',
             model: 'haiku',
             prompt: 'Test',
-          },
+          }),
         ],
-      };
+      });
 
       registry.registerFlow(flow);
       expect(registry.hasFlow('temp-flow')).toBe(true);
@@ -568,9 +561,8 @@ custom-flow:
 
   describe('Flow Validation', () => {
     it('should validate a correct flow', () => {
-      const validFlow: FlowDefinition = {
+      const validFlow = createMockFlow({
         id: 'valid',
-        version: '1.0.0',
         name: 'Valid',
         description: 'Valid flow',
         workspace: {
@@ -582,15 +574,14 @@ custom-flow:
           input1: 'string',
         },
         steps: [
-          {
+          createMockModelStep({
             id: 'step1',
             name: 'Step 1',
-            type: 'model',
             model: 'haiku',
             prompt: '${{ inputs.input1 }}',
-          },
+          }),
         ],
-      };
+      });
 
       const result = registry.validateFlow(validFlow);
 
@@ -599,9 +590,8 @@ custom-flow:
     });
 
     it('should detect validation errors', () => {
-      const invalidFlow: FlowDefinition = {
+      const invalidFlow = createMockFlow({
         id: 'invalid',
-        version: '1.0.0',
         name: 'Invalid',
         description: 'Invalid flow',
         workspace: {
@@ -609,18 +599,16 @@ custom-flow:
           gitStrategy: 'main-only',
           reusePolicy: 'never',
         },
-        inputs: {},
         steps: [
-          {
+          createMockModelStep({
             id: 'step1',
             name: 'Step 1',
-            type: 'model',
             model: 'haiku',
             prompt: 'Test',
             depends: ['non-existent-step'],
-          },
+          }),
         ],
-      };
+      });
 
       const result = registry.validateFlow(invalidFlow);
 
@@ -638,9 +626,8 @@ custom-flow:
     });
 
     it('should clear but keep default flows', () => {
-      const customFlow: FlowDefinition = {
+      const customFlow = createMockFlow({
         id: 'custom',
-        version: '1.0.0',
         name: 'Custom',
         description: 'Custom flow',
         workspace: {
@@ -648,17 +635,15 @@ custom-flow:
           gitStrategy: 'main-only',
           reusePolicy: 'never',
         },
-        inputs: {},
         steps: [
-          {
+          createMockModelStep({
             id: 'step1',
             name: 'Step 1',
-            type: 'model',
             model: 'haiku',
             prompt: 'Test',
-          },
+          }),
         ],
-      };
+      });
 
       registry.registerFlow(customFlow);
       expect(registry.hasFlow('custom')).toBe(true);
@@ -1227,9 +1212,8 @@ custom-flow:
 
   describe('Hash Computation (Phase 1)', () => {
     it('Test 5.1: should compute deterministic hash for same flow', () => {
-      const flow: FlowDefinition = {
+      const flow = createMockFlow({
         id: 'test-flow',
-        version: '1.0.0',
         name: 'Test Flow',
         description: 'Test description',
         workspace: {
@@ -1241,15 +1225,14 @@ custom-flow:
           input1: 'string',
         },
         steps: [
-          {
+          createMockModelStep({
             id: 'step1',
             name: 'Step 1',
-            type: 'model',
             model: 'haiku',
             prompt: 'Test prompt',
-          },
+          }),
         ],
-      };
+      });
 
       const hash1 = registry.computeFlowHash(flow);
       const hash2 = registry.computeFlowHash(flow);
@@ -1259,9 +1242,8 @@ custom-flow:
     });
 
     it('Test 5.2: should produce different hashes for different steps', () => {
-      const flow1: FlowDefinition = {
+      const flow1 = createMockFlow({
         id: 'flow1',
-        version: '1.0.0',
         name: 'Flow 1',
         description: 'Test',
         workspace: {
@@ -1269,28 +1251,25 @@ custom-flow:
           gitStrategy: 'main-only',
           reusePolicy: 'never',
         },
-        inputs: {},
         steps: [
-          {
+          createMockModelStep({
             id: 'step1',
             name: 'Step 1',
-            type: 'model',
             model: 'haiku',
             prompt: 'Prompt A',
-          },
+          }),
         ],
-      };
+      });
 
       const flow2: FlowDefinition = {
         ...flow1,
         steps: [
-          {
+          createMockModelStep({
             id: 'step1',
             name: 'Step 1',
-            type: 'model',
             model: 'haiku',
             prompt: 'Prompt B', // Different prompt
-          },
+          }),
         ],
       };
 
@@ -1301,9 +1280,8 @@ custom-flow:
     });
 
     it('Test 5.3: should produce different hashes for different workspace configs', () => {
-      const flow1: FlowDefinition = {
+      const flow1 = createMockFlow({
         id: 'flow1',
-        version: '1.0.0',
         name: 'Flow 1',
         description: 'Test',
         workspace: {
@@ -1311,17 +1289,15 @@ custom-flow:
           gitStrategy: 'main-only',
           reusePolicy: 'never',
         },
-        inputs: {},
         steps: [
-          {
+          createMockModelStep({
             id: 'step1',
             name: 'Step 1',
-            type: 'model',
             model: 'haiku',
             prompt: 'Test',
-          },
+          }),
         ],
-      };
+      });
 
       const flow2: FlowDefinition = {
         ...flow1,
@@ -1339,9 +1315,8 @@ custom-flow:
     });
 
     it('Test 5.4: should produce different hashes for different inputs', () => {
-      const flow1: FlowDefinition = {
+      const flow1 = createMockFlow({
         id: 'flow1',
-        version: '1.0.0',
         name: 'Flow 1',
         description: 'Test',
         workspace: {
@@ -1353,15 +1328,14 @@ custom-flow:
           input1: 'string',
         },
         steps: [
-          {
+          createMockModelStep({
             id: 'step1',
             name: 'Step 1',
-            type: 'model',
             model: 'haiku',
             prompt: 'Test',
-          },
+          }),
         ],
-      };
+      });
 
       const flow2: FlowDefinition = {
         ...flow1,
@@ -1378,9 +1352,8 @@ custom-flow:
     });
 
     it('Test 5.5: should produce same hash when only name/description differ', () => {
-      const flow1: FlowDefinition = {
+      const flow1 = createMockFlow({
         id: 'flow1',
-        version: '1.0.0',
         name: 'Flow 1',
         description: 'Description A',
         workspace: {
@@ -1392,15 +1365,14 @@ custom-flow:
           input1: 'string',
         },
         steps: [
-          {
+          createMockModelStep({
             id: 'step1',
             name: 'Step 1',
-            type: 'model',
             model: 'haiku',
             prompt: 'Test',
-          },
+          }),
         ],
-      };
+      });
 
       const flow2: FlowDefinition = {
         ...flow1,

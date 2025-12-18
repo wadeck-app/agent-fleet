@@ -11,59 +11,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GraphValidator } from './GraphValidator.js';
 import type { FlowStep, SubFlowStep, FlowDefinition } from '../types.js';
-import type { ValidationIssue, IssueCollector } from './ValidationTypes.js';
 import { ValidationCode } from './ValidationTypes.js';
-import type { FlowRegistry } from '../registry/FlowRegistry.js';
-
-/**
- * Mock IssueCollector for testing
- */
-class MockIssueCollector implements IssueCollector {
-  public issues: ValidationIssue[] = [];
-
-  addIssue(issue: ValidationIssue): void {
-    this.issues.push(issue);
-  }
-
-  reset(): void {
-    this.issues = [];
-  }
-
-  getErrors(): ValidationIssue[] {
-    return this.issues.filter(i => i.severity === 'error');
-  }
-
-  getWarnings(): ValidationIssue[] {
-    return this.issues.filter(i => i.severity === 'warning');
-  }
-
-  hasCode(code: ValidationCode): boolean {
-    return this.issues.some(i => i.code === code);
-  }
-}
-
-/**
- * Mock FlowRegistry for testing
- */
-class MockFlowRegistry implements Pick<FlowRegistry, 'getFlow' | 'hasFlow'> {
-  private flows: Map<string, FlowDefinition> = new Map();
-
-  addFlow(flow: FlowDefinition): void {
-    this.flows.set(flow.id, flow);
-  }
-
-  getFlow(id: string): FlowDefinition | undefined {
-    return this.flows.get(id);
-  }
-
-  hasFlow(id: string): boolean {
-    return this.flows.has(id);
-  }
-
-  clear(): void {
-    this.flows.clear();
-  }
-}
+import { MockIssueCollector, MockFlowRegistry } from '../../test-utils/index.js';
 
 describe('GraphValidator', () => {
   let collector: MockIssueCollector;

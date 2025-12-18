@@ -2,7 +2,7 @@
  * WebSocketEventHandler Tests
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { WebSocketEventHandler } from './WebSocketEventHandler.js';
 import { WebSocketConnectionManager } from './WebSocketConnectionManager.js';
 import { TaskManager } from '../core/TaskManager.js';
@@ -28,13 +28,13 @@ import {
   KillClaudeMessage,
 } from '../../shared/types.js';
 import { createMessage } from '../../shared/protocol.js';
-
-// Mock WebSocket class
-class MockWebSocket {
-  public readyState = 1; // OPEN
-  send = vi.fn();
-  close = vi.fn();
-}
+import {
+  setupTest,
+  createMockTaskManager,
+  createMockStateManager,
+  createMockConnectionManager,
+  MockWebSocket,
+} from '../../test-utils/index.js';
 
 // Mock dependencies
 vi.mock('./TaskManager.js');
@@ -43,49 +43,30 @@ vi.mock('../../shared/Logger.js');
 vi.mock('./WebSocketConnectionManager.js');
 
 describe('WebSocketEventHandler', () => {
+  let cleanup: () => void;
   let eventHandler: WebSocketEventHandler;
-  let mockTaskManager: TaskManager;
-  let mockStateManager: StateManager;
-  let mockConnectionManager: WebSocketConnectionManager;
+  let mockTaskManager: ReturnType<typeof createMockTaskManager>;
+  let mockStateManager: ReturnType<typeof createMockStateManager>;
+  let mockConnectionManager: ReturnType<typeof createMockConnectionManager>;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    cleanup = setupTest();
 
-    // Mock TaskManager
-    mockTaskManager = {
-      getNextTaskForWorker: vi.fn(),
-      assignTask: vi.fn(),
-      unassignTask: vi.fn(),
-      updateTaskStatus: vi.fn(),
-      addComment: vi.fn(),
-      getTask: vi.fn(),
-    } as any;
-
-    // Mock StateManager
-    mockStateManager = {
-      emitWorkerConnected: vi.fn(),
-      emitWorkerDisconnected: vi.fn(),
-      emitWorkerTaskAssigned: vi.fn(),
-      emitWorkerTaskReleased: vi.fn(),
-      emitTaskUpdated: vi.fn(),
-    } as any;
-
-    // Mock ConnectionManager
-    mockConnectionManager = {
-      getWorker: vi.fn(),
-      releaseWorker: vi.fn(),
-      sendMessage: vi.fn(),
-    } as any;
-
-    vi.mocked(Logger.log).mockImplementation(() => {});
-    vi.mocked(Logger.error).mockImplementation(() => {});
+    // Create mocks using test-utils
+    mockTaskManager = createMockTaskManager();
+    mockStateManager = createMockStateManager();
+    mockConnectionManager = createMockConnectionManager();
 
     // Create event handler
     eventHandler = new WebSocketEventHandler(
-      mockTaskManager,
-      mockStateManager,
-      mockConnectionManager
+      mockTaskManager as any,
+      mockStateManager as any,
+      mockConnectionManager as any
     );
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   describe('TASK_STARTED Message Handling', () => {

@@ -9,9 +9,15 @@ import { FlowWorker } from './FlowWorker.js';
 import { FlowRegistry } from '../../flow/registry/FlowRegistry.js';
 import { WorkspaceManager } from '../../flow/workspace/WorkspaceManager.js';
 import { FlowExecutor } from '../../flow/executor/FlowExecutor.js';
-import type { Task, TaskStatus } from '../../shared/types.js';
-import type { FlowDefinition, Workspace, FlowExecutionResult, WorkspaceMode, GitStrategy, ReusePolicy } from '../../flow/types.js';
+import type { Task } from '../../shared/types.js';
+import type { FlowDefinition, Workspace, FlowExecutionResult } from '../../flow/types.js';
 import { ChildProcess } from 'child_process';
+import {
+  createMockTask,
+  createMockFlow,
+  createMockWorkspace,
+  createMockFlowTrace,
+} from '../../test-utils/index.js';
 
 // Mock WebSocket
 vi.mock('ws', () => ({
@@ -91,64 +97,15 @@ describe('FlowWorker', () => {
   let mockFlow: FlowDefinition;
   let mockWorkspace: Workspace;
 
-  const createMockTask = (overrides?: Partial<Task>): Task => ({
-    id: 'task-1',
-    description: 'Test flow task',
-    status: 'pending' as TaskStatus,
-    priority: 'medium',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    assignedTo: null,
-    comments: [],
-    metadata: {},
-    history: [],
-    flowId: 'test-flow',
-    ...overrides
-  });
-
-  const createMockFlow = (overrides?: Partial<FlowDefinition>): FlowDefinition => ({
-    id: 'test-flow',
-    version: '1.0.0',
-    name: 'Test Flow',
-    description: 'Test flow description',
-    workspace: {
-      mode: 'isolated' as WorkspaceMode,
-      gitStrategy: 'feature-branch' as GitStrategy,
-      reusePolicy: 'if-available' as ReusePolicy
-    },
-    inputs: {},
-    steps: [
-      {
-        id: 'step1',
-        name: 'Test Step',
-        type: 'model',
-        model: 'sonnet',
-        prompt: 'Test prompt'
-      }
-    ],
-    ...overrides
-  });
-
-  const createMockWorkspace = (overrides?: Partial<Workspace>): Workspace => ({
-    id: 'workspace-1',
-    path: '/tmp/workspace-1',
-    mode: 'isolated' as WorkspaceMode,
-    concurrency: {
-      key: 'test',
-      activeTasks: new Set(),
-      locked: false
-    },
-    createdAt: new Date().toISOString(),
-    lastUsedAt: new Date().toISOString(),
-    usageCount: 1,
-    ...overrides
-  });
-
   beforeEach(() => {
     vi.clearAllMocks();
 
     // Setup mocks
-    mockTask = createMockTask();
+    mockTask = createMockTask({
+      id: 'task-1',
+      flowId: 'test-flow',
+      description: 'Test flow task'
+    });
     mockFlow = createMockFlow();
     mockWorkspace = createMockWorkspace();
 
@@ -174,15 +131,7 @@ describe('FlowWorker', () => {
     mockFlowExecutor = {
       execute: vi.fn().mockResolvedValue({
         success: true,
-        trace: {
-          id: 'trace-1',
-          taskId: 'task-1',
-          flowId: 'test-flow',
-          workspaceId: 'workspace-1',
-          startTime: Date.now(),
-          status: 'completed' as const,
-          steps: []
-        },
+        trace: createMockFlowTrace(),
         outputs: { step1: { result: 'success' } }
       } as FlowExecutionResult)
     };
@@ -338,6 +287,7 @@ describe('FlowWorker', () => {
 
     it('should pass flowInputs to execution', async () => {
       const taskWithInputs = createMockTask({
+        flowId: 'test-flow',
         flowInputs: { input1: 'value1', input2: 'value2' }
       });
 
@@ -489,6 +439,7 @@ describe('FlowWorker', () => {
       mockFlowRegistry.getFlow.mockReturnValue(manualFlow);
 
       const taskWithWorkspace = createMockTask({
+        flowId: 'test-flow',
         workspacePath: '/custom/workspace'
       });
 
@@ -606,6 +557,8 @@ describe('FlowWorker', () => {
   describe('executeTask - Task Metadata', () => {
     it('should pass task metadata to workspace allocation', async () => {
       const taskWithMetadata = createMockTask({
+        flowId: 'test-flow',
+        description: 'Test flow task',
         metadata: { custom: 'data', tag: 'test' }
       });
 
@@ -625,6 +578,8 @@ describe('FlowWorker', () => {
 
     it('should pass task metadata to executor', async () => {
       const taskWithMetadata = createMockTask({
+        flowId: 'test-flow',
+        description: 'Test flow task',
         metadata: { custom: 'data' }
       });
 
@@ -931,8 +886,8 @@ describe('FlowWorker', () => {
         .mockRejectedValueOnce(new Error('Allocation failed'))
         .mockResolvedValueOnce(mockWorkspace);
 
-      const task1 = createMockTask({ id: 'task-1' });
-      const task2 = createMockTask({ id: 'task-2' });
+      const task1 = createMockTask({ id: 'task-1', flowId: 'test-flow' });
+      const task2 = createMockTask({ id: 'task-2', flowId: 'test-flow' });
 
       await (worker as any).executeTask(task1);
       expect(task1.flowResult?.status).toBe('failed');
@@ -955,8 +910,8 @@ describe('FlowWorker', () => {
           outputs: { step1: { result: 'success' } }
         });
 
-      const task1 = createMockTask({ id: 'task-1' });
-      const task2 = createMockTask({ id: 'task-2' });
+      const task1 = createMockTask({ id: 'task-1', flowId: 'test-flow' });
+      const task2 = createMockTask({ id: 'task-2', flowId: 'test-flow' });
 
       await (worker as any).executeTask(task1);
       expect(task1.flowResult?.status).toBe('failed');
@@ -1129,7 +1084,7 @@ describe('FlowWorker', () => {
 
   describe('Edge Cases', () => {
     it('should handle task with empty metadata', async () => {
-      const taskWithEmptyMetadata = createMockTask({ metadata: {} });
+      const taskWithEmptyMetadata = createMockTask({ metadata: {}, flowId: 'test-flow' });
 
       await (worker as any).executeTask(taskWithEmptyMetadata);
 

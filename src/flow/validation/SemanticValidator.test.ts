@@ -7,29 +7,14 @@ import { SemanticValidator } from './SemanticValidator.js';
 import { GraphValidator } from './GraphValidator.js';
 import { FlowRegistry } from '../registry/FlowRegistry.js';
 import { ValidationCode } from './ValidationTypes.js';
-import type { ValidationIssue, IssueCollector } from './ValidationTypes.js';
 import type { FlowDefinition, FlowStep, SubFlowStep } from '../types.js';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-
-/**
- * Test issue collector implementation
- */
-class TestIssueCollector implements IssueCollector {
-  public issues: ValidationIssue[] = [];
-
-  public addIssue(issue: ValidationIssue): void {
-    this.issues.push(issue);
-  }
-
-  public reset(): void {
-    this.issues = [];
-  }
-}
+import { MockIssueCollector } from '../../test-utils/index.js';
 
 describe('SemanticValidator', () => {
-  let issueCollector: TestIssueCollector;
+  let issueCollector: MockIssueCollector;
   let graphValidator: GraphValidator;
   let registry: FlowRegistry;
   let semanticValidator: SemanticValidator;
@@ -45,7 +30,7 @@ describe('SemanticValidator', () => {
     fs.writeFileSync(path.join(flowsDir, 'flows.yml'), '');
 
     registry = new FlowRegistry(tempDir);
-    issueCollector = new TestIssueCollector();
+    issueCollector = new MockIssueCollector();
     graphValidator = new GraphValidator(issueCollector, registry);
     semanticValidator = new SemanticValidator(issueCollector, graphValidator, registry);
   });

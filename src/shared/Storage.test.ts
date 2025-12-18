@@ -8,6 +8,7 @@ import { Task, TaskStatus } from './types.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createMockTask, fileExists, directoryExists } from '../test-utils/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -49,22 +50,13 @@ describe('Storage', () => {
   }
 
   function createTestTask(id: string = 'test-task-1'): Task {
-    return {
+    return createMockTask({
       id,
+      status: 'backlog' as TaskStatus,
       description: 'Test task description',
-      status: TaskStatus.BACKLOG,
-      priority: 'medium',
       createdAt: '2024-01-01T00:00:00.000Z',
       updatedAt: '2024-01-01T00:00:00.000Z',
-      assignedTo: null,
-      comments: [],
-      metadata: {},
-      history: [{
-        timestamp: '2024-01-01T00:00:00.000Z',
-        event: 'created',
-        status: TaskStatus.BACKLOG
-      }]
-    };
+    });
   }
 
   describe('initialize', () => {
@@ -373,22 +365,4 @@ describe('Storage', () => {
     });
   });
 
-  // Helper functions
-  async function fileExists(filePath: string): Promise<boolean> {
-    try {
-      await fs.promises.access(filePath);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  async function directoryExists(dirPath: string): Promise<boolean> {
-    try {
-      const stats = await fs.promises.stat(dirPath);
-      return stats.isDirectory();
-    } catch {
-      return false;
-    }
-  }
 });

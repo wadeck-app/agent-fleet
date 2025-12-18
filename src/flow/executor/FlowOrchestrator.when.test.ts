@@ -11,6 +11,7 @@ import { FlowRegistry } from '../registry/FlowRegistry.js';
 import { FlowExecutor } from './FlowExecutor.js';
 import type { FlowDefinition, Workspace, FlowStep } from '../types.js';
 import type { TemplateContext } from '../processing/TemplateRenderer.js';
+import { createMockFlow, createMockScriptStep, createMockSubFlowStep } from '../../test-utils/index.js';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
@@ -61,9 +62,8 @@ describe('FlowOrchestrator - when condition', () => {
 
   describeWindows('Windows conditional execution', () => {
     it('should skip step when condition evaluates to false', async () => {
-      const flow: FlowDefinition = {
+      const flow = createMockFlow({
         id: 'test-conditional',
-        version: '1.0.0',
         name: 'Test Conditional',
         description: 'Test when condition',
         workspace: {
@@ -71,34 +71,30 @@ describe('FlowOrchestrator - when condition', () => {
           gitStrategy: 'any',
           reusePolicy: 'always',
         },
-        inputs: {},
         steps: [
-          {
-            type: 'script',
+          createMockScriptStep({
             id: 'set-flag',
             name: 'Set Flag',
             script: 'echo flag=false',
             output: {
               flag: { type: 'string', pattern: 'flag=(.*)' },
             },
-          } as FlowStep,
-          {
-            type: 'script',
+          }),
+          createMockScriptStep({
             id: 'should-skip',
             name: 'Should Skip',
             depends: ['set-flag'],
             when: "${{ steps['set-flag'].outputs.flag === 'true' }}",
             script: 'echo This should not execute',
-          } as FlowStep,
-          {
-            type: 'script',
+          }),
+          createMockScriptStep({
             id: 'always-run',
             name: 'Always Run',
             depends: ['set-flag'],
             script: 'echo This always runs',
-          } as FlowStep,
+          }),
         ],
-      };
+      });
 
       const context: TemplateContext = {
         inputs: {},
@@ -118,9 +114,8 @@ describe('FlowOrchestrator - when condition', () => {
     });
 
     it('should execute step when condition evaluates to true', async () => {
-      const flow: FlowDefinition = {
+      const flow = createMockFlow({
         id: 'test-conditional-true',
-        version: '1.0.0',
         name: 'Test Conditional True',
         description: 'Test when condition = true',
         workspace: {
@@ -128,19 +123,16 @@ describe('FlowOrchestrator - when condition', () => {
           gitStrategy: 'any',
           reusePolicy: 'always',
         },
-        inputs: {},
         steps: [
-          {
-            type: 'script',
+          createMockScriptStep({
             id: 'set-flag',
             name: 'Set Flag',
             script: 'echo flag=true',
             output: {
               flag: { type: 'string', pattern: 'flag=(.*)' },
             },
-          } as FlowStep,
-          {
-            type: 'script',
+          }),
+          createMockScriptStep({
             id: 'should-run',
             name: 'Should Run',
             depends: ['set-flag'],
@@ -149,9 +141,9 @@ describe('FlowOrchestrator - when condition', () => {
             output: {
               result: { type: 'string', pattern: '(.*)' },
             },
-          } as FlowStep,
+          }),
         ],
-      };
+      });
 
       const context: TemplateContext = {
         inputs: {},
@@ -169,9 +161,8 @@ describe('FlowOrchestrator - when condition', () => {
     });
 
     it('should stop recursion when condition becomes false', async () => {
-      const flow: FlowDefinition = {
+      const flow = createMockFlow({
         id: 'test-countdown',
-        version: '1.0.0',
         name: 'Test Countdown',
         description: 'Test recursive flow with exit condition',
         workspace: {
@@ -183,8 +174,7 @@ describe('FlowOrchestrator - when condition', () => {
           count: 'string',
         },
         steps: [
-          {
-            type: 'script',
+          createMockScriptStep({
             id: 'calculate',
             name: 'Calculate',
             script: 'set /a next=${{ inputs.count }}-1 >nul\necho next=%next%\nif %next% GEQ 0 (echo continue=true) else (echo continue=false)',
@@ -192,9 +182,8 @@ describe('FlowOrchestrator - when condition', () => {
               next: { type: 'string', pattern: 'next=(.*)' },
               continue: { type: 'string', pattern: 'continue=(.*)' },
             },
-          } as FlowStep,
-          {
-            type: 'subflow',
+          }),
+          createMockSubFlowStep({
             id: 'recurse',
             name: 'Recurse',
             flowId: 'test-countdown',
@@ -204,9 +193,9 @@ describe('FlowOrchestrator - when condition', () => {
             inputs: {
               count: '${{ steps.calculate.outputs.next }}',
             },
-          } as FlowStep,
+          }),
         ],
-      };
+      });
 
       // Register the flow so it can call itself
       flowRegistry.registerFlow(flow);

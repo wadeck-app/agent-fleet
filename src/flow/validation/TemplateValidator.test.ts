@@ -11,35 +11,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TemplateValidator } from './TemplateValidator.js';
 import type { FlowDefinition } from '../types.js';
-import type { ValidationIssue, IssueCollector } from './ValidationTypes.js';
 import { ValidationCode } from './ValidationTypes.js';
-
-/**
- * Mock IssueCollector for testing
- */
-class MockIssueCollector implements IssueCollector {
-  public issues: ValidationIssue[] = [];
-
-  addIssue(issue: ValidationIssue): void {
-    this.issues.push(issue);
-  }
-
-  reset(): void {
-    this.issues = [];
-  }
-
-  getErrors(): ValidationIssue[] {
-    return this.issues.filter(i => i.severity === 'error');
-  }
-
-  getWarnings(): ValidationIssue[] {
-    return this.issues.filter(i => i.severity === 'warning');
-  }
-
-  hasCode(code: ValidationCode): boolean {
-    return this.issues.some(i => i.code === code);
-  }
-}
+import { MockIssueCollector } from '../../test-utils/index.js';
 
 describe('TemplateValidator', () => {
   let validator: TemplateValidator;

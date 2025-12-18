@@ -2,7 +2,7 @@
  * WebSocketMessageRouter Tests
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { WebSocketMessageRouter } from './WebSocketMessageRouter.js';
 import { WebSocketConnectionManager } from './WebSocketConnectionManager.js';
 import { WebSocketEventHandler } from './WebSocketEventHandler.js';
@@ -26,13 +26,7 @@ import {
 } from '../../shared/types.js';
 import { createMessage } from '../../shared/protocol.js';
 import { Logger } from '../../shared/Logger.js';
-
-// Mock WebSocket class
-class MockWebSocket {
-  public readyState = 1; // OPEN
-  send = vi.fn();
-  close = vi.fn();
-}
+import { setupTest, MockWebSocket } from '../../test-utils/index.js';
 
 // Mock dependencies
 vi.mock('./WebSocketConnectionManager.js');
@@ -40,13 +34,14 @@ vi.mock('./WebSocketEventHandler.js');
 vi.mock('../../shared/Logger.js');
 
 describe('WebSocketMessageRouter', () => {
+  let cleanup: () => void;
   let messageRouter: WebSocketMessageRouter;
   let mockConnectionManager: WebSocketConnectionManager;
   let mockEventHandler: WebSocketEventHandler;
   let mockSocket: MockWebSocket;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    cleanup = setupTest();
 
     mockSocket = new MockWebSocket();
 
@@ -74,10 +69,12 @@ describe('WebSocketMessageRouter', () => {
       handleHookEvent: vi.fn(),
     } as any;
 
-    vi.mocked(Logger.log).mockImplementation(() => {});
-
     // Create message router
     messageRouter = new WebSocketMessageRouter(mockConnectionManager, mockEventHandler);
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   describe('Message Routing', () => {

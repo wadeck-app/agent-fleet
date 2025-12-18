@@ -8,6 +8,12 @@ import { Storage } from '../../shared/Storage.js';
 import { StateManager } from '../../shared/StateManager.js';
 import { Logger } from '../../shared/Logger.js';
 import { Task, TaskStatus, WorkerType } from '../../shared/types.js';
+import {
+  setupTest,
+  setupTimers,
+  createMockStateManager,
+  createMockTask,
+} from '../../test-utils/index.js';
 
 // Mock dependencies
 vi.mock('../../shared/Storage.js');
@@ -18,18 +24,17 @@ vi.mock('uuid', () => ({
 }));
 
 describe('TaskManager', () => {
+  let cleanup: () => void;
+  let cleanupTimers: () => void;
   let taskManager: TaskManager;
-  let mockStateManager: StateManager;
+  let mockStateManager: ReturnType<typeof createMockStateManager>;
 
   beforeEach(async () => {
-    vi.clearAllMocks();
+    cleanup = setupTest();
+    cleanupTimers = setupTimers();
 
-    // Mock StateManager
-    mockStateManager = {
-      emitTaskCreated: vi.fn(),
-      emitTaskUpdated: vi.fn(),
-      emitTaskDeleted: vi.fn(),
-    } as any;
+    // Mock StateManager using test-utils
+    mockStateManager = createMockStateManager();
 
     // Mock Storage with async methods
     vi.mocked(Storage.initialize).mockResolvedValue(undefined);
@@ -37,19 +42,16 @@ describe('TaskManager', () => {
     vi.mocked(Storage.saveTask).mockResolvedValue(undefined);
     vi.mocked(Storage.deleteTask).mockResolvedValue(undefined);
 
-    // Mock Logger
-    vi.mocked(Logger.log).mockImplementation(() => {});
-
     // Mock Date to have consistent timestamps
-    vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
 
-    taskManager = new TaskManager(mockStateManager);
+    taskManager = new TaskManager(mockStateManager as any);
     await taskManager.initialize();
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    cleanup();
+    cleanupTimers();
   });
 
   describe('Constructor and Initialization', () => {

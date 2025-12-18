@@ -9,6 +9,13 @@ import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer.js';
 import { StateManager, StateEvent } from '../../shared/StateManager.js';
 import { Task, TaskStatus, WorkerType, WorkerInfo } from '../../shared/types.js';
 import { Logger } from '../../shared/Logger.js';
+import {
+  createMockTask,
+  createMockWorker,
+  createMockTaskManager,
+  createMockStateManager,
+  setupTimers,
+} from '../../test-utils/index.js';
 
 // Mock dependencies
 vi.mock('../core/TaskManager.js');
@@ -18,12 +25,13 @@ vi.mock('../../shared/Logger.js');
 
 describe('MetricsCollector', () => {
   let collector: MetricsCollector;
-  let mockTaskManager: TaskManager;
-  let mockWsServer: WorkerWebSocketServer;
-  let mockStateManager: StateManager;
+  let mockTaskManager: any;
+  let mockWsServer: any;
+  let mockStateManager: any;
+  let cleanupTimers: () => void;
 
   const mockTasks: Task[] = [
-    {
+    createMockTask({
       id: 'task-1',
       description: 'Task 1',
       status: TaskStatus.IN_PROGRESS,
@@ -31,59 +39,47 @@ describe('MetricsCollector', () => {
       createdAt: '2024-01-01T00:00:00.000Z',
       updatedAt: '2024-01-01T00:05:00.000Z',
       assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
-      comments: [],
-      metadata: {},
-      history: []
-    },
-    {
+    }),
+    createMockTask({
       id: 'task-2',
       description: 'Task 2',
       status: TaskStatus.MERGED,
       priority: 'medium',
       createdAt: '2024-01-01T00:00:00.000Z',
       updatedAt: '2024-01-01T00:10:00.000Z',
-      assignedTo: null,
-      comments: [],
-      metadata: {},
-      history: []
-    },
-    {
+    }),
+    createMockTask({
       id: 'task-3',
       description: 'Task 3',
       status: TaskStatus.CANCELLED,
       priority: 'low',
       createdAt: '2024-01-01T00:00:00.000Z',
       updatedAt: '2024-01-01T00:03:00.000Z',
-      assignedTo: null,
-      comments: [],
-      metadata: {},
-      history: []
-    }
+    }),
   ];
 
   const mockWorkers: WorkerInfo[] = [
-    {
+    createMockWorker({
       id: 'worker-1',
       type: WorkerType.DEV,
       connectedAt: '2024-01-01T00:00:00.000Z',
       taskId: 'task-1',
-    },
-    {
+    }),
+    createMockWorker({
       id: 'worker-2',
       type: WorkerType.DEV,
       connectedAt: '2024-01-01T00:00:00.000Z',
       taskId: null,
-    }
+    }),
   ];
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.useFakeTimers();
+    cleanupTimers = setupTimers();
 
     // Mock TaskManager
-    mockTaskManager = {
-      getAllTasks: vi.fn().mockReturnValue(mockTasks)
-    } as any;
+    mockTaskManager = createMockTaskManager();
+    mockTaskManager.getAllTasks.mockReturnValue(mockTasks);
 
     // Mock WorkerWebSocketServer
     mockWsServer = {
@@ -91,9 +87,7 @@ describe('MetricsCollector', () => {
     } as any;
 
     // Mock StateManager
-    mockStateManager = {
-      emitMetricsUpdated: vi.fn()
-    } as any;
+    mockStateManager = createMockStateManager();
 
     // Mock Logger
     vi.mocked(Logger.logStructured).mockImplementation(() => {});
@@ -107,7 +101,7 @@ describe('MetricsCollector', () => {
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    cleanupTimers();
     collector.stop();
   });
 
