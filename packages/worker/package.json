@@ -1,0 +1,34 @@
+{
+  "name": "worker",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --build tsconfig.json",
+    "dev": "tsx src/flow/FlowWorker.ts --no-ui",
+    "dev:ui": "tsx src/flow/FlowWorker.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "shared-orch-worker": "*",
+    "shared-common": "*",
+    "flow-engine": "*",
+    "ws": "^8.16.0",
+    "react": "^19.2.0",
+    "ink": "^6.5.1",
+    "terminal-kit": "^3.1.2"
+  },
+  "devDependencies": {
+    "test-utils": "*",
+    "@types/ws": "^8.5.10",
+    "@types/terminal-kit": "^2.5.7",
+    "@types/react": "^19.2.7",
+    "typescript": "^5.3.3",
+    "vitest": "^4.0.14",
+    "tsx": "^4.7.0"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "web-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --build tsconfig.json",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "shared-frontend-backend": "*",
+    "shared-orch-backend": "*",
+    "shared-common": "*"
+  },
+  "devDependencies": {
+    "test-utils": "*",
+    "typescript": "^5.3.3",
+    "vitest": "^4.0.14",
+    "tsx": "^4.7.0"
+  }
+}
