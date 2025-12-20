@@ -16,6 +16,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { setupTest } from '../../test-utils/index.js';
 import { FlowExecutor } from './FlowExecutor.js';
 import { FlowRegistry } from '../registry/FlowRegistry.js';
 import type { FlowDefinition, Workspace } from '../types.js';
@@ -53,10 +54,7 @@ describe.skip('SubFlowStep Integration Tests', () => {
 
     vi.clearAllMocks();
 
-    // Suppress console output in tests
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Suppress console output in tests=> {});=> {});=> {});
   });
 
   describe('1. Basic subflow execution', () => {

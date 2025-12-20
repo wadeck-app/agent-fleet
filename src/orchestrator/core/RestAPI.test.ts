@@ -14,6 +14,7 @@ import { WorkspaceManager } from '../../flow/workspace/WorkspaceManager.js';
 import { StateManager } from '../../shared/StateManager.js';
 import { Task, TaskStatus, WorkerType, WorkerInfo } from '../../shared/types.js';
 import { Logger } from '../../shared/Logger.js';
+import { setupTest, createMockTask as createMockTaskUtil } from '../../test-utils/index.js';
 
 // Mock all dependencies
 vi.mock('./TaskManager.js');
@@ -31,24 +32,16 @@ describe('RestAPI', () => {
   let mockConnectionManager: any;
   let mockFlowDiscoveryRegistry: any;
   let app: any;
+  let cleanup: () => void;
 
-  // Helper to create a mock task
-  const createMockTask = (id: string, overrides?: Partial<Task>): Task => ({
-    id,
-    description: 'Test task',
-    status: TaskStatus.BACKLOG,
-    priority: 'medium',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z',
-    assignedTo: null,
-    comments: [],
-    metadata: {},
-    history: [],
+  // Local helper to create tasks with flexible overrides (allows non-standard properties)
+  const createMockTask = (id: string, overrides?: Partial<Task> & Record<string, any>): Task => ({
+    ...createMockTaskUtil({ id }),
     ...overrides,
-  });
+  } as Task);
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    cleanup = setupTest();
 
     // Mock StateManager
     mockStateManager = {

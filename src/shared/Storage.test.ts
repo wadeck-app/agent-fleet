@@ -49,15 +49,15 @@ describe('Storage', () => {
     }
   }
 
-  function createTestTask(id: string = 'test-task-1'): Task {
-    return createMockTask({
+  // Use test-utils factory with common defaults
+  const createTestTask = (id: string = 'test-task-1'): Task =>
+    createMockTask({
       id,
       status: 'backlog' as TaskStatus,
       description: 'Test task description',
       createdAt: '2024-01-01T00:00:00.000Z',
       updatedAt: '2024-01-01T00:00:00.000Z',
     });
-  }
 
   describe('initialize', () => {
     it('should create all required directories', async () => {

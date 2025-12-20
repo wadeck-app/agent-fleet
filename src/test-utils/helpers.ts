@@ -304,6 +304,32 @@ export async function retry<T>(
 }
 
 /**
+ * Mock process.platform for testing platform-specific code
+ *
+ * @example
+ * ```typescript
+ * const restore = mockPlatform('win32');
+ * // ... test Windows-specific code
+ * restore();
+ * ```
+ */
+export function mockPlatform(platform: NodeJS.Platform): () => void {
+  const original = Object.getOwnPropertyDescriptor(process, 'platform');
+
+  Object.defineProperty(process, 'platform', {
+    value: platform,
+    configurable: true,
+    writable: true,
+  });
+
+  return () => {
+    if (original) {
+      Object.defineProperty(process, 'platform', original);
+    }
+  };
+}
+
+/**
  * Create a mock that tracks call history with detailed information
  */
 export function createTrackedMock<T extends (...args: any[]) => any = any>() {

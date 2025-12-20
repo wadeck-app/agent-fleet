@@ -68,6 +68,7 @@ export {
   retry,
   createTrackedMock,
   setupTest,
+  mockPlatform,
 } from './helpers.js';
 
 // Export REST API helpers

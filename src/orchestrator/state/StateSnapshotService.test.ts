@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { setupTest } from '../../test-utils/index.js';
 import { StateSnapshotService } from './StateSnapshotService.js';
 import { TaskManager } from '../core/TaskManager.js';
 import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer.js';

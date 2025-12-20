@@ -1,3 +1,5 @@
+TODO check : est-ce que ca a été fait ?
+
 # Flow Discovery & Synchronization Implementation Plan
 
 **Date**: 2025-12-13

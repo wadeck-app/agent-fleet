@@ -2,7 +2,8 @@
  * Flow Orchestrator Tests
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { setupTest } from '../../test-utils/index.js';
 import { FlowOrchestrator } from './FlowOrchestrator.js';
 import { StepRunner } from './StepRunner.js';
 import type { FlowDefinition, Workspace, StepTrace } from '../types.js';
@@ -11,11 +12,13 @@ import type { FlowDefinition, Workspace, StepTrace } from '../types.js';
 vi.mock('./StepRunner.js');
 
 describe('FlowOrchestrator', () => {
+  let cleanup: () => void;
   let orchestrator: FlowOrchestrator;
   let mockStepRunner: StepRunner;
   let testWorkspace: Workspace;
 
   beforeEach(() => {
+    cleanup = setupTest();
     mockStepRunner = new StepRunner({ interactive: false });
     orchestrator = new FlowOrchestrator(mockStepRunner);
 
@@ -33,9 +36,10 @@ describe('FlowOrchestrator', () => {
       usageCount: 0,
     };
 
-    vi.clearAllMocks();
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   describe('Basic Orchestration', () => {

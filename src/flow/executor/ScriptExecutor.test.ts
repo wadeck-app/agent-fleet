@@ -4,6 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ScriptExecutor, ScriptExecutionError } from './ScriptExecutor.js';
+import { setupTest } from '../../test-utils/index.js';
 import * as child_process from 'child_process';
 import { EventEmitter } from 'events';
 
@@ -11,13 +12,15 @@ import { EventEmitter } from 'events';
 vi.mock('child_process');
 
 describe('ScriptExecutor', () => {
+  let cleanup: () => void;
   let executor: ScriptExecutor;
   let mockChild: any;
 
   beforeEach(() => {
-    executor = new ScriptExecutor();
-    vi.clearAllMocks();
+    cleanup = setupTest();
     vi.useFakeTimers();
+
+    executor = new ScriptExecutor();
 
     // Create a mock child process with EventEmitter functionality
     mockChild = new EventEmitter();
@@ -30,7 +33,7 @@ describe('ScriptExecutor', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    cleanup();
     vi.useRealTimers();
   });
 

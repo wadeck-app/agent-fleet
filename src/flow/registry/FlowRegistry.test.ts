@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { setupTest } from '../../test-utils/index.js';
 import { FlowRegistry, FlowValidationError } from './FlowRegistry.js';
 import type { FlowDefinition, WorkspaceConfig } from '../types.js';
 import { createMockFlow, createMockModelStep } from '../../test-utils/index.js';

@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { setupTest } from '../../test-utils/index.js';
 import { StepRunner } from './StepRunner.js';
 import type { ScriptFlowStep, ModelFlowStep, SubFlowStep, Workspace, FlowDefinition } from '../types.js';
 import { TemplateRenderer } from '../processing/TemplateRenderer.js';

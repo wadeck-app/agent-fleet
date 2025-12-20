@@ -13,22 +13,21 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { FlowExecutor, FlowExecutionError } from './FlowExecutor.js';
 import { StepRunner } from './StepRunner.js';
 import { FlowOrchestrator } from './FlowOrchestrator.js';
+import { setupTest } from '../../test-utils/index.js';
 
 // Mock dependencies
 vi.mock('./StepRunner.js');
 vi.mock('./FlowOrchestrator.js');
 
 describe('FlowExecutor', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  let cleanup: () => void;
 
-    // Suppress console output in tests
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  beforeEach(() => {
+    cleanup = setupTest();
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    cleanup();
   });
 
   describe('Constructor', () => {

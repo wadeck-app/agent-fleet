@@ -8,6 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach, MockedObject } from 'vitest';
+import { setupTest } from '../../test-utils/index.js';
 import { TaskManager } from './TaskManager.js';
 import { RestAPI } from './RestAPI.js';
 import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer.js';

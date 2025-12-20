@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { setupTest } from '../../test-utils/index.js';
 import { WebSocketConnectionManager } from './WebSocketConnectionManager.js';
 import { TaskManager } from '../core/TaskManager.js';
 import { StateManager } from '../../shared/StateManager.js';

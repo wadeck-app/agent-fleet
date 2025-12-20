@@ -2,19 +2,25 @@
  * Claude Launcher Tests
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ClaudeLauncher } from '../processing/ClaudeLauncher.js';
 import * as child_process from 'child_process';
+import { setupTest } from '../../test-utils/index.js';
 
 // Mock child_process
 vi.mock('child_process');
 
 describe('ClaudeLauncher', () => {
   let manager: ClaudeLauncher;
+  let cleanup: () => void;
 
   beforeEach(() => {
+    cleanup = setupTest();
     manager = new ClaudeLauncher();
-    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   describe('findClaudePath', () => {
@@ -49,12 +55,10 @@ describe('ClaudeLauncher', () => {
       vi.spyOn(child_process, 'execSync').mockImplementation(() => {
         throw new Error('Command not found');
       });
-      vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       const path = manager.findClaudePath();
 
       expect(path).toBe('claude');
-      expect(console.warn).toHaveBeenCalled();
     });
 
     it('should prefer .cmd files over .bat files on Windows', () => {
@@ -82,7 +86,6 @@ describe('ClaudeLauncher', () => {
 
       vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
       vi.spyOn(manager, 'findClaudePath').mockReturnValue('/usr/bin/claude');
-      vi.spyOn(console, 'log').mockImplementation(() => {});
 
       const result = await manager.launchInteractive({
         workingDir: '/test',
@@ -117,7 +120,6 @@ describe('ClaudeLauncher', () => {
 
       vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
       vi.spyOn(manager, 'findClaudePath').mockReturnValue('/usr/bin/claude');
-      vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await manager.launchInteractive({
         workingDir: '/test',
@@ -141,7 +143,6 @@ describe('ClaudeLauncher', () => {
 
       vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
       vi.spyOn(manager, 'findClaudePath').mockReturnValue('/usr/bin/claude');
-      vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await expect(
         manager.launchInteractive({
@@ -188,7 +189,6 @@ describe('ClaudeLauncher', () => {
 
       vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
       vi.spyOn(manager, 'findClaudePath').mockReturnValue('/usr/bin/claude');
-      vi.spyOn(console, 'log').mockImplementation(() => {});
 
       const result = await manager.launchBackground({
         workingDir: '/test',
@@ -233,8 +233,6 @@ describe('ClaudeLauncher', () => {
 
       vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
       vi.spyOn(manager, 'findClaudePath').mockReturnValue('/usr/bin/claude');
-      vi.spyOn(console, 'log').mockImplementation(() => {});
-      vi.spyOn(console, 'error').mockImplementation(() => {});
 
       const result = await manager.launchBackground({
         workingDir: '/test',

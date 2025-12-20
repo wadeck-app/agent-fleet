@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { setupTest } from '../../test-utils/index.js';
 import { UIClientHook } from './UIClientHook.js';
 import { StateManager, StateEvent } from '../../shared/StateManager.js';
 import { Logger } from '../../shared/Logger.js';
