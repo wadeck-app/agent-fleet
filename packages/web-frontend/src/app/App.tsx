@@ -7,7 +7,11 @@ import { useMediaQuery } from '@framework/hooks/useMediaQuery';
 import { DesktopSidebar } from '@app/components/navigation/DesktopSidebar';
 import { MobileSidebar } from '@app/components/navigation/MobileSidebar';
 import { BooksPage } from '@app/pages/books/BooksPage';
+import { DashboardPage } from '@app/pages/dashboard/DashboardPage';
 import { IngredientsPage } from '@app/pages/ingredients/IngredientsPage';
+import { TasksPage } from '@app/pages/tasks/TasksPage';
+import { WorkersPage } from '@app/pages/workers/WorkersPage';
+import { WorkspacesPage } from '@app/pages/workspaces/WorkspacesPage';
 
 import { circuitBreakerService } from './services';
 
@@ -31,13 +35,17 @@ function Layout() {
 			>
 				<div className="container mx-auto max-w-7xl p-6">
 					<Routes>
+						<Route path="/dashboard" element={<DashboardPage />} />
+						<Route path="/workers" element={<WorkersPage />} />
+						<Route path="/tasks" element={<TasksPage />} />
+						<Route path="/workspaces" element={<WorkspacesPage />} />
 						<Route path="/ingredients" element={<IngredientsPage />} />
 						<Route path="/ingredients/:mode" element={<IngredientsPage />} />
 						<Route path="/ingredients/:id/:mode" element={<IngredientsPage />} />
 						<Route path="/books" element={<BooksPage />} />
 						<Route path="/books/:mode" element={<BooksPage />} />
 						<Route path="/books/:id/:mode" element={<BooksPage />} />
-						<Route path="/" element={<IngredientsPage />} />
+						<Route path="/" element={<DashboardPage />} />
 					</Routes>
 				</div>
 			</main>

@@ -92,6 +92,22 @@ export default defineConfig(({ mode }) => {
 					changeOrigin: true,
 				},
 			},
+			// Watch for changes in shared packages sources
+			watch: {
+				// Include shared packages sources in watch
+				include: ['../shared-frontend-backend/src/**'],
+			},
+			// Explicitly allow serving files from workspace packages
+			fs: {
+				allow: [
+					// Search up for workspace root
+					path.resolve(__dirname, '../..'),
+				],
+			},
+		},
+		// Don't optimize shared packages so they stay reactive to changes
+		optimizeDeps: {
+			exclude: ['@shared', 'shared-frontend-backend'],
 		},
 		test: {
 			globals: true,

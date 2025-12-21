@@ -7,6 +7,8 @@
 		"paths": {
 			"@app/shared": ["../shared-frontend-backend/src"],
 			"@app/shared/*": ["../shared-frontend-backend/src/*"],
+			"@app/shared-orch-backend": ["../shared-orch-backend/src"],
+			"@app/shared-orch-backend/*": ["../shared-orch-backend/src/*"],
 			"@/*": ["./src/*"]
 		}
 	},

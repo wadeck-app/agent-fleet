@@ -142,6 +142,14 @@ function createLazyControllerPlugin<Routes = any>(
 			service = factory.getIngredientsService();
 		} else if (baseUrl === '/api/books') {
 			service = factory.getBooksService();
+		} else if (baseUrl === '/api/dashboard') {
+			service = factory.getDashboardService();
+		} else if (baseUrl === '/api/workers') {
+			service = factory.getWorkersService();
+		} else if (baseUrl === '/api/tasks') {
+			service = factory.getTasksService();
+		} else if (baseUrl === '/api/workspaces') {
+			service = factory.getWorkspacesService();
 		} else {
 			throw new Error(`No service mapping found for baseUrl: ${baseUrl}`);
 		}

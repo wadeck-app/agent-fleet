@@ -6,6 +6,12 @@ package-lock.json
 dist/
 *.tsbuildinfo
 
+# Prevent compiled files in src/ (should only be in dist/)
+packages/*/src/**/*.js
+packages/*/src/**/*.d.ts
+packages/*/src/**/*.js.map
+packages/*/src/**/*.d.ts.map
+
 # Data files (task storage)
 data/tasks/*.json
 data/contexts/

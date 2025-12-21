@@ -1,9 +1,6 @@
 {
 	"extends": "../../tsconfig.base.json",
-	"compilerOptions": {
-		"outDir": "./dist",
-		"rootDir": "./src"
-	},
+	"compilerOptions": {},
 	"include": ["src/**/*"],
 	"exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"],
 	"references": [{ "path": "../shared-common" }]

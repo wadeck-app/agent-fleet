@@ -6,7 +6,7 @@ import { Separator } from '@framework/components/primitives/Separator';
 import { Sheet, SheetContent, SheetTrigger } from '@framework/components/primitives/sheet';
 import { ConnectivityIndicator } from '@framework/features/connectivity/ConnectivityIndicator';
 import { useTheme } from '@framework/features/theme/useTheme';
-import { BookOpen, Menu, Package2 } from 'lucide-react';
+import { BookOpen, LayoutDashboard, Menu, Package2, Users, ListTodo, FolderKanban } from 'lucide-react';
 
 import { WorkspaceIndicator } from '@app/features/workspace/WorkspaceIndicator';
 
@@ -15,6 +15,26 @@ import { type NavItem, SidebarNav } from './SidebarNav';
 import { UserMenuWithThemeMobile } from './UserMenuWithTheme';
 
 const navigationItems: NavItem[] = [
+	{
+		path: '/dashboard',
+		label: 'Dashboard',
+		icon: LayoutDashboard,
+	},
+	{
+		path: '/workers',
+		label: 'Workers',
+		icon: Users,
+	},
+	{
+		path: '/tasks',
+		label: 'Tasks',
+		icon: ListTodo,
+	},
+	{
+		path: '/workspaces',
+		label: 'Workspaces',
+		icon: FolderKanban,
+	},
 	{
 		path: '/ingredients',
 		label: 'Ingredients',

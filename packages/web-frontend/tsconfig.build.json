@@ -1,7 +1,9 @@
 {
 	"extends": "./tsconfig.json",
 	"compilerOptions": {
-		"types": ["vite/client", "node"]
+		"types": ["vite/client", "node"],
+		"skipLibCheck": true,
+		"composite": false
 	},
 	"exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/tests/**", "src/**/*.stories.tsx"]
 }

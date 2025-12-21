@@ -110,7 +110,7 @@
           "specs": [
             {
               "title": "should allow editing ISBN without losing other form changes",
-              "ok": true,
+              "ok": false,
               "tags": [],
               "tests": [
                 {
@@ -123,18 +123,53 @@
                     {
                       "workerIndex": 0,
                       "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 4220,
-                      "errors": [],
+                      "status": "failed",
+                      "duration": 3122,
+                      "error": {
+                        "message": "Error: page.evaluate: Execution context was destroyed, most likely because of a navigation",
+                        "stack": "Error: page.evaluate: Execution context was destroyed, most likely because of a navigation\n    at clearToastEvents (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts:317:13)\n    at BooksPage.navigate (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\pages\\BasePage.ts:24:25)\n    at BooksPage.navigateToBooks (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\pages\\BooksPage.ts:48:3)\n    at C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\booksPage.partial-update.spec.ts:15:3",
+                        "location": {
+                          "file": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts",
+                          "column": 13,
+                          "line": 317
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39m..\\utils\\testHelpers.ts:317\n\n\u001b[0m \u001b[90m 315 |\u001b[39m \u001b[90m */\u001b[39m\n \u001b[90m 316 |\u001b[39m \u001b[36mexport\u001b[39m \u001b[36masync\u001b[39m \u001b[36mfunction\u001b[39m clearToastEvents(page\u001b[33m:\u001b[39m \u001b[33mPage\u001b[39m)\u001b[33m:\u001b[39m \u001b[33mPromise\u001b[39m\u001b[33m<\u001b[39m\u001b[36mvoid\u001b[39m\u001b[33m>\u001b[39m {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 317 |\u001b[39m \t\u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mevaluate(() \u001b[33m=>\u001b[39m {\n \u001b[90m     |\u001b[39m \t           \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 318 |\u001b[39m \t\t(window \u001b[36mas\u001b[39m any)\u001b[33m.\u001b[39m__toastEvents \u001b[33m=\u001b[39m []\u001b[33m;\u001b[39m\n \u001b[90m 319 |\u001b[39m \t\t(window \u001b[36mas\u001b[39m any)\u001b[33m.\u001b[39m__lastToast \u001b[33m=\u001b[39m undefined\u001b[33m;\u001b[39m\n \u001b[90m 320 |\u001b[39m \t})\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts",
+                            "column": 13,
+                            "line": 317
+                          },
+                          "message": "Error: page.evaluate: Execution context was destroyed, most likely because of a navigation\n\n   at ..\\utils\\testHelpers.ts:317\n\n  315 |  */\n  316 | export async function clearToastEvents(page: Page): Promise<void> {\n> 317 | \tawait page.evaluate(() => {\n      | \t           ^\n  318 | \t\t(window as any).__toastEvents = [];\n  319 | \t\t(window as any).__lastToast = undefined;\n  320 | \t});\n    at clearToastEvents (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts:317:13)\n    at BooksPage.navigate (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\pages\\BasePage.ts:24:25)\n    at BooksPage.navigateToBooks (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\pages\\BooksPage.ts:48:3)\n    at C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\booksPage.partial-update.spec.ts:15:3"
+                        }
+                      ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-12-21T16:44:10.110Z",
+                      "startTime": "2025-12-21T20:30:02.073Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\_results\\_misc\\booksPage.partial-update-B-70c54-t-losing-other-form-changes-chromium-desktop\\test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\_results\\_misc\\booksPage.partial-update-B-70c54-t-losing-other-form-changes-chromium-desktop\\video.webm"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts",
+                        "column": 13,
+                        "line": 317
+                      }
                     }
                   ],
-                  "status": "expected"
+                  "status": "unexpected"
                 }
               ],
               "id": "3a79c0bfe4111a37cb50-98eb118ad53a91b36aee",
@@ -144,7 +179,7 @@
             },
             {
               "title": "should handle optimistic locking conflicts when saving ISBN",
-              "ok": true,
+              "ok": false,
               "tags": [],
               "tests": [
                 {
@@ -157,18 +192,58 @@
                     {
                       "workerIndex": 1,
                       "parallelIndex": 1,
-                      "status": "passed",
-                      "duration": 3900,
-                      "errors": [],
+                      "status": "failed",
+                      "duration": 5055,
+                      "error": {
+                        "message": "Error: page.evaluate: Execution context was destroyed, most likely because of a navigation",
+                        "stack": "Error: page.evaluate: Execution context was destroyed, most likely because of a navigation\n    at clearToastEvents (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts:317:13)\n    at BooksPage.navigate (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\pages\\BasePage.ts:24:25)\n    at BooksPage.navigateToBooks (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\pages\\BooksPage.ts:48:3)\n    at C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\booksPage.partial-update.spec.ts:15:3",
+                        "location": {
+                          "file": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts",
+                          "column": 13,
+                          "line": 317
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39m..\\utils\\testHelpers.ts:317\n\n\u001b[0m \u001b[90m 315 |\u001b[39m \u001b[90m */\u001b[39m\n \u001b[90m 316 |\u001b[39m \u001b[36mexport\u001b[39m \u001b[36masync\u001b[39m \u001b[36mfunction\u001b[39m clearToastEvents(page\u001b[33m:\u001b[39m \u001b[33mPage\u001b[39m)\u001b[33m:\u001b[39m \u001b[33mPromise\u001b[39m\u001b[33m<\u001b[39m\u001b[36mvoid\u001b[39m\u001b[33m>\u001b[39m {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 317 |\u001b[39m \t\u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mevaluate(() \u001b[33m=>\u001b[39m {\n \u001b[90m     |\u001b[39m \t           \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 318 |\u001b[39m \t\t(window \u001b[36mas\u001b[39m any)\u001b[33m.\u001b[39m__toastEvents \u001b[33m=\u001b[39m []\u001b[33m;\u001b[39m\n \u001b[90m 319 |\u001b[39m \t\t(window \u001b[36mas\u001b[39m any)\u001b[33m.\u001b[39m__lastToast \u001b[33m=\u001b[39m undefined\u001b[33m;\u001b[39m\n \u001b[90m 320 |\u001b[39m \t})\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts",
+                            "column": 13,
+                            "line": 317
+                          },
+                          "message": "Error: page.evaluate: Execution context was destroyed, most likely because of a navigation\n\n   at ..\\utils\\testHelpers.ts:317\n\n  315 |  */\n  316 | export async function clearToastEvents(page: Page): Promise<void> {\n> 317 | \tawait page.evaluate(() => {\n      | \t           ^\n  318 | \t\t(window as any).__toastEvents = [];\n  319 | \t\t(window as any).__lastToast = undefined;\n  320 | \t});\n    at clearToastEvents (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts:317:13)\n    at BooksPage.navigate (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\pages\\BasePage.ts:24:25)\n    at BooksPage.navigateToBooks (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\pages\\BooksPage.ts:48:3)\n    at C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\booksPage.partial-update.spec.ts:15:3"
+                        }
+                      ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-12-21T16:44:10.108Z",
+                      "startTime": "2025-12-21T20:30:02.067Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\_results\\_misc\\booksPage.partial-update-B-19f81--conflicts-when-saving-ISBN-chromium-desktop\\test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\_results\\_misc\\booksPage.partial-update-B-19f81--conflicts-when-saving-ISBN-chromium-desktop\\video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\_results\\_misc\\booksPage.partial-update-B-19f81--conflicts-when-saving-ISBN-chromium-desktop\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts",
+                        "column": 13,
+                        "line": 317
+                      }
                     }
                   ],
-                  "status": "expected"
+                  "status": "unexpected"
                 }
               ],
               "id": "3a79c0bfe4111a37cb50-07c8bcdf17e36d8243d6",
@@ -178,7 +253,7 @@
             },
             {
               "title": "should validate ISBN uniqueness during partial update",
-              "ok": true,
+              "ok": false,
               "tags": [],
               "tests": [
                 {
@@ -191,18 +266,58 @@
                     {
                       "workerIndex": 2,
                       "parallelIndex": 2,
-                      "status": "passed",
-                      "duration": 4300,
-                      "errors": [],
+                      "status": "failed",
+                      "duration": 5051,
+                      "error": {
+                        "message": "Error: page.evaluate: Execution context was destroyed, most likely because of a navigation",
+                        "stack": "Error: page.evaluate: Execution context was destroyed, most likely because of a navigation\n    at clearToastEvents (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts:317:13)\n    at BooksPage.navigate (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\pages\\BasePage.ts:24:25)\n    at BooksPage.navigateToBooks (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\pages\\BooksPage.ts:48:3)\n    at C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\booksPage.partial-update.spec.ts:15:3",
+                        "location": {
+                          "file": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts",
+                          "column": 13,
+                          "line": 317
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39m..\\utils\\testHelpers.ts:317\n\n\u001b[0m \u001b[90m 315 |\u001b[39m \u001b[90m */\u001b[39m\n \u001b[90m 316 |\u001b[39m \u001b[36mexport\u001b[39m \u001b[36masync\u001b[39m \u001b[36mfunction\u001b[39m clearToastEvents(page\u001b[33m:\u001b[39m \u001b[33mPage\u001b[39m)\u001b[33m:\u001b[39m \u001b[33mPromise\u001b[39m\u001b[33m<\u001b[39m\u001b[36mvoid\u001b[39m\u001b[33m>\u001b[39m {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 317 |\u001b[39m \t\u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mevaluate(() \u001b[33m=>\u001b[39m {\n \u001b[90m     |\u001b[39m \t           \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 318 |\u001b[39m \t\t(window \u001b[36mas\u001b[39m any)\u001b[33m.\u001b[39m__toastEvents \u001b[33m=\u001b[39m []\u001b[33m;\u001b[39m\n \u001b[90m 319 |\u001b[39m \t\t(window \u001b[36mas\u001b[39m any)\u001b[33m.\u001b[39m__lastToast \u001b[33m=\u001b[39m undefined\u001b[33m;\u001b[39m\n \u001b[90m 320 |\u001b[39m \t})\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts",
+                            "column": 13,
+                            "line": 317
+                          },
+                          "message": "Error: page.evaluate: Execution context was destroyed, most likely because of a navigation\n\n   at ..\\utils\\testHelpers.ts:317\n\n  315 |  */\n  316 | export async function clearToastEvents(page: Page): Promise<void> {\n> 317 | \tawait page.evaluate(() => {\n      | \t           ^\n  318 | \t\t(window as any).__toastEvents = [];\n  319 | \t\t(window as any).__lastToast = undefined;\n  320 | \t});\n    at clearToastEvents (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts:317:13)\n    at BooksPage.navigate (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\pages\\BasePage.ts:24:25)\n    at BooksPage.navigateToBooks (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\pages\\BooksPage.ts:48:3)\n    at C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\booksPage.partial-update.spec.ts:15:3"
+                        }
+                      ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-12-21T16:44:10.100Z",
+                      "startTime": "2025-12-21T20:30:02.071Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\_results\\_misc\\booksPage.partial-update-B-8c38c-eness-during-partial-update-chromium-desktop\\test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\_results\\_misc\\booksPage.partial-update-B-8c38c-eness-during-partial-update-chromium-desktop\\video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\_results\\_misc\\booksPage.partial-update-B-8c38c-eness-during-partial-update-chromium-desktop\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts",
+                        "column": 13,
+                        "line": 317
+                      }
                     }
                   ],
-                  "status": "expected"
+                  "status": "unexpected"
                 }
               ],
               "id": "3a79c0bfe4111a37cb50-383eb92f36244f036773",
@@ -212,7 +327,7 @@
             },
             {
               "title": "should allow editing ISBN without losing other form changes",
-              "ok": true,
+              "ok": false,
               "tags": [],
               "tests": [
                 {
@@ -225,18 +340,58 @@
                     {
                       "workerIndex": 3,
                       "parallelIndex": 3,
-                      "status": "passed",
-                      "duration": 4640,
-                      "errors": [],
+                      "status": "failed",
+                      "duration": 5057,
+                      "error": {
+                        "message": "Error: page.evaluate: Execution context was destroyed, most likely because of a navigation",
+                        "stack": "Error: page.evaluate: Execution context was destroyed, most likely because of a navigation\n    at clearToastEvents (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts:317:13)\n    at BooksPage.navigate (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\pages\\BasePage.ts:24:25)\n    at BooksPage.navigateToBooks (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\pages\\BooksPage.ts:48:3)\n    at C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\booksPage.partial-update.spec.ts:15:3",
+                        "location": {
+                          "file": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts",
+                          "column": 13,
+                          "line": 317
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39m..\\utils\\testHelpers.ts:317\n\n\u001b[0m \u001b[90m 315 |\u001b[39m \u001b[90m */\u001b[39m\n \u001b[90m 316 |\u001b[39m \u001b[36mexport\u001b[39m \u001b[36masync\u001b[39m \u001b[36mfunction\u001b[39m clearToastEvents(page\u001b[33m:\u001b[39m \u001b[33mPage\u001b[39m)\u001b[33m:\u001b[39m \u001b[33mPromise\u001b[39m\u001b[33m<\u001b[39m\u001b[36mvoid\u001b[39m\u001b[33m>\u001b[39m {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 317 |\u001b[39m \t\u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mevaluate(() \u001b[33m=>\u001b[39m {\n \u001b[90m     |\u001b[39m \t           \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 318 |\u001b[39m \t\t(window \u001b[36mas\u001b[39m any)\u001b[33m.\u001b[39m__toastEvents \u001b[33m=\u001b[39m []\u001b[33m;\u001b[39m\n \u001b[90m 319 |\u001b[39m \t\t(window \u001b[36mas\u001b[39m any)\u001b[33m.\u001b[39m__lastToast \u001b[33m=\u001b[39m undefined\u001b[33m;\u001b[39m\n \u001b[90m 320 |\u001b[39m \t})\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts",
+                            "column": 13,
+                            "line": 317
+                          },
+                          "message": "Error: page.evaluate: Execution context was destroyed, most likely because of a navigation\n\n   at ..\\utils\\testHelpers.ts:317\n\n  315 |  */\n  316 | export async function clearToastEvents(page: Page): Promise<void> {\n> 317 | \tawait page.evaluate(() => {\n      | \t           ^\n  318 | \t\t(window as any).__toastEvents = [];\n  319 | \t\t(window as any).__lastToast = undefined;\n  320 | \t});\n    at clearToastEvents (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts:317:13)\n    at BooksPage.navigate (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\pages\\BasePage.ts:24:25)\n    at BooksPage.navigateToBooks (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\pages\\BooksPage.ts:48:3)\n    at C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\booksPage.partial-update.spec.ts:15:3"
+                        }
+                      ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-12-21T16:44:10.086Z",
+                      "startTime": "2025-12-21T20:30:02.066Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\_results\\_misc\\booksPage.partial-update-B-70c54-t-losing-other-form-changes-chromium-mobile\\test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\_results\\_misc\\booksPage.partial-update-B-70c54-t-losing-other-form-changes-chromium-mobile\\video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\_results\\_misc\\booksPage.partial-update-B-70c54-t-losing-other-form-changes-chromium-mobile\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts",
+                        "column": 13,
+                        "line": 317
+                      }
                     }
                   ],
-                  "status": "expected"
+                  "status": "unexpected"
                 }
               ],
               "id": "3a79c0bfe4111a37cb50-f7fbe55b8f5a4f30ce25",
@@ -246,7 +401,7 @@
             },
             {
               "title": "should handle optimistic locking conflicts when saving ISBN",
-              "ok": true,
+              "ok": false,
               "tags": [],
               "tests": [
                 {
@@ -259,18 +414,58 @@
                     {
                       "workerIndex": 4,
                       "parallelIndex": 4,
-                      "status": "passed",
-                      "duration": 4023,
-                      "errors": [],
+                      "status": "failed",
+                      "duration": 5052,
+                      "error": {
+                        "message": "Error: page.evaluate: Execution context was destroyed, most likely because of a navigation",
+                        "stack": "Error: page.evaluate: Execution context was destroyed, most likely because of a navigation\n    at clearToastEvents (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts:317:13)\n    at BooksPage.navigate (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\pages\\BasePage.ts:24:25)\n    at BooksPage.navigateToBooks (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\pages\\BooksPage.ts:48:3)\n    at C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\booksPage.partial-update.spec.ts:15:3",
+                        "location": {
+                          "file": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts",
+                          "column": 13,
+                          "line": 317
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39m..\\utils\\testHelpers.ts:317\n\n\u001b[0m \u001b[90m 315 |\u001b[39m \u001b[90m */\u001b[39m\n \u001b[90m 316 |\u001b[39m \u001b[36mexport\u001b[39m \u001b[36masync\u001b[39m \u001b[36mfunction\u001b[39m clearToastEvents(page\u001b[33m:\u001b[39m \u001b[33mPage\u001b[39m)\u001b[33m:\u001b[39m \u001b[33mPromise\u001b[39m\u001b[33m<\u001b[39m\u001b[36mvoid\u001b[39m\u001b[33m>\u001b[39m {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 317 |\u001b[39m \t\u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mevaluate(() \u001b[33m=>\u001b[39m {\n \u001b[90m     |\u001b[39m \t           \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 318 |\u001b[39m \t\t(window \u001b[36mas\u001b[39m any)\u001b[33m.\u001b[39m__toastEvents \u001b[33m=\u001b[39m []\u001b[33m;\u001b[39m\n \u001b[90m 319 |\u001b[39m \t\t(window \u001b[36mas\u001b[39m any)\u001b[33m.\u001b[39m__lastToast \u001b[33m=\u001b[39m undefined\u001b[33m;\u001b[39m\n \u001b[90m 320 |\u001b[39m \t})\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts",
+                            "column": 13,
+                            "line": 317
+                          },
+                          "message": "Error: page.evaluate: Execution context was destroyed, most likely because of a navigation\n\n   at ..\\utils\\testHelpers.ts:317\n\n  315 |  */\n  316 | export async function clearToastEvents(page: Page): Promise<void> {\n> 317 | \tawait page.evaluate(() => {\n      | \t           ^\n  318 | \t\t(window as any).__toastEvents = [];\n  319 | \t\t(window as any).__lastToast = undefined;\n  320 | \t});\n    at clearToastEvents (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts:317:13)\n    at BooksPage.navigate (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\pages\\BasePage.ts:24:25)\n    at BooksPage.navigateToBooks (C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\pages\\BooksPage.ts:48:3)\n    at C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\booksPage.partial-update.spec.ts:15:3"
+                        }
+                      ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-12-21T16:44:10.109Z",
+                      "startTime": "2025-12-21T20:30:02.071Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\_results\\_misc\\booksPage.partial-update-B-19f81--conflicts-when-saving-ISBN-chromium-mobile\\test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\_results\\_misc\\booksPage.partial-update-B-19f81--conflicts-when-saving-ISBN-chromium-mobile\\video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-integration\\_results\\_misc\\booksPage.partial-update-B-19f81--conflicts-when-saving-ISBN-chromium-mobile\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\utils\\testHelpers.ts",
+                        "column": 13,
+                        "line": 317
+                      }
                     }
                   ],
-                  "status": "expected"
+                  "status": "unexpected"
                 }
               ],
               "id": "3a79c0bfe4111a37cb50-fdcef7ce965346f477e5",
@@ -292,14 +487,14 @@
                   "results": [
                     {
                       "workerIndex": 5,
-                      "parallelIndex": 1,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2529,
+                      "duration": 3274,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-12-21T16:44:14.826Z",
+                      "startTime": "2025-12-21T20:30:05.942Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -319,11 +514,11 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2025-12-21T16:44:06.100Z",
-    "duration": 14020.106,
-    "expected": 6,
+    "startTime": "2025-12-21T20:29:57.933Z",
+    "duration": 12977.189,
+    "expected": 1,
     "skipped": 0,
-    "unexpected": 0,
+    "unexpected": 5,
     "flaky": 0
   }
 }

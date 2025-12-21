@@ -1,0 +1,130 @@
+import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
+import type { ActivityEntry, ActivityType } from '@shared';
+import { Activity, AlertCircle, CheckCircle2, Eye, GitMerge, UserCheck, UserX, XCircle } from 'lucide-react';
+
+/**
+ * ===========================================================================================
+ * RECENT ACTIVITY CARD - Activity Feed Display
+ * ===========================================================================================
+ *
+ * Displays:
+ * - Recent activity feed (up to 10 entries)
+ * - Activity type with appropriate icon
+ * - Timestamp (formatted as relative time)
+ * - Activity message
+ *
+ * Activity Icons:
+ * - CheckCircle2 (task completed) - green
+ * - Activity (task started) - blue
+ * - Eye (task review) - purple
+ * - GitMerge (task merged) - green
+ * - XCircle (task failed) - red
+ * - UserCheck (worker connected) - green
+ * - UserX (worker disconnected) - red
+ *
+ * Layout: Vertical feed with timestamp and icon on left, message on right
+ *
+ * ===========================================================================================
+ */
+
+export interface RecentActivityCardProps {
+	activities: ActivityEntry[];
+}
+
+/**
+ * Get icon component for activity type
+ */
+function getActivityIcon(type: ActivityType) {
+	switch (type) {
+		case 'task_completed':
+			return <CheckCircle2 className="size-4 text-green-600 dark:text-green-400" />;
+		case 'task_started':
+			return <Activity className="size-4 text-blue-600 dark:text-blue-400" />;
+		case 'task_review':
+			return <Eye className="size-4 text-purple-600 dark:text-purple-400" />;
+		case 'task_merged':
+			return <GitMerge className="size-4 text-green-600 dark:text-green-400" />;
+		case 'task_failed':
+			return <XCircle className="size-4 text-red-600 dark:text-red-400" />;
+		case 'worker_connected':
+			return <UserCheck className="size-4 text-green-600 dark:text-green-400" />;
+		case 'worker_disconnected':
+			return <UserX className="size-4 text-red-600 dark:text-red-400" />;
+		default:
+			return <AlertCircle className="size-4 text-muted-foreground" />;
+	}
+}
+
+/**
+ * Format timestamp as relative time (e.g., "2m ago", "1h ago")
+ */
+function formatRelativeTime(timestamp: string): string {
+	const now = new Date();
+	const activityTime = new Date(timestamp);
+	const diffMs = now.getTime() - activityTime.getTime();
+	const diffMinutes = Math.floor(diffMs / (1000 * 60));
+	const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+	const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+	if (diffDays > 0) {
+		return `${diffDays}d ago`;
+	}
+	if (diffHours > 0) {
+		return `${diffHours}h ago`;
+	}
+	if (diffMinutes > 0) {
+		return `${diffMinutes}m ago`;
+	}
+	return 'just now';
+}
+
+/**
+ * Format time as HH:MM (e.g., "23:42")
+ */
+function formatTime(timestamp: string): string {
+	const date = new Date(timestamp);
+	const hours = date.getHours().toString().padStart(2, '0');
+	const minutes = date.getMinutes().toString().padStart(2, '0');
+	return `${hours}:${minutes}`;
+}
+
+export function RecentActivityCard({ activities }: RecentActivityCardProps) {
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle>Recent Activity</CardTitle>
+			</CardHeader>
+			<CardContent>
+				{activities.length === 0 ? (
+					<div className="py-4 text-center text-sm text-muted-foreground">No recent activity</div>
+				) : (
+					<div className="space-y-3">
+						{activities.map((activity, index) => (
+							<div key={`${activity.timestamp}-${index}`} className="flex items-start gap-3">
+								{/* Icon */}
+								<div className="mt-0.5">{getActivityIcon(activity.type)}</div>
+
+								{/* Content */}
+								<div className="flex min-w-0 flex-1 flex-col gap-0.5">
+									<div className="flex items-baseline gap-2">
+										<span className="text-xs font-medium text-muted-foreground">
+											{formatTime(activity.timestamp)}
+										</span>
+										<span className="text-xs text-muted-foreground">{formatRelativeTime(activity.timestamp)}</span>
+									</div>
+									<span className="text-sm">{activity.message}</span>
+									{(activity.taskId || activity.workerId) && (
+										<div className="flex gap-2 text-xs text-muted-foreground">
+											{activity.taskId && <span>Task: {activity.taskId}</span>}
+											{activity.workerId && <span>Worker: {activity.workerId}</span>}
+										</div>
+									)}
+								</div>
+							</div>
+						))}
+					</div>
+				)}
+			</CardContent>
+		</Card>
+	);
+}

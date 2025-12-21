@@ -15,7 +15,8 @@
 		"lint:fix": "eslint . --fix",
 		"storybook": "storybook dev -p 6006",
 		"storybook:only-for-e2e": "node ../../scripts/storybook-e2e.js",
-		"clean": "rm -rf dist"
+		"clean": "rimraf dist",
+		"clean:cache": "rimraf node_modules/.vite"
 	},
 	"dependencies": {
 		"@base-ui/react": "^1.0.0",

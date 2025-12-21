@@ -3,15 +3,16 @@
 	"version": "1.0.0",
 	"private": true,
 	"type": "module",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
+	"main": "./src/index.js",
+	"types": "./src/index.d.ts",
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
+		"dev": "tsc --build tsconfig.json --watch",
 		"test": "jest",
 		"test:coverage": "jest --coverage",
 		"lint": "eslint src --ext .ts",
 		"lint:fix": "eslint src --ext .ts --fix",
-		"clean": "rm -rf dist"
+		"clean": "find src -name '*.js' -o -name '*.d.ts' -o -name '*.map' | grep -v node_modules | xargs rm -f"
 	},
 	"dependencies": {
 		"shared-common": "*",

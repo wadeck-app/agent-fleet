@@ -168,3 +168,113 @@ When centering modals/dialogs, Framer Motion can handle BOTH positioning AND ani
 
 - `frontend/inventory-ui-modern/src/components/ui/Dialog/Dialog.tsx` - Correct pattern
 - `frontend/minimalist-ui-v2/src/components/ui/Dialog/Dialog.tsx` - Reference implementation
+
+---
+
+## React Hook Polling Pattern - Separate Initial Fetch from Polling Interval
+
+**Problem**: When using `useAbortableEffect` with polling, including the fetch function in dependencies causes the effect to re-run every time the fetch function changes. If the fetch function depends on state that changes after the first fetch (like `isInitialLoad`), this creates multiple `setInterval` instances running in parallel, resulting in requests firing much faster than intended (e.g., every 300-500ms instead of 5000ms).
+
+**Root Cause**: 
+```tsx
+// ❌ BAD: Creates multiple intervals
+const fetchData = useCallback(async (signal) => {
+  if (isInitialLoad) setLoading(true);  // <- This dependency causes re-creation
+  // ... fetch logic
+}, [isInitialLoad]); // <- fetchData changes when isInitialLoad changes
+
+useAbortableEffect(async signal => {
+  await fetchData(signal);
+  const intervalId = setInterval(() => fetchData(signal), 5000);
+  signal.addEventListener('abort', () => clearInterval(intervalId));
+}, [fetchData]); // <- Re-runs when fetchData changes, creating new interval
+```
+
+**Correct Solution** ✅:
+```tsx
+// Separate initial fetch from polling
+const fetchData = useCallback(async (signal) => {
+  if (isInitialLoad) setLoading(true);
+  // ... fetch logic
+}, [isInitialLoad]);
+
+// Initial fetch only
+useAbortableEffect(
+  async signal => {
+    if (!enabled) return;
+    await fetchData(signal);
+  },
+  [enabled] // Only re-run if enabled changes
+);
+
+// Polling effect - separate from initial fetch
+useEffect(() => {
+  if (!enabled || !pollInterval || pollInterval <= 0 || isInitialLoad) return;
+
+  const intervalId = setInterval(async () => {
+    const controller = new AbortController();
+    await fetchData(controller.signal);
+  }, pollInterval);
+
+  return () => {
+    clearInterval(intervalId);
+  };
+}, [enabled, pollInterval, isInitialLoad, fetchData]);
+```
+
+**Key Principles**:
+1. **Separate Effects**: One for initial fetch, one for polling
+2. **Minimal Dependencies**: Initial fetch effect only depends on `enabled`
+3. **Wait for Initial Load**: Polling only starts after `isInitialLoad` becomes false
+4. **Proper Cleanup**: Return cleanup function from polling effect
+5. **New AbortController**: Create fresh controller in each interval callback
+
+**Why This Works**:
+- Initial fetch runs once on mount
+- Polling effect waits for initial load to complete
+- When `isInitialLoad` changes to false, polling starts
+- Only ONE interval is created and managed
+- Cleanup properly removes the interval on unmount
+
+**Symptoms of the Bug**:
+- Backend logs show requests much faster than expected interval
+- Multiple requests fire within milliseconds of each other
+- Network tab shows overlapping requests
+- Server load higher than expected
+
+**Files Affected** (December 2024):
+- `packages/web-frontend/src/app/pages/tasks/useTasks.ts` (lines 78-100)
+- `packages/web-frontend/src/app/pages/workers/useWorkers.ts` (lines 73-95)
+- `packages/web-frontend/src/app/pages/workspaces/useWorkspaces.ts` (lines 73-95)
+
+**Reference Implementation**:
+- `packages/web-frontend/src/app/pages/dashboard/useDashboard.ts` (correct from start)
+
+**When Discovered**: December 21, 2024 during web UI implementation. User reported backend receiving `/api/tasks` requests every 300ms instead of 5000ms.
+
+---
+
+## Unused Sidebar Components - Remove Duplicates to Avoid Confusion
+
+**Problem**: Having multiple similar components (e.g., `Sidebar.tsx`, `DesktopSidebar.tsx`, `MobileSidebar.tsx`) where only some are actually used can lead to confusion and bugs. Developers may update the wrong file, causing changes to not appear in the UI.
+
+**Example**: Added Workspaces navigation to `Sidebar.tsx`, but app actually uses `DesktopSidebar.tsx` and `MobileSidebar.tsx`, so the navigation link didn't appear.
+
+**Solution** ✅:
+1. **Identify Unused Files**: Check actual imports in App.tsx or root components
+2. **Remove Unused Files**: Delete any component files that aren't imported
+3. **Update Only Active Files**: Make changes to the files actually being used
+4. **Document Component Purpose**: Add comments explaining which components are used where
+
+**Files Affected** (December 2024):
+- Removed: `packages/web-frontend/src/app/components/navigation/Sidebar.tsx` (unused)
+- Updated: `packages/web-frontend/src/app/components/navigation/DesktopSidebar.tsx`
+- Updated: `packages/web-frontend/src/app/components/navigation/MobileSidebar.tsx`
+
+**Prevention**:
+- Regular code cleanup to remove unused files
+- ESLint rules to detect unused exports
+- Clear naming conventions (e.g., DesktopSidebar vs MobileSidebar makes purpose obvious)
+
+**When Discovered**: December 21, 2024 - User correctly pointed out that Sidebar.tsx wasn't used, preventing navigation changes from appearing.
+

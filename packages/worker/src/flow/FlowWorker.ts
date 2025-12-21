@@ -50,7 +50,6 @@ export class FlowWorker implements Shutdownable {
 	protected reconnectDelay = 1000; // Start at 1 second
 	protected maxReconnectDelay = 30000; // Max 30 seconds
 	protected reconnectionAttempts = 0;
-	protected maxReconnectAttempts = 10; // Stop after 10 attempts
 	protected heartbeatInterval = 30000;
 	private heartbeatTimer: NodeJS.Timeout | null = null;
 
@@ -265,16 +264,9 @@ export class FlowWorker implements Shutdownable {
 	}
 
 	/**
-	 * Schedule reconnection with exponential backoff
+	 * Schedule reconnection with exponential backoff (up to 30s)
 	 */
 	private scheduleReconnect(): void {
-		if (this.reconnectionAttempts >= this.maxReconnectAttempts) {
-			console.error(
-				`${this.logPrefix()} Maximum reconnection attempts (${this.maxReconnectAttempts}) reached. Giving up.`
-			);
-			process.exit(1);
-		}
-
 		this.reconnectionAttempts++;
 		const delay = Math.min(
 			this.reconnectDelay * Math.pow(2, this.reconnectionAttempts - 1),
@@ -282,12 +274,13 @@ export class FlowWorker implements Shutdownable {
 		);
 
 		console.log(
-			`${this.logPrefix()} Reconnecting in ${delay}ms... (attempt ${this.reconnectionAttempts}/${this.maxReconnectAttempts})`
+			`${this.logPrefix()} Reconnecting in ${delay}ms... (attempt ${this.reconnectionAttempts})`
 		);
 
 		setTimeout(() => {
 			this.connect().catch(error => {
 				console.error(`${this.logPrefix()} Reconnection failed:`, error);
+				// Will retry via the 'close' event handler
 			});
 		}, delay);
 	}
@@ -889,9 +882,9 @@ if (isMainModule) {
 			console.log('[FlowWorker] Worker started and connected');
 		})
 		.catch(error => {
-			console.error('[FlowWorker] Failed to connect:', error.message);
-			console.error('[FlowWorker] Make sure the orchestrator is running on ws://localhost:3738');
-			process.exit(1);
+			console.error('[FlowWorker] Initial connection failed:', error.message);
+			console.log('[FlowWorker] Will keep retrying to connect to orchestrator...');
+			// Don't exit - the worker will automatically retry with exponential backoff
 		});
 
 	// Handle shutdown signals

@@ -1,3 +1,4 @@
+// @ts-ignore
 import path from 'path';
 import { defineConfig } from 'vitest/config';
 
@@ -75,6 +76,7 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			'@app/shared': path.resolve(__dirname, '../shared-frontend-backend/src'),
+			'@app/shared-orch-backend': path.resolve(__dirname, '../shared-orch-backend/src'),
 		},
 	},
 });

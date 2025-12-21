@@ -33,3 +33,5 @@ export {
 // Re-export API clients
 export { ingredientsApi } from '@app/pages/ingredients/ingredients.api';
 export { booksApi } from '@app/pages/books/books.api';
+export { dashboardApi } from '@app/pages/dashboard/dashboard.api';
+export { tasksApi } from '@app/pages/tasks/tasks.api';

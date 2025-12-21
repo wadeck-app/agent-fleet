@@ -13,7 +13,7 @@
 		"dev": "tsx src/entry-point.ts",
 		"test": "vitest run",
 		"lint": "echo 'No ESLint configured for cli'",
-		"clean": "rm -rf dist"
+		"clean": "rimraf dist"
 	},
 	"dependencies": {
 		"orchestrator": "*",

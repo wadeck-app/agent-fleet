@@ -1,8 +1,13 @@
 import express, { Express, Request, Response } from 'express';
 import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager.js';
+import { IncomingMessage } from 'http';
 import { Logger } from 'shared-common/Logger.js';
 import { TaskStatus } from 'shared-common/types.js';
+import { Duplex } from 'stream';
+import { WebSocketServer } from 'ws';
 
+import { UIClientHook } from '../ui-client/UIClientHook.js';
+import { UIWebSocketServer } from '../websocket/UIWebSocketServer.js';
 import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer.js';
 import { TaskManager } from './TaskManager.js';
 
@@ -13,20 +18,30 @@ export class RestAPI {
 	private workspaceManager: WorkspaceManager | null;
 	private port: number;
 	private server: any;
+	private startTime: number;
+	private uiWebSocketServer: WebSocketServer | null = null;
+	private uiWSHandler: UIWebSocketServer | null = null;
 
 	constructor(
 		taskManager: TaskManager,
 		wsServer: WorkerWebSocketServer,
 		port: number = 3737,
-		workspaceManager: WorkspaceManager | null = null
+		workspaceManager: WorkspaceManager | null = null,
+		uiClientHook?: UIClientHook
 	) {
 		this.taskManager = taskManager;
 		this.wsServer = wsServer;
 		this.workspaceManager = workspaceManager;
 		this.port = port;
+		this.startTime = Date.now();
 		this.app = express();
 		this.setupMiddleware();
 		this.setupRoutes();
+
+		// Setup UI WebSocket server if UIClientHook is provided
+		if (uiClientHook) {
+			this.setupUIWebSocket(uiClientHook);
+		}
 	}
 
 	private setupMiddleware(): void {
@@ -49,10 +64,12 @@ export class RestAPI {
 		this.app.get('/stats', (req: Request, res: Response) => {
 			const taskStats = this.taskManager.getStats();
 			const workers = this.wsServer.getWorkers();
+			const uptime = Date.now() - this.startTime;
 
 			res.json({
 				restPort: this.port,
 				wsPort: this.wsServer.getPort(),
+				uptime,
 				workers: workers.length,
 				workersList: workers,
 				tasks: taskStats,

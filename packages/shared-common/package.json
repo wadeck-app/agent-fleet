@@ -7,10 +7,11 @@
 	"types": "./dist/index.d.ts",
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
+		"dev": "tsc --build tsconfig.json --watch",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
-		"clean": "rm -rf dist"
+		"clean": "rimraf dist"
 	},
 	"dependencies": {
 		"zod": "^4.1.13"

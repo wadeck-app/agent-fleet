@@ -7,6 +7,10 @@ type RouteDefinition = [ApiUrl, () => Promise<any>];
 const routes: RouteDefinition[] = [
 	['/api/ingredients', () => import('./controllers/IngredientsController')],
 	['/api/books', () => import('./controllers/BooksController')],
+	['/api/dashboard', () => import('./controllers/DashboardController')],
+	['/api/workers', () => import('./controllers/WorkersController')],
+	['/api/tasks', () => import('./controllers/TasksController')],
+	['/api/workspaces', () => import('./controllers/WorkspacesController')],
 ];
 
 export default routes;

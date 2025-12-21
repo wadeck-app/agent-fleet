@@ -7,12 +7,12 @@
 	"types": "./dist/index.d.ts",
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
-		"dev": "tsx src/core/index.ts",
+		"dev": "nodemon --watch src --watch ../shared-orch-backend/src --watch ../shared-orch-worker/src --watch ../shared-common/src --exec tsx src/core/index.ts",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
 		"lint": "echo 'No ESLint configured for orchestrator'",
-		"clean": "rm -rf dist"
+		"clean": "rimraf dist"
 	},
 	"dependencies": {
 		"express": "^4.18.2",
@@ -31,6 +31,7 @@
 		"@types/supertest": "^6.0.3",
 		"@types/terminal-kit": "^2.5.7",
 		"@types/ws": "^8.5.10",
+		"nodemon": "^3.1.11",
 		"supertest": "^7.1.4",
 		"test-utils": "*",
 		"tsx": "^4.7.0",

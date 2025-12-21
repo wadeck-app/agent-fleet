@@ -82,6 +82,74 @@ export type {
 	FailedDeletion,
 } from './api/books.contract';
 
+// API Contracts - Dashboard
+export {
+	DashboardDataSchema,
+	OrchestratorStatusSchema,
+	ActivityTypeSchema,
+	ActivityEntrySchema,
+	DASHBOARD_API_ROUTES,
+} from './api/dashboard.contract';
+export type {
+	DashboardData,
+	OrchestratorStatus,
+	ActivityType,
+	ActivityEntry,
+	DashboardApiRoutes,
+} from './api/dashboard.contract';
+
+// API Contracts - Workers
+export {
+	WorkerSchema,
+	WorkersDataSchema,
+	WorkerConnectionStatusSchema,
+	WorkerStateSchema,
+	WORKERS_API_ROUTES,
+} from './api/workers.contract';
+export type {
+	Worker,
+	WorkersData,
+	WorkerConnectionStatus,
+	WorkerState,
+	WorkersApiRoutes,
+} from './api/workers.contract';
+
+// API Contracts - Tasks
+export {
+	TaskSchema,
+	TasksDataSchema,
+	TaskStatusSchema,
+	TaskPrioritySchema,
+	TasksQuerySchema,
+	TASKS_API_ROUTES,
+} from './api/tasks.contract';
+export type {
+	Task,
+	TasksData,
+	TaskStatus,
+	TaskPriority,
+	TasksQuery,
+	TasksApiRoutes,
+} from './api/tasks.contract';
+
+// API Contracts - Workspaces
+export {
+	WorkspaceSchema,
+	WorkspacesDataSchema,
+	WorkspaceModeSchema,
+	WorkspaceStatusSchema,
+	GitStatusSchema,
+	WORKSPACES_API_ROUTES,
+} from './api/workspaces.contract';
+export type {
+	Workspace,
+	WorkspacesData,
+	WorkspaceMode,
+	WorkspaceStatus,
+	GitStatus,
+	WorkspacesApiRoutes,
+} from './api/workspaces.contract';
+
 // Types - Combined routes and type helpers
 export { ALL_API_ROUTES, ROUTES_BY_BASE_URL } from './types';
 export type { PathsForMethod, RouteParams, RouteQuery, RouteBody, RouteResponse, ApiPath } from './types';

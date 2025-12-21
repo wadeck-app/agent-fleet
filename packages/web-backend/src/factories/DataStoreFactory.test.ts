@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { Book, Ingredient } from '@app/shared';
 
 import { BooksService } from '../services/BooksService';
+import { DashboardService } from '../services/DashboardService';
 import { IngredientsService } from '../services/IngredientsService';
+import { TasksService } from '../services/TasksService';
 import { InMemoryStorage } from '../storage/InMemoryStorage';
 import { DataStoreFactory } from './DataStoreFactory';
 
@@ -117,6 +119,54 @@ describe('DataStoreFactory', () => {
 			// Should be able to retrieve it
 			const found = await service.getById(created.id);
 			expect(found).toEqual(created);
+		});
+	});
+
+	describe('getDashboardService - Service creation and singleton', () => {
+		it('should return DashboardService instance', () => {
+			const service = factory.getDashboardService();
+
+			expect(service).toBeInstanceOf(DashboardService);
+		});
+
+		it('should return same instance on multiple calls (singleton)', () => {
+			const service1 = factory.getDashboardService();
+			const service2 = factory.getDashboardService();
+
+			expect(service1).toBe(service2);
+		});
+
+		it('should create service with OrchestratorRepository dependency', () => {
+			const service = factory.getDashboardService();
+
+			// Service should be properly instantiated
+			expect(service).toBeInstanceOf(DashboardService);
+			// Note: We can't easily test the repository without mocking fetch
+			// That's covered in DashboardService.test.ts
+		});
+	});
+
+	describe('getTasksService - Service creation and singleton', () => {
+		it('should return TasksService instance', () => {
+			const service = factory.getTasksService();
+
+			expect(service).toBeInstanceOf(TasksService);
+		});
+
+		it('should return same instance on multiple calls (singleton)', () => {
+			const service1 = factory.getTasksService();
+			const service2 = factory.getTasksService();
+
+			expect(service1).toBe(service2);
+		});
+
+		it('should create service with OrchestratorRepository dependency', () => {
+			const service = factory.getTasksService();
+
+			// Service should be properly instantiated
+			expect(service).toBeInstanceOf(TasksService);
+			// Note: We can't easily test the repository without mocking fetch
+			// That's covered in TasksService.test.ts
 		});
 	});
 

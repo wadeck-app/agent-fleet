@@ -10,7 +10,7 @@
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
 		"lint": "echo 'No ESLint configured for flow-engine'",
-		"clean": "rm -rf dist"
+		"clean": "rimraf dist"
 	},
 	"dependencies": {
 		"shared-common": "*",

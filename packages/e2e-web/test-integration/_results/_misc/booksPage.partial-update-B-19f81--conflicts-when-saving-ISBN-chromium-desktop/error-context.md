@@ -1,0 +1,59 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - button "App" [ref=e6] [cursor=pointer]:
+        - generic [ref=e7]: App
+        - img
+      - navigation [ref=e9]:
+        - generic [ref=e10]:
+          - link "Dashboard" [ref=e11] [cursor=pointer]:
+            - /url: /dashboard
+            - img
+            - text: Dashboard
+          - link "Workers" [ref=e12] [cursor=pointer]:
+            - /url: /workers
+            - img
+            - text: Workers
+          - link "Tasks" [ref=e13] [cursor=pointer]:
+            - /url: /tasks
+            - img
+            - text: Tasks
+          - link "Ingredients" [ref=e14] [cursor=pointer]:
+            - /url: /ingredients
+            - img
+            - text: Ingredients
+          - link "Books" [ref=e15] [cursor=pointer]:
+            - /url: /books
+            - img
+            - text: Books
+      - button "User" [ref=e17] [cursor=pointer]:
+        - generic [ref=e18]: User
+        - img
+    - main [ref=e19]:
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - heading "Books(0)" [level=1] [ref=e23]:
+            - text: Books
+            - generic [ref=e24]: (0)
+          - generic [ref=e25]:
+            - textbox "Search books by title or author" [ref=e27]:
+              - /placeholder: Search by title or author...
+            - button "Toggle column visibility" [ref=e28] [cursor=pointer]:
+              - img
+              - text: Columns
+            - button "Add Book" [ref=e29] [cursor=pointer]:
+              - img
+              - text: Add Book
+        - generic [ref=e30]:
+          - img [ref=e32]
+          - heading "No books yet" [level=3] [ref=e34]
+          - paragraph [ref=e35]: Start building your library by adding your first book.
+          - button "Add First Book" [ref=e36] [cursor=pointer]
+  - generic [ref=e38]:
+    - generic [ref=e39]: Cannot read properties of null (reading 'get')
+    - button "Close toast" [ref=e40] [cursor=pointer]:
+      - img
+```

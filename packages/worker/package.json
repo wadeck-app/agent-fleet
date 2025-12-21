@@ -7,13 +7,14 @@
 	"types": "./dist/index.d.ts",
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
-		"dev": "tsx src/flow/FlowWorker.ts --no-ui",
-		"dev:ui": "tsx src/flow/FlowWorker.ts",
+		"dev": "nodemon --watch src --watch ../shared-orch-worker/src --watch ../shared-common/src --watch ../flow-engine/src --exec tsx src/flow/FlowWorker.ts -- --no-ui",
+		"dev:no-watch": "tsx src/flow/FlowWorker.ts --no-ui",
+		"dev:ui": "nodemon --watch src --watch ../shared-orch-worker/src --watch ../shared-common/src --watch ../flow-engine/src --exec tsx src/flow/FlowWorker.ts",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
 		"lint": "echo 'No ESLint configured for worker'",
-		"clean": "rm -rf dist"
+		"clean": "rimraf dist"
 	},
 	"dependencies": {
 		"shared-orch-worker": "*",
@@ -31,6 +32,7 @@
 		"@types/react": "^19.2.7",
 		"typescript": "^5.3.3",
 		"vitest": "^4.0.14",
-		"tsx": "^4.7.0"
+		"tsx": "^4.7.0",
+		"nodemon": "^3.1.11"
 	}
 }

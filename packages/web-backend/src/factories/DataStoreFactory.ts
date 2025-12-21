@@ -3,8 +3,13 @@ import type { Book, Ingredient } from '@app/shared';
 import { BaseRepository } from '../repositories/BaseRepository';
 import { BooksRepository } from '../repositories/BooksRepository';
 import { IngredientsRepository } from '../repositories/IngredientsRepository';
+import { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 import { BooksService } from '../services/BooksService';
+import { DashboardService } from '../services/DashboardService';
 import { IngredientsService } from '../services/IngredientsService';
+import { WorkersService } from '../services/WorkersService';
+import { TasksService } from '../services/TasksService';
+import { WorkspacesService } from '../services/WorkspacesService';
 import type { DataStorage } from '../storage/DataStorage';
 import { InMemoryStorage } from '../storage/InMemoryStorage';
 
@@ -30,6 +35,10 @@ export class DataStoreFactory {
 	private storage: DataStorage;
 	private ingredientsService?: IngredientsService;
 	private booksService?: BooksService;
+	private dashboardService?: DashboardService;
+	private workersService?: WorkersService;
+	private tasksService?: TasksService;
+	private workspacesService?: WorkspacesService;
 
 	constructor(storageMode: 'memory' | 'mariadb' = 'memory') {
 		// Create storage based on mode
@@ -75,6 +84,75 @@ export class DataStoreFactory {
 		}
 
 		return this.booksService;
+	}
+
+	/**
+	 * Get or create DashboardService
+	 */
+	getDashboardService(): DashboardService {
+		if (!this.dashboardService) {
+			// Get orchestrator URL from environment or default to localhost
+			const orchestratorUrl = process.env.ORCHESTRATOR_URL || 'http://localhost:3737';
+
+			// Create OrchestratorRepository with 5s cache TTL
+			const cacheTtlMs = 5000;
+			const orchestratorRepo = new OrchestratorRepository(orchestratorUrl, cacheTtlMs);
+
+			// Create DashboardService
+			this.dashboardService = new DashboardService(orchestratorRepo);
+		}
+
+		return this.dashboardService;
+	}
+
+	/**
+	 * Get or create WorkersService
+	 */
+	getWorkersService(): WorkersService {
+		if (!this.workersService) {
+			// Get orchestrator URL from environment or default to localhost
+			const orchestratorUrl = process.env.ORCHESTRATOR_URL || 'http://localhost:3737';
+
+			// Create OrchestratorRepository with 5s cache TTL
+			const cacheTtlMs = 5000;
+			const orchestratorRepo = new OrchestratorRepository(orchestratorUrl, cacheTtlMs);
+
+			// Create WorkersService
+			this.workersService = new WorkersService(orchestratorRepo);
+		}
+
+		return this.workersService;
+	}
+
+	/**
+	 * Get or create TasksService
+	 */
+	getTasksService(): TasksService {
+		if (!this.tasksService) {
+			// Get orchestrator URL from environment or default to localhost
+			const orchestratorUrl = process.env.ORCHESTRATOR_URL || 'http://localhost:3737';
+
+			// Create OrchestratorRepository with 5s cache TTL
+			const cacheTtlMs = 5000;
+			const orchestratorRepo = new OrchestratorRepository(orchestratorUrl, cacheTtlMs);
+
+			// Create TasksService
+			this.tasksService = new TasksService(orchestratorRepo);
+		}
+
+		return this.tasksService;
+	}
+
+	/**
+	 * Get or create WorkspacesService
+	 */
+	getWorkspacesService(): WorkspacesService {
+		if (!this.workspacesService) {
+			// Create WorkspacesService (no dependencies - generates mock data)
+			this.workspacesService = new WorkspacesService();
+		}
+
+		return this.workspacesService;
 	}
 
 	/**
