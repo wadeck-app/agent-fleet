@@ -7,11 +7,13 @@ All TypeScript files containing a primary exported class MUST be named in Pascal
 ### Examples from Codebase
 
 **Correct Patterns:**
+
 - `src/flow/executor/FlowExecutor.ts` → `export class FlowExecutor`
 - `src/orchestrator/websocket/WorkerWebSocketServer.ts` → `export class WorkerWebSocketServer`
 - `src/flow/processing/ClaudeProcessManager.ts` → `export class ClaudeProcessManager`
 
 **Incorrect Patterns:**
+
 ```
 ❌ flow-executor.ts       (kebab-case)
 ❌ executor.ts            (missing context)
@@ -24,6 +26,7 @@ All TypeScript files containing a primary exported class MUST be named in Pascal
 Files without a primary class export may use lowercase or kebab-case:
 
 **Examples from Codebase:**
+
 - `src/flow/types.ts` - Type definitions only
 - `src/shared/types.ts` - Shared type definitions
 - `index.ts` - Entry points and re-exports
@@ -39,6 +42,7 @@ src/flow/processing/SpecificManager.ts → Flow-specific implementation
 ```
 
 **Guidelines:**
+
 - Keep the same base name for the class
 - Rely on folder structure for context
 - Do NOT add prefixes/suffixes to the class name
@@ -46,14 +50,14 @@ src/flow/processing/SpecificManager.ts → Flow-specific implementation
 
 ## Quick Reference Table
 
-| Pattern | Valid | Example |
-|---------|-------|---------|
-| PascalCase matching class | ✅ | `TaskManager.ts` → `class TaskManager` |
-| Kebab-case for class file | ❌ | `task-manager.ts` |
-| Abbreviated name | ❌ | `tm.ts`, `task-mgr.ts` |
-| Generic name without context | ❌ | `manager.ts`, `server.ts` |
-| Utility file lowercase | ✅ | `types.ts`, `protocol.ts` |
-| Entry point | ✅ | `index.ts` |
+| Pattern                      | Valid | Example                                |
+| ---------------------------- | ----- | -------------------------------------- |
+| PascalCase matching class    | ✅    | `TaskManager.ts` → `class TaskManager` |
+| Kebab-case for class file    | ❌    | `task-manager.ts`                      |
+| Abbreviated name             | ❌    | `tm.ts`, `task-mgr.ts`                 |
+| Generic name without context | ❌    | `manager.ts`, `server.ts`              |
+| Utility file lowercase       | ✅    | `types.ts`, `protocol.ts`              |
+| Entry point                  | ✅    | `index.ts`                             |
 
 ## Refactoring Misnamed Files
 

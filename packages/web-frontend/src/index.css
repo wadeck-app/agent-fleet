@@ -1,0 +1,5 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import './framework/styles/theme.css';
+@import './framework/styles/animations.css';
+@import './app/styles/theme-overrides.css';

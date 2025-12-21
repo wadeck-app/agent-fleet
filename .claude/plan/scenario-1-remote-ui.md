@@ -63,45 +63,49 @@
 ## Connection Flow
 
 1. **Web UI démarrage**:
-   - Déployée sur cloud (ex: `https://my-ui.vercel.app`)
-   - WebSocket server écoute sur `/ws/orchestrator`
-   - Attend connexions authentifiées
+    - Déployée sur cloud (ex: `https://my-ui.vercel.app`)
+    - WebSocket server écoute sur `/ws/orchestrator`
+    - Attend connexions authentifiées
 
 2. **Orchestrator démarrage**:
-   - Lit config: `uiEndpoint: "wss://my-ui.vercel.app/ws/orchestrator"`
-   - Initie connexion WebSocket sortante
-   - Envoie auth token dans handshake
+    - Lit config: `uiEndpoint: "wss://my-ui.vercel.app/ws/orchestrator"`
+    - Initie connexion WebSocket sortante
+    - Envoie auth token dans handshake
 
 3. **Authentification**:
-   - UI valide token
-   - Si valid: connexion établie
-   - Si invalid: reject + log attempt
+    - UI valide token
+    - Si valid: connexion établie
+    - Si invalid: reject + log attempt
 
 4. **Runtime**:
-   - Orchestrator push state updates → UI
-   - UI broadcast updates → tous browsers connectés
-   - Browser envoie command → UI → Orchestrator
-   - Orchestrator valide + exécute + retourne résultat
+    - Orchestrator push state updates → UI
+    - UI broadcast updates → tous browsers connectés
+    - Browser envoie command → UI → Orchestrator
+    - Orchestrator valide + exécute + retourne résultat
 
 ## Security Considerations
 
 ### Réseau
+
 - **TLS obligatoire** (WSS) pour connexions cloud
 - Certificats valides (Let's Encrypt)
 - Firewall: Orchestrator n'expose rien publiquement
 
 ### Authentication
+
 - Token partagé orchestrator ↔ UI (rotating tokens recommandé)
 - Browser → UI: session-based auth (JWT, OAuth)
 - Séparation des credentials
 
 ### Commands
+
 - Signature HMAC pour chaque command
 - Whitelist de commands autorisées
 - Rate limiting côté UI
 - Audit log complet
 
 ### Network Failures
+
 - Auto-reconnect orchestrator avec backoff
 - Queue commands pendant déconnexion
 - Status visible dans UI
@@ -151,12 +155,14 @@
 ## Pros/Cons
 
 **Pros**:
+
 - Accès depuis n'importe où (laptop, mobile)
 - Pas besoin d'exposer orchestrator
 - Scalable (load balancer devant UI si besoin)
 - Logs centralisés
 
 **Cons**:
+
 - Dépend de connexion internet
 - Latence réseau pour commands
 - Coût d'hébergement UI

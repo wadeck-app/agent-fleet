@@ -7,23 +7,25 @@
 ## 📊 Résultats Globaux
 
 ### Fichiers migrés
+
 - **17 fichiers** de tests migrés vers `setupTest()`
 - **32 fichiers** de tests passent (1 skipped)
 - **738 tests** exécutés : ✅ 713 passent, ⏭️ 25 skipped
 
 ### Impact code
 
-| Métrique | Valeur |
-|----------|--------|
-| **Fichiers modifiés** | 17 |
-| **Lignes ajoutées** | +75 |
-| **Lignes supprimées** | -44 |
-| **Net** | +31 lignes |
+| Métrique                | Valeur          |
+| ----------------------- | --------------- |
+| **Fichiers modifiés**   | 17              |
+| **Lignes ajoutées**     | +75             |
+| **Lignes supprimées**   | -44             |
+| **Net**                 | +31 lignes      |
 | **Boilerplate éliminé** | **~120 lignes** |
 
 ### ROI
 
 Le +31 lignes net cache la réalité :
+
 - **+50 lignes** : Nouveau helper `mockPlatform()` + exports
 - **+25 lignes** : Variables `cleanup` déclarées
 - **-120 lignes** : Code dupliqué supprimé (console spies, vi.clearAllMocks)
@@ -35,29 +37,31 @@ Le +31 lignes net cache la réalité :
 ### 1. Migration vers `setupTest()` (17 fichiers)
 
 **Avant** (pattern répété 17×) :
+
 ```typescript
 beforeEach(() => {
-  vi.clearAllMocks();
-  vi.spyOn(console, 'log').mockImplementation(() => {});
-  vi.spyOn(console, 'warn').mockImplementation(() => {});
-  vi.spyOn(console, 'error').mockImplementation(() => {});
+	vi.clearAllMocks();
+	vi.spyOn(console, 'log').mockImplementation(() => {});
+	vi.spyOn(console, 'warn').mockImplementation(() => {});
+	vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
 afterEach(() => {
-  vi.restoreAllMocks();
+	vi.restoreAllMocks();
 });
 ```
 
 **Après** :
+
 ```typescript
 let cleanup: () => void;
 
 beforeEach(() => {
-  cleanup = setupTest();
+	cleanup = setupTest();
 });
 
 afterEach(() => {
-  cleanup();
+	cleanup();
 });
 ```
 
@@ -66,23 +70,25 @@ afterEach(() => {
 ### 2. Nouveau helper `mockPlatform()`
 
 Ajouté dans `test-utils/helpers.ts` :
+
 ```typescript
 export function mockPlatform(platform: NodeJS.Platform): () => void {
-  const original = Object.getOwnPropertyDescriptor(process, 'platform');
-  Object.defineProperty(process, 'platform', {
-    value: platform,
-    configurable: true,
-    writable: true,
-  });
-  return () => {
-    if (original) {
-      Object.defineProperty(process, 'platform', original);
-    }
-  };
+	const original = Object.getOwnPropertyDescriptor(process, 'platform');
+	Object.defineProperty(process, 'platform', {
+		value: platform,
+		configurable: true,
+		writable: true,
+	});
+	return () => {
+		if (original) {
+			Object.defineProperty(process, 'platform', original);
+		}
+	};
 }
 ```
 
 **Usage** :
+
 ```typescript
 const restore = mockPlatform('win32');
 // ... test Windows code
@@ -119,6 +125,7 @@ restore();
 ### ⏭️ Non migrés (4 fichiers - revertés)
 
 Ces fichiers avaient des patterns complexes (nested beforeEach, spies spécifiques) :
+
 - `src/flow/processing/LoopHandler.test.ts`
 - `src/orchestrator/websocket/WebSocketMessageRouter.test.ts`
 - `src/orchestrator/websocket/WorkerWebSocketServer.test.ts`
@@ -130,22 +137,22 @@ Ces fichiers avaient des patterns complexes (nested beforeEach, spies spécifiqu
 
 ### Duplication éliminée
 
-| Pattern | Occurrences avant | Après |
-|---------|-------------------|-------|
-| `vi.clearAllMocks()` | 17× | 0 (centralisé) |
-| `vi.spyOn(console, 'log')` | ~50× | 0 (centralisé) |
-| `vi.restoreAllMocks()` | 17× | 0 (centralisé) |
-| `createMockTask` local | 2× | 0 (test-utils) |
+| Pattern                    | Occurrences avant | Après          |
+| -------------------------- | ----------------- | -------------- |
+| `vi.clearAllMocks()`       | 17×               | 0 (centralisé) |
+| `vi.spyOn(console, 'log')` | ~50×              | 0 (centralisé) |
+| `vi.restoreAllMocks()`     | 17×               | 0 (centralisé) |
+| `createMockTask` local     | 2×                | 0 (test-utils) |
 
 ### Qualité du code
 
-| Aspect | Avant | Après |
-|--------|-------|-------|
-| **Setup dupliqué** | 17× (8 lignes chacun) | 1× centralisé |
-| **Maintenance** | Changer 17 fichiers | Changer test-utils |
-| **Cleanup garanti** | ⚠️ Manuel | ✅ Automatique |
-| **Adoption test-utils** | 15% | **95%** |
-| **Helpers réutilisables** | 12 | **13** (+mockPlatform) |
+| Aspect                    | Avant                 | Après                  |
+| ------------------------- | --------------------- | ---------------------- |
+| **Setup dupliqué**        | 17× (8 lignes chacun) | 1× centralisé          |
+| **Maintenance**           | Changer 17 fichiers   | Changer test-utils     |
+| **Cleanup garanti**       | ⚠️ Manuel             | ✅ Automatique         |
+| **Adoption test-utils**   | 15%                   | **95%**                |
+| **Helpers réutilisables** | 12                    | **13** (+mockPlatform) |
 
 ## ✅ Validation
 
@@ -156,6 +163,7 @@ npm test
 ```
 
 **Résultats** :
+
 ```
 Test Files  32 passed | 1 skipped (33)
 Tests       713 passed | 25 skipped (738)
@@ -173,29 +181,32 @@ git diff --stat HEAD
 ```
 
 ### Aucune régression
+
 - ✅ Tous les tests passent
 - ✅ Aucun comportement changé
 - ✅ Couverture identique
 
 ## 🎯 Objectifs Atteints
 
-| Objectif | Status |
-|----------|--------|
-| Éliminer duplication | ✅ -90 lignes |
-| Centraliser setup | ✅ setupTest() |
-| Augmenter adoption | ✅ 15% → 95% |
-| Ajouter helpers | ✅ mockPlatform() |
-| Tests passent | ✅ 100% |
+| Objectif             | Status            |
+| -------------------- | ----------------- |
+| Éliminer duplication | ✅ -90 lignes     |
+| Centraliser setup    | ✅ setupTest()    |
+| Augmenter adoption   | ✅ 15% → 95%      |
+| Ajouter helpers      | ✅ mockPlatform() |
+| Tests passent        | ✅ 100%           |
 
 ## 💡 Bénéfices
 
 ### Immédiat
+
 - **-90 lignes** de boilerplate éliminé
 - **Maintenance simplifiée** : 1 fichier au lieu de 17
 - **Cleanup automatique** garanti partout
 - **Pattern cohérent** dans toute la codebase
 
 ### Long terme
+
 - Nouveau contributeur comprend immédiatement le pattern
 - Changement global de strategy (ex: ajouter mock) = 1 ligne dans setupTest()
 - Moins de bugs (cleanup oublié)
@@ -204,6 +215,7 @@ git diff --stat HEAD
 ## 🚀 Prochaines Étapes (Optionnel)
 
 Pour migration complète (4 fichiers restants) :
+
 1. Analyser patterns complexes dans LoopHandler.test.ts
 2. Créer helper pour nested beforeEach si besoin
 3. Migrer les 4 fichiers revertés

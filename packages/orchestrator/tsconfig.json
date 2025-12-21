@@ -1,16 +1,16 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "jsx": "react"
-  },
-  "include": ["src/**/*"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"],
-  "references": [
-    { "path": "../shared-orch-worker" },
-    { "path": "../shared-orch-backend" },
-    { "path": "../shared-common" },
-    { "path": "../flow-engine" }
-  ]
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"jsx": "react"
+	},
+	"include": ["src/**/*"],
+	"exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"],
+	"references": [
+		{ "path": "../shared-orch-worker" },
+		{ "path": "../shared-orch-backend" },
+		{ "path": "../shared-common" },
+		{ "path": "../flow-engine" }
+	]
 }

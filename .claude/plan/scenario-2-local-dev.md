@@ -87,19 +87,19 @@ http://localhost:3000
 ## Connection Flow
 
 1. **Web UI démarrage**:
-   - Dev server (Vite/Webpack) sur port 3000
-   - WebSocket server embedded
-   - Hot reload activé
+    - Dev server (Vite/Webpack) sur port 3000
+    - WebSocket server embedded
+    - Hot reload activé
 
 2. **Orchestrator démarrage**:
-   - Lit config locale: `ws://localhost:3000/ws/orchestrator`
-   - Tente connexion
-   - Si UI pas encore up: retry avec backoff
+    - Lit config locale: `ws://localhost:3000/ws/orchestrator`
+    - Tente connexion
+    - Si UI pas encore up: retry avec backoff
 
 3. **Runtime**:
-   - Changes dans UI → hot reload → reconnexion orchestrator
-   - Changes dans orchestrator → restart → reconnexion automatique
-   - État persisté pour éviter perte de contexte
+    - Changes dans UI → hot reload → reconnexion orchestrator
+    - Changes dans orchestrator → restart → reconnexion automatique
+    - État persisté pour éviter perte de contexte
 
 ## Configuration Example
 
@@ -140,16 +140,19 @@ http://localhost:3000
 ## Dev Features
 
 ### Auto-reconnect
+
 - Orchestrator détecte UI restart (hot reload)
 - Reconnexion automatique sans intervention
 - Queue des messages pendant reconnexion
 
 ### Mock Data
+
 - UI peut fonctionner sans orchestrator (mode standalone)
 - Mock orchestrator pour tests frontend purs
 - Seed data pour développement UI
 
 ### Debug Tools
+
 - WebSocket message inspector
 - State snapshot/restore
 - Time-travel debugging
@@ -179,6 +182,7 @@ project/
 ## Helper Scripts
 
 ### dev-all.sh
+
 ```bash
 #!/bin/bash
 # Start everything in parallel
@@ -201,20 +205,22 @@ wait
 ```
 
 ### package.json scripts
+
 ```json
 {
-  "scripts": {
-    "dev": "node scripts/dev-all.sh",
-    "dev:ui": "cd web-ui && npm run dev",
-    "dev:orchestrator": "tsx src/orchestrator/core/index.ts --config config/dev.config.ts",
-    "dev:worker": "tsx src/workers/flow/FlowWorker.ts"
-  }
+	"scripts": {
+		"dev": "node scripts/dev-all.sh",
+		"dev:ui": "cd web-ui && npm run dev",
+		"dev:orchestrator": "tsx src/orchestrator/core/index.ts --config config/dev.config.ts",
+		"dev:worker": "tsx src/workers/flow/FlowWorker.ts"
+	}
 }
 ```
 
 ## Troubleshooting
 
 ### Port already in use
+
 ```bash
 # Find process
 lsof -i :3000
@@ -226,11 +232,13 @@ taskkill /PID <PID> /F  # Windows
 ```
 
 ### Connection refused
+
 - Vérifier UI est started
 - Vérifier firewall local
 - Vérifier config endpoint
 
 ### Hot reload casse connexion
+
 - Normal, reconnexion auto activée
 - Vérifier logs orchestrator pour reconnexion
 - Augmenter reconnect delay si trop rapide
@@ -238,6 +246,7 @@ taskkill /PID <PID> /F  # Windows
 ## Pros/Cons
 
 **Pros**:
+
 - Fast iteration (hot reload)
 - Pas de dépendance réseau externe
 - Debug facile (tous les logs locaux)
@@ -245,6 +254,7 @@ taskkill /PID <PID> /F  # Windows
 - Offline development
 
 **Cons**:
+
 - Config différente de prod (localhost vs cloud)
 - Pas de test de latence réseau
 - Pas de test de auth réelle

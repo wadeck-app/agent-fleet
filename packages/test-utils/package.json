@@ -1,19 +1,20 @@
 {
-  "name": "test-utils",
-  "version": "1.0.0",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "scripts": {
-    "build": "tsc --build tsconfig.json",
-    "clean": "rm -rf dist"
-  },
-  "dependencies": {
-    "shared-common": "*",
-    "flow-engine": "*"
-  },
-  "devDependencies": {
-    "typescript": "^5.3.3",
-    "vitest": "^4.0.14"
-  }
+	"name": "test-utils",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"scripts": {
+		"build": "tsc --build tsconfig.json",
+		"clean": "rm -rf dist"
+	},
+	"dependencies": {
+		"shared-common": "*",
+		"flow-engine": "*"
+	},
+	"devDependencies": {
+		"typescript": "^5.3.3",
+		"vitest": "^4.0.14"
+	}
 }

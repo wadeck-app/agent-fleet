@@ -3,12 +3,14 @@
 ## Technology Stack
 
 ### Core Framework
+
 - **Fastify** - High-performance web framework with TypeScript support
 - **Zod** - Runtime type validation and TypeScript type inference
 - **TypeScript 5.3+** - Strict mode enforced
 - **Vitest** - Fast test runner with native TypeScript support
 
 ### Integration
+
 - `@fastify/type-provider-typebox` or `fastify-type-provider-zod` for Zod integration
 - `Pino` - Structured JSON logging (Fastify default)
 
@@ -19,17 +21,20 @@
 **Goal:** Catch errors at compile-time, not runtime.
 
 **MUST:**
+
 - Define explicit return types for all exported functions
 - Use Zod schemas for all external input validation
 - Share types between frontend and backend (single source of truth)
 - Use discriminated unions for complex state
 
 **AVOID:**
+
 - `any` type in production code
 - Implicit return types in public APIs
 - Manual type definitions when Zod can infer them
 
 **Benefits:**
+
 - Frontend gets compile-time validation against backend contracts
 - Breaking API changes caught during build
 - Auto-completion and IntelliSense
@@ -41,9 +46,9 @@
 ```typescript
 // Define Zod schema
 const CreateUserSchema = z.object({
-  email: z.string().email(),
-  name: z.string().min(1),
-  age: z.number().min(0).optional()
+	email: z.string().email(),
+	name: z.string().min(1),
+	age: z.number().min(0).optional(),
 });
 
 // Infer TypeScript type
@@ -55,6 +60,7 @@ type CreateUserRequest = z.infer<typeof CreateUserSchema>;
 ### 3. Layered Architecture
 
 **Structure:**
+
 ```
 Presentation Layer (routes/, handlers/) → HTTP concerns only
 Business Logic Layer (services/, domain/) → Framework-agnostic, testable
@@ -64,6 +70,7 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 **Dependency Flow:** Presentation → Business Logic → Data Access (never reverse)
 
 **MUST:**
+
 - Keep HTTP concerns (headers, status codes) in presentation layer only
 - Make business logic testable without HTTP server
 - Encapsulate all data access in repositories
@@ -82,28 +89,33 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 ### Testing: Unit vs Integration
 
 **Unit tests when:**
+
 - Testing business logic in services (no HTTP)
 - Testing pure functions without external dependencies
 - Target: 70% of test suite
 
 **Integration tests when:**
+
 - Testing full route handler flow
 - Testing Zod schema validation
 - Testing error responses
 - Target: 20% of test suite
 
 **E2E tests when:**
+
 - Testing complete user flows across multiple endpoints
 - Target: 10% of test suite
 
 ### Dependency Injection: When to Use
 
 **Use constructor injection when:**
+
 - Component needs database access
 - Component calls external APIs
 - Component has complex dependencies
 
 **Use Fastify decorators when:**
+
 - Sharing services across multiple routes
 - Plugin-scoped state needed
 - Global configuration required
@@ -113,12 +125,14 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 ### Mocking: What to Mock
 
 **SHOULD mock:**
+
 - Database connections
 - External HTTP clients
 - File system operations
 - Date/time (for deterministic tests)
 
 **SHOULD NOT mock:**
+
 - Business logic (test it directly)
 - Utility functions
 - Internal service methods
@@ -130,11 +144,13 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 ### Plugin Architecture
 
 **When to use plugins:**
+
 - Feature spans multiple routes
 - Component needs isolated testing
 - Reusable across projects
 
 **When NOT to use plugins:**
+
 - Single-route feature (use handler)
 - No shared state needed
 
@@ -145,6 +161,7 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 ### Error Handling
 
 **Standard error format (MUST follow):**
+
 ```typescript
 {
   error: string;        // Human-readable message
@@ -155,6 +172,7 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 ```
 
 **HTTP status codes:**
+
 - `400` - Client validation errors
 - `401` - Missing/invalid authentication
 - `403` - Insufficient permissions
@@ -169,6 +187,7 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 ### Request Validation with Zod
 
 **MUST:**
+
 - Validate all external input with Zod schemas
 - Use Zod's type inference for TypeScript types
 - Define schemas as constants for reusability
@@ -180,6 +199,7 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 ### Lifecycle Hooks
 
 **Common patterns:**
+
 - Authentication (preHandler)
 - Request ID injection (onRequest)
 - Performance logging (onResponse)
@@ -189,11 +209,13 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 ### Logging
 
 **MUST:**
+
 - Use Pino (Fastify's default logger)
 - Use structured logging (JSON format)
 - Include request context in all logs
 
 **AVOID:**
+
 - `console.log` in production code
 - String concatenation for logs
 - Logging sensitive data (passwords, tokens)
@@ -205,6 +227,7 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 ### Strict Configuration
 
 **MUST enable in tsconfig.json:**
+
 - `strict: true`
 - `noImplicitAny: true`
 - `strictNullChecks: true`
@@ -219,6 +242,7 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 **Pattern:** Centralize shared types in dedicated files.
 
 **File structure:**
+
 - `types/api.ts` - API request/response contracts
 - `types/domain.ts` - Business entities
 - `types/enums.ts` - Shared enumerations
@@ -246,6 +270,7 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 **Common patterns:** `Pick`, `Partial`, `Required`, `Omit`, `Readonly`
 
 **When to use:**
+
 - Creating subsets of existing types
 - Making optional fields required
 - Removing sensitive fields for public APIs
@@ -259,6 +284,7 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 **Pattern:** Use `describe` blocks for organization, clear test names.
 
 **Naming convention:**
+
 - `describe('ClassName')` for outer block
 - `describe('methodName')` for method grouping
 - `it('should [behavior]')` for test cases
@@ -270,6 +296,7 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 **Pattern:** Use Fastify's `inject()` method (no HTTP server needed).
 
 **Benefits:**
+
 - Faster tests (no network overhead)
 - Full request/response cycle testing
 - Schema validation testing
@@ -279,12 +306,14 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 ### Coverage Requirements
 
 **Thresholds (MUST meet):**
+
 - Lines: 70%
 - Functions: 70%
 - Branches: 70%
 - Statements: 70%
 
 **Exclude from coverage:**
+
 - `node_modules/`
 - `dist/`
 - `**/*.test.ts`
@@ -299,6 +328,7 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 **Pattern:** Share Zod schemas between server and client.
 
 **Implementation:**
+
 - Export schemas from server
 - Import schemas in client
 - Use for runtime validation + TypeScript types
@@ -308,6 +338,7 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 ### Environment Configuration
 
 **MUST:**
+
 - Validate environment variables on startup
 - Use Zod for type-safe config
 - Fail fast if required variables missing
@@ -319,6 +350,7 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 **Pattern:** Constructor injection with factory functions.
 
 **AVOID:**
+
 - Global singletons (hard to test)
 - Service locator pattern
 - Implicit dependencies
@@ -348,6 +380,7 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 ### Input Sanitization
 
 **MUST:**
+
 - Validate all input with Zod schemas
 - Sanitize HTML content (use DOMPurify)
 - Prevent path traversal in file operations
@@ -357,6 +390,7 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 ### Rate Limiting
 
 **SHOULD implement for:**
+
 - Authentication endpoints
 - Public APIs
 - Resource-intensive operations
@@ -366,6 +400,7 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 ### CORS Configuration
 
 **MUST:**
+
 - Explicitly whitelist allowed origins
 - Never use `origin: true` in production
 - Configure allowed methods
@@ -375,6 +410,7 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 ### Security Headers
 
 **MUST implement:**
+
 - Content Security Policy (CSP)
 - X-Frame-Options
 - X-Content-Type-Options
@@ -443,6 +479,7 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 **Path:** `docs/examples/backend/`
 
 ### Fastify
+
 - `fastify/plugin-architecture.ts` - Plugin encapsulation pattern
 - `fastify/error-handling.ts` - Custom error classes, global handler
 - `fastify/request-validation.ts` - Zod schema validation
@@ -451,6 +488,7 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 - `fastify/logging.ts` - Pino configuration
 
 ### TypeScript
+
 - `typescript/strict-config.json` - Strict tsconfig settings
 - `typescript/type-organization.ts` - Type file structure
 - `typescript/type-guards.ts` - Runtime type checking
@@ -458,21 +496,25 @@ Data Access Layer (repositories/, datasources/) → Single mutation point
 - `typescript/utility-types.ts` - Pick, Omit, Readonly, etc.
 
 ### Vitest
+
 - `vitest/test-structure.ts` - Describe blocks, test organization
 - `vitest/mocking.ts` - Module and function mocks
 - `vitest/fastify-route-testing.ts` - inject() method usage
 - `vitest/vitest-config.ts` - Coverage configuration
 
 ### Integration
+
 - `integration/type-safe-api-client.ts` - Shared Zod schemas
 - `integration/environment-config.ts` - Zod environment validation
 - `integration/dependency-injection.ts` - Factory pattern
 
 ### Performance
+
 - `performance/response-serialization.ts` - Serialization optimization
 - `performance/connection-pooling.ts` - Database connection pool
 
 ### Security
+
 - `security/input-sanitization.ts` - HTML sanitization with DOMPurify
 - `security/rate-limiting.ts` - Request rate limits
 - `security/cors-config.ts` - CORS configuration

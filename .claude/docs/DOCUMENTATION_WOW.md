@@ -10,14 +10,15 @@
 [NUMBER]-[project]-[TYPE].md
 ```
 
-| Type | Purpose | Example |
-|------|---------|---------|
-| `PLAN` | Main reference (architecture, all phases) | `01-subflow-PLAN.md` |
-| `REPORT` | What was done | `02-subflow-phase1-REPORT.md` |
-| `TESTS` | Test coverage | `03-subflow-TESTS.md` |
-| `SUMMARY` | Quick overview | `04-subflow-SUMMARY.md` |
+| Type      | Purpose                                   | Example                       |
+| --------- | ----------------------------------------- | ----------------------------- |
+| `PLAN`    | Main reference (architecture, all phases) | `01-subflow-PLAN.md`          |
+| `REPORT`  | What was done                             | `02-subflow-phase1-REPORT.md` |
+| `TESTS`   | Test coverage                             | `03-subflow-TESTS.md`         |
+| `SUMMARY` | Quick overview                            | `04-subflow-SUMMARY.md`       |
 
 **Rules:**
+
 - Number: `01-`, `02-`, `03-`
 - Project: `lowercase-with-dashes`
 - Type: `UPPERCASE`
@@ -35,17 +36,20 @@
 ## ✍️ Writing Guidelines
 
 **Keep it SHORT:**
+
 - Aim for <500 lines per doc
 - Use tables, not paragraphs
 - Use bullet points
 - If you need >1000 lines, split the document
 
 **Be SPECIFIC:**
+
 - Include line numbers: `StepRunner.ts:338`
 - Use exact metrics: `81.69%` not "good"
 - Link related docs: `See 01-feature-PLAN.md`
 
 **Be ACTIONABLE:**
+
 - Clear TODOs
 - Concrete next steps
 - No vague recommendations
@@ -67,6 +71,7 @@ ADR-01-decision.md          # Architecture decisions
 ```
 
 **Status indicators:**
+
 - ✅ Complete
 - ⏳ In Progress
 - 📋 Planned

@@ -1,0 +1,58 @@
+/**
+ * Type guard to check if an error is an instance of Error
+ */
+export function isError(err: unknown): err is Error {
+	return err instanceof Error;
+}
+
+/**
+ * Type guard to check if an error is an API error with status and getUserMessage
+ */
+export function isApiError(err: unknown): err is { status: number; message: string; getUserMessage?: () => string } {
+	return (
+		typeof err === 'object' &&
+		err !== null &&
+		'status' in err &&
+		typeof (err as { status: unknown }).status === 'number' &&
+		'message' in err
+	);
+}
+
+/**
+ * Safely extract an error message from an unknown error value
+ */
+export function getErrorMessage(err: unknown): string {
+	if (isApiError(err) && err.getUserMessage) {
+		return err.getUserMessage();
+	}
+	if (isError(err)) {
+		return err.message;
+	}
+	if (typeof err === 'string') {
+		return err;
+	}
+	return 'An unknown error occurred';
+}
+
+/**
+ * Safely extract a full error for logging purposes
+ */
+export function normalizeError(err: unknown): Error {
+	if (isError(err)) {
+		return err;
+	}
+	if (typeof err === 'string') {
+		return new Error(err);
+	}
+	return new Error('An unknown error occurred');
+}
+
+/**
+ * Safely get the HTTP status code from an error
+ */
+export function getErrorStatus(err: unknown): number | undefined {
+	if (isApiError(err)) {
+		return err.status;
+	}
+	return undefined;
+}

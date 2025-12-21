@@ -1,14 +1,14 @@
 {
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node .claude/scripts/Stop.js"
-          }
-        ]
-      }
-    ]
-  }
+	"hooks": {
+		"Stop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node .claude/scripts/Stop.js"
+					}
+				]
+			}
+		]
+	}
 }

@@ -3,6 +3,7 @@
 ## What & Why
 
 **Agent Fleet** is a multi-agent orchestration system for autonomous development tasks. It coordinates AI agents through a TypeScript/Node.js framework using:
+
 - **Flow Engine**: DAG-based task execution with dependency management
 - **Orchestrator**: WebSocket-based coordination of distributed workers
 - **Workers**: Specialized agents (flow execution, development tasks)
@@ -16,12 +17,14 @@
 ## Architecture Principles
 
 **Required:**
+
 - Single Responsibility - One clear purpose per class
 - Dependency Injection - Constructor parameters, not globals
 - Test Coverage - >70% coverage for all classes
 - Clear Naming - No abbreviations (use `WebSocket` not `WS`)
 
 **Avoid:**
+
 - God classes (>500 lines → refactor at 400+)
 - Circular dependencies
 - Generic names (`manager.ts` → `TaskManager.ts`)
@@ -40,6 +43,7 @@
 ## Testing & Documentation
 
 **Run tests:**
+
 ```bash
 npm test                # Run all tests
 npm run test:coverage   # With coverage report
@@ -47,12 +51,14 @@ npm run test:watch      # Watch mode
 ```
 
 **Coverage requirement**: Minimum 70% for all classes. Place test files next to implementation:
+
 ```
 FlowExecutor.ts
 FlowExecutor.test.ts
 ```
 
 **Documentation standards:**
+
 - All documentation, code, and tests in English
 - Keep docs concise - reference actual code instead of excerpts
 - Examples must link to existing codebase files
@@ -82,6 +88,7 @@ src/
 - Ask user if requirements unclear (AskUserQuestion tool)
 
 ## Additional references (only consult when needed)
+
 - `.agent-fleet/.claude/docs/naming-conventions.md` - File naming rules, collision handling, examples
 - `.agent-fleet/.claude/docs/architecture.md` - Design patterns, code organization
 - `.agent-fleet/.claude/docs/flow-development.md` - Flow YAML syntax, validation, debugging

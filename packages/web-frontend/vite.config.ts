@@ -1,0 +1,127 @@
+import tailwindcss from '@tailwindcss/vite';
+import react from '@vitejs/plugin-react';
+import os from 'os';
+import path from 'path';
+import { defineConfig, loadEnv } from 'vite';
+import type { Plugin } from 'vite';
+
+export default defineConfig(({ mode }) => {
+	// Load env file based on `mode` in the current working directory.
+	// Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
+	const env = loadEnv(mode, process.cwd(), '');
+
+	// Calculate ports from PROJECT_ID for parallel development between projects
+	// PROJECT_ID=0 → Frontend:5000, Backend:3000 | WORKSPACE_ID=1 → Frontend:5010, Backend:3010
+	const projectId = parseInt(env.VITE_PROJECT_ID || '0', 10);
+	// Calculate ports from WORKSPACE_ID for parallel development between workspaces
+	// WORKSPACE_ID=0 → Frontend:5000, Backend:3000 | WORKSPACE_ID=1 → Frontend:5100, Backend:3100
+	const workspaceId = parseInt(env.VITE_WORKSPACE_ID || '0', 10);
+	const frontendPort = 5000 + projectId * 10 + workspaceId * 100;
+	const backendPort = 3000 + projectId * 10 + workspaceId * 100;
+
+	// Plugin to filter network addresses display
+	function filterNetworkAddresses(backendApiUrl: string): Plugin {
+		return {
+			name: 'filter-network-addresses',
+			configureServer(server) {
+				// const originalPrintUrls = server.printUrls;
+				server.printUrls = function () {
+					// Get filtered network addresses (only 192.168.x.x)
+					const interfaces = os.networkInterfaces();
+					const addresses: string[] = [];
+
+					for (const name of Object.keys(interfaces)) {
+						const nets = interfaces[name];
+						if (!nets) continue;
+
+						for (const net of nets) {
+							if (net.family === 'IPv4' && !net.internal) {
+								if (net.address.startsWith('192.168.')) {
+									addresses.push(net.address);
+								}
+							}
+						}
+					}
+
+					// Print filtered URLs
+					const protocol = server.config.server.https ? 'https' : 'http';
+					const port = server.config.server.port || 5173;
+
+					console.log(`\n  ➜  Local:   ${protocol}://localhost:${port}/`);
+					addresses.forEach(address => {
+						console.log(`  ➜  Network: ${protocol}://${address}:${port}/`);
+					});
+					console.log(`  ➜  Backend: ${backendApiUrl}`);
+					console.log('  ➜  press h + enter to show help\n');
+				};
+			},
+		};
+	}
+
+	// Calculate backend API URL
+	const backendHost = env.VITE_API_HOST || 'localhost';
+	const backendApiUrl = env.VITE_API_BASE_URL || `http://${backendHost}:${backendPort}/api`;
+
+	return {
+		plugins: [
+			react({
+				babel: {
+					plugins: [['babel-plugin-react-compiler', { target: '19' }]],
+				},
+			}),
+			tailwindcss(),
+			filterNetworkAddresses(backendApiUrl),
+		],
+		resolve: {
+			alias: {
+				'@': path.resolve(__dirname, './src'),
+				'@framework': path.resolve(__dirname, './src/framework'),
+				'@app': path.resolve(__dirname, './src/app'),
+				'@shared': path.resolve(__dirname, '../shared-frontend-backend/src'),
+			},
+		},
+		server: {
+			// Expose on all network interfaces to allow access from other devices
+			host: true,
+			// port: process.env.VITE_E2E_PORT ? parseInt(process.env.VITE_E2E_PORT, 10) : 5173,
+			port: frontendPort,
+			//strictPort: !!process.env.VITE_E2E_PORT,
+			proxy: {
+				'/api': {
+					target: `http://localhost:${backendPort}`,
+					changeOrigin: true,
+				},
+			},
+		},
+		test: {
+			globals: true,
+			environment: 'jsdom',
+			setupFiles: './src/framework/tests/setup.ts',
+			css: true,
+			env: {
+				// unit tests must mock the server!
+				VITE_UNIT_TEST: true,
+			},
+			coverage: {
+				provider: 'v8',
+				reporter: ['text', 'json', 'html'],
+				exclude: [
+					'node_modules/',
+					'src/framework/tests/',
+					'**/*.d.ts',
+					'**/*.config.*',
+					'**/mockData',
+					'dist/',
+					'.storybook/',
+					'src/app/main.tsx',
+				],
+				thresholds: {
+					lines: 80,
+					functions: 80,
+					branches: 80,
+					statements: 80,
+				},
+			},
+		},
+	};
+});

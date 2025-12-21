@@ -55,6 +55,7 @@ npm run dev
 ```
 
 This will start:
+
 - REST API on `http://localhost:3737`
 - WebSocket server on `ws://localhost:3738`
 
@@ -120,51 +121,62 @@ agent-fleet/
 ### REST API Endpoints
 
 #### `GET /health`
+
 Health check endpoint.
 
 #### `GET /stats`
+
 Get system statistics including worker count, task counts, etc.
 
 #### `POST /tasks`
+
 Create a new task.
 
 **Body:**
+
 ```json
 {
-  "description": "Task description",
-  "priority": "low|medium|high|urgent",
-  "metadata": {}
+	"description": "Task description",
+	"priority": "low|medium|high|urgent",
+	"metadata": {}
 }
 ```
 
 #### `GET /tasks`
+
 List all tasks. Optional query param: `?status=backlog`
 
 #### `GET /tasks/:id`
+
 Get a specific task by ID.
 
 #### `PATCH /tasks/:id/status`
+
 Update task status.
 
 **Body:**
+
 ```json
 {
-  "status": "backlog|refining|todo|in_progress|review|..."
+	"status": "backlog|refining|todo|in_progress|review|..."
 }
 ```
 
 #### `POST /tasks/:id/comments`
+
 Add a comment to a task.
 
 **Body:**
+
 ```json
 {
-  "author": "user",
-  "content": "Comment text"
+	"author": "user",
+	"content": "Comment text"
 }
 ```
 
 #### `GET /workers`
+
 List all connected workers.
 
 ### WebSocket Protocol
@@ -172,6 +184,7 @@ List all connected workers.
 Workers connect to `ws://localhost:3738` and exchange JSON messages.
 
 **Message Types:**
+
 - `WORKER_READY` - Worker announces it's ready
 - `ASSIGN_TASK` - Orchestrator assigns a task
 - `TASK_STARTED` - Worker started working on task
@@ -205,26 +218,31 @@ Tasks flow through these statuses:
 ## Worker Types
 
 ### Flow Worker
+
 Executes flows defined in `.agent-fleet/flows.yaml`. Each flow consists of multiple steps orchestrated through a DAG execution engine. Uses Claude Code to perform autonomous development tasks with workspace management.
 
 ## Development
 
 ### Build
+
 ```bash
 npm run build
 ```
 
 ### Run in Dev Mode
+
 ```bash
 npm run dev
 ```
 
 ### Add a Task via CLI
+
 ```bash
 npm run add-task create "Description" [priority]
 ```
 
 ### Run a Worker
+
 ```bash
 # Flow worker
 npm run worker:flow
@@ -236,6 +254,7 @@ npm run worker:flow:i
 ## Environment Variables
 
 Workers receive these environment variables:
+
 - `CLAUDE_WORKER_ID` - Unique worker ID
 - `CLAUDE_WORKER_SOCKET` - WebSocket URL to orchestrator
 - `CLAUDE_TASK_ID` - Current task ID
@@ -250,6 +269,7 @@ Example: `Stop.js` can send a `STOP_REQUESTED` message to the orchestrator when 
 ## Roadmap
 
 ### Phase 1: MVP ✅
+
 - [x] Orchestrator with REST API
 - [x] WebSocket server for workers
 - [x] Task management (JSON files)
@@ -258,6 +278,7 @@ Example: `Stop.js` can send a `STOP_REQUESTED` message to the orchestrator when 
 - [ ] Stop hook integration
 
 ### Phase 2: Multi-Agent System
+
 - [ ] PM worker (task refinement)
 - [ ] PO worker (prioritization)
 - [ ] Reviewer worker (code review)
@@ -265,12 +286,14 @@ Example: `Stop.js` can send a `STOP_REQUESTED` message to the orchestrator when 
 - [ ] GitHub PR creation
 
 ### Phase 3: Intelligence
+
 - [ ] Knowledge base integration
 - [ ] Context management
 - [ ] Dependency detection
 - [ ] Retry logic & error handling
 
 ### Phase 4: UI
+
 - [ ] Web dashboard
 - [ ] Real-time task visualization
 - [ ] Branch preview

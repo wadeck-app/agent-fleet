@@ -7,6 +7,7 @@ This document explains how to use the integrated Orchestrator + Flow Engine syst
 ## Overview
 
 The Flow Engine is now fully integrated with the Orchestrator, allowing you to:
+
 - Define workflows as YAML flows
 - Submit tasks that execute flows automatically
 - Manage workspaces with full git integration
@@ -43,6 +44,7 @@ npm run dev
 ```
 
 This starts:
+
 - **TaskManager**: Manages tasks and their lifecycle
 - **WebSocket Server**: Port 3738 for worker connections
 - **REST API**: Port 3737 for task creation and queries
@@ -57,6 +59,7 @@ npx tsx src/workers/flow-worker.ts
 ```
 
 The FlowWorker:
+
 - Connects to the orchestrator via WebSocket
 - Loads available flows from FlowRegistry
 - Waits for flow-based tasks to execute
@@ -79,6 +82,7 @@ curl -X POST http://localhost:3737/tasks \
 ```
 
 Response:
+
 ```json
 {
   "id": "abc123...",
@@ -103,6 +107,7 @@ curl http://localhost:3737/tasks/abc123
 ```
 
 The task will go through these states:
+
 1. `backlog` - Created, waiting for worker
 2. `in_progress` - Worker executing the flow
 3. `review` - Flow completed successfully
@@ -154,14 +159,14 @@ curl http://localhost:3737/flows/simple-qa
 ### Default Flows
 
 1. **simple-qa** - Simple question & answer
-   - Input: `question` (string)
-   - Output: Answer from codebase
-   - Workspace: shared, main-only, always reuse
+    - Input: `question` (string)
+    - Output: Answer from codebase
+    - Workspace: shared, main-only, always reuse
 
 2. **dev-full** - Full development cycle
-   - Input: `taskDescription` (string)
-   - Output: Implementation with tests
-   - Workspace: isolated, feature-branch, never reuse
+    - Input: `taskDescription` (string)
+    - Output: Implementation with tests
+    - Workspace: isolated, feature-branch, never reuse
 
 ## Creating Custom Flows
 
@@ -169,49 +174,53 @@ Create `.agent-fleet/flows.yaml` in your project:
 
 ```yaml
 my-custom-flow:
-  name: My Custom Flow
-  description: Does something amazing
-  workspace:
-    mode: isolated
-    gitStrategy: feature-branch
-    reusePolicy: never
-  inputs:
-    taskDescription: string
-  steps:
-    - type: script
-      id: setup
-      name: Setup environment
-      script: npm install
-      output:
-        exitCode: { type: number }
+    name: My Custom Flow
+    description: Does something amazing
+    workspace:
+        mode: isolated
+        gitStrategy: feature-branch
+        reusePolicy: never
+    inputs:
+        taskDescription: string
+    steps:
+        - type: script
+          id: setup
+          name: Setup environment
+          script: npm install
+          output:
+              exitCode: { type: number }
 
-    - type: model
-      id: implement
-      name: Implement feature
-      model: sonnet
-      prompt: |
-        Implement: ${{ inputs.taskDescription }}
-      next:
-        default: test
+        - type: model
+          id: implement
+          name: Implement feature
+          model: sonnet
+          prompt: |
+              Implement: ${{ inputs.taskDescription }}
+          next:
+              default: test
 
-    - type: script
-      id: test
-      name: Run tests
-      script: npm test
-      output:
-        exitCode: { type: number }
+        - type: script
+          id: test
+          name: Run tests
+          script: npm test
+          output:
+              exitCode: { type: number }
 ```
 
 ## Task Type Fields
 
 ### flowId (optional)
+
 The ID of the flow to execute. If not provided, the task is treated as a regular (non-flow) task.
 
 ### flowInputs (optional)
+
 Input variables for the flow. Must match the flow's `inputs` definition.
 
 ### flowResult (populated after execution)
+
 Contains:
+
 - `status`: 'completed' or 'failed'
 - `outputs`: Key-value pairs from flow execution
 - `error`: Error message if failed
@@ -220,17 +229,20 @@ Contains:
 ## Workspace Management
 
 FlowWorker automatically:
+
 - **Allocates** workspace based on flow configuration
 - **Executes** flow in the workspace
 - **Releases** workspace after completion
 - **Cleans up** isolated workspaces
 
 Workspace modes:
+
 - **isolated**: New workspace for each task (cleaned up after)
 - **shared**: Reused workspace (never cleaned up)
 - **manual**: User-provided directory path
 
 Git strategies:
+
 - **main-only**: Only use main branch
 - **feature-branch**: Create feature branches (`fleet/task-{id}-{slug}`)
 - **any**: Allow any branch
@@ -239,6 +251,7 @@ Git strategies:
 ## REST API Endpoints
 
 ### Tasks
+
 - `POST /tasks` - Create task (with optional flowId, flowInputs)
 - `GET /tasks` - List all tasks
 - `GET /tasks/:id` - Get specific task
@@ -247,10 +260,12 @@ Git strategies:
 - `POST /tasks/:id/comments` - Add comment
 
 ### Flows
+
 - `GET /flows` - List all flows
 - `GET /flows/:id` - Get flow definition
 
 ### System
+
 - `GET /health` - Health check
 - `GET /stats` - System statistics
 - `GET /workers` - List connected workers
@@ -264,6 +279,7 @@ npm test
 ```
 
 All 151 tests should pass, including:
+
 - Flow Engine tests (output extraction, conditions, templates, etc.)
 - Workspace Manager tests
 - Flow Executor tests
@@ -307,16 +323,19 @@ curl -X POST http://localhost:3737/tasks \
 ## Troubleshooting
 
 ### FlowWorker not picking up tasks
+
 - Check that FlowWorker is connected: `GET /workers`
 - Verify task has `flowId` set
 - Check orchestrator logs for errors
 
 ### Flow not found
+
 - List available flows: `GET /flows`
 - Check `.agent-fleet/flows.yaml` exists and is valid
 - Restart orchestrator to reload flows
 
 ### Workspace allocation fails
+
 - Check disk space
 - Verify git is installed and accessible
 - Check project root has `.git` directory
@@ -324,12 +343,14 @@ curl -X POST http://localhost:3737/tasks \
 ## Next Steps
 
 Phase 5 will add:
+
 - Enhanced UI showing flow execution progress
 - Real-time step updates via WebSocket
 - Workspace status visualization
 - Detailed execution trace viewer
 
 Phase 6 will add:
+
 - CLI interface for easier task submission
 - Interactive flow execution
 - Flow templating and management

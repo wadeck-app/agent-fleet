@@ -7,6 +7,7 @@ The Flow Engine has been successfully migrated from JavaScript template string s
 ## What Changed
 
 ### Old Syntax (JavaScript Template Strings)
+
 ```yaml
 script: echo "${message}"
 script: echo "${build.version}"
@@ -14,6 +15,7 @@ script: echo "${task.priority}"
 ```
 
 ### New Syntax (GitHub Actions)
+
 ```yaml
 script: echo "${{ inputs.message }}"
 script: echo "${{ steps.build.outputs.version }}"
@@ -25,23 +27,27 @@ script: echo "${{ task.priority }}"
 ### 1. Explicit Context Naming
 
 **Before**: Variables had ambiguous sources
+
 ```yaml
-script: echo "${message}"  # Where does 'message' come from?
+script: echo "${message}" # Where does 'message' come from?
 ```
 
 **After**: Clear context specification
+
 ```yaml
-script: echo "${{ inputs.message }}"  # Clearly from flow inputs
+script: echo "${{ inputs.message }}" # Clearly from flow inputs
 ```
 
 ### 2. No Shell Variable Conflicts
 
 **Before**: Confusion between template and shell variables
+
 ```yaml
-script: echo "${HOME}"  # Is this a template variable or shell variable?
+script: echo "${HOME}" # Is this a template variable or shell variable?
 ```
 
 **After**: Clear distinction
+
 ```yaml
 script: echo "$HOME"              # Shell variable
 script: echo "${{ inputs.home }}" # Flow variable
@@ -50,6 +56,7 @@ script: echo "${{ inputs.home }}" # Flow variable
 ### 3. Type Safety and Validation
 
 The new syntax enables compile-time validation:
+
 ```yaml
 ${{ inputs.varName }}              # ✓ Valid
 ${{ steps.stepId.outputs.var }}    # ✓ Valid
@@ -60,6 +67,7 @@ ${{ unknownContext.var }}          # ✗ Error: Unknown context
 ### 4. Better IDE Support
 
 The explicit context structure enables:
+
 - Auto-completion of available contexts
 - Type checking for variable access
 - Better error messages
@@ -69,18 +77,19 @@ The explicit context structure enables:
 ### Files Modified
 
 1. **Core Template Engine**
-   - `src/flow/template-renderer.ts` - Updated regex pattern and resolution logic
+    - `src/flow/template-renderer.ts` - Updated regex pattern and resolution logic
 
 2. **Flow Examples**
-   - `src/flow/flow-registry.ts` - Updated all default flow definitions
+    - `src/flow/flow-registry.ts` - Updated all default flow definitions
 
 3. **Test Files**
-   - `src/flow/flow-executor.test.ts` - 8 tests updated
-   - `src/flow/integration.test.ts` - 4 tests updated
+    - `src/flow/flow-executor.test.ts` - 8 tests updated
+    - `src/flow/integration.test.ts` - 4 tests updated
 
 ### Test Results
 
 All 104 tests passing:
+
 - ✓ 21 tests: Output extraction
 - ✓ 19 tests: Condition evaluation
 - ✓ 8 tests: Flow execution
@@ -108,13 +117,13 @@ Access outputs from previous steps:
 
 ```yaml
 steps:
-  - id: build
-    script: npm run build
-    output:
-      version: { type: string }
+    - id: build
+      script: npm run build
+      output:
+          version: { type: string }
 
-  - id: deploy
-    script: echo "Deploying ${{ steps.build.outputs.version }}"
+    - id: deploy
+      script: echo "Deploying ${{ steps.build.outputs.version }}"
 ```
 
 **Required Format**: `steps.<stepId>.outputs.<variableName>`
@@ -129,6 +138,7 @@ steps:
 ```
 
 Available metadata:
+
 - `task.priority` - Task priority level
 - `task.createdAt` - Task creation timestamp
 - Any custom metadata passed to executor
@@ -170,15 +180,15 @@ Clear error messages for invalid expressions:
 
 ```typescript
 // Missing context
-"${{ varName }}"
+'${{ varName }}';
 // Error: Unknown root context: 'varName'. Use 'inputs', 'steps', or 'task'
 
 // Wrong format
-"${{ steps.build.version }}"
+'${{ steps.build.version }}';
 // Error: steps requires format: steps.stepId.outputs.varName
 
 // Missing variable
-"${{ inputs.nonexistent }}"
+'${{ inputs.nonexistent }}';
 // Error: Property 'nonexistent' not found
 ```
 
@@ -188,17 +198,19 @@ Clear error messages for invalid expressions:
 
 ```typescript
 const flow = {
-  inputs: { name: 'string' },
-  steps: [{
-    type: 'script',
-    script: 'echo "Hello ${{ inputs.name }}"'
-  }]
+	inputs: { name: 'string' },
+	steps: [
+		{
+			type: 'script',
+			script: 'echo "Hello ${{ inputs.name }}"',
+		},
+	],
 };
 
 await executor.execute({
-  flow,
-  inputs: { name: 'Alice' },
-  // Output: "Hello Alice"
+	flow,
+	inputs: { name: 'Alice' },
+	// Output: "Hello Alice"
 });
 ```
 
@@ -206,19 +218,19 @@ await executor.execute({
 
 ```typescript
 const flow = {
-  steps: [
-    {
-      id: 'generate',
-      script: 'echo "42"',
-      output: {
-        value: { type: 'number', transform: 'parseInt' }
-      }
-    },
-    {
-      id: 'use',
-      script: 'echo "Value: ${{ steps.generate.outputs.value }}"'
-    }
-  ]
+	steps: [
+		{
+			id: 'generate',
+			script: 'echo "42"',
+			output: {
+				value: { type: 'number', transform: 'parseInt' },
+			},
+		},
+		{
+			id: 'use',
+			script: 'echo "Value: ${{ steps.generate.outputs.value }}"',
+		},
+	],
 };
 // Output: "Value: 42"
 ```
@@ -227,24 +239,22 @@ const flow = {
 
 ```typescript
 const flow = {
-  inputs: { threshold: 'number' },
-  steps: [
-    {
-      id: 'check',
-      script: 'echo "10"',
-      output: {
-        value: { type: 'number', transform: 'parseInt' }
-      },
-      next: {
-        conditions: [
-          { when: 'output.value > inputs.threshold', goto: 'high' }
-        ],
-        default: 'low'
-      }
-    },
-    { id: 'high', script: 'echo "High value"' },
-    { id: 'low', script: 'echo "Low value"' }
-  ]
+	inputs: { threshold: 'number' },
+	steps: [
+		{
+			id: 'check',
+			script: 'echo "10"',
+			output: {
+				value: { type: 'number', transform: 'parseInt' },
+			},
+			next: {
+				conditions: [{ when: 'output.value > inputs.threshold', goto: 'high' }],
+				default: 'low',
+			},
+		},
+		{ id: 'high', script: 'echo "High value"' },
+		{ id: 'low', script: 'echo "Low value"' },
+	],
 };
 ```
 
@@ -252,12 +262,12 @@ const flow = {
 
 ```typescript
 await executor.execute({
-  flow,
-  taskMetadata: {
-    priority: 'high',
-    createdAt: '2024-01-01T00:00:00Z',
-    customField: 'value'
-  }
+	flow,
+	taskMetadata: {
+		priority: 'high',
+		createdAt: '2024-01-01T00:00:00Z',
+		customField: 'value',
+	},
 });
 
 // Access in flow:
@@ -276,9 +286,9 @@ To migrate existing flows:
 
 1. ✓ Update all `${...}` to `${{ ... }}`
 2. ✓ Add explicit context prefixes:
-   - `${var}` → `${{ inputs.var }}`
-   - `${step.var}` → `${{ steps.step.outputs.var }}`
-   - `${task.prop}` → `${{ task.prop }}`
+    - `${var}` → `${{ inputs.var }}`
+    - `${step.var}` → `${{ steps.step.outputs.var }}`
+    - `${task.prop}` → `${{ task.prop }}`
 3. ✓ Update conditional expressions if needed
 4. ✓ Test all flows
 5. ✓ Update documentation
@@ -292,6 +302,7 @@ npm test
 ```
 
 All 104 tests pass, covering:
+
 - Template rendering with all context types
 - Output extraction with transforms
 - Conditional transitions
@@ -305,6 +316,7 @@ npx tsx examples/run-demo.ts
 ```
 
 Demonstrates:
+
 1. Simple variable interpolation
 2. Output extraction and passing
 3. Conditional branching
@@ -321,6 +333,7 @@ Demonstrates:
 ## Conclusion
 
 The GitHub Actions syntax migration provides:
+
 - ✓ Clearer variable scoping
 - ✓ Better error messages
 - ✓ No shell conflicts

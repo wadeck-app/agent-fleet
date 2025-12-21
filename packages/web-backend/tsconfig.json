@@ -1,13 +1,20 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src"
-  },
-  "include": ["src/**/*"],
-  "references": [
-    { "path": "../shared-frontend-backend" },
-    { "path": "../shared-orch-backend" },
-    { "path": "../shared-common" }
-  ]
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"baseUrl": ".",
+		"paths": {
+			"@app/shared": ["../shared-frontend-backend/src"],
+			"@app/shared/*": ["../shared-frontend-backend/src/*"],
+			"@/*": ["./src/*"]
+		}
+	},
+	"include": ["src/**/*"],
+	"exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"],
+	"references": [
+		{ "path": "../shared-frontend-backend" },
+		{ "path": "../shared-orch-backend" },
+		{ "path": "../shared-common" }
+	]
 }

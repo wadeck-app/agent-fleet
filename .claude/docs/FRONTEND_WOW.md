@@ -62,6 +62,7 @@ components/features/InventoryTable/
 ```
 
 **When to create a folder:**
+
 - ✅ Component has custom hook: `useComponentName.ts`
 - ✅ Component has types/schemas: `types.ts`, `schema.ts`
 - ✅ Component has sub-components: `ComponentRow.tsx`
@@ -70,16 +71,19 @@ components/features/InventoryTable/
 ## Quick Decision Rules
 
 ### Context vs Props?
+
 - **Props:** <4 components, <3 levels drilling
 - **Context:** >4-5 components, >3 levels drilling
 
 ### Component Type?
+
 - **Generic:** Reusable UI, zero business logic, Shadcn/ui based
 - **Feature:** Domain-specific, combines generics
 - **Page:** Top-level route, compositional only
 - **Layout:** Structure + responsive only
 
 ### Test Type?
+
 - **Unit (70%):** Hooks, services, utilities
 - **Integration (25%):** Component interactions
 - **E2E (5%):** Critical user journeys
@@ -89,6 +93,7 @@ components/features/InventoryTable/
 ### Generic Components
 
 **MUST:**
+
 - Start with Shadcn/ui components
 - Use Tailwind utilities only
 - Use Lucide icons
@@ -96,6 +101,7 @@ components/features/InventoryTable/
 - Zero business logic
 
 **AVOID:**
+
 - Business logic
 - Direct API calls
 - Feature-specific behavior
@@ -105,6 +111,7 @@ components/features/InventoryTable/
 ### Feature Components
 
 **MUST:**
+
 - Compose generic components
 - Receive data via props
 - Handle domain logic
@@ -115,12 +122,14 @@ components/features/InventoryTable/
 ### Page Components
 
 **MUST:**
+
 - Be compositional (just compose components)
 - Minimal styling (0-5 lines Tailwind max)
 - Delegate to layouts
 - Manage shared state if needed
 
 **AVOID:**
+
 - Business logic
 - Direct API calls
 - Styling (use layouts)
@@ -130,6 +139,7 @@ components/features/InventoryTable/
 ### Styling with Tailwind
 
 **MUST:**
+
 - Use Tailwind utilities exclusively
 - Use `cn()` for conditional classes
 - Use theme colors (`bg-primary`, never `bg-[#3b82f6]`)
@@ -137,12 +147,14 @@ components/features/InventoryTable/
 - Mobile-first responsive (Pixel 9a baseline: 393px)
 
 **AVOID:**
+
 - Inline styles
 - Hardcoded colors
 - CSS modules/separate style files
 - Fixed widths
 
 **References:**
+
 - `docs/examples/frontend/styling/tailwind-component.tsx` - cn() usage
 - `docs/examples/frontend/styling/theme-system-tailwind.css` - Theme setup
 - `docs/examples/frontend/styling/responsive-tailwind.tsx` - Responsive patterns
@@ -151,17 +163,20 @@ components/features/InventoryTable/
 ### Data Flow
 
 **MUST:**
+
 - Keep components free of API calls
 - Transform data in service layer
 - Expose via custom hooks
 - Pass hook data to components via props
 
 **AVOID:**
+
 - Direct API calls in components
 - Business logic in hooks (use service)
 - Data transformation in repository
 
 **References:**
+
 - `docs/examples/frontend/data-flow/api-client.ts`
 - `docs/examples/frontend/data-flow/repository.ts`
 - `docs/examples/frontend/data-flow/service.ts`
@@ -170,12 +185,14 @@ components/features/InventoryTable/
 ### Testing
 
 **MUST:**
+
 - Every component has `.stories.tsx`
 - Mock service layer when testing hooks
 - Test behavior, not implementation
 - Maintain 70/25/5 pyramid
 
 **References:**
+
 - `docs/examples/frontend/testing/unit-test-hook.test.ts`
 - `docs/examples/frontend/testing/integration-test-component.test.tsx`
 - `docs/examples/frontend/testing/storybook-stories.stories.tsx`
@@ -186,6 +203,7 @@ components/features/InventoryTable/
 **For detailed anti-patterns with examples:** See `.claude/docs/FRONTEND_ANTIPATTERNS.md`
 
 Quick list:
+
 - Business logic in generic components
 - Direct component-to-component communication
 - API calls in components
@@ -204,28 +222,33 @@ Quick list:
 All examples: `docs/examples/frontend/`
 
 **Components:**
+
 - `components/generic-component.tsx` - Shadcn/ui, Tailwind, Lucide
 - `components/feature-component.tsx` - Domain logic
 - `components/page-component.tsx` - Compositional
 - `components/layout-component.tsx` - Structure
 
 **State:**
+
 - `state/props-communication.tsx` - Props pattern
 - `state/context-usage.tsx` - Context pattern
 
 **Data Flow:**
+
 - `data-flow/api-client.ts` - HTTP client
 - `data-flow/repository.ts` - Data access
 - `data-flow/service.ts` - Business logic
 - `data-flow/custom-hook.ts` - Service interface
 
 **Testing:**
+
 - `testing/unit-test-hook.test.ts` - Hook tests
 - `testing/integration-test-component.test.tsx` - Integration tests
 - `testing/storybook-stories.stories.tsx` - Story variants
 - `testing/storybook-interaction-test.stories.tsx` - Interaction tests
 
 **Styling:**
+
 - `styling/tailwind-component.tsx` - cn() utility
 - `styling/theme-system-tailwind.css` - Dark/light themes
 - `styling/responsive-tailwind.tsx` - Mobile-first

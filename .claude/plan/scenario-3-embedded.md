@@ -101,73 +101,73 @@ agent-fleet start --ui
 // src/orchestrator/lifecycle/UILifecycleManager.ts
 
 export class UILifecycleManager {
-  private uiProcess: ChildProcess | null = null;
-  private uiPort: number | null = null;
+	private uiProcess: ChildProcess | null = null;
+	private uiPort: number | null = null;
 
-  async startUI(): Promise<{ port: number; endpoint: string }> {
-    // 1. Find available port
-    this.uiPort = await findAvailablePort(30000, 40000);
+	async startUI(): Promise<{ port: number; endpoint: string }> {
+		// 1. Find available port
+		this.uiPort = await findAvailablePort(30000, 40000);
 
-    // 2. Spawn UI process
-    this.uiProcess = spawn('node', [
-      'web-ui/dist/server.js',
-      '--port', this.uiPort.toString(),
-      '--orchestrator-token', generateToken()
-    ], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: false
-    });
+		// 2. Spawn UI process
+		this.uiProcess = spawn(
+			'node',
+			['web-ui/dist/server.js', '--port', this.uiPort.toString(), '--orchestrator-token', generateToken()],
+			{
+				stdio: ['ignore', 'pipe', 'pipe'],
+				detached: false,
+			}
+		);
 
-    // 3. Monitor stdout/stderr
-    this.uiProcess.stdout.on('data', (data) => {
-      logger.debug(`[UI] ${data}`);
-    });
+		// 3. Monitor stdout/stderr
+		this.uiProcess.stdout.on('data', data => {
+			logger.debug(`[UI] ${data}`);
+		});
 
-    // 4. Wait for ready signal
-    await this.waitForUIReady(this.uiPort);
+		// 4. Wait for ready signal
+		await this.waitForUIReady(this.uiPort);
 
-    // 5. Return connection info
-    return {
-      port: this.uiPort,
-      endpoint: `ws://localhost:${this.uiPort}/ws/orchestrator`
-    };
-  }
+		// 5. Return connection info
+		return {
+			port: this.uiPort,
+			endpoint: `ws://localhost:${this.uiPort}/ws/orchestrator`,
+		};
+	}
 
-  private async waitForUIReady(port: number): Promise<void> {
-    const maxAttempts = 30;
-    for (let i = 0; i < maxAttempts; i++) {
-      try {
-        await fetch(`http://localhost:${port}/health`);
-        return; // Success
-      } catch {
-        await sleep(1000);
-      }
-    }
-    throw new Error('UI failed to start');
-  }
+	private async waitForUIReady(port: number): Promise<void> {
+		const maxAttempts = 30;
+		for (let i = 0; i < maxAttempts; i++) {
+			try {
+				await fetch(`http://localhost:${port}/health`);
+				return; // Success
+			} catch {
+				await sleep(1000);
+			}
+		}
+		throw new Error('UI failed to start');
+	}
 
-  async stopUI(): Promise<void> {
-    if (this.uiProcess) {
-      this.uiProcess.kill('SIGTERM');
-      // Wait for graceful shutdown
-      await new Promise(resolve => {
-        this.uiProcess.once('exit', resolve);
-        setTimeout(() => {
-          this.uiProcess.kill('SIGKILL'); // Force after 5s
-          resolve(null);
-        }, 5000);
-      });
-    }
-  }
+	async stopUI(): Promise<void> {
+		if (this.uiProcess) {
+			this.uiProcess.kill('SIGTERM');
+			// Wait for graceful shutdown
+			await new Promise(resolve => {
+				this.uiProcess.once('exit', resolve);
+				setTimeout(() => {
+					this.uiProcess.kill('SIGKILL'); // Force after 5s
+					resolve(null);
+				}, 5000);
+			});
+		}
+	}
 
-  monitorHealth(): void {
-    if (this.uiProcess) {
-      this.uiProcess.on('exit', (code) => {
-        logger.error(`UI process exited with code ${code}`);
-        // Decide: restart or shutdown orchestrator?
-      });
-    }
-  }
+	monitorHealth(): void {
+		if (this.uiProcess) {
+			this.uiProcess.on('exit', code => {
+				logger.error(`UI process exited with code ${code}`);
+				// Decide: restart or shutdown orchestrator?
+			});
+		}
+	}
 }
 ```
 
@@ -177,13 +177,13 @@ export class UILifecycleManager {
 import open from 'open';
 
 async function openBrowser(url: string): Promise<void> {
-  try {
-    await open(url);
-    logger.info(`Browser opened: ${url}`);
-  } catch (error) {
-    logger.warn(`Failed to auto-open browser: ${error.message}`);
-    logger.info(`Please open manually: ${url}`);
-  }
+	try {
+		await open(url);
+		logger.info(`Browser opened: ${url}`);
+	} catch (error) {
+		logger.warn(`Failed to auto-open browser: ${error.message}`);
+		logger.info(`Please open manually: ${url}`);
+	}
 }
 ```
 
@@ -191,24 +191,24 @@ async function openBrowser(url: string): Promise<void> {
 
 ```typescript
 async function findAvailablePort(min: number, max: number): Promise<number> {
-  for (let port = min; port <= max; port++) {
-    if (await isPortAvailable(port)) {
-      return port;
-    }
-  }
-  throw new Error(`No available port in range ${min}-${max}`);
+	for (let port = min; port <= max; port++) {
+		if (await isPortAvailable(port)) {
+			return port;
+		}
+	}
+	throw new Error(`No available port in range ${min}-${max}`);
 }
 
 async function isPortAvailable(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-    server.once('error', () => resolve(false));
-    server.once('listening', () => {
-      server.close();
-      resolve(true);
-    });
-    server.listen(port);
-  });
+	return new Promise(resolve => {
+		const server = net.createServer();
+		server.once('error', () => resolve(false));
+		server.once('listening', () => {
+			server.close();
+			resolve(true);
+		});
+		server.listen(port);
+	});
 }
 ```
 
@@ -239,6 +239,7 @@ async function isPortAvailable(port: number): Promise<boolean> {
 ## Packaging Options
 
 ### Option A: Separate Node processes
+
 ```
 agent-fleet/
 ├── dist/
@@ -249,6 +250,7 @@ agent-fleet/
 ```
 
 ### Option B: Bundled executable (pkg, nexe)
+
 ```
 agent-fleet.exe
 ├── orchestrator (main)
@@ -256,6 +258,7 @@ agent-fleet.exe
 ```
 
 ### Option C: Single server (Express)
+
 ```typescript
 // All in one process
 const app = express();
@@ -271,35 +274,35 @@ app.ws('/ws/workers', workerWebSocket);
 
 ```typescript
 process.on('SIGINT', async () => {
-  logger.info('Shutting down...');
+	logger.info('Shutting down...');
 
-  // 1. Stop accepting new workers
-  await workerServer.close();
+	// 1. Stop accepting new workers
+	await workerServer.close();
 
-  // 2. Disconnect UI client
-  await uiClient.disconnect();
+	// 2. Disconnect UI client
+	await uiClient.disconnect();
 
-  // 3. Stop UI process
-  await uiLifecycle.stopUI();
+	// 3. Stop UI process
+	await uiLifecycle.stopUI();
 
-  // 4. Exit
-  process.exit(0);
+	// 4. Exit
+	process.exit(0);
 });
 ```
 
 ### Crash Recovery
 
 ```typescript
-uiLifecycle.on('ui-crashed', async (exitCode) => {
-  logger.error(`UI crashed with code ${exitCode}`);
+uiLifecycle.on('ui-crashed', async exitCode => {
+	logger.error(`UI crashed with code ${exitCode}`);
 
-  if (config.ui.autoRestart) {
-    logger.info('Restarting UI...');
-    await uiLifecycle.startUI();
-    await uiClient.reconnect();
-  } else {
-    logger.info('Auto-restart disabled, continuing without UI');
-  }
+	if (config.ui.autoRestart) {
+		logger.info('Restarting UI...');
+		await uiLifecycle.startUI();
+		await uiClient.reconnect();
+	} else {
+		logger.info('Auto-restart disabled, continuing without UI');
+	}
 });
 ```
 
@@ -329,6 +332,7 @@ agent-fleet status
 ## Pros/Cons
 
 **Pros**:
+
 - Simple UX: one command to start
 - Pas de gestion manuelle des processes
 - Port conflicts résolus automatiquement
@@ -336,6 +340,7 @@ agent-fleet status
 - Desktop app experience
 
 **Cons**:
+
 - Plus complexe à développer (lifecycle management)
 - Debugging plus difficile (2 processes)
 - Crash UI peut nécessiter restart orchestrator
@@ -346,33 +351,33 @@ agent-fleet status
 
 ```typescript
 describe('UILifecycleManager', () => {
-  it('should spawn UI and connect', async () => {
-    const lifecycle = new UILifecycleManager(config);
-    const { port, endpoint } = await lifecycle.startUI();
+	it('should spawn UI and connect', async () => {
+		const lifecycle = new UILifecycleManager(config);
+		const { port, endpoint } = await lifecycle.startUI();
 
-    expect(port).toBeGreaterThan(30000);
-    expect(endpoint).toBe(`ws://localhost:${port}/ws/orchestrator`);
+		expect(port).toBeGreaterThan(30000);
+		expect(endpoint).toBe(`ws://localhost:${port}/ws/orchestrator`);
 
-    // Health check
-    const response = await fetch(`http://localhost:${port}/health`);
-    expect(response.ok).toBe(true);
+		// Health check
+		const response = await fetch(`http://localhost:${port}/health`);
+		expect(response.ok).toBe(true);
 
-    await lifecycle.stopUI();
-  });
+		await lifecycle.stopUI();
+	});
 
-  it('should handle UI crash gracefully', async () => {
-    const lifecycle = new UILifecycleManager(config);
-    await lifecycle.startUI();
+	it('should handle UI crash gracefully', async () => {
+		const lifecycle = new UILifecycleManager(config);
+		await lifecycle.startUI();
 
-    // Simulate crash
-    lifecycle.uiProcess.kill('SIGKILL');
+		// Simulate crash
+		lifecycle.uiProcess.kill('SIGKILL');
 
-    // Wait for event
-    const exitCode = await new Promise(resolve => {
-      lifecycle.once('ui-crashed', resolve);
-    });
+		// Wait for event
+		const exitCode = await new Promise(resolve => {
+			lifecycle.once('ui-crashed', resolve);
+		});
 
-    expect(exitCode).not.toBe(0);
-  });
+		expect(exitCode).not.toBe(0);
+	});
 });
 ```

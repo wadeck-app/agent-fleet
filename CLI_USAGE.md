@@ -157,11 +157,13 @@ npm unlink
 ## Mode watch (activé par défaut)
 
 Le mode watch est **activé par défaut** pour faciliter le développement :
+
 - ✅ Les modifications de code sont détectées automatiquement
 - ✅ Le processus redémarre avec les nouvelles modifications
 - ✅ Idéal pour le développement
 
 Avec `--no-watch` :
+
 - ❌ Pas d'auto-reload
 - ✅ Plus léger en ressources
 - ✅ Idéal pour la production

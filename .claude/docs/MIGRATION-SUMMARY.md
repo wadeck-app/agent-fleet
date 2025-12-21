@@ -14,32 +14,34 @@
 
 ### Impact par fichier
 
-| Fichier | Lignes avant | Lignes après | Gain |
-|---------|--------------|--------------|------|
-| FlowExecutor.test.ts | 8 | 3 | **-62%** |
-| ClaudeLauncher.test.ts | 17 | 3 | **-82%** |
-| Storage.test.ts | 9 | 6 | **-33%** |
+| Fichier                | Lignes avant | Lignes après | Gain     |
+| ---------------------- | ------------ | ------------ | -------- |
+| FlowExecutor.test.ts   | 8            | 3            | **-62%** |
+| ClaudeLauncher.test.ts | 17           | 3            | **-82%** |
+| Storage.test.ts        | 9            | 6            | **-33%** |
 
 ## 🔧 Changements
 
 ### 1. Setup centralisé
+
 ```typescript
 // ❌ Avant (8 lignes répétées partout)
 beforeEach(() => {
-  vi.clearAllMocks();
-  vi.spyOn(console, 'log').mockImplementation(() => {});
-  vi.spyOn(console, 'warn').mockImplementation(() => {});
+	vi.clearAllMocks();
+	vi.spyOn(console, 'log').mockImplementation(() => {});
+	vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 afterEach(() => {
-  vi.restoreAllMocks();
+	vi.restoreAllMocks();
 });
 
 // ✅ Après (3 lignes, cleanup automatique)
-beforeEach(() => cleanup = setupTest());
+beforeEach(() => (cleanup = setupTest()));
 afterEach(() => cleanup());
 ```
 
 ### 2. Console spies automatiques
+
 ```typescript
 // ❌ Avant (répété 6× dans ClaudeLauncher.test.ts)
 vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -50,6 +52,7 @@ vi.spyOn(console, 'warn').mockImplementation(() => {});
 ```
 
 ### 3. Nouveau helper
+
 ```typescript
 // Nouveau dans test-utils
 const restore = mockPlatform('win32');
@@ -59,12 +62,12 @@ restore();
 
 ## 🎯 Qualité
 
-| Métrique | Avant | Après |
-|----------|-------|-------|
-| **Code dupliqué** | 35 lignes | 12 lignes |
-| **Maintenabilité** | 3 fichiers à changer | 1 fichier |
-| **Adoption test-utils** | 15% | 90% |
-| **Cleanup garanti** | ⚠️ Manuel | ✅ Auto |
+| Métrique                | Avant                | Après     |
+| ----------------------- | -------------------- | --------- |
+| **Code dupliqué**       | 35 lignes            | 12 lignes |
+| **Maintenabilité**      | 3 fichiers à changer | 1 fichier |
+| **Adoption test-utils** | 15%                  | 90%       |
+| **Cleanup garanti**     | ⚠️ Manuel            | ✅ Auto   |
 
 ## ✅ Validation
 

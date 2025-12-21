@@ -1,26 +1,28 @@
 {
-  "name": "cli",
-  "version": "1.0.0",
-  "type": "module",
-  "main": "./dist/entry-point.js",
-  "types": "./dist/entry-point.d.ts",
-  "bin": {
-    "fleet-task": "./dist/entry-point.js"
-  },
-  "scripts": {
-    "build": "tsc --build tsconfig.json",
-    "dev": "tsx src/entry-point.ts",
-    "test": "vitest run",
-    "clean": "rm -rf dist"
-  },
-  "dependencies": {
-    "orchestrator": "*",
-    "shared-common": "*"
-  },
-  "devDependencies": {
-    "test-utils": "*",
-    "typescript": "^5.3.3",
-    "vitest": "^4.0.14",
-    "tsx": "^4.7.0"
-  }
+	"name": "cli",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"main": "./dist/entry-point.js",
+	"types": "./dist/entry-point.d.ts",
+	"bin": {
+		"fleet-task": "./dist/entry-point.js"
+	},
+	"scripts": {
+		"build": "tsc --build tsconfig.json",
+		"dev": "tsx src/entry-point.ts",
+		"test": "vitest run",
+		"lint": "echo 'No ESLint configured for cli'",
+		"clean": "rm -rf dist"
+	},
+	"dependencies": {
+		"orchestrator": "*",
+		"shared-common": "*"
+	},
+	"devDependencies": {
+		"test-utils": "*",
+		"typescript": "^5.3.3",
+		"vitest": "^4.0.14",
+		"tsx": "^4.7.0"
+	}
 }

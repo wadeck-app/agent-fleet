@@ -1,0 +1,36 @@
+{
+	"name": "e2e-web",
+	"version": "1.0.0",
+	"private": true,
+	"description": "End-to-end tests for the web application",
+	"scripts": {
+		"test": "npm run test:app && npm run test:components",
+		"test:app": "cross-env E2E_SILENT_LOGS=true playwright test --config=playwright.config.integration.ts",
+		"test:app:ui": "playwright test --ui --config=playwright.config.integration.ts",
+		"test:app:headed": "playwright test --headed --config=playwright.config.integration.ts",
+		"test:app:debug": "playwright test --debug --config=playwright.config.integration.ts",
+		"test:components": "cross-env E2E_SILENT_LOGS=true playwright test --config=playwright.config.storybook.ts --project=functional-*",
+		"test:components:ui": "playwright test --config=playwright.config.storybook.ts --project=functional-* --ui",
+		"test:components:headed": "playwright test --config=playwright.config.storybook.ts --project=functional-* --headed",
+		"test:components:debug": "playwright test --config=playwright.config.storybook.ts --project=functional-* --debug",
+		"test:components:functional": "playwright test --config=playwright.config.storybook.ts --project=functional-*",
+		"test:functional": "npm run test:app && playwright test --config=playwright.config.storybook.ts --project=functional-*",
+		"test:report": "playwright show-report test-integration/_results/html",
+		"test:report:components": "playwright show-report test-storybook/_results/storybook-html",
+		"test:manual": "playwright test --config=playwright.config.manual.ts",
+		"test:manual:ui": "playwright test --config=playwright.config.manual.ts --ui",
+		"test:visual:generate": "node ../../scripts/generate-visual-regression-tests.js",
+		"test:visual": "npm run test:visual:generate && playwright test --config=playwright.config.visual.ts --project=visual-*",
+		"test:visual:ui": "npm run test:visual:generate && playwright test --config=playwright.config.visual.ts --project=visual-* --ui",
+		"-buggy-test:visual:approve": "node ../../scripts/approve-actual-snapshots.js",
+		"test:visual:update": "npm run test:visual:generate && playwright test --config=playwright.config.visual.ts --project=visual-* --update-snapshots"
+	},
+	"dependencies": {
+		"shared-frontend-backend": "*"
+	},
+	"devDependencies": {
+		"@playwright/test": "^1.57.0",
+		"@types/node": "^24.10.1",
+		"cross-env": "^10.1.0"
+	}
+}

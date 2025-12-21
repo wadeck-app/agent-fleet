@@ -9,26 +9,21 @@ Guide de référence rapide pour utiliser les utilitaires de test dans Agent Fle
 ```typescript
 // Import depuis le point d'entrée centralisé
 import {
-  // Factories
-  createMockTask,
-  createMockFlow,
-  createMockWorkspace,
-  createMockWorker,
-  createMockStepTrace,
-  createMockFlowTrace,
-  createMockFlowResult,
-
-  // Mocks
-  MockIssueCollector,
-  MockFlowRegistry,
-  MockWebSocket,
-  MockChildProcess,
-  createConsoleMocks,
-
-  // Helpers
-  setupTimers,
-  waitForCondition,
-  createTempTestDir,
+	MockChildProcess,
+	MockFlowRegistry, // Mocks
+	MockIssueCollector,
+	MockWebSocket,
+	createConsoleMocks,
+	createMockFlow,
+	createMockFlowResult,
+	createMockFlowTrace,
+	createMockStepTrace, // Factories
+	createMockTask,
+	createMockWorker,
+	createMockWorkspace,
+	createTempTestDir, // Helpers
+	setupTimers,
+	waitForCondition,
 } from '../test-utils';
 ```
 
@@ -96,22 +91,22 @@ const workspace = createMockWorkspace({
 ```typescript
 // Model step
 const modelStep = createMockModelStep({
-  id: 'analyze',
-  model: 'opus',
-  prompt: 'Analyze this code'
+	id: 'analyze',
+	model: 'opus',
+	prompt: 'Analyze this code',
 });
 
 // Script step
 const scriptStep = createMockScriptStep({
-  id: 'build',
-  script: 'npm run build'
+	id: 'build',
+	script: 'npm run build',
 });
 
 // SubFlow step
 const subflowStep = createMockSubFlowStep({
-  id: 'run-tests',
-  flowId: 'test-flow',
-  inputs: { suite: 'unit' }
+	id: 'run-tests',
+	flowId: 'test-flow',
+	inputs: { suite: 'unit' },
 });
 ```
 
@@ -123,32 +118,32 @@ const subflowStep = createMockSubFlowStep({
 
 ```typescript
 describe('MyValidator', () => {
-  let collector: MockIssueCollector;
+	let collector: MockIssueCollector;
 
-  beforeEach(() => {
-    collector = new MockIssueCollector();
-  });
+	beforeEach(() => {
+		collector = new MockIssueCollector();
+	});
 
-  it('should detect validation errors', () => {
-    validator.validate(data, collector);
+	it('should detect validation errors', () => {
+		validator.validate(data, collector);
 
-    // Assertions
-    expect(collector.hasError()).toBe(true);
-    expect(collector.hasCode(ValidationCode.INVALID_TYPE)).toBe(true);
-    expect(collector.getErrors()).toHaveLength(2);
-    expect(collector.getWarnings()).toHaveLength(1);
+		// Assertions
+		expect(collector.hasError()).toBe(true);
+		expect(collector.hasCode(ValidationCode.INVALID_TYPE)).toBe(true);
+		expect(collector.getErrors()).toHaveLength(2);
+		expect(collector.getWarnings()).toHaveLength(1);
 
-    const issue = collector.getIssueByCode(ValidationCode.INVALID_TYPE);
-    expect(issue?.message).toContain('expected string');
-  });
+		const issue = collector.getIssueByCode(ValidationCode.INVALID_TYPE);
+		expect(issue?.message).toContain('expected string');
+	});
 
-  it('should reset issues', () => {
-    validator.validate(data, collector);
-    expect(collector.issues).toHaveLength(3);
+	it('should reset issues', () => {
+		validator.validate(data, collector);
+		expect(collector.issues).toHaveLength(3);
 
-    collector.reset();
-    expect(collector.issues).toHaveLength(0);
-  });
+		collector.reset();
+		expect(collector.issues).toHaveLength(0);
+	});
 });
 ```
 
@@ -156,31 +151,31 @@ describe('MyValidator', () => {
 
 ```typescript
 describe('FlowLoader', () => {
-  let registry: MockFlowRegistry;
+	let registry: MockFlowRegistry;
 
-  beforeEach(() => {
-    registry = new MockFlowRegistry();
+	beforeEach(() => {
+		registry = new MockFlowRegistry();
 
-    // Add flows to registry
-    registry.addFlow(createMockFlow({ id: 'flow-1' }));
-    registry.addFlow(createMockFlow({ id: 'flow-2' }));
-  });
+		// Add flows to registry
+		registry.addFlow(createMockFlow({ id: 'flow-1' }));
+		registry.addFlow(createMockFlow({ id: 'flow-2' }));
+	});
 
-  it('should find flow by id', () => {
-    const flow = registry.getFlow('flow-1');
-    expect(flow).toBeDefined();
-    expect(flow?.id).toBe('flow-1');
-  });
+	it('should find flow by id', () => {
+		const flow = registry.getFlow('flow-1');
+		expect(flow).toBeDefined();
+		expect(flow?.id).toBe('flow-1');
+	});
 
-  it('should check flow existence', () => {
-    expect(registry.hasFlow('flow-1')).toBe(true);
-    expect(registry.hasFlow('non-existent')).toBe(false);
-  });
+	it('should check flow existence', () => {
+		expect(registry.hasFlow('flow-1')).toBe(true);
+		expect(registry.hasFlow('non-existent')).toBe(false);
+	});
 
-  it('should list all flows', () => {
-    const flows = registry.getAllFlows();
-    expect(flows).toHaveLength(2);
-  });
+	it('should list all flows', () => {
+		const flows = registry.getAllFlows();
+		expect(flows).toHaveLength(2);
+	});
 });
 ```
 
@@ -188,46 +183,44 @@ describe('FlowLoader', () => {
 
 ```typescript
 describe('WebSocketClient', () => {
-  let ws: MockWebSocket;
+	let ws: MockWebSocket;
 
-  beforeEach(() => {
-    ws = new MockWebSocket('ws://localhost:3738');
-  });
+	beforeEach(() => {
+		ws = new MockWebSocket('ws://localhost:3738');
+	});
 
-  it('should send messages', () => {
-    client.connect(ws as any);
-    client.sendMessage({ type: 'ping' });
+	it('should send messages', () => {
+		client.connect(ws as any);
+		client.sendMessage({ type: 'ping' });
 
-    expect(ws.send).toHaveBeenCalledWith(
-      JSON.stringify({ type: 'ping' })
-    );
-  });
+		expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: 'ping' }));
+	});
 
-  it('should receive messages', () => {
-    client.connect(ws as any);
+	it('should receive messages', () => {
+		client.connect(ws as any);
 
-    // Simulate receiving message
-    ws.simulateMessage({ type: 'pong' });
+		// Simulate receiving message
+		ws.simulateMessage({ type: 'pong' });
 
-    expect(client.lastMessage).toEqual({ type: 'pong' });
-  });
+		expect(client.lastMessage).toEqual({ type: 'pong' });
+	});
 
-  it('should handle connection', () => {
-    client.connect(ws as any);
+	it('should handle connection', () => {
+		client.connect(ws as any);
 
-    ws.simulateOpen();
-    expect(client.isConnected()).toBe(true);
+		ws.simulateOpen();
+		expect(client.isConnected()).toBe(true);
 
-    ws.simulateClose();
-    expect(client.isConnected()).toBe(false);
-  });
+		ws.simulateClose();
+		expect(client.isConnected()).toBe(false);
+	});
 
-  it('should handle errors', () => {
-    client.connect(ws as any);
+	it('should handle errors', () => {
+		client.connect(ws as any);
 
-    ws.simulateError(new Error('Connection failed'));
-    expect(client.lastError?.message).toBe('Connection failed');
-  });
+		ws.simulateError(new Error('Connection failed'));
+		expect(client.lastError?.message).toBe('Connection failed');
+	});
 });
 ```
 
@@ -235,30 +228,30 @@ describe('WebSocketClient', () => {
 
 ```typescript
 describe('ScriptRunner', () => {
-  let mockProcess: MockChildProcess;
+	let mockProcess: MockChildProcess;
 
-  beforeEach(() => {
-    mockProcess = new MockChildProcess(12345);
-    vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
-  });
+	beforeEach(() => {
+		mockProcess = new MockChildProcess(12345);
+		vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
+	});
 
-  it('should capture stdout', async () => {
-    const promise = runner.execute('echo "test"');
+	it('should capture stdout', async () => {
+		const promise = runner.execute('echo "test"');
 
-    mockProcess.simulateStdout('test\n');
-    mockProcess.simulateClose(0);
+		mockProcess.simulateStdout('test\n');
+		mockProcess.simulateClose(0);
 
-    const result = await promise;
-    expect(result.stdout).toBe('test');
-  });
+		const result = await promise;
+		expect(result.stdout).toBe('test');
+	});
 
-  it('should handle errors', async () => {
-    const promise = runner.execute('invalid-command');
+	it('should handle errors', async () => {
+		const promise = runner.execute('invalid-command');
 
-    mockProcess.simulateError(new Error('Command not found'));
+		mockProcess.simulateError(new Error('Command not found'));
 
-    await expect(promise).rejects.toThrow('Command not found');
-  });
+		await expect(promise).rejects.toThrow('Command not found');
+	});
 });
 ```
 
@@ -266,27 +259,27 @@ describe('ScriptRunner', () => {
 
 ```typescript
 describe('Logger', () => {
-  let consoleMocks: ReturnType<typeof createConsoleMocks>;
+	let consoleMocks: ReturnType<typeof createConsoleMocks>;
 
-  beforeEach(() => {
-    consoleMocks = createConsoleMocks();
-  });
+	beforeEach(() => {
+		consoleMocks = createConsoleMocks();
+	});
 
-  afterEach(() => {
-    consoleMocks.restore();
-  });
+	afterEach(() => {
+		consoleMocks.restore();
+	});
 
-  it('should log messages', () => {
-    logger.info('Test message');
+	it('should log messages', () => {
+		logger.info('Test message');
 
-    expect(consoleMocks.log).toHaveBeenCalledWith('Test message');
-  });
+		expect(consoleMocks.log).toHaveBeenCalledWith('Test message');
+	});
 
-  it('should log errors', () => {
-    logger.error('Error occurred');
+	it('should log errors', () => {
+		logger.error('Error occurred');
 
-    expect(consoleMocks.error).toHaveBeenCalledWith('Error occurred');
-  });
+		expect(consoleMocks.error).toHaveBeenCalledWith('Error occurred');
+	});
 });
 ```
 
@@ -298,26 +291,26 @@ describe('Logger', () => {
 
 ```typescript
 describe('ScheduledTask', () => {
-  let cleanupTimers: () => void;
+	let cleanupTimers: () => void;
 
-  beforeEach(() => {
-    cleanupTimers = setupTimers();
-  });
+	beforeEach(() => {
+		cleanupTimers = setupTimers();
+	});
 
-  afterEach(() => {
-    cleanupTimers();
-  });
+	afterEach(() => {
+		cleanupTimers();
+	});
 
-  it('should execute after delay', () => {
-    scheduler.scheduleTask(() => {
-      executed = true;
-    }, 1000);
+	it('should execute after delay', () => {
+		scheduler.scheduleTask(() => {
+			executed = true;
+		}, 1000);
 
-    expect(executed).toBe(false);
+		expect(executed).toBe(false);
 
-    vi.advanceTimersByTime(1000);
-    expect(executed).toBe(true);
-  });
+		vi.advanceTimersByTime(1000);
+		expect(executed).toBe(true);
+	});
 });
 ```
 
@@ -325,19 +318,19 @@ describe('ScheduledTask', () => {
 
 ```typescript
 describe('FileProcessor', () => {
-  it('should process files in temp dir', async () => {
-    const { path, cleanup } = await createTempTestDir('processor-');
+	it('should process files in temp dir', async () => {
+		const { path, cleanup } = await createTempTestDir('processor-');
 
-    try {
-      // Use temp directory
-      await fs.promises.writeFile(`${path}/test.txt`, 'content');
-      const result = await processor.process(path);
+		try {
+			// Use temp directory
+			await fs.promises.writeFile(`${path}/test.txt`, 'content');
+			const result = await processor.process(path);
 
-      expect(result).toBe('processed');
-    } finally {
-      await cleanup();
-    }
-  });
+			expect(result).toBe('processed');
+		} finally {
+			await cleanup();
+		}
+	});
 });
 ```
 
@@ -345,27 +338,23 @@ describe('FileProcessor', () => {
 
 ```typescript
 describe('AsyncOperations', () => {
-  it('should wait for condition', async () => {
-    let ready = false;
+	it('should wait for condition', async () => {
+		let ready = false;
 
-    setTimeout(() => { ready = true; }, 100);
+		setTimeout(() => {
+			ready = true;
+		}, 100);
 
-    await waitForCondition(
-      () => ready,
-      { timeout: 1000, interval: 10 }
-    );
+		await waitForCondition(() => ready, { timeout: 1000, interval: 10 });
 
-    expect(ready).toBe(true);
-  });
+		expect(ready).toBe(true);
+	});
 
-  it('should timeout if condition not met', async () => {
-    await expect(
-      waitForCondition(
-        () => false,
-        { timeout: 100, message: 'Never ready' }
-      )
-    ).rejects.toThrow('Never ready (timeout after 100ms)');
-  });
+	it('should timeout if condition not met', async () => {
+		await expect(waitForCondition(() => false, { timeout: 100, message: 'Never ready' })).rejects.toThrow(
+			'Never ready (timeout after 100ms)'
+		);
+	});
 });
 ```
 
@@ -373,19 +362,19 @@ describe('AsyncOperations', () => {
 
 ```typescript
 describe('EnvReader', () => {
-  it('should read custom env vars', () => {
-    const restore = mockEnvVars({
-      NODE_ENV: 'test',
-      API_KEY: 'test-key'
-    });
+	it('should read custom env vars', () => {
+		const restore = mockEnvVars({
+			NODE_ENV: 'test',
+			API_KEY: 'test-key',
+		});
 
-    try {
-      expect(process.env.NODE_ENV).toBe('test');
-      expect(reader.getApiKey()).toBe('test-key');
-    } finally {
-      restore();
-    }
-  });
+		try {
+			expect(process.env.NODE_ENV).toBe('test');
+			expect(reader.getApiKey()).toBe('test-key');
+		} finally {
+			restore();
+		}
+	});
 });
 ```
 
@@ -393,17 +382,17 @@ describe('EnvReader', () => {
 
 ```typescript
 describe('Reporter', () => {
-  it('should capture console output', async () => {
-    const { result, stdout, stderr } = await captureConsoleOutput(() => {
-      console.log('Info message');
-      console.error('Error message');
-      return 'result';
-    });
+	it('should capture console output', async () => {
+		const { result, stdout, stderr } = await captureConsoleOutput(() => {
+			console.log('Info message');
+			console.error('Error message');
+			return 'result';
+		});
 
-    expect(result).toBe('result');
-    expect(stdout).toEqual(['Info message']);
-    expect(stderr).toEqual(['Error message']);
-  });
+		expect(result).toBe('result');
+		expect(stdout).toEqual(['Info message']);
+		expect(stderr).toEqual(['Error message']);
+	});
 });
 ```
 
@@ -411,16 +400,13 @@ describe('Reporter', () => {
 
 ```typescript
 describe('ErrorHandling', () => {
-  it('should throw specific error', async () => {
-    const error = await assertThrowsAsync(
-      async () => {
-        await riskyOperation();
-      },
-      /connection failed/i
-    );
+	it('should throw specific error', async () => {
+		const error = await assertThrowsAsync(async () => {
+			await riskyOperation();
+		}, /connection failed/i);
 
-    expect(error.message).toContain('connection failed');
-  });
+		expect(error.message).toContain('connection failed');
+	});
 });
 ```
 
@@ -428,14 +414,14 @@ describe('ErrorHandling', () => {
 
 ```typescript
 describe('AsyncCoordination', () => {
-  it('should coordinate async operations', async () => {
-    const { promise, resolve } = createDeferred<string>();
+	it('should coordinate async operations', async () => {
+		const { promise, resolve } = createDeferred<string>();
 
-    setTimeout(() => resolve('done'), 100);
+		setTimeout(() => resolve('done'), 100);
 
-    const result = await promise;
-    expect(result).toBe('done');
-  });
+		const result = await promise;
+		expect(result).toBe('done');
+	});
 });
 ```
 
@@ -443,25 +429,25 @@ describe('AsyncCoordination', () => {
 
 ```typescript
 describe('NetworkRequests', () => {
-  it('should retry on failure', async () => {
-    let attempts = 0;
+	it('should retry on failure', async () => {
+		let attempts = 0;
 
-    const result = await retry(
-      async () => {
-        attempts++;
-        if (attempts < 3) throw new Error('Temporary failure');
-        return 'success';
-      },
-      {
-        maxAttempts: 5,
-        delay: 100,
-        backoff: 'exponential'
-      }
-    );
+		const result = await retry(
+			async () => {
+				attempts++;
+				if (attempts < 3) throw new Error('Temporary failure');
+				return 'success';
+			},
+			{
+				maxAttempts: 5,
+				delay: 100,
+				backoff: 'exponential',
+			}
+		);
 
-    expect(result).toBe('success');
-    expect(attempts).toBe(3);
-  });
+		expect(result).toBe('success');
+		expect(attempts).toBe(3);
+	});
 });
 ```
 
@@ -472,62 +458,56 @@ describe('NetworkRequests', () => {
 ### Test avec Setup Complet
 
 ```typescript
-import {
-  createMockTask,
-  createMockFlow,
-  MockIssueCollector,
-  setupTimers,
-  setupConsoleMocks,
-} from '../test-utils';
+import { MockIssueCollector, createMockFlow, createMockTask, setupConsoleMocks, setupTimers } from '../test-utils';
 
 describe('CompleteFeature', () => {
-  let task: Task;
-  let flow: FlowDefinition;
-  let collector: MockIssueCollector;
-  let cleanupTimers: () => void;
-  let consoleMocks: ReturnType<typeof setupConsoleMocks>;
+	let task: Task;
+	let flow: FlowDefinition;
+	let collector: MockIssueCollector;
+	let cleanupTimers: () => void;
+	let consoleMocks: ReturnType<typeof setupConsoleMocks>;
 
-  beforeEach(() => {
-    // Setup
-    task = createMockTask({ flowId: 'test-flow' });
-    flow = createMockFlow({ id: 'test-flow' });
-    collector = new MockIssueCollector();
-    cleanupTimers = setupTimers();
-    consoleMocks = setupConsoleMocks();
-  });
+	beforeEach(() => {
+		// Setup
+		task = createMockTask({ flowId: 'test-flow' });
+		flow = createMockFlow({ id: 'test-flow' });
+		collector = new MockIssueCollector();
+		cleanupTimers = setupTimers();
+		consoleMocks = setupConsoleMocks();
+	});
 
-  afterEach(() => {
-    // Cleanup
-    cleanupTimers();
-    consoleMocks.restore();
-  });
+	afterEach(() => {
+		// Cleanup
+		cleanupTimers();
+		consoleMocks.restore();
+	});
 
-  it('should work correctly', async () => {
-    // Test implementation
-  });
+	it('should work correctly', async () => {
+		// Test implementation
+	});
 });
 ```
 
 ### Test d'Intégration avec Temp Dir
 
 ```typescript
-import { createTempTestDir, createMockFlow } from '../test-utils';
+import { createMockFlow, createTempTestDir } from '../test-utils';
 
 describe('FlowPersistence', () => {
-  it('should save and load flows', async () => {
-    const { path, cleanup } = await createTempTestDir('flows-');
+	it('should save and load flows', async () => {
+		const { path, cleanup } = await createTempTestDir('flows-');
 
-    try {
-      const flow = createMockFlow();
+		try {
+			const flow = createMockFlow();
 
-      await persistence.save(path, flow);
-      const loaded = await persistence.load(path, flow.id);
+			await persistence.save(path, flow);
+			const loaded = await persistence.load(path, flow.id);
 
-      expect(loaded).toEqual(flow);
-    } finally {
-      await cleanup();
-    }
-  });
+			expect(loaded).toEqual(flow);
+		} finally {
+			await cleanup();
+		}
+	});
 });
 ```
 
@@ -537,21 +517,21 @@ describe('FlowPersistence', () => {
 import { MockWebSocket, createMockTask } from '../test-utils';
 
 describe('WorkerClient', () => {
-  let ws: MockWebSocket;
+	let ws: MockWebSocket;
 
-  beforeEach(() => {
-    ws = new MockWebSocket('ws://test');
-    client = new WorkerClient(ws as any);
-  });
+	beforeEach(() => {
+		ws = new MockWebSocket('ws://test');
+		client = new WorkerClient(ws as any);
+	});
 
-  it('should handle task assignment', () => {
-    ws.simulateOpen();
+	it('should handle task assignment', () => {
+		ws.simulateOpen();
 
-    const task = createMockTask();
-    ws.simulateMessage({ type: 'assign_task', task });
+		const task = createMockTask();
+		ws.simulateMessage({ type: 'assign_task', task });
 
-    expect(client.currentTask).toEqual(task);
-  });
+		expect(client.currentTask).toEqual(task);
+	});
 });
 ```
 
@@ -591,19 +571,19 @@ const tasks = [
 
 ```typescript
 describe('MyTests', () => {
-  let cleanup: () => void;
+	let cleanup: () => void;
 
-  afterEach(() => {
-    // Toujours cleanup dans afterEach
-    if (cleanup) cleanup();
-  });
+	afterEach(() => {
+		// Toujours cleanup dans afterEach
+		if (cleanup) cleanup();
+	});
 
-  it('should test something', async () => {
-    const { path, cleanup: cleanupDir } = await createTempTestDir();
-    cleanup = cleanupDir;
+	it('should test something', async () => {
+		const { path, cleanup: cleanupDir } = await createTempTestDir();
+		cleanup = cleanupDir;
 
-    // Test logic
-  });
+		// Test logic
+	});
 });
 ```
 
@@ -615,8 +595,8 @@ const mockExecutor = createMockFlowExecutor();
 const consoleMocks = createConsoleMocks();
 
 // ❌ Moins bon
-const executor = createMockFlowExecutor();  // Confus avec le vrai
-const mocks = createConsoleMocks();         // Trop vague
+const executor = createMockFlowExecutor(); // Confus avec le vrai
+const mocks = createConsoleMocks(); // Trop vague
 ```
 
 ---
@@ -629,4 +609,4 @@ const mocks = createConsoleMocks();         // Trop vague
 
 ---
 
-*Dernière mise à jour: 2025-12-15*
+_Dernière mise à jour: 2025-12-15_

@@ -1,8 +1,7 @@
 #!/usr/bin/env node
-
 import { spawn } from 'child_process';
-import { fileURLToPath } from 'url';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,15 +13,13 @@ const orchestratorPath = path.join(__dirname, '..', 'src', 'orchestrator', 'core
 const noWatchMode = process.argv.includes('--no-watch');
 
 // Use tsx to run the TypeScript file
-const args = noWatchMode
-  ? [orchestratorPath]
-  : ['watch', orchestratorPath];
+const args = noWatchMode ? [orchestratorPath] : ['watch', orchestratorPath];
 
 const child = spawn('tsx', args, {
-  stdio: 'inherit',
-  shell: true,
+	stdio: 'inherit',
+	shell: true,
 });
 
-child.on('exit', (code) => {
-  process.exit(code || 0);
+child.on('exit', code => {
+	process.exit(code || 0);
 });

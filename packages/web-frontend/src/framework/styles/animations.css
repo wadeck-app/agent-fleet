@@ -1,0 +1,73 @@
+/* LoadingDots animations */
+@keyframes typing-dot {
+	0%,
+	60%,
+	100% {
+		transform: translateY(0);
+	}
+	30% {
+		transform: translateY(-10px);
+	}
+}
+
+@keyframes typing-dot-large {
+	0%,
+	60%,
+	100% {
+		transform: translateY(0);
+	}
+	30% {
+		transform: translateY(-20px);
+	}
+}
+
+.animate-typing-dot {
+	animation-name: typing-dot;
+	animation-duration: 1.4s;
+	animation-iteration-count: infinite;
+	animation-timing-function: ease-in-out;
+}
+
+/* Large variant uses bigger bounce */
+.w-4.animate-typing-dot {
+	animation-name: typing-dot-large;
+}
+
+/* Toast animations */
+@keyframes toast-slide-in {
+	from {
+		transform: translateX(120%);
+		opacity: 0;
+	}
+	to {
+		transform: translateX(0);
+		opacity: 1;
+	}
+}
+
+/* Bulk action bar animation */
+@keyframes slide-up {
+	from {
+		transform: translateY(100%);
+		opacity: 0;
+	}
+	to {
+		transform: translateY(0);
+		opacity: 1;
+	}
+}
+
+/* Merge field animation - pulse once */
+@keyframes pulse-once {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.5;
+	}
+}
+
+.animate-pulse-once {
+	animation: pulse-once 1s ease-in-out;
+}

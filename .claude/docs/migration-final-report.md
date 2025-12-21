@@ -23,17 +23,20 @@
 ### Travaux Réalisés
 
 **1. Audit Complet** ✅
+
 - **33 fichiers analysés** (~38,000 lignes, ~1100+ tests)
 - **7,200 lignes de duplication identifiées** (20% du code)
 - **7 fichiers trop longs** (>800 lignes)
 - **85% des fichiers** n'utilisent pas test-utils
 
 **2. Améliorations test-utils** ✅
+
 - **4 nouveaux helpers** ajoutés
 - **1 nouveau module** (rest-api-helpers.ts)
 - **3 documents** créés (2600+ lignes)
 
 **3. Migrations Effectuées** ✅
+
 - **4 fichiers migrés** (WebSocketEventHandler, WebSocketMessageRouter, TaskManager, FlowValidator)
 - **150 tests validés** (100% passent)
 - **-67 lignes nettes** économisées
@@ -45,14 +48,15 @@
 
 ### 1. WebSocketEventHandler.test.ts ⭐⭐⭐⭐⭐
 
-| Métrique | Avant | Après | Gain |
-|----------|-------|-------|------|
-| **Lignes** | 597 | 577 | **-20 (-3.4%)** |
-| **Tests** | 25 | 25 | ✅ 100% |
-| **Setup** | 38 lignes | 15 lignes | **-61%** |
-| **Qualité** | 3/5 | 5/5 | **+67%** |
+| Métrique    | Avant     | Après     | Gain            |
+| ----------- | --------- | --------- | --------------- |
+| **Lignes**  | 597       | 577       | **-20 (-3.4%)** |
+| **Tests**   | 25        | 25        | ✅ 100%         |
+| **Setup**   | 38 lignes | 15 lignes | **-61%**        |
+| **Qualité** | 3/5       | 5/5       | **+67%**        |
 
 **Changements clés**:
+
 - ✅ Remplacé `MockWebSocket` manuelle par test-utils
 - ✅ Remplacé 3 `createMock*()` manuels par test-utils
 - ✅ Ajouté `setupTest()` avec cleanup garanti
@@ -64,14 +68,15 @@
 
 ### 2. WebSocketMessageRouter.test.ts ⭐⭐⭐⭐
 
-| Métrique | Avant | Après | Gain |
-|----------|-------|-------|------|
-| **Lignes** | 306 | 303 | **-3 (-1%)** |
-| **Tests** | 17 | 17 | ✅ 100% |
-| **Setup** | Répétitif | Propre | **Amélioré** |
-| **Qualité** | 3/5 | 5/5 | **+67%** |
+| Métrique    | Avant     | Après  | Gain         |
+| ----------- | --------- | ------ | ------------ |
+| **Lignes**  | 306       | 303    | **-3 (-1%)** |
+| **Tests**   | 17        | 17     | ✅ 100%      |
+| **Setup**   | Répétitif | Propre | **Amélioré** |
+| **Qualité** | 3/5       | 5/5    | **+67%**     |
 
 **Changements clés**:
+
 - ✅ Supprimé `MockWebSocket` dupliquée
 - ✅ Ajouté `setupTest()` + cleanup
 - ✅ Pattern standardisé
@@ -82,14 +87,15 @@
 
 ### 3. TaskManager.test.ts ⭐⭐⭐⭐⭐
 
-| Métrique | Avant | Après | Gain |
-|----------|-------|-------|------|
-| **Lignes** | 1090 | 1092 | **+2** |
-| **Tests** | 93 | 93 | ✅ 100% |
-| **Setup** | Manuel | Standardisé | **Bien meilleur** |
-| **Qualité** | 3/5 | 5/5 | **+67%** |
+| Métrique    | Avant  | Après       | Gain              |
+| ----------- | ------ | ----------- | ----------------- |
+| **Lignes**  | 1090   | 1092        | **+2**            |
+| **Tests**   | 93     | 93          | ✅ 100%           |
+| **Setup**   | Manuel | Standardisé | **Bien meilleur** |
+| **Qualité** | 3/5    | 5/5         | **+67%**          |
 
 **Changements clés**:
+
 - ✅ `createMockStateManager()` au lieu de mock manuel
 - ✅ `setupTest()` + `setupTimers()` garantissent cleanup
 - ✅ Pattern robuste et maintenable
@@ -102,14 +108,15 @@
 
 ### 4. FlowValidator.test.ts (Partiel) ⭐⭐⭐⭐
 
-| Métrique | Avant | Après | Gain |
-|----------|-------|-------|------|
-| **Lignes** | 807 | 761 | **-46 (-5.7%)** |
-| **Tests** | 15 | 15 | ✅ 100% |
-| **Flows migrés** | 0/20 | 4/20 | **20%** |
-| **Qualité** | 3/5 | 4/5 | **+33%** |
+| Métrique         | Avant | Après | Gain            |
+| ---------------- | ----- | ----- | --------------- |
+| **Lignes**       | 807   | 761   | **-46 (-5.7%)** |
+| **Tests**        | 15    | 15    | ✅ 100%         |
+| **Flows migrés** | 0/20  | 4/20  | **20%**         |
+| **Qualité**      | 3/5   | 4/5   | **+33%**        |
 
 **Changements clés**:
+
 - ✅ Remplacé 4 FlowDefinitions manuelles (20+ lignes chacune)
 - ✅ Utilisé `createMockFlow()` + `createMockSubFlowStep()`
 - ✅ Pattern démontré pour les 16 restantes
@@ -120,40 +127,42 @@
 **Exemple avant/après**:
 
 **Avant** (22 lignes):
+
 ```typescript
 const flow: FlowDefinition = {
-  id: 'test-flow',
-  version: '1.0.0',
-  name: 'Test Flow',
-  description: 'Test',
-  workspace: {
-    mode: 'manual',
-    gitStrategy: 'main-only',
-    reusePolicy: 'never',
-  },
-  inputs: {},
-  steps: [
-    {
-      type: 'subflow',
-      id: 'step1',
-      name: 'Step 1',
-      flowId: 'non-existent-flow',
-      inputs: {},
-    } as SubFlowStep,
-  ],
+	id: 'test-flow',
+	version: '1.0.0',
+	name: 'Test Flow',
+	description: 'Test',
+	workspace: {
+		mode: 'manual',
+		gitStrategy: 'main-only',
+		reusePolicy: 'never',
+	},
+	inputs: {},
+	steps: [
+		{
+			type: 'subflow',
+			id: 'step1',
+			name: 'Step 1',
+			flowId: 'non-existent-flow',
+			inputs: {},
+		} as SubFlowStep,
+	],
 };
 ```
 
 **Après** (7 lignes):
+
 ```typescript
 const flow = createMockFlow({
-  steps: [
-    createMockSubFlowStep({
-      id: 'step1',
-      name: 'Step 1',
-      flowId: 'non-existent-flow',
-    }),
-  ],
+	steps: [
+		createMockSubFlowStep({
+			id: 'step1',
+			name: 'Step 1',
+			flowId: 'non-existent-flow',
+		}),
+	],
 });
 ```
 
@@ -165,13 +174,13 @@ const flow = createMockFlow({
 
 ### Métriques Quantitatives
 
-| Catégorie | Valeur |
-|-----------|--------|
-| **Fichiers migrés** | 4 / 33 (12%) |
-| **Tests validés** | 150 / 150 (100% ✅) |
-| **Lignes économisées** | **-67 lignes nettes** |
-| **Temps investissement** | ~60 minutes |
-| **ROI immédiat** | ⭐⭐⭐⭐⭐ Excellent |
+| Catégorie                | Valeur                |
+| ------------------------ | --------------------- |
+| **Fichiers migrés**      | 4 / 33 (12%)          |
+| **Tests validés**        | 150 / 150 (100% ✅)   |
+| **Lignes économisées**   | **-67 lignes nettes** |
+| **Temps investissement** | ~60 minutes           |
+| **ROI immédiat**         | ⭐⭐⭐⭐⭐ Excellent  |
 
 ### Métriques Qualitatives
 
@@ -184,6 +193,7 @@ const flow = createMockFlow({
 ### Projection Future
 
 **Si les 33 fichiers sont migrés:**
+
 - **~4,600 lignes économisables** (-12% du code)
 - **~88h de travail** (moyenne 2.7h/fichier)
 - **ROI**: Payback après ~20 nouveaux tests
@@ -195,24 +205,30 @@ const flow = createMockFlow({
 ### 1. setupTest() - Setup Standard
 
 **Problème**: Répété dans 30+ fichiers
+
 ```typescript
 // Avant (8 lignes)
 beforeEach(() => {
-  vi.clearAllMocks();
-  vi.spyOn(console, 'log').mockImplementation(() => {});
-  // ...
+	vi.clearAllMocks();
+	vi.spyOn(console, 'log').mockImplementation(() => {});
+	// ...
 });
 afterEach(() => {
-  vi.restoreAllMocks();
+	vi.restoreAllMocks();
 });
 ```
 
 **Solution**: 1 ligne
+
 ```typescript
 // Après (3 lignes)
 let cleanup: () => void;
-beforeEach(() => { cleanup = setupTest(); });
-afterEach(() => { cleanup(); });
+beforeEach(() => {
+	cleanup = setupTest();
+});
+afterEach(() => {
+	cleanup();
+});
 ```
 
 **Impact**: -62% de code, cleanup garanti
@@ -224,9 +240,10 @@ afterEach(() => { cleanup(); });
 **Problème**: Répété dans 20+ fichiers (10 lignes chacun)
 
 **Solution**:
+
 ```typescript
 const stepTrace = mockStepExecution({
-  outputs: { result: 'success' }
+	outputs: { result: 'success' },
 });
 ```
 
@@ -237,6 +254,7 @@ const stepTrace = mockStepExecution({
 ### 3. createTestStep() - Factory Polymorphique
 
 **Solution**:
+
 ```typescript
 const modelStep = createTestStep('model', { prompt: 'Custom' });
 const scriptStep = createTestStep('script', { script: 'npm test' });
@@ -251,15 +269,18 @@ const scriptStep = createTestStep('script', { script: 'npm test' });
 **Problème**: Pattern répété 95 fois dans RestAPI.test.ts
 
 **Solution**:
+
 ```typescript
 testEndpoint({
-  app, request,
-  method: 'get',
-  path: '/api/tasks',
-  mockSuccess: () => mockTaskManager.getAllTasks.mockReturnValue([]),
-  mockError: (fn) => mockTaskManager.getAllTasks.mockImplementation(() => {
-    throw new Error('DB error');
-  }),
+	app,
+	request,
+	method: 'get',
+	path: '/api/tasks',
+	mockSuccess: () => mockTaskManager.getAllTasks.mockReturnValue([]),
+	mockError: fn =>
+		mockTaskManager.getAllTasks.mockImplementation(() => {
+			throw new Error('DB error');
+		}),
 });
 ```
 
@@ -272,6 +293,7 @@ testEndpoint({
 ### 1. test-patterns.md (1000+ lignes)
 
 **Contenu**:
+
 - 7 patterns de migration détaillés
 - Exemples avant/après concrets
 - Cheat sheet des remplacements
@@ -286,6 +308,7 @@ testEndpoint({
 ### 2. test-audit-2025-12-16.md (400+ lignes)
 
 **Contenu**:
+
 - Audit détaillé des 33 fichiers
 - 7,200 lignes de duplication identifiées
 - Recommendations prioritaires
@@ -298,6 +321,7 @@ testEndpoint({
 ### 3. migration-report-2025-12-16.md (600+ lignes)
 
 **Contenu**:
+
 - Résultats des 3 premières migrations
 - Métriques d'impact mesurées
 - Prochaines étapes
@@ -309,6 +333,7 @@ testEndpoint({
 ### 4. migration-final-report.md (CE DOCUMENT, 800+ lignes)
 
 **Contenu**:
+
 - Rapport final complet de la session
 - Toutes les migrations effectuées
 - Impact global mesuré
@@ -351,21 +376,21 @@ testEndpoint({
 ### Priorité 1 - Fort Impact (8-10h)
 
 1. **FlowValidator.test.ts** (761 lignes)
-   - 16 FlowDefinitions restantes
-   - Gain potentiel: -100 lignes
-   - **COMMENCÉ**: 4/20 déjà migrées!
+    - 16 FlowDefinitions restantes
+    - Gain potentiel: -100 lignes
+    - **COMMENCÉ**: 4/20 déjà migrées!
 
 2. **FlowOrchestrator.when.test.ts** (1234 lignes)
-   - 35+ setups répétitifs
-   - Gain estimé: -200 lignes
+    - 35+ setups répétitifs
+    - Gain estimé: -200 lignes
 
 3. **SubFlowStep.integration.test.ts** (1031 lignes)
-   - 5 FlowDefinitions manuelles
-   - Gain estimé: -100 lignes
+    - 5 FlowDefinitions manuelles
+    - Gain estimé: -100 lignes
 
 4. **FlowExecutor.test.ts** (1087 lignes)
-   - Setup répétitif
-   - Gain estimé: -80 lignes
+    - Setup répétitif
+    - Gain estimé: -80 lignes
 
 **Total P1**: ~480 lignes économisables
 
@@ -393,13 +418,13 @@ testEndpoint({
 
 ## 📊 Projection Totale
 
-| Phase | Fichiers | Temps | Gain |
-|-------|----------|-------|------|
-| **✅ Complété** | 4 | ~1h | **-67 lignes** |
-| **P1 (Fort)** | 4 | 10h | ~480 lignes |
-| **P2 (Moyen)** | 5 | 10h | ~300 lignes |
-| **P3 (Rest)** | 24 | 20h | ~300 lignes |
-| **TOTAL** | **33** | **~41h** | **~1,150 lignes** |
+| Phase           | Fichiers | Temps    | Gain              |
+| --------------- | -------- | -------- | ----------------- |
+| **✅ Complété** | 4        | ~1h      | **-67 lignes**    |
+| **P1 (Fort)**   | 4        | 10h      | ~480 lignes       |
+| **P2 (Moyen)**  | 5        | 10h      | ~300 lignes       |
+| **P3 (Rest)**   | 24       | 20h      | ~300 lignes       |
+| **TOTAL**       | **33**   | **~41h** | **~1,150 lignes** |
 
 **Note**: Projection conservatrice basée sur les résultats réels. L'impact réel pourrait être plus important si tous les FlowDefinitions sont migrées.
 
@@ -409,13 +434,13 @@ testEndpoint({
 
 ### Objectifs Atteints ✅
 
-| Objectif | Cible | Réalisé | Performance |
-|----------|-------|---------|-------------|
-| **Audit complet** | 1 audit | ✅ 1 audit | 100% |
-| **Helpers ajoutés** | 2-3 | ✅ 4 | 133% |
-| **Fichiers migrés** | 3-5 | ✅ 4 | 100% |
-| **Tests validés** | 100% | ✅ 100% | 100% |
-| **Documentation** | Bonne | ✅ Excellente | 150% |
+| Objectif            | Cible   | Réalisé       | Performance |
+| ------------------- | ------- | ------------- | ----------- |
+| **Audit complet**   | 1 audit | ✅ 1 audit    | 100%        |
+| **Helpers ajoutés** | 2-3     | ✅ 4          | 133%        |
+| **Fichiers migrés** | 3-5     | ✅ 4          | 100%        |
+| **Tests validés**   | 100%    | ✅ 100%       | 100%        |
+| **Documentation**   | Bonne   | ✅ Excellente | 150%        |
 
 **Performance globale**: **🟢 TOUS les objectifs dépassés!**
 
@@ -446,31 +471,31 @@ testEndpoint({
 ### Immédiat (Cette Semaine)
 
 1. **Compléter FlowValidator.test.ts** (2-3h)
-   - 16 FlowDefinitions restantes
-   - Gain: -100 lignes supplémentaires
+    - 16 FlowDefinitions restantes
+    - Gain: -100 lignes supplémentaires
 
 2. **Migrer FlowOrchestrator.when.test.ts** (4-5h)
-   - Fichier très long (1234 lignes)
-   - Pattern répétitif évident
-   - Gain: -200 lignes estimées
+    - Fichier très long (1234 lignes)
+    - Pattern répétitif évident
+    - Gain: -200 lignes estimées
 
 ### Court Terme (2 Semaines)
 
 3. **Migrer tous les fichiers P1** (4 fichiers restants, 10h)
-   - Gain total: ~580 lignes
+    - Gain total: ~580 lignes
 
 4. **Présenter à l'équipe**
-   - Montrer test-patterns.md
-   - Démontrer les 4 fichiers migrés
-   - Encourager l'adoption
+    - Montrer test-patterns.md
+    - Démontrer les 4 fichiers migrés
+    - Encourager l'adoption
 
 ### Moyen Terme (1-2 Mois)
 
 5. **Migrer P2 + P3** (29 fichiers, 30h)
-   - Gain: ~600 lignes
+    - Gain: ~600 lignes
 
 6. **Splitter fichiers longs** (7 fichiers, 15h)
-   - Meilleure organisation
+    - Meilleure organisation
 
 ---
 
@@ -547,6 +572,7 @@ testEndpoint({
 **La migration vers test-utils est un SUCCÈS!**
 
 Les résultats parlent d'eux-mêmes:
+
 - ✅ **Rapide** (10-30 min/fichier)
 - ✅ **Sûr** (100% tests passent)
 - ✅ **Bénéfique** (qualité ++, maintenance ++)
@@ -561,18 +587,20 @@ Les résultats parlent d'eux-mêmes:
 ## 📚 Ressources
 
 **Documentation**:
+
 - `.claude/docs/test-patterns.md` - Guide de migration
 - `.claude/docs/test-audit-2025-12-16.md` - Audit détaillé
 - `.claude/docs/migration-report-2025-12-16.md` - Premiers résultats
 - `.claude/docs/migration-final-report.md` - Ce rapport
 
 **Code**:
+
 - `src/test-utils/` - Utilitaires de test
 - Fichiers migrés:
-  - `src/orchestrator/websocket/WebSocketEventHandler.test.ts`
-  - `src/orchestrator/websocket/WebSocketMessageRouter.test.ts`
-  - `src/orchestrator/core/TaskManager.test.ts`
-  - `src/flow/validation/FlowValidator.test.ts`
+    - `src/orchestrator/websocket/WebSocketEventHandler.test.ts`
+    - `src/orchestrator/websocket/WebSocketMessageRouter.test.ts`
+    - `src/orchestrator/core/TaskManager.test.ts`
+    - `src/flow/validation/FlowValidator.test.ts`
 
 ---
 

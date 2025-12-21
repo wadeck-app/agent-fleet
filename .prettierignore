@@ -1,0 +1,52 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Build outputs
+dist
+build
+coverage
+.next
+.turbo
+
+# Generated files
+*.min.js
+*.min.css
+*.bundle.js
+*.chunk.js
+
+# Package manager
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Logs
+*.log
+
+# Test results
+test-results
+playwright-report
+e2e/test-results
+
+# Storybook
+storybook-static
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# IDE
+.vscode
+.idea
+
+# Temp files
+.claude/temp
+.DS_Store
+
+# Malformed HTML files (design prototypes)
+docs/design*/**/*.html
+
+# Documentation examples (may contain intentional syntax errors for demonstration)
+.claude/docs/examples/**
+docs/testing/examples/**

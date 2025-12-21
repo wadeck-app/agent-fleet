@@ -1,6 +1,7 @@
 # UI Design - Final Selections for Agent Fleet Web Application
 
 ## Overview
+
 This document presents the final selected ASCII mockups for the web interface to manage the Agent Fleet orchestrator system.
 
 ---
@@ -45,6 +46,7 @@ This document presents the final selected ASCII mockups for the web interface to
 ```
 
 **Rationale:**
+
 - Clear metrics presentation at the top
 - Activity feed for recent events
 - Quick action buttons for common operations
@@ -99,6 +101,7 @@ This document presents the final selected ASCII mockups for the web interface to
 ```
 
 **Rationale:**
+
 - Mini table at top shows summary stats
 - Split view allows seeing list and details simultaneously
 - Git status and active tasks are critical information
@@ -179,6 +182,7 @@ This document presents the final selected ASCII mockups for the web interface to
 ```
 
 **Rationale:**
+
 - Similar to workspaces - consistent UX pattern
 - Small table shows all workers with key info at a glance
 - Detailed panel on selection shows full worker context
@@ -269,6 +273,7 @@ This document presents the final selected ASCII mockups for the web interface to
 ```
 
 **Rationale:**
+
 - Card format makes each review task prominent
 - All critical info visible at card level
 - Quick action buttons on each card for immediate action
@@ -477,6 +482,7 @@ REVIEW PANEL (Bottom or Side Sheet)
 ```
 
 **Rationale:**
+
 - Familiar GitHub PR interface that developers know
 - Inline comments on each step of the plan enable precise feedback
 - Threaded discussions for collaborative review and clarifications
@@ -491,6 +497,7 @@ REVIEW PANEL (Bottom or Side Sheet)
 ## Implementation Notes
 
 ### Technical Stack
+
 - **Frontend Framework**: React with TypeScript
 - **UI Components**: Custom components based on existing terminal-kit patterns
 - **Real-time Updates**: WebSocket integration (already architected via UIClientHook)
@@ -498,6 +505,7 @@ REVIEW PANEL (Bottom or Side Sheet)
 - **State Management**: Real-time updates via StateManager event system
 
 ### Key Features
+
 1. **Consistent UX**: Table + details pattern for Workspaces and Workers
 2. **Real-time**: Live updates via WebSocket for all views
 3. **Responsive**: Designs adaptable to different screen sizes
@@ -505,7 +513,9 @@ REVIEW PANEL (Bottom or Side Sheet)
 5. **Action-Oriented**: Clear CTAs on all interactive elements
 
 ### Data Sources
+
 All designs leverage existing backend APIs:
+
 - `GET /stats` - Dashboard metrics
 - `GET /workspaces` - Workspace list and details
 - `GET /workers` - Worker list and status
@@ -513,6 +523,7 @@ All designs leverage existing backend APIs:
 - `GET /tasks/:id/trace` - Execution traces for plan review
 
 ### Next Steps
+
 1. Create web UI project structure (React + TypeScript)
 2. Implement base layout and navigation
 3. Build reusable table components

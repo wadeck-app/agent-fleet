@@ -3,141 +3,130 @@
  *
  * Simplified facade that orchestrates flow execution using specialized components.
  */
-
-import type {
-  FlowDefinition,
-  FlowExecutionResult,
-  Workspace,
-} from '../types.js';
 import type { TemplateContext } from '../processing/TemplateRenderer.js';
-import { StepRunner } from './StepRunner.js';
-import { FlowOrchestrator } from './FlowOrchestrator.js';
 import type { FlowRegistry } from '../registry/FlowRegistry.js';
+import type { FlowDefinition, FlowExecutionResult, Workspace } from '../types.js';
+import { FlowOrchestrator } from './FlowOrchestrator.js';
+import { StepRunner } from './StepRunner.js';
 
 /**
  * Options for flow execution
  */
 export interface FlowExecutionOptions {
-  /** Task ID executing this flow */
-  taskId: string;
+	/** Task ID executing this flow */
+	taskId: string;
 
-  /** Flow to execute */
-  flow: FlowDefinition;
+	/** Flow to execute */
+	flow: FlowDefinition;
 
-  /** Workspace to use */
-  workspace: Workspace;
+	/** Workspace to use */
+	workspace: Workspace;
 
-  /** Input variables */
-  inputs: Record<string, any>;
+	/** Input variables */
+	inputs: Record<string, any>;
 
-  /** Task metadata (priority, createdAt, etc.) */
-  taskMetadata?: Record<string, any>;
+	/** Task metadata (priority, createdAt, etc.) */
+	taskMetadata?: Record<string, any>;
 
-  /** Environment variables for Claude (for hooks) */
-  claudeEnv?: Record<string, string>;
+	/** Environment variables for Claude (for hooks) */
+	claudeEnv?: Record<string, string>;
 
-  /** Callback when Claude process starts (to store reference for killing) */
-  onClaudeProcessStarted?: (process: any) => void;
+	/** Callback when Claude process starts (to store reference for killing) */
+	onClaudeProcessStarted?: (process: any) => void;
 
-  /** Nesting depth for SubFlowStep recursion tracking */
-  nestingDepth?: number;
+	/** Nesting depth for SubFlowStep recursion tracking */
+	nestingDepth?: number;
 }
 
 /**
  * Flow execution error
  */
 export class FlowExecutionError extends Error {
-  constructor(
-    message: string,
-    public flowId: string,
-    public stepId?: string
-  ) {
-    super(
-      `Flow execution error in '${flowId}'${
-        stepId ? ` at step '${stepId}'` : ''
-      }: ${message}`
-    );
-    this.name = 'FlowExecutionError';
-  }
+	constructor(
+		message: string,
+		public flowId: string,
+		public stepId?: string
+	) {
+		super(`Flow execution error in '${flowId}'${stepId ? ` at step '${stepId}'` : ''}: ${message}`);
+		this.name = 'FlowExecutionError';
+	}
 }
 
 /**
  * Flow Executor class (Refactored)
  */
 export class FlowExecutor {
-  private stepRunner: StepRunner;
-  private orchestrator: FlowOrchestrator;
-  private flowRegistry?: FlowRegistry;
+	private stepRunner: StepRunner;
+	private orchestrator: FlowOrchestrator;
+	private flowRegistry?: FlowRegistry;
 
-  constructor(interactive: boolean = false, flowRegistry?: FlowRegistry) {
-    // Create step runner with configuration
-    this.stepRunner = new StepRunner({
-      interactive,
-    });
+	constructor(interactive: boolean = false, flowRegistry?: FlowRegistry) {
+		// Create step runner with configuration
+		this.stepRunner = new StepRunner({
+			interactive,
+		});
 
-    // Store flow registry reference
-    this.flowRegistry = flowRegistry;
+		// Store flow registry reference
+		this.flowRegistry = flowRegistry;
 
-    // Configure StepRunner with FlowRegistry and self-reference for recursion
-    if (flowRegistry) {
-      this.stepRunner.setFlowRegistry(flowRegistry);
-    }
-    this.stepRunner.setFlowExecutor(this);
+		// Configure StepRunner with FlowRegistry and self-reference for recursion
+		if (flowRegistry) {
+			this.stepRunner.setFlowRegistry(flowRegistry);
+		}
+		this.stepRunner.setFlowExecutor(this);
 
-    // Create orchestrator
-    this.orchestrator = new FlowOrchestrator(this.stepRunner);
-  }
+		// Create orchestrator
+		this.orchestrator = new FlowOrchestrator(this.stepRunner);
+	}
 
-  /**
-   * Set the flow registry (useful if not provided in constructor)
-   */
-  public setFlowRegistry(flowRegistry: FlowRegistry): void {
-    this.flowRegistry = flowRegistry;
-    this.stepRunner.setFlowRegistry(flowRegistry);
-  }
+	/**
+	 * Set the flow registry (useful if not provided in constructor)
+	 */
+	public setFlowRegistry(flowRegistry: FlowRegistry): void {
+		this.flowRegistry = flowRegistry;
+		this.stepRunner.setFlowRegistry(flowRegistry);
+	}
 
-  /**
-   * Execute a complete flow
-   */
-  public async execute(
-    options: FlowExecutionOptions
-  ): Promise<FlowExecutionResult> {
-    const {
-      taskId,
-      flow,
-      workspace,
-      inputs,
-      taskMetadata = {},
-      claudeEnv,
-      onClaudeProcessStarted,
-      nestingDepth = 0,
-    } = options;
+	/**
+	 * Execute a complete flow
+	 */
+	public async execute(options: FlowExecutionOptions): Promise<FlowExecutionResult> {
+		const {
+			taskId,
+			flow,
+			workspace,
+			inputs,
+			taskMetadata = {},
+			claudeEnv,
+			onClaudeProcessStarted,
+			nestingDepth = 0,
+		} = options;
 
-    // Update step runner configuration with Claude env and callback
-    this.stepRunner = new StepRunner({
-      interactive: this.stepRunner['config'].interactive,
-      claudeEnv,
-      onClaudeProcessStarted,
-      flowRegistry: this.flowRegistry,
-      flowExecutor: this,
-    });
+		// Update step runner configuration with Claude env and callback
+		this.stepRunner = new StepRunner({
+			interactive: this.stepRunner['config'].interactive,
+			claudeEnv,
+			onClaudeProcessStarted,
+			flowRegistry: this.flowRegistry,
+			flowExecutor: this,
+		});
 
-    // Recreate orchestrator with updated step runner
-    this.orchestrator = new FlowOrchestrator(this.stepRunner);
+		// Recreate orchestrator with updated step runner
+		this.orchestrator = new FlowOrchestrator(this.stepRunner);
 
-    // Context for template rendering
-    const stepOutputs = new Map<string, Record<string, any>>();
-    const context: TemplateContext = {
-      inputs,
-      stepOutputs,
-      taskMetadata,
-      nestingDepth,
-      taskId,
-      claudeEnv,
-      onClaudeProcessStarted,
-    };
+		// Context for template rendering
+		const stepOutputs = new Map<string, Record<string, any>>();
+		const context: TemplateContext = {
+			inputs,
+			stepOutputs,
+			taskMetadata,
+			nestingDepth,
+			taskId,
+			claudeEnv,
+			onClaudeProcessStarted,
+		};
 
-    // Orchestrate execution
-    return this.orchestrator.orchestrate(taskId, flow, workspace, context);
-  }
+		// Orchestrate execution
+		return this.orchestrator.orchestrate(taskId, flow, workspace, context);
+	}
 }

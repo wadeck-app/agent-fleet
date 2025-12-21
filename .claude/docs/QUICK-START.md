@@ -8,21 +8,16 @@
 
 ```typescript
 import {
-  // Factories (créer des données de test)
-  createMockTask,
-  createMockFlow,
-  createMockWorkspace,
-  createMockWorker,
-
-  // Mocks (classes mock réutilisables)
-  MockIssueCollector,
-  MockFlowRegistry,
-  MockChildProcess,
-
-  // Helpers (fonctions d'aide)
-  setupTimers,
-  createTempTestDir,
-  waitForCondition,
+	MockChildProcess,
+	MockFlowRegistry, // Mocks (classes mock réutilisables)
+	MockIssueCollector,
+	createMockFlow, // Factories (créer des données de test)
+	createMockTask,
+	createMockWorker,
+	createMockWorkspace,
+	createTempTestDir, // Helpers (fonctions d'aide)
+	setupTimers,
+	waitForCondition,
 } from '../test-utils';
 ```
 
@@ -31,6 +26,7 @@ import {
 ## 📦 Factories
 
 ### Créer une Task
+
 ```typescript
 // Simple
 const task = createMockTask();
@@ -48,21 +44,20 @@ const tasks = createMockTasks(3, { priority: 'high' }); // Avec overrides
 ```
 
 ### Créer un Flow
+
 ```typescript
 const flow = createMockFlow({
-  id: 'my-flow',
-  steps: [
-    createMockModelStep({ prompt: 'Analyze this' }),
-    createMockScriptStep({ script: 'npm test' }),
-  ],
+	id: 'my-flow',
+	steps: [createMockModelStep({ prompt: 'Analyze this' }), createMockScriptStep({ script: 'npm test' })],
 });
 ```
 
 ### Créer un Workspace
+
 ```typescript
 const workspace = createMockWorkspace({
-  mode: 'shared',
-  path: '/custom/path',
+	mode: 'shared',
+	path: '/custom/path',
 });
 ```
 
@@ -71,24 +66,26 @@ const workspace = createMockWorkspace({
 ## 🎭 Mocks
 
 ### MockIssueCollector (Validation)
+
 ```typescript
 describe('Validator', () => {
-  let collector: MockIssueCollector;
+	let collector: MockIssueCollector;
 
-  beforeEach(() => {
-    collector = new MockIssueCollector();
-  });
+	beforeEach(() => {
+		collector = new MockIssueCollector();
+	});
 
-  it('should detect errors', () => {
-    validator.validate(data, collector);
+	it('should detect errors', () => {
+		validator.validate(data, collector);
 
-    expect(collector.hasError()).toBe(true);
-    expect(collector.hasCode(ValidationCode.INVALID_TYPE)).toBe(true);
-  });
+		expect(collector.hasError()).toBe(true);
+		expect(collector.hasCode(ValidationCode.INVALID_TYPE)).toBe(true);
+	});
 });
 ```
 
 ### MockFlowRegistry
+
 ```typescript
 const registry = new MockFlowRegistry();
 registry.addFlow(createMockFlow({ id: 'flow-1' }));
@@ -97,6 +94,7 @@ expect(registry.hasFlow('flow-1')).toBe(true);
 ```
 
 ### MockChildProcess
+
 ```typescript
 const mockProcess = new MockChildProcess();
 
@@ -113,49 +111,56 @@ mockProcess.simulateError(new Error('Failed'));
 ## 🛠️ Helpers
 
 ### Timer Management
+
 ```typescript
 describe('MyTests', () => {
-  let cleanupTimers: () => void;
+	let cleanupTimers: () => void;
 
-  beforeEach(() => {
-    cleanupTimers = setupTimers();
-  });
+	beforeEach(() => {
+		cleanupTimers = setupTimers();
+	});
 
-  afterEach(() => {
-    cleanupTimers();
-  });
+	afterEach(() => {
+		cleanupTimers();
+	});
 
-  it('should wait', () => {
-    setTimeout(() => { done = true; }, 1000);
-    vi.advanceTimersByTime(1000);
-    expect(done).toBe(true);
-  });
+	it('should wait', () => {
+		setTimeout(() => {
+			done = true;
+		}, 1000);
+		vi.advanceTimersByTime(1000);
+		expect(done).toBe(true);
+	});
 });
 ```
 
 ### Temporary Directory
+
 ```typescript
 it('should process files', async () => {
-  const { path, cleanup } = await createTempTestDir('test-');
+	const { path, cleanup } = await createTempTestDir('test-');
 
-  try {
-    await fs.promises.writeFile(`${path}/file.txt`, 'content');
-    // ... test logic ...
-  } finally {
-    await cleanup();
-  }
+	try {
+		await fs.promises.writeFile(`${path}/file.txt`, 'content');
+		// ... test logic ...
+	} finally {
+		await cleanup();
+	}
 });
 ```
 
 ### Wait for Condition
+
 ```typescript
 it('should become ready', async () => {
-  let ready = false;
-  setTimeout(() => { ready = true; }, 100);
+	let ready = false;
+	setTimeout(() => {
+		ready = true;
+	}, 100);
 
-  await waitForCondition(() => ready, { timeout: 1000 });
+	await waitForCondition(() => ready, { timeout: 1000 });
 
-  expect(ready).toBe(true);
+	expect(ready).toBe(true);
 });
 ```
 
@@ -164,74 +169,70 @@ it('should become ready', async () => {
 ## 📋 Patterns Communs
 
 ### Test Complet
+
 ```typescript
-import {
-  createMockTask,
-  MockIssueCollector,
-  setupTimers,
-  createTempTestDir,
-} from '../test-utils';
+import { MockIssueCollector, createMockTask, createTempTestDir, setupTimers } from '../test-utils';
 
 describe('CompleteFeature', () => {
-  let cleanupTimers: () => void;
-  let collector: MockIssueCollector;
-  let tempDir: { path: string; cleanup: () => Promise<void> };
+	let cleanupTimers: () => void;
+	let collector: MockIssueCollector;
+	let tempDir: { path: string; cleanup: () => Promise<void> };
 
-  beforeEach(async () => {
-    cleanupTimers = setupTimers();
-    collector = new MockIssueCollector();
-    tempDir = await createTempTestDir('feature-');
-  });
+	beforeEach(async () => {
+		cleanupTimers = setupTimers();
+		collector = new MockIssueCollector();
+		tempDir = await createTempTestDir('feature-');
+	});
 
-  afterEach(async () => {
-    cleanupTimers();
-    await tempDir.cleanup();
-  });
+	afterEach(async () => {
+		cleanupTimers();
+		await tempDir.cleanup();
+	});
 
-  it('should work', async () => {
-    const task = createMockTask({ priority: 'high' });
-    // ... test implementation ...
-    expect(collector.hasError()).toBe(false);
-  });
+	it('should work', async () => {
+		const task = createMockTask({ priority: 'high' });
+		// ... test implementation ...
+		expect(collector.hasError()).toBe(false);
+	});
 });
 ```
 
 ### Validation Test
+
 ```typescript
 import { MockIssueCollector } from '../../test-utils';
 
 describe('MyValidator', () => {
-  let collector: MockIssueCollector;
+	let collector: MockIssueCollector;
 
-  beforeEach(() => {
-    collector = new MockIssueCollector();
-  });
+	beforeEach(() => {
+		collector = new MockIssueCollector();
+	});
 
-  it('should validate', () => {
-    validator.validate(data, collector);
+	it('should validate', () => {
+		validator.validate(data, collector);
 
-    expect(collector.hasError()).toBe(false);
-    expect(collector.issues).toHaveLength(0);
-  });
+		expect(collector.hasError()).toBe(false);
+		expect(collector.issues).toHaveLength(0);
+	});
 });
 ```
 
 ### Flow Test
+
 ```typescript
 import { createMockFlow, createMockModelStep } from '../../test-utils';
 
 describe('FlowExecution', () => {
-  it('should execute', async () => {
-    const flow = createMockFlow({
-      steps: [
-        createMockModelStep({ id: 'step1', prompt: 'Test' }),
-      ],
-    });
+	it('should execute', async () => {
+		const flow = createMockFlow({
+			steps: [createMockModelStep({ id: 'step1', prompt: 'Test' })],
+		});
 
-    const result = await executor.execute(flow);
+		const result = await executor.execute(flow);
 
-    expect(result.success).toBe(true);
-  });
+		expect(result.success).toBe(true);
+	});
 });
 ```
 
@@ -240,6 +241,7 @@ describe('FlowExecution', () => {
 ## 💡 Tips
 
 ### 1. Override Minimal
+
 ```typescript
 // ✅ Bon
 const task = createMockTask({ priority: 'high' });
@@ -253,15 +255,17 @@ const task = createMockTask({
 ```
 
 ### 2. Cleanup Systématique
+
 ```typescript
 // ✅ Toujours cleanup
 afterEach(() => {
-  if (cleanupTimers) cleanupTimers();
-  if (tempDir) tempDir.cleanup();
+	if (cleanupTimers) cleanupTimers();
+	if (tempDir) tempDir.cleanup();
 });
 ```
 
 ### 3. Nommer Clairement
+
 ```typescript
 // ✅ Clair
 const mockExecutor = createMockFlowExecutor();
@@ -292,10 +296,11 @@ const executor = createMockFlowExecutor();
 ---
 
 **Besoin d'aide?** Consultez les exemples dans les tests existants:
+
 - `src/flow/validation/*.test.ts` - Exemples de validation
 - `src/shared/Storage.test.ts` - Exemples avec filesystem
 - `src/orchestrator/metrics/MetricsCollector.test.ts` - Exemples avec timers
 
 ---
 
-*Dernière mise à jour: 2025-12-15*
+_Dernière mise à jour: 2025-12-15_

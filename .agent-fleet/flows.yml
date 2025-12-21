@@ -1,43 +1,43 @@
 simple-implement:
-  name: "(Dummy) Simple Implementation"
-  description: "Ask Claude to implement something"
-  workspace:
-    mode: isolated
-#    gitStrategy: feature-branch
-    gitStrategy: main-only
-#    reusePolicy: never
-    reusePolicy: always
-  statusTransitions:
-    onSuccess: review
-    onFailure: changes_requested
-  inputs:
-    task: string
-  steps:
-    - type: model
-      id: implement
-      name: "Implement Task"
-#      model: sonnet
-      model: haiku
-      prompt: "${{ inputs.task }}"
+    name: '(Dummy) Simple Implementation'
+    description: 'Ask Claude to implement something'
+    workspace:
+        mode: isolated
+        #    gitStrategy: feature-branch
+        gitStrategy: main-only
+        #    reusePolicy: never
+        reusePolicy: always
+    statusTransitions:
+        onSuccess: review
+        onFailure: changes_requested
+    inputs:
+        task: string
+    steps:
+        - type: model
+          id: implement
+          name: 'Implement Task'
+          #      model: sonnet
+          model: haiku
+          prompt: '${{ inputs.task }}'
 
 debug-local:
-  name: "Debug in Current Workspace"
-  description: "Work directly in the current directory (follow progress in your IDE)"
-  workspace:
-    mode: manual
-    gitStrategy: any
-    reusePolicy: always
-  statusTransitions:
-    onSuccess: approved
-    onFailure: todo
-  inputs:
-    task: string
-  steps:
-    - type: model
-      id: implement
-      name: "Implement Task Locally"
-      model: haiku
-      prompt: "${{ inputs.task }}"
+    name: 'Debug in Current Workspace'
+    description: 'Work directly in the current directory (follow progress in your IDE)'
+    workspace:
+        mode: manual
+        gitStrategy: any
+        reusePolicy: always
+    statusTransitions:
+        onSuccess: approved
+        onFailure: todo
+    inputs:
+        task: string
+    steps:
+        - type: model
+          id: implement
+          name: 'Implement Task Locally'
+          model: haiku
+          prompt: '${{ inputs.task }}'
 
 # Test Flow 1: Diamond Pattern (fork-join) - Windows CMD compatible
 #     A
@@ -46,352 +46,352 @@ debug-local:
 #    \ /
 #     D
 test-diamond:
-  name: "Test: Diamond Pattern"
-  description: "Tests fork-join with diamond shape (A splits to B+C, then joins at D)"
-  workspace:
-    mode: manual
-    gitStrategy: any
-    reusePolicy: always
-  statusTransitions:
-    onSuccess: approved
-    onFailure: todo
-  inputs:
-    message: string
-  steps:
-    # Root: A
-    - type: script
-      id: step-a
-      name: "Step A (Start)"
-      script: |
-        echo [A] Starting diamond flow: ${{ inputs.message }} && ping localhost -n 2 >nul && echo [A] After 1 second... && ping localhost -n 2 >nul && echo [A] After 2 seconds... && ping localhost -n 2 >nul && echo [A] Done!
+    name: 'Test: Diamond Pattern'
+    description: 'Tests fork-join with diamond shape (A splits to B+C, then joins at D)'
+    workspace:
+        mode: manual
+        gitStrategy: any
+        reusePolicy: always
+    statusTransitions:
+        onSuccess: approved
+        onFailure: todo
+    inputs:
+        message: string
+    steps:
+        # Root: A
+        - type: script
+          id: step-a
+          name: 'Step A (Start)'
+          script: |
+              echo [A] Starting diamond flow: ${{ inputs.message }} && ping localhost -n 2 >nul && echo [A] After 1 second... && ping localhost -n 2 >nul && echo [A] After 2 seconds... && ping localhost -n 2 >nul && echo [A] Done!
 
-    # Fork: B and C run in parallel
-    - type: script
-      id: step-b
-      name: "Step B (Left Branch)"
-      depends: [step-a]
-      script: |
-        echo [B] Processing left branch... && ping localhost -n 2 >nul && echo [B] After 1 second... && ping localhost -n 2 >nul && echo [B] After 2 seconds... && ping localhost -n 2 >nul && echo [B] After 3 seconds... && ping localhost -n 2 >nul && echo [B] Left branch complete!
+        # Fork: B and C run in parallel
+        - type: script
+          id: step-b
+          name: 'Step B (Left Branch)'
+          depends: [step-a]
+          script: |
+              echo [B] Processing left branch... && ping localhost -n 2 >nul && echo [B] After 1 second... && ping localhost -n 2 >nul && echo [B] After 2 seconds... && ping localhost -n 2 >nul && echo [B] After 3 seconds... && ping localhost -n 2 >nul && echo [B] Left branch complete!
 
-    - type: script
-      id: step-c
-      name: "Step C (Right Branch)"
-      depends: [step-a]
-      script: |
-        echo [C] Processing right branch... && ping localhost -n 2 >nul && echo [C] After 1 second... && ping localhost -n 2 >nul && echo [C] After 2 seconds... && ping localhost -n 2 >nul && echo [C] Right branch complete!
+        - type: script
+          id: step-c
+          name: 'Step C (Right Branch)'
+          depends: [step-a]
+          script: |
+              echo [C] Processing right branch... && ping localhost -n 2 >nul && echo [C] After 1 second... && ping localhost -n 2 >nul && echo [C] After 2 seconds... && ping localhost -n 2 >nul && echo [C] Right branch complete!
 
-    # Join: D waits for both B and C
-    - type: script
-      id: step-d
-      name: "Step D (Join)"
-      depends: [step-b, step-c]
-      script: |
-        echo [D] Merging results from B and C... && ping localhost -n 2 >nul && echo [D] After 1 second... && ping localhost -n 2 >nul && echo [D] After 2 seconds... && ping localhost -n 2 >nul && echo [D] Diamond flow complete!
+        # Join: D waits for both B and C
+        - type: script
+          id: step-d
+          name: 'Step D (Join)'
+          depends: [step-b, step-c]
+          script: |
+              echo [D] Merging results from B and C... && ping localhost -n 2 >nul && echo [D] After 1 second... && ping localhost -n 2 >nul && echo [D] After 2 seconds... && ping localhost -n 2 >nul && echo [D] Diamond flow complete!
 
 # Test Flow 2: Fork Pattern (parallel split) - Windows CMD compatible
 #     A
 #    /|\
 #   B C D
 test-fork:
-  name: "Test: Fork Pattern"
-  description: "Tests parallel execution with 3-way fork (A splits to B+C+D)"
-  workspace:
-    mode: manual
-    gitStrategy: any
-    reusePolicy: always
-  statusTransitions:
-    onSuccess: approved
-    onFailure: todo
-  inputs:
-    task: string
-  steps:
-    # Root: A
-    - type: script
-      id: step-a
-      name: "Step A (Initialize)"
-      script: |
-        echo [A] Initializing fork flow: ${{ inputs.task }} && ping localhost -n 2 >nul && echo [A] Waiting 2 seconds... && ping localhost -n 2 >nul && echo [A] Ready to fork into 3 parallel branches!
+    name: 'Test: Fork Pattern'
+    description: 'Tests parallel execution with 3-way fork (A splits to B+C+D)'
+    workspace:
+        mode: manual
+        gitStrategy: any
+        reusePolicy: always
+    statusTransitions:
+        onSuccess: approved
+        onFailure: todo
+    inputs:
+        task: string
+    steps:
+        # Root: A
+        - type: script
+          id: step-a
+          name: 'Step A (Initialize)'
+          script: |
+              echo [A] Initializing fork flow: ${{ inputs.task }} && ping localhost -n 2 >nul && echo [A] Waiting 2 seconds... && ping localhost -n 2 >nul && echo [A] Ready to fork into 3 parallel branches!
 
-    # Fork: B, C, and D run in parallel with different delays
-    - type: script
-      id: step-b
-      name: "Step B (Security Audit)"
-      depends: [step-a]
-      script: |
-        echo [B] Starting security audit... && ping localhost -n 2 >nul && echo [B] Phase 1: Scanning dependencies (3s) && ping localhost -n 4 >nul && echo [B] Phase 2: Checking vulnerabilities (4s) && ping localhost -n 5 >nul && echo [B] Phase 3: Generating report (2s) && ping localhost -n 3 >nul && echo [B] Security audit complete!
+        # Fork: B, C, and D run in parallel with different delays
+        - type: script
+          id: step-b
+          name: 'Step B (Security Audit)'
+          depends: [step-a]
+          script: |
+              echo [B] Starting security audit... && ping localhost -n 2 >nul && echo [B] Phase 1: Scanning dependencies (3s) && ping localhost -n 4 >nul && echo [B] Phase 2: Checking vulnerabilities (4s) && ping localhost -n 5 >nul && echo [B] Phase 3: Generating report (2s) && ping localhost -n 3 >nul && echo [B] Security audit complete!
 
-    - type: script
-      id: step-c
-      name: "Step C (Code Linting)"
-      depends: [step-a]
-      script: |
-        echo [C] Starting linting process... && ping localhost -n 2 >nul && echo [C] Phase 1: Loading rules (2s) && ping localhost -n 3 >nul && echo [C] Phase 2: Analyzing code (5s) && ping localhost -n 6 >nul && echo [C] Phase 3: Fixing auto-fixable issues (1s) && ping localhost -n 2 >nul && echo [C] Linting complete - no errors!
+        - type: script
+          id: step-c
+          name: 'Step C (Code Linting)'
+          depends: [step-a]
+          script: |
+              echo [C] Starting linting process... && ping localhost -n 2 >nul && echo [C] Phase 1: Loading rules (2s) && ping localhost -n 3 >nul && echo [C] Phase 2: Analyzing code (5s) && ping localhost -n 6 >nul && echo [C] Phase 3: Fixing auto-fixable issues (1s) && ping localhost -n 2 >nul && echo [C] Linting complete - no errors!
 
-    - type: script
-      id: step-d
-      name: "Step D (Test Suite)"
-      depends: [step-a]
-      script: |
-        echo [D] Starting test suite... && ping localhost -n 2 >nul && echo [D] Phase 1: Setup test environment (3s) && ping localhost -n 4 >nul && echo [D] Phase 2: Running unit tests (6s) && ping localhost -n 7 >nul && echo [D] Phase 3: Running integration tests (4s) && ping localhost -n 5 >nul && echo [D] Phase 4: Cleanup (2s) && ping localhost -n 3 >nul && echo [D] All tests passed!
+        - type: script
+          id: step-d
+          name: 'Step D (Test Suite)'
+          depends: [step-a]
+          script: |
+              echo [D] Starting test suite... && ping localhost -n 2 >nul && echo [D] Phase 1: Setup test environment (3s) && ping localhost -n 4 >nul && echo [D] Phase 2: Running unit tests (6s) && ping localhost -n 7 >nul && echo [D] Phase 3: Running integration tests (4s) && ping localhost -n 5 >nul && echo [D] Phase 4: Cleanup (2s) && ping localhost -n 3 >nul && echo [D] All tests passed!
 
 # Test Flow 3: Feedback Loop (test-loop)
 # Tests onFailure.goto with iteration tracking
 # Flow: implement → test (fails 2x, succeeds 3rd time) → done
 test-loop:
-  name: "Test: Feedback Loop (Retry Pattern)"
-  description: "Tests onFailure.goto with a test step that fails twice then succeeds"
-  workspace:
-    mode: manual
-    gitStrategy: any
-    reusePolicy: always
-  statusTransitions:
-    onSuccess: approved
-    onFailure: todo
-  inputs:
-    message: string
-  steps:
-    # Step 1: implement (always succeeds)
-    - type: script
-      id: implement
-      name: "Implement Feature"
-      script: |
-        echo [implement] Starting implementation: ${{ inputs.message }} && ping localhost -n 2 >nul && echo [implement] Writing code... && ping localhost -n 3 >nul && echo [implement] Implementation complete!
+    name: 'Test: Feedback Loop (Retry Pattern)'
+    description: 'Tests onFailure.goto with a test step that fails twice then succeeds'
+    workspace:
+        mode: manual
+        gitStrategy: any
+        reusePolicy: always
+    statusTransitions:
+        onSuccess: approved
+        onFailure: todo
+    inputs:
+        message: string
+    steps:
+        # Step 1: implement (always succeeds)
+        - type: script
+          id: implement
+          name: 'Implement Feature'
+          script: |
+              echo [implement] Starting implementation: ${{ inputs.message }} && ping localhost -n 2 >nul && echo [implement] Writing code... && ping localhost -n 3 >nul && echo [implement] Implementation complete!
 
-    # Step 2: test (fails first 2 times, succeeds on 3rd)
-    - type: script
-      id: test
-      name: "Run Tests"
-      depends: [implement]
-      onFailure:
-        goto: implement
-        maxIterations: 3
-      script: |
-        echo [test] Running test suite... && ping localhost -n 2 >nul && if not exist test-iter1.tmp (echo First iteration - FAIL && echo. > test-iter1.tmp && exit /b 1) else if not exist test-iter2.tmp (echo Second iteration - FAIL && echo. > test-iter2.tmp && exit /b 1) else (echo Third iteration - PASS && del test-iter1.tmp test-iter2.tmp 2>nul && exit /b 0)
+        # Step 2: test (fails first 2 times, succeeds on 3rd)
+        - type: script
+          id: test
+          name: 'Run Tests'
+          depends: [implement]
+          onFailure:
+              goto: implement
+              maxIterations: 3
+          script: |
+              echo [test] Running test suite... && ping localhost -n 2 >nul && if not exist test-iter1.tmp (echo First iteration - FAIL && echo. > test-iter1.tmp && exit /b 1) else if not exist test-iter2.tmp (echo Second iteration - FAIL && echo. > test-iter2.tmp && exit /b 1) else (echo Third iteration - PASS && del test-iter1.tmp test-iter2.tmp 2>nul && exit /b 0)
 
-    # Step 3: done (only runs after tests pass)
-    - type: script
-      id: done
-      name: "Complete"
-      depends: [test]
-      script: |
-        echo [done] All steps completed successfully! Flow finished.
+        # Step 3: done (only runs after tests pass)
+        - type: script
+          id: done
+          name: 'Complete'
+          depends: [test]
+          script: |
+              echo [done] All steps completed successfully! Flow finished.
 
 # Test Flow 4: Review Feedback Loop (test-review-loop)
 # Tests onFailure.goto with a review step that provides feedback
 # Flow: implement → review (fails 1st, passes 2nd) → deploy
 test-review-loop:
-  name: "Test: Review Feedback Loop"
-  description: "Tests onFailure.goto with a review step that fails once then approves"
-  workspace:
-    mode: manual
-    gitStrategy: any
-    reusePolicy: always
-  statusTransitions:
-    onSuccess: approved
-    onFailure: changes_requested
-  inputs:
-    feature: string
-  steps:
-    # Step 1: implement
-    - type: script
-      id: implement
-      name: "Implement Feature"
-      script: |
-        echo [implement] Implementing feature: ${{ inputs.feature }} && ping localhost -n 2 >nul && echo [implement] Adding new code... && ping localhost -n 2 >nul && if exist review-feedback.tmp (echo [implement] Applying feedback from review && ping localhost -n 2 >nul && del review-feedback.tmp 2>nul) && echo [implement] Implementation ready for review
+    name: 'Test: Review Feedback Loop'
+    description: 'Tests onFailure.goto with a review step that fails once then approves'
+    workspace:
+        mode: manual
+        gitStrategy: any
+        reusePolicy: always
+    statusTransitions:
+        onSuccess: approved
+        onFailure: changes_requested
+    inputs:
+        feature: string
+    steps:
+        # Step 1: implement
+        - type: script
+          id: implement
+          name: 'Implement Feature'
+          script: |
+              echo [implement] Implementing feature: ${{ inputs.feature }} && ping localhost -n 2 >nul && echo [implement] Adding new code... && ping localhost -n 2 >nul && if exist review-feedback.tmp (echo [implement] Applying feedback from review && ping localhost -n 2 >nul && del review-feedback.tmp 2>nul) && echo [implement] Implementation ready for review
 
-    # Step 2: review (fails first time with feedback, passes second time)
-    - type: script
-      id: review
-      name: "Code Review"
-      depends: [implement]
-      onFailure:
-        goto: implement
-        maxIterations: 2
-      script: |
-        echo [review] Starting code review... && ping localhost -n 2 >nul && if not exist review-iter1.tmp (echo [review] CHANGES REQUESTED: Please add error handling && echo. > review-iter1.tmp && echo. > review-feedback.tmp && exit /b 1) else (echo [review] Code review APPROVED! All issues addressed && del review-iter1.tmp 2>nul && exit /b 0)
+        # Step 2: review (fails first time with feedback, passes second time)
+        - type: script
+          id: review
+          name: 'Code Review'
+          depends: [implement]
+          onFailure:
+              goto: implement
+              maxIterations: 2
+          script: |
+              echo [review] Starting code review... && ping localhost -n 2 >nul && if not exist review-iter1.tmp (echo [review] CHANGES REQUESTED: Please add error handling && echo. > review-iter1.tmp && echo. > review-feedback.tmp && exit /b 1) else (echo [review] Code review APPROVED! All issues addressed && del review-iter1.tmp 2>nul && exit /b 0)
 
-    # Step 3: deploy (only runs after review passes)
-    - type: script
-      id: deploy
-      name: "Deploy to Production"
-      depends: [review]
-      script: |
-        echo [deploy] Deploying approved code to production... && ping localhost -n 3 >nul && echo [deploy] Deployment successful!
+        # Step 3: deploy (only runs after review passes)
+        - type: script
+          id: deploy
+          name: 'Deploy to Production'
+          depends: [review]
+          script: |
+              echo [deploy] Deploying approved code to production... && ping localhost -n 3 >nul && echo [deploy] Deployment successful!
 
 # Test Flow 5: Multi-Review with skipOnLoop and resetOnSuccess
 # Tests advanced loop features: multiple reviews, some skipped on retry
 # Flow: implement → (quality + security + consistency + usability) → deploy
 test-multi-review:
-  name: "Test: Multi-Review with Skip and Reset"
-  description: "Tests skipOnLoop and resetOnSuccess with parallel review steps"
-  workspace:
-    mode: manual
-    gitStrategy: any
-    reusePolicy: always
-  statusTransitions:
-    onSuccess: approved
-    onFailure: changes_requested
-  inputs:
-    feature: string
-  steps:
-    # Step 1: implement
-    - type: script
-      id: implement
-      name: "Implement Feature"
-      script: |
-        echo [implement] Implementing feature: ${{ inputs.feature }} && ping localhost -n 2 >nul && echo [implement] Code complete
+    name: 'Test: Multi-Review with Skip and Reset'
+    description: 'Tests skipOnLoop and resetOnSuccess with parallel review steps'
+    workspace:
+        mode: manual
+        gitStrategy: any
+        reusePolicy: always
+    statusTransitions:
+        onSuccess: approved
+        onFailure: changes_requested
+    inputs:
+        feature: string
+    steps:
+        # Step 1: implement
+        - type: script
+          id: implement
+          name: 'Implement Feature'
+          script: |
+              echo [implement] Implementing feature: ${{ inputs.feature }} && ping localhost -n 2 >nul && echo [implement] Code complete
 
-    # Step 2-5: Multiple reviews run in parallel
-    # Quality review only runs once (skipOnLoop=true)
-    - type: script
-      id: review-quality
-      name: "Code Quality Review"
-      depends: [implement]
-      skipOnLoop: true
-      script: |
-        echo [quality] Checking code quality... && ping localhost -n 2 >nul && echo [quality] Quality standards met!
+        # Step 2-5: Multiple reviews run in parallel
+        # Quality review only runs once (skipOnLoop=true)
+        - type: script
+          id: review-quality
+          name: 'Code Quality Review'
+          depends: [implement]
+          skipOnLoop: true
+          script: |
+              echo [quality] Checking code quality... && ping localhost -n 2 >nul && echo [quality] Quality standards met!
 
-    # Security review can trigger loop, with resetOnSuccess
-    - type: script
-      id: review-security
-      name: "Security Review"
-      depends: [implement]
-      onFailure:
-        goto: implement
-        maxIterations: 2
-        resetOnSuccess: true
-      script: |
-        echo [security] Running security audit... && ping localhost -n 2 >nul && if not exist security-pass.tmp (echo [security] SECURITY ISSUE FOUND - Fix required && echo. > security-pass.tmp && exit /b 1) else (echo [security] Security approved! && del security-pass.tmp 2>nul && exit /b 0)
+        # Security review can trigger loop, with resetOnSuccess
+        - type: script
+          id: review-security
+          name: 'Security Review'
+          depends: [implement]
+          onFailure:
+              goto: implement
+              maxIterations: 2
+              resetOnSuccess: true
+          script: |
+              echo [security] Running security audit... && ping localhost -n 2 >nul && if not exist security-pass.tmp (echo [security] SECURITY ISSUE FOUND - Fix required && echo. > security-pass.tmp && exit /b 1) else (echo [security] Security approved! && del security-pass.tmp 2>nul && exit /b 0)
 
-    # Consistency review only runs once (skipOnLoop=true)
-    - type: script
-      id: review-consistency
-      name: "Code Consistency Review"
-      depends: [implement]
-      skipOnLoop: true
-      script: |
-        echo [consistency] Checking code consistency... && ping localhost -n 2 >nul && echo [consistency] Consistent with project standards!
+        # Consistency review only runs once (skipOnLoop=true)
+        - type: script
+          id: review-consistency
+          name: 'Code Consistency Review'
+          depends: [implement]
+          skipOnLoop: true
+          script: |
+              echo [consistency] Checking code consistency... && ping localhost -n 2 >nul && echo [consistency] Consistent with project standards!
 
-    # Usability review can trigger loop, with resetOnSuccess
-    - type: script
-      id: review-usability
-      name: "Usability Review"
-      depends: [implement]
-      onFailure:
-        goto: implement
-        maxIterations: 2
-        resetOnSuccess: true
-      script: |
-        echo [usability] Reviewing user experience... && ping localhost -n 2 >nul && if not exist usability-pass.tmp (echo [usability] USABILITY ISSUE - Improve UX && echo. > usability-pass.tmp && exit /b 1) else (echo [usability] UX approved! && del usability-pass.tmp 2>nul && exit /b 0)
+        # Usability review can trigger loop, with resetOnSuccess
+        - type: script
+          id: review-usability
+          name: 'Usability Review'
+          depends: [implement]
+          onFailure:
+              goto: implement
+              maxIterations: 2
+              resetOnSuccess: true
+          script: |
+              echo [usability] Reviewing user experience... && ping localhost -n 2 >nul && if not exist usability-pass.tmp (echo [usability] USABILITY ISSUE - Improve UX && echo. > usability-pass.tmp && exit /b 1) else (echo [usability] UX approved! && del usability-pass.tmp 2>nul && exit /b 0)
 
-    # Step 6: deploy (waits for all reviews)
-    - type: script
-      id: deploy
-      name: "Deploy to Production"
-      depends: [review-quality, review-security, review-consistency, review-usability]
-      script: |
-        echo [deploy] All reviews passed! Deploying to production... && ping localhost -n 3 >nul && echo [deploy] Deployment complete!
+        # Step 6: deploy (waits for all reviews)
+        - type: script
+          id: deploy
+          name: 'Deploy to Production'
+          depends: [review-quality, review-security, review-consistency, review-usability]
+          script: |
+              echo [deploy] All reviews passed! Deploying to production... && ping localhost -n 3 >nul && echo [deploy] Deployment complete!
 
 # SubFlowStep Test Flows (Phase 1 MVP)
 # Test basic flow composition with 'inherit' workspace strategy
 
 # Atomic flow: Simple echo
 test-echo:
-  name: "Test: Echo Flow"
-  description: "Simple echo flow used for testing subflow composition"
-  workspace:
-    mode: manual
-    gitStrategy: any
-    reusePolicy: always
-  inputs:
-    message: string
-  steps:
-    - type: script
-      id: echo
-      name: "Echo Message"
-      script: 'echo "${{ inputs.message }}"'
-      output:
-        result: { type: string }
+    name: 'Test: Echo Flow'
+    description: 'Simple echo flow used for testing subflow composition'
+    workspace:
+        mode: manual
+        gitStrategy: any
+        reusePolicy: always
+    inputs:
+        message: string
+    steps:
+        - type: script
+          id: echo
+          name: 'Echo Message'
+          script: 'echo "${{ inputs.message }}"'
+          output:
+              result: { type: string }
 
 # Composite flow: Calls echo twice
 test-subflow-basic:
-  name: "Test: Basic SubFlow"
-  description: "Tests basic subflow execution with inherit strategy"
-  workspace:
-    mode: manual
-    gitStrategy: any
-    reusePolicy: always
-  inputs:
-    greeting: string
-  steps:
-    - type: subflow
-      id: first-echo
-      name: "First Echo"
-      flowId: test-echo
-      inputs:
-        message: "${{ inputs.greeting }}"
-      output:
-        echo1: "${{ steps.echo.outputs.result }}"
+    name: 'Test: Basic SubFlow'
+    description: 'Tests basic subflow execution with inherit strategy'
+    workspace:
+        mode: manual
+        gitStrategy: any
+        reusePolicy: always
+    inputs:
+        greeting: string
+    steps:
+        - type: subflow
+          id: first-echo
+          name: 'First Echo'
+          flowId: test-echo
+          inputs:
+              message: '${{ inputs.greeting }}'
+          output:
+              echo1: '${{ steps.echo.outputs.result }}'
 
-    - type: subflow
-      id: second-echo
-      name: "Second Echo"
-      flowId: test-echo
-      depends: [first-echo]
-      inputs:
-        message: "Reply: ${{ steps.first-echo.outputs.echo1 }}"
+        - type: subflow
+          id: second-echo
+          name: 'Second Echo'
+          flowId: test-echo
+          depends: [first-echo]
+          inputs:
+              message: 'Reply: ${{ steps.first-echo.outputs.echo1 }}'
 
 # Nested subflows: Test recursion depth tracking
 test-subflow-nested:
-  name: "Test: Nested SubFlows"
-  description: "Tests nested subflow execution (3 levels deep)"
-  workspace:
-    mode: manual
-    gitStrategy: any
-    reusePolicy: always
-  inputs:
-    msg: string
-  steps:
-    - type: subflow
-      id: call-basic
-      name: "Call Basic SubFlow"
-      flowId: test-subflow-basic
-      inputs:
-        greeting: "${{ inputs.msg }}"
+    name: 'Test: Nested SubFlows'
+    description: 'Tests nested subflow execution (3 levels deep)'
+    workspace:
+        mode: manual
+        gitStrategy: any
+        reusePolicy: always
+    inputs:
+        msg: string
+    steps:
+        - type: subflow
+          id: call-basic
+          name: 'Call Basic SubFlow'
+          flowId: test-subflow-basic
+          inputs:
+              greeting: '${{ inputs.msg }}'
 
 # Recursive flow: Countdown from N to 0
 test-recursive-countdown:
-  name: "Test: Recursive Countdown"
-  description: "Tests recursive SubFlowStep with exit condition (counts from N to 0)"
-  workspace:
-    mode: manual
-    gitStrategy: any
-    reusePolicy: always
-  inputs:
-    count: string
-  steps:
-    - type: script
-      id: display
-      name: "Display Count"
-      script: 'echo "Count: ${{ inputs.count }}"'
+    name: 'Test: Recursive Countdown'
+    description: 'Tests recursive SubFlowStep with exit condition (counts from N to 0)'
+    workspace:
+        mode: manual
+        gitStrategy: any
+        reusePolicy: always
+    inputs:
+        count: string
+    steps:
+        - type: script
+          id: display
+          name: 'Display Count'
+          script: 'echo "Count: ${{ inputs.count }}"'
 
-    - type: script
-      id: calculate
-      name: "Calculate Next"
-      script: |
-        set /a next=${{ inputs.count }}-1 >nul
-        echo next=%next%
-        if %next% GEQ 0 (echo continue=true) else (echo continue=false)
-      output:
-        next: { type: string, pattern: "next=(.*)" }
-        continue: { type: string, pattern: "continue=(.*)" }
+        - type: script
+          id: calculate
+          name: 'Calculate Next'
+          script: |
+              set /a next=${{ inputs.count }}-1 >nul
+              echo next=%next%
+              if %next% GEQ 0 (echo continue=true) else (echo continue=false)
+          output:
+              next: { type: string, pattern: 'next=(.*)' }
+              continue: { type: string, pattern: 'continue=(.*)' }
 
-    - type: subflow
-      id: recurse
-      name: "Recurse if count > 0"
-      flowId: test-recursive-countdown
-      allowRecursion: true
-      when: "${{ steps.calculate.outputs.continue === 'true' }}"
-      depends: [calculate]
-      inputs:
-        count: "${{ steps.calculate.outputs.next }}"
+        - type: subflow
+          id: recurse
+          name: 'Recurse if count > 0'
+          flowId: test-recursive-countdown
+          allowRecursion: true
+          when: "${{ steps.calculate.outputs.continue === 'true' }}"
+          depends: [calculate]
+          inputs:
+              count: '${{ steps.calculate.outputs.next }}'

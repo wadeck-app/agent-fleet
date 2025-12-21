@@ -9,6 +9,7 @@ Comment gérer les caractères littéraux `$`, `{`, `}` dans les scripts ? Faut-
 **Non, pas besoin d'échappement dans la plupart des cas !**
 
 Notre syntaxe `${{ }}` coexiste naturellement avec:
+
 - Variables shell (`$HOME`, `$PATH`, `${VAR}`)
 - JSON (`{ "key": "value" }`)
 - Autres syntaxes (`{{ mustache }}`, `{ bash }`)
@@ -38,7 +39,7 @@ script: awk '{ print $1 }'            # ✓ OK
 
 ```yaml
 # Syntaxes comme Mustache préservées
-script: echo "{{ variable }}"         # ✓ OK (pas de $)
+script: echo "{{ variable }}" # ✓ OK (pas de $)
 ```
 
 #### 4. Mélange de flow et shell variables
@@ -53,11 +54,13 @@ script: USER=${{ inputs.name }} HOME=$HOME ./script.sh        # ✓ OK
 ### ⚠️ Seul pattern interpolé: `${{ expression }}`
 
 Le pattern exact qui déclenche l'interpolation:
+
 ```
 ${{ expression }}
 ```
 
 Avec:
+
 - `$` - dollar
 - `{{` - deux accolades ouvrantes
 - espace optionnel
@@ -71,20 +74,21 @@ Avec:
 
 ```yaml
 script: |
-  #!/bin/bash
-  # Flow variable
-  USER=${{ inputs.username }}
+    #!/bin/bash
+    # Flow variable
+    USER=${{ inputs.username }}
 
-  # Shell variables
-  HOME_DIR=$HOME
-  CONFIG=${HOME}/.config
+    # Shell variables
+    HOME_DIR=$HOME
+    CONFIG=${HOME}/.config
 
-  # Mélange
-  echo "User $USER at $HOME_DIR"
-  mkdir -p ${CONFIG}/${{ inputs.appName }}
+    # Mélange
+    echo "User $USER at $HOME_DIR"
+    mkdir -p ${CONFIG}/${{ inputs.appName }}
 ```
 
 **Résultat après interpolation:**
+
 ```bash
 #!/bin/bash
 # Flow variable
@@ -103,21 +107,22 @@ mkdir -p ${CONFIG}/myapp
 
 ```yaml
 script: |
-  cat > config.json << EOF
-  {
-    "user": "${{ inputs.name }}",
-    "count": ${{ inputs.value }},
-    "home": "$HOME"
-  }
-  EOF
+    cat > config.json << EOF
+    {
+      "user": "${{ inputs.name }}",
+      "count": ${{ inputs.value }},
+      "home": "$HOME"
+    }
+    EOF
 ```
 
 **Résultat:**
+
 ```json
 {
-  "user": "alice",
-  "count": 42,
-  "home": "$HOME"
+	"user": "alice",
+	"count": 42,
+	"home": "$HOME"
 }
 ```
 
@@ -125,11 +130,11 @@ script: |
 
 ```yaml
 script: |
-  awk '{
-    if ($1 == "${{ inputs.field }}") {
-      print $2
-    }
-  }' ${{ inputs.inputFile }}
+    awk '{
+      if ($1 == "${{ inputs.field }}") {
+        print $2
+      }
+    }' ${{ inputs.inputFile }}
 ```
 
 ## Comment Afficher `${{` Littéralement ?
@@ -147,8 +152,9 @@ script: echo "Usage: $ {{ inputs.var }}"
 
 ```yaml
 script: |
-  DOLLAR='$'
-  echo "${DOLLAR}{{ inputs.var }}"
+    DOLLAR='$'
+    echo "${DOLLAR}{{ inputs.var }}"
+
 # Output: "${{ inputs.var }}"
 ```
 
@@ -227,6 +233,7 @@ Si besoin d'échappement avec `\`, ce serait une future amélioration.
 **Si ça n'a pas exactement la forme `${{ expression }}`, ça ne sera pas interpolé.**
 
 Exemples:
+
 - `$HOME` → ✓ préservé (manque `{{`)
 - `${VAR}` → ✓ préservé (manque deuxième `{`)
 - `{{ x }}` → ✓ préservé (manque `$`)
@@ -265,13 +272,13 @@ script: echo "\\${{ inputs.var }}"
 
 ## Résumé
 
-| Pattern | Comportement | Exemple |
-|---------|-------------|---------|
-| `${{` ... `}}` | ✗ Interpolé | `${{ inputs.x }}` → `value` |
-| `$VAR` | ✓ Préservé | `$HOME` → `$HOME` |
-| `${VAR}` | ✓ Préservé | `${HOME}` → `${HOME}` |
-| `{ }` | ✓ Préservé | `{ "a": 1 }` → `{ "a": 1 }` |
-| `{{ }}` | ✓ Préservé | `{{ x }}` → `{{ x }}` |
-| `$ {{ }}` | ✓ Préservé | `$ {{ x }}` → `$ {{ x }}` |
+| Pattern        | Comportement | Exemple                     |
+| -------------- | ------------ | --------------------------- |
+| `${{` ... `}}` | ✗ Interpolé  | `${{ inputs.x }}` → `value` |
+| `$VAR`         | ✓ Préservé   | `$HOME` → `$HOME`           |
+| `${VAR}`       | ✓ Préservé   | `${HOME}` → `${HOME}`       |
+| `{ }`          | ✓ Préservé   | `{ "a": 1 }` → `{ "a": 1 }` |
+| `{{ }}`        | ✓ Préservé   | `{{ x }}` → `{{ x }}`       |
+| `$ {{ }}`      | ✓ Préservé   | `$ {{ x }}` → `$ {{ x }}`   |
 
 **Conclusion**: La syntaxe `${{ }}` est suffisamment distinctive pour coexister naturellement avec les syntaxes shell, JSON, et autres. Pas besoin d'échappement dans 99% des cas !

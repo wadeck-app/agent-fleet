@@ -1,0 +1,332 @@
+// CRITICAL: Load environment variables BEFORE any other imports
+// This ensures env vars are available when other modules initialize
+import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
+import sensible from '@fastify/sensible';
+import fastifyStatic from '@fastify/static';
+import dotenv from 'dotenv';
+// ======================================================================================
+// Now import everything else
+import Fastify from 'fastify';
+import * as os from 'os';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+import { DataStoreFactory } from './factories';
+import apiStatsHook from './fastify/hooks/apiStats.hook';
+import errorHandlerHook from './fastify/hooks/errorHandler.hook';
+import latencySimulatorHook from './fastify/hooks/latencySimulator.hook';
+import requestLoggerHook from './fastify/hooks/requestLogger.hook';
+import responseHelpersPlugin from './fastify/plugins/responseHelpers.plugin';
+import routesPlugin from './fastify/plugins/routes.plugin';
+import { initializeFactory } from './utils/factory-instance';
+import { logger } from './utils/logger';
+
+// Get __dirname equivalent in ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Always load from backend/.env
+const envPath = path.join(__dirname, '../.env');
+dotenv.config({ path: envPath });
+
+// SAFETY: Force in-memory mode when running E2E tests
+// This prevents any accidental writes to production database during testing
+if (process.env.E2E_MODE === 'true') {
+	process.env.USE_PRODUCTION_DB = 'false';
+}
+
+/**
+ * ===========================================================================================
+ * BACKEND SERVER - LAYERED ARCHITECTURE
+ * ===========================================================================================
+ *
+ * Architecture:
+ * - Controllers (HTTP layer) → Services (business logic) → Repositories (data access) → Storage
+ *
+ * Benefits:
+ * ✅ Separation of concerns (controller / service / repository / storage)
+ * ✅ Dependency injection via DataStoreFactory
+ * ✅ Perfect type safety with Zod contracts
+ * ✅ Lazy controller loading (created only on first request)
+ * ✅ Query builder for complex queries (in-memory for tests, SQL for prod)
+ * ✅ Easy to test (mock services, mock storage)
+ *
+ * ===========================================================================================
+ */
+
+// ===========================================================================================
+// CREATE FASTIFY SERVER
+// ===========================================================================================
+
+// const fastify = Fastify({
+// 	logger: {
+// 		level: 'info',
+// 		transport: {
+// 			target: 'pino-pretty',
+// 			options: {
+// 				translateTime: 'HH:MM:ss Z',
+// 				ignore: 'pid,hostname',
+// 			},
+// 		},
+// 	},
+// });
+const fastify = Fastify({
+	logger: false,
+});
+
+// Calculate ports from PROJECT_ID for parallel development between projects
+// PROJECT_ID=0 → Frontend:5000, Backend:3000 | WORKSPACE_ID=1 → Frontend:5010, Backend:3010
+const projectId = parseInt(process.env.PROJECT_ID || '0', 10);
+// Calculate PORT from WORKSPACE_ID for parallel development
+// WORKSPACE_ID=0 → 3000, WORKSPACE_ID=1 → 3100, WORKSPACE_ID=2 → 3200, etc.
+const workspaceId = parseInt(process.env.WORKSPACE_ID || '0', 10);
+const calculatedPort = 3000 + projectId * 10 + workspaceId * 100;
+const PORT = parseInt(process.env.PORT || calculatedPort.toString(), 10);
+
+// Helper function to get network addresses
+function getNetworkAddresses(): string[] {
+	const interfaces = os.networkInterfaces();
+	const addresses: string[] = [];
+
+	for (const name of Object.keys(interfaces)) {
+		const nets = interfaces[name];
+		if (!nets) continue;
+
+		for (const net of nets) {
+			// Skip internal and non-IPv4 addresses
+			if (net.family === 'IPv4' && !net.internal) {
+				// Filter to show only 192.168.x.x addresses
+				if (net.address.startsWith('192.168.')) {
+					addresses.push(net.address);
+				}
+			}
+		}
+	}
+
+	return addresses;
+}
+
+// ===========================================================================================
+// REGISTER CONTROLLERS WITH DEPENDENCY INJECTION
+// ===========================================================================================
+
+// // Register Ingredients controller with injected service
+// fastify.register(
+// 	registerControllerWithCheck('/api/ingredients', async () => {
+// 		const {default: IngredientsController} = await import('./controllers/IngredientsController');
+// 		const service = factory.getIngredientsService();
+// 		return new IngredientsController(service);
+// 	})
+// );
+//
+// // Register Books controller with injected service
+// fastify.register(
+// 	registerControllerWithCheck('/api/books', async () => {
+// 		const {default: BooksController} = await import('./controllers/BooksController');
+// 		const service = factory.getBooksService();
+// 		return new BooksController(service);
+// 	})
+// );
+
+// // Health check route
+// fastify.get('/health', async () => ({
+// 	status: 'ok',
+// 	architecture: 'layered (controller → service → repository → storage)',
+// 	storage: 'in-memory',
+// 	timestamp: new Date().toISOString(),
+// }));
+
+// ===========================================================================================
+// START SERVER
+// ===========================================================================================
+
+// Initialize services and start server
+async function start() {
+	try {
+		// Register plugins
+		// Configure Helmet security headers based on environment
+		// SECURE BY DEFAULT: All security headers enabled unless DEPLOY_ENV=local
+		// DEPLOY_ENV=local disables security for HTTP local testing
+		// NODE_ENV=production enables static file serving
+		const isLocalTesting = process.env.DEPLOY_ENV === 'local';
+		const isDevelopment = process.env.NODE_ENV === 'development';
+
+		await fastify.register(helmet, {
+			// Content Security Policy (disabled only in dev or local testing)
+			contentSecurityPolicy:
+				isDevelopment || isLocalTesting
+					? false
+					: {
+							directives: {
+								defaultSrc: ["'self'"],
+								styleSrc: ["'self'", "'unsafe-inline'"],
+								scriptSrc: ["'self'"],
+								imgSrc: ["'self'", 'data:', 'https:'],
+								connectSrc: ["'self'"],
+								fontSrc: ["'self'", 'data:'],
+								objectSrc: ["'none'"],
+								mediaSrc: ["'self'"],
+								frameSrc: ["'none'"],
+							},
+						},
+
+			// Cross-Origin policies (disabled only in dev or local testing)
+			crossOriginOpenerPolicy: isDevelopment || isLocalTesting ? false : { policy: 'same-origin' },
+			crossOriginResourcePolicy: isDevelopment || isLocalTesting ? false : { policy: 'same-origin' },
+			crossOriginEmbedderPolicy: isDevelopment || isLocalTesting ? false : { policy: 'require-corp' },
+
+			// HSTS (disabled only in dev or local testing)
+			hsts:
+				isDevelopment || isLocalTesting
+					? false
+					: {
+							maxAge: 31536000,
+							includeSubDomains: true,
+							preload: true,
+						},
+		});
+
+		// Register timing/logging hooks BEFORE middleware that might short-circuit (like CORS)
+		// This ensures accurate timing for all requests, including OPTIONS
+		await fastify.register(requestLoggerHook);
+		await fastify.register(apiStatsHook);
+		if (process.env.NODE_ENV === 'development') {
+			const isE2EMode = process.env.E2E_MODE === 'true';
+			// Use environment variables for latency simulation, with sensible defaults
+			const minDelay = isE2EMode ? 10 : parseInt(process.env.LATENCY_MIN || '150', 10);
+			const maxDelay = isE2EMode ? 50 : parseInt(process.env.LATENCY_MAX || '600', 10);
+			await fastify.register(latencySimulatorHook, { minDelay, maxDelay });
+			if (!isE2EMode) {
+				logger.info(`Latency simulator enabled: ${minDelay}-${maxDelay}ms random delay`);
+			}
+		}
+
+		// CORS configuration
+		// In development, accept all origins to allow access from mobile devices
+		// In production, restrict to specific origin from environment variable
+		await fastify.register(cors, {
+			origin: process.env.NODE_ENV === 'production' ? process.env.CORS_ORIGIN || 'http://localhost:5173' : true,
+			credentials: true,
+			methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+		});
+
+		await fastify.register(sensible);
+		await fastify.register(responseHelpersPlugin);
+
+		// Register error handler hook (after all other hooks)
+		await fastify.register(errorHandlerHook);
+
+		// Register routes
+		// await fastify.register(routesPlugin, {prefix: '/api'});
+		// /api/xxx is used in the url to ease the typing
+		await fastify.register(routesPlugin);
+
+		// Serve static files in production only
+		if (process.env.NODE_ENV === 'production') {
+			await fastify.register(fastifyStatic, {
+				root: path.join(__dirname, '../public'),
+				prefix: '/',
+			});
+
+			// SPA fallback: all non-API routes → index.html
+			// This ensures React Router handles client-side routing
+			fastify.setNotFoundHandler((request, reply) => {
+				// If request is for API route, return 404 JSON
+				if (request.url.startsWith('/api')) {
+					return reply.code(404).send({ error: 'API endpoint not found' });
+				}
+				// Otherwise, serve index.html for React Router
+				return reply.sendFile('index.html');
+			});
+		}
+
+		// Health check handler (reused for both endpoints)
+		const healthCheckHandler = async (request: any, reply: any) => {
+			// Check critical dependencies
+			const checks = {
+				server: 'ok',
+				// TODO: Add database check when integrated
+				// database: await checkDatabaseConnection() ? 'ok' : 'error'
+			};
+
+			const allOk = Object.values(checks).every(status => status === 'ok');
+
+			return reply.code(allOk ? 200 : 503).send({
+				status: allOk ? 'ok' : 'degraded',
+				timestamp: new Date().toISOString(),
+				uptime: process.uptime(),
+				checks,
+			});
+		};
+
+		// Health check endpoints (used by frontend circuit breaker)
+		// /health - for direct backend access (dev, docker, etc.)
+		// /api/health - for production when only /api is exposed
+		fastify.get('/health', healthCheckHandler);
+		fastify.get('/api/health', healthCheckHandler);
+
+		// Initialize global factory for dependency injection
+		// This must be done BEFORE any controllers are loaded
+		if (process.env.USE_PRODUCTION_DB === 'true') {
+			//TODO database integration
+			// 'memory' for tests, 'mariadb' for prod
+			const factory = initializeFactory('memory');
+
+			// Seed initial data (for development)
+			await factory.seedData();
+		} else if (process.env.E2E_MODE !== 'true') {
+			logger.info('Skipping Google Sheets and Gemini AI initialization (in-memory mode)');
+
+			// 'memory' for tests, 'mariadb' for prod
+			const factory = initializeFactory('memory');
+
+			// Seed initial data (for development)
+			await factory.seedData();
+		} else {
+			// E2E mode also needs a factory for controllers
+			initializeFactory('memory');
+		}
+
+		// Start server
+		// Listen on 0.0.0.0 to allow connections from other devices on the network
+		await fastify.listen({ port: PORT, host: '0.0.0.0' });
+
+		// In E2E mode, emit a minimal success message for global-setup to detect
+		// This allows the test setup to know when the backend is ready without doing fetchs
+		if (process.env.E2E_MODE === 'true') {
+			const readyMessage = `E2E_BACKEND_READY port=${PORT} pid=${process.pid} runId=${process.env.RUN_ID || 'unknown'}`;
+			console.log(readyMessage);
+			// Force flush stdout to ensure message is immediately sent (important on Windows)
+			if (process.stdout.write) {
+				process.stdout.write('');
+			}
+		} else {
+			// Normal startup logs for development mode
+			logger.info(`Server running in ${process.env.NODE_ENV || 'development'} mode`);
+			logger.info(`  >  Local:   http://localhost:${PORT}/`);
+
+			const networkAddresses = getNetworkAddresses();
+			networkAddresses.forEach(address => {
+				logger.info(`  >  Network: http://${address}:${PORT}/`);
+			});
+		}
+	} catch (err) {
+		// Always log startup errors, even in E2E mode (critical for debugging)
+		console.error('❌ FATAL: Failed to start backend server:', err);
+		logger.error('Failed to start server', err);
+		process.exit(1);
+	}
+}
+
+// Graceful shutdown
+const signals = ['SIGTERM', 'SIGINT'] as const;
+signals.forEach(signal => {
+	process.on(signal, async () => {
+		logger.info(`${signal} signal received: closing HTTP server`);
+		await fastify.close();
+		process.exit(0);
+	});
+});
+
+start();

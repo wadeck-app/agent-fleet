@@ -106,11 +106,13 @@ If not installed, follow the [Claude Code installation guide](https://github.com
 ### Port already in use
 
 If ports 3737 or 3738 are already in use, you can change them by editing:
+
 - `src/orchestrator/index.ts` (REST_PORT and WS_PORT constants)
 
 ### Worker disconnects immediately
 
 Check the worker logs for errors. Common causes:
+
 - WebSocket connection refused (orchestrator not running)
 - Claude process crashes
 

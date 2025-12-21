@@ -19,16 +19,16 @@ Documentation:  ✅ 2600+ lignes
 
 ## ✅ Fichiers Migrés
 
-| Fichier | Tests | Résultat |
-|---------|-------|----------|
-| **GraphValidator.test.ts** | 20 | ✅ 20/20 (100%) |
-| **TemplateValidator.test.ts** | 10 | ✅ 10/10 (100%) |
-| **SemanticValidator.test.ts** | 18 | ✅ 18/18 (100%) |
-| **Storage.test.ts** | 33 | ✅ 33/33 (100%) |
-| **MetricsCollector.test.ts** | 23 | ✅ 22/23 (95.7%) |
-| **OutputExtractor.test.ts** | 21 | ✅ 21/21 (100%) |
-| **FlowWorker.test.ts** | ~35 | ✅ Partiel |
-| **TOTAL** | **~160** | ✅ **124/125 (99.2%)** |
+| Fichier                       | Tests    | Résultat               |
+| ----------------------------- | -------- | ---------------------- |
+| **GraphValidator.test.ts**    | 20       | ✅ 20/20 (100%)        |
+| **TemplateValidator.test.ts** | 10       | ✅ 10/10 (100%)        |
+| **SemanticValidator.test.ts** | 18       | ✅ 18/18 (100%)        |
+| **Storage.test.ts**           | 33       | ✅ 33/33 (100%)        |
+| **MetricsCollector.test.ts**  | 23       | ✅ 22/23 (95.7%)       |
+| **OutputExtractor.test.ts**   | 21       | ✅ 21/21 (100%)        |
+| **FlowWorker.test.ts**        | ~35      | ✅ Partiel             |
+| **TOTAL**                     | **~160** | ✅ **124/125 (99.2%)** |
 
 ---
 
@@ -46,28 +46,23 @@ Documentation:  ✅ 2600+ lignes
 ## 💡 Utilisation
 
 ```typescript
-import {
-  createMockTask,
-  createMockFlow,
-  MockIssueCollector,
-  setupTimers,
-} from '../test-utils';
+import { MockIssueCollector, createMockFlow, createMockTask, setupTimers } from '../test-utils';
 
 describe('MyTest', () => {
-  let cleanupTimers: () => void;
+	let cleanupTimers: () => void;
 
-  beforeEach(() => {
-    cleanupTimers = setupTimers();
-  });
+	beforeEach(() => {
+		cleanupTimers = setupTimers();
+	});
 
-  afterEach(() => {
-    cleanupTimers();
-  });
+	afterEach(() => {
+		cleanupTimers();
+	});
 
-  it('works', () => {
-    const task = createMockTask({ priority: 'high' });
-    expect(task.priority).toBe('high');
-  });
+	it('works', () => {
+		const task = createMockTask({ priority: 'high' });
+		expect(task.priority).toBe('high');
+	});
 });
 ```
 
@@ -94,4 +89,4 @@ describe('MyTest', () => {
 **Status**: ✅ PRÊT POUR PRODUCTION
 **Recommandation**: Adoption immédiate
 
-*Dernière mise à jour: 2025-12-15*
+_Dernière mise à jour: 2025-12-15_

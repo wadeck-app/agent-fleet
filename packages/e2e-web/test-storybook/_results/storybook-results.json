@@ -1,0 +1,138 @@
+{
+  "config": {
+    "configFile": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\playwright.config.storybook.ts",
+    "rootDir": "C:/Workspace_Tooling/agent-fleet/packages/e2e-web/test-storybook",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\playwright-hooks\\global-teardown-storybook.ts",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "html",
+        {
+          "outputFolder": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-storybook\\_results\\storybook-html",
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "C:\\Workspace_Tooling\\agent-fleet\\packages\\e2e-web\\test-storybook\\_results\\storybook-results.json"
+        }
+      ],
+      [
+        "list",
+        null
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "C:/Workspace_Tooling/agent-fleet/packages/e2e-web/test-storybook/_results/_misc",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "functional-desktop",
+        "name": "functional-desktop",
+        "testDir": "C:/Workspace_Tooling/agent-fleet/packages/e2e-web/test-storybook",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.storybook.spec.ts"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.57.0",
+    "workers": 5,
+    "webServer": {
+      "command": "node C:\\Workspace_Tooling\\agent-fleet/packages/e2e-web/scripts/start-storybook-with-retry.js",
+      "wait": {
+        "stdout": {}
+      },
+      "timeout": 120000,
+      "reuseExistingServer": false,
+      "stdout": "pipe",
+      "stderr": "pipe"
+    }
+  },
+  "suites": [
+    {
+      "title": "storybook-health.storybook.spec.ts",
+      "file": "storybook-health.storybook.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Storybook Infrastructure",
+          "file": "storybook-health.storybook.spec.ts",
+          "line": 9,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should load Storybook homepage",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "functional-desktop",
+                  "projectName": "functional-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 528,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-21T16:44:27.568Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1d73e0b7f75385be15c8-f498c7a600d1a5a3a072",
+              "file": "storybook-health.storybook.spec.ts",
+              "line": 10,
+              "column": 6
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2025-12-21T16:44:21.362Z",
+    "duration": 7342.2,
+    "expected": 1,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

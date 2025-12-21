@@ -5,6 +5,7 @@
 Documentation complète pour l'architecture de l'interface web de l'orchestrateur Agent Fleet.
 
 **Pattern choisi**: Architecture inversée (Option B)
+
 - L'orchestrateur se connecte à l'interface web (mode client)
 - L'interface web agit comme serveur WebSocket
 - Sécurité renforcée: l'orchestrateur contrôle quand/où se connecter
@@ -12,9 +13,11 @@ Documentation complète pour l'architecture de l'interface web de l'orchestrateu
 ## Documents
 
 ### 1. [Architecture Overview](./web-ui-architecture-overview.md)
+
 Vue d'ensemble de l'architecture, composants, patterns de communication.
 
 **Contenu**:
+
 - Principe de l'architecture inversée
 - Composants (Orchestrator Core, Web UI)
 - Support multi-UI
@@ -22,9 +25,11 @@ Vue d'ensemble de l'architecture, composants, patterns de communication.
 - Sécurité
 
 ### 2. [Scenario 1: Remote UI](./scenario-1-remote-ui.md)
+
 Interface web hébergée sur cloud, orchestrateur sur desktop.
 
 **Contenu**:
+
 - Schéma d'architecture
 - Flow de connexion
 - Configuration cloud
@@ -32,9 +37,11 @@ Interface web hébergée sur cloud, orchestrateur sur desktop.
 - Deployment checklist
 
 ### 3. [Scenario 2: Local Dev](./scenario-2-local-dev.md)
+
 Tout en local pour le développement.
 
 **Contenu**:
+
 - Schéma d'architecture
 - Workflow de développement
 - Scripts helper
@@ -42,9 +49,11 @@ Tout en local pour le développement.
 - Troubleshooting
 
 ### 4. [Scenario 3: Embedded Mode](./scenario-3-embedded.md)
+
 Orchestrateur lance l'UI comme process enfant.
 
 **Contenu**:
+
 - Schéma d'architecture
 - Lifecycle management
 - Implementation details
@@ -52,9 +61,11 @@ Orchestrateur lance l'UI comme process enfant.
 - Packaging options
 
 ### 5. [Data Flow & Security](./data-flow-security.md)
+
 Flux de données et considérations de sécurité.
 
 **Contenu**:
+
 - Message flows (state updates, commands)
 - Layers de sécurité (auth, signing, whitelist)
 - Configuration par scénario
@@ -73,6 +84,7 @@ Workers ──────► Orchestrator ──────► Web UI(s)
 ### Message Types
 
 **Orchestrator → UI** (push):
+
 - `worker.connected`
 - `worker.disconnected`
 - `flow.progress`
@@ -81,6 +93,7 @@ Workers ──────► Orchestrator ──────► Web UI(s)
 - `metrics`
 
 **UI → Orchestrator** (commands):
+
 - `start_flow`
 - `stop_flow`
 - `retry_flow`
@@ -97,29 +110,34 @@ Workers ──────► Orchestrator ──────► Web UI(s)
 ## Implementation Roadmap
 
 ### Phase 1: Core Infrastructure
+
 - [ ] UIConnectionManager (WebSocket client)
 - [ ] Message protocol definition
 - [ ] Basic authentication
 - [ ] State synchronization
 
 ### Phase 2: Web UI Application
+
 - [ ] Backend server (Express + WebSocket)
 - [ ] Frontend framework setup
 - [ ] Dashboard components
 - [ ] Real-time updates
 
 ### Phase 3: Security Hardening
+
 - [ ] Command signing
 - [ ] Rate limiting
 - [ ] Audit logging
 - [ ] Browser authentication
 
 ### Phase 4: Scenario Support
+
 - [ ] Scenario 2: Local dev mode
 - [ ] Scenario 1: Remote deployment
 - [ ] Scenario 3: Embedded mode
 
 ### Phase 5: Advanced Features
+
 - [ ] Multi-UI support
 - [ ] Flow visualization
 - [ ] Metrics dashboard

@@ -1,3 +1,3 @@
 export interface Shutdownable {
-	shutdown():void
+	shutdown(): void;
 }
