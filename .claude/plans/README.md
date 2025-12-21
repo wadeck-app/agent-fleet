@@ -12,7 +12,7 @@ Documentation complète pour l'architecture de l'interface web de l'orchestrateu
 
 ## Documents
 
-### 1. [Architecture Overview](./web-ui-architecture-overview.md)
+### 1. [Architecture Overview](web-ui-architecture-overview.md)
 
 Vue d'ensemble de l'architecture, composants, patterns de communication.
 
@@ -24,7 +24,7 @@ Vue d'ensemble de l'architecture, composants, patterns de communication.
 - Configuration
 - Sécurité
 
-### 2. [Scenario 1: Remote UI](./scenario-1-remote-ui.md)
+### 2. [Scenario 1: Remote UI](scenario-1-remote-ui.md)
 
 Interface web hébergée sur cloud, orchestrateur sur desktop.
 
@@ -36,7 +36,7 @@ Interface web hébergée sur cloud, orchestrateur sur desktop.
 - Sécurité (TLS, authentication)
 - Deployment checklist
 
-### 3. [Scenario 2: Local Dev](./scenario-2-local-dev.md)
+### 3. [Scenario 2: Local Dev](scenario-2-local-dev.md)
 
 Tout en local pour le développement.
 
@@ -48,7 +48,7 @@ Tout en local pour le développement.
 - Hot reload support
 - Troubleshooting
 
-### 4. [Scenario 3: Embedded Mode](./scenario-3-embedded.md)
+### 4. [Scenario 3: Embedded Mode](scenario-3-embedded.md)
 
 Orchestrateur lance l'UI comme process enfant.
 

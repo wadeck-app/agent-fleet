@@ -119,7 +119,7 @@ L'orchestrateur peut se connecter simultanément à plusieurs UIs:
 
 ## Related Documents
 
-- [Scenario 1: Remote UI](./scenario-1-remote-ui.md)
-- [Scenario 2: Local Dev](./scenario-2-local-dev.md)
-- [Scenario 3: Embedded Mode](./scenario-3-embedded.md)
+- [Scenario 1: Remote UI](scenario-1-remote-ui.md)
+- [Scenario 2: Local Dev](scenario-2-local-dev.md)
+- [Scenario 3: Embedded Mode](scenario-3-embedded.md)
 - [Data Flow & Security](./data-flow-security.md)
