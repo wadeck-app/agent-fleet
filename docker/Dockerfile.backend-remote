@@ -1,0 +1,99 @@
+# ===========================================================================================
+# BACKEND - REMOTE MODE DOCKERFILE
+# ===========================================================================================
+#
+# Builds backend for remote mode (connects to external orchestrator-server).
+# Orchestrator is NOT bundled, runs as a separate service.
+#
+# Usage:
+#   docker build -f docker/Dockerfile.backend-remote -t backend-remote .
+#   docker run -p 3000:3000 -e ORCHESTRATOR_MODE=remote -e ORCHESTRATOR_URL=http://orchestrator-server:3737 backend-remote
+#
+# ===========================================================================================
+
+FROM node:18-alpine AS base
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# ===========================================================================================
+# DEPENDENCIES STAGE
+# ===========================================================================================
+
+FROM base AS dependencies
+
+WORKDIR /app
+
+# Copy workspace files
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY packages/shared-common/package.json ./packages/shared-common/
+COPY packages/shared-frontend-backend/package.json ./packages/shared-frontend-backend/
+COPY packages/shared-orch-backend/package.json ./packages/shared-orch-backend/
+COPY packages/orchestrator-adapters/package.json ./packages/orchestrator-adapters/
+COPY packages/web-backend/package.json ./packages/web-backend/
+
+# Install all dependencies
+RUN pnpm install --frozen-lockfile
+
+# ===========================================================================================
+# BUILD STAGE
+# ===========================================================================================
+
+FROM base AS builder
+
+WORKDIR /app
+
+# Copy dependencies from previous stage
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY --from=dependencies /app/packages ./packages
+
+# Copy source code (NO orchestrator package in remote mode)
+COPY packages/shared-common ./packages/shared-common
+COPY packages/shared-frontend-backend ./packages/shared-frontend-backend
+COPY packages/shared-orch-backend ./packages/shared-orch-backend
+COPY packages/orchestrator-adapters ./packages/orchestrator-adapters
+COPY packages/web-backend ./packages/web-backend
+COPY package.json pnpm-workspace.yaml ./
+
+# Build all packages
+RUN pnpm --filter shared-common build
+RUN pnpm --filter shared-frontend-backend build
+RUN pnpm --filter shared-orch-backend build
+RUN pnpm --filter orchestrator-adapters build:remote
+RUN pnpm --filter web-backend build
+
+# ===========================================================================================
+# PRODUCTION STAGE
+# ===========================================================================================
+
+FROM base AS production
+
+WORKDIR /app
+
+# Copy workspace configuration
+COPY package.json pnpm-workspace.yaml ./
+
+# Copy built packages (NO orchestrator package)
+COPY --from=builder /app/packages/shared-common/dist ./packages/shared-common/dist
+COPY --from=builder /app/packages/shared-common/package.json ./packages/shared-common/
+COPY --from=builder /app/packages/shared-frontend-backend/dist ./packages/shared-frontend-backend/dist
+COPY --from=builder /app/packages/shared-frontend-backend/package.json ./packages/shared-frontend-backend/
+COPY --from=builder /app/packages/shared-orch-backend/dist ./packages/shared-orch-backend/dist
+COPY --from=builder /app/packages/shared-orch-backend/package.json ./packages/shared-orch-backend/
+COPY --from=builder /app/packages/orchestrator-adapters/dist ./packages/orchestrator-adapters/dist
+COPY --from=builder /app/packages/orchestrator-adapters/package.json ./packages/orchestrator-adapters/
+COPY --from=builder /app/packages/web-backend/dist ./packages/web-backend/dist
+COPY --from=builder /app/packages/web-backend/package.json ./packages/web-backend/
+
+# Install production dependencies only
+RUN pnpm install --prod --frozen-lockfile
+
+# Expose backend port
+EXPOSE 3000
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV ORCHESTRATOR_MODE=remote
+
+# Start backend
+CMD ["node", "packages/web-backend/dist/server.js"]
