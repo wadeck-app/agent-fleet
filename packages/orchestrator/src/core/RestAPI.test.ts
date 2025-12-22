@@ -12,6 +12,8 @@ import request from 'supertest';
 import { createMockTask as createMockTaskUtil, setupTest } from 'test-utils/index';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { UIClientHook } from '../ui-client/UIClientHook.js';
+import { UIWebSocketServer } from '../websocket/UIWebSocketServer.js';
 import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer.js';
 import { RestAPI } from './RestAPI.js';
 import { TaskManager } from './TaskManager.js';
@@ -19,6 +21,16 @@ import { TaskManager } from './TaskManager.js';
 // Mock all dependencies
 vi.mock('./TaskManager.js');
 vi.mock('../websocket/WorkerWebSocketServer.js');
+vi.mock('../websocket/UIWebSocketServer.js', () => ({
+	UIWebSocketServer: vi.fn(function (this: any) {
+		this.start = vi.fn();
+		this.stop = vi.fn();
+		this.handleConnection = vi.fn();
+		this.getClientCount = vi.fn().mockReturnValue(0);
+		this.isRunning = vi.fn().mockReturnValue(false);
+	}),
+}));
+vi.mock('../ui-client/UIClientHook.js');
 vi.mock('flow-engine/workspace/WorkspaceManager.js');
 vi.mock('shared-common/StateManager.js');
 vi.mock('shared-common/Logger.js');
@@ -138,16 +150,19 @@ describe('RestAPI', () => {
 			const response = await request(app).get('/stats');
 
 			expect(response.status).toBe(200);
-			expect(response.body).toEqual({
-				restPort: 3737,
-				wsPort: 3738,
-				workers: 0,
-				workersList: [],
-				tasks: {
-					total: 0,
-					byStatus: {},
-				},
-			});
+			expect(response.body).toEqual(
+				expect.objectContaining({
+					restPort: 3737,
+					wsPort: 3738,
+					workers: 0,
+					workersList: [],
+					tasks: {
+						total: 0,
+						byStatus: {},
+					},
+				})
+			);
+			expect(response.body.uptime).toBeGreaterThanOrEqual(0);
 		});
 
 		it('should return statistics with workers and tasks', async () => {
@@ -178,19 +193,22 @@ describe('RestAPI', () => {
 			const response = await request(app).get('/stats');
 
 			expect(response.status).toBe(200);
-			expect(response.body).toEqual({
-				restPort: 3737,
-				wsPort: 3738,
-				workers: 2,
-				workersList: mockWorkers,
-				tasks: {
-					total: 5,
-					byStatus: {
-						[TaskStatus.BACKLOG]: 2,
-						[TaskStatus.IN_PROGRESS]: 3,
+			expect(response.body).toEqual(
+				expect.objectContaining({
+					restPort: 3737,
+					wsPort: 3738,
+					workers: 2,
+					workersList: mockWorkers,
+					tasks: {
+						total: 5,
+						byStatus: {
+							[TaskStatus.BACKLOG]: 2,
+							[TaskStatus.IN_PROGRESS]: 3,
+						},
 					},
-				},
-			});
+				})
+			);
+			expect(response.body.uptime).toBeGreaterThanOrEqual(0);
 		});
 	});
 
@@ -1066,6 +1084,75 @@ describe('RestAPI', () => {
 
 			expect(response.status).toBe(200);
 			expect(response.body.id).toBe(taskId);
+		});
+	});
+
+	describe('UIClientHook Integration', () => {
+		it('should initialize UIWebSocketServer when UIClientHook is provided', () => {
+			const mockUIClientHook = {
+				enable: vi.fn(),
+				disable: vi.fn(),
+				isActive: vi.fn().mockReturnValue(true),
+				on: vi.fn(),
+				off: vi.fn(),
+				emit: vi.fn(),
+				removeAllListeners: vi.fn(),
+			} as any;
+
+			const apiWithUI = new RestAPI(
+				mockTaskManager,
+				mockWsServer,
+				3737,
+				mockWorkspaceManager,
+				mockUIClientHook
+			);
+
+			// Verify UIWebSocketServer was instantiated
+			expect(UIWebSocketServer).toHaveBeenCalledWith(mockUIClientHook);
+		});
+
+		it('should not initialize UIWebSocketServer when UIClientHook is not provided', () => {
+			// Clear previous mock calls
+			vi.clearAllMocks();
+
+			const apiWithoutUI = new RestAPI(mockTaskManager, mockWsServer, 3737);
+
+			// Verify UIWebSocketServer was not instantiated
+			expect(UIWebSocketServer).not.toHaveBeenCalled();
+		});
+
+		it('should start UIWebSocketServer when UIClientHook is provided', () => {
+			vi.clearAllMocks();
+
+			const mockUIClientHook = {
+				enable: vi.fn(),
+				disable: vi.fn(),
+				isActive: vi.fn().mockReturnValue(true),
+				on: vi.fn(),
+				off: vi.fn(),
+				emit: vi.fn(),
+				removeAllListeners: vi.fn(),
+			} as any;
+
+			const apiWithUI = new RestAPI(
+				mockTaskManager,
+				mockWsServer,
+				3737,
+				mockWorkspaceManager,
+				mockUIClientHook
+			);
+
+			// Verify UIWebSocketServer constructor was called
+			expect(UIWebSocketServer).toHaveBeenCalledWith(mockUIClientHook);
+		});
+
+		it('should not initialize UIWebSocketServer when UIClientHook is omitted', () => {
+			vi.clearAllMocks();
+
+			const apiWithoutUI = new RestAPI(mockTaskManager, mockWsServer, 3788);
+
+			// Verify UIWebSocketServer was not created
+			expect(UIWebSocketServer).not.toHaveBeenCalled();
 		});
 	});
 });

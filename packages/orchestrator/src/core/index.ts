@@ -62,9 +62,6 @@ export class Orchestrator implements Shutdownable {
 		// Create workspace manager
 		this.workspaceManager = new WorkspaceManager(this.projectRoot);
 
-		// Create REST API
-		this.restAPI = new RestAPI(this.taskManager, this.wsServer, this.restPort, this.workspaceManager);
-
 		// Initialize new UI-related services
 		this.snapshotService = new StateSnapshotService(this.taskManager, this.wsServer);
 
@@ -77,12 +74,12 @@ export class Orchestrator implements Shutdownable {
 
 		this.uiClientHook = new UIClientHook(this.stateManager);
 
-		// Enable UI client hook if configured
-		const uiClientEnabled = process.env.UI_CLIENT_ENABLED === 'true';
-		if (uiClientEnabled) {
-			this.uiClientHook.enable();
-			Logger.logStructured('info', 'Orchestrator', 'UI client hook enabled');
-		}
+		// Always enable UI client hook
+		this.uiClientHook.enable();
+		Logger.logStructured('info', 'Orchestrator', 'UI client hook enabled');
+
+		// Create REST API with UIClientHook for WebSocket support
+		this.restAPI = new RestAPI(this.taskManager, this.wsServer, this.restPort, this.workspaceManager, this.uiClientHook);
 	}
 
 	/**

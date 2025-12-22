@@ -12,6 +12,18 @@ vi.mock('./TasksService', () => ({
 	},
 }));
 
+// Mock the WebSocket hook
+vi.mock('../../hooks/useOrchestratorWebSocket', () => ({
+	useOrchestratorWebSocket: vi.fn(() => ({
+		status: 'disconnected',
+		isConnected: false,
+		lastMessage: null,
+		connect: vi.fn(),
+		disconnect: vi.fn(),
+		send: vi.fn(),
+	})),
+}));
+
 describe('useTasks', () => {
 	const mockTasksData: TasksData = {
 		timestamp: '2025-12-21T10:00:00Z',

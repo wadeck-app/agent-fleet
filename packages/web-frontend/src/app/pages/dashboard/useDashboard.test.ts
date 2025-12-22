@@ -12,6 +12,18 @@ vi.mock('./DashboardService', () => ({
 	},
 }));
 
+// Mock the WebSocket hook
+vi.mock('../../hooks/useOrchestratorWebSocket', () => ({
+	useOrchestratorWebSocket: vi.fn(() => ({
+		status: 'disconnected',
+		isConnected: false,
+		lastMessage: null,
+		connect: vi.fn(),
+		disconnect: vi.fn(),
+		send: vi.fn(),
+	})),
+}));
+
 describe('useDashboard', () => {
 	const mockDashboardData: DashboardData = {
 		timestamp: '2025-12-21T10:00:00Z',
@@ -64,6 +76,7 @@ describe('useDashboard', () => {
 
 			expect(result.current.data).toEqual(mockDashboardData);
 			expect(result.current.error).toBeNull();
+			expect(result.current.wsConnected).toBe(false);
 			expect(dashboardService.getDashboard).toHaveBeenCalled();
 		});
 

@@ -1,10 +1,11 @@
 import express, { Express, Request, Response } from 'express';
 import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager.js';
+import { Server as HttpServer } from 'http';
 import { IncomingMessage } from 'http';
 import { Logger } from 'shared-common/Logger.js';
 import { TaskStatus } from 'shared-common/types.js';
 import { Duplex } from 'stream';
-import { WebSocketServer } from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
 
 import { UIClientHook } from '../ui-client/UIClientHook.js';
 import { UIWebSocketServer } from '../websocket/UIWebSocketServer.js';
@@ -17,7 +18,7 @@ export class RestAPI {
 	private wsServer: WorkerWebSocketServer;
 	private workspaceManager: WorkspaceManager | null;
 	private port: number;
-	private server: any;
+	private server: HttpServer | null = null;
 	private startTime: number;
 	private uiWebSocketServer: WebSocketServer | null = null;
 	private uiWSHandler: UIWebSocketServer | null = null;
@@ -343,9 +344,57 @@ export class RestAPI {
 		});
 	}
 
+	/**
+	 * Setup WebSocket server for UI clients
+	 * Creates a WebSocketServer instance that handles UI client connections
+	 * and broadcasts state updates via UIClientHook
+	 */
+	private setupUIWebSocket(uiClientHook: UIClientHook): void {
+		// Create UIWebSocketServer handler
+		this.uiWSHandler = new UIWebSocketServer(uiClientHook);
+		this.uiWSHandler.start();
+
+		// Create WebSocketServer instance (noServer mode - we'll handle upgrade manually)
+		this.uiWebSocketServer = new WebSocketServer({ noServer: true });
+
+		Logger.logStructured('info', 'RestAPI', 'UI WebSocket server configured');
+	}
+
+	/**
+	 * Setup HTTP upgrade handler to support WebSocket connections
+	 * This must be called after the HTTP server is created in start()
+	 */
+	private setupWebSocketUpgrade(): void {
+		if (!this.server || !this.uiWebSocketServer || !this.uiWSHandler) {
+			return;
+		}
+
+		// Handle HTTP upgrade requests for WebSocket connections
+		this.server.on('upgrade', (request: IncomingMessage, socket: Duplex, head: Buffer) => {
+			const pathname = request.url;
+
+			// Route to UI WebSocket endpoint
+			if (pathname === '/ws/ui') {
+				this.uiWebSocketServer!.handleUpgrade(request, socket, head, (ws: WebSocket) => {
+					this.uiWebSocketServer!.emit('connection', ws, request);
+					// Pass the connection to our UIWebSocketServer handler
+					this.uiWSHandler!.handleConnection(ws);
+				});
+			} else {
+				// Reject unknown WebSocket paths
+				socket.destroy();
+			}
+		});
+
+		Logger.logStructured('info', 'RestAPI', 'HTTP upgrade handler configured for /ws/ui');
+	}
+
 	start(): Promise<void> {
 		return new Promise(resolve => {
 			this.server = this.app.listen(this.port, () => {
+				// Setup WebSocket upgrade handler after HTTP server is created
+				this.setupWebSocketUpgrade();
+
 				Logger.log(`[API] REST API listening on port ${this.port}`);
 				resolve();
 			});
@@ -353,6 +402,16 @@ export class RestAPI {
 	}
 
 	async stop(): Promise<void> {
+		// Stop UI WebSocket handler first
+		if (this.uiWSHandler) {
+			this.uiWSHandler.stop();
+		}
+
+		// Close UI WebSocket server
+		if (this.uiWebSocketServer) {
+			this.uiWebSocketServer.close();
+		}
+
 		return new Promise(resolve => {
 			if (this.server) {
 				this.server.close(() => {

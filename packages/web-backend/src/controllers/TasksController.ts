@@ -34,8 +34,7 @@ export default class TasksController implements LazyController<typeof TASKS_API_
 		 * Get tasks data with optional filtering
 		 * Query params: status, workerId, priority
 		 */
-		add('GET', '/api/tasks/', async request => {
-			const query = request.query;
+		add('GET', '/api/tasks/', async ({ query }) => {
 			return this.service.getTasksData(query);
 		});
 	}

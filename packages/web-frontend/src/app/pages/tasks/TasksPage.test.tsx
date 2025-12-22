@@ -75,6 +75,7 @@ describe('TasksPage', () => {
 				data: null,
 				loading: true,
 				error: null,
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});
@@ -89,6 +90,7 @@ describe('TasksPage', () => {
 				data: mockTasksData,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});
@@ -105,6 +107,7 @@ describe('TasksPage', () => {
 				data: null,
 				loading: false,
 				error: 'Failed to load tasks',
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});
@@ -120,6 +123,7 @@ describe('TasksPage', () => {
 				data: mockTasksData,
 				loading: false,
 				error: 'Failed to load tasks',
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: mockClearError,
 			});
@@ -140,6 +144,7 @@ describe('TasksPage', () => {
 				data: mockTasksData,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});
@@ -154,6 +159,7 @@ describe('TasksPage', () => {
 				data: mockTasksData,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});
@@ -172,6 +178,7 @@ describe('TasksPage', () => {
 				data: mockTasksData,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});
@@ -188,6 +195,7 @@ describe('TasksPage', () => {
 				data: mockTasksData,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});
@@ -206,6 +214,7 @@ describe('TasksPage', () => {
 				data: mockTasksData,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});
@@ -221,6 +230,7 @@ describe('TasksPage', () => {
 				data: mockTasksData,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: mockRefresh,
 				clearError: vi.fn(),
 			});
@@ -241,6 +251,7 @@ describe('TasksPage', () => {
 				data: mockTasksData,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: mockRefresh,
 				clearError: vi.fn(),
 			});
@@ -266,6 +277,7 @@ describe('TasksPage', () => {
 				data: mockTasksData,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});
@@ -289,6 +301,7 @@ describe('TasksPage', () => {
 				data: mockTasksData,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});
@@ -310,6 +323,7 @@ describe('TasksPage', () => {
 				data: null,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});

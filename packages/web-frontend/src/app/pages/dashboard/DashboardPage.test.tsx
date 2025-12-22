@@ -64,6 +64,7 @@ describe('DashboardPage', () => {
 				data: null,
 				loading: true,
 				error: null,
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});
@@ -78,6 +79,7 @@ describe('DashboardPage', () => {
 				data: mockDashboardData,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});
@@ -94,6 +96,7 @@ describe('DashboardPage', () => {
 				data: null,
 				loading: false,
 				error: 'Failed to load dashboard',
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});
@@ -109,6 +112,7 @@ describe('DashboardPage', () => {
 				data: mockDashboardData,
 				loading: false,
 				error: 'Failed to load dashboard',
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: mockClearError,
 			});
@@ -129,6 +133,7 @@ describe('DashboardPage', () => {
 				data: mockDashboardData,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});
@@ -143,6 +148,7 @@ describe('DashboardPage', () => {
 				data: mockDashboardData,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});
@@ -159,6 +165,7 @@ describe('DashboardPage', () => {
 				data: mockDashboardData,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});
@@ -175,6 +182,7 @@ describe('DashboardPage', () => {
 				data: mockDashboardData,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});
@@ -192,6 +200,7 @@ describe('DashboardPage', () => {
 				data: mockDashboardData,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});
@@ -209,6 +218,7 @@ describe('DashboardPage', () => {
 				data: mockDashboardData,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});
@@ -224,6 +234,7 @@ describe('DashboardPage', () => {
 				data: mockDashboardData,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: mockRefresh,
 				clearError: vi.fn(),
 			});
@@ -244,6 +255,7 @@ describe('DashboardPage', () => {
 				data: mockDashboardData,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: mockRefresh,
 				clearError: vi.fn(),
 			});
@@ -269,6 +281,7 @@ describe('DashboardPage', () => {
 				data: null,
 				loading: false,
 				error: null,
+				wsConnected: false,
 				refresh: vi.fn(),
 				clearError: vi.fn(),
 			});
