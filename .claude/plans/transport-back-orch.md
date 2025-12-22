@@ -6,6 +6,18 @@
 
 **Last Updated**: 2025-12-22
 
+**Session Report**: See `transport-back-orch-session-2025-12-22.md` for detailed progress
+
+### Quick Status
+
+- ✅ Phase 1: Shared Types & Contracts (B2OContract, O2BEventTypes)
+- ✅ Phase 2: OrchestratorClient Interface & Factory
+- ✅ Phase 3: Library Mode Adapter (375 lines, fully functional)
+- 🔄 Phase 4: Remote Transport Layer (NEXT - WebSocket, REST+SSE, Long-polling)
+- ⏳ Phases 5-10: Pending
+
+**Files Created**: 11 files, ~1,160 lines of production code
+
 ---
 
 ## Context
