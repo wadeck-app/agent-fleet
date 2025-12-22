@@ -1,7 +1,7 @@
-import { Circle } from 'lucide-react';
 import type { FC } from 'react';
 
 import { cn } from '@framework/lib/utils';
+import { Circle } from 'lucide-react';
 
 /**
  * ===========================================================================================

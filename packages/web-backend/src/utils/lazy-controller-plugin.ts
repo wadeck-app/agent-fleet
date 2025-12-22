@@ -119,7 +119,12 @@ function createLazyControllerPlugin<Routes = any>(
 		// 1. Get routes from shared (no controller import yet!)
 		const routes = ROUTES_BY_BASE_URL[baseUrl];
 		if (!routes) {
-			throw new Error(`No routes found in ROUTES_BY_BASE_URL for baseUrl: ${baseUrl}`);
+			// This is a configuration error, not a 404 - routes should be defined
+			throw new HttpException(
+				500,
+				`No routes configured for baseUrl: ${baseUrl}. Please add routes to shared-frontend-backend/src/types.ts`,
+				'ROUTES_NOT_CONFIGURED'
+			);
 		}
 
 		// 2. Create internal router
@@ -138,25 +143,39 @@ function createLazyControllerPlugin<Routes = any>(
 		let service: any;
 
 		// Map baseUrl to factory method
-		if (baseUrl === '/api/ingredients') {
+		if (baseUrl === '/api/auth') {
+			// AuthController needs both AuthService and WebSocketSessionManager
+			const authService = factory.getAuthService();
+			const sessionManager = factory.getSessionManager();
+			// @ts-expect-error - Dynamic service injection based on baseUrl
+			controllerInstance = new ControllerClass(authService, sessionManager);
+		} else if (baseUrl === '/api/ingredients') {
 			service = factory.getIngredientsService();
+			// @ts-expect-error - Dynamic service injection based on baseUrl
+			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/books') {
 			service = factory.getBooksService();
+			// @ts-expect-error - Dynamic service injection based on baseUrl
+			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/dashboard') {
 			service = factory.getDashboardService();
+			// @ts-expect-error - Dynamic service injection based on baseUrl
+			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/workers') {
 			service = factory.getWorkersService();
+			// @ts-expect-error - Dynamic service injection based on baseUrl
+			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/tasks') {
 			service = factory.getTasksService();
+			// @ts-expect-error - Dynamic service injection based on baseUrl
+			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/workspaces') {
 			service = factory.getWorkspacesService();
+			// @ts-expect-error - Dynamic service injection based on baseUrl
+			controllerInstance = new ControllerClass(service);
 		} else {
 			throw new Error(`No service mapping found for baseUrl: ${baseUrl}`);
 		}
-
-		//NOMERGE
-		// @ts-expect-error - Dynamic service injection based on baseUrl
-		controllerInstance = new ControllerClass(service);
 
 		// 4. Collect handler functions
 		handlerMap = new Map();

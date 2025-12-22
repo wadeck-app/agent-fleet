@@ -5,11 +5,12 @@
 		"outDir": "./dist",
 		"jsx": "react-jsx",
 		"lib": ["ES2022", "DOM", "DOM.Iterable"],
-		"types": ["vite/client", "vitest/globals", "@testing-library/jest-dom", "@storybook/react"],
+		"types": ["vite/client", "vitest/globals", "@testing-library/jest-dom", "@storybook/react", "node"],
 		"paths": {
 			"@/*": ["./src/*"],
 			"@framework/*": ["./src/framework/*"],
 			"@app/*": ["./src/app/*"],
+			"@transport/*": ["./src/transport/*"],
 			"@shared": ["../shared-frontend-backend/src/index.ts"],
 			"@shared/*": ["../shared-frontend-backend/src/*"]
 		}

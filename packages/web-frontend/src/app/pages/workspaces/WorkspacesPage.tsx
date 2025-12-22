@@ -7,8 +7,8 @@ import { PageHeader } from '@framework/components/layout/PageHeader';
 import { Button } from '@framework/components/primitives/Button';
 import { RefreshCw } from 'lucide-react';
 
-import { useWorkspaces } from './useWorkspaces';
 import { WorkspacesTable } from './WorkspacesTable';
+import { useWorkspaces } from './useWorkspaces';
 
 /**
  * ===========================================================================================
@@ -53,7 +53,12 @@ export function WorkspacesPage() {
 				title="Workspaces"
 				action={
 					<Button onClick={handleRefresh} disabled={isRefreshing} variant="outline" size="sm">
-						<RefreshCw className={`mr-2 size-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+						<RefreshCw
+							className={`
+         mr-2 size-4
+         ${isRefreshing ? 'animate-spin' : ''}
+       `}
+						/>
 						Refresh
 					</Button>
 				}
@@ -70,26 +75,59 @@ export function WorkspacesPage() {
 			{data && (
 				<div className="space-y-6">
 					{/* Summary Stats */}
-					<div className="grid gap-4 md:grid-cols-5">
-						<div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+					<div
+						className={`
+        grid gap-4
+        md:grid-cols-5
+      `}
+					>
+						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
 							<div className="text-sm font-medium text-muted-foreground">Total</div>
 							<div className="text-2xl font-bold">{data.summary.total}</div>
 						</div>
-						<div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
 							<div className="text-sm font-medium text-muted-foreground">Active</div>
-							<div className="text-2xl font-bold text-green-600 dark:text-green-400">{data.summary.active}</div>
+							<div
+								className={`
+          text-2xl font-bold text-green-600
+          dark:text-green-400
+        `}
+							>
+								{data.summary.active}
+							</div>
 						</div>
-						<div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
 							<div className="text-sm font-medium text-muted-foreground">Locked</div>
-							<div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{data.summary.locked}</div>
+							<div
+								className={`
+          text-2xl font-bold text-yellow-600
+          dark:text-yellow-400
+        `}
+							>
+								{data.summary.locked}
+							</div>
 						</div>
-						<div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
 							<div className="text-sm font-medium text-muted-foreground">Cleaning</div>
-							<div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{data.summary.cleaning}</div>
+							<div
+								className={`
+          text-2xl font-bold text-blue-600
+          dark:text-blue-400
+        `}
+							>
+								{data.summary.cleaning}
+							</div>
 						</div>
-						<div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
 							<div className="text-sm font-medium text-muted-foreground">Errors</div>
-							<div className="text-2xl font-bold text-red-600 dark:text-red-400">{data.summary.errorCount}</div>
+							<div
+								className={`
+          text-2xl font-bold text-red-600
+          dark:text-red-400
+        `}
+							>
+								{data.summary.errorCount}
+							</div>
 						</div>
 					</div>
 

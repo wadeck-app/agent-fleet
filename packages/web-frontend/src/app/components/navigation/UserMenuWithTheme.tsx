@@ -28,9 +28,9 @@ export function UserMenuWithTheme({ userName = 'User', theme, onToggleTheme, cla
 				<Button
 					variant="ghost"
 					className={`
-      w-full justify-start py-2
-      ${className || ''}
-    `}
+       w-full justify-start py-2
+       ${className || ''}
+     `}
 				>
 					<span className="flex-1 truncate text-left text-sm font-medium">{userName}</span>
 					<ChevronDown className="size-4 shrink-0 opacity-50" />
@@ -93,9 +93,9 @@ export function UserMenuWithThemeMobile({
 				<Button
 					variant="ghost"
 					className={`
-      w-full justify-start py-3
-      ${className || ''}
-    `}
+       w-full justify-start py-3
+       ${className || ''}
+     `}
 				>
 					<span className="flex-1 truncate text-left text-base font-medium">{userName}</span>
 					<ChevronDown className="size-5 shrink-0 opacity-50" />

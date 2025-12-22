@@ -46,9 +46,9 @@ export function EmptyState({ icon, title, description, action, className = '' }:
 	return (
 		<div
 			className={`
-    flex flex-col items-center justify-center p-12 text-center
-    ${className}
-  `}
+     flex flex-col items-center justify-center p-12 text-center
+     ${className}
+   `}
 		>
 			{icon && <div className="mb-4 text-muted-foreground">{icon}</div>}
 			<h3 className="mb-2 text-lg font-semibold text-foreground">{title}</h3>

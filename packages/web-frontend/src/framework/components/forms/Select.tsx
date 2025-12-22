@@ -166,9 +166,9 @@ function SelectItem({ className, children, ...props }: React.ComponentProps<type
 		>
 			<span
 				className={`
-     pointer-events-none absolute right-2 flex size-4 items-center
-     justify-center
-   `}
+      pointer-events-none absolute right-2 flex size-4 items-center
+      justify-center
+    `}
 			>
 				<SelectPrimitive.ItemIndicator>
 					<CheckIcon className="pointer-events-none" />

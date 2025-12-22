@@ -39,13 +39,10 @@ describe('TasksPage', () => {
 				priority: 'high',
 				createdAt: '2025-12-21T08:00:00Z',
 				updatedAt: '2025-12-21T09:30:00Z',
-				assignedTo: {
+				assignedWorker: {
 					workerId: 'worker-1',
 					workerType: 'dev',
 				},
-				comments: [],
-				metadata: {},
-				history: [],
 			},
 			{
 				id: 'task-2',
@@ -54,13 +51,10 @@ describe('TasksPage', () => {
 				priority: 'medium',
 				createdAt: '2025-12-21T07:00:00Z',
 				updatedAt: '2025-12-21T09:00:00Z',
-				assignedTo: {
+				assignedWorker: {
 					workerId: 'worker-2',
 					workerType: 'reviewer',
 				},
-				comments: [],
-				metadata: {},
-				history: [],
 			},
 		],
 	};
@@ -246,7 +240,7 @@ describe('TasksPage', () => {
 		});
 
 		it('should disable refresh button while refreshing', async () => {
-			const mockRefresh = vi.fn(() => new Promise(resolve => setTimeout(resolve, 100)));
+			const mockRefresh = vi.fn((): Promise<void> => new Promise(resolve => setTimeout(resolve, 100)));
 			vi.mocked(useTasksModule.useTasks).mockReturnValue({
 				data: mockTasksData,
 				loading: false,

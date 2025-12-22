@@ -213,8 +213,9 @@ export function ColumnVisibility({
 					{isDifferentFromDefault && (
 						<span
 							className={`
-        ml-1 rounded-md bg-primary px-1.5 py-0.5 text-xs text-primary-foreground
-      `}
+         ml-1 rounded-md bg-primary px-1.5 py-0.5 text-xs
+         text-primary-foreground
+       `}
 						>
 							{visibleCount}/{totalCount}
 						</span>

@@ -144,9 +144,9 @@ export const Comparison: Story = {
 	render: () => (
 		<div
 			className={`
-    grid gap-6
-    md:grid-cols-2
-  `}
+     grid gap-6
+     md:grid-cols-2
+   `}
 		>
 			<div className="rounded-lg border border-border bg-card">
 				<div className="border-b border-border p-4">

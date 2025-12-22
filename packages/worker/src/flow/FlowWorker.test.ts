@@ -935,30 +935,22 @@ describe('FlowWorker', () => {
 			// First attempt: 1000ms * 2^0 = 1000ms
 			(worker as any).reconnectionAttempts = 0;
 			(worker as any).scheduleReconnect();
-			expect(consoleSpy).toHaveBeenCalledWith(
-				expect.stringContaining('Reconnecting in 1000ms... (attempt 1/10)')
-			);
+			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Reconnecting in 1000ms... (attempt 1)'));
 
 			// Second attempt: 1000ms * 2^1 = 2000ms
 			(worker as any).reconnectionAttempts = 1;
 			(worker as any).scheduleReconnect();
-			expect(consoleSpy).toHaveBeenCalledWith(
-				expect.stringContaining('Reconnecting in 2000ms... (attempt 2/10)')
-			);
+			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Reconnecting in 2000ms... (attempt 2)'));
 
 			// Third attempt: 1000ms * 2^2 = 4000ms
 			(worker as any).reconnectionAttempts = 2;
 			(worker as any).scheduleReconnect();
-			expect(consoleSpy).toHaveBeenCalledWith(
-				expect.stringContaining('Reconnecting in 4000ms... (attempt 3/10)')
-			);
+			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Reconnecting in 4000ms... (attempt 3)'));
 
 			// Fourth attempt: 1000ms * 2^3 = 8000ms
 			(worker as any).reconnectionAttempts = 3;
 			(worker as any).scheduleReconnect();
-			expect(consoleSpy).toHaveBeenCalledWith(
-				expect.stringContaining('Reconnecting in 8000ms... (attempt 4/10)')
-			);
+			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Reconnecting in 8000ms... (attempt 4)'));
 
 			consoleSpy.mockRestore();
 			vi.useRealTimers();
@@ -971,28 +963,28 @@ describe('FlowWorker', () => {
 			// Attempt that would exceed max: 1000ms * 2^5 = 32000ms, capped at 30000ms
 			(worker as any).reconnectionAttempts = 5;
 			(worker as any).scheduleReconnect();
-			expect(consoleSpy).toHaveBeenCalledWith(
-				expect.stringContaining('Reconnecting in 30000ms... (attempt 6/10)')
-			);
+			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Reconnecting in 30000ms... (attempt 6)'));
 
 			consoleSpy.mockRestore();
 			vi.useRealTimers();
 		});
 
-		it('should exit process after max reconnection attempts', () => {
+		it('should continue reconnecting after many attempts', () => {
+			vi.useFakeTimers();
 			const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
-			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
+			// FlowWorker continues reconnecting indefinitely - no max attempts
 			(worker as any).reconnectionAttempts = 10;
 			(worker as any).scheduleReconnect();
 
-			expect(consoleSpy).toHaveBeenCalledWith(
-				expect.stringContaining('Maximum reconnection attempts (10) reached. Giving up.')
-			);
-			expect(exitSpy).toHaveBeenCalledWith(1);
+			// Should log reconnection attempt, not exit
+			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Reconnecting in 30000ms... (attempt 11)'));
+			expect(exitSpy).not.toHaveBeenCalled();
 
 			exitSpy.mockRestore();
 			consoleSpy.mockRestore();
+			vi.useRealTimers();
 		});
 
 		it('should not exit before reaching max attempts', () => {

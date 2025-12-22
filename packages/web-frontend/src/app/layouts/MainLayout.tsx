@@ -44,8 +44,8 @@ export default function MainLayout() {
 					{/* Mobile layout */}
 					<header
 						className={`
-       flex h-[60px] items-center justify-between bg-[#2c3e50] px-4 text-white
-     `}
+        flex h-[60px] items-center justify-between bg-[#2c3e50] px-4 text-white
+      `}
 					>
 						<div className="flex items-center gap-3">
 							<h1 className="m-0 text-xl">{getCurrentPageTitle()}</h1>
@@ -121,10 +121,10 @@ export default function MainLayout() {
 					{infoPanelContent && (
 						<aside
 							className={`
-        w-[300px] overflow-y-auto overscroll-y-contain bg-[#34495e] p-4
-        text-white
-        [-webkit-overflow-scrolling:touch]
-      `}
+         w-[300px] overflow-y-auto overscroll-y-contain bg-[#34495e] p-4
+         text-white
+         [-webkit-overflow-scrolling:touch]
+       `}
 						>
 							{infoPanelContent}
 						</aside>

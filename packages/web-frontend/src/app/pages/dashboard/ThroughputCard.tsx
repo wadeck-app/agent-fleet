@@ -84,10 +84,22 @@ export function ThroughputCard({ tasksPerHour, successRate, avgTaskDuration }: T
 
 					{/* Success Rate */}
 					<div className="flex items-center gap-3">
-						<TrendingUp className={`size-5 ${successRateColor}`} />
+						<TrendingUp
+							className={`
+         size-5
+         ${successRateColor}
+       `}
+						/>
 						<div className="flex flex-col gap-1">
 							<span className="text-sm text-muted-foreground">Success Rate</span>
-							<span className={`text-xl font-semibold ${successRateColor}`}>{successRate}%</span>
+							<span
+								className={`
+          text-xl font-semibold
+          ${successRateColor}
+        `}
+							>
+								{successRate}%
+							</span>
 						</div>
 					</div>
 

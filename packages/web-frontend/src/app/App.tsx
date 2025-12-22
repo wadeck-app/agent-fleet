@@ -3,9 +3,12 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { ConnectivityProvider } from '@framework/features/connectivity/ConnectivityContext';
 import { ToastProvider } from '@framework/features/toast/ToastContext';
 import { useMediaQuery } from '@framework/hooks/useMediaQuery';
+import { TransportProvider } from '@transport/TransportProvider';
 
 import { DesktopSidebar } from '@app/components/navigation/DesktopSidebar';
 import { MobileSidebar } from '@app/components/navigation/MobileSidebar';
+import { LoginPage } from '@app/pages/auth/LoginPage';
+import { ProtectedRoute } from '@app/pages/auth/ProtectedRoute';
 import { BooksPage } from '@app/pages/books/BooksPage';
 import { DashboardPage } from '@app/pages/dashboard/DashboardPage';
 import { IngredientsPage } from '@app/pages/ingredients/IngredientsPage';
@@ -29,24 +32,26 @@ function Layout() {
 			{/* Main Content */}
 			<main
 				className={`
-     min-h-screen overflow-auto
-     ${!isMobile ? 'ml-64' : ''}
-   `}
+      min-h-screen overflow-auto
+      ${!isMobile ? 'ml-64' : ''}
+    `}
 			>
 				<div className="container mx-auto max-w-7xl p-6">
-					<Routes>
-						<Route path="/dashboard" element={<DashboardPage />} />
-						<Route path="/workers" element={<WorkersPage />} />
-						<Route path="/tasks" element={<TasksPage />} />
-						<Route path="/workspaces" element={<WorkspacesPage />} />
-						<Route path="/ingredients" element={<IngredientsPage />} />
-						<Route path="/ingredients/:mode" element={<IngredientsPage />} />
-						<Route path="/ingredients/:id/:mode" element={<IngredientsPage />} />
-						<Route path="/books" element={<BooksPage />} />
-						<Route path="/books/:mode" element={<BooksPage />} />
-						<Route path="/books/:id/:mode" element={<BooksPage />} />
-						<Route path="/" element={<DashboardPage />} />
-					</Routes>
+					<ProtectedRoute>
+						<Routes>
+							<Route path="/dashboard" element={<DashboardPage />} />
+							<Route path="/workers" element={<WorkersPage />} />
+							<Route path="/tasks" element={<TasksPage />} />
+							<Route path="/workspaces" element={<WorkspacesPage />} />
+							<Route path="/ingredients" element={<IngredientsPage />} />
+							<Route path="/ingredients/:mode" element={<IngredientsPage />} />
+							<Route path="/ingredients/:id/:mode" element={<IngredientsPage />} />
+							<Route path="/books" element={<BooksPage />} />
+							<Route path="/books/:mode" element={<BooksPage />} />
+							<Route path="/books/:id/:mode" element={<BooksPage />} />
+							<Route path="/" element={<DashboardPage />} />
+						</Routes>
+					</ProtectedRoute>
 				</div>
 			</main>
 		</div>
@@ -58,7 +63,12 @@ export function App() {
 		<ConnectivityProvider circuitBreakerService={circuitBreakerService}>
 			<ToastProvider>
 				<BrowserRouter>
-					<Layout />
+					<TransportProvider>
+						<Routes>
+							<Route path="/login" element={<LoginPage />} />
+							<Route path="/*" element={<Layout />} />
+						</Routes>
+					</TransportProvider>
 				</BrowserRouter>
 			</ToastProvider>
 		</ConnectivityProvider>

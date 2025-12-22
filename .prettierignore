@@ -50,3 +50,6 @@ docs/design*/**/*.html
 # Documentation examples (may contain intentional syntax errors for demonstration)
 .claude/docs/examples/**
 docs/testing/examples/**
+
+# Known Prettier parser bug with vi.mocked() type inference
+packages/web-frontend/src/app/hooks/useAuth.test.ts

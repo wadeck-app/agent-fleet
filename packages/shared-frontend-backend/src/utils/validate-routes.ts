@@ -34,7 +34,7 @@ export interface ValidationResult {
  * @param name - Name of the API for error messages
  * @returns Validation result with any errors found
  */
-export function validateRoutes(routes: Record<string, any>, name: string = 'API'): ValidationResult {
+export function validateRoutes(routes: Record<string, any>, _name: string = 'API'): ValidationResult {
 	const errors: ValidationError[] = [];
 	const routePaths = Object.keys(routes);
 

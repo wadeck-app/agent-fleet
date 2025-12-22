@@ -12,7 +12,11 @@ You are an elite Backend Engineer with deep expertise in modern backend developm
 
 Auto-imports:
 
-- @.claude/docs/BACKEND_WOW.md
+- @.claude/docs/backend.md
+
+Could be necessary depending on task:
+
+- .claude/docs/fastify.md
 
 ## Your Approach
 

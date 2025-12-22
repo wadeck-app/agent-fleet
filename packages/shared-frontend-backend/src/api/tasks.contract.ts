@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { defineRoutes } from '../route-builder.js';
+
+import { defineRoutes } from '../route-builder';
 
 /**
  * Task status enum - imported from shared-common but defined here for frontend use
@@ -82,6 +83,17 @@ export type TasksQuery = z.infer<typeof TasksQuerySchema>;
 export type TasksData = z.infer<typeof TasksDataSchema>;
 
 /**
+ * Create task request schema
+ */
+export const CreateTaskSchema = z.object({
+	description: z.string(),
+	status: TaskStatusSchema.optional(),
+	priority: TaskPrioritySchema.optional(),
+});
+
+export type CreateTask = z.infer<typeof CreateTaskSchema>;
+
+/**
  * Tasks API routes
  */
 export const TASKS_API_ROUTES = defineRoutes({
@@ -89,6 +101,16 @@ export const TASKS_API_ROUTES = defineRoutes({
 		GET: {
 			query: TasksQuerySchema,
 			response: TasksDataSchema,
+		},
+		POST: {
+			body: CreateTaskSchema,
+			response: TaskSchema,
+		},
+	},
+	'/api/tasks/:id': {
+		GET: {
+			params: z.object({ id: z.string() }),
+			response: TaskSchema,
 		},
 	},
 });

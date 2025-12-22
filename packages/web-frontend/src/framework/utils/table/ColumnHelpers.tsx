@@ -125,9 +125,9 @@ export class ColumnHelpers {
 		const alignClass = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left';
 		const className = options?.className
 			? `
-    ${alignClass}
-    ${options.className}
-  `
+     ${alignClass}
+     ${options.className}
+   `
 			: alignClass;
 
 		return {

@@ -48,19 +48,43 @@ export function WorkersCard({ connected, idle, busy }: WorkersCardProps) {
 					<div className="grid grid-cols-2 gap-4">
 						{/* Idle Workers */}
 						<div className="flex items-center gap-3">
-							<UserCheck className="size-5 text-green-600 dark:text-green-400" />
+							<UserCheck
+								className={`
+          size-5 text-green-600
+          dark:text-green-400
+        `}
+							/>
 							<div className="flex flex-col gap-1">
 								<span className="text-sm text-muted-foreground">Idle</span>
-								<span className="text-xl font-semibold text-green-600 dark:text-green-400">{idle}</span>
+								<span
+									className={`
+           text-xl font-semibold text-green-600
+           dark:text-green-400
+         `}
+								>
+									{idle}
+								</span>
 							</div>
 						</div>
 
 						{/* Busy Workers */}
 						<div className="flex items-center gap-3">
-							<UserX className="size-5 text-orange-600 dark:text-orange-400" />
+							<UserX
+								className={`
+          size-5 text-orange-600
+          dark:text-orange-400
+        `}
+							/>
 							<div className="flex flex-col gap-1">
 								<span className="text-sm text-muted-foreground">Busy</span>
-								<span className="text-xl font-semibold text-orange-600 dark:text-orange-400">{busy}</span>
+								<span
+									className={`
+           text-xl font-semibold text-orange-600
+           dark:text-orange-400
+         `}
+								>
+									{busy}
+								</span>
 							</div>
 						</div>
 					</div>

@@ -1099,13 +1099,7 @@ describe('RestAPI', () => {
 				removeAllListeners: vi.fn(),
 			} as any;
 
-			const apiWithUI = new RestAPI(
-				mockTaskManager,
-				mockWsServer,
-				3737,
-				mockWorkspaceManager,
-				mockUIClientHook
-			);
+			const apiWithUI = new RestAPI(mockTaskManager, mockWsServer, 3737, mockWorkspaceManager, mockUIClientHook);
 
 			// Verify UIWebSocketServer was instantiated
 			expect(UIWebSocketServer).toHaveBeenCalledWith(mockUIClientHook);
@@ -1134,13 +1128,7 @@ describe('RestAPI', () => {
 				removeAllListeners: vi.fn(),
 			} as any;
 
-			const apiWithUI = new RestAPI(
-				mockTaskManager,
-				mockWsServer,
-				3737,
-				mockWorkspaceManager,
-				mockUIClientHook
-			);
+			const apiWithUI = new RestAPI(mockTaskManager, mockWsServer, 3737, mockWorkspaceManager, mockUIClientHook);
 
 			// Verify UIWebSocketServer constructor was called
 			expect(UIWebSocketServer).toHaveBeenCalledWith(mockUIClientHook);

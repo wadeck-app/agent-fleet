@@ -32,9 +32,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 			{children}
 			<div
 				className={`
-     pointer-events-none fixed right-6 bottom-6 z-[9999] flex flex-col gap-2
-     max-md:inset-x-4 max-md:bottom-4
-   `}
+      pointer-events-none fixed right-6 bottom-6 z-[9999] flex flex-col gap-2
+      max-md:inset-x-4 max-md:bottom-4
+    `}
 			>
 				{toasts.map(toast => (
 					<Toast

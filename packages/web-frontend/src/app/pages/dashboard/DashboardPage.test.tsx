@@ -250,7 +250,7 @@ describe('DashboardPage', () => {
 		});
 
 		it('should disable refresh button while refreshing', async () => {
-			const mockRefresh = vi.fn(() => new Promise(resolve => setTimeout(resolve, 100)));
+			const mockRefresh = vi.fn((): Promise<void> => new Promise(resolve => setTimeout(resolve, 100)));
 			vi.mocked(useDashboardModule.useDashboard).mockReturnValue({
 				data: mockDashboardData,
 				loading: false,

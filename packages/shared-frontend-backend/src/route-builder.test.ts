@@ -250,7 +250,7 @@ describe('defineRoutes', () => {
 
 			// Type check - these should compile without errors
 			type RouteType = typeof routes;
-			type GetRoute = RouteType['/api/books']['GET'];
+			type _GetRoute = RouteType['/api/books']['GET'];
 
 			// Verify the contracts are preserved
 			expect(routes['/api/books'].GET?.query).toBe(QuerySchema);

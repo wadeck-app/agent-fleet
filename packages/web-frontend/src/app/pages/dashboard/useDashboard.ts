@@ -4,7 +4,8 @@ import { useAbortableEffect } from '@framework/hooks/useAbortableEffect';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { DashboardData } from '@shared';
 
-import { useOrchestratorWebSocket, type WebSocketMessage } from '../../hooks/useOrchestratorWebSocket';
+import { type WebSocketMessage, useOrchestratorWebSocket } from '@/app/hooks/useOrchestratorWebSocket';
+
 import { dashboardService } from './DashboardService';
 
 /**
@@ -73,13 +74,22 @@ export function useDashboard(params?: UseDashboardParams): UseDashboardResult {
 			// Check orchestrator object
 			if (!obj.orchestrator || typeof obj.orchestrator !== 'object') return false;
 			const orchestrator = obj.orchestrator as Record<string, unknown>;
-			if (typeof orchestrator.status !== 'string' || typeof orchestrator.uptime !== 'number' || typeof orchestrator.version !== 'string')
+			if (
+				typeof orchestrator.status !== 'string' ||
+				typeof orchestrator.uptime !== 'number' ||
+				typeof orchestrator.version !== 'string'
+			)
 				return false;
 
 			// Check workers object
 			if (!obj.workers || typeof obj.workers !== 'object') return false;
 			const workers = obj.workers as Record<string, unknown>;
-			if (typeof workers.connected !== 'number' || typeof workers.idle !== 'number' || typeof workers.busy !== 'number') return false;
+			if (
+				typeof workers.connected !== 'number' ||
+				typeof workers.idle !== 'number' ||
+				typeof workers.busy !== 'number'
+			)
+				return false;
 
 			// Check tasks object
 			if (!obj.tasks || typeof obj.tasks !== 'object') return false;
@@ -194,13 +204,23 @@ export function useDashboard(params?: UseDashboardParams): UseDashboardResult {
 				console.log('[useDashboard] Received data:', dashboardData);
 
 				// Only update state if request wasn't aborted
-				console.log('[useDashboard] After fetch - signal.aborted:', signal.aborted, 'isMountedRef.current:', isMountedRef.current);
+				console.log(
+					'[useDashboard] After fetch - signal.aborted:',
+					signal.aborted,
+					'isMountedRef.current:',
+					isMountedRef.current
+				);
 				if (!signal.aborted && isMountedRef.current) {
 					console.log('[useDashboard] Setting data and isInitialLoad=false');
 					setData(dashboardData);
 					setIsInitialLoad(false);
 				} else {
-					console.log('[useDashboard] SKIPPED setting data because signal.aborted:', signal.aborted, 'or not mounted:', !isMountedRef.current);
+					console.log(
+						'[useDashboard] SKIPPED setting data because signal.aborted:',
+						signal.aborted,
+						'or not mounted:',
+						!isMountedRef.current
+					);
 				}
 			} catch (err) {
 				console.error('[useDashboard] Error caught:', err);
@@ -211,12 +231,22 @@ export function useDashboard(params?: UseDashboardParams): UseDashboardResult {
 					console.error('Error loading dashboard:', err);
 				}
 			} finally {
-				console.log('[useDashboard] Finally - signal.aborted:', signal.aborted, 'isMountedRef.current:', isMountedRef.current);
+				console.log(
+					'[useDashboard] Finally - signal.aborted:',
+					signal.aborted,
+					'isMountedRef.current:',
+					isMountedRef.current
+				);
 				if (!signal.aborted && isMountedRef.current) {
 					console.log('[useDashboard] Setting loading=false');
 					setLoading(false);
 				} else {
-					console.log('[useDashboard] SKIPPED setting loading=false because signal.aborted:', signal.aborted, 'or not mounted:', !isMountedRef.current);
+					console.log(
+						'[useDashboard] SKIPPED setting loading=false because signal.aborted:',
+						signal.aborted,
+						'or not mounted:',
+						!isMountedRef.current
+					);
 				}
 			}
 		},

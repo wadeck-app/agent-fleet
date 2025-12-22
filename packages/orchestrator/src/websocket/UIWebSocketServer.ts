@@ -167,7 +167,11 @@ export class UIWebSocketServer {
 		});
 
 		if (failureCount > 0) {
-			Logger.logStructured('debug', 'UIWebSocketServer', `Broadcast complete: ${successCount} success, ${failureCount} failed`);
+			Logger.logStructured(
+				'debug',
+				'UIWebSocketServer',
+				`Broadcast complete: ${successCount} success, ${failureCount} failed`
+			);
 		}
 	}
 

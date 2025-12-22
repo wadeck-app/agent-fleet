@@ -73,8 +73,9 @@ export function SearchInput({
 			{loading && (
 				<div
 					className={`
-      absolute top-1/2 right-2 flex -translate-y-1/2 items-center justify-center
-    `}
+       absolute top-1/2 right-2 flex -translate-y-1/2 items-center
+       justify-center
+     `}
 				>
 					<Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Searching" />
 				</div>

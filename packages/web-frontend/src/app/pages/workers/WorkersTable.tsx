@@ -1,7 +1,7 @@
-import type { Worker } from '@shared';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
-import { Activity, Circle, AlertCircle } from 'lucide-react';
+import type { Worker } from '@shared';
+import { Activity, AlertCircle, Circle } from 'lucide-react';
 
 /**
  * ===========================================================================================
@@ -40,7 +40,11 @@ export function WorkersTable({ workers }: WorkersTableProps) {
 					<div className="overflow-x-auto">
 						<table className="w-full">
 							<thead>
-								<tr className="border-b text-left text-sm font-medium text-muted-foreground">
+								<tr
+									className={`
+           border-b text-left text-sm font-medium text-muted-foreground
+         `}
+								>
 									<th className="pb-3">Worker ID</th>
 									<th className="pb-3">Type</th>
 									<th className="pb-3">Connection</th>
@@ -50,15 +54,30 @@ export function WorkersTable({ workers }: WorkersTableProps) {
 							</thead>
 							<tbody>
 								{workers.map(worker => (
-									<tr key={worker.workerId} className="border-b last:border-b-0">
+									<tr
+										key={worker.workerId}
+										className={`
+            border-b
+            last:border-b-0
+          `}
+									>
 										<td className="py-3">
 											<div className="flex items-center gap-2">
 												<Circle
-													className={`size-2 ${
-														worker.connected
-															? 'fill-green-600 text-green-600 dark:fill-green-400 dark:text-green-400'
-															: 'fill-red-600 text-red-600 dark:fill-red-400 dark:text-red-400'
-													}`}
+													className={`
+               size-2
+               ${
+					worker.connected
+						? `
+        fill-green-600 text-green-600
+        dark:fill-green-400 dark:text-green-400
+      `
+						: `
+        fill-red-600 text-red-600
+        dark:fill-red-400 dark:text-red-400
+      `
+				}
+             `}
 												/>
 												<span className="font-mono text-sm">{worker.workerId}</span>
 											</div>
@@ -75,13 +94,37 @@ export function WorkersTable({ workers }: WorkersTableProps) {
 											<div className="flex items-center gap-2">
 												{worker.state === 'busy' ? (
 													<>
-														<Activity className="size-4 text-orange-600 dark:text-orange-400" />
-														<span className="text-sm font-medium text-orange-600 dark:text-orange-400">Busy</span>
+														<Activity
+															className={`
+                 size-4 text-orange-600
+                 dark:text-orange-400
+               `}
+														/>
+														<span
+															className={`
+                 text-sm font-medium text-orange-600
+                 dark:text-orange-400
+               `}
+														>
+															Busy
+														</span>
 													</>
 												) : (
 													<>
-														<AlertCircle className="size-4 text-blue-600 dark:text-blue-400" />
-														<span className="text-sm font-medium text-blue-600 dark:text-blue-400">Idle</span>
+														<AlertCircle
+															className={`
+                 size-4 text-blue-600
+                 dark:text-blue-400
+               `}
+														/>
+														<span
+															className={`
+                 text-sm font-medium text-blue-600
+                 dark:text-blue-400
+               `}
+														>
+															Idle
+														</span>
 													</>
 												)}
 											</div>

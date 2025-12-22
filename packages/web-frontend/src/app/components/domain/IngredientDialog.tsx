@@ -70,9 +70,9 @@ export function IngredientDialog({
 				>
 					<RefreshCw
 						className={`
-       size-4
-       ${isRefreshing ? 'animate-spin' : ''}
-     `}
+        size-4
+        ${isRefreshing ? 'animate-spin' : ''}
+      `}
 					/>
 				</Button>
 			)}

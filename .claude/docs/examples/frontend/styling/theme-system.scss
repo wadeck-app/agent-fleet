@@ -3,77 +3,77 @@
 // Both dark and light themes
 
 :root {
-  // Light theme (default)
-  --color-primary: #3b82f6;
-  --color-primary-hover: #2563eb;
-  --color-secondary: #64748b;
-  --color-secondary-hover: #475569;
-  --color-destructive: #ef4444;
-  --color-destructive-hover: #dc2626;
+	// Light theme (default)
+	--color-primary: #3b82f6;
+	--color-primary-hover: #2563eb;
+	--color-secondary: #64748b;
+	--color-secondary-hover: #475569;
+	--color-destructive: #ef4444;
+	--color-destructive-hover: #dc2626;
 
-  --color-background: #ffffff;
-  --color-surface: #f8fafc;
-  --color-border: #e2e8f0;
+	--color-background: #ffffff;
+	--color-surface: #f8fafc;
+	--color-border: #e2e8f0;
 
-  --color-text: #0f172a;
-  --color-text-secondary: #64748b;
-  --color-text-on-primary: #ffffff;
-  --color-text-on-secondary: #ffffff;
-  --color-text-on-destructive: #ffffff;
+	--color-text: #0f172a;
+	--color-text-secondary: #64748b;
+	--color-text-on-primary: #ffffff;
+	--color-text-on-secondary: #ffffff;
+	--color-text-on-destructive: #ffffff;
 
-  // Spacing
-  --spacing-xs: 0.25rem;
-  --spacing-sm: 0.5rem;
-  --spacing-md: 1rem;
-  --spacing-lg: 1.5rem;
-  --spacing-xl: 2rem;
+	// Spacing
+	--spacing-xs: 0.25rem;
+	--spacing-sm: 0.5rem;
+	--spacing-md: 1rem;
+	--spacing-lg: 1.5rem;
+	--spacing-xl: 2rem;
 
-  // Typography
-  --font-family: system-ui, -apple-system, sans-serif;
-  --font-size-sm: 0.875rem;
-  --font-size-base: 1rem;
-  --font-size-lg: 1.125rem;
-  --font-size-xl: 1.25rem;
+	// Typography
+	--font-family: system-ui, -apple-system, sans-serif;
+	--font-size-sm: 0.875rem;
+	--font-size-base: 1rem;
+	--font-size-lg: 1.125rem;
+	--font-size-xl: 1.25rem;
 
-  // Border radius
-  --radius-sm: 0.25rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 1rem;
+	// Border radius
+	--radius-sm: 0.25rem;
+	--radius-md: 0.5rem;
+	--radius-lg: 1rem;
 
-  // Shadows
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+	// Shadows
+	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+	--shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+	--shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
 }
 
 // Dark theme
-[data-theme="dark"] {
-  --color-primary: #60a5fa;
-  --color-primary-hover: #3b82f6;
-  --color-secondary: #94a3b8;
-  --color-secondary-hover: #cbd5e1;
-  --color-destructive: #f87171;
-  --color-destructive-hover: #ef4444;
+[data-theme='dark'] {
+	--color-primary: #60a5fa;
+	--color-primary-hover: #3b82f6;
+	--color-secondary: #94a3b8;
+	--color-secondary-hover: #cbd5e1;
+	--color-destructive: #f87171;
+	--color-destructive-hover: #ef4444;
 
-  --color-background: #0f172a;
-  --color-surface: #1e293b;
-  --color-border: #334155;
+	--color-background: #0f172a;
+	--color-surface: #1e293b;
+	--color-border: #334155;
 
-  --color-text: #f8fafc;
-  --color-text-secondary: #94a3b8;
-  --color-text-on-primary: #0f172a;
-  --color-text-on-secondary: #0f172a;
-  --color-text-on-destructive: #0f172a;
+	--color-text: #f8fafc;
+	--color-text-secondary: #94a3b8;
+	--color-text-on-primary: #0f172a;
+	--color-text-on-secondary: #0f172a;
+	--color-text-on-destructive: #0f172a;
 
-  // Shadows adjusted for dark theme
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+	// Shadows adjusted for dark theme
+	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+	--shadow-md: 0 4px 6px rgba(0, 0, 0, 0.5);
+	--shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
 }
 
 // Apply theme to body
 body {
-  background-color: var(--color-background);
-  color: var(--color-text);
-  font-family: var(--font-family);
+	background-color: var(--color-background);
+	color: var(--color-text);
+	font-family: var(--font-family);
 }

@@ -1,9 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import type { DashboardData } from '@app/shared';
 import { InternalServerErrorException } from '@app/shared';
-import DashboardController from './DashboardController';
+
 import type { DashboardService } from '../services/DashboardService';
 import type { RouteWrapperFunc } from '../utils/fastify-wrapper';
+import DashboardController from './DashboardController';
 
 describe('DashboardController', () => {
 	let mockService: DashboardService;

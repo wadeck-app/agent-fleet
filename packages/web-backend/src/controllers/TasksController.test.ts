@@ -1,8 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import type { TasksData, TasksQuery } from '@app/shared';
-import TasksController from './TasksController';
+
 import type { TasksService } from '../services/TasksService';
 import type { RouteWrapperFunc } from '../utils/fastify-wrapper';
+import TasksController from './TasksController';
 
 describe('TasksController', () => {
 	let mockService: TasksService;

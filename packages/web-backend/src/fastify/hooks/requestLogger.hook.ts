@@ -5,7 +5,11 @@ import { logger } from '@/utils/logger';
 
 /**
  * Simple request logger hook
- * Logs only completed requests with format: "GET /api/path 200 123ms"
+ * Logs completed requests with format: "GET /api/path 200 123ms"
+ * Uses different log levels based on status code:
+ * - 5xx: error (red)
+ * - 4xx: warn (orange)
+ * - 2xx/3xx: info (default)
  */
 const requestLoggerHook: FastifyPluginAsync = async fastify => {
 	fastify.addHook('onRequest', async (request, _reply) => {
@@ -21,8 +25,16 @@ const requestLoggerHook: FastifyPluginAsync = async fastify => {
 		const url = request.url;
 		const statusCode = reply.statusCode;
 
-		// Log completed request
-		logger.info(`${method} ${url} ${statusCode} ${duration.toFixed(0)}ms`);
+		const logMessage = `${method} ${url} ${statusCode} ${duration.toFixed(0)}ms`;
+
+		// Log with appropriate level based on status code
+		if (statusCode >= 500) {
+			logger.error(logMessage);
+		} else if (statusCode >= 400) {
+			logger.warn(logMessage);
+		} else {
+			logger.info(logMessage);
+		}
 	});
 };
 

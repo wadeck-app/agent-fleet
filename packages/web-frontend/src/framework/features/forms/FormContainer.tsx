@@ -32,9 +32,9 @@ export function FormContainer({ isSubmitting, onSubmit, onCancel, submitLabel, c
 		<form onSubmit={onSubmit}>
 			<div
 				className={`
-     grid gap-4
-     md:grid-cols-2
-   `}
+      grid gap-4
+      md:grid-cols-2
+    `}
 			>
 				{children}
 			</div>

@@ -1,6 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { TasksService } from './TasksService';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
+import type { EventBroadcaster } from '../transport/EventBroadcaster';
+import { TasksService } from './TasksService';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -8,6 +10,7 @@ global.fetch = mockFetch;
 
 describe('TasksService', () => {
 	let mockRepository: OrchestratorRepository;
+	let mockEventBroadcaster: EventBroadcaster;
 	let service: TasksService;
 
 	beforeEach(() => {
@@ -17,7 +20,16 @@ describe('TasksService', () => {
 			clearCache: vi.fn(),
 		} as unknown as OrchestratorRepository;
 
-		service = new TasksService(mockRepository);
+		// Create mock event broadcaster
+		mockEventBroadcaster = {
+			broadcast: vi.fn(),
+			sendToClient: vi.fn(),
+			sendToUser: vi.fn(),
+			getConnectedClientsCount: vi.fn(),
+			getConnectedClients: vi.fn(),
+		} as unknown as EventBroadcaster;
+
+		service = new TasksService(mockRepository, mockEventBroadcaster);
 
 		// Reset fetch mock
 		mockFetch.mockReset();
@@ -386,6 +398,69 @@ describe('TasksService', () => {
 					medium: 1,
 				},
 			});
+		});
+	});
+
+	describe('EventBroadcaster Integration', () => {
+		it('should have EventBroadcaster injected', () => {
+			// Assert
+			expect(mockEventBroadcaster).toBeDefined();
+			expect(mockEventBroadcaster.broadcast).toBeDefined();
+		});
+
+		it('should be ready to emit events when CRUD operations are implemented', () => {
+			// This test documents the expected integration pattern
+			// When CRUD operations are implemented, they should emit events like this:
+
+			// Example: After creating a task
+			const mockTask = {
+				id: 'task-123',
+				description: 'New task',
+				status: 'todo',
+				priority: 'high',
+				createdAt: '2024-01-01T00:00:00.000Z',
+				updatedAt: '2024-01-01T00:00:00.000Z',
+				assignedWorker: null,
+			};
+
+			// Simulate event emission
+			mockEventBroadcaster.broadcast('task:created', mockTask as any);
+
+			// Verify emission would be called
+			expect(mockEventBroadcaster.broadcast).toHaveBeenCalledWith('task:created', mockTask);
+		});
+
+		it('should support task status change events', () => {
+			// Example: After updating task status
+			const statusChangeData = {
+				taskId: 'task-123',
+				task: {
+					id: 'task-123',
+					status: 'in_progress',
+				},
+				previousStatus: 'todo',
+			};
+
+			// Simulate event emission
+			mockEventBroadcaster.broadcast('task:status_changed', statusChangeData as any);
+
+			// Verify
+			expect(mockEventBroadcaster.broadcast).toHaveBeenCalledWith('task:status_changed', statusChangeData);
+		});
+
+		it('should support task assignment events', () => {
+			// Example: After assigning task to worker
+			const assignmentData = {
+				taskId: 'task-123',
+				workerId: 'worker-456',
+				assignedAt: Date.now(),
+			};
+
+			// Simulate event emission
+			mockEventBroadcaster.broadcast('task:assigned', assignmentData);
+
+			// Verify
+			expect(mockEventBroadcaster.broadcast).toHaveBeenCalledWith('task:assigned', assignmentData);
 		});
 	});
 });

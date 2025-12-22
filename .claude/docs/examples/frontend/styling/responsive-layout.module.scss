@@ -4,72 +4,72 @@
 
 // Breakpoint mixin
 @mixin desktop {
-  @media (min-width: 768px) {
-    @content;
-  }
+	@media (min-width: 768px) {
+		@content;
+	}
 }
 
 @mixin large-desktop {
-  @media (min-width: 1200px) {
-    @content;
-  }
+	@media (min-width: 1200px) {
+		@content;
+	}
 }
 
 // Layout component with responsive behavior
 .container {
-  // Mobile-first (Pixel 9a baseline: 393px × 851px)
-  width: 100%;
-  padding: var(--spacing-md);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
+	// Mobile-first (Pixel 9a baseline: 393px × 851px)
+	width: 100%;
+	padding: var(--spacing-md);
+	display: flex;
+	flex-direction: column;
+	gap: var(--spacing-md);
 
-  // Desktop layout
-  @include desktop {
-    flex-direction: row;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: var(--spacing-xl);
-    gap: var(--spacing-xl);
-  }
+	// Desktop layout
+	@include desktop {
+		flex-direction: row;
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: var(--spacing-xl);
+		gap: var(--spacing-xl);
+	}
 
-  @include large-desktop {
-    max-width: 1400px;
-  }
+	@include large-desktop {
+		max-width: 1400px;
+	}
 }
 
 .sidebar {
-  // Mobile: full width
-  width: 100%;
+	// Mobile: full width
+	width: 100%;
 
-  @include desktop {
-    // Desktop: fixed sidebar width
-    width: 250px;
-    flex-shrink: 0;
-  }
+	@include desktop {
+		// Desktop: fixed sidebar width
+		width: 250px;
+		flex-shrink: 0;
+	}
 }
 
 .main {
-  // Mobile: full width
-  width: 100%;
-  min-height: 100vh;
+	// Mobile: full width
+	width: 100%;
+	min-height: 100vh;
 
-  @include desktop {
-    // Desktop: flex grow to fill remaining space
-    flex: 1;
-  }
+	@include desktop {
+		// Desktop: flex grow to fill remaining space
+		flex: 1;
+	}
 }
 
 // Grid layout example
 .grid {
-  display: grid;
-  // Mobile: single column
-  grid-template-columns: 1fr;
-  gap: var(--spacing-md);
+	display: grid;
+	// Mobile: single column
+	grid-template-columns: 1fr;
+	gap: var(--spacing-md);
 
-  @include desktop {
-    // Desktop: multiple columns
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: var(--spacing-lg);
-  }
+	@include desktop {
+		// Desktop: multiple columns
+		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+		gap: var(--spacing-lg);
+	}
 }

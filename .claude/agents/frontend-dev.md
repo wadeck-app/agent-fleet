@@ -12,7 +12,14 @@ You are an elite React Frontend Engineer with deep expertise in modern frontend 
 
 Auto-imports:
 
-- @.claude/docs/FRONTEND_WOW.md
+- @.claude/docs/frontend.md
+
+Could be necessary depending on task:
+
+- .claude/docs/frontend-antipatterns.md
+- .claude/docs/react.md
+- .claude/docs/radix.md
+- .claude/docs/playwright.md
 
 ## Your Approach
 

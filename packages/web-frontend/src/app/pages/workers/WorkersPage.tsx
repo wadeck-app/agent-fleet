@@ -7,8 +7,8 @@ import { PageHeader } from '@framework/components/layout/PageHeader';
 import { Button } from '@framework/components/primitives/Button';
 import { RefreshCw } from 'lucide-react';
 
-import { useWorkers } from './useWorkers';
 import { WorkersTable } from './WorkersTable';
+import { useWorkers } from './useWorkers';
 
 /**
  * ===========================================================================================
@@ -53,7 +53,12 @@ export function WorkersPage() {
 				title="Workers"
 				action={
 					<Button onClick={handleRefresh} disabled={isRefreshing} variant="outline" size="sm">
-						<RefreshCw className={`mr-2 size-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+						<RefreshCw
+							className={`
+         mr-2 size-4
+         ${isRefreshing ? 'animate-spin' : ''}
+       `}
+						/>
 						Refresh
 					</Button>
 				}
@@ -70,24 +75,50 @@ export function WorkersPage() {
 			{data && (
 				<div className="space-y-6">
 					{/* Summary Stats */}
-					<div className="grid gap-4 md:grid-cols-5">
-						<div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+					<div
+						className={`
+        grid gap-4
+        md:grid-cols-5
+      `}
+					>
+						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
 							<div className="text-sm font-medium text-muted-foreground">Total</div>
 							<div className="text-2xl font-bold">{data.summary.total}</div>
 						</div>
-						<div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
 							<div className="text-sm font-medium text-muted-foreground">Connected</div>
-							<div className="text-2xl font-bold text-green-600 dark:text-green-400">{data.summary.connected}</div>
+							<div
+								className={`
+          text-2xl font-bold text-green-600
+          dark:text-green-400
+        `}
+							>
+								{data.summary.connected}
+							</div>
 						</div>
-						<div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
 							<div className="text-sm font-medium text-muted-foreground">Idle</div>
-							<div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{data.summary.idle}</div>
+							<div
+								className={`
+          text-2xl font-bold text-blue-600
+          dark:text-blue-400
+        `}
+							>
+								{data.summary.idle}
+							</div>
 						</div>
-						<div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
 							<div className="text-sm font-medium text-muted-foreground">Busy</div>
-							<div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{data.summary.busy}</div>
+							<div
+								className={`
+          text-2xl font-bold text-orange-600
+          dark:text-orange-400
+        `}
+							>
+								{data.summary.busy}
+							</div>
 						</div>
-						<div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
 							<div className="text-sm font-medium text-muted-foreground">Avg Load</div>
 							<div className="text-2xl font-bold">{data.summary.avgLoad}%</div>
 						</div>

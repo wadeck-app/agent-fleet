@@ -1,5 +1,6 @@
-import type { DashboardData, ActivityEntry } from '@app/shared';
-import { InternalServerErrorException, ERROR_CODES } from '@app/shared';
+import type { ActivityEntry, DashboardData } from '@app/shared';
+import { ERROR_CODES, InternalServerErrorException } from '@app/shared';
+
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 
 /**
@@ -33,8 +34,8 @@ export class DashboardService {
 			console.log('[DashboardService] Stats received:', { workers: stats.workers, uptime: stats.uptime });
 
 			// Calculate worker states
-			const idle = stats.workersList.filter(w => !w.taskId).length;
-			const busy = stats.workersList.filter(w => w.taskId).length;
+			const idle = stats.workersList.filter((w: any) => !w.taskId).length;
+			const busy = stats.workersList.filter((w: any) => w.taskId).length;
 
 			// Aggregate task statuses
 			const active = this.sumStatuses(stats.tasks.byStatus, ['IN_PROGRESS', 'TESTING']);
@@ -175,20 +176,20 @@ export class DashboardService {
 		}
 
 		// Add worker connection events
-		stats.workersList
-			.slice(0, 2)
-			.forEach((worker: any, index: number) => {
-				const timestamp = new Date(now.getTime() - (10 + index) * 60 * 1000);
-				activities.push({
-					timestamp: timestamp.toISOString(),
-					type: 'worker_connected',
-					message: `Worker connected (${worker.type})`,
-					workerId: worker.id,
-				});
+		stats.workersList.slice(0, 2).forEach((worker: any, index: number) => {
+			const timestamp = new Date(now.getTime() - (10 + index) * 60 * 1000);
+			activities.push({
+				timestamp: timestamp.toISOString(),
+				type: 'worker_connected',
+				message: `Worker connected (${worker.type})`,
+				workerId: worker.id,
 			});
+		});
 
 		// Sort by timestamp descending and limit to 10
-		return activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 10);
+		return activities
+			.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+			.slice(0, 10);
 	}
 
 	/**

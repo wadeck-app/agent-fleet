@@ -98,6 +98,9 @@ export type RouteWrapperFunc<Routes> = <M extends HttpMethod, P extends PathsFor
 		params: RouteParams<M, P, Routes>;
 		query: RouteQuery<M, P, Routes>;
 		body: RouteBody<M, P, Routes>;
+		reply: FastifyReply;
+		request: FastifyRequest;
+		cookies: Record<string, string | undefined>;
 	}) => Promise<RouteResponse<M, P, Routes>>
 ) => void;
 
@@ -138,6 +141,9 @@ export function createRouteWrapper<Routes>(fastify: FastifyInstance, routes: Rou
 			params: RouteParams<M, P, Routes>;
 			query: RouteQuery<M, P, Routes>;
 			body: RouteBody<M, P, Routes>;
+			reply: FastifyReply;
+			request: FastifyRequest;
+			cookies: Record<string, string | undefined>;
 		}) => Promise<RouteResponse<M, P, Routes>>
 	): void {
 		// @formatter:off
@@ -155,6 +161,9 @@ export function createRouteWrapper<Routes>(fastify: FastifyInstance, routes: Rou
 					params: {},
 					query: {},
 					body: {},
+					reply,
+					request: req,
+					cookies: (req as any).cookies || {},
 				};
 
 				if (contract.params) {

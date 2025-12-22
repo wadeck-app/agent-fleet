@@ -1,5 +1,5 @@
 import { renderHook, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useOrchestratorWebSocket } from './useOrchestratorWebSocket';
 
@@ -128,10 +128,11 @@ describe('useOrchestratorWebSocket', () => {
 
 		// Capture the WebSocket instance
 		const OriginalMockWebSocket = global.WebSocket;
-		global.WebSocket = class extends OriginalMockWebSocket {
+		global.WebSocket = class {
 			constructor(url: string) {
-				super(url);
-				wsInstance = this as unknown as MockWebSocket;
+				const instance = new OriginalMockWebSocket(url);
+				wsInstance = instance as any as MockWebSocket;
+				return instance;
 			}
 		} as unknown as typeof WebSocket;
 
@@ -152,7 +153,7 @@ describe('useOrchestratorWebSocket', () => {
 			type: 'state_update',
 			data: { workers: [], tasks: [] },
 		};
-		wsInstance?.simulateMessage(stateUpdateMessage);
+		(wsInstance as unknown as MockWebSocket)?.simulateMessage(stateUpdateMessage);
 
 		await waitFor(() => {
 			expect(onMessage).toHaveBeenCalledWith(stateUpdateMessage);
@@ -165,10 +166,11 @@ describe('useOrchestratorWebSocket', () => {
 
 		// Capture the WebSocket instance
 		const OriginalMockWebSocket = global.WebSocket;
-		global.WebSocket = class extends OriginalMockWebSocket {
+		global.WebSocket = class {
 			constructor(url: string) {
-				super(url);
-				wsInstance = this as unknown as MockWebSocket;
+				const instance = new OriginalMockWebSocket(url);
+				wsInstance = instance as any as MockWebSocket;
+				return instance;
 			}
 		} as unknown as typeof WebSocket;
 
@@ -181,7 +183,7 @@ describe('useOrchestratorWebSocket', () => {
 		});
 
 		// Simulate error
-		wsInstance?.simulateError();
+		(wsInstance as unknown as MockWebSocket)?.simulateError();
 
 		await waitFor(() => {
 			expect(result.current.status).toBe('error');
@@ -193,10 +195,11 @@ describe('useOrchestratorWebSocket', () => {
 
 		// Capture the WebSocket instance
 		const OriginalMockWebSocket = global.WebSocket;
-		global.WebSocket = class extends OriginalMockWebSocket {
+		global.WebSocket = class {
 			constructor(url: string) {
-				super(url);
-				wsInstance = this as unknown as MockWebSocket;
+				const instance = new OriginalMockWebSocket(url);
+				wsInstance = instance as any as MockWebSocket;
+				return instance;
 			}
 		} as unknown as typeof WebSocket;
 
@@ -212,7 +215,7 @@ describe('useOrchestratorWebSocket', () => {
 		const message = { type: 'command', data: { action: 'test' } };
 		result.current.send(message);
 
-		expect(wsInstance?.send).toHaveBeenCalledWith(JSON.stringify(message));
+		expect((wsInstance as unknown as MockWebSocket)?.send).toHaveBeenCalledWith(JSON.stringify(message));
 	});
 
 	it('should not send messages when disconnected', () => {
@@ -238,10 +241,11 @@ describe('useOrchestratorWebSocket', () => {
 
 		// Capture the WebSocket instance
 		const OriginalMockWebSocket = global.WebSocket;
-		global.WebSocket = class extends OriginalMockWebSocket {
+		global.WebSocket = class {
 			constructor(url: string) {
-				super(url);
-				wsInstance = this as unknown as MockWebSocket;
+				const instance = new OriginalMockWebSocket(url);
+				wsInstance = instance as any as MockWebSocket;
+				return instance;
 			}
 		} as unknown as typeof WebSocket;
 
@@ -267,10 +271,11 @@ describe('useOrchestratorWebSocket', () => {
 
 		// Capture the WebSocket instance
 		const OriginalMockWebSocket = global.WebSocket;
-		global.WebSocket = class extends OriginalMockWebSocket {
+		global.WebSocket = class {
 			constructor(url: string) {
-				super(url);
-				wsInstance = this as unknown as MockWebSocket;
+				const instance = new OriginalMockWebSocket(url);
+				wsInstance = instance as any as MockWebSocket;
+				return instance;
 			}
 		} as unknown as typeof WebSocket;
 
@@ -286,7 +291,7 @@ describe('useOrchestratorWebSocket', () => {
 		unmount();
 
 		// WebSocket should be closed
-		expect(wsInstance?.readyState).toBe(MockWebSocket.CLOSED);
+		expect((wsInstance as unknown as MockWebSocket)?.readyState).toBe(MockWebSocket.CLOSED);
 	});
 
 	it.skip('should call onStatusChange callback', async () => {
@@ -313,10 +318,11 @@ describe('useOrchestratorWebSocket', () => {
 
 		// Capture the WebSocket instance
 		const OriginalMockWebSocket = global.WebSocket;
-		global.WebSocket = class extends OriginalMockWebSocket {
+		global.WebSocket = class {
 			constructor(url: string) {
-				super(url);
-				wsInstance = this as unknown as MockWebSocket;
+				const instance = new OriginalMockWebSocket(url);
+				wsInstance = instance as any as MockWebSocket;
+				return instance;
 			}
 		} as unknown as typeof WebSocket;
 
@@ -334,7 +340,7 @@ describe('useOrchestratorWebSocket', () => {
 		const event = new MessageEvent('message', {
 			data: 'invalid json',
 		});
-		wsInstance?.onmessage?.(event);
+		(wsInstance as unknown as MockWebSocket)?.onmessage?.(event);
 
 		await waitFor(() => {
 			expect(consoleSpy).toHaveBeenCalledWith(

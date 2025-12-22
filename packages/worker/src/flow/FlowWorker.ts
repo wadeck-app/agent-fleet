@@ -273,9 +273,7 @@ export class FlowWorker implements Shutdownable {
 			this.maxReconnectDelay
 		);
 
-		console.log(
-			`${this.logPrefix()} Reconnecting in ${delay}ms... (attempt ${this.reconnectionAttempts})`
-		);
+		console.log(`${this.logPrefix()} Reconnecting in ${delay}ms... (attempt ${this.reconnectionAttempts})`);
 
 		setTimeout(() => {
 			this.connect().catch(error => {

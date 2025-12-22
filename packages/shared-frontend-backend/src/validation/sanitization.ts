@@ -43,7 +43,7 @@ function sanitizeHTML(value: string): string {
 /**
  * Sanitize path-like strings to prevent directory traversal
  */
-function sanitizePath(value: string): string {
+export function sanitizePath(value: string): string {
 	return (
 		value
 			// Remove path traversal attempts

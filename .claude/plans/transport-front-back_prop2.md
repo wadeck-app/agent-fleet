@@ -5,6 +5,7 @@
 Architecture en couches pour la communication Frontend ↔ Backend avec support de multiples transports (WebSocket, REST, Mock), fortement typée via `ALL_API_ROUTES`, et complètement agnostique du transport au niveau application.
 
 **Principes:**
+
 - Un seul point d'entrée vers la logique métier (backend et frontend)
 - Controllers backend réutilisés quel que soit le transport
 - Typage fort end-to-end via `ALL_API_ROUTES`
@@ -14,6 +15,7 @@ Architecture en couches pour la communication Frontend ↔ Backend avec support 
 ## Architecture en Couches
 
 ### Frontend
+
 ```
 Application (React hooks, components)
       ↓
@@ -25,6 +27,7 @@ Transport Adapters (WebSocket | REST | Mock)
 ```
 
 ### Backend
+
 ```
 Transport Adapters (WebSocket | REST)
       ↓
@@ -48,37 +51,37 @@ Services → Repositories → Storage
 ```typescript
 // Request-Response pattern (F2B)
 export interface TransportRequest<TBody = unknown> {
-  id: string;                           // UUID for request/response matching
-  method: HttpMethod;                   // 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
-  path: string;                         // '/api/tasks', '/api/workers/:id', etc.
-  query?: Record<string, any>;
-  params?: Record<string, string>;      // URL params (/api/tasks/:id)
-  body?: TBody;
-  headers?: Record<string, string>;
-  timestamp: number;
+	id: string; // UUID for request/response matching
+	method: HttpMethod; // 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+	path: string; // '/api/tasks', '/api/workers/:id', etc.
+	query?: Record<string, any>;
+	params?: Record<string, string>; // URL params (/api/tasks/:id)
+	body?: TBody;
+	headers?: Record<string, string>;
+	timestamp: number;
 }
 
 export interface TransportResponse<TBody = unknown> {
-  id: string;                           // Matches request.id
-  status: number;                       // HTTP status codes (200, 404, 500, etc.)
-  body?: TBody;
-  error?: TransportError;
-  headers?: Record<string, string>;
-  timestamp: number;
+	id: string; // Matches request.id
+	status: number; // HTTP status codes (200, 404, 500, etc.)
+	body?: TBody;
+	error?: TransportError;
+	headers?: Record<string, string>;
+	timestamp: number;
 }
 
 export interface TransportError {
-  code: string;                         // 'NOT_FOUND', 'VALIDATION_ERROR', etc.
-  message: string;
-  details?: any;
+	code: string; // 'NOT_FOUND', 'VALIDATION_ERROR', etc.
+	message: string;
+	details?: any;
 }
 
 // Event pattern (B2F)
 export interface TransportEvent<TData = unknown> {
-  id: string;                           // Event unique ID
-  type: string;                         // 'task:created', 'worker:status', etc.
-  data: TData;
-  timestamp: number;
+	id: string; // Event unique ID
+	type: string; // 'task:created', 'worker:status', etc.
+	data: TData;
+	timestamp: number;
 }
 ```
 
@@ -87,8 +90,8 @@ export interface TransportEvent<TData = unknown> {
 **Fichier:** `packages/shared-frontend-backend/src/transport/TypedTransport.ts`
 
 ```typescript
+import type { PathsForMethod, RouteBody, RouteQuery, RouteResponse } from '../route-builder';
 import { ALL_API_ROUTES } from '../types';
-import type { PathsForMethod, RouteQuery, RouteBody, RouteResponse } from '../route-builder';
 
 // Extract all possible paths and methods from ALL_API_ROUTES
 export type ApiPath = keyof typeof ALL_API_ROUTES;
@@ -96,25 +99,24 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 
 // Type-safe request builder
 export type TypedRequest<M extends HttpMethod, P extends PathsForMethod<M>> = {
-  method: M;
-  path: P;
-  query?: RouteQuery<M, P>;
-  params?: Record<string, string>;
-  body?: RouteBody<M, P>;
+	method: M;
+	path: P;
+	query?: RouteQuery<M, P>;
+	params?: Record<string, string>;
+	body?: RouteBody<M, P>;
 };
 
 // Type-safe response
-export type TypedResponse<M extends HttpMethod, P extends PathsForMethod<M>> =
-  RouteResponse<M, P>;
+export type TypedResponse<M extends HttpMethod, P extends PathsForMethod<M>> = RouteResponse<M, P>;
 
 // Helper type to extract all method-path combinations
 export type ApiEndpoint = {
-  [M in HttpMethod]: {
-    [P in PathsForMethod<M>]: {
-      request: TypedRequest<M, P>;
-      response: TypedResponse<M, P>;
-    };
-  };
+	[M in HttpMethod]: {
+		[P in PathsForMethod<M>]: {
+			request: TypedRequest<M, P>;
+			response: TypedResponse<M, P>;
+		};
+	};
 }[HttpMethod];
 ```
 
@@ -126,33 +128,28 @@ export type ApiEndpoint = {
 import type { Task, Worker, Workspace } from '../types';
 
 // CRUD Events (generic pattern)
-export type CrudEventType =
-  | 'created'
-  | 'updated'
-  | 'deleted'
-  | 'status_changed';
+export type CrudEventType = 'created' | 'updated' | 'deleted' | 'status_changed';
 
 // Resource-specific CRUD events
 export type ResourceEvent<Resource extends string, Data> = {
-  [K in CrudEventType as `${Resource}:${K}`]: Data;
+	[K in CrudEventType as `${Resource}:${K}`]: Data;
 };
 
 // Business-specific events
 export interface BusinessEvents {
-  'task:assigned': { taskId: string; workerId: string; assignedAt: number };
-  'task:priority_changed': { taskId: string; oldPriority: number; newPriority: number };
-  'worker:heartbeat': { workerId: string; timestamp: number; status: string };
-  'worker:capacity_changed': { workerId: string; capacity: number };
-  'workspace:quota_exceeded': { workspaceId: string; quotaType: string; usage: number; limit: number };
-  'workspace:archived': { workspaceId: string; archivedAt: number };
+	'task:assigned': { taskId: string; workerId: string; assignedAt: number };
+	'task:priority_changed': { taskId: string; oldPriority: number; newPriority: number };
+	'worker:heartbeat': { workerId: string; timestamp: number; status: string };
+	'worker:capacity_changed': { workerId: string; capacity: number };
+	'workspace:quota_exceeded': { workspaceId: string; quotaType: string; usage: number; limit: number };
+	'workspace:archived': { workspaceId: string; archivedAt: number };
 }
 
 // Combined event registry (CRUD + Business)
-export type EventTypes =
-  & ResourceEvent<'task', Task>
-  & ResourceEvent<'worker', Worker>
-  & ResourceEvent<'workspace', Workspace>
-  & BusinessEvents;
+export type EventTypes = ResourceEvent<'task', Task> &
+	ResourceEvent<'worker', Worker> &
+	ResourceEvent<'workspace', Workspace> &
+	BusinessEvents;
 
 // Event type helper
 export type EventType = keyof EventTypes;
@@ -160,7 +157,7 @@ export type EventData<T extends EventType> = EventTypes[T];
 
 // Type guard
 export function isEventType(type: string): type is EventType {
-  return type.includes(':');
+	return type.includes(':');
 }
 ```
 
@@ -174,41 +171,36 @@ export function isEventType(type: string): type is EventType {
 
 ```typescript
 import type { HttpMethod, PathsForMethod, TypedRequest, TypedResponse } from '@shared/transport';
-import type { EventType, EventData } from '@shared/transport/EventTypes';
+import type { EventData, EventType } from '@shared/transport/EventTypes';
 
 export interface ITransportClient {
-  // Request-Response (F2B) - strongly typed via ALL_API_ROUTES
-  request<M extends HttpMethod, P extends PathsForMethod<M>>(
-    method: M,
-    path: P,
-    options?: {
-      query?: TypedRequest<M, P>['query'];
-      params?: TypedRequest<M, P>['params'];
-      body?: TypedRequest<M, P>['body'];
-      headers?: Record<string, string>;
-    }
-  ): Promise<TypedResponse<M, P>>;
+	// Request-Response (F2B) - strongly typed via ALL_API_ROUTES
+	request<M extends HttpMethod, P extends PathsForMethod<M>>(
+		method: M,
+		path: P,
+		options?: {
+			query?: TypedRequest<M, P>['query'];
+			params?: TypedRequest<M, P>['params'];
+			body?: TypedRequest<M, P>['body'];
+			headers?: Record<string, string>;
+		}
+	): Promise<TypedResponse<M, P>>;
 
-  // Event subscription (B2F)
-  subscribe<E extends EventType>(
-    event: E,
-    handler: (data: EventData<E>) => void
-  ): UnsubscribeFunction;
+	// Event subscription (B2F)
+	subscribe<E extends EventType>(event: E, handler: (data: EventData<E>) => void): UnsubscribeFunction;
 
-  subscribeAll(
-    handler: (event: EventType, data: any) => void
-  ): UnsubscribeFunction;
+	subscribeAll(handler: (event: EventType, data: any) => void): UnsubscribeFunction;
 
-  // Connection management
-  connect(): Promise<void>;
-  disconnect(): Promise<void>;
-  isConnected(): boolean;
+	// Connection management
+	connect(): Promise<void>;
+	disconnect(): Promise<void>;
+	isConnected(): boolean;
 
-  // Transport type
-  getTransportType(): TransportType;
+	// Transport type
+	getTransportType(): TransportType;
 
-  // Lifecycle
-  onConnectionStateChange(handler: (state: ConnectionState) => void): UnsubscribeFunction;
+	// Lifecycle
+	onConnectionStateChange(handler: (state: ConnectionState) => void): UnsubscribeFunction;
 }
 
 export type TransportType = 'websocket' | 'rest' | 'mock';
@@ -222,75 +214,75 @@ export type UnsubscribeFunction = () => void;
 
 ```typescript
 export interface TransportConfig {
-  // Base URL for REST or WebSocket
-  baseUrl: string;
-  wsUrl?: string;
+	// Base URL for REST or WebSocket
+	baseUrl: string;
+	wsUrl?: string;
 
-  // Transport mode selection
-  mode?: 'websocket' | 'rest' | 'auto' | 'mock';
-  forceRest?: boolean;                  // Debug: force REST
+	// Transport mode selection
+	mode?: 'websocket' | 'rest' | 'auto' | 'mock';
+	forceRest?: boolean; // Debug: force REST
 
-  // Timeouts
-  requestTimeout?: number;              // Default 30s
-  connectionTimeout?: number;           // Default 10s
+	// Timeouts
+	requestTimeout?: number; // Default 30s
+	connectionTimeout?: number; // Default 10s
 
-  // Reconnection (for WebSocket)
-  reconnect?: boolean;
-  reconnectMaxAttempts?: number;
-  reconnectDelay?: number;              // Base delay for exponential backoff
+	// Reconnection (for WebSocket)
+	reconnect?: boolean;
+	reconnectMaxAttempts?: number;
+	reconnectDelay?: number; // Base delay for exponential backoff
 
-  // Polling (for REST events)
-  pollingInterval?: number;             // Default 2000ms
+	// Polling (for REST events)
+	pollingInterval?: number; // Default 2000ms
 
-  // Mock options
-  mock?: boolean;
-  mockOptions?: MockTransportOptions;
+	// Mock options
+	mock?: boolean;
+	mockOptions?: MockTransportOptions;
 }
 
 export class TransportFactory {
-  static create(config: TransportConfig): ITransportClient {
-    // 1. Check for mock mode (tests, isolated dev)
-    if (config.mock || config.mode === 'mock') {
-      return new MockTransportClient(config.mockOptions || {});
-    }
+	static create(config: TransportConfig): ITransportClient {
+		// 1. Check for mock mode (tests, isolated dev)
+		if (config.mock || config.mode === 'mock') {
+			return new MockTransportClient(config.mockOptions || {});
+		}
 
-    // 2. Force REST for debug
-    if (config.forceRest || config.mode === 'rest') {
-      return new RestTransportClient(config);
-    }
+		// 2. Force REST for debug
+		if (config.forceRest || config.mode === 'rest') {
+			return new RestTransportClient(config);
+		}
 
-    // 3. Explicit WebSocket
-    if (config.mode === 'websocket') {
-      return new WebSocketTransportClient(config);
-    }
+		// 3. Explicit WebSocket
+		if (config.mode === 'websocket') {
+			return new WebSocketTransportClient(config);
+		}
 
-    // 4. Auto mode: try WebSocket with REST fallback
-    return new AdaptiveTransportClient(config);
-  }
+		// 4. Auto mode: try WebSocket with REST fallback
+		return new AdaptiveTransportClient(config);
+	}
 
-  // Load config from env + localStorage override
-  static createFromEnv(): ITransportClient {
-    const envConfig = this.loadEnvConfig();
-    const runtimeConfig = this.loadRuntimeConfig();
-    const mergedConfig = { ...envConfig, ...runtimeConfig };
+	// Load config from env + localStorage override
+	static createFromEnv(): ITransportClient {
+		const envConfig = this.loadEnvConfig();
+		const runtimeConfig = this.loadRuntimeConfig();
+		const mergedConfig = { ...envConfig, ...runtimeConfig };
 
-    return this.create(mergedConfig);
-  }
+		return this.create(mergedConfig);
+	}
 
-  private static loadEnvConfig(): TransportConfig {
-    return {
-      baseUrl: import.meta.env.VITE_BACKEND_URL || 'http://localhost:3738',
-      wsUrl: import.meta.env.VITE_BACKEND_WS_URL || 'ws://localhost:3738',
-      mode: import.meta.env.VITE_TRANSPORT_MODE as TransportConfig['mode'] || 'auto',
-      requestTimeout: parseInt(import.meta.env.VITE_REQUEST_TIMEOUT || '30000'),
-      pollingInterval: parseInt(import.meta.env.VITE_POLLING_INTERVAL || '2000'),
-    };
-  }
+	private static loadEnvConfig(): TransportConfig {
+		return {
+			baseUrl: import.meta.env.VITE_BACKEND_URL || 'http://localhost:3738',
+			wsUrl: import.meta.env.VITE_BACKEND_WS_URL || 'ws://localhost:3738',
+			mode: (import.meta.env.VITE_TRANSPORT_MODE as TransportConfig['mode']) || 'auto',
+			requestTimeout: parseInt(import.meta.env.VITE_REQUEST_TIMEOUT || '30000'),
+			pollingInterval: parseInt(import.meta.env.VITE_POLLING_INTERVAL || '2000'),
+		};
+	}
 
-  private static loadRuntimeConfig(): Partial<TransportConfig> {
-    const stored = localStorage.getItem('transport_config');
-    return stored ? JSON.parse(stored) : {};
-  }
+	private static loadRuntimeConfig(): Partial<TransportConfig> {
+		const stored = localStorage.getItem('transport_config');
+		return stored ? JSON.parse(stored) : {};
+	}
 }
 ```
 
@@ -298,26 +290,26 @@ export class TransportFactory {
 
 ```typescript
 export class RuntimeTransportConfig {
-  static setTransportMode(mode: 'websocket' | 'rest' | 'auto' | 'mock') {
-    const config = this.getConfig();
-    config.mode = mode;
-    this.saveConfig(config);
-  }
+	static setTransportMode(mode: 'websocket' | 'rest' | 'auto' | 'mock') {
+		const config = this.getConfig();
+		config.mode = mode;
+		this.saveConfig(config);
+	}
 
-  static forceRest(enabled: boolean) {
-    const config = this.getConfig();
-    config.forceRest = enabled;
-    this.saveConfig(config);
-  }
+	static forceRest(enabled: boolean) {
+		const config = this.getConfig();
+		config.forceRest = enabled;
+		this.saveConfig(config);
+	}
 
-  static getConfig(): Partial<TransportConfig> {
-    const stored = localStorage.getItem('transport_config');
-    return stored ? JSON.parse(stored) : {};
-  }
+	static getConfig(): Partial<TransportConfig> {
+		const stored = localStorage.getItem('transport_config');
+		return stored ? JSON.parse(stored) : {};
+	}
 
-  private static saveConfig(config: Partial<TransportConfig>) {
-    localStorage.setItem('transport_config', JSON.stringify(config));
-  }
+	private static saveConfig(config: Partial<TransportConfig>) {
+		localStorage.setItem('transport_config', JSON.stringify(config));
+	}
 }
 ```
 
@@ -326,202 +318,196 @@ export class RuntimeTransportConfig {
 **Fichier:** `packages/web-frontend/src/transport/adapters/WebSocketTransportClient.ts`
 
 ```typescript
+import { TransportEvent, TransportRequest, TransportResponse } from '@shared/transport';
+
 import type { ITransportClient, TransportConfig } from '../ITransportClient';
-import { TransportRequest, TransportResponse, TransportEvent } from '@shared/transport';
 
 export class WebSocketTransportClient implements ITransportClient {
-  private ws: WebSocket | null = null;
-  private connectionState: ConnectionState = 'disconnected';
-  private pendingRequests = new Map<string, PendingRequest>();
-  private eventHandlers = new Map<string, Set<EventHandler>>();
-  private connectionStateHandlers = new Set<ConnectionStateHandler>();
+	private ws: WebSocket | null = null;
+	private connectionState: ConnectionState = 'disconnected';
+	private pendingRequests = new Map<string, PendingRequest>();
+	private eventHandlers = new Map<string, Set<EventHandler>>();
+	private connectionStateHandlers = new Set<ConnectionStateHandler>();
 
-  private reconnectAttempts = 0;
-  private reconnectTimer: NodeJS.Timeout | null = null;
+	private reconnectAttempts = 0;
+	private reconnectTimer: NodeJS.Timeout | null = null;
 
-  constructor(private config: TransportConfig) {}
+	constructor(private config: TransportConfig) {}
 
-  async connect(): Promise<void> {
-    if (this.ws?.readyState === WebSocket.OPEN) return;
+	async connect(): Promise<void> {
+		if (this.ws?.readyState === WebSocket.OPEN) return;
 
-    this.updateConnectionState('connecting');
+		this.updateConnectionState('connecting');
 
-    return new Promise((resolve, reject) => {
-      const wsUrl = this.config.wsUrl || this.config.baseUrl.replace('http', 'ws');
-      this.ws = new WebSocket(`${wsUrl}/ws`);
+		return new Promise((resolve, reject) => {
+			const wsUrl = this.config.wsUrl || this.config.baseUrl.replace('http', 'ws');
+			this.ws = new WebSocket(`${wsUrl}/ws`);
 
-      const timeout = setTimeout(() => {
-        reject(new Error('Connection timeout'));
-        this.ws?.close();
-      }, this.config.connectionTimeout || 10000);
+			const timeout = setTimeout(() => {
+				reject(new Error('Connection timeout'));
+				this.ws?.close();
+			}, this.config.connectionTimeout || 10000);
 
-      this.ws.onopen = () => {
-        clearTimeout(timeout);
-        this.updateConnectionState('connected');
-        this.reconnectAttempts = 0;
-        resolve();
-      };
+			this.ws.onopen = () => {
+				clearTimeout(timeout);
+				this.updateConnectionState('connected');
+				this.reconnectAttempts = 0;
+				resolve();
+			};
 
-      this.ws.onerror = (error) => {
-        clearTimeout(timeout);
-        this.updateConnectionState('error');
-        reject(error);
-      };
+			this.ws.onerror = error => {
+				clearTimeout(timeout);
+				this.updateConnectionState('error');
+				reject(error);
+			};
 
-      this.ws.onmessage = (event) => this.handleMessage(event);
+			this.ws.onmessage = event => this.handleMessage(event);
 
-      this.ws.onclose = () => {
-        this.updateConnectionState('disconnected');
-        this.handleReconnect();
-      };
-    });
-  }
+			this.ws.onclose = () => {
+				this.updateConnectionState('disconnected');
+				this.handleReconnect();
+			};
+		});
+	}
 
-  async request<M extends HttpMethod, P extends PathsForMethod<M>>(
-    method: M,
-    path: P,
-    options?: any
-  ): Promise<any> {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      throw new Error('WebSocket not connected');
-    }
+	async request<M extends HttpMethod, P extends PathsForMethod<M>>(method: M, path: P, options?: any): Promise<any> {
+		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+			throw new Error('WebSocket not connected');
+		}
 
-    const request: TransportRequest = {
-      id: generateUuid(),
-      method,
-      path,
-      query: options?.query,
-      params: options?.params,
-      body: options?.body,
-      headers: options?.headers,
-      timestamp: Date.now(),
-    };
+		const request: TransportRequest = {
+			id: generateUuid(),
+			method,
+			path,
+			query: options?.query,
+			params: options?.params,
+			body: options?.body,
+			headers: options?.headers,
+			timestamp: Date.now(),
+		};
 
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.pendingRequests.delete(request.id);
-        reject(new Error('Request timeout'));
-      }, this.config.requestTimeout || 30000);
+		return new Promise((resolve, reject) => {
+			const timeout = setTimeout(() => {
+				this.pendingRequests.delete(request.id);
+				reject(new Error('Request timeout'));
+			}, this.config.requestTimeout || 30000);
 
-      this.pendingRequests.set(request.id, { resolve, reject, timeout });
-      this.ws!.send(JSON.stringify(request));
-    });
-  }
+			this.pendingRequests.set(request.id, { resolve, reject, timeout });
+			this.ws!.send(JSON.stringify(request));
+		});
+	}
 
-  subscribe<E extends EventType>(
-    event: E,
-    handler: (data: EventData<E>) => void
-  ): UnsubscribeFunction {
-    if (!this.eventHandlers.has(event)) {
-      this.eventHandlers.set(event, new Set());
-    }
-    this.eventHandlers.get(event)!.add(handler);
+	subscribe<E extends EventType>(event: E, handler: (data: EventData<E>) => void): UnsubscribeFunction {
+		if (!this.eventHandlers.has(event)) {
+			this.eventHandlers.set(event, new Set());
+		}
+		this.eventHandlers.get(event)!.add(handler);
 
-    return () => {
-      this.eventHandlers.get(event)?.delete(handler);
-    };
-  }
+		return () => {
+			this.eventHandlers.get(event)?.delete(handler);
+		};
+	}
 
-  private handleMessage(event: MessageEvent) {
-    const data = JSON.parse(event.data);
+	private handleMessage(event: MessageEvent) {
+		const data = JSON.parse(event.data);
 
-    if (this.isResponse(data)) {
-      this.handleResponse(data as TransportResponse);
-    } else if (this.isEvent(data)) {
-      this.handleEvent(data as TransportEvent);
-    }
-  }
+		if (this.isResponse(data)) {
+			this.handleResponse(data as TransportResponse);
+		} else if (this.isEvent(data)) {
+			this.handleEvent(data as TransportEvent);
+		}
+	}
 
-  private handleResponse(response: TransportResponse) {
-    const pending = this.pendingRequests.get(response.id);
-    if (!pending) return;
+	private handleResponse(response: TransportResponse) {
+		const pending = this.pendingRequests.get(response.id);
+		if (!pending) return;
 
-    this.pendingRequests.delete(response.id);
-    clearTimeout(pending.timeout);
+		this.pendingRequests.delete(response.id);
+		clearTimeout(pending.timeout);
 
-    if (response.error) {
-      pending.reject(response.error);
-    } else {
-      pending.resolve(response.body);
-    }
-  }
+		if (response.error) {
+			pending.reject(response.error);
+		} else {
+			pending.resolve(response.body);
+		}
+	}
 
-  private handleEvent(event: TransportEvent) {
-    const handlers = this.eventHandlers.get(event.type);
-    if (handlers) {
-      handlers.forEach(handler => handler(event.data));
-    }
-  }
+	private handleEvent(event: TransportEvent) {
+		const handlers = this.eventHandlers.get(event.type);
+		if (handlers) {
+			handlers.forEach(handler => handler(event.data));
+		}
+	}
 
-  private handleReconnect() {
-    if (!this.config.reconnect) return;
-    if (this.reconnectAttempts >= (this.config.reconnectMaxAttempts || 10)) {
-      this.updateConnectionState('error');
-      return;
-    }
+	private handleReconnect() {
+		if (!this.config.reconnect) return;
+		if (this.reconnectAttempts >= (this.config.reconnectMaxAttempts || 10)) {
+			this.updateConnectionState('error');
+			return;
+		}
 
-    this.updateConnectionState('reconnecting');
-    this.reconnectAttempts++;
+		this.updateConnectionState('reconnecting');
+		this.reconnectAttempts++;
 
-    // Exponential backoff
-    const delay = Math.min(
-      (this.config.reconnectDelay || 1000) * Math.pow(2, this.reconnectAttempts - 1),
-      30000 // Max 30s
-    );
+		// Exponential backoff
+		const delay = Math.min(
+			(this.config.reconnectDelay || 1000) * Math.pow(2, this.reconnectAttempts - 1),
+			30000 // Max 30s
+		);
 
-    this.reconnectTimer = setTimeout(() => {
-      this.connect().catch(err => {
-        console.error('Reconnection failed', err);
-      });
-    }, delay);
-  }
+		this.reconnectTimer = setTimeout(() => {
+			this.connect().catch(err => {
+				console.error('Reconnection failed', err);
+			});
+		}, delay);
+	}
 
-  private isResponse(data: any): boolean {
-    return 'id' in data && 'status' in data;
-  }
+	private isResponse(data: any): boolean {
+		return 'id' in data && 'status' in data;
+	}
 
-  private isEvent(data: any): boolean {
-    return 'type' in data && 'data' in data && !('status' in data);
-  }
+	private isEvent(data: any): boolean {
+		return 'type' in data && 'data' in data && !('status' in data);
+	}
 
-  private updateConnectionState(state: ConnectionState) {
-    this.connectionState = state;
-    this.connectionStateHandlers.forEach(handler => handler(state));
-  }
+	private updateConnectionState(state: ConnectionState) {
+		this.connectionState = state;
+		this.connectionStateHandlers.forEach(handler => handler(state));
+	}
 
-  disconnect(): Promise<void> {
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
+	disconnect(): Promise<void> {
+		if (this.reconnectTimer) {
+			clearTimeout(this.reconnectTimer);
+			this.reconnectTimer = null;
+		}
 
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
+		if (this.ws) {
+			this.ws.close();
+			this.ws = null;
+		}
 
-    this.updateConnectionState('disconnected');
-    return Promise.resolve();
-  }
+		this.updateConnectionState('disconnected');
+		return Promise.resolve();
+	}
 
-  isConnected(): boolean {
-    return this.connectionState === 'connected';
-  }
+	isConnected(): boolean {
+		return this.connectionState === 'connected';
+	}
 
-  getTransportType(): TransportType {
-    return 'websocket';
-  }
+	getTransportType(): TransportType {
+		return 'websocket';
+	}
 
-  onConnectionStateChange(handler: ConnectionStateHandler): UnsubscribeFunction {
-    this.connectionStateHandlers.add(handler);
-    return () => this.connectionStateHandlers.delete(handler);
-  }
+	onConnectionStateChange(handler: ConnectionStateHandler): UnsubscribeFunction {
+		this.connectionStateHandlers.add(handler);
+		return () => this.connectionStateHandlers.delete(handler);
+	}
 }
 
 interface PendingRequest {
-  resolve: (value: any) => void;
-  reject: (error: any) => void;
-  timeout: NodeJS.Timeout;
+	resolve: (value: any) => void;
+	reject: (error: any) => void;
+	timeout: NodeJS.Timeout;
 }
 
 type EventHandler = (data: any) => void;
@@ -534,153 +520,146 @@ type ConnectionStateHandler = (state: ConnectionState) => void;
 
 ```typescript
 export class RestTransportClient implements ITransportClient {
-  private connectionState: ConnectionState = 'disconnected';
-  private eventPolling = new Map<string, NodeJS.Timer>();
-  private eventHandlers = new Map<string, Set<EventHandler>>();
-  private lastEventTimestamp: number = Date.now();
-  private connectionStateHandlers = new Set<ConnectionStateHandler>();
+	private connectionState: ConnectionState = 'disconnected';
+	private eventPolling = new Map<string, NodeJS.Timer>();
+	private eventHandlers = new Map<string, Set<EventHandler>>();
+	private lastEventTimestamp: number = Date.now();
+	private connectionStateHandlers = new Set<ConnectionStateHandler>();
 
-  constructor(private config: TransportConfig) {}
+	constructor(private config: TransportConfig) {}
 
-  async connect(): Promise<void> {
-    this.updateConnectionState('connecting');
+	async connect(): Promise<void> {
+		this.updateConnectionState('connecting');
 
-    // Test connection with health check
-    try {
-      const response = await fetch(`${this.config.baseUrl}/api/health`);
-      if (response.ok) {
-        this.updateConnectionState('connected');
-      } else {
-        throw new Error('Health check failed');
-      }
-    } catch (error) {
-      this.updateConnectionState('error');
-      throw error;
-    }
-  }
+		// Test connection with health check
+		try {
+			const response = await fetch(`${this.config.baseUrl}/api/health`);
+			if (response.ok) {
+				this.updateConnectionState('connected');
+			} else {
+				throw new Error('Health check failed');
+			}
+		} catch (error) {
+			this.updateConnectionState('error');
+			throw error;
+		}
+	}
 
-  async request<M extends HttpMethod, P extends PathsForMethod<M>>(
-    method: M,
-    path: P,
-    options?: any
-  ): Promise<any> {
-    // Build URL with params
-    let url = `${this.config.baseUrl}${path}`;
-    if (options?.params) {
-      Object.entries(options.params).forEach(([key, value]) => {
-        url = url.replace(`:${key}`, encodeURIComponent(value as string));
-      });
-    }
+	async request<M extends HttpMethod, P extends PathsForMethod<M>>(method: M, path: P, options?: any): Promise<any> {
+		// Build URL with params
+		let url = `${this.config.baseUrl}${path}`;
+		if (options?.params) {
+			Object.entries(options.params).forEach(([key, value]) => {
+				url = url.replace(`:${key}`, encodeURIComponent(value as string));
+			});
+		}
 
-    // Add query parameters
-    if (options?.query) {
-      const queryString = new URLSearchParams(options.query).toString();
-      url += `?${queryString}`;
-    }
+		// Add query parameters
+		if (options?.query) {
+			const queryString = new URLSearchParams(options.query).toString();
+			url += `?${queryString}`;
+		}
 
-    const response = await fetch(url, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
-      body: options?.body ? JSON.stringify(options.body) : undefined,
-    });
+		const response = await fetch(url, {
+			method,
+			headers: {
+				'Content-Type': 'application/json',
+				...options?.headers,
+			},
+			body: options?.body ? JSON.stringify(options.body) : undefined,
+		});
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw {
-        status: response.status,
-        message: error.message || response.statusText,
-        code: error.code || 'HTTP_ERROR',
-      };
-    }
+		if (!response.ok) {
+			const error = await response.json().catch(() => ({}));
+			throw {
+				status: response.status,
+				message: error.message || response.statusText,
+				code: error.code || 'HTTP_ERROR',
+			};
+		}
 
-    return response.json();
-  }
+		return response.json();
+	}
 
-  subscribe<E extends EventType>(
-    event: E,
-    handler: (data: EventData<E>) => void
-  ): UnsubscribeFunction {
-    if (!this.eventHandlers.has(event)) {
-      this.eventHandlers.set(event, new Set());
-      this.startPolling(event);
-    }
-    this.eventHandlers.get(event)!.add(handler);
+	subscribe<E extends EventType>(event: E, handler: (data: EventData<E>) => void): UnsubscribeFunction {
+		if (!this.eventHandlers.has(event)) {
+			this.eventHandlers.set(event, new Set());
+			this.startPolling(event);
+		}
+		this.eventHandlers.get(event)!.add(handler);
 
-    return () => {
-      this.eventHandlers.get(event)?.delete(handler);
-      if (this.eventHandlers.get(event)?.size === 0) {
-        this.stopPolling(event);
-      }
-    };
-  }
+		return () => {
+			this.eventHandlers.get(event)?.delete(handler);
+			if (this.eventHandlers.get(event)?.size === 0) {
+				this.stopPolling(event);
+			}
+		};
+	}
 
-  private startPolling(event: string) {
-    const timer = setInterval(async () => {
-      try {
-        // GET /api/events?since=<timestamp>&types=task:created,task:updated
-        const events = await this.request('GET', '/api/events' as any, {
-          query: {
-            since: this.lastEventTimestamp,
-            types: event,
-          },
-        });
+	private startPolling(event: string) {
+		const timer = setInterval(async () => {
+			try {
+				// GET /api/events?since=<timestamp>&types=task:created,task:updated
+				const events = await this.request('GET', '/api/events' as any, {
+					query: {
+						since: this.lastEventTimestamp,
+						types: event,
+					},
+				});
 
-        events.forEach((evt: TransportEvent) => {
-          const handlers = this.eventHandlers.get(evt.type);
-          if (handlers) {
-            handlers.forEach(handler => handler(evt.data));
-          }
-          this.lastEventTimestamp = Math.max(this.lastEventTimestamp, evt.timestamp);
-        });
-      } catch (error) {
-        console.error('Event polling error', error);
-      }
-    }, this.config.pollingInterval || 2000);
+				events.forEach((evt: TransportEvent) => {
+					const handlers = this.eventHandlers.get(evt.type);
+					if (handlers) {
+						handlers.forEach(handler => handler(evt.data));
+					}
+					this.lastEventTimestamp = Math.max(this.lastEventTimestamp, evt.timestamp);
+				});
+			} catch (error) {
+				console.error('Event polling error', error);
+			}
+		}, this.config.pollingInterval || 2000);
 
-    this.eventPolling.set(event, timer);
-  }
+		this.eventPolling.set(event, timer);
+	}
 
-  private stopPolling(event: string) {
-    const timer = this.eventPolling.get(event);
-    if (timer) {
-      clearInterval(timer);
-      this.eventPolling.delete(event);
-    }
-  }
+	private stopPolling(event: string) {
+		const timer = this.eventPolling.get(event);
+		if (timer) {
+			clearInterval(timer);
+			this.eventPolling.delete(event);
+		}
+	}
 
-  disconnect(): Promise<void> {
-    this.eventPolling.forEach(timer => clearInterval(timer));
-    this.eventPolling.clear();
-    this.updateConnectionState('disconnected');
-    return Promise.resolve();
-  }
+	disconnect(): Promise<void> {
+		this.eventPolling.forEach(timer => clearInterval(timer));
+		this.eventPolling.clear();
+		this.updateConnectionState('disconnected');
+		return Promise.resolve();
+	}
 
-  isConnected(): boolean {
-    return this.connectionState === 'connected';
-  }
+	isConnected(): boolean {
+		return this.connectionState === 'connected';
+	}
 
-  getTransportType(): TransportType {
-    return 'rest';
-  }
+	getTransportType(): TransportType {
+		return 'rest';
+	}
 
-  subscribeAll(handler: (event: EventType, data: any) => void): UnsubscribeFunction {
-    // For REST, we need to poll all event types
-    // This is less efficient, prefer specific subscriptions
-    throw new Error('subscribeAll not efficiently supported in REST mode. Use specific event subscriptions.');
-  }
+	subscribeAll(handler: (event: EventType, data: any) => void): UnsubscribeFunction {
+		// For REST, we need to poll all event types
+		// This is less efficient, prefer specific subscriptions
+		throw new Error('subscribeAll not efficiently supported in REST mode. Use specific event subscriptions.');
+	}
 
-  onConnectionStateChange(handler: ConnectionStateHandler): UnsubscribeFunction {
-    this.connectionStateHandlers.add(handler);
-    return () => this.connectionStateHandlers.delete(handler);
-  }
+	onConnectionStateChange(handler: ConnectionStateHandler): UnsubscribeFunction {
+		this.connectionStateHandlers.add(handler);
+		return () => this.connectionStateHandlers.delete(handler);
+	}
 
-  private updateConnectionState(state: ConnectionState) {
-    this.connectionState = state;
-    this.connectionStateHandlers.forEach(handler => handler(state));
-  }
+	private updateConnectionState(state: ConnectionState) {
+		this.connectionState = state;
+		this.connectionStateHandlers.forEach(handler => handler(state));
+	}
 }
 ```
 
@@ -690,300 +669,285 @@ export class RestTransportClient implements ITransportClient {
 
 ```typescript
 export interface MockTransportOptions {
-  // 1. Stub data
-  stubData?: Record<string, any>;
+	// 1. Stub data
+	stubData?: Record<string, any>;
 
-  // 2. Latency simulation
-  latency?: {
-    min: number;
-    max: number;
-  };
+	// 2. Latency simulation
+	latency?: {
+		min: number;
+		max: number;
+	};
 
-  // 3. Failure simulation
-  failureRate?: number;                 // 0.0 to 1.0 (e.g., 0.1 = 10% failure)
-  simulateDisconnect?: boolean;
-  simulateTimeout?: boolean;
+	// 3. Failure simulation
+	failureRate?: number; // 0.0 to 1.0 (e.g., 0.1 = 10% failure)
+	simulateDisconnect?: boolean;
+	simulateTimeout?: boolean;
 
-  // 4. Scenario recording/replay
-  recordScenario?: boolean;
-  replayScenario?: RecordedScenario;
+	// 4. Scenario recording/replay
+	recordScenario?: boolean;
+	replayScenario?: RecordedScenario;
 
-  // 5. In-memory state machine
-  inMemoryState?: boolean;              // Full CRUD with consistency
-  initialData?: {
-    tasks?: Task[];
-    workers?: Worker[];
-    workspaces?: Workspace[];
-  };
+	// 5. In-memory state machine
+	inMemoryState?: boolean; // Full CRUD with consistency
+	initialData?: {
+		tasks?: Task[];
+		workers?: Worker[];
+		workspaces?: Workspace[];
+	};
 }
 
 export interface RecordedScenario {
-  requests: Array<{
-    timestamp: number;
-    method: string;
-    path: string;
-    options: any;
-    response: any;
-  }>;
-  events: Array<{
-    timestamp: number;
-    type: string;
-    data: any;
-  }>;
+	requests: Array<{
+		timestamp: number;
+		method: string;
+		path: string;
+		options: any;
+		response: any;
+	}>;
+	events: Array<{
+		timestamp: number;
+		type: string;
+		data: any;
+	}>;
 }
 
 export class MockTransportClient implements ITransportClient {
-  private connectionState: ConnectionState = 'disconnected';
-  private eventHandlers = new Map<string, Set<EventHandler>>();
-  private connectionStateHandlers = new Set<ConnectionStateHandler>();
+	private connectionState: ConnectionState = 'disconnected';
+	private eventHandlers = new Map<string, Set<EventHandler>>();
+	private connectionStateHandlers = new Set<ConnectionStateHandler>();
 
-  // In-memory state
-  private inMemoryData: {
-    tasks: Map<string, Task>;
-    workers: Map<string, Worker>;
-    workspaces: Map<string, Workspace>;
-  };
+	// In-memory state
+	private inMemoryData: {
+		tasks: Map<string, Task>;
+		workers: Map<string, Worker>;
+		workspaces: Map<string, Workspace>;
+	};
 
-  // Recording
-  private recordedScenario: RecordedScenario | null = null;
-  private scenarioStartTime: number = 0;
+	// Recording
+	private recordedScenario: RecordedScenario | null = null;
+	private scenarioStartTime: number = 0;
 
-  constructor(private options: MockTransportOptions) {
-    // Initialize in-memory state
-    this.inMemoryData = {
-      tasks: new Map(options.initialData?.tasks?.map(t => [t.id, t]) || []),
-      workers: new Map(options.initialData?.workers?.map(w => [w.id, w]) || []),
-      workspaces: new Map(options.initialData?.workspaces?.map(w => [w.id, w]) || []),
-    };
+	constructor(private options: MockTransportOptions) {
+		// Initialize in-memory state
+		this.inMemoryData = {
+			tasks: new Map(options.initialData?.tasks?.map(t => [t.id, t]) || []),
+			workers: new Map(options.initialData?.workers?.map(w => [w.id, w]) || []),
+			workspaces: new Map(options.initialData?.workspaces?.map(w => [w.id, w]) || []),
+		};
 
-    // Initialize recording
-    if (options.recordScenario) {
-      this.recordedScenario = { requests: [], events: [] };
-      this.scenarioStartTime = Date.now();
-    }
-  }
+		// Initialize recording
+		if (options.recordScenario) {
+			this.recordedScenario = { requests: [], events: [] };
+			this.scenarioStartTime = Date.now();
+		}
+	}
 
-  async connect(): Promise<void> {
-    await this.simulateLatency();
+	async connect(): Promise<void> {
+		await this.simulateLatency();
 
-    if (this.options.simulateDisconnect) {
-      throw new Error('Simulated connection failure');
-    }
+		if (this.options.simulateDisconnect) {
+			throw new Error('Simulated connection failure');
+		}
 
-    this.updateConnectionState('connected');
-  }
+		this.updateConnectionState('connected');
+	}
 
-  async request<M extends HttpMethod, P extends PathsForMethod<M>>(
-    method: M,
-    path: P,
-    options?: any
-  ): Promise<any> {
-    await this.simulateLatency();
+	async request<M extends HttpMethod, P extends PathsForMethod<M>>(method: M, path: P, options?: any): Promise<any> {
+		await this.simulateLatency();
 
-    // Simulate random failures
-    if (Math.random() < (this.options.failureRate || 0)) {
-      throw new Error('Simulated request failure');
-    }
+		// Simulate random failures
+		if (Math.random() < (this.options.failureRate || 0)) {
+			throw new Error('Simulated request failure');
+		}
 
-    // Simulate timeout
-    if (this.options.simulateTimeout) {
-      await new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Request timeout')), 35000)
-      );
-    }
+		// Simulate timeout
+		if (this.options.simulateTimeout) {
+			await new Promise((_, reject) => setTimeout(() => reject(new Error('Request timeout')), 35000));
+		}
 
-    let response: any;
+		let response: any;
 
-    // Replay mode
-    if (this.options.replayScenario) {
-      response = this.replayRequest(method, path, options);
-    }
-    // In-memory state machine
-    else if (this.options.inMemoryState) {
-      response = await this.handleInMemoryRequest(method, path, options);
-    }
-    // Stub data
-    else {
-      response = this.getStubData(path);
-    }
+		// Replay mode
+		if (this.options.replayScenario) {
+			response = this.replayRequest(method, path, options);
+		}
+		// In-memory state machine
+		else if (this.options.inMemoryState) {
+			response = await this.handleInMemoryRequest(method, path, options);
+		}
+		// Stub data
+		else {
+			response = this.getStubData(path);
+		}
 
-    // Record request
-    if (this.options.recordScenario && this.recordedScenario) {
-      this.recordedScenario.requests.push({
-        timestamp: Date.now() - this.scenarioStartTime,
-        method,
-        path,
-        options,
-        response,
-      });
-    }
+		// Record request
+		if (this.options.recordScenario && this.recordedScenario) {
+			this.recordedScenario.requests.push({
+				timestamp: Date.now() - this.scenarioStartTime,
+				method,
+				path,
+				options,
+				response,
+			});
+		}
 
-    return response;
-  }
+		return response;
+	}
 
-  subscribe<E extends EventType>(
-    event: E,
-    handler: (data: EventData<E>) => void
-  ): UnsubscribeFunction {
-    if (!this.eventHandlers.has(event)) {
-      this.eventHandlers.set(event, new Set());
-    }
-    this.eventHandlers.get(event)!.add(handler);
+	subscribe<E extends EventType>(event: E, handler: (data: EventData<E>) => void): UnsubscribeFunction {
+		if (!this.eventHandlers.has(event)) {
+			this.eventHandlers.set(event, new Set());
+		}
+		this.eventHandlers.get(event)!.add(handler);
 
-    // In replay mode, schedule recorded events
-    if (this.options.replayScenario) {
-      this.scheduleReplayEvents(event);
-    }
+		// In replay mode, schedule recorded events
+		if (this.options.replayScenario) {
+			this.scheduleReplayEvents(event);
+		}
 
-    return () => {
-      this.eventHandlers.get(event)?.delete(handler);
-    };
-  }
+		return () => {
+			this.eventHandlers.get(event)?.delete(handler);
+		};
+	}
 
-  // Helper: manually trigger events (for tests)
-  simulateEvent<E extends EventType>(event: E, data: EventData<E>) {
-    const handlers = this.eventHandlers.get(event);
-    if (handlers) {
-      handlers.forEach(handler => handler(data));
-    }
+	// Helper: manually trigger events (for tests)
+	simulateEvent<E extends EventType>(event: E, data: EventData<E>) {
+		const handlers = this.eventHandlers.get(event);
+		if (handlers) {
+			handlers.forEach(handler => handler(data));
+		}
 
-    // Record event
-    if (this.options.recordScenario && this.recordedScenario) {
-      this.recordedScenario.events.push({
-        timestamp: Date.now() - this.scenarioStartTime,
-        type: event,
-        data,
-      });
-    }
-  }
+		// Record event
+		if (this.options.recordScenario && this.recordedScenario) {
+			this.recordedScenario.events.push({
+				timestamp: Date.now() - this.scenarioStartTime,
+				type: event,
+				data,
+			});
+		}
+	}
 
-  // Helper: get recorded scenario (for saving)
-  getRecordedScenario(): RecordedScenario | null {
-    return this.recordedScenario;
-  }
+	// Helper: get recorded scenario (for saving)
+	getRecordedScenario(): RecordedScenario | null {
+		return this.recordedScenario;
+	}
 
-  private async simulateLatency() {
-    if (this.options.latency) {
-      const delay =
-        Math.random() * (this.options.latency.max - this.options.latency.min) +
-        this.options.latency.min;
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
+	private async simulateLatency() {
+		if (this.options.latency) {
+			const delay =
+				Math.random() * (this.options.latency.max - this.options.latency.min) + this.options.latency.min;
+			await new Promise(resolve => setTimeout(resolve, delay));
+		}
+	}
 
-  private getStubData(path: string): any {
-    return this.options.stubData?.[path] || [];
-  }
+	private getStubData(path: string): any {
+		return this.options.stubData?.[path] || [];
+	}
 
-  private async handleInMemoryRequest(
-    method: string,
-    path: string,
-    options?: any
-  ): Promise<any> {
-    // Parse path to determine resource
-    const { resource, id } = this.parsePath(path);
+	private async handleInMemoryRequest(method: string, path: string, options?: any): Promise<any> {
+		// Parse path to determine resource
+		const { resource, id } = this.parsePath(path);
 
-    if (!resource) throw new Error(`Unknown path: ${path}`);
+		if (!resource) throw new Error(`Unknown path: ${path}`);
 
-    const store = this.inMemoryData[resource as keyof typeof this.inMemoryData];
-    if (!store) throw new Error(`Unknown resource: ${resource}`);
+		const store = this.inMemoryData[resource as keyof typeof this.inMemoryData];
+		if (!store) throw new Error(`Unknown resource: ${resource}`);
 
-    switch (method) {
-      case 'GET':
-        if (id) {
-          const item = store.get(id);
-          if (!item) throw { status: 404, message: 'Not found' };
-          return item;
-        }
-        return Array.from(store.values());
+		switch (method) {
+			case 'GET':
+				if (id) {
+					const item = store.get(id);
+					if (!item) throw { status: 404, message: 'Not found' };
+					return item;
+				}
+				return Array.from(store.values());
 
-      case 'POST':
-        const newItem = { id: generateUuid(), ...options?.body };
-        store.set(newItem.id, newItem);
-        this.simulateEvent(`${resource}:created` as EventType, newItem);
-        return newItem;
+			case 'POST':
+				const newItem = { id: generateUuid(), ...options?.body };
+				store.set(newItem.id, newItem);
+				this.simulateEvent(`${resource}:created` as EventType, newItem);
+				return newItem;
 
-      case 'PUT':
-      case 'PATCH':
-        if (!id) throw { status: 400, message: 'ID required' };
-        const existing = store.get(id);
-        if (!existing) throw { status: 404, message: 'Not found' };
-        const updated = { ...existing, ...options?.body };
-        store.set(id, updated);
-        this.simulateEvent(`${resource}:updated` as EventType, updated);
-        return updated;
+			case 'PUT':
+			case 'PATCH':
+				if (!id) throw { status: 400, message: 'ID required' };
+				const existing = store.get(id);
+				if (!existing) throw { status: 404, message: 'Not found' };
+				const updated = { ...existing, ...options?.body };
+				store.set(id, updated);
+				this.simulateEvent(`${resource}:updated` as EventType, updated);
+				return updated;
 
-      case 'DELETE':
-        if (!id) throw { status: 400, message: 'ID required' };
-        const deleted = store.get(id);
-        if (!deleted) throw { status: 404, message: 'Not found' };
-        store.delete(id);
-        this.simulateEvent(`${resource}:deleted` as EventType, { id });
-        return { success: true };
+			case 'DELETE':
+				if (!id) throw { status: 400, message: 'ID required' };
+				const deleted = store.get(id);
+				if (!deleted) throw { status: 404, message: 'Not found' };
+				store.delete(id);
+				this.simulateEvent(`${resource}:deleted` as EventType, { id });
+				return { success: true };
 
-      default:
-        throw { status: 405, message: 'Method not allowed' };
-    }
-  }
+			default:
+				throw { status: 405, message: 'Method not allowed' };
+		}
+	}
 
-  private parsePath(path: string): { resource: string | null; id: string | null } {
-    // Parse paths like '/api/tasks' or '/api/tasks/123'
-    const match = path.match(/^\/api\/(\w+)(?:\/([^\/]+))?/);
-    if (!match) return { resource: null, id: null };
-    return { resource: match[1], id: match[2] || null };
-  }
+	private parsePath(path: string): { resource: string | null; id: string | null } {
+		// Parse paths like '/api/tasks' or '/api/tasks/123'
+		const match = path.match(/^\/api\/(\w+)(?:\/([^\/]+))?/);
+		if (!match) return { resource: null, id: null };
+		return { resource: match[1], id: match[2] || null };
+	}
 
-  private replayRequest(method: string, path: string, options: any): any {
-    if (!this.options.replayScenario) return null;
+	private replayRequest(method: string, path: string, options: any): any {
+		if (!this.options.replayScenario) return null;
 
-    const recorded = this.options.replayScenario.requests.find(
-      r => r.method === method && r.path === path &&
-           JSON.stringify(r.options) === JSON.stringify(options)
-    );
+		const recorded = this.options.replayScenario.requests.find(
+			r => r.method === method && r.path === path && JSON.stringify(r.options) === JSON.stringify(options)
+		);
 
-    return recorded?.response || null;
-  }
+		return recorded?.response || null;
+	}
 
-  private scheduleReplayEvents(event: string) {
-    if (!this.options.replayScenario) return;
+	private scheduleReplayEvents(event: string) {
+		if (!this.options.replayScenario) return;
 
-    const events = this.options.replayScenario.events.filter(e => e.type === event);
-    events.forEach(evt => {
-      setTimeout(() => {
-        this.simulateEvent(evt.type as EventType, evt.data);
-      }, evt.timestamp);
-    });
-  }
+		const events = this.options.replayScenario.events.filter(e => e.type === event);
+		events.forEach(evt => {
+			setTimeout(() => {
+				this.simulateEvent(evt.type as EventType, evt.data);
+			}, evt.timestamp);
+		});
+	}
 
-  disconnect(): Promise<void> {
-    this.updateConnectionState('disconnected');
-    return Promise.resolve();
-  }
+	disconnect(): Promise<void> {
+		this.updateConnectionState('disconnected');
+		return Promise.resolve();
+	}
 
-  isConnected(): boolean {
-    return this.connectionState === 'connected';
-  }
+	isConnected(): boolean {
+		return this.connectionState === 'connected';
+	}
 
-  getTransportType(): TransportType {
-    return 'mock';
-  }
+	getTransportType(): TransportType {
+		return 'mock';
+	}
 
-  subscribeAll(handler: (event: EventType, data: any) => void): UnsubscribeFunction {
-    const unsubscribers: UnsubscribeFunction[] = [];
-    // Subscribe to all known event types
-    // (in practice, you'd list all possible events)
-    return () => unsubscribers.forEach(unsub => unsub());
-  }
+	subscribeAll(handler: (event: EventType, data: any) => void): UnsubscribeFunction {
+		const unsubscribers: UnsubscribeFunction[] = [];
+		// Subscribe to all known event types
+		// (in practice, you'd list all possible events)
+		return () => unsubscribers.forEach(unsub => unsub());
+	}
 
-  onConnectionStateChange(handler: ConnectionStateHandler): UnsubscribeFunction {
-    this.connectionStateHandlers.add(handler);
-    return () => this.connectionStateHandlers.delete(handler);
-  }
+	onConnectionStateChange(handler: ConnectionStateHandler): UnsubscribeFunction {
+		this.connectionStateHandlers.add(handler);
+		return () => this.connectionStateHandlers.delete(handler);
+	}
 
-  private updateConnectionState(state: ConnectionState) {
-    this.connectionState = state;
-    this.connectionStateHandlers.forEach(handler => handler(state));
-  }
+	private updateConnectionState(state: ConnectionState) {
+		this.connectionState = state;
+		this.connectionStateHandlers.forEach(handler => handler(state));
+	}
 }
 ```
 
@@ -993,78 +957,71 @@ export class MockTransportClient implements ITransportClient {
 
 ```typescript
 export class AdaptiveTransportClient implements ITransportClient {
-  private currentTransport: ITransportClient | null = null;
-  private attemptedWebSocket = false;
+	private currentTransport: ITransportClient | null = null;
+	private attemptedWebSocket = false;
 
-  constructor(private config: TransportConfig) {}
+	constructor(private config: TransportConfig) {}
 
-  async connect(): Promise<void> {
-    // Try WebSocket first
-    if (!this.attemptedWebSocket) {
-      this.attemptedWebSocket = true;
-      try {
-        this.currentTransport = new WebSocketTransportClient(this.config);
-        await this.currentTransport.connect();
-        console.log('Using WebSocket transport');
-        return;
-      } catch (error) {
-        console.warn('WebSocket connection failed, falling back to REST', error);
-      }
-    }
+	async connect(): Promise<void> {
+		// Try WebSocket first
+		if (!this.attemptedWebSocket) {
+			this.attemptedWebSocket = true;
+			try {
+				this.currentTransport = new WebSocketTransportClient(this.config);
+				await this.currentTransport.connect();
+				console.log('Using WebSocket transport');
+				return;
+			} catch (error) {
+				console.warn('WebSocket connection failed, falling back to REST', error);
+			}
+		}
 
-    // Fallback to REST
-    this.currentTransport = new RestTransportClient(this.config);
-    await this.currentTransport.connect();
-    console.log('Using REST transport');
-  }
+		// Fallback to REST
+		this.currentTransport = new RestTransportClient(this.config);
+		await this.currentTransport.connect();
+		console.log('Using REST transport');
+	}
 
-  // Delegate all methods to current transport
-  async request<M extends HttpMethod, P extends PathsForMethod<M>>(
-    method: M,
-    path: P,
-    options?: any
-  ): Promise<any> {
-    if (!this.currentTransport) {
-      throw new Error('Transport not initialized');
-    }
-    return this.currentTransport.request(method, path, options);
-  }
+	// Delegate all methods to current transport
+	async request<M extends HttpMethod, P extends PathsForMethod<M>>(method: M, path: P, options?: any): Promise<any> {
+		if (!this.currentTransport) {
+			throw new Error('Transport not initialized');
+		}
+		return this.currentTransport.request(method, path, options);
+	}
 
-  subscribe<E extends EventType>(
-    event: E,
-    handler: (data: EventData<E>) => void
-  ): UnsubscribeFunction {
-    if (!this.currentTransport) {
-      throw new Error('Transport not initialized');
-    }
-    return this.currentTransport.subscribe(event, handler);
-  }
+	subscribe<E extends EventType>(event: E, handler: (data: EventData<E>) => void): UnsubscribeFunction {
+		if (!this.currentTransport) {
+			throw new Error('Transport not initialized');
+		}
+		return this.currentTransport.subscribe(event, handler);
+	}
 
-  subscribeAll(handler: (event: EventType, data: any) => void): UnsubscribeFunction {
-    if (!this.currentTransport) {
-      throw new Error('Transport not initialized');
-    }
-    return this.currentTransport.subscribeAll(handler);
-  }
+	subscribeAll(handler: (event: EventType, data: any) => void): UnsubscribeFunction {
+		if (!this.currentTransport) {
+			throw new Error('Transport not initialized');
+		}
+		return this.currentTransport.subscribeAll(handler);
+	}
 
-  disconnect(): Promise<void> {
-    return this.currentTransport?.disconnect() || Promise.resolve();
-  }
+	disconnect(): Promise<void> {
+		return this.currentTransport?.disconnect() || Promise.resolve();
+	}
 
-  isConnected(): boolean {
-    return this.currentTransport?.isConnected() || false;
-  }
+	isConnected(): boolean {
+		return this.currentTransport?.isConnected() || false;
+	}
 
-  getTransportType(): TransportType {
-    return this.currentTransport?.getTransportType() || 'rest';
-  }
+	getTransportType(): TransportType {
+		return this.currentTransport?.getTransportType() || 'rest';
+	}
 
-  onConnectionStateChange(handler: (state: ConnectionState) => void): UnsubscribeFunction {
-    if (!this.currentTransport) {
-      return () => {};
-    }
-    return this.currentTransport.onConnectionStateChange(handler);
-  }
+	onConnectionStateChange(handler: (state: ConnectionState) => void): UnsubscribeFunction {
+		if (!this.currentTransport) {
+			return () => {};
+		}
+		return this.currentTransport.onConnectionStateChange(handler);
+	}
 }
 ```
 
@@ -1141,34 +1098,22 @@ Créer un adapter qui maintient l'API existante mais utilise le transport en des
 
 ```typescript
 // packages/web-frontend/src/app/api/client.ts
-
-import { useTransport } from '../transport/TransportProvider';
 import type { ITransportClient } from '../transport/ITransportClient';
+import { useTransport } from '../transport/TransportProvider';
 
 // Adapter: createTypedFetch but using transport
 export function createTypedFetch<Routes>(routes: Routes) {
-  return (
-    method: HttpMethod,
-    path: string,
-    options?: any
-  ) => {
-    const transport = useTransport();
-    return transport.request(method as any, path as any, options);
-  };
+	return (method: HttpMethod, path: string, options?: any) => {
+		const transport = useTransport();
+		return transport.request(method as any, path as any, options);
+	};
 }
 
 // Or, for non-hook usage (in services):
-export function createTypedFetchFromTransport<Routes>(
-  transport: ITransportClient,
-  routes: Routes
-) {
-  return (
-    method: HttpMethod,
-    path: string,
-    options?: any
-  ) => {
-    return transport.request(method as any, path as any, options);
-  };
+export function createTypedFetchFromTransport<Routes>(transport: ITransportClient, routes: Routes) {
+	return (method: HttpMethod, path: string, options?: any) => {
+		return transport.request(method as any, path as any, options);
+	};
 }
 ```
 
@@ -1184,24 +1129,24 @@ Les fichiers existants comme `tasks.api.ts` ne nécessitent AUCUNE modification 
 **Fichier:** `packages/web-backend/src/transport/ITransportServer.ts`
 
 ```typescript
-import type { EventType, EventData } from '@shared/transport/EventTypes';
+import type { EventData, EventType } from '@shared/transport/EventTypes';
 
 export interface ITransportServer {
-  // Initialize transport (register routes, WebSocket handlers, etc.)
-  initialize(app: FastifyInstance, router: TransportRouter): Promise<void>;
+	// Initialize transport (register routes, WebSocket handlers, etc.)
+	initialize(app: FastifyInstance, router: TransportRouter): Promise<void>;
 
-  // Broadcast events to clients (B2F)
-  broadcast<E extends EventType>(event: E, data: EventData<E>): void;
+	// Broadcast events to clients (B2F)
+	broadcast<E extends EventType>(event: E, data: EventData<E>): void;
 
-  // Send event to specific client
-  sendToClient<E extends EventType>(clientId: string, event: E, data: EventData<E>): void;
+	// Send event to specific client
+	sendToClient<E extends EventType>(clientId: string, event: E, data: EventData<E>): void;
 
-  // Connection lifecycle hooks
-  onClientConnected(handler: (clientId: string) => void): void;
-  onClientDisconnected(handler: (clientId: string) => void): void;
+	// Connection lifecycle hooks
+	onClientConnected(handler: (clientId: string) => void): void;
+	onClientDisconnected(handler: (clientId: string) => void): void;
 
-  // Get connected clients
-  getConnectedClients(): string[];
+	// Get connected clients
+	getConnectedClients(): string[];
 }
 ```
 
@@ -1214,89 +1159,84 @@ import type { TransportRequest, TransportResponse } from '@shared/transport';
 import type { ALL_API_ROUTES } from '@shared/types';
 
 export class TransportRouter {
-  constructor(
-    private controllers: Map<string, any> // Controller registry
-  ) {}
+	constructor(
+		private controllers: Map<string, any> // Controller registry
+	) {}
 
-  async handleRequest(request: TransportRequest): Promise<TransportResponse> {
-    try {
-      // Parse route
-      const route = this.parseRoute(request.path, request.method);
+	async handleRequest(request: TransportRequest): Promise<TransportResponse> {
+		try {
+			// Parse route
+			const route = this.parseRoute(request.path, request.method);
 
-      if (!route) {
-        return this.errorResponse(request.id, 404, 'Route not found');
-      }
+			if (!route) {
+				return this.errorResponse(request.id, 404, 'Route not found');
+			}
 
-      // Get controller and method
-      const { controller, method } = route;
+			// Get controller and method
+			const { controller, method } = route;
 
-      // Build request object (same format as Fastify)
-      const fastifyLikeRequest = {
-        params: request.params || {},
-        query: request.query || {},
-        body: request.body,
-        headers: request.headers || {},
-      };
+			// Build request object (same format as Fastify)
+			const fastifyLikeRequest = {
+				params: request.params || {},
+				query: request.query || {},
+				body: request.body,
+				headers: request.headers || {},
+			};
 
-      // Execute controller method
-      const result = await controller[method](fastifyLikeRequest);
+			// Execute controller method
+			const result = await controller[method](fastifyLikeRequest);
 
-      return {
-        id: request.id,
-        status: 200,
-        body: result,
-        timestamp: Date.now(),
-      };
-    } catch (error: any) {
-      return this.errorResponse(
-        request.id,
-        error.statusCode || error.status || 500,
-        error.message || 'Internal server error',
-        error.code
-      );
-    }
-  }
+			return {
+				id: request.id,
+				status: 200,
+				body: result,
+				timestamp: Date.now(),
+			};
+		} catch (error: any) {
+			return this.errorResponse(
+				request.id,
+				error.statusCode || error.status || 500,
+				error.message || 'Internal server error',
+				error.code
+			);
+		}
+	}
 
-  private parseRoute(path: string, method: string): { controller: any; method: string } | null {
-    // Match path to controller
-    // Example: '/api/tasks' + 'GET' => TasksController.list()
-    // Example: '/api/tasks/:id' + 'GET' => TasksController.get()
+	private parseRoute(path: string, method: string): { controller: any; method: string } | null {
+		// Match path to controller
+		// Example: '/api/tasks' + 'GET' => TasksController.list()
+		// Example: '/api/tasks/:id' + 'GET' => TasksController.get()
 
-    // This logic should mirror the existing route registration in routesPlugin
-    // We need access to the controller registry built by LazyController loading
+		// This logic should mirror the existing route registration in routesPlugin
+		// We need access to the controller registry built by LazyController loading
 
-    const routeKey = `${method} ${path}`;
-    const handler = this.controllerHandlers.get(routeKey);
+		const routeKey = `${method} ${path}`;
+		const handler = this.controllerHandlers.get(routeKey);
 
-    if (!handler) return null;
+		if (!handler) return null;
 
-    return handler;
-  }
+		return handler;
+	}
 
-  private errorResponse(
-    id: string,
-    status: number,
-    message: string,
-    code?: string
-  ): TransportResponse {
-    return {
-      id,
-      status,
-      error: {
-        code: code || `HTTP_${status}`,
-        message,
-      },
-      timestamp: Date.now(),
-    };
-  }
+	private errorResponse(id: string, status: number, message: string, code?: string): TransportResponse {
+		return {
+			id,
+			status,
+			error: {
+				code: code || `HTTP_${status}`,
+				message,
+			},
+			timestamp: Date.now(),
+		};
+	}
 
-  // Register handler (called during controller setup)
-  registerHandler(method: string, path: string, controller: any, handlerMethod: string) {
-    const routeKey = `${method} ${path}`;
-    this.controllerHandlers.set(routeKey, { controller, method: handlerMethod });
-  }
+	// Register handler (called during controller setup)
+	registerHandler(method: string, path: string, controller: any, handlerMethod: string) {
+		const routeKey = `${method} ${path}`;
+		this.controllerHandlers.set(routeKey, { controller, method: handlerMethod });
+	}
 
-  private controllerHandlers = new Map<string, { controller: any; method: string }>();
+	private controllerHandlers = new Map<string, { controller: any; method: string }>();
 }
 ```
 
@@ -1305,128 +1245,130 @@ export class TransportRouter {
 **Fichier:** `packages/web-backend/src/transport/adapters/WebSocketTransportServer.ts`
 
 ```typescript
-import type { ITransportServer } from '../ITransportServer';
-import type { TransportRequest, TransportResponse, TransportEvent } from '@shared/transport';
+import type { TransportEvent, TransportRequest, TransportResponse } from '@shared/transport';
 import type { FastifyInstance } from 'fastify';
 import type { WebSocket } from 'ws';
 
+import type { ITransportServer } from '../ITransportServer';
+
 export class WebSocketTransportServer implements ITransportServer {
-  private clients = new Map<string, WebSocket>();
-  private clientConnectedHandlers: Array<(clientId: string) => void> = [];
-  private clientDisconnectedHandlers: Array<(clientId: string) => void> = [];
+	private clients = new Map<string, WebSocket>();
+	private clientConnectedHandlers: Array<(clientId: string) => void> = [];
+	private clientDisconnectedHandlers: Array<(clientId: string) => void> = [];
 
-  constructor() {}
+	constructor() {}
 
-  async initialize(app: FastifyInstance, router: TransportRouter): Promise<void> {
-    // Register @fastify/websocket
-    await app.register(require('@fastify/websocket'));
+	async initialize(app: FastifyInstance, router: TransportRouter): Promise<void> {
+		// Register @fastify/websocket
+		await app.register(require('@fastify/websocket'));
 
-    // WebSocket endpoint: ws://host:port/ws
-    app.get('/ws', { websocket: true }, (connection, req) => {
-      const clientId = this.generateClientId();
-      this.clients.set(clientId, connection.socket);
+		// WebSocket endpoint: ws://host:port/ws
+		app.get('/ws', { websocket: true }, (connection, req) => {
+			const clientId = this.generateClientId();
+			this.clients.set(clientId, connection.socket);
 
-      console.log(`WebSocket client connected: ${clientId}`);
-      this.clientConnectedHandlers.forEach(handler => handler(clientId));
+			console.log(`WebSocket client connected: ${clientId}`);
+			this.clientConnectedHandlers.forEach(handler => handler(clientId));
 
-      connection.socket.on('message', async (rawMessage: Buffer) => {
-        try {
-          const message = rawMessage.toString();
-          const request: TransportRequest = JSON.parse(message);
+			connection.socket.on('message', async (rawMessage: Buffer) => {
+				try {
+					const message = rawMessage.toString();
+					const request: TransportRequest = JSON.parse(message);
 
-          // Route request to controller via router
-          const response = await router.handleRequest(request);
+					// Route request to controller via router
+					const response = await router.handleRequest(request);
 
-          // Send response back
-          connection.socket.send(JSON.stringify(response));
-        } catch (error) {
-          console.error('WebSocket message error', error);
-          const errorResponse: TransportResponse = {
-            id: 'unknown',
-            status: 500,
-            error: {
-              code: 'INTERNAL_ERROR',
-              message: 'Failed to process request',
-            },
-            timestamp: Date.now(),
-          };
-          connection.socket.send(JSON.stringify(errorResponse));
-        }
-      });
+					// Send response back
+					connection.socket.send(JSON.stringify(response));
+				} catch (error) {
+					console.error('WebSocket message error', error);
+					const errorResponse: TransportResponse = {
+						id: 'unknown',
+						status: 500,
+						error: {
+							code: 'INTERNAL_ERROR',
+							message: 'Failed to process request',
+						},
+						timestamp: Date.now(),
+					};
+					connection.socket.send(JSON.stringify(errorResponse));
+				}
+			});
 
-      connection.socket.on('close', () => {
-        console.log(`WebSocket client disconnected: ${clientId}`);
-        this.clients.delete(clientId);
-        this.clientDisconnectedHandlers.forEach(handler => handler(clientId));
-      });
+			connection.socket.on('close', () => {
+				console.log(`WebSocket client disconnected: ${clientId}`);
+				this.clients.delete(clientId);
+				this.clientDisconnectedHandlers.forEach(handler => handler(clientId));
+			});
 
-      connection.socket.on('error', (error) => {
-        console.error(`WebSocket error for client ${clientId}:`, error);
-      });
-    });
-  }
+			connection.socket.on('error', error => {
+				console.error(`WebSocket error for client ${clientId}:`, error);
+			});
+		});
+	}
 
-  broadcast<E extends EventType>(event: E, data: EventData<E>): void {
-    const eventMessage: TransportEvent = {
-      id: this.generateEventId(),
-      type: event,
-      data,
-      timestamp: Date.now(),
-    };
+	broadcast<E extends EventType>(event: E, data: EventData<E>): void {
+		const eventMessage: TransportEvent = {
+			id: this.generateEventId(),
+			type: event,
+			data,
+			timestamp: Date.now(),
+		};
 
-    const message = JSON.stringify(eventMessage);
+		const message = JSON.stringify(eventMessage);
 
-    this.clients.forEach((client, clientId) => {
-      if (client.readyState === 1) { // OPEN
-        try {
-          client.send(message);
-        } catch (error) {
-          console.error(`Failed to send event to client ${clientId}`, error);
-        }
-      }
-    });
-  }
+		this.clients.forEach((client, clientId) => {
+			if (client.readyState === 1) {
+				// OPEN
+				try {
+					client.send(message);
+				} catch (error) {
+					console.error(`Failed to send event to client ${clientId}`, error);
+				}
+			}
+		});
+	}
 
-  sendToClient<E extends EventType>(clientId: string, event: E, data: EventData<E>): void {
-    const client = this.clients.get(clientId);
-    if (!client || client.readyState !== 1) {
-      console.warn(`Client ${clientId} not connected`);
-      return;
-    }
+	sendToClient<E extends EventType>(clientId: string, event: E, data: EventData<E>): void {
+		const client = this.clients.get(clientId);
+		if (!client || client.readyState !== 1) {
+			console.warn(`Client ${clientId} not connected`);
+			return;
+		}
 
-    const eventMessage: TransportEvent = {
-      id: this.generateEventId(),
-      type: event,
-      data,
-      timestamp: Date.now(),
-    };
+		const eventMessage: TransportEvent = {
+			id: this.generateEventId(),
+			type: event,
+			data,
+			timestamp: Date.now(),
+		};
 
-    try {
-      client.send(JSON.stringify(eventMessage));
-    } catch (error) {
-      console.error(`Failed to send event to client ${clientId}`, error);
-    }
-  }
+		try {
+			client.send(JSON.stringify(eventMessage));
+		} catch (error) {
+			console.error(`Failed to send event to client ${clientId}`, error);
+		}
+	}
 
-  onClientConnected(handler: (clientId: string) => void): void {
-    this.clientConnectedHandlers.push(handler);
-  }
+	onClientConnected(handler: (clientId: string) => void): void {
+		this.clientConnectedHandlers.push(handler);
+	}
 
-  onClientDisconnected(handler: (clientId: string) => void): void {
-    this.clientDisconnectedHandlers.push(handler);
-  }
+	onClientDisconnected(handler: (clientId: string) => void): void {
+		this.clientDisconnectedHandlers.push(handler);
+	}
 
-  getConnectedClients(): string[] {
-    return Array.from(this.clients.keys());
-  }
+	getConnectedClients(): string[] {
+		return Array.from(this.clients.keys());
+	}
 
-  private generateClientId(): string {
-    return `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
+	private generateClientId(): string {
+		return `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+	}
 
-  private generateEventId(): string {
-    return `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
+	private generateEventId(): string {
+		return `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+	}
 }
 ```
 
@@ -1436,79 +1378,79 @@ export class WebSocketTransportServer implements ITransportServer {
 
 ```typescript
 export class RestTransportServer implements ITransportServer {
-  private eventBuffer: TransportEvent[] = [];
-  private maxBufferSize = 1000; // Keep last 1000 events
-  private maxEventAge = 60000; // 60 seconds
+	private eventBuffer: TransportEvent[] = [];
+	private maxBufferSize = 1000; // Keep last 1000 events
+	private maxEventAge = 60000; // 60 seconds
 
-  async initialize(app: FastifyInstance, router: TransportRouter): Promise<void> {
-    // REST routes are already registered by existing routesPlugin
-    // We only need to add the events polling endpoint
+	async initialize(app: FastifyInstance, router: TransportRouter): Promise<void> {
+		// REST routes are already registered by existing routesPlugin
+		// We only need to add the events polling endpoint
 
-    app.get('/api/events', async (request, reply) => {
-      const { since, types } = request.query as { since?: string; types?: string };
+		app.get('/api/events', async (request, reply) => {
+			const { since, types } = request.query as { since?: string; types?: string };
 
-      const sinceTimestamp = since ? parseInt(since) : 0;
-      const eventTypes = types ? types.split(',') : [];
+			const sinceTimestamp = since ? parseInt(since) : 0;
+			const eventTypes = types ? types.split(',') : [];
 
-      // Filter events
-      let events = this.eventBuffer.filter(evt => evt.timestamp > sinceTimestamp);
+			// Filter events
+			let events = this.eventBuffer.filter(evt => evt.timestamp > sinceTimestamp);
 
-      if (eventTypes.length > 0) {
-        events = events.filter(evt => eventTypes.includes(evt.type));
-      }
+			if (eventTypes.length > 0) {
+				events = events.filter(evt => eventTypes.includes(evt.type));
+			}
 
-      return events;
-    });
+			return events;
+		});
 
-    // Periodic cleanup of old events
-    setInterval(() => {
-      this.cleanupOldEvents();
-    }, 10000); // Every 10 seconds
-  }
+		// Periodic cleanup of old events
+		setInterval(() => {
+			this.cleanupOldEvents();
+		}, 10000); // Every 10 seconds
+	}
 
-  broadcast<E extends EventType>(event: E, data: EventData<E>): void {
-    const eventMessage: TransportEvent = {
-      id: this.generateEventId(),
-      type: event,
-      data,
-      timestamp: Date.now(),
-    };
+	broadcast<E extends EventType>(event: E, data: EventData<E>): void {
+		const eventMessage: TransportEvent = {
+			id: this.generateEventId(),
+			type: event,
+			data,
+			timestamp: Date.now(),
+		};
 
-    this.eventBuffer.push(eventMessage);
+		this.eventBuffer.push(eventMessage);
 
-    // Trim buffer if too large
-    if (this.eventBuffer.length > this.maxBufferSize) {
-      this.eventBuffer = this.eventBuffer.slice(-this.maxBufferSize);
-    }
-  }
+		// Trim buffer if too large
+		if (this.eventBuffer.length > this.maxBufferSize) {
+			this.eventBuffer = this.eventBuffer.slice(-this.maxBufferSize);
+		}
+	}
 
-  sendToClient<E extends EventType>(clientId: string, event: E, data: EventData<E>): void {
-    // REST doesn't support client-specific events
-    // Fallback to broadcast or implement client-specific polling
-    console.warn('sendToClient not efficiently supported in REST mode. Use WebSocket for targeted events.');
-    this.broadcast(event, data);
-  }
+	sendToClient<E extends EventType>(clientId: string, event: E, data: EventData<E>): void {
+		// REST doesn't support client-specific events
+		// Fallback to broadcast or implement client-specific polling
+		console.warn('sendToClient not efficiently supported in REST mode. Use WebSocket for targeted events.');
+		this.broadcast(event, data);
+	}
 
-  onClientConnected(handler: (clientId: string) => void): void {
-    // REST is stateless, no connection tracking
-  }
+	onClientConnected(handler: (clientId: string) => void): void {
+		// REST is stateless, no connection tracking
+	}
 
-  onClientDisconnected(handler: (clientId: string) => void): void {
-    // REST is stateless, no connection tracking
-  }
+	onClientDisconnected(handler: (clientId: string) => void): void {
+		// REST is stateless, no connection tracking
+	}
 
-  getConnectedClients(): string[] {
-    return []; // REST doesn't track clients
-  }
+	getConnectedClients(): string[] {
+		return []; // REST doesn't track clients
+	}
 
-  private cleanupOldEvents() {
-    const cutoffTime = Date.now() - this.maxEventAge;
-    this.eventBuffer = this.eventBuffer.filter(evt => evt.timestamp > cutoffTime);
-  }
+	private cleanupOldEvents() {
+		const cutoffTime = Date.now() - this.maxEventAge;
+		this.eventBuffer = this.eventBuffer.filter(evt => evt.timestamp > cutoffTime);
+	}
 
-  private generateEventId(): string {
-    return `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
+	private generateEventId(): string {
+		return `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+	}
 }
 ```
 
@@ -1518,21 +1460,21 @@ export class RestTransportServer implements ITransportServer {
 
 ```typescript
 export class TransportServerFactory {
-  static create(config: { mode?: 'websocket' | 'rest' | 'both' }): ITransportServer[] {
-    const mode = config.mode || 'both';
+	static create(config: { mode?: 'websocket' | 'rest' | 'both' }): ITransportServer[] {
+		const mode = config.mode || 'both';
 
-    const servers: ITransportServer[] = [];
+		const servers: ITransportServer[] = [];
 
-    if (mode === 'websocket' || mode === 'both') {
-      servers.push(new WebSocketTransportServer());
-    }
+		if (mode === 'websocket' || mode === 'both') {
+			servers.push(new WebSocketTransportServer());
+		}
 
-    if (mode === 'rest' || mode === 'both') {
-      servers.push(new RestTransportServer());
-    }
+		if (mode === 'rest' || mode === 'both') {
+			servers.push(new RestTransportServer());
+		}
 
-    return servers;
-  }
+		return servers;
+	}
 }
 ```
 
@@ -1546,43 +1488,43 @@ Les controllers doivent pouvoir broadcaster des événements. On injecte `ITrans
 
 ```typescript
 export default class TasksController implements LazyController<typeof TASKS_API_ROUTES> {
-  constructor(
-    private service: TasksService,
-    private eventBroadcaster: EventBroadcaster // NEW
-  ) {}
+	constructor(
+		private service: TasksService,
+		private eventBroadcaster: EventBroadcaster // NEW
+	) {}
 
-  configureRoutes(add: RouteWrapperFunc<typeof TASKS_API_ROUTES>) {
-    add('GET', '/api/tasks/', async ({ query }) => {
-      return this.service.getTasksData(query);
-    });
+	configureRoutes(add: RouteWrapperFunc<typeof TASKS_API_ROUTES>) {
+		add('GET', '/api/tasks/', async ({ query }) => {
+			return this.service.getTasksData(query);
+		});
 
-    add('POST', '/api/tasks/', async ({ body }) => {
-      const task = await this.service.createTask(body);
+		add('POST', '/api/tasks/', async ({ body }) => {
+			const task = await this.service.createTask(body);
 
-      // Broadcast event
-      this.eventBroadcaster.broadcast('task:created', task);
+			// Broadcast event
+			this.eventBroadcaster.broadcast('task:created', task);
 
-      return task;
-    });
+			return task;
+		});
 
-    add('PUT', '/api/tasks/:id', async ({ params, body }) => {
-      const task = await this.service.updateTask(params.id, body);
+		add('PUT', '/api/tasks/:id', async ({ params, body }) => {
+			const task = await this.service.updateTask(params.id, body);
 
-      // Broadcast event
-      this.eventBroadcaster.broadcast('task:updated', task);
+			// Broadcast event
+			this.eventBroadcaster.broadcast('task:updated', task);
 
-      return task;
-    });
+			return task;
+		});
 
-    add('DELETE', '/api/tasks/:id', async ({ params }) => {
-      await this.service.deleteTask(params.id);
+		add('DELETE', '/api/tasks/:id', async ({ params }) => {
+			await this.service.deleteTask(params.id);
 
-      // Broadcast event
-      this.eventBroadcaster.broadcast('task:deleted', { id: params.id });
+			// Broadcast event
+			this.eventBroadcaster.broadcast('task:deleted', { id: params.id });
 
-      return { success: true };
-    });
-  }
+			return { success: true };
+		});
+	}
 }
 ```
 
@@ -1592,15 +1534,15 @@ export default class TasksController implements LazyController<typeof TASKS_API_
 
 ```typescript
 export class EventBroadcaster {
-  constructor(private servers: ITransportServer[]) {}
+	constructor(private servers: ITransportServer[]) {}
 
-  broadcast<E extends EventType>(event: E, data: EventData<E>): void {
-    this.servers.forEach(server => server.broadcast(event, data));
-  }
+	broadcast<E extends EventType>(event: E, data: EventData<E>): void {
+		this.servers.forEach(server => server.broadcast(event, data));
+	}
 
-  sendToClient<E extends EventType>(clientId: string, event: E, data: EventData<E>): void {
-    this.servers.forEach(server => server.sendToClient(clientId, event, data));
-  }
+	sendToClient<E extends EventType>(clientId: string, event: E, data: EventData<E>): void {
+		this.servers.forEach(server => server.sendToClient(clientId, event, data));
+	}
 }
 ```
 
@@ -1649,122 +1591,122 @@ export async function createServer(config: ServerConfig) {
 
 ```typescript
 describe('WebSocketTransportClient', () => {
-  let transport: WebSocketTransportClient;
-  let mockWs: MockWebSocket;
+	let transport: WebSocketTransportClient;
+	let mockWs: MockWebSocket;
 
-  beforeEach(() => {
-    mockWs = new MockWebSocket();
-    transport = new WebSocketTransportClient({ wsUrl: 'ws://test' });
-  });
+	beforeEach(() => {
+		mockWs = new MockWebSocket();
+		transport = new WebSocketTransportClient({ wsUrl: 'ws://test' });
+	});
 
-  describe('request/response', () => {
-    it('should send request and receive response', async () => {
-      await transport.connect();
+	describe('request/response', () => {
+		it('should send request and receive response', async () => {
+			await transport.connect();
 
-      const responsePromise = transport.request('GET', '/api/tasks' as any);
+			const responsePromise = transport.request('GET', '/api/tasks' as any);
 
-      // Capture sent request
-      const sentMessage = JSON.parse(mockWs.lastSentMessage);
-      expect(sentMessage.method).toBe('GET');
-      expect(sentMessage.path).toBe('/api/tasks');
+			// Capture sent request
+			const sentMessage = JSON.parse(mockWs.lastSentMessage);
+			expect(sentMessage.method).toBe('GET');
+			expect(sentMessage.path).toBe('/api/tasks');
 
-      // Simulate server response
-      mockWs.receiveMessage({
-        id: sentMessage.id,
-        status: 200,
-        body: [{ id: '1', name: 'Task 1' }],
-        timestamp: Date.now(),
-      });
+			// Simulate server response
+			mockWs.receiveMessage({
+				id: sentMessage.id,
+				status: 200,
+				body: [{ id: '1', name: 'Task 1' }],
+				timestamp: Date.now(),
+			});
 
-      const result = await responsePromise;
-      expect(result).toEqual([{ id: '1', name: 'Task 1' }]);
-    });
+			const result = await responsePromise;
+			expect(result).toEqual([{ id: '1', name: 'Task 1' }]);
+		});
 
-    it('should handle timeout', async () => {
-      await transport.connect();
+		it('should handle timeout', async () => {
+			await transport.connect();
 
-      const responsePromise = transport.request('GET', '/api/tasks' as any);
+			const responsePromise = transport.request('GET', '/api/tasks' as any);
 
-      // Don't send response, wait for timeout
-      await expect(responsePromise).rejects.toThrow('Request timeout');
-    });
+			// Don't send response, wait for timeout
+			await expect(responsePromise).rejects.toThrow('Request timeout');
+		});
 
-    it('should handle error response', async () => {
-      await transport.connect();
+		it('should handle error response', async () => {
+			await transport.connect();
 
-      const responsePromise = transport.request('GET', '/api/tasks/999' as any);
+			const responsePromise = transport.request('GET', '/api/tasks/999' as any);
 
-      const sentMessage = JSON.parse(mockWs.lastSentMessage);
-      mockWs.receiveMessage({
-        id: sentMessage.id,
-        status: 404,
-        error: { code: 'NOT_FOUND', message: 'Task not found' },
-        timestamp: Date.now(),
-      });
+			const sentMessage = JSON.parse(mockWs.lastSentMessage);
+			mockWs.receiveMessage({
+				id: sentMessage.id,
+				status: 404,
+				error: { code: 'NOT_FOUND', message: 'Task not found' },
+				timestamp: Date.now(),
+			});
 
-      await expect(responsePromise).rejects.toMatchObject({
-        code: 'NOT_FOUND',
-        message: 'Task not found',
-      });
-    });
-  });
+			await expect(responsePromise).rejects.toMatchObject({
+				code: 'NOT_FOUND',
+				message: 'Task not found',
+			});
+		});
+	});
 
-  describe('events', () => {
-    it('should subscribe to events', async () => {
-      await transport.connect();
+	describe('events', () => {
+		it('should subscribe to events', async () => {
+			await transport.connect();
 
-      const handler = jest.fn();
-      transport.subscribe('task:created', handler);
+			const handler = jest.fn();
+			transport.subscribe('task:created', handler);
 
-      // Simulate server event
-      mockWs.receiveMessage({
-        id: 'evt1',
-        type: 'task:created',
-        data: { id: '1', name: 'New Task' },
-        timestamp: Date.now(),
-      });
+			// Simulate server event
+			mockWs.receiveMessage({
+				id: 'evt1',
+				type: 'task:created',
+				data: { id: '1', name: 'New Task' },
+				timestamp: Date.now(),
+			});
 
-      expect(handler).toHaveBeenCalledWith({ id: '1', name: 'New Task' });
-    });
+			expect(handler).toHaveBeenCalledWith({ id: '1', name: 'New Task' });
+		});
 
-    it('should unsubscribe from events', async () => {
-      await transport.connect();
+		it('should unsubscribe from events', async () => {
+			await transport.connect();
 
-      const handler = jest.fn();
-      const unsubscribe = transport.subscribe('task:created', handler);
+			const handler = jest.fn();
+			const unsubscribe = transport.subscribe('task:created', handler);
 
-      unsubscribe();
+			unsubscribe();
 
-      mockWs.receiveMessage({
-        id: 'evt1',
-        type: 'task:created',
-        data: { id: '1', name: 'New Task' },
-        timestamp: Date.now(),
-      });
+			mockWs.receiveMessage({
+				id: 'evt1',
+				type: 'task:created',
+				data: { id: '1', name: 'New Task' },
+				timestamp: Date.now(),
+			});
 
-      expect(handler).not.toHaveBeenCalled();
-    });
-  });
+			expect(handler).not.toHaveBeenCalled();
+		});
+	});
 
-  describe('reconnection', () => {
-    it('should reconnect on disconnect with exponential backoff', async () => {
-      await transport.connect();
+	describe('reconnection', () => {
+		it('should reconnect on disconnect with exponential backoff', async () => {
+			await transport.connect();
 
-      // Simulate disconnect
-      mockWs.simulateClose();
+			// Simulate disconnect
+			mockWs.simulateClose();
 
-      // Should attempt reconnect
-      await jest.advanceTimersByTimeAsync(1000);
-      expect(mockWs.reconnectAttempts).toBe(1);
+			// Should attempt reconnect
+			await jest.advanceTimersByTimeAsync(1000);
+			expect(mockWs.reconnectAttempts).toBe(1);
 
-      // Fail reconnect
-      mockWs.simulateError();
+			// Fail reconnect
+			mockWs.simulateError();
 
-      // Should retry with backoff
-      await jest.advanceTimersByTimeAsync(2000);
-      expect(mockWs.reconnectAttempts).toBe(2);
-    });
-  });
+			// Should retry with backoff
+			await jest.advanceTimersByTimeAsync(2000);
+			expect(mockWs.reconnectAttempts).toBe(2);
+		});
+	});
 });
 ```
 
@@ -1982,11 +1924,13 @@ export function TransportDebugPanel() {
 ### To Create
 
 **Shared (packages/shared-frontend-backend):**
+
 - `src/transport/TransportProtocol.ts` - Protocol types
 - `src/transport/TypedTransport.ts` - Typed API registry
 - `src/transport/EventTypes.ts` - Event types registry
 
 **Frontend (packages/web-frontend):**
+
 - `src/transport/ITransportClient.ts` - Client interface
 - `src/transport/TransportFactory.ts` - Factory with config
 - `src/transport/RuntimeTransportConfig.ts` - Runtime config
@@ -1998,6 +1942,7 @@ export function TransportDebugPanel() {
 - `src/app/components/debug/TransportDebugPanel.tsx`
 
 **Backend (packages/web-backend):**
+
 - `src/transport/ITransportServer.ts` - Server interface
 - `src/transport/TransportRouter.ts` - Request router
 - `src/transport/TransportServerFactory.ts` - Server factory
@@ -2006,6 +1951,7 @@ export function TransportDebugPanel() {
 - `src/transport/adapters/RestTransportServer.ts`
 
 **Tests:**
+
 - Frontend: `src/transport/adapters/*.test.ts` (3 files)
 - Frontend: `src/app/hooks/*.test.ts` (update existing with mock transport)
 - Backend: `src/transport/*.test.ts`
@@ -2013,6 +1959,7 @@ export function TransportDebugPanel() {
 ### To Modify
 
 **Frontend:**
+
 - `src/app/api/client.ts` - Wrap createTypedFetch to use transport
 - `src/app/hooks/useTasks.ts` - Subscribe to task events
 - `src/app/hooks/useWorkers.ts` - Subscribe to worker events
@@ -2021,6 +1968,7 @@ export function TransportDebugPanel() {
 - Remove `src/app/hooks/useOrchestratorWebSocket.ts` (replaced)
 
 **Backend:**
+
 - `src/server.ts` - Initialize transport servers
 - `src/controllers/TasksController.ts` - Inject EventBroadcaster, emit events
 - `src/controllers/WorkersController.ts` - Same
@@ -2028,12 +1976,14 @@ export function TransportDebugPanel() {
 - `src/controllers/WorkspacesController.ts` - Same
 
 **Config:**
+
 - `packages/web-frontend/.env.example`
 - `packages/web-backend/.env.example`
 
 ### To Delete
 
 **Frontend:**
+
 - `src/app/hooks/useOrchestratorWebSocket.ts` (architecture error, replaced by new system)
 
 ---
@@ -2041,53 +1991,53 @@ export function TransportDebugPanel() {
 ## 7. Implementation Order
 
 1. **Phase 1: Shared Protocol Types**
-   - Create TransportProtocol.ts, TypedTransport.ts, EventTypes.ts
-   - Test type helpers with existing ALL_API_ROUTES
+    - Create TransportProtocol.ts, TypedTransport.ts, EventTypes.ts
+    - Test type helpers with existing ALL_API_ROUTES
 
 2. **Phase 2: Frontend Transport Layer**
-   - Create ITransportClient interface
-   - Implement MockTransportClient (easiest, for immediate testing)
-   - Create TransportFactory and TransportProvider
-   - Write unit tests for MockTransportClient
+    - Create ITransportClient interface
+    - Implement MockTransportClient (easiest, for immediate testing)
+    - Create TransportFactory and TransportProvider
+    - Write unit tests for MockTransportClient
 
 3. **Phase 3: Frontend Integration**
-   - Modify client.ts to use transport
-   - Update hooks to subscribe to events
-   - Remove useOrchestratorWebSocket
-   - Test with MockTransportClient
+    - Modify client.ts to use transport
+    - Update hooks to subscribe to events
+    - Remove useOrchestratorWebSocket
+    - Test with MockTransportClient
 
 4. **Phase 4: Backend Transport Layer**
-   - Create ITransportServer, TransportRouter, EventBroadcaster
-   - Implement RestTransportServer (reuse existing routes)
-   - Add /api/events endpoint for polling
-   - Test with existing REST routes
+    - Create ITransportServer, TransportRouter, EventBroadcaster
+    - Implement RestTransportServer (reuse existing routes)
+    - Add /api/events endpoint for polling
+    - Test with existing REST routes
 
 5. **Phase 5: WebSocket Implementation**
-   - Implement WebSocketTransportClient (frontend)
-   - Implement WebSocketTransportServer (backend)
-   - Write unit tests
-   - Test end-to-end WebSocket communication
+    - Implement WebSocketTransportClient (frontend)
+    - Implement WebSocketTransportServer (backend)
+    - Write unit tests
+    - Test end-to-end WebSocket communication
 
 6. **Phase 6: REST Adapter**
-   - Implement RestTransportClient (frontend)
-   - Test REST polling
-   - Write unit tests
+    - Implement RestTransportClient (frontend)
+    - Test REST polling
+    - Write unit tests
 
 7. **Phase 7: Adaptive Transport**
-   - Implement AdaptiveTransportClient
-   - Test WebSocket → REST fallback
-   - Write unit tests
+    - Implement AdaptiveTransportClient
+    - Test WebSocket → REST fallback
+    - Write unit tests
 
 8. **Phase 8: Configuration & Debug**
-   - Add environment variables
-   - Implement RuntimeTransportConfig
-   - Create TransportDebugPanel UI
-   - Test config switching
+    - Add environment variables
+    - Implement RuntimeTransportConfig
+    - Create TransportDebugPanel UI
+    - Test config switching
 
 9. **Phase 9: Controllers Integration**
-   - Inject EventBroadcaster into all controllers
-   - Add event emission after CRUD operations
-   - Test event flow end-to-end
+    - Inject EventBroadcaster into all controllers
+    - Add event emission after CRUD operations
+    - Test event flow end-to-end
 
 10. **Phase 10: Mock Advanced Features**
     - Implement in-memory state machine

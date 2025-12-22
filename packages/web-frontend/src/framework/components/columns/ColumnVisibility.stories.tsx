@@ -536,8 +536,8 @@ export const InteractiveWithModifiedState: Story = {
 									{isModified && (
 										<span
 											className={`
-            rounded-md bg-primary/10 px-1.5 py-0.5 text-xs text-primary
-          `}
+             rounded-md bg-primary/10 px-1.5 py-0.5 text-xs text-primary
+           `}
 										>
 											modified
 										</span>

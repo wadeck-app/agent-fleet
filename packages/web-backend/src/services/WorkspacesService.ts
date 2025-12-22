@@ -1,4 +1,6 @@
-import type { WorkspacesData, Workspace, WorkspaceStatus } from '@app/shared';
+import type { Workspace, WorkspaceStatus, WorkspacesData } from '@app/shared';
+
+import type { EventBroadcaster } from '../transport/EventBroadcaster';
 
 /**
  * ===========================================================================================
@@ -10,15 +12,29 @@ import type { WorkspacesData, Workspace, WorkspaceStatus } from '@app/shared';
  * - Generate mock workspace data (MVP - orchestrator doesn't have workspaces API yet)
  * - Calculate summary statistics
  * - Transform workspace data into frontend DTO
+ * - Emit real-time events for workspace state changes
  *
  * Does NOT contain:
  * - HTTP concerns (in controller)
  * - Data fetching/caching (would be in repository when real API exists)
  *
+ * Event Emission Strategy:
+ * - Events are emitted AFTER successful operations
+ * - Broadcast failures are logged but don't fail the operation
+ * - Type-safe event emission using EventBroadcaster
+ *
+ * Future CRUD Operations (when implemented):
+ * - createWorkspace() → emit 'workspace:created'
+ * - updateWorkspace() → emit 'workspace:updated'
+ * - deleteWorkspace() → emit 'workspace:deleted'
+ * - archiveWorkspace() → emit 'workspace:archived'
+ * - checkQuota() → emit 'workspace:quota_exceeded' (when quota exceeded)
+ *
  * ===========================================================================================
  */
 
 export class WorkspacesService {
+	constructor(private readonly eventBroadcaster: EventBroadcaster) {}
 	/**
 	 * Get workspaces data
 	 * MVP: Returns mock data since orchestrator doesn't have workspaces API yet
@@ -178,7 +194,7 @@ export class WorkspacesService {
 		};
 
 		// Count workspaces by status
-		workspaces.forEach((workspace) => {
+		workspaces.forEach(workspace => {
 			switch (workspace.status) {
 				case 'active':
 					summary.active++;
@@ -197,4 +213,134 @@ export class WorkspacesService {
 
 		return summary;
 	}
+
+	// ===========================================================================================
+	// CRUD METHODS (TO BE IMPLEMENTED)
+	// ===========================================================================================
+	// When CRUD operations are implemented, use these as templates for event emission
+
+	/**
+	 * Create a new workspace (PLACEHOLDER - not implemented)
+	 * When implemented, emit 'workspace:created' event
+	 *
+	 * @example
+	 * ```typescript
+	 * async createWorkspace(data: CreateWorkspaceDto): Promise<Workspace> {
+	 *   try {
+	 *     const workspace = await this.repository.createWorkspace(data);
+	 *
+	 *     // Emit event AFTER successful creation
+	 *     this.eventBroadcaster.broadcast('workspace:created', workspace);
+	 *
+	 *     return workspace;
+	 *   } catch (error) {
+	 *     console.error('[WorkspacesService] Failed to create workspace:', error);
+	 *     throw error;
+	 *   }
+	 * }
+	 * ```
+	 */
+
+	/**
+	 * Update workspace (PLACEHOLDER - not implemented)
+	 * When implemented, emit 'workspace:updated' event
+	 *
+	 * @example
+	 * ```typescript
+	 * async updateWorkspace(id: string, data: UpdateWorkspaceDto): Promise<Workspace> {
+	 *   try {
+	 *     const workspace = await this.repository.updateWorkspace(id, data);
+	 *
+	 *     // Emit event AFTER successful update
+	 *     this.eventBroadcaster.broadcast('workspace:updated', workspace);
+	 *
+	 *     return workspace;
+	 *   } catch (error) {
+	 *     console.error('[WorkspacesService] Failed to update workspace:', error);
+	 *     throw error;
+	 *   }
+	 * }
+	 * ```
+	 */
+
+	/**
+	 * Archive workspace (PLACEHOLDER - not implemented)
+	 * When implemented, emit 'workspace:archived' event
+	 *
+	 * @example
+	 * ```typescript
+	 * async archiveWorkspace(workspaceId: string): Promise<Workspace> {
+	 *   try {
+	 *     const archivedAt = Date.now();
+	 *     const workspace = await this.repository.archiveWorkspace(workspaceId);
+	 *
+	 *     // Emit event AFTER successful archival
+	 *     this.eventBroadcaster.broadcast('workspace:archived', {
+	 *       workspaceId,
+	 *       archivedAt,
+	 *     });
+	 *
+	 *     return workspace;
+	 *   } catch (error) {
+	 *     console.error('[WorkspacesService] Failed to archive workspace:', error);
+	 *     throw error;
+	 *   }
+	 * }
+	 * ```
+	 */
+
+	/**
+	 * Check workspace quota (PLACEHOLDER - not implemented)
+	 * When implemented, emit 'workspace:quota_exceeded' event when quota is exceeded
+	 *
+	 * @example
+	 * ```typescript
+	 * async checkQuota(workspaceId: string, quotaType: string): Promise<boolean> {
+	 *   try {
+	 *     const quota = await this.repository.getWorkspaceQuota(workspaceId, quotaType);
+	 *
+	 *     if (quota.usage >= quota.limit) {
+	 *       // Emit event when quota is exceeded
+	 *       this.eventBroadcaster.broadcast('workspace:quota_exceeded', {
+	 *         workspaceId,
+	 *         quotaType,
+	 *         usage: quota.usage,
+	 *         limit: quota.limit,
+	 *       });
+	 *
+	 *       return true; // Quota exceeded
+	 *     }
+	 *
+	 *     return false; // Within quota
+	 *   } catch (error) {
+	 *     console.error('[WorkspacesService] Failed to check quota:', error);
+	 *     throw error;
+	 *   }
+	 * }
+	 * ```
+	 */
+
+	/**
+	 * Delete workspace (PLACEHOLDER - not implemented)
+	 * When implemented, emit 'workspace:deleted' event
+	 *
+	 * @example
+	 * ```typescript
+	 * async deleteWorkspace(workspaceId: string): Promise<void> {
+	 *   try {
+	 *     await this.repository.deleteWorkspace(workspaceId);
+	 *
+	 *     // Emit event AFTER successful deletion
+	 *     this.eventBroadcaster.broadcast('workspace:deleted', {
+	 *       id: workspaceId,
+	 *       deletedAt: Date.now(),
+	 *     } as any); // Type assertion needed as Workspace requires all fields
+	 *
+	 *   } catch (error) {
+	 *     console.error('[WorkspacesService] Failed to delete workspace:', error);
+	 *     throw error;
+	 *   }
+	 * }
+	 * ```
+	 */
 }

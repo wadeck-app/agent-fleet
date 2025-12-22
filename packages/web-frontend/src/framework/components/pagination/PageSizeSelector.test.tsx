@@ -149,13 +149,7 @@ describe('PageSizeSelector', () => {
 		it('should apply custom className', () => {
 			const onChange = vi.fn();
 			const { container } = render(
-				<PageSizeSelector
-					value={10}
-					onChange={onChange}
-					className={`
-     custom-class
-   `}
-				/>
+				<PageSizeSelector value={10} onChange={onChange} className={`custom-class`} />
 			);
 
 			const wrapper = container.firstChild as HTMLElement;

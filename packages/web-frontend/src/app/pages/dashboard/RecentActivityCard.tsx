@@ -37,19 +37,68 @@ export interface RecentActivityCardProps {
 function getActivityIcon(type: ActivityType) {
 	switch (type) {
 		case 'task_completed':
-			return <CheckCircle2 className="size-4 text-green-600 dark:text-green-400" />;
+			return (
+				<CheckCircle2
+					className={`
+       size-4 text-green-600
+       dark:text-green-400
+     `}
+				/>
+			);
 		case 'task_started':
-			return <Activity className="size-4 text-blue-600 dark:text-blue-400" />;
+			return (
+				<Activity
+					className={`
+       size-4 text-blue-600
+       dark:text-blue-400
+     `}
+				/>
+			);
 		case 'task_review':
-			return <Eye className="size-4 text-purple-600 dark:text-purple-400" />;
+			return (
+				<Eye
+					className={`
+       size-4 text-purple-600
+       dark:text-purple-400
+     `}
+				/>
+			);
 		case 'task_merged':
-			return <GitMerge className="size-4 text-green-600 dark:text-green-400" />;
+			return (
+				<GitMerge
+					className={`
+       size-4 text-green-600
+       dark:text-green-400
+     `}
+				/>
+			);
 		case 'task_failed':
-			return <XCircle className="size-4 text-red-600 dark:text-red-400" />;
+			return (
+				<XCircle
+					className={`
+       size-4 text-red-600
+       dark:text-red-400
+     `}
+				/>
+			);
 		case 'worker_connected':
-			return <UserCheck className="size-4 text-green-600 dark:text-green-400" />;
+			return (
+				<UserCheck
+					className={`
+       size-4 text-green-600
+       dark:text-green-400
+     `}
+				/>
+			);
 		case 'worker_disconnected':
-			return <UserX className="size-4 text-red-600 dark:text-red-400" />;
+			return (
+				<UserX
+					className={`
+       size-4 text-red-600
+       dark:text-red-400
+     `}
+				/>
+			);
 		default:
 			return <AlertCircle className="size-4 text-muted-foreground" />;
 	}
@@ -100,7 +149,7 @@ export function RecentActivityCard({ activities }: RecentActivityCardProps) {
 				) : (
 					<div className="space-y-3">
 						{activities.map((activity, index) => (
-							<div key={`${activity.timestamp}-${index}`} className="flex items-start gap-3">
+							<div key={`${activity.timestamp}-${index}`} className={`flex items-start gap-3`}>
 								{/* Icon */}
 								<div className="mt-0.5">{getActivityIcon(activity.type)}</div>
 
@@ -110,7 +159,9 @@ export function RecentActivityCard({ activities }: RecentActivityCardProps) {
 										<span className="text-xs font-medium text-muted-foreground">
 											{formatTime(activity.timestamp)}
 										</span>
-										<span className="text-xs text-muted-foreground">{formatRelativeTime(activity.timestamp)}</span>
+										<span className="text-xs text-muted-foreground">
+											{formatRelativeTime(activity.timestamp)}
+										</span>
 									</div>
 									<span className="text-sm">{activity.message}</span>
 									{(activity.taskId || activity.workerId) && (

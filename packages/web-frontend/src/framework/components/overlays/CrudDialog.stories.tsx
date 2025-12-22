@@ -220,8 +220,8 @@ export const MediumSize: Story = {
 					<input
 						type="text"
 						className={`
-       mt-1 w-full rounded-md border border-input bg-background px-3 py-2
-     `}
+        mt-1 w-full rounded-md border border-input bg-background px-3 py-2
+      `}
 					/>
 				</div>
 				<div className="flex justify-end gap-2">
@@ -244,8 +244,8 @@ export const LargeSize: Story = {
 					<input
 						type="text"
 						className={`
-       mt-1 w-full rounded-md border border-input bg-background px-3 py-2
-     `}
+        mt-1 w-full rounded-md border border-input bg-background px-3 py-2
+      `}
 					/>
 				</div>
 				<div>
@@ -253,8 +253,8 @@ export const LargeSize: Story = {
 					<input
 						type="text"
 						className={`
-       mt-1 w-full rounded-md border border-input bg-background px-3 py-2
-     `}
+        mt-1 w-full rounded-md border border-input bg-background px-3 py-2
+      `}
 					/>
 				</div>
 				<div className="flex justify-end gap-2">

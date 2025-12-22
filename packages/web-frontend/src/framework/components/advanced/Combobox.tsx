@@ -172,9 +172,9 @@ function ComboboxItem({ className, children, ...props }: ComboboxPrimitive.Item.
 				render={
 					<span
 						className={`
-       pointer-events-none absolute right-2 flex size-4 items-center
-       justify-center
-     `}
+        pointer-events-none absolute right-2 flex size-4 items-center
+        justify-center
+      `}
 					/>
 				}
 			>

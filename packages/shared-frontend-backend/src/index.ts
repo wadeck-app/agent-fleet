@@ -82,6 +82,42 @@ export type {
 	FailedDeletion,
 } from './api/books.contract';
 
+// API Contracts - Auth
+export {
+	LoginRequestSchema,
+	LoginResponseSchema,
+	RefreshTokenResponseSchema,
+	LogoutResponseSchema,
+	SessionResponseSchema,
+	AUTH_API_ROUTES,
+} from './api/auth.contract';
+export type {
+	LoginRequest,
+	LoginResponse,
+	RefreshTokenResponse,
+	LogoutResponse,
+	SessionResponse,
+	AuthApiRoutes,
+} from './api/auth.contract';
+
+// API Contracts - Monitoring
+export {
+	HealthResponseSchema,
+	TransportStatsResponseSchema,
+	SessionInfoSchema,
+	SessionsResponseSchema,
+	SubscriptionBreakdownSchema,
+	MONITORING_API_ROUTES,
+} from './api/monitoring.contract';
+export type {
+	HealthResponse,
+	TransportStatsResponse,
+	SessionInfo,
+	SessionsResponse,
+	SubscriptionBreakdown,
+	MonitoringApiRoutes,
+} from './api/monitoring.contract';
+
 // API Contracts - Dashboard
 export {
 	DashboardDataSchema,
@@ -123,14 +159,7 @@ export {
 	TasksQuerySchema,
 	TASKS_API_ROUTES,
 } from './api/tasks.contract';
-export type {
-	Task,
-	TasksData,
-	TaskStatus,
-	TaskPriority,
-	TasksQuery,
-	TasksApiRoutes,
-} from './api/tasks.contract';
+export type { Task, TasksData, TaskStatus, TaskPriority, TasksQuery, TasksApiRoutes } from './api/tasks.contract';
 
 // API Contracts - Workspaces
 export {
@@ -157,3 +186,31 @@ export type { PathsForMethod, RouteParams, RouteQuery, RouteBody, RouteResponse,
 // Utils - Route validation
 export { validateRoutes, assertValidRoutes, warnInvalidRoutes } from './utils/validate-routes';
 export type { ValidationError, ValidationResult } from './utils/validate-routes';
+
+// Transport - Transport layer types (Phase 1)
+export type {
+	TransportRequest,
+	TransportResponse,
+	TransportEvent,
+	SubscriptionMessage,
+	TransportError,
+	CrudEventType,
+	ResourceEvent,
+	BusinessEvents,
+	EventTypes,
+	EventType,
+	EventData,
+	EventFilter,
+	ResourceName,
+	EventsForResource,
+	ITransport,
+	TransportConfig,
+	RequestOptions,
+	ResponseType,
+	UnsubscribeFunction,
+	ConnectionState,
+	ConnectionStateHandler,
+	EventHandler,
+	TransportType,
+} from './transport';
+export { isValidPath, getAvailableMethods } from './transport';

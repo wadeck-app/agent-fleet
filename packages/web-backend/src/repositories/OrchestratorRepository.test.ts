@@ -1,5 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import type { OrchestratorStats } from '@app/shared-orch-backend';
+
 import { OrchestratorRepository } from './OrchestratorRepository';
 
 describe('OrchestratorRepository', () => {

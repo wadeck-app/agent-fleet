@@ -1,5 +1,8 @@
-import type { TaskStatus, TaskPriority } from '@shared';
+import { Input } from '@framework/components/forms/Input';
+import { Label } from '@framework/components/forms/Label';
+import { Button } from '@framework/components/primitives/Button';
 import { Card, CardContent } from '@framework/components/primitives/Card';
+import type { TaskPriority, TaskStatus } from '@shared';
 
 /**
  * ===========================================================================================
@@ -58,15 +61,23 @@ export function TaskFilters({
 	return (
 		<Card>
 			<CardContent className="pt-6">
-				<div className="flex flex-col gap-4 md:flex-row md:items-end">
+				<div
+					className={`
+       flex flex-col gap-4
+       md:flex-row md:items-end
+     `}
+				>
 					{/* Status Filter */}
 					<div className="flex-1">
-						<label htmlFor="status-filter" className="mb-2 block text-sm font-medium">
-							Status
-						</label>
+						<Label htmlFor="status-filter">Status</Label>
 						<select
 							id="status-filter"
-							className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+							className={`
+         w-full rounded-md border border-input bg-background px-3 py-2 text-sm
+         ring-offset-background
+         focus-visible:ring-2 focus-visible:ring-ring
+         focus-visible:ring-offset-2 focus-visible:outline-none
+       `}
 							value={status || ''}
 							onChange={e => onStatusChange(e.target.value as TaskStatus | undefined)}
 						>
@@ -80,12 +91,15 @@ export function TaskFilters({
 
 					{/* Priority Filter */}
 					<div className="flex-1">
-						<label htmlFor="priority-filter" className="mb-2 block text-sm font-medium">
-							Priority
-						</label>
+						<Label htmlFor="priority-filter">Priority</Label>
 						<select
 							id="priority-filter"
-							className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+							className={`
+         w-full rounded-md border border-input bg-background px-3 py-2 text-sm
+         ring-offset-background
+         focus-visible:ring-2 focus-visible:ring-ring
+         focus-visible:ring-offset-2 focus-visible:outline-none
+       `}
 							value={priority || ''}
 							onChange={e => onPriorityChange(e.target.value as TaskPriority | undefined)}
 						>
@@ -99,29 +113,24 @@ export function TaskFilters({
 
 					{/* Worker ID Filter */}
 					<div className="flex-1">
-						<label htmlFor="worker-filter" className="mb-2 block text-sm font-medium">
-							Worker ID
-						</label>
-						<input
+						<Label htmlFor="worker-filter">Worker ID</Label>
+						<Input
 							id="worker-filter"
 							type="text"
 							placeholder="Filter by worker..."
-							className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 							value={workerId || ''}
-							onChange={e => onWorkerIdChange(e.target.value || undefined)}
+							onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+								onWorkerIdChange(e.target.value || undefined)
+							}
 						/>
 					</div>
 
 					{/* Clear Filters Button */}
 					{hasFilters && (
 						<div className="flex-shrink-0">
-							<button
-								type="button"
-								onClick={onClearFilters}
-								className="h-10 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-							>
+							<Button variant="outline" onClick={onClearFilters} className="h-10">
 								Clear Filters
-							</button>
+							</Button>
 						</div>
 					)}
 				</div>

@@ -132,9 +132,9 @@ export const MultipleBoundaries: Story = {
 	render: () => (
 		<div
 			className={`
-    grid gap-6
-    md:grid-cols-2
-  `}
+     grid gap-6
+     md:grid-cols-2
+   `}
 		>
 			<div>
 				<h3 className="mb-4 text-lg font-semibold">Section 1 - Working</h3>

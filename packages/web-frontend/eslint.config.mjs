@@ -65,6 +65,7 @@ export default [
 				clearTimeout: 'readonly',
 				setInterval: 'readonly',
 				clearInterval: 'readonly',
+				queueMicrotask: 'readonly',
 				alert: 'readonly',
 				confirm: 'readonly',
 				prompt: 'readonly',

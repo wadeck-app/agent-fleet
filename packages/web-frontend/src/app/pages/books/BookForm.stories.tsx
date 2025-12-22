@@ -151,9 +151,9 @@ export const Comparison: Story = {
 	render: () => (
 		<div
 			className={`
-    grid gap-6
-    lg:grid-cols-2
-  `}
+     grid gap-6
+     lg:grid-cols-2
+   `}
 		>
 			<div>
 				<h3 className="mb-4 text-lg font-semibold">Create New Book</h3>

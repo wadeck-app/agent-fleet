@@ -52,11 +52,7 @@ export function ThemeToggleEnhanced({ theme, onToggle, className, variant = 'ico
 					{isDark ? (
 						<Moon className="size-4 text-foreground" />
 					) : (
-						<Sun
-							className={`
-       size-4 text-foreground
-     `}
-						/>
+						<Sun className={`size-4 text-foreground`} />
 					)}
 				</span>
 			</Button>

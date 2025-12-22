@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { defineRoutes } from '../route-builder.js';
+
+import { defineRoutes } from '../route-builder';
 
 /**
  * Worker connection status

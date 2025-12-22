@@ -2,4 +2,4 @@
  * Shared types for orchestrator-backend communication
  */
 
-export * from './api/dashboard.contract.js';
+export { OrchestratorStatsSchema, type OrchestratorStats } from './api/dashboard.contract.js';

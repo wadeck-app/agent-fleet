@@ -1,9 +1,10 @@
-import type { TasksData, TasksQuery } from '@shared';
-import { useState, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useAbortableEffect } from '@framework/hooks/useAbortableEffect';
+import type { TasksData, TasksQuery } from '@shared';
 
-import { useOrchestratorWebSocket, type WebSocketMessage } from '../../hooks/useOrchestratorWebSocket';
+import { type WebSocketMessage, useOrchestratorWebSocket } from '@/app/hooks/useOrchestratorWebSocket';
+
 import { tasksService } from './TasksService';
 
 /**
@@ -41,7 +42,12 @@ export interface UseTasksResult {
 	clearError: () => void;
 }
 
-export function useTasks({ enabled = true, pollInterval, filters, useWebSocket = true }: UseTasksParams = {}): UseTasksResult {
+export function useTasks({
+	enabled = true,
+	pollInterval,
+	filters,
+	useWebSocket = true,
+}: UseTasksParams = {}): UseTasksResult {
 	const [data, setData] = useState<TasksData | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);

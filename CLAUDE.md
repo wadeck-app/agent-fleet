@@ -19,7 +19,10 @@ Important: Delegate to sub-agents early and often. It reduces the context size a
 - Kebab-case for class files
 
 **Run tests:**
-Use the skill "run-test"
+Use the skill "run-test" and fix the failures
+
+**After each task:**
+Use the skill "check" and fix the issues
 
 **Coverage requirement**: Minimum 70% for all classes, targeting 90% for business logic. Place unit test files next to implementation:
 
@@ -39,7 +42,7 @@ FlowExecutor.test.ts
 - Delegate to sub-agents early and often
 - Test before declaring work complete (build + test:agent)
 - Document in .claude/temp folder if needed
-- Never kill processes you didn't create
+- <crucial>Never kill processes you didn't create</crucial>
 - Ask user if requirements unclear (AskUserQuestion tool)
   <IMPORTANT> Put your plan files in <projectRoot>.claude/plans folder, <CRITICAL> with relevant name</CRITICAL> and keep them updated (and NOT in ~/.claude !!!)</IMPORTANT>
 

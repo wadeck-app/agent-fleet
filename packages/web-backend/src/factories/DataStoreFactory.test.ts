@@ -7,6 +7,8 @@ import { DashboardService } from '../services/DashboardService';
 import { IngredientsService } from '../services/IngredientsService';
 import { TasksService } from '../services/TasksService';
 import { InMemoryStorage } from '../storage/InMemoryStorage';
+import { EventBroadcaster } from '../transport/EventBroadcaster';
+import { MockTransportServer } from '../transport/adapters/MockTransportServer';
 import { DataStoreFactory } from './DataStoreFactory';
 
 /**
@@ -26,9 +28,16 @@ import { DataStoreFactory } from './DataStoreFactory';
 
 describe('DataStoreFactory', () => {
 	let factory: DataStoreFactory;
+	let mockTransportServer: MockTransportServer;
+	let eventBroadcaster: EventBroadcaster;
 
 	beforeEach(() => {
 		factory = new DataStoreFactory('memory');
+
+		// Initialize EventBroadcaster for tests that need it
+		mockTransportServer = new MockTransportServer();
+		eventBroadcaster = new EventBroadcaster(mockTransportServer);
+		factory.setEventBroadcaster(eventBroadcaster);
 	});
 
 	describe('Constructor and storage initialization', () => {

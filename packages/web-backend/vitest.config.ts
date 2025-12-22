@@ -77,6 +77,7 @@ export default defineConfig({
 		alias: {
 			'@app/shared': path.resolve(__dirname, '../shared-frontend-backend/src'),
 			'@app/shared-orch-backend': path.resolve(__dirname, '../shared-orch-backend/src'),
+			'@': path.resolve(__dirname, './src'),
 		},
 	},
 });

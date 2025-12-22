@@ -6,7 +6,7 @@ import { Separator } from '@framework/components/primitives/Separator';
 import { Sheet, SheetContent, SheetTrigger } from '@framework/components/primitives/sheet';
 import { ConnectivityIndicator } from '@framework/features/connectivity/ConnectivityIndicator';
 import { useTheme } from '@framework/features/theme/useTheme';
-import { BookOpen, LayoutDashboard, Menu, Package2, Users, ListTodo, FolderKanban } from 'lucide-react';
+import { BookOpen, FolderKanban, LayoutDashboard, ListTodo, Menu, Package2, Users } from 'lucide-react';
 
 import { WorkspaceIndicator } from '@app/features/workspace/WorkspaceIndicator';
 
@@ -66,9 +66,9 @@ export function MobileSidebar() {
 					variant="ghost"
 					size="icon"
 					className={`
-      fixed top-4 left-4 z-50
-      md:hidden
-    `}
+       fixed top-4 left-4 z-50
+       md:hidden
+     `}
 				>
 					<Menu className="size-7" />
 					<span className="sr-only">Toggle navigation menu</span>
@@ -77,9 +77,9 @@ export function MobileSidebar() {
 			<SheetContent
 				side="left"
 				className={`
-     w-[85vw] max-w-sm p-0 text-base
-     sm:w-96
-   `}
+      w-[85vw] max-w-sm p-0 text-base
+      sm:w-96
+    `}
 			>
 				<div className="flex h-full max-h-screen flex-col overflow-hidden">
 					<div className="flex shrink-0 items-center gap-3 px-5 pt-4 pb-3">

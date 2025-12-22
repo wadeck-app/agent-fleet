@@ -26,7 +26,7 @@ interface ServerInfo {
 const projectRoot = path.resolve(__dirname, '../../..');
 const tempFolder = path.resolve(projectRoot, 'packages/e2e-web/temp');
 
-const debug = false;
+const debug = true;
 
 /**
  * Check if a port is available

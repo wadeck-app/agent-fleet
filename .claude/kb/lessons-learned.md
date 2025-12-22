@@ -175,54 +175,66 @@ When centering modals/dialogs, Framer Motion can handle BOTH positioning AND ani
 
 **Problem**: When using `useAbortableEffect` with polling, including the fetch function in dependencies causes the effect to re-run every time the fetch function changes. If the fetch function depends on state that changes after the first fetch (like `isInitialLoad`), this creates multiple `setInterval` instances running in parallel, resulting in requests firing much faster than intended (e.g., every 300-500ms instead of 5000ms).
 
-**Root Cause**: 
+**Root Cause**:
+
 ```tsx
 // ❌ BAD: Creates multiple intervals
-const fetchData = useCallback(async (signal) => {
-  if (isInitialLoad) setLoading(true);  // <- This dependency causes re-creation
-  // ... fetch logic
-}, [isInitialLoad]); // <- fetchData changes when isInitialLoad changes
+const fetchData = useCallback(
+	async signal => {
+		if (isInitialLoad) setLoading(true); // <- This dependency causes re-creation
+		// ... fetch logic
+	},
+	[isInitialLoad]
+); // <- fetchData changes when isInitialLoad changes
 
-useAbortableEffect(async signal => {
-  await fetchData(signal);
-  const intervalId = setInterval(() => fetchData(signal), 5000);
-  signal.addEventListener('abort', () => clearInterval(intervalId));
-}, [fetchData]); // <- Re-runs when fetchData changes, creating new interval
+useAbortableEffect(
+	async signal => {
+		await fetchData(signal);
+		const intervalId = setInterval(() => fetchData(signal), 5000);
+		signal.addEventListener('abort', () => clearInterval(intervalId));
+	},
+	[fetchData]
+); // <- Re-runs when fetchData changes, creating new interval
 ```
 
 **Correct Solution** ✅:
+
 ```tsx
 // Separate initial fetch from polling
-const fetchData = useCallback(async (signal) => {
-  if (isInitialLoad) setLoading(true);
-  // ... fetch logic
-}, [isInitialLoad]);
+const fetchData = useCallback(
+	async signal => {
+		if (isInitialLoad) setLoading(true);
+		// ... fetch logic
+	},
+	[isInitialLoad]
+);
 
 // Initial fetch only
 useAbortableEffect(
-  async signal => {
-    if (!enabled) return;
-    await fetchData(signal);
-  },
-  [enabled] // Only re-run if enabled changes
+	async signal => {
+		if (!enabled) return;
+		await fetchData(signal);
+	},
+	[enabled] // Only re-run if enabled changes
 );
 
 // Polling effect - separate from initial fetch
 useEffect(() => {
-  if (!enabled || !pollInterval || pollInterval <= 0 || isInitialLoad) return;
+	if (!enabled || !pollInterval || pollInterval <= 0 || isInitialLoad) return;
 
-  const intervalId = setInterval(async () => {
-    const controller = new AbortController();
-    await fetchData(controller.signal);
-  }, pollInterval);
+	const intervalId = setInterval(async () => {
+		const controller = new AbortController();
+		await fetchData(controller.signal);
+	}, pollInterval);
 
-  return () => {
-    clearInterval(intervalId);
-  };
+	return () => {
+		clearInterval(intervalId);
+	};
 }, [enabled, pollInterval, isInitialLoad, fetchData]);
 ```
 
 **Key Principles**:
+
 1. **Separate Effects**: One for initial fetch, one for polling
 2. **Minimal Dependencies**: Initial fetch effect only depends on `enabled`
 3. **Wait for Initial Load**: Polling only starts after `isInitialLoad` becomes false
@@ -230,6 +242,7 @@ useEffect(() => {
 5. **New AbortController**: Create fresh controller in each interval callback
 
 **Why This Works**:
+
 - Initial fetch runs once on mount
 - Polling effect waits for initial load to complete
 - When `isInitialLoad` changes to false, polling starts
@@ -237,17 +250,20 @@ useEffect(() => {
 - Cleanup properly removes the interval on unmount
 
 **Symptoms of the Bug**:
+
 - Backend logs show requests much faster than expected interval
 - Multiple requests fire within milliseconds of each other
 - Network tab shows overlapping requests
 - Server load higher than expected
 
 **Files Affected** (December 2024):
+
 - `packages/web-frontend/src/app/pages/tasks/useTasks.ts` (lines 78-100)
 - `packages/web-frontend/src/app/pages/workers/useWorkers.ts` (lines 73-95)
 - `packages/web-frontend/src/app/pages/workspaces/useWorkspaces.ts` (lines 73-95)
 
 **Reference Implementation**:
+
 - `packages/web-frontend/src/app/pages/dashboard/useDashboard.ts` (correct from start)
 
 **When Discovered**: December 21, 2024 during web UI implementation. User reported backend receiving `/api/tasks` requests every 300ms instead of 5000ms.
@@ -261,20 +277,94 @@ useEffect(() => {
 **Example**: Added Workspaces navigation to `Sidebar.tsx`, but app actually uses `DesktopSidebar.tsx` and `MobileSidebar.tsx`, so the navigation link didn't appear.
 
 **Solution** ✅:
+
 1. **Identify Unused Files**: Check actual imports in App.tsx or root components
 2. **Remove Unused Files**: Delete any component files that aren't imported
 3. **Update Only Active Files**: Make changes to the files actually being used
 4. **Document Component Purpose**: Add comments explaining which components are used where
 
 **Files Affected** (December 2024):
+
 - Removed: `packages/web-frontend/src/app/components/navigation/Sidebar.tsx` (unused)
 - Updated: `packages/web-frontend/src/app/components/navigation/DesktopSidebar.tsx`
 - Updated: `packages/web-frontend/src/app/components/navigation/MobileSidebar.tsx`
 
 **Prevention**:
+
 - Regular code cleanup to remove unused files
 - ESLint rules to detect unused exports
 - Clear naming conventions (e.g., DesktopSidebar vs MobileSidebar makes purpose obvious)
 
 **When Discovered**: December 21, 2024 - User correctly pointed out that Sidebar.tsx wasn't used, preventing navigation changes from appearing.
 
+---
+
+## Vitest Path Alias Configuration - Must Match TypeScript Paths
+
+**Problem**: Backend tests failing with module resolution errors like `Failed to load url @/auth/MockAuthService` even though the file exists and TypeScript compilation works fine.
+
+**Root Cause**: Vitest requires its own path alias configuration in `vitest.config.ts`. Having path aliases only in `tsconfig.json` is not sufficient - Vitest uses its own resolver that doesn't automatically inherit TypeScript path mappings.
+
+**Configuration Requirements**: Path aliases must be configured in THREE places for full functionality:
+
+1. **`tsconfig.json`** - For TypeScript compilation and IDE support
+2. **`build.mjs` (or webpack/esbuild config)** - For production builds
+3. **`vitest.config.ts`** - For test execution ← COMMONLY FORGOTTEN
+
+**Wrong Assumption** ❌:
+
+```typescript
+// Only in tsconfig.json
+{
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
+}
+// Tests will fail even though TypeScript is happy
+```
+
+**Correct Solution** ✅:
+
+```typescript
+// vitest.config.ts
+import path from 'path';
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+	resolve: {
+		alias: {
+			'@': path.resolve(__dirname, './src'),
+			// Add all path aliases from tsconfig.json
+		},
+	},
+});
+```
+
+**Key Principles**:
+
+- Vitest uses Vite's resolver, which requires explicit alias configuration
+- Path aliases must be synchronized across all three configurations
+- Use `path.resolve(__dirname, ...)` for absolute paths
+- Test the configuration by running tests, not just TypeScript compilation
+
+**Symptoms of Missing Vitest Aliases**:
+
+- Tests fail with "Failed to load url @/..." errors
+- File exists and TypeScript shows no errors
+- Production builds work fine
+- Only tests are affected
+
+**Files Affected** (December 2024):
+
+- Fixed: `packages/web-backend/vitest.config.ts` - Added missing `'@': path.resolve(__dirname, './src')`
+- Test files using `@/*` imports (10 files total):
+    - `src/transport/security/session-security.test.ts`
+    - `src/transport/security/cookie-security.test.ts`
+    - `src/transport/adapters/WebSocketTransportServer.test.ts`
+    - `src/transport/integration/websocket-auth-flow.test.ts`
+    - `src/transport/integration/event-broadcasting.test.ts`
+    - And 5 production files in fastify plugins/hooks
+
+**When Discovered**: December 22, 2025 - 5 backend transport tests failing with module resolution errors after implementing authentication features.

@@ -1,9 +1,10 @@
-import type { WorkspacesData } from '@shared';
-import { useState, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useAbortableEffect } from '@framework/hooks/useAbortableEffect';
+import type { WorkspacesData } from '@shared';
 
-import { useOrchestratorWebSocket, type WebSocketMessage } from '../../hooks/useOrchestratorWebSocket';
+import { type WebSocketMessage, useOrchestratorWebSocket } from '@/app/hooks/useOrchestratorWebSocket';
+
 import { workspacesService } from './WorkspacesService';
 
 /**
@@ -39,7 +40,11 @@ export interface UseWorkspacesResult {
 	clearError: () => void;
 }
 
-export function useWorkspaces({ enabled = true, pollInterval, useWebSocket = true }: UseWorkspacesParams = {}): UseWorkspacesResult {
+export function useWorkspaces({
+	enabled = true,
+	pollInterval,
+	useWebSocket = true,
+}: UseWorkspacesParams = {}): UseWorkspacesResult {
 	const [data, setData] = useState<WorkspacesData | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -96,33 +101,36 @@ export function useWorkspaces({ enabled = true, pollInterval, useWebSocket = tru
 	});
 
 	// Fetch workspaces data
-	const fetchWorkspaces = useCallback(async (signal: AbortSignal) => {
-		try {
-			// Only show loading on initial load
-			if (isInitialLoad) {
-				setLoading(true);
-			}
+	const fetchWorkspaces = useCallback(
+		async (signal: AbortSignal) => {
+			try {
+				// Only show loading on initial load
+				if (isInitialLoad) {
+					setLoading(true);
+				}
 
-			const workspacesData = await workspacesService.getWorkspaces();
+				const workspacesData = await workspacesService.getWorkspaces();
 
-			if (!signal.aborted) {
-				setData(workspacesData);
-				setError(null);
-				setIsInitialLoad(false);
+				if (!signal.aborted) {
+					setData(workspacesData);
+					setError(null);
+					setIsInitialLoad(false);
+				}
+			} catch (err) {
+				if (!signal.aborted) {
+					const message = err instanceof Error ? err.message : 'Failed to load workspaces';
+					setError(message);
+					console.error('[useWorkspaces] Error caught:', err);
+					console.error('Error loading workspaces:', err);
+				}
+			} finally {
+				if (!signal.aborted) {
+					setLoading(false);
+				}
 			}
-		} catch (err) {
-			if (!signal.aborted) {
-				const message = err instanceof Error ? err.message : 'Failed to load workspaces';
-				setError(message);
-				console.error('[useWorkspaces] Error caught:', err);
-				console.error('Error loading workspaces:', err);
-			}
-		} finally {
-			if (!signal.aborted) {
-				setLoading(false);
-			}
-		}
-	}, [isInitialLoad]);
+		},
+		[isInitialLoad]
+	);
 
 	// Initial fetch on mount
 	useAbortableEffect(

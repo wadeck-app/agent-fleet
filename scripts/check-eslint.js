@@ -32,6 +32,9 @@ try {
 const ERROR_LOG = 'eslint-errors.log';
 const PACKAGES = [
 	'shared-frontend-backend',
+	'shared-orch-backend',
+	'shared-orch-worker',
+	'shared-common',
 	'web-backend',
 	'web-frontend',
 	'flow-engine',

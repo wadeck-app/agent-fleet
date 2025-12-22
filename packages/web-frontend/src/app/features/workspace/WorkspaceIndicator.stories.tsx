@@ -60,8 +60,8 @@ export const AllVariants: Story = {
 		const WorkspaceCard = ({ id }: { id: number }) => (
 			<div
 				className={`
-     flex flex-col items-center gap-2 rounded-lg border border-border p-4
-   `}
+      flex flex-col items-center gap-2 rounded-lg border border-border p-4
+    `}
 			>
 				<WorkspaceIndicator workspaceId={id} />
 				<span className="text-xs text-muted-foreground">Workspace {id}</span>
@@ -98,8 +98,8 @@ export const CyclingPattern: Story = {
 			return (
 				<div
 					className={`
-      flex flex-col items-center gap-2 rounded-lg border border-border p-4
-    `}
+       flex flex-col items-center gap-2 rounded-lg border border-border p-4
+     `}
 				>
 					<WorkspaceIndicator workspaceId={id} />
 					<span className="text-xs text-muted-foreground">Workspace {id}</span>

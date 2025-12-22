@@ -1,5 +1,7 @@
-import type { TasksData, Task, TasksQuery } from '@app/shared';
+import type { Task, TasksData, TasksQuery } from '@app/shared';
+
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
+import type { EventBroadcaster } from '../transport/EventBroadcaster';
 
 /**
  * ===========================================================================================
@@ -12,16 +14,33 @@ import type { OrchestratorRepository } from '../repositories/OrchestratorReposit
  * - Transform raw task data into frontend-friendly DTO
  * - Support filtering by status, worker, and priority
  * - Calculate summary statistics
+ * - Emit real-time events for task state changes
  *
  * Does NOT contain:
  * - HTTP concerns (in controller)
  * - Data fetching/caching (in repository)
  *
+ * Event Emission Strategy:
+ * - Events are emitted AFTER successful operations
+ * - Broadcast failures are logged but don't fail the operation
+ * - Type-safe event emission using EventBroadcaster
+ *
+ * Future CRUD Operations (when implemented):
+ * - createTask() → emit 'task:created'
+ * - updateTask() → emit 'task:updated'
+ * - deleteTask() → emit 'task:deleted'
+ * - updateTaskStatus() → emit 'task:status_changed'
+ * - assignTask() → emit 'task:assigned'
+ * - updateTaskPriority() → emit 'task:priority_changed'
+ *
  * ===========================================================================================
  */
 
 export class TasksService {
-	constructor(private readonly orchestratorRepository: OrchestratorRepository) {}
+	constructor(
+		private readonly orchestratorRepository: OrchestratorRepository,
+		private readonly eventBroadcaster: EventBroadcaster
+	) {}
 
 	/**
 	 * Get tasks data with optional filtering
@@ -43,7 +62,7 @@ export class TasksService {
 			console.log(`[TasksService] Received ${Array.isArray(rawTasks) ? rawTasks.length : 0} tasks`);
 
 			// Transform tasks to frontend format
-			const tasks: Task[] = this.transformTasks(rawTasks);
+			const tasks: Task[] = this.transformTasks(rawTasks as any[]);
 
 			// Apply additional client-side filtering if needed
 			const filteredTasks = this.applyFilters(tasks, query);
@@ -92,7 +111,7 @@ export class TasksService {
 				? {
 						workerId: task.assignedTo.workerId,
 						workerType: task.assignedTo.workerType,
-				  }
+					}
 				: null,
 			// Flow-related fields
 			flowId: task.flowId,
@@ -100,7 +119,7 @@ export class TasksService {
 				? {
 						status: task.flowResult.status,
 						error: task.flowResult.error,
-				  }
+					}
 				: undefined,
 		}));
 	}
@@ -128,9 +147,11 @@ export class TasksService {
 	/**
 	 * Calculate summary statistics
 	 */
-	private calculateSummary(
-		tasks: Task[]
-	): { total: number; byStatus: Record<string, number>; byPriority: Record<string, number> } {
+	private calculateSummary(tasks: Task[]): {
+		total: number;
+		byStatus: Record<string, number>;
+		byPriority: Record<string, number>;
+	} {
 		const byStatus: Record<string, number> = {};
 		const byPriority: Record<string, number> = {};
 
@@ -168,4 +189,148 @@ export class TasksService {
 	private getOrchestratorUrl(): string {
 		return process.env.ORCHESTRATOR_URL || 'http://localhost:3737';
 	}
+
+	// ===========================================================================================
+	// CRUD METHODS (TO BE IMPLEMENTED)
+	// ===========================================================================================
+	// When CRUD operations are implemented, use these as templates for event emission
+
+	/**
+	 * Create a new task (PLACEHOLDER - not implemented)
+	 * When implemented, this should:
+	 * 1. Validate input
+	 * 2. Create task in orchestrator
+	 * 3. Emit 'task:created' event
+	 * 4. Return created task
+	 *
+	 * @example
+	 * ```typescript
+	 * async createTask(data: CreateTaskDto): Promise<Task> {
+	 *   try {
+	 *     const task = await this.orchestratorRepository.createTask(data);
+	 *
+	 *     // Emit event AFTER successful creation
+	 *     this.eventBroadcaster.broadcast('task:created', task);
+	 *
+	 *     return task;
+	 *   } catch (error) {
+	 *     console.error('[TasksService] Failed to create task:', error);
+	 *     throw error;
+	 *   }
+	 * }
+	 * ```
+	 */
+
+	/**
+	 * Update task status (PLACEHOLDER - not implemented)
+	 * When implemented, this should:
+	 * 1. Fetch current task
+	 * 2. Store previous status
+	 * 3. Update status in orchestrator
+	 * 4. Emit 'task:status_changed' event with both old and new status
+	 * 5. Return updated task
+	 *
+	 * @example
+	 * ```typescript
+	 * async updateTaskStatus(taskId: string, newStatus: TaskStatus): Promise<Task> {
+	 *   try {
+	 *     const currentTask = await this.orchestratorRepository.getTask(taskId);
+	 *     const previousStatus = currentTask.status;
+	 *
+	 *     const updatedTask = await this.orchestratorRepository.updateTaskStatus(taskId, newStatus);
+	 *
+	 *     // Emit event AFTER successful update
+	 *     this.eventBroadcaster.broadcast('task:status_changed', {
+	 *       taskId: updatedTask.id,
+	 *       task: updatedTask,
+	 *       previousStatus,
+	 *     });
+	 *
+	 *     return updatedTask;
+	 *   } catch (error) {
+	 *     console.error('[TasksService] Failed to update task status:', error);
+	 *     throw error;
+	 *   }
+	 * }
+	 * ```
+	 */
+
+	/**
+	 * Assign task to worker (PLACEHOLDER - not implemented)
+	 * When implemented, emit 'task:assigned' event
+	 *
+	 * @example
+	 * ```typescript
+	 * async assignTask(taskId: string, workerId: string): Promise<Task> {
+	 *   try {
+	 *     const task = await this.orchestratorRepository.assignTask(taskId, workerId);
+	 *
+	 *     // Emit event AFTER successful assignment
+	 *     this.eventBroadcaster.broadcast('task:assigned', {
+	 *       taskId: task.id,
+	 *       workerId,
+	 *       assignedAt: Date.now(),
+	 *     });
+	 *
+	 *     return task;
+	 *   } catch (error) {
+	 *     console.error('[TasksService] Failed to assign task:', error);
+	 *     throw error;
+	 *   }
+	 * }
+	 * ```
+	 */
+
+	/**
+	 * Update task priority (PLACEHOLDER - not implemented)
+	 * When implemented, emit 'task:priority_changed' event
+	 *
+	 * @example
+	 * ```typescript
+	 * async updateTaskPriority(taskId: string, newPriority: TaskPriority): Promise<Task> {
+	 *   try {
+	 *     const currentTask = await this.orchestratorRepository.getTask(taskId);
+	 *     const oldPriority = currentTask.priority;
+	 *
+	 *     const task = await this.orchestratorRepository.updateTaskPriority(taskId, newPriority);
+	 *
+	 *     // Emit event AFTER successful update
+	 *     this.eventBroadcaster.broadcast('task:priority_changed', {
+	 *       taskId: task.id,
+	 *       oldPriority,
+	 *       newPriority,
+	 *     });
+	 *
+	 *     return task;
+	 *   } catch (error) {
+	 *     console.error('[TasksService] Failed to update task priority:', error);
+	 *     throw error;
+	 *   }
+	 * }
+	 * ```
+	 */
+
+	/**
+	 * Delete task (PLACEHOLDER - not implemented)
+	 * When implemented, emit 'task:deleted' event
+	 *
+	 * @example
+	 * ```typescript
+	 * async deleteTask(taskId: string): Promise<void> {
+	 *   try {
+	 *     await this.orchestratorRepository.deleteTask(taskId);
+	 *
+	 *     // Emit event AFTER successful deletion
+	 *     this.eventBroadcaster.broadcast('task:deleted', {
+	 *       id: taskId,
+	 *       deletedAt: Date.now(),
+	 *     } as any); // Type assertion needed as Task requires all fields
+	 *
+	 *   } catch (error) {
+	 *     console.error('[TasksService] Failed to delete task:', error);
+	 *     throw error;
+	 *   }
+	 * }
+	 * ```
+	 */
 }

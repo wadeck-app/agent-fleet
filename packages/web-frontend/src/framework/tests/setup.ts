@@ -44,3 +44,11 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 		}
 	};
 }
+
+// Polyfill queueMicrotask for jsdom
+// queueMicrotask is a standard API in Node.js and browsers but not in jsdom
+if (typeof globalThis.queueMicrotask === 'undefined') {
+	globalThis.queueMicrotask = (callback: () => void) => {
+		Promise.resolve().then(callback);
+	};
+}

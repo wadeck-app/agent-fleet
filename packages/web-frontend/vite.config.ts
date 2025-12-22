@@ -77,6 +77,7 @@ export default defineConfig(({ mode }) => {
 				'@': path.resolve(__dirname, './src'),
 				'@framework': path.resolve(__dirname, './src/framework'),
 				'@app': path.resolve(__dirname, './src/app'),
+				'@transport': path.resolve(__dirname, './src/transport'),
 				'@shared': path.resolve(__dirname, '../shared-frontend-backend/src'),
 			},
 		},
@@ -114,6 +115,10 @@ export default defineConfig(({ mode }) => {
 			environment: 'jsdom',
 			setupFiles: './src/framework/tests/setup.ts',
 			css: true,
+			// Include test files only from src directory
+			include: ['src/**/*.test.{ts,tsx}', 'src/**/*.spec.{ts,tsx}'],
+			// Exclude dist and node_modules to prevent duplicate test execution
+			exclude: ['dist/**', 'node_modules/**'],
 			env: {
 				// unit tests must mock the server!
 				VITE_UNIT_TEST: true,

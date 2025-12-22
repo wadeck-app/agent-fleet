@@ -12,8 +12,8 @@ import { RecentActivityCard } from './RecentActivityCard';
 import { StatusCard } from './StatusCard';
 import { TasksCard } from './TasksCard';
 import { ThroughputCard } from './ThroughputCard';
-import { useDashboard } from './useDashboard';
 import { WorkersCard } from './WorkersCard';
+import { useDashboard } from './useDashboard';
 
 /**
  * ===========================================================================================
@@ -61,7 +61,12 @@ export function DashboardPage() {
 				title="Dashboard"
 				action={
 					<Button onClick={handleRefresh} disabled={isRefreshing} variant="outline" size="sm">
-						<RefreshCw className={`mr-2 size-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+						<RefreshCw
+							className={`
+         mr-2 size-4
+         ${isRefreshing ? 'animate-spin' : ''}
+       `}
+						/>
 						Refresh
 					</Button>
 				}
@@ -78,13 +83,22 @@ export function DashboardPage() {
 			{data && (
 				<div className="space-y-6">
 					{/* Top Row: Status, Workers, Tasks */}
-					<div className="grid gap-6 md:grid-cols-3">
+					<div
+						className={`
+        grid gap-6
+        md:grid-cols-3
+      `}
+					>
 						<StatusCard
 							status={data.orchestrator.status}
 							uptime={data.orchestrator.uptime}
 							version={data.orchestrator.version}
 						/>
-						<WorkersCard connected={data.workers.connected} idle={data.workers.idle} busy={data.workers.busy} />
+						<WorkersCard
+							connected={data.workers.connected}
+							idle={data.workers.idle}
+							busy={data.workers.busy}
+						/>
 						<TasksCard
 							total={data.tasks.total}
 							active={data.tasks.active}
@@ -96,7 +110,12 @@ export function DashboardPage() {
 					</div>
 
 					{/* Second Row: Throughput */}
-					<div className="grid gap-6 md:grid-cols-3">
+					<div
+						className={`
+        grid gap-6
+        md:grid-cols-3
+      `}
+					>
 						<ThroughputCard
 							tasksPerHour={data.throughput.tasksPerHour}
 							successRate={data.throughput.successRate}

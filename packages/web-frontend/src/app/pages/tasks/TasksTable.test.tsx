@@ -13,13 +13,10 @@ describe('TasksTable', () => {
 			priority: 'high',
 			createdAt: '2025-12-21T08:00:00Z',
 			updatedAt: '2025-12-21T09:30:00Z',
-			assignedTo: {
+			assignedWorker: {
 				workerId: 'worker-1',
 				workerType: 'dev',
 			},
-			comments: [],
-			metadata: {},
-			history: [],
 		},
 		{
 			id: 'task-2',
@@ -28,13 +25,10 @@ describe('TasksTable', () => {
 			priority: 'medium',
 			createdAt: '2025-12-21T07:00:00Z',
 			updatedAt: '2025-12-21T09:00:00Z',
-			assignedTo: {
+			assignedWorker: {
 				workerId: 'worker-2',
 				workerType: 'reviewer',
 			},
-			comments: [],
-			metadata: {},
-			history: [],
 		},
 		{
 			id: 'task-3',
@@ -43,10 +37,7 @@ describe('TasksTable', () => {
 			priority: 'urgent',
 			createdAt: '2025-12-21T06:00:00Z',
 			updatedAt: '2025-12-21T08:00:00Z',
-			assignedTo: null,
-			comments: [],
-			metadata: {},
-			history: [],
+			assignedWorker: null,
 		},
 	];
 

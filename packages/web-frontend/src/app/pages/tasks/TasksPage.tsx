@@ -1,11 +1,11 @@
 import { useState } from 'react';
 
-import type { TaskStatus, TaskPriority } from '@shared';
 import { ErrorAlert } from '@framework/components/feedback/ErrorAlert';
 import { LoadingState } from '@framework/components/feedback/LoadingState';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { Button } from '@framework/components/primitives/Button';
+import type { TaskPriority, TaskStatus } from '@shared';
 import { RefreshCw } from 'lucide-react';
 
 import { TaskFilters } from './TaskFilters';
@@ -75,7 +75,12 @@ export function TasksPage() {
 				title="Tasks"
 				action={
 					<Button onClick={handleRefresh} disabled={isRefreshing} variant="outline" size="sm">
-						<RefreshCw className={`mr-2 size-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+						<RefreshCw
+							className={`
+         mr-2 size-4
+         ${isRefreshing ? 'animate-spin' : ''}
+       `}
+						/>
 						Refresh
 					</Button>
 				}
@@ -92,32 +97,57 @@ export function TasksPage() {
 			{data && (
 				<div className="space-y-6">
 					{/* Summary Stats */}
-					<div className="grid gap-4 md:grid-cols-5">
-						<div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+					<div
+						className={`
+        grid gap-4
+        md:grid-cols-5
+      `}
+					>
+						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
 							<div className="text-sm font-medium text-muted-foreground">Total Tasks</div>
 							<div className="text-2xl font-bold">{data.summary.total}</div>
 						</div>
-						<div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
 							<div className="text-sm font-medium text-muted-foreground">In Progress</div>
-							<div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+							<div
+								className={`
+          text-2xl font-bold text-blue-600
+          dark:text-blue-400
+        `}
+							>
 								{data.summary.byStatus.in_progress || 0}
 							</div>
 						</div>
-						<div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
 							<div className="text-sm font-medium text-muted-foreground">Review</div>
-							<div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+							<div
+								className={`
+          text-2xl font-bold text-purple-600
+          dark:text-purple-400
+        `}
+							>
 								{data.summary.byStatus.review || 0}
 							</div>
 						</div>
-						<div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
 							<div className="text-sm font-medium text-muted-foreground">Completed</div>
-							<div className="text-2xl font-bold text-green-600 dark:text-green-400">
+							<div
+								className={`
+          text-2xl font-bold text-green-600
+          dark:text-green-400
+        `}
+							>
 								{(data.summary.byStatus.approved || 0) + (data.summary.byStatus.merged || 0)}
 							</div>
 						</div>
-						<div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
 							<div className="text-sm font-medium text-muted-foreground">Blocked</div>
-							<div className="text-2xl font-bold text-red-600 dark:text-red-400">
+							<div
+								className={`
+          text-2xl font-bold text-red-600
+          dark:text-red-400
+        `}
+							>
 								{data.summary.byStatus.blocked || 0}
 							</div>
 						</div>

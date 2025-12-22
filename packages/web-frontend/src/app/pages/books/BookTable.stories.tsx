@@ -181,9 +181,9 @@ export const InContext: Story = {
 				</div>
 				<button
 					className={`
-      rounded-md bg-primary px-4 py-2 text-sm font-medium
-      text-primary-foreground
-    `}
+       rounded-md bg-primary px-4 py-2 text-sm font-medium
+       text-primary-foreground
+     `}
 				>
 					Add Book
 				</button>

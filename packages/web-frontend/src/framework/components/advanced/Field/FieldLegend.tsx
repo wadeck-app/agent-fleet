@@ -11,10 +11,10 @@ export function FieldLegend({
 			data-variant={variant}
 			className={cn(
 				`
-     mb-1.5 font-medium
-     data-[variant=label]:text-sm
-     data-[variant=legend]:text-base
-   `,
+      mb-1.5 font-medium
+      data-[variant=label]:text-sm
+      data-[variant=legend]:text-base
+    `,
 				className
 			)}
 			{...props}

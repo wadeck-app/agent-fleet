@@ -61,7 +61,7 @@ describe('WorkersCard', () => {
 
 	describe('color coding', () => {
 		it('should apply green color to idle workers', () => {
-			const { container } = render(<WorkersCard connected={5} idle={3} busy={2} />);
+			render(<WorkersCard connected={5} idle={3} busy={2} />);
 
 			// Find the idle count element
 			const idleElement = screen.getByText('3');
@@ -69,7 +69,7 @@ describe('WorkersCard', () => {
 		});
 
 		it('should apply orange color to busy workers', () => {
-			const { container } = render(<WorkersCard connected={5} idle={3} busy={2} />);
+			render(<WorkersCard connected={5} idle={3} busy={2} />);
 
 			// Find the busy count element
 			const busyElement = screen.getByText('2');

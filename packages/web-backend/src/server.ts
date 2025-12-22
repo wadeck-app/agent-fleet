@@ -1,5 +1,6 @@
 // CRITICAL: Load environment variables BEFORE any other imports
 // This ensures env vars are available when other modules initialize
+import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import sensible from '@fastify/sensible';
@@ -7,7 +8,7 @@ import fastifyStatic from '@fastify/static';
 import dotenv from 'dotenv';
 // ======================================================================================
 // Now import everything else
-import Fastify from 'fastify';
+import Fastify, { type FastifyInstance } from 'fastify';
 import * as os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -19,6 +20,8 @@ import latencySimulatorHook from './fastify/hooks/latencySimulator.hook';
 import requestLoggerHook from './fastify/hooks/requestLogger.hook';
 import responseHelpersPlugin from './fastify/plugins/responseHelpers.plugin';
 import routesPlugin from './fastify/plugins/routes.plugin';
+import { EventBroadcaster } from './transport/EventBroadcaster';
+import { WebSocketTransportServer } from './transport/adapters/WebSocketTransportServer';
 import { initializeFactory } from './utils/factory-instance';
 import { logger } from './utils/logger';
 
@@ -30,10 +33,59 @@ const __dirname = path.dirname(__filename);
 const envPath = path.join(__dirname, '../.env');
 dotenv.config({ path: envPath });
 
+/**
+ * Initialize WebSocket transport server
+ */
+async function initializeTransportServer(app: FastifyInstance, factory: DataStoreFactory) {
+	// Get session manager and transport router from factory
+	const sessionManager = factory.getSessionManager();
+	const router = factory.getTransportRouter();
+
+	// Create WebSocket transport server
+	const transportServer = new WebSocketTransportServer(sessionManager, router);
+
+	// Initialize WebSocket endpoint
+	await transportServer.initialize(app);
+
+	// Register transport server in factory for MonitoringController
+	factory.setTransportServer(transportServer);
+
+	// Create and register EventBroadcaster
+	const eventBroadcaster = new EventBroadcaster(transportServer, sessionManager);
+	factory.setEventBroadcaster(eventBroadcaster);
+
+	logger.info('[Transport] WebSocket server initialized on GET /ws');
+
+	// Log connection events (optional, for debugging)
+	transportServer.onClientConnected(clientId => {
+		logger.info(`[Transport] Client connected: ${clientId}`);
+	});
+
+	transportServer.onClientDisconnected(clientId => {
+		logger.info(`[Transport] Client disconnected: ${clientId}`);
+	});
+}
+
 // SAFETY: Force in-memory mode when running E2E tests
 // This prevents any accidental writes to production database during testing
 if (process.env.E2E_MODE === 'true') {
 	process.env.USE_PRODUCTION_DB = 'false';
+}
+
+// SECURITY: Prevent DISABLE_AUTH_DEV in production
+// This is a HARD FAIL to prevent accidental deployment with auth disabled
+if (process.env.NODE_ENV === 'production' && process.env.DISABLE_AUTH_DEV === 'true') {
+	logger.error('❌ FATAL SECURITY ERROR: DISABLE_AUTH_DEV=true in production environment!');
+	logger.error('❌ Authentication bypass is ONLY allowed in development mode.');
+	logger.error('❌ Server startup aborted to prevent security breach.');
+	process.exit(1);
+}
+
+// WARNING: Log if auth is disabled in development (for visibility)
+if (process.env.DISABLE_AUTH_DEV === 'true') {
+	logger.warn('⚠️  WARNING: Authentication is DISABLED (DISABLE_AUTH_DEV=true)');
+	logger.warn('⚠️  This is ONLY safe in development mode!');
+	logger.warn('⚠️  All requests will be authenticated as mock user: dev-user-no-auth');
 }
 
 /**
@@ -211,6 +263,13 @@ async function start() {
 			methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
 		});
 
+		// Register cookie plugin for authentication
+		// Required for parsing cookies in requests and setting cookies in responses
+		await fastify.register(cookie, {
+			secret: process.env.COOKIE_SECRET || 'dev-cookie-secret-change-in-production',
+			parseOptions: {}, // options for cookie.parse
+		});
+
 		await fastify.register(sensible);
 		await fastify.register(responseHelpersPlugin);
 
@@ -275,6 +334,9 @@ async function start() {
 
 			// Seed initial data (for development)
 			await factory.seedData();
+
+			// Initialize WebSocket transport server
+			await initializeTransportServer(fastify, factory);
 		} else if (process.env.E2E_MODE !== 'true') {
 			logger.info('Skipping Google Sheets and Gemini AI initialization (in-memory mode)');
 
@@ -283,9 +345,15 @@ async function start() {
 
 			// Seed initial data (for development)
 			await factory.seedData();
+
+			// Initialize WebSocket transport server
+			await initializeTransportServer(fastify, factory);
 		} else {
 			// E2E mode also needs a factory for controllers
-			initializeFactory('memory');
+			const factory = initializeFactory('memory');
+
+			// Initialize WebSocket transport server for E2E tests
+			await initializeTransportServer(fastify, factory);
 		}
 
 		// Start server

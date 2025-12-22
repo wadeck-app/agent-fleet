@@ -58,14 +58,45 @@ export function defineRoutes<const T extends ApiRoutes>(routes: T): T & { __base
 		throw new Error('defineRoutes: routes object cannot be empty');
 	}
 
-	// Strategy: assume first route is the base (with possible params removed)
-	// Example: '/api/books/:id' → '/api/books'
-	// Remove trailing slash to keep __baseUrl consistent with backend route registration
-	// Exception: root path "/" should remain as "/"
-	let baseUrl = paths[0].replace(/\/:[^/]+.*$/, '');
-	if (baseUrl !== '/') {
-		baseUrl = baseUrl.replace(/\/$/, '');
+	// Strategy: find the longest common prefix of all routes by comparing path segments
+	// This handles cases like:
+	// - ['/api/auth/login', '/api/auth/refresh'] → '/api/auth'
+	// - ['/api/books/', '/api/books/:id'] → '/api/books'
+	// - ['/api/ingredients/', '/api/ingredients/:id'] → '/api/ingredients'
+
+	// Normalize paths: remove params and trailing slashes
+	const normalizedPaths = paths.map(p => p.replace(/\/:[^/]+.*$/, '').replace(/\/$/, ''));
+
+	// Split first path into segments
+	const firstSegments = normalizedPaths[0].split('/').filter(s => s !== '');
+
+	// If there's only one route, reconstruct the path
+	if (normalizedPaths.length === 1) {
+		const result = '/' + firstSegments.join('/');
+		return Object.assign(routes, { __baseUrl: result });
 	}
+
+	// Find common segments across all paths
+	const commonSegments: string[] = [];
+
+	for (let i = 0; i < firstSegments.length; i++) {
+		const segment = firstSegments[i];
+
+		// Check if this segment is present at the same position in all paths
+		const allHaveSegment = normalizedPaths.every(path => {
+			const segments = path.split('/').filter(s => s !== '');
+			return segments[i] === segment;
+		});
+
+		if (allHaveSegment) {
+			commonSegments.push(segment);
+		} else {
+			break; // Stop at first non-common segment
+		}
+	}
+
+	// Reconstruct baseUrl from common segments
+	const baseUrl = commonSegments.length > 0 ? '/' + commonSegments.join('/') : '/';
 
 	// In development mode, verify no route is shorter than the first one
 	// and that base routes come before parameterized versions

@@ -1,5 +1,7 @@
 import type { Book, Ingredient } from '@app/shared';
 
+import type { AuthService } from '../auth/AuthService';
+import { MockAuthService } from '../auth/MockAuthService';
 import { BaseRepository } from '../repositories/BaseRepository';
 import { BooksRepository } from '../repositories/BooksRepository';
 import { IngredientsRepository } from '../repositories/IngredientsRepository';
@@ -7,11 +9,15 @@ import { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 import { BooksService } from '../services/BooksService';
 import { DashboardService } from '../services/DashboardService';
 import { IngredientsService } from '../services/IngredientsService';
-import { WorkersService } from '../services/WorkersService';
 import { TasksService } from '../services/TasksService';
+import { WorkersService } from '../services/WorkersService';
 import { WorkspacesService } from '../services/WorkspacesService';
 import type { DataStorage } from '../storage/DataStorage';
 import { InMemoryStorage } from '../storage/InMemoryStorage';
+import { EventBroadcaster } from '../transport/EventBroadcaster';
+import type { ITransportServer } from '../transport/ITransportServer';
+import { TransportRouter } from '../transport/TransportRouter';
+import { WebSocketSessionManager } from '../transport/WebSocketSessionManager';
 
 /**
  * ===========================================================================================
@@ -39,6 +45,11 @@ export class DataStoreFactory {
 	private workersService?: WorkersService;
 	private tasksService?: TasksService;
 	private workspacesService?: WorkspacesService;
+	private authService?: AuthService;
+	private sessionManager?: WebSocketSessionManager;
+	private transportRouter?: TransportRouter;
+	private eventBroadcaster?: EventBroadcaster;
+	private transportServer?: ITransportServer;
 
 	constructor(storageMode: 'memory' | 'mariadb' = 'memory') {
 		// Create storage based on mode
@@ -117,8 +128,11 @@ export class DataStoreFactory {
 			const cacheTtlMs = 5000;
 			const orchestratorRepo = new OrchestratorRepository(orchestratorUrl, cacheTtlMs);
 
-			// Create WorkersService
-			this.workersService = new WorkersService(orchestratorRepo);
+			// Get EventBroadcaster
+			const eventBroadcaster = this.getEventBroadcaster();
+
+			// Create WorkersService with EventBroadcaster
+			this.workersService = new WorkersService(orchestratorRepo, eventBroadcaster);
 		}
 
 		return this.workersService;
@@ -136,8 +150,11 @@ export class DataStoreFactory {
 			const cacheTtlMs = 5000;
 			const orchestratorRepo = new OrchestratorRepository(orchestratorUrl, cacheTtlMs);
 
-			// Create TasksService
-			this.tasksService = new TasksService(orchestratorRepo);
+			// Get EventBroadcaster
+			const eventBroadcaster = this.getEventBroadcaster();
+
+			// Create TasksService with EventBroadcaster
+			this.tasksService = new TasksService(orchestratorRepo, eventBroadcaster);
 		}
 
 		return this.tasksService;
@@ -148,11 +165,145 @@ export class DataStoreFactory {
 	 */
 	getWorkspacesService(): WorkspacesService {
 		if (!this.workspacesService) {
-			// Create WorkspacesService (no dependencies - generates mock data)
-			this.workspacesService = new WorkspacesService();
+			// Get EventBroadcaster
+			const eventBroadcaster = this.getEventBroadcaster();
+
+			// Create WorkspacesService with EventBroadcaster
+			this.workspacesService = new WorkspacesService(eventBroadcaster);
 		}
 
 		return this.workspacesService;
+	}
+
+	/**
+	 * Get or create AuthService
+	 */
+	getAuthService(): AuthService {
+		if (!this.authService) {
+			// Create MockAuthService with JWT secret from env
+			const jwtSecret = process.env.JWT_SECRET || 'dev-secret-change-in-production';
+			this.authService = new MockAuthService(jwtSecret);
+		}
+
+		return this.authService;
+	}
+
+	/**
+	 * Get or create WebSocketSessionManager
+	 */
+	getSessionManager(): WebSocketSessionManager {
+		if (!this.sessionManager) {
+			// SessionManager depends on AuthService
+			const authService = this.getAuthService();
+			this.sessionManager = new WebSocketSessionManager(authService);
+		}
+
+		return this.sessionManager;
+	}
+
+	/**
+	 * Get or create TransportRouter
+	 */
+	getTransportRouter(): TransportRouter {
+		if (!this.transportRouter) {
+			this.transportRouter = new TransportRouter(this);
+		}
+
+		return this.transportRouter;
+	}
+
+	/**
+	 * Get or create EventBroadcaster
+	 * Note: Requires ITransportServer to be set after WebSocketTransportServer is created
+	 */
+	getEventBroadcaster(): EventBroadcaster {
+		if (!this.eventBroadcaster) {
+			throw new Error(
+				'EventBroadcaster not initialized. Call setEventBroadcaster() after creating WebSocketTransportServer.'
+			);
+		}
+
+		return this.eventBroadcaster;
+	}
+
+	/**
+	 * Set EventBroadcaster (called after WebSocketTransportServer is created)
+	 */
+	setEventBroadcaster(broadcaster: EventBroadcaster): void {
+		this.eventBroadcaster = broadcaster;
+	}
+
+	/**
+	 * Set TransportServer (called after WebSocketTransportServer is created)
+	 */
+	setTransportServer(server: ITransportServer): void {
+		this.transportServer = server;
+	}
+
+	/**
+	 * Get TransportServer
+	 */
+	getTransportServer(): ITransportServer {
+		if (!this.transportServer) {
+			throw new Error(
+				'TransportServer not initialized. Call setTransportServer() after creating WebSocketTransportServer.'
+			);
+		}
+
+		return this.transportServer;
+	}
+
+	/**
+	 * Get controller methods for lazy loading
+	 */
+	async getAuthController() {
+		const { default: AuthController } = await import('../controllers/AuthController');
+		const authService = this.getAuthService();
+		const sessionManager = this.getSessionManager();
+		return new AuthController(authService, sessionManager);
+	}
+
+	async getTasksController() {
+		const { default: TasksController } = await import('../controllers/TasksController');
+		const service = this.getTasksService();
+		return new TasksController(service);
+	}
+
+	async getWorkersController() {
+		const { default: WorkersController } = await import('../controllers/WorkersController');
+		const service = this.getWorkersService();
+		return new WorkersController(service);
+	}
+
+	async getWorkspacesController() {
+		const { default: WorkspacesController } = await import('../controllers/WorkspacesController');
+		const service = this.getWorkspacesService();
+		return new WorkspacesController(service);
+	}
+
+	async getDashboardController() {
+		const { default: DashboardController } = await import('../controllers/DashboardController');
+		const service = this.getDashboardService();
+		return new DashboardController(service);
+	}
+
+	async getIngredientsController() {
+		const { default: IngredientsController } = await import('../controllers/IngredientsController');
+		const service = this.getIngredientsService();
+		return new IngredientsController(service);
+	}
+
+	async getBooksController() {
+		const { default: BooksController } = await import('../controllers/BooksController');
+		const service = this.getBooksService();
+		return new BooksController(service);
+	}
+
+	async getMonitoringController() {
+		const { default: MonitoringController } = await import('../controllers/MonitoringController');
+		const transportServer = this.getTransportServer();
+		const sessionManager = this.getSessionManager();
+		return new MonitoringController(transportServer, sessionManager);
 	}
 
 	/**

@@ -14,7 +14,6 @@
  * ===========================================================================================
  */
 // Import types for use in type helpers below
-import { BOOKS_API_ROUTES } from './api/books.contract';
 
 /**
  * ===========================================================================================
@@ -25,10 +24,13 @@ import { BOOKS_API_ROUTES } from './api/books.contract';
  *
  * ===========================================================================================
  */
-import { INGREDIENTS_API_ROUTES } from './api/ingredients.contract';
+import { AUTH_API_ROUTES } from './api/auth.contract';
+import { BOOKS_API_ROUTES } from './api/books.contract';
 import { DASHBOARD_API_ROUTES } from './api/dashboard.contract';
-import { WORKERS_API_ROUTES } from './api/workers.contract';
+import { INGREDIENTS_API_ROUTES } from './api/ingredients.contract';
+import { MONITORING_API_ROUTES } from './api/monitoring.contract';
 import { TASKS_API_ROUTES } from './api/tasks.contract';
+import { WORKERS_API_ROUTES } from './api/workers.contract';
 import { WORKSPACES_API_ROUTES } from './api/workspaces.contract';
 import type { HttpMethod } from './route-builder';
 
@@ -41,12 +43,14 @@ export { defineRoutes } from './route-builder';
  * With the new structure, merging is trivial (no conflicts since paths are different)
  */
 export const ALL_API_ROUTES = {
+	...AUTH_API_ROUTES,
 	...INGREDIENTS_API_ROUTES,
 	...BOOKS_API_ROUTES,
 	...DASHBOARD_API_ROUTES,
 	...WORKERS_API_ROUTES,
 	...TASKS_API_ROUTES,
 	...WORKSPACES_API_ROUTES,
+	...MONITORING_API_ROUTES,
 } as const;
 
 /**
@@ -62,7 +66,16 @@ export const ALL_API_ROUTES = {
  *
  * ===========================================================================================
  */
-const ALL_CONTRACTS = [INGREDIENTS_API_ROUTES, BOOKS_API_ROUTES, DASHBOARD_API_ROUTES, WORKERS_API_ROUTES, TASKS_API_ROUTES, WORKSPACES_API_ROUTES] as const;
+const ALL_CONTRACTS = [
+	AUTH_API_ROUTES,
+	INGREDIENTS_API_ROUTES,
+	BOOKS_API_ROUTES,
+	DASHBOARD_API_ROUTES,
+	WORKERS_API_ROUTES,
+	TASKS_API_ROUTES,
+	WORKSPACES_API_ROUTES,
+	MONITORING_API_ROUTES,
+] as const;
 
 export const ROUTES_BY_BASE_URL: Record<string, any> = Object.fromEntries(
 	ALL_CONTRACTS.map(contract => [contract.__baseUrl, contract])

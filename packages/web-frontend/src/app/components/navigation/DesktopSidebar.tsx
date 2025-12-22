@@ -1,7 +1,7 @@
 import { Separator } from '@framework/components/primitives/Separator';
 import { ConnectivityIndicator } from '@framework/features/connectivity/ConnectivityIndicator';
 import { useTheme } from '@framework/features/theme/useTheme';
-import { BookOpen, LayoutDashboard, Package2, Users, ListTodo, FolderKanban } from 'lucide-react';
+import { BookOpen, FolderKanban, LayoutDashboard, ListTodo, Package2, Users } from 'lucide-react';
 
 import { WorkspaceIndicator } from '@app/features/workspace/WorkspaceIndicator';
 
@@ -52,9 +52,9 @@ export function DesktopSidebar({ className }: DesktopSidebarProps) {
 	return (
 		<aside
 			className={`
-    fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r bg-card
-    ${className || ''}
-  `}
+     fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r bg-card
+     ${className || ''}
+   `}
 		>
 			<div className="shrink-0 p-4">
 				<AppSwitcher />

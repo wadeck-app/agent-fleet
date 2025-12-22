@@ -27,9 +27,9 @@ export function Page({ className = '', children }: PageProps) {
 	return (
 		<div
 			className={`
-   container mx-auto max-w-7xl p-6
-   ${className}
- `}
+     container mx-auto max-w-7xl p-6
+     ${className}
+   `}
 		>
 			{children}
 		</div>

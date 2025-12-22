@@ -33,19 +33,27 @@ const onlyUnexpectedErrorLogged = false;
 const errorHandlerHook: FastifyPluginAsync = async fastify => {
 	fastify.setErrorHandler((error: FastifyError | ZodError | HttpException, request, reply) => {
 		const timestamp = new Date().toISOString();
+		const statusCode = ('statusCode' in error ? error.statusCode : undefined) ?? 500;
 
-		// Log error details (sanitize sensitive info in production)
-		if (!onlyUnexpectedErrorLogged || process.env.NODE_ENV === 'development') {
-			const statusCode = 'statusCode' in error ? error.statusCode : 500;
-			fastify.log.error({
-				error: error.message,
-				code: 'code' in error ? error.code : 'UNKNOWN_ERROR',
-				method: request.method,
-				url: request.url,
-				statusCode,
-				timestamp,
-				...(error.stack && { stack: error.stack }),
-			});
+		// Log error details (always log 5xx errors, optionally log others)
+		const shouldLogDetails =
+			statusCode >= 500 || !onlyUnexpectedErrorLogged || process.env.NODE_ENV === 'development';
+
+		if (shouldLogDetails) {
+			const errorCode = 'code' in error ? error.code : 'UNKNOWN_ERROR';
+			logger.error(
+				`Error handling ${request.method} ${request.url} - ${statusCode} ${errorCode}: ${error.message}`
+			);
+
+			// Log stack trace for 5xx errors
+			if (statusCode >= 500 && error.stack) {
+				logger.error(`Stack trace:\n${error.stack}`);
+			}
+
+			// Log additional error details if available
+			if ('details' in error && error.details) {
+				logger.error('Error details:', error.details);
+			}
 		}
 
 		// Handle custom HttpException (with error codes)
@@ -88,7 +96,6 @@ const errorHandlerHook: FastifyPluginAsync = async fastify => {
 		}
 
 		// Handle generic errors (sanitize message in production)
-		const statusCode = error.statusCode || 500;
 		const message =
 			process.env.NODE_ENV === 'production' && statusCode === 500
 				? 'Internal Server Error'

@@ -79,7 +79,13 @@ export class Orchestrator implements Shutdownable {
 		Logger.logStructured('info', 'Orchestrator', 'UI client hook enabled');
 
 		// Create REST API with UIClientHook for WebSocket support
-		this.restAPI = new RestAPI(this.taskManager, this.wsServer, this.restPort, this.workspaceManager, this.uiClientHook);
+		this.restAPI = new RestAPI(
+			this.taskManager,
+			this.wsServer,
+			this.restPort,
+			this.workspaceManager,
+			this.uiClientHook
+		);
 	}
 
 	/**

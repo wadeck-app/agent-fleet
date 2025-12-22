@@ -54,46 +54,106 @@ export function TasksCard({ total, active, review, done, blocked, failed }: Task
 					<div className="grid grid-cols-2 gap-4">
 						{/* Active Tasks */}
 						<div className="flex items-center gap-3">
-							<Activity className="size-4 text-blue-600 dark:text-blue-400" />
+							<Activity
+								className={`
+          size-4 text-blue-600
+          dark:text-blue-400
+        `}
+							/>
 							<div className="flex flex-col gap-1">
 								<span className="text-xs text-muted-foreground">Active</span>
-								<span className="text-base font-semibold text-blue-600 dark:text-blue-400">{active}</span>
+								<span
+									className={`
+           text-base font-semibold text-blue-600
+           dark:text-blue-400
+         `}
+								>
+									{active}
+								</span>
 							</div>
 						</div>
 
 						{/* Review Tasks */}
 						<div className="flex items-center gap-3">
-							<Eye className="size-4 text-purple-600 dark:text-purple-400" />
+							<Eye
+								className={`
+          size-4 text-purple-600
+          dark:text-purple-400
+        `}
+							/>
 							<div className="flex flex-col gap-1">
 								<span className="text-xs text-muted-foreground">Review</span>
-								<span className="text-base font-semibold text-purple-600 dark:text-purple-400">{review}</span>
+								<span
+									className={`
+           text-base font-semibold text-purple-600
+           dark:text-purple-400
+         `}
+								>
+									{review}
+								</span>
 							</div>
 						</div>
 
 						{/* Done Tasks */}
 						<div className="flex items-center gap-3">
-							<CheckCircle2 className="size-4 text-green-600 dark:text-green-400" />
+							<CheckCircle2
+								className={`
+          size-4 text-green-600
+          dark:text-green-400
+        `}
+							/>
 							<div className="flex flex-col gap-1">
 								<span className="text-xs text-muted-foreground">Done</span>
-								<span className="text-base font-semibold text-green-600 dark:text-green-400">{done}</span>
+								<span
+									className={`
+           text-base font-semibold text-green-600
+           dark:text-green-400
+         `}
+								>
+									{done}
+								</span>
 							</div>
 						</div>
 
 						{/* Blocked Tasks */}
 						<div className="flex items-center gap-3">
-							<AlertCircle className="size-4 text-orange-600 dark:text-orange-400" />
+							<AlertCircle
+								className={`
+          size-4 text-orange-600
+          dark:text-orange-400
+        `}
+							/>
 							<div className="flex flex-col gap-1">
 								<span className="text-xs text-muted-foreground">Blocked</span>
-								<span className="text-base font-semibold text-orange-600 dark:text-orange-400">{blocked}</span>
+								<span
+									className={`
+           text-base font-semibold text-orange-600
+           dark:text-orange-400
+         `}
+								>
+									{blocked}
+								</span>
 							</div>
 						</div>
 
 						{/* Failed Tasks */}
 						<div className="flex items-center gap-3">
-							<XCircle className="size-4 text-red-600 dark:text-red-400" />
+							<XCircle
+								className={`
+          size-4 text-red-600
+          dark:text-red-400
+        `}
+							/>
 							<div className="flex flex-col gap-1">
 								<span className="text-xs text-muted-foreground">Failed</span>
-								<span className="text-base font-semibold text-red-600 dark:text-red-400">{failed}</span>
+								<span
+									className={`
+           text-base font-semibold text-red-600
+           dark:text-red-400
+         `}
+								>
+									{failed}
+								</span>
 							</div>
 						</div>
 					</div>

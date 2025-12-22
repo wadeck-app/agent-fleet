@@ -56,9 +56,9 @@ export function TableRow<T>({
      ${
 			isSelected
 				? `
-       bg-primary/10
-       hover:bg-primary/20
-     `
+      bg-primary/10
+      hover:bg-primary/20
+    `
 				: alternatingBg
 		}
      ${isEditing ? 'border-2 border-primary bg-accent/50' : ''}
@@ -82,9 +82,9 @@ export function TableRow<T>({
 				<td
 					key={column.key}
 					className={`
-      h-12 px-4 py-2.5
-      ${column.className || ''}
-    `}
+       h-12 px-4 py-2.5
+       ${column.className || ''}
+     `}
 				>
 					<div className={isDeleting ? 'line-through' : ''}>{column.render(item, isEditing)}</div>
 				</td>

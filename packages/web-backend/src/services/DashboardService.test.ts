@@ -1,8 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { OrchestratorStats } from '@app/shared-orch-backend';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { InternalServerErrorException } from '@app/shared';
-import { DashboardService } from './DashboardService';
+import type { OrchestratorStats } from '@app/shared-orch-backend';
+
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
+import { DashboardService } from './DashboardService';
 
 describe('DashboardService', () => {
 	let mockRepository: OrchestratorRepository;

@@ -19,9 +19,9 @@ export function AppSwitcher({ className, compact = false }: AppSwitcherProps) {
 				<Button
 					variant="outline"
 					className={`
-      ${compact ? 'h-9 px-2 text-sm' : ''}
-      ${className || ''}
-    `}
+       ${compact ? 'h-9 px-2 text-sm' : ''}
+       ${className || ''}
+     `}
 				>
 					<span className={compact ? 'font-medium' : 'font-semibold'}>App</span>
 					<ChevronDown className="ml-auto size-4 opacity-50" />

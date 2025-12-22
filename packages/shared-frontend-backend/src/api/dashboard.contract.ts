@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { defineRoutes } from '../route-builder.js';
+
+import { defineRoutes } from '../route-builder';
 
 /**
  * Orchestrator status enum
@@ -71,11 +72,11 @@ export type ActivityEntry = z.infer<typeof ActivityEntrySchema>;
  * Dashboard API routes
  */
 export const DASHBOARD_API_ROUTES = defineRoutes({
-  '/api/dashboard/': {
-    GET: {
-      response: DashboardDataSchema,
-    },
-  },
+	'/api/dashboard/': {
+		GET: {
+			response: DashboardDataSchema,
+		},
+	},
 });
 
 export type DashboardApiRoutes = typeof DASHBOARD_API_ROUTES;

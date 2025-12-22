@@ -233,9 +233,9 @@ export function BookForm({
 			{/* ISBN Field with Check button */}
 			<div
 				className={`
-     flex flex-col gap-2
-     md:col-span-2
-   `}
+      flex flex-col gap-2
+      md:col-span-2
+    `}
 			>
 				<Label htmlFor="field-isbn" className="text-sm leading-snug font-medium">
 					ISBN

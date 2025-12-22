@@ -43,15 +43,15 @@ export function UserMenuEnhanced({ userName = 'User', userEmail, userAvatar, cla
 				<Button
 					variant="ghost"
 					className={`
-      w-full justify-start gap-3
-      ${className || ''}
-    `}
+       w-full justify-start gap-3
+       ${className || ''}
+     `}
 				>
 					<div
 						className={`
-       flex size-8 items-center justify-center rounded-full bg-primary
-       text-primary-foreground
-     `}
+        flex size-8 items-center justify-center rounded-full bg-primary
+        text-primary-foreground
+      `}
 					>
 						{userAvatar ? (
 							<img
@@ -113,17 +113,17 @@ export function UserMenuCompact({ className }: { className?: string }) {
 					variant="ghost"
 					size="icon"
 					className={`
-      relative
-      ${className || ''}
-    `}
+       relative
+       ${className || ''}
+     `}
 				>
 					<User className="size-5" />
 					{/* Optional: Status badge */}
 					<span
 						className={`
-       absolute right-0 bottom-0 size-2 rounded-full bg-accent ring-2
-       ring-background
-     `}
+        absolute right-0 bottom-0 size-2 rounded-full bg-accent ring-2
+        ring-background
+      `}
 					/>
 					<span className="sr-only">User menu</span>
 				</Button>
@@ -133,9 +133,9 @@ export function UserMenuCompact({ className }: { className?: string }) {
 					<div className="flex items-center gap-3">
 						<div
 							className={`
-        flex size-10 items-center justify-center rounded-full bg-primary
-        text-primary-foreground
-      `}
+         flex size-10 items-center justify-center rounded-full bg-primary
+         text-primary-foreground
+       `}
 						>
 							<User className="size-5" />
 						</div>

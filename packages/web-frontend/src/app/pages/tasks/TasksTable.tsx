@@ -1,16 +1,7 @@
-import type { Task } from '@shared';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
-import {
-	CheckCircle2,
-	Circle,
-	XCircle,
-	Clock,
-	AlertCircle,
-	GitMerge,
-	FileCheck,
-	CircleDashed,
-} from 'lucide-react';
+import type { Task } from '@shared';
+import { AlertCircle, CheckCircle2, Circle, CircleDashed, Clock, FileCheck, GitMerge, XCircle } from 'lucide-react';
 
 /**
  * ===========================================================================================
@@ -163,7 +154,11 @@ export function TasksTable({ tasks }: TasksTableProps) {
 					<div className="overflow-x-auto">
 						<table className="w-full">
 							<thead>
-								<tr className="border-b text-left text-sm font-medium text-muted-foreground">
+								<tr
+									className={`
+           border-b text-left text-sm font-medium text-muted-foreground
+         `}
+								>
 									<th className="pb-3">Task ID</th>
 									<th className="pb-3">Description</th>
 									<th className="pb-3">Status</th>
@@ -176,7 +171,13 @@ export function TasksTable({ tasks }: TasksTableProps) {
 								{tasks.map(task => {
 									const statusDisplay = getStatusDisplay(task.status);
 									return (
-										<tr key={task.id} className="border-b last:border-b-0">
+										<tr
+											key={task.id}
+											className={`
+             border-b
+             last:border-b-0
+           `}
+										>
 											<td className="py-3">
 												<span className="font-mono text-sm">{task.id}</span>
 											</td>
@@ -192,14 +193,19 @@ export function TasksTable({ tasks }: TasksTableProps) {
 												</Badge>
 											</td>
 											<td className="py-3">
-												<Badge variant={getPriorityVariant(task.priority)} className="capitalize">
+												<Badge
+													variant={getPriorityVariant(task.priority)}
+													className="capitalize"
+												>
 													{task.priority}
 												</Badge>
 											</td>
 											<td className="py-3">
 												{task.assignedWorker ? (
 													<div className="text-sm">
-														<div className="font-medium">{task.assignedWorker.workerId}</div>
+														<div className="font-medium">
+															{task.assignedWorker.workerId}
+														</div>
 														<div className="text-xs text-muted-foreground capitalize">
 															{task.assignedWorker.workerType}
 														</div>
@@ -209,7 +215,9 @@ export function TasksTable({ tasks }: TasksTableProps) {
 												)}
 											</td>
 											<td className="py-3">
-												<span className="text-sm text-muted-foreground">{formatDate(task.updatedAt)}</span>
+												<span className="text-sm text-muted-foreground">
+													{formatDate(task.updatedAt)}
+												</span>
 											</td>
 										</tr>
 									);

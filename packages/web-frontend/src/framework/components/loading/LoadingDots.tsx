@@ -40,31 +40,31 @@ export function LoadingDots({ size = 'medium', className = '' }: LoadingDotsProp
 	return (
 		<span
 			className={`
-    inline-flex items-center
-    ${gapClasses[size]}
-    ${className}
-  `}
+     inline-flex items-center
+     ${gapClasses[size]}
+     ${className}
+   `}
 		>
 			<span
 				className={`
-     ${dotClasses[size]}
-     animate-typing-dot rounded-full bg-current
-     [animation-delay:0s]
-   `}
+      ${dotClasses[size]}
+      animate-typing-dot rounded-full bg-current
+      [animation-delay:0s]
+    `}
 			/>
 			<span
 				className={`
-     ${dotClasses[size]}
-     animate-typing-dot rounded-full bg-current
-     [animation-delay:0.2s]
-   `}
+      ${dotClasses[size]}
+      animate-typing-dot rounded-full bg-current
+      [animation-delay:0.2s]
+    `}
 			/>
 			<span
 				className={`
-     ${dotClasses[size]}
-     animate-typing-dot rounded-full bg-current
-     [animation-delay:0.4s]
-   `}
+      ${dotClasses[size]}
+      animate-typing-dot rounded-full bg-current
+      [animation-delay:0.4s]
+    `}
 			/>
 		</span>
 	);

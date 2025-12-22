@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * ===========================================================================================
@@ -50,9 +50,7 @@ export interface UseOrchestratorWebSocketResult {
 	send: (message: unknown) => void;
 }
 
-export function useOrchestratorWebSocket(
-	params?: UseOrchestratorWebSocketParams
-): UseOrchestratorWebSocketResult {
+export function useOrchestratorWebSocket(params?: UseOrchestratorWebSocketParams): UseOrchestratorWebSocketResult {
 	const {
 		url = 'ws://localhost:3737/ws/ui',
 		enabled = true,
@@ -69,7 +67,7 @@ export function useOrchestratorWebSocket(
 
 	// Refs for managing WebSocket lifecycle
 	const wsRef = useRef<WebSocket | null>(null);
-	const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const reconnectDelayRef = useRef<number>(initialReconnectDelay);
 	const shouldReconnectRef = useRef<boolean>(true);
 	const isMountedRef = useRef<boolean>(true);
@@ -89,7 +87,11 @@ export function useOrchestratorWebSocket(
 	// Connect to WebSocket
 	const connect = useCallback(() => {
 		// Don't connect if disabled or already connecting/connected
-		if (!enabled || wsRef.current?.readyState === WebSocket.CONNECTING || wsRef.current?.readyState === WebSocket.OPEN) {
+		if (
+			!enabled ||
+			wsRef.current?.readyState === WebSocket.CONNECTING ||
+			wsRef.current?.readyState === WebSocket.OPEN
+		) {
 			return;
 		}
 

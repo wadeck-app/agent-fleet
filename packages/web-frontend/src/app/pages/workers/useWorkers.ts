@@ -1,9 +1,10 @@
-import type { WorkersData } from '@shared';
-import { useState, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useAbortableEffect } from '@framework/hooks/useAbortableEffect';
+import type { WorkersData } from '@shared';
 
-import { useOrchestratorWebSocket, type WebSocketMessage } from '../../hooks/useOrchestratorWebSocket';
+import { type WebSocketMessage, useOrchestratorWebSocket } from '@/app/hooks/useOrchestratorWebSocket';
+
 import { workersService } from './WorkersService';
 
 /**
@@ -39,7 +40,11 @@ export interface UseWorkersResult {
 	clearError: () => void;
 }
 
-export function useWorkers({ enabled = true, pollInterval, useWebSocket = true }: UseWorkersParams = {}): UseWorkersResult {
+export function useWorkers({
+	enabled = true,
+	pollInterval,
+	useWebSocket = true,
+}: UseWorkersParams = {}): UseWorkersResult {
 	const [data, setData] = useState<WorkersData | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -102,33 +107,36 @@ export function useWorkers({ enabled = true, pollInterval, useWebSocket = true }
 	});
 
 	// Fetch workers data
-	const fetchWorkers = useCallback(async (signal: AbortSignal) => {
-		try {
-			// Only show loading on initial load
-			if (isInitialLoad) {
-				setLoading(true);
-			}
+	const fetchWorkers = useCallback(
+		async (signal: AbortSignal) => {
+			try {
+				// Only show loading on initial load
+				if (isInitialLoad) {
+					setLoading(true);
+				}
 
-			const workersData = await workersService.getWorkers();
+				const workersData = await workersService.getWorkers();
 
-			if (!signal.aborted) {
-				setData(workersData);
-				setError(null);
-				setIsInitialLoad(false);
+				if (!signal.aborted) {
+					setData(workersData);
+					setError(null);
+					setIsInitialLoad(false);
+				}
+			} catch (err) {
+				if (!signal.aborted) {
+					const message = err instanceof Error ? err.message : 'Failed to load workers';
+					setError(message);
+					console.error('[useWorkers] Error caught:', err);
+					console.error('Error loading workers:', err);
+				}
+			} finally {
+				if (!signal.aborted) {
+					setLoading(false);
+				}
 			}
-		} catch (err) {
-			if (!signal.aborted) {
-				const message = err instanceof Error ? err.message : 'Failed to load workers';
-				setError(message);
-				console.error('[useWorkers] Error caught:', err);
-				console.error('Error loading workers:', err);
-			}
-		} finally {
-			if (!signal.aborted) {
-				setLoading(false);
-			}
-		}
-	}, [isInitialLoad]);
+		},
+		[isInitialLoad]
+	);
 
 	// Initial fetch on mount
 	useAbortableEffect(

@@ -25,9 +25,9 @@ export function LoadingState({ message = 'Loading...', size = 'large', className
 	return (
 		<div
 			className={`
-    flex flex-col items-center justify-center py-12
-    ${className}
-  `}
+     flex flex-col items-center justify-center py-12
+     ${className}
+   `}
 		>
 			<LoadingDots size={size} />
 			{message && <p className="mt-4 text-sm text-muted-foreground">{message}</p>}

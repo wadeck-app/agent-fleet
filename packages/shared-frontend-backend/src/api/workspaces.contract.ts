@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { defineRoutes } from '../route-builder.js';
+
+import { defineRoutes } from '../route-builder';
 
 export const WorkspaceModeSchema = z.enum(['development', 'production', 'staging']);
 export const WorkspaceStatusSchema = z.enum(['active', 'locked', 'cleaning', 'error']);

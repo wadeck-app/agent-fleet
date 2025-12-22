@@ -243,22 +243,22 @@ export const WithTable: Story = {
 							<tr>
 								<th
 									className={`
-          border-b border-border px-4 py-2 text-left text-sm font-medium
-        `}
+           border-b border-border px-4 py-2 text-left text-sm font-medium
+         `}
 								>
 									ID
 								</th>
 								<th
 									className={`
-          border-b border-border px-4 py-2 text-left text-sm font-medium
-        `}
+           border-b border-border px-4 py-2 text-left text-sm font-medium
+         `}
 								>
 									Name
 								</th>
 								<th
 									className={`
-          border-b border-border px-4 py-2 text-left text-sm font-medium
-        `}
+           border-b border-border px-4 py-2 text-left text-sm font-medium
+         `}
 								>
 									Value
 								</th>
@@ -269,9 +269,9 @@ export const WithTable: Story = {
 								<tr
 									key={item.id}
 									className={`
-          border-b border-border
-          last:border-b-0
-        `}
+           border-b border-border
+           last:border-b-0
+         `}
 								>
 									<td className="px-4 py-2 text-sm">{item.id}</td>
 									<td className="px-4 py-2 text-sm">{item.name}</td>

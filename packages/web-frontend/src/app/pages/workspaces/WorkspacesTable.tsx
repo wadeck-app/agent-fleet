@@ -1,6 +1,6 @@
-import type { Workspace } from '@shared';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
+import type { Workspace } from '@shared';
 import { Folder, GitBranch } from 'lucide-react';
 
 /**
@@ -84,7 +84,11 @@ export function WorkspacesTable({ workspaces }: WorkspacesTableProps) {
 					<div className="overflow-x-auto">
 						<table className="w-full">
 							<thead>
-								<tr className="border-b text-left text-sm font-medium text-muted-foreground">
+								<tr
+									className={`
+           border-b text-left text-sm font-medium text-muted-foreground
+         `}
+								>
 									<th className="pb-3">Path</th>
 									<th className="pb-3">Mode</th>
 									<th className="pb-3">Status</th>
@@ -95,7 +99,13 @@ export function WorkspacesTable({ workspaces }: WorkspacesTableProps) {
 							</thead>
 							<tbody>
 								{workspaces.map(workspace => (
-									<tr key={workspace.id} className="border-b last:border-b-0">
+									<tr
+										key={workspace.id}
+										className={`
+            border-b
+            last:border-b-0
+          `}
+									>
 										<td className="py-3">
 											<div className="flex items-center gap-2">
 												<Folder className="size-4 text-muted-foreground" />
@@ -103,12 +113,20 @@ export function WorkspacesTable({ workspaces }: WorkspacesTableProps) {
 											</div>
 										</td>
 										<td className="py-3">
-											<span className={`text-sm font-medium capitalize ${getModeColor(workspace.mode)}`}>
+											<span
+												className={`
+              text-sm font-medium capitalize
+              ${getModeColor(workspace.mode)}
+            `}
+											>
 												{workspace.mode}
 											</span>
 										</td>
 										<td className="py-3">
-											<Badge variant={getStatusVariant(workspace.status)} className="capitalize">
+											<Badge
+												variant={getStatusVariant(workspace.status)}
+												className={`capitalize`}
+											>
 												{workspace.status}
 											</Badge>
 										</td>
@@ -126,7 +144,9 @@ export function WorkspacesTable({ workspaces }: WorkspacesTableProps) {
 											<span className="text-sm font-medium">{workspace.tasksCount}</span>
 										</td>
 										<td className="py-3">
-											<span className="text-sm text-muted-foreground">{formatRelativeTime(workspace.lastUsed)}</span>
+											<span className="text-sm text-muted-foreground">
+												{formatRelativeTime(workspace.lastUsed)}
+											</span>
 										</td>
 									</tr>
 								))}

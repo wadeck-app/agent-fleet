@@ -53,13 +53,10 @@ describe('useTasks', () => {
 				priority: 'high',
 				createdAt: '2025-12-21T08:00:00Z',
 				updatedAt: '2025-12-21T09:30:00Z',
-				assignedTo: {
+				assignedWorker: {
 					workerId: 'worker-1',
 					workerType: 'dev',
 				},
-				comments: [],
-				metadata: {},
-				history: [],
 			},
 		],
 	};
@@ -261,12 +258,9 @@ describe('useTasks', () => {
 			const filters1 = { status: 'in_progress' as const };
 			const filters2 = { status: 'review' as const };
 
-			const { result, rerender } = renderHook(
-				({ filters }) => useTasks({ filters }),
-				{
-					initialProps: { filters: filters1 },
-				}
-			);
+			const { result, rerender } = renderHook(({ filters }) => useTasks({ filters }), {
+				initialProps: { filters: filters1 },
+			});
 
 			// Wait for initial load
 			await waitFor(() => {
@@ -276,7 +270,7 @@ describe('useTasks', () => {
 			expect(tasksService.getTasks).toHaveBeenCalledWith(filters1);
 
 			// Change filters
-			rerender({ filters: filters2 });
+			rerender({ filters: filters2 as any });
 
 			// Wait for refetch
 			await waitFor(() => {
