@@ -11,7 +11,6 @@
  *
  * ===========================================================================================
  */
-
 import type { FastifyInstance } from 'fastify';
 
 import type { OrchestratorRequestHandler } from '../OrchestratorRequestHandler.js';

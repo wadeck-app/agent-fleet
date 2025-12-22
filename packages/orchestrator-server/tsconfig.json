@@ -14,9 +14,5 @@
 		}
 	},
 	"include": ["src/**/*"],
-	"references": [
-		{ "path": "../orchestrator" },
-		{ "path": "../shared-orch-backend" },
-		{ "path": "../shared-common" }
-	]
+	"references": [{ "path": "../orchestrator" }, { "path": "../shared-orch-backend" }, { "path": "../shared-common" }]
 }

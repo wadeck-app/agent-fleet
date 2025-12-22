@@ -23,7 +23,6 @@
  *
  * ===========================================================================================
  */
-
 import type { FastifyInstance } from 'fastify';
 
 import type { OrchestratorEventBroadcaster } from '../OrchestratorEventBroadcaster.js';
@@ -57,7 +56,7 @@ export function registerWebSocketRoute(
 		console.log(`[WebSocketRoute] Client connected: ${clientId}`);
 
 		// Register client for event broadcasting
-		const client = eventBroadcaster.registerClient(clientId, async (event) => {
+		const client = eventBroadcaster.registerClient(clientId, async event => {
 			const message: WSMessage = {
 				type: 'event',
 				payload: event,
@@ -122,11 +121,7 @@ export function registerWebSocketRoute(
  * @param ws - WebSocket connection
  * @param requestHandler - Request handler
  */
-async function handleRequest(
-	message: WSMessage,
-	ws: any,
-	requestHandler: OrchestratorRequestHandler
-): Promise<void> {
+async function handleRequest(message: WSMessage, ws: any, requestHandler: OrchestratorRequestHandler): Promise<void> {
 	const request = message.payload as any;
 
 	// Process request

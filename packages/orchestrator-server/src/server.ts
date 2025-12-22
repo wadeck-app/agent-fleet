@@ -30,7 +30,6 @@
  *
  * ===========================================================================================
  */
-
 import cors from '@fastify/cors';
 import fastifyWebsocket from '@fastify/websocket';
 import dotenv from 'dotenv';
@@ -148,7 +147,7 @@ async function main() {
 }
 
 // Start server
-main().catch((error) => {
+main().catch(error => {
 	console.error('[OrchestratorServer] Fatal error:', error);
 	process.exit(1);
 });

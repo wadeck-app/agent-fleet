@@ -23,9 +23,9 @@
  *
  * ===========================================================================================
  */
+import { WebSocket } from 'ws';
 
 import type { B2ORequest, B2OResponse, O2BEvent, O2BEventType } from '@app/shared-orch-backend';
-import { WebSocket } from 'ws';
 
 import type { OrchestratorTransport, TransportEventHandler } from './OrchestratorTransport.js';
 
@@ -191,7 +191,7 @@ export class WebSocketTransport implements OrchestratorTransport {
 				payload: request,
 			};
 
-			this.ws!.send(JSON.stringify(message), (error) => {
+			this.ws!.send(JSON.stringify(message), error => {
 				if (error) {
 					clearTimeout(timeout);
 					this.pendingRequests.delete(request.id);
@@ -289,7 +289,7 @@ export class WebSocketTransport implements OrchestratorTransport {
 		console.log(`[WebSocketTransport] Connection closed: code=${code}, reason=${reason}`);
 
 		// Reject all pending requests
-		this.pendingRequests.forEach((pending) => {
+		this.pendingRequests.forEach(pending => {
 			clearTimeout(pending.timeout);
 			pending.reject(new Error('WebSocket connection closed'));
 		});
@@ -317,11 +317,13 @@ export class WebSocketTransport implements OrchestratorTransport {
 		const maxDelay = 30000; // Cap at 30 seconds
 		const actualDelay = Math.min(delay, maxDelay);
 
-		console.log(`[WebSocketTransport] Reconnecting in ${actualDelay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+		console.log(
+			`[WebSocketTransport] Reconnecting in ${actualDelay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`
+		);
 
 		this.reconnectTimeout = setTimeout(() => {
 			this.reconnectTimeout = null;
-			this.connect().catch((error) => {
+			this.connect().catch(error => {
 				console.error('[WebSocketTransport] Reconnection failed:', error);
 			});
 		}, actualDelay);
@@ -341,7 +343,7 @@ export class WebSocketTransport implements OrchestratorTransport {
 			eventTypes,
 		};
 
-		this.ws.send(JSON.stringify(message), (error) => {
+		this.ws.send(JSON.stringify(message), error => {
 			if (error) {
 				console.error('[WebSocketTransport] Failed to send subscription:', error);
 			} else {
@@ -360,7 +362,7 @@ export class WebSocketTransport implements OrchestratorTransport {
 			eventTypes,
 		};
 
-		this.ws.send(JSON.stringify(message), (error) => {
+		this.ws.send(JSON.stringify(message), error => {
 			if (error) {
 				console.error('[WebSocketTransport] Failed to send unsubscription:', error);
 			} else {
@@ -379,7 +381,7 @@ export class WebSocketTransport implements OrchestratorTransport {
 		this.pingInterval = setInterval(() => {
 			if (this.ws && this.connected) {
 				const message: WSMessage = { type: 'ping' };
-				this.ws.send(JSON.stringify(message), (error) => {
+				this.ws.send(JSON.stringify(message), error => {
 					if (error) {
 						console.error('[WebSocketTransport] Failed to send ping:', error);
 					}

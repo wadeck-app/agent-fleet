@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 
 import type { EventData, EventType } from '@app/shared';
 
-import type { ITransportServer } from '../ITransportServer';
+import type { ITransportServer } from './ITransportServer';
 
 /**
  * ===========================================================================================

@@ -34,10 +34,10 @@
  *
  * ===========================================================================================
  */
+import { EventEmitter } from 'events';
 
 import type { B2ORequest, B2OResponse, O2BEventData, O2BEventType } from '@app/shared-orch-backend';
 import type { Task, WorkerInfo } from '@app/shared-orch-backend';
-import { EventEmitter } from 'events';
 
 import type { OrchestratorClient, OrchestratorConfig, TaskFilters, WorkerFilters } from '../OrchestratorClient.js';
 import type { OrchestratorTransport } from '../transport/OrchestratorTransport.js';
@@ -85,7 +85,7 @@ export class RemoteOrchestratorAdapter implements OrchestratorClient {
 		});
 
 		// Route O→B events from transport to local EventEmitter
-		this.transport.onEvent((event) => {
+		this.transport.onEvent(event => {
 			this.eventEmitter.emit(event.type, event.data);
 		});
 

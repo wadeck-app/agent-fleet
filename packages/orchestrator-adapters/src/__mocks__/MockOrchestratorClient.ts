@@ -37,16 +37,11 @@
  *
  * ===========================================================================================
  */
-
-import type { O2BEventData, O2BEventType, OrchestratorStats, Task, WorkerInfo } from '@app/shared-orch-backend';
 import { EventEmitter } from 'events';
 
-import type {
-	OrchestratorClient,
-	OrchestratorConfig,
-	TaskFilters,
-	WorkerFilters,
-} from '../OrchestratorClient.js';
+import type { O2BEventData, O2BEventType, OrchestratorStats, Task, WorkerInfo } from '@app/shared-orch-backend';
+
+import type { OrchestratorClient, OrchestratorConfig, TaskFilters, WorkerFilters } from '../OrchestratorClient.js';
 
 /**
  * Call record for history tracking
@@ -345,7 +340,7 @@ export class MockOrchestratorClient implements OrchestratorClient {
 	 * ```
 	 */
 	getCallsFor(method: string): CallRecord[] {
-		return this.callHistory.filter((call) => call.method === method);
+		return this.callHistory.filter(call => call.method === method);
 	}
 
 	/**
@@ -355,7 +350,7 @@ export class MockOrchestratorClient implements OrchestratorClient {
 	 * @returns true if method was called at least once
 	 */
 	wasCalled(method: string): boolean {
-		return this.callHistory.some((call) => call.method === method);
+		return this.callHistory.some(call => call.method === method);
 	}
 
 	/**
@@ -365,7 +360,7 @@ export class MockOrchestratorClient implements OrchestratorClient {
 	 * @returns Call count
 	 */
 	getCallCount(method: string): number {
-		return this.callHistory.filter((call) => call.method === method).length;
+		return this.callHistory.filter(call => call.method === method).length;
 	}
 
 	/**

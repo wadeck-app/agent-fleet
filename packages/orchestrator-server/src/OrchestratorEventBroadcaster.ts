@@ -22,10 +22,10 @@
  *
  * ===========================================================================================
  */
-
-import type { O2BEvent } from '@app/shared-orch-backend';
 import { Orchestrator } from 'orchestrator/core/index.js';
 import { StateEvent } from 'shared-common/StateManager.js';
+
+import type { O2BEvent } from '@app/shared-orch-backend';
 
 /**
  * Client connection with subscription info
@@ -184,7 +184,7 @@ export class OrchestratorEventBroadcaster {
 			return;
 		}
 
-		eventTypes.forEach((eventType) => {
+		eventTypes.forEach(eventType => {
 			client.subscribedEvents.add(eventType);
 		});
 
@@ -203,7 +203,7 @@ export class OrchestratorEventBroadcaster {
 			return;
 		}
 
-		eventTypes.forEach((eventType) => {
+		eventTypes.forEach(eventType => {
 			client.subscribedEvents.delete(eventType);
 		});
 
@@ -230,7 +230,7 @@ export class OrchestratorEventBroadcaster {
 					.then(() => {
 						sentCount++;
 					})
-					.catch((error) => {
+					.catch(error => {
 						console.error(`[EventBroadcaster] Failed to send event to client ${clientId}:`, error);
 					});
 			}

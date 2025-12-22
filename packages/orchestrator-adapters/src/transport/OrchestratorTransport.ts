@@ -38,7 +38,6 @@
  *
  * ===========================================================================================
  */
-
 import type { B2ORequest, B2OResponse } from '@app/shared-orch-backend';
 import type { O2BEvent, O2BEventType } from '@app/shared-orch-backend';
 

@@ -36,6 +36,65 @@ const envPath = path.join(__dirname, '../.env');
 dotenv.config({ path: envPath });
 
 /**
+ * Initialize OrchestratorClient based on environment configuration
+ */
+async function initializeOrchestratorClient(): Promise<OrchestratorClient> {
+	const mode = process.env.ORCHESTRATOR_MODE || 'library';
+
+	if (mode === 'library') {
+		// Library mode: dynamic import orchestrator and create LibraryAdapter
+		logger.info('[Orchestrator] Initializing in library mode (embedded)');
+
+		// Dynamic import to avoid bundling orchestrator in remote mode builds
+		// @ts-expect-error - orchestrator is a devDependency, only available at runtime in library mode
+		const { Orchestrator } = await import('orchestrator/core/index.js');
+
+		// Create orchestrator instance
+		const orchestratorWsPort = parseInt(process.env.ORCHESTRATOR_WS_PORT || '3738', 10);
+		const orchestratorRestPort = parseInt(process.env.ORCHESTRATOR_REST_PORT || '3737', 10);
+
+		const orchestrator = new Orchestrator({
+			wsPort: orchestratorWsPort,
+			restPort: orchestratorRestPort,
+		});
+
+		await orchestrator.start();
+		logger.info(`[Orchestrator] Started on WS port ${orchestratorWsPort}, REST port ${orchestratorRestPort}`);
+
+		// Create LibraryAdapter
+		const orchestratorClient = await OrchestratorClientFactory.create({ mode: 'library' }, orchestrator);
+
+		await orchestratorClient.connect();
+		logger.info('[Orchestrator] LibraryAdapter connected');
+
+		return orchestratorClient;
+	} else if (mode === 'remote') {
+		// Remote mode: create RemoteAdapter with URL
+		const url = process.env.ORCHESTRATOR_URL;
+		if (!url) {
+			throw new Error('ORCHESTRATOR_URL is required when ORCHESTRATOR_MODE=remote');
+		}
+
+		logger.info(`[Orchestrator] Initializing in remote mode (URL: ${url})`);
+
+		const transportMode = (process.env.ORCHESTRATOR_TRANSPORT as any) || 'auto';
+
+		const orchestratorClient = await OrchestratorClientFactory.create({
+			mode: 'remote',
+			url,
+			transportMode,
+		});
+
+		await orchestratorClient.connect();
+		logger.info('[Orchestrator] RemoteAdapter connected');
+
+		return orchestratorClient;
+	} else {
+		throw new Error(`Invalid ORCHESTRATOR_MODE: ${mode}. Must be 'library' or 'remote'.`);
+	}
+}
+
+/**
  * Initialize WebSocket transport server
  */
 async function initializeTransportServer(app: FastifyInstance, factory: DataStoreFactory) {
@@ -327,12 +386,15 @@ async function start() {
 		fastify.get('/health', healthCheckHandler);
 		fastify.get('/api/health', healthCheckHandler);
 
+		// Initialize OrchestratorClient (library or remote mode)
+		const orchestratorClient = await initializeOrchestratorClient();
+
 		// Initialize global factory for dependency injection
 		// This must be done BEFORE any controllers are loaded
 		if (process.env.USE_PRODUCTION_DB === 'true') {
 			//TODO database integration
 			// 'memory' for tests, 'mariadb' for prod
-			const factory = initializeFactory('memory');
+			const factory = initializeFactory('memory', orchestratorClient);
 
 			// Seed initial data (for development)
 			await factory.seedData();
@@ -343,7 +405,7 @@ async function start() {
 			logger.info('Skipping Google Sheets and Gemini AI initialization (in-memory mode)');
 
 			// 'memory' for tests, 'mariadb' for prod
-			const factory = initializeFactory('memory');
+			const factory = initializeFactory('memory', orchestratorClient);
 
 			// Seed initial data (for development)
 			await factory.seedData();
@@ -352,7 +414,7 @@ async function start() {
 			await initializeTransportServer(fastify, factory);
 		} else {
 			// E2E mode also needs a factory for controllers
-			const factory = initializeFactory('memory');
+			const factory = initializeFactory('memory', orchestratorClient);
 
 			// Initialize WebSocket transport server for E2E tests
 			await initializeTransportServer(fastify, factory);

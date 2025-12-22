@@ -1,3 +1,5 @@
+import type { OrchestratorClient } from 'orchestrator-adapters';
+
 import { DataStoreFactory } from '../factories/DataStoreFactory';
 
 /**
@@ -19,11 +21,14 @@ let factoryInstance: DataStoreFactory | null = null;
  * Initialize the global factory instance
  * Must be called once during server startup
  */
-export function initializeFactory(storageMode: 'memory' | 'mariadb' = 'memory'): DataStoreFactory {
+export function initializeFactory(
+	storageMode: 'memory' | 'mariadb' = 'memory',
+	orchestratorClient: OrchestratorClient
+): DataStoreFactory {
 	if (factoryInstance) {
 		throw new Error('Factory already initialized');
 	}
-	factoryInstance = new DataStoreFactory(storageMode);
+	factoryInstance = new DataStoreFactory(storageMode, orchestratorClient);
 	return factoryInstance;
 }
 

@@ -23,7 +23,6 @@
  *
  * ===========================================================================================
  */
-
 import type { B2ORequest, B2OResponse, O2BEvent, O2BEventType } from '@app/shared-orch-backend';
 
 import type { OrchestratorTransport, TransportEventHandler } from './OrchestratorTransport.js';
@@ -131,7 +130,7 @@ export class RestLongPollingTransport implements OrchestratorTransport {
 				};
 			}
 
-			const data = await response.json() as any;
+			const data = (await response.json()) as any;
 			return {
 				id: request.id,
 				result: data.result,
@@ -224,7 +223,7 @@ export class RestLongPollingTransport implements OrchestratorTransport {
 
 				// Deliver events
 				if (events.length > 0 && this.eventHandler) {
-					events.forEach((event) => {
+					events.forEach(event => {
 						try {
 							this.eventHandler!(event);
 						} catch (error) {
@@ -274,7 +273,7 @@ export class RestLongPollingTransport implements OrchestratorTransport {
 				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 			}
 
-			const data = await response.json() as any;
+			const data = (await response.json()) as any;
 			return data.events || [];
 		} catch (error) {
 			clearTimeout(timeoutId);
@@ -285,6 +284,6 @@ export class RestLongPollingTransport implements OrchestratorTransport {
 	}
 
 	private sleep(ms: number): Promise<void> {
-		return new Promise((resolve) => setTimeout(resolve, ms));
+		return new Promise(resolve => setTimeout(resolve, ms));
 	}
 }

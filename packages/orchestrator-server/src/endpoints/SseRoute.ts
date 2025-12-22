@@ -15,7 +15,6 @@
  *
  * ===========================================================================================
  */
-
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import type { OrchestratorEventBroadcaster } from '../OrchestratorEventBroadcaster.js';
@@ -44,7 +43,7 @@ export function registerSseRoute(app: FastifyInstance, eventBroadcaster: Orchest
 		const subscribedEvents = query.events ? query.events.split(',') : [];
 
 		// Register client
-		const client = eventBroadcaster.registerClient(clientId, async (event) => {
+		const client = eventBroadcaster.registerClient(clientId, async event => {
 			// Send event as SSE
 			const data = JSON.stringify(event);
 			reply.raw.write(`data: ${data}\n\n`);

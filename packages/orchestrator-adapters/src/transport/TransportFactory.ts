@@ -35,7 +35,6 @@
  *
  * ===========================================================================================
  */
-
 import type { OrchestratorTransport } from './OrchestratorTransport.js';
 import { RestLongPollingTransport } from './RestLongPollingTransport.js';
 import { RestSseTransport } from './RestSseTransport.js';
@@ -143,7 +142,7 @@ export class TransportFactory {
 		}
 
 		// All transports failed
-		const errorSummary = errors.map((e) => `${e.mode}: ${e.error.message}`).join(', ');
+		const errorSummary = errors.map(e => `${e.mode}: ${e.error.message}`).join(', ');
 		throw new Error(`Failed to establish connection with any transport. Errors: ${errorSummary}`);
 	}
 
@@ -229,10 +228,7 @@ export class TransportFactory {
 	 * @param timeout - Timeout in milliseconds
 	 * @throws Error if connection times out
 	 */
-	private static async connectWithTimeout(
-		transport: OrchestratorTransport,
-		timeout: number
-	): Promise<void> {
+	private static async connectWithTimeout(transport: OrchestratorTransport, timeout: number): Promise<void> {
 		const timeoutPromise = new Promise<never>((_, reject) => {
 			setTimeout(() => reject(new Error(`Connection timeout after ${timeout}ms`)), timeout);
 		});

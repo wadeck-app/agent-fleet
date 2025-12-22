@@ -1,3 +1,5 @@
+import type { OrchestratorClient } from 'orchestrator-adapters';
+
 import type { Book, Ingredient } from '@app/shared';
 
 import type { AuthService } from '../auth/AuthService';
@@ -50,8 +52,9 @@ export class DataStoreFactory {
 	private transportRouter?: TransportRouter;
 	private eventBroadcaster?: EventBroadcaster;
 	private transportServer?: ITransportServer;
+	private orchestratorClient: OrchestratorClient;
 
-	constructor(storageMode: 'memory' | 'mariadb' = 'memory') {
+	constructor(storageMode: 'memory' | 'mariadb' = 'memory', orchestratorClient: OrchestratorClient) {
 		// Create storage based on mode
 		if (storageMode === 'memory') {
 			this.storage = new InMemoryStorage();
@@ -59,6 +62,8 @@ export class DataStoreFactory {
 			// TODO: Implement MariaDBStorage
 			throw new Error('MariaDB storage not yet implemented');
 		}
+
+		this.orchestratorClient = orchestratorClient;
 	}
 
 	/**
@@ -311,6 +316,13 @@ export class DataStoreFactory {
 	 */
 	getStorage(): DataStorage {
 		return this.storage;
+	}
+
+	/**
+	 * Get the orchestrator client
+	 */
+	getOrchestratorClient(): OrchestratorClient {
+		return this.orchestratorClient;
 	}
 
 	/**

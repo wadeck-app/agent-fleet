@@ -17,7 +17,6 @@
  *
  * ===========================================================================================
  */
-
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import type { OrchestratorEventBroadcaster } from '../OrchestratorEventBroadcaster.js';
@@ -41,10 +40,7 @@ const pollClients = new Map<string, PollClient>();
  * @param app - Fastify instance
  * @param eventBroadcaster - Event broadcaster
  */
-export function registerLongPollingRoute(
-	app: FastifyInstance,
-	eventBroadcaster: OrchestratorEventBroadcaster
-): void {
+export function registerLongPollingRoute(app: FastifyInstance, eventBroadcaster: OrchestratorEventBroadcaster): void {
 	app.get('/orchestrator/poll', async (request: FastifyRequest, reply: FastifyReply) => {
 		const query = request.query as { timeout?: string; events?: string; clientId?: string };
 		const timeoutSeconds = parseInt(query.timeout || '30');
@@ -65,7 +61,7 @@ export function registerLongPollingRoute(
 			pollClients.set(clientId, pollClient);
 
 			// Register with event broadcaster
-			eventBroadcaster.registerClient(clientId, async (event) => {
+			eventBroadcaster.registerClient(clientId, async event => {
 				const client = pollClients.get(clientId);
 				if (!client) return;
 
@@ -103,7 +99,7 @@ export function registerLongPollingRoute(
 		}
 
 		// Wait for events or timeout
-		const events = await new Promise<any[]>((resolve) => {
+		const events = await new Promise<any[]>(resolve => {
 			pollClient!.resolve = resolve;
 
 			// Set timeout

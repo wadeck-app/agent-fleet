@@ -23,7 +23,6 @@
  *
  * ===========================================================================================
  */
-
 import type { B2ORequest, B2OResponse, O2BEvent, O2BEventType } from '@app/shared-orch-backend';
 
 import type { OrchestratorTransport, TransportEventHandler } from './OrchestratorTransport.js';
@@ -123,7 +122,7 @@ export class RestSseTransport implements OrchestratorTransport {
 				};
 			}
 
-			const data = await response.json() as any;
+			const data = (await response.json()) as any;
 			return {
 				id: request.id,
 				result: data.result,
@@ -237,7 +236,7 @@ export class RestSseTransport implements OrchestratorTransport {
 
 		setTimeout(() => {
 			if (this.shouldReconnect && this.connected) {
-				this.connectSSE().catch((error) => {
+				this.connectSSE().catch(error => {
 					console.error('[RestSseTransport] SSE reconnection failed:', error);
 				});
 			}

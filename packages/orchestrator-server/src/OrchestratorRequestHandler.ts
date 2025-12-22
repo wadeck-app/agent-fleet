@@ -23,9 +23,9 @@
  *
  * ===========================================================================================
  */
+import { Orchestrator } from 'orchestrator/core/index.js';
 
 import type { B2ORequest, B2OResponse } from '@app/shared-orch-backend';
-import { Orchestrator } from 'orchestrator/core/index.js';
 
 /**
  * Orchestrator Request Handler
@@ -122,17 +122,17 @@ export class OrchestratorRequestHandler {
 		let filteredTasks = allTasks;
 
 		if (filters.status) {
-			filteredTasks = filteredTasks.filter((task) => task.status === filters.status);
+			filteredTasks = filteredTasks.filter(task => task.status === filters.status);
 		}
 
 		if (filters.workerId) {
 			filteredTasks = filteredTasks.filter(
-				(task) => task.assignedTo && task.assignedTo.workerId === filters.workerId
+				task => task.assignedTo && task.assignedTo.workerId === filters.workerId
 			);
 		}
 
 		if (filters.priority) {
-			filteredTasks = filteredTasks.filter((task) => task.priority === filters.priority);
+			filteredTasks = filteredTasks.filter(task => task.priority === filters.priority);
 		}
 
 		return {
@@ -214,7 +214,7 @@ export class OrchestratorRequestHandler {
 
 		// Calculate task counts by status
 		const byStatus: Record<string, number> = {};
-		allTasks.forEach((task) => {
+		allTasks.forEach(task => {
 			byStatus[task.status] = (byStatus[task.status] || 0) + 1;
 		});
 
