@@ -9,6 +9,8 @@ import dotenv from 'dotenv';
 // ======================================================================================
 // Now import everything else
 import Fastify, { type FastifyInstance } from 'fastify';
+import { OrchestratorClientFactory } from 'orchestrator-adapters';
+import type { OrchestratorClient } from 'orchestrator-adapters';
 import * as os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';

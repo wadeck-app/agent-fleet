@@ -1,0 +1,25 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"composite": true,
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"declarationMap": true,
+		"baseUrl": ".",
+		"paths": {
+			"@app/shared-orch-backend": ["../shared-orch-backend/src"],
+			"@app/shared-orch-backend/*": ["../shared-orch-backend/src/*"],
+			"shared-common": ["../shared-common/src"],
+			"shared-common/*": ["../shared-common/src/*"]
+		}
+	},
+	"include": ["src/**/*"],
+	"references": [
+		{
+			"path": "../shared-common"
+		},
+		{
+			"path": "../shared-orch-backend"
+		}
+	]
+}

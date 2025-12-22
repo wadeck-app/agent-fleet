@@ -1,21 +1,27 @@
 /**
- * Transport Layer - Backend
+ * ===========================================================================================
+ * TRANSPORT LAYER EXPORTS
+ * ===========================================================================================
  *
- * Export all transport-related modules for easy imports.
+ * WebSocket transport infrastructure for Frontend-Backend communication.
+ *
+ * ===========================================================================================
  */
 
 // Core interfaces
-export type { ITransportServer, ClientConnectedHandler, ClientDisconnectedHandler } from './ITransportServer';
+export type { ITransportServer } from './ITransportServer.js';
+
+// WebSocket server implementation
+export { WebSocketTransportServer } from './adapters/WebSocketTransportServer.js';
+
+// Event broadcasting
+export { EventBroadcaster } from './EventBroadcaster.js';
 
 // Session management
-export { WebSocketSessionManager } from './WebSocketSessionManager';
-export type { WebSocketSession, SessionStats } from './WebSocketSessionManager';
+export { WebSocketSessionManager } from './WebSocketSessionManager.js';
 
-// Routing and broadcasting
-export { TransportRouter } from './TransportRouter';
-export { EventBroadcaster } from './EventBroadcaster';
+// Request routing
+export { TransportRouter } from './TransportRouter.js';
 
-// Adapters
-export { WebSocketTransportServer } from './adapters/WebSocketTransportServer';
-export { MockTransportServer } from './adapters/MockTransportServer';
-export type { BroadcastRecord, ClientSendRecord } from './adapters/MockTransportServer';
+// Testing utilities
+export { MockTransportServer } from './MockTransportServer.js';

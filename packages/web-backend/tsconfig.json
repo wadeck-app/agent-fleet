@@ -9,6 +9,8 @@
 			"@app/shared/*": ["../shared-frontend-backend/src/*"],
 			"@app/shared-orch-backend": ["../shared-orch-backend/src"],
 			"@app/shared-orch-backend/*": ["../shared-orch-backend/src/*"],
+			"orchestrator-adapters": ["../orchestrator-adapters/src"],
+			"orchestrator-adapters/*": ["../orchestrator-adapters/src/*"],
 			"shared-common": ["../shared-common/src"],
 			"shared-common/*": ["../shared-common/src/*"],
 			"@/*": ["./src/*"]
@@ -17,6 +19,7 @@
 	"include": ["src/**/*"],
 	"exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"],
 	"references": [
+		{ "path": "../orchestrator-adapters" },
 		{ "path": "../shared-frontend-backend" },
 		{ "path": "../shared-orch-backend" },
 		{ "path": "../shared-common" }

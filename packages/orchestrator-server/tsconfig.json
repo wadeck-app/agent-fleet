@@ -1,0 +1,22 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"baseUrl": ".",
+		"paths": {
+			"orchestrator": ["../orchestrator/src"],
+			"orchestrator/*": ["../orchestrator/src/*"],
+			"@app/shared-orch-backend": ["../shared-orch-backend/src"],
+			"@app/shared-orch-backend/*": ["../shared-orch-backend/src/*"],
+			"shared-common": ["../shared-common/src"],
+			"shared-common/*": ["../shared-common/src/*"]
+		}
+	},
+	"include": ["src/**/*"],
+	"references": [
+		{ "path": "../orchestrator" },
+		{ "path": "../shared-orch-backend" },
+		{ "path": "../shared-common" }
+	]
+}

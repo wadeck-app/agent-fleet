@@ -1,5 +1,5 @@
 {
-	"name": "shared-common",
+	"name": "orchestrator-adapters",
 	"version": "1.0.0",
 	"private": true,
 	"type": "module",
@@ -7,26 +7,35 @@
 	"types": "./dist/index.d.ts",
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
+		"build:library": "node build.library.mjs",
+		"build:remote": "node build.remote.mjs",
 		"dev": "tsc --build tsconfig.json --watch",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
-		"lint": "echo \"No linting configured for shared-common\"",
 		"clean": "rimraf dist"
 	},
 	"dependencies": {
-		"@fastify/websocket": "^11.0.0",
-		"@types/cookie": "^0.6.0",
-		"cookie": "^1.0.2",
-		"fastify": "^5.6.2",
-		"ws": "^8.16.0",
-		"zod": "^4.1.13"
+		"shared-common": "*",
+		"shared-orch-backend": "*",
+		"ws": "^8.16.0"
+	},
+	"peerDependencies": {
+		"orchestrator": "*"
+	},
+	"peerDependenciesMeta": {
+		"orchestrator": {
+			"optional": true
+		}
 	},
 	"devDependencies": {
 		"@types/node": "^22.10.2",
 		"@types/ws": "^8.5.10",
+		"cross-env": "^7.0.3",
+		"esbuild": "^0.27.2",
+		"rimraf": "^6.1.2",
+		"tsx": "^4.7.0",
 		"typescript": "^5.3.3",
-		"vitest": "^4.0.14",
-		"tsx": "^4.7.0"
+		"vitest": "^4.0.14"
 	}
 }
