@@ -1,13 +1,7 @@
 /**
- * Shared types for orchestrator-backend communication
+ * Transport layer exports for Backend-Orchestrator communication
  */
 
-export { OrchestratorStatsSchema, type OrchestratorStats } from './api/dashboard.contract.js';
-
-// Re-export common types used in B2O/O2B communication
-export type { Task, WorkerInfo } from 'shared-common/types.js';
-
-// Transport layer types (B2O and O2B)
 export {
 	type B2ORequest,
 	type B2OResponse,
@@ -28,7 +22,7 @@ export {
 	type B2OMethods,
 	B2O_REQUEST_SCHEMAS,
 	validateB2ORequest,
-} from './transport/B2OContract.js';
+} from './B2OContract.js';
 
 export {
 	O2B_WorkerStatusEventSchema,
@@ -54,4 +48,4 @@ export {
 	type O2BEventData,
 	O2B_EVENT_SCHEMAS,
 	validateO2BEvent,
-} from './transport/O2BEventTypes.js';
+} from './O2BEventTypes.js';

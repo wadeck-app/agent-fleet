@@ -9,6 +9,8 @@
 			"@app/shared/*": ["../shared-frontend-backend/src/*"],
 			"@app/shared-orch-backend": ["../shared-orch-backend/src"],
 			"@app/shared-orch-backend/*": ["../shared-orch-backend/src/*"],
+			"shared-common": ["../shared-common/src"],
+			"shared-common/*": ["../shared-common/src/*"],
 			"@/*": ["./src/*"]
 		}
 	},
