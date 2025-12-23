@@ -188,7 +188,7 @@ export function Data2<T>({
 		// When any feature changes in a way that affects query, queryUrl changes, and we refetch
 		// We don't list 'query' directly because queryUrl is memoized from query
 		// So any change to query is reflected in queryUrl
-	}, [fetchData, queryUrl]);
+	}, [fetchData, query, queryUrl]);
 
 	// Calculate refreshing state: true if loading but we already have data
 	// (i.e., this is a refresh, not an initial load)
@@ -235,7 +235,7 @@ export function Data2<T>({
 
 		return props;
 		// Depend on feature states and isRefreshing
-	}, [data, isLoading, error, paginationData, pagination, sorting, search, filter, isRefreshing]);
+	}, [data, isLoading, error, paginationData, pagination, sorting, search, filter, isRefreshing]); // eslint-disable-line no-restricted-syntax
 
 	// Handle initial loading state (before first data)
 	if (isLoading && data.length === 0) {

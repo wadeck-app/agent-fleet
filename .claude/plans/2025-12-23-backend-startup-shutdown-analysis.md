@@ -15,39 +15,40 @@ The backend uses a **layered architecture** with multiple server instances being
 **Startup Sequence:**
 
 1. **Environment Loading** (Lines 1-41)
-   - Load .env files from root and backend package
-   - Critical env vars checked: NODE_ENV, DISABLE_AUTH_DEV, E2E_MODE, PROJECT_ID, WORKSPACE_ID
+    - Load .env files from root and backend package
+    - Critical env vars checked: NODE_ENV, DISABLE_AUTH_DEV, E2E_MODE, PROJECT_ID, WORKSPACE_ID
 
 2. **Orchestrator Initialization** (Lines 46-81, 397)
-   - Called in library mode only via initializeOrchestratorClient()
-   - Creates embedded Orchestrator instance
-   - Connects OrchestratorClient via LibraryAdapter
+    - Called in library mode only via initializeOrchestratorClient()
+    - Creates embedded Orchestrator instance
+    - Connects OrchestratorClient via LibraryAdapter
 
 3. **Fastify HTTP Server** (Lines 190-441)
-   - Initialized at line 190
-   - Plugins registered (CORS, Helmet, Cookie, etc.)
-   - Health check endpoints at /health and /api/health
-   - **Listens at line 441**: await fastify.listen({ port: PORT, host: '0.0.0.0' })
+    - Initialized at line 190
+    - Plugins registered (CORS, Helmet, Cookie, etc.)
+    - Health check endpoints at /health and /api/health
+    - **Listens at line 441**: await fastify.listen({ port: PORT, host: '0.0.0.0' })
 
 4. **DataStoreFactory** (Lines 399-437)
-   - Global singleton factory initialized for dependency injection
-   - Three initialization paths based on environment
+    - Global singleton factory initialized for dependency injection
+    - Three initialization paths based on environment
 
 5. **WebSocket Transport Server** (Lines 86-114, 424)
-   - Created via initializeTransportServer(fastify, factory)
-   - Registers /ws endpoint with Fastify
-   - Manages client sessions and subscriptions
+    - Created via initializeTransportServer(fastify, factory)
+    - Registers /ws endpoint with Fastify
+    - Manages client sessions and subscriptions
 
 6. **Event Bridge** (Lines 120-131, 413)
-   - OrchestratorEventBridge subscribes to O→B events
-   - Forwards orchestrator events to frontend clients
-   - Stored in module-level variable eventBridge (line 262)
+    - OrchestratorEventBridge subscribes to O→B events
+    - Forwards orchestrator events to frontend clients
+    - Stored in module-level variable eventBridge (line 262)
 
 ---
 
 ## 2. ALL SERVER INSTANCES CREATED
 
 ### 2.1 Fastify HTTP Server
+
 Location: packages/web-backend/src/server.ts:190
 
 - **Ports**: Calculated from PROJECT_ID (default: 3000 + projectId*10 + workspaceId*100)
@@ -57,6 +58,7 @@ Location: packages/web-backend/src/server.ts:190
 - **Status**: ✅ Proper cleanup
 
 ### 2.2 WebSocket Transport Server (Backend ↔ Frontend)
+
 Location: packages/web-backend/src/transport/adapters/WebSocketTransportServer.ts:69-78
 
 - **Registers**: GET /ws endpoint with @fastify/websocket plugin
@@ -67,17 +69,20 @@ Location: packages/web-backend/src/transport/adapters/WebSocketTransportServer.t
 - **Status**: ❌ No cleanup handler - connections not explicitly closed on shutdown
 
 ### 2.3 Orchestrator Instance (Library Mode)
+
 Location: packages/orchestrator-adapters/src/OrchestratorClientFactory.ts:35-69
 
 The orchestrator creates these servers:
 
 #### 2.3.1 WorkerWebSocketServer (Orchestrator)
+
 - **Port**: 3738 (calculated: 3737 + 1, or custom ORCHESTRATOR_WS_PORT)
 - **Purpose**: Worker ↔ Orchestrator communication
 - **Stop**: Line 111-121 of WorkerWebSocketServer.ts has proper stop() method
 - **Status**: ✅ Has stop() method
 
 #### 2.3.2 REST API Server (Orchestrator)
+
 - **Port**: 3737 (HTTP server via Express)
 - **Purpose**: REST endpoints for task management
 - **Start**: Line 392-401 of RestAPI.ts
@@ -85,21 +90,25 @@ The orchestrator creates these servers:
 - **Status**: ✅ Has stop() method
 
 #### 2.3.3 UI WebSocket Server (Orchestrator)
+
 - **Endpoint**: HTTP upgrade to /ws/ui on port 3737
 - **Stop**: Line 406-412 (called from RestAPI.stop())
 - **Status**: ✅ Cleanup included
 
 #### 2.3.4 StateManager
+
 - **Purpose**: Event coordination (task lifecycle, worker connections)
 - **Status**: ✅ Event cleanup handled (no resources to release)
 
 #### 2.3.5 MetricsCollector
+
 - **Purpose**: Collects metrics every 5 seconds
 - **Start**: Line 123 of Orchestrator index.ts
 - **Stop**: Line 159
 - **Status**: ✅ Has lifecycle management
 
 ### Orchestrator Shutdown (Line 145-180 of packages/orchestrator/src/core/index.ts)
+
 ```
 async shutdown(): Promise<void> {
     this.stateManager.emitOrchestratorStopping();
@@ -116,27 +125,29 @@ async shutdown(): Promise<void> {
 ## 3. GRACEFUL SHUTDOWN FLOW
 
 ### Main Shutdown Handler
+
 Location: packages/web-backend/src/server.ts:470-485
 
 ```typescript
 const signals = ['SIGTERM', 'SIGINT'] as const;
 signals.forEach(signal => {
-    process.on(signal, async () => {
-        logger.info(`${signal} signal received: closing HTTP server`);
-        
-        // Cleanup orchestrator event bridge
-        if (eventBridge) {
-            eventBridge.dispose();
-            logger.info('[Bridge] OrchestratorEventBridge disposed');
-        }
-        
-        await fastify.close();
-        process.exit(0);
-    });
+	process.on(signal, async () => {
+		logger.info(`${signal} signal received: closing HTTP server`);
+
+		// Cleanup orchestrator event bridge
+		if (eventBridge) {
+			eventBridge.dispose();
+			logger.info('[Bridge] OrchestratorEventBridge disposed');
+		}
+
+		await fastify.close();
+		process.exit(0);
+	});
 });
 ```
 
 ### Shutdown Sequence
+
 1. Signal received: SIGTERM or SIGINT
 2. Log message
 3. Dispose event bridge
@@ -154,8 +165,9 @@ signals.forEach(signal => {
 The orchestratorClient is created but the underlying Orchestrator instance is NOT stored in a module-level variable.
 
 **Impact**:
+
 - REST API (port 3737) not closed properly
-- WorkerWebSocketServer (port 3738) not closed properly  
+- WorkerWebSocketServer (port 3738) not closed properly
 - TaskManager state not persisted
 - Metrics not finalized
 - Potential zombie processes on Windows
@@ -175,6 +187,7 @@ The orchestratorClient is created but the underlying Orchestrator instance is NO
 - Client connections not explicitly closed
 
 **What Should Happen**:
+
 - Clear all expiration timers
 - Close all client connections
 - Clean up internal state
@@ -186,8 +199,9 @@ The orchestratorClient is created but the underlying Orchestrator instance is NO
 **Problem Location**: packages/orchestrator-adapters/src/adapters/LibraryAdapter.ts:324-348
 
 In off() method, composite events cannot be removed:
+
 - task.completed
-- task.failed  
+- task.failed
 - task.status_changed
 - worker.status
 - worker.log
@@ -201,6 +215,7 @@ These events wrap StateManager events but handlers not stored for removal.
 ## 5. NODEMON PROCESS MANAGEMENT
 
 ### Nodemon Configuration
+
 From packages/web-backend/package.json:
 
 ```
@@ -234,9 +249,11 @@ From packages/web-backend/package.json:
 ## 6. PROCESS TERMINATION SIGNAL HANDLING
 
 ### Current Implementation
+
 Lines 471-485 handle: SIGTERM, SIGINT
 
 ### Signal Coverage
+
 - ✅ SIGTERM - Termination signal (nodemon uses this)
 - ✅ SIGINT - Interrupt signal (Ctrl+C)
 - ❌ SIGHUP - Not handled (terminal closed)
@@ -244,6 +261,7 @@ Lines 471-485 handle: SIGTERM, SIGINT
 - ❌ Uncaught exceptions - No cleanup
 
 ### Timeout Protection
+
 - ❌ No timeout for graceful shutdown
 - ⚠️ If shutdown hangs, process.exit() still called immediately
 
@@ -252,5 +270,6 @@ Lines 471-485 handle: SIGTERM, SIGINT
 ## 7. FILE LOCATIONS - QUICK REFERENCE
 
 ### Backend Startup/Shutdown
+
 - packages/web-backend/src/server.ts (Lines 1-488) - Main entry point
 - packa

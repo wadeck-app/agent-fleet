@@ -18,7 +18,7 @@ describe('useCacheControl2', () => {
 		it('should have correct state shape', () => {
 			const { result } = renderHook(() => useCacheControl2());
 
-			expect(result.current.state).toEqual({
+			expect(result.current.fstate).toEqual({
 				cacheId: 0,
 				isRefreshing: false,
 			});
@@ -71,19 +71,19 @@ describe('useCacheControl2', () => {
 		it('should increment cacheId when refresh() called', () => {
 			const { result } = renderHook(() => useCacheControl2());
 
-			expect(result.current.state.cacheId).toBe(0);
+			expect(result.current.fstate.cacheId).toBe(0);
 
 			act(() => {
 				result.current.actions.refresh();
 			});
 
-			expect(result.current.state.cacheId).toBe(1);
+			expect(result.current.fstate.cacheId).toBe(1);
 
 			act(() => {
 				result.current.actions.refresh();
 			});
 
-			expect(result.current.state.cacheId).toBe(2);
+			expect(result.current.fstate.cacheId).toBe(2);
 		});
 	});
 
@@ -91,20 +91,20 @@ describe('useCacheControl2', () => {
 		it('should reset cacheId to initialCacheId', () => {
 			const { result } = renderHook(() => useCacheControl2({ initialCacheId: 5 }));
 
-			expect(result.current.state.cacheId).toBe(5);
+			expect(result.current.fstate.cacheId).toBe(5);
 
 			act(() => {
 				result.current.actions.refresh();
 				result.current.actions.refresh();
 			});
 
-			expect(result.current.state.cacheId).toBe(7);
+			expect(result.current.fstate.cacheId).toBe(7);
 
 			act(() => {
 				result.current.actions.reset();
 			});
 
-			expect(result.current.state.cacheId).toBe(5);
+			expect(result.current.fstate.cacheId).toBe(5);
 		});
 
 		it('should reset to 0 by default', () => {
@@ -115,13 +115,13 @@ describe('useCacheControl2', () => {
 				result.current.actions.refresh();
 			});
 
-			expect(result.current.state.cacheId).toBe(2);
+			expect(result.current.fstate.cacheId).toBe(2);
 
 			act(() => {
 				result.current.actions.reset();
 			});
 
-			expect(result.current.state.cacheId).toBe(0);
+			expect(result.current.fstate.cacheId).toBe(0);
 		});
 	});
 
@@ -133,7 +133,7 @@ describe('useCacheControl2', () => {
 				result.current.actions.setCacheId(42);
 			});
 
-			expect(result.current.state.cacheId).toBe(42);
+			expect(result.current.fstate.cacheId).toBe(42);
 		});
 
 		it('should reject negative cacheId values', () => {
@@ -145,7 +145,7 @@ describe('useCacheControl2', () => {
 				result.current.actions.setCacheId(-1);
 			});
 
-			expect(result.current.state.cacheId).toBe(0);
+			expect(result.current.fstate.cacheId).toBe(0);
 			expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid cacheId'));
 
 			consoleWarnSpy.mockRestore();
@@ -156,19 +156,19 @@ describe('useCacheControl2', () => {
 		it('should set and toggle isRefreshing state', () => {
 			const { result } = renderHook(() => useCacheControl2());
 
-			expect(result.current.state.isRefreshing).toBe(false);
+			expect(result.current.fstate.isRefreshing).toBe(false);
 
 			act(() => {
 				result.current.actions.setIsRefreshing(true);
 			});
 
-			expect(result.current.state.isRefreshing).toBe(true);
+			expect(result.current.fstate.isRefreshing).toBe(true);
 
 			act(() => {
 				result.current.actions.setIsRefreshing(false);
 			});
 
-			expect(result.current.state.isRefreshing).toBe(false);
+			expect(result.current.fstate.isRefreshing).toBe(false);
 		});
 	});
 
@@ -253,7 +253,7 @@ describe('useCacheControl2', () => {
 				result.current.actions.setIsRefreshing(false);
 			});
 
-			expect(result.current.state.isRefreshing).toBe(false);
+			expect(result.current.fstate.isRefreshing).toBe(false);
 		});
 
 		it('should work for auto-refresh after mutation', () => {
@@ -291,7 +291,7 @@ describe('useCacheControl2', () => {
 				});
 			}
 
-			expect(result.current.state.cacheId).toBe(5);
+			expect(result.current.fstate.cacheId).toBe(5);
 
 			const query: Record<string, unknown> = {};
 			result.current.fillQuery(query);
@@ -303,13 +303,13 @@ describe('useCacheControl2', () => {
 		it('should handle initialCacheId option', () => {
 			const { result } = renderHook(() => useCacheControl2({ initialCacheId: 100 }));
 
-			expect(result.current.state.cacheId).toBe(100);
+			expect(result.current.fstate.cacheId).toBe(100);
 
 			act(() => {
 				result.current.actions.refresh();
 			});
 
-			expect(result.current.state.cacheId).toBe(101);
+			expect(result.current.fstate.cacheId).toBe(101);
 		});
 
 		it('should handle enabled=false option', () => {

@@ -248,7 +248,7 @@ describe('buildQuery', () => {
 				query.sortBy = 'name';
 				query.sortOrder = 'asc';
 			});
-			const search = createMockFeature(query => {
+			const search = createMockFeature(_query => {
 				// No search filled
 			});
 
@@ -285,7 +285,7 @@ describe('buildQuery', () => {
 				query.page = 1;
 				query.pageSize = 10;
 			});
-			const filter = createMockFeature(query => {
+			const filter = createMockFeature(_query => {
 				// No filter value
 			});
 

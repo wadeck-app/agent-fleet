@@ -50,15 +50,7 @@ export const BOOK_TABLE_COLUMNS = defineColumns<Book>([
 	{
 		key: 'isbn',
 		label: 'ISBN',
-		render: (book: Book) => (
-			<span
-				className={`
-    font-mono text-sm text-muted-foreground
-  `}
-			>
-				{book.isbn}
-			</span>
-		),
+		render: (book: Book) => <span className={`font-mono text-sm text-muted-foreground`}>{book.isbn}</span>,
 		sortable: true,
 		canHide: true,
 		defaultVisible: true,

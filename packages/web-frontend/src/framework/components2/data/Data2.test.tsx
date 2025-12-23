@@ -1,4 +1,3 @@
-import type { FeatureContract } from '@framework/types/FeatureContract';
 import type { QueryResultDisplayerProps } from '@framework/types/QueryResultDisplayerContract';
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';

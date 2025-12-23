@@ -22,7 +22,7 @@ describe('usePagination2', () => {
 		it('should have correct state shape', () => {
 			const { result } = renderHook(() => usePagination2({ pageSize: 10 }));
 
-			expect(result.current.state).toEqual({
+			expect(result.current.fstate).toEqual({
 				currentPage: 1,
 				pageSize: 10,
 				canGoPrevious: false,
@@ -134,7 +134,7 @@ describe('usePagination2', () => {
 
 			const { result } = renderHook(() => usePagination2({ pageSize: 10, storageId: 'test-items' }));
 
-			expect(result.current.state.pageSize).toBe(50);
+			expect(result.current.fstate.pageSize).toBe(50);
 		});
 
 		it('should not persist when storageId is not provided', () => {
@@ -170,7 +170,7 @@ describe('usePagination2', () => {
 				result.current.actions.setPage(5);
 			});
 
-			expect(result.current.state.currentPage).toBe(5);
+			expect(result.current.fstate.currentPage).toBe(5);
 		});
 
 		it('should not allow setting page below 1', () => {
@@ -180,7 +180,7 @@ describe('usePagination2', () => {
 				result.current.actions.setPage(0);
 			});
 
-			expect(result.current.state.currentPage).toBe(1); // Should stay at 1
+			expect(result.current.fstate.currentPage).toBe(1); // Should stay at 1
 		});
 
 		it('should setPageSize and reset to page 1', () => {
@@ -191,8 +191,8 @@ describe('usePagination2', () => {
 				result.current.actions.setPageSize(20);
 			});
 
-			expect(result.current.state.pageSize).toBe(20);
-			expect(result.current.state.currentPage).toBe(1); // Should reset
+			expect(result.current.fstate.pageSize).toBe(20);
+			expect(result.current.fstate.currentPage).toBe(1); // Should reset
 		});
 
 		it('should not allow setting pageSize below 1', () => {
@@ -202,7 +202,7 @@ describe('usePagination2', () => {
 				result.current.actions.setPageSize(0);
 			});
 
-			expect(result.current.state.pageSize).toBe(10); // Should not change
+			expect(result.current.fstate.pageSize).toBe(10); // Should not change
 		});
 
 		it('should nextPage correctly', () => {
@@ -212,7 +212,7 @@ describe('usePagination2', () => {
 				result.current.actions.nextPage();
 			});
 
-			expect(result.current.state.currentPage).toBe(2);
+			expect(result.current.fstate.currentPage).toBe(2);
 		});
 
 		it('should previousPage correctly', () => {
@@ -223,7 +223,7 @@ describe('usePagination2', () => {
 				result.current.actions.previousPage();
 			});
 
-			expect(result.current.state.currentPage).toBe(2);
+			expect(result.current.fstate.currentPage).toBe(2);
 		});
 
 		it('should not go below page 1 when calling previousPage', () => {
@@ -233,7 +233,7 @@ describe('usePagination2', () => {
 				result.current.actions.previousPage();
 			});
 
-			expect(result.current.state.currentPage).toBe(1);
+			expect(result.current.fstate.currentPage).toBe(1);
 		});
 
 		it('should resetPage to initialPage', () => {
@@ -244,7 +244,7 @@ describe('usePagination2', () => {
 				result.current.actions.resetPage();
 			});
 
-			expect(result.current.state.currentPage).toBe(2);
+			expect(result.current.fstate.currentPage).toBe(2);
 		});
 	});
 
@@ -252,13 +252,13 @@ describe('usePagination2', () => {
 		it('should calculate canGoPrevious correctly', () => {
 			const { result } = renderHook(() => usePagination2({ pageSize: 10 }));
 
-			expect(result.current.state.canGoPrevious).toBe(false);
+			expect(result.current.fstate.canGoPrevious).toBe(false);
 
 			act(() => {
 				result.current.actions.setPage(2);
 			});
 
-			expect(result.current.state.canGoPrevious).toBe(true);
+			expect(result.current.fstate.canGoPrevious).toBe(true);
 		});
 
 		it('should calculate canGoNext correctly', () => {
@@ -268,9 +268,9 @@ describe('usePagination2', () => {
 				result.current.actions.setPage(5);
 			});
 
-			expect(result.current.state.canGoNext(10)).toBe(true);
-			expect(result.current.state.canGoNext(5)).toBe(false);
-			expect(result.current.state.canGoNext()).toBe(true); // Unknown total
+			expect(result.current.fstate.canGoNext(10)).toBe(true);
+			expect(result.current.fstate.canGoNext(5)).toBe(false);
+			expect(result.current.fstate.canGoNext()).toBe(true); // Unknown total
 		});
 	});
 
@@ -278,13 +278,13 @@ describe('usePagination2', () => {
 		it('should start at initialPage when provided', () => {
 			const { result } = renderHook(() => usePagination2({ pageSize: 10, initialPage: 3 }));
 
-			expect(result.current.state.currentPage).toBe(3);
+			expect(result.current.fstate.currentPage).toBe(3);
 		});
 
 		it('should default to page 1 when initialPage not provided', () => {
 			const { result } = renderHook(() => usePagination2({ pageSize: 10 }));
 
-			expect(result.current.state.currentPage).toBe(1);
+			expect(result.current.fstate.currentPage).toBe(1);
 		});
 	});
 

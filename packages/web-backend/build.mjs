@@ -131,6 +131,10 @@ try {
 		external: [
 			// terminal-kit has non-JS files (README) that cause build issues
 			'terminal-kit',
+			// Monorepo packages - let Node.js resolve via package.json exports
+			'shared-orch-worker',
+			'shared-common',
+			'orchestrator-adapters',
 		],
 
 		// ====================================================================

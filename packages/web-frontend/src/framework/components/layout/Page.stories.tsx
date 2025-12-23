@@ -99,12 +99,7 @@ export const WithCards: Story = {
      `}
 				>
 					{[1, 2, 3, 4, 5, 6].map(i => (
-						<div
-							key={i}
-							className={`
-        rounded-lg border border-border bg-card p-6 shadow-sm
-      `}
-						>
+						<div key={i} className={`rounded-lg border border-border bg-card p-6 shadow-sm`}>
 							<h3 className="mb-2 text-xl font-semibold">Card {i}</h3>
 							<p className="text-muted-foreground">Card content goes here</p>
 						</div>

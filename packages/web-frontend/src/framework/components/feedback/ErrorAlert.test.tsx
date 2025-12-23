@@ -56,14 +56,7 @@ describe('ErrorAlert', () => {
 		});
 
 		it('should apply custom className', () => {
-			const { container } = render(
-				<ErrorAlert
-					message="Error"
-					className={`
-     custom-class
-   `}
-				/>
-			);
+			const { container } = render(<ErrorAlert message="Error" className={`custom-class`} />);
 			const alert = container.firstChild as HTMLElement;
 
 			expect(alert.className).toContain('custom-class');

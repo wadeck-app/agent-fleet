@@ -24,9 +24,9 @@ describe('useCategoryFilter2', () => {
 		it('should have correct state shape', () => {
 			const { result } = renderHook(() => useCategoryFilter2({ categories: CATEGORIES }));
 
-			expect(result.current.state).toHaveProperty('value');
-			expect(result.current.state).toHaveProperty('options');
-			expect(Array.isArray(result.current.state.options)).toBe(true);
+			expect(result.current.fstate).toHaveProperty('value');
+			expect(result.current.fstate).toHaveProperty('options');
+			expect(Array.isArray(result.current.fstate.options)).toBe(true);
 		});
 
 		it('should have correct actions shape', () => {
@@ -121,7 +121,7 @@ describe('useCategoryFilter2', () => {
 				useCategoryFilter2({ categories: CATEGORIES, storageId: 'test-items' })
 			);
 
-			expect(result.current.state.value).toBe('Vegetable');
+			expect(result.current.fstate.value).toBe('Vegetable');
 		});
 
 		it('should remove value from localStorage when cleared', () => {
@@ -160,7 +160,7 @@ describe('useCategoryFilter2', () => {
 			);
 
 			// Should fall back to defaultCategory (null)
-			expect(result.current.state.value).toBeNull();
+			expect(result.current.fstate.value).toBeNull();
 		});
 	});
 
@@ -172,7 +172,7 @@ describe('useCategoryFilter2', () => {
 				result.current.actions.setValue('Protein');
 			});
 
-			expect(result.current.state.value).toBe('Protein');
+			expect(result.current.fstate.value).toBe('Protein');
 		});
 
 		it('should clearValue correctly', () => {
@@ -180,13 +180,13 @@ describe('useCategoryFilter2', () => {
 				useCategoryFilter2({ categories: CATEGORIES, defaultCategory: 'Protein' })
 			);
 
-			expect(result.current.state.value).toBe('Protein');
+			expect(result.current.fstate.value).toBe('Protein');
 
 			act(() => {
 				result.current.actions.clearValue();
 			});
 
-			expect(result.current.state.value).toBeNull();
+			expect(result.current.fstate.value).toBeNull();
 		});
 
 		it('should reject invalid category value', () => {
@@ -197,7 +197,7 @@ describe('useCategoryFilter2', () => {
 				result.current.actions.setValue('InvalidCategory');
 			});
 
-			expect(result.current.state.value).toBeNull();
+			expect(result.current.fstate.value).toBeNull();
 			expect(consoleWarnSpy).toHaveBeenCalled();
 
 			consoleWarnSpy.mockRestore();
@@ -208,13 +208,13 @@ describe('useCategoryFilter2', () => {
 				useCategoryFilter2({ categories: CATEGORIES, defaultCategory: 'Protein' })
 			);
 
-			expect(result.current.state.value).toBe('Protein');
+			expect(result.current.fstate.value).toBe('Protein');
 
 			act(() => {
 				result.current.actions.setValue(null);
 			});
 
-			expect(result.current.state.value).toBeNull();
+			expect(result.current.fstate.value).toBeNull();
 		});
 	});
 
@@ -222,7 +222,7 @@ describe('useCategoryFilter2', () => {
 		it('should expose available categories as options', () => {
 			const { result } = renderHook(() => useCategoryFilter2({ categories: CATEGORIES }));
 
-			expect(result.current.state.options).toEqual(CATEGORIES);
+			expect(result.current.fstate.options).toEqual(CATEGORIES);
 		});
 
 		it('should update options when categories change', () => {
@@ -233,7 +233,7 @@ describe('useCategoryFilter2', () => {
 			const newCategories = ['Spice', 'Oil'];
 			rerender({ categories: newCategories });
 
-			expect(result.current.state.options).toEqual(newCategories);
+			expect(result.current.fstate.options).toEqual(newCategories);
 		});
 	});
 
@@ -243,13 +243,13 @@ describe('useCategoryFilter2', () => {
 				useCategoryFilter2({ categories: CATEGORIES, defaultCategory: 'Protein' })
 			);
 
-			expect(result.current.state.value).toBe('Protein');
+			expect(result.current.fstate.value).toBe('Protein');
 		});
 
 		it('should start with null when defaultCategory not provided', () => {
 			const { result } = renderHook(() => useCategoryFilter2({ categories: CATEGORIES }));
 
-			expect(result.current.state.value).toBeNull();
+			expect(result.current.fstate.value).toBeNull();
 		});
 
 		it('should prioritize localStorage over defaultCategory', () => {
@@ -265,7 +265,7 @@ describe('useCategoryFilter2', () => {
 			);
 
 			// Should use localStorage value, not defaultCategory
-			expect(result.current.state.value).toBe('Vegetable');
+			expect(result.current.fstate.value).toBe('Vegetable');
 		});
 	});
 

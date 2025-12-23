@@ -15,8 +15,7 @@
  * ===========================================================================================
  */
 import { StateEvent } from 'shared-common/StateManager.js';
-import type { Task, WorkerInfo } from 'shared-orch-worker/index.js';
-import type { O2BEventData, O2BEventType, OrchestratorStats } from 'shared-orch-worker/index.js';
+import type { O2BEventData, O2BEventType, OrchestratorStats, Task, WorkerInfo } from 'shared-orch-worker/index.js';
 
 import type { OrchestratorClient, OrchestratorConfig, TaskFilters, WorkerFilters } from '../OrchestratorClient.js';
 

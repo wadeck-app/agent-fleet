@@ -1,41 +1,43 @@
-import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager.js';
-import { Logger } from 'shared-common/Logger.js';
-import { Shutdownable } from 'shared-common/Shutdownable.js';
-import { StateManager } from 'shared-common/StateManager.js';
+import {WorkspaceManager} from 'flow-engine/workspace/WorkspaceManager.js';
+import {Logger} from 'shared-common/Logger.js';
+import {Shutdownable} from 'shared-common/Shutdownable.js';
+import {StateManager} from 'shared-common/StateManager.js';
 
-import { MetricsCollector } from '../metrics/MetricsCollector.js';
-import { StateSnapshotService } from '../state/StateSnapshotService.js';
-import { UIClientHook } from '../ui-client/UIClientHook.js';
-import { OrchestratorSnapshot } from '../ui-client/types.js';
-import { renderUI } from '../ui.js';
-import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer.js';
-import { RestAPI } from './RestAPI.js';
-import { TaskManager } from './TaskManager.js';
+import {MetricsCollector} from '../metrics/MetricsCollector.js';
+import {StateSnapshotService} from '../state/StateSnapshotService.js';
+import {UIClientHook} from '../ui-client/UIClientHook.js';
+import {OrchestratorSnapshot} from '../ui-client/types.js';
+import {renderUI} from '../ui.js';
+import {WorkerWebSocketServer} from '../websocket/WorkerWebSocketServer.js';
+import {RestAPI} from './RestAPI.js';
+import {TaskManager} from './TaskManager.js';
+
+export type OrchestratorConfig = { restPort?:number; wsPort?:number; projectRoot?:string; libraryMode?:boolean };
 
 /**
  * Orchestrator class that coordinates all services
  * Manages lifecycle of TaskManager, WebSocket server, REST API, and UI
  */
 export class Orchestrator implements Shutdownable {
-	private restPort: number;
-	private wsPort: number;
-	private projectRoot: string;
-	private libraryMode: boolean;
-	private stateManager: StateManager;
-	private taskManager: TaskManager;
-	private wsServer?: WorkerWebSocketServer;
-	private restAPI?: RestAPI;
-	private workspaceManager?: WorkspaceManager;
-	private uiInstance?: any;
-	private isRunning: boolean = false;
+	private restPort:number;
+	private wsPort:number;
+	private projectRoot:string;
+	private libraryMode:boolean;
+	private stateManager:StateManager;
+	private taskManager:TaskManager;
+	private wsServer?:WorkerWebSocketServer;
+	private restAPI?:RestAPI;
+	private workspaceManager?:WorkspaceManager;
+	private uiInstance?:any;
+	private isRunning:boolean = false;
 
 	// New UI-related services
-	private snapshotService?: StateSnapshotService;
-	private metricsCollector?: MetricsCollector;
-	private uiClientHook?: UIClientHook;
-	private startTime: Date;
+	private snapshotService?:StateSnapshotService;
+	private metricsCollector?:MetricsCollector;
+	private uiClientHook?:UIClientHook;
+	private startTime:Date;
 
-	constructor(config?: { restPort?: number; wsPort?: number; projectRoot?: string; libraryMode?: boolean }) {
+	constructor(config?:OrchestratorConfig) {
 		this.restPort = config?.restPort || Number(process.env.REST_PORT) || 3737;
 		this.wsPort = config?.wsPort || Number(process.env.WS_PORT) || 3738;
 		this.projectRoot = config?.projectRoot || process.cwd();
@@ -57,7 +59,7 @@ export class Orchestrator implements Shutdownable {
 	/**
 	 * Initialize all components
 	 */
-	private async initialize(): Promise<void> {
+	private async initialize():Promise<void> {
 		// Emit orchestrator started event
 		this.stateManager.emitOrchestratorStarted();
 
@@ -104,7 +106,7 @@ export class Orchestrator implements Shutdownable {
 	/**
 	 * Start the orchestrator and all services
 	 */
-	async start(): Promise<void> {
+	async start():Promise<void> {
 		if (this.isRunning) {
 			throw new Error('Orchestrator is already running');
 		}
@@ -142,7 +144,7 @@ export class Orchestrator implements Shutdownable {
 	/**
 	 * Shutdown the orchestrator and all services
 	 */
-	async shutdown(): Promise<void> {
+	async shutdown():Promise<void> {
 		if (!this.isRunning) {
 			Logger.log('[Orchestrator] Already shut down, skipping');
 			return;
@@ -182,56 +184,56 @@ export class Orchestrator implements Shutdownable {
 	/**
 	 * Get the task manager instance
 	 */
-	getTaskManager(): TaskManager {
+	getTaskManager():TaskManager {
 		return this.taskManager;
 	}
 
 	/**
 	 * Get the WebSocket server instance
 	 */
-	getWsServer(): WorkerWebSocketServer | undefined {
+	getWsServer():WorkerWebSocketServer | undefined {
 		return this.wsServer;
 	}
 
 	/**
 	 * Get the REST API instance
 	 */
-	getRestAPI(): RestAPI | undefined {
+	getRestAPI():RestAPI | undefined {
 		return this.restAPI;
 	}
 
 	/**
 	 * Get the workspace manager instance
 	 */
-	getWorkspaceManager(): WorkspaceManager | undefined {
+	getWorkspaceManager():WorkspaceManager | undefined {
 		return this.workspaceManager;
 	}
 
 	/**
 	 * Get the state snapshot service instance
 	 */
-	getSnapshotService(): StateSnapshotService | undefined {
+	getSnapshotService():StateSnapshotService | undefined {
 		return this.snapshotService;
 	}
 
 	/**
 	 * Get the metrics collector instance
 	 */
-	getMetricsCollector(): MetricsCollector | undefined {
+	getMetricsCollector():MetricsCollector | undefined {
 		return this.metricsCollector;
 	}
 
 	/**
 	 * Get the UI client hook instance
 	 */
-	getUIClientHook(): UIClientHook | undefined {
+	getUIClientHook():UIClientHook | undefined {
 		return this.uiClientHook;
 	}
 
 	/**
 	 * Get current state snapshot (for UI connections)
 	 */
-	getStateSnapshot(): OrchestratorSnapshot | undefined {
+	getStateSnapshot():OrchestratorSnapshot | undefined {
 		return this.snapshotService?.getSnapshot();
 	}
 }
@@ -243,7 +245,7 @@ export async function main() {
 	const orchestrator = new Orchestrator();
 
 	// Handle termination signals with proper async/await
-	const handleShutdown = async (signal: string) => {
+	const handleShutdown = async (signal:string) => {
 		Logger.log(`[Orchestrator] Received ${signal}, shutting down gracefully...`);
 		try {
 			await orchestrator.shutdown();

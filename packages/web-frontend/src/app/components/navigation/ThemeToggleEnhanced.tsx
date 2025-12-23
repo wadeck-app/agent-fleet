@@ -117,22 +117,10 @@ export function ThemeToggleAnimated({ theme, onToggle, className }: Omit<ThemeTo
 		>
 			<div className="relative size-5">
 				<Sun
-					className={cn(
-						'absolute inset-0 scale-100 rotate-0 transition-all',
-						isDark &&
-							`
-       scale-0 rotate-90
-     `
-					)}
+					className={cn('absolute inset-0 scale-100 rotate-0 transition-all', isDark && `scale-0 rotate-90`)}
 				/>
 				<Moon
-					className={cn(
-						'absolute inset-0 scale-0 rotate-90 transition-all',
-						isDark &&
-							`
-       scale-100 rotate-0
-     `
-					)}
+					className={cn('absolute inset-0 scale-0 rotate-90 transition-all', isDark && `scale-100 rotate-0`)}
 				/>
 			</div>
 		</Button>

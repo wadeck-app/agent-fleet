@@ -35,8 +35,6 @@
  */
 import type { BaseListQueryMutable } from '@shared';
 
-import type { FeatureContract } from '../FeatureContract';
-
 /**
  * Search UI state (what useSearch2 manages)
  */

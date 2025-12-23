@@ -81,11 +81,19 @@ export function WorkspacesPage() {
         md:grid-cols-5
       `}
 					>
-						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
+						<div
+							className={`
+        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
+      `}
+						>
 							<div className="text-sm font-medium text-muted-foreground">Total</div>
 							<div className="text-2xl font-bold">{data.summary.total}</div>
 						</div>
-						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
+						<div
+							className={`
+        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
+      `}
+						>
 							<div className="text-sm font-medium text-muted-foreground">Active</div>
 							<div
 								className={`
@@ -96,7 +104,11 @@ export function WorkspacesPage() {
 								{data.summary.active}
 							</div>
 						</div>
-						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
+						<div
+							className={`
+        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
+      `}
+						>
 							<div className="text-sm font-medium text-muted-foreground">Locked</div>
 							<div
 								className={`
@@ -107,7 +119,11 @@ export function WorkspacesPage() {
 								{data.summary.locked}
 							</div>
 						</div>
-						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
+						<div
+							className={`
+        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
+      `}
+						>
 							<div className="text-sm font-medium text-muted-foreground">Cleaning</div>
 							<div
 								className={`
@@ -118,7 +134,11 @@ export function WorkspacesPage() {
 								{data.summary.cleaning}
 							</div>
 						</div>
-						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
+						<div
+							className={`
+        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
+      `}
+						>
 							<div className="text-sm font-medium text-muted-foreground">Errors</div>
 							<div
 								className={`

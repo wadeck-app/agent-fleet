@@ -34,7 +34,6 @@ import { Input } from '@framework/components/forms/Input';
 import { Page } from '@framework/components/layout/Page';
 import { Button } from '@framework/components/primitives/Button';
 import { useCacheControl2 } from '@framework/hooks2/useCacheControl2';
-import { useCategoryFilter2 } from '@framework/hooks2/useCategoryFilter2';
 import { useDebounce } from '@framework/hooks2/useDebounce';
 import { usePagination2 } from '@framework/hooks2/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
@@ -47,8 +46,6 @@ import { useIngredients } from '../ingredients/useIngredients';
 import { IngredientTable2 } from './IngredientTable2';
 
 const STORAGE_ID = 'ingredients2' as const;
-
-const AVAILABLE_CATEGORIES = ['Protein', 'Vegetable', 'Fruit', 'Grain', 'Dairy', 'Fat/Oil', 'Spice', 'Other'];
 
 export function Ingredients2Page() {
 	const navigate = useNavigate();
@@ -163,7 +160,12 @@ export function Ingredients2Page() {
 						className="h-8 w-8 p-0"
 						title={cache.fstate.isRefreshing ? 'Refreshing...' : 'Refresh data'}
 					>
-						<RefreshCw className={`h-4 w-4 ${cache.fstate.isRefreshing ? 'animate-spin' : ''}`} />
+						<RefreshCw
+							className={`
+        h-4 w-4
+        ${cache.fstate.isRefreshing ? `animate-spin` : ''}
+      `}
+						/>
 					</Button>
 				</div>
 				<Button onClick={handleCreateNew}>
@@ -188,7 +190,7 @@ export function Ingredients2Page() {
 							onClick={search.actions.clearQuery}
 							variant="ghost"
 							size="sm"
-							className="absolute right-2 top-9 -translate-y-1/2 h-6 w-6 p-0"
+							className="absolute top-9 right-2 h-6 w-6 -translate-y-1/2 p-0"
 							aria-label="Clear search"
 						>
 							<X className="h-4 w-4" />
@@ -200,7 +202,12 @@ export function Ingredients2Page() {
 			{/* Feature Info (for demo purposes - remove in production) */}
 			<div className="mb-4 rounded-lg border border-border bg-muted/50 p-4 text-sm">
 				<strong>Active Features (UI / Debounced):</strong>
-				<div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+				<div
+					className={`
+      mt-2 grid grid-cols-2 gap-2 text-xs
+      sm:grid-cols-4
+    `}
+				>
 					<div>
 						<span className="text-muted-foreground">Search:</span>{' '}
 						<span className="font-mono">

@@ -22,11 +22,7 @@ export function TableHeader<T>({
 	onToggleSelectAll,
 }: TableHeaderProps<T>) {
 	return (
-		<thead
-			className={`
-    border-b border-border bg-secondary text-secondary-foreground
-  `}
-		>
+		<thead className={`border-b border-border bg-secondary text-secondary-foreground`}>
 			<tr>
 				{selectable && (
 					<th className="h-12 w-12 px-4 py-3 text-center">
@@ -50,15 +46,7 @@ export function TableHeader<T>({
 						{column.label}
 					</th>
 				))}
-				{renderActions && (
-					<th
-						className={`
-      h-12 w-32 px-4 py-3 text-center text-sm font-medium
-    `}
-					>
-						Actions
-					</th>
-				)}
+				{renderActions && <th className={`h-12 w-32 px-4 py-3 text-center text-sm font-medium`}>Actions</th>}
 			</tr>
 		</thead>
 	);

@@ -73,8 +73,8 @@ export function TaskFilters({
 						<select
 							id="status-filter"
 							className={`
-         h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm
-         ring-offset-background
+         h-10 w-full rounded-md border border-input bg-background px-3 py-2
+         text-sm ring-offset-background
          focus-visible:ring-2 focus-visible:ring-ring
          focus-visible:ring-offset-2 focus-visible:outline-none
        `}
@@ -95,8 +95,8 @@ export function TaskFilters({
 						<select
 							id="priority-filter"
 							className={`
-         h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm
-         ring-offset-background
+         h-10 w-full rounded-md border border-input bg-background px-3 py-2
+         text-sm ring-offset-background
          focus-visible:ring-2 focus-visible:ring-ring
          focus-visible:ring-offset-2 focus-visible:outline-none
        `}

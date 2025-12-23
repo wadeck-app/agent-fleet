@@ -155,10 +155,20 @@ export function Table2<T>({
 	);
 
 	return (
-		<div className={`space-y-4 ${className}`}>
+		<div
+			className={`
+    space-y-4
+    ${className}
+  `}
+		>
 			{/* Error Display */}
 			{error && !isLoading && (
-				<div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+				<div
+					className={`
+      rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm
+      text-destructive
+    `}
+				>
 					<strong>Error:</strong> {error}
 				</div>
 			)}

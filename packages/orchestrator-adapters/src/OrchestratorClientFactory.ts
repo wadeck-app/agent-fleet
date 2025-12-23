@@ -48,15 +48,13 @@ export class OrchestratorClientFactory {
 				restPort = restPort ?? calculatedRestPort;
 			}
 
-			// Create orchestrator instance with provided config
-			const orchestratorConfig: any = {
+			const orchestratorConfig = {
 				wsPort,
 				restPort,
 				projectRoot: config.projectRoot,
 				libraryMode: config.libraryMode ?? false, // Always include libraryMode
 			};
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const orchestrator: any = new Orchestrator(orchestratorConfig);
+			const orchestrator = new Orchestrator(orchestratorConfig);
 
 			// Start the orchestrator
 			await orchestrator.start();

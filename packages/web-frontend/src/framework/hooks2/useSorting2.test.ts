@@ -22,10 +22,10 @@ describe('useSorting2', () => {
 		it('should have correct state shape', () => {
 			const { result } = renderHook(() => useSorting2());
 
-			expect(result.current.state).toHaveProperty('sortConfigs');
-			expect(result.current.state).toHaveProperty('getSortInfo');
-			expect(Array.isArray(result.current.state.sortConfigs)).toBe(true);
-			expect(typeof result.current.state.getSortInfo).toBe('function');
+			expect(result.current.fstate).toHaveProperty('sortConfigs');
+			expect(result.current.fstate).toHaveProperty('getSortInfo');
+			expect(Array.isArray(result.current.fstate.sortConfigs)).toBe(true);
+			expect(typeof result.current.fstate.getSortInfo).toBe('function');
 		});
 
 		it('should have correct actions shape', () => {
@@ -127,7 +127,7 @@ describe('useSorting2', () => {
 
 			const { result } = renderHook(() => useSorting2({ storageId: 'test-table' }));
 
-			expect(result.current.state.sortConfigs).toEqual([{ key: 'name', direction: 'desc' }]);
+			expect(result.current.fstate.sortConfigs).toEqual([{ key: 'name', direction: 'desc' }]);
 		});
 
 		it('should not persist when storageId is not provided', () => {
@@ -149,7 +149,7 @@ describe('useSorting2', () => {
 				result.current.actions.handleSort('name', false);
 			});
 
-			expect(result.current.state.sortConfigs).toEqual([{ key: 'name', direction: 'asc' }]);
+			expect(result.current.fstate.sortConfigs).toEqual([{ key: 'name', direction: 'asc' }]);
 		});
 
 		it('should cycle to desc on second click', () => {
@@ -160,7 +160,7 @@ describe('useSorting2', () => {
 				result.current.actions.handleSort('name', false);
 			});
 
-			expect(result.current.state.sortConfigs).toEqual([{ key: 'name', direction: 'desc' }]);
+			expect(result.current.fstate.sortConfigs).toEqual([{ key: 'name', direction: 'desc' }]);
 		});
 
 		it('should cycle to none (empty) on third click', () => {
@@ -172,7 +172,7 @@ describe('useSorting2', () => {
 				result.current.actions.handleSort('name', false);
 			});
 
-			expect(result.current.state.sortConfigs).toEqual([]);
+			expect(result.current.fstate.sortConfigs).toEqual([]);
 		});
 
 		it('should replace existing sort when clicking different column', () => {
@@ -183,7 +183,7 @@ describe('useSorting2', () => {
 				result.current.actions.handleSort('createdAt', false);
 			});
 
-			expect(result.current.state.sortConfigs).toEqual([{ key: 'createdAt', direction: 'asc' }]);
+			expect(result.current.fstate.sortConfigs).toEqual([{ key: 'createdAt', direction: 'asc' }]);
 		});
 	});
 
@@ -196,7 +196,7 @@ describe('useSorting2', () => {
 				result.current.actions.handleSort('createdAt', true); // shift+click
 			});
 
-			expect(result.current.state.sortConfigs).toEqual([
+			expect(result.current.fstate.sortConfigs).toEqual([
 				{ key: 'name', direction: 'asc' },
 				{ key: 'createdAt', direction: 'asc' },
 			]);
@@ -210,7 +210,7 @@ describe('useSorting2', () => {
 				result.current.actions.handleSort('createdAt', true); // Add secondary
 			});
 
-			expect(result.current.state.sortConfigs).toEqual([
+			expect(result.current.fstate.sortConfigs).toEqual([
 				{ key: 'name', direction: 'asc' },
 				{ key: 'createdAt', direction: 'asc' },
 			]);
@@ -219,7 +219,7 @@ describe('useSorting2', () => {
 				result.current.actions.handleSort('createdAt', true); // Cycle to desc
 			});
 
-			expect(result.current.state.sortConfigs).toEqual([
+			expect(result.current.fstate.sortConfigs).toEqual([
 				{ key: 'name', direction: 'asc' },
 				{ key: 'createdAt', direction: 'desc' },
 			]);
@@ -228,7 +228,7 @@ describe('useSorting2', () => {
 				result.current.actions.handleSort('createdAt', true); // Remove
 			});
 
-			expect(result.current.state.sortConfigs).toEqual([{ key: 'name', direction: 'asc' }]);
+			expect(result.current.fstate.sortConfigs).toEqual([{ key: 'name', direction: 'asc' }]);
 		});
 
 		it('should preserve other sorts when removing one', () => {
@@ -240,7 +240,7 @@ describe('useSorting2', () => {
 				result.current.actions.handleSort('updatedAt', true);
 			});
 
-			expect(result.current.state.sortConfigs).toHaveLength(3);
+			expect(result.current.fstate.sortConfigs).toHaveLength(3);
 
 			act(() => {
 				// Remove middle sort
@@ -248,7 +248,7 @@ describe('useSorting2', () => {
 				result.current.actions.handleSort('createdAt', true); // desc->remove
 			});
 
-			expect(result.current.state.sortConfigs).toEqual([
+			expect(result.current.fstate.sortConfigs).toEqual([
 				{ key: 'name', direction: 'asc' },
 				{ key: 'updatedAt', direction: 'asc' },
 			]);
@@ -263,7 +263,7 @@ describe('useSorting2', () => {
 			});
 
 			// Should replace, not add
-			expect(result.current.state.sortConfigs).toEqual([{ key: 'createdAt', direction: 'asc' }]);
+			expect(result.current.fstate.sortConfigs).toEqual([{ key: 'createdAt', direction: 'asc' }]);
 		});
 	});
 
@@ -271,7 +271,7 @@ describe('useSorting2', () => {
 		it('should return null when column not sorted', () => {
 			const { result } = renderHook(() => useSorting2());
 
-			const info = result.current.state.getSortInfo('name');
+			const info = result.current.fstate.getSortInfo('name');
 
 			expect(info).toEqual({ direction: null, priority: null });
 		});
@@ -283,7 +283,7 @@ describe('useSorting2', () => {
 				result.current.actions.handleSort('name', false);
 			});
 
-			const info = result.current.state.getSortInfo('name');
+			const info = result.current.fstate.getSortInfo('name');
 
 			expect(info).toEqual({ direction: 'asc', priority: null });
 		});
@@ -296,8 +296,8 @@ describe('useSorting2', () => {
 				result.current.actions.handleSort('createdAt', true);
 			});
 
-			const nameInfo = result.current.state.getSortInfo('name');
-			const createdAtInfo = result.current.state.getSortInfo('createdAt');
+			const nameInfo = result.current.fstate.getSortInfo('name');
+			const createdAtInfo = result.current.fstate.getSortInfo('createdAt');
 
 			expect(nameInfo).toEqual({ direction: 'asc', priority: 1 });
 			expect(createdAtInfo).toEqual({ direction: 'asc', priority: 2 });
@@ -314,7 +314,7 @@ describe('useSorting2', () => {
 				result.current.actions.clearSort();
 			});
 
-			expect(result.current.state.sortConfigs).toEqual([]);
+			expect(result.current.fstate.sortConfigs).toEqual([]);
 		});
 
 		it('should setSortConfigs directly', () => {
@@ -327,7 +327,7 @@ describe('useSorting2', () => {
 				]);
 			});
 
-			expect(result.current.state.sortConfigs).toEqual([
+			expect(result.current.fstate.sortConfigs).toEqual([
 				{ key: 'name', direction: 'desc' },
 				{ key: 'createdAt', direction: 'asc' },
 			]);
@@ -342,13 +342,13 @@ describe('useSorting2', () => {
 				})
 			);
 
-			expect(result.current.state.sortConfigs).toEqual([{ key: 'name', direction: 'asc' }]);
+			expect(result.current.fstate.sortConfigs).toEqual([{ key: 'name', direction: 'asc' }]);
 		});
 
 		it('should start with empty array when defaultSort not provided', () => {
 			const { result } = renderHook(() => useSorting2());
 
-			expect(result.current.state.sortConfigs).toEqual([]);
+			expect(result.current.fstate.sortConfigs).toEqual([]);
 		});
 	});
 
