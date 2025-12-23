@@ -86,7 +86,11 @@ describe('TypedTransport', () => {
 
 		it('should enforce type-safe event subscriptions', () => {
 			// Example of type-safe subscription (compile-time check only)
-			const eventTypes: EventType[] = ['task:created', 'worker:heartbeat', 'workspace:quota_exceeded'];
+			const eventTypes: EventType[] = [
+				'b2f:task:created',
+				'b2f:worker:heartbeat',
+				'b2f:workspace:quota_exceeded',
+			];
 
 			eventTypes.forEach(event => {
 				expect(typeof event).toBe('string');
@@ -155,7 +159,7 @@ describe('TypedTransport', () => {
 			const result = await transport.request('GET', '/api/tasks/');
 			expect(result.success).toBe(true);
 
-			const unsubscribe = transport.subscribe('task:created', _data => {
+			const unsubscribe = transport.subscribe('b2f:task:created', _data => {
 				// Handler
 			});
 			expect(typeof unsubscribe).toBe('function');
@@ -226,7 +230,7 @@ describe('TypedTransport', () => {
 			const transport = new MockTransport();
 			const events: any[] = [];
 
-			const unsubscribe = transport.subscribe('task:created', data => {
+			const unsubscribe = transport.subscribe('b2f:task:created', data => {
 				events.push(data);
 			});
 

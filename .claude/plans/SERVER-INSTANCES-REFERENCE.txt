@@ -1,0 +1,111 @@
+================================================================================
+SERVER INSTANCES - COMPLETE REFERENCE TABLE
+================================================================================
+
+Generated: 2025-12-23
+Analysis: Backend Startup and Shutdown Flow
+
+================================================================================
+BACKEND HTTP/WEBSOCKET SERVERS
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. FASTIFY HTTP SERVER (Backend)                                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File:            packages/web-backend/src/server.ts                         │
+│ Created:         Line 190                                                   │
+│ Port:            3000 + (PROJECT_ID * 10) + (WORKSPACE_ID * 100)            │
+│ Default Port:    3000                                                       │
+│ Started:         Line 441 - await fastify.listen({ port: PORT })           │
+│ Shutdown:        Line 482 - await fastify.close()                          │
+│ Status:          ✅ PROPERLY CLEANED UP                                     │
+│                                                                              │
+│ Endpoints:                                                                  │
+│ - GET  /health         Health check                                        │
+│ - GET  /api/health     Health check                                        │
+│ - GET  /ws             WebSocket transport (via @fastify/websocket)         │
+│ - *    /api/**         API routes (controllers, services)                   │
+│ - *    /               Static files (production only)                       │
+│                                                                              │
+│ Plugins Registered:                                                         │
+│ - @fastify/helmet      Security headers                                    │
+│ - @fastify/cors        Cross-origin requests                               │
+│ - @fastify/cookie      HTTP cookies                                        │
+│ - @fastify/sensible    Sensible defaults                                   │
+│ - @fastify/websocket   WebSocket support                                   │
+│ - @fastify/static      Static file serving (production)                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 2. WEBSOCKET TRANSPORT SERVER (Backend ↔ Frontend)                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File:            packages/web-backend/src/transport/adapters/WebSocketTransportServer.ts │
+│ Class:           WebSocketTransportServer                                   │
+│ Created:         Line 92 (via initializeTransportServer)                    │
+│ Port:            Shared with Fastify (GET /ws endpoint)                     │
+│ Initialize:      Line 69-78 - app.register(fastifyWebsocket)               │
+│ Endpoint:        GET /ws                                                    │
+│ Shutdown:        ❌ NO CLEANUP METHOD                                       │
+│ Status:          ❌ NOT CLEANED UP                                          │
+│                                                                              │
+│ Manages:                                                                    │
+│ - clients Map (line 55)           - Connected WebSocket connections        │
+│ - expirationTimers Map (line 58)  - Token expiration timers                │
+│ - clientConnectedHandlers array   - Connection event listeners             │
+│ - clientDisconnectedHandlers      - Disconnection event listeners          │
+│                                                                              │
+│ Key Methods:                                                                │
+│ + async initialize(app)           - Register /ws endpoint                  │
+│ + broadcast(event, data)          - Send to all subscribed clients         │
+│ + sendToClient(clientId, ...)     - Send to specific client                │
+│ + getConnectedClients()           - List connected client IDs              │
+│ - NO stop() method                - MISSING CLEANUP                         │
+│                                                                              │
+│ Issues:                                                                     │
+│ ❌ No stop() or dispose() method                                            │
+│ ❌ expirationTimers never cleared on shutdown                              │
+│ ❌ clients never explicitly closed on shutdown                             │
+│ ⚠️  Timers continue firing after server shutdown                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+ORCHESTRATOR SERVERS (LIBRARY MODE - EMBEDDED)
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 3. ORCHESTRATOR REST API SERVER                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File:            packages/orchestrator/src/core/RestAPI.ts                   │
+│ Class:           RestAPI                                                    │
+│ Framework:       Express (http module)                                      │
+│ Created:         Line 92-98 of orchestrator/src/core/index.ts              │
+│ Port:            3737 + (PROJECT_ID * 10) + (WORKSPACE_ID * 100)           │
+│ Default Port:    3737                                                       │
+│ HTTP Server:     Line 394 - this.app.listen(this.port)                    │
+│ Started:         start() method at line 392-401                            │
+│ Shutdown:        stop() method at line 404-425                             │
+│ Cleanup:         ✅ Has proper cleanup code                                │
+│ Called:          ❌ NEVER CALLED (orchestrator not accessible)             │
+│ Status:          ❌ NOT SHUT DOWN                                           │
+│                                                                              │
+│ Endpoints:                                                                  │
+│ - GET  /health                   Health check                              │
+│ - GET  /stats                    Orchestrator statistics                   │
+│ - POST /tasks                    Create new task                           │
+│ - GET  /tasks                    List all tasks                            │
+│ - GET  /tasks/:id                Get specific task                         │
+│ - PATCH /tasks/:id/status        Update task status                        │
+│ - GET  /tasks/:id/trace          Get execution trace                       │
+│ - GET  /workers                  List connected workers                    │
+│ - GET  /flows                    List available flows                      │
+│ - GET  /workspaces               List workspaces                           │
+│                                                                              │
+│ WebSocket Upgrade:                                                          │
+│ - /ws/ui                         UI WebSocket endpoint (HTTP upgrade)      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 4. WORKER WEBSOCKET SERVER (Orchestrator)                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File:            packages/orchestrator/src/websocket/WorkerWebSocketServer.ts │
+│ Class:           WorkerWebSocketServer                              

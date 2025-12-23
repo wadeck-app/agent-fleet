@@ -330,7 +330,7 @@ describe.skip('WebSocketTransportClient', () => {
 			const sendSpy = vi.spyOn(mockWs, 'send');
 			const handler = vi.fn();
 
-			client.subscribe('task:created' as any, handler);
+			client.subscribe('b2f:task:created' as any, handler);
 
 			// Should send subscription message
 			expect(sendSpy).toHaveBeenCalledWith(expect.stringContaining('subscription'));
@@ -338,17 +338,17 @@ describe.skip('WebSocketTransportClient', () => {
 			const sentData = JSON.parse(sendSpy.mock.calls[0][0]);
 			expect(sentData.type).toBe('subscription');
 			expect(sentData.action).toBe('subscribe');
-			expect(sentData.events).toEqual(['task:created']);
+			expect(sentData.events).toEqual(['b2f:task:created']);
 		});
 
 		it('should receive events', async () => {
 			const mockWs = MockWebSocket.getLastInstance()!;
 			const handler = vi.fn();
-			client.subscribe('task:created' as any, handler);
+			client.subscribe('b2f:task:created' as any, handler);
 
 			mockWs.simulateMessage({
 				id: 'event-1',
-				type: 'task:created',
+				type: 'b2f:task:created',
 				data: { id: '1', description: 'New task' },
 				timestamp: Date.now(),
 			});
@@ -365,7 +365,7 @@ describe.skip('WebSocketTransportClient', () => {
 			const sendSpy = vi.spyOn(mockWs, 'send');
 			const handler = vi.fn();
 
-			const unsubscribe = client.subscribe('task:created' as any, handler);
+			const unsubscribe = client.subscribe('b2f:task:created' as any, handler);
 			sendSpy.mockClear();
 
 			unsubscribe();
@@ -376,7 +376,7 @@ describe.skip('WebSocketTransportClient', () => {
 			const sentData = JSON.parse(sendSpy.mock.calls[0][0]);
 			expect(sentData.type).toBe('subscription');
 			expect(sentData.action).toBe('unsubscribe');
-			expect(sentData.events).toEqual(['task:created']);
+			expect(sentData.events).toEqual(['b2f:task:created']);
 		});
 
 		it('should support multiple handlers for same event', async () => {
@@ -384,12 +384,12 @@ describe.skip('WebSocketTransportClient', () => {
 			const handler1 = vi.fn();
 			const handler2 = vi.fn();
 
-			client.subscribe('task:created' as any, handler1);
-			client.subscribe('task:created' as any, handler2);
+			client.subscribe('b2f:task:created' as any, handler1);
+			client.subscribe('b2f:task:created' as any, handler2);
 
 			mockWs.simulateMessage({
 				id: 'event-1',
-				type: 'task:created',
+				type: 'b2f:task:created',
 				data: { id: '1', description: 'New task' },
 				timestamp: Date.now(),
 			});

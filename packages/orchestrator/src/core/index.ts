@@ -20,6 +20,7 @@ export class Orchestrator implements Shutdownable {
 	private restPort: number;
 	private wsPort: number;
 	private projectRoot: string;
+	private libraryMode: boolean;
 	private stateManager: StateManager;
 	private taskManager: TaskManager;
 	private wsServer?: WorkerWebSocketServer;
@@ -34,16 +35,23 @@ export class Orchestrator implements Shutdownable {
 	private uiClientHook?: UIClientHook;
 	private startTime: Date;
 
-	constructor(config?: { restPort?: number; wsPort?: number; projectRoot?: string }) {
+	constructor(config?: { restPort?: number; wsPort?: number; projectRoot?: string; libraryMode?: boolean }) {
 		this.restPort = config?.restPort || Number(process.env.REST_PORT) || 3737;
 		this.wsPort = config?.wsPort || Number(process.env.WS_PORT) || 3738;
 		this.projectRoot = config?.projectRoot || process.cwd();
+		this.libraryMode = config?.libraryMode ?? false;
 		this.stateManager = new StateManager();
 		this.taskManager = new TaskManager(this.stateManager);
 		this.startTime = new Date();
 
 		// Initialize Logger with StateManager
 		Logger.initialize(this.stateManager);
+
+		Logger.logStructured(
+			'info',
+			'Orchestrator',
+			`Constructor: libraryMode=${this.libraryMode}, wsPort=${this.wsPort}, restPort=${this.restPort}`
+		);
 	}
 
 	/**
@@ -78,14 +86,19 @@ export class Orchestrator implements Shutdownable {
 		this.uiClientHook.enable();
 		Logger.logStructured('info', 'Orchestrator', 'UI client hook enabled');
 
-		// Create REST API with UIClientHook for WebSocket support
-		this.restAPI = new RestAPI(
-			this.taskManager,
-			this.wsServer,
-			this.restPort,
-			this.workspaceManager,
-			this.uiClientHook
-		);
+		// Create REST API only if not in library mode
+		// In library mode, the backend (Fastify) handles HTTP/WebSocket communication
+		if (!this.libraryMode) {
+			this.restAPI = new RestAPI(
+				this.taskManager,
+				this.wsServer,
+				this.restPort,
+				this.workspaceManager,
+				this.uiClientHook
+			);
+		} else {
+			Logger.logStructured('info', 'Orchestrator', 'REST API disabled (library mode)');
+		}
 	}
 
 	/**
@@ -96,7 +109,7 @@ export class Orchestrator implements Shutdownable {
 			throw new Error('Orchestrator is already running');
 		}
 
-		console.log('[Orchestrator] Starting orchestrator...');
+		Logger.log('[Orchestrator] Starting orchestrator...');
 		process.title = 'Orchestrator';
 
 		try {
@@ -117,7 +130,7 @@ export class Orchestrator implements Shutdownable {
 			// Emit orchestrator ready event
 			this.stateManager.emitOrchestratorReady();
 
-			console.log('[Orchestrator] Orchestrator started successfully');
+			Logger.log('[Orchestrator] Orchestrator started successfully');
 			Logger.logStructured('info', 'Orchestrator', 'All services started successfully');
 		} catch (error) {
 			console.error('[Orchestrator] Failed to start:', error);
@@ -231,12 +244,12 @@ export async function main() {
 
 	// Handle termination signals with proper async/await
 	const handleShutdown = async (signal: string) => {
-		console.log(`\n[Orchestrator] Received ${signal}, shutting down gracefully...`);
+		Logger.log(`[Orchestrator] Received ${signal}, shutting down gracefully...`);
 		try {
 			await orchestrator.shutdown();
 			process.exit(0);
 		} catch (error) {
-			console.error('[Orchestrator] Error during shutdown:', error);
+			Logger.error('[Orchestrator] Error during shutdown:', error);
 			process.exit(1);
 		}
 	};

@@ -18,7 +18,7 @@ import type {
 	Workspace,
 	WorkspaceMode,
 } from 'flow-engine/types.js';
-import type { Task, TaskStatus, WorkerInfo, WorkerType } from 'shared-common/types.js';
+import type { Task, TaskStatus, WorkerInfo, WorkerType } from 'shared-orch-worker/index.js';
 
 /**
  * Create a mock Task for testing

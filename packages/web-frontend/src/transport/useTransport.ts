@@ -18,7 +18,7 @@
  *     transport.request('GET', '/api/tasks/').then(setTasks);
  *
  *     // Subscribe to events
- *     const unsubscribe = transport.subscribe('task:created', (task) => {
+ *     const unsubscribe = transport.subscribe('b2f:task:created', (task) => {
  *       setTasks(prev => [...prev, task]);
  *     });
  *

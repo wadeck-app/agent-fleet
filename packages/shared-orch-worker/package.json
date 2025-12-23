@@ -16,7 +16,6 @@
 		"clean": "rimraf dist"
 	},
 	"dependencies": {
-		"shared-common": "*",
 		"zod": "^4.1.13"
 	},
 	"devDependencies": {

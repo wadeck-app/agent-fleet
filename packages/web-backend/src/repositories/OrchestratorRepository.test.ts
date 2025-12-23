@@ -1,6 +1,5 @@
+import type { OrchestratorStats } from 'shared-orch-worker/index.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-import type { OrchestratorStats } from '@app/shared-orch-backend';
 
 import { OrchestratorRepository } from './OrchestratorRepository';
 

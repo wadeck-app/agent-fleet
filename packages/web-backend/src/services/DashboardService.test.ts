@@ -1,7 +1,5 @@
+import type { OrchestratorStats } from 'shared-orch-worker/index.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { InternalServerErrorException } from '@app/shared';
-import type { OrchestratorStats } from '@app/shared-orch-backend';
 
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 import { DashboardService } from './DashboardService';

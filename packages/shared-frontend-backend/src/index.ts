@@ -9,7 +9,7 @@ export {
 	createListResponseSchema,
 	createQuerySchema,
 } from './common/api-helpers';
-export type { DeleteResponse } from './common/api-helpers';
+export type { DeleteResponse, BaseListQuery, BaseListQueryMutable } from './common/api-helpers';
 
 // Validation - Input sanitization
 export {
@@ -213,4 +213,28 @@ export type {
 	EventHandler,
 	TransportType,
 } from './transport';
-export { isValidPath, getAvailableMethods } from './transport';
+export {
+	isValidPath,
+	getAvailableMethods,
+	B2F_TASK_CREATED,
+	B2F_TASK_UPDATED,
+	B2F_TASK_DELETED,
+	B2F_TASK_STATUS_CHANGED,
+	B2F_TASK_ASSIGNED,
+	B2F_TASK_PRIORITY_CHANGED,
+	B2F_WORKER_CREATED,
+	B2F_WORKER_UPDATED,
+	B2F_WORKER_DELETED,
+	B2F_WORKER_STATUS_CHANGED,
+	B2F_WORKER_HEARTBEAT,
+	B2F_WORKER_CAPACITY_CHANGED,
+	B2F_WORKER_CONNECTED,
+	B2F_WORKER_DISCONNECTED,
+	B2F_WORKER_STATUS,
+	B2F_WORKSPACE_CREATED,
+	B2F_WORKSPACE_UPDATED,
+	B2F_WORKSPACE_DELETED,
+	B2F_WORKSPACE_STATUS_CHANGED,
+	B2F_WORKSPACE_QUOTA_EXCEEDED,
+	B2F_WORKSPACE_ARCHIVED,
+} from './transport';

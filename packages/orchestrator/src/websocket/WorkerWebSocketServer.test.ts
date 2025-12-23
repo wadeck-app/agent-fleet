@@ -13,7 +13,7 @@ import {
 	WorkerHeartbeatMessage,
 	WorkerReadyMessage,
 	WorkerType,
-} from 'shared-common/types.js';
+} from 'shared-orch-worker/index.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TaskManager } from '../core/TaskManager.js';
@@ -194,7 +194,7 @@ describe('WorkerWebSocketServer Integration', () => {
 			expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith('worker-1', WorkerType.DEV);
 
 			// Verify ASSIGN_TASK message was sent
-			expect(mockSocket.send).toHaveBeenCalledWith(expect.stringContaining('assign_task'));
+			expect(mockSocket.send).toHaveBeenCalledWith(expect.stringContaining('o2w:task:assign'));
 
 			// Verify worker appears in list
 			const workers = server.getWorkers();

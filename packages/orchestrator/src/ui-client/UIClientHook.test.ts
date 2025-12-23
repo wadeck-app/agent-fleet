@@ -3,7 +3,7 @@
  */
 import { Logger } from 'shared-common/Logger.js';
 import { StateEvent, StateManager } from 'shared-common/StateManager.js';
-import { Task, TaskStatus, WorkerType } from 'shared-common/types.js';
+import { Task, TaskStatus, WorkerType } from 'shared-orch-worker/index.js';
 import { setupTest } from 'test-utils/index';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

@@ -18,7 +18,7 @@ import {
 	WorkerReadyMessage,
 	WorkspaceAllocatedMessage,
 	WorkspaceReleasedMessage,
-} from 'shared-common/types.js';
+} from 'shared-orch-worker/index.js';
 import { WebSocket } from 'ws';
 
 import { WebSocketConnectionManager } from './WebSocketConnectionManager.js';

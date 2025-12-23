@@ -4,7 +4,9 @@
 			"WebFetch(domain:survey.stackoverflow.co)",
 			"WebFetch(domain:npmtrends.com)",
 			"WebFetch(domain:github.com)",
-			"WebFetch(domain:www.radix-ui.com)"
+			"WebFetch(domain:www.radix-ui.com)",
+			"Skill(run-test)",
+			"Bash(npm run test:*)"
 		],
 		"deny": [],
 		"ask": []

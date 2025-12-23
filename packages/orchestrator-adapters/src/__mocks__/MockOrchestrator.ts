@@ -28,9 +28,8 @@
  * ===========================================================================================
  */
 import { EventEmitter } from 'events';
-import { TaskStatus } from 'shared-common/types.js';
-
-import type { Task, WorkerInfo } from '@app/shared-orch-backend';
+import { TaskStatus } from 'shared-orch-worker/index.js';
+import type { Task, WorkerInfo } from 'shared-orch-worker/index.js';
 
 /**
  * Options for creating a mock orchestrator
@@ -119,7 +118,7 @@ export function createMockOrchestrator(options?: MockOrchestratorOptions) {
 		createTask: async (description: string, metadata: Record<string, unknown>): Promise<Task> => {
 			return createMockTask({ description, metadata });
 		},
-		getTask: (taskId: string): Task | null => {
+		getTask: (_taskId: string): Task | null => {
 			return null; // Default: task not found
 		},
 		getAllTasks: (): Task[] => {

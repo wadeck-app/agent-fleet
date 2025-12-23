@@ -4,7 +4,7 @@
 import { Logger } from 'shared-common/Logger.js';
 import { StateManager } from 'shared-common/StateManager.js';
 import { createMessage, serializeMessage } from 'shared-common/protocol.js';
-import { MessageType, Task, TaskStatus, WorkerReadyMessage, WorkerType } from 'shared-common/types.js';
+import { MessageType, Task, TaskStatus, WorkerReadyMessage, WorkerType } from 'shared-orch-worker/index.js';
 import { setupTest } from 'test-utils/index';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

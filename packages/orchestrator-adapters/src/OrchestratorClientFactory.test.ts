@@ -13,7 +13,7 @@
  *
  * ===========================================================================================
  */
-import { TaskStatus } from 'shared-common/types.js';
+import { TaskStatus } from 'shared-orch-worker/index.js';
 import { describe, expect, test, vi } from 'vitest';
 
 import { OrchestratorClientFactory } from './OrchestratorClientFactory.js';
@@ -168,11 +168,9 @@ describe('OrchestratorClientFactory - Test Mode', () => {
 
 		await client.connect();
 
-		// Create a promise to track event emission
-		const eventReceived = new Promise(resolve => {
-			client.on('task.created', data => {
-				resolve(data);
-			});
+		// Setup event listener
+		client.on('task.created', _data => {
+			// Event handler for testing
 		});
 
 		// Act - Get the mock orchestrator to emit an event

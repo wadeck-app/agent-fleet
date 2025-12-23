@@ -1,6 +1,4 @@
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
-import { readFileSync } from 'fs';
-import path from 'path';
 import { ZodError } from 'zod';
 
 import { HttpException, ROUTES_BY_BASE_URL } from '@app/shared';
@@ -56,7 +54,7 @@ type ControllerLoader<Routes = any> = () => Promise<{ default: LazyControllerCla
 /**
  * Route wrapper function type (kept for controller compatibility)
  */
-export type RouteWrapperFunc<Routes> = <M extends string, P extends string>(
+export type RouteWrapperFunc<_Routes> = <M extends string, P extends string>(
 	method: M,
 	path: P,
 	handler: (validated: any) => Promise<any>
@@ -114,7 +112,6 @@ function createLazyControllerPlugin<Routes = any>(
 		if (router !== null) return; // Already initialized
 
 		// console.log(`[LAZY] Initializing controller for ${baseUrl}...`);
-		const startTime = performance.now();
 
 		// 1. Get routes from shared (no controller import yet!)
 		const routes = ROUTES_BY_BASE_URL[baseUrl];
@@ -187,7 +184,6 @@ function createLazyControllerPlugin<Routes = any>(
 
 		controllerInstance.configureRoutes(collectHandlers);
 
-		const endTime = performance.now();
 		// console.log(`[LAZY] ${baseUrl} initialized in ${(endTime - startTime).toFixed(2)}ms (${router.routeCount} routes)`);
 	};
 

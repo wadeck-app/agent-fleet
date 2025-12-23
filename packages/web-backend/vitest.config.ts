@@ -76,9 +76,9 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			'@app/shared': path.resolve(__dirname, '../shared-frontend-backend/src'),
-			'@app/shared-orch-backend': path.resolve(__dirname, '../shared-orch-backend/src'),
 			'orchestrator-adapters': path.resolve(__dirname, '../orchestrator-adapters/src'),
 			'shared-common': path.resolve(__dirname, '../shared-common/src'),
+			'shared-orch-worker': path.resolve(__dirname, '../shared-orch-worker/src'),
 			'@': path.resolve(__dirname, './src'),
 		},
 	},

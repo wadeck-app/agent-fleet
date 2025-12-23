@@ -394,4 +394,33 @@ export class WebSocketTransportServer implements ITransportServer {
 	private generateEventId(): string {
 		return `event_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 	}
+
+	/**
+	 * Stop the WebSocket server and clean up resources
+	 * Closes all client connections, clears timers, and resets state
+	 */
+	stop(): void {
+		// Clear all expiration timers
+		this.expirationTimers.forEach(timer => {
+			clearTimeout(timer);
+		});
+		this.expirationTimers.clear();
+
+		// Close all client connections gracefully
+		this.clients.forEach(socket => {
+			try {
+				if (socket && socket.readyState === 1) {
+					// 1 = OPEN
+					socket.close(1000, 'Server shutting down');
+				}
+			} catch (error) {
+				// Ignore errors when closing sockets
+			}
+		});
+		this.clients.clear();
+
+		// Clear event handlers
+		this.clientConnectedHandlers = [];
+		this.clientDisconnectedHandlers = [];
+	}
 }

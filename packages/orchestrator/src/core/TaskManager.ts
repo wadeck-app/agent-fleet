@@ -1,7 +1,7 @@
 import { Logger } from 'shared-common/Logger.js';
 import { StateManager } from 'shared-common/StateManager.js';
 import { Storage } from 'shared-common/Storage.js';
-import { Task, TaskHistoryEntry, TaskStatus, WorkerType } from 'shared-common/types.js';
+import { Task, TaskHistoryEntry, TaskStatus, WorkerType } from 'shared-orch-worker/index.js';
 import { v4 as uuidv4 } from 'uuid';
 
 interface WorkerIdleEntry {

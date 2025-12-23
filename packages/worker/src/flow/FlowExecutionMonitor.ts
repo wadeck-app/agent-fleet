@@ -5,7 +5,7 @@
  * Listens to FlowOrchestrator events and emits UI update events.
  */
 import { EventEmitter } from 'events';
-import type { Task } from 'shared-common/types.js';
+import type { Task } from 'shared-orch-worker/index.js';
 
 import type { UIStateManager } from './ui/shared/StateManager.js';
 

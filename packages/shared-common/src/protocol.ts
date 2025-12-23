@@ -1,4 +1,4 @@
-import { BaseMessage, Message, MessageType } from './types.js';
+import { BaseMessage, Message, MessageType } from 'shared-orch-worker/index.js';
 
 export function createMessage<T extends Message>(
 	type: T['type'],

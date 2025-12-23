@@ -17,7 +17,7 @@ import {
 	TaskStatus,
 	WorkspaceAllocatedMessage,
 	WorkspaceReleasedMessage,
-} from 'shared-common/types.js';
+} from 'shared-orch-worker/index.js';
 
 import { TaskManager } from '../core/TaskManager.js';
 import { WebSocketConnectionManager } from './WebSocketConnectionManager.js';

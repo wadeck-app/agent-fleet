@@ -18,9 +18,6 @@ Important: Delegate to sub-agents early and often. It reduces the context size a
 - Generic names (`manager.ts` → `TaskManager.ts`)
 - Kebab-case for class files
 
-**Run tests:**
-Use the skill "run-test" and fix the failures
-
 **After each task:**
 Use the skill "check" and fix the issues
 

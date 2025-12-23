@@ -8,7 +8,7 @@ import { FlowExecutor } from 'flow-engine/executor/FlowExecutor.js';
 import { FlowRegistry } from 'flow-engine/registry/FlowRegistry.js';
 import type { FlowDefinition, FlowExecutionResult, Workspace } from 'flow-engine/types.js';
 import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager.js';
-import type { Task } from 'shared-common/types.js';
+import type { Task } from 'shared-orch-worker/index.js';
 import { createMockFlow, createMockFlowTrace, createMockTask, createMockWorkspace } from 'test-utils/index';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -199,7 +199,7 @@ describe('FlowWorker', () => {
 			errorWorker.shutdown();
 		});
 
-		it('should setup Claude WebSocket server', async () => {
+		it('should setup WebSocket server', async () => {
 			// WebSocket server should be initialized
 			expect(worker).toBeDefined();
 		});
@@ -503,8 +503,8 @@ describe('FlowWorker', () => {
 		});
 	});
 
-	describe('executeTask - Claude Environment', () => {
-		it('should pass Claude environment variables to executor', async () => {
+	describe('executeTask - Environment', () => {
+		it('should pass environment variables to executor', async () => {
 			await (worker as any).executeTask(mockTask);
 
 			expect(mockFlowExecutor.execute).toHaveBeenCalledWith(
@@ -664,7 +664,7 @@ describe('FlowWorker', () => {
 	});
 
 	describe('killClaude', () => {
-		it('should do nothing when no Claude process is running', () => {
+		it('should do nothing when no process is running', () => {
 			expect(() => {
 				worker.killClaude();
 			}).not.toThrow();
@@ -713,8 +713,8 @@ describe('FlowWorker', () => {
 		});
 	});
 
-	describe('Claude WebSocket Server', () => {
-		it('should handle Claude connection', () => {
+	describe('WebSocket Server', () => {
+		it('should handle connection', () => {
 			// WebSocket server is initialized in constructor
 			expect(worker).toBeDefined();
 		});
@@ -722,7 +722,7 @@ describe('FlowWorker', () => {
 		it('should handle STOP_REQUESTED message from Claude', () => {
 			const killSpy = vi.spyOn((worker as any).claudeProcessManager, 'kill');
 
-			// Simulate Claude message
+			// Simulate message
 			const message = { type: 'STOP_REQUESTED' };
 			(worker as any).handleClaudeMessage(message);
 
@@ -759,7 +759,7 @@ describe('FlowWorker', () => {
 			expect(mockFlowRegistry.stopWatching).toHaveBeenCalled();
 		});
 
-		it('should kill Claude process if running', () => {
+		it('should kill process if running', () => {
 			const mockProcess = {
 				pid: 12345,
 				kill: vi.fn(),
@@ -773,7 +773,7 @@ describe('FlowWorker', () => {
 			expect((worker as any).claudeProcessManager.getProcess()).toBeNull();
 		});
 
-		it('should close Claude WebSocket server', () => {
+		it('should close WebSocket server', () => {
 			// The ClaudeLifecycleManager handles WebSocket server cleanup internally
 			// Just verify shutdown doesn't throw
 			expect(() => {
@@ -794,7 +794,7 @@ describe('FlowWorker', () => {
 			}).not.toThrow();
 		});
 
-		it('should handle shutdown when Claude process is null', () => {
+		it('should handle shutdown when process is null', () => {
 			// ClaudeLifecycleManager handles this internally
 			expect(() => {
 				worker.shutdown();

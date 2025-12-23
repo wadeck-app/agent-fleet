@@ -126,6 +126,9 @@ export interface CrudTableProps<T extends CrudTableItem> {
 	/** Optional column order (controlled by parent) */
 	columnOrder?: string[];
 
+	/** Optional initial loading state (show skeleton rows) */
+	initialLoading?: boolean;
+
 	/** Optional refreshing state */
 	refreshing?: boolean;
 
@@ -161,6 +164,7 @@ export function CrudTable<T extends CrudTableItem>({
 	sorting,
 	visibleColumns,
 	columnOrder,
+	initialLoading,
 	refreshing,
 	deleting,
 	selectable,
@@ -227,6 +231,7 @@ export function CrudTable<T extends CrudTableItem>({
 				emptyMessage={config.emptyMessage}
 				pagination={pagination}
 				sorting={sorting}
+				initialLoading={initialLoading}
 				refreshing={refreshing}
 				deleting={deleting}
 				selectable={selectable}

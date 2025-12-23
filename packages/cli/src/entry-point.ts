@@ -1,5 +1,5 @@
 // Simple CLI to add tasks to the orchestrator
-import { Task } from 'shared-common/types.js';
+import { Task } from 'shared-orch-worker/index.js';
 
 const REST_API_URL = 'http://localhost:3737';
 

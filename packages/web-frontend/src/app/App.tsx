@@ -11,6 +11,7 @@ import { LoginPage } from '@app/pages/auth/LoginPage';
 import { ProtectedRoute } from '@app/pages/auth/ProtectedRoute';
 import { BooksPage } from '@app/pages/books/BooksPage';
 import { DashboardPage } from '@app/pages/dashboard/DashboardPage';
+import { Ingredients2Page } from '@app/pages/ingredients2/Ingredients2Page';
 import { IngredientsPage } from '@app/pages/ingredients/IngredientsPage';
 import { TasksPage } from '@app/pages/tasks/TasksPage';
 import { WorkersPage } from '@app/pages/workers/WorkersPage';
@@ -46,6 +47,9 @@ function Layout() {
 							<Route path="/ingredients" element={<IngredientsPage />} />
 							<Route path="/ingredients/:mode" element={<IngredientsPage />} />
 							<Route path="/ingredients/:id/:mode" element={<IngredientsPage />} />
+							<Route path="/ingredients2" element={<Ingredients2Page />} />
+							<Route path="/ingredients2/:mode" element={<Ingredients2Page />} />
+							<Route path="/ingredients2/:id/:mode" element={<Ingredients2Page />} />
 							<Route path="/books" element={<BooksPage />} />
 							<Route path="/books/:mode" element={<BooksPage />} />
 							<Route path="/books/:id/:mode" element={<BooksPage />} />

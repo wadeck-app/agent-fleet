@@ -25,8 +25,12 @@ export function SidebarNav({ items, className, mobile = false }: SidebarNavProps
 	const location = useLocation();
 
 	// @formatter:off
-	// Check if current path starts with item path to handle nested routes
-	const isActive = (path: string) => location.pathname.startsWith(path);
+	// Check if current path matches exactly or starts with path followed by '/' to handle nested routes
+	// This prevents false positives like '/ingredients' matching '/ingredients2'
+	const isActive = (path: string) => {
+		const currentPath = location.pathname;
+		return currentPath === path || currentPath.startsWith(path + '/');
+	};
 	// @formatter:on
 
 	return (

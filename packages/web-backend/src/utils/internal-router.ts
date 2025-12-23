@@ -1,5 +1,4 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { ZodError } from 'zod';
 
 /**
  * ===========================================================================================
@@ -69,7 +68,6 @@ export class InternalRouter<Routes> {
 	 */
 	private buildRouteMap(routes: Routes) {
 		// console.log(`[INTERNAL ROUTER] Building route map for ${this.baseUrl}...`);
-		const startTime = performance.now();
 
 		// @formatter:off
 		// New structure: iterate over paths first, then methods
@@ -94,8 +92,6 @@ export class InternalRouter<Routes> {
 			}
 		}
 
-		const endTime = performance.now();
-		const totalRoutes = this.exactRoutes.size + this.paramRoutes.length;
 		// console.log(`[INTERNAL ROUTER] Built ${totalRoutes} routes (${this.exactRoutes.size} exact, ${this.paramRoutes.length} parameterized) in ${(endTime - startTime).toFixed(2)}ms`);
 	}
 

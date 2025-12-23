@@ -7,7 +7,7 @@
  * Key principle: Strong typing for reusability in the backend UI server.
  */
 import type { MetricsData, OrchestratorStatusData } from 'shared-common/StateManager.js';
-import type { Task, WorkerInfo } from 'shared-common/types.js';
+import type { Task, WorkerInfo } from 'shared-orch-worker/index.js';
 
 /**
  * Message types for UI ↔ Orchestrator communication

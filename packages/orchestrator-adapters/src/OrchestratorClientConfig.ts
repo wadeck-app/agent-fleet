@@ -4,7 +4,7 @@
  * ===========================================================================================
  *
  * Configuration types for OrchestratorClient.
- * Supports both library mode and remote mode.
+ * Supports library mode (embedded orchestrator) and test mode (mocked orchestrator).
  *
  * ===========================================================================================
  */
@@ -13,7 +13,7 @@
  * Base configuration for all modes
  */
 export interface BaseOrchestratorClientConfig {
-	mode: 'library' | 'remote' | 'test';
+	mode: 'library' | 'test';
 }
 
 /**
@@ -40,54 +40,12 @@ export interface LibraryOrchestratorClientConfig extends BaseOrchestratorClientC
 	 * @default process.cwd()
 	 */
 	projectRoot?: string;
-}
-
-/**
- * Remote mode configuration
- * Orchestrator runs in separate process, network communication
- */
-export interface RemoteOrchestratorClientConfig extends BaseOrchestratorClientConfig {
-	mode: 'remote';
 
 	/**
-	 * Orchestrator URL (e.g., "http://localhost:3737")
+	 * Disable REST API server when embedded in backend
+	 * @default false
 	 */
-	url: string;
-
-	/**
-	 * Transport mode selection
-	 * - 'auto': Try WebSocket → REST+SSE → REST+LongPolling
-	 * - 'websocket': Use WebSocket only
-	 * - 'rest-sse': Use REST+SSE only
-	 * - 'rest-longpolling': Use REST+LongPolling only
-	 */
-	transportMode?: 'auto' | 'websocket' | 'rest-sse' | 'rest-longpolling';
-
-	/**
-	 * Authentication configuration
-	 */
-	auth?: {
-		type: 'none' | 'mtls' | 'token';
-		clientCert?: string;
-		clientKey?: string;
-		caCert?: string;
-		token?: string;
-	};
-
-	/**
-	 * Request timeout in milliseconds
-	 */
-	requestTimeout?: number;
-
-	/**
-	 * Maximum number of retries for failed requests
-	 */
-	maxRetries?: number;
-
-	/**
-	 * WebSocket reconnection delay in milliseconds
-	 */
-	reconnectDelay?: number;
+	libraryMode?: boolean;
 }
 
 /**
@@ -108,23 +66,13 @@ export interface TestOrchestratorClientConfig extends BaseOrchestratorClientConf
 /**
  * Union type for all configuration modes
  */
-export type OrchestratorClientConfig =
-	| LibraryOrchestratorClientConfig
-	| RemoteOrchestratorClientConfig
-	| TestOrchestratorClientConfig;
+export type OrchestratorClientConfig = LibraryOrchestratorClientConfig | TestOrchestratorClientConfig;
 
 /**
  * Type guard to check if config is library mode
  */
 export function isLibraryMode(config: OrchestratorClientConfig): config is LibraryOrchestratorClientConfig {
 	return config.mode === 'library';
-}
-
-/**
- * Type guard to check if config is remote mode
- */
-export function isRemoteMode(config: OrchestratorClientConfig): config is RemoteOrchestratorClientConfig {
-	return config.mode === 'remote';
 }
 
 /**

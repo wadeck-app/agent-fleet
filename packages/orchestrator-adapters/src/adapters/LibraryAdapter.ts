@@ -15,9 +15,8 @@
  * ===========================================================================================
  */
 import { StateEvent } from 'shared-common/StateManager.js';
-import type { Task, WorkerInfo } from 'shared-common/types.js';
-
-import type { O2BEventData, O2BEventType, OrchestratorStats } from '@app/shared-orch-backend';
+import type { Task, WorkerInfo } from 'shared-orch-worker/index.js';
+import type { O2BEventData, O2BEventType, OrchestratorStats } from 'shared-orch-worker/index.js';
 
 import type { OrchestratorClient, OrchestratorConfig, TaskFilters, WorkerFilters } from '../OrchestratorClient.js';
 
@@ -164,7 +163,7 @@ export class LibraryOrchestratorAdapter implements OrchestratorClient {
 	/**
 	 * Update orchestrator configuration (not implemented yet)
 	 */
-	async updateConfig(config: Partial<OrchestratorConfig>): Promise<void> {
+	async updateConfig(_config: Partial<OrchestratorConfig>): Promise<void> {
 		// TODO: Implement when orchestrator supports dynamic configuration
 		throw new Error('updateConfig not yet implemented for library mode');
 	}
@@ -172,7 +171,7 @@ export class LibraryOrchestratorAdapter implements OrchestratorClient {
 	/**
 	 * Rename a worker (not implemented yet)
 	 */
-	async renameWorker(workerId: string, name: string): Promise<void> {
+	async renameWorker(_workerId: string, _name: string): Promise<void> {
 		// TODO: Implement when worker naming is supported
 		throw new Error('renameWorker not yet implemented for library mode');
 	}
@@ -253,7 +252,7 @@ export class LibraryOrchestratorAdapter implements OrchestratorClient {
 						if (current.event === 'status_change') {
 							const o2bData: O2BEventData<'task.status_changed'> = {
 								taskId: eventData.task.id,
-								previousStatus: (previous as any).status || 'unknown',
+								previousStatus: (previous as { status?: string }).status || 'unknown',
 								newStatus: eventData.task.status,
 								timestamp: new Date().toISOString(),
 							};
@@ -329,16 +328,16 @@ export class LibraryOrchestratorAdapter implements OrchestratorClient {
 		// Map O2B event types to StateManager events and remove listener
 		switch (event) {
 			case 'task.created':
-				stateManager.off(StateEvent.TASK_CREATED, handler as any);
+				stateManager.off(StateEvent.TASK_CREATED, handler as unknown as (...args: unknown[]) => void);
 				break;
 			case 'task.updated':
-				stateManager.off(StateEvent.TASK_UPDATED, handler as any);
+				stateManager.off(StateEvent.TASK_UPDATED, handler as unknown as (...args: unknown[]) => void);
 				break;
 			case 'worker.connected':
-				stateManager.off(StateEvent.WORKER_CONNECTED, handler as any);
+				stateManager.off(StateEvent.WORKER_CONNECTED, handler as unknown as (...args: unknown[]) => void);
 				break;
 			case 'worker.disconnected':
-				stateManager.off(StateEvent.WORKER_DISCONNECTED, handler as any);
+				stateManager.off(StateEvent.WORKER_DISCONNECTED, handler as unknown as (...args: unknown[]) => void);
 				break;
 			// Note: For composite events (task.completed, task.failed, worker.status),
 			// we'd need to track the wrapped handlers to properly remove them
@@ -364,5 +363,13 @@ export class LibraryOrchestratorAdapter implements OrchestratorClient {
 	 */
 	async disconnect(): Promise<void> {
 		// No-op: orchestrator lifecycle managed externally
+	}
+
+	/**
+	 * Get the underlying orchestrator instance (library mode only)
+	 * Used for shutdown and cleanup in library mode
+	 */
+	getOrchestrator(): Orchestrator {
+		return this.orchestrator;
 	}
 }

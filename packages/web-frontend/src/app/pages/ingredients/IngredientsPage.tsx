@@ -5,7 +5,6 @@ import { ColumnVisibility } from '@framework/components/columns/ColumnVisibility
 import { useColumnOrder } from '@framework/components/columns/useColumnOrder';
 import { useColumnVisibility } from '@framework/components/columns/useColumnVisibility';
 import { EmptyState } from '@framework/components/feedback/EmptyState';
-import { LoadingState } from '@framework/components/feedback/LoadingState';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { usePagination } from '@framework/components/pagination/usePagination';
@@ -171,7 +170,71 @@ export function IngredientsPage() {
 	};
 
 	if (loading && !ingredients.length) {
-		return <LoadingState message="Loading ingredients..." size="large" />;
+		return (
+			<Page>
+				<PageHeader
+					title="Ingredients"
+					badge={totalCount}
+					action={
+						<>
+							<ColumnVisibility
+								columns={toColumnVisibilityDefs(INGREDIENT_TABLE_COLUMNS)}
+								visibleColumns={columnVisibility.visibleColumns}
+								defaultVisible={new Set(extractDefaultVisible(INGREDIENT_TABLE_COLUMNS))}
+								onToggle={columnVisibility.toggleColumn}
+								onReset={() => {
+									columnVisibility.resetColumns();
+									columnOrder.resetOrder();
+								}}
+								onShowAll={columnVisibility.showAll}
+								onHideAll={columnVisibility.hideAll}
+								isColumnModified={columnVisibility.isColumnModified}
+								onResetColumn={columnVisibility.resetColumn}
+								columnOrder={columnOrder.columnOrder}
+								defaultOrder={extractColumnIds(INGREDIENT_TABLE_COLUMNS)}
+								onReorderColumns={columnOrder.reorderColumns}
+								isColumnModifiedOrder={columnOrder.isColumnModified}
+								onResetColumnOrder={columnOrder.resetColumn}
+							/>
+							<Button onClick={handleNewIngredient}>
+								<Plus />
+								Add Ingredient
+							</Button>
+						</>
+					}
+				/>
+				<IngredientTable
+					storageId={storageId}
+					ingredients={[]}
+					onEdit={handleEdit}
+					onDelete={handleDelete}
+					pagination={
+						paginationData
+							? {
+									currentPage: paginationData.page,
+									totalPages: paginationData.totalPages,
+									totalItems: paginationData.total,
+									onPageChange: pagination.setPage,
+									pageSize: pagination.pageSize,
+									onPageSizeChange: pagination.setPageSize,
+									pageSizeOptions: [5, 10, 20, 50],
+								}
+							: undefined
+					}
+					sorting={{
+						sortConfigs: sorting.sortConfigs,
+						onSortChange: sorting.handleSort,
+					}}
+					visibleColumns={columnVisibility.visibleColumns}
+					columnOrder={columnOrder.columnOrder}
+					initialLoading={true}
+					selectable={true}
+					selectedIds={selectedIds}
+					onSelectionChange={setSelectedIds}
+					deletingIds={deletingIds}
+				/>
+			</Page>
+		);
 	}
 
 	return (

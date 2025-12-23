@@ -1,0 +1,111 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                    AUTO RECONNECT/RETRY - VISUAL ANALYSIS                      ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+┌─ DEUX STRATÉGIES DE RECONNEXION ACTIVES ────────────────────────────────────────┐
+│                                                                                  │
+│  1️⃣  WebSocketTransportClient (Backend WebSocket)                              │
+│      ├─ Fichier: transport/adapters/WebSocketTransportClient.ts:423-426        │
+│      ├─ Trigger: WebSocket connection close                                    │
+│      ├─ Facteur: 2x exponentiel (1s, 2s, 4s, 8s, 16s, 30s)                    │
+│      └─ Max: 10 tentatives avant "error"                                       │
+│                                                                                  │
+│  2️⃣  CircuitBreakerService (Health Checks REST API)                            │
+│      ├─ Fichier: framework/features/connectivity/CircuitBreakerService.ts      │
+│      ├─ Trigger: 3 erreurs 5xx OU erreur réseau immédiate                      │
+│      ├─ Facteur: 2x exponentiel (1s, 2s, 4s, 8s, 16s, 30s)                    │
+│      └─ Health Check Timeout: 5 secondes                                        │
+│                                                                                  │
+└──────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ BUG IDENTIFIÉ: Compte à rebours disparaît ─────────────────────────────────────┐
+│                                                                                  │
+│  Observation:                                                                   │
+│    Widget UI affiche: 30s → 29s → 28s ... → 15s → [DISPARAÎT] → 2s → 1s → 0s  │
+│                                             ↑                  ↑                 │
+│                                       Temps perdu        Réapparaît            │
+│                                                                                  │
+│  Cause Racine:                                                                  │
+│    CircuitBreakerService.ts:397                                                │
+│    ┌─────────────────────────────────────────────────┐                         │
+│    │ private performHealthCheck(delayMs?: number) {  │                         │
+│    │   ...                                            │                         │
+│    │   this.state = CircuitState.HALF_OPEN;         │                         │
+│    │   this.nextRetryTime = null;  ⚠️ BUG!          │                         │
+│    │   this.notifyListeners();     ↓ UI perd temps   │                         │
+│    │ ...                                              │                         │
+│    │   // Pendant 5-7 secondes (HEALTH_CHECK_TIMEOUT)│                         │
+│    │ }                                                │                         │
+│    └─────────────────────────────────────────────────┘                         │
+│                                                                                  │
+│  Flux Temporel:                                                                 │
+│                                                                                  │
+│    T=0s        T=5s       T=15s      T=25s    T=30s   T=35s  T=37s             │
+│    ┌───────────────────────────────────────┬──────────┬──────────┐             │
+│    │ CLOSED (wait 30s)                     │ RUNNING  │ CLOSED   │             │
+│    │ nextRetryTime=now+30000               │          │          │             │
+│    │ UI: "retry in 30s"                    │          │          │             │
+│    │ ↓                                     │          │          │             │
+│    │ "retry in 25s"                        │          │          │             │
+│    │ ↓                                     │          │          │             │
+│    │ "retry in 15s"                        │          │          │             │
+│    │ ↓                                     ↓          ↓          │             │
+│    │ "retry in 5s"   ───→ [Health Check]   │ TIMEOUT  │ RECOVER  │             │
+│    │                       nextRetryTime=null OCCUR   nextRetryTime             │
+│    │                       UI shows nothing   here    =now+2000ms              │
+│    │                       (5-7 sec missing)          UI: "retry in 2s"        │
+│    │                       ⚠️ JUMP VISIBLE!                                    │
+│    └───────────────────────────────────────┴──────────┴──────────┘             │
+│                                                                                  │
+│  Résultat visible pour l'utilisateur:                                          │
+│    "30s → 5s → [jump to 2s] → 0s"  = Compte à rebours cassé!                  │
+│                                                                                  │
+└──────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ PROGRESSION EXPONENTIELLE (2x) ──────────────────────────────────────────────────┐
+│                                                                                  │
+│  Tentative │ Délai Calculé   │ Formule              │ Max?                     │
+│  ──────────┼─────────────────┼──────────────────────┼──────                     │
+│  1         │ 1s              │ 1000 × 2^(1-1) = 1000│ ✓                        │
+│  2         │ 2s              │ 1000 × 2^(2-1) = 2000│ ✓                        │
+│  3         │ 4s              │ 1000 × 2^(3-1) = 4000│ ✓                        │
+│  4         │ 8s              │ 1000 × 2^(4-1) = 8000│ ✓                        │
+│  5         │ 16s             │ 1000 × 2^(5-1)=16000│ ✓                        │
+│  6         │ 32s → CAP 30s   │ 1000 × 2^(6-1)=32000│ ⚠️ CAPPED!              │
+│  7+        │ 30s             │ Reste à 30s          │ ⚠️ STUCK!               │
+│                                                                                  │
+│  Math.min(32000, 30000) = 30000 = "capped at 30s"                             │
+│                                                                                  │
+└──────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ CODE LEGACY (UNUSED) ─────────────────────────────────────────────────────────┐
+│                                                                                │
+│  useOrchestratorWebSocket Hook                                               │
+│  ├─ Fichier: app/hooks/useOrchestratorWebSocket.ts                          │
+│  ├─ Status: ⚠️  NON UTILISÉ - Zéro référence dans le codebase              │
+│  ├─ Facteur: 1.5x (DIFFÉRENT du 2x utilisé ailleurs!)                       │
+│  ├─ Progression: 1s, 1.5s, 2.25s, 3.4s, 5.1s, 7.6s, 11.4s, 17.1s, 30s    │
+│  └─ Peut être supprimé (cleanup)                                            │
+│                                                                                │
+└──────────────────────────────────────────────────────────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                            FICHIERS CLÉS À CONSULTER                           ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+🔴 BUG CRITICAL:
+  • CircuitBreakerService.ts:397 ← nextRetryTime = null (cause principale)
+  • ConnectivityContext.tsx:62-69 ← calcul du temps restant dépend de nextRetryTime
+
+✅ LOGIQUE RECONNEXION:
+  • WebSocketTransportClient.ts:423-426 (exponential backoff WebSocket)
+  • CircuitBreakerService.ts:456-458 (increaseDelay function)
+  • CircuitBreakerService.ts:233-237 (configuration par défaut)
+
+📊 AFFICHAGE UI:
+  • ConnectivityIndicator.tsx:29-35 (formatRetryTime function)
+  • ConnectivityContext.tsx:60-105 (updateCountdown logic)
+
+🧪 TESTS DE VALIDATION:
+  • CircuitBreakerService.test.ts:239-327 (exponential backoff tests)
+  • CircuitBreakerService.test.ts:486-501 (schedu

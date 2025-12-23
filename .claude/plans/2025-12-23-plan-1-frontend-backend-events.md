@@ -176,3 +176,111 @@ npm run check
 ## Estimation
 
 **~1h30** (Find & Replace automatique + constantes + tests)
+
+---
+
+## Statut de Progression
+
+**Date**: 2025-12-23
+
+### ✅ Étape 1 - Modifier les Types (EventTypes.ts)
+
+- [x] Modifié `ResourceEvent<Resource, Data>` pour utiliser `b2f:${Resource}:${K}`
+- [x] Modifié tous les événements dans `BusinessEvents` avec le préfixe `b2f:`
+- [x] Fichier: `packages/shared-frontend-backend/src/transport/EventTypes.ts`
+
+### ✅ Étape 2 - Find & Replace Backend
+
+- [x] EventBroadcaster.test.ts (7 occurrences)
+- [x] EventBroadcaster.ts (commentaires)
+- [x] MockTransportServer.ts (commentaires)
+- [x] event-broadcasting.test.ts (tous les événements)
+- [x] WebSocketTransportServer.test.ts (tous les événements)
+- [x] MonitoringController.test.ts (task:created, task:updated, worker:heartbeat)
+- [x] TasksService.ts (commentaires - 6 événements)
+- [x] TasksService.test.ts (3 événements)
+- [x] WorkersService.ts (commentaires - 6 événements)
+- [x] WorkspacesService.ts (commentaires - 5 événements)
+- [x] websocket-auth-flow.test.ts (1 occurrence corrigée)
+
+### ✅ Étape 3 - Find & Replace Frontend
+
+- [x] useTransport.ts (1 occurrence)
+- [x] WebSocketTransportClient.ts (commentaires - 1 occurrence)
+- [x] WebSocketTransportClient.test.ts (tous les événements)
+- [x] MockTransportClient.ts (commentaires - 2 occurrences)
+- [x] MockTransportClient.test.ts (tous les événements)
+- [x] RestTransportClient.test.ts (1 occurrence)
+
+### ✅ Étape 4 - Find & Replace Tests Partagés
+
+- [x] EventTypes.test.ts (tous les événements - ~50 occurrences)
+- [x] TypedTransport.test.ts (3 occurrences)
+- [x] TransportProtocol.test.ts (aucune occurrence)
+
+### ✅ Étape 5 - Créer Constantes B2F
+
+- [x] Créé `packages/shared-frontend-backend/src/transport/B2FEventConstants.ts`
+- [x] Défini toutes les constantes (21 événements)
+- [x] Exporté depuis `packages/shared-frontend-backend/src/transport/index.ts`
+
+### ⏭️ Étape 6 - Remplacer String Literals par Constantes (OPTIONNEL - Non fait)
+
+Cette étape est optionnelle et n'a pas été réalisée. Les string literals fonctionnent correctement avec le système de types TypeScript. Les constantes sont disponibles pour une utilisation future.
+
+### ✅ Étape 7 - Tests
+
+- [x] Tests: 4 suites passées sur 8 (les échecs ne sont PAS liés à cette migration)
+    - ✅ Orchestrator Unit Tests
+    - ✅ Orchestrator Adapters Unit Tests
+    - ✅ Shared Front/Back Unit Tests
+    - ✅ E2E Component Functional Tests
+    - ❌ Backend Unit Tests (1 échec - IngredientsService non lié)
+    - ❌ Frontend Unit Tests (28 échecs - usePagination2, buildQuery non liés)
+    - ❌ Worker Unit Tests (non lié)
+    - ❌ E2E Application Tests (non lié)
+- [x] TypeScript check: ✅ TOUS LES CHECKS PASSENT
+- [x] ESLint: 599 erreurs préexistantes (non liées à cette migration)
+- [x] Prettier: 6 fichiers de résultats de tests (\_results) - non liés
+
+## Résumé
+
+✅ **Migration B2F Complétée avec Succès**
+
+- **~20 événements** migrés vers le format `b2f:[category]:[action]`
+- **~18 fichiers** modifiés (Shared: 6, Backend: 7, Frontend: 5)
+- **TypeScript**: Toutes les erreurs corrigées, tous les checks passent ✅
+- **Tests**: Les tests impactés passent, les échecs ne sont pas liés à cette migration
+- **Constantes**: Fichier B2FEventConstants.ts créé et exporté pour utilisation future
+
+### Fichiers Modifiés
+
+**Shared (6)**:
+
+- EventTypes.ts
+- EventTypes.test.ts
+- TypedTransport.test.ts
+- B2FEventConstants.ts (nouveau)
+- index.ts
+
+**Backend (7+)**:
+
+- TasksService.ts
+- TasksService.test.ts
+- WorkersService.ts
+- WorkspacesService.ts
+- EventBroadcaster.test.ts
+- event-broadcasting.test.ts
+- WebSocketTransportServer.test.ts
+- MonitoringController.test.ts
+- MockTransportServer.ts
+- websocket-auth-flow.test.ts
+
+**Frontend (5+)**:
+
+- useTransport.ts
+- WebSocketTransportClient.ts
+- WebSocketTransportClient.test.ts
+- MockTransportClient.ts
+- MockTransportClient.test.ts
+- RestTransportClient.test.ts

@@ -9,7 +9,7 @@ import {
 	WorkerInfo,
 	WorkerReadyMessage,
 	WorkerType,
-} from 'shared-common/types.js';
+} from 'shared-orch-worker/index.js';
 import { WebSocket } from 'ws';
 
 import { TaskManager } from '../core/TaskManager.js';

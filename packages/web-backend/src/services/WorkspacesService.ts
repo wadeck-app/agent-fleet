@@ -1,4 +1,4 @@
-import type { Workspace, WorkspaceStatus, WorkspacesData } from '@app/shared';
+import type { Workspace, WorkspacesData } from '@app/shared';
 
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 
@@ -24,11 +24,11 @@ import type { EventBroadcaster } from '../transport/EventBroadcaster';
  * - Type-safe event emission using EventBroadcaster
  *
  * Future CRUD Operations (when implemented):
- * - createWorkspace() → emit 'workspace:created'
- * - updateWorkspace() → emit 'workspace:updated'
- * - deleteWorkspace() → emit 'workspace:deleted'
- * - archiveWorkspace() → emit 'workspace:archived'
- * - checkQuota() → emit 'workspace:quota_exceeded' (when quota exceeded)
+ * - createWorkspace() → emit 'b2f:workspace:created'
+ * - updateWorkspace() → emit 'b2f:workspace:updated'
+ * - deleteWorkspace() → emit 'b2f:workspace:deleted'
+ * - archiveWorkspace() → emit 'b2f:workspace:archived'
+ * - checkQuota() → emit 'b2f:workspace:quota_exceeded' (when quota exceeded)
  *
  * ===========================================================================================
  */
@@ -221,7 +221,7 @@ export class WorkspacesService {
 
 	/**
 	 * Create a new workspace (PLACEHOLDER - not implemented)
-	 * When implemented, emit 'workspace:created' event
+	 * When implemented, emit 'b2f:workspace:created' event
 	 *
 	 * @example
 	 * ```typescript
@@ -230,7 +230,7 @@ export class WorkspacesService {
 	 *     const workspace = await this.repository.createWorkspace(data);
 	 *
 	 *     // Emit event AFTER successful creation
-	 *     this.eventBroadcaster.broadcast('workspace:created', workspace);
+	 *     this.eventBroadcaster.broadcast('b2f:workspace:created', workspace);
 	 *
 	 *     return workspace;
 	 *   } catch (error) {
@@ -243,7 +243,7 @@ export class WorkspacesService {
 
 	/**
 	 * Update workspace (PLACEHOLDER - not implemented)
-	 * When implemented, emit 'workspace:updated' event
+	 * When implemented, emit 'b2f:workspace:updated' event
 	 *
 	 * @example
 	 * ```typescript
@@ -252,7 +252,7 @@ export class WorkspacesService {
 	 *     const workspace = await this.repository.updateWorkspace(id, data);
 	 *
 	 *     // Emit event AFTER successful update
-	 *     this.eventBroadcaster.broadcast('workspace:updated', workspace);
+	 *     this.eventBroadcaster.broadcast('b2f:workspace:updated', workspace);
 	 *
 	 *     return workspace;
 	 *   } catch (error) {
@@ -265,7 +265,7 @@ export class WorkspacesService {
 
 	/**
 	 * Archive workspace (PLACEHOLDER - not implemented)
-	 * When implemented, emit 'workspace:archived' event
+	 * When implemented, emit 'b2f:workspace:archived' event
 	 *
 	 * @example
 	 * ```typescript
@@ -275,7 +275,7 @@ export class WorkspacesService {
 	 *     const workspace = await this.repository.archiveWorkspace(workspaceId);
 	 *
 	 *     // Emit event AFTER successful archival
-	 *     this.eventBroadcaster.broadcast('workspace:archived', {
+	 *     this.eventBroadcaster.broadcast('b2f:workspace:archived', {
 	 *       workspaceId,
 	 *       archivedAt,
 	 *     });
@@ -291,7 +291,7 @@ export class WorkspacesService {
 
 	/**
 	 * Check workspace quota (PLACEHOLDER - not implemented)
-	 * When implemented, emit 'workspace:quota_exceeded' event when quota is exceeded
+	 * When implemented, emit 'b2f:workspace:quota_exceeded' event when quota is exceeded
 	 *
 	 * @example
 	 * ```typescript
@@ -301,7 +301,7 @@ export class WorkspacesService {
 	 *
 	 *     if (quota.usage >= quota.limit) {
 	 *       // Emit event when quota is exceeded
-	 *       this.eventBroadcaster.broadcast('workspace:quota_exceeded', {
+	 *       this.eventBroadcaster.broadcast('b2f:workspace:quota_exceeded', {
 	 *         workspaceId,
 	 *         quotaType,
 	 *         usage: quota.usage,
@@ -322,7 +322,7 @@ export class WorkspacesService {
 
 	/**
 	 * Delete workspace (PLACEHOLDER - not implemented)
-	 * When implemented, emit 'workspace:deleted' event
+	 * When implemented, emit 'b2f:workspace:deleted' event
 	 *
 	 * @example
 	 * ```typescript
@@ -331,7 +331,7 @@ export class WorkspacesService {
 	 *     await this.repository.deleteWorkspace(workspaceId);
 	 *
 	 *     // Emit event AFTER successful deletion
-	 *     this.eventBroadcaster.broadcast('workspace:deleted', {
+	 *     this.eventBroadcaster.broadcast('b2f:workspace:deleted', {
 	 *       id: workspaceId,
 	 *       deletedAt: Date.now(),
 	 *     } as any); // Type assertion needed as Workspace requires all fields

@@ -7,13 +7,19 @@
  * Routes to appropriate adapter based on configuration mode.
  *
  * In library mode, dynamically imports and creates the Orchestrator instance internally.
- * In remote mode, creates a RemoteAdapter that connects to a running orchestrator server.
+ * In test mode, creates a mock orchestrator for unit tests.
+ *
+ * Port calculation (when not explicitly provided):
+ * - wsPort: calculated from WORKSPACE_ID/PROJECT_ID
+ * - restPort: calculated from WORKSPACE_ID/PROJECT_ID
  *
  * ===========================================================================================
  */
+import { getOrchestratorPortsFromEnv } from 'shared-common/PortCalculator.js';
+
 import type { OrchestratorClient } from './OrchestratorClient.js';
 import type { OrchestratorClientConfig } from './OrchestratorClientConfig.js';
-import { isLibraryMode, isRemoteMode, isTestMode } from './OrchestratorClientConfig.js';
+import { isLibraryMode, isTestMode } from './OrchestratorClientConfig.js';
 import { createMockOrchestrator } from './__mocks__/MockOrchestrator.js';
 
 /**
@@ -23,7 +29,7 @@ export class OrchestratorClientFactory {
 	/**
 	 * Create an OrchestratorClient based on configuration
 	 *
-	 * @param config - Client configuration (library or remote mode)
+	 * @param config - Client configuration (library or test mode)
 	 * @returns Configured OrchestratorClient instance
 	 */
 	static async create(config: OrchestratorClientConfig): Promise<OrchestratorClient> {
@@ -32,12 +38,25 @@ export class OrchestratorClientFactory {
 			// Dynamic import to avoid bundling orchestrator in remote mode builds
 			const { Orchestrator } = await import('orchestrator');
 
+			// Calculate ports if not explicitly provided
+			let wsPort = config.wsPort;
+			let restPort = config.restPort;
+
+			if (wsPort === undefined || restPort === undefined) {
+				const { wsPort: calculatedWsPort, restPort: calculatedRestPort } = getOrchestratorPortsFromEnv();
+				wsPort = wsPort ?? calculatedWsPort;
+				restPort = restPort ?? calculatedRestPort;
+			}
+
 			// Create orchestrator instance with provided config
-			const orchestrator = new Orchestrator({
-				wsPort: config.wsPort || 3738,
-				restPort: config.restPort || 3737,
+			const orchestratorConfig: any = {
+				wsPort,
+				restPort,
 				projectRoot: config.projectRoot,
-			});
+				libraryMode: config.libraryMode ?? false, // Always include libraryMode
+			};
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const orchestrator: any = new Orchestrator(orchestratorConfig);
 
 			// Start the orchestrator
 			await orchestrator.start();
@@ -45,11 +64,6 @@ export class OrchestratorClientFactory {
 			// Import LibraryAdapter dynamically to avoid circular dependencies
 			const { LibraryOrchestratorAdapter } = await import('./adapters/LibraryAdapter.js');
 			return new LibraryOrchestratorAdapter(orchestrator);
-		} else if (isRemoteMode(config)) {
-			// Remote mode: network communication
-			// Import RemoteAdapter dynamically
-			const { RemoteOrchestratorAdapter } = await import('./adapters/RemoteAdapter.js');
-			return new RemoteOrchestratorAdapter(config);
 		} else if (isTestMode(config)) {
 			// Test mode: use mock orchestrator for unit tests
 			// No dynamic import of real orchestrator, no side effects (ports, servers)
@@ -59,7 +73,7 @@ export class OrchestratorClientFactory {
 			const { LibraryOrchestratorAdapter } = await import('./adapters/LibraryAdapter.js');
 			return new LibraryOrchestratorAdapter(mockOrchestrator);
 		} else {
-			throw new Error(`Unknown orchestrator client mode: ${(config as any).mode}`);
+			throw new Error(`Unknown orchestrator client mode: ${(config as Record<string, unknown>).mode}`);
 		}
 	}
 }

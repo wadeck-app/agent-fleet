@@ -6,10 +6,10 @@
 		"declarationMap": true,
 		"baseUrl": ".",
 		"paths": {
-			"@app/shared-orch-backend": ["../shared-orch-backend/src"],
-			"@app/shared-orch-backend/*": ["../shared-orch-backend/src/*"],
 			"shared-common": ["../shared-common/src"],
-			"shared-common/*": ["../shared-common/src/*"]
+			"shared-common/*": ["../shared-common/src/*"],
+			"shared-orch-worker": ["../shared-orch-worker/src"],
+			"shared-orch-worker/*": ["../shared-orch-worker/src/*"]
 		}
 	},
 	"include": ["src/**/*"],
@@ -19,7 +19,7 @@
 			"path": "../shared-common"
 		},
 		{
-			"path": "../shared-orch-backend"
+			"path": "../shared-orch-worker"
 		}
 	]
 }

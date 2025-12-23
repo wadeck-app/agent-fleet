@@ -1,6 +1,7 @@
+import type { OrchestratorClient } from 'orchestrator-adapters';
+
 import type { Worker, WorkersData } from '@app/shared';
 
-import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 
 /**
@@ -10,6 +11,7 @@ import type { EventBroadcaster } from '../transport/EventBroadcaster';
  *
  * Business logic layer for workers data.
  * Responsibilities:
+ * - Fetch data from OrchestratorClient
  * - Transform orchestrator stats into workers DTO
  * - Calculate worker states and statistics
  * - Enrich worker data with computed fields
@@ -17,7 +19,6 @@ import type { EventBroadcaster } from '../transport/EventBroadcaster';
  *
  * Does NOT contain:
  * - HTTP concerns (in controller)
- * - Data fetching/caching (in repository)
  *
  * Event Emission Strategy:
  * - Events are emitted AFTER successful operations
@@ -25,19 +26,19 @@ import type { EventBroadcaster } from '../transport/EventBroadcaster';
  * - Type-safe event emission using EventBroadcaster
  *
  * Future CRUD Operations (when implemented):
- * - createWorker() → emit 'worker:created'
- * - updateWorker() → emit 'worker:updated'
- * - deleteWorker() → emit 'worker:deleted'
- * - updateWorkerStatus() → emit 'worker:status_changed'
- * - recordHeartbeat() → emit 'worker:heartbeat'
- * - updateWorkerCapacity() → emit 'worker:capacity_changed'
+ * - createWorker() → emit 'b2f:worker:created'
+ * - updateWorker() → emit 'b2f:worker:updated'
+ * - deleteWorker() → emit 'b2f:worker:deleted'
+ * - updateWorkerStatus() → emit 'b2f:worker:status_changed'
+ * - recordHeartbeat() → emit 'b2f:worker:heartbeat'
+ * - updateWorkerCapacity() → emit 'b2f:worker:capacity_changed'
  *
  * ===========================================================================================
  */
 
 export class WorkersService {
 	constructor(
-		private readonly orchestratorRepository: OrchestratorRepository,
+		private readonly orchestratorClient: OrchestratorClient,
 		private readonly eventBroadcaster: EventBroadcaster
 	) {}
 
@@ -46,7 +47,7 @@ export class WorkersService {
 	 */
 	async getWorkersData(): Promise<WorkersData> {
 		try {
-			const stats = await this.orchestratorRepository.getStats();
+			const stats = await this.orchestratorClient.getStats();
 
 			// Transform workers list
 			// Note: All workers in the list are connected (disconnected workers are removed)
@@ -86,7 +87,7 @@ export class WorkersService {
 			};
 
 			return workersData;
-		} catch (error) {
+		} catch (_error) {
 			// Orchestrator is offline - return empty workers data
 			return {
 				timestamp: new Date().toISOString(),
@@ -110,7 +111,7 @@ export class WorkersService {
 
 	/**
 	 * Create a new worker (PLACEHOLDER - not implemented)
-	 * When implemented, emit 'worker:created' event
+	 * When implemented, emit 'b2f:worker:created' event
 	 *
 	 * @example
 	 * ```typescript
@@ -119,7 +120,7 @@ export class WorkersService {
 	 *     const worker = await this.orchestratorRepository.createWorker(data);
 	 *
 	 *     // Emit event AFTER successful creation
-	 *     this.eventBroadcaster.broadcast('worker:created', worker);
+	 *     this.eventBroadcaster.broadcast('b2f:worker:created', worker);
 	 *
 	 *     return worker;
 	 *   } catch (error) {
@@ -132,7 +133,7 @@ export class WorkersService {
 
 	/**
 	 * Update worker status (PLACEHOLDER - not implemented)
-	 * When implemented, emit 'worker:status_changed' event
+	 * When implemented, emit 'b2f:worker:status_changed' event
 	 *
 	 * @example
 	 * ```typescript
@@ -141,7 +142,7 @@ export class WorkersService {
 	 *     const worker = await this.orchestratorRepository.updateWorkerStatus(workerId, status);
 	 *
 	 *     // Emit event AFTER successful update
-	 *     this.eventBroadcaster.broadcast('worker:status_changed', {
+	 *     this.eventBroadcaster.broadcast('b2f:worker:status_changed', {
 	 *       workerId: worker.workerId,
 	 *       status: worker.state,
 	 *     });
@@ -157,7 +158,7 @@ export class WorkersService {
 
 	/**
 	 * Record worker heartbeat (PLACEHOLDER - not implemented)
-	 * When implemented, emit 'worker:heartbeat' event
+	 * When implemented, emit 'b2f:worker:heartbeat' event
 	 *
 	 * @example
 	 * ```typescript
@@ -170,7 +171,7 @@ export class WorkersService {
 	 *     const worker = await this.orchestratorRepository.getWorker(workerId);
 	 *
 	 *     // Emit heartbeat event (periodic health check)
-	 *     this.eventBroadcaster.broadcast('worker:heartbeat', {
+	 *     this.eventBroadcaster.broadcast('b2f:worker:heartbeat', {
 	 *       workerId,
 	 *       timestamp,
 	 *       status: worker.state,
@@ -185,7 +186,7 @@ export class WorkersService {
 
 	/**
 	 * Update worker capacity (PLACEHOLDER - not implemented)
-	 * When implemented, emit 'worker:capacity_changed' event
+	 * When implemented, emit 'b2f:worker:capacity_changed' event
 	 *
 	 * @example
 	 * ```typescript
@@ -194,7 +195,7 @@ export class WorkersService {
 	 *     const worker = await this.orchestratorRepository.updateWorkerCapacity(workerId, capacity);
 	 *
 	 *     // Emit event AFTER successful update
-	 *     this.eventBroadcaster.broadcast('worker:capacity_changed', {
+	 *     this.eventBroadcaster.broadcast('b2f:worker:capacity_changed', {
 	 *       workerId: worker.workerId,
 	 *       capacity,
 	 *     });
@@ -210,7 +211,7 @@ export class WorkersService {
 
 	/**
 	 * Delete worker (PLACEHOLDER - not implemented)
-	 * When implemented, emit 'worker:deleted' event
+	 * When implemented, emit 'b2f:worker:deleted' event
 	 *
 	 * @example
 	 * ```typescript
@@ -219,7 +220,7 @@ export class WorkersService {
 	 *     await this.orchestratorRepository.deleteWorker(workerId);
 	 *
 	 *     // Emit event AFTER successful deletion
-	 *     this.eventBroadcaster.broadcast('worker:deleted', {
+	 *     this.eventBroadcaster.broadcast('b2f:worker:deleted', {
 	 *       workerId,
 	 *       deletedAt: Date.now(),
 	 *     } as any); // Type assertion needed as Worker requires all fields

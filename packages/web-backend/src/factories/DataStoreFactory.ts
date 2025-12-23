@@ -1,4 +1,5 @@
 import type { OrchestratorClient } from 'orchestrator-adapters';
+import { getOrchestratorRestUrl } from 'shared-common/PortCalculator.js';
 
 import type { Book, Ingredient } from '@app/shared';
 
@@ -67,6 +68,18 @@ export class DataStoreFactory {
 	}
 
 	/**
+	 * Get orchestrator URL from environment or calculate from WORKSPACE_ID/PROJECT_ID
+	 */
+	private getOrchestratorUrl(): string {
+		if (process.env.ORCHESTRATOR_URL) {
+			return process.env.ORCHESTRATOR_URL;
+		}
+
+		// Fall back to calculating from WORKSPACE_ID and PROJECT_ID
+		return getOrchestratorRestUrl('localhost');
+	}
+
+	/**
 	 * Get or create IngredientsService
 	 */
 	getIngredientsService(): IngredientsService {
@@ -107,8 +120,8 @@ export class DataStoreFactory {
 	 */
 	getDashboardService(): DashboardService {
 		if (!this.dashboardService) {
-			// Get orchestrator URL from environment or default to localhost
-			const orchestratorUrl = process.env.ORCHESTRATOR_URL || 'http://localhost:3737';
+			// Get orchestrator URL from environment or calculate from WORKSPACE_ID/PROJECT_ID
+			const orchestratorUrl = this.getOrchestratorUrl();
 
 			// Create OrchestratorRepository with 5s cache TTL
 			const cacheTtlMs = 5000;
@@ -126,18 +139,11 @@ export class DataStoreFactory {
 	 */
 	getWorkersService(): WorkersService {
 		if (!this.workersService) {
-			// Get orchestrator URL from environment or default to localhost
-			const orchestratorUrl = process.env.ORCHESTRATOR_URL || 'http://localhost:3737';
-
-			// Create OrchestratorRepository with 5s cache TTL
-			const cacheTtlMs = 5000;
-			const orchestratorRepo = new OrchestratorRepository(orchestratorUrl, cacheTtlMs);
-
 			// Get EventBroadcaster
 			const eventBroadcaster = this.getEventBroadcaster();
 
-			// Create WorkersService with EventBroadcaster
-			this.workersService = new WorkersService(orchestratorRepo, eventBroadcaster);
+			// Create WorkersService with OrchestratorClient (already connected)
+			this.workersService = new WorkersService(this.orchestratorClient, eventBroadcaster);
 		}
 
 		return this.workersService;
@@ -148,8 +154,8 @@ export class DataStoreFactory {
 	 */
 	getTasksService(): TasksService {
 		if (!this.tasksService) {
-			// Get orchestrator URL from environment or default to localhost
-			const orchestratorUrl = process.env.ORCHESTRATOR_URL || 'http://localhost:3737';
+			// Get orchestrator URL from environment or calculate from WORKSPACE_ID/PROJECT_ID
+			const orchestratorUrl = this.getOrchestratorUrl();
 
 			// Create OrchestratorRepository with 5s cache TTL
 			const cacheTtlMs = 5000;

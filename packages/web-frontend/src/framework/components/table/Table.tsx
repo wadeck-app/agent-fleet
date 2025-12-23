@@ -74,6 +74,9 @@ export interface TableProps<T> {
 	loading?: boolean;
 	loadingMessage?: string;
 
+	// Initial loading state (show skeleton rows)
+	initialLoading?: boolean;
+
 	// Refreshing state (blur effect while data is being fetched)
 	refreshing?: boolean;
 
@@ -109,6 +112,7 @@ export function Table<T>({
 	emptyMessage = 'No data available',
 	loading = false,
 	loadingMessage = 'Loading...',
+	initialLoading = false,
 	refreshing = false,
 	deleting = false,
 	pagination,
@@ -227,6 +231,7 @@ export function Table<T>({
 							columns={columnsWithSort}
 							getItemId={getItemId}
 							loading={loading}
+							initialLoading={initialLoading}
 							refreshing={refreshing}
 							deleting={deleting}
 							emptyMessage={emptyMessage}

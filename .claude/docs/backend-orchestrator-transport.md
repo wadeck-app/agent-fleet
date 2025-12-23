@@ -1,36 +1,33 @@
-# Backend-Orchestrator Transport Layer - Architecture Overview
+# Backend-Orchestrator Architecture - Embedded Mode
 
 ## Table of Contents
 
 - [Introduction](#introduction)
-- [Architecture Patterns](#architecture-patterns)
+- [Architecture Overview](#architecture-overview)
 - [Package Structure](#package-structure)
-- [Communication Protocols](#communication-protocols)
-- [Adapter Pattern](#adapter-pattern)
-- [Mode Comparison](#mode-comparison)
-- [Request-Response Flow](#request-response-flow)
-- [Event Streaming Flow](#event-streaming-flow)
+- [Library Mode](#library-mode)
+- [Communication Flow](#communication-flow)
 - [Design Decisions](#design-decisions)
 
 ---
 
 ## Introduction
 
-The Backend-Orchestrator transport layer enables flexible communication between the web backend and the orchestrator, supporting both **embedded** (library mode) and **remote** (client-server) deployment architectures.
+The Backend-Orchestrator architecture uses an **embedded orchestrator** that runs in the same process as the backend. This provides zero-latency communication and simplified deployment.
 
 ### Goals
 
-1. **Flexible Deployment**: Support both embedded and distributed architectures
-2. **Zero-Overhead Library Mode**: Direct method calls when co-located
-3. **Reliable Remote Mode**: Multiple transport protocols with auto-fallback
-4. **Type Safety**: End-to-end type safety with shared contracts
-5. **Testability**: Mock implementations for fast parallel testing
+1. **Simplified Deployment**: Single process, no network configuration
+2. **Zero-Overhead**: Direct method calls with no serialization
+3. **Type Safety**: End-to-end type safety with shared contracts
+4. **Testability**: Mock implementations for fast parallel testing
+5. **Reliability**: No network failures between backend and orchestrator
 
 ---
 
-## Architecture Patterns
+## Architecture Overview
 
-### Library Mode (Embedded)
+### Embedded Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -48,534 +45,247 @@ The Backend-Orchestrator transport layer enables flexible communication between 
 │                       │   • WorkerWS Server    │           │
 │                       │   • StateManager       │           │
 │                       └────────────────────────┘           │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+│                                    │                        │
+│                                    │ WebSocket              │
+└────────────────────────────────────┼────────────────────────┘
+                                     ↓
+                          ┌──────────────────┐
+                          │  Workers         │
+                          │  (W1, W2, W3...) │
+                          └──────────────────┘
 ```
 
-**Characteristics**:
+**Key Points:**
 
-- **Zero serialization overhead**: Direct JavaScript method calls
-- **No network latency**: In-process communication
-- **Simpler deployment**: Single process, single container
-- **Lower operational complexity**: Fewer moving parts
-
----
-
-### Remote Mode (Distributed)
-
-```
-┌──────────────────────────┐           ┌────────────────────────────┐
-│   Backend Process        │           │  Orchestrator-Server       │
-│                          │           │                            │
-│  ┌────────────────────┐  │           │  ┌──────────────────────┐ │
-│  │  Backend           │  │           │  │  OrchestratorRequest │ │
-│  │  Controllers       │  │           │  │  Handler             │ │
-│  └────────────────────┘  │           │  └──────────────────────┘ │
-│            │             │           │            │              │
-│            ↓             │           │            ↓              │
-│  ┌────────────────────┐  │           │  ┌──────────────────────┐ │
-│  │  RemoteAdapter     │  │           │  │  Orchestrator        │ │
-│  │                    │  │           │  │  • TaskManager       │ │
-│  └────────────────────┘  │           │  │  • WorkerWS Server   │ │
-│            │             │           │  │  • StateManager      │ │
-│            ↓             │           │  └──────────────────────┘ │
-│  ┌────────────────────┐  │           │            │              │
-│  │  Transport Layer   │  │  HTTP/WS  │  ┌──────────────────────┐ │
-│  │  • WebSocket       │◄─┼───────────┼─>│  Transport Endpoints │ │
-│  │  • REST+SSE        │  │           │  │  • WebSocket         │ │
-│  │  • REST+LongPoll   │  │           │  │  • REST              │ │
-│  └────────────────────┘  │           │  │  • SSE               │ │
-│                          │           │  │  • Long-polling      │ │
-└──────────────────────────┘           │  └──────────────────────┘ │
-                                       │                            │
-                                       │  ┌──────────────────────┐ │
-                                       │  │  OrchestratorEvent   │ │
-                                       │  │  Broadcaster         │ │
-                                       │  └──────────────────────┘ │
-                                       │                            │
-                                       └────────────────────────────┘
-```
-
-**Characteristics**:
-
-- **Horizontal scalability**: Multiple backend instances
-- **Independent deployment**: Backend and orchestrator can be scaled/updated separately
-- **Higher operational complexity**: Network configuration, health checks, monitoring
-- **Fault tolerance**: Orchestrator failure doesn't crash backend
+- Backend and Orchestrator in same process
+- Direct method calls (no network overhead)
+- Workers connect via WebSocket to embedded orchestrator
+- Simplified deployment (single container/process)
 
 ---
 
 ## Package Structure
 
-### orchestrator-adapters
+### `packages/orchestrator`
 
-**Purpose**: Adapter package providing OrchestratorClient interface with library and remote implementations.
+Core orchestrator logic (task management, worker coordination, state management).
 
-**Location**: `packages/orchestrator-adapters/`
+**Location**: `packages/orchestrator/src/`
 
-**Dependencies**:
+### `packages/orchestrator-adapters`
 
-```json
-{
-	"dependencies": {
-		"shared-common": "*",
-		"shared-orch-backend": "*",
-		"ws": "^8.16.0"
-	},
-	"peerDependencies": {
-		"orchestrator": "*"
-	},
-	"peerDependenciesMeta": {
-		"orchestrator": { "optional": true }
-	}
-}
-```
+Adapter layer for connecting backend to orchestrator.
 
-**Structure**:
+**Key Files:**
 
-```
-orchestrator-adapters/
-├── OrchestratorClient.ts          # Interface
-├── OrchestratorClientConfig.ts    # Configuration types
-├── OrchestratorClientFactory.ts   # Factory with dynamic imports
-├── adapters/
-│   ├── LibraryAdapter.ts          # Direct method delegation
-│   └── RemoteAdapter.ts           # Network-based client
-├── transport/
-│   ├── OrchestratorTransport.ts   # Transport interface
-│   ├── WebSocketTransport.ts      # Bidirectional WebSocket
-│   ├── RestSseTransport.ts        # REST + SSE
-│   ├── RestLongPollingTransport.ts # REST + Long-polling
-│   └── TransportFactory.ts        # Auto-fallback factory
-├── __mocks__/
-│   └── MockOrchestratorClient.ts  # Test double
-├── build.library.mjs              # Library mode build
-└── build.remote.mjs               # Remote mode build
-```
+- `OrchestratorClient.ts` - Interface for all adapters
+- `LibraryAdapter.ts` - Direct method calls (embedded mode)
+- `OrchestratorClientFactory.ts` - Creates appropriate adapter
+- `__mocks__/MockOrchestrator.ts` - Mock for unit tests
+
+**Location**: `packages/orchestrator-adapters/src/`
 
 ---
 
-### orchestrator-server
+## Library Mode
 
-**Purpose**: Standalone HTTP/WebSocket server exposing orchestrator functionality.
-
-**Location**: `packages/orchestrator-server/`
-
-**Dependencies**:
-
-```json
-{
-	"dependencies": {
-		"orchestrator": "*",
-		"shared-orch-backend": "*",
-		"@fastify/cors": "^11.1.0",
-		"@fastify/websocket": "^11.0.0",
-		"fastify": "^5.6.2",
-		"dotenv": "^16.4.5"
-	}
-}
-```
-
-**Structure**:
-
-```
-orchestrator-server/
-├── server.ts                            # Main Fastify app
-├── OrchestratorRequestHandler.ts        # Routes B→O requests to TaskManager
-├── OrchestratorEventBroadcaster.ts      # Maps StateManager events to O2B events
-└── endpoints/
-    ├── WebSocketRoute.ts                # GET /orchestrator/ws
-    ├── RestRoute.ts                     # POST /orchestrator/request
-    ├── SseRoute.ts                      # GET /orchestrator/events
-    └── LongPollingRoute.ts              # GET /orchestrator/poll
-```
-
----
-
-## Communication Protocols
-
-### Backend → Orchestrator (B2O) Requests
-
-**7 Request Methods** (defined in `B2OContract`):
-
-1. `createTask(description, metadata)` → Task
-2. `getTask(taskId)` → Task | null
-3. `getTasks(filters)` → Task[]
-4. `getWorkers(filters)` → WorkerInfo[]
-5. `getStats()` → OrchestratorStats
-6. `updateConfig(config)` → void
-7. `renameWorker(workerId, name)` → void
-
-**Request Format**:
+### Configuration
 
 ```typescript
-interface B2ORequest {
-	id: string; // Correlation ID
-	method: B2OMethod; // One of 7 methods
-	params: Record<string, unknown>; // Method parameters
-}
+// packages/web-backend/src/server.ts
+const orchestratorClient = await OrchestratorClientFactory.create({
+	mode: 'library',
+	wsPort: 3738,
+	restPort: 3737,
+});
+
+await orchestratorClient.connect();
 ```
 
-**Response Format**:
+### How It Works
 
-```typescript
-interface B2OResponse {
-	id: string; // Matches request ID
-	result?: unknown; // Success result
-	error?: {
-		// Error details
-		code: string;
-		message: string;
-	};
-}
-```
+1. **Factory creates Orchestrator instance**
+    - Dynamically imports `orchestrator` package
+    - Creates new `Orchestrator({ wsPort, restPort })`
+    - Starts the orchestrator
+
+2. **LibraryAdapter wraps orchestrator**
+    - Provides `OrchestratorClient` interface
+    - Direct method calls to orchestrator instance
+    - No network communication
+
+3. **Zero latency**
+    - In-process calls: ~0.01ms
+    - No serialization overhead
+    - Shared memory access
+
+### Benefits
+
+✅ **Performance**: Direct method calls (<1ms latency)
+✅ **Simplicity**: Single process, no network configuration
+✅ **Reliability**: No network failures
+✅ **Deployment**: Single Docker container
+✅ **Development**: One process to debug
 
 ---
 
-### Orchestrator → Backend (O2B) Events
+## Communication Flow
 
-**11 Event Types** (defined in `O2BEventTypes`):
-
-1. `task.created` - New task created
-2. `task.updated` - Task state changed
-3. `task.assigned` - Task assigned to worker
-4. `task.completed` - Task finished
-5. `task.failed` - Task execution failed
-6. `worker.registered` - Worker connected
-7. `worker.disconnected` - Worker lost connection
-8. `worker.status` - Worker status changed (busy/idle)
-9. `orchestrator.stats` - Stats update
-10. `system.error` - System-level error
-11. `system.warning` - System warning
-
-**Event Format**:
-
-```typescript
-interface O2BEvent {
-	type: O2BEventType;
-	data: O2BEventData<typeof type>;
-	timestamp: string; // ISO 8601
-}
-```
-
----
-
-## Adapter Pattern
-
-### OrchestratorClient Interface
-
-All adapters implement this interface:
-
-```typescript
-interface OrchestratorClient {
-	// Lifecycle
-	connect(): Promise<void>;
-	disconnect(): Promise<void>;
-
-	// B→O Request Methods (7 methods)
-	createTask(description: string, metadata?: Record<string, unknown>): Promise<Task>;
-	getTask(taskId: string): Promise<Task | null>;
-	getTasks(filters?: TaskFilters): Promise<Task[]>;
-	getWorkers(filters?: WorkerFilters): Promise<WorkerInfo[]>;
-	getStats(): Promise<OrchestratorStats>;
-	updateConfig(config: OrchestratorConfig): Promise<void>;
-	renameWorker(workerId: string, name: string): Promise<void>;
-
-	// O→B Event Subscription
-	on<T extends O2BEventType>(event: T, handler: (data: O2BEventData<T>) => void): void;
-
-	off<T extends O2BEventType>(event: T, handler: (data: O2BEventData<T>) => void): void;
-}
-```
-
----
-
-### LibraryAdapter Implementation
-
-**Direct delegation** to TaskManager and WorkerWebSocketServer:
-
-```typescript
-class LibraryOrchestratorAdapter implements OrchestratorClient {
-	constructor(private orchestrator: Orchestrator) {}
-
-	async createTask(description: string, metadata?: Record<string, unknown>): Promise<Task> {
-		// Direct method call - zero overhead
-		return this.orchestrator.getTaskManager().createTask(description, metadata);
-	}
-
-	on<T extends O2BEventType>(event: T, handler: (data: O2BEventData<T>) => void): void {
-		// Listen to StateManager events directly
-		const stateManager = this.orchestrator.getTaskManager().stateManager;
-		stateManager.on(mapO2BToStateEvent(event), handler);
-	}
-}
-```
-
-**Benefits**:
-
-- No serialization overhead
-- Synchronous method calls (wrapped in Promises for consistency)
-- Type-safe at compile time
-
----
-
-### RemoteAdapter Implementation
-
-**Network-based** communication via transport layer:
-
-```typescript
-class RemoteOrchestratorAdapter implements OrchestratorClient {
-	private transport: OrchestratorTransport;
-	private eventEmitter = new EventEmitter();
-
-	async connect(): Promise<void> {
-		this.transport = await TransportFactory.create(this.config);
-		await this.transport.connect();
-
-		// Route O→B events from transport to local EventEmitter
-		this.transport.onEvent((event: O2BEvent) => {
-			this.eventEmitter.emit(event.type, event.data);
-		});
-	}
-
-	async createTask(description: string, metadata?: Record<string, unknown>): Promise<Task> {
-		const response = await this.transport.request({
-			id: generateRequestId(),
-			method: 'createTask',
-			params: { description, metadata },
-		});
-
-		if (response.error) {
-			throw new Error(`createTask failed: ${response.error.message}`);
-		}
-
-		return response.result as Task;
-	}
-
-	on<T extends O2BEventType>(event: T, handler: (data: O2BEventData<T>) => void): void {
-		if (this.eventEmitter.listenerCount(event) === 0) {
-			this.transport.subscribe(event); // Subscribe on first listener
-		}
-		this.eventEmitter.on(event, handler);
-	}
-}
-```
-
-**Features**:
-
-- Request/response correlation with IDs
-- Event subscription management (subscribe/unsubscribe)
-- Network error handling
-- Reconnection logic (in transport layer)
-
----
-
-## Mode Comparison
-
-| Feature                    | Library Mode                   | Remote Mode                       |
-| -------------------------- | ------------------------------ | --------------------------------- |
-| **Deployment**             | Single process                 | Multiple processes                |
-| **Latency**                | ~0ms (direct calls)            | 1-10ms (network)                  |
-| **Scalability**            | Vertical (single instance)     | Horizontal (multiple backends)    |
-| **Fault Tolerance**        | Shared fate (same process)     | Independent processes             |
-| **Operational Complexity** | Low                            | Medium-High                       |
-| **Resource Usage**         | Lower (shared memory)          | Higher (separate processes)       |
-| **Development Experience** | Simpler (single process)       | More complex (multi-process)      |
-| **Hot Reload**             | Single restart                 | Backend can restart independently |
-| **Best For**               | Development, small deployments | Production, high availability     |
-
----
-
-## Request-Response Flow
-
-### Library Mode Flow
+### Request-Response (Backend → Orchestrator)
 
 ```
-Controller
+Backend Controller
     │
-    ├─> createTask()
-    │       │
-    │       └─> LibraryAdapter.createTask()
-    │               │
-    │               └─> orchestrator.getTaskManager().createTask()
-    │                       │
-    │                       └─> [Direct method execution]
-    │                               │
-    │                               └─> Return Task
+    │ client.createTask('description')
+    ↓
+LibraryAdapter
     │
-    └─> [Response returned synchronously]
-```
-
-**Performance**: <1ms (no serialization, no network)
-
----
-
-### Remote Mode Flow
-
-```
-Controller
+    │ orchestrator.getTaskManager().createTask(...)
+    ↓
+Orchestrator TaskManager
     │
-    ├─> createTask()
-    │       │
-    │       └─> RemoteAdapter.createTask()
-    │               │
-    │               ├─> Build B2ORequest { id, method, params }
-    │               │
-    │               └─> transport.request(request)
-    │                       │
-    │                       └─> WebSocketTransport.request()
-    │                               │
-    │                               ├─> Send JSON over WebSocket
-    │                               │
-    │                               └─> [Network]
-    │                                       │
-    │                                       ↓
-    [Orchestrator Server]
+    │ return Task object
+    ↓
+Backend Controller
+```
+
+**Latency**: ~0.01ms (direct method call)
+
+### Event Streaming (Orchestrator → Backend)
+
+```
+Orchestrator StateManager
     │
-    ├─> WebSocketRoute receives message
-    │       │
-    │       └─> OrchestratorRequestHandler.handleRequest()
-    │               │
-    │               └─> orchestrator.getTaskManager().createTask()
-    │                       │
-    │                       └─> Return Task
+    │ emit('TASK_CREATED', { task })
+    ↓
+LibraryAdapter (EventEmitter)
     │
-    └─> Build B2OResponse { id, result }
-            │
-            └─> Send JSON over WebSocket
-                    │
-                    └─> [Network]
-                            │
-                            ↓
-    WebSocketTransport.receive()
-            │
-            └─> Resolve Promise with result
-                    │
-                    └─> Return Task to Controller
-```
-
-**Performance**: 1-10ms (serialization + network)
-
----
-
-## Event Streaming Flow
-
-### Library Mode Events
-
-```
-StateManager.emit('TASK_CREATED', task)
+    │ emit('task.created', { task })
+    ↓
+Backend (OrchestratorEventBridge)
     │
-    └─> LibraryAdapter internal listener
-            │
-            └─> eventEmitter.emit('task.created', data)
-                    │
-                    └─> Controller handler invoked directly
+    │ eventBroadcaster.broadcast('o2b.task.created', { task })
+    ↓
+Frontend (via WebSocket)
 ```
 
-**Latency**: <1ms (in-process event)
+**Event Types:**
 
----
-
-### Remote Mode Events
-
-```
-StateManager.emit('TASK_CREATED', task)
-    │
-    └─> OrchestratorEventBroadcaster listener
-            │
-            ├─> Map StateEvent to O2BEvent
-            │
-            └─> broadcast({ type: 'task.created', data, timestamp })
-                    │
-                    └─> WebSocketRoute.send(JSON)
-                            │
-                            └─> [Network]
-                                    │
-                                    ↓
-    WebSocketTransport.receive()
-            │
-            ├─> Parse JSON to O2BEvent
-            │
-            └─> RemoteAdapter.eventEmitter.emit('task.created', data)
-                    │
-                    └─> Controller handler invoked
-```
-
-**Latency**: 1-10ms (serialization + network)
+- `TASK_CREATED` → `task.created`
+- `TASK_UPDATED` → `task.updated`
+- `WORKER_CONNECTED` → `worker.connected`
+- `WORKER_DISCONNECTED` → `worker.disconnected`
 
 ---
 
 ## Design Decisions
 
-### Why Adapter Pattern?
+### Why Embedded Mode Only?
 
-**Problem**: Need to support two fundamentally different communication mechanisms (direct calls vs network).
+**Rationale:**
 
-**Solution**: Adapter pattern with single interface (`OrchestratorClient`).
+1. **99% of deployments don't need remote mode** - Single backend instance is sufficient
+2. **Complexity reduction** - Removed ~2500 lines of transport layer code
+3. **Better performance** - Zero-latency direct calls
+4. **Simpler operations** - No network configuration, authentication, retries
+5. **Future flexibility** - Can add dedicated relays if needed
 
-**Benefits**:
+### What About Horizontal Scaling?
 
-- Controllers remain unchanged
-- Mode switching via configuration only
-- Easy to add new modes (e.g., gRPC adapter)
+**Options for scaling:**
+
+**Option A: Vertical Scaling (Recommended)**
+
+- Single Backend+Orchestrator with more resources
+- Sufficient for most use cases
+
+**Option B: Multiple Independent Instances**
+
+- Each Backend+Orchestrator manages its own worker pool
+- Partition by project/tenant
+- No coordination needed
+
+**Option C: Dedicated Relays (If Really Needed)**
+
+- Create lightweight relay components for specific scenarios
+- Frontend-Backend relay for internet-exposed deployments
+- Orchestrator-Worker relay for multi-network setups
+- See `.claude/docs/relay-architecture.md`
+
+### What About Multi-Network Deployments?
+
+Use **dedicated relays** instead of remote mode:
+
+- **Frontend-Backend Relay**: Proxy between internet and local network
+- **Worker Relay**: Bridge between orchestrator and workers in different networks
+
+These are simpler, more targeted solutions than a full remote mode.
 
 ---
 
-### Why Optional Peer Dependency?
+## Testing
 
-**Problem**: Library mode needs orchestrator package, remote mode doesn't.
+### Test Mode
 
-**Solution**: orchestrator as optional peer dependency in orchestrator-adapters.
-
-**Benefits**:
-
-- Remote mode builds don't include orchestrator (~500KB savings)
-- Library mode uses dynamic import to resolve at runtime
-- Type checking works in development (orchestrator in devDependencies)
-
----
-
-### Why Multiple Transport Protocols?
-
-**Problem**: Different network environments have different constraints.
-
-**Solution**: 4 transport implementations with auto-fallback.
-
-**Fallback Chain**:
-
-1. **WebSocket** (best: bidirectional, low latency)
-   ↓ (if blocked by firewall)
-2. **REST + SSE** (good: unidirectional events, HTTP-based)
-   ↓ (if SSE not supported)
-3. **REST + Long-polling** (ok: maximum compatibility, higher latency)
-
----
-
-### Why No Business Logic Duplication?
-
-**Problem**: 4 transport endpoints could duplicate request handling logic.
-
-**Solution**: Single `OrchestratorRequestHandler` used by all endpoints.
-
-**Architecture**:
-
-```
-WebSocketRoute  ─┐
-RestRoute       ─┼─> OrchestratorRequestHandler ─> TaskManager
-SseRoute        ─┤
-LongPollingRoute ┘
+```typescript
+// In tests
+const client = await OrchestratorClientFactory.create({
+	mode: 'test',
+	mockOrchestrator: createMockOrchestrator(),
+});
 ```
 
-**Benefits**:
+**Benefits:**
 
-- DRY principle (single source of truth)
-- Consistent behavior across transports
-- Easier testing and maintenance
+- No real orchestrator started
+- No ports allocated
+- Fast parallel tests
+- Deterministic behavior
+
+### Mock Implementation
+
+```typescript
+import { createMockOrchestrator, createMockTask } from 'orchestrator-adapters';
+
+const mockOrch = createMockOrchestrator({
+	taskManager: {
+		createTask: vi.fn().mockResolvedValue(createMockTask({ id: 'test-123' })),
+	},
+});
+```
+
+**Location**: `packages/orchestrator-adapters/src/__mocks__/MockOrchestrator.ts`
 
 ---
 
-## Next Steps
+## Migration from Remote Mode
 
-- See [OrchestratorClient Usage Guide](./orchestrator-client-usage.md) for implementation examples
-- See [Configuration Reference](./orchestrator-client-configuration.md) for environment variables
-- See [Migration Guide](./migration-guide-orchestrator-client.md) for transitioning to this architecture
+If you previously used remote mode, migration is simple:
+
+1. Remove `ORCHESTRATOR_MODE` and `ORCHESTRATOR_URL` from `.env`
+2. Keep only `ORCHESTRATOR_WS_PORT` and `ORCHESTRATOR_REST_PORT`
+3. Restart backend - orchestrator starts automatically
+
+**Before:**
+
+```bash
+ORCHESTRATOR_MODE=remote
+ORCHESTRATOR_URL=http://localhost:3737
+ORCHESTRATOR_TRANSPORT=websocket
+```
+
+**After:**
+
+```bash
+ORCHESTRATOR_WS_PORT=3738
+ORCHESTRATOR_REST_PORT=3737
+```
+
+---
+
+## References
+
+- Implementation: `packages/orchestrator-adapters/src/`
+- Configuration: `packages/web-backend/.env.example`
+- Tests: `packages/orchestrator-adapters/src/**/*.test.ts`
+- Backend Integration: `packages/web-backend/src/server.ts:42-60`

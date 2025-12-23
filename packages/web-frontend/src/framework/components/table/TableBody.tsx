@@ -4,12 +4,14 @@ import { LoadingDots } from '@framework/components/loading/LoadingDots';
 
 import { TableColumn } from './Table';
 import { TableRow } from './TableRow';
+import { TableSkeleton } from './TableSkeleton';
 
 export interface TableBodyProps<T> {
 	data: T[];
 	columns: TableColumn<T>[];
 	getItemId: (item: T) => string;
 	loading?: boolean;
+	initialLoading?: boolean;
 	refreshing?: boolean;
 	deleting?: boolean;
 	emptyMessage?: string;
@@ -28,6 +30,7 @@ export function TableBody<T>({
 	columns,
 	getItemId,
 	loading = false,
+	initialLoading = false,
 	refreshing = false,
 	deleting = false,
 	emptyMessage = 'No data available',
@@ -40,7 +43,14 @@ export function TableBody<T>({
 	renderActions,
 	onToggleSelection,
 }: TableBodyProps<T>) {
-	// Loading state
+	// Initial loading state (show skeleton rows)
+	if (initialLoading) {
+		return (
+			<TableSkeleton columns={columns} rowCount={10} selectable={selectable} renderActions={!!renderActions} />
+		);
+	}
+
+	// Loading state (show loading spinner)
 	if (loading) {
 		return (
 			<tbody>

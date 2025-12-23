@@ -27,7 +27,15 @@ export default tseslint.config(
 		rules: {
 			'@typescript-eslint/no-explicit-any': 'warn',
 			'@typescript-eslint/explicit-function-return-type': 'off',
-			'@typescript-eslint/no-unused-vars': 'warn',
+			'@typescript-eslint/no-unused-vars': [
+				'error',
+				{
+					argsIgnorePattern: '^_',
+					varsIgnorePattern: '^_',
+					caughtErrorsIgnorePattern: '^_',
+					destructuredArrayIgnorePattern: '^_',
+				},
+			],
 			// @formatter:off
 			// Forbid barrel exports with export * (architectural requirement)
 			// See: .claude/agents/backend-review.md:33
@@ -40,6 +48,14 @@ export default tseslint.config(
 				},
 			],
 			// @formatter:on
+		},
+	},
+
+	// Rules for test files
+	{
+		files: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+		rules: {
+			'@typescript-eslint/no-explicit-any': 'off', // Autoriser 'any' dans les tests
 		},
 	},
 

@@ -55,11 +55,11 @@ describe('EventBroadcaster', () => {
 			};
 
 			// Act
-			broadcaster.broadcast('task:created', task);
+			broadcaster.broadcast('b2f:task:created', task);
 
 			// Assert
 			expect(mockServer.broadcasts).toHaveLength(1);
-			expect(mockServer.broadcasts[0].event).toBe('task:created');
+			expect(mockServer.broadcasts[0].event).toBe('b2f:task:created');
 			expect(mockServer.broadcasts[0].data).toEqual(task);
 		});
 
@@ -86,8 +86,8 @@ describe('EventBroadcaster', () => {
 			};
 
 			// Act
-			broadcaster.broadcast('task:created', task1);
-			broadcaster.broadcast('task:created', task2);
+			broadcaster.broadcast('b2f:task:created', task1);
+			broadcaster.broadcast('b2f:task:created', task2);
 
 			// Assert
 			expect(mockServer.broadcasts).toHaveLength(2);
@@ -113,12 +113,12 @@ describe('EventBroadcaster', () => {
 			};
 
 			// Act
-			broadcaster.sendToClient(clientId, 'task:created', task);
+			broadcaster.sendToClient(clientId, 'b2f:task:created', task);
 
 			// Assert
 			expect(mockServer.clientSends).toHaveLength(1);
 			expect(mockServer.clientSends[0].clientId).toBe(clientId);
-			expect(mockServer.clientSends[0].event).toBe('task:created');
+			expect(mockServer.clientSends[0].event).toBe('b2f:task:created');
 			expect(mockServer.clientSends[0].data).toEqual(task);
 		});
 
@@ -136,7 +136,7 @@ describe('EventBroadcaster', () => {
 			};
 
 			// Act
-			broadcaster.sendToClient(clientId, 'task:created', task);
+			broadcaster.sendToClient(clientId, 'b2f:task:created', task);
 
 			// Assert - should not record the send
 			expect(mockServer.clientSends).toHaveLength(0);
@@ -147,14 +147,14 @@ describe('EventBroadcaster', () => {
 		it('should send event to all sessions of a user', async () => {
 			// Arrange
 			const userId = 'user-1';
-			const { accessToken, expiresAt } = await authService.createAccessToken(userId);
+			const { accessToken } = await authService.createAccessToken(userId);
 
 			// Create two sessions for the same user (multi-device)
-			const session1 = await sessionManager.authenticateConnection('client-1', {
+			await sessionManager.authenticateConnection('client-1', {
 				headers: { cookie: `access_token=${accessToken}` },
 			} as any);
 
-			const session2 = await sessionManager.authenticateConnection('client-2', {
+			await sessionManager.authenticateConnection('client-2', {
 				headers: { cookie: `access_token=${accessToken}` },
 			} as any);
 
@@ -173,7 +173,7 @@ describe('EventBroadcaster', () => {
 			};
 
 			// Act
-			broadcaster.sendToUser(userId, 'task:created', task);
+			broadcaster.sendToUser(userId, 'b2f:task:created', task);
 
 			// Assert
 			expect(mockServer.clientSends).toHaveLength(2);
@@ -197,7 +197,7 @@ describe('EventBroadcaster', () => {
 			};
 
 			// Act
-			broadcaster.sendToUser(userId, 'task:created', task);
+			broadcaster.sendToUser(userId, 'b2f:task:created', task);
 
 			// Assert - should not crash, just not send anything
 			expect(mockServer.clientSends).toHaveLength(0);

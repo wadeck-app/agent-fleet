@@ -189,7 +189,7 @@ export default class AuthController implements LazyController<typeof AUTH_API_RO
 					userId,
 					expiresAt,
 				};
-			} catch (error) {
+			} catch (_error) {
 				// Token invalid or expired
 				return {
 					authenticated: false,

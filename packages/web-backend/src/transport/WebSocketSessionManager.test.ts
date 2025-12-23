@@ -1,5 +1,5 @@
 import type { IncomingMessage } from 'http';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { MockAuthService } from '../auth/MockAuthService';
 import { WebSocketSessionManager } from './WebSocketSessionManager';
@@ -212,7 +212,7 @@ describe('WebSocketSessionManager', () => {
 		});
 
 		it('should handle refresh for user with no active sessions', async () => {
-			const { accessToken, userId, refreshToken } = await authService.login('test@example.com', 'password');
+			const { userId, refreshToken } = await authService.login('test@example.com', 'password');
 
 			const { accessToken: newToken } = await authService.refreshToken(refreshToken);
 

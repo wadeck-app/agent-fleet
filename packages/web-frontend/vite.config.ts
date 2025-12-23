@@ -1,21 +1,74 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 import type { Plugin } from 'vite';
 
+// Helper function to manually load .env files in order
+// This ensures the root .env is loaded first, then local package .env overrides it
+function loadEnvFiles(basePath: string, mode: string): Record<string, string> {
+	const env: Record<string, string> = {};
+
+	// Helper to parse .env file content
+	const parseEnvFile = (content: string) => {
+		const lines = content.split('\n');
+		for (const line of lines) {
+			const trimmed = line.trim();
+			// Skip comments and empty lines
+			if (!trimmed || trimmed.startsWith('#')) continue;
+
+			const match = trimmed.match(/^([^=]+)=(.*)$/);
+			if (match) {
+				const key = match[1].trim();
+				let value = match[2].trim();
+
+				// Remove quotes if present
+				if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+					value = value.slice(1, -1);
+				}
+
+				env[key] = value;
+			}
+		}
+	};
+
+	// Load root .env first (shared configuration for all packages)
+	const rootEnvPath = path.join(basePath, '../../.env');
+	if (fs.existsSync(rootEnvPath)) {
+		const content = fs.readFileSync(rootEnvPath, 'utf-8');
+		parseEnvFile(content);
+	}
+
+	// Load package .env (overrides root .env if same variables)
+	const packageEnvPath = path.join(basePath, '.env');
+	if (fs.existsSync(packageEnvPath)) {
+		const content = fs.readFileSync(packageEnvPath, 'utf-8');
+		parseEnvFile(content);
+	}
+
+	// Load mode-specific .env (e.g., .env.development, .env.production)
+	const modeEnvPath = path.join(basePath, `.env.${mode}`);
+	if (fs.existsSync(modeEnvPath)) {
+		const content = fs.readFileSync(modeEnvPath, 'utf-8');
+		parseEnvFile(content);
+	}
+
+	return env;
+}
+
 export default defineConfig(({ mode }) => {
-	// Load env file based on `mode` in the current working directory.
-	// Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
-	const env = loadEnv(mode, process.cwd(), '');
+	// Load env files with root .env loaded first
+	const baseDir = process.cwd();
+	const env = loadEnvFiles(baseDir, mode);
 
 	// Calculate ports from PROJECT_ID for parallel development between projects
-	// PROJECT_ID=0 → Frontend:5000, Backend:3000 | WORKSPACE_ID=1 → Frontend:5010, Backend:3010
-	const projectId = parseInt(env.VITE_PROJECT_ID || '0', 10);
+	// PROJECT_ID=0 → Frontend:5000, Backend:3000 | PROJECT_ID=1 → Frontend:5010, Backend:3010
+	const projectId = parseInt(env.VITE_PROJECT_ID || env.PROJECT_ID || '0', 10);
 	// Calculate ports from WORKSPACE_ID for parallel development between workspaces
 	// WORKSPACE_ID=0 → Frontend:5000, Backend:3000 | WORKSPACE_ID=1 → Frontend:5100, Backend:3100
-	const workspaceId = parseInt(env.VITE_WORKSPACE_ID || '0', 10);
+	const workspaceId = parseInt(env.VITE_WORKSPACE_ID || env.WORKSPACE_ID || '0', 10);
 	const frontendPort = 5000 + projectId * 10 + workspaceId * 100;
 	const backendPort = 3000 + projectId * 10 + workspaceId * 100;
 
@@ -92,11 +145,6 @@ export default defineConfig(({ mode }) => {
 					target: `http://localhost:${backendPort}`,
 					changeOrigin: true,
 				},
-			},
-			// Watch for changes in shared packages sources
-			watch: {
-				// Include shared packages sources in watch
-				include: ['../shared-frontend-backend/src/**'],
 			},
 			// Explicitly allow serving files from workspace packages
 			fs: {

@@ -190,7 +190,6 @@ describe('BooksRepository', () => {
 
 		it('should combine search with author filter', async () => {
 			const query: BooksListQuery = { search: 'Pragmatic', author: 'Hunt' };
-			const allBooks = [sampleBook, anotherBook];
 			vi.mocked(mockQueryBuilder.execute).mockResolvedValue([sampleBook]);
 
 			const result = await repository.findAll(query);
@@ -204,7 +203,6 @@ describe('BooksRepository', () => {
 
 		it('should combine search with genre filter', async () => {
 			const query: BooksListQuery = { search: 'Clean', genre: 'Programming' };
-			const allBooks = [sampleBook, anotherBook];
 			vi.mocked(mockQueryBuilder.execute).mockResolvedValue([sampleBook, anotherBook]);
 
 			const result = await repository.findAll(query);

@@ -47,7 +47,7 @@ class MockReply {
 		return this;
 	}
 
-	clearCookie(name: string, options?: any) {
+	clearCookie(name: string, _options?: any) {
 		delete this.cookies[name];
 		return this;
 	}

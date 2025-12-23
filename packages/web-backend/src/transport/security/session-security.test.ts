@@ -1,5 +1,5 @@
 import type { IncomingMessage } from 'http';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { MockAuthService } from '@/auth/MockAuthService';
 

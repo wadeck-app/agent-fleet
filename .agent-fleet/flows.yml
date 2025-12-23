@@ -1,4 +1,5 @@
 simple-implement:
+    version: '1.0.0'
     name: '(Dummy) Simple Implementation'
     description: 'Ask Claude to implement something'
     workspace:
@@ -21,6 +22,7 @@ simple-implement:
           prompt: '${{ inputs.task }}'
 
 debug-local:
+    version: '1.0.0'
     name: 'Debug in Current Workspace'
     description: 'Work directly in the current directory (follow progress in your IDE)'
     workspace:
@@ -46,6 +48,7 @@ debug-local:
 #    \ /
 #     D
 test-diamond:
+    version: '1.0.0'
     name: 'Test: Diamond Pattern'
     description: 'Tests fork-join with diamond shape (A splits to B+C, then joins at D)'
     workspace:
@@ -93,6 +96,7 @@ test-diamond:
 #    /|\
 #   B C D
 test-fork:
+    version: '1.0.0'
     name: 'Test: Fork Pattern'
     description: 'Tests parallel execution with 3-way fork (A splits to B+C+D)'
     workspace:
@@ -138,6 +142,7 @@ test-fork:
 # Tests onFailure.goto with iteration tracking
 # Flow: implement → test (fails 2x, succeeds 3rd time) → done
 test-loop:
+    version: '1.0.0'
     name: 'Test: Feedback Loop (Retry Pattern)'
     description: 'Tests onFailure.goto with a test step that fails twice then succeeds'
     workspace:
@@ -180,6 +185,7 @@ test-loop:
 # Tests onFailure.goto with a review step that provides feedback
 # Flow: implement → review (fails 1st, passes 2nd) → deploy
 test-review-loop:
+    version: '1.0.0'
     name: 'Test: Review Feedback Loop'
     description: 'Tests onFailure.goto with a review step that fails once then approves'
     workspace:
@@ -222,6 +228,7 @@ test-review-loop:
 # Tests advanced loop features: multiple reviews, some skipped on retry
 # Flow: implement → (quality + security + consistency + usability) → deploy
 test-multi-review:
+    version: '1.0.0'
     name: 'Test: Multi-Review with Skip and Reset'
     description: 'Tests skipOnLoop and resetOnSuccess with parallel review steps'
     workspace:
@@ -297,6 +304,7 @@ test-multi-review:
 
 # Atomic flow: Simple echo
 test-echo:
+    version: '1.0.0'
     name: 'Test: Echo Flow'
     description: 'Simple echo flow used for testing subflow composition'
     workspace:
@@ -315,6 +323,7 @@ test-echo:
 
 # Composite flow: Calls echo twice
 test-subflow-basic:
+    version: '1.0.0'
     name: 'Test: Basic SubFlow'
     description: 'Tests basic subflow execution with inherit strategy'
     workspace:
@@ -343,6 +352,7 @@ test-subflow-basic:
 
 # Nested subflows: Test recursion depth tracking
 test-subflow-nested:
+    version: '1.0.0'
     name: 'Test: Nested SubFlows'
     description: 'Tests nested subflow execution (3 levels deep)'
     workspace:
@@ -361,6 +371,7 @@ test-subflow-nested:
 
 # Recursive flow: Countdown from N to 0
 test-recursive-countdown:
+    version: '1.0.0'
     name: 'Test: Recursive Countdown'
     description: 'Tests recursive SubFlowStep with exit condition (counts from N to 0)'
     workspace:

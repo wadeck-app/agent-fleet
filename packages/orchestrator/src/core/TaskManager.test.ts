@@ -4,7 +4,7 @@
 import { Logger } from 'shared-common/Logger.js';
 import { StateManager } from 'shared-common/StateManager.js';
 import { Storage } from 'shared-common/Storage.js';
-import { Task, TaskStatus, WorkerType } from 'shared-common/types.js';
+import { Task, TaskStatus, WorkerType } from 'shared-orch-worker/index.js';
 import { createMockStateManager, createMockTask, setupTest, setupTimers } from 'test-utils/index';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

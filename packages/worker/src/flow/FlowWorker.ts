@@ -10,12 +10,14 @@
  * - Flow execution orchestration
  */
 import { exec } from 'child_process';
+import dotenv from 'dotenv';
 import { FlowExecutionOptions, FlowExecutor } from 'flow-engine/executor/FlowExecutor.js';
 import { FlowRegistry } from 'flow-engine/registry/FlowRegistry.js';
 import type { FlowMetadata, Workspace } from 'flow-engine/types.js';
 import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager.js';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { getOrchestratorWsUrl } from 'shared-common/PortCalculator.js';
 import { Shutdownable } from 'shared-common/Shutdownable.js';
 import { createMessage, parseMessage, serializeMessage } from 'shared-common/protocol.js';
 import {
@@ -27,7 +29,7 @@ import {
 	TaskStatus,
 	WorkerType,
 	WorkerWelcomeMessage,
-} from 'shared-common/types.js';
+} from 'shared-orch-worker/index.js';
 import { fileURLToPath } from 'url';
 import WebSocket from 'ws';
 
@@ -68,6 +70,14 @@ export class FlowWorker implements Shutdownable {
 	private flowExecutionMonitor: FlowExecutionMonitor;
 	private workerUIManager: WorkerUIManager;
 
+	/**
+	 * Initialize the Flow Worker
+	 * @param wsUrl - WebSocket URL for orchestrator connection (defaults to localhost)
+	 * @param projectRoot - Project root directory (can be set via CLI flag --project-root=<path> or env var PROJECT_ROOT, defaults to process.cwd())
+	 * @param interactive - Enable interactive mode for code execution
+	 * @param preferredWorkerId - Preferred worker ID (can be set via CLI flag --worker-id=<id> or env var WORKER_ID)
+	 * @param enableUI - Enable terminal UI (defaults to true, can be disabled via --no-ui flag)
+	 */
 	constructor(
 		wsUrl?: string,
 		projectRoot: string = process.cwd(),
@@ -78,7 +88,7 @@ export class FlowWorker implements Shutdownable {
 		// Worker identity
 		this.workerId = '?'; // Will be assigned by orchestrator during Welcome
 		this.workerType = WorkerType.DEV;
-		this.wsUrl = wsUrl || 'ws://localhost:3738';
+		this.wsUrl = wsUrl || getOrchestratorWsUrl('localhost', '/ws');
 		this.preferredWorkerId = preferredWorkerId;
 
 		this.interactive = interactive;
@@ -872,6 +882,25 @@ const isMainModule = currentFilePath === mainFilePath;
 if (isMainModule) {
 	console.log('[FlowWorker] Starting Flow Worker...');
 
+	// Load environment variables from root .env and package .env files
+	// Root .env is loaded first, then package .env (which can override)
+	// Calculate paths relative to the worker's source directory structure:
+	// __dirname = packages/worker/src/flow
+	// root .env = . (project root)
+	// package .env = packages/worker
+	const __dirname = fileURLToPath(new URL('.', import.meta.url));
+	const rootEnvPath = join(__dirname, '../../../../.env');
+	const packageEnvPath = join(__dirname, '../../.env');
+
+	console.log(`[FlowWorker] Loading .env files:`);
+	console.log(`[FlowWorker] - Root:    ${rootEnvPath}`);
+	console.log(`[FlowWorker] - Package: ${packageEnvPath}`);
+
+	dotenv.config({ path: rootEnvPath });
+	dotenv.config({ path: packageEnvPath });
+
+	console.log(`[FlowWorker] Loaded WORKSPACE_ID=${process.env.WORKSPACE_ID}, PROJECT_ID=${process.env.PROJECT_ID}`);
+
 	// Check for interactive mode from CLI args or environment variable
 	const interactiveArg = process.argv.includes('--interactive') || process.argv.includes('-i');
 	const interactiveEnv = process.env.WORKER_INTERACTIVE === 'true';
@@ -888,7 +917,10 @@ if (isMainModule) {
 	const workerIdArg = process.argv.find(arg => arg.startsWith('--worker-id='));
 	const preferredWorkerId = workerIdArg ? workerIdArg.split('=')[1] : process.env.WORKER_ID;
 
-	const projectRoot = process.cwd();
+	// Parse project root from CLI args or environment variable
+	const projectRootArg = process.argv.find(arg => arg.startsWith('--project-root='));
+	const projectRoot = projectRootArg ? projectRootArg.split('=')[1] : process.env.PROJECT_ROOT || process.cwd();
+
 	const worker = new FlowWorker(undefined, projectRoot, interactive, preferredWorkerId, enableUI);
 
 	worker

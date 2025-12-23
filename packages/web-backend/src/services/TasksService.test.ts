@@ -424,10 +424,10 @@ describe('TasksService', () => {
 			};
 
 			// Simulate event emission
-			mockEventBroadcaster.broadcast('task:created', mockTask as any);
+			mockEventBroadcaster.broadcast('b2f:task:created', mockTask as any);
 
 			// Verify emission would be called
-			expect(mockEventBroadcaster.broadcast).toHaveBeenCalledWith('task:created', mockTask);
+			expect(mockEventBroadcaster.broadcast).toHaveBeenCalledWith('b2f:task:created', mockTask);
 		});
 
 		it('should support task status change events', () => {
@@ -442,10 +442,10 @@ describe('TasksService', () => {
 			};
 
 			// Simulate event emission
-			mockEventBroadcaster.broadcast('task:status_changed', statusChangeData as any);
+			mockEventBroadcaster.broadcast('b2f:task:status_changed', statusChangeData as any);
 
 			// Verify
-			expect(mockEventBroadcaster.broadcast).toHaveBeenCalledWith('task:status_changed', statusChangeData);
+			expect(mockEventBroadcaster.broadcast).toHaveBeenCalledWith('b2f:task:status_changed', statusChangeData);
 		});
 
 		it('should support task assignment events', () => {
@@ -457,10 +457,10 @@ describe('TasksService', () => {
 			};
 
 			// Simulate event emission
-			mockEventBroadcaster.broadcast('task:assigned', assignmentData);
+			mockEventBroadcaster.broadcast('b2f:task:assigned', assignmentData);
 
 			// Verify
-			expect(mockEventBroadcaster.broadcast).toHaveBeenCalledWith('task:assigned', assignmentData);
+			expect(mockEventBroadcaster.broadcast).toHaveBeenCalledWith('b2f:task:assigned', assignmentData);
 		});
 	});
 });

@@ -261,7 +261,7 @@ export class TransportRouter {
 				};
 
 				const mockReply = {
-					code: (statusCode: number) => mockReply,
+					code: (_statusCode: number) => mockReply,
 					send: (data: any) => {
 						result = data;
 						return mockReply;

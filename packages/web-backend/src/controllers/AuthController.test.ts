@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { MockAuthService } from '../auth/MockAuthService';
 import { WebSocketSessionManager } from '../transport/WebSocketSessionManager';
@@ -42,7 +42,7 @@ class MockReply {
 		return this;
 	}
 
-	clearCookie(name: string, options?: any) {
+	clearCookie(name: string, _options?: any) {
 		this.clearedCookies.push(name);
 		delete this.cookies[name];
 		return this;
@@ -289,7 +289,7 @@ describe('AuthController', () => {
 
 		it('should update all WebSocket sessions on token refresh', async () => {
 			// Login
-			const { accessToken, refreshToken, userId } = await authService.login('test@example.com', 'password');
+			const { accessToken, refreshToken } = await authService.login('test@example.com', 'password');
 
 			// Create WebSocket session
 			const req = {

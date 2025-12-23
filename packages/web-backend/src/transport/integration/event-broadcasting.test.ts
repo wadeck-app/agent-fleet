@@ -95,11 +95,11 @@ describe('Event Broadcasting Integration', () => {
 				updatedAt: new Date().toISOString(),
 			};
 
-			broadcaster.broadcast('task:created', task);
+			broadcaster.broadcast('b2f:task:created', task);
 
 			// Verify all clients received the event
 			expect(mockTransport.broadcasts).toHaveLength(1);
-			expect(mockTransport.broadcasts[0].event).toBe('task:created');
+			expect(mockTransport.broadcasts[0].event).toBe('b2f:task:created');
 			expect(mockTransport.broadcasts[0].data).toEqual(task);
 		});
 
@@ -127,10 +127,10 @@ describe('Event Broadcasting Integration', () => {
 				updatedAt: new Date().toISOString(),
 			};
 
-			broadcaster.broadcast('task:updated', task);
+			broadcaster.broadcast('b2f:task:updated', task);
 
 			expect(mockTransport.broadcasts).toHaveLength(1);
-			expect(mockTransport.broadcasts[0].event).toBe('task:updated');
+			expect(mockTransport.broadcasts[0].event).toBe('b2f:task:updated');
 		});
 	});
 
@@ -159,10 +159,10 @@ describe('Event Broadcasting Integration', () => {
 			mockTransport.simulateConnect('client-2');
 
 			// Client 1 subscribes to task events
-			sessionManager.updateSubscriptions('client-1', 'subscribe', ['task:created', 'task:updated']);
+			sessionManager.updateSubscriptions('client-1', 'subscribe', ['b2f:task:created', 'b2f:task:updated']);
 
 			// Client 2 subscribes to worker events
-			sessionManager.updateSubscriptions('client-2', 'subscribe', ['worker:created']);
+			sessionManager.updateSubscriptions('client-2', 'subscribe', ['b2f:worker:created']);
 
 			// Broadcast task event
 			const task = {
@@ -175,14 +175,14 @@ describe('Event Broadcasting Integration', () => {
 				updatedAt: new Date().toISOString(),
 			};
 
-			broadcaster.broadcast('task:created', task);
+			broadcaster.broadcast('b2f:task:created', task);
 
 			// Only broadcasted (subscription filtering happens in WebSocketTransportServer)
 			expect(mockTransport.broadcasts).toHaveLength(1);
 
 			// Verify subscriptions
-			expect(sessionManager.isSubscribed('client-1', 'task:created')).toBe(true);
-			expect(sessionManager.isSubscribed('client-2', 'task:created')).toBe(false);
+			expect(sessionManager.isSubscribed('client-1', 'b2f:task:created')).toBe(true);
+			expect(sessionManager.isSubscribed('client-2', 'b2f:task:created')).toBe(false);
 		});
 
 		it('should handle unsubscribe correctly', async () => {
@@ -199,21 +199,21 @@ describe('Event Broadcasting Integration', () => {
 
 			// Subscribe to multiple events
 			sessionManager.updateSubscriptions('client-1', 'subscribe', [
-				'task:created',
-				'task:updated',
-				'task:deleted',
+				'b2f:task:created',
+				'b2f:task:updated',
+				'b2f:task:deleted',
 			]);
 
-			expect(sessionManager.isSubscribed('client-1', 'task:created')).toBe(true);
-			expect(sessionManager.isSubscribed('client-1', 'task:updated')).toBe(true);
-			expect(sessionManager.isSubscribed('client-1', 'task:deleted')).toBe(true);
+			expect(sessionManager.isSubscribed('client-1', 'b2f:task:created')).toBe(true);
+			expect(sessionManager.isSubscribed('client-1', 'b2f:task:updated')).toBe(true);
+			expect(sessionManager.isSubscribed('client-1', 'b2f:task:deleted')).toBe(true);
 
 			// Unsubscribe from one event
-			sessionManager.updateSubscriptions('client-1', 'unsubscribe', ['task:updated']);
+			sessionManager.updateSubscriptions('client-1', 'unsubscribe', ['b2f:task:updated']);
 
-			expect(sessionManager.isSubscribed('client-1', 'task:created')).toBe(true);
-			expect(sessionManager.isSubscribed('client-1', 'task:updated')).toBe(false);
-			expect(sessionManager.isSubscribed('client-1', 'task:deleted')).toBe(true);
+			expect(sessionManager.isSubscribed('client-1', 'b2f:task:created')).toBe(true);
+			expect(sessionManager.isSubscribed('client-1', 'b2f:task:updated')).toBe(false);
+			expect(sessionManager.isSubscribed('client-1', 'b2f:task:deleted')).toBe(true);
 		});
 
 		it('should allow all events when no subscriptions set', async () => {
@@ -229,9 +229,9 @@ describe('Event Broadcasting Integration', () => {
 			await sessionManager.authenticateConnection('client-1', req);
 
 			// Without explicit subscriptions, all events are allowed
-			expect(sessionManager.isSubscribed('client-1', 'task:created')).toBe(true);
-			expect(sessionManager.isSubscribed('client-1', 'worker:created')).toBe(true);
-			expect(sessionManager.isSubscribed('client-1', 'workspace:created')).toBe(true);
+			expect(sessionManager.isSubscribed('client-1', 'b2f:task:created')).toBe(true);
+			expect(sessionManager.isSubscribed('client-1', 'b2f:worker:created')).toBe(true);
+			expect(sessionManager.isSubscribed('client-1', 'b2f:workspace:created')).toBe(true);
 		});
 	});
 
@@ -270,7 +270,7 @@ describe('Event Broadcasting Integration', () => {
 				updatedAt: new Date().toISOString(),
 			};
 
-			broadcaster.sendToClient('client-1', 'task:created', task);
+			broadcaster.sendToClient('client-1', 'b2f:task:created', task);
 
 			// Only client-1 should receive
 			expect(mockTransport.clientSends).toHaveLength(1);
@@ -320,7 +320,7 @@ describe('Event Broadcasting Integration', () => {
 				updatedAt: new Date().toISOString(),
 			};
 
-			broadcaster.sendToUser(userId, 'task:created', task);
+			broadcaster.sendToUser(userId, 'b2f:task:created', task);
 
 			// All three devices should receive
 			expect(mockTransport.clientSends).toHaveLength(3);
@@ -377,9 +377,9 @@ describe('Event Broadcasting Integration', () => {
 				updatedAt: new Date().toISOString(),
 			};
 
-			broadcaster.broadcast('task:created', task1);
-			broadcaster.broadcast('task:created', task2);
-			broadcaster.broadcast('task:created', task3);
+			broadcaster.broadcast('b2f:task:created', task1);
+			broadcaster.broadcast('b2f:task:created', task2);
+			broadcaster.broadcast('b2f:task:created', task3);
 
 			expect(mockTransport.broadcasts).toHaveLength(3);
 			expect(mockTransport.broadcasts[0].data).toEqual(task1);
@@ -412,14 +412,14 @@ describe('Event Broadcasting Integration', () => {
 			};
 
 			// Test different task events
-			broadcaster.broadcast('task:created', task);
-			broadcaster.broadcast('task:updated', task);
-			broadcaster.broadcast('task:deleted', task);
+			broadcaster.broadcast('b2f:task:created', task);
+			broadcaster.broadcast('b2f:task:updated', task);
+			broadcaster.broadcast('b2f:task:deleted', task);
 
 			expect(mockTransport.broadcasts).toHaveLength(3);
-			expect(mockTransport.broadcasts[0].event).toBe('task:created');
-			expect(mockTransport.broadcasts[1].event).toBe('task:updated');
-			expect(mockTransport.broadcasts[2].event).toBe('task:deleted');
+			expect(mockTransport.broadcasts[0].event).toBe('b2f:task:created');
+			expect(mockTransport.broadcasts[1].event).toBe('b2f:task:updated');
+			expect(mockTransport.broadcasts[2].event).toBe('b2f:task:deleted');
 		});
 
 		it('should broadcast worker events', async () => {
@@ -441,10 +441,10 @@ describe('Event Broadcasting Integration', () => {
 				state: 'idle' as const,
 			};
 
-			broadcaster.broadcast('worker:created', worker);
+			broadcaster.broadcast('b2f:worker:created', worker);
 
 			expect(mockTransport.broadcasts).toHaveLength(1);
-			expect(mockTransport.broadcasts[0].event).toBe('worker:created');
+			expect(mockTransport.broadcasts[0].event).toBe('b2f:worker:created');
 			expect(mockTransport.broadcasts[0].data).toEqual(worker);
 		});
 
@@ -470,10 +470,10 @@ describe('Event Broadcasting Integration', () => {
 				lastUsed: new Date().toISOString(),
 			};
 
-			broadcaster.broadcast('workspace:created', workspace);
+			broadcaster.broadcast('b2f:workspace:created', workspace);
 
 			expect(mockTransport.broadcasts).toHaveLength(1);
-			expect(mockTransport.broadcasts[0].event).toBe('workspace:created');
+			expect(mockTransport.broadcasts[0].event).toBe('b2f:workspace:created');
 		});
 	});
 
@@ -535,7 +535,7 @@ describe('Event Broadcasting Integration', () => {
 
 			// Should not throw
 			expect(() => {
-				broadcaster.sendToClient('non-existent-client', 'task:created', task);
+				broadcaster.sendToClient('non-existent-client', 'b2f:task:created', task);
 			}).not.toThrow();
 
 			// No sends recorded
@@ -555,7 +555,7 @@ describe('Event Broadcasting Integration', () => {
 
 			// Should not throw
 			expect(() => {
-				broadcaster.sendToUser('non-existent-user', 'task:created', task);
+				broadcaster.sendToUser('non-existent-user', 'b2f:task:created', task);
 			}).not.toThrow();
 
 			// No sends recorded

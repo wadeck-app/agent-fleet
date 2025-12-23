@@ -31,6 +31,8 @@ export interface IngredientTableProps {
 	visibleColumns?: Set<string>;
 	/** Column order (array of column keys) for reordering */
 	columnOrder?: string[];
+	/** Initial loading state (show skeleton rows on first load) */
+	initialLoading?: boolean;
 	refreshing?: boolean;
 	deleting?: boolean;
 	/** Selection props */
@@ -75,6 +77,7 @@ export function IngredientTable({
 	sorting,
 	visibleColumns,
 	columnOrder,
+	initialLoading,
 	refreshing,
 	deleting,
 	selectable,
@@ -94,6 +97,7 @@ export function IngredientTable({
 			sorting={sorting}
 			visibleColumns={visibleColumns}
 			columnOrder={columnOrder}
+			initialLoading={initialLoading}
 			refreshing={refreshing}
 			deleting={deleting}
 			selectable={selectable}

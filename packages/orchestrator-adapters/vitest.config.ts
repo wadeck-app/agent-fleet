@@ -13,8 +13,8 @@ export default defineConfig({
 	},
 	resolve: {
 		alias: {
-			'@app/shared-orch-backend': path.resolve(__dirname, '../shared-orch-backend/src'),
 			'shared-common': path.resolve(__dirname, '../shared-common/src'),
+			'shared-orch-worker': path.resolve(__dirname, '../shared-orch-worker/src'),
 		},
 	},
 });

@@ -13,6 +13,7 @@ import { OrchestratorClientFactory } from 'orchestrator-adapters';
 import type { OrchestratorClient } from 'orchestrator-adapters';
 import * as os from 'os';
 import path from 'path';
+import { getOrchestratorPortsFromEnv } from 'shared-common/PortCalculator.js';
 import { fileURLToPath } from 'url';
 
 import { DataStoreFactory } from './factories';
@@ -45,20 +46,24 @@ async function initializeOrchestratorClient(): Promise<OrchestratorClient> {
 		// Library mode: Factory will create and start orchestrator internally
 		logger.info('[Orchestrator] Initializing in library mode (embedded)');
 
-		const orchestratorWsPort = parseInt(process.env.ORCHESTRATOR_WS_PORT || '3738', 10);
-		const orchestratorRestPort = parseInt(process.env.ORCHESTRATOR_REST_PORT || '3737', 10);
+		// Use the same port calculation as the worker for consistency
+		const { wsPort: calculatedWsPort, restPort: calculatedRestPort } = getOrchestratorPortsFromEnv();
+
+		const orchestratorWsPort = parseInt(process.env.ORCHESTRATOR_WS_PORT || calculatedWsPort.toString(), 10);
+		const orchestratorRestPort = parseInt(process.env.ORCHESTRATOR_REST_PORT || calculatedRestPort.toString(), 10);
+
+		logger.info(`[Orchestrator] Calculated ports from env: REST=${calculatedRestPort}, WS=${calculatedWsPort}`);
 
 		// Factory handles orchestrator creation and startup
 		const orchestratorClient = await OrchestratorClientFactory.create({
 			mode: 'library',
 			wsPort: orchestratorWsPort,
 			restPort: orchestratorRestPort,
+			libraryMode: true, // Disable REST API when embedded in backend
 		});
 
 		await orchestratorClient.connect();
-		logger.info(
-			`[Orchestrator] LibraryAdapter connected (WS: ${orchestratorWsPort}, REST: ${orchestratorRestPort})`
-		);
+		logger.info(`[Orchestrator] Connected (WS: ${orchestratorWsPort}, REST disabled in library mode)`);
 
 		return orchestratorClient;
 	} else if (mode === 'remote') {

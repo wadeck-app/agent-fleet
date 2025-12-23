@@ -32,7 +32,7 @@
  * // Returns: [{ id: '1', description: 'Task 1' }]
  *
  * // Trigger event
- * client.emit('task:created', { id: '2', description: 'Task 2' });
+ * client.emit('b2f:task:created', { id: '2', description: 'Task 2' });
  *
  * // Check request history
  * const history = client.getRequestHistory();
@@ -283,7 +283,7 @@ export class MockTransportClient implements ITransportClient {
 	 *
 	 * @example
 	 * ```typescript
-	 * client.emit('task:created', { id: '1', description: 'New task' });
+	 * client.emit('b2f:task:created', { id: '1', description: 'New task' });
 	 * ```
 	 */
 	emit<E extends EventType>(event: E, data: EventData<E>): void {

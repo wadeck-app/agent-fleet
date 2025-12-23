@@ -1,7 +1,7 @@
 import { Logger } from 'shared-common/Logger.js';
 import { StateManager } from 'shared-common/StateManager.js';
 import { createMessage, parseMessage } from 'shared-common/protocol.js';
-import { MessageType, WorkerInfo } from 'shared-common/types.js';
+import { MessageType, WorkerInfo } from 'shared-orch-worker/index.js';
 import { WebSocket, WebSocketServer } from 'ws';
 
 import { TaskManager } from '../core/TaskManager.js';

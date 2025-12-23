@@ -1,5 +1,5 @@
 import { MetricsData } from 'shared-common/StateManager.js';
-import { Task, TaskStatus } from 'shared-common/types.js';
+import { Task, TaskStatus } from 'shared-orch-worker/index.js';
 
 import { TaskManager } from '../core/TaskManager.js';
 import { OrchestratorSnapshot } from '../ui-client/types.js';

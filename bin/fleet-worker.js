@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Path to the flow worker source
-const workerPath = path.join(__dirname, '..', 'src', 'workers', 'flow', 'flow-worker.ts');
+const workerPath = path.join(__dirname, '..', 'packages', 'worker', 'src', 'flow', 'FlowWorker.ts');
 
 // Parse arguments
 const args = process.argv.slice(2);

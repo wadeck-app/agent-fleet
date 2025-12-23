@@ -3,7 +3,7 @@ import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager.js';
 import { Server as HttpServer } from 'http';
 import { IncomingMessage } from 'http';
 import { Logger } from 'shared-common/Logger.js';
-import { TaskStatus } from 'shared-common/types.js';
+import { TaskStatus } from 'shared-orch-worker/index.js';
 import { Duplex } from 'stream';
 import { WebSocket, WebSocketServer } from 'ws';
 

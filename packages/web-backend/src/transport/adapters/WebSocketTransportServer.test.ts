@@ -1,4 +1,3 @@
-import type { FastifyInstance } from 'fastify';
 import type { IncomingMessage } from 'http';
 import { MockOrchestratorClient } from 'orchestrator-adapters';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -137,7 +136,7 @@ describe('WebSocketTransportServer', () => {
 
 			// Mock WebSocket connection
 			const socket = new MockWebSocket();
-			const connection = { socket: socket as any };
+			const _connection = { socket: socket as any };
 
 			// Simulate connection (we can't directly call handleConnection as it's private)
 			// Instead, we test the authentication flow through sessionManager
@@ -206,7 +205,7 @@ describe('WebSocketTransportServer', () => {
 	describe('message handling', () => {
 		it('should handle subscription message', async () => {
 			// Create authenticated session
-			const { accessToken, userId } = await authService.login('test@example.com', 'password');
+			const { accessToken } = await authService.login('test@example.com', 'password');
 
 			const req = {
 				raw: {
@@ -216,15 +215,15 @@ describe('WebSocketTransportServer', () => {
 				} as IncomingMessage,
 			};
 
-			const session = await sessionManager.authenticateConnection('client-1', req.raw);
+			await sessionManager.authenticateConnection('client-1', req.raw);
 
 			// Update subscriptions
-			sessionManager.updateSubscriptions('client-1', 'subscribe', ['task:created', 'task:updated']);
+			sessionManager.updateSubscriptions('client-1', 'subscribe', ['b2f:task:created', 'b2f:task:updated']);
 
 			// Verify subscriptions
 			const subscriptions = sessionManager.getSubscriptions('client-1');
-			expect(subscriptions).toContain('task:created');
-			expect(subscriptions).toContain('task:updated');
+			expect(subscriptions).toContain('b2f:task:created');
+			expect(subscriptions).toContain('b2f:task:updated');
 		});
 
 		it('should handle unsubscribe message', async () => {
@@ -243,18 +242,18 @@ describe('WebSocketTransportServer', () => {
 
 			// Subscribe
 			sessionManager.updateSubscriptions('client-1', 'subscribe', [
-				'task:created',
-				'task:updated',
-				'task:deleted',
+				'b2f:task:created',
+				'b2f:task:updated',
+				'b2f:task:deleted',
 			]);
 
 			// Unsubscribe
-			sessionManager.updateSubscriptions('client-1', 'unsubscribe', ['task:updated']);
+			sessionManager.updateSubscriptions('client-1', 'unsubscribe', ['b2f:task:updated']);
 
 			const subscriptions = sessionManager.getSubscriptions('client-1');
-			expect(subscriptions).toContain('task:created');
-			expect(subscriptions).not.toContain('task:updated');
-			expect(subscriptions).toContain('task:deleted');
+			expect(subscriptions).toContain('b2f:task:created');
+			expect(subscriptions).not.toContain('b2f:task:updated');
+			expect(subscriptions).toContain('b2f:task:deleted');
 		});
 
 		it('should route TransportRequest through TransportRouter', async () => {
@@ -341,7 +340,7 @@ describe('WebSocketTransportServer', () => {
 
 			const eventMessage = {
 				id: `event_${Date.now()}`,
-				type: 'task:created',
+				type: 'b2f:task:created',
 				data: task,
 				timestamp: Date.now(),
 			};
@@ -349,7 +348,7 @@ describe('WebSocketTransportServer', () => {
 			const message = JSON.stringify(eventMessage);
 
 			// Broadcast to all
-			clients.forEach((socket: MockWebSocket, clientId) => {
+			clients.forEach((socket: MockWebSocket, _clientId) => {
 				if (socket.readyState === 1) {
 					socket.send(message);
 				}
@@ -385,17 +384,17 @@ describe('WebSocketTransportServer', () => {
 			await sessionManager.authenticateConnection('client-2', req2.raw);
 
 			// Client 1 subscribes to task events
-			sessionManager.updateSubscriptions('client-1', 'subscribe', ['task:created']);
+			sessionManager.updateSubscriptions('client-1', 'subscribe', ['b2f:task:created']);
 
 			// Client 2 subscribes to worker events
-			sessionManager.updateSubscriptions('client-2', 'subscribe', ['worker:created']);
+			sessionManager.updateSubscriptions('client-2', 'subscribe', ['b2f:worker:created']);
 
 			// Check subscriptions
-			expect(sessionManager.isSubscribed('client-1', 'task:created')).toBe(true);
-			expect(sessionManager.isSubscribed('client-1', 'worker:created')).toBe(false);
+			expect(sessionManager.isSubscribed('client-1', 'b2f:task:created')).toBe(true);
+			expect(sessionManager.isSubscribed('client-1', 'b2f:worker:created')).toBe(false);
 
-			expect(sessionManager.isSubscribed('client-2', 'task:created')).toBe(false);
-			expect(sessionManager.isSubscribed('client-2', 'worker:created')).toBe(true);
+			expect(sessionManager.isSubscribed('client-2', 'b2f:task:created')).toBe(false);
+			expect(sessionManager.isSubscribed('client-2', 'b2f:worker:created')).toBe(true);
 		});
 
 		it('should handle broadcast to disconnected clients gracefully', () => {
@@ -432,7 +431,7 @@ describe('WebSocketTransportServer', () => {
 		});
 
 		it('should remove client on disconnection', async () => {
-			const { accessToken, userId } = await authService.login('test@example.com', 'password');
+			const { accessToken } = await authService.login('test@example.com', 'password');
 
 			const req = {
 				raw: {
@@ -583,8 +582,8 @@ describe('WebSocketTransportServer', () => {
 		});
 
 		it('should track user count correctly', async () => {
-			const { accessToken: token1, userId: user1 } = await authService.login('test@example.com', 'password');
-			const { accessToken: token2, userId: user2 } = await authService.login('test@example.com', 'password');
+			const { accessToken: token1 } = await authService.login('test@example.com', 'password');
+			const { accessToken: token2 } = await authService.login('test@example.com', 'password');
 
 			const req1 = {
 				raw: {

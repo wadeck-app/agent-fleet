@@ -22,7 +22,7 @@ import {
 	WorkerType,
 	WorkspaceAllocatedMessage,
 	WorkspaceReleasedMessage,
-} from 'shared-common/types.js';
+} from 'shared-orch-worker/index.js';
 import {
 	MockWebSocket,
 	createMockConnectionManager,

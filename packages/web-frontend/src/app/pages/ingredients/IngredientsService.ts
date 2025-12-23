@@ -38,6 +38,7 @@ export interface GetIngredientsParams {
 	pageSize?: number;
 	sortBy?: string; // comma-separated column names
 	sortOrder?: string; // comma-separated asc/desc
+	search?: string; // Simple search query (omnisearch)
 }
 
 export class IngredientsService {
@@ -64,6 +65,7 @@ export class IngredientsService {
 		if (params?.pageSize) query.pageSize = params.pageSize;
 		if (params?.sortBy) query.sortBy = params.sortBy;
 		if (params?.sortOrder) query.sortOrder = params.sortOrder;
+		if (params?.search) query.search = params.search;
 
 		return await ingredientsApi.getAll(query as IngredientsListQuery);
 	}

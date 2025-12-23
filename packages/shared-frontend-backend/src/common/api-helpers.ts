@@ -46,6 +46,35 @@ export const BaseListQuerySchema = z.object({
 });
 
 /**
+ * Type-safe query object inferred from BaseListQuerySchema
+ * Represents the final validated query sent to the backend
+ */
+export type BaseListQuery = z.infer<typeof BaseListQuerySchema>;
+
+/**
+ * Mutable query object for the composition phase.
+ * All properties are optional since features may not fill all fields.
+ * This is what features receive in fillQuery() to mutate during composition.
+ *
+ * Example:
+ * ```typescript
+ * const fillQuery = useCallback((query: BaseListQueryMutable) => {
+ *   query.page = currentPage;        // Only set if needed
+ *   query.pageSize = pageSize;       // Only set if needed
+ *   // No need to set search/sortBy/etc if not relevant for this feature
+ * }, [currentPage, pageSize]);
+ * ```
+ */
+export type BaseListQueryMutable = {
+	search?: string | null;
+	page?: number | null;
+	pageSize?: number | null;
+	sortBy?: string | null;
+	sortOrder?: string | null;
+	[key: string]: unknown; // Allow extra properties from feature-specific filters
+};
+
+/**
  * Common delete response
  */
 export const DeleteResponseSchema = z.object({

@@ -34,7 +34,7 @@
  * const tasks = await client.request('GET', '/api/tasks/');
  *
  * // Subscribe to events (server-side filtering)
- * const unsubscribe = client.subscribe('task:created', (task) => {
+ * const unsubscribe = client.subscribe('b2f:task:created', (task) => {
  *   console.log('New task:', task);
  * });
  *

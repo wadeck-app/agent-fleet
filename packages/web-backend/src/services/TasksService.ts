@@ -1,3 +1,5 @@
+import { getOrchestratorRestUrl } from 'shared-common/PortCalculator.js';
+
 import type { Task, TasksData, TasksQuery } from '@app/shared';
 
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
@@ -184,10 +186,15 @@ export class TasksService {
 	}
 
 	/**
-	 * Get orchestrator URL from environment or default
+	 * Get orchestrator URL from environment or calculate from WORKSPACE_ID/PROJECT_ID
 	 */
 	private getOrchestratorUrl(): string {
-		return process.env.ORCHESTRATOR_URL || 'http://localhost:3737';
+		if (process.env.ORCHESTRATOR_URL) {
+			return process.env.ORCHESTRATOR_URL;
+		}
+
+		// Fall back to calculating from WORKSPACE_ID and PROJECT_ID
+		return getOrchestratorRestUrl('localhost');
 	}
 
 	// ===========================================================================================

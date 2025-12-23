@@ -33,7 +33,15 @@ export default tseslint.config(
 		rules: {
 			'@typescript-eslint/no-explicit-any': 'warn',
 			'@typescript-eslint/explicit-function-return-type': 'off',
-			'@typescript-eslint/no-unused-vars': 'off', // Disabled - too strict for Fastify hooks
+			'@typescript-eslint/no-unused-vars': [
+				'error',
+				{
+					argsIgnorePattern: '^_',
+					varsIgnorePattern: '^_',
+					caughtErrorsIgnorePattern: '^_',
+					destructuredArrayIgnorePattern: '^_',
+				},
+			],
 			'no-console': 'warn',
 			// @formatter:off
 			// Restrict deep relative imports - allow ./ and ../ but not ../../ and beyond
@@ -76,9 +84,17 @@ export default tseslint.config(
 			import: importPlugin,
 		},
 		rules: {
-			'@typescript-eslint/no-explicit-any': 'warn',
+			'@typescript-eslint/no-explicit-any': 'off', // Autoriser 'any' dans les tests
 			'@typescript-eslint/explicit-function-return-type': 'off',
-			'@typescript-eslint/no-unused-vars': 'off', // Disabled - too strict for tests
+			'@typescript-eslint/no-unused-vars': [
+				'error',
+				{
+					argsIgnorePattern: '^_',
+					varsIgnorePattern: '^_',
+					caughtErrorsIgnorePattern: '^_',
+					destructuredArrayIgnorePattern: '^_',
+				},
+			],
 			'no-console': 'off',
 			// @formatter:off
 			// Restrict deep relative imports - allow ./ and ../ but not ../../ and beyond

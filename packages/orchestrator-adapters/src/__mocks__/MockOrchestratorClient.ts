@@ -38,8 +38,7 @@
  * ===========================================================================================
  */
 import { EventEmitter } from 'events';
-
-import type { O2BEventData, O2BEventType, OrchestratorStats, Task, WorkerInfo } from '@app/shared-orch-backend';
+import type { O2BEventData, O2BEventType, OrchestratorStats, Task, WorkerInfo } from 'shared-orch-worker/index.js';
 
 import type { OrchestratorClient, OrchestratorConfig, TaskFilters, WorkerFilters } from '../OrchestratorClient.js';
 

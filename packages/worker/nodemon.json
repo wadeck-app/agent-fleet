@@ -1,0 +1,7 @@
+{
+	"watch": ["src", "../shared-orch-worker/src", "../shared-common/src", "../flow-engine/src"],
+	"ext": "ts,tsx,js,mjs,json",
+	"exec": "tsx src/flow/FlowWorker.ts",
+	"args": "--no-ui",
+	"ignore": ["dist/**", "node_modules/**", "**/*.test.ts"]
+}

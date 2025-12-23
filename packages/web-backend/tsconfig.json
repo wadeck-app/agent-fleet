@@ -6,12 +6,12 @@
 		"paths": {
 			"@app/shared": ["../shared-frontend-backend/src"],
 			"@app/shared/*": ["../shared-frontend-backend/src/*"],
-			"@app/shared-orch-backend": ["../shared-orch-backend/src"],
-			"@app/shared-orch-backend/*": ["../shared-orch-backend/src/*"],
 			"orchestrator-adapters": ["../orchestrator-adapters/src"],
 			"orchestrator-adapters/*": ["../orchestrator-adapters/src/*"],
 			"shared-common": ["../shared-common/src"],
 			"shared-common/*": ["../shared-common/src/*"],
+			"shared-orch-worker": ["../shared-orch-worker/src"],
+			"shared-orch-worker/*": ["../shared-orch-worker/src/*"],
 			"@/*": ["./src/*"]
 		}
 	},
@@ -20,7 +20,7 @@
 	"references": [
 		{ "path": "../orchestrator-adapters" },
 		{ "path": "../shared-frontend-backend" },
-		{ "path": "../shared-orch-backend" },
+		{ "path": "../shared-orch-worker" },
 		{ "path": "../shared-common" }
 	]
 }

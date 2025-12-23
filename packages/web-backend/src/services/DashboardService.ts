@@ -1,5 +1,4 @@
 import type { ActivityEntry, DashboardData } from '@app/shared';
-import { ERROR_CODES, InternalServerErrorException } from '@app/shared';
 
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 

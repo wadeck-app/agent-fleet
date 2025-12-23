@@ -16,6 +16,16 @@ module.exports = {
 		},
 	},
 	rules: {
+		// Variables non utilisées : strictes, sauf préfixe _
+		'@typescript-eslint/no-unused-vars': [
+			'error',
+			{
+				argsIgnorePattern: '^_',
+				varsIgnorePattern: '^_',
+				caughtErrorsIgnorePattern: '^_',
+				destructuredArrayIgnorePattern: '^_',
+			},
+		],
 		// Enforce import restrictions based on dependency matrix
 		'import/no-restricted-paths': [
 			'error',
@@ -94,4 +104,13 @@ module.exports = {
 			},
 		],
 	},
+	overrides: [
+		{
+			// Autoriser 'any' dans les tests
+			files: ['**/*.test.ts', '**/*.spec.ts', '**/__mocks__/**'],
+			rules: {
+				'@typescript-eslint/no-explicit-any': 'off',
+			},
+		},
+	],
 };

@@ -90,8 +90,8 @@ describe('BaseRepository', () => {
 		});
 
 		it('should return a new query builder for each call', () => {
-			const qb1 = repository.query();
-			const qb2 = repository.query();
+			repository.query();
+			repository.query();
 
 			expect(mockStorage.query).toHaveBeenCalledTimes(2);
 		});

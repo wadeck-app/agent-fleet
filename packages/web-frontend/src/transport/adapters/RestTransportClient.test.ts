@@ -362,7 +362,7 @@ describe('RestTransportClient', () => {
 	describe('event subscriptions', () => {
 		it('should not support event subscriptions', () => {
 			const handler = vi.fn();
-			const unsubscribe = client.subscribe('task:created' as any, handler);
+			const unsubscribe = client.subscribe('b2f:task:created' as any, handler);
 
 			expect(unsubscribe).toBeInstanceOf(Function);
 			expect(handler).not.toHaveBeenCalled();

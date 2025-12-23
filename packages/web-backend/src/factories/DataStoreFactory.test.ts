@@ -374,7 +374,7 @@ describe('DataStoreFactory', () => {
 			const service = factory.getBooksService();
 
 			// Create first book
-			const book1 = await service.create({
+			await service.create({
 				title: 'Book 1',
 				author: 'Author 1',
 				isbn: '978-1234567890',

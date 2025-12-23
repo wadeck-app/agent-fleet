@@ -20,7 +20,7 @@ import {
 	WorkerType,
 	WorkspaceAllocatedMessage,
 	WorkspaceReleasedMessage,
-} from 'shared-common/types.js';
+} from 'shared-orch-worker/index.js';
 import { MockWebSocket, setupTest } from 'test-utils/index';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -278,7 +278,7 @@ describe('WebSocketMessageRouter', () => {
 
 			messageRouter.routeMessage(mockSocket as any, message, 'worker-1');
 
-			expect(Logger.log).toHaveBeenCalledWith(expect.stringContaining('Received task_started from worker-1'));
+			expect(Logger.log).toHaveBeenCalledWith(expect.stringContaining('Received w2o:task:started from worker-1'));
 		});
 
 		it('should log received messages without worker ID as unknown', () => {
@@ -291,7 +291,7 @@ describe('WebSocketMessageRouter', () => {
 
 			messageRouter.routeMessage(mockSocket as any, message, null);
 
-			expect(Logger.log).toHaveBeenCalledWith(expect.stringContaining('Received worker_ready from unknown'));
+			expect(Logger.log).toHaveBeenCalledWith(expect.stringContaining('Received w2o:worker:ready from unknown'));
 		});
 	});
 });

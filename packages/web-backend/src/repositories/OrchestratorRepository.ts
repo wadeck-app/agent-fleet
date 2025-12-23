@@ -1,5 +1,5 @@
-import type { OrchestratorStats } from '@app/shared-orch-backend';
-import { OrchestratorStatsSchema } from '@app/shared-orch-backend';
+import type { OrchestratorStats } from 'shared-orch-worker/index.js';
+import { OrchestratorStatsSchema } from 'shared-orch-worker/index.js';
 
 /**
  * ===========================================================================================

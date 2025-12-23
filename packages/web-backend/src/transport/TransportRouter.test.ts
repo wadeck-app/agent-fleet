@@ -1,7 +1,7 @@
 import { MockOrchestratorClient } from 'orchestrator-adapters';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
-import type { TransportRequest, TransportResponse } from '@app/shared';
+import type { TransportRequest } from '@app/shared';
 
 import { MockAuthService } from '../auth/MockAuthService';
 import { DataStoreFactory } from '../factories/DataStoreFactory';

@@ -1,6 +1,6 @@
 import { Logger } from 'shared-common/Logger.js';
 import { MetricsData, StateManager } from 'shared-common/StateManager.js';
-import { Task, TaskStatus } from 'shared-common/types.js';
+import { Task, TaskStatus } from 'shared-orch-worker/index.js';
 
 import { TaskManager } from '../core/TaskManager.js';
 import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer.js';

@@ -1,8 +1,7 @@
 import fs from 'fs';
 import path from 'path';
+import { Task } from 'shared-orch-worker/index.js';
 import { fileURLToPath } from 'url';
-
-import { Task } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

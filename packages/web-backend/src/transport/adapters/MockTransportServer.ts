@@ -23,10 +23,10 @@ import type { ITransportServer } from '../ITransportServer';
  * const mockServer = new MockTransportServer();
  * const broadcaster = new EventBroadcaster(mockServer, sessionManager);
  *
- * broadcaster.broadcast('task:created', task);
+ * broadcaster.broadcast('b2f:task:created', task);
  *
  * expect(mockServer.broadcasts).toHaveLength(1);
- * expect(mockServer.broadcasts[0].event).toBe('task:created');
+ * expect(mockServer.broadcasts[0].event).toBe('b2f:task:created');
  * expect(mockServer.broadcasts[0].data).toEqual(task);
  * ```
  *
@@ -71,7 +71,7 @@ export class MockTransportServer implements ITransportServer {
 	/**
 	 * Initialize (no-op for mock)
 	 */
-	async initialize(app: FastifyInstance): Promise<void> {
+	async initialize(_app: FastifyInstance): Promise<void> {
 		// No-op for mock
 	}
 

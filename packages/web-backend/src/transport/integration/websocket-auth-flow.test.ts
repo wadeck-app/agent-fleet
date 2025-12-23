@@ -306,7 +306,7 @@ describe('WebSocket Authentication Flow Integration', () => {
 				updatedAt: new Date().toISOString(),
 			};
 
-			broadcaster.sendToUser(userId, 'task:created', task);
+			broadcaster.sendToUser(userId, 'b2f:task:created', task);
 
 			// Verify both clients received the event
 			expect(mockTransport.clientSends).toHaveLength(2);
@@ -349,7 +349,7 @@ describe('WebSocket Authentication Flow Integration', () => {
 	describe('token expiration handling', () => {
 		it('should detect expired token in session validation', async () => {
 			// Login
-			const { accessToken, userId } = await authService.login('test@example.com', 'password');
+			const { accessToken } = await authService.login('test@example.com', 'password');
 
 			// Connect
 			const req = {

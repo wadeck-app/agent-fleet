@@ -1,7 +1,7 @@
 import { Separator } from '@framework/components/primitives/Separator';
 import { ConnectivityIndicator } from '@framework/features/connectivity/ConnectivityIndicator';
 import { useTheme } from '@framework/features/theme/useTheme';
-import { BookOpen, FolderKanban, LayoutDashboard, ListTodo, Package2, Users } from 'lucide-react';
+import { BookOpen, FolderKanban, LayoutDashboard, ListTodo, Package2, PackageSearch, Users } from 'lucide-react';
 
 import { WorkspaceIndicator } from '@app/features/workspace/WorkspaceIndicator';
 
@@ -37,6 +37,11 @@ const navigationItems: NavItem[] = [
 		path: '/ingredients',
 		label: 'Ingredients',
 		icon: Package2,
+	},
+	{
+		path: '/ingredients2',
+		label: 'Ingredients v2',
+		icon: PackageSearch,
 	},
 	{
 		path: '/books',

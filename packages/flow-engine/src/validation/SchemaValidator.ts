@@ -12,7 +12,7 @@
  * This validator focuses on STRUCTURE, not semantics (e.g., it doesn't validate
  * that step references are valid - that's done by other validators).
  */
-import { TaskStatus } from 'shared-common/types.js';
+import { TaskStatus } from 'shared-orch-worker/index.js';
 
 import type {
 	FlowDefinition,

@@ -2,7 +2,7 @@
 import * as fs from 'fs';
 import { Shutdownable } from 'shared-common/Shutdownable.js';
 import { StateEvent, StateManager } from 'shared-common/StateManager.js';
-import { Task, TaskStatus, WorkerInfo } from 'shared-common/types.js';
+import { Task, TaskStatus, WorkerInfo } from 'shared-orch-worker/index.js';
 import termkit from 'terminal-kit';
 
 import { TaskManager } from '../core/TaskManager.js';

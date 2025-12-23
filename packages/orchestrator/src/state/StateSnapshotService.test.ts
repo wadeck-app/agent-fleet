@@ -1,7 +1,7 @@
 /**
  * StateSnapshotService Tests
  */
-import { Task, TaskStatus, WorkerInfo, WorkerType } from 'shared-common/types.js';
+import { Task, TaskStatus, WorkerInfo, WorkerType } from 'shared-orch-worker/index.js';
 import { setupTest } from 'test-utils/index';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

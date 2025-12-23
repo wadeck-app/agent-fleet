@@ -216,10 +216,10 @@ describe('MockTransportClient', () => {
 	describe('event handling', () => {
 		it('should subscribe and emit events', () => {
 			const handler = vi.fn();
-			client.subscribe('task:created' as any, handler);
+			client.subscribe('b2f:task:created' as any, handler);
 
 			const taskData = { id: '1', description: 'New task' };
-			client.emit('task:created' as any, taskData);
+			client.emit('b2f:task:created' as any, taskData);
 
 			expect(handler).toHaveBeenCalledWith(taskData);
 		});
@@ -228,11 +228,11 @@ describe('MockTransportClient', () => {
 			const handler1 = vi.fn();
 			const handler2 = vi.fn();
 
-			client.subscribe('task:created' as any, handler1);
-			client.subscribe('task:created' as any, handler2);
+			client.subscribe('b2f:task:created' as any, handler1);
+			client.subscribe('b2f:task:created' as any, handler2);
 
 			const taskData = { id: '1', description: 'New task' };
-			client.emit('task:created' as any, taskData);
+			client.emit('b2f:task:created' as any, taskData);
 
 			expect(handler1).toHaveBeenCalledWith(taskData);
 			expect(handler2).toHaveBeenCalledWith(taskData);
@@ -240,11 +240,11 @@ describe('MockTransportClient', () => {
 
 		it('should unsubscribe correctly', () => {
 			const handler = vi.fn();
-			const unsubscribe = client.subscribe('task:created' as any, handler);
+			const unsubscribe = client.subscribe('b2f:task:created' as any, handler);
 
 			unsubscribe();
 
-			client.emit('task:created' as any, { id: '1' });
+			client.emit('b2f:task:created' as any, { id: '1' });
 			expect(handler).not.toHaveBeenCalled();
 		});
 
@@ -252,11 +252,11 @@ describe('MockTransportClient', () => {
 			const taskHandler = vi.fn();
 			const workerHandler = vi.fn();
 
-			client.subscribe('task:created' as any, taskHandler);
-			client.subscribe('worker:heartbeat' as any, workerHandler);
+			client.subscribe('b2f:task:created' as any, taskHandler);
+			client.subscribe('b2f:worker:heartbeat' as any, workerHandler);
 
-			client.emit('task:created' as any, { id: '1' });
-			client.emit('worker:heartbeat' as any, { workerId: 'w1' });
+			client.emit('b2f:task:created' as any, { id: '1' });
+			client.emit('b2f:worker:heartbeat' as any, { workerId: 'w1' });
 
 			expect(taskHandler).toHaveBeenCalledWith({ id: '1' });
 			expect(workerHandler).toHaveBeenCalledWith({ workerId: 'w1' });

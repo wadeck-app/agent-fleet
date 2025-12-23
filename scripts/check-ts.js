@@ -32,7 +32,6 @@ try {
 const ERROR_LOG = 'ts-errors.log';
 const PACKAGES = [
 	'shared-frontend-backend',
-	'shared-orch-backend',
 	'shared-orch-worker',
 	'shared-common',
 	'web-backend',

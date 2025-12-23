@@ -35,7 +35,6 @@ export default defineConfig({
 			'shared-common': path.resolve(__dirname, '../shared-common/src'),
 			'flow-engine': path.resolve(__dirname, '../flow-engine/src'),
 			'shared-orch-worker': path.resolve(__dirname, '../shared-orch-worker/src'),
-			'shared-orch-backend': path.resolve(__dirname, '../shared-orch-backend/src'),
 		},
 		extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
 	},

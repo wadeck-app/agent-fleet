@@ -25,7 +25,7 @@ export type CrudEventType = 'created' | 'updated' | 'deleted' | 'status_changed'
  * }
  */
 export type ResourceEvent<Resource extends string, Data> = {
-	[K in CrudEventType as `${Resource}:${K}`]: Data;
+	[K in CrudEventType as `b2f:${Resource}:${K}`]: Data;
 };
 
 /**
@@ -37,34 +37,40 @@ export type ResourceEvent<Resource extends string, Data> = {
  */
 export interface BusinessEvents {
 	/** Task assigned to a worker */
-	'task:assigned': {
+	'b2f:task:assigned': {
 		taskId: string;
 		workerId: string;
 		assignedAt: number;
 	};
 
 	/** Task priority changed */
-	'task:priority_changed': {
+	'b2f:task:priority_changed': {
 		taskId: string;
 		oldPriority: number;
 		newPriority: number;
 	};
 
 	/** Worker heartbeat (periodic health check) */
-	'worker:heartbeat': {
+	'b2f:worker:heartbeat': {
 		workerId: string;
 		timestamp: number;
 		status: string;
 	};
 
 	/** Worker capacity changed */
-	'worker:capacity_changed': {
+	'b2f:worker:capacity_changed': {
 		workerId: string;
 		capacity: number;
 	};
 
+	/** Worker connected (lifecycle event) */
+	'b2f:worker:connected': Worker;
+
+	/** Worker disconnected (lifecycle event) */
+	'b2f:worker:disconnected': Worker;
+
 	/** Workspace quota exceeded */
-	'workspace:quota_exceeded': {
+	'b2f:workspace:quota_exceeded': {
 		workspaceId: string;
 		quotaType: string;
 		usage: number;
@@ -72,7 +78,7 @@ export interface BusinessEvents {
 	};
 
 	/** Workspace archived */
-	'workspace:archived': {
+	'b2f:workspace:archived': {
 		workspaceId: string;
 		archivedAt: number;
 	};

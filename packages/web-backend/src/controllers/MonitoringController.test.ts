@@ -159,8 +159,8 @@ describe('MonitoringController', () => {
 			await transportServer.simulateConnection('client-2', 'user-2');
 
 			// Subscribe to events
-			sessionManager.updateSubscriptions('client-1', 'subscribe', ['task:created', 'task:updated']);
-			sessionManager.updateSubscriptions('client-2', 'subscribe', ['task:created', 'worker:heartbeat']);
+			sessionManager.updateSubscriptions('client-1', 'subscribe', ['b2f:task:created', 'b2f:task:updated']);
+			sessionManager.updateSubscriptions('client-2', 'subscribe', ['b2f:task:created', 'b2f:worker:heartbeat']);
 
 			const statsRoute = routes.find(r => r.path === '/api/monitoring/transport/stats' && r.method === 'GET');
 
@@ -168,9 +168,9 @@ describe('MonitoringController', () => {
 
 			// Verify subscription breakdown
 			expect(result.subscriptions).toEqual({
-				'task:created': 2, // Both clients subscribed
-				'task:updated': 1, // Only client-1
-				'worker:heartbeat': 1, // Only client-2
+				'b2f:task:created': 2, // Both clients subscribed
+				'b2f:task:updated': 1, // Only client-1
+				'b2f:worker:heartbeat': 1, // Only client-2
 			});
 		});
 
@@ -223,7 +223,7 @@ describe('MonitoringController', () => {
 			await transportServer.simulateConnection('client-2', 'user-2');
 
 			// Subscribe to events
-			sessionManager.updateSubscriptions('client-1', 'subscribe', ['task:created']);
+			sessionManager.updateSubscriptions('client-1', 'subscribe', ['b2f:task:created']);
 
 			const sessionsRoute = routes.find(
 				r => r.path === '/api/monitoring/transport/sessions' && r.method === 'GET'
@@ -246,7 +246,7 @@ describe('MonitoringController', () => {
 				createdAt: expect.any(Number),
 				lastActivity: expect.any(Number),
 				tokenExpiresAt: expect.any(Number),
-				subscribedEvents: ['task:created'],
+				subscribedEvents: ['b2f:task:created'],
 			});
 
 			const session2 = result.sessions.find((s: any) => s.clientId === 'client-2');
