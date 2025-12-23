@@ -30,10 +30,10 @@ import { WebSocketTransport } from './WebSocketTransport.js';
 // ===========================================================================================
 
 class MockWebSocket extends EventEmitter {
-	public readyState = WebSocket.CONNECTING;
+	public readyState: number = WebSocket.CONNECTING;
 	public url: string;
-	public OPEN = WebSocket.OPEN;
-	public CLOSED = WebSocket.CLOSED;
+	public readonly OPEN: number = WebSocket.OPEN;
+	public readonly CLOSED: number = WebSocket.CLOSED;
 	public sentMessages: string[] = [];
 
 	constructor(url: string) {
@@ -300,7 +300,7 @@ describe('WebSocketTransport', () => {
 			await connectPromise;
 
 			// Listen before initial disconnect
-			let reconnectingPromise = once(transport, 'reconnecting');
+			const reconnectingPromise = once(transport, 'reconnecting');
 			await new Promise(resolve => setImmediate(resolve)); // Let once() register
 			mockWs.simulateClose(1006, 'Connection lost');
 			await reconnectingPromise;
@@ -373,7 +373,7 @@ describe('WebSocketTransport', () => {
 			mockWs = mockWs2;
 
 			// Trigger reconnection and simulate success
-			let reconnectedPromise = once(transport, 'reconnected');
+			const reconnectedPromise = once(transport, 'reconnected');
 			timeService.tick(1000);
 			await new Promise(resolve => setImmediate(resolve)); // Let connect() start
 			mockWs2.simulateOpen();
@@ -531,7 +531,7 @@ describe('WebSocketTransport', () => {
 		test('should ignore response for unknown request ID', async () => {
 			// Act
 			mockWs.simulateMessage({ type: 'response', payload: { id: 'unknown-req', result: {} } });
-			await new Promise(resolve => setTimeout(resolve), 0);
+			await new Promise(resolve => setTimeout(resolve, 0));
 
 			// Assert
 			expect(consoleWarnSpy).toHaveBeenCalledWith(
@@ -592,7 +592,7 @@ describe('WebSocketTransport', () => {
 
 			// Act
 			mockWs.simulateMessage({ type: 'event', payload: event });
-			await new Promise(resolve => setTimeout(resolve), 0);
+			await new Promise(resolve => setTimeout(resolve, 0));
 
 			// Assert
 			expect(handler).toHaveBeenCalledWith(event);
@@ -614,7 +614,7 @@ describe('WebSocketTransport', () => {
 
 			// Act
 			mockWs.simulateMessage({ type: 'event', payload: event });
-			await new Promise(resolve => setTimeout(resolve), 0);
+			await new Promise(resolve => setTimeout(resolve, 0));
 
 			// Assert
 			expect(handler1).not.toHaveBeenCalled(); // Was removed
@@ -649,7 +649,7 @@ describe('WebSocketTransport', () => {
 		test('should handle malformed JSON messages', async () => {
 			// Act
 			mockWs.emit('message', Buffer.from('invalid json {'));
-			await new Promise(resolve => setTimeout(resolve), 0);
+			await new Promise(resolve => setTimeout(resolve, 0));
 
 			// Assert
 			expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -661,7 +661,7 @@ describe('WebSocketTransport', () => {
 		test('should handle unknown message types', async () => {
 			// Act
 			mockWs.simulateMessage({ type: 'unknown-type', payload: {} });
-			await new Promise(resolve => setTimeout(resolve), 0);
+			await new Promise(resolve => setTimeout(resolve, 0));
 
 			// Assert
 			expect(consoleWarnSpy).toHaveBeenCalledWith('[WebSocketTransport] Unknown message type:', 'unknown-type');
@@ -681,7 +681,7 @@ describe('WebSocketTransport', () => {
 
 			// Act
 			mockWs.simulateMessage({ type: 'event', payload: event });
-			await new Promise(resolve => setTimeout(resolve), 0);
+			await new Promise(resolve => setTimeout(resolve, 0));
 
 			// Assert
 			expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -693,7 +693,7 @@ describe('WebSocketTransport', () => {
 		test('should handle pong messages silently', async () => {
 			// Act
 			mockWs.simulateMessage({ type: 'pong' });
-			await new Promise(resolve => setTimeout(resolve), 0);
+			await new Promise(resolve => setTimeout(resolve, 0));
 
 			// Assert - No errors or warnings
 			expect(true).toBe(true);

@@ -32,7 +32,7 @@ function createMockTransport(options: { shouldConnect: boolean; connectDelay?: n
 	return {
 		connect: vi.fn().mockImplementation(() => {
 			if (options.connectDelay) {
-				return new Promise((resolve, reject) => {
+				return new Promise<void>((resolve, reject) => {
 					setTimeout(() => {
 						options.shouldConnect ? resolve() : reject(new Error('Connection failed'));
 					}, options.connectDelay);

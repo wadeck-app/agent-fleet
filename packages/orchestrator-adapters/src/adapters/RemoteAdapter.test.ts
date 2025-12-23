@@ -17,11 +17,10 @@
  * ===========================================================================================
  */
 import { EventEmitter } from 'events';
-import { TaskStatus } from 'shared-common/types.js';
+import { TaskStatus, WorkerType } from 'shared-common/types.js';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import type { B2ORequest, B2OResponse, O2BEvent } from '@app/shared-orch-backend';
-import type { Task, WorkerInfo } from '@app/shared-orch-backend';
+import type { B2ORequest, B2OResponse, O2BEvent , Task, WorkerInfo } from '@app/shared-orch-backend';
 
 import type { OrchestratorTransport, TransportEventHandler } from '../transport/OrchestratorTransport.js';
 import { TransportFactory } from '../transport/TransportFactory.js';
@@ -32,9 +31,17 @@ import { RemoteOrchestratorAdapter } from './RemoteAdapter.js';
 // ===========================================================================================
 
 /**
+ * Mock transport type with test helpers
+ */
+interface MockTransport extends OrchestratorTransport {
+	_emitEvent: (event: O2BEvent) => void;
+	_getSubscribedEvents: () => Set<string>;
+}
+
+/**
  * Create a mock transport for testing
  */
-function createMockTransport(): OrchestratorTransport {
+function createMockTransport(): MockTransport {
 	let eventHandler: TransportEventHandler | null = null;
 	const subscribedEvents = new Set<string>();
 
@@ -65,7 +72,7 @@ function createMockTransport(): OrchestratorTransport {
 			}
 		},
 		_getSubscribedEvents: () => subscribedEvents,
-	} as any;
+	};
 }
 
 describe('RemoteOrchestratorAdapter', () => {
@@ -172,7 +179,7 @@ describe('RemoteOrchestratorAdapter', () => {
 			// Emit event after disconnect (should not be received)
 			mockTransport._emitEvent({
 				type: 'task.created',
-				data: { taskId: 'task-123' },
+				data: { taskId: 'task-123', task: {}, timestamp: new Date().toISOString() },
 			});
 
 			// Assert
@@ -193,11 +200,16 @@ describe('RemoteOrchestratorAdapter', () => {
 				id: 'task-123',
 				description: 'Test task',
 				status: TaskStatus.TODO,
+				priority: 'high',
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString(),
+				assignedTo: null,
+				comments: [],
 				metadata: { priority: 'high' },
-				created: new Date().toISOString(),
+				history: [],
 			};
 
-			mockTransport.request.mockResolvedValueOnce({
+			(mockTransport.request as any).mockResolvedValueOnce({
 				id: 'req-123',
 				result: mockTask,
 			});
@@ -221,14 +233,14 @@ describe('RemoteOrchestratorAdapter', () => {
 		test('should generate unique request IDs', async () => {
 			// Arrange
 			await adapter.connect();
-			mockTransport.request.mockResolvedValue({ id: 'req-123', result: {} });
+			(mockTransport.request as any).mockResolvedValue({ id: 'req-123', result: {} });
 
 			// Act
 			await adapter.createTask('Task 1');
 			await adapter.createTask('Task 2');
 
 			// Assert
-			const calls = mockTransport.request.mock.calls;
+			const calls = (mockTransport.request as any).mock.calls;
 			const id1 = (calls[0][0] as B2ORequest).id;
 			const id2 = (calls[1][0] as B2ORequest).id;
 			expect(id1).not.toBe(id2);
@@ -246,10 +258,16 @@ describe('RemoteOrchestratorAdapter', () => {
 				id: 'task-123',
 				description: 'Existing task',
 				status: TaskStatus.IN_PROGRESS,
-				created: new Date().toISOString(),
+				priority: 'medium',
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString(),
+				assignedTo: null,
+				comments: [],
+				metadata: {},
+				history: [],
 			};
 
-			mockTransport.request.mockResolvedValueOnce({
+			(mockTransport.request as any).mockResolvedValueOnce({
 				id: 'req-123',
 				result: mockTask,
 			});
@@ -271,7 +289,7 @@ describe('RemoteOrchestratorAdapter', () => {
 			// Arrange
 			await adapter.connect();
 
-			mockTransport.request.mockResolvedValueOnce({
+			(mockTransport.request as any).mockResolvedValueOnce({
 				id: 'req-123',
 				result: null,
 			});
@@ -294,17 +312,29 @@ describe('RemoteOrchestratorAdapter', () => {
 					id: 'task-1',
 					description: 'Task 1',
 					status: TaskStatus.TODO,
-					created: new Date().toISOString(),
+					priority: 'medium',
+					createdAt: new Date().toISOString(),
+					updatedAt: new Date().toISOString(),
+					assignedTo: null,
+					comments: [],
+					metadata: {},
+					history: [],
 				},
 				{
 					id: 'task-2',
 					description: 'Task 2',
-					status: TaskStatus.DONE,
-					created: new Date().toISOString(),
+					status: TaskStatus.MERGED,
+					priority: 'medium',
+					createdAt: new Date().toISOString(),
+					updatedAt: new Date().toISOString(),
+					assignedTo: null,
+					comments: [],
+					metadata: {},
+					history: [],
 				},
 			];
 
-			mockTransport.request.mockResolvedValueOnce({
+			(mockTransport.request as any).mockResolvedValueOnce({
 				id: 'req-123',
 				result: mockTasks,
 			});
@@ -326,7 +356,7 @@ describe('RemoteOrchestratorAdapter', () => {
 			// Arrange
 			await adapter.connect();
 
-			mockTransport.request.mockResolvedValueOnce({
+			(mockTransport.request as any).mockResolvedValueOnce({
 				id: 'req-123',
 				result: [],
 			});
@@ -351,18 +381,14 @@ describe('RemoteOrchestratorAdapter', () => {
 
 			const mockWorkers: WorkerInfo[] = [
 				{
-					workerId: 'worker-1',
-					workerName: 'Worker 1',
-					type: 'agent',
-					status: 'idle',
-					currentTask: null,
-					tasksProcessed: 5,
-					capabilities: ['code', 'test'],
-					lastSeen: new Date().toISOString(),
+					id: 'worker-1',
+					type: WorkerType.DEV,
+					taskId: null,
+					connectedAt: new Date().toISOString(),
 				},
 			];
 
-			mockTransport.request.mockResolvedValueOnce({
+			(mockTransport.request as any).mockResolvedValueOnce({
 				id: 'req-123',
 				result: mockWorkers,
 			});
@@ -384,19 +410,19 @@ describe('RemoteOrchestratorAdapter', () => {
 			// Arrange
 			await adapter.connect();
 
-			mockTransport.request.mockResolvedValueOnce({
+			(mockTransport.request as any).mockResolvedValueOnce({
 				id: 'req-123',
 				result: [],
 			});
 
 			// Act
-			await adapter.getWorkers({ type: 'agent', status: 'idle' });
+			await adapter.getWorkers({ type: WorkerType.DEV, status: 'idle' });
 
 			// Assert
 			expect(mockTransport.request).toHaveBeenCalledWith(
 				expect.objectContaining({
 					method: 'getWorkers',
-					params: { type: 'agent', status: 'idle' },
+					params: { type: WorkerType.DEV, status: 'idle' },
 				})
 			);
 		});
@@ -413,7 +439,7 @@ describe('RemoteOrchestratorAdapter', () => {
 				workers: 3,
 			};
 
-			mockTransport.request.mockResolvedValueOnce({
+			(mockTransport.request as any).mockResolvedValueOnce({
 				id: 'req-123',
 				result: mockStats,
 			});
@@ -437,7 +463,7 @@ describe('RemoteOrchestratorAdapter', () => {
 			// Arrange
 			await adapter.connect();
 
-			mockTransport.request.mockResolvedValueOnce({
+			(mockTransport.request as any).mockResolvedValueOnce({
 				id: 'req-123',
 				result: undefined,
 			});
@@ -460,7 +486,7 @@ describe('RemoteOrchestratorAdapter', () => {
 			// Arrange
 			await adapter.connect();
 
-			mockTransport.request.mockResolvedValueOnce({
+			(mockTransport.request as any).mockResolvedValueOnce({
 				id: 'req-123',
 				result: undefined,
 			});
@@ -494,7 +520,7 @@ describe('RemoteOrchestratorAdapter', () => {
 			// Arrange
 			await adapter.connect();
 
-			mockTransport.request.mockResolvedValueOnce({
+			(mockTransport.request as any).mockResolvedValueOnce({
 				id: 'req-123',
 				error: {
 					code: 'TASK_NOT_FOUND',
@@ -510,7 +536,7 @@ describe('RemoteOrchestratorAdapter', () => {
 			// Arrange
 			await adapter.connect();
 
-			mockTransport.request.mockRejectedValueOnce(new Error('Network error'));
+			(mockTransport.request as any).mockRejectedValueOnce(new Error('Network error'));
 
 			// Act & Assert
 			await expect(adapter.createTask('Test')).rejects.toThrow('Network error');
@@ -555,13 +581,14 @@ describe('RemoteOrchestratorAdapter', () => {
 			adapter.on('task.created', handler);
 
 			// Act
+			const eventData = { taskId: 'task-123', task: {}, timestamp: new Date().toISOString() };
 			mockTransport._emitEvent({
 				type: 'task.created',
-				data: { taskId: 'task-123' },
+				data: eventData,
 			});
 
 			// Assert
-			expect(handler).toHaveBeenCalledWith({ taskId: 'task-123' });
+			expect(handler).toHaveBeenCalledWith(eventData);
 		});
 
 		test('should route events to multiple handlers', async () => {
@@ -573,14 +600,15 @@ describe('RemoteOrchestratorAdapter', () => {
 			adapter.on('task.created', handler2);
 
 			// Act
+			const eventData = { taskId: 'task-123', task: {}, timestamp: new Date().toISOString() };
 			mockTransport._emitEvent({
 				type: 'task.created',
-				data: { taskId: 'task-123' },
+				data: eventData,
 			});
 
 			// Assert
-			expect(handler1).toHaveBeenCalledWith({ taskId: 'task-123' });
-			expect(handler2).toHaveBeenCalledWith({ taskId: 'task-123' });
+			expect(handler1).toHaveBeenCalledWith(eventData);
+			expect(handler2).toHaveBeenCalledWith(eventData);
 		});
 
 		test('should unsubscribe from event type when last listener removed', async () => {
@@ -621,7 +649,7 @@ describe('RemoteOrchestratorAdapter', () => {
 			// Act
 			mockTransport._emitEvent({
 				type: 'task.created',
-				data: { taskId: 'task-123' },
+				data: { taskId: 'task-123', task: {}, timestamp: new Date().toISOString() },
 			});
 
 			// Assert
@@ -637,18 +665,24 @@ describe('RemoteOrchestratorAdapter', () => {
 			adapter.on('worker.status', workerHandler);
 
 			// Act
+			const taskEventData = { taskId: 'task-123', task: {}, timestamp: new Date().toISOString() };
+			const workerEventData = {
+				workerId: 'worker-1',
+				status: 'busy' as const,
+				timestamp: new Date().toISOString(),
+			};
 			mockTransport._emitEvent({
 				type: 'task.created',
-				data: { taskId: 'task-123' },
+				data: taskEventData,
 			});
 			mockTransport._emitEvent({
 				type: 'worker.status',
-				data: { workerId: 'worker-1', status: 'busy' },
+				data: workerEventData,
 			});
 
 			// Assert
-			expect(taskHandler).toHaveBeenCalledWith({ taskId: 'task-123' });
-			expect(workerHandler).toHaveBeenCalledWith({ workerId: 'worker-1', status: 'busy' });
+			expect(taskHandler).toHaveBeenCalledWith(taskEventData);
+			expect(workerHandler).toHaveBeenCalledWith(workerEventData);
 			expect(mockTransport.subscribe).toHaveBeenCalledWith('task.created');
 			expect(mockTransport.subscribe).toHaveBeenCalledWith('worker.status');
 		});

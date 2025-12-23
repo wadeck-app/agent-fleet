@@ -36,8 +36,7 @@
  */
 import { EventEmitter } from 'events';
 
-import type { B2ORequest, B2OResponse, O2BEventData, O2BEventType } from '@app/shared-orch-backend';
-import type { Task, WorkerInfo } from '@app/shared-orch-backend';
+import type { B2ORequest, B2OResponse, O2BEventData, O2BEventType , Task, WorkerInfo } from '@app/shared-orch-backend';
 
 import type { OrchestratorClient, OrchestratorConfig, TaskFilters, WorkerFilters } from '../OrchestratorClient.js';
 import type { OrchestratorTransport } from '../transport/OrchestratorTransport.js';

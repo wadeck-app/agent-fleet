@@ -3,7 +3,6 @@
 	"compilerOptions": {
 		"composite": true,
 		"outDir": "./dist",
-		"rootDir": "./src",
 		"declarationMap": true,
 		"baseUrl": ".",
 		"paths": {
@@ -14,6 +13,7 @@
 		}
 	},
 	"include": ["src/**/*"],
+	"exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"],
 	"references": [
 		{
 			"path": "../shared-common"

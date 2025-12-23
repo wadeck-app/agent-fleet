@@ -378,33 +378,39 @@ export default defineConfig({
 **Root Cause**: Following system reminders blindly instead of prioritizing CLAUDE.md instructions. System reminders may point to existing files in the wrong location, and using them as source of truth leads to creating new files in the wrong place.
 
 **Wrong Approach** ❌:
+
 ```
 Creating files at: C:\Users\Wadeck\.claude\plans\refactored-finding-elephant.md
 Reason: System reminder said "plan file exists at C:\Users\Wadeck\.claude\plans\..."
 ```
 
 **Correct Approach** ✅:
+
 ```
 Creating files at: C:\Workspace_Tooling\agent-fleet\.claude\plans\plan-1-frontend-backend-events.md
 Reason: CLAUDE.md says "Put your plan files in <projectRoot>.claude/plans folder"
 ```
 
 **Hierarchy of Information Sources**:
+
 1. 🥇 **CLAUDE.md** - Project-specific instructions (HIGHEST PRIORITY)
 2. 🥈 **User requests** - Direct instructions from user (OVERRIDE everything)
 3. 🥉 **System reminders** - Contextual hints (NOT source of truth for paths)
 
 **Additional Issues**:
+
 - **Non-descriptive names**: Using generated names like `refactored-finding-elephant.md` instead of descriptive names like `task-creation-implementation.md` or `event-naming-migration.md`
 - **Ignoring CLAUDE.md critical tags**: Missing `<CRITICAL>with relevant name</CRITICAL>` despite explicit markup
 
 **Correct Workflow**:
+
 1. **Read CLAUDE.md first** when starting any project work
 2. **Create plans in project directory** from the start: `<workingDir>/.claude/plans/`
 3. **Use descriptive names** that explain what the plan is about
 4. **When user asks for changes** (split plans, rename, etc.): Create new files in the CORRECT location immediately
 
 **Prevention**:
+
 - Always check CLAUDE.md for project-specific requirements before creating files
 - Question system reminders that suggest paths outside the project directory
 - Use `ls <projectRoot>/.claude/plans/` to verify location before creating files

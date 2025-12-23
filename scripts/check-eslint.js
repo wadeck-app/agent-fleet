@@ -39,6 +39,7 @@ const PACKAGES = [
 	'web-frontend',
 	'flow-engine',
 	'orchestrator',
+	'orchestrator-adapters',
 	'worker',
 	'cli',
 ];
