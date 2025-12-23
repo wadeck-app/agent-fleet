@@ -24,4 +24,4 @@ export { WebSocketSessionManager } from './WebSocketSessionManager.js';
 export { TransportRouter } from './TransportRouter.js';
 
 // Testing utilities
-export { MockTransportServer } from './MockTransportServer.js';
+export { MockTransportServer } from './adapters/MockTransportServer.js';

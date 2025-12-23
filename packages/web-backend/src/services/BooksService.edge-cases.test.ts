@@ -61,7 +61,7 @@ describe('BooksService - Edge Cases', () => {
 			const result = await service.list({ page: -1 as any });
 
 			// Should sanitize to page 1
-			expect(result.pagination.page).toBe(1);
+			expect(result.pagination!.page).toBe(1);
 		});
 
 		it('should handle pageSize 0 by using minimum 1', async () => {
@@ -71,7 +71,7 @@ describe('BooksService - Edge Cases', () => {
 			const result = await service.list({ pageSize: 0 as any });
 
 			// Should enforce minimum pageSize of 1
-			expect(result.pagination.pageSize).toBeGreaterThanOrEqual(1);
+			expect(result.pagination!.pageSize).toBeGreaterThanOrEqual(1);
 		});
 
 		it('should handle negative pageSize by using minimum 1', async () => {
@@ -81,7 +81,7 @@ describe('BooksService - Edge Cases', () => {
 			const result = await service.list({ pageSize: -10 as any });
 
 			// Should enforce minimum pageSize of 1
-			expect(result.pagination.pageSize).toBeGreaterThanOrEqual(1);
+			expect(result.pagination!.pageSize).toBeGreaterThanOrEqual(1);
 		});
 
 		it('should cap pageSize at 100', async () => {
@@ -93,7 +93,7 @@ describe('BooksService - Edge Cases', () => {
 
 			const result = await service.list({ page: 1, pageSize: 500 });
 
-			expect(result.pagination.pageSize).toBe(100);
+			expect(result.pagination!.pageSize).toBe(100);
 			expect(result.items).toHaveLength(100);
 		});
 
@@ -104,7 +104,7 @@ describe('BooksService - Edge Cases', () => {
 			const result = await service.list({ page: 999, pageSize: 10 });
 
 			expect(result.items).toHaveLength(0);
-			expect(result.pagination.totalPages).toBe(1);
+			expect(result.pagination!.totalPages).toBe(1);
 		});
 	});
 

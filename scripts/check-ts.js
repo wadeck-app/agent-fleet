@@ -44,20 +44,26 @@ const PACKAGES = [
 ];
 
 /**
- * Run TypeScript check for a package
+ * Run TypeScript check for a package with a specific config
  */
-function checkPackage(packageName) {
+function checkPackageWithConfig(packageName, config = 'tsconfig.json') {
 	return new Promise((resolve, reject) => {
 		const packagePath = path.join(process.cwd(), 'packages', packageName);
 
 		// Check if package directory exists
 		if (!fs.existsSync(packagePath)) {
-			console.log(chalk.gray(`  ⊘ ${packageName} not found, skipping...`));
-			resolve({ package: packageName, skipped: true, errors: [] });
+			resolve({ package: packageName, config, skipped: true, errors: [] });
 			return;
 		}
 
-		const command = 'npx tsc --noEmit';
+		// Check if config file exists
+		const configPath = path.join(packagePath, config);
+		if (!fs.existsSync(configPath)) {
+			resolve({ package: packageName, config, skipped: true, errors: [] });
+			return;
+		}
+
+		const command = `npx tsc --noEmit --project ${config}`;
 		const tsc = spawn(command, {
 			cwd: packagePath,
 			shell: true,
@@ -82,12 +88,14 @@ function checkPackage(packageName) {
 			if (hasErrors) {
 				resolve({
 					package: packageName,
+					config,
 					skipped: false,
 					errors: output.split('\n').filter(line => line.trim()),
 				});
 			} else {
 				resolve({
 					package: packageName,
+					config,
 					skipped: false,
 					errors: [],
 				});
@@ -95,9 +103,29 @@ function checkPackage(packageName) {
 		});
 
 		tsc.on('error', err => {
-			reject(new Error(`Failed to run TypeScript check for ${packageName}: ${err.message}`));
+			reject(new Error(`Failed to run TypeScript check for ${packageName} with ${config}: ${err.message}`));
 		});
 	});
+}
+
+/**
+ * Run TypeScript check for a package (both main and test configs)
+ */
+async function checkPackage(packageName) {
+	const results = await Promise.all([
+		checkPackageWithConfig(packageName, 'tsconfig.json'),
+		checkPackageWithConfig(packageName, 'tsconfig.test.json'),
+	]);
+
+	// Combine errors from both configs
+	const allErrors = results.flatMap(r => r.errors);
+	const allSkipped = results.every(r => r.skipped);
+
+	return {
+		package: packageName,
+		skipped: allSkipped,
+		errors: allErrors,
+	};
 }
 
 /**

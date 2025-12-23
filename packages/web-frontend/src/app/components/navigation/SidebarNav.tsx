@@ -3,11 +3,17 @@ import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@framework/components/primitives/Button';
 import { type LucideIcon } from 'lucide-react';
 
-export interface NavItem {
+export type NavItemRegular = {
 	path: string;
 	label: string;
 	icon: LucideIcon;
-}
+};
+
+export type NavItemSeparator = {
+	type: 'separator';
+};
+
+export type NavItem = NavItemRegular | NavItemSeparator;
 
 interface SidebarNavProps {
 	items: NavItem[];
@@ -26,22 +32,29 @@ export function SidebarNav({ items, className, mobile = false }: SidebarNavProps
 	return (
 		<nav className={className}>
 			<div className="space-y-2">
-				{items.map(item => {
-					const Icon = item.icon;
+				{items.map((item, index) => {
+					// Check if this is a separator
+					if ('type' in item && item.type === 'separator') {
+						return <div key={`separator-${index}`} className="my-2 border-t border-border" />;
+					}
+
+					// Regular nav item - TypeScript knows this is NavItemRegular after the guard above
+					const regularItem = item as NavItemRegular;
+					const Icon = regularItem.icon;
 					return (
 						<Button
-							key={item.path}
+							key={regularItem.path}
 							asChild
-							variant={isActive(item.path) ? 'default' : 'ghost'}
+							variant={isActive(regularItem.path) ? 'default' : 'ghost'}
 							className={`
          w-full justify-start
          ${mobile ? 'h-12 gap-3 text-base' : `gap-2`}
        `}
 							size={mobile ? 'default' : 'sm'}
 						>
-							<Link to={item.path}>
+							<Link to={regularItem.path}>
 								<Icon className={mobile ? 'size-5' : 'size-4'} />
-								{item.label}
+								{regularItem.label}
 							</Link>
 						</Button>
 					);

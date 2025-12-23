@@ -22,10 +22,10 @@
  *
  * ===========================================================================================
  */
-import { Orchestrator } from 'orchestrator/core/index.js';
 import { StateEvent } from 'shared-common/StateManager.js';
+import type { O2BEvent } from 'shared-orch-backend';
 
-import type { O2BEvent } from '@app/shared-orch-backend';
+import { Orchestrator } from '../core/index.js';
 
 /**
  * Client connection with subscription info

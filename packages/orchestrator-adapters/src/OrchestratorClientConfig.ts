@@ -13,7 +13,7 @@
  * Base configuration for all modes
  */
 export interface BaseOrchestratorClientConfig {
-	mode: 'library' | 'remote';
+	mode: 'library' | 'remote' | 'test';
 }
 
 /**
@@ -22,7 +22,24 @@ export interface BaseOrchestratorClientConfig {
  */
 export interface LibraryOrchestratorClientConfig extends BaseOrchestratorClientConfig {
 	mode: 'library';
-	// No additional config needed - orchestrator instance will be injected
+
+	/**
+	 * WebSocket port for worker connections
+	 * @default 3738
+	 */
+	wsPort?: number;
+
+	/**
+	 * REST API port for orchestrator
+	 * @default 3737
+	 */
+	restPort?: number;
+
+	/**
+	 * Project root directory
+	 * @default process.cwd()
+	 */
+	projectRoot?: string;
 }
 
 /**
@@ -74,9 +91,27 @@ export interface RemoteOrchestratorClientConfig extends BaseOrchestratorClientCo
 }
 
 /**
+ * Test mode configuration
+ * Orchestrator is mocked for unit tests, no real orchestrator instance
+ */
+export interface TestOrchestratorClientConfig extends BaseOrchestratorClientConfig {
+	mode: 'test';
+
+	/**
+	 * Optional mock orchestrator instance for custom test scenarios
+	 * If not provided, a default mock will be used
+	 */
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	mockOrchestrator?: any;
+}
+
+/**
  * Union type for all configuration modes
  */
-export type OrchestratorClientConfig = LibraryOrchestratorClientConfig | RemoteOrchestratorClientConfig;
+export type OrchestratorClientConfig =
+	| LibraryOrchestratorClientConfig
+	| RemoteOrchestratorClientConfig
+	| TestOrchestratorClientConfig;
 
 /**
  * Type guard to check if config is library mode
@@ -90,4 +125,11 @@ export function isLibraryMode(config: OrchestratorClientConfig): config is Libra
  */
 export function isRemoteMode(config: OrchestratorClientConfig): config is RemoteOrchestratorClientConfig {
 	return config.mode === 'remote';
+}
+
+/**
+ * Type guard to check if config is test mode
+ */
+export function isTestMode(config: OrchestratorClientConfig): config is TestOrchestratorClientConfig {
+	return config.mode === 'test';
 }

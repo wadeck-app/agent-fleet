@@ -170,8 +170,8 @@ describe('IngredientsService', () => {
 
 			// Should be capped at 100
 			expect(result.items).toHaveLength(100);
-			expect(result.pagination.pageSize).toBe(100);
-			expect(result.pagination.totalPages).toBe(2);
+			expect(result.pagination!.pageSize).toBe(100);
+			expect(result.pagination!.totalPages).toBe(2);
 		});
 
 		it('should handle empty results', async () => {
@@ -341,6 +341,11 @@ describe('IngredientsService', () => {
 		it('should update ingredient successfully', async () => {
 			const updateData: UpdateIngredient = {
 				name: 'Updated Name',
+				calories: 200,
+				protein: 35,
+				carbs: 5,
+				fat: 4.0,
+				servingSize: 100,
 				version: 1,
 			};
 
@@ -367,6 +372,11 @@ describe('IngredientsService', () => {
 		it('should throw NotFoundException when ingredient not found', async () => {
 			const updateData: UpdateIngredient = {
 				name: 'Updated Name',
+				calories: 200,
+				protein: 35,
+				carbs: 5,
+				fat: 4.0,
+				servingSize: 100,
 				version: 1,
 			};
 
@@ -380,6 +390,11 @@ describe('IngredientsService', () => {
 		it('should throw ConflictException on version mismatch', async () => {
 			const updateData: UpdateIngredient = {
 				name: 'Updated Name',
+				calories: 200,
+				protein: 35,
+				carbs: 5,
+				fat: 4.0,
+				servingSize: 100,
 				version: 1,
 			};
 
@@ -396,10 +411,12 @@ describe('IngredientsService', () => {
 
 		it('should update with calorie validation', async () => {
 			const updateData: UpdateIngredient = {
+				name: 'Updated Name',
 				calories: 150,
 				protein: 10,
 				carbs: 5,
 				fat: 10,
+				servingSize: 100,
 				version: 1,
 			};
 
@@ -420,6 +437,12 @@ describe('IngredientsService', () => {
 
 		it('should skip validation when only version is provided', async () => {
 			const updateData: UpdateIngredient = {
+				name: 'Chicken Breast',
+				calories: 165,
+				protein: 31,
+				carbs: 0,
+				fat: 3.6,
+				servingSize: 100,
 				version: 1,
 			};
 
@@ -442,7 +465,12 @@ describe('IngredientsService', () => {
 
 		it('should update ingredient with partial data', async () => {
 			const updateData: UpdateIngredient = {
+				name: 'Chicken Breast',
 				calories: 180,
+				protein: 31,
+				carbs: 0,
+				fat: 3.6,
+				servingSize: 100,
 				version: 1,
 			};
 

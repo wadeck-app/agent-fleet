@@ -39,6 +39,12 @@ const testSuites = [
 		type: testSuiteType_UNIT,
 	},
 	{
+		name: 'Orchestrator Adapters Unit Tests',
+		command: 'npm',
+		args: ['run', 'test', '--workspace=orchestrator-adapters'],
+		type: testSuiteType_UNIT,
+	},
+	{
 		name: 'Shared Front/Back Unit Tests',
 		command: 'npm',
 		// args: ['run', 'test', '--workspace=@app/shared-frontend-backend'],

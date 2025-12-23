@@ -1,4 +1,5 @@
 import type { IncomingMessage } from 'http';
+import { MockOrchestratorClient } from 'orchestrator-adapters';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { MockAuthService } from '@/auth/MockAuthService';
@@ -45,7 +46,8 @@ describe('WebSocket Authentication Flow Integration', () => {
 
 	beforeEach(() => {
 		// Create factory
-		factory = new DataStoreFactory('memory');
+		const mockOrchestratorClient = new MockOrchestratorClient();
+		factory = new DataStoreFactory('memory', mockOrchestratorClient);
 
 		// Create auth service
 		authService = new MockAuthService('test-secret');
@@ -296,9 +298,10 @@ describe('WebSocket Authentication Flow Integration', () => {
 			// Broadcast event to user
 			const task = {
 				id: 'task-1',
-				name: 'Test task',
-				status: 'pending' as const,
-				priority: 1,
+				description: 'Test task',
+				status: 'todo' as const,
+				assignedWorker: null,
+				priority: 'high' as const,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};

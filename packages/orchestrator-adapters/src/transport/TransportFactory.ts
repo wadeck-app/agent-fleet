@@ -272,14 +272,14 @@ export class TransportFactory {
 	 */
 	private static convertToHttpUrl(url: string): string {
 		if (url.startsWith('http://') || url.startsWith('https://')) {
-			// Remove /ws endpoint if present
-			return url.replace(/\/ws$/, '').replace(/\/orchestrator\/ws$/, '');
+			// Remove /orchestrator/ws or /ws endpoint if present (order matters!)
+			return url.replace(/\/orchestrator\/ws$/, '').replace(/\/ws$/, '');
 		}
 
 		// Convert WS to HTTP
 		const httpUrl = url.replace(/^ws:\/\//, 'http://').replace(/^wss:\/\//, 'https://');
 
-		// Remove /ws endpoint if present
-		return httpUrl.replace(/\/ws$/, '').replace(/\/orchestrator\/ws$/, '');
+		// Remove /orchestrator/ws or /ws endpoint if present (order matters!)
+		return httpUrl.replace(/\/orchestrator\/ws$/, '').replace(/\/ws$/, '');
 	}
 }

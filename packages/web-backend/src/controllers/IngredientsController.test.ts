@@ -246,6 +246,11 @@ describe('IngredientsController', () => {
 		it('should update an ingredient successfully', async () => {
 			const updateData: UpdateIngredient = {
 				name: 'Updated Name',
+				calories: 200,
+				protein: 35,
+				carbs: 5,
+				fat: 4.0,
+				servingSize: 100,
 				version: 1,
 			};
 
@@ -270,6 +275,11 @@ describe('IngredientsController', () => {
 		it('should throw NotFoundException when updating non-existent ingredient', async () => {
 			const updateData: UpdateIngredient = {
 				name: 'Updated Name',
+				calories: 200,
+				protein: 35,
+				carbs: 5,
+				fat: 4.0,
+				servingSize: 100,
 				version: 1,
 			};
 
@@ -284,6 +294,11 @@ describe('IngredientsController', () => {
 		it('should throw ConflictException on version mismatch (optimistic locking)', async () => {
 			const updateData: UpdateIngredient = {
 				name: 'Updated Name',
+				calories: 200,
+				protein: 35,
+				carbs: 5,
+				fat: 4.0,
+				servingSize: 100,
 				version: 1,
 			};
 

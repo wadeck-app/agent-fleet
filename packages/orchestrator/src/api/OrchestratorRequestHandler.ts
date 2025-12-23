@@ -23,9 +23,9 @@
  *
  * ===========================================================================================
  */
-import { Orchestrator } from 'orchestrator/core/index.js';
+import type { B2ORequest, B2OResponse } from 'shared-orch-backend';
 
-import type { B2ORequest, B2OResponse } from '@app/shared-orch-backend';
+import { Orchestrator } from '../core/index.js';
 
 /**
  * Orchestrator Request Handler

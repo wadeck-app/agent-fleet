@@ -13,6 +13,7 @@
  * - Request timeout handling (30s default)
  * - Ping/pong heartbeat (every 30s)
  * - Connection state management
+ * - EventEmitter for reconnection lifecycle events
  *
  * Protocol:
  * - B→O requests: { type: 'request', payload: B2ORequest }
@@ -21,13 +22,40 @@
  * - Subscription: { type: 'subscribe', eventTypes: string[] }
  * - Unsubscribe: { type: 'unsubscribe', eventTypes: string[] }
  *
+ * Reconnection Events:
+ * - 'reconnecting': Emitted when a reconnection attempt is scheduled
+ * - 'reconnected': Emitted when reconnection succeeds
+ * - 'reconnect_failed': Emitted when reconnection attempt fails
+ * - 'max_reconnect_attempts': Emitted when max attempts reached
+ *
  * ===========================================================================================
  */
+import { EventEmitter } from 'events';
 import { WebSocket } from 'ws';
 
 import type { B2ORequest, B2OResponse, O2BEvent, O2BEventType } from '@app/shared-orch-backend';
 
 import type { OrchestratorTransport, TransportEventHandler } from './OrchestratorTransport.js';
+import type { TimeService } from './TimeService.js';
+import { realTimeService } from './TimeService.js';
+
+/**
+ * Reconnection event data
+ */
+export interface ReconnectingEvent {
+	attempt: number;
+	delay: number;
+	maxAttempts: number;
+}
+
+export interface ReconnectedEvent {
+	attempt: number;
+}
+
+export interface ReconnectFailedEvent {
+	attempt: number;
+	error: Error;
+}
 
 /**
  * WebSocket message types
@@ -61,14 +89,17 @@ export interface WebSocketTransportConfig {
 	maxReconnectAttempts?: number;
 	/** Initial reconnection delay in milliseconds (default: 1000) */
 	reconnectDelay?: number;
+	/** Time service for scheduling timers (default: realTimeService) */
+	timeService?: TimeService;
 }
 
 /**
  * WebSocket Transport Implementation
  *
  * Bidirectional WebSocket communication with orchestrator server.
+ * Extends EventEmitter for reconnection lifecycle events.
  */
-export class WebSocketTransport implements OrchestratorTransport {
+export class WebSocketTransport extends EventEmitter implements OrchestratorTransport {
 	private ws: WebSocket | null = null;
 	private connected = false;
 	private pendingRequests = new Map<string, PendingRequest>();
@@ -83,12 +114,15 @@ export class WebSocketTransport implements OrchestratorTransport {
 	private readonly pingIntervalMs: number;
 	private readonly maxReconnectAttempts: number;
 	private readonly baseReconnectDelay: number;
+	private readonly timeService: TimeService;
 
 	constructor(private config: WebSocketTransportConfig) {
+		super(); // Initialize EventEmitter
 		this.requestTimeout = config.requestTimeout ?? 30000;
 		this.pingIntervalMs = config.pingInterval ?? 30000;
 		this.maxReconnectAttempts = config.maxReconnectAttempts ?? 10;
 		this.baseReconnectDelay = config.reconnectDelay ?? 1000;
+		this.timeService = config.timeService ?? realTimeService;
 	}
 
 	// ===========================================================================================
@@ -128,7 +162,7 @@ export class WebSocketTransport implements OrchestratorTransport {
 				});
 
 				this.ws.on('error', (error: Error) => {
-					console.error('[WebSocketTransport] WebSocket error:', error);
+					console.error('[WebSocketTransport] WebSocket error:', this.formatConnectionError(error));
 					if (!this.connected) {
 						reject(error);
 					}
@@ -147,7 +181,7 @@ export class WebSocketTransport implements OrchestratorTransport {
 		this.shouldReconnect = false;
 
 		if (this.reconnectTimeout) {
-			clearTimeout(this.reconnectTimeout);
+			this.timeService.clearTimeout(this.reconnectTimeout);
 			this.reconnectTimeout = null;
 		}
 
@@ -177,7 +211,7 @@ export class WebSocketTransport implements OrchestratorTransport {
 
 		return new Promise<B2OResponse>((resolve, reject) => {
 			// Set up timeout
-			const timeout = setTimeout(() => {
+			const timeout = this.timeService.setTimeout(() => {
 				this.pendingRequests.delete(request.id);
 				reject(new Error(`Request timeout after ${this.requestTimeout}ms`));
 			}, this.requestTimeout);
@@ -193,7 +227,7 @@ export class WebSocketTransport implements OrchestratorTransport {
 
 			this.ws!.send(JSON.stringify(message), error => {
 				if (error) {
-					clearTimeout(timeout);
+					this.timeService.clearTimeout(timeout);
 					this.pendingRequests.delete(request.id);
 					reject(error);
 				}
@@ -266,7 +300,7 @@ export class WebSocketTransport implements OrchestratorTransport {
 			return;
 		}
 
-		clearTimeout(pending.timeout);
+		this.timeService.clearTimeout(pending.timeout);
 		this.pendingRequests.delete(response.id);
 
 		pending.resolve(response);
@@ -290,7 +324,7 @@ export class WebSocketTransport implements OrchestratorTransport {
 
 		// Reject all pending requests
 		this.pendingRequests.forEach(pending => {
-			clearTimeout(pending.timeout);
+			this.timeService.clearTimeout(pending.timeout);
 			pending.reject(new Error('WebSocket connection closed'));
 		});
 		this.pendingRequests.clear();
@@ -300,6 +334,10 @@ export class WebSocketTransport implements OrchestratorTransport {
 			this.scheduleReconnect();
 		} else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
 			console.error('[WebSocketTransport] Max reconnection attempts reached');
+			// Emit max attempts reached event
+			this.emit('max_reconnect_attempts', {
+				attempts: this.reconnectAttempts,
+			});
 		}
 	}
 
@@ -321,11 +359,39 @@ export class WebSocketTransport implements OrchestratorTransport {
 			`[WebSocketTransport] Reconnecting in ${actualDelay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`
 		);
 
-		this.reconnectTimeout = setTimeout(() => {
+		// Emit reconnecting event
+		this.emit('reconnecting', {
+			attempt: this.reconnectAttempts,
+			delay: actualDelay,
+			maxAttempts: this.maxReconnectAttempts,
+		} satisfies ReconnectingEvent);
+
+		this.reconnectTimeout = this.timeService.setTimeout(async () => {
 			this.reconnectTimeout = null;
-			this.connect().catch(error => {
-				console.error('[WebSocketTransport] Reconnection failed:', error);
-			});
+			try {
+				await this.connect();
+				// Emit reconnected event
+				this.emit('reconnected', {
+					attempt: this.reconnectAttempts,
+				} satisfies ReconnectedEvent);
+			} catch (error) {
+				console.error('[WebSocketTransport] Reconnection failed:', this.formatConnectionError(error));
+				// Emit reconnect_failed event
+				this.emit('reconnect_failed', {
+					attempt: this.reconnectAttempts,
+					error: error as Error,
+				} satisfies ReconnectFailedEvent);
+
+				// Schedule another reconnection attempt if we haven't reached max
+				if (this.shouldReconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
+					this.scheduleReconnect();
+				} else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+					console.error('[WebSocketTransport] Max reconnection attempts reached');
+					this.emit('max_reconnect_attempts', {
+						attempts: this.reconnectAttempts,
+					});
+				}
+			}
 		}, actualDelay);
 	}
 
@@ -378,7 +444,7 @@ export class WebSocketTransport implements OrchestratorTransport {
 	private startPingPong(): void {
 		this.stopPingPong();
 
-		this.pingInterval = setInterval(() => {
+		this.pingInterval = this.timeService.setInterval(() => {
 			if (this.ws && this.connected) {
 				const message: WSMessage = { type: 'ping' };
 				this.ws.send(JSON.stringify(message), error => {
@@ -392,8 +458,25 @@ export class WebSocketTransport implements OrchestratorTransport {
 
 	private stopPingPong(): void {
 		if (this.pingInterval) {
-			clearInterval(this.pingInterval);
+			this.timeService.clearInterval(this.pingInterval);
 			this.pingInterval = null;
 		}
+	}
+
+	/**
+	 * Format connection errors in a concise single-line format
+	 */
+	private formatConnectionError(error: any): string {
+		if (error.code === 'ECONNREFUSED') {
+			return 'Connection refused - orchestrator not running?';
+		}
+		if (error.code === 'ETIMEDOUT') {
+			return 'Connection timeout';
+		}
+		if (error.code === 'ENOTFOUND') {
+			return 'Host not found';
+		}
+		// For other errors, show just the message
+		return error.message || String(error);
 	}
 }

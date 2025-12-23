@@ -377,7 +377,20 @@ describe('InMemoryStorage', () => {
 	describe('clear - Clear all data', () => {
 		it('should clear all tables', async () => {
 			await storage.seed('books', [sampleBook]);
-			await storage.seed('ingredients', [{ id: '1', name: 'Apple' }]);
+			await storage.seed('ingredients', [
+				{
+					id: '1',
+					name: 'Apple',
+					calories: 52,
+					protein: 0.3,
+					carbs: 14,
+					fat: 0.2,
+					servingSize: 100,
+					version: 1,
+					createdAt: '2024-01-01T00:00:00.000Z',
+					updatedAt: '2024-01-01T00:00:00.000Z',
+				},
+			]);
 
 			await storage.clear();
 
@@ -392,7 +405,20 @@ describe('InMemoryStorage', () => {
 	describe('clearTable - Clear a specific table', () => {
 		it('should clear a specific table', async () => {
 			await storage.seed('books', [sampleBook]);
-			await storage.seed('ingredients', [{ id: '1', name: 'Apple' }]);
+			await storage.seed('ingredients', [
+				{
+					id: '1',
+					name: 'Apple',
+					calories: 52,
+					protein: 0.3,
+					carbs: 14,
+					fat: 0.2,
+					servingSize: 100,
+					version: 1,
+					createdAt: '2024-01-01T00:00:00.000Z',
+					updatedAt: '2024-01-01T00:00:00.000Z',
+				},
+			]);
 
 			await storage.clearTable('books');
 

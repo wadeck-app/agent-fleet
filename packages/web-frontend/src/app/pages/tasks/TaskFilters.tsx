@@ -60,7 +60,7 @@ export function TaskFilters({
 
 	return (
 		<Card>
-			<CardContent className="pt-6">
+			<CardContent>
 				<div
 					className={`
        flex flex-col gap-4
@@ -68,12 +68,12 @@ export function TaskFilters({
      `}
 				>
 					{/* Status Filter */}
-					<div className="flex-1">
+					<div className="flex-1 space-y-2">
 						<Label htmlFor="status-filter">Status</Label>
 						<select
 							id="status-filter"
 							className={`
-         w-full rounded-md border border-input bg-background px-3 py-2 text-sm
+         h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm
          ring-offset-background
          focus-visible:ring-2 focus-visible:ring-ring
          focus-visible:ring-offset-2 focus-visible:outline-none
@@ -90,12 +90,12 @@ export function TaskFilters({
 					</div>
 
 					{/* Priority Filter */}
-					<div className="flex-1">
+					<div className="flex-1 space-y-2">
 						<Label htmlFor="priority-filter">Priority</Label>
 						<select
 							id="priority-filter"
 							className={`
-         w-full rounded-md border border-input bg-background px-3 py-2 text-sm
+         h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm
          ring-offset-background
          focus-visible:ring-2 focus-visible:ring-ring
          focus-visible:ring-offset-2 focus-visible:outline-none
@@ -112,7 +112,7 @@ export function TaskFilters({
 					</div>
 
 					{/* Worker ID Filter */}
-					<div className="flex-1">
+					<div className="flex-1 space-y-2">
 						<Label htmlFor="worker-filter">Worker ID</Label>
 						<Input
 							id="worker-filter"
@@ -122,6 +122,7 @@ export function TaskFilters({
 							onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
 								onWorkerIdChange(e.target.value || undefined)
 							}
+							className="h-10"
 						/>
 					</div>
 

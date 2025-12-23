@@ -129,7 +129,8 @@ try {
 		// Typically for native modules or when you want node_modules at runtime
 
 		external: [
-			// Example: 'fsevents', 'lightningcss',
+			// terminal-kit has non-JS files (README) that cause build issues
+			'terminal-kit',
 		],
 
 		// ====================================================================
@@ -159,6 +160,12 @@ try {
 
 		// Keep original function/class names (for profiling/debugging)
 		// keepNames: true,
+
+		// Loader configuration to handle non-JS files
+		loader: {
+			'.README': 'text',
+			'.md': 'text',
+		},
 	});
 
 	// ====================================================================

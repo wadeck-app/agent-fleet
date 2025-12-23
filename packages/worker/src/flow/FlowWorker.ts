@@ -155,7 +155,7 @@ export class FlowWorker implements Shutdownable {
 			});
 
 			this.ws.on('error', error => {
-				console.error(`${this.logPrefix()} WebSocket error:`, error);
+				console.error(`${this.logPrefix()} WebSocket error: ${this.formatConnectionError(error)}`);
 				reject(error);
 			});
 		});
@@ -277,7 +277,7 @@ export class FlowWorker implements Shutdownable {
 
 		setTimeout(() => {
 			this.connect().catch(error => {
-				console.error(`${this.logPrefix()} Reconnection failed:`, error);
+				console.error(`${this.logPrefix()} Reconnection failed: ${this.formatConnectionError(error)}`);
 				// Will retry via the 'close' event handler
 			});
 		}, delay);
@@ -812,6 +812,23 @@ export class FlowWorker implements Shutdownable {
 
 	protected logPrefix(): string {
 		return `[FlowWorker ${this.workerId}]`;
+	}
+
+	/**
+	 * Format connection errors in a concise single-line format
+	 */
+	private formatConnectionError(error: any): string {
+		if (error.code === 'ECONNREFUSED') {
+			return 'Connection refused - orchestrator not running?';
+		}
+		if (error.code === 'ETIMEDOUT') {
+			return 'Connection timeout';
+		}
+		if (error.code === 'ENOTFOUND') {
+			return 'Host not found';
+		}
+		// For other errors, show just the message
+		return error.message || String(error);
 	}
 
 	/**

@@ -36,6 +36,9 @@ const navigationItems: NavItem[] = [
 		icon: FolderKanban,
 	},
 	{
+		type: 'separator',
+	},
+	{
 		path: '/ingredients',
 		label: 'Ingredients',
 		icon: Package2,

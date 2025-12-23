@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { IncomingMessage } from 'http';
+import { MockOrchestratorClient } from 'orchestrator-adapters';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MockAuthService } from '@/auth/MockAuthService';
@@ -82,7 +83,8 @@ describe('WebSocketTransportServer', () => {
 		authService = new MockAuthService('test-secret');
 
 		// Create factory
-		factory = new DataStoreFactory('memory');
+		const mockOrchestratorClient = new MockOrchestratorClient();
+		factory = new DataStoreFactory('memory', mockOrchestratorClient);
 
 		// Create session manager
 		sessionManager = new WebSocketSessionManager(authService);
@@ -259,7 +261,7 @@ describe('WebSocketTransportServer', () => {
 			// Create request
 			const request = {
 				id: 'req-1',
-				method: 'GET',
+				method: 'GET' as const,
 				path: '/api/workspaces',
 				timestamp: Date.now(),
 			};
@@ -555,7 +557,7 @@ describe('WebSocketTransportServer', () => {
 			// Should not throw when processing unknown message type
 			expect(() => {
 				// In real code, this would log a warning but not crash
-				if (message.type !== 'subscription' && !message.id) {
+				if (message.type !== 'subscription' && !(message as any).id) {
 					// Unknown message type
 				}
 			}).not.toThrow();

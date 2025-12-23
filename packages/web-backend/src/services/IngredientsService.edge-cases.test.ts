@@ -65,7 +65,7 @@ describe('IngredientsService - Edge Cases', () => {
 			const result = await service.list({ page: 0 as any });
 
 			// Implicit conversion: page 0 should behave like page 1
-			expect(result.pagination.page).toBe(1);
+			expect(result.pagination!.page).toBe(1);
 		});
 
 		it('should handle negative page size by using default', async () => {
@@ -75,7 +75,7 @@ describe('IngredientsService - Edge Cases', () => {
 			const result = await service.list({ pageSize: -5 as any });
 
 			// Should use default or minimum (10)
-			expect(result.pagination.pageSize).toBeGreaterThan(0);
+			expect(result.pagination!.pageSize).toBeGreaterThan(0);
 		});
 
 		it('should handle pageSize of 0 by using default', async () => {
@@ -85,7 +85,7 @@ describe('IngredientsService - Edge Cases', () => {
 			const result = await service.list({ pageSize: 0 as any });
 
 			// Should use default (10)
-			expect(result.pagination.pageSize).toBeGreaterThan(0);
+			expect(result.pagination!.pageSize).toBeGreaterThan(0);
 		});
 
 		it('should handle page beyond total pages', async () => {
@@ -96,8 +96,8 @@ describe('IngredientsService - Edge Cases', () => {
 
 			// Should return empty items but valid pagination
 			expect(result.items).toHaveLength(0);
-			expect(result.pagination.page).toBe(999);
-			expect(result.pagination.total).toBe(1);
+			expect(result.pagination!.page).toBe(999);
+			expect(result.pagination!.total).toBe(1);
 		});
 
 		it('should handle exactly 100 items with pageSize 100', async () => {
@@ -110,7 +110,7 @@ describe('IngredientsService - Edge Cases', () => {
 			const result = await service.list({ page: 1, pageSize: 100 });
 
 			expect(result.items).toHaveLength(100);
-			expect(result.pagination.totalPages).toBe(1);
+			expect(result.pagination!.totalPages).toBe(1);
 		});
 
 		it('should handle 101 items with pageSize 100', async () => {
@@ -123,7 +123,7 @@ describe('IngredientsService - Edge Cases', () => {
 			const result = await service.list({ page: 1, pageSize: 100 });
 
 			expect(result.items).toHaveLength(100);
-			expect(result.pagination.totalPages).toBe(2);
+			expect(result.pagination!.totalPages).toBe(2);
 
 			const page2 = await service.list({ page: 2, pageSize: 100 });
 			expect(page2.items).toHaveLength(1);

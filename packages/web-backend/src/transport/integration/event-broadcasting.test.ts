@@ -87,9 +87,10 @@ describe('Event Broadcasting Integration', () => {
 			// Broadcast event
 			const task = {
 				id: 'task-1',
-				name: 'New task',
-				status: 'pending' as const,
-				priority: 1,
+				description: 'New task',
+				status: 'todo' as const,
+				assignedWorker: null,
+				priority: 'high' as const,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
@@ -118,9 +119,10 @@ describe('Event Broadcasting Integration', () => {
 			// Broadcast update event
 			const task = {
 				id: 'task-1',
-				name: 'Updated task',
+				description: 'Updated task',
 				status: 'in_progress' as const,
-				priority: 2,
+				assignedWorker: null,
+				priority: 'medium' as const,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
@@ -165,9 +167,10 @@ describe('Event Broadcasting Integration', () => {
 			// Broadcast task event
 			const task = {
 				id: 'task-1',
-				name: 'Test task',
-				status: 'pending' as const,
-				priority: 1,
+				description: 'Test task',
+				status: 'todo' as const,
+				assignedWorker: null,
+				priority: 'high' as const,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
@@ -259,9 +262,10 @@ describe('Event Broadcasting Integration', () => {
 			// Send to specific client
 			const task = {
 				id: 'task-1',
-				name: 'Test task',
-				status: 'pending' as const,
-				priority: 1,
+				description: 'Test task',
+				status: 'todo' as const,
+				assignedWorker: null,
+				priority: 'high' as const,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
@@ -308,9 +312,10 @@ describe('Event Broadcasting Integration', () => {
 			// Send to user (all devices)
 			const task = {
 				id: 'task-1',
-				name: 'Test task',
-				status: 'pending' as const,
-				priority: 1,
+				description: 'Test task',
+				status: 'todo' as const,
+				assignedWorker: null,
+				priority: 'high' as const,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
@@ -344,27 +349,30 @@ describe('Event Broadcasting Integration', () => {
 			// Broadcast multiple events concurrently
 			const task1 = {
 				id: 'task-1',
-				name: 'Task 1',
-				status: 'pending' as const,
-				priority: 1,
+				description: 'Task 1',
+				status: 'todo' as const,
+				assignedWorker: null,
+				priority: 'high' as const,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
 
 			const task2 = {
 				id: 'task-2',
-				name: 'Task 2',
+				description: 'Task 2',
 				status: 'in_progress' as const,
-				priority: 2,
+				assignedWorker: null,
+				priority: 'medium' as const,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
 
 			const task3 = {
 				id: 'task-3',
-				name: 'Task 3',
-				status: 'completed' as const,
-				priority: 3,
+				description: 'Task 3',
+				status: 'merged' as const,
+				assignedWorker: null,
+				priority: 'high' as const,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
@@ -395,9 +403,10 @@ describe('Event Broadcasting Integration', () => {
 
 			const task = {
 				id: 'task-1',
-				name: 'Test task',
-				status: 'pending' as const,
-				priority: 1,
+				description: 'Test task',
+				status: 'todo' as const,
+				assignedWorker: null,
+				priority: 'high' as const,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
@@ -405,7 +414,7 @@ describe('Event Broadcasting Integration', () => {
 			// Test different task events
 			broadcaster.broadcast('task:created', task);
 			broadcaster.broadcast('task:updated', task);
-			broadcaster.broadcast('task:deleted', { id: task.id });
+			broadcaster.broadcast('task:deleted', task);
 
 			expect(mockTransport.broadcasts).toHaveLength(3);
 			expect(mockTransport.broadcasts[0].event).toBe('task:created');
@@ -426,12 +435,10 @@ describe('Event Broadcasting Integration', () => {
 			mockTransport.simulateConnect('client-1');
 
 			const worker = {
-				id: 'worker-1',
-				name: 'Test worker',
+				workerId: 'worker-1',
+				type: 'test',
+				connected: true,
 				state: 'idle' as const,
-				capacity: 10,
-				createdAt: new Date().toISOString(),
-				updatedAt: new Date().toISOString(),
 			};
 
 			broadcaster.broadcast('worker:created', worker);
@@ -455,9 +462,12 @@ describe('Event Broadcasting Integration', () => {
 
 			const workspace = {
 				id: 'workspace-1',
-				name: 'Test workspace',
+				status: 'active' as const,
 				createdAt: new Date().toISOString(),
-				updatedAt: new Date().toISOString(),
+				path: '/test/workspace',
+				mode: 'development' as const,
+				tasksCount: 0,
+				lastUsed: new Date().toISOString(),
 			};
 
 			broadcaster.broadcast('workspace:created', workspace);
@@ -515,9 +525,10 @@ describe('Event Broadcasting Integration', () => {
 			// Try to send to non-existent client
 			const task = {
 				id: 'task-1',
-				name: 'Test task',
-				status: 'pending' as const,
-				priority: 1,
+				description: 'Test task',
+				status: 'todo' as const,
+				assignedWorker: null,
+				priority: 'high' as const,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
@@ -534,9 +545,10 @@ describe('Event Broadcasting Integration', () => {
 		it('should handle sendToUser for user with no sessions', () => {
 			const task = {
 				id: 'task-1',
-				name: 'Test task',
-				status: 'pending' as const,
-				priority: 1,
+				description: 'Test task',
+				status: 'todo' as const,
+				assignedWorker: null,
+				priority: 'high' as const,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};

@@ -46,9 +46,10 @@ describe('EventBroadcaster', () => {
 			// Arrange
 			const task = {
 				id: 'task-1',
-				name: 'Test task',
-				status: 'pending' as const,
-				priority: 1,
+				description: 'Test task',
+				status: 'todo' as const,
+				assignedWorker: null,
+				priority: 'high' as const,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
@@ -66,18 +67,20 @@ describe('EventBroadcaster', () => {
 			// Arrange
 			const task1 = {
 				id: 'task-1',
-				name: 'Task 1',
-				status: 'pending' as const,
-				priority: 1,
+				description: 'Task 1',
+				status: 'todo' as const,
+				assignedWorker: null,
+				priority: 'high' as const,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
 
 			const task2 = {
 				id: 'task-2',
-				name: 'Task 2',
-				status: 'completed' as const,
-				priority: 2,
+				description: 'Task 2',
+				status: 'merged' as const,
+				assignedWorker: null,
+				priority: 'medium' as const,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
@@ -101,9 +104,10 @@ describe('EventBroadcaster', () => {
 
 			const task = {
 				id: 'task-1',
-				name: 'Test task',
-				status: 'pending' as const,
-				priority: 1,
+				description: 'Test task',
+				status: 'todo' as const,
+				assignedWorker: null,
+				priority: 'high' as const,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
@@ -123,9 +127,10 @@ describe('EventBroadcaster', () => {
 			const clientId = 'client-disconnected';
 			const task = {
 				id: 'task-1',
-				name: 'Test task',
-				status: 'pending' as const,
-				priority: 1,
+				description: 'Test task',
+				status: 'todo' as const,
+				assignedWorker: null,
+				priority: 'high' as const,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
@@ -159,9 +164,10 @@ describe('EventBroadcaster', () => {
 
 			const task = {
 				id: 'task-1',
-				name: 'Test task',
-				status: 'pending' as const,
-				priority: 1,
+				description: 'Test task',
+				status: 'todo' as const,
+				assignedWorker: null,
+				priority: 'high' as const,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
@@ -182,9 +188,10 @@ describe('EventBroadcaster', () => {
 			const userId = 'user-no-sessions';
 			const task = {
 				id: 'task-1',
-				name: 'Test task',
-				status: 'pending' as const,
-				priority: 1,
+				description: 'Test task',
+				status: 'todo' as const,
+				assignedWorker: null,
+				priority: 'high' as const,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};

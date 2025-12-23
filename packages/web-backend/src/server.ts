@@ -42,30 +42,23 @@ async function initializeOrchestratorClient(): Promise<OrchestratorClient> {
 	const mode = process.env.ORCHESTRATOR_MODE || 'library';
 
 	if (mode === 'library') {
-		// Library mode: dynamic import orchestrator and create LibraryAdapter
+		// Library mode: Factory will create and start orchestrator internally
 		logger.info('[Orchestrator] Initializing in library mode (embedded)');
 
-		// Dynamic import to avoid bundling orchestrator in remote mode builds
-		// @ts-expect-error - orchestrator is a devDependency, only available at runtime in library mode
-		const { Orchestrator } = await import('orchestrator/core/index.js');
-
-		// Create orchestrator instance
 		const orchestratorWsPort = parseInt(process.env.ORCHESTRATOR_WS_PORT || '3738', 10);
 		const orchestratorRestPort = parseInt(process.env.ORCHESTRATOR_REST_PORT || '3737', 10);
 
-		const orchestrator = new Orchestrator({
+		// Factory handles orchestrator creation and startup
+		const orchestratorClient = await OrchestratorClientFactory.create({
+			mode: 'library',
 			wsPort: orchestratorWsPort,
 			restPort: orchestratorRestPort,
 		});
 
-		await orchestrator.start();
-		logger.info(`[Orchestrator] Started on WS port ${orchestratorWsPort}, REST port ${orchestratorRestPort}`);
-
-		// Create LibraryAdapter
-		const orchestratorClient = await OrchestratorClientFactory.create({ mode: 'library' }, orchestrator);
-
 		await orchestratorClient.connect();
-		logger.info('[Orchestrator] LibraryAdapter connected');
+		logger.info(
+			`[Orchestrator] LibraryAdapter connected (WS: ${orchestratorWsPort}, REST: ${orchestratorRestPort})`
+		);
 
 		return orchestratorClient;
 	} else if (mode === 'remote') {

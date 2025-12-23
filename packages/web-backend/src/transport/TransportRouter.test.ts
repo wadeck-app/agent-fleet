@@ -1,3 +1,4 @@
+import { MockOrchestratorClient } from 'orchestrator-adapters';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { TransportRequest, TransportResponse } from '@app/shared';
@@ -40,7 +41,8 @@ describe('TransportRouter', () => {
 
 	beforeEach(() => {
 		// Create factory with in-memory storage
-		factory = new DataStoreFactory('memory');
+		const mockOrchestratorClient = new MockOrchestratorClient();
+		factory = new DataStoreFactory('memory', mockOrchestratorClient);
 
 		// Create auth service
 		authService = new MockAuthService('test-secret');
@@ -527,7 +529,7 @@ describe('TransportRouter', () => {
 				summary: expect.any(Object),
 				workspaces: expect.any(Array),
 			});
-			expect(Array.isArray(response.body.workspaces)).toBe(true);
+			expect(Array.isArray((response.body as any).workspaces)).toBe(true);
 		});
 
 		it('should handle multiple concurrent requests', async () => {

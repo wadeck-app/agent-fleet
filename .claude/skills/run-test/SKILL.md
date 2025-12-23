@@ -1,6 +1,6 @@
 ---
 name: run-test
-description: Run all tests with minimal context-efficient output. Use when verifying code changes, before creating PRs, or after implementing features. Outputs 3 lines on success, logs errors to test-errors.log on failure.
+description: Run all tests with minimal context-efficient output. Use when verifying code changes, before creating PRs, or after implementing features. Outputs 3 lines on success, logs errors to test-errors.log on failure. Do not use this skill to run a single test file.
 allowed-tools:
     - Bash
     - Read
@@ -9,6 +9,7 @@ allowed-tools:
 # Run-Test Agent Skill
 
 Run comprehensive test suites (unit + E2E) with minimal console output to reduce context pollution for LLM agents.
+<important>Please do not use this skill if you intent to only test a single class.</important>
 
 ## When to Use
 

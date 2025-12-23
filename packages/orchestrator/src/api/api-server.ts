@@ -34,8 +34,8 @@ import cors from '@fastify/cors';
 import fastifyWebsocket from '@fastify/websocket';
 import dotenv from 'dotenv';
 import Fastify from 'fastify';
-import { Orchestrator } from 'orchestrator/core/index.js';
 
+import { Orchestrator } from '../core/index.js';
 import { OrchestratorEventBroadcaster } from './OrchestratorEventBroadcaster.js';
 import { OrchestratorRequestHandler } from './OrchestratorRequestHandler.js';
 import { registerLongPollingRoute } from './endpoints/LongPollingRoute.js';

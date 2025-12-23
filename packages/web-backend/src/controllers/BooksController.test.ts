@@ -291,6 +291,7 @@ describe('BooksController', () => {
 		it('should update a book successfully', async () => {
 			const updateData: UpdateBook = {
 				title: 'Updated Title',
+				author: 'Updated Author',
 				version: 1,
 			};
 
@@ -315,6 +316,7 @@ describe('BooksController', () => {
 		it('should throw NotFoundException when updating non-existent book', async () => {
 			const updateData: UpdateBook = {
 				title: 'Updated Title',
+				author: 'Updated Author',
 				version: 1,
 			};
 
@@ -329,6 +331,7 @@ describe('BooksController', () => {
 		it('should throw ConflictException on version mismatch (optimistic locking)', async () => {
 			const updateData: UpdateBook = {
 				title: 'Updated Title',
+				author: 'Updated Author',
 				version: 1,
 			};
 
@@ -346,6 +349,8 @@ describe('BooksController', () => {
 
 		it('should throw ConflictException when updating ISBN to existing one', async () => {
 			const updateData: UpdateBook = {
+				title: 'Book Title',
+				author: 'Book Author',
 				isbn: '978-0132350884',
 				version: 1,
 			};
@@ -445,7 +450,7 @@ describe('BooksController', () => {
 	describe('DELETE /api/books/ - Bulk delete books', () => {
 		it('should delete multiple books successfully', async () => {
 			const bulkResponse = {
-				success: true,
+				success: true as const,
 				deleted: ['1', '2', '3'],
 				failed: [],
 				totalRequested: 3,
@@ -465,7 +470,7 @@ describe('BooksController', () => {
 
 		it('should handle partial failures', async () => {
 			const bulkResponse = {
-				success: true,
+				success: true as const,
 				deleted: ['1', '3'],
 				failed: [
 					{

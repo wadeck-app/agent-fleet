@@ -1,13 +1,16 @@
+import { MockOrchestratorClient } from 'orchestrator-adapters';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { Book, Ingredient } from '@app/shared';
 
+import { MockAuthService } from '../auth/MockAuthService';
 import { BooksService } from '../services/BooksService';
 import { DashboardService } from '../services/DashboardService';
 import { IngredientsService } from '../services/IngredientsService';
 import { TasksService } from '../services/TasksService';
 import { InMemoryStorage } from '../storage/InMemoryStorage';
 import { EventBroadcaster } from '../transport/EventBroadcaster';
+import { WebSocketSessionManager } from '../transport/WebSocketSessionManager';
 import { MockTransportServer } from '../transport/adapters/MockTransportServer';
 import { DataStoreFactory } from './DataStoreFactory';
 
@@ -30,13 +33,17 @@ describe('DataStoreFactory', () => {
 	let factory: DataStoreFactory;
 	let mockTransportServer: MockTransportServer;
 	let eventBroadcaster: EventBroadcaster;
+	let mockOrchestratorClient: MockOrchestratorClient;
 
 	beforeEach(() => {
-		factory = new DataStoreFactory('memory');
+		mockOrchestratorClient = new MockOrchestratorClient();
+		factory = new DataStoreFactory('memory', mockOrchestratorClient);
 
 		// Initialize EventBroadcaster for tests that need it
 		mockTransportServer = new MockTransportServer();
-		eventBroadcaster = new EventBroadcaster(mockTransportServer);
+		const authService = new MockAuthService('test-secret');
+		const sessionManager = new WebSocketSessionManager(authService);
+		eventBroadcaster = new EventBroadcaster(mockTransportServer, sessionManager);
 		factory.setEventBroadcaster(eventBroadcaster);
 	});
 
@@ -48,11 +55,13 @@ describe('DataStoreFactory', () => {
 		});
 
 		it('should throw error for MariaDB mode (not yet implemented)', () => {
-			expect(() => new DataStoreFactory('mariadb')).toThrow('MariaDB storage not yet implemented');
+			const client = new MockOrchestratorClient();
+			expect(() => new DataStoreFactory('mariadb', client)).toThrow('MariaDB storage not yet implemented');
 		});
 
 		it('should default to memory mode when no mode specified', () => {
-			const defaultFactory = new DataStoreFactory();
+			const client = new MockOrchestratorClient();
+			const defaultFactory = new DataStoreFactory('memory', client);
 			const storage = defaultFactory.getStorage();
 
 			expect(storage).toBeInstanceOf(InMemoryStorage);
@@ -230,8 +239,8 @@ describe('DataStoreFactory', () => {
 
 			// Default pagination returns 10 items per page
 			expect(books.items).toHaveLength(10);
-			expect(books.pagination.total).toBe(35);
-			expect(books.pagination.totalPages).toBe(4);
+			expect(books.pagination!.total).toBe(35);
+			expect(books.pagination!.totalPages).toBe(4);
 			expect(books.items[0]).toMatchObject({
 				id: '1',
 				title: 'The Pragmatic Programmer',
@@ -264,6 +273,7 @@ describe('DataStoreFactory', () => {
 			// Update seeded book
 			const updated = await booksService.update('1', {
 				title: 'Updated Title',
+				author: 'Updated Author',
 				version: 1,
 			});
 			expect(updated.title).toBe('Updated Title');
@@ -341,6 +351,7 @@ describe('DataStoreFactory', () => {
 			// Update
 			const updated = await service.update(created.id, {
 				title: 'Updated Title',
+				author: 'Updated Author',
 				version: 1,
 			});
 			expect(updated.title).toBe('Updated Title');
@@ -394,6 +405,7 @@ describe('DataStoreFactory', () => {
 			// Successful update with correct version
 			const updated = await service.update(book.id, {
 				title: 'Updated Title',
+				author: 'Updated Author',
 				version: 1,
 			});
 			expect(updated.version).toBe(2);
@@ -402,6 +414,7 @@ describe('DataStoreFactory', () => {
 			await expect(
 				service.update(book.id, {
 					title: 'Another Update',
+					author: 'Another Author',
 					version: 1, // Stale version
 				})
 			).rejects.toThrow('Book has been modified by another user');

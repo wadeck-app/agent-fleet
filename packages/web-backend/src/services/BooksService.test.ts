@@ -158,8 +158,8 @@ describe('BooksService', () => {
 
 			// Should be capped at 100
 			expect(result.items).toHaveLength(100);
-			expect(result.pagination.pageSize).toBe(100);
-			expect(result.pagination.totalPages).toBe(2);
+			expect(result.pagination!.pageSize).toBe(100);
+			expect(result.pagination!.totalPages).toBe(2);
 		});
 
 		it('should handle empty results', async () => {
