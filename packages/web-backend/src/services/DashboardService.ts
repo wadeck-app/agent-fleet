@@ -54,7 +54,7 @@ export class DashboardService {
 				timestamp: new Date().toISOString(),
 				orchestrator: {
 					status: 'ready', // Hardcoded for MVP
-					uptime: stats.uptime, // From orchestrator
+					uptime: stats.uptime ?? 0, // From orchestrator, default 0 if undefined
 					version: '1.0.0', // Hardcoded for MVP
 				},
 				workers: {

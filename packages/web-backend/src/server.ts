@@ -66,29 +66,8 @@ async function initializeOrchestratorClient(): Promise<OrchestratorClient> {
 		logger.info(`[Orchestrator] Connected (WS: ${orchestratorWsPort}, REST disabled in library mode)`);
 
 		return orchestratorClient;
-	} else if (mode === 'remote') {
-		// Remote mode: create RemoteAdapter with URL
-		const url = process.env.ORCHESTRATOR_URL;
-		if (!url) {
-			throw new Error('ORCHESTRATOR_URL is required when ORCHESTRATOR_MODE=remote');
-		}
-
-		logger.info(`[Orchestrator] Initializing in remote mode (URL: ${url})`);
-
-		const transportMode = (process.env.ORCHESTRATOR_TRANSPORT as any) || 'auto';
-
-		const orchestratorClient = await OrchestratorClientFactory.create({
-			mode: 'remote',
-			url,
-			transportMode,
-		});
-
-		await orchestratorClient.connect();
-		logger.info('[Orchestrator] RemoteAdapter connected');
-
-		return orchestratorClient;
 	} else {
-		throw new Error(`Invalid ORCHESTRATOR_MODE: ${mode}. Must be 'library' or 'remote'.`);
+		throw new Error(`Invalid ORCHESTRATOR_MODE: ${mode}. Must be 'library'.`);
 	}
 }
 

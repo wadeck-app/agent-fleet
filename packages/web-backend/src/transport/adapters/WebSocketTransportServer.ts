@@ -413,7 +413,7 @@ export class WebSocketTransportServer implements ITransportServer {
 					// 1 = OPEN
 					socket.close(1000, 'Server shutting down');
 				}
-			} catch (error) {
+			} catch (_error) {
 				// Ignore errors when closing sockets
 			}
 		});
