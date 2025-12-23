@@ -74,7 +74,7 @@ export function ConnectivityIndicator({ showWhenConnected = false, className }: 
 							forceRetry();
 						}}
 						className={`
-        ml-1 transition-opacity
+        ml-1 cursor-pointer transition-opacity
         hover:opacity-70
       `}
 						title="Retry now"

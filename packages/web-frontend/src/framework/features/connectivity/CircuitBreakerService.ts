@@ -393,8 +393,8 @@ export class CircuitBreakerServiceClass {
 		this.healthCheckTimerId = this.scheduler.schedule(async () => {
 			// Transition to HALF_OPEN for testing
 			this.state = CircuitState.HALF_OPEN;
-			// Clear nextRetryTime during health check (badge will show "Reconnecting" without countdown)
-			this.nextRetryTime = null;
+			// Keep nextRetryTime for UI countdown during health check
+			// This way the user sees a continuous countdown instead of it jumping
 			this.notifyListeners();
 
 			try {
