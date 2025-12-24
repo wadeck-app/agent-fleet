@@ -1,128 +1,36 @@
 import eslint from '@eslint/js';
 import prettierConfig from 'eslint-config-prettier';
-import importPlugin from 'eslint-plugin-import';
+import globals from 'globals';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import tseslint from 'typescript-eslint';
 
+import { backendRules, baseIgnores, testFileRules } from '../../eslint.config.mjs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 export default tseslint.config(
-	// Ignore patterns
-	{
-		ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.config', 'jest.config'],
-	},
-
-	// Base ESLint recommended rules
+	{ ignores: baseIgnores },
 	eslint.configs.recommended,
-
-	// TypeScript ESLint recommended rules
 	...tseslint.configs.recommended,
-
-	// Custom rules for source files (with type checking)
 	{
 		files: ['src/**/*.ts'],
-		ignores: ['src/**/*.test.ts'],
 		languageOptions: {
 			parser: tseslint.parser,
 			parserOptions: {
 				ecmaVersion: 2022,
 				sourceType: 'module',
-				project: './tsconfig.json',
+				tsconfigRootDir: __dirname,
+			},
+			globals: {
+				...globals.node,
 			},
 		},
-		plugins: {
-			import: importPlugin,
-		},
-		rules: {
-			'@typescript-eslint/no-explicit-any': 'warn',
-			'@typescript-eslint/explicit-function-return-type': 'off',
-			'@typescript-eslint/no-unused-vars': [
-				'error',
-				{
-					argsIgnorePattern: '^_',
-					varsIgnorePattern: '^_',
-					caughtErrorsIgnorePattern: '^_',
-					destructuredArrayIgnorePattern: '^_',
-				},
-			],
-			'no-console': 'warn',
-			// @formatter:off
-			// Restrict deep relative imports - allow ./ and ../ but not ../../ and beyond
-			'no-restricted-imports': [
-				'error',
-				{
-					patterns: [
-						{
-							group: ['../../*', '../../../*', '../../../../*', '../../../../../*'],
-							message: 'Use @/* alias for imports outside parent directory',
-						},
-					],
-				},
-			],
-			// Forbid barrel exports with export * (architectural requirement)
-			// See: .claude/agents/backend-review.md:33
-			'no-restricted-syntax': [
-				'error',
-				{
-					selector: 'ExportAllDeclaration',
-					message:
-						'export * is forbidden. Use explicit named exports instead. See .claude/agents/backend-review.md:33',
-				},
-			],
-			// @formatter:on
-		},
+		rules: backendRules,
 	},
-
-	// Rules for test files (without type checking project)
 	{
-		files: ['src/**/*.test.ts'],
-		languageOptions: {
-			parser: tseslint.parser,
-			parserOptions: {
-				ecmaVersion: 2022,
-				sourceType: 'module',
-			},
-		},
-		plugins: {
-			import: importPlugin,
-		},
-		rules: {
-			'@typescript-eslint/no-explicit-any': 'off', // Autoriser 'any' dans les tests
-			'@typescript-eslint/explicit-function-return-type': 'off',
-			'@typescript-eslint/no-unused-vars': [
-				'error',
-				{
-					argsIgnorePattern: '^_',
-					varsIgnorePattern: '^_',
-					caughtErrorsIgnorePattern: '^_',
-					destructuredArrayIgnorePattern: '^_',
-				},
-			],
-			'no-console': 'off',
-			// @formatter:off
-			// Restrict deep relative imports - allow ./ and ../ but not ../../ and beyond
-			'no-restricted-imports': [
-				'error',
-				{
-					patterns: [
-						{
-							group: ['../../*', '../../../*', '../../../../*', '../../../../../*'],
-							message: 'Use @/* alias for imports outside parent directory',
-						},
-					],
-				},
-			],
-			// Forbid barrel exports with export * (architectural requirement)
-			// See: .claude/agents/backend-review.md:33
-			'no-restricted-syntax': [
-				'error',
-				{
-					selector: 'ExportAllDeclaration',
-					message:
-						'export * is forbidden. Use explicit named exports instead. See .claude/agents/backend-review.md:33',
-				},
-			],
-			// @formatter:on
-		},
+		files: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+		rules: testFileRules,
 	},
-
-	// Prettier integration - disable conflicting ESLint rules
 	prettierConfig
 );

@@ -5,6 +5,8 @@
 	"type": "module",
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
+		"lint": "eslint src",
+		"lint:fix": "eslint src --fix",
 		"clean": "rimraf dist dist-types"
 	},
 	"dependencies": {

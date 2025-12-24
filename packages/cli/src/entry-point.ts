@@ -119,34 +119,30 @@ async function showStats(): Promise<void> {
 
 // @formatter:off
 async function resolvePartialTaskId(partialId: string): Promise<string> {
-	try {
-		const response = await fetch(`${REST_API_URL}/tasks`);
+	const response = await fetch(`${REST_API_URL}/tasks`);
 
-		if (!response.ok) {
-			throw new Error('Failed to fetch tasks');
-		}
-
-		const tasks = (await response.json()) as Task[];
-		const matches = tasks.filter(task => task.id.startsWith(partialId));
-
-		if (matches.length === 0) {
-			throw new Error(`No task found with ID starting with "${partialId}"`);
-		}
-
-		if (matches.length > 1) {
-			console.error(`❌ Ambiguous task ID "${partialId}". Multiple matches found:`);
-			matches.forEach(task => {
-				console.error(
-					`   ${task.id} - ${task.description.substring(0, 60)}${task.description.length > 60 ? '...' : ''}`
-				);
-			});
-			throw new Error('Please provide a more specific task ID');
-		}
-
-		return matches[0].id;
-	} catch (error) {
-		throw error;
+	if (!response.ok) {
+		throw new Error('Failed to fetch tasks');
 	}
+
+	const tasks = (await response.json()) as Task[];
+	const matches = tasks.filter(task => task.id.startsWith(partialId));
+
+	if (matches.length === 0) {
+		throw new Error(`No task found with ID starting with "${partialId}"`);
+	}
+
+	if (matches.length > 1) {
+		console.error(`❌ Ambiguous task ID "${partialId}". Multiple matches found:`);
+		matches.forEach(task => {
+			console.error(
+				`   ${task.id} - ${task.description.substring(0, 60)}${task.description.length > 60 ? '...' : ''}`
+			);
+		});
+		throw new Error('Please provide a more specific task ID');
+	}
+
+	return matches[0].id;
 }
 // @formatter:on
 
@@ -221,7 +217,7 @@ if (!command) {
 }
 
 switch (command) {
-	case 'create':
+	case 'create': {
 		if (!args[1]) {
 			console.error('❌ Error: Description is required');
 			console.log(
@@ -272,6 +268,7 @@ switch (command) {
 
 		await createTask(taskRequest);
 		break;
+	}
 
 	case 'list':
 		await listTasks();

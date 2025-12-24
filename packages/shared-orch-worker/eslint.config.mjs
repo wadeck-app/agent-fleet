@@ -1,20 +1,18 @@
 import eslint from '@eslint/js';
 import prettierConfig from 'eslint-config-prettier';
+import globals from 'globals';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import tseslint from 'typescript-eslint';
 
+import { baseIgnores, baseRules, testFileRules } from '../../eslint.config.mjs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 export default tseslint.config(
-	// Ignore patterns
-	{
-		ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.config', 'jest.config', '**/*', '**/*.d.ts'],
-	},
-
-	// Base ESLint recommended rules
+	{ ignores: baseIgnores },
 	eslint.configs.recommended,
-
-	// TypeScript ESLint recommended rules
 	...tseslint.configs.recommended,
-
-	// Custom rules for source files
 	{
 		files: ['src/**/*.ts'],
 		languageOptions: {
@@ -22,43 +20,17 @@ export default tseslint.config(
 			parserOptions: {
 				ecmaVersion: 2022,
 				sourceType: 'module',
+				tsconfigRootDir: __dirname,
+			},
+			globals: {
+				...globals.node,
 			},
 		},
-		rules: {
-			'@typescript-eslint/no-explicit-any': 'warn',
-			'@typescript-eslint/explicit-function-return-type': 'off',
-			'@typescript-eslint/no-unused-vars': [
-				'error',
-				{
-					argsIgnorePattern: '^_',
-					varsIgnorePattern: '^_',
-					caughtErrorsIgnorePattern: '^_',
-					destructuredArrayIgnorePattern: '^_',
-				},
-			],
-			// @formatter:off
-			// Forbid barrel exports with export * (architectural requirement)
-			// See: .claude/agents/backend-review.md:33
-			'no-restricted-syntax': [
-				'error',
-				{
-					selector: 'ExportAllDeclaration',
-					message:
-						'export * is forbidden. Use explicit named exports instead. See .claude/agents/backend-review.md:33',
-				},
-			],
-			// @formatter:on
-		},
+		rules: baseRules,
 	},
-
-	// Rules for test files
 	{
 		files: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
-		rules: {
-			'@typescript-eslint/no-explicit-any': 'off', // Autoriser 'any' dans les tests
-		},
+		rules: testFileRules,
 	},
-
-	// Prettier integration - disable conflicting ESLint rules
 	prettierConfig
 );

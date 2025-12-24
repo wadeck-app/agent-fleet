@@ -125,7 +125,7 @@ describe('FlowOrchestrator', () => {
 				taskMetadata: {},
 			};
 
-			let executionOrder: string[] = [];
+			const executionOrder: string[] = [];
 
 			vi.mocked(mockStepRunner.executeStep).mockImplementation(async step => {
 				executionOrder.push(step.id);
@@ -453,7 +453,7 @@ describe('FlowOrchestrator', () => {
 				taskMetadata: {},
 			};
 
-			let executionOrder: string[] = [];
+			const executionOrder: string[] = [];
 
 			vi.mocked(mockStepRunner.executeStep).mockImplementation(async step => {
 				executionOrder.push(step.id);

@@ -5,9 +5,15 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import tseslint from 'typescript-eslint';
 
-import { baseIgnores, baseRules, testFileRules } from '../../eslint.config.mjs';
+import { baseIgnores, baseRules } from '../../eslint.config.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// test-utils is a special package - allow any for flexibility in test helpers
+const testUtilsRules = {
+	...baseRules,
+	'@typescript-eslint/no-explicit-any': 'off',
+};
 
 export default tseslint.config(
 	{ ignores: baseIgnores },
@@ -26,11 +32,7 @@ export default tseslint.config(
 				...globals.node,
 			},
 		},
-		rules: baseRules,
-	},
-	{
-		files: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
-		rules: testFileRules,
+		rules: testUtilsRules,
 	},
 	prettierConfig
 );

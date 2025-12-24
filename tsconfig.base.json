@@ -23,7 +23,7 @@
 			"orchestrator/*": ["./packages/orchestrator/src/*"],
 			"shared-common/*": ["./packages/shared-common/src/*"],
 			"shared-orch-worker/*": ["./packages/shared-orch-worker/src/*"],
-//			"shared-frontend-backend/*": ["./packages/shared-frontend-backend/src/*"],
+			//			"shared-frontend-backend/*": ["./packages/shared-frontend-backend/src/*"],
 			"test-utils/*": ["./packages/test-utils/src/*"],
 			"web-backend/*": ["./packages/web-backend/src/*"],
 			"web-frontend/*": ["./packages/web-frontend/src/*"],

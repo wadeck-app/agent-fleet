@@ -23,7 +23,9 @@
 		"test:visual": "npm run test:visual:generate && playwright test --config=playwright.config.visual.ts --project=visual-*",
 		"test:visual:ui": "npm run test:visual:generate && playwright test --config=playwright.config.visual.ts --project=visual-* --ui",
 		"-buggy-test:visual:approve": "node ../../scripts/approve-actual-snapshots.js",
-		"test:visual:update": "npm run test:visual:generate && playwright test --config=playwright.config.visual.ts --project=visual-* --update-snapshots"
+		"test:visual:update": "npm run test:visual:generate && playwright test --config=playwright.config.visual.ts --project=visual-* --update-snapshots",
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix"
 	},
 	"dependencies": {
 		"shared-frontend-backend": "*"

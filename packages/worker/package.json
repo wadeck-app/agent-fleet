@@ -11,7 +11,8 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
-		"lint": "echo 'No ESLint configured for worker'",
+		"lint": "eslint src",
+		"lint:fix": "eslint src --fix",
 		"clean": "rimraf dist"
 	},
 	"dependencies": {

@@ -592,7 +592,7 @@ export class FlowWorker implements Shutdownable {
 			this.sendTaskProgress('Executing flow steps...');
 
 			// Start monitoring execution trace if UI is enabled
-			let monitorInterval: NodeJS.Timeout | null = null;
+			const monitorInterval: NodeJS.Timeout | null = null;
 			// if (this.workerUIManager.isEnabled()) {
 			// 	monitorInterval = this.startTraceMonitoring(task.id);
 			// }

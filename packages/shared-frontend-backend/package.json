@@ -9,8 +9,8 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
-		"lint": "eslint src --ext .ts",
-		"lint:fix": "eslint src --ext .ts --fix",
+		"lint": "eslint src",
+		"lint:fix": "eslint src --fix",
 		"clean": "rimraf dist dist-types"
 	},
 	"dependencies": {
@@ -19,10 +19,7 @@
 	},
 	"devDependencies": {
 		"@types/node": "^22.10.2",
-		"@typescript-eslint/eslint-plugin": "^8.18.2",
-		"@typescript-eslint/parser": "^8.18.2",
 		"@vitest/coverage-v8": "^4.0.14",
-		"eslint": "^9.17.0",
 		"typescript": "^5.7.2",
 		"vitest": "^4.0.14"
 	}

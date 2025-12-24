@@ -10,7 +10,8 @@
 		"build": "tsc --build tsconfig.json",
 		"dev": "tsx src/entry-point.ts",
 		"test": "vitest run",
-		"lint": "echo 'No ESLint configured for cli'",
+		"lint": "eslint src",
+		"lint:fix": "eslint src --fix",
 		"clean": "rimraf dist"
 	},
 	"dependencies": {

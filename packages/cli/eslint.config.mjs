@@ -5,7 +5,7 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import tseslint from 'typescript-eslint';
 
-import { baseIgnores, baseRules, testFileRules } from '../../eslint.config.mjs';
+import { baseIgnores, cliRules, testFileRules } from '../../eslint.config.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -26,7 +26,7 @@ export default tseslint.config(
 				...globals.node,
 			},
 		},
-		rules: baseRules,
+		rules: cliRules,
 	},
 	{
 		files: ['src/**/*.test.ts', 'src/**/*.spec.ts'],

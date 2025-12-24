@@ -5,16 +5,18 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import tseslint from 'typescript-eslint';
 
-import { baseIgnores, baseRules, testFileRules } from '../../eslint.config.mjs';
+import { baseIgnores, e2eRules } from '../../eslint.config.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default tseslint.config(
-	{ ignores: baseIgnores },
+	{
+		ignores: [...baseIgnores, '**/playwright-report/**', '**/test-results/**', '**/_results/**'],
+	},
 	eslint.configs.recommended,
 	...tseslint.configs.recommended,
 	{
-		files: ['src/**/*.ts'],
+		files: ['**/*.ts'],
 		languageOptions: {
 			parser: tseslint.parser,
 			parserOptions: {
@@ -26,11 +28,7 @@ export default tseslint.config(
 				...globals.node,
 			},
 		},
-		rules: baseRules,
-	},
-	{
-		files: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
-		rules: testFileRules,
+		rules: e2eRules,
 	},
 	prettierConfig
 );
