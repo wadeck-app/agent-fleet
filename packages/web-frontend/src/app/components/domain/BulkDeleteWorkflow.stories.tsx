@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { Button } from '@framework/components/primitives/Button';
-import type { FailedDeletion } from '@shared';
+import type { FailedDeletion } from '@shared/api/books.contract';
 import type { Meta, StoryObj } from '@storybook/react';
 import { expect, fn, userEvent, waitFor, within } from '@storybook/test';
 

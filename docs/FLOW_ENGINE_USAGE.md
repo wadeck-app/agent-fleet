@@ -145,8 +145,8 @@ steps:
 ### Basic Execution
 
 ```typescript
-import { FlowExecutor } from './flow/flow-executor.js';
-import type { FlowDefinition, Workspace } from './flow/types.js';
+import { FlowExecutor } from './flow/flow-executor';
+import type { FlowDefinition, Workspace } from './flow/types';
 
 // Create executor
 const executor = new FlowExecutor();

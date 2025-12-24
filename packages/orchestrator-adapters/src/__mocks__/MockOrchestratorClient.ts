@@ -38,9 +38,10 @@
  * ===========================================================================================
  */
 import { EventEmitter } from 'events';
-import type { O2BEventData, O2BEventType, OrchestratorStats, Task, WorkerInfo } from 'shared-orch-worker/index.js';
+import type { OrchestratorStats, Task, WorkerInfo } from 'shared-orch-worker/domain-types';
+import type { O2BEventData, O2BEventType } from 'shared-orch-worker/orchestrator-events';
 
-import type { OrchestratorClient, OrchestratorConfig, TaskFilters, WorkerFilters } from '../OrchestratorClient.js';
+import type { OrchestratorClient, OrchestratorConfig, TaskFilters, WorkerFilters } from '../OrchestratorClient';
 
 /**
  * Call record for history tracking

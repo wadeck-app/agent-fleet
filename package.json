@@ -24,6 +24,7 @@
 		"dev:backend:full": "npm run dev --workspace=shared-frontend-backend --workspace=shared-orch-backend --workspace=web-backend",
 		"dev:frontend": "npm run dev --workspace=web-frontend",
 		"dev:cli": "npm run dev --workspace=cli",
+		"typecheck:watch": "tsc -b -w",
 		"--------------------test": "",
 		"test": "node scripts/test-all.js",
 		"test:all": "npm run test --workspaces --if-present",

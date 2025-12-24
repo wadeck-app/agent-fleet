@@ -14,7 +14,7 @@ import {
 	isUICommand,
 	isUIResponse,
 	parseUIMessage,
-} from './types.js';
+} from './types';
 
 describe('UI Protocol Types', () => {
 	beforeEach(() => {

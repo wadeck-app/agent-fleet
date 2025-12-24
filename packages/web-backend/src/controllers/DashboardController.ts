@@ -1,5 +1,5 @@
-import type { DASHBOARD_API_ROUTES } from '@app/shared';
-import { DASHBOARD_API_ROUTES as routes } from '@app/shared';
+import type { DASHBOARD_API_ROUTES } from '@app/shared/api/dashboard.contract';
+import { DASHBOARD_API_ROUTES as routes } from '@app/shared/api/dashboard.contract';
 
 import type { DashboardService } from '../services/DashboardService';
 import type { RouteWrapperFunc } from '../utils/fastify-wrapper';

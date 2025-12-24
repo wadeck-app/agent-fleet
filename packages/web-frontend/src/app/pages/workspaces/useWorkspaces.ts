@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { useAbortableEffect } from '@framework/hooks/useAbortableEffect';
-import type { WorkspacesData } from '@shared';
+import type { WorkspacesData } from '@shared/api/workspaces.contract';
 
 import { type WebSocketMessage, useOrchestratorWebSocket } from '@/app/hooks/useOrchestratorWebSocket';
 

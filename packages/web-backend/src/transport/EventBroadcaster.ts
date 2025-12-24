@@ -1,4 +1,4 @@
-import type { EventData, EventType } from '@app/shared';
+import type { EventData, EventType } from '@app/shared/transport';
 
 import type { ITransportServer } from './ITransportServer';
 import type { WebSocketSessionManager } from './WebSocketSessionManager';

@@ -3,8 +3,6 @@
 	"version": "1.0.0",
 	"private": true,
 	"type": "module",
-	"main": "./dist/entry-point.js",
-	"types": "./dist/entry-point.d.ts",
 	"bin": {
 		"fleet-task": "./dist/entry-point.js"
 	},

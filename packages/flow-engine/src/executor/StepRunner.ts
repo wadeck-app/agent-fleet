@@ -3,12 +3,12 @@
  *
  * Executes individual flow steps (script and model types) with retry logic.
  */
-import { ClaudeLauncher } from '../processing/ClaudeLauncher.js';
-import { OutputExtractor } from '../processing/OutputExtractor.js';
-import { type TemplateContext, TemplateRenderer } from '../processing/TemplateRenderer.js';
-import type { FlowRegistry } from '../registry/FlowRegistry.js';
-import type { FlowStep, ModelFlowStep, ScriptFlowStep, StepTrace, SubFlowStep, Workspace } from '../types.js';
-import { ScriptExecutor } from './ScriptExecutor.js';
+import { ClaudeLauncher } from '../processing/ClaudeLauncher';
+import { OutputExtractor } from '../processing/OutputExtractor';
+import { type TemplateContext, TemplateRenderer } from '../processing/TemplateRenderer';
+import type { FlowRegistry } from '../registry/FlowRegistry';
+import type { FlowStep, ModelFlowStep, ScriptFlowStep, StepTrace, SubFlowStep, Workspace } from '../types';
+import { ScriptExecutor } from './ScriptExecutor';
 
 /**
  * Step execution error

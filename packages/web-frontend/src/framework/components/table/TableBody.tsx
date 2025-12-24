@@ -1,8 +1,8 @@
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
 
 import { LoadingDots } from '@framework/components/loading/LoadingDots';
 
-import { TableColumn } from './Table';
+import { type TableColumn } from './Table';
 import { TableRow } from './TableRow';
 import { TableSkeleton } from './TableSkeleton';
 

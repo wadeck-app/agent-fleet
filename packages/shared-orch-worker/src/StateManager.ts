@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
-import { Task, WorkerInfo } from 'shared-orch-worker/index.js';
+
+import { Task, WorkerInfo } from './domain-types';
 
 export enum StateEvent {
 	// Task events

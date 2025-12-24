@@ -1,5 +1,4 @@
-import type { WORKSPACES_API_ROUTES } from '@app/shared';
-import { WORKSPACES_API_ROUTES as routes } from '@app/shared';
+import { WORKSPACES_API_ROUTES } from '@app/shared/api/workspaces.contract';
 
 import type { WorkspacesService } from '../services/WorkspacesService';
 import type { RouteWrapperFunc } from '../utils/fastify-wrapper';
@@ -24,7 +23,7 @@ import type { LazyController } from '../utils/lazy-controller-plugin';
  * ===========================================================================================
  */
 export default class WorkspacesController implements LazyController<typeof WORKSPACES_API_ROUTES> {
-	static routes = routes;
+	static routes = WORKSPACES_API_ROUTES;
 
 	constructor(private readonly service: WorkspacesService) {}
 

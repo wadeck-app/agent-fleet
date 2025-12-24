@@ -8,7 +8,7 @@ import { IntegerField } from '@framework/features/forms/fields/IntegerField';
 import { TextField } from '@framework/features/forms/fields/TextField';
 import { useFormState } from '@framework/features/forms/useFormState';
 import { getErrorMessage, getErrorStatus } from '@framework/utils/errors/errorUtils';
-import type { Book, CreateBook } from '@shared';
+import type { Book, CreateBook } from '@shared/api/books.contract';
 import { Check } from 'lucide-react';
 
 import { booksService } from './BooksService';

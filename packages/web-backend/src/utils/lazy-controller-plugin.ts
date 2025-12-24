@@ -1,7 +1,8 @@
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { ZodError } from 'zod';
 
-import { HttpException, ROUTES_BY_BASE_URL } from '@app/shared';
+import { HttpException } from '@app/shared/exceptions/http-exceptions';
+import { ROUTES_BY_BASE_URL } from '@app/shared/types';
 
 import { CONTROLLER_REGISTRY } from './controller-registry';
 import { getFactory } from './factory-instance';

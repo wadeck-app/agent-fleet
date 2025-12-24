@@ -1,4 +1,4 @@
-import type { CreateBook } from '@shared';
+import type { CreateBook } from '@shared/api/books.contract';
 import type { Meta, StoryObj } from '@storybook/react';
 
 import { BookForm } from './BookForm';

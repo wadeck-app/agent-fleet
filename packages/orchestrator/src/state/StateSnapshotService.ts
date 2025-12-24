@@ -1,9 +1,9 @@
-import { MetricsData } from 'shared-common/StateManager.js';
-import { Task, TaskStatus } from 'shared-orch-worker/index.js';
+import { MetricsData } from 'shared-orch-worker/StateManager';
+import { Task, TaskStatus } from 'shared-orch-worker/domain-types';
 
-import { TaskManager } from '../core/TaskManager.js';
-import { OrchestratorSnapshot } from '../ui-client/types.js';
-import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer.js';
+import { TaskManager } from '../core/TaskManager';
+import { OrchestratorSnapshot } from '../ui-client/types';
+import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
 
 /**
  * Service to capture and provide snapshots of the orchestrator state

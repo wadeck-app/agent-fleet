@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Ingredient, IngredientsListQuery } from '@app/shared';
+import type { Ingredient, IngredientsListQuery } from '@app/shared/api/ingredients.contract';
 
 import type { QueryBuilder } from '../storage/QueryBuilder';
 import type { BaseRepository } from './BaseRepository';

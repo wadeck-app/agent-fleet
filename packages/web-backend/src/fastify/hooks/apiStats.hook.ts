@@ -1,8 +1,8 @@
 import { randomUUID } from 'crypto';
-import { FastifyPluginAsync } from 'fastify';
+import { type FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 
-import { apiStatsManager } from '@/utils/apiStats';
+import { apiStatsManager } from '../../utils/apiStats';
 
 /**
  * API stats tracking hook for Fastify

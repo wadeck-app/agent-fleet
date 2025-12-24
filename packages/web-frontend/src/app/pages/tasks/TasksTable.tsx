@@ -1,6 +1,6 @@
 import { Badge } from '@framework/components/primitives/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
-import type { Task } from '@shared';
+import type { Task } from '@shared/api/tasks.contract';
 import { AlertCircle, CheckCircle2, Circle, CircleDashed, Clock, FileCheck, GitMerge, XCircle } from 'lucide-react';
 
 /**
@@ -205,9 +205,6 @@ export function TasksTable({ tasks }: TasksTableProps) {
 													<div className="text-sm">
 														<div className="font-medium">
 															{task.assignedWorker.workerId}
-														</div>
-														<div className="text-xs text-muted-foreground capitalize">
-															{task.assignedWorker.workerType}
 														</div>
 													</div>
 												) : (

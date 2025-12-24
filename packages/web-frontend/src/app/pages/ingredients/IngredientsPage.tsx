@@ -17,7 +17,7 @@ import { toColumnVisibilityDefs } from '@framework/utils/table/ColumnConfig';
 import { extractColumnIds } from '@framework/utils/table/ColumnConfig';
 import { extractDefaultVisible } from '@framework/utils/table/ColumnConfig';
 import { extractCanHideConstraints } from '@framework/utils/table/ColumnConfig';
-import type { Ingredient } from '@shared';
+import type { Ingredient } from '@shared/api/ingredients.contract';
 import { Plus, Utensils } from 'lucide-react';
 
 import { IngredientDialog } from '@app/components/domain';

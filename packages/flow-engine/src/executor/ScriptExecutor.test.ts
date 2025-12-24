@@ -3,10 +3,10 @@
  */
 import * as child_process from 'child_process';
 import { EventEmitter } from 'events';
-import { setupTest } from 'test-utils/index';
+import { setupTest } from 'test-utils/helpers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ScriptExecutionError, ScriptExecutor } from './ScriptExecutor.js';
+import { ScriptExecutionError, ScriptExecutor } from './ScriptExecutor';
 
 // Mock child_process
 vi.mock('child_process');

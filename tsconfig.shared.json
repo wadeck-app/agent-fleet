@@ -1,0 +1,31 @@
+{
+	"compilerOptions": {
+		"target": "ES2022",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"lib": ["ES2022"],
+		"skipLibCheck": true,
+		"strict": true,
+		"composite": true,
+		"declaration": true,
+		"declarationMap": true,
+		"emitDeclarationOnly": true,
+		"noEmitOnError": true,
+		"stripInternal": true,
+
+		"paths": {
+			"cli/*": ["./packages/cli/src/*"],
+			"e2e-web/*": ["./packages/e2e-web/src/*"],
+			"flow-engine/*": ["./packages/flow-engine/src/*"],
+			"orchestrator/*": ["./packages/orchestrator/src/*"],
+			"orchestrator-adapters/*": ["./packages/orchestrator-adapters/src/*"],
+			"shared-common/*": ["./packages/shared-common/src/*"],
+			"shared-orch-worker/*": ["./packages/shared-orch-worker/src/*"],
+			"shared-frontend-backend/*": ["./packages/shared-frontend-backend/src/*"],
+			"test-utils/*": ["./packages/test-utils/src/*"],
+			"web-backend/*": ["./packages/web-backend/src/*"],
+			"web-frontend/*": ["./packages/web-frontend/src/*"],
+			"worker/*": ["./packages/worker/src/*"]
+		}
+	}
+}

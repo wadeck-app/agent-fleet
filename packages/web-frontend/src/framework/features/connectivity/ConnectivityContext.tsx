@@ -1,4 +1,4 @@
-import { ReactNode, createContext, useContext, useEffect, useState } from 'react';
+import { type ReactNode, createContext, useContext, useEffect, useState } from 'react';
 
 import { CircuitBreakerServiceClass, CircuitState } from './CircuitBreakerService';
 

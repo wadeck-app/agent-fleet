@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
 	// Ignore patterns
 	{
-		ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.config.js', 'jest.config.js'],
+		ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.config', 'jest.config'],
 	},
 
 	// Base ESLint recommended rules

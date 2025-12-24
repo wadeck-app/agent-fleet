@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { FlowValidator, ValidationCode } from './flow-validator.js';
-import type { FlowDefinition } from './types.js';
+import { FlowValidator, ValidationCode } from './flow-validator';
+import type { FlowDefinition } from './types';
 
 describe('FlowValidator', () => {
   const validator = new FlowValidator();

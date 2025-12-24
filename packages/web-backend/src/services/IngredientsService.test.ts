@@ -6,8 +6,8 @@ import type {
 	IngredientsListQuery,
 	PatchIngredient,
 	UpdateIngredient,
-} from '@app/shared';
-import { ConflictException, NotFoundException } from '@app/shared';
+} from '@app/shared/api/ingredients.contract';
+import { ConflictException, NotFoundException } from '@app/shared/exceptions/http-exceptions';
 
 import type { IngredientsRepository } from '../repositories/IngredientsRepository';
 import { IngredientsService } from './IngredientsService';

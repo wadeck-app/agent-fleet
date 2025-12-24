@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 
 import { CrudDialog } from '@framework/components/overlays/CrudDialog';
 import { Button } from '@framework/components/primitives/Button';
-import type { Book, CreateBook } from '@shared';
+import type { Book, CreateBook } from '@shared/api/books.contract';
 import { RefreshCw } from 'lucide-react';
 
 import { BookForm } from '@app/pages/books/BookForm';

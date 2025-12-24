@@ -477,7 +477,7 @@ module.exports = {
 	apps: [
 		{
 			name: 'api-server',
-			script: './dist/server.js',
+			script: './dist/server',
 			instances: 4, // Number of instances
 			exec_mode: 'cluster', // Cluster mode
 			env: {

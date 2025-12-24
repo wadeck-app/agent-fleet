@@ -12,7 +12,7 @@
  * This validator focuses on STRUCTURE, not semantics (e.g., it doesn't validate
  * that step references are valid - that's done by other validators).
  */
-import { TaskStatus } from 'shared-orch-worker/index.js';
+import { TaskStatus } from 'shared-orch-worker/domain-types';
 
 import type {
 	FlowDefinition,
@@ -26,9 +26,9 @@ import type {
 	VariableType,
 	WorkspaceMode,
 	WorkspaceStrategy,
-} from '../types.js';
-import type { IssueCollector } from './ValidationTypes.js';
-import { ValidationCode } from './ValidationTypes.js';
+} from '../types';
+import type { IssueCollector } from './ValidationTypes';
+import { ValidationCode } from './ValidationTypes';
 
 /**
  * Schema Validator
@@ -211,7 +211,7 @@ export class SchemaValidator {
 		}
 
 		// Get all valid task statuses
-		const validStatuses = Object.values(TaskStatus);
+		const validStatuses: TaskStatus[] = Object.values(TaskStatus);
 
 		// Validate onSuccess
 		if (!config.onSuccess) {

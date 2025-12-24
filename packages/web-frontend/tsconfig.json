@@ -2,7 +2,7 @@
 	"extends": "../../tsconfig.base.json",
 	"compilerOptions": {
 		"baseUrl": ".",
-		"outDir": "./dist",
+		"outDir": "dist",
 		"jsx": "react-jsx",
 		"lib": ["ES2022", "DOM", "DOM.Iterable"],
 		"types": ["vite/client", "vitest/globals", "@testing-library/jest-dom", "@storybook/react", "node"],
@@ -10,6 +10,7 @@
 			"@/*": ["./src/*"],
 			"@framework/*": ["./src/framework/*"],
 			"@app/*": ["./src/app/*"],
+			// TODO move into framework or app
 			"@transport/*": ["./src/transport/*"],
 			"@shared": ["../shared-frontend-backend/src/index.ts"],
 			"@shared/*": ["../shared-frontend-backend/src/*"]

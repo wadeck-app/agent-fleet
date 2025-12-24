@@ -1,10 +1,16 @@
 {
-	"extends": "../../tsconfig.base.json",
+	"extends": "../../tsconfig.shared.json",
 	"compilerOptions": {
-		"outDir": "./dist",
-		"rootDir": "./src"
+		"outDir": "dist",
+		"declarationDir": "dist-types",
+		"rootDir": "src"
 	},
-	"include": ["src/**/*"],
-	"exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"],
-	"references": [{ "path": "../shared-common" }]
+	"include": ["src"],
+	"exclude": ["dist", "dist-types"],
+	"references": [
+		//
+		{ "path": "../shared-common" },
+		{ "path": "../shared-orch-worker" },
+		{ "path": "../test-utils" }
+	]
 }

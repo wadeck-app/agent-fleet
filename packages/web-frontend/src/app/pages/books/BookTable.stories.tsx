@@ -1,5 +1,5 @@
 import { withMetadata } from '@framework/tests/withMetadata';
-import type { Book } from '@shared';
+import type { Book } from '@shared/api/books.contract';
 import type { Meta, StoryObj } from '@storybook/react';
 
 import { BookTable } from './BookTable';

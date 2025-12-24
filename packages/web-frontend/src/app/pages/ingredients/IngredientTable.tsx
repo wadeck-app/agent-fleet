@@ -3,7 +3,7 @@ import { type TablePaginationConfig } from '@framework/components/table/Table';
 import { type TableSortingConfig } from '@framework/components/table/Table';
 import { ColumnHelpers } from '@framework/utils/table/ColumnHelpers';
 import { defineColumns } from '@framework/utils/table/ColumnHelpers';
-import type { Ingredient } from '@shared';
+import type { Ingredient } from '@shared/api/ingredients.contract';
 
 /**
  * ===========================================================================================

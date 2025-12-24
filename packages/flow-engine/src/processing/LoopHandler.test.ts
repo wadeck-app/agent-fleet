@@ -3,12 +3,12 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { LoopHandler } from '../processing/LoopHandler.js';
-import type { DAG, DAGNode, FlowStep, StepTrace } from '../types.js';
+import { LoopHandler } from '../processing/LoopHandler';
+import type { DAG, DAGNode, FlowStep, StepTrace } from '../types';
 
 // @formatter:off
 // Mock DAGBuilder
-vi.mock('./DAGBuilder.js');
+vi.mock('./DAGBuilder');
 // @formatter:on
 
 describe('LoopHandler', () => {

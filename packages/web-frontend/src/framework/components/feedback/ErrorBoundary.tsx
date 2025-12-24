@@ -1,4 +1,4 @@
-import { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 import { Button } from '@framework/components/primitives/Button';
 import { AppError, ErrorSeverity, toAppError } from '@framework/utils/errors/AppError';

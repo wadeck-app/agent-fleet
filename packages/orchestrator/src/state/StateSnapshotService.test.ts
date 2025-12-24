@@ -1,17 +1,16 @@
 /**
  * StateSnapshotService Tests
  */
-import { Task, TaskStatus, WorkerInfo, WorkerType } from 'shared-orch-worker/index.js';
-import { setupTest } from 'test-utils/index';
+import { Task, TaskStatus, WorkerInfo } from 'shared-orch-worker/domain-types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { TaskManager } from '../core/TaskManager.js';
-import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer.js';
-import { StateSnapshotService } from './StateSnapshotService.js';
+import { TaskManager } from '../core/TaskManager';
+import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
+import { StateSnapshotService } from './StateSnapshotService';
 
 // Mock dependencies
-vi.mock('../core/TaskManager.js');
-vi.mock('../websocket/WorkerWebSocketServer.js');
+vi.mock('../core/TaskManager');
+vi.mock('../websocket/WorkerWebSocketServer');
 
 describe('StateSnapshotService', () => {
 	let service: StateSnapshotService;
@@ -26,7 +25,7 @@ describe('StateSnapshotService', () => {
 			priority: 'high',
 			createdAt: '2024-01-01T00:00:00.000Z',
 			updatedAt: '2024-01-01T00:05:00.000Z',
-			assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+			assignedTo: { workerId: 'worker-1' },
 			comments: [],
 			metadata: {},
 			history: [],
@@ -60,13 +59,11 @@ describe('StateSnapshotService', () => {
 	const mockWorkers: WorkerInfo[] = [
 		{
 			id: 'worker-1',
-			type: WorkerType.DEV,
 			connectedAt: '2024-01-01T00:00:00.000Z',
 			taskId: 'task-1',
 		},
 		{
 			id: 'worker-2',
-			type: WorkerType.DEV,
 			connectedAt: '2024-01-01T00:00:00.000Z',
 			taskId: null,
 		},

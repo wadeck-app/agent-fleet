@@ -4,7 +4,7 @@
  * Constructs a Directed Acyclic Graph (DAG) from flow steps and provides
  * utilities for topological sorting and finding ready steps.
  */
-import type { DAG, DAGNode, FlowStep } from '../types.js';
+import type { DAG, DAGNode, FlowStep } from '../types';
 
 /**
  * Error thrown when DAG construction fails

@@ -1,4 +1,4 @@
-import type { OrchestratorClient } from 'orchestrator-adapters';
+import { Orchestrator } from 'orchestrator';
 
 import { DataStoreFactory } from '../factories/DataStoreFactory';
 
@@ -23,12 +23,12 @@ let factoryInstance: DataStoreFactory | null = null;
  */
 export function initializeFactory(
 	storageMode: 'memory' | 'mariadb' = 'memory',
-	orchestratorClient: OrchestratorClient
+	orchestrator: Orchestrator
 ): DataStoreFactory {
 	if (factoryInstance) {
 		throw new Error('Factory already initialized');
 	}
-	factoryInstance = new DataStoreFactory(storageMode, orchestratorClient);
+	factoryInstance = new DataStoreFactory(storageMode, orchestrator);
 	return factoryInstance;
 }
 

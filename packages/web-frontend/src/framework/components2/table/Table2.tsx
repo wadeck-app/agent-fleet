@@ -33,12 +33,12 @@
  *
  * ===========================================================================================
  */
-import { ReactNode, useMemo, useRef } from 'react';
+import { type ReactNode, useMemo, useRef } from 'react';
 
 import { PageSizeSelector } from '@framework/components/pagination/PageSizeSelector';
 import { Pagination } from '@framework/components/pagination/Pagination';
 import { SortableColumnHeader } from '@framework/components/table/SortableColumnHeader';
-import { TableColumn as TableHeaderColumn } from '@framework/components/table/Table';
+import { type TableColumn as TableHeaderColumn } from '@framework/components/table/Table';
 import { TableBody } from '@framework/components/table/TableBody';
 import { TableHeader } from '@framework/components/table/TableHeader';
 import type { QueryResultDisplayerProps } from '@framework/types/QueryResultDisplayerContract';

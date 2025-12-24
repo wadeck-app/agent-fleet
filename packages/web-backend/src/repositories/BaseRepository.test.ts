@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Book } from '@app/shared';
+import type { Book } from '@app/shared/api/books.contract';
 
 import type { DataStorage } from '../storage/DataStorage';
 import type { QueryBuilder } from '../storage/QueryBuilder';

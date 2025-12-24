@@ -1,5 +1,5 @@
 import { withMetadata } from '@framework/tests/withMetadata';
-import type { CreateIngredient, Ingredient } from '@shared';
+import type { CreateIngredient, Ingredient } from '@shared/api/ingredients.contract';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ingredientsApi } from '@app/api/client';

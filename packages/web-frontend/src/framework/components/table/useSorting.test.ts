@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { SortConfig, useSorting } from './useSorting';
+import { type SortConfig, useSorting } from './useSorting';
 
 describe('useSorting', () => {
 	const storageId = 'test-table';

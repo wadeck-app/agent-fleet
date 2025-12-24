@@ -62,7 +62,7 @@ export const O2B_WorkerConnectedEventSchema = z.object({
 	type: z.literal('worker.connected'),
 	data: z.object({
 		workerId: z.string(),
-		workerType: z.string(),
+		// workerType: z.string(),
 		connectedAt: z.string(),
 		timestamp: z.string(),
 	}),

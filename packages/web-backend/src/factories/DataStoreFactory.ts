@@ -1,7 +1,11 @@
-import type { OrchestratorClient } from 'orchestrator-adapters';
-import { getOrchestratorRestUrl } from 'shared-common/PortCalculator.js';
+import { Orchestrator } from 'orchestrator';
+import { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
+import { getOrchestratorRestUrl } from 'shared-common/PortCalculator';
 
-import type { Book, Ingredient } from '@app/shared';
+// import type { Book } from 'shared-frontend-backend/src/api/books.contract';
+// import type { Ingredient } from 'shared-frontend-backend/src/api/ingredients.contract';
+import type { Book } from '@app/shared/api/books.contract';
+import type { Ingredient } from '@app/shared/api/ingredients.contract';
 
 import type { AuthService } from '../auth/AuthService';
 import { MockAuthService } from '../auth/MockAuthService';
@@ -53,9 +57,10 @@ export class DataStoreFactory {
 	private transportRouter?: TransportRouter;
 	private eventBroadcaster?: EventBroadcaster;
 	private transportServer?: ITransportServer;
-	private orchestratorClient: OrchestratorClient;
+	private orchestrator: Orchestrator;
+	private orchestratorWrapper: OrchestratorWrapper;
 
-	constructor(storageMode: 'memory' | 'mariadb' = 'memory', orchestratorClient: OrchestratorClient) {
+	constructor(storageMode: 'memory' | 'mariadb' = 'memory', orchestrator: Orchestrator) {
 		// Create storage based on mode
 		if (storageMode === 'memory') {
 			this.storage = new InMemoryStorage();
@@ -64,7 +69,8 @@ export class DataStoreFactory {
 			throw new Error('MariaDB storage not yet implemented');
 		}
 
-		this.orchestratorClient = orchestratorClient;
+		this.orchestrator = orchestrator;
+		this.orchestratorWrapper = new OrchestratorWrapper(orchestrator);
 	}
 
 	/**
@@ -143,7 +149,7 @@ export class DataStoreFactory {
 			const eventBroadcaster = this.getEventBroadcaster();
 
 			// Create WorkersService with OrchestratorClient (already connected)
-			this.workersService = new WorkersService(this.orchestratorClient, eventBroadcaster);
+			this.workersService = new WorkersService(this.orchestratorWrapper, eventBroadcaster);
 		}
 
 		return this.workersService;
@@ -324,12 +330,12 @@ export class DataStoreFactory {
 		return this.storage;
 	}
 
-	/**
-	 * Get the orchestrator client
-	 */
-	getOrchestratorClient(): OrchestratorClient {
-		return this.orchestratorClient;
-	}
+	// /**
+	//  * Get the orchestrator client
+	//  */
+	// getOrchestratorClient(): OrchestratorClient {
+	// 	return this.orchestratorClient;
+	// }
 
 	/**
 	 * Seed initial data (useful for development/testing)

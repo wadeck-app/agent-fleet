@@ -1,6 +1,6 @@
 import { Checkbox } from '@framework/components/forms/Checkbox';
 
-import { TableColumn } from './Table';
+import { type TableColumn } from './Table';
 
 export interface TableHeaderProps<T> {
 	columns: TableColumn<T>[];

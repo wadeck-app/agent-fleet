@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useAbortableEffect } from '@framework/hooks/useAbortableEffect';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
-import type { DashboardData } from '@shared';
+import type { DashboardData } from '@shared/api/dashboard.contract';
 
 import { type WebSocketMessage, useOrchestratorWebSocket } from '@/app/hooks/useOrchestratorWebSocket';
 

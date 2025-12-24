@@ -556,7 +556,7 @@ static async create(config: OrchestratorClientConfig): Promise<OrchestratorClien
     // Library mode logic
   } else if (isRemoteMode(config)) {
     // Remote mode logic - À SUPPRIMER
-    const { RemoteOrchestratorAdapter } = await import('./adapters/RemoteAdapter.js');
+    const { RemoteOrchestratorAdapter } = await import('./adapters/RemoteAdapter');
     return new RemoteOrchestratorAdapter(config);
   } else if (isTestMode(config)) {
     // Test mode logic

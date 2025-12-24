@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { Button } from '@framework/components/primitives/Button';
-import type { Book, CreateBook } from '@shared';
+import type { Book, CreateBook } from '@shared/api/books.contract';
 import type { Meta, StoryObj } from '@storybook/react';
 
 import { BookDialog } from './BookDialog';

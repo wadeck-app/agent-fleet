@@ -15,11 +15,11 @@
 import { useEffect, useState } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 
+import { type ConnectionState } from '@shared/transport';
 import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ConnectionState } from '../ITransportClient';
 import { TransportProvider, useTransportContext } from '../TransportProvider';
 import { MockTransportClient } from '../adapters/MockTransportClient';
 import { useTransport } from '../useTransport';

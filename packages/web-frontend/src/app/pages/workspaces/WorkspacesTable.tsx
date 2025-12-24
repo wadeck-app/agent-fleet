@@ -1,6 +1,6 @@
 import { Badge } from '@framework/components/primitives/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
-import type { Workspace } from '@shared';
+import type { Workspace } from '@shared/api/workspaces.contract';
 import { Folder, GitBranch } from 'lucide-react';
 
 /**

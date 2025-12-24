@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { LoadingDots, LoadingDotsSize } from '@framework/components/loading/LoadingDots';
+import { LoadingDots, type LoadingDotsSize } from '@framework/components/loading/LoadingDots';
 
 /**
  * ===========================================================================================

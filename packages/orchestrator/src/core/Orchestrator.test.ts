@@ -6,31 +6,22 @@
  * Note: The orchestrator module auto-starts when imported, so we focus on testing
  * the behavior of the orchestrator components and their interactions.
  */
-import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager.js';
-import { Logger } from 'shared-common/Logger.js';
-import { setupTest } from 'test-utils/index';
+import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
+import { logger } from 'shared-common/logger';
 import { MockedObject, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Import the mocked renderUI
-import { renderUI } from '../ui.js';
-import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer.js';
-import { RestAPI } from './RestAPI.js';
-import { TaskManager } from './TaskManager.js';
+import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
 // Import the actual Orchestrator class
-import { Orchestrator } from './index.js';
+import { Orchestrator } from './Orchestrator';
+import { RestAPI } from './RestAPI';
+import { TaskManager } from './TaskManager';
 
 // Mock all dependencies
-vi.mock('./TaskManager.js');
-vi.mock('./RestAPI.js');
-vi.mock('../websocket/WorkerWebSocketServer.js');
-vi.mock('flow-engine/workspace/WorkspaceManager.js');
-vi.mock('shared-common/Logger.js');
-vi.mock('../ui.js', () => ({
-	renderUI: vi.fn(async () => ({
-		unmount: vi.fn(),
-		waitUntilExit: vi.fn().mockResolvedValue(undefined),
-	})),
-}));
+vi.mock('./TaskManager');
+vi.mock('./RestAPI');
+vi.mock('../websocket/WorkerWebSocketServer');
+vi.mock('flow-engine/workspace/WorkspaceManager');
+vi.mock('shared-common/logger');
 
 describe('Orchestrator', () => {
 	let orchestrator: Orchestrator;
@@ -38,7 +29,6 @@ describe('Orchestrator', () => {
 	let mockRestAPI: MockedObject<RestAPI>;
 	let mockWsServer: MockedObject<WorkerWebSocketServer>;
 	let mockWorkspaceManager: MockedObject<WorkspaceManager>;
-	let mockRenderUI: Awaited<ReturnType<typeof renderUI>>;
 
 	// Store original process properties
 	let originalTitle: string;
@@ -53,8 +43,8 @@ describe('Orchestrator', () => {
 		process.cwd = vi.fn(() => '/test/project/root');
 
 		// Mock Logger
-		vi.mocked(Logger.log).mockImplementation(() => {});
-		vi.mocked(Logger.error).mockImplementation(() => {});
+		vi.mocked(logger.info).mockImplementation(() => {});
+		vi.mocked(logger.error).mockImplementation(() => {});
 
 		// Mock TaskManager
 		mockTaskManager = {
@@ -93,13 +83,6 @@ describe('Orchestrator', () => {
 		vi.mocked(WorkspaceManager).mockImplementation(function (this: any) {
 			return mockWorkspaceManager;
 		} as any);
-
-		// Mock renderUI
-		mockRenderUI = {
-			unmount: vi.fn(),
-			waitUntilExit: vi.fn().mockResolvedValue(undefined),
-		} as any;
-		vi.mocked(renderUI).mockResolvedValue(mockRenderUI);
 	});
 
 	afterEach(async () => {
@@ -174,23 +157,23 @@ describe('Orchestrator', () => {
 			expect(mockRestAPI.start).toHaveBeenCalled();
 		});
 
-		// SKIP: Test failing due to incorrect mock setup for renderUI return value. Pre-existing issue, not related to SubFlowStep implementation.
-		// TODO: Fix renderUI mock to properly handle the expected call signature with 3 parameters (taskManager, shutdown object, wsServer)
-		it.skip('should render UI after starting services', async () => {
-			orchestrator = new Orchestrator();
-			await orchestrator.start();
+		// // SKIP: Test failing due to incorrect mock setup for renderUI return value. Pre-existing issue, not related to SubFlowStep implementation.
+		// // TODO: Fix renderUI mock to properly handle the expected call signature with 3 parameters (taskManager, shutdown object, wsServer)
+		// it.skip('should render UI after starting services', async () => {
+		// 	orchestrator = new Orchestrator();
+		// 	await orchestrator.start();
+		//
+		// 	expect(renderUI).toHaveBeenCalledWith(mockTaskManager, mockWsServer);
+		// });
 
-			expect(renderUI).toHaveBeenCalledWith(mockTaskManager, mockWsServer);
-		});
-
-		// SKIP: Test failing due to incorrect mock setup for renderUI return value. Pre-existing issue, not related to SubFlowStep implementation.
-		// TODO: Fix renderUI mock to properly handle the expected call signature with 3 parameters (taskManager, shutdown object, wsServer)
-		it.skip('should pass taskManager and wsServer to renderUI', async () => {
-			orchestrator = new Orchestrator();
-			await orchestrator.start();
-
-			expect(renderUI).toHaveBeenCalledWith(mockTaskManager, mockWsServer);
-		});
+		// // SKIP: Test failing due to incorrect mock setup for renderUI return value. Pre-existing issue, not related to SubFlowStep implementation.
+		// // TODO: Fix renderUI mock to properly handle the expected call signature with 3 parameters (taskManager, shutdown object, wsServer)
+		// it.skip('should pass taskManager and wsServer to renderUI', async () => {
+		// 	orchestrator = new Orchestrator();
+		// 	await orchestrator.start();
+		//
+		// 	expect(renderUI).toHaveBeenCalledWith(mockTaskManager, mockWsServer);
+		// });
 
 		it('should handle REST API start failure', async () => {
 			const error = new Error('Port already in use');
@@ -207,10 +190,10 @@ describe('Orchestrator', () => {
 				callOrder.push('1-restAPI.start');
 			});
 
-			vi.mocked(renderUI).mockImplementation(async () => {
-				callOrder.push('2-renderUI');
-				return mockRenderUI;
-			});
+			// vi.mocked(renderUI).mockImplementation(async () => {
+			// 	callOrder.push('2-renderUI');
+			// 	return mockRenderUI;
+			// });
 
 			orchestrator = new Orchestrator();
 			await orchestrator.start();
@@ -220,34 +203,34 @@ describe('Orchestrator', () => {
 	});
 
 	describe('Orchestrator Class - stop', () => {
-		it('should unmount UI first', async () => {
-			const callOrder: string[] = [];
-
-			mockRenderUI.unmount = vi.fn(() => {
-				callOrder.push('1-ui.unmount');
-			});
-
-			mockRestAPI.stop.mockImplementation(async () => {
-				callOrder.push('2-restAPI.stop');
-			});
-
-			orchestrator = new Orchestrator();
-			await orchestrator.start();
-
-			vi.clearAllMocks();
-
-			mockRenderUI.unmount = vi.fn(() => {
-				callOrder.push('1-ui.unmount');
-			});
-
-			mockRestAPI.stop.mockImplementation(async () => {
-				callOrder.push('2-restAPI.stop');
-			});
-
-			await orchestrator.shutdown();
-
-			expect(callOrder[0]).toBe('1-ui.unmount');
-		});
+		// it('should unmount UI first', async () => {
+		// 	const callOrder: string[] = [];
+		//
+		// 	mockRenderUI.unmount = vi.fn(() => {
+		// 		callOrder.push('1-ui.unmount');
+		// 	});
+		//
+		// 	mockRestAPI.stop.mockImplementation(async () => {
+		// 		callOrder.push('2-restAPI.stop');
+		// 	});
+		//
+		// 	orchestrator = new Orchestrator();
+		// 	await orchestrator.start();
+		//
+		// 	vi.clearAllMocks();
+		//
+		// 	mockRenderUI.unmount = vi.fn(() => {
+		// 		callOrder.push('1-ui.unmount');
+		// 	});
+		//
+		// 	mockRestAPI.stop.mockImplementation(async () => {
+		// 		callOrder.push('2-restAPI.stop');
+		// 	});
+		//
+		// 	await orchestrator.shutdown();
+		//
+		// 	expect(callOrder[0]).toBe('1-ui.unmount');
+		// });
 
 		it('should log shutdown message', async () => {
 			orchestrator = new Orchestrator();
@@ -256,7 +239,7 @@ describe('Orchestrator', () => {
 			vi.clearAllMocks();
 			await orchestrator.shutdown();
 
-			expect(Logger.log).toHaveBeenCalledWith('[Orchestrator] Shutting down...');
+			expect(logger.info).toHaveBeenCalledWith('[Orchestrator] Shutting down...');
 		});
 
 		it('should stop REST API', async () => {
@@ -307,7 +290,7 @@ describe('Orchestrator', () => {
 			vi.clearAllMocks();
 			await orchestrator.shutdown();
 
-			expect(Logger.log).toHaveBeenCalledWith('[Orchestrator] Stopped');
+			expect(logger.info).toHaveBeenCalledWith('[Orchestrator] Stopped');
 		});
 
 		it('should handle REST API stop failure', async () => {
@@ -346,9 +329,9 @@ describe('Orchestrator', () => {
 
 			vi.clearAllMocks();
 
-			mockRenderUI.unmount = vi.fn(() => {
-				callOrder.push('1-ui.unmount');
-			});
+			// mockRenderUI.unmount = vi.fn(() => {
+			// 	callOrder.push('1-ui.unmount');
+			// });
 
 			mockRestAPI.stop.mockImplementation(async () => {
 				callOrder.push('2-restAPI.stop');
@@ -448,37 +431,37 @@ describe('Orchestrator', () => {
 		});
 	});
 
-	describe('UI Management', () => {
-		// SKIP: Test failing due to incorrect mock setup for renderUI return value. Pre-existing issue, not related to SubFlowStep implementation.
-		// TODO: Fix renderUI mock to properly handle the expected call signature with 3 parameters (taskManager, shutdown object, wsServer)
-		it.skip('should render UI with correct dependencies', async () => {
-			orchestrator = new Orchestrator();
-			await orchestrator.start();
-
-			expect(renderUI).toHaveBeenCalledWith(mockTaskManager, mockWsServer);
-		});
-
-		// SKIP: Test failing due to incorrect mock setup for renderUI return value. Pre-existing issue, not related to SubFlowStep implementation.
-		// TODO: Fix renderUI mock to properly handle the expected call signature with 3 parameters (taskManager, shutdown object, wsServer)
-		it.skip('should store UI instance for cleanup', async () => {
-			orchestrator = new Orchestrator();
-			await orchestrator.start();
-
-			expect(renderUI).toHaveBeenCalled();
-			const uiInstance = vi.mocked(renderUI).mock.results[0].value;
-			expect(uiInstance).toHaveProperty('unmount');
-		});
-
-		it('should unmount UI on stop', async () => {
-			orchestrator = new Orchestrator();
-			await orchestrator.start();
-
-			vi.clearAllMocks();
-			await orchestrator.shutdown();
-
-			expect(mockRenderUI.unmount).toHaveBeenCalled();
-		});
-	});
+	// describe('UI Management', () => {
+	// 	// SKIP: Test failing due to incorrect mock setup for renderUI return value. Pre-existing issue, not related to SubFlowStep implementation.
+	// 	// TODO: Fix renderUI mock to properly handle the expected call signature with 3 parameters (taskManager, shutdown object, wsServer)
+	// 	it.skip('should render UI with correct dependencies', async () => {
+	// 		orchestrator = new Orchestrator();
+	// 		await orchestrator.start();
+	//
+	// 		expect(renderUI).toHaveBeenCalledWith(mockTaskManager, mockWsServer);
+	// 	});
+	//
+	// 	// SKIP: Test failing due to incorrect mock setup for renderUI return value. Pre-existing issue, not related to SubFlowStep implementation.
+	// 	// TODO: Fix renderUI mock to properly handle the expected call signature with 3 parameters (taskManager, shutdown object, wsServer)
+	// 	it.skip('should store UI instance for cleanup', async () => {
+	// 		orchestrator = new Orchestrator();
+	// 		await orchestrator.start();
+	//
+	// 		expect(renderUI).toHaveBeenCalled();
+	// 		const uiInstance = vi.mocked(renderUI).mock.results[0].value;
+	// 		expect(uiInstance).toHaveProperty('unmount');
+	// 	});
+	//
+	// 	it('should unmount UI on stop', async () => {
+	// 		orchestrator = new Orchestrator();
+	// 		await orchestrator.start();
+	//
+	// 		vi.clearAllMocks();
+	// 		await orchestrator.shutdown();
+	//
+	// 		expect(mockRenderUI.unmount).toHaveBeenCalled();
+	// 	});
+	// });
 
 	describe('Logging', () => {
 		it('should initialize TaskManager and StateManager in constructor', () => {
@@ -495,7 +478,7 @@ describe('Orchestrator', () => {
 			vi.clearAllMocks();
 			await orchestrator.shutdown();
 
-			expect(Logger.log).toHaveBeenCalledWith('[Orchestrator] Shutting down...');
+			expect(logger.info).toHaveBeenCalledWith('[Orchestrator] Shutting down...');
 		});
 
 		it('should log stopped message', async () => {
@@ -505,7 +488,7 @@ describe('Orchestrator', () => {
 			vi.clearAllMocks();
 			await orchestrator.shutdown();
 
-			expect(Logger.log).toHaveBeenCalledWith('[Orchestrator] Stopped');
+			expect(logger.info).toHaveBeenCalledWith('[Orchestrator] Stopped');
 		});
 	});
 });

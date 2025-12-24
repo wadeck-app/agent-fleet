@@ -9,8 +9,8 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { FlowExecutor } from './flow-executor.js';
-import type { FlowDefinition, Workspace } from './types.js';
+import { FlowExecutor } from './flow-executor';
+import type { FlowDefinition, Workspace } from './types';
 
 describe('Integration Tests', () => {
   let executor: FlowExecutor;

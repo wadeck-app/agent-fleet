@@ -13,11 +13,11 @@
  *
  * ===========================================================================================
  */
-import { TaskStatus } from 'shared-orch-worker/index.js';
+import { TaskStatus } from 'shared-orch-worker/domain-types';
 import { describe, expect, test, vi } from 'vitest';
 
-import { OrchestratorClientFactory } from './OrchestratorClientFactory.js';
-import { createMockOrchestrator, createMockTask } from './__mocks__/MockOrchestrator.js';
+import { OrchestratorClientFactory } from './OrchestratorClientFactory';
+import { createMockOrchestrator, createMockTask } from './__mocks__/MockOrchestrator';
 
 describe('OrchestratorClientFactory - Test Mode', () => {
 	test('should create client in test mode with default mock', async () => {

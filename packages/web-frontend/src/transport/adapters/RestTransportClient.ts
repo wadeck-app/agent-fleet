@@ -56,11 +56,12 @@ import type {
 	PathsForMethod,
 	RequestOptions,
 	ResponseType,
+	TransportConfig,
 	TransportType,
 	UnsubscribeFunction,
-} from 'shared-frontend-backend/transport';
+} from '@shared/transport';
 
-import type { ITransportClient, TransportConfig } from '../ITransportClient';
+import type { ITransportClient } from '../ITransportClient';
 
 /**
  * REST Transport Client

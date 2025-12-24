@@ -1,26 +1,25 @@
-import { Logger } from 'shared-common/Logger.js';
-import { StateManager } from 'shared-common/StateManager.js';
-import { createMessage } from 'shared-common/protocol.js';
+import { logger } from 'shared-common/logger';
+import { createMessage } from 'shared-common/protocol';
+import { StateManager } from 'shared-orch-worker/StateManager';
+import { TaskStatus } from 'shared-orch-worker/domain-types';
+import { O2WMessageType } from 'shared-orch-worker/orchestrator-messages';
 import {
-	FlowStepCompletedMessage,
-	FlowStepFailedMessage,
-	FlowStepStartedMessage,
-	HookEventMessage,
-	Message,
-	MessageType,
-	StopRequestedMessage,
-	TaskCompletedMessage,
-	TaskFailedMessage,
-	TaskProgressMessage,
-	TaskQuestionMessage,
-	TaskStartedMessage,
-	TaskStatus,
-	WorkspaceAllocatedMessage,
-	WorkspaceReleasedMessage,
-} from 'shared-orch-worker/index.js';
+	REMOVE_W2OStopRequestedMessage,
+	W2OFlowStepCompletedMessage,
+	W2OFlowStepFailedMessage,
+	W2OFlowStepStartedMessage,
+	W2OHookEventMessage,
+	W2OTaskCompletedMessage,
+	W2OTaskFailedMessage,
+	W2OTaskProgressMessage,
+	W2OTaskQuestionMessage,
+	W2OTaskStartedMessage,
+	W2OWorkspaceAllocatedMessage,
+	W2OWorkspaceReleasedMessage,
+} from 'shared-orch-worker/worker-messages';
 
-import { TaskManager } from '../core/TaskManager.js';
-import { WebSocketConnectionManager } from './WebSocketConnectionManager.js';
+import { TaskManager } from '../core/TaskManager';
+import { WebSocketConnectionManager } from './WebSocketConnectionManager';
 
 /**
  * Handles all task-related and flow-related events from workers
@@ -44,9 +43,9 @@ export class WebSocketEventHandler {
 	/**
 	 * Handle TASK_STARTED message
 	 */
-	handleTaskStarted(message: TaskStartedMessage): void {
+	handleTaskStarted(message: W2OTaskStartedMessage): void {
 		const { workerId, taskId, newStatus } = message;
-		Logger.log(`[WS] Worker ${workerId} started task ${taskId}`);
+		logger.info(`[WS] Worker ${workerId} started task ${taskId}`);
 
 		const status = newStatus || TaskStatus.IN_PROGRESS;
 		this.taskManager.updateTaskStatus(taskId, status, {
@@ -58,9 +57,9 @@ export class WebSocketEventHandler {
 	/**
 	 * Handle TASK_PROGRESS message
 	 */
-	handleTaskProgress(message: TaskProgressMessage): void {
+	handleTaskProgress(message: W2OTaskProgressMessage): void {
 		const { workerId, taskId, progress } = message;
-		Logger.log(`[WS] Worker ${workerId} progress on task ${taskId}: ${progress}`);
+		logger.info(`[WS] Worker ${workerId} progress on task ${taskId}: ${progress}`);
 
 		this.taskManager.addComment(taskId, `worker-${workerId}`, progress);
 	}
@@ -68,9 +67,9 @@ export class WebSocketEventHandler {
 	/**
 	 * Handle TASK_COMPLETED message
 	 */
-	handleTaskCompleted(message: TaskCompletedMessage): void {
+	handleTaskCompleted(message: W2OTaskCompletedMessage): void {
 		const { workerId, taskId, result, newStatus } = message;
-		Logger.log(`[WS] Worker ${workerId} completed task ${taskId}`);
+		logger.info(`[WS] Worker ${workerId} completed task ${taskId}`);
 
 		const status = newStatus || TaskStatus.REVIEW;
 		this.taskManager.updateTaskStatus(taskId, status, {
@@ -86,9 +85,9 @@ export class WebSocketEventHandler {
 	/**
 	 * Handle TASK_FAILED message
 	 */
-	handleTaskFailed(message: TaskFailedMessage): void {
+	handleTaskFailed(message: W2OTaskFailedMessage): void {
 		const { workerId, taskId, error, newStatus } = message;
-		Logger.error(`[WS] Worker ${workerId} failed task ${taskId}: ${error}`);
+		logger.error(`[WS] Worker ${workerId} failed task ${taskId}: ${error}`);
 
 		// Use the provided status or default to BLOCKED
 		const failureStatus = newStatus || TaskStatus.BLOCKED;
@@ -112,9 +111,9 @@ export class WebSocketEventHandler {
 	/**
 	 * Handle TASK_QUESTION message
 	 */
-	handleTaskQuestion(message: TaskQuestionMessage): void {
+	handleTaskQuestion(message: W2OTaskQuestionMessage): void {
 		const { workerId, taskId, question } = message;
-		Logger.log(`[WS] Worker ${workerId} has a question on task ${taskId}`);
+		logger.info(`[WS] Worker ${workerId} has a question on task ${taskId}`);
 
 		this.taskManager.updateTaskStatus(taskId, TaskStatus.BLOCKED, {
 			event: 'question_raised',
@@ -128,9 +127,9 @@ export class WebSocketEventHandler {
 	/**
 	 * Handle FLOW_STEP_STARTED message
 	 */
-	handleFlowStepStarted(message: FlowStepStartedMessage): void {
+	handleFlowStepStarted(message: W2OFlowStepStartedMessage): void {
 		const { workerId, taskId, stepId, stepName } = message;
-		Logger.log(`[WS] Worker ${workerId} started flow step ${stepId} (${stepName}) for task ${taskId}`);
+		logger.info(`[WS] Worker ${workerId} started flow step ${stepId} (${stepName}) for task ${taskId}`);
 
 		this.taskManager.addComment(taskId, 'system', `Flow step started: ${stepName || stepId}`);
 
@@ -143,9 +142,9 @@ export class WebSocketEventHandler {
 	/**
 	 * Handle FLOW_STEP_COMPLETED message
 	 */
-	handleFlowStepCompleted(message: FlowStepCompletedMessage): void {
+	handleFlowStepCompleted(message: W2OFlowStepCompletedMessage): void {
 		const { workerId, taskId, stepId, outputs } = message;
-		Logger.log(`[WS] Worker ${workerId} completed flow step ${stepId} for task ${taskId}`);
+		logger.info(`[WS] Worker ${workerId} completed flow step ${stepId} for task ${taskId}`);
 
 		const outputInfo = outputs ? ` with ${Object.keys(outputs).length} output(s)` : '';
 		this.taskManager.addComment(taskId, 'system', `Flow step completed: ${stepId}${outputInfo}`);
@@ -159,9 +158,9 @@ export class WebSocketEventHandler {
 	/**
 	 * Handle FLOW_STEP_FAILED message
 	 */
-	handleFlowStepFailed(message: FlowStepFailedMessage): void {
+	handleFlowStepFailed(message: W2OFlowStepFailedMessage): void {
 		const { workerId, taskId, stepId, error } = message;
-		Logger.error(`[WS] Worker ${workerId} flow step ${stepId} failed for task ${taskId}: ${error}`);
+		logger.error(`[WS] Worker ${workerId} flow step ${stepId} failed for task ${taskId}: ${error}`);
 
 		this.taskManager.addComment(taskId, 'system', `Flow step failed: ${stepId} - ${error}`);
 
@@ -174,9 +173,11 @@ export class WebSocketEventHandler {
 	/**
 	 * Handle WORKSPACE_ALLOCATED message
 	 */
-	handleWorkspaceAllocated(message: WorkspaceAllocatedMessage): void {
+	handleWorkspaceAllocated(message: W2OWorkspaceAllocatedMessage): void {
 		const { workerId, taskId, workspaceId, workspacePath } = message;
-		Logger.log(`[WS] Worker ${workerId} allocated workspace ${workspaceId} at ${workspacePath} for task ${taskId}`);
+		logger.info(
+			`[WS] Worker ${workerId} allocated workspace ${workspaceId} at ${workspacePath} for task ${taskId}`
+		);
 
 		this.taskManager.addComment(taskId, 'system', `Workspace allocated: ${workspacePath}`);
 
@@ -193,9 +194,9 @@ export class WebSocketEventHandler {
 	/**
 	 * Handle WORKSPACE_RELEASED message
 	 */
-	handleWorkspaceReleased(message: WorkspaceReleasedMessage): void {
+	handleWorkspaceReleased(message: W2OWorkspaceReleasedMessage): void {
 		const { workerId, taskId, workspaceId } = message;
-		Logger.log(`[WS] Worker ${workerId} released workspace ${workspaceId} for task ${taskId}`);
+		logger.info(`[WS] Worker ${workerId} released workspace ${workspaceId} for task ${taskId}`);
 
 		this.taskManager.addComment(taskId, 'system', `Workspace released: ${workspaceId}`);
 
@@ -208,15 +209,15 @@ export class WebSocketEventHandler {
 	/**
 	 * Handle STOP_REQUESTED message
 	 */
-	handleStopRequested(message: StopRequestedMessage): void {
+	handleStopRequested(message: REMOVE_W2OStopRequestedMessage): void {
 		const { workerId, taskId } = message;
-		Logger.log(`[WS] Stop requested from worker ${workerId}, task ${taskId}`);
+		logger.info(`[WS] Stop requested from worker ${workerId}, task ${taskId}`);
 
 		const worker = this.connectionManager.getWorker(workerId);
 		if (worker) {
 			this.connectionManager.sendMessage(
 				worker.socket,
-				createMessage(MessageType.KILL_CLAUDE, {
+				createMessage(O2WMessageType.KILL_CLAUDE, {
 					reason: 'stop_requested',
 				})
 			);
@@ -226,9 +227,9 @@ export class WebSocketEventHandler {
 	/**
 	 * Handle HOOK_EVENT message
 	 */
-	handleHookEvent(message: HookEventMessage): void {
+	handleHookEvent(message: W2OHookEventMessage): void {
 		const { workerId, hookName, data } = message;
-		Logger.log(`[WS] Hook event ${hookName} from worker ${workerId}`);
+		logger.info(`[WS] Hook event ${hookName} from worker ${workerId}`);
 
 		// TODO: Log to knowledge base if relevant
 	}

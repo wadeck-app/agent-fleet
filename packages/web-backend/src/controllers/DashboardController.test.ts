@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { DashboardData } from '@app/shared';
-import { InternalServerErrorException } from '@app/shared';
+import type { DashboardData } from '@app/shared/api/dashboard.contract';
+import { InternalServerErrorException } from '@app/shared/exceptions/http-exceptions';
 
 import type { DashboardService } from '../services/DashboardService';
 import type { RouteWrapperFunc } from '../utils/fastify-wrapper';

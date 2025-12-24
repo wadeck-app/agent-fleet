@@ -12,8 +12,8 @@
  * Design Decision: Loops only trigger on step FAILURE (exitCode !== 0 or error thrown).
  * Conditional goto based on outputs is deferred to Phase 5 with `when` expressions.
  */
-import type { DAG, FlowStep, StepTrace } from '../types.js';
-import { DAGBuilder } from '../validation/DAGBuilder.js';
+import type { DAG, FlowStep, StepTrace } from '../types';
+import { DAGBuilder } from '../validation/DAGBuilder';
 
 /**
  * Result of checking if a loop should be triggered

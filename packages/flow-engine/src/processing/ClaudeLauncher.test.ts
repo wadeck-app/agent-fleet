@@ -2,10 +2,10 @@
  * Claude Launcher Tests
  */
 import * as child_process from 'child_process';
-import { setupTest } from 'test-utils/index';
+import { setupTest } from 'test-utils/helpers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ClaudeLauncher } from '../processing/ClaudeLauncher.js';
+import { ClaudeLauncher } from '../processing/ClaudeLauncher';
 
 // Mock child_process
 vi.mock('child_process');

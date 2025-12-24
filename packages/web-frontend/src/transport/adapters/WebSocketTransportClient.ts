@@ -44,12 +44,6 @@
  * ```
  */
 import type {
-	SubscriptionMessage,
-	TransportEvent,
-	TransportRequest,
-	TransportResponse,
-} from 'shared-frontend-backend/transport';
-import type {
 	ConnectionState,
 	ConnectionStateHandler,
 	EventHandler,
@@ -58,11 +52,16 @@ import type {
 	PathsForMethod,
 	RequestOptions,
 	ResponseType,
+	SubscriptionMessage,
+	TransportConfig,
+	TransportEvent,
+	TransportRequest,
+	TransportResponse,
 	TransportType,
 	UnsubscribeFunction,
-} from 'shared-frontend-backend/transport';
+} from '@shared/transport';
 
-import type { ITransportClient, TransportConfig } from '../ITransportClient';
+import type { ITransportClient } from '../ITransportClient';
 import { TokenRefreshManager } from '../TokenRefreshManager';
 
 /**

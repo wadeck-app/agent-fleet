@@ -34,29 +34,3 @@ export { MockTransportClient } from './adapters/MockTransportClient';
 export { TransportProvider, useTransportContext } from './TransportProvider';
 export type { TransportProviderProps, TransportContextState } from './TransportProvider';
 export { useTransport } from './useTransport';
-
-// Re-export types from shared-frontend-backend for convenience
-export type {
-	// Protocol Types
-	TransportRequest,
-	TransportResponse,
-	TransportEvent,
-	SubscriptionMessage,
-	TransportError,
-	// Event Types
-	EventType,
-	EventData,
-	EventTypes,
-	CrudEventType,
-	ResourceEvent,
-	BusinessEvents,
-	// Transport Types
-	TransportConfig,
-	TransportType,
-	ConnectionState,
-	ConnectionStateHandler,
-	RequestOptions,
-	ResponseType,
-	UnsubscribeFunction,
-	EventHandler,
-} from 'shared-frontend-backend/transport';

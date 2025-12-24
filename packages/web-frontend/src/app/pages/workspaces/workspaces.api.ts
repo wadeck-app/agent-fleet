@@ -1,6 +1,6 @@
 import { createTypedFetch } from '@framework/api/api-base';
-import type { WorkspacesData } from '@shared';
-import { WORKSPACES_API_ROUTES } from '@shared';
+import { WORKSPACES_API_ROUTES } from '@shared/api/workspaces.contract';
+import type { WorkspacesData } from '@shared/api/workspaces.contract';
 
 /**
  * ===========================================================================================

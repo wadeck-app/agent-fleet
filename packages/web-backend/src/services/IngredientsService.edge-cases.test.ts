@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { CreateIngredient, Ingredient, PatchIngredient, UpdateIngredient } from '@app/shared';
-import { ConflictException, ERROR_CODES, NotFoundException } from '@app/shared';
+import type {
+	CreateIngredient,
+	Ingredient,
+	PatchIngredient,
+	UpdateIngredient,
+} from '@app/shared/api/ingredients.contract';
+import { ConflictException, ERROR_CODES, NotFoundException } from '@app/shared/exceptions/http-exceptions';
 
 import type { IngredientsRepository } from '../repositories/IngredientsRepository';
 import { IngredientsService } from './IngredientsService';

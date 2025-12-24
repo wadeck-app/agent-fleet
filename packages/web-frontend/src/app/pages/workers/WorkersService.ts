@@ -1,4 +1,4 @@
-import type { WorkersData } from '@shared';
+import type { WorkersData } from '@shared/api/workers.contract';
 
 import { workersApi } from './workers.api';
 

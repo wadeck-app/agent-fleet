@@ -1,5 +1,5 @@
 import { createApiClient, createTypedFetch } from '@framework/api/api-base';
-import { BOOKS_API_ROUTES, type BooksListQuery } from '@shared';
+import { BOOKS_API_ROUTES, type BooksListQuery } from '@shared/api/books.contract';
 
 const api = createApiClient(BOOKS_API_ROUTES);
 const typedFetch = createTypedFetch(BOOKS_API_ROUTES);

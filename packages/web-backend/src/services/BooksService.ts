@@ -7,8 +7,8 @@ import type {
 	FailedDeletion,
 	PatchBook,
 	UpdateBook,
-} from '@app/shared';
-import { ConflictException, ERROR_CODES, NotFoundException } from '@app/shared';
+} from '@app/shared/api/books.contract';
+import { ConflictException, ERROR_CODES, NotFoundException } from '@app/shared/exceptions/http-exceptions';
 
 import type { BooksRepository } from '../repositories/BooksRepository';
 

@@ -1,5 +1,5 @@
-import type { MONITORING_API_ROUTES } from '@app/shared';
-import { MONITORING_API_ROUTES as routes } from '@app/shared';
+import { MONITORING_API_ROUTES as routes } from '@app/shared/api/monitoring.contract';
+import type { MONITORING_API_ROUTES } from '@app/shared/api/monitoring.contract';
 
 import type { ITransportServer } from '../transport/ITransportServer';
 import type { WebSocketSessionManager } from '../transport/WebSocketSessionManager';

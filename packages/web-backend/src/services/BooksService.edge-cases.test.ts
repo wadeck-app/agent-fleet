@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Book, CreateBook, PatchBook, UpdateBook } from '@app/shared';
-import { ConflictException, ERROR_CODES, NotFoundException } from '@app/shared';
+import type { Book, CreateBook, PatchBook, UpdateBook } from '@app/shared/api/books.contract';
+import { ConflictException, ERROR_CODES, NotFoundException } from '@app/shared/exceptions/http-exceptions';
 
 import type { BooksRepository } from '../repositories/BooksRepository';
 import { BooksService } from './BooksService';

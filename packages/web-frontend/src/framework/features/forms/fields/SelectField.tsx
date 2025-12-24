@@ -2,7 +2,7 @@ import { Field } from '@framework/components/advanced/Field/Field';
 import { FieldError } from '@framework/components/advanced/Field/FieldError';
 import { FieldLabel } from '@framework/components/advanced/Field/FieldLabel';
 
-import { BaseFieldProps, generateFieldId } from '../fieldUtils';
+import { type BaseFieldProps, generateFieldId } from '../fieldUtils';
 import { SelectInput, type SelectOption } from '../inputs/SelectInput';
 
 /**

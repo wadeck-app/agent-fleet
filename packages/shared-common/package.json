@@ -3,10 +3,6 @@
 	"version": "1.0.0",
 	"private": true,
 	"type": "module",
-	"exports": {
-		"./*.js": "./dist/*.js",
-		"./*": "./dist/*"
-	},
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
 		"dev": "tsc --build tsconfig.json --watch",
@@ -14,7 +10,7 @@
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
 		"lint": "echo \"No linting configured for shared-common\"",
-		"clean": "rimraf dist"
+		"clean": "rimraf dist dist-types"
 	},
 	"dependencies": {
 		"@fastify/websocket": "^11.0.0",

@@ -1,13 +1,15 @@
-import { Logger } from 'shared-common/Logger.js';
-import { StateManager } from 'shared-common/StateManager.js';
-import { createMessage, parseMessage } from 'shared-common/protocol.js';
-import { MessageType, WorkerInfo } from 'shared-orch-worker/index.js';
+import { logger } from 'shared-common/logger';
+import { createMessage, parseMessage } from 'shared-common/protocol';
+import { StateManager } from 'shared-orch-worker/StateManager';
+import { WorkerInfo } from 'shared-orch-worker/domain-types';
+import { O2WMessage, O2WMessageType } from 'shared-orch-worker/orchestrator-messages';
+import { W2OMessage, W2OMessageType } from 'shared-orch-worker/worker-messages';
 import { WebSocket, WebSocketServer } from 'ws';
 
-import { TaskManager } from '../core/TaskManager.js';
-import { WebSocketConnectionManager } from './WebSocketConnectionManager.js';
-import { WebSocketEventHandler } from './WebSocketEventHandler.js';
-import { WebSocketMessageRouter } from './WebSocketMessageRouter.js';
+import { TaskManager } from '../core/TaskManager';
+import { WebSocketConnectionManager } from './WebSocketConnectionManager';
+import { WebSocketEventHandler } from './WebSocketEventHandler';
+import { WebSocketMessageRouter } from './WebSocketMessageRouter';
 
 /**
  * Main WebSocket server that coordinates worker connections and message routing
@@ -38,15 +40,15 @@ export class WorkerWebSocketServer {
 
 	private setupServer(): void {
 		this.wss.on('connection', (socket: WebSocket) => {
-			Logger.debug('[WS] New worker connection');
+			logger.debug('[WS] New worker connection');
 			this.handleConnection(socket);
 		});
 
 		this.wss.on('error', error => {
-			Logger.error('[WS] Server error:', error);
+			logger.error('[WS] Server error:', error);
 		});
 
-		Logger.debug(`[WS] WebSocket server listening on port ${this.port}`);
+		logger.debug(`[WS] WebSocket server listening on port ${this.port}`);
 	}
 
 	private handleConnection(socket: WebSocket): void {
@@ -54,7 +56,7 @@ export class WorkerWebSocketServer {
 
 		socket.on('message', (data: Buffer) => {
 			try {
-				const message = parseMessage(data.toString());
+				const message = parseMessage(data.toString()) as W2OMessage;
 
 				const result = this.messageRouter.routeMessage(socket, message, workerId);
 				// If routeMessage returns a workerId, update it
@@ -62,10 +64,10 @@ export class WorkerWebSocketServer {
 					workerId = result;
 				}
 			} catch (error) {
-				Logger.error('[WS] Error parsing message:', (error as Error).message);
+				logger.error('[WS] Error parsing message:', (error as Error).message);
 				this.connectionManager.sendMessage(
 					socket,
-					createMessage(MessageType.ERROR, {
+					createMessage(O2WMessageType.ERROR, {
 						error: (error as Error).message,
 					})
 				);
@@ -79,7 +81,7 @@ export class WorkerWebSocketServer {
 		});
 
 		socket.on('error', error => {
-			Logger.error('[WS] Socket error:', error);
+			logger.error('[WS] Socket error:', error);
 		});
 	}
 
@@ -114,7 +116,7 @@ export class WorkerWebSocketServer {
 			this.connectionManager.closeAll();
 
 			this.wss.close(() => {
-				Logger.debug('[WS] WebSocket server stopped');
+				logger.debug('[WS] WebSocket server stopped');
 				resolve();
 			});
 		});

@@ -1,10 +1,14 @@
 {
 	"extends": "../../tsconfig.base.json",
 	"compilerOptions": {
-		"outDir": "./dist",
-		"rootDir": "./src"
+		"outDir": "dist-types",
+		"rootDir": "src"
 	},
-	"include": ["src/**/*"],
-	"exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"],
-	"references": [{ "path": "../orchestrator" }, { "path": "../shared-common" }]
+	"include": ["src"],
+	"references": [
+		//
+		{ "path": "../orchestrator" },
+		{ "path": "../shared-orch-worker" },
+		{ "path": "../shared-common" }
+	]
 }

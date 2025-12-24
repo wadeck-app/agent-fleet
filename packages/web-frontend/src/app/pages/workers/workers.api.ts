@@ -1,6 +1,6 @@
 import { createTypedFetch } from '@framework/api/api-base';
-import type { WorkersData } from '@shared';
-import { WORKERS_API_ROUTES } from '@shared';
+import { WORKERS_API_ROUTES } from '@shared/api/workers.contract';
+import type { WorkersData } from '@shared/api/workers.contract';
 
 /**
  * ===========================================================================================

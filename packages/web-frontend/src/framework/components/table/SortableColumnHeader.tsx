@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
 
-import { SortDirection } from './useTableSorting';
+import { type SortDirection } from './useTableSorting';
 
 export interface SortableColumnHeaderProps {
 	label: string;

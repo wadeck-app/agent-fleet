@@ -132,13 +132,13 @@ function findStoryFiles() {
 				}
 			}
 		} catch (error) {
-			Logger.error(`Failed to read directory: ${dir}`, error.message);
+			logger.error(`Failed to read directory: ${dir}`, error.message);
 		}
 	}
 
 	for (const searchDir of CONFIG.searchDirs) {
 		if (!fs.existsSync(searchDir)) {
-			Logger.warn(`Search directory does not exist: ${searchDir}`);
+			logger.warn(`Search directory does not exist: ${searchDir}`);
 			continue;
 		}
 		searchDirectory(searchDir);
@@ -268,7 +268,7 @@ function parseStoryFile(filePath) {
 
 		return stories;
 	} catch (error) {
-		Logger.error(`Failed to parse ${path.basename(filePath)}:`, error.message);
+		logger.error(`Failed to parse ${path.basename(filePath)}:`, error.message);
 		return [];
 	}
 }
@@ -428,7 +428,7 @@ function writeTestFile(content, outputPath) {
 		Logger.timing('File writing', duration);
 		Logger.success(`Generated test file: ${path.relative(path.join(__dirname, '..'), outputPath)}`);
 	} catch (error) {
-		Logger.error('Failed to write test file:', error.message);
+		logger.error('Failed to write test file:', error.message);
 		throw error;
 	}
 }
@@ -444,7 +444,7 @@ function writeTestFile(content, outputPath) {
  */
 function validateStories(stories) {
 	if (stories.length === 0) {
-		Logger.warn('No stories found! Check your story files and configuration.');
+		logger.warn('No stories found! Check your story files and configuration.');
 		return false;
 	}
 
@@ -456,9 +456,9 @@ function validateStories(stories) {
 
 	const duplicates = Object.entries(idCounts).filter(([_, count]) => count > 1);
 	if (duplicates.length > 0) {
-		Logger.error('Found duplicate story IDs:');
+		logger.error('Found duplicate story IDs:');
 		duplicates.forEach(([id, count]) => {
-			Logger.error(`  - ${id} (${count} times)`);
+			logger.error(`  - ${id} (${count} times)`);
 		});
 		return false;
 	}
@@ -491,7 +491,7 @@ async function main() {
 		const storyFiles = findStoryFiles();
 
 		if (storyFiles.length === 0) {
-			Logger.error('No story files found! Check your configuration.');
+			logger.error('No story files found! Check your configuration.');
 			process.exit(1);
 		}
 
@@ -522,12 +522,12 @@ async function main() {
 
 		// Performance assessment
 		if (totalDuration > 100) {
-			Logger.warn(`Generation took ${totalDuration.toFixed(0)}ms. Consider optimizing or filtering stories.`);
+			logger.warn(`Generation took ${totalDuration.toFixed(0)}ms. Consider optimizing or filtering stories.`);
 		}
 
 		process.exit(0);
 	} catch (error) {
-		Logger.error('Fatal error:', error.message);
+		logger.error('Fatal error:', error.message);
 		if (CONFIG.logging.verbose) {
 			console.error(error);
 		}

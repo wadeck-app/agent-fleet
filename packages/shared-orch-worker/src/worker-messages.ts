@@ -1,104 +1,135 @@
 // Worker → Orchestrator (W2O) messages
-import type { FlowMetadata, TaskStatus, WorkerType } from './domain-types.js';
-import type { BaseMessage, MessageType } from './protocol.js';
+import { ProtocolMessage } from 'shared-common/protocol';
 
-export interface WorkerReadyMessage extends BaseMessage {
-	type: MessageType.WORKER_READY;
-	workerType: WorkerType;
+import type { FlowMetadata, TaskStatus } from './domain-types';
+
+export enum W2OMessageType {
+	// W2O Messages (Worker → Orchestrator)
+	WORKER_READY = 'w2o:worker:ready',
+	WORKER_HEARTBEAT = 'w2o:worker:heartbeat',
+	REQUEST_TASK = 'w2o:task:request',
+	TASK_STARTED = 'w2o:task:started',
+	TASK_PROGRESS = 'w2o:task:progress',
+	TASK_COMPLETED = 'w2o:task:completed',
+	TASK_FAILED = 'w2o:task:failed',
+	TASK_QUESTION = 'w2o:task:question',
+	FLOWS_UPDATED = 'w2o:flows:updated',
+	FLOW_STEP_STARTED = 'w2o:flow:step:started',
+	FLOW_STEP_COMPLETED = 'w2o:flow:step:completed',
+	FLOW_STEP_FAILED = 'w2o:flow:step:failed',
+	WORKSPACE_ALLOCATED = 'w2o:workspace:allocated',
+	WORKSPACE_RELEASED = 'w2o:workspace:released',
+
+	// Hook → Orchestrator (via Worker) - TODO: Deprecated?
+	/** TODO Deprecated no?*/
+	STOP_REQUESTED = 'stop_requested',
+	/** TODO Deprecated no?*/
+	HOOK_EVENT = 'hook_event',
+	/** TODO Deprecated no?*/
+	TOOL_RESULT = 'tool_result',
+
+	ACK = 'w2o:ack',
+	ERROR = 'w2o:error',
+}
+
+export interface W2OBaseMessage extends ProtocolMessage<W2OMessageType> {}
+
+export interface W2OWorkerReadyMessage extends W2OBaseMessage {
+	type: W2OMessageType.WORKER_READY;
 	preferredId?: string;
 	projectId: string;
 	workspacePath: string;
 	availableFlows: FlowMetadata[];
 }
 
-export interface WorkerHeartbeatMessage extends BaseMessage {
-	type: MessageType.WORKER_HEARTBEAT;
+export interface W2OWorkerHeartbeatMessage extends W2OBaseMessage {
+	type: W2OMessageType.WORKER_HEARTBEAT;
 	workerId: string;
 }
 
-export interface RequestTaskMessage extends BaseMessage {
-	type: MessageType.REQUEST_TASK;
+export interface W2ORequestTaskMessage extends W2OBaseMessage {
+	type: W2OMessageType.REQUEST_TASK;
 	workerId: string;
 }
 
-export interface TaskStartedMessage extends BaseMessage {
-	type: MessageType.TASK_STARTED;
+export interface W2OTaskStartedMessage extends W2OBaseMessage {
+	type: W2OMessageType.TASK_STARTED;
 	workerId: string;
 	taskId: string;
 	newStatus?: TaskStatus;
 }
 
-export interface TaskProgressMessage extends BaseMessage {
-	type: MessageType.TASK_PROGRESS;
+export interface W2OTaskProgressMessage extends W2OBaseMessage {
+	type: W2OMessageType.TASK_PROGRESS;
 	workerId: string;
 	taskId: string;
 	progress: string;
 }
 
-export interface TaskCompletedMessage extends BaseMessage {
-	type: MessageType.TASK_COMPLETED;
+export interface W2OTaskCompletedMessage extends W2OBaseMessage {
+	type: W2OMessageType.TASK_COMPLETED;
 	workerId: string;
 	taskId: string;
 	newStatus?: TaskStatus;
 	result?: any;
 }
 
-export interface TaskFailedMessage extends BaseMessage {
-	type: MessageType.TASK_FAILED;
+export interface W2OTaskFailedMessage extends W2OBaseMessage {
+	type: W2OMessageType.TASK_FAILED;
 	workerId: string;
 	taskId: string;
 	error: string;
 	newStatus?: TaskStatus;
 }
 
-export interface TaskQuestionMessage extends BaseMessage {
-	type: MessageType.TASK_QUESTION;
+export interface W2OTaskQuestionMessage extends W2OBaseMessage {
+	type: W2OMessageType.TASK_QUESTION;
 	workerId: string;
 	taskId: string;
 	question: string;
 }
 
-export interface FlowStepStartedMessage extends BaseMessage {
-	type: MessageType.FLOW_STEP_STARTED;
+export interface W2OFlowStepStartedMessage extends W2OBaseMessage {
+	type: W2OMessageType.FLOW_STEP_STARTED;
 	workerId: string;
 	taskId: string;
 	stepId: string;
 	stepName?: string;
 }
 
-export interface FlowStepCompletedMessage extends BaseMessage {
-	type: MessageType.FLOW_STEP_COMPLETED;
+export interface W2OFlowStepCompletedMessage extends W2OBaseMessage {
+	type: W2OMessageType.FLOW_STEP_COMPLETED;
 	workerId: string;
 	taskId: string;
 	stepId: string;
 	outputs?: Record<string, any>;
 }
 
-export interface FlowStepFailedMessage extends BaseMessage {
-	type: MessageType.FLOW_STEP_FAILED;
+export interface W2OFlowStepFailedMessage extends W2OBaseMessage {
+	type: W2OMessageType.FLOW_STEP_FAILED;
 	workerId: string;
 	taskId: string;
 	stepId: string;
 	error: string;
 }
 
-export interface WorkspaceAllocatedMessage extends BaseMessage {
-	type: MessageType.WORKSPACE_ALLOCATED;
+export interface W2OWorkspaceAllocatedMessage extends W2OBaseMessage {
+	type: W2OMessageType.WORKSPACE_ALLOCATED;
 	workerId: string;
 	taskId: string;
 	workspaceId: string;
 	workspacePath: string;
 }
 
-export interface WorkspaceReleasedMessage extends BaseMessage {
-	type: MessageType.WORKSPACE_RELEASED;
+export interface W2OWorkspaceReleasedMessage extends W2OBaseMessage {
+	type: W2OMessageType.WORKSPACE_RELEASED;
 	workerId: string;
 	taskId: string;
 	workspaceId: string;
 }
 
-export interface FlowsUpdatedMessage extends BaseMessage {
-	type: MessageType.FLOWS_UPDATED;
+export interface W2OFlowsUpdatedMessage extends W2OBaseMessage {
+	type: W2OMessageType.FLOWS_UPDATED;
 	workerId: string;
 	projectId: string;
 	flows: FlowMetadata[];
@@ -110,34 +141,46 @@ export interface FlowsUpdatedMessage extends BaseMessage {
 }
 
 // Deprecated messages (TODO: Remove?)
-export interface StopRequestedMessage extends BaseMessage {
-	type: MessageType.STOP_REQUESTED;
+export interface REMOVE_W2OStopRequestedMessage extends W2OBaseMessage {
+	type: W2OMessageType.STOP_REQUESTED;
 	workerId: string;
 	taskId: string;
 	claudePid: number;
 }
 
-export interface HookEventMessage extends BaseMessage {
-	type: MessageType.HOOK_EVENT;
+export interface W2OHookEventMessage extends W2OBaseMessage {
+	type: W2OMessageType.HOOK_EVENT;
 	workerId: string;
 	hookName: string;
 	data: any;
 }
 
+export interface W2OAckMessage extends W2OBaseMessage {
+	type: W2OMessageType.ACK;
+	[key: string]: any;
+}
+
+export interface W2OErrorMessage extends W2OBaseMessage {
+	type: W2OMessageType.ERROR;
+	error: string;
+}
+
 export type W2OMessage =
-	| WorkerReadyMessage
-	| WorkerHeartbeatMessage
-	| RequestTaskMessage
-	| TaskStartedMessage
-	| TaskProgressMessage
-	| TaskCompletedMessage
-	| TaskFailedMessage
-	| TaskQuestionMessage
-	| FlowStepStartedMessage
-	| FlowStepCompletedMessage
-	| FlowStepFailedMessage
-	| WorkspaceAllocatedMessage
-	| WorkspaceReleasedMessage
-	| FlowsUpdatedMessage
-	| StopRequestedMessage
-	| HookEventMessage;
+	| W2OWorkerReadyMessage
+	| W2OWorkerHeartbeatMessage
+	| W2ORequestTaskMessage
+	| W2OTaskStartedMessage
+	| W2OTaskProgressMessage
+	| W2OTaskCompletedMessage
+	| W2OTaskFailedMessage
+	| W2OTaskQuestionMessage
+	| W2OFlowStepStartedMessage
+	| W2OFlowStepCompletedMessage
+	| W2OFlowStepFailedMessage
+	| W2OWorkspaceAllocatedMessage
+	| W2OWorkspaceReleasedMessage
+	| W2OFlowsUpdatedMessage
+	| REMOVE_W2OStopRequestedMessage
+	| W2OHookEventMessage
+	| W2OAckMessage
+	| W2OErrorMessage;

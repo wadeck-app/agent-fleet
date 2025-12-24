@@ -6,8 +6,8 @@
  *
  * Key principle: Strong typing for reusability in the backend UI server.
  */
-import type { MetricsData, OrchestratorStatusData } from 'shared-common/StateManager.js';
-import type { Task, WorkerInfo } from 'shared-orch-worker/index.js';
+import type { MetricsData, OrchestratorStatusData } from 'shared-orch-worker/StateManager';
+import { Task, WorkerInfo } from 'shared-orch-worker/domain-types';
 
 /**
  * Message types for UI ↔ Orchestrator communication
@@ -306,7 +306,9 @@ export interface OrchestratorSnapshot {
 	timestamp: string;
 	orchestrator: {
 		status: 'ready' | 'starting' | 'stopping';
-		uptime: number; // milliseconds
+		// milliseconds
+		//FIXME put in the name of the field, like uptimeMs
+		uptime: number;
 		version: string;
 	};
 	tasks: {
@@ -330,6 +332,7 @@ export interface OrchestratorSnapshot {
 /**
  * Create a UI message with automatic timestamp
  */
+//FIXME like in protocol.ts
 export function createUIMessage<T extends UIMessage>(type: T['type'], data: Omit<T, 'type' | 'timestamp'> | any): T {
 	return {
 		type,

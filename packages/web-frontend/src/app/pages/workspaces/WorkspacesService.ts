@@ -1,4 +1,4 @@
-import type { WorkspacesData } from '@shared';
+import type { WorkspacesData } from '@shared/api/workspaces.contract';
 
 import { workspacesApi } from './workspaces.api';
 

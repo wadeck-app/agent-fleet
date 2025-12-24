@@ -1,6 +1,6 @@
-import fs from 'fs';
-import path from 'path';
-import { Task } from 'shared-orch-worker/index.js';
+import * as fs from 'fs';
+import * as path from 'path';
+import { Task } from 'shared-orch-worker/domain-types';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);

@@ -6,7 +6,12 @@ import { nonNegative } from '@framework/utils/validation/validation';
 import { positive } from '@framework/utils/validation/validation';
 import { combine } from '@framework/utils/validation/validation';
 import { type ValidationResult } from '@framework/utils/validation/validation';
-import type { CreateIngredient, Ingredient, IngredientListResponse, IngredientsListQuery } from '@shared';
+import type {
+	CreateIngredient,
+	Ingredient,
+	IngredientListResponse,
+	IngredientsListQuery,
+} from '@shared/api/ingredients.contract';
 
 import { ingredientsApi } from '@app/api/client';
 

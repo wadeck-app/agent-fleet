@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import type { ConnectionState } from 'shared-frontend-backend/transport';
+import type { ConnectionState } from '@shared/transport';
 
 import type { ITransportClient } from './ITransportClient';
 import { WebSocketTransportClient } from './adapters/WebSocketTransportClient';

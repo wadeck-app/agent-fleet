@@ -189,6 +189,8 @@ export type BookListResponse = z.infer<typeof BookListSchema>;
 export type BooksListQuery = z.infer<typeof BookListQuerySchema>;
 export type IsbnParam = z.infer<typeof IsbnParamSchema>;
 export type IsbnQuery = z.infer<typeof IsbnQuerySchema>;
+//FIXME name bulkDelete with Book !
 export type BulkDeleteRequest = z.infer<typeof BulkDeleteRequestSchema>;
 export type BulkDeleteResponse = z.infer<typeof BulkDeleteResponseSchema>;
+//FIXME name FailedDeletion with Book !
 export type FailedDeletion = z.infer<typeof FailedDeletionSchema>;

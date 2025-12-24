@@ -1,4 +1,4 @@
-import type { TasksData, TasksQuery } from '@shared';
+import type { TasksData, TasksQuery } from '@shared/api/tasks.contract';
 
 import { tasksApi } from './tasks.api';
 

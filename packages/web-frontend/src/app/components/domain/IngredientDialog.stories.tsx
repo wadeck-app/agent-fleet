@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { Button } from '@framework/components/primitives/Button';
-import type { Ingredient } from '@shared';
+import type { Ingredient } from '@shared/api/ingredients.contract';
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
 

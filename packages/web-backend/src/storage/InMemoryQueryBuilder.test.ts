@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { BaseEntity } from '@app/shared';
+import type { BaseEntity } from '@app/shared/common/base-entity';
 
 import { InMemoryQueryBuilder } from './InMemoryQueryBuilder';
 

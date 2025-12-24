@@ -3,16 +3,19 @@
  *
  * Comprehensive unit tests for FlowWorker functionality.
  */
-import { ChildProcess } from 'child_process';
-import { FlowExecutor } from 'flow-engine/executor/FlowExecutor.js';
-import { FlowRegistry } from 'flow-engine/registry/FlowRegistry.js';
-import type { FlowDefinition, FlowExecutionResult, Workspace } from 'flow-engine/types.js';
-import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager.js';
-import type { Task } from 'shared-orch-worker/index.js';
-import { createMockFlow, createMockFlowTrace, createMockTask, createMockWorkspace } from 'test-utils/index';
+import type {
+	FlowDefinition,
+	FlowExecutionResult,
+	GitStrategy,
+	ReusePolicy,
+	Workspace,
+	WorkspaceMode,
+} from 'flow-engine/types';
+import { type Task, TaskStatus } from 'shared-orch-worker/domain-types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createMockFlow, createMockFlowTrace, createMockTask, createMockWorkspace } from 'worker/flow/factories';
 
-import { FlowWorker } from './FlowWorker.js';
+import { FlowWorker } from './FlowWorker';
 
 // Mock WebSocket
 vi.mock('ws', () => ({
@@ -57,7 +60,7 @@ let mockWorkspaceManagerInstance: any;
 let mockFlowExecutorInstance: any;
 
 // Mock FlowRegistry
-vi.mock('flow-engine/registry/FlowRegistry.js', () => ({
+vi.mock('flow-engine/registry/FlowRegistry', () => ({
 	FlowRegistry: class {
 		constructor(projectRoot: string) {
 			return mockFlowRegistryInstance;
@@ -66,7 +69,7 @@ vi.mock('flow-engine/registry/FlowRegistry.js', () => ({
 }));
 
 // Mock WorkspaceManager
-vi.mock('flow-engine/workspace/WorkspaceManager.js', () => ({
+vi.mock('flow-engine/workspace/WorkspaceManager', () => ({
 	WorkspaceManager: class {
 		constructor(projectRoot: string) {
 			return mockWorkspaceManagerInstance;
@@ -75,7 +78,7 @@ vi.mock('flow-engine/workspace/WorkspaceManager.js', () => ({
 }));
 
 // Mock FlowExecutor
-vi.mock('flow-engine/executor/FlowExecutor.js', () => ({
+vi.mock('flow-engine/executor/FlowExecutor', () => ({
 	FlowExecutor: class {
 		constructor(interactive: boolean) {
 			return mockFlowExecutorInstance;

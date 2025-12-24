@@ -14,7 +14,8 @@
  *
  * ===========================================================================================
  */
-import type { O2BEventData, O2BEventType, OrchestratorStats, Task, WorkerInfo } from 'shared-orch-worker/index.js';
+import { OrchestratorStats, Task, WorkerInfo } from 'shared-orch-worker/domain-types';
+import { O2BEventData, O2BEventType } from 'shared-orch-worker/orchestrator-events';
 
 /**
  * Task filters for getTasks()

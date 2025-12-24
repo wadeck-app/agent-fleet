@@ -1,4 +1,4 @@
-import type { OrchestratorStats } from 'shared-orch-worker/index.js';
+import type { OrchestratorStats } from 'shared-orch-worker/domain-types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
@@ -24,9 +24,9 @@ describe('DashboardService', () => {
 		uptime: 3600000,
 		workers: 3,
 		workersList: [
-			{ id: 'worker-1', type: 'flow', taskId: 'task-1', connectedAt: '2025-12-21T20:00:00.000Z' },
-			{ id: 'worker-2', type: 'flow', taskId: 'task-2', connectedAt: '2025-12-21T20:00:00.000Z' },
-			{ id: 'worker-3', type: 'flow', taskId: null, connectedAt: '2025-12-21T20:00:00.000Z' },
+			{ id: 'worker-1', taskId: 'task-1', connectedAt: '2025-12-21T20:00:00.000Z' },
+			{ id: 'worker-2', taskId: 'task-2', connectedAt: '2025-12-21T20:00:00.000Z' },
+			{ id: 'worker-3', taskId: null, connectedAt: '2025-12-21T20:00:00.000Z' },
 		],
 		tasks: {
 			total: 10,
@@ -82,9 +82,9 @@ describe('DashboardService', () => {
 			const mockStats = createMockStats({
 				workers: 3,
 				workersList: [
-					{ id: 'worker-1', type: 'flow', taskId: null, connectedAt: '2025-12-21T20:00:00.000Z' },
-					{ id: 'worker-2', type: 'flow', taskId: null, connectedAt: '2025-12-21T20:00:00.000Z' },
-					{ id: 'worker-3', type: 'flow', taskId: null, connectedAt: '2025-12-21T20:00:00.000Z' },
+					{ id: 'worker-1', taskId: null, connectedAt: '2025-12-21T20:00:00.000Z' },
+					{ id: 'worker-2', taskId: null, connectedAt: '2025-12-21T20:00:00.000Z' },
+					{ id: 'worker-3', taskId: null, connectedAt: '2025-12-21T20:00:00.000Z' },
 				],
 			});
 			vi.mocked(mockRepository.getStats).mockResolvedValue(mockStats);
@@ -105,9 +105,9 @@ describe('DashboardService', () => {
 			const mockStats = createMockStats({
 				workers: 3,
 				workersList: [
-					{ id: 'worker-1', type: 'flow', taskId: 'task-1', connectedAt: '2025-12-21T20:00:00.000Z' },
-					{ id: 'worker-2', type: 'flow', taskId: 'task-2', connectedAt: '2025-12-21T20:00:00.000Z' },
-					{ id: 'worker-3', type: 'flow', taskId: 'task-3', connectedAt: '2025-12-21T20:00:00.000Z' },
+					{ id: 'worker-1', taskId: 'task-1', connectedAt: '2025-12-21T20:00:00.000Z' },
+					{ id: 'worker-2', taskId: 'task-2', connectedAt: '2025-12-21T20:00:00.000Z' },
+					{ id: 'worker-3', taskId: 'task-3', connectedAt: '2025-12-21T20:00:00.000Z' },
 				],
 			});
 			vi.mocked(mockRepository.getStats).mockResolvedValue(mockStats);

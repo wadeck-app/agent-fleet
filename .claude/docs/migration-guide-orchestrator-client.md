@@ -215,7 +215,7 @@ async function initializeOrchestratorClient(): Promise<OrchestratorClient> {
 		logger.info('[Orchestrator] Initializing in library mode (embedded)');
 
 		// @ts-expect-error - orchestrator is a devDependency, only available at runtime in library mode
-		const { Orchestrator } = await import('orchestrator/core/index.js');
+		const { Orchestrator } = await import('orchestrator/core/index');
 
 		const orchestratorWsPort = parseInt(process.env.ORCHESTRATOR_WS_PORT || '3738', 10);
 		const orchestratorRestPort = parseInt(process.env.ORCHESTRATOR_REST_PORT || '3737', 10);
@@ -645,7 +645,7 @@ import { MockOrchestratorClient } from 'orchestrator-adapters/__mocks__/MockOrch
 
 ```typescript
 // @ts-expect-error - orchestrator is a devDependency, only available at runtime in library mode
-const { Orchestrator } = await import('orchestrator/core/index.js');
+const { Orchestrator } = await import('orchestrator/core/index');
 ```
 
 ---

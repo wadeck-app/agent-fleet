@@ -1,5 +1,4 @@
-import type { WORKERS_API_ROUTES } from '@app/shared';
-import { WORKERS_API_ROUTES as routes } from '@app/shared';
+import { WORKERS_API_ROUTES } from '@app/shared/api/workers.contract';
 
 import type { WorkersService } from '../services/WorkersService';
 import type { RouteWrapperFunc } from '../utils/fastify-wrapper';
@@ -24,7 +23,7 @@ import type { LazyController } from '../utils/lazy-controller-plugin';
  * ===========================================================================================
  */
 export default class WorkersController implements LazyController<typeof WORKERS_API_ROUTES> {
-	static routes = routes;
+	static routes = WORKERS_API_ROUTES;
 
 	constructor(private readonly service: WorkersService) {}
 

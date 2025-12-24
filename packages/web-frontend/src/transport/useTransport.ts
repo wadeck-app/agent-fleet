@@ -75,17 +75,6 @@ export function useTransport(): ITransportClient {
 }
 
 /**
- * Re-export types for convenience
- */
-export type {
-	ITransportClient,
-	TransportConfig,
-	ConnectionState,
-	ConnectionStateHandler,
-	TransportType,
-} from './ITransportClient';
-
-/**
  * Re-export TransportProvider and context hook
  */
 export { TransportProvider, useTransportContext } from './TransportProvider';

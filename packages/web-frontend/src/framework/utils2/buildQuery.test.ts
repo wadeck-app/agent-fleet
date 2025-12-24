@@ -1,5 +1,5 @@
 import type { FeatureContract } from '@framework/types/FeatureContract';
-import type { BaseListQueryMutable } from '@shared';
+import { type BaseListQueryMutable } from '@shared/common/api-helpers';
 import { describe, expect, it } from 'vitest';
 
 import { QueryBuilder, buildQuery } from './buildQuery';

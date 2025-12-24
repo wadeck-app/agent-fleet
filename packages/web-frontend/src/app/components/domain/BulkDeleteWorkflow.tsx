@@ -1,7 +1,7 @@
 import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
 import { useToast } from '@framework/features/toast/ToastContext';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
-import type { FailedDeletion } from '@shared';
+import type { FailedDeletion } from '@shared/api/books.contract';
 
 /**
  * ===========================================================================================

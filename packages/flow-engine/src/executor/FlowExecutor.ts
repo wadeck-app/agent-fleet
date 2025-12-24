@@ -3,11 +3,11 @@
  *
  * Simplified facade that orchestrates flow execution using specialized components.
  */
-import type { TemplateContext } from '../processing/TemplateRenderer.js';
-import type { FlowRegistry } from '../registry/FlowRegistry.js';
-import type { FlowDefinition, FlowExecutionResult, Workspace } from '../types.js';
-import { FlowOrchestrator } from './FlowOrchestrator.js';
-import { StepRunner } from './StepRunner.js';
+import type { TemplateContext } from '../processing/TemplateRenderer';
+import type { FlowRegistry } from '../registry/FlowRegistry';
+import type { FlowDefinition, FlowExecutionResult, Workspace } from '../types';
+import { FlowOrchestrator } from './FlowOrchestrator';
+import { StepRunner } from './StepRunner';
 
 /**
  * Options for flow execution

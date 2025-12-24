@@ -86,7 +86,7 @@ export type OrchestratorClientConfig =
 ```typescript
 // Removed remote branch
 else if (isRemoteMode(config)) {
-  const { RemoteOrchestratorAdapter } = await import('./adapters/RemoteAdapter.js');
+  const { RemoteOrchestratorAdapter } = await import('./adapters/RemoteAdapter');
   return new RemoteOrchestratorAdapter(config);
 }
 ```
@@ -123,9 +123,9 @@ async function initializeOrchestratorClient() {
 
 ```typescript
 // Removed
-export { ControllableTimeService } from './transport/TimeService.js';
-export type { TimeService } from './transport/TimeService.js';
-export type { ReconnectingEvent, ReconnectedEvent, ReconnectFailedEvent } from './transport/WebSocketTransport.js';
+export { ControllableTimeService } from './transport/TimeService';
+export type { TimeService } from './transport/TimeService';
+export type { ReconnectingEvent, ReconnectedEvent, ReconnectFailedEvent } from './transport/WebSocketTransport';
 
 // Simplified package description
 // Before: "Library mode (LibraryAdapter) and Remote mode (RemoteAdapter)"

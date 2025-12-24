@@ -5,8 +5,8 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { TemplateRenderer } from '../processing/TemplateRenderer.js';
-import type { TemplateContext } from '../processing/TemplateRenderer.js';
+import { TemplateRenderer } from '../processing/TemplateRenderer';
+import type { TemplateContext } from '../processing/TemplateRenderer';
 
 describe('TemplateRenderer - Escape & Literal Characters', () => {
 	const renderer = new TemplateRenderer();

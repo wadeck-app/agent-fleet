@@ -57,7 +57,7 @@ console.log(`Created task: ${task.id}`);
 
 ```typescript
 import { OrchestratorClientFactory } from 'orchestrator-adapters';
-import { Orchestrator } from 'orchestrator/core/index.js';
+import { Orchestrator } from 'orchestrator/core/index';
 
 // Create and start orchestrator instance
 const orchestrator = new Orchestrator({

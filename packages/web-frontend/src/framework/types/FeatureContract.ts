@@ -37,7 +37,7 @@
  *
  * ===========================================================================================
  */
-import type { BaseListQueryMutable } from '@shared';
+import { type BaseListQueryMutable } from '@shared/common/api-helpers';
 
 /**
  * Base contract that ALL feature hooks must implement.

@@ -1,4 +1,4 @@
-import type { ActivityEntry } from '@shared';
+import type { ActivityEntry } from '@shared/api/dashboard.contract';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 

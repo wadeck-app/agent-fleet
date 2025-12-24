@@ -1,17 +1,16 @@
 /**
  * UIClientHook Tests
  */
-import { Logger } from 'shared-common/Logger.js';
-import { StateEvent, StateManager } from 'shared-common/StateManager.js';
-import { Task, TaskStatus, WorkerType } from 'shared-orch-worker/index.js';
-import { setupTest } from 'test-utils/index';
+import { logger } from 'shared-common/logger';
+import { StateEvent, StateManager } from 'shared-orch-worker/StateManager';
+import { Task, TaskStatus } from 'shared-orch-worker/domain-types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { UIClientHook } from './UIClientHook.js';
+import { UIClientHook } from './UIClientHook';
 
 // Mock dependencies
-vi.mock('shared-common/StateManager.js');
-vi.mock('shared-common/Logger.js');
+vi.mock('shared-common/StateManager');
+vi.mock('shared-common/logger');
 
 describe('UIClientHook', () => {
 	let hook: UIClientHook;
@@ -24,7 +23,7 @@ describe('UIClientHook', () => {
 		priority: 'high',
 		createdAt: '2024-01-01T00:00:00.000Z',
 		updatedAt: '2024-01-01T00:00:00.000Z',
-		assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+		assignedTo: { workerId: 'worker-1' },
 		comments: [],
 		metadata: {},
 		history: [],
@@ -38,7 +37,10 @@ describe('UIClientHook', () => {
 		mockStateManager = new EventEmitter() as any;
 
 		// Mock Logger
-		vi.mocked(Logger.logStructured).mockImplementation(() => {});
+		vi.mocked(logger.debug).mockImplementation(() => {});
+		vi.mocked(logger.info).mockImplementation(() => {});
+		vi.mocked(logger.warn).mockImplementation(() => {});
+		vi.mocked(logger.error).mockImplementation(() => {});
 
 		hook = new UIClientHook(mockStateManager);
 	});
@@ -72,21 +74,13 @@ describe('UIClientHook', () => {
 			hook.enable();
 			hook.enable();
 
-			expect(Logger.logStructured).toHaveBeenCalledWith(
-				'warn',
-				'UIClientHook',
-				expect.stringContaining('Already enabled')
-			);
+			expect(logger.warn).toHaveBeenCalledWith('UIClientHook', expect.stringContaining('Already enabled'));
 		});
 
 		it('should log when enabled', () => {
 			hook.enable();
 
-			expect(Logger.logStructured).toHaveBeenCalledWith(
-				'info',
-				'UIClientHook',
-				expect.stringContaining('Enabled')
-			);
+			expect(logger.info).toHaveBeenCalledWith('UIClientHook', expect.stringContaining('Enabled'));
 		});
 	});
 
@@ -119,7 +113,7 @@ describe('UIClientHook', () => {
 			hook.enable();
 			hook.disable();
 
-			expect(Logger.logStructured).toHaveBeenCalledWith('info', 'UIClientHook', 'Disabled');
+			expect(logger.info).toHaveBeenCalledWith('UIClientHook', 'Disabled');
 		});
 	});
 
@@ -267,8 +261,7 @@ describe('UIClientHook', () => {
 		it('should log command result', () => {
 			hook.sendCommandResult('req-123', true);
 
-			expect(Logger.logStructured).toHaveBeenCalledWith(
-				'debug',
+			expect(logger.debug).toHaveBeenCalledWith(
 				'UIClientHook',
 				expect.stringContaining('Command result sent'),
 				expect.objectContaining({ requestId: 'req-123', success: true })
@@ -327,8 +320,7 @@ describe('UIClientHook', () => {
 
 			hook.broadcastError('Test error');
 
-			expect(Logger.logStructured).toHaveBeenCalledWith(
-				'error',
+			expect(logger.error).toHaveBeenCalledWith(
 				'UIClientHook',
 				expect.stringContaining('Error broadcasted'),
 				expect.any(Object)
@@ -398,8 +390,7 @@ describe('UIClientHook', () => {
 		it('should log snapshot sent', () => {
 			hook.sendSnapshot({ test: 'data' }, 'req-123');
 
-			expect(Logger.logStructured).toHaveBeenCalledWith(
-				'debug',
+			expect(logger.debug).toHaveBeenCalledWith(
 				'UIClientHook',
 				'Snapshot sent',
 				expect.objectContaining({ requestId: 'req-123' })

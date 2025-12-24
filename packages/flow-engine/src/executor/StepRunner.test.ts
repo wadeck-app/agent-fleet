@@ -1,22 +1,21 @@
 /**
  * Step Runner Tests
  */
-import { setupTest } from 'test-utils/index';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ClaudeLauncher } from '../processing/ClaudeLauncher.js';
-import { OutputExtractor } from '../processing/OutputExtractor.js';
-import { TemplateRenderer } from '../processing/TemplateRenderer.js';
-import type { FlowRegistry } from '../registry/FlowRegistry.js';
-import type { FlowDefinition, ModelFlowStep, ScriptFlowStep, SubFlowStep, Workspace } from '../types.js';
-import { ScriptExecutor } from './ScriptExecutor.js';
-import { StepRunner } from './StepRunner.js';
+import { ClaudeLauncher } from '../processing/ClaudeLauncher';
+import { OutputExtractor } from '../processing/OutputExtractor';
+import { TemplateRenderer } from '../processing/TemplateRenderer';
+import type { FlowRegistry } from '../registry/FlowRegistry';
+import type { FlowDefinition, ModelFlowStep, ScriptFlowStep, SubFlowStep, Workspace } from '../types';
+import { ScriptExecutor } from './ScriptExecutor';
+import { StepRunner } from './StepRunner';
 
 // Mock dependencies
-vi.mock('../processing/TemplateRenderer.js');
-vi.mock('./ScriptExecutor.js');
-vi.mock('../processing/OutputExtractor.js');
-vi.mock('../processing/ClaudeLauncher.js');
+vi.mock('../processing/TemplateRenderer');
+vi.mock('./ScriptExecutor');
+vi.mock('../processing/OutputExtractor');
+vi.mock('../processing/ClaudeLauncher');
 
 describe('StepRunner', () => {
 	let runner: StepRunner;

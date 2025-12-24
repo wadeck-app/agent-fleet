@@ -1,17 +1,17 @@
 /**
  * Tests for SemanticValidator - Semantic validation of flows
  */
+import { MockIssueCollector } from 'flow-engine/test-utils/mocks';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { MockIssueCollector } from 'test-utils/index';
 import { beforeEach, describe, expect, test } from 'vitest';
 
-import { FlowRegistry } from '../registry/FlowRegistry.js';
-import type { FlowDefinition, FlowStep, SubFlowStep } from '../types.js';
-import { GraphValidator } from './GraphValidator.js';
-import { SemanticValidator } from './SemanticValidator.js';
-import { ValidationCode } from './ValidationTypes.js';
+import { FlowRegistry } from '../registry/FlowRegistry';
+import type { FlowDefinition, FlowStep, SubFlowStep } from '../types';
+import { GraphValidator } from './GraphValidator';
+import { SemanticValidator } from './SemanticValidator';
+import { ValidationCode } from './ValidationTypes';
 
 describe('SemanticValidator', () => {
 	let issueCollector: MockIssueCollector;

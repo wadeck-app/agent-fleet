@@ -1,5 +1,5 @@
-import type { AUTH_API_ROUTES } from '@app/shared';
-import { AUTH_API_ROUTES as routes } from '@app/shared';
+import type { AUTH_API_ROUTES } from '@app/shared/api/auth.contract';
+import { AUTH_API_ROUTES as routes } from '@app/shared/api/auth.contract';
 
 import type { AuthService } from '../auth/AuthService';
 import type { MockAuthService } from '../auth/MockAuthService';

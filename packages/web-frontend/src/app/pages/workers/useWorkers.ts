@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { useAbortableEffect } from '@framework/hooks/useAbortableEffect';
-import type { WorkersData } from '@shared';
+import type { WorkersData } from '@shared/api/workers.contract';
 
 import { type WebSocketMessage, useOrchestratorWebSocket } from '@/app/hooks/useOrchestratorWebSocket';
 

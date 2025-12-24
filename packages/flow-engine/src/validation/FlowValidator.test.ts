@@ -1,15 +1,15 @@
 /**
  * Tests for FlowValidator - SubFlowStep validation
  */
+import { createMockFlow, createMockModelStep, createMockSubFlowStep } from 'flow-engine/test-utils/factories';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { createMockFlow, createMockModelStep, createMockSubFlowStep } from 'test-utils/index';
 import { beforeEach, describe, expect, test } from 'vitest';
 
-import { FlowRegistry } from '../registry/FlowRegistry.js';
-import type { FlowDefinition, SubFlowStep } from '../types.js';
-import { FlowValidator, ValidationCode } from './FlowValidator.js';
+import { FlowRegistry } from '../registry/FlowRegistry';
+import type { FlowDefinition, SubFlowStep } from '../types';
+import { FlowValidator, ValidationCode } from './FlowValidator';
 
 describe('FlowValidator - SubFlowStep Validation', () => {
 	let validator: FlowValidator;

@@ -19,7 +19,7 @@
 import { Table2, type Table2Column, type Table2Props } from '@framework/components2/table/Table2';
 import { Button } from '@framework/components/primitives/Button';
 import { formatDate } from '@framework/utils/formatting/DateFormat';
-import type { Ingredient } from '@shared';
+import type { Ingredient } from '@shared/api/ingredients.contract';
 import { Pencil, Trash2 } from 'lucide-react';
 
 /**

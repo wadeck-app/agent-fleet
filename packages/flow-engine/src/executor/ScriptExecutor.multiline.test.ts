@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { ScriptExecutor } from './ScriptExecutor.js';
+import { ScriptExecutor } from './ScriptExecutor';
 
 describe('ScriptExecutor - Multiline Scripts (Integration)', () => {
 	const executor = new ScriptExecutor();

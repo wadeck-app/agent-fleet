@@ -1,5 +1,5 @@
-import type { INGREDIENTS_API_ROUTES } from '@app/shared';
-import { INGREDIENTS_API_ROUTES as routes } from '@app/shared';
+import type { INGREDIENTS_API_ROUTES } from '@app/shared/api/ingredients.contract';
+import { INGREDIENTS_API_ROUTES as routes } from '@app/shared/api/ingredients.contract';
 
 import type { IngredientsService } from '../services/IngredientsService';
 import type { RouteWrapperFunc } from '../utils/fastify-wrapper';

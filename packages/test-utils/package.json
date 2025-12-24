@@ -3,16 +3,12 @@
 	"version": "1.0.0",
 	"private": true,
 	"type": "module",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
-		"clean": "rimraf dist"
+		"clean": "rimraf dist dist-types"
 	},
 	"dependencies": {
-		"shared-common": "*",
-		"shared-orch-worker": "*",
-		"flow-engine": "*"
+		"shared-common": "*"
 	},
 	"devDependencies": {
 		"typescript": "^5.3.3",

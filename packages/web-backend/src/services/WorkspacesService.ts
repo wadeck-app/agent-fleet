@@ -1,4 +1,4 @@
-import type { Workspace, WorkspacesData } from '@app/shared';
+import type { Workspace, WorkspacesData } from '@app/shared/api/workspaces.contract';
 
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 

@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { ZodError } from 'zod';
 
-import { ApiUrl } from '@app/shared';
+import type { ApiUrl } from '@app/shared/route-builder';
 
 /**
  * ===========================================================================================

@@ -1,4 +1,4 @@
-import type { Book, BooksListQuery } from '@app/shared';
+import type { Book, BooksListQuery } from '@app/shared/api/books.contract';
 
 import type { BaseRepository } from './BaseRepository';
 

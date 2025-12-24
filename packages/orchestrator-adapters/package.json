@@ -3,8 +3,6 @@
 	"version": "1.0.0",
 	"private": true,
 	"type": "module",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
 		"build:library": "node build.library.mjs",
@@ -13,7 +11,7 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
-		"clean": "rimraf dist",
+		"clean": "rimraf dist dist-types",
 		"lint": "eslint src --ext .ts",
 		"lint:fix": "eslint src --ext .ts --fix"
 	},
@@ -35,7 +33,6 @@
 		"@types/ws": "^8.5.10",
 		"cross-env": "^7.0.3",
 		"esbuild": "^0.27.2",
-		"rimraf": "^6.1.2",
 		"tsx": "^4.7.0",
 		"typescript": "^5.3.3",
 		"vitest": "^4.0.14"

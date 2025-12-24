@@ -16,12 +16,11 @@
  */
 import os from 'os';
 import path from 'path';
-import { setupTest } from 'test-utils/index';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { FlowRegistry } from '../registry/FlowRegistry.js';
-import type { FlowDefinition, Workspace } from '../types.js';
-import { FlowExecutor } from './FlowExecutor.js';
+import { FlowRegistry } from '../registry/FlowRegistry';
+import type { FlowDefinition, Workspace } from '../types';
+import { FlowExecutor } from './FlowExecutor';
 
 describe.skip('SubFlowStep Integration Tests', () => {
 	let flowRegistry: FlowRegistry;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { BOOKS_API_ROUTES } from '@app/shared';
-import { INGREDIENTS_API_ROUTES } from '@app/shared';
+import { BOOKS_API_ROUTES } from '@app/shared/api/books.contract';
+import { INGREDIENTS_API_ROUTES } from '@app/shared/api/ingredients.contract';
 
 /**
  * ===========================================================================================

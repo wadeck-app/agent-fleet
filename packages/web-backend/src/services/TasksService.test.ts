@@ -49,7 +49,6 @@ describe('TasksService', () => {
 			updatedAt: '2024-01-02T00:00:00.000Z',
 			assignedTo: {
 				workerId: 'worker-1',
-				workerType: 'dev',
 			},
 			flowId: 'flow-123',
 			flowResult: {
@@ -65,7 +64,6 @@ describe('TasksService', () => {
 			updatedAt: '2024-01-02T01:00:00.000Z',
 			assignedTo: {
 				workerId: 'worker-2',
-				workerType: 'dev',
 			},
 		},
 		{
@@ -128,7 +126,6 @@ describe('TasksService', () => {
 			expect(task1.priority).toBe('high');
 			expect(task1.assignedWorker).toEqual({
 				workerId: 'worker-1',
-				workerType: 'dev',
 			});
 			expect(task1.flowId).toBe('flow-123');
 			expect(task1.flowResult).toEqual({ status: 'completed' });
@@ -223,7 +220,6 @@ describe('TasksService', () => {
 					updatedAt: '2024-01-02T03:00:00.000Z',
 					assignedTo: {
 						workerId: 'worker-1',
-						workerType: 'dev',
 					},
 				},
 			];

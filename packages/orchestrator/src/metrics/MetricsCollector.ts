@@ -1,9 +1,9 @@
-import { Logger } from 'shared-common/Logger.js';
-import { MetricsData, StateManager } from 'shared-common/StateManager.js';
-import { Task, TaskStatus } from 'shared-orch-worker/index.js';
+import { logger } from 'shared-common/logger';
+import { MetricsData, StateManager } from 'shared-orch-worker/StateManager';
+import { Task, TaskStatus } from 'shared-orch-worker/domain-types';
 
-import { TaskManager } from '../core/TaskManager.js';
-import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer.js';
+import { TaskManager } from '../core/TaskManager';
+import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
 
 /**
  * Metrics Collector Service
@@ -43,7 +43,7 @@ export class MetricsCollector {
 	 */
 	start(): void {
 		if (this.isRunning) {
-			Logger.logStructured('warn', 'MetricsCollector', 'Already running, ignoring start()');
+			logger.warn('MetricsCollector', 'Already running, ignoring start()');
 			return;
 		}
 
@@ -57,11 +57,7 @@ export class MetricsCollector {
 			this.collectAndEmit();
 		}, this.collectIntervalMs);
 
-		Logger.logStructured(
-			'info',
-			'MetricsCollector',
-			`Started collecting metrics every ${this.collectIntervalMs}ms`
-		);
+		logger.info('MetricsCollector', `Started collecting metrics every ${this.collectIntervalMs}ms`);
 	}
 
 	/**
@@ -79,7 +75,7 @@ export class MetricsCollector {
 
 		this.isRunning = false;
 
-		Logger.logStructured('info', 'MetricsCollector', 'Stopped collecting metrics');
+		logger.info('MetricsCollector', 'Stopped collecting metrics');
 	}
 
 	/**
@@ -90,8 +86,7 @@ export class MetricsCollector {
 			const metrics = this.collectMetrics();
 			this.stateManager.emitMetricsUpdated(metrics);
 
-			Logger.logStructured(
-				'debug',
+			logger.debug(
 				'MetricsCollector',
 				`Metrics collected: ${metrics.taskThroughput.total} tasks, ${metrics.workerUtilization.total} workers`,
 				{
@@ -100,8 +95,7 @@ export class MetricsCollector {
 				}
 			);
 		} catch (error) {
-			Logger.logStructured(
-				'error',
+			logger.error(
 				'MetricsCollector',
 				`Failed to collect metrics: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -182,7 +176,7 @@ export class MetricsCollector {
 			this.start();
 		}
 
-		Logger.logStructured('info', 'MetricsCollector', `Collection interval changed to ${intervalMs}ms`);
+		logger.info('MetricsCollector', `Collection interval changed to ${intervalMs}ms`);
 	}
 
 	/**

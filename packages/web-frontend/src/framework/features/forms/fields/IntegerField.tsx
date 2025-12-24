@@ -1,4 +1,4 @@
-import { NumberField, NumberFieldProps } from './NumberField';
+import { NumberField, type NumberFieldProps } from './NumberField';
 
 /**
  * ===========================================================================================

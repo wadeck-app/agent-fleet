@@ -4,6 +4,7 @@ package-lock.json
 
 # Build output
 dist/
+dist-types/
 *.tsbuildinfo
 
 # Prevent compiled files in src/ (should only be in dist/)

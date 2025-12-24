@@ -1,16 +1,16 @@
 import express, { Express, Request, Response } from 'express';
-import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager.js';
+import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
 import { Server as HttpServer } from 'http';
 import { IncomingMessage } from 'http';
-import { Logger } from 'shared-common/Logger.js';
-import { TaskStatus } from 'shared-orch-worker/index.js';
+import { logger } from 'shared-common/logger';
+import { TaskStatus } from 'shared-orch-worker/domain-types';
 import { Duplex } from 'stream';
 import { WebSocket, WebSocketServer } from 'ws';
 
-import { UIClientHook } from '../ui-client/UIClientHook.js';
-import { UIWebSocketServer } from '../websocket/UIWebSocketServer.js';
-import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer.js';
-import { TaskManager } from './TaskManager.js';
+import { UIClientHook } from '../ui-client/UIClientHook';
+import { UIWebSocketServer } from '../websocket/UIWebSocketServer';
+import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
+import { TaskManager } from './TaskManager';
 
 export class RestAPI {
 	private app: Express;
@@ -48,9 +48,9 @@ export class RestAPI {
 	private setupMiddleware(): void {
 		this.app.use(express.json());
 
-		// Logger middleware
+		// logger middleware
 		this.app.use((req, res, next) => {
-			Logger.log(`[API] ${req.method} ${req.path}`);
+			logger.info(`[API] ${req.method} ${req.path}`);
 			next();
 		});
 	}
@@ -117,7 +117,7 @@ export class RestAPI {
 
 				res.status(201).json(task);
 			} catch (error) {
-				Logger.error('[API] Error creating task:', error);
+				logger.error('[API] Error creating task:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -136,7 +136,7 @@ export class RestAPI {
 
 				res.json(tasks);
 			} catch (error) {
-				Logger.error('[API] Error listing tasks:', error);
+				logger.error('[API] Error listing tasks:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -153,7 +153,7 @@ export class RestAPI {
 
 				res.json(task);
 			} catch (error) {
-				Logger.error('[API] Error getting task:', error);
+				logger.error('[API] Error getting task:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -173,7 +173,7 @@ export class RestAPI {
 
 				res.json(task);
 			} catch (error) {
-				Logger.error('[API] Error updating task status:', error);
+				logger.error('[API] Error updating task status:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -193,7 +193,7 @@ export class RestAPI {
 
 				res.json(task);
 			} catch (error) {
-				Logger.error('[API] Error adding comment:', error);
+				logger.error('[API] Error adding comment:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -210,7 +210,7 @@ export class RestAPI {
 
 				res.json({ message: 'Task deleted successfully' });
 			} catch (error) {
-				Logger.error('[API] Error deleting task:', error);
+				logger.error('[API] Error deleting task:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -221,7 +221,7 @@ export class RestAPI {
 				const count = await this.taskManager.clearAllTasks();
 				res.json({ message: `Cleared ${count} tasks` });
 			} catch (error) {
-				Logger.error('[API] Error clearing tasks:', error);
+				logger.error('[API] Error clearing tasks:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -232,7 +232,7 @@ export class RestAPI {
 				const workers = this.wsServer.getWorkers();
 				res.json(workers);
 			} catch (error) {
-				Logger.error('[API] Error listing workers:', error);
+				logger.error('[API] Error listing workers:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -253,7 +253,7 @@ export class RestAPI {
 
 				res.json(flowsByProject);
 			} catch (error) {
-				Logger.error('[API] Error listing flows:', error);
+				logger.error('[API] Error listing flows:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -271,7 +271,7 @@ export class RestAPI {
 
 				res.json(Object.fromEntries(projectFlows));
 			} catch (error) {
-				Logger.error('[API] Error getting project flows:', error);
+				logger.error('[API] Error getting project flows:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -300,7 +300,7 @@ export class RestAPI {
 					error: task.flowResult.error,
 				});
 			} catch (error) {
-				Logger.error('[API] Error getting task trace:', error);
+				logger.error('[API] Error getting task trace:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -316,7 +316,7 @@ export class RestAPI {
 				const workspaces = this.workspaceManager.getAllWorkspaces();
 				res.json(workspaces);
 			} catch (error) {
-				Logger.error('[API] Error listing workspaces:', error);
+				logger.error('[API] Error listing workspaces:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -338,7 +338,7 @@ export class RestAPI {
 
 				res.json(workspace);
 			} catch (error) {
-				Logger.error('[API] Error getting workspace:', error);
+				logger.error('[API] Error getting workspace:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -357,7 +357,7 @@ export class RestAPI {
 		// Create WebSocketServer instance (noServer mode - we'll handle upgrade manually)
 		this.uiWebSocketServer = new WebSocketServer({ noServer: true });
 
-		Logger.logStructured('info', 'RestAPI', 'UI WebSocket server configured');
+		logger.info('RestAPI', 'UI WebSocket server configured');
 	}
 
 	/**
@@ -386,7 +386,7 @@ export class RestAPI {
 			}
 		});
 
-		Logger.logStructured('info', 'RestAPI', 'HTTP upgrade handler configured for /ws/ui');
+		logger.info('RestAPI', 'HTTP upgrade handler configured for /ws/ui');
 	}
 
 	start(): Promise<void> {
@@ -395,7 +395,7 @@ export class RestAPI {
 				// Setup WebSocket upgrade handler after HTTP server is created
 				this.setupWebSocketUpgrade();
 
-				Logger.log(`[API] REST API listening on port ${this.port}`);
+				logger.info(`[API] REST API listening on port ${this.port}`);
 				resolve();
 			});
 		});
@@ -415,7 +415,7 @@ export class RestAPI {
 		return new Promise(resolve => {
 			if (this.server) {
 				this.server.close(() => {
-					Logger.log('[API] REST API stopped');
+					logger.info('[API] REST API stopped');
 					resolve();
 				});
 			} else {

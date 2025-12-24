@@ -1,6 +1,6 @@
 import { Badge } from '@framework/components/primitives/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
-import type { Worker } from '@shared';
+import type { Worker } from '@shared/api/workers.contract';
 import { Activity, AlertCircle, Circle } from 'lucide-react';
 
 /**
@@ -81,9 +81,6 @@ export function WorkersTable({ workers }: WorkersTableProps) {
 												/>
 												<span className="font-mono text-sm">{worker.workerId}</span>
 											</div>
-										</td>
-										<td className="py-3">
-											<Badge variant="outline">{worker.type}</Badge>
 										</td>
 										<td className="py-3">
 											<Badge variant={worker.connected ? 'default' : 'destructive'}>

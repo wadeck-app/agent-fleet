@@ -1,10 +1,9 @@
-import { FastifyError, FastifyPluginAsync } from 'fastify';
+import { type FastifyError, type FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
+import { logger } from 'shared-common/logger';
 import { ZodError } from 'zod';
 
-import { logger } from '@/utils/logger';
-
-import { ERROR_CODES, type ErrorResponse, HttpException } from '@app/shared';
+import { ERROR_CODES, type ErrorResponse, HttpException } from '@app/shared/exceptions/http-exceptions';
 
 const onlyUnexpectedErrorLogged = false;
 

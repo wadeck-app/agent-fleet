@@ -14,10 +14,11 @@
  *
  * ===========================================================================================
  */
-import { StateEvent } from 'shared-common/StateManager.js';
-import type { O2BEventData, O2BEventType, OrchestratorStats, Task, WorkerInfo } from 'shared-orch-worker/index.js';
+import { StateEvent } from 'shared-orch-worker/StateManager';
+import { OrchestratorStats, Task, WorkerInfo } from 'shared-orch-worker/domain-types';
+import { O2BEventData, O2BEventType } from 'shared-orch-worker/orchestrator-events';
 
-import type { OrchestratorClient, OrchestratorConfig, TaskFilters, WorkerFilters } from '../OrchestratorClient.js';
+import type { OrchestratorClient, OrchestratorConfig, TaskFilters, WorkerFilters } from '../OrchestratorClient';
 
 /**
  * Orchestrator instance type
@@ -109,10 +110,10 @@ export class LibraryOrchestratorAdapter implements OrchestratorClient {
 
 		// Apply filters
 		return allWorkers.filter((worker: WorkerInfo) => {
-			// Filter by type
-			if (filters.type && worker.type !== filters.type) {
-				return false;
-			}
+			// // Filter by type
+			// if (filters.type && worker.type !== filters.type) {
+			// 	return false;
+			// }
 
 			// Filter by status (idle/busy based on taskId)
 			if (filters.status) {
@@ -265,7 +266,6 @@ export class LibraryOrchestratorAdapter implements OrchestratorClient {
 				stateManager.on(StateEvent.WORKER_CONNECTED, (eventData: { worker: WorkerInfo }) => {
 					const o2bData: O2BEventData<'worker.connected'> = {
 						workerId: eventData.worker.id,
-						workerType: eventData.worker.type,
 						connectedAt: eventData.worker.connectedAt,
 						timestamp: new Date().toISOString(),
 					};

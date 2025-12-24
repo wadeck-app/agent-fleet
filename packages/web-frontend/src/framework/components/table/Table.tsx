@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
 
 import { type ColumnDef, ColumnVisibility } from '../columns/ColumnVisibility';
 import { useColumnVisibility } from '../columns/useColumnVisibility';

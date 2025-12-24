@@ -2,7 +2,7 @@ import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
 import { Button } from '@framework/components/primitives/Button';
 import { Card, CardContent } from '@framework/components/primitives/Card';
-import type { TaskPriority, TaskStatus } from '@shared';
+import type { TaskPriority, TaskStatus } from '@shared/api/tasks.contract';
 
 /**
  * ===========================================================================================

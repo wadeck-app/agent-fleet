@@ -15,12 +15,12 @@
  *
  * ===========================================================================================
  */
-import { getOrchestratorPortsFromEnv } from 'shared-common/PortCalculator.js';
+import { getOrchestratorPortsFromEnv } from 'shared-common/PortCalculator';
 
-import type { OrchestratorClient } from './OrchestratorClient.js';
-import type { OrchestratorClientConfig } from './OrchestratorClientConfig.js';
-import { isLibraryMode, isTestMode } from './OrchestratorClientConfig.js';
-import { createMockOrchestrator } from './__mocks__/MockOrchestrator.js';
+import type { OrchestratorClient } from './OrchestratorClient';
+import type { OrchestratorClientConfig } from './OrchestratorClientConfig';
+import { isLibraryMode, isTestMode } from './OrchestratorClientConfig';
+import { createMockOrchestrator } from './__mocks__/MockOrchestrator';
 
 /**
  * Factory class for creating OrchestratorClient instances
@@ -60,7 +60,7 @@ export class OrchestratorClientFactory {
 			await orchestrator.start();
 
 			// Import LibraryAdapter dynamically to avoid circular dependencies
-			const { LibraryOrchestratorAdapter } = await import('./adapters/LibraryAdapter.js');
+			const { LibraryOrchestratorAdapter } = await import('./adapters/LibraryAdapter');
 			return new LibraryOrchestratorAdapter(orchestrator);
 		} else if (isTestMode(config)) {
 			// Test mode: use mock orchestrator for unit tests
@@ -68,7 +68,7 @@ export class OrchestratorClientFactory {
 			const mockOrchestrator = config.mockOrchestrator ?? createMockOrchestrator();
 
 			// Import LibraryAdapter dynamically
-			const { LibraryOrchestratorAdapter } = await import('./adapters/LibraryAdapter.js');
+			const { LibraryOrchestratorAdapter } = await import('./adapters/LibraryAdapter');
 			return new LibraryOrchestratorAdapter(mockOrchestrator);
 		} else {
 			throw new Error(`Unknown orchestrator client mode: ${(config as Record<string, unknown>).mode}`);

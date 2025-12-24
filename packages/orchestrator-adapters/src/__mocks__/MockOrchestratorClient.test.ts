@@ -15,10 +15,10 @@
  *
  * ===========================================================================================
  */
-import type { O2BEventData } from 'shared-orch-worker/index.js';
+import type { O2BEventData } from 'shared-orch-worker/index';
 import { describe, expect, test, vi } from 'vitest';
 
-import { MockOrchestratorClient } from './MockOrchestratorClient.js';
+import { MockOrchestratorClient } from './MockOrchestratorClient';
 
 describe('MockOrchestratorClient', () => {
 	// ===========================================================================================

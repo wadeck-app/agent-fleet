@@ -41,7 +41,7 @@ export const TaskSchema = z.object({
 	assignedWorker: z
 		.object({
 			workerId: z.string(),
-			workerType: z.string(),
+			// workerType: z.string(),
 		})
 		.nullable(),
 	// Flow-related fields

@@ -5,8 +5,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import type { WorkspaceConfig } from '../types.js';
-import { WorkspaceAllocationError, WorkspaceManager } from './WorkspaceManager.js';
+import type { WorkspaceConfig } from '../types';
+import { WorkspaceAllocationError, WorkspaceManager } from './WorkspaceManager';
 
 describe('WorkspaceManager', () => {
 	const testRoot = path.join(process.cwd(), '.test-workspaces');

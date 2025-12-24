@@ -9,7 +9,7 @@
  * - Default values
  * - Required field validation
  */
-import type { OutputVariableConfig, StepOutput, TransformFunction } from '../types.js';
+import type { OutputVariableConfig, StepOutput, TransformFunction } from '../types';
 
 /**
  * Output extraction error

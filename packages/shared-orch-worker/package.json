@@ -3,17 +3,13 @@
 	"version": "1.0.0",
 	"private": true,
 	"type": "module",
-	"exports": {
-		"./*.js": "./dist/*.js",
-		"./*": "./dist/*"
-	},
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
 		"dev": "tsc --build tsconfig.json --watch",
 		"test": "vitest run --passWithNoTests",
 		"test:watch": "vitest",
 		"lint": "echo \"No linting configured for shared-orch-worker\"",
-		"clean": "rimraf dist"
+		"clean": "rimraf dist dist-types"
 	},
 	"dependencies": {
 		"zod": "^4.1.13"

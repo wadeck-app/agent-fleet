@@ -1,6 +1,8 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+//FIXME rename file to cn.ts
+
 /**
  * Combines class names using clsx and tailwind-merge.
  * This utility merges Tailwind CSS classes intelligently, handling conflicts.

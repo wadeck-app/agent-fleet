@@ -3,8 +3,8 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { OutputExtractor } from '../processing/OutputExtractor.js';
-import type { StepOutput } from '../types.js';
+import { OutputExtractor } from '../processing/OutputExtractor';
+import type { StepOutput } from '../types';
 
 describe('OutputExtractor', () => {
 	const extractor = new OutputExtractor();

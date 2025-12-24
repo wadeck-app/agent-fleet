@@ -1,7 +1,7 @@
-import { Logger } from 'shared-common/Logger.js';
-import { StateManager } from 'shared-common/StateManager.js';
-import { Storage } from 'shared-common/Storage.js';
-import { Task, TaskHistoryEntry, TaskStatus, WorkerType } from 'shared-orch-worker/index.js';
+import { Storage } from 'orchestrator/core/Storage';
+import { logger } from 'shared-common/logger';
+import { StateManager } from 'shared-orch-worker/StateManager';
+import { Task, TaskHistoryEntry, TaskStatus } from 'shared-orch-worker/domain-types';
 import { v4 as uuidv4 } from 'uuid';
 
 interface WorkerIdleEntry {
@@ -38,7 +38,9 @@ export class TaskManager {
 			await this.loadTasks();
 			this.initialized = true;
 		} catch (error) {
-			Logger.log(`[TaskManager] Failed to initialize: ${error instanceof Error ? error.message : String(error)}`);
+			logger.info(
+				`[TaskManager] Failed to initialize: ${error instanceof Error ? error.message : String(error)}`
+			);
 			throw error;
 		}
 	}
@@ -51,7 +53,11 @@ export class TaskManager {
 		tasks.forEach(task => {
 			this.tasks.set(task.id, task);
 		});
-		Logger.log(`[TaskManager] Loaded ${this.tasks.size} tasks`);
+		logger.info(`[TaskManager] Loaded ${this.tasks.size} tasks`);
+	}
+
+	getStateManager(): StateManager {
+		return this.stateManager;
 	}
 
 	/**
@@ -86,13 +92,13 @@ export class TaskManager {
 		} catch (error) {
 			// Rollback in-memory change if storage fails
 			this.tasks.delete(task.id);
-			Logger.log(
+			logger.info(
 				`[TaskManager] Failed to create task: ${error instanceof Error ? error.message : String(error)}`
 			);
 			throw error;
 		}
 
-		Logger.log(`[TaskManager] Created task ${task.id}: ${description.substring(0, 50)}...`);
+		logger.info(`[TaskManager] Created task ${task.id}: ${description.substring(0, 50)}...`);
 		this.stateManager.emitTaskCreated(task);
 
 		// Route task to appropriate queue
@@ -125,7 +131,7 @@ export class TaskManager {
 		} catch (error) {
 			// Rollback in-memory change if storage fails
 			this.tasks.set(task.id, oldTask);
-			Logger.log(
+			logger.info(
 				`[TaskManager] Failed to update task ${task.id}: ${error instanceof Error ? error.message : String(error)}`
 			);
 			throw error;
@@ -168,20 +174,21 @@ export class TaskManager {
 			// Rollback in-memory changes if storage fails
 			task.status = oldStatus;
 			task.history = oldHistory;
-			Logger.log(
+			logger.info(
 				`[TaskManager] Failed to update task ${taskId} status: ${error instanceof Error ? error.message : String(error)}`
 			);
 			throw error;
 		}
 
-		Logger.log(`[TaskManager] Task ${taskId} status: ${oldStatus} → ${newStatus}`);
+		logger.info(`[TaskManager] Task ${taskId} status: ${oldStatus} → ${newStatus}`);
 		this.stateManager.emitTaskUpdated(task);
 	}
 
 	/**
 	 * Assign a task to a worker
 	 */
-	async assignTask(taskId: string, workerId: string, workerType: WorkerType): Promise<void> {
+	// async assignTask(taskId: string, workerId: string, workerType: WorkerType): Promise<void> {
+	async assignTask(taskId: string, workerId: string): Promise<void> {
 		const task = this.tasks.get(taskId);
 		if (!task) {
 			throw new Error(`Task ${taskId} not found`);
@@ -190,14 +197,15 @@ export class TaskManager {
 		const oldAssignment = task.assignedTo;
 		const oldHistory = [...task.history];
 
-		task.assignedTo = { workerId, workerType };
+		// task.assignedTo = { workerId, workerType };
+		task.assignedTo = { workerId };
 		task.updatedAt = new Date().toISOString();
 
 		task.history.push({
 			timestamp: task.updatedAt,
 			event: 'assigned',
 			workerId,
-			workerType,
+			// workerType,
 		});
 
 		try {
@@ -206,13 +214,14 @@ export class TaskManager {
 			// Rollback in-memory changes if storage fails
 			task.assignedTo = oldAssignment;
 			task.history = oldHistory;
-			Logger.log(
+			logger.info(
 				`[TaskManager] Failed to assign task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
 			);
 			throw error;
 		}
 
-		Logger.log(`[TaskManager] Task ${taskId} assigned to ${workerType} worker ${workerId}`);
+		// logger.info(`[TaskManager] Task ${taskId} assigned to ${workerType} worker ${workerId}`);
+		logger.info(`[TaskManager] Task ${taskId} assigned to worker ${workerId}`);
 		this.stateManager.emitTaskUpdated(task);
 	}
 
@@ -242,13 +251,13 @@ export class TaskManager {
 			// Rollback in-memory changes if storage fails
 			task.assignedTo = oldAssignment;
 			task.history = oldHistory;
-			Logger.log(
+			logger.info(
 				`[TaskManager] Failed to unassign task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
 			);
 			throw error;
 		}
 
-		Logger.log(`[TaskManager] Task ${taskId} unassigned`);
+		logger.info(`[TaskManager] Task ${taskId} unassigned`);
 		this.stateManager.emitTaskUpdated(task);
 	}
 
@@ -276,7 +285,7 @@ export class TaskManager {
 		} catch (error) {
 			// Rollback in-memory changes if storage fails
 			task.comments = oldComments;
-			Logger.log(
+			logger.info(
 				`[TaskManager] Failed to add comment to task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
 			);
 			throw error;
@@ -290,32 +299,38 @@ export class TaskManager {
 	 * Note: This method is kept for backward compatibility but should not be used
 	 * in scenarios where race conditions are a concern. Use assignTaskToWorker instead.
 	 */
-	getNextTaskForWorker(workerType: WorkerType): Task | null {
-		return this.getNextAvailableTask(workerType);
+	// getNextTaskForWorker(workerType: WorkerType): Task | null {
+	getNextTaskForWorker(): Task | null {
+		// return this.getNextAvailableTask(workerType);
+		return this.getNextAvailableTask();
 	}
 
 	/**
 	 * Internal method to find the next available task for a worker type
 	 */
-	private getNextAvailableTask(workerType: WorkerType): Task | null {
-		// Determine which status to look for based on worker type
-		const statusMap: Record<WorkerType, TaskStatus[]> = {
-			[WorkerType.PM]: [TaskStatus.BACKLOG],
-			[WorkerType.PO]: [TaskStatus.REFINED],
-			// DEV accepts BACKLOG for MVP (until we have PM workers)
-			[WorkerType.DEV]: [TaskStatus.BACKLOG, TaskStatus.TODO, TaskStatus.CHANGES_REQUESTED],
-			[WorkerType.REVIEWER]: [TaskStatus.REVIEW],
-		};
+	// private getNextAvailableTask(workerType: WorkerType): Task | null {
+	private getNextAvailableTask(): Task | null {
+		// // Determine which status to look for based on worker type
+		// const statusMap: Record<WorkerType, TaskStatus[]> = {
+		// 	[WorkerType.PM]: [TaskStatus.BACKLOG],
+		// 	[WorkerType.PO]: [TaskStatus.REFINED],
+		// 	// DEV accepts BACKLOG for MVP (until we have PM workers)
+		// 	[WorkerType.DEV]: [TaskStatus.BACKLOG, TaskStatus.TODO, TaskStatus.CHANGES_REQUESTED],
+		// 	[WorkerType.REVIEWER]: [TaskStatus.REVIEW],
+		// };
 
-		const targetStatuses = statusMap[workerType] || [];
+		// const targetStatuses = statusMap[workerType] || [];
 
 		// Find the first unassigned task with the right status
 		// Prioritize by priority: urgent > high > medium > low
+
+		//FIXME has to be typed with related helper/constants for ordering
 		const priorityOrder: Task['priority'][] = ['urgent', 'high', 'medium', 'low'];
 
 		for (const priority of priorityOrder) {
 			for (const task of this.tasks.values()) {
-				if (targetStatuses.includes(task.status) && !task.assignedTo && task.priority === priority) {
+				// if (targetStatuses.includes(task.status) && !task.assignedTo && task.priority === priority) {
+				if (!task.assignedTo && task.priority === priority) {
 					return task;
 				}
 			}
@@ -329,9 +344,11 @@ export class TaskManager {
 	 * Returns the assigned task or null if no tasks are available.
 	 * This prevents race conditions where multiple workers claim the same task.
 	 */
-	async assignTaskToWorker(workerId: string, workerType: WorkerType): Promise<Task | null> {
+	// async assignTaskToWorker(workerId: string, workerType: WorkerType): Promise<Task | null> {
+	async assignTaskToWorker(workerId: string): Promise<Task | null> {
 		// Find next available task
-		const task = this.getNextAvailableTask(workerType);
+		// const task = this.getNextAvailableTask(workerType);
+		const task = this.getNextAvailableTask();
 
 		if (!task) {
 			return null;
@@ -339,7 +356,7 @@ export class TaskManager {
 
 		// Verify task is still unassigned (defensive check)
 		if (task.assignedTo) {
-			Logger.log(`[TaskManager] Task ${task.id} already assigned, skipping`);
+			logger.info(`[TaskManager] Task ${task.id} already assigned, skipping`);
 			return null;
 		}
 
@@ -348,7 +365,8 @@ export class TaskManager {
 		const oldStatus = task.status;
 		const oldHistory = [...task.history];
 
-		task.assignedTo = { workerId, workerType };
+		// task.assignedTo = { workerId, workerType };
+		task.assignedTo = { workerId };
 		task.status = TaskStatus.IN_PROGRESS;
 		task.updatedAt = new Date().toISOString();
 
@@ -356,12 +374,13 @@ export class TaskManager {
 			timestamp: task.updatedAt,
 			event: 'assigned',
 			workerId,
-			workerType,
+			// workerType,
 		});
 
 		try {
 			await Storage.saveTask(task);
-			Logger.log(`[TaskManager] Task ${task.id} atomically assigned to ${workerType} worker ${workerId}`);
+			// logger.info(`[TaskManager] Task ${task.id} atomically assigned to ${workerType} worker ${workerId}`);
+			logger.info(`[TaskManager] Task ${task.id} atomically assigned to worker ${workerId}`);
 			this.stateManager.emitTaskUpdated(task);
 			return task;
 		} catch (error) {
@@ -369,7 +388,7 @@ export class TaskManager {
 			task.assignedTo = oldAssignment;
 			task.status = oldStatus;
 			task.history = oldHistory;
-			Logger.log(
+			logger.info(
 				`[TaskManager] Failed to atomically assign task ${task.id}: ${error instanceof Error ? error.message : String(error)}`
 			);
 			throw error;
@@ -413,11 +432,11 @@ export class TaskManager {
 			// Remove from memory
 			this.tasks.delete(taskId);
 
-			Logger.log(`[TaskManager] Deleted task ${taskId}`);
+			logger.info(`[TaskManager] Deleted task ${taskId}`);
 			this.stateManager.emitTaskDeleted(taskId);
 			return true;
 		} catch (error) {
-			Logger.log(
+			logger.info(
 				`[TaskManager] Failed to delete task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
 			);
 			throw error;
@@ -441,10 +460,10 @@ export class TaskManager {
 				this.stateManager.emitTaskDeleted(taskId);
 			}
 
-			Logger.log(`[TaskManager] Cleared ${count} tasks`);
+			logger.info(`[TaskManager] Cleared ${count} tasks`);
 			return count;
 		} catch (error) {
-			Logger.log(
+			logger.info(
 				`[TaskManager] Failed to clear all tasks: ${error instanceof Error ? error.message : String(error)}`
 			);
 			throw error;
@@ -471,7 +490,7 @@ export class TaskManager {
 	 */
 	addTaskToBacklog(task: Task): void {
 		this.globalBacklog.push(task);
-		Logger.log(`[TaskManager] Added task ${task.id} to global backlog`);
+		logger.info(`[TaskManager] Added task ${task.id} to global backlog`);
 	}
 
 	/**
@@ -484,7 +503,7 @@ export class TaskManager {
 			this.workerQueues.set(workerId, queue);
 		}
 		queue.push(task);
-		Logger.log(`[TaskManager] Added task ${task.id} to worker ${workerId} queue`);
+		logger.info(`[TaskManager] Added task ${task.id} to worker ${workerId} queue`);
 	}
 
 	/**
@@ -498,7 +517,7 @@ export class TaskManager {
 				workerId,
 				requestedAt: new Date(),
 			});
-			Logger.log(`[TaskManager] Worker ${workerId} marked as idle`);
+			logger.info(`[TaskManager] Worker ${workerId} marked as idle`);
 		}
 	}
 
@@ -510,7 +529,7 @@ export class TaskManager {
 		const index = this.idleWorkers.findIndex(w => w.workerId === workerId);
 		if (index !== -1) {
 			this.idleWorkers.splice(index, 1);
-			Logger.log(`[TaskManager] Worker ${workerId} marked as busy with task ${task.id}`);
+			logger.info(`[TaskManager] Worker ${workerId} marked as busy with task ${task.id}`);
 		}
 	}
 
@@ -525,7 +544,7 @@ export class TaskManager {
 		const workerQueue = this.workerQueues.get(workerId);
 		if (workerQueue && workerQueue.length > 0) {
 			const task = workerQueue.shift()!;
-			Logger.log(`[TaskManager] Found task ${task.id} in worker ${workerId} personal queue`);
+			logger.info(`[TaskManager] Found task ${task.id} in worker ${workerId} personal queue`);
 			return task;
 		}
 
@@ -534,7 +553,7 @@ export class TaskManager {
 			// For now, just return the first task (FIFO)
 			// In Phase 5, we'll add flow compatibility checking
 			const task = this.globalBacklog.shift()!;
-			Logger.log(`[TaskManager] Found task ${task.id} in global backlog for worker ${workerId}`);
+			logger.info(`[TaskManager] Found task ${task.id} in global backlog for worker ${workerId}`);
 			return task;
 		}
 

@@ -1,4 +1,4 @@
-import type { DashboardData } from '@shared';
+import type { DashboardData } from '@shared/api/dashboard.contract';
 
 import { dashboardApi } from '@app/api/client';
 

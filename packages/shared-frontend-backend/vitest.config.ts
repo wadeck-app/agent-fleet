@@ -9,7 +9,7 @@ export default defineConfig({
 		include: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
 
 		// Exclude patterns
-		exclude: ['node_modules', 'dist', '**/*.d.ts', '**/*.js', '**/*.js.map'],
+		exclude: ['node_modules', 'dist', '**/*.d.ts', '**/*', '**/*.js.map'],
 
 		// Coverage configuration
 		coverage: {
@@ -21,7 +21,7 @@ export default defineConfig({
 				'**/*.test.ts',
 				'**/*.spec.ts',
 				'**/*.d.ts',
-				'**/*.js',
+				'**/*',
 				'**/*.js.map',
 				// Configuration files
 				'*.config.ts',

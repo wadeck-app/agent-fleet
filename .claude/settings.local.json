@@ -1,14 +1,18 @@
 {
-	"permissions": {
-		"allow": [
-			"WebFetch(domain:survey.stackoverflow.co)",
-			"WebFetch(domain:npmtrends.com)",
-			"WebFetch(domain:github.com)",
-			"WebFetch(domain:www.radix-ui.com)",
-			"Skill(run-test)",
-			"Bash(npm run test:*)"
-		],
-		"deny": [],
-		"ask": []
-	}
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:survey.stackoverflow.co)",
+      "WebFetch(domain:npmtrends.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.radix-ui.com)",
+      "Skill(run-test)",
+      "Bash(npm run test:*)",
+      "Bash(dir:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run clean:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
 }

@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type {
-	CreateIngredient,
-	Ingredient,
-	IngredientsListQuery,
-	PatchIngredient,
-	UpdateIngredient,
-} from '@app/shared';
-import { ConflictException, NotFoundException } from '@app/shared';
-import { INGREDIENTS_API_ROUTES } from '@app/shared';
+import {
+	type CreateIngredient,
+	INGREDIENTS_API_ROUTES,
+	type Ingredient,
+	type IngredientsListQuery,
+	type PatchIngredient,
+	type UpdateIngredient,
+} from '@app/shared/api/ingredients.contract';
+import { ConflictException, NotFoundException } from '@app/shared/exceptions/http-exceptions';
 
 import type { IngredientsService } from '../services/IngredientsService';
 import type { RouteWrapperFunc } from '../utils/fastify-wrapper';

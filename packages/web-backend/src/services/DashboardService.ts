@@ -1,4 +1,4 @@
-import type { ActivityEntry, DashboardData } from '@app/shared';
+import type { ActivityEntry, DashboardData } from '@app/shared/api/dashboard.contract';
 
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 

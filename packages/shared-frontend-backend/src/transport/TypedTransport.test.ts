@@ -1,6 +1,8 @@
+import { describe, expect, it } from 'vitest';
+
 import type { EventType } from './EventTypes';
-import { getAvailableMethods, isValidPath } from './TypedTransport';
 import type { ConnectionState, ITransport, TransportType } from './TypedTransport';
+import { getAvailableMethods, isValidPath } from './TypedTransport';
 
 describe('TypedTransport', () => {
 	describe('isValidPath', () => {

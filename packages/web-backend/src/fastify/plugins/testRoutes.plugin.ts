@@ -1,6 +1,5 @@
-import { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
-
-import { logger } from '@/utils/logger';
+import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
+import { logger } from 'shared-common/logger';
 
 /**
  * Only available when NOT in production mode

@@ -9,9 +9,9 @@ import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 import * as path from 'path';
 
-import type { FlowDefinition, FlowStep, VariableType, WorkspaceConfig } from '../types.js';
-import { FlowValidator } from '../validation/FlowValidator.js';
-import type { ValidationResult } from '../validation/FlowValidator.js';
+import type { FlowDefinition, FlowStep, VariableType, WorkspaceConfig } from '../types';
+import { FlowValidator } from '../validation/FlowValidator';
+import type { ValidationResult } from '../validation/FlowValidator';
 
 /**
  * Validation error for flow definitions

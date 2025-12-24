@@ -1,5 +1,5 @@
 import type { FeatureContract } from '@framework/types/FeatureContract';
-import { BaseListQuerySchema } from '@shared';
+import { BaseListQuerySchema } from '@shared/common/api-helpers';
 
 /**
  * ===========================================================================================

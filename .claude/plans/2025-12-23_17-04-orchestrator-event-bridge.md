@@ -246,7 +246,6 @@ import type { Worker } from '@app/shared';
 import { B2F_WORKER_CONNECTED, B2F_WORKER_DISCONNECTED } from '@app/shared-frontend-backend';
 import type { O2BEventData } from '@app/shared-orch-backend';
 
-import { logger } from '../utils/logger';
 import type { EventBroadcaster } from './EventBroadcaster';
 ```
 

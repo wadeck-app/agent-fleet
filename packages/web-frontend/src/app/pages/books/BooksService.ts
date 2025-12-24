@@ -7,7 +7,13 @@ import { nonNegative } from '@framework/utils/validation/validation';
 import { year } from '@framework/utils/validation/validation';
 import { combine } from '@framework/utils/validation/validation';
 import { type ValidationResult } from '@framework/utils/validation/validation';
-import type { Book, BookListResponse, BooksListQuery, BulkDeleteResponse, CreateBook } from '@shared';
+import type {
+	Book,
+	BookListResponse,
+	BooksListQuery,
+	BulkDeleteResponse,
+	CreateBook,
+} from '@shared/api/books.contract';
 
 import { booksApi } from '@app/api/client';
 

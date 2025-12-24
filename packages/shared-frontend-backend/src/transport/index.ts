@@ -14,6 +14,8 @@
  * @see packages/shared-frontend-backend/.claude/plans/transport-front-back_prop4.md
  */
 
+//FIXME remove index.ts
+
 // Transport Protocol - Core protocol types
 export type {
 	TransportRequest,

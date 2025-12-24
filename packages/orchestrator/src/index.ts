@@ -3,4 +3,4 @@
  *
  * Provides the Orchestrator class for library mode usage.
  */
-export { Orchestrator } from './core/index.js';
+export { Orchestrator } from './core/Orchestrator';

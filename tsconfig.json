@@ -1,0 +1,17 @@
+{
+	"files": [],
+	"references": [
+		{ "path": "packages/cli" },
+		{ "path": "packages/e2e-web" },
+		{ "path": "packages/flow-engine" },
+		{ "path": "packages/orchestrator" },
+		{ "path": "packages/orchestrator-adapters" },
+		{ "path": "packages/shared-common" },
+		{ "path": "packages/shared-frontend-backend" },
+		{ "path": "packages/shared-orch-worker" },
+		{ "path": "packages/test-utils" },
+		{ "path": "packages/web-backend" },
+		{ "path": "packages/web-frontend" },
+		{ "path": "packages/worker" }
+	]
+}

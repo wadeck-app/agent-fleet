@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 
 import { useAbortableEffect } from '@framework/hooks/useAbortableEffect';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
-import type { Book, BulkDeleteResponse, CreateBook, PatchBook, UpdateBook } from '@shared';
+import type { Book, BulkDeleteResponse, CreateBook, PatchBook, UpdateBook } from '@shared/api/books.contract';
 
 import { booksService } from './BooksService';
 

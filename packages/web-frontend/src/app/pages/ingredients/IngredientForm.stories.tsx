@@ -1,4 +1,4 @@
-import type { CreateIngredient } from '@shared';
+import type { CreateIngredient } from '@shared/api/ingredients.contract';
 import type { Meta, StoryObj } from '@storybook/react';
 
 import { IngredientForm } from './IngredientForm';

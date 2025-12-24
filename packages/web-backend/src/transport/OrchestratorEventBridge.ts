@@ -1,10 +1,10 @@
-import type { OrchestratorClient } from 'orchestrator-adapters';
-import type { O2BEventData } from 'shared-orch-worker/index.js';
+import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
+import { logger } from 'shared-common/logger';
+import type { O2BEventData } from 'shared-orch-worker/orchestrator-events';
 
-import type { Worker } from '@app/shared';
-import { B2F_WORKER_CONNECTED, B2F_WORKER_DISCONNECTED } from '@app/shared';
+import type { Worker } from '@app/shared/api/workers.contract';
+import { B2F_WORKER_CONNECTED, B2F_WORKER_DISCONNECTED } from '@app/shared/transport';
 
-import { logger } from '../utils/logger';
 import type { EventBroadcaster } from './EventBroadcaster';
 
 /**
@@ -44,7 +44,7 @@ import type { EventBroadcaster } from './EventBroadcaster';
  */
 export class OrchestratorEventBridge {
 	constructor(
-		private orchestratorClient: OrchestratorClient,
+		private orchestratorWrapper: OrchestratorWrapper,
 		private eventBroadcaster: EventBroadcaster
 	) {}
 
@@ -57,8 +57,8 @@ export class OrchestratorEventBridge {
 	initialize(): void {
 		// Subscribe to O2B worker lifecycle events
 		// Using .bind(this) to preserve context for later removal in dispose()
-		this.orchestratorClient.on('worker.connected', this.handleWorkerConnected.bind(this));
-		this.orchestratorClient.on('worker.disconnected', this.handleWorkerDisconnected.bind(this));
+		this.orchestratorWrapper.on('worker.connected', this.handleWorkerConnected.bind(this));
+		this.orchestratorWrapper.on('worker.disconnected', this.handleWorkerDisconnected.bind(this));
 	}
 
 	/**
@@ -68,8 +68,8 @@ export class OrchestratorEventBridge {
 	 * Must be called during server shutdown
 	 */
 	dispose(): void {
-		this.orchestratorClient.off('worker.connected', this.handleWorkerConnected);
-		this.orchestratorClient.off('worker.disconnected', this.handleWorkerDisconnected);
+		this.orchestratorWrapper.off('worker.connected', this.handleWorkerConnected);
+		this.orchestratorWrapper.off('worker.disconnected', this.handleWorkerDisconnected);
 	}
 
 	/**
@@ -81,15 +81,14 @@ export class OrchestratorEventBridge {
 	private handleWorkerConnected(data: O2BEventData<'worker.connected'>): void {
 		try {
 			// Validate required fields
-			if (!data.workerId || !data.workerType) {
-				logger.warn('[Bridge] Invalid worker.connected event data: missing workerId or workerType', data);
+			if (!data.workerId) {
+				logger.warn('[Bridge] Invalid worker.connected event data: missing workerId', data);
 				return;
 			}
 
 			// Transform O2B data to B2F Worker format
 			const worker: Worker = {
 				workerId: data.workerId,
-				type: data.workerType,
 				connected: true,
 				state: 'idle', // New workers start in idle state
 				taskId: undefined, // No task assigned yet
@@ -130,7 +129,6 @@ export class OrchestratorEventBridge {
 			// Note: workerType not available in disconnect event, using placeholder
 			const worker: Worker = {
 				workerId: data.workerId,
-				type: '<unknown>', // O2B disconnect event doesn't include workerType
 				connected: false,
 				state: 'idle', // Disconnected workers are idle
 				taskId: undefined,

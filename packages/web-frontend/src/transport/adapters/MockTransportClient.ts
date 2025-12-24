@@ -60,7 +60,6 @@
  * }
  * ```
  */
-import type { TransportError, TransportRequest } from 'shared-frontend-backend/transport';
 import type {
 	ConnectionState,
 	ConnectionStateHandler,
@@ -71,11 +70,14 @@ import type {
 	PathsForMethod,
 	RequestOptions,
 	ResponseType,
+	TransportConfig,
+	TransportError,
+	TransportRequest,
 	TransportType,
 	UnsubscribeFunction,
-} from 'shared-frontend-backend/transport';
+} from '@shared/transport';
 
-import type { ITransportClient, TransportConfig } from '../ITransportClient';
+import type { ITransportClient } from '../ITransportClient';
 
 /**
  * Mock Response Configuration

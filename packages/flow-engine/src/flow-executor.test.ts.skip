@@ -5,8 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { FlowExecutor } from './flow-executor.js';
-import type { FlowDefinition, Workspace } from './types.js';
+import { FlowExecutor } from './flow-executor';
+import type { FlowDefinition, Workspace } from './types';
 import * as path from 'path';
 import * as os from 'os';
 

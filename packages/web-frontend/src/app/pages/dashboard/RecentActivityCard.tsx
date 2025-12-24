@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
-import type { ActivityEntry, ActivityType } from '@shared';
+import type { ActivityEntry, ActivityType } from '@shared/api/dashboard.contract';
 import { Activity, AlertCircle, CheckCircle2, Eye, GitMerge, UserCheck, UserX, XCircle } from 'lucide-react';
 
 /**

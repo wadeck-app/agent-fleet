@@ -1,7 +1,6 @@
-import { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
-
-import { logger } from '@/utils/logger';
+import { logger } from 'shared-common/logger';
 
 /**
  * Simple request logger hook

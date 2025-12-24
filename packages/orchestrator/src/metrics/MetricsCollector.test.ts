@@ -1,28 +1,20 @@
 /**
  * MetricsCollector Tests
  */
-import { Logger } from 'shared-common/Logger.js';
-import { StateEvent, StateManager } from 'shared-common/StateManager.js';
-import { Task, TaskStatus, WorkerInfo, WorkerType } from 'shared-orch-worker/index.js';
-import { setupTest } from 'test-utils/index';
-import {
-	createMockStateManager,
-	createMockTask,
-	createMockTaskManager,
-	createMockWorker,
-	setupTimers,
-} from 'test-utils/index';
+import { createMockTask, createMockWorker } from 'orchestrator/test-utils/MockOrchestrator';
+import { createMockStateManager, createMockTaskManager } from 'orchestrator/test-utils/mocks';
+import { logger } from 'shared-common/logger';
+import { Task, TaskStatus, WorkerInfo } from 'shared-orch-worker/domain-types';
+import { setupTimers } from 'test-utils/helpers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { TaskManager } from '../core/TaskManager.js';
-import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer.js';
-import { MetricsCollector } from './MetricsCollector.js';
+import { MetricsCollector } from './MetricsCollector';
 
 // Mock dependencies
-vi.mock('../core/TaskManager.js');
-vi.mock('../websocket/WorkerWebSocketServer.js');
-vi.mock('shared-common/StateManager.js');
-vi.mock('shared-common/Logger.js');
+vi.mock('../core/TaskManager');
+vi.mock('../websocket/WorkerWebSocketServer');
+vi.mock('shared-common/StateManager');
+vi.mock('shared-common/logger');
 
 describe('MetricsCollector', () => {
 	let collector: MetricsCollector;
@@ -39,7 +31,8 @@ describe('MetricsCollector', () => {
 			priority: 'high',
 			createdAt: '2024-01-01T00:00:00.000Z',
 			updatedAt: '2024-01-01T00:05:00.000Z',
-			assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+			// assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+			assignedTo: { workerId: 'worker-1' },
 		}),
 		createMockTask({
 			id: 'task-2',
@@ -62,13 +55,13 @@ describe('MetricsCollector', () => {
 	const mockWorkers: WorkerInfo[] = [
 		createMockWorker({
 			id: 'worker-1',
-			type: WorkerType.DEV,
+			// type: WorkerType.DEV,
 			connectedAt: '2024-01-01T00:00:00.000Z',
 			taskId: 'task-1',
 		}),
 		createMockWorker({
 			id: 'worker-2',
-			type: WorkerType.DEV,
+			// type: WorkerType.DEV,
 			connectedAt: '2024-01-01T00:00:00.000Z',
 			taskId: null,
 		}),
@@ -91,7 +84,10 @@ describe('MetricsCollector', () => {
 		mockStateManager = createMockStateManager();
 
 		// Mock Logger
-		vi.mocked(Logger.logStructured).mockImplementation(() => {});
+		vi.mocked(logger.debug).mockImplementation(() => {});
+		vi.mocked(logger.info).mockImplementation(() => {});
+		vi.mocked(logger.warn).mockImplementation(() => {});
+		vi.mocked(logger.error).mockImplementation(() => {});
 
 		collector = new MetricsCollector(
 			mockTaskManager,
@@ -148,11 +144,7 @@ describe('MetricsCollector', () => {
 
 			collector.start(); // Second start call
 
-			expect(Logger.logStructured).toHaveBeenCalledWith(
-				'warn',
-				'MetricsCollector',
-				expect.stringContaining('Already running')
-			);
+			expect(logger.warn).toHaveBeenCalledWith('MetricsCollector', expect.stringContaining('Already running'));
 
 			// Should not have collected again
 			expect(vi.mocked(mockStateManager.emitMetricsUpdated).mock.calls.length).toBe(firstCallCount);
@@ -246,8 +238,7 @@ describe('MetricsCollector', () => {
 			});
 
 			expect(() => collector.collectAndEmit()).not.toThrow();
-			expect(Logger.logStructured).toHaveBeenCalledWith(
-				'error',
+			expect(logger.error).toHaveBeenCalledWith(
 				'MetricsCollector',
 				expect.stringContaining('Failed to collect metrics')
 			);

@@ -7,12 +7,12 @@
  * - Circular subflow dependency detection
  * - DAG structure validation
  */
-import { MockFlowRegistry, MockIssueCollector } from 'test-utils/index';
+import { MockFlowRegistry, MockIssueCollector } from 'flow-engine/test-utils/mocks';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import type { FlowDefinition, FlowStep, SubFlowStep } from '../types.js';
-import { GraphValidator } from './GraphValidator.js';
-import { ValidationCode } from './ValidationTypes.js';
+import type { FlowDefinition, FlowStep, SubFlowStep } from '../types';
+import { GraphValidator } from './GraphValidator';
+import { ValidationCode } from './ValidationTypes';
 
 describe('GraphValidator', () => {
 	let collector: MockIssueCollector;

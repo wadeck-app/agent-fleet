@@ -1,46 +1,42 @@
 /**
  * WebSocketEventHandler Tests
  */
-import { Logger } from 'shared-common/Logger.js';
-import { StateManager } from 'shared-common/StateManager.js';
-import { createMessage } from 'shared-common/protocol.js';
-import {
-	FlowStepCompletedMessage,
-	FlowStepFailedMessage,
-	FlowStepStartedMessage,
-	HookEventMessage,
-	KillClaudeMessage,
-	MessageType,
-	StopRequestedMessage,
-	Task,
-	TaskCompletedMessage,
-	TaskFailedMessage,
-	TaskProgressMessage,
-	TaskQuestionMessage,
-	TaskStartedMessage,
-	TaskStatus,
-	WorkerType,
-	WorkspaceAllocatedMessage,
-	WorkspaceReleasedMessage,
-} from 'shared-orch-worker/index.js';
 import {
 	MockWebSocket,
 	createMockConnectionManager,
 	createMockStateManager,
 	createMockTaskManager,
-	setupTest,
-} from 'test-utils/index';
+} from 'orchestrator/test-utils/mocks';
+import { UIMessageType } from 'orchestrator/ui-client/types';
+import { logger } from 'shared-common/logger';
+import { createMessage } from 'shared-common/protocol';
+import { Task, TaskStatus } from 'shared-orch-worker/domain-types';
+import { KillClaudeMessage, O2WMessageType } from 'shared-orch-worker/orchestrator-messages';
+import {
+	REMOVE_W2OStopRequestedMessage,
+	W2OFlowStepCompletedMessage,
+	W2OFlowStepFailedMessage,
+	W2OFlowStepStartedMessage,
+	W2OHookEventMessage,
+	W2OMessageType,
+	W2OTaskCompletedMessage,
+	W2OTaskFailedMessage,
+	W2OTaskProgressMessage,
+	W2OTaskQuestionMessage,
+	W2OTaskStartedMessage,
+	W2OWorkspaceAllocatedMessage,
+	W2OWorkspaceReleasedMessage,
+} from 'shared-orch-worker/worker-messages';
+import { setupTest } from 'test-utils/helpers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { TaskManager } from '../core/TaskManager.js';
-import { WebSocketConnectionManager } from './WebSocketConnectionManager.js';
-import { WebSocketEventHandler } from './WebSocketEventHandler.js';
+import { WebSocketEventHandler } from './WebSocketEventHandler';
 
 // Mock dependencies
-vi.mock('./TaskManager.js');
-vi.mock('shared-common/StateManager.js');
-vi.mock('shared-common/Logger.js');
-vi.mock('./WebSocketConnectionManager.js');
+vi.mock('./TaskManager');
+vi.mock('shared-common/StateManager');
+vi.mock('shared-common/logger');
+vi.mock('./WebSocketConnectionManager');
 
 describe('WebSocketEventHandler', () => {
 	let cleanup: () => void;
@@ -71,7 +67,7 @@ describe('WebSocketEventHandler', () => {
 
 	describe('TASK_STARTED Message Handling', () => {
 		it('should handle TASK_STARTED message', () => {
-			const startedMessage: TaskStartedMessage = createMessage(MessageType.TASK_STARTED, {
+			const startedMessage: W2OTaskStartedMessage = createMessage(W2OMessageType.TASK_STARTED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 			});
@@ -89,7 +85,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle TASK_STARTED with custom status', () => {
-			const startedMessage: TaskStartedMessage = createMessage(MessageType.TASK_STARTED, {
+			const startedMessage: W2OTaskStartedMessage = createMessage(W2OMessageType.TASK_STARTED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				newStatus: TaskStatus.TESTING,
@@ -107,7 +103,7 @@ describe('WebSocketEventHandler', () => {
 
 	describe('TASK_PROGRESS Message Handling', () => {
 		it('should handle TASK_PROGRESS message', () => {
-			const progressMessage: TaskProgressMessage = createMessage(MessageType.TASK_PROGRESS, {
+			const progressMessage: W2OTaskProgressMessage = createMessage(W2OMessageType.TASK_PROGRESS, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				progress: 'Working on implementation',
@@ -127,7 +123,7 @@ describe('WebSocketEventHandler', () => {
 		beforeEach(() => {
 			vi.mocked(mockConnectionManager.getWorker).mockReturnValue({
 				id: 'worker-1',
-				type: WorkerType.DEV,
+				// type: WorkerType.DEV,
 				taskId: 'task-1',
 				connectedAt: new Date().toISOString(),
 				socket: new MockWebSocket() as any,
@@ -135,7 +131,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle TASK_COMPLETED message', () => {
-			const completedMessage: TaskCompletedMessage = createMessage(MessageType.TASK_COMPLETED, {
+			const completedMessage: W2OTaskCompletedMessage = createMessage(W2OMessageType.TASK_COMPLETED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				result: { success: true },
@@ -155,7 +151,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle TASK_COMPLETED with custom status', () => {
-			const completedMessage: TaskCompletedMessage = createMessage(MessageType.TASK_COMPLETED, {
+			const completedMessage: W2OTaskCompletedMessage = createMessage(W2OMessageType.TASK_COMPLETED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				newStatus: TaskStatus.MERGED,
@@ -171,7 +167,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should release worker after completion', () => {
-			const completedMessage: TaskCompletedMessage = createMessage(MessageType.TASK_COMPLETED, {
+			const completedMessage: W2OTaskCompletedMessage = createMessage(W2OMessageType.TASK_COMPLETED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 			});
@@ -182,7 +178,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should try to assign new task after completion', () => {
-			const completedMessage: TaskCompletedMessage = createMessage(MessageType.TASK_COMPLETED, {
+			const completedMessage: W2OTaskCompletedMessage = createMessage(W2OMessageType.TASK_COMPLETED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 			});
@@ -197,7 +193,7 @@ describe('WebSocketEventHandler', () => {
 		beforeEach(() => {
 			vi.mocked(mockConnectionManager.getWorker).mockReturnValue({
 				id: 'worker-1',
-				type: WorkerType.DEV,
+				// type: WorkerType.DEV,
 				taskId: 'task-1',
 				connectedAt: new Date().toISOString(),
 				socket: new MockWebSocket() as any,
@@ -205,7 +201,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle TASK_FAILED message', () => {
-			const failedMessage: TaskFailedMessage = createMessage(MessageType.TASK_FAILED, {
+			const failedMessage: W2OTaskFailedMessage = createMessage(W2OMessageType.TASK_FAILED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				error: 'Test execution failed',
@@ -225,7 +221,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle TASK_FAILED with custom status', () => {
-			const failedMessage: TaskFailedMessage = createMessage(MessageType.TASK_FAILED, {
+			const failedMessage: W2OTaskFailedMessage = createMessage(W2OMessageType.TASK_FAILED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				error: 'Error',
@@ -242,7 +238,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should add failure comment', () => {
-			const failedMessage: TaskFailedMessage = createMessage(MessageType.TASK_FAILED, {
+			const failedMessage: W2OTaskFailedMessage = createMessage(W2OMessageType.TASK_FAILED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				error: 'Build failed',
@@ -254,7 +250,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should emit worker task released event', () => {
-			const failedMessage: TaskFailedMessage = createMessage(MessageType.TASK_FAILED, {
+			const failedMessage: W2OTaskFailedMessage = createMessage(W2OMessageType.TASK_FAILED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				error: 'Error',
@@ -266,7 +262,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should log error', () => {
-			const failedMessage: TaskFailedMessage = createMessage(MessageType.TASK_FAILED, {
+			const failedMessage: W2OTaskFailedMessage = createMessage(W2OMessageType.TASK_FAILED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				error: 'Critical error',
@@ -274,13 +270,13 @@ describe('WebSocketEventHandler', () => {
 
 			eventHandler.handleTaskFailed(failedMessage);
 
-			expect(Logger.error).toHaveBeenCalledWith(expect.stringContaining('failed task task-1'));
+			expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('failed task task-1'));
 		});
 	});
 
 	describe('TASK_QUESTION Message Handling', () => {
 		it('should handle TASK_QUESTION message', () => {
-			const questionMessage: TaskQuestionMessage = createMessage(MessageType.TASK_QUESTION, {
+			const questionMessage: W2OTaskQuestionMessage = createMessage(W2OMessageType.TASK_QUESTION, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				question: 'Need clarification on requirements',
@@ -300,7 +296,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should add question as comment', () => {
-			const questionMessage: TaskQuestionMessage = createMessage(MessageType.TASK_QUESTION, {
+			const questionMessage: W2OTaskQuestionMessage = createMessage(W2OMessageType.TASK_QUESTION, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				question: 'What should be the output format?',
@@ -337,7 +333,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle FLOW_STEP_STARTED message', () => {
-			const stepStartedMessage: FlowStepStartedMessage = createMessage(MessageType.FLOW_STEP_STARTED, {
+			const stepStartedMessage: W2OFlowStepStartedMessage = createMessage(W2OMessageType.FLOW_STEP_STARTED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				stepId: 'step-1',
@@ -354,7 +350,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle FLOW_STEP_STARTED without step name', () => {
-			const stepStartedMessage: FlowStepStartedMessage = createMessage(MessageType.FLOW_STEP_STARTED, {
+			const stepStartedMessage: W2OFlowStepStartedMessage = createMessage(W2OMessageType.FLOW_STEP_STARTED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				stepId: 'step-1',
@@ -366,12 +362,15 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle FLOW_STEP_COMPLETED message', () => {
-			const stepCompletedMessage: FlowStepCompletedMessage = createMessage(MessageType.FLOW_STEP_COMPLETED, {
-				workerId: 'worker-1',
-				taskId: 'task-1',
-				stepId: 'step-1',
-				outputs: { result: 'success' },
-			});
+			const stepCompletedMessage: W2OFlowStepCompletedMessage = createMessage(
+				W2OMessageType.FLOW_STEP_COMPLETED,
+				{
+					workerId: 'worker-1',
+					taskId: 'task-1',
+					stepId: 'step-1',
+					outputs: { result: 'success' },
+				}
+			);
 
 			eventHandler.handleFlowStepCompleted(stepCompletedMessage);
 
@@ -383,11 +382,14 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle FLOW_STEP_COMPLETED without outputs', () => {
-			const stepCompletedMessage: FlowStepCompletedMessage = createMessage(MessageType.FLOW_STEP_COMPLETED, {
-				workerId: 'worker-1',
-				taskId: 'task-1',
-				stepId: 'step-1',
-			});
+			const stepCompletedMessage: W2OFlowStepCompletedMessage = createMessage(
+				W2OMessageType.FLOW_STEP_COMPLETED,
+				{
+					workerId: 'worker-1',
+					taskId: 'task-1',
+					stepId: 'step-1',
+				}
+			);
 
 			eventHandler.handleFlowStepCompleted(stepCompletedMessage);
 
@@ -395,7 +397,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle FLOW_STEP_FAILED message', () => {
-			const stepFailedMessage: FlowStepFailedMessage = createMessage(MessageType.FLOW_STEP_FAILED, {
+			const stepFailedMessage: W2OFlowStepFailedMessage = createMessage(W2OMessageType.FLOW_STEP_FAILED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				stepId: 'step-1',
@@ -412,7 +414,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should emit task updated for flow step events', () => {
-			const stepStartedMessage: FlowStepStartedMessage = createMessage(MessageType.FLOW_STEP_STARTED, {
+			const stepStartedMessage: W2OFlowStepStartedMessage = createMessage(W2OMessageType.FLOW_STEP_STARTED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				stepId: 'step-1',
@@ -445,7 +447,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle WORKSPACE_ALLOCATED message', () => {
-			const allocatedMessage: WorkspaceAllocatedMessage = createMessage(MessageType.WORKSPACE_ALLOCATED, {
+			const allocatedMessage: W2OWorkspaceAllocatedMessage = createMessage(W2OMessageType.WORKSPACE_ALLOCATED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				workspaceId: 'ws-1',
@@ -462,7 +464,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should store workspace info in task metadata', () => {
-			const allocatedMessage: WorkspaceAllocatedMessage = createMessage(MessageType.WORKSPACE_ALLOCATED, {
+			const allocatedMessage: W2OWorkspaceAllocatedMessage = createMessage(W2OMessageType.WORKSPACE_ALLOCATED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				workspaceId: 'ws-1',
@@ -476,7 +478,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle WORKSPACE_RELEASED message', () => {
-			const releasedMessage: WorkspaceReleasedMessage = createMessage(MessageType.WORKSPACE_RELEASED, {
+			const releasedMessage: W2OWorkspaceReleasedMessage = createMessage(W2OMessageType.WORKSPACE_RELEASED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				workspaceId: 'ws-1',
@@ -493,13 +495,13 @@ describe('WebSocketEventHandler', () => {
 			const mockSocket = new MockWebSocket();
 			vi.mocked(mockConnectionManager.getWorker).mockReturnValue({
 				id: 'worker-1',
-				type: WorkerType.DEV,
+				// type: WorkerType.DEV,
 				taskId: 'task-1',
 				connectedAt: new Date().toISOString(),
 				socket: mockSocket as any,
 			});
 
-			const stopMessage: StopRequestedMessage = createMessage(MessageType.STOP_REQUESTED, {
+			const stopMessage: REMOVE_W2OStopRequestedMessage = createMessage(W2OMessageType.STOP_REQUESTED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				claudePid: 12345,
@@ -510,14 +512,14 @@ describe('WebSocketEventHandler', () => {
 			expect(mockConnectionManager.sendMessage).toHaveBeenCalled();
 			const callArgs = vi.mocked(mockConnectionManager.sendMessage).mock.calls[0];
 			expect(callArgs[0]).toBe(mockSocket);
-			expect(callArgs[1].type).toBe(MessageType.KILL_CLAUDE);
+			expect(callArgs[1].type).toBe(O2WMessageType.KILL_CLAUDE);
 			expect((callArgs[1] as KillClaudeMessage).reason).toBe('stop_requested');
 		});
 	});
 
 	describe('HOOK_EVENT Message Handling', () => {
 		it('should handle HOOK_EVENT message', () => {
-			const hookMessage: HookEventMessage = createMessage(MessageType.HOOK_EVENT, {
+			const hookMessage: W2OHookEventMessage = createMessage(W2OMessageType.HOOK_EVENT, {
 				workerId: 'worker-1',
 				hookName: 'test-hook',
 				data: { key: 'value' },
@@ -525,7 +527,7 @@ describe('WebSocketEventHandler', () => {
 
 			eventHandler.handleHookEvent(hookMessage);
 
-			expect(Logger.log).toHaveBeenCalledWith(
+			expect(logger.info).toHaveBeenCalledWith(
 				expect.stringContaining('Hook event test-hook from worker worker-1')
 			);
 		});

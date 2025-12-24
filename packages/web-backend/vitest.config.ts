@@ -23,10 +23,10 @@ export default defineConfig({
 				'**/*.test.ts',
 				'**/*.spec.ts',
 				// Configuration files
-				'*.config.js',
+				'*.config',
 				'*.config.mjs',
 				'*.config.ts',
-				'**/*.config.js',
+				'**/*.config',
 				'**/*.config.mjs',
 				'**/*.config.ts',
 				// Entry points and simple exports (tested via e2e)

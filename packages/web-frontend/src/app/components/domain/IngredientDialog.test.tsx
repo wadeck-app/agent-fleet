@@ -1,4 +1,4 @@
-import type { CreateIngredient, Ingredient } from '@shared';
+import type { CreateIngredient, Ingredient } from '@shared/api/ingredients.contract';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 

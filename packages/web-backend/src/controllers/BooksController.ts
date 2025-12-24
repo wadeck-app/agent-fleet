@@ -1,5 +1,5 @@
-import type { BOOKS_API_ROUTES } from '@app/shared';
-import { BOOKS_API_ROUTES as routes } from '@app/shared';
+import type { BOOKS_API_ROUTES } from '@app/shared/api/books.contract';
+import { BOOKS_API_ROUTES as routes } from '@app/shared/api/books.contract';
 
 import type { BooksService } from '../services/BooksService';
 import type { RouteWrapperFunc } from '../utils/fastify-wrapper';

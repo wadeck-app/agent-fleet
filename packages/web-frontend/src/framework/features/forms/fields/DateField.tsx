@@ -3,7 +3,7 @@ import { FieldError } from '@framework/components/advanced/Field/FieldError';
 import { FieldLabel } from '@framework/components/advanced/Field/FieldLabel';
 import { Input } from '@framework/components/forms/Input';
 
-import { BaseFieldProps, generateFieldId } from '../fieldUtils';
+import { type BaseFieldProps, generateFieldId } from '../fieldUtils';
 
 /**
  * ===========================================================================================

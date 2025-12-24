@@ -1,4 +1,4 @@
-import { TableColumn } from './Table';
+import { type TableColumn } from './Table';
 
 export interface TableSkeletonProps<T> {
 	columns: TableColumn<T>[];

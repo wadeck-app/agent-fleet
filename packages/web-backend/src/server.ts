@@ -9,11 +9,11 @@ import dotenv from 'dotenv';
 // ======================================================================================
 // Now import everything else
 import Fastify, { type FastifyInstance } from 'fastify';
-import { OrchestratorClientFactory } from 'orchestrator-adapters';
-import type { OrchestratorClient } from 'orchestrator-adapters';
+import { Orchestrator } from 'orchestrator';
 import * as os from 'os';
-import path from 'path';
-import { getOrchestratorPortsFromEnv } from 'shared-common/PortCalculator.js';
+import * as path from 'path';
+import { getOrchestratorPortsFromEnv } from 'shared-common/PortCalculator';
+import { logger } from 'shared-common/logger';
 import { fileURLToPath } from 'url';
 
 import { DataStoreFactory } from './factories';
@@ -26,7 +26,6 @@ import routesPlugin from './fastify/plugins/routes.plugin';
 import { EventBroadcaster } from './transport/EventBroadcaster';
 import { WebSocketTransportServer } from './transport/adapters/WebSocketTransportServer';
 import { initializeFactory } from './utils/factory-instance';
-import { logger } from './utils/logger';
 
 // Get __dirname equivalent in ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -39,7 +38,8 @@ dotenv.config({ path: envPath });
 /**
  * Initialize OrchestratorClient based on environment configuration
  */
-async function initializeOrchestratorClient(): Promise<OrchestratorClient> {
+// async function initializeOrchestratorClient(): Promise<OrchestratorClient> {
+async function initializeOrchestratorClient(): Promise<Orchestrator> {
 	const mode = process.env.ORCHESTRATOR_MODE || 'library';
 
 	if (mode === 'library') {
@@ -54,18 +54,29 @@ async function initializeOrchestratorClient(): Promise<OrchestratorClient> {
 
 		logger.info(`[Orchestrator] Calculated ports from env: REST=${calculatedRestPort}, WS=${calculatedWsPort}`);
 
-		// Factory handles orchestrator creation and startup
-		const orchestratorClient = await OrchestratorClientFactory.create({
-			mode: 'library',
-			wsPort: orchestratorWsPort,
-			restPort: orchestratorRestPort,
-			libraryMode: true, // Disable REST API when embedded in backend
-		});
+		const orchestratorConfig = {
+			orchestratorWsPort,
+			// restPort,
+			projectRoot: process.cwd(),
+			// Always include libraryMode
+			libraryMode: true,
+		};
+		const orchestrator = new Orchestrator(orchestratorConfig);
+		await orchestrator.start();
 
-		await orchestratorClient.connect();
+		// // Factory handles orchestrator creation and startup
+		// const orchestratorClient = await OrchestratorClientFactory.create({
+		// 	mode: 'library',
+		// 	wsPort: orchestratorWsPort,
+		// 	restPort: orchestratorRestPort,
+		// 	libraryMode: true, // Disable REST API when embedded in backend
+		// });
+		//
+		// await orchestratorClient.connect();
 		logger.info(`[Orchestrator] Connected (WS: ${orchestratorWsPort}, REST disabled in library mode)`);
 
-		return orchestratorClient;
+		// return orchestratorClient;
+		return orchestrator;
 	} else {
 		throw new Error(`Invalid ORCHESTRATOR_MODE: ${mode}. Must be 'library'.`);
 	}
@@ -379,7 +390,7 @@ async function start() {
 			// Initialize WebSocket transport server
 			await initializeTransportServer(fastify, factory);
 		} else if (process.env.E2E_MODE !== 'true') {
-			logger.info('Skipping Google Sheets and Gemini AI initialization (in-memory mode)');
+			//logger.info('Skipping Google Sheets and Gemini AI initialization (in-memory mode)');
 
 			// 'memory' for tests, 'mariadb' for prod
 			const factory = initializeFactory('memory', orchestratorClient);

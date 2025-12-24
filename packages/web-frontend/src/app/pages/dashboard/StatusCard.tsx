@@ -1,6 +1,6 @@
 import { Badge } from '@framework/components/primitives/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
-import type { OrchestratorStatus } from '@shared';
+import type { OrchestratorStatus } from '@shared/api/dashboard.contract';
 import { Activity, Clock, Package } from 'lucide-react';
 
 /**

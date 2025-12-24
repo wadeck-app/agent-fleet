@@ -2,7 +2,13 @@ import fastifyWebsocket from '@fastify/websocket';
 import type { FastifyInstance } from 'fastify';
 import type { WebSocket } from 'ws';
 
-import type { EventData, EventType, SubscriptionMessage, TransportEvent, TransportRequest } from '@app/shared';
+import type {
+	EventData,
+	EventType,
+	SubscriptionMessage,
+	TransportEvent,
+	TransportRequest,
+} from '@app/shared/transport';
 
 import type { ITransportServer } from '../ITransportServer';
 import type { TransportRouter } from '../TransportRouter';

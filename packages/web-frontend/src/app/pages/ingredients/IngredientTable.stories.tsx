@@ -1,5 +1,5 @@
 import { withMetadata } from '@framework/tests/withMetadata';
-import type { Ingredient } from '@shared';
+import type { Ingredient } from '@shared/api/ingredients.contract';
 import type { Meta, StoryObj } from '@storybook/react';
 
 import { IngredientTable } from './IngredientTable';

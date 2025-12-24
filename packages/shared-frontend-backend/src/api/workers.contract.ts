@@ -17,7 +17,6 @@ export const WorkerStateSchema = z.enum(['idle', 'busy']);
  */
 export const WorkerSchema = z.object({
 	workerId: z.string(),
-	type: z.string(),
 	connected: z.boolean(),
 	taskId: z.string().optional(),
 	state: WorkerStateSchema,

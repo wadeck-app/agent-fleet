@@ -1,4 +1,4 @@
-import type { BaseEntity } from '@app/shared';
+import type { BaseEntity } from '@app/shared/common/base-entity';
 
 import type { DataStorage } from '../storage/DataStorage';
 import type { QueryBuilder } from '../storage/QueryBuilder';

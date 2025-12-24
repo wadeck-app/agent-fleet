@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Button } from '@framework/components/primitives/Button';
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { Table, TableColumn } from './Table';
+import { Table, type TableColumn } from './Table';
 
 const meta: Meta<typeof Table> = {
 	title: 'Components/Table',

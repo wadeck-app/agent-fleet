@@ -23,7 +23,7 @@ const __dirname = path.dirname(__filename);
  * When you need true lazy loading with separate chunks:
  *
  * 1. Change these options:
- *    - outfile: 'dist/server.js'  →  outdir: 'dist'
+ *    - outfile: 'dist/server'  →  outdir: 'dist'
  *    - splitting: false           →  splitting: true
  *
  * 2. Result will be:
@@ -61,7 +61,7 @@ const aliasPlugin = {
 		build.onResolve({ filter: /^@\// }, args => {
 			let importPath = args.path.replace(/^@\//, '');
 			// Add .ts extension if not present
-			if (!importPath.endsWith('.ts') && !importPath.endsWith('.js')) {
+			if (!importPath.endsWith('.ts') && !importPath.endsWith('')) {
 				importPath += '.ts';
 			}
 			return {
@@ -87,7 +87,7 @@ try {
 		entryPoints: ['src/server.ts'],
 
 		// SINGLE BUNDLE mode (current)
-		outfile: 'dist/server.js',
+		outfile: 'dist/server',
 
 		// CODE SPLITTING mode (uncomment to enable, comment outfile above)
 		// outdir: 'dist',

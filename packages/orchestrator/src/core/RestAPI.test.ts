@@ -4,24 +4,25 @@
  * Comprehensive unit tests for the REST API endpoints.
  * Tests all HTTP endpoints with success and error cases.
  */
-import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager.js';
-import { Logger } from 'shared-common/Logger.js';
-import { StateManager } from 'shared-common/StateManager.js';
-import { Task, TaskStatus, WorkerInfo, WorkerType } from 'shared-orch-worker/index.js';
+import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
+import { createMockTask as createMockTaskUtil } from 'orchestrator/test-utils/MockOrchestrator';
+import { logger } from 'shared-common/logger';
+import { StateManager } from 'shared-orch-worker/StateManager';
+import { Task, TaskStatus, WorkerInfo } from 'shared-orch-worker/domain-types';
 import request from 'supertest';
-import { createMockTask as createMockTaskUtil, setupTest } from 'test-utils/index';
+import { setupTest } from 'test-utils/helpers';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { UIClientHook } from '../ui-client/UIClientHook.js';
-import { UIWebSocketServer } from '../websocket/UIWebSocketServer.js';
-import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer.js';
-import { RestAPI } from './RestAPI.js';
-import { TaskManager } from './TaskManager.js';
+import { UIClientHook } from '../ui-client/UIClientHook';
+import { UIWebSocketServer } from '../websocket/UIWebSocketServer';
+import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
+import { RestAPI } from './RestAPI';
+import { TaskManager } from './TaskManager';
 
 // Mock all dependencies
-vi.mock('./TaskManager.js');
-vi.mock('../websocket/WorkerWebSocketServer.js');
-vi.mock('../websocket/UIWebSocketServer.js', () => ({
+vi.mock('./TaskManager');
+vi.mock('../websocket/WorkerWebSocketServer');
+vi.mock('../websocket/UIWebSocketServer', () => ({
 	UIWebSocketServer: vi.fn(function (this: any) {
 		this.start = vi.fn();
 		this.stop = vi.fn();
@@ -30,10 +31,10 @@ vi.mock('../websocket/UIWebSocketServer.js', () => ({
 		this.isRunning = vi.fn().mockReturnValue(false);
 	}),
 }));
-vi.mock('../ui-client/UIClientHook.js');
-vi.mock('flow-engine/workspace/WorkspaceManager.js');
-vi.mock('shared-common/StateManager.js');
-vi.mock('shared-common/Logger.js');
+vi.mock('../ui-client/UIClientHook');
+vi.mock('flow-engine/workspace/WorkspaceManager');
+vi.mock('shared-common/StateManager');
+vi.mock('shared-common/logger');
 
 describe('RestAPI', () => {
 	let api: RestAPI;
@@ -116,8 +117,8 @@ describe('RestAPI', () => {
 		} as any;
 
 		// Mock Logger static methods
-		Logger.log = vi.fn();
-		Logger.error = vi.fn();
+		logger.info = vi.fn();
+		logger.error = vi.fn();
 
 		// Create API instance without workspace manager by default
 		api = new RestAPI(mockTaskManager, mockWsServer, 3737);
@@ -169,13 +170,13 @@ describe('RestAPI', () => {
 			const mockWorkers: WorkerInfo[] = [
 				{
 					id: 'worker-1',
-					type: WorkerType.DEV,
+					// type: WorkerType.DEV,
 					taskId: 'task-1',
 					connectedAt: '2024-01-01T00:00:00.000Z',
 				},
 				{
 					id: 'worker-2',
-					type: WorkerType.REVIEWER,
+					// type: WorkerType.REVIEWER,
 					taskId: null,
 					connectedAt: '2024-01-01T00:01:00.000Z',
 				},
@@ -605,13 +606,13 @@ describe('RestAPI', () => {
 			const mockWorkers: WorkerInfo[] = [
 				{
 					id: 'worker-1',
-					type: WorkerType.DEV,
+					// type: WorkerType.DEV,
 					taskId: 'task-1',
 					connectedAt: '2024-01-01T00:00:00.000Z',
 				},
 				{
 					id: 'worker-2',
-					type: WorkerType.REVIEWER,
+					// type: WorkerType.REVIEWER,
 					taskId: null,
 					connectedAt: '2024-01-01T00:01:00.000Z',
 				},
@@ -969,7 +970,7 @@ describe('RestAPI', () => {
 		it('should log API requests', async () => {
 			await request(app).get('/health');
 
-			expect(Logger.log).toHaveBeenCalledWith('[API] GET /health');
+			expect(logger.info).toHaveBeenCalledWith('[API] GET /health');
 		});
 
 		it('should log POST requests', async () => {
@@ -978,7 +979,7 @@ describe('RestAPI', () => {
 
 			await request(app).post('/tasks').send({ description: 'Test' });
 
-			expect(Logger.log).toHaveBeenCalledWith('[API] POST /tasks');
+			expect(logger.info).toHaveBeenCalledWith('[API] POST /tasks');
 		});
 	});
 
@@ -991,7 +992,8 @@ describe('RestAPI', () => {
 				flowId: 'test-flow',
 				flowInputs: { input1: 'value1', input2: 'value2' },
 				workspacePath: '/path/to/workspace',
-				assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+				// assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+				assignedTo: { workerId: 'worker-1' },
 				comments: [
 					{ timestamp: '2024-01-01T00:00:00.000Z', author: 'user-1', content: 'Comment 1' },
 					{ timestamp: '2024-01-01T00:01:00.000Z', author: 'user-2', content: 'Comment 2' },

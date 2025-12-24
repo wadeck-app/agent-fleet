@@ -2,22 +2,20 @@
  * WorkerWebSocketServer Integration Tests
  * Tests the coordination between components and overall server behavior
  */
-import { Logger } from 'shared-common/Logger.js';
-import { StateManager } from 'shared-common/StateManager.js';
-import { createMessage, serializeMessage } from 'shared-common/protocol.js';
+import { logger } from 'shared-common/logger';
+import { createMessage, serializeMessage } from 'shared-common/protocol';
+import { StateManager } from 'shared-orch-worker/StateManager';
+import { Task, TaskStatus } from 'shared-orch-worker/domain-types';
 import {
-	MessageType,
-	Task,
-	TaskCompletedMessage,
-	TaskStatus,
-	WorkerHeartbeatMessage,
-	WorkerReadyMessage,
-	WorkerType,
-} from 'shared-orch-worker/index.js';
+	W2OMessageType,
+	W2OTaskCompletedMessage,
+	W2OWorkerHeartbeatMessage,
+	W2OWorkerReadyMessage,
+} from 'shared-orch-worker/worker-messages';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { TaskManager } from '../core/TaskManager.js';
-import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer.js';
+import { TaskManager } from '../core/TaskManager';
+import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
 
 // Global WebSocket event handlers storage
 const globalWsEventHandlers: Record<string, Function[]> = {};
@@ -80,9 +78,9 @@ vi.mock('ws', () => {
 });
 
 // Mock dependencies
-vi.mock('./TaskManager.js');
-vi.mock('shared-common/StateManager.js');
-vi.mock('shared-common/Logger.js');
+vi.mock('./TaskManager');
+vi.mock('shared-common/StateManager');
+vi.mock('shared-common/logger');
 
 describe('WorkerWebSocketServer Integration', () => {
 	let server: WorkerWebSocketServer;
@@ -113,8 +111,8 @@ describe('WorkerWebSocketServer Integration', () => {
 			emitTaskUpdated: vi.fn(),
 		} as any;
 
-		vi.mocked(Logger.log).mockImplementation(() => {});
-		vi.mocked(Logger.error).mockImplementation(() => {});
+		vi.mocked(logger.info).mockImplementation(() => {});
+		vi.mocked(logger.error).mockImplementation(() => {});
 
 		// Create server
 		server = new WorkerWebSocketServer(mockTaskManager, mockStateManager, 3738);
@@ -136,10 +134,10 @@ describe('WorkerWebSocketServer Integration', () => {
 			expect(mockWss.listeners.get('error')).toBeDefined();
 		});
 
-		// SKIP: Test failing due to Logger.log not being called as expected. Pre-existing issue, not related to SubFlowStep implementation.
-		// TODO: Fix timing or mock issue causing Logger.log assertion to fail in constructor
+		// SKIP: Test failing due to logger.info not being called as expected. Pre-existing issue, not related to SubFlowStep implementation.
+		// TODO: Fix timing or mock issue causing logger.info assertion to fail in constructor
 		it.skip('should log server startup', () => {
-			expect(Logger.log).toHaveBeenCalledWith('[WS] WebSocket server listening on port 3738');
+			expect(logger.info).toHaveBeenCalledWith('[WS] WebSocket server listening on port 3738');
 		});
 
 		it('should use custom port', () => {
@@ -159,8 +157,7 @@ describe('WorkerWebSocketServer Integration', () => {
 			mockWss.emit('connection', mockSocket);
 
 			// Register worker
-			const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
 				preferredId: 'worker-1',
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -174,7 +171,7 @@ describe('WorkerWebSocketServer Integration', () => {
 				priority: 'medium',
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
-				assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+				assignedTo: { workerId: 'worker-1' },
 				comments: [],
 				metadata: {},
 				history: [],
@@ -191,7 +188,7 @@ describe('WorkerWebSocketServer Integration', () => {
 			expect(mockStateManager.emitWorkerConnected).toHaveBeenCalled();
 
 			// Verify task was assigned using atomic method
-			expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith('worker-1', WorkerType.DEV);
+			expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith('worker-1');
 
 			// Verify ASSIGN_TASK message was sent
 			expect(mockSocket.send).toHaveBeenCalledWith(expect.stringContaining('o2w:task:assign'));
@@ -208,8 +205,7 @@ describe('WorkerWebSocketServer Integration', () => {
 			mockWss.emit('connection', mockSocket);
 
 			// Register worker
-			const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
 				preferredId: 'worker-1',
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -223,7 +219,7 @@ describe('WorkerWebSocketServer Integration', () => {
 				priority: 'medium',
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
-				assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+				assignedTo: { workerId: 'worker-1' },
 				comments: [],
 				metadata: {},
 				history: [],
@@ -238,7 +234,7 @@ describe('WorkerWebSocketServer Integration', () => {
 			vi.clearAllMocks();
 
 			// Complete task
-			const completedMessage: TaskCompletedMessage = createMessage(MessageType.TASK_COMPLETED, {
+			const completedMessage: W2OTaskCompletedMessage = createMessage(W2OMessageType.TASK_COMPLETED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 			});
@@ -266,7 +262,7 @@ describe('WorkerWebSocketServer Integration', () => {
 			expect(mockStateManager.emitWorkerTaskReleased).toHaveBeenCalledWith('worker-1');
 
 			// Verify new task was assigned using atomic method
-			expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith('worker-1', WorkerType.DEV);
+			expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith('worker-1');
 		});
 
 		it('should handle worker disconnection with active task', async () => {
@@ -274,8 +270,7 @@ describe('WorkerWebSocketServer Integration', () => {
 			mockWss.emit('connection', mockSocket);
 
 			// Register worker
-			const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
 				preferredId: 'worker-1',
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -289,7 +284,7 @@ describe('WorkerWebSocketServer Integration', () => {
 				priority: 'medium',
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
-				assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+				assignedTo: { workerId: 'worker-1' },
 				comments: [],
 				metadata: {},
 				history: [],
@@ -317,69 +312,6 @@ describe('WorkerWebSocketServer Integration', () => {
 	});
 
 	describe('Multiple Workers Coordination', () => {
-		it('should handle multiple workers with different types', () => {
-			const mockSocket1 = new MockWebSocket();
-			const mockSocket2 = new MockWebSocket();
-			const mockSocket3 = new MockWebSocket();
-
-			mockWss.emit('connection', mockSocket1);
-			mockWss.emit('connection', mockSocket2);
-			mockWss.emit('connection', mockSocket3);
-
-			// Register workers of different types
-			mockSocket1.emit(
-				'message',
-				Buffer.from(
-					serializeMessage(
-						createMessage(MessageType.WORKER_READY, {
-							workerType: WorkerType.DEV,
-							preferredId: 'dev-1',
-							projectId: 'test-project',
-							workspacePath: '/test/path',
-							availableFlows: [],
-						})
-					)
-				)
-			);
-
-			mockSocket2.emit(
-				'message',
-				Buffer.from(
-					serializeMessage(
-						createMessage(MessageType.WORKER_READY, {
-							workerType: WorkerType.PM,
-							preferredId: 'pm-1',
-							projectId: 'test-project',
-							workspacePath: '/test/path',
-							availableFlows: [],
-						})
-					)
-				)
-			);
-
-			mockSocket3.emit(
-				'message',
-				Buffer.from(
-					serializeMessage(
-						createMessage(MessageType.WORKER_READY, {
-							workerType: WorkerType.REVIEWER,
-							preferredId: 'reviewer-1',
-							projectId: 'test-project',
-							workspacePath: '/test/path',
-							availableFlows: [],
-						})
-					)
-				)
-			);
-
-			// Verify all workers are registered
-			const workers = server.getWorkers();
-			expect(workers).toHaveLength(3);
-			expect(workers.find(w => w.type === WorkerType.DEV)).toBeDefined();
-			expect(workers.find(w => w.type === WorkerType.PM)).toBeDefined();
-			expect(workers.find(w => w.type === WorkerType.REVIEWER)).toBeDefined();
-		});
-
 		it('should assign tasks to idle workers via tryAssignTasksToIdleWorkers', async () => {
 			const mockSocket1 = new MockWebSocket();
 			const mockSocket2 = new MockWebSocket();
@@ -395,8 +327,7 @@ describe('WorkerWebSocketServer Integration', () => {
 				'message',
 				Buffer.from(
 					serializeMessage(
-						createMessage(MessageType.WORKER_READY, {
-							workerType: WorkerType.DEV,
+						createMessage(W2OMessageType.WORKER_READY, {
 							preferredId: 'worker-1',
 							projectId: 'test-project',
 							workspacePath: '/test/path',
@@ -410,8 +341,7 @@ describe('WorkerWebSocketServer Integration', () => {
 				'message',
 				Buffer.from(
 					serializeMessage(
-						createMessage(MessageType.WORKER_READY, {
-							workerType: WorkerType.DEV,
+						createMessage(W2OMessageType.WORKER_READY, {
 							preferredId: 'worker-2',
 							projectId: 'test-project',
 							workspacePath: '/test/path',
@@ -434,7 +364,7 @@ describe('WorkerWebSocketServer Integration', () => {
 				priority: 'medium',
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
-				assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+				assignedTo: { workerId: 'worker-1' },
 				comments: [],
 				metadata: {},
 				history: [],
@@ -447,7 +377,7 @@ describe('WorkerWebSocketServer Integration', () => {
 				priority: 'medium',
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
-				assignedTo: { workerId: 'worker-2', workerType: WorkerType.DEV },
+				assignedTo: { workerId: 'worker-2' },
 				comments: [],
 				metadata: {},
 				history: [],
@@ -468,7 +398,7 @@ describe('WorkerWebSocketServer Integration', () => {
 			expect(callCount).toBeGreaterThanOrEqual(1); // At least one worker should be assigned
 
 			// Check that at least worker-1 was called (it's first in iteration)
-			expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith('worker-1', WorkerType.DEV);
+			expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith('worker-1');
 		});
 	});
 
@@ -479,12 +409,12 @@ describe('WorkerWebSocketServer Integration', () => {
 
 			mockSocket.emit('message', Buffer.from('invalid json {'));
 
-			expect(Logger.error).toHaveBeenCalledWith('[WS] Error parsing message:', expect.any(String));
+			expect(logger.error).toHaveBeenCalledWith('[WS] Error parsing message:', expect.any(String));
 
 			// Error message should be sent to socket
 			expect(mockSocket.send).toHaveBeenCalled();
 			const sentMessage = JSON.parse(mockSocket.send.mock.calls[0][0]);
-			expect(sentMessage.type).toBe(MessageType.ERROR);
+			expect(sentMessage.type).toBe(W2OMessageType.ERROR);
 		});
 
 		it('should handle unknown message types', () => {
@@ -509,7 +439,7 @@ describe('WorkerWebSocketServer Integration', () => {
 			const error = new Error('Server error');
 			mockWss.emit('error', error);
 
-			expect(Logger.error).toHaveBeenCalledWith('[WS] Server error:', error);
+			expect(logger.error).toHaveBeenCalledWith('[WS] Server error:', error);
 		});
 
 		it('should handle socket errors', () => {
@@ -519,7 +449,7 @@ describe('WorkerWebSocketServer Integration', () => {
 			const error = new Error('Socket error');
 			mockSocket.emit('error', error);
 
-			expect(Logger.error).toHaveBeenCalledWith('[WS] Socket error:', error);
+			expect(logger.error).toHaveBeenCalledWith('[WS] Socket error:', error);
 		});
 	});
 
@@ -527,8 +457,7 @@ describe('WorkerWebSocketServer Integration', () => {
 		it('should close all worker connections', async () => {
 			const mockSocket1 = new MockWebSocket();
 			mockWss.emit('connection', mockSocket1);
-			const readyMessage1: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage1: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
 				projectId: 'test-project',
 				workspacePath: '/test/path',
 				availableFlows: [],
@@ -537,8 +466,7 @@ describe('WorkerWebSocketServer Integration', () => {
 
 			const mockSocket2 = new MockWebSocket();
 			mockWss.emit('connection', mockSocket2);
-			const readyMessage2: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.PM,
+			const readyMessage2: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
 				projectId: 'test-project',
 				workspacePath: '/test/path',
 				availableFlows: [],
@@ -560,8 +488,7 @@ describe('WorkerWebSocketServer Integration', () => {
 		it('should clear workers list', async () => {
 			const mockSocket = new MockWebSocket();
 			mockWss.emit('connection', mockSocket);
-			const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
 				projectId: 'test-project',
 				workspacePath: '/test/path',
 				availableFlows: [],
@@ -575,12 +502,12 @@ describe('WorkerWebSocketServer Integration', () => {
 			expect(server.getWorkers()).toHaveLength(0);
 		});
 
-		// SKIP: Test failing due to Logger.log not being called as expected. Pre-existing issue, not related to SubFlowStep implementation.
-		// TODO: Fix timing or mock issue causing Logger.log assertion to fail during stop
+		// SKIP: Test failing due to logger.info not being called as expected. Pre-existing issue, not related to SubFlowStep implementation.
+		// TODO: Fix timing or mock issue causing logger.info assertion to fail during stop
 		it.skip('should log server stop', async () => {
 			await server.stop();
 
-			expect(Logger.log).toHaveBeenCalledWith('[WS] WebSocket server stopped');
+			expect(logger.info).toHaveBeenCalledWith('[WS] WebSocket server stopped');
 		});
 	});
 
@@ -590,8 +517,7 @@ describe('WorkerWebSocketServer Integration', () => {
 			mockWss.emit('connection', mockSocket);
 
 			// Register worker first
-			const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
 				preferredId: 'worker-1',
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -601,7 +527,7 @@ describe('WorkerWebSocketServer Integration', () => {
 			mockSocket.send.mockClear();
 
 			// Send heartbeat
-			const heartbeatMessage: WorkerHeartbeatMessage = createMessage(MessageType.WORKER_HEARTBEAT, {
+			const heartbeatMessage: W2OWorkerHeartbeatMessage = createMessage(W2OMessageType.WORKER_HEARTBEAT, {
 				workerId: 'worker-1',
 			});
 
@@ -609,7 +535,7 @@ describe('WorkerWebSocketServer Integration', () => {
 
 			expect(mockSocket.send).toHaveBeenCalled();
 			const sentMessage = JSON.parse(mockSocket.send.mock.calls[0][0]);
-			expect(sentMessage.type).toBe(MessageType.ACK);
+			expect(sentMessage.type).toBe(W2OMessageType.ACK);
 		});
 	});
 });

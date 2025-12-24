@@ -1,5 +1,5 @@
 /* global AbortSignal, AbortController */
-import { DependencyList, useEffect, useRef } from 'react';
+import { type DependencyList, useEffect, useRef } from 'react';
 
 /**
  * ===========================================================================================

@@ -1,15 +1,15 @@
 /**
  * Flow Orchestrator Tests
  */
-import { setupTest } from 'test-utils/index';
+import { setupTest } from 'test-utils/helpers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { FlowDefinition, StepTrace, Workspace } from '../types.js';
-import { FlowOrchestrator } from './FlowOrchestrator.js';
-import { StepRunner } from './StepRunner.js';
+import type { FlowDefinition, StepTrace, Workspace } from '../types';
+import { FlowOrchestrator } from './FlowOrchestrator';
+import { StepRunner } from './StepRunner';
 
 // Mock StepRunner
-vi.mock('./StepRunner.js');
+vi.mock('./StepRunner');
 
 describe('FlowOrchestrator', () => {
 	let cleanup: () => void;

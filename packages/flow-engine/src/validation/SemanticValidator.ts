@@ -13,11 +13,11 @@
  * This validator assumes the flow has already passed schema validation,
  * so basic structure (step IDs, types) is guaranteed to be valid.
  */
-import type { FlowRegistry } from '../registry/FlowRegistry.js';
-import type { FlowDefinition, FlowStep, SubFlowStep, WorkspaceStrategy } from '../types.js';
-import type { GraphValidator } from './GraphValidator.js';
-import type { IssueCollector } from './ValidationTypes.js';
-import { ValidationCode } from './ValidationTypes.js';
+import type { FlowRegistry } from '../registry/FlowRegistry';
+import type { FlowDefinition, FlowStep, SubFlowStep, WorkspaceStrategy } from '../types';
+import type { GraphValidator } from './GraphValidator';
+import type { IssueCollector } from './ValidationTypes';
+import { ValidationCode } from './ValidationTypes';
 
 /**
  * Semantic Validator - validates semantic correctness of flows

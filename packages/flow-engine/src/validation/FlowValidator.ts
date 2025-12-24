@@ -17,16 +17,16 @@
  * Phase 3: Semantic validation (references) - only if schema valid
  * Phase 4: Template validation (expressions) - only if schema valid
  */
-import type { FlowRegistry } from '../registry/FlowRegistry.js';
-import type { FlowDefinition } from '../types.js';
-import { GraphValidator } from './GraphValidator.js';
+import type { FlowRegistry } from '../registry/FlowRegistry';
+import type { FlowDefinition } from '../types';
+import { GraphValidator } from './GraphValidator';
 // Import specialized validators
-import { SchemaValidator } from './SchemaValidator.js';
-import { SemanticValidator } from './SemanticValidator.js';
-import { TemplateValidator } from './TemplateValidator.js';
+import { SchemaValidator } from './SchemaValidator';
+import { SemanticValidator } from './SemanticValidator';
+import { TemplateValidator } from './TemplateValidator';
 // Import for internal use
-import type { IssueCollector, ValidationIssue, ValidationResult } from './ValidationTypes.js';
-import { ValidationCode } from './ValidationTypes.js';
+import type { IssueCollector, ValidationIssue, ValidationResult } from './ValidationTypes';
+import { ValidationCode } from './ValidationTypes';
 
 // Re-export types from ValidationTypes for backward compatibility
 export type {
@@ -36,9 +36,9 @@ export type {
 	ValidationResult,
 	VariableReference,
 	IssueCollector,
-} from './ValidationTypes.js';
+} from './ValidationTypes';
 
-export { ValidationCode } from './ValidationTypes.js';
+export { ValidationCode } from './ValidationTypes';
 
 /**
  * Flow Validator - orchestrates specialized validators

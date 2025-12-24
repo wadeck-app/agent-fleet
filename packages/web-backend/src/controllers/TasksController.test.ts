@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { TasksData, TasksQuery } from '@app/shared';
+import type { TasksData, TasksQuery } from '@app/shared/api/tasks.contract';
 
 import type { TasksService } from '../services/TasksService';
 import type { RouteWrapperFunc } from '../utils/fastify-wrapper';
@@ -44,7 +44,6 @@ describe('TasksController', () => {
 				updatedAt: '2024-01-02T00:00:00.000Z',
 				assignedWorker: {
 					workerId: 'worker-1',
-					workerType: 'dev',
 				},
 			},
 		],

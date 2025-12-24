@@ -5,7 +5,7 @@ import { LoadingState } from '@framework/components/feedback/LoadingState';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { Button } from '@framework/components/primitives/Button';
-import type { TaskPriority, TaskStatus } from '@shared';
+import type { TaskPriority, TaskStatus } from '@shared/api/tasks.contract';
 import { RefreshCw } from 'lucide-react';
 
 import { TaskFilters } from './TaskFilters';

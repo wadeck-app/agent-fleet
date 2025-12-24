@@ -1,6 +1,5 @@
 import { AsyncLocalStorage } from 'async_hooks';
-
-import { logger } from './logger';
+import { logger } from 'shared-common/logger';
 
 export interface ApiCallStats {
 	requestId: string;

@@ -1,14 +1,13 @@
 /**
  * Flow Registry Tests
  */
+import { createMockFlow, createMockModelStep } from 'flow-engine/test-utils/factories';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
-import { setupTest } from 'test-utils/index';
-import { createMockFlow, createMockModelStep } from 'test-utils/index';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { FlowDefinition, WorkspaceConfig } from '../types.js';
-import { FlowRegistry, FlowValidationError } from './FlowRegistry.js';
+import type { FlowDefinition } from '../types';
+import { FlowRegistry, FlowValidationError } from './FlowRegistry';
 
 // Mock fs and yaml modules
 vi.mock('fs');

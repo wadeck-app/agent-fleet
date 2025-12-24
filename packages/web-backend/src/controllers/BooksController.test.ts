@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Book, BooksListQuery, CreateBook, PatchBook, UpdateBook } from '@app/shared';
-import { ConflictException, NotFoundException } from '@app/shared';
-import { BOOKS_API_ROUTES } from '@app/shared';
+import type { Book, BooksListQuery, CreateBook, PatchBook, UpdateBook } from '@app/shared/api/books.contract';
+import { BOOKS_API_ROUTES } from '@app/shared/api/books.contract';
+import { ConflictException, NotFoundException } from '@app/shared/exceptions/http-exceptions';
 
 import type { BooksService } from '../services/BooksService';
 import type { RouteWrapperFunc } from '../utils/fastify-wrapper';

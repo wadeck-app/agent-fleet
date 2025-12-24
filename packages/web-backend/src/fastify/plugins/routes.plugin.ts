@@ -1,10 +1,10 @@
-import { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { readFileSync } from 'fs';
 import * as path from 'path';
 
-import routes from '@/routes';
-import { CONTROLLER_REGISTRY } from '@/utils/controller-registry';
-import { registerControllerWithCheck } from '@/utils/lazy-controller-plugin';
+import routes from '../../routes';
+import { CONTROLLER_REGISTRY } from '../../utils/controller-registry';
+import { registerControllerWithCheck } from '../../utils/lazy-controller-plugin';
 
 // /**
 //  * Route module definition for lazy loading

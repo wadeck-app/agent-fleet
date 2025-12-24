@@ -12,16 +12,18 @@
  * ===========================================================================================
  */
 
+//FIXME remove me
+
 // Main client interface
-export type { OrchestratorClient } from './OrchestratorClient.js';
+export type { OrchestratorClient } from './OrchestratorClient';
 export type {
 	OrchestratorClientConfig,
 	LibraryOrchestratorClientConfig,
 	TestOrchestratorClientConfig,
-} from './OrchestratorClientConfig.js';
-export { OrchestratorClientFactory } from './OrchestratorClientFactory.js';
+} from './OrchestratorClientConfig';
+export { OrchestratorClientFactory } from './OrchestratorClientFactory';
 
 // Testing utilities
-export { MockOrchestratorClient } from './__mocks__/MockOrchestratorClient.js';
-export { createMockOrchestrator, createMockTask, createMockWorker } from './__mocks__/MockOrchestrator.js';
-export type { MockOrchestratorOptions } from './__mocks__/MockOrchestrator.js';
+// export { MockOrchestratorClient } from './__mocks__/MockOrchestratorClient';
+// export { createMockOrchestrator, createMockTask, createMockWorker } from './__mocks__/MockOrchestrator';
+// export type { MockOrchestratorOptions } from './__mocks__/MockOrchestrator';

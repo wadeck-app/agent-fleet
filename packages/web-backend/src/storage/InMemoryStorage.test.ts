@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import type { Book } from '@app/shared';
+import type { Book } from '@app/shared/api/books.contract';
 
 import { InMemoryStorage } from './InMemoryStorage';
 

@@ -1,4 +1,4 @@
-import type { Ingredient, IngredientsListQuery } from '@app/shared';
+import type { Ingredient, IngredientsListQuery } from '@app/shared/api/ingredients.contract';
 
 import type { BaseRepository } from './BaseRepository';
 

@@ -1,6 +1,6 @@
 // Loaded by fastify/plugins/routes.plugin.ts
 // put at root level for discovery
-import { ApiUrl } from '@app/shared';
+import type { ApiUrl } from '@app/shared/route-builder';
 
 type RouteDefinition = [ApiUrl, () => Promise<any>];
 

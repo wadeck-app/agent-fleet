@@ -17,7 +17,7 @@
  *
  * @see packages/shared-frontend-backend/src/transport/TypedTransport.ts
  */
-import type { ConnectionStateHandler, ITransport, TransportType } from 'shared-frontend-backend/transport';
+import type { ConnectionStateHandler, ITransport, TransportType } from '@shared/transport';
 
 /**
  * Transport Client Interface
@@ -145,13 +145,3 @@ export interface ITransportClient extends ITransport {
 	 */
 	onConnectionStateChange(handler: ConnectionStateHandler): () => void;
 }
-
-/**
- * Re-export types from shared package for convenience
- */
-export type {
-	TransportConfig,
-	ConnectionState,
-	ConnectionStateHandler,
-	TransportType,
-} from 'shared-frontend-backend/transport';

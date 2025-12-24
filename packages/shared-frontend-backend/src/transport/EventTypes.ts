@@ -2,6 +2,9 @@ import type { Task } from '../api/tasks.contract';
 import type { Worker } from '../api/workers.contract';
 import type { Workspace } from '../api/workspaces.contract';
 
+//FIXME this whole typing structure is too complicated. I don't care to know about the abbreviation/type/action kind of things
+// it's only useful for readability.
+
 /**
  * CRUD Event Types
  * Standard lifecycle events for all resources

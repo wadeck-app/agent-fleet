@@ -3,18 +3,18 @@
  *
  * Tests for conditional step execution using the 'when' clause.
  */
+import { createMockFlow, createMockScriptStep, createMockSubFlowStep } from 'flow-engine/test-utils/factories';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { createMockFlow, createMockScriptStep, createMockSubFlowStep } from 'test-utils/index';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import type { TemplateContext } from '../processing/TemplateRenderer.js';
-import { FlowRegistry } from '../registry/FlowRegistry.js';
-import type { FlowDefinition, FlowStep, Workspace } from '../types.js';
-import { FlowExecutor } from './FlowExecutor.js';
-import { FlowOrchestrator } from './FlowOrchestrator.js';
-import { StepRunner } from './StepRunner.js';
+import type { TemplateContext } from '../processing/TemplateRenderer';
+import { FlowRegistry } from '../registry/FlowRegistry';
+import type { FlowDefinition, FlowStep, Workspace } from '../types';
+import { FlowExecutor } from './FlowExecutor';
+import { FlowOrchestrator } from './FlowOrchestrator';
+import { StepRunner } from './StepRunner';
 
 describe('FlowOrchestrator - when condition', () => {
 	let orchestrator: FlowOrchestrator;

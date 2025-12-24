@@ -64,7 +64,7 @@ export interface ErrorResponse {
  * ERROR CODES - Machine-readable error identifiers
  * ===========================================================================================
  */
-
+//FIXME no need to have code PER entity... that's a waste of code/time/readability
 export const ERROR_CODES = {
 	// 400 - Bad Request
 	BAD_REQUEST: 'BAD_REQUEST',

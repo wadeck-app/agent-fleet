@@ -3,7 +3,7 @@
  *
  * Validates DAG structure for cycles, unreachable steps, and other issues.
  */
-import type { DAG } from '../types.js';
+import type { DAG } from '../types';
 
 /**
  * Validation issue severity levels
@@ -13,7 +13,7 @@ export type ValidationSeverity = 'error' | 'warning';
 /**
  * A single validation issue
  */
-export interface ValidationIssue {
+export interface DAGValidationIssue {
 	/** Severity level */
 	severity: ValidationSeverity;
 
@@ -35,13 +35,13 @@ export interface ValidationResult {
 	valid: boolean;
 
 	/** List of validation issues */
-	issues: ValidationIssue[];
+	issues: DAGValidationIssue[];
 
 	/** Error issues only */
-	errors: ValidationIssue[];
+	errors: DAGValidationIssue[];
 
 	/** Warning issues only */
-	warnings: ValidationIssue[];
+	warnings: DAGValidationIssue[];
 }
 
 /**
@@ -55,7 +55,7 @@ export class DAGValidator {
 	 * @returns Validation result
 	 */
 	public validate(dag: DAG): ValidationResult {
-		const issues: ValidationIssue[] = [];
+		const issues: DAGValidationIssue[] = [];
 
 		// Check for cycles
 		const cycles = this.detectCycles(dag);

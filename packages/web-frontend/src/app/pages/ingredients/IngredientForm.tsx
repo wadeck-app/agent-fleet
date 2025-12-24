@@ -3,7 +3,7 @@ import { IntegerField } from '@framework/features/forms/fields/IntegerField';
 import { NumberField } from '@framework/features/forms/fields/NumberField';
 import { TextField } from '@framework/features/forms/fields/TextField';
 import { useFormState } from '@framework/features/forms/useFormState';
-import type { CreateIngredient } from '@shared';
+import type { CreateIngredient } from '@shared/api/ingredients.contract';
 
 import { ingredientsService } from './IngredientsService';
 

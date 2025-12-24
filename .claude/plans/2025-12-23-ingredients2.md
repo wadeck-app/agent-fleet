@@ -646,7 +646,7 @@ packages/web-frontend/src/app/pages/ingredients2/
 ```typescript
 import { Table2 } from '@framework/components2/table/Table2';
 import { ColumnHelpers } from '@framework/utils/table/ColumnHelpers';
-import type { Ingredient } from '@shared';
+import type { Ingredient } from '@shared/api/ingredients.contract';
 
 export const INGREDIENT_TABLE2_COLUMNS = [
   ...ColumnHelpers.metadata(),
@@ -710,7 +710,7 @@ import { Data2 } from '@framework/components2/data/Data2';
 import { IngredientTable2 } from './IngredientTable2';
 import { SearchInput } from '@framework/components/search/SearchInput';
 import { Select } from '@framework/components/forms/Select';
-import type { IngredientsListQuery, Ingredient } from '@shared';
+import type { IngredientsListQuery, Ingredient } from '@shared/api/ingredients.contract';
 
 const AVAILABLE_CATEGORIES = [
   'Protein', 'Vegetable', 'Fruit', 'Grain', 'Dairy', 'Fat/Oil', 'Spice', 'Other',

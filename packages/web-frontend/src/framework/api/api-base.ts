@@ -1,4 +1,5 @@
-import type { HttpMethod, PathsForMethod, RouteBody, RouteParams, RouteQuery, RouteResponse } from '@shared';
+import type { HttpMethod } from '@shared/route-builder';
+import type { PathsForMethod, RouteBody, RouteParams, RouteQuery, RouteResponse } from '@shared/types';
 
 import { API_BASE_URL } from '@app/api/config';
 import { circuitBreakerService } from '@app/services';

@@ -1,15 +1,16 @@
 /**
  * WebSocketConnectionManager Tests
  */
-import { Logger } from 'shared-common/Logger.js';
-import { StateManager } from 'shared-common/StateManager.js';
-import { createMessage, serializeMessage } from 'shared-common/protocol.js';
-import { MessageType, Task, TaskStatus, WorkerReadyMessage, WorkerType } from 'shared-orch-worker/index.js';
-import { setupTest } from 'test-utils/index';
+import { logger } from 'shared-common/logger';
+import { createMessage, serializeMessage } from 'shared-common/protocol';
+import { StateManager } from 'shared-orch-worker/StateManager';
+import { Task, TaskStatus } from 'shared-orch-worker/domain-types';
+import { O2WMessageType } from 'shared-orch-worker/orchestrator-messages';
+import { W2OMessageType, W2OWorkerReadyMessage } from 'shared-orch-worker/worker-messages';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { TaskManager } from '../core/TaskManager.js';
-import { WebSocketConnectionManager } from './WebSocketConnectionManager.js';
+import { TaskManager } from '../core/TaskManager';
+import { WebSocketConnectionManager } from './WebSocketConnectionManager';
 
 // Mock WebSocket class
 class MockWebSocket {
@@ -34,9 +35,9 @@ class MockWebSocket {
 }
 
 // Mock dependencies
-vi.mock('./TaskManager.js');
-vi.mock('shared-common/StateManager.js');
-vi.mock('shared-common/Logger.js');
+vi.mock('./TaskManager');
+vi.mock('shared-common/StateManager');
+vi.mock('shared-common/logger');
 
 describe('WebSocketConnectionManager', () => {
 	let connectionManager: WebSocketConnectionManager;
@@ -66,8 +67,8 @@ describe('WebSocketConnectionManager', () => {
 			emitTaskUpdated: vi.fn(),
 		} as any;
 
-		vi.mocked(Logger.log).mockImplementation(() => {});
-		vi.mocked(Logger.error).mockImplementation(() => {});
+		vi.mocked(logger.info).mockImplementation(() => {});
+		vi.mocked(logger.error).mockImplementation(() => {});
 
 		// Create connection manager
 		connectionManager = new WebSocketConnectionManager(mockTaskManager, mockStateManager);
@@ -81,8 +82,8 @@ describe('WebSocketConnectionManager', () => {
 		});
 
 		it('should register worker with auto-increment ID', () => {
-			const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+				// workerType: WorkerType.DEV,
 				projectId: 'test-project',
 				workspacePath: '/test/path',
 				availableFlows: [],
@@ -94,15 +95,15 @@ describe('WebSocketConnectionManager', () => {
 			expect(mockStateManager.emitWorkerConnected).toHaveBeenCalledWith(
 				expect.objectContaining({
 					id: '2',
-					type: WorkerType.DEV,
+					// type: WorkerType.DEV,
 					taskId: null,
 				})
 			);
 		});
 
 		it('should register worker with preferred ID', () => {
-			const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+				// workerType: WorkerType.DEV,
 				preferredId: 'preferred-worker-1',
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -115,15 +116,15 @@ describe('WebSocketConnectionManager', () => {
 			expect(mockStateManager.emitWorkerConnected).toHaveBeenCalledWith(
 				expect.objectContaining({
 					id: 'preferred-worker-1',
-					type: WorkerType.DEV,
+					// type: WorkerType.DEV,
 				})
 			);
 		});
 
 		it('should use auto-increment when preferred ID is taken', () => {
 			const mockSocket1 = new MockWebSocket();
-			const readyMessage1: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage1: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+				// workerType: WorkerType.DEV,
 				preferredId: 'preferred-id',
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -132,8 +133,8 @@ describe('WebSocketConnectionManager', () => {
 			connectionManager.handleWorkerReady(mockSocket1 as any, readyMessage1);
 
 			const mockSocket2 = new MockWebSocket();
-			const readyMessage2: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.PM,
+			const readyMessage2: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+				// workerType: WorkerType.PM,
 				preferredId: 'preferred-id',
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -142,14 +143,14 @@ describe('WebSocketConnectionManager', () => {
 			const workerId = connectionManager.handleWorkerReady(mockSocket2 as any, readyMessage2);
 
 			expect(workerId).not.toBe('preferred-id');
-			expect(Logger.log).toHaveBeenCalledWith(
+			expect(logger.info).toHaveBeenCalledWith(
 				expect.stringContaining("Preferred ID 'preferred-id' already taken")
 			);
 		});
 
 		it('should send WORKER_WELCOME message', () => {
-			const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+				// workerType: WorkerType.DEV,
 				projectId: 'test-project',
 				workspacePath: '/test/path',
 				availableFlows: [],
@@ -159,7 +160,7 @@ describe('WebSocketConnectionManager', () => {
 
 			expect(mockSocket.send).toHaveBeenCalled();
 			const sentMessage = JSON.parse(mockSocket.send.mock.calls[0][0]);
-			expect(sentMessage.type).toBe(MessageType.WORKER_WELCOME);
+			expect(sentMessage.type).toBe(O2WMessageType.WORKER_WELCOME);
 			expect(sentMessage.workerId).toBeDefined();
 		});
 	});
@@ -172,8 +173,8 @@ describe('WebSocketConnectionManager', () => {
 		});
 
 		it('should try to assign task after worker ready', async () => {
-			const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+				// workerType: WorkerType.DEV,
 				projectId: 'test-project',
 				workspacePath: '/test/path',
 				availableFlows: [],
@@ -186,25 +187,26 @@ describe('WebSocketConnectionManager', () => {
 			// Give async operation time to complete
 			await new Promise(resolve => setTimeout(resolve, 10));
 
-			expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith(expect.anything(), WorkerType.DEV);
+			// expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith(expect.anything(), WorkerType.DEV);
+			expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith(expect.anything());
 		});
 
-		it('should handle different worker types', () => {
-			const workerTypes = [WorkerType.DEV, WorkerType.PM, WorkerType.PO, WorkerType.REVIEWER];
-
-			workerTypes.forEach(type => {
-				const socket = new MockWebSocket();
-				const message: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-					workerType: type,
-					projectId: 'test-project',
-					workspacePath: '/test/path',
-					availableFlows: [],
-				});
-				connectionManager.handleWorkerReady(socket as any, message);
-
-				expect(mockStateManager.emitWorkerConnected).toHaveBeenCalledWith(expect.objectContaining({ type }));
-			});
-		});
+		// it('should handle different worker types', () => {
+		// 	const workerTypes = [WorkerType.DEV, WorkerType.PM, WorkerType.PO, WorkerType.REVIEWER];
+		//
+		// 	workerTypes.forEach(type => {
+		// 		const socket = new MockWebSocket();
+		// 		const message: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
+		// 			workerType: type,
+		// 			projectId: 'test-project',
+		// 			workspacePath: '/test/path',
+		// 			availableFlows: [],
+		// 		});
+		// 		connectionManager.handleWorkerReady(socket as any, message);
+		//
+		// 		expect(mockStateManager.emitWorkerConnected).toHaveBeenCalledWith(expect.objectContaining({ type }));
+		// 	});
+		// });
 	});
 
 	describe('Task Assignment', () => {
@@ -215,8 +217,8 @@ describe('WebSocketConnectionManager', () => {
 			mockSocket = new MockWebSocket();
 
 			// Register worker
-			const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+				// workerType: WorkerType.DEV,
 				preferredId: 'worker-1',
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -232,7 +234,8 @@ describe('WebSocketConnectionManager', () => {
 				priority: 'medium',
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
-				assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+				// assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+				assignedTo: { workerId: 'worker-1' },
 				comments: [],
 				metadata: {},
 				history: [],
@@ -244,7 +247,8 @@ describe('WebSocketConnectionManager', () => {
 
 			await connectionManager.tryAssignTasksToIdleWorkers();
 
-			expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith('worker-1', WorkerType.DEV);
+			// expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith('worker-1', WorkerType.DEV);
+			expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith('worker-1');
 		});
 
 		it('should send ASSIGN_TASK message to worker', async () => {
@@ -254,7 +258,7 @@ describe('WebSocketConnectionManager', () => {
 
 			expect(mockSocket.send).toHaveBeenCalled();
 			const sentMessage = JSON.parse(mockSocket.send.mock.calls[0][0]);
-			expect(sentMessage.type).toBe(MessageType.ASSIGN_TASK);
+			expect(sentMessage.type).toBe(O2WMessageType.ASSIGN_TASK);
 			expect(sentMessage.task).toEqual(mockTask);
 		});
 
@@ -271,7 +275,7 @@ describe('WebSocketConnectionManager', () => {
 
 			await connectionManager.tryAssignTasksToIdleWorkers();
 
-			expect(Logger.log).toHaveBeenCalledWith('[WS] Assigned task task-1 to worker worker-1');
+			expect(logger.info).toHaveBeenCalledWith('[WS] Assigned task task-1 to worker worker-1');
 		});
 
 		it('should handle no available task', async () => {
@@ -279,7 +283,7 @@ describe('WebSocketConnectionManager', () => {
 
 			await connectionManager.tryAssignTasksToIdleWorkers();
 
-			expect(Logger.log).toHaveBeenCalledWith(expect.stringContaining('No task available'));
+			expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('No task available'));
 		});
 
 		it('should not assign task to busy worker', async () => {
@@ -304,8 +308,8 @@ describe('WebSocketConnectionManager', () => {
 
 		it('should return workers list after connections', () => {
 			const mockSocket1 = new MockWebSocket();
-			const readyMessage1: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage1: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+				// workerType: WorkerType.DEV,
 				preferredId: 'worker-1',
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -314,8 +318,8 @@ describe('WebSocketConnectionManager', () => {
 			connectionManager.handleWorkerReady(mockSocket1 as any, readyMessage1);
 
 			const mockSocket2 = new MockWebSocket();
-			const readyMessage2: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.PM,
+			const readyMessage2: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+				// workerType: WorkerType.PM,
 				preferredId: 'worker-2',
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -331,8 +335,8 @@ describe('WebSocketConnectionManager', () => {
 
 		it('should not include socket in workers list', () => {
 			const mockSocket = new MockWebSocket();
-			const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+				// workerType: WorkerType.DEV,
 				preferredId: 'worker-1',
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -346,8 +350,8 @@ describe('WebSocketConnectionManager', () => {
 
 		it('should track worker task assignment', async () => {
 			const mockSocket = new MockWebSocket();
-			const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+				// workerType: WorkerType.DEV,
 				preferredId: 'worker-1',
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -362,7 +366,8 @@ describe('WebSocketConnectionManager', () => {
 				priority: 'medium',
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
-				assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+				// assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+				assignedTo: { workerId: 'worker-1' },
 				comments: [],
 				metadata: {},
 				history: [],
@@ -380,8 +385,8 @@ describe('WebSocketConnectionManager', () => {
 			// Create 3 workers
 			for (let i = 1; i <= 3; i++) {
 				const mockSocket = new MockWebSocket();
-				const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-					workerType: WorkerType.DEV,
+				const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+					// workerType: WorkerType.DEV,
 					preferredId: `worker-${i}`,
 					projectId: 'test-project',
 					workspacePath: '/test/path',
@@ -400,7 +405,8 @@ describe('WebSocketConnectionManager', () => {
 				priority: 'medium',
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
-				assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+				// assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+				assignedTo: { workerId: 'worker-1' },
 				comments: [],
 				metadata: {},
 				history: [],
@@ -416,8 +422,8 @@ describe('WebSocketConnectionManager', () => {
 		it('should not assign tasks to busy workers', async () => {
 			// Create worker and assign task
 			const mockSocket = new MockWebSocket();
-			const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+				// workerType: WorkerType.DEV,
 				preferredId: 'worker-1',
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -432,7 +438,8 @@ describe('WebSocketConnectionManager', () => {
 				priority: 'medium',
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
-				assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+				// assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+				assignedTo: { workerId: 'worker-1' },
 				comments: [],
 				metadata: {},
 				history: [],
@@ -454,8 +461,8 @@ describe('WebSocketConnectionManager', () => {
 
 		beforeEach(() => {
 			mockSocket = new MockWebSocket();
-			const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+				// workerType: WorkerType.DEV,
 				preferredId: 'worker-1',
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -468,7 +475,7 @@ describe('WebSocketConnectionManager', () => {
 			connectionManager.handleWorkerDisconnect('worker-1');
 
 			expect(mockStateManager.emitWorkerDisconnected).toHaveBeenCalledWith('worker-1');
-			expect(Logger.log).toHaveBeenCalledWith('[WS] Worker worker-1 disconnected');
+			expect(logger.info).toHaveBeenCalledWith('[WS] Worker worker-1 disconnected');
 		});
 
 		it('should unassign task on worker disconnect with active task', async () => {
@@ -480,7 +487,8 @@ describe('WebSocketConnectionManager', () => {
 				priority: 'medium',
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
-				assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+				// assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+				assignedTo: { workerId: 'worker-1' },
 				comments: [],
 				metadata: {},
 				history: [],
@@ -503,7 +511,8 @@ describe('WebSocketConnectionManager', () => {
 				priority: 'medium',
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
-				assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+				// assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+				assignedTo: { workerId: 'worker-1' },
 				comments: [],
 				metadata: {},
 				history: [],
@@ -517,7 +526,7 @@ describe('WebSocketConnectionManager', () => {
 
 			connectionManager.handleWorkerDisconnect('worker-1');
 
-			expect(Logger.error).toHaveBeenCalledWith(expect.stringContaining('Error unassigning task'));
+			expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Error unassigning task'));
 		});
 
 		it('should remove worker from workers list on disconnect', () => {
@@ -534,8 +543,8 @@ describe('WebSocketConnectionManager', () => {
 	describe('releaseWorker', () => {
 		it('should release worker and try to assign new task', async () => {
 			const mockSocket = new MockWebSocket();
-			const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+				// workerType: WorkerType.DEV,
 				preferredId: 'worker-1',
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -551,7 +560,8 @@ describe('WebSocketConnectionManager', () => {
 				priority: 'medium',
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
-				assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+				// assignedTo: { workerId: 'worker-1', workerType: WorkerType.DEV },
+				assignedTo: { workerId: 'worker-1' },
 				comments: [],
 				metadata: {},
 				history: [],
@@ -570,15 +580,16 @@ describe('WebSocketConnectionManager', () => {
 			// Give async operation time to complete
 			await new Promise(resolve => setTimeout(resolve, 10));
 
-			expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith('worker-1', WorkerType.DEV);
+			// expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith('worker-1', WorkerType.DEV);
+			expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith('worker-1');
 		});
 	});
 
 	describe('closeAll', () => {
 		it('should close all worker connections', () => {
 			const mockSocket1 = new MockWebSocket();
-			const readyMessage1: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage1: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+				// workerType: WorkerType.DEV,
 				projectId: 'test-project',
 				workspacePath: '/test/path',
 				availableFlows: [],
@@ -586,8 +597,8 @@ describe('WebSocketConnectionManager', () => {
 			connectionManager.handleWorkerReady(mockSocket1 as any, readyMessage1);
 
 			const mockSocket2 = new MockWebSocket();
-			const readyMessage2: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.PM,
+			const readyMessage2: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+				// workerType: WorkerType.PM,
 				projectId: 'test-project',
 				workspacePath: '/test/path',
 				availableFlows: [],
@@ -602,8 +613,8 @@ describe('WebSocketConnectionManager', () => {
 
 		it('should clear workers list', () => {
 			const mockSocket = new MockWebSocket();
-			const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+				// workerType: WorkerType.DEV,
 				projectId: 'test-project',
 				workspacePath: '/test/path',
 				availableFlows: [],
@@ -621,8 +632,8 @@ describe('WebSocketConnectionManager', () => {
 	describe('getWorker', () => {
 		it('should return worker by ID', () => {
 			const mockSocket = new MockWebSocket();
-			const readyMessage: WorkerReadyMessage = createMessage(MessageType.WORKER_READY, {
-				workerType: WorkerType.DEV,
+			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+				// workerType: WorkerType.DEV,
 				preferredId: 'worker-1',
 				projectId: 'test-project',
 				workspacePath: '/test/path',

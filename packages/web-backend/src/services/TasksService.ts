@@ -1,6 +1,6 @@
-import { getOrchestratorRestUrl } from 'shared-common/PortCalculator.js';
+import { getOrchestratorRestUrl } from 'shared-common/PortCalculator';
 
-import type { Task, TasksData, TasksQuery } from '@app/shared';
+import type { Task, TasksData, TasksQuery } from '@app/shared/api/tasks.contract';
 
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';

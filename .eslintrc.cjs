@@ -61,8 +61,8 @@ module.exports = {
 						from: './packages',
 						except: [
 							'shared-frontend-backend/src',
-							'shared-orch-backend/src',
 							'shared-common/src',
+							'flow-engine/src',
 							'test-utils/src',
 						],
 					},

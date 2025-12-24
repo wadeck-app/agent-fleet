@@ -12,8 +12,8 @@
  * - steps.*.outputs.* (step outputs)
  * - task.* (task metadata)
  */
-import type { FlowDefinition } from '../types.js';
-import { type IssueCollector, ValidationCode, type VariableReference } from './ValidationTypes.js';
+import type { FlowDefinition } from '../types';
+import { type IssueCollector, ValidationCode, type VariableReference } from './ValidationTypes';
 
 /**
  * Validates template expressions and variable references in flows

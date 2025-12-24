@@ -1,5 +1,3 @@
-import type { BaseEntity } from '@app/shared';
-
 /**
  * ===========================================================================================
  * QUERY BUILDER INTERFACE
@@ -12,6 +10,7 @@ import type { BaseEntity } from '@app/shared';
  *
  * ===========================================================================================
  */
+import type { BaseEntity } from '@app/shared/common/base-entity';
 
 export type QueryOperator = '=' | '!=' | '>' | '>=' | '<' | '<=' | 'in' | 'contains';
 export type SortOrder = 'ASC' | 'DESC';

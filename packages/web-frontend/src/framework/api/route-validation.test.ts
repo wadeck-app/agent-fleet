@@ -1,4 +1,5 @@
-import { BOOKS_API_ROUTES, INGREDIENTS_API_ROUTES } from '@shared';
+import { BOOKS_API_ROUTES } from '@shared/api/books.contract';
+import { INGREDIENTS_API_ROUTES } from '@shared/api/ingredients.contract';
 import { describe, expect, it } from 'vitest';
 
 import { booksApi } from '@app/pages/books/books.api';

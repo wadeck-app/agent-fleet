@@ -1,7 +1,7 @@
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 import { withMetadata } from '@framework/tests/withMetadata';
-import type { Book } from '@shared';
+import type { Book } from '@shared/api/books.contract';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

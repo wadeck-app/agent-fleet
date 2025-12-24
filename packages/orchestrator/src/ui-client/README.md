@@ -22,7 +22,7 @@ Protocol definition for UI ↔ Orchestrator WebSocket communication.
 **Usage in UI Backend:**
 
 ```typescript
-import { UIMessage, UIMessageType, createUIMessage, parseUIMessage } from './types.js';
+import { UIMessage, UIMessageType, createUIMessage, parseUIMessage } from './types';
 
 // Create a message
 const message = createUIMessage<UIStartFlowMessage>(UIMessageType.START_FLOW, {
@@ -174,7 +174,7 @@ import {
 import {
   UIMessageType,
   UIMessage
-} from './protocol/types.js'; // Copied from orchestrator
+} from './protocol/types'; // Copied from orchestrator
 ```
 
 ## Testing
@@ -191,7 +191,7 @@ Example:
 ```typescript
 import { describe, expect, it } from 'vitest';
 
-import { UIMessageType, createUIMessage } from './types.js';
+import { UIMessageType, createUIMessage } from './types';
 
 describe('UI Protocol', () => {
 	it('should create message with timestamp', () => {

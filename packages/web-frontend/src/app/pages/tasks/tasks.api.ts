@@ -1,6 +1,6 @@
 import { createTypedFetch } from '@framework/api/api-base';
-import type { TasksData, TasksQuery } from '@shared';
-import { TASKS_API_ROUTES } from '@shared';
+import { TASKS_API_ROUTES } from '@shared/api/tasks.contract';
+import type { TasksData, TasksQuery } from '@shared/api/tasks.contract';
 
 /**
  * ===========================================================================================

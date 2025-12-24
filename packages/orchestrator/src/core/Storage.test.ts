@@ -1,14 +1,15 @@
 /**
  * Storage Tests
  */
-import fs from 'fs';
-import path from 'path';
-import { createMockTask, directoryExists, fileExists } from 'test-utils/index';
+import * as fs from 'fs';
+import { createMockTask } from 'orchestrator/test-utils/MockOrchestrator';
+import * as path from 'path';
+import { Task, TaskStatus } from 'shared-orch-worker/domain-types';
+import { directoryExists, fileExists } from 'test-utils/helpers';
 import { fileURLToPath } from 'url';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { Storage } from './Storage.js';
-import { Task, TaskStatus } from './types.js';
+import { Storage } from './Storage';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

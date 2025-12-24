@@ -8,16 +8,16 @@
  * StepRunner (68% coverage) and FlowOrchestrator (68% coverage).
  * Integration tests in the full system provide end-to-end coverage.
  */
-import { setupTest } from 'test-utils/index';
+import { setupTest } from 'test-utils/helpers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { FlowExecutionError, FlowExecutor } from './FlowExecutor.js';
-import { FlowOrchestrator } from './FlowOrchestrator.js';
-import { StepRunner } from './StepRunner.js';
+import { FlowExecutionError, FlowExecutor } from './FlowExecutor';
+import { FlowOrchestrator } from './FlowOrchestrator';
+import { StepRunner } from './StepRunner';
 
 // Mock dependencies
-vi.mock('./StepRunner.js');
-vi.mock('./FlowOrchestrator.js');
+vi.mock('./StepRunner');
+vi.mock('./FlowOrchestrator');
 
 describe('FlowExecutor', () => {
 	let cleanup: () => void;

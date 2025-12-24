@@ -1,4 +1,4 @@
-import type { TasksData } from '@shared';
+import type { TasksData } from '@shared/api/tasks.contract';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -41,7 +41,6 @@ describe('TasksPage', () => {
 				updatedAt: '2025-12-21T09:30:00Z',
 				assignedWorker: {
 					workerId: 'worker-1',
-					workerType: 'dev',
 				},
 			},
 			{
@@ -53,7 +52,6 @@ describe('TasksPage', () => {
 				updatedAt: '2025-12-21T09:00:00Z',
 				assignedWorker: {
 					workerId: 'worker-2',
-					workerType: 'reviewer',
 				},
 			},
 		],

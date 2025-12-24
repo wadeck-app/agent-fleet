@@ -3,8 +3,6 @@
 	"version": "1.0.0",
 	"private": true,
 	"type": "module",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
 		"dev": "nodemon --watch src --watch ../shared-orch-worker/src --watch ../shared-common/src --exec tsx src/core/index.ts",
@@ -12,7 +10,7 @@
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
 		"lint": "echo 'No ESLint configured for orchestrator'",
-		"clean": "rimraf dist"
+		"clean": "rimraf dist dist-types"
 	},
 	"dependencies": {
 		"express": "^4.18.2",

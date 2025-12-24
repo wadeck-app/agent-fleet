@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { ConditionEvaluator } from './ConditionEvaluator.js';
+import { ConditionEvaluator } from './ConditionEvaluator';
 
 describe('ConditionEvaluator', () => {
 	const evaluator = new ConditionEvaluator();

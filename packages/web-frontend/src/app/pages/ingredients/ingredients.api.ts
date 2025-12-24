@@ -1,5 +1,5 @@
 import { createApiClient, createTypedFetch } from '@framework/api/api-base';
-import { INGREDIENTS_API_ROUTES, type IngredientsListQuery } from '@shared';
+import { INGREDIENTS_API_ROUTES, type IngredientsListQuery } from '@shared/api/ingredients.contract';
 
 const api = createApiClient(INGREDIENTS_API_ROUTES);
 const typedFetch = createTypedFetch(INGREDIENTS_API_ROUTES);

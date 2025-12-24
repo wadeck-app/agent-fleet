@@ -6,10 +6,10 @@
  * - Test 2.1-2.5: Query operations
  * - Test 3.1-3.6: Update and unregister operations
  */
-import { FlowMetadata } from 'flow-engine/types.js';
+import { FlowMetadata } from 'flow-engine/types';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { FlowDiscoveryRegistry, FlowVersionMismatchError, WorkerFlowEntry } from './FlowDiscoveryRegistry.js';
+import { FlowDiscoveryRegistry, FlowVersionMismatchError, WorkerFlowEntry } from './FlowDiscoveryRegistry';
 
 // Helper to create test flow metadata
 function createFlowMetadata(

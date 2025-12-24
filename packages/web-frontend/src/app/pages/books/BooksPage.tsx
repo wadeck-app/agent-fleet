@@ -20,7 +20,7 @@ import { toColumnVisibilityDefs } from '@framework/utils/table/ColumnConfig';
 import { extractColumnIds } from '@framework/utils/table/ColumnConfig';
 import { extractDefaultVisible } from '@framework/utils/table/ColumnConfig';
 import { extractCanHideConstraints } from '@framework/utils/table/ColumnConfig';
-import type { Book } from '@shared';
+import type { Book } from '@shared/api/books.contract';
 import { BookOpen, Plus, Trash2 } from 'lucide-react';
 
 import { BookDialog, BulkDeleteWorkflow } from '@app/components/domain';

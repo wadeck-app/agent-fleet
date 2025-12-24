@@ -1,6 +1,3 @@
-import type { OrchestratorStats } from 'shared-orch-worker/index.js';
-import { OrchestratorStatsSchema } from 'shared-orch-worker/index.js';
-
 /**
  * ===========================================================================================
  * ORCHESTRATOR REPOSITORY
@@ -18,6 +15,9 @@ import { OrchestratorStatsSchema } from 'shared-orch-worker/index.js';
  *
  * ===========================================================================================
  */
+import { type OrchestratorStats, OrchestratorStatsSchema } from 'shared-orch-worker/domain-types';
+
+//FIXME remove cache !
 
 /**
  * Cache entry structure

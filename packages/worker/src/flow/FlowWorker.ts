@@ -9,33 +9,32 @@
  * - Task assignment and execution coordination
  * - Flow execution orchestration
  */
-import { exec } from 'child_process';
+import { ChildProcess } from 'child_process';
 import dotenv from 'dotenv';
-import { FlowExecutionOptions, FlowExecutor } from 'flow-engine/executor/FlowExecutor.js';
-import { FlowRegistry } from 'flow-engine/registry/FlowRegistry.js';
-import type { FlowMetadata, Workspace } from 'flow-engine/types.js';
-import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager.js';
+import { type FlowExecutionOptions, FlowExecutor } from 'flow-engine/executor/FlowExecutor';
+import { FlowRegistry } from 'flow-engine/registry/FlowRegistry';
+import type { FlowMetadata, Workspace } from 'flow-engine/types';
+import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { getOrchestratorWsUrl } from 'shared-common/PortCalculator.js';
-import { Shutdownable } from 'shared-common/Shutdownable.js';
-import { createMessage, parseMessage, serializeMessage } from 'shared-common/protocol.js';
+import { getOrchestratorWsUrl } from 'shared-common/PortCalculator';
+import type { Shutdownable } from 'shared-common/Shutdownable';
+import { createMessage, parseMessage, serializeMessage } from 'shared-common/protocol';
+import { type Task, TaskStatus } from 'shared-orch-worker/domain-types';
 import {
-	AssignTaskMessage,
-	KillClaudeMessage,
-	Message,
-	MessageType,
-	Task,
-	TaskStatus,
-	WorkerType,
-	WorkerWelcomeMessage,
-} from 'shared-orch-worker/index.js';
+	type AssignTaskMessage,
+	type KillClaudeMessage,
+	type O2WMessage,
+	O2WMessageType,
+	type WorkerWelcomeMessage,
+} from 'shared-orch-worker/orchestrator-messages';
+import { type W2OMessage, W2OMessageType } from 'shared-orch-worker/worker-messages';
 import { fileURLToPath } from 'url';
 import WebSocket from 'ws';
 
-import { ClaudeLifecycleManager } from './ClaudeLifecycleManager.js';
-import { FlowExecutionMonitor } from './FlowExecutionMonitor.js';
-import { WorkerUIManager } from './WorkerUIManager.js';
+import { ClaudeLifecycleManager } from './ClaudeLifecycleManager';
+
+// import { FlowExecutionMonitor } from './FlowExecutionMonitor';
 
 /**
  * Flow Worker class (Refactored)
@@ -43,7 +42,6 @@ import { WorkerUIManager } from './WorkerUIManager.js';
 export class FlowWorker implements Shutdownable {
 	// Worker identity
 	protected workerId: string;
-	protected workerType: WorkerType;
 	protected preferredWorkerId?: string;
 
 	// WebSocket connection to orchestrator
@@ -67,8 +65,7 @@ export class FlowWorker implements Shutdownable {
 
 	// Specialized managers (extracted from god class)
 	private claudeProcessManager: ClaudeLifecycleManager;
-	private flowExecutionMonitor: FlowExecutionMonitor;
-	private workerUIManager: WorkerUIManager;
+	// private flowExecutionMonitor: FlowExecutionMonitor;
 
 	/**
 	 * Initialize the Flow Worker
@@ -87,7 +84,6 @@ export class FlowWorker implements Shutdownable {
 	) {
 		// Worker identity
 		this.workerId = '?'; // Will be assigned by orchestrator during Welcome
-		this.workerType = WorkerType.DEV;
 		this.wsUrl = wsUrl || getOrchestratorWsUrl('localhost', '/ws');
 		this.preferredWorkerId = preferredWorkerId;
 
@@ -100,8 +96,7 @@ export class FlowWorker implements Shutdownable {
 
 		// Initialize specialized managers
 		this.claudeProcessManager = new ClaudeLifecycleManager(this.logPrefix());
-		this.flowExecutionMonitor = new FlowExecutionMonitor();
-		this.workerUIManager = new WorkerUIManager(enableUI);
+		// this.flowExecutionMonitor = new FlowExecutionMonitor();
 
 		// Setup Claude message handler
 		this.claudeProcessManager.setMessageHandler(message => {
@@ -112,11 +107,6 @@ export class FlowWorker implements Shutdownable {
 		this.flowRegistry = new FlowRegistry(projectRoot);
 		this.flowExecutor = new FlowExecutor(interactive, this.flowRegistry);
 		this.workspaceManager = new WorkspaceManager(projectRoot);
-
-		// Initialize UI if enabled
-		if (enableUI) {
-			this.workerUIManager.initialize(this.workerId, this.wsUrl, this);
-		}
 
 		// Load project flows
 		this.loadFlows();
@@ -142,15 +132,12 @@ export class FlowWorker implements Shutdownable {
 				this.sendWorkerReady();
 				this.startHeartbeat();
 
-				// Start UI after connection
-				this.workerUIManager.start();
-
 				resolve();
 			});
 
 			this.ws.on('message', (data: Buffer) => {
 				try {
-					const message = parseMessage(data.toString());
+					const message = parseMessage(data.toString()) as O2WMessage;
 					this.handleMessage(message);
 				} catch (error) {
 					console.error(`${this.logPrefix()} Error parsing message:`, (error as Error).message);
@@ -160,7 +147,6 @@ export class FlowWorker implements Shutdownable {
 			this.ws.on('close', () => {
 				console.log(`${this.logPrefix()} Disconnected`);
 				this.stopHeartbeat();
-				this.workerUIManager.setConnected(false);
 				this.scheduleReconnect();
 			});
 
@@ -240,8 +226,7 @@ export class FlowWorker implements Shutdownable {
 		const availableFlows = this.buildFlowMetadata();
 
 		this.sendMessage(
-			createMessage(MessageType.WORKER_READY, {
-				workerType: this.workerType,
+			createMessage(W2OMessageType.WORKER_READY, {
 				preferredId: this.preferredWorkerId,
 				projectId,
 				workspacePath,
@@ -256,7 +241,7 @@ export class FlowWorker implements Shutdownable {
 	private startHeartbeat(): void {
 		this.heartbeatTimer = setInterval(() => {
 			this.sendMessage(
-				createMessage(MessageType.WORKER_HEARTBEAT, {
+				createMessage(W2OMessageType.WORKER_HEARTBEAT, {
 					workerId: this.workerId,
 				})
 			);
@@ -296,35 +281,35 @@ export class FlowWorker implements Shutdownable {
 	/**
 	 * Handle incoming message from orchestrator
 	 */
-	private handleMessage(message: Message): void {
+	private handleMessage(message: O2WMessage): void {
 		switch (message.type) {
-			case MessageType.ACK:
+			case O2WMessageType.ACK:
 				// Acknowledgment received
 				break;
 
-			case MessageType.WORKER_WELCOME:
+			case O2WMessageType.WORKER_WELCOME:
 				this.handleWelcome(message as WorkerWelcomeMessage);
 				break;
 
-			case MessageType.ASSIGN_TASK:
+			case O2WMessageType.ASSIGN_TASK:
 				this.handleAssignTask(message as AssignTaskMessage);
 				break;
 
-			case MessageType.KILL_CLAUDE:
+			case O2WMessageType.KILL_CLAUDE:
 				this.handleKillClaude(message as KillClaudeMessage);
 				break;
 
-			case MessageType.PAUSE:
+			case O2WMessageType.PAUSE:
 				console.log(`${this.logPrefix()} Received PAUSE`);
 				// TODO: Implement pause logic
 				break;
 
-			case MessageType.RESUME:
+			case O2WMessageType.RESUME:
 				console.log(`${this.logPrefix()} Received RESUME`);
 				// TODO: Implement resume logic
 				break;
 
-			case MessageType.SHUTDOWN:
+			case O2WMessageType.SHUTDOWN:
 				console.log(`${this.logPrefix()} Received SHUTDOWN`);
 				this.shutdown();
 				break;
@@ -342,9 +327,6 @@ export class FlowWorker implements Shutdownable {
 		process.title = `Worker ${this.workerId}`;
 
 		console.log(`${this.logPrefix()} Welcome received with assigned id=${message.workerId}`);
-
-		// Update UI with actual worker ID
-		this.workerUIManager.updateWorkerId(message.workerId);
 
 		// Request a task now that we're connected
 		this.sendRequestTask();
@@ -459,7 +441,7 @@ export class FlowWorker implements Shutdownable {
 		const projectId = this.detectProjectId();
 
 		this.sendMessage(
-			createMessage(MessageType.FLOWS_UPDATED, {
+			createMessage(W2OMessageType.FLOWS_UPDATED, {
 				workerId: this.workerId,
 				projectId,
 				flows,
@@ -496,21 +478,21 @@ export class FlowWorker implements Shutdownable {
 	 * Start monitoring execution trace and update UI
 	 */
 	private startTraceMonitoring(taskId: string): NodeJS.Timeout {
-		const stateManager = this.workerUIManager.getStateManager();
-		if (!stateManager) {
-			// No UI, return dummy interval
-			return setInterval(() => {}, 1000);
-		}
-
-		// Set state manager for monitor
-		this.flowExecutionMonitor.setStateManager(stateManager);
-
-		return setInterval(() => {
-			const currentTask = this.currentTask;
-			if (currentTask) {
-				this.flowExecutionMonitor.monitorTaskTrace(currentTask);
-			}
-		}, 200); // Poll every 200ms
+		// const stateManager = this.workerUIManager.getStateManager();
+		// if (!stateManager) {
+		// No UI, return dummy interval
+		return setInterval(() => {}, 1000);
+		// }
+		//
+		// // Set state manager for monitor
+		// this.flowExecutionMonitor.setStateManager(stateManager);
+		//
+		// return setInterval(() => {
+		// 	const currentTask = this.currentTask;
+		// 	if (currentTask) {
+		// 		this.flowExecutionMonitor.monitorTaskTrace(currentTask);
+		// 	}
+		// }, 200); // Poll every 200ms
 	}
 
 	/**
@@ -542,9 +524,6 @@ export class FlowWorker implements Shutdownable {
 
 		console.log(`${this.logPrefix()} Executing flow: ${flow.name} (${flow.id})`);
 		this.sendTaskStarted(TaskStatus.IN_PROGRESS);
-
-		// Initialize UI state if enabled
-		this.workerUIManager.startTask(task.id, flow.id, flow.name, flow.steps);
 
 		let workspace: Workspace | null = null;
 
@@ -583,9 +562,6 @@ export class FlowWorker implements Shutdownable {
 			console.log(`${this.logPrefix()} Workspace allocated: ${workspace.id} (${workspace.path})`);
 			this.sendTaskProgress(`Workspace ready: ${workspace.path}`);
 
-			// Update UI with workspace info
-			this.workerUIManager.setWorkspace(workspace.path);
-
 			// Prepare execution options
 			const executionOptions: FlowExecutionOptions = {
 				taskId: task.id,
@@ -607,7 +583,7 @@ export class FlowWorker implements Shutdownable {
 					CLAUDE_CODE_STOPPABLE: this.interactive ? 'true' : 'false',
 				},
 				// Callback to store Claude process reference
-				onClaudeProcessStarted: process => {
+				onClaudeProcessStarted: (process: ChildProcess) => {
 					this.claudeProcessManager.trackProcess(process);
 				},
 			};
@@ -617,9 +593,9 @@ export class FlowWorker implements Shutdownable {
 
 			// Start monitoring execution trace if UI is enabled
 			let monitorInterval: NodeJS.Timeout | null = null;
-			if (this.workerUIManager.isEnabled()) {
-				monitorInterval = this.startTraceMonitoring(task.id);
-			}
+			// if (this.workerUIManager.isEnabled()) {
+			// 	monitorInterval = this.startTraceMonitoring(task.id);
+			// }
 
 			const result = await this.flowExecutor.execute(executionOptions);
 
@@ -639,8 +615,8 @@ export class FlowWorker implements Shutdownable {
 			if (result.success) {
 				console.log(`${this.logPrefix()} Flow completed successfully`);
 
-				// Update UI
-				this.workerUIManager.taskCompleted();
+				// // Update UI
+				// this.workerUIManager.taskCompleted();
 
 				this.sendTaskCompleted(
 					{
@@ -653,8 +629,8 @@ export class FlowWorker implements Shutdownable {
 			} else {
 				console.error(`${this.logPrefix()} Flow failed: ${result.error}`);
 
-				// Update UI
-				this.workerUIManager.taskFailed(result.error || 'Flow execution failed');
+				// // Update UI
+				// this.workerUIManager.taskFailed(result.error || 'Flow execution failed');
 
 				this.sendTaskFailed(result.error || 'Flow execution failed', failureStatus);
 			}
@@ -690,7 +666,7 @@ export class FlowWorker implements Shutdownable {
 		if (!this.currentTask) return;
 
 		this.sendMessage(
-			createMessage(MessageType.TASK_STARTED, {
+			createMessage(W2OMessageType.TASK_STARTED, {
 				workerId: this.workerId,
 				taskId: this.currentTask.id,
 				newStatus,
@@ -705,7 +681,7 @@ export class FlowWorker implements Shutdownable {
 		if (!this.currentTask) return;
 
 		this.sendMessage(
-			createMessage(MessageType.TASK_PROGRESS, {
+			createMessage(W2OMessageType.TASK_PROGRESS, {
 				workerId: this.workerId,
 				taskId: this.currentTask.id,
 				progress,
@@ -720,7 +696,7 @@ export class FlowWorker implements Shutdownable {
 		if (!this.currentTask) return;
 
 		this.sendMessage(
-			createMessage(MessageType.TASK_COMPLETED, {
+			createMessage(W2OMessageType.TASK_COMPLETED, {
 				workerId: this.workerId,
 				taskId: this.currentTask.id,
 				result,
@@ -741,7 +717,7 @@ export class FlowWorker implements Shutdownable {
 		if (!this.currentTask) return;
 
 		this.sendMessage(
-			createMessage(MessageType.TASK_FAILED, {
+			createMessage(W2OMessageType.TASK_FAILED, {
 				workerId: this.workerId,
 				taskId: this.currentTask.id,
 				error,
@@ -762,7 +738,7 @@ export class FlowWorker implements Shutdownable {
 		if (!this.currentTask) return;
 
 		this.sendMessage(
-			createMessage(MessageType.TASK_QUESTION, {
+			createMessage(W2OMessageType.TASK_QUESTION, {
 				workerId: this.workerId,
 				taskId: this.currentTask.id,
 				question,
@@ -777,7 +753,7 @@ export class FlowWorker implements Shutdownable {
 		if (!this.currentTask) return;
 
 		this.sendMessage(
-			createMessage(MessageType.STOP_REQUESTED, {
+			createMessage(W2OMessageType.STOP_REQUESTED, {
 				workerId: this.workerId,
 				taskId: this.currentTask.id,
 				claudePid,
@@ -790,7 +766,7 @@ export class FlowWorker implements Shutdownable {
 	 */
 	protected sendHookEvent(hookName: string, data: any): void {
 		this.sendMessage(
-			createMessage(MessageType.HOOK_EVENT, {
+			createMessage(W2OMessageType.HOOK_EVENT, {
 				workerId: this.workerId,
 				hookName,
 				data,
@@ -803,7 +779,7 @@ export class FlowWorker implements Shutdownable {
 	 */
 	protected sendRequestTask(): void {
 		this.sendMessage(
-			createMessage(MessageType.REQUEST_TASK, {
+			createMessage(W2OMessageType.REQUEST_TASK, {
 				workerId: this.workerId,
 			})
 		);
@@ -812,7 +788,7 @@ export class FlowWorker implements Shutdownable {
 	/**
 	 * Send a message to orchestrator
 	 */
-	protected sendMessage(message: Message): void {
+	protected sendMessage(message: W2OMessage): void {
 		if (this.ws && this.ws.readyState === WebSocket.OPEN) {
 			this.ws.send(serializeMessage(message));
 		} else {
@@ -854,8 +830,8 @@ export class FlowWorker implements Shutdownable {
 	shutdown(): void {
 		console.log(`${this.logPrefix()} Shutting down...`);
 
-		// Stop UI
-		this.workerUIManager.stop();
+		// // Stop UI
+		// this.workerUIManager.stop();
 
 		// Stop watching flows file
 		this.flowRegistry.stopWatching();

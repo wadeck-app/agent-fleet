@@ -7,12 +7,12 @@
  * - Step reference validation
  * - Task metadata validation
  */
-import { MockIssueCollector } from 'test-utils/index';
+import { MockIssueCollector } from 'flow-engine/test-utils/mocks';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import type { FlowDefinition } from '../types.js';
-import { TemplateValidator } from './TemplateValidator.js';
-import { ValidationCode } from './ValidationTypes.js';
+import type { FlowDefinition } from '../types';
+import { TemplateValidator } from './TemplateValidator';
+import { ValidationCode } from './ValidationTypes';
 
 describe('TemplateValidator', () => {
 	let validator: TemplateValidator;

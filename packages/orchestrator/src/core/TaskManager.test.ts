@@ -1,19 +1,20 @@
 /**
  * TaskManager Tests
  */
-import { Logger } from 'shared-common/Logger.js';
-import { StateManager } from 'shared-common/StateManager.js';
-import { Storage } from 'shared-common/Storage.js';
-import { Task, TaskStatus, WorkerType } from 'shared-orch-worker/index.js';
-import { createMockStateManager, createMockTask, setupTest, setupTimers } from 'test-utils/index';
+import { Storage } from 'orchestrator/core/Storage';
+import { createMockStateManager } from 'orchestrator/test-utils/mocks';
+import { logger } from 'shared-common/logger';
+import { StateManager } from 'shared-orch-worker/StateManager';
+import { Task, TaskStatus } from 'shared-orch-worker/domain-types';
+import { setupTest, setupTimers } from 'test-utils/helpers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { TaskManager } from './TaskManager.js';
+import { TaskManager } from './TaskManager';
 
 // Mock dependencies
-vi.mock('shared-common/Storage.js');
-vi.mock('shared-common/StateManager.js');
-vi.mock('shared-common/Logger.js');
+vi.mock('shared-common/Storage');
+vi.mock('shared-common/StateManager');
+vi.mock('shared-common/logger');
 vi.mock('uuid', () => ({
 	v4: vi.fn(() => 'test-uuid-1234'),
 }));
@@ -22,7 +23,8 @@ describe('TaskManager', () => {
 	let cleanup: () => void;
 	let cleanupTimers: () => void;
 	let taskManager: TaskManager;
-	let mockStateManager: ReturnType<typeof createMockStateManager>;
+	// let mockStateManager: ReturnType<typeof createMockStateManager>;
+	let mockStateManager: Partial<StateManager>;
 
 	beforeEach(async () => {
 		cleanup = setupTest();
@@ -40,7 +42,7 @@ describe('TaskManager', () => {
 		// Mock Date to have consistent timestamps
 		vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
 
-		taskManager = new TaskManager(mockStateManager as any);
+		taskManager = new TaskManager(mockStateManager as StateManager);
 		await taskManager.initialize();
 	});
 
@@ -54,7 +56,7 @@ describe('TaskManager', () => {
 			expect(Storage.initialize).toHaveBeenCalled();
 			expect(Storage.listTasks).toHaveBeenCalled();
 			expect(taskManager.getAllTasks()).toHaveLength(0);
-			expect(Logger.log).toHaveBeenCalledWith('[TaskManager] Loaded 0 tasks');
+			expect(logger.info).toHaveBeenCalledWith('[TaskManager] Loaded 0 tasks');
 		});
 
 		it('should load existing tasks from storage', async () => {
@@ -75,7 +77,7 @@ describe('TaskManager', () => {
 
 			vi.mocked(Storage.listTasks).mockResolvedValue(existingTasks);
 
-			const newManager = new TaskManager(mockStateManager);
+			const newManager = new TaskManager(mockStateManager as StateManager);
 			await newManager.initialize();
 
 			expect(newManager.getAllTasks()).toHaveLength(1);
@@ -135,7 +137,7 @@ describe('TaskManager', () => {
 		it('should log task creation', async () => {
 			await taskManager.createTask('Log test task');
 
-			expect(Logger.log).toHaveBeenCalledWith(
+			expect(logger.info).toHaveBeenCalledWith(
 				expect.stringContaining('[TaskManager] Created task test-uuid-1234')
 			);
 		});
@@ -229,7 +231,7 @@ describe('TaskManager', () => {
 		it('should log status change', async () => {
 			await taskManager.updateTaskStatus(task.id, TaskStatus.APPROVED);
 
-			expect(Logger.log).toHaveBeenCalledWith(
+			expect(logger.info).toHaveBeenCalledWith(
 				`[TaskManager] Task ${task.id} status: ${TaskStatus.BACKLOG} → ${TaskStatus.APPROVED}`
 			);
 		});
@@ -250,73 +252,71 @@ describe('TaskManager', () => {
 		});
 
 		it('should assign task to worker', async () => {
-			await taskManager.assignTask(task.id, 'worker-1', WorkerType.DEV);
+			// await taskManager.assignTask(task.id, 'worker-1');
+			await taskManager.assignTask(task.id, 'worker-1');
 
 			const updatedTask = taskManager.getTask(task.id);
 			expect(updatedTask?.assignedTo).toEqual({
 				workerId: 'worker-1',
-				workerType: WorkerType.DEV,
 			});
 		});
 
 		it('should update task timestamp', async () => {
 			vi.setSystemTime(new Date('2024-01-01T02:00:00.000Z'));
 
-			await taskManager.assignTask(task.id, 'worker-1', WorkerType.DEV);
+			// await taskManager.assignTask(task.id, 'worker-1');
+			await taskManager.assignTask(task.id, 'worker-1');
 
 			const updatedTask = taskManager.getTask(task.id);
 			expect(updatedTask?.updatedAt).toBe('2024-01-01T02:00:00.000Z');
 		});
 
 		it('should add assignment to history', async () => {
-			await taskManager.assignTask(task.id, 'worker-1', WorkerType.REVIEWER);
+			// await taskManager.assignTask(task.id, 'worker-1', WorkerType.REVIEWER);
+			await taskManager.assignTask(task.id, 'worker-1');
 
 			const updatedTask = taskManager.getTask(task.id);
 			expect(updatedTask?.history[1]).toMatchObject({
 				timestamp: '2024-01-01T00:00:00.000Z',
 				event: 'assigned',
 				workerId: 'worker-1',
-				workerType: WorkerType.REVIEWER,
 			});
 		});
 
 		it('should save to storage', async () => {
-			await taskManager.assignTask(task.id, 'worker-2', WorkerType.PM);
+			await taskManager.assignTask(task.id, 'worker-2');
 
 			expect(Storage.saveTask).toHaveBeenCalledWith(
 				expect.objectContaining({
 					id: task.id,
 					assignedTo: {
 						workerId: 'worker-2',
-						workerType: WorkerType.PM,
 					},
 				})
 			);
 		});
 
 		it('should emit task updated event', async () => {
-			await taskManager.assignTask(task.id, 'worker-3', WorkerType.PO);
+			await taskManager.assignTask(task.id, 'worker-3');
 
 			expect(mockStateManager.emitTaskUpdated).toHaveBeenCalled();
 		});
 
 		it('should log assignment', async () => {
-			await taskManager.assignTask(task.id, 'worker-1', WorkerType.DEV);
+			await taskManager.assignTask(task.id, 'worker-1');
 
-			expect(Logger.log).toHaveBeenCalledWith(
-				`[TaskManager] Task ${task.id} assigned to ${WorkerType.DEV} worker worker-1`
-			);
+			expect(logger.info).toHaveBeenCalledWith(`[TaskManager] Task ${task.id} assigned to worker worker-1`);
 		});
 
 		it('should throw error for non-existent task', async () => {
-			await expect(taskManager.assignTask('non-existent-id', 'worker-1', WorkerType.DEV)).rejects.toThrow(
+			await expect(taskManager.assignTask('non-existent-id', 'worker-1')).rejects.toThrow(
 				'Task non-existent-id not found'
 			);
 		});
 
 		it('should allow reassigning task to different worker', async () => {
-			await taskManager.assignTask(task.id, 'worker-1', WorkerType.DEV);
-			await taskManager.assignTask(task.id, 'worker-2', WorkerType.DEV);
+			await taskManager.assignTask(task.id, 'worker-1');
+			await taskManager.assignTask(task.id, 'worker-2');
 
 			const updatedTask = taskManager.getTask(task.id);
 			expect(updatedTask?.assignedTo?.workerId).toBe('worker-2');
@@ -329,7 +329,7 @@ describe('TaskManager', () => {
 
 		beforeEach(async () => {
 			task = await taskManager.createTask('Test task');
-			await taskManager.assignTask(task.id, 'worker-1', WorkerType.DEV);
+			await taskManager.assignTask(task.id, 'worker-1');
 			vi.clearAllMocks();
 		});
 
@@ -380,7 +380,7 @@ describe('TaskManager', () => {
 		it('should log unassignment', async () => {
 			await taskManager.unassignTask(task.id);
 
-			expect(Logger.log).toHaveBeenCalledWith(`[TaskManager] Task ${task.id} unassigned`);
+			expect(logger.info).toHaveBeenCalledWith(`[TaskManager] Task ${task.id} unassigned`);
 		});
 
 		it('should throw error for non-existent task', async () => {
@@ -456,7 +456,7 @@ describe('TaskManager', () => {
 		});
 
 		it('should return null when no tasks available', async () => {
-			const task = taskManager.getNextTaskForWorker(WorkerType.DEV);
+			const task = taskManager.getNextTaskForWorker();
 			expect(task).toBeNull();
 		});
 
@@ -464,7 +464,7 @@ describe('TaskManager', () => {
 			const task1 = await taskManager.createTask('Task 1');
 			await taskManager.updateTaskStatus(task1.id, TaskStatus.BACKLOG);
 
-			const nextTask = taskManager.getNextTaskForWorker(WorkerType.PM);
+			const nextTask = taskManager.getNextTaskForWorker();
 			expect(nextTask?.id).toBe(task1.id);
 		});
 
@@ -472,7 +472,7 @@ describe('TaskManager', () => {
 			const task1 = await taskManager.createTask('Task 1');
 			await taskManager.updateTaskStatus(task1.id, TaskStatus.REFINED);
 
-			const nextTask = taskManager.getNextTaskForWorker(WorkerType.PO);
+			const nextTask = taskManager.getNextTaskForWorker();
 			expect(nextTask?.id).toBe(task1.id);
 		});
 
@@ -480,7 +480,7 @@ describe('TaskManager', () => {
 			const task1 = await taskManager.createTask('Task 1');
 			await taskManager.updateTaskStatus(task1.id, TaskStatus.TODO);
 
-			const nextTask = taskManager.getNextTaskForWorker(WorkerType.DEV);
+			const nextTask = taskManager.getNextTaskForWorker();
 			expect(nextTask?.id).toBe(task1.id);
 		});
 
@@ -488,16 +488,16 @@ describe('TaskManager', () => {
 			const task1 = await taskManager.createTask('Task 1');
 			await taskManager.updateTaskStatus(task1.id, TaskStatus.REVIEW);
 
-			const nextTask = taskManager.getNextTaskForWorker(WorkerType.REVIEWER);
+			const nextTask = taskManager.getNextTaskForWorker();
 			expect(nextTask?.id).toBe(task1.id);
 		});
 
 		it('should not return assigned tasks', async () => {
 			const task1 = await taskManager.createTask('Task 1');
 			await taskManager.updateTaskStatus(task1.id, TaskStatus.BACKLOG);
-			await taskManager.assignTask(task1.id, 'worker-1', WorkerType.DEV);
+			await taskManager.assignTask(task1.id, 'worker-1');
 
-			const nextTask = taskManager.getNextTaskForWorker(WorkerType.DEV);
+			const nextTask = taskManager.getNextTaskForWorker();
 			expect(nextTask).toBeNull();
 		});
 
@@ -513,7 +513,7 @@ describe('TaskManager', () => {
 			await taskManager.updateTaskStatus(mediumTask.id, TaskStatus.BACKLOG);
 			await taskManager.updateTaskStatus(urgentTask.id, TaskStatus.BACKLOG);
 
-			const nextTask = taskManager.getNextTaskForWorker(WorkerType.DEV);
+			const nextTask = taskManager.getNextTaskForWorker();
 			expect(nextTask?.id).toBe(urgentTask.id);
 		});
 
@@ -524,7 +524,7 @@ describe('TaskManager', () => {
 			await taskManager.updateTaskStatus(urgent1.id, TaskStatus.BACKLOG);
 			await taskManager.updateTaskStatus(urgent2.id, TaskStatus.BACKLOG);
 
-			const nextTask = taskManager.getNextTaskForWorker(WorkerType.DEV);
+			const nextTask = taskManager.getNextTaskForWorker();
 			expect(nextTask?.id).toBe(urgent1.id);
 		});
 
@@ -532,7 +532,7 @@ describe('TaskManager', () => {
 			const task1 = await taskManager.createTask('Task 1');
 			await taskManager.updateTaskStatus(task1.id, TaskStatus.MERGED);
 
-			const nextTask = taskManager.getNextTaskForWorker(WorkerType.DEV);
+			const nextTask = taskManager.getNextTaskForWorker();
 			expect(nextTask).toBeNull();
 		});
 
@@ -545,7 +545,7 @@ describe('TaskManager', () => {
 			await taskManager.updateTaskStatus(todoTask.id, TaskStatus.TODO);
 			await taskManager.updateTaskStatus(changesTask.id, TaskStatus.CHANGES_REQUESTED);
 
-			const nextTask = taskManager.getNextTaskForWorker(WorkerType.DEV);
+			const nextTask = taskManager.getNextTaskForWorker();
 			expect(nextTask?.id).toBe(changesTask.id); // highest priority
 		});
 	});
@@ -666,7 +666,7 @@ describe('TaskManager', () => {
 		it('should log deletion', async () => {
 			await taskManager.deleteTask(task.id);
 
-			expect(Logger.log).toHaveBeenCalledWith(`[TaskManager] Deleted task ${task.id}`);
+			expect(logger.info).toHaveBeenCalledWith(`[TaskManager] Deleted task ${task.id}`);
 		});
 
 		it('should return false for non-existent task', async () => {
@@ -733,7 +733,7 @@ describe('TaskManager', () => {
 
 			await taskManager.clearAllTasks();
 
-			expect(Logger.log).toHaveBeenCalledWith('[TaskManager] Cleared 3 tasks');
+			expect(logger.info).toHaveBeenCalledWith('[TaskManager] Cleared 3 tasks');
 		});
 
 		it('should return 0 when no tasks to clear', async () => {
@@ -855,19 +855,18 @@ describe('TaskManager', () => {
 			await taskManager.updateTaskStatus(task.id, TaskStatus.BACKLOG);
 			vi.clearAllMocks();
 
-			const assignedTask = await taskManager.assignTaskToWorker('worker-1', WorkerType.DEV);
+			const assignedTask = await taskManager.assignTaskToWorker('worker-1');
 
 			expect(assignedTask).toBeDefined();
 			expect(assignedTask?.id).toBe(task.id);
 			expect(assignedTask?.assignedTo).toEqual({
 				workerId: 'worker-1',
-				workerType: WorkerType.DEV,
 			});
 			expect(assignedTask?.status).toBe(TaskStatus.IN_PROGRESS);
 		});
 
 		it('should return null when no tasks available', async () => {
-			const assignedTask = await taskManager.assignTaskToWorker('worker-1', WorkerType.DEV);
+			const assignedTask = await taskManager.assignTaskToWorker('worker-1');
 
 			expect(assignedTask).toBeNull();
 		});
@@ -877,7 +876,7 @@ describe('TaskManager', () => {
 			await taskManager.updateTaskStatus(task.id, TaskStatus.TODO);
 			vi.clearAllMocks();
 
-			const assignedTask = await taskManager.assignTaskToWorker('worker-1', WorkerType.DEV);
+			const assignedTask = await taskManager.assignTaskToWorker('worker-1');
 
 			expect(assignedTask?.status).toBe(TaskStatus.IN_PROGRESS);
 		});
@@ -887,13 +886,12 @@ describe('TaskManager', () => {
 			await taskManager.updateTaskStatus(task.id, TaskStatus.BACKLOG);
 			vi.clearAllMocks();
 
-			const assignedTask = await taskManager.assignTaskToWorker('worker-1', WorkerType.DEV);
+			const assignedTask = await taskManager.assignTaskToWorker('worker-1');
 
 			const lastHistory = assignedTask?.history[assignedTask.history.length - 1];
 			expect(lastHistory).toMatchObject({
 				event: 'assigned',
 				workerId: 'worker-1',
-				workerType: WorkerType.DEV,
 			});
 		});
 
@@ -902,14 +900,13 @@ describe('TaskManager', () => {
 			await taskManager.updateTaskStatus(task.id, TaskStatus.BACKLOG);
 			vi.clearAllMocks();
 
-			await taskManager.assignTaskToWorker('worker-1', WorkerType.DEV);
+			await taskManager.assignTaskToWorker('worker-1');
 
 			expect(Storage.saveTask).toHaveBeenCalledWith(
 				expect.objectContaining({
 					id: task.id,
 					assignedTo: {
 						workerId: 'worker-1',
-						workerType: WorkerType.DEV,
 					},
 					status: TaskStatus.IN_PROGRESS,
 				})
@@ -921,7 +918,7 @@ describe('TaskManager', () => {
 			await taskManager.updateTaskStatus(task.id, TaskStatus.BACKLOG);
 			vi.clearAllMocks();
 
-			await taskManager.assignTaskToWorker('worker-1', WorkerType.DEV);
+			await taskManager.assignTaskToWorker('worker-1');
 
 			expect(mockStateManager.emitTaskUpdated).toHaveBeenCalled();
 		});
@@ -931,9 +928,9 @@ describe('TaskManager', () => {
 			await taskManager.updateTaskStatus(task.id, TaskStatus.BACKLOG);
 			vi.clearAllMocks();
 
-			await taskManager.assignTaskToWorker('worker-1', WorkerType.DEV);
+			await taskManager.assignTaskToWorker('worker-1');
 
-			expect(Logger.log).toHaveBeenCalledWith(expect.stringContaining('atomically assigned'));
+			expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('atomically assigned'));
 		});
 
 		it('should rollback on storage failure', async () => {
@@ -943,7 +940,7 @@ describe('TaskManager', () => {
 			const error = new Error('Storage failed');
 			vi.mocked(Storage.saveTask).mockRejectedValue(error);
 
-			await expect(taskManager.assignTaskToWorker('worker-1', WorkerType.DEV)).rejects.toThrow('Storage failed');
+			await expect(taskManager.assignTaskToWorker('worker-1')).rejects.toThrow('Storage failed');
 
 			// Task should be rolled back
 			const unchangedTask = taskManager.getTask(task.id);
@@ -956,10 +953,10 @@ describe('TaskManager', () => {
 			await taskManager.updateTaskStatus(task.id, TaskStatus.BACKLOG);
 
 			// Assign to worker 1
-			await taskManager.assignTaskToWorker('worker-1', WorkerType.DEV);
+			await taskManager.assignTaskToWorker('worker-1');
 
 			// Try to assign to worker 2 (should return null as no unassigned tasks available)
-			const result = await taskManager.assignTaskToWorker('worker-2', WorkerType.DEV);
+			const result = await taskManager.assignTaskToWorker('worker-2');
 
 			expect(result).toBeNull();
 		});
@@ -971,7 +968,7 @@ describe('TaskManager', () => {
 			await taskManager.updateTaskStatus(lowTask.id, TaskStatus.BACKLOG);
 			await taskManager.updateTaskStatus(highTask.id, TaskStatus.BACKLOG);
 
-			const assignedTask = await taskManager.assignTaskToWorker('worker-1', WorkerType.DEV);
+			const assignedTask = await taskManager.assignTaskToWorker('worker-1');
 
 			// Should assign high priority task first
 			expect(assignedTask?.id).toBe(highTask.id);
@@ -984,8 +981,8 @@ describe('TaskManager', () => {
 			await taskManager.updateTaskStatus(pmTask.id, TaskStatus.BACKLOG);
 			await taskManager.updateTaskStatus(devTask.id, TaskStatus.TODO);
 
-			const pmAssigned = await taskManager.assignTaskToWorker('pm-1', WorkerType.PM);
-			const devAssigned = await taskManager.assignTaskToWorker('dev-1', WorkerType.DEV);
+			const pmAssigned = await taskManager.assignTaskToWorker('pm-1');
+			const devAssigned = await taskManager.assignTaskToWorker('dev-1');
 
 			expect(pmAssigned?.id).toBe(pmTask.id);
 			expect(devAssigned?.id).toBe(devTask.id);
@@ -996,9 +993,9 @@ describe('TaskManager', () => {
 			await taskManager.updateTaskStatus(task.id, TaskStatus.BACKLOG);
 
 			// Manually assign to simulate race condition
-			task.assignedTo = { workerId: 'other-worker', workerType: WorkerType.DEV };
+			task.assignedTo = { workerId: 'other-worker' };
 
-			const result = await taskManager.assignTaskToWorker('worker-1', WorkerType.DEV);
+			const result = await taskManager.assignTaskToWorker('worker-1');
 
 			expect(result).toBeNull();
 		});
@@ -1040,7 +1037,7 @@ describe('TaskManager', () => {
 
 			// Simulate rapid updates
 			await taskManager.updateTaskStatus(task.id, TaskStatus.TODO);
-			await taskManager.assignTask(task.id, 'worker-1', WorkerType.DEV);
+			await taskManager.assignTask(task.id, 'worker-1');
 			await taskManager.addComment(task.id, 'user-1', 'Comment 1');
 			await taskManager.updateTaskStatus(task.id, TaskStatus.IN_PROGRESS);
 			await taskManager.addComment(task.id, 'user-2', 'Comment 2');
@@ -1070,7 +1067,7 @@ describe('TaskManager', () => {
 			const task = await taskManager.createTask('History test');
 
 			await taskManager.updateTaskStatus(task.id, TaskStatus.TODO);
-			await taskManager.assignTask(task.id, 'worker-1', WorkerType.DEV);
+			await taskManager.assignTask(task.id, 'worker-1');
 			await taskManager.updateTaskStatus(task.id, TaskStatus.IN_PROGRESS);
 			await taskManager.unassignTask(task.id);
 

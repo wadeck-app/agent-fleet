@@ -1,5 +1,5 @@
 import { withMetadata } from '@framework/tests/withMetadata';
-import type { Book, CreateBook } from '@shared';
+import type { Book, CreateBook } from '@shared/api/books.contract';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { booksApi } from '@app/api/client';

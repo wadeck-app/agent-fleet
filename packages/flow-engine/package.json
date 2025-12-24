@@ -2,17 +2,13 @@
 	"name": "flow-engine",
 	"version": "1.0.0",
 	"type": "module",
-	"exports": {
-		"./*.js": "./dist/*.js",
-		"./*": "./dist/*"
-	},
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
 		"lint": "echo 'No ESLint configured for flow-engine'",
-		"clean": "rimraf dist"
+		"clean": "rimraf dist dist-types"
 	},
 	"dependencies": {
 		"shared-common": "*",

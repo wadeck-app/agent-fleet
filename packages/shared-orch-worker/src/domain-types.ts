@@ -29,13 +29,6 @@ export enum TaskStatus {
 	CANCELLED = 'cancelled',
 }
 
-export enum WorkerType {
-	PM = 'pm',
-	PO = 'po',
-	DEV = 'dev',
-	REVIEWER = 'reviewer',
-}
-
 export interface Task {
 	id: string;
 	description: string;
@@ -45,7 +38,6 @@ export interface Task {
 	updatedAt: string;
 	assignedTo: {
 		workerId: string;
-		workerType: WorkerType;
 	} | null;
 	comments: TaskComment[];
 	metadata: Record<string, any>;
@@ -79,7 +71,6 @@ export interface TaskHistoryEntry {
 
 export interface WorkerInfo {
 	id: string;
-	type: WorkerType;
 	taskId: string | null;
 	connectedAt: string;
 }
@@ -91,14 +82,17 @@ export interface WorkerInfo {
 export const OrchestratorStatsSchema = z.object({
 	restPort: z.number(),
 	wsPort: z.number(),
-	uptime: z.number().optional(), // milliseconds since orchestrator start
+	// milliseconds since orchestrator start
+	uptime: z.number().optional(),
 	workers: z.number(),
 	workersList: z.array(
 		z.object({
 			id: z.string(),
-			type: z.string(),
-			taskId: z.string().nullable(), // Can be null when worker is idle
-			connectedAt: z.string(), // ISO 8601 timestamp
+			// type: z.string(),
+			// Can be null when worker is idle
+			taskId: z.string().nullable(),
+			// ISO 8601 timestamp
+			connectedAt: z.string(),
 		})
 	),
 	tasks: z.object({

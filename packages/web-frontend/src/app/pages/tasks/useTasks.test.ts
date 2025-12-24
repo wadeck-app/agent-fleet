@@ -1,4 +1,4 @@
-import type { TasksData } from '@shared';
+import type { TasksData } from '@shared/api/tasks.contract';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -55,7 +55,6 @@ describe('useTasks', () => {
 				updatedAt: '2025-12-21T09:30:00Z',
 				assignedWorker: {
 					workerId: 'worker-1',
-					workerType: 'dev',
 				},
 			},
 		],

@@ -38,7 +38,7 @@ import { useDebounce } from '@framework/hooks2/useDebounce';
 import { usePagination2 } from '@framework/hooks2/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
 import { useSorting2 } from '@framework/hooks2/useSorting2';
-import type { Ingredient, IngredientsListQuery } from '@shared';
+import type { Ingredient, IngredientsListQuery } from '@shared/api/ingredients.contract';
 import { Plus, RefreshCw, X } from 'lucide-react';
 
 import { ingredientsService } from '../ingredients/IngredientsService';

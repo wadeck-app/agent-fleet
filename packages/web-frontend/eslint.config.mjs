@@ -25,7 +25,7 @@ export default [
 			'better-tailwindcss': {
 				entryPoint: 'src/index.css',
 				printWidth: 120, // Align with Prettier config
-				config: './tailwind.config.js', // Load custom utilities from Tailwind config
+				config: './tailwind.config', // Load custom utilities from Tailwind config
 			},
 		},
 		rules: {

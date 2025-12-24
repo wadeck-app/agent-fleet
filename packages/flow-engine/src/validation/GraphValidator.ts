@@ -9,10 +9,10 @@
  *
  * This validator focuses on the structural integrity of the flow's execution graph.
  */
-import type { FlowRegistry } from '../registry/FlowRegistry.js';
-import type { FlowStep, SubFlowStep } from '../types.js';
-import type { IssueCollector } from './ValidationTypes.js';
-import { ValidationCode } from './ValidationTypes.js';
+import type { FlowRegistry } from '../registry/FlowRegistry';
+import type { FlowStep, SubFlowStep } from '../types';
+import type { IssueCollector } from './ValidationTypes';
+import { ValidationCode } from './ValidationTypes';
 
 /**
  * Graph Validator - validates flow graph structure

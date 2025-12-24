@@ -9,19 +9,19 @@
  */
 
 // Core interfaces
-export type { ITransportServer } from './ITransportServer.js';
+export type { ITransportServer } from './ITransportServer';
 
 // WebSocket server implementation
-export { WebSocketTransportServer } from './adapters/WebSocketTransportServer.js';
+export { WebSocketTransportServer } from './adapters/WebSocketTransportServer';
 
 // Event broadcasting
-export { EventBroadcaster } from './EventBroadcaster.js';
+export { EventBroadcaster } from './EventBroadcaster';
 
 // Session management
-export { WebSocketSessionManager } from './WebSocketSessionManager.js';
+export { WebSocketSessionManager } from './WebSocketSessionManager';
 
 // Request routing
-export { TransportRouter } from './TransportRouter.js';
+export { TransportRouter } from './TransportRouter';
 
 // Testing utilities
-export { MockTransportServer } from './adapters/MockTransportServer.js';
+export { MockTransportServer } from './adapters/MockTransportServer';

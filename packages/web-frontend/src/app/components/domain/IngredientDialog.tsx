@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 
 import { CrudDialog } from '@framework/components/overlays/CrudDialog';
 import { Button } from '@framework/components/primitives/Button';
-import type { CreateIngredient, Ingredient } from '@shared';
+import type { CreateIngredient, Ingredient } from '@shared/api/ingredients.contract';
 import { RefreshCw } from 'lucide-react';
 
 import { IngredientForm } from '@app/pages/ingredients/IngredientForm';

@@ -1,4 +1,4 @@
-import { ReactElement, ReactNode, cloneElement, useEffect, useMemo, useState } from 'react';
+import { type ReactElement, type ReactNode, cloneElement, useEffect, useMemo, useState } from 'react';
 
 import type { FilterContract } from '@framework/hooks2/useCategoryFilter2';
 import type { PaginationContract } from '@framework/hooks2/usePagination2';

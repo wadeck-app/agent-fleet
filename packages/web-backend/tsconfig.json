@@ -1,26 +1,33 @@
 {
 	"extends": "../../tsconfig.base.json",
 	"compilerOptions": {
-		"outDir": "./dist",
 		"baseUrl": ".",
+		"outDir": "./dist",
 		"paths": {
+			//FIXME to be cleaned up with all using @ prefix
 			"@app/shared": ["../shared-frontend-backend/src"],
 			"@app/shared/*": ["../shared-frontend-backend/src/*"],
-			"orchestrator-adapters": ["../orchestrator-adapters/src"],
-			"orchestrator-adapters/*": ["../orchestrator-adapters/src/*"],
+			//			"shared-frontend-backend": ["../shared-frontend-backend/src"],
+			//			"shared-frontend-backend/*": ["../shared-frontend-backend/src/*"],
+			"orchestrator": ["../orchestrator/src"],
+			"orchestrator/*": ["../orchestrator/src/*"],
+			//			"orchestrator-adapters": ["../orchestrator-adapters/src"],
+			//			"orchestrator-adapters/*": ["../orchestrator-adapters/src/*"],
 			"shared-common": ["../shared-common/src"],
 			"shared-common/*": ["../shared-common/src/*"],
 			"shared-orch-worker": ["../shared-orch-worker/src"],
-			"shared-orch-worker/*": ["../shared-orch-worker/src/*"],
-			"@/*": ["./src/*"]
+			"shared-orch-worker/*": ["../shared-orch-worker/src/*"]
+			//			"@/*": ["./src/*"]
 		}
 	},
 	"include": ["src/**/*"],
 	"exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"],
 	"references": [
-		{ "path": "../orchestrator-adapters" },
+		{ "path": "../orchestrator" },
+		//		{ "path": "../orchestrator-adapters" },
 		{ "path": "../shared-frontend-backend" },
 		{ "path": "../shared-orch-worker" },
+		{ "path": "../flow-engine" },
 		{ "path": "../shared-common" }
 	]
 }

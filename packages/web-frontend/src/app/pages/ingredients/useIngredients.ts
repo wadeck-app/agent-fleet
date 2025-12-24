@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 
 import { useAbortableEffect } from '@framework/hooks/useAbortableEffect';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
-import type { CreateIngredient, Ingredient, UpdateIngredient } from '@shared';
+import type { CreateIngredient, Ingredient, UpdateIngredient } from '@shared/api/ingredients.contract';
 
 import { ingredientsService } from './IngredientsService';
 

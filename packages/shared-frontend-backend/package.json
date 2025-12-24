@@ -3,18 +3,6 @@
 	"version": "1.0.0",
 	"private": true,
 	"type": "module",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"default": "./dist/index.js"
-		},
-		"./transport": {
-			"types": "./dist/transport/index.d.ts",
-			"default": "./dist/transport/index.js"
-		}
-	},
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
 		"dev": "tsc --build tsconfig.json --watch",
@@ -23,7 +11,7 @@
 		"test:coverage": "vitest run --coverage",
 		"lint": "eslint src --ext .ts",
 		"lint:fix": "eslint src --ext .ts --fix",
-		"clean": "rimraf dist"
+		"clean": "rimraf dist dist-types"
 	},
 	"dependencies": {
 		"shared-common": "*",

@@ -1,3 +1,4 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { defineRoutes } from './route-builder';

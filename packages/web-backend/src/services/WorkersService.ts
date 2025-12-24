@@ -1,6 +1,6 @@
-import type { OrchestratorClient } from 'orchestrator-adapters';
+import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
 
-import type { Worker, WorkersData } from '@app/shared';
+import type { Worker, WorkersData } from '@app/shared/api/workers.contract';
 
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 
@@ -38,7 +38,8 @@ import type { EventBroadcaster } from '../transport/EventBroadcaster';
 
 export class WorkersService {
 	constructor(
-		private readonly orchestratorClient: OrchestratorClient,
+		// private readonly orchestratorClient: OrchestratorClient,
+		private readonly orchestratorWrapper: OrchestratorWrapper,
 		private readonly eventBroadcaster: EventBroadcaster
 	) {}
 
@@ -47,7 +48,8 @@ export class WorkersService {
 	 */
 	async getWorkersData(): Promise<WorkersData> {
 		try {
-			const stats = await this.orchestratorClient.getStats();
+			// const stats = await this.orchestratorClient.getStats();
+			const stats = await this.orchestratorWrapper.getStats();
 
 			// Transform workers list
 			// Note: All workers in the list are connected (disconnected workers are removed)

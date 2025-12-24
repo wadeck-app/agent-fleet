@@ -6,13 +6,13 @@
  */
 import { v4 as uuidv4 } from 'uuid';
 
-import { LoopHandler } from '../processing/LoopHandler.js';
-import type { TemplateContext } from '../processing/TemplateRenderer.js';
-import { TemplateRenderer } from '../processing/TemplateRenderer.js';
-import type { DAG, FlowDefinition, FlowExecutionResult, FlowStep, FlowTrace, StepTrace, Workspace } from '../types.js';
-import { DAGBuilder } from '../validation/DAGBuilder.js';
-import { DAGValidator } from '../validation/DAGValidator.js';
-import { StepRunner } from './StepRunner.js';
+import { LoopHandler } from '../processing/LoopHandler';
+import type { TemplateContext } from '../processing/TemplateRenderer';
+import { TemplateRenderer } from '../processing/TemplateRenderer';
+import type { DAG, FlowDefinition, FlowExecutionResult, FlowStep, FlowTrace, StepTrace, Workspace } from '../types';
+import { DAGBuilder } from '../validation/DAGBuilder';
+import { DAGValidator } from '../validation/DAGValidator';
+import { StepRunner } from './StepRunner';
 
 /**
  * Orchestration error

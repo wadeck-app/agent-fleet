@@ -1,41 +1,56 @@
 // Orchestrator → Worker (O2W) messages
-import type { Task } from './domain-types.js';
-import type { BaseMessage, MessageType } from './protocol.js';
+import { ProtocolMessage } from 'shared-common/protocol';
 
-export interface WorkerWelcomeMessage extends BaseMessage {
-	type: MessageType.WORKER_WELCOME;
+import type { Task } from './domain-types';
+
+export interface O2WBaseMessage extends ProtocolMessage<O2WMessageType> {}
+
+export enum O2WMessageType {
+	// O2W Messages (Orchestrator → Worker)
+	WORKER_WELCOME = 'o2w:worker:welcome',
+	ASSIGN_TASK = 'o2w:task:assign',
+	KILL_CLAUDE = 'o2w:claude:kill',
+	PAUSE = 'o2w:execution:pause',
+	RESUME = 'o2w:execution:resume',
+	SHUTDOWN = 'o2w:worker:shutdown',
+	ACK = 'o2w:ack',
+	ERROR = 'o2w:error',
+}
+
+export interface WorkerWelcomeMessage extends O2WBaseMessage {
+	type: O2WMessageType.WORKER_WELCOME;
 	workerId: string;
 }
 
-export interface AssignTaskMessage extends BaseMessage {
-	type: MessageType.ASSIGN_TASK;
+export interface AssignTaskMessage extends O2WBaseMessage {
+	type: O2WMessageType.ASSIGN_TASK;
 	task: Task;
 }
 
-export interface KillClaudeMessage extends BaseMessage {
-	type: MessageType.KILL_CLAUDE;
+export interface KillClaudeMessage extends O2WBaseMessage {
+	type: O2WMessageType.KILL_CLAUDE;
 	reason: string;
 }
 
-export interface PauseMessage extends BaseMessage {
-	type: MessageType.PAUSE;
+export interface PauseMessage extends O2WBaseMessage {
+	type: O2WMessageType.PAUSE;
 }
 
-export interface ResumeMessage extends BaseMessage {
-	type: MessageType.RESUME;
+export interface ResumeMessage extends O2WBaseMessage {
+	type: O2WMessageType.RESUME;
 }
 
-export interface ShutdownMessage extends BaseMessage {
-	type: MessageType.SHUTDOWN;
+export interface ShutdownMessage extends O2WBaseMessage {
+	type: O2WMessageType.SHUTDOWN;
 }
 
-export interface AckMessage extends BaseMessage {
-	type: MessageType.ACK;
+export interface AckMessage extends O2WBaseMessage {
+	type: O2WMessageType.ACK;
 	[key: string]: any;
 }
 
-export interface ErrorMessage extends BaseMessage {
-	type: MessageType.ERROR;
+export interface ErrorMessage extends O2WBaseMessage {
+	type: O2WMessageType.ERROR;
 	error: string;
 }
 

@@ -1,4 +1,4 @@
-import { DependencyList, useState } from 'react';
+import { type DependencyList, useState } from 'react';
 
 import { useAbortableEffect } from './useAbortableEffect';
 
