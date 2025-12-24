@@ -4,9 +4,9 @@ import { TaskManager } from 'orchestrator/core/TaskManager';
 import { MetricsCollector } from 'orchestrator/metrics/MetricsCollector';
 import { StateSnapshotService } from 'orchestrator/state/StateSnapshotService';
 import { UIClientHook } from 'orchestrator/ui-client/UIClientHook';
-import { OrchestratorSnapshot } from 'orchestrator/ui-client/types';
+import { type OrchestratorSnapshot } from 'orchestrator/ui-client/types';
 import { WorkerWebSocketServer } from 'orchestrator/websocket/WorkerWebSocketServer';
-import { Shutdownable } from 'shared-common/Shutdownable';
+import { type Shutdownable } from 'shared-common/Shutdownable';
 import { logger } from 'shared-common/logger';
 import { StateManager } from 'shared-orch-worker/StateManager';
 

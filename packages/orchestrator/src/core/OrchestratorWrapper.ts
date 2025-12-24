@@ -16,8 +16,8 @@
  */
 import { Orchestrator } from 'orchestrator/core/Orchestrator';
 import { StateEvent } from 'shared-orch-worker/StateManager';
-import { OrchestratorStats, Task, WorkerInfo } from 'shared-orch-worker/domain-types';
-import { O2BEventData, O2BEventType } from 'shared-orch-worker/orchestrator-events';
+import type { OrchestratorStats, Task, WorkerInfo } from 'shared-orch-worker/domain-types';
+import type { O2BEventData, O2BEventType } from 'shared-orch-worker/orchestrator-events';
 
 /**
  * Task filters for getTasks()

@@ -1,5 +1,4 @@
 import type { IncomingMessage } from 'http';
-import { MockOrchestratorClient } from 'orchestrator-adapters';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MockAuthService } from '@/auth/MockAuthService';

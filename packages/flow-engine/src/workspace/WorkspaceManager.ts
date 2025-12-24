@@ -11,7 +11,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { SimpleGit, simpleGit } from 'simple-git';
+import { type SimpleGit, simpleGit } from 'simple-git';
 import { v4 as uuidv4 } from 'uuid';
 
 import type { GitStrategy, ReusePolicy, Workspace, WorkspaceConfig, WorkspaceGitState, WorkspaceMode } from '../types';

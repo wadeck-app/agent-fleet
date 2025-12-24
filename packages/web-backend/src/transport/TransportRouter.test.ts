@@ -1,4 +1,3 @@
-// import { MockOrchestratorClient } from 'orchestrator-adapters/src/__mocks__/MockOrchestratorClient';
 // import { beforeEach, describe, expect, it } from 'vitest';
 //
 // import type { TransportRequest } from '@app/shared/transport';
