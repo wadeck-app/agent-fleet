@@ -55,7 +55,7 @@ async function initializeOrchestratorClient(): Promise<Orchestrator> {
 		logger.info(`[Orchestrator] Calculated ports from env: REST=${calculatedRestPort}, WS=${calculatedWsPort}`);
 
 		const orchestratorConfig = {
-			orchestratorWsPort,
+			wsPort: orchestratorWsPort,
 			// restPort,
 			projectRoot: process.cwd(),
 			// Always include libraryMode
