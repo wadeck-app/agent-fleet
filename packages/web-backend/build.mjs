@@ -134,7 +134,6 @@ try {
 			// Monorepo packages - let Node.js resolve via package.json exports
 			'shared-orch-worker',
 			'shared-common',
-			'orchestrator-adapters',
 		],
 
 		// ====================================================================

@@ -13,8 +13,6 @@
 			"flow-engine/*": ["../flow-engine/src/*"],
 			"orchestrator": ["../orchestrator/src"],
 			"orchestrator/*": ["../orchestrator/src/*"],
-			//			"orchestrator-adapters": ["../orchestrator-adapters/src"],
-			//			"orchestrator-adapters/*": ["../orchestrator-adapters/src/*"],
 			"shared-common": ["../shared-common/src"],
 			"shared-common/*": ["../shared-common/src/*"],
 			"shared-orch-worker": ["../shared-orch-worker/src"],
@@ -26,7 +24,6 @@
 	"exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"],
 	"references": [
 		{ "path": "../orchestrator" },
-		//		{ "path": "../orchestrator-adapters" },
 		{ "path": "../shared-frontend-backend" },
 		{ "path": "../shared-orch-worker" },
 		{ "path": "../flow-engine" },

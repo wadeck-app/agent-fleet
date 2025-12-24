@@ -4,8 +4,8 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
+		"dev": "tsx watch --inspect src/flow/FlowWorker.ts --no-ui",
 		"build": "tsc --build tsconfig.json",
-		"dev": "nodemon --project-root=../.. --no-ui",
 		"dev:no-watch": "tsx src/flow/FlowWorker.ts --no-ui",
 		"dev:ui": "nodemon --args ''",
 		"test": "vitest run",
