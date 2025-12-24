@@ -25,6 +25,7 @@
 		"dev:frontend": "npm run dev --workspace=web-frontend",
 		"dev:cli": "npm run dev --workspace=cli",
 		"typecheck:watch": "tsc -b -w",
+		"typecheck:watch:no-pretty": "tsc -b -w --pretty false",
 		"--------------------test": "",
 		"test": "node scripts/test-all.js",
 		"test:all": "npm run test --workspaces --if-present",
