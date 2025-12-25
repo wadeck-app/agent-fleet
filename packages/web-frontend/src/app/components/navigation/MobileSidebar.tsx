@@ -8,6 +8,8 @@ import { ConnectivityIndicator } from '@framework/features/connectivity/Connecti
 import { useTheme } from '@framework/features/theme/useTheme';
 import { BookOpen, FolderKanban, LayoutDashboard, ListTodo, Menu, Package2, Users } from 'lucide-react';
 
+import { ConnectionModeIndicator } from '@app/components/connectivity/ConnectionModeIndicator';
+import { TransportModeSelector } from '@app/components/connectivity/TransportModeSelector';
 import { WorkspaceIndicator } from '@app/features/workspace/WorkspaceIndicator';
 
 import { AppSwitcher } from './AppSwitcher';
@@ -97,6 +99,11 @@ export function MobileSidebar() {
 						<div className="flex flex-col gap-3">
 							<WorkspaceIndicator />
 							<ConnectivityIndicator />
+							<ConnectionModeIndicator />
+
+							<Separator />
+
+							<TransportModeSelector />
 						</div>
 					</div>
 

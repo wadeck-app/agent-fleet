@@ -115,6 +115,7 @@ export function useSearch2(options?: UseSearch2Options): SearchContract {
 	const state = useMemo(
 		() => ({
 			query: localQuery,
+			trimmedQuery: localQuery.trim(),
 			isEmpty: !localQuery.trim(),
 		}),
 		[localQuery]
@@ -181,17 +182,17 @@ export function useSearch2(options?: UseSearch2Options): SearchContract {
 	);
 
 	// Fill backend query parameters
-	// Uses trimmed version for backend (security)
+	// Uses trimmed version for backend (security + prevents refetch on space-only changes)
+	// ANTIFRAGILE PATTERN: Only depends on trimmedQuery, not raw query
 	const fillQuery = useCallback(
 		(queryObj: Record<string, unknown>) => {
-			const stateTrimmed = state.query.trim();
-			if (!stateTrimmed) {
+			if (!state.trimmedQuery) {
 				return; // Empty query - don't fill query
 			}
 
-			queryObj.search = stateTrimmed;
+			queryObj.search = state.trimmedQuery;
 		},
-		[state.query]
+		[state.trimmedQuery]
 	);
 
 	return {

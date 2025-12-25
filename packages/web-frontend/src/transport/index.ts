@@ -27,6 +27,8 @@ export type { ITransportClient } from './ITransportClient';
 
 // Transport Adapters
 export { WebSocketTransportClient } from './adapters/WebSocketTransportClient';
+export { SSETransportClient } from './adapters/SSETransportClient';
+export { LongPollingTransportClient } from './adapters/LongPollingTransportClient';
 export { RestTransportClient } from './adapters/RestTransportClient';
 export { MockTransportClient } from './adapters/MockTransportClient';
 
@@ -34,3 +36,4 @@ export { MockTransportClient } from './adapters/MockTransportClient';
 export { TransportProvider, useTransportContext } from './TransportProvider';
 export type { TransportProviderProps, TransportContextState } from './TransportProvider';
 export { useTransport } from './useTransport';
+export type { TransportHookResult } from './useTransport';

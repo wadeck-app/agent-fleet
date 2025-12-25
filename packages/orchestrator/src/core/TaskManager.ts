@@ -154,10 +154,17 @@ export class TaskManager {
 		}
 
 		const oldStatus = task.status;
+		const oldCompletedAt = task.completedAt;
 		const oldHistory = [...task.history];
 
 		task.status = newStatus;
 		task.updatedAt = new Date().toISOString();
+
+		// Set completedAt timestamp when task reaches a terminal state
+		const terminalStatuses = [TaskStatus.APPROVED, TaskStatus.MERGED, TaskStatus.CANCELLED];
+		if (terminalStatuses.includes(newStatus)) {
+			task.completedAt = task.updatedAt;
+		}
 
 		// Add to history
 		task.history.push({
@@ -173,6 +180,7 @@ export class TaskManager {
 		} catch (error) {
 			// Rollback in-memory changes if storage fails
 			task.status = oldStatus;
+			task.completedAt = oldCompletedAt;
 			task.history = oldHistory;
 			logger.info(
 				`[TaskManager] Failed to update task ${taskId} status: ${error instanceof Error ? error.message : String(error)}`
@@ -363,12 +371,15 @@ export class TaskManager {
 		// Atomic assignment - update task state
 		const oldAssignment = task.assignedTo;
 		const oldStatus = task.status;
+		const oldStartedAt = task.startedAt;
 		const oldHistory = [...task.history];
 
 		// task.assignedTo = { workerId, workerType };
 		task.assignedTo = { workerId };
 		task.status = TaskStatus.IN_PROGRESS;
 		task.updatedAt = new Date().toISOString();
+		// Set startedAt timestamp when task moves to IN_PROGRESS
+		task.startedAt = task.updatedAt;
 
 		task.history.push({
 			timestamp: task.updatedAt,
@@ -387,6 +398,7 @@ export class TaskManager {
 			// Rollback in-memory changes if storage fails
 			task.assignedTo = oldAssignment;
 			task.status = oldStatus;
+			task.startedAt = oldStartedAt;
 			task.history = oldHistory;
 			logger.info(
 				`[TaskManager] Failed to atomically assign task ${task.id}: ${error instanceof Error ? error.message : String(error)}`

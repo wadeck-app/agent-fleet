@@ -3,7 +3,7 @@ import { AUTH_API_ROUTES as routes } from '@app/shared/api/auth.contract';
 
 import type { AuthService } from '../auth/AuthService';
 import type { MockAuthService } from '../auth/MockAuthService';
-import type { WebSocketSessionManager } from '../transport/WebSocketSessionManager';
+import type { TransportSessionManager } from '../transport/TransportSessionManager';
 import type { RouteWrapperFunc } from '../utils/fastify-wrapper';
 import type { LazyController } from '../utils/lazy-controller-plugin';
 
@@ -38,7 +38,7 @@ export default class AuthController implements LazyController<typeof AUTH_API_RO
 
 	constructor(
 		private readonly authService: AuthService,
-		private readonly sessionManager: WebSocketSessionManager
+		private readonly sessionManager: TransportSessionManager
 	) {}
 
 	configureRoutes(add: RouteWrapperFunc<typeof AUTH_API_ROUTES>) {

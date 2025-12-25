@@ -14,10 +14,22 @@
  *
  * ===========================================================================================
  */
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'node:url';
 import { Orchestrator } from 'orchestrator/core/Orchestrator';
+import path from 'path';
 import { StateEvent } from 'shared-orch-worker/StateManager';
 import type { OrchestratorStats, Task, WorkerInfo } from 'shared-orch-worker/domain-types';
 import type { O2BEventData, O2BEventType } from 'shared-orch-worker/orchestrator-events';
+
+// @formatter:off
+// Read version from package.json
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const packageJsonPath = path.join(__dirname, '../../package.json');
+const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+const ORCHESTRATOR_VERSION = packageJson.version;
+// @formatter:on
 
 /**
  * Task filters for getTasks()
@@ -151,6 +163,7 @@ export class OrchestratorWrapper {
 		return {
 			restPort: 3737, // TODO: Get from orchestrator config
 			wsPort: wsServer ? wsServer.getPort() : 3738,
+			version: ORCHESTRATOR_VERSION,
 			uptime: Date.now() - startTime.getTime(),
 			workers: workers.length,
 			workersList: workers,

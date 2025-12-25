@@ -23,7 +23,7 @@ describe('RecentActivityCard', () => {
 		{
 			timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString(), // 10 minutes ago
 			type: 'worker_connected',
-			message: 'Worker connected (DEV)',
+			message: 'Worker connected',
 			workerId: 'worker-3',
 		},
 	];
@@ -39,7 +39,7 @@ describe('RecentActivityCard', () => {
 
 		expect(screen.getByText('Completed flow execution')).toBeInTheDocument();
 		expect(screen.getByText('Started deployment')).toBeInTheDocument();
-		expect(screen.getByText('Worker connected (DEV)')).toBeInTheDocument();
+		expect(screen.getByText('Worker connected')).toBeInTheDocument();
 	});
 
 	it('should display task and worker IDs when present', () => {

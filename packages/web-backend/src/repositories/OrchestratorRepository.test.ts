@@ -1,4 +1,4 @@
-import type { OrchestratorStats } from 'shared-orch-worker/index';
+import type { OrchestratorStats } from 'shared-orch-worker/domain-types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { OrchestratorRepository } from './OrchestratorRepository';
@@ -24,11 +24,12 @@ describe('OrchestratorRepository', () => {
 	const createMockStats = (): OrchestratorStats => ({
 		restPort: 3737,
 		wsPort: 3738,
+		version: '1.0.0',
 		uptime: 3600000,
 		workers: 2,
 		workersList: [
-			{ id: 'worker-1', type: 'flow', taskId: 'task-1', connectedAt: '2025-12-21T20:00:00.000Z' },
-			{ id: 'worker-2', type: 'flow', taskId: null, connectedAt: '2025-12-21T20:00:00.000Z' },
+			{ id: 'worker-1', taskId: 'task-1', connectedAt: '2025-12-21T20:00:00.000Z' },
+			{ id: 'worker-2', taskId: null, connectedAt: '2025-12-21T20:00:00.000Z' },
 		],
 		tasks: {
 			total: 5,

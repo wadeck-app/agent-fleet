@@ -1,5 +1,5 @@
 // Worker → Orchestrator (W2O) messages
-import { ProtocolMessage } from 'shared-common/protocol';
+import { ProtocolMessage, createMessageInternal, createMessageInternal_Timestamp } from 'shared-common/protocol';
 
 import type { FlowMetadata, TaskStatus } from './domain-types';
 
@@ -184,3 +184,54 @@ export type W2OMessage =
 	| W2OHookEventMessage
 	| W2OAckMessage
 	| W2OErrorMessage;
+
+/**
+ * Type map for Worker → Orchestrator messages.
+ * Maps each W2OMessageType to its corresponding message interface.
+ */
+export interface W2OMessageMap {
+	[W2OMessageType.WORKER_READY]: W2OWorkerReadyMessage;
+	[W2OMessageType.WORKER_HEARTBEAT]: W2OWorkerHeartbeatMessage;
+	[W2OMessageType.REQUEST_TASK]: W2ORequestTaskMessage;
+	[W2OMessageType.TASK_STARTED]: W2OTaskStartedMessage;
+	[W2OMessageType.TASK_PROGRESS]: W2OTaskProgressMessage;
+	[W2OMessageType.TASK_COMPLETED]: W2OTaskCompletedMessage;
+	[W2OMessageType.TASK_FAILED]: W2OTaskFailedMessage;
+	[W2OMessageType.TASK_QUESTION]: W2OTaskQuestionMessage;
+	[W2OMessageType.FLOWS_UPDATED]: W2OFlowsUpdatedMessage;
+	[W2OMessageType.FLOW_STEP_STARTED]: W2OFlowStepStartedMessage;
+	[W2OMessageType.FLOW_STEP_COMPLETED]: W2OFlowStepCompletedMessage;
+	[W2OMessageType.FLOW_STEP_FAILED]: W2OFlowStepFailedMessage;
+	[W2OMessageType.WORKSPACE_ALLOCATED]: W2OWorkspaceAllocatedMessage;
+	[W2OMessageType.WORKSPACE_RELEASED]: W2OWorkspaceReleasedMessage;
+	[W2OMessageType.STOP_REQUESTED]: REMOVE_W2OStopRequestedMessage;
+	[W2OMessageType.HOOK_EVENT]: W2OHookEventMessage;
+	[W2OMessageType.TOOL_RESULT]: W2OBaseMessage;
+	[W2OMessageType.ACK]: W2OAckMessage;
+	[W2OMessageType.ERROR]: W2OErrorMessage;
+}
+
+/**
+ * Creates a typed Worker → Orchestrator message.
+ *
+ * @template T - The message type (inferred from the type parameter)
+ * @param type - The W2O message type
+ * @param payload - The message payload (type-safe based on message type)
+ * @param timestamp - Optional timestamp otherwise "now" is used
+ * @returns A fully typed W2O message with timestamp
+ *
+ * @example
+ * const msg = createW2OMessage(W2OMessageType.TASK_STARTED, {
+ *   workerId: '123',
+ *   taskId: '456',
+ *   newStatus: 'running'
+ * });
+ * // msg is automatically typed as W2OTaskStartedMessage
+ */
+export function createW2OMessage<T extends W2OMessageType>(
+	type: T,
+	payload: Omit<W2OMessageMap[T], 'type' | 'timestamp'>,
+	timestamp?: createMessageInternal_Timestamp
+): W2OMessageMap[T] {
+	return createMessageInternal(type, payload, timestamp);
+}

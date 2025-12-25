@@ -89,10 +89,11 @@ export function useSimpleSearch(options?: UseSimpleSearchOptions): SearchContrac
 		setLocalQuery(urlQuery);
 	}, [urlQuery]);
 
-	// State object (current UI state) - uses local query (untrimmed)
+	// State object (current UI state)
 	const state = useMemo(
 		() => ({
 			query: localQuery,
+			trimmedQuery: localQuery.trim(),
 			isEmpty: !localQuery.trim(),
 		}),
 		[localQuery]
@@ -162,14 +163,13 @@ export function useSimpleSearch(options?: UseSimpleSearchOptions): SearchContrac
 	// Maps 'q' URL param to 'search' backend param (only if non-empty)
 	const fillQuery = useCallback(
 		(queryObj: Record<string, unknown>) => {
-			const stateTrimmed = state.query.trim();
-			if (!stateTrimmed) {
-				return; // Empty query - don't fill query
+			if (!fstate.trimmedQuery) {
+				return;
 			}
 
-			queryObj.search = stateTrimmed;
+			queryObj.search = fstate.trimmedQuery;
 		},
-		[state.query]
+		[fstate.trimmedQuery]
 	);
 
 	return {

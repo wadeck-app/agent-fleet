@@ -1,6 +1,9 @@
 import express, { type Express, type Request, type Response } from 'express';
 import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
+import { readFileSync } from 'fs';
 import { Server as HttpServer, IncomingMessage } from 'http';
+import { fileURLToPath } from 'node:url';
+import path from 'path';
 import { logger } from 'shared-common/logger';
 import { TaskStatus } from 'shared-orch-worker/domain-types';
 import { Duplex } from 'stream';
@@ -10,6 +13,13 @@ import { UIClientHook } from '../ui-client/UIClientHook';
 import { UIWebSocketServer } from '../websocket/UIWebSocketServer';
 import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
 import { TaskManager } from './TaskManager';
+
+// Read version from package.json
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const packageJsonPath = path.join(__dirname, '../../package.json');
+const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+const ORCHESTRATOR_VERSION = packageJson.version;
 
 export class RestAPI {
 	private app: Express;
@@ -69,6 +79,7 @@ export class RestAPI {
 			res.json({
 				restPort: this.port,
 				wsPort: this.wsServer.getPort(),
+				version: ORCHESTRATOR_VERSION,
 				uptime,
 				workers: workers.length,
 				workersList: workers,

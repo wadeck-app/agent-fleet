@@ -43,8 +43,11 @@ export class DashboardService {
 			const blocked = this.sumStatuses(stats.tasks.byStatus, ['BLOCKED']);
 			const failed = this.sumStatuses(stats.tasks.byStatus, ['CANCELLED']);
 
-			// Calculate throughput metrics (MVP: simple estimations)
-			const throughput = this.calculateThroughput(stats, done, failed);
+			// Fetch tasks to calculate real avgTaskDuration
+			const tasks = await this.orchestratorRepository.getTasks();
+
+			// Calculate throughput metrics
+			const throughput = this.calculateThroughput(stats, done, failed, tasks);
 
 			// Generate recent activity from current state
 			const recentActivity = this.generateRecentActivity(stats);
@@ -53,9 +56,9 @@ export class DashboardService {
 			const dashboardData: DashboardData = {
 				timestamp: new Date().toISOString(),
 				orchestrator: {
-					status: 'ready', // Hardcoded for MVP
+					status: 'ready', // Orchestrator is responding, so it's ready
 					uptime: stats.uptime ?? 0, // From orchestrator, default 0 if undefined
-					version: '1.0.0', // Hardcoded for MVP
+					version: stats.version, // Real version from orchestrator
 				},
 				workers: {
 					connected: stats.workers,
@@ -110,13 +113,12 @@ export class DashboardService {
 
 	/**
 	 * Calculate throughput metrics
-	 * MVP: Simple estimations based on current uptime
-	 * TODO: Replace with actual historical tracking
 	 */
 	private calculateThroughput(
 		stats: any,
 		done: number,
-		failed: number
+		failed: number,
+		tasks: any[]
 	): { tasksPerHour: number; successRate: number; avgTaskDuration: number } {
 		const uptimeHours = stats.uptime / (1000 * 60 * 60);
 		const completed = done + failed;
@@ -127,15 +129,40 @@ export class DashboardService {
 		// Success rate
 		const successRate = completed > 0 ? Math.round((done / completed) * 100) : 100;
 
-		// Average task duration (MVP: estimate based on typical flow times)
-		// TODO: Track actual task start/end times
-		const avgTaskDuration = 3 * 60 * 1000 + 42 * 1000; // 3m 42s in milliseconds
+		// Average task duration - calculated from real task timestamps
+		const avgTaskDuration = this.calculateAvgTaskDuration(tasks);
 
 		return {
 			tasksPerHour,
 			successRate,
 			avgTaskDuration,
 		};
+	}
+
+	/**
+	 * Calculate average task duration from completed tasks
+	 * Uses startedAt and completedAt timestamps
+	 */
+	private calculateAvgTaskDuration(tasks: any[]): number {
+		// Filter completed tasks that have both startedAt and completedAt
+		const completedTasks = tasks.filter(
+			(task: any) =>
+				task.startedAt && task.completedAt && ['APPROVED', 'MERGED', 'CANCELLED'].includes(task.status)
+		);
+
+		if (completedTasks.length === 0) {
+			// No completed tasks with duration data yet, return 0
+			return 0;
+		}
+
+		// Calculate duration for each task and get average
+		const totalDuration = completedTasks.reduce((sum: number, task: any) => {
+			const startedAt = new Date(task.startedAt).getTime();
+			const completedAt = new Date(task.completedAt).getTime();
+			return sum + (completedAt - startedAt);
+		}, 0);
+
+		return Math.round(totalDuration / completedTasks.length);
 	}
 
 	/**
@@ -180,7 +207,7 @@ export class DashboardService {
 			activities.push({
 				timestamp: timestamp.toISOString(),
 				type: 'worker_connected',
-				message: `Worker connected (${worker.type})`,
+				message: `Worker connected`,
 				workerId: worker.id,
 			});
 		});

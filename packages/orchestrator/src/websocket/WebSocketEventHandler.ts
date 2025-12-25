@@ -1,8 +1,7 @@
 import { logger } from 'shared-common/logger';
-import { createMessage } from 'shared-common/protocol';
 import { StateManager } from 'shared-orch-worker/StateManager';
 import { TaskStatus } from 'shared-orch-worker/domain-types';
-import { O2WMessageType } from 'shared-orch-worker/orchestrator-messages';
+import { O2WMessageType, createO2WMessage } from 'shared-orch-worker/orchestrator-messages';
 import {
 	REMOVE_W2OStopRequestedMessage,
 	W2OFlowStepCompletedMessage,
@@ -217,7 +216,7 @@ export class WebSocketEventHandler {
 		if (worker) {
 			this.connectionManager.sendMessage(
 				worker.socket,
-				createMessage(O2WMessageType.KILL_CLAUDE, {
+				createO2WMessage(O2WMessageType.KILL_CLAUDE, {
 					reason: 'stop_requested',
 				})
 			);

@@ -3,7 +3,7 @@
  * Tests the coordination between components and overall server behavior
  */
 import { logger } from 'shared-common/logger';
-import { createMessage, serializeMessage } from 'shared-common/protocol';
+import { serializeMessage } from 'shared-common/protocol';
 import { StateManager } from 'shared-orch-worker/StateManager';
 import { Task, TaskStatus } from 'shared-orch-worker/domain-types';
 import {
@@ -11,6 +11,7 @@ import {
 	W2OTaskCompletedMessage,
 	W2OWorkerHeartbeatMessage,
 	W2OWorkerReadyMessage,
+	createW2OMessage,
 } from 'shared-orch-worker/worker-messages';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -157,7 +158,7 @@ describe('WorkerWebSocketServer Integration', () => {
 			mockWss.emit('connection', mockSocket);
 
 			// Register worker
-			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				preferredId: 'worker-1',
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -205,7 +206,7 @@ describe('WorkerWebSocketServer Integration', () => {
 			mockWss.emit('connection', mockSocket);
 
 			// Register worker
-			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				preferredId: 'worker-1',
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -234,7 +235,7 @@ describe('WorkerWebSocketServer Integration', () => {
 			vi.clearAllMocks();
 
 			// Complete task
-			const completedMessage: W2OTaskCompletedMessage = createMessage(W2OMessageType.TASK_COMPLETED, {
+			const completedMessage: W2OTaskCompletedMessage = createW2OMessage(W2OMessageType.TASK_COMPLETED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 			});
@@ -270,7 +271,7 @@ describe('WorkerWebSocketServer Integration', () => {
 			mockWss.emit('connection', mockSocket);
 
 			// Register worker
-			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				preferredId: 'worker-1',
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -327,7 +328,7 @@ describe('WorkerWebSocketServer Integration', () => {
 				'message',
 				Buffer.from(
 					serializeMessage(
-						createMessage(W2OMessageType.WORKER_READY, {
+						createW2OMessage(W2OMessageType.WORKER_READY, {
 							preferredId: 'worker-1',
 							projectId: 'test-project',
 							workspacePath: '/test/path',
@@ -341,7 +342,7 @@ describe('WorkerWebSocketServer Integration', () => {
 				'message',
 				Buffer.from(
 					serializeMessage(
-						createMessage(W2OMessageType.WORKER_READY, {
+						createW2OMessage(W2OMessageType.WORKER_READY, {
 							preferredId: 'worker-2',
 							projectId: 'test-project',
 							workspacePath: '/test/path',
@@ -457,7 +458,7 @@ describe('WorkerWebSocketServer Integration', () => {
 		it('should close all worker connections', async () => {
 			const mockSocket1 = new MockWebSocket();
 			mockWss.emit('connection', mockSocket1);
-			const readyMessage1: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage1: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				projectId: 'test-project',
 				workspacePath: '/test/path',
 				availableFlows: [],
@@ -466,7 +467,7 @@ describe('WorkerWebSocketServer Integration', () => {
 
 			const mockSocket2 = new MockWebSocket();
 			mockWss.emit('connection', mockSocket2);
-			const readyMessage2: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage2: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				projectId: 'test-project',
 				workspacePath: '/test/path',
 				availableFlows: [],
@@ -488,7 +489,7 @@ describe('WorkerWebSocketServer Integration', () => {
 		it('should clear workers list', async () => {
 			const mockSocket = new MockWebSocket();
 			mockWss.emit('connection', mockSocket);
-			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				projectId: 'test-project',
 				workspacePath: '/test/path',
 				availableFlows: [],
@@ -517,7 +518,7 @@ describe('WorkerWebSocketServer Integration', () => {
 			mockWss.emit('connection', mockSocket);
 
 			// Register worker first
-			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				preferredId: 'worker-1',
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -527,7 +528,7 @@ describe('WorkerWebSocketServer Integration', () => {
 			mockSocket.send.mockClear();
 
 			// Send heartbeat
-			const heartbeatMessage: W2OWorkerHeartbeatMessage = createMessage(W2OMessageType.WORKER_HEARTBEAT, {
+			const heartbeatMessage: W2OWorkerHeartbeatMessage = createW2OMessage(W2OMessageType.WORKER_HEARTBEAT, {
 				workerId: 'worker-1',
 			});
 

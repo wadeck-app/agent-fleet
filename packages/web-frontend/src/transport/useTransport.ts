@@ -10,7 +10,7 @@
  * @example
  * ```tsx
  * function TasksList() {
- *   const transport = useTransport();
+ *   const { transport } = useTransport();
  *   const [tasks, setTasks] = useState([]);
  *
  *   useEffect(() => {
@@ -33,11 +33,11 @@
  * ```tsx
  * // Check connection state
  * function MyComponent() {
- *   const transport = useTransport();
+ *   const { transport, connectionState, isConnected } = useTransport();
  *
  *   const handleAction = async () => {
- *     if (!transport.isConnected()) {
- *       console.warn('Not connected');
+ *     if (!isConnected) {
+ *       console.warn('Not connected, state:', connectionState);
  *       return;
  *     }
  *
@@ -52,26 +52,57 @@
  *
  * @throws Error if used outside TransportProvider
  */
+import type { ConnectionState } from '@shared/transport';
+
 import type { ITransportClient } from './ITransportClient';
 import { useTransportContext } from './TransportProvider';
 
 /**
- * Hook to access the transport client
+ * Transport hook result
+ * Provides transport client instance and connection state information
+ */
+export interface TransportHookResult {
+	/** Transport client instance */
+	transport: ITransportClient;
+	/** Current connection state */
+	connectionState: ConnectionState;
+	/** Whether transport is connected (convenience shorthand for connectionState === 'connected') */
+	isConnected: boolean;
+	/** Port number being used for the connection */
+	port: number;
+	/** Force manual downgrade to REST polling (stops WebSocket reconnection attempts) */
+	forceDowngrade: () => void;
+	/** Next reconnection delay in seconds (0 if not reconnecting) */
+	reconnectDelay: number;
+	/** Switch to a different transport mode dynamically (without page reload) */
+	switchTransport: (mode: 'auto' | 'websocket' | 'sse' | 'long-polling' | 'rest' | 'mock') => Promise<void>;
+}
+
+/**
+ * Hook to access the transport client and connection state
  *
- * Returns the transport client instance from context. Must be used within
- * a TransportProvider.
+ * Returns the transport client instance and connection state from context.
+ * Must be used within a TransportProvider.
  *
- * @returns ITransportClient instance
+ * @returns Transport client, connection state, and isConnected flag
  * @throws Error if used outside TransportProvider
  */
-export function useTransport(): ITransportClient {
-	const { transport } = useTransportContext();
+export function useTransport(): TransportHookResult {
+	const context = useTransportContext();
 
-	if (!transport) {
+	if (!context.transport) {
 		throw new Error('Transport not initialized');
 	}
 
-	return transport;
+	return {
+		transport: context.transport,
+		connectionState: context.connectionState,
+		isConnected: context.isConnected,
+		port: context.port,
+		forceDowngrade: context.forceDowngrade,
+		reconnectDelay: context.reconnectDelay,
+		switchTransport: context.switchTransport,
+	};
 }
 
 /**

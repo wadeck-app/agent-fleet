@@ -1,25 +1,32 @@
 import type { EventData, EventType } from '@app/shared/transport';
 
 import type { ITransportServer } from './ITransportServer';
-import type { WebSocketSessionManager } from './WebSocketSessionManager';
+import type { MessageQueue } from './MessageQueue';
+import type { TransportSessionManager } from './TransportSessionManager';
 
 /**
  * ===========================================================================================
- * EVENT BROADCASTER - CENTRAL EVENT BROADCASTING SERVICE
+ * EVENT BROADCASTER - MULTI-TRANSPORT EVENT BROADCASTING SERVICE
  * ===========================================================================================
  *
- * Wrapper around ITransportServer for type-safe event emission.
+ * Broadcasts events to multiple transport types (WebSocket, SSE, Long Polling).
  * Provides convenience methods for broadcasting events to clients.
  *
  * Features:
  * - Type-safe event emission using EventTypes
- * - Broadcast to all connected clients
- * - Send to specific client
+ * - Broadcast to all transports simultaneously
+ * - Send to specific client (auto-detects transport type)
  * - Send to all sessions of a specific user (multi-device support)
- * - Automatic subscription filtering via WebSocketSessionManager
+ * - Automatic subscription filtering via TransportSessionManager
+ * - Message queue for polling transports
+ *
+ * Anti-fragile design:
+ * - Each transport is independent
+ * - Failure in one transport doesn't affect others
+ * - Automatic fallback to message queue if delivery fails
  *
  * Architecture:
- * Service → EventBroadcaster → ITransportServer → WebSocket clients
+ * Service → EventBroadcaster → [WebSocket, SSE, LongPolling] → Clients
  *
  * @example
  * ```typescript
@@ -27,7 +34,7 @@ import type { WebSocketSessionManager } from './WebSocketSessionManager';
  * async createTask(data: CreateTaskDto): Promise<Task> {
  *   const task = await this.repository.createTask(data);
  *
- *   // Broadcast to all subscribed clients
+ *   // Broadcast to all subscribed clients across ALL transports
  *   this.eventBroadcaster.broadcast('task:created', task);
  *
  *   return task;
@@ -37,21 +44,39 @@ import type { WebSocketSessionManager } from './WebSocketSessionManager';
  * ===========================================================================================
  */
 export class EventBroadcaster {
-	constructor(
-		private transportServer: ITransportServer,
-		private sessionManager: WebSocketSessionManager
-	) {}
+	/**
+	 * Transport servers (WebSocket, SSE, Long Polling, etc.)
+	 */
+	private transportServers: ITransportServer[];
 
 	/**
-	 * Broadcast event to all connected clients
+	 * Primary transport (for backward compatibility)
+	 */
+	private primaryTransport: ITransportServer;
+
+	constructor(
+		transportServers: ITransportServer | ITransportServer[],
+		private sessionManager: TransportSessionManager,
+		private messageQueue?: MessageQueue
+	) {
+		// Support both single and multiple transports
+		this.transportServers = Array.isArray(transportServers) ? transportServers : [transportServers];
+		this.primaryTransport = this.transportServers[0];
+	}
+
+	/**
+	 * Broadcast event to all connected clients across ALL transports
 	 * Server-side subscription filtering is applied automatically
 	 *
-	 * @param event - Event type (e.g., 'task:created', 'worker:heartbeat')
+	 * Anti-fragile: Broadcasts to all transports independently.
+	 * If one transport fails, others continue.
+	 *
+	 * @param event - Event type (e.g., 'b2f:task:created', 'b2f:worker:heartbeat')
 	 * @param data - Event data matching the event type
 	 *
 	 * @example
 	 * ```typescript
-	 * broadcaster.broadcast('task:created', {
+	 * broadcaster.broadcast('b2f:task:created', {
 	 *   id: '123',
 	 *   name: 'New task',
 	 *   status: 'pending',
@@ -60,12 +85,20 @@ export class EventBroadcaster {
 	 * ```
 	 */
 	broadcast<E extends EventType>(event: E, data: EventData<E>): void {
-		this.transportServer.broadcast(event, data);
+		// Broadcast to all transports
+		for (const transport of this.transportServers) {
+			try {
+				transport.broadcast(event, data);
+			} catch (error) {
+				console.error(`[EventBroadcaster] Failed to broadcast to transport:`, error);
+				// Continue with other transports (anti-fragile)
+			}
+		}
 	}
 
 	/**
 	 * Send event to specific client
-	 * Checks subscription before sending
+	 * Automatically detects which transport the client is using
 	 *
 	 * @param clientId - Client ID to send to
 	 * @param event - Event type
@@ -73,7 +106,7 @@ export class EventBroadcaster {
 	 *
 	 * @example
 	 * ```typescript
-	 * broadcaster.sendToClient(clientId, 'task:assigned', {
+	 * broadcaster.sendToClient(clientId, 'b2f:task:assigned', {
 	 *   taskId: '123',
 	 *   workerId: 'worker-1',
 	 *   assignedAt: Date.now(),
@@ -81,7 +114,28 @@ export class EventBroadcaster {
 	 * ```
 	 */
 	sendToClient<E extends EventType>(clientId: string, event: E, data: EventData<E>): void {
-		this.transportServer.sendToClient(clientId, event, data);
+		// Try each transport until one successfully sends
+		for (const transport of this.transportServers) {
+			try {
+				transport.sendToClient(clientId, event, data);
+				// If successful, no need to try other transports
+				return;
+			} catch (error) {
+				// Client not on this transport, try next
+				continue;
+			}
+		}
+
+		// If no transport found, queue for later delivery
+		if (this.messageQueue) {
+			console.warn(`[EventBroadcaster] Client ${clientId} not found, queuing event ${event}`);
+			this.messageQueue.enqueue(clientId, {
+				id: `evt-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+				type: event,
+				data,
+				timestamp: Date.now(),
+			});
+		}
 	}
 
 	/**
@@ -112,20 +166,37 @@ export class EventBroadcaster {
 	}
 
 	/**
-	 * Get number of connected clients
+	 * Get number of connected clients across ALL transports
 	 *
 	 * @returns Number of connected clients
 	 */
 	getConnectedClientsCount(): number {
-		return this.transportServer.getConnectedClients().length;
+		const allClients = new Set<string>();
+		for (const transport of this.transportServers) {
+			transport.getConnectedClients().forEach(clientId => allClients.add(clientId));
+		}
+		return allClients.size;
 	}
 
 	/**
-	 * Get all connected client IDs
+	 * Get all connected client IDs across ALL transports
 	 *
-	 * @returns Array of client IDs
+	 * @returns Array of unique client IDs
 	 */
 	getConnectedClients(): string[] {
-		return this.transportServer.getConnectedClients();
+		const allClients = new Set<string>();
+		for (const transport of this.transportServers) {
+			transport.getConnectedClients().forEach(clientId => allClients.add(clientId));
+		}
+		return Array.from(allClients);
+	}
+
+	/**
+	 * Get transport distribution statistics
+	 *
+	 * @returns Statistics about client connections by transport type
+	 */
+	getTransportStats() {
+		return this.sessionManager.getTransportStats();
 	}
 }

@@ -3,16 +3,39 @@ export interface ProtocolMessage<T extends string> {
 	timestamp: string;
 }
 
-//FIXME stronger typing to find error in payload!!! and to determine the outcome based on the type
-export function createMessage<M extends ProtocolMessage<T>, T extends string>(
-	type: M['type'],
-	payload: Omit<M, 'type' | 'timestamp'> = {} as any
-): M {
+export type createMessageInternal_Timestamp = Date | number | undefined;
+
+/**
+ * Factory function for creating protocol messages with timestamp.
+ *
+ * This function is used by specialized message factories (createW2OMessage, createO2WMessage)
+ * to create typed messages. It handles adding the timestamp automatically.
+ *
+ * @param type - The message type
+ * @param payload - The message payload
+ * @param timestamp - Optional timestamp otherwise "now" is used
+ * @returns The complete message with type and timestamp
+ */
+export function createMessageInternal<T extends string>(
+	type: T,
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	payload: Record<string, any>,
+	timestamp?: createMessageInternal_Timestamp
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+): any {
+	let tsDate: Date;
+	if (timestamp instanceof Date) {
+		tsDate = timestamp;
+	} else if (typeof timestamp == 'number') {
+		tsDate = new Date(timestamp);
+	} else {
+		tsDate = new Date();
+	}
 	return {
 		type,
-		timestamp: new Date().toISOString(),
+		timestamp: tsDate.toISOString(),
 		...payload,
-	} as M;
+	};
 }
 
 export function parseMessage<M extends ProtocolMessage<T>, T extends string>(data: string): M {

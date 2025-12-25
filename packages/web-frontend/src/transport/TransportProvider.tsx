@@ -4,7 +4,74 @@ import { useNavigate } from 'react-router-dom';
 import type { ConnectionState } from '@shared/transport';
 
 import type { ITransportClient } from './ITransportClient';
+import { LongPollingTransportClient } from './adapters/LongPollingTransportClient';
+import { MockTransportClient } from './adapters/MockTransportClient';
+import { RestTransportClient } from './adapters/RestTransportClient';
+import { SSETransportClient } from './adapters/SSETransportClient';
 import { WebSocketTransportClient } from './adapters/WebSocketTransportClient';
+
+type TransportMode = 'auto' | 'websocket' | 'sse' | 'long-polling' | 'rest' | 'mock';
+
+/**
+ * Create transport client based on mode preference
+ */
+function createTransportClient(mode: TransportMode, baseUrl: string, wsUrl: string): ITransportClient {
+	console.log('[TransportProvider] Creating transport client with mode:', mode);
+
+	switch (mode) {
+		case 'websocket':
+			return new WebSocketTransportClient({
+				baseUrl,
+				wsUrl,
+				reconnect: true,
+				reconnectMaxAttempts: 10,
+				reconnectDelay: 1000,
+				connectionTimeout: 10000,
+				requestTimeout: 30000,
+			});
+
+		case 'rest':
+			return new RestTransportClient({ baseUrl });
+
+		case 'mock':
+			return new MockTransportClient();
+
+		case 'sse':
+			return new SSETransportClient({
+				baseUrl,
+				wsUrl: '', // Not used for SSE
+				reconnect: true,
+				reconnectMaxAttempts: 10,
+				reconnectDelay: 1000,
+				connectionTimeout: 10000,
+				requestTimeout: 30000,
+			});
+
+		case 'long-polling':
+			return new LongPollingTransportClient({
+				baseUrl,
+				wsUrl: '', // Not used for long polling
+				reconnect: true,
+				reconnectMaxAttempts: 10,
+				reconnectDelay: 1000,
+				connectionTimeout: 10000,
+				requestTimeout: 30000,
+			});
+
+		case 'auto':
+		default:
+			// Auto mode: Try WebSocket first
+			return new WebSocketTransportClient({
+				baseUrl,
+				wsUrl,
+				reconnect: true,
+				reconnectMaxAttempts: 10,
+				reconnectDelay: 1000,
+				connectionTimeout: 10000,
+				requestTimeout: 30000,
+			});
+	}
+}
 
 /**
  * Transport Context State
@@ -26,6 +93,28 @@ export interface TransportContextState {
 	 * Whether transport is connected and ready
 	 */
 	isConnected: boolean;
+
+	/**
+	 * Port number being used for the connection
+	 */
+	port: number;
+
+	/**
+	 * Force manual downgrade to REST polling
+	 * Stops WebSocket reconnection attempts
+	 */
+	forceDowngrade: () => void;
+
+	/**
+	 * Next reconnection delay in seconds (0 if not reconnecting)
+	 */
+	reconnectDelay: number;
+
+	/**
+	 * Switch to a different transport mode dynamically (without page reload)
+	 * Disconnects current transport and connects new one
+	 */
+	switchTransport: (mode: TransportMode) => Promise<void>;
 }
 
 /**
@@ -34,6 +123,35 @@ export interface TransportContextState {
  * React context for providing transport client to the component tree.
  */
 const TransportContext = createContext<TransportContextState | undefined>(undefined);
+
+/**
+ * Extract port number from URL
+ * @param url - URL to extract port from
+ * @returns Port number (defaults to 80 for http, 443 for https, 3030 for ws/wss if not specified)
+ */
+function extractPort(url: string): number {
+	try {
+		const urlObj = new URL(url);
+		if (urlObj.port) {
+			return parseInt(urlObj.port, 10);
+		}
+
+		// Default ports based on protocol
+		switch (urlObj.protocol) {
+			case 'http:':
+			case 'ws:':
+				return 80;
+			case 'https:':
+			case 'wss:':
+				return 443;
+			default:
+				return 3030; // Fallback
+		}
+	} catch (error) {
+		console.warn('[TransportProvider] Failed to extract port from URL:', url, error);
+		return 3030; // Fallback
+	}
+}
 
 /**
  * Transport Provider Props
@@ -116,23 +234,65 @@ export function TransportProvider({
 	const navigate = useNavigate();
 
 	// Create or use provided transport
-	const [transport] = useState<ITransportClient>(() => {
+	const [transport, setTransport] = useState<ITransportClient>(() => {
 		if (customTransport) {
 			return customTransport;
 		}
 
-		return new WebSocketTransportClient({
-			baseUrl,
-			wsUrl: wsUrl || baseUrl.replace(/^http/, 'ws'),
-			reconnect: true,
-			reconnectMaxAttempts: 10,
-			reconnectDelay: 1000,
-			connectionTimeout: 10000,
-			requestTimeout: 30000,
-		});
+		// Read transport mode preference from localStorage
+		const savedMode = localStorage.getItem('transport_mode') as TransportMode;
+		const mode: TransportMode = savedMode || 'auto';
+
+		return createTransportClient(mode, baseUrl, wsUrl || baseUrl.replace(/^http/, 'ws'));
 	});
 
 	const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
+
+	/**
+	 * Switch transport mode dynamically without page reload
+	 */
+	const switchTransport = useCallback(
+		async (mode: TransportMode) => {
+			console.log('[TransportProvider] Switching transport to:', mode);
+
+			// Don't switch if using custom transport
+			if (customTransport) {
+				console.warn('[TransportProvider] Cannot switch transport when using custom transport');
+				return;
+			}
+
+			// Disconnect current transport
+			console.log('[TransportProvider] Disconnecting current transport');
+			await transport.disconnect();
+
+			// Create new transport
+			const newTransport = createTransportClient(mode, baseUrl, wsUrl || baseUrl.replace(/^http/, 'ws'));
+
+			// Update state
+			setTransport(newTransport);
+
+			// Save preference
+			localStorage.setItem('transport_mode', mode);
+
+			console.log('[TransportProvider] Transport switched successfully, will auto-connect');
+		},
+		[transport, baseUrl, wsUrl, customTransport]
+	);
+
+	// Extract port from wsUrl or baseUrl
+	const port = extractPort(wsUrl || baseUrl);
+
+	/**
+	 * Force manual downgrade to REST polling
+	 */
+	const handleForceDowngrade = useCallback(() => {
+		// Check if forceDowngrade method exists
+		if ('forceDowngrade' in transport && typeof transport.forceDowngrade === 'function') {
+			transport.forceDowngrade();
+		} else {
+			console.warn('[TransportProvider] forceDowngrade not supported by current transport');
+		}
+	}, [transport]);
 
 	/**
 	 * Handle authentication failures
@@ -188,12 +348,20 @@ export function TransportProvider({
 			window.removeEventListener('auth:refresh_failed', handleRefreshFailed);
 			transport.disconnect();
 		};
-	}, [transport, autoConnect, handleAuthFailed, handleTokenExpired, handleRefreshFailed]);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [transport, autoConnect]);
+
+	// Get reconnect delay if transport supports it
+	const reconnectDelay = transport instanceof WebSocketTransportClient ? transport.getReconnectDelay() : 0;
 
 	const contextValue: TransportContextState = {
 		transport,
 		connectionState,
 		isConnected: connectionState === 'connected',
+		port,
+		forceDowngrade: handleForceDowngrade,
+		reconnectDelay,
+		switchTransport,
 	};
 
 	return <TransportContext.Provider value={contextValue}>{children}</TransportContext.Provider>;

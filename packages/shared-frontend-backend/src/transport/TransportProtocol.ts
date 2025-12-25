@@ -90,4 +90,10 @@ export interface SubscriptionMessage {
 	action: 'subscribe' | 'unsubscribe';
 	/** Array of event types to subscribe/unsubscribe from */
 	events: string[];
+	/**
+	 * Optional filters for server-side event filtering
+	 * Example: { workerId: 'worker-123', status: 'IN_PROGRESS' }
+	 * Backend will only broadcast events that match ALL specified filters
+	 */
+	filters?: Record<string, unknown>;
 }

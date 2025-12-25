@@ -74,12 +74,15 @@ export function useCacheControl2(options?: UseCacheControl2Options): CacheContro
 	const [isRefreshing, setIsRefreshingState] = useState(false);
 
 	// Frozen state (memoized, stable reference for useEffect deps)
+	// effectiveCacheId: only includes cacheId if enabled, otherwise undefined
+	// This ensures fillQuery() has stable reference when disabled (antifragile pattern)
 	const fstate = useMemo(
 		() => ({
 			cacheId,
 			isRefreshing,
+			effectiveCacheId: enabled ? cacheId : undefined,
 		}),
-		[cacheId, isRefreshing]
+		[cacheId, isRefreshing, enabled]
 	);
 
 	// Actions (all state-modifying functions)
@@ -134,7 +137,14 @@ export function useCacheControl2(options?: UseCacheControl2Options): CacheContro
 
 	/**
 	 * Fill backend query parameters with cache control info.
-	 * Only includes cacheId if enabled.
+	 * Only includes cacheId if enabled (via effectiveCacheId in fstate).
+	 *
+	 * ANTIFRAGILE PATTERN:
+	 * - If enabled=false: effectiveCacheId=undefined → fillQuery doesn't change when cacheId changes
+	 * - If enabled=true: effectiveCacheId=cacheId → fillQuery changes when cacheId changes
+	 * - If enabled changes: effectiveCacheId changes → fillQuery changes (correctly triggers refetch)
+	 *
+	 * This prevents unnecessary refetches when feature is disabled but cacheId increments.
 	 *
 	 * Example:
 	 * ```typescript
@@ -142,18 +152,20 @@ export function useCacheControl2(options?: UseCacheControl2Options): CacheContro
 	 * cache.fillQuery(query);
 	 * // If enabled and cacheId = 1:
 	 * // query = { cacheId: 1 }
+	 * // If disabled:
+	 * // query = {} (unchanged)
 	 * ```
 	 */
 	const fillQuery = useCallback(
 		(query: Record<string, unknown>) => {
-			if (enabled) {
-				console.log('[useCacheControl2] fillQuery() called, adding cacheId:', cacheId);
-				query.cacheId = cacheId;
+			if (fstate.effectiveCacheId !== undefined) {
+				console.log('[useCacheControl2] fillQuery() called, adding cacheId:', fstate.effectiveCacheId);
+				query.cacheId = fstate.effectiveCacheId;
 			} else {
 				console.log('[useCacheControl2] fillQuery() called but disabled, skipping cacheId');
 			}
 		},
-		[cacheId, enabled]
+		[fstate.effectiveCacheId]
 	);
 
 	return {

@@ -24,6 +24,9 @@ import requestLoggerHook from './fastify/hooks/requestLogger.hook';
 import responseHelpersPlugin from './fastify/plugins/responseHelpers.plugin';
 import routesPlugin from './fastify/plugins/routes.plugin';
 import { EventBroadcaster } from './transport/EventBroadcaster';
+import { MessageQueue } from './transport/MessageQueue';
+import { LongPollingTransportServer } from './transport/adapters/LongPollingTransportServer';
+import { SSETransportServer } from './transport/adapters/SSETransportServer';
 import { WebSocketTransportServer } from './transport/adapters/WebSocketTransportServer';
 import { initializeFactory } from './utils/factory-instance';
 
@@ -83,36 +86,72 @@ async function initializeOrchestratorClient(): Promise<Orchestrator> {
 }
 
 /**
- * Initialize WebSocket transport server
+ * Initialize Multi-Transport Server (WebSocket, SSE, Long Polling)
+ *
+ * Anti-fragile design:
+ * - Each transport is independent
+ * - Failure in one transport doesn't affect others
+ * - All transports share same session manager and message queue
+ * - EventBroadcaster routes to appropriate transport
  */
 async function initializeTransportServer(app: FastifyInstance, factory: DataStoreFactory) {
 	// Get session manager and transport router from factory
 	const sessionManager = factory.getSessionManager();
 	const router = factory.getTransportRouter();
 
-	// Create WebSocket transport server
-	const transportServer = new WebSocketTransportServer(sessionManager, router);
+	// Create MessageQueue for polling transports (SSE, Long Polling)
+	const messageQueue = new MessageQueue({
+		maxQueueSize: 100,
+		messageTTL: 60000, // 1 minute
+		cleanupInterval: 10000, // 10 seconds
+	});
 
-	// Initialize WebSocket endpoint
-	await transportServer.initialize(app);
+	// Create transport servers
+	const wsTransportServer = new WebSocketTransportServer(sessionManager, router);
+	const sseTransportServer = new SSETransportServer(sessionManager, messageQueue);
+	const longPollingTransportServer = new LongPollingTransportServer(sessionManager, messageQueue);
 
-	// Register transport server in factory for MonitoringController
-	factory.setTransportServer(transportServer);
+	// Initialize all transports
+	await wsTransportServer.initialize(app);
+	await sseTransportServer.initialize(app);
+	await longPollingTransportServer.initialize(app);
 
-	// Create and register EventBroadcaster
-	const eventBroadcaster = new EventBroadcaster(transportServer, sessionManager);
+	// Register WebSocket as primary transport server in factory (for MonitoringController)
+	factory.setTransportServer(wsTransportServer);
+
+	// Create EventBroadcaster that broadcasts to ALL transports
+	const allTransports = [wsTransportServer, sseTransportServer, longPollingTransportServer];
+	const eventBroadcaster = new EventBroadcaster(allTransports, sessionManager, messageQueue);
 	factory.setEventBroadcaster(eventBroadcaster);
 
-	logger.info('[Transport] WebSocket server initialized on GET /ws');
+	logger.info(`[Transport] Multi-transport server initialized:`);
+	logger.info(`  - WebSocket: ws://localhost:${PORT}/ws`);
+	logger.info(`  - SSE: http://localhost:${PORT}/sse`);
+	logger.info(`  - Long Polling: http://localhost:${PORT}/long-polling/events`);
 
-	// Log connection events (optional, for debugging)
-	transportServer.onClientConnected(clientId => {
-		logger.info(`[Transport] Client connected: ${clientId}`);
-	});
+	// Log connection events for all transports
+	const logConnection = (transport: string) => (clientId: string) => {
+		const type = sessionManager.getTransportType(clientId);
+		logger.info(`[${transport}] Client ${clientId} connected (type=${type})`);
+	};
 
-	transportServer.onClientDisconnected(clientId => {
-		logger.info(`[Transport] Client disconnected: ${clientId}`);
-	});
+	const logDisconnection = (transport: string) => (clientId: string) => {
+		logger.info(`[${transport}] Client ${clientId} disconnected`);
+	};
+
+	wsTransportServer.onClientConnected(logConnection('WebSocket'));
+	wsTransportServer.onClientDisconnected(logDisconnection('WebSocket'));
+
+	sseTransportServer.onClientConnected(logConnection('SSE'));
+	sseTransportServer.onClientDisconnected(logDisconnection('SSE'));
+
+	longPollingTransportServer.onClientConnected(logConnection('LongPolling'));
+	longPollingTransportServer.onClientDisconnected(logDisconnection('LongPolling'));
+
+	// Log transport distribution every 60 seconds
+	setInterval(() => {
+		sessionManager.logTransportDistribution();
+	}, 60000);
 }
 
 // SAFETY: Force in-memory mode when running E2E tests
@@ -237,6 +276,118 @@ function getNetworkAddresses(): string[] {
 // 	storage: 'in-memory',
 // 	timestamp: new Date().toISOString(),
 // }));
+
+// ===========================================================================================
+// DASHBOARD BROADCASTER
+// ===========================================================================================
+
+/**
+ * Start broadcasting dashboard data via WebSocket
+ * Reactive/event-driven: broadcasts only when orchestrator state changes
+ */
+function startDashboardBroadcaster(factory: DataStoreFactory): void {
+	const dashboardService = factory.getDashboardService();
+	const eventBroadcaster = factory.getEventBroadcaster();
+	const orchestratorWrapper = factory.getOrchestratorWrapper();
+
+	const broadcastDashboardData = async () => {
+		try {
+			if (!eventBroadcaster) {
+				logger.warn('[Dashboard Broadcaster] EventBroadcaster not initialized');
+				return;
+			}
+
+			const dashboardData = await dashboardService.getDashboardData();
+			eventBroadcaster.broadcast('b2f:dashboard:updated', dashboardData);
+			console.log('[Dashboard Broadcaster] Broadcast dashboard data (reactive)');
+		} catch (error) {
+			logger.error('[Dashboard Broadcaster] Failed to broadcast dashboard data:', error);
+		}
+	};
+
+	// Initial broadcast on startup
+	broadcastDashboardData();
+
+	// Listen to orchestrator events and broadcast on changes (reactive mode)
+	orchestratorWrapper.on('task.created', broadcastDashboardData);
+	orchestratorWrapper.on('task.updated', broadcastDashboardData);
+	orchestratorWrapper.on('task.status_changed', broadcastDashboardData);
+	orchestratorWrapper.on('worker.connected', broadcastDashboardData);
+	orchestratorWrapper.on('worker.disconnected', broadcastDashboardData);
+	orchestratorWrapper.on('worker.status', broadcastDashboardData);
+
+	logger.info('[Dashboard Broadcaster] Started (reactive/event-driven mode)');
+}
+
+/**
+ * Start broadcasting tasks data via WebSocket
+ * Reactive/event-driven: broadcasts only when task state changes
+ */
+function startTasksBroadcaster(factory: DataStoreFactory): void {
+	const tasksService = factory.getTasksService();
+	const eventBroadcaster = factory.getEventBroadcaster();
+	const orchestratorWrapper = factory.getOrchestratorWrapper();
+
+	const broadcastTasksData = async () => {
+		try {
+			if (!eventBroadcaster) {
+				logger.warn('[Tasks Broadcaster] EventBroadcaster not initialized');
+				return;
+			}
+
+			const tasksData = await tasksService.getTasksData({});
+			eventBroadcaster.broadcast('b2f:tasks:updated', tasksData);
+			console.log('[Tasks Broadcaster] Broadcast tasks data (reactive)');
+		} catch (error) {
+			logger.error('[Tasks Broadcaster] Failed to broadcast tasks data:', error);
+		}
+	};
+
+	// Initial broadcast on startup
+	broadcastTasksData();
+
+	// Listen to orchestrator events and broadcast on changes (reactive mode)
+	orchestratorWrapper.on('task.created', broadcastTasksData);
+	orchestratorWrapper.on('task.updated', broadcastTasksData);
+	orchestratorWrapper.on('task.status_changed', broadcastTasksData);
+
+	logger.info('[Tasks Broadcaster] Started (reactive/event-driven mode)');
+}
+
+/**
+ * Start broadcasting workers data via WebSocket
+ * Reactive/event-driven: broadcasts only when worker state changes
+ */
+function startWorkersBroadcaster(factory: DataStoreFactory): void {
+	const workersService = factory.getWorkersService();
+	const eventBroadcaster = factory.getEventBroadcaster();
+	const orchestratorWrapper = factory.getOrchestratorWrapper();
+
+	const broadcastWorkersData = async () => {
+		try {
+			if (!eventBroadcaster) {
+				logger.warn('[Workers Broadcaster] EventBroadcaster not initialized');
+				return;
+			}
+
+			const workersData = await workersService.getWorkersData();
+			eventBroadcaster.broadcast('b2f:workers:updated', workersData);
+			console.log('[Workers Broadcaster] Broadcast workers data (reactive)');
+		} catch (error) {
+			logger.error('[Workers Broadcaster] Failed to broadcast workers data:', error);
+		}
+	};
+
+	// Initial broadcast on startup
+	broadcastWorkersData();
+
+	// Listen to orchestrator events and broadcast on changes (reactive mode)
+	orchestratorWrapper.on('worker.connected', broadcastWorkersData);
+	orchestratorWrapper.on('worker.disconnected', broadcastWorkersData);
+	orchestratorWrapper.on('worker.status', broadcastWorkersData);
+
+	logger.info('[Workers Broadcaster] Started (reactive/event-driven mode)');
+}
 
 // ===========================================================================================
 // START SERVER
@@ -379,11 +530,10 @@ async function start() {
 
 		// Initialize global factory for dependency injection
 		// This must be done BEFORE any controllers are loaded
+		const factory = initializeFactory('memory', orchestratorClient);
+
 		if (process.env.USE_PRODUCTION_DB === 'true') {
 			//TODO database integration
-			// 'memory' for tests, 'mariadb' for prod
-			const factory = initializeFactory('memory', orchestratorClient);
-
 			// Seed initial data (for development)
 			await factory.seedData();
 
@@ -392,9 +542,6 @@ async function start() {
 		} else if (process.env.E2E_MODE !== 'true') {
 			//logger.info('Skipping Google Sheets and Gemini AI initialization (in-memory mode)');
 
-			// 'memory' for tests, 'mariadb' for prod
-			const factory = initializeFactory('memory', orchestratorClient);
-
 			// Seed initial data (for development)
 			await factory.seedData();
 
@@ -402,8 +549,6 @@ async function start() {
 			await initializeTransportServer(fastify, factory);
 		} else {
 			// E2E mode also needs a factory for controllers
-			const factory = initializeFactory('memory', orchestratorClient);
-
 			// Initialize WebSocket transport server for E2E tests
 			await initializeTransportServer(fastify, factory);
 		}
@@ -430,6 +575,13 @@ async function start() {
 			networkAddresses.forEach(address => {
 				logger.info(`  >  Network: http://${address}:${PORT}/`);
 			});
+		}
+
+		// Start broadcasters (only in normal mode, not E2E)
+		if (process.env.E2E_MODE !== 'true') {
+			startDashboardBroadcaster(factory);
+			startTasksBroadcaster(factory);
+			startWorkersBroadcaster(factory);
 		}
 	} catch (err) {
 		// Always log startup errors, even in E2E mode (critical for debugging)

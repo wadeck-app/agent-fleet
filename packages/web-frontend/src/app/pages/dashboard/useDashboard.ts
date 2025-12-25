@@ -3,8 +3,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAbortableEffect } from '@framework/hooks/useAbortableEffect';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { DashboardData } from '@shared/api/dashboard.contract';
+import { B2F_DASHBOARD_UPDATED } from '@shared/transport';
 
-import { type WebSocketMessage, useOrchestratorWebSocket } from '@/app/hooks/useOrchestratorWebSocket';
+import { useTransport } from '@/transport';
 
 import { dashboardService } from './DashboardService';
 
@@ -59,99 +60,35 @@ export function useDashboard(params?: UseDashboardParams): UseDashboardResult {
 	// Track if component is mounted for cleanup
 	const isMountedRef = useRef(true);
 
+	// Get transport for WebSocket events and connection state
+	const { transport, connectionState } = useTransport();
+
 	/**
-	 * WebSocket connection for real-time updates
+	 * WebSocket connection for real-time updates via backend transport
 	 */
-	const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
-		// Validate that the message contains DashboardData structure
-		const isValidDashboardData = (data: unknown): data is DashboardData => {
-			if (!data || typeof data !== 'object') return false;
-			const obj = data as Record<string, unknown>;
-
-			// Check timestamp
-			if (typeof obj.timestamp !== 'string') return false;
-
-			// Check orchestrator object
-			if (!obj.orchestrator || typeof obj.orchestrator !== 'object') return false;
-			const orchestrator = obj.orchestrator as Record<string, unknown>;
-			if (
-				typeof orchestrator.status !== 'string' ||
-				typeof orchestrator.uptime !== 'number' ||
-				typeof orchestrator.version !== 'string'
-			)
-				return false;
-
-			// Check workers object
-			if (!obj.workers || typeof obj.workers !== 'object') return false;
-			const workers = obj.workers as Record<string, unknown>;
-			if (
-				typeof workers.connected !== 'number' ||
-				typeof workers.idle !== 'number' ||
-				typeof workers.busy !== 'number'
-			)
-				return false;
-
-			// Check tasks object
-			if (!obj.tasks || typeof obj.tasks !== 'object') return false;
-			const tasks = obj.tasks as Record<string, unknown>;
-			if (
-				typeof tasks.total !== 'number' ||
-				typeof tasks.active !== 'number' ||
-				typeof tasks.review !== 'number' ||
-				typeof tasks.done !== 'number' ||
-				typeof tasks.blocked !== 'number' ||
-				typeof tasks.failed !== 'number'
-			)
-				return false;
-
-			// Check throughput object
-			if (!obj.throughput || typeof obj.throughput !== 'object') return false;
-			const throughput = obj.throughput as Record<string, unknown>;
-			if (
-				typeof throughput.tasksPerHour !== 'number' ||
-				typeof throughput.successRate !== 'number' ||
-				typeof throughput.avgTaskDuration !== 'number'
-			)
-				return false;
-
-			// Check recentActivity array
-			if (!Array.isArray(obj.recentActivity)) return false;
-
-			return true;
-		};
-
-		// Handle state_update messages
-		if (message.type === 'state_update' && isMountedRef.current) {
-			console.log('[useDashboard] Received state_update via WebSocket');
-			if (isValidDashboardData(message.data)) {
-				setData(message.data);
-				setError(null);
-			} else {
-				console.log('[useDashboard] state_update does not contain dashboard data - ignoring');
-			}
-		}
-		// Handle snapshot messages (full state)
-		else if (message.type === 'snapshot' && isMountedRef.current) {
-			console.log('[useDashboard] Received snapshot via WebSocket');
-			if (isValidDashboardData(message.data)) {
-				setData(message.data);
-				setError(null);
-			} else {
-				console.log('[useDashboard] snapshot does not contain dashboard data - ignoring');
-			}
-		}
-		// Handle error messages
-		else if (message.type === 'error' && isMountedRef.current) {
-			console.error('[useDashboard] Received error via WebSocket:', message);
-			const errorMessage = (message.message as string) || 'WebSocket error received';
-			setError(errorMessage);
+	const handleDashboardEvent = useCallback((dashboardData: DashboardData) => {
+		if (isMountedRef.current) {
+			console.log('[useDashboard] Received dashboard update via WebSocket');
+			setData(dashboardData);
+			setError(null);
 		}
 	}, []);
 
-	const { isConnected: wsConnected } = useOrchestratorWebSocket({
-		enabled: enabled && useWebSocket,
-		onMessage: handleWebSocketMessage,
-	});
+	// Subscribe to dashboard events via backend WebSocket
+	useEffect(() => {
+		if (!enabled || !useWebSocket) return;
+
+		console.log('[useDashboard] Subscribing to dashboard updates');
+		const unsubscribe = transport.subscribe(B2F_DASHBOARD_UPDATED, handleDashboardEvent);
+
+		return () => {
+			console.log('[useDashboard] Unsubscribing from dashboard updates');
+			unsubscribe();
+		};
+	}, [enabled, useWebSocket, transport, handleDashboardEvent]);
+
+	// Check if WebSocket is connected (convenience for return value)
+	const wsConnected = connectionState === 'connected';
 
 	/**
 	 * Manual refresh capability
@@ -255,19 +192,27 @@ export function useDashboard(params?: UseDashboardParams): UseDashboardResult {
 
 	/**
 	 * Polling effect - refresh data at regular intervals
-	 * Only active when WebSocket is NOT connected (fallback mode)
+	 * Only active when WebSocket has failed or is not used (fallback mode)
+	 * Does NOT poll during 'reconnecting' state to respect exponential backoff
 	 * Uses setInterval inside useEffect for cleanup
 	 */
 	useEffect(() => {
 		// Don't poll if:
 		// - Not enabled
 		// - Still doing initial load
-		// - WebSocket is connected (real-time updates active)
-		if (!enabled || isInitialLoad || wsConnected) {
+		// - WebSocket is not used
+		if (!enabled || isInitialLoad || !useWebSocket) {
 			return;
 		}
 
-		console.log('[useDashboard] Starting polling (WebSocket disconnected)');
+		// Don't poll if WebSocket is connected or trying to reconnect
+		// Only poll if WebSocket has given up ('error') or is disabled ('disconnected' without reconnect)
+		if (connectionState === 'connected' || connectionState === 'connecting' || connectionState === 'reconnecting') {
+			console.log(`[useDashboard] Waiting for WebSocket (state: ${connectionState})`);
+			return;
+		}
+
+		console.log('[useDashboard] Starting REST polling (WebSocket failed or unavailable)');
 		const intervalId = setInterval(async () => {
 			try {
 				const dashboardData = await dashboardService.getDashboard();
@@ -285,10 +230,10 @@ export function useDashboard(params?: UseDashboardParams): UseDashboardResult {
 
 		// Cleanup interval on unmount or when dependencies change
 		return () => {
-			console.log('[useDashboard] Stopping polling');
+			console.log('[useDashboard] Stopping REST polling');
 			clearInterval(intervalId);
 		};
-	}, [enabled, isInitialLoad, pollInterval, wsConnected]);
+	}, [enabled, isInitialLoad, pollInterval, useWebSocket, connectionState]);
 
 	/**
 	 * Cleanup on unmount

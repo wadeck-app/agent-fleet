@@ -12,7 +12,7 @@ import type {
 
 import type { ITransportServer } from '../ITransportServer';
 import type { TransportRouter } from '../TransportRouter';
-import type { WebSocketSessionManager } from '../WebSocketSessionManager';
+import type { TransportSessionManager } from '../TransportSessionManager';
 
 /**
  * ===========================================================================================
@@ -64,7 +64,7 @@ export class WebSocketTransportServer implements ITransportServer {
 	private expirationTimers = new Map<string, NodeJS.Timeout>();
 
 	constructor(
-		private sessionManager: WebSocketSessionManager,
+		private sessionManager: TransportSessionManager,
 		private router: TransportRouter
 	) {}
 
@@ -77,67 +77,98 @@ export class WebSocketTransportServer implements ITransportServer {
 		await app.register(fastifyWebsocket);
 
 		// Register WebSocket endpoint
-		// @ts-expect-error - Fastify websocket types are not fully compatible
-		app.get('/ws', { websocket: true }, async (connection: { socket: WebSocket }, req: any) => {
-			await this.handleConnection(connection.socket, req);
+		app.get('/ws', { websocket: true }, (connection: any, req: any) => {
+			console.log(
+				'[WS] Handler called with connection type:',
+				typeof connection,
+				'keys:',
+				Object.keys(connection || {})
+			);
+			console.log('[WS] connection.socket exists?', !!connection?.socket);
+
+			if (!connection) {
+				console.error('[WS] Connection is null/undefined');
+				return;
+			}
+
+			// if (!connection.socket) {
+			// 	console.error('[WS] connection.socket is null/undefined, connection keys:', Object.keys(connection));
+			// 	return;
+			// }
+
+			// this.handleConnection(connection.socket, req);
+			this.handleConnection(connection, req);
 		});
 	}
 
 	/**
 	 * Handle new WebSocket connection
 	 */
-	private async handleConnection(socket: WebSocket, req: any): Promise<void> {
-		const clientId = this.generateClientId();
-
-		try {
-			// Authenticate from HTTP cookies
-			const session = await this.sessionManager.authenticateConnection(clientId, req.raw);
-
-			// Store client
-			this.clients.set(clientId, socket);
-
-			// Send connection success
-			this.sendMessage(socket, {
-				type: 'connected',
-				clientId,
-				userId: session.userId,
-				tokenExpiresAt: session.tokenExpiresAt,
-			});
-
-			console.log(`[WS] Connected: client=${clientId}, user=${session.userId}`);
-
-			// Notify connection handlers
-			this.clientConnectedHandlers.forEach(handler => handler(clientId));
-
-			// Schedule expiration warning
-			this.scheduleExpirationWarning(clientId, session.tokenExpiresAt);
-
-			// Handle incoming messages
-			socket.on('message', async (rawMessage: Buffer) => {
-				await this.handleMessage(clientId, socket, rawMessage);
-			});
-
-			// Handle disconnection
-			socket.on('close', () => {
-				this.handleDisconnection(clientId);
-			});
-
-			// Handle errors
-			socket.on('error', error => {
-				console.error(`[WS] Error: client=${clientId}`, error);
-			});
-		} catch (error: any) {
-			console.error('[WS] Authentication failed', error);
-
-			// Send auth error
-			this.sendMessage(socket, {
-				type: 'auth_error',
-				message: error.message || 'Authentication failed',
-			});
-
-			// Close connection
-			socket.close();
+	private handleConnection(socket: WebSocket, req: any): void {
+		// Validate socket exists
+		if (!socket) {
+			console.error('[WS] Connection handler called with undefined socket');
+			return;
 		}
+
+		const clientId = this.generateClientId();
+		console.log(`[WS] New connection attempt: client=${clientId}`);
+
+		// Setup message handlers immediately (don't wait for auth)
+		socket.on('message', async (rawMessage: Buffer) => {
+			await this.handleMessage(clientId, socket, rawMessage);
+		});
+
+		// Handle disconnection
+		socket.on('close', () => {
+			this.handleDisconnection(clientId);
+		});
+
+		// Handle errors
+		socket.on('error', error => {
+			console.error(`[WS] Error: client=${clientId}`, error);
+		});
+
+		// Authenticate asynchronously after handlers are set up
+		this.sessionManager
+			.authenticateConnection(clientId, req.raw, 'websocket')
+			.then(session => {
+				// Store client
+				this.clients.set(clientId, socket);
+
+				// Send connection success
+				this.sendMessage(socket, {
+					type: 'connected',
+					clientId,
+					userId: session.userId,
+					tokenExpiresAt: session.tokenExpiresAt,
+				});
+
+				console.log(`[WS] Connected: client=${clientId}, user=${session.userId}`);
+
+				// Notify connection handlers
+				this.clientConnectedHandlers.forEach(handler => handler(clientId));
+
+				// Schedule expiration warning
+				//TODO			this.scheduleExpirationWarning(clientId, session.tokenExpiresAt);
+			})
+			.catch((error: any) => {
+				console.error('[WS] Authentication failed', error);
+
+				// Send auth error (socket might be closed, so check first)
+				if (socket && socket.readyState === 1) {
+					this.sendMessage(socket, {
+						type: 'auth_error',
+						message: error.message || 'Authentication failed',
+					});
+				}
+
+				// Close connection
+				if (socket && socket.readyState !== 3) {
+					// 3 = CLOSED
+					socket.close();
+				}
+			});
 	}
 
 	/**
@@ -175,16 +206,17 @@ export class WebSocketTransportServer implements ITransportServer {
 	 * Handle subscription control message
 	 */
 	private handleSubscription(clientId: string, socket: WebSocket, message: SubscriptionMessage): void {
-		const { action, events } = message;
+		const { action, events, filters } = message;
 
-		// Update subscriptions in session manager
-		this.sessionManager.updateSubscriptions(clientId, action, events);
+		// Update subscriptions in session manager (with filters)
+		this.sessionManager.updateSubscriptions(clientId, action, events, filters);
 
-		// Confirm subscription
+		// Confirm subscription (with filters)
 		this.sendMessage(socket, {
 			type: 'subscription_updated',
 			action,
 			events,
+			filters,
 		});
 	}
 
@@ -242,6 +274,16 @@ export class WebSocketTransportServer implements ITransportServer {
 		// Warn 2 minutes (120000ms) before expiration
 		const warningTime = Math.max(0, timeUntilExpiry - 120000);
 
+		// setTimeout max value is 2^31-1 ms (~24.8 days)
+		// If warning time exceeds this, skip scheduling (token is too far in future)
+		const MAX_TIMEOUT = 2147483647; // 2^31 - 1
+		if (warningTime > MAX_TIMEOUT) {
+			console.log(
+				`[WS] Token expiration too far in future (${Math.floor(warningTime / 86400000)} days), skipping warning`
+			);
+			return;
+		}
+
 		const timer = setTimeout(() => {
 			const socket = this.clients.get(clientId);
 
@@ -283,7 +325,7 @@ export class WebSocketTransportServer implements ITransportServer {
 
 	/**
 	 * Broadcast event to all connected clients
-	 * Server-side subscription filtering is applied
+	 * Server-side subscription and filter matching is applied
 	 */
 	broadcast<E extends EventType>(event: E, data: EventData<E>): void {
 		const eventMessage: TransportEvent = {
@@ -307,6 +349,13 @@ export class WebSocketTransportServer implements ITransportServer {
 			// Check if client is subscribed to this event
 			if (!this.sessionManager.isSubscribed(clientId, event)) {
 				filteredCount++;
+				return;
+			}
+
+			// NEW: Check if event data matches client's filters
+			if (!this.sessionManager.matchesFilters(clientId, event, data)) {
+				filteredCount++;
+				console.log(`[WS] Client ${clientId} filtered out by filters for ${event}`);
 				return;
 			}
 
@@ -381,7 +430,7 @@ export class WebSocketTransportServer implements ITransportServer {
 	 * Send message to WebSocket
 	 */
 	private sendMessage(socket: WebSocket, message: any): void {
-		if (socket.readyState === 1) {
+		if (socket && socket.readyState === 1) {
 			// 1 = OPEN
 			socket.send(JSON.stringify(message));
 		}

@@ -1,8 +1,8 @@
 import { logger } from 'shared-common/logger';
-import { createMessage, parseMessage } from 'shared-common/protocol';
+import { parseMessage } from 'shared-common/protocol';
 import { StateManager } from 'shared-orch-worker/StateManager';
 import { WorkerInfo } from 'shared-orch-worker/domain-types';
-import { O2WMessage, O2WMessageType } from 'shared-orch-worker/orchestrator-messages';
+import { O2WMessage, O2WMessageType, createO2WMessage } from 'shared-orch-worker/orchestrator-messages';
 import { W2OMessage, W2OMessageType } from 'shared-orch-worker/worker-messages';
 import { WebSocket, WebSocketServer } from 'ws';
 
@@ -67,7 +67,7 @@ export class WorkerWebSocketServer {
 				logger.error('[WS] Error parsing message:', (error as Error).message);
 				this.connectionManager.sendMessage(
 					socket,
-					createMessage(O2WMessageType.ERROR, {
+					createO2WMessage(O2WMessageType.ERROR, {
 						error: (error as Error).message,
 					})
 				);

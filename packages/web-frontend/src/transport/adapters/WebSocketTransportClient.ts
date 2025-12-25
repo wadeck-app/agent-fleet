@@ -24,7 +24,7 @@
  *   baseUrl: 'http://localhost:3000',
  *   wsUrl: 'ws://localhost:3000',
  *   reconnect: true,
- *   reconnectMaxAttempts: 10
+ *   reconnectMaxAttempts: 3
  * });
  *
  * // Connect (automatic authentication)
@@ -101,6 +101,12 @@ export class WebSocketTransportClient implements ITransportClient {
 	private eventHandlers = new Map<string, Set<EventHandler<any>>>();
 
 	/**
+	 * Event filters by event type
+	 * Stores filters for server-side event filtering
+	 */
+	private eventFilters = new Map<string, Record<string, unknown>>();
+
+	/**
 	 * Connection state change handlers
 	 */
 	private connectionStateHandlers = new Set<ConnectionStateHandler>();
@@ -119,6 +125,14 @@ export class WebSocketTransportClient implements ITransportClient {
 	 * Reconnection timer
 	 */
 	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+	/**
+	 * Flag indicating if connection was ever established successfully
+	 * Used to determine reconnection strategy:
+	 * - If true: infinite reconnection attempts (backend likely temporarily down)
+	 * - If false: limited attempts (WebSocket might not be supported)
+	 */
+	private hasConnectedOnce = false;
 
 	/**
 	 * Create a new WebSocketTransportClient
@@ -177,6 +191,7 @@ export class WebSocketTransportClient implements ITransportClient {
 					clearTimeout(timeout);
 					this.updateConnectionState('connected');
 					this.reconnectAttempts = 0;
+					this.hasConnectedOnce = true; // Mark that connection was successful
 
 					console.log(`[WS] Authenticated as user ${data.userId}`);
 
@@ -274,6 +289,46 @@ export class WebSocketTransportClient implements ITransportClient {
 	}
 
 	/**
+	 * Force manual downgrade to REST polling
+	 * Stops WebSocket reconnection attempts and switches to 'manual_downgrade' state
+	 */
+	forceDowngrade(): void {
+		console.log('[WS] User requested manual downgrade to REST');
+
+		// Stop token refresh
+		this.tokenRefreshManager.stopAutoRefresh();
+
+		// Stop any pending reconnection
+		if (this.reconnectTimer) {
+			clearTimeout(this.reconnectTimer);
+			this.reconnectTimer = null;
+		}
+
+		// Close current connection if exists
+		if (this.ws) {
+			this.ws.close();
+			this.ws = null;
+		}
+
+		// Update to manual_downgrade state
+		this.updateConnectionState('manual_downgrade');
+	}
+
+	/**
+	 * Get next reconnection delay in seconds
+	 * Returns 0 if not reconnecting
+	 */
+	getReconnectDelay(): number {
+		if (this.connectionState !== 'reconnecting') {
+			return 0;
+		}
+
+		// Calculate delay with exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (max)
+		const delayMs = Math.min((this.config.reconnectDelay || 1000) * Math.pow(2, this.reconnectAttempts - 1), 30000);
+		return Math.round(delayMs / 1000);
+	}
+
+	/**
 	 * Make a type-safe request
 	 */
 	async request<M extends HttpMethod, P extends PathsForMethod<M>>(
@@ -310,8 +365,18 @@ export class WebSocketTransportClient implements ITransportClient {
 
 	/**
 	 * Subscribe to events with server-side filtering
+	 *
+	 * @param event - Event type to subscribe to
+	 * @param handler - Event handler function
+	 * @param filters - Optional filters for server-side filtering
+	 *                  Example: { workerId: 'worker-123', status: 'IN_PROGRESS' }
+	 *                  Backend will only send events matching ALL specified filters
 	 */
-	subscribe<E extends EventType>(event: E, handler: EventHandler<E>): UnsubscribeFunction {
+	subscribe<E extends EventType>(
+		event: E,
+		handler: EventHandler<E>,
+		filters?: Record<string, unknown>
+	): UnsubscribeFunction {
 		const isFirstSubscription = !this.eventHandlers.has(event);
 
 		if (!this.eventHandlers.has(event)) {
@@ -319,9 +384,14 @@ export class WebSocketTransportClient implements ITransportClient {
 		}
 		this.eventHandlers.get(event)!.add(handler);
 
-		// Notify server of subscription
+		// Store filters for this event
+		if (filters) {
+			this.eventFilters.set(event, filters);
+		}
+
+		// Notify server of subscription (with filters)
 		if (isFirstSubscription) {
-			this.sendSubscriptionMessage('subscribe', [event]);
+			this.sendSubscriptionMessage('subscribe', [event], filters);
 		}
 
 		return () => {
@@ -330,6 +400,7 @@ export class WebSocketTransportClient implements ITransportClient {
 			// If no more handlers, unsubscribe from server
 			if (this.eventHandlers.get(event)?.size === 0) {
 				this.eventHandlers.delete(event);
+				this.eventFilters.delete(event);
 				this.sendSubscriptionMessage('unsubscribe', [event]);
 			}
 		};
@@ -345,8 +416,16 @@ export class WebSocketTransportClient implements ITransportClient {
 
 	/**
 	 * Send subscription control message to server
+	 *
+	 * @param action - Subscribe or unsubscribe action
+	 * @param events - Array of event types
+	 * @param filters - Optional filters for server-side filtering
 	 */
-	private sendSubscriptionMessage(action: 'subscribe' | 'unsubscribe', events: string[]): void {
+	private sendSubscriptionMessage(
+		action: 'subscribe' | 'unsubscribe',
+		events: string[],
+		filters?: Record<string, unknown>
+	): void {
 		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
 			return;
 		}
@@ -355,6 +434,7 @@ export class WebSocketTransportClient implements ITransportClient {
 			type: 'subscription',
 			action,
 			events,
+			filters,
 		};
 
 		this.ws.send(JSON.stringify(message));
@@ -402,16 +482,26 @@ export class WebSocketTransportClient implements ITransportClient {
 		}
 	}
 
+	private reconnectMaxAttempts() {
+		return this.config.reconnectMaxAttempts || 3;
+	}
+
 	/**
 	 * Handle reconnection with exponential backoff
+	 *
+	 * Strategy:
+	 * - If hasConnectedOnce: infinite reconnection attempts (backend likely down temporarily)
+	 * - If !hasConnectedOnce: limited attempts (WebSocket might not be supported)
 	 */
 	private handleReconnect(): void {
 		if (!this.config.reconnect) {
 			return;
 		}
 
-		if (this.reconnectAttempts >= (this.config.reconnectMaxAttempts || 10)) {
-			console.error('[WS] Max reconnection attempts reached');
+		// Only enforce max attempts if we never connected successfully
+		// If we did connect once, keep trying indefinitely (backend likely just restarting)
+		if (!this.hasConnectedOnce && this.reconnectAttempts >= this.reconnectMaxAttempts()) {
+			console.error('[WS] Max reconnection attempts reached (never connected)');
 			this.updateConnectionState('error');
 			return;
 		}
@@ -422,7 +512,10 @@ export class WebSocketTransportClient implements ITransportClient {
 		// Exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (max)
 		const delay = Math.min((this.config.reconnectDelay || 1000) * Math.pow(2, this.reconnectAttempts - 1), 30000);
 
-		console.log(`[WS] Reconnecting in ${Math.round(delay / 1000)}s (attempt ${this.reconnectAttempts})`);
+		const attemptInfo = this.hasConnectedOnce
+			? `attempt ${this.reconnectAttempts} (infinite retry)`
+			: `attempt ${this.reconnectAttempts}/${this.reconnectMaxAttempts()}`;
+		console.log(`[WS] Reconnecting in ${Math.round(delay / 1000)}s (${attemptInfo})`);
 
 		this.reconnectTimer = setTimeout(() => {
 			this.connect().catch(err => {

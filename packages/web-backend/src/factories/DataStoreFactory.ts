@@ -24,7 +24,7 @@ import { InMemoryStorage } from '../storage/InMemoryStorage';
 import { EventBroadcaster } from '../transport/EventBroadcaster';
 import type { ITransportServer } from '../transport/ITransportServer';
 import { TransportRouter } from '../transport/TransportRouter';
-import { WebSocketSessionManager } from '../transport/WebSocketSessionManager';
+import { TransportSessionManager } from '../transport/TransportSessionManager';
 
 /**
  * ===========================================================================================
@@ -53,7 +53,7 @@ export class DataStoreFactory {
 	private tasksService?: TasksService;
 	private workspacesService?: WorkspacesService;
 	private authService?: AuthService;
-	private sessionManager?: WebSocketSessionManager;
+	private sessionManager?: TransportSessionManager;
 	private transportRouter?: TransportRouter;
 	private eventBroadcaster?: EventBroadcaster;
 	private transportServer?: ITransportServer;
@@ -71,6 +71,13 @@ export class DataStoreFactory {
 
 		this.orchestrator = orchestrator;
 		this.orchestratorWrapper = new OrchestratorWrapper(orchestrator);
+	}
+
+	/**
+	 * Get OrchestratorWrapper (library mode access)
+	 */
+	getOrchestratorWrapper(): OrchestratorWrapper {
+		return this.orchestratorWrapper;
 	}
 
 	/**
@@ -126,12 +133,8 @@ export class DataStoreFactory {
 	 */
 	getDashboardService(): DashboardService {
 		if (!this.dashboardService) {
-			// Get orchestrator URL from environment or calculate from WORKSPACE_ID/PROJECT_ID
-			const orchestratorUrl = this.getOrchestratorUrl();
-
-			// Create OrchestratorRepository with 5s cache TTL
-			const cacheTtlMs = 5000;
-			const orchestratorRepo = new OrchestratorRepository(orchestratorUrl, cacheTtlMs);
+			// Use orchestratorWrapper directly (library mode - no HTTP calls)
+			const orchestratorRepo = new OrchestratorRepository(this.orchestratorWrapper);
 
 			// Create DashboardService
 			this.dashboardService = new DashboardService(orchestratorRepo);
@@ -206,13 +209,13 @@ export class DataStoreFactory {
 	}
 
 	/**
-	 * Get or create WebSocketSessionManager
+	 * Get or create TransportSessionManager
 	 */
-	getSessionManager(): WebSocketSessionManager {
+	getSessionManager(): TransportSessionManager {
 		if (!this.sessionManager) {
 			// SessionManager depends on AuthService
 			const authService = this.getAuthService();
-			this.sessionManager = new WebSocketSessionManager(authService);
+			this.sessionManager = new TransportSessionManager(authService);
 		}
 
 		return this.sessionManager;

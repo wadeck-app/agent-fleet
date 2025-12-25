@@ -1,8 +1,8 @@
 import { logger } from 'shared-common/logger';
-import { createMessage, serializeMessage } from 'shared-common/protocol';
+import { serializeMessage } from 'shared-common/protocol';
 import { StateManager } from 'shared-orch-worker/StateManager';
 import { WorkerInfo } from 'shared-orch-worker/domain-types';
-import { O2WMessage, O2WMessageType } from 'shared-orch-worker/orchestrator-messages';
+import { O2WMessage, O2WMessageType, createO2WMessage } from 'shared-orch-worker/orchestrator-messages';
 import {
 	W2OFlowsUpdatedMessage,
 	W2OMessage,
@@ -73,7 +73,7 @@ export class WebSocketConnectionManager {
 				logger.error(`[WS] Flow version mismatch for worker ${workerId}: ${error.message}`);
 				this.sendMessage(
 					socket,
-					createMessage(O2WMessageType.ERROR, {
+					createO2WMessage(O2WMessageType.ERROR, {
 						error: error.message,
 					})
 				);
@@ -104,7 +104,7 @@ export class WebSocketConnectionManager {
 		});
 
 		// Send Welcome
-		this.sendMessage(socket, createMessage(O2WMessageType.WORKER_WELCOME, { workerId }));
+		this.sendMessage(socket, createO2WMessage(O2WMessageType.WORKER_WELCOME, { workerId }));
 
 		// Assign a task if available (async, fire and forget)
 		// this.tryAssignTask(workerId, workerType).catch(error => {
@@ -171,7 +171,7 @@ export class WebSocketConnectionManager {
 		// Send the task to the worker
 		this.sendMessage(
 			worker.socket,
-			createMessage(O2WMessageType.ASSIGN_TASK, {
+			createO2WMessage(O2WMessageType.ASSIGN_TASK, {
 				task,
 			})
 		);
@@ -300,11 +300,10 @@ export class WebSocketConnectionManager {
 		worker.taskId = task.id;
 
 		this.stateManager.emitWorkerTaskAssigned(workerId, task.id);
-
 		// Send the task to the worker
 		this.sendMessage(
 			worker.socket,
-			createMessage(O2WMessageType.ASSIGN_TASK, {
+			createO2WMessage(O2WMessageType.ASSIGN_TASK, {
 				task,
 			})
 		);
@@ -343,7 +342,7 @@ export class WebSocketConnectionManager {
 				if (worker) {
 					this.sendMessage(
 						worker.socket,
-						createMessage(O2WMessageType.ERROR, {
+						createO2WMessage(O2WMessageType.ERROR, {
 							error: error.message,
 						})
 					);

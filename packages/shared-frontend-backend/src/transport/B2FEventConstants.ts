@@ -24,6 +24,13 @@
 // TASK EVENTS
 // ===========================================================================================
 
+/**
+ * Tasks data updated event (aggregate)
+ * Used for reactive updates of entire task list (like dashboard)
+ * Replaces direct orchestrator WebSocket connection
+ */
+export const B2F_TASKS_UPDATED = 'b2f:tasks:updated' as const;
+
 /** Task created event */
 export const B2F_TASK_CREATED = 'b2f:task:created' as const;
 
@@ -45,6 +52,13 @@ export const B2F_TASK_PRIORITY_CHANGED = 'b2f:task:priority_changed' as const;
 // ===========================================================================================
 // WORKER EVENTS
 // ===========================================================================================
+
+/**
+ * Workers data updated event (aggregate)
+ * Used for reactive updates of entire worker list (like dashboard)
+ * Replaces direct orchestrator WebSocket connection
+ */
+export const B2F_WORKERS_UPDATED = 'b2f:workers:updated' as const;
 
 /** Worker created event */
 export const B2F_WORKER_CREATED = 'b2f:worker:created' as const;
@@ -94,3 +108,10 @@ export const B2F_WORKSPACE_QUOTA_EXCEEDED = 'b2f:workspace:quota_exceeded' as co
 
 /** Workspace archived event */
 export const B2F_WORKSPACE_ARCHIVED = 'b2f:workspace:archived' as const;
+
+// =============================================================================
+// Dashboard Events
+// =============================================================================
+
+/** Dashboard data updated event */
+export const B2F_DASHBOARD_UPDATED = 'b2f:dashboard:updated' as const;

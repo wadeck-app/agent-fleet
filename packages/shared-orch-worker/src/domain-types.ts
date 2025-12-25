@@ -43,6 +43,10 @@ export interface Task {
 	metadata: Record<string, any>;
 	history: TaskHistoryEntry[];
 
+	// Duration tracking
+	startedAt?: string; // ISO 8601 timestamp when task was started (IN_PROGRESS)
+	completedAt?: string; // ISO 8601 timestamp when task was completed (APPROVED/MERGED/CANCELLED)
+
 	// Flow Engine integration
 	flowId?: string;
 	flowInputs?: Record<string, any>;
@@ -82,6 +86,8 @@ export interface WorkerInfo {
 export const OrchestratorStatsSchema = z.object({
 	restPort: z.number(),
 	wsPort: z.number(),
+	// orchestrator version
+	version: z.string(),
 	// milliseconds since orchestrator start
 	uptime: z.number().optional(),
 	workers: z.number(),

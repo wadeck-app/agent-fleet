@@ -3,8 +3,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAbortableEffect } from '@framework/hooks/useAbortableEffect';
 import type { WorkspacesData } from '@shared/api/workspaces.contract';
 
-import { type WebSocketMessage, useOrchestratorWebSocket } from '@/app/hooks/useOrchestratorWebSocket';
-
 import { workspacesService } from './WorkspacesService';
 
 /**
@@ -16,11 +14,12 @@ import { workspacesService } from './WorkspacesService';
  *
  * Features:
  * - Auto-fetch on mount
- * - Real-time updates via WebSocket
- * - Fallback to polling when WebSocket disconnected
+ * - Optional polling for updates
  * - Manual refresh
  * - Loading/error states
  * - AbortController support for cleanup
+ *
+ * Note: Workspaces are REST-only (no WebSocket) - updates are infrequent
  *
  * ===========================================================================================
  */
@@ -28,77 +27,21 @@ import { workspacesService } from './WorkspacesService';
 export interface UseWorkspacesParams {
 	enabled?: boolean;
 	pollInterval?: number; // milliseconds
-	useWebSocket?: boolean; // default true
 }
 
 export interface UseWorkspacesResult {
 	data: WorkspacesData | null;
 	loading: boolean;
 	error: string | null;
-	wsConnected: boolean;
 	refresh: () => Promise<void>;
 	clearError: () => void;
 }
 
-export function useWorkspaces({
-	enabled = true,
-	pollInterval,
-	useWebSocket = true,
-}: UseWorkspacesParams = {}): UseWorkspacesResult {
+export function useWorkspaces({ enabled = true, pollInterval }: UseWorkspacesParams = {}): UseWorkspacesResult {
 	const [data, setData] = useState<WorkspacesData | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [isInitialLoad, setIsInitialLoad] = useState(true);
-
-	/**
-	 * WebSocket connection for real-time updates
-	 */
-	const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
-		// Validate that the message contains WorkspacesData structure
-		const isValidWorkspacesData = (data: unknown): data is WorkspacesData => {
-			if (!data || typeof data !== 'object') return false;
-			const obj = data as Record<string, unknown>;
-			return (
-				typeof obj.timestamp === 'string' &&
-				obj.summary !== undefined &&
-				typeof obj.summary === 'object' &&
-				Array.isArray(obj.workspaces)
-			);
-		};
-
-		// Handle state_update messages
-		if (message.type === 'state_update') {
-			console.log('[useWorkspaces] Received state_update via WebSocket');
-			if (isValidWorkspacesData(message.data)) {
-				setData(message.data);
-				setError(null);
-			} else {
-				// Generic state_update not relevant to workspaces - ignore
-				console.log('[useWorkspaces] state_update does not contain workspaces data - ignoring');
-			}
-		}
-		// Handle snapshot messages (full state)
-		else if (message.type === 'snapshot') {
-			console.log('[useWorkspaces] Received snapshot via WebSocket');
-			if (isValidWorkspacesData(message.data)) {
-				setData(message.data);
-				setError(null);
-			} else {
-				console.log('[useWorkspaces] snapshot does not contain workspaces data - ignoring');
-			}
-		}
-		// Handle error messages
-		else if (message.type === 'error') {
-			console.error('[useWorkspaces] Received error via WebSocket:', message);
-			const errorMessage = (message.message as string) || 'WebSocket error received';
-			setError(errorMessage);
-		}
-	}, []);
-
-	const { isConnected: wsConnected } = useOrchestratorWebSocket({
-		enabled: enabled && useWebSocket,
-		onMessage: handleWebSocketMessage,
-	});
 
 	// Fetch workspaces data
 	const fetchWorkspaces = useCallback(
@@ -142,18 +85,16 @@ export function useWorkspaces({
 	);
 
 	// Polling effect - separate from initial fetch to avoid re-creating intervals
-	// Only active when WebSocket is NOT connected (fallback mode)
 	useEffect(() => {
 		// Don't poll if:
 		// - Not enabled
 		// - No poll interval set
 		// - Still doing initial load
-		// - WebSocket is connected (real-time updates active)
-		if (!enabled || !pollInterval || pollInterval <= 0 || isInitialLoad || wsConnected) {
+		if (!enabled || !pollInterval || pollInterval <= 0 || isInitialLoad) {
 			return;
 		}
 
-		console.log('[useWorkspaces] Starting polling (WebSocket disconnected)');
+		console.log('[useWorkspaces] Starting polling');
 		const intervalId = setInterval(async () => {
 			const controller = new AbortController();
 			await fetchWorkspaces(controller.signal);
@@ -164,7 +105,7 @@ export function useWorkspaces({
 			console.log('[useWorkspaces] Stopping polling');
 			clearInterval(intervalId);
 		};
-	}, [enabled, pollInterval, isInitialLoad, fetchWorkspaces, wsConnected]);
+	}, [enabled, pollInterval, isInitialLoad, fetchWorkspaces]);
 
 	// Manual refresh
 	const refresh = useCallback(async () => {
@@ -181,7 +122,6 @@ export function useWorkspaces({
 		data,
 		loading,
 		error,
-		wsConnected,
 		refresh,
 		clearError,
 	};

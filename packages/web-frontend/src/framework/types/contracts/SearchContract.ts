@@ -42,6 +42,13 @@ export interface SearchState {
 	/** Current search query (from URL parameter) */
 	query: string;
 
+	/**
+	 * Trimmed version of query (used for backend requests).
+	 * ANTIFRAGILE PATTERN: Used as dependency for fillQuery() to avoid
+	 * unnecessary refetches when user only types/removes spaces.
+	 */
+	trimmedQuery: string;
+
 	/** Whether search is empty (derived state for convenience) */
 	isEmpty: boolean;
 }

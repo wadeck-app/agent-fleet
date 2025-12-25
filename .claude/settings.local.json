@@ -11,7 +11,12 @@
 			"Bash(npm run build:*)",
 			"Bash(npx tsc:*)",
 			"Bash(npm run clean:*)",
-			"Bash(findstr:*)"
+			"Bash(findstr:*)",
+			"Skill(get-timestamp)",
+			"Bash(node scripts/timestamp.js)",
+			"Bash(netstat:*)",
+			"Bash(curl:*)",
+			"Skill(check)"
 		],
 		"deny": [],
 		"ask": []

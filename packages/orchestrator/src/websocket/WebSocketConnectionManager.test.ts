@@ -2,11 +2,11 @@
  * WebSocketConnectionManager Tests
  */
 import { logger } from 'shared-common/logger';
-import { createMessage, serializeMessage } from 'shared-common/protocol';
+import { serializeMessage } from 'shared-common/protocol';
 import { StateManager } from 'shared-orch-worker/StateManager';
 import { Task, TaskStatus } from 'shared-orch-worker/domain-types';
 import { O2WMessageType } from 'shared-orch-worker/orchestrator-messages';
-import { W2OMessageType, W2OWorkerReadyMessage } from 'shared-orch-worker/worker-messages';
+import { W2OMessageType, W2OWorkerReadyMessage, createW2OMessage } from 'shared-orch-worker/worker-messages';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TaskManager } from '../core/TaskManager';
@@ -82,7 +82,7 @@ describe('WebSocketConnectionManager', () => {
 		});
 
 		it('should register worker with auto-increment ID', () => {
-			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				// workerType: WorkerType.DEV,
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -102,7 +102,7 @@ describe('WebSocketConnectionManager', () => {
 		});
 
 		it('should register worker with preferred ID', () => {
-			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				// workerType: WorkerType.DEV,
 				preferredId: 'preferred-worker-1',
 				projectId: 'test-project',
@@ -123,7 +123,7 @@ describe('WebSocketConnectionManager', () => {
 
 		it('should use auto-increment when preferred ID is taken', () => {
 			const mockSocket1 = new MockWebSocket();
-			const readyMessage1: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage1: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				// workerType: WorkerType.DEV,
 				preferredId: 'preferred-id',
 				projectId: 'test-project',
@@ -133,7 +133,7 @@ describe('WebSocketConnectionManager', () => {
 			connectionManager.handleWorkerReady(mockSocket1 as any, readyMessage1);
 
 			const mockSocket2 = new MockWebSocket();
-			const readyMessage2: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage2: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				// workerType: WorkerType.PM,
 				preferredId: 'preferred-id',
 				projectId: 'test-project',
@@ -149,7 +149,7 @@ describe('WebSocketConnectionManager', () => {
 		});
 
 		it('should send WORKER_WELCOME message', () => {
-			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				// workerType: WorkerType.DEV,
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -173,7 +173,7 @@ describe('WebSocketConnectionManager', () => {
 		});
 
 		it('should try to assign task after worker ready', async () => {
-			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				// workerType: WorkerType.DEV,
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -217,7 +217,7 @@ describe('WebSocketConnectionManager', () => {
 			mockSocket = new MockWebSocket();
 
 			// Register worker
-			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				// workerType: WorkerType.DEV,
 				preferredId: 'worker-1',
 				projectId: 'test-project',
@@ -308,7 +308,7 @@ describe('WebSocketConnectionManager', () => {
 
 		it('should return workers list after connections', () => {
 			const mockSocket1 = new MockWebSocket();
-			const readyMessage1: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage1: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				// workerType: WorkerType.DEV,
 				preferredId: 'worker-1',
 				projectId: 'test-project',
@@ -318,7 +318,7 @@ describe('WebSocketConnectionManager', () => {
 			connectionManager.handleWorkerReady(mockSocket1 as any, readyMessage1);
 
 			const mockSocket2 = new MockWebSocket();
-			const readyMessage2: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage2: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				// workerType: WorkerType.PM,
 				preferredId: 'worker-2',
 				projectId: 'test-project',
@@ -335,7 +335,7 @@ describe('WebSocketConnectionManager', () => {
 
 		it('should not include socket in workers list', () => {
 			const mockSocket = new MockWebSocket();
-			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				// workerType: WorkerType.DEV,
 				preferredId: 'worker-1',
 				projectId: 'test-project',
@@ -350,7 +350,7 @@ describe('WebSocketConnectionManager', () => {
 
 		it('should track worker task assignment', async () => {
 			const mockSocket = new MockWebSocket();
-			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				// workerType: WorkerType.DEV,
 				preferredId: 'worker-1',
 				projectId: 'test-project',
@@ -385,7 +385,7 @@ describe('WebSocketConnectionManager', () => {
 			// Create 3 workers
 			for (let i = 1; i <= 3; i++) {
 				const mockSocket = new MockWebSocket();
-				const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+				const readyMessage: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 					// workerType: WorkerType.DEV,
 					preferredId: `worker-${i}`,
 					projectId: 'test-project',
@@ -422,7 +422,7 @@ describe('WebSocketConnectionManager', () => {
 		it('should not assign tasks to busy workers', async () => {
 			// Create worker and assign task
 			const mockSocket = new MockWebSocket();
-			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				// workerType: WorkerType.DEV,
 				preferredId: 'worker-1',
 				projectId: 'test-project',
@@ -461,7 +461,7 @@ describe('WebSocketConnectionManager', () => {
 
 		beforeEach(() => {
 			mockSocket = new MockWebSocket();
-			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				// workerType: WorkerType.DEV,
 				preferredId: 'worker-1',
 				projectId: 'test-project',
@@ -543,7 +543,7 @@ describe('WebSocketConnectionManager', () => {
 	describe('releaseWorker', () => {
 		it('should release worker and try to assign new task', async () => {
 			const mockSocket = new MockWebSocket();
-			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				// workerType: WorkerType.DEV,
 				preferredId: 'worker-1',
 				projectId: 'test-project',
@@ -588,7 +588,7 @@ describe('WebSocketConnectionManager', () => {
 	describe('closeAll', () => {
 		it('should close all worker connections', () => {
 			const mockSocket1 = new MockWebSocket();
-			const readyMessage1: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage1: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				// workerType: WorkerType.DEV,
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -597,7 +597,7 @@ describe('WebSocketConnectionManager', () => {
 			connectionManager.handleWorkerReady(mockSocket1 as any, readyMessage1);
 
 			const mockSocket2 = new MockWebSocket();
-			const readyMessage2: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage2: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				// workerType: WorkerType.PM,
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -613,7 +613,7 @@ describe('WebSocketConnectionManager', () => {
 
 		it('should clear workers list', () => {
 			const mockSocket = new MockWebSocket();
-			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				// workerType: WorkerType.DEV,
 				projectId: 'test-project',
 				workspacePath: '/test/path',
@@ -632,7 +632,7 @@ describe('WebSocketConnectionManager', () => {
 	describe('getWorker', () => {
 		it('should return worker by ID', () => {
 			const mockSocket = new MockWebSocket();
-			const readyMessage: W2OWorkerReadyMessage = createMessage(W2OMessageType.WORKER_READY, {
+			const readyMessage: W2OWorkerReadyMessage = createW2OMessage(W2OMessageType.WORKER_READY, {
 				// workerType: WorkerType.DEV,
 				preferredId: 'worker-1',
 				projectId: 'test-project',

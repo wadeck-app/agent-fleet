@@ -1,5 +1,3 @@
-import { getOrchestratorRestUrl } from 'shared-common/PortCalculator';
-
 import type { Task, TasksData, TasksQuery } from '@app/shared/api/tasks.contract';
 
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
@@ -49,18 +47,9 @@ export class TasksService {
 	 */
 	async getTasksData(query?: TasksQuery): Promise<TasksData> {
 		try {
-			// Fetch tasks from orchestrator
-			const orchestratorUrl = this.getOrchestratorUrl();
-			const tasksUrl = this.buildTasksUrl(orchestratorUrl, query);
-
-			console.log(`[TasksService] Fetching tasks from: ${tasksUrl}`);
-			const response = await fetch(tasksUrl);
-
-			if (!response.ok) {
-				throw new Error(`Orchestrator tasks API returned ${response.status}: ${response.statusText}`);
-			}
-
-			const rawTasks = await response.json();
+			// Fetch tasks from orchestrator via repository (library mode or HTTP)
+			console.log('[TasksService] Fetching tasks via OrchestratorRepository...');
+			const rawTasks = await this.orchestratorRepository.getTasks();
 			console.log(`[TasksService] Received ${Array.isArray(rawTasks) ? rawTasks.length : 0} tasks`);
 
 			// Transform tasks to frontend format
@@ -170,31 +159,6 @@ export class TasksService {
 			byStatus,
 			byPriority,
 		};
-	}
-
-	/**
-	 * Build tasks URL with optional query parameters
-	 */
-	private buildTasksUrl(baseUrl: string, query?: TasksQuery): string {
-		const url = new URL('/tasks', baseUrl);
-
-		if (query?.status) {
-			url.searchParams.append('status', query.status);
-		}
-
-		return url.toString();
-	}
-
-	/**
-	 * Get orchestrator URL from environment or calculate from WORKSPACE_ID/PROJECT_ID
-	 */
-	private getOrchestratorUrl(): string {
-		if (process.env.ORCHESTRATOR_URL) {
-			return process.env.ORCHESTRATOR_URL;
-		}
-
-		// Fall back to calculating from WORKSPACE_ID and PROJECT_ID
-		return getOrchestratorRestUrl('localhost');
 	}
 
 	// ===========================================================================================

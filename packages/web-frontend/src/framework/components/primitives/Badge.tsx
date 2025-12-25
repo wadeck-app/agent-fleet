@@ -45,6 +45,30 @@ const badgeVariants = cva(
       text-primary underline-offset-4
       hover:underline
     `,
+				success: `
+      bg-green-600 text-white
+      dark:bg-green-700
+      [a]:hover:bg-green-700
+      dark:[a]:hover:bg-green-800
+    `,
+				warning: `
+      bg-yellow-600 text-white
+      dark:bg-yellow-700
+      [a]:hover:bg-yellow-700
+      dark:[a]:hover:bg-yellow-800
+    `,
+				info: `
+      bg-blue-600 text-white
+      dark:bg-blue-700
+      [a]:hover:bg-blue-700
+      dark:[a]:hover:bg-blue-800
+    `,
+				alert: `
+      bg-orange-600 text-white
+      dark:bg-orange-700
+      [a]:hover:bg-orange-700
+      dark:[a]:hover:bg-orange-800
+    `,
 			},
 		},
 		defaultVariants: {

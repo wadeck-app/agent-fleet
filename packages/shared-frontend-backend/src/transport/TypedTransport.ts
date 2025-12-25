@@ -38,8 +38,22 @@ export type UnsubscribeFunction = () => void;
 /**
  * Connection State
  * Current state of the transport connection
+ *
+ * States:
+ * - disconnected: No connection established
+ * - connecting: Initial connection attempt
+ * - connected: Successfully connected
+ * - reconnecting: Attempting to reconnect after disconnection
+ * - error: Connection failed after max retries (auto-downgrade to REST)
+ * - manual_downgrade: User manually switched to REST mode
  */
-export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
+export type ConnectionState =
+	| 'disconnected'
+	| 'connecting'
+	| 'connected'
+	| 'reconnecting'
+	| 'error'
+	| 'manual_downgrade';
 
 /**
  * Connection State Handler
@@ -117,25 +131,38 @@ export interface ITransport {
 	): Promise<ResponseType<M, P>>;
 
 	/**
-	 * Subscribe to a specific event type
+	 * Subscribe to a specific event type with optional server-side filtering
 	 *
 	 * @template E - Event type (must be a valid EventType)
 	 * @param event - Event type to subscribe to
 	 * @param handler - Event handler callback
+	 * @param filters - Optional filters for server-side event filtering (e.g., { workerId: 'worker-123' })
 	 * @returns Unsubscribe function
 	 *
 	 * @example
 	 * ```typescript
-	 * // Subscribe to task creation events
-	 * const unsubscribe = transport.subscribe('task:created', (task) => {
-	 *   console.log('Task created:', task.id);
+	 * // Subscribe to all task events
+	 * const unsubscribe1 = transport.subscribe('b2f:tasks:updated', (tasksData) => {
+	 *   console.log('Tasks updated:', tasksData);
 	 * });
 	 *
+	 * // Subscribe with server-side filtering (only tasks for specific worker)
+	 * const unsubscribe2 = transport.subscribe(
+	 *   'b2f:tasks:updated',
+	 *   (tasksData) => console.log('Worker tasks:', tasksData),
+	 *   { workerId: 'worker-123' }
+	 * );
+	 *
 	 * // Later, unsubscribe
-	 * unsubscribe();
+	 * unsubscribe1();
+	 * unsubscribe2();
 	 * ```
 	 */
-	subscribe<E extends EventType>(event: E, handler: EventHandler<E>): UnsubscribeFunction;
+	subscribe<E extends EventType>(
+		event: E,
+		handler: EventHandler<E>,
+		filters?: Record<string, unknown>
+	): UnsubscribeFunction;
 
 	/**
 	 * Subscribe to connection state changes

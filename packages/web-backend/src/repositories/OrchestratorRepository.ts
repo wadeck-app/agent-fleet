@@ -3,11 +3,11 @@
  * ORCHESTRATOR REPOSITORY
  * ===========================================================================================
  *
- * Fetches data from the orchestrator REST API with intelligent caching.
+ * Fetches data from the orchestrator (library mode or HTTP API).
  * Responsibilities:
- * - HTTP requests to orchestrator API
- * - In-memory caching with TTL
- * - Stale cache fallback on errors
+ * - Direct access via OrchestratorWrapper (library mode) or HTTP requests
+ * - In-memory caching with TTL (HTTP mode only)
+ * - Stale cache fallback on errors (HTTP mode only)
  *
  * Does NOT contain:
  * - Business logic (in service)
@@ -15,12 +15,11 @@
  *
  * ===========================================================================================
  */
-import { type OrchestratorStats, OrchestratorStatsSchema } from 'shared-orch-worker/domain-types';
-
-//FIXME remove cache !
+import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
+import { type OrchestratorStats, OrchestratorStatsSchema, type Task } from 'shared-orch-worker/domain-types';
 
 /**
- * Cache entry structure
+ * Cache entry structure (used only in HTTP mode)
  */
 interface CacheEntry {
 	data: OrchestratorStats | null;
@@ -29,18 +28,38 @@ interface CacheEntry {
 
 export class OrchestratorRepository {
 	private cache: CacheEntry = { data: null, timestamp: 0 };
+	private orchestratorWrapper?: OrchestratorWrapper;
+	private orchestratorUrl?: string;
+	private cacheTtlMs: number;
 
-	constructor(
-		private readonly orchestratorUrl: string,
-		private readonly cacheTtlMs: number = 5000
-	) {}
+	constructor(orchestratorWrapperOrUrl: OrchestratorWrapper | string, cacheTtlMs: number = 5000) {
+		if (typeof orchestratorWrapperOrUrl === 'string') {
+			// HTTP mode
+			this.orchestratorUrl = orchestratorWrapperOrUrl;
+		} else {
+			// Library mode
+			this.orchestratorWrapper = orchestratorWrapperOrUrl;
+		}
+		this.cacheTtlMs = cacheTtlMs;
+	}
 
 	/**
-	 * Get orchestrator stats from API (with caching)
-	 * Returns cached data if within TTL
-	 * Falls back to stale cache on error if available
+	 * Get orchestrator stats (library mode or API with caching)
+	 * Library mode: Direct call to orchestratorWrapper
+	 * HTTP mode: Returns cached data if within TTL, falls back to stale cache on error
 	 */
 	async getStats(): Promise<OrchestratorStats> {
+		// Library mode - direct access, no caching needed
+		if (this.orchestratorWrapper) {
+			console.log('[OrchestratorRepository] Using library mode (direct access)');
+			return this.orchestratorWrapper.getStats();
+		}
+
+		// HTTP mode - with caching
+		if (!this.orchestratorUrl) {
+			throw new Error('OrchestratorRepository not properly configured');
+		}
+
 		const now = Date.now();
 		const cacheAge = now - this.cache.timestamp;
 
@@ -81,6 +100,36 @@ export class OrchestratorRepository {
 			// No cache available, propagate error
 			throw new Error(
 				`Failed to fetch orchestrator stats: ${error instanceof Error ? error.message : 'Unknown error'}`
+			);
+		}
+	}
+
+	/**
+	 * Get all tasks from orchestrator (library mode or HTTP API)
+	 */
+	async getTasks(): Promise<Task[]> {
+		// Library mode - direct access
+		if (this.orchestratorWrapper) {
+			return this.orchestratorWrapper.getTasks();
+		}
+
+		// HTTP mode
+		if (!this.orchestratorUrl) {
+			throw new Error('OrchestratorRepository not properly configured');
+		}
+
+		try {
+			const response = await fetch(`${this.orchestratorUrl}/tasks`);
+
+			if (!response.ok) {
+				throw new Error(`Orchestrator API returned ${response.status}: ${response.statusText}`);
+			}
+
+			const tasks = await response.json();
+			return Array.isArray(tasks) ? tasks : [];
+		} catch (error) {
+			throw new Error(
+				`Failed to fetch orchestrator tasks: ${error instanceof Error ? error.message : 'Unknown error'}`
 			);
 		}
 	}

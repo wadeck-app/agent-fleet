@@ -93,13 +93,13 @@ function TasksList() {
 
 // Test component that subscribes to events
 function TasksWithEvents() {
-	const transport = useTransport();
+	const { transport } = useTransport();
 	const [tasks, setTasks] = useState<any[]>([]);
 	const [eventCount, setEventCount] = useState(0);
 
 	useEffect(() => {
 		// Subscribe to task:created events
-		const unsubscribe = transport.subscribe('task:created' as any, task => {
+		const unsubscribe = transport.subscribe('task:created' as any, (task: any) => {
 			setTasks(prev => [...prev, task]);
 			setEventCount(prev => prev + 1);
 		});
@@ -124,7 +124,7 @@ function TasksWithEvents() {
 
 // Test component that creates tasks
 function CreateTaskForm() {
-	const transport = useTransport();
+	const { transport } = useTransport();
 	const [description, setDescription] = useState('');
 	const [submitting, setSubmitting] = useState(false);
 	const [result, setResult] = useState<string | null>(null);

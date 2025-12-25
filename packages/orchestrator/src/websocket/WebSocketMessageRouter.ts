@@ -1,6 +1,5 @@
 import { logger } from 'shared-common/logger';
-import { createMessage } from 'shared-common/protocol';
-import { O2WMessageType } from 'shared-orch-worker/orchestrator-messages';
+import { O2WMessageType, createO2WMessage } from 'shared-orch-worker/orchestrator-messages';
 import { W2OMessage, W2OMessageType } from 'shared-orch-worker/worker-messages';
 import { WebSocket } from 'ws';
 
@@ -35,7 +34,7 @@ export class WebSocketMessageRouter {
 				return this.connectionManager.handleWorkerReady(socket, message);
 
 			case W2OMessageType.WORKER_HEARTBEAT:
-				this.connectionManager.sendMessage(socket, createMessage(O2WMessageType.ACK, {}));
+				this.connectionManager.sendMessage(socket, createO2WMessage(O2WMessageType.ACK, {}));
 				break;
 
 			case W2OMessageType.TASK_STARTED:

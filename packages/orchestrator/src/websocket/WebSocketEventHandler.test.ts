@@ -9,7 +9,6 @@ import {
 } from 'orchestrator/test-utils/mocks';
 import { UIMessageType } from 'orchestrator/ui-client/types';
 import { logger } from 'shared-common/logger';
-import { createMessage } from 'shared-common/protocol';
 import { Task, TaskStatus } from 'shared-orch-worker/domain-types';
 import { KillClaudeMessage, O2WMessageType } from 'shared-orch-worker/orchestrator-messages';
 import {
@@ -26,6 +25,7 @@ import {
 	W2OTaskStartedMessage,
 	W2OWorkspaceAllocatedMessage,
 	W2OWorkspaceReleasedMessage,
+	createW2OMessage,
 } from 'shared-orch-worker/worker-messages';
 import { setupTest } from 'test-utils/helpers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -67,7 +67,7 @@ describe('WebSocketEventHandler', () => {
 
 	describe('TASK_STARTED Message Handling', () => {
 		it('should handle TASK_STARTED message', () => {
-			const startedMessage: W2OTaskStartedMessage = createMessage(W2OMessageType.TASK_STARTED, {
+			const startedMessage: W2OTaskStartedMessage = createW2OMessage(W2OMessageType.TASK_STARTED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 			});
@@ -85,7 +85,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle TASK_STARTED with custom status', () => {
-			const startedMessage: W2OTaskStartedMessage = createMessage(W2OMessageType.TASK_STARTED, {
+			const startedMessage: W2OTaskStartedMessage = createW2OMessage(W2OMessageType.TASK_STARTED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				newStatus: TaskStatus.TESTING,
@@ -103,7 +103,7 @@ describe('WebSocketEventHandler', () => {
 
 	describe('TASK_PROGRESS Message Handling', () => {
 		it('should handle TASK_PROGRESS message', () => {
-			const progressMessage: W2OTaskProgressMessage = createMessage(W2OMessageType.TASK_PROGRESS, {
+			const progressMessage: W2OTaskProgressMessage = createW2OMessage(W2OMessageType.TASK_PROGRESS, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				progress: 'Working on implementation',
@@ -131,7 +131,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle TASK_COMPLETED message', () => {
-			const completedMessage: W2OTaskCompletedMessage = createMessage(W2OMessageType.TASK_COMPLETED, {
+			const completedMessage: W2OTaskCompletedMessage = createW2OMessage(W2OMessageType.TASK_COMPLETED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				result: { success: true },
@@ -151,7 +151,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle TASK_COMPLETED with custom status', () => {
-			const completedMessage: W2OTaskCompletedMessage = createMessage(W2OMessageType.TASK_COMPLETED, {
+			const completedMessage: W2OTaskCompletedMessage = createW2OMessage(W2OMessageType.TASK_COMPLETED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				newStatus: TaskStatus.MERGED,
@@ -167,7 +167,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should release worker after completion', () => {
-			const completedMessage: W2OTaskCompletedMessage = createMessage(W2OMessageType.TASK_COMPLETED, {
+			const completedMessage: W2OTaskCompletedMessage = createW2OMessage(W2OMessageType.TASK_COMPLETED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 			});
@@ -178,7 +178,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should try to assign new task after completion', () => {
-			const completedMessage: W2OTaskCompletedMessage = createMessage(W2OMessageType.TASK_COMPLETED, {
+			const completedMessage: W2OTaskCompletedMessage = createW2OMessage(W2OMessageType.TASK_COMPLETED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 			});
@@ -201,7 +201,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle TASK_FAILED message', () => {
-			const failedMessage: W2OTaskFailedMessage = createMessage(W2OMessageType.TASK_FAILED, {
+			const failedMessage: W2OTaskFailedMessage = createW2OMessage(W2OMessageType.TASK_FAILED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				error: 'Test execution failed',
@@ -221,7 +221,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle TASK_FAILED with custom status', () => {
-			const failedMessage: W2OTaskFailedMessage = createMessage(W2OMessageType.TASK_FAILED, {
+			const failedMessage: W2OTaskFailedMessage = createW2OMessage(W2OMessageType.TASK_FAILED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				error: 'Error',
@@ -238,7 +238,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should add failure comment', () => {
-			const failedMessage: W2OTaskFailedMessage = createMessage(W2OMessageType.TASK_FAILED, {
+			const failedMessage: W2OTaskFailedMessage = createW2OMessage(W2OMessageType.TASK_FAILED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				error: 'Build failed',
@@ -250,7 +250,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should emit worker task released event', () => {
-			const failedMessage: W2OTaskFailedMessage = createMessage(W2OMessageType.TASK_FAILED, {
+			const failedMessage: W2OTaskFailedMessage = createW2OMessage(W2OMessageType.TASK_FAILED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				error: 'Error',
@@ -262,7 +262,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should log error', () => {
-			const failedMessage: W2OTaskFailedMessage = createMessage(W2OMessageType.TASK_FAILED, {
+			const failedMessage: W2OTaskFailedMessage = createW2OMessage(W2OMessageType.TASK_FAILED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				error: 'Critical error',
@@ -276,7 +276,7 @@ describe('WebSocketEventHandler', () => {
 
 	describe('TASK_QUESTION Message Handling', () => {
 		it('should handle TASK_QUESTION message', () => {
-			const questionMessage: W2OTaskQuestionMessage = createMessage(W2OMessageType.TASK_QUESTION, {
+			const questionMessage: W2OTaskQuestionMessage = createW2OMessage(W2OMessageType.TASK_QUESTION, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				question: 'Need clarification on requirements',
@@ -296,7 +296,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should add question as comment', () => {
-			const questionMessage: W2OTaskQuestionMessage = createMessage(W2OMessageType.TASK_QUESTION, {
+			const questionMessage: W2OTaskQuestionMessage = createW2OMessage(W2OMessageType.TASK_QUESTION, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				question: 'What should be the output format?',
@@ -333,7 +333,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle FLOW_STEP_STARTED message', () => {
-			const stepStartedMessage: W2OFlowStepStartedMessage = createMessage(W2OMessageType.FLOW_STEP_STARTED, {
+			const stepStartedMessage: W2OFlowStepStartedMessage = createW2OMessage(W2OMessageType.FLOW_STEP_STARTED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				stepId: 'step-1',
@@ -350,7 +350,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle FLOW_STEP_STARTED without step name', () => {
-			const stepStartedMessage: W2OFlowStepStartedMessage = createMessage(W2OMessageType.FLOW_STEP_STARTED, {
+			const stepStartedMessage: W2OFlowStepStartedMessage = createW2OMessage(W2OMessageType.FLOW_STEP_STARTED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				stepId: 'step-1',
@@ -362,7 +362,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle FLOW_STEP_COMPLETED message', () => {
-			const stepCompletedMessage: W2OFlowStepCompletedMessage = createMessage(
+			const stepCompletedMessage: W2OFlowStepCompletedMessage = createW2OMessage(
 				W2OMessageType.FLOW_STEP_COMPLETED,
 				{
 					workerId: 'worker-1',
@@ -382,7 +382,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle FLOW_STEP_COMPLETED without outputs', () => {
-			const stepCompletedMessage: W2OFlowStepCompletedMessage = createMessage(
+			const stepCompletedMessage: W2OFlowStepCompletedMessage = createW2OMessage(
 				W2OMessageType.FLOW_STEP_COMPLETED,
 				{
 					workerId: 'worker-1',
@@ -397,7 +397,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle FLOW_STEP_FAILED message', () => {
-			const stepFailedMessage: W2OFlowStepFailedMessage = createMessage(W2OMessageType.FLOW_STEP_FAILED, {
+			const stepFailedMessage: W2OFlowStepFailedMessage = createW2OMessage(W2OMessageType.FLOW_STEP_FAILED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				stepId: 'step-1',
@@ -414,7 +414,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should emit task updated for flow step events', () => {
-			const stepStartedMessage: W2OFlowStepStartedMessage = createMessage(W2OMessageType.FLOW_STEP_STARTED, {
+			const stepStartedMessage: W2OFlowStepStartedMessage = createW2OMessage(W2OMessageType.FLOW_STEP_STARTED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				stepId: 'step-1',
@@ -447,12 +447,15 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle WORKSPACE_ALLOCATED message', () => {
-			const allocatedMessage: W2OWorkspaceAllocatedMessage = createMessage(W2OMessageType.WORKSPACE_ALLOCATED, {
-				workerId: 'worker-1',
-				taskId: 'task-1',
-				workspaceId: 'ws-1',
-				workspacePath: '/path/to/workspace',
-			});
+			const allocatedMessage: W2OWorkspaceAllocatedMessage = createW2OMessage(
+				W2OMessageType.WORKSPACE_ALLOCATED,
+				{
+					workerId: 'worker-1',
+					taskId: 'task-1',
+					workspaceId: 'ws-1',
+					workspacePath: '/path/to/workspace',
+				}
+			);
 
 			eventHandler.handleWorkspaceAllocated(allocatedMessage);
 
@@ -464,12 +467,15 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should store workspace info in task metadata', () => {
-			const allocatedMessage: W2OWorkspaceAllocatedMessage = createMessage(W2OMessageType.WORKSPACE_ALLOCATED, {
-				workerId: 'worker-1',
-				taskId: 'task-1',
-				workspaceId: 'ws-1',
-				workspacePath: '/path/to/workspace',
-			});
+			const allocatedMessage: W2OWorkspaceAllocatedMessage = createW2OMessage(
+				W2OMessageType.WORKSPACE_ALLOCATED,
+				{
+					workerId: 'worker-1',
+					taskId: 'task-1',
+					workspaceId: 'ws-1',
+					workspacePath: '/path/to/workspace',
+				}
+			);
 
 			eventHandler.handleWorkspaceAllocated(allocatedMessage);
 
@@ -478,7 +484,7 @@ describe('WebSocketEventHandler', () => {
 		});
 
 		it('should handle WORKSPACE_RELEASED message', () => {
-			const releasedMessage: W2OWorkspaceReleasedMessage = createMessage(W2OMessageType.WORKSPACE_RELEASED, {
+			const releasedMessage: W2OWorkspaceReleasedMessage = createW2OMessage(W2OMessageType.WORKSPACE_RELEASED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				workspaceId: 'ws-1',
@@ -501,7 +507,7 @@ describe('WebSocketEventHandler', () => {
 				socket: mockSocket as any,
 			});
 
-			const stopMessage: REMOVE_W2OStopRequestedMessage = createMessage(W2OMessageType.STOP_REQUESTED, {
+			const stopMessage: REMOVE_W2OStopRequestedMessage = createW2OMessage(W2OMessageType.STOP_REQUESTED, {
 				workerId: 'worker-1',
 				taskId: 'task-1',
 				claudePid: 12345,
@@ -519,7 +525,7 @@ describe('WebSocketEventHandler', () => {
 
 	describe('HOOK_EVENT Message Handling', () => {
 		it('should handle HOOK_EVENT message', () => {
-			const hookMessage: W2OHookEventMessage = createMessage(W2OMessageType.HOOK_EVENT, {
+			const hookMessage: W2OHookEventMessage = createW2OMessage(W2OMessageType.HOOK_EVENT, {
 				workerId: 'worker-1',
 				hookName: 'test-hook',
 				data: { key: 'value' },

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useAbortableEffect } from '@framework/hooks/useAbortableEffect';
 import type { TasksData, TasksQuery } from '@shared/api/tasks.contract';
+import { B2F_TASKS_UPDATED } from '@shared/transport';
 
-import { type WebSocketMessage, useOrchestratorWebSocket } from '@/app/hooks/useOrchestratorWebSocket';
+import { useTransport } from '@/transport';
 
 import { tasksService } from './TasksService';
 
@@ -16,12 +17,17 @@ import { tasksService } from './TasksService';
  *
  * Features:
  * - Auto-fetch on mount
- * - Real-time updates via WebSocket
+ * - Real-time updates via Backend WebSocket (with server-side filtering)
  * - Fallback to polling when WebSocket disconnected
- * - Optional filtering (status, workerId, priority)
+ * - Server-side filtering (status, workerId, priority)
  * - Manual refresh
  * - Loading/error states
  * - AbortController support for cleanup
+ *
+ * Migration Notes:
+ * - Replaced direct orchestrator WebSocket with backend WebSocket
+ * - Now uses B2F_TASKS_UPDATED event instead of state_update/snapshot
+ * - Server-side filtering reduces bandwidth (only matching tasks sent)
  *
  * ===========================================================================================
  */
@@ -52,59 +58,68 @@ export function useTasks({
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [isInitialLoad, setIsInitialLoad] = useState(true);
+	const isMountedRef = useRef(true);
+
+	// Transport connection for backend WebSocket and connection state
+	const { transport, connectionState } = useTransport();
 
 	/**
-	 * WebSocket connection for real-time updates
+	 * Handle tasks update event from backend WebSocket
+	 * Type-safe - receives TasksData directly (no validation needed)
 	 */
-	const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
-		// Validate that the message contains TasksData structure
-		const isValidTasksData = (data: unknown): data is TasksData => {
-			if (!data || typeof data !== 'object') return false;
-			const obj = data as Record<string, unknown>;
-			return (
-				typeof obj.timestamp === 'string' &&
-				obj.summary !== undefined &&
-				typeof obj.summary === 'object' &&
-				obj.summary !== null &&
-				typeof (obj.summary as Record<string, unknown>).total === 'number' &&
-				typeof (obj.summary as Record<string, unknown>).byStatus === 'object' &&
-				typeof (obj.summary as Record<string, unknown>).byPriority === 'object' &&
-				Array.isArray(obj.tasks)
-			);
-		};
-
-		// Handle state_update messages
-		if (message.type === 'state_update') {
-			console.log('[useTasks] Received state_update via WebSocket');
-			if (isValidTasksData(message.data)) {
-				setData(message.data);
-				setError(null);
-			} else {
-				console.log('[useTasks] state_update does not contain tasks data - ignoring');
-			}
-		}
-		// Handle snapshot messages (full state)
-		else if (message.type === 'snapshot') {
-			console.log('[useTasks] Received snapshot via WebSocket');
-			if (isValidTasksData(message.data)) {
-				setData(message.data);
-				setError(null);
-			} else {
-				console.log('[useTasks] snapshot does not contain tasks data - ignoring');
-			}
-		}
-		// Handle error messages
-		else if (message.type === 'error') {
-			console.error('[useTasks] Received error via WebSocket:', message);
-			const errorMessage = (message.message as string) || 'WebSocket error received';
-			setError(errorMessage);
+	const handleTasksEvent = useCallback((tasksData: TasksData) => {
+		if (isMountedRef.current) {
+			console.log('[useTasks] Received tasks update via Backend WebSocket');
+			setData(tasksData);
+			setError(null);
 		}
 	}, []);
 
-	const { isConnected: wsConnected } = useOrchestratorWebSocket({
-		enabled: enabled && useWebSocket,
-		onMessage: handleWebSocketMessage,
-	});
+	/**
+	 * Subscribe to tasks events via backend WebSocket WITH server-side filters
+	 * Backend will only send tasks matching the filters (workerId, status, priority)
+	 * This dramatically reduces bandwidth when filtering by specific worker
+	 */
+	useEffect(() => {
+		if (!enabled || !useWebSocket) return;
+
+		// Build filters for server-side filtering
+		const subscriptionFilters: Record<string, unknown> = {};
+		if (filters?.workerId) {
+			subscriptionFilters.workerId = filters.workerId;
+		}
+		if (filters?.status) {
+			subscriptionFilters.status = filters.status;
+		}
+		if (filters?.priority) {
+			subscriptionFilters.priority = filters.priority;
+		}
+
+		console.log('[useTasks] Subscribing to tasks updates with filters:', subscriptionFilters);
+
+		// Subscribe with server-side filters
+		const unsubscribe = transport.subscribe(
+			B2F_TASKS_UPDATED,
+			handleTasksEvent,
+			Object.keys(subscriptionFilters).length > 0 ? subscriptionFilters : undefined
+		);
+
+		return () => {
+			console.log('[useTasks] Unsubscribing from tasks updates');
+			unsubscribe();
+		};
+	}, [enabled, useWebSocket, transport, handleTasksEvent, filters?.workerId, filters?.status, filters?.priority]);
+
+	// Track mount state
+	useEffect(() => {
+		isMountedRef.current = true;
+		return () => {
+			isMountedRef.current = false;
+		};
+	}, []);
+
+	// Check if WebSocket is connected (convenience for return value)
+	const wsConnected = connectionState === 'connected';
 
 	// Fetch tasks data
 	const fetchTasks = useCallback(
@@ -148,18 +163,26 @@ export function useTasks({
 	);
 
 	// Polling effect - separate from initial fetch to avoid re-creating intervals
-	// Only active when WebSocket is NOT connected (fallback mode)
+	// Only active when WebSocket has failed or is not used (fallback mode)
+	// Does NOT poll during 'reconnecting' state to respect exponential backoff
 	useEffect(() => {
 		// Don't poll if:
 		// - Not enabled
 		// - No poll interval set
 		// - Still doing initial load
-		// - WebSocket is connected (real-time updates active)
-		if (!enabled || !pollInterval || pollInterval <= 0 || isInitialLoad || wsConnected) {
+		// - WebSocket is not used
+		if (!enabled || !pollInterval || pollInterval <= 0 || isInitialLoad || !useWebSocket) {
 			return;
 		}
 
-		console.log('[useTasks] Starting polling (WebSocket disconnected)');
+		// Don't poll if WebSocket is connected or trying to reconnect
+		// Only poll if WebSocket has given up ('error') or is disabled ('disconnected' without reconnect)
+		if (connectionState === 'connected' || connectionState === 'connecting' || connectionState === 'reconnecting') {
+			console.log(`[useTasks] Waiting for WebSocket (state: ${connectionState})`);
+			return;
+		}
+
+		console.log('[useTasks] Starting REST polling (WebSocket failed or unavailable)');
 		const intervalId = setInterval(async () => {
 			const controller = new AbortController();
 			await fetchTasks(controller.signal);
@@ -167,10 +190,10 @@ export function useTasks({
 
 		// Cleanup interval on unmount or when dependencies change
 		return () => {
-			console.log('[useTasks] Stopping polling');
+			console.log('[useTasks] Stopping REST polling');
 			clearInterval(intervalId);
 		};
-	}, [enabled, pollInterval, isInitialLoad, fetchTasks, wsConnected]);
+	}, [enabled, pollInterval, isInitialLoad, useWebSocket, connectionState, fetchTasks]);
 
 	// Manual refresh
 	const refresh = useCallback(async () => {

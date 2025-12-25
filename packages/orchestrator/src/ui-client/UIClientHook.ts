@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import { logger } from 'shared-common/logger';
 import { StateEvent, StateManager } from 'shared-orch-worker/StateManager';
 
+//FIXME remove me, no longer necessary as the orch has no direct UI
 /**
  * UI Client Hook
  *
@@ -89,7 +90,7 @@ export class UIClientHook extends EventEmitter {
 			timestamp: new Date().toISOString(),
 		});
 
-		logger.debug('UIClientHook', `State event relayed: ${event}`, { event });
+		//logger.debug('UIClientHook', `State event relayed: ${event}`, { event });
 	}
 
 	/**

@@ -12,6 +12,7 @@ describe('DashboardService', () => {
 		// Create mock repository
 		mockRepository = {
 			getStats: vi.fn(),
+			getTasks: vi.fn().mockResolvedValue([]),
 			clearCache: vi.fn(),
 		} as unknown as OrchestratorRepository;
 
@@ -21,6 +22,7 @@ describe('DashboardService', () => {
 	const createMockStats = (overrides?: Partial<OrchestratorStats>): OrchestratorStats => ({
 		restPort: 3737,
 		wsPort: 3738,
+		version: '1.0.0',
 		uptime: 3600000,
 		workers: 3,
 		workersList: [

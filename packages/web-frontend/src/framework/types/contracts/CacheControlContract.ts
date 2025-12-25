@@ -36,6 +36,15 @@ export interface CacheControlState {
 
 	/** Whether a refresh is currently in progress */
 	isRefreshing: boolean;
+
+	/**
+	 * Effective cache ID that will be sent to backend.
+	 * Only set when cache control is enabled, otherwise undefined.
+	 *
+	 * ANTIFRAGILE PATTERN: Used as dependency for fillQuery() to avoid
+	 * unnecessary refetches when feature is disabled but cacheId changes.
+	 */
+	effectiveCacheId: number | undefined;
 }
 
 /**

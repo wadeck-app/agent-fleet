@@ -5,6 +5,7 @@ import { Task, TaskStatus } from 'shared-orch-worker/domain-types';
 import { TaskManager } from '../core/TaskManager';
 import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
 
+//FIXME remove me, no longer necessary as the orch has no direct UI
 /**
  * Metrics Collector Service
  *
@@ -57,7 +58,7 @@ export class MetricsCollector {
 			this.collectAndEmit();
 		}, this.collectIntervalMs);
 
-		logger.info('MetricsCollector', `Started collecting metrics every ${this.collectIntervalMs}ms`);
+		//logger.info('MetricsCollector', `Started collecting metrics every ${this.collectIntervalMs}ms`);
 	}
 
 	/**
@@ -75,7 +76,7 @@ export class MetricsCollector {
 
 		this.isRunning = false;
 
-		logger.info('MetricsCollector', 'Stopped collecting metrics');
+		//logger.info('MetricsCollector', 'Stopped collecting metrics');
 	}
 
 	/**
@@ -86,14 +87,14 @@ export class MetricsCollector {
 			const metrics = this.collectMetrics();
 			this.stateManager.emitMetricsUpdated(metrics);
 
-			logger.debug(
-				'MetricsCollector',
-				`Metrics collected: ${metrics.taskThroughput.total} tasks, ${metrics.workerUtilization.total} workers`,
-				{
-					tasks: metrics.taskThroughput.total,
-					workers: metrics.workerUtilization.total,
-				}
-			);
+			// logger.debug(
+			// 	'MetricsCollector',
+			// 	`Metrics collected: ${metrics.taskThroughput.total} tasks, ${metrics.workerUtilization.total} workers`,
+			// 	{
+			// 		tasks: metrics.taskThroughput.total,
+			// 		workers: metrics.workerUtilization.total,
+			// 	}
+			// );
 		} catch (error) {
 			logger.error(
 				'MetricsCollector',

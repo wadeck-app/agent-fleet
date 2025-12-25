@@ -2,7 +2,7 @@ import { MONITORING_API_ROUTES as routes } from '@app/shared/api/monitoring.cont
 import type { MONITORING_API_ROUTES } from '@app/shared/api/monitoring.contract';
 
 import type { ITransportServer } from '../transport/ITransportServer';
-import type { WebSocketSessionManager } from '../transport/WebSocketSessionManager';
+import type { TransportSessionManager } from '../transport/TransportSessionManager';
 import type { RouteWrapperFunc } from '../utils/fastify-wrapper';
 import type { LazyController } from '../utils/lazy-controller-plugin';
 
@@ -37,7 +37,7 @@ export default class MonitoringController implements LazyController<typeof MONIT
 
 	constructor(
 		private readonly transportServer: ITransportServer,
-		private readonly sessionManager: WebSocketSessionManager
+		private readonly sessionManager: TransportSessionManager
 	) {
 		this.startTime = Date.now();
 	}

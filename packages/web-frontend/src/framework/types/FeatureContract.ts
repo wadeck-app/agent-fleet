@@ -39,6 +39,8 @@
  */
 import { type BaseListQueryMutable } from '@shared/common/api-helpers';
 
+export type QueryFiller = (query: BaseListQueryMutable) => void;
+
 /**
  * Base contract that ALL feature hooks must implement.
  * Ensures composability and predictable behavior across the entire headless architecture.
@@ -97,7 +99,7 @@ export interface FeatureContract<TState> {
 	 * }, [currentPage, pageSize]);
 	 * ```
 	 */
-	fillQuery: (query: BaseListQueryMutable) => void;
+	fillQuery: QueryFiller;
 }
 
 /**

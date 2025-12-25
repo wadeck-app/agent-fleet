@@ -120,12 +120,18 @@ export function Data2<T>({
 	// This memoizes to prevent unnecessary refetches
 	const query: ComposedQuery = useMemo(() => {
 		try {
-			return buildQuery(pagination, sorting, search, filter, cache);
+			return buildQuery(
+				pagination?.fillQuery,
+				sorting?.fillQuery,
+				search?.fillQuery,
+				filter?.fillQuery,
+				cache?.fillQuery
+			);
 		} catch (err) {
 			console.error('Failed to build query:', err);
 			throw err;
 		}
-	}, [pagination, sorting, search, filter, cache]);
+	}, [pagination?.fillQuery, sorting?.fillQuery, search?.fillQuery, filter?.fillQuery, cache?.fillQuery]);
 
 	// Convert query to URL string for cache busting (source of truth)
 	// Simple approach: serialize query to JSON, so any change in query = different URL

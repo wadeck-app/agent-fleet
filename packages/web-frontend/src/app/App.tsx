@@ -5,6 +5,7 @@ import { ToastProvider } from '@framework/features/toast/ToastContext';
 import { useMediaQuery } from '@framework/hooks/useMediaQuery';
 import { TransportProvider } from '@transport/TransportProvider';
 
+import { API_BASE_URL } from '@app/api/config';
 import { DesktopSidebar } from '@app/components/navigation/DesktopSidebar';
 import { MobileSidebar } from '@app/components/navigation/MobileSidebar';
 import { LoginPage } from '@app/pages/auth/LoginPage';
@@ -63,11 +64,15 @@ function Layout() {
 }
 
 export function App() {
+	// Use API_BASE_URL for TransportProvider (backend URL, not frontend URL)
+	// Remove /api suffix for base URL
+	const backendBaseUrl = API_BASE_URL.replace(/\/api$/, '');
+
 	return (
 		<ConnectivityProvider circuitBreakerService={circuitBreakerService}>
 			<ToastProvider>
 				<BrowserRouter>
-					<TransportProvider>
+					<TransportProvider baseUrl={backendBaseUrl}>
 						<Routes>
 							<Route path="/login" element={<LoginPage />} />
 							<Route path="/*" element={<Layout />} />

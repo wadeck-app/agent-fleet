@@ -42,6 +42,8 @@ export interface WebSocketSession {
 	lastActivity: number;
 	// Track which events this client is subscribed to
 	subscribedEvents: Set<string>;
+	// Track filters for each event (event → filters)
+	eventFilters: Map<string, Record<string, unknown>>;
 }
 
 /**
@@ -104,6 +106,7 @@ export class WebSocketSessionManager {
 				createdAt: Date.now(),
 				lastActivity: Date.now(),
 				subscribedEvents: new Set(),
+				eventFilters: new Map(),
 			};
 
 			this.sessions.set(clientId, session);
@@ -141,6 +144,7 @@ export class WebSocketSessionManager {
 				createdAt: Date.now(),
 				lastActivity: Date.now(),
 				subscribedEvents: new Set(), // Empty initially
+				eventFilters: new Map(), // Empty initially
 			};
 
 			this.sessions.set(clientId, session);
@@ -244,16 +248,33 @@ export class WebSocketSessionManager {
 	 * @param clientId - Client ID
 	 * @param action - 'subscribe' or 'unsubscribe'
 	 * @param events - Array of event types
+	 * @param filters - Optional filters for server-side event filtering
 	 */
-	updateSubscriptions(clientId: string, action: 'subscribe' | 'unsubscribe', events: string[]): void {
+	updateSubscriptions(
+		clientId: string,
+		action: 'subscribe' | 'unsubscribe',
+		events: string[],
+		filters?: Record<string, unknown>
+	): void {
 		const session = this.sessions.get(clientId);
 		if (!session) return;
 
 		if (action === 'subscribe') {
-			events.forEach(event => session.subscribedEvents.add(event));
-			console.log(`[Subscription] Client ${clientId} subscribed to:`, events);
+			events.forEach(event => {
+				session.subscribedEvents.add(event);
+				// Store filters for this event
+				if (filters) {
+					session.eventFilters.set(event, filters);
+					console.log(`[Subscription] Client ${clientId} subscribed to ${event} with filters:`, filters);
+				} else {
+					console.log(`[Subscription] Client ${clientId} subscribed to ${event} (no filters)`);
+				}
+			});
 		} else {
-			events.forEach(event => session.subscribedEvents.delete(event));
+			events.forEach(event => {
+				session.subscribedEvents.delete(event);
+				session.eventFilters.delete(event);
+			});
 			console.log(`[Subscription] Client ${clientId} unsubscribed from:`, events);
 		}
 	}
@@ -273,6 +294,56 @@ export class WebSocketSessionManager {
 		if (session.subscribedEvents.size === 0) return true;
 
 		return session.subscribedEvents.has(eventType);
+	}
+
+	/**
+	 * Check if event data matches client's filters
+	 *
+	 * Server-side filtering: only send events to clients that match ALL filter criteria
+	 *
+	 * @param clientId - Client ID
+	 * @param eventType - Event type
+	 * @param eventData - Event data to check against filters
+	 * @returns true if event matches filters (or no filters set)
+	 *
+	 * @example
+	 * // Client subscribed with filters: { workerId: 'worker-123', status: 'IN_PROGRESS' }
+	 * // Event data: { workerId: 'worker-123', status: 'IN_PROGRESS', taskId: 'task-1' }
+	 * // Returns: true (all filters match)
+	 *
+	 * // Event data: { workerId: 'worker-456', status: 'IN_PROGRESS', taskId: 'task-2' }
+	 * // Returns: false (workerId doesn't match)
+	 */
+	matchesFilters(clientId: string, eventType: string, eventData: unknown): boolean {
+		const session = this.sessions.get(clientId);
+		if (!session) return false;
+
+		// Get filters for this event
+		const filters = session.eventFilters.get(eventType);
+
+		// No filters = match all events of this type
+		if (!filters || Object.keys(filters).length === 0) {
+			return true;
+		}
+
+		// Check if eventData is an object
+		if (!eventData || typeof eventData !== 'object') {
+			console.warn(`[Filter] Event data is not an object for ${eventType}, cannot apply filters`);
+			return true; // Allow through if data format unexpected
+		}
+
+		// Check each filter - ALL must match
+		for (const [key, expectedValue] of Object.entries(filters)) {
+			const actualValue = (eventData as any)[key];
+
+			// Deep equality check for primitives
+			if (actualValue !== expectedValue) {
+				return false; // Filter doesn't match
+			}
+		}
+
+		// All filters matched!
+		return true;
 	}
 
 	/**
@@ -376,5 +447,12 @@ export class WebSocketSessionManager {
 		}
 		this.sessions.clear();
 		this.userSessions.clear();
+	}
+
+	/**
+	 * Shutdown (alias for destroy())
+	 */
+	shutdown(): void {
+		this.destroy();
 	}
 }

@@ -1,4 +1,4 @@
-import type { FeatureContract } from '@framework/types/FeatureContract';
+import type { FeatureContract, QueryFiller } from '@framework/types/FeatureContract';
 import { BaseListQuerySchema } from '@shared/common/api-helpers';
 
 /**
@@ -69,7 +69,7 @@ export type ComposedQuery = {
  * - Filters out undefined, null, and empty string values
  * - Validates result against BaseListQuerySchema
  *
- * @param features - Variable number of feature contracts (undefined/null are skipped)
+ * @param queryFillers - Variable number of feature contracts (undefined/null are skipped)
  * @returns Validated query object typed as ComposedQuery
  * @throws ZodError if validation fails (developer error, not recoverable)
  *
@@ -83,17 +83,15 @@ export type ComposedQuery = {
  * );
  * ```
  */
-export function buildQuery(...features: Array<FeatureContract<any> | undefined | null>): ComposedQuery {
+export function buildQuery(...queryFillers: Array<QueryFiller | undefined | null>): ComposedQuery {
 	const query: Record<string, unknown> = {};
 
 	// 1. Each feature fills the query (order = priority)
-	for (const feature of features) {
+	for (const queryFiller of queryFillers) {
 		// Skip undefined/null features gracefully
-		if (!feature) continue;
+		if (!queryFiller) continue;
 
-		// Feature fills the query
-		console.log('[buildQuery] Calling fillQuery on feature');
-		feature.fillQuery(query);
+		queryFiller(query);
 	}
 
 	// 2. Filter out empty values (undefined, null, empty strings)

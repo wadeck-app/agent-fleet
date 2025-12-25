@@ -19,7 +19,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { getOrchestratorWsUrl } from 'shared-common/PortCalculator';
 import type { Shutdownable } from 'shared-common/Shutdownable';
-import { createMessage, parseMessage, serializeMessage } from 'shared-common/protocol';
+import { parseMessage, serializeMessage } from 'shared-common/protocol';
 import { type Task, TaskStatus } from 'shared-orch-worker/domain-types';
 import {
 	type AssignTaskMessage,
@@ -28,7 +28,7 @@ import {
 	O2WMessageType,
 	type WorkerWelcomeMessage,
 } from 'shared-orch-worker/orchestrator-messages';
-import { type W2OMessage, W2OMessageType } from 'shared-orch-worker/worker-messages';
+import { type W2OMessage, W2OMessageType, createW2OMessage } from 'shared-orch-worker/worker-messages';
 import { fileURLToPath } from 'url';
 import WebSocket from 'ws';
 
@@ -226,7 +226,7 @@ export class FlowWorker implements Shutdownable {
 		const availableFlows = this.buildFlowMetadata();
 
 		this.sendMessage(
-			createMessage(W2OMessageType.WORKER_READY, {
+			createW2OMessage(W2OMessageType.WORKER_READY, {
 				preferredId: this.preferredWorkerId,
 				projectId,
 				workspacePath,
@@ -241,7 +241,7 @@ export class FlowWorker implements Shutdownable {
 	private startHeartbeat(): void {
 		this.heartbeatTimer = setInterval(() => {
 			this.sendMessage(
-				createMessage(W2OMessageType.WORKER_HEARTBEAT, {
+				createW2OMessage(W2OMessageType.WORKER_HEARTBEAT, {
 					workerId: this.workerId,
 				})
 			);
@@ -441,7 +441,7 @@ export class FlowWorker implements Shutdownable {
 		const projectId = this.detectProjectId();
 
 		this.sendMessage(
-			createMessage(W2OMessageType.FLOWS_UPDATED, {
+			createW2OMessage(W2OMessageType.FLOWS_UPDATED, {
 				workerId: this.workerId,
 				projectId,
 				flows,
@@ -662,11 +662,11 @@ export class FlowWorker implements Shutdownable {
 	/**
 	 * Send task started notification
 	 */
-	protected sendTaskStarted(newStatus?: string): void {
+	protected sendTaskStarted(newStatus?: TaskStatus): void {
 		if (!this.currentTask) return;
 
 		this.sendMessage(
-			createMessage(W2OMessageType.TASK_STARTED, {
+			createW2OMessage(W2OMessageType.TASK_STARTED, {
 				workerId: this.workerId,
 				taskId: this.currentTask.id,
 				newStatus,
@@ -681,7 +681,7 @@ export class FlowWorker implements Shutdownable {
 		if (!this.currentTask) return;
 
 		this.sendMessage(
-			createMessage(W2OMessageType.TASK_PROGRESS, {
+			createW2OMessage(W2OMessageType.TASK_PROGRESS, {
 				workerId: this.workerId,
 				taskId: this.currentTask.id,
 				progress,
@@ -692,11 +692,11 @@ export class FlowWorker implements Shutdownable {
 	/**
 	 * Send task completed notification
 	 */
-	protected sendTaskCompleted(result?: any, newStatus?: string): void {
+	protected sendTaskCompleted(result?: any, newStatus?: TaskStatus): void {
 		if (!this.currentTask) return;
 
 		this.sendMessage(
-			createMessage(W2OMessageType.TASK_COMPLETED, {
+			createW2OMessage(W2OMessageType.TASK_COMPLETED, {
 				workerId: this.workerId,
 				taskId: this.currentTask.id,
 				result,
@@ -717,7 +717,7 @@ export class FlowWorker implements Shutdownable {
 		if (!this.currentTask) return;
 
 		this.sendMessage(
-			createMessage(W2OMessageType.TASK_FAILED, {
+			createW2OMessage(W2OMessageType.TASK_FAILED, {
 				workerId: this.workerId,
 				taskId: this.currentTask.id,
 				error,
@@ -738,7 +738,7 @@ export class FlowWorker implements Shutdownable {
 		if (!this.currentTask) return;
 
 		this.sendMessage(
-			createMessage(W2OMessageType.TASK_QUESTION, {
+			createW2OMessage(W2OMessageType.TASK_QUESTION, {
 				workerId: this.workerId,
 				taskId: this.currentTask.id,
 				question,
@@ -753,7 +753,7 @@ export class FlowWorker implements Shutdownable {
 		if (!this.currentTask) return;
 
 		this.sendMessage(
-			createMessage(W2OMessageType.STOP_REQUESTED, {
+			createW2OMessage(W2OMessageType.STOP_REQUESTED, {
 				workerId: this.workerId,
 				taskId: this.currentTask.id,
 				claudePid,
@@ -766,7 +766,7 @@ export class FlowWorker implements Shutdownable {
 	 */
 	protected sendHookEvent(hookName: string, data: any): void {
 		this.sendMessage(
-			createMessage(W2OMessageType.HOOK_EVENT, {
+			createW2OMessage(W2OMessageType.HOOK_EVENT, {
 				workerId: this.workerId,
 				hookName,
 				data,
@@ -779,7 +779,7 @@ export class FlowWorker implements Shutdownable {
 	 */
 	protected sendRequestTask(): void {
 		this.sendMessage(
-			createMessage(W2OMessageType.REQUEST_TASK, {
+			createW2OMessage(W2OMessageType.REQUEST_TASK, {
 				workerId: this.workerId,
 			})
 		);

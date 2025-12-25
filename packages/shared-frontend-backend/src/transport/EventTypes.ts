@@ -1,5 +1,6 @@
-import type { Task } from '../api/tasks.contract';
-import type { Worker } from '../api/workers.contract';
+import type { DashboardData } from '../api/dashboard.contract';
+import type { Task, TasksData } from '../api/tasks.contract';
+import type { Worker, WorkersData } from '../api/workers.contract';
 import type { Workspace } from '../api/workspaces.contract';
 
 //FIXME this whole typing structure is too complicated. I don't care to know about the abbreviation/type/action kind of things
@@ -85,6 +86,15 @@ export interface BusinessEvents {
 		workspaceId: string;
 		archivedAt: number;
 	};
+
+	/** Dashboard data updated (aggregate) */
+	'b2f:dashboard:updated': DashboardData;
+
+	/** Tasks data updated (aggregate) - replaces direct orchestrator WebSocket */
+	'b2f:tasks:updated': TasksData;
+
+	/** Workers data updated (aggregate) - replaces direct orchestrator WebSocket */
+	'b2f:workers:updated': WorkersData;
 }
 
 /**
