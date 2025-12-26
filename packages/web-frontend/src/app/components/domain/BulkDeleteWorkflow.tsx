@@ -104,6 +104,11 @@ export function BulkDeleteWorkflow({
 	const handleConfirm = async () => {
 		const idsArray = Array.from(selectedIds);
 
+		console.log('[BULK DELETE] 1. Starting bulk delete', {
+			count: idsArray.length,
+			timestamp: performance.now(),
+		});
+
 		// STEP 1: Mark items as deleting (strike-through visual feedback + blur effect)
 		if (onDeletingChange) {
 			onDeletingChange(new Set(idsArray));
@@ -111,6 +116,10 @@ export function BulkDeleteWorkflow({
 		if (onBulkDeletingChange) {
 			onBulkDeletingChange(true);
 		}
+
+		console.log('[BULK DELETE] 2. States set (deletingIds + isBulkDeleting)', {
+			timestamp: performance.now(),
+		});
 
 		// STEP 2: Clear selection and close dialog immediately
 		onClear();
@@ -126,6 +135,11 @@ export function BulkDeleteWorkflow({
 		const allDeleted: string[] = [];
 		const allFailed: FailedDeletion[] = [];
 		let currentBatch = 0;
+
+		console.log('[BULK DELETE] 3. Starting batch processing', {
+			batchCount: batches.length,
+			timestamp: performance.now(),
+		});
 
 		try {
 			for (const batch of batches) {
@@ -145,8 +159,16 @@ export function BulkDeleteWorkflow({
 				allFailed.push(...result.failed);
 			}
 
+			console.log('[BULK DELETE] 4. All batches completed, starting reload', {
+				timestamp: performance.now(),
+			});
+
 			// STEP 5: Refresh and show results
 			await onReload();
+
+			console.log('[BULK DELETE] 5. Reload completed', {
+				timestamp: performance.now(),
+			});
 
 			// Clear visual feedback
 			if (onDeletingChange) {
@@ -155,6 +177,10 @@ export function BulkDeleteWorkflow({
 			if (onBulkDeletingChange) {
 				onBulkDeletingChange(false);
 			}
+
+			console.log('[BULK DELETE] 6. Cleanup done (success path)', {
+				timestamp: performance.now(),
+			});
 
 			// Show appropriate toast based on results
 			if (allFailed.length === 0) {
@@ -168,6 +194,10 @@ export function BulkDeleteWorkflow({
 				showToast(`Deleted ${allDeleted.length} ${itemTypeName}(s), ${allFailed.length} failed`, 'warning');
 			}
 		} catch (error: unknown) {
+			console.log('[BULK DELETE] Error occurred, starting reload', {
+				timestamp: performance.now(),
+			});
+
 			// Network error or unexpected error
 			await onReload();
 
@@ -178,6 +208,10 @@ export function BulkDeleteWorkflow({
 			if (onBulkDeletingChange) {
 				onBulkDeletingChange(false);
 			}
+
+			console.log('[BULK DELETE] 6. Cleanup done (error path)', {
+				timestamp: performance.now(),
+			});
 
 			showToast(getErrorMessage(error) || `Failed to delete ${itemTypeName}(s)`, 'error');
 		}

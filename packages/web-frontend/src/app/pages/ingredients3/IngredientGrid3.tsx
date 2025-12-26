@@ -81,6 +81,14 @@ export function IngredientGrid3({
 	onSelectionToggle,
 	onSelectAll,
 }: IngredientGrid3Props) {
+	// Log render with blur state
+	console.log('[GRID] Render', {
+		refreshing,
+		deleting,
+		blurActive: refreshing || deleting,
+		timestamp: performance.now(),
+	});
+
 	// Extract selection state from injected features
 	const selection = features?.selection;
 	const hasSelection = !!selection && !!onSelectionToggle;
@@ -238,21 +246,17 @@ export function IngredientGrid3({
 					(refreshing || deleting) && 'pointer-events-none opacity-50 blur-sm'
 				)}
 			>
-				{data.map(ingredient => {
-					const isDeleting = deletingIds.has(ingredient.id);
-					return (
-						<div key={ingredient.id} className={cn(isDeleting && 'opacity-50 line-through')}>
-							<IngredientCard3
-								ingredient={ingredient}
-								onEdit={onEdit}
-								onDelete={onDelete}
-								selectable={hasSelection}
-								isSelected={selectedIds.has(ingredient.id)}
-								onToggleSelection={onSelectionToggle}
-							/>
-						</div>
-					);
-				})}
+				{data.map(ingredient => (
+					<IngredientCard3
+						key={ingredient.id}
+						ingredient={ingredient}
+						onEdit={onEdit}
+						onDelete={onDelete}
+						selectable={hasSelection}
+						isSelected={selectedIds.has(ingredient.id)}
+						onToggleSelection={onSelectionToggle}
+					/>
+				))}
 			</div>
 
 			{/* Pagination Controls */}

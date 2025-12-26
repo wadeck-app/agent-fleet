@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { Data2 } from '@framework/components2/data/Data2';
@@ -122,6 +122,32 @@ export function Ingredients2Page() {
 	const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 	// Track if bulk delete is in progress (for blur effect)
 	const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+	// Track if we're refreshing after a mutation (delete/update/create)
+	// This keeps the blur effect active during mutation + subsequent refresh
+	const [isRefreshingAfterMutation, setIsRefreshingAfterMutation] = useState(false);
+	// Track if we're waiting for a refresh to complete after a mutation
+	const isMutating = useRef(false);
+
+	// Clear isRefreshingAfterMutation and isBulkDeleting when the data changes (refresh completed)
+	// This prevents the "flash" where blur disappears between delete and refresh
+	useEffect(() => {
+		console.log('[DELETE] useEffect - ingredients changed', {
+			isMutating: isMutating.current,
+			ingredientsCount: ingredients.length,
+			timestamp: performance.now(),
+		});
+
+		// If we were mutating, and ingredients changed (refresh completed)
+		if (isMutating.current && ingredients.length > 0) {
+			console.log('[DELETE] useEffect - clearing mutation flags', {
+				timestamp: performance.now(),
+			});
+			isMutating.current = false;
+			setIsRefreshingAfterMutation(false);
+			setIsBulkDeleting(false);
+			setDeletingIds(new Set()); // Also clear deletingIds for bulk delete
+		}
+	}, [ingredients]);
 
 	// Dialog state management using URL routing
 	const { isOpen, editingItem: editingIngredient } = useRoutedDialog({
@@ -157,9 +183,48 @@ export function Ingredients2Page() {
 
 	const handleDeleteConfirm = async () => {
 		if (deleteConfirmation.ingredientId) {
-			await deleteIngredient(deleteConfirmation.ingredientId);
-			// Trigger Data2 refresh via cache control
-			await cache.actions.refresh();
+			console.log('[DELETE] 1. Starting delete process', {
+				id: deleteConfirmation.ingredientId,
+				timestamp: performance.now(),
+			});
+
+			// Mark as deleting for strike-through effect
+			setDeletingIds(prev => new Set([...prev, deleteConfirmation.ingredientId!]));
+			// Start refreshing state before mutation (blur effect active during delete + refresh)
+			setIsRefreshingAfterMutation(true);
+			// Mark that we're in mutation mode (useEffect will clear the flag when refresh completes)
+			isMutating.current = true;
+
+			console.log('[DELETE] 2. States set (deletingIds + isRefreshingAfterMutation + isMutating)', {
+				timestamp: performance.now(),
+			});
+
+			try {
+				console.log('[DELETE] 3. Starting deleteIngredient API call', {
+					timestamp: performance.now(),
+				});
+				await deleteIngredient(deleteConfirmation.ingredientId);
+				console.log('[DELETE] 4. Delete completed, starting refresh', {
+					timestamp: performance.now(),
+				});
+
+				// Trigger Data2 refresh via cache control
+				await cache.actions.refresh();
+				console.log('[DELETE] 5. Refresh triggered (cache ID incremented)', {
+					timestamp: performance.now(),
+				});
+			} finally {
+				// Clear deleting state
+				setDeletingIds(prev => {
+					const next = new Set(prev);
+					next.delete(deleteConfirmation.ingredientId!);
+					return next;
+				});
+				// DON'T clear isRefreshingAfterMutation here - let useEffect do it when refresh completes
+				console.log('[DELETE] 6. Cleanup done (deletingIds cleared, waiting for refresh to complete)', {
+					timestamp: performance.now(),
+				});
+			}
 		}
 	};
 
@@ -168,17 +233,25 @@ export function Ingredients2Page() {
 	};
 
 	const handleSubmit = async (data: CreateIngredient) => {
-		if (editingIngredient) {
-			// Find the latest version from the ingredients array
-			const latestIngredient = ingredients.find(i => i.id === editingIngredient.id);
-			const version = latestIngredient?.version ?? editingIngredient.version;
-			await updateIngredient(editingIngredient.id, { ...data, version });
-		} else {
-			await createIngredient(data);
+		// Start refreshing state before mutation
+		setIsRefreshingAfterMutation(true);
+		// Mark that we're in mutation mode (useEffect will clear the flag when refresh completes)
+		isMutating.current = true;
+		try {
+			if (editingIngredient) {
+				// Find the latest version from the ingredients array
+				const latestIngredient = ingredients.find(i => i.id === editingIngredient.id);
+				const version = latestIngredient?.version ?? editingIngredient.version;
+				await updateIngredient(editingIngredient.id, { ...data, version });
+			} else {
+				await createIngredient(data);
+			}
+			// Trigger Data2 refresh via cache control
+			await cache.actions.refresh();
+			navigate('/ingredients2');
+		} finally {
+			// DON'T clear isRefreshingAfterMutation here - let useEffect do it when refresh completes
 		}
-		// Trigger Data2 refresh via cache control
-		await cache.actions.refresh();
-		navigate('/ingredients2');
 	};
 
 	const handleRefresh = async () => {
@@ -329,12 +402,18 @@ export function Ingredients2Page() {
 				selection={selection}
 				delegateLoadingToChildren={true}
 			>
-				<IngredientTable2
-					onEdit={handleEdit}
-					onDelete={handleDelete}
-					onSelectionToggle={selection.actions.toggle}
-					onSelectAll={handleSelectAll}
-				/>
+				{injectedProps => (
+					<IngredientTable2
+						{...injectedProps}
+						onEdit={handleEdit}
+						onDelete={handleDelete}
+						refreshing={injectedProps.isLoading || isRefreshingAfterMutation}
+						deleting={isBulkDeleting}
+						deletingIds={deletingIds}
+						onSelectionToggle={selection.actions.toggle}
+						onSelectAll={handleSelectAll}
+					/>
+				)}
 			</Data2>
 
 			{/* Bulk Delete Workflow */}
@@ -346,8 +425,23 @@ export function Ingredients2Page() {
 				onBulkDelete={bulkDeleteIngredients}
 				onReload={async () => cache.actions.refresh()}
 				itemTypeName="ingredient"
-				onDeletingChange={setDeletingIds}
-				onBulkDeletingChange={setIsBulkDeleting}
+				onDeletingChange={ids => {
+					// Only set deletingIds if non-empty (ignore clear - let useEffect do it)
+					if (ids.size > 0) {
+						setDeletingIds(ids);
+					}
+				}}
+				onBulkDeletingChange={deleting => {
+					if (deleting) {
+						// Set flag and mark as mutating (useEffect will clear when refresh completes)
+						setIsBulkDeleting(true);
+						isMutating.current = true;
+						console.log('[BULK DELETE] onBulkDeletingChange(true) - isMutating set', {
+							timestamp: performance.now(),
+						});
+					}
+					// Ignore deleting=false - let useEffect clear it when refresh completes
+				}}
 			/>
 
 			{/* Ingredient Dialog for Create/Edit */}
@@ -363,7 +457,10 @@ export function Ingredients2Page() {
 			{/* Delete Confirmation Dialog */}
 			<AlertDialogWrapper
 				open={deleteConfirmation.open}
-				onOpenChange={open => setDeleteConfirmation({ open, ingredientId: null })}
+				onOpenChange={open => {
+					console.log('[DELETE] onOpenChange called', { open, timestamp: performance.now() });
+					setDeleteConfirmation({ open, ingredientId: open ? deleteConfirmation.ingredientId : null });
+				}}
 				title="Delete Ingredient"
 				description="Are you sure you want to delete this ingredient? This action cannot be undone."
 				confirmLabel="Delete"

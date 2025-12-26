@@ -62,7 +62,6 @@ export function TableRow<T>({
 				: alternatingBg
 		}
      ${isEditing ? 'border-2 border-primary bg-accent/50' : ''}
-     ${isDeleting ? 'pointer-events-none opacity-50' : ''}
      ${rowClassName}
    `}
 			data-testid="table-row"
@@ -86,12 +85,12 @@ export function TableRow<T>({
        ${column.className || ''}
      `}
 				>
-					<div className={isDeleting ? 'line-through' : ''}>{column.render(item, isEditing)}</div>
+					{column.render(item, isEditing)}
 				</td>
 			))}
 			{renderActions && (
 				<td className="h-12 px-4 py-2.5 text-center">
-					<div className={isDeleting ? 'line-through' : ''}>{renderActions(item, isEditing)}</div>
+					{renderActions(item, isEditing)}
 				</td>
 			)}
 		</tr>
