@@ -165,7 +165,7 @@ export function Ingredients3GridPage() {
 		if (deleteConfirmation.ingredientId) {
 			// Mark as deleting for strike-through effect
 			setDeletingIds(prev => new Set([...prev, deleteConfirmation.ingredientId!]));
-			// Start refreshing state before mutation
+			// Start refreshing state before mutation (blur effect active during delete + refresh)
 			setIsRefreshingAfterMutation(true);
 			try {
 				await deleteIngredient(deleteConfirmation.ingredientId);
