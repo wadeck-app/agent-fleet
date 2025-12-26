@@ -399,14 +399,15 @@ describe('IngredientsController', () => {
 	});
 
 	describe('Route registration', () => {
-		it('should register all 6 routes', () => {
-			expect(routes.size).toBe(6);
+		it('should register all 7 routes', () => {
+			expect(routes.size).toBe(7);
 			expect(routes.has('GET /api/ingredients/')).toBe(true);
 			expect(routes.has('GET /api/ingredients/:id')).toBe(true);
 			expect(routes.has('POST /api/ingredients/')).toBe(true);
 			expect(routes.has('PUT /api/ingredients/:id')).toBe(true);
 			expect(routes.has('PATCH /api/ingredients/:id')).toBe(true);
 			expect(routes.has('DELETE /api/ingredients/:id')).toBe(true);
+			expect(routes.has('DELETE /api/ingredients/')).toBe(true); // Bulk delete
 		});
 
 		it('should have static routes property', () => {

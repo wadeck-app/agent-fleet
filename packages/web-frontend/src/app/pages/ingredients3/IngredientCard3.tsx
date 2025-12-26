@@ -12,6 +12,7 @@
  *
  * ===========================================================================================
  */
+import { Checkbox } from '@framework/components/forms/Checkbox';
 import { Button } from '@framework/components/primitives/Button';
 import {
 	Card,
@@ -32,6 +33,12 @@ export interface IngredientCard3Props {
 	onEdit?: (ingredient: Ingredient) => void;
 	/** Optional delete callback */
 	onDelete?: (id: string) => void;
+	/** Whether selection is enabled */
+	selectable?: boolean;
+	/** Whether this card is selected */
+	isSelected?: boolean;
+	/** Selection toggle callback */
+	onToggleSelection?: (id: string) => void;
 }
 
 /**
@@ -40,9 +47,27 @@ export interface IngredientCard3Props {
  * Renders all ingredient information in a structured card layout.
  * Designed to be used in a grid layout by IngredientGrid3.
  */
-export function IngredientCard3({ ingredient, onEdit, onDelete }: IngredientCard3Props) {
+export function IngredientCard3({
+	ingredient,
+	onEdit,
+	onDelete,
+	selectable = false,
+	isSelected = false,
+	onToggleSelection,
+}: IngredientCard3Props) {
 	return (
-		<Card size="default" className="hover:shadow-lg transition-shadow">
+		<Card size="default" className="hover:shadow-lg transition-shadow relative">
+			{/* Selection checkbox (top right) */}
+			{selectable && onToggleSelection && (
+				<div className="absolute top-3 right-3 z-10">
+					<Checkbox
+						checked={isSelected}
+						onCheckedChange={() => onToggleSelection(ingredient.id)}
+						aria-label={`Select ${ingredient.name}`}
+					/>
+				</div>
+			)}
+
 			{/* Header: Primary info */}
 			<CardHeader>
 				<CardTitle>{ingredient.name}</CardTitle>

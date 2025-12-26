@@ -234,11 +234,15 @@ export class TasksService {
 	}
 
 	/**
-	 * Apply client-side filters (workerId, priority)
-	 * Note: status filtering is done server-side via query param
+	 * Apply domain filters (status, workerId, priority)
 	 */
 	private applyFilters(tasks: Task[], query?: TasksQuery): Task[] {
 		let filtered = tasks;
+
+		// Filter by status if specified
+		if (query?.status) {
+			filtered = filtered.filter(task => task.status === query.status);
+		}
 
 		// Filter by workerId if specified
 		if (query?.workerId) {

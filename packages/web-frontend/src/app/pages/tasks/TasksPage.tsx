@@ -82,7 +82,7 @@ export function TasksPage() {
 				action={
 					<div className="flex gap-2">
 						<Button onClick={() => setCreateDialogOpen(true)} variant="default" size="sm">
-							<Plus className="mr-2 size-4" />
+							<Plus />
 							Create Task
 						</Button>
 						<Button onClick={handleRefresh} disabled={isRefreshing} variant="outline" size="sm">

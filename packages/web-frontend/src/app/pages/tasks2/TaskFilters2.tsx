@@ -1,7 +1,5 @@
 import { Input } from '@framework/components/forms/Input';
-import { Label } from '@framework/components/forms/Label';
 import { Button } from '@framework/components/primitives/Button';
-import { Card, CardContent } from '@framework/components/primitives/Card';
 import { SelectInput } from '@framework/features/forms/inputs/SelectInput';
 
 import type { TaskFiltersContract } from './useTaskFilters2';
@@ -57,57 +55,49 @@ export interface TaskFilters2Props {
  */
 export function TaskFilters2({ filters }: TaskFilters2Props) {
 	return (
-		<Card className="mb-4">
-			<CardContent className="pt-6">
-				<div className="flex gap-4 items-end flex-wrap">
-					{/* Status Filter */}
-					<div className="flex-1 min-w-[200px]">
-						<Label htmlFor="status-filter" className="mb-2">
-							Status
-						</Label>
-						<SelectInput
-							id="status-filter"
-							value={filters.fstate.status || '__all__'}
-							onChange={val => filters.actions.setStatus(val === '__all__' ? undefined : (val as any))}
-							options={STATUS_OPTIONS}
-						/>
-					</div>
+		<div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+			{/* Status Filter */}
+			<div>
+				<div className="mb-2 text-xs font-medium text-muted-foreground">Status</div>
+				<SelectInput
+					id="status-filter"
+					value={filters.fstate.status || '__all__'}
+					onChange={val => filters.actions.setStatus(val === '__all__' ? undefined : (val as any))}
+					options={STATUS_OPTIONS}
+				/>
+			</div>
 
-					{/* Priority Filter */}
-					<div className="flex-1 min-w-[200px]">
-						<Label htmlFor="priority-filter" className="mb-2">
-							Priority
-						</Label>
-						<SelectInput
-							id="priority-filter"
-							value={filters.fstate.priority || '__all__'}
-							onChange={val => filters.actions.setPriority(val === '__all__' ? undefined : (val as any))}
-							options={PRIORITY_OPTIONS}
-						/>
-					</div>
+			{/* Priority Filter */}
+			<div>
+				<div className="mb-2 text-xs font-medium text-muted-foreground">Priority</div>
+				<SelectInput
+					id="priority-filter"
+					value={filters.fstate.priority || '__all__'}
+					onChange={val => filters.actions.setPriority(val === '__all__' ? undefined : (val as any))}
+					options={PRIORITY_OPTIONS}
+				/>
+			</div>
 
-					{/* Worker ID Filter */}
-					<div className="flex-1 min-w-[200px]">
-						<Label htmlFor="worker-filter" className="mb-2">
-							Worker ID
-						</Label>
-						<Input
-							id="worker-filter"
-							type="text"
-							value={filters.fstate.workerId || ''}
-							onChange={e => filters.actions.setWorkerId(e.target.value || undefined)}
-							placeholder="Filter by worker..."
-						/>
-					</div>
+			{/* Worker ID Filter */}
+			<div>
+				<div className="mb-2 text-xs font-medium text-muted-foreground">Worker ID</div>
+				<Input
+					id="worker-filter"
+					type="text"
+					value={filters.fstate.workerId || ''}
+					onChange={e => filters.actions.setWorkerId(e.target.value || undefined)}
+					placeholder="Filter by worker..."
+				/>
+			</div>
 
-					{/* Clear Filters Button */}
-					{filters.fstate.hasFilters && (
-						<Button onClick={filters.actions.clearFilters} variant="outline" size="default">
-							Clear Filters
-						</Button>
-					)}
+			{/* Clear Filters Button - Full width on mobile, auto on larger screens */}
+			{filters.fstate.hasFilters && (
+				<div className="sm:col-span-3">
+					<Button onClick={filters.actions.clearFilters} variant="outline" size="default">
+						Clear Filters
+					</Button>
 				</div>
-			</CardContent>
-		</Card>
+			)}
+		</div>
 	);
 }

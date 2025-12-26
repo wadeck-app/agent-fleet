@@ -1,4 +1,4 @@
-import { Orchestrator } from 'orchestrator';
+import type { Orchestrator } from 'orchestrator';
 import { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
 import { getOrchestratorRestUrl } from 'shared-common/PortCalculator';
 
@@ -22,7 +22,7 @@ import { WorkersService } from '../services/WorkersService';
 import { WorkspacesService } from '../services/WorkspacesService';
 import type { DataStorage } from '../storage/DataStorage';
 import { InMemoryStorage } from '../storage/InMemoryStorage';
-import { EventBroadcaster } from '../transport/EventBroadcaster';
+import type { EventBroadcaster } from '../transport/EventBroadcaster';
 import type { ITransportServer } from '../transport/ITransportServer';
 import { TransportRouter } from '../transport/TransportRouter';
 import { TransportSessionManager } from '../transport/TransportSessionManager';

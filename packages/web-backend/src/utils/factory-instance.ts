@@ -1,4 +1,4 @@
-import { Orchestrator } from 'orchestrator';
+import type { Orchestrator } from 'orchestrator';
 
 import { DataStoreFactory } from '../factories/DataStoreFactory';
 

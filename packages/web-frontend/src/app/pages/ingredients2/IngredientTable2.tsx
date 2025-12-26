@@ -112,6 +112,14 @@ export interface IngredientTable2Props extends Partial<Table2Props<Ingredient>> 
 	onDelete?: (id: string) => void;
 	/** Optional refreshing state - from Data2 */
 	refreshing?: boolean;
+	/** Optional deleting state - for bulk delete blur effect */
+	deleting?: boolean;
+	/** IDs of items being deleted - for strike-through effect */
+	deletingIds?: Set<string>;
+	/** Selection toggle callback */
+	onSelectionToggle?: (id: string) => void;
+	/** Select all callback */
+	onSelectAll?: (ids: string[]) => void;
 }
 
 /**
@@ -120,7 +128,16 @@ export interface IngredientTable2Props extends Partial<Table2Props<Ingredient>> 
  * Wraps Table2 with ingredient-specific column definitions and action handlers.
  * Receives injected props from Data2 (data, isLoading, error, pagination, sorting).
  */
-export function IngredientTable2({ onEdit, onDelete, refreshing, ...tableProps }: IngredientTable2Props) {
+export function IngredientTable2({
+	onEdit,
+	onDelete,
+	refreshing,
+	deleting,
+	deletingIds,
+	onSelectionToggle,
+	onSelectAll,
+	...tableProps
+}: IngredientTable2Props) {
 	// Build actions column if either onEdit or onDelete is provided
 	const renderActions =
 		onEdit || onDelete
@@ -163,7 +180,12 @@ export function IngredientTable2({ onEdit, onDelete, refreshing, ...tableProps }
 			error={tableProps.error ?? null}
 			pagination={tableProps.pagination}
 			sorting={tableProps.sorting}
+			features={tableProps.features}
 			refreshing={refreshing}
+			deleting={deleting}
+			deletingIds={deletingIds}
+			onSelectionToggle={onSelectionToggle}
+			onSelectAll={onSelectAll}
 		/>
 	);
 }

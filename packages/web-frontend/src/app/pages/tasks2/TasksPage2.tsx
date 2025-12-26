@@ -74,29 +74,24 @@ export function TasksPage2() {
 	// Debounce search query
 	const debouncedSearchQuery = useDebounce(search.fstate.query, 300);
 
-	// Fetch function - combines Data2 query + domain filters
-	const fetchTasks = useCallback(
-		async (query: ComposedQuery) => {
-			const response = await tasksApi.getTasksList({
-				// Data2 features
-				page: query.page,
-				pageSize: query.pageSize,
-				sortBy: query.sortBy,
-				sortOrder: query.sortOrder as 'asc' | 'desc' | undefined,
-				search: query.search,
-				// Domain filters
-				status: filters.fstate.status,
-				priority: filters.fstate.priority,
-				workerId: filters.fstate.workerId,
-			});
+	// Fetch function - query includes all features composed by Data2
+	const fetchTasks = useCallback(async (query: ComposedQuery) => {
+		const response = await tasksApi.getTasksList({
+			page: query.page,
+			pageSize: query.pageSize,
+			sortBy: query.sortBy,
+			sortOrder: query.sortOrder as 'asc' | 'desc' | undefined,
+			search: query.search,
+			status: query.status as any,
+			priority: query.priority as any,
+			workerId: query.workerId as string | undefined,
+		});
 
-			return {
-				items: response.items,
-				pagination: response.pagination,
-			};
-		},
-		[filters.fstate]
-	);
+		return {
+			items: response.items,
+			pagination: response.pagination,
+		};
+	}, []);
 
 	return (
 		<Page>
@@ -183,7 +178,15 @@ export function TasksPage2() {
 			</div>
 
 			{/* Data + Table */}
-			<Data2 fetchData={fetchTasks} pagination={pagination} sorting={sorting} search={search} cache={cache}>
+			<Data2
+				fetchData={fetchTasks}
+				pagination={pagination}
+				sorting={sorting}
+				search={search}
+				filter={filters as any}
+				cache={cache}
+				delegateLoadingToChildren={true}
+			>
 				<TasksTable2 />
 			</Data2>
 		</Page>

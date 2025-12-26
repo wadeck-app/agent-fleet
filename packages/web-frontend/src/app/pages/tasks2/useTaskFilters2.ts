@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
+import type { QueryFiller } from '@framework/types/FeatureContract';
 import type { TaskPriority, TaskStatus } from '@shared/api/tasks.contract';
 
 /**
@@ -58,6 +59,7 @@ export interface TaskFiltersContract {
 		setWorkerId: (workerId?: string) => void;
 		clearFilters: () => void;
 	};
+	fillQuery: QueryFiller;
 }
 
 /**
@@ -169,8 +171,19 @@ export function useTaskFilters2(options?: UseTaskFilters2Options): TaskFiltersCo
 		[setSearchParams, onFilterChange]
 	);
 
+	// Fill query function for Data2 integration
+	const fillQuery = useCallback<QueryFiller>(
+		query => {
+			if (status) query.status = status;
+			if (priority) query.priority = priority;
+			if (workerId) query.workerId = workerId;
+		},
+		[status, priority, workerId]
+	);
+
 	return {
 		fstate,
 		actions,
+		fillQuery,
 	};
 }

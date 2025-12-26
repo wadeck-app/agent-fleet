@@ -1,9 +1,11 @@
+import { type ReactNode } from 'react';
+
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
 
 import { type SortDirection } from './useTableSorting';
 
 export interface SortableColumnHeaderProps {
-	label: string;
+	label: string | ReactNode;
 	sortDirection: SortDirection;
 	priority?: number | null;
 	onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;

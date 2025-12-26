@@ -419,3 +419,88 @@ Reason: CLAUDE.md says "Put your plan files in <projectRoot>.claude/plans folder
 **When Discovered**: December 23, 2024 - User repeatedly asked for plans in correct location, but agent continued creating in home directory until explicitly challenged on retention mechanism.
 
 **Related Instructions**: See CLAUDE.md line about `.claude/plans` folder and requirement to "Append [lessons-learned.md] with what you are learning!"
+
+---
+
+## React useEffect Dependencies - Query URL as Source of Truth, Not Query Object
+
+**Problem**: When implementing data fetching with query composition, depending on the `query` object in useEffect dependencies causes unnecessary re-fetches. Even if the query content is identical, object reference changes trigger new fetches, resulting in multiple requests (e.g., 5 requests instead of 2 for a single page load).
+
+**Root Cause**: Two issues compound to create excessive re-fetches:
+
+1. **Array recreation**: Creating a new array on every render changes the features array reference, even if elements are stable
+2. **Wrong dependencies**: Including `query` object in useEffect dependencies when `queryUrl` is the source of truth for change detection
+
+**Wrong Approach** ❌:
+
+```typescript
+// Data2.tsx - Creating array on every render
+const { query, queryUrl } = useQueryComposition([pagination, sorting, search, filter, cache]);
+
+// useDataFetch.ts - Depending on query object
+useEffect(() => {
+	const result = await fetchData(query);
+	// ...
+}, [fetchData, query, queryUrl]); // ← query changes every render!
+```
+
+**Symptoms**:
+
+- Multiple identical requests in quick succession (e.g., 5 requests where only 2 expected)
+- Backend logs show requests with identical parameters
+- Network tab shows overlapping requests with same query string
+- Happens even without user interaction (page load only)
+
+**Correct Solution** ✅:
+
+```typescript
+// Data2.tsx - Memoize features array
+const features = useMemo(
+	() => [pagination, sorting, search, filter, cache],
+	[pagination, sorting, search, filter, cache]
+);
+const { query, queryUrl } = useQueryComposition(features);
+
+// useDataFetch.ts - Only depend on queryUrl (source of truth)
+useEffect(() => {
+	const result = await fetchData(query); // query captured via closure
+	// ...
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [queryUrl]); // ← Only queryUrl, not query or fetchData
+```
+
+**Key Principles**:
+
+1. **Memoize array inputs**: Always wrap array literals in `useMemo` when passing to hooks
+2. **Use source of truth for dependencies**: If you have a serialized version (`queryUrl`), use ONLY that for change detection
+3. **Closure capture is OK**: Stable values like `query` and `fetchData` can be captured via closure
+4. **Trust useMemo chains**: If `query` is memoized based on stable dependencies, it won't change unexpectedly
+
+**Why This Works**:
+
+- `queryUrl` is the JSON-serialized, sorted version of `query` - it only changes when content changes
+- `query` object reference might change even if content is identical (JavaScript object equality)
+- `fetchData` should be stable (passed from parent component)
+- Capturing via closure is safe because these values won't change between renders unless `queryUrl` changes
+
+**Architecture Pattern** (useQueryComposition → useDataFetch → usePropsInjection):
+
+```typescript
+// Step 1: Compose query (memoized based on feature fillQuery functions)
+const { query, queryUrl } = useQueryComposition(features);
+
+// Step 2: Fetch data (only refetch when queryUrl changes)
+const dataState = useDataFetch(queryUrl, query, fetchData); // query used but not in deps
+
+// Step 3: Build props (memoized based on dataState and features)
+const injectedProps = usePropsInjection(dataState, { pagination, sorting, ... });
+```
+
+**Files Affected** (December 2024):
+
+- `packages/web-frontend/src/framework/hooks2/useDataFetch.ts` - Changed dependencies from `[fetchData, query, queryUrl]` to `[queryUrl]`
+- `packages/web-frontend/src/framework/components2/data/Data2.tsx` - Added `useMemo` for features array
+
+**When Discovered**: December 26, 2024 during Data2 refactoring. User reported 5 requests instead of 2 on Ingredients2Page load. Root cause: combining array recreation with wrong useEffect dependencies.
+
+**Related Pattern**: This is similar to the "React Hook Polling Pattern" lesson - both involve being careful about useEffect dependencies and understanding what should trigger re-execution vs what should be captured via closure.

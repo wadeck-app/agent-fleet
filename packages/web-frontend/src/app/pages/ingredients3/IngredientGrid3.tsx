@@ -14,7 +14,6 @@
  * Features:
  * - Data display using IngredientCard3
  * - Sort controls with dropdown selector
- * - Sort indicator bar showing active sorts
  * - Pagination controls (if pagination feature enabled)
  * - Loading state with skeleton cards
  * - Empty and error states
@@ -32,13 +31,12 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
 import { PageSizeSelector } from '@framework/components/pagination/PageSizeSelector';
 import { Pagination } from '@framework/components/pagination/Pagination';
-import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import { Card, CardContent, CardFooter, CardHeader } from '@framework/components/primitives/Card';
 import { cn } from '@framework/lib/utils';
 import type { QueryResultDisplayerProps } from '@framework/types/QueryResultDisplayerContract';
 import type { Ingredient } from '@shared/api/ingredients.contract';
-import { AlertCircle, ArrowDown, ArrowUp, LayoutGrid, RefreshCw } from 'lucide-react';
+import { AlertCircle, ArrowDown, ArrowUp, LayoutGrid } from 'lucide-react';
 
 import { IngredientCard3 } from './IngredientCard3';
 
@@ -53,6 +51,14 @@ export interface IngredientGrid3Props extends Partial<QueryResultDisplayerProps<
 	onDelete?: (id: string) => void;
 	/** Optional refreshing state - from Data2 */
 	refreshing?: boolean;
+	/** Optional deleting state - for bulk delete blur effect */
+	deleting?: boolean;
+	/** IDs of items being deleted - for strike-through effect */
+	deletingIds?: Set<string>;
+	/** Selection toggle callback */
+	onSelectionToggle?: (id: string) => void;
+	/** Select all callback */
+	onSelectAll?: (ids: string[]) => void;
 }
 
 /**
@@ -68,9 +74,18 @@ export function IngredientGrid3({
 	sorting,
 	features,
 	refreshing = false,
+	deleting = false,
+	deletingIds = new Set(),
 	onEdit,
 	onDelete,
+	onSelectionToggle,
+	onSelectAll,
 }: IngredientGrid3Props) {
+	// Extract selection state from injected features
+	const selection = features?.selection;
+	const hasSelection = !!selection && !!onSelectionToggle;
+	const selectedIds = selection?.selectedIds || new Set<string>();
+
 	// ═══════════════════════════════════════════════════════════════════════════════════════
 	// ERROR STATE
 	// ═══════════════════════════════════════════════════════════════════════════════════════
@@ -142,50 +157,11 @@ export function IngredientGrid3({
 	);
 
 	// ═══════════════════════════════════════════════════════════════════════════════════════
-	// SORT INDICATOR BAR
-	// ═══════════════════════════════════════════════════════════════════════════════════════
-
-	const sortIndicator = sorting && sorting.sortConfigs.length > 0 && (
-		<div className="mb-4 flex items-center gap-2 rounded-lg border border-border bg-muted/50 p-3">
-			<span className="text-sm font-medium">Sorted by:</span>
-			<div className="flex flex-wrap gap-2">
-				{sorting.sortConfigs.map((config, idx) => (
-					<Badge key={config.key} variant="secondary" className="gap-1">
-						<span className="capitalize">{config.key}</span>
-						{config.direction === 'asc' ? (
-							<ArrowUp className="h-3 w-3" />
-						) : (
-							<ArrowDown className="h-3 w-3" />
-						)}
-						{sorting.sortConfigs.length > 1 && (
-							<span className="ml-1 rounded-full bg-primary/20 px-1.5 text-xs">{idx + 1}</span>
-						)}
-					</Badge>
-				))}
-			</div>
-			<Button
-				variant="ghost"
-				size="sm"
-				onClick={() => {
-					// Clear all sorts by toggling primary sort twice
-					const primaryKey = sorting.sortConfigs[0]?.key;
-					if (primaryKey) {
-						sorting.onSortChange(primaryKey, false);
-						sorting.onSortChange(primaryKey, false);
-					}
-				}}
-				className="ml-auto"
-			>
-				Clear Sort
-			</Button>
-		</div>
-	);
-
-	// ═══════════════════════════════════════════════════════════════════════════════════════
 	// LOADING STATE - Skeleton Cards
 	// ═══════════════════════════════════════════════════════════════════════════════════════
 
 	if (isLoading && data.length === 0) {
+		// Use pageSize from injected pagination (now always available via usePropsInjection)
 		const skeletonCount = pagination?.pageSize ?? 9;
 		return (
 			<div>
@@ -255,35 +231,28 @@ export function IngredientGrid3({
 			{/* Sort Controls */}
 			{sortControl}
 
-			{/* Sort Indicator Bar */}
-			{sortIndicator}
-
-			{/* Grid with refreshing overlay */}
-			<div className="relative">
-				<div
-					className={cn(
-						'grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3',
-						refreshing && 'pointer-events-none opacity-50'
-					)}
-				>
-					{data.map(ingredient => (
-						<IngredientCard3
-							key={ingredient.id}
-							ingredient={ingredient}
-							onEdit={onEdit}
-							onDelete={onDelete}
-						/>
-					))}
-				</div>
-
-				{/* Refreshing spinner overlay */}
-				{refreshing && (
-					<div className="absolute inset-0 flex items-center justify-center">
-						<div className="rounded-lg bg-background/80 p-4 shadow-lg">
-							<RefreshCw className="h-6 w-6 animate-spin" />
-						</div>
-					</div>
+			{/* Grid with refreshing/deleting blur effect */}
+			<div
+				className={cn(
+					'grid grid-cols-1 gap-6 transition-all duration-200 md:grid-cols-2 lg:grid-cols-3',
+					(refreshing || deleting) && 'pointer-events-none opacity-50 blur-sm'
 				)}
+			>
+				{data.map(ingredient => {
+					const isDeleting = deletingIds.has(ingredient.id);
+					return (
+						<div key={ingredient.id} className={cn(isDeleting && 'opacity-50 line-through')}>
+							<IngredientCard3
+								ingredient={ingredient}
+								onEdit={onEdit}
+								onDelete={onDelete}
+								selectable={hasSelection}
+								isSelected={selectedIds.has(ingredient.id)}
+								onToggleSelection={onSelectionToggle}
+							/>
+						</div>
+					);
+				})}
 			</div>
 
 			{/* Pagination Controls */}

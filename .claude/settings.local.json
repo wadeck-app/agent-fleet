@@ -16,7 +16,8 @@
 			"Bash(node scripts/timestamp.js)",
 			"Bash(netstat:*)",
 			"Bash(curl:*)",
-			"Skill(check)"
+			"Skill(check)",
+			"Bash(powershell:*)"
 		],
 		"deny": [],
 		"ask": []

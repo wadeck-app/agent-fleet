@@ -16,7 +16,7 @@ import { getOrchestratorPortsFromEnv } from 'shared-common/PortCalculator';
 import { logger } from 'shared-common/logger';
 import { fileURLToPath } from 'url';
 
-import { DataStoreFactory } from './factories';
+import type { DataStoreFactory } from './factories';
 import apiStatsHook from './fastify/hooks/apiStats.hook';
 import errorHandlerHook from './fastify/hooks/errorHandler.hook';
 import latencySimulatorHook from './fastify/hooks/latencySimulator.hook';

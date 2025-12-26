@@ -25,7 +25,7 @@ describe('buildQuery', () => {
 				query.pageSize = 10;
 			});
 
-			const result = buildQuery(pagination);
+			const result = buildQuery(pagination.fillQuery);
 
 			expect(result).toEqual({ page: 1, pageSize: 10 });
 		});
@@ -43,7 +43,7 @@ describe('buildQuery', () => {
 				query.search = 'chicken';
 			});
 
-			const result = buildQuery(pagination, sorting, search);
+			const result = buildQuery(pagination.fillQuery, sorting.fillQuery, search.fillQuery);
 
 			expect(result).toEqual({
 				page: 1,
@@ -65,7 +65,7 @@ describe('buildQuery', () => {
 				query.search = 'test';
 			});
 
-			const result = buildQuery(feature1, feature2);
+			const result = buildQuery(feature1.fillQuery, feature2.fillQuery);
 
 			expect(result).toEqual({ page: 1, search: 'test' });
 			expect(result).not.toHaveProperty('pageSize');
@@ -80,7 +80,7 @@ describe('buildQuery', () => {
 				query.search = 'test';
 			});
 
-			const result = buildQuery(feature1, feature2);
+			const result = buildQuery(feature1.fillQuery, feature2.fillQuery);
 
 			expect(result).toEqual({ page: 1, search: 'test' });
 			expect(result).not.toHaveProperty('pageSize');
@@ -94,7 +94,7 @@ describe('buildQuery', () => {
 				query.search = '';
 			});
 
-			const result = buildQuery(feature1, feature2);
+			const result = buildQuery(feature1.fillQuery, feature2.fillQuery);
 
 			expect(result).toEqual({ page: 1 });
 			expect(result).not.toHaveProperty('search');
@@ -106,7 +106,7 @@ describe('buildQuery', () => {
 				query.offset = 0;
 			});
 
-			const result = buildQuery(feature);
+			const result = buildQuery(feature.fillQuery);
 
 			expect(result).toEqual({ page: 1, offset: 0 });
 		});
@@ -117,7 +117,7 @@ describe('buildQuery', () => {
 				query.includeDeleted = false;
 			});
 
-			const result = buildQuery(feature);
+			const result = buildQuery(feature.fillQuery);
 
 			expect(result).toEqual({ page: 1, includeDeleted: false });
 		});
@@ -133,7 +133,7 @@ describe('buildQuery', () => {
 				query.page = 5;
 			});
 
-			const result = buildQuery(feature1, feature2);
+			const result = buildQuery(feature1.fillQuery, feature2.fillQuery);
 
 			expect(result).toEqual({ page: 5, pageSize: 10 });
 		});
@@ -148,7 +148,7 @@ describe('buildQuery', () => {
 				query.sortOrder = 'desc';
 			});
 
-			const result = buildQuery(feature1, feature2);
+			const result = buildQuery(feature1.fillQuery, feature2.fillQuery);
 
 			expect(result).toEqual({ sortBy: 'createdAt', sortOrder: 'desc' });
 		});
@@ -164,7 +164,7 @@ describe('buildQuery', () => {
 				query.search = 'test';
 			});
 
-			const result = buildQuery(feature1, feature2, feature3);
+			const result = buildQuery(feature1.fillQuery, feature2, feature3.fillQuery);
 
 			expect(result).toEqual({ page: 1, search: 'test' });
 		});
@@ -178,7 +178,7 @@ describe('buildQuery', () => {
 				query.search = 'test';
 			});
 
-			const result = buildQuery(feature1, feature2, feature3);
+			const result = buildQuery(feature1.fillQuery, feature2, feature3.fillQuery);
 
 			expect(result).toEqual({ page: 1, search: 'test' });
 		});
@@ -204,7 +204,7 @@ describe('buildQuery', () => {
 				query.search = 'chicken';
 			});
 
-			const result = buildQuery(pagination, sorting, search);
+			const result = buildQuery(pagination.fillQuery, sorting.fillQuery, search.fillQuery);
 
 			expect(result).toEqual({
 				page: 2,
@@ -228,7 +228,7 @@ describe('buildQuery', () => {
 				query.search = ''; // Empty search
 			});
 
-			const result = buildQuery(pagination, sorting, search);
+			const result = buildQuery(pagination.fillQuery, sorting.fillQuery, search.fillQuery);
 
 			expect(result).toEqual({
 				page: 1,
@@ -252,7 +252,7 @@ describe('buildQuery', () => {
 				// No search filled
 			});
 
-			const result = buildQuery(pagination, sorting, search);
+			const result = buildQuery(pagination.fillQuery, sorting.fillQuery, search.fillQuery);
 
 			expect(result).toEqual({
 				page: 1,
@@ -271,7 +271,7 @@ describe('buildQuery', () => {
 				query.category = 'Protein';
 			});
 
-			const result = buildQuery(pagination, filter);
+			const result = buildQuery(pagination.fillQuery, filter.fillQuery);
 
 			expect(result).toEqual({
 				page: 1,
@@ -289,7 +289,7 @@ describe('buildQuery', () => {
 				// No filter value
 			});
 
-			const result = buildQuery(pagination, filter);
+			const result = buildQuery(pagination.fillQuery, filter.fillQuery);
 
 			expect(result).toEqual({
 				page: 1,
@@ -306,7 +306,7 @@ describe('buildQuery', () => {
 			});
 
 			// Should not throw
-			const result = buildQuery(feature);
+			const result = buildQuery(feature.fillQuery);
 			expect(result).toEqual({ page: 1, pageSize: 10 });
 		});
 
@@ -317,7 +317,7 @@ describe('buildQuery', () => {
 			});
 
 			// Should throw ZodError
-			expect(() => buildQuery(feature)).toThrow();
+			expect(() => buildQuery(feature.fillQuery)).toThrow();
 		});
 
 		it('should validate pageSize max 100', () => {
@@ -327,7 +327,7 @@ describe('buildQuery', () => {
 			});
 
 			// Should throw ZodError
-			expect(() => buildQuery(feature)).toThrow();
+			expect(() => buildQuery(feature.fillQuery)).toThrow();
 		});
 
 		it('should sanitize search input', () => {
@@ -337,7 +337,7 @@ describe('buildQuery', () => {
 				query.search = 'test; DROP TABLE';
 			});
 
-			const result = buildQuery(feature) as Record<string, unknown>;
+			const result = buildQuery(feature.fillQuery) as Record<string, unknown>;
 
 			// SQL injection chars should be removed
 			const searchValue = result.search as string;
@@ -455,6 +455,131 @@ describe('QueryBuilder', () => {
 
 			// Should throw ZodError
 			expect(() => new QueryBuilder().add(feature).build()).toThrow();
+		});
+	});
+});
+
+describe('buildQuery safeguards (dev mode)', () => {
+	const createMockFeature = (fillFn: (query: BaseListQueryMutable) => void): FeatureContract<any> => ({
+		fstate: {},
+		actions: {},
+		fillQuery: fillFn,
+	});
+
+	describe('feature contribution validation', () => {
+		it('should accept features that contribute keys', () => {
+			const feature = createMockFeature(query => {
+				query.page = 1;
+				query.pageSize = 10;
+			});
+
+			// Should not throw
+			const result = buildQuery(feature.fillQuery);
+			expect(result).toEqual({ page: 1, pageSize: 10 });
+		});
+
+		it('should handle features that contribute nothing without throwing', () => {
+			const emptyFeature = createMockFeature(() => {
+				// Contributes nothing (might be intentional - e.g., disabled filter)
+			});
+
+			// Should not throw, just warn in console
+			const result = buildQuery(emptyFeature.fillQuery);
+			expect(result).toEqual({});
+		});
+	});
+
+	describe('error handling', () => {
+		it('should catch and wrap errors from fillQuery', () => {
+			const brokenFeature = createMockFeature(() => {
+				throw new Error('Feature is broken');
+			});
+
+			// Should throw with helpful error message
+			expect(() => buildQuery(brokenFeature.fillQuery)).toThrow('Query builder failed at feature #0');
+		});
+
+		it('should identify which feature threw error', () => {
+			const goodFeature = createMockFeature(query => {
+				query.page = 1;
+			});
+			const brokenFeature = createMockFeature(() => {
+				throw new Error('I am broken');
+			});
+
+			// Should indicate feature #1 (0-indexed)
+			expect(() => buildQuery(goodFeature.fillQuery, brokenFeature.fillQuery)).toThrow(
+				'Query builder failed at feature #1'
+			);
+		});
+	});
+
+	describe('key collision detection (dev mode)', () => {
+		it('should handle non-colliding features silently', () => {
+			const pagination = createMockFeature(query => {
+				query.page = 1;
+				query.pageSize = 10;
+			});
+			const sorting = createMockFeature(query => {
+				query.sortBy = 'name';
+				query.sortOrder = 'asc';
+			});
+
+			// Different keys - no collision
+			const result = buildQuery(pagination.fillQuery, sorting.fillQuery);
+			expect(result).toEqual({
+				page: 1,
+				pageSize: 10,
+				sortBy: 'name',
+				sortOrder: 'asc',
+			});
+		});
+
+		// Note: In dev mode, key collisions log errors to console.error
+		// but don't throw (to allow override behavior).
+		// This test verifies the functional behavior (last write wins)
+		it('should allow override behavior (last write wins)', () => {
+			const feature1 = createMockFeature(query => {
+				query.page = 1;
+			});
+			const feature2 = createMockFeature(query => {
+				query.page = 5;
+			});
+
+			// Last write wins (feature2 overrides feature1)
+			const result = buildQuery(feature1.fillQuery, feature2.fillQuery);
+			expect(result.page).toBe(5);
+		});
+	});
+
+	describe('value type validation (dev mode)', () => {
+		it('should handle valid value types', () => {
+			const feature = createMockFeature(query => {
+				query.page = 1; // number
+				query.search = 'test'; // string
+				query.isActive = true; // boolean
+				query.optional = null; // null (will be filtered)
+			});
+
+			const result = buildQuery(feature.fillQuery);
+			expect(result).toEqual({
+				page: 1,
+				search: 'test',
+				isActive: true,
+			});
+		});
+
+		// Note: Functions and undefined values are logged as warnings
+		// but don't throw (to allow graceful handling)
+		it('should filter out undefined values', () => {
+			const feature = createMockFeature(query => {
+				query.page = 1;
+				query.pageSize = undefined;
+			});
+
+			const result = buildQuery(feature.fillQuery);
+			expect(result).toEqual({ page: 1 });
+			expect(result).not.toHaveProperty('pageSize');
 		});
 	});
 });

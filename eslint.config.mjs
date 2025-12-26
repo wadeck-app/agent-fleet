@@ -51,6 +51,15 @@ export const baseIgnores = [
  * Base rules shared by all TypeScript packages
  */
 export const baseRules = {
+	// Enforce type-only imports for type annotations (auto-fixable)
+	'@typescript-eslint/consistent-type-imports': [
+		'error',
+		{
+			prefer: 'type-imports',
+			fixStyle: 'separate-type-imports',
+			disallowTypeAnnotations: false,
+		},
+	],
 	'@typescript-eslint/no-explicit-any': 'warn',
 	'@typescript-eslint/explicit-function-return-type': 'off',
 	'@typescript-eslint/no-unused-vars': [

@@ -80,6 +80,14 @@ export interface Table2Props<T> extends QueryResultDisplayerProps<T> {
 	className?: string;
 	/** Optional refreshing state - applies blur effect when true */
 	refreshing?: boolean;
+	/** Optional deleting state - applies blur effect during bulk delete */
+	deleting?: boolean;
+	/** IDs of items currently being deleted (for strike-through effect) */
+	deletingIds?: Set<string>;
+	/** Selection callback - called when user toggles row selection */
+	onSelectionToggle?: (id: string) => void;
+	/** Select all callback - called when user toggles select all checkbox */
+	onSelectAll?: (ids: string[]) => void;
 }
 
 /**
@@ -93,6 +101,7 @@ export function Table2<T>({
 	error,
 	pagination,
 	sorting,
+	features,
 	columns,
 	getItemId,
 	renderActions,
@@ -101,8 +110,30 @@ export function Table2<T>({
 	rowHeight: _rowHeight,
 	className = '',
 	refreshing,
+	deleting,
+	deletingIds = new Set(),
+	onSelectionToggle,
+	onSelectAll,
 }: Table2Props<T>) {
 	const selectAllCheckboxRef = useRef<HTMLButtonElement | null>(null);
+
+	// Extract selection state from injected features
+	const selection = features?.selection;
+	const hasSelection = !!selection && !!onSelectionToggle;
+	const selectedIds = selection?.selectedIds || new Set<string>();
+
+	// Handle select all checkbox
+	const handleToggleSelectAll = () => {
+		if (!hasSelection || !onSelectAll) return;
+
+		const currentPageIds = data.map(getItemId);
+		onSelectAll(currentPageIds);
+	};
+
+	// Calculate select all checkbox state
+	const currentPageIds = data.map(getItemId);
+	const selectAllChecked =
+		hasSelection && currentPageIds.length > 0 && currentPageIds.every(id => selectedIds.has(id));
 
 	// Build columns with sortable headers if sorting is enabled
 	const columnsWithSort = useMemo(() => {
@@ -179,26 +210,28 @@ export function Table2<T>({
 					<table className="w-full border-collapse">
 						<TableHeader
 							columns={adaptedColumns}
-							selectable={false}
+							selectable={hasSelection}
 							renderActions={!!renderActions}
-							selectAllChecked={false}
-							selectAllDisabled={true}
+							selectAllChecked={selectAllChecked}
+							selectAllDisabled={data.length === 0}
 							selectAllCheckboxRef={selectAllCheckboxRef}
-							onToggleSelectAll={() => {}}
+							onToggleSelectAll={handleToggleSelectAll}
 						/>
 						<TableBody
 							data={data}
 							columns={adaptedColumns}
 							getItemId={getItemId}
-							loading={isLoading}
+							initialLoading={isLoading && data.length === 0}
 							emptyMessage={emptyMessage}
-							selectable={false}
-							selectedIds={new Set()}
-							deletingIds={new Set()}
+							selectable={hasSelection}
+							selectedIds={selectedIds}
+							deletingIds={deletingIds}
 							editingId={null}
 							refreshing={refreshing}
+							deleting={deleting}
 							renderActions={renderActions ? (item: T) => renderActions(item) : undefined}
-							onToggleSelection={() => {}}
+							onToggleSelection={onSelectionToggle || (() => {})}
+							skeletonRowCount={pagination?.pageSize ?? 10}
 						/>
 					</table>
 				</div>

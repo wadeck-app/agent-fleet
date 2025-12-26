@@ -9,6 +9,7 @@ import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWr
 import { Button } from '@framework/components/primitives/Button';
 import { useCacheControl2 } from '@framework/hooks2/useCacheControl2';
 import { useDebounce } from '@framework/hooks2/useDebounce';
+import { useMultiSelect2 } from '@framework/hooks2/useMultiSelect2';
 import { usePagination2 } from '@framework/hooks2/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
 import { useSorting2 } from '@framework/hooks2/useSorting2';
@@ -19,7 +20,7 @@ import { Plus, RefreshCw, Trash2, X } from 'lucide-react';
 import { BulkDeleteWorkflow, IngredientDialog } from '@app/components/domain';
 
 import { ingredientsService } from '../ingredients/IngredientsService';
-import { useIngredients } from '../ingredients/useIngredients';
+import { useIngredientsCrud } from '../ingredients/useIngredientsCrud';
 import { IngredientTable2 } from './IngredientTable2';
 
 const STORAGE_ID = 'ingredients2' as const;
@@ -56,6 +57,9 @@ export function Ingredients2Page() {
 	// Cache control feature: explicit cache busting and refresh management
 	const cache = useCacheControl2({ enabled: true });
 
+	// Multi-selection feature: manages selection state
+	const selection = useMultiSelect2();
+
 	// ═══════════════════════════════════════════════════════════════════════════════════════
 	// DEBOUNCE - Delay search queries to avoid excessive requests
 	// ═══════════════════════════════════════════════════════════════════════════════════════
@@ -73,48 +77,45 @@ export function Ingredients2Page() {
 	 * Data2 will call this function whenever feature states change.
 	 * CRITICAL: Wrapped with useCallback to prevent infinite loops in Data2 useEffect
 	 */
-	const fetchIngredients = useCallback(async (query: IngredientsListQuery) => {
-		const response = await ingredientsService.getIngredients({
-			page: query.page,
-			pageSize: query.pageSize,
-			sortBy: query.sortBy,
-			sortOrder: query.sortOrder,
-			search: query.search, // From simple search
-		});
+	const fetchIngredients = useCallback(
+		async (query: IngredientsListQuery) => {
+			const response = await ingredientsService.getIngredients({
+				page: query.page,
+				pageSize: query.pageSize,
+				sortBy: query.sortBy,
+				sortOrder: query.sortOrder,
+				search: query.search, // From simple search
+			});
 
-		return {
-			items: response.items,
-			pagination: response.pagination
-				? {
-						total: response.pagination.total,
-						page: response.pagination.page,
-						pageSize: response.pagination.pageSize,
-						totalPages: response.pagination.totalPages,
-					}
-				: undefined,
-		};
-	}, []); // No dependencies - ingredientsService is stable
+			// Store ingredients for dialog and version lookups
+			setIngredients(response.items);
+
+			return {
+				items: response.items,
+				pagination: response.pagination
+					? {
+							total: response.pagination.total,
+							page: response.pagination.page,
+							pageSize: response.pagination.pageSize,
+							totalPages: response.pagination.totalPages,
+						}
+					: undefined,
+			};
+		},
+		[] // No dependencies - ingredientsService and setIngredients are stable
+	);
 
 	// ═══════════════════════════════════════════════════════════════════════════════════════
 	// ACTIONS - Domain-specific operations
 	// ═══════════════════════════════════════════════════════════════════════════════════════
 
-	// Use existing hook for CRUD operations
-	const {
-		ingredients,
-		createIngredient,
-		updateIngredient,
-		deleteIngredient,
-		refreshIngredient,
-		bulkDeleteIngredients,
-		loadIngredients,
-	} = useIngredients({
-		page: pagination.fstate.currentPage,
-		pageSize: pagination.fstate.pageSize,
-	});
+	// Store fetched ingredients for dialog and version lookups
+	const [ingredients, setIngredients] = useState<Ingredient[]>([]);
 
-	// Multi-row selection state (persists across pagination during session)
-	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+	// Use new CRUD-only hook (no automatic fetching)
+	const { createIngredient, updateIngredient, deleteIngredient, refreshIngredient, bulkDeleteIngredients } =
+		useIngredientsCrud();
+
 	// Bulk delete dialog state
 	const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
 	// Track IDs being deleted (for strike-through visual feedback)
@@ -157,7 +158,8 @@ export function Ingredients2Page() {
 	const handleDeleteConfirm = async () => {
 		if (deleteConfirmation.ingredientId) {
 			await deleteIngredient(deleteConfirmation.ingredientId);
-			// Data2 will auto-refresh via dependency tracking
+			// Trigger Data2 refresh via cache control
+			await cache.actions.refresh();
 		}
 	};
 
@@ -174,6 +176,8 @@ export function Ingredients2Page() {
 		} else {
 			await createIngredient(data);
 		}
+		// Trigger Data2 refresh via cache control
+		await cache.actions.refresh();
 		navigate('/ingredients2');
 	};
 
@@ -181,7 +185,11 @@ export function Ingredients2Page() {
 		if (editingIngredient) {
 			setIsDialogRefreshing(true);
 			try {
-				await refreshIngredient(editingIngredient.id);
+				const refreshedIngredient = await refreshIngredient(editingIngredient.id);
+				if (refreshedIngredient) {
+					// Update the ingredient in the local state
+					setIngredients(prev => prev.map(i => (i.id === editingIngredient.id ? refreshedIngredient : i)));
+				}
 			} finally {
 				setIsDialogRefreshing(false);
 			}
@@ -189,14 +197,26 @@ export function Ingredients2Page() {
 	};
 
 	const handleBulkDelete = async () => {
-		if (selectedIds.size === 0) return;
+		if (selection.fstate.isEmpty) return;
 		setShowBulkDeleteDialog(true);
 	};
 
-	// Current params for reload after bulk delete
-	const currentParams = {
-		page: pagination.fstate.currentPage,
-		pageSize: pagination.fstate.pageSize,
+	// Handle select all for current page
+	const handleSelectAll = (ids: string[]) => {
+		// If all current page items are selected, deselect them
+		// Otherwise, select them (merge with existing selection)
+		const allSelected = ids.every(id => selection.actions.isSelected(id));
+
+		if (allSelected) {
+			// Deselect all current page items
+			const newSelection = new Set(selection.fstate.selectedIds);
+			ids.forEach(id => newSelection.delete(id));
+			selection.actions.set(newSelection);
+		} else {
+			// Select all current page items (merge with existing selection)
+			const newSelection = new Set([...selection.fstate.selectedIds, ...ids]);
+			selection.actions.set(newSelection);
+		}
 	};
 
 	// ═══════════════════════════════════════════════════════════════════════════════════════
@@ -285,11 +305,11 @@ export function Ingredients2Page() {
 			</div>
 
 			{/* Bulk Action Bar */}
-			{selectedIds.size > 0 && (
+			{!selection.fstate.isEmpty && (
 				<BulkActionBar
-					selectionCount={selectedIds.size}
-					selectedLabel={`${selectedIds.size} ingredient(s) selected`}
-					onCancel={() => setSelectedIds(new Set())}
+					selectionCount={selection.fstate.count}
+					selectedLabel={`${selection.fstate.count} ingredient(s) selected`}
+					onCancel={selection.actions.clear}
 					variant="light"
 				>
 					<Button onClick={handleBulkDelete} variant="destructive" size="sm">
@@ -300,18 +320,31 @@ export function Ingredients2Page() {
 			)}
 
 			{/* Data Shell + Table */}
-			<Data2 fetchData={fetchIngredients} pagination={pagination} sorting={sorting} search={search} cache={cache}>
-				<IngredientTable2 onEdit={handleEdit} onDelete={handleDelete} />
+			<Data2
+				fetchData={fetchIngredients}
+				pagination={pagination}
+				sorting={sorting}
+				search={search}
+				cache={cache}
+				selection={selection}
+				delegateLoadingToChildren={true}
+			>
+				<IngredientTable2
+					onEdit={handleEdit}
+					onDelete={handleDelete}
+					onSelectionToggle={selection.actions.toggle}
+					onSelectAll={handleSelectAll}
+				/>
 			</Data2>
 
 			{/* Bulk Delete Workflow */}
 			<BulkDeleteWorkflow
 				open={showBulkDeleteDialog}
 				onOpenChange={setShowBulkDeleteDialog}
-				selectedIds={selectedIds}
-				onClear={() => setSelectedIds(new Set())}
+				selectedIds={selection.fstate.selectedIds}
+				onClear={selection.actions.clear}
 				onBulkDelete={bulkDeleteIngredients}
-				onReload={() => loadIngredients(currentParams)}
+				onReload={async () => cache.actions.refresh()}
 				itemTypeName="ingredient"
 				onDeletingChange={setDeletingIds}
 				onBulkDeletingChange={setIsBulkDeleting}

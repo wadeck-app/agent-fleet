@@ -19,42 +19,45 @@ export function TableSkeleton<T>({
 }: TableSkeletonProps<T>) {
 	return (
 		<tbody>
-			{Array.from({ length: rowCount }).map((_, rowIndex) => (
-				<tr
-					key={`skeleton-row-${rowIndex}`}
-					className={`
+			{Array.from({ length: rowCount }).map((_, rowIndex) => {
+				// Alternating row background colors (even/odd) - same as real rows
+				const alternatingBg = rowIndex % 2 === 0 ? 'bg-background' : 'bg-muted/20';
+
+				return (
+					<tr
+						key={`skeleton-row-${rowIndex}`}
+						className={`
        border-b border-border transition-colors
        hover:bg-muted/50
+       ${alternatingBg}
      `}
-				>
-					{/* Checkbox column */}
-					{selectable && (
-						<td className="w-12 px-4 py-3">
-							<div className="h-4 w-4 animate-pulse rounded bg-muted" />
-						</td>
-					)}
+					>
+						{/* Checkbox column */}
+						{selectable && (
+							<td className="h-12 px-4 py-2.5 text-center">
+								<div className="mx-auto h-4 w-4 animate-pulse rounded bg-muted" />
+							</td>
+						)}
 
-					{/* Data columns */}
-					{columns.map(col => (
-						<td key={`${col.key}-skeleton-${rowIndex}`} className="px-4 py-3">
-							<div
-								className="h-4 w-full animate-pulse rounded bg-muted"
-								style={{ maxWidth: `${70 + Math.random() * 30}%` }}
-							/>
-						</td>
-					))}
+						{/* Data columns */}
+						{columns.map(col => (
+							<td key={`${col.key}-skeleton-${rowIndex}`} className="h-12 px-4 py-2.5">
+								<div className="h-5 w-3/4 animate-pulse rounded bg-muted" />
+							</td>
+						))}
 
-					{/* Actions column */}
-					{renderActions && (
-						<td className="px-4 py-3">
-							<div className="flex justify-center gap-2">
-								<div className="h-8 w-8 animate-pulse rounded bg-muted" />
-								<div className="h-8 w-8 animate-pulse rounded bg-muted" />
-							</div>
-						</td>
-					)}
-				</tr>
-			))}
+						{/* Actions column */}
+						{renderActions && (
+							<td className="h-12 px-4 py-2.5 text-center">
+								<div className="flex justify-center gap-2">
+									<div className="h-7 w-7 animate-pulse rounded bg-muted" />
+									<div className="h-7 w-7 animate-pulse rounded bg-muted" />
+								</div>
+							</td>
+						)}
+					</tr>
+				);
+			})}
 		</tbody>
 	);
 }

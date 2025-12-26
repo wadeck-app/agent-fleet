@@ -86,12 +86,62 @@ export type ComposedQuery = {
 export function buildQuery(...queryFillers: Array<QueryFiller | undefined | null>): ComposedQuery {
 	const query: Record<string, unknown> = {};
 
+	// DEV MODE: Track key ownership for collision detection
+	const keyOwnership = process.env.NODE_ENV === 'development' ? new Map<string, number>() : null;
+
 	// 1. Each feature fills the query (order = priority)
-	for (const queryFiller of queryFillers) {
+	for (let i = 0; i < queryFillers.length; i++) {
+		const queryFiller = queryFillers[i];
 		// Skip undefined/null features gracefully
 		if (!queryFiller) continue;
 
-		queryFiller(query);
+		// DEV MODE: Capture state before mutation
+		const beforeKeys = process.env.NODE_ENV === 'development' ? new Set(Object.keys(query)) : null;
+
+		// Execute filler (mutates query)
+		try {
+			queryFiller(query);
+		} catch (err) {
+			console.error(`[buildQuery] Feature #${i} threw error:`, err);
+			throw new Error(`Query builder failed at feature #${i}: ${err}`);
+		}
+
+		// DEV MODE: Validate mutation
+		if (process.env.NODE_ENV === 'development' && beforeKeys && keyOwnership) {
+			const afterKeys = new Set(Object.keys(query));
+			const addedKeys = [...afterKeys].filter(key => !beforeKeys.has(key));
+
+			// Warn: Feature didn't contribute anything
+			if (addedKeys.length === 0) {
+				// it's expected sometimes, not a bug. Typically if there is no filter, the filter feature will do nothing
+				//console.warn(`[buildQuery] Feature #${i} fillQuery() added no keys. Possible bug?`);
+			}
+
+			// Error: Key collision between features
+			for (const key of addedKeys) {
+				if (keyOwnership.has(key)) {
+					console.error(
+						`[buildQuery] KEY COLLISION: Feature #${i} tried to set "${key}" ` +
+							`but it was already set by Feature #${keyOwnership.get(key)}. ` +
+							`Features should not overwrite each other's keys.`
+					);
+				}
+				keyOwnership.set(key, i);
+			}
+
+			// Error: Non-serializable value
+			for (const key of addedKeys) {
+				const value = query[key];
+				if (typeof value === 'function') {
+					console.error(
+						`[buildQuery] Feature #${i} set "${key}" to a function. ` + `Must be JSON-serializable.`
+					);
+				}
+				if (value === undefined) {
+					console.warn(`[buildQuery] Feature #${i} set "${key}" to undefined. Use null instead.`);
+				}
+			}
+		}
 	}
 
 	// 2. Filter out empty values (undefined, null, empty strings)
@@ -125,6 +175,16 @@ export function buildQuery(...queryFillers: Array<QueryFiller | undefined | null
 			)
 		),
 	};
+
+	// DEV MODE: Final check - ensure query is JSON-serializable
+	if (process.env.NODE_ENV === 'development') {
+		try {
+			JSON.stringify(result);
+		} catch (err) {
+			console.error('[buildQuery] Final query is not JSON-serializable:', result);
+			throw new Error('Query must be JSON-serializable for cache busting to work');
+		}
+	}
 
 	return result as ComposedQuery;
 }

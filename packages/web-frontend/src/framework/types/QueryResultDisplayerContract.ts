@@ -129,6 +129,11 @@ export interface QueryResultDisplayerProps<T> {
 			value: string | null;
 			options: string[];
 		};
+		selection?: {
+			selectedIds: Set<string>;
+			count: number;
+			isEmpty: boolean;
+		};
 		[key: string]: unknown;
 	};
 
