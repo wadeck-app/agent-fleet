@@ -1,7 +1,23 @@
+import { useState } from 'react';
+
+import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
 import { Badge } from '@framework/components/primitives/Badge';
+import { Button } from '@framework/components/primitives/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
 import type { Task } from '@shared/api/tasks.contract';
-import { AlertCircle, CheckCircle2, Circle, CircleDashed, Clock, FileCheck, GitMerge, XCircle } from 'lucide-react';
+import {
+	AlertCircle,
+	CheckCircle2,
+	Circle,
+	CircleDashed,
+	Clock,
+	FileCheck,
+	GitMerge,
+	Trash2,
+	XCircle,
+} from 'lucide-react';
+
+import { tasksService } from './TasksService';
 
 /**
  * ===========================================================================================
@@ -30,6 +46,7 @@ import { AlertCircle, CheckCircle2, Circle, CircleDashed, Clock, FileCheck, GitM
 
 export interface TasksTableProps {
 	tasks: Task[];
+	onTaskDeleted?: () => void;
 }
 
 // Helper to get status badge variant and icon
@@ -141,7 +158,29 @@ function formatDate(dateString: string): string {
 	return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-export function TasksTable({ tasks }: TasksTableProps) {
+export function TasksTable({ tasks, onTaskDeleted }: TasksTableProps) {
+	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+	const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
+
+	const handleDeleteClick = (taskId: string) => {
+		setTaskToDelete(taskId);
+		setDeleteDialogOpen(true);
+	};
+
+	const handleConfirmDelete = async () => {
+		if (!taskToDelete) return;
+
+		try {
+			await tasksService.deleteTask(taskToDelete);
+			onTaskDeleted?.();
+		} catch (error) {
+			console.error('Failed to delete task:', error);
+			alert('Failed to delete task');
+		} finally {
+			setTaskToDelete(null);
+		}
+	};
+
 	return (
 		<Card>
 			<CardHeader>
@@ -164,7 +203,9 @@ export function TasksTable({ tasks }: TasksTableProps) {
 									<th className="pb-3">Status</th>
 									<th className="pb-3">Priority</th>
 									<th className="pb-3">Assigned To</th>
+									<th className="pb-3">Flow ID</th>
 									<th className="pb-3">Updated</th>
+									<th className="pb-3">Actions</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -212,9 +253,26 @@ export function TasksTable({ tasks }: TasksTableProps) {
 												)}
 											</td>
 											<td className="py-3">
+												{task.flowId ? (
+													<span className="font-mono text-sm">{task.flowId}</span>
+												) : (
+													<span className="text-sm text-muted-foreground">-</span>
+												)}
+											</td>
+											<td className="py-3">
 												<span className="text-sm text-muted-foreground">
 													{formatDate(task.updatedAt)}
 												</span>
+											</td>
+											<td className="py-3">
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={() => handleDeleteClick(task.id)}
+													className="size-8 p-0"
+												>
+													<Trash2 className="size-4 text-destructive" />
+												</Button>
 											</td>
 										</tr>
 									);
@@ -224,6 +282,17 @@ export function TasksTable({ tasks }: TasksTableProps) {
 					</div>
 				)}
 			</CardContent>
+
+			<AlertDialogWrapper
+				open={deleteDialogOpen}
+				onOpenChange={setDeleteDialogOpen}
+				title="Delete Task"
+				description="Are you sure you want to delete this task? This action cannot be undone."
+				confirmLabel="Delete"
+				cancelLabel="Cancel"
+				variant="danger"
+				onConfirm={handleConfirmDelete}
+			/>
 		</Card>
 	);
 }

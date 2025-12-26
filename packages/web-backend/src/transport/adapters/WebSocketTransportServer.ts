@@ -78,12 +78,12 @@ export class WebSocketTransportServer implements ITransportServer {
 
 		// Register WebSocket endpoint
 		app.get('/ws', { websocket: true }, (connection: any, req: any) => {
-			console.log(
-				'[WS] Handler called with connection type:',
-				typeof connection,
-				'keys:',
-				Object.keys(connection || {})
-			);
+			// console.log(
+			// 	'[WS] Handler called with connection type:',
+			// 	typeof connection,
+			// 	'keys:',
+			// 	Object.keys(connection || {})
+			// );
 			console.log('[WS] connection.socket exists?', !!connection?.socket);
 
 			if (!connection) {

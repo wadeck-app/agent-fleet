@@ -13,9 +13,13 @@ import { ProtectedRoute } from '@app/pages/auth/ProtectedRoute';
 import { BooksPage } from '@app/pages/books/BooksPage';
 import { DashboardPage } from '@app/pages/dashboard/DashboardPage';
 import { Ingredients2Page } from '@app/pages/ingredients2/Ingredients2Page';
+import { Ingredients3GridPage } from '@app/pages/ingredients3/Ingredients3GridPage';
 import { IngredientsPage } from '@app/pages/ingredients/IngredientsPage';
+import { TasksPage2 } from '@app/pages/tasks2/TasksPage2';
 import { TasksPage } from '@app/pages/tasks/TasksPage';
+import { WorkersPage2 } from '@app/pages/workers2/WorkersPage2';
 import { WorkersPage } from '@app/pages/workers/WorkersPage';
+import { WorkspacesPage2 } from '@app/pages/workspaces2/WorkspacesPage2';
 import { WorkspacesPage } from '@app/pages/workspaces/WorkspacesPage';
 
 import { circuitBreakerService } from './services';
@@ -43,14 +47,20 @@ function Layout() {
 						<Routes>
 							<Route path="/dashboard" element={<DashboardPage />} />
 							<Route path="/workers" element={<WorkersPage />} />
+							<Route path="/workers2" element={<WorkersPage2 />} />
 							<Route path="/tasks" element={<TasksPage />} />
+							<Route path="/tasks2" element={<TasksPage2 />} />
 							<Route path="/workspaces" element={<WorkspacesPage />} />
+							<Route path="/workspaces2" element={<WorkspacesPage2 />} />
 							<Route path="/ingredients" element={<IngredientsPage />} />
 							<Route path="/ingredients/:mode" element={<IngredientsPage />} />
 							<Route path="/ingredients/:id/:mode" element={<IngredientsPage />} />
 							<Route path="/ingredients2" element={<Ingredients2Page />} />
 							<Route path="/ingredients2/:mode" element={<Ingredients2Page />} />
 							<Route path="/ingredients2/:id/:mode" element={<Ingredients2Page />} />
+							<Route path="/ingredients3" element={<Ingredients3GridPage />} />
+							<Route path="/ingredients3/:mode" element={<Ingredients3GridPage />} />
+							<Route path="/ingredients3/:id/:mode" element={<Ingredients3GridPage />} />
 							<Route path="/books" element={<BooksPage />} />
 							<Route path="/books/:mode" element={<BooksPage />} />
 							<Route path="/books/:id/:mode" element={<BooksPage />} />

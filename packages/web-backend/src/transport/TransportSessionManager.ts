@@ -240,14 +240,14 @@ export class TransportSessionManager extends WebSocketSessionManager {
 	logTransportDistribution(): void {
 		const stats = this.getTransportStats();
 
-		console.log('[Transport] Session distribution:');
-		console.log(`  - Total sessions: ${stats.totalSessions}`);
-		console.log(`  - Total users: ${stats.totalUsers}`);
-		console.log(`  - WebSocket: ${stats.byTransportType.websocket}`);
-		console.log(`  - SSE: ${stats.byTransportType.sse}`);
-		console.log(`  - Long Polling: ${stats.byTransportType['long-polling']}`);
-		console.log(`  - HTTP: ${stats.byTransportType.http}`);
-		console.log(`  - Mock: ${stats.byTransportType.mock}`);
+		// console.log('[Transport] Session distribution:');
+		// console.log(`  - Total sessions: ${stats.totalSessions}`);
+		// console.log(`  - Total users: ${stats.totalUsers}`);
+		// console.log(`  - WebSocket: ${stats.byTransportType.websocket}`);
+		// console.log(`  - SSE: ${stats.byTransportType.sse}`);
+		// console.log(`  - Long Polling: ${stats.byTransportType['long-polling']}`);
+		// console.log(`  - HTTP: ${stats.byTransportType.http}`);
+		// console.log(`  - Mock: ${stats.byTransportType.mock}`);
 	}
 
 	/**

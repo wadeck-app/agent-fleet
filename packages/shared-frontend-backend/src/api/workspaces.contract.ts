@@ -43,10 +43,46 @@ export type GitStatus = z.infer<typeof GitStatusSchema>;
 export type Workspace = z.infer<typeof WorkspaceSchema>;
 export type WorkspacesData = z.infer<typeof WorkspacesDataSchema>;
 
+/**
+ * Extended query parameters with pagination, sorting, and search support
+ */
+export const WorkspacesListQuerySchema = z.object({
+	// Pagination
+	page: z.coerce.number().int().positive().optional(),
+	pageSize: z.coerce.number().int().positive().max(100).optional(),
+	// Sorting
+	sortBy: z.string().optional(),
+	sortOrder: z.enum(['asc', 'desc']).optional(),
+	// Search
+	search: z.string().optional(),
+	// Domain-specific filters (future)
+	status: WorkspaceStatusSchema.optional(),
+	mode: WorkspaceModeSchema.optional(),
+});
+
+/**
+ * Paginated workspaces list response
+ */
+export const WorkspacesListResponseSchema = z.object({
+	items: z.array(WorkspaceSchema),
+	pagination: z
+		.object({
+			total: z.number(),
+			page: z.number(),
+			pageSize: z.number(),
+			totalPages: z.number(),
+		})
+		.optional(),
+});
+
+export type WorkspacesListQuery = z.infer<typeof WorkspacesListQuerySchema>;
+export type WorkspacesListResponse = z.infer<typeof WorkspacesListResponseSchema>;
+
 export const WORKSPACES_API_ROUTES = defineRoutes({
 	'/api/workspaces/': {
 		GET: {
-			response: WorkspacesDataSchema,
+			query: WorkspacesListQuerySchema.optional(),
+			response: z.union([WorkspacesDataSchema, WorkspacesListResponseSchema]),
 		},
 	},
 });

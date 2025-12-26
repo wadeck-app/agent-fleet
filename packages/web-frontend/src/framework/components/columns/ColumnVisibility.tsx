@@ -64,8 +64,8 @@ const RADIX_CONTENT_CLASSES = cn(
 export interface ColumnDef {
 	/** Unique column identifier */
 	id: string;
-	/** Display label for the column */
-	label: string;
+	/** Display label for the column (can be string or ReactNode for sortable headers) */
+	label: string | React.ReactNode;
 	/** Whether this column can be hidden (default: true) */
 	canHide?: boolean;
 }

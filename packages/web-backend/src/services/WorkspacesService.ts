@@ -1,4 +1,9 @@
-import type { Workspace, WorkspacesData } from '@app/shared/api/workspaces.contract';
+import type {
+	Workspace,
+	WorkspacesData,
+	WorkspacesListQuery,
+	WorkspacesListResponse,
+} from '@app/shared/api/workspaces.contract';
 
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 
@@ -55,6 +60,96 @@ export class WorkspacesService {
 		};
 
 		return workspacesData;
+	}
+
+	/**
+	 * Get workspaces list with pagination, sorting, and search support
+	 * (New Data2 architecture)
+	 */
+	async getWorkspacesList(query: WorkspacesListQuery): Promise<WorkspacesListResponse> {
+		console.log('[WorkspacesService] Fetching workspaces list...');
+
+		// Generate mock workspaces
+		let workspaces = this.generateMockWorkspaces();
+
+		// Apply domain filters (status, mode)
+		if (query.status) {
+			workspaces = workspaces.filter(w => w.status === query.status);
+		}
+		if (query.mode) {
+			workspaces = workspaces.filter(w => w.mode === query.mode);
+		}
+
+		// Apply search if provided
+		if (query.search) {
+			workspaces = this.applySearch(workspaces, query.search);
+		}
+
+		// Apply sorting if provided
+		if (query.sortBy && query.sortOrder) {
+			workspaces = this.applySorting(workspaces, query.sortBy, query.sortOrder);
+		}
+
+		// Apply pagination
+		const page = query.page || 1;
+		const pageSize = query.pageSize || 10;
+		const total = workspaces.length;
+		const totalPages = Math.ceil(total / pageSize);
+		const start = (page - 1) * pageSize;
+		const paginatedWorkspaces = workspaces.slice(start, start + pageSize);
+
+		return {
+			items: paginatedWorkspaces,
+			pagination: {
+				total,
+				page,
+				pageSize,
+				totalPages,
+			},
+		};
+	}
+
+	/**
+	 * Apply search filter across workspace fields
+	 */
+	private applySearch(workspaces: Workspace[], searchQuery: string): Workspace[] {
+		const lowerQuery = searchQuery.toLowerCase().trim();
+		if (!lowerQuery) return workspaces;
+
+		return workspaces.filter(
+			w =>
+				w.id.toLowerCase().includes(lowerQuery) ||
+				w.path.toLowerCase().includes(lowerQuery) ||
+				w.mode.toLowerCase().includes(lowerQuery) ||
+				w.status.toLowerCase().includes(lowerQuery) ||
+				w.gitBranch?.toLowerCase().includes(lowerQuery)
+		);
+	}
+
+	/**
+	 * Apply sorting to workspaces
+	 */
+	private applySorting(workspaces: Workspace[], sortBy: string, sortOrder: string): Workspace[] {
+		const isDescending = sortOrder === 'desc';
+
+		return [...workspaces].sort((a, b) => {
+			const aVal = (a as any)[sortBy];
+			const bVal = (b as any)[sortBy];
+
+			if (aVal === null || aVal === undefined) return 1;
+			if (bVal === null || bVal === undefined) return -1;
+
+			let comparison = 0;
+			if (typeof aVal === 'string' && typeof bVal === 'string') {
+				comparison = aVal.localeCompare(bVal);
+			} else if (typeof aVal === 'number' && typeof bVal === 'number') {
+				comparison = aVal - bVal;
+			} else {
+				comparison = String(aVal).localeCompare(String(bVal));
+			}
+
+			return isDescending ? -comparison : comparison;
+		});
 	}
 
 	/**

@@ -15,6 +15,7 @@ import { IngredientsRepository } from '../repositories/IngredientsRepository';
 import { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 import { BooksService } from '../services/BooksService';
 import { DashboardService } from '../services/DashboardService';
+import { FlowsService } from '../services/FlowsService';
 import { IngredientsService } from '../services/IngredientsService';
 import { TasksService } from '../services/TasksService';
 import { WorkersService } from '../services/WorkersService';
@@ -50,6 +51,7 @@ export class DataStoreFactory {
 	private booksService?: BooksService;
 	private dashboardService?: DashboardService;
 	private workersService?: WorkersService;
+	private flowsService?: FlowsService;
 	private tasksService?: TasksService;
 	private workspacesService?: WorkspacesService;
 	private authService?: AuthService;
@@ -159,16 +161,27 @@ export class DataStoreFactory {
 	}
 
 	/**
+	 * Get or create FlowsService
+	 */
+	getFlowsService(): FlowsService {
+		if (!this.flowsService) {
+			// Get EventBroadcaster
+			const eventBroadcaster = this.getEventBroadcaster();
+
+			// Create FlowsService with OrchestratorWrapper
+			this.flowsService = new FlowsService(this.orchestratorWrapper, eventBroadcaster);
+		}
+
+		return this.flowsService;
+	}
+
+	/**
 	 * Get or create TasksService
 	 */
 	getTasksService(): TasksService {
 		if (!this.tasksService) {
-			// Get orchestrator URL from environment or calculate from WORKSPACE_ID/PROJECT_ID
-			const orchestratorUrl = this.getOrchestratorUrl();
-
-			// Create OrchestratorRepository with 5s cache TTL
-			const cacheTtlMs = 5000;
-			const orchestratorRepo = new OrchestratorRepository(orchestratorUrl, cacheTtlMs);
+			// Use orchestratorWrapper directly (library mode - no HTTP calls)
+			const orchestratorRepo = new OrchestratorRepository(this.orchestratorWrapper);
 
 			// Get EventBroadcaster
 			const eventBroadcaster = this.getEventBroadcaster();
@@ -293,6 +306,12 @@ export class DataStoreFactory {
 		const { default: WorkersController } = await import('../controllers/WorkersController');
 		const service = this.getWorkersService();
 		return new WorkersController(service);
+	}
+
+	async getFlowsController() {
+		const { default: FlowsController } = await import('../controllers/FlowsController');
+		const service = this.getFlowsService();
+		return new FlowsController(service);
 	}
 
 	async getWorkspacesController() {

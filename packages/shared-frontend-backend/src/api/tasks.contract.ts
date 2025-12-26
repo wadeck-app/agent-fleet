@@ -64,6 +64,24 @@ export const TasksQuerySchema = z.object({
 });
 
 /**
+ * Extended query parameters with pagination, sorting, and search support
+ */
+export const TasksListQuerySchema = z.object({
+	// Pagination
+	page: z.coerce.number().int().positive().optional(),
+	pageSize: z.coerce.number().int().positive().max(100).optional(),
+	// Sorting
+	sortBy: z.string().optional(),
+	sortOrder: z.enum(['asc', 'desc']).optional(),
+	// Search
+	search: z.string().optional(),
+	// Existing filters
+	status: TaskStatusSchema.optional(),
+	workerId: z.string().optional(),
+	priority: TaskPrioritySchema.optional(),
+});
+
+/**
  * Tasks list response with summary stats
  */
 export const TasksDataSchema = z.object({
@@ -76,19 +94,40 @@ export const TasksDataSchema = z.object({
 	tasks: z.array(TaskSchema),
 });
 
+/**
+ * Paginated tasks list response
+ */
+export const TasksListResponseSchema = z.object({
+	items: z.array(TaskSchema),
+	pagination: z
+		.object({
+			total: z.number(),
+			page: z.number(),
+			pageSize: z.number(),
+			totalPages: z.number(),
+		})
+		.optional(),
+});
+
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 export type TaskPriority = z.infer<typeof TaskPrioritySchema>;
 export type Task = z.infer<typeof TaskSchema>;
 export type TasksQuery = z.infer<typeof TasksQuerySchema>;
 export type TasksData = z.infer<typeof TasksDataSchema>;
+export type TasksListQuery = z.infer<typeof TasksListQuerySchema>;
+export type TasksListResponse = z.infer<typeof TasksListResponseSchema>;
 
 /**
  * Create task request schema
  */
 export const CreateTaskSchema = z.object({
-	description: z.string(),
-	status: TaskStatusSchema.optional(),
-	priority: TaskPrioritySchema.optional(),
+	description: z.string().min(1, 'Description is required'),
+	priority: TaskPrioritySchema,
+	assignedTo: z.object({
+		workerId: z.string(),
+	}),
+	flowId: z.string().optional(),
+	flowInputs: z.record(z.any()).optional(),
 });
 
 export type CreateTask = z.infer<typeof CreateTaskSchema>;
@@ -99,8 +138,8 @@ export type CreateTask = z.infer<typeof CreateTaskSchema>;
 export const TASKS_API_ROUTES = defineRoutes({
 	'/api/tasks/': {
 		GET: {
-			query: TasksQuerySchema,
-			response: TasksDataSchema,
+			query: TasksListQuerySchema,
+			response: z.union([TasksDataSchema, TasksListResponseSchema]),
 		},
 		POST: {
 			body: CreateTaskSchema,
@@ -111,6 +150,10 @@ export const TASKS_API_ROUTES = defineRoutes({
 		GET: {
 			params: z.object({ id: z.string() }),
 			response: TaskSchema,
+		},
+		DELETE: {
+			params: z.object({ id: z.string() }),
+			response: z.object({ success: z.boolean() }),
 		},
 	},
 });

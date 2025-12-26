@@ -1,4 +1,4 @@
-import type { TasksData, TasksQuery } from '@shared/api/tasks.contract';
+import type { CreateTask, Task, TasksData, TasksQuery } from '@shared/api/tasks.contract';
 
 import { tasksApi } from './tasks.api';
 
@@ -26,6 +26,20 @@ export class TasksService {
 	 */
 	async getTasks(query?: TasksQuery): Promise<TasksData> {
 		return tasksApi.getTasks(query);
+	}
+
+	/**
+	 * Create a new task
+	 */
+	async createTask(data: CreateTask): Promise<Task> {
+		return tasksApi.createTask(data);
+	}
+
+	/**
+	 * Delete a task
+	 */
+	async deleteTask(taskId: string): Promise<void> {
+		await tasksApi.deleteTask(taskId);
 	}
 }
 

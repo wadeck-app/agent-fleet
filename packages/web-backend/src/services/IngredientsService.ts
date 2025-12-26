@@ -1,5 +1,7 @@
 import type {
+	BulkDeleteResponse,
 	CreateIngredient,
+	FailedDeletion,
 	Ingredient,
 	IngredientListResponse,
 	IngredientsListQuery,
@@ -160,6 +162,51 @@ export class IngredientsService {
 
 		// Delete via repository
 		await this.repository.delete(id);
+	}
+
+	/**
+	 * Delete multiple ingredients (best-effort approach)
+	 * Returns detailed results for each ID
+	 */
+	async bulkDelete(ids: string[]): Promise<BulkDeleteResponse> {
+		const deleted: string[] = [];
+		const failed: FailedDeletion[] = [];
+
+		for (const id of ids) {
+			try {
+				// Validate ingredient exists (throws NotFoundException if not)
+				await this.getById(id);
+
+				// Delete via repository
+				await this.repository.delete(id);
+
+				deleted.push(id);
+			} catch (error) {
+				// Collect failure information
+				if (error instanceof NotFoundException) {
+					failed.push({
+						id,
+						reason: `Ingredient with id ${id} not found`,
+						code: ERROR_CODES.INGREDIENT_NOT_FOUND,
+					});
+				} else {
+					failed.push({
+						id,
+						reason: error instanceof Error ? error.message : 'Unknown error',
+						code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+					});
+				}
+			}
+		}
+
+		return {
+			success: true,
+			deleted,
+			failed,
+			totalRequested: ids.length,
+			totalDeleted: deleted.length,
+			totalFailed: failed.length,
+		};
 	}
 
 	/**

@@ -31,10 +31,37 @@ export default class TasksController implements LazyController<typeof TASKS_API_
 		/**
 		 * GET /api/tasks/
 		 * Get tasks data with optional filtering
-		 * Query params: status, workerId, priority
+		 * Query params: status, workerId, priority, page, pageSize, sortBy, sortOrder, search
+		 *
+		 * Routes to either:
+		 * - getTasksList() if pagination params present (new Data2 format)
+		 * - getTasksData() if no pagination params (legacy format for backwards compatibility)
 		 */
 		add('GET', '/api/tasks/', async ({ query }) => {
+			// Check if pagination requested (new format)
+			if (query.page !== undefined || query.pageSize !== undefined) {
+				return this.service.getTasksList(query);
+			}
+
+			// Legacy format (backwards compatibility)
 			return this.service.getTasksData(query);
+		});
+
+		/**
+		 * POST /api/tasks/
+		 * Create a new task
+		 */
+		add('POST', '/api/tasks/', async ({ body }) => {
+			return this.service.createTask(body);
+		});
+
+		/**
+		 * DELETE /api/tasks/:id
+		 * Delete a task
+		 */
+		add('DELETE', '/api/tasks/:id', async ({ params }) => {
+			await this.service.deleteTask(params.id);
+			return { success: true };
 		});
 	}
 }

@@ -1,7 +1,16 @@
 import { Separator } from '@framework/components/primitives/Separator';
 import { ConnectivityIndicator } from '@framework/features/connectivity/ConnectivityIndicator';
 import { useTheme } from '@framework/features/theme/useTheme';
-import { BookOpen, FolderKanban, LayoutDashboard, ListTodo, Package2, PackageSearch, Users } from 'lucide-react';
+import {
+	BookOpen,
+	FolderKanban,
+	LayoutDashboard,
+	LayoutGrid,
+	ListTodo,
+	Package2,
+	PackageSearch,
+	Users,
+} from 'lucide-react';
 
 import { ConnectionModeIndicator } from '@app/components/connectivity/ConnectionModeIndicator';
 import { TransportModeSelector } from '@app/components/connectivity/TransportModeSelector';
@@ -23,13 +32,28 @@ const navigationItems: NavItem[] = [
 		icon: Users,
 	},
 	{
+		path: '/workers2',
+		label: 'Workers v2',
+		icon: Users,
+	},
+	{
 		path: '/tasks',
 		label: 'Tasks',
 		icon: ListTodo,
 	},
 	{
+		path: '/tasks2',
+		label: 'Tasks v2',
+		icon: ListTodo,
+	},
+	{
 		path: '/workspaces',
 		label: 'Workspaces',
+		icon: FolderKanban,
+	},
+	{
+		path: '/workspaces2',
+		label: 'Workspaces v2',
 		icon: FolderKanban,
 	},
 	{
@@ -44,6 +68,11 @@ const navigationItems: NavItem[] = [
 		path: '/ingredients2',
 		label: 'Ingredients v2',
 		icon: PackageSearch,
+	},
+	{
+		path: '/ingredients3',
+		label: 'Ingredients Grid',
+		icon: LayoutGrid,
 	},
 	{
 		path: '/books',

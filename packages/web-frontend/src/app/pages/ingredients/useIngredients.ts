@@ -2,7 +2,12 @@ import { useCallback, useState } from 'react';
 
 import { useAbortableEffect } from '@framework/hooks/useAbortableEffect';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
-import type { CreateIngredient, Ingredient, UpdateIngredient } from '@shared/api/ingredients.contract';
+import type {
+	BulkDeleteResponse,
+	CreateIngredient,
+	Ingredient,
+	UpdateIngredient,
+} from '@shared/api/ingredients.contract';
 
 import { ingredientsService } from './IngredientsService';
 
@@ -50,6 +55,7 @@ export interface UseIngredientsResult {
 	createIngredient: (data: CreateIngredient) => Promise<void>;
 	updateIngredient: (id: string, data: UpdateIngredient) => Promise<void>;
 	deleteIngredient: (id: string) => Promise<void>;
+	bulkDeleteIngredients: (ids: string[]) => Promise<BulkDeleteResponse>;
 	refreshIngredient: (id: string) => Promise<Ingredient | null>;
 	clearError: () => void;
 
@@ -154,6 +160,14 @@ export function useIngredients(params?: UseIngredientsParams): UseIngredientsRes
 	};
 
 	/**
+	 * Bulk delete ingredients
+	 */
+	const bulkDeleteIngredients = useCallback(async (ids: string[]) => {
+		const result = await ingredientsService.bulkDeleteIngredients(ids);
+		return result;
+	}, []);
+
+	/**
 	 * Refresh a single ingredient from the API to get latest version
 	 */
 	const refreshIngredient = async (id: string): Promise<Ingredient | null> => {
@@ -231,6 +245,7 @@ export function useIngredients(params?: UseIngredientsParams): UseIngredientsRes
 		createIngredient,
 		updateIngredient,
 		deleteIngredient,
+		bulkDeleteIngredients,
 		refreshIngredient,
 		clearError,
 

@@ -10,6 +10,7 @@ const routes: RouteDefinition[] = [
 	['/api/books', () => import('./controllers/BooksController')],
 	['/api/dashboard', () => import('./controllers/DashboardController')],
 	['/api/workers', () => import('./controllers/WorkersController')],
+	['/api/flows', () => import('./controllers/FlowsController')],
 	['/api/tasks', () => import('./controllers/TasksController')],
 	['/api/workspaces', () => import('./controllers/WorkspacesController')],
 	['/api/monitoring', () => import('./controllers/MonitoringController')],

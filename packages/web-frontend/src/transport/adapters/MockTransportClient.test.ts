@@ -70,7 +70,11 @@ describe('MockTransportClient', () => {
 			client.mockResponse('POST', '/api/tasks/', { body: mockTask });
 
 			const result = await client.request('POST', '/api/tasks/', {
-				body: { description: 'New task' },
+				body: {
+					description: 'New task',
+					priority: 'medium',
+					assignedTo: { workerId: 'worker-1' },
+				},
 			});
 
 			expect(result).toEqual(mockTask);

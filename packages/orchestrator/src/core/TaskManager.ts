@@ -354,7 +354,50 @@ export class TaskManager {
 	 */
 	// async assignTaskToWorker(workerId: string, workerType: WorkerType): Promise<Task | null> {
 	async assignTaskToWorker(workerId: string): Promise<Task | null> {
-		// Find next available task
+		// PRIORITY 1: Check if worker has a specific queue with pre-assigned tasks
+		const workerQueue = this.workerQueues.get(workerId);
+		if (workerQueue && workerQueue.length > 0) {
+			// Get the first task from the worker's queue
+			const task = workerQueue.shift()!; // Remove from queue
+
+			// If task was pre-assigned to this worker, just start it
+			if (task.assignedTo?.workerId === workerId) {
+				logger.info(`[TaskManager] Found pre-assigned task ${task.id} in worker ${workerId} queue`);
+				// Task is already assigned, just update status to IN_PROGRESS
+				const oldStatus = task.status;
+				const oldStartedAt = task.startedAt;
+				const oldHistory = [...task.history];
+
+				task.status = TaskStatus.IN_PROGRESS;
+				task.updatedAt = new Date().toISOString();
+				task.startedAt = task.updatedAt;
+
+				task.history.push({
+					timestamp: task.updatedAt,
+					event: 'started',
+					workerId,
+				});
+
+				try {
+					await Storage.saveTask(task);
+					logger.info(`[TaskManager] Started pre-assigned task ${task.id} for worker ${workerId}`);
+					this.stateManager.emitTaskUpdated(task);
+					return task;
+				} catch (error) {
+					// Rollback and re-add to queue
+					task.status = oldStatus;
+					task.startedAt = oldStartedAt;
+					task.history = oldHistory;
+					workerQueue.unshift(task); // Put back at front of queue
+					logger.error(
+						`[TaskManager] Failed to start pre-assigned task ${task.id}: ${error instanceof Error ? error.message : String(error)}`
+					);
+					throw error;
+				}
+			}
+		}
+
+		// PRIORITY 2: Find next available task from global backlog
 		// const task = this.getNextAvailableTask(workerType);
 		const task = this.getNextAvailableTask();
 
@@ -503,6 +546,19 @@ export class TaskManager {
 	addTaskToBacklog(task: Task): void {
 		this.globalBacklog.push(task);
 		logger.info(`[TaskManager] Added task ${task.id} to global backlog`);
+	}
+
+	/**
+	 * Remove a task from the global backlog
+	 */
+	removeTaskFromBacklog(taskId: string): boolean {
+		const index = this.globalBacklog.findIndex(t => t.id === taskId);
+		if (index !== -1) {
+			this.globalBacklog.splice(index, 1);
+			logger.info(`[TaskManager] Removed task ${taskId} from global backlog`);
+			return true;
+		}
+		return false;
 	}
 
 	/**

@@ -10,4 +10,8 @@ export const ingredientsApi = {
 	create: api.mutate('POST', '/api/ingredients/'),
 	update: api.mutateById('PUT', '/api/ingredients/:id'),
 	delete: api.byId('DELETE', '/api/ingredients/:id'),
+	bulkDelete: (ids: string[]) =>
+		typedFetch('DELETE', '/api/ingredients/', {
+			body: { ids },
+		}),
 } as const;

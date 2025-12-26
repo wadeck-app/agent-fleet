@@ -4,7 +4,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev": "tsx watch --inspect src/server.ts",
+		"dev": "tsx watch --inspect=0 src/server.ts",
 		"dev:library": "cross-env ORCHESTRATOR_MODE=library nodemon",
 		"dev:remote": "cross-env ORCHESTRATOR_MODE=remote ORCHESTRATOR_URL=http://localhost:3737 nodemon",
 		"dev:debug": "tsx src/server.ts",

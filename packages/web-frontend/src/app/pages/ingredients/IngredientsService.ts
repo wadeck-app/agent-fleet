@@ -7,6 +7,7 @@ import { positive } from '@framework/utils/validation/validation';
 import { combine } from '@framework/utils/validation/validation';
 import { type ValidationResult } from '@framework/utils/validation/validation';
 import type {
+	BulkDeleteResponse,
 	CreateIngredient,
 	Ingredient,
 	IngredientListResponse,
@@ -128,6 +129,13 @@ export class IngredientsService {
 	 */
 	async deleteIngredient(id: string): Promise<void> {
 		await ingredientsApi.delete(id);
+	}
+
+	/**
+	 * Bulk delete ingredients
+	 */
+	async bulkDeleteIngredients(ids: string[]): Promise<BulkDeleteResponse> {
+		return await ingredientsApi.bulkDelete(ids);
 	}
 
 	/**

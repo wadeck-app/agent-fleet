@@ -218,7 +218,8 @@ export function Data2<T>({
 				pageSize: paginationData.pageSize,
 				onPageChange: pagination.actions.setPage,
 				onPageSizeChange: pagination.actions.setPageSize,
-				pageSizeOptions: [5, 10, 20, 50],
+				// Use pageSizeOptions from hook if provided, otherwise default to [5, 10, 20, 50]
+				pageSizeOptions: pagination.fstate?.pageSizeOptions ?? [5, 10, 20, 50],
 			};
 		}
 

@@ -1,4 +1,4 @@
-import { Select } from '@framework/components/forms/Select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
 
 /**
  * ===========================================================================================
@@ -35,8 +35,19 @@ export interface SelectInputProps {
 	id?: string;
 }
 
-// @formatter:off
-export function SelectInput(props: SelectInputProps) {
-	return <Select {...props} />;
+export function SelectInput({ value, onChange, options, placeholder, disabled, id }: SelectInputProps) {
+	return (
+		<Select value={value} onValueChange={onChange} disabled={disabled}>
+			<SelectTrigger id={id} aria-label={placeholder}>
+				<SelectValue placeholder={placeholder} />
+			</SelectTrigger>
+			<SelectContent>
+				{options.map(option => (
+					<SelectItem key={option.value} value={option.value}>
+						{option.label}
+					</SelectItem>
+				))}
+			</SelectContent>
+		</Select>
+	);
 }
-// @formatter:on

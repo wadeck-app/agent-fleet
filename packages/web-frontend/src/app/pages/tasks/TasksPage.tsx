@@ -6,8 +6,9 @@ import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { Button } from '@framework/components/primitives/Button';
 import type { TaskPriority, TaskStatus } from '@shared/api/tasks.contract';
-import { RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 
+import { CreateTaskDialog } from './CreateTaskDialog';
 import { TaskFilters } from './TaskFilters';
 import { TasksTable } from './TasksTable';
 import { useTasks } from './useTasks';
@@ -48,6 +49,7 @@ export function TasksPage() {
 	});
 
 	const [isRefreshing, setIsRefreshing] = useState(false);
+	const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
 	const handleRefresh = async () => {
 		setIsRefreshing(true);
@@ -56,6 +58,10 @@ export function TasksPage() {
 		} finally {
 			setIsRefreshing(false);
 		}
+	};
+
+	const handleTaskCreated = async () => {
+		await refresh();
 	};
 
 	const handleClearFilters = () => {
@@ -74,15 +80,21 @@ export function TasksPage() {
 			<PageHeader
 				title="Tasks"
 				action={
-					<Button onClick={handleRefresh} disabled={isRefreshing} variant="outline" size="sm">
-						<RefreshCw
-							className={`
+					<div className="flex gap-2">
+						<Button onClick={() => setCreateDialogOpen(true)} variant="default" size="sm">
+							<Plus className="mr-2 size-4" />
+							Create Task
+						</Button>
+						<Button onClick={handleRefresh} disabled={isRefreshing} variant="outline" size="sm">
+							<RefreshCw
+								className={`
          mr-2 size-4
          ${isRefreshing ? 'animate-spin' : ''}
        `}
-						/>
-						Refresh
-					</Button>
+							/>
+							Refresh
+						</Button>
+					</div>
 				}
 			/>
 
@@ -185,9 +197,15 @@ export function TasksPage() {
 					/>
 
 					{/* Tasks Table */}
-					<TasksTable tasks={data.tasks} />
+					<TasksTable tasks={data.tasks} onTaskDeleted={refresh} />
 				</div>
 			)}
+
+			<CreateTaskDialog
+				open={createDialogOpen}
+				onOpenChange={setCreateDialogOpen}
+				onSuccess={handleTaskCreated}
+			/>
 		</Page>
 	);
 }

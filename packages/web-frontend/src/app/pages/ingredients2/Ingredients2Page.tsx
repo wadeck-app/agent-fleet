@@ -1,45 +1,22 @@
-/**
- * ===========================================================================================
- * INGREDIENTS2 PAGE - Headless Composable Architecture
- * ===========================================================================================
- *
- * This page demonstrates the headless composable architecture with independent features:
- * - Each feature (pagination, sorting, search, filter, cache) is a headless hook
- * - Features are composed via buildQuery() and orchestrated by Data2
- * - UI components receive injected props from Data2
- * - Features can be added/removed without affecting each other (antifragile)
- *
- * Architecture pattern:
- * 1. Headless hooks return: { state, fstate, actions, fillQuery() }
- * 2. Data2 composes queries and manages fetch lifecycle
- * 3. Table2 receives data + feature callbacks via props injection
- * 4. Page wires features together but remains minimal
- *
- * Data Flow:
- * Hooks → buildQuery() → Data2 → fetchData → Table2 (injected props)
- *
- * Key differences from v1 (IngredientsPage):
- * - No useIngredients() for list data (Data2 handles it)
- * - Simpler hooks with stable references (fstate)
- * - Features are truly independent
- * - Explicit composition instead of implicit coupling
- *
- * ===========================================================================================
- */
-import { useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import { Data2 } from '@framework/components2/data/Data2';
+import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
 import { Input } from '@framework/components/forms/Input';
 import { Page } from '@framework/components/layout/Page';
+import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
 import { Button } from '@framework/components/primitives/Button';
 import { useCacheControl2 } from '@framework/hooks2/useCacheControl2';
 import { useDebounce } from '@framework/hooks2/useDebounce';
 import { usePagination2 } from '@framework/hooks2/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
 import { useSorting2 } from '@framework/hooks2/useSorting2';
-import type { Ingredient, IngredientsListQuery } from '@shared/api/ingredients.contract';
-import { Plus, RefreshCw, X } from 'lucide-react';
+import { useRoutedDialog } from '@framework/hooks/useRoutedDialog';
+import type { CreateIngredient, Ingredient, IngredientsListQuery } from '@shared/api/ingredients.contract';
+import { Plus, RefreshCw, Trash2, X } from 'lucide-react';
+
+import { BulkDeleteWorkflow, IngredientDialog } from '@app/components/domain';
 
 import { ingredientsService } from '../ingredients/IngredientsService';
 import { useIngredients } from '../ingredients/useIngredients';
@@ -49,6 +26,7 @@ const STORAGE_ID = 'ingredients2' as const;
 
 export function Ingredients2Page() {
 	const navigate = useNavigate();
+	const { id, mode } = useParams<{ id?: string; mode?: 'new' | 'edit' }>();
 
 	// ═══════════════════════════════════════════════════════════════════════════════════════
 	// HEADLESS FEATURES - Each is independent and composable
@@ -121,25 +99,104 @@ export function Ingredients2Page() {
 	// ACTIONS - Domain-specific operations
 	// ═══════════════════════════════════════════════════════════════════════════════════════
 
-	// Use existing hook for delete functionality (will refactor later to use optimistic updates)
-	const { deleteIngredient } = useIngredients({
+	// Use existing hook for CRUD operations
+	const {
+		ingredients,
+		createIngredient,
+		updateIngredient,
+		deleteIngredient,
+		refreshIngredient,
+		bulkDeleteIngredients,
+		loadIngredients,
+	} = useIngredients({
 		page: pagination.fstate.currentPage,
 		pageSize: pagination.fstate.pageSize,
 	});
+
+	// Multi-row selection state (persists across pagination during session)
+	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+	// Bulk delete dialog state
+	const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+	// Track IDs being deleted (for strike-through visual feedback)
+	const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+	// Track if bulk delete is in progress (for blur effect)
+	const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
+	// Dialog state management using URL routing
+	const { isOpen, editingItem: editingIngredient } = useRoutedDialog({
+		mode,
+		id,
+		items: ingredients,
+		findItem: (items, id) => items.find(i => i.id === id),
+		onNavigateBack: () => navigate('/ingredients2'),
+	});
+
+	// Delete confirmation dialog state
+	const [deleteConfirmation, setDeleteConfirmation] = useState<{
+		open: boolean;
+		ingredientId: string | null;
+	}>({
+		open: false,
+		ingredientId: null,
+	});
+
+	// Dialog refresh state
+	const [isDialogRefreshing, setIsDialogRefreshing] = useState(false);
 
 	const handleEdit = (ingredient: Ingredient) => {
 		navigate(`/ingredients2/${ingredient.id}/edit`);
 	};
 
-	const handleDelete = async (id: string) => {
-		if (confirm('Delete this ingredient?')) {
-			await deleteIngredient(id);
+	const handleDelete = (id: string) => {
+		setDeleteConfirmation({
+			open: true,
+			ingredientId: id,
+		});
+	};
+
+	const handleDeleteConfirm = async () => {
+		if (deleteConfirmation.ingredientId) {
+			await deleteIngredient(deleteConfirmation.ingredientId);
 			// Data2 will auto-refresh via dependency tracking
 		}
 	};
 
 	const handleCreateNew = () => {
 		navigate('/ingredients2/new');
+	};
+
+	const handleSubmit = async (data: CreateIngredient) => {
+		if (editingIngredient) {
+			// Find the latest version from the ingredients array
+			const latestIngredient = ingredients.find(i => i.id === editingIngredient.id);
+			const version = latestIngredient?.version ?? editingIngredient.version;
+			await updateIngredient(editingIngredient.id, { ...data, version });
+		} else {
+			await createIngredient(data);
+		}
+		navigate('/ingredients2');
+	};
+
+	const handleRefresh = async () => {
+		if (editingIngredient) {
+			setIsDialogRefreshing(true);
+			try {
+				await refreshIngredient(editingIngredient.id);
+			} finally {
+				setIsDialogRefreshing(false);
+			}
+		}
+	};
+
+	const handleBulkDelete = async () => {
+		if (selectedIds.size === 0) return;
+		setShowBulkDeleteDialog(true);
+	};
+
+	// Current params for reload after bulk delete
+	const currentParams = {
+		page: pagination.fstate.currentPage,
+		pageSize: pagination.fstate.pageSize,
 	};
 
 	// ═══════════════════════════════════════════════════════════════════════════════════════
@@ -227,10 +284,60 @@ export function Ingredients2Page() {
 				</div>
 			</div>
 
+			{/* Bulk Action Bar */}
+			{selectedIds.size > 0 && (
+				<BulkActionBar
+					selectionCount={selectedIds.size}
+					selectedLabel={`${selectedIds.size} ingredient(s) selected`}
+					onCancel={() => setSelectedIds(new Set())}
+					variant="light"
+				>
+					<Button onClick={handleBulkDelete} variant="destructive" size="sm">
+						<Trash2 className="mr-2 size-4" />
+						Delete
+					</Button>
+				</BulkActionBar>
+			)}
+
 			{/* Data Shell + Table */}
 			<Data2 fetchData={fetchIngredients} pagination={pagination} sorting={sorting} search={search} cache={cache}>
 				<IngredientTable2 onEdit={handleEdit} onDelete={handleDelete} />
 			</Data2>
+
+			{/* Bulk Delete Workflow */}
+			<BulkDeleteWorkflow
+				open={showBulkDeleteDialog}
+				onOpenChange={setShowBulkDeleteDialog}
+				selectedIds={selectedIds}
+				onClear={() => setSelectedIds(new Set())}
+				onBulkDelete={bulkDeleteIngredients}
+				onReload={() => loadIngredients(currentParams)}
+				itemTypeName="ingredient"
+				onDeletingChange={setDeletingIds}
+				onBulkDeletingChange={setIsBulkDeleting}
+			/>
+
+			{/* Ingredient Dialog for Create/Edit */}
+			<IngredientDialog
+				open={isOpen}
+				onClose={() => navigate('/ingredients2')}
+				ingredient={editingIngredient}
+				onSubmit={handleSubmit}
+				onRefresh={handleRefresh}
+				isRefreshing={isDialogRefreshing}
+			/>
+
+			{/* Delete Confirmation Dialog */}
+			<AlertDialogWrapper
+				open={deleteConfirmation.open}
+				onOpenChange={open => setDeleteConfirmation({ open, ingredientId: null })}
+				title="Delete Ingredient"
+				description="Are you sure you want to delete this ingredient? This action cannot be undone."
+				confirmLabel="Delete"
+				cancelLabel="Cancel"
+				variant="danger"
+				onConfirm={handleDeleteConfirm}
+			/>
 		</Page>
 	);
 }

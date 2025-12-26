@@ -90,7 +90,7 @@ export class RestAPI {
 		// Create a task (supports both regular and flow-based tasks)
 		this.app.post('/tasks', async (req: Request, res: Response) => {
 			try {
-				const { description, priority, metadata, flowId, flowInputs, workspacePath } = req.body;
+				const { description, priority, metadata, flowId, flowInputs, workspacePath, assignedTo } = req.body;
 
 				if (!description) {
 					res.status(400).json({ error: 'Description is required' });
@@ -116,10 +116,24 @@ export class RestAPI {
 					task.workspacePath = workspacePath;
 				}
 
+				// Add worker assignment if provided
+				if (assignedTo?.workerId) {
+					task.assignedTo = assignedTo;
+				}
+
 				// IMPORTANT: Update task in TaskManager's memory + storage
-				// (createTask() saves before we add flowInputs/workspacePath)
-				if (flowId || workspacePath) {
+				// (createTask() saves before we add flowInputs/workspacePath/assignedTo)
+				if (flowId || workspacePath || assignedTo) {
 					await this.taskManager.updateTask(task);
+
+					// Re-route task if assignedTo was added
+					// The task was initially added to global backlog, we need to remove it and add to worker queue
+					if (assignedTo?.workerId) {
+						// Remove from global backlog
+						this.taskManager.removeTaskFromBacklog(task.id);
+						// Add to worker queue
+						this.taskManager.addTaskToWorkerQueue(assignedTo.workerId, task);
+					}
 				}
 
 				// Try to assign the task to an available worker

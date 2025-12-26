@@ -52,6 +52,8 @@ export interface UsePagination2Options {
 	pageSize: number;
 	/** Initial page (default: 1) */
 	initialPage?: number;
+	/** Available page size options (e.g., [5, 10, 20, 50]) */
+	pageSizeOptions?: number[];
 	/** Storage ID for persistence (e.g., 'items', 'products'). If provided, appends '-pagination' */
 	storageId?: string;
 	/** Storage adapter to use (defaults to localStorage) */
@@ -67,6 +69,8 @@ export interface PaginationState {
 	currentPage: number;
 	/** Items per page */
 	pageSize: number;
+	/** Available page size options (e.g., [5, 10, 20, 50]) */
+	pageSizeOptions?: number[];
 	/** Whether we can go to previous page */
 	canGoPrevious: boolean;
 	/** Whether we can go to next page (function because it needs totalPages context) */
@@ -91,7 +95,13 @@ export type PaginationContract = FeatureContract<PaginationState>;
  * @returns PaginationContract with state, fstate, actions, fillQuery
  */
 export function usePagination2(options: UsePagination2Options): PaginationContract {
-	const { pageSize: initialPageSize, initialPage = 1, storageId, storage = defaultStorage } = options;
+	const {
+		pageSize: initialPageSize,
+		initialPage = 1,
+		pageSizeOptions,
+		storageId,
+		storage = defaultStorage,
+	} = options;
 
 	// Storage key for pagination state
 	const storageKey = storageId ? `${storageId}-pagination` : null;
@@ -129,10 +139,11 @@ export function usePagination2(options: UsePagination2Options): PaginationContra
 		() => ({
 			currentPage,
 			pageSize,
+			pageSizeOptions,
 			canGoPrevious,
 			canGoNext,
 		}),
-		[currentPage, pageSize, canGoPrevious, canGoNext]
+		[currentPage, pageSize, pageSizeOptions, canGoPrevious, canGoNext]
 	);
 
 	// Actions (all state-modifying functions)

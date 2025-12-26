@@ -46,7 +46,6 @@ export function WorkersTable({ workers }: WorkersTableProps) {
          `}
 								>
 									<th className="pb-3">Worker ID</th>
-									<th className="pb-3">Type</th>
 									<th className="pb-3">Connection</th>
 									<th className="pb-3">State</th>
 									<th className="pb-3">Current Task</th>

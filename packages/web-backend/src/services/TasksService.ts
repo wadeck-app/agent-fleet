@@ -1,4 +1,11 @@
-import type { Task, TasksData, TasksQuery } from '@app/shared/api/tasks.contract';
+import type {
+	CreateTask,
+	Task,
+	TasksData,
+	TasksListQuery,
+	TasksListResponse,
+	TasksQuery,
+} from '@app/shared/api/tasks.contract';
 
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
@@ -84,6 +91,117 @@ export class TasksService {
 	}
 
 	/**
+	 * Get tasks list with pagination, sorting, and search support
+	 * (New Data2 architecture)
+	 */
+	async getTasksList(query: TasksListQuery): Promise<TasksListResponse> {
+		try {
+			// Fetch all tasks from orchestrator
+			console.log('[TasksService] Fetching tasks for paginated list...');
+			const rawTasks = await this.orchestratorRepository.getTasks();
+			let tasks: Task[] = this.transformTasks(rawTasks as any[]);
+
+			// Apply domain filters (status, workerId, priority)
+			tasks = this.applyFilters(tasks, query);
+
+			// Apply search if provided
+			if (query.search) {
+				tasks = this.applySearch(tasks, query.search);
+			}
+
+			// Apply sorting if provided
+			if (query.sortBy && query.sortOrder) {
+				tasks = this.applySorting(tasks, query.sortBy, query.sortOrder);
+			}
+
+			// Apply pagination
+			const page = query.page || 1;
+			const pageSize = query.pageSize || 10;
+			const total = tasks.length;
+			const totalPages = Math.ceil(total / pageSize);
+			const start = (page - 1) * pageSize;
+			const paginatedTasks = tasks.slice(start, start + pageSize);
+
+			return {
+				items: paginatedTasks,
+				pagination: {
+					total,
+					page,
+					pageSize,
+					totalPages,
+				},
+			};
+		} catch (error) {
+			// Orchestrator is offline - return empty list
+			console.error('[TasksService] Failed to fetch tasks list:', error);
+			return {
+				items: [],
+				pagination: {
+					total: 0,
+					page: query.page || 1,
+					pageSize: query.pageSize || 10,
+					totalPages: 0,
+				},
+			};
+		}
+	}
+
+	/**
+	 * Apply search filter across task fields
+	 */
+	private applySearch(tasks: Task[], searchQuery: string): Task[] {
+		const lowerQuery = searchQuery.toLowerCase().trim();
+		if (!lowerQuery) return tasks;
+
+		return tasks.filter(
+			task =>
+				task.id.toLowerCase().includes(lowerQuery) ||
+				task.description.toLowerCase().includes(lowerQuery) ||
+				task.assignedWorker?.workerId.toLowerCase().includes(lowerQuery) ||
+				task.status.toLowerCase().includes(lowerQuery) ||
+				task.priority.toLowerCase().includes(lowerQuery)
+		);
+	}
+
+	/**
+	 * Apply sorting to tasks
+	 */
+	private applySorting(tasks: Task[], sortBy: string, sortOrder: string): Task[] {
+		const isDescending = sortOrder === 'desc';
+
+		return [...tasks].sort((a, b) => {
+			const aVal = this.getTaskValue(a, sortBy);
+			const bVal = this.getTaskValue(b, sortBy);
+
+			if (aVal === null || aVal === undefined) return 1;
+			if (bVal === null || bVal === undefined) return -1;
+
+			let comparison = 0;
+			if (typeof aVal === 'string' && typeof bVal === 'string') {
+				comparison = aVal.localeCompare(bVal);
+			} else if (typeof aVal === 'number' && typeof bVal === 'number') {
+				comparison = aVal - bVal;
+			} else {
+				comparison = String(aVal).localeCompare(String(bVal));
+			}
+
+			return isDescending ? -comparison : comparison;
+		});
+	}
+
+	/**
+	 * Get task field value for sorting
+	 */
+	private getTaskValue(task: Task, key: string): any {
+		// Handle nested properties
+		if (key === 'assignedWorker') {
+			return task.assignedWorker?.workerId || null;
+		}
+
+		return (task as any)[key];
+	}
+
+	/**
 	 * Transform raw orchestrator tasks to frontend Task schema
 	 */
 	private transformTasks(rawTasks: any[]): Task[] {
@@ -162,35 +280,73 @@ export class TasksService {
 	}
 
 	// ===========================================================================================
-	// CRUD METHODS (TO BE IMPLEMENTED)
+	// CRUD METHODS
 	// ===========================================================================================
-	// When CRUD operations are implemented, use these as templates for event emission
 
 	/**
-	 * Create a new task (PLACEHOLDER - not implemented)
-	 * When implemented, this should:
+	 * Delete a task
+	 * 1. Delete task from orchestrator
+	 * 2. Emit 'b2f:task:deleted' event
+	 */
+	async deleteTask(taskId: string): Promise<void> {
+		try {
+			await this.orchestratorRepository.deleteTask(taskId);
+
+			// Emit event AFTER successful deletion
+			this.eventBroadcaster.broadcast('b2f:task:deleted', { id: taskId } as any);
+		} catch (error) {
+			console.error('[TasksService] Failed to delete task:', error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Create a new task
 	 * 1. Validate input
 	 * 2. Create task in orchestrator
-	 * 3. Emit 'task:created' event
+	 * 3. Emit 'b2f:task:created' event
 	 * 4. Return created task
-	 *
-	 * @example
-	 * ```typescript
-	 * async createTask(data: CreateTaskDto): Promise<Task> {
-	 *   try {
-	 *     const task = await this.orchestratorRepository.createTask(data);
-	 *
-	 *     // Emit event AFTER successful creation
-	 *     this.eventBroadcaster.broadcast('task:created', task);
-	 *
-	 *     return task;
-	 *   } catch (error) {
-	 *     console.error('[TasksService] Failed to create task:', error);
-	 *     throw error;
-	 *   }
-	 * }
-	 * ```
 	 */
+	async createTask(data: CreateTask): Promise<Task> {
+		try {
+			// Validate input
+			const errors: string[] = [];
+
+			if (!data.description?.trim()) {
+				errors.push('Description is required');
+			}
+			if (!data.priority) {
+				errors.push('Priority is required');
+			}
+			if (!data.assignedTo?.workerId) {
+				errors.push('Worker assignment is required');
+			}
+
+			if (errors.length > 0) {
+				throw new Error(errors.join(', '));
+			}
+
+			// Create task via OrchestratorRepository (library mode)
+			const task = await this.orchestratorRepository.createTask(
+				data.description,
+				data.priority,
+				data.assignedTo,
+				data.flowId,
+				data.flowInputs
+			);
+
+			// Transform to frontend format
+			const transformedTask = this.transformTasks([task])[0];
+
+			// Emit event AFTER successful creation
+			this.eventBroadcaster.broadcast('b2f:task:created', transformedTask);
+
+			return transformedTask;
+		} catch (error) {
+			console.error('[TasksService] Failed to create task:', error);
+			throw error;
+		}
+	}
 
 	/**
 	 * Update task status (PLACEHOLDER - not implemented)

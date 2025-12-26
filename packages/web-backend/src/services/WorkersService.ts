@@ -1,6 +1,7 @@
 import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
 
-import type { Worker, WorkersData } from '@app/shared/api/workers.contract';
+import type { WorkerFlows } from '@app/shared/api/flows.contract';
+import type { Worker, WorkersData, WorkersListQuery, WorkersListResponse } from '@app/shared/api/workers.contract';
 
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 
@@ -55,7 +56,6 @@ export class WorkersService {
 			// Note: All workers in the list are connected (disconnected workers are removed)
 			const workers: Worker[] = stats.workersList.map((w: any) => ({
 				workerId: w.id,
-				type: w.type,
 				connected: true, // Workers in the list are connected
 				taskId: w.taskId ?? undefined, // Convert null to undefined
 				state: w.taskId ? 'busy' : 'idle',
@@ -103,6 +103,138 @@ export class WorkersService {
 				},
 				workers: [],
 			};
+		}
+	}
+
+	/**
+	 * Get workers list with pagination, sorting, and search support
+	 * (New Data2 architecture)
+	 */
+	async getWorkersList(query: WorkersListQuery): Promise<WorkersListResponse> {
+		try {
+			// Fetch all workers from orchestrator
+			const stats = await this.orchestratorWrapper.getStats();
+			let workers: Worker[] = stats.workersList.map((w: any) => ({
+				workerId: w.id,
+				connected: true,
+				taskId: w.taskId ?? undefined,
+				state: w.taskId ? 'busy' : 'idle',
+				uptime: undefined,
+				lastHeartbeat: undefined,
+				tasksCompleted: undefined,
+				successRate: undefined,
+			}));
+
+			// Apply search if provided
+			if (query.search) {
+				workers = this.applySearch(workers, query.search);
+			}
+
+			// Apply sorting if provided
+			if (query.sortBy && query.sortOrder) {
+				workers = this.applySorting(workers, query.sortBy, query.sortOrder);
+			}
+
+			// Apply pagination
+			const page = query.page || 1;
+			const pageSize = query.pageSize || 10;
+			const total = workers.length;
+			const totalPages = Math.ceil(total / pageSize);
+			const start = (page - 1) * pageSize;
+			const paginatedWorkers = workers.slice(start, start + pageSize);
+
+			return {
+				items: paginatedWorkers,
+				pagination: {
+					total,
+					page,
+					pageSize,
+					totalPages,
+				},
+			};
+		} catch (error) {
+			// Orchestrator is offline - return empty list
+			console.error('[WorkersService] Failed to fetch workers list:', error);
+			return {
+				items: [],
+				pagination: {
+					total: 0,
+					page: query.page || 1,
+					pageSize: query.pageSize || 10,
+					totalPages: 0,
+				},
+			};
+		}
+	}
+
+	/**
+	 * Apply search filter across worker fields
+	 */
+	private applySearch(workers: Worker[], searchQuery: string): Worker[] {
+		const lowerQuery = searchQuery.toLowerCase().trim();
+		if (!lowerQuery) return workers;
+
+		return workers.filter(
+			w =>
+				w.workerId.toLowerCase().includes(lowerQuery) ||
+				w.state.toLowerCase().includes(lowerQuery) ||
+				w.taskId?.toLowerCase().includes(lowerQuery)
+		);
+	}
+
+	/**
+	 * Apply sorting to workers
+	 */
+	private applySorting(workers: Worker[], sortBy: string, sortOrder: string): Worker[] {
+		const isDescending = sortOrder === 'desc';
+
+		return [...workers].sort((a, b) => {
+			const aVal = (a as any)[sortBy];
+			const bVal = (b as any)[sortBy];
+
+			if (aVal === null || aVal === undefined) return 1;
+			if (bVal === null || bVal === undefined) return -1;
+
+			let comparison = 0;
+			if (typeof aVal === 'boolean') {
+				comparison = aVal === bVal ? 0 : aVal ? 1 : -1;
+			} else if (typeof aVal === 'string' && typeof bVal === 'string') {
+				comparison = aVal.localeCompare(bVal);
+			} else if (typeof aVal === 'number' && typeof bVal === 'number') {
+				comparison = aVal - bVal;
+			} else {
+				comparison = String(aVal).localeCompare(String(bVal));
+			}
+
+			return isDescending ? -comparison : comparison;
+		});
+	}
+
+	/**
+	 * Get flows for a specific worker
+	 */
+	async getWorkerFlows(workerId: string): Promise<WorkerFlows> {
+		try {
+			// Check if orchestratorWrapper is available (library mode)
+			if (!this.orchestratorWrapper) {
+				return [];
+			}
+
+			// Access FlowDiscoveryRegistry via OrchestratorWrapper (library mode)
+			const orchestrator = this.orchestratorWrapper.getOrchestrator();
+			const wsServer = orchestrator.getWsServer();
+
+			if (!wsServer) {
+				return [];
+			}
+
+			const flowDiscoveryRegistry = wsServer.getConnectionManager().getFlowDiscoveryRegistry();
+			const workerFlows = flowDiscoveryRegistry.getWorkerFlows(workerId);
+
+			return workerFlows || [];
+		} catch (_error) {
+			// Orchestrator is offline or worker not found - return empty flows
+			return [];
 		}
 	}
 

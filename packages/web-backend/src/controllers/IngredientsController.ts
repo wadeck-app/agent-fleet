@@ -56,6 +56,14 @@ export default class IngredientsController implements LazyController<typeof INGR
 		});
 
 		/**
+		 * DELETE /api/ingredients/
+		 * Bulk delete ingredients (up to 10 per batch)
+		 */
+		add('DELETE', '/api/ingredients/', async ({ body }) => {
+			return this.service.bulkDelete(body.ids);
+		});
+
+		/**
 		 * PUT /api/ingredients/:id
 		 * Update an existing ingredient
 		 */

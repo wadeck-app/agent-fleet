@@ -135,6 +135,83 @@ export class OrchestratorRepository {
 	}
 
 	/**
+	 * Create a new task in orchestrator
+	 */
+	async createTask(
+		description: string,
+		priority: string,
+		assignedTo?: { workerId: string; workerType?: string },
+		flowId?: string,
+		flowInputs?: Record<string, unknown>
+	): Promise<Task> {
+		// Library mode - direct access via TaskManager
+		if (this.orchestratorWrapper) {
+			const orchestrator = this.orchestratorWrapper.getOrchestrator();
+			const taskManager = orchestrator.getTaskManager();
+
+			// Create task with metadata
+			const metadata: Record<string, unknown> = { priority };
+			const task = await taskManager.createTask(description, metadata);
+
+			// Update task with additional fields if provided
+			if (assignedTo || flowId || flowInputs) {
+				if (assignedTo) {
+					task.assignedTo = assignedTo;
+				}
+				if (flowId) {
+					task.flowId = flowId;
+				}
+				if (flowInputs) {
+					task.flowInputs = flowInputs;
+				}
+
+				// Save updated task
+				await taskManager.updateTask(task);
+
+				// IMPORTANT: Re-route task if assignedTo was added
+				// The task was initially added to global backlog, we need to remove it and add to worker queue
+				if (assignedTo?.workerId) {
+					// Remove from global backlog
+					taskManager.removeTaskFromBacklog(task.id);
+					// Add to worker queue
+					taskManager.addTaskToWorkerQueue(assignedTo.workerId, task);
+
+					// Notify idle workers about the new task
+					const wsServer = orchestrator.getWsServer();
+					if (wsServer) {
+						wsServer.tryAssignTasksToIdleWorkers();
+					}
+				}
+			}
+
+			return task;
+		}
+
+		// HTTP mode - not supported for createTask
+		throw new Error('HTTP mode for createTask is not supported. Backend should use library mode.');
+	}
+
+	/**
+	 * Delete a task from orchestrator
+	 */
+	async deleteTask(taskId: string): Promise<void> {
+		// Library mode - direct access via TaskManager
+		if (this.orchestratorWrapper) {
+			const orchestrator = this.orchestratorWrapper.getOrchestrator();
+			const taskManager = orchestrator.getTaskManager();
+
+			const deleted = await taskManager.deleteTask(taskId);
+			if (!deleted) {
+				throw new Error(`Task ${taskId} not found`);
+			}
+			return;
+		}
+
+		// HTTP mode - not supported for deleteTask
+		throw new Error('HTTP mode for deleteTask is not supported. Backend should use library mode.');
+	}
+
+	/**
 	 * Clear the cache (useful for testing)
 	 */
 	clearCache(): void {

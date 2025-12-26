@@ -146,7 +146,7 @@ export function Table2<T>({
 		() =>
 			columnsWithSort.map(col => ({
 				key: col.key,
-				label: typeof col.label === 'string' ? col.label : String(col.key),
+				label: col.label, // Keep ReactNode for SortableColumnHeader
 				render: (item: T, _isEditing: boolean) => col.render(item),
 				className: col.className,
 				sortable: col.sortable,

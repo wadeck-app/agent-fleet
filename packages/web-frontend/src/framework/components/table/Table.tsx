@@ -12,7 +12,7 @@ import type { SortDirection } from './useTableSorting';
 
 export interface TableColumn<T> {
 	key: string;
-	label: string;
+	label: string | ReactNode;
 	render: (item: T, isEditing: boolean) => ReactNode;
 	className?: string;
 	// For sortable columns

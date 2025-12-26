@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
+import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
 import { ColumnVisibility } from '@framework/components/columns/ColumnVisibility';
 import { useColumnOrder } from '@framework/components/columns/useColumnOrder';
 import { useColumnVisibility } from '@framework/components/columns/useColumnVisibility';
@@ -18,9 +19,9 @@ import { extractColumnIds } from '@framework/utils/table/ColumnConfig';
 import { extractDefaultVisible } from '@framework/utils/table/ColumnConfig';
 import { extractCanHideConstraints } from '@framework/utils/table/ColumnConfig';
 import type { Ingredient } from '@shared/api/ingredients.contract';
-import { Plus, Utensils } from 'lucide-react';
+import { Plus, Trash2, Utensils } from 'lucide-react';
 
-import { IngredientDialog } from '@app/components/domain';
+import { BulkDeleteWorkflow, IngredientDialog } from '@app/components/domain';
 
 import { INGREDIENT_TABLE_COLUMNS, IngredientTable } from './IngredientTable';
 import { useIngredients } from './useIngredients';
@@ -70,9 +71,13 @@ export function IngredientsPage() {
 	});
 	// Multi-row selection state (persists across pagination during session)
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+	// Bulk delete dialog state
+	const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
 	// Add comment above the target line, not at the end
 	// Track IDs being deleted (for strike-through visual feedback)
 	const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+	// Track if bulk delete is in progress (for blur effect)
+	const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 	// Track if dialog refresh is in progress (for loading state in dialog)
 	const [isDialogRefreshing, setIsDialogRefreshing] = useState(false);
 
@@ -88,9 +93,11 @@ export function IngredientsPage() {
 		createIngredient,
 		updateIngredient,
 		deleteIngredient,
+		bulkDeleteIngredients,
 		refreshIngredient,
 		clearError,
 		totalCount,
+		loadIngredients,
 	} = useIngredients({
 		page: pagination.currentPage,
 		pageSize: pagination.pageSize,
@@ -167,6 +174,19 @@ export function IngredientsPage() {
 
 	const handleNewIngredient = () => {
 		navigate('/ingredients/new');
+	};
+
+	const handleBulkDelete = async () => {
+		if (selectedIds.size === 0) return;
+		setShowBulkDeleteDialog(true);
+	};
+
+	// Current params for reload after bulk delete
+	const currentParams = {
+		page: pagination.currentPage,
+		pageSize: pagination.pageSize,
+		sortBy: sortBy || undefined,
+		sortOrder: sortOrder || undefined,
 	};
 
 	if (loading && !ingredients.length) {
@@ -286,38 +306,70 @@ export function IngredientsPage() {
 						}}
 					/>
 				) : (
-					<IngredientTable
-						storageId={storageId}
-						ingredients={ingredients}
-						onEdit={handleEdit}
-						onDelete={handleDelete}
-						pagination={
-							paginationData
-								? {
-										currentPage: paginationData.page,
-										totalPages: paginationData.totalPages,
-										totalItems: paginationData.total,
-										onPageChange: pagination.setPage,
-										pageSize: pagination.pageSize,
-										onPageSizeChange: pagination.setPageSize,
-										pageSizeOptions: [5, 10, 20, 50],
-									}
-								: undefined
-						}
-						sorting={{
-							sortConfigs: sorting.sortConfigs,
-							onSortChange: sorting.handleSort,
-						}}
-						visibleColumns={columnVisibility.visibleColumns}
-						columnOrder={columnOrder.columnOrder}
-						refreshing={isRefreshing}
-						selectable={true}
-						selectedIds={selectedIds}
-						onSelectionChange={setSelectedIds}
-						deletingIds={deletingIds}
-					/>
+					<>
+						{/* Bulk Action Bar */}
+						{selectedIds.size > 0 && (
+							<BulkActionBar
+								selectionCount={selectedIds.size}
+								selectedLabel={`${selectedIds.size} ingredient(s) selected`}
+								onCancel={() => setSelectedIds(new Set())}
+								variant="light"
+							>
+								<Button onClick={handleBulkDelete} variant="destructive" size="sm">
+									<Trash2 className="mr-2 size-4" />
+									Delete
+								</Button>
+							</BulkActionBar>
+						)}
+
+						<IngredientTable
+							storageId={storageId}
+							ingredients={ingredients}
+							onEdit={handleEdit}
+							onDelete={handleDelete}
+							pagination={
+								paginationData
+									? {
+											currentPage: paginationData.page,
+											totalPages: paginationData.totalPages,
+											totalItems: paginationData.total,
+											onPageChange: pagination.setPage,
+											pageSize: pagination.pageSize,
+											onPageSizeChange: pagination.setPageSize,
+											pageSizeOptions: [5, 10, 20, 50],
+										}
+									: undefined
+							}
+							sorting={{
+								sortConfigs: sorting.sortConfigs,
+								onSortChange: sorting.handleSort,
+							}}
+							visibleColumns={columnVisibility.visibleColumns}
+							columnOrder={columnOrder.columnOrder}
+							refreshing={isRefreshing}
+							deleting={isBulkDeleting}
+							selectable={true}
+							selectedIds={selectedIds}
+							onSelectionChange={setSelectedIds}
+							deletingIds={deletingIds}
+						/>
+					</>
 				)}
 			</Page>
+
+			{/* Bulk Delete Workflow */}
+			<BulkDeleteWorkflow
+				open={showBulkDeleteDialog}
+				onOpenChange={setShowBulkDeleteDialog}
+				selectedIds={selectedIds}
+				onClear={() => setSelectedIds(new Set())}
+				onBulkDelete={bulkDeleteIngredients}
+				onReload={() => loadIngredients(currentParams)}
+				itemTypeName="ingredient"
+				onDeletingChange={setDeletingIds}
+				onBulkDeletingChange={setIsBulkDeleting}
+			/>
+
 			<IngredientDialog
 				open={isOpen}
 				onClose={() => navigate('/ingredients')}
