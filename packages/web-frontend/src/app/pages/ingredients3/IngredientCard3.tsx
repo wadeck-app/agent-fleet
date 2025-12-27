@@ -12,6 +12,7 @@
  *
  * ===========================================================================================
  */
+import type { Table2Column } from '@framework/components2/table/Table2';
 import { Checkbox } from '@framework/components/forms/Checkbox';
 import { Button } from '@framework/components/primitives/Button';
 import {
@@ -22,13 +23,16 @@ import {
 	CardHeader,
 	CardTitle,
 } from '@framework/components/primitives/Card';
-import { formatDate } from '@framework/utils/formatting/DateFormat';
 import type { Ingredient } from '@shared/api/ingredients.contract';
 import { Pencil, Trash2 } from 'lucide-react';
+
+import { INGREDIENT_GRID_FIELDS } from './IngredientGrid3';
 
 export interface IngredientCard3Props {
 	/** The ingredient to display */
 	ingredient: Ingredient;
+	/** Fields to display in the card (excluding name which is always in header) */
+	fields?: Table2Column<Ingredient>[];
 	/** Optional edit callback */
 	onEdit?: (ingredient: Ingredient) => void;
 	/** Optional delete callback */
@@ -49,12 +53,18 @@ export interface IngredientCard3Props {
  */
 export function IngredientCard3({
 	ingredient,
+	fields = INGREDIENT_GRID_FIELDS,
 	onEdit,
 	onDelete,
 	selectable = false,
 	isSelected = false,
 	onToggleSelection,
 }: IngredientCard3Props) {
+	// Add comment above the target line, not at the end
+	// Separate fields into main fields (first 4) and metadata fields (rest)
+	const mainFields = fields.filter(f => ['calories', 'protein', 'carbs', 'fat'].includes(f.key));
+	const metadataFields = fields.filter(f => !['calories', 'protein', 'carbs', 'fat', 'category'].includes(f.key));
+
 	return (
 		<Card size="default" className="hover:shadow-lg transition-shadow relative">
 			{/* Selection checkbox (top right) */}
@@ -68,53 +78,43 @@ export function IngredientCard3({
 				</div>
 			)}
 
-			{/* Header: Primary info */}
+			{/* Header: Primary info (name is always shown, category if visible) */}
 			<CardHeader>
 				<CardTitle>{ingredient.name}</CardTitle>
-				<CardDescription>{ingredient.category || 'Uncategorized'}</CardDescription>
+				<CardDescription>
+					{fields.find(f => f.key === 'category')
+						? (fields.find(f => f.key === 'category')!.render(ingredient) as string)
+						: ingredient.category || 'Uncategorized'}
+				</CardDescription>
 			</CardHeader>
 
-			{/* Content: Nutritional data + metadata */}
+			{/* Content: Dynamic fields based on visibility/ordering */}
 			<CardContent>
-				{/* Nutritional Info - 2x2 Grid */}
-				<div className="grid grid-cols-2 gap-3">
-					<div className="space-y-1">
-						<div className="text-xs text-muted-foreground">Calories</div>
-						<div className="text-lg font-semibold tabular-nums">{ingredient.calories}</div>
+				{/* Main Nutritional Fields - 2x2 Grid (if any visible) */}
+				{mainFields.length > 0 && (
+					<div className="grid grid-cols-2 gap-3">
+						{mainFields.map(field => (
+							<div key={field.key} className="space-y-1">
+								<div className="text-xs text-muted-foreground">{field.label}</div>
+								<div className="text-lg font-semibold tabular-nums">{field.render(ingredient)}</div>
+							</div>
+						))}
 					</div>
-					<div className="space-y-1">
-						<div className="text-xs text-muted-foreground">Protein</div>
-						<div className="text-lg font-semibold tabular-nums">{ingredient.protein}g</div>
-					</div>
-					<div className="space-y-1">
-						<div className="text-xs text-muted-foreground">Carbs</div>
-						<div className="text-lg font-semibold tabular-nums">{ingredient.carbs}g</div>
-					</div>
-					<div className="space-y-1">
-						<div className="text-xs text-muted-foreground">Fat</div>
-						<div className="text-lg font-semibold tabular-nums">{ingredient.fat}g</div>
-					</div>
-				</div>
+				)}
 
-				{/* Metadata - Timestamps + ID */}
-				<div className="mt-4 space-y-1 border-t pt-3">
-					<div className="flex justify-between text-xs text-muted-foreground">
-						<span>Created:</span>
-						<span title={formatDate(ingredient.createdAt).full}>
-							{formatDate(ingredient.createdAt).short}
-						</span>
+				{/* Metadata Fields (if any visible) */}
+				{metadataFields.length > 0 && (
+					<div className={`${mainFields.length > 0 ? 'mt-4 border-t pt-3' : ''} space-y-1`}>
+						{metadataFields.map(field => (
+							<div key={field.key} className="flex justify-between text-xs text-muted-foreground">
+								<span>{field.label}:</span>
+								<span className={field.key === 'id' ? 'font-mono' : ''}>
+									{field.render(ingredient)}
+								</span>
+							</div>
+						))}
 					</div>
-					<div className="flex justify-between text-xs text-muted-foreground">
-						<span>Updated:</span>
-						<span title={formatDate(ingredient.updatedAt).full}>
-							{formatDate(ingredient.updatedAt).short}
-						</span>
-					</div>
-					<div className="flex justify-between text-xs text-muted-foreground">
-						<span>ID:</span>
-						<span className="font-mono">{ingredient.id}</span>
-					</div>
-				</div>
+				)}
 			</CardContent>
 
 			{/* Footer: Actions */}

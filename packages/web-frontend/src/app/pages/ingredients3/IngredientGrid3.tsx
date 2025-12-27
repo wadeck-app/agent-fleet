@@ -28,6 +28,7 @@
  *
  * ===========================================================================================
  */
+import type { Table2Column } from '@framework/components2/table/Table2';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
 import { PageSizeSelector } from '@framework/components/pagination/PageSizeSelector';
 import { Pagination } from '@framework/components/pagination/Pagination';
@@ -35,16 +36,93 @@ import { Button } from '@framework/components/primitives/Button';
 import { Card, CardContent, CardFooter, CardHeader } from '@framework/components/primitives/Card';
 import { cn } from '@framework/lib/utils';
 import type { QueryResultDisplayerProps } from '@framework/types/QueryResultDisplayerContract';
+import { formatDate } from '@framework/utils/formatting/DateFormat';
 import type { Ingredient } from '@shared/api/ingredients.contract';
 import { AlertCircle, ArrowDown, ArrowUp, LayoutGrid } from 'lucide-react';
 
 import { IngredientCard3 } from './IngredientCard3';
 
 /**
+ * Field definitions for ingredient grid (reusing Table2Column interface for compatibility)
+ * Exported as single source of truth for field configuration
+ *
+ * Note: 'name' field is NOT included here because it's always displayed in the card header
+ * and cannot be hidden or reordered
+ */
+export const INGREDIENT_GRID_FIELDS: Table2Column<Ingredient>[] = [
+	// ID field
+	{
+		key: 'id',
+		label: 'ID',
+		render: item => item.id,
+		defaultVisible: false, // Hidden by default
+	},
+	// Name column
+	{
+		key: 'name',
+		label: 'Name',
+		render: item => <span className="font-medium">{item.name}</span>,
+		canHide: false, // Cannot be hidden (always visible)
+		canReorder: false, // Cannot be reordered (always first)
+	},
+	// Calories field
+	{
+		key: 'calories',
+		label: 'Calories',
+		render: item => `${item.calories}`,
+		defaultVisible: true,
+	},
+	// Protein field
+	{
+		key: 'protein',
+		label: 'Protein',
+		render: item => `${item.protein}g`,
+		defaultVisible: true,
+	},
+	// Carbs field
+	{
+		key: 'carbs',
+		label: 'Carbs',
+		render: item => `${item.carbs}g`,
+		defaultVisible: true,
+	},
+	// Fat field
+	{
+		key: 'fat',
+		label: 'Fat',
+		render: item => `${item.fat}g`,
+		defaultVisible: true,
+	},
+	// Category field
+	{
+		key: 'category',
+		label: 'Category',
+		render: item => item.category || '-',
+		defaultVisible: false, // Hidden by default (shown in header subtitle)
+	},
+	// Created field
+	{
+		key: 'createdAt',
+		label: 'Created',
+		render: item => formatDate(item.createdAt).short,
+		defaultVisible: false, // Hidden by default
+	},
+	// Updated field
+	{
+		key: 'updatedAt',
+		label: 'Updated',
+		render: item => formatDate(item.updatedAt).short,
+		defaultVisible: false, // Hidden by default
+	},
+];
+
+/**
  * Props for IngredientGrid3
  * Extends QueryResultDisplayerProps to receive injected state from Data2
  */
 export interface IngredientGrid3Props extends Partial<QueryResultDisplayerProps<Ingredient>> {
+	/** Optional field configuration override (for visibility/ordering feature) */
+	fields?: Table2Column<Ingredient>[];
 	/** Optional edit callback */
 	onEdit?: (ingredient: Ingredient) => void;
 	/** Optional delete callback */
@@ -73,6 +151,7 @@ export function IngredientGrid3({
 	pagination,
 	sorting,
 	features,
+	fields = INGREDIENT_GRID_FIELDS,
 	refreshing = false,
 	deleting = false,
 	deletingIds = new Set(),
@@ -250,6 +329,7 @@ export function IngredientGrid3({
 					<IngredientCard3
 						key={ingredient.id}
 						ingredient={ingredient}
+						fields={fields}
 						onEdit={onEdit}
 						onDelete={onDelete}
 						selectable={hasSelection}

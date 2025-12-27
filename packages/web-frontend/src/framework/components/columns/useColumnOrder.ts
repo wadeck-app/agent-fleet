@@ -36,6 +36,8 @@ export interface UseColumnOrderOptions {
 	defaultOrder: string[];
 	/** Storage adapter to use (defaults to localStorage) */
 	storage?: StorageAdapter;
+	/** Column constraints (e.g., canReorder) - maps column IDs to their constraints */
+	constraints?: Record<string, { canReorder: boolean }>;
 }
 
 export interface UseColumnOrderResult {
@@ -64,7 +66,7 @@ export interface UseColumnOrderResult {
  * @returns Column order state and controls
  */
 export function useColumnOrder(options: UseColumnOrderOptions): UseColumnOrderResult {
-	const { storageId, defaultOrder, storage = defaultStorage } = options;
+	const { storageId, defaultOrder, storage = defaultStorage, constraints } = options;
 	const storageKey = `${storageId}-column-order`;
 
 	// Load initial state from storage (SSR-safe)
@@ -96,25 +98,34 @@ export function useColumnOrder(options: UseColumnOrderOptions): UseColumnOrderRe
 	 * Reorder columns by swapping activeId with overId
 	 * Used with dnd-kit onDragEnd handler
 	 */
-	const reorderColumns = useCallback((activeId: string, overId: string) => {
-		setColumnOrder(prev => {
-			const activeIndex = prev.indexOf(activeId);
-			const overIndex = prev.indexOf(overId);
+	const reorderColumns = useCallback(
+		(activeId: string, overId: string) => {
+			setColumnOrder(prev => {
+				// Add comment above the target line, not at the end
+				// Check if activeId can be reordered (new constraint)
+				if (constraints && constraints[activeId] && !constraints[activeId].canReorder) {
+					return prev; // Cannot reorder this column, no-op
+				}
 
-			// Invalid indices, no-op
-			if (activeIndex === -1 || overIndex === -1) return prev;
+				const activeIndex = prev.indexOf(activeId);
+				const overIndex = prev.indexOf(overId);
 
-			// Same position, no-op
-			if (activeIndex === overIndex) return prev;
+				// Invalid indices, no-op
+				if (activeIndex === -1 || overIndex === -1) return prev;
 
-			// Create new array with swapped elements
-			const next = [...prev];
-			next.splice(activeIndex, 1);
-			next.splice(overIndex, 0, activeId);
+				// Same position, no-op
+				if (activeIndex === overIndex) return prev;
 
-			return next;
-		});
-	}, []);
+				// Create new array with swapped elements
+				const next = [...prev];
+				next.splice(activeIndex, 1);
+				next.splice(overIndex, 0, activeId);
+
+				return next;
+			});
+		},
+		[constraints]
+	);
 
 	/**
 	 * Move column to specific index

@@ -88,11 +88,7 @@ export function TableRow<T>({
 					{column.render(item, isEditing)}
 				</td>
 			))}
-			{renderActions && (
-				<td className="h-12 px-4 py-2.5 text-center">
-					{renderActions(item, isEditing)}
-				</td>
-			)}
+			{renderActions && <td className="h-12 px-4 py-2.5 text-center">{renderActions(item, isEditing)}</td>}
 		</tr>
 	);
 }

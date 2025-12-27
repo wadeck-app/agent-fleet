@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { Data2 } from '@framework/components2/data/Data2';
 import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
+import { ColumnVisibility } from '@framework/components/columns/ColumnVisibility';
+import { useColumnOrder } from '@framework/components/columns/useColumnOrder';
+import { useColumnVisibility } from '@framework/components/columns/useColumnVisibility';
 import { Input } from '@framework/components/forms/Input';
 import { Page } from '@framework/components/layout/Page';
 import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
@@ -14,6 +17,15 @@ import { usePagination2 } from '@framework/hooks2/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
 import { useSorting2 } from '@framework/hooks2/useSorting2';
 import { useRoutedDialog } from '@framework/hooks/useRoutedDialog';
+import {
+	applyColumnOrder,
+	applyColumnVisibility,
+	extractCanHideConstraints,
+	extractCanReorderConstraints,
+	extractColumnIds,
+	extractDefaultVisible,
+	toColumnVisibilityDefs,
+} from '@framework/utils2/Table2ColumnConfig';
 import type { CreateIngredient, Ingredient, IngredientsListQuery } from '@shared/api/ingredients.contract';
 import { Plus, RefreshCw, Trash2, X } from 'lucide-react';
 
@@ -21,7 +33,7 @@ import { BulkDeleteWorkflow, IngredientDialog } from '@app/components/domain';
 
 import { ingredientsService } from '../ingredients/IngredientsService';
 import { useIngredientsCrud } from '../ingredients/useIngredientsCrud';
-import { IngredientTable2 } from './IngredientTable2';
+import { INGREDIENT_TABLE2_COLUMNS, IngredientTable2 } from './IngredientTable2';
 
 const STORAGE_ID = 'ingredients2' as const;
 
@@ -59,6 +71,28 @@ export function Ingredients2Page() {
 
 	// Multi-selection feature: manages selection state
 	const selection = useMultiSelect2();
+
+	// Column visibility feature: manages visible columns with localStorage persistence
+	const columnVisibility = useColumnVisibility(extractColumnIds(INGREDIENT_TABLE2_COLUMNS), {
+		storageId: STORAGE_ID,
+		defaultVisible: extractDefaultVisible(INGREDIENT_TABLE2_COLUMNS),
+		constraints: extractCanHideConstraints(INGREDIENT_TABLE2_COLUMNS),
+	});
+
+	// Column ordering feature: manages column order with drag & drop
+	const columnOrder = useColumnOrder({
+		storageId: STORAGE_ID,
+		defaultOrder: extractColumnIds(INGREDIENT_TABLE2_COLUMNS),
+		constraints: extractCanReorderConstraints(INGREDIENT_TABLE2_COLUMNS),
+	});
+
+	// Apply visibility + ordering to columns
+	const visibleOrderedColumns = useMemo(() => {
+		let cols = INGREDIENT_TABLE2_COLUMNS;
+		cols = applyColumnVisibility(cols, columnVisibility.visibleColumns);
+		cols = applyColumnOrder(cols, columnOrder.columnOrder);
+		return cols;
+	}, [columnVisibility.visibleColumns, columnOrder.columnOrder]);
 
 	// ═══════════════════════════════════════════════════════════════════════════════════════
 	// DEBOUNCE - Delay search queries to avoid excessive requests
@@ -318,10 +352,31 @@ export function Ingredients2Page() {
 						/>
 					</Button>
 				</div>
-				<Button onClick={handleCreateNew}>
-					<Plus className="mr-2 h-4 w-4" />
-					Add Ingredient
-				</Button>
+				<div className="flex items-center gap-2">
+					<ColumnVisibility
+						columns={toColumnVisibilityDefs(INGREDIENT_TABLE2_COLUMNS)}
+						visibleColumns={columnVisibility.visibleColumns}
+						defaultVisible={new Set(extractDefaultVisible(INGREDIENT_TABLE2_COLUMNS))}
+						onToggle={columnVisibility.toggleColumn}
+						onReset={() => {
+							columnVisibility.resetColumns();
+							columnOrder.resetOrder();
+						}}
+						onShowAll={columnVisibility.showAll}
+						onHideAll={columnVisibility.hideAll}
+						isColumnModified={columnVisibility.isColumnModified}
+						onResetColumn={columnVisibility.resetColumn}
+						columnOrder={columnOrder.columnOrder}
+						defaultOrder={extractColumnIds(INGREDIENT_TABLE2_COLUMNS)}
+						onReorderColumns={columnOrder.reorderColumns}
+						isColumnModifiedOrder={columnOrder.isColumnModified}
+						onResetColumnOrder={columnOrder.resetColumn}
+					/>
+					<Button onClick={handleCreateNew}>
+						<Plus />
+						Add Ingredient
+					</Button>
+				</div>
 			</div>
 
 			{/* Search & Filter Bar */}
@@ -405,6 +460,7 @@ export function Ingredients2Page() {
 				{injectedProps => (
 					<IngredientTable2
 						{...injectedProps}
+						columns={visibleOrderedColumns}
 						onEdit={handleEdit}
 						onDelete={handleDelete}
 						refreshing={injectedProps.isLoading || isRefreshingAfterMutation}

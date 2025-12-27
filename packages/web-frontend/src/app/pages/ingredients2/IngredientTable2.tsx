@@ -32,6 +32,7 @@ export const INGREDIENT_TABLE2_COLUMNS: Table2Column<Ingredient>[] = [
 		key: 'id',
 		label: 'ID',
 		render: item => <span className="font-mono text-xs text-muted-foreground">{item.id}</span>,
+		defaultVisible: false, // Hidden by default
 	},
 	// Created column
 	{
@@ -45,6 +46,7 @@ export const INGREDIENT_TABLE2_COLUMNS: Table2Column<Ingredient>[] = [
 				</span>
 			);
 		},
+		defaultVisible: false, // Hidden by default
 	},
 	// Updated column
 	{
@@ -58,12 +60,15 @@ export const INGREDIENT_TABLE2_COLUMNS: Table2Column<Ingredient>[] = [
 				</span>
 			);
 		},
+		defaultVisible: false, // Hidden by default
 	},
 	// Name column
 	{
 		key: 'name',
 		label: 'Name',
 		render: item => <span className="font-medium">{item.name}</span>,
+		canHide: false, // Cannot be hidden (always visible)
+		canReorder: false, // Cannot be reordered (always first)
 	},
 	// Calories column
 	{
@@ -106,6 +111,8 @@ export const INGREDIENT_TABLE2_COLUMNS: Table2Column<Ingredient>[] = [
  * Extends partial Table2Props to allow Data2 to inject data, loading, error, pagination, sorting
  */
 export interface IngredientTable2Props extends Partial<Table2Props<Ingredient>> {
+	/** Optional column override (for visibility/ordering feature) */
+	columns?: Table2Column<Ingredient>[];
 	/** Optional edit callback */
 	onEdit?: (ingredient: Ingredient) => void;
 	/** Optional delete callback */
@@ -129,6 +136,7 @@ export interface IngredientTable2Props extends Partial<Table2Props<Ingredient>> 
  * Receives injected props from Data2 (data, isLoading, error, pagination, sorting).
  */
 export function IngredientTable2({
+	columns = INGREDIENT_TABLE2_COLUMNS,
 	onEdit,
 	onDelete,
 	refreshing,
@@ -169,7 +177,7 @@ export function IngredientTable2({
 
 	return (
 		<Table2
-			columns={INGREDIENT_TABLE2_COLUMNS}
+			columns={columns}
 			getItemId={item => item.id}
 			renderActions={renderActions}
 			emptyMessage="No ingredients found. Add your first ingredient to get started."

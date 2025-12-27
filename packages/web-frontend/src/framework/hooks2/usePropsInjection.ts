@@ -91,7 +91,7 @@ export function usePropsInjection<T>(
 			} else if (features.pagination.fstate) {
 				// Before first fetch: provide pageSize from feature state for skeleton loaders
 				props.pagination = {
-					currentPage: features.pagination.fstate.page,
+					currentPage: features.pagination.fstate.currentPage,
 					totalPages: 1,
 					totalItems: 0,
 					pageSize: features.pagination.fstate.pageSize,

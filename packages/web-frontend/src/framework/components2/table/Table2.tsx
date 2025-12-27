@@ -57,6 +57,12 @@ export interface Table2Column<T> {
 	className?: string;
 	/** Whether column is sortable (default: true) */
 	sortable?: boolean;
+	/** Whether column can be hidden (default: true) */
+	canHide?: boolean;
+	/** Whether column is visible by default (default: true) */
+	defaultVisible?: boolean;
+	/** Whether column can be reordered (default: true) */
+	canReorder?: boolean;
 }
 
 /**

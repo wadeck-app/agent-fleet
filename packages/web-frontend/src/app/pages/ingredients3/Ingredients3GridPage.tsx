@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { Data2 } from '@framework/components2/data/Data2';
 import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
+import { ColumnVisibility } from '@framework/components/columns/ColumnVisibility';
+import { useColumnOrder } from '@framework/components/columns/useColumnOrder';
+import { useColumnVisibility } from '@framework/components/columns/useColumnVisibility';
 import { Input } from '@framework/components/forms/Input';
 import { Page } from '@framework/components/layout/Page';
 import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
@@ -14,6 +17,15 @@ import { usePagination2 } from '@framework/hooks2/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
 import { useSorting2 } from '@framework/hooks2/useSorting2';
 import { useRoutedDialog } from '@framework/hooks/useRoutedDialog';
+import {
+	applyColumnOrder,
+	applyColumnVisibility,
+	extractCanHideConstraints,
+	extractCanReorderConstraints,
+	extractColumnIds,
+	extractDefaultVisible,
+	toColumnVisibilityDefs,
+} from '@framework/utils2/Table2ColumnConfig';
 import type { CreateIngredient, Ingredient, IngredientsListQuery } from '@shared/api/ingredients.contract';
 import { Plus, RefreshCw, Trash2, X } from 'lucide-react';
 
@@ -21,7 +33,7 @@ import { BulkDeleteWorkflow, IngredientDialog } from '@app/components/domain';
 
 import { ingredientsService } from '../ingredients/IngredientsService';
 import { useIngredientsCrud } from '../ingredients/useIngredientsCrud';
-import { IngredientGrid3 } from './IngredientGrid3';
+import { INGREDIENT_GRID_FIELDS, IngredientGrid3 } from './IngredientGrid3';
 
 const STORAGE_ID = 'ingredients3' as const;
 
@@ -62,6 +74,28 @@ export function Ingredients3GridPage() {
 
 	// Multi-selection feature: manages selection state
 	const selection = useMultiSelect2();
+
+	// Field visibility feature: manages visible fields with localStorage persistence
+	const fieldVisibility = useColumnVisibility(extractColumnIds(INGREDIENT_GRID_FIELDS), {
+		storageId: STORAGE_ID + '-fields',
+		defaultVisible: extractDefaultVisible(INGREDIENT_GRID_FIELDS),
+		constraints: extractCanHideConstraints(INGREDIENT_GRID_FIELDS),
+	});
+
+	// Field ordering feature: manages field order with drag & drop
+	const fieldOrder = useColumnOrder({
+		storageId: STORAGE_ID + '-fields',
+		defaultOrder: extractColumnIds(INGREDIENT_GRID_FIELDS),
+		constraints: extractCanReorderConstraints(INGREDIENT_GRID_FIELDS),
+	});
+
+	// Apply visibility + ordering to fields
+	const visibleOrderedFields = useMemo(() => {
+		let fields = INGREDIENT_GRID_FIELDS;
+		fields = applyColumnVisibility(fields, fieldVisibility.visibleColumns);
+		fields = applyColumnOrder(fields, fieldOrder.columnOrder);
+		return fields;
+	}, [fieldVisibility.visibleColumns, fieldOrder.columnOrder]);
 
 	// ═══════════════════════════════════════════════════════════════════════════════════════
 	// DEBOUNCE - Delay search queries to avoid excessive requests
@@ -332,10 +366,32 @@ export function Ingredients3GridPage() {
 						/>
 					</Button>
 				</div>
-				<Button onClick={handleCreateNew}>
-					<Plus className="mr-2 h-4 w-4" />
-					Add Ingredient
-				</Button>
+				<div className="flex items-center gap-2">
+					<ColumnVisibility
+						label="Fields"
+						columns={toColumnVisibilityDefs(INGREDIENT_GRID_FIELDS)}
+						visibleColumns={fieldVisibility.visibleColumns}
+						defaultVisible={new Set(extractDefaultVisible(INGREDIENT_GRID_FIELDS))}
+						onToggle={fieldVisibility.toggleColumn}
+						onReset={() => {
+							fieldVisibility.resetColumns();
+							fieldOrder.resetOrder();
+						}}
+						onShowAll={fieldVisibility.showAll}
+						onHideAll={fieldVisibility.hideAll}
+						isColumnModified={fieldVisibility.isColumnModified}
+						onResetColumn={fieldVisibility.resetColumn}
+						columnOrder={fieldOrder.columnOrder}
+						defaultOrder={extractColumnIds(INGREDIENT_GRID_FIELDS)}
+						onReorderColumns={fieldOrder.reorderColumns}
+						isColumnModifiedOrder={fieldOrder.isColumnModified}
+						onResetColumnOrder={fieldOrder.resetColumn}
+					/>
+					<Button onClick={handleCreateNew}>
+						<Plus />
+						Add Ingredient
+					</Button>
+				</div>
 			</div>
 
 			{/* Search Bar */}
@@ -419,6 +475,7 @@ export function Ingredients3GridPage() {
 				{injectedProps => (
 					<IngredientGrid3
 						{...injectedProps}
+						fields={visibleOrderedFields}
 						onEdit={handleEdit}
 						onDelete={handleDelete}
 						refreshing={injectedProps.isLoading || isRefreshingAfterMutation}
