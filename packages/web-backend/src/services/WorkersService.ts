@@ -1,8 +1,17 @@
 import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
 
 import type { WorkerFlows } from '@app/shared/api/flows.contract';
-import type { Worker, WorkersData, WorkersListQuery, WorkersListResponse } from '@app/shared/api/workers.contract';
+import {
+	type UpdateWorkerNameRequest,
+	type Worker,
+	type WorkersData,
+	type WorkersListQuery,
+	type WorkersListResponse,
+} from '@app/shared/api/workers.contract';
+import { ConflictException, ERROR_CODES, NotFoundException } from '@app/shared/exceptions/http-exceptions';
+import { B2F_WORKER_UPDATED } from '@app/shared/transport';
 
+import type { WorkersRepository } from '../repositories/WorkersRepository';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 
 /**
@@ -41,7 +50,8 @@ export class WorkersService {
 	constructor(
 		// private readonly orchestratorClient: OrchestratorClient,
 		private readonly orchestratorWrapper: OrchestratorWrapper,
-		private readonly eventBroadcaster: EventBroadcaster
+		private readonly eventBroadcaster: EventBroadcaster,
+		private readonly workersRepository: WorkersRepository
 	) {}
 
 	/**
@@ -52,10 +62,16 @@ export class WorkersService {
 			// const stats = await this.orchestratorClient.getStats();
 			const stats = await this.orchestratorWrapper.getStats();
 
+			// Fetch all worker metadata
+			const allMetadata = await this.workersRepository.findAll();
+			const metadataMap = new Map(allMetadata.map(m => [m.workerId, m]));
+
 			// Transform workers list
 			// Note: All workers in the list are connected (disconnected workers are removed)
 			const workers: Worker[] = stats.workersList.map((w: any) => ({
 				workerId: w.id,
+				name: metadataMap.get(w.id)?.name, // Merge name from metadata
+				version: metadataMap.get(w.id)?.version, // Merge version from metadata
 				connected: true, // Workers in the list are connected
 				taskId: w.taskId ?? undefined, // Convert null to undefined
 				state: w.taskId ? 'busy' : 'idle',
@@ -114,8 +130,15 @@ export class WorkersService {
 		try {
 			// Fetch all workers from orchestrator
 			const stats = await this.orchestratorWrapper.getStats();
+
+			// Fetch all worker metadata
+			const allMetadata = await this.workersRepository.findAll();
+			const metadataMap = new Map(allMetadata.map(m => [m.workerId, m]));
+
 			let workers: Worker[] = stats.workersList.map((w: any) => ({
 				workerId: w.id,
+				name: metadataMap.get(w.id)?.name, // Merge name from metadata
+				version: metadataMap.get(w.id)?.version, // Merge version from metadata
 				connected: true,
 				taskId: w.taskId ?? undefined,
 				state: w.taskId ? 'busy' : 'idle',
@@ -177,6 +200,7 @@ export class WorkersService {
 		return workers.filter(
 			w =>
 				w.workerId.toLowerCase().includes(lowerQuery) ||
+				w.name?.toLowerCase().includes(lowerQuery) ||
 				w.state.toLowerCase().includes(lowerQuery) ||
 				w.taskId?.toLowerCase().includes(lowerQuery)
 		);
@@ -236,6 +260,73 @@ export class WorkersService {
 			// Orchestrator is offline or worker not found - return empty flows
 			return [];
 		}
+	}
+
+	/**
+	 * Update worker name with optimistic locking
+	 * Emits 'b2f:worker:updated' event after successful update
+	 * @param workerId Worker ID
+	 * @param data Update data containing name and version
+	 */
+	async updateWorkerName(workerId: string, data: UpdateWorkerNameRequest): Promise<Worker> {
+		// 1. Validate worker exists in orchestrator (runtime data)
+		const stats = await this.orchestratorWrapper.getStats();
+		const runtimeWorker = stats.workersList.find((w: any) => w.id === workerId);
+
+		if (!runtimeWorker) {
+			throw new NotFoundException(`Worker ${workerId} not found`, ERROR_CODES.RESOURCE_NOT_FOUND, { workerId });
+		}
+
+		// 2. Get current metadata (null if first time renaming)
+		const currentMetadata = await this.workersRepository.findByWorkerId(workerId);
+
+		// 3. Optimistic locking check
+		if (currentMetadata) {
+			// Metadata exists - check version matches
+			if (currentMetadata.version !== data.version) {
+				throw new ConflictException(
+					`Worker has been modified by another user. Expected version ${data.version}, but current version is ${currentMetadata.version}.`,
+					ERROR_CODES.VERSION_MISMATCH,
+					{ expectedVersion: data.version, currentVersion: currentMetadata.version }
+				);
+			}
+		} else {
+			// First time - version must be 1
+			if (data.version !== 1) {
+				throw new ConflictException(
+					`Worker has no metadata yet. Expected version 1 for first rename, but got ${data.version}.`,
+					ERROR_CODES.VERSION_MISMATCH,
+					{ expectedVersion: 1, receivedVersion: data.version }
+				);
+			}
+		}
+
+		// 4. Calculate new version
+		const newVersion = currentMetadata ? currentMetadata.version + 1 : 1;
+
+		// 5. Update or create metadata with new version
+		const updatedMetadata = await this.workersRepository.updateName(workerId, data.name, newVersion);
+
+		// 6. Build updated worker object
+		const updatedWorker: Worker = {
+			workerId,
+			name: data.name,
+			version: updatedMetadata.version,
+			connected: true,
+			taskId: runtimeWorker.taskId ?? undefined,
+			state: runtimeWorker.taskId ? 'busy' : 'idle',
+			uptime: undefined,
+			lastHeartbeat: undefined,
+			tasksCompleted: undefined,
+			successRate: undefined,
+		};
+
+		// 7. Emit event AFTER successful update (for other frontends)
+		console.log('[WorkersService] Broadcasting B2F_WORKER_UPDATED event for worker:', workerId);
+		this.eventBroadcaster.broadcast(B2F_WORKER_UPDATED, updatedWorker);
+		console.log('[WorkersService] Event broadcasted successfully');
+
+		return updatedWorker;
 	}
 
 	// ===========================================================================================

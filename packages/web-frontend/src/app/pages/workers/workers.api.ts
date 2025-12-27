@@ -1,7 +1,7 @@
 import { createTypedFetch } from '@framework/api/api-base';
 import type { WorkerFlows } from '@shared/api/flows.contract';
 import { WORKERS_API_ROUTES } from '@shared/api/workers.contract';
-import type { WorkersData, WorkersListQuery, WorkersListResponse } from '@shared/api/workers.contract';
+import type { Worker, WorkersData, WorkersListQuery, WorkersListResponse } from '@shared/api/workers.contract';
 
 /**
  * ===========================================================================================
@@ -30,5 +30,15 @@ export const workersApi = {
 
 	getWorkerFlows: (workerId: string): Promise<WorkerFlows> => {
 		return typedFetch('GET', '/api/workers/:workerId/flows', { params: { workerId } });
+	},
+
+	/**
+	 * Update worker name
+	 */
+	updateWorkerName: (workerId: string, name: string, version: number): Promise<Worker> => {
+		return typedFetch('PATCH', '/api/workers/:workerId', {
+			params: { workerId },
+			body: { name, version },
+		});
 	},
 } as const;

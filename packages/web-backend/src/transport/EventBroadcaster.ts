@@ -85,10 +85,13 @@ export class EventBroadcaster {
 	 * ```
 	 */
 	broadcast<E extends EventType>(event: E, data: EventData<E>): void {
+		console.log(`[EventBroadcaster] Broadcasting event "${event}" to ${this.transportServers.length} transport(s)`);
 		// Broadcast to all transports
 		for (const transport of this.transportServers) {
 			try {
 				transport.broadcast(event, data);
+				//TODO implement .name method in transport and use it
+				console.log(`[EventBroadcaster] Successfully broadcast to transport`);
 			} catch (error) {
 				console.error(`[EventBroadcaster] Failed to broadcast to transport:`, error);
 				// Continue with other transports (anti-fragile)

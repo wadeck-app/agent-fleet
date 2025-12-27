@@ -1,0 +1,658 @@
+# Plan : Éditeur Visuel de Flow
+
+**Date** : 2025-12-27_10-58
+**Projet** : agent-fleet
+**Composant** : Éditeur Visuel de Flow
+
+---
+
+## 📋 Contexte
+
+L'application agent-fleet utilise des flows YAML pour définir des workflows composés de :
+
+- **Steps** : ModelFlowStep, ScriptFlowStep, SubFlowStep
+- **Dépendances** : via le champ `depends[]`
+- **Patterns complexes** : exécution parallèle, boucles (onFailure.goto), conditions (when), subflows
+- **Validation** : FlowValidator avec 4 validateurs spécialisés (Schema, Graph, Semantic, Template)
+
+**Stack actuel** :
+
+- Frontend : React 19 + TypeScript + Vite
+- UI : Radix UI + Tailwind CSS
+- Déjà présent : @dnd-kit pour drag & drop
+
+**Besoins utilisateur** :
+
+- ✅ Édition complète avec construction visuelle
+- ✅ Validation en temps réel
+- ✅ Intégration dans l'app existante (nouvelle page)
+- ✅ Style Radix Nova
+
+---
+
+## 🎯 Proposition 1 : React Flow (RECOMMANDÉ)
+
+### Technologie
+
+**Bibliothèque** : [React Flow](https://reactflow.dev/) v11.x (~400KB gzipped)
+
+**Avantages** :
+
+- ✅ Bibliothèque battle-tested (20k+ stars GitHub)
+- ✅ Fonctionnalités intégrées : drag & drop, zoom, pan, minimap, edge routing
+- ✅ Excellent support TypeScript
+- ✅ Documentation complète avec nombreux exemples
+- ✅ Intégration facile avec Radix UI
+- ✅ Performance optimisée (100+ nodes)
+- ✅ Accessibilité intégrée
+
+**Inconvénients** :
+
+- ⚠️ Dépendance externe (~400KB)
+- ⚠️ Système de layout opinionné (surpassable)
+
+### Architecture
+
+```
+packages/web-frontend/src/app/pages/flow-editor/
+├── FlowEditorPage.tsx                # Page principale (route /flows/:id/edit)
+├── FlowEditorCanvas.tsx              # Canvas React Flow
+├── FlowEditorToolbar.tsx             # Barre d'outils (add nodes, layout, validate)
+├── FlowEditorPropertiesPanel.tsx    # Panneau de propriétés (droite)
+├── FlowEditorValidationPanel.tsx    # Panneau de validation (bas)
+├── nodes/
+│   ├── ModelStepNode.tsx             # Node pour ModelFlowStep
+│   ├── ScriptStepNode.tsx            # Node pour ScriptFlowStep
+│   ├── SubFlowStepNode.tsx           # Node pour SubFlowStep
+│   └── BaseStepNode.tsx              # Composants partagés
+├── edges/
+│   ├── DependencyEdge.tsx            # Edge standard (depends)
+│   ├── ConditionalEdge.tsx           # Edge conditionnel (when)
+│   └── LoopEdge.tsx                  # Edge de boucle (onFailure.goto)
+├── hooks/
+│   ├── useFlowEditor.ts              # État principal
+│   ├── useFlowValidation.ts          # Validation temps réel
+│   ├── useFlowSerialization.ts       # YAML ↔ React Flow
+│   └── useNodeOperations.ts          # Opérations CRUD sur nodes
+└── utils/
+    ├── flowToReactFlow.ts            # FlowDefinition → React Flow
+    ├── reactFlowToFlow.ts            # React Flow → FlowDefinition
+    └── layoutAlgorithms.ts           # Auto-layout (dagre)
+```
+
+### Sérialisation YAML ↔ React Flow
+
+**FlowDefinition → React Flow** :
+
+1. Créer nodes depuis `flow.steps[]` avec positions auto-calculées
+2. Créer edges depuis `step.depends[]` (type: dependency)
+3. Créer edges depuis `step.onFailure.goto` (type: loop, animé)
+4. Créer edges depuis conditions when (type: conditional, dashed)
+
+**React Flow → FlowDefinition** :
+
+1. Extraire steps depuis nodes
+2. Reconstruire `depends[]` depuis edges de type dependency
+3. Reconstruire `onFailure.goto` depuis edges de type loop
+4. Reconstruire conditions depuis edges conditionnels
+
+### Validation temps réel
+
+```typescript
+// Hook de validation avec debounce
+useEffect(() => {
+	const timeout = setTimeout(() => {
+		const result = flowValidator.validate(flowDefinition);
+		setValidationResult(result);
+
+		// Mapper les issues aux nodes
+		const nodesWithIssues = nodes.map(node => ({
+			...node,
+			data: {
+				...node.data,
+				validationIssues: result.issues.filter(issue => issue.location?.stepId === node.id),
+			},
+		}));
+		setNodes(nodesWithIssues);
+	}, 500);
+	return () => clearTimeout(timeout);
+}, [flowDefinition]);
+```
+
+### Interface (ASCII Draft)
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────────┐
+│  Flow Editor: simple-implement v1.0.0                             [💾 Save] [✓ Validate]   │
+├────────────────────────────────────────────────────────────────────────────────────────────┤
+│  [🧠 Model Step] [⌨️ Script Step] [🔄 SubFlow]  │ Layout: [Auto] [Manual]  Zoom: [-][+]   │
+├───────────────────────────────────────────────────────────┬────────────────────────────────┤
+│                                                            │  Properties Panel              │
+│   Canvas Area (React Flow avec pan/zoom)                  │  ───────────────────           │
+│                                                            │                                │
+│   ┌─────────────────┐                                     │  Selected: implement           │
+│   │  ○              │                                     │                                │
+│   │  🧠 implement   │                                     │  Step ID                       │
+│   │  Implement Task │                                     │  ┌───────────────────┐        │
+│   │  [sonnet]       │                                     │  │ implement         │        │
+│   └────────┬────────┘                                     │  └───────────────────┘        │
+│            │                                               │                                │
+│     ┌──────┴─────┬──────────┐                            │  Step Name                     │
+│     │            │          │                             │  ┌───────────────────┐        │
+│     ▼            ▼          ▼                             │  │ Implement Task    │        │
+│  ┌──────┐   ┌──────┐   ┌──────┐                         │  └───────────────────┘        │
+│  │  ⌨️  │   │  ⌨️  │   │  🧠  │                         │                                │
+│  │step-b│   │step-c│   │step-d│                         │  Model                         │
+│  │Script│   │Script│   │ Model│                         │  ┌───────────────────┐        │
+│  └──┬───┘   └──┬───┘   └──┬───┘                         │  │ sonnet        ▼   │        │
+│     │          │          │                              │  └───────────────────┘        │
+│     └──────────┴──────────┘                              │                                │
+│                │                                          │  Prompt                        │
+│                ▼                                          │  ┌───────────────────┐        │
+│           ┌────────┐                                      │  │${{inputs.task}}   │        │
+│           │  ○     │                                      │  │                   │        │
+│           │step-end│    Legend:                          │  │                   │        │
+│           │ Done   │    ──→  Dependency                  │  └───────────────────┘        │
+│           └────────┘    ╌╌→  Conditional                 │                                │
+│                          ⟲   Loop                        │  ▼ Advanced                    │
+│  Minimap:  [▪️▪️▪️]                                      │    When: ____________         │
+│                                                            │    □ Skip on Loop             │
+│                                                            │    Retry: ____________        │
+│                                                            │                                │
+│                                                            │  [🗑️ Delete Step]            │
+├────────────────────────────────────────────────────────────┴────────────────────────────────┤
+│  Validation Results                                                      2 warnings ⚠️      │
+│  ──────────────────────────────────────────────────────────────────────────────────────    │
+│  ⚠️  UNUSED_INPUT | Flow input 'priority' is never used                                    │
+│  ⚠️  MISSING_OUTPUT | Step 'implement' has no output configuration                         │
+└────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Composants Radix UI réutilisés
+
+- `Dialog` : assistant de création de step
+- `Select` : sélection de model/type
+- `Tabs` : vue visuelle / YAML
+- `Collapsible` : options avancées
+- `AlertDialog` : confirmation changements non sauvegardés
+- `Badge` : affichage des types (model, script)
+- `Button`, `Separator`, etc.
+
+### Complexité & Estimation
+
+**Complexité** : Moyenne
+**Durée estimée** : **2-3 semaines**
+
+**Répartition** :
+
+- Setup React Flow + routing : 3-4 jours
+- Composants Node/Edge : 2-3 jours
+- Panneau de propriétés : 2-3 jours
+- Intégration validation : 1-2 jours
+- Sérialisation YAML : 2-3 jours
+- Auto-layout : 1-2 jours
+- Tests & polish : 2-3 jours
+
+---
+
+## 🎯 Proposition 2 : Xyflow (React Flow v12+)
+
+### Technologie
+
+**Bibliothèque** : [Xyflow](https://xyflow.com/) (~400KB gzipped)
+
+**Différences vs React Flow v11** :
+
+- ✅ Performance 2x meilleure (100+ nodes)
+- ✅ Support TypeScript encore plus strict
+- ✅ Système de plugins modulaire
+- ✅ Accessibilité WCAG 2.1 AA
+- ✅ Meilleur support touch/mobile
+- ⚠️ Plus récent (fin 2024) = moins battle-tested
+- ⚠️ Moins d'exemples communautaires
+
+### Architecture
+
+Quasi-identique à Proposition 1, avec ces différences :
+
+**Système de plugins** :
+
+```typescript
+import { ReactFlow, Background, Controls, MiniMap } from '@xyflow/react';
+
+<ReactFlow nodes={nodes} edges={edges}>
+  <Background />
+  <Controls />
+  <MiniMap nodeColor={getNodeColor} />
+  <ValidationOverlay /> {/* Plugin custom */}
+</ReactFlow>
+```
+
+**Types plus stricts** :
+
+```typescript
+import type { Edge, Node } from '@xyflow/react';
+
+type ModelStepNode = Node<StepNodeData, 'model'>;
+type ScriptStepNode = Node<StepNodeData, 'script'>;
+type FlowNode = ModelStepNode | ScriptStepNode | SubFlowStepNode;
+```
+
+### Interface (ASCII Draft)
+
+Identique à Proposition 1 - seule l'implémentation interne diffère.
+
+### Complexité & Estimation
+
+**Complexité** : Moyenne
+**Durée estimée** : **2-3 semaines** (similaire à Prop 1)
+
+**Quand choisir Xyflow plutôt que React Flow** :
+
+- Performance critique avec flows >50 nodes
+- Accessibilité WCAG 2.1 AA requise
+- Support mobile/tablette important
+- Projet long terme (future-proof)
+
+---
+
+## 🎯 Proposition 3 : Solution Custom SVG + D3.js
+
+### Technologie
+
+**Bibliothèques** :
+
+- D3.js v7 (~50KB) : algorithmes de layout (dagre, force)
+- @dnd-kit (déjà présent) : drag & drop
+- SVG natif pour rendering
+
+**Avantages** :
+
+- ✅ Contrôle total sur rendering et interactions
+- ✅ Bundle plus petit (~100KB vs ~400KB)
+- ✅ Pas de dépendance à une lib externe
+- ✅ Optimisations spécifiques au domaine possibles
+
+**Inconvénients** :
+
+- ❌ Beaucoup plus de développement
+- ❌ Maintenance plus lourde
+- ❌ Réinventer la roue (zoom, pan, minimap, edge routing)
+- ❌ Accessibilité à implémenter manuellement
+- ❌ Plus de bugs potentiels
+
+### Architecture
+
+```
+packages/web-frontend/src/app/pages/flow-editor/
+├── FlowEditorPage.tsx                # Page principale
+├── svg/
+│   ├── FlowSvgContainer.tsx          # Container SVG avec viewBox
+│   ├── FlowViewportControls.tsx      # Zoom/pan custom
+│   ├── FlowGrid.tsx                  # Grille de fond
+│   └── FlowMinimap.tsx               # Minimap custom
+├── nodes/
+│   ├── SvgModelStepNode.tsx          # Node SVG pour model step
+│   ├── SvgScriptStepNode.tsx         # Node SVG pour script step
+│   └── SvgSubFlowStepNode.tsx        # Node SVG pour subflow step
+├── edges/
+│   ├── SvgDependencyEdge.tsx         # <path> SVG pour dépendances
+│   ├── SvgConditionalEdge.tsx        # <path> SVG dashed
+│   └── SvgLoopEdge.tsx               # <path> SVG courbé avec flèche
+├── hooks/
+│   ├── useFlowEditor.ts              # État principal
+│   ├── useSvgPanZoom.ts              # Pan/zoom custom
+│   ├── useSvgDragDrop.ts             # D&D avec @dnd-kit
+│   └── useD3Layout.ts                # Layouts D3 (dagre, force)
+└── utils/
+    ├── svgPathCalculation.ts         # Calcul courbes Bézier
+    ├── svgTransforms.ts              # Transformations matricielles
+    └── layoutAlgorithms.ts           # Algos D3
+```
+
+### Implémentation Pan/Zoom
+
+```typescript
+// Hook custom pour pan/zoom
+const handleWheel = (e: WheelEvent) => {
+	e.preventDefault();
+	const delta = e.deltaY > 0 ? 0.9 : 1.1;
+	setViewport(v => ({
+		...v,
+		zoom: clamp(v.zoom * delta, 0.1, 3),
+	}));
+};
+
+// Pan avec middle-click ou Ctrl+click
+const handleMouseDown = (e: MouseEvent) => {
+	if (e.button === 1 || (e.button === 0 && e.ctrlKey)) {
+		isPanning = true;
+		startPoint = { x: e.clientX - viewport.x, y: e.clientY - viewport.y };
+	}
+};
+```
+
+### Rendering SVG
+
+```typescript
+// Node SVG
+<g transform={`translate(${node.x}, ${node.y})`}>
+  <rect
+    x={0} y={0}
+    width={node.width} height={node.height}
+    rx={8}
+    fill="hsl(var(--card))"
+    stroke={selected ? 'hsl(var(--primary))' : 'hsl(var(--border))'}
+    strokeWidth={selected ? 3 : 2}
+  />
+  <text x={20} y={25} fontSize={14} fontWeight="600">
+    {step.name}
+  </text>
+  {/* Handles pour connexions */}
+  <circle cx={width/2} cy={0} r={10} fill="transparent" />
+</g>
+
+// Edge SVG avec Bézier
+<path
+  d={`M ${sx} ${sy} C ${sx} ${sy+offset}, ${tx} ${ty-offset}, ${tx} ${ty}`}
+  fill="none"
+  stroke="hsl(var(--border))"
+  strokeWidth={2}
+  markerEnd="url(#arrowhead)"
+/>
+```
+
+### Interface (ASCII Draft)
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────────┐
+│  Flow Editor: simple-implement v1.0.0                             [💾 Save] [✓ Validate]   │
+├────────────────────────────────────────────────────────────────────────────────────────────┤
+│  [🧠 Model] [⌨️ Script] [🔄 SubFlow]  │  Layout: [Dagre] [Force]  Zoom: [−][100%][+]      │
+├───────────────────────────────────────────────────────────┬────────────────────────────────┤
+│                                                            │  Properties Panel              │
+│   <svg> Custom Canvas avec pan/zoom manuel                │  ───────────────────           │
+│                                                            │                                │
+│   ┌─────────────────┐  ← SVG <g> elements               │  Selected: implement           │
+│   │ <rect/>         │                                     │                                │
+│   │ 🧠 implement    │                                     │  [Identique aux autres        │
+│   │ <text/>         │                                     │   propositions]               │
+│   └────────┬────────┘                                     │                                │
+│            │ <path d="M...C..." />                        │                                │
+│     ┌──────┴─────┬──────────┐                            │                                │
+│     │            │          │                             │                                │
+│  <g>│</g>     <g>│</g>   <g>│</g>                        │                                │
+│     ▼            ▼          ▼                             │                                │
+│                                                            │                                │
+│   • Tout en SVG natif                                     │                                │
+│   • Pan/zoom custom                                       │                                │
+│   • Edges = <path> Bézier                                │                                │
+│   • D3.js pour layout                                     │                                │
+│                                                            │                                │
+│  Minimap: Custom SVG                                      │                                │
+│                                                            │                                │
+├────────────────────────────────────────────────────────────┴────────────────────────────────┤
+│  Validation Results [identique]                                                             │
+└────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Complexité & Estimation
+
+**Complexité** : Élevée
+**Durée estimée** : **5-8 semaines**
+
+**Répartition** :
+
+- Container SVG + pan/zoom : 3-4 jours
+- Rendering nodes/edges SVG : 3-4 jours
+- Intégration D3 layouts : 2-3 jours
+- Drag & drop custom : 3-4 jours
+- Création de connexions : 2-3 jours
+- Minimap custom : 2-3 jours
+- Panneau propriétés : 2-3 jours
+- Validation : 1-2 jours
+- Sérialisation : 2-3 jours
+- Accessibilité (ARIA) : 2-3 jours
+- Optimisations perf : 2-3 jours
+- Tests & polish : 3-4 jours
+
+**Quand choisir cette approche** :
+
+- Bundle size critique absolu
+- Visualisations très spécifiques impossibles avec React Flow
+- Équipe expérimentée en SVG/D3
+- Ressources long-terme pour maintenance
+
+---
+
+## 📊 Tableau Comparatif
+
+| Critère           | React Flow (Prop 1) | Xyflow (Prop 2) | Custom SVG (Prop 3) |
+| ----------------- | ------------------- | --------------- | ------------------- |
+| **Temps dev**     | 2-3 semaines        | 2-3 semaines    | 5-8 semaines        |
+| **Complexité**    | Moyenne             | Moyenne         | Élevée              |
+| **Bundle**        | ~400KB              | ~400KB          | ~100KB              |
+| **Performance**   | Bonne               | Excellente      | Bonne (si optimisé) |
+| **Customisation** | Élevée              | Élevée          | Illimitée           |
+| **Maintenance**   | Faible              | Faible          | Élevée              |
+| **Accessibilité** | Intégrée            | WCAG 2.1 AA     | Manuelle            |
+| **Mobile**        | Bon                 | Excellent       | Manuel              |
+| **Documentation** | Excellente          | Bonne           | D3/SVG docs         |
+| **Risque**        | Faible              | Faible-Moyen    | Élevé               |
+
+---
+
+## ✅ Recommandation Principale
+
+### **Proposition 1 : React Flow v11**
+
+**Pourquoi ?**
+
+1. ✅ Meilleur équilibre fonctionnalités / temps / risque
+2. ✅ Bibliothèque battle-tested avec large communauté
+3. ✅ Time-to-market rapide (2-3 semaines)
+4. ✅ Maintenance faible
+5. ✅ Customisation suffisante pour agent-fleet
+6. ✅ Documentation excellente
+7. ✅ Intégration prouvée avec Radix UI + Tailwind
+
+### Alternative : **Proposition 2 : Xyflow**
+
+**Quand choisir** :
+
+- Flows régulièrement >50 nodes
+- Accessibilité WCAG critique
+- Support mobile/tablette requis
+- Confortable avec libs récentes
+
+### Non recommandé : **Proposition 3 : Custom SVG**
+
+**Pourquoi éviter** :
+
+- 2-3x plus long (5-8 semaines vs 2-3)
+- Complexité et maintenance élevées
+- Réinvente la roue
+- Économie bundle (~300KB) ne vaut pas l'effort
+
+---
+
+## 🚀 Plan d'Implémentation (Proposition 1)
+
+### Phase 1 : Fondations (Semaine 1)
+
+**Tâches** :
+
+1. Installer dépendances React Flow
+
+    ```bash
+    npm install reactflow dagre
+    npm install -D @types/dagre
+    ```
+
+2. Créer structure de base
+    - `packages/web-frontend/src/app/pages/flow-editor/FlowEditorPage.tsx`
+    - Route dans `App.tsx` : `/flows/:flowId/edit`
+
+3. Implémenter sérialisation
+    - `utils/flowToReactFlow.ts` : FlowDefinition → React Flow
+    - `utils/reactFlowToFlow.ts` : React Flow → FlowDefinition
+    - Tests unitaires pour round-trip
+
+4. Créer composants Node basiques
+    - `nodes/ModelStepNode.tsx`
+    - `nodes/ScriptStepNode.tsx`
+    - `nodes/SubFlowStepNode.tsx`
+
+5. Test avec flows.yml existants
+
+**Critère de succès** :
+
+- ✅ Charger un flow YAML et l'afficher visuellement
+- ✅ Round-trip parfait : YAML → React Flow → YAML
+
+### Phase 2 : Fonctionnalités Core (Semaine 2)
+
+**Tâches** :
+
+1. Implémenter drag & drop depuis toolbar
+    - `FlowEditorToolbar.tsx` avec palette de nodes
+    - Gestion du drop dans canvas
+
+2. Créer composants Edge
+    - `edges/DependencyEdge.tsx` (standard)
+    - `edges/ConditionalEdge.tsx` (dashed)
+    - `edges/LoopEdge.tsx` (animé, coloré)
+
+3. Intégrer FlowValidator
+    - `hooks/useFlowValidation.ts`
+    - Validation temps réel avec debounce (500ms)
+    - Mapper ValidationIssue → nodes
+
+4. Créer ValidationPanel
+    - `FlowEditorValidationPanel.tsx`
+    - Affichage issues groupées par sévérité
+    - Click sur issue → focus node
+
+5. Affichage visuel des erreurs
+    - Border rouge sur nodes avec erreurs
+    - Badge compteur d'erreurs
+
+**Critère de succès** :
+
+- ✅ Ajouter/supprimer steps par drag & drop
+- ✅ Validation temps réel fonctionnelle
+- ✅ Erreurs visibles sur nodes et dans panel
+
+### Phase 3 : Édition & Polish (Semaine 3)
+
+**Tâches** :
+
+1. Implémenter PropertiesPanel
+    - `FlowEditorPropertiesPanel.tsx`
+    - Formulaires selon type de step (model/script/subflow)
+    - Intégration avec composants form existants (TextField, SelectField, etc.)
+    - Section "Advanced Options" (when, skipOnLoop, retry, onFailure)
+
+2. Gestion sélection et édition
+    - Click sur node → affiche properties
+    - Modifications → mise à jour immédiate
+    - Validation temps réel sur édition
+
+3. Auto-layout avec dagre
+    - `utils/layoutAlgorithms.ts`
+    - Button "Auto Layout" dans toolbar
+    - Algorithme hierarchique (TB = Top-Bottom)
+
+4. Actions toolbar
+    - Save (POST vers API flows)
+    - Validate (force validation)
+    - Layout (auto-arrange)
+    - Export YAML
+
+5. Tests, bugs, polish
+    - Tests E2E avec Playwright
+    - Tests unitaires composants
+    - Polish UI (animations, feedback)
+    - Documentation inline
+
+**Critère de succès** :
+
+- ✅ Édition complète des properties
+- ✅ Auto-layout fonctionnel
+- ✅ Save vers backend
+- ✅ Tous flows.yml existants chargeables et éditables
+
+---
+
+## 📁 Fichiers Critiques
+
+### Lecture (existants)
+
+- `packages/flow-engine/src/types.ts` - Types FlowDefinition, FlowStep
+- `packages/flow-engine/src/validation/FlowValidator.ts` - Validation
+- `packages/flow-engine/src/validation/ValidationTypes.ts` - ValidationIssue
+- `.agent-fleet/flows.yml` - Exemples de flows pour tests
+
+### Création (nouveaux)
+
+- `packages/web-frontend/src/app/pages/flow-editor/` - Tous les composants de l'éditeur
+- `packages/web-frontend/src/app/App.tsx` - Ajout routes
+
+### Modification (existants)
+
+- `packages/web-frontend/package.json` - Ajout dépendances
+
+---
+
+## ⚠️ Risques & Mitigation
+
+### Risques Techniques
+
+1. **Performance avec large flows**
+    - **Mitigation** : React Flow gère bien 100+ nodes ; virtualisation si besoin
+    - **Fallback** : Passer à Xyflow si nécessaire
+
+2. **Complexité sérialisation**
+    - **Mitigation** : Types TypeScript stricts facilitent le mapping
+    - **Tests** : Tests unitaires exhaustifs avec tous les flows.yml
+
+3. **Mapping validation**
+    - **Mitigation** : ValidationIssue.location.stepId déjà présent
+    - **Direct** : Mapping trivial validation → nodes
+
+4. **Edge routing loops/conditionals**
+    - **Mitigation** : React Flow gère bien les cas standards
+    - **Custom** : Composants edge custom pour cas spéciaux
+
+### Risques Intégration
+
+1. **Radix UI + React Flow conflicts**
+    - **Mitigation** : Les deux sont React-first, compatibles
+    - **Test early** : Spike d'intégration en Phase 1
+
+2. **Tailwind dans React Flow nodes**
+    - **Mitigation** : Tailwind fonctionne dans composants React Flow
+    - **Validation** : Test dès Phase 1
+
+---
+
+## 📋 Prochaines Étapes
+
+1. ✅ **Validation stakeholder** sur approche (recommandation : Proposition 1)
+2. 🔬 **Spike technique** (1-2 jours) :
+    - Intégration React Flow + Radix UI
+    - Sérialisation round-trip avec flow réel
+    - Mapping validation
+3. 🚀 **Démarrer Phase 1** si validation OK
+4. 🔄 **Itérer** selon feedback utilisateur
+
+---
+
+## 💡 Notes Additionnelles
+
+- **Style Radix Nova** : Utiliser les CSS variables existantes (--primary, --card, --border, etc.)
+- **Cohérence UI** : Réutiliser au maximum les composants framework existants
+- **Accessibilité** : React Flow fournit déjà navigation clavier et ARIA
+- **Mobile** : React Flow supporte touch, mais peut être amélioré si besoin critique
+- **Documentation** : Ajouter guide utilisateur dans `.claude/docs/`
+- **Tests** : Couvrir sérialisation, validation mapping, opérations CRUD

@@ -1,4 +1,4 @@
-import type { WorkersData } from '@shared/api/workers.contract';
+import type { Worker, WorkersData } from '@shared/api/workers.contract';
 
 import { workersApi } from './workers.api';
 
@@ -26,6 +26,16 @@ export class WorkersService {
 	 */
 	async getWorkers(): Promise<WorkersData> {
 		return workersApi.getWorkers();
+	}
+
+	/**
+	 * Rename a worker
+	 * @param workerId Worker ID
+	 * @param name New name for the worker
+	 * @param version Current version for optimistic locking (use 1 for first rename)
+	 */
+	async renameWorker(workerId: string, name: string, version: number): Promise<Worker> {
+		return workersApi.updateWorkerName(workerId, name, version);
 	}
 }
 

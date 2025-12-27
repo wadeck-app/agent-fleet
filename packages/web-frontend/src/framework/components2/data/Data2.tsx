@@ -9,6 +9,7 @@ import { usePropsInjection } from '@framework/hooks2/usePropsInjection';
 import { useQueryComposition } from '@framework/hooks2/useQueryComposition';
 import type { SortingContract } from '@framework/hooks2/useSorting2';
 import type { FeatureContract } from '@framework/types/FeatureContract';
+import type { MutationContract } from '@framework/types/MutationContract';
 import type { QueryResultDisplayerProps } from '@framework/types/QueryResultDisplayerContract';
 import type { SearchContract } from '@framework/types/contracts/SearchContract';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
@@ -72,6 +73,8 @@ export interface Data2Props<T> {
 	cache?: FeatureContract<any> | null;
 	/** Multi-selection feature contract (optional) */
 	selection?: MultiSelectContract | null;
+	/** Mutation feature contract (optional) - enables direct cache mutations */
+	mutation?: MutationContract<T> | null;
 
 	/**
 	 * Children: either ReactElement (for cloneElement) or render prop function
@@ -106,6 +109,7 @@ export function Data2<T>({
 	filter,
 	cache,
 	selection,
+	mutation,
 	children,
 	loadingComponent,
 	errorComponent,
@@ -121,8 +125,8 @@ export function Data2<T>({
 		cache,
 	});
 
-	// Step 2: Fetch data whenever query changes
-	const dataState = useDataFetch(queryUrl, query, fetchData);
+	// Step 2: Fetch data whenever query changes (with optional mutation support)
+	const dataState = useDataFetch(queryUrl, query, fetchData, mutation ?? undefined);
 
 	// Step 3: Build props to inject into children
 	const injectedProps = usePropsInjection(dataState, {

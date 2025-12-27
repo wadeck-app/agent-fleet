@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
+import type { MutationContract, MutationMethods } from '@framework/types/MutationContract';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
 
 /**
@@ -70,6 +71,8 @@ export interface UseDataFetchState<T> {
 	paginationData: PaginationData | null;
 	/** Is this a refresh? (loading but we already have data) */
 	isRefreshing: boolean;
+	/** Optional mutation methods (available when mutation contract is provided) */
+	mutation?: MutationMethods<T>;
 }
 
 /**
@@ -79,12 +82,14 @@ export interface UseDataFetchState<T> {
  * @param queryUrl - Stable string representation of query (for change detection)
  * @param query - Actual query object to pass to fetchData
  * @param fetchData - Function to fetch data given a query
- * @returns Data state (data, isLoading, error, paginationData, isRefreshing)
+ * @param mutation - Optional mutation contract for cache mutations
+ * @returns Data state (data, isLoading, error, paginationData, isRefreshing, mutation?)
  */
 export function useDataFetch<T>(
 	queryUrl: string,
 	query: ComposedQuery,
-	fetchData: (query: ComposedQuery) => Promise<FetchDataResult<T>>
+	fetchData: (query: ComposedQuery) => Promise<FetchDataResult<T>>,
+	mutation?: MutationContract<T>
 ): UseDataFetchState<T> {
 	const [data, setData] = useState<T[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
@@ -102,6 +107,55 @@ export function useDataFetch<T>(
 		);
 		fetchDataRef.current = fetchData;
 	}
+
+	// Mutation methods (only if mutation contract provided)
+	const updateItem = useCallback(
+		(updatedItem: T) => {
+			if (!mutation) {
+				return;
+			}
+
+			setData(prev =>
+				prev.map(item =>
+					mutation.keyExtractor(item) === mutation.keyExtractor(updatedItem) ? updatedItem : item
+				)
+			);
+
+			// Optional callback
+			mutation.onUpdate?.(updatedItem);
+		},
+		[mutation]
+	);
+
+	const addItem = useCallback(
+		(newItem: T) => {
+			if (!mutation) {
+				return;
+			}
+
+			setData(prev => [...prev, newItem]);
+
+			// Optional callback
+			mutation.onAdd?.(newItem);
+		},
+		[mutation]
+	);
+
+	const removeItem = useCallback(
+		(itemId: string | number) => {
+			if (!mutation) {
+				return;
+			}
+
+			setData(prev => prev.filter(item => mutation.keyExtractor(item) !== itemId));
+
+			// Optional callback
+			mutation.onRemove?.(itemId);
+		},
+		[mutation]
+	);
+
+	const mutationMethods: MutationMethods<T> | undefined = mutation ? { updateItem, addItem, removeItem } : undefined;
 
 	useEffect(() => {
 		const abortController = new AbortController();
@@ -152,5 +206,6 @@ export function useDataFetch<T>(
 		error,
 		paginationData,
 		isRefreshing,
+		mutation: mutationMethods,
 	};
 }

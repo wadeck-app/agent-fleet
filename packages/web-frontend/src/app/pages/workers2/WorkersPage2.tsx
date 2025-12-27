@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { Data2 } from '@framework/components2/data/Data2';
 import { Input } from '@framework/components/forms/Input';
@@ -10,8 +10,13 @@ import { useDebounce } from '@framework/hooks2/useDebounce';
 import { usePagination2 } from '@framework/hooks2/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
 import { useSorting2 } from '@framework/hooks2/useSorting2';
+import type { MutationContract } from '@framework/types/MutationContract';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
+import type { Worker } from '@shared/api/workers.contract';
+import { B2F_WORKER_UPDATED } from '@shared/transport';
 import { RefreshCw, X } from 'lucide-react';
+
+import { useTransport } from '@/transport';
 
 import { workersApi } from '../workers/workers.api';
 import { WorkersTable2 } from './WorkersTable2';
@@ -57,6 +62,62 @@ export function WorkersPage2() {
 
 	// Debounce search query
 	const debouncedSearchQuery = useDebounce(search.fstate.query, 300);
+
+	// WebSocket transport for real-time updates
+	const { transport } = useTransport();
+
+	// Track expected versions after mutations (version-based deduplication)
+	// Map<workerId, expectedVersion>
+	const expectedVersionsRef = useRef(new Map<string, number>());
+
+	// Mutation contract for direct cache updates
+	const mutation: MutationContract<Worker> = useMemo(
+		() => ({
+			keyExtractor: (worker: Worker) => worker.workerId,
+			onUpdate: (updatedWorker: Worker) => {
+				// Track expected version after mutation
+				if (updatedWorker.version) {
+					expectedVersionsRef.current.set(updatedWorker.workerId, updatedWorker.version);
+					console.log(
+						`[WorkersPage2] Tracked expected version ${updatedWorker.version} for worker ${updatedWorker.workerId}`
+					);
+				}
+			},
+		}),
+		[]
+	);
+
+	// Subscribe to worker updates via WebSocket
+	// Uses version-based deduplication to prevent processing own events
+	useEffect(() => {
+		console.log('[WorkersPage2] Subscribing to B2F_WORKER_UPDATED events');
+
+		const unsubscribe = transport.subscribe(B2F_WORKER_UPDATED, updatedWorker => {
+			console.log(
+				'[WorkersPage2] Received worker update event:',
+				updatedWorker.workerId,
+				'v' + updatedWorker.version
+			);
+
+			// Version-based deduplication: skip if we already have this version or newer
+			const expectedVersion = expectedVersionsRef.current.get(updatedWorker.workerId);
+			if (expectedVersion && updatedWorker.version && updatedWorker.version <= expectedVersion) {
+				console.log(
+					`[WorkersPage2] Skipping event (already have v${expectedVersion}, event is v${updatedWorker.version})`
+				);
+				return;
+			}
+
+			console.log('[WorkersPage2] Processing event from other client - refreshing cache');
+			// Trigger a refresh to fetch updated data (from other client)
+			cache.actions.refresh();
+		});
+
+		return () => {
+			console.log('[WorkersPage2] Unsubscribing from B2F_WORKER_UPDATED events');
+			unsubscribe();
+		};
+	}, [transport, cache.actions]);
 
 	// Fetch function
 	const fetchWorkers = useCallback(async (query: ComposedQuery) => {
@@ -142,7 +203,14 @@ export function WorkersPage2() {
 			</div>
 
 			{/* Data + Table */}
-			<Data2 fetchData={fetchWorkers} pagination={pagination} sorting={sorting} search={search} cache={cache}>
+			<Data2
+				fetchData={fetchWorkers}
+				pagination={pagination}
+				sorting={sorting}
+				search={search}
+				cache={cache}
+				mutation={mutation}
+			>
 				<WorkersTable2 />
 			</Data2>
 		</Page>

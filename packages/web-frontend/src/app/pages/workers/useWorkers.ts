@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useAbortableEffect } from '@framework/hooks/useAbortableEffect';
-import type { WorkersData } from '@shared/api/workers.contract';
-import { B2F_WORKERS_UPDATED } from '@shared/transport';
+import type { Worker, WorkersData } from '@shared/api/workers.contract';
+import { B2F_WORKERS_UPDATED, B2F_WORKER_UPDATED } from '@shared/transport';
 
 import { useTransport } from '@/transport';
 
@@ -73,22 +73,51 @@ export function useWorkers({
 	}, []);
 
 	/**
+	 * Handle individual worker update event
+	 * Updates a single worker in the list without full refresh
+	 */
+	const handleWorkerUpdateEvent = useCallback(
+		(updatedWorker: Worker) => {
+			if (isMountedRef.current && data) {
+				console.log('[useWorkers] Received individual worker update:', updatedWorker.workerId);
+				// Update the specific worker in the list
+				const updatedWorkers = data.workers.map(w =>
+					w.workerId === updatedWorker.workerId ? updatedWorker : w
+				);
+
+				setData({
+					...data,
+					workers: updatedWorkers,
+					timestamp: new Date().toISOString(),
+				});
+				setError(null);
+			}
+		},
+		[data]
+	);
+
+	/**
 	 * Subscribe to workers events via backend WebSocket
-	 * No filters needed for workers (all workers are relevant)
+	 * - B2F_WORKERS_UPDATED: Full list updates (bulk changes)
+	 * - B2F_WORKER_UPDATED: Individual worker updates (rename, etc.)
 	 */
 	useEffect(() => {
 		if (!enabled || !useWebSocket) return;
 
 		console.log('[useWorkers] Subscribing to workers updates');
 
-		// Subscribe without filters (all workers)
-		const unsubscribe = transport.subscribe(B2F_WORKERS_UPDATED, handleWorkersEvent);
+		// Subscribe to bulk updates (all workers)
+		const unsubscribeBulk = transport.subscribe(B2F_WORKERS_UPDATED, handleWorkersEvent);
+
+		// Subscribe to individual worker updates
+		const unsubscribeIndividual = transport.subscribe(B2F_WORKER_UPDATED, handleWorkerUpdateEvent);
 
 		return () => {
 			console.log('[useWorkers] Unsubscribing from workers updates');
-			unsubscribe();
+			unsubscribeBulk();
+			unsubscribeIndividual();
 		};
-	}, [enabled, useWebSocket, transport, handleWorkersEvent]);
+	}, [enabled, useWebSocket, transport, handleWorkersEvent, handleWorkerUpdateEvent]);
 
 	// Track mount state
 	useEffect(() => {

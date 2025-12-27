@@ -26,6 +26,7 @@
  *   error,
  *   pagination,
  *   sorting,
+ *   mutation,
  * }: QueryResultDisplayerProps<T>) {
  *   // Render table with data
  * }
@@ -33,6 +34,7 @@
  *
  * ===========================================================================================
  */
+import type { MutationMethods } from './MutationContract';
 
 /**
  * Sort configuration (matches backend format)
@@ -143,6 +145,25 @@ export interface QueryResultDisplayerProps<T> {
 	 * False during initial load or when no data exists yet.
 	 */
 	refreshing?: boolean;
+
+	/**
+	 * Mutation methods (optional).
+	 * Only present if mutation contract is provided to Data2.
+	 *
+	 * Enables direct cache mutations without full refetch:
+	 * - updateItem: Update existing item with backend response
+	 * - addItem: Add new item to cache
+	 * - removeItem: Remove item from cache
+	 *
+	 * Example:
+	 * ```typescript
+	 * const handleUpdate = async (item: T) => {
+	 *   const updated = await api.update(item);
+	 *   mutation?.updateItem(updated); // Immediate UI update
+	 * };
+	 * ```
+	 */
+	mutation?: MutationMethods<T>;
 }
 
 /**

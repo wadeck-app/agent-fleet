@@ -13,6 +13,7 @@ import { BaseRepository } from '../repositories/BaseRepository';
 import { BooksRepository } from '../repositories/BooksRepository';
 import { IngredientsRepository } from '../repositories/IngredientsRepository';
 import { OrchestratorRepository } from '../repositories/OrchestratorRepository';
+import { type WorkerMetadata, WorkersRepository } from '../repositories/WorkersRepository';
 import { BooksService } from '../services/BooksService';
 import { DashboardService } from '../services/DashboardService';
 import { FlowsService } from '../services/FlowsService';
@@ -153,8 +154,12 @@ export class DataStoreFactory {
 			// Get EventBroadcaster
 			const eventBroadcaster = this.getEventBroadcaster();
 
+			// Create WorkersRepository
+			const workersBaseRepo = new BaseRepository<WorkerMetadata>('workers', this.storage);
+			const workersRepository = new WorkersRepository(workersBaseRepo);
+
 			// Create WorkersService with OrchestratorClient (already connected)
-			this.workersService = new WorkersService(this.orchestratorWrapper, eventBroadcaster);
+			this.workersService = new WorkersService(this.orchestratorWrapper, eventBroadcaster, workersRepository);
 		}
 
 		return this.workersService;

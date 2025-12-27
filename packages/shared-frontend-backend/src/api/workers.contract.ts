@@ -18,6 +18,10 @@ export const WorkerStateSchema = z.enum(['idle', 'busy']);
  */
 export const WorkerSchema = z.object({
 	workerId: z.string(),
+	// User-defined name
+	name: z.string().min(1).max(100).optional(),
+	// Metadata version for optimistic locking
+	version: z.number().int().positive().optional(),
 	connected: z.boolean(),
 	taskId: z.string().optional(),
 	state: WorkerStateSchema,
@@ -82,6 +86,17 @@ export type WorkersListQuery = z.infer<typeof WorkersListQuerySchema>;
 export type WorkersListResponse = z.infer<typeof WorkersListResponseSchema>;
 
 /**
+ * Update worker name request schema
+ */
+export const UpdateWorkerNameSchema = z.object({
+	name: z.string().min(1).max(100),
+	// Required for optimistic locking - use 1 for first rename
+	version: z.number().int().positive(),
+});
+
+export type UpdateWorkerNameRequest = z.infer<typeof UpdateWorkerNameSchema>;
+
+/**
  * Workers API routes
  */
 export const WORKERS_API_ROUTES = defineRoutes({
@@ -89,6 +104,13 @@ export const WORKERS_API_ROUTES = defineRoutes({
 		GET: {
 			query: WorkersListQuerySchema.optional(),
 			response: z.union([WorkersDataSchema, WorkersListResponseSchema]),
+		},
+	},
+	'/api/workers/:workerId': {
+		PATCH: {
+			params: z.object({ workerId: z.string() }),
+			body: UpdateWorkerNameSchema,
+			response: WorkerSchema,
 		},
 	},
 	'/api/workers/:workerId/flows': {

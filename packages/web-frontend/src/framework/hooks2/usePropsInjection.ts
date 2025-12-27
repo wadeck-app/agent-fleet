@@ -73,6 +73,7 @@ export function usePropsInjection<T>(
 			isLoading: dataState.isLoading,
 			error: dataState.error,
 			refreshing: dataState.isRefreshing,
+			mutation: dataState.mutation, // Pass mutation methods through
 		};
 
 		// Add pagination props if feature enabled
