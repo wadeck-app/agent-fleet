@@ -111,8 +111,18 @@ export class WebSocketTransportServer implements ITransportServer {
 			return;
 		}
 
-		const clientId = this.generateClientId();
-		console.log(`[WS] New connection attempt: client=${clientId}`);
+		// Extract connId from query params (sent by frontend for request correlation)
+		// URL format: /ws?connId=<uuid>
+		let clientId: string;
+		try {
+			const url = new URL(req.url || '', 'http://dummy');
+			const connId = url.searchParams.get('connId');
+			clientId = connId || this.generateClientId();
+			console.log(`[WS] New connection attempt: client=${clientId}${connId ? ' (from query)' : ' (generated)'}`);
+		} catch (error) {
+			clientId = this.generateClientId();
+			console.log(`[WS] New connection attempt: client=${clientId} (error parsing URL:`, error, ')');
+		}
 
 		// Setup message handlers immediately (don't wait for auth)
 		socket.on('message', async (rawMessage: Buffer) => {

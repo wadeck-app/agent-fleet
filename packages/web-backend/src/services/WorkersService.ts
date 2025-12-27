@@ -267,8 +267,9 @@ export class WorkersService {
 	 * Emits 'b2f:worker:updated' event after successful update
 	 * @param workerId Worker ID
 	 * @param data Update data containing name and version
+	 * @param connId Connection ID to exclude from broadcast (prevents echo to origin client)
 	 */
-	async updateWorkerName(workerId: string, data: UpdateWorkerNameRequest): Promise<Worker> {
+	async updateWorkerName(workerId: string, data: UpdateWorkerNameRequest, connId?: string): Promise<Worker> {
 		// 1. Validate worker exists in orchestrator (runtime data)
 		const stats = await this.orchestratorWrapper.getStats();
 		const runtimeWorker = stats.workersList.find((w: any) => w.id === workerId);
@@ -321,10 +322,10 @@ export class WorkersService {
 			successRate: undefined,
 		};
 
-		// 7. Emit event AFTER successful update (for other frontends)
-		console.log('[WorkersService] Broadcasting B2F_WORKER_UPDATED event for worker:', workerId);
-		this.eventBroadcaster.broadcast(B2F_WORKER_UPDATED, updatedWorker);
-		console.log('[WorkersService] Event broadcasted successfully');
+		// 7. Emit event AFTER successful update (for other frontends, excluding origin)
+		console.log('[WorkersService] Broadcasting B2F_WORKER_UPDATED event for worker:', workerId, 'connId:', connId);
+		this.eventBroadcaster.broadcastExcept(B2F_WORKER_UPDATED, updatedWorker, connId);
+		console.log('[WorkersService] Event broadcasted successfully (origin excluded)');
 
 		return updatedWorker;
 	}

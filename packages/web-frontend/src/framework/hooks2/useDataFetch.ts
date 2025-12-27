@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MutationContract, MutationMethods } from '@framework/types/MutationContract';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
 
+import { useMutation } from './useMutation';
+
 /**
  * ===========================================================================================
  * USE DATA FETCH - Data Fetching Lifecycle Hook
@@ -97,6 +99,8 @@ export function useDataFetch<T>(
 	const [paginationData, setPaginationData] = useState<PaginationData | null>(null);
 	// Track if we have previous data (to distinguish initial load from refresh)
 	const [hadPreviousData, setHadPreviousData] = useState(false);
+	// Manual refresh trigger for mutation operations
+	const [refreshTrigger, setRefreshTrigger] = useState(0);
 
 	// DEV MODE: Warn if fetchData changes (should be memoized with useCallback)
 	const fetchDataRef = useRef(fetchData);
@@ -108,54 +112,13 @@ export function useDataFetch<T>(
 		fetchDataRef.current = fetchData;
 	}
 
-	// Mutation methods (only if mutation contract provided)
-	const updateItem = useCallback(
-		(updatedItem: T) => {
-			if (!mutation) {
-				return;
-			}
+	// Manual refresh function for mutation operations (addItem/removeItem)
+	const refresh = useCallback(() => {
+		setRefreshTrigger(prev => prev + 1);
+	}, []);
 
-			setData(prev =>
-				prev.map(item =>
-					mutation.keyExtractor(item) === mutation.keyExtractor(updatedItem) ? updatedItem : item
-				)
-			);
-
-			// Optional callback
-			mutation.onUpdate?.(updatedItem);
-		},
-		[mutation]
-	);
-
-	const addItem = useCallback(
-		(newItem: T) => {
-			if (!mutation) {
-				return;
-			}
-
-			setData(prev => [...prev, newItem]);
-
-			// Optional callback
-			mutation.onAdd?.(newItem);
-		},
-		[mutation]
-	);
-
-	const removeItem = useCallback(
-		(itemId: string | number) => {
-			if (!mutation) {
-				return;
-			}
-
-			setData(prev => prev.filter(item => mutation.keyExtractor(item) !== itemId));
-
-			// Optional callback
-			mutation.onRemove?.(itemId);
-		},
-		[mutation]
-	);
-
-	const mutationMethods: MutationMethods<T> | undefined = mutation ? { updateItem, addItem, removeItem } : undefined;
+	// Mutation methods using useMutation hook
+	const mutationMethods = useMutation(setData, mutation, refresh);
 
 	useEffect(() => {
 		const abortController = new AbortController();
@@ -191,10 +154,11 @@ export function useDataFetch<T>(
 		return () => {
 			abortController.abort();
 		};
-		// IMPORTANT: Only depend on queryUrl (source of truth for change detection)
+		// IMPORTANT: queryUrl is source of truth for query changes
+		// refreshTrigger enables manual refresh for mutation operations
 		// query and fetchData are captured via closure and should be stable
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [queryUrl]);
+	}, [queryUrl, refreshTrigger]);
 
 	// Calculate refreshing state: true if loading but we already have data
 	// (i.e., this is a refresh, not an initial load)

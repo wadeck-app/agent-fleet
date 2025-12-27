@@ -185,10 +185,7 @@ export function createTypedFetch<Routes extends Record<string, unknown>>(routes:
 		path: P,
 		options?: TypedFetchOptions<M, P, Routes>
 	): Promise<RouteResponse<M, P, Routes>> {
-		// @formatter:off
-		// Access pattern changed: routes[path][method] instead of routes[method][path]
 		// New structure: apiRoute > httpMethod > request/response types
-		// @formatter:on
 		const contract = (routes as Record<string, Record<string, unknown>>)[path]?.[method] as
 			| {
 					params?: {
@@ -259,11 +256,15 @@ export function createTypedFetch<Routes extends Record<string, unknown>>(routes:
 		// Build the URL
 		const url = buildUrl(path, options);
 
+		// Get connId from sessionStorage for request correlation (unique per tab)
+		const connId = sessionStorage.getItem('agent_fleet_conn_id');
+
 		// Execute the request
 		const response = await circuitBreakerService.executeFetch(url, {
 			method,
 			headers: {
 				...(options?.body ? { 'Content-Type': 'application/json' } : {}),
+				...(connId ? { 'X-Conn-Id': connId } : {}),
 			},
 			body: options?.body ? JSON.stringify(options.body) : undefined,
 		});

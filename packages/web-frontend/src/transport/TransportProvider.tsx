@@ -13,6 +13,34 @@ import { WebSocketTransportClient } from './adapters/WebSocketTransportClient';
 type TransportMode = 'auto' | 'websocket' | 'sse' | 'long-polling' | 'rest' | 'mock';
 
 /**
+ * Generate or retrieve connection ID from sessionStorage
+ * Connection ID is used to correlate requests and prevent broadcast echo.
+ *
+ * IMPORTANT: Uses sessionStorage (not localStorage) so each tab/window gets unique connId.
+ * This enables proper multi-tab support where:
+ * - Tab A makes update → Tab A excluded from broadcast (has connId-1)
+ * - Tab B receives event and refreshes (has connId-2)
+ *
+ * @returns Unique connection ID (persisted for current tab/window session)
+ */
+function getOrCreateConnId(): string {
+	const CONN_ID_KEY = 'agent_fleet_conn_id';
+
+	// Try to get existing connId from sessionStorage (unique per tab)
+	const existingConnId = sessionStorage.getItem(CONN_ID_KEY);
+	if (existingConnId) {
+		console.log('[TransportProvider] Using existing connId:', existingConnId.substring(0, 8) + '...');
+		return existingConnId;
+	}
+
+	// Generate new connId using crypto.randomUUID()
+	const newConnId = crypto.randomUUID();
+	sessionStorage.setItem(CONN_ID_KEY, newConnId);
+	console.log('[TransportProvider] Generated new connId:', newConnId.substring(0, 8) + '...');
+	return newConnId;
+}
+
+/**
  * Create transport client based on mode preference
  */
 function createTransportClient(mode: TransportMode, baseUrl: string, wsUrl: string): ITransportClient {
@@ -115,6 +143,13 @@ export interface TransportContextState {
 	 * Disconnects current transport and connects new one
 	 */
 	switchTransport: (mode: TransportMode) => Promise<void>;
+
+	/**
+	 * Connection ID - Unique identifier for this browser/tab
+	 * Used to correlate requests and prevent broadcast echo
+	 * Generated once per browser/tab and persisted in localStorage
+	 */
+	connId: string;
 }
 
 /**
@@ -232,6 +267,9 @@ export function TransportProvider({
 	transport: customTransport,
 }: TransportProviderProps) {
 	const navigate = useNavigate();
+
+	// Generate or retrieve connection ID
+	const connId = useState(() => getOrCreateConnId())[0];
 
 	// Create or use provided transport
 	const [transport, setTransport] = useState<ITransportClient>(() => {
@@ -362,6 +400,7 @@ export function TransportProvider({
 		forceDowngrade: handleForceDowngrade,
 		reconnectDelay,
 		switchTransport,
+		connId,
 	};
 
 	return <TransportContext.Provider value={contextValue}>{children}</TransportContext.Provider>;

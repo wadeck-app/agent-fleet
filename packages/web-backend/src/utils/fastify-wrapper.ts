@@ -101,6 +101,7 @@ export type RouteWrapperFunc<Routes> = <M extends HttpMethod, P extends PathsFor
 		reply: FastifyReply;
 		request: FastifyRequest;
 		cookies: Record<string, string | undefined>;
+		connId?: string;
 	}) => Promise<RouteResponse<M, P, Routes>>
 ) => void;
 
@@ -144,6 +145,7 @@ export function createRouteWrapper<Routes>(fastify: FastifyInstance, routes: Rou
 			reply: FastifyReply;
 			request: FastifyRequest;
 			cookies: Record<string, string | undefined>;
+			connId?: string;
 		}) => Promise<RouteResponse<M, P, Routes>>
 	): void {
 		// @formatter:off
@@ -157,6 +159,9 @@ export function createRouteWrapper<Routes>(fastify: FastifyInstance, routes: Rou
 
 		const fastifyHandler = async (req: FastifyRequest, reply: FastifyReply) => {
 			try {
+				// Extract connId from X-Conn-Id header for request correlation
+				const connId = req.headers['x-conn-id'] as string | undefined;
+
 				const validated: any = {
 					params: {},
 					query: {},
@@ -164,6 +169,7 @@ export function createRouteWrapper<Routes>(fastify: FastifyInstance, routes: Rou
 					reply,
 					request: req,
 					cookies: (req as any).cookies || {},
+					connId,
 				};
 
 				if (contract.params) {

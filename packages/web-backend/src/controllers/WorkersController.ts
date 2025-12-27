@@ -59,8 +59,8 @@ export default class WorkersController implements LazyController<typeof WORKERS_
 		 * PATCH /api/workers/:workerId
 		 * Update worker name with optimistic locking
 		 */
-		add('PATCH', '/api/workers/:workerId', async ({ params, body }) => {
-			return this.service.updateWorkerName(params.workerId, body);
+		add('PATCH', '/api/workers/:workerId', async ({ params, body, connId }) => {
+			return this.service.updateWorkerName(params.workerId, body, connId);
 		});
 	}
 }

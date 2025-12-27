@@ -170,9 +170,13 @@ export class WebSocketTransportClient implements ITransportClient {
 		return new Promise((resolve, reject) => {
 			const wsUrl = this.config.wsUrl || this.config.baseUrl.replace(/^http/, 'ws');
 
+			// Get connId from sessionStorage for request correlation (unique per tab)
+			const connId = sessionStorage.getItem('agent_fleet_conn_id');
+			const wsUrlWithConnId = connId ? `${wsUrl}/ws?connId=${connId}` : `${wsUrl}/ws`;
+
 			// SECURITY: WebSocket automatically sends cookies from same origin
 			// No need to pass tokens manually!
-			this.ws = new WebSocket(`${wsUrl}/ws`);
+			this.ws = new WebSocket(wsUrlWithConnId);
 
 			const timeout = setTimeout(() => {
 				reject(new Error('Connection timeout'));

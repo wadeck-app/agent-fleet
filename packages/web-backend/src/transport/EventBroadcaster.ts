@@ -100,6 +100,66 @@ export class EventBroadcaster {
 	}
 
 	/**
+	 * Broadcast event to all connected clients EXCEPT the specified connection
+	 * Prevents "broadcast echo" - client that triggered the event won't receive it
+	 *
+	 * Use case: Client makes API call that triggers broadcast event.
+	 * Client already has the data from API response, so it shouldn't receive the broadcast.
+	 *
+	 * @param event - Event type
+	 * @param data - Event data matching the event type
+	 * @param excludeConnId - Connection ID to exclude (optional, from X-Conn-Id header)
+	 *
+	 * @example
+	 * ```typescript
+	 * // In WorkersService.updateWorkerName
+	 * async updateWorkerName(workerId: string, name: string, version: number, connId?: string) {
+	 *   const updatedWorker = await this.repository.update(...);
+	 *
+	 *   // Broadcast to all clients EXCEPT the one that made the update
+	 *   this.eventBroadcaster.broadcastExcept('b2f:worker:updated', updatedWorker, connId);
+	 *
+	 *   return updatedWorker;
+	 * }
+	 * ```
+	 */
+	broadcastExcept<E extends EventType>(event: E, data: EventData<E>, excludeConnId?: string): void {
+		if (!excludeConnId) {
+			// No exclusion needed, use regular broadcast
+			this.broadcast(event, data);
+			return;
+		}
+
+		console.log(
+			`[EventBroadcaster] Broadcasting event "${event}" (excluding connId: ${excludeConnId.substring(0, 8)}...)`
+		);
+
+		// Get all connected clients from all transports
+		const allClients = this.getConnectedClients();
+
+		// Filter out the excluded connId
+		const targetClients = allClients.filter(clientId => clientId !== excludeConnId);
+
+		if (targetClients.length >= 3) {
+			console.log(`[EventBroadcaster] Sending to ${targetClients.length} clients (excluded 1)`);
+		} else {
+			console.log(
+				`[EventBroadcaster] Sending to ${targetClients.length} clients (excluded 1): ${targetClients.map(clientId => clientId.substring(0, 8)).join(', ')}`
+			);
+		}
+
+		// Send to each client individually
+		for (const clientId of targetClients) {
+			try {
+				this.sendToClient(clientId, event, data);
+			} catch (error) {
+				console.error(`[EventBroadcaster] Failed to send to client ${clientId}:`, error);
+				// Continue with other clients (anti-fragile)
+			}
+		}
+	}
+
+	/**
 	 * Send event to specific client
 	 * Automatically detects which transport the client is using
 	 *

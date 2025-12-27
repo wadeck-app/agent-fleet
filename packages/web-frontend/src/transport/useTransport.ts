@@ -76,6 +76,8 @@ export interface TransportHookResult {
 	reconnectDelay: number;
 	/** Switch to a different transport mode dynamically (without page reload) */
 	switchTransport: (mode: 'auto' | 'websocket' | 'sse' | 'long-polling' | 'rest' | 'mock') => Promise<void>;
+	/** Connection ID - Unique identifier for this browser/tab (for request correlation) */
+	connId: string;
 }
 
 /**
@@ -102,7 +104,31 @@ export function useTransport(): TransportHookResult {
 		forceDowngrade: context.forceDowngrade,
 		reconnectDelay: context.reconnectDelay,
 		switchTransport: context.switchTransport,
+		connId: context.connId,
 	};
+}
+
+/**
+ * Hook to access connection ID
+ *
+ * Convenience hook that returns only the connection ID.
+ * Useful when you only need the connId and not the full transport context.
+ *
+ * @returns Connection ID (unique per browser/tab)
+ * @throws Error if used outside TransportProvider
+ *
+ * @example
+ * ```tsx
+ * function MyComponent() {
+ *   const connId = useConnId();
+ *   console.log('My connection ID:', connId);
+ *   return <div>Connected as: {connId.substring(0, 8)}</div>;
+ * }
+ * ```
+ */
+export function useConnId(): string {
+	const context = useTransportContext();
+	return context.connId;
 }
 
 /**

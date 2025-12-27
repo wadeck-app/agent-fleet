@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { Label } from '@framework/components/forms/Label';
 import { RadioGroup, RadioGroupItem } from '@framework/components/forms/RadioGroup';
 
-import { useTransport } from '@/transport';
+import { useConnId, useTransport } from '@/transport';
 
 export type TransportMode = 'auto' | 'websocket' | 'sse' | 'long-polling' | 'rest' | 'mock';
 
@@ -29,6 +29,7 @@ const modes: Array<{ value: TransportMode; label: string; description: string }>
 
 export function TransportModeSelector({ className }: TransportModeSelectorProps) {
 	const { switchTransport } = useTransport();
+	const connId = useConnId();
 
 	// Read current mode from localStorage
 	const [selectedMode, setSelectedMode] = useState<TransportMode>(() => {
@@ -77,6 +78,16 @@ export function TransportModeSelector({ className }: TransportModeSelectorProps)
 					<span className="text-muted-foreground">Switching transport...</span>
 				</div>
 			)}
+
+			{/* Connection ID Badge - Global to app, unique per tab */}
+			<div className="mt-3 rounded border px-3 py-2">
+				<div className="flex items-center justify-between gap-2">
+					<span className="text-xs text-muted-foreground">Connection ID:</span>
+					<span className="font-mono text-xs font-semibold text-yellow-600 dark:text-yellow-400">
+						{connId ? connId.substring(0, 8) : 'N/A'}
+					</span>
+				</div>
+			</div>
 		</div>
 	);
 }

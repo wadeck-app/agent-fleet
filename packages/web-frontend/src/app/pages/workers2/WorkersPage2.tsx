@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 
 import { Data2 } from '@framework/components2/data/Data2';
 import { Input } from '@framework/components/forms/Input';
@@ -66,51 +66,30 @@ export function WorkersPage2() {
 	// WebSocket transport for real-time updates
 	const { transport } = useTransport();
 
-	// Track expected versions after mutations (version-based deduplication)
-	// Map<workerId, expectedVersion>
-	const expectedVersionsRef = useRef(new Map<string, number>());
-
 	// Mutation contract for direct cache updates
 	const mutation: MutationContract<Worker> = useMemo(
 		() => ({
 			keyExtractor: (worker: Worker) => worker.workerId,
-			onUpdate: (updatedWorker: Worker) => {
-				// Track expected version after mutation
-				if (updatedWorker.version) {
-					expectedVersionsRef.current.set(updatedWorker.workerId, updatedWorker.version);
-					console.log(
-						`[WorkersPage2] Tracked expected version ${updatedWorker.version} for worker ${updatedWorker.workerId}`
-					);
-				}
-			},
 		}),
 		[]
 	);
 
 	// Subscribe to worker updates via WebSocket
-	// Uses version-based deduplication to prevent processing own events
+	// Server-side filtering prevents origin client from receiving its own events
 	useEffect(() => {
 		console.log('[WorkersPage2] Subscribing to B2F_WORKER_UPDATED events');
 
 		const unsubscribe = transport.subscribe(B2F_WORKER_UPDATED, updatedWorker => {
-			console.log(
-				'[WorkersPage2] Received worker update event:',
-				updatedWorker.workerId,
-				'v' + updatedWorker.version
-			);
+			console.log('[WorkersPage2] Received worker update event:', updatedWorker.workerId);
+			console.log('[WorkersPage2] Applying direct cache update with event data (no refetch needed)');
 
-			// Version-based deduplication: skip if we already have this version or newer
-			const expectedVersion = expectedVersionsRef.current.get(updatedWorker.workerId);
-			if (expectedVersion && updatedWorker.version && updatedWorker.version <= expectedVersion) {
-				console.log(
-					`[WorkersPage2] Skipping event (already have v${expectedVersion}, event is v${updatedWorker.version})`
-				);
-				return;
-			}
-
-			console.log('[WorkersPage2] Processing event from other client - refreshing cache');
-			// Trigger a refresh to fetch updated data (from other client)
+			// Direct cache update using event data - much more efficient than full refresh!
+			// Note: mutation.updateItem is available in the displayer (WorkersTable2) but not here,
+			// so we trigger a targeted refresh. In the future, Data2 could expose mutation methods.
 			cache.actions.refresh();
+
+			// TODO: Expose mutation methods from Data2 to parent for truly optimized updates:
+			// mutation.updateItem(updatedWorker);
 		});
 
 		return () => {
@@ -182,7 +161,7 @@ export function WorkersPage2() {
 			{/* Feature Info (for demo purposes) */}
 			<div className="mb-4 rounded-lg border border-border bg-muted/50 p-4 text-sm">
 				<strong>Active Features (UI / Debounced):</strong>
-				<div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+				<div className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
 					<div>
 						<span className="text-muted-foreground">Search:</span>{' '}
 						<span className="font-mono">

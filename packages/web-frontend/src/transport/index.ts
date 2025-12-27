@@ -35,5 +35,5 @@ export { MockTransportClient } from './adapters/MockTransportClient';
 // React Integration (Phase 5)
 export { TransportProvider, useTransportContext } from './TransportProvider';
 export type { TransportProviderProps, TransportContextState } from './TransportProvider';
-export { useTransport } from './useTransport';
+export { useTransport, useConnId } from './useTransport';
 export type { TransportHookResult } from './useTransport';
