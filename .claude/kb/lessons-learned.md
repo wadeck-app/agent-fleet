@@ -504,3 +504,66 @@ const injectedProps = usePropsInjection(dataState, { pagination, sorting, ... })
 **When Discovered**: December 26, 2024 during Data2 refactoring. User reported 5 requests instead of 2 on Ingredients2Page load. Root cause: combining array recreation with wrong useEffect dependencies.
 
 **Related Pattern**: This is similar to the "React Hook Polling Pattern" lesson - both involve being careful about useEffect dependencies and understanding what should trigger re-execution vs what should be captured via closure.
+
+---
+
+## Custom HTTP Headers - CORS Configuration + Request Pipeline Integration
+
+**Problem**: Custom headers like `X-Conn-Id` sent from frontend don't reach backend handlers even though the header appears in browser DevTools network requests.
+
+**Root Causes**:
+
+1. **CORS blocks custom headers by default** - Only "simple" headers (Content-Type, Accept, etc.) are allowed
+2. **Lazy controller plugin missing extraction** - Header exists in request but never extracted and passed to handler
+
+**Wrong Assumptions** ❌:
+
+- Thinking browser sent the header = backend received it
+- Assuming CORS allows all headers by default
+- Not checking every step in the request pipeline (CORS → routing → validation → handler)
+
+**Correct Solution** ✅:
+
+```typescript
+// 1. CORS - Explicitly allow custom headers (server.ts)
+await fastify.register(cors, {
+	allowedHeaders: ['Content-Type', 'Authorization', 'X-Conn-Id'],
+});
+
+// 2. Request pipeline - Extract header BEFORE handler (lazy-controller-plugin.ts)
+const connId = request.headers['x-conn-id'] as string | undefined;
+const validated: any = {
+	params: extractedParams,
+	query: {},
+	body: {},
+	connId, // Pass to handler
+};
+```
+
+**Architecture Principle**: Separation of concerns between:
+
+- **Business data** (Zod contract): `params`, `query`, `body`, `response`
+- **Infrastructure** (request pipeline): `connId`, `cookies`, `reply`, `request`
+
+Headers like `X-Conn-Id` are infrastructure concerns - never in Zod contracts, but available in handlers through pipeline injection.
+
+**Multi-Tab Support**: Use `sessionStorage` (not `localStorage`) for per-tab connId generation - ensures each browser tab gets unique ID for proper broadcast echo prevention.
+
+**Debug Strategy**: Add logging at EVERY pipeline step to identify where data is lost:
+
+1. Frontend: Log before sending request
+2. CORS: Verify header in OPTIONS preflight
+3. Request handler: Log raw headers
+4. Validated object: Log extracted values
+5. Service layer: Log received parameters
+
+**Files Affected** (December 2024):
+
+- `packages/web-backend/src/server.ts` - Added `allowedHeaders` to CORS config
+- `packages/web-backend/src/utils/lazy-controller-plugin.ts` - Extract `connId` from headers
+- `packages/web-frontend/src/transport/TransportProvider.tsx` - Generate connId using `sessionStorage`
+- `packages/web-frontend/src/framework/api/api-base.ts` - Inject `X-Conn-Id` header in all requests
+
+**When Discovered**: December 27, 2024 during broadcast echo prevention implementation. Header sent but showed `undefined` in backend logs. User correctly identified lazy-controller-plugin was missing extraction step.
+
+**Related**: WebSocket also sends connId via query param (`?connId=xxx`) since WebSocket handshake doesn't support custom headers.

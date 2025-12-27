@@ -213,11 +213,15 @@ function createLazyControllerPlugin<Routes = any>(
 
 				const { contract, params: extractedParams, relativePath: matchedPattern } = matchResult;
 
+				// Extract connId from X-Conn-Id header for request correlation
+				const connId = request.headers['x-conn-id'] as string | undefined;
+
 				// Validate input using Zod schemas from contract
 				const validated: any = {
 					params: extractedParams,
 					query: {},
 					body: {},
+					connId,
 				};
 
 				// Validate query parameters

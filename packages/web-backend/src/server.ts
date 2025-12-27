@@ -461,6 +461,10 @@ async function start() {
 			origin: process.env.NODE_ENV === 'production' ? process.env.CORS_ORIGIN || 'http://localhost:5173' : true,
 			credentials: true,
 			methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+			// Allow custom headers (X-Conn-Id for request correlation and broadcast echo prevention)
+			allowedHeaders: ['Content-Type', 'Authorization', 'X-Conn-Id'],
+			// Expose custom headers in response (if needed in future)
+			exposedHeaders: ['X-Request-Id'],
 		});
 
 		// Register cookie plugin for authentication

@@ -259,13 +259,19 @@ export function createTypedFetch<Routes extends Record<string, unknown>>(routes:
 		// Get connId from sessionStorage for request correlation (unique per tab)
 		const connId = sessionStorage.getItem('agent_fleet_conn_id');
 
+		// Build headers object
+		const headers: Record<string, string> = {};
+		if (options?.body) {
+			headers['Content-Type'] = 'application/json';
+		}
+		if (connId) {
+			headers['X-Conn-Id'] = connId;
+		}
+
 		// Execute the request
 		const response = await circuitBreakerService.executeFetch(url, {
 			method,
-			headers: {
-				...(options?.body ? { 'Content-Type': 'application/json' } : {}),
-				...(connId ? { 'X-Conn-Id': connId } : {}),
-			},
+			headers,
 			body: options?.body ? JSON.stringify(options.body) : undefined,
 		});
 
