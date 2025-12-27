@@ -63,7 +63,10 @@ export function IngredientCard3({
 	// Add comment above the target line, not at the end
 	// Separate fields into main fields (first 4) and metadata fields (rest)
 	const mainFields = fields.filter(f => ['calories', 'protein', 'carbs', 'fat'].includes(f.key));
-	const metadataFields = fields.filter(f => !['calories', 'protein', 'carbs', 'fat', 'category'].includes(f.key));
+	const metadataFields = fields.filter(
+		f => !['calories', 'protein', 'carbs', 'fat', 'category', 'name'].includes(f.key)
+	);
+	const categoryField = fields.find(f => f.key === 'category') ?? undefined;
 
 	return (
 		<Card size="default" className="hover:shadow-lg transition-shadow relative">
@@ -81,11 +84,7 @@ export function IngredientCard3({
 			{/* Header: Primary info (name is always shown, category if visible) */}
 			<CardHeader>
 				<CardTitle>{ingredient.name}</CardTitle>
-				<CardDescription>
-					{fields.find(f => f.key === 'category')
-						? (fields.find(f => f.key === 'category')!.render(ingredient) as string)
-						: ingredient.category || 'Uncategorized'}
-				</CardDescription>
+				<CardDescription>{categoryField ? (categoryField!.render(ingredient) as string) : ''}</CardDescription>
 			</CardHeader>
 
 			{/* Content: Dynamic fields based on visibility/ordering */}

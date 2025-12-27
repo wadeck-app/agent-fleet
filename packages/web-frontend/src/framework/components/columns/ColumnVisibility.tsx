@@ -68,6 +68,8 @@ export interface ColumnDef {
 	label: string | React.ReactNode;
 	/** Whether this column can be hidden (default: true) */
 	canHide?: boolean;
+	/** Whether this column can be reordered (default: true) */
+	canReorder?: boolean;
 }
 
 export interface ColumnVisibilityProps {
@@ -293,6 +295,7 @@ export function ColumnVisibility({
 										{orderedColumns.map(column => {
 											const isVisible = visibleColumns.has(column.id);
 											const canHide = column.canHide !== false;
+											const canReorder = column.canReorder !== false;
 											const isModified = isColumnModified(column.id);
 
 											return (
@@ -302,6 +305,7 @@ export function ColumnVisibility({
 													isVisible={isVisible}
 													isModified={isModified}
 													canHide={canHide}
+													canReorder={canReorder}
 													onToggle={() => handleToggle(column.id)}
 													onResetColumn={() => handleResetColumn(column.id)}
 												/>

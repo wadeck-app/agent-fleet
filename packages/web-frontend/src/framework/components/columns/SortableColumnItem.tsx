@@ -42,6 +42,8 @@ export interface SortableColumnItemProps {
 	isModified: boolean;
 	/** Whether this column can be hidden (default: true) */
 	canHide?: boolean;
+	/** Whether this column can be reordered (default: true) */
+	canReorder?: boolean;
 	/** Callback when checkbox is toggled */
 	onToggle: () => void;
 	/** Callback to reset column to default state */
@@ -53,6 +55,7 @@ export function SortableColumnItem({
 	isVisible,
 	isModified,
 	canHide = true,
+	canReorder = true,
 	onToggle,
 	onResetColumn,
 }: SortableColumnItemProps) {
@@ -85,17 +88,16 @@ export function SortableColumnItem({
 			{/* eslint-disable-next-line no-restricted-syntax */}
 			<button
 				{...attributes}
-				{...listeners}
+				{...(canReorder ? listeners : {})}
 				className={cn(
-					`
-       cursor-grab touch-none p-2 opacity-40
-       hover:opacity-70
-       active:cursor-grabbing
-     `,
+					canReorder
+						? `cursor-grab touch-none p-2 opacity-40 hover:opacity-70 active:cursor-grabbing`
+						: `cursor-not-allowed p-2 opacity-20`,
 					'transition-opacity duration-150'
 				)}
 				aria-label={`Reorder ${column.label}`}
-				title="Drag to reorder"
+				title={canReorder ? 'Drag to reorder' : 'This column cannot be reordered'}
+				disabled={!canReorder}
 			>
 				<GripVertical className="h-4 w-4" />
 			</button>

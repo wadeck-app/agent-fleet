@@ -55,15 +55,26 @@ export const INGREDIENT_GRID_FIELDS: Table2Column<Ingredient>[] = [
 		key: 'id',
 		label: 'ID',
 		render: item => item.id,
-		defaultVisible: false, // Hidden by default
+		// Hidden by default
+		defaultVisible: false,
 	},
 	// Name column
 	{
 		key: 'name',
 		label: 'Name',
 		render: item => <span className="font-medium">{item.name}</span>,
-		canHide: false, // Cannot be hidden (always visible)
-		canReorder: false, // Cannot be reordered (always first)
+		// Cannot be hidden (always visible)
+		canHide: false,
+		// Cannot be reordered (always first)
+		canReorder: false,
+	},
+	// Category field
+	{
+		key: 'category',
+		label: 'Category',
+		render: item => item.category || '-',
+		// Visible by default (shown in header subtitle)
+		defaultVisible: true,
 	},
 	// Calories field
 	{
@@ -92,13 +103,6 @@ export const INGREDIENT_GRID_FIELDS: Table2Column<Ingredient>[] = [
 		label: 'Fat',
 		render: item => `${item.fat}g`,
 		defaultVisible: true,
-	},
-	// Category field
-	{
-		key: 'category',
-		label: 'Category',
-		render: item => item.category || '-',
-		defaultVisible: false, // Hidden by default (shown in header subtitle)
 	},
 	// Created field
 	{

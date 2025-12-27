@@ -37,14 +37,14 @@ import type { ColumnDef } from '@framework/components/columns/ColumnVisibility';
  * @example
  * ```typescript
  * const tableColumns: Table2Column<Ingredient>[] = [
- *   { key: 'name', label: 'Name', render: ..., canHide: false },
+ *   { key: 'name', label: 'Name', render: ..., canHide: false, canReorder: false },
  *   { key: 'calories', label: 'Calories', render: ... },
  * ];
  *
  * const visibilityDefs = toColumnVisibilityDefs(tableColumns);
  * // Result: [
- * //   { id: 'name', label: 'Name', canHide: false },
- * //   { id: 'calories', label: 'Calories', canHide: true }
+ * //   { id: 'name', label: 'Name', canHide: false, canReorder: false },
+ * //   { id: 'calories', label: 'Calories', canHide: true, canReorder: true }
  * // ]
  * ```
  */
@@ -53,6 +53,7 @@ export function toColumnVisibilityDefs<T>(columns: Table2Column<T>[]): ColumnDef
 		id: col.key,
 		label: col.label,
 		canHide: col.canHide ?? true,
+		canReorder: col.canReorder ?? true,
 	}));
 }
 

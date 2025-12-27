@@ -1,4 +1,4 @@
-import { CreateIngredient } from 'shared-frontend-backend';
+import type { CreateIngredient } from 'shared-frontend-backend/src/api/ingredients.contract';
 
 /**
  * Fixtures pour les tests d'ingrédients
