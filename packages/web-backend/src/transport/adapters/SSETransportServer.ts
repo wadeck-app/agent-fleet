@@ -43,8 +43,8 @@ import type { TransportSessionManager } from '../TransportSessionManager';
  * Tracks an active SSE connection with its reply stream
  */
 interface SSEConnection {
-	/** Client ID */
-	clientId: string;
+	/** Connection ID */
+	connId: string;
 	/** User ID */
 	userId: string;
 	/** Fastify reply for sending events */
@@ -64,7 +64,7 @@ interface SSEConnection {
 export class SSETransportServer implements ITransportServer {
 	/**
 	 * Active SSE connections
-	 * Map<clientId, SSEConnection>
+	 * Map<connId, SSEConnection>
 	 */
 	private connections = new Map<string, SSEConnection>();
 
@@ -106,17 +106,17 @@ export class SSETransportServer implements ITransportServer {
 
 	/**
 	 * Initialize SSE server
-	 * Registers SSE endpoint and subscription management
+	 * Registers SSE endpoint with /api prefix
 	 */
 	async initialize(app: FastifyInstance): Promise<void> {
-		// SSE events endpoint
-		app.get('/sse', async (request, reply) => {
+		// SSE events endpoint (NEW with /api prefix)
+		app.get('/api/transports/sse', async (request, reply) => {
 			await this.handleSSEConnection(request, reply);
 		});
 
-		// Subscription management endpoint
-		app.post('/sse/subscription', async (request, reply) => {
-			await this.handleSubscriptionUpdate(request, reply);
+		// Backward compatibility redirect (temporary)
+		app.get('/sse', async (request, reply) => {
+			reply.code(308).redirect('/api/transports/sse');
 		});
 
 		// Start heartbeat
@@ -129,68 +129,83 @@ export class SSETransportServer implements ITransportServer {
 	 * Handle SSE connection
 	 */
 	private async handleSSEConnection(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-		const clientId = this.generateClientId();
+		// Get connId from query parameter (sent by client)
+		const connId = (request.query as { connId?: string }).connId;
+
+		if (!connId) {
+			reply.code(400).send({ error: 'Missing connId parameter' });
+			return;
+		}
 
 		try {
 			// Authenticate connection
-			const session = await this.sessionManager.authenticateConnection(clientId, request.raw, 'sse');
+			const session = await this.sessionManager.authenticateConnection(connId, request.raw, 'sse');
 
 			// Setup SSE headers
+			// CORS headers must be manually added when using reply.raw.writeHead()
+			// as it bypasses Fastify's CORS plugin
 			reply.raw.writeHead(200, {
 				'Content-Type': 'text/event-stream',
 				'Cache-Control': 'no-cache',
 				Connection: 'keep-alive',
 				'X-Accel-Buffering': 'no', // Disable nginx buffering
+				'Access-Control-Allow-Origin': request.headers.origin || '*',
+				'Access-Control-Allow-Credentials': 'true',
 			});
 
 			// Create connection
 			const connection: SSEConnection = {
-				clientId,
+				connId,
 				userId: session.userId,
 				reply,
 				lastHeartbeat: Date.now(),
 				connectedAt: Date.now(),
 			};
 
-			this.connections.set(clientId, connection);
+			this.connections.set(connId, connection);
 
-			console.log(`[SSE] Client ${clientId} connected (user=${session.userId}, total=${this.connections.size})`);
+			console.log(
+				`[SSE] Connection ${connId} connected (user=${session.userId}, total=${this.connections.size})`
+			);
 
-			// Send initial connected event with auth info
+			// Send initial connected event with auth info (NO connId - client already has it)
 			this.sendSSEEvent(reply, 'connected', {
 				userId: session.userId,
 				tokenExpiresAt: session.tokenExpiresAt,
 			});
 
 			// Send any queued messages
-			const queuedEvents = this.messageQueue.dequeue(clientId);
+			const queuedEvents = this.messageQueue.dequeue(connId);
 			if (queuedEvents.length > 0) {
-				console.log(`[SSE] Sending ${queuedEvents.length} queued events to client ${clientId}`);
+				console.log(`[SSE] Sending ${queuedEvents.length} queued events to connection ${connId}`);
 				for (const event of queuedEvents) {
 					this.sendSSEEvent(reply, 'message', event);
 				}
 			}
 
 			// Notify connection handlers
-			this.connectHandlers.forEach(handler => handler(clientId));
+			this.connectHandlers.forEach(handler => handler(connId));
 
 			// Handle connection close
 			request.raw.on('close', () => {
-				this.handleDisconnection(clientId);
+				this.handleDisconnection(connId);
 			});
 
 			// Keep connection alive
 			reply.raw.on('error', error => {
-				console.error(`[SSE] Connection error for client ${clientId}:`, error);
-				this.handleDisconnection(clientId);
+				console.error(`[SSE] Connection error for ${connId}:`, error);
+				this.handleDisconnection(connId);
 			});
 		} catch (error) {
 			console.error('[SSE] Authentication failed:', error);
 
 			// Send auth error and close
+			// CORS headers must be manually added when using reply.raw.writeHead()
 			reply.raw.writeHead(200, {
 				'Content-Type': 'text/event-stream',
 				'Cache-Control': 'no-cache',
+				'Access-Control-Allow-Origin': request.headers.origin || '*',
+				'Access-Control-Allow-Credentials': 'true',
 			});
 
 			this.sendSSEEvent(reply, 'auth_error', {
@@ -203,103 +218,40 @@ export class SSETransportServer implements ITransportServer {
 
 	/**
 	 * Handle subscription update (subscribe/unsubscribe)
+	 *
+	 * DEPRECATED: Subscription management now handled by TransportsController
+	 * at /api/transports/subscriptions. This method is kept for backward
+	 * compatibility but should be removed in future versions.
 	 */
 	private async handleSubscriptionUpdate(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-		try {
-			// Parse cookies for authentication
-			const cookies = this.parseCookies(request.raw.headers.cookie || '');
-			const accessToken = cookies['access_token'];
-
-			// SECURITY: DEVELOPMENT ONLY - Bypass authentication if DISABLE_AUTH_DEV=true
-			const disableAuthDev = process.env.DISABLE_AUTH_DEV === 'true';
-
-			let userId: string;
-
-			if (disableAuthDev && !accessToken) {
-				// Mode DEV: pas d'auth, use mock user
-				userId = 'dev-user-no-auth';
-				console.log('[SSE] DEV MODE: Subscription without auth (user=dev-user-no-auth)');
-			} else if (!accessToken) {
-				reply.code(401).send({ error: 'Unauthorized' });
-				return;
-			} else {
-				// Get user from token
-				const result = await this.sessionManager['authService'].verifyAccessToken(accessToken);
-				userId = result.userId;
-			}
-
-			// Get request body
-			const body = request.body as {
-				action: 'subscribe' | 'unsubscribe';
-				events: string[];
-				filters?: Record<string, unknown>;
-			};
-
-			// Find all SSE connections for this user
-			const userConnections = Array.from(this.connections.values()).filter(conn => conn.userId === userId);
-
-			if (userConnections.length === 0) {
-				reply.code(404).send({ error: 'No active SSE connection found' });
-				return;
-			}
-
-			// Update subscriptions for all user connections
-			for (const conn of userConnections) {
-				const session = this.sessionManager['sessions'].get(conn.clientId);
-				if (!session) continue;
-
-				if (body.action === 'subscribe') {
-					body.events.forEach(event => {
-						session.subscribedEvents.add(event);
-						if (body.filters) {
-							session.eventFilters.set(event, body.filters);
-						}
-					});
-				} else {
-					body.events.forEach(event => {
-						session.subscribedEvents.delete(event);
-						session.eventFilters.delete(event);
-					});
-				}
-
-				// Send confirmation
-				this.sendSSEEvent(conn.reply, 'subscription_updated', {
-					action: body.action,
-					events: body.events,
-				});
-			}
-
-			console.log(
-				`[SSE] ${body.action} for user ${userId}: ${body.events.join(', ')} (${userConnections.length} connections)`
-			);
-
-			reply.send({ success: true });
-		} catch (error) {
-			console.error('[SSE] Subscription update failed:', error);
-			reply.code(500).send({ error: 'Internal server error' });
-		}
+		// Redirect to unified subscription endpoint
+		reply.code(410).send({
+			error: 'Endpoint deprecated',
+			message: 'Subscription management moved to /api/transports/subscriptions',
+			newEndpoint: '/api/transports/subscriptions',
+		});
 	}
 
 	/**
-	 * Handle client disconnection
+	 * Handle connection disconnection
 	 */
-	private handleDisconnection(clientId: string): void {
-		const connection = this.connections.get(clientId);
+	private handleDisconnection(connId: string): void {
+		const connection = this.connections.get(connId);
 		if (!connection) return;
 
-		this.connections.delete(clientId);
-		this.sessionManager.removeSession(clientId);
+		this.connections.delete(connId);
+		this.sessionManager.removeSession(connId);
 
 		console.log(
-			`[SSE] Client ${clientId} disconnected (user=${connection.userId}, total=${this.connections.size})`
+			`[SSE] Connection ${connId} disconnected (user=${connection.userId}, total=${this.connections.size})`
 		);
 
 		// Notify disconnection handlers
-		this.disconnectHandlers.forEach(handler => handler(clientId));
+		this.disconnectHandlers.forEach(handler => handler(connId));
 	}
 
 	/**
-	 * Broadcast event to all SSE clients
+	 * Broadcast event to all SSE connections
 	 */
 	broadcast<E extends EventType>(event: E, data: EventData<E>): void {
 		const transportEvent: TransportEvent = {
@@ -312,15 +264,14 @@ export class SSETransportServer implements ITransportServer {
 		let sentCount = 0;
 		let queuedCount = 0;
 
-		for (const [clientId, connection] of this.connections) {
-			// Check if client is subscribed
-			const session = this.sessionManager['sessions'].get(clientId);
-			if (!session || !session.subscribedEvents.has(event)) {
+		for (const [connId, connection] of this.connections) {
+			// Check if connection is subscribed
+			if (!this.sessionManager.isSubscribed(connId, event)) {
 				continue;
 			}
 
 			// Check filters
-			if (!this.matchesFilters(data, session.eventFilters.get(event))) {
+			if (!this.sessionManager.matchesFilters(connId, event, data)) {
 				continue;
 			}
 
@@ -328,9 +279,9 @@ export class SSETransportServer implements ITransportServer {
 				this.sendSSEEvent(connection.reply, 'message', transportEvent);
 				sentCount++;
 			} catch (error) {
-				console.error(`[SSE] Failed to send to client ${clientId}:`, error);
+				console.error(`[SSE] Failed to send to connection ${connId}:`, error);
 				// Queue for later delivery
-				this.messageQueue.enqueue(clientId, transportEvent);
+				this.messageQueue.enqueue(connId, transportEvent);
 				queuedCount++;
 			}
 		}
@@ -341,31 +292,30 @@ export class SSETransportServer implements ITransportServer {
 	}
 
 	/**
-	 * Send event to specific client
+	 * Send event to specific connection
 	 */
-	sendToClient<E extends EventType>(clientId: string, event: E, data: EventData<E>): void {
-		const connection = this.connections.get(clientId);
+	sendToClient<E extends EventType>(connId: string, event: E, data: EventData<E>): void {
+		const connection = this.connections.get(connId);
 		if (!connection) {
-			// Client not connected, queue the message
+			// Connection not active, queue the message
 			const transportEvent: TransportEvent = {
 				id: this.generateEventId(),
 				type: event,
 				data,
 				timestamp: Date.now(),
 			};
-			this.messageQueue.enqueue(clientId, transportEvent);
-			console.log(`[SSE] Queued event ${event} for offline client ${clientId}`);
+			this.messageQueue.enqueue(connId, transportEvent);
+			console.log(`[SSE] Queued event ${event} for offline connection ${connId}`);
 			return;
 		}
 
-		// Check if client is subscribed
-		const session = this.sessionManager['sessions'].get(clientId);
-		if (!session || !session.subscribedEvents.has(event)) {
+		// Check if connection is subscribed
+		if (!this.sessionManager.isSubscribed(connId, event)) {
 			return;
 		}
 
 		// Check filters
-		if (!this.matchesFilters(data, session.eventFilters.get(event))) {
+		if (!this.sessionManager.matchesFilters(connId, event, data)) {
 			return;
 		}
 
@@ -379,8 +329,8 @@ export class SSETransportServer implements ITransportServer {
 		try {
 			this.sendSSEEvent(connection.reply, 'message', transportEvent);
 		} catch (error) {
-			console.error(`[SSE] Failed to send to client ${clientId}:`, error);
-			this.messageQueue.enqueue(clientId, transportEvent);
+			console.error(`[SSE] Failed to send to connection ${connId}:`, error);
+			this.messageQueue.enqueue(connId, transportEvent);
 		}
 	}
 
@@ -400,12 +350,12 @@ export class SSETransportServer implements ITransportServer {
 		this.heartbeatTimer = setInterval(() => {
 			const now = Date.now();
 
-			for (const [clientId, connection] of this.connections) {
+			for (const [connId, connection] of this.connections) {
 				// Check if connection is dead
 				const timeSinceLastHeartbeat = now - connection.lastHeartbeat;
 				if (timeSinceLastHeartbeat > this.CONNECTION_TIMEOUT) {
-					console.warn(`[SSE] Connection timeout for client ${clientId}, removing`);
-					this.handleDisconnection(clientId);
+					console.warn(`[SSE] Connection timeout for ${connId}, removing`);
+					this.handleDisconnection(connId);
 					continue;
 				}
 
@@ -414,44 +364,11 @@ export class SSETransportServer implements ITransportServer {
 					connection.reply.raw.write(':heartbeat\n\n');
 					connection.lastHeartbeat = now;
 				} catch (error) {
-					console.error(`[SSE] Heartbeat failed for client ${clientId}:`, error);
-					this.handleDisconnection(clientId);
+					console.error(`[SSE] Heartbeat failed for ${connId}:`, error);
+					this.handleDisconnection(connId);
 				}
 			}
 		}, this.HEARTBEAT_INTERVAL);
-	}
-
-	/**
-	 * Check if event data matches filters
-	 */
-	private matchesFilters(data: unknown, filters?: Record<string, unknown>): boolean {
-		if (!filters || Object.keys(filters).length === 0) {
-			return true;
-		}
-
-		const dataObj = data as Record<string, unknown>;
-		return Object.entries(filters).every(([key, value]) => dataObj[key] === value);
-	}
-
-	/**
-	 * Parse cookies from header
-	 */
-	private parseCookies(cookieHeader: string): Record<string, string> {
-		const cookies: Record<string, string> = {};
-		cookieHeader.split(';').forEach(cookie => {
-			const [key, value] = cookie.trim().split('=');
-			if (key && value) {
-				cookies[key] = decodeURIComponent(value);
-			}
-		});
-		return cookies;
-	}
-
-	/**
-	 * Generate unique client ID
-	 */
-	private generateClientId(): string {
-		return `sse-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 	}
 
 	/**
@@ -476,7 +393,7 @@ export class SSETransportServer implements ITransportServer {
 	}
 
 	/**
-	 * Get all connected client IDs
+	 * Get all connected connection IDs
 	 */
 	getConnectedClients(): string[] {
 		return Array.from(this.connections.keys());
@@ -492,7 +409,7 @@ export class SSETransportServer implements ITransportServer {
 		}
 
 		// Close all connections
-		for (const [clientId, connection] of this.connections) {
+		for (const [connId, connection] of this.connections) {
 			try {
 				connection.reply.raw.end();
 			} catch (error) {

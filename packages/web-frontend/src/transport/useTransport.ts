@@ -75,7 +75,9 @@ export interface TransportHookResult {
 	/** Next reconnection delay in seconds (0 if not reconnecting) */
 	reconnectDelay: number;
 	/** Switch to a different transport mode dynamically (without page reload) */
-	switchTransport: (mode: 'auto' | 'websocket' | 'sse' | 'long-polling' | 'rest' | 'mock') => Promise<void>;
+	switchTransport: (
+		mode: 'auto' | 'websocket' | 'sse' | 'long-polling' | 'http-polling' | 'rest' | 'mock'
+	) => Promise<void>;
 	/** Connection ID - Unique identifier for this browser/tab (for request correlation) */
 	connId: string;
 }

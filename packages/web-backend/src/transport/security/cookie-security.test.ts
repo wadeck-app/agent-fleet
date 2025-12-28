@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { MockAuthService } from '@/auth/MockAuthService';
-import AuthController from '@/controllers/AuthController';
-
-import { WebSocketSessionManager } from '../WebSocketSessionManager';
+import { MockAuthService } from '../../auth/MockAuthService';
+import AuthController from '../../controllers/AuthController';
+import { TransportSessionManager } from '../TransportSessionManager';
 
 /**
  * ===========================================================================================
@@ -74,11 +73,11 @@ function createMockRouteWrapper() {
 describe('Cookie Security Tests', () => {
 	let controller: AuthController;
 	let authService: MockAuthService;
-	let sessionManager: WebSocketSessionManager;
+	let sessionManager: TransportSessionManager;
 
 	beforeEach(() => {
 		authService = new MockAuthService('test-secret');
-		sessionManager = new WebSocketSessionManager(authService);
+		sessionManager = new TransportSessionManager(authService);
 		controller = new AuthController(authService, sessionManager);
 	});
 

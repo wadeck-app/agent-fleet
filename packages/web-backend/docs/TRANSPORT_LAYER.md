@@ -76,25 +76,27 @@ Production implementation of `ITransportServer` using `@fastify/websocket`.
 
 **WebSocket Endpoint:** `GET /ws`
 
-### 3. WebSocketSessionManager
+### 3. TransportSessionManager
 
-Manages authenticated WebSocket sessions with subscription tracking.
+Manages authenticated sessions for all transport types with unified authentication and subscription tracking.
 
-**File:** `src/transport/WebSocketSessionManager.ts`
+**File:** `src/transport/TransportSessionManager.ts`
 
 **Responsibilities:**
 
-- Parse HTTP cookies from WebSocket upgrade request
+- Parse HTTP cookies from connection upgrade request
 - Authenticate connections using AuthService
-- Track session metadata (userId, token, expiration, subscriptions)
+- Track session metadata (userId, token, expiration, subscriptions, transport type)
 - Multi-device support (multiple sessions per user)
+- Multi-transport support (WebSocket, SSE, Long Polling, HTTP, Mock)
 - Automatic cleanup of expired sessions (every 60 seconds)
 - Subscription management per client
+- Transport type detection and tracking
 
 **Session Data:**
 
 ```typescript
-interface WebSocketSession {
+interface BaseSession {
 	clientId: string;
 	userId: string;
 	accessToken: string;
@@ -102,6 +104,11 @@ interface WebSocketSession {
 	createdAt: number;
 	lastActivity: number;
 	subscribedEvents: Set<string>;
+	eventFilters: Map<string, Record<string, unknown>>;
+}
+
+interface TransportSession extends BaseSession {
+	transportType: TransportType; // 'websocket' | 'sse' | 'long-polling' | 'http' | 'mock'
 }
 ```
 
@@ -558,11 +565,11 @@ REFRESH_TOKEN_EXPIRY=604800     # Refresh token expiry (seconds, 7 days)
 ```typescript
 // server.ts
 import { TransportRouter } from './transport/TransportRouter';
-import { WebSocketSessionManager } from './transport/WebSocketSessionManager';
+import { TransportSessionManager } from './transport/TransportSessionManager';
 import { WebSocketTransportServer } from './transport/adapters/WebSocketTransportServer';
 
 const authService = new JwtAuthService(process.env.JWT_SECRET!);
-const sessionManager = new WebSocketSessionManager(authService);
+const sessionManager = new TransportSessionManager(authService);
 const router = new TransportRouter(/* ... controllers ... */);
 const transportServer = new WebSocketTransportServer(sessionManager, router);
 

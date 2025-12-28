@@ -27,12 +27,12 @@ import type { EventData, EventType } from '@app/shared/transport';
 /**
  * Client connection handler callback
  */
-export type ClientConnectedHandler = (clientId: string) => void;
+export type ClientConnectedHandler = (connId: string) => void;
 
 /**
  * Client disconnection handler callback
  */
-export type ClientDisconnectedHandler = (clientId: string) => void;
+export type ClientDisconnectedHandler = (connId: string) => void;
 
 /**
  * Transport server interface
@@ -83,23 +83,23 @@ export interface ITransportServer {
 	broadcast<E extends EventType>(event: E, data: EventData<E>): void;
 
 	/**
-	 * Send event to specific client
+	 * Send event to specific connection
 	 * Checks subscription before sending
 	 *
-	 * @param clientId - Client ID to send to
+	 * @param connId - Connection ID to send to
 	 * @param event - Event type
 	 * @param data - Event data matching the event type
 	 *
 	 * @example
 	 * ```typescript
-	 * server.sendToClient(clientId, 'task:assigned', {
+	 * server.sendToClient(connId, 'task:assigned', {
 	 *   taskId: '123',
 	 *   workerId: 'worker-1',
 	 *   assignedAt: Date.now(),
 	 * });
 	 * ```
 	 */
-	sendToClient<E extends EventType>(clientId: string, event: E, data: EventData<E>): void;
+	sendToClient<E extends EventType>(connId: string, event: E, data: EventData<E>): void;
 
 	/**
 	 * Register handler for client connections
@@ -108,9 +108,9 @@ export interface ITransportServer {
 	 *
 	 * @example
 	 * ```typescript
-	 * server.onClientConnected((clientId) => {
-	 *   console.log(`Client ${clientId} connected`);
-	 *   // Initialize client-specific state
+	 * server.onClientConnected((connId) => {
+	 *   console.log(`Connection ${connId} connected`);
+	 *   // Initialize connection-specific state
 	 * });
 	 * ```
 	 */
@@ -123,23 +123,23 @@ export interface ITransportServer {
 	 *
 	 * @example
 	 * ```typescript
-	 * server.onClientDisconnected((clientId) => {
-	 *   console.log(`Client ${clientId} disconnected`);
-	 *   // Clean up client-specific state
+	 * server.onClientDisconnected((connId) => {
+	 *   console.log(`Connection ${connId} disconnected`);
+	 *   // Clean up connection-specific state
 	 * });
 	 * ```
 	 */
 	onClientDisconnected(handler: ClientDisconnectedHandler): void;
 
 	/**
-	 * Get list of all connected client IDs
+	 * Get list of all connected connection IDs
 	 *
-	 * @returns Array of client IDs
+	 * @returns Array of connection IDs
 	 *
 	 * @example
 	 * ```typescript
-	 * const clients = server.getConnectedClients();
-	 * console.log(`${clients.length} clients connected`);
+	 * const connections = server.getConnectedClients();
+	 * console.log(`${connections.length} connections active`);
 	 * ```
 	 */
 	getConnectedClients(): string[];

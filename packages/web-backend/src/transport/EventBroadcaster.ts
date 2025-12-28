@@ -84,6 +84,7 @@ export class EventBroadcaster {
 	 * });
 	 * ```
 	 */
+	//TODO normally never used, in favor of braodcastExcept as we do not want to inform the source of the event about that said event
 	broadcast<E extends EventType>(event: E, data: EventData<E>): void {
 		console.log(`[EventBroadcaster] Broadcasting event "${event}" to ${this.transportServers.length} transport(s)`);
 		// Broadcast to all transports
@@ -134,65 +135,65 @@ export class EventBroadcaster {
 			`[EventBroadcaster] Broadcasting event "${event}" (excluding connId: ${excludeConnId.substring(0, 8)}...)`
 		);
 
-		// Get all connected clients from all transports
-		const allClients = this.getConnectedClients();
+		// Get all connected connections from all transports
+		const allConnections = this.getConnectedClients();
 
 		// Filter out the excluded connId
-		const targetClients = allClients.filter(clientId => clientId !== excludeConnId);
+		const targetConnections = allConnections.filter(connId => connId !== excludeConnId);
 
-		if (targetClients.length >= 3) {
-			console.log(`[EventBroadcaster] Sending to ${targetClients.length} clients (excluded 1)`);
+		if (targetConnections.length >= 3) {
+			console.log(`[EventBroadcaster] Sending to ${targetConnections.length} connections (excluded 1)`);
 		} else {
 			console.log(
-				`[EventBroadcaster] Sending to ${targetClients.length} clients (excluded 1): ${targetClients.map(clientId => clientId.substring(0, 8)).join(', ')}`
+				`[EventBroadcaster] Sending to ${targetConnections.length} connections (excluded 1): ${targetConnections.map(connId => connId.substring(0, 8)).join(', ')}`
 			);
 		}
 
-		// Send to each client individually
-		for (const clientId of targetClients) {
+		// Send to each connection individually
+		for (const connId of targetConnections) {
 			try {
-				this.sendToClient(clientId, event, data);
+				this.sendToClient(connId, event, data);
 			} catch (error) {
-				console.error(`[EventBroadcaster] Failed to send to client ${clientId}:`, error);
-				// Continue with other clients (anti-fragile)
+				console.error(`[EventBroadcaster] Failed to send to connection ${connId}:`, error);
+				// Continue with other connections (anti-fragile)
 			}
 		}
 	}
 
 	/**
-	 * Send event to specific client
-	 * Automatically detects which transport the client is using
+	 * Send event to specific connection
+	 * Automatically detects which transport the connection is using
 	 *
-	 * @param clientId - Client ID to send to
+	 * @param connId - Connection ID to send to
 	 * @param event - Event type
 	 * @param data - Event data matching the event type
 	 *
 	 * @example
 	 * ```typescript
-	 * broadcaster.sendToClient(clientId, 'b2f:task:assigned', {
+	 * broadcaster.sendToClient(connId, 'b2f:task:assigned', {
 	 *   taskId: '123',
 	 *   workerId: 'worker-1',
 	 *   assignedAt: Date.now(),
 	 * });
 	 * ```
 	 */
-	sendToClient<E extends EventType>(clientId: string, event: E, data: EventData<E>): void {
+	sendToClient<E extends EventType>(connId: string, event: E, data: EventData<E>): void {
 		// Try each transport until one successfully sends
 		for (const transport of this.transportServers) {
 			try {
-				transport.sendToClient(clientId, event, data);
+				transport.sendToClient(connId, event, data);
 				// If successful, no need to try other transports
 				return;
 			} catch (error) {
-				// Client not on this transport, try next
+				// Connection not on this transport, try next
 				continue;
 			}
 		}
 
 		// If no transport found, queue for later delivery
 		if (this.messageQueue) {
-			console.warn(`[EventBroadcaster] Client ${clientId} not found, queuing event ${event}`);
-			this.messageQueue.enqueue(clientId, {
+			console.warn(`[EventBroadcaster] Connection ${connId} not found, queuing event ${event}`);
+			this.messageQueue.enqueue(connId, {
 				id: `evt-${Date.now()}-${Math.random().toString(36).substring(7)}`,
 				type: event,
 				data,
@@ -222,36 +223,36 @@ export class EventBroadcaster {
 		// Get all sessions for this user
 		const sessions = this.sessionManager.getUserSessions(userId);
 
-		// Send to each session's client
+		// Send to each session's connection
 		sessions.forEach(session => {
-			this.sendToClient(session.clientId, event, data);
+			this.sendToClient(session.connId, event, data);
 		});
 	}
 
 	/**
-	 * Get number of connected clients across ALL transports
+	 * Get number of connected connections across ALL transports
 	 *
-	 * @returns Number of connected clients
+	 * @returns Number of connected connections
 	 */
 	getConnectedClientsCount(): number {
-		const allClients = new Set<string>();
+		const allConnections = new Set<string>();
 		for (const transport of this.transportServers) {
-			transport.getConnectedClients().forEach(clientId => allClients.add(clientId));
+			transport.getConnectedClients().forEach(connId => allConnections.add(connId));
 		}
-		return allClients.size;
+		return allConnections.size;
 	}
 
 	/**
-	 * Get all connected client IDs across ALL transports
+	 * Get all connected connection IDs across ALL transports
 	 *
-	 * @returns Array of unique client IDs
+	 * @returns Array of unique connection IDs
 	 */
 	getConnectedClients(): string[] {
-		const allClients = new Set<string>();
+		const allConnections = new Set<string>();
 		for (const transport of this.transportServers) {
-			transport.getConnectedClients().forEach(clientId => allClients.add(clientId));
+			transport.getConnectedClients().forEach(connId => allConnections.add(connId));
 		}
-		return Array.from(allClients);
+		return Array.from(allConnections);
 	}
 
 	/**

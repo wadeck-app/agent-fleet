@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
  *
  * Protection layers tested:
  * 1. Server startup check (server.ts)
- * 2. Runtime checks in auth endpoints (AuthController, WebSocketSessionManager)
+ * 2. Runtime checks in auth endpoints (AuthController, TransportSessionManager)
  * ===========================================================================================
  */
 
@@ -77,7 +77,7 @@ describe('Auth Security Enforcement', () => {
 			const disableAuthDev = true;
 			const isProduction = true;
 
-			// This is the code pattern used in AuthController and WebSocketSessionManager
+			// This is the code pattern used in AuthController and TransportSessionManager
 			const checkPassed = () => {
 				if (disableAuthDev && isProduction) {
 					throw new Error('Authentication bypass not allowed in production');
@@ -110,7 +110,7 @@ describe('Auth Security Enforcement', () => {
 				return nodeEnv === 'production' && disableAuth === 'true';
 			};
 
-			// Layer 2: Runtime checks (AuthController, WebSocketSessionManager)
+			// Layer 2: Runtime checks (AuthController, TransportSessionManager)
 			const runtimeCheck = (nodeEnv: string, disableAuth: boolean) => {
 				if (disableAuth && nodeEnv === 'production') {
 					throw new Error('Not allowed');

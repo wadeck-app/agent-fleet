@@ -1,12 +1,12 @@
 import type { IncomingMessage } from 'http';
+import type { Orchestrator } from 'orchestrator';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { MockAuthService } from '@/auth/MockAuthService';
-import { DataStoreFactory } from '@/factories/DataStoreFactory';
-
+import { MockAuthService } from '../../auth/MockAuthService';
+import { DataStoreFactory } from '../../factories/DataStoreFactory';
 import { EventBroadcaster } from '../EventBroadcaster';
 import { TransportRouter } from '../TransportRouter';
-import { WebSocketSessionManager } from '../WebSocketSessionManager';
+import { TransportSessionManager } from '../TransportSessionManager';
 import { WebSocketTransportServer } from './WebSocketTransportServer';
 
 /**
@@ -71,7 +71,7 @@ class MockWebSocket {
 
 describe('WebSocketTransportServer', () => {
 	let server: WebSocketTransportServer;
-	let sessionManager: WebSocketSessionManager;
+	let sessionManager: TransportSessionManager;
 	let router: TransportRouter;
 	let authService: MockAuthService;
 	let factory: DataStoreFactory;
@@ -80,12 +80,12 @@ describe('WebSocketTransportServer', () => {
 		// Create auth service
 		authService = new MockAuthService('test-secret');
 
-		// Create factory
-		const mockOrchestratorClient = new MockOrchestratorClient();
-		factory = new DataStoreFactory('memory', mockOrchestratorClient);
+		// Create factory with mock orchestrator
+		const mockOrchestrator = {} as Orchestrator;
+		factory = new DataStoreFactory('memory', mockOrchestrator);
 
 		// Create session manager
-		sessionManager = new WebSocketSessionManager(authService);
+		sessionManager = new TransportSessionManager(authService);
 
 		// Create router
 		router = new TransportRouter(factory);
@@ -142,7 +142,7 @@ describe('WebSocketTransportServer', () => {
 			const session = await sessionManager.authenticateConnection('test-client', req.raw);
 
 			expect(session.userId).toBe(userId);
-			expect(session.clientId).toBe('test-client');
+			expect(session.connId).toBe('test-client');
 		});
 
 		it('should reject connection without access token', async () => {
@@ -499,8 +499,8 @@ describe('WebSocketTransportServer', () => {
 
 			const userSessions = sessionManager.getUserSessions(userId);
 			expect(userSessions).toHaveLength(2);
-			expect(userSessions.map(s => s.clientId)).toContain('client-1');
-			expect(userSessions.map(s => s.clientId)).toContain('client-2');
+			expect(userSessions.map(s => s.connId)).toContain('client-1');
+			expect(userSessions.map(s => s.connId)).toContain('client-2');
 		});
 
 		it('should send events to all user sessions', async () => {

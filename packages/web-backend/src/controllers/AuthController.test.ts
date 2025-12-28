@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { MockAuthService } from '../auth/MockAuthService';
-import { WebSocketSessionManager } from '../transport/WebSocketSessionManager';
+import { TransportSessionManager } from '../transport/TransportSessionManager';
 import AuthController from './AuthController';
 
 /**
@@ -71,14 +71,14 @@ function createMockRouteWrapper() {
 describe('AuthController', () => {
 	let controller: AuthController;
 	let authService: MockAuthService;
-	let sessionManager: WebSocketSessionManager;
+	let sessionManager: TransportSessionManager;
 
 	beforeEach(() => {
 		// Create auth service
 		authService = new MockAuthService('test-secret');
 
 		// Create session manager
-		sessionManager = new WebSocketSessionManager(authService);
+		sessionManager = new TransportSessionManager(authService);
 
 		// Create controller
 		controller = new AuthController(authService, sessionManager);

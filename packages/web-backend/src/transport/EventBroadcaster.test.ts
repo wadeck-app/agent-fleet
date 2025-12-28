@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { MockAuthService } from '../auth/MockAuthService';
 import { EventBroadcaster } from './EventBroadcaster';
-import { WebSocketSessionManager } from './WebSocketSessionManager';
+import { TransportSessionManager } from './TransportSessionManager';
 import { MockTransportServer } from './adapters/MockTransportServer';
 
 /**
@@ -23,7 +23,7 @@ import { MockTransportServer } from './adapters/MockTransportServer';
 
 describe('EventBroadcaster', () => {
 	let mockServer: MockTransportServer;
-	let sessionManager: WebSocketSessionManager;
+	let sessionManager: TransportSessionManager;
 	let broadcaster: EventBroadcaster;
 	let authService: MockAuthService;
 
@@ -32,7 +32,7 @@ describe('EventBroadcaster', () => {
 		authService = new MockAuthService('test-secret');
 
 		// Create session manager
-		sessionManager = new WebSocketSessionManager(authService);
+		sessionManager = new TransportSessionManager(authService);
 
 		// Create mock transport server
 		mockServer = new MockTransportServer();

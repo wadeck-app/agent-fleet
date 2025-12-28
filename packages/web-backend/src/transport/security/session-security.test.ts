@@ -1,9 +1,8 @@
 import type { IncomingMessage } from 'http';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { MockAuthService } from '@/auth/MockAuthService';
-
-import { WebSocketSessionManager } from '../WebSocketSessionManager';
+import { MockAuthService } from '../../auth/MockAuthService';
+import { TransportSessionManager } from '../TransportSessionManager';
 
 /**
  * ===========================================================================================
@@ -32,11 +31,11 @@ import { WebSocketSessionManager } from '../WebSocketSessionManager';
 
 describe('Session Security Tests', () => {
 	let authService: MockAuthService;
-	let sessionManager: WebSocketSessionManager;
+	let sessionManager: TransportSessionManager;
 
 	beforeEach(() => {
 		authService = new MockAuthService('test-secret');
-		sessionManager = new WebSocketSessionManager(authService);
+		sessionManager = new TransportSessionManager(authService);
 	});
 
 	describe('session isolation', () => {
@@ -66,17 +65,17 @@ describe('Session Security Tests', () => {
 			const session2 = await sessionManager.authenticateConnection('client-2', req2);
 
 			// Sessions should be separate
-			expect(session1.clientId).not.toBe(session2.clientId);
+			expect(session1.connId).not.toBe(session2.connId);
 
 			// Verify each session can only access its own data
 			const retrievedSession1 = sessionManager.getSession('client-1');
 			const retrievedSession2 = sessionManager.getSession('client-2');
 
-			expect(retrievedSession1?.clientId).toBe('client-1');
-			expect(retrievedSession2?.clientId).toBe('client-2');
+			expect(retrievedSession1?.connId).toBe('client-1');
+			expect(retrievedSession2?.connId).toBe('client-2');
 
 			// User 1 cannot access user 2's session
-			expect(retrievedSession1?.clientId).not.toBe(retrievedSession2?.clientId);
+			expect(retrievedSession1?.connId).not.toBe(retrievedSession2?.connId);
 		});
 
 		it('should prevent session access without proper authentication', () => {
@@ -290,13 +289,13 @@ describe('Session Security Tests', () => {
 
 			// All should succeed (MockAuthService generates new tokens)
 			expect(results).toHaveLength(3);
-			results.forEach(result => {
+			results.forEach((result: { userId: string; accessToken: string }) => {
 				expect(result.userId).toBe(userId);
 				expect(result.accessToken).toBeTruthy();
 			});
 
 			// Each refresh should return a unique token
-			const tokens = results.map(r => r.accessToken);
+			const tokens = results.map((r: { accessToken: string }) => r.accessToken);
 			const uniqueTokens = new Set(tokens);
 			expect(uniqueTokens.size).toBe(3);
 		});

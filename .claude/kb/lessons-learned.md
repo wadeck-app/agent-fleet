@@ -567,3 +567,123 @@ Headers like `X-Conn-Id` are infrastructure concerns - never in Zod contracts, b
 **When Discovered**: December 27, 2024 during broadcast echo prevention implementation. Header sent but showed `undefined` in backend logs. User correctly identified lazy-controller-plugin was missing extraction step.
 
 **Related**: WebSocket also sends connId via query param (`?connId=xxx`) since WebSocket handshake doesn't support custom headers.
+
+---
+
+## API Endpoints Must Start With `/api` - Production Routing Requirement
+
+**Problem**: Endpoints that don't start with `/api` break in production environments. Frontend proxy configuration, reverse proxy rules, and deployment pipelines expect all backend API endpoints to be under the `/api` prefix.
+
+**Root Cause**: Development mode often works fine without this prefix because the frontend dev server proxies all non-static requests. Production environments use explicit routing rules that only forward `/api/*` paths to the backend server.
+
+**Wrong Approach** ❌:
+
+```typescript
+// These endpoints break in production:
+app.get('/ws', ...) → WebSocket
+app.get('/sse', ...) → SSE
+app.get('/long-polling/events', ...) → Long Polling
+app.post('/sse/subscription', ...) → Subscriptions
+app.post('/long-polling/subscription', ...) → Subscriptions
+```
+
+**Correct Approach** ✅:
+
+```typescript
+// All endpoints MUST start with /api:
+app.get('/api/transports/ws', ...) → WebSocket
+app.get('/api/transports/sse', ...) → SSE
+app.get('/api/transports/long-polling', ...) → Long Polling
+app.post('/api/transports/subscriptions', ...) → Unified subscriptions
+
+// Other API routes:
+app.get('/api/tasks', ...)
+app.post('/api/workers', ...)
+app.get('/api/monitoring/metrics', ...)
+```
+
+**Why This Matters**:
+
+1. **Reverse Proxy Configuration**: Nginx/Apache configured to forward only `/api/*` to backend
+2. **Frontend Proxy**: Vite/Webpack dev server proxy rules match `/api` prefix
+3. **CORS Policies**: Often scoped to `/api` paths
+4. **API Gateway**: Cloud deployments route based on path prefix
+5. **Security Rules**: Firewall/WAF rules typically allow `/api` explicitly
+
+**Production Failure Symptoms**:
+
+- Development works, production shows 404 Not Found
+- WebSocket connections fail to establish (404 on `/ws`)
+- SSE streams never connect (404 on `/sse`)
+- CORS errors only in production
+- API monitoring/logging shows missing routes
+
+**Configuration That Breaks**:
+
+```nginx
+# Nginx reverse proxy - only forwards /api
+location /api {
+    proxy_pass http://backend:3000;
+}
+# Routes like /ws, /sse won't match! → 404
+```
+
+```typescript
+// Vite config - only proxies /api
+export default defineConfig({
+	server: {
+		proxy: {
+			'/api': 'http://localhost:3000',
+		},
+	},
+});
+// Routes like /ws, /sse won't be proxied → Connection refused
+```
+
+**Enforcement**:
+
+1. **Code Review**: Reject any route that doesn't start with `/api`
+2. **Linting**: Add ESLint rule to check route registration
+3. **Testing**: Integration tests should verify all routes start with `/api`
+4. **Documentation**: Mark this requirement as **CRITICAL** in architecture docs
+
+**Migration Strategy**:
+
+If you have existing routes without `/api` prefix:
+
+1. Add new routes with `/api` prefix
+2. Keep old routes with 301/308 redirects for backward compatibility
+3. Update all client code to use new routes
+4. After migration period, remove old routes
+
+```typescript
+// Temporary redirect for backward compatibility
+app.get('/ws', (request, reply) => {
+	reply.redirect(308, '/api/transports/ws');
+});
+
+// New proper route
+app.get('/api/transports/ws', websocketHandler);
+```
+
+**Related Transport Unification**:
+
+This lesson led to proposing unified transport API architecture:
+
+- All transport endpoints under `/api/transports/*`
+- Unified subscriptions at `/api/transports/subscriptions`
+- See: `.claude/plans/2025-12-27_20-30_unified-transport-api.md`
+
+**When Discovered**: December 27, 2024 - User pointed out that endpoints like `/ws`, `/sse`, `/long-polling/*` would break in production because they don't follow the `/api` prefix rule. This is a critical architecture requirement that was missed during initial transport implementation.
+
+**Prevention Checklist**:
+
+- ✅ ALL endpoints start with `/api`
+- ✅ Transport streams: `/api/transports/*`
+- ✅ CRUD operations: `/api/{resource}/*`
+- ✅ Health/monitoring: `/api/health`, `/api/metrics`
+- ✅ WebSocket upgrade: `/api/transports/ws` (not `/ws`)
+- ✅ SSE streams: `/api/transports/sse` (not `/sse`)
+- ✅ Subscriptions: `/api/transports/subscriptions` (not per-transport endpoints)
+
+**Exception**: Static files, health check endpoints for load balancers might use different prefixes like `/health` or `/`, but these should be explicitly documented and minimal.

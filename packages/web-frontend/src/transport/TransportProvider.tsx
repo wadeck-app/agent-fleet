@@ -1,16 +1,17 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import type { ConnectionState } from '@shared/transport';
 
 import type { ITransportClient } from './ITransportClient';
+import { HttpPollingTransportClient } from './adapters/HttpPollingTransportClient';
 import { LongPollingTransportClient } from './adapters/LongPollingTransportClient';
 import { MockTransportClient } from './adapters/MockTransportClient';
 import { RestTransportClient } from './adapters/RestTransportClient';
 import { SSETransportClient } from './adapters/SSETransportClient';
 import { WebSocketTransportClient } from './adapters/WebSocketTransportClient';
 
-type TransportMode = 'auto' | 'websocket' | 'sse' | 'long-polling' | 'rest' | 'mock';
+type TransportMode = 'auto' | 'websocket' | 'sse' | 'long-polling' | 'http-polling' | 'rest' | 'mock';
 
 /**
  * Generate or retrieve connection ID from sessionStorage
@@ -84,6 +85,18 @@ function createTransportClient(mode: TransportMode, baseUrl: string, wsUrl: stri
 				reconnectDelay: 1000,
 				connectionTimeout: 10000,
 				requestTimeout: 30000,
+			});
+
+		case 'http-polling':
+			return new HttpPollingTransportClient({
+				baseUrl,
+				wsUrl: '', // Not used for HTTP polling
+				reconnect: false, // HTTP polling doesn't reconnect (just keeps polling)
+				reconnectMaxAttempts: 0,
+				reconnectDelay: 0,
+				connectionTimeout: 10000,
+				requestTimeout: 30000,
+				pollInterval: 5000, // Poll every 5 seconds
 			});
 
 		case 'auto':
@@ -268,8 +281,19 @@ export function TransportProvider({
 }: TransportProviderProps) {
 	const navigate = useNavigate();
 
-	// Generate or retrieve connection ID
-	const connId = useState(() => getOrCreateConnId())[0];
+	// const connId = useState(() => getOrCreateConnId())[0];
+	const connId = useMemo(() => getOrCreateConnId());
+
+	// // Generate or retrieve connection ID
+	// // NOTE: We generate a NEW connId on each mount to handle React StrictMode double-mounting
+	// // This ensures each tab has a unique connId even after StrictMode cleanup/remount
+	// const [connId] = useState(() => {
+	// 	// Always generate a new connId on mount (don't reuse from sessionStorage)
+	// 	const newConnId = crypto.randomUUID();
+	// 	sessionStorage.setItem('agent_fleet_conn_id', newConnId);
+	// 	console.log('[TransportProvider] Generated new connId:', newConnId.substring(0, 8) + '...');
+	// 	return newConnId;
+	// });
 
 	// Create or use provided transport
 	const [transport, setTransport] = useState<ITransportClient>(() => {

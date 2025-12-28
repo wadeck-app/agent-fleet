@@ -70,20 +70,14 @@ export class WebSocketTransportServer implements ITransportServer {
 
 	/**
 	 * Initialize WebSocket server
-	 * Registers GET /ws endpoint with Fastify
+	 * Registers WebSocket endpoint with /api prefix
 	 */
 	async initialize(app: FastifyInstance): Promise<void> {
 		// Register @fastify/websocket plugin
 		await app.register(fastifyWebsocket);
 
-		// Register WebSocket endpoint
-		app.get('/ws', { websocket: true }, (connection: any, req: any) => {
-			// console.log(
-			// 	'[WS] Handler called with connection type:',
-			// 	typeof connection,
-			// 	'keys:',
-			// 	Object.keys(connection || {})
-			// );
+		// Register WebSocket endpoint (NEW with /api prefix)
+		app.get('/api/transports/ws', { websocket: true }, (connection: any, req: any) => {
 			console.log('[WS] connection.socket exists?', !!connection?.socket);
 
 			if (!connection) {
@@ -91,12 +85,20 @@ export class WebSocketTransportServer implements ITransportServer {
 				return;
 			}
 
-			// if (!connection.socket) {
-			// 	console.error('[WS] connection.socket is null/undefined, connection keys:', Object.keys(connection));
-			// 	return;
-			// }
+			this.handleConnection(connection, req);
+		});
 
-			// this.handleConnection(connection.socket, req);
+		// Backward compatibility redirect (temporary)
+		// Note: WebSocket upgrade requests cannot be redirected with 308
+		// Clients should be updated to use /api/transports/ws
+		app.get('/ws', { websocket: true }, (connection: any, req: any) => {
+			console.log('[WS] DEPRECATED: Client connecting via /ws, use /api/transports/ws instead');
+
+			if (!connection) {
+				console.error('[WS] Connection is null/undefined');
+				return;
+			}
+
 			this.handleConnection(connection, req);
 		});
 	}

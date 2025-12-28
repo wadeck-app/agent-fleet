@@ -1,28 +1,32 @@
 /**
- * Long Polling Transport Client
+ * HTTP Polling Transport Client
  *
- * HTTP Long Polling transport for receiving server events via HTTP requests
- * that remain open until data is available or timeout occurs.
+ * Simple HTTP polling transport for receiving server events via periodic HTTP requests.
+ * This is the most basic and compatible transport method.
  *
  * Key Features:
  * - Automatic cookie-based authentication (no manual token passing!)
  * - Automatic token refresh before expiration
  * - Server-side event filtering via subscriptions
- * - Automatic reconnection with exponential backoff
+ * - Configurable polling interval (default: 5 seconds)
  * - Type-safe event subscriptions
- * - Fallback transport for environments without WebSocket/SSE
+ * - Maximum compatibility (works everywhere HTTP works)
  *
- * How Long Polling Works:
- * 1. Client sends HTTP request to server
- * 2. Server holds connection open until event available or timeout
- * 3. Server responds with event(s)
- * 4. Client immediately sends next request (no delay)
- * 5. If timeout without events, server responds empty, client retries
+ * How HTTP Polling Works:
+ * 1. Client sends HTTP GET request every N seconds (default: 5)
+ * 2. Server responds immediately with events (if any) or empty array
+ * 3. Client processes events and waits for next poll interval
+ * 4. Repeat
+ *
+ * Differences from Long Polling:
+ * - HTTP Polling: Fixed interval, server responds immediately
+ * - Long Polling: Server holds connection until events available or timeout
  *
  * Limitations:
  * - Unidirectional: Server → Client only (like SSE)
- * - Higher latency than WebSocket/SSE
- * - Cannot send requests via long polling (use REST API instead)
+ * - Higher latency than WebSocket/SSE/Long Polling (depends on poll interval)
+ * - More overhead (frequent connections)
+ * - Cannot send requests via polling (use REST API instead)
  * - request() method throws error (not supported)
  *
  * Security:
@@ -33,10 +37,9 @@
  *
  * @example
  * ```typescript
- * const client = new LongPollingTransportClient({
+ * const client = new HttpPollingTransportClient({
  *   baseUrl: 'http://localhost:3000',
- *   reconnect: true,
- *   reconnectMaxAttempts: 10
+ *   pollInterval: 5000, // Poll every 5 seconds
  * });
  *
  * // Connect (starts polling loop)
@@ -67,15 +70,15 @@ import type {
 	UnsubscribeFunction,
 } from '@shared/transport';
 
-import type { ITransportClient, TransportStatus } from '../ITransportClient';
+import type { ITransportClient, Subscription, TransportStatus } from '../ITransportClient';
 import { TokenRefreshManager } from '../TokenRefreshManager';
 
 /**
- * Long Polling Response
- * Server response from long polling endpoint
+ * HTTP Polling Response
+ * Server response from HTTP polling endpoint
  */
-interface LongPollingResponse {
-	/** Array of events received during polling */
+interface HttpPollingResponse {
+	/** Array of events received since last poll */
 	events: TransportEvent[];
 	/** Whether client is authenticated */
 	authenticated?: boolean;
@@ -86,13 +89,21 @@ interface LongPollingResponse {
 }
 
 /**
- * Long Polling Transport Client
+ * Extended Transport Config with Polling Interval
+ */
+interface HttpPollingConfig extends TransportConfig {
+	/** Polling interval in milliseconds (default: 5000 = 5 seconds) */
+	pollInterval?: number;
+}
+
+/**
+ * HTTP Polling Transport Client
  *
- * Implements ITransportClient using HTTP Long Polling for event streaming.
+ * Implements ITransportClient using HTTP Polling (short polling) for event streaming.
  *
  * Note: This transport does NOT support request() - use REST API for requests.
  */
-export class LongPollingTransportClient implements ITransportClient {
+export class HttpPollingTransportClient implements ITransportClient {
 	/**
 	 * Current connection state
 	 */
@@ -120,14 +131,9 @@ export class LongPollingTransportClient implements ITransportClient {
 	private tokenRefreshManager: TokenRefreshManager;
 
 	/**
-	 * Reconnection attempt counter
+	 * Polling interval timer
 	 */
-	private reconnectAttempts = 0;
-
-	/**
-	 * Reconnection timer
-	 */
-	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+	private pollingInterval: ReturnType<typeof setInterval> | null = null;
 
 	/**
 	 * Flag indicating if connection was ever established successfully
@@ -140,29 +146,31 @@ export class LongPollingTransportClient implements ITransportClient {
 	private shouldPoll = false;
 
 	/**
+	 * Polling interval in milliseconds
+	 */
+	private pollIntervalMs: number;
+
+	/**
 	 * Current polling request abort controller
 	 */
 	private abortController: AbortController | null = null;
 
 	/**
-	 * Flag to prevent multiple concurrent polls
+	 * Create a new HttpPollingTransportClient
+	 * @param config - Transport configuration with optional pollInterval
 	 */
-	private isPolling = false;
+	constructor(private config: HttpPollingConfig) {
+		this.pollIntervalMs = config.pollInterval || 5000; // Default: 5 seconds
 
-	/**
-	 * Create a new LongPollingTransportClient
-	 * @param config - Transport configuration
-	 */
-	constructor(private config: TransportConfig) {
 		// SECURITY: Token refresh via HTTP
 		this.tokenRefreshManager = new TokenRefreshManager({
 			refreshEndpoint: `${config.baseUrl}/api/auth/refresh`,
 			refreshBeforeExpiry: 60000, // Refresh 1 minute before expiry
 			onRefreshSuccess: _expiresAt => {
-				console.log('[LongPolling] Token refreshed, connection still valid');
+				console.log('[HttpPolling] Token refreshed, connection still valid');
 			},
 			onRefreshFailed: error => {
-				console.error('[LongPolling] Token refresh failed, triggering re-auth', error);
+				console.error('[HttpPolling] Token refresh failed, triggering re-auth', error);
 				this.disconnect();
 				window.dispatchEvent(new CustomEvent('auth:refresh_failed'));
 			},
@@ -170,7 +178,7 @@ export class LongPollingTransportClient implements ITransportClient {
 	}
 
 	/**
-	 * Connect to long polling server
+	 * Connect to HTTP polling server
 	 *
 	 * Starts the polling loop and waits for initial authentication confirmation.
 	 *
@@ -187,7 +195,13 @@ export class LongPollingTransportClient implements ITransportClient {
 		try {
 			// First poll will authenticate
 			await this.performPoll();
-			// If successful, polling loop continues automatically
+
+			// Start polling interval
+			this.pollingInterval = setInterval(() => {
+				this.performPoll().catch(error => {
+					console.error('[HttpPolling] Poll failed:', error);
+				});
+			}, this.pollIntervalMs);
 		} catch (error) {
 			this.shouldPoll = false;
 			throw error;
@@ -195,7 +209,7 @@ export class LongPollingTransportClient implements ITransportClient {
 	}
 
 	/**
-	 * Disconnect from long polling server
+	 * Disconnect from HTTP polling server
 	 *
 	 * Stops the polling loop and cleans up resources.
 	 */
@@ -203,9 +217,9 @@ export class LongPollingTransportClient implements ITransportClient {
 		this.shouldPoll = false;
 		this.tokenRefreshManager.stopAutoRefresh();
 
-		if (this.reconnectTimer) {
-			clearTimeout(this.reconnectTimer);
-			this.reconnectTimer = null;
+		if (this.pollingInterval) {
+			clearInterval(this.pollingInterval);
+			this.pollingInterval = null;
 		}
 
 		if (this.abortController) {
@@ -227,50 +241,17 @@ export class LongPollingTransportClient implements ITransportClient {
 	 * Get transport type
 	 */
 	getTransportType(): TransportType {
-		return 'long-polling';
-	}
-
-	/**
-	 * Force manual downgrade to REST polling
-	 */
-	forceDowngrade(): void {
-		console.log('[LongPolling] User requested manual downgrade to REST');
-
-		this.shouldPoll = false;
-		this.tokenRefreshManager.stopAutoRefresh();
-
-		if (this.reconnectTimer) {
-			clearTimeout(this.reconnectTimer);
-			this.reconnectTimer = null;
-		}
-
-		if (this.abortController) {
-			this.abortController.abort();
-			this.abortController = null;
-		}
-
-		this.updateConnectionState('manual_downgrade');
-	}
-
-	/**
-	 * Get next reconnection delay in seconds
-	 */
-	getReconnectDelay(): number {
-		if (this.connectionState !== 'reconnecting') {
-			return 0;
-		}
-
-		const delayMs = Math.min((this.config.reconnectDelay || 1000) * Math.pow(2, this.reconnectAttempts - 1), 30000);
-		return Math.round(delayMs / 1000);
+		// Note: 'http-polling' is not in the base TransportType, but we use 'http' as closest match
+		return 'http';
 	}
 
 	/**
 	 * Make a type-safe request
 	 *
-	 * ⚠️ NOT SUPPORTED by Long Polling (unidirectional transport)
+	 * ⚠️ NOT SUPPORTED by HTTP Polling (unidirectional transport)
 	 * Use REST API for requests instead.
 	 *
-	 * @throws Error Always throws - Long Polling does not support requests
+	 * @throws Error Always throws - HTTP Polling does not support requests
 	 */
 	async request<M extends HttpMethod, P extends PathsForMethod<M>>(
 		_method: M,
@@ -278,8 +259,8 @@ export class LongPollingTransportClient implements ITransportClient {
 		_options?: RequestOptions<M, P>
 	): Promise<ResponseType<M, P>> {
 		throw new Error(
-			'[LongPolling] request() is not supported by Long Polling transport. ' +
-				'Long Polling is unidirectional (server→client only). ' +
+			'[HttpPolling] request() is not supported by HTTP Polling transport. ' +
+				'HTTP Polling is unidirectional (server→client only). ' +
 				'Use REST API for requests.'
 		);
 	}
@@ -306,7 +287,9 @@ export class LongPollingTransportClient implements ITransportClient {
 
 		// Notify server of subscription (with filters)
 		if (isFirstSubscription) {
-			this.sendSubscriptionMessage('subscribe', [event], filters);
+			this.subscribeToEvent(event, filters).catch(error => {
+				console.error(`[HttpPolling] Failed to subscribe to ${event}:`, error);
+			});
 		}
 
 		return () => {
@@ -316,7 +299,9 @@ export class LongPollingTransportClient implements ITransportClient {
 			if (this.eventHandlers.get(event)?.size === 0) {
 				this.eventHandlers.delete(event);
 				this.eventFilters.delete(event);
-				this.sendSubscriptionMessage('unsubscribe', [event]);
+				this.unsubscribeFromEvent(event).catch(error => {
+					console.error(`[HttpPolling] Failed to unsubscribe from ${event}:`, error);
+				});
 			}
 		};
 	}
@@ -356,7 +341,7 @@ export class LongPollingTransportClient implements ITransportClient {
 			throw new Error(`Subscription failed: ${response.status} ${response.statusText}`);
 		}
 
-		console.log(`[LongPolling] Subscribed to ${events.length} events`);
+		console.log(`[HttpPolling] Subscribed to ${events.length} events`);
 	}
 
 	/**
@@ -385,7 +370,7 @@ export class LongPollingTransportClient implements ITransportClient {
 			throw new Error(`Subscription failed: ${response.status} ${response.statusText}`);
 		}
 
-		console.log(`[LongPolling] Subscribed to event: ${event}`);
+		console.log(`[HttpPolling] Subscribed to event: ${event}`);
 	}
 
 	/**
@@ -412,13 +397,13 @@ export class LongPollingTransportClient implements ITransportClient {
 			throw new Error(`Unsubscription failed: ${response.status} ${response.statusText}`);
 		}
 
-		console.log(`[LongPolling] Unsubscribed from event: ${event}`);
+		console.log(`[HttpPolling] Unsubscribed from event: ${event}`);
 	}
 
 	/**
 	 * Get current subscriptions (unified subscription API)
 	 */
-	async getSubscriptions(): Promise<Array<{ event: string; filters?: Record<string, unknown> }>> {
+	async getSubscriptions(): Promise<Subscription[]> {
 		const connId = sessionStorage.getItem('agent_fleet_conn_id');
 		if (!connId) {
 			throw new Error('No connId found in sessionStorage');
@@ -465,34 +450,13 @@ export class LongPollingTransportClient implements ITransportClient {
 	}
 
 	/**
-	 * Send subscription control message to server
-	 */
-	private sendSubscriptionMessage(
-		action: 'subscribe' | 'unsubscribe',
-		events: string[],
-		filters?: Record<string, unknown>
-	): void {
-		// Use unified subscription API
-		if (action === 'subscribe') {
-			this.subscribeToEvent(events[0], filters).catch(error => {
-				console.error(`[LongPolling] Failed to subscribe to ${events[0]}:`, error);
-			});
-		} else {
-			this.unsubscribeFromEvent(events[0]).catch(error => {
-				console.error(`[LongPolling] Failed to unsubscribe from ${events[0]}:`, error);
-			});
-		}
-	}
-
-	/**
-	 * Perform a single long polling request
+	 * Perform a single HTTP polling request
 	 */
 	private async performPoll(): Promise<void> {
-		if (!this.shouldPoll || this.isPolling) {
+		if (!this.shouldPoll) {
 			return;
 		}
 
-		this.isPolling = true;
 		this.abortController = new AbortController();
 
 		try {
@@ -502,18 +466,11 @@ export class LongPollingTransportClient implements ITransportClient {
 				throw new Error('No connId found in sessionStorage');
 			}
 
-			// Long polling timeout: 30s (server will respond before this)
-			const timeout = setTimeout(() => {
-				this.abortController?.abort();
-			}, 30000);
-
-			const response = await fetch(`${this.config.baseUrl}/api/transports/long-polling?connId=${connId}`, {
+			const response = await fetch(`${this.config.baseUrl}/api/transports/http-polling?connId=${connId}`, {
 				method: 'GET',
 				credentials: 'include', // Send cookies for authentication
 				signal: this.abortController.signal,
 			});
-
-			clearTimeout(timeout);
 
 			if (!response.ok) {
 				if (response.status === 401) {
@@ -524,13 +481,13 @@ export class LongPollingTransportClient implements ITransportClient {
 				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 			}
 
-			// Defensive JSON parsing: handle empty/malformed responses
-			let data: LongPollingResponse;
+			// Parse response
+			let data: HttpPollingResponse;
 			try {
 				data = await response.json();
 			} catch (jsonError) {
-				// Empty or malformed JSON (connection aborted, timeout, etc.)
-				console.warn('[LongPolling] Failed to parse response JSON, using empty events:', jsonError);
+				// Empty or malformed JSON
+				console.warn('[HttpPolling] Failed to parse response JSON, using empty events:', jsonError);
 				data = {
 					events: [],
 					authenticated: true,
@@ -539,9 +496,8 @@ export class LongPollingTransportClient implements ITransportClient {
 
 			// Handle initial authentication
 			if (!this.hasConnectedOnce && data.authenticated) {
-				console.log(`[LongPolling] Authenticated as user ${data.userId}`);
+				console.log(`[HttpPolling] Authenticated as user ${data.userId}`);
 				this.hasConnectedOnce = true;
-				this.reconnectAttempts = 0;
 				this.updateConnectionState('connected');
 
 				// Start token refresh
@@ -557,26 +513,17 @@ export class LongPollingTransportClient implements ITransportClient {
 			if (data.events && data.events.length > 0) {
 				data.events.forEach(event => this.handleEvent(event));
 			}
-
-			// Continue polling immediately (no delay)
-			this.isPolling = false;
-			if (this.shouldPoll) {
-				setImmediate(() => this.performPoll());
-			}
 		} catch (error) {
-			this.isPolling = false;
-
 			// Ignore abort errors (manual disconnect)
 			if (error instanceof Error && error.name === 'AbortError') {
 				return;
 			}
 
-			console.error('[LongPolling] Polling error:', error);
+			console.error('[HttpPolling] Polling error:', error);
 
-			// If we were connected, try to reconnect
+			// If we were connected, mark as disconnected
 			if (this.hasConnectedOnce && this.shouldPoll) {
 				this.updateConnectionState('disconnected');
-				this.handleReconnect();
 			} else {
 				// Initial connection failed
 				this.updateConnectionState('error');
@@ -591,7 +538,9 @@ export class LongPollingTransportClient implements ITransportClient {
 	private resubscribeAll(): void {
 		for (const [event, _handlers] of this.eventHandlers) {
 			const filters = this.eventFilters.get(event);
-			this.sendSubscriptionMessage('subscribe', [event], filters);
+			this.subscribeToEvent(event, filters).catch(error => {
+				console.error(`[HttpPolling] Failed to resubscribe to ${event}:`, error);
+			});
 		}
 	}
 
@@ -605,49 +554,10 @@ export class LongPollingTransportClient implements ITransportClient {
 				try {
 					handler(event.data);
 				} catch (error) {
-					console.error(`[LongPolling] Error in event handler for ${event.type}:`, error);
+					console.error(`[HttpPolling] Error in event handler for ${event.type}:`, error);
 				}
 			});
 		}
-	}
-
-	/**
-	 * Handle reconnection logic
-	 */
-	private handleReconnect(): void {
-		if (!this.shouldPoll) {
-			console.log('[LongPolling] Reconnection disabled (manual disconnect)');
-			return;
-		}
-
-		if (!this.config.reconnect) {
-			console.log('[LongPolling] Reconnection disabled by config');
-			this.updateConnectionState('error');
-			return;
-		}
-
-		const maxAttempts = this.hasConnectedOnce ? Infinity : this.config.reconnectMaxAttempts || 3;
-
-		if (this.reconnectAttempts >= maxAttempts) {
-			console.error('[LongPolling] Max reconnection attempts reached');
-			this.updateConnectionState('error');
-			return;
-		}
-
-		this.reconnectAttempts++;
-		this.updateConnectionState('reconnecting');
-
-		// Exponential backoff
-		const delay = Math.min((this.config.reconnectDelay || 1000) * Math.pow(2, this.reconnectAttempts - 1), 30000);
-
-		console.log(`[LongPolling] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${maxAttempts})...`);
-
-		this.reconnectTimer = setTimeout(() => {
-			console.log('[LongPolling] Attempting reconnection...');
-			this.performPoll().catch(error => {
-				console.error('[LongPolling] Reconnection failed:', error);
-			});
-		}, delay);
 	}
 
 	/**
@@ -659,13 +569,13 @@ export class LongPollingTransportClient implements ITransportClient {
 		}
 
 		this.connectionState = state;
-		console.log(`[LongPolling] Connection state changed: ${state}`);
+		console.log(`[HttpPolling] Connection state changed: ${state}`);
 
 		this.connectionStateHandlers.forEach(handler => {
 			try {
 				handler(state);
 			} catch (error) {
-				console.error('[LongPolling] Error in connection state handler:', error);
+				console.error('[HttpPolling] Error in connection state handler:', error);
 			}
 		});
 	}

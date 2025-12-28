@@ -419,7 +419,7 @@ Each Node.js instance has its own in-memory sessions. User on instance 1 won't r
 **Solution: Redis-backed session storage**
 
 ```typescript
-// TODO: Implement Redis-backed WebSocketSessionManager
+// TODO: Implement Redis-backed TransportSessionManager
 import Redis from 'ioredis';
 
 const redis = new Redis(process.env.REDIS_URL);

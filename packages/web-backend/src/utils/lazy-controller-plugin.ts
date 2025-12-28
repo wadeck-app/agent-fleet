@@ -142,7 +142,7 @@ function createLazyControllerPlugin<Routes = any>(
 
 		// Map baseUrl to factory method
 		if (baseUrl === '/api/auth') {
-			// AuthController needs both AuthService and WebSocketSessionManager
+			// AuthController needs both AuthService and TransportSessionManager
 			const authService = factory.getAuthService();
 			const sessionManager = factory.getSessionManager();
 			// @ts-expect-error - Dynamic service injection based on baseUrl

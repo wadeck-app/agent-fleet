@@ -2,14 +2,14 @@ import type { IncomingMessage } from 'http';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { MockAuthService } from '../auth/MockAuthService';
-import { WebSocketSessionManager } from './WebSocketSessionManager';
+import { TransportSessionManager } from './TransportSessionManager';
 
 /**
  * ===========================================================================================
- * WEBSOCKET SESSION MANAGER TESTS
+ * TRANSPORT SESSION MANAGER TESTS
  * ===========================================================================================
  *
- * Tests for WebSocket session tracking, authentication, and subscription management.
+ * Tests for transport session tracking, authentication, and subscription management.
  *
  * Coverage:
  * - Connection authentication from HTTP cookies
@@ -19,18 +19,19 @@ import { WebSocketSessionManager } from './WebSocketSessionManager';
  * - Subscription tracking
  * - Session expiration and cleanup
  * - Statistics
+ * - Transport type tracking
  *
  * ===========================================================================================
  */
 
-describe('WebSocketSessionManager', () => {
-	let sessionManager: WebSocketSessionManager;
+describe('TransportSessionManager', () => {
+	let sessionManager: TransportSessionManager;
 	let authService: MockAuthService;
 	const testSecret = 'test-secret-key';
 
 	beforeEach(() => {
 		authService = new MockAuthService(testSecret);
-		sessionManager = new WebSocketSessionManager(authService);
+		sessionManager = new TransportSessionManager(authService);
 	});
 
 	afterEach(() => {
@@ -54,7 +55,7 @@ describe('WebSocketSessionManager', () => {
 			const session = await sessionManager.authenticateConnection('client-1', request);
 
 			expect(session).toMatchObject({
-				clientId: 'client-1',
+				connId: 'client-1',
 				userId,
 				accessToken,
 			});
@@ -105,7 +106,7 @@ describe('WebSocketSessionManager', () => {
 			// Both sessions should exist
 			const userSessions = sessionManager.getUserSessions(userId);
 			expect(userSessions).toHaveLength(2);
-			expect(userSessions.map(s => s.clientId)).toEqual(expect.arrayContaining(['client-1', 'client-2']));
+			expect(userSessions.map(s => s.connId)).toEqual(expect.arrayContaining(['client-1', 'client-2']));
 		});
 	});
 
@@ -126,7 +127,7 @@ describe('WebSocketSessionManager', () => {
 
 			expect(result.userId).toBe(userId);
 			expect(result.session).toMatchObject({
-				clientId: 'client-1',
+				connId: 'client-1',
 				userId,
 			});
 		});
@@ -345,7 +346,7 @@ describe('WebSocketSessionManager', () => {
 
 			const remainingSessions = sessionManager.getUserSessions(userId);
 			expect(remainingSessions).toHaveLength(1);
-			expect(remainingSessions[0].clientId).toBe('client-2');
+			expect(remainingSessions[0].connId).toBe('client-2');
 		});
 	});
 

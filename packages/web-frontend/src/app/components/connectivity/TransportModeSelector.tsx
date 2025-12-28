@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from '@framework/components/forms/RadioGro
 
 import { useConnId, useTransport } from '@/transport';
 
-export type TransportMode = 'auto' | 'websocket' | 'sse' | 'long-polling' | 'rest' | 'mock';
+export type TransportMode = 'auto' | 'websocket' | 'sse' | 'long-polling' | 'http-polling' | 'rest' | 'mock';
 
 export interface TransportModeSelectorProps {
 	/** Additional CSS classes */
@@ -23,7 +23,8 @@ const modes: Array<{ value: TransportMode; label: string; description: string }>
 	{ value: 'websocket', label: 'WebSocket', description: 'Real-time bidirectional' },
 	{ value: 'sse', label: 'SSE', description: 'Server-Sent Events' },
 	{ value: 'long-polling', label: 'Long Polling', description: 'HTTP long polling' },
-	{ value: 'rest', label: 'REST', description: 'Simple HTTP polling' },
+	{ value: 'http-polling', label: 'HTTP Polling', description: 'Short polling (5s interval)' },
+	{ value: 'rest', label: 'REST', description: 'No real-time events' },
 	{ value: 'mock', label: 'Mock', description: 'Test mode' },
 ];
 

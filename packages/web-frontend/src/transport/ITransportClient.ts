@@ -144,4 +144,120 @@ export interface ITransportClient extends ITransport {
 	 * ```
 	 */
 	onConnectionStateChange(handler: ConnectionStateHandler): () => void;
+
+	/**
+	 * Subscribe to multiple events in a single request (unified subscription API)
+	 *
+	 * Batch subscription endpoint for efficient subscription management.
+	 * Supported by SSE, Long Polling, and HTTP Polling transports.
+	 *
+	 * @param events - Array of event types to subscribe to
+	 * @param filters - Optional filters per event type for server-side filtering
+	 * @returns Promise that resolves when subscription is confirmed
+	 *
+	 * @example
+	 * ```typescript
+	 * await client.subscribeBatch(
+	 *   ['b2f:task:created', 'b2f:task:updated'],
+	 *   {
+	 *     'b2f:task:created': { workerId: 'worker-123' },
+	 *     'b2f:task:updated': { status: 'IN_PROGRESS' }
+	 *   }
+	 * );
+	 * ```
+	 */
+	subscribeBatch?(events: string[], filters?: Record<string, Record<string, unknown>>): Promise<void>;
+
+	/**
+	 * Subscribe to a single event (unified subscription API)
+	 *
+	 * Individual event subscription endpoint.
+	 * Supported by SSE, Long Polling, and HTTP Polling transports.
+	 *
+	 * @param event - Event type to subscribe to
+	 * @param filters - Optional filters for server-side filtering
+	 * @returns Promise that resolves when subscription is confirmed
+	 *
+	 * @example
+	 * ```typescript
+	 * await client.subscribeToEvent('b2f:task:created', {
+	 *   workerId: 'worker-123'
+	 * });
+	 * ```
+	 */
+	subscribeToEvent?(event: string, filters?: Record<string, unknown>): Promise<void>;
+
+	/**
+	 * Unsubscribe from a single event (unified subscription API)
+	 *
+	 * @param event - Event type to unsubscribe from
+	 * @returns Promise that resolves when unsubscription is confirmed
+	 *
+	 * @example
+	 * ```typescript
+	 * await client.unsubscribeFromEvent('b2f:task:created');
+	 * ```
+	 */
+	unsubscribeFromEvent?(event: string): Promise<void>;
+
+	/**
+	 * Get current subscriptions (unified subscription API)
+	 *
+	 * @returns Promise resolving to array of current subscriptions with filters
+	 *
+	 * @example
+	 * ```typescript
+	 * const subscriptions = await client.getSubscriptions();
+	 * console.log('Subscribed events:', subscriptions.map(s => s.event));
+	 * ```
+	 */
+	getSubscriptions?(): Promise<Subscription[]>;
+
+	/**
+	 * Get transport status and connection details (unified subscription API)
+	 *
+	 * @returns Promise resolving to current transport status
+	 *
+	 * @example
+	 * ```typescript
+	 * const status = await client.getTransportStatus();
+	 * console.log('Connected as:', status.userId);
+	 * console.log('Subscribed to:', status.subscriptions.length, 'events');
+	 * ```
+	 */
+	getTransportStatus?(): Promise<TransportStatus>;
+}
+
+/**
+ * Subscription
+ * Represents an active event subscription with optional filters
+ */
+export interface Subscription {
+	/** Event type being subscribed to */
+	event: string;
+	/** Optional server-side filters */
+	filters?: Record<string, unknown>;
+}
+
+/**
+ * Transport Status
+ * Complete status information about the transport connection
+ */
+export interface TransportStatus {
+	/** Unique client identifier */
+	clientId: string;
+	/** Authenticated user ID */
+	userId: string;
+	/** Transport type being used */
+	transportType: TransportType;
+	/** Whether client is currently connected */
+	connected: boolean;
+	/** Timestamp when authentication completed */
+	authenticatedAt: number;
+	/** Timestamp of last activity */
+	lastActivity: number;
+	/** List of subscribed event types */
+	subscriptions: string[];
+	/** Number of queued events waiting for delivery */
+	queuedEvents: number;
 }

@@ -16,6 +16,7 @@ import { getOrchestratorPortsFromEnv } from 'shared-common/PortCalculator';
 import { logger } from 'shared-common/logger';
 import { fileURLToPath } from 'url';
 
+import { TransportsController } from './controllers/TransportsController';
 import type { DataStoreFactory } from './factories';
 import apiStatsHook from './fastify/hooks/apiStats.hook';
 import errorHandlerHook from './fastify/hooks/errorHandler.hook';
@@ -25,6 +26,7 @@ import responseHelpersPlugin from './fastify/plugins/responseHelpers.plugin';
 import routesPlugin from './fastify/plugins/routes.plugin';
 import { EventBroadcaster } from './transport/EventBroadcaster';
 import { MessageQueue } from './transport/MessageQueue';
+import { HttpPollingTransportServer } from './transport/adapters/HttpPollingTransportServer';
 import { LongPollingTransportServer } from './transport/adapters/LongPollingTransportServer';
 import { SSETransportServer } from './transport/adapters/SSETransportServer';
 import { WebSocketTransportServer } from './transport/adapters/WebSocketTransportServer';
@@ -86,7 +88,7 @@ async function initializeOrchestratorClient(): Promise<Orchestrator> {
 }
 
 /**
- * Initialize Multi-Transport Server (WebSocket, SSE, Long Polling)
+ * Initialize Multi-Transport Server (WebSocket, SSE, Long Polling, HTTP Polling)
  *
  * Anti-fragile design:
  * - Each transport is independent
@@ -99,7 +101,7 @@ async function initializeTransportServer(app: FastifyInstance, factory: DataStor
 	const sessionManager = factory.getSessionManager();
 	const router = factory.getTransportRouter();
 
-	// Create MessageQueue for polling transports (SSE, Long Polling)
+	// Create MessageQueue for polling transports (SSE, Long Polling, HTTP Polling)
 	const messageQueue = new MessageQueue({
 		maxQueueSize: 100,
 		messageTTL: 60000, // 1 minute
@@ -110,24 +112,46 @@ async function initializeTransportServer(app: FastifyInstance, factory: DataStor
 	const wsTransportServer = new WebSocketTransportServer(sessionManager, router);
 	const sseTransportServer = new SSETransportServer(sessionManager, messageQueue);
 	const longPollingTransportServer = new LongPollingTransportServer(sessionManager, messageQueue);
+	const httpPollingTransportServer = new HttpPollingTransportServer(sessionManager, messageQueue);
 
 	// Initialize all transports
 	await wsTransportServer.initialize(app);
 	await sseTransportServer.initialize(app);
 	await longPollingTransportServer.initialize(app);
+	await httpPollingTransportServer.initialize(app);
+
+	// Register TransportsController for unified subscription management
+	const transportsController = new TransportsController(sessionManager, messageQueue);
+	app.post('/api/transports/subscriptions', async (req, reply) =>
+		transportsController.batchSubscriptions(req, reply)
+	);
+	app.post('/api/transports/subscriptions/:event', async (req, reply) =>
+		transportsController.subscribeToEvent(req, reply)
+	);
+	app.delete('/api/transports/subscriptions/:event', async (req, reply) =>
+		transportsController.unsubscribeFromEvent(req, reply)
+	);
+	app.get('/api/transports/subscriptions', async (req, reply) => transportsController.getSubscriptions(req, reply));
+	app.get('/api/transports/status', async (req, reply) => transportsController.getStatus(req, reply));
 
 	// Register WebSocket as primary transport server in factory (for MonitoringController)
 	factory.setTransportServer(wsTransportServer);
 
 	// Create EventBroadcaster that broadcasts to ALL transports
-	const allTransports = [wsTransportServer, sseTransportServer, longPollingTransportServer];
+	const allTransports = [
+		wsTransportServer,
+		sseTransportServer,
+		longPollingTransportServer,
+		httpPollingTransportServer,
+	];
 	const eventBroadcaster = new EventBroadcaster(allTransports, sessionManager, messageQueue);
 	factory.setEventBroadcaster(eventBroadcaster);
 
 	logger.info(`[Transport] Multi-transport server initialized:`);
-	logger.info(`  - WebSocket: ws://localhost:${PORT}/ws`);
-	logger.info(`  - SSE: http://localhost:${PORT}/sse`);
-	logger.info(`  - Long Polling: http://localhost:${PORT}/long-polling/events`);
+	logger.info(`  - WebSocket: ws://localhost:${PORT}/api/transports/ws`);
+	logger.info(`  - SSE: http://localhost:${PORT}/api/transports/sse`);
+	logger.info(`  - Long Polling: http://localhost:${PORT}/api/transports/long-polling`);
+	logger.info(`  - HTTP Polling: http://localhost:${PORT}/api/transports/http-polling`);
 
 	// Log connection events for all transports
 	const logConnection = (transport: string) => (clientId: string) => {
@@ -147,6 +171,9 @@ async function initializeTransportServer(app: FastifyInstance, factory: DataStor
 
 	longPollingTransportServer.onClientConnected(logConnection('LongPolling'));
 	longPollingTransportServer.onClientDisconnected(logDisconnection('LongPolling'));
+
+	httpPollingTransportServer.onClientConnected(logConnection('HttpPolling'));
+	httpPollingTransportServer.onClientDisconnected(logDisconnection('HttpPolling'));
 
 	// Log transport distribution every 60 seconds
 	setInterval(() => {

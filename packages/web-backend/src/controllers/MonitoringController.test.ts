@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { MockAuthService } from '../auth/MockAuthService';
-import { WebSocketSessionManager } from '../transport/WebSocketSessionManager';
+import { TransportSessionManager } from '../transport/TransportSessionManager';
 import { MockTransportServer } from '../transport/adapters/MockTransportServer';
 import MonitoringController from './MonitoringController';
 
@@ -51,7 +51,7 @@ function createMockRequest(userId?: string) {
 describe('MonitoringController', () => {
 	let controller: MonitoringController;
 	let transportServer: MockTransportServer;
-	let sessionManager: WebSocketSessionManager;
+	let sessionManager: TransportSessionManager;
 	let authService: MockAuthService;
 
 	beforeEach(() => {
@@ -59,7 +59,7 @@ describe('MonitoringController', () => {
 		authService = new MockAuthService('test-secret');
 
 		// Create session manager
-		sessionManager = new WebSocketSessionManager(authService);
+		sessionManager = new TransportSessionManager(authService);
 
 		// Create transport server
 		transportServer = new MockTransportServer();

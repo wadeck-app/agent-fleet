@@ -43,8 +43,8 @@ import type { TransportSessionManager } from '../TransportSessionManager';
  * Tracks a long polling request waiting for events
  */
 interface PendingPoll {
-	/** Client ID */
-	clientId: string;
+	/** Connection ID */
+	connId: string;
 	/** User ID */
 	userId: string;
 	/** Fastify reply */
@@ -79,13 +79,13 @@ interface LongPollingResponse {
 export class LongPollingTransportServer implements ITransportServer {
 	/**
 	 * Pending poll requests
-	 * Map<clientId, PendingPoll>
+	 * Map<connId, PendingPoll>
 	 */
 	private pendingPolls = new Map<string, PendingPoll>();
 
 	/**
-	 * Active client sessions (tracked for getConnectedClients)
-	 * Map<clientId, lastPollTimestamp>
+	 * Active connection sessions (tracked for getConnectedClients)
+	 * Map<connId, lastPollTimestamp>
 	 */
 	private activeSessions = new Map<string, number>();
 
@@ -132,17 +132,17 @@ export class LongPollingTransportServer implements ITransportServer {
 
 	/**
 	 * Initialize Long Polling server
-	 * Registers polling endpoint and subscription management
+	 * Registers polling endpoint with /api prefix
 	 */
 	async initialize(app: FastifyInstance): Promise<void> {
-		// Long polling events endpoint
-		app.get('/long-polling/events', async (request, reply) => {
+		// Long polling events endpoint (NEW with /api prefix)
+		app.get('/api/transports/long-polling', async (request, reply) => {
 			await this.handlePollRequest(request, reply);
 		});
 
-		// Subscription management endpoint
-		app.post('/long-polling/subscription', async (request, reply) => {
-			await this.handleSubscriptionUpdate(request, reply);
+		// Backward compatibility redirect (temporary)
+		app.get('/long-polling/events', async (request, reply) => {
+			reply.code(308).redirect('/api/transports/long-polling');
 		});
 
 		// Start cleanup timer
@@ -155,37 +155,35 @@ export class LongPollingTransportServer implements ITransportServer {
 	 * Handle long polling request
 	 */
 	private async handlePollRequest(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-		// Get or create client ID from cookie
-		const cookies = this.parseCookies(request.raw.headers.cookie || '');
-		let clientId = cookies['client_id'];
+		// Get connId from query parameter (sent by client)
+		const connId = (request.query as { connId?: string }).connId;
 
-		if (!clientId) {
-			clientId = this.generateClientId();
-			// Note: In production, you'd set this cookie properly
-			reply.header('Set-Cookie', `client_id=${clientId}; HttpOnly; SameSite=Strict; Path=/`);
+		if (!connId) {
+			reply.code(400).send({ error: 'Missing connId parameter' });
+			return;
 		}
 
 		try {
 			// Authenticate
-			const session = await this.sessionManager.authenticateConnection(clientId, request.raw, 'long-polling');
+			const session = await this.sessionManager.authenticateConnection(connId, request.raw, 'long-polling');
 
 			// Track active session
-			const isNewSession = !this.activeSessions.has(clientId);
-			this.activeSessions.set(clientId, Date.now());
+			const isNewSession = !this.activeSessions.has(connId);
+			this.activeSessions.set(connId, Date.now());
 
 			if (isNewSession) {
 				console.log(
-					`[LongPolling] New client ${clientId} (user=${session.userId}, total=${this.activeSessions.size})`
+					`[LongPolling] New connection ${connId} (user=${session.userId}, total=${this.activeSessions.size})`
 				);
-				this.connectHandlers.forEach(handler => handler(clientId));
+				this.connectHandlers.forEach(handler => handler(connId));
 			}
 
 			// Check if there are queued events
-			const queuedEvents = this.messageQueue.dequeue(clientId);
+			const queuedEvents = this.messageQueue.dequeue(connId);
 
 			if (queuedEvents.length > 0) {
 				// Immediate response with queued events
-				console.log(`[LongPolling] Sending ${queuedEvents.length} queued events to client ${clientId}`);
+				console.log(`[LongPolling] Sending ${queuedEvents.length} queued events to connection ${connId}`);
 				const response: LongPollingResponse = {
 					events: queuedEvents,
 					authenticated: true,
@@ -198,16 +196,16 @@ export class LongPollingTransportServer implements ITransportServer {
 
 			// No queued events, hold connection open
 			const pending: PendingPoll = {
-				clientId,
+				connId,
 				userId: session.userId,
 				reply,
 				timeout: setTimeout(() => {
-					this.respondToPoll(clientId, []);
+					this.respondToPoll(connId, []);
 				}, this.POLL_TIMEOUT),
 				receivedAt: Date.now(),
 			};
 
-			this.pendingPolls.set(clientId, pending);
+			this.pendingPolls.set(connId, pending);
 
 			// If this is the first poll, send initial response
 			if (isNewSession) {
@@ -218,16 +216,32 @@ export class LongPollingTransportServer implements ITransportServer {
 					tokenExpiresAt: session.tokenExpiresAt,
 				};
 				reply.send(response);
-				this.pendingPolls.delete(clientId);
+				this.pendingPolls.delete(connId);
 				clearTimeout(pending.timeout);
 			}
 
 			// Handle request abort
 			request.raw.on('close', () => {
-				const p = this.pendingPolls.get(clientId);
+				const p = this.pendingPolls.get(connId);
 				if (p) {
 					clearTimeout(p.timeout);
-					this.pendingPolls.delete(clientId);
+					this.pendingPolls.delete(connId);
+
+					// Send empty response if not already sent
+					// This prevents leaving the connection with an incomplete HTTP response when it aborts
+					try {
+						if (!p.reply.sent) {
+							const response: LongPollingResponse = {
+								events: [],
+								authenticated: true,
+								userId: p.userId,
+							};
+							p.reply.send(response);
+						}
+					} catch (error) {
+						// Connection already closed or response already sent, ignore
+						// This is expected behavior when connection aborts
+					}
 				}
 			});
 		} catch (error) {
@@ -241,80 +255,29 @@ export class LongPollingTransportServer implements ITransportServer {
 
 	/**
 	 * Handle subscription update (subscribe/unsubscribe)
+	 *
+	 * DEPRECATED: Subscription management now handled by TransportsController
+	 * at /api/transports/subscriptions. This method is kept for backward
+	 * compatibility but should be removed in future versions.
 	 */
 	private async handleSubscriptionUpdate(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-		try {
-			// Parse cookies for authentication
-			const cookies = this.parseCookies(request.raw.headers.cookie || '');
-			const accessToken = cookies['access_token'];
-			const clientId = cookies['client_id'];
-
-			// SECURITY: DEVELOPMENT ONLY - Bypass authentication if DISABLE_AUTH_DEV=true
-			const disableAuthDev = process.env.DISABLE_AUTH_DEV === 'true';
-
-			let userId: string;
-
-			if (disableAuthDev && !accessToken && clientId) {
-				// Mode DEV: pas d'auth, use mock user
-				userId = 'dev-user-no-auth';
-				console.log('[LongPolling] DEV MODE: Subscription without auth (user=dev-user-no-auth)');
-			} else if (!accessToken || !clientId) {
-				reply.code(401).send({ error: 'Unauthorized' });
-				return;
-			} else {
-				// Get user from token
-				const result = await this.sessionManager['authService'].verifyAccessToken(accessToken);
-				userId = result.userId;
-			}
-
-			// Get request body
-			const body = request.body as {
-				action: 'subscribe' | 'unsubscribe';
-				events: string[];
-				filters?: Record<string, unknown>;
-			};
-
-			// Update subscriptions
-			const session = this.sessionManager['sessions'].get(clientId);
-			if (!session) {
-				reply.code(404).send({ error: 'No active session found' });
-				return;
-			}
-
-			if (body.action === 'subscribe') {
-				body.events.forEach(event => {
-					session.subscribedEvents.add(event);
-					if (body.filters) {
-						session.eventFilters.set(event, body.filters);
-					}
-				});
-			} else {
-				body.events.forEach(event => {
-					session.subscribedEvents.delete(event);
-					session.eventFilters.delete(event);
-				});
-			}
-
-			console.log(
-				`[LongPolling] ${body.action} for client ${clientId} (user=${userId}): ${body.events.join(', ')}`
-			);
-
-			reply.send({ success: true });
-		} catch (error) {
-			console.error('[LongPolling] Subscription update failed:', error);
-			reply.code(500).send({ error: 'Internal server error' });
-		}
+		// Redirect to unified subscription endpoint
+		reply.code(410).send({
+			error: 'Endpoint deprecated',
+			message: 'Subscription management moved to /api/transports/subscriptions',
+			newEndpoint: '/api/transports/subscriptions',
+		});
 	}
 
 	/**
 	 * Respond to pending poll with events
 	 */
-	private respondToPoll(clientId: string, events: TransportEvent[]): void {
-		const pending = this.pendingPolls.get(clientId);
+	private respondToPoll(connId: string, events: TransportEvent[]): void {
+		const pending = this.pendingPolls.get(connId);
 		if (!pending) return;
 
 		clearTimeout(pending.timeout);
-		this.pendingPolls.delete(clientId);
+		this.pendingPolls.delete(connId);
 
 		try {
 			const response: LongPollingResponse = {
@@ -324,12 +287,12 @@ export class LongPollingTransportServer implements ITransportServer {
 			};
 			pending.reply.send(response);
 		} catch (error) {
-			console.error(`[LongPolling] Failed to respond to client ${clientId}:`, error);
+			console.error(`[LongPolling] Failed to respond to connection ${connId}:`, error);
 		}
 	}
 
 	/**
-	 * Broadcast event to all long polling clients
+	 * Broadcast event to all long polling connections
 	 * Events are queued for delivery on next poll
 	 */
 	broadcast<E extends EventType>(event: E, data: EventData<E>): void {
@@ -343,28 +306,27 @@ export class LongPollingTransportServer implements ITransportServer {
 		let deliveredCount = 0;
 		let queuedCount = 0;
 
-		// Get all active clients
-		for (const clientId of this.activeSessions.keys()) {
-			// Check if client is subscribed
-			const session = this.sessionManager['sessions'].get(clientId);
-			if (!session || !session.subscribedEvents.has(event)) {
+		// Get all active connections
+		for (const connId of this.activeSessions.keys()) {
+			// Check if connection is subscribed
+			if (!this.sessionManager.isSubscribed(connId, event)) {
 				continue;
 			}
 
 			// Check filters
-			if (!this.matchesFilters(data, session.eventFilters.get(event))) {
+			if (!this.sessionManager.matchesFilters(connId, event, data)) {
 				continue;
 			}
 
-			// Check if client has pending poll
-			const pending = this.pendingPolls.get(clientId);
+			// Check if connection has pending poll
+			const pending = this.pendingPolls.get(connId);
 			if (pending) {
 				// Deliver immediately
-				this.respondToPoll(clientId, [transportEvent]);
+				this.respondToPoll(connId, [transportEvent]);
 				deliveredCount++;
 			} else {
 				// Queue for next poll
-				this.messageQueue.enqueue(clientId, transportEvent);
+				this.messageQueue.enqueue(connId, transportEvent);
 				queuedCount++;
 			}
 		}
@@ -375,17 +337,16 @@ export class LongPollingTransportServer implements ITransportServer {
 	}
 
 	/**
-	 * Send event to specific client
+	 * Send event to specific connection
 	 */
-	sendToClient<E extends EventType>(clientId: string, event: E, data: EventData<E>): void {
-		// Check if client is subscribed
-		const session = this.sessionManager['sessions'].get(clientId);
-		if (!session || !session.subscribedEvents.has(event)) {
+	sendToClient<E extends EventType>(connId: string, event: E, data: EventData<E>): void {
+		// Check if connection is subscribed
+		if (!this.sessionManager.isSubscribed(connId, event)) {
 			return;
 		}
 
 		// Check filters
-		if (!this.matchesFilters(data, session.eventFilters.get(event))) {
+		if (!this.sessionManager.matchesFilters(connId, event, data)) {
 			return;
 		}
 
@@ -396,14 +357,14 @@ export class LongPollingTransportServer implements ITransportServer {
 			timestamp: Date.now(),
 		};
 
-		// Check if client has pending poll
-		const pending = this.pendingPolls.get(clientId);
+		// Check if connection has pending poll
+		const pending = this.pendingPolls.get(connId);
 		if (pending) {
 			// Deliver immediately
-			this.respondToPoll(clientId, [transportEvent]);
+			this.respondToPoll(connId, [transportEvent]);
 		} else {
 			// Queue for next poll
-			this.messageQueue.enqueue(clientId, transportEvent);
+			this.messageQueue.enqueue(connId, transportEvent);
 		}
 	}
 
@@ -413,64 +374,31 @@ export class LongPollingTransportServer implements ITransportServer {
 	private startCleanup(): void {
 		this.cleanupTimer = setInterval(() => {
 			const now = Date.now();
-			const inactiveSessions: string[] = [];
+			const inactiveConnections: string[] = [];
 
-			for (const [clientId, lastPoll] of this.activeSessions) {
+			for (const [connId, lastPoll] of this.activeSessions) {
 				const timeSinceLastPoll = now - lastPoll;
 				if (timeSinceLastPoll > this.SESSION_TIMEOUT) {
-					inactiveSessions.push(clientId);
+					inactiveConnections.push(connId);
 				}
 			}
 
-			for (const clientId of inactiveSessions) {
-				this.activeSessions.delete(clientId);
-				this.sessionManager.removeSession(clientId);
-				this.messageQueue.clearQueue(clientId);
+			for (const connId of inactiveConnections) {
+				this.activeSessions.delete(connId);
+				this.sessionManager.removeSession(connId);
+				this.messageQueue.clearQueue(connId);
 
-				console.log(`[LongPolling] Removed inactive session ${clientId}`);
+				console.log(`[LongPolling] Removed inactive connection ${connId}`);
 
-				this.disconnectHandlers.forEach(handler => handler(clientId));
+				this.disconnectHandlers.forEach(handler => handler(connId));
 			}
 
-			if (inactiveSessions.length > 0) {
+			if (inactiveConnections.length > 0) {
 				console.log(
-					`[LongPolling] Cleaned up ${inactiveSessions.length} inactive sessions (active=${this.activeSessions.size})`
+					`[LongPolling] Cleaned up ${inactiveConnections.length} inactive connections (active=${this.activeSessions.size})`
 				);
 			}
 		}, this.CLEANUP_INTERVAL);
-	}
-
-	/**
-	 * Check if event data matches filters
-	 */
-	private matchesFilters(data: unknown, filters?: Record<string, unknown>): boolean {
-		if (!filters || Object.keys(filters).length === 0) {
-			return true;
-		}
-
-		const dataObj = data as Record<string, unknown>;
-		return Object.entries(filters).every(([key, value]) => dataObj[key] === value);
-	}
-
-	/**
-	 * Parse cookies from header
-	 */
-	private parseCookies(cookieHeader: string): Record<string, string> {
-		const cookies: Record<string, string> = {};
-		cookieHeader.split(';').forEach(cookie => {
-			const [key, value] = cookie.trim().split('=');
-			if (key && value) {
-				cookies[key] = decodeURIComponent(value);
-			}
-		});
-		return cookies;
-	}
-
-	/**
-	 * Generate unique client ID
-	 */
-	private generateClientId(): string {
-		return `lp-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 	}
 
 	/**
@@ -495,7 +423,7 @@ export class LongPollingTransportServer implements ITransportServer {
 	}
 
 	/**
-	 * Get all connected (active) client IDs
+	 * Get all connected (active) connection IDs
 	 */
 	getConnectedClients(): string[] {
 		return Array.from(this.activeSessions.keys());
@@ -511,7 +439,7 @@ export class LongPollingTransportServer implements ITransportServer {
 		}
 
 		// Cancel all pending polls
-		for (const [clientId, pending] of this.pendingPolls) {
+		for (const [connId, pending] of this.pendingPolls) {
 			clearTimeout(pending.timeout);
 			try {
 				pending.reply.send({ events: [], authenticated: true });

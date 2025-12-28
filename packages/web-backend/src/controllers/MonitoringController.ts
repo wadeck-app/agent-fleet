@@ -136,7 +136,7 @@ export default class MonitoringController implements LazyController<typeof MONIT
 					if (!session) return null;
 
 					return {
-						clientId: session.clientId,
+						clientId: session.connId,
 						userId: session.userId,
 						createdAt: session.createdAt,
 						lastActivity: session.lastActivity,

@@ -59,7 +59,7 @@ import type {
 	UnsubscribeFunction,
 } from '@shared/transport';
 
-import type { ITransportClient } from '../ITransportClient';
+import type { ITransportClient, TransportStatus } from '../ITransportClient';
 import { TokenRefreshManager } from '../TokenRefreshManager';
 
 /**
@@ -158,7 +158,14 @@ export class SSETransportClient implements ITransportClient {
 		this.shouldReconnect = true;
 
 		return new Promise((resolve, reject) => {
-			const sseUrl = `${this.config.baseUrl}/sse`;
+			// Get connId from sessionStorage
+			const connId = sessionStorage.getItem('agent_fleet_conn_id');
+			if (!connId) {
+				reject(new Error('No connId found in sessionStorage'));
+				return;
+			}
+
+			const sseUrl = `${this.config.baseUrl}/api/transports/sse?connId=${connId}`;
 
 			// SECURITY: EventSource automatically sends cookies from same origin
 			// No need to pass tokens manually!
@@ -235,7 +242,9 @@ export class SSETransportClient implements ITransportClient {
 				// EventSource will automatically try to reconnect
 				// But we want to manage reconnection ourselves for better control
 				if (this.eventSource?.readyState === EventSource.CLOSED) {
-					if (timeout) clearTimeout(timeout);
+					if (timeout) {
+						clearTimeout(timeout);
+					}
 					this.updateConnectionState('disconnected');
 					this.tokenRefreshManager.stopAutoRefresh();
 
@@ -391,6 +400,141 @@ export class SSETransportClient implements ITransportClient {
 	}
 
 	/**
+	 * Subscribe to multiple events in a single request (unified subscription API)
+	 */
+	async subscribeBatch(events: string[], filters?: Record<string, Record<string, unknown>>): Promise<void> {
+		const connId = sessionStorage.getItem('agent_fleet_conn_id');
+		if (!connId) {
+			throw new Error('No connId found in sessionStorage');
+		}
+
+		const response = await fetch(`${this.config.baseUrl}/api/transports/subscriptions`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'X-Conn-Id': connId,
+			},
+			credentials: 'include', // Send cookies for authentication
+			body: JSON.stringify({
+				action: 'subscribe',
+				events,
+				filters,
+			}),
+		});
+
+		if (!response.ok) {
+			throw new Error(`Subscription failed: ${response.status} ${response.statusText}`);
+		}
+
+		console.log(`[SSE] Subscribed to ${events.length} events`);
+	}
+
+	/**
+	 * Subscribe to a single event (unified subscription API)
+	 */
+	async subscribeToEvent(event: string, filters?: Record<string, unknown>): Promise<void> {
+		const connId = sessionStorage.getItem('agent_fleet_conn_id');
+		if (!connId) {
+			throw new Error('No connId found in sessionStorage');
+		}
+
+		const response = await fetch(
+			`${this.config.baseUrl}/api/transports/subscriptions/${encodeURIComponent(event)}`,
+			{
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'X-Conn-Id': connId,
+				},
+				credentials: 'include', // Send cookies for authentication
+				body: JSON.stringify({ filters }),
+			}
+		);
+
+		if (!response.ok) {
+			throw new Error(`Subscription failed: ${response.status} ${response.statusText}`);
+		}
+
+		console.log(`[SSE] Subscribed to event: ${event}`);
+	}
+
+	/**
+	 * Unsubscribe from a single event (unified subscription API)
+	 */
+	async unsubscribeFromEvent(event: string): Promise<void> {
+		const connId = sessionStorage.getItem('agent_fleet_conn_id');
+		if (!connId) {
+			throw new Error('No connId found in sessionStorage');
+		}
+
+		const response = await fetch(
+			`${this.config.baseUrl}/api/transports/subscriptions/${encodeURIComponent(event)}`,
+			{
+				method: 'DELETE',
+				headers: {
+					'X-Conn-Id': connId,
+				},
+				credentials: 'include', // Send cookies for authentication
+			}
+		);
+
+		if (!response.ok) {
+			throw new Error(`Unsubscription failed: ${response.status} ${response.statusText}`);
+		}
+
+		console.log(`[SSE] Unsubscribed from event: ${event}`);
+	}
+
+	/**
+	 * Get current subscriptions (unified subscription API)
+	 */
+	async getSubscriptions(): Promise<Array<{ event: string; filters?: Record<string, unknown> }>> {
+		const connId = sessionStorage.getItem('agent_fleet_conn_id');
+		if (!connId) {
+			throw new Error('No connId found in sessionStorage');
+		}
+
+		const response = await fetch(`${this.config.baseUrl}/api/transports/subscriptions`, {
+			method: 'GET',
+			headers: {
+				'X-Conn-Id': connId,
+			},
+			credentials: 'include', // Send cookies for authentication
+		});
+
+		if (!response.ok) {
+			throw new Error(`Failed to get subscriptions: ${response.status} ${response.statusText}`);
+		}
+
+		const result = await response.json();
+		return result.subscriptions || [];
+	}
+
+	/**
+	 * Get transport status (unified subscription API)
+	 */
+	async getTransportStatus(): Promise<TransportStatus> {
+		const connId = sessionStorage.getItem('agent_fleet_conn_id');
+		if (!connId) {
+			throw new Error('No connId found in sessionStorage');
+		}
+
+		const response = await fetch(`${this.config.baseUrl}/api/transports/status`, {
+			method: 'GET',
+			headers: {
+				'X-Conn-Id': connId,
+			},
+			credentials: 'include', // Send cookies for authentication
+		});
+
+		if (!response.ok) {
+			throw new Error(`Failed to get transport status: ${response.status} ${response.statusText}`);
+		}
+
+		return await response.json();
+	}
+
+	/**
 	 * Send subscription control message to server
 	 *
 	 * Since SSE is unidirectional, we send subscription via HTTP POST
@@ -400,27 +544,16 @@ export class SSETransportClient implements ITransportClient {
 		events: string[],
 		filters?: Record<string, unknown>
 	): void {
-		// Send subscription via HTTP POST to control endpoint
-		fetch(`${this.config.baseUrl}/sse/subscription`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			credentials: 'include', // Send cookies for authentication
-			body: JSON.stringify({
-				action,
-				events,
-				filters,
-			}),
-		})
-			.then(response => {
-				if (!response.ok) {
-					console.error(`[SSE] Failed to ${action} events:`, events);
-				}
-			})
-			.catch(error => {
-				console.error(`[SSE] Error sending subscription:`, error);
+		// Use unified subscription API
+		if (action === 'subscribe') {
+			this.subscribeToEvent(events[0], filters).catch(error => {
+				console.error(`[SSE] Failed to subscribe to ${events[0]}:`, error);
 			});
+		} else {
+			this.unsubscribeFromEvent(events[0]).catch(error => {
+				console.error(`[SSE] Failed to unsubscribe from ${events[0]}:`, error);
+			});
+		}
 	}
 
 	/**

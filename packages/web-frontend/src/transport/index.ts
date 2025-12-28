@@ -23,12 +23,13 @@ export { TokenRefreshManager } from './TokenRefreshManager';
 export type { TokenRefreshConfig } from './TokenRefreshManager';
 
 // Transport Client Interface
-export type { ITransportClient } from './ITransportClient';
+export type { ITransportClient, Subscription, TransportStatus } from './ITransportClient';
 
 // Transport Adapters
 export { WebSocketTransportClient } from './adapters/WebSocketTransportClient';
 export { SSETransportClient } from './adapters/SSETransportClient';
 export { LongPollingTransportClient } from './adapters/LongPollingTransportClient';
+export { HttpPollingTransportClient } from './adapters/HttpPollingTransportClient';
 export { RestTransportClient } from './adapters/RestTransportClient';
 export { MockTransportClient } from './adapters/MockTransportClient';
 

@@ -29,7 +29,7 @@ import type { LazyController } from '../utils/lazy-controller-plugin';
  * Does NOT contain:
  * - Authentication logic (in AuthService)
  * - Token generation/validation (in AuthService)
- * - WebSocket session management (in WebSocketSessionManager)
+ * - Transport session management (in TransportSessionManager)
  *
  * ===========================================================================================
  */

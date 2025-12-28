@@ -1,10 +1,9 @@
 import type { IncomingMessage } from 'http';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { MockAuthService } from '@/auth/MockAuthService';
-
+import { MockAuthService } from '../../auth/MockAuthService';
 import { EventBroadcaster } from '../EventBroadcaster';
-import { WebSocketSessionManager } from '../WebSocketSessionManager';
+import { TransportSessionManager } from '../TransportSessionManager';
 import { MockTransportServer } from '../adapters/MockTransportServer';
 
 /**
@@ -24,7 +23,7 @@ import { MockTransportServer } from '../adapters/MockTransportServer';
  *
  * These tests verify the integration between:
  * - EventBroadcaster
- * - WebSocketSessionManager (for subscription filtering)
+ * - TransportSessionManager (for subscription filtering)
  * - MockTransportServer
  *
  * ===========================================================================================
@@ -32,7 +31,7 @@ import { MockTransportServer } from '../adapters/MockTransportServer';
 
 describe('Event Broadcasting Integration', () => {
 	let authService: MockAuthService;
-	let sessionManager: WebSocketSessionManager;
+	let sessionManager: TransportSessionManager;
 	let mockTransport: MockTransportServer;
 	let broadcaster: EventBroadcaster;
 
@@ -41,7 +40,7 @@ describe('Event Broadcasting Integration', () => {
 		authService = new MockAuthService('test-secret');
 
 		// Create session manager
-		sessionManager = new WebSocketSessionManager(authService);
+		sessionManager = new TransportSessionManager(authService);
 
 		// Create mock transport
 		mockTransport = new MockTransportServer();

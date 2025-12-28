@@ -61,7 +61,7 @@ import type {
 	UnsubscribeFunction,
 } from '@shared/transport';
 
-import type { ITransportClient } from '../ITransportClient';
+import type { ITransportClient, TransportStatus } from '../ITransportClient';
 import { TokenRefreshManager } from '../TokenRefreshManager';
 
 /**
@@ -172,7 +172,9 @@ export class WebSocketTransportClient implements ITransportClient {
 
 			// Get connId from sessionStorage for request correlation (unique per tab)
 			const connId = sessionStorage.getItem('agent_fleet_conn_id');
-			const wsUrlWithConnId = connId ? `${wsUrl}/ws?connId=${connId}` : `${wsUrl}/ws`;
+			const wsUrlWithConnId = connId
+				? `${wsUrl}/api/transports/ws?connId=${connId}`
+				: `${wsUrl}/api/transports/ws`;
 
 			// SECURITY: WebSocket automatically sends cookies from same origin
 			// No need to pass tokens manually!
@@ -416,6 +418,89 @@ export class WebSocketTransportClient implements ITransportClient {
 	onConnectionStateChange(handler: ConnectionStateHandler): UnsubscribeFunction {
 		this.connectionStateHandlers.add(handler);
 		return () => this.connectionStateHandlers.delete(handler);
+	}
+
+	/**
+	 * Subscribe to multiple events in a single request (unified subscription API)
+	 *
+	 * For WebSocket, this uses internal message passing instead of HTTP endpoints.
+	 */
+	async subscribeBatch(events: string[], filters?: Record<string, Record<string, unknown>>): Promise<void> {
+		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+			throw new Error('WebSocket not connected');
+		}
+
+		// For WebSocket, we send subscription messages via the WebSocket connection
+		for (const event of events) {
+			const eventFilters = filters?.[event];
+			this.sendSubscriptionMessage('subscribe', [event], eventFilters);
+		}
+
+		console.log(`[WS] Subscribed to ${events.length} events via WebSocket messages`);
+	}
+
+	/**
+	 * Subscribe to a single event (unified subscription API)
+	 *
+	 * For WebSocket, this uses internal message passing instead of HTTP endpoints.
+	 */
+	async subscribeToEvent(event: string, filters?: Record<string, unknown>): Promise<void> {
+		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+			throw new Error('WebSocket not connected');
+		}
+
+		this.sendSubscriptionMessage('subscribe', [event], filters);
+		console.log(`[WS] Subscribed to event: ${event}`);
+	}
+
+	/**
+	 * Unsubscribe from a single event (unified subscription API)
+	 *
+	 * For WebSocket, this uses internal message passing instead of HTTP endpoints.
+	 */
+	async unsubscribeFromEvent(event: string): Promise<void> {
+		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+			throw new Error('WebSocket not connected');
+		}
+
+		this.sendSubscriptionMessage('unsubscribe', [event]);
+		console.log(`[WS] Unsubscribed from event: ${event}`);
+	}
+
+	/**
+	 * Get current subscriptions (unified subscription API)
+	 *
+	 * For WebSocket, returns local subscription state.
+	 */
+	async getSubscriptions(): Promise<Array<{ event: string; filters?: Record<string, unknown> }>> {
+		const subscriptions: Array<{ event: string; filters?: Record<string, unknown> }> = [];
+
+		for (const [event, _handlers] of this.eventHandlers) {
+			const filters = this.eventFilters.get(event);
+			subscriptions.push({ event, filters });
+		}
+
+		return subscriptions;
+	}
+
+	/**
+	 * Get transport status (unified subscription API)
+	 *
+	 * Note: WebSocket client doesn't have direct access to server-side status.
+	 * This returns a client-side representation.
+	 */
+	async getTransportStatus(): Promise<TransportStatus> {
+		// WebSocket doesn't have a dedicated status endpoint, return client-side info
+		return {
+			clientId: 'ws-client', // WebSocket doesn't expose client ID on client side
+			userId: 'unknown', // Would need to store from connection message
+			transportType: 'websocket',
+			connected: this.isConnected(),
+			authenticatedAt: 0, // Not tracked client-side
+			lastActivity: Date.now(),
+			subscriptions: Array.from(this.eventHandlers.keys()),
+			queuedEvents: 0, // Not tracked client-side
+		};
 	}
 
 	/**
