@@ -439,6 +439,13 @@ export class WebSocketTransportServer implements ITransportServer {
 	}
 
 	/**
+	 * Get transport type for this server
+	 */
+	getTransportType(): 'websocket' {
+		return 'websocket';
+	}
+
+	/**
 	 * Send message to WebSocket
 	 */
 	private sendMessage(socket: WebSocket, message: any): void {

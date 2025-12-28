@@ -135,6 +135,13 @@ export class MockTransportServer implements ITransportServer {
 	}
 
 	/**
+	 * Get transport type for this server
+	 */
+	getTransportType(): 'mock' {
+		return 'mock';
+	}
+
+	/**
 	 * Simulate client connection (for testing)
 	 */
 	simulateConnect(clientId: string): void {

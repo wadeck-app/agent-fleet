@@ -162,6 +162,15 @@ export class MockTransportClient implements ITransportClient {
 	}
 
 	/**
+	 * Check if connection is in progress
+	 *
+	 * For mock transport, returns true only during the simulated connection delay.
+	 */
+	isConnecting(): boolean {
+		return this.connectionState === 'connecting';
+	}
+
+	/**
 	 * Get transport type
 	 */
 	getTransportType(): TransportType {

@@ -302,6 +302,13 @@ export class HttpPollingTransportServer implements ITransportServer {
 	}
 
 	/**
+	 * Get transport type for this server
+	 */
+	getTransportType(): 'http' {
+		return 'http';
+	}
+
+	/**
 	 * Shutdown HTTP polling server
 	 */
 	shutdown(): void {

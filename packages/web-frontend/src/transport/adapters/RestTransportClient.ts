@@ -123,6 +123,15 @@ export class RestTransportClient implements ITransportClient {
 	}
 
 	/**
+	 * Check if connection is in progress
+	 *
+	 * For REST transport, this always returns false since connection is instant.
+	 */
+	isConnecting(): boolean {
+		return false;
+	}
+
+	/**
 	 * Get transport type
 	 */
 	getTransportType(): TransportType {

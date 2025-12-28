@@ -203,12 +203,8 @@ export class SSETransportClient implements ITransportClient {
 				}
 
 				// Send current subscriptions to server
-				// IMPORTANT: Add a small delay to let backend session stabilize
-				// This prevents 401 errors during rapid reconnections (React StrictMode)
-				setTimeout(() => {
-					console.info(`[SSE] ${debugRan} resubscribeAll`);
-					this.resubscribeAll();
-				}, 200);
+				console.info(`[SSE] ${debugRan} resubscribeAll`);
+				this.resubscribeAll();
 
 				resolve();
 			});
@@ -296,6 +292,13 @@ export class SSETransportClient implements ITransportClient {
 	 */
 	isConnected(): boolean {
 		return this.connectionState === 'connected';
+	}
+
+	/**
+	 * Check if connection is in progress
+	 */
+	isConnecting(): boolean {
+		return this.connectionState === 'connecting';
 	}
 
 	/**

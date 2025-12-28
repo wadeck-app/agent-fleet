@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 
-import type { EventData, EventType } from '@app/shared/transport';
+import type { EventData, EventType, TransportType } from '@app/shared/transport';
 
 /**
  * ===========================================================================================
@@ -143,4 +143,19 @@ export interface ITransportServer {
 	 * ```
 	 */
 	getConnectedClients(): string[];
+
+	/**
+	 * Get transport type for this server
+	 *
+	 * Used by EventBroadcaster to route messages to the correct transport.
+	 *
+	 * @returns Transport type ('websocket', 'sse', 'long-polling', 'http', or 'mock')
+	 *
+	 * @example
+	 * ```typescript
+	 * const transportType = server.getTransportType();
+	 * console.log(`Server is using ${transportType} transport`);
+	 * ```
+	 */
+	getTransportType(): TransportType;
 }

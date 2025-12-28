@@ -97,9 +97,21 @@ describe('EventBroadcaster', () => {
 	});
 
 	describe('sendToClient', () => {
-		it('should send event to specific client', () => {
+		it('should send event to specific client using correct transport', async () => {
 			// Arrange
 			const clientId = 'client-1';
+			const userId = 'user-1';
+			const { accessToken } = await authService.createAccessToken(userId);
+
+			// Authenticate connection (this registers the transport type in session manager)
+			await sessionManager.authenticateConnection(
+				clientId,
+				{
+					headers: { cookie: `access_token=${accessToken}` },
+				} as any,
+				'mock'
+			);
+
 			mockServer.simulateConnect(clientId);
 
 			const task = {
@@ -122,7 +134,7 @@ describe('EventBroadcaster', () => {
 			expect(mockServer.clientSends[0].data).toEqual(task);
 		});
 
-		it('should warn when sending to disconnected client', () => {
+		it('should warn when sending to client not in session manager', () => {
 			// Arrange
 			const clientId = 'client-disconnected';
 			const task = {
@@ -135,7 +147,7 @@ describe('EventBroadcaster', () => {
 				updatedAt: new Date().toISOString(),
 			};
 
-			// Act
+			// Act - client not authenticated in session manager
 			broadcaster.sendToClient(clientId, 'b2f:task:created', task);
 
 			// Assert - should not record the send
@@ -150,13 +162,21 @@ describe('EventBroadcaster', () => {
 			const { accessToken } = await authService.createAccessToken(userId);
 
 			// Create two sessions for the same user (multi-device)
-			await sessionManager.authenticateConnection('client-1', {
-				headers: { cookie: `access_token=${accessToken}` },
-			} as any);
+			await sessionManager.authenticateConnection(
+				'client-1',
+				{
+					headers: { cookie: `access_token=${accessToken}` },
+				} as any,
+				'mock'
+			);
 
-			await sessionManager.authenticateConnection('client-2', {
-				headers: { cookie: `access_token=${accessToken}` },
-			} as any);
+			await sessionManager.authenticateConnection(
+				'client-2',
+				{
+					headers: { cookie: `access_token=${accessToken}` },
+				} as any,
+				'mock'
+			);
 
 			// Simulate connections
 			mockServer.simulateConnect('client-1');

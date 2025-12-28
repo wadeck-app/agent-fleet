@@ -291,6 +291,13 @@ export class WebSocketTransportClient implements ITransportClient {
 	}
 
 	/**
+	 * Check if connection is in progress
+	 */
+	isConnecting(): boolean {
+		return this.connectionState === 'connecting';
+	}
+
+	/**
 	 * Get transport type
 	 */
 	getTransportType(): TransportType {

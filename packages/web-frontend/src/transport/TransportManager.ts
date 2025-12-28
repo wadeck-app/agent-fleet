@@ -102,6 +102,12 @@ export class TransportManager {
 	private connId: string | null = null;
 
 	/**
+	 * Connection promise for deduplication
+	 * Stores the ongoing connection promise to prevent multiple simultaneous connections
+	 */
+	private connectPromise: Promise<void> | null = null;
+
+	/**
 	 * Private constructor (singleton pattern)
 	 */
 	private constructor() {}
@@ -192,9 +198,11 @@ export class TransportManager {
 	}
 
 	/**
-	 * Connect to transport server
+	 * Connect to transport server with deduplication
 	 *
-	 * Safe to call multiple times - will not reconnect if already connected.
+	 * Safe to call multiple times - will deduplicate concurrent connection attempts.
+	 * If a connection is already in progress, returns the existing promise instead of
+	 * starting a new connection. This prevents race conditions during React StrictMode.
 	 *
 	 * @returns Promise that resolves when connected
 	 */
@@ -203,16 +211,32 @@ export class TransportManager {
 			throw new Error('[TransportManager] Transport not initialized. Call getInstance() first.');
 		}
 
-		// Don't reconnect if already connected
+		// Already connected
 		if (this.transport.isConnected()) {
-			console.log('[TransportManager] Already connected, skipping connect()');
+			console.log('[TransportManager] Already connected');
 			return;
 		}
-		//TODO use isConnecting() to return the same promise as this.transport.connect
 
-		console.log('[TransportManager] Connecting...');
-		await this.transport.connect();
-		console.log('[TransportManager] Connected successfully');
+		// Connection in progress - reuse existing promise
+		if (this.transport.isConnecting() && this.connectPromise) {
+			console.log('[TransportManager] Connection already in progress, reusing promise');
+			return this.connectPromise;
+		}
+
+		// Start new connection
+		console.log('[TransportManager] Starting new connection...');
+		this.connectPromise = this.transport.connect();
+
+		try {
+			await this.connectPromise;
+			console.log('[TransportManager] Connected successfully');
+		} catch (error) {
+			console.error('[TransportManager] Connection failed:', error);
+			throw error;
+		} finally {
+			// Clear promise after completion (success or failure)
+			this.connectPromise = null;
+		}
 	}
 
 	/**

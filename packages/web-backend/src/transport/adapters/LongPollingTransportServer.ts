@@ -430,6 +430,13 @@ export class LongPollingTransportServer implements ITransportServer {
 	}
 
 	/**
+	 * Get transport type for this server
+	 */
+	getTransportType(): 'long-polling' {
+		return 'long-polling';
+	}
+
+	/**
 	 * Shutdown long polling server
 	 */
 	shutdown(): void {

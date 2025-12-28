@@ -417,6 +417,13 @@ export class SSETransportServer implements ITransportServer {
 	}
 
 	/**
+	 * Get transport type for this server
+	 */
+	getTransportType(): 'sse' {
+		return 'sse';
+	}
+
+	/**
 	 * Shutdown SSE server
 	 */
 	shutdown(): void {

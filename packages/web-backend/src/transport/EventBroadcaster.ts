@@ -162,7 +162,7 @@ export class EventBroadcaster {
 
 	/**
 	 * Send event to specific connection
-	 * Automatically detects which transport the connection is using
+	 * Routes directly to the correct transport based on session manager
 	 *
 	 * @param connId - Connection ID to send to
 	 * @param event - Event type
@@ -178,28 +178,35 @@ export class EventBroadcaster {
 	 * ```
 	 */
 	sendToClient<E extends EventType>(connId: string, event: E, data: EventData<E>): void {
-		// Try each transport until one successfully sends
-		for (const transport of this.transportServers) {
-			try {
-				transport.sendToClient(connId, event, data);
-				// If successful, no need to try other transports
-				return;
-			} catch (error) {
-				// Connection not on this transport, try next
-				continue;
+		// Get transport type for this connection from session manager
+		const transportType = this.sessionManager.getTransportType(connId);
+
+		if (!transportType) {
+			// Connection not found in session manager - queue for later delivery
+			if (this.messageQueue) {
+				console.warn(
+					`[EventBroadcaster] Connection ${connId} not found in session manager, queuing event ${event}`
+				);
+				this.messageQueue.enqueue(connId, {
+					id: `evt-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+					type: event,
+					data,
+					timestamp: Date.now(),
+				});
 			}
+			return;
 		}
 
-		// If no transport found, queue for later delivery
-		if (this.messageQueue) {
-			console.warn(`[EventBroadcaster] Connection ${connId} not found, queuing event ${event}`);
-			this.messageQueue.enqueue(connId, {
-				id: `evt-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-				type: event,
-				data,
-				timestamp: Date.now(),
-			});
+		// Find the transport server that handles this transport type
+		const transport = this.findTransportByType(transportType);
+
+		if (!transport) {
+			console.error(`[EventBroadcaster] No transport server found for type: ${transportType}`);
+			return;
 		}
+
+		// Send directly to the correct transport
+		transport.sendToClient(connId, event, data);
 	}
 
 	/**
@@ -262,5 +269,31 @@ export class EventBroadcaster {
 	 */
 	getTransportStats() {
 		return this.sessionManager.getTransportStats();
+	}
+
+	/**
+	 * Find transport server by transport type
+	 *
+	 * Maps transport types to their corresponding transport server implementation.
+	 *
+	 * @param transportType - Type of transport (websocket, sse, long-polling, http, mock)
+	 * @returns Transport server or undefined if not found
+	 *
+	 * @example
+	 * ```typescript
+	 * const transport = broadcaster.findTransportByType('sse');
+	 * if (transport) {
+	 *   transport.sendToClient(connId, event, data);
+	 * }
+	 * ```
+	 */
+	private findTransportByType(transportType: string): ITransportServer | undefined {
+		// Find the transport server that matches this transport type
+		for (const transport of this.transportServers) {
+			if (transport.getTransportType() === transportType) {
+				return transport;
+			}
+		}
+		return undefined;
 	}
 }
