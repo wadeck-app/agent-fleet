@@ -295,6 +295,103 @@ describe('TransportSessionManager', () => {
 			const subscriptions = sessionManager.getSubscriptions('non-existent');
 			expect(subscriptions.size).toBe(0);
 		});
+
+		it('should preserve subscriptions on reconnection', async () => {
+			const { accessToken } = await authService.login('test@example.com', 'password');
+
+			const request = {
+				headers: {
+					cookie: `access_token=${accessToken}`,
+				},
+			} as IncomingMessage;
+
+			// Initial connection
+			await sessionManager.authenticateConnection('client-1', request);
+
+			// Subscribe to events
+			sessionManager.updateSubscriptions('client-1', 'subscribe', ['task:created', 'task:updated']);
+
+			// Verify subscriptions
+			let subscriptions = sessionManager.getSubscriptions('client-1');
+			expect(subscriptions.size).toBe(2);
+			expect(subscriptions).toContain('task:created');
+			expect(subscriptions).toContain('task:updated');
+
+			// Reconnect with same connId (simulating React StrictMode or network issue)
+			await sessionManager.authenticateConnection('client-1', request);
+
+			// Subscriptions should be preserved
+			subscriptions = sessionManager.getSubscriptions('client-1');
+			expect(subscriptions.size).toBe(2);
+			expect(subscriptions).toContain('task:created');
+			expect(subscriptions).toContain('task:updated');
+		});
+
+		it('should preserve filters on reconnection', async () => {
+			const { accessToken } = await authService.login('test@example.com', 'password');
+
+			const request = {
+				headers: {
+					cookie: `access_token=${accessToken}`,
+				},
+			} as IncomingMessage;
+
+			// Initial connection
+			await sessionManager.authenticateConnection('client-1', request);
+
+			// Subscribe with filters
+			const filters = { workerId: 'worker-123', status: 'IN_PROGRESS' };
+			sessionManager.updateSubscriptions('client-1', 'subscribe', ['b2f:worker:updated'], filters);
+
+			// Verify filter matching works
+			expect(
+				sessionManager.matchesFilters('client-1', 'b2f:worker:updated', {
+					workerId: 'worker-123',
+					status: 'IN_PROGRESS',
+				})
+			).toBe(true);
+
+			expect(
+				sessionManager.matchesFilters('client-1', 'b2f:worker:updated', {
+					workerId: 'worker-456',
+					status: 'IN_PROGRESS',
+				})
+			).toBe(false);
+
+			// Reconnect with same connId
+			await sessionManager.authenticateConnection('client-1', request);
+
+			// Filters should be preserved
+			expect(
+				sessionManager.matchesFilters('client-1', 'b2f:worker:updated', {
+					workerId: 'worker-123',
+					status: 'IN_PROGRESS',
+				})
+			).toBe(true);
+
+			expect(
+				sessionManager.matchesFilters('client-1', 'b2f:worker:updated', {
+					workerId: 'worker-456',
+					status: 'IN_PROGRESS',
+				})
+			).toBe(false);
+		});
+
+		it('should start with empty subscriptions on first connection', async () => {
+			const { accessToken } = await authService.login('test@example.com', 'password');
+
+			const request = {
+				headers: {
+					cookie: `access_token=${accessToken}`,
+				},
+			} as IncomingMessage;
+
+			// First connection should have no subscriptions
+			await sessionManager.authenticateConnection('client-1', request);
+
+			const subscriptions = sessionManager.getSubscriptions('client-1');
+			expect(subscriptions.size).toBe(0);
+		});
 	});
 
 	describe('session removal', () => {

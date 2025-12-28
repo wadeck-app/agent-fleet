@@ -287,9 +287,7 @@ export class HttpPollingTransportClient implements ITransportClient {
 
 		// Notify server of subscription (with filters)
 		if (isFirstSubscription) {
-			this.subscribeToEvent(event, filters).catch(error => {
-				console.error(`[HttpPolling] Failed to subscribe to ${event}:`, error);
-			});
+			this.sendSubscriptionMessage('subscribe', [event], filters);
 		}
 
 		return () => {
@@ -299,9 +297,7 @@ export class HttpPollingTransportClient implements ITransportClient {
 			if (this.eventHandlers.get(event)?.size === 0) {
 				this.eventHandlers.delete(event);
 				this.eventFilters.delete(event);
-				this.unsubscribeFromEvent(event).catch(error => {
-					console.error(`[HttpPolling] Failed to unsubscribe from ${event}:`, error);
-				});
+				this.sendSubscriptionMessage('unsubscribe', [event]);
 			}
 		};
 	}
@@ -450,6 +446,48 @@ export class HttpPollingTransportClient implements ITransportClient {
 	}
 
 	/**
+	 * Get local subscriptions (synchronous)
+	 *
+	 * Returns event types that have handlers registered locally.
+	 * This is a synchronous method that reads from the local eventHandlers map.
+	 *
+	 * @returns Array of event types with active handlers
+	 */
+	getLocalSubscriptions(): string[] {
+		return Array.from(this.eventHandlers.keys());
+	}
+
+	/**
+	 * Send subscription control message to server
+	 *
+	 * IMPORTANT: If not connected, subscription is queued locally and will be sent
+	 * automatically when connection is established (via resubscribeAll()).
+	 */
+	private sendSubscriptionMessage(
+		action: 'subscribe' | 'unsubscribe',
+		events: string[],
+		filters?: Record<string, unknown>
+	): void {
+		// Queue subscriptions if not connected yet
+		// They will be sent automatically via resubscribeAll() when connected
+		if (!this.isConnected()) {
+			console.log(`[HttpPolling] Queuing ${action} for ${events[0]} (not connected yet)`);
+			return;
+		}
+
+		// Use unified subscription API
+		if (action === 'subscribe') {
+			this.subscribeToEvent(events[0], filters).catch(error => {
+				console.error(`[HttpPolling] Failed to subscribe to ${events[0]}:`, error);
+			});
+		} else {
+			this.unsubscribeFromEvent(events[0]).catch(error => {
+				console.error(`[HttpPolling] Failed to unsubscribe from ${events[0]}:`, error);
+			});
+		}
+	}
+
+	/**
 	 * Perform a single HTTP polling request
 	 */
 	private async performPoll(): Promise<void> {
@@ -538,9 +576,7 @@ export class HttpPollingTransportClient implements ITransportClient {
 	private resubscribeAll(): void {
 		for (const [event, _handlers] of this.eventHandlers) {
 			const filters = this.eventFilters.get(event);
-			this.subscribeToEvent(event, filters).catch(error => {
-				console.error(`[HttpPolling] Failed to resubscribe to ${event}:`, error);
-			});
+			this.sendSubscriptionMessage('subscribe', [event], filters);
 		}
 	}
 

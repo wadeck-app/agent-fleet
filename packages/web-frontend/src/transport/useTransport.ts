@@ -80,6 +80,8 @@ export interface TransportHookResult {
 	) => Promise<void>;
 	/** Connection ID - Unique identifier for this browser/tab (for request correlation) */
 	connId: string;
+	/** Active subscriptions - Event types that have handlers registered locally */
+	subscriptions: string[];
 }
 
 /**
@@ -107,6 +109,7 @@ export function useTransport(): TransportHookResult {
 		reconnectDelay: context.reconnectDelay,
 		switchTransport: context.switchTransport,
 		connId: context.connId,
+		subscriptions: context.subscriptions,
 	};
 }
 

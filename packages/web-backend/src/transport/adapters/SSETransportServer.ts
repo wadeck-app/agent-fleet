@@ -114,10 +114,10 @@ export class SSETransportServer implements ITransportServer {
 			await this.handleSSEConnection(request, reply);
 		});
 
-		// Backward compatibility redirect (temporary)
-		app.get('/sse', async (request, reply) => {
-			reply.code(308).redirect('/api/transports/sse');
-		});
+		// // Backward compatibility redirect (temporary)
+		// app.get('/sse', async (request, reply) => {
+		// 	reply.code(308).redirect('/api/transports/sse');
+		// });
 
 		// Start heartbeat
 		this.startHeartbeat();
@@ -137,8 +137,25 @@ export class SSETransportServer implements ITransportServer {
 			return;
 		}
 
+		// Check for existing connection (rapid reconnect scenario)
+		// This can happen with React StrictMode or network issues causing rapid reconnects
+		const existingConnection = this.connections.get(connId);
+		if (existingConnection) {
+			console.warn(
+				`[SSE] Replacing existing connection ${connId.substring(0, 8)}... (rapid reconnect detected, closing orphaned stream)`
+			);
+
+			// Clean up orphaned connection to prevent memory leaks
+			try {
+				existingConnection.reply.raw.end();
+				console.log(`[SSE] Closed orphaned connection stream for ${connId.substring(0, 8)}...`);
+			} catch (error) {
+				console.error(`[SSE] Failed to close orphaned connection ${connId.substring(0, 8)}...:`, error);
+			}
+		}
+
 		try {
-			// Authenticate connection
+			// Authenticate connection (preserves subscriptions if reconnecting)
 			const session = await this.sessionManager.authenticateConnection(connId, request.raw, 'sse');
 
 			// Setup SSE headers

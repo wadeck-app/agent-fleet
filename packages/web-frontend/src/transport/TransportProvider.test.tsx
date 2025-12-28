@@ -3,6 +3,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 
 import { TransportProvider, useTransportContext } from './TransportProvider';
+import { TransportManager } from './TransportManager';
 import { MockTransportClient } from './adapters/MockTransportClient';
 
 // Mock navigate
@@ -34,6 +35,13 @@ const _wrapper = ({ children }: { children: React.ReactNode }) => <BrowserRouter
 describe('TransportProvider', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		// Clear sessionStorage before each test
+		sessionStorage.clear();
+	});
+
+	afterEach(async () => {
+		// Cleanup singleton between tests
+		await TransportManager.cleanup();
 	});
 
 	describe('initialization', () => {
@@ -213,7 +221,7 @@ describe('TransportProvider', () => {
 	});
 
 	describe('cleanup', () => {
-		it('should disconnect transport on unmount', async () => {
+		it('should NOT disconnect transport on unmount (singleton persists)', async () => {
 			const mockTransport = new MockTransportClient();
 			const disconnectSpy = vi.spyOn(mockTransport, 'disconnect');
 
@@ -227,9 +235,12 @@ describe('TransportProvider', () => {
 
 			unmount();
 
-			await waitFor(() => {
-				expect(disconnectSpy).toHaveBeenCalledTimes(1);
-			});
+			// Wait a bit to ensure disconnect is NOT called
+			await new Promise(resolve => setTimeout(resolve, 100));
+
+			// CRITICAL: disconnect should NOT be called on unmount
+			// The singleton persists across React remounts (StrictMode)
+			expect(disconnectSpy).not.toHaveBeenCalled();
 		});
 
 		it('should remove event listeners on unmount', async () => {

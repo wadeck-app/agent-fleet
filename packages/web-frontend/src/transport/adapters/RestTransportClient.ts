@@ -221,6 +221,17 @@ export class RestTransportClient implements ITransportClient {
 	}
 
 	/**
+	 * Get local subscriptions (synchronous)
+	 *
+	 * REST transport doesn't support subscriptions, so this always returns an empty array.
+	 *
+	 * @returns Empty array (REST doesn't support subscriptions)
+	 */
+	getLocalSubscriptions(): string[] {
+		return [];
+	}
+
+	/**
 	 * Update connection state and notify handlers
 	 */
 	private updateConnectionState(state: ConnectionState): void {

@@ -206,6 +206,9 @@ export class WebSocketTransportClient implements ITransportClient {
 						this.tokenRefreshManager.startAutoRefresh(data.tokenExpiresAt);
 					}
 
+					// Send current subscriptions to server
+					this.resubscribeAll();
+
 					resolve();
 					return;
 				}
@@ -504,7 +507,22 @@ export class WebSocketTransportClient implements ITransportClient {
 	}
 
 	/**
+	 * Get local subscriptions (synchronous)
+	 *
+	 * Returns event types that have handlers registered locally.
+	 * This is a synchronous method that reads from the local eventHandlers map.
+	 *
+	 * @returns Array of event types with active handlers
+	 */
+	getLocalSubscriptions(): string[] {
+		return Array.from(this.eventHandlers.keys());
+	}
+
+	/**
 	 * Send subscription control message to server
+	 *
+	 * IMPORTANT: If not connected, subscription is queued locally and will be sent
+	 * automatically when connection is established (via resubscribeAll()).
 	 *
 	 * @param action - Subscribe or unsubscribe action
 	 * @param events - Array of event types
@@ -515,7 +533,10 @@ export class WebSocketTransportClient implements ITransportClient {
 		events: string[],
 		filters?: Record<string, unknown>
 	): void {
+		// Queue subscriptions if not connected yet
+		// They will be sent automatically via resubscribeAll() when connected
 		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+			console.log(`[WS] Queuing ${action} for ${events[0]} (not connected yet)`);
 			return;
 		}
 
@@ -527,6 +548,16 @@ export class WebSocketTransportClient implements ITransportClient {
 		};
 
 		this.ws.send(JSON.stringify(message));
+	}
+
+	/**
+	 * Resubscribe to all events after reconnection
+	 */
+	private resubscribeAll(): void {
+		for (const [event, _handlers] of this.eventHandlers) {
+			const filters = this.eventFilters.get(event);
+			this.sendSubscriptionMessage('subscribe', [event], filters);
+		}
 	}
 
 	/**

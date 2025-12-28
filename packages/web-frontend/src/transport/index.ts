@@ -18,6 +18,10 @@
  * @see .claude/plans/transport-front-back_prop4.md
  */
 
+// Transport Manager (Singleton)
+export { TransportManager } from './TransportManager';
+export type { TransportManagerConfig, TransportMode } from './TransportManager';
+
 // Token Refresh Manager
 export { TokenRefreshManager } from './TokenRefreshManager';
 export type { TokenRefreshConfig } from './TokenRefreshManager';

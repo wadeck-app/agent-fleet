@@ -4,115 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import type { ConnectionState } from '@shared/transport';
 
 import type { ITransportClient } from './ITransportClient';
-import { HttpPollingTransportClient } from './adapters/HttpPollingTransportClient';
-import { LongPollingTransportClient } from './adapters/LongPollingTransportClient';
-import { MockTransportClient } from './adapters/MockTransportClient';
-import { RestTransportClient } from './adapters/RestTransportClient';
-import { SSETransportClient } from './adapters/SSETransportClient';
+import { TransportManager, type TransportMode } from './TransportManager';
 import { WebSocketTransportClient } from './adapters/WebSocketTransportClient';
-
-type TransportMode = 'auto' | 'websocket' | 'sse' | 'long-polling' | 'http-polling' | 'rest' | 'mock';
-
-/**
- * Generate or retrieve connection ID from sessionStorage
- * Connection ID is used to correlate requests and prevent broadcast echo.
- *
- * IMPORTANT: Uses sessionStorage (not localStorage) so each tab/window gets unique connId.
- * This enables proper multi-tab support where:
- * - Tab A makes update → Tab A excluded from broadcast (has connId-1)
- * - Tab B receives event and refreshes (has connId-2)
- *
- * @returns Unique connection ID (persisted for current tab/window session)
- */
-function getOrCreateConnId(): string {
-	const CONN_ID_KEY = 'agent_fleet_conn_id';
-
-	// Try to get existing connId from sessionStorage (unique per tab)
-	const existingConnId = sessionStorage.getItem(CONN_ID_KEY);
-	if (existingConnId) {
-		console.log('[TransportProvider] Using existing connId:', existingConnId.substring(0, 8) + '...');
-		return existingConnId;
-	}
-
-	// Generate new connId using crypto.randomUUID()
-	const newConnId = crypto.randomUUID();
-	sessionStorage.setItem(CONN_ID_KEY, newConnId);
-	console.log('[TransportProvider] Generated new connId:', newConnId.substring(0, 8) + '...');
-	return newConnId;
-}
-
-/**
- * Create transport client based on mode preference
- */
-function createTransportClient(mode: TransportMode, baseUrl: string, wsUrl: string): ITransportClient {
-	console.log('[TransportProvider] Creating transport client with mode:', mode);
-
-	switch (mode) {
-		case 'websocket':
-			return new WebSocketTransportClient({
-				baseUrl,
-				wsUrl,
-				reconnect: true,
-				reconnectMaxAttempts: 10,
-				reconnectDelay: 1000,
-				connectionTimeout: 10000,
-				requestTimeout: 30000,
-			});
-
-		case 'rest':
-			return new RestTransportClient({ baseUrl });
-
-		case 'mock':
-			return new MockTransportClient();
-
-		case 'sse':
-			return new SSETransportClient({
-				baseUrl,
-				wsUrl: '', // Not used for SSE
-				reconnect: true,
-				reconnectMaxAttempts: 10,
-				reconnectDelay: 1000,
-				connectionTimeout: 10000,
-				requestTimeout: 30000,
-			});
-
-		case 'long-polling':
-			return new LongPollingTransportClient({
-				baseUrl,
-				wsUrl: '', // Not used for long polling
-				reconnect: true,
-				reconnectMaxAttempts: 10,
-				reconnectDelay: 1000,
-				connectionTimeout: 10000,
-				requestTimeout: 30000,
-			});
-
-		case 'http-polling':
-			return new HttpPollingTransportClient({
-				baseUrl,
-				wsUrl: '', // Not used for HTTP polling
-				reconnect: false, // HTTP polling doesn't reconnect (just keeps polling)
-				reconnectMaxAttempts: 0,
-				reconnectDelay: 0,
-				connectionTimeout: 10000,
-				requestTimeout: 30000,
-				pollInterval: 5000, // Poll every 5 seconds
-			});
-
-		case 'auto':
-		default:
-			// Auto mode: Try WebSocket first
-			return new WebSocketTransportClient({
-				baseUrl,
-				wsUrl,
-				reconnect: true,
-				reconnectMaxAttempts: 10,
-				reconnectDelay: 1000,
-				connectionTimeout: 10000,
-				requestTimeout: 30000,
-			});
-	}
-}
 
 /**
  * Transport Context State
@@ -163,6 +56,12 @@ export interface TransportContextState {
 	 * Generated once per browser/tab and persisted in localStorage
 	 */
 	connId: string;
+
+	/**
+	 * Active subscriptions - Event types that have handlers registered locally
+	 * Updates in real-time when components subscribe/unsubscribe
+	 */
+	subscriptions: string[];
 }
 
 /**
@@ -281,34 +180,36 @@ export function TransportProvider({
 }: TransportProviderProps) {
 	const navigate = useNavigate();
 
-	// const connId = useState(() => getOrCreateConnId())[0];
-	const connId = useMemo(() => getOrCreateConnId());
-
-	// // Generate or retrieve connection ID
-	// // NOTE: We generate a NEW connId on each mount to handle React StrictMode double-mounting
-	// // This ensures each tab has a unique connId even after StrictMode cleanup/remount
-	// const [connId] = useState(() => {
-	// 	// Always generate a new connId on mount (don't reuse from sessionStorage)
-	// 	const newConnId = crypto.randomUUID();
-	// 	sessionStorage.setItem('agent_fleet_conn_id', newConnId);
-	// 	console.log('[TransportProvider] Generated new connId:', newConnId.substring(0, 8) + '...');
-	// 	return newConnId;
-	// });
-
-	// Create or use provided transport
-	const [transport, setTransport] = useState<ITransportClient>(() => {
-		if (customTransport) {
-			return customTransport;
-		}
-
+	// Initialize TransportManager singleton
+	// This happens on every render but getInstance() returns same instance (singleton pattern)
+	const transportManager = useMemo(() => {
 		// Read transport mode preference from localStorage
 		const savedMode = localStorage.getItem('transport_mode') as TransportMode;
 		const mode: TransportMode = savedMode || 'auto';
 
-		return createTransportClient(mode, baseUrl, wsUrl || baseUrl.replace(/^http/, 'ws'));
-	});
+		return TransportManager.getInstance({
+			mode,
+			baseUrl,
+			wsUrl: wsUrl || baseUrl.replace(/^http/, 'ws'),
+			customTransport,
+		});
+	}, [baseUrl, wsUrl, customTransport]);
+
+	// Get transport and connId from manager
+	const transport = transportManager.getTransport();
+	const connId = transportManager.getConnId();
 
 	const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
+	const [subscriptions, setSubscriptions] = useState<string[]>([]);
+
+	/**
+	 * Update subscriptions from transport
+	 * Called periodically and when subscriptions might have changed
+	 */
+	const updateSubscriptions = useCallback(() => {
+		const currentSubscriptions = transport.getLocalSubscriptions();
+		setSubscriptions(currentSubscriptions);
+	}, [transport]);
 
 	/**
 	 * Switch transport mode dynamically without page reload
@@ -323,22 +224,28 @@ export function TransportProvider({
 				return;
 			}
 
-			// Disconnect current transport
-			console.log('[TransportProvider] Disconnecting current transport');
-			await transport.disconnect();
-
-			// Create new transport
-			const newTransport = createTransportClient(mode, baseUrl, wsUrl || baseUrl.replace(/^http/, 'ws'));
-
-			// Update state
-			setTransport(newTransport);
-
 			// Save preference
 			localStorage.setItem('transport_mode', mode);
 
-			console.log('[TransportProvider] Transport switched successfully, will auto-connect');
+			// Disconnect current transport (will be recreated by getInstance on next render)
+			console.log('[TransportProvider] Disconnecting current transport');
+			await transportManager.disconnect();
+
+			// Get new transport manager with new mode
+			// This will detect config change and create new transport
+			TransportManager.getInstance({
+				mode,
+				baseUrl,
+				wsUrl: wsUrl || baseUrl.replace(/^http/, 'ws'),
+				customTransport,
+			});
+
+			console.log('[TransportProvider] Transport switched successfully, will auto-connect on next render');
+
+			// Force re-render by triggering connection state change
+			setConnectionState('disconnected');
 		},
-		[transport, baseUrl, wsUrl, customTransport]
+		[transportManager, baseUrl, wsUrl, customTransport]
 	);
 
 	// Extract port from wsUrl or baseUrl
@@ -376,6 +283,10 @@ export function TransportProvider({
 
 	/**
 	 * Initialize transport and set up listeners
+	 *
+	 * IMPORTANT: We do NOT call disconnect() in cleanup!
+	 * The singleton persists across React remounts (StrictMode).
+	 * We only unsubscribe event listeners.
 	 */
 	useEffect(() => {
 		// Subscribe to connection state changes
@@ -391,7 +302,7 @@ export function TransportProvider({
 
 		// Auto-connect if enabled
 		if (autoConnect) {
-			transport
+			transportManager
 				.connect()
 				.then(() => {
 					console.log('[TransportProvider] Connected successfully');
@@ -402,16 +313,37 @@ export function TransportProvider({
 		}
 
 		// Cleanup on unmount
+		// CRITICAL: We do NOT call disconnect() here!
+		// The singleton persists across React remounts.
+		// Only cleanup: unsubscribe listeners
 		return () => {
-			console.log('[TransportProvider] Cleaning up transport');
+			console.log('[TransportProvider] Cleaning up listeners (NOT disconnecting - singleton persists)');
 			unsubscribeConnectionState();
 			window.removeEventListener('auth:failed', handleAuthFailed);
 			window.removeEventListener('auth:token_expired', handleTokenExpired);
 			window.removeEventListener('auth:refresh_failed', handleRefreshFailed);
-			transport.disconnect();
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [transport, autoConnect]);
+	}, [transport, autoConnect, transportManager]);
+
+	/**
+	 * Poll subscriptions periodically to detect changes
+	 *
+	 * This is necessary because subscribe/unsubscribe calls don't have
+	 * a built-in notification mechanism. We poll every 500ms to detect
+	 * when components add or remove subscriptions.
+	 */
+	useEffect(() => {
+		// Initial update
+		updateSubscriptions();
+
+		// Poll every 500ms
+		const interval = setInterval(updateSubscriptions, 500);
+
+		return () => {
+			clearInterval(interval);
+		};
+	}, [updateSubscriptions]);
 
 	// Get reconnect delay if transport supports it
 	const reconnectDelay = transport instanceof WebSocketTransportClient ? transport.getReconnectDelay() : 0;
@@ -425,6 +357,7 @@ export function TransportProvider({
 		reconnectDelay,
 		switchTransport,
 		connId,
+		subscriptions,
 	};
 
 	return <TransportContext.Provider value={contextValue}>{children}</TransportContext.Provider>;

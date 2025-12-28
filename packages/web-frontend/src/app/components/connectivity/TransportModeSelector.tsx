@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from '@framework/components/forms/RadioGro
 
 import { useConnId, useTransport } from '@/transport';
 
-export type TransportMode = 'auto' | 'websocket' | 'sse' | 'long-polling' | 'http-polling' | 'rest' | 'mock';
+export type TransportMode = 'auto' | 'websocket' | 'sse' | 'long-polling' | 'http-polling';
 
 export interface TransportModeSelectorProps {
 	/** Additional CSS classes */
@@ -24,12 +24,10 @@ const modes: Array<{ value: TransportMode; label: string; description: string }>
 	{ value: 'sse', label: 'SSE', description: 'Server-Sent Events' },
 	{ value: 'long-polling', label: 'Long Polling', description: 'HTTP long polling' },
 	{ value: 'http-polling', label: 'HTTP Polling', description: 'Short polling (5s interval)' },
-	{ value: 'rest', label: 'REST', description: 'No real-time events' },
-	{ value: 'mock', label: 'Mock', description: 'Test mode' },
 ];
 
 export function TransportModeSelector({ className }: TransportModeSelectorProps) {
-	const { switchTransport } = useTransport();
+	const { switchTransport, subscriptions } = useTransport();
 	const connId = useConnId();
 
 	// Read current mode from localStorage
@@ -88,6 +86,25 @@ export function TransportModeSelector({ className }: TransportModeSelectorProps)
 						{connId ? connId.substring(0, 8) : 'N/A'}
 					</span>
 				</div>
+			</div>
+
+			{/* Subscriptions Badge - Shows active event subscriptions */}
+			<div className="mt-2 rounded border px-3 py-2">
+				<div className="mb-1 text-xs text-muted-foreground">Subscriptions:</div>
+				{subscriptions.length > 0 ? (
+					<div className="flex flex-wrap gap-1">
+						{subscriptions.map(topic => (
+							<span
+								key={topic}
+								className="rounded bg-blue-100 px-2 py-0.5 font-mono text-xs text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+							>
+								{topic}
+							</span>
+						))}
+					</div>
+				) : (
+					<span className="text-xs text-muted-foreground">No active subscriptions</span>
+				)}
 			</div>
 		</div>
 	);

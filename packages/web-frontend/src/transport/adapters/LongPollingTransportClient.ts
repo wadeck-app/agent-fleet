@@ -465,13 +465,35 @@ export class LongPollingTransportClient implements ITransportClient {
 	}
 
 	/**
+	 * Get local subscriptions (synchronous)
+	 *
+	 * Returns event types that have handlers registered locally.
+	 * This is a synchronous method that reads from the local eventHandlers map.
+	 *
+	 * @returns Array of event types with active handlers
+	 */
+	getLocalSubscriptions(): string[] {
+		return Array.from(this.eventHandlers.keys());
+	}
+
+	/**
 	 * Send subscription control message to server
+	 *
+	 * IMPORTANT: If not connected, subscription is queued locally and will be sent
+	 * automatically when connection is established (via resubscribeAll()).
 	 */
 	private sendSubscriptionMessage(
 		action: 'subscribe' | 'unsubscribe',
 		events: string[],
 		filters?: Record<string, unknown>
 	): void {
+		// Queue subscriptions if not connected yet
+		// They will be sent automatically via resubscribeAll() when connected
+		if (!this.isConnected()) {
+			console.log(`[LongPolling] Queuing ${action} for ${events[0]} (not connected yet)`);
+			return;
+		}
+
 		// Use unified subscription API
 		if (action === 'subscribe') {
 			this.subscribeToEvent(events[0], filters).catch(error => {

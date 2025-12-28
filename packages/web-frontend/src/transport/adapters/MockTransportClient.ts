@@ -236,6 +236,18 @@ export class MockTransportClient implements ITransportClient {
 	}
 
 	/**
+	 * Get local subscriptions (synchronous)
+	 *
+	 * Returns event types that have handlers registered locally.
+	 * This is a synchronous method that reads from the local eventHandlers map.
+	 *
+	 * @returns Array of event types with active handlers
+	 */
+	getLocalSubscriptions(): string[] {
+		return Array.from(this.eventHandlers.keys());
+	}
+
+	/**
 	 * Mock a response for a specific method and path
 	 *
 	 * @param method - HTTP method

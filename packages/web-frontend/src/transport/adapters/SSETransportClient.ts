@@ -143,6 +143,8 @@ export class SSETransportClient implements ITransportClient {
 		});
 	}
 
+	private debugSeed = 1;
+
 	/**
 	 * Connect to SSE server
 	 *
@@ -154,6 +156,8 @@ export class SSETransportClient implements ITransportClient {
 			return;
 		}
 
+		const debugRan = `${this.debugSeed++}_${Math.round(1000 + Math.random() * 9000)}`;
+
 		this.updateConnectionState('connecting');
 		this.shouldReconnect = true;
 
@@ -161,6 +165,7 @@ export class SSETransportClient implements ITransportClient {
 			// Get connId from sessionStorage
 			const connId = sessionStorage.getItem('agent_fleet_conn_id');
 			if (!connId) {
+				console.info(`[SSE] ${debugRan} No connId`);
 				reject(new Error('No connId found in sessionStorage'));
 				return;
 			}
@@ -173,12 +178,13 @@ export class SSETransportClient implements ITransportClient {
 			this.eventSource = new EventSource(sseUrl, { withCredentials: true });
 
 			const timeout = setTimeout(() => {
+				console.info(`[SSE] ${debugRan} Connection timeout`);
 				reject(new Error('Connection timeout'));
 				this.eventSource?.close();
 			}, this.config.connectionTimeout || 10000);
 
 			this.eventSource.onopen = () => {
-				console.log('[SSE] Connection opened, waiting for auth confirmation...');
+				console.log(`[SSE] ${debugRan} Connection opened, waiting for auth confirmation...`);
 			};
 
 			// Handle 'connected' event for authentication confirmation
@@ -189,7 +195,7 @@ export class SSETransportClient implements ITransportClient {
 				this.reconnectAttempts = 0;
 				this.hasConnectedOnce = true;
 
-				console.log(`[SSE] Authenticated as user ${data.userId}`);
+				console.log(`[SSE] ${debugRan} Authenticated as user ${data.userId}`);
 
 				// SECURITY: Start automatic token refresh
 				if (data.tokenExpiresAt) {
@@ -197,7 +203,12 @@ export class SSETransportClient implements ITransportClient {
 				}
 
 				// Send current subscriptions to server
-				this.resubscribeAll();
+				// IMPORTANT: Add a small delay to let backend session stabilize
+				// This prevents 401 errors during rapid reconnections (React StrictMode)
+				setTimeout(() => {
+					console.info(`[SSE] ${debugRan} resubscribeAll`);
+					this.resubscribeAll();
+				}, 200);
 
 				resolve();
 			});
@@ -212,15 +223,15 @@ export class SSETransportClient implements ITransportClient {
 
 			// Handle 'token_expiring_soon' event
 			this.eventSource.addEventListener('token_expiring_soon', () => {
-				console.warn('[SSE] Token expiring soon, refreshing immediately...');
+				console.warn(`[SSE] ${debugRan} Token expiring soon, refreshing immediately...`);
 				this.tokenRefreshManager.refreshToken().catch(err => {
-					console.error('[SSE] Failed to refresh token on warning', err);
+					console.error(`[SSE] ${debugRan} Failed to refresh token on warning`, err);
 				});
 			});
 
 			// Handle 'token_expired' event
 			this.eventSource.addEventListener('token_expired', () => {
-				console.error('[SSE] Token expired, disconnecting');
+				console.error(`[SSE] ${debugRan} Token expired, disconnecting`);
 				this.eventSource?.close();
 				window.dispatchEvent(new CustomEvent('auth:token_expired'));
 			});
@@ -228,16 +239,17 @@ export class SSETransportClient implements ITransportClient {
 			// Handle 'subscription_updated' event
 			this.eventSource.addEventListener('subscription_updated', event => {
 				const data = JSON.parse((event as MessageEvent).data);
-				console.log(`[SSE] Subscription ${data.action}:`, data.events);
+				console.log(`[SSE] ${debugRan} Subscription ${data.action}:`, data.events);
 			});
 
 			// Handle regular messages (events)
 			this.eventSource.onmessage = event => {
+				console.info(`[SSE] ${debugRan} onmessage`, event);
 				this.handleMessage(event);
 			};
 
 			this.eventSource.onerror = error => {
-				console.error('[SSE] Connection error', error);
+				console.error(`[SSE] ${debugRan} Connection error`, error);
 
 				// EventSource will automatically try to reconnect
 				// But we want to manage reconnection ourselves for better control
@@ -535,15 +547,37 @@ export class SSETransportClient implements ITransportClient {
 	}
 
 	/**
+	 * Get local subscriptions (synchronous)
+	 *
+	 * Returns event types that have handlers registered locally.
+	 * This is a synchronous method that reads from the local eventHandlers map.
+	 *
+	 * @returns Array of event types with active handlers
+	 */
+	getLocalSubscriptions(): string[] {
+		return Array.from(this.eventHandlers.keys());
+	}
+
+	/**
 	 * Send subscription control message to server
 	 *
 	 * Since SSE is unidirectional, we send subscription via HTTP POST
+	 *
+	 * IMPORTANT: If not connected, subscription is queued locally and will be sent
+	 * automatically when connection is established (via resubscribeAll()).
 	 */
 	private sendSubscriptionMessage(
 		action: 'subscribe' | 'unsubscribe',
 		events: string[],
 		filters?: Record<string, unknown>
 	): void {
+		// Queue subscriptions if not connected yet
+		// They will be sent automatically via resubscribeAll() when connected
+		if (!this.isConnected()) {
+			console.log(`[SSE] Queuing ${action} for ${events[0]} (not connected yet)`);
+			return;
+		}
+
 		// Use unified subscription API
 		if (action === 'subscribe') {
 			this.subscribeToEvent(events[0], filters).catch(error => {

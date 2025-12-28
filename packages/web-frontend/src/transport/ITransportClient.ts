@@ -100,6 +100,13 @@ export interface ITransportClient extends ITransport {
 	isConnected(): boolean;
 
 	/**
+	 * Check if currently connecting, to avoid starting another connection yet but returning the current one
+	 *
+	 * @returns True if connection is in progress
+	 */
+	isConnecting(): boolean;
+
+	/**
 	 * Get the transport type
 	 *
 	 * @returns Transport type identifier
@@ -226,6 +233,24 @@ export interface ITransportClient extends ITransport {
 	 * ```
 	 */
 	getTransportStatus?(): Promise<TransportStatus>;
+
+	/**
+	 * Get local subscriptions (synchronous)
+	 *
+	 * Returns event types that have handlers registered locally.
+	 * This is a synchronous method that reads from the local eventHandlers map.
+	 * Does not make any network calls.
+	 *
+	 * @returns Array of event types with active handlers
+	 *
+	 * @example
+	 * ```typescript
+	 * const subscriptions = client.getLocalSubscriptions();
+	 * console.log('Subscribed to:', subscriptions);
+	 * // Output: ['b2f:worker:updated', 'b2f:task:created']
+	 * ```
+	 */
+	getLocalSubscriptions(): string[];
 }
 
 /**

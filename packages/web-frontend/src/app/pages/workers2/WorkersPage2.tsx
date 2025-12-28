@@ -79,6 +79,8 @@ export function WorkersPage2() {
 	useEffect(() => {
 		console.log('[WorkersPage2] Subscribing to B2F_WORKER_UPDATED events');
 
+		// Transport automatically queues subscriptions if not connected yet
+		// They will be sent when connection is established
 		const unsubscribe = transport.subscribe(B2F_WORKER_UPDATED, updatedWorker => {
 			console.log('[WorkersPage2] Received worker update event:', updatedWorker.workerId);
 			console.log('[WorkersPage2] Applying direct cache update with event data (no refetch needed)');

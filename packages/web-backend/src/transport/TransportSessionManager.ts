@@ -150,6 +150,13 @@ export class TransportSessionManager {
 		request: IncomingMessage,
 		transportType: TransportType = 'websocket'
 	): Promise<TransportSession> {
+		// Check if session already exists (reconnection scenario)
+		// Preserve subscriptions and filters to avoid losing them on rapid reconnects
+		const existingSession = this.sessions.get(connId);
+		const existingSubscriptions = existingSession?.subscribedEvents || new Set();
+		const existingFilters = existingSession?.eventFilters || new Map();
+		const isReconnection = existingSession !== undefined;
+
 		// DEVELOPMENT ONLY: Bypass authentication if DISABLE_AUTH_DEV=true
 		// This allows frontend development without authentication blocking
 		// NEVER use this in production!
@@ -175,8 +182,8 @@ export class TransportSessionManager {
 				tokenExpiresAt: expiresAt,
 				createdAt: Date.now(),
 				lastActivity: Date.now(),
-				subscribedEvents: new Set(),
-				eventFilters: new Map(),
+				subscribedEvents: existingSubscriptions,
+				eventFilters: existingFilters,
 			};
 
 			this.sessions.set(connId, baseSession);
@@ -190,9 +197,15 @@ export class TransportSessionManager {
 			// Track transport type
 			this.transportTypes.set(connId, transportType);
 
-			console.log(
-				`[Auth] DEVELOPMENT MODE: Connection authenticated without credentials (connId=${connId}, transport=${transportType})`
-			);
+			if (isReconnection) {
+				console.log(
+					`[Auth] DEVELOPMENT MODE: Connection reconnected (connId=${connId}, transport=${transportType}, preserved ${existingSubscriptions.size} subscriptions)`
+				);
+			} else {
+				console.log(
+					`[Auth] DEVELOPMENT MODE: Connection authenticated without credentials (connId=${connId}, transport=${transportType})`
+				);
+			}
 
 			return {
 				...baseSession,
@@ -221,8 +234,8 @@ export class TransportSessionManager {
 				tokenExpiresAt: expiresAt,
 				createdAt: Date.now(),
 				lastActivity: Date.now(),
-				subscribedEvents: new Set(), // Empty initially
-				eventFilters: new Map(), // Empty initially
+				subscribedEvents: existingSubscriptions,
+				eventFilters: existingFilters,
 			};
 
 			this.sessions.set(connId, baseSession);
@@ -236,9 +249,15 @@ export class TransportSessionManager {
 			// Track transport type
 			this.transportTypes.set(connId, transportType);
 
-			console.log(
-				`[Auth] Connection authenticated: connId=${connId}, user=${userId}, transport=${transportType}, expires=${new Date(expiresAt).toISOString()}`
-			);
+			if (isReconnection) {
+				console.log(
+					`[Auth] Connection reconnected: connId=${connId}, user=${userId}, transport=${transportType}, preserved ${existingSubscriptions.size} subscriptions, expires=${new Date(expiresAt).toISOString()}`
+				);
+			} else {
+				console.log(
+					`[Auth] Connection authenticated: connId=${connId}, user=${userId}, transport=${transportType}, expires=${new Date(expiresAt).toISOString()}`
+				);
+			}
 
 			return {
 				...baseSession,
