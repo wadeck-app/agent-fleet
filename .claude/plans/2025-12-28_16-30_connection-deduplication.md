@@ -7,6 +7,7 @@
 ## Problem
 
 During React StrictMode (double mount), `TransportManager.connect()` was called twice rapidly:
+
 1. First call → `connect()` starts (state = 'connecting')
 2. Second call → Checks `isConnected()` → returns `false` (still connecting)
 3. Second call → Starts **another connection** with same connId
@@ -36,57 +37,64 @@ isConnecting(): boolean;
 All transport clients now implement `isConnecting()`:
 
 - **WebSocketTransportClient** ✅
-  ```typescript
-  isConnecting(): boolean {
-      return this.connectionState === 'connecting';
-  }
-  ```
+
+    ```typescript
+    isConnecting(): boolean {
+        return this.connectionState === 'connecting';
+    }
+    ```
 
 - **SSETransportClient** ✅
-  ```typescript
-  isConnecting(): boolean {
-      return this.connectionState === 'connecting';
-  }
-  ```
+
+    ```typescript
+    isConnecting(): boolean {
+        return this.connectionState === 'connecting';
+    }
+    ```
 
 - **LongPollingTransportClient** ✅
-  ```typescript
-  isConnecting(): boolean {
-      return this.connectionState === 'connecting';
-  }
-  ```
+
+    ```typescript
+    isConnecting(): boolean {
+        return this.connectionState === 'connecting';
+    }
+    ```
 
 - **HttpPollingTransportClient** ✅
-  ```typescript
-  isConnecting(): boolean {
-      return this.connectionState === 'connecting';
-  }
-  ```
+
+    ```typescript
+    isConnecting(): boolean {
+        return this.connectionState === 'connecting';
+    }
+    ```
 
 - **RestTransportClient** ✅
-  ```typescript
-  isConnecting(): boolean {
-      return false; // Connection is instant
-  }
-  ```
+
+    ```typescript
+    isConnecting(): boolean {
+        return false; // Connection is instant
+    }
+    ```
 
 - **MockTransportClient** ✅
-  ```typescript
-  isConnecting(): boolean {
-      return this.connectionState === 'connecting';
-  }
-  ```
+    ```typescript
+    isConnecting(): boolean {
+        return this.connectionState === 'connecting';
+    }
+    ```
 
 ### 3. Refactored TransportManager.connect() with Deduplication ✅
 
 **File:** `packages/web-frontend/src/transport/TransportManager.ts`
 
 Added connection promise tracking:
+
 ```typescript
 private connectPromise: Promise<void> | null = null;
 ```
 
 Implemented deduplication logic:
+
 ```typescript
 async connect(): Promise<void> {
     if (!this.transport) {
@@ -127,26 +135,28 @@ async connect(): Promise<void> {
 **File:** `packages/web-frontend/src/transport/adapters/SSETransportClient.ts`
 
 **Before (lines 202-211):**
+
 ```typescript
 // SECURITY: Start automatic token refresh
 if (data.tokenExpiresAt) {
-    this.tokenRefreshManager.startAutoRefresh(data.tokenExpiresAt);
+	this.tokenRefreshManager.startAutoRefresh(data.tokenExpiresAt);
 }
 
 // Send current subscriptions to server
 // IMPORTANT: Add a small delay to let backend session stabilize
 // This prevents 401 errors during rapid reconnections (React StrictMode)
 setTimeout(() => {
-    console.info(`[SSE] ${debugRan} resubscribeAll`);
-    this.resubscribeAll();
+	console.info(`[SSE] ${debugRan} resubscribeAll`);
+	this.resubscribeAll();
 }, 200);
 ```
 
 **After:**
+
 ```typescript
 // SECURITY: Start automatic token refresh
 if (data.tokenExpiresAt) {
-    this.tokenRefreshManager.startAutoRefresh(data.tokenExpiresAt);
+	this.tokenRefreshManager.startAutoRefresh(data.tokenExpiresAt);
 }
 
 // Send current subscriptions to server
@@ -161,6 +171,7 @@ The setTimeout workaround is no longer needed because connection deduplication p
 ### During React StrictMode:
 
 **Console Output:**
+
 ```
 [TransportManager] Starting new connection...
 [SSE] Connection opened, waiting for auth confirmation...
@@ -170,11 +181,13 @@ The setTimeout workaround is no longer needed because connection deduplication p
 ```
 
 ### Network Tab:
+
 - **One** single GET request: `/api/transports/sse?connId=...`
 - No rapid close/reopen
 - No 401 errors on subscription requests
 
 ### Backend Logs:
+
 ```
 [SSE] Connection abc123 connected (user=dev-user-no-auth, total=1)
 [Subscription] Connection abc123 subscribed to b2f:worker:updated
@@ -183,18 +196,18 @@ The setTimeout workaround is no longer needed because connection deduplication p
 ## Testing Scenarios
 
 1. **Single connect() call**
-   - Should connect normally
+    - Should connect normally
 
 2. **Rapid double connect() (StrictMode)**
-   - First call starts connection
-   - Second call reuses promise
-   - Only one actual connection established
+    - First call starts connection
+    - Second call reuses promise
+    - Only one actual connection established
 
 3. **connect() after connected**
-   - Should return immediately without reconnecting
+    - Should return immediately without reconnecting
 
 4. **connect() after connection failure**
-   - Should start fresh connection (promise cleared)
+    - Should start fresh connection (promise cleared)
 
 ## Files Modified
 
@@ -219,17 +232,17 @@ The setTimeout workaround is no longer needed because connection deduplication p
 ## Next Steps
 
 1. **Manual Testing:**
-   - Start frontend with React StrictMode enabled
-   - Check console logs for "reusing promise" message
-   - Verify network tab shows only one connection
-   - Ensure subscriptions work without 401 errors
+    - Start frontend with React StrictMode enabled
+    - Check console logs for "reusing promise" message
+    - Verify network tab shows only one connection
+    - Ensure subscriptions work without 401 errors
 
 2. **Performance Testing:**
-   - Verify no performance degradation
-   - Check that reconnection still works correctly
-   - Test error scenarios (connection failure)
+    - Verify no performance degradation
+    - Check that reconnection still works correctly
+    - Test error scenarios (connection failure)
 
 3. **Code Review:**
-   - Review all implementations for consistency
-   - Ensure documentation is accurate
-   - Verify TypeScript compilation passes
+    - Review all implementations for consistency
+    - Ensure documentation is accurate
+    - Verify TypeScript compilation passes

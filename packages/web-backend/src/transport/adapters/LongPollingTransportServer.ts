@@ -158,17 +158,47 @@ export class LongPollingTransportServer implements ITransportServer {
 		// Get connId from query parameter (sent by client)
 		const connId = (request.query as { connId?: string }).connId;
 
+		console.log(`[LongPolling] Poll request received for connId: ${connId}`);
+
 		if (!connId) {
 			reply.code(400).send({ error: 'Missing connId parameter' });
 			return;
 		}
 
+		// Handle request abort FIRST (before any processing)
+		// This ensures we detect client aborts even during initial response
+		let aborted = false;
+		const abortedAt = { time: 0 };
+		const requestStartTime = Date.now();
+		request.raw.on('close', () => {
+			aborted = true;
+			abortedAt.time = Date.now();
+			const elapsedMs = abortedAt.time - requestStartTime;
+			const p = this.pendingPolls.get(connId);
+			if (p) {
+				clearTimeout(p.timeout);
+				this.pendingPolls.delete(connId);
+				console.log(
+					`[LongPolling] DEBUG: Connection ${connId} closed, had pending poll (elapsed=${elapsedMs}ms)`
+				);
+			} else {
+				console.log(
+					`[LongPolling] DEBUG: Connection ${connId} closed, no pending poll (elapsed=${elapsedMs}ms)`
+				);
+			}
+			console.log(
+				`[LongPolling] DEBUG: Request complete:${request.raw.complete}, Response ended:${reply.raw.writableEnded}`
+			);
+		});
+
 		try {
 			// Authenticate
 			const session = await this.sessionManager.authenticateConnection(connId, request.raw, 'long-polling');
 
-			// Track active session
+			// Track active session and detect reconnections
 			const isNewSession = !this.activeSessions.has(connId);
+			const isReconnect = this.activeSessions.has(connId);
+
 			this.activeSessions.set(connId, Date.now());
 
 			if (isNewSession) {
@@ -176,25 +206,105 @@ export class LongPollingTransportServer implements ITransportServer {
 					`[LongPolling] New connection ${connId} (user=${session.userId}, total=${this.activeSessions.size})`
 				);
 				this.connectHandlers.forEach(handler => handler(connId));
+
+				// Queue initial response instead of sending it immediately
+				// This avoids race condition with React StrictMode double-mount
+				// where the first request gets aborted before the response is fully received
+				const initialEvent: TransportEvent = {
+					id: this.generateEventId(),
+					type: '__initial_response__' as any,
+					data: {
+						authenticated: true,
+						userId: session.userId,
+						tokenExpiresAt: session.tokenExpiresAt,
+					},
+					timestamp: Date.now(),
+				};
+				this.messageQueue.enqueue(connId, initialEvent);
+				console.log(`[LongPolling] Queued initial response for new session ${connId}`);
+			} else if (isReconnect) {
+				// Reconnection detected (page refresh, React remount, navigation, etc.)
+				// Queue an immediate response to avoid making the client wait 30s
+				console.log(`[LongPolling] Reconnection detected for ${connId} (connId already known)`);
+				const keepAliveEvent: TransportEvent = {
+					id: this.generateEventId(),
+					type: '__keep_alive__' as any,
+					data: {
+						authenticated: true,
+						userId: session.userId,
+						tokenExpiresAt: session.tokenExpiresAt,
+					},
+					timestamp: Date.now(),
+				};
+				this.messageQueue.enqueue(connId, keepAliveEvent);
+				console.log(`[LongPolling] Queued keep-alive response for reconnection ${connId}`);
+			}
+
+			// Check if connection was aborted during authentication
+			if (aborted) {
+				console.log(`[LongPolling] Connection ${connId} aborted during authentication`);
+				return;
 			}
 
 			// Check if there are queued events
 			const queuedEvents = this.messageQueue.dequeue(connId);
+			console.log(
+				`[LongPolling] DEBUG: Dequeued ${queuedEvents.length} events for ${connId}, aborted=${aborted}`
+			);
 
 			if (queuedEvents.length > 0) {
+				// Check if aborted before sending
+				if (aborted) {
+					console.log(`[LongPolling] Connection ${connId} aborted before sending queued events`);
+					return;
+				}
+
+				// Filter out special marker events (don't send them to client)
+				const filteredEvents = queuedEvents.filter(
+					e => e.type !== '__initial_response__' && e.type !== '__keep_alive__'
+				);
+
 				// Immediate response with queued events
-				console.log(`[LongPolling] Sending ${queuedEvents.length} queued events to connection ${connId}`);
+				console.log(
+					`[LongPolling] Sending ${filteredEvents.length} queued events to connection ${connId} (${queuedEvents.length - filteredEvents.length} filtered)`
+				);
 				const response: LongPollingResponse = {
-					events: queuedEvents,
+					events: filteredEvents,
 					authenticated: true,
 					userId: session.userId,
 					tokenExpiresAt: session.tokenExpiresAt,
 				};
-				reply.send(response);
+				reply.header('Content-Type', 'application/json').send(response);
 				return;
 			}
 
 			// No queued events, hold connection open
+			console.log(`[LongPolling] DEBUG: No queued events, adding to pendingPolls for ${connId}`);
+
+			// Check if there's already a pending poll for this connId (e.g., from a page refresh)
+			// If so, terminate it immediately to avoid making the new request wait
+			const existingPoll = this.pendingPolls.get(connId);
+			if (existingPoll) {
+				console.log(`[LongPolling] DEBUG: Replacing existing pending poll for ${connId} (rapid reconnect)`);
+				clearTimeout(existingPoll.timeout);
+				this.pendingPolls.delete(connId);
+				try {
+					// Send empty response to old poll
+					this.sendHijackedResponse(existingPoll.reply, {
+						events: [],
+						authenticated: true,
+						userId: existingPoll.userId,
+					});
+				} catch (error) {
+					// Ignore errors (old connection might already be closed)
+					console.log(`[LongPolling] DEBUG: Failed to close old poll (likely already closed):`, error);
+				}
+			}
+
+			// CRITICAL: Tell Fastify we're manually managing this response
+			// Without hijack(), Fastify will auto-send an empty 200 when the async handler returns
+			reply.hijack();
+
 			const pending: PendingPoll = {
 				connId,
 				userId: session.userId,
@@ -206,44 +316,11 @@ export class LongPollingTransportServer implements ITransportServer {
 			};
 
 			this.pendingPolls.set(connId, pending);
+			console.log(
+				`[LongPolling] DEBUG: Added to pendingPolls, total pending=${this.pendingPolls.size}, response hijacked`
+			);
 
-			// If this is the first poll, send initial response
-			if (isNewSession) {
-				const response: LongPollingResponse = {
-					events: [],
-					authenticated: true,
-					userId: session.userId,
-					tokenExpiresAt: session.tokenExpiresAt,
-				};
-				reply.send(response);
-				this.pendingPolls.delete(connId);
-				clearTimeout(pending.timeout);
-			}
-
-			// Handle request abort
-			request.raw.on('close', () => {
-				const p = this.pendingPolls.get(connId);
-				if (p) {
-					clearTimeout(p.timeout);
-					this.pendingPolls.delete(connId);
-
-					// Send empty response if not already sent
-					// This prevents leaving the connection with an incomplete HTTP response when it aborts
-					try {
-						if (!p.reply.sent) {
-							const response: LongPollingResponse = {
-								events: [],
-								authenticated: true,
-								userId: p.userId,
-							};
-							p.reply.send(response);
-						}
-					} catch (error) {
-						// Connection already closed or response already sent, ignore
-						// This is expected behavior when connection aborts
-					}
-				}
-			});
+			// Note: Request abort is already handled by the 'close' listener attached at the start of handlePollRequest
 		} catch (error) {
 			console.error('[LongPolling] Authentication failed:', error);
 			reply.code(401).send({
@@ -270,22 +347,55 @@ export class LongPollingTransportServer implements ITransportServer {
 	}
 
 	/**
+	 * Send a hijacked response with proper CORS headers
+	 *
+	 * When using reply.hijack(), Fastify doesn't add CORS headers automatically.
+	 * This helper ensures CORS headers are always included.
+	 */
+	private sendHijackedResponse(reply: FastifyReply, data: unknown): void {
+		const responseBody = JSON.stringify(data);
+		reply.raw.writeHead(200, {
+			'Content-Type': 'application/json',
+			'Content-Length': Buffer.byteLength(responseBody),
+			// CORS headers (must be added manually when using hijack)
+			'Access-Control-Allow-Origin': reply.raw.req.headers.origin || '*',
+			'Access-Control-Allow-Credentials': 'true',
+		});
+		reply.raw.write(responseBody);
+		reply.raw.end();
+	}
+
+	/**
 	 * Respond to pending poll with events
 	 */
 	private respondToPoll(connId: string, events: TransportEvent[]): void {
+		console.log(`[LongPolling] DEBUG: respondToPoll called for ${connId} with ${events.length} events`);
 		const pending = this.pendingPolls.get(connId);
-		if (!pending) return;
+		if (!pending) {
+			console.log(`[LongPolling] Cannot respond to ${connId}: no pending poll found`);
+			return;
+		}
 
 		clearTimeout(pending.timeout);
 		this.pendingPolls.delete(connId);
 
 		try {
+			// Get session to include tokenExpiresAt
+			const session = this.sessionManager.getSession(connId);
+
 			const response: LongPollingResponse = {
 				events,
 				authenticated: true,
 				userId: pending.userId,
+				tokenExpiresAt: session?.tokenExpiresAt,
 			};
-			pending.reply.send(response);
+			console.log(`[LongPolling] Responding to poll ${connId} with ${events.length} events`);
+			console.log(`[LongPolling] DEBUG: About to send response:`, JSON.stringify(response).substring(0, 200));
+
+			// Send response using helper (includes CORS headers)
+			this.sendHijackedResponse(pending.reply, response);
+
+			console.log(`[LongPolling] DEBUG: Response sent for ${connId}`);
 		} catch (error) {
 			console.error(`[LongPolling] Failed to respond to connection ${connId}:`, error);
 		}
@@ -449,7 +559,8 @@ export class LongPollingTransportServer implements ITransportServer {
 		for (const [connId, pending] of this.pendingPolls) {
 			clearTimeout(pending.timeout);
 			try {
-				pending.reply.send({ events: [], authenticated: true });
+				// Send empty response using helper (includes CORS headers)
+				this.sendHijackedResponse(pending.reply, { events: [], authenticated: true });
 			} catch (error) {
 				// Ignore errors during shutdown
 			}

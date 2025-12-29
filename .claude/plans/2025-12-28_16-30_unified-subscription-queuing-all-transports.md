@@ -10,6 +10,7 @@ Apply the automatic subscription queuing pattern consistently across ALL transpo
 ## Problem Statement
 
 The subscription queuing pattern was only implemented in `SSETransportClient`, causing:
+
 - 401 errors in other transports when components subscribe before connection
 - Inconsistent behavior across transport implementations
 - React lifecycle coupling with transport lifecycle
@@ -17,6 +18,7 @@ The subscription queuing pattern was only implemented in `SSETransportClient`, c
 ## Solution
 
 Implement identical queuing logic in all transports:
+
 1. Check `isConnected()` in `sendSubscriptionMessage()`
 2. Queue subscriptions locally if not connected
 3. Automatically send queued subscriptions via `resubscribeAll()` when connected
@@ -46,18 +48,21 @@ private sendSubscriptionMessage(
 ### Changes Made
 
 #### 1. WebSocketTransportClient.ts
+
 - **Added**: `resubscribeAll()` method (lines 541-549)
 - **Modified**: `sendSubscriptionMessage()` to check connection state and queue (lines 509-539)
 - **Modified**: `connect()` to call `resubscribeAll()` after authentication (line 210)
 - **Result**: Subscriptions made before WebSocket connection are now queued and sent automatically
 
 #### 2. LongPollingTransportClient.ts
+
 - **Modified**: `sendSubscriptionMessage()` to check `isConnected()` and queue (lines 467-495)
 - **Already had**: `resubscribeAll()` method (lines 589-596)
 - **Already had**: Call to `resubscribeAll()` in connection handler (line 553)
 - **Result**: Subscriptions made before polling starts are now queued
 
 #### 3. HttpPollingTransportClient.ts
+
 - **Added**: `sendSubscriptionMessage()` method with queuing logic (lines 448-476)
 - **Modified**: `subscribe()` to use `sendSubscriptionMessage()` instead of direct API calls (line 290)
 - **Modified**: `resubscribeAll()` to use `sendSubscriptionMessage()` (lines 561-569)
@@ -65,6 +70,7 @@ private sendSubscriptionMessage(
 - **Result**: Subscriptions made before polling starts are now queued
 
 #### 4. SSETransportClient.ts
+
 - **No changes needed**: Already implemented the pattern correctly (lines 545-567)
 
 ## Benefits

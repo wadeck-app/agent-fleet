@@ -119,17 +119,20 @@ To test the fix manually:
 6. Verify Front B receives the broadcast event via SSE
 
 Expected backend logs:
+
 ```
 [EventBroadcaster] Sending to 1 connections: 5a23fcee
 [SSE] Broadcast b2f:worker:updated: sent=1, queued=0
 ```
 
 To run automated tests:
+
 ```bash
 npm run test --workspace=web-backend
 ```
 
 Or run the full test suite:
+
 ```bash
 npm run test:agent
 ```

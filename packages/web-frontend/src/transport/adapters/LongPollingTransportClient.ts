@@ -150,6 +150,11 @@ export class LongPollingTransportClient implements ITransportClient {
 	private isPolling = false;
 
 	/**
+	 * Counter for consecutive empty responses (to detect infinite loops)
+	 */
+	private consecutiveEmptyResponses = 0;
+
+	/**
 	 * Create a new LongPollingTransportClient
 	 * @param config - Transport configuration
 	 */
@@ -517,12 +522,21 @@ export class LongPollingTransportClient implements ITransportClient {
 	 * Perform a single long polling request
 	 */
 	private async performPoll(): Promise<void> {
+		const callStack = new Error().stack;
+		console.log(`[LongPolling] DEBUG: performPoll() called from:`, callStack?.split('\n')[2]);
+		console.log(`[LongPolling] DEBUG: performPoll() state: shouldPoll=${this.shouldPoll}, isPolling=${this.isPolling}`);
 		if (!this.shouldPoll || this.isPolling) {
+			console.log(`[LongPolling] DEBUG: performPoll() returning early`);
 			return;
 		}
 
 		this.isPolling = true;
-		this.abortController = new AbortController();
+
+		// Create a NEW AbortController for this specific request
+		// Don't reuse the previous one - each request needs its own
+		const abortController = new AbortController();
+		this.abortController = abortController;
+		console.log(`[LongPolling] DEBUG: performPoll() starting new request`);
 
 		try {
 			// Get connId from sessionStorage
@@ -531,18 +545,28 @@ export class LongPollingTransportClient implements ITransportClient {
 				throw new Error('No connId found in sessionStorage');
 			}
 
-			// Long polling timeout: 30s (server will respond before this)
+			// Long polling timeout: 35s (server timeout is 30s, client should wait longer)
 			const timeout = setTimeout(() => {
-				this.abortController?.abort();
-			}, 30000);
+				abortController.abort();
+			}, 35000);
 
+			console.log(`[LongPolling] DEBUG: About to fetch for connId=${connId}, isPolling=${this.isPolling}`);
 			const response = await fetch(`${this.config.baseUrl}/api/transports/long-polling?connId=${connId}`, {
 				method: 'GET',
 				credentials: 'include', // Send cookies for authentication
-				signal: this.abortController.signal,
+				signal: abortController.signal,
 			});
+			console.log(`[LongPolling] DEBUG: Fetch completed for connId=${connId}`);
 
 			clearTimeout(timeout);
+
+			// Debug logging for response
+			console.log(
+				`[LongPolling] Response status: ${response.status}, content-type: ${response.headers.get('content-type')}`
+			);
+			const headers = Array.from(response.headers.entries());
+			console.log(`[LongPolling] DEBUG: All response headers (${headers.length}):`, headers);
+			console.log(`[LongPolling] DEBUG: Content-Length header:`, response.headers.get('content-length'));
 
 			if (!response.ok) {
 				if (response.status === 401) {
@@ -553,17 +577,46 @@ export class LongPollingTransportClient implements ITransportClient {
 				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 			}
 
-			// Defensive JSON parsing: handle empty/malformed responses
+			// Parse JSON response
 			let data: LongPollingResponse;
 			try {
-				data = await response.json();
+				// DEBUG: Read response as text first to see what we got
+				const responseText = await response.text();
+				console.log(`[LongPolling] DEBUG: Response text length: ${responseText.length}`);
+				console.log(`[LongPolling] DEBUG: Response text: "${responseText}"`);
+
+				if (!responseText) {
+					this.consecutiveEmptyResponses++;
+					console.warn(
+						`[LongPolling] Empty response body (${this.consecutiveEmptyResponses} consecutive) - likely race condition with React remount`
+					);
+
+					// If we get more than 3 consecutive empty responses, something is wrong
+					// Stop retrying and treat it as an error
+					if (this.consecutiveEmptyResponses > 3) {
+						console.error('[LongPolling] Too many consecutive empty responses, treating as error');
+						this.consecutiveEmptyResponses = 0;
+						throw new Error('Too many consecutive empty responses');
+					}
+
+					// Don't throw - just continue polling immediately without backoff
+					// This is a race condition with React StrictMode, not a real error
+					this.isPolling = false;
+					if (this.shouldPoll) {
+						setTimeout(() => this.performPoll(), 100); // Small delay to avoid tight loop
+					}
+					return;
+				}
+
+				// Reset counter on successful response
+				this.consecutiveEmptyResponses = 0;
+
+				data = JSON.parse(responseText);
 			} catch (jsonError) {
 				// Empty or malformed JSON (connection aborted, timeout, etc.)
-				console.warn('[LongPolling] Failed to parse response JSON, using empty events:', jsonError);
-				data = {
-					events: [],
-					authenticated: true,
-				};
+				// Log the error and throw to trigger reconnection with backoff
+				console.warn('[LongPolling] Failed to parse response JSON:', jsonError);
+				throw new Error('Failed to parse response JSON');
 			}
 
 			// Handle initial authentication
@@ -590,7 +643,8 @@ export class LongPollingTransportClient implements ITransportClient {
 			// Continue polling immediately (no delay)
 			this.isPolling = false;
 			if (this.shouldPoll) {
-				setImmediate(() => this.performPoll());
+				// Use setTimeout(0) instead of setImmediate (Node.js API not available in browsers)
+				setTimeout(() => this.performPoll(), 0);
 			}
 		} catch (error) {
 			this.isPolling = false;

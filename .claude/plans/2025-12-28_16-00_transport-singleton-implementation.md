@@ -12,12 +12,14 @@ Successfully implemented the singleton pattern for TransportManager to decouple 
 ## Problem Solved
 
 **Before:**
+
 - `TransportProvider` created new transport on every render
 - Called `disconnect()` in cleanup, causing StrictMode to disconnect during remount
 - Front B (SSE mode) would connect but immediately disconnect during StrictMode remount
 - When Front A broadcasts an event, Front B is no longer connected (total=0 connections)
 
 **After:**
+
 - Singleton pattern: Single transport instance across app lifetime
 - Cleanup only unsubscribes listeners, does NOT call disconnect()
 - Transport persists across React remounts
@@ -30,6 +32,7 @@ Successfully implemented the singleton pattern for TransportManager to decouple 
 **Location:** `packages/web-frontend/src/transport/TransportManager.ts`
 
 **Features:**
+
 - Singleton pattern with `getInstance()` method
 - ConnId management (generates/persists in sessionStorage)
 - Config change detection (recreates transport when mode/baseUrl changes)
@@ -37,6 +40,7 @@ Successfully implemented the singleton pattern for TransportManager to decouple 
 - `cleanup()` method for tests and app shutdown
 
 **Key Methods:**
+
 ```typescript
 // Get singleton instance
 TransportManager.getInstance(config: TransportManagerConfig): TransportManager
@@ -60,12 +64,14 @@ static cleanup(): Promise<void>
 ### 2. Refactored `TransportProvider.tsx`
 
 **Changes:**
+
 - Uses `TransportManager.getInstance()` instead of creating transport directly
 - Gets transport and connId from manager
 - Cleanup does NOT call `disconnect()` - only unsubscribes listeners
 - Updated `switchTransport()` to work with singleton
 
 **Key Code:**
+
 ```typescript
 // Initialize singleton (persists across remounts)
 const transportManager = useMemo(() => {
@@ -97,12 +103,14 @@ return () => {
 ### 3. Updated Tests
 
 **TransportManager.test.ts:**
+
 - Comprehensive tests for singleton pattern
 - ConnId management tests
 - Config change detection tests
 - StrictMode compatibility tests
 
 **TransportProvider.test.tsx:**
+
 - Added cleanup between tests (`TransportManager.cleanup()`)
 - Updated cleanup test to verify disconnect is NOT called on unmount
 - Added sessionStorage clear in beforeEach
@@ -110,6 +118,7 @@ return () => {
 ### 4. Transport Adapters
 
 **No changes needed!** All transport adapters already get connId from sessionStorage:
+
 - `WebSocketTransportClient.ts`
 - `SSETransportClient.ts`
 - `LongPollingTransportClient.ts`
@@ -122,6 +131,7 @@ They all use: `sessionStorage.getItem('agent_fleet_conn_id')`
 **Location:** `packages/web-frontend/src/transport/index.ts`
 
 Added exports:
+
 ```typescript
 export { TransportManager } from './TransportManager';
 export type { TransportManagerConfig, TransportMode } from './TransportManager';
@@ -130,44 +140,49 @@ export type { TransportManagerConfig, TransportMode } from './TransportManager';
 ## Files Created/Modified
 
 ### Created:
+
 1. `packages/web-frontend/src/transport/TransportManager.ts` (316 lines)
 2. `packages/web-frontend/src/transport/TransportManager.test.ts` (380 lines)
 3. `.claude/plans/2025-12-28_16-00_transport-singleton-implementation.md` (this file)
 
 ### Modified:
+
 1. `packages/web-frontend/src/transport/TransportProvider.tsx`
-   - Removed `getOrCreateConnId()` and `createTransportClient()` functions (moved to TransportManager)
-   - Updated to use TransportManager singleton
-   - Updated cleanup to NOT call disconnect()
+    - Removed `getOrCreateConnId()` and `createTransportClient()` functions (moved to TransportManager)
+    - Updated to use TransportManager singleton
+    - Updated cleanup to NOT call disconnect()
 
 2. `packages/web-frontend/src/transport/TransportProvider.test.tsx`
-   - Added TransportManager import
-   - Added cleanup between tests
-   - Updated cleanup test to verify disconnect is NOT called
+    - Added TransportManager import
+    - Added cleanup between tests
+    - Updated cleanup test to verify disconnect is NOT called
 
 3. `packages/web-frontend/src/transport/index.ts`
-   - Added TransportManager exports
+    - Added TransportManager exports
 
 ## Testing
 
 ### Unit Tests
+
 - All existing TransportProvider tests pass
 - New TransportManager tests cover:
-  - Singleton pattern
-  - ConnId management
-  - Config change detection
-  - Connection management
-  - StrictMode compatibility
+    - Singleton pattern
+    - ConnId management
+    - Config change detection
+    - Connection management
+    - StrictMode compatibility
 
 ### Manual Testing Required
 
 **Test Scenario 1: StrictMode Connection Persistence**
+
 1. Ensure React StrictMode is enabled in `main.tsx`
 2. Open Front B in SSE mode
 3. Check console logs - should see only ONE connection attempt
 4. Front B should stay connected (no disconnect during remount)
 
 **Test Scenario 2: Multi-Tab Broadcast**
+
 1. Open Front A in one tab
 2. Open Front B in another tab (SSE mode)
 3. Front A creates/updates a worker
@@ -175,6 +190,7 @@ export type { TransportManagerConfig, TransportMode } from './TransportManager';
 5. Backend logs should show "Broadcasting to N clients" where N > 0
 
 **Test Scenario 3: Transport Switching**
+
 1. Start with WebSocket mode
 2. Switch to SSE mode using TransportModeSelector
 3. Should disconnect WebSocket and create SSE transport
@@ -182,6 +198,7 @@ export type { TransportManagerConfig, TransportMode } from './TransportManager';
 5. Events should still work
 
 **Test Scenario 4: ConnId Persistence**
+
 1. Refresh the page multiple times
 2. Check sessionStorage - should see same connId across refreshes
 3. Open new tab - should get NEW connId (unique per tab)
@@ -214,13 +231,13 @@ npm run build
 
 ## Risks Mitigated
 
-| Risk | Mitigation |
-|------|-----------|
-| Memory leaks | Added `cleanup()` method for tests/shutdown |
-| Multiple instances | Singleton pattern ensures single instance |
-| StrictMode disconnects | Cleanup does NOT call disconnect() |
+| Risk                         | Mitigation                                     |
+| ---------------------------- | ---------------------------------------------- |
+| Memory leaks                 | Added `cleanup()` method for tests/shutdown    |
+| Multiple instances           | Singleton pattern ensures single instance      |
+| StrictMode disconnects       | Cleanup does NOT call disconnect()             |
 | Config changes not reflected | Detects config changes and recreates transport |
-| ConnId collision | Uses sessionStorage (unique per tab) |
+| ConnId collision             | Uses sessionStorage (unique per tab)           |
 
 ## Next Steps
 
@@ -233,9 +250,9 @@ npm run build
 
 - The singleton persists for the entire app lifetime (or until cleanup is called)
 - Only cleanup on:
-  - Test teardown (`afterEach()`)
-  - App shutdown (`window.onbeforeunload`)
-  - Manual logout
+    - Test teardown (`afterEach()`)
+    - App shutdown (`window.onbeforeunload`)
+    - Manual logout
 - DO NOT call `TransportManager.cleanup()` during normal app usage
 - The connId in sessionStorage is managed by TransportManager but accessed directly by transport adapters
 

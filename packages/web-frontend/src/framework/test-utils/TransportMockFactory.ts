@@ -11,6 +11,8 @@ export class TransportMockFactory {
 			subscribe: vi.fn().mockReturnValue(() => {}),
 			getTransportType: vi.fn().mockReturnValue('mock'),
 			isConnected: vi.fn().mockReturnValue(true),
+			isConnecting: vi.fn().mockReturnValue(false),
+			getLocalSubscriptions: vi.fn().mockReturnValue([]),
 			onConnectionStateChange: vi.fn().mockReturnValue(() => {}),
 			...overrides,
 		};

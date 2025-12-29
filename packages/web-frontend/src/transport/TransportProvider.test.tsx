@@ -2,8 +2,8 @@ import { BrowserRouter } from 'react-router-dom';
 
 import { render, screen, waitFor } from '@testing-library/react';
 
-import { TransportProvider, useTransportContext } from './TransportProvider';
 import { TransportManager } from './TransportManager';
+import { TransportProvider, useTransportContext } from './TransportProvider';
 import { MockTransportClient } from './adapters/MockTransportClient';
 
 // Mock navigate

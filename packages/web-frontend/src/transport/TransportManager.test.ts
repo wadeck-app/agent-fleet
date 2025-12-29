@@ -3,11 +3,11 @@
  *
  * Tests for the TransportManager singleton.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ITransportClient } from './ITransportClient';
-import { MockTransportClient } from './adapters/MockTransportClient';
 import { TransportManager } from './TransportManager';
+import { MockTransportClient } from './adapters/MockTransportClient';
 
 describe('TransportManager', () => {
 	beforeEach(() => {

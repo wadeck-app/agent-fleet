@@ -12,12 +12,14 @@ Frontend is being refactored to use a singleton TransportManager to prevent disc
 ### 1. Session Management - TransportSessionManager ✅ GOOD
 
 **Current Implementation:**
+
 - Sessions are stored by `connId` in a Map
 - Each authentication creates/overwrites session for the `connId`
 - Sessions are properly cleaned up on disconnection via `removeSession()`
 - Multi-device support works correctly (multiple connIds per userId)
 
 **Reconnection Behavior:**
+
 ```typescript
 async authenticateConnection(connId: string, request: IncomingMessage, transportType: TransportType) {
     // If connId already exists in sessions, it will be OVERWRITTEN
@@ -33,12 +35,14 @@ async authenticateConnection(connId: string, request: IncomingMessage, transport
 ```
 
 **Verdict:** ✅ **NO ISSUES DETECTED**
+
 - Reconnecting with same `connId` is safe
 - Session map is overwritten (not duplicated)
 - User sessions Set is idempotent
 - No memory leaks from rapid reconnections
 
 **Subscriptions Handling:**
+
 - Subscriptions are tied to the session object
 - When session is overwritten during reconnection, subscriptions are LOST
 - **POTENTIAL ISSUE:** Client needs to re-subscribe after reconnection
@@ -46,6 +50,7 @@ async authenticateConnection(connId: string, request: IncomingMessage, transport
 ### 2. SSE Transport Server - SSETransportServer ⚠️ ISSUES FOUND
 
 **Current Implementation:**
+
 ```typescript
 private async handleSSEConnection(request: FastifyRequest, reply: FastifyReply) {
     const connId = (request.query as { connId?: string }).connId;
@@ -66,12 +71,14 @@ private async handleSSEConnection(request: FastifyRequest, reply: FastifyReply) 
 
 **Problem 1: Orphaned Connection Cleanup** ⚠️
 When reconnecting with same `connId`:
+
 1. Old connection exists in `this.connections` with old `reply` stream
 2. New connection overwrites it: `this.connections.set(connId, newConnection)`
 3. Old `reply` stream is never closed → **memory leak**
 4. Old `request.raw.on('close')` event listener still exists → **event listener leak**
 
 **Problem 2: Double Cleanup on Disconnect** ⚠️
+
 ```typescript
 private handleDisconnection(connId: string): void {
     const connection = this.connections.get(connId);
@@ -81,9 +88,11 @@ private handleDisconnection(connId: string): void {
     this.sessionManager.removeSession(connId); // ← Clean
 }
 ```
+
 This part is actually OK - the guard prevents double cleanup.
 
 **Problem 3: Race Condition with Heartbeat** ⚠️
+
 ```typescript
 private startHeartbeat(): void {
     this.heartbeatTimer = setInterval(() => {
@@ -101,6 +110,7 @@ private startHeartbeat(): void {
 ```
 
 **Scenario:**
+
 1. Old connection established at T=0, lastHeartbeat=0
 2. Client disconnects but server doesn't detect yet (no 'close' event fired)
 3. Client reconnects at T=10 with SAME connId
@@ -113,6 +123,7 @@ Actually, this is OK because the connection object is overwritten, so the new la
 ### 3. EventBroadcaster ✅ GOOD
 
 **Current Implementation:**
+
 ```typescript
 broadcastExcept<E extends EventType>(event: E, data: EventData<E>, excludeConnId?: string) {
     // Get all connected connections from all transports
@@ -146,6 +157,7 @@ sendToClient<E extends EventType>(connId: string, event: E, data: EventData<E>) 
 ```
 
 **Verdict:** ✅ **NO ISSUES DETECTED**
+
 - Correctly excludes the source connId
 - Handles missing connections gracefully
 - Message queue fallback works well
@@ -153,6 +165,7 @@ sendToClient<E extends EventType>(connId: string, event: E, data: EventData<E>) 
 ### 4. Logging Analysis 🔍
 
 **Current Logs:**
+
 ```typescript
 // Connection
 console.log(`[SSE] Connection ${connId} connected (user=${session.userId}, total=${this.connections.size})`);
@@ -165,35 +178,40 @@ console.log(`[EventBroadcaster] Sending to ${targetConnections.length} connectio
 ```
 
 **Issues:**
+
 - No log when OVERWRITING an existing connection
 - No log for orphaned connection cleanup
 - Connection count might be misleading during rapid reconnects
 
 **Recommended Additional Logs:**
+
 ```typescript
 // In handleSSEConnection, before this.connections.set():
 const existingConnection = this.connections.get(connId);
 if (existingConnection) {
-    console.warn(`[SSE] Replacing existing connection ${connId} (possible rapid reconnect)`);
-    // Clean up old connection
-    try {
-        existingConnection.reply.raw.end();
-    } catch (error) {
-        console.error(`[SSE] Failed to close orphaned connection ${connId}:`, error);
-    }
+	console.warn(`[SSE] Replacing existing connection ${connId} (possible rapid reconnect)`);
+	// Clean up old connection
+	try {
+		existingConnection.reply.raw.end();
+	} catch (error) {
+		console.error(`[SSE] Failed to close orphaned connection ${connId}:`, error);
+	}
 }
 ```
 
 ## Summary of Issues
 
 ### Critical Issues (Must Fix)
+
 None - the backend can handle singleton reconnections
 
 ### Important Issues (Should Fix)
+
 1. **⚠️ Subscription Loss on Reconnect** - Client must re-subscribe after reconnection
 2. **⚠️ Orphaned SSE Streams** - Old reply streams are not closed when same connId reconnects
 
 ### Minor Issues (Nice to Have)
+
 1. **Missing logs** for connection replacement scenarios
 2. **Connection count** might be temporarily incorrect during rapid reconnects
 
@@ -202,6 +220,7 @@ None - the backend can handle singleton reconnections
 Based on the code analysis, the most likely causes are:
 
 ### Hypothesis 1: Client Disconnects Before Subscription ⭐ MOST LIKELY
+
 ```
 Timeline:
 T=0: Frontend B connects to SSE → Backend creates connection
@@ -213,11 +232,13 @@ T=40: Frontend A broadcasts event → Backend sees 0 SSE connections
 ```
 
 **Evidence:**
+
 - React StrictMode causes double mount/unmount
 - Connection established but immediately closed
 - Subscription happens AFTER connection, not during
 
 ### Hypothesis 2: Subscription Not Persisting
+
 ```
 Timeline:
 T=0: Frontend B connects and subscribes
@@ -228,6 +249,7 @@ T=40: Frontend A broadcasts → Backend filters out Frontend B (no subscription)
 ```
 
 **Evidence from code:**
+
 ```typescript
 async authenticateConnection(connId: string, ...) {
     const baseSession: BaseSession = {
@@ -250,6 +272,7 @@ This is the REAL PROBLEM! When reconnecting with same connId, subscriptions are 
 ### 1. Fix Subscription Loss on Reconnection (HIGH PRIORITY)
 
 **Option A: Preserve Subscriptions on Reconnection** (Recommended)
+
 ```typescript
 async authenticateConnection(connId: string, request: IncomingMessage, transportType: TransportType) {
     // Check if session already exists (reconnection)
@@ -281,6 +304,7 @@ async authenticateConnection(connId: string, request: IncomingMessage, transport
 ```
 
 **Option B: Client Re-subscribes on Each Reconnection**
+
 - Simpler but requires client-side changes
 - Client must track its subscriptions and re-send them after each connection
 - More network overhead
@@ -314,6 +338,7 @@ private async handleSSEConnection(request: FastifyRequest, reply: FastifyReply) 
 ### 3. Improve Logging (LOW PRIORITY)
 
 Add logs for:
+
 - Connection replacement detection
 - Subscription preservation/loss
 - Orphaned connection cleanup
@@ -364,16 +389,19 @@ This would allow rapid reconnections without losing subscriptions, but adds comp
 ## Testing Strategy
 
 ### Unit Tests to Add
+
 1. Test reconnection with same connId preserves subscriptions
 2. Test orphaned connection cleanup
 3. Test concurrent reconnections don't cause race conditions
 
 ### Integration Tests to Add
+
 1. Test frontend rapid reconnect scenario (StrictMode simulation)
 2. Test event broadcasting during reconnection window
 3. Test message queue works during reconnection
 
 ### Manual Testing
+
 1. Enable React StrictMode in frontend
 2. Connect Frontend B with SSE
 3. Trigger worker update from Frontend A
@@ -389,15 +417,18 @@ The backend can handle singleton reconnections, but there is ONE critical issue 
 **Root Cause:** Subscriptions are lost on reconnection because `authenticateConnection()` creates a new session with empty `subscribedEvents` Set.
 
 **Immediate Fix Required:**
+
 1. Preserve subscriptions on reconnection (Option A recommended)
 2. Add logging for reconnection scenarios
 
 **Optional Improvements:**
+
 1. Clean up orphaned SSE streams
 2. Add reconnection grace period
 3. Better logging throughout
 
 **Impact Assessment:**
+
 - Without fix: Frontend B will NOT receive broadcasts after reconnection
 - With fix: Frontend B will seamlessly receive broadcasts even with StrictMode reconnections
 - No breaking changes required
