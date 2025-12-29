@@ -36,7 +36,14 @@ export function UserMenuWithTheme({ userName = 'User', theme, onToggleTheme, cla
 					<ChevronDown className="size-4 shrink-0 opacity-50" />
 				</Button>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="start" side="right" sideOffset={8} className={`mb-2 w-56`}>
+			<DropdownMenuContent
+				align="start"
+				side="right"
+				sideOffset={8}
+				className={`
+     mb-2 w-56
+   `}
+			>
 				<DropdownMenuItem className="cursor-pointer">
 					<User className="size-4" />
 					Profile
@@ -104,7 +111,12 @@ export function UserMenuWithThemeMobile({
 					Settings
 				</DropdownMenuItem>
 				<DropdownMenuSeparator />
-				<DropdownMenuItem onClick={onToggleTheme} className={`cursor-pointer py-3 text-base`}>
+				<DropdownMenuItem
+					onClick={onToggleTheme}
+					className={`
+      cursor-pointer py-3 text-base
+    `}
+				>
 					{isDark ? (
 						<>
 							<Sun className="size-5" />
@@ -118,7 +130,12 @@ export function UserMenuWithThemeMobile({
 					)}
 				</DropdownMenuItem>
 				<DropdownMenuSeparator />
-				<DropdownMenuItem variant="destructive" className={`cursor-pointer py-3 text-base`}>
+				<DropdownMenuItem
+					variant="destructive"
+					className={`
+      cursor-pointer py-3 text-base
+    `}
+				>
 					<LogOut className="size-5" />
 					Logout
 				</DropdownMenuItem>

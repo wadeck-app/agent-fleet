@@ -119,7 +119,7 @@ export function TableBody<T>({
 						selectable={selectable}
 						isSelected={isSelected}
 						isEditing={isEditing}
-						isDeleting={isDeleting}
+						_isDeleting={isDeleting}
 						rowClassName={rowClassName}
 						itemId={id}
 						renderActions={renderActions}

@@ -28,7 +28,8 @@
  * ===========================================================================================
  */
 import { EventEmitter } from 'events';
-import { Task, TaskStatus, WorkerInfo } from 'shared-orch-worker/domain-types';
+import type { Task, WorkerInfo } from 'shared-orch-worker/domain-types';
+import { TaskStatus } from 'shared-orch-worker/domain-types';
 
 /**
  * Options for creating a mock orchestrator

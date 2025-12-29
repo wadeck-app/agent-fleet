@@ -16,7 +16,7 @@
  */
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'node:url';
-import { Orchestrator } from 'orchestrator/core/Orchestrator';
+import type { Orchestrator } from 'orchestrator/core/Orchestrator';
 import path from 'path';
 import { StateEvent } from 'shared-orch-worker/StateManager';
 import type { OrchestratorStats, Task, WorkerInfo } from 'shared-orch-worker/domain-types';

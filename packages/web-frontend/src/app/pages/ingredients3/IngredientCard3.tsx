@@ -69,7 +69,13 @@ export function IngredientCard3({
 	const categoryField = fields.find(f => f.key === 'category') ?? undefined;
 
 	return (
-		<Card size="default" className="hover:shadow-lg transition-shadow relative">
+		<Card
+			size="default"
+			className={`
+    relative transition-shadow
+    hover:shadow-lg
+  `}
+		>
 			{/* Selection checkbox (top right) */}
 			{selectable && onToggleSelection && (
 				<div className="absolute top-3 right-3 z-10">
@@ -103,9 +109,19 @@ export function IngredientCard3({
 
 				{/* Metadata Fields (if any visible) */}
 				{metadataFields.length > 0 && (
-					<div className={`${mainFields.length > 0 ? 'mt-4 border-t pt-3' : ''} space-y-1`}>
+					<div
+						className={`
+       ${mainFields.length > 0 ? 'mt-4 border-t pt-3' : ''}
+       space-y-1
+     `}
+					>
 						{metadataFields.map(field => (
-							<div key={field.key} className="flex justify-between text-xs text-muted-foreground">
+							<div
+								key={field.key}
+								className={`
+         flex justify-between text-xs text-muted-foreground
+       `}
+							>
 								<span>{field.label}:</span>
 								<span className={field.key === 'id' ? 'font-mono' : ''}>
 									{field.render(ingredient)}

@@ -106,9 +106,9 @@ export function TasksPage2() {
 					>
 						<RefreshCw
 							className={`
-								mr-2 size-4
-								${cache.fstate.isRefreshing ? 'animate-spin' : ''}
-							`}
+         mr-2 size-4
+         ${cache.fstate.isRefreshing ? 'animate-spin' : ''}
+       `}
 						/>
 						Refresh
 					</Button>
@@ -116,7 +116,7 @@ export function TasksPage2() {
 			/>
 
 			{/* Search Bar */}
-			<div className="mb-4 relative">
+			<div className="relative mb-4">
 				<div className="mb-2 text-xs font-medium text-muted-foreground">Search</div>
 				<Input
 					type="text"
@@ -143,7 +143,12 @@ export function TasksPage2() {
 			{/* Feature Info (for demo purposes) */}
 			<div className="mb-4 rounded-lg border border-border bg-muted/50 p-4 text-sm">
 				<strong>Active Features (UI / Debounced):</strong>
-				<div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+				<div
+					className={`
+      mt-2 grid grid-cols-2 gap-2 text-xs
+      sm:grid-cols-4
+    `}
+				>
 					<div>
 						<span className="text-muted-foreground">Search:</span>{' '}
 						<span className="font-mono">

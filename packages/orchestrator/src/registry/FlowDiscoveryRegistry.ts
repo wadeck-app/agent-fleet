@@ -7,7 +7,7 @@
  * - Hash validation (ensure same version has same implementation)
  * - Task assignment based on flow availability
  */
-import { FlowMetadata } from 'flow-engine/types';
+import type { FlowMetadata } from 'flow-engine/types';
 
 /**
  * Error thrown when two workers report the same flow version with different hashes

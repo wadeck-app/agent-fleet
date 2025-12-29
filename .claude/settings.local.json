@@ -17,7 +17,7 @@
 			"Bash(netstat:*)",
 			"Bash(curl:*)",
 			"Skill(check)",
-			"Bash(powershell:*)"
+			"Bash(npm run lint:*)"
 		],
 		"deny": [],
 		"ask": []

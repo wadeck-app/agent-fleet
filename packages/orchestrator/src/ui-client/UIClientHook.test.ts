@@ -2,8 +2,10 @@
  * UIClientHook Tests
  */
 import { logger } from 'shared-common/logger';
-import { StateEvent, StateManager } from 'shared-orch-worker/StateManager';
-import { Task, TaskStatus } from 'shared-orch-worker/domain-types';
+import type { StateManager } from 'shared-orch-worker/StateManager';
+import { StateEvent } from 'shared-orch-worker/StateManager';
+import type { Task } from 'shared-orch-worker/domain-types';
+import { TaskStatus } from 'shared-orch-worker/domain-types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { UIClientHook } from './UIClientHook';

@@ -180,7 +180,7 @@ export function buildQuery(...queryFillers: Array<QueryFiller | undefined | null
 	if (process.env.NODE_ENV === 'development') {
 		try {
 			JSON.stringify(result);
-		} catch (err) {
+		} catch (_err) {
 			console.error('[buildQuery] Final query is not JSON-serializable:', result);
 			throw new Error('Query must be JSON-serializable for cache busting to work');
 		}

@@ -1,7 +1,8 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 import { Button } from '@framework/components/primitives/Button';
-import { AppError, ErrorSeverity, toAppError } from '@framework/utils/errors/AppError';
+import type { AppError } from '@framework/utils/errors/AppError';
+import { ErrorSeverity, toAppError } from '@framework/utils/errors/AppError';
 import { errorLogger } from '@framework/utils/errors/ErrorLogger';
 
 /**
@@ -161,7 +162,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 						<p className="text-muted-foreground">{error.getUserMessage()}</p>
 
 						{/* Error code badge */}
-						<div className={`inline-block rounded-md bg-muted px-3 py-1 font-mono text-xs`}>
+						<div
+							className={`
+        inline-block rounded-md bg-muted px-3 py-1 font-mono text-xs
+      `}
+						>
 							Error Code: {error.code}
 						</div>
 

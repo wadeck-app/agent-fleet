@@ -1,10 +1,11 @@
 import { logger } from 'shared-common/logger';
 import { O2WMessageType, createO2WMessage } from 'shared-orch-worker/orchestrator-messages';
-import { W2OMessage, W2OMessageType } from 'shared-orch-worker/worker-messages';
-import { WebSocket } from 'ws';
+import type { W2OMessage } from 'shared-orch-worker/worker-messages';
+import { W2OMessageType } from 'shared-orch-worker/worker-messages';
+import type { WebSocket } from 'ws';
 
-import { WebSocketConnectionManager } from './WebSocketConnectionManager';
-import { WebSocketEventHandler } from './WebSocketEventHandler';
+import type { WebSocketConnectionManager } from './WebSocketConnectionManager';
+import type { WebSocketEventHandler } from './WebSocketEventHandler';
 
 /**
  * Routes WebSocket messages to appropriate handlers

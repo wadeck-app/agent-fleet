@@ -1,5 +1,6 @@
 // Worker → Orchestrator (W2O) messages
-import { ProtocolMessage, createMessageInternal, createMessageInternal_Timestamp } from 'shared-common/protocol';
+import type { ProtocolMessage, createMessageInternal_Timestamp } from 'shared-common/protocol';
+import { createMessageInternal } from 'shared-common/protocol';
 
 import type { FlowMetadata, TaskStatus } from './domain-types';
 

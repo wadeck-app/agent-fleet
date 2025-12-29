@@ -136,11 +136,11 @@ export interface IngredientGrid3Props extends Partial<QueryResultDisplayerProps<
 	/** Optional deleting state - for bulk delete blur effect */
 	deleting?: boolean;
 	/** IDs of items being deleted - for strike-through effect */
-	deletingIds?: Set<string>;
+	_deletingIds?: Set<string>;
 	/** Selection toggle callback */
 	onSelectionToggle?: (id: string) => void;
 	/** Select all callback */
-	onSelectAll?: (ids: string[]) => void;
+	_onSelectAll?: (ids: string[]) => void;
 }
 
 /**
@@ -158,11 +158,11 @@ export function IngredientGrid3({
 	fields = INGREDIENT_GRID_FIELDS,
 	refreshing = false,
 	deleting = false,
-	deletingIds = new Set(),
+	_deletingIds = new Set(),
 	onEdit,
 	onDelete,
 	onSelectionToggle,
-	onSelectAll,
+	_onSelectAll,
 }: IngredientGrid3Props) {
 	// Log render with blur state
 	console.log('[GRID] Render', {
@@ -183,7 +183,11 @@ export function IngredientGrid3({
 
 	if (error && !isLoading) {
 		return (
-			<div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+			<div
+				className={`
+     rounded-lg border border-destructive/50 bg-destructive/10 p-4
+   `}
+			>
 				<div className="flex items-center gap-2">
 					<AlertCircle className="h-5 w-5 text-destructive" />
 					<strong className="text-sm font-semibold text-destructive">Error:</strong>
@@ -257,7 +261,13 @@ export function IngredientGrid3({
 		return (
 			<div>
 				{sortControl}
-				<div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+				<div
+					className={`
+      grid grid-cols-1 gap-6
+      md:grid-cols-2
+      lg:grid-cols-3
+    `}
+				>
 					{Array.from({ length: skeletonCount }).map((_, idx) => (
 						<Card key={idx} className="animate-pulse">
 							<CardHeader>
@@ -325,7 +335,11 @@ export function IngredientGrid3({
 			{/* Grid with refreshing/deleting blur effect */}
 			<div
 				className={cn(
-					'grid grid-cols-1 gap-6 transition-all duration-200 md:grid-cols-2 lg:grid-cols-3',
+					`
+       grid grid-cols-1 gap-6 transition-all duration-200
+       md:grid-cols-2
+       lg:grid-cols-3
+     `,
 					(refreshing || deleting) && 'pointer-events-none opacity-50 blur-sm'
 				)}
 			>

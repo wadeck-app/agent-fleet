@@ -1,6 +1,7 @@
 import { type ReactNode, createContext, useContext, useEffect, useState } from 'react';
 
-import { CircuitBreakerServiceClass, CircuitState } from './CircuitBreakerService';
+import type { CircuitBreakerServiceClass } from './CircuitBreakerService';
+import { CircuitState } from './CircuitBreakerService';
 
 /**
  * Connectivity status for UI display

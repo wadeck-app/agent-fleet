@@ -27,10 +27,10 @@ export function TableSkeleton<T>({
 					<tr
 						key={`skeleton-row-${rowIndex}`}
 						className={`
-       border-b border-border transition-colors
-       hover:bg-muted/50
-       ${alternatingBg}
-     `}
+        border-b border-border transition-colors
+        hover:bg-muted/50
+        ${alternatingBg}
+      `}
 					>
 						{/* Checkbox column */}
 						{selectable && (

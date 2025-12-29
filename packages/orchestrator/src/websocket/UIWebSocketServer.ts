@@ -1,7 +1,7 @@
 import { logger } from 'shared-common/logger';
 import { WebSocket, WebSocketServer } from 'ws';
 
-import { UIClientHook } from '../ui-client/UIClientHook';
+import type { UIClientHook } from '../ui-client/UIClientHook';
 
 /**
  * WebSocket server for UI clients

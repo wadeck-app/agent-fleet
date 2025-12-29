@@ -4,18 +4,18 @@
  */
 import { logger } from 'shared-common/logger';
 import { serializeMessage } from 'shared-common/protocol';
-import { StateManager } from 'shared-orch-worker/StateManager';
-import { Task, TaskStatus } from 'shared-orch-worker/domain-types';
-import {
-	W2OMessageType,
+import type { StateManager } from 'shared-orch-worker/StateManager';
+import type { Task } from 'shared-orch-worker/domain-types';
+import { TaskStatus } from 'shared-orch-worker/domain-types';
+import type {
 	W2OTaskCompletedMessage,
 	W2OWorkerHeartbeatMessage,
 	W2OWorkerReadyMessage,
-	createW2OMessage,
 } from 'shared-orch-worker/worker-messages';
+import { W2OMessageType, createW2OMessage } from 'shared-orch-worker/worker-messages';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { TaskManager } from '../core/TaskManager';
+import type { TaskManager } from '../core/TaskManager';
 import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
 
 // Global WebSocket event handlers storage

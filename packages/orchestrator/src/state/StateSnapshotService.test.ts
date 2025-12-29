@@ -1,11 +1,12 @@
 /**
  * StateSnapshotService Tests
  */
-import { Task, TaskStatus, WorkerInfo } from 'shared-orch-worker/domain-types';
+import type { Task, WorkerInfo } from 'shared-orch-worker/domain-types';
+import { TaskStatus } from 'shared-orch-worker/domain-types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { TaskManager } from '../core/TaskManager';
-import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
+import type { TaskManager } from '../core/TaskManager';
+import type { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
 import { StateSnapshotService } from './StateSnapshotService';
 
 // Mock dependencies

@@ -149,12 +149,7 @@ export function RecentActivityCard({ activities }: RecentActivityCardProps) {
 				) : (
 					<div className="space-y-3">
 						{activities.map((activity, index) => (
-							<div
-								key={`${activity.timestamp}-${index}`}
-								className={`
-         flex items-start gap-3
-       `}
-							>
+							<div key={`${activity.timestamp}-${index}`} className={`flex items-start gap-3`}>
 								{/* Icon */}
 								<div className="mt-0.5">{getActivityIcon(activity.type)}</div>
 

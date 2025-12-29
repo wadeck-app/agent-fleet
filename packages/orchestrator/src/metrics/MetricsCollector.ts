@@ -1,9 +1,10 @@
 import { logger } from 'shared-common/logger';
-import { MetricsData, StateManager } from 'shared-orch-worker/StateManager';
-import { Task, TaskStatus } from 'shared-orch-worker/domain-types';
+import type { MetricsData, StateManager } from 'shared-orch-worker/StateManager';
+import type { Task } from 'shared-orch-worker/domain-types';
+import { TaskStatus } from 'shared-orch-worker/domain-types';
 
-import { TaskManager } from '../core/TaskManager';
-import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
+import type { TaskManager } from '../core/TaskManager';
+import type { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
 
 //FIXME remove me, no longer necessary as the orch has no direct UI
 /**

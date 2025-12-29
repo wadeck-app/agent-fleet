@@ -52,7 +52,6 @@
  * await client.disconnect();
  * ```
  */
-import { getConnId } from '../connection-id';
 import type {
 	ConnectionState,
 	ConnectionStateHandler,
@@ -70,6 +69,7 @@ import type {
 
 import type { ITransportClient, TransportStatus } from '../ITransportClient';
 import { TokenRefreshManager } from '../TokenRefreshManager';
+import { getConnId } from '../connection-id';
 
 /**
  * Long Polling Response
@@ -531,7 +531,9 @@ export class LongPollingTransportClient implements ITransportClient {
 	private async performPoll(): Promise<void> {
 		const callStack = new Error().stack;
 		console.log(`[LongPolling] DEBUG: performPoll() called from:`, callStack?.split('\n')[2]);
-		console.log(`[LongPolling] DEBUG: performPoll() state: shouldPoll=${this.shouldPoll}, isPolling=${this.isPolling}`);
+		console.log(
+			`[LongPolling] DEBUG: performPoll() state: shouldPoll=${this.shouldPoll}, isPolling=${this.isPolling}`
+		);
 		if (!this.shouldPoll || this.isPolling) {
 			console.log(`[LongPolling] DEBUG: performPoll() returning early`);
 			return;

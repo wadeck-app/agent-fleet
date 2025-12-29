@@ -164,7 +164,7 @@ export function Ingredients3GridPage() {
 	const [isRefreshingAfterMutation, setIsRefreshingAfterMutation] = useState(false);
 	// Track if we're waiting for a refresh to complete after a mutation
 	const isMutating = useRef(false);
-	const prevCacheIsRefreshing = useRef(false);
+	const _prevCacheIsRefreshing = useRef(false);
 
 	// Clear isRefreshingAfterMutation and isBulkDeleting when the data changes (refresh completed)
 	// This prevents the "flash" where blur disappears between delete and refresh
@@ -360,9 +360,9 @@ export function Ingredients3GridPage() {
 					>
 						<RefreshCw
 							className={`
-        h-4 w-4
-        ${cache.fstate.isRefreshing ? `animate-spin` : ''}
-      `}
+         h-4 w-4
+         ${cache.fstate.isRefreshing ? `animate-spin` : ''}
+       `}
 						/>
 					</Button>
 				</div>
@@ -424,9 +424,9 @@ export function Ingredients3GridPage() {
 				<strong>Active Features (UI / Debounced):</strong>
 				<div
 					className={`
-      mt-2 grid grid-cols-2 gap-2 text-xs
-      sm:grid-cols-4
-    `}
+       mt-2 grid grid-cols-2 gap-2 text-xs
+       sm:grid-cols-4
+     `}
 				>
 					<div>
 						<span className="text-muted-foreground">Search:</span>{' '}
@@ -480,9 +480,9 @@ export function Ingredients3GridPage() {
 						onDelete={handleDelete}
 						refreshing={injectedProps.isLoading || isRefreshingAfterMutation}
 						deleting={isBulkDeleting}
-						deletingIds={deletingIds}
+						_deletingIds={deletingIds}
 						onSelectionToggle={selection.actions.toggle}
-						onSelectAll={handleSelectAll}
+						_onSelectAll={handleSelectAll}
 					/>
 				)}
 			</Data2>

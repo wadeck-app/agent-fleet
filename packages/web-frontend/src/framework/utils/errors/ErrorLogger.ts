@@ -1,6 +1,7 @@
 import type { ErrorInfo } from 'react';
 
-import { AppError, ErrorSeverity } from './AppError';
+import type { AppError } from './AppError';
+import { ErrorSeverity } from './AppError';
 
 /**
  * ===========================================================================================

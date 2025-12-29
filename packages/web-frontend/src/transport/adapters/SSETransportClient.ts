@@ -44,7 +44,6 @@
  * await client.disconnect();
  * ```
  */
-import { getConnId } from '../connection-id';
 import type {
 	ConnectionState,
 	ConnectionStateHandler,
@@ -62,6 +61,7 @@ import type {
 
 import type { ITransportClient, TransportStatus } from '../ITransportClient';
 import { TokenRefreshManager } from '../TokenRefreshManager';
+import { getConnId } from '../connection-id';
 
 /**
  * SSE Transport Client

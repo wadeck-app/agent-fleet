@@ -11,7 +11,8 @@ import type {
 	Workspace,
 	WorkspaceMode,
 } from 'flow-engine/types';
-import { type Task, TaskStatus } from 'shared-orch-worker/domain-types';
+import type { TaskStatus } from 'shared-orch-worker/domain-types';
+import { type Task } from 'shared-orch-worker/domain-types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockFlow, createMockFlowTrace, createMockTask, createMockWorkspace } from 'worker/flow/factories';
 

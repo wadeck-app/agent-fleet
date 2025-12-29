@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { logger } from 'shared-common/logger';
-import { StateEvent, StateManager } from 'shared-orch-worker/StateManager';
+import type { StateManager } from 'shared-orch-worker/StateManager';
+import { StateEvent } from 'shared-orch-worker/StateManager';
 
 //FIXME remove me, no longer necessary as the orch has no direct UI
 /**

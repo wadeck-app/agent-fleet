@@ -1,17 +1,18 @@
 import { logger } from 'shared-common/logger';
 import { serializeMessage } from 'shared-common/protocol';
-import { StateManager } from 'shared-orch-worker/StateManager';
-import { WorkerInfo } from 'shared-orch-worker/domain-types';
-import { O2WMessage, O2WMessageType, createO2WMessage } from 'shared-orch-worker/orchestrator-messages';
-import {
+import type { StateManager } from 'shared-orch-worker/StateManager';
+import type { WorkerInfo } from 'shared-orch-worker/domain-types';
+import type { O2WMessage } from 'shared-orch-worker/orchestrator-messages';
+import { O2WMessageType, createO2WMessage } from 'shared-orch-worker/orchestrator-messages';
+import type {
 	W2OFlowsUpdatedMessage,
-	W2OMessage,
 	W2ORequestTaskMessage,
 	W2OWorkerReadyMessage,
 } from 'shared-orch-worker/worker-messages';
+import type { W2OMessage } from 'shared-orch-worker/worker-messages';
 import { WebSocket } from 'ws';
 
-import { TaskManager } from '../core/TaskManager';
+import type { TaskManager } from '../core/TaskManager';
 import { FlowDiscoveryRegistry, FlowVersionMismatchError } from '../registry/FlowDiscoveryRegistry';
 
 interface WorkerConnection extends WorkerInfo {

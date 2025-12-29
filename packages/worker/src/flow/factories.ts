@@ -13,7 +13,8 @@ import type {
 	Workspace,
 	WorkspaceMode,
 } from 'flow-engine/types';
-import { type Task, TaskStatus, type WorkerInfo } from 'shared-orch-worker/domain-types';
+import type { TaskStatus } from 'shared-orch-worker/domain-types';
+import { type Task, type WorkerInfo } from 'shared-orch-worker/domain-types';
 
 /**
  * Create a mock Task for testing

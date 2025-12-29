@@ -3,18 +3,14 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
+import type {
 	UIConnectMessage,
 	UIErrorMessage,
-	UIMessageType,
 	UISnapshotMessage,
 	UIStartFlowMessage,
 	UIStateUpdateMessage,
-	createUIMessage,
-	isUICommand,
-	isUIResponse,
-	parseUIMessage,
 } from './types';
+import { UIMessageType, createUIMessage, isUICommand, isUIResponse, parseUIMessage } from './types';
 
 describe('UI Protocol Types', () => {
 	beforeEach(() => {

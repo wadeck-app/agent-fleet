@@ -88,9 +88,9 @@ export function TasksPage() {
 						<Button onClick={handleRefresh} disabled={isRefreshing} variant="outline" size="sm">
 							<RefreshCw
 								className={`
-         mr-2 size-4
-         ${isRefreshing ? 'animate-spin' : ''}
-       `}
+          mr-2 size-4
+          ${isRefreshing ? 'animate-spin' : ''}
+        `}
 							/>
 							Refresh
 						</Button>
@@ -115,19 +115,11 @@ export function TasksPage() {
         md:grid-cols-5
       `}
 					>
-						<div
-							className={`
-        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
-      `}
-						>
+						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
 							<div className="text-sm font-medium text-muted-foreground">Total Tasks</div>
 							<div className="text-2xl font-bold">{data.summary.total}</div>
 						</div>
-						<div
-							className={`
-        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
-      `}
-						>
+						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
 							<div className="text-sm font-medium text-muted-foreground">In Progress</div>
 							<div
 								className={`
@@ -138,11 +130,7 @@ export function TasksPage() {
 								{data.summary.byStatus.in_progress || 0}
 							</div>
 						</div>
-						<div
-							className={`
-        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
-      `}
-						>
+						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
 							<div className="text-sm font-medium text-muted-foreground">Review</div>
 							<div
 								className={`
@@ -153,11 +141,7 @@ export function TasksPage() {
 								{data.summary.byStatus.review || 0}
 							</div>
 						</div>
-						<div
-							className={`
-        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
-      `}
-						>
+						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
 							<div className="text-sm font-medium text-muted-foreground">Completed</div>
 							<div
 								className={`
@@ -168,11 +152,7 @@ export function TasksPage() {
 								{(data.summary.byStatus.approved || 0) + (data.summary.byStatus.merged || 0)}
 							</div>
 						</div>
-						<div
-							className={`
-        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
-      `}
-						>
+						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
 							<div className="text-sm font-medium text-muted-foreground">Blocked</div>
 							<div
 								className={`

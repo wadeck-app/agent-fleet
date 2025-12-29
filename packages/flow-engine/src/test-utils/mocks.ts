@@ -3,9 +3,9 @@
  *
  * Reusable mock classes and objects for testing.
  */
-import { FlowRegistry } from 'flow-engine/registry/FlowRegistry';
-import { FlowDefinition } from 'flow-engine/types';
-import { IssueCollector, ValidationCode, ValidationIssue } from 'flow-engine/validation/ValidationTypes';
+import type { FlowRegistry } from 'flow-engine/registry/FlowRegistry';
+import type { FlowDefinition } from 'flow-engine/types';
+import type { IssueCollector, ValidationCode, ValidationIssue } from 'flow-engine/validation/ValidationTypes';
 
 // import type { FlowRegistry } from 'flow-engine/registry/FlowRegistry';
 // import type { FlowDefinition } from 'flow-engine/types';

@@ -4,7 +4,7 @@
  * This module defines all the core interfaces and types for the workflow engine,
  * including flow definitions, steps, workspaces, and execution traces.
  */
-import { TaskStatus } from 'shared-orch-worker/domain-types';
+import type { TaskStatus } from 'shared-orch-worker/domain-types';
 
 /**
  * Supported model types for step execution

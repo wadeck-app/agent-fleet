@@ -8,7 +8,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { MockedObject } from 'vitest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { MessageQueue } from '../MessageQueue';
+import type { MessageQueue } from '../MessageQueue';
 import type { TransportSession, TransportSessionManager } from '../TransportSessionManager';
 import { HttpPollingTransportServer } from './HttpPollingTransportServer';
 

@@ -1,9 +1,10 @@
 import type { HttpMethod } from '@shared/route-builder';
 import type { PathsForMethod, RouteBody, RouteParams, RouteQuery, RouteResponse } from '@shared/types';
 
+import { getConnId } from '@/transport/connection-id';
+
 import { API_BASE_URL } from '@app/api/config';
 import { circuitBreakerService } from '@app/services';
-import { getConnId } from '../../transport/connection-id';
 
 /**
  * ===========================================================================================

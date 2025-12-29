@@ -91,7 +91,11 @@ export function SortableColumnItem({
 				{...(canReorder ? listeners : {})}
 				className={cn(
 					canReorder
-						? `cursor-grab touch-none p-2 opacity-40 hover:opacity-70 active:cursor-grabbing`
+						? `
+        cursor-grab touch-none p-2 opacity-40
+        hover:opacity-70
+        active:cursor-grabbing
+      `
 						: `cursor-not-allowed p-2 opacity-20`,
 					'transition-opacity duration-150'
 				)}

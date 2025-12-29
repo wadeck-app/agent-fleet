@@ -76,25 +76,27 @@ export function useWorkers({
 	 * Handle individual worker update event
 	 * Updates a single worker in the list without full refresh
 	 */
-	const handleWorkerUpdateEvent = useCallback(
-		(updatedWorker: Worker) => {
-			if (isMountedRef.current && data) {
-				console.log('[useWorkers] Received individual worker update:', updatedWorker.workerId);
+	const handleWorkerUpdateEvent = useCallback((updatedWorker: Worker) => {
+		if (isMountedRef.current) {
+			console.log('[useWorkers] Received individual worker update:', updatedWorker.workerId);
+			// Use functional update to avoid depending on data object
+			setData(prevData => {
+				if (!prevData) return prevData;
+
 				// Update the specific worker in the list
-				const updatedWorkers = data.workers.map(w =>
+				const updatedWorkers = prevData.workers.map(w =>
 					w.workerId === updatedWorker.workerId ? updatedWorker : w
 				);
 
-				setData({
-					...data,
+				return {
+					...prevData,
 					workers: updatedWorkers,
 					timestamp: new Date().toISOString(),
-				});
-				setError(null);
-			}
-		},
-		[data]
-	);
+				};
+			});
+			setError(null);
+		}
+	}, []);
 
 	/**
 	 * Subscribe to workers events via backend WebSocket

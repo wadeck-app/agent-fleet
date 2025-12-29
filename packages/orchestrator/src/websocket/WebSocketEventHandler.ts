@@ -1,8 +1,8 @@
 import { logger } from 'shared-common/logger';
-import { StateManager } from 'shared-orch-worker/StateManager';
+import type { StateManager } from 'shared-orch-worker/StateManager';
 import { TaskStatus } from 'shared-orch-worker/domain-types';
 import { O2WMessageType, createO2WMessage } from 'shared-orch-worker/orchestrator-messages';
-import {
+import type {
 	REMOVE_W2OStopRequestedMessage,
 	W2OFlowStepCompletedMessage,
 	W2OFlowStepFailedMessage,
@@ -17,8 +17,8 @@ import {
 	W2OWorkspaceReleasedMessage,
 } from 'shared-orch-worker/worker-messages';
 
-import { TaskManager } from '../core/TaskManager';
-import { WebSocketConnectionManager } from './WebSocketConnectionManager';
+import type { TaskManager } from '../core/TaskManager';
+import type { WebSocketConnectionManager } from './WebSocketConnectionManager';
 
 /**
  * Handles all task-related and flow-related events from workers

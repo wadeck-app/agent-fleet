@@ -4,20 +4,21 @@
  * Comprehensive unit tests for the REST API endpoints.
  * Tests all HTTP endpoints with success and error cases.
  */
-import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
+import type { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
 import { createMockTask as createMockTaskUtil } from 'orchestrator/test-utils/MockOrchestrator';
 import { logger } from 'shared-common/logger';
-import { StateManager } from 'shared-orch-worker/StateManager';
-import { Task, TaskStatus, WorkerInfo } from 'shared-orch-worker/domain-types';
+import type { StateManager } from 'shared-orch-worker/StateManager';
+import type { Task, WorkerInfo } from 'shared-orch-worker/domain-types';
+import { TaskStatus } from 'shared-orch-worker/domain-types';
 import request from 'supertest';
 import { setupTest } from 'test-utils/helpers';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { UIClientHook } from '../ui-client/UIClientHook';
 import { UIWebSocketServer } from '../websocket/UIWebSocketServer';
-import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
+import type { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
 import { RestAPI } from './RestAPI';
-import { TaskManager } from './TaskManager';
+import type { TaskManager } from './TaskManager';
 
 // Mock all dependencies
 vi.mock('./TaskManager');

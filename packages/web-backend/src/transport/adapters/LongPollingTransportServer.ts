@@ -230,7 +230,9 @@ export class LongPollingTransportServer implements ITransportServer {
 					timestamp: Date.now(),
 				};
 				this.messageQueue.enqueue(connId, responseEvent);
-				console.log(`[LongPolling] Queued ${eventType} for ${isNewSession ? 'new session' : 'reconnection'} ${connId}`);
+				console.log(
+					`[LongPolling] Queued ${eventType} for ${isNewSession ? 'new session' : 'reconnection'} ${connId}`
+				);
 			}
 
 			// Check if connection was aborted during authentication

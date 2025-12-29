@@ -105,14 +105,18 @@ export function EditableText({
 					maxLength={maxLength}
 					className="text-sm"
 				/>
-				{error && <div className="text-xs text-destructive mt-1">{error}</div>}
+				{error && <div className="mt-1 text-xs text-destructive">{error}</div>}
 			</div>
 		);
 	}
 
 	return (
 		<div
-			className={`cursor-pointer hover:underline ${displayClassName}`}
+			className={`
+     cursor-pointer
+     hover:underline
+     ${displayClassName}
+   `}
 			onClick={() => setIsEditing(true)}
 			title="Click to edit"
 		>

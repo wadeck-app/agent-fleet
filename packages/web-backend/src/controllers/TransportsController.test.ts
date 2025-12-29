@@ -8,7 +8,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { MockedObject } from 'vitest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { MessageQueue } from '../transport/MessageQueue';
+import type { MessageQueue } from '../transport/MessageQueue';
 import type { TransportSession, TransportSessionManager } from '../transport/TransportSessionManager';
 import { TransportsController } from './TransportsController';
 

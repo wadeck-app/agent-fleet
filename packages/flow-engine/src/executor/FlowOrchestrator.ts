@@ -12,7 +12,7 @@ import { TemplateRenderer } from '../processing/TemplateRenderer';
 import type { DAG, FlowDefinition, FlowExecutionResult, FlowStep, FlowTrace, StepTrace, Workspace } from '../types';
 import { DAGBuilder } from '../validation/DAGBuilder';
 import { DAGValidator } from '../validation/DAGValidator';
-import { StepRunner } from './StepRunner';
+import type { StepRunner } from './StepRunner';
 
 /**
  * Orchestration error

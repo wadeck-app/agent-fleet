@@ -9,7 +9,7 @@
  * - Task assignment and execution coordination
  * - Flow execution orchestration
  */
-import { ChildProcess } from 'child_process';
+import type { ChildProcess } from 'child_process';
 import dotenv from 'dotenv';
 import { type FlowExecutionOptions, FlowExecutor } from 'flow-engine/executor/FlowExecutor';
 import { FlowRegistry } from 'flow-engine/registry/FlowRegistry';

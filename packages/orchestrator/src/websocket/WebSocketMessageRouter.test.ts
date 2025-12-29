@@ -3,13 +3,12 @@
  */
 import { MockWebSocket } from 'orchestrator/test-utils/mocks';
 import { logger } from 'shared-common/logger';
-import {
+import type {
 	REMOVE_W2OStopRequestedMessage,
 	W2OFlowStepCompletedMessage,
 	W2OFlowStepFailedMessage,
 	W2OFlowStepStartedMessage,
 	W2OHookEventMessage,
-	W2OMessageType,
 	W2OTaskCompletedMessage,
 	W2OTaskFailedMessage,
 	W2OTaskProgressMessage,
@@ -19,13 +18,13 @@ import {
 	W2OWorkerReadyMessage,
 	W2OWorkspaceAllocatedMessage,
 	W2OWorkspaceReleasedMessage,
-	createW2OMessage,
 } from 'shared-orch-worker/worker-messages';
+import { W2OMessageType, createW2OMessage } from 'shared-orch-worker/worker-messages';
 import { setupTest } from 'test-utils/helpers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { WebSocketConnectionManager } from './WebSocketConnectionManager';
-import { WebSocketEventHandler } from './WebSocketEventHandler';
+import type { WebSocketConnectionManager } from './WebSocketConnectionManager';
+import type { WebSocketEventHandler } from './WebSocketEventHandler';
 import { WebSocketMessageRouter } from './WebSocketMessageRouter';
 
 // Mock dependencies

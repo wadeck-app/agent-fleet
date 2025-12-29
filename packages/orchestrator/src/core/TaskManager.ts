@@ -1,7 +1,8 @@
 import { Storage } from 'orchestrator/core/Storage';
 import { logger } from 'shared-common/logger';
-import { StateManager } from 'shared-orch-worker/StateManager';
-import { Task, TaskHistoryEntry, TaskStatus } from 'shared-orch-worker/domain-types';
+import type { StateManager } from 'shared-orch-worker/StateManager';
+import type { Task, TaskHistoryEntry } from 'shared-orch-worker/domain-types';
+import { TaskStatus } from 'shared-orch-worker/domain-types';
 import { v4 as uuidv4 } from 'uuid';
 
 interface WorkerIdleEntry {

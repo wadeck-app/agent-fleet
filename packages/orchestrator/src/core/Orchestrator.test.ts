@@ -8,7 +8,8 @@
  */
 import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
 import { logger } from 'shared-common/logger';
-import { MockedObject, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MockedObject } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
 // Import the actual Orchestrator class

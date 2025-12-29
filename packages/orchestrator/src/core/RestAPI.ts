@@ -1,18 +1,19 @@
 import express, { type Express, type Request, type Response } from 'express';
-import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
+import type { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
 import { readFileSync } from 'fs';
-import { Server as HttpServer, IncomingMessage } from 'http';
+import type { Server as HttpServer, IncomingMessage } from 'http';
 import { fileURLToPath } from 'node:url';
 import path from 'path';
 import { logger } from 'shared-common/logger';
-import { TaskStatus } from 'shared-orch-worker/domain-types';
-import { Duplex } from 'stream';
-import { WebSocket, WebSocketServer } from 'ws';
+import type { TaskStatus } from 'shared-orch-worker/domain-types';
+import type { Duplex } from 'stream';
+import type { WebSocket } from 'ws';
+import { WebSocketServer } from 'ws';
 
-import { UIClientHook } from '../ui-client/UIClientHook';
+import type { UIClientHook } from '../ui-client/UIClientHook';
 import { UIWebSocketServer } from '../websocket/UIWebSocketServer';
-import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
-import { TaskManager } from './TaskManager';
+import type { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
+import type { TaskManager } from './TaskManager';
 
 // Read version from package.json
 const __filename = fileURLToPath(import.meta.url);

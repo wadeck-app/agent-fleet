@@ -4,8 +4,10 @@
  * Manages Claude process lifecycle (spawn, kill, track).
  * Handles platform-specific process termination and WebSocket communication.
  */
-import { ChildProcess, execSync } from 'child_process';
-import { WebSocket, WebSocketServer } from 'ws';
+import type { ChildProcess } from 'child_process';
+import { execSync } from 'child_process';
+import type { WebSocket } from 'ws';
+import { WebSocketServer } from 'ws';
 
 /**
  * Message types received from Claude processes

@@ -4,7 +4,7 @@
 import * as fs from 'fs';
 import { createMockTask } from 'orchestrator/test-utils/MockOrchestrator';
 import * as path from 'path';
-import { Task, TaskStatus } from 'shared-orch-worker/domain-types';
+import type { Task, TaskStatus } from 'shared-orch-worker/domain-types';
 import { directoryExists, fileExists } from 'test-utils/helpers';
 import { fileURLToPath } from 'url';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';

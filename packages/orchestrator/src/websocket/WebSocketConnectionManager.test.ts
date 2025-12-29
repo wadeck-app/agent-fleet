@@ -3,13 +3,15 @@
  */
 import { logger } from 'shared-common/logger';
 import { serializeMessage } from 'shared-common/protocol';
-import { StateManager } from 'shared-orch-worker/StateManager';
-import { Task, TaskStatus } from 'shared-orch-worker/domain-types';
+import type { StateManager } from 'shared-orch-worker/StateManager';
+import type { Task } from 'shared-orch-worker/domain-types';
+import { TaskStatus } from 'shared-orch-worker/domain-types';
 import { O2WMessageType } from 'shared-orch-worker/orchestrator-messages';
-import { W2OMessageType, W2OWorkerReadyMessage, createW2OMessage } from 'shared-orch-worker/worker-messages';
+import type { W2OWorkerReadyMessage } from 'shared-orch-worker/worker-messages';
+import { W2OMessageType, createW2OMessage } from 'shared-orch-worker/worker-messages';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { TaskManager } from '../core/TaskManager';
+import type { TaskManager } from '../core/TaskManager';
 import { WebSocketConnectionManager } from './WebSocketConnectionManager';
 
 // Mock WebSocket class

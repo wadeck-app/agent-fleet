@@ -72,7 +72,15 @@ export function PageSizeSelector({
 
 	return (
 		<div className={cn('flex items-center gap-2', className)}>
-			{showLabel && <span className={`text-sm whitespace-nowrap text-muted-foreground`}>{label}</span>}
+			{showLabel && (
+				<span
+					className={`
+     text-sm whitespace-nowrap text-muted-foreground
+   `}
+				>
+					{label}
+				</span>
+			)}
 			<Select value={String(value)} onValueChange={handleValueChange} disabled={disabled}>
 				<SelectTrigger
 					size={size}

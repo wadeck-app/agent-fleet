@@ -346,9 +346,9 @@ export function Ingredients2Page() {
 					>
 						<RefreshCw
 							className={`
-        h-4 w-4
-        ${cache.fstate.isRefreshing ? `animate-spin` : ''}
-      `}
+         h-4 w-4
+         ${cache.fstate.isRefreshing ? `animate-spin` : ''}
+       `}
 						/>
 					</Button>
 				</div>
@@ -409,9 +409,9 @@ export function Ingredients2Page() {
 				<strong>Active Features (UI / Debounced):</strong>
 				<div
 					className={`
-      mt-2 grid grid-cols-2 gap-2 text-xs
-      sm:grid-cols-4
-    `}
+       mt-2 grid grid-cols-2 gap-2 text-xs
+       sm:grid-cols-4
+     `}
 				>
 					<div>
 						<span className="text-muted-foreground">Search:</span>{' '}

@@ -9,15 +9,16 @@ import {
 } from 'orchestrator/test-utils/mocks';
 import { UIMessageType } from 'orchestrator/ui-client/types';
 import { logger } from 'shared-common/logger';
-import { Task, TaskStatus } from 'shared-orch-worker/domain-types';
-import { KillClaudeMessage, O2WMessageType } from 'shared-orch-worker/orchestrator-messages';
-import {
+import type { Task } from 'shared-orch-worker/domain-types';
+import { TaskStatus } from 'shared-orch-worker/domain-types';
+import type { KillClaudeMessage } from 'shared-orch-worker/orchestrator-messages';
+import { O2WMessageType } from 'shared-orch-worker/orchestrator-messages';
+import type {
 	REMOVE_W2OStopRequestedMessage,
 	W2OFlowStepCompletedMessage,
 	W2OFlowStepFailedMessage,
 	W2OFlowStepStartedMessage,
 	W2OHookEventMessage,
-	W2OMessageType,
 	W2OTaskCompletedMessage,
 	W2OTaskFailedMessage,
 	W2OTaskProgressMessage,
@@ -25,8 +26,8 @@ import {
 	W2OTaskStartedMessage,
 	W2OWorkspaceAllocatedMessage,
 	W2OWorkspaceReleasedMessage,
-	createW2OMessage,
 } from 'shared-orch-worker/worker-messages';
+import { W2OMessageType, createW2OMessage } from 'shared-orch-worker/worker-messages';
 import { setupTest } from 'test-utils/helpers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

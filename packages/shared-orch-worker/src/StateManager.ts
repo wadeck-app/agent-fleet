@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 
-import { Task, WorkerInfo } from './domain-types';
+import type { Task, WorkerInfo } from './domain-types';
 
 export enum StateEvent {
 	// Task events

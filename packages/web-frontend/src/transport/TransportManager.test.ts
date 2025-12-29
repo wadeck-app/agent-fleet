@@ -5,7 +5,6 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ITransportClient } from './ITransportClient';
 import { TransportManager } from './TransportManager';
 import { MockTransportClient } from './adapters/MockTransportClient';
 
@@ -15,8 +14,8 @@ describe('TransportManager', () => {
 		TransportManager.cleanup();
 		// Clear sessionStorage
 		sessionStorage.clear();
-		// Mock crypto.randomUUID
-		vi.spyOn(crypto, 'randomUUID').mockReturnValue('test-uuid-123');
+		// Mock crypto.randomUUID with valid UUID format
+		vi.spyOn(crypto, 'randomUUID').mockReturnValue('12345678-1234-1234-1234-123456789012');
 	});
 
 	afterEach(async () => {

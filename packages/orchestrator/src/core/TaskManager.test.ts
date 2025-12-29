@@ -4,8 +4,9 @@
 import { Storage } from 'orchestrator/core/Storage';
 import { createMockStateManager } from 'orchestrator/test-utils/mocks';
 import { logger } from 'shared-common/logger';
-import { StateManager } from 'shared-orch-worker/StateManager';
-import { Task, TaskStatus } from 'shared-orch-worker/domain-types';
+import type { StateManager } from 'shared-orch-worker/StateManager';
+import type { Task } from 'shared-orch-worker/domain-types';
+import { TaskStatus } from 'shared-orch-worker/domain-types';
 import { setupTest, setupTimers } from 'test-utils/helpers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

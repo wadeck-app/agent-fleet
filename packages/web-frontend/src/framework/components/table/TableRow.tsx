@@ -11,7 +11,7 @@ export interface TableRowProps<T> {
 	selectable?: boolean;
 	isSelected: boolean;
 	isEditing: boolean;
-	isDeleting?: boolean;
+	_isDeleting?: boolean;
 	rowClassName: string;
 	itemId: string;
 	renderActions?: (item: T, isEditing: boolean) => ReactNode;
@@ -25,7 +25,7 @@ export function TableRow<T>({
 	selectable,
 	isSelected,
 	isEditing,
-	isDeleting = false,
+	_isDeleting = false,
 	rowClassName,
 	itemId,
 	renderActions,

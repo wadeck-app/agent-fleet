@@ -4,7 +4,8 @@
 import { createMockTask, createMockWorker } from 'orchestrator/test-utils/MockOrchestrator';
 import { createMockStateManager, createMockTaskManager } from 'orchestrator/test-utils/mocks';
 import { logger } from 'shared-common/logger';
-import { Task, TaskStatus, WorkerInfo } from 'shared-orch-worker/domain-types';
+import type { Task, WorkerInfo } from 'shared-orch-worker/domain-types';
+import { TaskStatus } from 'shared-orch-worker/domain-types';
 import { setupTimers } from 'test-utils/helpers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

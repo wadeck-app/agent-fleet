@@ -232,9 +232,26 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 				{/* Dynamic Flow Inputs Section */}
 				{selectedFlow?.inputs && Object.keys(selectedFlow.inputs).length > 0 && (
 					<div className="col-span-2 space-y-4">
-						<div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-							<h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Flow Inputs</h3>
-							<div className="space-y-3 pl-2 border-l-2 border-blue-500 dark:border-blue-400">
+						<div
+							className={`
+        border-t border-gray-200 pt-4
+        dark:border-gray-700
+      `}
+						>
+							<h3
+								className={`
+         mb-3 text-sm font-semibold text-gray-900
+         dark:text-gray-100
+       `}
+							>
+								Flow Inputs
+							</h3>
+							<div
+								className={`
+         space-y-3 border-l-2 border-blue-500 pl-2
+         dark:border-blue-400
+       `}
+							>
 								{Object.entries(selectedFlow.inputs).map(([inputName, inputType]) => {
 									const value = flowInputs[inputName] || '';
 									const error = formState.validationErrors[`input_${inputName}`];
