@@ -156,6 +156,11 @@ export class LongPollingTransportClient implements ITransportClient {
 	private consecutiveEmptyResponses = 0;
 
 	/**
+	 * Flag to indicate if this is the first poll after connect/reconnect
+	 */
+	private isFirstPoll = false;
+
+	/**
 	 * Create a new LongPollingTransportClient
 	 * @param config - Transport configuration
 	 */
@@ -189,6 +194,7 @@ export class LongPollingTransportClient implements ITransportClient {
 
 		this.updateConnectionState('connecting');
 		this.shouldPoll = true;
+		this.isFirstPoll = true; // Mark as first poll
 
 		try {
 			// First poll will authenticate
@@ -551,8 +557,16 @@ export class LongPollingTransportClient implements ITransportClient {
 				abortController.abort();
 			}, 35000);
 
+			// Build URL with firstPoll flag if this is the first poll
+			const url = new URL(`${this.config.baseUrl}/api/transports/long-polling`);
+			url.searchParams.set('connId', connId);
+			if (this.isFirstPoll) {
+				url.searchParams.set('firstPoll', 'true');
+				this.isFirstPoll = false; // Reset flag after first poll
+			}
+
 			console.log(`[LongPolling] DEBUG: About to fetch for connId=${connId}, isPolling=${this.isPolling}`);
-			const response = await fetch(`${this.config.baseUrl}/api/transports/long-polling?connId=${connId}`, {
+			const response = await fetch(url.toString(), {
 				method: 'GET',
 				credentials: 'include', // Send cookies for authentication
 				signal: abortController.signal,

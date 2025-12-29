@@ -155,10 +155,12 @@ export class LongPollingTransportServer implements ITransportServer {
 	 * Handle long polling request
 	 */
 	private async handlePollRequest(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-		// Get connId from query parameter (sent by client)
-		const connId = (request.query as { connId?: string }).connId;
+		// Get connId and firstPoll flag from query parameters (sent by client)
+		const query = request.query as { connId?: string; firstPoll?: string };
+		const connId = query.connId;
+		const isFirstPoll = query.firstPoll === 'true';
 
-		console.log(`[LongPolling] Poll request received for connId: ${connId}`);
+		console.log(`[LongPolling] Poll request received for connId: ${connId}, firstPoll: ${isFirstPoll}`);
 
 		if (!connId) {
 			reply.code(400).send({ error: 'Missing connId parameter' });
@@ -195,9 +197,13 @@ export class LongPollingTransportServer implements ITransportServer {
 			// Authenticate
 			const session = await this.sessionManager.authenticateConnection(connId, request.raw, 'long-polling');
 
-			// Track active session and detect reconnections
+			// Track active session and detect new sessions vs reconnections
 			const isNewSession = !this.activeSessions.has(connId);
-			const isReconnect = this.activeSessions.has(connId);
+			// @formatter:off
+			// Client sends firstPoll=true on first poll after connect/reconnect
+			// This ensures immediate response even after page refresh with same connId
+			// @formatter:on
+			const shouldSendImmediateResponse = isNewSession || isFirstPoll;
 
 			this.activeSessions.set(connId, Date.now());
 
@@ -206,13 +212,16 @@ export class LongPollingTransportServer implements ITransportServer {
 					`[LongPolling] New connection ${connId} (user=${session.userId}, total=${this.activeSessions.size})`
 				);
 				this.connectHandlers.forEach(handler => handler(connId));
+			}
 
+			if (shouldSendImmediateResponse) {
 				// Queue initial response instead of sending it immediately
 				// This avoids race condition with React StrictMode double-mount
 				// where the first request gets aborted before the response is fully received
-				const initialEvent: TransportEvent = {
+				const eventType = isNewSession ? '__initial_response__' : '__keep_alive__';
+				const responseEvent: TransportEvent = {
 					id: this.generateEventId(),
-					type: '__initial_response__' as any,
+					type: eventType as any,
 					data: {
 						authenticated: true,
 						userId: session.userId,
@@ -220,24 +229,8 @@ export class LongPollingTransportServer implements ITransportServer {
 					},
 					timestamp: Date.now(),
 				};
-				this.messageQueue.enqueue(connId, initialEvent);
-				console.log(`[LongPolling] Queued initial response for new session ${connId}`);
-			} else if (isReconnect) {
-				// Reconnection detected (page refresh, React remount, navigation, etc.)
-				// Queue an immediate response to avoid making the client wait 30s
-				console.log(`[LongPolling] Reconnection detected for ${connId} (connId already known)`);
-				const keepAliveEvent: TransportEvent = {
-					id: this.generateEventId(),
-					type: '__keep_alive__' as any,
-					data: {
-						authenticated: true,
-						userId: session.userId,
-						tokenExpiresAt: session.tokenExpiresAt,
-					},
-					timestamp: Date.now(),
-				};
-				this.messageQueue.enqueue(connId, keepAliveEvent);
-				console.log(`[LongPolling] Queued keep-alive response for reconnection ${connId}`);
+				this.messageQueue.enqueue(connId, responseEvent);
+				console.log(`[LongPolling] Queued ${eventType} for ${isNewSession ? 'new session' : 'reconnection'} ${connId}`);
 			}
 
 			// Check if connection was aborted during authentication
