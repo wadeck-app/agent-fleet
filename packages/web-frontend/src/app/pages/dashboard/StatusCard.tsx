@@ -1,5 +1,6 @@
 import { Badge } from '@framework/components/primitives/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
+import { formatUptime } from '@framework/utils/formatting/formatUptime';
 import type { OrchestratorStatus } from '@shared/api/dashboard.contract';
 import { Activity, Clock, Package } from 'lucide-react';
 
@@ -25,21 +26,6 @@ export interface StatusCardProps {
 	status: OrchestratorStatus;
 	uptime: number; // milliseconds
 	version: string;
-}
-
-/**
- * Format uptime in milliseconds to human-readable string
- * Examples: "1h 30m", "45m", "2h 5m"
- */
-function formatUptime(milliseconds: number): string {
-	const totalSeconds = Math.floor(milliseconds / 1000);
-	const hours = Math.floor(totalSeconds / 3600);
-	const minutes = Math.floor((totalSeconds % 3600) / 60);
-
-	if (hours > 0) {
-		return `${hours}h ${minutes}m`;
-	}
-	return `${minutes}m`;
 }
 
 /**

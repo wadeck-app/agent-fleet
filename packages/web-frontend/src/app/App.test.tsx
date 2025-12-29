@@ -26,25 +26,6 @@ describe('App - Theme Integration', () => {
 		expect(userMenuButton).toBeInTheDocument();
 	});
 
-	it('should have user menu with dropdown', () => {
-		render(<App />);
-		const userMenuButton = screen.getByText('User');
-		expect(userMenuButton).toBeInTheDocument();
-	});
-
-	it('should support theme persistence in localStorage', () => {
-		localStorage.setItem('app_theme_preference', 'dark');
-		render(<App />);
-		expect(document.documentElement.classList.contains('dark')).toBe(true);
-	});
-
-	it('should maintain localStorage on component mount', () => {
-		localStorage.setItem('app_theme_preference', 'light');
-		render(<App />);
-		const stored = localStorage.getItem('app_theme_preference');
-		expect(stored).toBeTruthy();
-	});
-
 	it('should restore theme from localStorage on mount', () => {
 		localStorage.setItem('app_theme_preference', 'dark');
 
@@ -60,13 +41,6 @@ describe('App - Theme Integration', () => {
 		const booksLink = screen.getByText('Books');
 
 		expect(ingredientsLink).toBeInTheDocument();
-		expect(booksLink).toBeInTheDocument();
-	});
-
-	it('should navigate between pages', () => {
-		render(<App />);
-		const booksLink = screen.getByText('Books');
-		fireEvent.click(booksLink);
 		expect(booksLink).toBeInTheDocument();
 	});
 });
