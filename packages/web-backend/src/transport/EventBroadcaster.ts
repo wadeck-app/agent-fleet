@@ -257,8 +257,14 @@ export class EventBroadcaster {
 	getConnectedClients(): string[] {
 		const allConnections = new Set<string>();
 		for (const transport of this.transportServers) {
-			transport.getConnectedClients().forEach(connId => allConnections.add(connId));
+			const transportConnections = transport.getConnectedClients();
+			console.log(
+				`[EventBroadcaster] Transport ${transport.getTransportType()}: ${transportConnections.length} connections`,
+				transportConnections.map(c => c.substring(0, 8))
+			);
+			transportConnections.forEach(connId => allConnections.add(connId));
 		}
+		console.log(`[EventBroadcaster] Total unique connections: ${allConnections.size}`);
 		return Array.from(allConnections);
 	}
 

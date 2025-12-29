@@ -43,6 +43,7 @@
  * await client.disconnect();
  * ```
  */
+import { getConnId } from '../connection-id';
 import type {
 	ConnectionState,
 	ConnectionStateHandler,
@@ -170,11 +171,9 @@ export class WebSocketTransportClient implements ITransportClient {
 		return new Promise((resolve, reject) => {
 			const wsUrl = this.config.wsUrl || this.config.baseUrl.replace(/^http/, 'ws');
 
-			// Get connId from sessionStorage for request correlation (unique per tab)
-			const connId = sessionStorage.getItem('agent_fleet_conn_id');
-			const wsUrlWithConnId = connId
-				? `${wsUrl}/api/transports/ws?connId=${connId}`
-				: `${wsUrl}/api/transports/ws`;
+			// Get connId for request correlation (unique per tab)
+			const connId = getConnId();
+			const wsUrlWithConnId = `${wsUrl}/api/transports/ws?connId=${connId}`;
 
 			// SECURITY: WebSocket automatically sends cookies from same origin
 			// No need to pass tokens manually!

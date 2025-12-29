@@ -3,6 +3,7 @@ import type { PathsForMethod, RouteBody, RouteParams, RouteQuery, RouteResponse 
 
 import { API_BASE_URL } from '@app/api/config';
 import { circuitBreakerService } from '@app/services';
+import { getConnId } from '../../transport/connection-id';
 
 /**
  * ===========================================================================================
@@ -256,17 +257,16 @@ export function createTypedFetch<Routes extends Record<string, unknown>>(routes:
 		// Build the URL
 		const url = buildUrl(path, options);
 
-		// Get connId from sessionStorage for request correlation (unique per tab)
-		const connId = sessionStorage.getItem('agent_fleet_conn_id');
+		// Get connId for request correlation (unique per tab, even for duplicated tabs)
+		const connId = getConnId();
 
 		// Build headers object
 		const headers: Record<string, string> = {};
 		if (options?.body) {
 			headers['Content-Type'] = 'application/json';
 		}
-		if (connId) {
-			headers['X-Conn-Id'] = connId;
-		}
+		// Always send connId (unique per tab)
+		headers['X-Conn-Id'] = connId;
 
 		// Execute the request
 		const response = await circuitBreakerService.executeFetch(url, {

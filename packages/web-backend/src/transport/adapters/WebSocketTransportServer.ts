@@ -455,6 +455,7 @@ export class WebSocketTransportServer implements ITransportServer {
 		}
 	}
 
+	//FIXME doit utiliser connId, pas clientId
 	/**
 	 * Generate unique client ID
 	 */

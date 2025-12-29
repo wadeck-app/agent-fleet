@@ -45,6 +45,7 @@ import { MockTransportClient } from './adapters/MockTransportClient';
 import { RestTransportClient } from './adapters/RestTransportClient';
 import { SSETransportClient } from './adapters/SSETransportClient';
 import { WebSocketTransportClient } from './adapters/WebSocketTransportClient';
+import { clearConnId, getConnId } from './connection-id';
 
 export type TransportMode = 'auto' | 'websocket' | 'sse' | 'long-polling' | 'http-polling' | 'rest' | 'mock';
 
@@ -97,7 +98,7 @@ export class TransportManager {
 
 	/**
 	 * Connection ID (unique per tab)
-	 * Generated once and persisted in sessionStorage
+	 * Managed by connection-id helper (uses window.name)
 	 */
 	private connId: string | null = null;
 
@@ -166,35 +167,16 @@ export class TransportManager {
 	/**
 	 * Get or create connection ID (unique per tab)
 	 *
-	 * ConnId is generated once per tab and persisted in sessionStorage.
-	 * This enables proper multi-tab support:
-	 * - Each tab has unique connId
-	 * - Backend can exclude broadcast to specific tab (prevent echo)
-	 * - Survives React StrictMode remounts
+	 * Delegates to centralized connection-id helper.
+	 * See connection-id.ts for implementation details.
 	 *
 	 * @returns Connection ID
 	 */
 	getConnId(): string {
-		if (this.connId) {
-			return this.connId;
+		if (!this.connId) {
+			this.connId = getConnId();
 		}
-
-		// Try to get existing connId from sessionStorage
-		const CONN_ID_KEY = 'agent_fleet_conn_id';
-		const existingConnId = sessionStorage.getItem(CONN_ID_KEY);
-
-		if (existingConnId) {
-			console.log('[TransportManager] Using existing connId:', existingConnId.substring(0, 8) + '...');
-			this.connId = existingConnId;
-			return existingConnId;
-		}
-
-		// Generate new connId
-		const newConnId = crypto.randomUUID();
-		sessionStorage.setItem(CONN_ID_KEY, newConnId);
-		console.log('[TransportManager] Generated new connId:', newConnId.substring(0, 8) + '...');
-		this.connId = newConnId;
-		return newConnId;
+		return this.connId;
 	}
 
 	/**
@@ -265,7 +247,7 @@ export class TransportManager {
 	 * Cleanup singleton (for tests or app shutdown)
 	 *
 	 * Disconnects transport and resets singleton instance.
-	 * Clears connId from sessionStorage.
+	 * Clears connId via connection-id helper.
 	 */
 	static async cleanup(): Promise<void> {
 		if (TransportManager.instance) {
@@ -275,8 +257,8 @@ export class TransportManager {
 			TransportManager.instance.connId = null;
 			TransportManager.instance = null;
 
-			// Clear connId from sessionStorage
-			sessionStorage.removeItem('agent_fleet_conn_id');
+			// Clear connId
+			clearConnId();
 			console.log('[TransportManager] Cleanup complete');
 		}
 	}

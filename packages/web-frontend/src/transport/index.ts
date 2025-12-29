@@ -26,6 +26,9 @@ export type { TransportManagerConfig, TransportMode } from './TransportManager';
 export { TokenRefreshManager } from './TokenRefreshManager';
 export type { TokenRefreshConfig } from './TokenRefreshManager';
 
+// Connection ID helpers (centralized connId management)
+export { clearConnId, getConnId } from './connection-id';
+
 // Transport Client Interface
 export type { ITransportClient, Subscription, TransportStatus } from './ITransportClient';
 

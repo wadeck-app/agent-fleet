@@ -61,7 +61,7 @@ export function ConnectionModeIndicator() {
 				badgeText = `LongPoll (${port})`;
 				break;
 			case 'http':
-				badgeText = `REST (${port})`;
+				badgeText = `HTTP (${port})`;
 				badgeVariant = 'warning';
 				break;
 			case 'mock':

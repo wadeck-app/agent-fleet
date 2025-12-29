@@ -16,12 +16,9 @@ describe('HttpPollingTransportClient', () => {
 		vi.clearAllTimers();
 		vi.clearAllMocks();
 
-		// Mock sessionStorage for connId
+		// Mock window.name for connId
 		const mockConnId = 'test-conn-id-123';
-		vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
-			if (key === 'agent_fleet_conn_id') return mockConnId;
-			return null;
-		});
+		window.name = mockConnId;
 
 		client = new HttpPollingTransportClient({
 			baseUrl,

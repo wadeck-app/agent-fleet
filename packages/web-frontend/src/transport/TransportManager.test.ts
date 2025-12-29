@@ -66,11 +66,11 @@ describe('TransportManager', () => {
 			const connId = instance.getConnId();
 
 			expect(connId).toBe('test-uuid-123');
-			expect(sessionStorage.getItem('agent_fleet_conn_id')).toBe('test-uuid-123');
+			expect(window.name).toBe('test-uuid-123');
 		});
 
 		it('should reuse existing connId from sessionStorage', () => {
-			sessionStorage.setItem('agent_fleet_conn_id', 'existing-uuid');
+			window.name = 'existing-uuid';
 
 			const config = {
 				mode: 'mock' as const,
@@ -110,11 +110,11 @@ describe('TransportManager', () => {
 			const instance = TransportManager.getInstance(config);
 			instance.getConnId();
 
-			expect(sessionStorage.getItem('agent_fleet_conn_id')).toBe('test-uuid-123');
+			expect(window.name).toBe('test-uuid-123');
 
 			await TransportManager.cleanup();
 
-			expect(sessionStorage.getItem('agent_fleet_conn_id')).toBeNull();
+			expect(window.name).toBe('');
 		});
 	});
 
@@ -290,7 +290,7 @@ describe('TransportManager', () => {
 			expect(transport.isConnected()).toBe(false);
 
 			// SessionStorage should be cleared
-			expect(sessionStorage.getItem('agent_fleet_conn_id')).toBeNull();
+			expect(window.name).toBeNull();
 
 			// New getInstance should create new instance
 			const newInstance = TransportManager.getInstance(config);

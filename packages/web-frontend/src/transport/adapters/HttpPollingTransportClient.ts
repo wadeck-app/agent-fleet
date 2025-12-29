@@ -55,6 +55,7 @@
  * await client.disconnect();
  * ```
  */
+import { getConnId } from '../connection-id';
 import type {
 	ConnectionState,
 	ConnectionStateHandler,
@@ -321,7 +322,7 @@ export class HttpPollingTransportClient implements ITransportClient {
 	 * Subscribe to multiple events in a single request (unified subscription API)
 	 */
 	async subscribeBatch(events: string[], filters?: Record<string, Record<string, unknown>>): Promise<void> {
-		const connId = sessionStorage.getItem('agent_fleet_conn_id');
+		const connId = getConnId();
 		if (!connId) {
 			throw new Error('No connId found in sessionStorage');
 		}
@@ -351,7 +352,7 @@ export class HttpPollingTransportClient implements ITransportClient {
 	 * Subscribe to a single event (unified subscription API)
 	 */
 	async subscribeToEvent(event: string, filters?: Record<string, unknown>): Promise<void> {
-		const connId = sessionStorage.getItem('agent_fleet_conn_id');
+		const connId = getConnId();
 		if (!connId) {
 			throw new Error('No connId found in sessionStorage');
 		}
@@ -380,7 +381,7 @@ export class HttpPollingTransportClient implements ITransportClient {
 	 * Unsubscribe from a single event (unified subscription API)
 	 */
 	async unsubscribeFromEvent(event: string): Promise<void> {
-		const connId = sessionStorage.getItem('agent_fleet_conn_id');
+		const connId = getConnId();
 		if (!connId) {
 			throw new Error('No connId found in sessionStorage');
 		}
@@ -407,7 +408,7 @@ export class HttpPollingTransportClient implements ITransportClient {
 	 * Get current subscriptions (unified subscription API)
 	 */
 	async getSubscriptions(): Promise<Subscription[]> {
-		const connId = sessionStorage.getItem('agent_fleet_conn_id');
+		const connId = getConnId();
 		if (!connId) {
 			throw new Error('No connId found in sessionStorage');
 		}
@@ -432,7 +433,7 @@ export class HttpPollingTransportClient implements ITransportClient {
 	 * Get transport status (unified subscription API)
 	 */
 	async getTransportStatus(): Promise<TransportStatus> {
-		const connId = sessionStorage.getItem('agent_fleet_conn_id');
+		const connId = getConnId();
 		if (!connId) {
 			throw new Error('No connId found in sessionStorage');
 		}
@@ -506,7 +507,7 @@ export class HttpPollingTransportClient implements ITransportClient {
 
 		try {
 			// Get connId from sessionStorage
-			const connId = sessionStorage.getItem('agent_fleet_conn_id');
+			const connId = getConnId();
 			if (!connId) {
 				throw new Error('No connId found in sessionStorage');
 			}
