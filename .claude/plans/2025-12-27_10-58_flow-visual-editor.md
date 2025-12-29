@@ -30,21 +30,26 @@ L'application agent-fleet utilise des flows YAML pour définir des workflows com
 
 ---
 
-## 🎯 Proposition 1 : React Flow (RECOMMANDÉ)
+## 🎯 Proposition 1 : Xyflow (React Flow v12) - RECOMMANDÉ
 
 ### Technologie
 
-**Bibliothèque** : [React Flow](https://reactflow.dev/) v11.x (~400KB gzipped)
+**Bibliothèque** : [Xyflow](https://xyflow.com/) v12.x (~400KB gzipped)
+
+**Note** : Xyflow est le nouveau nom de React Flow v12+. C'est la même équipe, même philosophie, version modernisée.
 
 **Avantages** :
 
-- ✅ Bibliothèque battle-tested (20k+ stars GitHub)
+- ✅ Bibliothèque battle-tested (20k+ stars GitHub) - version modernisée
+- ✅ **Performance 2x meilleure** que v11 pour large flows (100+ nodes)
+- ✅ **TypeScript plus strict** - meilleure inférence de types
+- ✅ **Architecture plugins modulaire** - plus propre et extensible
 - ✅ Fonctionnalités intégrées : drag & drop, zoom, pan, minimap, edge routing
-- ✅ Excellent support TypeScript
-- ✅ Documentation complète avec nombreux exemples
+- ✅ **Accessibilité WCAG 2.1 AA** (meilleure que v11)
+- ✅ **Support mobile/touch amélioré**
+- ✅ Documentation complète et migration guide depuis v11
 - ✅ Intégration facile avec Radix UI
-- ✅ Performance optimisée (100+ nodes)
-- ✅ Accessibilité intégrée
+- ✅ **Future-proof** - version active avec nouvelles fonctionnalités
 
 **Inconvénients** :
 
@@ -53,10 +58,19 @@ L'application agent-fleet utilise des flows YAML pour définir des workflows com
 
 ### Architecture
 
+**Imports Xyflow** :
+
+```typescript
+import { Background, Controls, MiniMap, ReactFlow } from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+```
+
+**Structure** :
+
 ```
 packages/web-frontend/src/app/pages/flow-editor/
 ├── FlowEditorPage.tsx                # Page principale (route /flows/:id/edit)
-├── FlowEditorCanvas.tsx              # Canvas React Flow
+├── FlowEditorCanvas.tsx              # Canvas Xyflow
 ├── FlowEditorToolbar.tsx             # Barre d'outils (add nodes, layout, validate)
 ├── FlowEditorPropertiesPanel.tsx    # Panneau de propriétés (droite)
 ├── FlowEditorValidationPanel.tsx    # Panneau de validation (bas)
@@ -195,64 +209,34 @@ useEffect(() => {
 
 ---
 
-## 🎯 Proposition 2 : Xyflow (React Flow v12+)
+## 🎯 Proposition 2 : React Flow v11 (Ancienne version)
 
 ### Technologie
 
-**Bibliothèque** : [Xyflow](https://xyflow.com/) (~400KB gzipped)
+**Bibliothèque** : [React Flow](https://reactflow.dev/) v11.x (~400KB gzipped)
 
-**Différences vs React Flow v11** :
+**Pourquoi considérer v11** :
 
-- ✅ Performance 2x meilleure (100+ nodes)
-- ✅ Support TypeScript encore plus strict
-- ✅ Système de plugins modulaire
-- ✅ Accessibilité WCAG 2.1 AA
-- ✅ Meilleur support touch/mobile
-- ⚠️ Plus récent (fin 2024) = moins battle-tested
-- ⚠️ Moins d'exemples communautaires
+- ⚠️ **Uniquement si** vous avez une dépendance critique à un plugin non migré
+- ⚠️ **Approche ultra-conservatrice** (mais injustifiée pour nouveau projet)
 
-### Architecture
+**Différences vs Xyflow v12** :
 
-Quasi-identique à Proposition 1, avec ces différences :
+- ❌ Performance inférieure (~50% plus lent sur large flows)
+- ❌ Types TypeScript moins stricts
+- ❌ Pas d'architecture plugins
+- ❌ Accessibilité basique (pas WCAG 2.1 AA)
+- ❌ Support mobile/touch moins bon
+- ❌ Version legacy - nouvelles features sur v12 uniquement
 
-**Système de plugins** :
+### Recommandation
 
-```typescript
-import { ReactFlow, Background, Controls, MiniMap } from '@xyflow/react';
+**NE PAS CHOISIR** pour un nouveau projet. Xyflow v12 est supérieur dans tous les aspects.
 
-<ReactFlow nodes={nodes} edges={edges}>
-  <Background />
-  <Controls />
-  <MiniMap nodeColor={getNodeColor} />
-  <ValidationOverlay /> {/* Plugin custom */}
-</ReactFlow>
-```
+**Seul cas d'usage valide** :
 
-**Types plus stricts** :
-
-```typescript
-import type { Edge, Node } from '@xyflow/react';
-
-type ModelStepNode = Node<StepNodeData, 'model'>;
-type ScriptStepNode = Node<StepNodeData, 'script'>;
-type FlowNode = ModelStepNode | ScriptStepNode | SubFlowStepNode;
-```
-
-### Interface (ASCII Draft)
-
-Identique à Proposition 1 - seule l'implémentation interne diffère.
-
-### Complexité & Estimation
-
-**Complexité** : Moyenne
-**Durée estimée** : **2-3 semaines** (similaire à Prop 1)
-
-**Quand choisir Xyflow plutôt que React Flow** :
-
-- Performance critique avec flows >50 nodes
-- Accessibilité WCAG 2.1 AA requise
-- Support mobile/tablette important
-- Projet long terme (future-proof)
+- Migration d'un projet React Flow v11 existant où le coût de migration est trop élevé
+- Dépendance critique à un plugin communautaire non compatible v12 (rare)
 
 ---
 
@@ -427,43 +411,50 @@ const handleMouseDown = (e: MouseEvent) => {
 
 ## 📊 Tableau Comparatif
 
-| Critère           | React Flow (Prop 1) | Xyflow (Prop 2) | Custom SVG (Prop 3) |
-| ----------------- | ------------------- | --------------- | ------------------- |
-| **Temps dev**     | 2-3 semaines        | 2-3 semaines    | 5-8 semaines        |
-| **Complexité**    | Moyenne             | Moyenne         | Élevée              |
-| **Bundle**        | ~400KB              | ~400KB          | ~100KB              |
-| **Performance**   | Bonne               | Excellente      | Bonne (si optimisé) |
-| **Customisation** | Élevée              | Élevée          | Illimitée           |
-| **Maintenance**   | Faible              | Faible          | Élevée              |
-| **Accessibilité** | Intégrée            | WCAG 2.1 AA     | Manuelle            |
-| **Mobile**        | Bon                 | Excellent       | Manuel              |
-| **Documentation** | Excellente          | Bonne           | D3/SVG docs         |
-| **Risque**        | Faible              | Faible-Moyen    | Élevé               |
+| Critère           | Xyflow v12 (Prop 1) | React Flow v11 (Prop 2) | Custom SVG (Prop 3) |
+| ----------------- | ------------------- | ----------------------- | ------------------- |
+| **Temps dev**     | 2-3 semaines        | 2-3 semaines            | 5-8 semaines        |
+| **Complexité**    | Moyenne             | Moyenne                 | Élevée              |
+| **Bundle**        | ~400KB              | ~400KB                  | ~100KB              |
+| **Performance**   | Excellente (2x v11) | Bonne                   | Bonne (si optimisé) |
+| **Customisation** | Élevée              | Élevée                  | Illimitée           |
+| **Maintenance**   | Faible              | Faible                  | Élevée              |
+| **Accessibilité** | WCAG 2.1 AA ⭐      | Basique                 | Manuelle            |
+| **Mobile**        | Excellent ⭐        | Bon                     | Manuel              |
+| **Documentation** | Excellente          | Excellente              | D3/SVG docs         |
+| **Risque**        | Faible              | Faible                  | Élevé               |
+| **Future-proof**  | ✅ Oui              | ❌ Legacy               | 🤷 Dépend équipe    |
 
 ---
 
 ## ✅ Recommandation Principale
 
-### **Proposition 1 : React Flow v11**
+### **Proposition 1 : Xyflow v12 (React Flow modernisé)** ⭐
 
 **Pourquoi ?**
 
-1. ✅ Meilleur équilibre fonctionnalités / temps / risque
-2. ✅ Bibliothèque battle-tested avec large communauté
-3. ✅ Time-to-market rapide (2-3 semaines)
-4. ✅ Maintenance faible
-5. ✅ Customisation suffisante pour agent-fleet
-6. ✅ Documentation excellente
-7. ✅ Intégration prouvée avec Radix UI + Tailwind
+1. ✅ **Meilleur équilibre** fonctionnalités / temps / risque
+2. ✅ **Performance 2x meilleure** que v11 - important pour flows complexes
+3. ✅ **TypeScript plus strict** - moins de bugs runtime
+4. ✅ **Architecture plugins** - code plus propre et maintenable
+5. ✅ **Accessibilité WCAG 2.1 AA** - meilleure que v11
+6. ✅ **Time-to-market rapide** (2-3 semaines)
+7. ✅ **Future-proof** - version active avec nouvelles features
+8. ✅ Intégration prouvée avec Radix UI + Tailwind
+9. ✅ Documentation excellente + migration guide
 
-### Alternative : **Proposition 2 : Xyflow**
+**C'est le choix évident pour un nouveau projet.**
 
-**Quand choisir** :
+### Non recommandé : **Proposition 2 : React Flow v11**
 
-- Flows régulièrement >50 nodes
-- Accessibilité WCAG critique
-- Support mobile/tablette requis
-- Confortable avec libs récentes
+**Pourquoi éviter** :
+
+- Version legacy - pas de nouvelles features
+- Performance inférieure
+- Pas d'architecture plugins
+- Accessibilité limitée
+
+**Seulement si** : Migration d'un projet v11 existant avec coût de migration élevé
 
 ### Non recommandé : **Proposition 3 : Custom SVG**
 
@@ -482,10 +473,10 @@ const handleMouseDown = (e: MouseEvent) => {
 
 **Tâches** :
 
-1. Installer dépendances React Flow
+1. Installer dépendances Xyflow
 
     ```bash
-    npm install reactflow dagre
+    npm install @xyflow/react dagre
     npm install -D @types/dagre
     ```
 
@@ -638,7 +629,7 @@ const handleMouseDown = (e: MouseEvent) => {
 
 ## 📋 Prochaines Étapes
 
-1. ✅ **Validation stakeholder** sur approche (recommandation : Proposition 1)
+1. ✅ **Validation stakeholder** sur approche (recommandation : Proposition 1 - Xyflow v12) ✅ **VALIDÉ**
 2. 🔬 **Spike technique** (1-2 jours) :
     - Intégration React Flow + Radix UI
     - Sérialisation round-trip avec flow réel

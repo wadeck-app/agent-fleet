@@ -14,6 +14,8 @@ export enum O2WMessageType {
 	PAUSE = 'o2w:execution:pause',
 	RESUME = 'o2w:execution:resume',
 	SHUTDOWN = 'o2w:worker:shutdown',
+	REQUEST_FLOW_DEFINITION = 'o2w:flow:request_definition',
+	SAVE_FLOW_DEFINITION = 'o2w:flow:save_definition',
 	ACK = 'o2w:ack',
 	ERROR = 'o2w:error',
 }
@@ -55,6 +57,19 @@ export interface ErrorMessage extends O2WBaseMessage {
 	error: string;
 }
 
+export interface RequestFlowDefinitionMessage extends O2WBaseMessage {
+	type: O2WMessageType.REQUEST_FLOW_DEFINITION;
+	flowId: string;
+	requestId: string; // For matching request with response
+}
+
+export interface SaveFlowDefinitionMessage extends O2WBaseMessage {
+	type: O2WMessageType.SAVE_FLOW_DEFINITION;
+	flowId: string;
+	flowDefinition: any; // Full flow definition with steps
+	requestId: string; // For matching request with response
+}
+
 export type O2WMessage =
 	| WorkerWelcomeMessage
 	| AssignTaskMessage
@@ -62,6 +77,8 @@ export type O2WMessage =
 	| PauseMessage
 	| ResumeMessage
 	| ShutdownMessage
+	| RequestFlowDefinitionMessage
+	| SaveFlowDefinitionMessage
 	| AckMessage
 	| ErrorMessage;
 
@@ -76,6 +93,8 @@ export interface O2WMessageMap {
 	[O2WMessageType.PAUSE]: PauseMessage;
 	[O2WMessageType.RESUME]: ResumeMessage;
 	[O2WMessageType.SHUTDOWN]: ShutdownMessage;
+	[O2WMessageType.REQUEST_FLOW_DEFINITION]: RequestFlowDefinitionMessage;
+	[O2WMessageType.SAVE_FLOW_DEFINITION]: SaveFlowDefinitionMessage;
 	[O2WMessageType.ACK]: AckMessage;
 	[O2WMessageType.ERROR]: ErrorMessage;
 }

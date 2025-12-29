@@ -16,6 +16,7 @@ import {
 	Package2,
 	PackageSearch,
 	Users,
+	Workflow,
 } from 'lucide-react';
 
 import { ConnectionModeIndicator } from '@app/components/connectivity/ConnectionModeIndicator';
@@ -64,6 +65,11 @@ const navigationItems: NavItem[] = [
 	},
 	{
 		type: 'separator',
+	},
+	{
+		path: '/flows/new',
+		label: 'Flow Editor',
+		icon: Workflow,
 	},
 	{
 		path: '/ingredients',

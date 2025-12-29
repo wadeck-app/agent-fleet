@@ -159,6 +159,10 @@ function createLazyControllerPlugin<Routes = any>(
 			service = factory.getDashboardService();
 			// @ts-expect-error - Dynamic service injection based on baseUrl
 			controllerInstance = new ControllerClass(service);
+		} else if (baseUrl === '/api/flows') {
+			service = factory.getFlowsService();
+			// @ts-expect-error - Dynamic service injection based on baseUrl
+			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/workers') {
 			service = factory.getWorkersService();
 			// @ts-expect-error - Dynamic service injection based on baseUrl

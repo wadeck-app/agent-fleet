@@ -27,6 +27,7 @@
 import { AUTH_API_ROUTES } from './api/auth.contract';
 import { BOOKS_API_ROUTES } from './api/books.contract';
 import { DASHBOARD_API_ROUTES } from './api/dashboard.contract';
+import { FLOWS_API_ROUTES } from './api/flows.contract';
 import { INGREDIENTS_API_ROUTES } from './api/ingredients.contract';
 import { MONITORING_API_ROUTES } from './api/monitoring.contract';
 import { TASKS_API_ROUTES } from './api/tasks.contract';
@@ -47,6 +48,7 @@ export const ALL_API_ROUTES = {
 	...INGREDIENTS_API_ROUTES,
 	...BOOKS_API_ROUTES,
 	...DASHBOARD_API_ROUTES,
+	...FLOWS_API_ROUTES,
 	...WORKERS_API_ROUTES,
 	...TASKS_API_ROUTES,
 	...WORKSPACES_API_ROUTES,
@@ -71,6 +73,7 @@ const ALL_CONTRACTS = [
 	INGREDIENTS_API_ROUTES,
 	BOOKS_API_ROUTES,
 	DASHBOARD_API_ROUTES,
+	FLOWS_API_ROUTES,
 	WORKERS_API_ROUTES,
 	TASKS_API_ROUTES,
 	WORKSPACES_API_ROUTES,

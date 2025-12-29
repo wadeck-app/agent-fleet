@@ -94,6 +94,12 @@ export class WebSocketMessageRouter {
 				this.connectionManager.handleFlowsUpdated(message);
 				break;
 
+			case W2OMessageType.FLOW_DEFINITION_RESPONSE:
+			case W2OMessageType.FLOW_SAVED_RESPONSE:
+				// Route flow definition messages to generic handler for OrchestratorWrapper
+				this.eventHandler.handleGenericWorkerMessage(message);
+				break;
+
 			default:
 				console.warn(`[WS] Unknown message type: ${(message as unknown as any).type}`);
 		}

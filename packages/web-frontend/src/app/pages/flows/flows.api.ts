@@ -1,6 +1,6 @@
 import { createTypedFetch } from '@framework/api/api-base';
 import { FLOWS_API_ROUTES } from '@shared/api/flows.contract';
-import type { FlowsByProject } from '@shared/api/flows.contract';
+import type { FlowDefinition, FlowListItem, FlowsByProject } from '@shared/api/flows.contract';
 
 /**
  * ===========================================================================================
@@ -18,5 +18,22 @@ const typedFetch = createTypedFetch(FLOWS_API_ROUTES);
 export const flowsApi = {
 	getFlows: (): Promise<FlowsByProject> => {
 		return typedFetch('GET', '/api/flows/', {});
+	},
+
+	getFlowsList: (): Promise<FlowListItem[]> => {
+		return typedFetch('GET', '/api/flows/list', {});
+	},
+
+	getFlowById: (flowId: string): Promise<FlowDefinition> => {
+		return typedFetch('GET', '/api/flows/:flowId', {
+			params: { flowId },
+		});
+	},
+
+	saveFlow: (flowId: string, flowDefinition: FlowDefinition): Promise<{ success: boolean }> => {
+		return typedFetch('PUT', '/api/flows/:flowId', {
+			params: { flowId },
+			body: flowDefinition,
+		});
 	},
 } as const;

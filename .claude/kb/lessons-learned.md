@@ -687,3 +687,64 @@ This lesson led to proposing unified transport API architecture:
 - ✅ Subscriptions: `/api/transports/subscriptions` (not per-transport endpoints)
 
 **Exception**: Static files, health check endpoints for load balancers might use different prefixes like `/health` or `/`, but these should be explicitly documented and minimal.
+
+---
+
+## Visual UI Changes - ALWAYS Take Screenshots, Never Say "Fixed" Without Verification
+
+**Problem**: Making CSS/visual changes and telling the user "it's fixed" or "should work now" without actually verifying the result. This wastes the user's time when the fix doesn't work.
+
+**Root Cause**: Cannot see the rendered UI output, so assuming changes will work based on code logic alone. CSS is particularly tricky - variables might be transparent, z-index might hide elements, specificity might be wrong, etc.
+
+**Wrong Approach** ❌:
+
+```
+Agent: "I've fixed the dark mode controls by adding background-color: hsl(var(--card))"
+User: *sends screenshot showing controls still invisible*
+Agent: "It should be visible now, I added !important"
+User: *sends screenshot showing it's STILL not working*
+User: "var(--card) = rgba(0, 0, 0, 0) - it's transparent!"
+```
+
+**Correct Approach** ✅:
+
+```
+Agent: "I've changed the CSS to use background-color: hsl(var(--card)). Can you take a screenshot and show me if the controls are visible now?"
+
+OR better:
+
+Agent: "Looking at the CSS variables, I see var(--card) might be transparent in dark mode. Let me use a solid color instead: background-color: #1f1f1f (dark gray). Can you verify if this works?"
+```
+
+**Key Principles**:
+
+1. **Request screenshots** when making visual changes - don't guess if it worked
+2. **Check CSS variable values** - Variables like `--card`, `--background` might be transparent or unexpected colors
+3. **Use fallback solid colors** when in doubt - Better to use `#1f1f1f` than rely on unknown variables
+4. **Never say "it's fixed"** - Instead say "I've made these changes, can you verify?"
+5. **Ask for color values** if unsure - User can inspect element and tell you what CSS variables resolve to
+
+**Common CSS Pitfalls**:
+
+- `rgba(0, 0, 0, 0)` - Completely transparent
+- `hsl(var(--card))` when `--card` is not defined or transparent
+- Using Tailwind arbitrary values that don't apply correctly
+- `!important` doesn't help if the color itself is wrong
+- Z-index conflicts hiding elements
+- Specificity wars where styles don't apply
+
+**Verification Questions to Ask**:
+
+- "Can you take a screenshot showing the current state?"
+- "What does DevTools show for the computed background-color value?"
+- "Is the element visible at all, or just the wrong color?"
+- "What are the actual CSS variable values in dark mode?"
+
+**Files Affected** (December 2024):
+
+- `packages/web-frontend/src/app/pages/flows/flow-editor/FlowEditor.css` - ReactFlow controls styling
+- Multiple attempts to fix visibility using CSS variables that were transparent
+
+**When Discovered**: December 29, 2024 - User repeatedly had to correct visual issues with screenshots because agent kept saying "it's fixed" without verification. User explicitly requested this be added to lessons learned.
+
+**Remember**: Visual issues require visual verification. Code that looks correct might not render correctly.

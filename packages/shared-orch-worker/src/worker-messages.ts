@@ -18,6 +18,8 @@ export enum W2OMessageType {
 	FLOW_STEP_STARTED = 'w2o:flow:step:started',
 	FLOW_STEP_COMPLETED = 'w2o:flow:step:completed',
 	FLOW_STEP_FAILED = 'w2o:flow:step:failed',
+	FLOW_DEFINITION_RESPONSE = 'w2o:flow:definition_response',
+	FLOW_SAVED_RESPONSE = 'w2o:flow:saved_response',
 	WORKSPACE_ALLOCATED = 'w2o:workspace:allocated',
 	WORKSPACE_RELEASED = 'w2o:workspace:released',
 
@@ -141,6 +143,24 @@ export interface W2OFlowsUpdatedMessage extends W2OBaseMessage {
 	};
 }
 
+export interface W2OFlowDefinitionResponseMessage extends W2OBaseMessage {
+	type: W2OMessageType.FLOW_DEFINITION_RESPONSE;
+	workerId: string;
+	requestId: string;
+	flowId: string;
+	flowDefinition: any | null; // Full flow definition with steps, or null if not found
+	error?: string;
+}
+
+export interface W2OFlowSavedResponseMessage extends W2OBaseMessage {
+	type: W2OMessageType.FLOW_SAVED_RESPONSE;
+	workerId: string;
+	requestId: string;
+	flowId: string;
+	success: boolean;
+	error?: string;
+}
+
 // Deprecated messages (TODO: Remove?)
 export interface REMOVE_W2OStopRequestedMessage extends W2OBaseMessage {
 	type: W2OMessageType.STOP_REQUESTED;
@@ -178,6 +198,8 @@ export type W2OMessage =
 	| W2OFlowStepStartedMessage
 	| W2OFlowStepCompletedMessage
 	| W2OFlowStepFailedMessage
+	| W2OFlowDefinitionResponseMessage
+	| W2OFlowSavedResponseMessage
 	| W2OWorkspaceAllocatedMessage
 	| W2OWorkspaceReleasedMessage
 	| W2OFlowsUpdatedMessage
@@ -203,6 +225,8 @@ export interface W2OMessageMap {
 	[W2OMessageType.FLOW_STEP_STARTED]: W2OFlowStepStartedMessage;
 	[W2OMessageType.FLOW_STEP_COMPLETED]: W2OFlowStepCompletedMessage;
 	[W2OMessageType.FLOW_STEP_FAILED]: W2OFlowStepFailedMessage;
+	[W2OMessageType.FLOW_DEFINITION_RESPONSE]: W2OFlowDefinitionResponseMessage;
+	[W2OMessageType.FLOW_SAVED_RESPONSE]: W2OFlowSavedResponseMessage;
 	[W2OMessageType.WORKSPACE_ALLOCATED]: W2OWorkspaceAllocatedMessage;
 	[W2OMessageType.WORKSPACE_RELEASED]: W2OWorkspaceReleasedMessage;
 	[W2OMessageType.STOP_REQUESTED]: REMOVE_W2OStopRequestedMessage;

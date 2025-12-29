@@ -1,6 +1,9 @@
+import * as fs from 'fs';
+import * as yaml from 'js-yaml';
 import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
+import * as path from 'path';
 
-import type { FlowMetadata, FlowsByProject } from '@app/shared/api/flows.contract';
+import type { FlowDefinition, FlowListItem, FlowMetadata, FlowsByProject } from '@app/shared/api/flows.contract';
 
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 
@@ -22,10 +25,32 @@ import type { EventBroadcaster } from '../transport/EventBroadcaster';
  */
 
 export class FlowsService {
+	private flowsFilePath: string;
+
 	constructor(
 		private readonly orchestratorWrapper: OrchestratorWrapper,
 		private readonly eventBroadcaster: EventBroadcaster
-	) {}
+	) {
+		// Find monorepo root: go up until we find package.json with "workspaces"
+		let currentDir = process.cwd();
+		while (currentDir !== path.dirname(currentDir)) {
+			const packageJsonPath = path.join(currentDir, 'package.json');
+			if (fs.existsSync(packageJsonPath)) {
+				const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+				if (packageJson.workspaces) {
+					// Found monorepo root
+					this.flowsFilePath = path.join(currentDir, '.agent-fleet', 'flows.yml');
+					console.log('[FlowsService] Using flows file:', this.flowsFilePath);
+					return;
+				}
+			}
+			currentDir = path.dirname(currentDir);
+		}
+
+		// Fallback: use process.cwd()
+		this.flowsFilePath = path.join(process.cwd(), '.agent-fleet', 'flows.yml');
+		console.log('[FlowsService] Fallback - using flows file:', this.flowsFilePath);
+	}
 
 	/**
 	 * Get all flows organized by project
@@ -69,6 +94,167 @@ export class FlowsService {
 		} catch (_error) {
 			// Orchestrator is offline - return empty flows
 			return {};
+		}
+	}
+
+	/**
+	 * Get list of all available flows
+	 * Tries orchestrator first, falls back to local flows.yml
+	 */
+	async getFlowsList(): Promise<FlowListItem[]> {
+		try {
+			// Try getting from orchestrator first
+			const flowsByProject = await this.getFlows();
+
+			// Flatten into a list
+			const flowList: FlowListItem[] = [];
+			for (const projectId of Object.keys(flowsByProject)) {
+				const projectFlows = flowsByProject[projectId];
+				for (const [flowId, metadata] of Object.entries(projectFlows)) {
+					flowList.push({
+						id: flowId,
+						name: metadata.name,
+						description: metadata.description,
+						version: metadata.version,
+					});
+				}
+			}
+
+			// If orchestrator has flows, return them
+			if (flowList.length > 0) {
+				return flowList;
+			}
+
+			// Otherwise fallback to local file
+			return this.getFlowsListFromFile();
+		} catch (error) {
+			console.error('Error loading flows list from orchestrator, trying local file:', error);
+			return this.getFlowsListFromFile();
+		}
+	}
+
+	/**
+	 * Get flows from local flows.yml file
+	 */
+	private getFlowsListFromFile(): FlowListItem[] {
+		try {
+			if (!fs.existsSync(this.flowsFilePath)) {
+				console.log('Flows file not found:', this.flowsFilePath);
+				return [];
+			}
+
+			const fileContents = fs.readFileSync(this.flowsFilePath, 'utf8');
+			const flows = yaml.load(fileContents) as Record<string, any>;
+
+			const flowList: FlowListItem[] = [];
+			for (const [id, flow] of Object.entries(flows)) {
+				if (flow && typeof flow === 'object') {
+					flowList.push({
+						id,
+						name: flow.name || id,
+						description: flow.description || '',
+						version: flow.version || '1.0.0',
+					});
+				}
+			}
+
+			console.log(`Loaded ${flowList.length} flows from local file`);
+			return flowList;
+		} catch (error) {
+			console.error('Error loading flows from file:', error);
+			return [];
+		}
+	}
+
+	/**
+	 * Get a specific flow definition by ID
+	 * Requests the full definition from the worker via orchestrator
+	 */
+	async getFlowById(flowId: string): Promise<FlowDefinition | null> {
+		// Get all flows to find which project the flow belongs to
+		const flowsByProject = await this.getFlows();
+
+		// Search for the flow across all projects
+		for (const projectId of Object.keys(flowsByProject)) {
+			const projectFlows = flowsByProject[projectId];
+			if (projectFlows[flowId]) {
+				// Found the flow - request full definition from worker
+				console.log(`[FlowsService] Requesting flow ${flowId} from project ${projectId}`);
+				const flowDefinition = await this.orchestratorWrapper.requestFlowDefinition(projectId, flowId);
+				return flowDefinition;
+			}
+		}
+
+		// Flow not found in any project
+		console.log(`[FlowsService] Flow ${flowId} not found in any project`);
+		return null;
+	}
+
+	/**
+	 * Save a flow definition
+	 * Sends the updated definition to the worker via orchestrator
+	 */
+	async saveFlow(flowId: string, flowDefinition: FlowDefinition): Promise<void> {
+		try {
+			// Get all flows to find which project the flow belongs to
+			const flowsByProject = await this.getFlows();
+
+			// Search for the flow across all projects
+			for (const projectId of Object.keys(flowsByProject)) {
+				const projectFlows = flowsByProject[projectId];
+				if (projectFlows[flowId]) {
+					// Found the flow - send save request to worker
+					console.log(`[FlowsService] Saving flow ${flowId} to project ${projectId}`);
+					await this.orchestratorWrapper.saveFlowDefinition(projectId, flowId, flowDefinition);
+					return;
+				}
+			}
+
+			throw new Error(`Flow ${flowId} not found in any project`);
+		} catch (error) {
+			console.error(`[FlowsService] Error saving flow ${flowId}:`, error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Get flow by ID from local flows.yml file
+	 */
+	private getFlowByIdFromFile(flowId: string): FlowDefinition | null {
+		try {
+			console.log(`[FlowsService] Loading flow ${flowId} from ${this.flowsFilePath}`);
+
+			if (!fs.existsSync(this.flowsFilePath)) {
+				console.log('[FlowsService] File does not exist');
+				return null;
+			}
+
+			const fileContents = fs.readFileSync(this.flowsFilePath, 'utf8');
+			const flows = yaml.load(fileContents) as Record<string, any>;
+
+			console.log(`[FlowsService] Available flows:`, Object.keys(flows));
+
+			const flow = flows[flowId];
+			if (!flow) {
+				console.log(`[FlowsService] Flow ${flowId} not found in file`);
+				return null;
+			}
+
+			console.log(`[FlowsService] Found flow ${flowId}, returning definition`);
+
+			return {
+				id: flowId,
+				version: flow.version || '1.0.0',
+				name: flow.name || flowId,
+				description: flow.description || '',
+				workspace: flow.workspace,
+				statusTransitions: flow.statusTransitions,
+				inputs: flow.inputs,
+				steps: flow.steps || [],
+			};
+		} catch (error) {
+			console.error(`[FlowsService] Error loading flow ${flowId} from file:`, error);
+			return null;
 		}
 	}
 }

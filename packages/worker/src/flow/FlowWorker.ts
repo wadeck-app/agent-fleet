@@ -15,8 +15,10 @@ import { type FlowExecutionOptions, FlowExecutor } from 'flow-engine/executor/Fl
 import { FlowRegistry } from 'flow-engine/registry/FlowRegistry';
 import type { FlowMetadata, Workspace } from 'flow-engine/types';
 import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
+import * as yaml from 'js-yaml';
 import { join } from 'path';
+import * as path from 'path';
 import { getOrchestratorWsUrl } from 'shared-common/PortCalculator';
 import type { Shutdownable } from 'shared-common/Shutdownable';
 import { parseMessage, serializeMessage } from 'shared-common/protocol';
@@ -62,6 +64,7 @@ export class FlowWorker implements Shutdownable {
 	private workspaceManager: WorkspaceManager;
 	private interactive: boolean;
 	private projectRoot: string;
+	private projectId: string = '';
 
 	// Specialized managers (extracted from god class)
 	private claudeProcessManager: ClaudeLifecycleManager;
@@ -221,14 +224,14 @@ export class FlowWorker implements Shutdownable {
 	 * Send WORKER_READY message with project info and available flows
 	 */
 	private sendWorkerReady(): void {
-		const projectId = this.detectProjectId();
+		this.projectId = this.detectProjectId();
 		const workspacePath = this.projectRoot;
 		const availableFlows = this.buildFlowMetadata();
 
 		this.sendMessage(
 			createW2OMessage(W2OMessageType.WORKER_READY, {
 				preferredId: this.preferredWorkerId,
-				projectId,
+				projectId: this.projectId,
 				workspacePath,
 				availableFlows,
 			})
@@ -314,6 +317,14 @@ export class FlowWorker implements Shutdownable {
 				this.shutdown();
 				break;
 
+			case O2WMessageType.REQUEST_FLOW_DEFINITION:
+				this.handleRequestFlowDefinition(message as any);
+				break;
+
+			case O2WMessageType.SAVE_FLOW_DEFINITION:
+				this.handleSaveFlowDefinition(message as any);
+				break;
+
 			default:
 				console.warn(`${this.logPrefix()} Unknown message type: ${message.type}`);
 		}
@@ -353,6 +364,137 @@ export class FlowWorker implements Shutdownable {
 	private handleKillClaude(message: KillClaudeMessage): void {
 		console.log(`${this.logPrefix()} Kill Claude requested: ${message.reason}`);
 		this.claudeProcessManager.kill();
+	}
+
+	/**
+	 * Handle REQUEST_FLOW_DEFINITION message
+	 */
+	private handleRequestFlowDefinition(message: any): void {
+		const { flowId, requestId } = message;
+		console.log(`${this.logPrefix()} Received REQUEST_FLOW_DEFINITION for ${flowId}`);
+
+		try {
+			// Read flows from local flows.yml file
+			const flowsFilePath = path.join(this.projectRoot, '.agent-fleet', 'flows.yml');
+
+			if (!existsSync(flowsFilePath)) {
+				throw new Error(`Flows file not found: ${flowsFilePath}`);
+			}
+
+			const fileContents = readFileSync(flowsFilePath, 'utf8');
+			const flows = yaml.load(fileContents) as Record<string, any>;
+
+			const flowDefinition = flows[flowId];
+			if (!flowDefinition) {
+				throw new Error(`Flow ${flowId} not found in flows.yml`);
+			}
+
+			// Add the id to the definition
+			const completeDefinition = {
+				id: flowId,
+				...flowDefinition,
+			};
+
+			// Send response
+			this.sendMessage(
+				createW2OMessage(W2OMessageType.FLOW_DEFINITION_RESPONSE, {
+					workerId: this.workerId,
+					requestId,
+					flowId,
+					flowDefinition: completeDefinition,
+				})
+			);
+
+			console.log(`${this.logPrefix()} Sent FLOW_DEFINITION_RESPONSE for ${flowId}`);
+		} catch (error) {
+			console.error(`${this.logPrefix()} Error handling REQUEST_FLOW_DEFINITION:`, error);
+
+			// Send error response
+			this.sendMessage(
+				createW2OMessage(W2OMessageType.FLOW_DEFINITION_RESPONSE, {
+					workerId: this.workerId,
+					requestId,
+					flowId,
+					flowDefinition: null,
+					error: error instanceof Error ? error.message : 'Unknown error',
+				})
+			);
+		}
+	}
+
+	/**
+	 * Handle SAVE_FLOW_DEFINITION message
+	 */
+	private async handleSaveFlowDefinition(message: any): Promise<void> {
+		const { flowId, flowDefinition, requestId } = message;
+		console.log(`${this.logPrefix()} Received SAVE_FLOW_DEFINITION for ${flowId}`);
+
+		try {
+			// Read current flows from file
+			const flowsFilePath = path.join(this.projectRoot, '.agent-fleet', 'flows.yml');
+
+			if (!existsSync(flowsFilePath)) {
+				throw new Error(`Flows file not found: ${flowsFilePath}`);
+			}
+
+			const fileContents = readFileSync(flowsFilePath, 'utf8');
+			const flows = yaml.load(fileContents) as Record<string, any>;
+
+			// Remove the id field as it's the key
+			const { id, ...flowData } = flowDefinition;
+
+			// Update the flow
+			flows[flowId] = flowData;
+
+			// Write back to file
+			const newContent = yaml.dump(flows, {
+				indent: 4,
+				lineWidth: 120,
+				noRefs: true,
+				sortKeys: false,
+			});
+
+			writeFileSync(flowsFilePath, newContent, 'utf8');
+
+			// Reload flows in registry
+			await this.flowRegistry.loadProjectFlows();
+
+			// Send updated flow list to orchestrator
+			const flowMetadata = this.buildFlowMetadata();
+
+			this.sendMessage(
+				createW2OMessage(W2OMessageType.FLOWS_UPDATED, {
+					workerId: this.workerId,
+					projectId: this.projectId,
+					flows: flowMetadata,
+				})
+			);
+
+			// Send success response
+			this.sendMessage(
+				createW2OMessage(W2OMessageType.FLOW_SAVED_RESPONSE, {
+					workerId: this.workerId,
+					requestId,
+					flowId,
+					success: true,
+				})
+			);
+
+			console.log(`${this.logPrefix()} Successfully saved flow ${flowId}`);
+		} catch (error) {
+			console.error(`${this.logPrefix()} Error handling SAVE_FLOW_DEFINITION:`, error);
+
+			// Send error response
+			this.sendMessage(
+				createW2OMessage(W2OMessageType.FLOW_SAVED_RESPONSE, {
+					workerId: this.workerId,
+					requestId,
+					flowId,
+					success: false,
+					error: error instanceof Error ? error.message : 'Unknown error',
+				})
+			);
+		}
 	}
 
 	/**
@@ -438,12 +580,10 @@ export class FlowWorker implements Shutdownable {
 	 * Send FLOWS_UPDATED message
 	 */
 	private sendFlowsUpdated(flows: any[], changes?: { added: string[]; removed: string[]; updated: string[] }): void {
-		const projectId = this.detectProjectId();
-
 		this.sendMessage(
 			createW2OMessage(W2OMessageType.FLOWS_UPDATED, {
 				workerId: this.workerId,
-				projectId,
+				projectId: this.projectId,
 				flows,
 				changes,
 			})

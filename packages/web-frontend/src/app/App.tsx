@@ -12,6 +12,7 @@ import { LoginPage } from '@app/pages/auth/LoginPage';
 import { ProtectedRoute } from '@app/pages/auth/ProtectedRoute';
 import { BooksPage } from '@app/pages/books/BooksPage';
 import { DashboardPage } from '@app/pages/dashboard/DashboardPage';
+import { FlowEditorPage } from '@app/pages/flows/flow-editor/FlowEditorPage';
 import { Ingredients2Page } from '@app/pages/ingredients2/Ingredients2Page';
 import { Ingredients3GridPage } from '@app/pages/ingredients3/Ingredients3GridPage';
 import { IngredientsPage } from '@app/pages/ingredients/IngredientsPage';
@@ -42,32 +43,32 @@ function Layout() {
       ${!isMobile ? 'ml-64' : ''}
     `}
 			>
-				<div className="container mx-auto max-w-7xl p-6">
-					<ProtectedRoute>
-						<Routes>
-							<Route path="/dashboard" element={<DashboardPage />} />
-							<Route path="/workers" element={<WorkersPage />} />
-							<Route path="/workers2" element={<WorkersPage2 />} />
-							<Route path="/tasks" element={<TasksPage />} />
-							<Route path="/tasks2" element={<TasksPage2 />} />
-							<Route path="/workspaces" element={<WorkspacesPage />} />
-							<Route path="/workspaces2" element={<WorkspacesPage2 />} />
-							<Route path="/ingredients" element={<IngredientsPage />} />
-							<Route path="/ingredients/:mode" element={<IngredientsPage />} />
-							<Route path="/ingredients/:id/:mode" element={<IngredientsPage />} />
-							<Route path="/ingredients2" element={<Ingredients2Page />} />
-							<Route path="/ingredients2/:mode" element={<Ingredients2Page />} />
-							<Route path="/ingredients2/:id/:mode" element={<Ingredients2Page />} />
-							<Route path="/ingredients3" element={<Ingredients3GridPage />} />
-							<Route path="/ingredients3/:mode" element={<Ingredients3GridPage />} />
-							<Route path="/ingredients3/:id/:mode" element={<Ingredients3GridPage />} />
-							<Route path="/books" element={<BooksPage />} />
-							<Route path="/books/:mode" element={<BooksPage />} />
-							<Route path="/books/:id/:mode" element={<BooksPage />} />
-							<Route path="/" element={<DashboardPage />} />
-						</Routes>
-					</ProtectedRoute>
-				</div>
+				<ProtectedRoute>
+					<Routes>
+						<Route path="/dashboard" element={<DashboardPage />} />
+						<Route path="/workers" element={<WorkersPage />} />
+						<Route path="/workers2" element={<WorkersPage2 />} />
+						<Route path="/tasks" element={<TasksPage />} />
+						<Route path="/tasks2" element={<TasksPage2 />} />
+						<Route path="/workspaces" element={<WorkspacesPage />} />
+						<Route path="/workspaces2" element={<WorkspacesPage2 />} />
+						<Route path="/ingredients" element={<IngredientsPage />} />
+						<Route path="/ingredients/:mode" element={<IngredientsPage />} />
+						<Route path="/ingredients/:id/:mode" element={<IngredientsPage />} />
+						<Route path="/ingredients2" element={<Ingredients2Page />} />
+						<Route path="/ingredients2/:mode" element={<Ingredients2Page />} />
+						<Route path="/ingredients2/:id/:mode" element={<Ingredients2Page />} />
+						<Route path="/ingredients3" element={<Ingredients3GridPage />} />
+						<Route path="/ingredients3/:mode" element={<Ingredients3GridPage />} />
+						<Route path="/ingredients3/:id/:mode" element={<Ingredients3GridPage />} />
+						<Route path="/books" element={<BooksPage />} />
+						<Route path="/books/:mode" element={<BooksPage />} />
+						<Route path="/books/:id/:mode" element={<BooksPage />} />
+						<Route path="/flows/new" element={<FlowEditorPage />} />
+						<Route path="/flows/:flowId/edit" element={<FlowEditorPage />} />
+						<Route path="/" element={<DashboardPage />} />
+					</Routes>
+				</ProtectedRoute>
 			</main>
 		</div>
 	);

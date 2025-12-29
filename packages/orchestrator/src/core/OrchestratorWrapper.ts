@@ -51,11 +51,63 @@ export interface WorkerFilters {
  * Library Mode Adapter - Direct access to orchestrator
  */
 export class OrchestratorWrapper {
+	private flowRequestPromises: Map<string, { resolve: (data: any) => void; reject: (error: Error) => void }> =
+		new Map();
+
 	constructor(private readonly orchestrator: Orchestrator) {
 		if (!orchestrator) {
 			throw new Error('OrchestratorWrapper requires an Orchestrator instance');
 		}
 		this.orchestrator = orchestrator;
+		this.setupFlowResponseHandlers();
+	}
+
+	/**
+	 * Setup handlers for flow definition responses from workers
+	 */
+	private setupFlowResponseHandlers(): void {
+		const wsServer = this.orchestrator.getWsServer();
+		if (!wsServer) return;
+
+		const connectionManager = wsServer.getConnectionManager();
+		const stateManager = this.orchestrator.getTaskManager().getStateManager();
+
+		// Listen to state events for flow responses
+		stateManager.on('worker.message', (data: any) => {
+			if (data.type === 'w2o:flow:definition_response') {
+				this.handleFlowDefinitionResponse(data);
+			} else if (data.type === 'w2o:flow:saved_response') {
+				this.handleFlowSavedResponse(data);
+			}
+		});
+	}
+
+	private handleFlowDefinitionResponse(message: any): void {
+		const { requestId, flowDefinition, error } = message;
+		const pending = this.flowRequestPromises.get(requestId);
+
+		if (pending) {
+			this.flowRequestPromises.delete(requestId);
+			if (error) {
+				pending.reject(new Error(error));
+			} else {
+				pending.resolve(flowDefinition);
+			}
+		}
+	}
+
+	private handleFlowSavedResponse(message: any): void {
+		const { requestId, success, error } = message;
+		const pending = this.flowRequestPromises.get(requestId);
+
+		if (pending) {
+			this.flowRequestPromises.delete(requestId);
+			if (!success && error) {
+				pending.reject(new Error(error));
+			} else {
+				pending.resolve({ success });
+			}
+		}
 	}
 
 	// ===========================================================================================
@@ -355,6 +407,125 @@ export class OrchestratorWrapper {
 	// ===========================================================================================
 	// LIFECYCLE MANAGEMENT
 	// ===========================================================================================
+
+	// ===========================================================================================
+	// FLOW DEFINITION METHODS
+	// ===========================================================================================
+
+	/**
+	 * Request full flow definition from a worker
+	 */
+	async requestFlowDefinition(projectId: string, flowId: string): Promise<any> {
+		const wsServer = this.orchestrator.getWsServer();
+		if (!wsServer) {
+			throw new Error('WebSocket server not available');
+		}
+
+		const connectionManager = wsServer.getConnectionManager();
+		const registry = connectionManager.getFlowDiscoveryRegistry();
+
+		// Find workers that have this flow
+		const projectFlows = registry.getProjectFlows(projectId);
+		if (!projectFlows || !projectFlows.has(flowId)) {
+			throw new Error(`Flow ${flowId} not found in project ${projectId}`);
+		}
+
+		const flowEntries = projectFlows.get(flowId);
+		if (!flowEntries || flowEntries.length === 0) {
+			throw new Error(`No workers available for flow ${flowId}`);
+		}
+
+		// Take the first available worker
+		const workerId = flowEntries[0].workerId;
+		const requestId = `flow-req-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+		// Create promise for response
+		const responsePromise = new Promise<any>((resolve, reject) => {
+			this.flowRequestPromises.set(requestId, { resolve, reject });
+
+			// Timeout after 10 seconds
+			setTimeout(() => {
+				if (this.flowRequestPromises.has(requestId)) {
+					this.flowRequestPromises.delete(requestId);
+					reject(new Error(`Timeout waiting for flow definition response for ${flowId}`));
+				}
+			}, 10000);
+		});
+
+		// Send request to worker
+		const worker = connectionManager.getWorker(workerId);
+		if (!worker) {
+			this.flowRequestPromises.delete(requestId);
+			throw new Error(`Worker ${workerId} not found`);
+		}
+
+		connectionManager.sendMessage(worker.socket, {
+			type: 'o2w:flow:request_definition',
+			flowId,
+			requestId,
+			timestamp: Date.now(),
+		} as any);
+
+		return responsePromise;
+	}
+
+	/**
+	 * Request worker to save flow definition
+	 */
+	async saveFlowDefinition(projectId: string, flowId: string, flowDefinition: any): Promise<void> {
+		const wsServer = this.orchestrator.getWsServer();
+		if (!wsServer) {
+			throw new Error('WebSocket server not available');
+		}
+
+		const connectionManager = wsServer.getConnectionManager();
+		const registry = connectionManager.getFlowDiscoveryRegistry();
+
+		// Find workers that have this flow
+		const projectFlows = registry.getProjectFlows(projectId);
+		if (!projectFlows || !projectFlows.has(flowId)) {
+			throw new Error(`Flow ${flowId} not found in project ${projectId}`);
+		}
+
+		const flowEntries = projectFlows.get(flowId);
+		if (!flowEntries || flowEntries.length === 0) {
+			throw new Error(`No workers available for flow ${flowId}`);
+		}
+
+		// Take the first available worker
+		const workerId = flowEntries[0].workerId;
+		const requestId = `flow-save-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+		// Create promise for response
+		const responsePromise = new Promise<void>((resolve, reject) => {
+			this.flowRequestPromises.set(requestId, { resolve, reject });
+
+			// Timeout after 10 seconds
+			setTimeout(() => {
+				if (this.flowRequestPromises.has(requestId)) {
+					this.flowRequestPromises.delete(requestId);
+					reject(new Error(`Timeout waiting for flow save response for ${flowId}`));
+				}
+			}, 10000);
+		});
+
+		// Send save request to worker
+		const worker = connectionManager.getWorker(workerId);
+		if (!worker) {
+			this.flowRequestPromises.delete(requestId);
+			throw new Error(`Worker ${workerId} not found`);
+		}
+
+		connectionManager.sendMessage(worker.socket, {
+			type: 'o2w:flow:save_definition',
+			flowId,
+			flowDefinition,
+			requestId,
+			timestamp: Date.now(),
+		} as any);
+
+		return responsePromise;
+	}
 
 	/**
 	 * Connect to orchestrator (no-op for library mode)

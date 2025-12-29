@@ -232,4 +232,13 @@ export class WebSocketEventHandler {
 
 		// TODO: Log to knowledge base if relevant
 	}
+
+	/**
+	 * Handle generic worker messages (for OrchestratorWrapper)
+	 * Emits messages as worker.message events for custom handlers
+	 */
+	handleGenericWorkerMessage(message: any): void {
+		// Emit generic worker message event for OrchestratorWrapper to handle
+		this.stateManager.emit('worker.message', message);
+	}
 }
