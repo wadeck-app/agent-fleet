@@ -13,7 +13,7 @@
 			"Bash(npm run clean:*)",
 			"Bash(findstr:*)",
 			"Skill(get-timestamp)",
-			"Bash(node scripts/timestamp.js)",
+			"Bash(node .claude/skills/get-timestamp/scripts/timestamp.js)",
 			"Bash(netstat:*)",
 			"Bash(curl:*)",
 			"Skill(check)",

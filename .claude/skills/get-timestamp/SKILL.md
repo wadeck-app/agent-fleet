@@ -12,5 +12,5 @@ For advanced usage, see examples.md.
 Run the helper script:
 
 ```bash
-node scripts/timestamp.js
+node .claude/skills/get-timestamp/scripts/timestamp.js
 ```
