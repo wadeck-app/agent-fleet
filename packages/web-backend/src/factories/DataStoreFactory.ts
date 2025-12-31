@@ -14,12 +14,15 @@ import { BooksRepository } from '../repositories/BooksRepository';
 import { IngredientsRepository } from '../repositories/IngredientsRepository';
 import { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 import { type WorkerMetadata, WorkersRepository } from '../repositories/WorkersRepository';
+import { WorkspaceMetadataRepository } from '../repositories/WorkspaceMetadataRepository';
 import { BooksService } from '../services/BooksService';
 import { DashboardService } from '../services/DashboardService';
 import { FlowsService } from '../services/FlowsService';
 import { IngredientsService } from '../services/IngredientsService';
+import { InterventionsService } from '../services/InterventionsService';
 import { TasksService } from '../services/TasksService';
 import { WorkersService } from '../services/WorkersService';
+import { WorkspaceMetadataFile } from '../services/WorkspaceMetadataFile';
 import { WorkspacesService } from '../services/WorkspacesService';
 import type { DataStorage } from '../storage/DataStorage';
 import { InMemoryStorage } from '../storage/InMemoryStorage';
@@ -55,6 +58,7 @@ export class DataStoreFactory {
 	private flowsService?: FlowsService;
 	private tasksService?: TasksService;
 	private workspacesService?: WorkspacesService;
+	private interventionsService?: InterventionsService;
 	private authService?: AuthService;
 	private sessionManager?: TransportSessionManager;
 	private transportRouter?: TransportRouter;
@@ -62,6 +66,7 @@ export class DataStoreFactory {
 	private transportServer?: ITransportServer;
 	private orchestrator: Orchestrator;
 	private orchestratorWrapper: OrchestratorWrapper;
+	private orchestratorEventBridge?: any; // OrchestratorEventBridge (using any to avoid circular import)
 
 	constructor(storageMode: 'memory' | 'mariadb' = 'memory', orchestrator: Orchestrator) {
 		// Create storage based on mode
@@ -203,14 +208,36 @@ export class DataStoreFactory {
 	 */
 	getWorkspacesService(): WorkspacesService {
 		if (!this.workspacesService) {
+			// Create WorkspaceMetadataFile service
+			const metadataFile = new WorkspaceMetadataFile();
+			const metadataRepo = new WorkspaceMetadataRepository(metadataFile);
+
 			// Get EventBroadcaster
 			const eventBroadcaster = this.getEventBroadcaster();
 
-			// Create WorkspacesService with EventBroadcaster
-			this.workspacesService = new WorkspacesService(eventBroadcaster);
+			// Create WorkspacesService with OrchestratorWrapper directly
+			this.workspacesService = new WorkspacesService(eventBroadcaster, this.orchestratorWrapper, metadataRepo);
 		}
 
 		return this.workspacesService;
+	}
+
+	/**
+	 * Get or create InterventionsService
+	 */
+	getInterventionsService(): InterventionsService {
+		if (!this.interventionsService) {
+			// Use orchestratorWrapper directly (library mode - no HTTP calls)
+			const orchestratorRepo = new OrchestratorRepository(this.orchestratorWrapper);
+
+			// Get EventBroadcaster
+			const eventBroadcaster = this.getEventBroadcaster();
+
+			// Create InterventionsService with EventBroadcaster
+			this.interventionsService = new InterventionsService(orchestratorRepo, eventBroadcaster);
+		}
+
+		return this.interventionsService;
 	}
 
 	/**
@@ -292,6 +319,20 @@ export class DataStoreFactory {
 	}
 
 	/**
+	 * Set OrchestratorEventBridge (called after bridge is created)
+	 */
+	setOrchestratorEventBridge(bridge: any): void {
+		this.orchestratorEventBridge = bridge;
+	}
+
+	/**
+	 * Get OrchestratorEventBridge (for cleanup on shutdown)
+	 */
+	getOrchestratorEventBridge(): any | undefined {
+		return this.orchestratorEventBridge;
+	}
+
+	/**
 	 * Get controller methods for lazy loading
 	 */
 	async getAuthController() {
@@ -323,6 +364,12 @@ export class DataStoreFactory {
 		const { default: WorkspacesController } = await import('../controllers/WorkspacesController');
 		const service = this.getWorkspacesService();
 		return new WorkspacesController(service);
+	}
+
+	async getInterventionsController() {
+		const { default: InterventionsController } = await import('../controllers/InterventionsController');
+		const service = this.getInterventionsService();
+		return new InterventionsController(service);
 	}
 
 	async getDashboardController() {

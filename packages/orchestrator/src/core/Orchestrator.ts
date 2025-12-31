@@ -1,4 +1,5 @@
 import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
+import { InterventionManager } from 'orchestrator/core/InterventionManager';
 import { RestAPI } from 'orchestrator/core/RestAPI';
 import { TaskManager } from 'orchestrator/core/TaskManager';
 import { MetricsCollector } from 'orchestrator/metrics/MetricsCollector';
@@ -23,6 +24,7 @@ export class Orchestrator implements Shutdownable {
 	private libraryMode: boolean;
 	private stateManager: StateManager;
 	private taskManager: TaskManager;
+	private interventionManager?: InterventionManager;
 	private wsServer?: WorkerWebSocketServer;
 	private restAPI?: RestAPI;
 	private workspaceManager?: WorkspaceManager;
@@ -63,8 +65,17 @@ export class Orchestrator implements Shutdownable {
 		// Initialize TaskManager
 		await this.taskManager.initialize();
 
+		// Initialize InterventionManager
+		this.interventionManager = new InterventionManager(this.taskManager);
+		await this.interventionManager.loadPendingInterventions();
+		logger.info('Orchestrator', 'InterventionManager initialized');
+
 		// Create WebSocket server
 		this.wsServer = new WorkerWebSocketServer(this.taskManager, this.stateManager, this.wsPort);
+
+		// Inject flow discovery registry into TaskManager for flow validation
+		const flowRegistry = this.wsServer.getConnectionManager().getFlowDiscoveryRegistry();
+		this.taskManager.setFlowDiscoveryRegistry(flowRegistry);
 
 		// Create workspace manager
 		this.workspaceManager = new WorkspaceManager(this.projectRoot);
@@ -158,6 +169,10 @@ export class Orchestrator implements Shutdownable {
 		this.metricsCollector?.stop();
 		logger.info('[Orchestrator] MetricsCollector stopped');
 
+		// Cleanup InterventionManager
+		this.interventionManager?.cleanup();
+		logger.info('[Orchestrator] InterventionManager cleaned up');
+
 		// Disable UI client hook
 		this.uiClientHook?.disable();
 		logger.info('[Orchestrator] UIClientHook disabled');
@@ -187,6 +202,13 @@ export class Orchestrator implements Shutdownable {
 	 */
 	getTaskManager(): TaskManager {
 		return this.taskManager;
+	}
+
+	/**
+	 * Get the intervention manager instance
+	 */
+	getInterventionManager(): InterventionManager | undefined {
+		return this.interventionManager;
 	}
 
 	/**

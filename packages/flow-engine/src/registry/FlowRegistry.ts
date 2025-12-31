@@ -140,6 +140,7 @@ export class FlowRegistry {
 	private watcher: fs.FSWatcher | null = null;
 	private reloadTimeout: NodeJS.Timeout | null = null;
 	private externalFiles: Set<string> = new Set();
+	private flowValidationResults: Map<string, ValidationResult> = new Map();
 
 	/**
 	 * Create a new flow registry
@@ -162,6 +163,7 @@ export class FlowRegistry {
 
 	/**
 	 * Load flows from project configuration file
+	 * Loads all flows (valid and invalid) - invalid flows are marked but not rejected
 	 * @throws Error if file cannot be read or parsed
 	 */
 	public async loadProjectFlows(): Promise<void> {
@@ -169,8 +171,6 @@ export class FlowRegistry {
 			console.log(`No project flows found at ${this.configPath}, using defaults only`);
 			return;
 		}
-
-		const validationErrors: Array<{ flowId: string; error: Error }> = [];
 
 		try {
 			const content = fs.readFileSync(this.configPath, 'utf-8');
@@ -187,9 +187,9 @@ export class FlowRegistry {
 					// Use new validator for comprehensive validation
 					const validationResult = this.validator.validate(flow);
 
+					// Log validation status
 					if (!validationResult.valid) {
-						// Log all validation errors
-						console.error(`\nValidation failed for flow '${id}':`);
+						console.error(`\n⚠️  Flow '${id}' has validation errors (loading anyway for editing):`);
 						console.error(`  Errors: ${validationResult.summary.errors}`);
 						console.error(`  Warnings: ${validationResult.summary.warnings}\n`);
 
@@ -204,53 +204,51 @@ export class FlowRegistry {
 								}
 							}
 						}
-
-						const error = new FlowValidationError(id, 'Flow validation failed. See errors above.');
-						validationErrors.push({ flowId: id, error });
-						continue; // Continue to validate other flows
-					}
-
-					// Log warnings (non-blocking)
-					const warnings = validationResult.issues.filter(i => i.severity === 'warning');
-					if (warnings.length > 0) {
-						console.warn(`\nWarnings for flow '${id}':`);
-						for (const warning of warnings) {
-							console.warn(`  [WARN] ${warning.message}`);
-							if (warning.suggestion) {
-								console.warn(`    suggestion: ${warning.suggestion}`);
+					} else {
+						// Log warnings for valid flows
+						const warnings = validationResult.issues.filter(i => i.severity === 'warning');
+						if (warnings.length > 0) {
+							console.warn(`\nWarnings for flow '${id}':`);
+							for (const warning of warnings) {
+								console.warn(`  [WARN] ${warning.message}`);
+								if (warning.suggestion) {
+									console.warn(`    suggestion: ${warning.suggestion}`);
+								}
 							}
 						}
+						console.log(`✓ Loaded flow: ${id}`);
 					}
 
+					// ALWAYS store the flow (valid or invalid)
 					this.flows.set(id, flow);
-					console.log(`✓ Loaded flow: ${id}`);
+
+					// Store validation result for metadata building
+					this.flowValidationResults.set(id, validationResult);
 				} catch (error) {
-					// Collect parsing errors too
+					// Parsing errors still prevent loading (can't create FlowDefinition)
 					console.error(
-						`\nFailed to parse flow '${id}':`,
+						`\n❌ Failed to parse flow '${id}':`,
 						error instanceof Error ? error.message : String(error)
 					);
-					validationErrors.push({
-						flowId: id,
-						error: error instanceof Error ? error : new Error(String(error)),
-					});
+					console.error(`    This flow will NOT be loaded.\n`);
 				}
 			}
 
-			// If there were any validation errors, fail startup
-			if (validationErrors.length > 0) {
-				console.error(`\n❌ Flow validation failed! ${validationErrors.length} flow(s) have errors:\n`);
-				for (const { flowId, error } of validationErrors) {
-					console.error(`  ✗ ${flowId}: ${error.message}`);
-				}
-				console.error('\n🛑 Orchestrator cannot start with invalid flows. Please fix the errors above.\n');
-				throw new Error(`Flow validation failed for ${validationErrors.length} flow(s). See errors above.`);
+			// Summary logging instead of throwing
+			const totalFlows = this.flows.size;
+			const invalidFlows = Array.from(this.flowValidationResults.entries()).filter(
+				([_, result]) => !result.valid
+			);
+
+			if (invalidFlows.length > 0) {
+				console.warn(
+					`\n⚠️  Loaded ${totalFlows} flows (${invalidFlows.length} invalid, ${totalFlows - invalidFlows.length} valid)`
+				);
+				console.warn(`   Invalid flows can be edited in the UI but cannot be executed.\n`);
+			} else {
+				console.log(`\n✓ All ${totalFlows} flows loaded successfully\n`);
 			}
 		} catch (error) {
-			// Re-throw validation errors as-is
-			if (error instanceof Error && error.message.includes('Flow validation failed')) {
-				throw error;
-			}
 			throw new Error(`Failed to load flows from ${this.configPath}: ${error}`);
 		}
 	}
@@ -523,6 +521,15 @@ export class FlowRegistry {
 	}
 
 	/**
+	 * Get validation result for a flow
+	 * @param id - Flow identifier
+	 * @returns Validation result or undefined if flow not validated
+	 */
+	public getFlowValidationResult(id: string): ValidationResult | undefined {
+		return this.flowValidationResults.get(id);
+	}
+
+	/**
 	 * Register a new flow programmatically
 	 * @param flow - Flow definition to register
 	 * @throws FlowValidationError if validation fails
@@ -667,7 +674,10 @@ export class FlowRegistry {
 			const defaultFlowIds = Object.keys(DEFAULT_FLOWS);
 			const projectFlowIds = Array.from(this.flows.keys()).filter(id => !defaultFlowIds.includes(id));
 
-			projectFlowIds.forEach(id => this.flows.delete(id));
+			projectFlowIds.forEach(id => {
+				this.flows.delete(id);
+				this.flowValidationResults.delete(id); // Clear validation results too
+			});
 
 			// Reload project flows
 			await this.loadProjectFlows();

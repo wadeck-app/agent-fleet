@@ -2,10 +2,11 @@ import { useState } from 'react';
 
 import { Button } from '@framework/components/primitives/Button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@framework/components/primitives/tabs';
+import type { ValidationResult } from 'flow-engine/validation/ValidationTypes';
 import * as yaml from 'js-yaml';
 import { AlertCircle, AlertTriangle, ChevronLeft, ChevronRight, Code, Info, ShieldAlert } from 'lucide-react';
 
-import type { FlowDefinition, ValidationResult } from './types/flow-engine.types';
+import type { FlowDefinition } from './types/flow-engine.types';
 import { cn } from './utils/cn';
 
 interface FlowEditorRightPanelProps {
@@ -20,16 +21,18 @@ export function FlowEditorRightPanel({ flowDefinition, validationResult, onIssue
 
 	if (!isOpen) {
 		return (
-			<div className="border-l bg-card">
-				<Button
-					variant="ghost"
-					size="sm"
-					onClick={() => setIsOpen(true)}
-					className="flex h-full w-12 items-center justify-center"
-					title="Show right panel"
-				>
-					<ChevronLeft className="size-4" />
-				</Button>
+			<div className="flex flex-col border-l bg-card">
+				<div className="flex h-[57px] items-center justify-center border-b">
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={() => setIsOpen(true)}
+						className="size-9"
+						title="Show right panel"
+					>
+						<ChevronLeft className="size-4" />
+					</Button>
+				</div>
 			</div>
 		);
 	}
@@ -48,16 +51,30 @@ export function FlowEditorRightPanel({ flowDefinition, validationResult, onIssue
 	const warningCount = validationResult?.summary.warnings || 0;
 
 	return (
-		<div className="flex w-[500px] flex-col border-l bg-card">
-			{/* Header */}
-			<div className="flex items-center justify-between border-b p-3">
-				<Tabs value={activeTab} onValueChange={value => setActiveTab(value as 'yaml' | 'validation')}>
+		<div className="flex h-full w-[500px] flex-col border-l bg-card">
+			<Tabs
+				value={activeTab}
+				onValueChange={value => setActiveTab(value as 'yaml' | 'validation')}
+				className="flex min-h-0 flex-1 flex-col"
+			>
+				{/* Header */}
+				<div className="flex items-center justify-between border-b p-3">
 					<TabsList>
-						<TabsTrigger value="yaml" className={`flex cursor-pointer items-center gap-2`}>
+						<TabsTrigger
+							value="yaml"
+							className={`
+        flex cursor-pointer items-center gap-2
+      `}
+						>
 							<Code className="size-4" />
 							YAML
 						</TabsTrigger>
-						<TabsTrigger value="validation" className={`flex cursor-pointer items-center gap-2`}>
+						<TabsTrigger
+							value="validation"
+							className={`
+        flex cursor-pointer items-center gap-2
+      `}
+						>
 							<ShieldAlert className="size-4" />
 							Validation
 							{hasValidationIssues && (
@@ -74,37 +91,38 @@ export function FlowEditorRightPanel({ flowDefinition, validationResult, onIssue
 							)}
 						</TabsTrigger>
 					</TabsList>
-				</Tabs>
-				<Button variant="ghost" size="sm" onClick={() => setIsOpen(false)}>
-					<ChevronRight className="size-4" />
-				</Button>
-			</div>
+					<Button variant="ghost" size="sm" onClick={() => setIsOpen(false)}>
+						<ChevronRight className="size-4" />
+					</Button>
+				</div>
 
-			{/* Content */}
-			<div className="min-h-0 flex-1 overflow-auto">
-				<Tabs value={activeTab}>
-					{/* YAML Tab Content */}
-					<TabsContent value="yaml" className="m-0 h-full">
+				{/* Content */}
+				<div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+					<TabsContent
+						value="yaml"
+						className={`
+        m-0 h-full p-4
+        data-[state=active]:flex data-[state=active]:flex-col
+      `}
+					>
 						{!flowDefinition ? (
 							<div
 								className={`
-          flex h-full items-center justify-center p-4 text-center text-sm
+          flex h-full items-center justify-center text-center text-sm
           text-muted-foreground
         `}
 							>
 								No flow loaded
 							</div>
 						) : (
-							<div className="p-4">
-								<pre className="overflow-x-auto rounded bg-muted p-3 font-mono text-xs">
-									<code>{yamlContent}</code>
-								</pre>
-							</div>
+							<pre className="h-full overflow-auto rounded bg-muted p-3 font-mono text-xs">
+								<code>{yamlContent}</code>
+							</pre>
 						)}
 					</TabsContent>
 
 					{/* Validation Tab Content */}
-					<TabsContent value="validation" className="m-0 h-full">
+					<TabsContent value="validation" className="m-0 h-full overflow-auto">
 						{!validationResult || validationResult.issues.length === 0 ? (
 							<div
 								className={`
@@ -169,8 +187,8 @@ export function FlowEditorRightPanel({ flowDefinition, validationResult, onIssue
 							</div>
 						)}
 					</TabsContent>
-				</Tabs>
-			</div>
+				</div>
+			</Tabs>
 		</div>
 	);
 }

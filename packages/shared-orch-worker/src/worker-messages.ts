@@ -43,6 +43,7 @@ export interface W2OWorkerReadyMessage extends W2OBaseMessage {
 	projectId: string;
 	workspacePath: string;
 	availableFlows: FlowMetadata[];
+	gitBranch?: string;
 }
 
 export interface W2OWorkerHeartbeatMessage extends W2OBaseMessage {

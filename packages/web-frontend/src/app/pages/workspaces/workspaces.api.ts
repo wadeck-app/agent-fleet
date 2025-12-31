@@ -1,6 +1,12 @@
 import { createTypedFetch } from '@framework/api/api-base';
 import { WORKSPACES_API_ROUTES } from '@shared/api/workspaces.contract';
-import type { WorkspacesData, WorkspacesListQuery, WorkspacesListResponse } from '@shared/api/workspaces.contract';
+import type {
+	UpdateWorkspaceDto,
+	Workspace,
+	WorkspacesData,
+	WorkspacesListQuery,
+	WorkspacesListResponse,
+} from '@shared/api/workspaces.contract';
 
 /**
  * ===========================================================================================
@@ -25,5 +31,15 @@ export const workspacesApi = {
 	 */
 	getWorkspacesList: (query: WorkspacesListQuery): Promise<WorkspacesListResponse> => {
 		return typedFetch('GET', '/api/workspaces/', { query }) as Promise<WorkspacesListResponse>;
+	},
+
+	/**
+	 * Update workspace metadata (name, description)
+	 */
+	updateWorkspace: (workspaceId: string, data: UpdateWorkspaceDto): Promise<Workspace> => {
+		return typedFetch('PATCH', '/api/workspaces/:id', {
+			params: { id: workspaceId },
+			body: data,
+		}) as Promise<Workspace>;
 	},
 } as const;

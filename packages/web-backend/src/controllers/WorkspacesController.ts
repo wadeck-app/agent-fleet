@@ -46,5 +46,13 @@ export default class WorkspacesController implements LazyController<typeof WORKS
 			// Legacy format (backwards compatibility)
 			return this.service.getWorkspacesData();
 		});
+
+		/**
+		 * PATCH /api/workspaces/:id
+		 * Update workspace metadata (name, description)
+		 */
+		add('PATCH', '/api/workspaces/:id', async ({ params, body }) => {
+			return this.service.updateWorkspace(params.id, body);
+		});
 	}
 }

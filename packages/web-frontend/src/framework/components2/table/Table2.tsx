@@ -94,6 +94,8 @@ export interface Table2Props<T> extends QueryResultDisplayerProps<T> {
 	onSelectionToggle?: (id: string) => void;
 	/** Select all callback - called when user toggles select all checkbox */
 	onSelectAll?: (ids: string[]) => void;
+	/** Row click callback - called when user clicks a row */
+	onRowClick?: (item: T) => void;
 }
 
 /**
@@ -120,6 +122,7 @@ export function Table2<T>({
 	deletingIds = new Set(),
 	onSelectionToggle,
 	onSelectAll,
+	onRowClick,
 }: Table2Props<T>) {
 	const selectAllCheckboxRef = useRef<HTMLButtonElement | null>(null);
 
@@ -237,6 +240,7 @@ export function Table2<T>({
 							deleting={deleting}
 							renderActions={renderActions ? (item: T) => renderActions(item) : undefined}
 							onToggleSelection={onSelectionToggle || (() => {})}
+							onRowClick={onRowClick}
 							skeletonRowCount={pagination?.pageSize ?? 10}
 						/>
 					</table>

@@ -17,6 +17,9 @@ import { FlowDiscoveryRegistry, FlowVersionMismatchError } from '../registry/Flo
 
 interface WorkerConnection extends WorkerInfo {
 	socket: WebSocket;
+	projectId: string;
+	workspacePath: string;
+	gitBranch?: string;
 }
 
 /**
@@ -47,7 +50,9 @@ export class WebSocketConnectionManager {
 	 * Returns the assigned worker ID
 	 */
 	handleWorkerReady(socket: WebSocket, message: W2OWorkerReadyMessage): string {
-		const { preferredId, projectId, workspacePath, availableFlows } = message;
+		const { preferredId, projectId, workspacePath, availableFlows, gitBranch } = message;
+
+		logger.info(`[WS] Worker READY - gitBranch: ${gitBranch || 'undefined'}, workspacePath: ${workspacePath}`);
 
 		let workerId: string;
 
@@ -90,6 +95,9 @@ export class WebSocketConnectionManager {
 			taskId: null,
 			connectedAt: new Date().toISOString(),
 			socket,
+			projectId,
+			workspacePath,
+			gitBranch,
 		};
 
 		this.workers.set(workerId, worker);
@@ -228,6 +236,38 @@ export class WebSocketConnectionManager {
 			taskId: w.taskId,
 			connectedAt: w.connectedAt,
 		}));
+	}
+
+	/**
+	 * Get workspaces from all connected workers
+	 * Returns workspace information (path, projectId, workerId, connectedAt, gitBranch)
+	 */
+	getConnectedWorkspaces(): Array<{
+		workerId: string;
+		workspacePath: string;
+		projectId: string;
+		connectedAt: string;
+		gitBranch?: string;
+	}> {
+		const workspaces: Array<{
+			workerId: string;
+			workspacePath: string;
+			projectId: string;
+			connectedAt: string;
+			gitBranch?: string;
+		}> = [];
+
+		for (const worker of this.workers.values()) {
+			workspaces.push({
+				workerId: worker.id,
+				workspacePath: worker.workspacePath,
+				projectId: worker.projectId,
+				connectedAt: worker.connectedAt,
+				gitBranch: worker.gitBranch,
+			});
+		}
+
+		return workspaces;
 	}
 
 	/**

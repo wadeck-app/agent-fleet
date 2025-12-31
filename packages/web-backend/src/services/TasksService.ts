@@ -1,11 +1,16 @@
 import type {
 	CreateTask,
+	LogEntry,
+	LogLevel,
+	PaginatedLogsQuery,
+	PaginatedLogsResponse,
 	Task,
 	TasksData,
 	TasksListQuery,
 	TasksListResponse,
 	TasksQuery,
 } from '@app/shared/api/tasks.contract';
+import { B2F_TASKS_UPDATED, B2F_TASK_CREATED, B2F_TASK_DELETED } from '@app/shared/transport';
 
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
@@ -296,8 +301,12 @@ export class TasksService {
 		try {
 			await this.orchestratorRepository.deleteTask(taskId);
 
-			// Emit event AFTER successful deletion
-			this.eventBroadcaster.broadcast('b2f:task:deleted', { id: taskId } as any);
+			// Emit specific event AFTER successful deletion
+			this.eventBroadcaster.broadcast(B2F_TASK_DELETED, { id: taskId } as any);
+
+			// Emit aggregate event for dashboard updates
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
 		} catch (error) {
 			console.error('[TasksService] Failed to delete task:', error);
 			throw error;
@@ -342,8 +351,12 @@ export class TasksService {
 			// Transform to frontend format
 			const transformedTask = this.transformTasks([task])[0];
 
-			// Emit event AFTER successful creation
-			this.eventBroadcaster.broadcast('b2f:task:created', transformedTask);
+			// Emit specific event AFTER successful creation
+			this.eventBroadcaster.broadcast(B2F_TASK_CREATED, transformedTask);
+
+			// Emit aggregate event for dashboard updates
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
 
 			return transformedTask;
 		} catch (error) {
@@ -464,4 +477,230 @@ export class TasksService {
 	 * }
 	 * ```
 	 */
+
+	// ===========================================================================================
+	// LOGS METHODS
+	// ===========================================================================================
+
+	/**
+	 * Get a single task by ID with full flowResult including trace
+	 */
+	async getTaskById(taskId: string): Promise<Task | null> {
+		try {
+			console.log(`[TasksService] Fetching task ${taskId} with full trace...`);
+			const rawTasks = await this.orchestratorRepository.getTasks();
+			const rawTask = rawTasks.find((t: any) => t.id === taskId);
+
+			if (!rawTask) {
+				return null;
+			}
+
+			// Transform to frontend format (but keep full flowResult.trace)
+			const task: Task = {
+				id: rawTask.id,
+				description: rawTask.description,
+				status: rawTask.status,
+				priority: rawTask.priority,
+				createdAt: rawTask.createdAt,
+				updatedAt: rawTask.updatedAt,
+				assignedWorker: rawTask.assignedTo
+					? {
+							workerId: rawTask.assignedTo.workerId,
+							// workerType: rawTask.assignedTo.workerType,
+						}
+					: null,
+				flowId: rawTask.flowId,
+				flowResult: rawTask.flowResult
+					? {
+							status: rawTask.flowResult.status,
+							error: rawTask.flowResult.error,
+							outputs: rawTask.flowResult.outputs,
+							trace: rawTask.flowResult.trace, // Include full trace
+						}
+					: undefined,
+			};
+
+			return task;
+		} catch (error) {
+			console.error(`[TasksService] Failed to fetch task ${taskId}:`, error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Get paginated logs for a task
+	 * Converts FlowTrace.steps to LogEntry[] with chunking/pagination
+	 */
+	async getTaskLogs(taskId: string, query: PaginatedLogsQuery): Promise<PaginatedLogsResponse> {
+		try {
+			console.log(
+				`[TasksService] Fetching logs for task ${taskId}, cursor=${query.cursor}, limit=${query.limit}`
+			);
+
+			// Get full task with trace
+			const task = await this.getTaskById(taskId);
+
+			if (!task) {
+				throw new Error(`Task ${taskId} not found`);
+			}
+
+			// Check if task is still running
+			const isRunning = task.status === 'in_progress' || task.status === 'testing';
+
+			// Extract steps from trace
+			const trace = task.flowResult?.trace;
+			if (!trace || !trace.steps || !Array.isArray(trace.steps)) {
+				return {
+					logs: [],
+					nextCursor: null,
+					total: 0,
+					isRunning,
+				};
+			}
+
+			const steps = trace.steps;
+
+			// Convert steps to log entries
+			let allLogs: LogEntry[] = [];
+			steps.forEach((step: any, stepIndex: number) => {
+				// Main step entry
+				const stepLog: LogEntry = {
+					id: `${step.stepId}-main`,
+					timestamp: step.startTime,
+					level: this.inferLogLevel(step),
+					message: this.formatStepMessage(step),
+					stepId: step.stepId,
+					stepName: step.stepName,
+					stepType: step.stepType,
+					metadata: {
+						durationMs: step.durationMs,
+						model: step.model,
+						exitCode: step.exitCode,
+					},
+				};
+				allLogs.push(stepLog);
+
+				// Add additional logs for detailed output (prompt, response, stdout, stderr)
+				if (step.prompt) {
+					allLogs.push({
+						id: `${step.stepId}-prompt`,
+						timestamp: step.startTime + 1,
+						level: 'debug' as LogLevel,
+						message: `Prompt: ${step.prompt.substring(0, 200)}${step.prompt.length > 200 ? '...' : ''}`,
+						stepId: step.stepId,
+						stepName: step.stepName,
+						stepType: step.stepType,
+						metadata: { fullPrompt: step.prompt },
+					});
+				}
+
+				if (step.response) {
+					allLogs.push({
+						id: `${step.stepId}-response`,
+						timestamp: step.endTime || step.startTime + 2,
+						level: 'info' as LogLevel,
+						message: `Response: ${step.response.substring(0, 200)}${step.response.length > 200 ? '...' : ''}`,
+						stepId: step.stepId,
+						stepName: step.stepName,
+						stepType: step.stepType,
+						metadata: { fullResponse: step.response },
+					});
+				}
+
+				if (step.stdout) {
+					allLogs.push({
+						id: `${step.stepId}-stdout`,
+						timestamp: step.endTime || step.startTime + 3,
+						level: 'info' as LogLevel,
+						message: `stdout: ${step.stdout.substring(0, 200)}${step.stdout.length > 200 ? '...' : ''}`,
+						stepId: step.stepId,
+						stepName: step.stepName,
+						stepType: step.stepType,
+						metadata: { fullStdout: step.stdout },
+					});
+				}
+
+				if (step.stderr) {
+					allLogs.push({
+						id: `${step.stepId}-stderr`,
+						timestamp: step.endTime || step.startTime + 4,
+						level: 'error' as LogLevel,
+						message: `stderr: ${step.stderr.substring(0, 200)}${step.stderr.length > 200 ? '...' : ''}`,
+						stepId: step.stepId,
+						stepName: step.stepName,
+						stepType: step.stepType,
+						metadata: { fullStderr: step.stderr },
+					});
+				}
+			});
+
+			// Apply filters
+			if (query.level) {
+				allLogs = allLogs.filter(log => log.level === query.level);
+			}
+
+			if (query.search) {
+				const searchLower = query.search.toLowerCase();
+				allLogs = allLogs.filter(log => log.message.toLowerCase().includes(searchLower));
+			}
+
+			const total = allLogs.length;
+
+			// Apply pagination
+			const cursor = query.cursor || 0;
+			const limit = query.limit || 100;
+			const paginatedLogs = allLogs.slice(cursor, cursor + limit);
+			const nextCursor = cursor + limit < total ? cursor + limit : null;
+
+			return {
+				logs: paginatedLogs,
+				nextCursor,
+				total,
+				isRunning,
+			};
+		} catch (error) {
+			console.error(`[TasksService] Failed to fetch logs for task ${taskId}:`, error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Infer log level from step result
+	 */
+	private inferLogLevel(step: any): LogLevel {
+		// Script steps with non-zero exit code = error
+		if (step.stepType === 'script' && step.exitCode && step.exitCode !== 0) {
+			return 'error';
+		}
+
+		// Steps with stderr = warning or error
+		if (step.stderr) {
+			return 'warning';
+		}
+
+		// Default to info
+		return 'info';
+	}
+
+	/**
+	 * Format step message for display
+	 */
+	private formatStepMessage(step: any): string {
+		const duration = step.durationMs ? ` (${step.durationMs}ms)` : '';
+
+		if (step.stepType === 'model') {
+			return `[${step.stepName}] Model: ${step.model}${duration}`;
+		}
+
+		if (step.stepType === 'script') {
+			const exitStatus = step.exitCode !== undefined ? ` [exit ${step.exitCode}]` : '';
+			return `[${step.stepName}] Script executed${exitStatus}${duration}`;
+		}
+
+		if (step.stepType === 'subflow') {
+			return `[${step.stepName}] SubFlow: ${step.subFlowId}${duration}`;
+		}
+
+		return `[${step.stepName}] ${step.stepType}${duration}`;
+	}
 }

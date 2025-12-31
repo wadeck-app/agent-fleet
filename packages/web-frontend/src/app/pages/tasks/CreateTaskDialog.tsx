@@ -8,6 +8,7 @@ import { TextField } from '@framework/features/forms/fields/TextField';
 import { useFormState } from '@framework/features/forms/useFormState';
 import type { FlowMetadata } from '@shared/api/flows.contract';
 import type { CreateTask } from '@shared/api/tasks.contract';
+import { AlertTriangle } from 'lucide-react';
 
 import { useWorkers } from '../workers/useWorkers';
 import { workersApi } from '../workers/workers.api';
@@ -150,9 +151,13 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 	}, [selectedFlow]);
 
 	// Convert flow metadata to select options
+	// Mark invalid flows with a badge and disable them
 	const flowOptions: SelectOption[] = workerFlowsMetadata.map(flow => ({
 		value: flow.id,
-		label: flow.name || flow.id,
+		label: flow.isValid
+			? flow.name || flow.id
+			: `${flow.name || flow.id} ❌ Invalid (${flow.validationErrors?.length || 0} errors)`,
+		disabled: !flow.isValid, // Disable invalid flows
 	}));
 
 	return (
@@ -227,6 +232,27 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 						}
 						disabled={!formState.formData.workerId || flowsLoading}
 					/>
+
+					{/* Warning for invalid flows in the list */}
+					{workerFlowsMetadata.some(f => !f.isValid) && (
+						<div
+							className={`
+        mt-2 rounded-md border border-warning/20 bg-warning/10 p-3
+      `}
+						>
+							<div className="flex items-start">
+								<div className="flex-shrink-0">
+									<AlertTriangle className="h-5 w-5 text-warning" />
+								</div>
+								<div className="ml-3 flex-1">
+									<p className="text-sm text-foreground">
+										Some flows have validation errors and cannot be selected. They can be edited in
+										the Flow Editor.
+									</p>
+								</div>
+							</div>
+						</div>
+					)}
 				</div>
 
 				{/* Dynamic Flow Inputs Section */}
@@ -234,23 +260,23 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 					<div className="col-span-2 space-y-4">
 						<div
 							className={`
-        border-t border-gray-200 pt-4
-        dark:border-gray-700
-      `}
+         border-t border-border pt-4
+         dark:border-gray-700
+       `}
 						>
 							<h3
 								className={`
-         mb-3 text-sm font-semibold text-gray-900
-         dark:text-gray-100
-       `}
+          mb-3 text-sm font-semibold text-gray-900
+          dark:text-gray-100
+        `}
 							>
 								Flow Inputs
 							</h3>
 							<div
 								className={`
-         space-y-3 border-l-2 border-blue-500 pl-2
-         dark:border-blue-400
-       `}
+          space-y-3 border-l-2 border-blue-500 pl-2
+          dark:border-blue-400
+        `}
 							>
 								{Object.entries(selectedFlow.inputs).map(([inputName, inputType]) => {
 									const value = flowInputs[inputName] || '';

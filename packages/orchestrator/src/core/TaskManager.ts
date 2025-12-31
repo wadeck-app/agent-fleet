@@ -5,6 +5,8 @@ import type { Task, TaskHistoryEntry } from 'shared-orch-worker/domain-types';
 import { TaskStatus } from 'shared-orch-worker/domain-types';
 import { v4 as uuidv4 } from 'uuid';
 
+import type { FlowDiscoveryRegistry } from '../registry/FlowDiscoveryRegistry';
+
 interface WorkerIdleEntry {
 	workerId: string;
 	requestedAt: Date;
@@ -14,6 +16,7 @@ export class TaskManager {
 	private tasks: Map<string, Task>;
 	private stateManager: StateManager;
 	private initialized: boolean = false;
+	private flowDiscoveryRegistry?: FlowDiscoveryRegistry;
 
 	// Queue system for task assignment
 	private globalBacklog: Task[] = [];
@@ -23,6 +26,14 @@ export class TaskManager {
 	constructor(stateManager: StateManager) {
 		this.tasks = new Map();
 		this.stateManager = stateManager;
+	}
+
+	/**
+	 * Set the flow discovery registry for flow validation
+	 * Called after WebSocket server initialization
+	 */
+	setFlowDiscoveryRegistry(registry: FlowDiscoveryRegistry): void {
+		this.flowDiscoveryRegistry = registry;
 	}
 
 	/**
@@ -65,6 +76,29 @@ export class TaskManager {
 	 * Create a new task
 	 */
 	async createTask(description: string, metadata: Partial<Task['metadata']> = {}): Promise<Task> {
+		// Validate flow if flowId is provided
+		if (metadata.flowId && this.flowDiscoveryRegistry) {
+			const flowMetadata = this.flowDiscoveryRegistry.getFlowMetadataById(metadata.flowId);
+
+			if (!flowMetadata) {
+				throw new Error(
+					`Cannot create task: Flow '${metadata.flowId}' not found. ` +
+						`Please check that the flow exists and workers are connected.`
+				);
+			}
+
+			if (flowMetadata.isValid === false) {
+				const errorCount = flowMetadata.validationErrors?.length || 0;
+				const firstError = flowMetadata.validationErrors?.[0];
+
+				throw new Error(
+					`Cannot create task: Flow '${metadata.flowId}' has ${errorCount} validation error(s).\n` +
+						`First error: ${firstError?.message || 'Unknown error'}\n` +
+						`Please fix the flow definition before creating tasks.`
+				);
+			}
+		}
+
 		const task: Task = {
 			id: uuidv4(),
 			description,
@@ -627,5 +661,94 @@ export class TaskManager {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Set active intervention for a task
+	 * Updates task status to AWAITING_USER and tracks intervention
+	 */
+	async setTaskIntervention(taskId: string, interventionId: string): Promise<void> {
+		const task = this.tasks.get(taskId);
+		if (!task) {
+			throw new Error(`Task ${taskId} not found`);
+		}
+
+		const oldStatus = task.status;
+		const oldActiveInterventionId = task.activeInterventionId;
+		const oldInterventionHistory = task.interventionHistory ? [...task.interventionHistory] : undefined;
+		const oldHistory = [...task.history];
+
+		task.status = TaskStatus.AWAITING_USER;
+		task.activeInterventionId = interventionId;
+		task.interventionHistory = task.interventionHistory || [];
+		task.interventionHistory.push(interventionId);
+		task.updatedAt = new Date().toISOString();
+
+		task.history.push({
+			timestamp: task.updatedAt,
+			event: 'intervention_requested',
+			interventionId,
+		});
+
+		try {
+			await Storage.saveTask(task);
+			logger.info(`[TaskManager] Task ${taskId} awaiting user intervention ${interventionId}`);
+			this.stateManager.emitTaskUpdated(task);
+		} catch (error) {
+			// Rollback on error
+			task.status = oldStatus;
+			task.activeInterventionId = oldActiveInterventionId;
+			task.interventionHistory = oldInterventionHistory;
+			task.history = oldHistory;
+			logger.info(
+				`[TaskManager] Failed to set intervention for task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
+			);
+			throw error;
+		}
+	}
+
+	/**
+	 * Clear active intervention for a task
+	 * Called when user responds to an intervention, resumes task execution
+	 */
+	async clearTaskIntervention(taskId: string, interventionId: string): Promise<void> {
+		const task = this.tasks.get(taskId);
+		if (!task) {
+			throw new Error(`Task ${taskId} not found`);
+		}
+
+		if (task.activeInterventionId !== interventionId) {
+			logger.info(`[TaskManager] Intervention ${interventionId} is not active for task ${taskId}, ignoring`);
+			return;
+		}
+
+		const oldStatus = task.status;
+		const oldActiveInterventionId = task.activeInterventionId;
+		const oldHistory = [...task.history];
+
+		task.status = TaskStatus.IN_PROGRESS;
+		task.activeInterventionId = undefined;
+		task.updatedAt = new Date().toISOString();
+
+		task.history.push({
+			timestamp: task.updatedAt,
+			event: 'intervention_answered',
+			interventionId,
+		});
+
+		try {
+			await Storage.saveTask(task);
+			logger.info(`[TaskManager] Task ${taskId} resumed after intervention ${interventionId}`);
+			this.stateManager.emitTaskUpdated(task);
+		} catch (error) {
+			// Rollback on error
+			task.status = oldStatus;
+			task.activeInterventionId = oldActiveInterventionId;
+			task.history = oldHistory;
+			logger.info(
+				`[TaskManager] Failed to clear intervention for task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
+			);
+			throw error;
+		}
 	}
 }

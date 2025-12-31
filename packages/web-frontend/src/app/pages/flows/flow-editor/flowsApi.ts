@@ -1,5 +1,5 @@
 import { createTypedFetch } from '@framework/api/api-base';
-import { FLOWS_API_ROUTES, type FlowDefinition, type FlowListItem } from '@shared/api/flows.contract';
+import { FLOWS_API_ROUTES, type FlowDefinition } from '@shared/api/flows.contract';
 
 const typedFetch = createTypedFetch(FLOWS_API_ROUTES);
 

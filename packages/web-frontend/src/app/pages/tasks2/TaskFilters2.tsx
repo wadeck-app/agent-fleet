@@ -57,9 +57,9 @@ export function TaskFilters2({ filters }: TaskFilters2Props) {
 	return (
 		<div
 			className={`
-    mb-4 grid grid-cols-1 gap-4
-    sm:grid-cols-3
-  `}
+     mb-4 grid grid-cols-1 gap-4
+     sm:grid-cols-3
+   `}
 		>
 			{/* Status Filter */}
 			<div>

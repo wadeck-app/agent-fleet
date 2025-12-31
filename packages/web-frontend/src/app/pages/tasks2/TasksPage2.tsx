@@ -11,7 +11,10 @@ import { usePagination2 } from '@framework/hooks2/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
 import { useSorting2 } from '@framework/hooks2/useSorting2';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
+import { B2F_TASK_CREATED, B2F_TASK_DELETED, B2F_TASK_UPDATED } from '@shared/transport';
 import { RefreshCw, X } from 'lucide-react';
+
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 import { tasksApi } from '../tasks/tasks.api';
 import { TaskFilters2 } from './TaskFilters2';
@@ -62,6 +65,14 @@ export function TasksPage2() {
 	});
 
 	const cache = useCacheControl2({ enabled: true });
+
+	// Subscribe to real-time task events
+	// Refresh list when tasks are created, updated, or deleted
+	useRealtimeRefresh({
+		events: [B2F_TASK_CREATED, B2F_TASK_UPDATED, B2F_TASK_DELETED],
+		onEvent: cache.actions.refresh,
+		logPrefix: 'TasksPage2',
+	});
 
 	// Domain-specific filters (tasks-specific)
 	const filters = useTaskFilters2({
@@ -145,9 +156,9 @@ export function TasksPage2() {
 				<strong>Active Features (UI / Debounced):</strong>
 				<div
 					className={`
-      mt-2 grid grid-cols-2 gap-2 text-xs
-      sm:grid-cols-4
-    `}
+       mt-2 grid grid-cols-2 gap-2 text-xs
+       sm:grid-cols-4
+     `}
 				>
 					<div>
 						<span className="text-muted-foreground">Search:</span>{' '}

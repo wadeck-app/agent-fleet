@@ -10,6 +10,29 @@ export interface FlowMetadata {
 	description: string;
 	inputs: Record<string, any>;
 	workspace: any;
+	isValid: boolean;
+	validationErrors?: Array<{
+		severity: 'error' | 'warning' | 'info';
+		code: any; // ValidationCode from flow-engine, using any for compatibility
+		message: string;
+		location?: {
+			stepId?: string;
+			field?: string;
+			path?: string;
+		};
+		suggestion?: string;
+	}>;
+	validationWarnings?: Array<{
+		severity: 'error' | 'warning' | 'info';
+		code: any; // ValidationCode from flow-engine, using any for compatibility
+		message: string;
+		location?: {
+			stepId?: string;
+			field?: string;
+			path?: string;
+		};
+		suggestion?: string;
+	}>;
 }
 
 export enum TaskStatus {
@@ -27,6 +50,7 @@ export enum TaskStatus {
 	MERGED = 'merged',
 	BLOCKED = 'blocked',
 	CANCELLED = 'cancelled',
+	AWAITING_USER = 'awaiting_user',
 }
 
 export interface Task {
@@ -59,6 +83,10 @@ export interface Task {
 
 	// Workspace configuration
 	workspacePath?: string; // For manual workspace mode
+
+	// User Intervention (Approach 3: Hybrid - lightweight references)
+	activeInterventionId?: string; // ID of current pending intervention
+	interventionHistory?: string[]; // IDs of past interventions
 }
 
 export interface TaskComment {
@@ -77,6 +105,84 @@ export interface WorkerInfo {
 	id: string;
 	taskId: string | null;
 	connectedAt: string;
+}
+
+/**
+ * User Intervention types and interfaces
+ * Supports approval, question, and choice interventions
+ */
+export type InterventionType = 'approval' | 'question' | 'choice';
+export type InterventionStatus = 'pending' | 'answered' | 'timeout' | 'cancelled';
+export type InterventionSourceType = 'flow_step' | 'agent_tool';
+
+export interface InterventionSource {
+	type: InterventionSourceType;
+	stepId?: string;
+	toolName?: string;
+}
+
+export interface InterventionValidation {
+	pattern?: string;
+	min?: number;
+	max?: number;
+}
+
+export interface InterventionOption {
+	id: string;
+	label: string;
+	description?: string;
+}
+
+export interface InterventionConfig {
+	title: string;
+	description?: string;
+
+	// For approval
+	allowReject?: boolean;
+
+	// For question
+	question?: string;
+	responseType?: 'text' | 'number' | 'boolean';
+	validation?: InterventionValidation;
+
+	// For choice
+	options?: InterventionOption[];
+	allowMultiple?: boolean;
+}
+
+export interface InterventionTimeout {
+	minutes: number;
+	onTimeout: 'fail' | 'continue' | 'default';
+	defaultValue?: any;
+}
+
+export interface InterventionResponse {
+	value: any;
+	answeredBy: string;
+	comment?: string;
+}
+
+export interface Intervention {
+	id: string;
+	taskId: string;
+	workerId?: string;
+	flowId?: string;
+	stepId?: string;
+
+	type: InterventionType;
+	status: InterventionStatus;
+
+	createdAt: string;
+	answeredAt?: string;
+	timeoutAt?: string;
+
+	source: InterventionSource;
+	config: InterventionConfig;
+
+	blocking: boolean;
+	timeout?: InterventionTimeout;
+
+	response?: InterventionResponse;
 }
 
 /**

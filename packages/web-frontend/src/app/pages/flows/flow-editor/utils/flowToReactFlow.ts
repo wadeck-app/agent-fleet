@@ -35,7 +35,9 @@ export function flowDefinitionToReactFlow(flow: FlowDefinition): {
 				edges.push({
 					id: `${depId}->conditional->${step.id}`,
 					source: depId,
+					sourceHandle: 'right',
 					target: step.id,
+					targetHandle: 'left',
 					type: 'conditional',
 					data: {
 						edgeType: 'conditional' as const,
@@ -49,7 +51,9 @@ export function flowDefinitionToReactFlow(flow: FlowDefinition): {
 				edges.push({
 					id: `${depId}->${step.id}`,
 					source: depId,
+					sourceHandle: 'right',
 					target: step.id,
+					targetHandle: 'left',
 					type: 'dependency',
 					data: { edgeType: 'dependency' as const },
 				});
@@ -58,16 +62,18 @@ export function flowDefinitionToReactFlow(flow: FlowDefinition): {
 	});
 
 	// Create edges from onFailure.goto (loops)
+	// Use bottom handles for loop edges to route failures below the normal flow
 	flow.steps
 		.filter(step => step.onFailure?.goto)
 		.forEach(step => {
 			edges.push({
 				id: `${step.id}->loop->${step.onFailure!.goto}`,
 				source: step.id,
+				sourceHandle: 'bottom',
 				target: step.onFailure!.goto!,
+				targetHandle: 'bottom',
 				type: 'loop',
 				animated: true,
-				style: { stroke: 'hsl(var(--warning))' },
 				data: {
 					edgeType: 'loop' as const,
 					loopConfig: step.onFailure,
@@ -92,12 +98,16 @@ export function reactFlowToFlowDefinition(
 	nodes: FlowNode[],
 	edges: FlowEdge[]
 ): FlowDefinition {
+	// CRITICAL: Exclude data flow edges and constant nodes (UI-only, not persisted to backend)
+	const backendEdges = edges.filter(e => e.data?.edgeType !== 'dataflow');
+	const backendNodes = nodes.filter(n => n.type !== 'constant');
+
 	// Build dependency map from edges
 	const dependencyMap = new Map<string, string[]>();
 	const conditionalMap = new Map<string, string>();
 	const loopMap = new Map<string, any>();
 
-	edges.forEach(edge => {
+	backendEdges.forEach(edge => {
 		if (edge.data?.edgeType === 'dependency') {
 			const deps = dependencyMap.get(edge.target) || [];
 			deps.push(edge.source);
@@ -115,8 +125,8 @@ export function reactFlowToFlowDefinition(
 		}
 	});
 
-	// Convert nodes back to steps
-	const steps: FlowStep[] = nodes.map(node => {
+	// Convert nodes back to steps (only backend nodes, excluding constants)
+	const steps: FlowStep[] = backendNodes.map(node => {
 		const step = { ...node.data.step };
 
 		// Add dependencies from edges

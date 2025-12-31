@@ -1,6 +1,8 @@
 import type { Edge, Node } from '@xyflow/react';
+import type { ValidationIssue } from 'flow-engine/validation/ValidationTypes';
 
-import type { FlowDefinition, FlowStep, ValidationIssue } from './types/flow-engine.types';
+import type { FlowDefinition, FlowStep, VariableType } from './types/flow-engine.types';
+import type { VariablePort } from './utils/VariableExtractor';
 
 /**
  * Custom data attached to each node
@@ -10,6 +12,10 @@ export interface StepNodeData extends Record<string, unknown> {
 	step: FlowStep;
 	/** Validation issues for this step */
 	validationIssues: ValidationIssue[];
+	/** Input variable ports for data flow visualization */
+	inputPorts?: VariablePort[];
+	/** Output variable ports for data flow visualization */
+	outputPorts?: VariablePort[];
 }
 
 /**
@@ -17,11 +23,17 @@ export interface StepNodeData extends Record<string, unknown> {
  */
 export interface EdgeData extends Record<string, unknown> {
 	/** Type of edge */
-	edgeType: 'dependency' | 'conditional' | 'loop';
+	edgeType: 'dependency' | 'conditional' | 'loop' | 'dataflow';
 	/** Condition expression (for conditional edges) */
 	condition?: string;
 	/** Loop configuration (for loop edges) */
 	loopConfig?: FlowStep['onFailure'];
+	/** Source variable name (for data flow edges) */
+	sourceVarName?: string;
+	/** Target variable name (for data flow edges) */
+	targetVarName?: string;
+	/** Variable type (for data flow edges) */
+	varType?: VariableType;
 }
 
 /**

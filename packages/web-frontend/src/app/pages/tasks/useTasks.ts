@@ -63,17 +63,54 @@ export function useTasks({
 	// Transport connection for backend WebSocket and connection state
 	const { transport, connectionState } = useTransport();
 
+	// Check if WebSocket is connected (convenience for return value)
+	const wsConnected = connectionState === 'connected';
+
+	// Fetch tasks data (defined early so it can be used by handleTasksEvent)
+	const fetchTasks = useCallback(
+		async (signal: AbortSignal) => {
+			try {
+				// Only show loading on initial load
+				if (isInitialLoad) {
+					setLoading(true);
+				}
+
+				const tasksData = await tasksService.getTasks(filters);
+
+				if (!signal.aborted) {
+					setData(tasksData);
+					setError(null);
+					setIsInitialLoad(false);
+				}
+			} catch (err) {
+				if (!signal.aborted) {
+					const message = err instanceof Error ? err.message : 'Failed to load tasks';
+					setError(message);
+					console.error('[useTasks] Error caught:', err);
+					console.error('Error loading tasks:', err);
+				}
+			} finally {
+				if (!signal.aborted) {
+					setLoading(false);
+				}
+			}
+		},
+		[isInitialLoad, filters]
+	);
+
 	/**
 	 * Handle tasks update event from backend WebSocket
-	 * Type-safe - receives TasksData directly (no validation needed)
+	 * B2F_TASKS_UPDATED sends empty payload as invalidation signal
+	 * We need to refresh the data when this event arrives
 	 */
-	const handleTasksEvent = useCallback((tasksData: TasksData) => {
+	const handleTasksEvent = useCallback(() => {
 		if (isMountedRef.current) {
-			console.log('[useTasks] Received tasks update via Backend WebSocket');
-			setData(tasksData);
-			setError(null);
+			console.log('[useTasks] Received tasks update via Backend WebSocket - refreshing data');
+			// Trigger a refresh instead of trying to use event data (which is empty)
+			const controller = new AbortController();
+			fetchTasks(controller.signal);
 		}
-	}, []);
+	}, [fetchTasks]);
 
 	/**
 	 * Subscribe to tasks events via backend WebSocket WITH server-side filters
@@ -117,41 +154,6 @@ export function useTasks({
 			isMountedRef.current = false;
 		};
 	}, []);
-
-	// Check if WebSocket is connected (convenience for return value)
-	const wsConnected = connectionState === 'connected';
-
-	// Fetch tasks data
-	const fetchTasks = useCallback(
-		async (signal: AbortSignal) => {
-			try {
-				// Only show loading on initial load
-				if (isInitialLoad) {
-					setLoading(true);
-				}
-
-				const tasksData = await tasksService.getTasks(filters);
-
-				if (!signal.aborted) {
-					setData(tasksData);
-					setError(null);
-					setIsInitialLoad(false);
-				}
-			} catch (err) {
-				if (!signal.aborted) {
-					const message = err instanceof Error ? err.message : 'Failed to load tasks';
-					setError(message);
-					console.error('[useTasks] Error caught:', err);
-					console.error('Error loading tasks:', err);
-				}
-			} finally {
-				if (!signal.aborted) {
-					setLoading(false);
-				}
-			}
-		},
-		[isInitialLoad, filters]
-	);
 
 	// Initial fetch on mount
 	useAbortableEffect(

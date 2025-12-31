@@ -276,6 +276,25 @@ export class FlowDiscoveryRegistry {
 	}
 
 	/**
+	 * Find a flow by ID across all projects and return its metadata
+	 * Used for task creation validation
+	 *
+	 * @param flowId - Flow ID to search for
+	 * @returns Flow metadata from the first worker that has it, or undefined if not found
+	 */
+	getFlowMetadataById(flowId: string): FlowMetadata | undefined {
+		// Search across all projects
+		for (const projectFlows of this.projectFlowIndex.values()) {
+			const flowEntries = projectFlows.get(flowId);
+			if (flowEntries && flowEntries.length > 0) {
+				// Return metadata from the first entry (any worker with this flow)
+				return flowEntries[0].metadata;
+			}
+		}
+		return undefined;
+	}
+
+	/**
 	 * Get all flows for a project
 	 *
 	 * @returns Map of flowId to list of worker entries, or undefined if project not found

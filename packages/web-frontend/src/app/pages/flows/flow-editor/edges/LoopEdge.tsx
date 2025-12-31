@@ -1,7 +1,7 @@
 import { memo } from 'react';
 
 import type { Position } from '@xyflow/react';
-import { BaseEdge, EdgeLabelRenderer, getBezierPath } from '@xyflow/react';
+import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath } from '@xyflow/react';
 
 import type { EdgeData } from '../types';
 
@@ -18,24 +18,24 @@ export interface LoopEdgeProps {
 
 export const LoopEdge = memo(
 	({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }: LoopEdgeProps) => {
-		// Create curved path with custom control points to route around nodes
-		const offset = 150;
-		const [edgePath] = getBezierPath({
+		// Use smooth step path for failure loops - routed below the normal flow
+		const [edgePath] = getSmoothStepPath({
 			sourceX,
 			sourceY,
 			sourcePosition,
 			targetX,
 			targetY,
 			targetPosition,
-			curvature: 0.5, // More pronounced curve for better visibility
+			borderRadius: 12,
+			offset: 30, // Offset to route below
 		});
 
-		// Use CSS variable color for the arrow
-		const warningColor = '#f59e0b'; // Fallback color
+		// Red color for failures/errors
+		const errorColor = '#ef4444'; // red-500
 
-		// Position label to the right of the edge path, roughly in the middle vertically
-		const labelX = Math.max(sourceX, targetX) + offset;
-		const labelY = (sourceY + targetY) / 2;
+		// Position label below the edge path
+		const labelX = (sourceX + targetX) / 2;
+		const labelY = Math.max(sourceY, targetY) + 80; // Below both nodes
 
 		return (
 			<>
@@ -49,13 +49,13 @@ export const LoopEdge = memo(
 						markerHeight="6"
 						orient="auto-start-reverse"
 					>
-						<path d="M 0 0 L 10 5 L 0 10 z" fill={warningColor} />
+						<path d="M 0 0 L 10 5 L 0 10 z" fill={errorColor} />
 					</marker>
 				</defs>
 				<BaseEdge
 					id={id}
 					path={edgePath}
-					style={{ stroke: warningColor, strokeWidth: 2, strokeDasharray: '5,5' }}
+					style={{ stroke: errorColor, strokeWidth: 2, strokeDasharray: '5,5' }}
 					markerEnd="url(#arrow-loop)"
 				/>
 				{data?.loopConfig && (
@@ -66,7 +66,10 @@ export const LoopEdge = memo(
 								transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
 								pointerEvents: 'all',
 							}}
-							className="rounded bg-warning px-2 py-1 text-xs font-medium text-warning-foreground"
+							className={`
+         rounded bg-destructive px-2 py-1 text-xs font-medium
+         text-destructive-foreground
+       `}
 						>
 							⚠️ on failure, retry (max: {data.loopConfig.maxIterations || 3})
 						</div>

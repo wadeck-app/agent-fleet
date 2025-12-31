@@ -45,15 +45,7 @@ describe('SearchInput', () => {
 		});
 
 		it('should apply custom className to wrapper', () => {
-			const { container } = render(
-				<SearchInput
-					value=""
-					onChange={() => {}}
-					className={`
-     custom-class
-   `}
-				/>
-			);
+			const { container } = render(<SearchInput value="" onChange={() => {}} className={`custom-class`} />);
 
 			const wrapper = container.firstChild;
 			expect(wrapper).toHaveClass('custom-class');

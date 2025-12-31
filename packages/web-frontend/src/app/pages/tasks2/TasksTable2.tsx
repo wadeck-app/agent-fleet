@@ -1,3 +1,5 @@
+import { useNavigate } from 'react-router-dom';
+
 import { Table2, type Table2Column, type Table2Props } from '@framework/components2/table/Table2';
 import { Badge } from '@framework/components/primitives/Badge';
 import type { Task } from '@shared/api/tasks.contract';
@@ -113,6 +115,13 @@ export interface TasksTable2Props extends Partial<Table2Props<Task>> {
  * Tasks table component using Table2
  */
 export function TasksTable2(props: TasksTable2Props) {
+	const navigate = useNavigate();
+
+	const handleRowClick = (task: Task) => {
+		// Navigate to stacked layout by default (full width logs)
+		navigate(`/tasks/${task.id}/logs-stacked`);
+	};
+
 	return (
 		<Table2
 			columns={TASKS_TABLE2_COLUMNS}
@@ -125,6 +134,7 @@ export function TasksTable2(props: TasksTable2Props) {
 			sorting={props.sorting}
 			features={props.features}
 			refreshing={props.refreshing}
+			onRowClick={handleRowClick}
 		/>
 	);
 }

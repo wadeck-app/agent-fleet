@@ -56,6 +56,27 @@ export default class TasksController implements LazyController<typeof TASKS_API_
 		});
 
 		/**
+		 * GET /api/tasks/:id
+		 * Get a single task by ID with full trace
+		 */
+		add('GET', '/api/tasks/:id', async ({ params }) => {
+			const task = await this.service.getTaskById(params.id);
+			if (!task) {
+				throw new Error(`Task ${params.id} not found`);
+			}
+			return task;
+		});
+
+		/**
+		 * GET /api/tasks/:id/logs
+		 * Get paginated logs for a task
+		 * Query params: cursor, limit, level, search
+		 */
+		add('GET', '/api/tasks/:id/logs', async ({ params, query }) => {
+			return this.service.getTaskLogs(params.id, query);
+		});
+
+		/**
 		 * DELETE /api/tasks/:id
 		 * Delete a task
 		 */

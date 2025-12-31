@@ -30,6 +30,7 @@ function createFlowMetadata(
 			gitStrategy: 'feature-branch',
 			reusePolicy: 'if-available',
 		},
+		isValid: true, // Default to valid for tests
 		...overrides,
 	};
 }

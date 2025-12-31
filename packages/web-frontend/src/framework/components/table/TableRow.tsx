@@ -16,6 +16,7 @@ export interface TableRowProps<T> {
 	itemId: string;
 	renderActions?: (item: T, isEditing: boolean) => ReactNode;
 	onToggleSelection: (id: string, index: number, event: React.ChangeEvent<HTMLInputElement>) => void;
+	onRowClick?: (item: T) => void;
 }
 
 export function TableRow<T>({
@@ -30,6 +31,7 @@ export function TableRow<T>({
 	itemId,
 	renderActions,
 	onToggleSelection,
+	onRowClick,
 }: TableRowProps<T>) {
 	// Alternating row background colors (even/odd)
 	const alternatingBg = index % 2 === 0 ? 'bg-background' : 'bg-muted/20';
@@ -62,8 +64,10 @@ export function TableRow<T>({
 				: alternatingBg
 		}
      ${isEditing ? 'border-2 border-primary bg-accent/50' : ''}
+     ${onRowClick ? 'cursor-pointer' : ''}
      ${rowClassName}
    `}
+			onClick={() => onRowClick?.(item)}
 			data-testid="table-row"
 			data-row-id={itemId}
 		>

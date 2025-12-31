@@ -72,9 +72,9 @@ export function IngredientCard3({
 		<Card
 			size="default"
 			className={`
-    relative transition-shadow
-    hover:shadow-lg
-  `}
+     relative transition-shadow
+     hover:shadow-lg
+   `}
 		>
 			{/* Selection checkbox (top right) */}
 			{selectable && onToggleSelection && (
@@ -111,17 +111,12 @@ export function IngredientCard3({
 				{metadataFields.length > 0 && (
 					<div
 						className={`
-       ${mainFields.length > 0 ? 'mt-4 border-t pt-3' : ''}
-       space-y-1
-     `}
+        ${mainFields.length > 0 ? 'mt-4 border-t pt-3' : ''}
+        space-y-1
+      `}
 					>
 						{metadataFields.map(field => (
-							<div
-								key={field.key}
-								className={`
-         flex justify-between text-xs text-muted-foreground
-       `}
-							>
+							<div key={field.key} className={`flex justify-between text-xs text-muted-foreground`}>
 								<span>{field.label}:</span>
 								<span className={field.key === 'id' ? 'font-mono' : ''}>
 									{field.render(ingredient)}

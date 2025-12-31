@@ -78,15 +78,7 @@ describe('ThemeToggle', () => {
 	describe('styling', () => {
 		it('should apply custom className', () => {
 			const onToggle = vi.fn();
-			render(
-				<ThemeToggle
-					theme="light"
-					onToggle={onToggle}
-					className={`
-     custom-class
-   `}
-				/>
-			);
+			render(<ThemeToggle theme="light" onToggle={onToggle} className={`custom-class`} />);
 			const button = screen.getByRole('button');
 			expect(button).toHaveClass('custom-class');
 		});

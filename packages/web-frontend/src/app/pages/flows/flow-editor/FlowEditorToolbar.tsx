@@ -1,7 +1,7 @@
 import { Button } from '@framework/components/primitives/Button';
 import { Separator } from '@framework/components/primitives/Separator';
 import type { FlowListItem } from '@shared/api/flows.contract';
-import { Brain, CheckCircle, Layout, Save, Terminal, Workflow } from 'lucide-react';
+import { Brain, CheckCircle, GitBranch, Hash, Layout, Save, Tag, Terminal, Workflow } from 'lucide-react';
 
 import { FlowSelector } from './FlowSelector';
 
@@ -9,12 +9,19 @@ interface FlowEditorToolbarProps {
 	onSave: () => void;
 	onValidate: () => void;
 	onAutoLayout: () => void;
-	onAddNode: (type: 'model' | 'script' | 'subflow') => void;
+	onAddNode: (type: 'model' | 'script' | 'subflow' | 'constant') => void;
 	onLoadFlow: (flowId: string) => void;
 	availableFlows: FlowListItem[];
 	currentFlowId: string | null;
 	isDirty: boolean;
 	isSaving: boolean;
+	// Edge visibility toggles
+	showDependencyEdges: boolean;
+	showDataFlowEdges: boolean;
+	showEdgeLabels: boolean;
+	onToggleDependencyEdges: () => void;
+	onToggleDataFlowEdges: () => void;
+	onToggleEdgeLabels: () => void;
 }
 
 export function FlowEditorToolbar({
@@ -27,6 +34,12 @@ export function FlowEditorToolbar({
 	currentFlowId,
 	isDirty,
 	isSaving,
+	showDependencyEdges,
+	showDataFlowEdges,
+	showEdgeLabels,
+	onToggleDependencyEdges,
+	onToggleDataFlowEdges,
+	onToggleEdgeLabels,
 }: FlowEditorToolbarProps) {
 	const onDragStart = (event: React.DragEvent, nodeType: string) => {
 		event.dataTransfer.setData('application/reactflow', nodeType);
@@ -34,7 +47,7 @@ export function FlowEditorToolbar({
 	};
 
 	return (
-		<div className="flex flex-col gap-3 p-4 border-b bg-card/50">
+		<div className="flex flex-col gap-3 border-b bg-card/50 p-4">
 			{/* Flow Selector */}
 			<FlowSelector availableFlows={availableFlows} currentFlowId={currentFlowId} onLoadFlow={onLoadFlow} />
 
@@ -72,12 +85,58 @@ export function FlowEditorToolbar({
 					<Workflow className="mr-2 size-4" />
 					SubFlow
 				</Button>
+				<Button
+					variant="ghost"
+					size="sm"
+					draggable
+					onDragStart={e => onDragStart(e, 'constant')}
+					onClick={() => onAddNode('constant')}
+					className="h-8"
+				>
+					<Hash className="mr-2 size-4" />
+					Constant
+				</Button>
+
+				<Separator orientation="vertical" className="h-8" />
+
+				{/* Edge Visibility Toggles */}
+				<div className="flex items-center gap-2">
+					<span className="mr-1 text-xs font-medium text-muted-foreground">Show:</span>
+					<Button
+						variant={showDependencyEdges ? 'default' : 'outline'}
+						size="sm"
+						onClick={onToggleDependencyEdges}
+						className="h-8"
+					>
+						<GitBranch className="mr-2 size-4" />
+						Dependencies
+					</Button>
+					<Button
+						variant={showDataFlowEdges ? 'default' : 'outline'}
+						size="sm"
+						onClick={onToggleDataFlowEdges}
+						className="h-8"
+					>
+						<Workflow className="mr-2 size-4" />
+						Data Flow
+					</Button>
+					<Button
+						variant={showEdgeLabels ? 'default' : 'outline'}
+						size="sm"
+						onClick={onToggleEdgeLabels}
+						className="h-8"
+						title={showEdgeLabels ? 'Hide edge labels' : 'Show edge labels'}
+					>
+						<Tag className="mr-2 size-4" />
+						Labels
+					</Button>
+				</div>
 
 				<Separator orientation="vertical" className="h-8" />
 
 				{/* Flow Actions */}
 				<div className="flex items-center gap-2">
-					<span className="text-xs font-medium text-muted-foreground mr-1">Actions:</span>
+					<span className="mr-1 text-xs font-medium text-muted-foreground">Actions:</span>
 					<Button variant="outline" size="sm" onClick={onAutoLayout}>
 						<Layout className="mr-2 size-4" />
 						Auto Layout

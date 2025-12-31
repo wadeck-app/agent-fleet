@@ -11,7 +11,15 @@ import { usePagination2 } from '@framework/hooks2/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
 import { useSorting2 } from '@framework/hooks2/useSorting2';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
+import {
+	B2F_WORKSPACES_UPDATED,
+	B2F_WORKSPACE_CREATED,
+	B2F_WORKSPACE_DELETED,
+	B2F_WORKSPACE_UPDATED,
+} from '@shared/transport';
 import { RefreshCw, X } from 'lucide-react';
+
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 import { workspacesApi } from '../workspaces/workspaces.api';
 import { WorkspacesTable2 } from './WorkspacesTable2';
@@ -54,6 +62,14 @@ export function WorkspacesPage2() {
 	});
 
 	const cache = useCacheControl2({ enabled: true });
+
+	// Subscribe to real-time workspace events
+	// Refresh list when workspaces are created, updated, deleted, or when workers connect/disconnect
+	useRealtimeRefresh({
+		events: [B2F_WORKSPACES_UPDATED, B2F_WORKSPACE_CREATED, B2F_WORKSPACE_UPDATED, B2F_WORKSPACE_DELETED],
+		onEvent: cache.actions.refresh,
+		logPrefix: 'WorkspacesPage2',
+	});
 
 	// Debounce search query
 	const debouncedSearchQuery = useDebounce(search.fstate.query, 300);
@@ -123,9 +139,9 @@ export function WorkspacesPage2() {
 				<strong>Active Features (UI / Debounced):</strong>
 				<div
 					className={`
-      mt-2 grid grid-cols-2 gap-2 text-xs
-      sm:grid-cols-3
-    `}
+       mt-2 grid grid-cols-2 gap-2 text-xs
+       sm:grid-cols-3
+     `}
 				>
 					<div>
 						<span className="text-muted-foreground">Search:</span>{' '}

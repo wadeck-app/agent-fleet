@@ -185,7 +185,7 @@ describe('useDashboard', () => {
 		it('should enable polling with specified interval', async () => {
 			vi.mocked(dashboardService.getDashboard).mockResolvedValue(mockDashboardData);
 
-			const { result } = renderHook(() => useDashboard({ pollInterval: 100 }));
+			const { result } = renderHook(() => useDashboard());
 
 			// Wait for initial load
 			await waitFor(() => {
@@ -208,7 +208,7 @@ describe('useDashboard', () => {
 		it('should not show loading state after initial load', async () => {
 			vi.mocked(dashboardService.getDashboard).mockResolvedValue(mockDashboardData);
 
-			const { result } = renderHook(() => useDashboard({ pollInterval: 100 }));
+			const { result } = renderHook(() => useDashboard());
 
 			// Wait for initial load
 			await waitFor(() => {

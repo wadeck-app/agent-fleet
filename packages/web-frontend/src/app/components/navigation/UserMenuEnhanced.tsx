@@ -54,13 +54,7 @@ export function UserMenuEnhanced({ userName = 'User', userEmail, userAvatar, cla
       `}
 					>
 						{userAvatar ? (
-							<img
-								src={userAvatar}
-								alt={userName}
-								className={`
-         size-8 rounded-full object-cover
-       `}
-							/>
+							<img src={userAvatar} alt={userName} className={`size-8 rounded-full object-cover`} />
 						) : (
 							<span className="text-xs font-medium">{initials}</span>
 						)}

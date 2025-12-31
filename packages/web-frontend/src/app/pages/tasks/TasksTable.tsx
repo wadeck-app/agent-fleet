@@ -61,7 +61,7 @@ function getStatusDisplay(status: Task['status']): {
 		case 'testing':
 			return {
 				variant: 'default',
-				color: 'text-blue-600 dark:text-blue-400',
+				color: 'text-info ',
 				icon: <Clock className="size-3" />,
 				label: 'In Progress',
 			};
@@ -69,35 +69,35 @@ function getStatusDisplay(status: Task['status']): {
 		case 'reviewing':
 			return {
 				variant: 'default',
-				color: 'text-purple-600 dark:text-purple-400',
+				color: 'text-primary ',
 				icon: <FileCheck className="size-3" />,
 				label: 'Review',
 			};
 		case 'approved':
 			return {
 				variant: 'default',
-				color: 'text-green-600 dark:text-green-400',
+				color: 'text-success ',
 				icon: <CheckCircle2 className="size-3" />,
 				label: 'Approved',
 			};
 		case 'merged':
 			return {
 				variant: 'default',
-				color: 'text-green-600 dark:text-green-400',
+				color: 'text-success ',
 				icon: <GitMerge className="size-3" />,
 				label: 'Merged',
 			};
 		case 'blocked':
 			return {
 				variant: 'destructive',
-				color: 'text-red-600 dark:text-red-400',
+				color: 'text-destructive ',
 				icon: <AlertCircle className="size-3" />,
 				label: 'Blocked',
 			};
 		case 'cancelled':
 			return {
 				variant: 'destructive',
-				color: 'text-red-600 dark:text-red-400',
+				color: 'text-destructive ',
 				icon: <XCircle className="size-3" />,
 				label: 'Failed',
 			};

@@ -34,7 +34,7 @@ export class TemplateValidator {
 
 		// Validate each reference
 		for (const ref of references) {
-			this.validateReference(ref, stepIds, inputNames);
+			this.validateReference(ref, flow, stepIds, inputNames);
 		}
 	}
 
@@ -115,10 +115,16 @@ export class TemplateValidator {
 	 * Validate a single variable reference
 	 *
 	 * @param ref - Variable reference to validate
+	 * @param flow - Flow definition for looking up step configurations
 	 * @param stepIds - Set of valid step IDs
 	 * @param inputNames - Set of valid input names
 	 */
-	private validateReference(ref: VariableReference, stepIds: Set<string>, inputNames: Set<string>): void {
+	private validateReference(
+		ref: VariableReference,
+		flow: FlowDefinition,
+		stepIds: Set<string>,
+		inputNames: Set<string>
+	): void {
 		if (ref.type === 'input') {
 			// Validate input reference
 			const inputName = ref.path[0];
@@ -150,8 +156,41 @@ export class TemplateValidator {
 						related: Array.from(stepIds),
 					},
 				});
+			} else if (ref.path.length >= 3 && ref.path[1] === 'outputs') {
+				// Validate that the output field is defined in the step's output config
+				const outputVarName = ref.path[2];
+				const sourceStep = flow.steps.find(s => s.id === stepId);
+
+				if (sourceStep && sourceStep.output) {
+					// Step has output config - check if the variable is defined
+					if (!sourceStep.output[outputVarName]) {
+						const availableOutputs = Object.keys(sourceStep.output);
+						this.issueCollector.addIssue({
+							severity: 'warning',
+							code: ValidationCode.UNDEFINED_OUTPUT,
+							message: `Reference to undefined output: ${ref.expression}. Step '${stepId}' does not define output '${outputVarName}'`,
+							location: ref.location,
+							suggestion:
+								availableOutputs.length > 0
+									? `Add output definition to step '${stepId}' or use an existing output: ${availableOutputs.join(', ')}`
+									: `Add output definition for '${outputVarName}' to step '${stepId}'`,
+							context: {
+								actual: outputVarName,
+								related: availableOutputs,
+							},
+						});
+					}
+				} else if (sourceStep && !sourceStep.output) {
+					// Step exists but has no output config at all
+					this.issueCollector.addIssue({
+						severity: 'warning',
+						code: ValidationCode.MISSING_OUTPUT,
+						message: `Reference to output from step with no output config: ${ref.expression}`,
+						location: ref.location,
+						suggestion: `Add 'output' configuration to step '${stepId}' to define available outputs`,
+					});
+				}
 			}
-			// Note: We can't validate output field without execution, so we skip that
 		} else if (ref.type === 'task') {
 			// Task metadata is dynamic, so we just validate basic structure
 			const validTaskFields = ['priority', 'metadata', 'id', 'createdAt'];

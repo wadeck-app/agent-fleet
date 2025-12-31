@@ -58,7 +58,10 @@ export const ConditionalEdge = memo(
 								transform: `translate(-50%, -50%) translate(${(sourceX + targetX) / 2}px, ${(sourceY + targetY) / 2}px)`,
 								pointerEvents: 'all',
 							}}
-							className="rounded bg-primary px-2 py-1 text-xs font-medium text-primary-foreground"
+							className={`
+         rounded bg-primary px-2 py-1 text-xs font-medium
+         text-primary-foreground
+       `}
 						>
 							when: {data.condition}
 						</div>

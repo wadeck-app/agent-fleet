@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { type Task } from 'shared-orch-worker/domain-types';
+import { type Intervention, type InterventionStatus, type Task } from 'shared-orch-worker/domain-types';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -10,6 +10,7 @@ const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 const DATA_DIR = process.env.AGENT_FLEET_DATA_DIR || path.join(PROJECT_ROOT, 'data');
 const TASKS_DIR = path.join(DATA_DIR, 'tasks');
+const INTERVENTIONS_DIR = path.join(DATA_DIR, 'interventions');
 const KNOWLEDGE_DIR = path.join(DATA_DIR, 'knowledge');
 
 export interface KnowledgeEntry {
@@ -52,6 +53,7 @@ export class Storage {
 		try {
 			await this.ensureDirectoryExists(DATA_DIR);
 			await this.ensureDirectoryExists(TASKS_DIR);
+			await this.ensureDirectoryExists(INTERVENTIONS_DIR);
 			await this.ensureDirectoryExists(KNOWLEDGE_DIR);
 		} catch (error) {
 			console.error('[Storage] Failed to initialize directories:', error);
@@ -242,6 +244,125 @@ export class Storage {
 		} catch (error) {
 			console.error('[Storage] Failed to clear all tasks:', error);
 			throw new Error(`Failed to clear all tasks: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	// ===========================================================================================
+	// INTERVENTION STORAGE METHODS
+	// ===========================================================================================
+
+	/**
+	 * Save an intervention to storage
+	 * @throws Error if the intervention cannot be saved
+	 */
+	static async saveIntervention(intervention: Intervention): Promise<void> {
+		try {
+			await this.ensureDirectoryExists(INTERVENTIONS_DIR);
+			const filePath = path.join(INTERVENTIONS_DIR, `${intervention.id}.json`);
+			await fs.promises.writeFile(filePath, JSON.stringify(intervention, null, 2), 'utf8');
+		} catch (error) {
+			console.error(`[Storage] Failed to save intervention ${intervention.id}:`, error);
+			throw new Error(
+				`Failed to save intervention ${intervention.id}: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	}
+
+	/**
+	 * Load an intervention by ID
+	 * @returns The intervention if found, null otherwise
+	 * @throws Error if the intervention file exists but cannot be read or parsed
+	 */
+	static async loadIntervention(interventionId: string): Promise<Intervention | null> {
+		try {
+			const filePath = path.join(INTERVENTIONS_DIR, `${interventionId}.json`);
+			const data = await fs.promises.readFile(filePath, 'utf8');
+			return JSON.parse(data) as Intervention;
+		} catch (error: any) {
+			if (error.code === 'ENOENT') {
+				return null;
+			}
+			console.error(`[Storage] Failed to load intervention ${interventionId}:`, error);
+			throw new Error(
+				`Failed to load intervention ${interventionId}: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	}
+
+	/**
+	 * List all interventions
+	 * @returns Array of all interventions in storage
+	 * @throws Error if interventions cannot be read
+	 */
+	static async listInterventions(): Promise<Intervention[]> {
+		try {
+			await this.ensureDirectoryExists(INTERVENTIONS_DIR);
+			const files = await fs.promises.readdir(INTERVENTIONS_DIR);
+			const jsonFiles = files.filter(f => f.endsWith('.json'));
+
+			const interventions = await Promise.all(
+				jsonFiles.map(async file => {
+					const data = await fs.promises.readFile(path.join(INTERVENTIONS_DIR, file), 'utf8');
+					return JSON.parse(data) as Intervention;
+				})
+			);
+
+			return interventions;
+		} catch (error) {
+			console.error('[Storage] Failed to list interventions:', error);
+			throw new Error(`Failed to list interventions: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	/**
+	 * Delete an intervention from storage
+	 * @throws Error if the intervention cannot be deleted (except ENOENT which is ignored)
+	 */
+	static async deleteIntervention(interventionId: string): Promise<void> {
+		try {
+			const filePath = path.join(INTERVENTIONS_DIR, `${interventionId}.json`);
+			await fs.promises.unlink(filePath);
+		} catch (error: any) {
+			if (error.code === 'ENOENT') {
+				// File doesn't exist, which is fine for delete
+				return;
+			}
+			console.error(`[Storage] Failed to delete intervention ${interventionId}:`, error);
+			throw new Error(
+				`Failed to delete intervention ${interventionId}: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	}
+
+	/**
+	 * Find interventions by task ID
+	 * @returns Array of interventions for the specified task
+	 */
+	static async findInterventionsByTaskId(taskId: string): Promise<Intervention[]> {
+		const allInterventions = await this.listInterventions();
+		return allInterventions.filter(intervention => intervention.taskId === taskId);
+	}
+
+	/**
+	 * Find interventions by status
+	 * @returns Array of interventions with the specified status
+	 */
+	static async findInterventionsByStatus(status: InterventionStatus): Promise<Intervention[]> {
+		const allInterventions = await this.listInterventions();
+		return allInterventions.filter(intervention => intervention.status === status);
+	}
+
+	/**
+	 * Check if an intervention exists in storage
+	 * @returns true if the intervention file exists, false otherwise
+	 */
+	static async interventionExists(interventionId: string): Promise<boolean> {
+		try {
+			const filePath = path.join(INTERVENTIONS_DIR, `${interventionId}.json`);
+			await fs.promises.access(filePath);
+			return true;
+		} catch (error) {
+			return false;
 		}
 	}
 }

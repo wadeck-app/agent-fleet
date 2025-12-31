@@ -10,6 +10,7 @@
  * - Flow execution orchestration
  */
 import type { ChildProcess } from 'child_process';
+import { execSync } from 'child_process';
 import dotenv from 'dotenv';
 import { type FlowExecutionOptions, FlowExecutor } from 'flow-engine/executor/FlowExecutor';
 import { FlowRegistry } from 'flow-engine/registry/FlowRegistry';
@@ -17,7 +18,7 @@ import type { FlowMetadata, Workspace } from 'flow-engine/types';
 import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import * as yaml from 'js-yaml';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import * as path from 'path';
 import { getOrchestratorWsUrl } from 'shared-common/PortCalculator';
 import type { Shutdownable } from 'shared-common/Shutdownable';
@@ -200,7 +201,6 @@ export class FlowWorker implements Shutdownable {
 	 */
 	private detectGitRemoteSync(): string | null {
 		try {
-			const { execSync } = require('child_process');
 			const remoteUrl = execSync('git remote get-url origin', {
 				cwd: this.projectRoot,
 				encoding: 'utf-8',
@@ -221,12 +221,37 @@ export class FlowWorker implements Shutdownable {
 	}
 
 	/**
+	 * Synchronously detect current git branch
+	 * Returns the branch name or null if not in a git repository
+	 */
+	private detectGitBranchSync(): string | null {
+		try {
+			console.log(`${this.logPrefix()} Detecting git branch in: ${this.projectRoot}`);
+			const branch = execSync('git branch --show-current', {
+				cwd: this.projectRoot,
+				encoding: 'utf-8',
+				stdio: ['pipe', 'pipe', 'ignore'], // Suppress stderr
+			}).trim();
+
+			console.log(`${this.logPrefix()} Git command result: "${branch}" (length: ${branch.length})`);
+			return branch || null;
+		} catch (error) {
+			// Not in a git repository or git command failed
+			console.error(`${this.logPrefix()} Git detection failed:`, (error as Error).message);
+			return null;
+		}
+	}
+
+	/**
 	 * Send WORKER_READY message with project info and available flows
 	 */
 	private sendWorkerReady(): void {
 		this.projectId = this.detectProjectId();
 		const workspacePath = this.projectRoot;
 		const availableFlows = this.buildFlowMetadata();
+		const gitBranch = this.detectGitBranchSync();
+
+		console.log(`${this.logPrefix()} Detected git branch: ${gitBranch || 'null'} for workspace: ${workspacePath}`);
 
 		this.sendMessage(
 			createW2OMessage(W2OMessageType.WORKER_READY, {
@@ -234,6 +259,7 @@ export class FlowWorker implements Shutdownable {
 				projectId: this.projectId,
 				workspacePath,
 				availableFlows,
+				gitBranch: gitBranch || undefined, // Only send if detected
 			})
 		);
 	}
@@ -541,27 +567,32 @@ export class FlowWorker implements Shutdownable {
 	 * This polls the flow registry to detect changes and sends FLOWS_UPDATED
 	 */
 	private setupFlowHotReload(): void {
-		// Store initial flow state
-		let lastFlowIds = new Set(this.flowRegistry.getFlowIds());
+		// Store initial flow state with hashes to detect content changes
+		let lastFlowState = new Map<string, string>(); // flowId → hash
+		this.buildFlowMetadata().forEach(flow => {
+			lastFlowState.set(flow.id, flow.hash);
+		});
 
 		// Poll every 2 seconds to detect changes
 		setInterval(() => {
-			const currentFlowIds = new Set(this.flowRegistry.getFlowIds());
+			// Build current flow state with hashes
+			const currentFlowState = new Map<string, string>();
+			const updatedFlows = this.buildFlowMetadata();
+			updatedFlows.forEach(flow => {
+				currentFlowState.set(flow.id, flow.hash);
+			});
 
 			// Check if flows have changed
-			const added = [...currentFlowIds].filter(id => !lastFlowIds.has(id));
-			const removed = [...lastFlowIds].filter(id => !currentFlowIds.has(id));
+			const added = [...currentFlowState.keys()].filter(id => !lastFlowState.has(id));
+			const removed = [...lastFlowState.keys()].filter(id => !currentFlowState.has(id));
+			const updated = [...currentFlowState.keys()].filter(
+				id => lastFlowState.has(id) && lastFlowState.get(id) !== currentFlowState.get(id)
+			);
 
-			if (added.length > 0 || removed.length > 0) {
-				console.log(`${this.logPrefix()} Flows changed - added: ${added.length}, removed: ${removed.length}`);
-
-				// Build updated flow metadata
-				const updatedFlows = this.buildFlowMetadata();
-
-				// Detect which flows were updated (same ID but different hash)
-				const updated: string[] = [];
-				// For now, we'll skip detailed update detection and just mark as updated
-				// This could be improved by storing previous hashes
+			if (added.length > 0 || removed.length > 0 || updated.length > 0) {
+				console.log(
+					`${this.logPrefix()} Flows changed - added: ${added.length}, removed: ${removed.length}, updated: ${updated.length}`
+				);
 
 				// Send FLOWS_UPDATED message
 				this.sendFlowsUpdated(updatedFlows, {
@@ -571,7 +602,7 @@ export class FlowWorker implements Shutdownable {
 				});
 
 				// Update our snapshot
-				lastFlowIds = currentFlowIds;
+				lastFlowState = currentFlowState;
 			}
 		}, 2000); // Poll every 2 seconds
 	}
@@ -592,7 +623,7 @@ export class FlowWorker implements Shutdownable {
 
 	/**
 	 * Build flow metadata for all loaded flows
-	 * Metadata includes version and computed hash for each flow
+	 * Metadata includes version, computed hash, and validation state for each flow
 	 * @returns Array of flow metadata objects
 	 */
 	public buildFlowMetadata(): FlowMetadata[] {
@@ -600,6 +631,11 @@ export class FlowWorker implements Shutdownable {
 
 		return flows.map(flow => {
 			const hash = this.flowRegistry.computeFlowHash(flow);
+			const validationResult = this.flowRegistry.getFlowValidationResult(flow.id);
+
+			// Extract errors and warnings separately
+			const errors = validationResult?.issues.filter(i => i.severity === 'error') || [];
+			const warnings = validationResult?.issues.filter(i => i.severity === 'warning') || [];
 
 			return {
 				id: flow.id,
@@ -610,6 +646,11 @@ export class FlowWorker implements Shutdownable {
 				inputs: flow.inputs,
 				workspace: flow.workspace,
 				statusTransitions: flow.statusTransitions,
+
+				// Validation state
+				isValid: validationResult?.valid ?? true, // Default to valid if not validated
+				validationErrors: errors.length > 0 ? errors : undefined,
+				validationWarnings: warnings.length > 0 ? warnings : undefined,
 			};
 		});
 	}
@@ -652,6 +693,19 @@ export class FlowWorker implements Shutdownable {
 		const flow = this.flowRegistry.getFlow(task.flowId);
 		if (!flow) {
 			const error = `Flow '${task.flowId}' not found in registry`;
+			console.error(`${this.logPrefix()} ${error}`);
+			throw new Error(error);
+		}
+
+		// Check if flow is valid before execution (defense in depth)
+		const validationResult = this.flowRegistry.getFlowValidationResult(task.flowId);
+		if (validationResult && !validationResult.valid) {
+			const errorMessages = validationResult.issues
+				.filter(i => i.severity === 'error')
+				.map(i => `  - ${i.message}${i.location?.stepId ? ` (at step: ${i.location.stepId})` : ''}`)
+				.join('\n');
+
+			const error = `Cannot execute flow '${task.flowId}': Flow has validation errors:\n${errorMessages}`;
 			console.error(`${this.logPrefix()} ${error}`);
 			throw new Error(error);
 		}
@@ -1035,7 +1089,11 @@ if (isMainModule) {
 
 	// Parse project root from CLI args or environment variable
 	const projectRootArg = process.argv.find(arg => arg.startsWith('--project-root='));
-	const projectRoot = projectRootArg ? projectRootArg.split('=')[1] : process.env.PROJECT_ROOT || process.cwd();
+	const projectRootRelative = projectRootArg
+		? projectRootArg.split('=')[1]
+		: process.env.PROJECT_ROOT || process.cwd();
+	// Always resolve to absolute path
+	const projectRoot = resolve(projectRootRelative);
 
 	const worker = new FlowWorker(undefined, projectRoot, interactive, preferredWorkerId, enableUI);
 

@@ -13,13 +13,24 @@
 			// TODO move into framework or app
 			"@transport/*": ["./src/transport/*"],
 			"@shared": ["../shared-frontend-backend/src/index.ts"],
-			"@shared/*": ["../shared-frontend-backend/src/*"]
+			"@shared/*": ["../shared-frontend-backend/src/*"],
+			// Monorepo package paths (matching vite.config.ts aliases)
+			"flow-engine/*": ["../flow-engine/src/*"],
+			"shared-orch-worker/*": ["../shared-orch-worker/src/*"],
+			"shared-common/*": ["../shared-common/src/*"],
+			"test-utils/*": ["../test-utils/src/*"]
 		}
 	},
 	"include": ["src/**/*"],
 	"references": [
 		{
 			"path": "../shared-frontend-backend"
+		},
+		{
+			"path": "../flow-engine"
+		},
+		{
+			"path": "../shared-orch-worker"
 		}
 	]
 }

@@ -10,12 +10,12 @@ export function applyDagreLayout(nodes: FlowNode[], edges: FlowEdge[]): FlowNode
 
 	// Configure graph with larger spacing to avoid edge overlaps and node crossings
 	dagreGraph.setGraph({
-		rankdir: 'TB', // Top to Bottom
-		nodesep: 200, // Horizontal spacing between nodes (increased for better edge routing)
-		ranksep: 250, // Vertical spacing between ranks (increased to avoid crossings)
-		edgesep: 100, // Spacing between edges (increased)
+		rankdir: 'LR', // Left to Right (horizontal flow for better input/output visibility)
+		nodesep: 150, // Vertical spacing between nodes in same rank
+		ranksep: 300, // Horizontal spacing between ranks (increased for horizontal flow)
+		edgesep: 80, // Spacing between edges
 		ranker: 'network-simplex', // Use better ranking algorithm
-		marginx: 50, // Margin on x-axis
+		marginx: 100, // Margin on x-axis (more space horizontally)
 		marginy: 50, // Margin on y-axis
 	});
 

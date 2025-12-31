@@ -2,6 +2,8 @@ import { createTypedFetch } from '@framework/api/api-base';
 import { TASKS_API_ROUTES } from '@shared/api/tasks.contract';
 import type {
 	CreateTask,
+	PaginatedLogsQuery,
+	PaginatedLogsResponse,
 	Task,
 	TasksData,
 	TasksListQuery,
@@ -32,6 +34,20 @@ export const tasksApi = {
 	 */
 	getTasksList: (query: TasksListQuery): Promise<TasksListResponse> => {
 		return typedFetch('GET', '/api/tasks/', { query }) as Promise<TasksListResponse>;
+	},
+
+	/**
+	 * Get a single task by ID with full flowResult including trace
+	 */
+	getTaskById: (id: string): Promise<Task> => {
+		return typedFetch('GET', '/api/tasks/:id', { params: { id } });
+	},
+
+	/**
+	 * Get paginated logs for a task
+	 */
+	getTaskLogs: (id: string, query: PaginatedLogsQuery): Promise<PaginatedLogsResponse> => {
+		return typedFetch('GET', '/api/tasks/:id/logs', { params: { id }, query });
 	},
 
 	createTask: (body: CreateTask): Promise<Task> => {

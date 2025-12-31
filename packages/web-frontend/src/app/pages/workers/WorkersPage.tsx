@@ -81,11 +81,19 @@ export function WorkersPage() {
         md:grid-cols-5
       `}
 					>
-						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
+						<div
+							className={`
+        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
+      `}
+						>
 							<div className="text-sm font-medium text-muted-foreground">Total</div>
 							<div className="text-2xl font-bold">{data.summary.total}</div>
 						</div>
-						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
+						<div
+							className={`
+        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
+      `}
+						>
 							<div className="text-sm font-medium text-muted-foreground">Connected</div>
 							<div
 								className={`
@@ -96,7 +104,11 @@ export function WorkersPage() {
 								{data.summary.connected}
 							</div>
 						</div>
-						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
+						<div
+							className={`
+        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
+      `}
+						>
 							<div className="text-sm font-medium text-muted-foreground">Idle</div>
 							<div
 								className={`
@@ -107,7 +119,11 @@ export function WorkersPage() {
 								{data.summary.idle}
 							</div>
 						</div>
-						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
+						<div
+							className={`
+        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
+      `}
+						>
 							<div className="text-sm font-medium text-muted-foreground">Busy</div>
 							<div
 								className={`
@@ -118,7 +134,11 @@ export function WorkersPage() {
 								{data.summary.busy}
 							</div>
 						</div>
-						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
+						<div
+							className={`
+        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
+      `}
+						>
 							<div className="text-sm font-medium text-muted-foreground">Avg Load</div>
 							<div className="text-2xl font-bold">{data.summary.avgLoad}%</div>
 						</div>

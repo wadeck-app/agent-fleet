@@ -13,6 +13,7 @@ export const TaskStatusSchema = z.enum([
 	'prioritizing',
 	'todo',
 	'in_progress',
+	'awaiting_user',
 	'testing',
 	'review',
 	'reviewing',
@@ -30,6 +31,36 @@ export const TaskPrioritySchema = z.enum(['low', 'medium', 'high', 'urgent']);
 
 /**
  * Individual task schema
+ */
+/**
+ * Log level enum
+ */
+export const LogLevelSchema = z.enum(['debug', 'info', 'warning', 'error']);
+
+/**
+ * Individual log entry (from FlowTrace step)
+ */
+export const LogEntrySchema = z.object({
+	/** Unique log entry ID (stepId + sequence) */
+	id: z.string(),
+	/** Timestamp (Unix ms) */
+	timestamp: z.number(),
+	/** Log level */
+	level: LogLevelSchema,
+	/** Log message */
+	message: z.string(),
+	/** Step ID this log belongs to */
+	stepId: z.string(),
+	/** Step name */
+	stepName: z.string(),
+	/** Step type */
+	stepType: z.enum(['model', 'script', 'subflow', 'constant']),
+	/** Optional metadata (prompt, response, stdout, stderr, etc.) */
+	metadata: z.record(z.any()).optional(),
+});
+
+/**
+ * Task schema with full flowResult including trace
  */
 export const TaskSchema = z.object({
 	id: z.string(),
@@ -50,6 +81,8 @@ export const TaskSchema = z.object({
 		.object({
 			status: z.enum(['completed', 'failed']),
 			error: z.string().optional(),
+			outputs: z.record(z.any()).optional(),
+			trace: z.any().optional(), // Full FlowTrace object
 		})
 		.optional(),
 });
@@ -109,6 +142,39 @@ export const TasksListResponseSchema = z.object({
 		.optional(),
 });
 
+/**
+ * Paginated logs query parameters
+ */
+export const PaginatedLogsQuerySchema = z.object({
+	/** Cursor for pagination (step index) */
+	cursor: z.coerce.number().int().min(0).optional(),
+	/** Page size (max 500 for large logs) */
+	limit: z.coerce.number().int().positive().max(500).default(100),
+	/** Filter by log level */
+	level: LogLevelSchema.optional(),
+	/** Search query (matches message content) */
+	search: z.string().optional(),
+});
+
+/**
+ * Paginated logs response
+ */
+export const PaginatedLogsResponseSchema = z.object({
+	/** Log entries */
+	logs: z.array(LogEntrySchema),
+	/** Next cursor for pagination (null if no more logs) */
+	nextCursor: z.number().nullable(),
+	/** Total count of logs (for UI display) */
+	total: z.number(),
+	/** Whether the task is still running (for real-time updates) */
+	isRunning: z.boolean(),
+});
+
+export type LogLevel = z.infer<typeof LogLevelSchema>;
+export type LogEntry = z.infer<typeof LogEntrySchema>;
+export type PaginatedLogsQuery = z.infer<typeof PaginatedLogsQuerySchema>;
+export type PaginatedLogsResponse = z.infer<typeof PaginatedLogsResponseSchema>;
+
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 export type TaskPriority = z.infer<typeof TaskPrioritySchema>;
 export type Task = z.infer<typeof TaskSchema>;
@@ -154,6 +220,13 @@ export const TASKS_API_ROUTES = defineRoutes({
 		DELETE: {
 			params: z.object({ id: z.string() }),
 			response: z.object({ success: z.boolean() }),
+		},
+	},
+	'/api/tasks/:id/logs': {
+		GET: {
+			params: z.object({ id: z.string() }),
+			query: PaginatedLogsQuerySchema,
+			response: PaginatedLogsResponseSchema,
 		},
 	},
 });

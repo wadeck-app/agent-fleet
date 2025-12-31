@@ -1,4 +1,5 @@
 import type { DashboardData } from '../api/dashboard.contract';
+import type { Intervention } from '../api/interventions.contract';
 import type { Task, TasksData } from '../api/tasks.contract';
 import type { Worker, WorkersData } from '../api/workers.contract';
 import type { Workspace } from '../api/workspaces.contract';
@@ -95,6 +96,27 @@ export interface BusinessEvents {
 
 	/** Workers data updated (aggregate) - replaces direct orchestrator WebSocket */
 	'b2f:workers:updated': WorkersData;
+
+	/** Workspaces data updated (aggregate) */
+	'b2f:workspaces:updated': Workspace[];
+
+	/** Interventions data updated (aggregate) */
+	'b2f:interventions:updated': Intervention[];
+
+	/** Intervention created */
+	'b2f:intervention:created': Intervention;
+
+	/** Intervention updated */
+	'b2f:intervention:updated': Intervention;
+
+	/** Intervention answered */
+	'b2f:intervention:answered': Intervention;
+
+	/** Intervention timeout */
+	'b2f:intervention:timeout': Intervention;
+
+	/** Intervention cancelled */
+	'b2f:intervention:cancelled': Intervention;
 }
 
 /**

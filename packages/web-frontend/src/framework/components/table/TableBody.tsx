@@ -23,6 +23,7 @@ export interface TableBodyProps<T> {
 	getRowClassName?: (item: T) => string;
 	renderActions?: (item: T, isEditing: boolean) => ReactNode;
 	onToggleSelection: (id: string, index: number, event: React.ChangeEvent<HTMLInputElement>) => void;
+	onRowClick?: (item: T) => void;
 	/** Number of skeleton rows to display during initial loading (defaults to 10) */
 	skeletonRowCount?: number;
 }
@@ -44,6 +45,7 @@ export function TableBody<T>({
 	getRowClassName,
 	renderActions,
 	onToggleSelection,
+	onRowClick,
 	skeletonRowCount = 10,
 }: TableBodyProps<T>) {
 	// Initial loading state (show skeleton rows)
@@ -124,6 +126,7 @@ export function TableBody<T>({
 						itemId={id}
 						renderActions={renderActions}
 						onToggleSelection={onToggleSelection}
+						onRowClick={onRowClick}
 					/>
 				);
 			})}

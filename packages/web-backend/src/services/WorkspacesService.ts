@@ -1,11 +1,17 @@
+import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
+
 import type {
+	UpdateWorkspaceDto,
 	Workspace,
 	WorkspacesData,
 	WorkspacesListQuery,
 	WorkspacesListResponse,
 } from '@app/shared/api/workspaces.contract';
+import { B2F_WORKSPACES_UPDATED, B2F_WORKSPACE_UPDATED } from '@app/shared/transport';
 
+import type { WorkspaceMetadataRepository } from '../repositories/WorkspaceMetadataRepository';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
+import { WorkspaceMapper } from './WorkspaceMapper';
 
 /**
  * ===========================================================================================
@@ -39,78 +45,178 @@ import type { EventBroadcaster } from '../transport/EventBroadcaster';
  */
 
 export class WorkspacesService {
-	constructor(private readonly eventBroadcaster: EventBroadcaster) {}
+	constructor(
+		private readonly eventBroadcaster: EventBroadcaster,
+		private readonly orchestratorWrapper: OrchestratorWrapper,
+		private readonly metadataRepository: WorkspaceMetadataRepository
+	) {
+		// Configure metadata file watcher to emit B2F_WORKSPACES_UPDATED on changes
+		this.metadataRepository.setChangeCallback((workspacePath: string) => {
+			console.log(`[WorkspacesService] Metadata changed for workspace: ${workspacePath}`);
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			this.eventBroadcaster.broadcast(B2F_WORKSPACES_UPDATED, {} as any);
+		});
+	}
 	/**
-	 * Get workspaces data
-	 * MVP: Returns mock data since orchestrator doesn't have workspaces API yet
+	 * Deduplicate worker workspaces by path (multiple workers can work in same workspace)
+	 */
+	private deduplicateWorkspaces(
+		workerWorkspaces: Array<{
+			workerId: string;
+			workspacePath: string;
+			projectId: string;
+			connectedAt: string;
+		}>
+	): Array<{
+		workerId: string;
+		workspacePath: string;
+		projectId: string;
+		connectedAt: string;
+	}> {
+		const pathMap = new Map<
+			string,
+			{
+				workerId: string;
+				workspacePath: string;
+				projectId: string;
+				connectedAt: string;
+			}
+		>();
+
+		for (const workspace of workerWorkspaces) {
+			const existing = pathMap.get(workspace.workspacePath);
+			// Keep the one with most recent connectedAt
+			if (!existing || workspace.connectedAt > existing.connectedAt) {
+				pathMap.set(workspace.workspacePath, workspace);
+			}
+		}
+
+		return Array.from(pathMap.values());
+	}
+
+	/**
+	 * Get workspaces data with summary statistics
 	 */
 	async getWorkspacesData(): Promise<WorkspacesData> {
-		console.log('[WorkspacesService] Generating mock workspaces data...');
+		console.log('[WorkspacesService] Fetching workspaces from connected workers...');
 
-		// Generate synthetic workspaces for MVP
-		const workspaces = this.generateMockWorkspaces();
+		try {
+			// Fetch workspaces from connected workers
+			const workerWorkspaces = await this.orchestratorWrapper.getConnectedWorkersWorkspaces();
 
-		// Calculate summary statistics
-		const summary = this.calculateSummary(workspaces);
+			// Deduplicate by workspace path (multiple workers can work in same workspace)
+			const uniqueWorkspaces = this.deduplicateWorkspaces(workerWorkspaces);
 
-		const workspacesData: WorkspacesData = {
-			timestamp: new Date().toISOString(),
-			summary,
-			workspaces,
-		};
+			// Fetch metadata for all workspace paths
+			const workspacePaths = uniqueWorkspaces.map(w => w.workspacePath);
+			const metadataMap = await this.metadataRepository.getMetadataForWorkspaces(workspacePaths);
 
-		return workspacesData;
+			// Map to API format
+			const workspaces = WorkspaceMapper.mapWorkerWorkspacesToApi(uniqueWorkspaces, metadataMap);
+
+			// Calculate summary statistics
+			const summary = this.calculateSummary(workspaces);
+
+			return {
+				timestamp: new Date().toISOString(),
+				summary,
+				workspaces,
+			};
+		} catch (error) {
+			console.error('[WorkspacesService] Failed to fetch workspaces:', error);
+			// Return empty data on error
+			return {
+				timestamp: new Date().toISOString(),
+				summary: {
+					total: 0,
+					active: 0,
+					locked: 0,
+					cleaning: 0,
+					errorCount: 0,
+				},
+				workspaces: [],
+			};
+		}
 	}
 
 	/**
 	 * Get workspaces list with pagination, sorting, and search support
-	 * (New Data2 architecture)
+	 * (Data2 architecture)
 	 */
 	async getWorkspacesList(query: WorkspacesListQuery): Promise<WorkspacesListResponse> {
-		console.log('[WorkspacesService] Fetching workspaces list...');
+		console.log('[WorkspacesService] Fetching workspaces list from connected workers...');
 
-		// Generate mock workspaces
-		let workspaces = this.generateMockWorkspaces();
+		try {
+			// Fetch workspaces from connected workers
+			const workerWorkspaces = await this.orchestratorWrapper.getConnectedWorkersWorkspaces();
 
-		// Apply domain filters (status, mode)
-		if (query.status) {
-			workspaces = workspaces.filter(w => w.status === query.status);
+			// Deduplicate by workspace path (multiple workers can work in same workspace)
+			const uniqueWorkspaces = this.deduplicateWorkspaces(workerWorkspaces);
+
+			// Fetch metadata for all workspace paths
+			const workspacePaths = uniqueWorkspaces.map(w => w.workspacePath);
+			const metadataMap = await this.metadataRepository.getMetadataForWorkspaces(workspacePaths);
+
+			// Start watching metadata files for all connected workspaces
+			for (const workspacePath of workspacePaths) {
+				this.metadataRepository.startWatching(workspacePath);
+			}
+
+			// Map to API format
+			let workspaces = WorkspaceMapper.mapWorkerWorkspacesToApi(uniqueWorkspaces, metadataMap);
+
+			// Apply domain filters (status, mode)
+			if (query.status) {
+				workspaces = workspaces.filter(w => w.status === query.status);
+			}
+			if (query.mode) {
+				workspaces = workspaces.filter(w => w.mode === query.mode);
+			}
+
+			// Apply search if provided
+			if (query.search) {
+				workspaces = this.applySearch(workspaces, query.search);
+			}
+
+			// Apply sorting if provided
+			if (query.sortBy && query.sortOrder) {
+				workspaces = this.applySorting(workspaces, query.sortBy, query.sortOrder);
+			}
+
+			// Apply pagination
+			const page = query.page || 1;
+			const pageSize = query.pageSize || 10;
+			const total = workspaces.length;
+			const totalPages = Math.ceil(total / pageSize);
+			const start = (page - 1) * pageSize;
+			const paginatedWorkspaces = workspaces.slice(start, start + pageSize);
+
+			return {
+				items: paginatedWorkspaces,
+				pagination: {
+					total,
+					page,
+					pageSize,
+					totalPages,
+				},
+			};
+		} catch (error) {
+			console.error('[WorkspacesService] Failed to fetch workspaces list:', error);
+			// Return empty list on error
+			return {
+				items: [],
+				pagination: {
+					total: 0,
+					page: query.page || 1,
+					pageSize: query.pageSize || 10,
+					totalPages: 0,
+				},
+			};
 		}
-		if (query.mode) {
-			workspaces = workspaces.filter(w => w.mode === query.mode);
-		}
-
-		// Apply search if provided
-		if (query.search) {
-			workspaces = this.applySearch(workspaces, query.search);
-		}
-
-		// Apply sorting if provided
-		if (query.sortBy && query.sortOrder) {
-			workspaces = this.applySorting(workspaces, query.sortBy, query.sortOrder);
-		}
-
-		// Apply pagination
-		const page = query.page || 1;
-		const pageSize = query.pageSize || 10;
-		const total = workspaces.length;
-		const totalPages = Math.ceil(total / pageSize);
-		const start = (page - 1) * pageSize;
-		const paginatedWorkspaces = workspaces.slice(start, start + pageSize);
-
-		return {
-			items: paginatedWorkspaces,
-			pagination: {
-				total,
-				page,
-				pageSize,
-				totalPages,
-			},
-		};
 	}
 
 	/**
-	 * Apply search filter across workspace fields
+	 * Apply search filter across workspace fields (including metadata)
 	 */
 	private applySearch(workspaces: Workspace[], searchQuery: string): Workspace[] {
 		const lowerQuery = searchQuery.toLowerCase().trim();
@@ -122,7 +228,9 @@ export class WorkspacesService {
 				w.path.toLowerCase().includes(lowerQuery) ||
 				w.mode.toLowerCase().includes(lowerQuery) ||
 				w.status.toLowerCase().includes(lowerQuery) ||
-				w.gitBranch?.toLowerCase().includes(lowerQuery)
+				w.gitBranch?.toLowerCase().includes(lowerQuery) ||
+				w.name?.toLowerCase().includes(lowerQuery) ||
+				w.description?.toLowerCase().includes(lowerQuery)
 		);
 	}
 
@@ -150,123 +258,6 @@ export class WorkspacesService {
 
 			return isDescending ? -comparison : comparison;
 		});
-	}
-
-	/**
-	 * Generate mock workspace data for MVP
-	 * TODO: Replace with real orchestrator API calls when available
-	 */
-	private generateMockWorkspaces(): Workspace[] {
-		const now = new Date();
-		const workspaces: Workspace[] = [];
-
-		// Workspace 1: Active development workspace with git changes
-		workspaces.push({
-			id: 'ws-dev-001',
-			path: 'C:\\Workspace_Tooling\\agent-fleet\\workspaces\\dev-001',
-			mode: 'development',
-			tasksCount: 3,
-			gitBranch: 'feature/user-authentication',
-			status: 'active',
-			createdAt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
-			lastUsed: new Date(now.getTime() - 30 * 60 * 1000).toISOString(), // 30 min ago
-			gitStatus: {
-				ahead: 5,
-				behind: 0,
-				modified: 8,
-				untracked: 2,
-			},
-			activeTasks: ['task-001', 'task-002', 'task-003'],
-		});
-
-		// Workspace 2: Production workspace - locked
-		workspaces.push({
-			id: 'ws-prod-001',
-			path: 'C:\\Workspace_Tooling\\agent-fleet\\workspaces\\prod-001',
-			mode: 'production',
-			tasksCount: 0,
-			gitBranch: 'main',
-			status: 'locked',
-			createdAt: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days ago
-			lastUsed: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
-			gitStatus: {
-				ahead: 0,
-				behind: 0,
-				modified: 0,
-				untracked: 0,
-			},
-			activeTasks: [],
-		});
-
-		// Workspace 3: Staging workspace - active
-		workspaces.push({
-			id: 'ws-stage-001',
-			path: 'C:\\Workspace_Tooling\\agent-fleet\\workspaces\\stage-001',
-			mode: 'staging',
-			tasksCount: 2,
-			gitBranch: 'release/v1.2.0',
-			status: 'active',
-			createdAt: new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days ago
-			lastUsed: new Date(now.getTime() - 1 * 60 * 60 * 1000).toISOString(), // 1 hour ago
-			gitStatus: {
-				ahead: 2,
-				behind: 1,
-				modified: 3,
-				untracked: 0,
-			},
-			activeTasks: ['task-004', 'task-005'],
-		});
-
-		// Workspace 4: Development workspace - cleaning
-		workspaces.push({
-			id: 'ws-dev-002',
-			path: 'C:\\Workspace_Tooling\\agent-fleet\\workspaces\\dev-002',
-			mode: 'development',
-			tasksCount: 0,
-			gitBranch: 'feature/cleanup',
-			status: 'cleaning',
-			createdAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
-			lastUsed: new Date(now.getTime() - 10 * 60 * 1000).toISOString(), // 10 min ago
-			gitStatus: {
-				ahead: 0,
-				behind: 3,
-				modified: 0,
-				untracked: 0,
-			},
-		});
-
-		// Workspace 5: Development workspace - error state
-		workspaces.push({
-			id: 'ws-dev-003',
-			path: 'C:\\Workspace_Tooling\\agent-fleet\\workspaces\\dev-003',
-			mode: 'development',
-			tasksCount: 1,
-			gitBranch: 'feature/broken-build',
-			status: 'error',
-			createdAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days ago
-			lastUsed: new Date(now.getTime() - 5 * 60 * 60 * 1000).toISOString(), // 5 hours ago
-			gitStatus: {
-				ahead: 1,
-				behind: 0,
-				modified: 15,
-				untracked: 7,
-			},
-			activeTasks: ['task-006'],
-		});
-
-		// Workspace 6: Active development workspace without git branch
-		workspaces.push({
-			id: 'ws-dev-004',
-			path: 'C:\\Workspace_Tooling\\agent-fleet\\workspaces\\dev-004',
-			mode: 'development',
-			tasksCount: 4,
-			status: 'active',
-			createdAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
-			lastUsed: new Date(now.getTime() - 5 * 60 * 1000).toISOString(), // 5 min ago
-			activeTasks: ['task-007', 'task-008', 'task-009', 'task-010'],
-		});
-
-		return workspaces;
 	}
 
 	/**
@@ -337,26 +328,71 @@ export class WorkspacesService {
 	 */
 
 	/**
-	 * Update workspace (PLACEHOLDER - not implemented)
-	 * When implemented, emit 'b2f:workspace:updated' event
-	 *
-	 * @example
-	 * ```typescript
-	 * async updateWorkspace(id: string, data: UpdateWorkspaceDto): Promise<Workspace> {
-	 *   try {
-	 *     const workspace = await this.repository.updateWorkspace(id, data);
-	 *
-	 *     // Emit event AFTER successful update
-	 *     this.eventBroadcaster.broadcast('b2f:workspace:updated', workspace);
-	 *
-	 *     return workspace;
-	 *   } catch (error) {
-	 *     console.error('[WorkspacesService] Failed to update workspace:', error);
-	 *     throw error;
-	 *   }
-	 * }
-	 * ```
+	 * Update workspace metadata (name, description)
+	 * Emits 'b2f:workspace:updated' event after successful update
 	 */
+	async updateWorkspace(workspaceId: string, data: UpdateWorkspaceDto): Promise<Workspace> {
+		try {
+			// Find workspace by ID among connected workers
+			const workerWorkspaces = await this.orchestratorWrapper.getConnectedWorkersWorkspaces();
+
+			// For now, use workspaceId as the path identifier or match by metadata ID
+			// First, try to find by checking metadata IDs
+			const workspacePaths = workerWorkspaces.map(w => w.workspacePath);
+			const metadataMap = await this.metadataRepository.getMetadataForWorkspaces(workspacePaths);
+
+			let targetWorkspacePath: string | null = null;
+
+			// Check metadata IDs first
+			for (const [path, metadata] of metadataMap.entries()) {
+				if (metadata.id === workspaceId) {
+					targetWorkspacePath = path;
+					break;
+				}
+			}
+
+			// If not found in metadata, check generated IDs from paths
+			if (!targetWorkspacePath) {
+				for (const workerWorkspace of workerWorkspaces) {
+					const generatedId = WorkspaceMapper.generateIdFromPath(workerWorkspace.workspacePath);
+					if (generatedId === workspaceId) {
+						targetWorkspacePath = workerWorkspace.workspacePath;
+						break;
+					}
+				}
+			}
+
+			if (!targetWorkspacePath) {
+				throw new Error(`Workspace ${workspaceId} not found`);
+			}
+
+			// Update metadata
+			const metadata = await this.metadataRepository.upsertMetadata(targetWorkspacePath, {
+				name: data.name,
+				description: data.description,
+			});
+
+			// Start watching the metadata file if not already watching
+			this.metadataRepository.startWatching(targetWorkspacePath);
+
+			// Find the worker workspace info
+			const workerWorkspace = workerWorkspaces.find(w => w.workspacePath === targetWorkspacePath);
+			if (!workerWorkspace) {
+				throw new Error(`Workspace ${workspaceId} not found among connected workers`);
+			}
+
+			// Map to API format with updated metadata
+			const workspace = WorkspaceMapper.mapWorkerWorkspaceToApi(workerWorkspace, metadata);
+
+			// Emit event AFTER successful update
+			this.eventBroadcaster.broadcast(B2F_WORKSPACE_UPDATED, workspace);
+
+			return workspace;
+		} catch (error) {
+			console.error('[WorkspacesService] Failed to update workspace:', error);
+			throw error;
+		}
+	}
 
 	/**
 	 * Archive workspace (PLACEHOLDER - not implemented)

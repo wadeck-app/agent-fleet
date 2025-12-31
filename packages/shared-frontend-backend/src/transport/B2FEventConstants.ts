@@ -91,6 +91,13 @@ export const B2F_WORKER_STATUS = 'b2f:worker:status' as const;
 // WORKSPACE EVENTS
 // ===========================================================================================
 
+/**
+ * Workspaces data updated event (aggregate)
+ * Used for reactive updates of entire workspace list
+ * Emitted when workers connect/disconnect or workspace metadata changes
+ */
+export const B2F_WORKSPACES_UPDATED = 'b2f:workspaces:updated' as const;
+
 /** Workspace created event */
 export const B2F_WORKSPACE_CREATED = 'b2f:workspace:created' as const;
 
@@ -115,3 +122,28 @@ export const B2F_WORKSPACE_ARCHIVED = 'b2f:workspace:archived' as const;
 
 /** Dashboard data updated event */
 export const B2F_DASHBOARD_UPDATED = 'b2f:dashboard:updated' as const;
+
+// ===========================================================================================
+// INTERVENTION EVENTS
+// ===========================================================================================
+
+/**
+ * Interventions data updated event (aggregate)
+ * Used for reactive updates of entire intervention list
+ */
+export const B2F_INTERVENTIONS_UPDATED = 'b2f:interventions:updated' as const;
+
+/** Intervention created event */
+export const B2F_INTERVENTION_CREATED = 'b2f:intervention:created' as const;
+
+/** Intervention updated event */
+export const B2F_INTERVENTION_UPDATED = 'b2f:intervention:updated' as const;
+
+/** Intervention answered event */
+export const B2F_INTERVENTION_ANSWERED = 'b2f:intervention:answered' as const;
+
+/** Intervention timeout event */
+export const B2F_INTERVENTION_TIMEOUT = 'b2f:intervention:timeout' as const;
+
+/** Intervention cancelled event */
+export const B2F_INTERVENTION_CANCELLED = 'b2f:intervention:cancelled' as const;

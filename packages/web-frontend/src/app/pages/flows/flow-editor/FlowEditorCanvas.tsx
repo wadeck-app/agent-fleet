@@ -25,8 +25,10 @@ interface FlowEditorCanvasProps {
 	onEdgesChange: OnEdgesChange;
 	onConnect: OnConnect;
 	onNodeClick: NodeMouseHandler;
+	onEdgeClick: EdgeMouseHandler;
 	onPaneClick: () => void;
 	selectedNodeId: string | null;
+	selectedEdgeId: string | null;
 }
 
 export function FlowEditorCanvas({
@@ -36,7 +38,10 @@ export function FlowEditorCanvas({
 	onEdgesChange,
 	onConnect,
 	onNodeClick,
+	onEdgeClick,
 	onPaneClick,
+	selectedNodeId,
+	selectedEdgeId,
 }: FlowEditorCanvasProps) {
 	const onDragOver = useCallback((event: React.DragEvent) => {
 		event.preventDefault();
@@ -53,25 +58,20 @@ export function FlowEditorCanvas({
 		// For now, just prevent default behavior
 	}, []);
 
-	const onEdgesDelete: OnEdgesDelete = useCallback(
-		deletedEdges => {
-			console.log('[FlowEditorCanvas] Edges deleted:', deletedEdges);
-		},
-		[]
-	);
-
-	const onEdgeClick: EdgeMouseHandler = useCallback(
-		(_event, _edge) => {
-			// Deselect any selected node when an edge is clicked
-			onPaneClick();
-		},
-		[onPaneClick]
-	);
+	const onEdgesDelete: OnEdgesDelete = useCallback(deletedEdges => {
+		console.log('[FlowEditorCanvas] Edges deleted:', deletedEdges);
+	}, []);
 
 	return (
 		<ReactFlow
-			nodes={nodes}
-			edges={edges}
+			nodes={nodes.map(node => ({
+				...node,
+				selected: node.id === selectedNodeId,
+			}))}
+			edges={edges.map(edge => ({
+				...edge,
+				selected: edge.id === selectedEdgeId,
+			}))}
 			onNodesChange={onNodesChange}
 			onEdgesChange={onEdgesChange}
 			onConnect={onConnect}
@@ -86,7 +86,7 @@ export function FlowEditorCanvas({
 			fitView
 			edgesFocusable={true}
 			selectNodesOnDrag={false}
-			className="bg-muted/20 w-full h-full"
+			className="h-full w-full bg-muted/20"
 			deleteKeyCode="Delete"
 		>
 			<Background />
@@ -98,7 +98,7 @@ export function FlowEditorCanvas({
 					if (node.type === 'subflow') return 'hsl(var(--accent))';
 					return 'hsl(var(--muted))';
 				}}
-				className="!bg-card !border-border"
+				className="!border-border !bg-card"
 			/>
 		</ReactFlow>
 	);

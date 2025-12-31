@@ -113,6 +113,18 @@ export class WorkerWebSocketServer {
 		return this.connectionManager;
 	}
 
+	/**
+	 * Get workspaces from all connected workers
+	 */
+	getConnectedWorkspaces(): Array<{
+		workerId: string;
+		workspacePath: string;
+		projectId: string;
+		connectedAt: string;
+	}> {
+		return this.connectionManager.getConnectedWorkspaces();
+	}
+
 	async stop(): Promise<void> {
 		return new Promise(resolve => {
 			// Close all worker connections

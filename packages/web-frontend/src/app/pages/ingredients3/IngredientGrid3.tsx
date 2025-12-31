@@ -183,11 +183,7 @@ export function IngredientGrid3({
 
 	if (error && !isLoading) {
 		return (
-			<div
-				className={`
-     rounded-lg border border-destructive/50 bg-destructive/10 p-4
-   `}
-			>
+			<div className={`rounded-lg border border-destructive/50 bg-destructive/10 p-4`}>
 				<div className="flex items-center gap-2">
 					<AlertCircle className="h-5 w-5 text-destructive" />
 					<strong className="text-sm font-semibold text-destructive">Error:</strong>
@@ -263,10 +259,10 @@ export function IngredientGrid3({
 				{sortControl}
 				<div
 					className={`
-      grid grid-cols-1 gap-6
-      md:grid-cols-2
-      lg:grid-cols-3
-    `}
+       grid grid-cols-1 gap-6
+       md:grid-cols-2
+       lg:grid-cols-3
+     `}
 				>
 					{Array.from({ length: skeletonCount }).map((_, idx) => (
 						<Card key={idx} className="animate-pulse">

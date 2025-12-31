@@ -748,3 +748,672 @@ Agent: "Looking at the CSS variables, I see var(--card) might be transparent in 
 **When Discovered**: December 29, 2024 - User repeatedly had to correct visual issues with screenshots because agent kept saying "it's fixed" without verification. User explicitly requested this be added to lessons learned.
 
 **Remember**: Visual issues require visual verification. Code that looks correct might not render correctly.
+
+---
+
+## Flexbox Overflow Scrolling - Parent Must Have Explicit Height Constraint
+
+**Problem**: Using `overflow-auto` on a flex child doesn't create scrollbars even when content overflows. The container just expands to fit all content instead of staying constrained and scrolling.
+
+**Root Cause**: For `overflow` to work, the element must have a defined height. In flexbox layouts without explicit height constraints, flex containers expand to accommodate their content. Without a height limit, there's nothing to "overflow" from.
+
+**Wrong Approach** ❌:
+
+```tsx
+// Parent has no height constraint
+<div className="flex flex-col border-l bg-card">
+	<div className="flex-1 overflow-auto">
+		<pre>{longContent}</pre> {/* Container expands, no scroll */}
+	</div>
+</div>
+```
+
+**Correct Solution** ✅:
+
+```tsx
+// Parent establishes height constraint
+<div className="flex h-full flex-col border-l bg-card">
+	{' '}
+	{/* h-full = height: 100% */}
+	<div className="flex-1 overflow-auto">
+		<pre>{longContent}</pre> {/* Now scrolls because parent is constrained */}
+	</div>
+</div>
+```
+
+**Key Principles**:
+
+1. **Explicit height on parent**: Use `h-full`, `h-screen`, `h-[500px]`, etc. on the parent container
+2. **Flex child with overflow**: Child can use `flex-1` + `overflow-auto` to become scrollable
+3. **min-h-0 for nested flex**: Deep nesting may need `min-h-0` to allow shrinking
+4. **Height propagation**: The constraint must propagate from a parent that has defined height (viewport, fixed height, etc.)
+
+**Why This Happens**:
+
+- Default flex behavior: containers grow to fit content
+- Overflow requires constraint: "overflow from what boundary?"
+- Without height: no boundary exists, so content just expands the container
+- With height: boundary is defined, overflow can happen and scrollbar appears
+
+**Common Scenarios**:
+
+```tsx
+// Scenario 1: Full viewport height
+<div className="h-screen flex flex-col">  {/* Constraint from viewport */}
+  <div className="flex-1 overflow-auto">{content}</div>
+</div>
+
+// Scenario 2: Parent container with fixed height
+<div className="h-[600px] flex flex-col">  {/* Explicit constraint */}
+  <div className="flex-1 overflow-auto">{content}</div>
+</div>
+
+// Scenario 3: Nested in another flex container
+<div className="flex h-full flex-col">  {/* Gets height from parent */}
+  <div className="flex-1 flex flex-col min-h-0">  {/* min-h-0 allows shrinking */}
+    <div className="flex-1 overflow-auto">{content}</div>
+  </div>
+</div>
+```
+
+**Debugging Strategy**:
+
+1. Check if parent has explicit height (`h-full`, `h-screen`, fixed height)
+2. Verify height propagates from root (viewport → containers → overflow element)
+3. Use DevTools to inspect computed height (should not be `auto`)
+4. Look for `min-height: auto` preventing shrinking (add `min-h-0`)
+
+**Files Affected** (December 2024):
+
+- `packages/web-frontend/src/app/pages/flows/flow-editor/FlowEditorRightPanel.tsx` - Added `h-full` to root div to enable scrolling in YAML/Validation tabs
+
+**When Discovered**: December 30, 2024 - Multiple attempts to fix scroll in FlowEditorRightPanel failed until user identified the missing height constraint. The fix was simple (`h-full` on parent) but the diagnosis required understanding flexbox height propagation.
+
+**Related Pattern**: Similar to CSS Grid where `minmax(0, 1fr)` is needed to allow content to shrink below its intrinsic size.
+
+---
+
+## CSS Color Functions - Use `color-mix()` for Transparency with CSS Variables
+
+**Problem**: Using `hsl(var(--variable) / 0.4)` for transparency doesn't work when CSS variables are defined in `oklch()` or other non-HSL color spaces. The syntax assumes HSL format and breaks silently with other formats.
+
+**Root Cause**: The syntax `hsl(var(--variable) / alpha)` requires the variable to contain HSL values like `240 50% 50%`. When variables use `oklch()`, `rgb()`, or hex values, this syntax fails and often falls back to transparent or incorrect colors.
+
+**Wrong Approach** ❌:
+
+```css
+/* CSS variables defined in oklch */
+:root {
+	--muted: oklch(0.967 0.001 286.375);
+	--muted-foreground: oklch(0.552 0.016 285.938);
+}
+
+/* Trying to add transparency with hsl() */
+.scrollbar-track {
+	background: hsl(var(--muted) / 0.3); /* Doesn't work! */
+}
+
+.scrollbar-thumb {
+	background: hsl(var(--muted-foreground) / 0.4); /* Doesn't work! */
+}
+```
+
+**Correct Solution** ✅:
+
+```css
+/* Use color-mix() - works with ANY color format */
+.scrollbar-track {
+	background: color-mix(in srgb, var(--muted) 30%, transparent);
+}
+
+.scrollbar-thumb {
+	background: color-mix(in srgb, var(--muted-foreground) 40%, transparent);
+}
+
+.scrollbar-thumb:hover {
+	background: color-mix(in srgb, var(--muted-foreground) 60%, transparent);
+}
+```
+
+**Why `color-mix()` is Better**:
+
+1. **Format-agnostic**: Works with `oklch()`, `hsl()`, `rgb()`, `hex`, named colors
+2. **Explicit transparency**: Percentage clearly shows opacity level
+3. **Color space control**: Can specify interpolation space (`srgb`, `oklch`, `hsl`)
+4. **Future-proof**: Part of CSS Color Level 4 spec, widely supported
+5. **No assumptions**: Doesn't assume variable format
+
+**Browser Support**:
+
+- Chrome/Edge 111+ ✅
+- Firefox 113+ ✅
+- Safari 16.2+ ✅
+- Modern browsers only, but that's fine for most projects
+
+**Alternative for Older Browsers**:
+
+If you need to support older browsers, define separate variables with alpha:
+
+```css
+:root {
+	--muted: oklch(0.967 0.001 286.375);
+	--muted-30: oklch(0.967 0.001 286.375 / 0.3); /* With alpha */
+}
+
+.scrollbar-track {
+	background: var(--muted-30);
+}
+```
+
+**Common Mistakes**:
+
+- ❌ `hsl(var(--color) / 0.5)` when `--color` is `oklch()`
+- ❌ `rgba(var(--color), 0.5)` when `--color` is not RGB
+- ❌ Assuming all color variables are in the same format
+- ✅ Use `color-mix()` consistently for all transparency needs
+
+**Debugging**:
+
+If colors appear transparent or wrong:
+
+1. Check CSS variable definition format (`oklch`, `hsl`, `rgb`?)
+2. Inspect computed styles - does it show `rgba(0, 0, 0, 0)` (transparent)?
+3. Try `color-mix()` instead of format-specific functions
+4. Verify theme switching updates all color variables
+
+**Files Affected** (December 2024):
+
+- `packages/web-frontend/src/framework/styles/theme.css` - Changed scrollbar styles from `hsl(var(--muted) / 0.3)` to `color-mix(in srgb, var(--muted) 30%, transparent)`
+
+**When Discovered**: December 30, 2024 - Scrollbar colors didn't adapt to dark theme because `hsl()` syntax was incompatible with `oklch()` variables. User noticed scrollbar stayed light gray in dark mode despite theme variables being correct.
+
+**Related**: This is particularly important for projects using modern color spaces like `oklch()` which provide better color accuracy and wider gamut than `hsl()`.
+
+---
+
+## Check Existing Global Styles Before Creating New Utilities
+
+**Problem**: Adding new utility classes or styles without checking if similar functionality already exists globally. This creates duplication, inconsistency, and technical debt.
+
+**Root Cause**: Not reviewing the codebase's existing CSS architecture before adding new styles. Assuming that if a specific utility class doesn't exist, the styling must be added.
+
+**Wrong Approach** ❌:
+
+```javascript
+// tailwind.config.js - Adding new scrollbar utilities
+plugins: [
+	function ({ addUtilities }) {
+		addUtilities({
+			'.scrollbar-themed': {
+				'scrollbar-width': 'thin',
+				'scrollbar-color': '...',
+				// ... custom scrollbar styles
+			},
+		});
+	},
+];
+```
+
+**Meanwhile, in theme.css (already exists!)**:
+
+```css
+/* Global scrollbar styles already defined */
+::-webkit-scrollbar {
+	width: 12px;
+	height: 12px;
+}
+::-webkit-scrollbar-thumb {
+	background: color-mix(in srgb, var(--muted-foreground) 40%, transparent);
+	/* ... */
+}
+```
+
+**Correct Approach** ✅:
+
+1. **Search for existing styles** before adding new ones:
+
+```bash
+# Search for scrollbar-related styles
+grep -r "scrollbar" packages/web-frontend/src/**/*.css
+grep -r "::-webkit-scrollbar" packages/web-frontend/src/**/*.css
+```
+
+2. **Check common CSS files**:
+    - `src/index.css` - Main entry point
+    - `src/framework/styles/theme.css` - Theme variables and global styles
+    - `src/framework/styles/animations.css` - Animation utilities
+    - `tailwind.config.js` - Custom utilities
+
+3. **Understand the hierarchy**:
+    - Global styles apply automatically to all elements
+    - Element-specific classes override globals
+    - Only add new utilities if truly needed
+
+4. **Reuse and extend** instead of duplicating:
+
+```css
+/* If global styles exist but need adjustments */
+.special-scrollbar::-webkit-scrollbar-thumb {
+	/* Override specific property */
+	background: var(--primary);
+}
+```
+
+**Key Principles**:
+
+1. **Global first**: Check if functionality exists globally before adding utilities
+2. **Search before adding**: Use grep/search to find existing implementations
+3. **Consistency**: Use the same approach as the rest of the codebase
+4. **Document discoveries**: If you find good global styles, remember they exist
+
+**Common Global Style Locations**:
+
+- **Scrollbars**: Usually in `theme.css` or `globals.css`
+- **Animations**: `animations.css` or Tailwind config
+- **Typography**: `theme.css` base layer
+- **Resets**: `theme.css` or dedicated `reset.css`
+- **Dark mode**: Theme-specific CSS files or `:root`/`.dark` selectors
+
+**Prevention**:
+
+- Read project CSS architecture before adding styles
+- Check CSS import chain (`index.css` → what files are imported?)
+- Look for `::-webkit-*` pseudo-elements for browser-specific features
+- Search for similar selectors (scrollbar, selection, placeholder, etc.)
+
+**Files Affected** (December 2024):
+
+- Initially added `.scrollbar-themed` to `tailwind.config.js` (wrong)
+- Discovered existing scrollbar styles in `src/framework/styles/theme.css`
+- Removed duplicate utility, fixed existing global styles instead (correct)
+
+**When Discovered**: December 30, 2024 - User correctly challenged adding new scrollbar utilities: "attends, y a d'autres scroll bar sur l'application, regarde bien et reste cohérent stp pas d'accumulation de dette technique !!!" This led to discovering and fixing the existing global scrollbar styles.
+
+**Remember**: The best code is the code you don't have to write. Check if it exists first!
+
+## Workspace Synchronization: Workers Report to Orchestrator
+
+**Problem**: WorkspacesPage2 showed empty list even though workers were connected and working in workspaces.
+
+**Root Cause**: Each worker has its own local `WorkspaceManager`. The orchestrator's `WorkspaceManager` is empty because workers manage their own workspaces independently.
+
+**Solution - Worker-Reported Architecture**:
+
+1. Workers already send `workspacePath` and `projectId` in WORKER_READY message
+2. Orchestrator stores this info in `WebSocketConnectionManager.workers`
+3. Backend reads from `getConnectedWorkersWorkspaces()` instead of `WorkspaceManager`
+4. Metadata persisted in `<workspace>/.agent-fleet/workspace-metadata.json`
+
+**Key Implementation Details**:
+
+- **Workspace ID Generation**: SHA-256 hash of workspace path (first 16 chars)
+- **Metadata Storage**: File-based, not in-memory (survives restarts)
+- **Update Lookup**: Check both metadata IDs and path-generated IDs
+- **Relative Paths**: Workers report relative paths (e.g., "../.."), resolved by backend
+
+**Files Created**:
+
+- `packages/web-backend/src/services/WorkspaceMetadataFile.ts` - File I/O
+- `packages/web-backend/src/services/WorkspaceMapper.ts` - Transform WorkerWorkspace → API
+- `packages/web-backend/src/repositories/WorkspaceMetadataRepository.ts` - Refactored for files
+
+**Files Modified**:
+
+- `packages/orchestrator/src/websocket/WebSocketConnectionManager.ts` - Added getConnectedWorkspaces()
+- `packages/orchestrator/src/core/OrchestratorWrapper.ts` - Exposed getConnectedWorkersWorkspaces()
+- `packages/web-backend/src/services/WorkspacesService.ts` - Read from workers, not WorkspaceManager
+- `packages/web-backend/src/factories/DataStoreFactory.ts` - Added missing OrchestratorRepository import (caused backend crash!)
+
+**Critical Bug Fixed**: Missing `OrchestratorRepository` import in DataStoreFactory caused backend to crash during hot reload. Always verify imports after refactoring!
+
+**When Discovered**: December 31, 2024 - User observation: "il y a deux workers actuellement, qui travaillent les deux dans le meme workspace, pourquoi n'y a til pas de workspace listé?"
+
+**Architecture Decision**: "Chaque worker qui se connecte à l'orchestrateur indique dans quel workspace il travaille... le meilleur endroit pour stocker les workspaces est ... dans le workspace directement (c'est un dossier), dans le .agent-fleet j'imagine, à coté de flow.yml"
+
+**Remember**: Workers are autonomous and report their state. Orchestrator aggregates, doesn't manage.
+
+## Workspace Path Must Be Absolute, Not Relative
+
+**Problem**: Workers reporting relative paths (e.g., "../..") caused issues:
+
+1. Ambiguous workspace identification
+2. Duplicate workspace entries (same relative path from 2 workers = 2 entries)
+
+**Root Cause**: Worker's `projectRoot` defaulted to `process.cwd()` without path resolution, resulting in relative paths being sent to orchestrator.
+
+**Solution**:
+
+1. **Worker side** (`FlowWorker.ts`):
+
+    ```typescript
+    const projectRootRelative = projectRootArg ? ... : process.cwd();
+    const projectRoot = resolve(projectRootRelative); // Always absolute!
+    ```
+
+2. **Backend side** (`WorkspacesService.ts`):
+    ```typescript
+    private deduplicateWorkspaces(workerWorkspaces) {
+      // Group by workspacePath, keep most recent connectedAt
+      // Multiple workers in same workspace → single entry
+    }
+    ```
+
+**Result**:
+
+- Path: `C:\Workspace_Tooling\agent-fleet` (not `../..`)
+- 2 workers in same workspace → 1 workspace displayed ✅
+
+**When Discovered**: December 31, 2024 - User: "Je pense que le path doit être absolu, sinon c'est compliqué de s'en sortir... je ne devrais en voir qu'un seul, puisque les deux workers bossent depuis le meme !"
+
+**Remember**: Always use absolute paths for workspace identification. Relative paths are ambiguous and break deduplication logic.
+
+---
+
+## CSS Theme Variables - Must Define Values, Not Just Declare Names
+
+**Problem**: Theme color variables like `--success`, `--warning`, `--info` were declared in `theme.css` but never defined with actual color values in `theme-overrides.css`. Classes like `text-success`, `text-warning` were used throughout the codebase but rendered as transparent or undefined colors.
+
+**Root Cause**: `theme.css` declares variable names for Tailwind CSS mapping (`--color-success: var(--success)`), but the actual CSS custom property `--success` was never given a value. Without the base value, all derived utilities are broken.
+
+**Wrong Approach** ❌:
+
+```css
+/* theme.css - Only mapping, no values */
+@theme inline {
+	--color-success: var(--success); /* Where is --success defined? */
+	--color-warning: var(--warning);
+	--color-info: var(--info);
+}
+
+/* theme-overrides.css - Missing! */
+:root {
+	--primary: oklch(0.51 0.23 277);
+	--secondary: oklch(0.967 0.001 286.375);
+	/* --success is NOT defined anywhere! */
+}
+```
+
+**Result**: `text-success` compiles but has no effect, color is undefined/transparent.
+
+**Correct Solution** ✅:
+
+```css
+/* theme-overrides.css - Define ALL variables for BOTH themes */
+:root {
+	/* ... existing colors ... */
+	--success: oklch(0.55 0.15 145); /* Green */
+	--success-foreground: oklch(0.985 0 0); /* White text */
+	--warning: oklch(0.65 0.15 85); /* Yellow/Orange */
+	--warning-foreground: oklch(0.141 0.005 285.823); /* Dark text */
+	--info: oklch(0.60 0.15 235); /* Blue */
+	--info-foreground: oklch(0.985 0 0); /* White text */
+	--danger: oklch(0.577 0.245 27.325); /* Red */
+	--danger-foreground: oklch(0.985 0 0); /* White text */
+	--special: oklch(0.65 0.18 310); /* Magenta */
+	--special-foreground: oklch(0.985 0 0); /* White text */
+}
+
+.dark {
+	/* ... existing colors ... */
+	--success: oklch(0.70 0.15 145); /* Lighter green for dark mode */
+	--success-foreground: oklch(0.141 0.005 285.823); /* Dark text */
+	--warning: oklch(0.75 0.15 85); /* Lighter yellow */
+	--warning-foreground: oklch(0.141 0.005 285.823);
+	--info: oklch(0.70 0.15 235); /* Lighter blue */
+	--info-foreground: oklch(0.141 0.005 285.823);
+	--danger: oklch(0.704 0.191 22.216); /* Lighter red */
+	--danger-foreground: oklch(0.985 0 0);
+	--special: oklch(0.75 0.18 310); /* Lighter magenta */
+	--special-foreground: oklch(0.141 0.005 285.823);
+}
+```
+
+**Key Principles**:
+
+1. **Every mapped variable needs a value**: If `theme.css` declares `--color-X: var(--X)`, then `--X` MUST be defined
+2. **Define for both light AND dark**: Each theme needs its own values
+3. **Include foreground colors**: Always define both `--X` and `--X-foreground` for proper text contrast
+4. **Use oklch for modern colors**: Better color accuracy and perceptual uniformity than HSL
+
+**Symptoms of Missing Variables**:
+
+- DevTools shows `--success is not defined` in CSS inspector
+- `text-success` class has no visible effect
+- Colors appear transparent or fall back to default
+- No console errors (CSS fails silently)
+
+**How to Audit**:
+
+```bash
+# Find all color variable declarations in theme.css
+grep "color-" packages/web-frontend/src/framework/styles/theme.css
+
+# Check if they're defined in theme-overrides.css
+grep -E "(--success|--warning|--info|--danger|--special)" packages/web-frontend/src/app/styles/theme-overrides.css
+```
+
+**Files Affected** (January 2025):
+
+- `packages/web-frontend/src/app/styles/theme-overrides.css` - Added missing color definitions for success, warning, info, danger, special (both light and dark themes)
+- Used throughout frontend: `text-success`, `text-warning`, `text-info`, `bg-success`, etc.
+
+**When Discovered**: January 1, 2025 - Task log viewer needed green color for "Auto-scroll ON" text. User discovered `--success` was not defined in CSS when inspecting DevTools: "je vois '--success' is not defined en css... c'est ridicule".
+
+**Prevention**:
+
+- When adding new Tailwind color utilities, ALWAYS define the base CSS variable
+- Use color naming convention: `--{name}` and `--{name}-foreground`
+- Test in BOTH light and dark modes
+- Check DevTools CSS inspector for undefined variables
+
+**Remember**: Tailwind CSS utilities are just wrappers. The actual color values MUST exist in CSS custom properties.
+
+---
+
+## Radix UI Toggle Component - Requires Package Installation
+
+**Problem**: Creating a Toggle component based on shadcn/ui pattern fails with "Cannot find module '@radix-ui/react-toggle'" even though other Radix UI components work fine.
+
+**Root Cause**: Unlike some Radix UI components that might be bundled together, `@radix-ui/react-toggle` is a separate package that must be explicitly installed. It's not included in other Radix UI packages.
+
+**Wrong Assumption** ❌:
+
+"Other Radix components work, so Toggle should too - must be an import issue"
+
+**Correct Solution** ✅:
+
+```bash
+# Install the Toggle primitive package
+cd packages/web-frontend
+npm install @radix-ui/react-toggle
+```
+
+Then create the component:
+
+```typescript
+import * as TogglePrimitive from '@radix-ui/react-toggle';
+import { type VariantProps, cva } from 'class-variance-authority';
+
+const toggleVariants = cva(/* ... variants ... */);
+
+export type ToggleProps = React.ComponentPropsWithoutRef<typeof TogglePrimitive.Root> & VariantProps<typeof toggleVariants>;
+
+const Toggle = React.forwardRef<React.ElementRef<typeof TogglePrimitive.Root>, ToggleProps>(
+	({ className, variant, size, ...props }, ref) => (
+		<TogglePrimitive.Root ref={ref} className={cn(toggleVariants({ variant, size, className }))} {...props} />
+	)
+);
+```
+
+**Key Principles**:
+
+1. **Check package.json first**: Verify if the Radix package is installed
+2. **Install missing primitives**: Each Radix UI primitive is a separate package
+3. **Follow shadcn/ui pattern**: Use CVA for variants, forward refs, use `asChild` prop pattern
+4. **TypeScript integration**: Extend `ComponentPropsWithoutRef<typeof Primitive.Root>`
+
+**shadcn/ui Component Pattern**:
+
+- Use CVA (class-variance-authority) for styling variants
+- Create TypeScript type combining primitive props + variant props
+- Forward ref to the Radix primitive
+- Use `cn()` utility to merge classes
+- Support `asChild` prop for composition
+
+**Common Radix UI Packages**:
+
+- `@radix-ui/react-dialog` - Modal dialogs
+- `@radix-ui/react-dropdown-menu` - Dropdown menus
+- `@radix-ui/react-toggle` - Toggle buttons (separate package!)
+- `@radix-ui/react-switch` - ON/OFF switches
+- `@radix-ui/react-checkbox` - Checkboxes
+- `@radix-ui/react-select` - Select dropdowns
+
+**Files Affected** (January 2025):
+
+- `packages/web-frontend/package.json` - Added `@radix-ui/react-toggle` dependency
+- `packages/web-frontend/src/framework/components/primitives/Toggle.tsx` - New component following shadcn/ui pattern
+
+**When Discovered**: January 1, 2025 - Creating auto-scroll toggle for task logs viewer. Initially failed with module not found error, fixed by installing the package.
+
+**Remember**: Always check if the Radix UI primitive you need is installed, even if other Radix components are already in use.
+
+---
+
+## Button Size Variants - Project-Specific Heights, Not Standard Tailwind
+
+**Problem**: Assuming button `size="sm"` uses standard Tailwind heights like `h-8` or `h-9`, when the project uses custom sizing like `h-7`.
+
+**Root Cause**: Projects customize their component libraries with project-specific design tokens. The Button component's size variants are defined in `Button.tsx`, not in Tailwind defaults.
+
+**Wrong Assumption** ❌:
+
+"Small buttons are typically h-8 in Tailwind, so I'll use that for the Toggle component"
+
+**Correct Approach** ✅:
+
+1. **Check the Button component definition**:
+
+```typescript
+// Button.tsx
+const buttonVariants = cva(/* ... */, {
+	variants: {
+		size: {
+			default: 'h-8 gap-1.5 px-2.5',
+			sm: 'h-7 gap-1 px-2.5 text-[0.8rem]', // ← h-7, not h-8!
+			lg: 'h-9 gap-1.5 px-2.5',
+		},
+	},
+});
+```
+
+2. **Match the exact sizing in custom components**:
+
+```typescript
+// Toggle.tsx - Must match Button's sm size
+const toggleVariants = cva(/* ... */, {
+	variants: {
+		size: {
+			sm: 'h-7 gap-1 px-2.5 text-[0.8rem]', // Same as Button!
+		},
+	},
+});
+```
+
+**Key Principles**:
+
+1. **Read existing components first**: Check Button, Input, Select for consistent sizing
+2. **Copy exact values**: Don't approximate - use the exact same height, gap, padding, font-size
+3. **Visual consistency**: Components next to each other should have matching heights
+4. **Design system**: Projects have their own design tokens that override Tailwind defaults
+
+**Common Size Variants in Projects**:
+
+- `xs`: Often `h-6` with smaller padding
+- `sm`: Could be `h-7` (like this project) or `h-8`
+- `default`: Often `h-8` or `h-10`
+- `lg`: Often `h-9` or `h-11`
+
+**Files Affected** (January 2025):
+
+- `packages/web-frontend/src/framework/components/primitives/Toggle.tsx` - Initially used h-8, corrected to h-7 to match Button size="sm"
+- Visual alignment with Button components in TaskLogsViewer controls bar
+
+**When Discovered**: January 1, 2025 - User pointed out Toggle button was taller than adjacent buttons: "toujours pas pour la taille..." Checked Button.tsx and found `sm` uses `h-7`, not `h-8`.
+
+**Remember**: Never assume standard Tailwind sizing. Always check the project's component library for actual size definitions.
+
+---
+
+## Styling Radix UI Toggle - Child Selector Required to Override State Styles
+
+**Problem**: Adding `text-success` class directly to a span inside a Toggle component has no effect. The text color doesn't change even with `!important`.
+
+**Root Cause**: Radix UI Toggle applies `data-[state=on]:text-accent-foreground` to the root element, which cascades to all children. This specificity beats regular class selectors, even with `!important` on the child.
+
+**Wrong Approach** ❌:
+
+```tsx
+<Toggle pressed={isEnabled} ...>
+	<span>Auto-scroll</span>
+	<span className="!text-success">{isEnabled ? 'ON' : 'OFF'}</span>
+	{/* No effect - accent-foreground still applies */}
+</Toggle>
+```
+
+**Correct Solution** ✅:
+
+```tsx
+<Toggle
+	pressed={isEnabled}
+	className={`gap-2 text-xs ${isEnabled ? '[&>span:last-child]:!text-success' : ''}`}
+>
+	<span>Auto-scroll</span>
+	<span className="font-semibold">{isEnabled ? 'ON' : 'OFF'}</span>
+	{/* Now text-success applies via parent selector */}
+</Toggle>
+```
+
+**Why This Works**:
+
+- `[&>span:last-child]:!text-success` is applied to the Toggle root
+- Tailwind compiles this to `.toggle-root > span:last-child { color: var(--success) !important; }`
+- Child combinator (`>`) + pseudo-class (`:last-child`) + `!important` beats the data attribute selector
+- The color rule comes from the parent context, not the child
+
+**Alternative Approach** (inline styles):
+
+```tsx
+<span style={{ color: isEnabled ? 'var(--success)' : undefined }}>
+	{isEnabled ? 'ON' : 'OFF'}
+</span>
+```
+
+**Key Principles**:
+
+1. **Understand Radix state styles**: Components like Toggle/Switch apply styles via `data-[state=...]` attributes
+2. **Use parent selectors**: Target children from the parent's className, not child's className
+3. **Specificity hierarchy**: `data-[state]` selector > class selector, need `!important` to override
+4. **Tailwind arbitrary variants**: Use `[&>selector]:className` syntax for child targeting
+
+**Common Radix State Attributes**:
+
+- `data-[state=open]` / `data-[state=closed]` - Dialog, Dropdown, etc.
+- `data-[state=on]` / `data-[state=off]` - Toggle, Switch
+- `data-[state=checked]` / `data-[state=unchecked]` - Checkbox, Radio
+- `data-[disabled]` - All interactive components
+
+**Debugging Strategy**:
+
+1. Inspect element in DevTools - which styles are applied?
+2. Look for `data-[state=...]` attributes on component root
+3. Check if parent's `text-accent-foreground` cascades to child
+4. Apply color from parent using child selector instead of direct class
+
+**Files Affected** (January 2025):
+
+- `packages/web-frontend/src/app/pages/tasks/components/TaskLogsViewer.tsx` - Changed from direct `text-success` class to parent selector `[&>span:last-child]:!text-success`
+
+**When Discovered**: January 1, 2025 - User wanted green color on "ON" text in Toggle. Direct className didn't work, even with `!important`. Solution: target from parent using Tailwind arbitrary variant.
+
+**Remember**: When styling children of Radix UI components, use parent selectors to override state-based styles.

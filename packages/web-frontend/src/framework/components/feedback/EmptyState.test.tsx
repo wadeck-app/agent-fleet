@@ -108,14 +108,7 @@ describe('EmptyState', () => {
 		});
 
 		it('should apply custom className', () => {
-			const { container } = render(
-				<EmptyState
-					title="No items"
-					className={`
-     custom-class
-   `}
-				/>
-			);
+			const { container } = render(<EmptyState title="No items" className={`custom-class`} />);
 			const wrapper = container.firstChild as HTMLElement;
 
 			expect(wrapper.className).toContain('custom-class');

@@ -406,3 +406,734 @@ test-recursive-countdown:
           depends: [calculate]
           inputs:
               count: '${{ steps.calculate.outputs.next }}'
+
+# Data Flow Examples - Progressive complexity for visualization
+
+# Example 1: Simple Linear Pipeline (A → B → C)
+data-simple-pipeline:
+    version: '1.0.0'
+    name: 'Data Flow: Simple Pipeline'
+    description: 'Linear data flow: generate → transform → display'
+    workspace:
+        mode: manual
+        gitStrategy: any
+        reusePolicy: always
+    inputs:
+        seed: string
+    steps:
+        - type: script
+          id: generate
+          name: 'Generate Data'
+          script: |
+              echo Input seed: ${{ inputs.seed }}
+              set /a value=${{ inputs.seed }} * 10
+              echo value=%value%
+          output:
+              value: { type: string, pattern: 'value=(.*)' }
+
+        - type: script
+          id: transform
+          name: 'Transform Data'
+          depends: [generate]
+          script: |
+              echo Received: ${{ steps.generate.outputs.value }}
+              set /a doubled=${{ steps.generate.outputs.value }} * 2
+              echo doubled=%doubled%
+          output:
+              doubled: { type: string, pattern: 'doubled=(.*)' }
+
+        - type: script
+          id: display
+          name: 'Display Result'
+          depends: [transform]
+          script: |
+              echo Final result: ${{ steps.transform.outputs.doubled }}
+              echo Original seed was ${{ inputs.seed }}, final value is ${{ steps.transform.outputs.doubled }}
+
+# Example 2: Multi-Output Pipeline (one step produces multiple outputs)
+data-multi-output:
+    version: '1.0.0'
+    name: 'Data Flow: Multi-Output'
+    description: 'One step generates multiple outputs used by different consumers'
+    workspace:
+        mode: manual
+        gitStrategy: any
+        reusePolicy: always
+    inputs:
+        number: string
+    steps:
+        - type: script
+          id: calculate
+          name: 'Calculate Multiple Values'
+          script: |
+              echo Processing: ${{ inputs.number }}
+              set /a sum=${{ inputs.number }} + 100
+              set /a product=${{ inputs.number }} * 5
+              set /a square=${{ inputs.number }} * ${{ inputs.number }}
+              echo sum=%sum%
+              echo product=%product%
+              echo square=%square%
+          output:
+              sum: { type: string, pattern: 'sum=(.*)' }
+              product: { type: string, pattern: 'product=(.*)' }
+              square: { type: string, pattern: 'square=(.*)' }
+
+        - type: script
+          id: use-sum
+          name: 'Process Sum'
+          depends: [calculate]
+          script: |
+              echo Sum result: ${{ steps.calculate.outputs.sum }}
+              set /a result=${{ steps.calculate.outputs.sum }} + 10
+              echo result=%result%
+          output:
+              result: { type: string, pattern: 'result=(.*)' }
+
+        - type: script
+          id: use-product
+          name: 'Process Product'
+          depends: [calculate]
+          script: |
+              echo Product result: ${{ steps.calculate.outputs.product }}
+              set /a result=${{ steps.calculate.outputs.product }} / 5
+              echo result=%result%
+          output:
+              result: { type: string, pattern: 'result=(.*)' }
+
+        - type: script
+          id: merge
+          name: 'Merge Results'
+          depends: [use-sum, use-product]
+          script: |
+              echo Merging: sum_result=${{ steps.use-sum.outputs.result }}, product_result=${{ steps.use-product.outputs.result }}
+              echo Original square was: ${{ steps.calculate.outputs.square }}
+              set /a final=${{ steps.use-sum.outputs.result }} + ${{ steps.use-product.outputs.result }}
+              echo final=%final%
+          output:
+              final: { type: string, pattern: 'final=(.*)' }
+
+# Example 3: Diamond with Data Flow
+data-diamond:
+    version: '1.0.0'
+    name: 'Data Flow: Diamond Pattern'
+    description: 'Fork and join with data transformations at each step'
+    workspace:
+        mode: manual
+        gitStrategy: any
+        reusePolicy: always
+    inputs:
+        value: string
+    steps:
+        - type: script
+          id: source
+          name: 'Data Source'
+          script: |
+              echo Starting with: ${{ inputs.value }}
+              set /a base=${{ inputs.value }} * 2
+              echo base=%base%
+          output:
+              base: { type: string, pattern: 'base=(.*)' }
+
+        - type: script
+          id: branch-a
+          name: 'Branch A: Add'
+          depends: [source]
+          script: |
+              echo Branch A processing: ${{ steps.source.outputs.base }}
+              set /a result=${{ steps.source.outputs.base }} + 50
+              echo result=%result%
+          output:
+              result: { type: string, pattern: 'result=(.*)' }
+
+        - type: script
+          id: branch-b
+          name: 'Branch B: Multiply'
+          depends: [source]
+          script: |
+              echo Branch B processing: ${{ steps.source.outputs.base }}
+              set /a result=${{ steps.source.outputs.base }} * 3
+              echo result=%result%
+          output:
+              result: { type: string, pattern: 'result=(.*)' }
+
+        - type: script
+          id: combine
+          name: 'Combine Results'
+          depends: [branch-a, branch-b]
+          script: |
+              echo Combining A=${{ steps.branch-a.outputs.result }} and B=${{ steps.branch-b.outputs.result }}
+              set /a combined=${{ steps.branch-a.outputs.result }} + ${{ steps.branch-b.outputs.result }}
+              echo combined=%combined%
+          output:
+              combined: { type: string, pattern: 'combined=(.*)' }
+
+# Example 4: ETL Pattern (Extract → Transform → Load)
+data-etl:
+    version: '1.0.0'
+    name: 'Data Flow: ETL Pattern'
+    description: 'Extract, Transform, Load pattern with multiple transformations'
+    workspace:
+        mode: manual
+        gitStrategy: any
+        reusePolicy: always
+    inputs:
+        source: string
+    steps:
+        - type: script
+          id: extract
+          name: 'Extract Data'
+          script: |
+              echo Extracting from: ${{ inputs.source }}
+              echo raw_data=user123,active,premium
+          output:
+              raw_data: { type: string, pattern: 'raw_data=(.*)' }
+
+        - type: script
+          id: parse
+          name: 'Parse Fields'
+          depends: [extract]
+          script: |
+              echo Parsing: ${{ steps.extract.outputs.raw_data }}
+              echo user_id=user123
+              echo status=active
+              echo tier=premium
+          output:
+              user_id: { type: string, pattern: 'user_id=(.*)' }
+              status: { type: string, pattern: 'status=(.*)' }
+              tier: { type: string, pattern: 'tier=(.*)' }
+
+        - type: script
+          id: validate
+          name: 'Validate Data'
+          depends: [parse]
+          script: |
+              echo Validating user: ${{ steps.parse.outputs.user_id }}
+              echo Status: ${{ steps.parse.outputs.status }}
+              echo Tier: ${{ steps.parse.outputs.tier }}
+              echo valid=true
+          output:
+              valid: { type: string, pattern: 'valid=(.*)' }
+
+        - type: script
+          id: enrich
+          name: 'Enrich Data'
+          depends: [validate]
+          script: |
+              echo Enriching: ${{ steps.parse.outputs.user_id }}
+              echo credits=1000
+              echo expiry=2025-12-31
+          output:
+              credits: { type: string, pattern: 'credits=(.*)' }
+              expiry: { type: string, pattern: 'expiry=(.*)' }
+
+        - type: script
+          id: load
+          name: 'Load to Database'
+          depends: [enrich]
+          script: |
+              echo Loading to database:
+              echo - User: ${{ steps.parse.outputs.user_id }}
+              echo - Status: ${{ steps.parse.outputs.status }}
+              echo - Tier: ${{ steps.parse.outputs.tier }}
+              echo - Credits: ${{ steps.enrich.outputs.credits }}
+              echo - Expiry: ${{ steps.enrich.outputs.expiry }}
+              echo loaded=success
+
+# Example 5: Complex Fan-Out Fan-In
+data-fanout-fanin:
+    version: '1.0.0'
+    name: 'Data Flow: Fan-Out/Fan-In'
+    description: 'Complex pattern with multiple parallel transformations and aggregation'
+    workspace:
+        mode: manual
+        gitStrategy: any
+        reusePolicy: always
+    inputs:
+        dataset: string
+    steps:
+        - type: script
+          id: prepare
+          name: 'Prepare Dataset'
+          script: |
+              echo Preparing dataset: ${{ inputs.dataset }}
+              set /a count=100
+              set /a total=5000
+              echo count=%count%
+              echo total=%total%
+          output:
+              count: { type: string, pattern: 'count=(.*)' }
+              total: { type: string, pattern: 'total=(.*)' }
+
+        # Fan-out: Multiple parallel processors
+        - type: script
+          id: calc-average
+          name: 'Calculate Average'
+          depends: [prepare]
+          script: |
+              echo Calculating average from total=${{ steps.prepare.outputs.total }}, count=${{ steps.prepare.outputs.count }}
+              set /a avg=${{ steps.prepare.outputs.total }} / ${{ steps.prepare.outputs.count }}
+              echo average=%avg%
+          output:
+              average: { type: string, pattern: 'average=(.*)' }
+
+        - type: script
+          id: calc-min
+          name: 'Find Minimum'
+          depends: [prepare]
+          script: |
+              echo Finding min in dataset
+              set /a min=5
+              echo min=%min%
+          output:
+              min: { type: string, pattern: 'min=(.*)' }
+
+        - type: script
+          id: calc-max
+          name: 'Find Maximum'
+          depends: [prepare]
+          script: |
+              echo Finding max in dataset
+              set /a max=95
+              echo max=%max%
+          output:
+              max: { type: string, pattern: 'max=(.*)' }
+
+        - type: script
+          id: calc-stddev
+          name: 'Calculate Std Dev'
+          depends: [prepare]
+          script: |
+              echo Calculating standard deviation
+              set /a stddev=15
+              echo stddev=%stddev%
+          output:
+              stddev: { type: string, pattern: 'stddev=(.*)' }
+
+        # Intermediate: Use some results
+        - type: script
+          id: calc-range
+          name: 'Calculate Range'
+          depends: [calc-min, calc-max]
+          script: |
+              echo Range calculation: max=${{ steps.calc-max.outputs.max }}, min=${{ steps.calc-min.outputs.min }}
+              set /a range=${{ steps.calc-max.outputs.max }} - ${{ steps.calc-min.outputs.min }}
+              echo range=%range%
+          output:
+              range: { type: string, pattern: 'range=(.*)' }
+
+        # Fan-in: Aggregate all statistics
+        - type: script
+          id: generate-report
+          name: 'Generate Statistics Report'
+          depends: [calc-average, calc-range, calc-stddev]
+          script: |
+              echo === Statistics Report ===
+              echo Dataset: ${{ inputs.dataset }}
+              echo Count: ${{ steps.prepare.outputs.count }}
+              echo Total: ${{ steps.prepare.outputs.total }}
+              echo Average: ${{ steps.calc-average.outputs.average }}
+              echo Min: ${{ steps.calc-min.outputs.min }}
+              echo Max: ${{ steps.calc-max.outputs.max }}
+              echo Range: ${{ steps.calc-range.outputs.range }}
+              echo StdDev: ${{ steps.calc-stddev.outputs.stddev }}
+              echo report=generated
+          output:
+              report: { type: string, pattern: 'report=(.*)' }
+
+# Example 6: Conditional Data Flow
+data-conditional:
+    version: '1.0.0'
+    name: 'Data Flow: Conditional Processing'
+    description: 'Data flows through different paths based on conditions'
+    workspace:
+        mode: manual
+        gitStrategy: any
+        reusePolicy: always
+    inputs:
+        value: string
+    steps:
+        - type: script
+          id: check
+          name: 'Check Value'
+          script: |
+              echo Checking value: ${{ inputs.value }}
+              set /a num=${{ inputs.value }}
+              if %num% GTR 50 (
+                echo path=high
+                set /a category=1
+              ) else if %num% GTR 20 (
+                echo path=medium
+                set /a category=2
+              ) else (
+                echo path=low
+                set /a category=3
+              )
+              echo category=%category%
+          output:
+              path: { type: string, pattern: 'path=(.*)' }
+              category: { type: string, pattern: 'category=(.*)' }
+
+        - type: script
+          id: process-high
+          name: 'High Value Processing'
+          depends: [check]
+          when: "${{ steps.check.outputs.path === 'high' }}"
+          script: |
+              echo Processing HIGH value
+              set /a result=${{ inputs.value }} * 100
+              echo result=%result%
+          output:
+              result: { type: string, pattern: 'result=(.*)' }
+
+        - type: script
+          id: process-medium
+          name: 'Medium Value Processing'
+          depends: [check]
+          when: "${{ steps.check.outputs.path === 'medium' }}"
+          script: |
+              echo Processing MEDIUM value
+              set /a result=${{ inputs.value }} * 10
+              echo result=%result%
+          output:
+              result: { type: string, pattern: 'result=(.*)' }
+
+        - type: script
+          id: process-low
+          name: 'Low Value Processing'
+          depends: [check]
+          when: "${{ steps.check.outputs.path === 'low' }}"
+          script: |
+              echo Processing LOW value
+              set /a result=${{ inputs.value }} * 2
+              echo result=%result%
+          output:
+              result: { type: string, pattern: 'result=(.*)' }
+
+        - type: script
+          id: finalize
+          name: 'Finalize Processing'
+          depends: [check]
+          script: |
+              echo Finalizing for category: ${{ steps.check.outputs.category }}
+              echo Final processing complete
+
+# Example 7: Build Pipeline (realistic CI/CD example)
+data-build-pipeline:
+    version: '1.0.0'
+    name: 'Data Flow: Build Pipeline'
+    description: 'CI/CD pipeline with compile, test, and package steps'
+    workspace:
+        mode: manual
+        gitStrategy: any
+        reusePolicy: always
+    inputs:
+        version: string
+    steps:
+        - type: script
+          id: checkout
+          name: 'Checkout Code'
+          script: |
+              echo Checking out version: ${{ inputs.version }}
+              echo commit=abc123def
+              echo branch=main
+          output:
+              commit: { type: string, pattern: 'commit=(.*)' }
+              branch: { type: string, pattern: 'branch=(.*)' }
+
+        - type: script
+          id: install-deps
+          name: 'Install Dependencies'
+          depends: [checkout]
+          script: |
+              echo Installing dependencies for commit ${{ steps.checkout.outputs.commit }}
+              ping localhost -n 2 >nul
+              echo deps_installed=true
+              echo deps_count=142
+          output:
+              deps_installed: { type: string, pattern: 'deps_installed=(.*)' }
+              deps_count: { type: string, pattern: 'deps_count=(.*)' }
+
+        - type: script
+          id: compile
+          name: 'Compile Source'
+          depends: [install-deps]
+          script: |
+              echo Compiling with ${{ steps.install-deps.outputs.deps_count }} dependencies
+              ping localhost -n 3 >nul
+              echo artifacts=dist/bundle.js
+              echo size=2048
+          output:
+              artifacts: { type: string, pattern: 'artifacts=(.*)' }
+              size: { type: string, pattern: 'size=(.*)' }
+
+        - type: script
+          id: test-unit
+          name: 'Run Unit Tests'
+          depends: [compile]
+          script: |
+              echo Running unit tests on ${{ steps.compile.outputs.artifacts }}
+              ping localhost -n 2 >nul
+              echo tests_passed=45
+              echo tests_failed=0
+          output:
+              tests_passed: { type: string, pattern: 'tests_passed=(.*)' }
+              tests_failed: { type: string, pattern: 'tests_failed=(.*)' }
+
+        - type: script
+          id: test-integration
+          name: 'Run Integration Tests'
+          depends: [compile]
+          script: |
+              echo Running integration tests
+              ping localhost -n 3 >nul
+              echo tests_passed=12
+              echo tests_failed=0
+          output:
+              tests_passed: { type: string, pattern: 'tests_passed=(.*)' }
+              tests_failed: { type: string, pattern: 'tests_failed=(.*)' }
+
+        - type: script
+          id: analyze-coverage
+          name: 'Analyze Test Coverage'
+          depends: [test-unit, test-integration]
+          script: |
+              echo Analyzing coverage from unit and integration tests
+              echo Unit: ${{ steps.test-unit.outputs.tests_passed }} passed
+              echo Integration: ${{ steps.test-integration.outputs.tests_passed }} passed
+              set /a total=${{ steps.test-unit.outputs.tests_passed }} + ${{ steps.test-integration.outputs.tests_passed }}
+              echo coverage=87
+              echo total_tests=%total%
+          output:
+              coverage: { type: string, pattern: 'coverage=(.*)' }
+              total_tests: { type: string, pattern: 'total_tests=(.*)' }
+
+        - type: script
+          id: package
+          name: 'Package Application'
+          depends: [analyze-coverage]
+          script: |
+              echo Packaging version ${{ inputs.version }}
+              echo Artifact: ${{ steps.compile.outputs.artifacts }}
+              echo Size: ${{ steps.compile.outputs.size }}KB
+              echo Coverage: ${{ steps.analyze-coverage.outputs.coverage }}%%
+              echo package=app-${{ inputs.version }}.zip
+          output:
+              package: { type: string, pattern: 'package=(.*)' }
+
+        - type: script
+          id: publish
+          name: 'Publish Artifacts'
+          depends: [package]
+          script: |
+              echo Publishing ${{ steps.package.outputs.package }}
+              echo Branch: ${{ steps.checkout.outputs.branch }}
+              echo Commit: ${{ steps.checkout.outputs.commit }}
+              echo url=https://artifacts.example.com/${{ steps.package.outputs.package }}
+          output:
+              url: { type: string, pattern: 'url=(.*)' }
+
+# ============================================================================
+# VALIDATION ERROR EXAMPLES
+# These flows demonstrate errors that the new validation system will catch
+# ============================================================================
+
+# Example 1: Missing Dependency Error
+# ❌ ERROR: step2 uses step1.outputs.result but does not depend on step1
+validation-error-missing-dependency:
+    version: '1.0.0'
+    name: 'Validation Error: Missing Dependency'
+    description: 'Demonstrates variable usage without proper dependency declaration'
+    workspace:
+        mode: isolated
+        gitStrategy: main-only
+        reusePolicy: always
+    inputs:
+        number: string
+    steps:
+        - type: script
+          id: step1
+          name: 'Calculate Square'
+          script: |
+              set /a result=${{ inputs.number }} * ${{ inputs.number }}
+              echo result=%result%
+          output:
+              result: { type: string, pattern: 'result=(.*)' }
+
+        - type: script
+          id: step2
+          name: 'Use Result (MISSING DEPENDENCY)'
+          # ❌ ERROR: Uses step1.outputs.result but no depends: [step1]
+          script: |
+              echo The square is ${{ steps.step1.outputs.result }}
+              echo status=done
+          output:
+              status: { type: string, pattern: 'status=(.*)' }
+
+# Example 2: Undefined Output Warning
+# ⚠️ WARNING: References output fields not defined in step's output config
+validation-error-undefined-output:
+    version: '1.0.0'
+    name: 'Validation Error: Undefined Output'
+    description: 'Demonstrates referencing outputs that are not declared'
+    workspace:
+        mode: isolated
+        gitStrategy: main-only
+        reusePolicy: always
+    inputs:
+        task: string
+    steps:
+        - type: model
+          id: analyze
+          name: 'Analyze Task'
+          model: haiku
+          prompt: 'Analyze: ${{ inputs.task }}'
+          output:
+              analysis: { type: string }
+              # Note: Only 'analysis' is defined, not 'summary' or 'recommendations'
+
+        - type: model
+          id: report
+          name: 'Generate Report'
+          depends: [analyze]
+          model: haiku
+          prompt: |
+              Analysis: ${{ steps.analyze.outputs.analysis }}
+              Summary: ${{ steps.analyze.outputs.summary }}
+              Recommendations: ${{ steps.analyze.outputs.recommendations }}
+          # ⚠️ WARNING: 'summary' and 'recommendations' not defined in step 'analyze'
+
+# Example 3: Missing Transitive Dependency
+# ❌ ERROR: step3 uses step1 output but only depends on step2 (which doesn't depend on step1)
+validation-error-transitive-missing:
+    version: '1.0.0'
+    name: 'Validation Error: Missing Transitive Dependency'
+    description: 'Demonstrates missing transitive dependency in variable usage'
+    workspace:
+        mode: isolated
+        gitStrategy: main-only
+        reusePolicy: always
+    inputs:
+        value: string
+    steps:
+        - type: script
+          id: step1
+          name: 'Process Value'
+          script: |
+              echo processed=${{ inputs.value }}_processed
+          output:
+              processed: { type: string, pattern: 'processed=(.*)' }
+
+        - type: script
+          id: step2
+          name: 'Independent Step'
+          # No dependency on step1
+          script: |
+              echo independent=true
+          output:
+              independent: { type: string, pattern: 'independent=(.*)' }
+
+        - type: script
+          id: step3
+          name: 'Use step1 Output (INVALID)'
+          depends: [step2]
+          # ❌ ERROR: Uses step1.outputs.processed but step2 doesn't depend on step1
+          # This creates an invalid dependency chain: step3 → step2 (but step2 doesn't depend on step1)
+          script: |
+              echo Using processed value: ${{ steps.step1.outputs.processed }}
+              echo Using independent: ${{ steps.step2.outputs.independent }}
+              echo final=complete
+          output:
+              final: { type: string, pattern: 'final=(.*)' }
+
+# Example 4: Correct Usage (For Comparison)
+# ✅ VALID: All dependencies properly declared
+validation-correct-example:
+    version: '1.0.0'
+    name: 'Validation: Correct Example'
+    description: 'Demonstrates correct variable usage with proper dependencies'
+    workspace:
+        mode: isolated
+        gitStrategy: main-only
+        reusePolicy: always
+    inputs:
+        number: string
+    steps:
+        - type: script
+          id: step1
+          name: 'Calculate'
+          script: |
+              set /a result=${{ inputs.number }} * 2
+              echo result=%result%
+          output:
+              result: { type: string, pattern: 'result=(.*)' }
+
+        - type: script
+          id: step2
+          name: 'Use Result (CORRECT)'
+          depends: [step1] # ✅ Correctly depends on step1
+          script: |
+              echo The result is ${{ steps.step1.outputs.result }}
+              echo status=done
+          output:
+              status: { type: string, pattern: 'status=(.*)' }
+
+        - type: script
+          id: step3
+          name: 'Use Both (CORRECT - Transitive)'
+          depends: [step2] # ✅ Transitive: step3 → step2 → step1
+          script: |
+              echo Original result: ${{ steps.step1.outputs.result }}
+              echo Status: ${{ steps.step2.outputs.status }}
+              echo final=complete
+          output:
+              final: { type: string, pattern: 'final=(.*)' }
+
+# Test Flow: User Intervention
+# Tests the new user_intervention step type with approval workflow
+test-user-intervention:
+    version: '1.0.0'
+    name: 'Test: User Intervention'
+    description: 'Tests user intervention step with approval workflow'
+    workspace:
+        mode: manual
+        gitStrategy: any
+        reusePolicy: always
+    statusTransitions:
+        onSuccess: approved
+        onFailure: todo
+    inputs:
+        message: string
+    steps:
+        - type: script
+          id: prepare
+          name: 'Prepare Data'
+          script: |
+              echo [prepare] Processing: ${{ inputs.message }}
+              ping localhost -n 2 >nul
+              echo [prepare] Data ready for review
+              echo data_hash=abc123
+          output:
+              data_hash: { type: string, pattern: 'data_hash=(.*)' }
+
+        - type: user_intervention
+          id: approval
+          name: 'Approve Deployment'
+          interventionType: approval
+          blocking: true
+          depends: [prepare]
+          approval:
+              title: 'Approve Deployment to Production'
+              description: 'Data hash: ${{ steps.prepare.outputs.data_hash }}. Please review and approve this deployment.'
+              allowReject: true
+          output:
+              approved: '${{ steps.approval.outputs.approved }}'
+
+        - type: script
+          id: deploy
+          name: 'Deploy to Production'
+          depends: [approval]
+          script: |
+              echo [deploy] User decision: ${{ steps.approval.outputs.userResponse }}
+              echo [deploy] Deploying data: ${{ steps.prepare.outputs.data_hash }}
+              ping localhost -n 3 >nul
+              echo [deploy] Deployment successful!

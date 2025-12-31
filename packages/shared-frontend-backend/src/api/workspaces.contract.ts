@@ -23,6 +23,8 @@ export const WorkspaceSchema = z.object({
 	lastUsed: z.string(),
 	gitStatus: GitStatusSchema.optional(),
 	activeTasks: z.array(z.string()).optional(),
+	name: z.string().optional(),
+	description: z.string().optional(),
 });
 
 export const WorkspacesDataSchema = z.object({
@@ -78,11 +80,28 @@ export const WorkspacesListResponseSchema = z.object({
 export type WorkspacesListQuery = z.infer<typeof WorkspacesListQuerySchema>;
 export type WorkspacesListResponse = z.infer<typeof WorkspacesListResponseSchema>;
 
+/**
+ * DTO for updating workspace metadata
+ */
+export const UpdateWorkspaceDtoSchema = z.object({
+	name: z.string().optional(),
+	description: z.string().optional(),
+});
+
+export type UpdateWorkspaceDto = z.infer<typeof UpdateWorkspaceDtoSchema>;
+
 export const WORKSPACES_API_ROUTES = defineRoutes({
 	'/api/workspaces/': {
 		GET: {
 			query: WorkspacesListQuerySchema.optional(),
 			response: z.union([WorkspacesDataSchema, WorkspacesListResponseSchema]),
+		},
+	},
+	'/api/workspaces/:id': {
+		PATCH: {
+			params: z.object({ id: z.string() }),
+			body: UpdateWorkspaceDtoSchema,
+			response: WorkspaceSchema,
 		},
 	},
 });

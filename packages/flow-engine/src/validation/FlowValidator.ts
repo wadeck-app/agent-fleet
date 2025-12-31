@@ -5,20 +5,23 @@
  * Designed to collect ALL errors (not just the first) and provide rich metadata
  * for UI integration (workflow builder).
  *
- * This validator orchestrates four specialized validators:
+ * This validator orchestrates five specialized validators:
  * 1. SchemaValidator - Structure, required fields, types
  * 2. GraphValidator - Cycles, reachability, DAG structure
  * 3. SemanticValidator - References, subflows, dependencies
  * 4. TemplateValidator - Variable expressions, template syntax
+ * 5. DependencyOrderValidator - Variable usage respects dependency order
  *
  * Validation phases:
  * Phase 1: Schema validation (structural)
  * Phase 2: Graph validation (cycles, reachability) - only if schema valid
  * Phase 3: Semantic validation (references) - only if schema valid
  * Phase 4: Template validation (expressions) - only if schema valid
+ * Phase 5: Dependency order validation (variable usage) - only if schema valid
  */
 import type { FlowRegistry } from '../registry/FlowRegistry';
 import type { FlowDefinition } from '../types';
+import { DependencyOrderValidator } from './DependencyOrderValidator';
 import { GraphValidator } from './GraphValidator';
 // Import specialized validators
 import { SchemaValidator } from './SchemaValidator';
@@ -52,6 +55,7 @@ export class FlowValidator implements IssueCollector {
 	private graphValidator: GraphValidator;
 	private semanticValidator: SemanticValidator;
 	private templateValidator: TemplateValidator;
+	private dependencyOrderValidator: DependencyOrderValidator;
 
 	/**
 	 * Create a new FlowValidator
@@ -65,11 +69,12 @@ export class FlowValidator implements IssueCollector {
 		this.graphValidator = new GraphValidator(this, flowRegistry);
 		this.semanticValidator = new SemanticValidator(this, this.graphValidator, flowRegistry);
 		this.templateValidator = new TemplateValidator(this);
+		this.dependencyOrderValidator = new DependencyOrderValidator(this);
 	}
 
 	/**
 	 * Validate a flow definition completely
-	 * Orchestrates the four specialized validators in sequence
+	 * Orchestrates the five specialized validators in sequence
 	 */
 	public validate(flow: FlowDefinition): ValidationResult {
 		this.issues = [];
@@ -91,6 +96,9 @@ export class FlowValidator implements IssueCollector {
 		// Phase 4: Template validation (expressions)
 		const inputNames = new Set(Object.keys(flow.inputs || {}));
 		this.templateValidator.validateTemplates(flow, stepIds, inputNames);
+
+		// Phase 5: Dependency order validation (variable usage respects dependency graph)
+		this.dependencyOrderValidator.validateDependencyOrder(flow);
 
 		return this.buildResult();
 	}

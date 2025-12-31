@@ -8,6 +8,53 @@ export type WorkspaceMode = 'isolated' | 'shared' | 'manual';
 export type GitStrategy = 'main-only' | 'feature-branch' | 'any' | 'worktree';
 export type ReusePolicy = 'never' | 'if-available' | 'always';
 
+/**
+ * Variable types supported in flow inputs and outputs
+ */
+export type VariableType = 'string' | 'number' | 'boolean' | 'object';
+
+/**
+ * Built-in transform functions for output parsing
+ */
+export type TransformFunction =
+	| 'parseJSON'
+	| 'parseYAML'
+	| 'parseInt'
+	| 'parseFloat'
+	| 'parseBoolean'
+	| 'trim'
+	| 'toLowerCase'
+	| 'toUpperCase'
+	| 'split';
+
+/**
+ * Output extraction configuration for a single variable
+ */
+export interface OutputVariableConfig {
+	/** Type of the extracted value */
+	type: VariableType;
+
+	/** Optional regex pattern for extraction from text */
+	pattern?: string;
+
+	/** Whether this field is required (checked in post-process) */
+	required?: boolean;
+
+	/** Optional transform function to apply after extraction */
+	transform?: TransformFunction | string;
+
+	/** Default value if extraction fails (only for non-required fields) */
+	default?: any;
+}
+
+/**
+ * Output configuration for a step
+ */
+export interface StepOutput {
+	/** Map of variable names to extraction configs */
+	[variableName: string]: OutputVariableConfig;
+}
+
 export interface WorkspaceConfig {
 	mode: WorkspaceMode;
 	gitStrategy: GitStrategy;
@@ -21,6 +68,8 @@ export interface BaseFlowStep {
 	depends?: string[];
 	when?: string;
 	skipOnLoop?: boolean;
+	/** Output parsing and extraction */
+	output?: StepOutput;
 	onFailure?: {
 		goto?: string;
 		maxIterations?: number;
@@ -48,7 +97,32 @@ export interface SubFlowStep extends BaseFlowStep {
 	workspaceStrategy?: 'inherit' | 'separate';
 }
 
-export type FlowStep = ModelFlowStep | ScriptFlowStep | SubFlowStep;
+export interface UserInterventionStep extends BaseFlowStep {
+	type: 'user_intervention';
+	interventionType: 'approval' | 'question' | 'choice';
+	blocking?: boolean;
+	timeout?: {
+		minutes: number;
+		onTimeout: 'fail' | 'continue' | 'default';
+		defaultValue?: any;
+	};
+	approval?: {
+		title: string;
+		description?: string;
+		allowReject?: boolean;
+	};
+	question?: {
+		question: string;
+		responseType: 'text' | 'number' | 'boolean';
+	};
+	choice?: {
+		question: string;
+		options: Array<{ id: string; label: string; description?: string }>;
+		allowMultiple?: boolean;
+	};
+}
+
+export type FlowStep = ModelFlowStep | ScriptFlowStep | SubFlowStep | UserInterventionStep;
 
 export interface FlowDefinition {
 	id: string;
@@ -56,84 +130,31 @@ export interface FlowDefinition {
 	name: string;
 	description: string;
 	workspace: WorkspaceConfig;
-	inputs: Record<string, string>;
+	/** Input variables expected from task with their types */
+	inputs: Record<string, VariableType>;
 	steps: FlowStep[];
 }
 
-export type ValidationSeverity = 'error' | 'warning' | 'info';
+/**
+ * Validation types (ValidationResult, ValidationIssue, ValidationSeverity)
+ * are now imported from the backend flow-engine package.
+ * See: packages/flow-engine/src/validation/ValidationTypes.ts
+ *
+ * Import them with:
+ * import type { ValidationResult, ValidationIssue } from 'flow-engine/validation/ValidationTypes';
+ */
 
-export interface ValidationIssue {
-	code: string;
-	message: string;
-	severity: ValidationSeverity;
-	location?: {
-		stepId?: string;
-		field?: string;
-	};
-}
-
-export interface ValidationResult {
-	valid: boolean;
-	issues: ValidationIssue[];
-	summary: {
-		errors: number;
-		warnings: number;
-		info: number;
-	};
-}
-
-// Mock FlowValidator for now
-export class FlowValidator {
-	validate(flow: FlowDefinition): ValidationResult {
-		// Simple validation - just check for empty steps
-		const issues: ValidationIssue[] = [];
-
-		if (!flow.steps || flow.steps.length === 0) {
-			issues.push({
-				code: 'EMPTY_FLOW',
-				message: 'Flow has no steps',
-				severity: 'error',
-			});
-		}
-
-		// Check for duplicate step IDs
-		const stepIds = new Set<string>();
-		flow.steps.forEach(step => {
-			if (stepIds.has(step.id)) {
-				issues.push({
-					code: 'DUPLICATE_ID',
-					message: `Duplicate step ID: ${step.id}`,
-					severity: 'error',
-					location: { stepId: step.id },
-				});
-			}
-			stepIds.add(step.id);
-		});
-
-		// Check for invalid dependencies
-		flow.steps.forEach(step => {
-			if (step.depends) {
-				step.depends.forEach(depId => {
-					if (!stepIds.has(depId)) {
-						issues.push({
-							code: 'INVALID_DEPENDENCY',
-							message: `Step ${step.id} depends on non-existent step: ${depId}`,
-							severity: 'error',
-							location: { stepId: step.id },
-						});
-					}
-				});
-			}
-		});
-
-		return {
-			valid: issues.filter(i => i.severity === 'error').length === 0,
-			issues,
-			summary: {
-				errors: issues.filter(i => i.severity === 'error').length,
-				warnings: issues.filter(i => i.severity === 'warning').length,
-				info: issues.filter(i => i.severity === 'info').length,
-			},
-		};
-	}
-}
+/**
+ * FlowValidator is now imported from the backend flow-engine package
+ * See: packages/flow-engine/src/validation/FlowValidator.ts
+ *
+ * The real validator provides comprehensive validation including:
+ * - Schema validation (structure, required fields)
+ * - Graph validation (cycles, reachability, DAG)
+ * - Semantic validation (references, subflows)
+ * - Template validation (variable expressions)
+ * - Dependency order validation (variables respect dependency graph)
+ *
+ * Import it in your code with:
+ * import { FlowValidator } from 'flow-engine/validation/FlowValidator';
+ */

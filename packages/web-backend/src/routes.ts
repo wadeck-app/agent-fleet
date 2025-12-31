@@ -13,6 +13,7 @@ const routes: RouteDefinition[] = [
 	['/api/flows', () => import('./controllers/FlowsController')],
 	['/api/tasks', () => import('./controllers/TasksController')],
 	['/api/workspaces', () => import('./controllers/WorkspacesController')],
+	['/api/interventions', () => import('./controllers/InterventionsController')],
 	['/api/monitoring', () => import('./controllers/MonitoringController')],
 ];
 

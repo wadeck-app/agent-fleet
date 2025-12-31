@@ -223,13 +223,7 @@ export const Interactive: Story = {
 								key={column.id}
 								className={`
           text-sm
-          ${
-				visibleColumns.has(column.id)
-					? 'text-foreground'
-					: `
-            text-muted-foreground line-through
-          `
-			}
+          ${visibleColumns.has(column.id) ? 'text-foreground' : `text-muted-foreground line-through`}
         `}
 							>
 								{column.label}
@@ -522,13 +516,7 @@ export const InteractiveWithModifiedState: Story = {
 									key={column.id}
 									className={`
            flex items-center gap-2 text-sm
-           ${
-				isVisible
-					? `text-foreground`
-					: `
-             text-muted-foreground line-through
-           `
-			}
+           ${isVisible ? `text-foreground` : `text-muted-foreground line-through`}
          `}
 								>
 									{column.label}

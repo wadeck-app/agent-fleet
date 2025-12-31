@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { type FlowDefinition, FlowValidator, type ValidationResult } from '../types/flow-engine.types';
+import { FlowValidator } from 'flow-engine/validation/FlowValidator';
+import type { ValidationResult } from 'flow-engine/validation/ValidationTypes';
+
+import type { FlowDefinition } from '../types/flow-engine.types';
 
 /**
  * Hook for real-time flow validation

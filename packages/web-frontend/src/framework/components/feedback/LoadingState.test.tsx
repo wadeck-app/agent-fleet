@@ -105,13 +105,7 @@ describe('LoadingState', () => {
 	describe('complete scenarios', () => {
 		it('should render with all props', () => {
 			const { container } = render(
-				<LoadingState
-					message="Loading books..."
-					size="large"
-					className={`
-      my-custom-class
-    `}
-				/>
+				<LoadingState message="Loading books..." size="large" className={`my-custom-class`} />
 			);
 
 			expect(screen.getByText('Loading books...')).toBeInTheDocument();

@@ -1,13 +1,22 @@
 /**
  * Step Runner
  *
- * Executes individual flow steps (script and model types) with retry logic.
+ * Executes individual flow steps (script, model, subflow, and user_intervention types) with retry logic.
  */
 import { ClaudeLauncher } from '../processing/ClaudeLauncher';
 import { OutputExtractor } from '../processing/OutputExtractor';
 import { type TemplateContext, TemplateRenderer } from '../processing/TemplateRenderer';
 import type { FlowRegistry } from '../registry/FlowRegistry';
-import type { FlowStep, ModelFlowStep, ScriptFlowStep, StepTrace, SubFlowStep, Workspace } from '../types';
+import type {
+	FlowStep,
+	ModelFlowStep,
+	ScriptFlowStep,
+	StepTrace,
+	SubFlowStep,
+	UserInterventionStep,
+	Workspace,
+} from '../types';
+import type { InterventionHandler } from './InterventionHandler';
 import { ScriptExecutor } from './ScriptExecutor';
 
 /**
@@ -42,6 +51,9 @@ export interface StepRunnerConfig {
 
 	/** Flow executor for recursive subflow execution (optional, set after construction) */
 	flowExecutor?: any; // Using 'any' to avoid circular dependency
+
+	/** Intervention handler for user intervention steps (optional, set after construction) */
+	interventionHandler?: InterventionHandler;
 }
 
 /**
@@ -77,6 +89,13 @@ export class StepRunner {
 	}
 
 	/**
+	 * Set the intervention handler (used for user intervention steps)
+	 */
+	public setInterventionHandler(interventionHandler: InterventionHandler): void {
+		this.config.interventionHandler = interventionHandler;
+	}
+
+	/**
 	 * Execute a step with retry logic
 	 */
 	public async executeStep(step: FlowStep, workspace: Workspace, context: TemplateContext): Promise<StepTrace> {
@@ -106,6 +125,8 @@ export class StepRunner {
 					result = await this.executeModelStep(step, workspace, context, stepTrace);
 				} else if (step.type === 'subflow') {
 					result = await this.executeSubFlowStep(step, workspace, context, stepTrace);
+				} else if (step.type === 'user_intervention') {
+					result = await this.executeUserInterventionStep(step, workspace, context, stepTrace);
 				} else {
 					throw new StepExecutionError(
 						`Unknown step type: ${(step as any).type}`,
@@ -449,6 +470,125 @@ export class StepRunner {
 			stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
 			stepTrace.error = error instanceof Error ? error.message : String(error);
 			console.error(`[StepRunner] SubFlowStep ${step.id} error:`, stepTrace.error);
+			return stepTrace;
+		}
+	}
+
+	/**
+	 * Execute a user intervention step (request user approval/input)
+	 */
+	private async executeUserInterventionStep(
+		step: UserInterventionStep,
+		workspace: Workspace,
+		context: TemplateContext,
+		stepTrace: StepTrace
+	): Promise<StepTrace> {
+		// Check if intervention handler is configured
+		if (!this.config.interventionHandler) {
+			stepTrace.endTime = Date.now();
+			stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
+			stepTrace.error = 'InterventionHandler not configured in StepRunner';
+			return stepTrace;
+		}
+
+		// Build intervention request based on step type
+		const config =
+			step.interventionType === 'approval'
+				? step.approval
+				: step.interventionType === 'question'
+					? step.question
+					: step.choice;
+
+		if (!config) {
+			stepTrace.endTime = Date.now();
+			stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
+			stepTrace.error = `Missing configuration for intervention type '${step.interventionType}'`;
+			return stepTrace;
+		}
+
+		// Render title and description with variable interpolation
+		// Use type narrowing to access type-specific properties
+		const renderedConfig: any = { ...config };
+
+		if (step.interventionType === 'approval' && step.approval) {
+			if (typeof step.approval.title === 'string') {
+				renderedConfig.title = this.templateRenderer.render(step.approval.title, context, true);
+			}
+			if (typeof step.approval.description === 'string') {
+				renderedConfig.description = this.templateRenderer.render(step.approval.description, context, true);
+			}
+		} else if (step.interventionType === 'question' && step.question) {
+			if (typeof step.question.question === 'string') {
+				renderedConfig.question = this.templateRenderer.render(step.question.question, context, true);
+			}
+		} else if (step.interventionType === 'choice' && step.choice) {
+			if (typeof step.choice.question === 'string') {
+				renderedConfig.question = this.templateRenderer.render(step.choice.question, context, true);
+			}
+		}
+
+		const interventionRequest: import('./InterventionHandler').InterventionRequest = {
+			taskId: context.taskId || 'unknown',
+			workerId: context.workerId,
+			flowId: context.flowId,
+			stepId: step.id,
+			type: step.interventionType,
+			blocking: step.blocking !== false, // Default to true
+			config: renderedConfig,
+			timeout: step.timeout,
+		};
+
+		console.log(`[StepRunner] Executing UserInterventionStep: ${step.id}`);
+		console.log(`[StepRunner] Intervention type: ${step.interventionType}`);
+		console.log(`[StepRunner] Blocking: ${interventionRequest.blocking}`);
+
+		stepTrace.interventionType = step.interventionType;
+		stepTrace.interventionBlocking = interventionRequest.blocking;
+
+		try {
+			// Request intervention
+			const response = await this.config.interventionHandler.requestIntervention(interventionRequest);
+
+			stepTrace.endTime = Date.now();
+			stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
+
+			if (response) {
+				console.log(`[StepRunner] User responded to intervention ${step.id}`);
+				stepTrace.interventionResponse = response;
+
+				// Extract outputs based on intervention type
+				if (step.interventionType === 'approval') {
+					stepTrace.outputs = {
+						approved: response.value === true,
+						rejected: response.value === false,
+						userResponse: response.value,
+						comment: response.comment,
+					};
+				} else if (step.interventionType === 'question') {
+					stepTrace.outputs = {
+						answer: response.value,
+						comment: response.comment,
+					};
+				} else if (step.interventionType === 'choice') {
+					stepTrace.outputs = {
+						choice: response.value,
+						comment: response.comment,
+					};
+				}
+			} else {
+				// Non-blocking intervention that returned immediately
+				console.log(`[StepRunner] Non-blocking intervention ${step.id} requested`);
+				stepTrace.outputs = {
+					interventionRequested: true,
+				};
+			}
+
+			return stepTrace;
+		} catch (error) {
+			stepTrace.endTime = Date.now();
+			stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
+			stepTrace.error = error instanceof Error ? error.message : String(error);
+			console.error(`[StepRunner] UserInterventionStep ${step.id} error:`, stepTrace.error);
 			return stepTrace;
 		}
 	}

@@ -31,7 +31,7 @@ export function FlowYamlPanel({ flowDefinition }: FlowYamlPanelProps) {
 					variant="ghost"
 					size="sm"
 					onClick={() => setIsOpen(true)}
-					className="h-full w-12 flex items-center justify-center"
+					className="flex h-full w-12 items-center justify-center"
 					title="Show YAML"
 				>
 					<ChevronLeft className="size-4" />
@@ -41,12 +41,12 @@ export function FlowYamlPanel({ flowDefinition }: FlowYamlPanelProps) {
 	}
 
 	return (
-		<div className="w-[500px] border-l bg-card flex flex-col">
+		<div className="flex w-[500px] flex-col border-l bg-card">
 			{/* Header */}
-			<div className="flex items-center justify-between p-3 border-b">
+			<div className="flex items-center justify-between border-b p-3">
 				<div className="flex items-center gap-2">
 					<Code className="size-4" />
-					<span className="font-semibold text-sm">YAML View</span>
+					<span className="text-sm font-semibold">YAML View</span>
 				</div>
 				<Button variant="ghost" size="sm" onClick={() => setIsOpen(false)}>
 					<ChevronRight className="size-4" />
@@ -55,7 +55,7 @@ export function FlowYamlPanel({ flowDefinition }: FlowYamlPanelProps) {
 
 			{/* YAML Content */}
 			<div className="flex-1 overflow-auto p-4">
-				<pre className="text-xs font-mono bg-muted p-3 rounded overflow-x-auto">
+				<pre className="overflow-x-auto rounded bg-muted p-3 font-mono text-xs">
 					<code>{yamlContent}</code>
 				</pre>
 			</div>

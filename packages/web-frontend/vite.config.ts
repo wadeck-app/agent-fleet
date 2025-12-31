@@ -132,6 +132,11 @@ export default defineConfig(({ mode }) => {
 				'@app': path.resolve(__dirname, './src/app'),
 				'@transport': path.resolve(__dirname, './src/transport'),
 				'@shared': path.resolve(__dirname, '../shared-frontend-backend/src'),
+				// Monorepo package aliases (matching tsconfig.base.json paths)
+				'flow-engine': path.resolve(__dirname, '../flow-engine/src'),
+				'shared-orch-worker': path.resolve(__dirname, '../shared-orch-worker/src'),
+				'shared-common': path.resolve(__dirname, '../shared-common/src'),
+				'test-utils': path.resolve(__dirname, '../test-utils/src'),
 			},
 		},
 		server: {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import { Data2 } from '@framework/components2/data/Data2';
 import { Input } from '@framework/components/forms/Input';
@@ -13,10 +13,10 @@ import { useSorting2 } from '@framework/hooks2/useSorting2';
 import type { MutationContract } from '@framework/types/MutationContract';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
 import type { Worker } from '@shared/api/workers.contract';
-import { B2F_WORKER_UPDATED } from '@shared/transport';
+import { B2F_WORKER_CONNECTED, B2F_WORKER_DISCONNECTED, B2F_WORKER_UPDATED } from '@shared/transport';
 import { RefreshCw, X } from 'lucide-react';
 
-import { useTransport } from '@/transport';
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 import { workersApi } from '../workers/workers.api';
 import { WorkersTable2 } from './WorkersTable2';
@@ -63,9 +63,6 @@ export function WorkersPage2() {
 	// Debounce search query
 	const debouncedSearchQuery = useDebounce(search.fstate.query, 300);
 
-	// WebSocket transport for real-time updates
-	const { transport } = useTransport();
-
 	// Mutation contract for direct cache updates
 	const mutation: MutationContract<Worker> = useMemo(
 		() => ({
@@ -74,31 +71,13 @@ export function WorkersPage2() {
 		[]
 	);
 
-	// Subscribe to worker updates via WebSocket
-	// Server-side filtering prevents origin client from receiving its own events
-	useEffect(() => {
-		console.log('[WorkersPage2] Subscribing to B2F_WORKER_UPDATED events');
-
-		// Transport automatically queues subscriptions if not connected yet
-		// They will be sent when connection is established
-		const unsubscribe = transport.subscribe(B2F_WORKER_UPDATED, updatedWorker => {
-			console.log('[WorkersPage2] Received worker update event:', updatedWorker.workerId);
-			console.log('[WorkersPage2] Applying direct cache update with event data (no refetch needed)');
-
-			// Direct cache update using event data - much more efficient than full refresh!
-			// Note: mutation.updateItem is available in the displayer (WorkersTable2) but not here,
-			// so we trigger a targeted refresh. In the future, Data2 could expose mutation methods.
-			cache.actions.refresh();
-
-			// TODO: Expose mutation methods from Data2 to parent for truly optimized updates:
-			// mutation.updateItem(updatedWorker);
-		});
-
-		return () => {
-			console.log('[WorkersPage2] Unsubscribing from B2F_WORKER_UPDATED events');
-			unsubscribe();
-		};
-	}, [transport, cache.actions]);
+	// Subscribe to real-time worker events
+	// Events: worker name updates, worker connections, worker disconnections
+	useRealtimeRefresh({
+		events: [B2F_WORKER_UPDATED, B2F_WORKER_CONNECTED, B2F_WORKER_DISCONNECTED],
+		onEvent: cache.actions.refresh,
+		logPrefix: 'WorkersPage2',
+	});
 
 	// Fetch function
 	const fetchWorkers = useCallback(async (query: ComposedQuery) => {
@@ -165,10 +144,10 @@ export function WorkersPage2() {
 				<strong>Active Features (UI / Debounced):</strong>
 				<div
 					className={`
-      mt-2 grid grid-cols-1 gap-2 text-xs
-      sm:grid-cols-2
-      lg:grid-cols-3
-    `}
+       mt-2 grid grid-cols-1 gap-2 text-xs
+       sm:grid-cols-2
+       lg:grid-cols-3
+     `}
 				>
 					<div>
 						<span className="text-muted-foreground">Search:</span>{' '}

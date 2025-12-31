@@ -2,6 +2,7 @@ import { Separator } from '@framework/components/primitives/Separator';
 import { ConnectivityIndicator } from '@framework/features/connectivity/ConnectivityIndicator';
 import { useTheme } from '@framework/features/theme/useTheme';
 import {
+	Bell,
 	BookOpen,
 	FolderKanban,
 	LayoutDashboard,
@@ -46,6 +47,11 @@ const navigationItems: NavItem[] = [
 		path: '/tasks2',
 		label: 'Tasks v2',
 		icon: ListTodo,
+	},
+	{
+		path: '/interventions',
+		label: 'Interventions',
+		icon: Bell,
 	},
 	{
 		path: '/workspaces',

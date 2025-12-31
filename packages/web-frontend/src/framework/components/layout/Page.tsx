@@ -34,7 +34,16 @@ export interface PageProps {
  */
 export function Page({ className = '', children, fullWidth = false }: PageProps) {
 	if (fullWidth) {
-		return <div className={`w-full p-6 ${className}`}>{children}</div>;
+		return (
+			<div
+				className={`
+    w-full p-6
+    ${className}
+  `}
+			>
+				{children}
+			</div>
+		);
 	}
 
 	return (

@@ -5,8 +5,10 @@ import { Label } from '@framework/components/forms/Label';
 import { Textarea } from '@framework/components/forms/Textarea';
 import { Button } from '@framework/components/primitives/Button';
 import { Separator } from '@framework/components/primitives/Separator';
-import { ChevronDown, Trash2 } from 'lucide-react';
+import type { ValidationIssue } from 'flow-engine/validation/ValidationTypes';
+import { AlertCircle, AlertTriangle, ChevronDown, Info, Trash2 } from 'lucide-react';
 
+import type { ConstantNodeData } from './nodes/ConstantNode';
 import type { FlowNode } from './types';
 import type { FlowStep } from './types/flow-engine.types';
 
@@ -14,6 +16,57 @@ interface FlowEditorPropertiesPanelProps {
 	selectedNode: FlowNode | null;
 	onUpdateNode: (nodeId: string, updates: Partial<FlowStep>) => void;
 	onDeleteNode: (nodeId: string) => void;
+}
+
+/**
+ * Component to display field-specific validation messages inline
+ */
+function FieldValidationMessage({ issues }: { issues: ValidationIssue[] }) {
+	if (issues.length === 0) return null;
+
+	return (
+		<div className="mt-2 space-y-2">
+			{issues.map((issue, idx) => {
+				const Icon =
+					issue.severity === 'error' ? AlertCircle : issue.severity === 'warning' ? AlertTriangle : Info;
+				const bgColor =
+					issue.severity === 'error'
+						? 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800'
+						: issue.severity === 'warning'
+							? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800'
+							: 'bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800';
+				const textColor =
+					issue.severity === 'error'
+						? 'text-red-800 dark:text-red-200'
+						: issue.severity === 'warning'
+							? 'text-yellow-800 dark:text-yellow-200'
+							: 'text-blue-800 dark:text-blue-200';
+
+				return (
+					<div
+						key={idx}
+						className={`
+       rounded-md border p-3
+       ${bgColor}
+     `}
+					>
+						<div
+							className={`
+        flex items-start gap-2 text-xs
+        ${textColor}
+      `}
+						>
+							<Icon className="mt-0.5 size-4 flex-shrink-0" />
+							<div className="flex-1">
+								<div className="font-medium">{issue.message}</div>
+								{issue.suggestion && <div className="mt-1 text-xs opacity-80">{issue.suggestion}</div>}
+							</div>
+						</div>
+					</div>
+				);
+			})}
+		</div>
+	);
 }
 
 export function FlowEditorPropertiesPanel({
@@ -27,11 +80,93 @@ export function FlowEditorPropertiesPanel({
 		return (
 			<div
 				className={`
-     flex w-96 items-center justify-center border-l bg-card p-4
-     text-muted-foreground
-   `}
+      flex w-96 items-center justify-center border-l bg-card p-4
+      text-muted-foreground
+    `}
 			>
 				Select a step to edit properties
+			</div>
+		);
+	}
+
+	// Handle constant nodes (UI-only, different data structure)
+	if (selectedNode.type === 'constant') {
+		const constantData = selectedNode.data as unknown as ConstantNodeData;
+		return (
+			<div className="w-96 overflow-auto border-l bg-card">
+				<div className="space-y-4 p-4">
+					{/* Header */}
+					<div>
+						<h3 className="mb-1 text-lg font-semibold">Constant Value</h3>
+						<p className="text-xs text-muted-foreground">
+							Type: <span className="font-mono">{constantData.type}</span>
+						</p>
+					</div>
+
+					<Separator />
+
+					<div className="space-y-2">
+						<Label htmlFor="constantLabel">Label (optional)</Label>
+						<Input
+							id="constantLabel"
+							value={constantData.label || ''}
+							onChange={e => {
+								// Update constant node data
+								const newData: ConstantNodeData = { ...constantData, label: e.target.value };
+								// Note: This requires special handling in useFlowEditor
+								onUpdateNode(selectedNode.id, newData as unknown as Partial<FlowStep>);
+							}}
+							placeholder="Optional label"
+						/>
+						<p className="text-xs text-muted-foreground">Optional label for this constant</p>
+					</div>
+
+					<div className="space-y-2">
+						<Label htmlFor="constantValue">Value</Label>
+						<Textarea
+							id="constantValue"
+							value={
+								constantData.type === 'object'
+									? JSON.stringify(constantData.value, null, 2)
+									: String(constantData.value ?? '')
+							}
+							onChange={e => {
+								let newValue: string | number | boolean | object = e.target.value;
+								// Parse based on type
+								if (constantData.type === 'number') {
+									newValue = Number(e.target.value);
+								} else if (constantData.type === 'boolean') {
+									newValue = e.target.value.toLowerCase() === 'true';
+								} else if (constantData.type === 'object') {
+									try {
+										newValue = JSON.parse(e.target.value);
+									} catch (_err) {
+										// Invalid JSON, keep as string for now
+										return;
+									}
+								}
+								const newData: ConstantNodeData = { ...constantData, value: newValue };
+								onUpdateNode(selectedNode.id, newData as unknown as Partial<FlowStep>);
+							}}
+							rows={4}
+							placeholder={`Enter ${constantData.type} value`}
+						/>
+						<p className="text-xs text-muted-foreground">Value of this constant</p>
+					</div>
+
+					<Separator />
+
+					{/* Actions */}
+					<Button
+						variant="destructive"
+						size="sm"
+						onClick={() => onDeleteNode(selectedNode.id)}
+						className="w-full"
+					>
+						<Trash2 className="mr-2 size-4" />
+						Delete Constant
+					</Button>
+				</div>
 			</div>
 		);
 	}
@@ -80,6 +215,78 @@ export function FlowEditorPropertiesPanel({
 
 				<Separator />
 
+				{/* Inputs & Outputs Section */}
+				{((selectedNode.data.inputPorts?.length ?? 0) > 0 ||
+					(selectedNode.data.outputPorts?.length ?? 0) > 0) && (
+					<>
+						<div className="space-y-4">
+							{/* Inputs */}
+							{selectedNode.data.inputPorts && selectedNode.data.inputPorts.length > 0 && (
+								<div className="space-y-2">
+									<Label className="text-sm font-semibold">Inputs</Label>
+									<div className="space-y-2 rounded-md border bg-muted/30 p-3">
+										{selectedNode.data.inputPorts.map(port => (
+											<div
+												key={port.id}
+												className="flex items-center justify-between gap-2 text-sm"
+											>
+												<div className="flex min-w-0 flex-1 items-center gap-2">
+													<span className="truncate font-mono text-xs">{port.name}</span>
+													{port.uncertain && (
+														<AlertTriangle className="size-3 flex-shrink-0 text-warning" />
+													)}
+												</div>
+												<span
+													className={`
+              flex-shrink-0 rounded bg-background px-2 py-0.5 font-mono text-xs
+              text-muted-foreground
+            `}
+												>
+													{port.type}
+												</span>
+											</div>
+										))}
+									</div>
+								</div>
+							)}
+
+							{/* Outputs */}
+							{selectedNode.data.outputPorts && selectedNode.data.outputPorts.length > 0 && (
+								<div className="space-y-2">
+									<Label className="text-sm font-semibold">Outputs</Label>
+									<div className="space-y-2 rounded-md border bg-muted/30 p-3">
+										{selectedNode.data.outputPorts.map(port => (
+											<div
+												key={port.id}
+												className="flex items-center justify-between gap-2 text-sm"
+											>
+												<div className="flex min-w-0 flex-1 items-center gap-2">
+													<span className="truncate font-mono text-xs">{port.name}</span>
+													{port.required && (
+														<span className="flex-shrink-0 text-xs text-destructive">
+															*
+														</span>
+													)}
+												</div>
+												<span
+													className={`
+              flex-shrink-0 rounded bg-background px-2 py-0.5 font-mono text-xs
+              text-muted-foreground
+            `}
+												>
+													{port.type}
+												</span>
+											</div>
+										))}
+									</div>
+								</div>
+							)}
+						</div>
+
+						<Separator />
+					</>
+				)}
+
 				{/* Type-Specific Fields */}
 				{step.type === 'model' && (
 					<>
@@ -112,6 +319,11 @@ export function FlowEditorPropertiesPanel({
 							<p className="text-xs text-muted-foreground">
 								Template with variable interpolation support
 							</p>
+							<FieldValidationMessage
+								issues={selectedNode.data.validationIssues.filter(
+									issue => issue.location?.field === 'prompt'
+								)}
+							/>
 						</div>
 					</>
 				)}
@@ -129,6 +341,11 @@ export function FlowEditorPropertiesPanel({
 								placeholder="Shell script or command to execute"
 							/>
 							<p className="text-xs text-muted-foreground">Shell script or command to execute</p>
+							<FieldValidationMessage
+								issues={selectedNode.data.validationIssues.filter(
+									issue => issue.location?.field === 'script'
+								)}
+							/>
 						</div>
 
 						<div className="space-y-2">
@@ -174,6 +391,11 @@ export function FlowEditorPropertiesPanel({
 								placeholder="{}"
 							/>
 							<p className="text-xs text-muted-foreground">Template inputs to pass to the subflow</p>
+							<FieldValidationMessage
+								issues={selectedNode.data.validationIssues.filter(
+									issue => issue.location?.field === 'inputs'
+								)}
+							/>
 						</div>
 					</>
 				)}
@@ -194,9 +416,9 @@ export function FlowEditorPropertiesPanel({
 						Advanced Options
 						<ChevronDown
 							className={`
-        size-4 transition-transform
-        ${showAdvanced ? `rotate-180` : ''}
-      `}
+         size-4 transition-transform
+         ${showAdvanced ? `rotate-180` : ''}
+       `}
 						/>
 					</Button>
 					{showAdvanced && (
@@ -212,6 +434,11 @@ export function FlowEditorPropertiesPanel({
 								<p className="text-xs text-muted-foreground">
 									JavaScript expression for conditional execution
 								</p>
+								<FieldValidationMessage
+									issues={selectedNode.data.validationIssues.filter(
+										issue => issue.location?.field === 'when'
+									)}
+								/>
 							</div>
 						</div>
 					)}

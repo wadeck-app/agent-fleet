@@ -115,49 +115,69 @@ export function TasksPage() {
         md:grid-cols-5
       `}
 					>
-						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
+						<div
+							className={`
+        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
+      `}
+						>
 							<div className="text-sm font-medium text-muted-foreground">Total Tasks</div>
 							<div className="text-2xl font-bold">{data.summary.total}</div>
 						</div>
-						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
+						<div
+							className={`
+        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
+      `}
+						>
 							<div className="text-sm font-medium text-muted-foreground">In Progress</div>
 							<div
 								className={`
-          text-2xl font-bold text-blue-600
-          dark:text-blue-400
+          text-2xl font-bold text-info
+          
         `}
 							>
 								{data.summary.byStatus.in_progress || 0}
 							</div>
 						</div>
-						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
+						<div
+							className={`
+        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
+      `}
+						>
 							<div className="text-sm font-medium text-muted-foreground">Review</div>
 							<div
 								className={`
-          text-2xl font-bold text-purple-600
-          dark:text-purple-400
+          text-2xl font-bold text-primary
+          
         `}
 							>
 								{data.summary.byStatus.review || 0}
 							</div>
 						</div>
-						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
+						<div
+							className={`
+        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
+      `}
+						>
 							<div className="text-sm font-medium text-muted-foreground">Completed</div>
 							<div
 								className={`
-          text-2xl font-bold text-green-600
-          dark:text-green-400
+          text-2xl font-bold text-success
+          
         `}
 							>
 								{(data.summary.byStatus.approved || 0) + (data.summary.byStatus.merged || 0)}
 							</div>
 						</div>
-						<div className={`rounded-lg border bg-card p-4 text-card-foreground shadow-sm`}>
+						<div
+							className={`
+        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
+      `}
+						>
 							<div className="text-sm font-medium text-muted-foreground">Blocked</div>
 							<div
 								className={`
-          text-2xl font-bold text-red-600
-          dark:text-red-400
+          text-2xl font-bold text-destructive
+          
         `}
 							>
 								{data.summary.byStatus.blocked || 0}

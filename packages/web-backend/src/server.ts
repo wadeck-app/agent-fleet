@@ -147,6 +147,13 @@ async function initializeTransportServer(app: FastifyInstance, factory: DataStor
 	const eventBroadcaster = new EventBroadcaster(allTransports, sessionManager, messageQueue);
 	factory.setEventBroadcaster(eventBroadcaster);
 
+	// Initialize OrchestratorEventBridge to forward orchestrator events to B2F events
+	const { OrchestratorEventBridge } = await import('./orchestrator/OrchestratorEventBridge');
+	const orchestratorWrapper = factory.getOrchestratorWrapper();
+	const orchestratorEventBridge = new OrchestratorEventBridge(orchestratorWrapper, eventBroadcaster);
+	orchestratorEventBridge.start();
+	factory.setOrchestratorEventBridge(orchestratorEventBridge);
+
 	logger.info(`[Transport] Multi-transport server initialized:`);
 	logger.info(`  - WebSocket: ws://localhost:${PORT}/api/transports/ws`);
 	logger.info(`  - SSE: http://localhost:${PORT}/api/transports/sse`);

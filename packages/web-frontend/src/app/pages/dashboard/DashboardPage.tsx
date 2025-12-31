@@ -38,7 +38,7 @@ import { useDashboard } from './useDashboard';
  */
 
 export function DashboardPage() {
-	const { data, loading, error, refresh, clearError } = useDashboard({ pollInterval: 5000 });
+	const { data, loading, error, refresh, clearError } = useDashboard();
 	const [isRefreshing, setIsRefreshing] = useState(false);
 
 	const handleRefresh = async () => {

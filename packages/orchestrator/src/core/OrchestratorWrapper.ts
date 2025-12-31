@@ -227,6 +227,47 @@ export class OrchestratorWrapper {
 	}
 
 	/**
+	 * Get all workspaces from WorkspaceManager
+	 */
+	async getWorkspaces(): Promise<any[]> {
+		const workspaceManager = this.orchestrator.getWorkspaceManager();
+		if (!workspaceManager) {
+			return [];
+		}
+		return workspaceManager.getAllWorkspaces();
+	}
+
+	/**
+	 * Get single workspace by ID
+	 */
+	async getWorkspace(workspaceId: string): Promise<any | null> {
+		const workspaceManager = this.orchestrator.getWorkspaceManager();
+		if (!workspaceManager) {
+			return null;
+		}
+		return workspaceManager.getWorkspace(workspaceId) || null;
+	}
+
+	/**
+	 * Get workspaces from all connected workers
+	 */
+	async getConnectedWorkersWorkspaces(): Promise<
+		Array<{
+			workerId: string;
+			workspacePath: string;
+			projectId: string;
+			connectedAt: string;
+			gitBranch?: string;
+		}>
+	> {
+		const wsServer = this.orchestrator.getWsServer();
+		if (!wsServer) {
+			return [];
+		}
+		return wsServer.getConnectedWorkspaces();
+	}
+
+	/**
 	 * Rename a worker (not implemented yet)
 	 */
 	async renameWorker(_workerId: string, _name: string): Promise<void> {

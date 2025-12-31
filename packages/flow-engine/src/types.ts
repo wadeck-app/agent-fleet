@@ -6,6 +6,8 @@
  */
 import type { TaskStatus } from 'shared-orch-worker/domain-types';
 
+import type { ValidationIssue } from './validation/ValidationTypes';
+
 /**
  * Supported model types for step execution
  */
@@ -321,9 +323,56 @@ export interface SubFlowStep extends Omit<BaseFlowStep, 'output'> {
 }
 
 /**
+ * Step that requires user intervention/approval
+ * Pauses flow execution until user responds
+ */
+export interface UserInterventionStep extends BaseFlowStep {
+	/** Step type discriminator */
+	type: 'user_intervention';
+
+	/** Type of intervention requested */
+	interventionType: 'approval' | 'question' | 'choice';
+
+	/** Block flow execution until answered (default: true) */
+	blocking?: boolean;
+
+	/** Timeout configuration */
+	timeout?: {
+		minutes: number;
+		onTimeout: 'fail' | 'continue' | 'default';
+		defaultValue?: any;
+	};
+
+	/** Configuration for approval type */
+	approval?: {
+		title: string;
+		description?: string;
+		allowReject?: boolean;
+	};
+
+	/** Configuration for question type */
+	question?: {
+		question: string;
+		responseType: 'text' | 'number' | 'boolean';
+		validation?: ValidationRule[];
+	};
+
+	/** Configuration for choice type */
+	choice?: {
+		question: string;
+		options: Array<{
+			id: string;
+			label: string;
+			description?: string;
+		}>;
+		allowMultiple?: boolean;
+	};
+}
+
+/**
  * Union type for all step types (discriminated by 'type' field)
  */
-export type FlowStep = ModelFlowStep | ScriptFlowStep | SubFlowStep;
+export type FlowStep = ModelFlowStep | ScriptFlowStep | SubFlowStep | UserInterventionStep;
 
 /**
  * Flow lifecycle hooks
@@ -410,6 +459,15 @@ export interface FlowMetadata {
 
 	/** Optional status transitions configuration */
 	statusTransitions?: StatusTransitions;
+
+	/** Whether the flow passed validation */
+	isValid: boolean;
+
+	/** Validation errors (severity: 'error') - present only if isValid is false */
+	validationErrors?: ValidationIssue[];
+
+	/** Validation warnings (severity: 'warning') - present even if isValid is true */
+	validationWarnings?: ValidationIssue[];
 }
 
 /**
@@ -480,7 +538,7 @@ export interface StepTrace {
 	stepName: string;
 
 	/** Step type */
-	stepType: 'model' | 'script' | 'subflow';
+	stepType: 'model' | 'script' | 'subflow' | 'user_intervention';
 
 	/** Start time (Unix timestamp in ms) */
 	startTime: number;
@@ -523,6 +581,21 @@ export interface StepTrace {
 
 	/** Nesting depth (for type='subflow') */
 	nestingDepth?: number;
+
+	// User Intervention step fields
+	/** Intervention type (for type='user_intervention') */
+	interventionType?: 'approval' | 'question' | 'choice';
+
+	/** Whether intervention blocks flow execution (for type='user_intervention') */
+	interventionBlocking?: boolean;
+
+	/** User's response to intervention (for type='user_intervention') */
+	interventionResponse?: {
+		value: any;
+		comment?: string;
+		answeredAt: string;
+		answeredBy: string;
+	};
 
 	// Common fields
 	/** Extracted output variables */

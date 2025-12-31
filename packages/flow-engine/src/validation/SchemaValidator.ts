@@ -23,6 +23,7 @@ import type {
 	ReusePolicy,
 	ScriptFlowStep,
 	SubFlowStep,
+	UserInterventionStep,
 	VariableType,
 	WorkspaceMode,
 	WorkspaceStrategy,
@@ -373,16 +374,18 @@ export class SchemaValidator {
 			this.validateScriptStep(step);
 		} else if (step.type === 'subflow') {
 			this.validateSubFlowStepSchema(step);
+		} else if (step.type === 'user_intervention') {
+			this.validateUserInterventionStep(step);
 		} else {
 			this.issueCollector.addIssue({
 				severity: 'error',
 				code: ValidationCode.INVALID_VALUE,
 				message: `Invalid step type: ${(step as any).type}`,
 				location: { stepId: (step as any).id, field: 'type' },
-				suggestion: 'Type must be either "model", "script", or "subflow"',
+				suggestion: 'Type must be either "model", "script", "subflow", or "user_intervention"',
 				context: {
 					actual: (step as any).type,
-					expected: ['model', 'script', 'subflow'],
+					expected: ['model', 'script', 'subflow', 'user_intervention'],
 				},
 			});
 		}
@@ -520,6 +523,159 @@ export class SchemaValidator {
 					actual: typeof step.inputs,
 				},
 			});
+		}
+	}
+
+	/**
+	 * Validate user intervention step schema (structure only)
+	 */
+	private validateUserInterventionStep(step: UserInterventionStep): void {
+		// Validate interventionType is provided
+		const validTypes = ['approval', 'question', 'choice'];
+		if (!step.interventionType || !validTypes.includes(step.interventionType)) {
+			this.issueCollector.addIssue({
+				severity: 'error',
+				code: ValidationCode.MISSING_FIELD,
+				message: `UserIntervention step '${step.id}' must have a valid interventionType`,
+				location: { stepId: step.id, field: 'interventionType' },
+				suggestion: `Must be one of: ${validTypes.join(', ')}`,
+				context: {
+					actual: step.interventionType,
+					expected: validTypes,
+				},
+			});
+		}
+
+		// Validate type-specific configuration
+		if (step.interventionType === 'approval') {
+			if (!step.approval) {
+				this.issueCollector.addIssue({
+					severity: 'error',
+					code: ValidationCode.MISSING_FIELD,
+					message: `UserIntervention step '${step.id}' of type 'approval' must have an 'approval' config`,
+					location: { stepId: step.id, field: 'approval' },
+					suggestion: 'Add an approval configuration with title and optional description',
+				});
+			} else {
+				// Validate approval.title
+				if (!step.approval.title || typeof step.approval.title !== 'string') {
+					this.issueCollector.addIssue({
+						severity: 'error',
+						code: ValidationCode.MISSING_FIELD,
+						message: `Approval step '${step.id}' must have a non-empty title`,
+						location: { stepId: step.id, field: 'approval.title' },
+						suggestion: 'Add a title describing what needs approval',
+					});
+				}
+			}
+		} else if (step.interventionType === 'question') {
+			if (!step.question) {
+				this.issueCollector.addIssue({
+					severity: 'error',
+					code: ValidationCode.MISSING_FIELD,
+					message: `UserIntervention step '${step.id}' of type 'question' must have a 'question' config`,
+					location: { stepId: step.id, field: 'question' },
+					suggestion: 'Add a question configuration with question text and responseType',
+				});
+			} else {
+				// Validate question.question
+				if (!step.question.question || typeof step.question.question !== 'string') {
+					this.issueCollector.addIssue({
+						severity: 'error',
+						code: ValidationCode.MISSING_FIELD,
+						message: `Question step '${step.id}' must have a non-empty question`,
+						location: { stepId: step.id, field: 'question.question' },
+						suggestion: 'Add a question text',
+					});
+				}
+				// Validate question.responseType
+				const validResponseTypes = ['text', 'number', 'boolean'];
+				if (!step.question.responseType || !validResponseTypes.includes(step.question.responseType)) {
+					this.issueCollector.addIssue({
+						severity: 'error',
+						code: ValidationCode.INVALID_VALUE,
+						message: `Question step '${step.id}' must have a valid responseType`,
+						location: { stepId: step.id, field: 'question.responseType' },
+						suggestion: `Must be one of: ${validResponseTypes.join(', ')}`,
+						context: {
+							actual: step.question.responseType,
+							expected: validResponseTypes,
+						},
+					});
+				}
+			}
+		} else if (step.interventionType === 'choice') {
+			if (!step.choice) {
+				this.issueCollector.addIssue({
+					severity: 'error',
+					code: ValidationCode.MISSING_FIELD,
+					message: `UserIntervention step '${step.id}' of type 'choice' must have a 'choice' config`,
+					location: { stepId: step.id, field: 'choice' },
+					suggestion: 'Add a choice configuration with question and options',
+				});
+			} else {
+				// Validate choice.question
+				if (!step.choice.question || typeof step.choice.question !== 'string') {
+					this.issueCollector.addIssue({
+						severity: 'error',
+						code: ValidationCode.MISSING_FIELD,
+						message: `Choice step '${step.id}' must have a non-empty question`,
+						location: { stepId: step.id, field: 'choice.question' },
+						suggestion: 'Add a question text',
+					});
+				}
+				// Validate choice.options
+				if (!Array.isArray(step.choice.options) || step.choice.options.length === 0) {
+					this.issueCollector.addIssue({
+						severity: 'error',
+						code: ValidationCode.EMPTY_COLLECTION,
+						message: `Choice step '${step.id}' must have at least one option`,
+						location: { stepId: step.id, field: 'choice.options' },
+						suggestion: 'Add at least one choice option with id and label',
+					});
+				}
+			}
+		}
+
+		// Validate blocking (optional, should be boolean if present)
+		if (step.blocking !== undefined && typeof step.blocking !== 'boolean') {
+			this.issueCollector.addIssue({
+				severity: 'error',
+				code: ValidationCode.INVALID_TYPE,
+				message: `UserIntervention step '${step.id}' blocking must be a boolean`,
+				location: { stepId: step.id, field: 'blocking' },
+				context: {
+					expected: 'boolean',
+					actual: typeof step.blocking,
+				},
+			});
+		}
+
+		// Validate timeout structure (optional)
+		if (step.timeout) {
+			if (typeof step.timeout.minutes !== 'number' || step.timeout.minutes <= 0) {
+				this.issueCollector.addIssue({
+					severity: 'error',
+					code: ValidationCode.INVALID_VALUE,
+					message: `UserIntervention step '${step.id}' timeout minutes must be a positive number`,
+					location: { stepId: step.id, field: 'timeout.minutes' },
+					suggestion: 'Set a positive number of minutes for timeout',
+				});
+			}
+			const validTimeoutActions = ['fail', 'continue', 'default'];
+			if (!step.timeout.onTimeout || !validTimeoutActions.includes(step.timeout.onTimeout)) {
+				this.issueCollector.addIssue({
+					severity: 'error',
+					code: ValidationCode.INVALID_VALUE,
+					message: `UserIntervention step '${step.id}' timeout.onTimeout must be valid`,
+					location: { stepId: step.id, field: 'timeout.onTimeout' },
+					suggestion: `Must be one of: ${validTimeoutActions.join(', ')}`,
+					context: {
+						actual: step.timeout.onTimeout,
+						expected: validTimeoutActions,
+					},
+				});
+			}
 		}
 	}
 }

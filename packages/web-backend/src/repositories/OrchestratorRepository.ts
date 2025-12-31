@@ -212,6 +212,32 @@ export class OrchestratorRepository {
 	}
 
 	/**
+	 * Get all workspaces from orchestrator
+	 */
+	async getWorkspaces(): Promise<any[]> {
+		// Library mode - direct access
+		if (this.orchestratorWrapper) {
+			return this.orchestratorWrapper.getWorkspaces();
+		}
+
+		// HTTP mode - not supported for now
+		throw new Error('HTTP mode for getWorkspaces not yet implemented');
+	}
+
+	/**
+	 * Get single workspace by ID
+	 */
+	async getWorkspace(workspaceId: string): Promise<any | null> {
+		// Library mode - direct access
+		if (this.orchestratorWrapper) {
+			return this.orchestratorWrapper.getWorkspace(workspaceId);
+		}
+
+		// HTTP mode - not supported for now
+		throw new Error('HTTP mode for getWorkspace not yet implemented');
+	}
+
+	/**
 	 * Clear the cache (useful for testing)
 	 */
 	clearCache(): void {

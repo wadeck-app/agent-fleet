@@ -102,12 +102,7 @@ export const WithForm: Story = {
 						placeholder="Enter email"
 					/>
 				</div>
-				<button
-					type="submit"
-					className={`
-      rounded-md bg-primary px-4 py-2 text-primary-foreground
-    `}
-				>
+				<button type="submit" className={`rounded-md bg-primary px-4 py-2 text-primary-foreground`}>
 					Submit
 				</button>
 			</form>

@@ -27,6 +27,12 @@ export interface TemplateContext {
 	/** Task ID for the current execution */
 	taskId?: string;
 
+	/** Worker ID (if applicable) */
+	workerId?: string;
+
+	/** Flow ID being executed */
+	flowId?: string;
+
 	/** Claude environment variables */
 	claudeEnv?: Record<string, string>;
 

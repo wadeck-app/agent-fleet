@@ -2,6 +2,23 @@ import { z } from 'zod';
 
 import { defineRoutes } from '../route-builder';
 
+// Validation issue schema for flow validation errors and warnings
+export const ValidationIssueSchema = z.object({
+	severity: z.enum(['error', 'warning', 'info']),
+	code: z.string(),
+	message: z.string(),
+	location: z
+		.object({
+			stepId: z.string().optional(),
+			field: z.string().optional(),
+			path: z.string().optional(),
+		})
+		.optional(),
+	suggestion: z.string().optional(),
+});
+
+export type ValidationIssue = z.infer<typeof ValidationIssueSchema>;
+
 export const FlowMetadataSchema = z.object({
 	id: z.string(),
 	version: z.string(),
@@ -9,6 +26,9 @@ export const FlowMetadataSchema = z.object({
 	name: z.string(),
 	description: z.string(),
 	inputs: z.record(z.string(), z.enum(['string', 'number', 'boolean', 'object'])).optional(),
+	isValid: z.boolean(),
+	validationErrors: z.array(ValidationIssueSchema).optional(),
+	validationWarnings: z.array(ValidationIssueSchema).optional(),
 });
 
 export type FlowMetadata = z.infer<typeof FlowMetadataSchema>;

@@ -19,23 +19,18 @@ import { type VariantProps, cva } from 'class-variance-authority';
  * </Button>
  */
 
-const spinnerVariants = cva(
-	`
-  animate-spin rounded-full border-solid border-primary border-t-transparent
-`,
-	{
-		variants: {
-			size: {
-				sm: 'size-4 border-2',
-				md: 'size-8 border-4',
-				lg: 'size-12 border-4',
-			},
+const spinnerVariants = cva(`animate-spin rounded-full border-solid border-primary border-t-transparent`, {
+	variants: {
+		size: {
+			sm: 'size-4 border-2',
+			md: 'size-8 border-4',
+			lg: 'size-12 border-4',
 		},
-		defaultVariants: {
-			size: 'md',
-		},
-	}
-);
+	},
+	defaultVariants: {
+		size: 'md',
+	},
+});
 
 const containerVariants = cva('flex flex-col items-center justify-center', {
 	variants: {
