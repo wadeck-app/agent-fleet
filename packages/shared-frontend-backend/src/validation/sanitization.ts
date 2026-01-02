@@ -62,7 +62,7 @@ export function sanitizePath(value: string): string {
  * Create a sanitized string schema (basic sanitization)
  * Use for: names, titles, categories
  */
-export function sanitizedString(minLength = 1, maxLength = 255): z.ZodEffects<z.ZodString, string, string> {
+export function sanitizedString(minLength = 1, maxLength = 255) {
 	return z
 		.string()
 		.min(minLength, `Must be at least ${minLength} character${minLength > 1 ? 's' : ''}`)
@@ -74,7 +74,7 @@ export function sanitizedString(minLength = 1, maxLength = 255): z.ZodEffects<z.
  * Create a sanitized text schema (HTML removed)
  * Use for: descriptions, comments, user-generated content
  */
-export function sanitizedText(minLength = 1, maxLength = 5000): z.ZodEffects<z.ZodString, string, string> {
+export function sanitizedText(minLength = 1, maxLength = 5000) {
 	return z
 		.string()
 		.min(minLength, `Must be at least ${minLength} character${minLength > 1 ? 's' : ''}`)
@@ -85,7 +85,7 @@ export function sanitizedText(minLength = 1, maxLength = 5000): z.ZodEffects<z.Z
 /**
  * Create an optional sanitized string schema
  */
-export function optionalSanitizedString(maxLength = 255): z.ZodOptional<z.ZodEffects<z.ZodString, string, string>> {
+export function optionalSanitizedString(maxLength = 255) {
 	return z.string().max(maxLength, `Must be at most ${maxLength} characters`).transform(sanitizeString).optional();
 }
 
@@ -137,7 +137,7 @@ export function emailSchema() {
 /**
  * Validate URL format
  */
-export function urlSchema(): z.ZodEffects<z.ZodString, string, string> {
+export function urlSchema() {
 	return z
 		.string()
 		.url('Invalid URL format')

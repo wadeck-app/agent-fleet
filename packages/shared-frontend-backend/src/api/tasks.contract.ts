@@ -56,7 +56,7 @@ export const LogEntrySchema = z.object({
 	/** Step type */
 	stepType: z.enum(['model', 'script', 'subflow', 'constant']),
 	/** Optional metadata (prompt, response, stdout, stderr, etc.) */
-	metadata: z.record(z.any()).optional(),
+	metadata: z.record(z.string(), z.any()).optional(),
 });
 
 /**
@@ -81,7 +81,7 @@ export const TaskSchema = z.object({
 		.object({
 			status: z.enum(['completed', 'failed']),
 			error: z.string().optional(),
-			outputs: z.record(z.any()).optional(),
+			outputs: z.record(z.string(), z.any()).optional(),
 			trace: z.any().optional(), // Full FlowTrace object
 		})
 		.optional(),
@@ -195,7 +195,7 @@ export const CreateTaskSchema = z.object({
 		workerId: z.string(),
 	}),
 	flowId: z.string().optional(),
-	flowInputs: z.record(z.any()).optional(),
+	flowInputs: z.record(z.string(), z.any()).optional(),
 });
 
 export type CreateTask = z.infer<typeof CreateTaskSchema>;
