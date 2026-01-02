@@ -16,6 +16,8 @@ import { useMultiSelect2 } from '@framework/hooks2/useMultiSelect2';
 import { usePagination2 } from '@framework/hooks2/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
 import { useSorting2 } from '@framework/hooks2/useSorting2';
+import { useCrudSuccessToast } from '@framework/hooks/useCrudSuccessToast';
+import { useErrorToast } from '@framework/hooks/useErrorToast';
 import { useRoutedDialog } from '@framework/hooks/useRoutedDialog';
 import {
 	applyColumnOrder,
@@ -147,8 +149,21 @@ export function Ingredients2Page() {
 	const [ingredients, setIngredients] = useState<Ingredient[]>([]);
 
 	// Use new CRUD-only hook (no automatic fetching)
-	const { createIngredient, updateIngredient, deleteIngredient, refreshIngredient, bulkDeleteIngredients } =
-		useIngredientsCrud();
+	const {
+		createIngredient,
+		updateIngredient,
+		deleteIngredient,
+		refreshIngredient,
+		bulkDeleteIngredients,
+		operationError,
+		clearOperationError,
+	} = useIngredientsCrud();
+
+	// Show error as toast automatically
+	useErrorToast({ error: operationError, clearError: clearOperationError });
+
+	// Success toast helper
+	const successToast = useCrudSuccessToast('ingredient');
 
 	// Bulk delete dialog state
 	const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
@@ -247,6 +262,9 @@ export function Ingredients2Page() {
 				console.log('[DELETE] 5. Refresh triggered (cache ID incremented)', {
 					timestamp: performance.now(),
 				});
+
+				// Show success toast
+				successToast.deleted();
 			} finally {
 				// Clear deleting state
 				setDeletingIds(prev => {
@@ -272,6 +290,7 @@ export function Ingredients2Page() {
 		// Mark that we're in mutation mode (useEffect will clear the flag when refresh completes)
 		isMutating.current = true;
 		try {
+			const isEditing = !!editingIngredient;
 			if (editingIngredient) {
 				// Find the latest version from the ingredients array
 				const latestIngredient = ingredients.find(i => i.id === editingIngredient.id);
@@ -283,6 +302,13 @@ export function Ingredients2Page() {
 			// Trigger Data2 refresh via cache control
 			await cache.actions.refresh();
 			navigate('/ingredients2');
+
+			// Show success toast
+			if (isEditing) {
+				successToast.updated();
+			} else {
+				successToast.created();
+			}
 		} finally {
 			// DON'T clear isRefreshingAfterMutation here - let useEffect do it when refresh completes
 		}

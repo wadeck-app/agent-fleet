@@ -280,6 +280,43 @@ export class WebSocketConnectionManager {
 	}
 
 	/**
+	 * Send an intervention response to the worker handling a specific task
+	 */
+	sendInterventionResponse(
+		taskId: string,
+		interventionId: string,
+		response: {
+			value: any;
+			comment?: string;
+			answeredAt: string;
+			answeredBy: string;
+		} | null,
+		timedOut?: boolean,
+		cancelled?: boolean
+	): boolean {
+		// Find worker handling this task
+		for (const worker of this.workers.values()) {
+			if (worker.taskId === taskId) {
+				this.sendMessage(
+					worker.socket,
+					createO2WMessage(O2WMessageType.INTERVENTION_RESPONSE, {
+						taskId,
+						interventionId,
+						response,
+						timedOut,
+						cancelled,
+					})
+				);
+				logger.info(`[WS] Sent INTERVENTION_RESPONSE for task ${taskId} to worker ${worker.id}`);
+				return true;
+			}
+		}
+
+		logger.warn(`[WS] No worker found for task ${taskId} to send intervention response`);
+		return false;
+	}
+
+	/**
 	 * Close all worker connections
 	 */
 	closeAll(): void {

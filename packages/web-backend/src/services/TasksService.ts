@@ -152,6 +152,23 @@ export class TasksService {
 	}
 
 	/**
+	 * Helper function for partial string matching (case-insensitive, trimmed)
+	 * Returns true if value contains query string (after trimming and lowercasing both)
+	 * Returns true if query is empty/undefined (no filtering)
+	 * Returns false if value is undefined/null but query is not empty
+	 */
+	private matchesPartialString(value: string | undefined | null, query: string | undefined): boolean {
+		if (!query) return true;
+
+		const trimmedQuery = query.toLowerCase().trim();
+		if (!trimmedQuery) return true;
+
+		if (!value) return false;
+
+		return value.toLowerCase().includes(trimmedQuery);
+	}
+
+	/**
 	 * Apply search filter across task fields
 	 */
 	private applySearch(tasks: Task[], searchQuery: string): Task[] {
@@ -160,11 +177,12 @@ export class TasksService {
 
 		return tasks.filter(
 			task =>
-				task.id.toLowerCase().includes(lowerQuery) ||
-				task.description.toLowerCase().includes(lowerQuery) ||
-				task.assignedWorker?.workerId.toLowerCase().includes(lowerQuery) ||
-				task.status.toLowerCase().includes(lowerQuery) ||
-				task.priority.toLowerCase().includes(lowerQuery)
+				this.matchesPartialString(task.id, searchQuery) ||
+				this.matchesPartialString(task.description, searchQuery) ||
+				this.matchesPartialString(task.assignedWorker?.workerId, searchQuery) ||
+				this.matchesPartialString(task.status, searchQuery) ||
+				this.matchesPartialString(task.priority, searchQuery) ||
+				this.matchesPartialString(task.flowId, searchQuery)
 		);
 	}
 
@@ -239,24 +257,32 @@ export class TasksService {
 	}
 
 	/**
-	 * Apply domain filters (status, workerId, priority)
+	 * Apply domain filters (status, workerId, priority, flowId)
+	 * Note: workerId and flowId use partial matching (contains) for better UX
 	 */
 	private applyFilters(tasks: Task[], query?: TasksQuery): Task[] {
 		let filtered = tasks;
 
-		// Filter by status if specified
+		// Filter by status if specified (exact match)
 		if (query?.status) {
 			filtered = filtered.filter(task => task.status === query.status);
 		}
 
-		// Filter by workerId if specified
+		// Filter by workerId if specified (partial match)
 		if (query?.workerId) {
-			filtered = filtered.filter(task => task.assignedWorker?.workerId === query.workerId);
+			filtered = filtered.filter(task =>
+				this.matchesPartialString(task.assignedWorker?.workerId, query.workerId)
+			);
 		}
 
-		// Filter by priority if specified
+		// Filter by priority if specified (exact match)
 		if (query?.priority) {
 			filtered = filtered.filter(task => task.priority === query.priority);
+		}
+
+		// Filter by flowId if specified (partial match)
+		if (query?.flowId) {
+			filtered = filtered.filter(task => this.matchesPartialString(task.flowId, query.flowId));
 		}
 
 		return filtered;

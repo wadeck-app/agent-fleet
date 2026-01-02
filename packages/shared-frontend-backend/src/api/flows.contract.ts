@@ -49,8 +49,8 @@ export const FlowDefinitionSchema = z.object({
 	version: z.string(),
 	name: z.string(),
 	description: z.string(),
-	workspace: z.record(z.any()).optional(),
-	statusTransitions: z.record(z.any()).optional(),
+	workspace: z.any().optional(), // Use z.any() for flexible object structure
+	statusTransitions: z.any().optional(), // Use z.any() for flexible object structure
 	inputs: z.record(z.string(), z.string()).optional(),
 	steps: z.array(z.any()),
 });

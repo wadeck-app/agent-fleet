@@ -36,7 +36,7 @@ export interface InterventionRequest {
 	timeout?: {
 		minutes: number;
 		onTimeout: 'fail' | 'continue' | 'default';
-		defaultValue?: any;
+		defaultValue?: unknown;
 	};
 }
 
@@ -45,7 +45,7 @@ export interface InterventionRequest {
  */
 export interface InterventionResponse {
 	/** User's response value */
-	value: any;
+	value: unknown;
 
 	/** Optional comment from user */
 	comment?: string;

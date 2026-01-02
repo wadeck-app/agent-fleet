@@ -2,7 +2,20 @@ import { useState } from 'react';
 
 import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
 import { Textarea } from '@framework/components/forms/Textarea';
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogMedia,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from '@framework/components/overlays/AlertDialog';
 import { Button } from '@framework/components/primitives/Button';
 import { Separator } from '@framework/components/primitives/Separator';
 import type { ValidationIssue } from 'flow-engine/validation/ValidationTypes';
@@ -157,15 +170,32 @@ export function FlowEditorPropertiesPanel({
 					<Separator />
 
 					{/* Actions */}
-					<Button
-						variant="destructive"
-						size="sm"
-						onClick={() => onDeleteNode(selectedNode.id)}
-						className="w-full"
-					>
-						<Trash2 className="mr-2 size-4" />
-						Delete Constant
-					</Button>
+					<AlertDialog>
+						<AlertDialogTrigger asChild>
+							<Button variant="destructive" size="sm" className="w-full">
+								<Trash2 className="mr-2 size-4" />
+								Delete Constant
+							</Button>
+						</AlertDialogTrigger>
+						<AlertDialogContent>
+							<AlertDialogHeader>
+								<AlertDialogMedia>
+									<Trash2 className="text-destructive" />
+								</AlertDialogMedia>
+								<AlertDialogTitle>Delete Constant?</AlertDialogTitle>
+								<AlertDialogDescription>
+									This action cannot be undone. The constant value will be permanently removed from
+									the flow.
+								</AlertDialogDescription>
+							</AlertDialogHeader>
+							<AlertDialogFooter>
+								<AlertDialogCancel>Cancel</AlertDialogCancel>
+								<AlertDialogAction variant="destructive" onClick={() => onDeleteNode(selectedNode.id)}>
+									Delete
+								</AlertDialogAction>
+							</AlertDialogFooter>
+						</AlertDialogContent>
+					</AlertDialog>
 				</div>
 			</div>
 		);
@@ -400,6 +430,224 @@ export function FlowEditorPropertiesPanel({
 					</>
 				)}
 
+				{step.type === 'user_intervention' && (
+					<>
+						<div className="space-y-2">
+							<Label htmlFor="interventionType">Intervention Type</Label>
+							<Select
+								value={step.interventionType}
+								onValueChange={value =>
+									onUpdateNode(selectedNode.id, {
+										interventionType: value as 'approval' | 'question' | 'choice',
+									} as Partial<FlowStep>)
+								}
+							>
+								<SelectTrigger className="w-full">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="approval">Approval</SelectItem>
+									<SelectItem value="question">Question</SelectItem>
+									<SelectItem value="choice">Choice</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+
+						<div className="space-y-2">
+							<Label htmlFor="blocking">
+								<input
+									id="blocking"
+									type="checkbox"
+									checked={step.blocking ?? true}
+									onChange={e =>
+										onUpdateNode(selectedNode.id, {
+											blocking: e.target.checked,
+										} as Partial<FlowStep>)
+									}
+									className="mr-2"
+								/>
+								Blocking (wait for user response)
+							</Label>
+						</div>
+
+						{/* Approval Configuration */}
+						{step.interventionType === 'approval' && (
+							<>
+								<div className="space-y-2">
+									<Label htmlFor="approval-title">Approval Title</Label>
+									<Input
+										id="approval-title"
+										value={step.approval?.title || ''}
+										onChange={e =>
+											onUpdateNode(selectedNode.id, {
+												approval: { ...step.approval, title: e.target.value },
+											} as Partial<FlowStep>)
+										}
+										placeholder="e.g., Approve Deployment to Production"
+									/>
+									<FieldValidationMessage
+										issues={selectedNode.data.validationIssues.filter(
+											issue => issue.location?.field === 'approval.title'
+										)}
+									/>
+								</div>
+
+								<div className="space-y-2">
+									<Label htmlFor="approval-description">Description (optional)</Label>
+									<Textarea
+										id="approval-description"
+										value={step.approval?.description || ''}
+										onChange={e =>
+											onUpdateNode(selectedNode.id, {
+												approval: { ...step.approval, description: e.target.value },
+											} as Partial<FlowStep>)
+										}
+										rows={3}
+										placeholder="Additional context or instructions"
+									/>
+								</div>
+
+								<div className="space-y-2">
+									<Label htmlFor="approval-allowReject">
+										<input
+											id="approval-allowReject"
+											type="checkbox"
+											checked={step.approval?.allowReject ?? true}
+											onChange={e =>
+												onUpdateNode(selectedNode.id, {
+													approval: { ...step.approval, allowReject: e.target.checked },
+												} as Partial<FlowStep>)
+											}
+											className="mr-2"
+										/>
+										Allow Reject
+									</Label>
+								</div>
+							</>
+						)}
+
+						{/* Question Configuration */}
+						{step.interventionType === 'question' && (
+							<>
+								<div className="space-y-2">
+									<Label htmlFor="question-text">Question</Label>
+									<Textarea
+										id="question-text"
+										value={step.question?.question || ''}
+										onChange={e =>
+											onUpdateNode(selectedNode.id, {
+												question: { ...step.question, question: e.target.value },
+											} as Partial<FlowStep>)
+										}
+										rows={3}
+										placeholder="Enter your question here"
+									/>
+									<FieldValidationMessage
+										issues={selectedNode.data.validationIssues.filter(
+											issue => issue.location?.field === 'question.question'
+										)}
+									/>
+								</div>
+
+								<div className="space-y-2">
+									<Label htmlFor="question-responseType">Response Type</Label>
+									<Select
+										value={step.question?.responseType || 'text'}
+										onValueChange={value =>
+											onUpdateNode(selectedNode.id, {
+												question: {
+													...step.question,
+													responseType: value as 'text' | 'number' | 'boolean',
+												},
+											} as Partial<FlowStep>)
+										}
+									>
+										<SelectTrigger className="w-full">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="text">Text</SelectItem>
+											<SelectItem value="number">Number</SelectItem>
+											<SelectItem value="boolean">Boolean</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
+							</>
+						)}
+
+						{/* Choice Configuration */}
+						{step.interventionType === 'choice' && (
+							<>
+								<div className="space-y-2">
+									<Label htmlFor="choice-question">Question</Label>
+									<Textarea
+										id="choice-question"
+										value={step.choice?.question || ''}
+										onChange={e =>
+											onUpdateNode(selectedNode.id, {
+												choice: { ...step.choice, question: e.target.value },
+											} as Partial<FlowStep>)
+										}
+										rows={3}
+										placeholder="What would you like the user to choose?"
+									/>
+									<FieldValidationMessage
+										issues={selectedNode.data.validationIssues.filter(
+											issue => issue.location?.field === 'choice.question'
+										)}
+									/>
+								</div>
+
+								<div className="space-y-2">
+									<Label htmlFor="choice-options">Options (JSON)</Label>
+									<Textarea
+										id="choice-options"
+										value={JSON.stringify(step.choice?.options || [], null, 2)}
+										onChange={e => {
+											try {
+												const parsed = JSON.parse(e.target.value);
+												onUpdateNode(selectedNode.id, {
+													choice: { ...step.choice, options: parsed },
+												} as Partial<FlowStep>);
+											} catch (_err) {
+												// Invalid JSON, ignore
+											}
+										}}
+										rows={8}
+										className="font-mono text-sm"
+										placeholder='[{"id": "option1", "label": "Option 1", "description": "..."}]'
+									/>
+									<p className="text-xs text-muted-foreground">
+										Array of options with id, label, and optional description
+									</p>
+									<FieldValidationMessage
+										issues={selectedNode.data.validationIssues.filter(
+											issue => issue.location?.field === 'choice.options'
+										)}
+									/>
+								</div>
+
+								<div className="space-y-2">
+									<Label htmlFor="choice-allowMultiple">
+										<input
+											id="choice-allowMultiple"
+											type="checkbox"
+											checked={step.choice?.allowMultiple ?? false}
+											onChange={e =>
+												onUpdateNode(selectedNode.id, {
+													choice: { ...step.choice, allowMultiple: e.target.checked },
+												} as Partial<FlowStep>)
+											}
+											className="mr-2"
+										/>
+										Allow Multiple Selection
+									</Label>
+								</div>
+							</>
+						)}
+					</>
+				)}
+
 				<Separator />
 
 				{/* Advanced Options */}
@@ -447,15 +695,32 @@ export function FlowEditorPropertiesPanel({
 				<Separator />
 
 				{/* Actions */}
-				<Button
-					variant="destructive"
-					size="sm"
-					onClick={() => onDeleteNode(selectedNode.id)}
-					className="w-full"
-				>
-					<Trash2 className="mr-2 size-4" />
-					Delete Step
-				</Button>
+				<AlertDialog>
+					<AlertDialogTrigger asChild>
+						<Button variant="destructive" size="sm" className="w-full">
+							<Trash2 className="mr-2 size-4" />
+							Delete Step
+						</Button>
+					</AlertDialogTrigger>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<AlertDialogMedia>
+								<Trash2 className="text-destructive" />
+							</AlertDialogMedia>
+							<AlertDialogTitle>Delete Step?</AlertDialogTitle>
+							<AlertDialogDescription>
+								This action cannot be undone. The step and all its connections will be permanently
+								removed from the flow.
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<AlertDialogFooter>
+							<AlertDialogCancel>Cancel</AlertDialogCancel>
+							<AlertDialogAction variant="destructive" onClick={() => onDeleteNode(selectedNode.id)}>
+								Delete
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
 			</div>
 		</div>
 	);

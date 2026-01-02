@@ -369,13 +369,13 @@ export class SchemaValidator {
 	 */
 	private validateStepType(step: FlowStep): void {
 		if (step.type === 'model') {
-			this.validateModelStep(step);
+			this.validateModelStep(step as ModelFlowStep);
 		} else if (step.type === 'script') {
-			this.validateScriptStep(step);
+			this.validateScriptStep(step as ScriptFlowStep);
 		} else if (step.type === 'subflow') {
-			this.validateSubFlowStepSchema(step);
+			this.validateSubFlowStepSchema(step as SubFlowStep);
 		} else if (step.type === 'user_intervention') {
-			this.validateUserInterventionStep(step);
+			this.validateUserInterventionStep(step as UserInterventionStep);
 		} else {
 			this.issueCollector.addIssue({
 				severity: 'error',
@@ -675,6 +675,61 @@ export class SchemaValidator {
 						expected: validTimeoutActions,
 					},
 				});
+			}
+		}
+
+		// Validate outputs for user_intervention steps
+		if (step.output) {
+			// Available sources from InterventionResponse (see StepRunner.ts line 562-577)
+			const availableSources = new Set([
+				'intervention.value',
+				'intervention.comment',
+				'intervention.answeredBy',
+				'intervention.answeredAt',
+				'intervention.userResponse',
+				'intervention.approved',
+				'intervention.rejected',
+				'intervention.answer',
+				'intervention.choice',
+			]);
+
+			for (const [outputName, outputConfig] of Object.entries(step.output)) {
+				// UserIntervention steps should NOT have patterns
+				if (outputConfig.pattern) {
+					this.issueCollector.addIssue({
+						severity: 'error',
+						code: ValidationCode.INVALID_VALUE,
+						message: `UserIntervention step '${step.id}' output '${outputName}' must not have a pattern`,
+						location: { stepId: step.id, field: `output.${outputName}.pattern` },
+						suggestion: `Remove 'pattern' and use 'from' instead to specify the source explicitly.`,
+					});
+				}
+
+				// UserIntervention steps MUST have 'from' field
+				if (!outputConfig.from) {
+					this.issueCollector.addIssue({
+						severity: 'error',
+						code: ValidationCode.MISSING_FIELD,
+						message: `UserIntervention step '${step.id}' output '${outputName}' must have a 'from' field`,
+						location: { stepId: step.id, field: `output.${outputName}.from` },
+						suggestion: `Add 'from' field. Examples: 'intervention.approved', 'intervention.comment', 'intervention.answeredBy'. Available sources: ${Array.from(availableSources).join(', ')}`,
+					});
+				} else {
+					// Validate that 'from' points to an available source
+					if (!availableSources.has(outputConfig.from)) {
+						this.issueCollector.addIssue({
+							severity: 'error',
+							code: ValidationCode.INVALID_VALUE,
+							message: `UserIntervention step '${step.id}' output '${outputName}' has invalid 'from' value: '${outputConfig.from}'`,
+							location: { stepId: step.id, field: `output.${outputName}.from` },
+							suggestion: `Must be one of: ${Array.from(availableSources).join(', ')}`,
+							context: {
+								actual: outputConfig.from,
+								expected: Array.from(availableSources),
+							},
+						});
+					}
+				}
 			}
 		}
 	}

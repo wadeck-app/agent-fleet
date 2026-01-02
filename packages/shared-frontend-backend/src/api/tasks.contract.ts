@@ -94,6 +94,7 @@ export const TasksQuerySchema = z.object({
 	status: TaskStatusSchema.optional(),
 	workerId: z.string().optional(),
 	priority: TaskPrioritySchema.optional(),
+	flowId: z.string().optional(),
 });
 
 /**
@@ -112,6 +113,7 @@ export const TasksListQuerySchema = z.object({
 	status: TaskStatusSchema.optional(),
 	workerId: z.string().optional(),
 	priority: TaskPrioritySchema.optional(),
+	flowId: z.string().optional(),
 });
 
 /**

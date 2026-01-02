@@ -25,9 +25,41 @@ export class InterventionManager {
 	private pendingInterventions: Map<string, Intervention> = new Map();
 	private timeoutHandles: Map<string, NodeJS.Timeout> = new Map();
 	private taskManager: TaskManager;
+	private sendResponseCallback?: (
+		taskId: string,
+		interventionId: string,
+		response: {
+			value: any;
+			comment?: string;
+			answeredAt: string;
+			answeredBy: string;
+		} | null,
+		timedOut?: boolean,
+		cancelled?: boolean
+	) => boolean;
 
 	constructor(taskManager: TaskManager) {
 		this.taskManager = taskManager;
+	}
+
+	/**
+	 * Set the callback for sending intervention responses to workers
+	 */
+	setSendResponseCallback(
+		callback: (
+			taskId: string,
+			interventionId: string,
+			response: {
+				value: any;
+				comment?: string;
+				answeredAt: string;
+				answeredBy: string;
+			} | null,
+			timedOut?: boolean,
+			cancelled?: boolean
+		) => boolean
+	): void {
+		this.sendResponseCallback = callback;
 	}
 
 	/**
@@ -141,7 +173,10 @@ export class InterventionManager {
 		// Update intervention
 		intervention.status = 'answered';
 		intervention.answeredAt = new Date().toISOString();
-		intervention.response = response;
+		intervention.response = {
+			...response,
+			answeredAt: intervention.answeredAt,
+		};
 
 		// Save to storage
 		await Storage.saveIntervention(intervention);
@@ -149,6 +184,25 @@ export class InterventionManager {
 		// Remove from pending and cancel timeout
 		this.pendingInterventions.delete(interventionId);
 		this.cancelTimeout(interventionId);
+
+		// Send response to worker if callback is set
+		if (this.sendResponseCallback) {
+			const sent = this.sendResponseCallback(
+				intervention.taskId,
+				interventionId,
+				{
+					value: response.value,
+					comment: response.comment,
+					answeredAt: intervention.answeredAt,
+					answeredBy: response.answeredBy,
+				},
+				false,
+				false
+			);
+			if (!sent) {
+				console.warn(`[InterventionManager] Failed to send response to worker for task ${intervention.taskId}`);
+			}
+		}
 
 		// Resume task execution
 		await this.taskManager.clearTaskIntervention(intervention.taskId, interventionId);
@@ -173,6 +227,11 @@ export class InterventionManager {
 		this.pendingInterventions.delete(interventionId);
 		this.cancelTimeout(interventionId);
 
+		// Send cancellation to worker if callback is set
+		if (this.sendResponseCallback) {
+			this.sendResponseCallback(intervention.taskId, interventionId, null, false, true);
+		}
+
 		console.log(`[InterventionManager] Intervention ${interventionId} cancelled`);
 	}
 
@@ -190,6 +249,7 @@ export class InterventionManager {
 		intervention.status = 'timeout';
 
 		// Apply timeout behavior
+		const answeredAt = new Date().toISOString();
 		if (intervention.timeout) {
 			switch (intervention.timeout.onTimeout) {
 				case 'default':
@@ -197,6 +257,7 @@ export class InterventionManager {
 					intervention.response = {
 						value: intervention.timeout.defaultValue,
 						answeredBy: 'system',
+						answeredAt,
 						comment: 'Timeout: using default value',
 					};
 					break;
@@ -205,6 +266,7 @@ export class InterventionManager {
 					intervention.response = {
 						value: null,
 						answeredBy: 'system',
+						answeredAt,
 						comment: 'Timeout: continuing without value',
 					};
 					break;
@@ -217,6 +279,14 @@ export class InterventionManager {
 		await Storage.saveIntervention(intervention);
 		this.pendingInterventions.delete(interventionId);
 		this.timeoutHandles.delete(interventionId);
+
+		// Send timeout response to worker if callback is set
+		if (this.sendResponseCallback) {
+			this.sendResponseCallback(intervention.taskId, interventionId, intervention.response || null, true, false);
+		}
+
+		// Resume task execution
+		await this.taskManager.clearTaskIntervention(intervention.taskId, interventionId);
 	}
 
 	/**

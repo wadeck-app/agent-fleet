@@ -8,6 +8,7 @@ import type {
 	W2OFlowStepFailedMessage,
 	W2OFlowStepStartedMessage,
 	W2OHookEventMessage,
+	W2OInterventionRequestedMessage,
 	W2OTaskCompletedMessage,
 	W2OTaskFailedMessage,
 	W2OTaskProgressMessage,
@@ -17,6 +18,7 @@ import type {
 	W2OWorkspaceReleasedMessage,
 } from 'shared-orch-worker/worker-messages';
 
+import type { InterventionManager } from '../core/InterventionManager';
 import type { TaskManager } from '../core/TaskManager';
 import type { WebSocketConnectionManager } from './WebSocketConnectionManager';
 
@@ -32,11 +34,18 @@ export class WebSocketEventHandler {
 	private taskManager: TaskManager;
 	private stateManager: StateManager;
 	private connectionManager: WebSocketConnectionManager;
+	private interventionManager: InterventionManager;
 
-	constructor(taskManager: TaskManager, stateManager: StateManager, connectionManager: WebSocketConnectionManager) {
+	constructor(
+		taskManager: TaskManager,
+		stateManager: StateManager,
+		connectionManager: WebSocketConnectionManager,
+		interventionManager: InterventionManager
+	) {
 		this.taskManager = taskManager;
 		this.stateManager = stateManager;
 		this.connectionManager = connectionManager;
+		this.interventionManager = interventionManager;
 	}
 
 	/**
@@ -231,6 +240,67 @@ export class WebSocketEventHandler {
 		logger.info(`[WS] Hook event ${hookName} from worker ${workerId}`);
 
 		// TODO: Log to knowledge base if relevant
+	}
+
+	/**
+	 * Handle INTERVENTION_REQUESTED message
+	 */
+	async handleInterventionRequested(message: W2OInterventionRequestedMessage): Promise<void> {
+		const { workerId, taskId, flowId, stepId, interventionType, blocking, config, timeout } = message;
+		logger.info(
+			`[WS] Worker ${workerId} requested ${interventionType} intervention for task ${taskId} step ${stepId}`
+		);
+
+		try {
+			// Create intervention using InterventionManager
+			const intervention = await this.interventionManager.createIntervention({
+				taskId,
+				workerId,
+				flowId,
+				stepId,
+				type: interventionType,
+				source: {
+					type: 'flow_step',
+					stepId,
+				},
+				config,
+				blocking,
+				timeout,
+			});
+
+			logger.info(`[WS] Created intervention ${intervention.id} for task ${taskId}`);
+
+			// Emit event for UI to show intervention
+			this.stateManager.emit('intervention.created', intervention);
+
+			// For non-blocking interventions, send immediate response
+			if (!blocking) {
+				const worker = this.connectionManager.getWorker(workerId);
+				if (worker) {
+					this.connectionManager.sendMessage(
+						worker.socket,
+						createO2WMessage(O2WMessageType.INTERVENTION_RESPONSE, {
+							taskId,
+							interventionId: intervention.id,
+							response: null,
+						})
+					);
+				}
+			}
+		} catch (error) {
+			logger.error(`[WS] Failed to create intervention for task ${taskId}:`, error);
+
+			// Send error response to worker
+			const worker = this.connectionManager.getWorker(workerId);
+			if (worker) {
+				this.connectionManager.sendMessage(
+					worker.socket,
+					createO2WMessage(O2WMessageType.ERROR, {
+						error: error instanceof Error ? error.message : 'Failed to create intervention',
+					})
+				);
+			}
+		}
 	}
 
 	/**

@@ -1126,7 +1126,10 @@ test-user-intervention:
               description: 'Data hash: ${{ steps.prepare.outputs.data_hash }}. Please review and approve this deployment.'
               allowReject: true
           output:
-              approved: '${{ steps.approval.outputs.approved }}'
+              approved: { type: boolean, from: 'intervention.approved' }
+              userResponse: { type: string, from: 'intervention.userResponse' }
+              comment: { type: string, from: 'intervention.comment' }
+              answeredBy: { type: string, from: 'intervention.answeredBy' }
 
         - type: script
           id: deploy
@@ -1137,3 +1140,5 @@ test-user-intervention:
               echo [deploy] Deploying data: ${{ steps.prepare.outputs.data_hash }}
               ping localhost -n 3 >nul
               echo [deploy] Deployment successful!
+
+# Temporary test flow - INVALID

@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { CrudDialog } from '@framework/components/overlays/CrudDialog';
 import { FormContainer } from '@framework/features/forms/FormContainer';
-import { SelectField, type SelectOption } from '@framework/features/forms/fields/SelectField';
+import { ComboboxField, type ComboboxOption } from '@framework/features/forms/fields/ComboboxField';
+import { SelectField } from '@framework/features/forms/fields/SelectField';
 import { TextAreaField } from '@framework/features/forms/fields/TextAreaField';
 import { TextField } from '@framework/features/forms/fields/TextField';
 import { useFormState } from '@framework/features/forms/useFormState';
+import { useToast } from '@framework/features/toast/ToastContext';
 import type { FlowMetadata } from '@shared/api/flows.contract';
 import type { CreateTask } from '@shared/api/tasks.contract';
 import { AlertTriangle } from 'lucide-react';
@@ -36,13 +38,14 @@ const defaultFormData: CreateTaskFormData = {
 };
 
 export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDialogProps) {
+	const { showToast } = useToast();
 	const { data: workersData, loading: workersLoading } = useWorkers();
 	const [workerFlowsMetadata, setWorkerFlowsMetadata] = useState<FlowMetadata[]>([]);
 	const [flowsLoading, setFlowsLoading] = useState(false);
 	const [flowInputs, setFlowInputs] = useState<Record<string, string>>({});
 
-	// Transform workers to SelectOption format
-	const workerOptions: SelectOption[] =
+	// Transform workers to ComboboxOption format
+	const workerOptions: ComboboxOption[] =
 		workersData?.workers.map(w => ({
 			value: w.workerId,
 			label: `${w.workerId}${w.taskId ? ' (busy)' : ' (idle)'}`,
@@ -88,17 +91,29 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 		},
 		onSubmit: async data => {
 			// Transform flat form data to nested CreateTask structure
+			// IMPORTANT: Empty strings must be undefined for Zod validation
 			const createTaskData: CreateTask = {
 				description: data.description,
 				priority: data.priority as CreateTask['priority'],
 				assignedTo: { workerId: data.workerId },
-				flowId: data.flowId || undefined,
+				flowId: data.flowId?.trim() || undefined,
 				// Pass the actual flow inputs if flow is selected
 				flowInputs: data.flowId && Object.keys(flowInputs).length > 0 ? flowInputs : undefined,
 			};
-			await tasksService.createTask(createTaskData);
-			onSuccess();
-			onOpenChange(false);
+
+			try {
+				await tasksService.createTask(createTaskData);
+				showToast('Task created successfully', 'success');
+				onSuccess();
+				onOpenChange(false);
+			} catch (error) {
+				// Show error toast to user
+				const errorMessage = error instanceof Error ? error.message : 'Failed to create task';
+				showToast(errorMessage, 'error');
+				console.error('Failed to create task:', error);
+				// Re-throw to let useFormState handle the isSubmitting state
+				throw error;
+			}
 		},
 	});
 
@@ -150,9 +165,9 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 		}
 	}, [selectedFlow]);
 
-	// Convert flow metadata to select options
+	// Convert flow metadata to combobox options
 	// Mark invalid flows with a badge and disable them
-	const flowOptions: SelectOption[] = workerFlowsMetadata.map(flow => ({
+	const flowOptions: ComboboxOption[] = workerFlowsMetadata.map(flow => ({
 		value: flow.id,
 		label: flow.isValid
 			? flow.name || flow.id
@@ -203,7 +218,7 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 				</div>
 
 				<div className="col-span-2">
-					<SelectField
+					<ComboboxField
 						label="Assign to Worker"
 						value={formState.formData.workerId}
 						onChange={value => formState.updateField('workerId', value)}
@@ -216,7 +231,7 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 				</div>
 
 				<div className="col-span-2">
-					<SelectField
+					<ComboboxField
 						label="Flow (Optional)"
 						value={formState.formData.flowId}
 						onChange={value => formState.updateField('flowId', value)}

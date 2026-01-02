@@ -71,7 +71,17 @@ export class Orchestrator implements Shutdownable {
 		logger.info('Orchestrator', 'InterventionManager initialized');
 
 		// Create WebSocket server
-		this.wsServer = new WorkerWebSocketServer(this.taskManager, this.stateManager, this.wsPort);
+		this.wsServer = new WorkerWebSocketServer(
+			this.taskManager,
+			this.stateManager,
+			this.interventionManager,
+			this.wsPort
+		);
+
+		// Wire up intervention response callback
+		this.interventionManager.setSendResponseCallback((taskId, interventionId, response, timedOut, cancelled) => {
+			return this.wsServer!.sendInterventionResponse(taskId, interventionId, response, timedOut, cancelled);
+		});
 
 		// Inject flow discovery registry into TaskManager for flow validation
 		const flowRegistry = this.wsServer.getConnectionManager().getFlowDiscoveryRegistry();

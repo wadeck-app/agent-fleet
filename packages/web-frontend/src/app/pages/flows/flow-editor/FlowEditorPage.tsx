@@ -1,7 +1,9 @@
+import { useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
+import { useToast } from '@framework/features/toast/ToastContext';
 import { ReactFlowProvider } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { AlertTriangle, XCircle } from 'lucide-react';
@@ -21,10 +23,22 @@ export function FlowEditorPage() {
 	const navigate = useNavigate();
 	const flowEditor = useFlowEditor(flowId);
 	const { flows } = useFlowsList();
+	const { showToast } = useToast();
+
+	// Track previous isSaving state to detect save completion
+	const wasSavingRef = useRef(false);
+
+	// Show success toast when save completes successfully
+	useEffect(() => {
+		if (wasSavingRef.current && !flowEditor.isSaving && !flowEditor.error) {
+			showToast('Flow saved successfully', 'success');
+		}
+		wasSavingRef.current = flowEditor.isSaving;
+	}, [flowEditor.isSaving, flowEditor.error, showToast]);
 
 	const handleLoadFlow = (selectedFlowId: string) => {
 		// Update URL - the useEffect in useFlowEditor will handle loading
-		navigate(`/flows/${selectedFlowId}/edit`, { replace: true });
+		navigate(`/flows/${selectedFlowId}/edit`);
 	};
 
 	// Only show full loading screen on initial load
@@ -146,13 +160,14 @@ export function FlowEditorPage() {
 							</div>
 
 							{/* Properties Panel - Show Node or Edge Panel based on selection */}
-							{flowEditor.selectedNode ? (
+							{flowEditor.selectedNode && (
 								<FlowEditorPropertiesPanel
 									selectedNode={flowEditor.selectedNode}
 									onUpdateNode={flowEditor.updateNodeData}
 									onDeleteNode={flowEditor.deleteNode}
 								/>
-							) : flowEditor.selectedEdge ? (
+							)}
+							{flowEditor.selectedEdge && (
 								<FlowEditorEdgePanel
 									selectedEdge={flowEditor.selectedEdge}
 									nodes={flowEditor.nodes}
@@ -160,10 +175,6 @@ export function FlowEditorPage() {
 										flowEditor.setEdges(eds => eds.filter(e => e.id !== edgeId));
 									}}
 								/>
-							) : (
-								<div className="flex w-96 items-center justify-center border-l bg-card p-4 text-muted-foreground">
-									Select a node or edge to view properties
-								</div>
 							)}
 
 							{/* Right Panel (YAML + Validation) */}

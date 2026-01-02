@@ -185,10 +185,10 @@ export function BulkDeleteWorkflow({
 			// Show appropriate toast based on results
 			if (allFailed.length === 0) {
 				// All succeeded
-				showToast(`✓ Successfully deleted ${allDeleted.length} ${itemTypeName}(s)`, 'success');
+				showToast(`Successfully deleted ${allDeleted.length} ${itemTypeName}(s)`, 'success');
 			} else if (allDeleted.length === 0) {
 				// All failed
-				showToast(`✗ Failed to delete all ${allFailed.length} ${itemTypeName}(s)`, 'error');
+				showToast(`Failed to delete all ${allFailed.length} ${itemTypeName}(s)`, 'error');
 			} else {
 				// Partial success
 				showToast(`Deleted ${allDeleted.length} ${itemTypeName}(s), ${allFailed.length} failed`, 'warning');

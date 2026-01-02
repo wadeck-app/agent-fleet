@@ -16,6 +16,7 @@ export enum O2WMessageType {
 	SHUTDOWN = 'o2w:worker:shutdown',
 	REQUEST_FLOW_DEFINITION = 'o2w:flow:request_definition',
 	SAVE_FLOW_DEFINITION = 'o2w:flow:save_definition',
+	INTERVENTION_RESPONSE = 'o2w:intervention:response',
 	ACK = 'o2w:ack',
 	ERROR = 'o2w:error',
 }
@@ -70,6 +71,20 @@ export interface SaveFlowDefinitionMessage extends O2WBaseMessage {
 	requestId: string; // For matching request with response
 }
 
+export interface InterventionResponseMessage extends O2WBaseMessage {
+	type: O2WMessageType.INTERVENTION_RESPONSE;
+	taskId: string;
+	interventionId: string;
+	response: {
+		value: any;
+		comment?: string;
+		answeredAt: string;
+		answeredBy: string;
+	} | null; // null if timeout or cancelled
+	timedOut?: boolean;
+	cancelled?: boolean;
+}
+
 export type O2WMessage =
 	| WorkerWelcomeMessage
 	| AssignTaskMessage
@@ -79,6 +94,7 @@ export type O2WMessage =
 	| ShutdownMessage
 	| RequestFlowDefinitionMessage
 	| SaveFlowDefinitionMessage
+	| InterventionResponseMessage
 	| AckMessage
 	| ErrorMessage;
 
@@ -95,6 +111,7 @@ export interface O2WMessageMap {
 	[O2WMessageType.SHUTDOWN]: ShutdownMessage;
 	[O2WMessageType.REQUEST_FLOW_DEFINITION]: RequestFlowDefinitionMessage;
 	[O2WMessageType.SAVE_FLOW_DEFINITION]: SaveFlowDefinitionMessage;
+	[O2WMessageType.INTERVENTION_RESPONSE]: InterventionResponseMessage;
 	[O2WMessageType.ACK]: AckMessage;
 	[O2WMessageType.ERROR]: ErrorMessage;
 }
@@ -114,7 +131,7 @@ export interface O2WMessageMap {
  * });
  * // msg is automatically typed as WorkerWelcomeMessage
  */
-export function createO2WMessage<T extends O2WMessageType>(
+export function createO2WMessage<T extends keyof O2WMessageMap>(
 	type: T,
 	payload: Omit<O2WMessageMap[T], 'type' | 'timestamp'>,
 	timestamp?: createMessageInternal_Timestamp

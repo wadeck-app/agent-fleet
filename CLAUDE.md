@@ -10,6 +10,7 @@ Important: Delegate to sub-agents early and often. It reduces the context size a
 - Dependency Injection - Constructor parameters, not globals
 - Test Coverage - >70% coverage for all classes, targeting 90% for business logic
 - Clear Naming - No abbreviations (use `WebSocket` not `WS`)
+- "Antifragile" approach: composable/reusable/isolated features that are improved by encountering new situations rather than breaking
 
 **Avoid:**
 
@@ -17,6 +18,7 @@ Important: Delegate to sub-agents early and often. It reduces the context size a
 - Circular dependencies
 - Generic names (`manager.ts` → `TaskManager.ts`)
 - Kebab-case for class files
+- Fallback for unrecognized value, you must fail fast (e.g. switch default case → throw)
 
 **After each task:**
 Use the skill "check" and fix the issues

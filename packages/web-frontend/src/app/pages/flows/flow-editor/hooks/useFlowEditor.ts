@@ -5,7 +5,14 @@ import { type EdgeMouseHandler, type Node, type OnConnect, addEdge, useEdgesStat
 import { flowsApi } from '../flowsApi';
 import type { ConstantNodeData } from '../nodes/ConstantNode';
 import type { FlowEdge, FlowNode } from '../types';
-import type { FlowDefinition, FlowStep, ModelFlowStep, ScriptFlowStep, SubFlowStep } from '../types/flow-engine.types';
+import type {
+	FlowDefinition,
+	FlowStep,
+	ModelFlowStep,
+	ScriptFlowStep,
+	SubFlowStep,
+	UserInterventionStep,
+} from '../types/flow-engine.types';
 import { areTypesCompatible, getHandleType } from '../utils/TypeValidator';
 import { extractAllPorts } from '../utils/VariableExtractor';
 import { flowDefinitionToReactFlow, reactFlowToFlowDefinition } from '../utils/flowToReactFlow';
@@ -368,7 +375,7 @@ export function useFlowEditor(flowId: string | undefined) {
 
 	// Add new node
 	const addNode = useCallback(
-		(type: 'model' | 'script' | 'subflow' | 'constant') => {
+		(type: 'model' | 'script' | 'subflow' | 'constant' | 'user_intervention') => {
 			const newId = `step-${Date.now()}`;
 
 			// Handle constant nodes (UI-only, not FlowSteps)
@@ -406,6 +413,18 @@ export function useFlowEditor(flowId: string | undefined) {
 					name: 'New Script Step',
 					script: '',
 				} as ScriptFlowStep;
+			} else if (type === 'user_intervention') {
+				newStep = {
+					type: 'user_intervention',
+					id: newId,
+					name: 'New User Intervention',
+					interventionType: 'approval',
+					blocking: true,
+					approval: {
+						title: '',
+						allowReject: true,
+					},
+				} as UserInterventionStep;
 			} else {
 				newStep = {
 					type: 'subflow',

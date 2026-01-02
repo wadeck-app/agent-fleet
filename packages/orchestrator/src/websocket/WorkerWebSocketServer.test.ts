@@ -115,8 +115,16 @@ describe('WorkerWebSocketServer Integration', () => {
 		vi.mocked(logger.info).mockImplementation(() => {});
 		vi.mocked(logger.error).mockImplementation(() => {});
 
+		// Create mock intervention manager
+		const mockInterventionManager = {
+			createIntervention: vi.fn(),
+			respondToIntervention: vi.fn(),
+			cancelIntervention: vi.fn(),
+			setSendResponseCallback: vi.fn(),
+		} as any;
+
 		// Create server
-		server = new WorkerWebSocketServer(mockTaskManager, mockStateManager, 3738);
+		server = new WorkerWebSocketServer(mockTaskManager, mockStateManager, mockInterventionManager, 3738);
 		mockWss = latestWssInstance;
 	});
 
@@ -142,7 +150,18 @@ describe('WorkerWebSocketServer Integration', () => {
 		});
 
 		it('should use custom port', () => {
-			const customServer = new WorkerWebSocketServer(mockTaskManager, mockStateManager, 9999);
+			const mockInterventionManager = {
+				createIntervention: vi.fn(),
+				respondToIntervention: vi.fn(),
+				cancelIntervention: vi.fn(),
+				setSendResponseCallback: vi.fn(),
+			} as any;
+			const customServer = new WorkerWebSocketServer(
+				mockTaskManager,
+				mockStateManager,
+				mockInterventionManager,
+				9999
+			);
 			const customWss = latestWssInstance;
 			expect(customWss.config.port).toBe(9999);
 		});

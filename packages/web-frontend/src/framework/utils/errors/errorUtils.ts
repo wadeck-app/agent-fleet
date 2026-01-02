@@ -26,9 +26,29 @@ export function getErrorMessage(err: unknown): string {
 		return err.getUserMessage();
 	}
 	if (isError(err)) {
+		// Check if the message contains Zod validation errors (array format)
+		try {
+			const parsed = JSON.parse(err.message);
+			if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].message) {
+				// Extract first error message from Zod array
+				return parsed[0].message;
+			}
+		} catch {
+			// Not JSON or invalid format, use original message
+		}
 		return err.message;
 	}
 	if (typeof err === 'string') {
+		// Check if the string is a Zod error array
+		try {
+			const parsed = JSON.parse(err);
+			if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].message) {
+				// Extract first error message from Zod array
+				return parsed[0].message;
+			}
+		} catch {
+			// Not JSON or invalid format, use original string
+		}
 		return err;
 	}
 	return 'An unknown error occurred';

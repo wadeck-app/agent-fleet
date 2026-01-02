@@ -100,6 +100,10 @@ export class WebSocketMessageRouter {
 				this.eventHandler.handleGenericWorkerMessage(message);
 				break;
 
+			case W2OMessageType.INTERVENTION_REQUESTED:
+				this.eventHandler.handleInterventionRequested(message);
+				break;
+
 			default:
 				console.warn(`[WS] Unknown message type: ${(message as unknown as any).type}`);
 		}

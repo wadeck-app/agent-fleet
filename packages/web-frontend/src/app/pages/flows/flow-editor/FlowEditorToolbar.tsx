@@ -1,7 +1,7 @@
 import { Button } from '@framework/components/primitives/Button';
 import { Separator } from '@framework/components/primitives/Separator';
 import type { FlowListItem } from '@shared/api/flows.contract';
-import { Brain, CheckCircle, GitBranch, Hash, Layout, Save, Tag, Terminal, Workflow } from 'lucide-react';
+import { Bell, Brain, CheckCircle, GitBranch, Hash, Layout, Save, Tag, Terminal, Workflow } from 'lucide-react';
 
 import { FlowSelector } from './FlowSelector';
 
@@ -9,7 +9,7 @@ interface FlowEditorToolbarProps {
 	onSave: () => void;
 	onValidate: () => void;
 	onAutoLayout: () => void;
-	onAddNode: (type: 'model' | 'script' | 'subflow' | 'constant') => void;
+	onAddNode: (type: 'model' | 'script' | 'subflow' | 'constant' | 'user_intervention') => void;
 	onLoadFlow: (flowId: string) => void;
 	availableFlows: FlowListItem[];
 	currentFlowId: string | null;
@@ -53,7 +53,7 @@ export function FlowEditorToolbar({
 
 			<div className="flex items-center gap-4">
 				<Button
-					variant="ghost"
+					variant="outline"
 					size="sm"
 					draggable
 					onDragStart={e => onDragStart(e, 'model')}
@@ -64,7 +64,7 @@ export function FlowEditorToolbar({
 					Model
 				</Button>
 				<Button
-					variant="ghost"
+					variant="outline"
 					size="sm"
 					draggable
 					onDragStart={e => onDragStart(e, 'script')}
@@ -75,7 +75,7 @@ export function FlowEditorToolbar({
 					Script
 				</Button>
 				<Button
-					variant="ghost"
+					variant="outline"
 					size="sm"
 					draggable
 					onDragStart={e => onDragStart(e, 'subflow')}
@@ -86,7 +86,7 @@ export function FlowEditorToolbar({
 					SubFlow
 				</Button>
 				<Button
-					variant="ghost"
+					variant="outline"
 					size="sm"
 					draggable
 					onDragStart={e => onDragStart(e, 'constant')}
@@ -95,6 +95,17 @@ export function FlowEditorToolbar({
 				>
 					<Hash className="mr-2 size-4" />
 					Constant
+				</Button>
+				<Button
+					variant="outline"
+					size="sm"
+					draggable
+					onDragStart={e => onDragStart(e, 'user_intervention')}
+					onClick={() => onAddNode('user_intervention')}
+					className="h-8"
+				>
+					<Bell className="mr-2 size-4" />
+					User Intervention
 				</Button>
 
 				<Separator orientation="vertical" className="h-8" />
@@ -137,15 +148,21 @@ export function FlowEditorToolbar({
 				{/* Flow Actions */}
 				<div className="flex items-center gap-2">
 					<span className="mr-1 text-xs font-medium text-muted-foreground">Actions:</span>
-					<Button variant="outline" size="sm" onClick={onAutoLayout}>
+					<Button variant="outline" size="sm" onClick={onAutoLayout} className="h-8">
 						<Layout className="mr-2 size-4" />
 						Auto Layout
 					</Button>
-					<Button variant="outline" size="sm" onClick={onValidate}>
+					<Button variant="outline" size="sm" onClick={onValidate} className="h-8">
 						<CheckCircle className="mr-2 size-4" />
 						Validate
 					</Button>
-					<Button variant="default" size="sm" onClick={onSave} disabled={!isDirty || isSaving}>
+					<Button
+						variant="default"
+						size="sm"
+						onClick={onSave}
+						disabled={!isDirty || isSaving}
+						className="h-8"
+					>
 						<Save className="mr-2 size-4" />
 						{isSaving ? 'Saving...' : isDirty ? 'Save' : 'Saved'}
 					</Button>

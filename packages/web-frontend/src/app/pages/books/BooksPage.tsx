@@ -14,6 +14,7 @@ import { Button } from '@framework/components/primitives/Button';
 import { SearchInput } from '@framework/components/search/SearchInput';
 import { useSorting } from '@framework/components/table/useSorting';
 import { useTableRefreshing } from '@framework/components/table/useTableRefreshing';
+import { useCrudSuccessToast } from '@framework/hooks/useCrudSuccessToast';
 import { useErrorToast } from '@framework/hooks/useErrorToast';
 import { useRoutedDialog } from '@framework/hooks/useRoutedDialog';
 import { toColumnVisibilityDefs } from '@framework/utils/table/ColumnConfig';
@@ -129,6 +130,9 @@ export function BooksPage() {
 	// Show error as toast automatically
 	useErrorToast({ error, clearError });
 
+	// Success toast helper
+	const successToast = useCrudSuccessToast('book');
+
 	// Handle URL-based dialog routing
 	const { isOpen, editingItem: editingBook } = useRoutedDialog<Book>({
 		mode: mode as 'new' | 'edit' | undefined,
@@ -143,6 +147,7 @@ export function BooksPage() {
 	};
 
 	const handleSubmit = async (data: Parameters<typeof createBook>[0]) => {
+		const isEditing = !!editingBook;
 		if (editingBook) {
 			// Find the latest version from the books array
 			const latestBook = books.find(b => b.id === editingBook.id);
@@ -152,6 +157,13 @@ export function BooksPage() {
 			await createBook(data);
 		}
 		navigate('/books');
+
+		// Show success toast
+		if (isEditing) {
+			successToast.updated();
+		} else {
+			successToast.created();
+		}
 	};
 
 	const handleNewBook = () => {
@@ -179,6 +191,8 @@ export function BooksPage() {
 		setDeletingIds(prev => new Set([...prev, id]));
 		try {
 			await deleteBook(id);
+			// Show success toast
+			successToast.deleted();
 		} finally {
 			// Add comment above the target line, not at the end
 			// Clear deleting state after deletion completes

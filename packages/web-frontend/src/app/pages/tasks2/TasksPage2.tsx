@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 
 import { Data2 } from '@framework/components2/data/Data2';
 import { Input } from '@framework/components/forms/Input';
@@ -12,10 +12,11 @@ import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
 import { useSorting2 } from '@framework/hooks2/useSorting2';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
 import { B2F_TASK_CREATED, B2F_TASK_DELETED, B2F_TASK_UPDATED } from '@shared/transport';
-import { RefreshCw, X } from 'lucide-react';
+import { Plus, RefreshCw, X } from 'lucide-react';
 
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
+import { CreateTaskDialog } from '../tasks/CreateTaskDialog';
 import { tasksApi } from '../tasks/tasks.api';
 import { TaskFilters2 } from './TaskFilters2';
 import { TasksTable2 } from './TasksTable2';
@@ -45,6 +46,8 @@ const STORAGE_ID = 'tasks2' as const;
  * ===========================================================================================
  */
 export function TasksPage2() {
+	const [createDialogOpen, setCreateDialogOpen] = useState(false);
+
 	// Headless features
 	const pagination = usePagination2({
 		pageSize: 10,
@@ -96,6 +99,7 @@ export function TasksPage2() {
 			status: query.status as any,
 			priority: query.priority as any,
 			workerId: query.workerId as string | undefined,
+			flowId: query.flowId as string | undefined,
 		});
 
 		return {
@@ -104,25 +108,35 @@ export function TasksPage2() {
 		};
 	}, []);
 
+	const handleTaskCreated = async () => {
+		cache.actions.refresh();
+	};
+
 	return (
 		<Page>
 			<PageHeader
 				title="Tasks (v2)"
 				action={
-					<Button
-						onClick={cache.actions.refresh}
-						disabled={cache.fstate.isRefreshing}
-						variant="outline"
-						size="sm"
-					>
-						<RefreshCw
-							className={`
+					<div className="flex gap-2">
+						<Button onClick={() => setCreateDialogOpen(true)} variant="default" size="sm">
+							<Plus />
+							Create Task
+						</Button>
+						<Button
+							onClick={cache.actions.refresh}
+							disabled={cache.fstate.isRefreshing}
+							variant="outline"
+							size="sm"
+						>
+							<RefreshCw
+								className={`
          mr-2 size-4
          ${cache.fstate.isRefreshing ? 'animate-spin' : ''}
        `}
-						/>
-						Refresh
-					</Button>
+							/>
+							Refresh
+						</Button>
+					</div>
 				}
 			/>
 
@@ -180,6 +194,7 @@ export function TasksPage2() {
 										filters.fstate.status && `status:${filters.fstate.status}`,
 										filters.fstate.priority && `priority:${filters.fstate.priority}`,
 										filters.fstate.workerId && `worker:${filters.fstate.workerId}`,
+										filters.fstate.flowId && `flow:${filters.fstate.flowId}`,
 									]
 										.filter(Boolean)
 										.join(', ')
@@ -205,6 +220,12 @@ export function TasksPage2() {
 			>
 				<TasksTable2 />
 			</Data2>
+
+			<CreateTaskDialog
+				open={createDialogOpen}
+				onOpenChange={setCreateDialogOpen}
+				onSuccess={handleTaskCreated}
+			/>
 		</Page>
 	);
 }

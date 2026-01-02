@@ -23,6 +23,9 @@ export enum W2OMessageType {
 	WORKSPACE_ALLOCATED = 'w2o:workspace:allocated',
 	WORKSPACE_RELEASED = 'w2o:workspace:released',
 
+	// Intervention messages
+	INTERVENTION_REQUESTED = 'w2o:intervention:requested',
+
 	// Hook → Orchestrator (via Worker) - TODO: Deprecated?
 	/** TODO Deprecated no?*/
 	STOP_REQUESTED = 'stop_requested',
@@ -162,6 +165,22 @@ export interface W2OFlowSavedResponseMessage extends W2OBaseMessage {
 	error?: string;
 }
 
+export interface W2OInterventionRequestedMessage extends W2OBaseMessage {
+	type: W2OMessageType.INTERVENTION_REQUESTED;
+	workerId: string;
+	taskId: string;
+	flowId?: string;
+	stepId: string;
+	interventionType: 'approval' | 'question' | 'choice';
+	blocking: boolean;
+	config: any; // InterventionConfig from the step
+	timeout?: {
+		minutes: number;
+		onTimeout: 'fail' | 'continue' | 'default';
+		defaultValue?: any;
+	};
+}
+
 // Deprecated messages (TODO: Remove?)
 export interface REMOVE_W2OStopRequestedMessage extends W2OBaseMessage {
 	type: W2OMessageType.STOP_REQUESTED;
@@ -204,6 +223,7 @@ export type W2OMessage =
 	| W2OWorkspaceAllocatedMessage
 	| W2OWorkspaceReleasedMessage
 	| W2OFlowsUpdatedMessage
+	| W2OInterventionRequestedMessage
 	| REMOVE_W2OStopRequestedMessage
 	| W2OHookEventMessage
 	| W2OAckMessage
@@ -230,6 +250,7 @@ export interface W2OMessageMap {
 	[W2OMessageType.FLOW_SAVED_RESPONSE]: W2OFlowSavedResponseMessage;
 	[W2OMessageType.WORKSPACE_ALLOCATED]: W2OWorkspaceAllocatedMessage;
 	[W2OMessageType.WORKSPACE_RELEASED]: W2OWorkspaceReleasedMessage;
+	[W2OMessageType.INTERVENTION_REQUESTED]: W2OInterventionRequestedMessage;
 	[W2OMessageType.STOP_REQUESTED]: REMOVE_W2OStopRequestedMessage;
 	[W2OMessageType.HOOK_EVENT]: W2OHookEventMessage;
 	[W2OMessageType.TOOL_RESULT]: W2OBaseMessage;
@@ -254,7 +275,7 @@ export interface W2OMessageMap {
  * });
  * // msg is automatically typed as W2OTaskStartedMessage
  */
-export function createW2OMessage<T extends W2OMessageType>(
+export function createW2OMessage<T extends keyof W2OMessageMap>(
 	type: T,
 	payload: Omit<W2OMessageMap[T], 'type' | 'timestamp'>,
 	timestamp?: createMessageInternal_Timestamp

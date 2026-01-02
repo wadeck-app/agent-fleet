@@ -1145,7 +1145,7 @@ grep -r "::-webkit-scrollbar" packages/web-frontend/src/**/*.css
 	--success-foreground: oklch(0.985 0 0); /* White text */
 	--warning: oklch(0.65 0.15 85); /* Yellow/Orange */
 	--warning-foreground: oklch(0.141 0.005 285.823); /* Dark text */
-	--info: oklch(0.60 0.15 235); /* Blue */
+	--info: oklch(0.6 0.15 235); /* Blue */
 	--info-foreground: oklch(0.985 0 0); /* White text */
 	--danger: oklch(0.577 0.245 27.325); /* Red */
 	--danger-foreground: oklch(0.985 0 0); /* White text */
@@ -1155,11 +1155,11 @@ grep -r "::-webkit-scrollbar" packages/web-frontend/src/**/*.css
 
 .dark {
 	/* ... existing colors ... */
-	--success: oklch(0.70 0.15 145); /* Lighter green for dark mode */
+	--success: oklch(0.7 0.15 145); /* Lighter green for dark mode */
 	--success-foreground: oklch(0.141 0.005 285.823); /* Dark text */
 	--warning: oklch(0.75 0.15 85); /* Lighter yellow */
 	--warning-foreground: oklch(0.141 0.005 285.823);
-	--info: oklch(0.70 0.15 235); /* Lighter blue */
+	--info: oklch(0.7 0.15 235); /* Lighter blue */
 	--info-foreground: oklch(0.141 0.005 285.823);
 	--danger: oklch(0.704 0.191 22.216); /* Lighter red */
 	--danger-foreground: oklch(0.985 0 0);
@@ -1364,10 +1364,7 @@ const toggleVariants = cva(/* ... */, {
 **Correct Solution** ✅:
 
 ```tsx
-<Toggle
-	pressed={isEnabled}
-	className={`gap-2 text-xs ${isEnabled ? '[&>span:last-child]:!text-success' : ''}`}
->
+<Toggle pressed={isEnabled} className={`gap-2 text-xs ${isEnabled ? '[&>span:last-child]:!text-success' : ''}`}>
 	<span>Auto-scroll</span>
 	<span className="font-semibold">{isEnabled ? 'ON' : 'OFF'}</span>
 	{/* Now text-success applies via parent selector */}
@@ -1384,9 +1381,7 @@ const toggleVariants = cva(/* ... */, {
 **Alternative Approach** (inline styles):
 
 ```tsx
-<span style={{ color: isEnabled ? 'var(--success)' : undefined }}>
-	{isEnabled ? 'ON' : 'OFF'}
-</span>
+<span style={{ color: isEnabled ? 'var(--success)' : undefined }}>{isEnabled ? 'ON' : 'OFF'}</span>
 ```
 
 **Key Principles**:
@@ -1417,3 +1412,510 @@ const toggleVariants = cva(/* ... */, {
 **When Discovered**: January 1, 2025 - User wanted green color on "ON" text in Toggle. Direct className didn't work, even with `!important`. Solution: target from parent using Tailwind arbitrary variant.
 
 **Remember**: When styling children of Radix UI components, use parent selectors to override state-based styles.
+
+---
+
+## User Intervention System - Worker-Orchestrator Integration Pattern
+
+**Problem**: Implementing bidirectional communication for user interventions between Worker (flow execution) and Orchestrator (user response handling) required careful message protocol design and Promise-based waiting mechanism.
+
+**Context**: Flow execution in Worker needs to pause and wait for user response from Orchestrator. The Orchestrator receives intervention requests, shows them in UI, gets user response, and sends response back to Worker.
+
+**Solution Architecture**:
+
+1. **Message Protocol Design**:
+    - W2O (Worker→Orchestrator): `INTERVENTION_REQUESTED` message with full intervention config
+    - O2W (Orchestrator→Worker): `INTERVENTION_RESPONSE` message with user response or timeout/cancellation
+
+2. **TypeScript Generic Constraints**:
+    - Use `keyof MessageMap` instead of enum type for generic constraints
+    - Allows TypeScript to properly infer message payload types
+
+```typescript
+// ❌ Wrong - TypeScript can't index with enum
+export function createMessage<T extends MessageType>(...)
+
+// ✅ Correct - TypeScript can index with keyof
+export function createMessage<T extends keyof MessageMap>(...)
+```
+
+3. **Promise-Based Blocking in Worker**:
+    - Store Promise resolvers in `Map<taskId, {resolve, reject}>`
+    - When intervention response arrives, resolve the Promise
+    - Enables `await interventionHandler.requestIntervention(...)` pattern
+
+```typescript
+private pendingInterventions: Map<string, {
+  resolve: (response: InterventionResponse | null) => void;
+  reject: (error: Error) => void;
+}> = new Map();
+
+// Request intervention and wait
+const promise = new Promise<InterventionResponse | null>((resolve, reject) => {
+  this.pendingInterventions.set(taskId, { resolve, reject });
+});
+
+// Later, when response arrives
+const pending = this.pendingInterventions.get(taskId);
+pending.resolve(response);
+```
+
+4. **Callback Pattern for Response Delivery**:
+    - InterventionManager doesn't directly access WebSocket server
+    - Uses callback set by Orchestrator: `setSendResponseCallback()`
+    - Callback finds worker by taskId and sends INTERVENTION_RESPONSE message
+
+```typescript
+// In InterventionManager
+this.sendResponseCallback(taskId, interventionId, response, timedOut, cancelled);
+
+// In Orchestrator
+interventionManager.setSendResponseCallback((taskId, ...) => {
+  return this.wsServer.sendInterventionResponse(taskId, ...);
+});
+```
+
+5. **Timeout Handling**:
+    - Client-side timeout in Worker (safety net)
+    - Server-side timeout in InterventionManager (authoritative)
+    - Three strategies: 'fail' (no response), 'continue' (null response), 'default' (specified value)
+
+6. **Interface Evolution - Remember answeredAt**:
+    - When adding response data, ensure timestamp fields are included
+    - `InterventionResponse` needs `answeredAt` field for audit trail
+    - Update all places that create response objects to include timestamp
+
+**Common Pitfalls**:
+
+- ❌ Making `flowId` required when it should be optional (worker might not be in flow context)
+- ❌ Forgetting to add timestamp fields like `answeredAt` to response interfaces
+- ❌ Using enum type instead of `keyof MessageMap` for generic constraints
+- ❌ Not cleaning up pending promises on timeout/cancellation
+- ❌ Trying to send response to worker that disconnected
+
+**Testing Strategy**:
+
+Create integration tests that cover full lifecycle:
+
+1. Worker connects and gets assigned task
+2. Worker sends INTERVENTION_REQUESTED
+3. Orchestrator creates intervention
+4. User responds via InterventionManager
+5. Orchestrator sends INTERVENTION_RESPONSE
+6. Worker receives and resolves promise
+7. Flow continues execution
+
+Test edge cases:
+
+- Timeout with different strategies (fail/continue/default)
+- Cancellation
+- Multiple interventions per task
+- Non-blocking interventions (no wait)
+- Worker disconnect with pending intervention
+
+**Files Modified** (January 2025):
+
+- `packages/shared-orch-worker/src/orchestrator-messages.ts` - Added INTERVENTION_RESPONSE
+- `packages/shared-orch-worker/src/worker-messages.ts` - Added INTERVENTION_REQUESTED
+- `packages/shared-orch-worker/src/domain-types.ts` - Added answeredAt to InterventionResponse
+- `packages/worker/src/flow/FlowWorker.ts` - Promise-based intervention handling
+- `packages/orchestrator/src/websocket/WebSocketEventHandler.ts` - Handle INTERVENTION_REQUESTED
+- `packages/orchestrator/src/websocket/WebSocketConnectionManager.ts` - Send responses
+- `packages/orchestrator/src/core/InterventionManager.ts` - Callback mechanism
+- `packages/orchestrator/src/core/Orchestrator.ts` - Wire callback
+- `packages/orchestrator/src/websocket/InterventionFlow.test.ts` - Integration tests
+
+**Key Lessons**:
+
+1. **Use `keyof` for message type generics** - Enables proper type inference
+2. **Promise Map pattern works well for async wait** - Clean API for blocking operations
+3. **Callback pattern decouples components** - InterventionManager doesn't need WebSocket dependency
+4. **Always include timestamps** - answeredAt, createdAt, timeoutAt for audit trails
+5. **Test timeout scenarios thoroughly** - Different strategies need different handling
+6. **Clean up promises on error/timeout** - Prevent memory leaks
+7. **Optional fields for cross-context data** - flowId may not exist in all contexts
+
+**When Discovered**: January 1, 2025 - Completing user intervention system worker-orchestrator integration. Multiple TypeScript errors around generic constraints, missing timestamp fields, and optional flowId requirement.
+
+**Reference**: See plan file `giggly-booping-hennessy.md` for complete implementation details and architecture decisions.
+
+---
+
+## Base UI Combobox - Control Open State and Sync Input Value Properly
+
+**Problem**: ComboboxInput component had three critical bugs:
+
+1. User could not type in the field - text input had no effect
+2. "No results found" displayed even when results were visible
+3. Selected value didn't display when field was closed (showed only placeholder)
+
+**Root Cause**: The `inputValue` prop wasn't properly synchronized with the component's open/closed state and selected value. Base UI Combobox requires careful state management for the input value based on whether the dropdown is open or closed.
+
+**Key Issues**:
+
+1. **Input value not synced with selected value**: When closed, `inputValue` should show the selected option's label, not be empty
+2. **No open/close state tracking**: Component didn't know when dropdown was open vs closed
+3. **Manual filtering conflicts with Base UI**: We filter options manually but need to ensure Base UI's empty detection works correctly
+
+**Correct Solution** ✅:
+
+```typescript
+export function ComboboxInput({ value, onChange, options, placeholder, disabled, id }: ComboboxInputProps) {
+  const [searchValue, setSearchValue] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Find the selected option label to display
+  const selectedOption = options.find(opt => opt.value === value);
+  const displayValue = selectedOption?.label || '';
+
+  // Sync inputValue with selected value when closed
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchValue(displayValue);
+    }
+  }, [displayValue, isOpen]);
+
+  // Filter options based on search input
+  const filteredOptions = useMemo(() => {
+    if (!searchValue.trim()) return options;
+    return options.filter(option =>
+      option.label.toLowerCase().includes(searchValue.toLowerCase())
+    );
+  }, [options, searchValue]);
+
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (open) {
+      setSearchValue(''); // Clear to show all options
+    } else {
+      setSearchValue(displayValue); // Restore selected label
+    }
+  };
+
+  return (
+    <Combobox
+      value={value || null}
+      onValueChange={handleValueChange}
+      inputValue={searchValue}
+      onInputChange={e => setSearchValue(e.target.value)}
+      open={isOpen}
+      onOpenChange={handleOpenChange}
+    >
+      {/* ... */}
+    </Combobox>
+  );
+}
+```
+
+**Key Principles**:
+
+1. **Track open state explicitly**: Use controlled `open` prop with `isOpen` state
+2. **Sync input value with selection**: When closed, show selected label; when opening, clear for search
+3. **Use useEffect for closed state sync**: Automatically update input when selection or open state changes
+4. **Clear on open**: Starting with empty search shows all options (better UX)
+5. **Manual filtering is OK**: Base UI detects empty state from `filteredOptions` array length
+
+**Expected Behavior**:
+
+- **Closed**: Shows selected option label or placeholder
+- **Opening**: Clears input to show all options
+- **Typing**: Filters options in real-time
+- **After selection**: Closes dropdown and displays selected label
+- **Empty state**: "No results found" only when `filteredOptions.length === 0`
+
+**Common Pitfalls**:
+
+- ❌ Not tracking `isOpen` state - can't manage input value correctly
+- ❌ Not syncing `searchValue` with `displayValue` when closed
+- ❌ Using `onFocus`/`onBlur` instead of `onOpenChange` - unreliable for state management
+- ❌ Assuming Base UI will handle input value automatically
+- ✅ Controlled state management for both `open` and `inputValue`
+
+**Testing Checklist**:
+
+- [ ] Click field and verify you can type
+- [ ] Typing filters the options list correctly
+- [ ] "No results found" only shows when truly no matches
+- [ ] Select option and verify label displays when closed
+- [ ] Reopen and verify search starts fresh (empty or cleared)
+- [ ] Test with pre-selected value (should show label immediately)
+- [ ] Test disabled state
+- [ ] Test with empty options list
+
+**Files Created** (January 2025):
+
+- `packages/web-frontend/src/framework/features/forms/inputs/ComboboxInput.stories.tsx` - Comprehensive Storybook stories for testing
+- `packages/web-frontend/src/framework/features/forms/fields/ComboboxField.stories.tsx` - Field-level stories with validation
+
+**Files Modified**:
+
+- `packages/web-frontend/src/framework/features/forms/inputs/ComboboxInput.tsx` - Added `isOpen` state, `useEffect` sync, and `handleOpenChange`
+
+**Usage Context**: Used in CreateTaskDialog for worker and flow selection. The component provides search/filter functionality for dropdowns with many options.
+
+**When Discovered**: January 1, 2026 - User reported three bugs with screenshots showing the issues. Fixed by properly managing open state and input value synchronization.
+
+**Base UI Documentation**: The Base UI Combobox component requires explicit control over:
+
+- `open` / `onOpenChange` for dropdown state
+- `inputValue` / `onInputChange` for input field text
+- Manual filtering of options (Base UI doesn't filter automatically)
+- Empty state detection based on filtered options array
+
+**Remember**: Base UI components require controlled state management. Don't assume they handle everything internally - you need to explicitly manage open state and input value synchronization.
+
+---
+
+## User Intervention Steps - Declarative Output Pattern
+
+**Problem**: Initial implementation of user_intervention steps had "magic" auto-generated outputs (approved, rejected, userResponse, etc.) that were not declared in the step definition. This violated the "no-magic, fully declarative" principle.
+
+**Context**: User wanted all step types to follow the same pattern: outputs must be explicitly declared in the `output:` field, not auto-generated. This makes flows self-documenting and prevents the FlowBuilder from needing to know implementation details of each step type.
+
+**Solution**: Modified StepRunner to use OutputExtractor (same as script/model/subflow steps) for declarative output mapping.
+
+**Implementation**:
+
+1. **StepRunner.executeUserInterventionStep()** now builds an `additionalContext` with all intervention response values:
+
+```typescript
+const additionalContext = {
+	// Raw values
+	value: response.value,
+	comment: response.comment,
+	answeredBy: response.answeredBy,
+	answeredAt: response.answeredAt,
+
+	// Common aliases
+	userResponse: response.value,
+	approved: response.value === true,
+	rejected: response.value === false,
+	answer: response.value,
+	choice: response.value,
+};
+
+// Use OutputExtractor just like other steps
+const outputs = this.outputExtractor.extract(rawOutput, step.output, step.id, additionalContext);
+```
+
+2. **Flow definition** explicitly declares outputs:
+
+```yaml
+- type: user_intervention
+  id: approval
+  interventionType: approval
+  approval:
+      title: 'Approve Deployment'
+  output:
+      approved: { type: boolean } # User must declare what they want
+      comment: { type: string }
+      answeredBy: { type: string }
+```
+
+3. **OutputExtractor** maps output names to additionalContext values:
+    - If `output.approved` is declared, it looks for `additionalContext.approved`
+    - No regex pattern needed (direct value lookup)
+    - Same behavior as other step types (consistent pattern)
+
+**Available Variables**:
+
+- `value` - Raw response value (boolean/string/array)
+- `comment` - Optional comment
+- `answeredBy` - Who answered
+- `answeredAt` - When answered
+- `userResponse` - Generic alias for value
+- `approved` - For approval (true if approved)
+- `rejected` - For approval (true if rejected)
+- `answer` - For question type
+- `choice` - For choice type
+
+**Benefits**:
+
+1. **No Magic**: All outputs are explicitly declared in YAML
+2. **Self-Documenting**: Flow definition shows exactly what outputs are available
+3. **Consistent Pattern**: All steps (script, model, subflow, user_intervention) work the same way
+4. **FlowBuilder Friendly**: UI doesn't need special logic per step type
+5. **Type-Safe**: Outputs have explicit types (boolean, string, etc.)
+6. **Flexible**: Users can name outputs whatever they want
+
+**Testing**:
+
+- See `test-user-intervention` flow in `.agent-fleet/flows.yml`
+- Documented in `.claude/docs/user-intervention-outputs.md`
+
+**When Discovered**: January 2, 2025 - User pointed out that auto-generated outputs violated the "no-magic" principle.
+
+**Reference**: Conversation about FlowBuilder needing to be easy to write without knowing implementation details of each step type.
+
+---
+
+## User Intervention Step Type Not Parsed by FlowRegistry
+
+**Issue**: The `FlowRegistry.parseFlowStep()` method did not handle the `user_intervention` step type, causing all user intervention steps to be incorrectly parsed as `ModelFlowStep` (default case). This resulted in validation errors like "Model step 'X' must have a non-empty prompt" for user intervention steps.
+
+**Root Cause**:
+
+- `FlowRegistry.parseFlowStep()` had branches for `subflow`, `script`, and a default case for `model`
+- Missing branch for `user_intervention` type
+- Steps with `type: 'user_intervention'` fell through to the default `model` case
+
+**Solution**:
+Added the missing branch in `packages/flow-engine/src/registry/FlowRegistry.ts`:
+
+```typescript
+} else if (stepType === 'user_intervention') {
+    // User Intervention step
+    return {
+        ...baseStep,
+        type: 'user_intervention',
+        interventionType: data.interventionType,
+        blocking: data.blocking !== false, // Default to true
+        timeout: data.timeout,
+        approval: data.approval,
+        question: data.question,
+        choice: data.choice,
+    };
+}
+```
+
+**Additional Fixes**:
+
+1. **Removed dangerous default fallback**: Changed `data.type || 'model'` to explicit validation that throws if `type` is missing. No more silent errors!
+2. **Made all step types explicit**: Moved `model` from default case to explicit branch. Unknown types now throw immediately.
+3. **Added output validation for user_intervention steps**:
+    - **Error** if output has a `pattern` (doesn't make sense for user_intervention)
+    - **Warning** if output name not in available values: `value`, `comment`, `answeredBy`, `answeredAt`, `userResponse`, `approved`, `rejected`, `answer`, `choice`
+4. **Added explicit type casts** in `SchemaValidator.validateStepType()` for proper TypeScript narrowing.
+
+**Engineering Principle**: **Fail fast, fail explicitly**. Never use fallbacks that mask errors - they create silent bugs that are hard to debug. Every error should throw immediately with a clear message.
+
+**Impact**:
+
+- User intervention flows can now be properly validated and executed
+- Invalid outputs are caught at validation time, not runtime
+- Type mismatches throw immediately instead of creating ModelFlowStep silently
+
+**When Discovered**: January 2, 2025 - User reported that `test-user-intervention` flow was marked as invalid in TasksV2 with "Model step must have prompt" error, but appeared valid in FlowEditor. User then correctly identified that the `|| 'model'` fallback was "une pure connerie d'engineering" that masked the real error.
+
+**Reference**: The FlowEditor validates using frontend code, while TasksV2 shows metadata from the worker's validation. The worker uses FlowRegistry which was missing the parser branch.
+
+---
+
+## Always Use Framework Components, Not Native HTML Elements
+
+**Issue**: When adding UI controls (like dropdowns), using native HTML elements (`<select>`) with inline styles instead of framework components results in:
+
+- Inconsistent styling (e.g., black background in dark mode)
+- Poor accessibility
+- Lack of keyboard navigation
+- Missing design system integration
+
+**Root Cause**:
+
+- Developer unfamiliar with available framework components
+- Following existing bad patterns in codebase without questioning them
+- Not checking for proper component abstractions before implementing
+
+**Solution**:
+
+Use the framework's Radix UI-based components from `@framework/components/forms/`:
+
+```typescript
+// ❌ BAD - Native HTML with inline styles
+<select
+  value={value}
+  onChange={e => onChange(e.target.value)}
+  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+>
+  <option value="option1">Option 1</option>
+  <option value="option2">Option 2</option>
+</select>
+
+// ✅ GOOD - Framework component
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
+
+<Select value={value} onValueChange={onChange}>
+  <SelectTrigger className="w-full">
+    <SelectValue />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="option1">Option 1</SelectItem>
+    <SelectItem value="option2">Option 2</SelectItem>
+  </SelectContent>
+</Select>
+```
+
+**Available Framework Components**:
+
+Located in `packages/web-frontend/src/framework/components/`:
+
+- **Forms**: `Input`, `Label`, `Textarea`, `Select`, `Checkbox`, `RadioGroup`
+- **Primitives**: `Button`, `Separator`, `Card`, `Badge`
+- **Advanced**: `Dialog`, `Popover`, `Tooltip`, `DropdownMenu`
+
+**Engineering Principle**: **Use the design system**. Never reinvent UI controls with native HTML + inline styles. The framework components provide:
+
+- Consistent styling across light/dark modes
+- Proper accessibility (ARIA, keyboard navigation)
+- TypeScript types
+- Mobile-friendly interactions
+- Design system tokens
+
+**When Discovered**: January 2, 2025 - User correctly called out "amateurisme" when noticing black backgrounds on select dropdowns in FlowEditorPropertiesPanel. Investigation revealed native `<select>` elements with inline CSS classes instead of proper Radix UI Select components.
+
+**Impact**: All user_intervention configuration dropdowns now use proper Select components with consistent styling and better UX.
+
+---
+
+## Explicit Output Sources with 'from' Field
+
+**Issue**: User intervention outputs declared types (`approved: { type: boolean }`) but did NOT specify where the value comes from. This is "magic" - the system implicitly knew to look in `additionalContext`, but it wasn't explicit in the YAML. "Comment tu comptes mapper le 'approved'? il vient d'ou ? tu le sais PAS, donc invalide !"
+
+**Root Cause**: No explicit source specification for output values. The connection between YAML declarations and runtime extraction was implicit/magical.
+
+**Solution**: Added `from` field to `OutputVariableConfig` to make sources explicit.
+
+**Before** (INVALID - magic):
+```yaml
+output:
+    approved: { type: boolean }  # ❌ Where does this come from?
+    comment: { type: string }     # ❌ No source specified!
+```
+
+**After** (VALID - explicit):
+```yaml
+output:
+    approved: { type: boolean, from: 'intervention.approved' }
+    comment: { type: string, from: 'intervention.comment' }
+    answeredBy: { type: string, from: 'intervention.answeredBy' }
+```
+
+**Implementation Changes**:
+
+1. **Added `from` field** to `OutputVariableConfig` type (`packages/flow-engine/src/types.ts`)
+2. **Validation enforces explicit sources** (`packages/flow-engine/src/validation/SchemaValidator.ts`):
+   - ERROR if user_intervention output lacks `from` field
+   - ERROR if user_intervention output has `pattern` (doesn't make sense)
+   - ERROR if `from` points to non-existent source
+3. **OutputExtractor uses `from`** (`packages/flow-engine/src/processing/OutputExtractor.ts`):
+   - Added `extractFromPath()` to navigate dot-notation paths like 'intervention.approved'
+   - Fails fast if path doesn't exist
+4. **StepRunner structures context** (`packages/flow-engine/src/executor/StepRunner.ts`):
+   - Changed from flat `{ approved: true, comment: '...' }`
+   - To nested `{ intervention: { approved: true, comment: '...' } }`
+   - Makes the namespace explicit
+
+**Available Sources for user_intervention**:
+- `intervention.value` - Raw response value
+- `intervention.comment` - Optional comment
+- `intervention.answeredBy` - Who answered
+- `intervention.answeredAt` - When answered
+- `intervention.userResponse` - Generic alias for value
+- `intervention.approved` - For approval: true if approved
+- `intervention.rejected` - For approval: true if rejected
+- `intervention.answer` - For question: the answer
+- `intervention.choice` - For choice: selected choice(s)
+
+**Engineering Principle**: **No magic. Everything explicit.** If you can't tell from reading the YAML where a value comes from, it's wrong. The `from` field makes it impossible to have implicit/magical mappings.
+
+**When Discovered**: January 2, 2025 - Immediately after fixing the parser issue, user correctly identified that outputs without source specification are invalid: "Ces outputs n'ont pas été changé... comment tu comptes mapper le 'approved'? il vient d'ou ? tu le sais PAS, donc invalide !". User rejected implicit/automatic outputs as "C'EST DE LA MAGIE".

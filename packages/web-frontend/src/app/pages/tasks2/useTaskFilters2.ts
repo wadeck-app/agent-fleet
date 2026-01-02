@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import type { QueryFiller } from '@framework/types/FeatureContract';
@@ -9,7 +9,7 @@ import type { TaskPriority, TaskStatus } from '@shared/api/tasks.contract';
  * USE TASK FILTERS2 - Domain-Specific Filters Hook
  * ===========================================================================================
  *
- * Manages task-specific filters (status, priority, workerId) using URL parameters.
+ * Manages task-specific filters (status, priority, workerId, flowId) using URL parameters.
  * This is separate from the generic search feature (useSimpleSearch).
  *
  * Key features:
@@ -48,6 +48,7 @@ export interface TaskFiltersState {
 	status?: TaskStatus;
 	priority?: TaskPriority;
 	workerId?: string;
+	flowId?: string;
 	hasFilters: boolean;
 }
 
@@ -57,6 +58,7 @@ export interface TaskFiltersContract {
 		setStatus: (status?: TaskStatus) => void;
 		setPriority: (priority?: TaskPriority) => void;
 		setWorkerId: (workerId?: string) => void;
+		setFlowId: (flowId?: string) => void;
 		clearFilters: () => void;
 	};
 	fillQuery: QueryFiller;
@@ -75,17 +77,33 @@ export function useTaskFilters2(options?: UseTaskFilters2Options): TaskFiltersCo
 	// Read filter values from URL parameters
 	const status = (searchParams.get('status') as TaskStatus) || undefined;
 	const priority = (searchParams.get('priority') as TaskPriority) || undefined;
-	const workerId = searchParams.get('workerId') || undefined;
+	const urlWorkerId = searchParams.get('workerId') || '';
+	const urlFlowId = searchParams.get('flowId') || '';
+
+	// Local state for UI (what user actually typed, without trimming)
+	// Initialize from URL, but stays independent after that
+	const [localWorkerId, setLocalWorkerId] = useState(urlWorkerId);
+	const [localFlowId, setLocalFlowId] = useState(urlFlowId);
+
+	// Sync local state with URL when URL changes externally (e.g., browser back/forward)
+	useMemo(() => {
+		setLocalWorkerId(urlWorkerId);
+	}, [urlWorkerId]);
+
+	useMemo(() => {
+		setLocalFlowId(urlFlowId);
+	}, [urlFlowId]);
 
 	// Frozen state
 	const fstate = useMemo<TaskFiltersState>(
 		() => ({
 			status,
 			priority,
-			workerId,
-			hasFilters: !!(status || priority || workerId),
+			workerId: localWorkerId || undefined,
+			flowId: localFlowId || undefined,
+			hasFilters: !!(status || priority || localWorkerId.trim() || localFlowId.trim()),
 		}),
-		[status, priority, workerId]
+		[status, priority, localWorkerId, localFlowId]
 	);
 
 	// Actions
@@ -133,12 +151,20 @@ export function useTaskFilters2(options?: UseTaskFilters2Options): TaskFiltersCo
 
 			/**
 			 * Set workerId filter
+			 * UI shows exactly what user typed (local state, no trim).
+			 * URL stores trimmed version (prevents unnecessary requests on whitespace).
 			 */
 			setWorkerId: (newWorkerId?: string) => {
+				const value = newWorkerId || '';
+
+				// Update local UI state immediately (no trim)
+				setLocalWorkerId(value);
+
+				// Update URL with trimmed version
 				setSearchParams(
 					prev => {
 						const params = new URLSearchParams(prev);
-						const trimmed = newWorkerId?.trim();
+						const trimmed = value.trim();
 						if (trimmed) {
 							params.set('workerId', trimmed);
 						} else {
@@ -152,15 +178,49 @@ export function useTaskFilters2(options?: UseTaskFilters2Options): TaskFiltersCo
 			},
 
 			/**
+			 * Set flowId filter
+			 * UI shows exactly what user typed (local state, no trim).
+			 * URL stores trimmed version (prevents unnecessary requests on whitespace).
+			 */
+			setFlowId: (newFlowId?: string) => {
+				const value = newFlowId || '';
+
+				// Update local UI state immediately (no trim)
+				setLocalFlowId(value);
+
+				// Update URL with trimmed version
+				setSearchParams(
+					prev => {
+						const params = new URLSearchParams(prev);
+						const trimmed = value.trim();
+						if (trimmed) {
+							params.set('flowId', trimmed);
+						} else {
+							params.delete('flowId');
+						}
+						return params;
+					},
+					{ replace: true }
+				);
+				onFilterChange?.();
+			},
+
+			/**
 			 * Clear all filters
 			 */
 			clearFilters: () => {
+				// Clear local states
+				setLocalWorkerId('');
+				setLocalFlowId('');
+
+				// Clear URL params
 				setSearchParams(
 					prev => {
 						const params = new URLSearchParams(prev);
 						params.delete('status');
 						params.delete('priority');
 						params.delete('workerId');
+						params.delete('flowId');
 						return params;
 					},
 					{ replace: true }
@@ -168,7 +228,7 @@ export function useTaskFilters2(options?: UseTaskFilters2Options): TaskFiltersCo
 				onFilterChange?.();
 			},
 		}),
-		[setSearchParams, onFilterChange]
+		[setSearchParams, onFilterChange, setLocalWorkerId, setLocalFlowId]
 	);
 
 	// Fill query function for Data2 integration
@@ -176,9 +236,15 @@ export function useTaskFilters2(options?: UseTaskFilters2Options): TaskFiltersCo
 		query => {
 			if (status) query.status = status;
 			if (priority) query.priority = priority;
-			if (workerId) query.workerId = workerId;
+
+			// Only send trimmed values to backend
+			const trimmedWorkerId = localWorkerId.trim();
+			const trimmedFlowId = localFlowId.trim();
+
+			if (trimmedWorkerId) query.workerId = trimmedWorkerId;
+			if (trimmedFlowId) query.flowId = trimmedFlowId;
 		},
-		[status, priority, workerId]
+		[status, priority, localWorkerId, localFlowId]
 	);
 
 	return {

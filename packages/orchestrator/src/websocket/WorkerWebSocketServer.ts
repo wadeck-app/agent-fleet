@@ -9,6 +9,7 @@ import { W2OMessageType } from 'shared-orch-worker/worker-messages';
 import type { WebSocket } from 'ws';
 import { WebSocketServer } from 'ws';
 
+import type { InterventionManager } from '../core/InterventionManager';
 import type { TaskManager } from '../core/TaskManager';
 import { WebSocketConnectionManager } from './WebSocketConnectionManager';
 import { WebSocketEventHandler } from './WebSocketEventHandler';
@@ -28,12 +29,22 @@ export class WorkerWebSocketServer {
 	private eventHandler: WebSocketEventHandler;
 	private messageRouter: WebSocketMessageRouter;
 
-	constructor(taskManager: TaskManager, stateManager: StateManager, port: number = 3738) {
+	constructor(
+		taskManager: TaskManager,
+		stateManager: StateManager,
+		interventionManager: InterventionManager,
+		port: number = 3738
+	) {
 		this.port = port;
 
 		// Initialize components
 		this.connectionManager = new WebSocketConnectionManager(taskManager, stateManager);
-		this.eventHandler = new WebSocketEventHandler(taskManager, stateManager, this.connectionManager);
+		this.eventHandler = new WebSocketEventHandler(
+			taskManager,
+			stateManager,
+			this.connectionManager,
+			interventionManager
+		);
 		this.messageRouter = new WebSocketMessageRouter(this.connectionManager, this.eventHandler);
 
 		// Setup WebSocket server
@@ -123,6 +134,24 @@ export class WorkerWebSocketServer {
 		connectedAt: string;
 	}> {
 		return this.connectionManager.getConnectedWorkspaces();
+	}
+
+	/**
+	 * Send an intervention response to the worker handling a task
+	 */
+	sendInterventionResponse(
+		taskId: string,
+		interventionId: string,
+		response: {
+			value: any;
+			comment?: string;
+			answeredAt: string;
+			answeredBy: string;
+		} | null,
+		timedOut?: boolean,
+		cancelled?: boolean
+	): boolean {
+		return this.connectionManager.sendInterventionResponse(taskId, interventionId, response, timedOut, cancelled);
 	}
 
 	async stop(): Promise<void> {

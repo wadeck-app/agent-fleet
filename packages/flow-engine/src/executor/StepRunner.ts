@@ -556,31 +556,48 @@ export class StepRunner {
 				console.log(`[StepRunner] User responded to intervention ${step.id}`);
 				stepTrace.interventionResponse = response;
 
-				// Extract outputs based on intervention type
-				if (step.interventionType === 'approval') {
-					stepTrace.outputs = {
-						approved: response.value === true,
-						rejected: response.value === false,
-						userResponse: response.value,
-						comment: response.comment,
-					};
-				} else if (step.interventionType === 'question') {
-					stepTrace.outputs = {
-						answer: response.value,
-						comment: response.comment,
-					};
-				} else if (step.interventionType === 'choice') {
-					stepTrace.outputs = {
-						choice: response.value,
-						comment: response.comment,
-					};
-				}
+				// Build additional context with intervention data
+				// All intervention values are under 'intervention' namespace
+				// Users reference them explicitly with 'from' field:
+				//   output:
+				//     approved: { type: boolean, from: 'intervention.approved' }
+				//     comment: { type: string, from: 'intervention.comment' }
+				const additionalContext = {
+					intervention: {
+						// Raw intervention response values
+						value: response.value, // The user's response value (boolean for approval, string/number for question, string/array for choice)
+						comment: response.comment, // Optional comment
+						answeredBy: response.answeredBy, // Who answered
+						answeredAt: response.answeredAt, // When answered
+
+						// Common aliases for convenience
+						userResponse: response.value, // Generic alias
+
+						// Type-specific aliases (work for any type)
+						approved: response.value === true, // For approval: true if approved
+						rejected: response.value === false, // For approval: true if rejected
+						answer: response.value, // For question: the answer value
+						choice: response.value, // For choice: the selected choice(s)
+					},
+				};
+
+				// Convert response value to string for extraction (OutputExtractor expects string)
+				const rawOutput = response.value != null ? String(response.value) : '';
+
+				// Extract outputs using declarative configuration with explicit 'from' paths
+				const outputs = this.outputExtractor.extract(rawOutput, step.output, step.id, additionalContext);
+
+				stepTrace.outputs = outputs;
 			} else {
 				// Non-blocking intervention that returned immediately
 				console.log(`[StepRunner] Non-blocking intervention ${step.id} requested`);
-				stepTrace.outputs = {
+
+				// For non-blocking, extract outputs with empty context
+				const outputs = this.outputExtractor.extract('', step.output, step.id, {
 					interventionRequested: true,
-				};
+				});
+
+				stepTrace.outputs = outputs;
 			}
 
 			return stepTrace;

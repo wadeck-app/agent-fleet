@@ -88,6 +88,7 @@ export function FlowEditorCanvas({
 			selectNodesOnDrag={false}
 			className="h-full w-full bg-muted/20"
 			deleteKeyCode="Delete"
+			proOptions={{ hideAttribution: true }}
 		>
 			<Background />
 			<Controls />
@@ -99,6 +100,8 @@ export function FlowEditorCanvas({
 					return 'hsl(var(--muted))';
 				}}
 				className="!border-border !bg-card"
+				zoomable
+				pannable
 			/>
 		</ReactFlow>
 	);

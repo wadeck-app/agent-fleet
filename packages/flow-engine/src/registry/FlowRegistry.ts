@@ -428,10 +428,18 @@ export class FlowRegistry {
 
 	/**
 	 * Parse a single flow step
-	 * Supports 'model', 'script', and 'subflow' step types
+	 * Supports 'model', 'script', 'subflow', and 'user_intervention' step types
 	 */
 	private parseFlowStep(data: any): FlowStep {
-		const stepType = data.type || 'model'; // Default to model for backward compatibility
+		const stepType = data.type;
+
+		// Validate that type is specified
+		if (!stepType) {
+			throw new Error(
+				`Step '${data.id || '<unknown>'}' is missing required 'type' field. ` +
+					`Valid types: 'model', 'script', 'subflow', 'user_intervention'`
+			);
+		}
 
 		// Common properties
 		const baseStep = {
@@ -447,15 +455,13 @@ export class FlowRegistry {
 			contract: data.contract,
 		};
 
-		if (stepType === 'subflow') {
-			// SubFlow step
+		if (stepType === 'model') {
+			// Model step
 			return {
 				...baseStep,
-				type: 'subflow',
-				flowId: data.flowId || '',
-				inputs: data.inputs || {},
-				workspaceStrategy: data.workspaceStrategy || 'inherit',
-				allowRecursion: data.allowRecursion,
+				type: 'model',
+				model: data.model || 'haiku',
+				prompt: data.prompt || '',
 			};
 		} else if (stepType === 'script') {
 			// Script step
@@ -467,14 +473,34 @@ export class FlowRegistry {
 				env: data.env,
 				captureOutput: data.captureOutput !== false, // Default to true
 			};
-		} else {
-			// Model step (default)
+		} else if (stepType === 'subflow') {
+			// SubFlow step
 			return {
 				...baseStep,
-				type: 'model',
-				model: data.model || 'haiku',
-				prompt: data.prompt || '',
+				type: 'subflow',
+				flowId: data.flowId || '',
+				inputs: data.inputs || {},
+				workspaceStrategy: data.workspaceStrategy || 'inherit',
+				allowRecursion: data.allowRecursion,
 			};
+		} else if (stepType === 'user_intervention') {
+			// User Intervention step
+			return {
+				...baseStep,
+				type: 'user_intervention',
+				interventionType: data.interventionType,
+				blocking: data.blocking !== false, // Default to true
+				timeout: data.timeout,
+				approval: data.approval,
+				question: data.question,
+				choice: data.choice,
+			};
+		} else {
+			// Unknown step type - FAIL FAST
+			throw new Error(
+				`Unknown step type '${stepType}' for step '${data.id || '<unknown>'}'. ` +
+					`Valid types: 'model', 'script', 'subflow', 'user_intervention'`
+			);
 		}
 	}
 

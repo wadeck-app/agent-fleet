@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { useMemo } from 'react';
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
-import { Button } from '@framework/components/primitives/Button';
-import { FolderOpen } from 'lucide-react';
+import type { ComboboxOption } from '@framework/features/forms/inputs/ComboboxInput';
+import { ComboboxInput } from '@framework/features/forms/inputs/ComboboxInput';
 
 interface FlowSelectorProps {
 	availableFlows: Array<{ id: string; name: string; description: string }>;
@@ -11,40 +10,32 @@ interface FlowSelectorProps {
 }
 
 export function FlowSelector({ availableFlows, currentFlowId, onLoadFlow }: FlowSelectorProps) {
-	const [selectedFlowId, setSelectedFlowId] = useState<string>(currentFlowId || '');
+	// Transform flows into ComboboxOption format
+	const flowOptions: ComboboxOption[] = useMemo(
+		() =>
+			availableFlows.map(flow => ({
+				value: flow.id,
+				label: `${flow.name} (${flow.id})`,
+			})),
+		[availableFlows]
+	);
 
-	const handleLoadFlow = () => {
-		if (selectedFlowId && selectedFlowId !== currentFlowId) {
-			onLoadFlow(selectedFlowId);
+	const handleFlowChange = (flowId: string) => {
+		if (flowId && flowId !== currentFlowId) {
+			onLoadFlow(flowId);
 		}
 	};
 
 	return (
 		<div className="flex items-center gap-2">
-			<Select value={selectedFlowId} onValueChange={setSelectedFlowId}>
-				<SelectTrigger className="w-[300px]">
-					<SelectValue placeholder="Select a flow to load..." />
-				</SelectTrigger>
-				<SelectContent>
-					{availableFlows.map(flow => (
-						<SelectItem key={flow.id} value={flow.id}>
-							<div className="flex items-center gap-2">
-								<span className="font-medium">{flow.name}</span>
-								<span className="text-xs text-muted-foreground">({flow.id})</span>
-							</div>
-						</SelectItem>
-					))}
-				</SelectContent>
-			</Select>
-			<Button
-				variant="outline"
-				size="sm"
-				onClick={handleLoadFlow}
-				disabled={!selectedFlowId || selectedFlowId === currentFlowId}
-			>
-				<FolderOpen className="mr-2 size-4" />
-				Load
-			</Button>
+			<div className="w-[300px]">
+				<ComboboxInput
+					value={currentFlowId || ''}
+					onChange={handleFlowChange}
+					options={flowOptions}
+					placeholder="Search and select a flow..."
+				/>
+			</div>
 		</div>
 	);
 }

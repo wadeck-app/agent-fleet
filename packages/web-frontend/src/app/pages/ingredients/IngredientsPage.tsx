@@ -12,6 +12,7 @@ import { usePagination } from '@framework/components/pagination/usePagination';
 import { Button } from '@framework/components/primitives/Button';
 import { useSorting } from '@framework/components/table/useSorting';
 import { useTableRefreshing } from '@framework/components/table/useTableRefreshing';
+import { useCrudSuccessToast } from '@framework/hooks/useCrudSuccessToast';
 import { useErrorToast } from '@framework/hooks/useErrorToast';
 import { useRoutedDialog } from '@framework/hooks/useRoutedDialog';
 import { toColumnVisibilityDefs } from '@framework/utils/table/ColumnConfig';
@@ -119,6 +120,9 @@ export function IngredientsPage() {
 	// Show error as toast automatically
 	useErrorToast({ error, clearError });
 
+	// Success toast helper
+	const successToast = useCrudSuccessToast('ingredient');
+
 	// Handle URL-based dialog routing
 	const { isOpen, editingItem: editingIngredient } = useRoutedDialog<Ingredient>({
 		mode: mode as 'new' | 'edit' | undefined,
@@ -129,6 +133,7 @@ export function IngredientsPage() {
 	});
 
 	const handleSubmit = async (data: Parameters<typeof createIngredient>[0]) => {
+		const isEditing = !!editingIngredient;
 		if (editingIngredient) {
 			// Find the latest version from the ingredients array
 			const latestIngredient = ingredients.find(i => i.id === editingIngredient.id);
@@ -138,6 +143,13 @@ export function IngredientsPage() {
 			await createIngredient(data);
 		}
 		navigate('/ingredients');
+
+		// Show success toast
+		if (isEditing) {
+			successToast.updated();
+		} else {
+			successToast.created();
+		}
 	};
 
 	const handleRefresh = async () => {
@@ -161,6 +173,8 @@ export function IngredientsPage() {
 		setDeletingIds(prev => new Set([...prev, id]));
 		try {
 			await deleteIngredient(id);
+			// Show success toast
+			successToast.deleted();
 		} finally {
 			// Add comment above the target line, not at the end
 			// Clear deleting state after deletion completes

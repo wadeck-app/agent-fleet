@@ -68,6 +68,11 @@ export const TASKS_TABLE2_COLUMNS: Table2Column<Task>[] = [
 		render: (t: Task) => <span className="font-mono text-xs text-muted-foreground">{t.id}</span>,
 	},
 	{
+		key: 'flowId',
+		label: 'Flow ID',
+		render: (t: Task) => <span className="font-mono text-xs text-muted-foreground">{t.flowId || '-'}</span>,
+	},
+	{
 		key: 'description',
 		label: 'Description',
 		render: (t: Task) => <span className="text-sm">{t.description}</span>,

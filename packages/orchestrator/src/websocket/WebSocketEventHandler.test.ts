@@ -54,11 +54,19 @@ describe('WebSocketEventHandler', () => {
 		mockStateManager = createMockStateManager();
 		mockConnectionManager = createMockConnectionManager();
 
+		// Create mock intervention manager
+		const mockInterventionManager = {
+			createIntervention: vi.fn(),
+			respondToIntervention: vi.fn(),
+			cancelIntervention: vi.fn(),
+		};
+
 		// Create event handler
 		eventHandler = new WebSocketEventHandler(
 			mockTaskManager as any,
 			mockStateManager as any,
-			mockConnectionManager as any
+			mockConnectionManager as any,
+			mockInterventionManager as any
 		);
 	});
 

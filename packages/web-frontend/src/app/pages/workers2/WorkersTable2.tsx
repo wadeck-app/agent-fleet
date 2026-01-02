@@ -1,6 +1,7 @@
 import { Table2, type Table2Column, type Table2Props } from '@framework/components2/table/Table2';
 import { EditableText } from '@framework/components/forms/EditableText';
 import { Badge } from '@framework/components/primitives/Badge';
+import { useToast } from '@framework/features/toast/ToastContext';
 import type { MutationMethods } from '@framework/types/MutationContract';
 import type { Worker } from '@shared/api/workers.contract';
 
@@ -8,9 +9,12 @@ import { workersService } from '@/app/pages/workers/WorkersService';
 
 /**
  * Workers table column definitions factory
- * Creates columns with access to mutation methods
+ * Creates columns with access to mutation methods and toast
  */
-function createWorkersColumns(mutation?: MutationMethods<Worker>): Table2Column<Worker>[] {
+function createWorkersColumns(
+	mutation?: MutationMethods<Worker>,
+	showToast?: (message: string, type: 'success' | 'error') => void
+): Table2Column<Worker>[] {
 	/**
 	 * Handle worker rename with optimistic update
 	 */
@@ -27,6 +31,9 @@ function createWorkersColumns(mutation?: MutationMethods<Worker>): Table2Column<
 
 			console.log('[WorkersTable2] Updated worker via mutation.updateItem:', updatedWorker.workerId);
 			// Real-time update via WebSocket (B2F_WORKER_UPDATED) will update other frontends
+
+			// Show success toast
+			showToast?.('Worker renamed successfully', 'success');
 		} catch (error) {
 			console.error('Failed to rename worker:', error);
 			throw error; // Re-throw to show error in EditableText
@@ -88,8 +95,10 @@ export interface WorkersTable2Props extends Partial<Table2Props<Worker>> {
  * Receives mutation methods from Data2 for optimistic updates
  */
 export function WorkersTable2(props: WorkersTable2Props) {
-	// Create columns with mutation support
-	const columns = createWorkersColumns(props.mutation);
+	const { showToast } = useToast();
+
+	// Create columns with mutation support and toast
+	const columns = createWorkersColumns(props.mutation, showToast);
 
 	return (
 		<Table2

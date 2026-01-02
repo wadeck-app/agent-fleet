@@ -26,6 +26,7 @@ import { parseMessage, serializeMessage } from 'shared-common/protocol';
 import { type Task, TaskStatus } from 'shared-orch-worker/domain-types';
 import {
 	type AssignTaskMessage,
+	type ErrorMessage,
 	type KillClaudeMessage,
 	type O2WMessage,
 	O2WMessageType,
@@ -351,6 +352,10 @@ export class FlowWorker implements Shutdownable {
 				this.handleSaveFlowDefinition(message as any);
 				break;
 
+			case O2WMessageType.ERROR:
+				this.handleError(message as ErrorMessage);
+				break;
+
 			default:
 				console.warn(`${this.logPrefix()} Unknown message type: ${message.type}`);
 		}
@@ -367,6 +372,13 @@ export class FlowWorker implements Shutdownable {
 
 		// Request a task now that we're connected
 		this.sendRequestTask();
+	}
+
+	/**
+	 * Handle ERROR message from orchestrator
+	 */
+	private handleError(message: ErrorMessage): void {
+		console.error(`${this.logPrefix()} Error from orchestrator: ${message.error}`);
 	}
 
 	/**

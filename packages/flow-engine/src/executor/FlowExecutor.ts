@@ -34,6 +34,9 @@ export interface FlowExecutionOptions {
 	/** Callback when Claude process starts (to store reference for killing) */
 	onClaudeProcessStarted?: (process: any) => void;
 
+	/** Handler for user interventions (approval, questions, choices) */
+	interventionHandler?: import('./InterventionHandler').InterventionHandler;
+
 	/** Nesting depth for SubFlowStep recursion tracking */
 	nestingDepth?: number;
 }
@@ -99,6 +102,7 @@ export class FlowExecutor {
 			taskMetadata = {},
 			claudeEnv,
 			onClaudeProcessStarted,
+			interventionHandler,
 			nestingDepth = 0,
 		} = options;
 
@@ -107,6 +111,7 @@ export class FlowExecutor {
 			interactive: this.stepRunner['config'].interactive,
 			claudeEnv,
 			onClaudeProcessStarted,
+			interventionHandler,
 			flowRegistry: this.flowRegistry,
 			flowExecutor: this,
 		});

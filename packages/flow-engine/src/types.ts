@@ -100,8 +100,15 @@ export interface OutputVariableConfig {
 	/** Type of the extracted value */
 	type: VariableType;
 
-	/** Optional regex pattern for extraction from text */
+	/** Optional regex pattern for extraction from text (for script/model steps) */
 	pattern?: string;
+
+	/**
+	 * Source path for extraction (for user_intervention steps)
+	 * Examples: 'intervention.approved', 'intervention.comment', 'intervention.answeredBy'
+	 * This makes it explicit where the value comes from - no magic!
+	 */
+	from?: string;
 
 	/** Whether this field is required (checked in post-process) */
 	required?: boolean;
@@ -340,7 +347,7 @@ export interface UserInterventionStep extends BaseFlowStep {
 	timeout?: {
 		minutes: number;
 		onTimeout: 'fail' | 'continue' | 'default';
-		defaultValue?: any;
+		defaultValue?: unknown;
 	};
 
 	/** Configuration for approval type */

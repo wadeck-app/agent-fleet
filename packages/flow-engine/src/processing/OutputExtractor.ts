@@ -86,14 +86,20 @@ export class OutputExtractor {
 	): any {
 		let value: any;
 
-		// First, check if it's in additionalContext (for script steps: exitCode, stderr, etc.)
-		if (additionalContext && varName in additionalContext) {
+		// If 'from' is specified, extract from the specified source path
+		if (config.from) {
+			value = this.extractFromPath(config.from, additionalContext, varName, stepId);
+		}
+		// Check if it's in additionalContext (for script steps: exitCode, stderr, etc.)
+		else if (additionalContext && varName in additionalContext) {
 			value = additionalContext[varName];
-		} else if (config.pattern) {
-			// Extract using regex pattern
+		}
+		// Extract using regex pattern
+		else if (config.pattern) {
 			value = this.extractWithPattern(config.pattern, rawOutput, varName, stepId);
-		} else {
-			// No pattern, use entire raw output
+		}
+		// No pattern, use entire raw output
+		else {
 			value = rawOutput;
 		}
 
@@ -106,6 +112,45 @@ export class OutputExtractor {
 		value = this.convertType(value, config.type, varName, stepId);
 
 		return value;
+	}
+
+	/**
+	 * Extract value from a path like 'intervention.approved'
+	 */
+	private extractFromPath(
+		path: string,
+		additionalContext: Record<string, any> | undefined,
+		varName: string,
+		stepId: string
+	): any {
+		if (!additionalContext) {
+			throw new OutputExtractionError(
+				`Cannot extract from path '${path}': no context available`,
+				varName,
+				stepId
+			);
+		}
+
+		const parts = path.split('.');
+		let current: any = additionalContext;
+
+		for (const part of parts) {
+			if (current == null || typeof current !== 'object') {
+				throw new OutputExtractionError(
+					`Cannot navigate path '${path}': reached non-object at '${part}'`,
+					varName,
+					stepId
+				);
+			}
+
+			if (!(part in current)) {
+				throw new OutputExtractionError(`Path '${path}' not found: missing '${part}'`, varName, stepId);
+			}
+
+			current = current[part];
+		}
+
+		return current;
 	}
 
 	/**

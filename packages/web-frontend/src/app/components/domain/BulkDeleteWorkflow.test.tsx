@@ -162,7 +162,7 @@ describe('BulkDeleteWorkflow', () => {
 			});
 
 			await waitFor(() => {
-				expect(mockShowToast).toHaveBeenCalledWith('✓ Successfully deleted 3 book(s)', 'success');
+				expect(mockShowToast).toHaveBeenCalledWith('Successfully deleted 3 book(s)', 'success');
 			});
 		});
 
@@ -191,7 +191,7 @@ describe('BulkDeleteWorkflow', () => {
 			});
 
 			await waitFor(() => {
-				expect(mockShowToast).toHaveBeenCalledWith('✓ Successfully deleted 3 book(s)', 'success');
+				expect(mockShowToast).toHaveBeenCalledWith('Successfully deleted 3 book(s)', 'success');
 			});
 		});
 	});
@@ -232,7 +232,7 @@ describe('BulkDeleteWorkflow', () => {
 			});
 
 			await waitFor(() => {
-				expect(mockShowToast).toHaveBeenCalledWith('✗ Failed to delete all 3 book(s)', 'error');
+				expect(mockShowToast).toHaveBeenCalledWith('Failed to delete all 3 book(s)', 'error');
 			});
 		});
 
@@ -444,7 +444,7 @@ describe('BulkDeleteWorkflow', () => {
 			});
 
 			await waitFor(() => {
-				expect(mockShowToast).toHaveBeenCalledWith('✓ Successfully deleted 1 book(s)', 'success');
+				expect(mockShowToast).toHaveBeenCalledWith('Successfully deleted 1 book(s)', 'success');
 			});
 		});
 

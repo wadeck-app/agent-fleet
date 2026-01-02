@@ -159,6 +159,7 @@ export interface InterventionTimeout {
 export interface InterventionResponse {
 	value: any;
 	answeredBy: string;
+	answeredAt: string;
 	comment?: string;
 }
 

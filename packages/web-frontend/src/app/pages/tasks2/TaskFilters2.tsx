@@ -13,6 +13,7 @@ import type { TaskFiltersContract } from './useTaskFilters2';
  * - Status dropdown
  * - Priority dropdown
  * - Worker ID text input
+ * - Flow ID text input
  * - Clear filters button
  *
  * Uses the TaskFiltersContract from useTaskFilters2 hook.
@@ -58,7 +59,8 @@ export function TaskFilters2({ filters }: TaskFilters2Props) {
 		<div
 			className={`
      mb-4 grid grid-cols-1 gap-4
-     sm:grid-cols-3
+     sm:grid-cols-2
+     lg:grid-cols-4
    `}
 		>
 			{/* Status Filter */}
@@ -95,9 +97,21 @@ export function TaskFilters2({ filters }: TaskFilters2Props) {
 				/>
 			</div>
 
+			{/* Flow ID Filter */}
+			<div>
+				<div className="mb-2 text-xs font-medium text-muted-foreground">Flow ID</div>
+				<Input
+					id="flow-filter"
+					type="text"
+					value={filters.fstate.flowId || ''}
+					onChange={e => filters.actions.setFlowId(e.target.value || undefined)}
+					placeholder="Filter by flow..."
+				/>
+			</div>
+
 			{/* Clear Filters Button - Full width on mobile, auto on larger screens */}
 			{filters.fstate.hasFilters && (
-				<div className="sm:col-span-3">
+				<div className="sm:col-span-2 lg:col-span-4">
 					<Button onClick={filters.actions.clearFilters} variant="outline" size="default">
 						Clear Filters
 					</Button>

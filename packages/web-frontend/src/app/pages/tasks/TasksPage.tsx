@@ -5,6 +5,7 @@ import { LoadingState } from '@framework/components/feedback/LoadingState';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { Button } from '@framework/components/primitives/Button';
+import { useToast } from '@framework/features/toast/ToastContext';
 import type { TaskPriority, TaskStatus } from '@shared/api/tasks.contract';
 import { Plus, RefreshCw } from 'lucide-react';
 
@@ -50,6 +51,7 @@ export function TasksPage() {
 
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [createDialogOpen, setCreateDialogOpen] = useState(false);
+	const { showToast } = useToast();
 
 	const handleRefresh = async () => {
 		setIsRefreshing(true);
@@ -62,6 +64,7 @@ export function TasksPage() {
 
 	const handleTaskCreated = async () => {
 		await refresh();
+		showToast('Task created successfully', 'success');
 	};
 
 	const handleClearFilters = () => {
