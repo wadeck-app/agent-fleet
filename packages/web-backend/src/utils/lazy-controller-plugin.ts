@@ -140,6 +140,8 @@ function createLazyControllerPlugin<Routes = any>(
 		const factory = getFactory();
 		let service: any;
 
+		//FIXME refactor this injection in a cleaner way!!!
+
 		// Map baseUrl to factory method
 		if (baseUrl === '/api/auth') {
 			// AuthController needs both AuthService and TransportSessionManager
@@ -173,6 +175,10 @@ function createLazyControllerPlugin<Routes = any>(
 			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/workspaces') {
 			service = factory.getWorkspacesService();
+			// @ts-expect-error - Dynamic service injection based on baseUrl
+			controllerInstance = new ControllerClass(service);
+		} else if (baseUrl === '/api/interventions') {
+			service = factory.getInterventionsService();
 			// @ts-expect-error - Dynamic service injection based on baseUrl
 			controllerInstance = new ControllerClass(service);
 		} else {
@@ -271,7 +277,7 @@ function createLazyControllerPlugin<Routes = any>(
 					return reply.status(400).send({
 						error: 'ValidationError',
 						message: 'Invalid request data',
-						details: error.errors.map(e => ({
+						details: error.issues.map(e => ({
 							path: e.path.join('.'),
 							message: e.message,
 						})),

@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
+import { ErrorBoundary } from '@framework/components/feedback/ErrorBoundary';
 import { ConnectivityProvider } from '@framework/features/connectivity/ConnectivityContext';
 import { ToastProvider } from '@framework/features/toast/ToastContext';
 import { useMediaQuery } from '@framework/hooks/useMediaQuery';
@@ -89,17 +90,19 @@ export function App() {
 	const backendBaseUrl = API_BASE_URL.replace(/\/api$/, '');
 
 	return (
-		<ConnectivityProvider circuitBreakerService={circuitBreakerService}>
-			<ToastProvider>
-				<BrowserRouter>
-					<TransportProvider baseUrl={backendBaseUrl}>
-						<Routes>
-							<Route path="/login" element={<LoginPage />} />
-							<Route path="/*" element={<Layout />} />
-						</Routes>
-					</TransportProvider>
-				</BrowserRouter>
-			</ToastProvider>
-		</ConnectivityProvider>
+		<ErrorBoundary>
+			<ConnectivityProvider circuitBreakerService={circuitBreakerService}>
+				<ToastProvider>
+					<BrowserRouter>
+						<TransportProvider baseUrl={backendBaseUrl}>
+							<Routes>
+								<Route path="/login" element={<LoginPage />} />
+								<Route path="/*" element={<Layout />} />
+							</Routes>
+						</TransportProvider>
+					</BrowserRouter>
+				</ToastProvider>
+			</ConnectivityProvider>
+		</ErrorBoundary>
 	);
 }

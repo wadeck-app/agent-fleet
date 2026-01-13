@@ -163,7 +163,14 @@ export function WorkspacesPage2() {
 			</div>
 
 			{/* Data + Table */}
-			<Data2 fetchData={fetchWorkspaces} pagination={pagination} sorting={sorting} search={search} cache={cache}>
+			<Data2
+				fetchData={fetchWorkspaces}
+				pagination={pagination}
+				sorting={sorting}
+				search={search}
+				cache={cache}
+				delegateLoadingToChildren={true}
+			>
 				<WorkspacesTable2 />
 			</Data2>
 		</Page>

@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
+import { createListResponseSchema, createQuerySchema } from '../common/api-helpers';
+import { BaseEntitySchema, IdParamSchema } from '../common/base-entity';
 import { defineRoutes } from '../route-builder';
+import { assertValidRoutes } from '../utils/validate-routes';
+import { optionalSanitizedString, sanitizedString } from '../validation/sanitization';
 
 /**
  * Intervention type enum
@@ -19,32 +23,34 @@ export const InterventionSourceTypeSchema = z.enum(['flow_step', 'agent_tool']);
 
 /**
  * Intervention option schema (for choice type)
+ * All string inputs are sanitized to prevent XSS
  */
 export const InterventionOptionSchema = z.object({
-	id: z.string(),
-	label: z.string(),
-	description: z.string().optional(),
+	id: sanitizedString(1, 100),
+	label: sanitizedString(1, 255),
+	description: optionalSanitizedString(500),
 });
 
 /**
  * Intervention validation schema (for question type)
  */
 export const InterventionValidationSchema = z.object({
-	pattern: z.string().optional(),
+	pattern: optionalSanitizedString(500),
 	min: z.number().optional(),
 	max: z.number().optional(),
 });
 
 /**
  * Intervention configuration schema
+ * All string inputs are sanitized to prevent XSS
  */
 export const InterventionConfigSchema = z.object({
-	title: z.string(),
-	description: z.string().optional(),
+	title: sanitizedString(1, 255),
+	description: optionalSanitizedString(1000),
 	// For approval
 	allowReject: z.boolean().optional(),
 	// For question
-	question: z.string().optional(),
+	question: optionalSanitizedString(1000),
 	responseType: z.enum(['text', 'number', 'boolean']).optional(),
 	validation: InterventionValidationSchema.optional(),
 	// For choice
@@ -57,42 +63,41 @@ export const InterventionConfigSchema = z.object({
  */
 export const InterventionSourceSchema = z.object({
 	type: InterventionSourceTypeSchema,
-	stepId: z.string().optional(),
-	toolName: z.string().optional(),
+	stepId: optionalSanitizedString(100),
+	toolName: optionalSanitizedString(100),
 });
 
 /**
  * Intervention timeout schema
  */
 export const InterventionTimeoutSchema = z.object({
-	minutes: z.number(),
+	minutes: z.number().positive(),
 	onTimeout: z.enum(['fail', 'continue', 'default']),
 	defaultValue: z.any().optional(),
 });
 
 /**
  * Intervention response schema
+ * All string inputs are sanitized to prevent XSS
  */
 export const InterventionResponseSchema = z.object({
 	value: z.any(),
-	answeredBy: z.string(),
-	comment: z.string().optional(),
+	answeredBy: sanitizedString(1, 255),
+	comment: optionalSanitizedString(1000),
 });
 
 /**
- * Individual intervention schema
+ * Intervention-specific fields
  */
-export const InterventionSchema = z.object({
-	id: z.string(),
-	taskId: z.string(),
-	workerId: z.string().optional(),
-	flowId: z.string().optional(),
-	stepId: z.string().optional(),
+const InterventionFields = z.object({
+	taskId: sanitizedString(1, 100),
+	workerId: optionalSanitizedString(100),
+	flowId: optionalSanitizedString(100),
+	stepId: optionalSanitizedString(100),
 	type: InterventionTypeSchema,
 	status: InterventionStatusSchema,
-	createdAt: z.string(), // ISO 8601
-	answeredAt: z.string().optional(),
-	timeoutAt: z.string().optional(),
+	answeredAt: z.string().optional(), // ISO 8601
+	timeoutAt: z.string().optional(), // ISO 8601
 	source: InterventionSourceSchema,
 	config: InterventionConfigSchema,
 	blocking: z.boolean(),
@@ -101,40 +106,31 @@ export const InterventionSchema = z.object({
 });
 
 /**
- * Query parameters for filtering interventions
+ * Complete intervention = specific fields + common metadata (id, createdAt, updatedAt, version)
  */
-export const InterventionsQuerySchema = z.object({
+export const InterventionSchema = InterventionFields.merge(BaseEntitySchema);
+
+/**
+ * Query parameters for filtering interventions (extends common base with pagination/sorting)
+ */
+export const InterventionsQuerySchema = createQuerySchema({
 	status: InterventionStatusSchema.optional(),
 	type: InterventionTypeSchema.optional(),
-	taskId: z.string().optional(),
-	page: z.coerce.number().int().positive().optional(),
-	pageSize: z.coerce.number().int().positive().max(100).optional(),
+	taskId: optionalSanitizedString(100),
 });
 
 /**
- * Pagination metadata schema
+ * Interventions list response (uses common pagination structure)
  */
-export const PaginationSchema = z.object({
-	total: z.number(),
-	page: z.number(),
-	pageSize: z.number(),
-	totalPages: z.number(),
-});
-
-/**
- * Interventions list response
- */
-export const InterventionsListResponseSchema = z.object({
-	items: z.array(InterventionSchema),
-	pagination: PaginationSchema.optional(),
-});
+export const InterventionsListResponseSchema = createListResponseSchema(InterventionSchema);
 
 /**
  * Response submission schema
+ * All string inputs are sanitized to prevent XSS
  */
 export const InterventionResponseSubmitSchema = z.object({
 	value: z.any(),
-	comment: z.string().optional(),
+	comment: optionalSanitizedString(1000),
 });
 
 /**
@@ -142,11 +138,12 @@ export const InterventionResponseSubmitSchema = z.object({
  */
 export const SuccessResponseSchema = z.object({
 	success: z.boolean(),
-	message: z.string().optional(),
+	message: optionalSanitizedString(500),
 });
 
 /**
  * API Routes definition using zod schemas
+ * Following the same pattern as ingredients (using :id instead of :interventionId)
  */
 export const INTERVENTIONS_API_ROUTES = defineRoutes({
 	'/api/interventions/': {
@@ -155,26 +152,31 @@ export const INTERVENTIONS_API_ROUTES = defineRoutes({
 			response: InterventionsListResponseSchema,
 		},
 	},
-	'/api/interventions/:interventionId': {
+	'/api/interventions/:id': {
 		GET: {
-			params: z.object({ interventionId: z.string() }),
+			params: IdParamSchema,
 			response: InterventionSchema,
 		},
 	},
-	'/api/interventions/:interventionId/respond': {
+	'/api/interventions/:id/respond': {
 		POST: {
-			params: z.object({ interventionId: z.string() }),
+			params: IdParamSchema,
 			body: InterventionResponseSubmitSchema,
 			response: SuccessResponseSchema,
 		},
 	},
-	'/api/interventions/:interventionId/cancel': {
+	'/api/interventions/:id/cancel': {
 		POST: {
-			params: z.object({ interventionId: z.string() }),
+			params: IdParamSchema,
 			response: SuccessResponseSchema,
 		},
 	},
 });
+
+// Validate routes at module load time (development/test only)
+if (process.env.NODE_ENV !== 'production') {
+	assertValidRoutes(INTERVENTIONS_API_ROUTES, 'INTERVENTIONS_API');
+}
 
 // Type exports
 export type InterventionType = z.infer<typeof InterventionTypeSchema>;

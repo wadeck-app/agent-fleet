@@ -10,8 +10,10 @@ import type {
 	TasksListResponse,
 	TasksQuery,
 } from '@app/shared/api/tasks.contract';
+import type { BulkDeleteResponse, FailedDeletion } from '@app/shared/common/api-helpers';
 import { B2F_TASKS_UPDATED, B2F_TASK_CREATED, B2F_TASK_DELETED } from '@app/shared/transport';
 
+import { TraceChunkStorage } from '../../../orchestrator/src/core/TraceChunkStorage';
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 
@@ -49,10 +51,15 @@ import type { EventBroadcaster } from '../transport/EventBroadcaster';
  */
 
 export class TasksService {
+	private readonly traceStorage: TraceChunkStorage;
+
 	constructor(
 		private readonly orchestratorRepository: OrchestratorRepository,
 		private readonly eventBroadcaster: EventBroadcaster
-	) {}
+	) {
+		// Use the same data directory as the orchestrator
+		this.traceStorage = new TraceChunkStorage('./data/tasks');
+	}
 
 	/**
 	 * Get tasks data with optional filtering
@@ -340,6 +347,44 @@ export class TasksService {
 	}
 
 	/**
+	 * Bulk delete tasks (best-effort approach)
+	 * Returns detailed results for each ID
+	 */
+	async bulkDeleteTasks(ids: string[]): Promise<BulkDeleteResponse> {
+		const deleted: string[] = [];
+		const failed: FailedDeletion[] = [];
+
+		for (const id of ids) {
+			try {
+				await this.orchestratorRepository.deleteTask(id);
+				deleted.push(id);
+			} catch (error) {
+				failed.push({
+					id,
+					reason: error instanceof Error ? error.message : 'Unknown error',
+					code: 'DELETE_FAILED',
+				});
+			}
+		}
+
+		// Emit events after bulk deletion
+		if (deleted.length > 0) {
+			// Emit aggregate event for dashboard updates
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
+		}
+
+		return {
+			success: true,
+			deleted,
+			failed,
+			totalRequested: ids.length,
+			totalDeleted: deleted.length,
+			totalFailed: failed.length,
+		};
+	}
+
+	/**
 	 * Create a new task
 	 * 1. Validate input
 	 * 2. Create task in orchestrator
@@ -563,7 +608,7 @@ export class TasksService {
 				`[TasksService] Fetching logs for task ${taskId}, cursor=${query.cursor}, limit=${query.limit}`
 			);
 
-			// Get full task with trace
+			// Get task to check status
 			const task = await this.getTaskById(taskId);
 
 			if (!task) {
@@ -573,9 +618,14 @@ export class TasksService {
 			// Check if task is still running
 			const isRunning = task.status === 'in_progress' || task.status === 'testing';
 
-			// Extract steps from trace
-			const trace = task.flowResult?.trace;
-			if (!trace || !trace.steps || !Array.isArray(trace.steps)) {
+			// Use TraceChunkStorage to read logs efficiently
+			const {
+				logs: steps,
+				nextCursor: stepsCursor,
+				total: stepsTotal,
+			} = await this.traceStorage.readLogsPaginated(taskId, query.cursor || 0, query.limit || 500);
+
+			if (steps.length === 0) {
 				return {
 					logs: [],
 					nextCursor: null,
@@ -583,8 +633,6 @@ export class TasksService {
 					isRunning,
 				};
 			}
-
-			const steps = trace.steps;
 
 			// Convert steps to log entries
 			let allLogs: LogEntry[] = [];
@@ -670,18 +718,12 @@ export class TasksService {
 				allLogs = allLogs.filter(log => log.message.toLowerCase().includes(searchLower));
 			}
 
-			const total = allLogs.length;
-
-			// Apply pagination
-			const cursor = query.cursor || 0;
-			const limit = query.limit || 100;
-			const paginatedLogs = allLogs.slice(cursor, cursor + limit);
-			const nextCursor = cursor + limit < total ? cursor + limit : null;
-
+			// Note: Pagination already done by TraceChunkStorage
+			// We return the logs as-is with the cursor from the storage
 			return {
-				logs: paginatedLogs,
-				nextCursor,
-				total,
+				logs: allLogs,
+				nextCursor: stepsCursor,
+				total: stepsTotal,
 				isRunning,
 			};
 		} catch (error) {

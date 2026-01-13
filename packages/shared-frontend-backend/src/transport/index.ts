@@ -47,6 +47,7 @@ export {
 	B2F_TASK_STATUS_CHANGED,
 	B2F_TASK_ASSIGNED,
 	B2F_TASK_PRIORITY_CHANGED,
+	B2F_TASK_TRACE_UPDATED,
 	B2F_WORKERS_UPDATED,
 	B2F_WORKER_CREATED,
 	B2F_WORKER_UPDATED,
@@ -72,6 +73,24 @@ export {
 	B2F_INTERVENTION_TIMEOUT,
 	B2F_INTERVENTION_CANCELLED,
 } from './B2FEventConstants';
+
+// Event Filters - Type-safe subscription filters
+export type {
+	NoFilter,
+	TaskFilter,
+	WorkerFilter,
+	WorkspaceFilter,
+	InterventionFilter,
+	B2FEventFilters,
+	B2FEvent,
+	FilterForEvent,
+	EventRequiresFilter,
+	EventsWithFilter,
+	Subscription,
+	SubscriptionOptions,
+} from './EventFilters';
+
+export { matchesFilter } from './EventFilters';
 
 // Typed Transport - Type-safe transport interface
 export type {

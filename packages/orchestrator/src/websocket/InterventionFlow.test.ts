@@ -168,6 +168,7 @@ describe('Intervention Flow Integration', () => {
 				{
 					workerId: 'worker-1',
 					taskId: 'task-1',
+					interventionId: 'test-intervention-1',
 					flowId: 'flow-1',
 					stepId: 'step-1',
 					interventionType: 'approval',
@@ -267,6 +268,7 @@ describe('Intervention Flow Integration', () => {
 				{
 					workerId: 'worker-1',
 					taskId: 'task-1',
+					interventionId: 'test-intervention-2',
 					stepId: 'step-approval',
 					interventionType: 'approval',
 					blocking: true,
@@ -337,6 +339,7 @@ describe('Intervention Flow Integration', () => {
 				{
 					workerId: 'worker-1',
 					taskId: 'task-1',
+					interventionId: 'test-intervention-3',
 					stepId: 'step-question',
 					interventionType: 'question',
 					blocking: false, // Non-blocking
@@ -404,6 +407,7 @@ describe('Intervention Flow Integration', () => {
 				{
 					workerId: 'worker-1',
 					taskId: 'task-1',
+					interventionId: 'test-intervention-4',
 					stepId: 'step-timeout',
 					interventionType: 'approval',
 					blocking: true,
@@ -476,6 +480,7 @@ describe('Intervention Flow Integration', () => {
 				{
 					workerId: 'worker-1',
 					taskId: 'task-1',
+					interventionId: 'test-intervention-5',
 					stepId: 'step-default',
 					interventionType: 'choice',
 					blocking: true,
@@ -549,6 +554,7 @@ describe('Intervention Flow Integration', () => {
 				{
 					workerId: 'worker-1',
 					taskId: 'task-1',
+					interventionId: 'test-intervention-6',
 					stepId: 'step-cancel',
 					interventionType: 'question',
 					blocking: true,
@@ -621,6 +627,7 @@ describe('Intervention Flow Integration', () => {
 				{
 					workerId: 'worker-1',
 					taskId: 'task-1',
+					interventionId: 'test-intervention-7',
 					stepId: 'step-1',
 					interventionType: 'approval',
 					blocking: true,
@@ -637,6 +644,7 @@ describe('Intervention Flow Integration', () => {
 				{
 					workerId: 'worker-1',
 					taskId: 'task-1',
+					interventionId: 'test-intervention-8',
 					stepId: 'step-2',
 					interventionType: 'question',
 					blocking: true,

@@ -2,12 +2,8 @@ import { useCallback, useState } from 'react';
 
 import { useAbortableEffect } from '@framework/hooks/useAbortableEffect';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
-import type {
-	BulkDeleteResponse,
-	CreateIngredient,
-	Ingredient,
-	UpdateIngredient,
-} from '@shared/api/ingredients.contract';
+import type { CreateIngredient, Ingredient, UpdateIngredient } from '@shared/api/ingredients.contract';
+import type { BulkDeleteResponse } from '@shared/common/api-helpers';
 
 import { ingredientsService } from './IngredientsService';
 

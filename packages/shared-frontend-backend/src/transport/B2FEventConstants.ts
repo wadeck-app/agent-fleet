@@ -49,6 +49,14 @@ export const B2F_TASK_ASSIGNED = 'b2f:task:assigned' as const;
 /** Task priority changed event */
 export const B2F_TASK_PRIORITY_CHANGED = 'b2f:task:priority_changed' as const;
 
+/**
+ * Task trace updated event (real-time log streaming)
+ * Emitted every ~500ms during task execution with incremental trace updates
+ * REQUIRES taskId filter to avoid spamming all clients
+ * @see EventFilters.ts for filter requirements
+ */
+export const B2F_TASK_TRACE_UPDATED = 'b2f:task:trace_updated' as const;
+
 // ===========================================================================================
 // WORKER EVENTS
 // ===========================================================================================

@@ -27,7 +27,7 @@ export class WebSocketMessageRouter {
 	 * Route a message to the appropriate handler
 	 * Returns workerId if this is a WORKER_READY message (for connection tracking)
 	 */
-	routeMessage(socket: WebSocket, message: W2OMessage, workerId: string | null): string | void {
+	async routeMessage(socket: WebSocket, message: W2OMessage, workerId: string | null): Promise<string | void> {
 		logger.info(`[WS] Received ${message.type} from ${workerId || 'unknown'}`);
 
 		switch (message.type) {
@@ -47,11 +47,15 @@ export class WebSocketMessageRouter {
 				break;
 
 			case W2OMessageType.TASK_COMPLETED:
-				this.eventHandler.handleTaskCompleted(message);
+				await this.eventHandler.handleTaskCompleted(message);
 				break;
 
 			case W2OMessageType.TASK_FAILED:
-				this.eventHandler.handleTaskFailed(message);
+				await this.eventHandler.handleTaskFailed(message);
+				break;
+
+			case W2OMessageType.TASK_TRACE_UPDATE:
+				await this.eventHandler.handleTaskTraceUpdate(message);
 				break;
 
 			case W2OMessageType.TASK_QUESTION:
@@ -101,7 +105,7 @@ export class WebSocketMessageRouter {
 				break;
 
 			case W2OMessageType.INTERVENTION_REQUESTED:
-				this.eventHandler.handleInterventionRequested(message);
+				await this.eventHandler.handleInterventionRequested(message);
 				break;
 
 			default:

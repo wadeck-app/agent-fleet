@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-import { DeleteResponseSchema, createListResponseSchema, createQuerySchema } from '../common/api-helpers';
+import {
+	BulkDeleteRequestSchema,
+	BulkDeleteResponseSchema,
+	DeleteResponseSchema,
+	createListResponseSchema,
+	createQuerySchema,
+} from '../common/api-helpers';
 import { BaseEntitySchema, IdParamSchema } from '../common/base-entity';
 
 /**
@@ -96,28 +102,6 @@ const IngredientListQuerySchema = createQuerySchema({
  */
 const IngredientListSchema = createListResponseSchema(IngredientSchema);
 
-/**
- * Bulk delete schemas
- */
-const BulkDeleteRequestSchema = z.object({
-	ids: z.array(z.string()).min(1).max(10), // MAX 10 per batch
-});
-
-const FailedDeletionSchema = z.object({
-	id: z.string(),
-	reason: z.string(),
-	code: z.string(),
-});
-
-const BulkDeleteResponseSchema = z.object({
-	success: z.literal(true),
-	deleted: z.array(z.string()),
-	failed: z.array(FailedDeletionSchema),
-	totalRequested: z.number(),
-	totalDeleted: z.number(),
-	totalFailed: z.number(),
-});
-
 export const INGREDIENTS_API_ROUTES = defineRoutes({
 	'/api/ingredients/': {
 		GET: {
@@ -169,6 +153,4 @@ export type UpdateIngredient = z.infer<typeof UpdateIngredientSchema>;
 export type PatchIngredient = z.infer<typeof PatchIngredientSchema>;
 export type IngredientListResponse = z.infer<typeof IngredientListSchema>;
 export type IngredientsListQuery = z.infer<typeof IngredientListQuerySchema>;
-export type BulkDeleteRequest = z.infer<typeof BulkDeleteRequestSchema>;
-export type BulkDeleteResponse = z.infer<typeof BulkDeleteResponseSchema>;
-export type FailedDeletion = z.infer<typeof FailedDeletionSchema>;
+// BulkDelete types are now imported from api-helpers (common)

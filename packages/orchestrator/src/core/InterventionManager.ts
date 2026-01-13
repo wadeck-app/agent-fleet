@@ -66,6 +66,7 @@ export class InterventionManager {
 	 * Create a new intervention request
 	 */
 	async createIntervention(params: {
+		id?: string; // Optional ID from worker (if provided, use it instead of generating new UUID)
 		taskId: string;
 		workerId?: string;
 		flowId?: string;
@@ -77,7 +78,7 @@ export class InterventionManager {
 		timeout?: InterventionTimeout;
 	}): Promise<Intervention> {
 		const intervention: Intervention = {
-			id: randomUUID(),
+			id: params.id || randomUUID(), // Use provided ID or generate new UUID
 			taskId: params.taskId,
 			workerId: params.workerId,
 			flowId: params.flowId,

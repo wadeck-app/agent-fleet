@@ -1,0 +1,25 @@
+{
+	"chunkIndex": 0,
+	"entries": [
+		{
+			"stepId": "prepare",
+			"stepName": "Prepare Data",
+			"stepType": "script",
+			"startTime": 1767454641044,
+			"retries": 0,
+			"script": "echo [prepare] Processing: tata1\nping localhost -n 2 >nul\necho [prepare] Data ready for review\necho data_hash=abc123\n",
+			"exitCode": 0,
+			"stdout": "[prepare] Processing: tata1\r\n[prepare] Data ready for review\r\ndata_hash=abc123",
+			"stderr": "",
+			"endTime": 1767454642076,
+			"durationMs": 1031,
+			"outputs": {
+				"exitCode": 0,
+				"stdout": "[prepare] Processing: tata1\r\n[prepare] Data ready for review\r\ndata_hash=abc123",
+				"stderr": "",
+				"success": true,
+				"data_hash": "abc123"
+			}
+		}
+	]
+}

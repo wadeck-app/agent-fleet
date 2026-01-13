@@ -1876,13 +1876,15 @@ Located in `packages/web-frontend/src/framework/components/`:
 **Solution**: Added `from` field to `OutputVariableConfig` to make sources explicit.
 
 **Before** (INVALID - magic):
+
 ```yaml
 output:
-    approved: { type: boolean }  # ❌ Where does this come from?
-    comment: { type: string }     # ❌ No source specified!
+    approved: { type: boolean } # ❌ Where does this come from?
+    comment: { type: string } # ❌ No source specified!
 ```
 
 **After** (VALID - explicit):
+
 ```yaml
 output:
     approved: { type: boolean, from: 'intervention.approved' }
@@ -1894,18 +1896,19 @@ output:
 
 1. **Added `from` field** to `OutputVariableConfig` type (`packages/flow-engine/src/types.ts`)
 2. **Validation enforces explicit sources** (`packages/flow-engine/src/validation/SchemaValidator.ts`):
-   - ERROR if user_intervention output lacks `from` field
-   - ERROR if user_intervention output has `pattern` (doesn't make sense)
-   - ERROR if `from` points to non-existent source
+    - ERROR if user_intervention output lacks `from` field
+    - ERROR if user_intervention output has `pattern` (doesn't make sense)
+    - ERROR if `from` points to non-existent source
 3. **OutputExtractor uses `from`** (`packages/flow-engine/src/processing/OutputExtractor.ts`):
-   - Added `extractFromPath()` to navigate dot-notation paths like 'intervention.approved'
-   - Fails fast if path doesn't exist
+    - Added `extractFromPath()` to navigate dot-notation paths like 'intervention.approved'
+    - Fails fast if path doesn't exist
 4. **StepRunner structures context** (`packages/flow-engine/src/executor/StepRunner.ts`):
-   - Changed from flat `{ approved: true, comment: '...' }`
-   - To nested `{ intervention: { approved: true, comment: '...' } }`
-   - Makes the namespace explicit
+    - Changed from flat `{ approved: true, comment: '...' }`
+    - To nested `{ intervention: { approved: true, comment: '...' } }`
+    - Makes the namespace explicit
 
 **Available Sources for user_intervention**:
+
 - `intervention.value` - Raw response value
 - `intervention.comment` - Optional comment
 - `intervention.answeredBy` - Who answered

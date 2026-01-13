@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 
 import { Input } from '@framework/components/forms/Input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
 import { Button } from '@framework/components/primitives/Button';
 import { Toggle } from '@framework/components/primitives/Toggle';
 import type { LogEntry as LogEntryType, LogLevel } from '@shared/api/tasks.contract';
@@ -89,17 +90,21 @@ export function TaskLogsViewer({
 
 				{/* Level Filter */}
 				{onLevelChange && (
-					<select
-						value={level || ''}
-						onChange={e => onLevelChange((e.target.value as LogLevel) || undefined)}
-						className="rounded border border-input px-2 py-1 text-xs"
+					<Select
+						value={level || 'all'}
+						onValueChange={value => onLevelChange(value === 'all' ? undefined : (value as LogLevel))}
 					>
-						<option value="">All Levels</option>
-						<option value="debug">🔍 Debug</option>
-						<option value="info">ℹ️ Info</option>
-						<option value="warning">⚠️ Warning</option>
-						<option value="error">❌ Error</option>
-					</select>
+						<SelectTrigger size="sm" className="w-32 text-xs">
+							<SelectValue placeholder="All Levels" />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value="all">All Levels</SelectItem>
+							<SelectItem value="debug">Debug</SelectItem>
+							<SelectItem value="info">Info</SelectItem>
+							<SelectItem value="warning">Warning</SelectItem>
+							<SelectItem value="error">Error</SelectItem>
+						</SelectContent>
+					</Select>
 				)}
 
 				<div className="flex-1" />

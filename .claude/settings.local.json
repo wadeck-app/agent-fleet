@@ -18,7 +18,8 @@
 			"Bash(curl:*)",
 			"Skill(check)",
 			"Bash(npm run lint:*)",
-			"Bash(npm run check)"
+			"Bash(npm run check)",
+			"Bash(npm run format)"
 		],
 		"deny": [],
 		"ask": []

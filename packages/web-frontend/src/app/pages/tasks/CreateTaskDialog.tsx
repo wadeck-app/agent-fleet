@@ -45,11 +45,10 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 	const [flowInputs, setFlowInputs] = useState<Record<string, string>>({});
 
 	// Transform workers to ComboboxOption format
-	const workerOptions: ComboboxOption[] =
-		workersData?.workers.map(w => ({
-			value: w.workerId,
-			label: `${w.workerId}${w.taskId ? ' (busy)' : ' (idle)'}`,
-		})) || [];
+	const workerOptions: ComboboxOption[] = (workersData?.workers || []).map(w => ({
+		value: w.workerId,
+		label: `${w.workerId}${w.taskId ? ' (busy)' : ' (idle)'}`,
+	}));
 
 	const formState = useFormState<CreateTaskFormData>({
 		defaultData: defaultFormData,

@@ -7,12 +7,12 @@ import { positive } from '@framework/utils/validation/validation';
 import { combine } from '@framework/utils/validation/validation';
 import { type ValidationResult } from '@framework/utils/validation/validation';
 import type {
-	BulkDeleteResponse,
 	CreateIngredient,
 	Ingredient,
 	IngredientListResponse,
 	IngredientsListQuery,
 } from '@shared/api/ingredients.contract';
+import type { BulkDeleteResponse } from '@shared/common/api-helpers';
 
 import { ingredientsApi } from '@app/api/client';
 

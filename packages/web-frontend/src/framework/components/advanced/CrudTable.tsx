@@ -1,11 +1,10 @@
-import { useState } from 'react';
-
 import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
 import { Button } from '@framework/components/primitives/Button';
 import { Table } from '@framework/components/table/Table';
 import { type TablePaginationConfig } from '@framework/components/table/Table';
 import { type TableSortingConfig } from '@framework/components/table/Table';
 import { type TableColumn } from '@framework/components/table/Table';
+import { useDialogDeleteConfirmation } from '@framework/hooks/useDialogDeleteConfirmation';
 import { applyColumnOrder } from '@framework/utils/table/columnOrdering';
 import { Pencil, Trash2 } from 'lucide-react';
 
@@ -172,18 +171,11 @@ export function CrudTable<T extends CrudTableItem>({
 	onSelectionChange,
 	deletingIds,
 }: CrudTableProps<T>) {
-	const [itemToDelete, setItemToDelete] = useState<T | null>(null);
-
-	const handleDeleteClick = (item: T) => {
-		setItemToDelete(item);
-	};
-
-	const handleConfirmDelete = () => {
-		if (itemToDelete) {
-			onDelete(itemToDelete.id);
-			setItemToDelete(null);
-		}
-	};
+	const deleteConfirmation = useDialogDeleteConfirmation<T>({
+		itemTypeName: config.itemTypeName,
+		onDelete: item => onDelete(item.id),
+		getItemDisplayName: config.getItemDisplayName,
+	});
 
 	// Apply column order first (if provided)
 	const orderedColumns = columnOrder ? applyColumnOrder(columns, columnOrder) : columns;
@@ -206,20 +198,13 @@ export function CrudTable<T extends CrudTableItem>({
 			<Button
 				size="sm"
 				variant="destructive"
-				onClick={() => handleDeleteClick(item)}
+				onClick={() => deleteConfirmation.open(item)}
 				aria-label={`Delete ${config.itemTypeName}`}
 			>
 				<Trash2 className="size-4" />
 			</Button>
 		</div>
 	);
-
-	// Delete confirmation message
-	const deleteDescription = itemToDelete
-		? config.deleteDescription
-			? config.deleteDescription(itemToDelete)
-			: `This action cannot be undone. The ${config.itemTypeName} will be permanently deleted.`
-		: '';
 
 	return (
 		<>
@@ -241,16 +226,7 @@ export function CrudTable<T extends CrudTableItem>({
 			/>
 
 			{/* Delete Confirmation Dialog */}
-			<AlertDialogWrapper
-				open={itemToDelete !== null}
-				onOpenChange={open => !open && setItemToDelete(null)}
-				title={itemToDelete ? `Delete "${config.getItemDisplayName(itemToDelete)}"?` : ''}
-				description={deleteDescription}
-				confirmLabel="Delete"
-				cancelLabel="Cancel"
-				onConfirm={handleConfirmDelete}
-				variant="danger"
-			/>
+			<AlertDialogWrapper {...deleteConfirmation.dialogProps} />
 		</>
 	);
 }

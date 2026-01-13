@@ -14,6 +14,7 @@ import { useTransport } from '@/transport';
  * - Centralized logging
  * - Support for multiple events
  * - Conditional enabling
+ * - Server-side event filtering (for performance)
  *
  * @example
  * ```tsx
@@ -22,6 +23,17 @@ import { useTransport } from '@/transport';
  *   events: [B2F_TASK_CREATED, B2F_TASK_UPDATED, B2F_TASK_DELETED],
  *   onEvent: cache.actions.refresh,
  *   logPrefix: 'TasksPage2',
+ * });
+ * ```
+ *
+ * @example
+ * ```tsx
+ * // Subscribe with filters (e.g., only trace updates for specific taskId)
+ * useRealtimeRefresh({
+ *   events: [B2F_TASK_TRACE_UPDATED],
+ *   onEvent: refetchLogs,
+ *   filters: { taskId: 'task-123' },
+ *   logPrefix: 'TaskLogsPage',
  * });
  * ```
  *
@@ -50,6 +62,13 @@ export function useRealtimeRefresh(options: {
 	onEvent: () => void;
 
 	/**
+	 * Optional filters for server-side event filtering
+	 * Reduces network traffic by only receiving events matching criteria
+	 * @example { taskId: 'task-123' } for B2F_TASK_TRACE_UPDATED
+	 */
+	filters?: Record<string, unknown>;
+
+	/**
 	 * Whether subscriptions are enabled
 	 * @default true
 	 */
@@ -62,22 +81,29 @@ export function useRealtimeRefresh(options: {
 	logPrefix?: string;
 }) {
 	const { transport } = useTransport();
-	const { events, onEvent, enabled = true, logPrefix = 'Page' } = options;
+	const { events, onEvent, filters, enabled = true, logPrefix = 'Page' } = options;
 
 	useEffect(() => {
 		// Don't subscribe if disabled
 		if (!enabled) return;
 
-		console.log(`[${logPrefix}] Subscribing to real-time events:`, events);
+		const logMessage = filters
+			? `[${logPrefix}] Subscribing to real-time events with filters: ${JSON.stringify(filters)}`
+			: `[${logPrefix}] Subscribing to real-time events`;
+		console.log(logMessage, events);
 
 		// Subscribe to all events and collect unsubscribe functions
 		// Type assertion needed because transport.subscribe has strict event type checking
 		const unsubscribers = events.map(event =>
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			transport.subscribe(event as any, data => {
-				console.log(`[${logPrefix}] Received event: ${event}`, data);
-				onEvent();
-			})
+			transport.subscribe(
+				event as any,
+				data => {
+					console.log(`[${logPrefix}] Received event: ${event}`, data);
+					onEvent();
+				},
+				filters // Pass filters to transport
+			)
 		);
 
 		// Cleanup: unsubscribe from all events
@@ -86,5 +112,5 @@ export function useRealtimeRefresh(options: {
 			unsubscribers.forEach(unsub => unsub());
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [transport, onEvent, enabled, logPrefix, ...events]);
+	}, [transport, onEvent, enabled, logPrefix, filters, ...events]);
 }

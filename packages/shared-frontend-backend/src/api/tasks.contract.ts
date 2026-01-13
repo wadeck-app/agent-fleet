@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+import {
+	type BulkDeleteRequest,
+	BulkDeleteRequestSchema,
+	type BulkDeleteResponse,
+	BulkDeleteResponseSchema,
+	type FailedDeletion,
+} from '../common/api-helpers';
 import { defineRoutes } from '../route-builder';
 
 /**
@@ -212,6 +219,10 @@ export const TASKS_API_ROUTES = defineRoutes({
 		POST: {
 			body: CreateTaskSchema,
 			response: TaskSchema,
+		},
+		DELETE: {
+			body: BulkDeleteRequestSchema,
+			response: BulkDeleteResponseSchema,
 		},
 	},
 	'/api/tasks/:id': {

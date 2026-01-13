@@ -21,18 +21,18 @@ export const interventionsApi = {
 	/**
 	 * Get a single intervention by ID
 	 */
-	getIntervention: (interventionId: string): Promise<Intervention> => {
-		return typedFetch('GET', '/api/interventions/:interventionId', {
-			params: { interventionId },
+	getIntervention: (id: string): Promise<Intervention> => {
+		return typedFetch('GET', '/api/interventions/:id', {
+			params: { id },
 		});
 	},
 
 	/**
 	 * Respond to an intervention
 	 */
-	respondToIntervention: (interventionId: string, response: InterventionResponseSubmit): Promise<SuccessResponse> => {
-		return typedFetch('POST', '/api/interventions/:interventionId/respond', {
-			params: { interventionId },
+	respondToIntervention: (id: string, response: InterventionResponseSubmit): Promise<SuccessResponse> => {
+		return typedFetch('POST', '/api/interventions/:id/respond', {
+			params: { id },
 			body: response,
 		});
 	},
@@ -40,9 +40,9 @@ export const interventionsApi = {
 	/**
 	 * Cancel an intervention
 	 */
-	cancelIntervention: (interventionId: string): Promise<SuccessResponse> => {
-		return typedFetch('POST', '/api/interventions/:interventionId/cancel', {
-			params: { interventionId },
+	cancelIntervention: (id: string): Promise<SuccessResponse> => {
+		return typedFetch('POST', '/api/interventions/:id/cancel', {
+			params: { id },
 		});
 	},
 } as const;

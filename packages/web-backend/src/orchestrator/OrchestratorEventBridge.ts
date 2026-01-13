@@ -4,6 +4,7 @@ import { StateEvent } from 'shared-orch-worker/StateManager';
 import type { Worker } from '@app/shared/api/workers.contract';
 import {
 	B2F_TASKS_UPDATED,
+	B2F_TASK_TRACE_UPDATED,
 	B2F_WORKERS_UPDATED,
 	B2F_WORKER_CONNECTED,
 	B2F_WORKER_DISCONNECTED,
@@ -139,6 +140,16 @@ export class OrchestratorEventBridge {
 				this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
 			});
 
+			// Task trace updated (real-time log streaming)
+			// Emitted every ~500ms during task execution with incremental trace updates
+			// Filtered by taskId on subscription to avoid spamming all clients
+			stateManager.on(StateEvent.TASK_TRACE_UPDATED, (eventData: { taskId: string; stepsCount: number }) => {
+				console.log('[OrchestratorEventBridge] TASK_TRACE_UPDATED:', eventData.taskId, eventData.stepsCount);
+				// Broadcast with taskId for filtering
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				this.eventBroadcaster.broadcast(B2F_TASK_TRACE_UPDATED, eventData as any);
+			});
+
 			this.isStarted = true;
 			console.log('[OrchestratorEventBridge] Started listening to orchestrator events');
 		} catch (error) {
@@ -167,6 +178,7 @@ export class OrchestratorEventBridge {
 			stateManager.removeAllListeners(StateEvent.TASK_CREATED);
 			stateManager.removeAllListeners(StateEvent.TASK_UPDATED);
 			stateManager.removeAllListeners(StateEvent.TASK_DELETED);
+			stateManager.removeAllListeners(StateEvent.TASK_TRACE_UPDATED);
 
 			this.isStarted = false;
 			console.log('[OrchestratorEventBridge] Stopped listening to orchestrator events');

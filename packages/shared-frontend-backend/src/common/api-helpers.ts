@@ -83,6 +83,33 @@ export const DeleteResponseSchema = z.object({
 });
 
 /**
+ * Common bulk delete schemas
+ * Used for batch deletion operations across all entities
+ */
+export const BulkDeleteRequestSchema = z.object({
+	ids: z.array(z.string()).min(1).max(10), // Max 10 per batch
+});
+
+export const FailedDeletionSchema = z.object({
+	id: z.string(),
+	reason: z.string(),
+	code: z.string(),
+});
+
+export const BulkDeleteResponseSchema = z.object({
+	success: z.literal(true),
+	deleted: z.array(z.string()),
+	failed: z.array(FailedDeletionSchema),
+	totalRequested: z.number(),
+	totalDeleted: z.number(),
+	totalFailed: z.number(),
+});
+
+export type BulkDeleteRequest = z.infer<typeof BulkDeleteRequestSchema>;
+export type BulkDeleteResponse = z.infer<typeof BulkDeleteResponseSchema>;
+export type FailedDeletion = z.infer<typeof FailedDeletionSchema>;
+
+/**
  * Helper to create a list response schema
  */
 export function createListResponseSchema<T extends z.ZodTypeAny>(itemSchema: T) {

@@ -10,6 +10,7 @@ import type {
 	TasksListResponse,
 	TasksQuery,
 } from '@shared/api/tasks.contract';
+import type { BulkDeleteResponse } from '@shared/common/api-helpers';
 
 /**
  * ===========================================================================================
@@ -56,5 +57,9 @@ export const tasksApi = {
 
 	deleteTask: (id: string): Promise<{ success: boolean }> => {
 		return typedFetch('DELETE', '/api/tasks/:id', { params: { id } });
+	},
+
+	bulkDeleteTasks: (ids: string[]): Promise<BulkDeleteResponse> => {
+		return typedFetch('DELETE', '/api/tasks/', { body: { ids } }) as Promise<BulkDeleteResponse>;
 	},
 } as const;

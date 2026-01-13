@@ -68,11 +68,11 @@ export class WorkerWebSocketServer {
 	private handleConnection(socket: WebSocket): void {
 		let workerId: string | null = null;
 
-		socket.on('message', (data: Buffer) => {
+		socket.on('message', async (data: Buffer) => {
 			try {
 				const message = parseMessage(data.toString()) as W2OMessage;
 
-				const result = this.messageRouter.routeMessage(socket, message, workerId);
+				const result = await this.messageRouter.routeMessage(socket, message, workerId);
 				// If routeMessage returns a workerId, update it
 				if (result && typeof result === 'string') {
 					workerId = result;

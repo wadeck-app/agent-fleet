@@ -7,6 +7,7 @@ export enum StateEvent {
 	TASK_CREATED = 'task_created',
 	TASK_UPDATED = 'task_updated',
 	TASK_DELETED = 'task_deleted',
+	TASK_TRACE_UPDATED = 'task_trace_updated', // Real-time trace updates (every ~500ms)
 
 	// Worker events
 	WORKER_CONNECTED = 'worker_connected',
@@ -35,6 +36,11 @@ export enum StateEvent {
 
 export interface TaskEventData {
 	task: Task;
+}
+
+export interface TaskTraceUpdatedEventData {
+	taskId: string;
+	stepsCount: number;
 }
 
 export interface WorkerEventData {
@@ -96,6 +102,10 @@ export class StateManager extends EventEmitter {
 
 	emitTaskDeleted(taskId: string): void {
 		this.emit(StateEvent.TASK_DELETED, { taskId });
+	}
+
+	emitTaskTraceUpdated(taskId: string, stepsCount: number): void {
+		this.emit(StateEvent.TASK_TRACE_UPDATED, { taskId, stepsCount });
 	}
 
 	// Worker events

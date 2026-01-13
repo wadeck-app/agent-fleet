@@ -38,11 +38,11 @@ export default class InterventionsController implements LazyController<typeof IN
 		});
 
 		/**
-		 * GET /api/interventions/:interventionId
+		 * GET /api/interventions/:id
 		 * Get a single intervention by ID
 		 */
-		add('GET', '/api/interventions/:interventionId', async request => {
-			const intervention = await this.service.getIntervention(request.params.interventionId);
+		add('GET', '/api/interventions/:id', async request => {
+			const intervention = await this.service.getIntervention(request.params.id);
 			if (!intervention) {
 				request.reply.code(404);
 				throw new Error('Intervention not found');
@@ -51,19 +51,19 @@ export default class InterventionsController implements LazyController<typeof IN
 		});
 
 		/**
-		 * POST /api/interventions/:interventionId/respond
+		 * POST /api/interventions/:id/respond
 		 * Respond to an intervention
 		 */
-		add('POST', '/api/interventions/:interventionId/respond', async request => {
-			return this.service.respondToIntervention(request.params.interventionId, request.body);
+		add('POST', '/api/interventions/:id/respond', async request => {
+			return this.service.respondToIntervention(request.params.id, request.body);
 		});
 
 		/**
-		 * POST /api/interventions/:interventionId/cancel
+		 * POST /api/interventions/:id/cancel
 		 * Cancel an intervention
 		 */
-		add('POST', '/api/interventions/:interventionId/cancel', async request => {
-			return this.service.cancelIntervention(request.params.interventionId);
+		add('POST', '/api/interventions/:id/cancel', async request => {
+			return this.service.cancelIntervention(request.params.id);
 		});
 	}
 }

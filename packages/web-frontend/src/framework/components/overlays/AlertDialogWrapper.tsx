@@ -6,6 +6,7 @@ import {
 	AlertDialogDescription,
 	AlertDialogFooter,
 	AlertDialogHeader,
+	AlertDialogMedia,
 	AlertDialogTitle,
 } from './AlertDialog';
 
@@ -22,6 +23,35 @@ import {
  * - Escape key closes dialog
  * - Better accessibility than window.confirm
  * - Customizable title, description, and button labels
+ * - Optional icon support with variant-based styling
+ * - Configurable dialog size
+ *
+ * Example usage:
+ * ```tsx
+ * import { Trash2 } from 'lucide-react';
+ * import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
+ *
+ * function MyComponent() {
+ *   const [open, setOpen] = useState(false);
+ *
+ *   return (
+ *     <AlertDialogWrapper
+ *       open={open}
+ *       onOpenChange={setOpen}
+ *       title="Delete Item?"
+ *       description="This action cannot be undone."
+ *       confirmLabel="Delete"
+ *       onConfirm={() => handleDelete()}
+ *       variant="danger"
+ *       icon={<Trash2 />}
+ *     />
+ *   );
+ * }
+ * ```
+ *
+ * @see {@link useDialog} for state management helper
+ * @see {@link useDialogDeleteConfirmation} for delete confirmation preset
+ * @see {@link useDialogActionConfirmation} for custom action confirmation preset
  *
  * ===========================================================================================
  */
@@ -36,6 +66,8 @@ export interface AlertDialogWrapperProps {
 	onConfirm: () => void;
 	onCancel?: () => void;
 	variant?: 'danger' | 'warning' | 'info';
+	icon?: React.ReactNode;
+	size?: 'default' | 'sm';
 }
 
 export function AlertDialogWrapper({
@@ -48,6 +80,8 @@ export function AlertDialogWrapper({
 	onConfirm,
 	onCancel,
 	variant = 'danger',
+	icon,
+	size = 'default',
 }: AlertDialogWrapperProps) {
 	const handleConfirm = () => {
 		onConfirm();
@@ -61,10 +95,15 @@ export function AlertDialogWrapper({
 		onOpenChange(false);
 	};
 
+	// Determine icon className based on variant
+	const iconClassName =
+		variant === 'danger' ? 'text-destructive' : variant === 'warning' ? 'text-warning' : 'text-primary';
+
 	return (
 		<AlertDialog open={open} onOpenChange={onOpenChange}>
-			<AlertDialogContent>
+			<AlertDialogContent size={size}>
 				<AlertDialogHeader>
+					{icon && <AlertDialogMedia className={iconClassName}>{icon}</AlertDialogMedia>}
 					<AlertDialogTitle>{title}</AlertDialogTitle>
 					<AlertDialogDescription>{description}</AlertDialogDescription>
 				</AlertDialogHeader>

@@ -176,6 +176,7 @@ export function WorkersPage2() {
 				search={search}
 				cache={cache}
 				mutation={mutation}
+			delegateLoadingToChildren={true}
 			>
 				<WorkersTable2 />
 			</Data2>

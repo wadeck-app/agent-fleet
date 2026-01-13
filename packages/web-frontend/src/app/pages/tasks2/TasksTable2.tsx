@@ -1,8 +1,10 @@
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 import { Table2, type Table2Column, type Table2Props } from '@framework/components2/table/Table2';
 import { Badge } from '@framework/components/primitives/Badge';
+import { Button } from '@framework/components/primitives/Button';
 import type { Task } from '@shared/api/tasks.contract';
+import { Trash2 } from 'lucide-react';
 
 /**
  * Format date for display
@@ -65,7 +67,15 @@ export const TASKS_TABLE2_COLUMNS: Table2Column<Task>[] = [
 	{
 		key: 'id',
 		label: 'ID',
-		render: (t: Task) => <span className="font-mono text-xs text-muted-foreground">{t.id}</span>,
+		render: (t: Task) => (
+			<Link
+				to={`/tasks/${t.id}/logs-stacked`}
+				className="font-mono text-xs text-primary hover:underline"
+				onClick={e => e.stopPropagation()}
+			>
+				{t.id}
+			</Link>
+		),
 	},
 	{
 		key: 'flowId',
@@ -113,24 +123,53 @@ export const TASKS_TABLE2_COLUMNS: Table2Column<Task>[] = [
 ];
 
 export interface TasksTable2Props extends Partial<Table2Props<Task>> {
-	// Add any custom props if needed
+	/** Optional delete callback */
+	onDelete?: (id: string) => void;
+	/** Optional refreshing state - from Data2 */
+	refreshing?: boolean;
+	/** Optional deleting state - for bulk delete blur effect */
+	deleting?: boolean;
+	/** IDs of items being deleted - for strike-through effect */
+	deletingIds?: Set<string>;
+	/** Selection toggle callback */
+	onSelectionToggle?: (id: string) => void;
+	/** Select all callback */
+	onSelectAll?: (ids: string[]) => void;
 }
 
 /**
  * Tasks table component using Table2
  */
-export function TasksTable2(props: TasksTable2Props) {
-	const navigate = useNavigate();
-
-	const handleRowClick = (task: Task) => {
-		// Navigate to stacked layout by default (full width logs)
-		navigate(`/tasks/${task.id}/logs-stacked`);
-	};
+export function TasksTable2({
+	onDelete,
+	refreshing,
+	deleting,
+	deletingIds,
+	onSelectionToggle,
+	onSelectAll,
+	...props
+}: TasksTable2Props) {
+	// Build actions column if onDelete is provided
+	const renderActions = onDelete
+		? (task: Task) => (
+				<div className="flex items-center justify-center gap-2">
+					<Button
+						size="sm"
+						variant="destructive"
+						onClick={() => onDelete(task.id)}
+						aria-label={`Delete ${task.description}`}
+					>
+						<Trash2 className="h-4 w-4" />
+					</Button>
+				</div>
+			)
+		: undefined;
 
 	return (
 		<Table2
 			columns={TASKS_TABLE2_COLUMNS}
 			getItemId={(t: Task) => t.id}
+			renderActions={renderActions}
 			emptyMessage="No tasks found. Create your first task to get started."
 			data={props.data ?? []}
 			isLoading={props.isLoading ?? false}
@@ -138,8 +177,11 @@ export function TasksTable2(props: TasksTable2Props) {
 			pagination={props.pagination}
 			sorting={props.sorting}
 			features={props.features}
-			refreshing={props.refreshing}
-			onRowClick={handleRowClick}
+			refreshing={refreshing}
+			deleting={deleting}
+			deletingIds={deletingIds}
+			onSelectionToggle={onSelectionToggle}
+			onSelectAll={onSelectAll}
 		/>
 	);
 }

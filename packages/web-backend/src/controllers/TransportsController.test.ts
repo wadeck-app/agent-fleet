@@ -36,10 +36,7 @@ describe('TransportsController', () => {
 		// Mock Fastify request/reply
 		mockRequest = {
 			headers: {
-				cookie: '__client_id=test-client-123',
-			},
-			cookies: {
-				__client_id: 'test-client-123',
+				'x-conn-id': 'test-client-123',
 			},
 			body: {},
 			params: {},
@@ -88,16 +85,15 @@ describe('TransportsController', () => {
 			});
 		});
 
-		it('should return 401 if no client ID in cookie', async () => {
-			mockRequest.cookies = {};
+		it('should return 400 if no client ID in header', async () => {
 			mockRequest.headers = {};
 
 			await controller.batchSubscriptions(mockRequest as FastifyRequest, mockReply as FastifyReply);
 
-			expect(mockReply.code).toHaveBeenCalledWith(401);
+			expect(mockReply.code).toHaveBeenCalledWith(400);
 			expect(mockReply.send).toHaveBeenCalledWith({
-				error: 'Not authenticated',
-				message: 'Client ID not found in cookie',
+				error: 'Missing connection ID',
+				message: 'X-Conn-Id header required',
 			});
 		});
 
@@ -235,7 +231,7 @@ describe('TransportsController', () => {
 			await controller.getStatus(mockRequest as FastifyRequest, mockReply as FastifyReply);
 
 			expect(mockReply.send).toHaveBeenCalledWith({
-				clientId: 'test-client-123',
+				connId: 'test-client-123',
 				userId: 'user-456',
 				transportType: 'long-polling',
 				connected: true,

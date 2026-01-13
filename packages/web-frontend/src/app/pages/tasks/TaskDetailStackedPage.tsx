@@ -7,7 +7,10 @@ import { PageHeader } from '@framework/components/layout/PageHeader';
 import { LoadingSpinner } from '@framework/components/loading/LoadingSpinner';
 import { Button } from '@framework/components/primitives/Button';
 import type { LogLevel } from '@shared/api/tasks.contract';
+import { B2F_TASK_TRACE_UPDATED } from '@shared/transport';
 import { ArrowLeft } from 'lucide-react';
+
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 import { TaskInfoCard } from './components/TaskInfoCard';
 import { TaskLogsViewer } from './components/TaskLogsViewer';
@@ -45,6 +48,15 @@ export function TaskDetailStackedPage() {
 		level,
 		search,
 		limit: 100,
+	});
+
+	// Subscribe to real-time trace updates for THIS task only (filtered by taskId)
+	// This prevents spam - only receives updates for the task being viewed
+	useRealtimeRefresh({
+		events: [B2F_TASK_TRACE_UPDATED],
+		onEvent: refetch,
+		filters: { taskId }, // Server-side filter: only this task's trace updates
+		logPrefix: 'TaskDetailStackedPage',
 	});
 
 	if (isTaskLoading) {

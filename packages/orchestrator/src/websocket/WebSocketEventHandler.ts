@@ -14,12 +14,14 @@ import type {
 	W2OTaskProgressMessage,
 	W2OTaskQuestionMessage,
 	W2OTaskStartedMessage,
+	W2OTaskTraceUpdateMessage,
 	W2OWorkspaceAllocatedMessage,
 	W2OWorkspaceReleasedMessage,
 } from 'shared-orch-worker/worker-messages';
 
 import type { InterventionManager } from '../core/InterventionManager';
 import type { TaskManager } from '../core/TaskManager';
+import { TraceChunkStorage } from '../core/TraceChunkStorage';
 import type { WebSocketConnectionManager } from './WebSocketConnectionManager';
 
 /**
@@ -35,17 +37,20 @@ export class WebSocketEventHandler {
 	private stateManager: StateManager;
 	private connectionManager: WebSocketConnectionManager;
 	private interventionManager: InterventionManager;
+	private traceStorage: TraceChunkStorage;
 
 	constructor(
 		taskManager: TaskManager,
 		stateManager: StateManager,
 		connectionManager: WebSocketConnectionManager,
-		interventionManager: InterventionManager
+		interventionManager: InterventionManager,
+		traceStorage?: TraceChunkStorage
 	) {
 		this.taskManager = taskManager;
 		this.stateManager = stateManager;
 		this.connectionManager = connectionManager;
 		this.interventionManager = interventionManager;
+		this.traceStorage = traceStorage || new TraceChunkStorage();
 	}
 
 	/**
@@ -75,9 +80,46 @@ export class WebSocketEventHandler {
 	/**
 	 * Handle TASK_COMPLETED message
 	 */
-	handleTaskCompleted(message: W2OTaskCompletedMessage): void {
+	async handleTaskCompleted(message: W2OTaskCompletedMessage): Promise<void> {
 		const { workerId, taskId, result, newStatus } = message;
 		logger.info(`[WS] Worker ${workerId} completed task ${taskId}`);
+
+		// Write final trace to chunks
+		if (result?.trace) {
+			try {
+				await this.traceStorage.writeTraceFull(taskId, result.trace);
+			} catch (error) {
+				logger.error(`[WS] Failed to write final trace for task ${taskId}:`, error);
+			}
+		}
+
+		// Update task with flowResult (without storing full trace in task.json)
+		const task = this.taskManager.getTask(taskId);
+		if (task && result) {
+			task.flowResult = {
+				status: 'completed',
+				outputs: result.outputs || {},
+				// Store only trace metadata in task.json
+				trace: result.trace
+					? {
+							id: result.trace.id,
+							taskId: result.trace.taskId,
+							flowId: result.trace.flowId,
+							workspaceId: result.trace.workspaceId,
+							startTime: result.trace.startTime,
+							endTime: result.trace.endTime,
+							status: result.trace.status,
+							steps: [], // Empty - stored in chunks
+						}
+					: undefined,
+			};
+
+			try {
+				await this.taskManager.updateTask(task);
+			} catch (error) {
+				logger.error(`[WS] Failed to update task ${taskId} flowResult:`, error);
+			}
+		}
 
 		const status = newStatus || TaskStatus.REVIEW;
 		this.taskManager.updateTaskStatus(taskId, status, {
@@ -93,9 +135,24 @@ export class WebSocketEventHandler {
 	/**
 	 * Handle TASK_FAILED message
 	 */
-	handleTaskFailed(message: W2OTaskFailedMessage): void {
+	async handleTaskFailed(message: W2OTaskFailedMessage): Promise<void> {
 		const { workerId, taskId, error, newStatus } = message;
 		logger.error(`[WS] Worker ${workerId} failed task ${taskId}: ${error}`);
+
+		// Update task with flowResult (error only for now, trace not included in failure message)
+		const task = this.taskManager.getTask(taskId);
+		if (task) {
+			task.flowResult = {
+				status: 'failed',
+				error: error,
+			};
+
+			try {
+				await this.taskManager.updateTask(task);
+			} catch (updateError) {
+				logger.error(`[WS] Failed to update task ${taskId} flowResult:`, updateError);
+			}
+		}
 
 		// Use the provided status or default to BLOCKED
 		const failureStatus = newStatus || TaskStatus.BLOCKED;
@@ -114,6 +171,50 @@ export class WebSocketEventHandler {
 			worker.taskId = null;
 			this.stateManager.emitWorkerTaskReleased(workerId);
 		}
+	}
+
+	/**
+	 * Handle TASK_TRACE_UPDATE message (real-time trace updates every 500ms)
+	 */
+	async handleTaskTraceUpdate(message: W2OTaskTraceUpdateMessage): Promise<void> {
+		const { workerId, taskId, trace } = message;
+		logger.debug(
+			`[WS] Worker ${workerId} sent trace update for task ${taskId} (${trace?.steps?.length || 0} steps)`
+		);
+
+		const task = this.taskManager.getTask(taskId);
+		if (!task) {
+			logger.warn(`[WS] Task ${taskId} not found for trace update`);
+			return;
+		}
+
+		// Write trace incrementally to chunks
+		try {
+			await this.traceStorage.writeTraceIncremental(taskId, trace);
+		} catch (error) {
+			logger.error(`[WS] Failed to write trace chunks for task ${taskId}:`, error);
+		}
+
+		// Update task in-memory (without full trace for performance)
+		// Store only metadata, actual logs are in chunks
+		// Note: We keep status as 'completed' to satisfy type system, but task.status will be 'in_progress'
+		task.flowResult = {
+			status: 'completed', // Type constraint, actual execution status tracked by task.status
+			trace: {
+				id: trace.id,
+				taskId: trace.taskId,
+				flowId: trace.flowId,
+				workspaceId: trace.workspaceId,
+				startTime: trace.startTime,
+				status: trace.status,
+				steps: [], // Empty - stored in chunks
+			},
+		};
+
+		// Emit event for real-time frontend updates
+		// Use TASK_TRACE_UPDATED instead of TASK_UPDATED to avoid spamming backend
+		// This allows frontend to subscribe ONLY to trace updates for specific taskId
+		this.stateManager.emitTaskTraceUpdated(taskId, trace?.steps?.length || 0);
 	}
 
 	/**
@@ -246,14 +347,17 @@ export class WebSocketEventHandler {
 	 * Handle INTERVENTION_REQUESTED message
 	 */
 	async handleInterventionRequested(message: W2OInterventionRequestedMessage): Promise<void> {
-		const { workerId, taskId, flowId, stepId, interventionType, blocking, config, timeout } = message;
+		const { workerId, taskId, interventionId, flowId, stepId, interventionType, blocking, config, timeout } =
+			message;
 		logger.info(
-			`[WS] Worker ${workerId} requested ${interventionType} intervention for task ${taskId} step ${stepId}`
+			`[WS] Worker ${workerId} requested ${interventionType} intervention for task ${taskId} step ${stepId} (id: ${interventionId})`
 		);
 
 		try {
 			// Create intervention using InterventionManager
+			// Use the interventionId from the worker to ensure consistency
 			const intervention = await this.interventionManager.createIntervention({
+				id: interventionId, // Use the ID provided by the worker
 				taskId,
 				workerId,
 				flowId,

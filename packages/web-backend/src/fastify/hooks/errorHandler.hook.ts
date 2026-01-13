@@ -74,7 +74,7 @@ const errorHandlerHook: FastifyPluginAsync = async fastify => {
 				code: ERROR_CODES.VALIDATION_FAILED,
 				statusCode: 400,
 				timestamp,
-				details: error.errors.map(e => ({
+				details: error.issues.map(e => ({
 					field: e.path.join('.'),
 					message: e.message,
 				})),

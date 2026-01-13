@@ -37,6 +37,9 @@ export interface FlowExecutionOptions {
 	/** Handler for user interventions (approval, questions, choices) */
 	interventionHandler?: import('./InterventionHandler').InterventionHandler;
 
+	/** Callback for real-time trace updates (called after each step completion) */
+	onTraceUpdate?: (trace: import('../types').FlowTrace) => void;
+
 	/** Nesting depth for SubFlowStep recursion tracking */
 	nestingDepth?: number;
 }
@@ -103,6 +106,7 @@ export class FlowExecutor {
 			claudeEnv,
 			onClaudeProcessStarted,
 			interventionHandler,
+			onTraceUpdate,
 			nestingDepth = 0,
 		} = options;
 
@@ -132,6 +136,6 @@ export class FlowExecutor {
 		};
 
 		// Orchestrate execution
-		return this.orchestrator.orchestrate(taskId, flow, workspace, context);
+		return this.orchestrator.orchestrate(taskId, flow, workspace, context, onTraceUpdate);
 	}
 }

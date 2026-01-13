@@ -55,6 +55,12 @@ export interface BusinessEvents {
 		newPriority: number;
 	};
 
+	/** Task trace updated (real-time log streaming) */
+	'b2f:task:trace_updated': {
+		taskId: string;
+		stepsCount: number;
+	};
+
 	/** Worker heartbeat (periodic health check) */
 	'b2f:worker:heartbeat': {
 		workerId: string;

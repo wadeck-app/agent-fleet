@@ -1,13 +1,12 @@
 import type {
-	BulkDeleteResponse,
 	CreateIngredient,
-	FailedDeletion,
 	Ingredient,
 	IngredientListResponse,
 	IngredientsListQuery,
 	PatchIngredient,
 	UpdateIngredient,
 } from '@app/shared/api/ingredients.contract';
+import type { BulkDeleteResponse, FailedDeletion } from '@app/shared/common/api-helpers';
 import { ConflictException, ERROR_CODES, NotFoundException } from '@app/shared/exceptions/http-exceptions';
 
 import type { IngredientsRepository } from '../repositories/IngredientsRepository';

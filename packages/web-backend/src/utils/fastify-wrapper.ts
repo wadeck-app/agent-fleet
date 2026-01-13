@@ -111,7 +111,7 @@ export type RouteWrapperFunc<Routes> = <M extends HttpMethod, P extends PathsFor
 function handleZodError(error: ZodError, reply: FastifyReply) {
 	return reply.status(400).send({
 		error: 'Validation failed',
-		details: error.errors.map(e => ({
+		details: error.issues.map(e => ({
 			path: e.path.join('.'),
 			message: e.message,
 		})),

@@ -13,6 +13,11 @@ import type { ChildProcess } from 'child_process';
 import { execSync } from 'child_process';
 import dotenv from 'dotenv';
 import { type FlowExecutionOptions, FlowExecutor } from 'flow-engine/executor/FlowExecutor';
+import type {
+	InterventionHandler,
+	InterventionRequest,
+	InterventionResponse,
+} from 'flow-engine/executor/InterventionHandler';
 import { FlowRegistry } from 'flow-engine/registry/FlowRegistry';
 import type { FlowMetadata, Workspace } from 'flow-engine/types';
 import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
@@ -60,6 +65,10 @@ export class FlowWorker implements Shutdownable {
 	// Task management
 	protected currentTask: Task | null = null;
 
+	// Trace update management
+	private traceUpdateTimer: NodeJS.Timeout | null = null;
+	private readonly TRACE_UPDATE_INTERVAL = 500; // 500ms
+
 	// Flow engine components
 	private flowRegistry: FlowRegistry;
 	private flowExecutor: FlowExecutor;
@@ -71,6 +80,15 @@ export class FlowWorker implements Shutdownable {
 	// Specialized managers (extracted from god class)
 	private claudeProcessManager: ClaudeLifecycleManager;
 	// private flowExecutionMonitor: FlowExecutionMonitor;
+
+	// Intervention handling
+	private pendingInterventions: Map<
+		string,
+		{
+			resolve: (response: InterventionResponse | null) => void;
+			reject: (error: Error) => void;
+		}
+	> = new Map();
 
 	/**
 	 * Initialize the Flow Worker
@@ -352,13 +370,87 @@ export class FlowWorker implements Shutdownable {
 				this.handleSaveFlowDefinition(message as any);
 				break;
 
+			case O2WMessageType.INTERVENTION_RESPONSE:
+				this.handleInterventionResponse(message as any);
+				break;
+
 			case O2WMessageType.ERROR:
 				this.handleError(message as ErrorMessage);
 				break;
 
 			default:
-				console.warn(`${this.logPrefix()} Unknown message type: ${message.type}`);
+				console.warn(`${this.logPrefix()} Unknown message type: ${(message as any).type}`);
 		}
+	}
+
+	/**
+	 * Create an intervention handler for flow execution
+	 */
+	private createInterventionHandler(): InterventionHandler {
+		return {
+			requestIntervention: async (request: InterventionRequest): Promise<InterventionResponse | null> => {
+				// Generate unique intervention ID (worker-controlled)
+				// Use '-' instead of ':' to ensure Windows file system compatibility
+				const interventionId = `${request.taskId}-${request.stepId}-${Date.now()}`;
+
+				console.log(
+					`${this.logPrefix()} Requesting intervention: ${request.type} for step ${request.stepId} (blocking: ${request.blocking}, id: ${interventionId})`
+				);
+
+				// Send intervention request to orchestrator
+				this.sendMessage(
+					createW2OMessage(W2OMessageType.INTERVENTION_REQUESTED, {
+						workerId: this.workerId,
+						taskId: request.taskId,
+						interventionId,
+						flowId: request.flowId,
+						stepId: request.stepId,
+						interventionType: request.type,
+						blocking: request.blocking,
+						config: request.config,
+						timeout: request.timeout,
+					})
+				);
+
+				// For non-blocking interventions, return immediately
+				if (!request.blocking) {
+					console.log(`${this.logPrefix()} Non-blocking intervention requested, continuing...`);
+					return null;
+				}
+
+				// For blocking interventions, wait for response
+				return new Promise<InterventionResponse | null>((resolve, reject) => {
+					// Store promise handlers to be called when response arrives
+					this.pendingInterventions.set(interventionId, { resolve, reject });
+
+					// Setup timeout if configured
+					if (request.timeout) {
+						const timeoutMs = request.timeout.minutes * 60 * 1000;
+						setTimeout(() => {
+							const pending = this.pendingInterventions.get(interventionId);
+							if (pending) {
+								this.pendingInterventions.delete(interventionId);
+
+								if (request.timeout!.onTimeout === 'fail') {
+									reject(
+										new Error(`Intervention timed out after ${request.timeout!.minutes} minutes`)
+									);
+								} else if (request.timeout!.onTimeout === 'continue') {
+									resolve(null);
+								} else if (request.timeout!.onTimeout === 'default') {
+									// Use default value
+									resolve({
+										value: request.timeout!.defaultValue,
+										answeredAt: new Date().toISOString(),
+										answeredBy: 'system (timeout)',
+									});
+								}
+							}
+						}, timeoutMs);
+					}
+				});
+			},
+		};
 	}
 
 	/**
@@ -372,6 +464,39 @@ export class FlowWorker implements Shutdownable {
 
 		// Request a task now that we're connected
 		this.sendRequestTask();
+	}
+
+	/**
+	 * Handle INTERVENTION_RESPONSE message
+	 */
+	private handleInterventionResponse(message: any): void {
+		const { taskId, interventionId, response, timedOut, cancelled } = message;
+
+		console.log(`${this.logPrefix()} Received intervention response for ${interventionId}`);
+
+		// Find the pending intervention using interventionId
+		// The interventionId should match what we used as the key when storing the promise
+		const pending = this.pendingInterventions.get(interventionId);
+		if (!pending) {
+			console.warn(
+				`${this.logPrefix()} Received intervention response for unknown intervention: ${interventionId}`
+			);
+			return;
+		}
+
+		// Remove from pending map
+		this.pendingInterventions.delete(interventionId);
+
+		// Resolve or reject the promise based on response
+		if (cancelled) {
+			pending.reject(new Error('Intervention was cancelled'));
+		} else if (timedOut) {
+			pending.reject(new Error('Intervention timed out'));
+		} else if (response) {
+			pending.resolve(response);
+		} else {
+			pending.resolve(null);
+		}
 	}
 
 	/**
@@ -792,10 +917,33 @@ export class FlowWorker implements Shutdownable {
 				onClaudeProcessStarted: (process: ChildProcess) => {
 					this.claudeProcessManager.trackProcess(process);
 				},
+				// Intervention handler for user_intervention steps
+				interventionHandler: this.createInterventionHandler(),
+				// Real-time trace update callback (called after each step completion)
+				onTraceUpdate: (trace: any) => {
+					// Update the task's trace in-place so the 500ms timer can access it
+					if (this.currentTask?.flowResult) {
+						this.currentTask.flowResult.trace = trace;
+					}
+				},
 			};
 
 			// Execute the flow
 			this.sendTaskProgress('Executing flow steps...');
+
+			// Initialize task.flowResult BEFORE execution so timer can access it
+			task.flowResult = {
+				status: 'completed', // Will be updated by callback
+				trace: {
+					id: '',
+					taskId: task.id,
+					flowId: flow.id,
+					workspaceId: workspace.id,
+					startTime: Date.now(),
+					status: 'running',
+					steps: [],
+				},
+			};
 
 			// Start monitoring execution trace if UI is enabled
 			const monitorInterval: NodeJS.Timeout | null = null;
@@ -803,7 +951,13 @@ export class FlowWorker implements Shutdownable {
 			// 	monitorInterval = this.startTraceMonitoring(task.id);
 			// }
 
+			// Start periodic trace updates (every 500ms)
+			this.startTraceUpdates();
+
 			const result = await this.flowExecutor.execute(executionOptions);
+
+			// Stop periodic trace updates
+			this.stopTraceUpdates();
 
 			// Stop monitoring
 			if (monitorInterval) {
@@ -842,6 +996,9 @@ export class FlowWorker implements Shutdownable {
 			}
 		} catch (error) {
 			console.error(`${this.logPrefix()} Task execution error:`, error);
+
+			// Stop trace updates on error
+			this.stopTraceUpdates();
 
 			// Store error in task
 			task.flowResult = {
@@ -891,6 +1048,46 @@ export class FlowWorker implements Shutdownable {
 				workerId: this.workerId,
 				taskId: this.currentTask.id,
 				progress,
+			})
+		);
+	}
+
+	/**
+	 * Start periodic trace updates (every 500ms)
+	 */
+	private startTraceUpdates(): void {
+		if (this.traceUpdateTimer) {
+			clearInterval(this.traceUpdateTimer);
+		}
+
+		this.traceUpdateTimer = setInterval(() => {
+			if (this.currentTask?.flowResult?.trace) {
+				this.sendTraceUpdate(this.currentTask.flowResult.trace);
+			}
+		}, this.TRACE_UPDATE_INTERVAL);
+	}
+
+	/**
+	 * Stop periodic trace updates
+	 */
+	private stopTraceUpdates(): void {
+		if (this.traceUpdateTimer) {
+			clearInterval(this.traceUpdateTimer);
+			this.traceUpdateTimer = null;
+		}
+	}
+
+	/**
+	 * Send trace update to orchestrator
+	 */
+	private sendTraceUpdate(trace: any): void {
+		if (!this.currentTask) return;
+
+		this.sendMessage(
+			createW2OMessage(W2OMessageType.TASK_TRACE_UPDATE, {
+				workerId: this.workerId,
+				taskId: this.currentTask.id,
+				trace: trace,
 			})
 		);
 	}

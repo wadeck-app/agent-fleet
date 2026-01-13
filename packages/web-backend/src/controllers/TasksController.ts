@@ -56,6 +56,14 @@ export default class TasksController implements LazyController<typeof TASKS_API_
 		});
 
 		/**
+		 * DELETE /api/tasks/
+		 * Bulk delete tasks (up to 10 per batch)
+		 */
+		add('DELETE', '/api/tasks/', async ({ body }) => {
+			return this.service.bulkDeleteTasks(body.ids);
+		});
+
+		/**
 		 * GET /api/tasks/:id
 		 * Get a single task by ID with full trace
 		 */

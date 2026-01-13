@@ -52,7 +52,8 @@ export class FlowOrchestrator {
 		taskId: string,
 		flow: FlowDefinition,
 		workspace: Workspace,
-		context: TemplateContext
+		context: TemplateContext,
+		onTraceUpdate?: (trace: FlowTrace) => void
 	): Promise<FlowExecutionResult> {
 		// Initialize trace
 		const trace: FlowTrace = {
@@ -87,7 +88,7 @@ export class FlowOrchestrator {
 			}
 
 			// Execute flow
-			const result = await this.executeFlow(flow, dag, workspace, context, trace, stepOutputs);
+			const result = await this.executeFlow(flow, dag, workspace, context, trace, stepOutputs, onTraceUpdate);
 
 			return result;
 		} catch (error) {
@@ -114,7 +115,8 @@ export class FlowOrchestrator {
 		workspace: Workspace,
 		context: TemplateContext,
 		trace: FlowTrace,
-		stepOutputs: Map<string, Record<string, any>>
+		stepOutputs: Map<string, Record<string, any>>,
+		onTraceUpdate?: (trace: FlowTrace) => void
 	): Promise<FlowExecutionResult> {
 		// Track completed steps
 		const completed = new Set<string>();
@@ -184,7 +186,8 @@ export class FlowOrchestrator {
 				trace,
 				stepOutputs,
 				completed,
-				iterations
+				iterations,
+				onTraceUpdate
 			);
 
 			if (!shouldContinue.continue) {
@@ -221,13 +224,19 @@ export class FlowOrchestrator {
 		trace: FlowTrace,
 		stepOutputs: Map<string, Record<string, any>>,
 		completed: Set<string>,
-		iterations: Map<string, number>
+		iterations: Map<string, number>,
+		onTraceUpdate?: (trace: FlowTrace) => void
 	): { continue: boolean; result?: FlowExecutionResult } {
 		for (let i = 0; i < ready.length; i++) {
 			const step = ready[i];
 			const stepTrace = stepTraces[i];
 
 			trace.steps.push(stepTrace);
+
+			// Notify callback of trace update (for real-time updates)
+			if (onTraceUpdate) {
+				onTraceUpdate(trace);
+			}
 
 			// Store outputs
 			if (stepTrace.outputs) {
