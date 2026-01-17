@@ -12,6 +12,7 @@ import type { FlowMetadata } from '@shared/api/flows.contract';
 import type { CreateTask } from '@shared/api/tasks.contract';
 import { AlertTriangle } from 'lucide-react';
 
+import { projectsApi } from '../projects/projects.api';
 import { useWorkers } from '../workers/useWorkers';
 import { workersApi } from '../workers/workers.api';
 import { tasksService } from './TasksService';
@@ -27,6 +28,7 @@ interface CreateTaskFormData {
 	description: string;
 	priority: string;
 	workerId: string;
+	projectId: string;
 	flowId: string;
 }
 
@@ -34,6 +36,7 @@ const defaultFormData: CreateTaskFormData = {
 	description: '',
 	priority: 'medium',
 	workerId: '',
+	projectId: 'default',
 	flowId: '',
 };
 
@@ -43,6 +46,8 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 	const [workerFlowsMetadata, setWorkerFlowsMetadata] = useState<FlowMetadata[]>([]);
 	const [flowsLoading, setFlowsLoading] = useState(false);
 	const [flowInputs, setFlowInputs] = useState<Record<string, string>>({});
+	const [projects, setProjects] = useState<ComboboxOption[]>([]);
+	const [projectsLoading, setProjectsLoading] = useState(false);
 
 	// Transform workers to ComboboxOption format
 	const workerOptions: ComboboxOption[] = (workersData?.workers || []).map(w => ({
@@ -67,6 +72,10 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 				errors.workerId = 'Worker assignment is required';
 			}
 
+			if (!data.projectId) {
+				errors.projectId = 'Project is required';
+			}
+
 			// Validate flow inputs if flow is selected
 			// Find the selected flow to check its inputs
 			const selectedFlow = workerFlowsMetadata.find(f => f.id === data.flowId);
@@ -87,6 +96,7 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 			'Description is required': 'description',
 			'Priority is required': 'priority',
 			'Worker assignment is required': 'workerId',
+			'Project is required': 'projectId',
 		},
 		onSubmit: async data => {
 			// Transform flat form data to nested CreateTask structure
@@ -95,6 +105,7 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 				description: data.description,
 				priority: data.priority as CreateTask['priority'],
 				assignedTo: { workerId: data.workerId },
+				projectId: data.projectId,
 				flowId: data.flowId?.trim() || undefined,
 				// Pass the actual flow inputs if flow is selected
 				flowInputs: data.flowId && Object.keys(flowInputs).length > 0 ? flowInputs : undefined,
@@ -121,6 +132,39 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 		() => workerFlowsMetadata.find(f => f.id === formState.formData.flowId),
 		[workerFlowsMetadata, formState.formData.flowId]
 	);
+
+	// Load projects when dialog opens
+	useEffect(() => {
+		const loadProjects = async () => {
+			if (!open) return;
+
+			try {
+				setProjectsLoading(true);
+				const response = await projectsApi.getProjectsList({ archived: false });
+				const projectOptions: ComboboxOption[] = response.items.map(p => ({
+					value: p.id,
+					label: p.name,
+				}));
+				setProjects(projectOptions);
+
+				// Set default project if available
+				const defaultProject = response.items.find(p => p.id === 'default');
+				if (defaultProject) {
+					formState.updateField('projectId', 'default');
+				} else if (response.items.length > 0) {
+					formState.updateField('projectId', response.items[0].id);
+				}
+			} catch (error) {
+				console.error('Failed to load projects:', error);
+				setProjects([]);
+			} finally {
+				setProjectsLoading(false);
+			}
+		};
+
+		loadProjects();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [open]);
 
 	// Load flows when worker is selected
 	useEffect(() => {
@@ -213,6 +257,19 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 						]}
 						required
 						error={formState.validationErrors.priority}
+					/>
+				</div>
+
+				<div className="col-span-2">
+					<ComboboxField
+						label="Project"
+						value={formState.formData.projectId}
+						onChange={value => formState.updateField('projectId', value)}
+						options={projects}
+						placeholder={projectsLoading ? 'Loading projects...' : 'Select project...'}
+						required
+						disabled={projectsLoading || projects.length === 0}
+						error={formState.validationErrors.projectId}
 					/>
 				</div>
 

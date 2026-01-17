@@ -10,5 +10,6 @@
 				]
 			}
 		]
-	}
+	},
+	"plansDirectory": "./.claude/plans"
 }

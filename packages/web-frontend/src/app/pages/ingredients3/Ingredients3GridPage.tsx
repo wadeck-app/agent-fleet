@@ -8,6 +8,7 @@ import { useColumnOrder } from '@framework/components/columns/useColumnOrder';
 import { useColumnVisibility } from '@framework/components/columns/useColumnVisibility';
 import { Input } from '@framework/components/forms/Input';
 import { Page } from '@framework/components/layout/Page';
+import { PageHeader } from '@framework/components/layout/PageHeader';
 import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
 import { Button } from '@framework/components/primitives/Button';
 import { useCacheControl2 } from '@framework/hooks2/useCacheControl2';
@@ -29,7 +30,7 @@ import {
 	toColumnVisibilityDefs,
 } from '@framework/utils2/Table2ColumnConfig';
 import type { CreateIngredient, Ingredient, IngredientsListQuery } from '@shared/api/ingredients.contract';
-import { Plus, RefreshCw, Trash2, X } from 'lucide-react';
+import { Plus, Trash2, X } from 'lucide-react';
 
 import { BulkDeleteWorkflow, IngredientDialog } from '@app/components/domain';
 
@@ -372,53 +373,39 @@ export function Ingredients3GridPage() {
 
 	return (
 		<Page>
-			{/* Page Header with refresh button next to title */}
-			<div className="mb-6 flex items-center justify-between">
-				<div className="flex items-center gap-2">
-					<h1 className="text-3xl font-bold">Ingredients (Grid)</h1>
-					<Button
-						onClick={cache.actions.refresh}
-						disabled={cache.fstate.isRefreshing}
-						variant="ghost"
-						size="sm"
-						className="h-8 w-8 p-0"
-						title={cache.fstate.isRefreshing ? 'Refreshing...' : 'Refresh data'}
-					>
-						<RefreshCw
-							className={`
-         h-4 w-4
-         ${cache.fstate.isRefreshing ? `animate-spin` : ''}
-       `}
+			<PageHeader
+				title="Ingredients (Grid)"
+				onRefresh={cache.actions.refresh}
+				isRefreshing={cache.fstate.isRefreshing}
+				action={
+					<>
+						<ColumnVisibility
+							label="Fields"
+							columns={toColumnVisibilityDefs(INGREDIENT_GRID_FIELDS)}
+							visibleColumns={fieldVisibility.visibleColumns}
+							defaultVisible={new Set(extractDefaultVisible(INGREDIENT_GRID_FIELDS))}
+							onToggle={fieldVisibility.toggleColumn}
+							onReset={() => {
+								fieldVisibility.resetColumns();
+								fieldOrder.resetOrder();
+							}}
+							onShowAll={fieldVisibility.showAll}
+							onHideAll={fieldVisibility.hideAll}
+							isColumnModified={fieldVisibility.isColumnModified}
+							onResetColumn={fieldVisibility.resetColumn}
+							columnOrder={fieldOrder.columnOrder}
+							defaultOrder={extractColumnIds(INGREDIENT_GRID_FIELDS)}
+							onReorderColumns={fieldOrder.reorderColumns}
+							isColumnModifiedOrder={fieldOrder.isColumnModified}
+							onResetColumnOrder={fieldOrder.resetColumn}
 						/>
-					</Button>
-				</div>
-				<div className="flex items-center gap-2">
-					<ColumnVisibility
-						label="Fields"
-						columns={toColumnVisibilityDefs(INGREDIENT_GRID_FIELDS)}
-						visibleColumns={fieldVisibility.visibleColumns}
-						defaultVisible={new Set(extractDefaultVisible(INGREDIENT_GRID_FIELDS))}
-						onToggle={fieldVisibility.toggleColumn}
-						onReset={() => {
-							fieldVisibility.resetColumns();
-							fieldOrder.resetOrder();
-						}}
-						onShowAll={fieldVisibility.showAll}
-						onHideAll={fieldVisibility.hideAll}
-						isColumnModified={fieldVisibility.isColumnModified}
-						onResetColumn={fieldVisibility.resetColumn}
-						columnOrder={fieldOrder.columnOrder}
-						defaultOrder={extractColumnIds(INGREDIENT_GRID_FIELDS)}
-						onReorderColumns={fieldOrder.reorderColumns}
-						isColumnModifiedOrder={fieldOrder.isColumnModified}
-						onResetColumnOrder={fieldOrder.resetColumn}
-					/>
-					<Button onClick={handleCreateNew}>
-						<Plus />
-						Add Ingredient
-					</Button>
-				</div>
-			</div>
+						<Button onClick={handleCreateNew}>
+							<Plus />
+							Add Ingredient
+						</Button>
+					</>
+				}
+			/>
 
 			{/* Search Bar */}
 			<div className="mb-4 flex flex-col gap-4">

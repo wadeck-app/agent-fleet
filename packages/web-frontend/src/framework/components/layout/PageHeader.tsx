@@ -1,10 +1,17 @@
 import { type ReactNode } from 'react';
 
+import { Button } from '@framework/components/primitives/Button';
+import { RefreshCw } from 'lucide-react';
+
 export interface PageHeaderProps {
 	/** Page title */
 	title: string;
-	/** Optional count badge (e.g., total items) */
+	/** Optional count badge (e.g., total items) - legacy support */
 	badge?: string | number;
+	/** Optional refresh handler - adds ghost icon-only refresh button next to title */
+	onRefresh?: () => void;
+	/** Whether refresh is in progress (shows spinning animation) */
+	isRefreshing?: boolean;
 	/** Optional action button(s) or other elements */
 	action?: ReactNode;
 	/** Additional CSS classes */
@@ -12,52 +19,65 @@ export interface PageHeaderProps {
 }
 
 /**
- * PageHeader - Header component for pages with title, optional badge, and actions
+ * PageHeader - Header component for pages with title, optional refresh button, and actions
  *
- * Provides consistent page header layout with:
+ * Provides consistent page header layout following Ingredients pattern:
  * - Bold title (text-3xl)
- * - Optional count badge in muted color
+ * - Optional refresh button (ghost, icon-only, h-8 w-8) next to title
  * - Optional action buttons/elements aligned to the right
- * - Flex layout with space-between
+ * - Consistent spacing: mb-6 for header, gap-2 for internal elements
  *
  * @example
  * ```tsx
  * <PageHeader
- *   title="Books"
- *   badge={totalCount}
- *   action={<Button>Add Book</Button>}
+ *   title="Workers"
+ *   onRefresh={handleRefresh}
+ *   isRefreshing={isRefreshing}
  * />
  * ```
  *
  * @example
  * ```tsx
- * // With multiple actions
+ * // With actions
  * <PageHeader
- *   title="Ingredients"
- *   badge={50}
- *   action={
- *     <>
- *       <Button variant="outline">Export</Button>
- *       <Button>Add Ingredient</Button>
- *     </>
- *   }
+ *   title="Tasks"
+ *   onRefresh={handleRefresh}
+ *   isRefreshing={isRefreshing}
+ *   action={<Button>Create Task</Button>}
  * />
  * ```
  */
-export function PageHeader({ title, badge, action, className = '' }: PageHeaderProps) {
+export function PageHeader({ title, badge, onRefresh, isRefreshing = false, action, className = '' }: PageHeaderProps) {
 	return (
 		<div
 			className={`
-     mb-6 flex flex-col gap-4
-     sm:flex-row sm:items-center sm:justify-between
+     mb-6 flex items-center justify-between
      ${className}
    `}
 		>
-			<h1 className="text-3xl font-bold">
-				{title}
-				{badge !== undefined && <span className="ml-2 text-lg text-muted-foreground">({badge})</span>}
-			</h1>
-			{action && <div className="flex flex-wrap items-center gap-2">{action}</div>}
+			<div className="flex items-center gap-2">
+				<h1 className="text-3xl font-bold">
+					{title}
+					{badge !== undefined && <span className="ml-2 text-lg text-muted-foreground">({badge})</span>}
+				</h1>
+				{onRefresh && (
+					<Button
+						onClick={onRefresh}
+						disabled={isRefreshing}
+						variant="ghost"
+						size="sm"
+						className="h-8 w-8 p-0"
+					>
+						<RefreshCw
+							className={`
+         h-4 w-4
+         ${isRefreshing ? 'animate-spin' : ''}
+       `}
+						/>
+					</Button>
+				)}
+			</div>
+			{action && <div className="flex items-center gap-2">{action}</div>}
 		</div>
 	);
 }

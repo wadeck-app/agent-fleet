@@ -1,141 +1,122 @@
 import { Input } from '@framework/components/forms/Input';
-import { Label } from '@framework/components/forms/Label';
 import { Button } from '@framework/components/primitives/Button';
-import { Card, CardContent } from '@framework/components/primitives/Card';
-import type { TaskPriority, TaskStatus } from '@shared/api/tasks.contract';
+import { SelectInput } from '@framework/features/forms/inputs/SelectInput';
+
+import type { TaskFiltersContract } from './useTaskFilters';
 
 /**
  * ===========================================================================================
- * TASK FILTERS - Filter Controls
+ * TASK FILTERS COMPONENT
  * ===========================================================================================
  *
- * Provides filtering controls for tasks:
+ * UI component for task-specific filters:
  * - Status dropdown
  * - Priority dropdown
- * - Worker ID input
+ * - Worker ID text input
+ * - Flow ID text input
+ * - Clear filters button
+ *
+ * Uses the TaskFiltersContract from useTaskFilters hook.
  *
  * ===========================================================================================
  */
 
-export interface TaskFiltersProps {
-	status?: TaskStatus;
-	priority?: TaskPriority;
-	workerId?: string;
-	onStatusChange: (status?: TaskStatus) => void;
-	onPriorityChange: (priority?: TaskPriority) => void;
-	onWorkerIdChange: (workerId?: string) => void;
-	onClearFilters: () => void;
-}
-
-const statusOptions: { value: TaskStatus | ''; label: string }[] = [
-	{ value: '', label: 'All Statuses' },
+const STATUS_OPTIONS = [
+	{ value: '__all__', label: 'All Statuses' },
+	{ value: 'backlog', label: 'Backlog' },
+	{ value: 'refining', label: 'Refining' },
+	{ value: 'refined', label: 'Refined' },
+	{ value: 'prioritizing', label: 'Prioritizing' },
 	{ value: 'todo', label: 'To Do' },
 	{ value: 'in_progress', label: 'In Progress' },
 	{ value: 'testing', label: 'Testing' },
 	{ value: 'review', label: 'Review' },
+	{ value: 'reviewing', label: 'Reviewing' },
+	{ value: 'changes_requested', label: 'Changes Requested' },
 	{ value: 'approved', label: 'Approved' },
 	{ value: 'merged', label: 'Merged' },
 	{ value: 'blocked', label: 'Blocked' },
 	{ value: 'cancelled', label: 'Cancelled' },
 ];
 
-const priorityOptions: { value: TaskPriority | ''; label: string }[] = [
-	{ value: '', label: 'All Priorities' },
-	{ value: 'urgent', label: 'Urgent' },
-	{ value: 'high', label: 'High' },
-	{ value: 'medium', label: 'Medium' },
+const PRIORITY_OPTIONS = [
+	{ value: '__all__', label: 'All Priorities' },
 	{ value: 'low', label: 'Low' },
+	{ value: 'medium', label: 'Medium' },
+	{ value: 'high', label: 'High' },
+	{ value: 'urgent', label: 'Urgent' },
 ];
 
-export function TaskFilters({
-	status,
-	priority,
-	workerId,
-	onStatusChange,
-	onPriorityChange,
-	onWorkerIdChange,
-	onClearFilters,
-}: TaskFiltersProps) {
-	const hasFilters = status || priority || workerId;
+export interface TaskFiltersProps {
+	filters: TaskFiltersContract;
+}
 
+/**
+ * Task filters UI component
+ */
+export function TaskFilters({ filters }: TaskFiltersProps) {
 	return (
-		<Card>
-			<CardContent>
-				<div
-					className={`
-       flex flex-col gap-4
-       md:flex-row md:items-end
-     `}
-				>
-					{/* Status Filter */}
-					<div className="flex-1 space-y-2">
-						<Label htmlFor="status-filter">Status</Label>
-						<select
-							id="status-filter"
-							className={`
-         h-10 w-full rounded-md border border-input bg-background px-3 py-2
-         text-sm ring-offset-background
-         focus-visible:ring-2 focus-visible:ring-ring
-         focus-visible:ring-offset-2 focus-visible:outline-none
-       `}
-							value={status || ''}
-							onChange={e => onStatusChange(e.target.value as TaskStatus | undefined)}
-						>
-							{statusOptions.map(option => (
-								<option key={option.value || 'all'} value={option.value}>
-									{option.label}
-								</option>
-							))}
-						</select>
-					</div>
+		<div
+			className={`
+     mb-4 grid grid-cols-1 gap-4
+     sm:grid-cols-2
+     lg:grid-cols-4
+   `}
+		>
+			{/* Status Filter */}
+			<div>
+				<div className="mb-2 text-xs font-medium text-muted-foreground">Status</div>
+				<SelectInput
+					id="status-filter"
+					value={filters.fstate.status || '__all__'}
+					onChange={val => filters.actions.setStatus(val === '__all__' ? undefined : (val as any))}
+					options={STATUS_OPTIONS}
+				/>
+			</div>
 
-					{/* Priority Filter */}
-					<div className="flex-1 space-y-2">
-						<Label htmlFor="priority-filter">Priority</Label>
-						<select
-							id="priority-filter"
-							className={`
-         h-10 w-full rounded-md border border-input bg-background px-3 py-2
-         text-sm ring-offset-background
-         focus-visible:ring-2 focus-visible:ring-ring
-         focus-visible:ring-offset-2 focus-visible:outline-none
-       `}
-							value={priority || ''}
-							onChange={e => onPriorityChange(e.target.value as TaskPriority | undefined)}
-						>
-							{priorityOptions.map(option => (
-								<option key={option.value || 'all'} value={option.value}>
-									{option.label}
-								</option>
-							))}
-						</select>
-					</div>
+			{/* Priority Filter */}
+			<div>
+				<div className="mb-2 text-xs font-medium text-muted-foreground">Priority</div>
+				<SelectInput
+					id="priority-filter"
+					value={filters.fstate.priority || '__all__'}
+					onChange={val => filters.actions.setPriority(val === '__all__' ? undefined : (val as any))}
+					options={PRIORITY_OPTIONS}
+				/>
+			</div>
 
-					{/* Worker ID Filter */}
-					<div className="flex-1 space-y-2">
-						<Label htmlFor="worker-filter">Worker ID</Label>
-						<Input
-							id="worker-filter"
-							type="text"
-							placeholder="Filter by worker..."
-							value={workerId || ''}
-							onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-								onWorkerIdChange(e.target.value || undefined)
-							}
-							className="h-10"
-						/>
-					</div>
+			{/* Worker ID Filter */}
+			<div>
+				<div className="mb-2 text-xs font-medium text-muted-foreground">Worker ID</div>
+				<Input
+					id="worker-filter"
+					type="text"
+					value={filters.fstate.workerId || ''}
+					onChange={e => filters.actions.setWorkerId(e.target.value || undefined)}
+					placeholder="Filter by worker..."
+				/>
+			</div>
 
-					{/* Clear Filters Button */}
-					{hasFilters && (
-						<div className="flex-shrink-0">
-							<Button variant="outline" onClick={onClearFilters} className="h-10">
-								Clear Filters
-							</Button>
-						</div>
-					)}
+			{/* Flow ID Filter */}
+			<div>
+				<div className="mb-2 text-xs font-medium text-muted-foreground">Flow ID</div>
+				<Input
+					id="flow-filter"
+					type="text"
+					value={filters.fstate.flowId || ''}
+					onChange={e => filters.actions.setFlowId(e.target.value || undefined)}
+					placeholder="Filter by flow..."
+				/>
+			</div>
+
+			{/* Clear Filters Button - Full width on mobile, auto on larger screens */}
+			{filters.fstate.hasFilters && (
+				<div className="sm:col-span-2 lg:col-span-4">
+					<Button onClick={filters.actions.clearFilters} variant="outline" size="default">
+						Clear Filters
+					</Button>
 				</div>
-			</CardContent>
-		</Card>
+			)}
+		</div>
 	);
 }

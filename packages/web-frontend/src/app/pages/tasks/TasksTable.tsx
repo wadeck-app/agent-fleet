@@ -1,298 +1,187 @@
-import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
-import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
+import { Table2, type Table2Column, type Table2Props } from '@framework/components2/table/Table2';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
-import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
 import type { Task } from '@shared/api/tasks.contract';
-import {
-	AlertCircle,
-	CheckCircle2,
-	Circle,
-	CircleDashed,
-	Clock,
-	FileCheck,
-	GitMerge,
-	Trash2,
-	XCircle,
-} from 'lucide-react';
-
-import { tasksService } from './TasksService';
+import { Trash2 } from 'lucide-react';
 
 /**
- * ===========================================================================================
- * TASKS TABLE - Tasks List Display
- * ===========================================================================================
- *
- * Displays:
- * - Task ID
- * - Description
- * - Status (badge with icon and color)
- * - Priority (badge)
- * - Assigned Worker
- * - Created/Updated dates
- *
- * Status Colors:
- * - IN_PROGRESS: blue
- * - REVIEW: purple
- * - DONE (APPROVED/MERGED): green
- * - BLOCKED: red
- * - FAILED (CANCELLED): red
- * - TODO: gray
- * - Other: gray
- *
- * ===========================================================================================
+ * Format date for display
  */
-
-export interface TasksTableProps {
-	tasks: Task[];
-	onTaskDeleted?: () => void;
+function formatDate(isoString: string): string {
+	const date = new Date(isoString);
+	return date.toLocaleDateString('en-US', {
+		month: 'short',
+		day: 'numeric',
+		year: 'numeric',
+	});
 }
 
-// Helper to get status badge variant and icon
-function getStatusDisplay(status: Task['status']): {
-	variant: 'default' | 'secondary' | 'destructive' | 'outline';
-	color: string;
-	icon: React.ReactNode;
-	label: string;
-} {
+/**
+ * Get badge variant for task status
+ */
+function getStatusVariant(status: Task['status']): 'default' | 'secondary' | 'success' | 'warning' | 'destructive' {
 	switch (status) {
+		case 'approved':
+		case 'merged':
+			return 'success';
 		case 'in_progress':
 		case 'testing':
-			return {
-				variant: 'default',
-				color: 'text-info ',
-				icon: <Clock className="size-3" />,
-				label: 'In Progress',
-			};
+			return 'default';
 		case 'review':
 		case 'reviewing':
-			return {
-				variant: 'default',
-				color: 'text-primary ',
-				icon: <FileCheck className="size-3" />,
-				label: 'Review',
-			};
-		case 'approved':
-			return {
-				variant: 'default',
-				color: 'text-success ',
-				icon: <CheckCircle2 className="size-3" />,
-				label: 'Approved',
-			};
-		case 'merged':
-			return {
-				variant: 'default',
-				color: 'text-success ',
-				icon: <GitMerge className="size-3" />,
-				label: 'Merged',
-			};
+			return 'secondary';
 		case 'blocked':
-			return {
-				variant: 'destructive',
-				color: 'text-destructive ',
-				icon: <AlertCircle className="size-3" />,
-				label: 'Blocked',
-			};
 		case 'cancelled':
-			return {
-				variant: 'destructive',
-				color: 'text-destructive ',
-				icon: <XCircle className="size-3" />,
-				label: 'Failed',
-			};
-		case 'todo':
-			return {
-				variant: 'outline',
-				color: 'text-gray-600 dark:text-gray-400',
-				icon: <CircleDashed className="size-3" />,
-				label: 'To Do',
-			};
+			return 'destructive';
 		case 'changes_requested':
-			return {
-				variant: 'outline',
-				color: 'text-orange-600 dark:text-orange-400',
-				icon: <AlertCircle className="size-3" />,
-				label: 'Changes Requested',
-			};
+			return 'warning';
 		default:
-			return {
-				variant: 'outline',
-				color: 'text-gray-600 dark:text-gray-400',
-				icon: <Circle className="size-3" />,
-				label: status,
-			};
+			return 'secondary';
 	}
 }
 
-// Helper to get priority badge variant
-function getPriorityVariant(priority: Task['priority']): 'default' | 'secondary' | 'destructive' | 'outline' {
+/**
+ * Get badge variant for task priority
+ */
+function getPriorityVariant(priority: Task['priority']): 'default' | 'secondary' | 'warning' | 'destructive' {
 	switch (priority) {
 		case 'urgent':
 			return 'destructive';
 		case 'high':
-			return 'default';
+			return 'warning';
 		case 'medium':
-			return 'secondary';
+			return 'default';
 		case 'low':
-			return 'outline';
+			return 'secondary';
 		default:
-			return 'outline';
+			return 'secondary';
 	}
 }
 
-// Format date to relative time or short date
-function formatDate(dateString: string): string {
-	const date = new Date(dateString);
-	const now = new Date();
-	const diffMs = now.getTime() - date.getTime();
-	const diffMins = Math.floor(diffMs / 60000);
-	const diffHours = Math.floor(diffMs / 3600000);
-	const diffDays = Math.floor(diffMs / 86400000);
+/**
+ * Tasks table column definitions
+ */
+export const TASKS_TABLE_COLUMNS: Table2Column<Task>[] = [
+	{
+		key: 'id',
+		label: 'ID',
+		render: (t: Task) => (
+			<Link
+				to={`/tasks/${t.id}/logs-stacked`}
+				className="font-mono text-xs text-primary hover:underline"
+				onClick={e => e.stopPropagation()}
+			>
+				{t.id}
+			</Link>
+		),
+	},
+	{
+		key: 'flowId',
+		label: 'Flow ID',
+		render: (t: Task) => <span className="font-mono text-xs text-muted-foreground">{t.flowId || '-'}</span>,
+	},
+	{
+		key: 'description',
+		label: 'Description',
+		render: (t: Task) => <span className="text-sm">{t.description}</span>,
+	},
+	{
+		key: 'status',
+		label: 'Status',
+		render: (t: Task) => (
+			<Badge variant={getStatusVariant(t.status)} className="font-medium">
+				{t.status.replace('_', ' ')}
+			</Badge>
+		),
+	},
+	{
+		key: 'priority',
+		label: 'Priority',
+		render: (t: Task) => (
+			<Badge variant={getPriorityVariant(t.priority)} className="font-medium">
+				{t.priority}
+			</Badge>
+		),
+	},
+	{
+		key: 'assignedWorker',
+		label: 'Worker',
+		render: (t: Task) => <span className="font-mono text-xs">{t.assignedWorker?.workerId || '-'}</span>,
+		sortable: false,
+	},
+	{
+		key: 'createdAt',
+		label: 'Created',
+		render: (t: Task) => (
+			<span className="text-xs text-muted-foreground" title={new Date(t.createdAt).toLocaleString()}>
+				{formatDate(t.createdAt)}
+			</span>
+		),
+	},
+];
 
-	if (diffMins < 1) return 'Just now';
-	if (diffMins < 60) return `${diffMins}m ago`;
-	if (diffHours < 24) return `${diffHours}h ago`;
-	if (diffDays < 7) return `${diffDays}d ago`;
-
-	return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+export interface TasksTableProps extends Partial<Table2Props<Task>> {
+	/** Optional delete callback */
+	onDelete?: (id: string) => void;
+	/** Optional refreshing state - from Data2 */
+	refreshing?: boolean;
+	/** Optional deleting state - for bulk delete blur effect */
+	deleting?: boolean;
+	/** IDs of items being deleted - for strike-through effect */
+	deletingIds?: Set<string>;
+	/** Selection toggle callback */
+	onSelectionToggle?: (id: string) => void;
+	/** Select all callback */
+	onSelectAll?: (ids: string[]) => void;
 }
 
-export function TasksTable({ tasks, onTaskDeleted }: TasksTableProps) {
-	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-	const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
-
-	const handleDeleteClick = (taskId: string) => {
-		setTaskToDelete(taskId);
-		setDeleteDialogOpen(true);
-	};
-
-	const handleConfirmDelete = async () => {
-		if (!taskToDelete) return;
-
-		try {
-			await tasksService.deleteTask(taskToDelete);
-			onTaskDeleted?.();
-		} catch (error) {
-			console.error('Failed to delete task:', error);
-			alert('Failed to delete task');
-		} finally {
-			setTaskToDelete(null);
-		}
-	};
+/**
+ * Tasks table component using Table2
+ */
+export function TasksTable({
+	onDelete,
+	refreshing,
+	deleting,
+	deletingIds,
+	onSelectionToggle,
+	onSelectAll,
+	...props
+}: TasksTableProps) {
+	// Build actions column if onDelete is provided
+	const renderActions = onDelete
+		? (task: Task) => (
+				<div className="flex items-center justify-center gap-2">
+					<Button
+						size="sm"
+						variant="destructive"
+						onClick={() => onDelete(task.id)}
+						aria-label={`Delete ${task.description}`}
+					>
+						<Trash2 className="h-4 w-4" />
+					</Button>
+				</div>
+			)
+		: undefined;
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>Tasks List</CardTitle>
-			</CardHeader>
-			<CardContent>
-				{tasks.length === 0 ? (
-					<div className="py-8 text-center text-sm text-muted-foreground">No tasks available</div>
-				) : (
-					<div className="overflow-x-auto">
-						<table className="w-full">
-							<thead>
-								<tr
-									className={`
-           border-b text-left text-sm font-medium text-muted-foreground
-         `}
-								>
-									<th className="pb-3">Task ID</th>
-									<th className="pb-3">Description</th>
-									<th className="pb-3">Status</th>
-									<th className="pb-3">Priority</th>
-									<th className="pb-3">Assigned To</th>
-									<th className="pb-3">Flow ID</th>
-									<th className="pb-3">Updated</th>
-									<th className="pb-3">Actions</th>
-								</tr>
-							</thead>
-							<tbody>
-								{tasks.map(task => {
-									const statusDisplay = getStatusDisplay(task.status);
-									return (
-										<tr
-											key={task.id}
-											className={`
-             border-b
-             last:border-b-0
-           `}
-										>
-											<td className="py-3">
-												<span className="font-mono text-sm">{task.id}</span>
-											</td>
-											<td className="py-3">
-												<div className="max-w-md">
-													<p className="line-clamp-2 text-sm">{task.description}</p>
-												</div>
-											</td>
-											<td className="py-3">
-												<Badge variant={statusDisplay.variant} className="gap-1">
-													{statusDisplay.icon}
-													<span>{statusDisplay.label}</span>
-												</Badge>
-											</td>
-											<td className="py-3">
-												<Badge
-													variant={getPriorityVariant(task.priority)}
-													className="capitalize"
-												>
-													{task.priority}
-												</Badge>
-											</td>
-											<td className="py-3">
-												{task.assignedWorker ? (
-													<div className="text-sm">
-														<div className="font-medium">
-															{task.assignedWorker.workerId}
-														</div>
-													</div>
-												) : (
-													<span className="text-sm text-muted-foreground">Unassigned</span>
-												)}
-											</td>
-											<td className="py-3">
-												{task.flowId ? (
-													<span className="font-mono text-sm">{task.flowId}</span>
-												) : (
-													<span className="text-sm text-muted-foreground">-</span>
-												)}
-											</td>
-											<td className="py-3">
-												<span className="text-sm text-muted-foreground">
-													{formatDate(task.updatedAt)}
-												</span>
-											</td>
-											<td className="py-3">
-												<Button
-													variant="ghost"
-													size="sm"
-													onClick={() => handleDeleteClick(task.id)}
-													className="size-8 p-0"
-												>
-													<Trash2 className="size-4 text-destructive" />
-												</Button>
-											</td>
-										</tr>
-									);
-								})}
-							</tbody>
-						</table>
-					</div>
-				)}
-			</CardContent>
-
-			<AlertDialogWrapper
-				open={deleteDialogOpen}
-				onOpenChange={setDeleteDialogOpen}
-				title="Delete Task"
-				description="Are you sure you want to delete this task? This action cannot be undone."
-				confirmLabel="Delete"
-				cancelLabel="Cancel"
-				variant="danger"
-				onConfirm={handleConfirmDelete}
-			/>
-		</Card>
+		<Table2
+			columns={TASKS_TABLE_COLUMNS}
+			getItemId={(t: Task) => t.id}
+			renderActions={renderActions}
+			emptyMessage="No tasks found. Create your first task to get started."
+			data={props.data ?? []}
+			isLoading={props.isLoading ?? false}
+			error={props.error ?? null}
+			pagination={props.pagination}
+			sorting={props.sorting}
+			features={props.features}
+			refreshing={refreshing}
+			deleting={deleting}
+			deletingIds={deletingIds}
+			onSelectionToggle={onSelectionToggle}
+			onSelectAll={onSelectAll}
+		/>
 	);
 }

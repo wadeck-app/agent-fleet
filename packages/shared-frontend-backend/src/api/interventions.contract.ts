@@ -117,6 +117,7 @@ export const InterventionsQuerySchema = createQuerySchema({
 	status: InterventionStatusSchema.optional(),
 	type: InterventionTypeSchema.optional(),
 	taskId: optionalSanitizedString(100),
+	blocking: z.boolean().optional(),
 });
 
 /**
@@ -139,6 +140,26 @@ export const InterventionResponseSubmitSchema = z.object({
 export const SuccessResponseSchema = z.object({
 	success: z.boolean(),
 	message: optionalSanitizedString(500),
+});
+
+/**
+ * Bulk cancel request schema
+ */
+export const BulkCancelRequestSchema = z.object({
+	ids: z.array(z.string().min(1)).min(1).max(100),
+});
+
+/**
+ * Bulk cancel response schema
+ */
+export const BulkCancelResponseSchema = z.object({
+	cancelled: z.array(z.string()),
+	failed: z.array(
+		z.object({
+			id: z.string(),
+			error: z.string(),
+		})
+	),
 });
 
 /**
@@ -171,6 +192,12 @@ export const INTERVENTIONS_API_ROUTES = defineRoutes({
 			response: SuccessResponseSchema,
 		},
 	},
+	'/api/interventions/bulk-cancel/': {
+		POST: {
+			body: BulkCancelRequestSchema,
+			response: BulkCancelResponseSchema,
+		},
+	},
 });
 
 // Validate routes at module load time (development/test only)
@@ -186,3 +213,5 @@ export type InterventionsQuery = z.infer<typeof InterventionsQuerySchema>;
 export type InterventionsListResponse = z.infer<typeof InterventionsListResponseSchema>;
 export type InterventionResponseSubmit = z.infer<typeof InterventionResponseSubmitSchema>;
 export type SuccessResponse = z.infer<typeof SuccessResponseSchema>;
+export type BulkCancelRequest = z.infer<typeof BulkCancelRequestSchema>;
+export type BulkCancelResponse = z.infer<typeof BulkCancelResponseSchema>;

@@ -4,8 +4,6 @@ import { ErrorAlert } from '@framework/components/feedback/ErrorAlert';
 import { LoadingState } from '@framework/components/feedback/LoadingState';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
-import { Button } from '@framework/components/primitives/Button';
-import { RefreshCw } from 'lucide-react';
 
 import { QuickActions } from './QuickActions';
 import { RecentActivityCard } from './RecentActivityCard';
@@ -57,20 +55,7 @@ export function DashboardPage() {
 
 	return (
 		<Page>
-			<PageHeader
-				title="Dashboard"
-				action={
-					<Button onClick={handleRefresh} disabled={isRefreshing} variant="outline" size="sm">
-						<RefreshCw
-							className={`
-         mr-2 size-4
-         ${isRefreshing ? 'animate-spin' : ''}
-       `}
-						/>
-						Refresh
-					</Button>
-				}
-			/>
+			<PageHeader title="Dashboard" onRefresh={handleRefresh} isRefreshing={isRefreshing} />
 
 			{/* Error Alert */}
 			{error && (

@@ -1,213 +1,379 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { ErrorAlert } from '@framework/components/feedback/ErrorAlert';
-import { LoadingState } from '@framework/components/feedback/LoadingState';
+import { Data2 } from '@framework/components2/data/Data2';
+import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
+import { Input } from '@framework/components/forms/Input';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
+import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
 import { Button } from '@framework/components/primitives/Button';
-import { useToast } from '@framework/features/toast/ToastContext';
-import type { TaskPriority, TaskStatus } from '@shared/api/tasks.contract';
-import { Plus, RefreshCw } from 'lucide-react';
+import { useCacheControl2 } from '@framework/hooks2/useCacheControl2';
+import { useDebounce } from '@framework/hooks2/useDebounce';
+import { useMultiSelect2 } from '@framework/hooks2/useMultiSelect2';
+import { usePagination2 } from '@framework/hooks2/usePagination2';
+import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
+import { useSorting2 } from '@framework/hooks2/useSorting2';
+import { useCrudSuccessToast } from '@framework/hooks/useCrudSuccessToast';
+import { useErrorToast } from '@framework/hooks/useErrorToast';
+import type { ComposedQuery } from '@framework/utils2/buildQuery';
+import type { Task } from '@shared/api/tasks.contract';
+import { B2F_TASK_CREATED, B2F_TASK_DELETED, B2F_TASK_UPDATED } from '@shared/transport';
+import { Plus, Trash2, X } from 'lucide-react';
+
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
+
+import { BulkDeleteWorkflow } from '@app/components/domain';
 
 import { CreateTaskDialog } from './CreateTaskDialog';
 import { TaskFilters } from './TaskFilters';
 import { TasksTable } from './TasksTable';
-import { useTasks } from './useTasks';
+import { tasksApi } from './tasks.api';
+import { useTaskFilters } from './useTaskFilters';
+import { useTasksCrud } from './useTasksCrud';
+
+const STORAGE_ID = 'tasks' as const;
 
 /**
  * ===========================================================================================
- * TASKS PAGE - Tasks Management
+ * TASKS PAGE - Data2 Architecture with Hybrid Filtering
  * ===========================================================================================
  *
- * Displays list of tasks with filtering capabilities:
- * - Summary stats (total, by status, by priority)
- * - Tasks table with ID, description, status, priority, assigned worker
- * - Filter controls (status, priority, worker ID)
- * - Real-time updates
+ * Modern tasks page using headless composable architecture:
+ * - Pagination (usePagination2)
+ * - Sorting (useSorting2)
+ * - Search (useSimpleSearch) - omnisearch across all fields
+ * - Domain Filters (useTaskFilters) - status, priority, workerId
+ * - Cache control (useCacheControl2)
+ * - Data2 orchestration
+ * - Table2 display
  *
- * Features:
- * - Auto-refresh every 5 seconds
- * - Manual refresh capability
- * - Loading and error states
- * - Responsive layout
- * - Filter by status, priority, and worker ID
+ * Hybrid approach:
+ * - Generic search (useSimpleSearch) for text-based queries
+ * - Domain filters (useTaskFilters) for structured filtering
+ * - Both integrate seamlessly with Data2 architecture
  *
  * ===========================================================================================
  */
-
 export function TasksPage() {
-	const [status, setStatus] = useState<TaskStatus | undefined>();
-	const [priority, setPriority] = useState<TaskPriority | undefined>();
-	const [workerId, setWorkerId] = useState<string | undefined>();
+	const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
-	const { data, loading, error, refresh, clearError } = useTasks({
-		pollInterval: 5000,
-		filters: {
-			status,
-			priority,
-			workerId,
+	// Headless features
+	const pagination = usePagination2({
+		pageSize: 10,
+		storageId: STORAGE_ID,
+		initialPage: 1,
+	});
+
+	const sorting = useSorting2({
+		storageId: STORAGE_ID,
+		defaultSort: [{ key: 'createdAt', direction: 'desc' }],
+	});
+
+	const search = useSimpleSearch({
+		onSearchChange: () => {
+			// Reset to first page when search changes
+			pagination.actions.resetPage();
 		},
 	});
 
-	const [isRefreshing, setIsRefreshing] = useState(false);
-	const [createDialogOpen, setCreateDialogOpen] = useState(false);
-	const { showToast } = useToast();
+	const cache = useCacheControl2({ enabled: true });
 
-	const handleRefresh = async () => {
-		setIsRefreshing(true);
-		try {
-			await refresh();
-		} finally {
-			setIsRefreshing(false);
+	// Multi-selection feature: manages selection state
+	const selection = useMultiSelect2();
+
+	// CRUD operations
+	const { deleteTask, bulkDeleteTasks, operationError, clearOperationError } = useTasksCrud();
+
+	// Show error as toast automatically
+	useErrorToast({ error: operationError, clearError: clearOperationError });
+
+	// Success toast helper
+	const successToast = useCrudSuccessToast('task');
+
+	// Bulk delete dialog state
+	const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+	// Track IDs being deleted (for strike-through visual feedback)
+	const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+	// Track if bulk delete is in progress (for blur effect)
+	const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+	// Track if we're refreshing after a mutation (delete/update/create)
+	const [isRefreshingAfterMutation, setIsRefreshingAfterMutation] = useState(false);
+	// Track if we're waiting for a refresh to complete after a mutation
+	const isMutating = useRef(false);
+
+	// Delete confirmation dialog state
+	const [deleteConfirmation, setDeleteConfirmation] = useState<{
+		open: boolean;
+		taskId: string | null;
+	}>({
+		open: false,
+		taskId: null,
+	});
+
+	// Store fetched tasks for visual feedback
+	const [tasks, setTasks] = useState<Task[]>([]);
+
+	// Subscribe to real-time task events
+	// Refresh list when tasks are created, updated, or deleted
+	useRealtimeRefresh({
+		events: [B2F_TASK_CREATED, B2F_TASK_UPDATED, B2F_TASK_DELETED],
+		onEvent: cache.actions.refresh,
+		logPrefix: 'TasksPage',
+	});
+
+	// Domain-specific filters (tasks-specific)
+	const filters = useTaskFilters({
+		onFilterChange: () => {
+			// Reset to first page when filters change
+			pagination.actions.resetPage();
+		},
+	});
+
+	// Debounce search query
+	const debouncedSearchQuery = useDebounce(search.fstate.query, 300);
+
+	// Clear isRefreshingAfterMutation and isBulkDeleting when the data changes
+	useEffect(() => {
+		if (isMutating.current && tasks.length > 0) {
+			isMutating.current = false;
+			setIsRefreshingAfterMutation(false);
+			setIsBulkDeleting(false);
+			setDeletingIds(new Set());
 		}
-	};
+	}, [tasks]);
+
+	// Fetch function - query includes all features composed by Data2
+	const fetchTasks = useCallback(async (query: ComposedQuery) => {
+		const response = await tasksApi.getTasksList({
+			page: query.page,
+			pageSize: query.pageSize,
+			sortBy: query.sortBy,
+			sortOrder: query.sortOrder as 'asc' | 'desc' | undefined,
+			search: query.search,
+			status: query.status as any,
+			priority: query.priority as any,
+			workerId: query.workerId as string | undefined,
+			flowId: query.flowId as string | undefined,
+		});
+
+		// Store tasks for visual feedback
+		setTasks(response.items);
+
+		return {
+			items: response.items,
+			pagination: response.pagination,
+		};
+	}, []);
 
 	const handleTaskCreated = async () => {
-		await refresh();
-		showToast('Task created successfully', 'success');
+		cache.actions.refresh();
 	};
 
-	const handleClearFilters = () => {
-		setStatus(undefined);
-		setPriority(undefined);
-		setWorkerId(undefined);
+	const handleDelete = (id: string) => {
+		setDeleteConfirmation({ open: true, taskId: id });
 	};
 
-	// Show loading state on initial load
-	if (loading && !data) {
-		return <LoadingState message="Loading tasks..." size="large" />;
-	}
+	const handleDeleteConfirm = async () => {
+		if (deleteConfirmation.taskId) {
+			// Mark as deleting for strike-through effect
+			setDeletingIds(prev => new Set([...prev, deleteConfirmation.taskId!]));
+			// Start refreshing state
+			setIsRefreshingAfterMutation(true);
+			// Mark mutation mode
+			isMutating.current = true;
+
+			try {
+				await deleteTask(deleteConfirmation.taskId);
+				await cache.actions.refresh();
+				successToast.deleted();
+			} finally {
+				setDeletingIds(prev => {
+					const next = new Set(prev);
+					next.delete(deleteConfirmation.taskId!);
+					return next;
+				});
+			}
+		}
+		setDeleteConfirmation({ open: false, taskId: null });
+	};
+
+	const handleBulkDelete = async () => {
+		if (selection.fstate.isEmpty) return;
+		setShowBulkDeleteDialog(true);
+	};
+
+	// Handle select all for current page
+	const handleSelectAll = (ids: string[]) => {
+		const allSelected = ids.every(id => selection.actions.isSelected(id));
+
+		if (allSelected) {
+			const newSelection = new Set(selection.fstate.selectedIds);
+			ids.forEach(id => newSelection.delete(id));
+			selection.actions.set(newSelection);
+		} else {
+			const newSelection = new Set([...selection.fstate.selectedIds, ...ids]);
+			selection.actions.set(newSelection);
+		}
+	};
 
 	return (
 		<Page>
 			<PageHeader
 				title="Tasks"
+				onRefresh={cache.actions.refresh}
+				isRefreshing={cache.fstate.isRefreshing}
 				action={
-					<div className="flex gap-2">
-						<Button onClick={() => setCreateDialogOpen(true)} variant="default" size="sm">
-							<Plus />
-							Create Task
-						</Button>
-						<Button onClick={handleRefresh} disabled={isRefreshing} variant="outline" size="sm">
-							<RefreshCw
-								className={`
-          mr-2 size-4
-          ${isRefreshing ? 'animate-spin' : ''}
-        `}
-							/>
-							Refresh
-						</Button>
-					</div>
+					<Button onClick={() => setCreateDialogOpen(true)} variant="default" size="sm">
+						<Plus />
+						Create Task
+					</Button>
 				}
 			/>
 
-			{/* Error Alert */}
-			{error && (
-				<div className="mb-6">
-					<ErrorAlert message={error} onDismiss={clearError} />
-				</div>
-			)}
-
-			{/* Tasks Content */}
-			{data && (
-				<div className="space-y-6">
-					{/* Summary Stats */}
-					<div
-						className={`
-        grid gap-4
-        md:grid-cols-5
-      `}
-					>
-						<div
-							className={`
-        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
-      `}
-						>
-							<div className="text-sm font-medium text-muted-foreground">Total Tasks</div>
-							<div className="text-2xl font-bold">{data.summary.total}</div>
-						</div>
-						<div
-							className={`
-        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
-      `}
-						>
-							<div className="text-sm font-medium text-muted-foreground">In Progress</div>
-							<div
-								className={`
-          text-2xl font-bold text-info
-          
-        `}
-							>
-								{data.summary.byStatus.in_progress || 0}
-							</div>
-						</div>
-						<div
-							className={`
-        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
-      `}
-						>
-							<div className="text-sm font-medium text-muted-foreground">Review</div>
-							<div
-								className={`
-          text-2xl font-bold text-primary
-          
-        `}
-							>
-								{data.summary.byStatus.review || 0}
-							</div>
-						</div>
-						<div
-							className={`
-        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
-      `}
-						>
-							<div className="text-sm font-medium text-muted-foreground">Completed</div>
-							<div
-								className={`
-          text-2xl font-bold text-success
-          
-        `}
-							>
-								{(data.summary.byStatus.approved || 0) + (data.summary.byStatus.merged || 0)}
-							</div>
-						</div>
-						<div
-							className={`
-        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
-      `}
-						>
-							<div className="text-sm font-medium text-muted-foreground">Blocked</div>
-							<div
-								className={`
-          text-2xl font-bold text-destructive
-          
-        `}
-							>
-								{data.summary.byStatus.blocked || 0}
-							</div>
-						</div>
-					</div>
-
-					{/* Filters */}
-					<TaskFilters
-						status={status}
-						priority={priority}
-						workerId={workerId}
-						onStatusChange={setStatus}
-						onPriorityChange={setPriority}
-						onWorkerIdChange={setWorkerId}
-						onClearFilters={handleClearFilters}
+			{/* Search Bar */}
+			<div className="mb-4 flex flex-col gap-4">
+				<div className="relative">
+					<div className="mb-2 text-xs font-medium text-muted-foreground">Search</div>
+					<Input
+						type="text"
+						value={search.fstate.query}
+						onChange={e => search.actions.setQuery(e.target.value)}
+						placeholder="Search tasks by ID, description, worker, status, or priority..."
 					/>
-
-					{/* Tasks Table */}
-					<TasksTable tasks={data.tasks} onTaskDeleted={refresh} />
+					{search.fstate.query && (
+						<Button
+							onClick={search.actions.clearQuery}
+							variant="ghost"
+							size="sm"
+							className="absolute top-9 right-2 h-6 w-6 -translate-y-1/2 p-0"
+							aria-label="Clear search"
+						>
+							<X className="h-4 w-4" />
+						</Button>
+					)}
 				</div>
+			</div>
+
+			{/* Domain Filters */}
+			<TaskFilters filters={filters} />
+
+			{/* Bulk Action Bar */}
+			{!selection.fstate.isEmpty && (
+				<BulkActionBar
+					selectionCount={selection.fstate.count}
+					selectedLabel={`${selection.fstate.count} task(s) selected`}
+					onCancel={selection.actions.clear}
+					variant="light"
+				>
+					<Button onClick={handleBulkDelete} variant="destructive" size="sm">
+						<Trash2 className="mr-2 size-4" />
+						Delete
+					</Button>
+				</BulkActionBar>
 			)}
+
+			{/* Feature Info (for demo purposes) */}
+			<div className="mb-4 rounded-lg border border-border bg-muted/50 p-4 text-sm">
+				<strong>Active Features (UI / Debounced):</strong>
+				<div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+					<div>
+						<span className="text-muted-foreground">Search:</span>{' '}
+						<span className="font-mono">
+							{search.fstate.query ? `${search.fstate.query} / ${debouncedSearchQuery}` : 'none'}
+						</span>
+					</div>
+					<div>
+						<span className="text-muted-foreground">Sort:</span>{' '}
+						<span className="font-mono">
+							{sorting.fstate.sortConfigs.map(c => `${c.key}:${c.direction}`).join(', ') || 'none'}
+						</span>
+					</div>
+					<div>
+						<span className="text-muted-foreground">Filters:</span>{' '}
+						<span className="font-mono">
+							{filters.fstate.hasFilters
+								? [
+										filters.fstate.status && `status:${filters.fstate.status}`,
+										filters.fstate.priority && `priority:${filters.fstate.priority}`,
+										filters.fstate.workerId && `worker:${filters.fstate.workerId}`,
+										filters.fstate.flowId && `flow:${filters.fstate.flowId}`,
+									]
+										.filter(Boolean)
+										.join(', ')
+								: 'none'}
+						</span>
+					</div>
+					<div>
+						<span className="text-muted-foreground">Cache ID:</span>{' '}
+						<span className="font-mono">{cache.fstate.cacheId}</span>
+					</div>
+				</div>
+			</div>
+
+			{/* Data + Table */}
+			<Data2
+				fetchData={fetchTasks}
+				pagination={pagination}
+				sorting={sorting}
+				search={search}
+				filter={filters as any}
+				cache={cache}
+				selection={selection}
+				delegateLoadingToChildren={true}
+			>
+				{injectedProps => (
+					<TasksTable
+						{...injectedProps}
+						onDelete={handleDelete}
+						refreshing={injectedProps.isLoading || isRefreshingAfterMutation}
+						deleting={isBulkDeleting}
+						deletingIds={deletingIds}
+						onSelectionToggle={selection.actions.toggle}
+						onSelectAll={handleSelectAll}
+					/>
+				)}
+			</Data2>
 
 			<CreateTaskDialog
 				open={createDialogOpen}
 				onOpenChange={setCreateDialogOpen}
 				onSuccess={handleTaskCreated}
+			/>
+
+			{/* Bulk Delete Workflow */}
+			<BulkDeleteWorkflow
+				open={showBulkDeleteDialog}
+				onOpenChange={setShowBulkDeleteDialog}
+				selectedIds={selection.fstate.selectedIds}
+				onClear={selection.actions.clear}
+				onBulkDelete={bulkDeleteTasks}
+				onReload={async () => cache.actions.refresh()}
+				itemTypeName="task"
+				onDeletingChange={ids => {
+					if (ids.size > 0) {
+						setDeletingIds(ids);
+					}
+				}}
+				onBulkDeletingChange={deleting => {
+					if (deleting) {
+						setIsBulkDeleting(true);
+						isMutating.current = true;
+					}
+				}}
+			/>
+
+			{/* Delete Confirmation Dialog */}
+			<AlertDialogWrapper
+				open={deleteConfirmation.open}
+				onOpenChange={open => {
+					setDeleteConfirmation({ open, taskId: open ? deleteConfirmation.taskId : null });
+				}}
+				title="Delete Task"
+				description="Are you sure you want to delete this task? This action cannot be undone."
+				confirmLabel="Delete"
+				cancelLabel="Cancel"
+				variant="danger"
+				onConfirm={handleDeleteConfirm}
 			/>
 		</Page>
 	);

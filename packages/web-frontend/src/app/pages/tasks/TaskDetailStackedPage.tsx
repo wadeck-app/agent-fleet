@@ -74,7 +74,7 @@ export function TaskDetailStackedPage() {
 		return (
 			<Page>
 				<PageHeader title="Error" />
-				<ErrorAlert message={taskError?.message || 'Task not found'} onDismiss={() => navigate('/tasks2')} />
+				<ErrorAlert message={taskError?.message || 'Task not found'} onDismiss={() => navigate('/tasks')} />
 			</Page>
 		);
 	}
@@ -84,7 +84,7 @@ export function TaskDetailStackedPage() {
 			<PageHeader
 				title={`Task #${task.id.substring(0, 8)}`}
 				action={
-					<Button variant="outline" size="sm" onClick={() => navigate('/tasks2')}>
+					<Button variant="outline" size="sm" onClick={() => navigate('/tasks')}>
 						<ArrowLeft className="mr-2 size-4" />
 						Back to Tasks
 					</Button>

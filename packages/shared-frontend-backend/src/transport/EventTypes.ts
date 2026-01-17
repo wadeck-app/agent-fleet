@@ -1,5 +1,6 @@
 import type { DashboardData } from '../api/dashboard.contract';
 import type { Intervention } from '../api/interventions.contract';
+import type { Project, ProjectBoardData, ProjectsData } from '../api/projects.contract';
 import type { Task, TasksData } from '../api/tasks.contract';
 import type { Worker, WorkersData } from '../api/workers.contract';
 import type { Workspace } from '../api/workspaces.contract';
@@ -123,6 +124,21 @@ export interface BusinessEvents {
 
 	/** Intervention cancelled */
 	'b2f:intervention:cancelled': Intervention;
+
+	/** Projects data updated (aggregate) */
+	'b2f:projects:updated': ProjectsData;
+
+	/** Project created */
+	'b2f:project:created': Project;
+
+	/** Project updated */
+	'b2f:project:updated': Project;
+
+	/** Project deleted */
+	'b2f:project:deleted': Project;
+
+	/** Project board data updated */
+	'b2f:project:board_updated': ProjectBoardData;
 }
 
 /**
@@ -133,11 +149,13 @@ export interface BusinessEvents {
  * - CRUD events for tasks (task:created, task:updated, etc.)
  * - CRUD events for workers (worker:created, worker:updated, etc.)
  * - CRUD events for workspaces (workspace:created, workspace:updated, etc.)
+ * - CRUD events for projects (project:created, project:updated, etc.)
  * - Business-specific events (task:assigned, worker:heartbeat, etc.)
  */
 export type EventTypes = ResourceEvent<'task', Task> &
 	ResourceEvent<'worker', Worker> &
 	ResourceEvent<'workspace', Workspace> &
+	ResourceEvent<'project', Project> &
 	BusinessEvents;
 
 /**

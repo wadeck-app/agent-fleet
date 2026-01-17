@@ -1,160 +1,165 @@
-import { useState } from 'react';
+import { useCallback } from 'react';
 
-import { ErrorAlert } from '@framework/components/feedback/ErrorAlert';
-import { LoadingState } from '@framework/components/feedback/LoadingState';
+import { Data2 } from '@framework/components2/data/Data2';
+import { Input } from '@framework/components/forms/Input';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { Button } from '@framework/components/primitives/Button';
-import { RefreshCw } from 'lucide-react';
+import { useCacheControl2 } from '@framework/hooks2/useCacheControl2';
+import { useDebounce } from '@framework/hooks2/useDebounce';
+import { usePagination2 } from '@framework/hooks2/usePagination2';
+import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
+import { useSorting2 } from '@framework/hooks2/useSorting2';
+import type { ComposedQuery } from '@framework/utils2/buildQuery';
+import {
+	B2F_PROJECT_DELETED,
+	B2F_WORKSPACES_UPDATED,
+	B2F_WORKSPACE_CREATED,
+	B2F_WORKSPACE_DELETED,
+	B2F_WORKSPACE_UPDATED,
+} from '@shared/transport';
+import { X } from 'lucide-react';
+
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 import { WorkspacesTable } from './WorkspacesTable';
-import { useWorkspaces } from './useWorkspaces';
+import { workspacesApi } from './workspaces.api';
+
+const STORAGE_ID = 'workspaces' as const;
 
 /**
  * ===========================================================================================
- * WORKSPACES PAGE - Workspaces Management
+ * WORKSPACES PAGE - Data2 Architecture
  * ===========================================================================================
  *
- * Displays list of workspaces with their status and details:
- * - Summary stats (total, active, locked, cleaning, errors)
- * - Workspaces table with path, mode, status, git branch, tasks count
- * - Real-time updates
- *
- * Features:
- * - Auto-refresh every 5 seconds
- * - Manual refresh capability
- * - Loading and error states
- * - Responsive layout
+ * Modern workspaces page using headless composable architecture:
+ * - Pagination (usePagination2)
+ * - Sorting (useSorting2)
+ * - Search (useSimpleSearch)
+ * - Cache control (useCacheControl2)
+ * - Data2 orchestration
+ * - Table2 display
  *
  * ===========================================================================================
  */
-
 export function WorkspacesPage() {
-	const { data, loading, error, refresh, clearError } = useWorkspaces({ pollInterval: 5000 });
-	const [isRefreshing, setIsRefreshing] = useState(false);
+	// Headless features
+	const pagination = usePagination2({
+		pageSize: 10,
+		storageId: STORAGE_ID,
+		initialPage: 1,
+	});
 
-	const handleRefresh = async () => {
-		setIsRefreshing(true);
-		try {
-			await refresh();
-		} finally {
-			setIsRefreshing(false);
-		}
-	};
+	const sorting = useSorting2({
+		storageId: STORAGE_ID,
+		defaultSort: [{ key: 'lastUsed', direction: 'desc' }],
+	});
 
-	// Show loading state on initial load
-	if (loading && !data) {
-		return <LoadingState message="Loading workspaces..." size="large" />;
-	}
+	const search = useSimpleSearch({
+		onSearchChange: () => {
+			// Reset to first page when search changes
+			pagination.actions.resetPage();
+		},
+	});
+
+	const cache = useCacheControl2({ enabled: true });
+
+	// Subscribe to real-time workspace events
+	// Refresh list when workspaces are created, updated, deleted, or when workers connect/disconnect
+	// Also refresh when projects are deleted (to update project names in table)
+	useRealtimeRefresh({
+		events: [
+			B2F_WORKSPACES_UPDATED,
+			B2F_WORKSPACE_CREATED,
+			B2F_WORKSPACE_UPDATED,
+			B2F_WORKSPACE_DELETED,
+			B2F_PROJECT_DELETED,
+		],
+		onEvent: cache.actions.refresh,
+		logPrefix: 'WorkspacesPage',
+	});
+
+	// Debounce search query
+	const debouncedSearchQuery = useDebounce(search.fstate.query, 300);
+
+	// Fetch function
+	const fetchWorkspaces = useCallback(async (query: ComposedQuery) => {
+		const response = await workspacesApi.getWorkspacesList({
+			page: query.page,
+			pageSize: query.pageSize,
+			sortBy: query.sortBy,
+			sortOrder: query.sortOrder as 'asc' | 'desc' | undefined,
+			search: query.search,
+		});
+
+		return {
+			items: response.items,
+			pagination: response.pagination,
+		};
+	}, []);
 
 	return (
 		<Page>
-			<PageHeader
-				title="Workspaces"
-				action={
-					<Button onClick={handleRefresh} disabled={isRefreshing} variant="outline" size="sm">
-						<RefreshCw
-							className={`
-         mr-2 size-4
-         ${isRefreshing ? 'animate-spin' : ''}
-       `}
-						/>
-						Refresh
-					</Button>
-				}
-			/>
+			<PageHeader title="Workspaces" onRefresh={cache.actions.refresh} isRefreshing={cache.fstate.isRefreshing} />
 
-			{/* Error Alert */}
-			{error && (
-				<div className="mb-6">
-					<ErrorAlert message={error} onDismiss={clearError} />
+			{/* Search Bar */}
+			<div className="mb-4 flex flex-col gap-4">
+				<div className="relative">
+					<div className="mb-2 text-xs font-medium text-muted-foreground">Search</div>
+					<Input
+						type="text"
+						value={search.fstate.query}
+						onChange={e => search.actions.setQuery(e.target.value)}
+						placeholder="Search workspaces by path, mode, status, or branch..."
+					/>
+					{search.fstate.query && (
+						<Button
+							onClick={search.actions.clearQuery}
+							variant="ghost"
+							size="sm"
+							className="absolute top-9 right-2 h-6 w-6 -translate-y-1/2 p-0"
+							aria-label="Clear search"
+						>
+							<X className="h-4 w-4" />
+						</Button>
+					)}
 				</div>
-			)}
+			</div>
 
-			{/* Workspaces Content */}
-			{data && (
-				<div className="space-y-6">
-					{/* Summary Stats */}
-					<div
-						className={`
-        grid gap-4
-        md:grid-cols-5
-      `}
-					>
-						<div
-							className={`
-        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
-      `}
-						>
-							<div className="text-sm font-medium text-muted-foreground">Total</div>
-							<div className="text-2xl font-bold">{data.summary.total}</div>
-						</div>
-						<div
-							className={`
-        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
-      `}
-						>
-							<div className="text-sm font-medium text-muted-foreground">Active</div>
-							<div
-								className={`
-          text-2xl font-bold text-green-600
-          dark:text-green-400
-        `}
-							>
-								{data.summary.active}
-							</div>
-						</div>
-						<div
-							className={`
-        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
-      `}
-						>
-							<div className="text-sm font-medium text-muted-foreground">Locked</div>
-							<div
-								className={`
-          text-2xl font-bold text-yellow-600
-          dark:text-yellow-400
-        `}
-							>
-								{data.summary.locked}
-							</div>
-						</div>
-						<div
-							className={`
-        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
-      `}
-						>
-							<div className="text-sm font-medium text-muted-foreground">Cleaning</div>
-							<div
-								className={`
-          text-2xl font-bold text-blue-600
-          dark:text-blue-400
-        `}
-							>
-								{data.summary.cleaning}
-							</div>
-						</div>
-						<div
-							className={`
-        rounded-lg border bg-card p-4 text-card-foreground shadow-sm
-      `}
-						>
-							<div className="text-sm font-medium text-muted-foreground">Errors</div>
-							<div
-								className={`
-          text-2xl font-bold text-red-600
-          dark:text-red-400
-        `}
-							>
-								{data.summary.errorCount}
-							</div>
-						</div>
+			{/* Feature Info (for demo purposes) */}
+			<div className="mb-4 rounded-lg border border-border bg-muted/50 p-4 text-sm">
+				<strong>Active Features (UI / Debounced):</strong>
+				<div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+					<div>
+						<span className="text-muted-foreground">Search:</span>{' '}
+						<span className="font-mono">
+							{search.fstate.query ? `${search.fstate.query} / ${debouncedSearchQuery}` : 'none'}
+						</span>
 					</div>
-
-					{/* Workspaces Table */}
-					<WorkspacesTable workspaces={data.workspaces} />
+					<div>
+						<span className="text-muted-foreground">Sort:</span>{' '}
+						<span className="font-mono">
+							{sorting.fstate.sortConfigs.map(c => `${c.key}:${c.direction}`).join(', ') || 'none'}
+						</span>
+					</div>
+					<div>
+						<span className="text-muted-foreground">Cache ID:</span>{' '}
+						<span className="font-mono">{cache.fstate.cacheId}</span>
+					</div>
 				</div>
-			)}
+			</div>
+
+			{/* Data + Table */}
+			<Data2
+				fetchData={fetchWorkspaces}
+				pagination={pagination}
+				sorting={sorting}
+				search={search}
+				cache={cache}
+				delegateLoadingToChildren={true}
+			>
+				<WorkspacesTable />
+			</Data2>
 		</Page>
 	);
 }

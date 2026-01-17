@@ -43,8 +43,6 @@ FlowExecutor.test.ts
 - Document in .claude/temp folder if needed
 - <crucial>Never kill processes you didn't create</crucial>
 - Ask user if requirements unclear (AskUserQuestion tool)
-  <IMPORTANT> Put your plan files in <projectRoot>.claude/plans folder, <CRITICAL> with relevant name</CRITICAL> and keep them updated (and NOT in ~/.claude !!!)</IMPORTANT>
-- Prefix the plan with the timestamp from skill "get-timestamp"
 
 ## Additional references (only consult when needed)
 

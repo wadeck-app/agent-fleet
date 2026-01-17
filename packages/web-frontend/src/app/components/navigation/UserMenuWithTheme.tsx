@@ -1,12 +1,23 @@
+import { useState } from 'react';
+
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
 	DropdownMenuSeparator,
+	DropdownMenuSub,
+	DropdownMenuSubContent,
+	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 } from '@framework/components/overlays/DropdownMenu';
 import { Button } from '@framework/components/primitives/Button';
-import { ChevronDown, LogOut, Moon, Settings, Sun, User } from 'lucide-react';
+import { ChevronDown, LogOut, Moon, Network, Settings, Sun, User } from 'lucide-react';
+
+import { useTransport } from '@/transport';
+
+import type { TransportMode } from '@app/components/connectivity/TransportModeSelector';
 
 interface UserMenuWithThemeProps {
 	userName?: string;
@@ -15,12 +26,37 @@ interface UserMenuWithThemeProps {
 	className?: string;
 }
 
+const TRANSPORT_MODES: Array<{ value: TransportMode; label: string }> = [
+	{ value: 'auto', label: 'Auto' },
+	{ value: 'websocket', label: 'WebSocket' },
+	{ value: 'sse', label: 'SSE' },
+	{ value: 'long-polling', label: 'Long Polling' },
+	{ value: 'http-polling', label: 'HTTP Polling' },
+];
+
 /**
  * User Menu with integrated Theme Toggle
  * Compact design with proper spacing and mobile-friendly sizes
  */
 export function UserMenuWithTheme({ userName = 'User', theme, onToggleTheme, className }: UserMenuWithThemeProps) {
 	const isDark = theme === 'dark';
+	const { switchTransport } = useTransport();
+
+	const [selectedMode, setSelectedMode] = useState<TransportMode>(() => {
+		const saved = localStorage.getItem('transport_mode') as TransportMode;
+		return saved || 'auto';
+	});
+
+	const handleTransportChange = async (value: string) => {
+		const mode = value as TransportMode;
+		setSelectedMode(mode);
+
+		try {
+			await switchTransport(mode);
+		} catch (error) {
+			console.error('[UserMenu] Failed to switch transport:', error);
+		}
+	};
 
 	return (
 		<DropdownMenu>
@@ -45,6 +81,22 @@ export function UserMenuWithTheme({ userName = 'User', theme, onToggleTheme, cla
 					<Settings className="size-4" />
 					Settings
 				</DropdownMenuItem>
+				<DropdownMenuSeparator />
+				<DropdownMenuSub>
+					<DropdownMenuSubTrigger>
+						<Network className="size-4" />
+						(Dev) Transport Mode
+					</DropdownMenuSubTrigger>
+					<DropdownMenuSubContent>
+						<DropdownMenuRadioGroup value={selectedMode} onValueChange={handleTransportChange}>
+							{TRANSPORT_MODES.map(mode => (
+								<DropdownMenuRadioItem key={mode.value} value={mode.value}>
+									{mode.label}
+								</DropdownMenuRadioItem>
+							))}
+						</DropdownMenuRadioGroup>
+					</DropdownMenuSubContent>
+				</DropdownMenuSub>
 				<DropdownMenuSeparator />
 				<DropdownMenuItem onClick={onToggleTheme} className="cursor-pointer">
 					{isDark ? (
@@ -79,6 +131,23 @@ export function UserMenuWithThemeMobile({
 	className,
 }: UserMenuWithThemeProps) {
 	const isDark = theme === 'dark';
+	const { switchTransport } = useTransport();
+
+	const [selectedMode, setSelectedMode] = useState<TransportMode>(() => {
+		const saved = localStorage.getItem('transport_mode') as TransportMode;
+		return saved || 'auto';
+	});
+
+	const handleTransportChange = async (value: string) => {
+		const mode = value as TransportMode;
+		setSelectedMode(mode);
+
+		try {
+			await switchTransport(mode);
+		} catch (error) {
+			console.error('[UserMenu] Failed to switch transport:', error);
+		}
+	};
 
 	return (
 		<DropdownMenu>
@@ -104,7 +173,34 @@ export function UserMenuWithThemeMobile({
 					Settings
 				</DropdownMenuItem>
 				<DropdownMenuSeparator />
-				<DropdownMenuItem onClick={onToggleTheme} className={`cursor-pointer py-3 text-base`}>
+				<DropdownMenuSub>
+					<DropdownMenuSubTrigger className="py-3 text-base">
+						<Network className="size-5" />
+						(Dev) Transport Mode
+					</DropdownMenuSubTrigger>
+					<DropdownMenuSubContent>
+						<DropdownMenuRadioGroup value={selectedMode} onValueChange={handleTransportChange}>
+							{TRANSPORT_MODES.map(mode => (
+								<DropdownMenuRadioItem
+									key={mode.value}
+									value={mode.value}
+									className={`
+          py-2 text-base
+        `}
+								>
+									{mode.label}
+								</DropdownMenuRadioItem>
+							))}
+						</DropdownMenuRadioGroup>
+					</DropdownMenuSubContent>
+				</DropdownMenuSub>
+				<DropdownMenuSeparator />
+				<DropdownMenuItem
+					onClick={onToggleTheme}
+					className={`
+      cursor-pointer py-3 text-base
+    `}
+				>
 					{isDark ? (
 						<>
 							<Sun className="size-5" />
@@ -118,7 +214,12 @@ export function UserMenuWithThemeMobile({
 					)}
 				</DropdownMenuItem>
 				<DropdownMenuSeparator />
-				<DropdownMenuItem variant="destructive" className={`cursor-pointer py-3 text-base`}>
+				<DropdownMenuItem
+					variant="destructive"
+					className={`
+      cursor-pointer py-3 text-base
+    `}
+				>
 					<LogOut className="size-5" />
 					Logout
 				</DropdownMenuItem>

@@ -74,6 +74,7 @@ describe('MockTransportClient', () => {
 					description: 'New task',
 					priority: 'medium',
 					assignedTo: { workerId: 'worker-1' },
+					projectId: 'default',
 				},
 			});
 

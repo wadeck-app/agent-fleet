@@ -16,16 +16,17 @@ import { DashboardPage } from '@app/pages/dashboard/DashboardPage';
 import { FlowEditorPage } from '@app/pages/flows/flow-editor/FlowEditorPage';
 import { Ingredients2Page } from '@app/pages/ingredients2/Ingredients2Page';
 import { Ingredients3GridPage } from '@app/pages/ingredients3/Ingredients3GridPage';
+import { Ingredients4CarouselPage as Ingredients4cCarouselPage } from '@app/pages/ingredients4c/Ingredients4CarouselPage';
 import { IngredientsPage } from '@app/pages/ingredients/IngredientsPage';
 import { InterventionDetailPage } from '@app/pages/interventions/InterventionDetailPage';
 import { InterventionsPage } from '@app/pages/interventions/InterventionsPage';
-import { TasksPage2 } from '@app/pages/tasks2/TasksPage2';
+import { ProjectsV2Page } from '@app/pages/projects2/ProjectsV2Page';
+import { ProjectBoardPage } from '@app/pages/projects/ProjectBoardPage';
+import { ProjectsPage } from '@app/pages/projects/ProjectsPage';
 import { TaskDetailSplitPage } from '@app/pages/tasks/TaskDetailSplitPage';
 import { TaskDetailStackedPage } from '@app/pages/tasks/TaskDetailStackedPage';
 import { TasksPage } from '@app/pages/tasks/TasksPage';
-import { WorkersPage2 } from '@app/pages/workers2/WorkersPage2';
 import { WorkersPage } from '@app/pages/workers/WorkersPage';
-import { WorkspacesPage2 } from '@app/pages/workspaces2/WorkspacesPage2';
 import { WorkspacesPage } from '@app/pages/workspaces/WorkspacesPage';
 
 import { circuitBreakerService } from './services';
@@ -52,16 +53,16 @@ function Layout() {
 					<Routes>
 						<Route path="/dashboard" element={<DashboardPage />} />
 						<Route path="/workers" element={<WorkersPage />} />
-						<Route path="/workers2" element={<WorkersPage2 />} />
 						<Route path="/tasks" element={<TasksPage />} />
-						<Route path="/tasks2" element={<TasksPage2 />} />
 						<Route path="/tasks/:id/logs-split" element={<TaskDetailSplitPage />} />
 						<Route path="/tasks/:id/logs-stacked" element={<TaskDetailStackedPage />} />
 						<Route path="/tasks/:id" element={<TaskDetailStackedPage />} />
+						<Route path="/projects" element={<ProjectsPage />} />
+						<Route path="/projects-v2" element={<ProjectsV2Page />} />
+						<Route path="/projects/:projectId/board" element={<ProjectBoardPage />} />
 						<Route path="/interventions" element={<InterventionsPage />} />
 						<Route path="/interventions/:interventionId" element={<InterventionDetailPage />} />
 						<Route path="/workspaces" element={<WorkspacesPage />} />
-						<Route path="/workspaces2" element={<WorkspacesPage2 />} />
 						<Route path="/ingredients" element={<IngredientsPage />} />
 						<Route path="/ingredients/:mode" element={<IngredientsPage />} />
 						<Route path="/ingredients/:id/:mode" element={<IngredientsPage />} />
@@ -71,6 +72,9 @@ function Layout() {
 						<Route path="/ingredients3" element={<Ingredients3GridPage />} />
 						<Route path="/ingredients3/:mode" element={<Ingredients3GridPage />} />
 						<Route path="/ingredients3/:id/:mode" element={<Ingredients3GridPage />} />
+						<Route path="/ingredients4c" element={<Ingredients4cCarouselPage />} />
+						<Route path="/ingredients4c/:mode" element={<Ingredients4cCarouselPage />} />
+						<Route path="/ingredients4c/:id/:mode" element={<Ingredients4cCarouselPage />} />
 						<Route path="/books" element={<BooksPage />} />
 						<Route path="/books/:mode" element={<BooksPage />} />
 						<Route path="/books/:id/:mode" element={<BooksPage />} />

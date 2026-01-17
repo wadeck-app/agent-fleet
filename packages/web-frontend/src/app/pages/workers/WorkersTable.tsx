@@ -1,144 +1,117 @@
+import { Table2, type Table2Column, type Table2Props } from '@framework/components2/table/Table2';
+import { EditableText } from '@framework/components/forms/EditableText';
 import { Badge } from '@framework/components/primitives/Badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
+import { useToast } from '@framework/features/toast/ToastContext';
+import type { MutationMethods } from '@framework/types/MutationContract';
 import type { Worker } from '@shared/api/workers.contract';
-import { Activity, AlertCircle, Circle } from 'lucide-react';
+
+import { workersService } from '@/app/pages/workers/WorkersService';
 
 /**
- * ===========================================================================================
- * WORKERS TABLE - Workers List Display
- * ===========================================================================================
- *
- * Displays:
- * - Worker ID
- * - Type
- * - Connection status (badge with icon)
- * - State (idle/busy with icon)
- * - Current task ID (if busy)
- *
- * Icons:
- * - Circle (connected status - green/red)
- * - Activity (busy state - orange)
- * - AlertCircle (idle state - blue)
- *
- * ===========================================================================================
+ * Workers table column definitions factory
+ * Creates columns with access to mutation methods and toast
  */
+function createWorkersColumns(
+	mutation?: MutationMethods<Worker>,
+	showToast?: (message: string, type: 'success' | 'error') => void
+): Table2Column<Worker>[] {
+	/**
+	 * Handle worker rename with optimistic update
+	 */
+	const handleRenameWorker = async (worker: Worker, newName: string) => {
+		try {
+			// Pass version for optimistic locking (1 for first rename when no metadata exists)
+			const version = worker.version ?? 1;
 
-export interface WorkersTableProps {
-	workers: Worker[];
+			// Call backend and get updated worker
+			const updatedWorker = await workersService.renameWorker(worker.workerId, newName, version);
+
+			// Immediately update cache with backend response (optimistic update)
+			mutation?.updateItem(updatedWorker);
+
+			console.log('[WorkersTable] Updated worker via mutation.updateItem:', updatedWorker.workerId);
+			// Real-time update via WebSocket (B2F_WORKER_UPDATED) will update other frontends
+
+			// Show success toast
+			showToast?.('Worker renamed successfully', 'success');
+		} catch (error) {
+			console.error('Failed to rename worker:', error);
+			throw error; // Re-throw to show error in EditableText
+		}
+	};
+
+	return [
+		{
+			key: 'workerId',
+			label: 'Worker ID',
+			render: (w: Worker) => <span className={`font-mono text-xs text-muted-foreground`}>{w.workerId}</span>,
+		},
+		{
+			key: 'name',
+			label: 'Name',
+			render: (w: Worker) => (
+				<EditableText
+					value={w.name}
+					placeholder="Set name..."
+					onSave={newName => handleRenameWorker(w, newName)}
+					maxLength={100}
+					displayClassName="text-sm font-medium"
+				/>
+			),
+		},
+		{
+			key: 'state',
+			label: 'State',
+			render: (w: Worker) => (
+				<Badge variant={w.state === 'busy' ? 'warning' : 'success'} className={`font-medium`}>
+					{w.state === 'busy' ? 'Busy' : 'Idle'}
+				</Badge>
+			),
+		},
+		{
+			key: 'connected',
+			label: 'Connection',
+			render: (w: Worker) => (
+				<Badge variant={w.connected ? 'success' : 'destructive'} className={`font-medium`}>
+					{w.connected ? 'Connected' : 'Disconnected'}
+				</Badge>
+			),
+		},
+		{
+			key: 'taskId',
+			label: 'Current Task',
+			render: (w: Worker) => <span className="text-sm">{w.taskId || '-'}</span>,
+			sortable: false,
+		},
+	];
 }
 
-export function WorkersTable({ workers }: WorkersTableProps) {
+export interface WorkersTableProps extends Partial<Table2Props<Worker>> {
+	// Add any custom props if needed
+}
+
+/**
+ * Workers table component using Table2
+ * Receives mutation methods from Data2 for optimistic updates
+ */
+export function WorkersTable(props: WorkersTableProps) {
+	const { showToast } = useToast();
+
+	// Create columns with mutation support and toast
+	const columns = createWorkersColumns(props.mutation, showToast);
+
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>Workers List</CardTitle>
-			</CardHeader>
-			<CardContent>
-				{workers.length === 0 ? (
-					<div className="py-8 text-center text-sm text-muted-foreground">No workers available</div>
-				) : (
-					<div className="overflow-x-auto">
-						<table className="w-full">
-							<thead>
-								<tr
-									className={`
-           border-b text-left text-sm font-medium text-muted-foreground
-         `}
-								>
-									<th className="pb-3">Worker ID</th>
-									<th className="pb-3">Connection</th>
-									<th className="pb-3">State</th>
-									<th className="pb-3">Current Task</th>
-								</tr>
-							</thead>
-							<tbody>
-								{workers.map(worker => (
-									<tr
-										key={worker.workerId}
-										className={`
-            border-b
-            last:border-b-0
-          `}
-									>
-										<td className="py-3">
-											<div className="flex items-center gap-2">
-												<Circle
-													className={`
-               size-2
-               ${
-					worker.connected
-						? `
-        fill-green-600 text-green-600
-        dark:fill-green-400 dark:text-green-400
-      `
-						: `
-        fill-red-600 text-red-600
-        dark:fill-red-400 dark:text-red-400
-      `
-				}
-             `}
-												/>
-												<span className="font-mono text-sm">{worker.workerId}</span>
-											</div>
-										</td>
-										<td className="py-3">
-											<Badge variant={worker.connected ? 'default' : 'destructive'}>
-												{worker.connected ? 'Connected' : 'Disconnected'}
-											</Badge>
-										</td>
-										<td className="py-3">
-											<div className="flex items-center gap-2">
-												{worker.state === 'busy' ? (
-													<>
-														<Activity
-															className={`
-                 size-4 text-orange-600
-                 dark:text-orange-400
-               `}
-														/>
-														<span
-															className={`
-                 text-sm font-medium text-orange-600
-                 dark:text-orange-400
-               `}
-														>
-															Busy
-														</span>
-													</>
-												) : (
-													<>
-														<AlertCircle
-															className={`
-                 size-4 text-blue-600
-                 dark:text-blue-400
-               `}
-														/>
-														<span
-															className={`
-                 text-sm font-medium text-blue-600
-                 dark:text-blue-400
-               `}
-														>
-															Idle
-														</span>
-													</>
-												)}
-											</div>
-										</td>
-										<td className="py-3">
-											{worker.taskId ? (
-												<span className="font-mono text-sm">{worker.taskId}</span>
-											) : (
-												<span className="text-sm text-muted-foreground">—</span>
-											)}
-										</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
-					</div>
-				)}
-			</CardContent>
-		</Card>
+		<Table2
+			columns={columns}
+			getItemId={(w: Worker) => w.workerId}
+			emptyMessage="No workers found."
+			data={props.data ?? []}
+			isLoading={props.isLoading ?? false}
+			error={props.error ?? null}
+			pagination={props.pagination}
+			sorting={props.sorting}
+			features={props.features}
+			refreshing={props.refreshing}
+		/>
 	);
 }

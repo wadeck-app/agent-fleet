@@ -568,7 +568,9 @@ async function start() {
 
 		// Initialize global factory for dependency injection
 		// This must be done BEFORE any controllers are loaded
-		const factory = initializeFactory('memory', orchestratorClient);
+		// Storage mode: 'memory' (in-memory, data lost on restart), 'file' (persistent JSON files), 'mariadb' (not yet implemented)
+		const storageMode = (process.env.STORAGE_MODE || 'file') as 'memory' | 'file' | 'mariadb';
+		const factory = initializeFactory(storageMode, orchestratorClient);
 
 		if (process.env.USE_PRODUCTION_DB === 'true') {
 			//TODO database integration

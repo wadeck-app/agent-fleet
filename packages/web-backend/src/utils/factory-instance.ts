@@ -22,7 +22,7 @@ let factoryInstance: DataStoreFactory | null = null;
  * Must be called once during server startup
  */
 export function initializeFactory(
-	storageMode: 'memory' | 'mariadb' = 'memory',
+	storageMode: 'memory' | 'file' | 'mariadb' = 'file',
 	orchestrator: Orchestrator
 ): DataStoreFactory {
 	if (factoryInstance) {

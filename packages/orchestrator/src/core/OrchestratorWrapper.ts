@@ -275,6 +275,50 @@ export class OrchestratorWrapper {
 		throw new Error('renameWorker not yet implemented for library mode');
 	}
 
+	/**
+	 * Get all interventions with optional filters
+	 */
+	async getInterventions(): Promise<any[]> {
+		const interventionManager = this.orchestrator.getInterventionManager();
+		if (!interventionManager) {
+			console.log('[OrchestratorWrapper] InterventionManager not available');
+			return [];
+		}
+		console.log('[OrchestratorWrapper] Fetching pending interventions from InterventionManager...');
+		const interventions = await interventionManager.getPendingInterventions();
+		console.log(`[OrchestratorWrapper] Got ${interventions.length} pending interventions`);
+		return interventions;
+	}
+
+	/**
+	 * Get single intervention by ID
+	 */
+	async getIntervention(interventionId: string): Promise<any | null> {
+		const interventionManager = this.orchestrator.getInterventionManager();
+		if (!interventionManager) {
+			return null;
+		}
+		return await interventionManager.getIntervention(interventionId);
+	}
+
+	/**
+	 * Respond to an intervention
+	 */
+	async respondToIntervention(
+		interventionId: string,
+		response: {
+			value: any;
+			answeredBy: string;
+			comment?: string;
+		}
+	): Promise<any> {
+		const interventionManager = this.orchestrator.getInterventionManager();
+		if (!interventionManager) {
+			throw new Error('InterventionManager not available');
+		}
+		return await interventionManager.respondToIntervention(interventionId, response);
+	}
+
 	// ===========================================================================================
 	// O→B EVENT SUBSCRIPTION (Direct EventEmitter integration)
 	// ===========================================================================================

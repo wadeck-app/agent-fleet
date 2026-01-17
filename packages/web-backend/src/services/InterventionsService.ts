@@ -82,9 +82,20 @@ export class InterventionsService {
 		try {
 			console.log(`[InterventionsService] Fetching intervention ${interventionId}...`);
 
-			// TODO: Get from orchestrator
-			const interventions = await this.fetchInterventionsFromOrchestrator();
-			return interventions.find(i => i.id === interventionId) || null;
+			// Get from orchestrator via repository
+			const rawIntervention = await this.orchestratorRepository.getIntervention(interventionId);
+			if (!rawIntervention) {
+				return null;
+			}
+
+			// Transform to match API contract (add missing BaseEntity fields)
+			const intervention: Intervention = {
+				...rawIntervention,
+				version: 1, // Interventions don't have versioning yet
+				updatedAt: rawIntervention.answeredAt || rawIntervention.createdAt, // Use answeredAt if available, else createdAt
+			};
+
+			return intervention;
 		} catch (error) {
 			console.error(`[InterventionsService] Error fetching intervention ${interventionId}:`, error);
 			throw error;
@@ -101,14 +112,19 @@ export class InterventionsService {
 		try {
 			console.log(`[InterventionsService] Responding to intervention ${interventionId}...`);
 
-			// TODO: Call orchestrator to submit response
-			// For now, just emit events
-			console.log(`[InterventionsService] Intervention ${interventionId} answered with:`, response);
+			// Call orchestrator to submit response
+			// Note: answeredBy should be set from authenticated user context (future enhancement)
+			await this.orchestratorRepository.respondToIntervention(interventionId, {
+				value: response.value,
+				answeredBy: 'web-user', // TODO: Get from authenticated user context
+				comment: response.comment,
+			});
+
+			console.log(`[InterventionsService] Intervention ${interventionId} answered successfully`);
 
 			// Emit events for real-time updates
 			try {
-				// TODO: Get actual intervention from orchestrator after update
-				// For now, fetch current state to broadcast
+				// Get updated intervention from orchestrator after update
 				const intervention = await this.getIntervention(interventionId);
 				if (intervention) {
 					await this.eventBroadcaster.broadcast(B2F_INTERVENTION_ANSWERED, intervention);
@@ -167,12 +183,24 @@ export class InterventionsService {
 
 	/**
 	 * Fetch interventions from orchestrator
-	 * TODO: Wire up with actual InterventionManager
 	 */
 	private async fetchInterventionsFromOrchestrator(query?: InterventionsQuery): Promise<Intervention[]> {
-		// For now, return empty array
-		// This will be wired up once Orchestrator has InterventionManager integrated
-		return [];
+		// Fetch from orchestrator via repository
+		const rawInterventions = await this.orchestratorRepository.getInterventions();
+
+		// Transform to match API contract (add missing BaseEntity fields)
+		const interventions: Intervention[] = rawInterventions.map(intervention => ({
+			...intervention,
+			version: 1, // Interventions don't have versioning yet
+			updatedAt: intervention.answeredAt || intervention.createdAt, // Use answeredAt if available, else createdAt
+		}));
+
+		// Filter by status if specified
+		if (query?.status) {
+			return interventions.filter(i => i.status === query.status);
+		}
+
+		return interventions;
 	}
 
 	/**
@@ -180,12 +208,12 @@ export class InterventionsService {
 	 */
 	async emitInterventionCreated(interventionId: string): Promise<void> {
 		try {
-			// TODO: Get actual intervention from orchestrator
+			// Get actual intervention from orchestrator (already transformed in getIntervention)
 			const intervention = await this.getIntervention(interventionId);
 			if (intervention) {
 				await this.eventBroadcaster.broadcast(B2F_INTERVENTION_CREATED, intervention);
 			}
-			// Broadcast updated list
+			// Broadcast updated list (already transformed in fetchInterventionsFromOrchestrator)
 			const allInterventions = await this.fetchInterventionsFromOrchestrator();
 			await this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, allInterventions);
 		} catch (error) {

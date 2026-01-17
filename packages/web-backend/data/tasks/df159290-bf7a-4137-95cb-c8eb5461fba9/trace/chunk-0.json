@@ -1,0 +1,25 @@
+{
+	"chunkIndex": 0,
+	"entries": [
+		{
+			"stepId": "prepare",
+			"stepName": "Prepare Data",
+			"stepType": "script",
+			"startTime": 1768429637979,
+			"retries": 0,
+			"script": "echo [prepare] Processing: asdf\nping localhost -n 2 >nul\necho [prepare] Data ready for review\necho data_hash=abc123\n",
+			"exitCode": 0,
+			"stdout": "[prepare] Processing: asdf\r\n[prepare] Data ready for review\r\ndata_hash=abc123",
+			"stderr": "",
+			"endTime": 1768429639004,
+			"durationMs": 1025,
+			"outputs": {
+				"exitCode": 0,
+				"stdout": "[prepare] Processing: asdf\r\n[prepare] Data ready for review\r\ndata_hash=abc123",
+				"stderr": "",
+				"success": true,
+				"data_hash": "abc123"
+			}
+		}
+	]
+}

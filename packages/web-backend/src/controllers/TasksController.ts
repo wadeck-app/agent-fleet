@@ -92,5 +92,13 @@ export default class TasksController implements LazyController<typeof TASKS_API_
 			await this.service.deleteTask(params.id);
 			return { success: true };
 		});
+
+		/**
+		 * PATCH /api/tasks/:id
+		 * Update task status
+		 */
+		add('PATCH', '/api/tasks/:id', async ({ params, body }) => {
+			return this.service.updateTaskStatus(params.id, body.status);
+		});
 	}
 }

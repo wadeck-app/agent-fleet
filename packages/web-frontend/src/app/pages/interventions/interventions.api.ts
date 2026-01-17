@@ -1,5 +1,7 @@
 import { createTypedFetch } from '@framework/api/api-base';
 import type {
+	BulkCancelRequest,
+	BulkCancelResponse,
 	Intervention,
 	InterventionResponseSubmit,
 	InterventionsListResponse,
@@ -43,6 +45,15 @@ export const interventionsApi = {
 	cancelIntervention: (id: string): Promise<SuccessResponse> => {
 		return typedFetch('POST', '/api/interventions/:id/cancel', {
 			params: { id },
+		});
+	},
+
+	/**
+	 * Bulk cancel multiple interventions
+	 */
+	bulkCancelInterventions: (ids: string[]): Promise<BulkCancelResponse> => {
+		return typedFetch('POST', '/api/interventions/bulk-cancel/', {
+			body: { ids },
 		});
 	},
 } as const;

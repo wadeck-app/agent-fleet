@@ -212,6 +212,51 @@ export class OrchestratorRepository {
 	}
 
 	/**
+	 * Update task status
+	 */
+	async updateTaskStatus(taskId: string, newStatus: string): Promise<Task> {
+		// Library mode - direct access via TaskManager
+		if (this.orchestratorWrapper) {
+			const orchestrator = this.orchestratorWrapper.getOrchestrator();
+			const taskManager = orchestrator.getTaskManager();
+
+			await taskManager.updateTaskStatus(taskId, newStatus as any);
+			const task = taskManager.getTask(taskId);
+
+			if (!task) {
+				throw new Error(`Task ${taskId} not found`);
+			}
+
+			return task;
+		}
+
+		// HTTP mode - call orchestrator REST API
+		if (!this.orchestratorUrl) {
+			throw new Error('OrchestratorRepository not properly configured');
+		}
+
+		try {
+			const response = await fetch(`${this.orchestratorUrl}/tasks/${taskId}/status`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ status: newStatus }),
+			});
+
+			if (!response.ok) {
+				throw new Error(`Orchestrator API returned ${response.status}: ${response.statusText}`);
+			}
+
+			return (await response.json()) as Task;
+		} catch (error) {
+			throw new Error(
+				`Failed to update task status: ${error instanceof Error ? error.message : 'Unknown error'}`
+			);
+		}
+	}
+
+	/**
 	 * Get all workspaces from orchestrator
 	 */
 	async getWorkspaces(): Promise<any[]> {
@@ -235,6 +280,55 @@ export class OrchestratorRepository {
 
 		// HTTP mode - not supported for now
 		throw new Error('HTTP mode for getWorkspace not yet implemented');
+	}
+
+	/**
+	 * Get all interventions from orchestrator
+	 */
+	async getInterventions(): Promise<any[]> {
+		// Library mode - direct access
+		if (this.orchestratorWrapper) {
+			console.log('[OrchestratorRepository] Fetching interventions from orchestrator...');
+			const interventions = await this.orchestratorWrapper.getInterventions();
+			console.log(`[OrchestratorRepository] Got ${interventions.length} interventions`);
+			return interventions;
+		}
+
+		// HTTP mode - not supported for now
+		throw new Error('HTTP mode for getInterventions not yet implemented');
+	}
+
+	/**
+	 * Get single intervention by ID
+	 */
+	async getIntervention(interventionId: string): Promise<any | null> {
+		// Library mode - direct access
+		if (this.orchestratorWrapper) {
+			return this.orchestratorWrapper.getIntervention(interventionId);
+		}
+
+		// HTTP mode - not supported for now
+		throw new Error('HTTP mode for getIntervention not yet implemented');
+	}
+
+	/**
+	 * Respond to an intervention
+	 */
+	async respondToIntervention(
+		interventionId: string,
+		response: {
+			value: any;
+			answeredBy: string;
+			comment?: string;
+		}
+	): Promise<any> {
+		// Library mode - direct access
+		if (this.orchestratorWrapper) {
+			return this.orchestratorWrapper.respondToIntervention(interventionId, response);
+		}
+
+		// HTTP mode - not supported
+		throw new Error('HTTP mode for respondToIntervention not yet implemented');
 	}
 
 	/**

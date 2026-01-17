@@ -5,6 +5,14 @@ import { defineRoutes } from '../route-builder';
 export const WorkspaceModeSchema = z.enum(['development', 'production', 'staging']);
 export const WorkspaceStatusSchema = z.enum(['active', 'locked', 'cleaning', 'error']);
 
+/**
+ * Workspace color schema - hex color string
+ */
+export const WorkspaceColorSchema = z
+	.string()
+	.regex(/^#[0-9A-Fa-f]{6}$/, 'Must be a valid hex color')
+	.optional();
+
 export const GitStatusSchema = z.object({
 	ahead: z.number(),
 	behind: z.number(),
@@ -25,6 +33,8 @@ export const WorkspaceSchema = z.object({
 	activeTasks: z.array(z.string()).optional(),
 	name: z.string().optional(),
 	description: z.string().optional(),
+	color: WorkspaceColorSchema,
+	projectId: z.string().optional(),
 });
 
 export const WorkspacesDataSchema = z.object({
@@ -41,6 +51,7 @@ export const WorkspacesDataSchema = z.object({
 
 export type WorkspaceMode = z.infer<typeof WorkspaceModeSchema>;
 export type WorkspaceStatus = z.infer<typeof WorkspaceStatusSchema>;
+export type WorkspaceColor = z.infer<typeof WorkspaceColorSchema>;
 export type GitStatus = z.infer<typeof GitStatusSchema>;
 export type Workspace = z.infer<typeof WorkspaceSchema>;
 export type WorkspacesData = z.infer<typeof WorkspacesDataSchema>;
@@ -86,6 +97,8 @@ export type WorkspacesListResponse = z.infer<typeof WorkspacesListResponseSchema
 export const UpdateWorkspaceDtoSchema = z.object({
 	name: z.string().optional(),
 	description: z.string().optional(),
+	color: z.string().optional(),
+	projectId: z.string().nullable().optional(),
 });
 
 export type UpdateWorkspaceDto = z.infer<typeof UpdateWorkspaceDtoSchema>;

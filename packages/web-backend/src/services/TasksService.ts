@@ -11,7 +11,7 @@ import type {
 	TasksQuery,
 } from '@app/shared/api/tasks.contract';
 import type { BulkDeleteResponse, FailedDeletion } from '@app/shared/common/api-helpers';
-import { B2F_TASKS_UPDATED, B2F_TASK_CREATED, B2F_TASK_DELETED } from '@app/shared/transport';
+import { B2F_TASKS_UPDATED, B2F_TASK_CREATED, B2F_TASK_DELETED, B2F_TASK_UPDATED } from '@app/shared/transport';
 
 import { TraceChunkStorage } from '../../../orchestrator/src/core/TraceChunkStorage';
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
@@ -260,11 +260,14 @@ export class TasksService {
 						error: task.flowResult.error,
 					}
 				: undefined,
+			// Project and workspace fields
+			projectId: task.projectId,
+			workspaceId: task.workspaceId,
 		}));
 	}
 
 	/**
-	 * Apply domain filters (status, workerId, priority, flowId)
+	 * Apply domain filters (status, workerId, priority, flowId, projectId, workspaceId)
 	 * Note: workerId and flowId use partial matching (contains) for better UX
 	 */
 	private applyFilters(tasks: Task[], query?: TasksQuery): Task[] {
@@ -290,6 +293,16 @@ export class TasksService {
 		// Filter by flowId if specified (partial match)
 		if (query?.flowId) {
 			filtered = filtered.filter(task => this.matchesPartialString(task.flowId, query.flowId));
+		}
+
+		// Filter by projectId if specified (exact match)
+		if (query?.projectId) {
+			filtered = filtered.filter(task => task.projectId === query.projectId);
+		}
+
+		// Filter by workspaceId if specified (exact match)
+		if (query?.workspaceId) {
+			filtered = filtered.filter(task => task.workspaceId === query.workspaceId);
 		}
 
 		return filtered;
@@ -382,6 +395,33 @@ export class TasksService {
 			totalDeleted: deleted.length,
 			totalFailed: failed.length,
 		};
+	}
+
+	/**
+	 * Update task status
+	 * 1. Update task status in orchestrator
+	 * 2. Emit 'b2f:task:updated' and 'b2f:tasks:updated' events
+	 */
+	async updateTaskStatus(taskId: string, newStatus: string): Promise<Task> {
+		try {
+			const task = await this.orchestratorRepository.updateTaskStatus(taskId, newStatus);
+
+			// Transform to frontend format
+			const transformedTask = this.transformTasks([task as any])[0];
+
+			// Emit events AFTER successful update
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			this.eventBroadcaster.broadcast(B2F_TASK_UPDATED, transformedTask as any);
+
+			// Emit aggregate event for dashboard/board updates
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
+
+			return transformedTask;
+		} catch (error) {
+			console.error('[TasksService] Failed to update task status:', error);
+			throw error;
+		}
 	}
 
 	/**

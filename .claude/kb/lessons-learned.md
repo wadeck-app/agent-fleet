@@ -999,6 +999,154 @@ grep -r "::-webkit-scrollbar" packages/web-frontend/src/**/*.css
 }
 ```
 
+---
+
+## Data2Infinite - Decorator Pattern for Infinite Scroll
+
+**Problem**: Implementing infinite scroll by duplicating Data2's feature composition logic manually (v4c before refactor) creates inconsistency, more code (~150 lines), and breaks the composability patterns established by Data2.
+
+**Root Cause**: Thinking that infinite scroll is fundamentally different from pagination, requiring a completely different implementation. In reality, infinite scroll is just pagination with data accumulation.
+
+**Wrong Approach** ❌:
+
+```typescript
+// Manual feature composition (duplicates Data2 logic)
+const fetchIngredients = useCallback(async (query: Record<string, unknown>) => {
+	const response = await ingredientsService.getIngredients({
+		page: query.page as number,
+		pageSize: query.pageSize as number,
+		sortBy: query.sortBy as string | undefined,
+		sortOrder: query.sortOrder as 'asc' | 'desc' | undefined,
+		search: query.search as string | undefined,
+	});
+	return { items: response.items, pagination: ... };
+}, []);
+
+// Custom infinite scroll hook (reimplements Data2 fetch logic)
+const { data, isLoading, hasMore, reset } = useInfiniteCarousel({
+	fetchFn: fetchIngredients,
+	pageSize: PAGE_SIZE,
+	sortBy: sorting.fstate.sortConfigs[0]?.key,
+	sortOrder: sorting.fstate.sortConfigs[0]?.direction,
+	search: searchQuery,
+	emblaApi: carousel.fstate.emblaApi,
+	triggerThreshold: 0.85,
+});
+
+// Manual props passing (16+ props)
+<IngredientCarousel4c
+	data={data}
+	isLoading={isLoading}
+	hasMore={hasMore}
+	sorting={sorting}
+	searchQuery={searchQuery}
+	// ... 11 more props
+/>
+```
+
+**Correct Solution - Decorator Pattern** ✅:
+
+```typescript
+// Data2Infinite.tsx - Wraps Data2 without modifying it
+export function Data2Infinite({ infinitePagination, deduplicateBy, children, ...data2Props }) {
+	const paginationAdapter = useMemo(
+		() => ({
+			fstate: { page: infinitePagination.fstate.currentPage, pageSize: infinitePagination.fstate.pageSize },
+			actions: { setPage: infinitePagination.actions.loadNext, ... },
+			fillQuery: infinitePagination.fillQuery,
+		}),
+		[infinitePagination]
+	);
+
+	return (
+		<Data2 {...data2Props} pagination={paginationAdapter}>
+			{props => {
+				// DECORATOR: Accumulate data before passing to children
+				const accumulatedState = useDataAccumulator(props, { enabled: true, deduplicateBy });
+				return children({ ...props, data: accumulatedState.data });
+			}}
+		</Data2>
+	);
+}
+
+// useDataAccumulator.ts - Pure transformation decorator
+export function useDataAccumulator(dataState, options) {
+	const [accumulated, setAccumulated] = useState([]);
+
+	useEffect(() => {
+		if (dataState.data.length < prevData.length) {
+			setAccumulated(dataState.data); // Reset detected
+		} else if (dataState.data !== prevData) {
+			setAccumulated(prev => {
+				if (deduplicateBy) {
+					const seen = new Set(prev.map(deduplicateBy));
+					const unique = dataState.data.filter(item => !seen.has(deduplicateBy(item)));
+					return [...prev, ...unique];
+				}
+				return [...prev, ...dataState.data];
+			});
+		}
+	}, [dataState.data]);
+
+	return { ...dataState, data: accumulated };
+}
+```
+
+**Key Architecture Principles**:
+
+1. **Decorator Pattern**: Wrap Data2 instead of modifying it (zero changes to Data2 core)
+2. **Adapter Pattern**: Convert infinite pagination to regular pagination contract
+3. **Separation of Concerns**: Data2 handles fetching, useDataAccumulator handles accumulation
+4. **Composability**: Can stack multiple decorators (cache, throttle, filter)
+
+**Benefits**:
+
+- ✅ Zero modifications to Data2 or useDataFetch (100% backwards compatible)
+- ✅ Reuses ALL Data2 features (sorting, search, selection, filtering)
+- ✅ ~150 lines less code in pages (30-40% reduction)
+- ✅ Architectural consistency with v2/v3 table/grid pages
+- ✅ Easy to add more decorators later (caching, throttling)
+
+**Usage Example**:
+
+```typescript
+const infinitePagination = useInfinitePagination({ pageSize: 12, hasMore: true });
+const search = useMemo(() => ({
+	fstate: { query: searchQuery },
+	actions: { setQuery: setSearchQuery, clearQuery: () => setSearchQuery('') },
+	fillQuery: (q) => { if (searchQuery) q.search = searchQuery; },
+}), [searchQuery]);
+
+<Data2Infinite
+	fetchData={fetchIngredients}
+	infinitePagination={infinitePagination}
+	sorting={sorting}
+	search={search}
+	selection={selection}
+	deduplicateBy={item => item.id}
+>
+	{props => <IngredientCarousel data={props.data} isLoading={props.isLoading} {...props} />}
+</Data2Infinite>
+```
+
+**Antifragility Test**: Adding a new feature (e.g., filtering)
+
+- **Before (v4c manual)**: Modify fetchIngredients, add filter to useInfiniteCarousel options, pass filter prop to component (3 changes)
+- **After (Data2Infinite)**: Add `filter={myFilter}` to Data2Infinite (1 change, automatic composition)
+
+**Files Affected** (January 2025):
+
+- Created: `packages/web-frontend/src/framework/components2/data/Data2Infinite.tsx`
+- Created: `packages/web-frontend/src/framework/hooks2/useDataAccumulator.ts`
+- Created: `packages/web-frontend/src/framework/hooks2/useInfinitePagination.ts`
+- Refactored: `packages/web-frontend/src/app/pages/ingredients4c/Ingredients4CarouselPage.tsx` (reduced from 499 to ~350 lines)
+
+**When Discovered**: January 17, 2025 - User questioned why v4c didn't use Data2 when it had all the same features (sorting, search, selection). Analysis revealed that v4c was manually reimplementing Data2's composition logic, which was an architectural regression. Refactoring to decorator pattern restored consistency and reduced code significantly.
+
+**Related Pattern**: This is similar to React's composition patterns - prefer composition over inheritance, use render props for flexible children, wrap instead of modify.
+
+**Prevention**: When implementing a new data display pattern, ALWAYS check if existing data composition tools (like Data2) can be extended rather than reimplemented. If Data2 can't handle it directly, ask: "Can I wrap/decorate Data2 instead of rebuilding its logic?"
+
 **Key Principles**:
 
 1. **Global first**: Check if functionality exists globally before adding utilities
@@ -1922,3 +2070,508 @@ output:
 **Engineering Principle**: **No magic. Everything explicit.** If you can't tell from reading the YAML where a value comes from, it's wrong. The `from` field makes it impossible to have implicit/magical mappings.
 
 **When Discovered**: January 2, 2025 - Immediately after fixing the parser issue, user correctly identified that outputs without source specification are invalid: "Ces outputs n'ont pas été changé... comment tu comptes mapper le 'approved'? il vient d'ou ? tu le sais PAS, donc invalide !". User rejected implicit/automatic outputs as "C'EST DE LA MAGIE".
+
+---
+
+## Carousel Implementation - Headless Composable Pattern with Embla
+
+**Problem**: Need to create a carousel-based view for ingredients that follows the same composable architecture as table/grid views (v2/v3), while integrating a third-party carousel library (Embla).
+
+**Solution**: Treat carousel as a **feature hook** following the FeatureContract pattern, just like pagination, sorting, or search.
+
+**Key Design Decision**: Carousel state management is UI-only and doesn't affect backend queries.
+
+**Implementation Pattern**:
+
+```typescript
+// 1. Create feature hook following FeatureContract
+export function useCarousel(options: UseCarouselOptions): CarouselContract {
+	const [emblaRef, emblaApi] = useEmblaCarousel({ ... });
+	// Wrap Embla API with consistent fstate/actions/fillQuery interface
+	return { fstate, actions, fillQuery: () => {} }; // fillQuery is no-op
+}
+
+// 2. Compose with other features in page component
+const pagination = usePagination2({ pageSize: 3 });
+const sorting = useSorting2({ ... });
+const search = useSimpleSearch({ ... });
+const carousel = useCarousel({ itemsPerView: pagination.fstate.pageSize });
+
+// 3. Pass to Data2 shell (carousel not passed to Data2, only to displayer)
+<Data2 pagination={pagination} sorting={sorting} search={search}>
+  {props => <IngredientCarousel4 {...props} carousel={carousel} />}
+</Data2>
+```
+
+**Why This Works**:
+
+- **Separation of Concerns**: Carousel handles presentation (scrolling), pagination handles data fetching (pages)
+- **Composability**: Carousel can be reused in any page, not just ingredients
+- **Consistency**: Follows same pattern as other features (pagination, sorting, etc.)
+- **No Backend Impact**: Carousel state is purely UI - doesn't affect API queries
+
+**Common Pitfall**: Trying to merge carousel navigation with pagination. These are **separate concerns**:
+
+- **Pagination**: Fetches data in pages (e.g., page 1 with 3 items)
+- **Carousel**: Displays current page's items with scrolling UI
+
+**Files Created**:
+
+- `packages/web-frontend/src/app/pages/ingredients4/useCarousel.ts` - Feature hook
+- `packages/web-frontend/src/app/pages/ingredients4/IngredientCarousel4.tsx` - Displayer
+- `packages/web-frontend/src/app/pages/ingredients4/IngredientCard4.tsx` - Card component
+- `packages/web-frontend/src/app/pages/ingredients4/Ingredients4CarouselPage.tsx` - Orchestrator
+
+**Reusable Components**:
+
+- useCarousel hook can be extracted to `@framework/hooks2/` for framework-level reuse
+- Pattern works for any carousel need (books, tasks, etc.)
+
+**TypeScript Clean**: All new files passed type checking with no errors.
+
+**When Discovered**: January 13, 2026 - User requested carousel view to explore composability patterns and create "antifragile" components that can handle new use cases without breaking.
+
+---
+
+## Fix Root Causes, Not Symptoms - And Actually Apply Lessons Learned
+
+**Problem**: When encountering bugs, tendency to apply quick fixes that mask symptoms instead of analyzing and fixing the root cause. Additionally, saying "I understand" or "I'll integrate this feedback" without actually following through by updating documentation.
+
+**Example Case - Carousel Display Bug**:
+
+User reported seeing "Slide 15 / 10" in carousel display after scrolling. This was the symptom.
+
+**Wrong Approach** ❌:
+
+```typescript
+// First attempt - treating the symptom
+const onSelect = () => {
+	setCurrentIndex(emblaApi.selectedScrollSnap());
+	setCanScrollPrev(emblaApi.canScrollPrev());
+	setCanScrollNext(emblaApi.canScrollNext());
+	setScrollSnaps(emblaApi.scrollSnapList()); // ❌ Recalculate on EVERY scroll!
+};
+```
+
+User challenge: "tu penses que c'est une bonne solution que le 'max' soit recalculé après le scroll ?"
+
+**Root Cause Analysis** ✅:
+
+The real issue wasn't that scrollSnaps needed updating - it was that we were using the WRONG data source for display:
+
+- `scrollSnaps.length` = number of snap points (UI metric for dot indicators)
+- `ingredients.length` = actual number of items accumulated (correct data source)
+
+**Correct Fix** ✅:
+
+```typescript
+// In display
+<span>Slide {carousel.fstate.currentIndex + 1} / {ingredients.length}</span>
+// Use ingredients.length (data count), not scrollSnaps.length (UI metric)
+
+// In useCarousel - NO recalculation on scroll
+const onSelect = () => {
+  setCurrentIndex(emblaApi.selectedScrollSnap());
+  setCanScrollPrev(emblaApi.canScrollPrev());
+  setCanScrollNext(emblaApi.canScrollNext());
+  // scrollSnaps calculated once on init, not on every scroll
+};
+```
+
+**Key Principles**:
+
+1. **Identify the root cause**: Why is this happening? What's the actual problem?
+2. **Question quick fixes**: If a fix feels like a workaround, it probably is
+3. **Analyze data sources**: Are you using the right metric for what you're displaying?
+4. **Performance matters**: Recalculating on every event is often a red flag
+5. **Think before declaring "fixed"**: Analyze the solution thoroughly before saying it's correct
+
+**The Meta-Lesson - Following Through**:
+
+When I said "J'ai bien compris. Je vais intégrer ce feedback dans ma façon de travailler", the user correctly challenged: "comment tu l'as intégré ? Je suis curieux, car je ne t'ai pas vu modifier lessons_learned"
+
+**Critical Mistake Pattern**:
+
+- Say "I understand" → Don't update documentation
+- Say "I'll integrate this" → Don't actually integrate it
+- Declare something "correct" → Haven't analyzed it thoroughly
+- User has to point out the pattern → Repeat the same mistake in the next message
+
+**What "Integrating Feedback" Actually Means**:
+
+1. ✅ **Update documentation** - Add lesson to lessons-learned.md IMMEDIATELY
+2. ✅ **Apply the principle** - Use it in your next action, not just acknowledge it
+3. ✅ **Verify before declaring** - Analyze thoroughly before saying "it's fixed" or "it's correct"
+4. ✅ **Be proactive** - Reflect on solutions yourself instead of waiting for user to question them
+
+**Questions to Ask Yourself Before Declaring Something Fixed**:
+
+- Have I identified the root cause, or just masked the symptom?
+- Is this using the correct data source for what I'm displaying?
+- Does this solution make semantic sense, or is it a hack?
+- Would this work with edge cases (e.g., 72+ items, 108+ items)?
+- Have I analyzed this thoroughly, or am I just guessing it's correct?
+- If I said "I'll integrate this lesson" - have I actually updated lessons-learned.md?
+
+**When Discovered**: January 14, 2026 - During infinite scroll carousel implementation. User had to repeatedly challenge my approach: first the symptom-treating fix, then my failure to actually apply the lesson I said I learned. User quote: "et le message qui suit, tu dis deja que tu n'as pas appliqué ta lecon, c'est fou"
+
+**Remember**: "I understand" without action is meaningless. "It's fixed" without analysis is dishonest. Think critically, fix root causes, and follow through on commitments to update documentation.
+
+---
+
+## Always Design for User Experience, Not Technical Metrics
+
+**Problem**: Displaying technical metrics that are correct from an implementation perspective but confusing or misleading from a user's perspective. Failing to ask "What does the user actually see and understand?"
+
+**Example Case - Carousel Item Count Display**:
+
+User viewing a carousel with 3 items visible at once, out of 25 total items.
+
+**Three Progressive Failures** ❌:
+
+1. **First attempt**: "Slide 15 / 10"
+    - Technical issue: Using `scrollSnaps.length` (UI metric) instead of actual data count
+    - User confusion: "I see item 15 but max is 10?"
+
+2. **Second attempt**: "Slide 1 / 12"
+    - Technical issue: Using `ingredients.length` (loaded items) instead of `totalItems` (full dataset)
+    - User confusion: "Why does it say 12 when I know there are 25 ingredients?"
+    - User quote: "Ca doit être la taille complète du dataset !!!! pense à l'utilisatuer"
+
+3. **Third attempt**: "Slide 23 / 25"
+    - Technical issue: Showing position of first visible item, ignoring that 3 items are visible simultaneously
+    - User confusion: "I'm looking at items 23, 24, and 25 right now, why does it say 23/25?"
+    - User quote: "c'est normal d'afficher 23/25 lorsque je suis sur la derniere slide j'imagine ? vu qu'il y a 3 slides à l'écran"
+
+**Correct Solution** ✅:
+
+```typescript
+// Show the RANGE of items currently visible
+<span>
+  Viewing: {currentIndex + 1}-{Math.min(currentIndex + itemsPerView, totalItems)} of {totalItems}
+</span>
+
+// Examples:
+// - At start: "Viewing: 1-3 of 25"
+// - At end: "Viewing: 23-25 of 25"
+// - In middle: "Viewing: 10-12 of 25"
+```
+
+**Key Principles**:
+
+1. **Think from user's perspective**: What does the user ACTUALLY see on screen?
+2. **Match visual reality**: If 3 items are visible, show a range of 3 items
+3. **Use meaningful totals**: Show full dataset size, not cached/loaded subset
+4. **Question technical metrics**: Just because a value is "correct" technically doesn't mean it's useful to users
+5. **Ask "So what?"**: Would a user understand this number? Does it help them?
+
+**Questions to Ask Before Displaying Any Metric**:
+
+- What is the user actually seeing on their screen right now?
+- Does this number reflect their visual experience?
+- Is this number actionable or just confusing?
+- Am I displaying a technical implementation detail instead of user-facing information?
+- Would my mom understand what this number means?
+
+**Common UX Mistakes**:
+
+- ❌ Displaying internal indices (0-based) instead of user counts (1-based)
+- ❌ Showing cached/loaded counts instead of total available counts
+- ❌ Displaying single positions when multiple items are visible
+- ❌ Using technical terminology ("scrollSnaps", "pageSize") in user-facing text
+- ❌ Showing implementation details that users don't care about
+- ✅ Always ask: "If I were the user, would this make sense?"
+
+**Impact**:
+
+User experience is not optional or a "nice to have" - it's fundamental. A technically correct display that confuses users is a bug, not a feature. Users don't care about your implementation details; they care about understanding what they're looking at.
+
+**When Discovered**: January 14, 2026 - Three consecutive failures on the same carousel component, each technically "correct" but failing to consider user experience. User had to correct each one. User quote: "ca semble tellement évident mias tu ne l'as pas fait 3x de suite"
+
+**Remember**: Always put yourself in the user's shoes. If a metric doesn't make sense from their perspective, it's wrong - even if it's technically accurate. User experience isn't about displaying data correctly; it's about displaying data **meaningfully**.
+
+---
+
+## BaseEntitySchema Required Fields for API Contracts
+
+**Problem**: When fetching data from orchestrator (InterventionManager, TaskManager, etc.) and returning it via API endpoints, you get a 400 Bad Request error even though the data exists.
+
+**Root Cause**: API contracts in `packages/shared-frontend-backend/src/api/*.contract.ts` extend `BaseEntitySchema` which requires:
+
+- `id: string` ✅
+- `version: number` ❌ (orchestrator entities don't have this)
+- `createdAt: string` ✅
+- `updatedAt: string` ❌ (orchestrator entities don't have this)
+
+Orchestrator entities typically only have `id` and `createdAt`, missing `version` and `updatedAt`.
+
+**Solution**: Transform orchestrator data in the Service layer before returning:
+
+```typescript
+private async fetchInterventionsFromOrchestrator(query?: InterventionsQuery): Promise<Intervention[]> {
+    const rawInterventions = await this.orchestratorRepository.getInterventions();
+
+    // Transform to match API contract (add missing BaseEntity fields)
+    const interventions: Intervention[] = rawInterventions.map(intervention => ({
+        ...intervention,
+        version: 1, // Interventions don't have versioning yet
+        updatedAt: intervention.answeredAt || intervention.createdAt,
+    }));
+
+    return interventions;
+}
+```
+
+**When discovered**: January 2026 during interventions feature implementation. Backend logs showed 400 errors with `[InterventionsService] Found 9 interventions` but frontend received nothing.
+
+**Related files**:
+
+- `packages/shared-frontend-backend/src/common/base-entity.ts` - BaseEntitySchema definition
+- `packages/web-backend/src/services/InterventionsService.ts` - Example transformation
+- `packages/orchestrator/src/core/InterventionManager.ts` - Source data structure
+
+**Key Insight**: Always check Zod schema validation when orchestrator data doesn't appear in frontend. The 400 status code indicates schema validation failure, not missing data.
+
+---
+
+## Never Use Native Browser Dialogs (window.alert/confirm/prompt)
+
+**Problem**: Native browser dialogs (`window.alert()`, `window.confirm()`, `window.prompt()`) look unprofessional, block the entire browser, and break the app's visual consistency.
+
+**Wrong Approach** ❌:
+
+```typescript
+// DON'T: Native alert
+alert('Approved!');
+alert('Failed to submit response');
+
+// DON'T: Native confirm
+if (window.confirm('Are you sure?')) {
+	deleteItem();
+}
+```
+
+**Correct Approach** ✅:
+
+```typescript
+// DO: Use toast for feedback messages
+import { useToast } from '@framework/features/toast/ToastContext';
+
+const { showToast } = useToast();
+showToast('Intervention approved successfully', 'success');
+showToast('Failed to submit response. Please try again.', 'error');
+
+// DO: Use AlertDialogWrapper for confirmations
+import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
+
+<AlertDialogWrapper
+  open={confirmationOpen}
+  onOpenChange={setConfirmationOpen}
+  title="Delete Task"
+  description="Are you sure you want to delete this task? This action cannot be undone."
+  confirmLabel="Delete"
+  cancelLabel="Cancel"
+  variant="danger"
+  onConfirm={handleDelete}
+/>
+```
+
+**Benefits**:
+
+- ✅ Professional appearance matching app design
+- ✅ Non-blocking (users can interact with the page)
+- ✅ Accessible (keyboard navigation, screen readers)
+- ✅ Customizable (colors, sizes, variants)
+- ✅ Animations and transitions
+- ✅ Mobile-friendly
+
+**When discovered**: January 2026 during interventions feature. User noticed native `alert()` popup instead of professional toast after approving an intervention.
+
+**Related files**:
+
+- `packages/web-frontend/src/framework/features/toast/ToastContext.tsx` - Toast system
+- `packages/web-frontend/src/framework/components/overlays/AlertDialogWrapper.tsx` - Alert dialog component
+- `packages/web-frontend/src/app/pages/interventions/InterventionDetailPage.tsx` - Example fix
+
+**Quick Reference**:
+
+| Use Case            | Component          | Example                          |
+| ------------------- | ------------------ | -------------------------------- |
+| Success feedback    | Toast              | `showToast('Saved!', 'success')` |
+| Error feedback      | Toast              | `showToast('Failed', 'error')`   |
+| Confirmation dialog | AlertDialogWrapper | Delete, dangerous actions        |
+| Info message        | Toast              | `showToast('Info', 'info')`      |
+
+---
+
+## Temporary File Cleanup (2026-01-17)
+
+**Issue**: Claude Code bug creates `tmpclaude-XXXX-cwd` files throughout project where XXXX are 4 hexadecimal characters.
+
+**Solution**: Added automatic cleanup to `.claude/scripts/Stop.js` hook that runs when sessions stop.
+
+**Implementation**:
+
+- Pattern validation: `/^tmpclaude-[0-9a-f]{4}-cwd$/i`
+- Recursive directory scan from project root
+- Multi-layer safety checks (path validation, size limits)
+- Non-blocking error handling
+- Comprehensive logging to Stop.txt
+
+**Safety Measures**:
+
+- Only deletes files matching exact pattern
+- Verifies files are within project directory
+- Skips files larger than 1KB
+- Individual file errors don't stop cleanup
+- Cleanup errors don't prevent agent stop
+
+**Related files**:
+
+- `.claude/scripts/Stop.js` - Main file with cleanup logic
+- `.gitignore` - Pattern added to prevent git tracking temporary files
+
+---
+
+## React useEffect Infinite Loops - Stabilize Array and Object Dependencies
+
+**Problem**: When using arrays or objects as dependencies in useEffect hooks, passing them inline creates new references on every render, causing infinite loops of mount/unmount/remount cycles. This manifests as continuous subscription/unsubscription logs in backend servers.
+
+**Root Cause**: Arrays and objects created inline (`[item1, item2]` or `{ key: value }`) get new references on every component render, even if their contents are identical. When these are used in useEffect dependency arrays (either directly or via spread `...array`), the effect re-runs infinitely.
+
+**Symptoms**:
+
+- Backend logs show continuous subscribe/unsubscribe patterns
+- Component mounts and unmounts repeatedly
+- Network requests fire continuously
+- Performance degradation
+
+**Wrong Approach** ❌:
+
+```typescript
+// useRealtimeRefresh.ts
+export function useRealtimeRefresh({ events, onEvent, filters }) {
+	useEffect(() => {
+		// Subscribe to events
+		const unsubscribers = events.map(event => transport.subscribe(event, onEvent, filters));
+		return () => unsubscribers.forEach(unsub => unsub());
+	}, [transport, onEvent, filters, ...events]); // ← Spreading array creates individual deps
+}
+
+// ProjectsPage.tsx
+useRealtimeRefresh({
+	events: [B2F_PROJECT_CREATED, B2F_PROJECT_UPDATED], // ← New array every render
+	onEvent: cache.actions.refresh,
+	filters: { projectId: '123' }, // ← New object every render
+});
+```
+
+**Why This Fails**:
+
+1. `events` array is created inline in component → new reference every render
+2. `...events` spreads the array into dependency array → compares references, not contents
+3. useEffect sees different references → re-runs effect
+4. Effect unsubscribes and resubscribes → infinite loop
+
+**Correct Approach** ✅:
+
+Use **refs for callbacks** and **stringified keys for arrays/objects**:
+
+```typescript
+// useRealtimeRefresh.ts
+export function useRealtimeRefresh({ events, onEvent, filters }) {
+	// Store callback in ref - always use latest without re-subscribing
+	const onEventRef = useRef(onEvent);
+	onEventRef.current = onEvent;
+
+	// Stabilize arrays/objects using stringified comparison
+	const eventsKey = useMemo(() => JSON.stringify(events), [events]);
+	const filtersKey = useMemo(() => (filters ? JSON.stringify(filters) : null), [filters]);
+
+	useEffect(() => {
+		// Subscribe using events/filters directly (captured via closure)
+		const unsubscribers = events.map(event =>
+			transport.subscribe(
+				event,
+				data => onEventRef.current(), // ← Use ref
+				filters
+			)
+		);
+		return () => unsubscribers.forEach(unsub => unsub());
+		// Depend on stringified keys, not raw arrays/objects
+	}, [transport, eventsKey, filtersKey]);
+}
+```
+
+**Key Principles**:
+
+1. **Use refs for callbacks**: Callbacks that change reference shouldn't trigger re-subscription
+
+    ```typescript
+    const callbackRef = useRef(callback);
+    callbackRef.current = callback; // Always latest
+    // In effect: callbackRef.current()
+    ```
+
+2. **Stringify arrays/objects**: Compare contents, not references
+
+    ```typescript
+    const arrayKey = useMemo(() => JSON.stringify(array), [array]);
+    // Depend on arrayKey instead of array
+    ```
+
+3. **Understand what should trigger effects**:
+    - ✅ Actual data changes (array contents, filter values)
+    - ✅ Feature toggles (enabled/disabled)
+    - ✅ Core dependencies (transport instance)
+    - ❌ Callback reference changes (use refs)
+    - ❌ Array/object reference changes (use stringified keys)
+
+**Alternative Solutions**:
+
+1. **Memoize in caller** (if you control the component):
+
+    ```typescript
+    const events = useMemo(() => [B2F_PROJECT_CREATED, B2F_PROJECT_UPDATED], []);
+    useRealtimeRefresh({ events, onEvent });
+    ```
+
+2. **Define outside component** (for constant arrays):
+
+    ```typescript
+    const PROJECT_EVENTS = [B2F_PROJECT_CREATED, B2F_PROJECT_UPDATED];
+
+    function Component() {
+    	useRealtimeRefresh({ events: PROJECT_EVENTS, onEvent });
+    }
+    ```
+
+3. **Custom deep comparison** (for complex objects):
+
+    ```typescript
+    import { useDeepCompareEffect } from 'use-deep-compare';
+
+    // Note: More expensive, use stringified keys for simple cases
+    ```
+
+**Impact**: This pattern affected 12 pages using `useRealtimeRefresh` hook:
+
+- ProjectsPage
+- ProjectsV2Page
+- WorkspacesPage
+- TasksPage
+- InterventionsPage
+- WorkersPage
+- DashboardPage
+- And 5 more...
+
+**Files Modified**:
+
+- `packages/web-frontend/src/hooks/useRealtimeRefresh.ts` - Fixed infinite loop by using refs for callbacks and stringified keys for arrays/filters
+
+**When Discovered**: January 17, 2026. User reported subscription/unsubscription logs repeating infinitely in backend. Root cause: spreading `...events` in useEffect dependencies combined with inline array creation in all pages using the hook.
+
+**Related Patterns**:
+
+- See "React useEffect Dependencies - Query URL as Source of Truth" for similar pattern with query objects
+- See "React Hook Polling Pattern" for general useEffect dependency best practices

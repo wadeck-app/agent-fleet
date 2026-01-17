@@ -50,6 +50,9 @@ tmp/
 temp/
 *.tmp
 
+# Claude temporary files
+tmpclaude-*-cwd
+
 # OS
 Thumbs.db
 

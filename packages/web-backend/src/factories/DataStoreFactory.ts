@@ -6,6 +6,7 @@ import { getOrchestratorRestUrl } from 'shared-common/PortCalculator';
 // import type { Ingredient } from 'shared-frontend-backend/src/api/ingredients.contract';
 import type { Book } from '@app/shared/api/books.contract';
 import type { Ingredient } from '@app/shared/api/ingredients.contract';
+import type { Project } from '@app/shared/api/projects.contract';
 
 import type { AuthService } from '../auth/AuthService';
 import { MockAuthService } from '../auth/MockAuthService';
@@ -13,6 +14,7 @@ import { BaseRepository } from '../repositories/BaseRepository';
 import { BooksRepository } from '../repositories/BooksRepository';
 import { IngredientsRepository } from '../repositories/IngredientsRepository';
 import { OrchestratorRepository } from '../repositories/OrchestratorRepository';
+import { ProjectsRepository } from '../repositories/ProjectsRepository';
 import { type WorkerMetadata, WorkersRepository } from '../repositories/WorkersRepository';
 import { WorkspaceMetadataRepository } from '../repositories/WorkspaceMetadataRepository';
 import { BooksService } from '../services/BooksService';
@@ -20,11 +22,13 @@ import { DashboardService } from '../services/DashboardService';
 import { FlowsService } from '../services/FlowsService';
 import { IngredientsService } from '../services/IngredientsService';
 import { InterventionsService } from '../services/InterventionsService';
+import { ProjectsService } from '../services/ProjectsService';
 import { TasksService } from '../services/TasksService';
 import { WorkersService } from '../services/WorkersService';
 import { WorkspaceMetadataFile } from '../services/WorkspaceMetadataFile';
 import { WorkspacesService } from '../services/WorkspacesService';
 import type { DataStorage } from '../storage/DataStorage';
+import { FileBasedStorage } from '../storage/FileBasedStorage';
 import { InMemoryStorage } from '../storage/InMemoryStorage';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 import type { ITransportServer } from '../transport/ITransportServer';
@@ -58,6 +62,7 @@ export class DataStoreFactory {
 	private flowsService?: FlowsService;
 	private tasksService?: TasksService;
 	private workspacesService?: WorkspacesService;
+	private projectsService?: ProjectsService;
 	private interventionsService?: InterventionsService;
 	private authService?: AuthService;
 	private sessionManager?: TransportSessionManager;
@@ -68,10 +73,15 @@ export class DataStoreFactory {
 	private orchestratorWrapper: OrchestratorWrapper;
 	private orchestratorEventBridge?: any; // OrchestratorEventBridge (using any to avoid circular import)
 
-	constructor(storageMode: 'memory' | 'mariadb' = 'memory', orchestrator: Orchestrator) {
+	constructor(storageMode: 'memory' | 'file' | 'mariadb' = 'file', orchestrator: Orchestrator) {
 		// Create storage based on mode
 		if (storageMode === 'memory') {
 			this.storage = new InMemoryStorage();
+		} else if (storageMode === 'file') {
+			// File-based storage in ./data directory
+			const dataDir = process.env.DATA_DIR || './data';
+			this.storage = new FileBasedStorage(dataDir);
+			console.log(`[DataStoreFactory] Using FileBasedStorage with data directory: ${dataDir}`);
 		} else {
 			// TODO: Implement MariaDBStorage
 			throw new Error('MariaDB storage not yet implemented');
@@ -212,11 +222,20 @@ export class DataStoreFactory {
 			const metadataFile = new WorkspaceMetadataFile();
 			const metadataRepo = new WorkspaceMetadataRepository(metadataFile);
 
+			// Create ProjectsRepository
+			const projectsBaseRepo = new BaseRepository<Project>('projects', this.storage);
+			const projectsRepo = new ProjectsRepository(projectsBaseRepo);
+
 			// Get EventBroadcaster
 			const eventBroadcaster = this.getEventBroadcaster();
 
 			// Create WorkspacesService with OrchestratorWrapper directly
-			this.workspacesService = new WorkspacesService(eventBroadcaster, this.orchestratorWrapper, metadataRepo);
+			this.workspacesService = new WorkspacesService(
+				eventBroadcaster,
+				this.orchestratorWrapper,
+				metadataRepo,
+				projectsRepo
+			);
 		}
 
 		return this.workspacesService;
@@ -238,6 +257,40 @@ export class DataStoreFactory {
 		}
 
 		return this.interventionsService;
+	}
+
+	/**
+	 * Get or create ProjectsService
+	 */
+	getProjectsService(): ProjectsService {
+		if (!this.projectsService) {
+			// Create BaseRepository
+			const baseRepo = new BaseRepository<Project>('projects', this.storage);
+
+			// Create ProjectsRepository
+			const projectsRepo = new ProjectsRepository(baseRepo);
+
+			// Create OrchestratorRepository for task data
+			const orchestratorRepo = new OrchestratorRepository(this.orchestratorWrapper);
+
+			// Create WorkspaceMetadataFile service for workspace cleanup
+			const metadataFile = new WorkspaceMetadataFile();
+			const workspaceMetadataRepo = new WorkspaceMetadataRepository(metadataFile);
+
+			// Get EventBroadcaster
+			const eventBroadcaster = this.getEventBroadcaster();
+
+			// Create ProjectsService with dependencies
+			this.projectsService = new ProjectsService(
+				projectsRepo,
+				orchestratorRepo,
+				eventBroadcaster,
+				workspaceMetadataRepo,
+				this.orchestratorWrapper
+			);
+		}
+
+		return this.projectsService;
 	}
 
 	/**
@@ -370,6 +423,12 @@ export class DataStoreFactory {
 		const { default: InterventionsController } = await import('../controllers/InterventionsController');
 		const service = this.getInterventionsService();
 		return new InterventionsController(service);
+	}
+
+	async getProjectsController() {
+		const { default: ProjectsController } = await import('../controllers/ProjectsController');
+		const service = this.getProjectsService();
+		return new ProjectsController(service);
 	}
 
 	async getDashboardController() {

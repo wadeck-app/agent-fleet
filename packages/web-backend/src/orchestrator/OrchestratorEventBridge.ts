@@ -3,6 +3,8 @@ import { StateEvent } from 'shared-orch-worker/StateManager';
 
 import type { Worker } from '@app/shared/api/workers.contract';
 import {
+	B2F_INTERVENTIONS_UPDATED,
+	B2F_INTERVENTION_CREATED,
 	B2F_TASKS_UPDATED,
 	B2F_TASK_TRACE_UPDATED,
 	B2F_WORKERS_UPDATED,
@@ -150,6 +152,28 @@ export class OrchestratorEventBridge {
 				this.eventBroadcaster.broadcast(B2F_TASK_TRACE_UPDATED, eventData as any);
 			});
 
+			// Intervention events
+			// @formatter:off
+			stateManager.on('intervention.created', (intervention: any) => {
+				console.log('[OrchestratorEventBridge] INTERVENTION_CREATED:', intervention.id);
+
+				// Transform intervention to match API contract (add missing BaseEntity fields)
+				const transformedIntervention = {
+					...intervention,
+					version: 1, // Interventions don't have versioning yet
+					updatedAt: intervention.answeredAt || intervention.createdAt,
+				};
+
+				// Emit specific event
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				this.eventBroadcaster.broadcast(B2F_INTERVENTION_CREATED, transformedIntervention as any);
+
+				// Emit aggregate event (invalidation signal for frontend)
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, {} as any);
+			});
+			// @formatter:on
+
 			this.isStarted = true;
 			console.log('[OrchestratorEventBridge] Started listening to orchestrator events');
 		} catch (error) {
@@ -179,6 +203,7 @@ export class OrchestratorEventBridge {
 			stateManager.removeAllListeners(StateEvent.TASK_UPDATED);
 			stateManager.removeAllListeners(StateEvent.TASK_DELETED);
 			stateManager.removeAllListeners(StateEvent.TASK_TRACE_UPDATED);
+			stateManager.removeAllListeners('intervention.created');
 
 			this.isStarted = false;
 			console.log('[OrchestratorEventBridge] Stopped listening to orchestrator events');

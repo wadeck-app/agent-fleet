@@ -92,6 +92,9 @@ export const TaskSchema = z.object({
 			trace: z.any().optional(), // Full FlowTrace object
 		})
 		.optional(),
+	// Project and workspace assignment
+	projectId: z.string().optional(),
+	workspaceId: z.string().optional(),
 });
 
 /**
@@ -102,6 +105,8 @@ export const TasksQuerySchema = z.object({
 	workerId: z.string().optional(),
 	priority: TaskPrioritySchema.optional(),
 	flowId: z.string().optional(),
+	projectId: z.string().optional(),
+	workspaceId: z.string().optional(),
 });
 
 /**
@@ -121,6 +126,8 @@ export const TasksListQuerySchema = z.object({
 	workerId: z.string().optional(),
 	priority: TaskPrioritySchema.optional(),
 	flowId: z.string().optional(),
+	projectId: z.string().optional(),
+	workspaceId: z.string().optional(),
 });
 
 /**
@@ -203,9 +210,20 @@ export const CreateTaskSchema = z.object({
 	}),
 	flowId: z.string().optional(),
 	flowInputs: z.record(z.string(), z.any()).optional(),
+	projectId: z.string(),
+	workspaceId: z.string().optional(),
 });
 
 export type CreateTask = z.infer<typeof CreateTaskSchema>;
+
+/**
+ * Update task status request schema
+ */
+export const UpdateTaskStatusSchema = z.object({
+	status: TaskStatusSchema,
+});
+
+export type UpdateTaskStatus = z.infer<typeof UpdateTaskStatusSchema>;
 
 /**
  * Tasks API routes
@@ -233,6 +251,11 @@ export const TASKS_API_ROUTES = defineRoutes({
 		DELETE: {
 			params: z.object({ id: z.string() }),
 			response: z.object({ success: z.boolean() }),
+		},
+		PATCH: {
+			params: z.object({ id: z.string() }),
+			body: UpdateTaskStatusSchema,
+			response: TaskSchema,
 		},
 	},
 	'/api/tasks/:id/logs': {

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 import { useTransport } from '@/transport';
 
@@ -22,7 +22,7 @@ import { useTransport } from '@/transport';
  * useRealtimeRefresh({
  *   events: [B2F_TASK_CREATED, B2F_TASK_UPDATED, B2F_TASK_DELETED],
  *   onEvent: cache.actions.refresh,
- *   logPrefix: 'TasksPage2',
+ *   logPrefix: 'TasksPage',
  * });
  * ```
  *
@@ -83,6 +83,15 @@ export function useRealtimeRefresh(options: {
 	const { transport } = useTransport();
 	const { events, onEvent, filters, enabled = true, logPrefix = 'Page' } = options;
 
+	// Use ref to always have the latest onEvent callback without causing re-subscriptions
+	const onEventRef = useRef(onEvent);
+	onEventRef.current = onEvent;
+
+	// Stabilize events and filters arrays using stringified comparison
+	// This prevents infinite loops when arrays are created inline in component render
+	const eventsKey = useMemo(() => JSON.stringify(events), [events]);
+	const filtersKey = useMemo(() => (filters ? JSON.stringify(filters) : null), [filters]);
+
 	useEffect(() => {
 		// Don't subscribe if disabled
 		if (!enabled) return;
@@ -95,12 +104,12 @@ export function useRealtimeRefresh(options: {
 		// Subscribe to all events and collect unsubscribe functions
 		// Type assertion needed because transport.subscribe has strict event type checking
 		const unsubscribers = events.map(event =>
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			transport.subscribe(
-				event as any,
+				event as import('@shared/transport').EventType,
 				data => {
 					console.log(`[${logPrefix}] Received event: ${event}`, data);
-					onEvent();
+					// Use ref to access latest callback without causing re-subscription
+					onEventRef.current();
 				},
 				filters // Pass filters to transport
 			)
@@ -111,6 +120,9 @@ export function useRealtimeRefresh(options: {
 			console.log(`[${logPrefix}] Unsubscribing from real-time events`);
 			unsubscribers.forEach(unsub => unsub());
 		};
+		// Only re-subscribe when transport, enabled, logPrefix, or the actual content of events/filters changes
+		// NOT when onEvent reference changes (use ref instead)
+		// NOT when events/filters array reference changes (use stringified keys instead)
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [transport, onEvent, enabled, logPrefix, filters, ...events]);
+	}, [transport, enabled, logPrefix, eventsKey, filtersKey]);
 }

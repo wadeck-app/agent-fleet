@@ -5,6 +5,7 @@ import type {
 	PaginatedLogsQuery,
 	PaginatedLogsResponse,
 	Task,
+	TaskStatus,
 	TasksData,
 	TasksListQuery,
 	TasksListResponse,
@@ -61,5 +62,12 @@ export const tasksApi = {
 
 	bulkDeleteTasks: (ids: string[]): Promise<BulkDeleteResponse> => {
 		return typedFetch('DELETE', '/api/tasks/', { body: { ids } }) as Promise<BulkDeleteResponse>;
+	},
+
+	/**
+	 * Update task status
+	 */
+	updateTaskStatus: (id: string, status: TaskStatus): Promise<Task> => {
+		return typedFetch('PATCH', '/api/tasks/:id', { params: { id }, body: { status } });
 	},
 } as const;

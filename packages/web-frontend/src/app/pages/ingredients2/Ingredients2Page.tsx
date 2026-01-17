@@ -8,6 +8,7 @@ import { useColumnOrder } from '@framework/components/columns/useColumnOrder';
 import { useColumnVisibility } from '@framework/components/columns/useColumnVisibility';
 import { Input } from '@framework/components/forms/Input';
 import { Page } from '@framework/components/layout/Page';
+import { PageHeader } from '@framework/components/layout/PageHeader';
 import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
 import { Button } from '@framework/components/primitives/Button';
 import { useCacheControl2 } from '@framework/hooks2/useCacheControl2';
@@ -29,7 +30,7 @@ import {
 	toColumnVisibilityDefs,
 } from '@framework/utils2/Table2ColumnConfig';
 import type { CreateIngredient, Ingredient, IngredientsListQuery } from '@shared/api/ingredients.contract';
-import { Plus, RefreshCw, Trash2, X } from 'lucide-react';
+import { Plus, Trash2, X } from 'lucide-react';
 
 import { BulkDeleteWorkflow, IngredientDialog } from '@app/components/domain';
 
@@ -358,56 +359,41 @@ export function Ingredients2Page() {
 
 	return (
 		<Page>
-			{/* Page Header with refresh button next to title */}
-			<div className="mb-6 flex items-center justify-between">
-				<div className="flex items-center gap-2">
-					<h1 className="text-3xl font-bold">Ingredients (v2)</h1>
-					<Button
-						onClick={cache.actions.refresh}
-						disabled={cache.fstate.isRefreshing}
-						variant="ghost"
-						size="sm"
-						className="h-8 w-8 p-0"
-						title={cache.fstate.isRefreshing ? 'Refreshing...' : 'Refresh data'}
-					>
-						<RefreshCw
-							className={`
-         h-4 w-4
-         ${cache.fstate.isRefreshing ? `animate-spin` : ''}
-       `}
+			<PageHeader
+				title="Ingredients (v2)"
+				onRefresh={cache.actions.refresh}
+				isRefreshing={cache.fstate.isRefreshing}
+				action={
+					<>
+						<ColumnVisibility
+							columns={toColumnVisibilityDefs(INGREDIENT_TABLE2_COLUMNS)}
+							visibleColumns={columnVisibility.visibleColumns}
+							defaultVisible={new Set(extractDefaultVisible(INGREDIENT_TABLE2_COLUMNS))}
+							onToggle={columnVisibility.toggleColumn}
+							onReset={() => {
+								columnVisibility.resetColumns();
+								columnOrder.resetOrder();
+							}}
+							onShowAll={columnVisibility.showAll}
+							onHideAll={columnVisibility.hideAll}
+							isColumnModified={columnVisibility.isColumnModified}
+							onResetColumn={columnVisibility.resetColumn}
+							columnOrder={columnOrder.columnOrder}
+							defaultOrder={extractColumnIds(INGREDIENT_TABLE2_COLUMNS)}
+							onReorderColumns={columnOrder.reorderColumns}
+							isColumnModifiedOrder={columnOrder.isColumnModified}
+							onResetColumnOrder={columnOrder.resetColumn}
 						/>
-					</Button>
-				</div>
-				<div className="flex items-center gap-2">
-					<ColumnVisibility
-						columns={toColumnVisibilityDefs(INGREDIENT_TABLE2_COLUMNS)}
-						visibleColumns={columnVisibility.visibleColumns}
-						defaultVisible={new Set(extractDefaultVisible(INGREDIENT_TABLE2_COLUMNS))}
-						onToggle={columnVisibility.toggleColumn}
-						onReset={() => {
-							columnVisibility.resetColumns();
-							columnOrder.resetOrder();
-						}}
-						onShowAll={columnVisibility.showAll}
-						onHideAll={columnVisibility.hideAll}
-						isColumnModified={columnVisibility.isColumnModified}
-						onResetColumn={columnVisibility.resetColumn}
-						columnOrder={columnOrder.columnOrder}
-						defaultOrder={extractColumnIds(INGREDIENT_TABLE2_COLUMNS)}
-						onReorderColumns={columnOrder.reorderColumns}
-						isColumnModifiedOrder={columnOrder.isColumnModified}
-						onResetColumnOrder={columnOrder.resetColumn}
-					/>
-					<Button onClick={handleCreateNew}>
-						<Plus />
-						Add Ingredient
-					</Button>
-				</div>
-			</div>
+						<Button onClick={handleCreateNew}>
+							<Plus />
+							Add Ingredient
+						</Button>
+					</>
+				}
+			/>
 
-			{/* Search & Filter Bar */}
+			{/* Search Bar */}
 			<div className="mb-4 flex flex-col gap-4">
-				{/* Search Input */}
 				<div className="relative">
 					<div className="mb-2 text-xs font-medium text-muted-foreground">Search</div>
 					<Input

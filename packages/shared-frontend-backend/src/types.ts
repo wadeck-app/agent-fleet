@@ -31,6 +31,7 @@ import { FLOWS_API_ROUTES } from './api/flows.contract';
 import { INGREDIENTS_API_ROUTES } from './api/ingredients.contract';
 import { INTERVENTIONS_API_ROUTES } from './api/interventions.contract';
 import { MONITORING_API_ROUTES } from './api/monitoring.contract';
+import { PROJECTS_API_ROUTES } from './api/projects.contract';
 import { TASKS_API_ROUTES } from './api/tasks.contract';
 import { WORKERS_API_ROUTES } from './api/workers.contract';
 import { WORKSPACES_API_ROUTES } from './api/workspaces.contract';
@@ -51,6 +52,7 @@ export const ALL_API_ROUTES = {
 	...DASHBOARD_API_ROUTES,
 	...FLOWS_API_ROUTES,
 	...INTERVENTIONS_API_ROUTES,
+	...PROJECTS_API_ROUTES,
 	...WORKERS_API_ROUTES,
 	...TASKS_API_ROUTES,
 	...WORKSPACES_API_ROUTES,
@@ -77,6 +79,7 @@ const ALL_CONTRACTS = [
 	DASHBOARD_API_ROUTES,
 	FLOWS_API_ROUTES,
 	INTERVENTIONS_API_ROUTES,
+	PROJECTS_API_ROUTES,
 	WORKERS_API_ROUTES,
 	TASKS_API_ROUTES,
 	WORKSPACES_API_ROUTES,

@@ -6,92 +6,15 @@ import { Separator } from '@framework/components/primitives/Separator';
 import { Sheet, SheetContent, SheetTrigger } from '@framework/components/primitives/sheet';
 import { ConnectivityIndicator } from '@framework/features/connectivity/ConnectivityIndicator';
 import { useTheme } from '@framework/features/theme/useTheme';
-import {
-	BookOpen,
-	FolderKanban,
-	LayoutDashboard,
-	LayoutGrid,
-	ListTodo,
-	Menu,
-	Package2,
-	PackageSearch,
-	Users,
-	Workflow,
-} from 'lucide-react';
+import { Menu } from 'lucide-react';
 
 import { ConnectionModeIndicator } from '@app/components/connectivity/ConnectionModeIndicator';
-import { TransportModeSelector } from '@app/components/connectivity/TransportModeSelector';
 import { WorkspaceIndicator } from '@app/features/workspace/WorkspaceIndicator';
 
 import { AppSwitcher } from './AppSwitcher';
-import { type NavItem, SidebarNav } from './SidebarNav';
+import { SidebarNav } from './SidebarNav';
 import { UserMenuWithThemeMobile } from './UserMenuWithTheme';
-
-const navigationItems: NavItem[] = [
-	{
-		path: '/dashboard',
-		label: 'Dashboard',
-		icon: LayoutDashboard,
-	},
-	{
-		path: '/workers',
-		label: 'Workers',
-		icon: Users,
-	},
-	{
-		path: '/workers2',
-		label: 'Workers v2',
-		icon: Users,
-	},
-	{
-		path: '/tasks',
-		label: 'Tasks',
-		icon: ListTodo,
-	},
-	{
-		path: '/tasks2',
-		label: 'Tasks v2',
-		icon: ListTodo,
-	},
-	{
-		path: '/workspaces',
-		label: 'Workspaces',
-		icon: FolderKanban,
-	},
-	{
-		path: '/workspaces2',
-		label: 'Workspaces v2',
-		icon: FolderKanban,
-	},
-	{
-		type: 'separator',
-	},
-	{
-		path: '/flows/new',
-		label: 'Flow Editor',
-		icon: Workflow,
-	},
-	{
-		path: '/ingredients',
-		label: 'Ingredients',
-		icon: Package2,
-	},
-	{
-		path: '/ingredients2',
-		label: 'Ingredients v2',
-		icon: PackageSearch,
-	},
-	{
-		path: '/ingredients3',
-		label: 'Ingredients Grid',
-		icon: LayoutGrid,
-	},
-	{
-		path: '/books',
-		label: 'Books',
-		icon: BookOpen,
-	},
-];
+import { navigationItems } from './navigationConfig';
 
 export function MobileSidebar() {
 	const [open, setOpen] = useState(false);
@@ -141,10 +64,6 @@ export function MobileSidebar() {
 							<WorkspaceIndicator />
 							<ConnectivityIndicator />
 							<ConnectionModeIndicator />
-
-							<Separator />
-
-							<TransportModeSelector />
 						</div>
 					</div>
 

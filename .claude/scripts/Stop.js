@@ -1,3 +1,5 @@
+import fssync from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -6,6 +8,86 @@ import WebSocket from 'ws';
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+/**
+ * Validates if a filename matches the temporary Claude file pattern
+ * Pattern: tmpclaude-XXXX-cwd where XXXX is 4 hexadecimal characters
+ */
+function isTempClaudeFile(filename) {
+	const pattern = /^tmpclaude-[0-9a-f]{4}-cwd$/i;
+	return pattern.test(filename);
+}
+
+/**
+ * Recursively finds all temporary Claude files in the project directory
+ */
+async function findTempFiles(projectDir, logToFile) {
+	const tempFiles = [];
+
+	try {
+		const entries = await fs.readdir(projectDir, {
+			recursive: true,
+			withFileTypes: true,
+		});
+
+		for (const entry of entries) {
+			if (entry.isFile() && isTempClaudeFile(entry.name)) {
+				const fullPath = path.join(entry.parentPath || entry.path, entry.name);
+				tempFiles.push(fullPath);
+			}
+		}
+	} catch (error) {
+		logToFile(`Error scanning for temp files: ${error.message}`);
+	}
+
+	return tempFiles;
+}
+
+/**
+ * Safely deletes temporary Claude files with validation
+ */
+async function cleanupTemporaryFiles(projectDir, logToFile) {
+	logToFile('Starting temporary file cleanup...');
+
+	const tempFiles = await findTempFiles(projectDir, logToFile);
+	logToFile(`Found ${tempFiles.length} temporary files to clean`);
+
+	let deleted = 0;
+	let failed = 0;
+
+	for (const filePath of tempFiles) {
+		try {
+			// Safety check: verify file is within project directory
+			const resolvedPath = path.resolve(filePath);
+			const resolvedProject = path.resolve(projectDir);
+
+			if (!resolvedPath.startsWith(resolvedProject)) {
+				logToFile(`Skipping file outside project: ${filePath}`);
+				failed++;
+				continue;
+			}
+
+			// Safety check: verify file size (temp files should be tiny)
+			const stats = await fs.stat(filePath);
+			if (stats.size > 1024) {
+				logToFile(`Skipping large file: ${filePath} (${stats.size} bytes)`);
+				failed++;
+				continue;
+			}
+
+			// Delete the file
+			await fs.unlink(filePath);
+			deleted++;
+			logToFile(`Deleted: ${filePath}`);
+		} catch (error) {
+			failed++;
+			logToFile(`Failed to delete ${filePath}: ${error.message}`);
+		}
+	}
+
+	logToFile(`Cleanup complete: ${deleted} deleted, ${failed} failed`);
+	console.log(`Temp file cleanup: ${deleted} deleted, ${failed} failed`);
+}
 
 // Get all arguments
 const args = process.argv.slice(2);
@@ -20,7 +102,7 @@ process.stdin.on('data', chunk => {
 	stdinData += chunk;
 });
 
-process.stdin.on('end', () => {
+process.stdin.on('end', async () => {
 	// Parse stdin JSON
 	let parsedStdin = null;
 	try {
@@ -55,8 +137,17 @@ process.stdin.on('end', () => {
 	const logToFile = message => {
 		const logPath = path.join(projectDir, 'Stop.txt');
 		const timestamp = new Date().toISOString();
-		//    fs.appendFileSync(logPath, `[${timestamp}] ${message}\n`);
+		fssync.appendFileSync(logPath, `[${timestamp}] ${message}\n`);
 	};
+
+	// Run cleanup before WebSocket logic
+	try {
+		await cleanupTemporaryFiles(projectDir, logToFile);
+	} catch (error) {
+		logToFile(`Cleanup error: ${error.message}`);
+		console.error('Temp cleanup error:', error.message);
+		// Continue with stop logic even if cleanup fails
+	}
 
 	// Check if stoppable mode is enabled
 	const isStoppable = env.CLAUDE_CODE_STOPPABLE === 'true';

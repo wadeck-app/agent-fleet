@@ -132,6 +132,28 @@ export const B2F_WORKSPACE_ARCHIVED = 'b2f:workspace:archived' as const;
 export const B2F_DASHBOARD_UPDATED = 'b2f:dashboard:updated' as const;
 
 // ===========================================================================================
+// PROJECT EVENTS
+// ===========================================================================================
+
+/**
+ * Projects data updated event (aggregate)
+ * Used for reactive updates of entire project list
+ */
+export const B2F_PROJECTS_UPDATED = 'b2f:projects:updated' as const;
+
+/** Project created event */
+export const B2F_PROJECT_CREATED = 'b2f:project:created' as const;
+
+/** Project updated event */
+export const B2F_PROJECT_UPDATED = 'b2f:project:updated' as const;
+
+/** Project deleted event */
+export const B2F_PROJECT_DELETED = 'b2f:project:deleted' as const;
+
+/** Project board updated event (tasks grouped by status) */
+export const B2F_PROJECT_BOARD_UPDATED = 'b2f:project:board_updated' as const;
+
+// ===========================================================================================
 // INTERVENTION EVENTS
 // ===========================================================================================
 
