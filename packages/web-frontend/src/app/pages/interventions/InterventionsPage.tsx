@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 
 import { Data2 } from '@framework/components2/data/Data2';
-import { Input } from '@framework/components/forms/Input';
+import { SearchBar } from '@framework/components/forms/SearchBar';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { Pagination } from '@framework/components/pagination/Pagination';
@@ -12,7 +12,6 @@ import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
 import { useSorting2 } from '@framework/hooks2/useSorting2';
 import type { InterventionsQuery } from '@shared/api/interventions.contract';
 import { B2F_INTERVENTIONS_UPDATED, B2F_INTERVENTION_CREATED } from '@shared/transport';
-import { X } from 'lucide-react';
 
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
@@ -98,28 +97,13 @@ export function InterventionsPage() {
 			/>
 
 			{/* Search Bar */}
-			<div className="mb-4 flex flex-col gap-4">
-				<div className="relative">
-					<div className="mb-2 text-xs font-medium text-muted-foreground">Search</div>
-					<Input
-						type="text"
-						value={search.fstate.query}
-						onChange={e => search.actions.setQuery(e.target.value)}
-						placeholder="Search interventions by ID, title, description, task, or type..."
-					/>
-					{search.fstate.query && (
-						<Button
-							onClick={search.actions.clearQuery}
-							variant="ghost"
-							size="sm"
-							className="absolute top-9 right-2 h-6 w-6 -translate-y-1/2 p-0"
-							aria-label="Clear search"
-						>
-							<X className="h-4 w-4" />
-						</Button>
-					)}
-				</div>
-			</div>
+			<SearchBar
+				value={search.fstate.query}
+				onChange={search.actions.setQuery}
+				onClear={search.actions.clearQuery}
+				placeholder="Search interventions by ID, title, description, task, or type..."
+				className="mb-4"
+			/>
 
 			<InterventionFilters filters={filters} />
 

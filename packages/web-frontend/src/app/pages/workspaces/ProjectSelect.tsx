@@ -1,5 +1,5 @@
-import { DynamicLucideIcon } from '@framework/components/icons/DynamicLucideIcon';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
+import { DynamicLucideIcon } from '@framework/components/icons/DynamicLucideIcon';
 import { useAsyncData } from '@framework/hooks/useAsyncData';
 import { X } from 'lucide-react';
 
@@ -28,7 +28,13 @@ export interface ProjectSelectProps {
  * />
  * ```
  */
-export function ProjectSelect({ value, onChange, placeholder = 'Select project...', disabled, id }: ProjectSelectProps) {
+export function ProjectSelect({
+	value,
+	onChange,
+	placeholder = 'Select project...',
+	disabled,
+	id,
+}: ProjectSelectProps) {
 	const { data: projectsResponse, loading } = useAsyncData(
 		() => projectsApi.getProjectsList({ page: 1, pageSize: 100 }),
 		[]

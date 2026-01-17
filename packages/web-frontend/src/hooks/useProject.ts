@@ -1,5 +1,5 @@
-import type { Project } from '@shared/api/projects.contract';
 import { useAsyncData } from '@framework/hooks/useAsyncData';
+import type { Project } from '@shared/api/projects.contract';
 
 import { projectsApi } from '../app/pages/projects/projects.api';
 
@@ -21,15 +21,12 @@ import { projectsApi } from '../app/pages/projects/projects.api';
  * ```
  */
 export function useProject(projectId: string | undefined) {
-	const { data, loading, error } = useAsyncData(
-		() => {
-			if (!projectId) {
-				return Promise.resolve(null);
-			}
-			return projectsApi.getProjectById(projectId);
-		},
-		[projectId]
-	);
+	const { data, loading, error } = useAsyncData(() => {
+		if (!projectId) {
+			return Promise.resolve(null);
+		}
+		return projectsApi.getProjectById(projectId);
+	}, [projectId]);
 
 	return {
 		project: data,

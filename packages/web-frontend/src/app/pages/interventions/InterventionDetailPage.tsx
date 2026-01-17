@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
+import { ContextRow } from '@framework/components/data/ContextRow';
 import { ErrorAlert } from '@framework/components/feedback/ErrorAlert';
 import { Label } from '@framework/components/forms/Label';
 import { Textarea } from '@framework/components/forms/Textarea';
@@ -232,49 +233,55 @@ export function InterventionDetailPage() {
 					</CardHeader>
 					<CardContent>
 						<div className="space-y-3">
-							<div className="flex items-center justify-between py-2 border-b">
-								<Label className="text-xs text-muted-foreground">Intervention ID</Label>
-								<Badge variant="outline" className="font-mono text-xs">
-									{interventionId}
-								</Badge>
-							</div>
-							<div className="flex items-center justify-between py-2 border-b">
-								<Label className="text-xs text-muted-foreground">Task ID</Label>
-								{intervention.taskId ? (
-									<Link to={`/tasks/${intervention.taskId}/logs-stacked`}>
-										<Badge
-											variant="outline"
-											className="font-mono text-xs hover:bg-accent cursor-pointer"
-										>
-											{intervention.taskId}
-										</Badge>
-									</Link>
-								) : (
-									<Badge variant="outline" className="font-mono text-xs text-muted-foreground">
-										-
+							<ContextRow
+								label="Intervention ID"
+								value={
+									<Badge variant="outline" className="font-mono text-xs">
+										{interventionId}
 									</Badge>
-								)}
-							</div>
-							<div className="flex items-center justify-between py-2 border-b">
-								<Label className="text-xs text-muted-foreground">Type</Label>
-								<Badge variant="secondary">{intervention.type}</Badge>
-							</div>
-							<div className="flex items-center justify-between py-2 border-b">
-								<Label className="text-xs text-muted-foreground">Blocking</Label>
-								<Badge variant={intervention.blocking ? 'destructive' : 'secondary'}>
-									{intervention.blocking ? 'Yes' : 'No'}
-								</Badge>
-							</div>
-							<div className="flex items-center justify-between py-2">
-								<Label className="text-xs text-muted-foreground">Created</Label>
-								<Badge
-									variant="outline"
-									className="text-xs"
-									title={new Date(intervention.createdAt).toISOString()}
-								>
-									{formatRelativeTime(intervention.createdAt)}
-								</Badge>
-							</div>
+								}
+							/>
+							<ContextRow
+								label="Task ID"
+								value={
+									intervention.taskId ? (
+										<Link to={`/tasks/${intervention.taskId}/logs-stacked`}>
+											<Badge
+												variant="outline"
+												className="font-mono text-xs hover:bg-accent cursor-pointer"
+											>
+												{intervention.taskId}
+											</Badge>
+										</Link>
+									) : (
+										<Badge variant="outline" className="font-mono text-xs text-muted-foreground">
+											-
+										</Badge>
+									)
+								}
+							/>
+							<ContextRow label="Type" value={<Badge variant="secondary">{intervention.type}</Badge>} />
+							<ContextRow
+								label="Blocking"
+								value={
+									<Badge variant={intervention.blocking ? 'destructive' : 'secondary'}>
+										{intervention.blocking ? 'Yes' : 'No'}
+									</Badge>
+								}
+							/>
+							<ContextRow
+								label="Created"
+								value={
+									<Badge
+										variant="outline"
+										className="text-xs"
+										title={new Date(intervention.createdAt).toISOString()}
+									>
+										{formatRelativeTime(intervention.createdAt)}
+									</Badge>
+								}
+								showBorder={false}
+							/>
 						</div>
 					</CardContent>
 				</Card>

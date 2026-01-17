@@ -8,9 +8,9 @@ import { Button } from '@framework/components/primitives/Button';
 import { useAsyncData } from '@framework/hooks/useAsyncData';
 import type { Workspace } from '@shared/api/workspaces.contract';
 
+import { ProjectSelect } from './ProjectSelect';
 import { workspacesApi } from './workspaces.api';
 import { suggestWorkspaceColor } from './workspaces.helpers';
-import { ProjectSelect } from './ProjectSelect';
 
 interface EditWorkspaceDialogProps {
 	workspace: Workspace;
@@ -51,7 +51,7 @@ export function EditWorkspaceDialog({ workspace, open, onClose, onSave }: EditWo
 				name,
 				description,
 				color,
-				projectId: projectId === undefined ? null : projectId
+				projectId: projectId === undefined ? null : projectId,
 			});
 			onClose();
 		} catch (err) {
@@ -89,7 +89,11 @@ export function EditWorkspaceDialog({ workspace, open, onClose, onSave }: EditWo
 
 					<div>
 						<Label className="text-sm font-medium">Project</Label>
-						<ProjectSelect value={projectId} onChange={setProjectId} placeholder="Select project (optional)" />
+						<ProjectSelect
+							value={projectId}
+							onChange={setProjectId}
+							placeholder="Select project (optional)"
+						/>
 					</div>
 
 					<div>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Data2 } from '@framework/components2/data/Data2';
 import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
-import { Input } from '@framework/components/forms/Input';
+import { SearchBar } from '@framework/components/forms/SearchBar';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
@@ -18,7 +18,7 @@ import { useErrorToast } from '@framework/hooks/useErrorToast';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
 import type { Task } from '@shared/api/tasks.contract';
 import { B2F_TASK_CREATED, B2F_TASK_DELETED, B2F_TASK_UPDATED } from '@shared/transport';
-import { Plus, Trash2, X } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
@@ -231,28 +231,13 @@ export function TasksPage() {
 			/>
 
 			{/* Search Bar */}
-			<div className="mb-4 flex flex-col gap-4">
-				<div className="relative">
-					<div className="mb-2 text-xs font-medium text-muted-foreground">Search</div>
-					<Input
-						type="text"
-						value={search.fstate.query}
-						onChange={e => search.actions.setQuery(e.target.value)}
-						placeholder="Search tasks by ID, description, worker, status, or priority..."
-					/>
-					{search.fstate.query && (
-						<Button
-							onClick={search.actions.clearQuery}
-							variant="ghost"
-							size="sm"
-							className="absolute top-9 right-2 h-6 w-6 -translate-y-1/2 p-0"
-							aria-label="Clear search"
-						>
-							<X className="h-4 w-4" />
-						</Button>
-					)}
-				</div>
-			</div>
+			<SearchBar
+				value={search.fstate.query}
+				onChange={search.actions.setQuery}
+				onClear={search.actions.clearQuery}
+				placeholder="Search tasks by ID, description, worker, status, or priority..."
+				className="mb-4"
+			/>
 
 			{/* Domain Filters */}
 			<TaskFilters filters={filters} />

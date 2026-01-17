@@ -1,3 +1,4 @@
+import { MetricItem } from '@framework/components/data/MetricItem';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
 import { formatUptime } from '@framework/utils/formatting/formatUptime';
@@ -57,33 +58,21 @@ export function StatusCard({ status, uptime, version }: StatusCardProps) {
 			<CardContent>
 				<div className="space-y-4">
 					{/* Status */}
-					<div className="flex items-center gap-3">
-						<Activity className="size-5 text-muted-foreground" />
-						<div className="flex flex-col gap-1">
-							<span className="text-sm text-muted-foreground">Status</span>
+					<MetricItem
+						icon={<Activity />}
+						label="Status"
+						value={
 							<Badge variant={statusVariant} className="w-fit">
 								{status}
 							</Badge>
-						</div>
-					</div>
+						}
+					/>
 
 					{/* Uptime */}
-					<div className="flex items-center gap-3">
-						<Clock className="size-5 text-muted-foreground" />
-						<div className="flex flex-col gap-1">
-							<span className="text-sm text-muted-foreground">Uptime</span>
-							<span className="text-base font-medium">{uptimeFormatted}</span>
-						</div>
-					</div>
+					<MetricItem icon={<Clock />} label="Uptime" value={uptimeFormatted} />
 
 					{/* Version */}
-					<div className="flex items-center gap-3">
-						<Package className="size-5 text-muted-foreground" />
-						<div className="flex flex-col gap-1">
-							<span className="text-sm text-muted-foreground">Version</span>
-							<span className="text-base font-medium">{version}</span>
-						</div>
-					</div>
+					<MetricItem icon={<Package />} label="Version" value={version} />
 				</div>
 			</CardContent>
 		</Card>

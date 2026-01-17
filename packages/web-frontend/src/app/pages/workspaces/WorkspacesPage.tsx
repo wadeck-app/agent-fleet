@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 
 import { Data2 } from '@framework/components2/data/Data2';
-import { Input } from '@framework/components/forms/Input';
+import { SearchBar } from '@framework/components/forms/SearchBar';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { Button } from '@framework/components/primitives/Button';
@@ -18,7 +18,6 @@ import {
 	B2F_WORKSPACE_DELETED,
 	B2F_WORKSPACE_UPDATED,
 } from '@shared/transport';
-import { X } from 'lucide-react';
 
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
@@ -103,28 +102,13 @@ export function WorkspacesPage() {
 			<PageHeader title="Workspaces" onRefresh={cache.actions.refresh} isRefreshing={cache.fstate.isRefreshing} />
 
 			{/* Search Bar */}
-			<div className="mb-4 flex flex-col gap-4">
-				<div className="relative">
-					<div className="mb-2 text-xs font-medium text-muted-foreground">Search</div>
-					<Input
-						type="text"
-						value={search.fstate.query}
-						onChange={e => search.actions.setQuery(e.target.value)}
-						placeholder="Search workspaces by path, mode, status, or branch..."
-					/>
-					{search.fstate.query && (
-						<Button
-							onClick={search.actions.clearQuery}
-							variant="ghost"
-							size="sm"
-							className="absolute top-9 right-2 h-6 w-6 -translate-y-1/2 p-0"
-							aria-label="Clear search"
-						>
-							<X className="h-4 w-4" />
-						</Button>
-					)}
-				</div>
-			</div>
+			<SearchBar
+				value={search.fstate.query}
+				onChange={search.actions.setQuery}
+				onClear={search.actions.clearQuery}
+				placeholder="Search workspaces by path, mode, status, or branch..."
+				className="mb-4"
+			/>
 
 			{/* Feature Info (for demo purposes) */}
 			<div className="mb-4 rounded-lg border border-border bg-muted/50 p-4 text-sm">

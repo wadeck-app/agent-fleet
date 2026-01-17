@@ -262,3 +262,9 @@
 [2026-01-17T21:45:50.988Z] Stoppable mode: false
 [2026-01-17T21:45:50.988Z] Worker socket: undefined
 [2026-01-17T21:45:50.989Z] Stoppable mode disabled - not sending stop request
+[2026-01-17T22:33:56.638Z] Starting temporary file cleanup...
+[2026-01-17T22:33:57.485Z] Found 0 temporary files to clean
+[2026-01-17T22:33:57.485Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-17T22:33:57.486Z] Stoppable mode: false
+[2026-01-17T22:33:57.486Z] Worker socket: undefined
+[2026-01-17T22:33:57.486Z] Stoppable mode disabled - not sending stop request

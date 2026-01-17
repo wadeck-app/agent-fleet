@@ -1,3 +1,5 @@
+import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
+
 import type {
 	AddWorkspacesToProject,
 	CreateProject,
@@ -11,15 +13,13 @@ import type {
 import type { Task } from '@app/shared/api/tasks.contract';
 import type { Workspace } from '@app/shared/api/workspaces.contract';
 import type { BulkDeleteResponse } from '@app/shared/common/api-helpers';
-import { B2F_WORKSPACE_UPDATED } from '@app/shared/transport';
 import {
 	ConflictException,
 	ERROR_CODES,
 	HttpException,
 	NotFoundException,
 } from '@app/shared/exceptions/http-exceptions';
-
-import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
+import { B2F_WORKSPACE_UPDATED } from '@app/shared/transport';
 
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 import type { ProjectsRepository } from '../repositories/ProjectsRepository';
@@ -313,10 +313,7 @@ export class ProjectsService {
 						);
 					}
 				} catch (error) {
-					console.warn(
-						`[ProjectsService] Failed to clear projectId from workspace ${workspace.id}:`,
-						error
-					);
+					console.warn(`[ProjectsService] Failed to clear projectId from workspace ${workspace.id}:`, error);
 				}
 			}
 

@@ -85,7 +85,12 @@ export class WorkspaceMetadataFile {
 			description: metadata.description !== undefined ? metadata.description : existing?.description,
 			color: metadata.color !== undefined ? metadata.color : existing?.color,
 			// If projectId is null, explicitly remove it; if undefined, keep existing
-			projectId: metadata.projectId === null ? undefined : metadata.projectId !== undefined ? metadata.projectId : existing?.projectId,
+			projectId:
+				metadata.projectId === null
+					? undefined
+					: metadata.projectId !== undefined
+						? metadata.projectId
+						: existing?.projectId,
 			mode: metadata.mode || existing?.mode || 'development',
 			createdAt: existing?.createdAt || metadata.createdAt || now,
 			updatedAt: now,

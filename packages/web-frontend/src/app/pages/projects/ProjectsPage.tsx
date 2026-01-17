@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Data2 } from '@framework/components2/data/Data2';
 import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
-import { Input } from '@framework/components/forms/Input';
+import { SearchBar } from '@framework/components/forms/SearchBar';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
@@ -18,7 +18,7 @@ import { useErrorToast } from '@framework/hooks/useErrorToast';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
 import type { Project } from '@shared/api/projects.contract';
 import { B2F_PROJECT_CREATED, B2F_PROJECT_DELETED, B2F_PROJECT_UPDATED } from '@shared/transport';
-import { Plus, Trash2, X } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
@@ -231,26 +231,13 @@ export function ProjectsPage() {
 			/>
 
 			{/* Search Bar */}
-			<div className="relative mb-4">
-				<div className="mb-2 text-xs font-medium text-muted-foreground">Search</div>
-				<Input
-					type="text"
-					value={search.fstate.query}
-					onChange={e => search.actions.setQuery(e.target.value)}
-					placeholder="Search projects by name or description..."
-				/>
-				{search.fstate.query && (
-					<Button
-						onClick={search.actions.clearQuery}
-						variant="ghost"
-						size="sm"
-						className="absolute top-9 right-2 h-6 w-6 -translate-y-1/2 p-0"
-						aria-label="Clear search"
-					>
-						<X className="h-4 w-4" />
-					</Button>
-				)}
-			</div>
+			<SearchBar
+				value={search.fstate.query}
+				onChange={search.actions.setQuery}
+				onClear={search.actions.clearQuery}
+				placeholder="Search projects by name or description..."
+				className="mb-4"
+			/>
 
 			{/* Bulk Action Bar */}
 			{!selection.fstate.isEmpty && (

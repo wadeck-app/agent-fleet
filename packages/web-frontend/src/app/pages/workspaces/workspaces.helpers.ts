@@ -39,9 +39,7 @@ export function getUnusedColors(workspaces: Workspace[], projectId?: string): st
 
 	// Get colors used by workspaces in this project
 	const usedColors = new Set(
-		workspaces
-			.filter(w => w.projectId === projectId && w.color)
-			.map(w => w.color!.toUpperCase())
+		workspaces.filter(w => w.projectId === projectId && w.color).map(w => w.color!.toUpperCase())
 	);
 
 	// Return colors not yet used

@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
 
 import { Data2 } from '@framework/components2/data/Data2';
-import { Input } from '@framework/components/forms/Input';
+import { SearchBar } from '@framework/components/forms/SearchBar';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { Button } from '@framework/components/primitives/Button';
@@ -14,7 +14,6 @@ import type { MutationContract } from '@framework/types/MutationContract';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
 import type { Worker } from '@shared/api/workers.contract';
 import { B2F_WORKER_CONNECTED, B2F_WORKER_DISCONNECTED, B2F_WORKER_UPDATED } from '@shared/transport';
-import { X } from 'lucide-react';
 
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
@@ -100,28 +99,13 @@ export function WorkersPage() {
 			<PageHeader title="Workers" onRefresh={cache.actions.refresh} isRefreshing={cache.fstate.isRefreshing} />
 
 			{/* Search Bar */}
-			<div className="mb-4 flex flex-col gap-4">
-				<div className="relative">
-					<div className="mb-2 text-xs font-medium text-muted-foreground">Search</div>
-					<Input
-						type="text"
-						value={search.fstate.query}
-						onChange={e => search.actions.setQuery(e.target.value)}
-						placeholder="Search workers by ID, state, or task..."
-					/>
-					{search.fstate.query && (
-						<Button
-							onClick={search.actions.clearQuery}
-							variant="ghost"
-							size="sm"
-							className="absolute top-9 right-2 h-6 w-6 -translate-y-1/2 p-0"
-							aria-label="Clear search"
-						>
-							<X className="h-4 w-4" />
-						</Button>
-					)}
-				</div>
-			</div>
+			<SearchBar
+				value={search.fstate.query}
+				onChange={search.actions.setQuery}
+				onClear={search.actions.clearQuery}
+				placeholder="Search workers by ID, state, or task..."
+				className="mb-4"
+			/>
 
 			{/* Feature Info (for demo purposes) */}
 			<div className="mb-4 rounded-lg border border-border bg-muted/50 p-4 text-sm">

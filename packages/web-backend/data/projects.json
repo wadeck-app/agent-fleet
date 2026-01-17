@@ -2,9 +2,7 @@
 	"projects": [
 		{
 			"name": "Agent Fleet",
-			"workspaceIds": [
-				"50115a2e-5226-46d4-9fb8-6f9c11a16f9d"
-			],
+			"workspaceIds": ["50115a2e-5226-46d4-9fb8-6f9c11a16f9d"],
 			"icon": "Users",
 			"iconColor": "#10B981",
 			"archived": false,
