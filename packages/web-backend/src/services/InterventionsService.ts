@@ -1,4 +1,5 @@
 import type {
+	BulkCancelResponse,
 	Intervention,
 	InterventionResponseSubmit,
 	InterventionsListResponse,
@@ -41,16 +42,38 @@ export class InterventionsService {
 	 */
 	async getInterventions(query?: InterventionsQuery): Promise<InterventionsListResponse> {
 		try {
-			console.log('[InterventionsService] Fetching interventions from orchestrator...');
+			console.log('[InterventionsService] Fetching interventions from orchestrator with query:', query);
 
-			// TODO: Get interventions from orchestrator
-			// For now, return mock data for UI development
+			// Fetch and filter interventions
 			const interventions: Intervention[] = await this.fetchInterventionsFromOrchestrator(query);
 
-			console.log(`[InterventionsService] Found ${interventions.length} interventions`);
+			console.log(`[InterventionsService] Found ${interventions.length} interventions after filtering`);
 
-			// Sort by createdAt desc (newest first)
-			interventions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+			// Apply sorting
+			const sortBy = query?.sortBy || 'createdAt';
+			const sortOrder = query?.sortOrder || 'desc';
+
+			interventions.sort((a, b) => {
+				let aVal: any = a[sortBy as keyof Intervention];
+				let bVal: any = b[sortBy as keyof Intervention];
+
+				// Handle date comparisons
+				if (sortBy === 'createdAt' || sortBy === 'updatedAt') {
+					aVal = new Date(aVal as string).getTime();
+					bVal = new Date(bVal as string).getTime();
+				}
+
+				// Handle boolean comparisons
+				if (typeof aVal === 'boolean') {
+					aVal = aVal ? 1 : 0;
+					bVal = bVal ? 1 : 0;
+				}
+
+				// Compare
+				if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+				if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+				return 0;
+			});
 
 			// Apply pagination
 			const page = query?.page || 1;
@@ -182,22 +205,82 @@ export class InterventionsService {
 	}
 
 	/**
-	 * Fetch interventions from orchestrator
+	 * Bulk cancel multiple interventions
+	 */
+	async bulkCancelInterventions(ids: string[]): Promise<BulkCancelResponse> {
+		console.log(`[InterventionsService] Bulk cancelling ${ids.length} interventions...`);
+
+		const cancelled: string[] = [];
+		const failed: Array<{ id: string; error: string }> = [];
+
+		// Process each cancellation
+		for (const id of ids) {
+			try {
+				await this.cancelIntervention(id);
+				cancelled.push(id);
+			} catch (error) {
+				console.error(`[InterventionsService] Failed to cancel intervention ${id}:`, error);
+				failed.push({
+					id,
+					error: error instanceof Error ? error.message : 'Unknown error',
+				});
+			}
+		}
+
+		console.log(
+			`[InterventionsService] Bulk cancel completed: ${cancelled.length} succeeded, ${failed.length} failed`
+		);
+
+		return {
+			cancelled,
+			failed,
+		};
+	}
+
+	/**
+	 * Fetch interventions from orchestrator with filtering
 	 */
 	private async fetchInterventionsFromOrchestrator(query?: InterventionsQuery): Promise<Intervention[]> {
 		// Fetch from orchestrator via repository
 		const rawInterventions = await this.orchestratorRepository.getInterventions();
 
 		// Transform to match API contract (add missing BaseEntity fields)
-		const interventions: Intervention[] = rawInterventions.map(intervention => ({
+		let interventions: Intervention[] = rawInterventions.map(intervention => ({
 			...intervention,
 			version: 1, // Interventions don't have versioning yet
 			updatedAt: intervention.answeredAt || intervention.createdAt, // Use answeredAt if available, else createdAt
 		}));
 
-		// Filter by status if specified
+		// Apply filters
 		if (query?.status) {
-			return interventions.filter(i => i.status === query.status);
+			interventions = interventions.filter(i => i.status === query.status);
+		}
+
+		if (query?.type) {
+			interventions = interventions.filter(i => i.type === query.type);
+		}
+
+		if (query?.blocking !== undefined) {
+			interventions = interventions.filter(i => i.blocking === query.blocking);
+		}
+
+		if (query?.taskId) {
+			const taskIdLower = query.taskId.toLowerCase();
+			interventions = interventions.filter(i => i.taskId.toLowerCase().includes(taskIdLower));
+		}
+
+		// Apply search filter (searches across multiple fields)
+		if (query?.search) {
+			const searchLower = query.search.toLowerCase();
+			interventions = interventions.filter(
+				i =>
+					i.id.toLowerCase().includes(searchLower) ||
+					i.taskId.toLowerCase().includes(searchLower) ||
+					i.config.title.toLowerCase().includes(searchLower) ||
+					i.config.description?.toLowerCase().includes(searchLower) ||
+					i.type.toLowerCase().includes(searchLower) ||
+					i.status.toLowerCase().includes(searchLower)
+			);
 		}
 
 		return interventions;

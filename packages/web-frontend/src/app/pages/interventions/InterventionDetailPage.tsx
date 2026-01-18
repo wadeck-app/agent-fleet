@@ -16,11 +16,7 @@ import type { Intervention } from '@shared/api/interventions.contract';
 import { ArrowLeft } from 'lucide-react';
 
 import { interventionsApi } from './interventions.api';
-import {
-	getInterventionStatusVariant,
-	getInterventionTypeIcon,
-	getInterventionTypeVariant,
-} from './interventions.helpers';
+import { getInterventionStatusVariant, getInterventionTypeVariant } from './interventions.helpers';
 
 /**
  * ===========================================================================================
@@ -181,8 +177,8 @@ export function InterventionDetailPage() {
 						#{interventionId?.slice(0, 8)}
 					</Badge>
 					<Badge variant={getInterventionStatusVariant(intervention.status)}>{intervention.status}</Badge>
-					<Badge variant={getInterventionTypeVariant(intervention.type)}>
-						{getInterventionTypeIcon(intervention.type)} {intervention.type}
+					<Badge variant={getInterventionTypeVariant(intervention.type)} className="capitalize">
+						{intervention.type}
 					</Badge>
 				</div>
 

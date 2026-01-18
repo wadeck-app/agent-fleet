@@ -43,6 +43,38 @@ export interface Data2InfiniteProps<T> extends Omit<Data2Props<T>, 'children' | 
 }
 
 /**
+ * Internal component that handles data accumulation.
+ * This is a separate component to ensure hooks are called at the top level.
+ */
+interface DataAccumulatorWrapperProps<T> {
+	props: QueryResultDisplayerProps<T>;
+	deduplicateBy?: (item: T) => string | number;
+	onReset: () => void;
+	children: (props: QueryResultDisplayerProps<T>) => ReactNode;
+}
+
+function DataAccumulatorWrapper<T>({ props, deduplicateBy, onReset, children }: DataAccumulatorWrapperProps<T>) {
+	// DECORATOR: Accumulate data before passing to children
+	const accumulatedState = useDataAccumulator(
+		{
+			data: props.data,
+			isLoading: props.isLoading,
+			error: props.error,
+			paginationData: null,
+			isRefreshing: props.refreshing ?? false,
+		},
+		{
+			enabled: true,
+			deduplicateBy,
+			onReset,
+		}
+	);
+
+	// Pass accumulated data to children
+	return <>{children({ ...props, data: accumulatedState.data })}</>;
+}
+
+/**
  * Data2 wrapper that adds infinite scroll accumulation using decorator pattern.
  *
  * This component wraps Data2 without modifying it. It uses render props to
@@ -94,8 +126,11 @@ export function Data2Infinite<T>({
 	const paginationAdapter = useMemo(
 		() => ({
 			fstate: {
+				currentPage: infinitePagination.fstate.currentPage,
 				page: infinitePagination.fstate.currentPage,
 				pageSize: infinitePagination.fstate.pageSize,
+				canGoPrevious: infinitePagination.fstate.currentPage > 1,
+				canGoNext: () => infinitePagination.fstate.hasMore,
 			},
 			actions: {
 				setPage: infinitePagination.actions.loadNext,
@@ -113,29 +148,15 @@ export function Data2Infinite<T>({
 
 	return (
 		<Data2 {...data2Props} pagination={paginationAdapter}>
-			{props => {
-				// DECORATOR: Accumulate data before passing to children
-				const accumulatedState = useDataAccumulator(
-					{
-						data: props.data,
-						isLoading: props.isLoading,
-						error: props.error,
-						paginationData: props.paginationData,
-						isRefreshing: props.isRefreshing,
-					},
-					{
-						enabled: true,
-						deduplicateBy,
-						onReset: infinitePagination.actions.reset,
-					}
-				);
-
-				// Pass accumulated data to children
-				return children({
-					...props,
-					data: accumulatedState.data,
-				});
-			}}
+			{props => (
+				<DataAccumulatorWrapper
+					props={props}
+					deduplicateBy={deduplicateBy}
+					onReset={infinitePagination.actions.reset}
+				>
+					{children}
+				</DataAccumulatorWrapper>
+			)}
 		</Data2>
 	);
 }

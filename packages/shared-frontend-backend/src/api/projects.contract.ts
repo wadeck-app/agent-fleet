@@ -134,6 +134,8 @@ export const ProjectSchema = z.object({
 	icon: ProjectIconSchema,
 	iconColor: ProjectIconColorSchema,
 	archived: z.boolean().default(false),
+	pinned: z.boolean().default(false),
+	order: z.number().int().min(0).default(0),
 	createdAt: z.string(), // ISO 8601
 	updatedAt: z.string(), // ISO 8601
 	version: z.number().int().min(0), // For optimistic locking
@@ -148,6 +150,8 @@ export const CreateProjectSchema = ProjectSchema.omit({
 	updatedAt: true,
 	version: true,
 	taskCount: true,
+	pinned: true,
+	order: true,
 });
 
 /**

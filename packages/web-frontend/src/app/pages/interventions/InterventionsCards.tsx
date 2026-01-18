@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 
 import { EmptyState } from '@framework/components/feedback/EmptyState';
+import { SkeletonBox } from '@framework/components/loading/SkeletonBox';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Card, CardContent } from '@framework/components/primitives/Card';
 import type { QueryResultDisplayerProps } from '@framework/types/QueryResultDisplayerContract';
@@ -8,7 +9,7 @@ import { formatRelativeTime } from '@framework/utils/formatting/DateFormat';
 import type { Intervention } from '@shared/api/interventions.contract';
 import { Bell } from 'lucide-react';
 
-import { getInterventionStatusVariant, getInterventionTypeIcon } from './interventions.helpers';
+import { getInterventionStatusVariant, getInterventionTypeVariant } from './interventions.helpers';
 
 /**
  * ===========================================================================================
@@ -46,19 +47,19 @@ export function InterventionsCards({ data, isLoading, error, features }: Interve
 								<div className="flex-1 min-w-0 space-y-2">
 									{/* Icon + Title skeleton */}
 									<div className="flex items-center gap-2">
-										<div className="h-6 w-6 animate-pulse rounded bg-muted shrink-0" />
-										<div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
+										<SkeletonBox shape="square" className="h-6 w-6" />
+										<SkeletonBox className="h-5 w-2/3" />
 									</div>
 									{/* Description skeleton */}
-									<div className="h-4 w-full animate-pulse rounded bg-muted" />
-									<div className="h-4 w-4/5 animate-pulse rounded bg-muted" />
+									<SkeletonBox className="h-4 w-full" />
+									<SkeletonBox className="h-4 w-4/5" />
 								</div>
 								{/* Badges skeleton */}
 								<div className="flex items-center gap-2 shrink-0">
-									<div className="h-6 w-16 animate-pulse rounded-full bg-muted" />
-									<div className="h-6 w-16 animate-pulse rounded-full bg-muted" />
-									<div className="h-6 w-20 animate-pulse rounded-full bg-muted" />
-									<div className="h-6 w-16 animate-pulse rounded-full bg-muted" />
+									<SkeletonBox shape="pill" className="h-6 w-16" />
+									<SkeletonBox shape="pill" className="h-6 w-16" />
+									<SkeletonBox shape="pill" className="h-6 w-20" />
+									<SkeletonBox shape="pill" className="h-6 w-16" />
 								</div>
 							</div>
 						</CardContent>
@@ -103,8 +104,8 @@ export function InterventionsCards({ data, isLoading, error, features }: Interve
  */
 function InterventionCard({ intervention }: { intervention: Intervention }) {
 	const navigate = useNavigate();
-	const icon = getInterventionTypeIcon(intervention.type);
 	const statusVariant = getInterventionStatusVariant(intervention.status);
+	const typeVariant = getInterventionTypeVariant(intervention.type);
 
 	const handleClick = () => {
 		navigate(`/interventions/${intervention.id}`);
@@ -115,9 +116,11 @@ function InterventionCard({ intervention }: { intervention: Intervention }) {
 			<CardContent className="p-3">
 				<div className="flex items-start justify-between gap-3">
 					<div className="flex-1 min-w-0">
-						{/* Header with icon and title */}
+						{/* Header with type badge and title */}
 						<div className="flex items-center gap-2 mb-2">
-							<span className="text-xl shrink-0">{icon}</span>
+							<Badge variant={typeVariant} className="capitalize text-xs shrink-0">
+								{intervention.type}
+							</Badge>
 							<div className="font-semibold text-foreground truncate">
 								{intervention.config?.title || 'Intervention Required'}
 							</div>

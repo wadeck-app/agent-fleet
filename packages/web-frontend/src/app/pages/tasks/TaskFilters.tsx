@@ -1,4 +1,5 @@
 import { Input } from '@framework/components/forms/Input';
+import { FilterGrid } from '@framework/components/layout/FilterGrid';
 import { Button } from '@framework/components/primitives/Button';
 import { SelectInput } from '@framework/features/forms/inputs/SelectInput';
 
@@ -56,13 +57,7 @@ export interface TaskFiltersProps {
  */
 export function TaskFilters({ filters }: TaskFiltersProps) {
 	return (
-		<div
-			className={`
-     mb-4 grid grid-cols-1 gap-4
-     sm:grid-cols-2
-     lg:grid-cols-4
-   `}
-		>
+		<FilterGrid cols={4}>
 			{/* Status Filter */}
 			<div>
 				<div className="mb-2 text-xs font-medium text-muted-foreground">Status</div>
@@ -117,6 +112,6 @@ export function TaskFilters({ filters }: TaskFiltersProps) {
 					</Button>
 				</div>
 			)}
-		</div>
+		</FilterGrid>
 	);
 }

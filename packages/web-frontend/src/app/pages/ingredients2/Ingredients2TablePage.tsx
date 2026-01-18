@@ -40,7 +40,7 @@ import { INGREDIENT_TABLE2_COLUMNS, IngredientTable2 } from './IngredientTable2'
 
 const STORAGE_ID = 'ingredients2' as const;
 
-export function Ingredients2Page() {
+export function Ingredients2TablePage() {
 	const navigate = useNavigate();
 	const { id, mode } = useParams<{ id?: string; mode?: 'new' | 'edit' }>();
 
@@ -360,7 +360,7 @@ export function Ingredients2Page() {
 	return (
 		<Page>
 			<PageHeader
-				title="Ingredients (v2)"
+				title="Ingredients v2 table"
 				onRefresh={cache.actions.refresh}
 				isRefreshing={cache.fstate.isRefreshing}
 				action={

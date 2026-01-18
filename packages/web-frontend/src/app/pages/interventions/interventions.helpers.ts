@@ -21,25 +21,17 @@ export function getInterventionStatusVariant(status: InterventionStatus): BadgeP
 }
 
 /**
- * Get emoji icon for intervention type
- */
-export function getInterventionTypeIcon(type: InterventionType): string {
-	switch (type) {
-		case 'approval':
-			return '⏸️';
-		case 'question':
-			return '💬';
-		case 'choice':
-			return '❓';
-		default:
-			return '❓';
-	}
-}
-
-/**
- * Get badge variant for intervention type
+ * Get badge variant for intervention type with distinct colors
  */
 export function getInterventionTypeVariant(type: InterventionType): BadgeProps['variant'] {
-	// All types use default variant - differentiated by icon
-	return 'default';
+	switch (type) {
+		case 'approval':
+			return 'default'; // Blue
+		case 'question':
+			return 'secondary'; // Gray
+		case 'choice':
+			return 'warning'; // Yellow/Orange
+		default:
+			return 'secondary';
+	}
 }

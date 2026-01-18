@@ -65,5 +65,13 @@ export default class InterventionsController implements LazyController<typeof IN
 		add('POST', '/api/interventions/:id/cancel', async request => {
 			return this.service.cancelIntervention(request.params.id);
 		});
+
+		/**
+		 * POST /api/interventions/bulk-cancel/
+		 * Bulk cancel multiple interventions
+		 */
+		add('POST', '/api/interventions/bulk-cancel/', async request => {
+			return this.service.bulkCancelInterventions(request.body.ids);
+		});
 	}
 }

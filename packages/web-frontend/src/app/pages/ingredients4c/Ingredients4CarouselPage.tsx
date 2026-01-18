@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { Data2Infinite } from '@framework/components2/data/Data2Infinite';
@@ -117,22 +117,28 @@ export function Ingredients4CarouselPage() {
 	}, []);
 
 	// Search feature contract
-	const search: SearchContract = useMemo(
-		() => ({
-			fstate: { query: searchQuery },
+	const search: SearchContract = useMemo(() => {
+		const trimmedQuery = searchQuery.trim();
+		const searchState = {
+			query: searchQuery,
+			trimmedQuery,
+			isEmpty: trimmedQuery === '',
+		};
+		return {
+			state: searchState,
+			fstate: searchState,
 			actions: {
 				setQuery: setSearchQuery,
 				clearQuery: () => setSearchQuery(''),
 			},
-			fillQuery: (q: ComposedQuery) => {
-				if (searchQuery) q.search = searchQuery;
+			fillQuery: q => {
+				if (trimmedQuery) q.search = trimmedQuery;
 			},
-		}),
-		[searchQuery]
-	);
+		};
+	}, [searchQuery]);
 
 	// Infinite pagination feature - track hasMore from backend
-	const [hasMore, setHasMore] = useState(true);
+	const [hasMore, _setHasMore] = useState(true);
 	const infinitePagination = useInfinitePagination({
 		pageSize: PAGE_SIZE,
 		hasMore,
@@ -302,7 +308,7 @@ export function Ingredients4CarouselPage() {
 	};
 
 	// Handle select all for current visible items
-	const handleSelectAll = (ids: string[]) => {
+	const _handleSelectAll = (ids: string[]) => {
 		const allSelected = ids.every(id => selection.actions.isSelected(id));
 
 		if (allSelected) {
@@ -324,7 +330,7 @@ export function Ingredients4CarouselPage() {
 	return (
 		<Page>
 			<PageHeader
-				title="Ingredients v4c (Infinite Scroll Carousel)"
+				title="Ingredients v4 carousel"
 				onRefresh={handleManualRefresh}
 				isRefreshing={isLoading}
 				action={
@@ -440,8 +446,8 @@ export function Ingredients4CarouselPage() {
 				{props => {
 					// Update refs for dialog management (safe to do in render)
 					ingredientsRef.current = props.data;
-					if (props.paginationData) {
-						totalItemsRef.current = props.paginationData.total;
+					if (props.pagination) {
+						totalItemsRef.current = props.pagination.totalItems;
 					}
 					// Sync loading state for UI outside render props
 					if (isLoading !== props.isLoading) {
@@ -455,7 +461,7 @@ export function Ingredients4CarouselPage() {
 							isLoadingMore={false} // TODO: derive from Data2
 							hasMore={hasMore}
 							error={props.error}
-							sorting={props.sorting}
+							sorting={sorting}
 							searchQuery={searchQuery}
 							carousel={carousel}
 							fields={visibleOrderedFields}

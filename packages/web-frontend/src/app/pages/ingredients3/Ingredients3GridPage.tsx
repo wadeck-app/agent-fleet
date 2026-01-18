@@ -374,7 +374,7 @@ export function Ingredients3GridPage() {
 	return (
 		<Page>
 			<PageHeader
-				title="Ingredients (Grid)"
+				title="Ingredients v3 grid"
 				onRefresh={cache.actions.refresh}
 				isRefreshing={cache.fstate.isRefreshing}
 				action={

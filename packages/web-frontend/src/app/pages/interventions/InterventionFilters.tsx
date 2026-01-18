@@ -1,5 +1,5 @@
 import { Input } from '@framework/components/forms/Input';
-import { Label } from '@framework/components/forms/Label';
+import { FilterGrid } from '@framework/components/layout/FilterGrid';
 import { Button } from '@framework/components/primitives/Button';
 import { SelectInput } from '@framework/features/forms/inputs/SelectInput';
 
@@ -52,18 +52,10 @@ export interface InterventionFiltersProps {
  */
 export function InterventionFilters({ filters }: InterventionFiltersProps) {
 	return (
-		<div
-			className={`
-     mb-4 grid grid-cols-1 gap-4
-     sm:grid-cols-2
-     lg:grid-cols-4
-   `}
-		>
+		<FilterGrid cols={4}>
 			{/* Status Filter */}
 			<div>
-				<Label htmlFor="status-filter" className="text-xs">
-					Status
-				</Label>
+				<div className="mb-2 text-xs font-medium text-muted-foreground">Status</div>
 				<SelectInput
 					id="status-filter"
 					value={filters.fstate.status || '__all__'}
@@ -74,9 +66,7 @@ export function InterventionFilters({ filters }: InterventionFiltersProps) {
 
 			{/* Type Filter */}
 			<div>
-				<Label htmlFor="type-filter" className="text-xs">
-					Type
-				</Label>
+				<div className="mb-2 text-xs font-medium text-muted-foreground">Type</div>
 				<SelectInput
 					id="type-filter"
 					value={filters.fstate.type || '__all__'}
@@ -87,9 +77,7 @@ export function InterventionFilters({ filters }: InterventionFiltersProps) {
 
 			{/* Blocking Filter */}
 			<div>
-				<Label htmlFor="blocking-filter" className="text-xs">
-					Blocking
-				</Label>
+				<div className="mb-2 text-xs font-medium text-muted-foreground">Blocking</div>
 				<SelectInput
 					id="blocking-filter"
 					value={filters.fstate.blocking === undefined ? '__all__' : String(filters.fstate.blocking)}
@@ -102,9 +90,7 @@ export function InterventionFilters({ filters }: InterventionFiltersProps) {
 
 			{/* Task ID Filter */}
 			<div>
-				<Label htmlFor="task-filter" className="text-xs">
-					Task ID
-				</Label>
+				<div className="mb-2 text-xs font-medium text-muted-foreground">Task ID</div>
 				<Input
 					id="task-filter"
 					type="text"
@@ -122,6 +108,6 @@ export function InterventionFilters({ filters }: InterventionFiltersProps) {
 					</Button>
 				</div>
 			)}
-		</div>
+		</FilterGrid>
 	);
 }

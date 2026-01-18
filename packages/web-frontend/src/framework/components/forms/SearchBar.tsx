@@ -24,8 +24,8 @@ export function SearchBar({
 }: SearchBarProps) {
 	return (
 		<div className={className}>
+			<div className="mb-2 text-xs font-medium text-muted-foreground">{label}</div>
 			<div className="relative">
-				<div className="mb-2 text-xs font-medium text-muted-foreground">{label}</div>
 				<Input
 					type="text"
 					value={value}
@@ -37,7 +37,7 @@ export function SearchBar({
 						onClick={onClear}
 						variant="ghost"
 						size="sm"
-						className="absolute top-9 right-2 h-6 w-6 -translate-y-1/2 p-0"
+						className="absolute top-1/2 right-2 h-6 w-6 -translate-y-1/2 p-0"
 						aria-label="Clear search"
 					>
 						<X className="h-4 w-4" />

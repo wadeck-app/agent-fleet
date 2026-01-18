@@ -14,12 +14,12 @@ import { ProtectedRoute } from '@app/pages/auth/ProtectedRoute';
 import { BooksPage } from '@app/pages/books/BooksPage';
 import { DashboardPage } from '@app/pages/dashboard/DashboardPage';
 import { FlowEditorPage } from '@app/pages/flows/flow-editor/FlowEditorPage';
-import { Ingredients2Page } from '@app/pages/ingredients2/Ingredients2Page';
+import { Ingredients2TablePage } from '@app/pages/ingredients2/Ingredients2TablePage';
 import { Ingredients3GridPage } from '@app/pages/ingredients3/Ingredients3GridPage';
 import { Ingredients4CarouselPage as Ingredients4cCarouselPage } from '@app/pages/ingredients4c/Ingredients4CarouselPage';
-import { IngredientsPage } from '@app/pages/ingredients/IngredientsPage';
 import { InterventionDetailPage } from '@app/pages/interventions/InterventionDetailPage';
 import { InterventionsPage } from '@app/pages/interventions/InterventionsPage';
+import { InterventionsV2Page } from '@app/pages/interventions/InterventionsV2Page';
 import { ProjectsV2Page } from '@app/pages/projects2/ProjectsV2Page';
 import { ProjectBoardPage } from '@app/pages/projects/ProjectBoardPage';
 import { ProjectsPage } from '@app/pages/projects/ProjectsPage';
@@ -61,14 +61,12 @@ function Layout() {
 						<Route path="/projects-v2" element={<ProjectsV2Page />} />
 						<Route path="/projects/:projectId/board" element={<ProjectBoardPage />} />
 						<Route path="/interventions" element={<InterventionsPage />} />
+						<Route path="/interventions-v2" element={<InterventionsV2Page />} />
 						<Route path="/interventions/:interventionId" element={<InterventionDetailPage />} />
 						<Route path="/workspaces" element={<WorkspacesPage />} />
-						<Route path="/ingredients" element={<IngredientsPage />} />
-						<Route path="/ingredients/:mode" element={<IngredientsPage />} />
-						<Route path="/ingredients/:id/:mode" element={<IngredientsPage />} />
-						<Route path="/ingredients2" element={<Ingredients2Page />} />
-						<Route path="/ingredients2/:mode" element={<Ingredients2Page />} />
-						<Route path="/ingredients2/:id/:mode" element={<Ingredients2Page />} />
+						<Route path="/ingredients2" element={<Ingredients2TablePage />} />
+						<Route path="/ingredients2/:mode" element={<Ingredients2TablePage />} />
+						<Route path="/ingredients2/:id/:mode" element={<Ingredients2TablePage />} />
 						<Route path="/ingredients3" element={<Ingredients3GridPage />} />
 						<Route path="/ingredients3/:mode" element={<Ingredients3GridPage />} />
 						<Route path="/ingredients3/:id/:mode" element={<Ingredients3GridPage />} />

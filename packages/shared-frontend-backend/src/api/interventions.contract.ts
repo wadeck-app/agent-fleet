@@ -117,7 +117,7 @@ export const InterventionsQuerySchema = createQuerySchema({
 	status: InterventionStatusSchema.optional(),
 	type: InterventionTypeSchema.optional(),
 	taskId: optionalSanitizedString(100),
-	blocking: z.boolean().optional(),
+	blocking: z.coerce.boolean().optional(),
 });
 
 /**

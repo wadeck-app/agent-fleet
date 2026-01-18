@@ -268,3 +268,207 @@
 [2026-01-17T22:33:57.486Z] Stoppable mode: false
 [2026-01-17T22:33:57.486Z] Worker socket: undefined
 [2026-01-17T22:33:57.486Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T09:30:25.879Z] Starting temporary file cleanup...
+[2026-01-18T09:30:26.225Z] Found 0 temporary files to clean
+[2026-01-18T09:30:26.225Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T09:30:26.225Z] Stoppable mode: false
+[2026-01-18T09:30:26.225Z] Worker socket: undefined
+[2026-01-18T09:30:26.226Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T09:35:13.139Z] Starting temporary file cleanup...
+[2026-01-18T09:35:13.491Z] Found 0 temporary files to clean
+[2026-01-18T09:35:13.491Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T09:35:13.491Z] Stoppable mode: false
+[2026-01-18T09:35:13.491Z] Worker socket: undefined
+[2026-01-18T09:35:13.492Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T09:44:15.828Z] Starting temporary file cleanup...
+[2026-01-18T09:44:16.258Z] Found 0 temporary files to clean
+[2026-01-18T09:44:16.258Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T09:44:16.258Z] Stoppable mode: false
+[2026-01-18T09:44:16.259Z] Worker socket: undefined
+[2026-01-18T09:44:16.259Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T09:44:51.848Z] Starting temporary file cleanup...
+[2026-01-18T09:44:52.259Z] Found 0 temporary files to clean
+[2026-01-18T09:44:52.260Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T09:44:52.260Z] Stoppable mode: false
+[2026-01-18T09:44:52.260Z] Worker socket: undefined
+[2026-01-18T09:44:52.260Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T09:51:35.064Z] Starting temporary file cleanup...
+[2026-01-18T09:51:35.567Z] Found 0 temporary files to clean
+[2026-01-18T09:51:35.567Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T09:51:35.567Z] Stoppable mode: false
+[2026-01-18T09:51:35.568Z] Worker socket: undefined
+[2026-01-18T09:51:35.568Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T10:09:04.564Z] Starting temporary file cleanup...
+[2026-01-18T10:09:04.958Z] Found 0 temporary files to clean
+[2026-01-18T10:09:04.958Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T10:09:04.959Z] Stoppable mode: false
+[2026-01-18T10:09:04.959Z] Worker socket: undefined
+[2026-01-18T10:09:04.959Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T10:11:14.043Z] Starting temporary file cleanup...
+[2026-01-18T10:11:14.387Z] Found 0 temporary files to clean
+[2026-01-18T10:11:14.387Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T10:11:14.388Z] Stoppable mode: false
+[2026-01-18T10:11:14.388Z] Worker socket: undefined
+[2026-01-18T10:11:14.388Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T10:15:25.524Z] Starting temporary file cleanup...
+[2026-01-18T10:15:25.865Z] Found 0 temporary files to clean
+[2026-01-18T10:15:25.865Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T10:15:25.866Z] Stoppable mode: false
+[2026-01-18T10:15:25.866Z] Worker socket: undefined
+[2026-01-18T10:15:25.866Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T10:19:21.558Z] Starting temporary file cleanup...
+[2026-01-18T10:19:21.902Z] Found 0 temporary files to clean
+[2026-01-18T10:19:21.903Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T10:19:21.903Z] Stoppable mode: false
+[2026-01-18T10:19:21.903Z] Worker socket: undefined
+[2026-01-18T10:19:21.903Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T10:23:55.236Z] Starting temporary file cleanup...
+[2026-01-18T10:23:55.628Z] Found 0 temporary files to clean
+[2026-01-18T10:23:55.629Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T10:23:55.629Z] Stoppable mode: false
+[2026-01-18T10:23:55.629Z] Worker socket: undefined
+[2026-01-18T10:23:55.629Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T10:24:18.098Z] Starting temporary file cleanup...
+[2026-01-18T10:24:18.453Z] Found 0 temporary files to clean
+[2026-01-18T10:24:18.454Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T10:24:18.454Z] Stoppable mode: false
+[2026-01-18T10:24:18.454Z] Worker socket: undefined
+[2026-01-18T10:24:18.454Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T10:26:00.162Z] Starting temporary file cleanup...
+[2026-01-18T10:26:00.544Z] Found 0 temporary files to clean
+[2026-01-18T10:26:00.545Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T10:26:00.545Z] Stoppable mode: false
+[2026-01-18T10:26:00.545Z] Worker socket: undefined
+[2026-01-18T10:26:00.545Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T10:26:31.005Z] Starting temporary file cleanup...
+[2026-01-18T10:26:31.359Z] Found 0 temporary files to clean
+[2026-01-18T10:26:31.359Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T10:26:31.360Z] Stoppable mode: false
+[2026-01-18T10:26:31.360Z] Worker socket: undefined
+[2026-01-18T10:26:31.360Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T10:29:02.802Z] Starting temporary file cleanup...
+[2026-01-18T10:29:03.274Z] Found 0 temporary files to clean
+[2026-01-18T10:29:03.274Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T10:29:03.275Z] Stoppable mode: false
+[2026-01-18T10:29:03.275Z] Worker socket: undefined
+[2026-01-18T10:29:03.275Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T10:30:00.105Z] Starting temporary file cleanup...
+[2026-01-18T10:30:00.463Z] Found 0 temporary files to clean
+[2026-01-18T10:30:00.463Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T10:30:00.464Z] Stoppable mode: false
+[2026-01-18T10:30:00.464Z] Worker socket: undefined
+[2026-01-18T10:30:00.464Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T10:32:24.036Z] Starting temporary file cleanup...
+[2026-01-18T10:32:24.369Z] Found 0 temporary files to clean
+[2026-01-18T10:32:24.370Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T10:32:24.370Z] Stoppable mode: false
+[2026-01-18T10:32:24.370Z] Worker socket: undefined
+[2026-01-18T10:32:24.370Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T10:35:50.819Z] Starting temporary file cleanup...
+[2026-01-18T10:35:51.184Z] Found 0 temporary files to clean
+[2026-01-18T10:35:51.185Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T10:35:51.185Z] Stoppable mode: false
+[2026-01-18T10:35:51.185Z] Worker socket: undefined
+[2026-01-18T10:35:51.185Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T10:36:02.317Z] Starting temporary file cleanup...
+[2026-01-18T10:36:02.694Z] Found 0 temporary files to clean
+[2026-01-18T10:36:02.694Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T10:36:02.695Z] Stoppable mode: false
+[2026-01-18T10:36:02.695Z] Worker socket: undefined
+[2026-01-18T10:36:02.695Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T10:36:15.892Z] Starting temporary file cleanup...
+[2026-01-18T10:36:16.256Z] Found 0 temporary files to clean
+[2026-01-18T10:36:16.256Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T10:36:16.256Z] Stoppable mode: false
+[2026-01-18T10:36:16.256Z] Worker socket: undefined
+[2026-01-18T10:36:16.256Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T10:36:28.032Z] Starting temporary file cleanup...
+[2026-01-18T10:36:28.403Z] Found 0 temporary files to clean
+[2026-01-18T10:36:28.403Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T10:36:28.403Z] Stoppable mode: false
+[2026-01-18T10:36:28.403Z] Worker socket: undefined
+[2026-01-18T10:36:28.403Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T10:52:17.641Z] Starting temporary file cleanup...
+[2026-01-18T10:52:18.054Z] Found 0 temporary files to clean
+[2026-01-18T10:52:18.055Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T10:52:18.055Z] Stoppable mode: false
+[2026-01-18T10:52:18.055Z] Worker socket: undefined
+[2026-01-18T10:52:18.055Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T10:56:28.384Z] Starting temporary file cleanup...
+[2026-01-18T10:56:29.241Z] Found 0 temporary files to clean
+[2026-01-18T10:56:29.241Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T10:56:29.242Z] Stoppable mode: false
+[2026-01-18T10:56:29.242Z] Worker socket: undefined
+[2026-01-18T10:56:29.242Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T10:59:21.898Z] Starting temporary file cleanup...
+[2026-01-18T10:59:22.273Z] Found 0 temporary files to clean
+[2026-01-18T10:59:22.273Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T10:59:22.273Z] Stoppable mode: false
+[2026-01-18T10:59:22.274Z] Worker socket: undefined
+[2026-01-18T10:59:22.274Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T11:01:35.468Z] Starting temporary file cleanup...
+[2026-01-18T11:01:35.819Z] Found 0 temporary files to clean
+[2026-01-18T11:01:35.819Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T11:01:35.820Z] Stoppable mode: false
+[2026-01-18T11:01:35.820Z] Worker socket: undefined
+[2026-01-18T11:01:35.820Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T11:05:10.987Z] Starting temporary file cleanup...
+[2026-01-18T11:05:11.337Z] Found 0 temporary files to clean
+[2026-01-18T11:05:11.337Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T11:05:11.337Z] Stoppable mode: false
+[2026-01-18T11:05:11.337Z] Worker socket: undefined
+[2026-01-18T11:05:11.337Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T11:08:15.103Z] Starting temporary file cleanup...
+[2026-01-18T11:08:15.444Z] Found 0 temporary files to clean
+[2026-01-18T11:08:15.444Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T11:08:15.445Z] Stoppable mode: false
+[2026-01-18T11:08:15.445Z] Worker socket: undefined
+[2026-01-18T11:08:15.445Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T11:09:22.870Z] Starting temporary file cleanup...
+[2026-01-18T11:09:23.213Z] Found 0 temporary files to clean
+[2026-01-18T11:09:23.213Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T11:09:23.213Z] Stoppable mode: false
+[2026-01-18T11:09:23.213Z] Worker socket: undefined
+[2026-01-18T11:09:23.213Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T11:09:30.106Z] Starting temporary file cleanup...
+[2026-01-18T11:09:30.494Z] Found 0 temporary files to clean
+[2026-01-18T11:09:30.494Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T11:09:30.495Z] Stoppable mode: false
+[2026-01-18T11:09:30.495Z] Worker socket: undefined
+[2026-01-18T11:09:30.495Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T11:20:32.199Z] Starting temporary file cleanup...
+[2026-01-18T11:20:32.665Z] Found 0 temporary files to clean
+[2026-01-18T11:20:32.666Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T11:20:32.666Z] Stoppable mode: false
+[2026-01-18T11:20:32.666Z] Worker socket: undefined
+[2026-01-18T11:20:32.666Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T11:26:45.090Z] Starting temporary file cleanup...
+[2026-01-18T11:26:45.432Z] Found 0 temporary files to clean
+[2026-01-18T11:26:45.432Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T11:26:45.432Z] Stoppable mode: false
+[2026-01-18T11:26:45.432Z] Worker socket: undefined
+[2026-01-18T11:26:45.432Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T11:29:33.720Z] Starting temporary file cleanup...
+[2026-01-18T11:29:34.295Z] Found 0 temporary files to clean
+[2026-01-18T11:29:34.295Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T11:29:34.296Z] Stoppable mode: false
+[2026-01-18T11:29:34.296Z] Worker socket: undefined
+[2026-01-18T11:29:34.296Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T11:35:13.843Z] Starting temporary file cleanup...
+[2026-01-18T11:35:14.255Z] Found 0 temporary files to clean
+[2026-01-18T11:35:14.255Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T11:35:14.255Z] Stoppable mode: false
+[2026-01-18T11:35:14.255Z] Worker socket: undefined
+[2026-01-18T11:35:14.255Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T11:51:59.116Z] Starting temporary file cleanup...
+[2026-01-18T11:51:59.541Z] Found 0 temporary files to clean
+[2026-01-18T11:51:59.542Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T11:51:59.542Z] Stoppable mode: false
+[2026-01-18T11:51:59.542Z] Worker socket: undefined
+[2026-01-18T11:51:59.542Z] Stoppable mode disabled - not sending stop request
+[2026-01-18T11:53:30.709Z] Starting temporary file cleanup...
+[2026-01-18T11:53:31.125Z] Found 0 temporary files to clean
+[2026-01-18T11:53:31.126Z] Cleanup complete: 0 deleted, 0 failed
+[2026-01-18T11:53:31.126Z] Stoppable mode: false
+[2026-01-18T11:53:31.126Z] Worker socket: undefined
+[2026-01-18T11:53:31.126Z] Stoppable mode disabled - not sending stop request

@@ -69,6 +69,12 @@ const errorHandlerHook: FastifyPluginAsync = async fastify => {
 
 		// Handle Zod validation errors
 		if (error instanceof ZodError) {
+			// Log detailed validation error information
+			logger.error(`Zod validation error for ${request.method} ${request.url}`);
+			logger.error('Query params:', request.query);
+			logger.error('Body:', request.body);
+			logger.error('Validation issues:', JSON.stringify(error.issues, null, 2));
+
 			const response: ErrorResponse = {
 				error: 'Validation failed',
 				code: ERROR_CODES.VALIDATION_FAILED,
@@ -77,6 +83,8 @@ const errorHandlerHook: FastifyPluginAsync = async fastify => {
 				details: error.issues.map(e => ({
 					field: e.path.join('.'),
 					message: e.message,
+					code: e.code,
+					received: 'received' in e ? e.received : undefined,
 				})),
 			};
 			return reply.status(400).send(response);
@@ -84,6 +92,12 @@ const errorHandlerHook: FastifyPluginAsync = async fastify => {
 
 		// Handle Fastify validation errors
 		if ('validation' in error && error.validation) {
+			// Log detailed validation error information
+			logger.error(`Fastify validation error for ${request.method} ${request.url}`);
+			logger.error('Query params:', request.query);
+			logger.error('Body:', request.body);
+			logger.error('Validation details:', error.validation);
+
 			const response: ErrorResponse = {
 				error: 'Validation failed',
 				code: ERROR_CODES.VALIDATION_FAILED,

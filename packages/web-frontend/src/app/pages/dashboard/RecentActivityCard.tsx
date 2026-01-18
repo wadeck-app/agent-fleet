@@ -1,6 +1,6 @@
+import { StatusIcons, StatusIndicatorIcon } from '@framework/components/feedback/StatusIndicatorIcon';
 import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
 import type { ActivityEntry, ActivityType } from '@shared/api/dashboard.contract';
-import { Activity, AlertCircle, CheckCircle2, Eye, GitMerge, UserCheck, UserX, XCircle } from 'lucide-react';
 
 /**
  * ===========================================================================================
@@ -37,70 +37,21 @@ export interface RecentActivityCardProps {
 function getActivityIcon(type: ActivityType) {
 	switch (type) {
 		case 'task_completed':
-			return (
-				<CheckCircle2
-					className={`
-       size-4 text-green-600
-       dark:text-green-400
-     `}
-				/>
-			);
+			return <StatusIndicatorIcon status="success" icon={StatusIcons.checkCircle} />;
 		case 'task_started':
-			return (
-				<Activity
-					className={`
-       size-4 text-blue-600
-       dark:text-blue-400
-     `}
-				/>
-			);
+			return <StatusIndicatorIcon status="info" icon={StatusIcons.activity} />;
 		case 'task_review':
-			return (
-				<Eye
-					className={`
-       size-4 text-purple-600
-       dark:text-purple-400
-     `}
-				/>
-			);
+			return <StatusIndicatorIcon status="purple" icon={StatusIcons.eye} />;
 		case 'task_merged':
-			return (
-				<GitMerge
-					className={`
-       size-4 text-green-600
-       dark:text-green-400
-     `}
-				/>
-			);
+			return <StatusIndicatorIcon status="success" icon={StatusIcons.gitMerge} />;
 		case 'task_failed':
-			return (
-				<XCircle
-					className={`
-       size-4 text-red-600
-       dark:text-red-400
-     `}
-				/>
-			);
+			return <StatusIndicatorIcon status="error" icon={StatusIcons.xCircle} />;
 		case 'worker_connected':
-			return (
-				<UserCheck
-					className={`
-       size-4 text-green-600
-       dark:text-green-400
-     `}
-				/>
-			);
+			return <StatusIndicatorIcon status="success" icon={StatusIcons.userCheck} />;
 		case 'worker_disconnected':
-			return (
-				<UserX
-					className={`
-       size-4 text-red-600
-       dark:text-red-400
-     `}
-				/>
-			);
+			return <StatusIndicatorIcon status="error" icon={StatusIcons.userX} />;
 		default:
-			return <AlertCircle className="size-4 text-muted-foreground" />;
+			return <StatusIndicatorIcon status="muted" icon={StatusIcons.alertCircle} />;
 	}
 }
 

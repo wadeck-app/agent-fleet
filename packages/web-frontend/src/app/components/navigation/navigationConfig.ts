@@ -6,8 +6,8 @@ import {
 	LayoutDashboard,
 	LayoutGrid,
 	ListTodo,
-	Package2,
 	PackageSearch,
+	Table2,
 	Users,
 	Workflow,
 } from 'lucide-react';
@@ -50,6 +50,11 @@ export const navigationItems: NavItem[] = [
 		icon: Bell,
 	},
 	{
+		path: '/interventions-v2',
+		label: 'Interventions v2',
+		icon: Table2,
+	},
+	{
 		path: '/workspaces',
 		label: 'Workspaces',
 		icon: Layers,
@@ -63,23 +68,18 @@ export const navigationItems: NavItem[] = [
 		icon: Workflow,
 	},
 	{
-		path: '/ingredients',
-		label: 'Ingredients',
-		icon: Package2,
-	},
-	{
 		path: '/ingredients2',
-		label: 'Ingredients v2',
+		label: 'Ingredients v2 table',
 		icon: PackageSearch,
 	},
 	{
 		path: '/ingredients3',
-		label: 'Ingredients Grid',
+		label: 'Ingredients v3 grid',
 		icon: LayoutGrid,
 	},
 	{
 		path: '/ingredients4c',
-		label: 'Ingredients v4c (Infinite Scroll)',
+		label: 'Ingredients v4 carousel',
 		icon: Layers,
 	},
 	{

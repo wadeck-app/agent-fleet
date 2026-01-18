@@ -2,15 +2,31 @@
 	"projects": [
 		{
 			"name": "Agent Fleet",
-			"workspaceIds": ["50115a2e-5226-46d4-9fb8-6f9c11a16f9d"],
+			"workspaceIds": [],
 			"icon": "Users",
 			"iconColor": "#10B981",
 			"archived": false,
 			"taskCount": 0,
 			"id": "wwuypfn8p",
-			"version": 5,
+			"version": 42,
 			"createdAt": "2026-01-17T20:24:15.224Z",
-			"updatedAt": "2026-01-17T22:21:17.709Z"
+			"updatedAt": "2026-01-18T11:53:49.210Z",
+			"pinned": true,
+			"order": 0
+		},
+		{
+			"name": "Image generation",
+			"workspaceIds": [],
+			"icon": "Palette",
+			"iconColor": "#F59E0B",
+			"archived": false,
+			"taskCount": 0,
+			"pinned": true,
+			"order": 0,
+			"id": "jz52yz1uq",
+			"version": 33,
+			"createdAt": "2026-01-18T11:17:46.747Z",
+			"updatedAt": "2026-01-18T11:53:49.427Z"
 		}
 	]
 }

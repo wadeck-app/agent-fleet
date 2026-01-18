@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Data2 } from '@framework/components2/data/Data2';
 import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
+import { FeatureInfoBox } from '@framework/components/feedback/FeatureInfoBox';
 import { SearchBar } from '@framework/components/forms/SearchBar';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
@@ -255,8 +256,7 @@ export function ProjectsPage() {
 			)}
 
 			{/* Feature Info (for demo purposes) */}
-			<div className="mb-4 rounded-lg border border-border bg-muted/50 p-4 text-sm">
-				<strong>Active Features (UI / Debounced):</strong>
+			<FeatureInfoBox title="Active Features (UI / Debounced):">
 				<div
 					className={`
        mt-2 grid grid-cols-2 gap-2 text-xs
@@ -280,7 +280,7 @@ export function ProjectsPage() {
 						<span className="font-mono">{cache.fstate.cacheId}</span>
 					</div>
 				</div>
-			</div>
+			</FeatureInfoBox>
 
 			{/* Data + Table */}
 			<Data2

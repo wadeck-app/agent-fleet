@@ -181,6 +181,8 @@ export class ProjectsService {
 			const project = await this.repository.create({
 				...data,
 				taskCount: 0,
+				pinned: false,
+				order: 0,
 			});
 
 			// Emit event AFTER successful creation
