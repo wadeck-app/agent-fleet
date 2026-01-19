@@ -1,6 +1,7 @@
 import { logger } from 'shared-common/logger';
 import { serializeMessage } from 'shared-common/protocol';
 import type { StateManager } from 'shared-orch-worker/StateManager';
+import { StateEvent } from 'shared-orch-worker/StateManager';
 import type { WorkerInfo } from 'shared-orch-worker/domain-types';
 import type { O2WMessage } from 'shared-orch-worker/orchestrator-messages';
 import { O2WMessageType, createO2WMessage } from 'shared-orch-worker/orchestrator-messages';
@@ -12,7 +13,7 @@ import type {
 import type { W2OMessage } from 'shared-orch-worker/worker-messages';
 import { WebSocket } from 'ws';
 
-import type { TaskManager } from '../core/TaskManager';
+import type { WorkerCoordinator } from '../core/WorkerCoordinator';
 import { FlowDiscoveryRegistry, FlowVersionMismatchError } from '../registry/FlowDiscoveryRegistry';
 
 interface WorkerConnection extends WorkerInfo {
@@ -28,21 +29,37 @@ interface WorkerConnection extends WorkerInfo {
  * - Track worker connections
  * - Assign worker IDs
  * - Handle connection/disconnection lifecycle
- * - Assign tasks to workers
+ * - Assign tasks to workers (delegated to WorkerCoordinator)
  * - Manage flow discovery registry
  */
 export class WebSocketConnectionManager {
 	private workers: Map<string, WorkerConnection>;
 	private nextWorkerNum: number = 1;
-	private taskManager: TaskManager;
+	private workerCoordinator: WorkerCoordinator;
 	private stateManager: StateManager;
 	private flowDiscoveryRegistry: FlowDiscoveryRegistry;
+	private taskAssignedListener: (data: { workerId: string; taskId: string }) => void;
 
-	constructor(taskManager: TaskManager, stateManager: StateManager) {
+	constructor(workerCoordinator: WorkerCoordinator, stateManager: StateManager) {
 		this.workers = new Map();
-		this.taskManager = taskManager;
+		this.workerCoordinator = workerCoordinator;
 		this.stateManager = stateManager;
 		this.flowDiscoveryRegistry = new FlowDiscoveryRegistry();
+
+		// Store listener reference so we can remove it later during cleanup
+		this.taskAssignedListener = (data: { workerId: string; taskId: string }) => {
+			const worker = this.workers.get(data.workerId);
+			if (worker) {
+				logger.info(`[WebSocketConnectionManager] Updating worker ${data.workerId} taskId to ${data.taskId}`);
+				worker.taskId = data.taskId;
+				worker.taskStartedAt = new Date().toISOString();
+			} else {
+				logger.warn(`[WebSocketConnectionManager] Cannot update taskId: worker ${data.workerId} not found`);
+			}
+		};
+
+		// Listen to task assignment events to update worker.taskId and taskStartedAt
+		this.stateManager.on(StateEvent.WORKER_TASK_ASSIGNED, this.taskAssignedListener);
 	}
 
 	/**
@@ -91,8 +108,8 @@ export class WebSocketConnectionManager {
 
 		const worker: WorkerConnection = {
 			id: workerId,
-			// type: workerType,
 			taskId: null,
+			taskStartedAt: null,
 			connectedAt: new Date().toISOString(),
 			socket,
 			projectId,
@@ -102,24 +119,21 @@ export class WebSocketConnectionManager {
 
 		this.workers.set(workerId, worker);
 
-		// logger.info(`[WS] Worker ${workerId} (${workerType}) is ready`);
-		logger.info(`[WS] Worker ${workerId} is ready`);
+		logger.info(`[WS] Work  er ${workerId} is ready`);
 
 		this.stateManager.emitWorkerConnected({
 			id: workerId,
-			// type: workerType,
 			taskId: null,
+			taskStartedAt: null,
 			connectedAt: worker.connectedAt,
 		});
 
 		// Send Welcome
 		this.sendMessage(socket, createO2WMessage(O2WMessageType.WORKER_WELCOME, { workerId }));
 
-		// Assign a task if available (async, fire and forget)
-		// this.tryAssignTask(workerId, workerType).catch(error => {
-		this.tryAssignTask(workerId).catch(error => {
-			logger.error(`[WS] Error assigning task to worker ${workerId}: ${(error as Error).message}`);
-		});
+		// Register worker with WorkerCoordinator (convert FlowMetadata[] to string[])
+		const flowIds = availableFlows.map(flow => flow.id);
+		this.workerCoordinator.registerWorker(workerId, socket, flowIds);
 
 		return workerId;
 	}
@@ -135,14 +149,8 @@ export class WebSocketConnectionManager {
 
 		logger.info(`[WS] Worker ${workerId} disconnected`);
 
-		// Release the task if the worker was working on it
-		if (worker.taskId) {
-			try {
-				this.taskManager.unassignTask(worker.taskId);
-			} catch (error) {
-				logger.error(`[WS] Error unassigning task: ${(error as Error).message}`);
-			}
-		}
+		// Unregister from WorkerCoordinator (handles task cleanup)
+		this.workerCoordinator.unregisterWorker(workerId);
 
 		// Unregister from flow discovery registry
 		this.flowDiscoveryRegistry.unregisterWorker(workerId);
@@ -153,69 +161,26 @@ export class WebSocketConnectionManager {
 	}
 
 	/**
-	 * Try to assign a task to a specific worker using atomic assignment
-	 */
-	// async tryAssignTask(workerId: string, workerType: WorkerType): Promise<void> {
-	async tryAssignTask(workerId: string): Promise<void> {
-		const worker = this.workers.get(workerId);
-		if (!worker) {
-			logger.error(`[WS] Worker ${workerId} not found`);
-			return;
-		}
-
-		// Use atomic assignment to prevent race conditions
-		// const task = await this.taskManager.assignTaskToWorker(workerId, workerType);
-		const task = await this.taskManager.assignTaskToWorker(workerId);
-		if (!task) {
-			// logger.info(`[WS] No task available for ${workerType} worker ${workerId}`);
-			logger.info(`[WS] No task available for worker ${workerId}`);
-			return;
-		}
-
-		// Update worker state
-		worker.taskId = task.id;
-
-		this.stateManager.emitWorkerTaskAssigned(workerId, task.id);
-
-		// Send the task to the worker
-		this.sendMessage(
-			worker.socket,
-			createO2WMessage(O2WMessageType.ASSIGN_TASK, {
-				task,
-			})
-		);
-
-		logger.info(`[WS] Assigned task ${task.id} to worker ${workerId}`);
-	}
-
-	/**
 	 * Try to assign tasks to all idle workers
+	 * Note: This is now handled by WorkerCoordinator, but kept for backward compatibility
 	 */
 	async tryAssignTasksToIdleWorkers(): Promise<void> {
-		// Find all idle workers (not currently working on a task)
-		const idleWorkers = Array.from(this.workers.values()).filter(w => w.taskId === null);
-
-		// Try to assign a task to each idle worker (sequentially to avoid race conditions)
-		for (const worker of idleWorkers) {
-			// await this.tryAssignTask(worker.id, worker.type);
-			await this.tryAssignTask(worker.id);
-		}
+		// WorkerCoordinator now handles task assignment automatically
+		// This method is kept for backward compatibility but does nothing
+		logger.debug('[WS] tryAssignTasksToIdleWorkers called - WorkerCoordinator handles assignment automatically');
 	}
 
 	/**
 	 * Release a worker from its current task
+	 * Note: Task assignment is now handled by WorkerCoordinator
 	 */
 	releaseWorker(workerId: string): void {
 		const worker = this.workers.get(workerId);
 		if (worker) {
 			worker.taskId = null;
+			worker.taskStartedAt = null;
 			this.stateManager.emitWorkerTaskReleased(workerId);
-
-			// Try to assign a new task (async, fire and forget)
-			// this.tryAssignTask(workerId, worker.type).catch(error => {
-			this.tryAssignTask(workerId).catch(error => {
-				logger.error(`[WS] Error assigning task to released worker ${workerId}: ${(error as Error).message}`);
-			});
+			// WorkerCoordinator handles task assignment automatically when worker becomes idle
 		}
 	}
 
@@ -227,13 +192,14 @@ export class WebSocketConnectionManager {
 	}
 
 	/**
-	 * Get all workers (without socket references)
+	 * Get all workers (without  socket references)
 	 */
 	getWorkers(): WorkerInfo[] {
 		return Array.from(this.workers.values()).map(w => ({
 			id: w.id,
 			// type: w.type,
 			taskId: w.taskId,
+			taskStartedAt: w.taskStartedAt,
 			connectedAt: w.connectedAt,
 		}));
 	}
@@ -320,6 +286,10 @@ export class WebSocketConnectionManager {
 	 * Close all worker connections
 	 */
 	closeAll(): void {
+		// Remove event listener to prevent memory leaks
+		this.stateManager.removeListener(StateEvent.WORKER_TASK_ASSIGNED, this.taskAssignedListener);
+
+		// Close all worker sockets
 		for (const worker of this.workers.values()) {
 			worker.socket.close();
 		}
@@ -335,6 +305,7 @@ export class WebSocketConnectionManager {
 
 	/**
 	 * Handle REQUEST_TASK message from a worker
+	 * Delegates to WorkerCoordinator via onWorkerMessage
 	 */
 	handleRequestTask(socket: WebSocket, message: W2ORequestTaskMessage): void {
 		const { workerId } = message;
@@ -347,46 +318,8 @@ export class WebSocketConnectionManager {
 
 		logger.info(`[WS] Worker ${workerId} requesting task`);
 
-		// Mark worker as idle
-		this.taskManager.markWorkerIdle(workerId);
-
-		// Try to find a matching task
-		const task = this.taskManager.findMatchingTask(workerId);
-
-		if (task) {
-			// Assign the task to the worker
-			this.assignTaskToWorker(workerId, worker, task).catch(error => {
-				logger.error(`[WS] Error assigning task to worker ${workerId}: ${(error as Error).message}`);
-			});
-		} else {
-			logger.info(`[WS] No task available for worker ${workerId}, remains idle`);
-		}
-	}
-
-	/**
-	 * Assign a task to a worker (used by REQUEST_TASK handler)
-	 */
-	private async assignTaskToWorker(workerId: string, worker: WorkerConnection, task: any): Promise<void> {
-		// Mark worker as busy
-		this.taskManager.markWorkerBusy(workerId, task);
-
-		// Update task assignment
-		// await this.taskManager.assignTask(task.id, workerId, worker.type);
-		await this.taskManager.assignTask(task.id, workerId);
-
-		// Update worker state
-		worker.taskId = task.id;
-
-		this.stateManager.emitWorkerTaskAssigned(workerId, task.id);
-		// Send the task to the worker
-		this.sendMessage(
-			worker.socket,
-			createO2WMessage(O2WMessageType.ASSIGN_TASK, {
-				task,
-			})
-		);
-
-		logger.info(`[WS] Assigned task ${task.id} to worker ${workerId}`);
+		// Delegate to WorkerCoordinator which handles task assignment
+		this.workerCoordinator.onWorkerMessage(workerId, message);
 	}
 
 	/**

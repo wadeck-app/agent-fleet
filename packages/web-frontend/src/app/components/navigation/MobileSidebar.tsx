@@ -12,8 +12,10 @@ import { ConnectionModeIndicator } from '@app/components/connectivity/Connection
 import { WorkspaceIndicator } from '@app/features/workspace/WorkspaceIndicator';
 
 import { AppSwitcher } from './AppSwitcher';
+import { EventDebugWidget } from './EventDebugWidget';
 import { SidebarNav } from './SidebarNav';
 import { UserMenuWithThemeMobile } from './UserMenuWithTheme';
+import { WorkersWidget } from './WorkersWidget';
 import { navigationItems } from './navigationConfig';
 
 export function MobileSidebar() {
@@ -57,6 +59,12 @@ export function MobileSidebar() {
 
 					<div className="flex flex-1 flex-col gap-6 overflow-y-auto px-5 py-2">
 						<SidebarNav items={navigationItems} mobile />
+
+						<Separator />
+
+						<WorkersWidget />
+
+						<EventDebugWidget />
 
 						<Separator />
 

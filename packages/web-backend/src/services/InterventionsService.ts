@@ -8,6 +8,7 @@ import type {
 } from '@app/shared/api/interventions.contract';
 import { B2F_INTERVENTIONS_UPDATED, B2F_INTERVENTION_ANSWERED, B2F_INTERVENTION_CREATED } from '@app/shared/transport';
 
+import type { InterventionsRepository } from '../repositories/InterventionsRepository';
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 
@@ -18,36 +19,64 @@ import type { EventBroadcaster } from '../transport/EventBroadcaster';
  *
  * Business logic layer for user interventions.
  * Responsibilities:
- * - Fetch interventions from orchestrator
- * - Filter and paginate interventions
- * - Handle user responses
+ * - Manage interventions using InterventionsRepository (file-based persistence)
+ * - Sync intervention state changes to orchestrator (cache invalidation)
+ * - Apply sorting and pagination (business logic layer concern)
+ * - Handle user responses and cancellations
  * - Emit real-time events for intervention state changes
  *
  * Event Emission Strategy:
  * - Events are emitted AFTER successful operations
  * - Broadcast failures are logged but don't fail the operation
  *
+ * Persistence Strategy:
+ * - Interventions are created by orchestrator and synced to backend via events
+ * - Backend persists them to file storage (data/interventions.json)
+ * - This ensures interventions survive restarts
+ *
+ * Cache Synchronization:
+ * - Backend is source of truth (file storage)
+ * - Orchestrator maintains in-memory cache for fast access
+ * - When backend updates intervention (respond/cancel), it notifies orchestrator
+ * - Orchestrator updates its cache and notifies waiting workers
+ *
  * ===========================================================================================
  */
 
 export class InterventionsService {
 	constructor(
-		private readonly orchestratorRepository: OrchestratorRepository,
-		private readonly eventBroadcaster: EventBroadcaster
+		private readonly interventionsRepository: InterventionsRepository,
+		private readonly eventBroadcaster: EventBroadcaster,
+		private readonly orchestratorRepository: OrchestratorRepository
 	) {}
 
 	/**
 	 * Get interventions with optional filtering and pagination
-	 * TODO: Wire up with InterventionManager once integrated in Orchestrator
 	 */
 	async getInterventions(query?: InterventionsQuery): Promise<InterventionsListResponse> {
 		try {
-			console.log('[InterventionsService] Fetching interventions from orchestrator with query:', query);
+			console.log('[InterventionsService] Fetching interventions with query:', query);
 
-			// Fetch and filter interventions
-			const interventions: Intervention[] = await this.fetchInterventionsFromOrchestrator(query);
+			// Fetch from repository (file-based storage)
+			let interventions = await this.interventionsRepository.findAll(query);
 
-			console.log(`[InterventionsService] Found ${interventions.length} interventions after filtering`);
+			console.log(
+				`[InterventionsService] Found ${interventions.length} interventions after repository filtering`
+			);
+
+			// Apply search filter (searches across multiple fields)
+			if (query?.search) {
+				const searchLower = query.search.toLowerCase();
+				interventions = interventions.filter(
+					i =>
+						i.id.toLowerCase().includes(searchLower) ||
+						i.taskId.toLowerCase().includes(searchLower) ||
+						i.config.title.toLowerCase().includes(searchLower) ||
+						i.config.description?.toLowerCase().includes(searchLower) ||
+						i.type.toLowerCase().includes(searchLower) ||
+						i.status.toLowerCase().includes(searchLower)
+				);
+			}
 
 			// Apply sorting
 			const sortBy = query?.sortBy || 'createdAt';
@@ -99,24 +128,47 @@ export class InterventionsService {
 	}
 
 	/**
+	 * Create a new intervention
+	 * Called by OrchestratorEventHandler when orchestrator creates an intervention
+	 */
+	async createIntervention(
+		data: Omit<Intervention, 'id' | 'version' | 'createdAt' | 'updatedAt'> & { id: string }
+	): Promise<Intervention> {
+		try {
+			console.log(`[InterventionsService] Creating intervention ${data.id}...`);
+
+			// Create in repository (persists to file)
+			// Note: orchestrator has already generated the ID, so we use createWithId
+			const { id, ...dataWithoutId } = data;
+			const intervention = await this.interventionsRepository.createWithId(id, dataWithoutId);
+
+			console.log(`[InterventionsService] Intervention ${intervention.id} created successfully`);
+
+			// Emit events for real-time updates
+			try {
+				this.eventBroadcaster.broadcast(B2F_INTERVENTION_CREATED, intervention);
+				this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, {} as any);
+			} catch (broadcastError) {
+				console.error('[InterventionsService] Failed to broadcast events:', broadcastError);
+				// Don't fail the operation if broadcast fails
+			}
+
+			return intervention;
+		} catch (error) {
+			console.error(`[InterventionsService] Error creating intervention:`, error);
+			throw error;
+		}
+	}
+
+	/**
 	 * Get a single intervention by ID
 	 */
 	async getIntervention(interventionId: string): Promise<Intervention | null> {
 		try {
 			console.log(`[InterventionsService] Fetching intervention ${interventionId}...`);
 
-			// Get from orchestrator via repository
-			const rawIntervention = await this.orchestratorRepository.getIntervention(interventionId);
-			if (!rawIntervention) {
-				return null;
-			}
-
-			// Transform to match API contract (add missing BaseEntity fields)
-			const intervention: Intervention = {
-				...rawIntervention,
-				version: 1, // Interventions don't have versioning yet
-				updatedAt: rawIntervention.answeredAt || rawIntervention.createdAt, // Use answeredAt if available, else createdAt
-			};
+			// Get from repository (already includes all BaseEntity fields)
+			const intervention = await this.interventionsRepository.findById(interventionId);
 
 			return intervention;
 		} catch (error) {
@@ -127,6 +179,7 @@ export class InterventionsService {
 
 	/**
 	 * Respond to an intervention
+	 * Synchronizes backend (file) and orchestrator (cache) state
 	 */
 	async respondToIntervention(
 		interventionId: string,
@@ -135,25 +188,39 @@ export class InterventionsService {
 		try {
 			console.log(`[InterventionsService] Responding to intervention ${interventionId}...`);
 
-			// Call orchestrator to submit response
+			// 1. Update backend file storage (source of truth)
 			// Note: answeredBy should be set from authenticated user context (future enhancement)
-			await this.orchestratorRepository.respondToIntervention(interventionId, {
+			const updatedIntervention = await this.interventionsRepository.respond(interventionId, {
 				value: response.value,
 				answeredBy: 'web-user', // TODO: Get from authenticated user context
 				comment: response.comment,
 			});
 
-			console.log(`[InterventionsService] Intervention ${interventionId} answered successfully`);
+			console.log(`[InterventionsService] Intervention ${interventionId} answered in backend storage`);
 
-			// Emit events for real-time updates
+			// 2. Notify orchestrator to update its cache and unblock worker
 			try {
-				// Get updated intervention from orchestrator after update
-				const intervention = await this.getIntervention(interventionId);
-				if (intervention) {
-					await this.eventBroadcaster.broadcast(B2F_INTERVENTION_ANSWERED, intervention);
-				}
+				await this.orchestratorRepository.respondToIntervention(interventionId, {
+					value: response.value,
+					answeredBy: 'web-user',
+					comment: response.comment,
+				});
+				console.log(`[InterventionsService] Orchestrator notified of intervention ${interventionId} response`);
+			} catch (orchestratorError) {
+				console.error(
+					'[InterventionsService] Failed to notify orchestrator of intervention response:',
+					orchestratorError
+				);
+				// Don't fail the operation if orchestrator notification fails
+				// Backend file is already updated (source of truth)
+			}
+
+			// 3. Emit events for real-time UI updates
+			try {
+				// Broadcast the updated intervention
+				await this.eventBroadcaster.broadcast(B2F_INTERVENTION_ANSWERED, updatedIntervention);
 				// Broadcast updated list
-				const allInterventions = await this.fetchInterventionsFromOrchestrator();
+				const allInterventions = await this.interventionsRepository.findAll();
 				await this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, allInterventions);
 			} catch (broadcastError) {
 				console.error(
@@ -179,13 +246,15 @@ export class InterventionsService {
 		try {
 			console.log(`[InterventionsService] Cancelling intervention ${interventionId}...`);
 
-			// TODO: Call orchestrator to cancel
+			// Cancel via repository
+			await this.interventionsRepository.cancel(interventionId);
+
 			console.log(`[InterventionsService] Intervention ${interventionId} cancelled`);
 
 			// Emit events
 			try {
 				// Broadcast updated list
-				const allInterventions = await this.fetchInterventionsFromOrchestrator();
+				const allInterventions = await this.interventionsRepository.findAll();
 				await this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, allInterventions);
 			} catch (broadcastError) {
 				console.error(
@@ -210,80 +279,23 @@ export class InterventionsService {
 	async bulkCancelInterventions(ids: string[]): Promise<BulkCancelResponse> {
 		console.log(`[InterventionsService] Bulk cancelling ${ids.length} interventions...`);
 
-		const cancelled: string[] = [];
-		const failed: Array<{ id: string; error: string }> = [];
-
-		// Process each cancellation
-		for (const id of ids) {
-			try {
-				await this.cancelIntervention(id);
-				cancelled.push(id);
-			} catch (error) {
-				console.error(`[InterventionsService] Failed to cancel intervention ${id}:`, error);
-				failed.push({
-					id,
-					error: error instanceof Error ? error.message : 'Unknown error',
-				});
-			}
-		}
+		// Delegate to repository for bulk operation
+		const result = await this.interventionsRepository.bulkCancel(ids);
 
 		console.log(
-			`[InterventionsService] Bulk cancel completed: ${cancelled.length} succeeded, ${failed.length} failed`
+			`[InterventionsService] Bulk cancel completed: ${result.cancelled.length} succeeded, ${result.failed.length} failed`
 		);
 
-		return {
-			cancelled,
-			failed,
-		};
-	}
-
-	/**
-	 * Fetch interventions from orchestrator with filtering
-	 */
-	private async fetchInterventionsFromOrchestrator(query?: InterventionsQuery): Promise<Intervention[]> {
-		// Fetch from orchestrator via repository
-		const rawInterventions = await this.orchestratorRepository.getInterventions();
-
-		// Transform to match API contract (add missing BaseEntity fields)
-		let interventions: Intervention[] = rawInterventions.map(intervention => ({
-			...intervention,
-			version: 1, // Interventions don't have versioning yet
-			updatedAt: intervention.answeredAt || intervention.createdAt, // Use answeredAt if available, else createdAt
-		}));
-
-		// Apply filters
-		if (query?.status) {
-			interventions = interventions.filter(i => i.status === query.status);
+		// Emit events for real-time updates
+		try {
+			// Broadcast updated list
+			const allInterventions = await this.interventionsRepository.findAll();
+			await this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, allInterventions);
+		} catch (broadcastError) {
+			console.error('[InterventionsService] Failed to broadcast bulk cancel event:', broadcastError);
 		}
 
-		if (query?.type) {
-			interventions = interventions.filter(i => i.type === query.type);
-		}
-
-		if (query?.blocking !== undefined) {
-			interventions = interventions.filter(i => i.blocking === query.blocking);
-		}
-
-		if (query?.taskId) {
-			const taskIdLower = query.taskId.toLowerCase();
-			interventions = interventions.filter(i => i.taskId.toLowerCase().includes(taskIdLower));
-		}
-
-		// Apply search filter (searches across multiple fields)
-		if (query?.search) {
-			const searchLower = query.search.toLowerCase();
-			interventions = interventions.filter(
-				i =>
-					i.id.toLowerCase().includes(searchLower) ||
-					i.taskId.toLowerCase().includes(searchLower) ||
-					i.config.title.toLowerCase().includes(searchLower) ||
-					i.config.description?.toLowerCase().includes(searchLower) ||
-					i.type.toLowerCase().includes(searchLower) ||
-					i.status.toLowerCase().includes(searchLower)
-			);
-		}
-
-		return interventions;
+		return result;
 	}
 
 	/**
@@ -291,13 +303,13 @@ export class InterventionsService {
 	 */
 	async emitInterventionCreated(interventionId: string): Promise<void> {
 		try {
-			// Get actual intervention from orchestrator (already transformed in getIntervention)
-			const intervention = await this.getIntervention(interventionId);
+			// Get actual intervention from repository
+			const intervention = await this.interventionsRepository.findById(interventionId);
 			if (intervention) {
 				await this.eventBroadcaster.broadcast(B2F_INTERVENTION_CREATED, intervention);
 			}
-			// Broadcast updated list (already transformed in fetchInterventionsFromOrchestrator)
-			const allInterventions = await this.fetchInterventionsFromOrchestrator();
+			// Broadcast updated list
+			const allInterventions = await this.interventionsRepository.findAll();
 			await this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, allInterventions);
 		} catch (error) {
 			console.error('[InterventionsService] Failed to broadcast intervention created event:', error);

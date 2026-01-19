@@ -106,11 +106,14 @@ export class OrchestratorRepository {
 
 	/**
 	 * Get all tasks from orchestrator (library mode or HTTP API)
+	 * Note: Library mode now uses direct Orchestrator access instead of wrapper
 	 */
 	async getTasks(): Promise<Task[]> {
-		// Library mode - direct access
+		// Library mode - direct access via TaskManager
 		if (this.orchestratorWrapper) {
-			return this.orchestratorWrapper.getTasks();
+			const orchestrator = this.orchestratorWrapper.getOrchestrator();
+			const taskManager = orchestrator.getTaskManager();
+			return taskManager.getAllTasks();
 		}
 
 		// HTTP mode
@@ -258,11 +261,17 @@ export class OrchestratorRepository {
 
 	/**
 	 * Get all workspaces from orchestrator
+	 * Note: Library mode now uses direct Orchestrator access instead of wrapper
 	 */
 	async getWorkspaces(): Promise<any[]> {
-		// Library mode - direct access
+		// Library mode - direct access via WorkspaceManager
 		if (this.orchestratorWrapper) {
-			return this.orchestratorWrapper.getWorkspaces();
+			const orchestrator = this.orchestratorWrapper.getOrchestrator();
+			const workspaceManager = orchestrator.getWorkspaceManager();
+			if (!workspaceManager) {
+				return [];
+			}
+			return workspaceManager.getAllWorkspaces();
 		}
 
 		// HTTP mode - not supported for now
@@ -271,11 +280,17 @@ export class OrchestratorRepository {
 
 	/**
 	 * Get single workspace by ID
+	 * Note: Library mode now uses direct Orchestrator access instead of wrapper
 	 */
 	async getWorkspace(workspaceId: string): Promise<any | null> {
-		// Library mode - direct access
+		// Library mode - direct access via WorkspaceManager
 		if (this.orchestratorWrapper) {
-			return this.orchestratorWrapper.getWorkspace(workspaceId);
+			const orchestrator = this.orchestratorWrapper.getOrchestrator();
+			const workspaceManager = orchestrator.getWorkspaceManager();
+			if (!workspaceManager) {
+				return null;
+			}
+			return workspaceManager.getWorkspace(workspaceId) || null;
 		}
 
 		// HTTP mode - not supported for now
@@ -284,13 +299,21 @@ export class OrchestratorRepository {
 
 	/**
 	 * Get all interventions from orchestrator
+	 * Note: Library mode now uses direct Orchestrator access instead of wrapper
 	 */
 	async getInterventions(): Promise<any[]> {
-		// Library mode - direct access
+		// Library mode - direct access via InterventionManager
 		if (this.orchestratorWrapper) {
 			console.log('[OrchestratorRepository] Fetching interventions from orchestrator...');
-			const interventions = await this.orchestratorWrapper.getInterventions();
-			console.log(`[OrchestratorRepository] Got ${interventions.length} interventions`);
+			const orchestrator = this.orchestratorWrapper.getOrchestrator();
+			const interventionManager = orchestrator.getInterventionManager();
+			if (!interventionManager) {
+				console.log('[OrchestratorRepository] InterventionManager not available');
+				return [];
+			}
+			// Get pending interventions from memory (active interventions)
+			const interventions = interventionManager.getPendingInterventionsFromMemory();
+			console.log(`[OrchestratorRepository] Got ${interventions.length} interventions from memory`);
 			return interventions;
 		}
 
@@ -300,11 +323,17 @@ export class OrchestratorRepository {
 
 	/**
 	 * Get single intervention by ID
+	 * Note: Library mode now uses direct Orchestrator access instead of wrapper
 	 */
 	async getIntervention(interventionId: string): Promise<any | null> {
-		// Library mode - direct access
+		// Library mode - direct access via InterventionManager
 		if (this.orchestratorWrapper) {
-			return this.orchestratorWrapper.getIntervention(interventionId);
+			const orchestrator = this.orchestratorWrapper.getOrchestrator();
+			const interventionManager = orchestrator.getInterventionManager();
+			if (!interventionManager) {
+				return null;
+			}
+			return await interventionManager.getIntervention(interventionId);
 		}
 
 		// HTTP mode - not supported for now
@@ -329,6 +358,23 @@ export class OrchestratorRepository {
 
 		// HTTP mode - not supported
 		throw new Error('HTTP mode for respondToIntervention not yet implemented');
+	}
+
+	/**
+	 * Enqueue a task to the orchestrator's WorkerCoordinator
+	 * Called when a task is created or becomes assignable
+	 *
+	 * @param task - Task to enqueue
+	 */
+	enqueueTask(task: Task): void {
+		if (!this.orchestratorWrapper) {
+			console.warn(
+				'[OrchestratorRepository] Cannot enqueue task: orchestrator wrapper not available (HTTP mode?)'
+			);
+			return;
+		}
+
+		this.orchestratorWrapper.enqueueTask(task);
 	}
 
 	/**

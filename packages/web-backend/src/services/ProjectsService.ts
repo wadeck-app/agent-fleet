@@ -462,6 +462,7 @@ export class ProjectsService {
 			description: task.description,
 			status: task.status,
 			priority: task.priority,
+			version: task.version,
 			createdAt: task.createdAt,
 			updatedAt: task.updatedAt,
 			assignedWorker: task.assignedTo

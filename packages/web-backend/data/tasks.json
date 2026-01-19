@@ -1,0 +1,20 @@
+{
+	"tasks": [
+		{
+			"description": "asdgfasdf",
+			"status": "cancelled",
+			"priority": "medium",
+			"assignedWorker": {
+				"workerId": "2"
+			},
+			"flowId": "test-diamond",
+			"flowInputs": {
+				"message": "asdasd"
+			},
+			"id": "bmqm9prgv",
+			"version": 4,
+			"createdAt": "2026-01-19T20:19:30.981Z",
+			"updatedAt": "2026-01-19T20:19:41.409Z"
+		}
+	]
+}

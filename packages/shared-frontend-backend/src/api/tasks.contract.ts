@@ -74,6 +74,7 @@ export const TaskSchema = z.object({
 	description: z.string(),
 	status: TaskStatusSchema,
 	priority: TaskPrioritySchema,
+	version: z.number().int().positive(), // Optimistic locking
 	createdAt: z.string(), // ISO 8601
 	updatedAt: z.string(), // ISO 8601
 	assignedWorker: z
@@ -84,6 +85,7 @@ export const TaskSchema = z.object({
 		.nullable(),
 	// Flow-related fields
 	flowId: z.string().optional(),
+	flowInputs: z.record(z.string(), z.any()).optional(),
 	flowResult: z
 		.object({
 			status: z.enum(['completed', 'failed']),
@@ -210,7 +212,7 @@ export const CreateTaskSchema = z.object({
 	}),
 	flowId: z.string().optional(),
 	flowInputs: z.record(z.string(), z.any()).optional(),
-	projectId: z.string(),
+	projectId: z.string().optional(),
 	workspaceId: z.string().optional(),
 });
 

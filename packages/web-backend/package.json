@@ -5,6 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "tsx watch --inspect=0 src/server.ts",
+		"dev:nodemon": "nodemon",
 		"dev:library": "cross-env ORCHESTRATOR_MODE=library nodemon",
 		"dev:remote": "cross-env ORCHESTRATOR_MODE=remote ORCHESTRATOR_URL=http://localhost:3737 nodemon",
 		"dev:debug": "tsx src/server.ts",
@@ -16,6 +17,7 @@
 		"start": "node dist/server.js",
 		"start:library": "cross-env ORCHESTRATOR_MODE=library node dist/server.js",
 		"start:remote": "cross-env ORCHESTRATOR_MODE=remote node dist/server.js",
+		"migrate": "tsx src/migrations/MigrateToBackendStorage.ts",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",

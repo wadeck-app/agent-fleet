@@ -94,6 +94,7 @@ export function createMockWorker(overrides?: Partial<WorkerInfo>): WorkerInfo {
 		// type: 'dev' as WorkerType,
 		connectedAt: new Date().toISOString(),
 		taskId: null,
+		taskStartedAt: null,
 		...overrides,
 	};
 }

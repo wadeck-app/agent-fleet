@@ -68,6 +68,7 @@ export class FlowWorker implements Shutdownable {
 	// Trace update management
 	private traceUpdateTimer: NodeJS.Timeout | null = null;
 	private readonly TRACE_UPDATE_INTERVAL = 500; // 500ms
+	private lastSentTraceHash: string | null = null; // Hash of last sent trace to avoid duplicates
 
 	// Flow engine components
 	private flowRegistry: FlowRegistry;
@@ -819,6 +820,9 @@ export class FlowWorker implements Shutdownable {
 	protected async executeTask(task: Task): Promise<void> {
 		console.log(`${this.logPrefix()} Starting task execution...`);
 
+		// Reset trace hash for new task execution
+		this.lastSentTraceHash = null;
+
 		// Check if task has a flowId
 		if (!task.flowId) {
 			const error = 'FlowWorker requires task.flowId to be set';
@@ -1079,10 +1083,23 @@ export class FlowWorker implements Shutdownable {
 
 	/**
 	 * Send trace update to orchestrator
+	 * Only sends if trace has changed since last update to avoid spam
 	 */
 	private sendTraceUpdate(trace: any): void {
 		if (!this.currentTask) return;
 
+		// Calculate hash of trace to detect changes
+		const traceHash = JSON.stringify(trace);
+
+		// Skip if trace hasn't changed since last send
+		if (traceHash === this.lastSentTraceHash) {
+			return;
+		}
+
+		// Update last sent hash
+		this.lastSentTraceHash = traceHash;
+
+		// Send update to orchestrator
 		this.sendMessage(
 			createW2OMessage(W2OMessageType.TASK_TRACE_UPDATE, {
 				workerId: this.workerId,

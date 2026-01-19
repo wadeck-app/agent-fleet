@@ -50,6 +50,7 @@ describe('EventBroadcaster', () => {
 				status: 'todo' as const,
 				assignedWorker: null,
 				priority: 'high' as const,
+				version: 1,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
@@ -71,6 +72,7 @@ describe('EventBroadcaster', () => {
 				status: 'todo' as const,
 				assignedWorker: null,
 				priority: 'high' as const,
+				version: 1,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
@@ -81,6 +83,7 @@ describe('EventBroadcaster', () => {
 				status: 'merged' as const,
 				assignedWorker: null,
 				priority: 'medium' as const,
+				version: 1,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
@@ -120,6 +123,7 @@ describe('EventBroadcaster', () => {
 				status: 'todo' as const,
 				assignedWorker: null,
 				priority: 'high' as const,
+				version: 1,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
@@ -143,6 +147,7 @@ describe('EventBroadcaster', () => {
 				status: 'todo' as const,
 				assignedWorker: null,
 				priority: 'high' as const,
+				version: 1,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
@@ -188,6 +193,7 @@ describe('EventBroadcaster', () => {
 				status: 'todo' as const,
 				assignedWorker: null,
 				priority: 'high' as const,
+				version: 1,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};
@@ -212,6 +218,7 @@ describe('EventBroadcaster', () => {
 				status: 'todo' as const,
 				assignedWorker: null,
 				priority: 'high' as const,
+				version: 1,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			};

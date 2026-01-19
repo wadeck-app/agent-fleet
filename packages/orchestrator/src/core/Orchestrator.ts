@@ -1,7 +1,9 @@
 import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
+import { BackendEventBridge } from 'orchestrator/core/BackendEventBridge';
 import { InterventionManager } from 'orchestrator/core/InterventionManager';
 import { RestAPI } from 'orchestrator/core/RestAPI';
 import { TaskManager } from 'orchestrator/core/TaskManager';
+import { WorkerCoordinator } from 'orchestrator/core/WorkerCoordinator';
 import { MetricsCollector } from 'orchestrator/metrics/MetricsCollector';
 import { StateSnapshotService } from 'orchestrator/state/StateSnapshotService';
 import { UIClientHook } from 'orchestrator/ui-client/UIClientHook';
@@ -24,6 +26,8 @@ export class Orchestrator implements Shutdownable {
 	private libraryMode: boolean;
 	private stateManager: StateManager;
 	private taskManager: TaskManager;
+	private workerCoordinator: WorkerCoordinator;
+	private backendEventBridge: BackendEventBridge;
 	private interventionManager?: InterventionManager;
 	private wsServer?: WorkerWebSocketServer;
 	private restAPI?: RestAPI;
@@ -44,6 +48,8 @@ export class Orchestrator implements Shutdownable {
 		this.libraryMode = config?.libraryMode ?? false;
 		this.stateManager = new StateManager();
 		this.taskManager = new TaskManager(this.stateManager);
+		this.backendEventBridge = new BackendEventBridge();
+		this.workerCoordinator = new WorkerCoordinator(this.backendEventBridge, this.stateManager);
 		this.startTime = new Date();
 
 		// Initialize Logger with StateManager
@@ -72,7 +78,7 @@ export class Orchestrator implements Shutdownable {
 
 		// Create WebSocket server
 		this.wsServer = new WorkerWebSocketServer(
-			this.taskManager,
+			this.workerCoordinator,
 			this.stateManager,
 			this.interventionManager,
 			this.wsPort
@@ -268,5 +274,19 @@ export class Orchestrator implements Shutdownable {
 	 */
 	getStateSnapshot(): OrchestratorSnapshot | undefined {
 		return this.snapshotService?.getSnapshot();
+	}
+
+	/**
+	 * Get the worker coordinator instance
+	 */
+	getWorkerCoordinator(): WorkerCoordinator {
+		return this.workerCoordinator;
+	}
+
+	/**
+	 * Get the backend event bridge instance
+	 */
+	getBackendEventBridge(): BackendEventBridge {
+		return this.backendEventBridge;
 	}
 }

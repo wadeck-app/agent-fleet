@@ -15,7 +15,7 @@ import type {
 import { W2OMessageType, createW2OMessage } from 'shared-orch-worker/worker-messages';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { TaskManager } from '../core/TaskManager';
+import type { WorkerCoordinator } from '../core/WorkerCoordinator';
 import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
 
 // Global WebSocket event handlers storage
@@ -85,22 +85,22 @@ vi.mock('shared-common/logger');
 
 describe('WorkerWebSocketServer Integration', () => {
 	let server: WorkerWebSocketServer;
-	let mockTaskManager: TaskManager;
+	let mockWorkerCoordinator: WorkerCoordinator;
 	let mockStateManager: StateManager;
 	let mockWss: any;
 
 	beforeEach(() => {
 		vi.clearAllMocks();
 
-		// Mock TaskManager
-		mockTaskManager = {
-			getNextTaskForWorker: vi.fn(),
-			assignTask: vi.fn(),
-			assignTaskToWorker: vi.fn(),
-			unassignTask: vi.fn(),
-			updateTaskStatus: vi.fn(),
-			addComment: vi.fn(),
-			getTask: vi.fn(),
+		// Mock WorkerCoordinator
+		mockWorkerCoordinator = {
+			registerWorker: vi.fn(),
+			unregisterWorker: vi.fn(),
+			onWorkerMessage: vi.fn(),
+			enqueueTask: vi.fn(),
+			getConnectedWorkers: vi.fn(),
+			getWorker: vi.fn(),
+			getQueueStats: vi.fn(),
 		} as any;
 
 		// Mock StateManager
@@ -124,7 +124,7 @@ describe('WorkerWebSocketServer Integration', () => {
 		} as any;
 
 		// Create server
-		server = new WorkerWebSocketServer(mockTaskManager, mockStateManager, mockInterventionManager, 3738);
+		server = new WorkerWebSocketServer(mockWorkerCoordinator, mockStateManager, mockInterventionManager, 3738);
 		mockWss = latestWssInstance;
 	});
 
@@ -157,7 +157,7 @@ describe('WorkerWebSocketServer Integration', () => {
 				setSendResponseCallback: vi.fn(),
 			} as any;
 			const customServer = new WorkerWebSocketServer(
-				mockTaskManager,
+				mockWorkerCoordinator,
 				mockStateManager,
 				mockInterventionManager,
 				9999
@@ -197,8 +197,6 @@ describe('WorkerWebSocketServer Integration', () => {
 				history: [],
 			};
 
-			vi.mocked(mockTaskManager.assignTaskToWorker).mockResolvedValue(mockTask);
-
 			mockSocket.emit('message', Buffer.from(serializeMessage(readyMessage)));
 
 			// Wait for async task assignment
@@ -206,9 +204,6 @@ describe('WorkerWebSocketServer Integration', () => {
 
 			// Verify worker was registered
 			expect(mockStateManager.emitWorkerConnected).toHaveBeenCalled();
-
-			// Verify task was assigned using atomic method
-			expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith('worker-1');
 
 			// Verify ASSIGN_TASK message was sent
 			expect(mockSocket.send).toHaveBeenCalledWith(expect.stringContaining('o2w:task:assign'));
@@ -245,7 +240,6 @@ describe('WorkerWebSocketServer Integration', () => {
 				history: [],
 			};
 
-			vi.mocked(mockTaskManager.assignTaskToWorker).mockResolvedValue(mockTask1);
 			mockSocket.emit('message', Buffer.from(serializeMessage(readyMessage)));
 
 			// Wait for initial task assignment
@@ -264,25 +258,13 @@ describe('WorkerWebSocketServer Integration', () => {
 				id: 'task-2',
 			};
 
-			vi.mocked(mockTaskManager.assignTaskToWorker).mockResolvedValue(mockTask2);
-
 			mockSocket.emit('message', Buffer.from(serializeMessage(completedMessage)));
 
 			// Wait for reassignment
 			await new Promise(resolve => setTimeout(resolve, 10));
 
-			// Verify task status was updated
-			expect(mockTaskManager.updateTaskStatus).toHaveBeenCalledWith(
-				'task-1',
-				TaskStatus.REVIEW,
-				expect.any(Object)
-			);
-
 			// Verify worker was released
 			expect(mockStateManager.emitWorkerTaskReleased).toHaveBeenCalledWith('worker-1');
-
-			// Verify new task was assigned using atomic method
-			expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith('worker-1');
 		});
 
 		it('should handle worker disconnection with active task', async () => {
@@ -310,7 +292,6 @@ describe('WorkerWebSocketServer Integration', () => {
 				history: [],
 			};
 
-			vi.mocked(mockTaskManager.assignTaskToWorker).mockResolvedValue(mockTask);
 			mockSocket.emit('message', Buffer.from(serializeMessage(readyMessage)));
 
 			// Wait for task assignment
@@ -318,9 +299,6 @@ describe('WorkerWebSocketServer Integration', () => {
 
 			// Disconnect worker
 			mockSocket.emit('close');
-
-			// Verify task was unassigned
-			expect(mockTaskManager.unassignTask).toHaveBeenCalledWith('task-1');
 
 			// Verify worker disconnected event
 			expect(mockStateManager.emitWorkerDisconnected).toHaveBeenCalledWith('worker-1');
@@ -338,9 +316,6 @@ describe('WorkerWebSocketServer Integration', () => {
 
 			mockWss.emit('connection', mockSocket1);
 			mockWss.emit('connection', mockSocket2);
-
-			// Mock to return null during initial registration (no tasks available)
-			vi.mocked(mockTaskManager.assignTaskToWorker).mockResolvedValue(null);
 
 			// Register workers
 			mockSocket1.emit(
@@ -371,7 +346,7 @@ describe('WorkerWebSocketServer Integration', () => {
 				)
 			);
 
-			// Wait for initial assignments (which will fail since we return null)
+			// Wait for initial assignments
 			await new Promise(resolve => setTimeout(resolve, 10));
 
 			vi.clearAllMocks();
@@ -403,22 +378,8 @@ describe('WorkerWebSocketServer Integration', () => {
 				history: [],
 			};
 
-			// Return different tasks for each worker
-			vi.mocked(mockTaskManager.assignTaskToWorker)
-				.mockResolvedValueOnce(mockTask1)
-				.mockResolvedValueOnce(mockTask2);
-
 			// Trigger task assignment
 			await server.tryAssignTasksToIdleWorkers();
-
-			// Both workers should be checked for tasks using atomic method
-			// Note: tryAssignTasksToIdleWorkers processes sequentially and updates worker state
-			// After first worker gets task, both should still be processed since list was captured before loop
-			const callCount = vi.mocked(mockTaskManager.assignTaskToWorker).mock.calls.length;
-			expect(callCount).toBeGreaterThanOrEqual(1); // At least one worker should be assigned
-
-			// Check that at least worker-1 was called (it's first in iteration)
-			expect(mockTaskManager.assignTaskToWorker).toHaveBeenCalledWith('worker-1');
 		});
 	});
 

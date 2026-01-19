@@ -78,7 +78,12 @@ export class WorkspaceMetadataRepository {
 			mode?: 'development' | 'production' | 'staging';
 		}
 	): Promise<WorkspaceMetadata> {
-		const fileMetadata = await this.metadataFile.write(workspacePath, data);
+		// Convert null to undefined for projectId to match WorkspaceFileMetadata type
+		const sanitizedData = {
+			...data,
+			projectId: data.projectId === null ? undefined : data.projectId,
+		};
+		const fileMetadata = await this.metadataFile.write(workspacePath, sanitizedData);
 		return this.mapToMetadata(fileMetadata);
 	}
 

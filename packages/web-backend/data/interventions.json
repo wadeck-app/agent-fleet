@@ -1,0 +1,24 @@
+{
+	"interventions": [
+		{
+			"taskId": "4sqo2lx1k",
+			"stepId": "approval",
+			"type": "approval",
+			"status": "pending",
+			"blocking": true,
+			"config": {
+				"title": "Approve Deployment to Production",
+				"description": "Data hash: abc123. Please review and approve this deployment.",
+				"allowReject": true
+			},
+			"source": {
+				"type": "flow_step",
+				"stepId": "approval"
+			},
+			"id": "4sqo2lx1k-approval-1768777661539",
+			"version": 1,
+			"createdAt": "2026-01-18T23:07:41.541Z",
+			"updatedAt": "2026-01-18T23:07:41.541Z"
+		}
+	]
+}

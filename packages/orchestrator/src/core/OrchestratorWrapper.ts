@@ -3,14 +3,17 @@
  * LIBRARY MODE ADAPTER
  * ===========================================================================================
  *
- * Direct in-process access to Orchestrator.
+ * Direct in-process access to Orchestrator for coordination operations.
  * Zero serialization overhead, direct method calls.
  *
  * Features:
- * - Direct access to TaskManager and WorkerWebSocketServer
+ * - Worker coordination and communication
  * - EventEmitter integration for O→B events
+ * - Flow definition requests
  * - Type-safe method delegation
  * - No network overhead
+ *
+ * Note: Data CRUD operations (tasks, interventions) should go through backend services/repositories.
  *
  * ===========================================================================================
  */
@@ -30,15 +33,6 @@ const packageJsonPath = path.join(__dirname, '../../package.json');
 const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 const ORCHESTRATOR_VERSION = packageJson.version;
 // @formatter:on
-
-/**
- * Task filters for getTasks()
- */
-export interface TaskFilters {
-	status?: string;
-	workerId?: string;
-	priority?: 'low' | 'medium' | 'high' | 'urgent';
-}
 
 /**
  * Worker filters for getWorkers()
@@ -111,57 +105,8 @@ export class OrchestratorWrapper {
 	}
 
 	// ===========================================================================================
-	// B→O REQUEST METHODS (Direct delegation to TaskManager/WorkerWebSocketServer)
+	// COORDINATION METHODS (Worker and queue management)
 	// ===========================================================================================
-
-	/**
-	 * Create a new task
-	 */
-	async createTask(description: string, metadata?: Record<string, unknown>): Promise<Task> {
-		const taskManager = this.orchestrator.getTaskManager();
-		return await taskManager.createTask(description, metadata || {});
-	}
-
-	/**
-	 * Get a task by ID
-	 */
-	async getTask(taskId: string): Promise<Task | null> {
-		const taskManager = this.orchestrator.getTaskManager();
-		const task = taskManager.getTask(taskId);
-		return task || null;
-	}
-
-	/**
-	 * Get all tasks with optional filters
-	 */
-	async getTasks(filters?: TaskFilters): Promise<Task[]> {
-		const taskManager = this.orchestrator.getTaskManager();
-		const allTasks = taskManager.getAllTasks();
-
-		if (!filters) {
-			return allTasks;
-		}
-
-		// Apply filters
-		return allTasks.filter((task: Task) => {
-			// Filter by status
-			if (filters.status && task.status !== filters.status) {
-				return false;
-			}
-
-			// Filter by workerId
-			if (filters.workerId && task.assignedTo?.workerId !== filters.workerId) {
-				return false;
-			}
-
-			// Filter by priority
-			if (filters.priority && task.priority !== filters.priority) {
-				return false;
-			}
-
-			return true;
-		});
-	}
 
 	/**
 	 * Get all workers with optional filters
@@ -196,7 +141,8 @@ export class OrchestratorWrapper {
 	}
 
 	/**
-	 * Get orchestrator statistics
+	 * Get orchestrator coordination statistics
+	 * Note: Task statistics should be fetched from TasksService/Repository
 	 */
 	async getStats(): Promise<OrchestratorStats> {
 		const taskManager = this.orchestrator.getTaskManager();
@@ -227,29 +173,8 @@ export class OrchestratorWrapper {
 	}
 
 	/**
-	 * Get all workspaces from WorkspaceManager
-	 */
-	async getWorkspaces(): Promise<any[]> {
-		const workspaceManager = this.orchestrator.getWorkspaceManager();
-		if (!workspaceManager) {
-			return [];
-		}
-		return workspaceManager.getAllWorkspaces();
-	}
-
-	/**
-	 * Get single workspace by ID
-	 */
-	async getWorkspace(workspaceId: string): Promise<any | null> {
-		const workspaceManager = this.orchestrator.getWorkspaceManager();
-		if (!workspaceManager) {
-			return null;
-		}
-		return workspaceManager.getWorkspace(workspaceId) || null;
-	}
-
-	/**
 	 * Get workspaces from all connected workers
+	 * This is a coordination method as it queries connected workers
 	 */
 	async getConnectedWorkersWorkspaces(): Promise<
 		Array<{
@@ -268,41 +193,9 @@ export class OrchestratorWrapper {
 	}
 
 	/**
-	 * Rename a worker (not implemented yet)
-	 */
-	async renameWorker(_workerId: string, _name: string): Promise<void> {
-		// TODO: Implement when worker naming is supported
-		throw new Error('renameWorker not yet implemented for library mode');
-	}
-
-	/**
-	 * Get all interventions with optional filters
-	 */
-	async getInterventions(): Promise<any[]> {
-		const interventionManager = this.orchestrator.getInterventionManager();
-		if (!interventionManager) {
-			console.log('[OrchestratorWrapper] InterventionManager not available');
-			return [];
-		}
-		console.log('[OrchestratorWrapper] Fetching pending interventions from InterventionManager...');
-		const interventions = await interventionManager.getPendingInterventions();
-		console.log(`[OrchestratorWrapper] Got ${interventions.length} pending interventions`);
-		return interventions;
-	}
-
-	/**
-	 * Get single intervention by ID
-	 */
-	async getIntervention(interventionId: string): Promise<any | null> {
-		const interventionManager = this.orchestrator.getInterventionManager();
-		if (!interventionManager) {
-			return null;
-		}
-		return await interventionManager.getIntervention(interventionId);
-	}
-
-	/**
 	 * Respond to an intervention
+	 * This is a coordination method as it sends responses to workers via WebSocket
+	 * Note: Intervention data operations should go through InterventionsService/Repository
 	 */
 	async respondToIntervention(
 		interventionId: string,
@@ -610,6 +503,36 @@ export class OrchestratorWrapper {
 		} as any);
 
 		return responsePromise;
+	}
+
+	/**
+	 * Enqueue a task to be assigned to a worker
+	 *
+	 * Called by backend when a task is created or becomes assignable.
+	 * The orchestrator will assign it to an idle worker or queue it.
+	 *
+	 * @param task - Task to enqueue (may have assignedWorker instead of assignedTo)
+	 */
+	enqueueTask(task: Task): void {
+		const taskManager = this.orchestrator.getTaskManager();
+		const workerCoordinator = this.orchestrator.getWorkerCoordinator();
+
+		// Map backend Task format to orchestrator Task format if needed
+		// Backend uses assignedWorker, orchestrator uses assignedTo
+		const orchestratorTask: Task = {
+			...task,
+			assignedTo: (task as any).assignedWorker || task.assignedTo,
+			comments: task.comments || [],
+			metadata: task.metadata || {},
+			history: task.history || [],
+		};
+
+		// Register task in TaskManager's in-memory store (needed for interventions and status tracking)
+		// We don't save to orchestrator's storage because task is already persisted in backend
+		(taskManager as any).tasks.set(orchestratorTask.id, orchestratorTask);
+
+		// Enqueue task for worker assignment
+		workerCoordinator.enqueueTask(orchestratorTask);
 	}
 
 	/**

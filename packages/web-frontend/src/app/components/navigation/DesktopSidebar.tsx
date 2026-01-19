@@ -6,8 +6,10 @@ import { ConnectionModeIndicator } from '@app/components/connectivity/Connection
 import { WorkspaceIndicator } from '@app/features/workspace/WorkspaceIndicator';
 
 import { AppSwitcher } from './AppSwitcher';
+import { EventDebugWidget } from './EventDebugWidget';
 import { SidebarNav } from './SidebarNav';
 import { UserMenuWithTheme } from './UserMenuWithTheme';
+import { WorkersWidget } from './WorkersWidget';
 import { navigationItems } from './navigationConfig';
 
 interface DesktopSidebarProps {
@@ -30,6 +32,12 @@ export function DesktopSidebar({ className }: DesktopSidebarProps) {
 
 			<div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
 				<SidebarNav items={navigationItems} />
+
+				<Separator />
+
+				<WorkersWidget />
+
+				<EventDebugWidget />
 
 				<Separator />
 

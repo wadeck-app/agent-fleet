@@ -15,6 +15,7 @@ import { B2F_TASKS_UPDATED, B2F_TASK_CREATED, B2F_TASK_DELETED, B2F_TASK_UPDATED
 
 import { TraceChunkStorage } from '../../../orchestrator/src/core/TraceChunkStorage';
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
+import type { TasksRepository } from '../repositories/TasksRepository';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 
 /**
@@ -24,8 +25,7 @@ import type { EventBroadcaster } from '../transport/EventBroadcaster';
  *
  * Business logic layer for tasks data.
  * Responsibilities:
- * - Fetch tasks from orchestrator
- * - Transform raw task data into frontend-friendly DTO
+ * - Fetch tasks from backend storage (TasksRepository)
  * - Support filtering by status, worker, and priority
  * - Calculate summary statistics
  * - Emit real-time events for task state changes
@@ -39,7 +39,7 @@ import type { EventBroadcaster } from '../transport/EventBroadcaster';
  * - Broadcast failures are logged but don't fail the operation
  * - Type-safe event emission using EventBroadcaster
  *
- * Future CRUD Operations (when implemented):
+ * CRUD Operations:
  * - createTask() → emit 'task:created'
  * - updateTask() → emit 'task:updated'
  * - deleteTask() → emit 'task:deleted'
@@ -54,8 +54,9 @@ export class TasksService {
 	private readonly traceStorage: TraceChunkStorage;
 
 	constructor(
-		private readonly orchestratorRepository: OrchestratorRepository,
-		private readonly eventBroadcaster: EventBroadcaster
+		private readonly tasksRepository: TasksRepository,
+		private readonly eventBroadcaster: EventBroadcaster,
+		private readonly orchestratorRepository: OrchestratorRepository
 	) {
 		// Use the same data directory as the orchestrator
 		this.traceStorage = new TraceChunkStorage('./data/tasks');
@@ -66,29 +67,23 @@ export class TasksService {
 	 */
 	async getTasksData(query?: TasksQuery): Promise<TasksData> {
 		try {
-			// Fetch tasks from orchestrator via repository (library mode or HTTP)
-			console.log('[TasksService] Fetching tasks via OrchestratorRepository...');
-			const rawTasks = await this.orchestratorRepository.getTasks();
-			console.log(`[TasksService] Received ${Array.isArray(rawTasks) ? rawTasks.length : 0} tasks`);
-
-			// Transform tasks to frontend format
-			const tasks: Task[] = this.transformTasks(rawTasks as any[]);
-
-			// Apply additional client-side filtering if needed
-			const filteredTasks = this.applyFilters(tasks, query);
+			// Fetch tasks from TasksRepository (already in correct format)
+			console.log('[TasksService] Fetching tasks via TasksRepository...');
+			const tasks = await this.tasksRepository.findAll(query);
+			console.log(`[TasksService] Received ${tasks.length} tasks`);
 
 			// Calculate summary statistics
-			const summary = this.calculateSummary(filteredTasks);
+			const summary = this.calculateSummary(tasks);
 
 			const tasksData: TasksData = {
 				timestamp: new Date().toISOString(),
 				summary,
-				tasks: filteredTasks,
+				tasks,
 			};
 
 			return tasksData;
 		} catch (error) {
-			// Orchestrator is offline - return empty tasks data
+			// Storage is unavailable - return empty tasks data
 			console.error('[TasksService] Failed to fetch tasks:', error);
 			return {
 				timestamp: new Date().toISOString(),
@@ -108,13 +103,9 @@ export class TasksService {
 	 */
 	async getTasksList(query: TasksListQuery): Promise<TasksListResponse> {
 		try {
-			// Fetch all tasks from orchestrator
+			// Fetch all tasks from TasksRepository (already in correct format)
 			console.log('[TasksService] Fetching tasks for paginated list...');
-			const rawTasks = await this.orchestratorRepository.getTasks();
-			let tasks: Task[] = this.transformTasks(rawTasks as any[]);
-
-			// Apply domain filters (status, workerId, priority)
-			tasks = this.applyFilters(tasks, query);
+			let tasks = await this.tasksRepository.findAll(query);
 
 			// Apply search if provided
 			if (query.search) {
@@ -144,7 +135,7 @@ export class TasksService {
 				},
 			};
 		} catch (error) {
-			// Orchestrator is offline - return empty list
+			// Storage is unavailable - return empty list
 			console.error('[TasksService] Failed to fetch tasks list:', error);
 			return {
 				items: [],
@@ -232,83 +223,6 @@ export class TasksService {
 	}
 
 	/**
-	 * Transform raw orchestrator tasks to frontend Task schema
-	 */
-	private transformTasks(rawTasks: any[]): Task[] {
-		if (!Array.isArray(rawTasks)) {
-			return [];
-		}
-
-		return rawTasks.map(task => ({
-			id: task.id,
-			description: task.description,
-			status: task.status,
-			priority: task.priority,
-			createdAt: task.createdAt,
-			updatedAt: task.updatedAt,
-			assignedWorker: task.assignedTo
-				? {
-						workerId: task.assignedTo.workerId,
-						workerType: task.assignedTo.workerType,
-					}
-				: null,
-			// Flow-related fields
-			flowId: task.flowId,
-			flowResult: task.flowResult
-				? {
-						status: task.flowResult.status,
-						error: task.flowResult.error,
-					}
-				: undefined,
-			// Project and workspace fields
-			projectId: task.projectId,
-			workspaceId: task.workspaceId,
-		}));
-	}
-
-	/**
-	 * Apply domain filters (status, workerId, priority, flowId, projectId, workspaceId)
-	 * Note: workerId and flowId use partial matching (contains) for better UX
-	 */
-	private applyFilters(tasks: Task[], query?: TasksQuery): Task[] {
-		let filtered = tasks;
-
-		// Filter by status if specified (exact match)
-		if (query?.status) {
-			filtered = filtered.filter(task => task.status === query.status);
-		}
-
-		// Filter by workerId if specified (partial match)
-		if (query?.workerId) {
-			filtered = filtered.filter(task =>
-				this.matchesPartialString(task.assignedWorker?.workerId, query.workerId)
-			);
-		}
-
-		// Filter by priority if specified (exact match)
-		if (query?.priority) {
-			filtered = filtered.filter(task => task.priority === query.priority);
-		}
-
-		// Filter by flowId if specified (partial match)
-		if (query?.flowId) {
-			filtered = filtered.filter(task => this.matchesPartialString(task.flowId, query.flowId));
-		}
-
-		// Filter by projectId if specified (exact match)
-		if (query?.projectId) {
-			filtered = filtered.filter(task => task.projectId === query.projectId);
-		}
-
-		// Filter by workspaceId if specified (exact match)
-		if (query?.workspaceId) {
-			filtered = filtered.filter(task => task.workspaceId === query.workspaceId);
-		}
-
-		return filtered;
-	}
-
-	/**
 	 * Calculate summary statistics
 	 */
 	private calculateSummary(tasks: Task[]): {
@@ -340,12 +254,12 @@ export class TasksService {
 
 	/**
 	 * Delete a task
-	 * 1. Delete task from orchestrator
+	 * 1. Delete task from TasksRepository
 	 * 2. Emit 'b2f:task:deleted' event
 	 */
 	async deleteTask(taskId: string): Promise<void> {
 		try {
-			await this.orchestratorRepository.deleteTask(taskId);
+			await this.tasksRepository.delete(taskId);
 
 			// Emit specific event AFTER successful deletion
 			this.eventBroadcaster.broadcast(B2F_TASK_DELETED, { id: taskId } as any);
@@ -369,7 +283,7 @@ export class TasksService {
 
 		for (const id of ids) {
 			try {
-				await this.orchestratorRepository.deleteTask(id);
+				await this.tasksRepository.delete(id);
 				deleted.push(id);
 			} catch (error) {
 				failed.push({
@@ -399,25 +313,22 @@ export class TasksService {
 
 	/**
 	 * Update task status
-	 * 1. Update task status in orchestrator
+	 * 1. Update task status in TasksRepository
 	 * 2. Emit 'b2f:task:updated' and 'b2f:tasks:updated' events
 	 */
 	async updateTaskStatus(taskId: string, newStatus: string): Promise<Task> {
 		try {
-			const task = await this.orchestratorRepository.updateTaskStatus(taskId, newStatus);
-
-			// Transform to frontend format
-			const transformedTask = this.transformTasks([task as any])[0];
+			const task = await this.tasksRepository.updateStatus(taskId, newStatus);
 
 			// Emit events AFTER successful update
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			this.eventBroadcaster.broadcast(B2F_TASK_UPDATED, transformedTask as any);
+			this.eventBroadcaster.broadcast(B2F_TASK_UPDATED, task as any);
 
 			// Emit aggregate event for dashboard/board updates
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
 
-			return transformedTask;
+			return task;
 		} catch (error) {
 			console.error('[TasksService] Failed to update task status:', error);
 			throw error;
@@ -427,7 +338,7 @@ export class TasksService {
 	/**
 	 * Create a new task
 	 * 1. Validate input
-	 * 2. Create task in orchestrator
+	 * 2. Create task in TasksRepository
 	 * 3. Emit 'b2f:task:created' event
 	 * 4. Return created task
 	 */
@@ -450,26 +361,38 @@ export class TasksService {
 				throw new Error(errors.join(', '));
 			}
 
-			// Create task via OrchestratorRepository (library mode)
-			const task = await this.orchestratorRepository.createTask(
-				data.description,
-				data.priority,
-				data.assignedTo,
-				data.flowId,
-				data.flowInputs
-			);
+			// Map CreateTask to Task fields (assignedTo → assignedWorker)
+			const task = await this.tasksRepository.create({
+				description: data.description,
+				status: 'backlog',
+				priority: data.priority,
+				assignedWorker: {
+					workerId: data.assignedTo.workerId,
+				},
+				flowId: data.flowId,
+				flowInputs: data.flowInputs,
+				projectId: data.projectId,
+				workspaceId: data.workspaceId,
+			});
 
-			// Transform to frontend format
-			const transformedTask = this.transformTasks([task])[0];
+			// Enqueue task in orchestrator for assignment to worker
+			try {
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				this.orchestratorRepository.enqueueTask(task as any);
+				console.log(`[TasksService] Task ${task.id} enqueued to orchestrator`);
+			} catch (error) {
+				console.error('[TasksService] Failed to enqueue task to orchestrator:', error);
+				// Don't fail the task creation if orchestrator is unavailable
+			}
 
 			// Emit specific event AFTER successful creation
-			this.eventBroadcaster.broadcast(B2F_TASK_CREATED, transformedTask);
+			this.eventBroadcaster.broadcast(B2F_TASK_CREATED, task);
 
 			// Emit aggregate event for dashboard updates
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
 
-			return transformedTask;
+			return task;
 		} catch (error) {
 			console.error('[TasksService] Failed to create task:', error);
 			throw error;
@@ -599,37 +522,11 @@ export class TasksService {
 	async getTaskById(taskId: string): Promise<Task | null> {
 		try {
 			console.log(`[TasksService] Fetching task ${taskId} with full trace...`);
-			const rawTasks = await this.orchestratorRepository.getTasks();
-			const rawTask = rawTasks.find((t: any) => t.id === taskId);
+			const task = await this.tasksRepository.findById(taskId);
 
-			if (!rawTask) {
+			if (!task) {
 				return null;
 			}
-
-			// Transform to frontend format (but keep full flowResult.trace)
-			const task: Task = {
-				id: rawTask.id,
-				description: rawTask.description,
-				status: rawTask.status,
-				priority: rawTask.priority,
-				createdAt: rawTask.createdAt,
-				updatedAt: rawTask.updatedAt,
-				assignedWorker: rawTask.assignedTo
-					? {
-							workerId: rawTask.assignedTo.workerId,
-							// workerType: rawTask.assignedTo.workerType,
-						}
-					: null,
-				flowId: rawTask.flowId,
-				flowResult: rawTask.flowResult
-					? {
-							status: rawTask.flowResult.status,
-							error: rawTask.flowResult.error,
-							outputs: rawTask.flowResult.outputs,
-							trace: rawTask.flowResult.trace, // Include full trace
-						}
-					: undefined,
-			};
 
 			return task;
 		} catch (error) {

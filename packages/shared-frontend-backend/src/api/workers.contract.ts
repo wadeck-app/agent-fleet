@@ -25,6 +25,8 @@ export const WorkerSchema = z.object({
 	connected: z.boolean(),
 	taskId: z.string().optional(),
 	state: WorkerStateSchema,
+	// Task timing
+	taskStartedAt: z.string().optional(), // ISO timestamp when current task started
 	// Extended fields (would come from tracking)
 	uptime: z.number().optional(), // milliseconds
 	lastHeartbeat: z.string().optional(), // ISO timestamp

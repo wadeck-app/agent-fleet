@@ -75,6 +75,7 @@ export class WorkersService {
 				connected: true, // Workers in the list are connected
 				taskId: w.taskId ?? undefined, // Convert null to undefined
 				state: w.taskId ? 'busy' : 'idle',
+				taskStartedAt: w.taskStartedAt ?? undefined, // Convert null to undefined
 				// MVP: These would come from actual tracking
 				uptime: undefined,
 				lastHeartbeat: undefined,
@@ -142,6 +143,7 @@ export class WorkersService {
 				connected: true,
 				taskId: w.taskId ?? undefined,
 				state: w.taskId ? 'busy' : 'idle',
+				taskStartedAt: w.taskStartedAt ?? undefined, // Convert null to undefined
 				uptime: undefined,
 				lastHeartbeat: undefined,
 				tasksCompleted: undefined,

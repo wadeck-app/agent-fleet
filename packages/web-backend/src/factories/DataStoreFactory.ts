@@ -6,15 +6,19 @@ import { getOrchestratorRestUrl } from 'shared-common/PortCalculator';
 // import type { Ingredient } from 'shared-frontend-backend/src/api/ingredients.contract';
 import type { Book } from '@app/shared/api/books.contract';
 import type { Ingredient } from '@app/shared/api/ingredients.contract';
+import type { Intervention } from '@app/shared/api/interventions.contract';
 import type { Project } from '@app/shared/api/projects.contract';
+import type { Task } from '@app/shared/api/tasks.contract';
 
 import type { AuthService } from '../auth/AuthService';
 import { MockAuthService } from '../auth/MockAuthService';
 import { BaseRepository } from '../repositories/BaseRepository';
 import { BooksRepository } from '../repositories/BooksRepository';
 import { IngredientsRepository } from '../repositories/IngredientsRepository';
+import { InterventionsRepository } from '../repositories/InterventionsRepository';
 import { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 import { ProjectsRepository } from '../repositories/ProjectsRepository';
+import { TasksRepository } from '../repositories/TasksRepository';
 import { type WorkerMetadata, WorkersRepository } from '../repositories/WorkersRepository';
 import { WorkspaceMetadataRepository } from '../repositories/WorkspaceMetadataRepository';
 import { BooksService } from '../services/BooksService';
@@ -22,6 +26,7 @@ import { DashboardService } from '../services/DashboardService';
 import { FlowsService } from '../services/FlowsService';
 import { IngredientsService } from '../services/IngredientsService';
 import { InterventionsService } from '../services/InterventionsService';
+import { OrchestratorEventHandler } from '../services/OrchestratorEventHandler';
 import { ProjectsService } from '../services/ProjectsService';
 import { TasksService } from '../services/TasksService';
 import { WorkersService } from '../services/WorkersService';
@@ -75,6 +80,7 @@ export class DataStoreFactory {
 	private orchestrator: Orchestrator;
 	private orchestratorWrapper: OrchestratorWrapper;
 	private orchestratorEventBridge?: any; // OrchestratorEventBridge (using any to avoid circular import)
+	private orchestratorEventHandler?: OrchestratorEventHandler;
 
 	constructor(storageMode: 'memory' | 'file' | 'mariadb' = 'file', orchestrator: Orchestrator) {
 		// Create primary storage based on mode
@@ -208,14 +214,18 @@ export class DataStoreFactory {
 	 */
 	getTasksService(): TasksService {
 		if (!this.tasksService) {
-			// Use orchestratorWrapper directly (library mode - no HTTP calls)
-			const orchestratorRepo = new OrchestratorRepository(this.orchestratorWrapper);
+			// Create TasksRepository using persistent storage
+			const tasksBaseRepo = new BaseRepository<Task>('tasks', this.storage);
+			const tasksRepo = new TasksRepository(tasksBaseRepo);
 
 			// Get EventBroadcaster
 			const eventBroadcaster = this.getEventBroadcaster();
 
-			// Create TasksService with EventBroadcaster
-			this.tasksService = new TasksService(orchestratorRepo, eventBroadcaster);
+			// Get OrchestratorRepository for task enqueueing
+			const orchestratorRepo = new OrchestratorRepository(this.orchestratorWrapper);
+
+			// Create TasksService with TasksRepository and OrchestratorRepository
+			this.tasksService = new TasksService(tasksRepo, eventBroadcaster, orchestratorRepo);
 		}
 
 		return this.tasksService;
@@ -254,14 +264,20 @@ export class DataStoreFactory {
 	 */
 	getInterventionsService(): InterventionsService {
 		if (!this.interventionsService) {
-			// Use orchestratorWrapper directly (library mode - no HTTP calls)
-			const orchestratorRepo = new OrchestratorRepository(this.orchestratorWrapper);
+			// Create InterventionsRepository using persistent storage (file-based)
+			const interventionsBaseRepo = new BaseRepository<Intervention>('interventions', this.storage);
+			const interventionsRepo = new InterventionsRepository(interventionsBaseRepo);
 
 			// Get EventBroadcaster
 			const eventBroadcaster = this.getEventBroadcaster();
 
-			// Create InterventionsService with EventBroadcaster
-			this.interventionsService = new InterventionsService(orchestratorRepo, eventBroadcaster);
+			// Create OrchestratorRepository for cache synchronization
+			const orchestratorRepo = new OrchestratorRepository(this.orchestratorWrapper);
+
+			// Create InterventionsService with InterventionsRepository
+			// Interventions are persisted to file for durability across restarts
+			// OrchestratorRepository used to sync cache when interventions are updated
+			this.interventionsService = new InterventionsService(interventionsRepo, eventBroadcaster, orchestratorRepo);
 		}
 
 		return this.interventionsService;
@@ -391,6 +407,42 @@ export class DataStoreFactory {
 	 */
 	getOrchestratorEventBridge(): any | undefined {
 		return this.orchestratorEventBridge;
+	}
+
+	/**
+	 * Get or create OrchestratorEventHandler
+	 */
+	getOrchestratorEventHandler(): OrchestratorEventHandler {
+		if (!this.orchestratorEventHandler) {
+			// Get dependencies
+			const tasksService = this.getTasksService();
+			const interventionsService = this.getInterventionsService();
+			const workersService = this.getWorkersService();
+
+			// Create handler
+			this.orchestratorEventHandler = new OrchestratorEventHandler(
+				tasksService,
+				interventionsService,
+				workersService
+			);
+		}
+
+		return this.orchestratorEventHandler;
+	}
+
+	/**
+	 * Initialize orchestrator integration
+	 * Call this after orchestrator is started
+	 */
+	initializeOrchestratorIntegration(): void {
+		const backendEventBridge = this.orchestrator.getBackendEventBridge();
+		const handler = this.getOrchestratorEventHandler();
+
+		backendEventBridge.registerHandler(async (event: string, data: unknown) => {
+			await handler.handleOrchestratorEvent(event, data);
+		});
+
+		console.log('[DataStoreFactory] Orchestrator integration initialized');
 	}
 
 	/**

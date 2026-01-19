@@ -20,8 +20,8 @@ import type {
 } from 'shared-orch-worker/worker-messages';
 
 import type { InterventionManager } from '../core/InterventionManager';
-import type { TaskManager } from '../core/TaskManager';
 import { TraceChunkStorage } from '../core/TraceChunkStorage';
+import type { WorkerCoordinator } from '../core/WorkerCoordinator';
 import type { WebSocketConnectionManager } from './WebSocketConnectionManager';
 
 /**
@@ -30,23 +30,23 @@ import type { WebSocketConnectionManager } from './WebSocketConnectionManager';
  * - Process task lifecycle events (started, progress, completed, failed)
  * - Handle flow step events
  * - Handle workspace events
- * - Update task manager and state manager
+ * - Delegate events to WorkerCoordinator which forwards to backend
  */
 export class WebSocketEventHandler {
-	private taskManager: TaskManager;
+	private workerCoordinator: WorkerCoordinator;
 	private stateManager: StateManager;
 	private connectionManager: WebSocketConnectionManager;
 	private interventionManager: InterventionManager;
 	private traceStorage: TraceChunkStorage;
 
 	constructor(
-		taskManager: TaskManager,
+		workerCoordinator: WorkerCoordinator,
 		stateManager: StateManager,
 		connectionManager: WebSocketConnectionManager,
 		interventionManager: InterventionManager,
 		traceStorage?: TraceChunkStorage
 	) {
-		this.taskManager = taskManager;
+		this.workerCoordinator = workerCoordinator;
 		this.stateManager = stateManager;
 		this.connectionManager = connectionManager;
 		this.interventionManager = interventionManager;
@@ -55,117 +55,57 @@ export class WebSocketEventHandler {
 
 	/**
 	 * Handle TASK_STARTED message
+	 * Delegates to WorkerCoordinator which forwards to backend
 	 */
 	handleTaskStarted(message: W2OTaskStartedMessage): void {
-		const { workerId, taskId, newStatus } = message;
+		const { workerId, taskId } = message;
 		logger.info(`[WS] Worker ${workerId} started task ${taskId}`);
 
-		const status = newStatus || TaskStatus.IN_PROGRESS;
-		this.taskManager.updateTaskStatus(taskId, status, {
-			event: 'started',
-			workerId,
-		});
+		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
+		this.workerCoordinator.onWorkerMessage(workerId, message);
 	}
 
 	/**
 	 * Handle TASK_PROGRESS message
+	 * Delegates to WorkerCoordinator which forwards to backend
 	 */
 	handleTaskProgress(message: W2OTaskProgressMessage): void {
 		const { workerId, taskId, progress } = message;
 		logger.info(`[WS] Worker ${workerId} progress on task ${taskId}: ${progress}`);
 
-		this.taskManager.addComment(taskId, `worker-${workerId}`, progress);
+		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
+		this.workerCoordinator.onWorkerMessage(workerId, message);
 	}
 
 	/**
 	 * Handle TASK_COMPLETED message
+	 * Delegates to WorkerCoordinator which forwards to backend
 	 */
 	async handleTaskCompleted(message: W2OTaskCompletedMessage): Promise<void> {
-		const { workerId, taskId, result, newStatus } = message;
+		const { workerId, taskId } = message;
 		logger.info(`[WS] Worker ${workerId} completed task ${taskId}`);
 
-		// Write final trace to chunks
-		if (result?.trace) {
-			try {
-				await this.traceStorage.writeTraceFull(taskId, result.trace);
-			} catch (error) {
-				logger.error(`[WS] Failed to write final trace for task ${taskId}:`, error);
-			}
-		}
+		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
+		// Backend handles trace storage and task updates
+		this.workerCoordinator.onWorkerMessage(workerId, message);
 
-		// Update task with flowResult (without storing full trace in task.json)
-		const task = this.taskManager.getTask(taskId);
-		if (task && result) {
-			task.flowResult = {
-				status: 'completed',
-				outputs: result.outputs || {},
-				// Store only trace metadata in task.json
-				trace: result.trace
-					? {
-							id: result.trace.id,
-							taskId: result.trace.taskId,
-							flowId: result.trace.flowId,
-							workspaceId: result.trace.workspaceId,
-							startTime: result.trace.startTime,
-							endTime: result.trace.endTime,
-							status: result.trace.status,
-							steps: [], // Empty - stored in chunks
-						}
-					: undefined,
-			};
-
-			try {
-				await this.taskManager.updateTask(task);
-			} catch (error) {
-				logger.error(`[WS] Failed to update task ${taskId} flowResult:`, error);
-			}
-		}
-
-		const status = newStatus || TaskStatus.REVIEW;
-		this.taskManager.updateTaskStatus(taskId, status, {
-			event: 'completed',
-			workerId,
-			result,
-		});
-
-		// Release the worker
+		// Release the worker locally (WorkerCoordinator also marks worker as idle)
 		this.connectionManager.releaseWorker(workerId);
 	}
 
 	/**
 	 * Handle TASK_FAILED message
+	 * Delegates to WorkerCoordinator which forwards to backend
 	 */
 	async handleTaskFailed(message: W2OTaskFailedMessage): Promise<void> {
-		const { workerId, taskId, error, newStatus } = message;
+		const { workerId, taskId, error } = message;
 		logger.error(`[WS] Worker ${workerId} failed task ${taskId}: ${error}`);
 
-		// Update task with flowResult (error only for now, trace not included in failure message)
-		const task = this.taskManager.getTask(taskId);
-		if (task) {
-			task.flowResult = {
-				status: 'failed',
-				error: error,
-			};
+		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
+		// Backend handles task updates and status changes
+		this.workerCoordinator.onWorkerMessage(workerId, message);
 
-			try {
-				await this.taskManager.updateTask(task);
-			} catch (updateError) {
-				logger.error(`[WS] Failed to update task ${taskId} flowResult:`, updateError);
-			}
-		}
-
-		// Use the provided status or default to BLOCKED
-		const failureStatus = newStatus || TaskStatus.BLOCKED;
-
-		this.taskManager.updateTaskStatus(taskId, failureStatus, {
-			event: 'failed',
-			workerId,
-			error,
-		});
-
-		this.taskManager.addComment(taskId, 'system', `Task failed: ${error}`);
-
-		// Release the worker
+		// Release the worker locally (WorkerCoordinator also marks worker as idle)
 		const worker = this.connectionManager.getWorker(workerId);
 		if (worker) {
 			worker.taskId = null;
@@ -175,6 +115,7 @@ export class WebSocketEventHandler {
 
 	/**
 	 * Handle TASK_TRACE_UPDATE message (real-time trace updates every 500ms)
+	 * Delegates to WorkerCoordinator which forwards to backend
 	 */
 	async handleTaskTraceUpdate(message: W2OTaskTraceUpdateMessage): Promise<void> {
 		const { workerId, taskId, trace } = message;
@@ -182,105 +123,62 @@ export class WebSocketEventHandler {
 			`[WS] Worker ${workerId} sent trace update for task ${taskId} (${trace?.steps?.length || 0} steps)`
 		);
 
-		const task = this.taskManager.getTask(taskId);
-		if (!task) {
-			logger.warn(`[WS] Task ${taskId} not found for trace update`);
-			return;
-		}
-
-		// Write trace incrementally to chunks
-		try {
-			await this.traceStorage.writeTraceIncremental(taskId, trace);
-		} catch (error) {
-			logger.error(`[WS] Failed to write trace chunks for task ${taskId}:`, error);
-		}
-
-		// Update task in-memory (without full trace for performance)
-		// Store only metadata, actual logs are in chunks
-		// Note: We keep status as 'completed' to satisfy type system, but task.status will be 'in_progress'
-		task.flowResult = {
-			status: 'completed', // Type constraint, actual execution status tracked by task.status
-			trace: {
-				id: trace.id,
-				taskId: trace.taskId,
-				flowId: trace.flowId,
-				workspaceId: trace.workspaceId,
-				startTime: trace.startTime,
-				status: trace.status,
-				steps: [], // Empty - stored in chunks
-			},
-		};
-
-		// Emit event for real-time frontend updates
-		// Use TASK_TRACE_UPDATED instead of TASK_UPDATED to avoid spamming backend
-		// This allows frontend to subscribe ONLY to trace updates for specific taskId
-		this.stateManager.emitTaskTraceUpdated(taskId, trace?.steps?.length || 0);
+		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
+		// Backend handles trace storage
+		this.workerCoordinator.onWorkerMessage(workerId, message);
 	}
 
 	/**
 	 * Handle TASK_QUESTION message
+	 * Delegates to WorkerCoordinator which forwards to backend
 	 */
 	handleTaskQuestion(message: W2OTaskQuestionMessage): void {
 		const { workerId, taskId, question } = message;
 		logger.info(`[WS] Worker ${workerId} has a question on task ${taskId}`);
 
-		this.taskManager.updateTaskStatus(taskId, TaskStatus.BLOCKED, {
-			event: 'question_raised',
-			workerId,
-			question,
-		});
-
-		this.taskManager.addComment(taskId, `worker-${workerId}`, `Question: ${question}`);
+		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
+		this.workerCoordinator.onWorkerMessage(workerId, message);
 	}
 
 	/**
 	 * Handle FLOW_STEP_STARTED message
+	 * Delegates to WorkerCoordinator which forwards to backend
 	 */
 	handleFlowStepStarted(message: W2OFlowStepStartedMessage): void {
 		const { workerId, taskId, stepId, stepName } = message;
 		logger.info(`[WS] Worker ${workerId} started flow step ${stepId} (${stepName}) for task ${taskId}`);
 
-		this.taskManager.addComment(taskId, 'system', `Flow step started: ${stepName || stepId}`);
-
-		const task = this.taskManager.getTask(taskId);
-		if (task) {
-			this.stateManager.emitTaskUpdated(task);
-		}
+		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
+		this.workerCoordinator.onWorkerMessage(workerId, message);
 	}
 
 	/**
 	 * Handle FLOW_STEP_COMPLETED message
+	 * Delegates to WorkerCoordinator which forwards to backend
 	 */
 	handleFlowStepCompleted(message: W2OFlowStepCompletedMessage): void {
-		const { workerId, taskId, stepId, outputs } = message;
+		const { workerId, taskId, stepId } = message;
 		logger.info(`[WS] Worker ${workerId} completed flow step ${stepId} for task ${taskId}`);
 
-		const outputInfo = outputs ? ` with ${Object.keys(outputs).length} output(s)` : '';
-		this.taskManager.addComment(taskId, 'system', `Flow step completed: ${stepId}${outputInfo}`);
-
-		const task = this.taskManager.getTask(taskId);
-		if (task) {
-			this.stateManager.emitTaskUpdated(task);
-		}
+		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
+		this.workerCoordinator.onWorkerMessage(workerId, message);
 	}
 
 	/**
 	 * Handle FLOW_STEP_FAILED message
+	 * Delegates to WorkerCoordinator which forwards to backend
 	 */
 	handleFlowStepFailed(message: W2OFlowStepFailedMessage): void {
 		const { workerId, taskId, stepId, error } = message;
 		logger.error(`[WS] Worker ${workerId} flow step ${stepId} failed for task ${taskId}: ${error}`);
 
-		this.taskManager.addComment(taskId, 'system', `Flow step failed: ${stepId} - ${error}`);
-
-		const task = this.taskManager.getTask(taskId);
-		if (task) {
-			this.stateManager.emitTaskUpdated(task);
-		}
+		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
+		this.workerCoordinator.onWorkerMessage(workerId, message);
 	}
 
 	/**
 	 * Handle WORKSPACE_ALLOCATED message
+	 * Delegates to WorkerCoordinator which forwards to backend
 	 */
 	handleWorkspaceAllocated(message: W2OWorkspaceAllocatedMessage): void {
 		const { workerId, taskId, workspaceId, workspacePath } = message;
@@ -288,31 +186,20 @@ export class WebSocketEventHandler {
 			`[WS] Worker ${workerId} allocated workspace ${workspaceId} at ${workspacePath} for task ${taskId}`
 		);
 
-		this.taskManager.addComment(taskId, 'system', `Workspace allocated: ${workspacePath}`);
-
-		// Store workspace info in task metadata
-		const task = this.taskManager.getTask(taskId);
-		if (task) {
-			task.metadata = task.metadata || {};
-			task.metadata.workspaceId = workspaceId;
-			task.metadata.workspacePath = workspacePath;
-			this.stateManager.emitTaskUpdated(task);
-		}
+		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
+		this.workerCoordinator.onWorkerMessage(workerId, message);
 	}
 
 	/**
 	 * Handle WORKSPACE_RELEASED message
+	 * Delegates to WorkerCoordinator which forwards to backend
 	 */
 	handleWorkspaceReleased(message: W2OWorkspaceReleasedMessage): void {
 		const { workerId, taskId, workspaceId } = message;
 		logger.info(`[WS] Worker ${workerId} released workspace ${workspaceId} for task ${taskId}`);
 
-		this.taskManager.addComment(taskId, 'system', `Workspace released: ${workspaceId}`);
-
-		const task = this.taskManager.getTask(taskId);
-		if (task) {
-			this.stateManager.emitTaskUpdated(task);
-		}
+		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
+		this.workerCoordinator.onWorkerMessage(workerId, message);
 	}
 
 	/**
@@ -345,6 +232,10 @@ export class WebSocketEventHandler {
 
 	/**
 	 * Handle INTERVENTION_REQUESTED message
+	 * Delegates to WorkerCoordinator which forwards to backend
+	 *
+	 * Note: InterventionManager is still used for backward compatibility
+	 * but should eventually be moved to backend as well
 	 */
 	async handleInterventionRequested(message: W2OInterventionRequestedMessage): Promise<void> {
 		const { workerId, taskId, interventionId, flowId, stepId, interventionType, blocking, config, timeout } =
@@ -353,6 +244,10 @@ export class WebSocketEventHandler {
 			`[WS] Worker ${workerId} requested ${interventionType} intervention for task ${taskId} step ${stepId} (id: ${interventionId})`
 		);
 
+		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
+		this.workerCoordinator.onWorkerMessage(workerId, message);
+
+		// TODO: Remove InterventionManager usage once backend handles interventions
 		try {
 			// Create intervention using InterventionManager
 			// Use the interventionId from the worker to ensure consistency

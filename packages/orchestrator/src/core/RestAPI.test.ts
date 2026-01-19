@@ -174,12 +174,14 @@ describe('RestAPI', () => {
 					// type: WorkerType.DEV,
 					taskId: 'task-1',
 					connectedAt: '2024-01-01T00:00:00.000Z',
+					taskStartedAt: '2024-01-01T00:00:00.000Z',
 				},
 				{
 					id: 'worker-2',
 					// type: WorkerType.REVIEWER,
 					taskId: null,
 					connectedAt: '2024-01-01T00:01:00.000Z',
+					taskStartedAt: null,
 				},
 			];
 
@@ -610,12 +612,14 @@ describe('RestAPI', () => {
 					// type: WorkerType.DEV,
 					taskId: 'task-1',
 					connectedAt: '2024-01-01T00:00:00.000Z',
+					taskStartedAt: '2024-01-01T00:00:00.000Z',
 				},
 				{
 					id: 'worker-2',
 					// type: WorkerType.REVIEWER,
 					taskId: null,
 					connectedAt: '2024-01-01T00:01:00.000Z',
+					taskStartedAt: null,
 				},
 			];
 			mockWsServer.getWorkers = vi.fn().mockReturnValue(mockWorkers);

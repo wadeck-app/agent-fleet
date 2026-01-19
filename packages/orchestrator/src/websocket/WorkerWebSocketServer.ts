@@ -10,7 +10,7 @@ import type { WebSocket } from 'ws';
 import { WebSocketServer } from 'ws';
 
 import type { InterventionManager } from '../core/InterventionManager';
-import type { TaskManager } from '../core/TaskManager';
+import type { WorkerCoordinator } from '../core/WorkerCoordinator';
 import { WebSocketConnectionManager } from './WebSocketConnectionManager';
 import { WebSocketEventHandler } from './WebSocketEventHandler';
 import { WebSocketMessageRouter } from './WebSocketMessageRouter';
@@ -30,7 +30,7 @@ export class WorkerWebSocketServer {
 	private messageRouter: WebSocketMessageRouter;
 
 	constructor(
-		taskManager: TaskManager,
+		workerCoordinator: WorkerCoordinator,
 		stateManager: StateManager,
 		interventionManager: InterventionManager,
 		port: number = 3738
@@ -38,9 +38,9 @@ export class WorkerWebSocketServer {
 		this.port = port;
 
 		// Initialize components
-		this.connectionManager = new WebSocketConnectionManager(taskManager, stateManager);
+		this.connectionManager = new WebSocketConnectionManager(workerCoordinator, stateManager);
 		this.eventHandler = new WebSocketEventHandler(
-			taskManager,
+			workerCoordinator,
 			stateManager,
 			this.connectionManager,
 			interventionManager

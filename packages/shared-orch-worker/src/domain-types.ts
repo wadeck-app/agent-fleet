@@ -104,6 +104,7 @@ export interface TaskHistoryEntry {
 export interface WorkerInfo {
 	id: string;
 	taskId: string | null;
+	taskStartedAt: string | null; // ISO timestamp when current task started
 	connectedAt: string;
 }
 

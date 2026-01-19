@@ -13,7 +13,7 @@ import { W2OMessageType, createW2OMessage } from 'shared-orch-worker/worker-mess
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { InterventionManager } from '../core/InterventionManager';
-import type { TaskManager } from '../core/TaskManager';
+import type { WorkerCoordinator } from '../core/WorkerCoordinator';
 import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
 
 // Mock WebSocket class
@@ -79,7 +79,8 @@ vi.mock('shared-common/logger');
 
 describe('Intervention Flow Integration', () => {
 	let server: WorkerWebSocketServer;
-	let mockTaskManager: TaskManager;
+	let mockWorkerCoordinator: WorkerCoordinator;
+	let mockTaskManager: any;
 	let mockStateManager: StateManager;
 	let interventionManager: InterventionManager;
 	let mockWss: any;
@@ -87,7 +88,7 @@ describe('Intervention Flow Integration', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 
-		// Mock TaskManager
+		// Mock TaskManager (still needed for InterventionManager)
 		mockTaskManager = {
 			getNextTaskForWorker: vi.fn(),
 			assignTask: vi.fn(),
@@ -98,6 +99,17 @@ describe('Intervention Flow Integration', () => {
 			getTask: vi.fn(),
 			setTaskIntervention: vi.fn(),
 			clearTaskIntervention: vi.fn(),
+		} as any;
+
+		// Mock WorkerCoordinator
+		mockWorkerCoordinator = {
+			registerWorker: vi.fn(),
+			unregisterWorker: vi.fn(),
+			onWorkerMessage: vi.fn(),
+			enqueueTask: vi.fn(),
+			getConnectedWorkers: vi.fn(),
+			getWorker: vi.fn(),
+			getQueueStats: vi.fn(),
 		} as any;
 
 		// Mock StateManager
@@ -113,11 +125,11 @@ describe('Intervention Flow Integration', () => {
 		vi.mocked(logger.info).mockImplementation(() => {});
 		vi.mocked(logger.error).mockImplementation(() => {});
 
-		// Create real InterventionManager
+		// Create real InterventionManager (still uses TaskManager for now)
 		interventionManager = new InterventionManager(mockTaskManager);
 
 		// Create server
-		server = new WorkerWebSocketServer(mockTaskManager, mockStateManager, interventionManager, 3738);
+		server = new WorkerWebSocketServer(mockWorkerCoordinator, mockStateManager, interventionManager, 3738);
 		mockWss = latestWssInstance;
 
 		// Wire up callback

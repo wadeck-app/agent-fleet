@@ -103,6 +103,7 @@ export function createMockWorker(overrides?: Partial<WorkerInfo>): WorkerInfo {
 		//FIXME no new Date in test (flaky)
 		connectedAt: new Date().toISOString(),
 		taskId: null,
+		taskStartedAt: null,
 		...overrides,
 	};
 }

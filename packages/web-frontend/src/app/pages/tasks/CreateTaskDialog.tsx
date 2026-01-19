@@ -36,7 +36,7 @@ const defaultFormData: CreateTaskFormData = {
 	description: '',
 	priority: 'medium',
 	workerId: '',
-	projectId: 'default',
+	projectId: '',
 	flowId: '',
 };
 
@@ -72,10 +72,6 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 				errors.workerId = 'Worker assignment is required';
 			}
 
-			if (!data.projectId) {
-				errors.projectId = 'Project is required';
-			}
-
 			// Validate flow inputs if flow is selected
 			// Find the selected flow to check its inputs
 			const selectedFlow = workerFlowsMetadata.find(f => f.id === data.flowId);
@@ -96,7 +92,6 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 			'Description is required': 'description',
 			'Priority is required': 'priority',
 			'Worker assignment is required': 'workerId',
-			'Project is required': 'projectId',
 		},
 		onSubmit: async data => {
 			// Transform flat form data to nested CreateTask structure
@@ -105,7 +100,7 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 				description: data.description,
 				priority: data.priority as CreateTask['priority'],
 				assignedTo: { workerId: data.workerId },
-				projectId: data.projectId,
+				projectId: data.projectId?.trim() || undefined,
 				flowId: data.flowId?.trim() || undefined,
 				// Pass the actual flow inputs if flow is selected
 				flowInputs: data.flowId && Object.keys(flowInputs).length > 0 ? flowInputs : undefined,
@@ -141,29 +136,23 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 			try {
 				setProjectsLoading(true);
 				const response = await projectsApi.getProjectsList({ archived: false });
-				const projectOptions: ComboboxOption[] = response.items.map(p => ({
-					value: p.id,
-					label: p.name,
-				}));
+				const projectOptions: ComboboxOption[] = [
+					{ value: '', label: 'No Project (assign to workspace/worker)' },
+					...response.items.map(p => ({
+						value: p.id,
+						label: p.name,
+					})),
+				];
 				setProjects(projectOptions);
-
-				// Set default project if available
-				const defaultProject = response.items.find(p => p.id === 'default');
-				if (defaultProject) {
-					formState.updateField('projectId', 'default');
-				} else if (response.items.length > 0) {
-					formState.updateField('projectId', response.items[0].id);
-				}
 			} catch (error) {
 				console.error('Failed to load projects:', error);
-				setProjects([]);
+				setProjects([{ value: '', label: 'No Project (assign to workspace/worker)' }]);
 			} finally {
 				setProjectsLoading(false);
 			}
 		};
 
 		loadProjects();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [open]);
 
 	// Load flows when worker is selected
@@ -262,13 +251,12 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 
 				<div className="col-span-2">
 					<ComboboxField
-						label="Project"
+						label="Project (Optional)"
 						value={formState.formData.projectId}
 						onChange={value => formState.updateField('projectId', value)}
 						options={projects}
-						placeholder={projectsLoading ? 'Loading projects...' : 'Select project...'}
-						required
-						disabled={projectsLoading || projects.length === 0}
+						placeholder={projectsLoading ? 'Loading projects...' : 'Select project or leave empty...'}
+						disabled={projectsLoading}
 						error={formState.validationErrors.projectId}
 					/>
 				</div>
@@ -306,11 +294,7 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 
 					{/* Warning for invalid flows in the list */}
 					{workerFlowsMetadata.some(f => !f.isValid) && (
-						<div
-							className={`
-        mt-2 rounded-md border border-warning/20 bg-warning/10 p-3
-      `}
-						>
+						<div className="mt-2 rounded-md border border-warning/20 bg-warning/10 p-3">
 							<div className="flex items-start">
 								<div className="flex-shrink-0">
 									<AlertTriangle className="h-5 w-5 text-warning" />

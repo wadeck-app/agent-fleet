@@ -89,12 +89,24 @@ export class EventBroadcaster {
 		console.log(`[EventBroadcaster] Broadcasting event "${event}" to ${this.transportServers.length} transport(s)`);
 		// Broadcast to all transports
 		for (const transport of this.transportServers) {
+			const transportType = transport.getTransportType();
+			const connectedCount = transport.getConnectedClients().length;
+
+			// Skip logging if no connections on this transport
+			if (connectedCount === 0) {
+				continue;
+			}
+
 			try {
 				transport.broadcast(event, data);
-				//TODO implement .name method in transport and use it
-				console.log(`[EventBroadcaster] Successfully broadcast to transport`);
+				console.log(
+					`[EventBroadcaster] Successfully broadcast to transport: ${transportType} (${connectedCount} connection(s))`
+				);
 			} catch (error) {
-				console.error(`[EventBroadcaster] Failed to broadcast to transport:`, error);
+				console.error(
+					`[EventBroadcaster] Failed to broadcast to transport: ${transportType} (${connectedCount} connection(s))`,
+					error
+				);
 				// Continue with other transports (anti-fragile)
 			}
 		}

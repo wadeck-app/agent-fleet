@@ -230,24 +230,9 @@ if (process.env.DISABLE_AUTH_DEV === 'true') {
  */
 
 // ===========================================================================================
-// CREATE FASTIFY SERVER
+// FASTIFY SERVER CREATION
 // ===========================================================================================
-
-// const fastify = Fastify({
-// 	logger: {
-// 		level: 'info',
-// 		transport: {
-// 			target: 'pino-pretty',
-// 			options: {
-// 				translateTime: 'HH:MM:ss Z',
-// 				ignore: 'pid,hostname',
-// 			},
-// 		},
-// 	},
-// });
-const fastify = Fastify({
-	logger: false,
-});
+// Note: Fastify instance is created inside start() function to allow retry on EADDRINUSE
 
 // Calculate ports from PROJECT_ID for parallel development between projects
 // PROJECT_ID=0 → Frontend:5000, Backend:3000 | WORKSPACE_ID=1 → Frontend:5010, Backend:3010
@@ -427,10 +412,83 @@ function startWorkersBroadcaster(factory: DataStoreFactory): void {
 // START SERVER
 // ===========================================================================================
 
+// Global server instances (needed for shutdown handlers)
+let orchestratorClient: Orchestrator | null = null;
+let fastifyInstance: FastifyInstance | null = null;
+
+// Register shutdown handlers ONCE at module level
+// This ensures clean shutdown even if SIGTERM arrives during startup
+const signals = ['SIGTERM', 'SIGINT'] as const;
+signals.forEach(signal => {
+	process.on(signal, async () => {
+		console.log(`\n\n🚨 ${signal} SIGNAL RECEIVED 🚨\n\n`);
+		logger.info(`${signal} signal received: initiating graceful shutdown`);
+		try {
+			// Close orchestrator first (if it was initialized)
+			if (orchestratorClient) {
+				logger.info('Shutting down orchestrator...');
+				await orchestratorClient.shutdown();
+			}
+
+			// Then close fastify (if it was initialized)
+			if (fastifyInstance) {
+				logger.info('Closing fastify server...');
+				await fastifyInstance.close();
+			}
+
+			logger.info('Server shutdown complete');
+			process.exit(0);
+		} catch (err) {
+			logger.error('Error during shutdown:', err);
+			process.exit(1);
+		}
+	});
+});
+
+/**
+ * Wait for ports to be available (handles TIME_WAIT on Windows)
+ */
+async function waitForPortsAvailable(): Promise<void> {
+	const MAX_RETRIES = 10;
+	const RETRY_DELAY_MS = 250;
+
+	for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+		try {
+			// Try to bind to the ports temporarily to check availability
+			const testServer = Fastify({ logger: false });
+			await testServer.listen({ port: PORT, host: '0.0.0.0' });
+			await testServer.close();
+			return; // Ports are available
+		} catch (err) {
+			const isAddressInUse = err instanceof Error && 'code' in err && err.code === 'EADDRINUSE';
+			if (isAddressInUse && attempt < MAX_RETRIES - 1) {
+				logger.info(`Port ${PORT} in use, retrying (${attempt + 1}/${MAX_RETRIES})...`);
+				await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+			} else if (isAddressInUse) {
+				throw new Error(
+					`Port ${PORT} still in use after ${MAX_RETRIES} retries. Another instance may be running.`
+				);
+			} else {
+				throw err;
+			}
+		}
+	}
+}
+
 // Initialize services and start server
-async function start() {
+async function start(): Promise<void> {
 	try {
-		// Register plugins
+		// Wait for ports to be available before starting initialization
+		await waitForPortsAvailable();
+
+		// Create Fastify instance
+		const fastify = Fastify({
+			logger: false,
+		});
+
+		// Store fastify instance in variable accessible to shutdown handlers
+		fastifyInstance = fastify;
+
 		// Configure Helmet security headers based on environment
 		// SECURE BY DEFAULT: All security headers enabled unless DEPLOY_ENV=local
 		// DEPLOY_ENV=local disables security for HTTP local testing
@@ -564,7 +622,8 @@ async function start() {
 		fastify.get('/api/health', healthCheckHandler);
 
 		// Initialize OrchestratorClient (library or remote mode)
-		const orchestratorClient = await initializeOrchestratorClient();
+		// Assign to closure variable so shutdown handlers can access it
+		orchestratorClient = await initializeOrchestratorClient();
 
 		// Initialize global factory for dependency injection
 		// This must be done BEFORE any controllers are loaded
@@ -579,6 +638,10 @@ async function start() {
 
 			// Initialize WebSocket transport server
 			await initializeTransportServer(fastify, factory);
+
+			// Initialize orchestrator integration (connect BackendEventBridge to OrchestratorEventHandler)
+			// MUST be done AFTER initializeTransportServer creates EventBroadcaster
+			factory.initializeOrchestratorIntegration();
 		} else if (process.env.E2E_MODE !== 'true') {
 			//logger.info('Skipping Google Sheets and Gemini AI initialization (in-memory mode)');
 
@@ -587,10 +650,18 @@ async function start() {
 
 			// Initialize WebSocket transport server
 			await initializeTransportServer(fastify, factory);
+
+			// Initialize orchestrator integration (connect BackendEventBridge to OrchestratorEventHandler)
+			// MUST be done AFTER initializeTransportServer creates EventBroadcaster
+			factory.initializeOrchestratorIntegration();
 		} else {
 			// E2E mode also needs a factory for controllers
 			// Initialize WebSocket transport server for E2E tests
 			await initializeTransportServer(fastify, factory);
+
+			// Initialize orchestrator integration (connect BackendEventBridge to OrchestratorEventHandler)
+			// MUST be done AFTER initializeTransportServer creates EventBroadcaster
+			factory.initializeOrchestratorIntegration();
 		}
 
 		// Start server
@@ -624,21 +695,11 @@ async function start() {
 			startWorkersBroadcaster(factory);
 		}
 	} catch (err) {
-		// Always log startup errors, even in E2E mode (critical for debugging)
+		// Always log startup errors
 		console.error('❌ FATAL: Failed to start backend server:', err);
 		logger.error('Failed to start server', err);
 		process.exit(1);
 	}
 }
-
-// Graceful shutdown
-const signals = ['SIGTERM', 'SIGINT'] as const;
-signals.forEach(signal => {
-	process.on(signal, async () => {
-		logger.info(`${signal} signal received: closing HTTP server`);
-		await fastify.close();
-		process.exit(0);
-	});
-});
 
 start();
