@@ -418,7 +418,7 @@ let fastifyInstance: FastifyInstance | null = null;
 
 // Register shutdown handlers ONCE at module level
 // This ensures clean shutdown even if SIGTERM arrives during startup
-const signals = ['SIGTERM', 'SIGINT'] as const;
+const signals = ['SIGTERM', 'SIGINT', 'SIGBREAK'] as const;
 signals.forEach(signal => {
 	process.on(signal, async () => {
 		console.log(`\n\n🚨 ${signal} SIGNAL RECEIVED 🚨\n\n`);
@@ -664,6 +664,24 @@ async function start(): Promise<void> {
 			factory.initializeOrchestratorIntegration();
 		}
 
+		// Add onClose hook to terminate all WebSocket connections before shutdown
+		// This prevents Fastify from hanging when trying to close with active connections
+		fastify.addHook('onClose', (instance, done) => {
+			logger.info('[Fastify] onClose: Terminating all active WebSocket connections...');
+			const transportServer = factory.getTransportServer();
+			if (transportServer) {
+				// Get WebSocketTransportServer and close all connections
+				const wsServer = (transportServer as any).wss;
+				if (wsServer?.clients) {
+					wsServer.clients.forEach((client: any) => {
+						client.terminate();
+					});
+					logger.info(`[Fastify] Terminated ${wsServer.clients.size} WebSocket connections`);
+				}
+			}
+			done();
+		});
+
 		// Start server
 		// Listen on 0.0.0.0 to allow connections from other devices on the network
 		await fastify.listen({ port: PORT, host: '0.0.0.0' });
@@ -680,6 +698,7 @@ async function start(): Promise<void> {
 		} else {
 			// Normal startup logs for development mode
 			logger.info(`Server running in ${process.env.NODE_ENV || 'development'} mode`);
+			logger.info(`  >  PID:     ${process.pid} (parent: ${process.ppid || 'unknown'})`);
 			logger.info(`  >  Local:   http://localhost:${PORT}/`);
 
 			const networkAddresses = getNetworkAddresses();

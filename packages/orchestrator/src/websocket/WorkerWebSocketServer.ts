@@ -18,7 +18,7 @@ import { WebSocketMessageRouter } from './WebSocketMessageRouter';
 /**
  * Main WebSocket server that coordinates worker connections and message routing
  * Responsibilities:
- * - Setup and manage WebSocket server
+ * - Setup and manage Web Socket server
  * - Coordinate specialized components
  * - Handle connection lifecycle
  */
