@@ -16,7 +16,11 @@
  * - Graceful degradation if queue is full (oldest messages dropped)
  * - No single point of failure
  */
+import { createLogger } from 'shared-common/logger';
+
 import type { TransportEvent } from '@app/shared/transport';
+
+const log = createLogger('MessageQueue');
 
 /**
  * Queued Message
@@ -123,7 +127,7 @@ export class MessageQueue {
 		// Check for duplicate (already delivered)
 		const delivered = this.deliveredMessages.get(clientId);
 		if (delivered?.has(event.id)) {
-			console.log(`[MessageQueue] Skipping duplicate event ${event.id} for client ${clientId}`);
+			log.info(`Skipping duplicate event ${event.id} for client ${clientId}`);
 			return false;
 		}
 
@@ -140,13 +144,11 @@ export class MessageQueue {
 		// Enforce max queue size (drop oldest if exceeded)
 		if (queue.length > this.config.maxQueueSize) {
 			const dropped = queue.shift();
-			console.warn(
-				`[MessageQueue] Queue full for client ${clientId}, dropped oldest message: ${dropped?.event.id}`
-			);
+			log.warn(`Queue full for client ${clientId}, dropped oldest message: ${dropped?.event.id}`);
 			return false;
 		}
 
-		console.log(`[MessageQueue] Enqueued event ${event.type} (${event.id}) for client ${clientId}`);
+		log.info(`Enqueued event ${event.type} (${event.id}) for client ${clientId}`);
 		return true;
 	}
 
@@ -182,7 +184,7 @@ export class MessageQueue {
 		// Clear queue
 		this.queues.set(clientId, []);
 
-		console.log(`[MessageQueue] Dequeued ${events.length} events for client ${clientId}`);
+		log.info(`Dequeued ${events.length} events for client ${clientId}`);
 		return events;
 	}
 
@@ -220,7 +222,7 @@ export class MessageQueue {
 	clearQueue(clientId: string): void {
 		this.queues.delete(clientId);
 		this.deliveredMessages.delete(clientId);
-		console.log(`[MessageQueue] Cleared queue for client ${clientId}`);
+		log.info(`Cleared queue for client ${clientId}`);
 	}
 
 	/**
@@ -281,7 +283,7 @@ export class MessageQueue {
 			const filtered = queue.filter(qm => {
 				const age = now - qm.queuedAt;
 				if (age > this.config.messageTTL) {
-					console.log(`[MessageQueue] Expired message ${qm.event.id} for client ${clientId} (age: ${age}ms)`);
+					log.info(`Expired message ${qm.event.id} for client ${clientId} (age: ${age}ms)`);
 					expiredCount++;
 					return false;
 				}
@@ -307,8 +309,8 @@ export class MessageQueue {
 		}
 
 		if (expiredCount > 0 || emptyQueuesRemoved > 0) {
-			console.log(
-				`[MessageQueue] Cleanup: expired=${expiredCount}, emptyQueues=${emptyQueuesRemoved}, ` +
+			log.info(
+				`Cleanup: expired=${expiredCount}, emptyQueues=${emptyQueuesRemoved}, ` +
 					`totalQueued=${this.getTotalQueuedMessages()}`
 			);
 		}
@@ -329,7 +331,7 @@ export class MessageQueue {
 		this.queues.clear();
 		this.deliveredMessages.clear();
 
-		console.log('[MessageQueue] Shutdown complete');
+		log.info('Shutdown complete');
 	}
 
 	/**

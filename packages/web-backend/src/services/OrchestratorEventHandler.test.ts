@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { EventBroadcaster } from '../transport/EventBroadcaster';
 import type { InterventionsService } from './InterventionsService';
 import { OrchestratorEventHandler } from './OrchestratorEventHandler';
 import type { TasksService } from './TasksService';
@@ -10,6 +11,7 @@ describe('OrchestratorEventHandler', () => {
 	let mockTasksService: TasksService;
 	let mockInterventionsService: InterventionsService;
 	let mockWorkersService: WorkersService;
+	let mockEventBroadcaster: EventBroadcaster;
 
 	beforeEach(() => {
 		// Create mocks for all service dependencies
@@ -24,8 +26,17 @@ describe('OrchestratorEventHandler', () => {
 
 		mockWorkersService = {} as any;
 
+		mockEventBroadcaster = {
+			broadcast: vi.fn(),
+		} as any;
+
 		// Create handler instance with mocked dependencies
-		handler = new OrchestratorEventHandler(mockTasksService, mockInterventionsService, mockWorkersService);
+		handler = new OrchestratorEventHandler(
+			mockTasksService,
+			mockInterventionsService,
+			mockWorkersService,
+			mockEventBroadcaster
+		);
 	});
 
 	describe('handleOrchestratorEvent', () => {

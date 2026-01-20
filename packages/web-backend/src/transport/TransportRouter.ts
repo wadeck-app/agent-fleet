@@ -1,9 +1,13 @@
+import { createLogger } from 'shared-common/logger';
+
 import type { HttpMethod } from '@app/shared/route-builder';
 import type { TransportRequest, TransportResponse } from '@app/shared/transport';
 import { ALL_API_ROUTES } from '@app/shared/types';
 
 import type { DataStoreFactory } from '../factories/DataStoreFactory';
 import type { LazyController } from '../utils/lazy-controller-plugin';
+
+const log = createLogger('TransportRouter');
 
 /**
  * ===========================================================================================
@@ -338,7 +342,7 @@ export class TransportRouter {
 				timestamp: Date.now(),
 			};
 		} catch (err: any) {
-			console.error('[TransportRouter] Request error:', err);
+			log.error('Request error:', err);
 
 			return {
 				id: request.id,

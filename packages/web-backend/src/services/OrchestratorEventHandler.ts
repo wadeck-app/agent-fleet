@@ -1,9 +1,13 @@
+import { createLogger } from 'shared-common/logger';
+
 import { B2F_TASK_TRACE_UPDATED } from '@app/shared/transport/B2FEventConstants';
 
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 import type { InterventionsService } from './InterventionsService';
 import type { TasksService } from './TasksService';
 import type { WorkersService } from './WorkersService';
+
+const log = createLogger('OrchestratorEventHandler');
 
 /**
  * ===========================================================================================
@@ -55,7 +59,7 @@ export class OrchestratorEventHandler {
 	 * @param data Event data (varies by event type)
 	 */
 	async handleOrchestratorEvent(event: string, data: any): Promise<void> {
-		console.log(`[OrchestratorEventHandler] Received event: ${event}`, {
+		log.info(`Received event: ${event}`, {
 			dataKeys: data ? Object.keys(data) : [],
 		});
 
@@ -90,10 +94,10 @@ export class OrchestratorEventHandler {
 					break;
 
 				default:
-					console.warn(`[OrchestratorEventHandler] Unknown event type: ${event}`);
+					log.warn(`Unknown event type: ${event}`);
 			}
 		} catch (error) {
-			console.error(`[OrchestratorEventHandler] Error handling event ${event}:`, error);
+			log.error(`Error handling event ${event}:`, error);
 			// Don't throw - orchestrator shouldn't fail if backend fails
 		}
 	}
@@ -109,15 +113,15 @@ export class OrchestratorEventHandler {
 	 */
 	private async handleWorkerConnected(data: { workerId: string; metadata?: any }): Promise<void> {
 		try {
-			console.log(`[OrchestratorEventHandler] Worker connected: ${data.workerId}`);
+			log.info(`Worker connected: ${data.workerId}`);
 
 			// TODO: Implement worker connection tracking in WorkersService
 			// For now, worker status comes from orchestrator stats
 			// Future enhancement: Track connection history and uptime
 
-			console.log(`[OrchestratorEventHandler] Worker ${data.workerId} marked as connected`);
+			log.info(`Worker ${data.workerId} marked as connected`);
 		} catch (error) {
-			console.error(`[OrchestratorEventHandler] Failed to handle worker_connected for ${data.workerId}:`, error);
+			log.error(`Failed to handle worker_connected for ${data.workerId}:`, error);
 		}
 	}
 
@@ -128,18 +132,15 @@ export class OrchestratorEventHandler {
 	 */
 	private async handleWorkerDisconnected(data: { workerId: string; reason?: string }): Promise<void> {
 		try {
-			console.log(`[OrchestratorEventHandler] Worker disconnected: ${data.workerId}`);
+			log.info(`Worker disconnected: ${data.workerId}`);
 
 			// TODO: Implement worker disconnection tracking in WorkersService
 			// For now, worker status comes from orchestrator stats
 			// Future enhancement: Track disconnection history and reasons
 
-			console.log(`[OrchestratorEventHandler] Worker ${data.workerId} marked as disconnected`);
+			log.info(`Worker ${data.workerId} marked as disconnected`);
 		} catch (error) {
-			console.error(
-				`[OrchestratorEventHandler] Failed to handle worker_disconnected for ${data.workerId}:`,
-				error
-			);
+			log.error(`Failed to handle worker_disconnected for ${data.workerId}:`, error);
 		}
 	}
 
@@ -154,15 +155,15 @@ export class OrchestratorEventHandler {
 	 */
 	private async handleTaskAssigned(data: { taskId: string; workerId: string }): Promise<void> {
 		try {
-			console.log(`[OrchestratorEventHandler] Task assigned: ${data.taskId} → ${data.workerId}`);
+			log.info(`Task assigned: ${data.taskId} → ${data.workerId}`);
 
 			// Use TasksService method if available, otherwise direct repository access
 			// Note: TasksService doesn't have markAssigned method, so we'll use updateTaskStatus
 			await this.tasksService.updateTaskStatus(data.taskId, 'in_progress');
 
-			console.log(`[OrchestratorEventHandler] Task ${data.taskId} marked as assigned to ${data.workerId}`);
+			log.info(`Task ${data.taskId} marked as assigned to ${data.workerId}`);
 		} catch (error) {
-			console.error(`[OrchestratorEventHandler] Failed to handle task_assigned for ${data.taskId}:`, error);
+			log.error(`Failed to handle task_assigned for ${data.taskId}:`, error);
 		}
 	}
 
@@ -173,13 +174,13 @@ export class OrchestratorEventHandler {
 	 */
 	private async handleTaskStarted(data: { taskId: string }): Promise<void> {
 		try {
-			console.log(`[OrchestratorEventHandler] Task started: ${data.taskId}`);
+			log.info(`Task started: ${data.taskId}`);
 
 			await this.tasksService.updateTaskStatus(data.taskId, 'in_progress');
 
-			console.log(`[OrchestratorEventHandler] Task ${data.taskId} marked as started`);
+			log.info(`Task ${data.taskId} marked as started`);
 		} catch (error) {
-			console.error(`[OrchestratorEventHandler] Failed to handle task_started for ${data.taskId}:`, error);
+			log.error(`Failed to handle task_started for ${data.taskId}:`, error);
 		}
 	}
 
@@ -190,14 +191,12 @@ export class OrchestratorEventHandler {
 	 */
 	private async handleTaskTraceUpdate(data: { taskId: string; traceChunk: any }): Promise<void> {
 		try {
-			console.log(
-				`[OrchestratorEventHandler] [TRACE] Task trace update: ${data.taskId}, steps: ${data.traceChunk?.steps?.length || 0}`
-			);
+			log.info(`[TRACE] Task trace update: ${data.taskId}, steps: ${data.traceChunk?.steps?.length || 0}`);
 
 			// Write trace to storage using TasksService
 			await this.tasksService.writeTrace(data.taskId, data.traceChunk);
 
-			console.log(`[OrchestratorEventHandler] [TRACE] Task ${data.taskId} trace successfully written to storage`);
+			log.info(`[TRACE] Task ${data.taskId} trace successfully written to storage`);
 
 			// Broadcast B2F event to notify frontend about trace update
 			this.eventBroadcaster.broadcast(B2F_TASK_TRACE_UPDATED, {
@@ -205,11 +204,9 @@ export class OrchestratorEventHandler {
 				stepsCount: data.traceChunk?.steps?.length || 0,
 			});
 
-			console.log(
-				`[OrchestratorEventHandler] [TRACE] Broadcasted B2F_TASK_TRACE_UPDATED for task ${data.taskId}`
-			);
+			log.info(`[TRACE] Broadcasted B2F_TASK_TRACE_UPDATED for task ${data.taskId}`);
 		} catch (error) {
-			console.error(`[OrchestratorEventHandler] Failed to handle task_trace_update for ${data.taskId}:`, error);
+			log.error(`Failed to handle task_trace_update for ${data.taskId}:`, error);
 			// Don't throw - orchestrator shouldn't fail if backend storage fails
 		}
 	}
@@ -230,7 +227,7 @@ export class OrchestratorEventHandler {
 		};
 	}): Promise<void> {
 		try {
-			console.log(`[OrchestratorEventHandler] Task completed: ${data.taskId}, success: ${data.success}`);
+			log.info(`Task completed: ${data.taskId}, success: ${data.success}`);
 
 			// Determine final status based on success/failure
 			// - success === true → 'review' (completed successfully, awaiting human review)
@@ -239,9 +236,9 @@ export class OrchestratorEventHandler {
 
 			await this.tasksService.updateTaskStatus(data.taskId, finalStatus);
 
-			console.log(`[OrchestratorEventHandler] Task ${data.taskId} marked as ${finalStatus}`);
+			log.info(`Task ${data.taskId} marked as ${finalStatus}`);
 		} catch (error) {
-			console.error(`[OrchestratorEventHandler] Failed to handle task_completed for ${data.taskId}:`, error);
+			log.error(`Failed to handle task_completed for ${data.taskId}:`, error);
 		}
 	}
 
@@ -268,7 +265,7 @@ export class OrchestratorEventHandler {
 	}): Promise<void> {
 		try {
 			const { taskId, interventionData } = data;
-			console.log(`[OrchestratorEventHandler] Intervention requested: ${interventionData.interventionId}`);
+			log.info(`Intervention requested: ${interventionData.interventionId}`);
 
 			// Create intervention in backend storage (data/interventions.json)
 			// This is the source of truth for UI and persistence across restarts
@@ -292,12 +289,9 @@ export class OrchestratorEventHandler {
 			// Save to backend repository (persists to file)
 			await this.interventionsService.createIntervention(intervention);
 
-			console.log(`[OrchestratorEventHandler] Intervention ${interventionData.interventionId} saved to backend`);
+			log.info(`Intervention ${interventionData.interventionId} saved to backend`);
 		} catch (error) {
-			console.error(
-				`[OrchestratorEventHandler] Failed to handle intervention_requested for ${data.interventionData?.interventionId}:`,
-				error
-			);
+			log.error(`Failed to handle intervention_requested for ${data.interventionData?.interventionId}:`, error);
 		}
 	}
 }

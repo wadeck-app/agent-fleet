@@ -37,12 +37,15 @@
  * ```
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { createLogger } from 'shared-common/logger';
 
 import type { EventData, EventType, TransportEvent } from '@app/shared/transport';
 
 import type { ClientConnectedHandler, ClientDisconnectedHandler, ITransportServer } from '../ITransportServer';
 import type { MessageQueue } from '../MessageQueue';
 import type { TransportSessionManager } from '../TransportSessionManager';
+
+const log = createLogger('HttpPollingTransportServer');
 
 /**
  * HTTP Polling Response
@@ -121,7 +124,7 @@ export class HttpPollingTransportServer implements ITransportServer {
 		// Start cleanup timer
 		this.startCleanup();
 
-		console.log('[HttpPolling] Server initialized');
+		log.info('Server initialized');
 	}
 
 	/**
@@ -148,7 +151,7 @@ export class HttpPollingTransportServer implements ITransportServer {
 			this.activeSessions.set(connId, Date.now());
 
 			if (isNewSession) {
-				console.log(
+				log.info(
 					`[HttpPolling] New connection ${connId} (user=${session.userId}, total=${this.activeSessions.size})`
 				);
 				this.connectHandlers.forEach(handler => handler(connId));
@@ -158,7 +161,7 @@ export class HttpPollingTransportServer implements ITransportServer {
 			const queuedEvents = this.messageQueue.dequeue(connId);
 
 			if (queuedEvents.length > 0) {
-				console.log(`[HttpPolling] Sending ${queuedEvents.length} queued events to connection ${connId}`);
+				log.info(`Sending ${queuedEvents.length} queued events to connection ${connId}`);
 			}
 
 			// Always respond immediately (no waiting)
@@ -171,7 +174,7 @@ export class HttpPollingTransportServer implements ITransportServer {
 
 			reply.send(response);
 		} catch (error) {
-			console.error('[HttpPolling] Authentication failed:', error);
+			log.error('Authentication failed:', error);
 			reply.code(401).send({
 				error: 'Authentication failed',
 				message: error instanceof Error ? error.message : 'Unauthorized',
@@ -211,7 +214,7 @@ export class HttpPollingTransportServer implements ITransportServer {
 		}
 
 		if (queuedCount > 0) {
-			console.log(`[HttpPolling] Broadcast ${event}: queued=${queuedCount}`);
+			log.info(`Broadcast ${event}: queued=${queuedCount}`);
 		}
 	}
 
@@ -260,13 +263,13 @@ export class HttpPollingTransportServer implements ITransportServer {
 				this.sessionManager.removeSession(connId);
 				this.messageQueue.clearQueue(connId);
 
-				console.log(`[HttpPolling] Removed inactive connection ${connId}`);
+				log.info(`Removed inactive connection ${connId}`);
 
 				this.disconnectHandlers.forEach(handler => handler(connId));
 			}
 
 			if (inactiveConnections.length > 0) {
-				console.log(
+				log.info(
 					`[HttpPolling] Cleaned up ${inactiveConnections.length} inactive connections (active=${this.activeSessions.size})`
 				);
 			}
@@ -319,6 +322,6 @@ export class HttpPollingTransportServer implements ITransportServer {
 
 		this.activeSessions.clear();
 
-		console.log('[HttpPolling] Server shutdown complete');
+		log.info('Server shutdown complete');
 	}
 }

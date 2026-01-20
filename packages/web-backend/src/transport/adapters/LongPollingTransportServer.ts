@@ -31,12 +31,15 @@
  * ```
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { createLogger } from 'shared-common/logger';
 
 import type { EventData, EventType, TransportEvent } from '@app/shared/transport';
 
 import type { ClientConnectedHandler, ClientDisconnectedHandler, ITransportServer } from '../ITransportServer';
 import type { MessageQueue } from '../MessageQueue';
 import type { TransportSessionManager } from '../TransportSessionManager';
+
+const log = createLogger('LongPollingTransportServer');
 
 /**
  * Pending Poll Request
@@ -148,7 +151,7 @@ export class LongPollingTransportServer implements ITransportServer {
 		// Start cleanup timer
 		this.startCleanup();
 
-		console.log('[LongPolling] Server initialized');
+		log.info('Server initialized');
 	}
 
 	/**
@@ -160,7 +163,7 @@ export class LongPollingTransportServer implements ITransportServer {
 		const connId = query.connId;
 		const isFirstPoll = query.firstPoll === 'true';
 
-		console.log(`[LongPolling] Poll request received for connId: ${connId}, firstPoll: ${isFirstPoll}`);
+		log.info(`Poll request received for connId: ${connId}, firstPoll: ${isFirstPoll}`);
 
 		if (!connId) {
 			reply.code(400).send({ error: 'Missing connId parameter' });
@@ -180,15 +183,11 @@ export class LongPollingTransportServer implements ITransportServer {
 			if (p) {
 				clearTimeout(p.timeout);
 				this.pendingPolls.delete(connId);
-				console.log(
-					`[LongPolling] DEBUG: Connection ${connId} closed, had pending poll (elapsed=${elapsedMs}ms)`
-				);
+				log.info(`[LongPolling] DEBUG: Connection ${connId} closed, had pending poll (elapsed=${elapsedMs}ms)`);
 			} else {
-				console.log(
-					`[LongPolling] DEBUG: Connection ${connId} closed, no pending poll (elapsed=${elapsedMs}ms)`
-				);
+				log.info(`[LongPolling] DEBUG: Connection ${connId} closed, no pending poll (elapsed=${elapsedMs}ms)`);
 			}
-			console.log(
+			log.info(
 				`[LongPolling] DEBUG: Request complete:${request.raw.complete}, Response ended:${reply.raw.writableEnded}`
 			);
 		});
@@ -208,7 +207,7 @@ export class LongPollingTransportServer implements ITransportServer {
 			this.activeSessions.set(connId, Date.now());
 
 			if (isNewSession) {
-				console.log(
+				log.info(
 					`[LongPolling] New connection ${connId} (user=${session.userId}, total=${this.activeSessions.size})`
 				);
 				this.connectHandlers.forEach(handler => handler(connId));
@@ -230,27 +229,25 @@ export class LongPollingTransportServer implements ITransportServer {
 					timestamp: Date.now(),
 				};
 				this.messageQueue.enqueue(connId, responseEvent);
-				console.log(
+				log.info(
 					`[LongPolling] Queued ${eventType} for ${isNewSession ? 'new session' : 'reconnection'} ${connId}`
 				);
 			}
 
 			// Check if connection was aborted during authentication
 			if (aborted) {
-				console.log(`[LongPolling] Connection ${connId} aborted during authentication`);
+				log.info(`Connection ${connId} aborted during authentication`);
 				return;
 			}
 
 			// Check if there are queued events
 			const queuedEvents = this.messageQueue.dequeue(connId);
-			console.log(
-				`[LongPolling] DEBUG: Dequeued ${queuedEvents.length} events for ${connId}, aborted=${aborted}`
-			);
+			log.info(`[LongPolling] DEBUG: Dequeued ${queuedEvents.length} events for ${connId}, aborted=${aborted}`);
 
 			if (queuedEvents.length > 0) {
 				// Check if aborted before sending
 				if (aborted) {
-					console.log(`[LongPolling] Connection ${connId} aborted before sending queued events`);
+					log.info(`Connection ${connId} aborted before sending queued events`);
 					return;
 				}
 
@@ -260,7 +257,7 @@ export class LongPollingTransportServer implements ITransportServer {
 				);
 
 				// Immediate response with queued events
-				console.log(
+				log.info(
 					`[LongPolling] Sending ${filteredEvents.length} queued events to connection ${connId} (${queuedEvents.length - filteredEvents.length} filtered)`
 				);
 				const response: LongPollingResponse = {
@@ -274,13 +271,13 @@ export class LongPollingTransportServer implements ITransportServer {
 			}
 
 			// No queued events, hold connection open
-			console.log(`[LongPolling] DEBUG: No queued events, adding to pendingPolls for ${connId}`);
+			log.info(`DEBUG: No queued events, adding to pendingPolls for ${connId}`);
 
 			// Check if there's already a pending poll for this connId (e.g., from a page refresh)
 			// If so, terminate it immediately to avoid making the new request wait
 			const existingPoll = this.pendingPolls.get(connId);
 			if (existingPoll) {
-				console.log(`[LongPolling] DEBUG: Replacing existing pending poll for ${connId} (rapid reconnect)`);
+				log.info(`DEBUG: Replacing existing pending poll for ${connId} (rapid reconnect)`);
 				clearTimeout(existingPoll.timeout);
 				this.pendingPolls.delete(connId);
 				try {
@@ -292,7 +289,7 @@ export class LongPollingTransportServer implements ITransportServer {
 					});
 				} catch (error) {
 					// Ignore errors (old connection might already be closed)
-					console.log(`[LongPolling] DEBUG: Failed to close old poll (likely already closed):`, error);
+					log.info(`DEBUG: Failed to close old poll (likely already closed):`, error);
 				}
 			}
 
@@ -311,13 +308,13 @@ export class LongPollingTransportServer implements ITransportServer {
 			};
 
 			this.pendingPolls.set(connId, pending);
-			console.log(
+			log.info(
 				`[LongPolling] DEBUG: Added to pendingPolls, total pending=${this.pendingPolls.size}, response hijacked`
 			);
 
 			// Note: Request abort is already handled by the 'close' listener attached at the start of handlePollRequest
 		} catch (error) {
-			console.error('[LongPolling] Authentication failed:', error);
+			log.error('Authentication failed:', error);
 			reply.code(401).send({
 				error: 'Authentication failed',
 				message: error instanceof Error ? error.message : 'Unauthorized',
@@ -364,10 +361,10 @@ export class LongPollingTransportServer implements ITransportServer {
 	 * Respond to pending poll with events
 	 */
 	private respondToPoll(connId: string, events: TransportEvent[]): void {
-		console.log(`[LongPolling] DEBUG: respondToPoll called for ${connId} with ${events.length} events`);
+		log.info(`DEBUG: respondToPoll called for ${connId} with ${events.length} events`);
 		const pending = this.pendingPolls.get(connId);
 		if (!pending) {
-			console.log(`[LongPolling] Cannot respond to ${connId}: no pending poll found`);
+			log.info(`Cannot respond to ${connId}: no pending poll found`);
 			return;
 		}
 
@@ -384,15 +381,15 @@ export class LongPollingTransportServer implements ITransportServer {
 				userId: pending.userId,
 				tokenExpiresAt: session?.tokenExpiresAt,
 			};
-			console.log(`[LongPolling] Responding to poll ${connId} with ${events.length} events`);
-			console.log(`[LongPolling] DEBUG: About to send response:`, JSON.stringify(response).substring(0, 200));
+			log.info(`Responding to poll ${connId} with ${events.length} events`);
+			log.info(`DEBUG: About to send response:`, JSON.stringify(response).substring(0, 200));
 
 			// Send response using helper (includes CORS headers)
 			this.sendHijackedResponse(pending.reply, response);
 
-			console.log(`[LongPolling] DEBUG: Response sent for ${connId}`);
+			log.info(`DEBUG: Response sent for ${connId}`);
 		} catch (error) {
-			console.error(`[LongPolling] Failed to respond to connection ${connId}:`, error);
+			log.error(`Failed to respond to connection ${connId}:`, error);
 		}
 	}
 
@@ -437,7 +434,7 @@ export class LongPollingTransportServer implements ITransportServer {
 		}
 
 		if (deliveredCount > 0 || queuedCount > 0) {
-			console.log(`[LongPolling] Broadcast ${event}: delivered=${deliveredCount}, queued=${queuedCount}`);
+			log.info(`Broadcast ${event}: delivered=${deliveredCount}, queued=${queuedCount}`);
 		}
 	}
 
@@ -493,13 +490,13 @@ export class LongPollingTransportServer implements ITransportServer {
 				this.sessionManager.removeSession(connId);
 				this.messageQueue.clearQueue(connId);
 
-				console.log(`[LongPolling] Removed inactive connection ${connId}`);
+				log.info(`Removed inactive connection ${connId}`);
 
 				this.disconnectHandlers.forEach(handler => handler(connId));
 			}
 
 			if (inactiveConnections.length > 0) {
-				console.log(
+				log.info(
 					`[LongPolling] Cleaned up ${inactiveConnections.length} inactive connections (active=${this.activeSessions.size})`
 				);
 			}
@@ -564,6 +561,6 @@ export class LongPollingTransportServer implements ITransportServer {
 		this.pendingPolls.clear();
 		this.activeSessions.clear();
 
-		console.log('[LongPolling] Server shutdown complete');
+		log.info('Server shutdown complete');
 	}
 }

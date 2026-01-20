@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
+import { createLogger } from 'shared-common/logger';
 import { ZodError } from 'zod';
 
 import { HttpException } from '@app/shared/exceptions/http-exceptions';
@@ -7,6 +8,8 @@ import { ROUTES_BY_BASE_URL } from '@app/shared/types';
 import { CONTROLLER_REGISTRY } from './controller-registry';
 import { getFactory } from './factory-instance';
 import { InternalRouter } from './internal-router';
+
+const log = createLogger('LazyControllerPlugin');
 
 /**
  * ===========================================================================================
@@ -79,7 +82,7 @@ export function registerControllerWithCheck(baseUrl: string, loader: () => Promi
 		});
 
 		if (conflictingPath) {
-			console.warn(`
+			log.warn(`
 ⚠️  WARNING: Route ordering issue detected!
     Already registered: "${conflictingPath}" (will catch all requests)
     Trying to register: "${baseUrl}" (will NEVER be reached!)

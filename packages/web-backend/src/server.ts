@@ -320,7 +320,7 @@ function startDashboardBroadcaster(factory: DataStoreFactory): void {
 
 			const dashboardData = await dashboardService.getDashboardData();
 			eventBroadcaster.broadcast('b2f:dashboard:updated', dashboardData);
-			console.log('[Dashboard Broadcaster] Broadcast dashboard data (reactive)');
+			logger.debug('[Dashboard Broadcaster] Broadcast dashboard data (reactive)');
 		} catch (error) {
 			logger.error('[Dashboard Broadcaster] Failed to broadcast dashboard data:', error);
 		}
@@ -358,7 +358,7 @@ function startTasksBroadcaster(factory: DataStoreFactory): void {
 
 			const tasksData = await tasksService.getTasksData({});
 			eventBroadcaster.broadcast('b2f:tasks:updated', tasksData);
-			console.log('[Tasks Broadcaster] Broadcast tasks data (reactive)');
+			logger.debug('[Tasks Broadcaster] Broadcast tasks data (reactive)');
 		} catch (error) {
 			logger.error('[Tasks Broadcaster] Failed to broadcast tasks data:', error);
 		}
@@ -393,7 +393,7 @@ function startWorkersBroadcaster(factory: DataStoreFactory): void {
 
 			const workersData = await workersService.getWorkersData();
 			eventBroadcaster.broadcast('b2f:workers:updated', workersData);
-			console.log('[Workers Broadcaster] Broadcast workers data (reactive)');
+			logger.debug('[Workers Broadcaster] Broadcast workers data (reactive)');
 		} catch (error) {
 			logger.error('[Workers Broadcaster] Failed to broadcast workers data:', error);
 		}
@@ -434,7 +434,7 @@ const signals = ['SIGTERM', 'SIGINT', 'SIGBREAK'] as const;
 signals.forEach(signal => {
 	process.on(signal, async () => {
 		logToFile(`🚨 ${signal} SIGNAL RECEIVED 🚨`);
-		console.log(`\n\n🚨 ${signal} SIGNAL RECEIVED 🚨\n\n`);
+		// Signal already logged by logger.info below
 		logger.info(`${signal} signal received: initiating graceful shutdown`);
 		try {
 			// Close orchestrator first (if it was initialized)

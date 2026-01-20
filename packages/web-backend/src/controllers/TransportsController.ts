@@ -32,9 +32,12 @@
  * ```
  */
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { createLogger } from 'shared-common/logger';
 
 import type { MessageQueue } from '../transport/MessageQueue';
 import type { TransportSessionManager } from '../transport/TransportSessionManager';
+
+const log = createLogger('TransportsController');
 
 /**
  * Batch subscription request body
@@ -134,7 +137,7 @@ export class TransportsController {
 				return;
 			}
 
-			console.log(
+			log.info(
 				`[TransportsController] ${body.action} for connection ${connId}: ${body.events.join(', ')} (user=${session.userId})`
 			);
 
@@ -145,7 +148,7 @@ export class TransportsController {
 				filters: Object.fromEntries(updatedSession.eventFilters),
 			});
 		} catch (error) {
-			console.error('[TransportsController] Batch subscription failed:', error);
+			log.error('Batch subscription failed:', error);
 			reply.code(500).send({
 				error: 'Internal server error',
 				message: error instanceof Error ? error.message : 'Unknown error',
@@ -213,7 +216,7 @@ export class TransportsController {
 				return;
 			}
 
-			console.log(
+			log.info(
 				`[TransportsController] subscribe to ${event} for connection ${connId} (user=${session.userId}, filters=${JSON.stringify(filters || {})})`
 			);
 
@@ -224,7 +227,7 @@ export class TransportsController {
 				filters: updatedSession.eventFilters.get(event) || {},
 			});
 		} catch (error) {
-			console.error('[TransportsController] Subscribe to event failed:', error);
+			log.error('Subscribe to event failed:', error);
 			reply.code(500).send({
 				error: 'Internal server error',
 				message: error instanceof Error ? error.message : 'Unknown error',
@@ -271,7 +274,7 @@ export class TransportsController {
 			// Unsubscribe from single event
 			this.sessionManager.updateSubscriptions(connId, 'unsubscribe', [event]);
 
-			console.log(
+			log.info(
 				`[TransportsController] unsubscribe from ${event} for connection ${connId} (user=${session.userId})`
 			);
 
@@ -282,7 +285,7 @@ export class TransportsController {
 				unsubscribed: true,
 			});
 		} catch (error) {
-			console.error('[TransportsController] Unsubscribe from event failed:', error);
+			log.error('Unsubscribe from event failed:', error);
 			reply.code(500).send({
 				error: 'Internal server error',
 				message: error instanceof Error ? error.message : 'Unknown error',
@@ -332,7 +335,7 @@ export class TransportsController {
 				transportType: this.sessionManager.getTransportType(connId),
 			});
 		} catch (error) {
-			console.error('[TransportsController] Get subscriptions failed:', error);
+			log.error('Get subscriptions failed:', error);
 			reply.code(500).send({
 				error: 'Internal server error',
 				message: error instanceof Error ? error.message : 'Unknown error',
@@ -388,7 +391,7 @@ export class TransportsController {
 				queuedEvents: queuedEvents.length,
 			});
 		} catch (error) {
-			console.error('[TransportsController] Get status failed:', error);
+			log.error('Get status failed:', error);
 			reply.code(500).send({
 				error: 'Internal server error',
 				message: error instanceof Error ? error.message : 'Unknown error',

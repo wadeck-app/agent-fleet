@@ -1,8 +1,11 @@
 import type { FastifyInstance } from 'fastify';
+import { createLogger } from 'shared-common/logger';
 
 import type { EventData, EventType } from '@app/shared/transport';
 
 import type { ITransportServer } from '../ITransportServer';
+
+const log = createLogger('MockTransportServer');
 
 /**
  * ===========================================================================================
@@ -101,7 +104,7 @@ export class MockTransportServer implements ITransportServer {
 	 */
 	sendToClient<E extends EventType>(clientId: string, event: E, data: EventData<E>): void {
 		if (!this.clients.has(clientId)) {
-			console.warn(`[MockTransportServer] Client ${clientId} not connected`);
+			log.warn(`Client ${clientId} not connected`);
 			return;
 		}
 

@@ -1,4 +1,5 @@
 import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
+import { createLogger } from 'shared-common/logger';
 import { StateEvent } from 'shared-orch-worker/StateManager';
 
 import type { Worker } from '@app/shared/api/workers.contract';
@@ -14,6 +15,8 @@ import {
 } from '@app/shared/transport';
 
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
+
+const log = createLogger('OrchestratorEventBridge');
 
 /**
  * ===========================================================================================
@@ -66,14 +69,14 @@ export class OrchestratorEventBridge {
 	 */
 	start(): void {
 		if (this.isStarted) {
-			console.log('[OrchestratorEventBridge] Already started, skipping');
+			log.warn('Already started, skipping');
 			return;
 		}
 
 		try {
 			const orchestrator = this.orchestratorWrapper.getOrchestrator();
 			if (!orchestrator) {
-				console.error('[OrchestratorEventBridge] Orchestrator not available, cannot start bridge');
+				log.error('Orchestrator not available, cannot start bridge');
 				return;
 			}
 
@@ -81,7 +84,7 @@ export class OrchestratorEventBridge {
 
 			// Worker connected
 			stateManager.on(StateEvent.WORKER_CONNECTED, (data: { worker: any }) => {
-				console.log('[OrchestratorEventBridge] WORKER_CONNECTED:', data.worker?.id);
+				log.info('WORKER_CONNECTED:', data.worker?.id);
 
 				const worker = this.transformWorker(data.worker);
 
@@ -99,7 +102,7 @@ export class OrchestratorEventBridge {
 
 			// Worker disconnected
 			stateManager.on(StateEvent.WORKER_DISCONNECTED, (data: { workerId: string }) => {
-				console.log('[OrchestratorEventBridge] WORKER_DISCONNECTED:', data.workerId);
+				log.info('WORKER_DISCONNECTED:', data.workerId);
 
 				// Emit specific event
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -116,7 +119,7 @@ export class OrchestratorEventBridge {
 
 			// Worker task assigned (worker state changed)
 			stateManager.on(StateEvent.WORKER_TASK_ASSIGNED, (data: { workerId: string; taskId: string }) => {
-				console.log('[OrchestratorEventBridge] WORKER_TASK_ASSIGNED:', data.workerId, data.taskId);
+				log.debug('WORKER_TASK_ASSIGNED:', data.workerId, data.taskId);
 
 				// Emit aggregate event - dashboard needs to know worker states changed (invalidation signal)
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -125,19 +128,19 @@ export class OrchestratorEventBridge {
 
 			// Task events (aggregate only - specific task events are emitted by TasksService)
 			stateManager.on(StateEvent.TASK_CREATED, () => {
-				console.log('[OrchestratorEventBridge] TASK_CREATED');
+				log.debug('TASK_CREATED');
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
 			});
 
 			stateManager.on(StateEvent.TASK_UPDATED, () => {
-				console.log('[OrchestratorEventBridge] TASK_UPDATED');
+				log.debug('TASK_UPDATED');
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
 			});
 
 			stateManager.on(StateEvent.TASK_DELETED, () => {
-				console.log('[OrchestratorEventBridge] TASK_DELETED');
+				log.debug('TASK_DELETED');
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
 			});
@@ -146,7 +149,7 @@ export class OrchestratorEventBridge {
 			// Emitted every ~500ms during task execution with incremental trace updates
 			// Filtered by taskId on subscription to avoid spamming all clients
 			stateManager.on(StateEvent.TASK_TRACE_UPDATED, (eventData: { taskId: string; stepsCount: number }) => {
-				console.log('[OrchestratorEventBridge] TASK_TRACE_UPDATED:', eventData.taskId, eventData.stepsCount);
+				log.debug('TASK_TRACE_UPDATED:', eventData.taskId, eventData.stepsCount);
 				// Broadcast with taskId for filtering
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				this.eventBroadcaster.broadcast(B2F_TASK_TRACE_UPDATED, eventData as any);
@@ -155,7 +158,7 @@ export class OrchestratorEventBridge {
 			// Intervention events
 			// @formatter:off
 			stateManager.on('intervention.created', (intervention: any) => {
-				console.log('[OrchestratorEventBridge] INTERVENTION_CREATED:', intervention.id);
+				log.info('INTERVENTION_CREATED:', intervention.id);
 
 				// Transform intervention to match API contract (add missing BaseEntity fields)
 				const transformedIntervention = {
@@ -175,9 +178,9 @@ export class OrchestratorEventBridge {
 			// @formatter:on
 
 			this.isStarted = true;
-			console.log('[OrchestratorEventBridge] Started listening to orchestrator events');
+			log.info('Started listening to orchestrator events');
 		} catch (error) {
-			console.error('[OrchestratorEventBridge] Failed to start:', error);
+			log.error('Failed to start:', error);
 		}
 	}
 
@@ -206,9 +209,9 @@ export class OrchestratorEventBridge {
 			stateManager.removeAllListeners('intervention.created');
 
 			this.isStarted = false;
-			console.log('[OrchestratorEventBridge] Stopped listening to orchestrator events');
+			log.info('Stopped listening to orchestrator events');
 		} catch (error) {
-			console.error('[OrchestratorEventBridge] Failed to stop:', error);
+			log.error('Failed to stop:', error);
 		}
 	}
 

@@ -34,10 +34,13 @@
  */
 import cookie from 'cookie';
 import type { IncomingMessage } from 'http';
+import { createLogger } from 'shared-common/logger';
 
 import type { TransportType } from '@app/shared/transport';
 
 import type { AuthService } from '../auth/AuthService';
+
+const log = createLogger('TransportSessionManager');
 
 /**
  * Base session data
@@ -166,7 +169,7 @@ export class TransportSessionManager {
 		// This prevents bypass if someone removes the startup check
 		if (disableAuthDev) {
 			if (process.env.NODE_ENV === 'production') {
-				console.error('[Auth] FATAL: DISABLE_AUTH_DEV=true detected in production!');
+				log.error('FATAL: DISABLE_AUTH_DEV=true detected in production!');
 				throw new Error('Connection authentication bypass not allowed in production');
 			}
 
@@ -198,12 +201,12 @@ export class TransportSessionManager {
 			this.transportTypes.set(connId, transportType);
 
 			if (isReconnection) {
-				console.log(
-					`[Auth] DEVELOPMENT MODE: Connection reconnected (connId=${connId}, transport=${transportType}, preserved ${existingSubscriptions.size} subscriptions)`
+				log.info(
+					`DEVELOPMENT MODE: Connection reconnected (connId=${connId}, transport=${transportType}, preserved ${existingSubscriptions.size} subscriptions)`
 				);
 			} else {
-				console.log(
-					`[Auth] DEVELOPMENT MODE: Connection authenticated without credentials (connId=${connId}, transport=${transportType})`
+				log.info(
+					`DEVELOPMENT MODE: Connection authenticated without credentials (connId=${connId}, transport=${transportType})`
 				);
 			}
 
@@ -250,12 +253,12 @@ export class TransportSessionManager {
 			this.transportTypes.set(connId, transportType);
 
 			if (isReconnection) {
-				console.log(
-					`[Auth] Connection reconnected: connId=${connId}, user=${userId}, transport=${transportType}, preserved ${existingSubscriptions.size} subscriptions, expires=${new Date(expiresAt).toISOString()}`
+				log.info(
+					`Connection reconnected: connId=${connId}, user=${userId}, transport=${transportType}, preserved ${existingSubscriptions.size} subscriptions, expires=${new Date(expiresAt).toISOString()}`
 				);
 			} else {
-				console.log(
-					`[Auth] Connection authenticated: connId=${connId}, user=${userId}, transport=${transportType}, expires=${new Date(expiresAt).toISOString()}`
+				log.info(
+					`Connection authenticated: connId=${connId}, user=${userId}, transport=${transportType}, expires=${new Date(expiresAt).toISOString()}`
 				);
 			}
 
@@ -264,7 +267,7 @@ export class TransportSessionManager {
 				transportType,
 			};
 		} catch (error) {
-			console.error('[Auth] Connection authentication failed', error);
+			log.error('Connection authentication failed', error);
 			throw new Error('Invalid access token');
 		}
 	}
@@ -290,7 +293,7 @@ export class TransportSessionManager {
 		// Check if token expired
 		const now = Date.now();
 		if (now >= session.tokenExpiresAt) {
-			console.warn(`[Auth] Session expired for connId=${connId}`);
+			log.warn(`Session expired for connId=${connId}`);
 			// Remove expired session
 			this.removeSession(connId);
 			throw new Error('Access token expired');
@@ -312,7 +315,7 @@ export class TransportSessionManager {
 
 			const connIds = this.userSessions.get(userId);
 			if (!connIds || connIds.size === 0) {
-				console.log(`[Auth] No active sessions for user=${userId}`);
+				log.info(`No active sessions for user=${userId}`);
 				return;
 			}
 
@@ -326,9 +329,9 @@ export class TransportSessionManager {
 				}
 			});
 
-			console.log(`[Auth] Refreshed token for ${updatedCount} sessions (user=${userId})`);
+			log.info(`Refreshed token for ${updatedCount} sessions (user=${userId})`);
 		} catch (error) {
-			console.error('[Auth] Failed to refresh session token', error);
+			log.error('Failed to refresh session token', error);
 			throw error;
 		}
 	}
@@ -368,9 +371,9 @@ export class TransportSessionManager {
 				// Store filters for this event
 				if (filters) {
 					session.eventFilters.set(event, filters);
-					console.log(`[Subscription] Connection ${connId} subscribed to ${event} with filters:`, filters);
+					log.info(`Connection ${connId} subscribed to ${event} with filters:`, filters);
 				} else {
-					console.log(`[Subscription] Connection ${connId} subscribed to ${event} (no filters)`);
+					log.info(`Connection ${connId} subscribed to ${event} (no filters)`);
 				}
 			});
 		} else {
@@ -378,7 +381,7 @@ export class TransportSessionManager {
 				session.subscribedEvents.delete(event);
 				session.eventFilters.delete(event);
 			});
-			console.log(`[Subscription] Connection ${connId} unsubscribed from:`, events);
+			log.info(`Connection ${connId} unsubscribed from:`, events);
 		}
 	}
 
@@ -431,7 +434,7 @@ export class TransportSessionManager {
 
 		// Check if eventData is an object
 		if (!eventData || typeof eventData !== 'object') {
-			console.warn(`[Filter] Event data is not an object for ${eventType}, cannot apply filters`);
+			log.warn(`Event data is not an object for ${eventType}, cannot apply filters`);
 			return true; // Allow through if data format unexpected
 		}
 
@@ -485,9 +488,9 @@ export class TransportSessionManager {
 		this.transportTypes.delete(connId);
 
 		if (transportType) {
-			console.log(`[Session] Removed: connId=${connId}, transport=${transportType}`);
+			log.info(`Removed: connId=${connId}, transport=${transportType}`);
 		} else {
-			console.log(`[Session] Removed: connId=${connId}`);
+			log.info(`Removed: connId=${connId}`);
 		}
 	}
 
@@ -507,7 +510,7 @@ export class TransportSessionManager {
 		});
 
 		if (cleanedCount > 0) {
-			console.log(`[Cleanup] Removed ${cleanedCount} expired sessions`);
+			log.info(`Removed ${cleanedCount} expired sessions`);
 		}
 	}
 
@@ -685,6 +688,6 @@ export class TransportSessionManager {
 	 */
 	shutdown(): void {
 		this.destroy();
-		console.log('[Transport] TransportSessionManager shutdown complete');
+		log.info('TransportSessionManager shutdown complete');
 	}
 }

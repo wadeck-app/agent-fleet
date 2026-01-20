@@ -36,7 +36,7 @@ const errorHandlerHook: FastifyPluginAsync = async fastify => {
 
 		// Log ALL 400 errors with full context for debugging
 		if (statusCode === 400) {
-			console.error(`[400] ${request.method} ${request.url} - ${error.constructor.name}: ${error.message}`, {
+			logger.error(`[400] ${request.method} ${request.url} - ${error.constructor.name}: ${error.message}`, {
 				query: request.query,
 				body: request.body,
 			});

@@ -1,6 +1,10 @@
+import { createLogger } from 'shared-common/logger';
+
 import type { ActivityEntry, DashboardData } from '@app/shared/api/dashboard.contract';
 
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
+
+const log = createLogger('DashboardService');
 
 /**
  * ===========================================================================================
@@ -28,9 +32,9 @@ export class DashboardService {
 	 */
 	async getDashboardData(): Promise<DashboardData> {
 		try {
-			console.log('[DashboardService] Fetching stats from orchestrator...');
+			log.debug('Fetching stats from orchestrator...');
 			const stats = await this.orchestratorRepository.getStats();
-			console.log('[DashboardService] Stats received:', { workers: stats.workers, uptime: stats.uptime });
+			log.debug('Stats received:', { workers: stats.workers, uptime: stats.uptime });
 
 			// Calculate worker states
 			const idle = stats.workersList.filter((w: any) => !w.taskId).length;
@@ -80,7 +84,7 @@ export class DashboardService {
 			return dashboardData;
 		} catch (error) {
 			// Orchestrator is offline - return dashboard with offline status
-			console.error('[DashboardService] Failed to fetch orchestrator stats:', error);
+			log.error('Failed to fetch orchestrator stats:', error);
 			return {
 				timestamp: new Date().toISOString(),
 				orchestrator: {

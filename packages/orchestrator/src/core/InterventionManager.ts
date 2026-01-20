@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { createLogger } from 'shared-common/logger';
 import type {
 	Intervention,
 	InterventionConfig,
@@ -10,6 +11,8 @@ import type {
 
 import { Storage } from './Storage';
 import type { TaskManager } from './TaskManager';
+
+const log = createLogger('InterventionManager');
 
 /**
  * InterventionManager
@@ -100,7 +103,7 @@ export class InterventionManager {
 			// Schedule timeout handler
 			const handle = setTimeout(() => {
 				this.handleTimeout(intervention.id).catch(error => {
-					console.error(`[InterventionManager] Failed to handle timeout for ${intervention.id}:`, error);
+					log.error(` Failed to handle timeout for ${intervention.id}:`, error);
 				});
 			}, timeoutMs);
 
@@ -116,8 +119,8 @@ export class InterventionManager {
 		// Update task status to AWAITING_USER
 		await this.taskManager.setTaskIntervention(intervention.taskId, intervention.id);
 
-		console.log(
-			`[InterventionManager] Created intervention ${intervention.id} for task ${intervention.taskId} (type: ${intervention.type})`
+		log.info(
+			` Created intervention ${intervention.id} for task ${intervention.taskId} (type: ${intervention.type})`
 		);
 
 		return intervention;
@@ -201,14 +204,14 @@ export class InterventionManager {
 				false
 			);
 			if (!sent) {
-				console.warn(`[InterventionManager] Failed to send response to worker for task ${intervention.taskId}`);
+				log.warn(` Failed to send response to worker for task ${intervention.taskId}`);
 			}
 		}
 
 		// Resume task execution
 		await this.taskManager.clearTaskIntervention(intervention.taskId, interventionId);
 
-		console.log(`[InterventionManager] Intervention ${interventionId} answered by ${response.answeredBy}`);
+		log.info(` Intervention ${interventionId} answered by ${response.answeredBy}`);
 
 		return intervention;
 	}
@@ -233,7 +236,7 @@ export class InterventionManager {
 			this.sendResponseCallback(intervention.taskId, interventionId, null, false, true);
 		}
 
-		console.log(`[InterventionManager] Intervention ${interventionId} cancelled`);
+		log.info(` Intervention ${interventionId} cancelled`);
 	}
 
 	/**
@@ -245,7 +248,7 @@ export class InterventionManager {
 			return;
 		}
 
-		console.log(`[InterventionManager] Intervention ${interventionId} timed out`);
+		log.info(` Intervention ${interventionId} timed out`);
 
 		intervention.status = 'timeout';
 
@@ -360,10 +363,7 @@ export class InterventionManager {
 				if (timeoutMs > 0) {
 					const handle = setTimeout(() => {
 						this.handleTimeout(intervention.id).catch(error => {
-							console.error(
-								`[InterventionManager] Failed to handle timeout for ${intervention.id}:`,
-								error
-							);
+							log.error(`Failed to handle timeout for ${intervention.id}:`, error);
 						});
 					}, timeoutMs);
 
@@ -375,7 +375,7 @@ export class InterventionManager {
 			}
 		}
 
-		console.log(`[InterventionManager] Loaded ${pending.length} pending interventions from storage`);
+		log.info(` Loaded ${pending.length} pending interventions from storage`);
 	}
 
 	/**

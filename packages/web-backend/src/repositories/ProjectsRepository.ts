@@ -1,6 +1,10 @@
+import { createLogger } from 'shared-common/logger';
+
 import type { Project, ProjectsListQuery } from '@app/shared/api/projects.contract';
 
 import type { BaseRepository } from './BaseRepository';
+
+const log = createLogger('ProjectsRepository');
 
 /**
  * ===========================================================================================
@@ -107,7 +111,7 @@ export class ProjectsRepository {
 			throw new Error(`Project with id ${id} not found`);
 		}
 
-		console.log(
+		log.info(
 			`[ProjectsRepository] Adding workspaces to project ${id}. Current workspaceIds:`,
 			project.workspaceIds,
 			'Adding:',
@@ -117,14 +121,14 @@ export class ProjectsRepository {
 		// Merge workspace IDs (avoid duplicates)
 		const uniqueWorkspaceIds = Array.from(new Set([...project.workspaceIds, ...workspaceIds]));
 
-		console.log(`[ProjectsRepository] Merged workspaceIds:`, uniqueWorkspaceIds);
+		log.info(`[ProjectsRepository] Merged workspaceIds:`, uniqueWorkspaceIds);
 
 		const updatedProject = await this.update(id, {
 			workspaceIds: uniqueWorkspaceIds,
 			version: project.version + 1,
 		});
 
-		console.log(`[ProjectsRepository] After update, project ${id} workspaceIds:`, updatedProject.workspaceIds);
+		log.info(`[ProjectsRepository] After update, project ${id} workspaceIds:`, updatedProject.workspaceIds);
 
 		return updatedProject;
 	}

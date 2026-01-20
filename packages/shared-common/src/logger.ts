@@ -11,9 +11,11 @@ const colors = {
 
 class Logger {
 	private level: LogLevel;
+	private name?: string;
 
-	constructor() {
+	constructor(name?: string) {
 		this.level = (process.env.LOG_LEVEL as LogLevel) || 'debug';
+		this.name = name;
 	}
 
 	private shouldLog(level: LogLevel): boolean {
@@ -28,10 +30,14 @@ class Logger {
 		return `${time}.${ms}`;
 	}
 
+	private getNamePrefix(): string {
+		return this.name ? `[${this.name}] ` : '';
+	}
+
 	debug(message: string, ...args: unknown[]) {
 		if (this.shouldLog('debug')) {
 			console.debug(
-				`${colors.gray}[${this.getTimestamp()}] [${'DEBUG'.padStart(5)}] ${message}${colors.reset}`,
+				`${colors.gray}[${this.getTimestamp()}] [${'DEBUG'.padStart(5)}] ${this.getNamePrefix()}${message}${colors.reset}`,
 				...args
 			);
 		}
@@ -39,14 +45,14 @@ class Logger {
 
 	info(message: string, ...args: unknown[]) {
 		if (this.shouldLog('info')) {
-			console.info(`[${this.getTimestamp()}] [${'INFO'.padStart(5)}] ${message}`, ...args);
+			console.info(`[${this.getTimestamp()}] [${'INFO'.padStart(5)}] ${this.getNamePrefix()}${message}`, ...args);
 		}
 	}
 
 	warn(message: string, ...args: unknown[]) {
 		if (this.shouldLog('warn')) {
 			console.warn(
-				`${colors.orange}[${this.getTimestamp()}] [${'WARN'.padStart(5)}] ${message}${colors.reset}`,
+				`${colors.orange}[${this.getTimestamp()}] [${'WARN'.padStart(5)}] ${this.getNamePrefix()}${message}${colors.reset}`,
 				...args
 			);
 		}
@@ -55,11 +61,20 @@ class Logger {
 	error(message: string, ...args: unknown[]) {
 		if (this.shouldLog('error')) {
 			console.error(
-				`${colors.bold}${colors.red}[${this.getTimestamp()}] [${'ERROR'.padStart(5)}] ${message}${colors.reset}`,
+				`${colors.bold}${colors.red}[${this.getTimestamp()}] [${'ERROR'.padStart(5)}] ${this.getNamePrefix()}${message}${colors.reset}`,
 				...args
 			);
 		}
 	}
 }
 
+// Factory function for creating named loggers
+export function createLogger(name: string): Logger {
+	return new Logger(name);
+}
+
+// Singleton logger for backward compatibility
 export const logger = new Logger();
+
+// Export the type for instance usage
+export type { Logger };

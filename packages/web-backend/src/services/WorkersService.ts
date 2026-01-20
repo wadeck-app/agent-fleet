@@ -1,4 +1,5 @@
 import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
+import { createLogger } from 'shared-common/logger';
 
 import type { WorkerFlows } from '@app/shared/api/flows.contract';
 import {
@@ -13,6 +14,8 @@ import { B2F_WORKER_UPDATED } from '@app/shared/transport';
 
 import type { WorkersRepository } from '../repositories/WorkersRepository';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
+
+const log = createLogger('WorkersService');
 
 /**
  * ===========================================================================================
@@ -179,7 +182,7 @@ export class WorkersService {
 			};
 		} catch (error) {
 			// Orchestrator is offline - return empty list
-			console.error('[WorkersService] Failed to fetch workers list:', error);
+			log.error('Failed to fetch workers list:', error);
 			return {
 				items: [],
 				pagination: {
@@ -325,9 +328,9 @@ export class WorkersService {
 		};
 
 		// 7. Emit event AFTER successful update (for other frontends, excluding origin)
-		console.log('[WorkersService] Broadcasting B2F_WORKER_UPDATED event for worker:', workerId, 'connId:', connId);
+		log.info('Broadcasting B2F_WORKER_UPDATED event for worker:', workerId, 'connId:', connId);
 		this.eventBroadcaster.broadcastExcept(B2F_WORKER_UPDATED, updatedWorker, connId);
-		console.log('[WorkersService] Event broadcasted successfully (origin excluded)');
+		log.info('Event broadcasted successfully (origin excluded)');
 
 		return updatedWorker;
 	}

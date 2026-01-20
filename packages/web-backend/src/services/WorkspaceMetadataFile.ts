@@ -1,6 +1,9 @@
 import { randomUUID } from 'crypto';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
+import { createLogger } from 'shared-common/logger';
+
+const log = createLogger('WorkspaceMetadataFile');
 
 /**
  * Workspace metadata stored in .agent-fleet/workspace-metadata.json
@@ -50,9 +53,7 @@ export class WorkspaceMetadataFile {
 
 			// Validate required fields
 			if (!metadata.id || !metadata.createdAt || !metadata.updatedAt) {
-				console.warn(
-					`[WorkspaceMetadataFile] Invalid metadata file at ${metadataPath}, missing required fields`
-				);
+				log.warn(`[WorkspaceMetadataFile] Invalid metadata file at ${metadataPath}, missing required fields`);
 				return null;
 			}
 
@@ -63,7 +64,7 @@ export class WorkspaceMetadataFile {
 				return null;
 			}
 			// Log other errors but don't throw
-			console.error(`[WorkspaceMetadataFile] Error reading metadata from ${metadataPath}:`, error);
+			log.error(`Error reading metadata from ${metadataPath}:`, error);
 			return null;
 		}
 	}
@@ -106,7 +107,7 @@ export class WorkspaceMetadataFile {
 
 			return updated;
 		} catch (error) {
-			console.error(`[WorkspaceMetadataFile] Error writing metadata to ${metadataPath}:`, error);
+			log.error(`Error writing metadata to ${metadataPath}:`, error);
 			throw new Error(`Failed to write workspace metadata: ${(error as Error).message}`);
 		}
 	}

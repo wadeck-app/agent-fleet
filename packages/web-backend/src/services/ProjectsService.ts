@@ -1,4 +1,5 @@
 import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
+import { createLogger } from 'shared-common/logger';
 
 import type {
 	AddWorkspacesToProject,
@@ -26,6 +27,8 @@ import type { ProjectsRepository } from '../repositories/ProjectsRepository';
 import type { WorkspaceMetadataRepository } from '../repositories/WorkspaceMetadataRepository';
 import { WorkspaceMapper } from '../services/WorkspaceMapper';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
+
+const log = createLogger('ProjectsService');
 
 /**
  * ===========================================================================================
@@ -83,7 +86,7 @@ export class ProjectsService {
 				projects,
 			};
 		} catch (error) {
-			console.error('[ProjectsService] Failed to fetch projects data:', error);
+			log.error(' Failed to fetch projects data:', error);
 			return {
 				timestamp: new Date().toISOString(),
 				summary: {
@@ -129,7 +132,7 @@ export class ProjectsService {
 				},
 			};
 		} catch (error) {
-			console.error('[ProjectsService] Failed to fetch projects list:', error);
+			log.error(' Failed to fetch projects list:', error);
 			return {
 				items: [],
 				pagination: {
@@ -194,7 +197,7 @@ export class ProjectsService {
 
 			return project;
 		} catch (error) {
-			console.error('[ProjectsService] Failed to create project:', error);
+			log.error(' Failed to create project:', error);
 			throw error;
 		}
 	}
@@ -232,7 +235,7 @@ export class ProjectsService {
 
 			return updated;
 		} catch (error) {
-			console.error('[ProjectsService] Failed to update project:', error);
+			log.error(' Failed to update project:', error);
 			throw error;
 		}
 	}
@@ -270,7 +273,7 @@ export class ProjectsService {
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as any);
 		} catch (error) {
-			console.error('[ProjectsService] Failed to delete project:', error);
+			log.error(' Failed to delete project:', error);
 			throw error;
 		}
 	}
@@ -310,22 +313,20 @@ export class ProjectsService {
 					if (workerWorkspace) {
 						const workspaceData = WorkspaceMapper.mapWorkerWorkspaceToApi(workerWorkspace, metadata);
 						this.eventBroadcaster.broadcast(B2F_WORKSPACE_UPDATED, workspaceData);
-						console.log(
-							`[ProjectsService] Cleared projectId from workspace ${workspace.id} (project ${projectId} deleted)`
-						);
+						log.info(` Cleared projectId from workspace ${workspace.id} (project ${projectId} deleted)`);
 					}
 				} catch (error) {
-					console.warn(`[ProjectsService] Failed to clear projectId from workspace ${workspace.id}:`, error);
+					log.warn(` Failed to clear projectId from workspace ${workspace.id}:`, error);
 				}
 			}
 
 			if (affectedWorkspaces.length < workspaceIds.length) {
-				console.warn(
-					`[ProjectsService] Only cleared ${affectedWorkspaces.length} of ${workspaceIds.length} workspaces (some not connected)`
+				log.warn(
+					`Only cleared ${affectedWorkspaces.length} of ${workspaceIds.length} workspaces (some not connected)`
 				);
 			}
 		} catch (error) {
-			console.error('[ProjectsService] Failed to clear projectId from workspaces:', error);
+			log.error(' Failed to clear projectId from workspaces:', error);
 			// Don't throw - deletion should succeed even if workspace cleanup fails
 		}
 	}
@@ -383,7 +384,7 @@ export class ProjectsService {
 
 			return updated;
 		} catch (error) {
-			console.error('[ProjectsService] Failed to add workspaces to project:', error);
+			log.error(' Failed to add workspaces to project:', error);
 			throw error;
 		}
 	}
@@ -444,7 +445,7 @@ export class ProjectsService {
 				timestamp: new Date().toISOString(),
 			};
 		} catch (error) {
-			console.error('[ProjectsService] Failed to get project board:', error);
+			log.error(' Failed to get project board:', error);
 			throw error;
 		}
 	}
@@ -492,7 +493,7 @@ export class ProjectsService {
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as any);
 		} catch (error) {
-			console.error('[ProjectsService] Failed to increment task count:', error);
+			log.error(' Failed to increment task count:', error);
 			throw error;
 		}
 	}
@@ -509,7 +510,7 @@ export class ProjectsService {
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as any);
 		} catch (error) {
-			console.error('[ProjectsService] Failed to decrement task count:', error);
+			log.error(' Failed to decrement task count:', error);
 			throw error;
 		}
 	}

@@ -16,7 +16,10 @@
  * ===========================================================================================
  */
 import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
+import { createLogger } from 'shared-common/logger';
 import { type OrchestratorStats, OrchestratorStatsSchema, type Task } from 'shared-orch-worker/domain-types';
+
+const log = createLogger('OrchestratorRepository');
 
 /**
  * Cache entry structure (used only in HTTP mode)
@@ -51,7 +54,7 @@ export class OrchestratorRepository {
 	async getStats(): Promise<OrchestratorStats> {
 		// Library mode - direct access, no caching needed
 		if (this.orchestratorWrapper) {
-			console.log('[OrchestratorRepository] Using library mode (direct access)');
+			log.info('Using library mode (direct access)');
 			return this.orchestratorWrapper.getStats();
 		}
 
@@ -70,7 +73,7 @@ export class OrchestratorRepository {
 
 		// Fetch fresh data
 		try {
-			console.log(`[OrchestratorRepository] Fetching from: ${this.orchestratorUrl}/stats`);
+			log.info(`Fetching from: ${this.orchestratorUrl}/stats`);
 			const response = await fetch(`${this.orchestratorUrl}/stats`);
 
 			if (!response.ok) {
@@ -79,7 +82,7 @@ export class OrchestratorRepository {
 
 			const rawData = await response.json();
 
-			console.log('[OrchestratorRepository] Raw data received:', JSON.stringify(rawData, null, 2));
+			log.info('Raw data received:', JSON.stringify(rawData, null, 2));
 
 			// Validate response against schema
 			const stats = OrchestratorStatsSchema.parse(rawData);
@@ -304,16 +307,16 @@ export class OrchestratorRepository {
 	async getInterventions(): Promise<any[]> {
 		// Library mode - direct access via InterventionManager
 		if (this.orchestratorWrapper) {
-			console.log('[OrchestratorRepository] Fetching interventions from orchestrator...');
+			log.info('Fetching interventions from orchestrator...');
 			const orchestrator = this.orchestratorWrapper.getOrchestrator();
 			const interventionManager = orchestrator.getInterventionManager();
 			if (!interventionManager) {
-				console.log('[OrchestratorRepository] InterventionManager not available');
+				log.info('InterventionManager not available');
 				return [];
 			}
 			// Get pending interventions from memory (active interventions)
 			const interventions = interventionManager.getPendingInterventionsFromMemory();
-			console.log(`[OrchestratorRepository] Got ${interventions.length} interventions from memory`);
+			log.info(`Got ${interventions.length} interventions from memory`);
 			return interventions;
 		}
 
@@ -368,9 +371,7 @@ export class OrchestratorRepository {
 	 */
 	enqueueTask(task: Task): void {
 		if (!this.orchestratorWrapper) {
-			console.warn(
-				'[OrchestratorRepository] Cannot enqueue task: orchestrator wrapper not available (HTTP mode?)'
-			);
+			log.warn('[OrchestratorRepository] Cannot enqueue task: orchestrator wrapper not available (HTTP mode?)');
 			return;
 		}
 

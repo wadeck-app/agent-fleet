@@ -159,7 +159,7 @@ export class Orchestrator implements Shutdownable {
 			logger.info('[Orchestrator] Orchestrator started successfully');
 			logger.info('Orchestrator', 'All services started successfully');
 		} catch (error) {
-			console.error('[Orchestrator] Failed to start:', error);
+			logger.error('Orchestrator', 'Failed to start:', error);
 			await this.shutdown();
 			throw error;
 		}

@@ -6,6 +6,7 @@
  */
 import type { ChildProcess } from 'child_process';
 import { execSync } from 'child_process';
+import { type Logger, createLogger } from 'shared-common/logger';
 import type { WebSocket } from 'ws';
 import { WebSocketServer } from 'ws';
 
@@ -32,10 +33,10 @@ export class ClaudeLifecycleManager {
 	private claudeSocket: WebSocket | null = null;
 	private claudeProcess: ChildProcess | null = null;
 	private messageHandler: ClaudeMessageHandler | null = null;
-	private logPrefix: string;
+	private logger: Logger;
 
-	constructor(logPrefix: string = '[ClaudeLifecycleManager]') {
-		this.logPrefix = logPrefix;
+	constructor(workerId: string) {
+		this.logger = createLogger(`ClaudeLifecycle[${workerId}]`);
 		this.setupWebSocketServer();
 	}
 
@@ -50,12 +51,12 @@ export class ClaudeLifecycleManager {
 			const address = this.claudeWss!.address();
 			if (typeof address === 'object' && address !== null) {
 				this.claudeWsPort = address.port;
-				console.log(`${this.logPrefix} Claude WebSocket server listening on port ${this.claudeWsPort}`);
+				this.logger.info(` Claude WebSocket server listening on port ${this.claudeWsPort}`);
 			}
 		});
 
 		this.claudeWss.on('connection', (socket: WebSocket) => {
-			console.log(`${this.logPrefix} Claude process connected to worker socket`);
+			this.logger.info(` Claude process connected to worker socket`);
 			this.claudeSocket = socket;
 
 			socket.on('message', (data: Buffer) => {
@@ -63,22 +64,22 @@ export class ClaudeLifecycleManager {
 					const message = JSON.parse(data.toString());
 					this.handleClaudeMessage(message);
 				} catch (error) {
-					console.error(`${this.logPrefix} Error parsing Claude message:`, error);
+					this.logger.error(`} Error parsing Claude message:`, error);
 				}
 			});
 
 			socket.on('close', () => {
-				console.log(`${this.logPrefix} Claude socket disconnected`);
+				this.logger.info(` Claude socket disconnected`);
 				this.claudeSocket = null;
 			});
 
 			socket.on('error', error => {
-				console.error(`${this.logPrefix} Claude socket error:`, error);
+				this.logger.error(`} Claude socket error:`, error);
 			});
 		});
 
 		this.claudeWss.on('error', error => {
-			console.error(`${this.logPrefix} Claude WebSocket server error:`, error);
+			this.logger.error(`} Claude WebSocket server error:`, error);
 		});
 	}
 
@@ -93,16 +94,16 @@ export class ClaudeLifecycleManager {
 			// Default handling
 			switch (message.type) {
 				case 'STOP_REQUESTED':
-					console.log(`${this.logPrefix} Stop requested by Claude, killing process...`);
+					this.logger.info(` Stop requested by Claude, killing process...`);
 					this.kill();
 					break;
 
 				case 'HOOK_EVENT':
-					console.log(`${this.logPrefix} Hook event: ${message.hookName}`);
+					this.logger.info(` Hook event: ${message.hookName}`);
 					break;
 
 				default:
-					console.log(`${this.logPrefix} Unknown message type: ${message.type}`);
+					this.logger.info(` Unknown message type: ${message.type}`);
 			}
 		}
 	}
@@ -141,7 +142,7 @@ export class ClaudeLifecycleManager {
 	kill(): void {
 		if (this.claudeProcess) {
 			const pid = this.claudeProcess.pid;
-			console.log(`${this.logPrefix} Killing Claude process (PID: ${pid})...`);
+			this.logger.info(` Killing Claude process (PID: ${pid})...`);
 
 			try {
 				if (pid && process.platform === 'win32') {
@@ -150,10 +151,10 @@ export class ClaudeLifecycleManager {
 							stdio: 'inherit',
 							windowsHide: false,
 						});
-						console.log(`${this.logPrefix} Process killed successfully`);
+						this.logger.info(` Process killed successfully`);
 					} catch (killError: any) {
 						if (!killError.message?.includes('not found')) {
-							console.error(`${this.logPrefix} Kill error:`, killError.message);
+							this.logger.error(`} Kill error:`, killError.message);
 						}
 					}
 				} else if (this.claudeProcess) {
@@ -162,7 +163,7 @@ export class ClaudeLifecycleManager {
 
 				this.claudeProcess = null;
 			} catch (error) {
-				console.error(`${this.logPrefix} Error killing process:`, error);
+				this.logger.error(`} Error killing process:`, error);
 				this.claudeProcess = null;
 			}
 		}
@@ -172,16 +173,16 @@ export class ClaudeLifecycleManager {
 	 * Cleanup on shutdown
 	 */
 	shutdown(): void {
-		console.log(`${this.logPrefix} Shutting down...`);
+		this.logger.info(` Shutting down...`);
 
 		// Kill Claude if running
 		this.kill();
 
 		// Close Claude WebSocket server
 		if (this.claudeWss) {
-			console.log(`${this.logPrefix} Closing Claude WebSocket server...`);
+			this.logger.info(` Closing Claude WebSocket server...`);
 			this.claudeWss.close(() => {
-				console.log(`${this.logPrefix} Claude WebSocket server closed`);
+				this.logger.info(` Claude WebSocket server closed`);
 			});
 			this.claudeWss = null;
 		}

@@ -27,6 +27,7 @@ import { join, resolve } from 'path';
 import * as path from 'path';
 import { getOrchestratorWsUrl } from 'shared-common/PortCalculator';
 import type { Shutdownable } from 'shared-common/Shutdownable';
+import { type Logger, createLogger } from 'shared-common/logger';
 import { parseMessage, serializeMessage } from 'shared-common/protocol';
 import { type Task, TaskStatus } from 'shared-orch-worker/domain-types';
 import {
@@ -52,6 +53,7 @@ export class FlowWorker implements Shutdownable {
 	// Worker identity
 	protected workerId: string;
 	protected preferredWorkerId?: string;
+	private logger: Logger;
 
 	// WebSocket connection to orchestrator
 	protected ws: WebSocket | null = null;
@@ -110,16 +112,17 @@ export class FlowWorker implements Shutdownable {
 		this.workerId = '?'; // Will be assigned by orchestrator during Welcome
 		this.wsUrl = wsUrl || getOrchestratorWsUrl('localhost', '/ws');
 		this.preferredWorkerId = preferredWorkerId;
+		this.logger = createLogger('FlowWorker ?');
 
 		this.interactive = interactive;
 		this.projectRoot = projectRoot;
-		console.log(`[FlowWorker] Initializing with project root: ${projectRoot}`);
-		if (interactive) console.log(`[FlowWorker] Interactive mode enabled`);
-		if (preferredWorkerId) console.log(`[FlowWorker] Preferred worker ID: ${preferredWorkerId}`);
-		if (enableUI) console.log(`[FlowWorker] UI enabled`);
+		this.logger.info(` Initializing with project root: ${projectRoot}`);
+		if (interactive) this.logger.info(` Interactive mode enabled`);
+		if (preferredWorkerId) this.logger.info(` Preferred worker ID: ${preferredWorkerId}`);
+		if (enableUI) this.logger.info(` UI enabled`);
 
 		// Initialize specialized managers
-		this.claudeProcessManager = new ClaudeLifecycleManager(this.logPrefix());
+		this.claudeProcessManager = new ClaudeLifecycleManager(this.workerId);
 		// this.flowExecutionMonitor = new FlowExecutionMonitor();
 
 		// Setup Claude message handler
@@ -143,12 +146,12 @@ export class FlowWorker implements Shutdownable {
 		process.title = 'Worker X';
 
 		return new Promise((resolve, reject) => {
-			console.log(`${this.logPrefix()} Connecting to ${this.wsUrl}...`);
+			this.logger.info(` Connecting to ${this.wsUrl}...`);
 
 			this.ws = new WebSocket(this.wsUrl);
 
 			this.ws.on('open', () => {
-				console.log(`${this.logPrefix()} Connected`);
+				this.logger.info(` Connected`);
 
 				// Reset reconnection attempts on successful connection
 				this.reconnectionAttempts = 0;
@@ -164,18 +167,18 @@ export class FlowWorker implements Shutdownable {
 					const message = parseMessage(data.toString()) as O2WMessage;
 					this.handleMessage(message);
 				} catch (error) {
-					console.error(`${this.logPrefix()} Error parsing message:`, (error as Error).message);
+					this.logger.error(` Error parsing message:`, (error as Error).message);
 				}
 			});
 
 			this.ws.on('close', () => {
-				console.log(`${this.logPrefix()} Disconnected`);
+				this.logger.info(` Disconnected`);
 				this.stopHeartbeat();
 				this.scheduleReconnect();
 			});
 
 			this.ws.on('error', error => {
-				console.error(`${this.logPrefix()} WebSocket error: ${this.formatConnectionError(error)}`);
+				this.logger.error(` WebSocket error: ${this.formatConnectionError(error)}`);
 				reject(error);
 			});
 		});
@@ -191,7 +194,7 @@ export class FlowWorker implements Shutdownable {
 			const packageJsonPath = join(this.projectRoot, 'package.json');
 			const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 			if (packageJson.name) {
-				console.log(`${this.logPrefix()} Detected project ID from package.json: ${packageJson.name}`);
+				this.logger.info(` Detected project ID from package.json: ${packageJson.name}`);
 				return packageJson.name;
 			}
 		} catch (error) {
@@ -202,7 +205,7 @@ export class FlowWorker implements Shutdownable {
 		try {
 			const gitRemote = this.detectGitRemoteSync();
 			if (gitRemote) {
-				console.log(`${this.logPrefix()} Detected project ID from git remote: ${gitRemote}`);
+				this.logger.info(` Detected project ID from git remote: ${gitRemote}`);
 				return gitRemote;
 			}
 		} catch (error) {
@@ -246,18 +249,18 @@ export class FlowWorker implements Shutdownable {
 	 */
 	private detectGitBranchSync(): string | null {
 		try {
-			console.log(`${this.logPrefix()} Detecting git branch in: ${this.projectRoot}`);
+			this.logger.info(` Detecting git branch in: ${this.projectRoot}`);
 			const branch = execSync('git branch --show-current', {
 				cwd: this.projectRoot,
 				encoding: 'utf-8',
 				stdio: ['pipe', 'pipe', 'ignore'], // Suppress stderr
 			}).trim();
 
-			console.log(`${this.logPrefix()} Git command result: "${branch}" (length: ${branch.length})`);
+			this.logger.info(` Git command result: "${branch}" (length: ${branch.length})`);
 			return branch || null;
 		} catch (error) {
 			// Not in a git repository or git command failed
-			console.error(`${this.logPrefix()} Git detection failed:`, (error as Error).message);
+			this.logger.error(` Git detection failed:`, (error as Error).message);
 			return null;
 		}
 	}
@@ -271,7 +274,7 @@ export class FlowWorker implements Shutdownable {
 		const availableFlows = this.buildFlowMetadata();
 		const gitBranch = this.detectGitBranchSync();
 
-		console.log(`${this.logPrefix()} Detected git branch: ${gitBranch || 'null'} for workspace: ${workspacePath}`);
+		this.logger.info(` Detected git branch: ${gitBranch || 'null'} for workspace: ${workspacePath}`);
 
 		this.sendMessage(
 			createW2OMessage(W2OMessageType.WORKER_READY, {
@@ -317,11 +320,11 @@ export class FlowWorker implements Shutdownable {
 			this.maxReconnectDelay
 		);
 
-		console.log(`${this.logPrefix()} Reconnecting in ${delay}ms... (attempt ${this.reconnectionAttempts})`);
+		this.logger.info(` Reconnecting in ${delay}ms... (attempt ${this.reconnectionAttempts})`);
 
 		setTimeout(() => {
 			this.connect().catch(error => {
-				console.error(`${this.logPrefix()} Reconnection failed: ${this.formatConnectionError(error)}`);
+				this.logger.error(` Reconnection failed: ${this.formatConnectionError(error)}`);
 				// Will retry via the 'close' event handler
 			});
 		}, delay);
@@ -349,17 +352,17 @@ export class FlowWorker implements Shutdownable {
 				break;
 
 			case O2WMessageType.PAUSE:
-				console.log(`${this.logPrefix()} Received PAUSE`);
+				this.logger.info(` Received PAUSE`);
 				// TODO: Implement pause logic
 				break;
 
 			case O2WMessageType.RESUME:
-				console.log(`${this.logPrefix()} Received RESUME`);
+				this.logger.info(` Received RESUME`);
 				// TODO: Implement resume logic
 				break;
 
 			case O2WMessageType.SHUTDOWN:
-				console.log(`${this.logPrefix()} Received SHUTDOWN`);
+				this.logger.info(` Received SHUTDOWN`);
 				this.shutdown();
 				break;
 
@@ -380,7 +383,7 @@ export class FlowWorker implements Shutdownable {
 				break;
 
 			default:
-				console.warn(`${this.logPrefix()} Unknown message type: ${(message as any).type}`);
+				this.logger.warn(` Unknown message type: ${(message as any).type}`);
 		}
 	}
 
@@ -394,8 +397,8 @@ export class FlowWorker implements Shutdownable {
 				// Use '-' instead of ':' to ensure Windows file system compatibility
 				const interventionId = `${request.taskId}-${request.stepId}-${Date.now()}`;
 
-				console.log(
-					`${this.logPrefix()} Requesting intervention: ${request.type} for step ${request.stepId} (blocking: ${request.blocking}, id: ${interventionId})`
+				this.logger.info(
+					` Requesting intervention: ${request.type} for step ${request.stepId} (blocking: ${request.blocking}, id: ${interventionId})`
 				);
 
 				// Send intervention request to orchestrator
@@ -415,7 +418,7 @@ export class FlowWorker implements Shutdownable {
 
 				// For non-blocking interventions, return immediately
 				if (!request.blocking) {
-					console.log(`${this.logPrefix()} Non-blocking intervention requested, continuing...`);
+					this.logger.info(` Non-blocking intervention requested, continuing...`);
 					return null;
 				}
 
@@ -459,9 +462,10 @@ export class FlowWorker implements Shutdownable {
 	 */
 	private async handleWelcome(message: WorkerWelcomeMessage): Promise<void> {
 		this.workerId = message.workerId;
+		this.logger = createLogger(`FlowWorker ${this.workerId}`);
 		process.title = `Worker ${this.workerId}`;
 
-		console.log(`${this.logPrefix()} Welcome received with assigned id=${message.workerId}`);
+		this.logger.info(`Welcome received with assigned id=${message.workerId}`);
 
 		// Request a task now that we're connected
 		this.sendRequestTask();
@@ -473,15 +477,13 @@ export class FlowWorker implements Shutdownable {
 	private handleInterventionResponse(message: any): void {
 		const { taskId, interventionId, response, timedOut, cancelled } = message;
 
-		console.log(`${this.logPrefix()} Received intervention response for ${interventionId}`);
+		this.logger.info(` Received intervention response for ${interventionId}`);
 
 		// Find the pending intervention using interventionId
 		// The interventionId should match what we used as the key when storing the promise
 		const pending = this.pendingInterventions.get(interventionId);
 		if (!pending) {
-			console.warn(
-				`${this.logPrefix()} Received intervention response for unknown intervention: ${interventionId}`
-			);
+			this.logger.warn(`Received intervention response for unknown intervention: ${interventionId}`);
 			return;
 		}
 
@@ -504,7 +506,7 @@ export class FlowWorker implements Shutdownable {
 	 * Handle ERROR message from orchestrator
 	 */
 	private handleError(message: ErrorMessage): void {
-		console.error(`${this.logPrefix()} Error from orchestrator: ${message.error}`);
+		this.logger.error(` Error from orchestrator: ${message.error}`);
 	}
 
 	/**
@@ -512,12 +514,12 @@ export class FlowWorker implements Shutdownable {
 	 */
 	private async handleAssignTask(message: AssignTaskMessage): Promise<void> {
 		this.currentTask = message.task;
-		console.log(`${this.logPrefix()} Assigned task ${this.currentTask.id}: ${this.currentTask.description}`);
+		this.logger.info(` Assigned task ${this.currentTask.id}: ${this.currentTask.description}`);
 
 		try {
 			await this.executeTask(this.currentTask);
 		} catch (error) {
-			console.error(`${this.logPrefix()} Task execution error:`, error);
+			this.logger.error(` Task execution error:`, error);
 			this.sendTaskFailed((error as Error).message);
 		}
 	}
@@ -526,7 +528,7 @@ export class FlowWorker implements Shutdownable {
 	 * Handle KILL_CLAUDE message
 	 */
 	private handleKillClaude(message: KillClaudeMessage): void {
-		console.log(`${this.logPrefix()} Kill Claude requested: ${message.reason}`);
+		this.logger.info(` Kill Claude requested: ${message.reason}`);
 		this.claudeProcessManager.kill();
 	}
 
@@ -535,7 +537,7 @@ export class FlowWorker implements Shutdownable {
 	 */
 	private handleRequestFlowDefinition(message: any): void {
 		const { flowId, requestId } = message;
-		console.log(`${this.logPrefix()} Received REQUEST_FLOW_DEFINITION for ${flowId}`);
+		this.logger.info(` Received REQUEST_FLOW_DEFINITION for ${flowId}`);
 
 		try {
 			// Read flows from local flows.yml file
@@ -569,9 +571,9 @@ export class FlowWorker implements Shutdownable {
 				})
 			);
 
-			console.log(`${this.logPrefix()} Sent FLOW_DEFINITION_RESPONSE for ${flowId}`);
+			this.logger.info(` Sent FLOW_DEFINITION_RESPONSE for ${flowId}`);
 		} catch (error) {
-			console.error(`${this.logPrefix()} Error handling REQUEST_FLOW_DEFINITION:`, error);
+			this.logger.error(` Error handling REQUEST_FLOW_DEFINITION:`, error);
 
 			// Send error response
 			this.sendMessage(
@@ -591,7 +593,7 @@ export class FlowWorker implements Shutdownable {
 	 */
 	private async handleSaveFlowDefinition(message: any): Promise<void> {
 		const { flowId, flowDefinition, requestId } = message;
-		console.log(`${this.logPrefix()} Received SAVE_FLOW_DEFINITION for ${flowId}`);
+		this.logger.info(` Received SAVE_FLOW_DEFINITION for ${flowId}`);
 
 		try {
 			// Read current flows from file
@@ -644,9 +646,9 @@ export class FlowWorker implements Shutdownable {
 				})
 			);
 
-			console.log(`${this.logPrefix()} Successfully saved flow ${flowId}`);
+			this.logger.info(` Successfully saved flow ${flowId}`);
 		} catch (error) {
-			console.error(`${this.logPrefix()} Error handling SAVE_FLOW_DEFINITION:`, error);
+			this.logger.error(` Error handling SAVE_FLOW_DEFINITION:`, error);
 
 			// Send error response
 			this.sendMessage(
@@ -667,16 +669,16 @@ export class FlowWorker implements Shutdownable {
 	private handleClaudeMessage(message: any): void {
 		switch (message.type) {
 			case 'STOP_REQUESTED':
-				console.log(`${this.logPrefix()} Stop requested by Claude, killing process...`);
+				this.logger.info(` Stop requested by Claude, killing process...`);
 				this.claudeProcessManager.kill();
 				break;
 
 			case 'HOOK_EVENT':
-				console.log(`${this.logPrefix()} Hook event: ${message.hookName}`);
+				this.logger.info(` Hook event: ${message.hookName}`);
 				break;
 
 			default:
-				console.log(`${this.logPrefix()} Unknown message type: ${message.type}`);
+				this.logger.info(` Unknown message type: ${message.type}`);
 		}
 	}
 
@@ -687,7 +689,7 @@ export class FlowWorker implements Shutdownable {
 		try {
 			await this.flowRegistry.loadProjectFlows();
 			const flowIds = this.flowRegistry.getFlowIds();
-			console.log(`${this.logPrefix()} Loaded ${flowIds.length} flows: ${flowIds.join(', ')}`);
+			this.logger.info(` Loaded ${flowIds.length} flows: ${flowIds.join(', ')}`);
 
 			// Start watching flows file for changes with hot-reload callback
 			this.flowRegistry.startWatching();
@@ -696,7 +698,7 @@ export class FlowWorker implements Shutdownable {
 			// For now, we'll implement a polling mechanism to detect changes
 			this.setupFlowHotReload();
 		} catch (error) {
-			console.error(`${this.logPrefix()} Failed to load flows:`, error);
+			this.logger.error(` Failed to load flows:`, error);
 		}
 	}
 
@@ -728,8 +730,8 @@ export class FlowWorker implements Shutdownable {
 			);
 
 			if (added.length > 0 || removed.length > 0 || updated.length > 0) {
-				console.log(
-					`${this.logPrefix()} Flows changed - added: ${added.length}, removed: ${removed.length}, updated: ${updated.length}`
+				this.logger.info(
+					` Flows changed - added: ${added.length}, removed: ${removed.length}, updated: ${updated.length}`
 				);
 
 				// Send FLOWS_UPDATED message
@@ -767,13 +769,13 @@ export class FlowWorker implements Shutdownable {
 	public buildFlowMetadata(): FlowMetadata[] {
 		const flows = this.flowRegistry.getAllFlows();
 
-		return flows.map(flow => {
+		return flows.map((flow: any) => {
 			const hash = this.flowRegistry.computeFlowHash(flow);
 			const validationResult = this.flowRegistry.getFlowValidationResult(flow.id);
 
 			// Extract errors and warnings separately
-			const errors = validationResult?.issues.filter(i => i.severity === 'error') || [];
-			const warnings = validationResult?.issues.filter(i => i.severity === 'warning') || [];
+			const errors = validationResult?.issues.filter((i: any) => i.severity === 'error') || [];
+			const warnings = validationResult?.issues.filter((i: any) => i.severity === 'warning') || [];
 
 			return {
 				id: flow.id,
@@ -818,7 +820,7 @@ export class FlowWorker implements Shutdownable {
 	 * Execute a task - either a flow-based task or error if no flowId
 	 */
 	protected async executeTask(task: Task): Promise<void> {
-		console.log(`${this.logPrefix()} Starting task execution...`);
+		this.logger.info(` Starting task execution...`);
 
 		// Reset trace hash for new task execution
 		this.lastSentTraceHash = null;
@@ -826,7 +828,7 @@ export class FlowWorker implements Shutdownable {
 		// Check if task has a flowId
 		if (!task.flowId) {
 			const error = 'FlowWorker requires task.flowId to be set';
-			console.error(`${this.logPrefix()} ${error}`);
+			this.logger.error(` ${error}`);
 			throw new Error(error);
 		}
 
@@ -834,7 +836,7 @@ export class FlowWorker implements Shutdownable {
 		const flow = this.flowRegistry.getFlow(task.flowId);
 		if (!flow) {
 			const error = `Flow '${task.flowId}' not found in registry`;
-			console.error(`${this.logPrefix()} ${error}`);
+			this.logger.error(` ${error}`);
 			throw new Error(error);
 		}
 
@@ -842,12 +844,12 @@ export class FlowWorker implements Shutdownable {
 		const validationResult = this.flowRegistry.getFlowValidationResult(task.flowId);
 		if (validationResult && !validationResult.valid) {
 			const errorMessages = validationResult.issues
-				.filter(i => i.severity === 'error')
-				.map(i => `  - ${i.message}${i.location?.stepId ? ` (at step: ${i.location.stepId})` : ''}`)
+				.filter((i: any) => i.severity === 'error')
+				.map((i: any) => `  - ${i.message}${i.location?.stepId ? ` (at step: ${i.location.stepId})` : ''}`)
 				.join('\n');
 
 			const error = `Cannot execute flow '${task.flowId}': Flow has validation errors:\n${errorMessages}`;
-			console.error(`${this.logPrefix()} ${error}`);
+			this.logger.error(` ${error}`);
 			throw new Error(error);
 		}
 
@@ -857,7 +859,7 @@ export class FlowWorker implements Shutdownable {
 		const successStatus = flow.statusTransitions?.onSuccess ?? defaultOnSuccess;
 		const failureStatus = flow.statusTransitions?.onFailure ?? defaultOnFailure;
 
-		console.log(`${this.logPrefix()} Executing flow: ${flow.name} (${flow.id})`);
+		this.logger.info(` Executing flow: ${flow.name} (${flow.id})`);
 		this.sendTaskStarted(TaskStatus.IN_PROGRESS);
 
 		let workspace: Workspace | null = null;
@@ -872,14 +874,12 @@ export class FlowWorker implements Shutdownable {
 			// If task specifies a workspace path, use it (OVERRIDE)
 			if (task.workspacePath) {
 				workspacePath = task.workspacePath;
-				console.log(`${this.logPrefix()} Using task-specified workspace override: ${workspacePath}`);
+				this.logger.info(` Using task-specified workspace override: ${workspacePath}`);
 			}
 			// Otherwise, if manual mode but no path specified, use current working directory
 			else if (flow.workspace.mode === 'manual') {
 				workspacePath = process.cwd();
-				console.log(
-					`${this.logPrefix()} Using current working directory as manual workspace: ${workspacePath}`
-				);
+				this.logger.info(` Using current working directory as manual workspace: ${workspacePath}`);
 			}
 
 			workspace = await this.workspaceManager.allocate({
@@ -894,7 +894,7 @@ export class FlowWorker implements Shutdownable {
 				},
 			});
 
-			console.log(`${this.logPrefix()} Workspace allocated: ${workspace.id} (${workspace.path})`);
+			this.logger.info(` Workspace allocated: ${workspace.id} (${workspace.path})`);
 			this.sendTaskProgress(`Workspace ready: ${workspace.path}`);
 
 			// Prepare execution options
@@ -925,17 +925,15 @@ export class FlowWorker implements Shutdownable {
 				interventionHandler: this.createInterventionHandler(),
 				// Real-time trace update callback (called after each step completion)
 				onTraceUpdate: (trace: any) => {
-					console.log(
-						`${this.logPrefix()} [TRACE] onTraceUpdate called - steps=${trace?.steps?.length || 0}`
-					);
+					this.logger.debug(`[TRACE] onTraceUpdate called - steps=${trace?.steps?.length || 0}`);
 					// Update the task's trace in-place so the 500ms timer can access it
 					if (this.currentTask?.flowResult) {
 						this.currentTask.flowResult.trace = trace;
-						console.log(
-							`${this.logPrefix()} [TRACE] Updated currentTask.flowResult.trace - steps=${this.currentTask.flowResult.trace?.steps?.length || 0}`
+						this.logger.debug(
+							`[TRACE] Updated currentTask.flowResult.trace - steps=${this.currentTask.flowResult.trace?.steps?.length || 0}`
 						);
 					} else {
-						console.log(`${this.logPrefix()} [TRACE] WARNING: No currentTask or flowResult to update!`);
+						this.logger.warn(` [TRACE] WARNING: No currentTask or flowResult to update!`);
 					}
 				},
 			};
@@ -973,8 +971,8 @@ export class FlowWorker implements Shutdownable {
 
 			// Send final trace update after execution completes
 			if (this.currentTask?.flowResult?.trace) {
-				console.log(
-					`${this.logPrefix()} [TRACE] Sending FINAL trace update after execution - steps=${this.currentTask.flowResult.trace.steps?.length || 0}`
+				this.logger.info(
+					` [TRACE] Sending FINAL trace update after execution - steps=${this.currentTask.flowResult.trace.steps?.length || 0}`
 				);
 				this.sendTraceUpdate(this.currentTask.flowResult.trace);
 			}
@@ -993,7 +991,7 @@ export class FlowWorker implements Shutdownable {
 			};
 
 			if (result.success) {
-				console.log(`${this.logPrefix()} Flow completed successfully`);
+				this.logger.info(` Flow completed successfully`);
 
 				// // Update UI
 				// this.workerUIManager.taskCompleted();
@@ -1007,7 +1005,7 @@ export class FlowWorker implements Shutdownable {
 					successStatus
 				);
 			} else {
-				console.error(`${this.logPrefix()} Flow failed: ${result.error}`);
+				this.logger.error(` Flow failed: ${result.error}`);
 
 				// // Update UI
 				// this.workerUIManager.taskFailed(result.error || 'Flow execution failed');
@@ -1015,7 +1013,7 @@ export class FlowWorker implements Shutdownable {
 				this.sendTaskFailed(result.error || 'Flow execution failed', failureStatus);
 			}
 		} catch (error) {
-			console.error(`${this.logPrefix()} Task execution error:`, error);
+			this.logger.error(` Task execution error:`, error);
 
 			// Stop trace updates on error
 			this.stopTraceUpdates();
@@ -1032,11 +1030,11 @@ export class FlowWorker implements Shutdownable {
 			// Release workspace
 			if (workspace) {
 				try {
-					console.log(`${this.logPrefix()} Releasing workspace ${workspace.id}...`);
+					this.logger.info(` Releasing workspace ${workspace.id}...`);
 					await this.workspaceManager.release(workspace.id, task.id);
-					console.log(`${this.logPrefix()} Workspace released`);
+					this.logger.info(` Workspace released`);
 				} catch (error) {
-					console.error(`${this.logPrefix()} Failed to release workspace:`, error);
+					this.logger.error(` Failed to release workspace:`, error);
 				}
 			}
 		}
@@ -1080,14 +1078,14 @@ export class FlowWorker implements Shutdownable {
 			clearInterval(this.traceUpdateTimer);
 		}
 
-		console.log(`${this.logPrefix()} [TRACE] Starting trace updates (interval: ${this.TRACE_UPDATE_INTERVAL}ms)`);
+		this.logger.info(` [TRACE] Starting trace updates (interval: ${this.TRACE_UPDATE_INTERVAL}ms)`);
 
 		this.traceUpdateTimer = setInterval(() => {
 			if (this.currentTask?.flowResult?.trace) {
 				this.sendTraceUpdate(this.currentTask.flowResult.trace);
 			} else {
-				console.log(
-					`${this.logPrefix()} [TRACE] No trace available - task=${!!this.currentTask}, flowResult=${!!this.currentTask?.flowResult}, trace=${!!this.currentTask?.flowResult?.trace}`
+				this.logger.info(
+					` [TRACE] No trace available - task=${!!this.currentTask}, flowResult=${!!this.currentTask?.flowResult}, trace=${!!this.currentTask?.flowResult?.trace}`
 				);
 			}
 		}, this.TRACE_UPDATE_INTERVAL);
@@ -1098,7 +1096,7 @@ export class FlowWorker implements Shutdownable {
 	 */
 	private stopTraceUpdates(): void {
 		if (this.traceUpdateTimer) {
-			console.log(`${this.logPrefix()} [TRACE] Stopping trace updates`);
+			this.logger.info(` [TRACE] Stopping trace updates`);
 			clearInterval(this.traceUpdateTimer);
 			this.traceUpdateTimer = null;
 		}
@@ -1110,7 +1108,7 @@ export class FlowWorker implements Shutdownable {
 	 */
 	private sendTraceUpdate(trace: any): void {
 		if (!this.currentTask) {
-			console.log(`${this.logPrefix()} [TRACE] sendTraceUpdate called but no current task`);
+			this.logger.info(` [TRACE] sendTraceUpdate called but no current task`);
 			return;
 		}
 
@@ -1119,8 +1117,8 @@ export class FlowWorker implements Shutdownable {
 
 		// Skip if trace hasn't changed since last send
 		if (traceHash === this.lastSentTraceHash) {
-			console.log(
-				`${this.logPrefix()} [TRACE] Trace unchanged (hash match) - task=${this.currentTask.id}, steps=${trace?.steps?.length || 0}`
+			this.logger.debug(
+				`[TRACE] Trace unchanged (hash match) - task=${this.currentTask.id}, steps=${trace?.steps?.length || 0}`
 			);
 			return;
 		}
@@ -1128,8 +1126,8 @@ export class FlowWorker implements Shutdownable {
 		// Update last sent hash
 		this.lastSentTraceHash = traceHash;
 
-		console.log(
-			`${this.logPrefix()} [TRACE] Sending trace update - task=${this.currentTask.id}, steps=${trace?.steps?.length || 0}, ws.readyState=${this.ws?.readyState} (1=OPEN)`
+		this.logger.debug(
+			`[TRACE] Sending trace update - task=${this.currentTask.id}, steps=${trace?.steps?.length || 0}, ws.readyState=${this.ws?.readyState} (1=OPEN)`
 		);
 
 		// Send update to orchestrator
@@ -1245,7 +1243,7 @@ export class FlowWorker implements Shutdownable {
 		if (this.ws && this.ws.readyState === WebSocket.OPEN) {
 			this.ws.send(serializeMessage(message));
 		} else {
-			console.error(`${this.logPrefix()} Cannot send message, not connected`);
+			this.logger.error(` Cannot send message, not connected`);
 		}
 	}
 
@@ -1281,7 +1279,7 @@ export class FlowWorker implements Shutdownable {
 	 * Cleanup on shutdown
 	 */
 	shutdown(): void {
-		console.log(`${this.logPrefix()} Shutting down...`);
+		this.logger.info(` Shutting down...`);
 
 		// // Stop UI
 		// this.workerUIManager.stop();
@@ -1309,7 +1307,9 @@ const mainFilePath = process.argv[1];
 const isMainModule = currentFilePath === mainFilePath;
 
 if (isMainModule) {
-	console.log('[FlowWorker] Starting Flow Worker...');
+	// Create logger for entry point initialization
+	const entryLog = createLogger('FlowWorker:main');
+	entryLog.info('Starting Flow Worker...');
 
 	// Load environment variables from root .env and package .env files
 	// Root .env is loaded first, then package .env (which can override)
@@ -1321,14 +1321,14 @@ if (isMainModule) {
 	const rootEnvPath = join(__dirname, '../../../../.env');
 	const packageEnvPath = join(__dirname, '../../.env');
 
-	console.log(`[FlowWorker] Loading .env files:`);
-	console.log(`[FlowWorker] - Root:    ${rootEnvPath}`);
-	console.log(`[FlowWorker] - Package: ${packageEnvPath}`);
+	entryLog.info('Loading .env files:');
+	entryLog.info(`- Root:    ${rootEnvPath}`);
+	entryLog.info(`- Package: ${packageEnvPath}`);
 
 	dotenv.config({ path: rootEnvPath });
 	dotenv.config({ path: packageEnvPath });
 
-	console.log(`[FlowWorker] Loaded WORKSPACE_ID=${process.env.WORKSPACE_ID}, PROJECT_ID=${process.env.PROJECT_ID}`);
+	entryLog.info(`Loaded WORKSPACE_ID=${process.env.WORKSPACE_ID}, PROJECT_ID=${process.env.PROJECT_ID}`);
 
 	// Check for interactive mode from CLI args or environment variable
 	const interactiveArg = process.argv.includes('--interactive') || process.argv.includes('-i');
@@ -1359,23 +1359,23 @@ if (isMainModule) {
 	worker
 		.connect()
 		.then(() => {
-			console.log('[FlowWorker] Worker started and connected');
+			entryLog.info('Worker started and connected');
 		})
 		.catch(error => {
-			console.error('[FlowWorker] Initial connection failed:', error.message);
-			console.log('[FlowWorker] Will keep retrying to connect to orchestrator...');
+			entryLog.error('Initial connection failed:', error.message);
+			entryLog.info('Will keep retrying to connect to orchestrator...');
 			// Don't exit - the worker will automatically retry with exponential backoff
 		});
 
 	// Handle shutdown signals
 	process.on('SIGINT', () => {
-		console.log('\n[FlowWorker] Received SIGINT, shutting down...');
+		entryLog.info('\nReceived SIGINT, shutting down...');
 		worker.shutdown();
 		process.exit(0);
 	});
 
 	process.on('SIGTERM', () => {
-		console.log('\n[FlowWorker] Received SIGTERM, shutting down...');
+		entryLog.info('\nReceived SIGTERM, shutting down...');
 		worker.shutdown();
 		process.exit(0);
 	});

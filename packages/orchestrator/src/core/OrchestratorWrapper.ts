@@ -21,9 +21,12 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'node:url';
 import type { Orchestrator } from 'orchestrator/core/Orchestrator';
 import path from 'path';
+import { createLogger } from 'shared-common/logger';
 import { StateEvent } from 'shared-orch-worker/StateManager';
 import type { OrchestratorStats, Task, WorkerInfo } from 'shared-orch-worker/domain-types';
 import type { O2BEventData, O2BEventType } from 'shared-orch-worker/orchestrator-events';
+
+const log = createLogger('OrchestratorWrapper');
 
 // @formatter:off
 // Read version from package.json
@@ -349,7 +352,7 @@ export class OrchestratorWrapper {
 				break;
 
 			default:
-				console.warn(`[LibraryAdapter] Unknown event type: ${event}`);
+				log.warn(`Unknown event type: ${event}`);
 		}
 	}
 
@@ -378,7 +381,7 @@ export class OrchestratorWrapper {
 			// we'd need to track the wrapped handlers to properly remove them
 			// This is a known limitation - consider refactoring if needed
 			default:
-				console.warn(`[LibraryAdapter] Cannot unsubscribe from event: ${event}`);
+				log.warn(`Cannot unsubscribe from event: ${event}`);
 		}
 	}
 

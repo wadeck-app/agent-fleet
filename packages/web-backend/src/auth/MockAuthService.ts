@@ -1,6 +1,9 @@
 import jwt from 'jsonwebtoken';
+import { createLogger } from 'shared-common/logger';
 
 import type { AuthService, LoginResponse, RefreshTokenResponse, TokenPayload } from './AuthService';
+
+const log = createLogger('MockAuthService');
 
 /**
  * ===========================================================================================
@@ -161,7 +164,7 @@ export class MockAuthService implements AuthService {
 		// In a real implementation, you'd blacklist all tokens for this user
 		// For now, we rely on the client to send the token to blacklist
 		// This is called from AuthController which has the token
-		console.log(`[MockAuthService] User ${userId} logged out`);
+		log.info(`User ${userId} logged out`);
 	}
 
 	/**
@@ -236,7 +239,7 @@ export class MockAuthService implements AuthService {
 		});
 
 		if (cleanedCount > 0) {
-			console.log(`[MockAuthService] Cleaned ${cleanedCount} expired tokens from blacklist`);
+			log.info(`Cleaned ${cleanedCount} expired tokens from blacklist`);
 		}
 	}
 

@@ -1,7 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { createLogger } from 'shared-common/logger';
 import { type Intervention, type InterventionStatus, type Task } from 'shared-orch-worker/domain-types';
 import { fileURLToPath } from 'url';
+
+const log = createLogger('Storage');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -56,7 +59,7 @@ export class Storage {
 			await this.ensureDirectoryExists(INTERVENTIONS_DIR);
 			await this.ensureDirectoryExists(KNOWLEDGE_DIR);
 		} catch (error) {
-			console.error('[Storage] Failed to initialize directories:', error);
+			log.error('Failed to initialize directories:', error);
 			throw new Error(`Failed to initialize storage: ${error instanceof Error ? error.message : String(error)}`);
 		}
 	}
@@ -70,7 +73,7 @@ export class Storage {
 			const filePath = path.join(TASKS_DIR, `${task.id}.json`);
 			await fs.promises.writeFile(filePath, JSON.stringify(task, null, 2), 'utf8');
 		} catch (error) {
-			console.error(`[Storage] Failed to save task ${task.id}:`, error);
+			log.error(`Failed to save task ${task.id}:`, error);
 			throw new Error(
 				`Failed to save task ${task.id}: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -91,7 +94,7 @@ export class Storage {
 			if (error.code === 'ENOENT') {
 				return null;
 			}
-			console.error(`[Storage] Failed to load task ${taskId}:`, error);
+			log.error(`Failed to load task ${taskId}:`, error);
 			throw new Error(`Failed to load task ${taskId}: ${error instanceof Error ? error.message : String(error)}`);
 		}
 	}
@@ -116,7 +119,7 @@ export class Storage {
 
 			return tasks;
 		} catch (error) {
-			console.error('[Storage] Failed to list tasks:', error);
+			log.error('Failed to list tasks:', error);
 			throw new Error(`Failed to list tasks: ${error instanceof Error ? error.message : String(error)}`);
 		}
 	}
@@ -134,7 +137,7 @@ export class Storage {
 				// File doesn't exist, which is fine for delete
 				return;
 			}
-			console.error(`[Storage] Failed to delete task ${taskId}:`, error);
+			log.error(`Failed to delete task ${taskId}:`, error);
 			throw new Error(
 				`Failed to delete task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -157,7 +160,7 @@ export class Storage {
 				}) + '\n';
 			await fs.promises.appendFile(filePath, line, 'utf8');
 		} catch (error) {
-			console.error(`[Storage] Failed to add knowledge to ${category}:`, error);
+			log.error(`Failed to add knowledge to ${category}:`, error);
 			throw new Error(
 				`Failed to add knowledge to ${category}: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -181,7 +184,7 @@ export class Storage {
 			if (error.code === 'ENOENT') {
 				return [];
 			}
-			console.error(`[Storage] Failed to read knowledge from ${category}:`, error);
+			log.error(`Failed to read knowledge from ${category}:`, error);
 			throw new Error(
 				`Failed to read knowledge from ${category}: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -200,7 +203,7 @@ export class Storage {
 			await this.ensureDirectoryExists(dir);
 			return dir;
 		} catch (error) {
-			console.error(`[Storage] Failed to get context directory for task ${taskId}:`, error);
+			log.error(`Failed to get context directory for task ${taskId}:`, error);
 			throw new Error(
 				`Failed to get context directory for task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -242,7 +245,7 @@ export class Storage {
 
 			return jsonFiles.length;
 		} catch (error) {
-			console.error('[Storage] Failed to clear all tasks:', error);
+			log.error('Failed to clear all tasks:', error);
 			throw new Error(`Failed to clear all tasks: ${error instanceof Error ? error.message : String(error)}`);
 		}
 	}
@@ -261,7 +264,7 @@ export class Storage {
 			const filePath = path.join(INTERVENTIONS_DIR, `${intervention.id}.json`);
 			await fs.promises.writeFile(filePath, JSON.stringify(intervention, null, 2), 'utf8');
 		} catch (error) {
-			console.error(`[Storage] Failed to save intervention ${intervention.id}:`, error);
+			log.error(`Failed to save intervention ${intervention.id}:`, error);
 			throw new Error(
 				`Failed to save intervention ${intervention.id}: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -282,7 +285,7 @@ export class Storage {
 			if (error.code === 'ENOENT') {
 				return null;
 			}
-			console.error(`[Storage] Failed to load intervention ${interventionId}:`, error);
+			log.error(`Failed to load intervention ${interventionId}:`, error);
 			throw new Error(
 				`Failed to load intervention ${interventionId}: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -309,7 +312,7 @@ export class Storage {
 
 			return interventions;
 		} catch (error) {
-			console.error('[Storage] Failed to list interventions:', error);
+			log.error('Failed to list interventions:', error);
 			throw new Error(`Failed to list interventions: ${error instanceof Error ? error.message : String(error)}`);
 		}
 	}
@@ -327,7 +330,7 @@ export class Storage {
 				// File doesn't exist, which is fine for delete
 				return;
 			}
-			console.error(`[Storage] Failed to delete intervention ${interventionId}:`, error);
+			log.error(`Failed to delete intervention ${interventionId}:`, error);
 			throw new Error(
 				`Failed to delete intervention ${interventionId}: ${error instanceof Error ? error.message : String(error)}`
 			);

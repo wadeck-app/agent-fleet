@@ -1,6 +1,9 @@
 import * as fs from 'fs';
+import { createLogger } from 'shared-common/logger';
 
 import type { WorkspaceFileMetadata, WorkspaceMetadataFile } from '../services/WorkspaceMetadataFile';
+
+const log = createLogger('WorkspaceMetadataRepository');
 
 /**
  * Workspace metadata (user-editable fields)
@@ -116,13 +119,13 @@ export class WorkspaceMetadataRepository {
 
 			// Only watch if file exists
 			if (!fs.existsSync(metadataPath)) {
-				console.log(`[WorkspaceMetadataRepository] Metadata file doesn't exist yet: ${metadataPath}`);
+				log.info(`Metadata file doesn't exist yet: ${metadataPath}`);
 				return;
 			}
 
 			const watcher = fs.watch(metadataPath, (eventType, filename) => {
 				if (eventType === 'change') {
-					console.log(`[WorkspaceMetadataRepository] Metadata file changed for workspace: ${workspacePath}`);
+					log.info(`Metadata file changed for workspace: ${workspacePath}`);
 					// Notify via callback
 					if (this.changeCallback) {
 						this.changeCallback(workspacePath);
@@ -131,9 +134,9 @@ export class WorkspaceMetadataRepository {
 			});
 
 			this.watchers.set(workspacePath, watcher);
-			console.log(`[WorkspaceMetadataRepository] Started watching: ${workspacePath}`);
+			log.info(`Started watching: ${workspacePath}`);
 		} catch (error) {
-			console.error(`[WorkspaceMetadataRepository] Failed to watch ${workspacePath}:`, error);
+			log.error(`Failed to watch ${workspacePath}:`, error);
 		}
 	}
 
@@ -145,7 +148,7 @@ export class WorkspaceMetadataRepository {
 		if (watcher) {
 			watcher.close();
 			this.watchers.delete(workspacePath);
-			console.log(`[WorkspaceMetadataRepository] Stopped watching: ${workspacePath}`);
+			log.info(`Stopped watching: ${workspacePath}`);
 		}
 	}
 
@@ -155,7 +158,7 @@ export class WorkspaceMetadataRepository {
 	stopAllWatching(): void {
 		for (const [workspacePath, watcher] of this.watchers) {
 			watcher.close();
-			console.log(`[WorkspaceMetadataRepository] Stopped watching: ${workspacePath}`);
+			log.info(`Stopped watching: ${workspacePath}`);
 		}
 		this.watchers.clear();
 	}

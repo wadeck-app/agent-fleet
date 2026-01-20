@@ -26,7 +26,7 @@ export async function main() {
 	try {
 		await orchestrator.start();
 	} catch (error) {
-		console.error('[Orchestrator] Failed to start:', error);
+		logger.error('[Orchestrator] Failed to start:', error);
 		process.exit(1);
 	}
 }

@@ -1,3 +1,5 @@
+import { createLogger } from 'shared-common/logger';
+
 import type {
 	CreateIngredient,
 	Ingredient,
@@ -10,6 +12,8 @@ import type { BulkDeleteResponse, FailedDeletion } from '@app/shared/common/api-
 import { ConflictException, ERROR_CODES, NotFoundException } from '@app/shared/exceptions/http-exceptions';
 
 import type { IngredientsRepository } from '../repositories/IngredientsRepository';
+
+const log = createLogger('IngredientsService');
 
 /**
  * ===========================================================================================
@@ -220,7 +224,7 @@ export class IngredientsService {
 
 			// Allow 10% margin of error
 			if (Math.abs(calculatedCalories - declaredCalories) > declaredCalories * 0.1) {
-				console.warn(
+				log.warn(
 					`Calories mismatch: calculated ${calculatedCalories} vs declared ${declaredCalories}. Proceeding anyway.`
 				);
 			}

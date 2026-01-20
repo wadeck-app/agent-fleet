@@ -1,6 +1,7 @@
 import type { Orchestrator } from 'orchestrator';
 import { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
 import { getOrchestratorRestUrl } from 'shared-common/PortCalculator';
+import { createLogger } from 'shared-common/logger';
 
 // import type { Book } from 'shared-frontend-backend/src/api/books.contract';
 // import type { Ingredient } from 'shared-frontend-backend/src/api/ingredients.contract';
@@ -39,6 +40,8 @@ import type { EventBroadcaster } from '../transport/EventBroadcaster';
 import type { ITransportServer } from '../transport/ITransportServer';
 import { TransportRouter } from '../transport/TransportRouter';
 import { TransportSessionManager } from '../transport/TransportSessionManager';
+
+const log = createLogger('DataStoreFactory');
 
 /**
  * ===========================================================================================
@@ -90,7 +93,7 @@ export class DataStoreFactory {
 			// File-based storage in ./data directory
 			const dataDir = process.env.DATA_DIR || './data';
 			this.storage = new FileBasedStorage(dataDir);
-			console.log(`[DataStoreFactory] Using FileBasedStorage with data directory: ${dataDir}`);
+			log.info(`Using FileBasedStorage with data directory: ${dataDir}`);
 		} else {
 			// TODO: Implement MariaDBStorage
 			throw new Error('MariaDB storage not yet implemented');
@@ -99,7 +102,7 @@ export class DataStoreFactory {
 		// Always create in-memory storage for reference data (ingredients, books)
 		// These are "seed data" that should be present at every startup
 		this.referenceStorage = new InMemoryStorage();
-		console.log('[DataStoreFactory] Using InMemoryStorage for reference data (ingredients, books)');
+		log.info('Using InMemoryStorage for reference data (ingredients, books)');
 
 		this.orchestrator = orchestrator;
 		this.orchestratorWrapper = new OrchestratorWrapper(orchestrator);
@@ -444,7 +447,7 @@ export class DataStoreFactory {
 			await handler.handleOrchestratorEvent(event, data);
 		});
 
-		console.log('[DataStoreFactory] Orchestrator integration initialized');
+		log.info('Orchestrator integration initialized');
 	}
 
 	/**

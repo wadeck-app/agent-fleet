@@ -109,7 +109,7 @@ export class WebSocketMessageRouter {
 				break;
 
 			default:
-				console.warn(`[WS] Unknown message type: ${(message as unknown as any).type}`);
+				logger.warn(`[WS] Unknown message type: ${(message as unknown as any).type}`);
 		}
 	}
 }

@@ -1,8 +1,12 @@
+import { createLogger } from 'shared-common/logger';
+
 import type { EventData, EventType } from '@app/shared/transport';
 
 import type { ITransportServer } from './ITransportServer';
 import type { MessageQueue } from './MessageQueue';
 import type { TransportSessionManager } from './TransportSessionManager';
+
+const log = createLogger('EventBroadcaster');
 
 /**
  * ===========================================================================================
@@ -86,7 +90,7 @@ export class EventBroadcaster {
 	 */
 	//TODO normally never used, in favor of braodcastExcept as we do not want to inform the source of the event about that said event
 	broadcast<E extends EventType>(event: E, data: EventData<E>): void {
-		console.log(`[EventBroadcaster] Broadcasting event "${event}" to ${this.transportServers.length} transport(s)`);
+		log.info(`Broadcasting event "${event}" to ${this.transportServers.length} transport(s)`);
 		// Broadcast to all transports
 		for (const transport of this.transportServers) {
 			const transportType = transport.getTransportType();
@@ -99,12 +103,10 @@ export class EventBroadcaster {
 
 			try {
 				transport.broadcast(event, data);
-				console.log(
-					`[EventBroadcaster] Successfully broadcast to transport: ${transportType} (${connectedCount} connection(s))`
-				);
+				log.info(`Successfully broadcast to transport: ${transportType} (${connectedCount} connection(s))`);
 			} catch (error) {
-				console.error(
-					`[EventBroadcaster] Failed to broadcast to transport: ${transportType} (${connectedCount} connection(s))`,
+				log.error(
+					`Failed to broadcast to transport: ${transportType} (${connectedCount} connection(s))`,
 					error
 				);
 				// Continue with other transports (anti-fragile)
@@ -143,9 +145,7 @@ export class EventBroadcaster {
 			return;
 		}
 
-		console.log(
-			`[EventBroadcaster] Broadcasting event "${event}" (excluding connId: ${excludeConnId.substring(0, 8)}...)`
-		);
+		log.info(`Broadcasting event "${event}" (excluding connId: ${excludeConnId.substring(0, 8)}...)`);
 
 		// Get all connected connections from all transports
 		const allConnections = this.getConnectedClients();
@@ -154,10 +154,10 @@ export class EventBroadcaster {
 		const targetConnections = allConnections.filter(connId => connId !== excludeConnId);
 
 		if (targetConnections.length >= 3) {
-			console.log(`[EventBroadcaster] Sending to ${targetConnections.length} connections (excluded 1)`);
+			log.info(`Sending to ${targetConnections.length} connections (excluded 1)`);
 		} else {
-			console.log(
-				`[EventBroadcaster] Sending to ${targetConnections.length} connections (excluded 1): ${targetConnections.map(connId => connId.substring(0, 8)).join(', ')}`
+			log.info(
+				`Sending to ${targetConnections.length} connections (excluded 1): ${targetConnections.map(connId => connId.substring(0, 8)).join(', ')}`
 			);
 		}
 
@@ -166,7 +166,7 @@ export class EventBroadcaster {
 			try {
 				this.sendToClient(connId, event, data);
 			} catch (error) {
-				console.error(`[EventBroadcaster] Failed to send to connection ${connId}:`, error);
+				log.error(`Failed to send to connection ${connId}:`, error);
 				// Continue with other connections (anti-fragile)
 			}
 		}
@@ -196,9 +196,7 @@ export class EventBroadcaster {
 		if (!transportType) {
 			// Connection not found in session manager - queue for later delivery
 			if (this.messageQueue) {
-				console.warn(
-					`[EventBroadcaster] Connection ${connId} not found in session manager, queuing event ${event}`
-				);
+				log.warn(`Connection ${connId} not found in session manager, queuing event ${event}`);
 				this.messageQueue.enqueue(connId, {
 					id: `evt-${Date.now()}-${Math.random().toString(36).substring(7)}`,
 					type: event,
@@ -213,7 +211,7 @@ export class EventBroadcaster {
 		const transport = this.findTransportByType(transportType);
 
 		if (!transport) {
-			console.error(`[EventBroadcaster] No transport server found for type: ${transportType}`);
+			log.error(`No transport server found for type: ${transportType}`);
 			return;
 		}
 
@@ -270,13 +268,13 @@ export class EventBroadcaster {
 		const allConnections = new Set<string>();
 		for (const transport of this.transportServers) {
 			const transportConnections = transport.getConnectedClients();
-			console.log(
-				`[EventBroadcaster] Transport ${transport.getTransportType()}: ${transportConnections.length} connections`,
+			log.info(
+				`Transport ${transport.getTransportType()}: ${transportConnections.length} connections`,
 				transportConnections.map(c => c.substring(0, 8))
 			);
 			transportConnections.forEach(connId => allConnections.add(connId));
 		}
-		console.log(`[EventBroadcaster] Total unique connections: ${allConnections.size}`);
+		log.info(`Total unique connections: ${allConnections.size}`);
 		return Array.from(allConnections);
 	}
 

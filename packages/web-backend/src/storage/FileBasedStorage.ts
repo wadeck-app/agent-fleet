@@ -1,11 +1,14 @@
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
+import { createLogger } from 'shared-common/logger';
 
 import type { BaseEntity } from '@app/shared/common/base-entity';
 
 import type { DataStorage } from './DataStorage';
 import { InMemoryQueryBuilder } from './InMemoryQueryBuilder';
 import type { QueryBuilder } from './QueryBuilder';
+
+const log = createLogger('FileBasedStorage');
 
 /**
  * ===========================================================================================
@@ -80,19 +83,19 @@ export class FileBasedStorage implements DataStorage {
 			this.tables.set(table, items);
 			this.loadedTables.add(table);
 
-			console.log(`[FileBasedStorage] Loaded ${items.length} items from ${filePath}`);
+			log.info(`Loaded ${items.length} items from ${filePath}`);
 			return items as T[];
 		} catch (error) {
 			if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
 				// File doesn't exist - create empty table
-				console.log(`[FileBasedStorage] File not found, creating empty table: ${table}`);
+				log.info(`File not found, creating empty table: ${table}`);
 				this.tables.set(table, []);
 				this.loadedTables.add(table);
 				return [];
 			}
 
 			// Other errors (parse errors, permission errors, etc.)
-			console.error(`[FileBasedStorage] Error loading ${filePath}:`, error);
+			log.error(`Error loading ${filePath}:`, error);
 			throw new Error(`Failed to load table ${table}: ${(error as Error).message}`);
 		}
 	}
@@ -112,9 +115,9 @@ export class FileBasedStorage implements DataStorage {
 			const data = { [table]: items };
 			await writeFile(filePath, JSON.stringify(data, null, '\t'), 'utf-8');
 
-			console.log(`[FileBasedStorage] Saved ${items.length} items to ${filePath}`);
+			log.info(`Saved ${items.length} items to ${filePath}`);
 		} catch (error) {
-			console.error(`[FileBasedStorage] Error saving ${filePath}:`, error);
+			log.error(`Error saving ${filePath}:`, error);
 			throw new Error(`Failed to save table ${table}: ${(error as Error).message}`);
 		}
 	}
@@ -133,7 +136,7 @@ export class FileBasedStorage implements DataStorage {
 		if (!this.loadedTables.has(table)) {
 			// Schedule async load but return empty data for now
 			this.ensureTableLoaded<T>(table).catch(err => {
-				console.error(`[FileBasedStorage] Failed to load table ${table} for query:`, err);
+				log.error(`Failed to load table ${table} for query:`, err);
 			});
 			this.tables.set(table, []);
 			this.loadedTables.add(table);

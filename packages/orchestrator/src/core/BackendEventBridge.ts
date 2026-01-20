@@ -7,7 +7,10 @@
  * The backend (via OrchestratorWrapper) registers a handler to receive events,
  * and the orchestrator calls sendToBackend() when events occur.
  */
+import { createLogger } from 'shared-common/logger';
 import type { Task } from 'shared-orch-worker/domain-types';
+
+const log = createLogger('BackendEventBridge');
 
 /**
  * Event types that can be sent to the backend
@@ -140,7 +143,7 @@ export class BackendEventBridge {
 			try {
 				await handler(event, data);
 			} catch (error) {
-				console.error(`[BackendEventBridge] Handler failed for event ${event}:`, error);
+				log.error(`Handler failed for event ${event}:`, error);
 			}
 		}
 	}

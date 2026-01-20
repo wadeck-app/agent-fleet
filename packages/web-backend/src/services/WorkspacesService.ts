@@ -1,4 +1,5 @@
 import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
+import { createLogger } from 'shared-common/logger';
 
 import type {
 	UpdateWorkspaceDto,
@@ -13,6 +14,8 @@ import type { ProjectsRepository } from '../repositories/ProjectsRepository';
 import type { WorkspaceMetadataRepository } from '../repositories/WorkspaceMetadataRepository';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 import { WorkspaceMapper } from './WorkspaceMapper';
+
+const log = createLogger('WorkspacesService');
 
 /**
  * ===========================================================================================
@@ -54,7 +57,7 @@ export class WorkspacesService {
 	) {
 		// Configure metadata file watcher to emit B2F_WORKSPACES_UPDATED on changes
 		this.metadataRepository.setChangeCallback((workspacePath: string) => {
-			console.log(`[WorkspacesService] Metadata changed for workspace: ${workspacePath}`);
+			log.info(`Metadata changed for workspace: ${workspacePath}`);
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast(B2F_WORKSPACES_UPDATED, {} as any);
 		});
@@ -100,7 +103,7 @@ export class WorkspacesService {
 	 * Get workspaces data with summary statistics
 	 */
 	async getWorkspacesData(): Promise<WorkspacesData> {
-		console.log('[WorkspacesService] Fetching workspaces from connected workers...');
+		log.info('Fetching workspaces from connected workers...');
 
 		try {
 			// Fetch workspaces from connected workers
@@ -125,7 +128,7 @@ export class WorkspacesService {
 				workspaces,
 			};
 		} catch (error) {
-			console.error('[WorkspacesService] Failed to fetch workspaces:', error);
+			log.error('Failed to fetch workspaces:', error);
 			// Return empty data on error
 			return {
 				timestamp: new Date().toISOString(),
@@ -146,7 +149,7 @@ export class WorkspacesService {
 	 * (Data2 architecture)
 	 */
 	async getWorkspacesList(query: WorkspacesListQuery): Promise<WorkspacesListResponse> {
-		console.log('[WorkspacesService] Fetching workspaces list from connected workers...');
+		log.info('Fetching workspaces list from connected workers...');
 
 		try {
 			// Fetch workspaces from connected workers
@@ -203,7 +206,7 @@ export class WorkspacesService {
 				},
 			};
 		} catch (error) {
-			console.error('[WorkspacesService] Failed to fetch workspaces list:', error);
+			log.error('Failed to fetch workspaces list:', error);
 			// Return empty list on error
 			return {
 				items: [],
@@ -384,18 +387,14 @@ export class WorkspacesService {
 
 			// Handle bidirectional sync with projects
 			if (oldProjectId !== newProjectId) {
-				console.log(
-					`[WorkspacesService] Project ID changed for workspace ${workspaceId}: ${oldProjectId} -> ${newProjectId}`
-				);
+				log.info(`Project ID changed for workspace ${workspaceId}: ${oldProjectId} -> ${newProjectId}`);
 				// Remove workspace from old project if it had one
 				if (oldProjectId) {
 					try {
 						await this.projectsRepository.removeWorkspace(oldProjectId, workspaceId);
-						console.log(
-							`[WorkspacesService] Removed workspace ${workspaceId} from project ${oldProjectId}`
-						);
+						log.info(`Removed workspace ${workspaceId} from project ${oldProjectId}`);
 					} catch (error) {
-						console.warn(
+						log.warn(
 							`[WorkspacesService] Failed to remove workspace from old project ${oldProjectId}:`,
 							error
 						);
@@ -404,20 +403,15 @@ export class WorkspacesService {
 
 				// Add workspace to new project if assigned
 				if (newProjectId) {
-					console.log(
-						`[WorkspacesService] Attempting to add workspace ${workspaceId} to project ${newProjectId}`
-					);
+					log.info(`Attempting to add workspace ${workspaceId} to project ${newProjectId}`);
 					try {
 						const updatedProject = await this.projectsRepository.addWorkspaces(newProjectId, [workspaceId]);
-						console.log(
-							`[WorkspacesService] Added workspace ${workspaceId} to project ${newProjectId}. Project workspaceIds:`,
+						log.info(
+							`Added workspace ${workspaceId} to project ${newProjectId}. Project workspaceIds:`,
 							updatedProject.workspaceIds
 						);
 					} catch (error) {
-						console.warn(
-							`[WorkspacesService] Failed to add workspace to new project ${newProjectId}:`,
-							error
-						);
+						log.warn(`[WorkspacesService] Failed to add workspace to new project ${newProjectId}:`, error);
 					}
 				}
 			}
@@ -439,7 +433,7 @@ export class WorkspacesService {
 
 			return workspace;
 		} catch (error) {
-			console.error('[WorkspacesService] Failed to update workspace:', error);
+			log.error('Failed to update workspace:', error);
 			throw error;
 		}
 	}

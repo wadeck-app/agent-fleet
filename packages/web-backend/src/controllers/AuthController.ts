@@ -1,3 +1,5 @@
+import { createLogger } from 'shared-common/logger';
+
 import type { AUTH_API_ROUTES } from '@app/shared/api/auth.contract';
 import { AUTH_API_ROUTES as routes } from '@app/shared/api/auth.contract';
 
@@ -6,6 +8,8 @@ import type { MockAuthService } from '../auth/MockAuthService';
 import type { TransportSessionManager } from '../transport/TransportSessionManager';
 import type { RouteWrapperFunc } from '../utils/fastify-wrapper';
 import type { LazyController } from '../utils/lazy-controller-plugin';
+
+const log = createLogger('AuthController');
 
 /**
  * ===========================================================================================
@@ -71,7 +75,7 @@ export default class AuthController implements LazyController<typeof AUTH_API_RO
 				maxAge: 7 * 24 * 60 * 60, // 7 days
 			});
 
-			console.log(`[Auth] User ${userId} logged in`);
+			log.info(`User ${userId} logged in`);
 
 			return {
 				userId,
@@ -110,7 +114,7 @@ export default class AuthController implements LazyController<typeof AUTH_API_RO
 			// This ensures all connected devices get the new token without reconnecting
 			await this.sessionManager.refreshSessionToken(userId, accessToken);
 
-			console.log(`[Auth] Token refreshed for user ${userId}`);
+			log.info(`Token refreshed for user ${userId}`);
 
 			return {
 				userId,
@@ -137,7 +141,7 @@ export default class AuthController implements LazyController<typeof AUTH_API_RO
 			// Note: WebSocket connections will be closed automatically when token expires
 			// or when client receives logout confirmation
 
-			console.log('[Auth] User logged out');
+			log.info('User logged out');
 
 			return { success: true };
 		});
@@ -157,7 +161,7 @@ export default class AuthController implements LazyController<typeof AUTH_API_RO
 			// This prevents bypass if someone removes the startup check
 			if (disableAuthDev) {
 				if (process.env.NODE_ENV === 'production') {
-					console.error('[Auth] FATAL: DISABLE_AUTH_DEV=true detected in production!');
+					log.error('FATAL: DISABLE_AUTH_DEV=true detected in production!');
 					throw new Error('Authentication bypass not allowed in production');
 				}
 
@@ -165,7 +169,7 @@ export default class AuthController implements LazyController<typeof AUTH_API_RO
 				// Set expiration far in the future (1 year)
 				const expiresAt = Date.now() + 365 * 24 * 60 * 60 * 1000;
 
-				console.log('[Auth] DEVELOPMENT MODE: Session check bypassed, returning authenticated');
+				log.info('DEVELOPMENT MODE: Session check bypassed, returning authenticated');
 
 				return {
 					authenticated: true,

@@ -31,12 +31,15 @@
  * ```
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { createLogger } from 'shared-common/logger';
 
 import type { EventData, EventType, TransportEvent } from '@app/shared/transport';
 
 import type { ClientConnectedHandler, ClientDisconnectedHandler, ITransportServer } from '../ITransportServer';
 import type { MessageQueue } from '../MessageQueue';
 import type { TransportSessionManager } from '../TransportSessionManager';
+
+const log = createLogger('SSETransportServer');
 
 /**
  * SSE Connection
@@ -122,7 +125,7 @@ export class SSETransportServer implements ITransportServer {
 		// Start heartbeat
 		this.startHeartbeat();
 
-		console.log('[SSE] Server initialized');
+		log.info('Server initialized');
 	}
 
 	/**
@@ -141,16 +144,16 @@ export class SSETransportServer implements ITransportServer {
 		// This can happen with React StrictMode or network issues causing rapid reconnects
 		const existingConnection = this.connections.get(connId);
 		if (existingConnection) {
-			console.warn(
-				`[SSE] Replacing existing connection ${connId.substring(0, 8)}... (rapid reconnect detected, closing orphaned stream)`
+			log.warn(
+				`Replacing existing connection ${connId.substring(0, 8)}... (rapid reconnect detected, closing orphaned stream)`
 			);
 
 			// Clean up orphaned connection to prevent memory leaks
 			try {
 				existingConnection.reply.raw.end();
-				console.log(`[SSE] Closed orphaned connection stream for ${connId.substring(0, 8)}...`);
+				log.info(`Closed orphaned connection stream for ${connId.substring(0, 8)}...`);
 			} catch (error) {
-				console.error(`[SSE] Failed to close orphaned connection ${connId.substring(0, 8)}...:`, error);
+				log.error(`Failed to close orphaned connection ${connId.substring(0, 8)}...:`, error);
 			}
 		}
 
@@ -181,9 +184,7 @@ export class SSETransportServer implements ITransportServer {
 
 			this.connections.set(connId, connection);
 
-			console.log(
-				`[SSE] Connection ${connId} connected (user=${session.userId}, total=${this.connections.size})`
-			);
+			log.info(`[SSE] Connection ${connId} connected (user=${session.userId}, total=${this.connections.size})`);
 
 			// Send initial connected event with auth info (NO connId - client already has it)
 			this.sendSSEEvent(reply, 'connected', {
@@ -194,7 +195,7 @@ export class SSETransportServer implements ITransportServer {
 			// Send any queued messages
 			const queuedEvents = this.messageQueue.dequeue(connId);
 			if (queuedEvents.length > 0) {
-				console.log(`[SSE] Sending ${queuedEvents.length} queued events to connection ${connId}`);
+				log.info(`Sending ${queuedEvents.length} queued events to connection ${connId}`);
 				for (const event of queuedEvents) {
 					this.sendSSEEvent(reply, 'message', event);
 				}
@@ -210,11 +211,11 @@ export class SSETransportServer implements ITransportServer {
 
 			// Keep connection alive
 			reply.raw.on('error', error => {
-				console.error(`[SSE] Connection error for ${connId}:`, error);
+				log.error(`Connection error for ${connId}:`, error);
 				this.handleDisconnection(connId);
 			});
 		} catch (error) {
-			console.error('[SSE] Authentication failed:', error);
+			log.error('Authentication failed:', error);
 
 			// Send auth error and close
 			// CORS headers must be manually added when using reply.raw.writeHead()
@@ -259,9 +260,7 @@ export class SSETransportServer implements ITransportServer {
 		this.connections.delete(connId);
 		this.sessionManager.removeSession(connId);
 
-		console.log(
-			`[SSE] Connection ${connId} disconnected (user=${connection.userId}, total=${this.connections.size})`
-		);
+		log.info(`[SSE] Connection ${connId} disconnected (user=${connection.userId}, total=${this.connections.size})`);
 
 		// Notify disconnection handlers
 		this.disconnectHandlers.forEach(handler => handler(connId));
@@ -296,7 +295,7 @@ export class SSETransportServer implements ITransportServer {
 				this.sendSSEEvent(connection.reply, 'message', transportEvent);
 				sentCount++;
 			} catch (error) {
-				console.error(`[SSE] Failed to send to connection ${connId}:`, error);
+				log.error(`Failed to send to connection ${connId}:`, error);
 				// Queue for later delivery
 				this.messageQueue.enqueue(connId, transportEvent);
 				queuedCount++;
@@ -304,7 +303,7 @@ export class SSETransportServer implements ITransportServer {
 		}
 
 		if (sentCount > 0 || queuedCount > 0) {
-			console.log(`[SSE] Broadcast ${event}: sent=${sentCount}, queued=${queuedCount}`);
+			log.info(`Broadcast ${event}: sent=${sentCount}, queued=${queuedCount}`);
 		}
 	}
 
@@ -322,7 +321,7 @@ export class SSETransportServer implements ITransportServer {
 				timestamp: Date.now(),
 			};
 			this.messageQueue.enqueue(connId, transportEvent);
-			console.log(`[SSE] Queued event ${event} for offline connection ${connId}`);
+			log.info(`Queued event ${event} for offline connection ${connId}`);
 			return;
 		}
 
@@ -346,7 +345,7 @@ export class SSETransportServer implements ITransportServer {
 		try {
 			this.sendSSEEvent(connection.reply, 'message', transportEvent);
 		} catch (error) {
-			console.error(`[SSE] Failed to send to connection ${connId}:`, error);
+			log.error(`Failed to send to connection ${connId}:`, error);
 			this.messageQueue.enqueue(connId, transportEvent);
 		}
 	}
@@ -371,7 +370,7 @@ export class SSETransportServer implements ITransportServer {
 				// Check if connection is dead
 				const timeSinceLastHeartbeat = now - connection.lastHeartbeat;
 				if (timeSinceLastHeartbeat > this.CONNECTION_TIMEOUT) {
-					console.warn(`[SSE] Connection timeout for ${connId}, removing`);
+					log.warn(`Connection timeout for ${connId}, removing`);
 					this.handleDisconnection(connId);
 					continue;
 				}
@@ -381,7 +380,7 @@ export class SSETransportServer implements ITransportServer {
 					connection.reply.raw.write(':heartbeat\n\n');
 					connection.lastHeartbeat = now;
 				} catch (error) {
-					console.error(`[SSE] Heartbeat failed for ${connId}:`, error);
+					log.error(`Heartbeat failed for ${connId}:`, error);
 					this.handleDisconnection(connId);
 				}
 			}
@@ -442,6 +441,6 @@ export class SSETransportServer implements ITransportServer {
 		}
 
 		this.connections.clear();
-		console.log('[SSE] Server shutdown complete');
+		log.info('Server shutdown complete');
 	}
 }

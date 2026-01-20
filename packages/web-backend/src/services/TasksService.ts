@@ -1,3 +1,5 @@
+import { createLogger } from 'shared-common/logger';
+
 import type {
 	CreateTask,
 	LogEntry,
@@ -17,6 +19,8 @@ import { TraceChunkStorage } from '../../../orchestrator/src/core/TraceChunkStor
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 import type { TasksRepository } from '../repositories/TasksRepository';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
+
+const log = createLogger('TasksService');
 
 /**
  * ===========================================================================================
@@ -68,9 +72,9 @@ export class TasksService {
 	async getTasksData(query?: TasksQuery): Promise<TasksData> {
 		try {
 			// Fetch tasks from TasksRepository (already in correct format)
-			console.log('[TasksService] Fetching tasks via TasksRepository...');
+			log.info('Fetching tasks via TasksRepository...');
 			const tasks = await this.tasksRepository.findAll(query);
-			console.log(`[TasksService] Received ${tasks.length} tasks`);
+			log.info(`Received ${tasks.length} tasks`);
 
 			// Calculate summary statistics
 			const summary = this.calculateSummary(tasks);
@@ -84,7 +88,7 @@ export class TasksService {
 			return tasksData;
 		} catch (error) {
 			// Storage is unavailable - return empty tasks data
-			console.error('[TasksService] Failed to fetch tasks:', error);
+			log.error('Failed to fetch tasks:', error);
 			return {
 				timestamp: new Date().toISOString(),
 				summary: {
@@ -104,7 +108,7 @@ export class TasksService {
 	async getTasksList(query: TasksListQuery): Promise<TasksListResponse> {
 		try {
 			// Fetch all tasks from TasksRepository (already in correct format)
-			console.log('[TasksService] Fetching tasks for paginated list...');
+			log.info('Fetching tasks for paginated list...');
 			let tasks = await this.tasksRepository.findAll(query);
 
 			// Apply search if provided
@@ -136,7 +140,7 @@ export class TasksService {
 			};
 		} catch (error) {
 			// Storage is unavailable - return empty list
-			console.error('[TasksService] Failed to fetch tasks list:', error);
+			log.error('Failed to fetch tasks list:', error);
 			return {
 				items: [],
 				pagination: {
@@ -268,7 +272,7 @@ export class TasksService {
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
 		} catch (error) {
-			console.error('[TasksService] Failed to delete task:', error);
+			log.error('Failed to delete task:', error);
 			throw error;
 		}
 	}
@@ -331,7 +335,7 @@ export class TasksService {
 
 			return task;
 		} catch (error) {
-			console.error('[TasksService] Failed to update task status:', error);
+			log.error('Failed to update task status:', error);
 			throw error;
 		}
 	}
@@ -380,9 +384,9 @@ export class TasksService {
 			try {
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				this.orchestratorRepository.enqueueTask(task as any);
-				console.log(`[TasksService] Task ${task.id} enqueued to orchestrator`);
+				log.info(`Task ${task.id} enqueued to orchestrator`);
 			} catch (error) {
-				console.error('[TasksService] Failed to enqueue task to orchestrator:', error);
+				log.error('Failed to enqueue task to orchestrator:', error);
 				// Don't fail the task creation if orchestrator is unavailable
 			}
 
@@ -395,7 +399,7 @@ export class TasksService {
 
 			return task;
 		} catch (error) {
-			console.error('[TasksService] Failed to create task:', error);
+			log.error('Failed to create task:', error);
 			throw error;
 		}
 	}
@@ -522,7 +526,7 @@ export class TasksService {
 	 */
 	async getTaskById(taskId: string): Promise<Task | null> {
 		try {
-			console.log(`[TasksService] Fetching task ${taskId} with full trace...`);
+			log.info(`Fetching task ${taskId} with full trace...`);
 			const task = await this.tasksRepository.findById(taskId);
 
 			if (!task) {
@@ -531,7 +535,7 @@ export class TasksService {
 
 			return task;
 		} catch (error) {
-			console.error(`[TasksService] Failed to fetch task ${taskId}:`, error);
+			log.error(`Failed to fetch task ${taskId}:`, error);
 			throw error;
 		}
 	}
@@ -542,9 +546,7 @@ export class TasksService {
 	 */
 	async getTaskLogs(taskId: string, query: PaginatedLogsQuery): Promise<PaginatedLogsResponse> {
 		try {
-			console.log(
-				`[TasksService] Fetching logs for task ${taskId}, cursor=${query.cursor}, limit=${query.limit}`
-			);
+			log.info(`Fetching logs for task ${taskId}, cursor=${query.cursor}, limit=${query.limit}`);
 
 			// Get task to check status
 			const task = await this.getTaskById(taskId);
@@ -665,7 +667,7 @@ export class TasksService {
 				isRunning,
 			};
 		} catch (error) {
-			console.error(`[TasksService] Failed to fetch logs for task ${taskId}:`, error);
+			log.error(`Failed to fetch logs for task ${taskId}:`, error);
 			throw error;
 		}
 	}
@@ -716,11 +718,11 @@ export class TasksService {
 	 */
 	async writeTrace(taskId: string, trace: any): Promise<void> {
 		try {
-			console.log(`[TasksService] Writing trace for task ${taskId}, steps count: ${trace.steps?.length || 0}`);
+			log.info(`Writing trace for task ${taskId}, steps count: ${trace.steps?.length || 0}`);
 			await this.traceStorage.writeTraceIncremental(taskId, trace);
-			console.log(`[TasksService] Successfully wrote trace for task ${taskId}`);
+			log.info(`Successfully wrote trace for task ${taskId}`);
 		} catch (error) {
-			console.error(`[TasksService] Failed to write trace for task ${taskId}:`, error);
+			log.error(`Failed to write trace for task ${taskId}:`, error);
 			throw error;
 		}
 	}

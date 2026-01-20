@@ -1,3 +1,5 @@
+import { createLogger } from 'shared-common/logger';
+
 import { MONITORING_API_ROUTES as routes } from '@app/shared/api/monitoring.contract';
 import type { MONITORING_API_ROUTES } from '@app/shared/api/monitoring.contract';
 
@@ -5,6 +7,8 @@ import type { ITransportServer } from '../transport/ITransportServer';
 import type { TransportSessionManager } from '../transport/TransportSessionManager';
 import type { RouteWrapperFunc } from '../utils/fastify-wrapper';
 import type { LazyController } from '../utils/lazy-controller-plugin';
+
+const log = createLogger('MonitoringController');
 
 /**
  * ===========================================================================================
@@ -59,7 +63,7 @@ export default class MonitoringController implements LazyController<typeof MONIT
 			try {
 				this.sessionManager.getStats();
 			} catch (error) {
-				console.error('[Monitoring] Health check failed:', error);
+				log.error('Health check failed:', error);
 				transportHealth = 'error';
 				authHealth = 'error';
 			}

@@ -1,3 +1,5 @@
+import { createLogger } from 'shared-common/logger';
+
 import type {
 	BulkCancelResponse,
 	Intervention,
@@ -11,6 +13,8 @@ import { B2F_INTERVENTIONS_UPDATED, B2F_INTERVENTION_ANSWERED, B2F_INTERVENTION_
 import type { InterventionsRepository } from '../repositories/InterventionsRepository';
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
+
+const log = createLogger('InterventionsService');
 
 /**
  * ===========================================================================================
@@ -55,14 +59,12 @@ export class InterventionsService {
 	 */
 	async getInterventions(query?: InterventionsQuery): Promise<InterventionsListResponse> {
 		try {
-			console.log('[InterventionsService] Fetching interventions with query:', query);
+			log.info(' Fetching interventions with query:', query);
 
 			// Fetch from repository (file-based storage)
 			let interventions = await this.interventionsRepository.findAll(query);
 
-			console.log(
-				`[InterventionsService] Found ${interventions.length} interventions after repository filtering`
-			);
+			log.info(` Found ${interventions.length} interventions after repository filtering`);
 
 			// Apply search filter (searches across multiple fields)
 			if (query?.search) {
@@ -122,7 +124,7 @@ export class InterventionsService {
 				},
 			};
 		} catch (error) {
-			console.error('[InterventionsService] Error fetching interventions:', error);
+			log.error(' Error fetching interventions:', error);
 			throw error;
 		}
 	}
@@ -135,27 +137,27 @@ export class InterventionsService {
 		data: Omit<Intervention, 'id' | 'version' | 'createdAt' | 'updatedAt'> & { id: string }
 	): Promise<Intervention> {
 		try {
-			console.log(`[InterventionsService] Creating intervention ${data.id}...`);
+			log.info(` Creating intervention ${data.id}...`);
 
 			// Create in repository (persists to file)
 			// Note: orchestrator has already generated the ID, so we use createWithId
 			const { id, ...dataWithoutId } = data;
 			const intervention = await this.interventionsRepository.createWithId(id, dataWithoutId);
 
-			console.log(`[InterventionsService] Intervention ${intervention.id} created successfully`);
+			log.info(` Intervention ${intervention.id} created successfully`);
 
 			// Emit events for real-time updates
 			try {
 				this.eventBroadcaster.broadcast(B2F_INTERVENTION_CREATED, intervention);
 				this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, {} as any);
 			} catch (broadcastError) {
-				console.error('[InterventionsService] Failed to broadcast events:', broadcastError);
+				log.error(' Failed to broadcast events:', broadcastError);
 				// Don't fail the operation if broadcast fails
 			}
 
 			return intervention;
 		} catch (error) {
-			console.error(`[InterventionsService] Error creating intervention:`, error);
+			log.error(` Error creating intervention:`, error);
 			throw error;
 		}
 	}
@@ -165,14 +167,14 @@ export class InterventionsService {
 	 */
 	async getIntervention(interventionId: string): Promise<Intervention | null> {
 		try {
-			console.log(`[InterventionsService] Fetching intervention ${interventionId}...`);
+			log.info(` Fetching intervention ${interventionId}...`);
 
 			// Get from repository (already includes all BaseEntity fields)
 			const intervention = await this.interventionsRepository.findById(interventionId);
 
 			return intervention;
 		} catch (error) {
-			console.error(`[InterventionsService] Error fetching intervention ${interventionId}:`, error);
+			log.error(` Error fetching intervention ${interventionId}:`, error);
 			throw error;
 		}
 	}
@@ -186,7 +188,7 @@ export class InterventionsService {
 		response: InterventionResponseSubmit
 	): Promise<SuccessResponse> {
 		try {
-			console.log(`[InterventionsService] Responding to intervention ${interventionId}...`);
+			log.info(` Responding to intervention ${interventionId}...`);
 
 			// 1. Update backend file storage (source of truth)
 			// Note: answeredBy should be set from authenticated user context (future enhancement)
@@ -196,7 +198,7 @@ export class InterventionsService {
 				comment: response.comment,
 			});
 
-			console.log(`[InterventionsService] Intervention ${interventionId} answered in backend storage`);
+			log.info(` Intervention ${interventionId} answered in backend storage`);
 
 			// 2. Notify orchestrator to update its cache and unblock worker
 			try {
@@ -205,12 +207,9 @@ export class InterventionsService {
 					answeredBy: 'web-user',
 					comment: response.comment,
 				});
-				console.log(`[InterventionsService] Orchestrator notified of intervention ${interventionId} response`);
+				log.info(` Orchestrator notified of intervention ${interventionId} response`);
 			} catch (orchestratorError) {
-				console.error(
-					'[InterventionsService] Failed to notify orchestrator of intervention response:',
-					orchestratorError
-				);
+				log.error(' Failed to notify orchestrator of intervention response:', orchestratorError);
 				// Don't fail the operation if orchestrator notification fails
 				// Backend file is already updated (source of truth)
 			}
@@ -223,10 +222,7 @@ export class InterventionsService {
 				const allInterventions = await this.interventionsRepository.findAll();
 				await this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, allInterventions);
 			} catch (broadcastError) {
-				console.error(
-					'[InterventionsService] Failed to broadcast intervention answered event:',
-					broadcastError
-				);
+				log.error(' Failed to broadcast intervention answered event:', broadcastError);
 			}
 
 			return {
@@ -234,7 +230,7 @@ export class InterventionsService {
 				message: 'Intervention answered successfully',
 			};
 		} catch (error) {
-			console.error(`[InterventionsService] Error responding to intervention ${interventionId}:`, error);
+			log.error(` Error responding to intervention ${interventionId}:`, error);
 			throw error;
 		}
 	}
@@ -244,12 +240,12 @@ export class InterventionsService {
 	 */
 	async cancelIntervention(interventionId: string): Promise<SuccessResponse> {
 		try {
-			console.log(`[InterventionsService] Cancelling intervention ${interventionId}...`);
+			log.info(` Cancelling intervention ${interventionId}...`);
 
 			// Cancel via repository
 			await this.interventionsRepository.cancel(interventionId);
 
-			console.log(`[InterventionsService] Intervention ${interventionId} cancelled`);
+			log.info(` Intervention ${interventionId} cancelled`);
 
 			// Emit events
 			try {
@@ -257,10 +253,7 @@ export class InterventionsService {
 				const allInterventions = await this.interventionsRepository.findAll();
 				await this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, allInterventions);
 			} catch (broadcastError) {
-				console.error(
-					'[InterventionsService] Failed to broadcast intervention cancelled event:',
-					broadcastError
-				);
+				log.error(' Failed to broadcast intervention cancelled event:', broadcastError);
 			}
 
 			return {
@@ -268,7 +261,7 @@ export class InterventionsService {
 				message: 'Intervention cancelled successfully',
 			};
 		} catch (error) {
-			console.error(`[InterventionsService] Error cancelling intervention ${interventionId}:`, error);
+			log.error(` Error cancelling intervention ${interventionId}:`, error);
 			throw error;
 		}
 	}
@@ -277,14 +270,12 @@ export class InterventionsService {
 	 * Bulk cancel multiple interventions
 	 */
 	async bulkCancelInterventions(ids: string[]): Promise<BulkCancelResponse> {
-		console.log(`[InterventionsService] Bulk cancelling ${ids.length} interventions...`);
+		log.info(` Bulk cancelling ${ids.length} interventions...`);
 
 		// Delegate to repository for bulk operation
 		const result = await this.interventionsRepository.bulkCancel(ids);
 
-		console.log(
-			`[InterventionsService] Bulk cancel completed: ${result.cancelled.length} succeeded, ${result.failed.length} failed`
-		);
+		log.info(`Bulk cancel completed: ${result.cancelled.length} succeeded, ${result.failed.length} failed`);
 
 		// Emit events for real-time updates
 		try {
@@ -292,7 +283,7 @@ export class InterventionsService {
 			const allInterventions = await this.interventionsRepository.findAll();
 			await this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, allInterventions);
 		} catch (broadcastError) {
-			console.error('[InterventionsService] Failed to broadcast bulk cancel event:', broadcastError);
+			log.error(' Failed to broadcast bulk cancel event:', broadcastError);
 		}
 
 		return result;
@@ -312,7 +303,7 @@ export class InterventionsService {
 			const allInterventions = await this.interventionsRepository.findAll();
 			await this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, allInterventions);
 		} catch (error) {
-			console.error('[InterventionsService] Failed to broadcast intervention created event:', error);
+			log.error(' Failed to broadcast intervention created event:', error);
 		}
 	}
 }

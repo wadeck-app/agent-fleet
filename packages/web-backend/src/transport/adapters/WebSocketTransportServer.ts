@@ -1,5 +1,6 @@
 import fastifyWebsocket from '@fastify/websocket';
 import type { FastifyInstance } from 'fastify';
+import { createLogger } from 'shared-common/logger';
 import type { WebSocket } from 'ws';
 
 import type {
@@ -13,6 +14,8 @@ import type {
 import type { ITransportServer } from '../ITransportServer';
 import type { TransportRouter } from '../TransportRouter';
 import type { TransportSessionManager } from '../TransportSessionManager';
+
+const log = createLogger('WebSocketTransportServer');
 
 /**
  * ===========================================================================================
@@ -78,10 +81,10 @@ export class WebSocketTransportServer implements ITransportServer {
 
 		// Register WebSocket endpoint (NEW with /api prefix)
 		app.get('/api/transports/ws', { websocket: true }, (connection: any, req: any) => {
-			console.log('[WS] connection.socket exists?', !!connection?.socket);
+			log.info('connection.socket exists?', !!connection?.socket);
 
 			if (!connection) {
-				console.error('[WS] Connection is null/undefined');
+				log.error('Connection is null/undefined');
 				return;
 			}
 
@@ -92,10 +95,10 @@ export class WebSocketTransportServer implements ITransportServer {
 		// Note: WebSocket upgrade requests cannot be redirected with 308
 		// Clients should be updated to use /api/transports/ws
 		app.get('/ws', { websocket: true }, (connection: any, req: any) => {
-			console.log('[WS] DEPRECATED: Client connecting via /ws, use /api/transports/ws instead');
+			log.info('DEPRECATED: Client connecting via /ws, use /api/transports/ws instead');
 
 			if (!connection) {
-				console.error('[WS] Connection is null/undefined');
+				log.error('Connection is null/undefined');
 				return;
 			}
 
@@ -109,7 +112,7 @@ export class WebSocketTransportServer implements ITransportServer {
 	private handleConnection(socket: WebSocket, req: any): void {
 		// Validate socket exists
 		if (!socket) {
-			console.error('[WS] Connection handler called with undefined socket');
+			log.error('Connection handler called with undefined socket');
 			return;
 		}
 
@@ -120,10 +123,10 @@ export class WebSocketTransportServer implements ITransportServer {
 			const url = new URL(req.url || '', 'http://dummy');
 			const connId = url.searchParams.get('connId');
 			clientId = connId || this.generateClientId();
-			console.log(`[WS] New connection attempt: client=${clientId}${connId ? ' (from query)' : ' (generated)'}`);
+			log.info(`New connection attempt: client=${clientId}${connId ? ' (from query)' : ' (generated)'}`);
 		} catch (error) {
 			clientId = this.generateClientId();
-			console.log(`[WS] New connection attempt: client=${clientId} (error parsing URL:`, error, ')');
+			log.info(`New connection attempt: client=${clientId} (error parsing URL:`, error, ')');
 		}
 
 		// Setup message handlers immediately (don't wait for auth)
@@ -138,7 +141,7 @@ export class WebSocketTransportServer implements ITransportServer {
 
 		// Handle errors
 		socket.on('error', error => {
-			console.error(`[WS] Error: client=${clientId}`, error);
+			log.error(`Error: client=${clientId}`, error);
 		});
 
 		// Authenticate asynchronously after handlers are set up
@@ -156,7 +159,7 @@ export class WebSocketTransportServer implements ITransportServer {
 					tokenExpiresAt: session.tokenExpiresAt,
 				});
 
-				console.log(`[WS] Connected: client=${clientId}, user=${session.userId}`);
+				log.info(`Connected: client=${clientId}, user=${session.userId}`);
 
 				// Notify connection handlers
 				this.clientConnectedHandlers.forEach(handler => handler(clientId));
@@ -165,7 +168,7 @@ export class WebSocketTransportServer implements ITransportServer {
 				//TODO			this.scheduleExpirationWarning(clientId, session.tokenExpiresAt);
 			})
 			.catch((error: any) => {
-				console.error('[WS] Authentication failed', error);
+				log.error('Authentication failed', error);
 
 				// Send auth error (socket might be closed, so check first)
 				if (socket && socket.readyState === 1) {
@@ -203,9 +206,9 @@ export class WebSocketTransportServer implements ITransportServer {
 			}
 
 			// Unknown message type
-			console.warn('[WS] Unknown message type:', message);
+			log.warn('Unknown message type:', message);
 		} catch (error) {
-			console.error('[WS] Message parsing error:', error);
+			log.error('Message parsing error:', error);
 
 			this.sendMessage(socket, {
 				type: 'error',
@@ -249,7 +252,7 @@ export class WebSocketTransportServer implements ITransportServer {
 			// Send response
 			this.sendMessage(socket, response);
 		} catch (error: any) {
-			console.error('[WS] Request handling error:', error);
+			log.error('Request handling error:', error);
 
 			// Check if token expired
 			if (error.message === 'Access token expired') {
@@ -290,7 +293,7 @@ export class WebSocketTransportServer implements ITransportServer {
 		// If warning time exceeds this, skip scheduling (token is too far in future)
 		const MAX_TIMEOUT = 2147483647; // 2^31 - 1
 		if (warningTime > MAX_TIMEOUT) {
-			console.log(
+			log.info(
 				`[WS] Token expiration too far in future (${Math.floor(warningTime / 86400000)} days), skipping warning`
 			);
 			return;
@@ -316,7 +319,7 @@ export class WebSocketTransportServer implements ITransportServer {
 	 * Handle client disconnection
 	 */
 	private handleDisconnection(clientId: string): void {
-		console.log(`[WS] Disconnected: client=${clientId}`);
+		log.info(`Disconnected: client=${clientId}`);
 
 		// Clear expiration timer
 		const timer = this.expirationTimers.get(clientId);
@@ -367,7 +370,7 @@ export class WebSocketTransportServer implements ITransportServer {
 			// NEW: Check if event data matches client's filters
 			if (!this.sessionManager.matchesFilters(clientId, event, data)) {
 				filteredCount++;
-				console.log(`[WS] Client ${clientId} filtered out by filters for ${event}`);
+				log.info(`Client ${clientId} filtered out by filters for ${event}`);
 				return;
 			}
 
@@ -375,12 +378,12 @@ export class WebSocketTransportServer implements ITransportServer {
 				socket.send(message);
 				sentCount++;
 			} catch (error) {
-				console.error(`[WS] Failed to send event to client ${clientId}`, error);
+				log.error(`Failed to send event to client ${clientId}`, error);
 			}
 		});
 
 		if (filteredCount > 0) {
-			console.log(`[WS] Broadcast ${event}: sent=${sentCount}, filtered=${filteredCount}`);
+			log.info(`Broadcast ${event}: sent=${sentCount}, filtered=${filteredCount}`);
 		}
 	}
 
@@ -393,13 +396,13 @@ export class WebSocketTransportServer implements ITransportServer {
 
 		if (!socket || socket.readyState !== 1) {
 			// 1 = OPEN
-			console.warn(`[WS] Client ${clientId} not connected`);
+			log.warn(`Client ${clientId} not connected`);
 			return;
 		}
 
 		// Check subscription
 		if (!this.sessionManager.isSubscribed(clientId, event)) {
-			console.log(`[WS] Client ${clientId} not subscribed to ${event}, skipping`);
+			log.info(`Client ${clientId} not subscribed to ${event}, skipping`);
 			return;
 		}
 
@@ -413,7 +416,7 @@ export class WebSocketTransportServer implements ITransportServer {
 		try {
 			this.sendMessage(socket, eventMessage);
 		} catch (error) {
-			console.error(`[WS] Failed to send event to client ${clientId}`, error);
+			log.error(`Failed to send event to client ${clientId}`, error);
 		}
 	}
 

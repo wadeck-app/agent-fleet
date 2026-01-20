@@ -181,8 +181,8 @@ export class WorkerCoordinator {
 				break;
 
 			case W2OMessageType.TASK_TRACE_UPDATE:
-				console.log(
-					`[WorkerCoordinator] [TRACE] Received TASK_TRACE_UPDATE from worker ${workerId} - task=${message.taskId}, steps=${message.trace?.steps?.length || 0}`
+				logger.debug(
+					`[TRACE] Received TASK_TRACE_UPDATE from worker ${workerId} - task=${message.taskId}, steps=${message.trace?.steps?.length || 0}`
 				);
 
 				// Send trace to backend for storage
