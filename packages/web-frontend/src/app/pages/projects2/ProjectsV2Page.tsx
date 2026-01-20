@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
+import { arrayMove } from '@dnd-kit/sortable';
 import { DynamicLucideIcon } from '@framework/components/icons/DynamicLucideIcon';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
@@ -9,7 +10,12 @@ import { Button } from '@framework/components/primitives/Button';
 import { TabButton } from '@framework/components/primitives/TabButton';
 import type { Project } from '@shared/api/projects.contract';
 import type { Workspace } from '@shared/api/workspaces.contract';
-import { B2F_PROJECT_CREATED, B2F_PROJECT_DELETED, B2F_PROJECT_UPDATED } from '@shared/transport/B2FEventConstants';
+import {
+	B2F_PROJECT_CREATED,
+	B2F_PROJECT_DELETED,
+	B2F_PROJECT_UPDATED,
+	B2F_WORKSPACE_UPDATED,
+} from '@shared/transport/B2FEventConstants';
 import { Settings } from 'lucide-react';
 
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
@@ -17,6 +23,7 @@ import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 import { projectsApi } from '../projects/projects.api';
 import { workspacesApi } from '../workspaces/workspaces.api';
 import { ManagePinnedProjectsDialog } from './ManagePinnedProjectsDialog';
+import { ManageProjectWorkspacesDialog } from './ManageProjectWorkspacesDialog';
 import { WorkspacePanel } from './WorkspacePanel';
 import { WorkspaceTabs } from './WorkspaceTabs';
 
@@ -57,6 +64,7 @@ export function ProjectsV2Page() {
 	const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [isManageDialogOpen, setIsManageDialogOpen] = useState(false);
+	const [isManageWorkspacesDialogOpen, setIsManageWorkspacesDialogOpen] = useState(false);
 
 	// Load projects
 	const loadProjects = async () => {
@@ -93,10 +101,12 @@ export function ProjectsV2Page() {
 	// Load workspaces
 	const loadWorkspaces = async () => {
 		try {
+			console.log('[ProjectsV2Page] Loading workspaces...');
 			const response = await workspacesApi.getWorkspaces();
+			console.log('[ProjectsV2Page] Workspaces loaded:', response.workspaces.length, response.workspaces);
 			setWorkspaces(response.workspaces);
 		} catch (error) {
-			console.error('Failed to load workspaces:', error);
+			console.error('[ProjectsV2Page] Failed to load workspaces:', error);
 		}
 	};
 
@@ -104,18 +114,24 @@ export function ProjectsV2Page() {
 	useEffect(() => {
 		loadProjects();
 		loadWorkspaces();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
 	// Subscribe to real-time project updates
+	// Also subscribe to workspace updates since they can modify project.workspaceIds[]
 	useRealtimeRefresh({
-		events: [B2F_PROJECT_CREATED, B2F_PROJECT_UPDATED, B2F_PROJECT_DELETED],
-		onEvent: loadProjects,
+		events: [B2F_PROJECT_CREATED, B2F_PROJECT_UPDATED, B2F_PROJECT_DELETED, B2F_WORKSPACE_UPDATED],
+		onEvent: () => {
+			loadProjects();
+			loadWorkspaces();
+		},
 		logPrefix: 'ProjectsV2Page',
 	});
 
 	// Save active state to localStorage whenever it changes
 	useEffect(() => {
 		saveActiveState(state);
+		// eslint-disable-next-line no-restricted-syntax
 	}, [state]);
 
 	// Pin a project (mark as pinned and set order)
@@ -247,17 +263,50 @@ export function ProjectsV2Page() {
 		}));
 	};
 
+	// Associate a workspace with the active project
+	// Backend handles bidirectional sync: updates both workspace.projectId AND project.workspaceIds
+	const handleWorkspaceAssociate = async (workspaceId: string) => {
+		if (!activeProject) return;
+		await workspacesApi.updateWorkspace(workspaceId, { projectId: activeProject.id });
+	};
+
+	// Dissociate a workspace from its project
+	// Backend handles bidirectional sync: updates both workspace.projectId AND project.workspaceIds
+	const handleWorkspaceDissociate = async (workspaceId: string) => {
+		await workspacesApi.updateWorkspace(workspaceId, { projectId: null });
+	};
+
+	// Reorder workspaces in the active project
+	const handleWorkspaceReorder = async (activeId: string, overId: string) => {
+		if (!activeProject) return;
+		const currentOrder = [...activeProject.workspaceIds];
+		const oldIndex = currentOrder.indexOf(activeId);
+		const newIndex = currentOrder.indexOf(overId);
+		if (oldIndex === -1 || newIndex === -1) return;
+
+		const reordered = arrayMove(currentOrder, oldIndex, newIndex);
+		await projectsApi.updateProject(activeProject.id, {
+			workspaceIds: reordered,
+			version: activeProject.version,
+		});
+	};
+
 	// Get pinned projects
 	const pinnedProjects = projects.filter(p => p.pinned);
 
 	// Get active project
 	const activeProject = projects.find(p => p.id === state.activeProjectId);
 
-	// Get workspaces for active project
-	const projectWorkspaces =
-		activeProject && activeProject.workspaceIds.length > 0
-			? workspaces.filter(w => activeProject.workspaceIds.includes(w.id))
-			: [];
+	// Get workspaces for active project (respects the order of workspaceIds)
+	const projectWorkspaces = useMemo(
+		() =>
+			activeProject && activeProject.workspaceIds.length > 0
+				? activeProject.workspaceIds
+						.map((id: string) => workspaces.find((w: Workspace) => w.id === id))
+						.filter((w: Workspace | undefined): w is Workspace => w !== undefined)
+				: [],
+		[activeProject, workspaces]
+	);
 
 	// Auto-select first workspace if project has workspaces and none selected
 	useEffect(() => {
@@ -267,7 +316,9 @@ export function ProjectsV2Page() {
 				activeWorkspaceId: projectWorkspaces[0].id,
 			}));
 		}
-	}, [activeProject, projectWorkspaces, state.activeWorkspaceId]);
+		// Only run when activeProject.id changes, not when projectWorkspaces array changes
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [activeProject?.id]);
 
 	const activeWorkspace = workspaces.find(w => w.id === state.activeWorkspaceId);
 
@@ -276,14 +327,25 @@ export function ProjectsV2Page() {
 			<PageHeader
 				title="Projects v2"
 				action={
-					<Button variant="default" size="sm" onClick={() => setIsManageDialogOpen(true)}>
-						<Settings />
-						Manage Projects
-					</Button>
+					<div className="flex gap-2">
+						<Button
+							variant="default"
+							size="sm"
+							onClick={() => setIsManageWorkspacesDialogOpen(true)}
+							disabled={!activeProject}
+						>
+							<Settings />
+							Manage Workspaces
+						</Button>
+						<Button variant="default" size="sm" onClick={() => setIsManageDialogOpen(true)}>
+							<Settings />
+							Manage Projects
+						</Button>
+					</div>
 				}
 			/>
 
-			<div className="flex-1 overflow-hidden -mx-6">
+			<div className="-mx-6 flex-1 overflow-hidden">
 				{loading ? (
 					// Loading skeleton
 					<div className="flex h-full flex-col">
@@ -418,6 +480,17 @@ export function ProjectsV2Page() {
 				onPin={handleProjectSelect}
 				onUnpin={handleProjectRemove}
 				onReorder={handleReorder}
+			/>
+
+			{/* Manage Project Workspaces Dialog */}
+			<ManageProjectWorkspacesDialog
+				open={isManageWorkspacesDialogOpen}
+				onOpenChange={setIsManageWorkspacesDialogOpen}
+				project={activeProject}
+				workspaces={workspaces}
+				onAssociate={handleWorkspaceAssociate}
+				onDissociate={handleWorkspaceDissociate}
+				onReorder={handleWorkspaceReorder}
 			/>
 		</Page>
 	);

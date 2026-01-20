@@ -320,9 +320,10 @@ export class TasksService {
 		try {
 			const task = await this.tasksRepository.updateStatus(taskId, newStatus);
 
-			// Emit events AFTER successful update
+			// Emit filtered event for task detail pages
+			// Payload includes taskId for server-side filtering
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			this.eventBroadcaster.broadcast(B2F_TASK_UPDATED, task as any);
+			this.eventBroadcaster.broadcast(B2F_TASK_UPDATED, { taskId } as any);
 
 			// Emit aggregate event for dashboard/board updates
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -707,5 +708,20 @@ export class TasksService {
 		}
 
 		return `[${step.stepName}] ${step.stepType}${duration}`;
+	}
+
+	/**
+	 * Write trace data incrementally to storage
+	 * Used for real-time trace updates from orchestrator
+	 */
+	async writeTrace(taskId: string, trace: any): Promise<void> {
+		try {
+			console.log(`[TasksService] Writing trace for task ${taskId}, steps count: ${trace.steps?.length || 0}`);
+			await this.traceStorage.writeTraceIncremental(taskId, trace);
+			console.log(`[TasksService] Successfully wrote trace for task ${taskId}`);
+		} catch (error) {
+			console.error(`[TasksService] Failed to write trace for task ${taskId}:`, error);
+			throw error;
+		}
 	}
 }

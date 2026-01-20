@@ -7,7 +7,7 @@ import { PageHeader } from '@framework/components/layout/PageHeader';
 import { LoadingSpinner } from '@framework/components/loading/LoadingSpinner';
 import { Button } from '@framework/components/primitives/Button';
 import type { LogLevel } from '@shared/api/tasks.contract';
-import { B2F_TASK_TRACE_UPDATED } from '@shared/transport';
+import { B2F_TASK_TRACE_UPDATED, B2F_TASK_UPDATED } from '@shared/transport';
 import { ArrowLeft } from 'lucide-react';
 
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
@@ -27,7 +27,13 @@ export function TaskDetailSplitPage() {
 	const taskId = id!;
 
 	// Fetch task details
-	const { data: task, isLoading: isTaskLoading, isError: isTaskError, error: taskError } = useTask(taskId);
+	const {
+		data: task,
+		isLoading: isTaskLoading,
+		isError: isTaskError,
+		error: taskError,
+		refetch: refetchTask,
+	} = useTask(taskId);
 
 	// Logs filtering state
 	const [level, setLevel] = useState<LogLevel | undefined>(undefined);
@@ -43,6 +49,7 @@ export function TaskDetailSplitPage() {
 		hasMore,
 		isLoadingMore,
 		refetch,
+		appendNewLogs,
 	} = useTaskLogs({
 		taskId,
 		level,
@@ -51,12 +58,24 @@ export function TaskDetailSplitPage() {
 	});
 
 	// Subscribe to real-time trace updates for THIS task only (filtered by taskId)
-	// This prevents spam - only receives updates for the task being viewed
+	// Uses appendNewLogs for smooth incremental updates without full reload
 	useRealtimeRefresh({
 		events: [B2F_TASK_TRACE_UPDATED],
-		onEvent: refetch,
+		onEvent: appendNewLogs,
 		filters: { taskId }, // Server-side filter: only this task's trace updates
-		logPrefix: 'TaskDetailSplitPage',
+		logPrefix: 'TaskDetailSplitPage:traces',
+	});
+
+	// Subscribe to task status updates (e.g., completion, cancellation)
+	// Also updates isRunning state by calling appendNewLogs
+	useRealtimeRefresh({
+		events: [B2F_TASK_UPDATED],
+		onEvent: () => {
+			refetchTask();
+			appendNewLogs(); // Update isRunning state
+		},
+		filters: { taskId }, // Server-side filter: only this task's updates
+		logPrefix: 'TaskDetailSplitPage:task',
 	});
 
 	if (isTaskLoading) {

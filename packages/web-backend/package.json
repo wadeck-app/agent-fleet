@@ -10,6 +10,8 @@
 		"dev:remote": "cross-env ORCHESTRATOR_MODE=remote ORCHESTRATOR_URL=http://localhost:3737 nodemon",
 		"dev:debug": "tsx src/server.ts",
 		"dev:only-for-e2e": "tsx src/server.ts",
+		"check-tsx": "wmic process where \"CommandLine like '%tsx%watch%'\" get ProcessId,CommandLine",
+		"check-ports": "netstat -ano | findstr \":3030 :3731\"",
 		"build": "node build.mjs",
 		"build:tsc": "tsc --build tsconfig.json",
 		"build:analyze": "node build.mjs && npm run analyze",

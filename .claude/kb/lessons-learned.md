@@ -2762,3 +2762,242 @@ private sendTraceUpdate(trace: any): void {
 **When Discovered**: January 2026 during user intervention testing - logs showed continuous `trace_update` spam every 500ms while waiting for approval.
 
 **Related Issue**: This was discovered while fixing the "Task not found" intervention error, where the continuous logging made debugging difficult.
+
+## UX: Always Add Tooltips for Ambiguous UI Elements (2026-01-20)
+
+**Context**: Added workspace management dialog with task count badges showing just numbers ("0", "5", etc.) without explanation.
+
+**Problem**: User complained (rightfully\!) that the UI displayed unexplained numbers. No tooltip, no icon, no context. Poor UX.
+
+**Lesson**: Always think UX-first:
+
+- Numbers/badges without context need tooltips or icons
+- Don't assume users will understand implicit meanings
+- Add \ attribute to badges/spans for hover tooltips
+- Consider icons (e.g., task icon) alongside numbers when space allows
+
+**Fix**: Added \ to all task count badges.
+
+## UX: Always Add Tooltips for Ambiguous UI Elements (2026-01-20)
+
+**Context**: Added workspace management dialog with task count badges showing just numbers ("0", "5", etc.) without explanation.
+
+**Problem**: User complained (rightfully!) that the UI displayed unexplained numbers. No tooltip, no icon, no context. Poor UX.
+
+**Lesson**: Always think UX-first:
+
+- Numbers/badges without context need tooltips or icons
+- Don't assume users will understand implicit meanings
+- Add `title` attribute to badges/spans for hover tooltips
+- Consider icons (e.g., task icon) alongside numbers when space allows
+
+**Fix**: Added `title="X task(s)"` to all task count badges.
+
+## Backend Bidirectional Sync: Trust the Backend (2026-01-20)
+
+**Context**: Implementing workspace-project association. Backend already had bidirectional sync (updating workspace.projectId auto-updates project.workspaceIds).
+
+**Problem**: Implemented BOTH client-side calls:
+
+1. `workspacesApi.updateWorkspace(id, { projectId: 'xyz' })`
+2. `projectsApi.updateProject(projectId, { workspaceIds: [...] })`
+
+This caused:
+
+- Race conditions
+- Version conflicts
+- Workspaces ending up in wrong projects
+- Active project disappearing from UI
+
+**Lesson**:
+
+- READ THE PLAN/DOCS before implementing
+- If backend does bidirectional sync, DON'T duplicate it on frontend
+- Trust backend logic - one API call should be enough
+- Add comments explaining why only one call is needed
+
+**Fix**: Removed duplicate projectsApi.updateProject() call. Backend handles sync automatically.
+
+## Optimistic UI: Hierarchy of Truth (2026-01-20)
+
+**Philosophy**: In interactive UIs, there's a hierarchy of "truth" that determines what the user sees:
+
+### The Hierarchy (Most Authoritative → Least)
+
+1. **User Actions (Optimistic State)** = Truth until proven otherwise
+    - When user clicks/drags, update UI immediately
+    - This is the user's INTENT, the most recent truth
+    - Must be preserved until confirmed or rejected by server
+
+2. **Synchronous API Responses** = Confirmation or Correction
+    - API response confirms the optimistic state (success)
+    - OR corrects it with error (rollback + show error)
+    - This is the definitive answer about the user's action
+
+3. **Asynchronous Events (WebSocket)** = Secondary Synchronization
+    - Keeps UI in sync with other users/sessions
+    - **MUST NOT overwrite pending user actions**
+    - Only apply to non-pending items
+
+### The Problem: WebSocket Race Conditions
+
+```
+Timeline:
+0ms  → User clicks "Associate Workspace A"
+1ms  → Optimistic: Move A to "Associated" (pending)
+2ms  → API call starts
+5ms  → WebSocket event arrives (old state: A is Available)
+10ms → WebSocket naively applies: A jumps back to Available (BAD!)
+50ms → API responds: A confirmed as Associated
+```
+
+**Result**: Visual "jumping" - item moves, then jumps back, then moves again. Terrible UX.
+
+### The Solution: Pending State Tracking
+
+```typescript
+// Track pending operations
+const [pendingWorkspaceIds, setPendingWorkspaceIds] = useState<Set<string>>(new Set());
+
+// User action: Optimistic update + track pending
+const handleAssociate = async (workspaceId: string) => {
+  // 1. Mark as pending
+  setPendingWorkspaceIds(prev => new Set(prev).add(workspaceId));
+
+  // 2. Optimistic UI update (move immediately)
+  setLocalState(...);
+
+  try {
+    // 3. API call
+    await api.updateWorkspace(...);
+    // 4. Success: remove from pending (let real data flow)
+    setPendingWorkspaceIds(prev => {
+      const next = new Set(prev);
+      next.delete(workspaceId);
+      return next;
+    });
+  } catch (error) {
+    // 5. Error: rollback + remove from pending
+    rollbackOptimisticUpdate(...);
+    setPendingWorkspaceIds(prev => {
+      const next = new Set(prev);
+      next.delete(workspaceId);
+      return next;
+    });
+    showErrorToast(...);
+  }
+};
+
+// WebSocket event handler: Respect pending state
+useEffect(() => {
+  onWebSocketUpdate((newData) => {
+    // Filter out pending items - don't overwrite optimistic state
+    const nonPendingData = newData.filter(item => !pendingWorkspaceIds.has(item.id));
+    applyUpdate(nonPendingData);
+  });
+}, [pendingWorkspaceIds]);
+```
+
+### Key Principles
+
+1. **User intent is sacred** - Never make the UI lie about what the user just did
+2. **Optimistic updates first** - Move items immediately, add subtle "pending" indicator
+3. **WebSocket events defer to pending** - Skip updates for items in pending state
+4. **API response is final** - Clears pending, allows normal updates to resume
+5. **Rollback on error** - Undo optimistic update + show clear error message
+
+### Visual Feedback Pattern
+
+- **During pending**: Subtle opacity (0.7) or border to indicate "saving..."
+- **On success**: Fade to normal opacity (confirms save)
+- **On error**: Rollback position + red border + error toast
+
+### Benefits
+
+✅ Instant feedback (feels fast)
+✅ No visual jumping
+✅ Clear error handling
+✅ Works even with slow networks
+✅ Respects user intent above all
+
+### Anti-Patterns to Avoid
+
+❌ Waiting for API before updating UI (feels sluggish)
+❌ Letting WebSocket events overwrite optimistic state (visual jumping)
+❌ No error handling (user doesn't know if action failed)
+❌ No pending indicator (user clicks multiple times thinking it didn't work)
+
+**Reference**: This pattern is used by Trello, Notion, Linear, Gmail, and all modern interactive UIs.
+
+## Code Duplication: Extract Patterns When You See Twins (2026-01-20)
+
+**Context**: Created two dialogs on the same page (ManageProjectWorkspacesDialog and ManagePinnedProjectsDialog) with identical optimistic UI logic. Duplicated all the state management and handlers instead of extracting a reusable pattern.
+
+**Problem**:
+
+- Fixed a bug in workspace dialog → Same bug exists in projects dialog
+- No single source of truth for optimistic UI logic
+- User frustration: "I'm tired of you making custom components when you have one on THE SAME PAGE!"
+
+**Lesson**: **STOP. LOOK. EXTRACT.**
+
+When implementing a feature:
+
+1. **STOP** - Before writing the second similar component
+2. **LOOK** - Check if there's already something similar on the same page/codebase
+3. **EXTRACT** - Create a reusable hook/wrapper FIRST, then use it in both places
+
+### Warning Signs You're Duplicating:
+
+❌ "I'll just copy-paste this and change the types"
+❌ "It's slightly different, I'll make it custom"  
+❌ "I'll refactor it later" (you won't)
+❌ Multiple useState with same pattern in different components on same page
+
+### The Reflex to Develop:
+
+✅ See pattern repeated twice → Extract it IMMEDIATELY
+✅ Custom hook for state logic: `useOptimisticAssociation<T>()`
+✅ Wrapper component for UI patterns
+✅ One source of truth = One place to fix bugs
+
+### Example: This Case
+
+**BAD** (what I did):
+
+```typescript
+// ManageProjectWorkspacesDialog.tsx
+const [optimisticAssociations, setOptimisticAssociations] = useState<Set<string>>(new Set());
+const handleAssociate = async id => {
+	/* ... */
+};
+// ... 50 lines of logic
+
+// ManagePinnedProjectsDialog.tsx
+const [optimisticPins, setOptimisticPins] = useState<Set<string>>(new Set());
+const handlePin = async id => {
+	/* ... */
+};
+// ... 50 lines of DUPLICATED logic
+```
+
+**GOOD** (what should have been done):
+
+```typescript
+// hooks/useOptimisticAssociation.ts
+export function useOptimisticAssociation<T>(
+  items: T[],
+  associatedIds: string[],
+  onAssociate: (id: string) => Promise<void>,
+  onDissociate: (id: string) => Promise<void>
+) {
+  // All the logic in ONE place
+}
+
+// Both dialogs use it:
+const { effectiveIds, handleAssociate, handleDissociate } = useOptimisticAssociation(...);
+```
+
+**Impact**: Bug fix in one place fixes both dialogs. No repetition.
+
+**Action**: Next time you write `const [something...` for the 2nd time, STOP and extract it first.

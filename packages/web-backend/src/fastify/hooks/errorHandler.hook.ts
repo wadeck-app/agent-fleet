@@ -34,6 +34,14 @@ const errorHandlerHook: FastifyPluginAsync = async fastify => {
 		const timestamp = new Date().toISOString();
 		const statusCode = ('statusCode' in error ? error.statusCode : undefined) ?? 500;
 
+		// Log ALL 400 errors with full context for debugging
+		if (statusCode === 400) {
+			console.error(`[400] ${request.method} ${request.url} - ${error.constructor.name}: ${error.message}`, {
+				query: request.query,
+				body: request.body,
+			});
+		}
+
 		// Log error details (always log 5xx errors, optionally log others)
 		const shouldLogDetails =
 			statusCode >= 500 || !onlyUnexpectedErrorLogged || process.env.NODE_ENV === 'development';

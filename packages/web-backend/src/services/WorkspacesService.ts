@@ -384,6 +384,9 @@ export class WorkspacesService {
 
 			// Handle bidirectional sync with projects
 			if (oldProjectId !== newProjectId) {
+				console.log(
+					`[WorkspacesService] Project ID changed for workspace ${workspaceId}: ${oldProjectId} -> ${newProjectId}`
+				);
 				// Remove workspace from old project if it had one
 				if (oldProjectId) {
 					try {
@@ -401,9 +404,15 @@ export class WorkspacesService {
 
 				// Add workspace to new project if assigned
 				if (newProjectId) {
+					console.log(
+						`[WorkspacesService] Attempting to add workspace ${workspaceId} to project ${newProjectId}`
+					);
 					try {
-						await this.projectsRepository.addWorkspaces(newProjectId, [workspaceId]);
-						console.log(`[WorkspacesService] Added workspace ${workspaceId} to project ${newProjectId}`);
+						const updatedProject = await this.projectsRepository.addWorkspaces(newProjectId, [workspaceId]);
+						console.log(
+							`[WorkspacesService] Added workspace ${workspaceId} to project ${newProjectId}. Project workspaceIds:`,
+							updatedProject.workspaceIds
+						);
 					} catch (error) {
 						console.warn(
 							`[WorkspacesService] Failed to add workspace to new project ${newProjectId}:`,

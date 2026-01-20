@@ -59,7 +59,7 @@ export function ColorPicker({ value, onChange, defaultColor = '#6366F1' }: Color
 							type="button"
 							onClick={() => onChange(color.value)}
 							className={`
-								relative h-10 w-10 rounded-md border-2 transition-all
+								relative h-10 w-10 rounded-md border-2 transition-all cursor-pointer
 								hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
 								${isSelected ? 'border-foreground ring-2 ring-primary' : 'border-border'}
 							`}

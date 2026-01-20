@@ -22,6 +22,7 @@ interface UseTaskLogsResult {
 	hasMore: boolean;
 	isLoadingMore: boolean;
 	refetch: () => void;
+	appendNewLogs: () => Promise<void>;
 }
 
 /**
@@ -104,6 +105,36 @@ export function useTaskLogs({ taskId, level, search, limit = 100 }: UseTaskLogsO
 		}
 	}, [taskId, nextCursor, limit, level, search, isLoadingMore]);
 
+	// Append new logs incrementally (for real-time updates)
+	// This fetches only new logs without clearing existing ones or showing loading
+	const appendNewLogs = useCallback(async () => {
+		try {
+			// Use current logs count as cursor to fetch only new logs
+			const currentCursor = logs.length;
+
+			const response: PaginatedLogsResponse = await tasksApi.getTaskLogs(taskId, {
+				cursor: currentCursor,
+				limit,
+				level,
+				search,
+			});
+
+			// Only append if we got new logs
+			if (response.logs.length > 0) {
+				setLogs(prevLogs => [...prevLogs, ...response.logs]);
+				setTotal(response.total);
+				setIsRunning(response.isRunning);
+				setNextCursor(response.nextCursor);
+			} else {
+				// No new logs, but update isRunning status
+				setIsRunning(response.isRunning);
+			}
+		} catch (err) {
+			// Silently fail for real-time updates to avoid disrupting user experience
+			console.error('Failed to append new logs:', err);
+		}
+	}, [taskId, logs.length, limit, level, search]);
+
 	// Manual refetch
 	const refetch = useCallback(() => {
 		setRefreshTrigger(prev => prev + 1);
@@ -120,5 +151,6 @@ export function useTaskLogs({ taskId, level, search, limit = 100 }: UseTaskLogsO
 		hasMore: nextCursor !== null,
 		isLoadingMore,
 		refetch,
+		appendNewLogs,
 	};
 }

@@ -925,9 +925,17 @@ export class FlowWorker implements Shutdownable {
 				interventionHandler: this.createInterventionHandler(),
 				// Real-time trace update callback (called after each step completion)
 				onTraceUpdate: (trace: any) => {
+					console.log(
+						`${this.logPrefix()} [TRACE] onTraceUpdate called - steps=${trace?.steps?.length || 0}`
+					);
 					// Update the task's trace in-place so the 500ms timer can access it
 					if (this.currentTask?.flowResult) {
 						this.currentTask.flowResult.trace = trace;
+						console.log(
+							`${this.logPrefix()} [TRACE] Updated currentTask.flowResult.trace - steps=${this.currentTask.flowResult.trace?.steps?.length || 0}`
+						);
+					} else {
+						console.log(`${this.logPrefix()} [TRACE] WARNING: No currentTask or flowResult to update!`);
 					}
 				},
 			};
@@ -962,6 +970,14 @@ export class FlowWorker implements Shutdownable {
 
 			// Stop periodic trace updates
 			this.stopTraceUpdates();
+
+			// Send final trace update after execution completes
+			if (this.currentTask?.flowResult?.trace) {
+				console.log(
+					`${this.logPrefix()} [TRACE] Sending FINAL trace update after execution - steps=${this.currentTask.flowResult.trace.steps?.length || 0}`
+				);
+				this.sendTraceUpdate(this.currentTask.flowResult.trace);
+			}
 
 			// Stop monitoring
 			if (monitorInterval) {
@@ -1064,9 +1080,15 @@ export class FlowWorker implements Shutdownable {
 			clearInterval(this.traceUpdateTimer);
 		}
 
+		console.log(`${this.logPrefix()} [TRACE] Starting trace updates (interval: ${this.TRACE_UPDATE_INTERVAL}ms)`);
+
 		this.traceUpdateTimer = setInterval(() => {
 			if (this.currentTask?.flowResult?.trace) {
 				this.sendTraceUpdate(this.currentTask.flowResult.trace);
+			} else {
+				console.log(
+					`${this.logPrefix()} [TRACE] No trace available - task=${!!this.currentTask}, flowResult=${!!this.currentTask?.flowResult}, trace=${!!this.currentTask?.flowResult?.trace}`
+				);
 			}
 		}, this.TRACE_UPDATE_INTERVAL);
 	}
@@ -1076,6 +1098,7 @@ export class FlowWorker implements Shutdownable {
 	 */
 	private stopTraceUpdates(): void {
 		if (this.traceUpdateTimer) {
+			console.log(`${this.logPrefix()} [TRACE] Stopping trace updates`);
 			clearInterval(this.traceUpdateTimer);
 			this.traceUpdateTimer = null;
 		}
@@ -1086,18 +1109,28 @@ export class FlowWorker implements Shutdownable {
 	 * Only sends if trace has changed since last update to avoid spam
 	 */
 	private sendTraceUpdate(trace: any): void {
-		if (!this.currentTask) return;
+		if (!this.currentTask) {
+			console.log(`${this.logPrefix()} [TRACE] sendTraceUpdate called but no current task`);
+			return;
+		}
 
 		// Calculate hash of trace to detect changes
 		const traceHash = JSON.stringify(trace);
 
 		// Skip if trace hasn't changed since last send
 		if (traceHash === this.lastSentTraceHash) {
+			console.log(
+				`${this.logPrefix()} [TRACE] Trace unchanged (hash match) - task=${this.currentTask.id}, steps=${trace?.steps?.length || 0}`
+			);
 			return;
 		}
 
 		// Update last sent hash
 		this.lastSentTraceHash = traceHash;
+
+		console.log(
+			`${this.logPrefix()} [TRACE] Sending trace update - task=${this.currentTask.id}, steps=${trace?.steps?.length || 0}, ws.readyState=${this.ws?.readyState} (1=OPEN)`
+		);
 
 		// Send update to orchestrator
 		this.sendMessage(

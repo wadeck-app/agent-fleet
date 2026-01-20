@@ -125,13 +125,13 @@ export type B2FEventFilters = {
 	// Task Events - Aggregate (no filter needed)
 	[B2F_TASKS_UPDATED]: NoFilter;
 	[B2F_TASK_CREATED]: NoFilter;
-	[B2F_TASK_UPDATED]: NoFilter;
 	[B2F_TASK_DELETED]: NoFilter;
 	[B2F_TASK_STATUS_CHANGED]: NoFilter;
 	[B2F_TASK_ASSIGNED]: NoFilter;
 	[B2F_TASK_PRIORITY_CHANGED]: NoFilter;
 
 	// Task Events - Filtered (requires taskId)
+	[B2F_TASK_UPDATED]: TaskFilter; // REQUIRES taskId filter - for detail pages
 	[B2F_TASK_TRACE_UPDATED]: TaskFilter; // REQUIRES taskId filter
 
 	// Worker Events - Aggregate (no filter needed)

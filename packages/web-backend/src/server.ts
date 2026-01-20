@@ -9,6 +9,8 @@ import dotenv from 'dotenv';
 // ======================================================================================
 // Now import everything else
 import Fastify, { type FastifyInstance } from 'fastify';
+// File logger for debugging shutdown (console logs may be lost when tsx kills process)
+import * as fs from 'fs';
 import { Orchestrator } from 'orchestrator';
 import * as os from 'os';
 import * as path from 'path';
@@ -416,29 +418,46 @@ function startWorkersBroadcaster(factory: DataStoreFactory): void {
 let orchestratorClient: Orchestrator | null = null;
 let fastifyInstance: FastifyInstance | null = null;
 
+function logToFile(message: string) {
+	const timestamp = new Date().toISOString();
+	const logMessage = `[${timestamp}] [PID:${process.pid}] ${message}\n`;
+	try {
+		fs.appendFileSync(path.join(__dirname, '../shutdown-debug.log'), logMessage);
+	} catch (err) {
+		// Ignore errors - we're trying to debug shutdown
+	}
+}
+
 // Register shutdown handlers ONCE at module level
 // This ensures clean shutdown even if SIGTERM arrives during startup
 const signals = ['SIGTERM', 'SIGINT', 'SIGBREAK'] as const;
 signals.forEach(signal => {
 	process.on(signal, async () => {
+		logToFile(`🚨 ${signal} SIGNAL RECEIVED 🚨`);
 		console.log(`\n\n🚨 ${signal} SIGNAL RECEIVED 🚨\n\n`);
 		logger.info(`${signal} signal received: initiating graceful shutdown`);
 		try {
 			// Close orchestrator first (if it was initialized)
 			if (orchestratorClient) {
+				logToFile('Shutting down orchestrator...');
 				logger.info('Shutting down orchestrator...');
 				await orchestratorClient.shutdown();
+				logToFile('Orchestrator shutdown complete');
 			}
 
 			// Then close fastify (if it was initialized)
 			if (fastifyInstance) {
+				logToFile('Closing fastify server...');
 				logger.info('Closing fastify server...');
 				await fastifyInstance.close();
+				logToFile('Fastify closed');
 			}
 
+			logToFile('Server shutdown complete - exiting');
 			logger.info('Server shutdown complete');
 			process.exit(0);
 		} catch (err) {
+			logToFile(`Error during shutdown: ${err}`);
 			logger.error('Error during shutdown:', err);
 			process.exit(1);
 		}
@@ -477,6 +496,7 @@ async function waitForPortsAvailable(): Promise<void> {
 
 // Initialize services and start server
 async function start(): Promise<void> {
+	logToFile(`=== START CALLED === PID: ${process.pid}, PPID: ${process.ppid}`);
 	try {
 		// Wait for ports to be available before starting initialization
 		await waitForPortsAvailable();
@@ -697,6 +717,7 @@ async function start(): Promise<void> {
 			}
 		} else {
 			// Normal startup logs for development mode
+			logToFile(`=== SERVER STARTED SUCCESSFULLY === PORT: ${PORT}`);
 			logger.info(`Server running in ${process.env.NODE_ENV || 'development'} mode`);
 			logger.info(`  >  PID:     ${process.pid} (parent: ${process.ppid || 'unknown'})`);
 			logger.info(`  >  Local:   http://localhost:${PORT}/`);
@@ -715,10 +736,12 @@ async function start(): Promise<void> {
 		}
 	} catch (err) {
 		// Always log startup errors
+		logToFile(`❌ FATAL ERROR: ${err}`);
 		console.error('❌ FATAL: Failed to start backend server:', err);
 		logger.error('Failed to start server', err);
 		process.exit(1);
 	}
 }
 
+logToFile('=== MODULE LOADED === About to call start()');
 start();

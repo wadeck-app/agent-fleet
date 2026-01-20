@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import type { Worker } from '@shared/api/workers.contract';
 import { B2F_WORKERS_UPDATED, B2F_WORKER_CONNECTED, B2F_WORKER_DISCONNECTED } from '@shared/transport';
@@ -144,7 +145,12 @@ export function WorkersWidget() {
 				{sortedWorkers.map(worker => (
 					<div key={worker.workerId} className="space-y-0.5">
 						<div className="flex items-center justify-between text-xs">
-							<span className="truncate">{worker.workerId}</span>
+							<Link
+								to="/workers"
+								className="truncate hover:text-foreground hover:underline transition-colors"
+							>
+								{worker.workerId}
+							</Link>
 							{worker.state === 'busy' ? (
 								<Zap className="size-3 shrink-0 text-yellow-500" />
 							) : (
@@ -153,7 +159,13 @@ export function WorkersWidget() {
 						</div>
 						{worker.state === 'busy' && worker.taskId && (
 							<div className="text-xs text-muted-foreground">
-								- {worker.taskId}
+								-{' '}
+								<Link
+									to={`/tasks/${worker.taskId}`}
+									className="hover:text-foreground hover:underline transition-colors"
+								>
+									{worker.taskId}
+								</Link>
 								{worker.taskStartedAt && (
 									<span className="ml-1">({formatDuration(worker.taskStartedAt)})</span>
 								)}

@@ -418,12 +418,14 @@ export class DataStoreFactory {
 			const tasksService = this.getTasksService();
 			const interventionsService = this.getInterventionsService();
 			const workersService = this.getWorkersService();
+			const eventBroadcaster = this.getEventBroadcaster();
 
 			// Create handler
 			this.orchestratorEventHandler = new OrchestratorEventHandler(
 				tasksService,
 				interventionsService,
-				workersService
+				workersService,
+				eventBroadcaster
 			);
 		}
 

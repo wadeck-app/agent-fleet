@@ -1,3 +1,6 @@
+import { B2F_TASK_TRACE_UPDATED } from '@app/shared/transport/B2FEventConstants';
+
+import type { EventBroadcaster } from '../transport/EventBroadcaster';
 import type { InterventionsService } from './InterventionsService';
 import type { TasksService } from './TasksService';
 import type { WorkersService } from './WorkersService';
@@ -41,7 +44,8 @@ export class OrchestratorEventHandler {
 	constructor(
 		private readonly tasksService: TasksService,
 		private readonly interventionsService: InterventionsService,
-		private readonly workersService: WorkersService
+		private readonly workersService: WorkersService,
+		private readonly eventBroadcaster: EventBroadcaster
 	) {}
 
 	/**
@@ -182,20 +186,31 @@ export class OrchestratorEventHandler {
 	/**
 	 * Handle task_trace_update event
 	 * Writes trace chunk to storage for real-time log updates
-	 * @param data { taskId: string, trace: any }
+	 * @param data { taskId: string, traceChunk: any }
 	 */
-	private async handleTaskTraceUpdate(data: { taskId: string; trace: any }): Promise<void> {
+	private async handleTaskTraceUpdate(data: { taskId: string; traceChunk: any }): Promise<void> {
 		try {
-			console.log(`[OrchestratorEventHandler] Task trace update: ${data.taskId}`);
+			console.log(
+				`[OrchestratorEventHandler] [TRACE] Task trace update: ${data.taskId}, steps: ${data.traceChunk?.steps?.length || 0}`
+			);
 
-			// TODO: Implement trace chunk writing in TasksService
-			// TasksService uses TraceChunkStorage internally
-			// For now, TasksService.getTaskLogs() reads from TraceChunkStorage
-			// Need to add writeTrace() method to TasksService
+			// Write trace to storage using TasksService
+			await this.tasksService.writeTrace(data.taskId, data.traceChunk);
 
-			console.log(`[OrchestratorEventHandler] Task ${data.taskId} trace updated`);
+			console.log(`[OrchestratorEventHandler] [TRACE] Task ${data.taskId} trace successfully written to storage`);
+
+			// Broadcast B2F event to notify frontend about trace update
+			this.eventBroadcaster.broadcast(B2F_TASK_TRACE_UPDATED, {
+				taskId: data.taskId,
+				stepsCount: data.traceChunk?.steps?.length || 0,
+			});
+
+			console.log(
+				`[OrchestratorEventHandler] [TRACE] Broadcasted B2F_TASK_TRACE_UPDATED for task ${data.taskId}`
+			);
 		} catch (error) {
 			console.error(`[OrchestratorEventHandler] Failed to handle task_trace_update for ${data.taskId}:`, error);
+			// Don't throw - orchestrator shouldn't fail if backend storage fails
 		}
 	}
 

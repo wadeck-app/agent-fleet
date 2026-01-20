@@ -181,10 +181,18 @@ export class WorkerCoordinator {
 				break;
 
 			case W2OMessageType.TASK_TRACE_UPDATE:
+				console.log(
+					`[WorkerCoordinator] [TRACE] Received TASK_TRACE_UPDATE from worker ${workerId} - task=${message.taskId}, steps=${message.trace?.steps?.length || 0}`
+				);
+
+				// Send trace to backend for storage
 				void this.eventBridge.sendToBackend('task_trace_update', {
 					taskId: message.taskId,
 					traceChunk: message.trace,
 				});
+
+				// Emit state event for real-time frontend updates
+				this.stateManager.emitTaskTraceUpdated(message.taskId, message.trace?.steps?.length || 0);
 				break;
 
 			case W2OMessageType.INTERVENTION_REQUESTED:

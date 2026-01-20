@@ -2,17 +2,17 @@
 	"projects": [
 		{
 			"name": "Agent Fleet",
-			"workspaceIds": [],
+			"workspaceIds": ["50115a2e-5226-46d4-9fb8-6f9c11a16f9d"],
 			"icon": "Users",
 			"iconColor": "#10B981",
 			"archived": false,
 			"taskCount": 0,
 			"id": "wwuypfn8p",
-			"version": 42,
+			"version": 50,
 			"createdAt": "2026-01-17T20:24:15.224Z",
-			"updatedAt": "2026-01-18T11:53:49.210Z",
+			"updatedAt": "2026-01-20T20:07:43.162Z",
 			"pinned": true,
-			"order": 0
+			"order": 1
 		},
 		{
 			"name": "Image generation",

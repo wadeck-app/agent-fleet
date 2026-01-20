@@ -11,6 +11,8 @@ import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 import { TasksTable } from '../tasks/TasksTable';
 import { tasksApi } from '../tasks/tasks.api';
+import { EditWorkspaceDialog } from '../workspaces/EditWorkspaceDialog';
+import { workspacesApi } from '../workspaces/workspaces.api';
 
 // Helper to extract basename from path
 function getBasename(path: string): string {
@@ -25,6 +27,7 @@ interface WorkspacePanelProps {
 export function WorkspacePanel({ workspace, projectId }: WorkspacePanelProps) {
 	const [tasks, setTasks] = useState<Task[]>([]);
 	const [refreshing, setRefreshing] = useState(false);
+	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
 	// Load tasks
 	const loadTasks = async () => {
@@ -55,6 +58,14 @@ export function WorkspacePanel({ workspace, projectId }: WorkspacePanelProps) {
 	const filteredTasks = useMemo(() => {
 		return tasks.filter((task: Task) => task.projectId === projectId && task.workspaceId === workspace.id);
 	}, [tasks, projectId, workspace.id]);
+
+	// Handle workspace edit
+	const handleWorkspaceSave = async (
+		workspaceId: string,
+		data: { name?: string; description?: string; color?: string; projectId?: string | null }
+	) => {
+		await workspacesApi.updateWorkspace(workspaceId, data);
+	};
 
 	const displayName = workspace.name || getBasename(workspace.path);
 
@@ -122,7 +133,7 @@ export function WorkspacePanel({ workspace, projectId }: WorkspacePanelProps) {
 						)}
 					</div>
 
-					<Button variant="ghost" size="sm">
+					<Button variant="outline" size="sm" onClick={() => setIsEditDialogOpen(true)}>
 						<Pencil className="h-4 w-4" />
 						Edit
 					</Button>
@@ -148,6 +159,14 @@ export function WorkspacePanel({ workspace, projectId }: WorkspacePanelProps) {
 					)}
 				</div>
 			</div>
+
+			{/* Edit Workspace Dialog */}
+			<EditWorkspaceDialog
+				workspace={workspace}
+				open={isEditDialogOpen}
+				onClose={() => setIsEditDialogOpen(false)}
+				onSave={handleWorkspaceSave}
+			/>
 		</div>
 	);
 }

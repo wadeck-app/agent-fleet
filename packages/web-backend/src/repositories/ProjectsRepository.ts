@@ -107,13 +107,26 @@ export class ProjectsRepository {
 			throw new Error(`Project with id ${id} not found`);
 		}
 
+		console.log(
+			`[ProjectsRepository] Adding workspaces to project ${id}. Current workspaceIds:`,
+			project.workspaceIds,
+			'Adding:',
+			workspaceIds
+		);
+
 		// Merge workspace IDs (avoid duplicates)
 		const uniqueWorkspaceIds = Array.from(new Set([...project.workspaceIds, ...workspaceIds]));
 
-		return this.update(id, {
+		console.log(`[ProjectsRepository] Merged workspaceIds:`, uniqueWorkspaceIds);
+
+		const updatedProject = await this.update(id, {
 			workspaceIds: uniqueWorkspaceIds,
 			version: project.version + 1,
 		});
+
+		console.log(`[ProjectsRepository] After update, project ${id} workspaceIds:`, updatedProject.workspaceIds);
+
+		return updatedProject;
 	}
 
 	/**

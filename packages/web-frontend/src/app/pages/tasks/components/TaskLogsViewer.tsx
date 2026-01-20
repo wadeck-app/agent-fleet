@@ -2,6 +2,13 @@ import { useRef, useState } from 'react';
 
 import { Input } from '@framework/components/forms/Input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from '@framework/components/overlays/Dialog';
 import { Button } from '@framework/components/primitives/Button';
 import { Toggle } from '@framework/components/primitives/Toggle';
 import type { LogEntry as LogEntryType, LogLevel } from '@shared/api/tasks.contract';
@@ -109,6 +116,17 @@ export function TaskLogsViewer({
 
 				<div className="flex-1" />
 
+				{/* Status indicator - placed before other controls to avoid shifting when it appears/disappears */}
+				{isRunning && (
+					<span
+						className="flex items-center gap-1 text-xs text-success"
+						title="Task is currently running and receiving real-time log updates"
+					>
+						<span className="inline-block size-2 animate-pulse rounded-full bg-success" />
+						Live
+					</span>
+				)}
+
 				{/* Auto-scroll toggle */}
 				<Toggle
 					pressed={isAutoScrollEnabled}
@@ -132,14 +150,6 @@ export function TaskLogsViewer({
 					<Download className="mr-1 size-4" />
 					Export
 				</Button>
-
-				{/* Status indicator */}
-				{isRunning && (
-					<span className="flex items-center gap-1 text-xs text-success">
-						<span className="inline-block size-2 animate-pulse rounded-full bg-success" />
-						Live
-					</span>
-				)}
 			</div>
 
 			{/* Logs Container */}
@@ -166,28 +176,23 @@ export function TaskLogsViewer({
 				)}
 			</div>
 
-			{/* Expanded Log Modal (simple version) */}
-			{expandedLog && (
-				<div
-					className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-					onClick={() => setExpandedLog(null)}
-				>
-					<div
-						className="max-h-[80vh] w-[800px] overflow-auto rounded-lg bg-card p-6"
-						onClick={e => e.stopPropagation()}
-					>
-						<div className="mb-4 flex items-center justify-between">
-							<h3 className="font-semibold">Log Details</h3>
-							<Button variant="ghost" size="sm" onClick={() => setExpandedLog(null)}>
-								×
-							</Button>
-						</div>
-						<pre className="overflow-x-auto rounded bg-muted p-4 text-xs">
+			{/* Expanded Log Dialog - using design system Dialog */}
+			<Dialog open={expandedLog !== null} onOpenChange={open => !open && setExpandedLog(null)}>
+				<DialogContent className="max-w-3xl">
+					<DialogHeader>
+						<DialogTitle>Log Entry Details</DialogTitle>
+						<DialogDescription>
+							Full details and metadata for this log entry. You can copy this information for debugging.
+						</DialogDescription>
+					</DialogHeader>
+
+					<div className="max-h-[60vh] overflow-auto">
+						<pre className="rounded bg-muted p-4 text-xs font-mono">
 							{JSON.stringify(expandedLog, null, 2)}
 						</pre>
 					</div>
-				</div>
-			)}
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

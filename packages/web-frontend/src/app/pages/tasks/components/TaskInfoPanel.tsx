@@ -79,13 +79,11 @@ export function TaskInfoPanel({ task }: TaskInfoPanelProps) {
 
 			{/* Timestamps */}
 			<div>
-				<h3 className="mb-2 text-sm font-semibold text-muted-foreground">Created</h3>
-				<p className="text-xs text-muted-foreground">{formatDate(task.createdAt)}</p>
-			</div>
-
-			<div>
-				<h3 className="mb-2 text-sm font-semibold text-muted-foreground">Updated</h3>
-				<p className="text-xs text-muted-foreground">{formatDate(task.updatedAt)}</p>
+				<h3 className="mb-2 text-sm font-semibold text-muted-foreground">Timeline</h3>
+				<div className="flex flex-col gap-1 text-xs text-muted-foreground">
+					<span>Created: {formatDate(task.createdAt)}</span>
+					<span>Updated: {formatDate(task.updatedAt)}</span>
+				</div>
 			</div>
 
 			{/* Flow Info */}

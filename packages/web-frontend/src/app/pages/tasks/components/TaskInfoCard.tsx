@@ -15,8 +15,6 @@ interface TaskInfoCardProps {
  * Collapsible card with task details (for stacked layout)
  */
 export function TaskInfoCard({ task, collapsible = true, defaultOpen = true }: TaskInfoCardProps) {
-	const [isOpen, setIsOpen] = useState(defaultOpen);
-
 	const formatDate = (isoString: string) => {
 		return new Date(isoString).toLocaleString('en-US', {
 			month: 'short',
@@ -55,10 +53,7 @@ export function TaskInfoCard({ task, collapsible = true, defaultOpen = true }: T
 	return (
 		<div className="rounded-lg border border-border bg-card">
 			{/* Header (always visible) */}
-			<div
-				className={`flex items-center gap-4 p-4 ${collapsible ? 'cursor-pointer hover:bg-muted/50' : ''}`}
-				onClick={collapsible ? () => setIsOpen(!isOpen) : undefined}
-			>
+			<div className={`flex items-center gap-4 p-4 ${collapsible ? 'cursor-pointer hover:bg-muted/50' : ''}`}>
 				<div className="flex-1">
 					<div className="mb-2 flex items-center gap-2">
 						<h2 className="text-lg font-semibold text-foreground">{task.description}</h2>
@@ -77,48 +72,10 @@ export function TaskInfoCard({ task, collapsible = true, defaultOpen = true }: T
 							</span>
 						)}
 						<span className="text-muted-foreground">Created: {formatDate(task.createdAt)}</span>
+						<span className="text-muted-foreground">Updated: {formatDate(task.updatedAt)}</span>
 					</div>
 				</div>
-
-				{collapsible && (
-					<Button variant="ghost" size="sm">
-						{isOpen ? <ChevronUp className="size-5" /> : <ChevronDown className="size-5" />}
-					</Button>
-				)}
 			</div>
-
-			{/* Expandable content */}
-			{isOpen && (
-				<div className="border-t border-border p-4">
-					<div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
-						<div>
-							<span className="font-semibold text-muted-foreground">Updated:</span>
-							<p className="text-muted-foreground">{formatDate(task.updatedAt)}</p>
-						</div>
-
-						{task.flowResult && (
-							<>
-								<div>
-									<span className="font-semibold text-muted-foreground">Flow Status:</span>
-									<p>
-										<Badge
-											variant={task.flowResult.status === 'completed' ? 'success' : 'destructive'}
-										>
-											{task.flowResult.status}
-										</Badge>
-									</p>
-								</div>
-								{task.flowResult.error && (
-									<div className="col-span-2">
-										<span className="font-semibold text-muted-foreground">Error:</span>
-										<p className="text-xs text-destructive">{task.flowResult.error}</p>
-									</div>
-								)}
-							</>
-						)}
-					</div>
-				</div>
-			)}
 		</div>
 	);
 }
