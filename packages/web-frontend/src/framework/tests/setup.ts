@@ -52,3 +52,11 @@ if (typeof globalThis.queueMicrotask === 'undefined') {
 		Promise.resolve().then(callback);
 	};
 }
+
+// Mock scrollIntoView for tests
+// jsdom doesn't implement scrollIntoView
+if (typeof Element.prototype.scrollIntoView === 'undefined') {
+	Element.prototype.scrollIntoView = function () {
+		// noop
+	};
+}
