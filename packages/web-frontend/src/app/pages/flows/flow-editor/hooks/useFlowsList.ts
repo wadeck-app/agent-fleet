@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { FlowListItem } from '@shared/api/flows.contract';
 
 import { flowsApi } from '../flowsApi';
@@ -24,7 +25,7 @@ export function useFlowsList() {
 			setFlows(flowsList);
 		} catch (err) {
 			console.error('[useFlowsList] Error loading flows:', err);
-			setError(err instanceof Error ? err.message : 'Failed to load flows');
+			setError(getErrorMessage(err));
 			setFlows([]);
 		} finally {
 			setLoading(false);

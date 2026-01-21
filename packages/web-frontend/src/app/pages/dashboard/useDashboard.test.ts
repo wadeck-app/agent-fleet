@@ -24,6 +24,21 @@ vi.mock('../../hooks/useOrchestratorWebSocket', () => ({
 	})),
 }));
 
+// Mock useTransport
+vi.mock('@/transport', () => ({
+	useTransport: vi.fn(() => ({
+		connectionState: 'disconnected',
+		request: vi.fn(),
+		subscribe: vi.fn(),
+		unsubscribe: vi.fn(),
+	})),
+}));
+
+// Mock useRealtimeRefresh
+vi.mock('@/hooks/useRealtimeRefresh', () => ({
+	useRealtimeRefresh: vi.fn(),
+}));
+
 describe('useDashboard', () => {
 	const mockDashboardData: DashboardData = {
 		timestamp: '2025-12-21T10:00:00Z',
@@ -192,17 +207,17 @@ describe('useDashboard', () => {
 				expect(result.current.loading).toBe(false);
 			});
 
+			// Note: Polling removed - dashboard now uses real-time events only
+			// This test verifies that after initial load, no automatic polling occurs
 			const initialCallCount = vi.mocked(dashboardService.getDashboard).mock.calls.length;
 
-			// Wait for at least one poll cycle
+			// Wait for what would have been a poll cycle
 			await act(async () => {
 				await new Promise(resolve => setTimeout(resolve, 150));
 			});
 
-			// Should have polled at least once more
-			await waitFor(() => {
-				expect(vi.mocked(dashboardService.getDashboard).mock.calls.length).toBeGreaterThan(initialCallCount);
-			});
+			// Should NOT have polled again (no automatic polling anymore)
+			expect(vi.mocked(dashboardService.getDashboard).mock.calls.length).toBe(initialCallCount);
 		});
 
 		it('should not show loading state after initial load', async () => {

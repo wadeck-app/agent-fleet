@@ -289,7 +289,7 @@ describe('TransportManager', () => {
 			expect(transport.isConnected()).toBe(false);
 
 			// SessionStorage should be cleared
-			expect(window.name).toBeNull();
+			expect(window.name).toBe('');
 
 			// New getInstance should create new instance
 			const newInstance = TransportManager.getInstance(config);
@@ -349,7 +349,8 @@ describe('TransportManager', () => {
 			const instance = TransportManager.getInstance(config);
 			const transport = instance.getTransport();
 
-			expect(transport.getTransportType()).toBe('rest');
+			// RestTransportClient returns 'http' as its transport type
+			expect(transport.getTransportType()).toBe('http');
 		});
 
 		it('should create WebSocket transport for auto mode', () => {

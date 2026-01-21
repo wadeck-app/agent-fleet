@@ -7,6 +7,7 @@ import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { Button } from '@framework/components/primitives/Button';
 import { useToast } from '@framework/features/toast/ToastContext';
+import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { ProjectBoardData } from '@shared/api/projects.contract';
 import type { TaskStatus } from '@shared/api/tasks.contract';
 import { B2F_TASK_CREATED, B2F_TASK_DELETED, B2F_TASK_UPDATED } from '@shared/transport';
@@ -49,7 +50,7 @@ export function ProjectBoardPage() {
 			setBoardData(data);
 		} catch (err) {
 			console.error('[ProjectBoardPage] Failed to fetch board data:', err);
-			setError(err instanceof Error ? err.message : 'Failed to load board data');
+			setError(getErrorMessage(err));
 		} finally {
 			setIsLoading(false);
 		}

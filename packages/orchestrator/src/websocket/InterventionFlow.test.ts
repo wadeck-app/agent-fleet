@@ -5,6 +5,7 @@
 import { logger } from 'shared-common/logger';
 import { serializeMessage } from 'shared-common/protocol';
 import type { StateManager } from 'shared-orch-worker/StateManager';
+import { StateEvent } from 'shared-orch-worker/StateManager';
 import type { Task } from 'shared-orch-worker/domain-types';
 import { TaskStatus } from 'shared-orch-worker/domain-types';
 import { O2WMessageType } from 'shared-orch-worker/orchestrator-messages';
@@ -75,7 +76,10 @@ vi.mock('ws', () => {
 // Mock dependencies
 vi.mock('./TaskManager');
 vi.mock('shared-common/StateManager');
-vi.mock('shared-common/logger', () => ({	createLogger: () => ({		info: vi.fn(),		warn: vi.fn(),		error: vi.fn(),		debug: vi.fn(),	}),	logger: {		info: vi.fn(),		warn: vi.fn(),		error: vi.fn(),		debug: vi.fn(),	},}));
+vi.mock('shared-common/logger', () => ({
+	createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
+	logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
 
 describe('Intervention Flow Integration', () => {
 	let server: WorkerWebSocketServer;
@@ -112,16 +116,31 @@ describe('Intervention Flow Integration', () => {
 			getQueueStats: vi.fn(),
 		} as any;
 
-		// Mock StateManager
+		// Mock StateManager with actual event emitter functionality
+		const eventListeners = new Map<string, Function[]>();
 		mockStateManager = {
 			emitWorkerConnected: vi.fn(),
 			emitWorkerDisconnected: vi.fn(),
 			emitWorkerTaskAssigned: vi.fn(),
 			emitWorkerTaskReleased: vi.fn(),
 			emitTaskUpdated: vi.fn(),
-			emit: vi.fn(),
-			on: vi.fn(),
+			emit: vi.fn((event: string, data: any) => {
+				const listeners = eventListeners.get(event) || [];
+				listeners.forEach(listener => listener(data));
+			}),
+			on: vi.fn((event: string, listener: Function) => {
+				const listeners = eventListeners.get(event) || [];
+				listeners.push(listener);
+				eventListeners.set(event, listeners);
+			}),
 			off: vi.fn(),
+			removeListener: vi.fn((event: string, listener: Function) => {
+				const listeners = eventListeners.get(event) || [];
+				const index = listeners.indexOf(listener);
+				if (index > -1) {
+					listeners.splice(index, 1);
+				}
+			}),
 		} as any;
 
 		vi.mocked(logger.info).mockImplementation(() => {});
@@ -173,6 +192,9 @@ describe('Intervention Flow Integration', () => {
 
 			// Wait for worker registration
 			await new Promise(resolve => setTimeout(resolve, 10));
+
+			// Simulate task assignment by emitting the event
+			mockStateManager.emit(StateEvent.WORKER_TASK_ASSIGNED, { workerId: 'worker-1', taskId: 'task-1' });
 
 			vi.clearAllMocks();
 
@@ -274,6 +296,10 @@ describe('Intervention Flow Integration', () => {
 
 			mockSocket.emit('message', Buffer.from(serializeMessage(readyMessage)));
 			await new Promise(resolve => setTimeout(resolve, 10));
+
+			// Simulate task assignment by emitting the event
+			mockStateManager.emit(StateEvent.WORKER_TASK_ASSIGNED, { workerId: 'worker-1', taskId: 'task-1' });
+
 			vi.clearAllMocks();
 
 			// Send intervention request
@@ -345,6 +371,10 @@ describe('Intervention Flow Integration', () => {
 
 			mockSocket.emit('message', Buffer.from(serializeMessage(readyMessage)));
 			await new Promise(resolve => setTimeout(resolve, 10));
+
+			// Simulate task assignment by emitting the event
+			mockStateManager.emit(StateEvent.WORKER_TASK_ASSIGNED, { workerId: 'worker-1', taskId: 'task-1' });
+
 			vi.clearAllMocks();
 
 			// Send non-blocking intervention request
@@ -413,6 +443,10 @@ describe('Intervention Flow Integration', () => {
 
 			mockSocket.emit('message', Buffer.from(serializeMessage(readyMessage)));
 			await new Promise(resolve => setTimeout(resolve, 10));
+
+			// Simulate task assignment by emitting the event
+			mockStateManager.emit(StateEvent.WORKER_TASK_ASSIGNED, { workerId: 'worker-1', taskId: 'task-1' });
+
 			vi.clearAllMocks();
 
 			// Send intervention with short timeout
@@ -486,6 +520,10 @@ describe('Intervention Flow Integration', () => {
 
 			mockSocket.emit('message', Buffer.from(serializeMessage(readyMessage)));
 			await new Promise(resolve => setTimeout(resolve, 10));
+
+			// Simulate task assignment by emitting the event
+			mockStateManager.emit(StateEvent.WORKER_TASK_ASSIGNED, { workerId: 'worker-1', taskId: 'task-1' });
+
 			vi.clearAllMocks();
 
 			// Send intervention with default value timeout
@@ -560,6 +598,10 @@ describe('Intervention Flow Integration', () => {
 
 			mockSocket.emit('message', Buffer.from(serializeMessage(readyMessage)));
 			await new Promise(resolve => setTimeout(resolve, 10));
+
+			// Simulate task assignment by emitting the event
+			mockStateManager.emit(StateEvent.WORKER_TASK_ASSIGNED, { workerId: 'worker-1', taskId: 'task-1' });
+
 			vi.clearAllMocks();
 
 			// Create intervention
@@ -633,6 +675,10 @@ describe('Intervention Flow Integration', () => {
 
 			mockSocket.emit('message', Buffer.from(serializeMessage(readyMessage)));
 			await new Promise(resolve => setTimeout(resolve, 10));
+
+			// Simulate task assignment by emitting the event
+			mockStateManager.emit(StateEvent.WORKER_TASK_ASSIGNED, { workerId: 'worker-1', taskId: 'task-1' });
+
 			vi.clearAllMocks();
 
 			// Create first intervention

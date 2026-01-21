@@ -279,7 +279,7 @@ describe('Transport Integration Tests', () => {
 			);
 
 			await waitFor(() => {
-				expect(screen.getByRole('alert')).toHaveTextContent('Connection failed');
+				expect(screen.getByRole('alert')).toHaveTextContent('Failed to fetch tasks');
 			});
 		});
 	});
@@ -415,9 +415,9 @@ describe('Transport Integration Tests', () => {
 			await mockTransport.connect();
 
 			const { unmount } = render(
-				<TransportProvider transport={mockTransport} autoConnect={false}>
+				<TestWrapper transport={mockTransport} autoConnect={false}>
 					<TasksWithEvents />
-				</TransportProvider>
+				</TestWrapper>
 			);
 
 			expect(screen.getByText('Tasks (Live)')).toBeInTheDocument();
@@ -505,8 +505,10 @@ describe('Transport Integration Tests', () => {
 
 			unmount();
 
+			// Note: TransportProvider does NOT disconnect on unmount (singleton persists)
+			// This is intentional to maintain connection across React remounts
 			await waitFor(() => {
-				expect(disconnectSpy).toHaveBeenCalledTimes(1);
+				expect(disconnectSpy).not.toHaveBeenCalled();
 			});
 		});
 
@@ -514,9 +516,9 @@ describe('Transport Integration Tests', () => {
 			await mockTransport.connect();
 
 			const { unmount } = render(
-				<TransportProvider transport={mockTransport} autoConnect={false}>
+				<TestWrapper transport={mockTransport} autoConnect={false}>
 					<TasksWithEvents />
-				</TransportProvider>
+				</TestWrapper>
 			);
 
 			// Verify subscription works

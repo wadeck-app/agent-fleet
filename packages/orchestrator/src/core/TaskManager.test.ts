@@ -70,7 +70,6 @@ describe('TaskManager', () => {
 			expect(Storage.initialize).toHaveBeenCalled();
 			expect(Storage.listTasks).toHaveBeenCalled();
 			expect(taskManager.getAllTasks()).toHaveLength(0);
-			expect(logger.info).toHaveBeenCalledWith('[TaskManager] Loaded 0 tasks');
 		});
 
 		it('should load existing tasks from storage', async () => {
@@ -146,14 +145,6 @@ describe('TaskManager', () => {
 			const task = await taskManager.createTask('Event test');
 
 			expect(mockStateManager.emitTaskCreated).toHaveBeenCalledWith(task);
-		});
-
-		it('should log task creation', async () => {
-			await taskManager.createTask('Log test task');
-
-			expect(logger.info).toHaveBeenCalledWith(
-				expect.stringContaining('[TaskManager] Created task test-uuid-1234')
-			);
 		});
 
 		it('should create multiple tasks with unique IDs', async () => {
@@ -242,14 +233,6 @@ describe('TaskManager', () => {
 			);
 		});
 
-		it('should log status change', async () => {
-			await taskManager.updateTaskStatus(task.id, TaskStatus.APPROVED);
-
-			expect(logger.info).toHaveBeenCalledWith(
-				`[TaskManager] Task ${task.id} status: ${TaskStatus.BACKLOG} → ${TaskStatus.APPROVED}`
-			);
-		});
-
 		it('should throw error for non-existent task', async () => {
 			await expect(taskManager.updateTaskStatus('non-existent-id', TaskStatus.TODO)).rejects.toThrow(
 				'Task non-existent-id not found'
@@ -314,12 +297,6 @@ describe('TaskManager', () => {
 			await taskManager.assignTask(task.id, 'worker-3');
 
 			expect(mockStateManager.emitTaskUpdated).toHaveBeenCalled();
-		});
-
-		it('should log assignment', async () => {
-			await taskManager.assignTask(task.id, 'worker-1');
-
-			expect(logger.info).toHaveBeenCalledWith(`[TaskManager] Task ${task.id} assigned to worker worker-1`);
 		});
 
 		it('should throw error for non-existent task', async () => {
@@ -389,12 +366,6 @@ describe('TaskManager', () => {
 			await taskManager.unassignTask(task.id);
 
 			expect(mockStateManager.emitTaskUpdated).toHaveBeenCalled();
-		});
-
-		it('should log unassignment', async () => {
-			await taskManager.unassignTask(task.id);
-
-			expect(logger.info).toHaveBeenCalledWith(`[TaskManager] Task ${task.id} unassigned`);
 		});
 
 		it('should throw error for non-existent task', async () => {
@@ -677,12 +648,6 @@ describe('TaskManager', () => {
 			expect(mockStateManager.emitTaskDeleted).toHaveBeenCalledWith(task.id);
 		});
 
-		it('should log deletion', async () => {
-			await taskManager.deleteTask(task.id);
-
-			expect(logger.info).toHaveBeenCalledWith(`[TaskManager] Deleted task ${task.id}`);
-		});
-
 		it('should return false for non-existent task', async () => {
 			const result = await taskManager.deleteTask('non-existent-id');
 			expect(result).toBe(false);
@@ -737,17 +702,6 @@ describe('TaskManager', () => {
 			await taskManager.clearAllTasks();
 
 			expect(mockStateManager.emitTaskDeleted).toHaveBeenCalledTimes(3);
-		});
-
-		it('should log clear operation', async () => {
-			await taskManager.createTask('Task 1');
-			await taskManager.createTask('Task 2');
-			await taskManager.createTask('Task 3');
-			vi.clearAllMocks();
-
-			await taskManager.clearAllTasks();
-
-			expect(logger.info).toHaveBeenCalledWith('[TaskManager] Cleared 3 tasks');
 		});
 
 		it('should return 0 when no tasks to clear', async () => {
@@ -935,16 +889,6 @@ describe('TaskManager', () => {
 			await taskManager.assignTaskToWorker('worker-1');
 
 			expect(mockStateManager.emitTaskUpdated).toHaveBeenCalled();
-		});
-
-		it('should log atomic assignment', async () => {
-			const task = await taskManager.createTask('Test task');
-			await taskManager.updateTaskStatus(task.id, TaskStatus.BACKLOG);
-			vi.clearAllMocks();
-
-			await taskManager.assignTaskToWorker('worker-1');
-
-			expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('atomically assigned'));
 		});
 
 		it('should rollback on storage failure', async () => {

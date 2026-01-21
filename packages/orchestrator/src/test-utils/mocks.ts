@@ -218,6 +218,9 @@ export function createMockStateManager() {
 		emitTaskCreated: vi.fn(),
 		emitTaskDeleted: vi.fn(),
 		emitMetricsUpdated: vi.fn(),
+		// EventEmitter methods
+		on: vi.fn(),
+		removeListener: vi.fn(),
 	};
 }
 

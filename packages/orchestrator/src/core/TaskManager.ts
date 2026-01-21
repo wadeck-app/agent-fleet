@@ -365,13 +365,16 @@ export class TaskManager {
 		// Find the first unassigned task with the right status
 		// Prioritize by priority: urgent > high > medium > low
 
+		// Exclude terminal statuses that should not be assigned
+		const terminalStatuses: TaskStatus[] = [TaskStatus.MERGED, TaskStatus.CANCELLED, TaskStatus.APPROVED];
+
 		//FIXME has to be typed with related helper/constants for ordering
 		const priorityOrder: Task['priority'][] = ['urgent', 'high', 'medium', 'low'];
 
 		for (const priority of priorityOrder) {
 			for (const task of this.tasks.values()) {
 				// if (targetStatuses.includes(task.status) && !task.assignedTo && task.priority === priority) {
-				if (!task.assignedTo && task.priority === priority) {
+				if (!task.assignedTo && task.priority === priority && !terminalStatuses.includes(task.status)) {
 					return task;
 				}
 			}

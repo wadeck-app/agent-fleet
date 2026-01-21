@@ -172,9 +172,8 @@ describe('CrudTable', () => {
 			const deleteButtons = screen.getAllByRole('button', { name: /delete item/i });
 			fireEvent.click(deleteButtons[0]!);
 
-			await waitFor(() => {
-				expect(screen.getByText('Are you sure you want to delete Item One?')).toBeInTheDocument();
-			});
+			// Use findByText which waits for the element to appear
+			expect(await screen.findByText('Are you sure you want to delete Item One?')).toBeInTheDocument();
 		});
 
 		it('should call onDelete when user confirms', async () => {

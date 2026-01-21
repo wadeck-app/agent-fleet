@@ -37,6 +37,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { EmblaCarouselType } from 'embla-carousel';
 
 /**
@@ -202,7 +203,7 @@ export function useInfiniteCarousel<T>({
 			} catch (err) {
 				if (!isMounted.current) return;
 
-				setError(err instanceof Error ? err.message : 'Failed to load data');
+				setError(getErrorMessage(err));
 				// Remove from loaded pages so user can retry
 				loadedPages.current.delete(page);
 			} finally {

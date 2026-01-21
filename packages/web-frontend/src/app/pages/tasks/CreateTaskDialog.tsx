@@ -9,6 +9,7 @@ import { TextAreaField } from '@framework/features/forms/fields/TextAreaField';
 import { TextField } from '@framework/features/forms/fields/TextField';
 import { useFormState } from '@framework/features/forms/useFormState';
 import { useToast } from '@framework/features/toast/ToastContext';
+import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { FlowMetadata } from '@shared/api/flows.contract';
 import type { CreateTask } from '@shared/api/tasks.contract';
 import { AlertTriangle } from 'lucide-react';
@@ -115,8 +116,7 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 				onOpenChange(false);
 			} catch (error) {
 				// Show error toast to user
-				const errorMessage = error instanceof Error ? error.message : 'Failed to create task';
-				showToast(errorMessage, 'error');
+				showToast(getErrorMessage(error), 'error');
 				console.error('Failed to create task:', error);
 				// Re-throw to let useFormState handle the isSubmitting state
 				throw error;
@@ -140,13 +140,14 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 				const response = await projectsApi.getProjectsList({ archived: false });
 				const projectOptions: ComboboxOption[] = [
 					{ value: '', label: 'No Project (assign to workspace/worker)' },
-					...response.items.map(p => ({
+					...(response.items || []).map(p => ({
 						value: p.id,
 						label: p.name,
 					})),
 				];
 				setProjects(projectOptions);
 			} catch (error) {
+				showToast(getErrorMessage(error), 'error');
 				console.error('Failed to load projects:', error);
 				setProjects([{ value: '', label: 'No Project (assign to workspace/worker)' }]);
 			} finally {
@@ -155,7 +156,7 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 		};
 
 		loadProjects();
-	}, [open]);
+	}, [open, showToast]);
 
 	// Load flows when worker is selected
 	useEffect(() => {
@@ -170,6 +171,7 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 				const flows = await workersApi.getWorkerFlows(formState.formData.workerId);
 				setWorkerFlowsMetadata(flows);
 			} catch (error) {
+				showToast(getErrorMessage(error), 'error');
 				console.error('Failed to load worker flows:', error);
 				setWorkerFlowsMetadata([]);
 			} finally {
@@ -228,8 +230,7 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 			onOpenChange(false);
 			navigate(`/tasks/${createdTask.id}`);
 		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : 'Failed to create task';
-			showToast(errorMessage, 'error');
+			showToast(getErrorMessage(error), 'error');
 			console.error('Failed to create task:', error);
 		}
 	};

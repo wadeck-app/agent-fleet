@@ -48,11 +48,9 @@ export const LogLevelSchema = z.enum(['debug', 'info', 'warning', 'error']);
  * Individual log entry (from FlowTrace step)
  */
 export const LogEntrySchema = z.object({
-	/** Unique log entry ID (stepId + sequence) */
+	/** Unique log entry ID */
 	id: z.string(),
-	/** Global sequence number for ordering (guaranteed monotonic) */
-	sequence: z.number().int().min(0),
-	/** Timestamp (Unix ms) */
+	/** Server-side timestamp in Unix milliseconds (for ordering) */
 	timestamp: z.number(),
 	/** Log level */
 	level: LogLevelSchema,
@@ -174,9 +172,6 @@ export const PaginatedLogsQuerySchema = z.object({
 	level: LogLevelSchema.optional(),
 	/** Search query (matches message content) */
 	search: z.string().optional(),
-	/** Fetch logs in sequence range (for gap filling) */
-	sequenceStart: z.coerce.number().int().min(0).optional(),
-	sequenceEnd: z.coerce.number().int().min(0).optional(),
 });
 
 /**
@@ -191,10 +186,6 @@ export const PaginatedLogsResponseSchema = z.object({
 	total: z.number(),
 	/** Whether the task is still running (for real-time updates) */
 	isRunning: z.boolean(),
-	/** Minimum sequence number in this response */
-	minSequence: z.number().int().min(0),
-	/** Maximum sequence number in this response */
-	maxSequence: z.number().int().min(0),
 });
 
 export type LogLevel = z.infer<typeof LogLevelSchema>;

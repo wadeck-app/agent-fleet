@@ -113,7 +113,7 @@ describe('ToastContext', () => {
 
 		await waitFor(() => {
 			const toast = screen.getByText('Default message').closest('div')!.parentElement;
-			expect(toast).toHaveClass('bg-primary');
+			expect(toast).toHaveClass('bg-green-600');
 		});
 	});
 });

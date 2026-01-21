@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { FlowsByProject } from '@shared/api/flows.contract';
 
 import { flowsService } from './FlowsService';
@@ -37,7 +38,7 @@ export function useFlows(): UseFlowsResult {
 				setFlows(data);
 				setError(null);
 			} catch (err) {
-				setError(err instanceof Error ? err.message : 'Failed to fetch flows');
+				setError(getErrorMessage(err));
 			} finally {
 				setLoading(false);
 			}

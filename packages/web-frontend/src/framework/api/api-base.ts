@@ -73,9 +73,12 @@ export class ApiError extends Error {
 		if (this.details && Array.isArray(this.details) && this.details.length > 0) {
 			const detailMessages = this.details
 				.map((detail: unknown) => {
-					const d = detail as { field?: string; message?: string };
-					if (d.field && d.message) {
-						return `${d.field}: ${d.message}`;
+					// Handle Zod validation errors (with path array)
+					const d = detail as { path?: string[]; field?: string; message?: string };
+					// Extract field name from path array or field property
+					const fieldName = d.path && d.path.length > 0 ? d.path.join('.') : d.field;
+					if (fieldName && d.message) {
+						return `${fieldName}: ${d.message}`;
 					}
 					return d.message || JSON.stringify(detail);
 				})

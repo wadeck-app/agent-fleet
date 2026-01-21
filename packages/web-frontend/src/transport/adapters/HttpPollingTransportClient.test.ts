@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HttpPollingTransportClient } from './HttpPollingTransportClient';
+import * as connectionId from '../connection-id';
 
 describe('HttpPollingTransportClient', () => {
 	let client: HttpPollingTransportClient;
@@ -85,8 +86,8 @@ describe('HttpPollingTransportClient', () => {
 		});
 
 		it('should throw error if connId is missing from sessionStorage', async () => {
-			// Mock sessionStorage to return null for connId
-			vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(null);
+			// Mock getConnId to return empty string (simulating missing connId)
+			vi.spyOn(connectionId, 'getConnId').mockReturnValue('');
 
 			await expect(client.connect()).rejects.toThrow('No connId found in sessionStorage');
 		});
@@ -147,6 +148,21 @@ describe('HttpPollingTransportClient', () => {
 			const stateChanges: string[] = [];
 			client.onConnectionStateChange(state => stateChanges.push(state));
 
+			// Mock fetch for connection
+			global.fetch = vi.fn().mockResolvedValue({
+				ok: true,
+				json: async () => ({
+					events: [],
+					authenticated: true,
+					userId: 'test-user',
+					tokenExpiresAt: Date.now() + 3600000,
+				}),
+			});
+
+			// Connect first
+			await client.connect();
+
+			// Then disconnect
 			await client.disconnect();
 
 			expect(stateChanges).toContain('disconnected');
@@ -188,6 +204,20 @@ describe('HttpPollingTransportClient', () => {
 
 	describe('subscribe()', () => {
 		it('should call subscribeToEvent on first subscription', async () => {
+			// Mock fetch for connection
+			global.fetch = vi.fn().mockResolvedValue({
+				ok: true,
+				json: async () => ({
+					events: [],
+					authenticated: true,
+					userId: 'test-user',
+					tokenExpiresAt: Date.now() + 3600000,
+				}),
+			});
+
+			// Connect first so subscriptions aren't queued
+			await client.connect();
+
 			const subscribeMock = vi.fn().mockResolvedValue(undefined);
 			client.subscribeToEvent = subscribeMock;
 

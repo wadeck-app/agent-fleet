@@ -38,7 +38,6 @@ export function LogEntry({ log, onExpand }: LogEntryProps) {
 	return (
 		<div
 			data-log-id={log.id}
-			data-log-sequence={log.sequence}
 			className={`
      flex gap-3 border-b border-border px-4 py-2 font-mono text-xs
      hover:bg-muted/50

@@ -5,29 +5,20 @@ import { describe, expect, it, vi } from 'vitest';
 import { Data2 } from './Data2';
 
 describe('Data2', () => {
-	// Mock feature for testing (returns separated props for new API)
+	// Mock feature for testing (uses new FeatureContract API)
 	const createMockFeature = <TQuery extends Record<string, unknown>>(query: TQuery, state: any = {}) => {
 		const fstate = state; // Stable reference
 		const actions = {}; // Stable reference
-		const toQuery = vi.fn(() => query); // Changes when query changes
+		const fillQuery = vi.fn((q: any) => {
+			// Fill query with all properties from the query object
+			Object.assign(q, query);
+		});
 
 		return {
-			state,
 			fstate,
 			actions,
-			toQuery,
+			fillQuery,
 		};
-	};
-
-	// Helper to spread feature props for Data2 (makes tests more readable)
-	const spreadFeatureProps = (feature: any, prefix: 'pagination' | 'sorting' | 'search' | 'filter') => {
-		if (!feature) return {};
-
-		const result: any = {};
-		result[`${prefix}ToQuery`] = feature.toQuery;
-		result[`${prefix}Actions`] = feature.actions;
-		result[`${prefix}Fstate`] = feature.fstate;
-		return result;
 	};
 
 	// Mock displayer component
@@ -51,12 +42,7 @@ describe('Data2', () => {
 			const search = createMockFeature({ search: 'chicken' });
 
 			render(
-				<Data2
-					fetchData={mockFetch}
-					{...spreadFeatureProps(pagination, 'pagination')}
-					{...spreadFeatureProps(sorting, 'sorting')}
-					{...spreadFeatureProps(search, 'search')}
-				>
+				<Data2 fetchData={mockFetch} pagination={pagination} sorting={sorting} search={search}>
 					<TestDisplayer data={[]} isLoading={false} error={null} />
 				</Data2>
 			);
@@ -81,11 +67,7 @@ describe('Data2', () => {
 			const search = createMockFeature({}); // Empty search
 
 			render(
-				<Data2
-					fetchData={mockFetch}
-					{...spreadFeatureProps(pagination, 'pagination')}
-					{...spreadFeatureProps(search, 'search')}
-				>
+				<Data2 fetchData={mockFetch} pagination={pagination} search={search}>
 					<TestDisplayer data={[]} isLoading={false} error={null} />
 				</Data2>
 			);
@@ -106,7 +88,7 @@ describe('Data2', () => {
 			const pagination = createMockFeature({ page: 1, pageSize: 10 });
 
 			render(
-				<Data2 fetchData={mockFetch} {...spreadFeatureProps(pagination, 'pagination')}>
+				<Data2 fetchData={mockFetch} pagination={pagination}>
 					<TestDisplayer data={[]} isLoading={false} error={null} />
 				</Data2>
 			);
@@ -126,13 +108,15 @@ describe('Data2', () => {
 				() => new Promise(() => {}) // Never resolves
 			);
 
-			render(
+			const { container } = render(
 				<Data2 fetchData={mockFetch}>
 					<TestDisplayer data={[]} isLoading={false} error={null} />
 				</Data2>
 			);
 
-			expect(screen.getByText('Loading...')).toBeInTheDocument();
+			// Check for LoadingDots (animate-typing-dot class)
+			const loadingDots = container.querySelectorAll('.animate-typing-dot');
+			expect(loadingDots.length).toBeGreaterThan(0);
 		});
 
 		it('should display custom loading component when provided', () => {
@@ -237,7 +221,10 @@ describe('Data2', () => {
 			const pagination = {
 				fstate: {},
 				actions: { setPage, setPageSize },
-				toQuery: vi.fn(() => ({ page: 2, pageSize: 10 })),
+				fillQuery: vi.fn((q: any) => {
+					q.page = 2;
+					q.pageSize = 10;
+				}),
 			};
 
 			const TestPaginationDisplayer = ({ pagination }: QueryResultDisplayerProps<any>) => (
@@ -254,7 +241,7 @@ describe('Data2', () => {
 			);
 
 			render(
-				<Data2 fetchData={mockFetch} {...spreadFeatureProps(pagination, 'pagination')}>
+				<Data2 fetchData={mockFetch} pagination={pagination}>
 					<TestPaginationDisplayer data={[]} isLoading={false} error={null} />
 				</Data2>
 			);
@@ -274,15 +261,17 @@ describe('Data2', () => {
 
 			const handleSort = vi.fn();
 			const sorting = {
-				state: {
+				fstate: {
 					sortConfigs: [
 						{ key: 'name', direction: 'asc' },
 						{ key: 'createdAt', direction: 'desc' },
 					],
 				},
-				fstate: {},
 				actions: { handleSort },
-				toQuery: vi.fn(() => ({ sortBy: 'name,createdAt', sortOrder: 'asc,desc' })),
+				fillQuery: vi.fn((q: any) => {
+					q.sortBy = 'name,createdAt';
+					q.sortOrder = 'asc,desc';
+				}),
 			};
 
 			const TestSortingDisplayer = ({ sorting }: QueryResultDisplayerProps<any>) => (
@@ -290,7 +279,7 @@ describe('Data2', () => {
 			);
 
 			render(
-				<Data2 fetchData={mockFetch} {...spreadFeatureProps(sorting, 'sorting')}>
+				<Data2 fetchData={mockFetch} sorting={sorting}>
 					<TestSortingDisplayer data={[]} isLoading={false} error={null} />
 				</Data2>
 			);
@@ -345,7 +334,7 @@ describe('Data2', () => {
 			const pagination = createMockFeature({ page: 1, pageSize: 10 });
 
 			const { rerender } = render(
-				<Data2 fetchData={mockFetch} {...spreadFeatureProps(pagination, 'pagination')}>
+				<Data2 fetchData={mockFetch} pagination={pagination}>
 					<TestDisplayer data={[]} isLoading={false} error={null} />
 				</Data2>
 			);
@@ -353,7 +342,7 @@ describe('Data2', () => {
 			// Change pagination (triggers new fetch)
 			const newPagination = createMockFeature({ page: 2, pageSize: 10 });
 			rerender(
-				<Data2 fetchData={mockFetch} {...spreadFeatureProps(newPagination, 'pagination')}>
+				<Data2 fetchData={mockFetch} pagination={newPagination}>
 					<TestDisplayer data={[]} isLoading={false} error={null} />
 				</Data2>
 			);
@@ -378,24 +367,27 @@ describe('Data2', () => {
 	});
 
 	describe('infinite loop prevention', () => {
-		it('should NOT cause infinite loop when toQuery is stable (same reference)', async () => {
+		it('should NOT cause infinite loop when fillQuery is stable (same reference)', async () => {
 			const mockFetch = vi.fn().mockResolvedValue({
 				items: [{ id: '1', name: 'Test' }],
 			});
 
-			// Create stable toQuery reference (industry-standard: useCallback with deps)
-			const stableToQuery = vi.fn(() => ({ page: 1, pageSize: 10 }));
+			// Create stable fillQuery reference (industry-standard: useCallback with deps)
+			const stableFillQuery = vi.fn((q: any) => {
+				q.page = 1;
+				q.pageSize = 10;
+			});
 			const stableActions = { setPage: vi.fn(), setPageSize: vi.fn() };
 			const stableFstate = { page: 1, pageSize: 10 };
 
-			const createProps = () => ({
-				paginationToQuery: stableToQuery, // SAME reference
-				paginationActions: stableActions, // SAME reference
-				paginationFstate: stableFstate, // SAME reference
-			});
+			const pagination = {
+				fillQuery: stableFillQuery, // SAME reference
+				actions: stableActions, // SAME reference
+				fstate: stableFstate, // SAME reference
+			};
 
 			const { rerender } = render(
-				<Data2 fetchData={mockFetch} {...createProps()}>
+				<Data2 fetchData={mockFetch} pagination={pagination}>
 					<TestDisplayer data={[]} isLoading={false} error={null} />
 				</Data2>
 			);
@@ -405,11 +397,11 @@ describe('Data2', () => {
 				expect(mockFetch).toHaveBeenCalledTimes(1);
 			});
 
-			// Simulate multiple re-renders with SAME toQuery reference
+			// Simulate multiple re-renders with SAME fillQuery reference
 			// This simulates what happens when hooks use useCallback properly
 			for (let i = 0; i < 5; i++) {
 				rerender(
-					<Data2 fetchData={mockFetch} {...createProps()}>
+					<Data2 fetchData={mockFetch} pagination={pagination}>
 						<TestDisplayer data={[]} isLoading={false} error={null} />
 					</Data2>
 				);
@@ -422,21 +414,24 @@ describe('Data2', () => {
 			expect(mockFetch).toHaveBeenCalledTimes(1);
 		});
 
-		it('should fetch again ONLY when toQuery reference changes', async () => {
+		it('should fetch again ONLY when fillQuery reference changes', async () => {
 			const mockFetch = vi.fn().mockResolvedValue({
 				items: [{ id: '1' }],
 			});
 
 			// Start with page 1
-			const toQuery1 = vi.fn(() => ({ page: 1, pageSize: 10 }));
+			const fillQuery1 = vi.fn((q: any) => {
+				q.page = 1;
+				q.pageSize = 10;
+			});
 			const pagination1 = {
-				toQuery: toQuery1,
+				fillQuery: fillQuery1,
 				actions: { setPage: vi.fn(), setPageSize: vi.fn() },
 				fstate: { page: 1, pageSize: 10 },
 			};
 
 			const { rerender } = render(
-				<Data2 fetchData={mockFetch} {...spreadFeatureProps(pagination1, 'pagination')}>
+				<Data2 fetchData={mockFetch} pagination={pagination1}>
 					<TestDisplayer data={[]} isLoading={false} error={null} />
 				</Data2>
 			);
@@ -446,21 +441,24 @@ describe('Data2', () => {
 				expect(mockFetch).toHaveBeenCalledTimes(1);
 			});
 
-			// Change to page 2 (NEW toQuery reference - simulates useCallback with new deps)
-			const toQuery2 = vi.fn(() => ({ page: 2, pageSize: 10 }));
+			// Change to page 2 (NEW fillQuery reference - simulates useCallback with new deps)
+			const fillQuery2 = vi.fn((q: any) => {
+				q.page = 2;
+				q.pageSize = 10;
+			});
 			const pagination2 = {
-				toQuery: toQuery2,
+				fillQuery: fillQuery2,
 				actions: { setPage: vi.fn(), setPageSize: vi.fn() },
 				fstate: { page: 2, pageSize: 10 },
 			};
 
 			rerender(
-				<Data2 fetchData={mockFetch} {...spreadFeatureProps(pagination2, 'pagination')}>
+				<Data2 fetchData={mockFetch} pagination={pagination2}>
 					<TestDisplayer data={[]} isLoading={false} error={null} />
 				</Data2>
 			);
 
-			// Should fetch again because toQuery reference changed
+			// Should fetch again because fillQuery reference changed
 			await waitFor(() => {
 				expect(mockFetch).toHaveBeenCalledTimes(2);
 			});

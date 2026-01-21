@@ -41,6 +41,8 @@
 import type { ITransportClient } from './ITransportClient';
 import { HttpPollingTransportClient } from './adapters/HttpPollingTransportClient';
 import { LongPollingTransportClient } from './adapters/LongPollingTransportClient';
+import { MockTransportClient } from './adapters/MockTransportClient';
+import { RestTransportClient } from './adapters/RestTransportClient';
 import { SSETransportClient } from './adapters/SSETransportClient';
 import { WebSocketTransportClient } from './adapters/WebSocketTransportClient';
 import { clearConnId, getConnId } from './connection-id';
@@ -312,11 +314,11 @@ export class TransportManager {
 					requestTimeout: 30000,
 				});
 
-			// case 'rest':
-			// 	return new RestTransportClient({ baseUrl: config.baseUrl });
-			//
-			// case 'mock':
-			// 	return new MockTransportClient();
+			case 'rest':
+				return new RestTransportClient({ baseUrl: config.baseUrl });
+
+			case 'mock':
+				return new MockTransportClient();
 
 			case 'sse':
 				return new SSETransportClient({

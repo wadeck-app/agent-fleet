@@ -12,6 +12,7 @@ import { TextAreaField } from '@framework/features/forms/fields/TextAreaField';
 import { TextField } from '@framework/features/forms/fields/TextField';
 import { useFormState } from '@framework/features/forms/useFormState';
 import { useToast } from '@framework/features/toast/ToastContext';
+import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { CreateProject } from '@shared/api/projects.contract';
 
 import { projectsApi } from './projects.api';
@@ -85,8 +86,7 @@ export function CreateProjectDialog({ open, onOpenChange, onSuccess }: CreatePro
 				onSuccess();
 				onOpenChange(false);
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : 'Failed to create project';
-				showToast(errorMessage, 'error');
+				showToast(getErrorMessage(error), 'error');
 				console.error('Failed to create project:', error);
 				throw error;
 			}

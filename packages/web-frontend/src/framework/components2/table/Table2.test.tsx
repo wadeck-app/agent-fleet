@@ -103,9 +103,11 @@ describe('Table2', () => {
 		it('shows loading state', () => {
 			const props = createBaseProps({ isLoading: true, data: [] });
 
-			render(<Table2 {...props} columns={mockColumns} getItemId={item => item.id} />);
+			const { container } = render(<Table2 {...props} columns={mockColumns} getItemId={item => item.id} />);
 
-			expect(screen.getByText('Loading...')).toBeInTheDocument();
+			// Check for skeleton rows (animate-pulse class is used for skeleton loading)
+			const skeletonElements = container.querySelectorAll('.animate-pulse');
+			expect(skeletonElements.length).toBeGreaterThan(0);
 		});
 
 		it('does not show data when loading initially', () => {

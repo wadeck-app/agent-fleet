@@ -4,6 +4,7 @@ import { Navigate } from 'react-router-dom';
 import { LoadingSpinner } from '@framework/components/loading/LoadingSpinner';
 import { Button } from '@framework/components/primitives/Button';
 import { TextField } from '@framework/features/forms/fields/TextField';
+import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 
 import { useAuth } from '@app/hooks/useAuth';
 
@@ -74,7 +75,7 @@ export function LoginPage() {
 			// Navigate is handled by useAuth hook
 		} catch (err) {
 			console.error('Login error:', err);
-			setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
+			setError(getErrorMessage(err));
 		} finally {
 			setIsSubmitting(false);
 		}

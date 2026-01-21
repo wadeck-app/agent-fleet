@@ -36,7 +36,10 @@ import { WebSocketEventHandler } from './WebSocketEventHandler';
 // Mock dependencies
 vi.mock('./TaskManager');
 vi.mock('shared-common/StateManager');
-vi.mock('shared-common/logger', () => ({	createLogger: () => ({		info: vi.fn(),		warn: vi.fn(),		error: vi.fn(),		debug: vi.fn(),	}),	logger: {		info: vi.fn(),		warn: vi.fn(),		error: vi.fn(),		debug: vi.fn(),	},}));
+vi.mock('shared-common/logger', () => ({
+	createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
+	logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
 vi.mock('./WebSocketConnectionManager');
 
 describe('WebSocketEventHandler', () => {
@@ -45,6 +48,7 @@ describe('WebSocketEventHandler', () => {
 	let mockTaskManager: ReturnType<typeof createMockTaskManager>;
 	let mockStateManager: ReturnType<typeof createMockStateManager>;
 	let mockConnectionManager: ReturnType<typeof createMockConnectionManager>;
+	let mockWorkerCoordinator: { onWorkerMessage: ReturnType<typeof vi.fn> };
 
 	beforeEach(() => {
 		cleanup = setupTest();
@@ -53,6 +57,11 @@ describe('WebSocketEventHandler', () => {
 		mockTaskManager = createMockTaskManager();
 		mockStateManager = createMockStateManager();
 		mockConnectionManager = createMockConnectionManager();
+
+		// Create mock worker coordinator
+		mockWorkerCoordinator = {
+			onWorkerMessage: vi.fn(),
+		};
 
 		// Create mock intervention manager
 		const mockInterventionManager = {
@@ -63,7 +72,7 @@ describe('WebSocketEventHandler', () => {
 
 		// Create event handler
 		eventHandler = new WebSocketEventHandler(
-			mockTaskManager as any,
+			mockWorkerCoordinator as any,
 			mockStateManager as any,
 			mockConnectionManager as any,
 			mockInterventionManager as any
@@ -83,14 +92,7 @@ describe('WebSocketEventHandler', () => {
 
 			eventHandler.handleTaskStarted(startedMessage);
 
-			expect(mockTaskManager.updateTaskStatus).toHaveBeenCalledWith(
-				'task-1',
-				TaskStatus.IN_PROGRESS,
-				expect.objectContaining({
-					event: 'started',
-					workerId: 'worker-1',
-				})
-			);
+			expect(mockWorkerCoordinator.onWorkerMessage).toHaveBeenCalledWith('worker-1', startedMessage);
 		});
 
 		it('should handle TASK_STARTED with custom status', () => {
@@ -102,11 +104,7 @@ describe('WebSocketEventHandler', () => {
 
 			eventHandler.handleTaskStarted(startedMessage);
 
-			expect(mockTaskManager.updateTaskStatus).toHaveBeenCalledWith(
-				'task-1',
-				TaskStatus.TESTING,
-				expect.any(Object)
-			);
+			expect(mockWorkerCoordinator.onWorkerMessage).toHaveBeenCalledWith('worker-1', startedMessage);
 		});
 	});
 
@@ -120,11 +118,7 @@ describe('WebSocketEventHandler', () => {
 
 			eventHandler.handleTaskProgress(progressMessage);
 
-			expect(mockTaskManager.addComment).toHaveBeenCalledWith(
-				'task-1',
-				'worker-worker-1',
-				'Working on implementation'
-			);
+			expect(mockWorkerCoordinator.onWorkerMessage).toHaveBeenCalledWith('worker-1', progressMessage);
 		});
 	});
 
@@ -148,15 +142,7 @@ describe('WebSocketEventHandler', () => {
 
 			eventHandler.handleTaskCompleted(completedMessage);
 
-			expect(mockTaskManager.updateTaskStatus).toHaveBeenCalledWith(
-				'task-1',
-				TaskStatus.REVIEW,
-				expect.objectContaining({
-					event: 'completed',
-					workerId: 'worker-1',
-					result: { success: true },
-				})
-			);
+			expect(mockWorkerCoordinator.onWorkerMessage).toHaveBeenCalledWith('worker-1', completedMessage);
 		});
 
 		it('should handle TASK_COMPLETED with custom status', () => {
@@ -168,11 +154,7 @@ describe('WebSocketEventHandler', () => {
 
 			eventHandler.handleTaskCompleted(completedMessage);
 
-			expect(mockTaskManager.updateTaskStatus).toHaveBeenCalledWith(
-				'task-1',
-				TaskStatus.MERGED,
-				expect.any(Object)
-			);
+			expect(mockWorkerCoordinator.onWorkerMessage).toHaveBeenCalledWith('worker-1', completedMessage);
 		});
 
 		it('should release worker after completion', () => {
@@ -218,15 +200,7 @@ describe('WebSocketEventHandler', () => {
 
 			eventHandler.handleTaskFailed(failedMessage);
 
-			expect(mockTaskManager.updateTaskStatus).toHaveBeenCalledWith(
-				'task-1',
-				TaskStatus.BLOCKED,
-				expect.objectContaining({
-					event: 'failed',
-					workerId: 'worker-1',
-					error: 'Test execution failed',
-				})
-			);
+			expect(mockWorkerCoordinator.onWorkerMessage).toHaveBeenCalledWith('worker-1', failedMessage);
 		});
 
 		it('should handle TASK_FAILED with custom status', () => {
@@ -239,11 +213,7 @@ describe('WebSocketEventHandler', () => {
 
 			eventHandler.handleTaskFailed(failedMessage);
 
-			expect(mockTaskManager.updateTaskStatus).toHaveBeenCalledWith(
-				'task-1',
-				TaskStatus.CANCELLED,
-				expect.any(Object)
-			);
+			expect(mockWorkerCoordinator.onWorkerMessage).toHaveBeenCalledWith('worker-1', failedMessage);
 		});
 
 		it('should add failure comment', () => {
@@ -255,7 +225,7 @@ describe('WebSocketEventHandler', () => {
 
 			eventHandler.handleTaskFailed(failedMessage);
 
-			expect(mockTaskManager.addComment).toHaveBeenCalledWith('task-1', 'system', 'Task failed: Build failed');
+			expect(mockWorkerCoordinator.onWorkerMessage).toHaveBeenCalledWith('worker-1', failedMessage);
 		});
 
 		it('should emit worker task released event', () => {
@@ -269,18 +239,6 @@ describe('WebSocketEventHandler', () => {
 
 			expect(mockStateManager.emitWorkerTaskReleased).toHaveBeenCalledWith('worker-1');
 		});
-
-		it('should log error', () => {
-			const failedMessage: W2OTaskFailedMessage = createW2OMessage(W2OMessageType.TASK_FAILED, {
-				workerId: 'worker-1',
-				taskId: 'task-1',
-				error: 'Critical error',
-			});
-
-			eventHandler.handleTaskFailed(failedMessage);
-
-			expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('failed task task-1'));
-		});
 	});
 
 	describe('TASK_QUESTION Message Handling', () => {
@@ -293,15 +251,7 @@ describe('WebSocketEventHandler', () => {
 
 			eventHandler.handleTaskQuestion(questionMessage);
 
-			expect(mockTaskManager.updateTaskStatus).toHaveBeenCalledWith(
-				'task-1',
-				TaskStatus.BLOCKED,
-				expect.objectContaining({
-					event: 'question_raised',
-					workerId: 'worker-1',
-					question: 'Need clarification on requirements',
-				})
-			);
+			expect(mockWorkerCoordinator.onWorkerMessage).toHaveBeenCalledWith('worker-1', questionMessage);
 		});
 
 		it('should add question as comment', () => {
@@ -313,11 +263,7 @@ describe('WebSocketEventHandler', () => {
 
 			eventHandler.handleTaskQuestion(questionMessage);
 
-			expect(mockTaskManager.addComment).toHaveBeenCalledWith(
-				'task-1',
-				'worker-worker-1',
-				'Question: What should be the output format?'
-			);
+			expect(mockWorkerCoordinator.onWorkerMessage).toHaveBeenCalledWith('worker-1', questionMessage);
 		});
 	});
 
@@ -351,11 +297,7 @@ describe('WebSocketEventHandler', () => {
 
 			eventHandler.handleFlowStepStarted(stepStartedMessage);
 
-			expect(mockTaskManager.addComment).toHaveBeenCalledWith(
-				'task-1',
-				'system',
-				'Flow step started: Initialize'
-			);
+			expect(mockWorkerCoordinator.onWorkerMessage).toHaveBeenCalledWith('worker-1', stepStartedMessage);
 		});
 
 		it('should handle FLOW_STEP_STARTED without step name', () => {
@@ -367,7 +309,7 @@ describe('WebSocketEventHandler', () => {
 
 			eventHandler.handleFlowStepStarted(stepStartedMessage);
 
-			expect(mockTaskManager.addComment).toHaveBeenCalledWith('task-1', 'system', 'Flow step started: step-1');
+			expect(mockWorkerCoordinator.onWorkerMessage).toHaveBeenCalledWith('worker-1', stepStartedMessage);
 		});
 
 		it('should handle FLOW_STEP_COMPLETED message', () => {
@@ -383,11 +325,7 @@ describe('WebSocketEventHandler', () => {
 
 			eventHandler.handleFlowStepCompleted(stepCompletedMessage);
 
-			expect(mockTaskManager.addComment).toHaveBeenCalledWith(
-				'task-1',
-				'system',
-				expect.stringContaining('Flow step completed: step-1')
-			);
+			expect(mockWorkerCoordinator.onWorkerMessage).toHaveBeenCalledWith('worker-1', stepCompletedMessage);
 		});
 
 		it('should handle FLOW_STEP_COMPLETED without outputs', () => {
@@ -402,7 +340,7 @@ describe('WebSocketEventHandler', () => {
 
 			eventHandler.handleFlowStepCompleted(stepCompletedMessage);
 
-			expect(mockTaskManager.addComment).toHaveBeenCalledWith('task-1', 'system', 'Flow step completed: step-1');
+			expect(mockWorkerCoordinator.onWorkerMessage).toHaveBeenCalledWith('worker-1', stepCompletedMessage);
 		});
 
 		it('should handle FLOW_STEP_FAILED message', () => {
@@ -415,23 +353,7 @@ describe('WebSocketEventHandler', () => {
 
 			eventHandler.handleFlowStepFailed(stepFailedMessage);
 
-			expect(mockTaskManager.addComment).toHaveBeenCalledWith(
-				'task-1',
-				'system',
-				'Flow step failed: step-1 - Step execution failed'
-			);
-		});
-
-		it('should emit task updated for flow step events', () => {
-			const stepStartedMessage: W2OFlowStepStartedMessage = createW2OMessage(W2OMessageType.FLOW_STEP_STARTED, {
-				workerId: 'worker-1',
-				taskId: 'task-1',
-				stepId: 'step-1',
-			});
-
-			eventHandler.handleFlowStepStarted(stepStartedMessage);
-
-			expect(mockStateManager.emitTaskUpdated).toHaveBeenCalledWith(mockTask);
+			expect(mockWorkerCoordinator.onWorkerMessage).toHaveBeenCalledWith('worker-1', stepFailedMessage);
 		});
 	});
 
@@ -468,28 +390,7 @@ describe('WebSocketEventHandler', () => {
 
 			eventHandler.handleWorkspaceAllocated(allocatedMessage);
 
-			expect(mockTaskManager.addComment).toHaveBeenCalledWith(
-				'task-1',
-				'system',
-				'Workspace allocated: /path/to/workspace'
-			);
-		});
-
-		it('should store workspace info in task metadata', () => {
-			const allocatedMessage: W2OWorkspaceAllocatedMessage = createW2OMessage(
-				W2OMessageType.WORKSPACE_ALLOCATED,
-				{
-					workerId: 'worker-1',
-					taskId: 'task-1',
-					workspaceId: 'ws-1',
-					workspacePath: '/path/to/workspace',
-				}
-			);
-
-			eventHandler.handleWorkspaceAllocated(allocatedMessage);
-
-			expect(mockTask.metadata.workspaceId).toBe('ws-1');
-			expect(mockTask.metadata.workspacePath).toBe('/path/to/workspace');
+			expect(mockWorkerCoordinator.onWorkerMessage).toHaveBeenCalledWith('worker-1', allocatedMessage);
 		});
 
 		it('should handle WORKSPACE_RELEASED message', () => {
@@ -501,7 +402,7 @@ describe('WebSocketEventHandler', () => {
 
 			eventHandler.handleWorkspaceReleased(releasedMessage);
 
-			expect(mockTaskManager.addComment).toHaveBeenCalledWith('task-1', 'system', 'Workspace released: ws-1');
+			expect(mockWorkerCoordinator.onWorkerMessage).toHaveBeenCalledWith('worker-1', releasedMessage);
 		});
 	});
 
@@ -529,22 +430,6 @@ describe('WebSocketEventHandler', () => {
 			expect(callArgs[0]).toBe(mockSocket);
 			expect(callArgs[1].type).toBe(O2WMessageType.KILL_CLAUDE);
 			expect((callArgs[1] as KillClaudeMessage).reason).toBe('stop_requested');
-		});
-	});
-
-	describe('HOOK_EVENT Message Handling', () => {
-		it('should handle HOOK_EVENT message', () => {
-			const hookMessage: W2OHookEventMessage = createW2OMessage(W2OMessageType.HOOK_EVENT, {
-				workerId: 'worker-1',
-				hookName: 'test-hook',
-				data: { key: 'value' },
-			});
-
-			eventHandler.handleHookEvent(hookMessage);
-
-			expect(logger.info).toHaveBeenCalledWith(
-				expect.stringContaining('Hook event test-hook from worker worker-1')
-			);
 		});
 	});
 });

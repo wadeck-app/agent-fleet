@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import tseslint from 'typescript-eslint';
 
 import { baseIgnores, baseRules } from '../../eslint.config.mjs';
+import errorHandlingRules from '../../scripts/eslint-rules/error-handling-rules.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -170,13 +171,20 @@ export default tseslint.config(
 		plugins: {
 			react: reactPlugin,
 			'react-hooks': reactHooksPlugin,
+			'error-handling': errorHandlingRules,
 		},
 		settings: {
 			react: {
 				version: 'detect',
 			},
 		},
-		rules: frontendRules,
+		rules: {
+			...frontendRules,
+			// Custom error handling rules
+			'error-handling/require-get-error-message': 'error',
+			'error-handling/require-user-feedback-on-error': 'warn',
+			'error-handling/defensive-array-access': 'warn',
+		},
 	},
 
 	// Low-level UI components - MUST use native HTML elements (they wrap them)

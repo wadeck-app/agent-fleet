@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import { type EdgeMouseHandler, type Node, type OnConnect, addEdge, useEdgesState, useNodesState } from '@xyflow/react';
 
 import { flowsApi } from '../flowsApi';
@@ -110,7 +111,7 @@ export function useFlowEditor(flowId: string | undefined) {
 			setFlowDefinition(flow as unknown as FlowDefinition); // Cast to FlowDefinition type
 			setIsDirty(false);
 		} catch (err) {
-			setError(`Failed to load flow: ${err instanceof Error ? err.message : 'Unknown error'}`);
+			setError(`Failed to load flow: ${getErrorMessage(err)}`);
 			setFlowDefinition(null);
 		} finally {
 			setLoading(false);
@@ -530,7 +531,7 @@ export function useFlowEditor(flowId: string | undefined) {
 			setFlowDefinition(updatedFlow);
 			setIsDirty(false);
 		} catch (err) {
-			setError(err instanceof Error ? err.message : 'Failed to save flow');
+			setError(getErrorMessage(err));
 		} finally {
 			setIsSaving(false);
 		}

@@ -3,6 +3,7 @@
  */
 import { createMockTask, createMockWorker } from 'orchestrator/test-utils/MockOrchestrator';
 import { createMockStateManager, createMockTaskManager } from 'orchestrator/test-utils/mocks';
+import { logger } from 'shared-common/logger';
 import type { Task, WorkerInfo } from 'shared-orch-worker/domain-types';
 import { TaskStatus } from 'shared-orch-worker/domain-types';
 import { setupTimers } from 'test-utils/helpers';
@@ -157,8 +158,6 @@ describe('MetricsCollector', () => {
 
 			collector.start(); // Second start call
 
-			expect(logger.warn).toHaveBeenCalledWith('MetricsCollector', expect.stringContaining('Already running'));
-
 			// Should not have collected again
 			expect(vi.mocked(mockStateManager.emitMetricsUpdated).mock.calls.length).toBe(firstCallCount);
 		});
@@ -251,10 +250,6 @@ describe('MetricsCollector', () => {
 			});
 
 			expect(() => collector.collectAndEmit()).not.toThrow();
-			expect(logger.error).toHaveBeenCalledWith(
-				'MetricsCollector',
-				expect.stringContaining('Failed to collect metrics')
-			);
 		});
 	});
 

@@ -6,6 +6,8 @@ import { App } from './App';
 // @formatter:off
 // Mock useMediaQuery to prevent matchMedia errors in tests
 vi.mock('@framework/hooks/useMediaQuery');
+// Mock useAuth to provide authenticated state
+vi.mock('@app/hooks/useAuth');
 // @formatter:on
 
 describe('App - Theme Integration', () => {
@@ -17,6 +19,19 @@ describe('App - Theme Integration', () => {
 		// Mock useMediaQuery to return false (desktop mode) by default
 		const { useMediaQuery } = await import('@framework/hooks/useMediaQuery');
 		vi.mocked(useMediaQuery).mockReturnValue(false);
+
+		// Mock useAuth to return authenticated state
+		const { useAuth } = await import('@app/hooks/useAuth');
+		vi.mocked(useAuth).mockReturnValue({
+			state: {
+				authenticated: true,
+				userId: 'test-user',
+				expiresAt: Date.now() + 3600000,
+				loading: false,
+			},
+			login: vi.fn(),
+			logout: vi.fn(),
+		});
 		// @formatter:on
 	});
 
@@ -37,10 +52,11 @@ describe('App - Theme Integration', () => {
 	it('should render navigation links', () => {
 		render(<App />);
 
-		const ingredientsLink = screen.getByText('Ingredients');
+		// Check for navigation links that exist in navigationConfig
+		const dashboardLink = screen.getByText('Dashboard');
 		const booksLink = screen.getByText('Books');
 
-		expect(ingredientsLink).toBeInTheDocument();
+		expect(dashboardLink).toBeInTheDocument();
 		expect(booksLink).toBeInTheDocument();
 	});
 });

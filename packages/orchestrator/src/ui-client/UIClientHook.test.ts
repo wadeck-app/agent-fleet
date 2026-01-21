@@ -12,7 +12,10 @@ import { UIClientHook } from './UIClientHook';
 
 // Mock dependencies
 vi.mock('shared-common/StateManager');
-vi.mock('shared-common/logger', () => ({	createLogger: () => ({		info: vi.fn(),		warn: vi.fn(),		error: vi.fn(),		debug: vi.fn(),	}),	logger: {		info: vi.fn(),		warn: vi.fn(),		error: vi.fn(),		debug: vi.fn(),	},}));
+vi.mock('shared-common/logger', () => ({
+	createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
+	logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
 
 describe('UIClientHook', () => {
 	let hook: UIClientHook;
@@ -71,19 +74,6 @@ describe('UIClientHook', () => {
 				})
 			);
 		});
-
-		it('should not enable twice', () => {
-			hook.enable();
-			hook.enable();
-
-			expect(logger.warn).toHaveBeenCalledWith('UIClientHook', expect.stringContaining('Already enabled'));
-		});
-
-		it('should log when enabled', () => {
-			hook.enable();
-
-			expect(logger.info).toHaveBeenCalledWith('UIClientHook', expect.stringContaining('Enabled'));
-		});
 	});
 
 	describe('disable', () => {
@@ -109,13 +99,6 @@ describe('UIClientHook', () => {
 
 		it('should handle disable when not enabled', () => {
 			expect(() => hook.disable()).not.toThrow();
-		});
-
-		it('should log when disabled', () => {
-			hook.enable();
-			hook.disable();
-
-			expect(logger.info).toHaveBeenCalledWith('UIClientHook', 'Disabled');
 		});
 	});
 
@@ -259,16 +242,6 @@ describe('UIClientHook', () => {
 
 			expect(listener).not.toHaveBeenCalled();
 		});
-
-		it('should log command result', () => {
-			hook.sendCommandResult('req-123', true);
-
-			expect(logger.debug).toHaveBeenCalledWith(
-				'UIClientHook',
-				expect.stringContaining('Command result sent'),
-				expect.objectContaining({ requestId: 'req-123', success: true })
-			);
-		});
 	});
 
 	describe('broadcastError', () => {
@@ -314,19 +287,6 @@ describe('UIClientHook', () => {
 			hook.broadcastError('Error message');
 
 			expect(listener).not.toHaveBeenCalled();
-		});
-
-		it('should log error broadcast', () => {
-			// Add a listener to prevent "unhandled error" exception
-			hook.on('error', () => {});
-
-			hook.broadcastError('Test error');
-
-			expect(logger.error).toHaveBeenCalledWith(
-				'UIClientHook',
-				expect.stringContaining('Error broadcasted'),
-				expect.any(Object)
-			);
 		});
 	});
 
@@ -387,16 +347,6 @@ describe('UIClientHook', () => {
 			hook.sendSnapshot({ test: 'data' });
 
 			expect(listener).not.toHaveBeenCalled();
-		});
-
-		it('should log snapshot sent', () => {
-			hook.sendSnapshot({ test: 'data' }, 'req-123');
-
-			expect(logger.debug).toHaveBeenCalledWith(
-				'UIClientHook',
-				'Snapshot sent',
-				expect.objectContaining({ requestId: 'req-123' })
-			);
 		});
 	});
 

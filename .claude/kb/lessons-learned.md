@@ -3001,3 +3001,52 @@ const { effectiveIds, handleAssociate, handleDissociate } = useOptimisticAssocia
 **Impact**: Bug fix in one place fixes both dialogs. No repetition.
 
 **Action**: Next time you write `const [something...` for the 2nd time, STOP and extract it first.
+
+## API Error Display - Always Use getErrorMessage()
+
+**Problem**: Zod validation errors from API were displayed as generic "ValidationError" in toasts instead of user-friendly messages like "description: Description is required".
+
+**Root Cause**: Components were directly accessing `error.message` instead of using the `ApiError.getUserMessage()` method that properly formats Zod validation errors.
+
+**Discovery**: January 2025 - User reported seeing "ValidationError" toast when creating a task without a description, which is not actionable UX.
+
+**Solution**: Use the centralized `getErrorMessage()` utility function from `@framework/utils/errors/errorUtils`:
+
+```typescript
+// ❌ BAD - Direct error message access
+catch (error) {
+  const errorMessage = error instanceof Error ? error.message : 'Failed to create';
+  showToast(errorMessage, 'error');
+}
+
+// ✅ GOOD - Use getErrorMessage utility
+import { getErrorMessage } from '@framework/utils/errors/errorUtils';
+
+catch (error) {
+  showToast(getErrorMessage(error), 'error');
+}
+```
+
+**What getErrorMessage() does**:
+
+1. Checks if error is `ApiError` and calls `getUserMessage()` method
+2. Extracts field names from Zod's `path[]` array in validation errors
+3. Formats as "fieldName: error message" (e.g., "description: Description is required")
+4. Falls back to standard error messages for non-API errors
+
+**Files Updated**:
+
+- `packages/web-frontend/src/framework/api/api-base.ts:71-90` - Fixed `getUserMessage()` to handle Zod's `path[]` format
+- `CreateTaskDialog.tsx`, `CreateProjectDialog.tsx`, `EditProjectDialog.tsx` - Replaced manual error handling with `getErrorMessage()`
+
+**Pattern**: This utility already existed in the codebase (`errorUtils.ts`) but wasn't being used consistently. Always check for existing utilities before implementing error handling manually.
+
+**Action**: When displaying API errors to users, ALWAYS use `getErrorMessage(error)`. Never access `error.message` directly.
+
+**Prevention**: Custom ESLint rules now enforce this pattern automatically:
+
+- `error-handling/require-get-error-message` (error): Prevents direct `error.message` access
+- `error-handling/require-user-feedback-on-error` (warn): Requires showToast in catch blocks
+- `error-handling/defensive-array-access` (warn): Requires `|| []` for API array properties
+
+See `scripts/eslint-rules/README.md` for details. Run `npm run lint` to check violations.

@@ -12,6 +12,7 @@ import { TextAreaField } from '@framework/features/forms/fields/TextAreaField';
 import { TextField } from '@framework/features/forms/fields/TextField';
 import { useFormState } from '@framework/features/forms/useFormState';
 import { useToast } from '@framework/features/toast/ToastContext';
+import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { Project, UpdateProject } from '@shared/api/projects.contract';
 
 import { projectsApi } from './projects.api';
@@ -98,7 +99,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: Ed
 				onSuccess();
 				onOpenChange(false);
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : 'Failed to update project';
+				const errorMessage = getErrorMessage(error);
 
 				// Handle version mismatch gracefully
 				if (errorMessage.includes('version') || errorMessage.includes('optimistic')) {

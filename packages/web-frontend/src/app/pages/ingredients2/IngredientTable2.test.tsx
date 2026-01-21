@@ -79,10 +79,10 @@ describe('IngredientTable2', () => {
 
 			render(<IngredientTable2 {...props} />);
 
-			// Check column headers
+			// Check column headers - use getAllByText for headers that may appear multiple times
 			expect(screen.getByText('Name')).toBeInTheDocument();
 			expect(screen.getByText('Calories')).toBeInTheDocument();
-			expect(screen.getByText('Protein')).toBeInTheDocument();
+			expect(screen.getAllByText('Protein').length).toBeGreaterThan(0); // Header + category value
 			expect(screen.getByText('Carbs')).toBeInTheDocument();
 			expect(screen.getByText('Fat')).toBeInTheDocument();
 			expect(screen.getByText('Category')).toBeInTheDocument();
@@ -110,7 +110,8 @@ describe('IngredientTable2', () => {
 
 			render(<IngredientTable2 {...props} />);
 
-			expect(screen.getByText('Protein')).toBeInTheDocument();
+			// Use getAllByText for "Protein" since it appears as both header and category
+			expect(screen.getAllByText('Protein').length).toBeGreaterThanOrEqual(2); // Header + category value
 			expect(screen.getByText('Grain')).toBeInTheDocument();
 			expect(screen.getByText('Vegetable')).toBeInTheDocument();
 		});
@@ -148,9 +149,11 @@ describe('IngredientTable2', () => {
 		it('shows loading state', () => {
 			const props = createBaseProps({ isLoading: true, data: [] });
 
-			render(<IngredientTable2 {...props} />);
+			const { container } = render(<IngredientTable2 {...props} />);
 
-			expect(screen.getByText('Loading...')).toBeInTheDocument();
+			// Check for skeleton rows (animate-pulse class is used for skeleton loading)
+			const skeletonElements = container.querySelectorAll('.animate-pulse');
+			expect(skeletonElements.length).toBeGreaterThan(0);
 		});
 	});
 

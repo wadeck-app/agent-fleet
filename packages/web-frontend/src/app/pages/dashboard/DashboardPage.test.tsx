@@ -225,7 +225,10 @@ describe('DashboardPage', () => {
 
 			render(<DashboardPage />);
 
-			expect(screen.getByText('Refresh')).toBeInTheDocument();
+			// Refresh button is now an icon-only button in PageHeader
+			const refreshButtons = screen.getAllByRole('button');
+			const refreshButton = refreshButtons.find(btn => btn.querySelector('svg'));
+			expect(refreshButton).toBeInTheDocument();
 		});
 
 		it('should call refresh when refresh button is clicked', async () => {
@@ -241,8 +244,12 @@ describe('DashboardPage', () => {
 
 			render(<DashboardPage />);
 
-			const refreshButton = screen.getByText('Refresh');
-			fireEvent.click(refreshButton);
+			// Find the refresh button by its SVG icon
+			const refreshButtons = screen.getAllByRole('button');
+			const refreshButton = refreshButtons.find(btn => btn.querySelector('svg'));
+			expect(refreshButton).toBeInTheDocument();
+
+			fireEvent.click(refreshButton!);
 
 			await waitFor(() => {
 				expect(mockRefresh).toHaveBeenCalledOnce();
@@ -262,8 +269,12 @@ describe('DashboardPage', () => {
 
 			render(<DashboardPage />);
 
-			const refreshButton = screen.getByText('Refresh');
-			fireEvent.click(refreshButton);
+			// Find the refresh button by its SVG icon
+			const refreshButtons = screen.getAllByRole('button');
+			const refreshButton = refreshButtons.find(btn => btn.querySelector('svg'));
+			expect(refreshButton).toBeInTheDocument();
+
+			fireEvent.click(refreshButton!);
 
 			// Button should be disabled immediately
 			expect(refreshButton).toBeDisabled();

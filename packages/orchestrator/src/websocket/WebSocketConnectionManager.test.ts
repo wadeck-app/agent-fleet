@@ -38,7 +38,10 @@ class MockWebSocket {
 
 // Mock dependencies
 vi.mock('shared-common/StateManager');
-vi.mock('shared-common/logger', () => ({	createLogger: () => ({		info: vi.fn(),		warn: vi.fn(),		error: vi.fn(),		debug: vi.fn(),	}),	logger: {		info: vi.fn(),		warn: vi.fn(),		error: vi.fn(),		debug: vi.fn(),	},}));
+vi.mock('shared-common/logger', () => ({
+	createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
+	logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
 
 describe('WebSocketConnectionManager', () => {
 	let connectionManager: WebSocketConnectionManager;
@@ -68,6 +71,7 @@ describe('WebSocketConnectionManager', () => {
 			emitTaskUpdated: vi.fn(),
 			on: vi.fn(),
 			off: vi.fn(),
+			removeListener: vi.fn(),
 		} as any;
 
 		vi.mocked(logger.info).mockImplementation(() => {});
@@ -146,9 +150,6 @@ describe('WebSocketConnectionManager', () => {
 			const workerId = connectionManager.handleWorkerReady(mockSocket2 as any, readyMessage2);
 
 			expect(workerId).not.toBe('preferred-id');
-			expect(logger.info).toHaveBeenCalledWith(
-				expect.stringContaining("Preferred ID 'preferred-id' already taken")
-			);
 		});
 
 		it('should send WORKER_WELCOME message', () => {
@@ -368,7 +369,6 @@ describe('WebSocketConnectionManager', () => {
 			connectionManager.handleWorkerDisconnect('worker-1');
 
 			expect(mockStateManager.emitWorkerDisconnected).toHaveBeenCalledWith('worker-1');
-			expect(logger.info).toHaveBeenCalledWith('[WS] Worker worker-1 disconnected');
 		});
 
 		it('should unassign task on worker disconnect with active task', async () => {

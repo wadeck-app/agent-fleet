@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 
 import { Input } from '@framework/components/forms/Input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
+import { LoadingDots } from '@framework/components/loading/LoadingDots';
 import {
 	Dialog,
 	DialogContent,
@@ -15,20 +16,16 @@ import type { LogEntry as LogEntryType, LogLevel } from '@shared/api/tasks.contr
 import { Download, RefreshCw } from 'lucide-react';
 
 import { useAutoScroll } from '../hooks/useAutoScroll';
-import type { SequenceGap } from '../hooks/useTaskLogs';
 import { LogEntry } from './LogEntry';
-import { LogGap } from './LogGap';
 
 interface TaskLogsViewerProps {
 	logs: LogEntryType[];
-	gaps: SequenceGap[];
 	isRunning: boolean;
 	isLoading: boolean;
 	hasMore: boolean;
 	isLoadingMore: boolean;
 	onLoadMore: () => void;
 	onRefresh: () => void;
-	onFetchGap: (gap: SequenceGap) => Promise<void>;
 	// Filters
 	level?: LogLevel;
 	search?: string;
@@ -41,14 +38,12 @@ interface TaskLogsViewerProps {
  */
 export function TaskLogsViewer({
 	logs,
-	gaps,
 	isRunning,
 	isLoading,
 	hasMore,
 	isLoadingMore,
 	onLoadMore,
 	onRefresh,
-	onFetchGap,
 	level,
 	search,
 	onLevelChange,
@@ -177,23 +172,16 @@ export function TaskLogsViewer({
 					</div>
 				) : (
 					<>
-						{logs.map(log => {
-							// Find if there's a gap after this log
-							const gapAfter = gaps.find(g => g.afterSequence === log.sequence);
+						{logs.map(log => (
+							<LogEntry key={log.id} log={log} onExpand={setExpandedLog} />
+						))}
 
-							return (
-								<div key={log.id}>
-									<LogEntry log={log} onExpand={setExpandedLog} />
-									{gapAfter && (
-										<LogGap
-											key={`gap-${gapAfter.afterSequence}`}
-											gap={gapAfter}
-											onFetchGap={onFetchGap}
-										/>
-									)}
-								</div>
-							);
-						})}
+						{/* Running indicator */}
+						{isRunning && (
+							<div className="flex justify-center py-4">
+								<LoadingDots size="small" className="text-muted-foreground" />
+							</div>
+						)}
 
 						{/* Load More Button */}
 						{hasMore && (

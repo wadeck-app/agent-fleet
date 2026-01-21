@@ -94,7 +94,7 @@ export function useIngredients(params?: UseIngredientsParams): UseIngredientsRes
 			setIngredients(data.items);
 			setPagination(data.pagination ?? null);
 		} catch (err) {
-			const message = err instanceof Error ? err.message : 'Failed to load ingredients';
+			const message = getErrorMessage(err);
 			setError(message);
 			console.error('Error loading ingredients:', err);
 		} finally {
@@ -207,7 +207,7 @@ export function useIngredients(params?: UseIngredientsParams): UseIngredientsRes
 			} catch (err) {
 				// Ignore aborted requests
 				if (!signal.aborted) {
-					const message = err instanceof Error ? err.message : 'Failed to load ingredients';
+					const message = getErrorMessage(err);
 					setError(message);
 					console.error('Error loading ingredients:', err);
 				}

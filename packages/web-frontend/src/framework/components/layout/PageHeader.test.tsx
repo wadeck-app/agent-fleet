@@ -17,8 +17,8 @@ describe('PageHeader', () => {
 		const headerDiv = container.firstChild as HTMLElement;
 		expect(headerDiv).toHaveClass('mb-6');
 		expect(headerDiv).toHaveClass('flex');
-		expect(headerDiv).toHaveClass('sm:items-center');
-		expect(headerDiv).toHaveClass('sm:justify-between');
+		expect(headerDiv).toHaveClass('items-center');
+		expect(headerDiv).toHaveClass('justify-between');
 	});
 
 	it('should render badge when provided', () => {

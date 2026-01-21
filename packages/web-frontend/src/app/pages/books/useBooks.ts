@@ -82,7 +82,7 @@ export function useBooks(params?: UseBooksParams): UseBooksResult {
 			setBooks(data.items);
 			setPagination(data.pagination ?? null);
 		} catch (err) {
-			const message = err instanceof Error ? err.message : 'Failed to load books';
+			const message = getErrorMessage(err);
 			setError(message);
 			console.error('Error loading books:', err);
 		} finally {
@@ -235,7 +235,7 @@ export function useBooks(params?: UseBooksParams): UseBooksResult {
 			} catch (err) {
 				// Ignore aborted requests
 				if (!signal.aborted) {
-					const message = err instanceof Error ? err.message : 'Failed to load books';
+					const message = getErrorMessage(err);
 					setError(message);
 					console.error('Error loading books:', err);
 				}

@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { ColorPicker } from '@framework/components/pickers/ColorPicker';
 import { Button } from '@framework/components/primitives/Button';
 import { useAsyncData } from '@framework/hooks/useAsyncData';
+import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { Workspace } from '@shared/api/workspaces.contract';
 
 import { ProjectSelect } from './ProjectSelect';
@@ -55,7 +56,7 @@ export function EditWorkspaceDialog({ workspace, open, onClose, onSave }: EditWo
 			});
 			onClose();
 		} catch (err) {
-			setError(err instanceof Error ? err.message : 'Failed to update workspace');
+			setError(getErrorMessage(err));
 		} finally {
 			setIsSaving(false);
 		}

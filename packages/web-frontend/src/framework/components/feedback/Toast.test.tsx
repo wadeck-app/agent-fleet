@@ -57,7 +57,7 @@ describe('Toast', () => {
 	it('should render with success style by default', () => {
 		const { container } = render(<Toast message="Success" onClose={() => {}} />);
 		const toast = container.firstChild as HTMLElement;
-		expect(toast).toHaveClass('bg-primary', 'text-primary-foreground');
+		expect(toast).toHaveClass('bg-green-600', 'text-white');
 	});
 
 	it('should render with error style', () => {

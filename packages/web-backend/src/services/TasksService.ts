@@ -571,44 +571,17 @@ export class TasksService {
 					nextCursor: null,
 					total: 0,
 					isRunning,
-					minSequence: 0,
-					maxSequence: 0,
 				};
 			}
 
-			// Convert steps to log entries with global sequence numbers
+			// Convert steps to log entries with server-side timestamps
 			let allLogs: LogEntry[] = [];
-			let minSeq = Infinity;
-			let maxSeq = -1;
+			let logCounter = 0; // Counter for unique IDs within this batch
 
-			steps.forEach((step: any, stepIndex: number) => {
-				// Calculate global step index (accounts for pagination)
-				const globalStepIndex = (query.cursor || 0) + stepIndex;
-				// Base sequence = globalStepIndex * 10 (leaves room for sub-entries)
-				const baseSequence = globalStepIndex * 10;
-
-				// If sequenceStart/sequenceEnd provided, skip steps outside the range
-				if (query.sequenceStart !== undefined && query.sequenceEnd !== undefined) {
-					// Calculate base sequences for the gap boundaries
-					const gapStartBase = Math.floor(query.sequenceStart / 10) * 10;
-					const gapEndBase = Math.floor(query.sequenceEnd / 10) * 10;
-
-					// Include steps whose base sequence is strictly between the gap base boundaries
-					// Example: gap between seq 23 (base 20) and seq 30 (base 30)
-					// We want steps with base > 20 AND base < 30 (none in this case, correct!)
-					// Example: gap between seq 23 (base 20) and seq 40 (base 40)
-					// We want steps with base > 20 AND base < 40 (includes base 30)
-					if (baseSequence <= gapStartBase || baseSequence >= gapEndBase) {
-						return; // Skip this step
-					}
-				}
-
-				let currentSeq = globalStepIndex * 10;
-
+			steps.forEach((step: any) => {
 				// Main step entry
 				const stepLog: LogEntry = {
-					id: `${taskId}-${currentSeq}`,
-					sequence: currentSeq++,
+					id: `${taskId}-${step.stepId}-${logCounter++}`,
 					timestamp: step.startTime,
 					level: this.inferLogLevel(step),
 					message: this.formatStepMessage(step),
@@ -626,9 +599,9 @@ export class TasksService {
 				// Add additional logs for detailed output (prompt, response, stdout, stderr)
 				if (step.prompt) {
 					allLogs.push({
-						id: `${taskId}-${currentSeq}`,
-						sequence: currentSeq++,
-						timestamp: step.startTime + 1,
+						id: `${taskId}-${step.stepId}-${logCounter++}`,
+						timestamp: step.startTime + 1, // Slight offset for ordering within step
+
 						level: 'debug' as LogLevel,
 						message: `Prompt: ${step.prompt.substring(0, 200)}${step.prompt.length > 200 ? '...' : ''}`,
 						stepId: step.stepId,
@@ -640,8 +613,7 @@ export class TasksService {
 
 				if (step.response) {
 					allLogs.push({
-						id: `${taskId}-${currentSeq}`,
-						sequence: currentSeq++,
+						id: `${taskId}-${step.stepId}-${logCounter++}`,
 						timestamp: step.endTime || step.startTime + 2,
 						level: 'info' as LogLevel,
 						message: `Response: ${step.response.substring(0, 200)}${step.response.length > 200 ? '...' : ''}`,
@@ -654,8 +626,7 @@ export class TasksService {
 
 				if (step.stdout) {
 					allLogs.push({
-						id: `${taskId}-${currentSeq}`,
-						sequence: currentSeq++,
+						id: `${taskId}-${step.stepId}-${logCounter++}`,
 						timestamp: step.endTime || step.startTime + 3,
 						level: 'info' as LogLevel,
 						message: `stdout: ${step.stdout.substring(0, 200)}${step.stdout.length > 200 ? '...' : ''}`,
@@ -668,8 +639,7 @@ export class TasksService {
 
 				if (step.stderr) {
 					allLogs.push({
-						id: `${taskId}-${currentSeq}`,
-						sequence: currentSeq++,
+						id: `${taskId}-${step.stepId}-${logCounter++}`,
 						timestamp: step.endTime || step.startTime + 4,
 						level: 'error' as LogLevel,
 						message: `stderr: ${step.stderr.substring(0, 200)}${step.stderr.length > 200 ? '...' : ''}`,
@@ -679,10 +649,6 @@ export class TasksService {
 						metadata: { fullStderr: step.stderr },
 					});
 				}
-
-				// Track min/max sequences for this batch
-				minSeq = Math.min(minSeq, globalStepIndex * 10);
-				maxSeq = Math.max(maxSeq, currentSeq - 1);
 			});
 
 			// Apply filters
@@ -696,14 +662,12 @@ export class TasksService {
 			}
 
 			// Note: Pagination already done by TraceChunkStorage
-			// We return the logs as-is with the cursor from the storage
+			// Logs are ordered by timestamp (server-side) for correct display
 			return {
 				logs: allLogs,
 				nextCursor: stepsCursor,
 				total: stepsTotal,
 				isRunning,
-				minSequence: minSeq === Infinity ? 0 : minSeq,
-				maxSequence: maxSeq === -1 ? 0 : maxSeq,
 			};
 		} catch (error) {
 			log.error(`Failed to fetch logs for task ${taskId}:`, error);
