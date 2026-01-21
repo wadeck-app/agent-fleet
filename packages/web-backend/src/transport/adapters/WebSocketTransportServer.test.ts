@@ -81,7 +81,13 @@ describe('WebSocketTransportServer', () => {
 		authService = new MockAuthService('test-secret');
 
 		// Create factory with mock orchestrator
-		const mockOrchestrator = {} as Orchestrator;
+		const mockOrchestrator = {
+			getWsServer: vi.fn(),
+			getTaskManager: vi.fn(),
+			getWorkspaceManager: vi.fn(),
+			getInterventionManager: vi.fn(),
+			getBackendEventBridge: vi.fn(),
+		} as unknown as Orchestrator;
 		factory = new DataStoreFactory('memory', mockOrchestrator);
 
 		// Create session manager
