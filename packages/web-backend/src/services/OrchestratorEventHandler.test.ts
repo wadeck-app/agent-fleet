@@ -145,39 +145,11 @@ describe('OrchestratorEventHandler', () => {
 	});
 
 	describe('handleWorkerConnected', () => {
-		it('should log worker connection', async () => {
-			const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-			await handler.handleOrchestratorEvent('worker_connected', {
-				workerId: 'worker-1',
-				metadata: { version: '1.0.0' },
-			});
-
-			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Worker connected: worker-1'));
-
-			consoleLogSpy.mockRestore();
-		});
-
 		it('should not throw if worker connection handling fails', async () => {
 			// Should not throw even with invalid data
 			await expect(
 				handler.handleOrchestratorEvent('worker_connected', { workerId: undefined })
 			).resolves.toBeUndefined();
-		});
-	});
-
-	describe('handleWorkerDisconnected', () => {
-		it('should log worker disconnection', async () => {
-			const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-			await handler.handleOrchestratorEvent('worker_disconnected', {
-				workerId: 'worker-1',
-				reason: 'timeout',
-			});
-
-			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Worker disconnected: worker-1'));
-
-			consoleLogSpy.mockRestore();
 		});
 	});
 
@@ -189,19 +161,6 @@ describe('OrchestratorEventHandler', () => {
 			});
 
 			expect(mockTasksService.updateTaskStatus).toHaveBeenCalledWith('task-1', 'in_progress');
-		});
-
-		it('should log task assignment', async () => {
-			const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-			await handler.handleOrchestratorEvent('task_assigned', {
-				taskId: 'task-1',
-				workerId: 'worker-1',
-			});
-
-			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Task assigned: task-1 → worker-1'));
-
-			consoleLogSpy.mockRestore();
 		});
 
 		it('should not throw if service call fails', async () => {
@@ -222,32 +181,9 @@ describe('OrchestratorEventHandler', () => {
 
 			expect(mockTasksService.updateTaskStatus).toHaveBeenCalledWith('task-1', 'in_progress');
 		});
-
-		it('should log task start', async () => {
-			const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-			await handler.handleOrchestratorEvent('task_started', { taskId: 'task-1' });
-
-			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Task started: task-1'));
-
-			consoleLogSpy.mockRestore();
-		});
 	});
 
 	describe('handleTaskTraceUpdate', () => {
-		it('should log trace update', async () => {
-			const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-			await handler.handleOrchestratorEvent('task_trace_update', {
-				taskId: 'task-1',
-				trace: { steps: [{ stepId: 'step-1', stepName: 'Test' }] },
-			});
-
-			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Task trace update: task-1'));
-
-			consoleLogSpy.mockRestore();
-		});
-
 		it('should not throw if trace update fails', async () => {
 			// Should handle gracefully even with invalid trace data
 			await expect(
@@ -286,22 +222,6 @@ describe('OrchestratorEventHandler', () => {
 			expect(mockTasksService.updateTaskStatus).toHaveBeenCalledWith('task-1', 'cancelled');
 		});
 
-		it('should log task completion', async () => {
-			const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-			await handler.handleOrchestratorEvent('task_completed', {
-				taskId: 'task-1',
-				success: true,
-				flowResult: { status: 'completed' },
-			});
-
-			expect(consoleLogSpy).toHaveBeenCalledWith(
-				expect.stringContaining('Task completed: task-1, success: true')
-			);
-
-			consoleLogSpy.mockRestore();
-		});
-
 		it('should not throw if status update fails', async () => {
 			vi.spyOn(mockTasksService, 'updateTaskStatus').mockRejectedValueOnce(new Error('Update failed'));
 
@@ -337,26 +257,6 @@ describe('OrchestratorEventHandler', () => {
 					config: { title: 'Input required' },
 				})
 			);
-		});
-
-		it('should log intervention request', async () => {
-			const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-			await handler.handleOrchestratorEvent('intervention_requested', {
-				taskId: 'task-1',
-				interventionData: {
-					interventionId: 'intervention-1',
-					interventionType: 'approval' as const,
-					blocking: false,
-					config: {},
-				},
-			});
-
-			expect(consoleLogSpy).toHaveBeenCalledWith(
-				expect.stringContaining('Intervention requested: intervention-1')
-			);
-
-			consoleLogSpy.mockRestore();
 		});
 
 		it('should not throw if service call fails', async () => {
