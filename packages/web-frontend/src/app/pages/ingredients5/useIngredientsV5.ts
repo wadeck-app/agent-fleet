@@ -16,9 +16,8 @@ export function useIngredientsV5(params: {
 	search?: string;
 }) {
 	// Add comment above the target line, not at the end
-	// Note: useIngredients doesn't support search yet, so we ignore it for now
-	const { search: _search, ...restParams } = params;
-	const result = useIngredients(restParams);
+	// Pass all params including search to useIngredients
+	const result = useIngredients(params);
 
 	// Add comment above the target line, not at the end
 	// Convert string error to Error object for useCrudPage compatibility

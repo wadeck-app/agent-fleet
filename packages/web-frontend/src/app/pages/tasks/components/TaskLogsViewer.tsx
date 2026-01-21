@@ -15,16 +15,20 @@ import type { LogEntry as LogEntryType, LogLevel } from '@shared/api/tasks.contr
 import { Download, RefreshCw } from 'lucide-react';
 
 import { useAutoScroll } from '../hooks/useAutoScroll';
+import type { SequenceGap } from '../hooks/useTaskLogs';
 import { LogEntry } from './LogEntry';
+import { LogGap } from './LogGap';
 
 interface TaskLogsViewerProps {
 	logs: LogEntryType[];
+	gaps: SequenceGap[];
 	isRunning: boolean;
 	isLoading: boolean;
 	hasMore: boolean;
 	isLoadingMore: boolean;
 	onLoadMore: () => void;
 	onRefresh: () => void;
+	onFetchGap: (gap: SequenceGap) => Promise<void>;
 	// Filters
 	level?: LogLevel;
 	search?: string;
@@ -37,12 +41,14 @@ interface TaskLogsViewerProps {
  */
 export function TaskLogsViewer({
 	logs,
+	gaps,
 	isRunning,
 	isLoading,
 	hasMore,
 	isLoadingMore,
 	onLoadMore,
 	onRefresh,
+	onFetchGap,
 	level,
 	search,
 	onLevelChange,
@@ -73,7 +79,11 @@ export function TaskLogsViewer({
 		return (
 			<div className="flex h-full items-center justify-center">
 				<div className="text-center">
-					<RefreshCw className={`mx-auto mb-2 size-8 animate-spin text-muted-foreground`} />
+					<RefreshCw
+						className={`
+       mx-auto mb-2 size-8 animate-spin text-muted-foreground
+     `}
+					/>
 					<p className="text-sm text-muted-foreground">Loading logs...</p>
 				</div>
 			</div>
@@ -122,7 +132,11 @@ export function TaskLogsViewer({
 						className="flex items-center gap-1 text-xs text-success"
 						title="Task is currently running and receiving real-time log updates"
 					>
-						<span className={`inline-block size-2 animate-pulse rounded-full bg-success`} />
+						<span
+							className={`
+        inline-block size-2 animate-pulse rounded-full bg-success
+      `}
+						/>
 						Live
 					</span>
 				)}
@@ -163,9 +177,23 @@ export function TaskLogsViewer({
 					</div>
 				) : (
 					<>
-						{logs.map(log => (
-							<LogEntry key={log.id} log={log} onExpand={setExpandedLog} />
-						))}
+						{logs.map(log => {
+							// Find if there's a gap after this log
+							const gapAfter = gaps.find(g => g.afterSequence === log.sequence);
+
+							return (
+								<div key={log.id}>
+									<LogEntry log={log} onExpand={setExpandedLog} />
+									{gapAfter && (
+										<LogGap
+											key={`gap-${gapAfter.afterSequence}`}
+											gap={gapAfter}
+											onFetchGap={onFetchGap}
+										/>
+									)}
+								</div>
+							);
+						})}
 
 						{/* Load More Button */}
 						{hasMore && (

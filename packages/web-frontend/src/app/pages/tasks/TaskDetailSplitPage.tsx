@@ -42,6 +42,7 @@ export function TaskDetailSplitPage() {
 	// Fetch logs with pagination
 	const {
 		logs,
+		gaps,
 		total: _total,
 		isRunning,
 		isLoading: isLogsLoading,
@@ -50,6 +51,7 @@ export function TaskDetailSplitPage() {
 		isLoadingMore,
 		refetch,
 		appendNewLogs,
+		fetchGap,
 	} = useTaskLogs({
 		taskId,
 		level,
@@ -118,12 +120,14 @@ export function TaskDetailSplitPage() {
 				<div className="overflow-hidden rounded-lg border border-border bg-card">
 					<TaskLogsViewer
 						logs={logs}
+						gaps={gaps}
 						isRunning={isRunning}
 						isLoading={isLogsLoading}
 						hasMore={hasMore}
 						isLoadingMore={isLoadingMore}
 						onLoadMore={loadMore}
 						onRefresh={refetch}
+						onFetchGap={fetchGap}
 						level={level}
 						search={search}
 						onLevelChange={setLevel}

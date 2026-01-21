@@ -16,7 +16,7 @@ describe('TasksService - Deterministic Log IDs and Sequences', () => {
 		steps: Array<{ stepId: string; prompt?: string; response?: string; stdout?: string; stderr?: string }>,
 		cursor: number = 0
 	): { logs: LogEntry[]; minSequence: number; maxSequence: number } {
-		let allLogs: LogEntry[] = [];
+		const allLogs: LogEntry[] = [];
 		let minSeq = Infinity;
 		let maxSeq = -1;
 

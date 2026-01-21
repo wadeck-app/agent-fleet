@@ -32,6 +32,7 @@ export interface UseIngredientsParams {
 	pageSize?: number;
 	sortBy?: string;
 	sortOrder?: string;
+	search?: string;
 }
 
 export interface UseIngredientsResult {

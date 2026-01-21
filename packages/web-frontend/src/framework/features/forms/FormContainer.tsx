@@ -19,15 +19,30 @@ import { Button } from '@framework/components/primitives/Button';
  * ===========================================================================================
  */
 
+export interface SecondaryAction {
+	label: string;
+	onClick: () => void;
+	disabled?: boolean;
+	variant?: 'default' | 'outline' | 'ghost';
+}
+
 export interface FormContainerProps {
 	isSubmitting: boolean;
 	onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
 	onCancel: () => void;
 	submitLabel: string;
 	children: React.ReactNode;
+	secondaryActions?: SecondaryAction[];
 }
 
-export function FormContainer({ isSubmitting, onSubmit, onCancel, submitLabel, children }: FormContainerProps) {
+export function FormContainer({
+	isSubmitting,
+	onSubmit,
+	onCancel,
+	submitLabel,
+	children,
+	secondaryActions,
+}: FormContainerProps) {
 	return (
 		<form onSubmit={onSubmit}>
 			<div
@@ -43,6 +58,17 @@ export function FormContainer({ isSubmitting, onSubmit, onCancel, submitLabel, c
 				<Button type="submit" disabled={isSubmitting}>
 					{isSubmitting ? 'Saving...' : submitLabel}
 				</Button>
+				{secondaryActions?.map((action, index) => (
+					<Button
+						key={index}
+						type="button"
+						variant={action.variant || 'default'}
+						onClick={action.onClick}
+						disabled={action.disabled ?? isSubmitting}
+					>
+						{action.label}
+					</Button>
+				))}
 				<Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
 					Cancel
 				</Button>

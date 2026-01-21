@@ -5,6 +5,7 @@
 **USER EXPLICIT INSTRUCTION**: "Histoire de valider que le systeme de orderId/timestamp fonctionne, je veux que tu implementes ca, que tu le test, AVANT de corriger les duplication d'events"
 
 **Implementation Order**:
+
 1. **FIRST**: Implement Phase 2 (Sequence Number System) - Lines 248-406
 2. **Test thoroughly** with controlledPromise tests
 3. **THEN**: Implement Phase 1 (Root Cause Fixes) - Lines 108-244

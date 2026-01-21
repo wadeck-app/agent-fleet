@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { CrudDialog } from '@framework/components/overlays/CrudDialog';
-import { FormContainer } from '@framework/features/forms/FormContainer';
+import { FormContainer, type SecondaryAction } from '@framework/features/forms/FormContainer';
 import { ComboboxField, type ComboboxOption } from '@framework/features/forms/fields/ComboboxField';
 import { SelectField } from '@framework/features/forms/fields/SelectField';
 import { TextAreaField } from '@framework/features/forms/fields/TextAreaField';
@@ -41,6 +42,7 @@ const defaultFormData: CreateTaskFormData = {
 };
 
 export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDialogProps) {
+	const navigate = useNavigate();
 	const { showToast } = useToast();
 	const { data: workersData, loading: workersLoading } = useWorkers();
 	const [workerFlowsMetadata, setWorkerFlowsMetadata] = useState<FlowMetadata[]>([]);
@@ -207,6 +209,39 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 		disabled: !flow.isValid, // Disable invalid flows
 	}));
 
+	// Handler for "Create and open" button
+	const handleCreateAndOpen = async () => {
+		// Transform flat form data to nested CreateTask structure
+		const createTaskData: CreateTask = {
+			description: formState.formData.description,
+			priority: formState.formData.priority as CreateTask['priority'],
+			assignedTo: { workerId: formState.formData.workerId },
+			projectId: formState.formData.projectId?.trim() || undefined,
+			flowId: formState.formData.flowId?.trim() || undefined,
+			flowInputs: formState.formData.flowId && Object.keys(flowInputs).length > 0 ? flowInputs : undefined,
+		};
+
+		try {
+			const createdTask = await tasksService.createTask(createTaskData);
+			showToast('Task created successfully', 'success');
+			onSuccess();
+			onOpenChange(false);
+			navigate(`/tasks/${createdTask.id}`);
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : 'Failed to create task';
+			showToast(errorMessage, 'error');
+			console.error('Failed to create task:', error);
+		}
+	};
+
+	const secondaryActions: SecondaryAction[] = [
+		{
+			label: 'Create and open',
+			onClick: handleCreateAndOpen,
+			variant: 'default',
+		},
+	];
+
 	return (
 		<CrudDialog
 			open={open}
@@ -220,6 +255,7 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 				onSubmit={formState.handleSubmit}
 				onCancel={() => onOpenChange(false)}
 				submitLabel="Create Task"
+				secondaryActions={secondaryActions}
 			>
 				<div className="col-span-2">
 					<TextAreaField

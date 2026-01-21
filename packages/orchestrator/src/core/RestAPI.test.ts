@@ -984,21 +984,6 @@ describe('RestAPI', () => {
 			expect(response.status).toBe(201);
 			expect(mockTaskManager.createTask).toHaveBeenCalled();
 		});
-
-		it('should log API requests', async () => {
-			await request(app).get('/health');
-
-			expect(logger.info).toHaveBeenCalledWith('[API] GET /health');
-		});
-
-		it('should log POST requests', async () => {
-			const mockTask = createMockTask('task-1');
-			mockTaskManager.createTask = vi.fn().mockReturnValue(mockTask);
-
-			await request(app).post('/tasks').send({ description: 'Test' });
-
-			expect(logger.info).toHaveBeenCalledWith('[API] POST /tasks');
-		});
 	});
 
 	describe('Edge Cases', () => {

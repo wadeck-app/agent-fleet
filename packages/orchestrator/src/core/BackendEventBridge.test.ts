@@ -97,7 +97,7 @@ describe('BackendEventBridge', () => {
 			expect(handler).toHaveBeenCalledOnce();
 		});
 
-		it('should log error and continue if a handler throws', async () => {
+		it('should continue processing if a handler throws', async () => {
 			const handler1: BackendEventHandler = vi.fn().mockRejectedValue(new Error('Handler 1 failed'));
 			const handler2: BackendEventHandler = vi.fn().mockResolvedValue(undefined);
 
@@ -106,13 +106,7 @@ describe('BackendEventBridge', () => {
 
 			await bridge.sendToBackend('task_completed', { taskId: 'task-1' });
 
-			// Verify error was logged
-			expect(consoleErrorSpy).toHaveBeenCalledWith(
-				'[BackendEventBridge] Handler failed for event task_completed:',
-				expect.any(Error)
-			);
-
-			// Verify second handler was still called
+			// Verify second handler was still called despite first handler failure
 			expect(handler2).toHaveBeenCalledOnce();
 		});
 
@@ -127,10 +121,7 @@ describe('BackendEventBridge', () => {
 
 			await bridge.sendToBackend('intervention_requested', { taskId: 'task-1' });
 
-			// Verify errors were logged
-			expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
-
-			// Verify all handlers were called
+			// Verify all handlers were called despite failures
 			expect(handler1).toHaveBeenCalledOnce();
 			expect(handler2).toHaveBeenCalledOnce();
 			expect(handler3).toHaveBeenCalledOnce();

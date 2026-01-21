@@ -735,7 +735,6 @@ describe('FlowWorker', () => {
 
 			expect(killSpy).toHaveBeenCalled();
 		});
-
 	});
 
 	describe('shutdown', () => {
@@ -946,7 +945,6 @@ describe('FlowWorker', () => {
 			connectSpy.mockRestore();
 			vi.useRealTimers();
 		});
-
 	});
 
 	describe('Edge Cases', () => {
