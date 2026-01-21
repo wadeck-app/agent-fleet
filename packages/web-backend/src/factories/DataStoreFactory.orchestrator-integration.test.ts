@@ -1,6 +1,7 @@
 import { Orchestrator } from 'orchestrator';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { EventBroadcaster } from '../transport/EventBroadcaster';
 import { DataStoreFactory } from './DataStoreFactory';
 
 /**
@@ -29,6 +30,12 @@ describe('DataStoreFactory - Orchestrator Integration', () => {
 		});
 
 		factory = new DataStoreFactory('memory', mockOrchestrator);
+
+		// Initialize EventBroadcaster to prevent "not initialized" error
+		const mockEventBroadcaster = {
+			broadcast: vi.fn(),
+		} as unknown as EventBroadcaster;
+		factory.setEventBroadcaster(mockEventBroadcaster);
 	});
 
 	describe('getOrchestratorEventHandler', () => {
