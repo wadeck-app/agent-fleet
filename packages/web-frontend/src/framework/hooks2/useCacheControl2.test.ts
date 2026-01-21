@@ -8,7 +8,6 @@ describe('useCacheControl2', () => {
 		it('should return correct FeatureContract shape', () => {
 			const { result } = renderHook(() => useCacheControl2());
 
-			expect(result.current).toHaveProperty('state');
 			expect(result.current).toHaveProperty('fstate');
 			expect(result.current).toHaveProperty('actions');
 			expect(result.current).toHaveProperty('fillQuery');
@@ -21,6 +20,7 @@ describe('useCacheControl2', () => {
 			expect(result.current.fstate).toEqual({
 				cacheId: 0,
 				isRefreshing: false,
+				effectiveCacheId: 0,
 			});
 		});
 
