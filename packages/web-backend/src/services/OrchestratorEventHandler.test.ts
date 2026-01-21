@@ -18,6 +18,7 @@ describe('OrchestratorEventHandler', () => {
 		mockTasksService = {
 			updateTaskStatus: vi.fn(),
 			getTaskById: vi.fn(),
+			writeTrace: vi.fn().mockResolvedValue(undefined),
 		} as any;
 
 		mockInterventionsService = {
