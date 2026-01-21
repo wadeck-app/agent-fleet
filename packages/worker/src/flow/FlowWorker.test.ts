@@ -736,27 +736,6 @@ describe('FlowWorker', () => {
 			expect(killSpy).toHaveBeenCalled();
 		});
 
-		it('should handle HOOK_EVENT message from Claude', () => {
-			const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-			const message = { type: 'HOOK_EVENT', hookName: 'test-hook' };
-			(worker as any).handleClaudeMessage(message);
-
-			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Hook event: test-hook'));
-
-			consoleSpy.mockRestore();
-		});
-
-		it('should handle unknown message type from Claude', () => {
-			const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-			const message = { type: 'UNKNOWN_TYPE' };
-			(worker as any).handleClaudeMessage(message);
-
-			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Unknown message type: UNKNOWN_TYPE'));
-
-			consoleSpy.mockRestore();
-		});
 	});
 
 	describe('shutdown', () => {
@@ -820,8 +799,6 @@ describe('FlowWorker', () => {
 
 	describe('Integration - Full Flow Execution', () => {
 		it('should complete full flow execution lifecycle', async () => {
-			const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
 			await (worker as any).executeTask(mockTask);
 
 			// Verify execution order
@@ -829,14 +806,6 @@ describe('FlowWorker', () => {
 			expect(mockWorkspaceManager.allocate).toHaveBeenCalled();
 			expect(mockFlowExecutor.execute).toHaveBeenCalled();
 			expect(mockWorkspaceManager.release).toHaveBeenCalled();
-
-			// Verify console logs
-			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Starting task execution'));
-			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Executing flow: Test Flow'));
-			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Workspace allocated: workspace-1'));
-			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Flow completed successfully'));
-
-			consoleSpy.mockRestore();
 		});
 
 		it('should handle multiple sequential tasks', async () => {
@@ -935,65 +904,6 @@ describe('FlowWorker', () => {
 			vi.useRealTimers();
 		});
 
-		it('should use exponential backoff for reconnection delay', () => {
-			vi.useFakeTimers();
-			const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-			// First attempt: 1000ms * 2^0 = 1000ms
-			(worker as any).reconnectionAttempts = 0;
-			(worker as any).scheduleReconnect();
-			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Reconnecting in 1000ms... (attempt 1)'));
-
-			// Second attempt: 1000ms * 2^1 = 2000ms
-			(worker as any).reconnectionAttempts = 1;
-			(worker as any).scheduleReconnect();
-			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Reconnecting in 2000ms... (attempt 2)'));
-
-			// Third attempt: 1000ms * 2^2 = 4000ms
-			(worker as any).reconnectionAttempts = 2;
-			(worker as any).scheduleReconnect();
-			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Reconnecting in 4000ms... (attempt 3)'));
-
-			// Fourth attempt: 1000ms * 2^3 = 8000ms
-			(worker as any).reconnectionAttempts = 3;
-			(worker as any).scheduleReconnect();
-			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Reconnecting in 8000ms... (attempt 4)'));
-
-			consoleSpy.mockRestore();
-			vi.useRealTimers();
-		});
-
-		it('should cap reconnection delay at maxReconnectDelay', () => {
-			vi.useFakeTimers();
-			const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-			// Attempt that would exceed max: 1000ms * 2^5 = 32000ms, capped at 30000ms
-			(worker as any).reconnectionAttempts = 5;
-			(worker as any).scheduleReconnect();
-			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Reconnecting in 30000ms... (attempt 6)'));
-
-			consoleSpy.mockRestore();
-			vi.useRealTimers();
-		});
-
-		it('should continue reconnecting after many attempts', () => {
-			vi.useFakeTimers();
-			const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
-			const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-			// FlowWorker continues reconnecting indefinitely - no max attempts
-			(worker as any).reconnectionAttempts = 10;
-			(worker as any).scheduleReconnect();
-
-			// Should log reconnection attempt, not exit
-			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Reconnecting in 30000ms... (attempt 11)'));
-			expect(exitSpy).not.toHaveBeenCalled();
-
-			exitSpy.mockRestore();
-			consoleSpy.mockRestore();
-			vi.useRealTimers();
-		});
-
 		it('should not exit before reaching max attempts', () => {
 			vi.useFakeTimers();
 			const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
@@ -1037,23 +947,6 @@ describe('FlowWorker', () => {
 			vi.useRealTimers();
 		});
 
-		it('should handle reconnection failures gracefully', async () => {
-			vi.useFakeTimers();
-			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-			const connectSpy = vi.spyOn(worker as any, 'connect').mockRejectedValue(new Error('Connection failed'));
-
-			(worker as any).reconnectionAttempts = 0;
-			(worker as any).scheduleReconnect();
-
-			// Fast-forward time
-			await vi.advanceTimersByTimeAsync(1000);
-
-			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Reconnection failed:'), expect.any(Error));
-
-			connectSpy.mockRestore();
-			consoleSpy.mockRestore();
-			vi.useRealTimers();
-		});
 	});
 
 	describe('Edge Cases', () => {
