@@ -113,6 +113,8 @@ describe('FlowWorker', () => {
 			loadProjectFlows: vi.fn().mockResolvedValue(undefined),
 			getFlowIds: vi.fn().mockReturnValue(['test-flow']),
 			getFlow: vi.fn().mockReturnValue(mockFlow),
+			getAllFlows: vi.fn().mockReturnValue([mockFlow]),
+			computeFlowHash: vi.fn().mockReturnValue('test-flow-hash-123'),
 			getFlowValidationResult: vi.fn().mockReturnValue({ valid: true, issues: [] }),
 			startWatching: vi.fn(),
 			stopWatching: vi.fn(),
