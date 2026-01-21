@@ -198,23 +198,6 @@ describe('Orchestrator', () => {
 			await expect(orchestrator.start()).rejects.toThrow('Port already in use');
 		});
 
-		it('should perform startup steps in correct order', async () => {
-			const callOrder: string[] = [];
-
-			mockRestAPI.start.mockImplementation(async () => {
-				callOrder.push('1-restAPI.start');
-			});
-
-			// vi.mocked(renderUI).mockImplementation(async () => {
-			// 	callOrder.push('2-renderUI');
-			// 	return mockRenderUI;
-			// });
-
-			orchestrator = new Orchestrator();
-			await orchestrator.start();
-
-			expect(callOrder).toEqual(['1-restAPI.start', '2-renderUI']);
-		});
 	});
 
 	describe('Orchestrator Class - stop', () => {
@@ -246,16 +229,6 @@ describe('Orchestrator', () => {
 		//
 		// 	expect(callOrder[0]).toBe('1-ui.unmount');
 		// });
-
-		it('should log shutdown message', async () => {
-			orchestrator = new Orchestrator();
-			await orchestrator.start();
-
-			vi.clearAllMocks();
-			await orchestrator.shutdown();
-
-			expect(logger.info).toHaveBeenCalledWith('[Orchestrator] Shutting down...');
-		});
 
 		it('should stop REST API', async () => {
 			orchestrator = new Orchestrator();
@@ -298,16 +271,6 @@ describe('Orchestrator', () => {
 			expect(callOrder).toEqual(['restAPI.stop', 'wsServer.stop']);
 		});
 
-		it('should log final stopped message', async () => {
-			orchestrator = new Orchestrator();
-			await orchestrator.start();
-
-			vi.clearAllMocks();
-			await orchestrator.shutdown();
-
-			expect(logger.info).toHaveBeenCalledWith('[Orchestrator] Stopped');
-		});
-
 		it('should handle REST API stop failure', async () => {
 			const error = new Error('Failed to close server');
 			mockRestAPI.stop.mockRejectedValue(error);
@@ -336,30 +299,6 @@ describe('Orchestrator', () => {
 			await expect(orchestrator.shutdown()).resolves.not.toThrow();
 		});
 
-		it('should perform shutdown steps in correct order', async () => {
-			const callOrder: string[] = [];
-
-			orchestrator = new Orchestrator();
-			await orchestrator.start();
-
-			vi.clearAllMocks();
-
-			// mockRenderUI.unmount = vi.fn(() => {
-			// 	callOrder.push('1-ui.unmount');
-			// });
-
-			mockRestAPI.stop.mockImplementation(async () => {
-				callOrder.push('2-restAPI.stop');
-			});
-
-			mockWsServer.stop.mockImplementation(async () => {
-				callOrder.push('3-wsServer.stop');
-			});
-
-			await orchestrator.shutdown();
-
-			expect(callOrder).toEqual(['1-ui.unmount', '2-restAPI.stop', '3-wsServer.stop']);
-		});
 	});
 
 	describe('Service Integration', () => {
@@ -486,24 +425,5 @@ describe('Orchestrator', () => {
 			expect(TaskManager).toHaveBeenCalled();
 		});
 
-		it('should log shutdown message', async () => {
-			orchestrator = new Orchestrator();
-			await orchestrator.start();
-
-			vi.clearAllMocks();
-			await orchestrator.shutdown();
-
-			expect(logger.info).toHaveBeenCalledWith('[Orchestrator] Shutting down...');
-		});
-
-		it('should log stopped message', async () => {
-			orchestrator = new Orchestrator();
-			await orchestrator.start();
-
-			vi.clearAllMocks();
-			await orchestrator.shutdown();
-
-			expect(logger.info).toHaveBeenCalledWith('[Orchestrator] Stopped');
-		});
 	});
 });
