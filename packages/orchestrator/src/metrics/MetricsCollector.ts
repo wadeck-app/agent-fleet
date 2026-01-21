@@ -1,10 +1,12 @@
-import { logger } from 'shared-common/logger';
+import { createLogger } from 'shared-common/logger';
 import type { MetricsData, StateManager } from 'shared-orch-worker/StateManager';
 import type { Task } from 'shared-orch-worker/domain-types';
 import { TaskStatus } from 'shared-orch-worker/domain-types';
 
 import type { TaskManager } from '../core/TaskManager';
 import type { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
+
+const log = createLogger('MetricsCollector');
 
 //FIXME remove me, no longer necessary as the orch has no direct UI
 /**
@@ -45,7 +47,7 @@ export class MetricsCollector {
 	 */
 	start(): void {
 		if (this.isRunning) {
-			logger.warn('MetricsCollector', 'Already running, ignoring start()');
+			log.warn('MetricsCollector', 'Already running, ignoring start()');
 			return;
 		}
 
@@ -59,7 +61,7 @@ export class MetricsCollector {
 			this.collectAndEmit();
 		}, this.collectIntervalMs);
 
-		//logger.info('MetricsCollector', `Started collecting metrics every ${this.collectIntervalMs}ms`);
+		//log.info('MetricsCollector', `Started collecting metrics every ${this.collectIntervalMs}ms`);
 	}
 
 	/**
@@ -77,7 +79,7 @@ export class MetricsCollector {
 
 		this.isRunning = false;
 
-		//logger.info('MetricsCollector', 'Stopped collecting metrics');
+		//log.info('MetricsCollector', 'Stopped collecting metrics');
 	}
 
 	/**
@@ -88,7 +90,7 @@ export class MetricsCollector {
 			const metrics = this.collectMetrics();
 			this.stateManager.emitMetricsUpdated(metrics);
 
-			// logger.debug(
+			// log.debug(
 			// 	'MetricsCollector',
 			// 	`Metrics collected: ${metrics.taskThroughput.total} tasks, ${metrics.workerUtilization.total} workers`,
 			// 	{
@@ -97,7 +99,7 @@ export class MetricsCollector {
 			// 	}
 			// );
 		} catch (error) {
-			logger.error(
+			log.error(
 				'MetricsCollector',
 				`Failed to collect metrics: ${error instanceof Error ? error.message : String(error)}`
 			);
@@ -178,7 +180,7 @@ export class MetricsCollector {
 			this.start();
 		}
 
-		logger.info('MetricsCollector', `Collection interval changed to ${intervalMs}ms`);
+		log.info('MetricsCollector', `Collection interval changed to ${intervalMs}ms`);
 	}
 
 	/**

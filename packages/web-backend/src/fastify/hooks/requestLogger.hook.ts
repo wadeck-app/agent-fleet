@@ -1,6 +1,8 @@
 import type { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
-import { logger } from 'shared-common/logger';
+import { createLogger } from 'shared-common/logger';
+
+const log = createLogger('RequestLogger');
 
 /**
  * Simple request logger hook
@@ -28,11 +30,11 @@ const requestLoggerHook: FastifyPluginAsync = async fastify => {
 
 		// Log with appropriate level based on status code
 		if (statusCode >= 500) {
-			logger.error(logMessage);
+			log.error(logMessage);
 		} else if (statusCode >= 400) {
-			logger.warn(logMessage);
+			log.warn(logMessage);
 		} else {
-			logger.info(logMessage);
+			log.info(logMessage);
 		}
 	});
 };

@@ -1,4 +1,4 @@
-import { logger } from 'shared-common/logger';
+import { createLogger } from 'shared-common/logger';
 import { O2WMessageType, createO2WMessage } from 'shared-orch-worker/orchestrator-messages';
 import type { W2OMessage } from 'shared-orch-worker/worker-messages';
 import { W2OMessageType } from 'shared-orch-worker/worker-messages';
@@ -6,6 +6,8 @@ import type { WebSocket } from 'ws';
 
 import type { WebSocketConnectionManager } from './WebSocketConnectionManager';
 import type { WebSocketEventHandler } from './WebSocketEventHandler';
+
+const log = createLogger('WebSocketMessageRouter');
 
 /**
  * Routes WebSocket messages to appropriate handlers
@@ -28,7 +30,7 @@ export class WebSocketMessageRouter {
 	 * Returns workerId if this is a WORKER_READY message (for connection tracking)
 	 */
 	async routeMessage(socket: WebSocket, message: W2OMessage, workerId: string | null): Promise<string | void> {
-		logger.info(`[WS] Received ${message.type} from ${workerId || 'unknown'}`);
+		log.info(`[WS] Received ${message.type} from ${workerId || 'unknown'}`);
 
 		switch (message.type) {
 			case W2OMessageType.WORKER_READY:
@@ -109,7 +111,7 @@ export class WebSocketMessageRouter {
 				break;
 
 			default:
-				logger.warn(`[WS] Unknown message type: ${(message as unknown as any).type}`);
+				log.warn(`[WS] Unknown message type: ${(message as unknown as any).type}`);
 		}
 	}
 }

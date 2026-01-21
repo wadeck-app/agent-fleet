@@ -15,7 +15,9 @@
  */
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
-import { logger } from 'shared-common/logger';
+import { createLogger } from 'shared-common/logger';
+
+const log = createLogger('MigrateProjects');
 
 // Default project configuration
 const DEFAULT_PROJECT = {
@@ -66,7 +68,7 @@ function readJsonFile<T>(filePath: string): T | null {
 		const content = readFileSync(filePath, 'utf-8');
 		return JSON.parse(content);
 	} catch (error) {
-		logger.error(`Error reading file ${filePath}:`, error);
+		log.error(`Error reading file ${filePath}:`, error);
 		return null;
 	}
 }
@@ -77,9 +79,9 @@ function readJsonFile<T>(filePath: string): T | null {
 function writeJsonFile<T>(filePath: string, data: T): void {
 	try {
 		writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
-		logger.info(`✓ Written to ${filePath}`);
+		log.info(`✓ Written to ${filePath}`);
 	} catch (error) {
-		logger.error(`Error writing file ${filePath}:`, error);
+		log.error(`Error writing file ${filePath}:`, error);
 		throw error;
 	}
 }
@@ -88,19 +90,19 @@ function writeJsonFile<T>(filePath: string, data: T): void {
  * Main migration function
  */
 async function migrate() {
-	logger.info('Starting Projects migration...\n');
+	log.info('Starting Projects migration...\n');
 
 	const dataDir = getDataDir();
 	const projectsFilePath = resolve(dataDir, 'projects.json');
 
 	// Step 1: Create or load projects.json
-	logger.info('Step 1: Loading or creating projects.json...');
+	log.info('Step 1: Loading or creating projects.json...');
 	const projectsData: { projects: Project[] } = readJsonFile(projectsFilePath) || { projects: [] };
 
 	// Check if default project already exists
 	const existingDefaultProject = projectsData.projects.find(p => p.id === 'default');
 	if (existingDefaultProject) {
-		logger.info('  ℹ Default project already exists');
+		log.info('  ℹ Default project already exists');
 	} else {
 		// Create default project
 		const now = new Date().toISOString();
@@ -110,40 +112,40 @@ async function migrate() {
 			updatedAt: now,
 		};
 		projectsData.projects.push(defaultProject);
-		logger.info('  ✓ Created default project "Unassigned"');
+		log.info('  ✓ Created default project "Unassigned"');
 	}
 
 	// Step 2: Scan orchestrator tasks and assign to default project
-	logger.info('\nStep 2: Scanning tasks and assigning to default project...');
+	log.info('\nStep 2: Scanning tasks and assigning to default project...');
 
 	// Note: Since tasks are stored in the orchestrator (in-memory or file-based),
 	// we'll need to handle this differently. For now, we'll just create the default project.
 	// The orchestrator will need to be updated separately to handle projectId.
 
-	logger.info('  ℹ Task migration is handled by the orchestrator');
-	logger.info('  ℹ New tasks will require projectId on creation');
+	log.info('  ℹ Task migration is handled by the orchestrator');
+	log.info('  ℹ New tasks will require projectId on creation');
 
 	// Step 3: Save projects.json
-	logger.info('\nStep 3: Saving projects.json...');
+	log.info('\nStep 3: Saving projects.json...');
 	writeJsonFile(projectsFilePath, projectsData);
 
-	logger.info('\n✓ Migration completed successfully!');
-	logger.info('\nSummary:');
-	logger.info(`  - Projects: ${projectsData.projects.length}`);
-	logger.info(`  - Default project ID: ${DEFAULT_PROJECT.id}`);
-	logger.info('\nNext steps:');
-	logger.info('  1. Start the backend server');
-	logger.info('  2. Verify the default project exists at GET /api/projects/');
-	logger.info('  3. Create new tasks with projectId="default" for testing');
+	log.info('\n✓ Migration completed successfully!');
+	log.info('\nSummary:');
+	log.info(`  - Projects: ${projectsData.projects.length}`);
+	log.info(`  - Default project ID: ${DEFAULT_PROJECT.id}`);
+	log.info('\nNext steps:');
+	log.info('  1. Start the backend server');
+	log.info('  2. Verify the default project exists at GET /api/projects/');
+	log.info('  3. Create new tasks with projectId="default" for testing');
 }
 
 // Run migration
 migrate()
 	.then(() => {
-		logger.info('\nMigration completed.');
+		log.info('\nMigration completed.');
 		process.exit(0);
 	})
 	.catch(error => {
-		logger.error('\nMigration failed:', error);
+		log.error('\nMigration failed:', error);
 		process.exit(1);
 	});

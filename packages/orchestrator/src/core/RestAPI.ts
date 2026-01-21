@@ -4,7 +4,7 @@ import { readFileSync } from 'fs';
 import type { Server as HttpServer, IncomingMessage } from 'http';
 import { fileURLToPath } from 'node:url';
 import path from 'path';
-import { logger } from 'shared-common/logger';
+import { createLogger } from 'shared-common/logger';
 import type { TaskStatus } from 'shared-orch-worker/domain-types';
 import type { Duplex } from 'stream';
 import type { WebSocket } from 'ws';
@@ -14,6 +14,8 @@ import type { UIClientHook } from '../ui-client/UIClientHook';
 import { UIWebSocketServer } from '../websocket/UIWebSocketServer';
 import type { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
 import type { TaskManager } from './TaskManager';
+
+const log = createLogger('RestAPI');
 
 // Read version from package.json
 const __filename = fileURLToPath(import.meta.url);
@@ -60,7 +62,7 @@ export class RestAPI {
 
 		// logger middleware
 		this.app.use((req, res, next) => {
-			logger.info(`[API] ${req.method} ${req.path}`);
+			log.info(`[API] ${req.method} ${req.path}`);
 			next();
 		});
 	}
@@ -142,7 +144,7 @@ export class RestAPI {
 
 				res.status(201).json(task);
 			} catch (error) {
-				logger.error('[API] Error creating task:', error);
+				log.error('[API] Error creating task:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -161,7 +163,7 @@ export class RestAPI {
 
 				res.json(tasks);
 			} catch (error) {
-				logger.error('[API] Error listing tasks:', error);
+				log.error('[API] Error listing tasks:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -178,7 +180,7 @@ export class RestAPI {
 
 				res.json(task);
 			} catch (error) {
-				logger.error('[API] Error getting task:', error);
+				log.error('[API] Error getting task:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -198,7 +200,7 @@ export class RestAPI {
 
 				res.json(task);
 			} catch (error) {
-				logger.error('[API] Error updating task status:', error);
+				log.error('[API] Error updating task status:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -218,7 +220,7 @@ export class RestAPI {
 
 				res.json(task);
 			} catch (error) {
-				logger.error('[API] Error adding comment:', error);
+				log.error('[API] Error adding comment:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -235,7 +237,7 @@ export class RestAPI {
 
 				res.json({ message: 'Task deleted successfully' });
 			} catch (error) {
-				logger.error('[API] Error deleting task:', error);
+				log.error('[API] Error deleting task:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -246,7 +248,7 @@ export class RestAPI {
 				const count = await this.taskManager.clearAllTasks();
 				res.json({ message: `Cleared ${count} tasks` });
 			} catch (error) {
-				logger.error('[API] Error clearing tasks:', error);
+				log.error('[API] Error clearing tasks:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -257,7 +259,7 @@ export class RestAPI {
 				const workers = this.wsServer.getWorkers();
 				res.json(workers);
 			} catch (error) {
-				logger.error('[API] Error listing workers:', error);
+				log.error('[API] Error listing workers:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -278,7 +280,7 @@ export class RestAPI {
 
 				res.json(flowsByProject);
 			} catch (error) {
-				logger.error('[API] Error listing flows:', error);
+				log.error('[API] Error listing flows:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -296,7 +298,7 @@ export class RestAPI {
 
 				res.json(Object.fromEntries(projectFlows));
 			} catch (error) {
-				logger.error('[API] Error getting project flows:', error);
+				log.error('[API] Error getting project flows:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -325,7 +327,7 @@ export class RestAPI {
 					error: task.flowResult.error,
 				});
 			} catch (error) {
-				logger.error('[API] Error getting task trace:', error);
+				log.error('[API] Error getting task trace:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -341,7 +343,7 @@ export class RestAPI {
 				const workspaces = this.workspaceManager.getAllWorkspaces();
 				res.json(workspaces);
 			} catch (error) {
-				logger.error('[API] Error listing workspaces:', error);
+				log.error('[API] Error listing workspaces:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -363,7 +365,7 @@ export class RestAPI {
 
 				res.json(workspace);
 			} catch (error) {
-				logger.error('[API] Error getting workspace:', error);
+				log.error('[API] Error getting workspace:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});
@@ -382,7 +384,7 @@ export class RestAPI {
 		// Create WebSocketServer instance (noServer mode - we'll handle upgrade manually)
 		this.uiWebSocketServer = new WebSocketServer({ noServer: true });
 
-		logger.info('RestAPI', 'UI WebSocket server configured');
+		log.info('RestAPI', 'UI WebSocket server configured');
 	}
 
 	/**
@@ -411,7 +413,7 @@ export class RestAPI {
 			}
 		});
 
-		logger.info('RestAPI', 'HTTP upgrade handler configured for /ws/ui');
+		log.info('RestAPI', 'HTTP upgrade handler configured for /ws/ui');
 	}
 
 	start(): Promise<void> {
@@ -420,7 +422,7 @@ export class RestAPI {
 				// Setup WebSocket upgrade handler after HTTP server is created
 				this.setupWebSocketUpgrade();
 
-				logger.info(`[API] REST API listening on port ${this.port}`);
+				log.info(`[API] REST API listening on port ${this.port}`);
 				resolve();
 			});
 		});
@@ -440,7 +442,7 @@ export class RestAPI {
 		return new Promise(resolve => {
 			if (this.server) {
 				this.server.close(() => {
-					logger.info('[API] REST API stopped');
+					log.info('[API] REST API stopped');
 					resolve();
 				});
 			} else {

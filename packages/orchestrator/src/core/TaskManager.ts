@@ -1,11 +1,13 @@
 import { Storage } from 'orchestrator/core/Storage';
-import { logger } from 'shared-common/logger';
+import { createLogger } from 'shared-common/logger';
 import type { StateManager } from 'shared-orch-worker/StateManager';
 import type { Task, TaskHistoryEntry } from 'shared-orch-worker/domain-types';
 import { TaskStatus } from 'shared-orch-worker/domain-types';
 import { v4 as uuidv4 } from 'uuid';
 
 import type { FlowDiscoveryRegistry } from '../registry/FlowDiscoveryRegistry';
+
+const log = createLogger('TaskManager');
 
 interface WorkerIdleEntry {
 	workerId: string;
@@ -50,9 +52,7 @@ export class TaskManager {
 			await this.loadTasks();
 			this.initialized = true;
 		} catch (error) {
-			logger.info(
-				`[TaskManager] Failed to initialize: ${error instanceof Error ? error.message : String(error)}`
-			);
+			log.info(`[TaskManager] Failed to initialize: ${error instanceof Error ? error.message : String(error)}`);
 			throw error;
 		}
 	}
@@ -65,7 +65,7 @@ export class TaskManager {
 		tasks.forEach(task => {
 			this.tasks.set(task.id, task);
 		});
-		logger.info(`[TaskManager] Loaded ${this.tasks.size} tasks`);
+		log.info(`[TaskManager] Loaded ${this.tasks.size} tasks`);
 	}
 
 	getStateManager(): StateManager {
@@ -127,13 +127,11 @@ export class TaskManager {
 		} catch (error) {
 			// Rollback in-memory change if storage fails
 			this.tasks.delete(task.id);
-			logger.info(
-				`[TaskManager] Failed to create task: ${error instanceof Error ? error.message : String(error)}`
-			);
+			log.info(`[TaskManager] Failed to create task: ${error instanceof Error ? error.message : String(error)}`);
 			throw error;
 		}
 
-		logger.info(`[TaskManager] Created task ${task.id}: ${description.substring(0, 50)}...`);
+		log.info(`[TaskManager] Created task ${task.id}: ${description.substring(0, 50)}...`);
 		this.stateManager.emitTaskCreated(task);
 
 		// Route task to appropriate queue
@@ -166,7 +164,7 @@ export class TaskManager {
 		} catch (error) {
 			// Rollback in-memory change if storage fails
 			this.tasks.set(task.id, oldTask);
-			logger.info(
+			log.info(
 				`[TaskManager] Failed to update task ${task.id}: ${error instanceof Error ? error.message : String(error)}`
 			);
 			throw error;
@@ -217,13 +215,13 @@ export class TaskManager {
 			task.status = oldStatus;
 			task.completedAt = oldCompletedAt;
 			task.history = oldHistory;
-			logger.info(
+			log.info(
 				`[TaskManager] Failed to update task ${taskId} status: ${error instanceof Error ? error.message : String(error)}`
 			);
 			throw error;
 		}
 
-		logger.info(`[TaskManager] Task ${taskId} status: ${oldStatus} → ${newStatus}`);
+		log.info(`[TaskManager] Task ${taskId} status: ${oldStatus} → ${newStatus}`);
 		this.stateManager.emitTaskUpdated(task);
 	}
 
@@ -257,14 +255,14 @@ export class TaskManager {
 			// Rollback in-memory changes if storage fails
 			task.assignedTo = oldAssignment;
 			task.history = oldHistory;
-			logger.info(
+			log.info(
 				`[TaskManager] Failed to assign task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
 			);
 			throw error;
 		}
 
-		// logger.info(`[TaskManager] Task ${taskId} assigned to ${workerType} worker ${workerId}`);
-		logger.info(`[TaskManager] Task ${taskId} assigned to worker ${workerId}`);
+		// log.info(`[TaskManager] Task ${taskId} assigned to ${workerType} worker ${workerId}`);
+		log.info(`[TaskManager] Task ${taskId} assigned to worker ${workerId}`);
 		this.stateManager.emitTaskUpdated(task);
 	}
 
@@ -294,13 +292,13 @@ export class TaskManager {
 			// Rollback in-memory changes if storage fails
 			task.assignedTo = oldAssignment;
 			task.history = oldHistory;
-			logger.info(
+			log.info(
 				`[TaskManager] Failed to unassign task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
 			);
 			throw error;
 		}
 
-		logger.info(`[TaskManager] Task ${taskId} unassigned`);
+		log.info(`[TaskManager] Task ${taskId} unassigned`);
 		this.stateManager.emitTaskUpdated(task);
 	}
 
@@ -328,7 +326,7 @@ export class TaskManager {
 		} catch (error) {
 			// Rollback in-memory changes if storage fails
 			task.comments = oldComments;
-			logger.info(
+			log.info(
 				`[TaskManager] Failed to add comment to task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
 			);
 			throw error;
@@ -397,7 +395,7 @@ export class TaskManager {
 
 			// If task was pre-assigned to this worker, just start it
 			if (task.assignedTo?.workerId === workerId) {
-				logger.info(`[TaskManager] Found pre-assigned task ${task.id} in worker ${workerId} queue`);
+				log.info(`[TaskManager] Found pre-assigned task ${task.id} in worker ${workerId} queue`);
 				// Task is already assigned, just update status to IN_PROGRESS
 				const oldStatus = task.status;
 				const oldStartedAt = task.startedAt;
@@ -415,7 +413,7 @@ export class TaskManager {
 
 				try {
 					await Storage.saveTask(task);
-					logger.info(`[TaskManager] Started pre-assigned task ${task.id} for worker ${workerId}`);
+					log.info(`[TaskManager] Started pre-assigned task ${task.id} for worker ${workerId}`);
 					this.stateManager.emitTaskUpdated(task);
 					return task;
 				} catch (error) {
@@ -424,7 +422,7 @@ export class TaskManager {
 					task.startedAt = oldStartedAt;
 					task.history = oldHistory;
 					workerQueue.unshift(task); // Put back at front of queue
-					logger.error(
+					log.error(
 						`[TaskManager] Failed to start pre-assigned task ${task.id}: ${error instanceof Error ? error.message : String(error)}`
 					);
 					throw error;
@@ -442,7 +440,7 @@ export class TaskManager {
 
 		// Verify task is still unassigned (defensive check)
 		if (task.assignedTo) {
-			logger.info(`[TaskManager] Task ${task.id} already assigned, skipping`);
+			log.info(`[TaskManager] Task ${task.id} already assigned, skipping`);
 			return null;
 		}
 
@@ -468,8 +466,8 @@ export class TaskManager {
 
 		try {
 			await Storage.saveTask(task);
-			// logger.info(`[TaskManager] Task ${task.id} atomically assigned to ${workerType} worker ${workerId}`);
-			logger.info(`[TaskManager] Task ${task.id} atomically assigned to worker ${workerId}`);
+			// log.info(`[TaskManager] Task ${task.id} atomically assigned to ${workerType} worker ${workerId}`);
+			log.info(`[TaskManager] Task ${task.id} atomically assigned to worker ${workerId}`);
 			this.stateManager.emitTaskUpdated(task);
 			return task;
 		} catch (error) {
@@ -478,7 +476,7 @@ export class TaskManager {
 			task.status = oldStatus;
 			task.startedAt = oldStartedAt;
 			task.history = oldHistory;
-			logger.info(
+			log.info(
 				`[TaskManager] Failed to atomically assign task ${task.id}: ${error instanceof Error ? error.message : String(error)}`
 			);
 			throw error;
@@ -522,11 +520,11 @@ export class TaskManager {
 			// Remove from memory
 			this.tasks.delete(taskId);
 
-			logger.info(`[TaskManager] Deleted task ${taskId}`);
+			log.info(`[TaskManager] Deleted task ${taskId}`);
 			this.stateManager.emitTaskDeleted(taskId);
 			return true;
 		} catch (error) {
-			logger.info(
+			log.info(
 				`[TaskManager] Failed to delete task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
 			);
 			throw error;
@@ -550,10 +548,10 @@ export class TaskManager {
 				this.stateManager.emitTaskDeleted(taskId);
 			}
 
-			logger.info(`[TaskManager] Cleared ${count} tasks`);
+			log.info(`[TaskManager] Cleared ${count} tasks`);
 			return count;
 		} catch (error) {
-			logger.info(
+			log.info(
 				`[TaskManager] Failed to clear all tasks: ${error instanceof Error ? error.message : String(error)}`
 			);
 			throw error;
@@ -580,7 +578,7 @@ export class TaskManager {
 	 */
 	addTaskToBacklog(task: Task): void {
 		this.globalBacklog.push(task);
-		logger.info(`[TaskManager] Added task ${task.id} to global backlog`);
+		log.info(`[TaskManager] Added task ${task.id} to global backlog`);
 	}
 
 	/**
@@ -590,7 +588,7 @@ export class TaskManager {
 		const index = this.globalBacklog.findIndex(t => t.id === taskId);
 		if (index !== -1) {
 			this.globalBacklog.splice(index, 1);
-			logger.info(`[TaskManager] Removed task ${taskId} from global backlog`);
+			log.info(`[TaskManager] Removed task ${taskId} from global backlog`);
 			return true;
 		}
 		return false;
@@ -606,7 +604,7 @@ export class TaskManager {
 			this.workerQueues.set(workerId, queue);
 		}
 		queue.push(task);
-		logger.info(`[TaskManager] Added task ${task.id} to worker ${workerId} queue`);
+		log.info(`[TaskManager] Added task ${task.id} to worker ${workerId} queue`);
 	}
 
 	/**
@@ -620,7 +618,7 @@ export class TaskManager {
 				workerId,
 				requestedAt: new Date(),
 			});
-			logger.info(`[TaskManager] Worker ${workerId} marked as idle`);
+			log.info(`[TaskManager] Worker ${workerId} marked as idle`);
 		}
 	}
 
@@ -632,7 +630,7 @@ export class TaskManager {
 		const index = this.idleWorkers.findIndex(w => w.workerId === workerId);
 		if (index !== -1) {
 			this.idleWorkers.splice(index, 1);
-			logger.info(`[TaskManager] Worker ${workerId} marked as busy with task ${task.id}`);
+			log.info(`[TaskManager] Worker ${workerId} marked as busy with task ${task.id}`);
 		}
 	}
 
@@ -647,7 +645,7 @@ export class TaskManager {
 		const workerQueue = this.workerQueues.get(workerId);
 		if (workerQueue && workerQueue.length > 0) {
 			const task = workerQueue.shift()!;
-			logger.info(`[TaskManager] Found task ${task.id} in worker ${workerId} personal queue`);
+			log.info(`[TaskManager] Found task ${task.id} in worker ${workerId} personal queue`);
 			return task;
 		}
 
@@ -656,7 +654,7 @@ export class TaskManager {
 			// For now, just return the first task (FIFO)
 			// In Phase 5, we'll add flow compatibility checking
 			const task = this.globalBacklog.shift()!;
-			logger.info(`[TaskManager] Found task ${task.id} in global backlog for worker ${workerId}`);
+			log.info(`[TaskManager] Found task ${task.id} in global backlog for worker ${workerId}`);
 			return task;
 		}
 
@@ -692,7 +690,7 @@ export class TaskManager {
 
 		try {
 			await Storage.saveTask(task);
-			logger.info(`[TaskManager] Task ${taskId} awaiting user intervention ${interventionId}`);
+			log.info(`[TaskManager] Task ${taskId} awaiting user intervention ${interventionId}`);
 			this.stateManager.emitTaskUpdated(task);
 		} catch (error) {
 			// Rollback on error
@@ -700,7 +698,7 @@ export class TaskManager {
 			task.activeInterventionId = oldActiveInterventionId;
 			task.interventionHistory = oldInterventionHistory;
 			task.history = oldHistory;
-			logger.info(
+			log.info(
 				`[TaskManager] Failed to set intervention for task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
 			);
 			throw error;
@@ -718,7 +716,7 @@ export class TaskManager {
 		}
 
 		if (task.activeInterventionId !== interventionId) {
-			logger.info(`[TaskManager] Intervention ${interventionId} is not active for task ${taskId}, ignoring`);
+			log.info(`[TaskManager] Intervention ${interventionId} is not active for task ${taskId}, ignoring`);
 			return;
 		}
 
@@ -738,14 +736,14 @@ export class TaskManager {
 
 		try {
 			await Storage.saveTask(task);
-			logger.info(`[TaskManager] Task ${taskId} resumed after intervention ${interventionId}`);
+			log.info(`[TaskManager] Task ${taskId} resumed after intervention ${interventionId}`);
 			this.stateManager.emitTaskUpdated(task);
 		} catch (error) {
 			// Rollback on error
 			task.status = oldStatus;
 			task.activeInterventionId = oldActiveInterventionId;
 			task.history = oldHistory;
-			logger.info(
+			log.info(
 				`[TaskManager] Failed to clear intervention for task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
 			);
 			throw error;

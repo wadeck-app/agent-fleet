@@ -1,4 +1,4 @@
-import { logger } from 'shared-common/logger';
+import { createLogger } from 'shared-common/logger';
 import type { StateManager } from 'shared-orch-worker/StateManager';
 import { TaskStatus } from 'shared-orch-worker/domain-types';
 import { O2WMessageType, createO2WMessage } from 'shared-orch-worker/orchestrator-messages';
@@ -23,6 +23,8 @@ import type { InterventionManager } from '../core/InterventionManager';
 import { TraceChunkStorage } from '../core/TraceChunkStorage';
 import type { WorkerCoordinator } from '../core/WorkerCoordinator';
 import type { WebSocketConnectionManager } from './WebSocketConnectionManager';
+
+const log = createLogger('WebSocketEventHandler');
 
 /**
  * Handles all task-related and flow-related events from workers
@@ -59,7 +61,7 @@ export class WebSocketEventHandler {
 	 */
 	handleTaskStarted(message: W2OTaskStartedMessage): void {
 		const { workerId, taskId } = message;
-		logger.info(`[WS] Worker ${workerId} started task ${taskId}`);
+		log.info(`[WS] Worker ${workerId} started task ${taskId}`);
 
 		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
 		this.workerCoordinator.onWorkerMessage(workerId, message);
@@ -71,7 +73,7 @@ export class WebSocketEventHandler {
 	 */
 	handleTaskProgress(message: W2OTaskProgressMessage): void {
 		const { workerId, taskId, progress } = message;
-		logger.info(`[WS] Worker ${workerId} progress on task ${taskId}: ${progress}`);
+		log.info(`[WS] Worker ${workerId} progress on task ${taskId}: ${progress}`);
 
 		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
 		this.workerCoordinator.onWorkerMessage(workerId, message);
@@ -83,7 +85,7 @@ export class WebSocketEventHandler {
 	 */
 	async handleTaskCompleted(message: W2OTaskCompletedMessage): Promise<void> {
 		const { workerId, taskId } = message;
-		logger.info(`[WS] Worker ${workerId} completed task ${taskId}`);
+		log.info(`[WS] Worker ${workerId} completed task ${taskId}`);
 
 		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
 		// Backend handles trace storage and task updates
@@ -99,7 +101,7 @@ export class WebSocketEventHandler {
 	 */
 	async handleTaskFailed(message: W2OTaskFailedMessage): Promise<void> {
 		const { workerId, taskId, error } = message;
-		logger.error(`[WS] Worker ${workerId} failed task ${taskId}: ${error}`);
+		log.error(`[WS] Worker ${workerId} failed task ${taskId}: ${error}`);
 
 		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
 		// Backend handles task updates and status changes
@@ -119,9 +121,7 @@ export class WebSocketEventHandler {
 	 */
 	async handleTaskTraceUpdate(message: W2OTaskTraceUpdateMessage): Promise<void> {
 		const { workerId, taskId, trace } = message;
-		logger.debug(
-			`[WS] Worker ${workerId} sent trace update for task ${taskId} (${trace?.steps?.length || 0} steps)`
-		);
+		log.debug(`[WS] Worker ${workerId} sent trace update for task ${taskId} (${trace?.steps?.length || 0} steps)`);
 
 		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
 		// Backend handles trace storage
@@ -134,7 +134,7 @@ export class WebSocketEventHandler {
 	 */
 	handleTaskQuestion(message: W2OTaskQuestionMessage): void {
 		const { workerId, taskId, question } = message;
-		logger.info(`[WS] Worker ${workerId} has a question on task ${taskId}`);
+		log.info(`[WS] Worker ${workerId} has a question on task ${taskId}`);
 
 		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
 		this.workerCoordinator.onWorkerMessage(workerId, message);
@@ -146,7 +146,7 @@ export class WebSocketEventHandler {
 	 */
 	handleFlowStepStarted(message: W2OFlowStepStartedMessage): void {
 		const { workerId, taskId, stepId, stepName } = message;
-		logger.info(`[WS] Worker ${workerId} started flow step ${stepId} (${stepName}) for task ${taskId}`);
+		log.info(`[WS] Worker ${workerId} started flow step ${stepId} (${stepName}) for task ${taskId}`);
 
 		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
 		this.workerCoordinator.onWorkerMessage(workerId, message);
@@ -158,7 +158,7 @@ export class WebSocketEventHandler {
 	 */
 	handleFlowStepCompleted(message: W2OFlowStepCompletedMessage): void {
 		const { workerId, taskId, stepId } = message;
-		logger.info(`[WS] Worker ${workerId} completed flow step ${stepId} for task ${taskId}`);
+		log.info(`[WS] Worker ${workerId} completed flow step ${stepId} for task ${taskId}`);
 
 		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
 		this.workerCoordinator.onWorkerMessage(workerId, message);
@@ -170,7 +170,7 @@ export class WebSocketEventHandler {
 	 */
 	handleFlowStepFailed(message: W2OFlowStepFailedMessage): void {
 		const { workerId, taskId, stepId, error } = message;
-		logger.error(`[WS] Worker ${workerId} flow step ${stepId} failed for task ${taskId}: ${error}`);
+		log.error(`[WS] Worker ${workerId} flow step ${stepId} failed for task ${taskId}: ${error}`);
 
 		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
 		this.workerCoordinator.onWorkerMessage(workerId, message);
@@ -182,9 +182,7 @@ export class WebSocketEventHandler {
 	 */
 	handleWorkspaceAllocated(message: W2OWorkspaceAllocatedMessage): void {
 		const { workerId, taskId, workspaceId, workspacePath } = message;
-		logger.info(
-			`[WS] Worker ${workerId} allocated workspace ${workspaceId} at ${workspacePath} for task ${taskId}`
-		);
+		log.info(`[WS] Worker ${workerId} allocated workspace ${workspaceId} at ${workspacePath} for task ${taskId}`);
 
 		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
 		this.workerCoordinator.onWorkerMessage(workerId, message);
@@ -196,7 +194,7 @@ export class WebSocketEventHandler {
 	 */
 	handleWorkspaceReleased(message: W2OWorkspaceReleasedMessage): void {
 		const { workerId, taskId, workspaceId } = message;
-		logger.info(`[WS] Worker ${workerId} released workspace ${workspaceId} for task ${taskId}`);
+		log.info(`[WS] Worker ${workerId} released workspace ${workspaceId} for task ${taskId}`);
 
 		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
 		this.workerCoordinator.onWorkerMessage(workerId, message);
@@ -207,7 +205,7 @@ export class WebSocketEventHandler {
 	 */
 	handleStopRequested(message: REMOVE_W2OStopRequestedMessage): void {
 		const { workerId, taskId } = message;
-		logger.info(`[WS] Stop requested from worker ${workerId}, task ${taskId}`);
+		log.info(`[WS] Stop requested from worker ${workerId}, task ${taskId}`);
 
 		const worker = this.connectionManager.getWorker(workerId);
 		if (worker) {
@@ -225,7 +223,7 @@ export class WebSocketEventHandler {
 	 */
 	handleHookEvent(message: W2OHookEventMessage): void {
 		const { workerId, hookName, data } = message;
-		logger.info(`[WS] Hook event ${hookName} from worker ${workerId}`);
+		log.info(`[WS] Hook event ${hookName} from worker ${workerId}`);
 
 		// TODO: Log to knowledge base if relevant
 	}
@@ -240,7 +238,7 @@ export class WebSocketEventHandler {
 	async handleInterventionRequested(message: W2OInterventionRequestedMessage): Promise<void> {
 		const { workerId, taskId, interventionId, flowId, stepId, interventionType, blocking, config, timeout } =
 			message;
-		logger.info(
+		log.info(
 			`[WS] Worker ${workerId} requested ${interventionType} intervention for task ${taskId} step ${stepId} (id: ${interventionId})`
 		);
 
@@ -267,7 +265,7 @@ export class WebSocketEventHandler {
 				timeout,
 			});
 
-			logger.info(`[WS] Created intervention ${intervention.id} for task ${taskId}`);
+			log.info(`[WS] Created intervention ${intervention.id} for task ${taskId}`);
 
 			// Emit event for UI to show intervention
 			this.stateManager.emit('intervention.created', intervention);
@@ -287,7 +285,7 @@ export class WebSocketEventHandler {
 				}
 			}
 		} catch (error) {
-			logger.error(`[WS] Failed to create intervention for task ${taskId}:`, error);
+			log.error(`[WS] Failed to create intervention for task ${taskId}:`, error);
 
 			// Send error response to worker
 			const worker = this.connectionManager.getWorker(workerId);

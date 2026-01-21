@@ -1,7 +1,9 @@
-import { logger } from 'shared-common/logger';
+import { createLogger } from 'shared-common/logger';
 import { WebSocket, WebSocketServer } from 'ws';
 
 import type { UIClientHook } from '../ui-client/UIClientHook';
+
+const log = createLogger('UIWebSocketServer');
 
 /**
  * WebSocket server for UI clients
@@ -29,7 +31,7 @@ export class UIWebSocketServer {
 	 */
 	start(): void {
 		if (this.isActive) {
-			logger.warn('UIWebSocketServer', 'Already started, ignoring start()');
+			log.warn('UIWebSocketServer', 'Already started, ignoring start()');
 			return;
 		}
 
@@ -51,7 +53,7 @@ export class UIWebSocketServer {
 		});
 
 		this.isActive = true;
-		logger.info('UIWebSocketServer', 'Started and listening to UIClientHook events');
+		log.info('UIWebSocketServer', 'Started and listening to UIClientHook events');
 	}
 
 	/**
@@ -77,7 +79,7 @@ export class UIWebSocketServer {
 		this.clients.clear();
 
 		this.isActive = false;
-		logger.info('UIWebSocketServer', 'Stopped');
+		log.info('UIWebSocketServer', 'Stopped');
 	}
 
 	/**
@@ -85,7 +87,7 @@ export class UIWebSocketServer {
 	 */
 	handleConnection(socket: WebSocket): void {
 		this.clients.add(socket);
-		logger.info('UIWebSocketServer', `New UI client connected (total: ${this.clients.size})`);
+		log.info('UIWebSocketServer', `New UI client connected (total: ${this.clients.size})`);
 
 		// Send initial snapshot to the new client
 		this.sendInitialSnapshot(socket);
@@ -96,7 +98,7 @@ export class UIWebSocketServer {
 				const message = JSON.parse(data.toString());
 				this.handleClientMessage(socket, message);
 			} catch (error) {
-				logger.error('UIWebSocketServer', 'Error parsing client message', {
+				log.error('UIWebSocketServer', 'Error parsing client message', {
 					error: (error as Error).message,
 				});
 			}
@@ -105,12 +107,12 @@ export class UIWebSocketServer {
 		// Handle client disconnection
 		socket.on('close', () => {
 			this.clients.delete(socket);
-			logger.info('UIWebSocketServer', `UI client disconnected (remaining: ${this.clients.size})`);
+			log.info('UIWebSocketServer', `UI client disconnected (remaining: ${this.clients.size})`);
 		});
 
 		// Handle socket errors
 		socket.on('error', error => {
-			logger.error('UIWebSocketServer', 'Socket error', {
+			log.error('UIWebSocketServer', 'Socket error', {
 				error: error.message,
 			});
 		});
@@ -130,20 +132,20 @@ export class UIWebSocketServer {
 		};
 
 		this.sendToClient(socket, JSON.stringify(welcomeMessage));
-		logger.debug('UIWebSocketServer', 'Sent welcome message to new client');
+		log.debug('UIWebSocketServer', 'Sent welcome message to new client');
 	}
 
 	/**
 	 * Handle messages from UI clients (for future commands/requests)
 	 */
 	private handleClientMessage(socket: WebSocket, message: any): void {
-		logger.debug('UIWebSocketServer', 'Received client message', { message });
+		log.debug('UIWebSocketServer', 'Received client message', { message });
 
 		// Future: Handle commands like 'request_snapshot', 'pause_updates', etc.
 		// For now, just log
 		if (message.type === 'request_snapshot') {
 			// Request snapshot and it will be broadcasted via UIClientHook
-			logger.debug('UIWebSocketServer', 'Client requested snapshot');
+			log.debug('UIWebSocketServer', 'Client requested snapshot');
 		}
 	}
 
@@ -163,7 +165,7 @@ export class UIWebSocketServer {
 		});
 
 		if (failureCount > 0) {
-			logger.debug('UIWebSocketServer', `Broadcast complete: ${successCount} success, ${failureCount} failed`);
+			log.debug('UIWebSocketServer', `Broadcast complete: ${successCount} success, ${failureCount} failed`);
 		}
 	}
 
@@ -176,7 +178,7 @@ export class UIWebSocketServer {
 				client.send(message);
 				return true;
 			} catch (error) {
-				logger.error('UIWebSocketServer', 'Error sending to client', {
+				log.error('UIWebSocketServer', 'Error sending to client', {
 					error: (error as Error).message,
 				});
 				return false;

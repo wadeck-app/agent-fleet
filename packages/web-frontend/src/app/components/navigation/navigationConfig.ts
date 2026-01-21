@@ -7,6 +7,7 @@ import {
 	LayoutGrid,
 	ListTodo,
 	PackageSearch,
+	Sparkles,
 	Table2,
 	Users,
 	Workflow,
@@ -81,6 +82,11 @@ export const navigationItems: NavItem[] = [
 		path: '/ingredients4c',
 		label: 'Ingredients v4 carousel',
 		icon: Layers,
+	},
+	{
+		path: '/ingredients5',
+		label: 'Ingredients v5 ✨',
+		icon: Sparkles,
 	},
 	{
 		path: '/books',

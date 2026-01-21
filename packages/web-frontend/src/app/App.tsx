@@ -17,6 +17,7 @@ import { FlowEditorPage } from '@app/pages/flows/flow-editor/FlowEditorPage';
 import { Ingredients2TablePage } from '@app/pages/ingredients2/Ingredients2TablePage';
 import { Ingredients3GridPage } from '@app/pages/ingredients3/Ingredients3GridPage';
 import { Ingredients4CarouselPage as Ingredients4cCarouselPage } from '@app/pages/ingredients4c/Ingredients4CarouselPage';
+import { IngredientsV5Page } from '@app/pages/ingredients5/IngredientsV5Page';
 import { InterventionDetailPage } from '@app/pages/interventions/InterventionDetailPage';
 import { InterventionsPage } from '@app/pages/interventions/InterventionsPage';
 import { InterventionsV2Page } from '@app/pages/interventions/InterventionsV2Page';
@@ -73,6 +74,9 @@ function Layout() {
 						<Route path="/ingredients4c" element={<Ingredients4cCarouselPage />} />
 						<Route path="/ingredients4c/:mode" element={<Ingredients4cCarouselPage />} />
 						<Route path="/ingredients4c/:id/:mode" element={<Ingredients4cCarouselPage />} />
+						<Route path="/ingredients5" element={<IngredientsV5Page />} />
+						<Route path="/ingredients5/:mode" element={<IngredientsV5Page />} />
+						<Route path="/ingredients5/:id/:mode" element={<IngredientsV5Page />} />
 						<Route path="/books" element={<BooksPage />} />
 						<Route path="/books/:mode" element={<BooksPage />} />
 						<Route path="/books/:id/:mode" element={<BooksPage />} />

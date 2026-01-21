@@ -15,7 +15,7 @@ import { Orchestrator } from 'orchestrator';
 import * as os from 'os';
 import * as path from 'path';
 import { getOrchestratorPortsFromEnv } from 'shared-common/PortCalculator';
-import { logger } from 'shared-common/logger';
+import { createLogger } from 'shared-common/logger';
 import { fileURLToPath } from 'url';
 
 import { TransportsController } from './controllers/TransportsController';
@@ -34,6 +34,8 @@ import { SSETransportServer } from './transport/adapters/SSETransportServer';
 import { WebSocketTransportServer } from './transport/adapters/WebSocketTransportServer';
 import { initializeFactory } from './utils/factory-instance';
 
+const log = createLogger('BackendServer');
+
 // Get __dirname equivalent in ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -51,7 +53,7 @@ async function initializeOrchestratorClient(): Promise<Orchestrator> {
 
 	if (mode === 'library') {
 		// Library mode: Factory will create and start orchestrator internally
-		logger.info('[Orchestrator] Initializing in library mode (embedded)');
+		log.info('[Orchestrator] Initializing in library mode (embedded)');
 
 		// Use the same port calculation as the worker for consistency
 		const { wsPort: calculatedWsPort, restPort: calculatedRestPort } = getOrchestratorPortsFromEnv();
@@ -59,7 +61,7 @@ async function initializeOrchestratorClient(): Promise<Orchestrator> {
 		const orchestratorWsPort = parseInt(process.env.ORCHESTRATOR_WS_PORT || calculatedWsPort.toString(), 10);
 		const _orchestratorRestPort = parseInt(process.env.ORCHESTRATOR_REST_PORT || calculatedRestPort.toString(), 10);
 
-		logger.info(`[Orchestrator] Calculated ports from env: REST=${calculatedRestPort}, WS=${calculatedWsPort}`);
+		log.info(`[Orchestrator] Calculated ports from env: REST=${calculatedRestPort}, WS=${calculatedWsPort}`);
 
 		const orchestratorConfig = {
 			wsPort: orchestratorWsPort,
@@ -80,7 +82,7 @@ async function initializeOrchestratorClient(): Promise<Orchestrator> {
 		// });
 		//
 		// await orchestratorClient.connect();
-		logger.info(`[Orchestrator] Connected (WS: ${orchestratorWsPort}, REST disabled in library mode)`);
+		log.info(`[Orchestrator] Connected (WS: ${orchestratorWsPort}, REST disabled in library mode)`);
 
 		// return orchestratorClient;
 		return orchestrator;
@@ -156,20 +158,20 @@ async function initializeTransportServer(app: FastifyInstance, factory: DataStor
 	orchestratorEventBridge.start();
 	factory.setOrchestratorEventBridge(orchestratorEventBridge);
 
-	logger.info(`[Transport] Multi-transport server initialized:`);
-	logger.info(`  - WebSocket: ws://localhost:${PORT}/api/transports/ws`);
-	logger.info(`  - SSE: http://localhost:${PORT}/api/transports/sse`);
-	logger.info(`  - Long Polling: http://localhost:${PORT}/api/transports/long-polling`);
-	logger.info(`  - HTTP Polling: http://localhost:${PORT}/api/transports/http-polling`);
+	log.info(`[Transport] Multi-transport server initialized:`);
+	log.info(`  - WebSocket: ws://localhost:${PORT}/api/transports/ws`);
+	log.info(`  - SSE: http://localhost:${PORT}/api/transports/sse`);
+	log.info(`  - Long Polling: http://localhost:${PORT}/api/transports/long-polling`);
+	log.info(`  - HTTP Polling: http://localhost:${PORT}/api/transports/http-polling`);
 
 	// Log connection events for all transports
 	const logConnection = (transport: string) => (clientId: string) => {
 		const type = sessionManager.getTransportType(clientId);
-		logger.info(`[${transport}] Client ${clientId} connected (type=${type})`);
+		log.info(`[${transport}] Client ${clientId} connected (type=${type})`);
 	};
 
 	const logDisconnection = (transport: string) => (clientId: string) => {
-		logger.info(`[${transport}] Client ${clientId} disconnected`);
+		log.info(`[${transport}] Client ${clientId} disconnected`);
 	};
 
 	wsTransportServer.onClientConnected(logConnection('WebSocket'));
@@ -199,17 +201,17 @@ if (process.env.E2E_MODE === 'true') {
 // SECURITY: Prevent DISABLE_AUTH_DEV in production
 // This is a HARD FAIL to prevent accidental deployment with auth disabled
 if (process.env.NODE_ENV === 'production' && process.env.DISABLE_AUTH_DEV === 'true') {
-	logger.error('❌ FATAL SECURITY ERROR: DISABLE_AUTH_DEV=true in production environment!');
-	logger.error('❌ Authentication bypass is ONLY allowed in development mode.');
-	logger.error('❌ Server startup aborted to prevent security breach.');
+	log.error('❌ FATAL SECURITY ERROR: DISABLE_AUTH_DEV=true in production environment!');
+	log.error('❌ Authentication bypass is ONLY allowed in development mode.');
+	log.error('❌ Server startup aborted to prevent security breach.');
 	process.exit(1);
 }
 
 // WARNING: Log if auth is disabled in development (for visibility)
 if (process.env.DISABLE_AUTH_DEV === 'true') {
-	logger.warn('⚠️  WARNING: Authentication is DISABLED (DISABLE_AUTH_DEV=true)');
-	logger.warn('⚠️  This is ONLY safe in development mode!');
-	logger.warn('⚠️  All requests will be authenticated as mock user: dev-user-no-auth');
+	log.warn('⚠️  WARNING: Authentication is DISABLED (DISABLE_AUTH_DEV=true)');
+	log.warn('⚠️  This is ONLY safe in development mode!');
+	log.warn('⚠️  All requests will be authenticated as mock user: dev-user-no-auth');
 }
 
 /**
@@ -314,15 +316,15 @@ function startDashboardBroadcaster(factory: DataStoreFactory): void {
 	const broadcastDashboardData = async () => {
 		try {
 			if (!eventBroadcaster) {
-				logger.warn('[Dashboard Broadcaster] EventBroadcaster not initialized');
+				log.warn('[Dashboard Broadcaster] EventBroadcaster not initialized');
 				return;
 			}
 
 			const dashboardData = await dashboardService.getDashboardData();
 			eventBroadcaster.broadcast('b2f:dashboard:updated', dashboardData);
-			logger.debug('[Dashboard Broadcaster] Broadcast dashboard data (reactive)');
+			log.debug('[Dashboard Broadcaster] Broadcast dashboard data (reactive)');
 		} catch (error) {
-			logger.error('[Dashboard Broadcaster] Failed to broadcast dashboard data:', error);
+			log.error('[Dashboard Broadcaster] Failed to broadcast dashboard data:', error);
 		}
 	};
 
@@ -337,7 +339,7 @@ function startDashboardBroadcaster(factory: DataStoreFactory): void {
 	orchestratorWrapper.on('worker.disconnected', broadcastDashboardData);
 	orchestratorWrapper.on('worker.status', broadcastDashboardData);
 
-	logger.info('[Dashboard Broadcaster] Started (reactive/event-driven mode)');
+	log.info('[Dashboard Broadcaster] Started (reactive/event-driven mode)');
 }
 
 /**
@@ -352,15 +354,15 @@ function startTasksBroadcaster(factory: DataStoreFactory): void {
 	const broadcastTasksData = async () => {
 		try {
 			if (!eventBroadcaster) {
-				logger.warn('[Tasks Broadcaster] EventBroadcaster not initialized');
+				log.warn('[Tasks Broadcaster] EventBroadcaster not initialized');
 				return;
 			}
 
 			const tasksData = await tasksService.getTasksData({});
 			eventBroadcaster.broadcast('b2f:tasks:updated', tasksData);
-			logger.debug('[Tasks Broadcaster] Broadcast tasks data (reactive)');
+			log.debug('[Tasks Broadcaster] Broadcast tasks data (reactive)');
 		} catch (error) {
-			logger.error('[Tasks Broadcaster] Failed to broadcast tasks data:', error);
+			log.error('[Tasks Broadcaster] Failed to broadcast tasks data:', error);
 		}
 	};
 
@@ -372,7 +374,7 @@ function startTasksBroadcaster(factory: DataStoreFactory): void {
 	orchestratorWrapper.on('task.updated', broadcastTasksData);
 	orchestratorWrapper.on('task.status_changed', broadcastTasksData);
 
-	logger.info('[Tasks Broadcaster] Started (reactive/event-driven mode)');
+	log.info('[Tasks Broadcaster] Started (reactive/event-driven mode)');
 }
 
 /**
@@ -387,15 +389,15 @@ function startWorkersBroadcaster(factory: DataStoreFactory): void {
 	const broadcastWorkersData = async () => {
 		try {
 			if (!eventBroadcaster) {
-				logger.warn('[Workers Broadcaster] EventBroadcaster not initialized');
+				log.warn('[Workers Broadcaster] EventBroadcaster not initialized');
 				return;
 			}
 
 			const workersData = await workersService.getWorkersData();
 			eventBroadcaster.broadcast('b2f:workers:updated', workersData);
-			logger.debug('[Workers Broadcaster] Broadcast workers data (reactive)');
+			log.debug('[Workers Broadcaster] Broadcast workers data (reactive)');
 		} catch (error) {
-			logger.error('[Workers Broadcaster] Failed to broadcast workers data:', error);
+			log.error('[Workers Broadcaster] Failed to broadcast workers data:', error);
 		}
 	};
 
@@ -407,7 +409,7 @@ function startWorkersBroadcaster(factory: DataStoreFactory): void {
 	orchestratorWrapper.on('worker.disconnected', broadcastWorkersData);
 	orchestratorWrapper.on('worker.status', broadcastWorkersData);
 
-	logger.info('[Workers Broadcaster] Started (reactive/event-driven mode)');
+	log.info('[Workers Broadcaster] Started (reactive/event-driven mode)');
 }
 
 // ===========================================================================================
@@ -434,13 +436,13 @@ const signals = ['SIGTERM', 'SIGINT', 'SIGBREAK'] as const;
 signals.forEach(signal => {
 	process.on(signal, async () => {
 		logToFile(`🚨 ${signal} SIGNAL RECEIVED 🚨`);
-		// Signal already logged by logger.info below
-		logger.info(`${signal} signal received: initiating graceful shutdown`);
+		// Signal already logged by log.info below
+		log.info(`${signal} signal received: initiating graceful shutdown`);
 		try {
 			// Close orchestrator first (if it was initialized)
 			if (orchestratorClient) {
 				logToFile('Shutting down orchestrator...');
-				logger.info('Shutting down orchestrator...');
+				log.info('Shutting down orchestrator...');
 				await orchestratorClient.shutdown();
 				logToFile('Orchestrator shutdown complete');
 			}
@@ -448,17 +450,17 @@ signals.forEach(signal => {
 			// Then close fastify (if it was initialized)
 			if (fastifyInstance) {
 				logToFile('Closing fastify server...');
-				logger.info('Closing fastify server...');
+				log.info('Closing fastify server...');
 				await fastifyInstance.close();
 				logToFile('Fastify closed');
 			}
 
 			logToFile('Server shutdown complete - exiting');
-			logger.info('Server shutdown complete');
+			log.info('Server shutdown complete');
 			process.exit(0);
 		} catch (err) {
 			logToFile(`Error during shutdown: ${err}`);
-			logger.error('Error during shutdown:', err);
+			log.error('Error during shutdown:', err);
 			process.exit(1);
 		}
 	});
@@ -481,7 +483,7 @@ async function waitForPortsAvailable(): Promise<void> {
 		} catch (err) {
 			const isAddressInUse = err instanceof Error && 'code' in err && err.code === 'EADDRINUSE';
 			if (isAddressInUse && attempt < MAX_RETRIES - 1) {
-				logger.info(`Port ${PORT} in use, retrying (${attempt + 1}/${MAX_RETRIES})...`);
+				log.info(`Port ${PORT} in use, retrying (${attempt + 1}/${MAX_RETRIES})...`);
 				await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
 			} else if (isAddressInUse) {
 				throw new Error(
@@ -562,7 +564,7 @@ async function start(): Promise<void> {
 			const maxDelay = isE2EMode ? 50 : parseInt(process.env.LATENCY_MAX || '600', 10);
 			await fastify.register(latencySimulatorHook, { minDelay, maxDelay });
 			if (!isE2EMode) {
-				logger.info(`Latency simulator enabled: ${minDelay}-${maxDelay}ms random delay`);
+				log.info(`Latency simulator enabled: ${minDelay}-${maxDelay}ms random delay`);
 			}
 		}
 
@@ -663,7 +665,7 @@ async function start(): Promise<void> {
 			// MUST be done AFTER initializeTransportServer creates EventBroadcaster
 			factory.initializeOrchestratorIntegration();
 		} else if (process.env.E2E_MODE !== 'true') {
-			//logger.info('Skipping Google Sheets and Gemini AI initialization (in-memory mode)');
+			//log.info('Skipping Google Sheets and Gemini AI initialization (in-memory mode)');
 
 			// Seed initial data (for development)
 			await factory.seedData();
@@ -687,7 +689,7 @@ async function start(): Promise<void> {
 		// Add onClose hook to terminate all WebSocket connections before shutdown
 		// This prevents Fastify from hanging when trying to close with active connections
 		fastify.addHook('onClose', (instance, done) => {
-			logger.info('[Fastify] onClose: Terminating all active WebSocket connections...');
+			log.info('[Fastify] onClose: Terminating all active WebSocket connections...');
 			const transportServer = factory.getTransportServer();
 			if (transportServer) {
 				// Get WebSocketTransportServer and close all connections
@@ -702,7 +704,7 @@ async function start(): Promise<void> {
 						// @formatter:on
 						client.terminate();
 					});
-					logger.info(`[Fastify] Terminated ${wsServer.clients.size} WebSocket connections`);
+					log.info(`[Fastify] Terminated ${wsServer.clients.size} WebSocket connections`);
 				}
 			}
 			done();
@@ -716,10 +718,7 @@ async function start(): Promise<void> {
 		// This allows the test setup to know when the backend is ready without doing fetchs
 		if (process.env.E2E_MODE === 'true') {
 			const readyMessage = `E2E_BACKEND_READY port=${PORT} pid=${process.pid} runId=${process.env.RUN_ID || 'unknown'}`;
-			// @formatter:off
-			// eslint-disable-next-line no-console
-			console.log(readyMessage);
-			// @formatter:on
+			log.info(readyMessage);
 			// Force flush stdout to ensure message is immediately sent (important on Windows)
 			if (process.stdout.write) {
 				process.stdout.write('');
@@ -727,13 +726,13 @@ async function start(): Promise<void> {
 		} else {
 			// Normal startup logs for development mode
 			logToFile(`=== SERVER STARTED SUCCESSFULLY === PORT: ${PORT}`);
-			logger.info(`Server running in ${process.env.NODE_ENV || 'development'} mode`);
-			logger.info(`  >  PID:     ${process.pid} (parent: ${process.ppid || 'unknown'})`);
-			logger.info(`  >  Local:   http://localhost:${PORT}/`);
+			log.info(`Server running in ${process.env.NODE_ENV || 'development'} mode`);
+			log.info(`  >  PID:     ${process.pid} (parent: ${process.ppid || 'unknown'})`);
+			log.info(`  >  Local:   http://localhost:${PORT}/`);
 
 			const networkAddresses = getNetworkAddresses();
 			networkAddresses.forEach(address => {
-				logger.info(`  >  Network: http://${address}:${PORT}/`);
+				log.info(`  >  Network: http://${address}:${PORT}/`);
 			});
 		}
 
@@ -746,7 +745,7 @@ async function start(): Promise<void> {
 	} catch (err) {
 		// Always log startup errors
 		logToFile(`❌ FATAL ERROR: ${err}`);
-		logger.error('❌ FATAL: Failed to start backend server:', err);
+		log.error('❌ FATAL: Failed to start backend server:', err);
 		process.exit(1);
 	}
 }

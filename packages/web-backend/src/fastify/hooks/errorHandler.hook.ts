@@ -1,9 +1,11 @@
 import { type FastifyError, type FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
-import { logger } from 'shared-common/logger';
+import { createLogger } from 'shared-common/logger';
 import { ZodError } from 'zod';
 
 import { ERROR_CODES, type ErrorResponse, HttpException } from '@app/shared/exceptions/http-exceptions';
+
+const log = createLogger('ErrorHandler');
 
 const onlyUnexpectedErrorLogged = false;
 
@@ -36,7 +38,7 @@ const errorHandlerHook: FastifyPluginAsync = async fastify => {
 
 		// Log ALL 400 errors with full context for debugging
 		if (statusCode === 400) {
-			logger.error(`[400] ${request.method} ${request.url} - ${error.constructor.name}: ${error.message}`, {
+			log.error(`[400] ${request.method} ${request.url} - ${error.constructor.name}: ${error.message}`, {
 				query: request.query,
 				body: request.body,
 			});
@@ -48,18 +50,16 @@ const errorHandlerHook: FastifyPluginAsync = async fastify => {
 
 		if (shouldLogDetails) {
 			const errorCode = 'code' in error ? error.code : 'UNKNOWN_ERROR';
-			logger.error(
-				`Error handling ${request.method} ${request.url} - ${statusCode} ${errorCode}: ${error.message}`
-			);
+			log.error(`Error handling ${request.method} ${request.url} - ${statusCode} ${errorCode}: ${error.message}`);
 
 			// Log stack trace for 5xx errors
 			if (statusCode >= 500 && error.stack) {
-				logger.error(`Stack trace:\n${error.stack}`);
+				log.error(`Stack trace:\n${error.stack}`);
 			}
 
 			// Log additional error details if available
 			if ('details' in error && error.details) {
-				logger.error('Error details:', error.details);
+				log.error('Error details:', error.details);
 			}
 		}
 
@@ -78,10 +78,10 @@ const errorHandlerHook: FastifyPluginAsync = async fastify => {
 		// Handle Zod validation errors
 		if (error instanceof ZodError) {
 			// Log detailed validation error information
-			logger.error(`Zod validation error for ${request.method} ${request.url}`);
-			logger.error('Query params:', request.query);
-			logger.error('Body:', request.body);
-			logger.error('Validation issues:', JSON.stringify(error.issues, null, 2));
+			log.error(`Zod validation error for ${request.method} ${request.url}`);
+			log.error('Query params:', request.query);
+			log.error('Body:', request.body);
+			log.error('Validation issues:', JSON.stringify(error.issues, null, 2));
 
 			const response: ErrorResponse = {
 				error: 'Validation failed',
@@ -101,10 +101,10 @@ const errorHandlerHook: FastifyPluginAsync = async fastify => {
 		// Handle Fastify validation errors
 		if ('validation' in error && error.validation) {
 			// Log detailed validation error information
-			logger.error(`Fastify validation error for ${request.method} ${request.url}`);
-			logger.error('Query params:', request.query);
-			logger.error('Body:', request.body);
-			logger.error('Validation details:', error.validation);
+			log.error(`Fastify validation error for ${request.method} ${request.url}`);
+			log.error('Query params:', request.query);
+			log.error('Body:', request.body);
+			log.error('Validation details:', error.validation);
 
 			const response: ErrorResponse = {
 				error: 'Validation failed',
@@ -123,7 +123,7 @@ const errorHandlerHook: FastifyPluginAsync = async fastify => {
 				: error.message || 'Internal Server Error';
 
 		if (onlyUnexpectedErrorLogged) {
-			logger.error('Unexpected error', error);
+			log.error('Unexpected error', error);
 		}
 
 		const response: ErrorResponse = {

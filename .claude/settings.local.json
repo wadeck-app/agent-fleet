@@ -21,7 +21,8 @@
 			"Bash(npm run check)",
 			"Bash(npm run format)",
 			"Bash(git mv:*)",
-			"Bash(npx eslint:*)"
+			"Bash(npx eslint:*)",
+			"Bash(grep:*)"
 		],
 		"deny": [],
 		"ask": []

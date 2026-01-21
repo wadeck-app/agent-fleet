@@ -1,6 +1,8 @@
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { logger } from 'shared-common/logger';
+import { createLogger } from 'shared-common/logger';
+
+const log = createLogger('TraceChunkStorage');
 
 export interface ChunkMetadata {
 	index: number;
@@ -229,7 +231,7 @@ export class TraceChunkStorage {
 			if (chunk) {
 				const nextCursor = cursor + chunk.entries.length < total ? cursor + chunk.entries.length : null;
 
-				logger.debug(
+				log.debug(
 					`[TraceChunkStorage] Optimized read: chunk ${chunkIndex} for task ${taskId} (${chunk.entries.length} entries)`
 				);
 

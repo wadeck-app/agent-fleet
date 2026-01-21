@@ -137,7 +137,7 @@ process.stdin.on('end', async () => {
 	const logToFile = message => {
 		const logPath = path.join(projectDir, 'Stop.txt');
 		const timestamp = new Date().toISOString();
-		fssync.appendFileSync(logPath, `[${timestamp}] ${message}\n`);
+		// fssync.appendFileSync(logPath, `[${timestamp}] ${message}\n`);
 	};
 
 	// Run cleanup before WebSocket logic

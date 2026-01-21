@@ -10,8 +10,10 @@ import { UIClientHook } from 'orchestrator/ui-client/UIClientHook';
 import { type OrchestratorSnapshot } from 'orchestrator/ui-client/types';
 import { WorkerWebSocketServer } from 'orchestrator/websocket/WorkerWebSocketServer';
 import { type Shutdownable } from 'shared-common/Shutdownable';
-import { logger } from 'shared-common/logger';
+import { createLogger } from 'shared-common/logger';
 import { StateManager } from 'shared-orch-worker/StateManager';
+
+const log = createLogger('Orchestrator');
 
 export type OrchestratorConfig = { restPort?: number; wsPort?: number; projectRoot?: string; libraryMode?: boolean };
 
@@ -55,7 +57,7 @@ export class Orchestrator implements Shutdownable {
 		// Initialize Logger with StateManager
 		// Logger.initialize(this.stateManager);
 
-		logger.info(
+		log.info(
 			'Orchestrator',
 			`Constructor: libraryMode=${this.libraryMode}, wsPort=${this.wsPort}, restPort=${this.restPort}`
 		);
@@ -74,7 +76,7 @@ export class Orchestrator implements Shutdownable {
 		// Initialize InterventionManager
 		this.interventionManager = new InterventionManager(this.taskManager);
 		await this.interventionManager.loadPendingInterventions();
-		logger.info('Orchestrator', 'InterventionManager initialized');
+		log.info('Orchestrator', 'InterventionManager initialized');
 
 		// Create WebSocket server
 		this.wsServer = new WorkerWebSocketServer(
@@ -110,7 +112,7 @@ export class Orchestrator implements Shutdownable {
 
 		// Always enable UI client hook
 		this.uiClientHook.enable();
-		logger.info('Orchestrator', 'UI client hook enabled');
+		log.info('Orchestrator', 'UI client hook enabled');
 
 		// Create REST API only if not in library mode
 		// In library mode, the backend (Fastify) handles HTTP/WebSocket communication
@@ -123,7 +125,7 @@ export class Orchestrator implements Shutdownable {
 				this.uiClientHook
 			);
 		} else {
-			logger.info('Orchestrator', 'REST API disabled (library mode)');
+			log.info('Orchestrator', 'REST API disabled (library mode)');
 		}
 	}
 
@@ -135,7 +137,7 @@ export class Orchestrator implements Shutdownable {
 			throw new Error('Orchestrator is already running');
 		}
 
-		logger.info('[Orchestrator] Starting orchestrator...');
+		log.info('[Orchestrator] Starting orchestrator...');
 		process.title = 'Orchestrator';
 
 		try {
@@ -156,10 +158,10 @@ export class Orchestrator implements Shutdownable {
 			// Emit orchestrator ready event
 			this.stateManager.emitOrchestratorReady();
 
-			logger.info('[Orchestrator] Orchestrator started successfully');
-			logger.info('Orchestrator', 'All services started successfully');
+			log.info('[Orchestrator] Orchestrator started successfully');
+			log.info('Orchestrator', 'All services started successfully');
 		} catch (error) {
-			logger.error('Orchestrator', 'Failed to start:', error);
+			log.error('Orchestrator', 'Failed to start:', error);
 			await this.shutdown();
 			throw error;
 		}
@@ -170,11 +172,11 @@ export class Orchestrator implements Shutdownable {
 	 */
 	async shutdown(): Promise<void> {
 		if (!this.isRunning) {
-			logger.info('[Orchestrator] Already shut down, skipping');
+			log.info('[Orchestrator] Already shut down, skipping');
 			return;
 		}
 
-		logger.info('[Orchestrator] Shutting down...');
+		log.info('[Orchestrator] Shutting down...');
 
 		// Emit orchestrator stopping event
 		this.stateManager.emitOrchestratorStopping();
@@ -183,15 +185,15 @@ export class Orchestrator implements Shutdownable {
 
 		// Stop metrics collector
 		this.metricsCollector?.stop();
-		logger.info('[Orchestrator] MetricsCollector stopped');
+		log.info('[Orchestrator] MetricsCollector stopped');
 
 		// Cleanup InterventionManager
 		this.interventionManager?.cleanup();
-		logger.info('[Orchestrator] InterventionManager cleaned up');
+		log.info('[Orchestrator] InterventionManager cleaned up');
 
 		// Disable UI client hook
 		this.uiClientHook?.disable();
-		logger.info('[Orchestrator] UIClientHook disabled');
+		log.info('[Orchestrator] UIClientHook disabled');
 
 		// // Unmount UI
 		// if (this.uiInstance) {
@@ -200,13 +202,13 @@ export class Orchestrator implements Shutdownable {
 
 		// Stop REST API
 		await this.restAPI?.stop();
-		logger.info('[Orchestrator] restAPI Stopped');
+		log.info('[Orchestrator] restAPI Stopped');
 
 		// Stop WebSocket server
 		await this.wsServer?.stop();
-		logger.info('[Orchestrator] wsServer Stopped');
+		log.info('[Orchestrator] wsServer Stopped');
 
-		logger.info('[Orchestrator] Stopped');
+		log.info('[Orchestrator] Stopped');
 	}
 
 	getStartTime(): Date {

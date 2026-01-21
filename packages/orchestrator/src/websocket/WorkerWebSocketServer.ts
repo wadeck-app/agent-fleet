@@ -1,4 +1,4 @@
-import { logger } from 'shared-common/logger';
+import { createLogger } from 'shared-common/logger';
 import { parseMessage } from 'shared-common/protocol';
 import type { StateManager } from 'shared-orch-worker/StateManager';
 import type { WorkerInfo } from 'shared-orch-worker/domain-types';
@@ -14,6 +14,8 @@ import type { WorkerCoordinator } from '../core/WorkerCoordinator';
 import { WebSocketConnectionManager } from './WebSocketConnectionManager';
 import { WebSocketEventHandler } from './WebSocketEventHandler';
 import { WebSocketMessageRouter } from './WebSocketMessageRouter';
+
+const log = createLogger('WorkerWebSocketServer');
 
 /**
  * Main WebSocket server that coordinates worker connections and message routing
@@ -54,15 +56,15 @@ export class WorkerWebSocketServer {
 
 	private setupServer(): void {
 		this.wss.on('connection', (socket: WebSocket) => {
-			logger.debug('[WS] New worker connection');
+			log.debug('[WS] New worker connection');
 			this.handleConnection(socket);
 		});
 
 		this.wss.on('error', error => {
-			logger.error('[WS] Server error:', error);
+			log.error('[WS] Server error:', error);
 		});
 
-		logger.debug(`[WS] WebSocket server listening on port ${this.port}`);
+		log.debug(`[WS] WebSocket server listening on port ${this.port}`);
 	}
 
 	private handleConnection(socket: WebSocket): void {
@@ -78,7 +80,7 @@ export class WorkerWebSocketServer {
 					workerId = result;
 				}
 			} catch (error) {
-				logger.error('[WS] Error parsing message:', (error as Error).message);
+				log.error('[WS] Error parsing message:', (error as Error).message);
 				this.connectionManager.sendMessage(
 					socket,
 					createO2WMessage(O2WMessageType.ERROR, {
@@ -95,7 +97,7 @@ export class WorkerWebSocketServer {
 		});
 
 		socket.on('error', error => {
-			logger.error('[WS] Socket error:', error);
+			log.error('[WS] Socket error:', error);
 		});
 	}
 
@@ -160,7 +162,7 @@ export class WorkerWebSocketServer {
 			this.connectionManager.closeAll();
 
 			this.wss.close(() => {
-				logger.debug('[WS] WebSocket server stopped');
+				log.debug('[WS] WebSocket server stopped');
 				resolve();
 			});
 		});

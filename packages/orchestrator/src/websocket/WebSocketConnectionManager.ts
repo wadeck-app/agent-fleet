@@ -1,4 +1,4 @@
-import { logger } from 'shared-common/logger';
+import { createLogger } from 'shared-common/logger';
 import { serializeMessage } from 'shared-common/protocol';
 import type { StateManager } from 'shared-orch-worker/StateManager';
 import { StateEvent } from 'shared-orch-worker/StateManager';
@@ -15,6 +15,8 @@ import { WebSocket } from 'ws';
 
 import type { WorkerCoordinator } from '../core/WorkerCoordinator';
 import { FlowDiscoveryRegistry, FlowVersionMismatchError } from '../registry/FlowDiscoveryRegistry';
+
+const log = createLogger('WebSocketConnectionManager');
 
 interface WorkerConnection extends WorkerInfo {
 	socket: WebSocket;
@@ -50,11 +52,11 @@ export class WebSocketConnectionManager {
 		this.taskAssignedListener = (data: { workerId: string; taskId: string }) => {
 			const worker = this.workers.get(data.workerId);
 			if (worker) {
-				logger.info(`[WebSocketConnectionManager] Updating worker ${data.workerId} taskId to ${data.taskId}`);
+				log.info(`[WebSocketConnectionManager] Updating worker ${data.workerId} taskId to ${data.taskId}`);
 				worker.taskId = data.taskId;
 				worker.taskStartedAt = new Date().toISOString();
 			} else {
-				logger.warn(`[WebSocketConnectionManager] Cannot update taskId: worker ${data.workerId} not found`);
+				log.warn(`[WebSocketConnectionManager] Cannot update taskId: worker ${data.workerId} not found`);
 			}
 		};
 
@@ -69,31 +71,29 @@ export class WebSocketConnectionManager {
 	handleWorkerReady(socket: WebSocket, message: W2OWorkerReadyMessage): string {
 		const { preferredId, projectId, workspacePath, availableFlows, gitBranch } = message;
 
-		logger.info(`[WS] Worker READY - gitBranch: ${gitBranch || 'undefined'}, workspacePath: ${workspacePath}`);
+		log.info(`[WS] Worker READY - gitBranch: ${gitBranch || 'undefined'}, workspacePath: ${workspacePath}`);
 
 		let workerId: string;
 
 		// If a preferred ID is provided and not already taken, use it
 		if (preferredId && !this.workers.has(preferredId)) {
 			workerId = preferredId;
-			logger.info(`[WS] Using preferred worker ID: ${workerId}`);
+			log.info(`[WS] Using preferred worker ID: ${workerId}`);
 		} else {
 			// Otherwise, use auto-increment
 			workerId = '' + ++this.nextWorkerNum;
 			if (preferredId) {
-				logger.info(`[WS] Preferred ID '${preferredId}' already taken, assigned '${workerId}' instead`);
+				log.info(`[WS] Preferred ID '${preferredId}' already taken, assigned '${workerId}' instead`);
 			}
 		}
 
 		// Register worker flows in discovery registry
 		try {
 			this.flowDiscoveryRegistry.registerWorker(workerId, projectId, workspacePath, availableFlows);
-			logger.info(
-				`[WS] Registered ${availableFlows.length} flows for worker ${workerId} (project: ${projectId})`
-			);
+			log.info(`[WS] Registered ${availableFlows.length} flows for worker ${workerId} (project: ${projectId})`);
 		} catch (error) {
 			if (error instanceof FlowVersionMismatchError) {
-				logger.error(`[WS] Flow version mismatch for worker ${workerId}: ${error.message}`);
+				log.error(`[WS] Flow version mismatch for worker ${workerId}: ${error.message}`);
 				this.sendMessage(
 					socket,
 					createO2WMessage(O2WMessageType.ERROR, {
@@ -119,7 +119,7 @@ export class WebSocketConnectionManager {
 
 		this.workers.set(workerId, worker);
 
-		logger.info(`[WS] Work  er ${workerId} is ready`);
+		log.info(`[WS] Work  er ${workerId} is ready`);
 
 		this.stateManager.emitWorkerConnected({
 			id: workerId,
@@ -147,14 +147,14 @@ export class WebSocketConnectionManager {
 			return;
 		}
 
-		logger.info(`[WS] Worker ${workerId} disconnected`);
+		log.info(`[WS] Worker ${workerId} disconnected`);
 
 		// Unregister from WorkerCoordinator (handles task cleanup)
 		this.workerCoordinator.unregisterWorker(workerId);
 
 		// Unregister from flow discovery registry
 		this.flowDiscoveryRegistry.unregisterWorker(workerId);
-		logger.info(`[WS] Unregistered worker ${workerId} from flow discovery registry`);
+		log.info(`[WS] Unregistered worker ${workerId} from flow discovery registry`);
 
 		this.workers.delete(workerId);
 		this.stateManager.emitWorkerDisconnected(workerId);
@@ -167,7 +167,7 @@ export class WebSocketConnectionManager {
 	async tryAssignTasksToIdleWorkers(): Promise<void> {
 		// WorkerCoordinator now handles task assignment automatically
 		// This method is kept for backward compatibility but does nothing
-		logger.debug('[WS] tryAssignTasksToIdleWorkers called - WorkerCoordinator handles assignment automatically');
+		log.debug('[WS] tryAssignTasksToIdleWorkers called - WorkerCoordinator handles assignment automatically');
 	}
 
 	/**
@@ -273,12 +273,12 @@ export class WebSocketConnectionManager {
 						cancelled,
 					})
 				);
-				logger.info(`[WS] Sent INTERVENTION_RESPONSE for task ${taskId} to worker ${worker.id}`);
+				log.info(`[WS] Sent INTERVENTION_RESPONSE for task ${taskId} to worker ${worker.id}`);
 				return true;
 			}
 		}
 
-		logger.warn(`[WS] No worker found for task ${taskId} to send intervention response`);
+		log.warn(`[WS] No worker found for task ${taskId} to send intervention response`);
 		return false;
 	}
 
@@ -312,11 +312,11 @@ export class WebSocketConnectionManager {
 		const worker = this.workers.get(workerId);
 
 		if (!worker) {
-			logger.error(`[WS] REQUEST_TASK from unknown worker ${workerId}`);
+			log.error(`[WS] REQUEST_TASK from unknown worker ${workerId}`);
 			return;
 		}
 
-		logger.info(`[WS] Worker ${workerId} requesting task`);
+		log.info(`[WS] Worker ${workerId} requesting task`);
 
 		// Delegate to WorkerCoordinator which handles task assignment
 		this.workerCoordinator.onWorkerMessage(workerId, message);
@@ -328,7 +328,7 @@ export class WebSocketConnectionManager {
 	handleFlowsUpdated(message: W2OFlowsUpdatedMessage): void {
 		const { workerId, projectId, flows, changes } = message;
 
-		logger.info(`[WS] Worker ${workerId} updating flows (project: ${projectId})`);
+		log.info(`[WS] Worker ${workerId} updating flows (project: ${projectId})`);
 
 		try {
 			this.flowDiscoveryRegistry.updateWorkerFlows(workerId, flows);
@@ -344,11 +344,11 @@ export class WebSocketConnectionManager {
 				if (changes.updated.length > 0) {
 					changeDesc.push(`${changes.updated.length} updated`);
 				}
-				logger.info(`[WS] Flow update for worker ${workerId}: ${changeDesc.join(', ')}`);
+				log.info(`[WS] Flow update for worker ${workerId}: ${changeDesc.join(', ')}`);
 			}
 		} catch (error) {
 			if (error instanceof FlowVersionMismatchError) {
-				logger.error(`[WS] Flow version mismatch for worker ${workerId}: ${error.message}`);
+				log.error(`[WS] Flow version mismatch for worker ${workerId}: ${error.message}`);
 				const worker = this.workers.get(workerId);
 				if (worker) {
 					this.sendMessage(
@@ -359,7 +359,7 @@ export class WebSocketConnectionManager {
 					);
 				}
 			} else {
-				logger.error(`[WS] Error updating flows for worker ${workerId}: ${(error as Error).message}`);
+				log.error(`[WS] Error updating flows for worker ${workerId}: ${(error as Error).message}`);
 			}
 		}
 	}

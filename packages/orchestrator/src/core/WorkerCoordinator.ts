@@ -1,4 +1,4 @@
-import { logger } from 'shared-common/logger';
+import { createLogger } from 'shared-common/logger';
 import type { StateManager } from 'shared-orch-worker/StateManager';
 import type { Task } from 'shared-orch-worker/domain-types';
 import { O2WMessageType, createO2WMessage } from 'shared-orch-worker/orchestrator-messages';
@@ -7,6 +7,8 @@ import { W2OMessageType } from 'shared-orch-worker/worker-messages';
 import type { WebSocket } from 'ws';
 
 import type { BackendEventBridge } from './BackendEventBridge';
+
+const log = createLogger('WorkerCoordinator');
 
 /**
  * Worker connection information stored in memory
@@ -64,11 +66,11 @@ export class WorkerCoordinator {
 				this.workerQueues.set(workerId, queue);
 			}
 			queue.push(task);
-			logger.info(`[WorkerCoordinator] Task ${task.id} enqueued for worker ${workerId}`);
+			log.info(`[WorkerCoordinator] Task ${task.id} enqueued for worker ${workerId}`);
 		} else {
 			// Global backlog
 			this.globalBacklog.push(task);
-			logger.info(`[WorkerCoordinator] Task ${task.id} enqueued to global backlog`);
+			log.info(`[WorkerCoordinator] Task ${task.id} enqueued to global backlog`);
 		}
 
 		this.tryAssignTasks();
@@ -107,14 +109,14 @@ export class WorkerCoordinator {
 		const workerQueue = this.workerQueues.get(workerId);
 		if (workerQueue && workerQueue.length > 0) {
 			const task = workerQueue.shift()!;
-			logger.info(`[WorkerCoordinator] Found task ${task.id} in worker ${workerId} queue`);
+			log.info(`[WorkerCoordinator] Found task ${task.id} in worker ${workerId} queue`);
 			return task;
 		}
 
 		// Check global backlog
 		if (this.globalBacklog.length > 0) {
 			const task = this.globalBacklog.shift()!;
-			logger.info(`[WorkerCoordinator] Found task ${task.id} in global backlog for worker ${workerId}`);
+			log.info(`[WorkerCoordinator] Found task ${task.id} in global backlog for worker ${workerId}`);
 			return task;
 		}
 
@@ -131,7 +133,7 @@ export class WorkerCoordinator {
 	private assignTaskToWorker(task: Task, workerId: string): void {
 		const worker = this.workers.get(workerId);
 		if (!worker) {
-			logger.error(`[WorkerCoordinator] Cannot assign task ${task.id}: worker ${workerId} not found`);
+			log.error(`[WorkerCoordinator] Cannot assign task ${task.id}: worker ${workerId} not found`);
 			// Re-enqueue task
 			this.globalBacklog.unshift(task);
 			return;
@@ -144,7 +146,7 @@ export class WorkerCoordinator {
 
 		try {
 			worker.socket.send(JSON.stringify(message));
-			logger.info(`[WorkerCoordinator] Assigned task ${task.id} to worker ${workerId}`);
+			log.info(`[WorkerCoordinator] Assigned task ${task.id} to worker ${workerId}`);
 
 			// Mark worker as busy
 			this.idleWorkers.delete(workerId);
@@ -158,7 +160,7 @@ export class WorkerCoordinator {
 				workerId,
 			});
 		} catch (error) {
-			logger.error(
+			log.error(
 				`[WorkerCoordinator] Failed to send task ${task.id} to worker ${workerId}: ${error instanceof Error ? error.message : String(error)}`
 			);
 			// Re-enqueue task
@@ -181,7 +183,7 @@ export class WorkerCoordinator {
 				break;
 
 			case W2OMessageType.TASK_TRACE_UPDATE:
-				logger.debug(
+				log.debug(
 					`[TRACE] Received TASK_TRACE_UPDATE from worker ${workerId} - task=${message.taskId}, steps=${message.trace?.steps?.length || 0}`
 				);
 
@@ -247,13 +249,13 @@ export class WorkerCoordinator {
 				} else {
 					// No task available, mark as idle
 					this.idleWorkers.add(workerId);
-					logger.info(`[WorkerCoordinator] No tasks available for worker ${workerId}, marked as idle`);
+					log.info(`[WorkerCoordinator] No tasks available for worker ${workerId}, marked as idle`);
 				}
 				break;
 
 			default:
 				// Pass through other message types without specific handling
-				logger.debug(`[WorkerCoordinator] Received unhandled message type: ${message.type}`);
+				log.debug(`[WorkerCoordinator] Received unhandled message type: ${message.type}`);
 				break;
 		}
 	}
@@ -274,7 +276,7 @@ export class WorkerCoordinator {
 
 		this.idleWorkers.add(workerId);
 
-		logger.info(`[WorkerCoordinator] Worker ${workerId} registered with ${availableFlows.length} flows`);
+		log.info(`[WorkerCoordinator] Worker ${workerId} registered with ${availableFlows.length} flows`);
 
 		void this.eventBridge.sendToBackend('worker_connected', {
 			workerId,
@@ -299,13 +301,13 @@ export class WorkerCoordinator {
 		// Remove worker's queue (tasks are lost - backend should re-enqueue)
 		const queue = this.workerQueues.get(workerId);
 		if (queue && queue.length > 0) {
-			logger.info(
+			log.info(
 				`[WorkerCoordinator] Worker ${workerId} disconnected with ${queue.length} tasks in queue (discarded)`
 			);
 		}
 		this.workerQueues.delete(workerId);
 
-		logger.info(`[WorkerCoordinator] Worker ${workerId} unregistered`);
+		log.info(`[WorkerCoordinator] Worker ${workerId} unregistered`);
 
 		void this.eventBridge.sendToBackend('worker_disconnected', {
 			workerId,

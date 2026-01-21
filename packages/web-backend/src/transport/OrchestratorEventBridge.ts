@@ -1,11 +1,13 @@
 import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
-import { logger } from 'shared-common/logger';
+import { createLogger } from 'shared-common/logger';
 import type { O2BEventData } from 'shared-orch-worker/orchestrator-events';
 
 import type { Worker } from '@app/shared/api/workers.contract';
 import { B2F_WORKER_CONNECTED, B2F_WORKER_DISCONNECTED } from '@app/shared/transport';
 
 import type { EventBroadcaster } from './EventBroadcaster';
+
+const log = createLogger('OrchestratorEventBridge');
 
 /**
  * ===========================================================================================
@@ -82,7 +84,7 @@ export class OrchestratorEventBridge {
 		try {
 			// Validate required fields
 			if (!data.workerId) {
-				logger.warn('[Bridge] Invalid worker.connected event data: missing workerId', data);
+				log.warn('[Bridge] Invalid worker.connected event data: missing workerId', data);
 				return;
 			}
 
@@ -101,10 +103,10 @@ export class OrchestratorEventBridge {
 			// Broadcast B2F event to all connected clients
 			this.eventBroadcaster.broadcast(B2F_WORKER_CONNECTED, worker);
 
-			logger.debug(`[Bridge] Broadcasted worker.connected for ${data.workerId}`);
+			log.debug(`[Bridge] Broadcasted worker.connected for ${data.workerId}`);
 		} catch (error) {
 			// Never crash the server - log error and continue
-			logger.error('[Bridge] Failed to handle worker.connected event:', error);
+			log.error('[Bridge] Failed to handle worker.connected event:', error);
 		}
 	}
 
@@ -121,7 +123,7 @@ export class OrchestratorEventBridge {
 		try {
 			// Validate required fields
 			if (!data.workerId) {
-				logger.warn('[Bridge] Invalid worker.disconnected event data: missing workerId', data);
+				log.warn('[Bridge] Invalid worker.disconnected event data: missing workerId', data);
 				return;
 			}
 
@@ -141,10 +143,10 @@ export class OrchestratorEventBridge {
 			// Broadcast B2F event to all connected clients
 			this.eventBroadcaster.broadcast(B2F_WORKER_DISCONNECTED, worker);
 
-			logger.debug(`[Bridge] Broadcasted worker.disconnected for ${data.workerId}`);
+			log.debug(`[Bridge] Broadcasted worker.disconnected for ${data.workerId}`);
 		} catch (error) {
 			// Never crash the server - log error and continue
-			logger.error('[Bridge] Failed to handle worker.disconnected event:', error);
+			log.error('[Bridge] Failed to handle worker.disconnected event:', error);
 		}
 	}
 }

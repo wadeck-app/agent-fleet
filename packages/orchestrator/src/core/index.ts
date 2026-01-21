@@ -1,5 +1,7 @@
 import { Orchestrator } from 'orchestrator/core/Orchestrator';
-import { logger } from 'shared-common/logger';
+import { createLogger } from 'shared-common/logger';
+
+const log = createLogger('OrchestratorMain');
 
 /**
  * Main entry point for the orchestrator
@@ -9,12 +11,12 @@ export async function main() {
 
 	// Handle termination signals with proper async/await
 	const handleShutdown = async (signal: string) => {
-		logger.info(`[Orchestrator] Received ${signal}, shutting down gracefully...`);
+		log.info(`[Orchestrator] Received ${signal}, shutting down gracefully...`);
 		try {
 			await orchestrator.shutdown();
 			process.exit(0);
 		} catch (error) {
-			logger.error('[Orchestrator] Error during shutdown:', error);
+			log.error('[Orchestrator] Error during shutdown:', error);
 			process.exit(1);
 		}
 	};
@@ -26,7 +28,7 @@ export async function main() {
 	try {
 		await orchestrator.start();
 	} catch (error) {
-		logger.error('[Orchestrator] Failed to start:', error);
+		log.error('[Orchestrator] Failed to start:', error);
 		process.exit(1);
 	}
 }

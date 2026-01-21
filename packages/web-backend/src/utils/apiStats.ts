@@ -1,5 +1,7 @@
 import { AsyncLocalStorage } from 'async_hooks';
-import { logger } from 'shared-common/logger';
+import { createLogger } from 'shared-common/logger';
+
+const log = createLogger('ApiStats');
 
 export interface ApiCallStats {
 	requestId: string;
@@ -66,12 +68,12 @@ class ApiStatsManager {
 
 		if (stats.callCount > 1) {
 			const operations = stats.calls.map(c => `${c.operation}@${c.duration}ms`).join(', ');
-			logger.warn(
+			log.warn(
 				`GSS Warning: ${stats.method} ${stats.path} -> ${stats.callCount} calls in ${stats.duration}ms: [${operations}]`
 			);
 		} else if (stats.callCount === 1) {
 			const op = stats.calls[0];
-			logger.debug(`GSS Stats: ${stats.method} ${stats.path} -> ${op.operation}@${op.duration}ms`);
+			log.debug(`GSS Stats: ${stats.method} ${stats.path} -> ${op.operation}@${op.duration}ms`);
 		}
 
 		this.storeStats(stats);

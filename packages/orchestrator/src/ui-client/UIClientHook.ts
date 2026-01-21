@@ -1,7 +1,9 @@
 import { EventEmitter } from 'events';
-import { logger } from 'shared-common/logger';
+import { createLogger } from 'shared-common/logger';
 import type { StateManager } from 'shared-orch-worker/StateManager';
 import { StateEvent } from 'shared-orch-worker/StateManager';
+
+const log = createLogger('UIClientHook');
 
 //FIXME remove me, no longer necessary as the orch has no direct UI
 /**
@@ -39,7 +41,7 @@ export class UIClientHook extends EventEmitter {
 	 */
 	enable(): void {
 		if (this.isEnabled) {
-			logger.warn('UIClientHook', 'Already enabled, ignoring enable()');
+			log.warn('UIClientHook', 'Already enabled, ignoring enable()');
 			return;
 		}
 
@@ -52,7 +54,7 @@ export class UIClientHook extends EventEmitter {
 
 		this.isEnabled = true;
 
-		logger.info('UIClientHook', `Enabled and listening to ${Object.values(StateEvent).length} state events`);
+		log.info('UIClientHook', `Enabled and listening to ${Object.values(StateEvent).length} state events`);
 	}
 
 	/**
@@ -71,7 +73,7 @@ export class UIClientHook extends EventEmitter {
 		this.eventSubscriptions.clear();
 		this.isEnabled = false;
 
-		logger.info('UIClientHook', 'Disabled');
+		log.info('UIClientHook', 'Disabled');
 	}
 
 	/**
@@ -91,7 +93,7 @@ export class UIClientHook extends EventEmitter {
 			timestamp: new Date().toISOString(),
 		});
 
-		//logger.debug('UIClientHook', `State event relayed: ${event}`, { event });
+		//log.debug('UIClientHook', `State event relayed: ${event}`, { event });
 	}
 
 	/**
@@ -111,7 +113,7 @@ export class UIClientHook extends EventEmitter {
 			timestamp: new Date().toISOString(),
 		});
 
-		logger.debug('UIClientHook', `Command result sent: ${requestId} (${success ? 'success' : 'error'})`, {
+		log.debug('UIClientHook', `Command result sent: ${requestId} (${success ? 'success' : 'error'})`, {
 			requestId,
 			success,
 		});
@@ -131,7 +133,7 @@ export class UIClientHook extends EventEmitter {
 			timestamp: new Date().toISOString(),
 		});
 
-		logger.error('UIClientHook', `Error broadcasted: ${error}`, { error });
+		log.error('UIClientHook', `Error broadcasted: ${error}`, { error });
 	}
 
 	/**
@@ -149,7 +151,7 @@ export class UIClientHook extends EventEmitter {
 			timestamp: new Date().toISOString(),
 		});
 
-		logger.debug('UIClientHook', 'Snapshot sent', { requestId });
+		log.debug('UIClientHook', 'Snapshot sent', { requestId });
 	}
 
 	/**
