@@ -7,7 +7,6 @@
  * the behavior of the orchestrator components and their interactions.
  */
 import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
-import { logger } from 'shared-common/logger';
 import type { MockedObject } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -22,7 +21,22 @@ vi.mock('./TaskManager');
 vi.mock('./RestAPI');
 vi.mock('../websocket/WorkerWebSocketServer');
 vi.mock('flow-engine/workspace/WorkspaceManager');
-vi.mock('shared-common/logger');
+
+// Mock the logger module - createLogger returns a mock logger instance
+vi.mock('shared-common/logger', () => ({
+	createLogger: () => ({
+		info: vi.fn(),
+		warn: vi.fn(),
+		error: vi.fn(),
+		debug: vi.fn(),
+	}),
+	logger: {
+		info: vi.fn(),
+		warn: vi.fn(),
+		error: vi.fn(),
+		debug: vi.fn(),
+	},
+}));
 
 describe('Orchestrator', () => {
 	let orchestrator: Orchestrator;
@@ -43,16 +57,13 @@ describe('Orchestrator', () => {
 		originalCwd = process.cwd;
 		process.cwd = vi.fn(() => '/test/project/root');
 
-		// Mock Logger
-		vi.mocked(logger.info).mockImplementation(() => {});
-		vi.mocked(logger.error).mockImplementation(() => {});
-
 		// Mock TaskManager
 		mockTaskManager = {
 			initialize: vi.fn().mockResolvedValue(undefined),
 			createTask: vi.fn(),
 			getStats: vi.fn().mockReturnValue({ total: 0, byStatus: {} }),
 			getAllTasks: vi.fn().mockReturnValue([]),
+			setFlowDiscoveryRegistry: vi.fn(),
 		} as any;
 		vi.mocked(TaskManager).mockImplementation(function (this: any) {
 			return mockTaskManager;
@@ -71,6 +82,9 @@ describe('Orchestrator', () => {
 		mockWsServer = {
 			stop: vi.fn().mockResolvedValue(undefined),
 			getWorkers: vi.fn().mockReturnValue([]),
+			getConnectionManager: vi.fn().mockReturnValue({
+				getFlowDiscoveryRegistry: vi.fn().mockReturnValue({}),
+			}),
 		} as any;
 		vi.mocked(WorkerWebSocketServer).mockImplementation(function (this: any) {
 			return mockWsServer;

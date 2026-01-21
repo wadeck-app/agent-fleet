@@ -27,6 +27,9 @@ export default defineConfig({
 		globals: true,
 		environment: 'node',
 		exclude: ['**/node_modules/**', '**/dist/**', '**/dist-types/**'],
+		setupFiles: ['./test/setup.ts'],
+		mockReset: false,
+		restoreMocks: false,
 	},
 	resolve: {
 		alias: {
