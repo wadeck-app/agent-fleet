@@ -437,12 +437,6 @@ describe('IngredientsService', () => {
 
 		it('should skip validation when only version is provided', async () => {
 			const updateData: UpdateIngredient = {
-				name: 'Chicken Breast',
-				calories: 165,
-				protein: 31,
-				carbs: 0,
-				fat: 3.6,
-				servingSize: 100,
 				version: 1,
 			};
 
