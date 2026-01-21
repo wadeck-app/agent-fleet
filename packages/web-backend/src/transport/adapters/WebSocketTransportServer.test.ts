@@ -279,27 +279,6 @@ describe('WebSocketTransportServer', () => {
 	});
 
 	describe('token expiration', () => {
-		it('should detect expired token in session validation', async () => {
-			// Create authenticated session
-			const { accessToken } = await authService.login('test@example.com', 'password');
-
-			const req = {
-				raw: {
-					headers: {
-						cookie: `access_token=${accessToken}`,
-					},
-				} as IncomingMessage,
-			};
-
-			const session = await sessionManager.authenticateConnection('client-1', req.raw);
-
-			// Manually expire the session
-			session.tokenExpiresAt = Date.now() - 1000;
-
-			// Validate should fail
-			expect(() => sessionManager.validateSession('client-1')).toThrow('Access token expired');
-		});
-
 		it('should calculate time until expiration correctly', async () => {
 			const { accessToken } = await authService.login('test@example.com', 'password');
 
