@@ -14,8 +14,8 @@ describe('TransportManager', () => {
 		TransportManager.cleanup();
 		// Clear sessionStorage
 		sessionStorage.clear();
-		// Mock crypto.randomUUID with valid UUID format
-		vi.spyOn(crypto, 'randomUUID').mockReturnValue('12345678-1234-1234-1234-123456789012');
+		// Mock crypto.randomUUID with test UUID
+		vi.spyOn(crypto, 'randomUUID').mockReturnValue('test-uuid-123' as any);
 	});
 
 	afterEach(async () => {
