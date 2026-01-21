@@ -226,7 +226,10 @@ export class OrchestratorRepository {
 			const orchestrator = this.orchestratorWrapper.getOrchestrator();
 			const taskManager = orchestrator.getTaskManager();
 
+			// @formatter:off
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			await taskManager.updateTaskStatus(taskId, newStatus as any);
+			// @formatter:on
 			const task = taskManager.getTask(taskId);
 
 			if (!task) {
@@ -266,7 +269,7 @@ export class OrchestratorRepository {
 	 * Get all workspaces from orchestrator
 	 * Note: Library mode now uses direct Orchestrator access instead of wrapper
 	 */
-	async getWorkspaces(): Promise<any[]> {
+	async getWorkspaces(): Promise<unknown[]> {
 		// Library mode - direct access via WorkspaceManager
 		if (this.orchestratorWrapper) {
 			const orchestrator = this.orchestratorWrapper.getOrchestrator();
@@ -285,7 +288,7 @@ export class OrchestratorRepository {
 	 * Get single workspace by ID
 	 * Note: Library mode now uses direct Orchestrator access instead of wrapper
 	 */
-	async getWorkspace(workspaceId: string): Promise<any | null> {
+	async getWorkspace(workspaceId: string): Promise<unknown | null> {
 		// Library mode - direct access via WorkspaceManager
 		if (this.orchestratorWrapper) {
 			const orchestrator = this.orchestratorWrapper.getOrchestrator();
@@ -304,7 +307,7 @@ export class OrchestratorRepository {
 	 * Get all interventions from orchestrator
 	 * Note: Library mode now uses direct Orchestrator access instead of wrapper
 	 */
-	async getInterventions(): Promise<any[]> {
+	async getInterventions(): Promise<unknown[]> {
 		// Library mode - direct access via InterventionManager
 		if (this.orchestratorWrapper) {
 			log.info('Fetching interventions from orchestrator...');
@@ -328,7 +331,7 @@ export class OrchestratorRepository {
 	 * Get single intervention by ID
 	 * Note: Library mode now uses direct Orchestrator access instead of wrapper
 	 */
-	async getIntervention(interventionId: string): Promise<any | null> {
+	async getIntervention(interventionId: string): Promise<unknown | null> {
 		// Library mode - direct access via InterventionManager
 		if (this.orchestratorWrapper) {
 			const orchestrator = this.orchestratorWrapper.getOrchestrator();
@@ -349,11 +352,11 @@ export class OrchestratorRepository {
 	async respondToIntervention(
 		interventionId: string,
 		response: {
-			value: any;
+			value: unknown;
 			answeredBy: string;
 			comment?: string;
 		}
-	): Promise<any> {
+	): Promise<unknown> {
 		// Library mode - direct access
 		if (this.orchestratorWrapper) {
 			return this.orchestratorWrapper.respondToIntervention(interventionId, response);

@@ -9,12 +9,7 @@ import {
 	useSensor,
 	useSensors,
 } from '@dnd-kit/core';
-import {
-	SortableContext,
-	arrayMove,
-	sortableKeyboardCoordinates,
-	verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SearchBar } from '@framework/components/forms/SearchBar';
 import { CrudDialog } from '@framework/components/overlays/CrudDialog';
 import type { Project } from '@shared/api/projects.contract';
@@ -177,7 +172,7 @@ export function ManagePinnedProjectsDialog({
 					</div>
 
 					{pinnedProjects.length === 0 ? (
-						<div className="flex flex-col items-center justify-center py-8 text-center">
+						<div className={`flex flex-col items-center justify-center py-8 text-center`}>
 							<div className="mb-2 text-3xl text-muted-foreground">📌</div>
 							<p className="text-sm text-muted-foreground">No pinned projects</p>
 							<p className="text-xs text-muted-foreground">Pin projects from the right panel</p>
@@ -225,18 +220,18 @@ export function ManagePinnedProjectsDialog({
 					/>
 
 					{availableProjects.length === 0 ? (
-						<div className="flex flex-col items-center justify-center py-8 text-center">
+						<div className={`flex flex-col items-center justify-center py-8 text-center`}>
 							<div className="mb-2 text-3xl text-muted-foreground">✨</div>
 							<p className="text-sm text-muted-foreground">All projects are pinned</p>
 						</div>
 					) : filteredAvailableProjects.length === 0 ? (
-						<div className="flex flex-col items-center justify-center py-8 text-center">
+						<div className={`flex flex-col items-center justify-center py-8 text-center`}>
 							<div className="mb-2 text-3xl text-muted-foreground">🔍</div>
 							<p className="text-sm text-muted-foreground">No projects match your search</p>
 						</div>
 					) : (
 						<>
-							<div className="space-y-1 max-h-[400px] overflow-y-auto">
+							<div className="max-h-[400px] space-y-1 overflow-y-auto">
 								{filteredAvailableProjects.map(project => (
 									<AvailableProjectItem
 										key={project.id}

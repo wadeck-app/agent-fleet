@@ -1,6 +1,5 @@
 import { createTypedFetch } from '@framework/api/api-base';
 import type {
-	BulkCancelRequest,
 	BulkCancelResponse,
 	Intervention,
 	InterventionResponseSubmit,

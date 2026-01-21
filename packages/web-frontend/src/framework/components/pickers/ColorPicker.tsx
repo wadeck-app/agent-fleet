@@ -1,5 +1,7 @@
 import { Check } from 'lucide-react';
 
+import { Button } from '../primitives/Button';
+
 export interface ColorPickerProps {
 	value?: string;
 	onChange: (color: string) => void;
@@ -54,15 +56,17 @@ export function ColorPicker({ value, onChange, defaultColor = '#6366F1' }: Color
 					const isSelected = selectedColor.toUpperCase() === color.value.toUpperCase();
 
 					return (
-						<button
+						<Button
 							key={color.value}
-							type="button"
+							variant="ghost"
+							size="icon"
 							onClick={() => onChange(color.value)}
 							className={`
-								relative h-10 w-10 rounded-md border-2 transition-all cursor-pointer
-								hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
-								${isSelected ? 'border-foreground ring-2 ring-primary' : 'border-border'}
-							`}
+         relative h-10 w-10 cursor-pointer rounded-md border-2 transition-all
+         hover:scale-110
+         focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:outline-none
+         ${isSelected ? 'border-foreground ring-2 ring-primary' : `border-border`}
+       `}
 							style={{ backgroundColor: color.value }}
 							title={color.name}
 							aria-label={`Select ${color.name} color`}
@@ -72,7 +76,7 @@ export function ColorPicker({ value, onChange, defaultColor = '#6366F1' }: Color
 									<Check className="h-5 w-5 text-white drop-shadow-lg" strokeWidth={3} />
 								</div>
 							)}
-						</button>
+						</Button>
 					);
 				})}
 			</div>

@@ -1,0 +1,20 @@
+{
+	"workers": [
+		{
+			"workerId": "2",
+			"name": "W2",
+			"id": "h70ct4csn",
+			"version": 1,
+			"createdAt": "2026-01-21T13:14:39.419Z",
+			"updatedAt": "2026-01-21T13:14:39.419Z"
+		},
+		{
+			"workerId": "3",
+			"name": "W3",
+			"id": "rhrh1wawj",
+			"version": 1,
+			"createdAt": "2026-01-21T13:14:41.247Z",
+			"updatedAt": "2026-01-21T13:14:41.247Z"
+		}
+	]
+}

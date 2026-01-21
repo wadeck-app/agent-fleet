@@ -78,7 +78,7 @@ export class TasksRepository {
 	async findByStatus(status: string): Promise<Task[]> {
 		return this.base
 			.query()
-			.where('status', '=', status as any)
+			.where('status', '=', status as Task['status'])
 			.orderBy('createdAt', 'DESC')
 			.execute();
 	}
@@ -164,9 +164,9 @@ export class TasksRepository {
 		id: string,
 		flowResult: {
 			status: 'completed' | 'failed';
-			outputs?: Record<string, any>;
+			outputs?: Record<string, unknown>;
 			error?: string;
-			trace?: any;
+			trace?: unknown;
 		}
 	): Promise<Task> {
 		const task = await this.findById(id);
@@ -190,9 +190,9 @@ export class TasksRepository {
 		id: string,
 		flowResult: {
 			status: 'completed' | 'failed';
-			outputs?: Record<string, any>;
+			outputs?: Record<string, unknown>;
 			error?: string;
-			trace?: any;
+			trace?: unknown;
 		}
 	): Promise<Task> {
 		const task = await this.findById(id);
@@ -216,7 +216,7 @@ export class TasksRepository {
 		}
 
 		return this.update(id, {
-			status: status as any,
+			status: status as Task['status'],
 			version: task.version + 1,
 		});
 	}

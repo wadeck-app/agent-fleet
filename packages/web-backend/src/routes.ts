@@ -2,7 +2,7 @@
 // put at root level for discovery
 import type { ApiUrl } from '@app/shared/route-builder';
 
-type RouteDefinition = [ApiUrl, () => Promise<any>];
+type RouteDefinition = [ApiUrl, () => Promise<{ default: unknown }>];
 
 const routes: RouteDefinition[] = [
 	['/api/auth', () => import('./controllers/AuthController')],
@@ -15,7 +15,7 @@ const routes: RouteDefinition[] = [
 	['/api/workspaces', () => import('./controllers/WorkspacesController')],
 	['/api/projects', () => import('./controllers/ProjectsController')],
 	['/api/interventions', () => import('./controllers/InterventionsController')],
-	['/api/monitoring', () => import('./controllers/MonitoringController')],
+	['/api/monitoring/transport', () => import('./controllers/MonitoringController')],
 ];
 
 export default routes;

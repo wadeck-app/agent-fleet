@@ -81,9 +81,9 @@ export function FlowEditorPage() {
 						{flowEditor.validationResult && !flowEditor.validationResult.valid && (
 							<span
 								className={`
-        inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3
-        py-1 text-sm font-medium text-destructive
-      `}
+          inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3
+          py-1 text-sm font-medium text-destructive
+        `}
 							>
 								<XCircle className="h-4 w-4" />
 								Invalid ({flowEditor.validationResult.summary.errors} errors)
@@ -94,9 +94,9 @@ export function FlowEditorPage() {
 							flowEditor.validationResult.summary.warnings > 0 && (
 								<span
 									className={`
-         inline-flex items-center gap-1.5 rounded-full bg-warning/10 px-3 py-1
-         text-sm font-medium text-warning
-       `}
+           inline-flex items-center gap-1.5 rounded-full bg-warning/10 px-3 py-1
+           text-sm font-medium text-warning
+         `}
 								>
 									<AlertTriangle className="h-4 w-4" />
 									{flowEditor.validationResult.summary.warnings} warnings
@@ -109,8 +109,8 @@ export function FlowEditorPage() {
 
 					<div
 						className={`
-      flex h-[calc(100vh-12rem)] flex-col rounded-lg border bg-card
-    `}
+       flex h-[calc(100vh-12rem)] flex-col rounded-lg border bg-card
+     `}
 					>
 						{/* Toolbar */}
 						<FlowEditorToolbar
@@ -150,9 +150,9 @@ export function FlowEditorPage() {
 								{flowEditor.loading && (
 									<div
 										className={`
-          absolute inset-0 z-50 flex items-center justify-center
-          bg-background/80 backdrop-blur-sm
-        `}
+            absolute inset-0 z-50 flex items-center justify-center
+            bg-background/80 backdrop-blur-sm
+          `}
 									>
 										<div className="text-muted-foreground">Loading flow...</div>
 									</div>
@@ -187,9 +187,9 @@ export function FlowEditorPage() {
 								{flowEditor.loading && (
 									<div
 										className={`
-          absolute inset-0 z-50 flex items-center justify-center
-          bg-background/80 backdrop-blur-sm
-        `}
+            absolute inset-0 z-50 flex items-center justify-center
+            bg-background/80 backdrop-blur-sm
+          `}
 									>
 										<div className="text-muted-foreground">Loading...</div>
 									</div>

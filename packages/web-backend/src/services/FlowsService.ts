@@ -147,6 +147,7 @@ export class FlowsService {
 			}
 
 			const fileContents = fs.readFileSync(this.flowsFilePath, 'utf8');
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const flows = yaml.load(fileContents) as Record<string, any>;
 
 			const flowList: FlowListItem[] = [];
@@ -233,6 +234,7 @@ export class FlowsService {
 			}
 
 			const fileContents = fs.readFileSync(this.flowsFilePath, 'utf8');
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const flows = yaml.load(fileContents) as Record<string, any>;
 
 			log.info(` Available flows:`, Object.keys(flows));

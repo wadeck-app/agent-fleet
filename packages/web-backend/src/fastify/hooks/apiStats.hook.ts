@@ -15,7 +15,7 @@ const apiStatsHook: FastifyPluginAsync = async fastify => {
 	fastify.addHook('onRequest', async (request, _reply) => {
 		const requestId = randomUUID();
 		// Store requestId in request context for response hook
-		(request as any).statsId = requestId;
+		(request as { statsId?: string }).statsId = requestId;
 		apiStatsManager.startRequest(requestId, request.method, request.url);
 	});
 

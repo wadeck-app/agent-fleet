@@ -42,7 +42,7 @@ export function AvailableProjectItem({ project, onPin, isLoading = false }: Avai
 			className={cn(
 				'flex items-center gap-2 rounded-sm px-2 py-1.5 transition-colors',
 				'hover:bg-accent',
-				isLoading && 'opacity-50 pointer-events-none'
+				isLoading && 'pointer-events-none opacity-50'
 			)}
 		>
 			{/* Pin Button (Arrow Left) - Positioned on the left */}
@@ -54,7 +54,10 @@ export function AvailableProjectItem({ project, onPin, isLoading = false }: Avai
 					onPin(project.id);
 				}}
 				disabled={isLoading}
-				className="opacity-70 hover:opacity-100"
+				className={`
+      opacity-70
+      hover:opacity-100
+    `}
 				aria-label={`Pin ${project.name}`}
 				title="Pin project"
 			>
@@ -63,7 +66,7 @@ export function AvailableProjectItem({ project, onPin, isLoading = false }: Avai
 
 			{/* Project Icon */}
 			{project.icon && (
-				<DynamicLucideIcon name={project.icon} color={project.iconColor || '#6366F1'} className="h-4 w-4" />
+				<DynamicLucideIcon name={project.icon} color={project.iconColor || '#6366F1'} className={`h-4 w-4`} />
 			)}
 
 			{/* Project Name */}

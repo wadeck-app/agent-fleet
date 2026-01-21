@@ -68,16 +68,19 @@ export function useInfinitePagination(options: {
 	const [currentPage, setCurrentPage] = useState(1);
 	const [pageSize, setPageSizeState] = useState(options.pageSize);
 
+	// Extract primitive properties to avoid object dependency
+	const { hasMore, onLoadMore } = options;
+
 	// ═══════════════════════════════════════════════════════════════════════════════════════
 	// ACTIONS
 	// ═══════════════════════════════════════════════════════════════════════════════════════
 
 	const loadNext = useCallback(() => {
-		if (options.hasMore) {
+		if (hasMore) {
 			setCurrentPage(prev => prev + 1);
-			options.onLoadMore?.();
+			onLoadMore?.();
 		}
-	}, [options]);
+	}, [hasMore, onLoadMore]);
 
 	const reset = useCallback(() => {
 		setCurrentPage(1);

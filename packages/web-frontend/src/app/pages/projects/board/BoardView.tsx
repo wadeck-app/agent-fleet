@@ -79,7 +79,7 @@ export function BoardView({ tasksByStatus, onTaskStatusChange }: BoardViewProps)
 			{/* Drag overlay - shows the task being dragged */}
 			<DragOverlay>
 				{activeTask ? (
-					<div className="rotate-3 scale-105">
+					<div className="scale-105 rotate-3">
 						<TaskCard task={activeTask} isDragging />
 					</div>
 				) : null}

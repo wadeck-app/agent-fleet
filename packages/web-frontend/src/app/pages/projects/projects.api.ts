@@ -1,7 +1,6 @@
 import { createTypedFetch } from '@framework/api/api-base';
 import { PROJECTS_API_ROUTES } from '@shared/api/projects.contract';
 import type {
-	AddWorkspacesToProject,
 	CreateProject,
 	Project,
 	ProjectBoardData,

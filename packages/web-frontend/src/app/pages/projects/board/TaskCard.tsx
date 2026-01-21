@@ -56,10 +56,10 @@ export function TaskCard({ task, isDragging }: TaskCardProps) {
 			style={style}
 			className={cn(
 				`
-        group relative cursor-pointer rounded-lg border border-border
-        bg-card p-3 shadow-sm transition-all
-        hover:border-primary/50 hover:shadow-md
-      `,
+      group relative cursor-pointer rounded-lg border border-border bg-card p-3
+      shadow-sm transition-all
+      hover:border-primary/50 hover:shadow-md
+    `,
 				isDragging && 'opacity-50'
 			)}
 			onClick={handleCardClick}
@@ -70,9 +70,10 @@ export function TaskCard({ task, isDragging }: TaskCardProps) {
 				{...listeners}
 				data-drag-handle
 				className={`
-          absolute top-2 left-2 cursor-grab opacity-0 transition-opacity
-          group-hover:opacity-100 active:cursor-grabbing
-        `}
+      absolute top-2 left-2 cursor-grab opacity-0 transition-opacity
+      group-hover:opacity-100
+      active:cursor-grabbing
+    `}
 				aria-label="Drag task"
 			>
 				<GripVertical className="size-4 text-muted-foreground" />

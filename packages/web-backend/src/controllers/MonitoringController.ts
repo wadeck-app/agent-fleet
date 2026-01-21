@@ -119,7 +119,7 @@ export default class MonitoringController implements LazyController<typeof MONIT
 			// Check if user is authenticated
 			// The userId is set by TransportRouter when handling WebSocket requests
 			// or by auth middleware for HTTP requests
-			const userId = (request as any).userId;
+			const userId = (request as { userId?: string }).userId;
 
 			if (!userId) {
 				// Return empty sessions for non-authenticated users

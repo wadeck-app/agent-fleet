@@ -26,6 +26,29 @@
  */
 
 /**
+ * Generate a UUID v4 (with fallback for non-secure contexts)
+ *
+ * Uses crypto.randomUUID() when available (HTTPS or localhost),
+ * falls back to a custom implementation for HTTP over IP addresses.
+ *
+ * @returns UUID v4 string
+ */
+function generateUUID(): string {
+	// Try to use crypto.randomUUID() if available (secure context: HTTPS or localhost)
+	if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+		return crypto.randomUUID();
+	}
+
+	// Fallback for non-secure contexts (HTTP over IP address)
+	// Generate UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+	return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+		const r = (Math.random() * 16) | 0;
+		const v = c === 'x' ? r : (r & 0x3) | 0x8;
+		return v.toString(16);
+	});
+}
+
+/**
  * Get or generate connection ID (unique per tab)
  *
  * Returns existing connId from window.name, or generates a new one if not found.
@@ -42,7 +65,7 @@ export function getConnId(): string {
 	}
 
 	// Generate new connId and store in window.name
-	const newConnId = crypto.randomUUID();
+	const newConnId = generateUUID();
 	window.name = newConnId;
 	console.log('[ConnectionId] Generated new connId:', newConnId.substring(0, 8) + '...');
 	return newConnId;

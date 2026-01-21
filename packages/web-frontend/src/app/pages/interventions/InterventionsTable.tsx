@@ -25,7 +25,10 @@ export const INTERVENTIONS_TABLE_COLUMNS: Table2Column<Intervention>[] = [
 		render: (i: Intervention) => (
 			<Link
 				to={`/tasks/${i.taskId}/logs-stacked`}
-				className="font-mono text-xs text-primary hover:underline"
+				className={`
+      font-mono text-xs text-primary
+      hover:underline
+    `}
 				onClick={e => e.stopPropagation()}
 			>
 				{i.taskId.substring(0, 8)}
@@ -37,7 +40,7 @@ export const INTERVENTIONS_TABLE_COLUMNS: Table2Column<Intervention>[] = [
 		key: 'type',
 		label: 'Type',
 		render: (i: Intervention) => (
-			<Badge variant={getInterventionTypeVariant(i.type)} className="font-medium capitalize">
+			<Badge variant={getInterventionTypeVariant(i.type)} className={`font-medium capitalize`}>
 				{i.type}
 			</Badge>
 		),
@@ -47,9 +50,9 @@ export const INTERVENTIONS_TABLE_COLUMNS: Table2Column<Intervention>[] = [
 		label: 'Title',
 		render: (i: Intervention) => (
 			<div className="flex flex-col gap-0.5">
-				<span className="font-semibold text-sm">{i.config.title}</span>
+				<span className="text-sm font-semibold">{i.config.title}</span>
 				{i.config.description && (
-					<span className="text-xs text-muted-foreground line-clamp-1">{i.config.description}</span>
+					<span className="line-clamp-1 text-xs text-muted-foreground">{i.config.description}</span>
 				)}
 			</div>
 		),
@@ -59,7 +62,7 @@ export const INTERVENTIONS_TABLE_COLUMNS: Table2Column<Intervention>[] = [
 		key: 'status',
 		label: 'Status',
 		render: (i: Intervention) => (
-			<Badge variant={getInterventionStatusVariant(i.status)} className="font-medium">
+			<Badge variant={getInterventionStatusVariant(i.status)} className={`font-medium`}>
 				{i.status}
 			</Badge>
 		),
@@ -68,7 +71,7 @@ export const INTERVENTIONS_TABLE_COLUMNS: Table2Column<Intervention>[] = [
 		key: 'blocking',
 		label: 'Blocking',
 		render: (i: Intervention) => (
-			<Badge variant={i.blocking ? 'destructive' : 'secondary'} className="font-medium">
+			<Badge variant={i.blocking ? 'destructive' : 'secondary'} className={`font-medium`}>
 				{i.blocking ? 'Yes' : 'No'}
 			</Badge>
 		),

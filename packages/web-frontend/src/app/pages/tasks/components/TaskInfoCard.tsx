@@ -1,9 +1,5 @@
-import { useState } from 'react';
-
 import { Badge } from '@framework/components/primitives/Badge';
-import { Button } from '@framework/components/primitives/Button';
 import type { Task } from '@shared/api/tasks.contract';
-import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface TaskInfoCardProps {
 	task: Task;
@@ -14,7 +10,7 @@ interface TaskInfoCardProps {
 /**
  * Collapsible card with task details (for stacked layout)
  */
-export function TaskInfoCard({ task, collapsible = true, defaultOpen = true }: TaskInfoCardProps) {
+export function TaskInfoCard({ task, collapsible = true, defaultOpen: _defaultOpen = true }: TaskInfoCardProps) {
 	const formatDate = (isoString: string) => {
 		return new Date(isoString).toLocaleString('en-US', {
 			month: 'short',
@@ -53,7 +49,19 @@ export function TaskInfoCard({ task, collapsible = true, defaultOpen = true }: T
 	return (
 		<div className="rounded-lg border border-border bg-card">
 			{/* Header (always visible) */}
-			<div className={`flex items-center gap-4 p-4 ${collapsible ? 'cursor-pointer hover:bg-muted/50' : ''}`}>
+			<div
+				className={`
+      flex items-center gap-4 p-4
+      ${
+			collapsible
+				? `
+      cursor-pointer
+      hover:bg-muted/50
+    `
+				: ''
+		}
+    `}
+			>
 				<div className="flex-1">
 					<div className="mb-2 flex items-center gap-2">
 						<h2 className="text-lg font-semibold text-foreground">{task.description}</h2>

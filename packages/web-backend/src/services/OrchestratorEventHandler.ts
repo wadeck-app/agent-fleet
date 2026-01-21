@@ -58,6 +58,7 @@ export class OrchestratorEventHandler {
 	 * @param event Event name from orchestrator
 	 * @param data Event data (varies by event type)
 	 */
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	async handleOrchestratorEvent(event: string, data: any): Promise<void> {
 		log.info(`Received event: ${event}`, {
 			dataKeys: data ? Object.keys(data) : [],
@@ -111,6 +112,7 @@ export class OrchestratorEventHandler {
 	 * Updates worker status to online in backend
 	 * @param data { workerId: string, metadata?: any }
 	 */
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	private async handleWorkerConnected(data: { workerId: string; metadata?: any }): Promise<void> {
 		try {
 			log.info(`Worker connected: ${data.workerId}`);
@@ -189,6 +191,7 @@ export class OrchestratorEventHandler {
 	 * Writes trace chunk to storage for real-time log updates
 	 * @param data { taskId: string, traceChunk: any }
 	 */
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	private async handleTaskTraceUpdate(data: { taskId: string; traceChunk: any }): Promise<void> {
 		try {
 			log.info(`[TRACE] Task trace update: ${data.taskId}, steps: ${data.traceChunk?.steps?.length || 0}`);
@@ -216,13 +219,16 @@ export class OrchestratorEventHandler {
 	 * Updates task with flow result and sets final status
 	 * @param data { taskId: string, success: boolean, flowResult: any }
 	 */
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	private async handleTaskCompleted(data: {
 		taskId: string;
 		success: boolean;
 		flowResult: {
 			status: 'completed' | 'failed';
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			outputs?: Record<string, any>;
 			error?: string;
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			trace?: any;
 		};
 	}): Promise<void> {
@@ -259,7 +265,9 @@ export class OrchestratorEventHandler {
 			stepId?: string;
 			interventionType: 'approval' | 'question' | 'choice';
 			blocking: boolean;
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			config: any;
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			timeout?: any;
 		};
 	}): Promise<void> {

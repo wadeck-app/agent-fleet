@@ -80,7 +80,7 @@ export class InterventionsRepository {
 	async findByStatus(status: string): Promise<Intervention[]> {
 		return this.base
 			.query()
-			.where('status', '=', status as any)
+			.where('status', '=', status as Intervention['status'])
 			.orderBy('createdAt', 'DESC')
 			.execute();
 	}
@@ -128,7 +128,10 @@ export class InterventionsRepository {
 
 		// Access the underlying storage to add the intervention
 		// This is a temporary workaround until we add createWithId() to DataStorage interface
+		// @formatter:off
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const storage = (this.base as any).storage;
+		// @formatter:on
 		const tableName = this.base.getTableName();
 
 		// Get the in-memory table, add our intervention, and save to file
@@ -159,7 +162,7 @@ export class InterventionsRepository {
 	async respond(
 		id: string,
 		response: {
-			value: any;
+			value: unknown;
 			answeredBy: string;
 			comment?: string;
 		}

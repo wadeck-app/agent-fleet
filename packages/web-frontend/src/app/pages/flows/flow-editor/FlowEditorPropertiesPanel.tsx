@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { Checkbox } from '@framework/components/forms/Checkbox';
 import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
@@ -59,15 +60,15 @@ function FieldValidationMessage({ issues }: { issues: ValidationIssue[] }) {
 					<div
 						key={idx}
 						className={`
-       rounded-md border p-3
-       ${bgColor}
-     `}
+        rounded-md border p-3
+        ${bgColor}
+      `}
 					>
 						<div
 							className={`
-        flex items-start gap-2 text-xs
-        ${textColor}
-      `}
+         flex items-start gap-2 text-xs
+         ${textColor}
+       `}
 						>
 							<Icon className="mt-0.5 size-4 flex-shrink-0" />
 							<div className="flex-1">
@@ -268,9 +269,9 @@ export function FlowEditorPropertiesPanel({
 												</div>
 												<span
 													className={`
-              flex-shrink-0 rounded bg-background px-2 py-0.5 font-mono text-xs
-              text-muted-foreground
-            `}
+               flex-shrink-0 rounded bg-background px-2 py-0.5 font-mono text-xs
+               text-muted-foreground
+             `}
 												>
 													{port.type}
 												</span>
@@ -300,9 +301,9 @@ export function FlowEditorPropertiesPanel({
 												</div>
 												<span
 													className={`
-              flex-shrink-0 rounded bg-background px-2 py-0.5 font-mono text-xs
-              text-muted-foreground
-            `}
+               flex-shrink-0 rounded bg-background px-2 py-0.5 font-mono text-xs
+               text-muted-foreground
+             `}
 												>
 													{port.type}
 												</span>
@@ -454,17 +455,15 @@ export function FlowEditorPropertiesPanel({
 						</div>
 
 						<div className="space-y-2">
-							<Label htmlFor="blocking">
-								<input
+							<Label htmlFor="blocking" className="flex items-center gap-2">
+								<Checkbox
 									id="blocking"
-									type="checkbox"
 									checked={step.blocking ?? true}
-									onChange={e =>
+									onCheckedChange={checked =>
 										onUpdateNode(selectedNode.id, {
-											blocking: e.target.checked,
+											blocking: checked as boolean,
 										} as Partial<FlowStep>)
 									}
-									className="mr-2"
 								/>
 								Blocking (wait for user response)
 							</Label>
@@ -508,17 +507,15 @@ export function FlowEditorPropertiesPanel({
 								</div>
 
 								<div className="space-y-2">
-									<Label htmlFor="approval-allowReject">
-										<input
+									<Label htmlFor="approval-allowReject" className={`flex items-center gap-2`}>
+										<Checkbox
 											id="approval-allowReject"
-											type="checkbox"
 											checked={step.approval?.allowReject ?? true}
-											onChange={e =>
+											onCheckedChange={checked =>
 												onUpdateNode(selectedNode.id, {
-													approval: { ...step.approval, allowReject: e.target.checked },
+													approval: { ...step.approval, allowReject: checked as boolean },
 												} as Partial<FlowStep>)
 											}
-											className="mr-2"
 										/>
 										Allow Reject
 									</Label>
@@ -628,17 +625,15 @@ export function FlowEditorPropertiesPanel({
 								</div>
 
 								<div className="space-y-2">
-									<Label htmlFor="choice-allowMultiple">
-										<input
+									<Label htmlFor="choice-allowMultiple" className={`flex items-center gap-2`}>
+										<Checkbox
 											id="choice-allowMultiple"
-											type="checkbox"
 											checked={step.choice?.allowMultiple ?? false}
-											onChange={e =>
+											onCheckedChange={checked =>
 												onUpdateNode(selectedNode.id, {
-													choice: { ...step.choice, allowMultiple: e.target.checked },
+													choice: { ...step.choice, allowMultiple: checked as boolean },
 												} as Partial<FlowStep>)
 											}
-											className="mr-2"
 										/>
 										Allow Multiple Selection
 									</Label>

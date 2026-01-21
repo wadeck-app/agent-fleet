@@ -139,9 +139,9 @@ export function SortableAssociatedWorkspaceItem({
 				disabled={isLoading}
 				className={cn(
 					`
-      mr-1 opacity-70
-      hover:opacity-100
-    `,
+       mr-1 opacity-70
+       hover:opacity-100
+     `,
 					isDragging && `pointer-events-none`
 				)}
 				aria-label={`Dissociate ${displayName}`}

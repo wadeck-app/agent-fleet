@@ -64,9 +64,9 @@ export const UserInterventionNode = memo(({ data, selected }: UserInterventionNo
 				!hasErrors &&
 					!hasWarnings &&
 					`
-      border-border
-      hover:border-primary/50
-    `
+       border-border
+       hover:border-primary/50
+     `
 			)}
 			style={{ minHeight: `${nodeHeight}px` }}
 		>
@@ -78,11 +78,9 @@ export const UserInterventionNode = memo(({ data, selected }: UserInterventionNo
 					position={Position.Left}
 					id={port.id}
 					className={cn(
+						// eslint-disable-next-line no-restricted-syntax -- Flow editor uses specific colors for port types (blue=input, green=output, yellow=warning)
 						'!h-3 !w-3 !bg-blue-500',
-						port.uncertain &&
-							`
-       !border-2 !border-yellow-500
-     `
+						port.uncertain && '!border-2 !border-yellow-500'
 					)}
 					style={{
 						top: `${20 + index * 24}px`,
@@ -158,6 +156,7 @@ export const UserInterventionNode = memo(({ data, selected }: UserInterventionNo
 					type="source"
 					position={Position.Right}
 					id={port.id}
+					// eslint-disable-next-line no-restricted-syntax -- Flow editor uses specific colors for port types (blue=input, green=output, yellow=warning)
 					className="!h-3 !w-3 !bg-green-500"
 					style={{
 						top: `${20 + index * 24}px`,

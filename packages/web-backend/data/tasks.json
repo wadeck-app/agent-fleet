@@ -175,6 +175,22 @@
 			"version": 4,
 			"createdAt": "2026-01-20T12:41:41.487Z",
 			"updatedAt": "2026-01-20T12:41:53.311Z"
+		},
+		{
+			"description": "sadfgsdfg",
+			"status": "cancelled",
+			"priority": "medium",
+			"assignedWorker": {
+				"workerId": "3"
+			},
+			"flowId": "test-loop",
+			"flowInputs": {
+				"message": "sdfghdfgh"
+			},
+			"id": "nw8nif1vo",
+			"version": 4,
+			"createdAt": "2026-01-21T13:15:27.178Z",
+			"updatedAt": "2026-01-21T13:15:39.604Z"
 		}
 	]
 }

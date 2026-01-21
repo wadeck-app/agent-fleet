@@ -14,9 +14,9 @@ const Command = React.forwardRef<
 		ref={ref}
 		className={cn(
 			`
-      flex h-full w-full flex-col overflow-hidden rounded-md
-      bg-popover text-popover-foreground
-    `,
+     flex h-full w-full flex-col overflow-hidden rounded-md bg-popover
+     text-popover-foreground
+   `,
 			className
 		)}
 		{...props}
@@ -34,10 +34,10 @@ const CommandInput = React.forwardRef<
 			ref={ref}
 			className={cn(
 				`
-        flex h-11 w-full rounded-md bg-transparent py-3 text-sm
-        outline-none placeholder:text-muted-foreground
-        disabled:cursor-not-allowed disabled:opacity-50
-      `,
+      flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none
+      placeholder:text-muted-foreground
+      disabled:cursor-not-allowed disabled:opacity-50
+    `,
 				className
 			)}
 			{...props}
@@ -67,7 +67,7 @@ const CommandList = React.forwardRef<
 	return (
 		<CommandPrimitive.List
 			ref={listRef}
-			className={cn('max-h-[300px] !overflow-y-auto overflow-x-hidden p-1', className)}
+			className={cn('max-h-[300px] overflow-x-hidden !overflow-y-auto p-1', className)}
 			style={{ maxHeight: '300px', overflowY: 'auto' }}
 			onWheel={handleWheel}
 			{...props}
@@ -80,7 +80,7 @@ CommandList.displayName = CommandPrimitive.List.displayName;
 const CommandEmpty = React.forwardRef<
 	React.ElementRef<typeof CommandPrimitive.Empty>,
 	React.ComponentPropsWithoutRef<typeof CommandPrimitive.Empty>
->((props, ref) => <CommandPrimitive.Empty ref={ref} className="py-6 text-center text-sm" {...props} />);
+>((props, ref) => <CommandPrimitive.Empty ref={ref} className={`py-6 text-center text-sm`} {...props} />);
 
 CommandEmpty.displayName = CommandPrimitive.Empty.displayName;
 
@@ -92,11 +92,11 @@ const CommandGroup = React.forwardRef<
 		ref={ref}
 		className={cn(
 			`
-      p-1 text-foreground
-      [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5
-      [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium
-      [&_[cmdk-group-heading]]:text-muted-foreground
-    `,
+     p-1 text-foreground
+     [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5
+     [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium
+     [&_[cmdk-group-heading]]:text-muted-foreground
+   `,
 			className
 		)}
 		{...props}
@@ -113,12 +113,12 @@ const CommandItem = React.forwardRef<
 		ref={ref}
 		className={cn(
 			`
-      relative flex cursor-pointer select-none items-center rounded-sm
-      px-2 py-1.5 text-sm outline-none
-      aria-selected:bg-accent aria-selected:text-accent-foreground
-      data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50
-      data-[disabled=true]:cursor-not-allowed
-    `,
+     relative flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm
+     outline-none select-none
+     aria-selected:bg-accent aria-selected:text-accent-foreground
+     data-[disabled=true]:pointer-events-none
+     data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-50
+   `,
 			className
 		)}
 		{...props}

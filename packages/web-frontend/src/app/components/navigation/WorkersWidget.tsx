@@ -3,11 +3,10 @@ import { Link } from 'react-router-dom';
 
 import type { Worker } from '@shared/api/workers.contract';
 import { B2F_WORKERS_UPDATED, B2F_WORKER_CONNECTED, B2F_WORKER_DISCONNECTED } from '@shared/transport';
-import { Circle, Cpu, Hourglass, Zap } from 'lucide-react';
+import { Cpu, Hourglass, Zap } from 'lucide-react';
 
+import { workersApi } from '@/app/pages/workers/workers.api';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
-
-import { workersApi } from '../../pages/workers/workers.api';
 
 /**
  * Format duration from ISO timestamp to human-readable format
@@ -147,12 +146,15 @@ export function WorkersWidget() {
 						<div className="flex items-center justify-between text-xs">
 							<Link
 								to="/workers"
-								className="truncate hover:text-foreground hover:underline transition-colors"
+								className={`
+          truncate transition-colors
+          hover:text-foreground hover:underline
+        `}
 							>
 								{worker.workerId}
 							</Link>
 							{worker.state === 'busy' ? (
-								<Zap className="size-3 shrink-0 text-yellow-500" />
+								<Zap className="size-3 shrink-0 text-warning" />
 							) : (
 								<Hourglass className="size-3 shrink-0 text-muted-foreground" />
 							)}
@@ -162,7 +164,10 @@ export function WorkersWidget() {
 								-{' '}
 								<Link
 									to={`/tasks/${worker.taskId}`}
-									className="hover:text-foreground hover:underline transition-colors"
+									className={`
+           transition-colors
+           hover:text-foreground hover:underline
+         `}
 								>
 									{worker.taskId}
 								</Link>

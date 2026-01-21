@@ -1,5 +1,6 @@
 import { copyFile, mkdir, readFile, readdir, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
+import { logger } from 'shared-common/logger';
 import { fileURLToPath } from 'url';
 
 import type { Task as BackendTask } from '@app/shared/api/tasks.contract';
@@ -62,21 +63,21 @@ interface OrchestratorTask {
 		author: string;
 		content: string;
 	}>;
-	metadata?: Record<string, any>;
+	metadata?: Record<string, unknown>;
 	history?: Array<{
 		timestamp: string;
 		event: string;
-		[key: string]: any;
+		[key: string]: unknown;
 	}>;
 	startedAt?: string;
 	completedAt?: string;
 	flowId?: string;
-	flowInputs?: Record<string, any>;
+	flowInputs?: Record<string, unknown>;
 	flowResult?: {
 		status: 'completed' | 'failed';
-		outputs?: Record<string, any>;
+		outputs?: Record<string, unknown>;
 		error?: string;
-		trace?: any;
+		trace?: unknown;
 	};
 	workspacePath?: string;
 	activeInterventionId?: string;
@@ -109,7 +110,7 @@ function transformTask(orchestratorTask: OrchestratorTask): BackendTask {
 	const backendTask: BackendTask = {
 		id: orchestratorTask.id,
 		description: orchestratorTask.description,
-		status: orchestratorTask.status as any,
+		status: orchestratorTask.status as BackendTask['status'],
 		priority: orchestratorTask.priority,
 		version: 1, // Add version for optimistic locking
 		createdAt: orchestratorTask.createdAt,
@@ -172,7 +173,7 @@ async function readOrchestratorTasks(): Promise<OrchestratorTask[]> {
 				const task = JSON.parse(content) as OrchestratorTask;
 				tasks.push(task);
 			} catch (error) {
-				console.error(`[Migration] Failed to read task file ${file}:`, error);
+				logger.error(`[Migration] Failed to read task file ${file}:`, error);
 				throw error;
 			}
 		}
@@ -180,7 +181,7 @@ async function readOrchestratorTasks(): Promise<OrchestratorTask[]> {
 		return tasks;
 	} catch (error) {
 		if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-			console.log('[Migration] Orchestrator tasks directory not found. Nothing to migrate.');
+			logger.info('[Migration] Orchestrator tasks directory not found. Nothing to migrate.');
 			return [];
 		}
 		throw error;
@@ -191,7 +192,7 @@ async function readOrchestratorTasks(): Promise<OrchestratorTask[]> {
  * Create backup of orchestrator data
  */
 async function createBackup(): Promise<void> {
-	console.log('[Migration] Creating backup of orchestrator data...');
+	logger.info('[Migration] Creating backup of orchestrator data...');
 
 	try {
 		// Create backup directory
@@ -207,9 +208,9 @@ async function createBackup(): Promise<void> {
 			await copyFile(sourcePath, destPath);
 		}
 
-		console.log(`[Migration] Backed up ${jsonFiles.length} task files to ${ORCHESTRATOR_BACKUP_DIR}`);
+		logger.info(`[Migration] Backed up ${jsonFiles.length} task files to ${ORCHESTRATOR_BACKUP_DIR}`);
 	} catch (error) {
-		console.error('[Migration] Failed to create backup:', error);
+		logger.error('[Migration] Failed to create backup:', error);
 		throw new Error(`Backup failed: ${(error as Error).message}`);
 	}
 }
@@ -225,7 +226,7 @@ async function writeBackendTasks(tasks: BackendTask[]): Promise<void> {
 	const data = { tasks };
 	await writeFile(BACKEND_TASKS_FILE, JSON.stringify(data, null, '\t'), 'utf-8');
 
-	console.log(`[Migration] Wrote ${tasks.length} tasks to ${BACKEND_TASKS_FILE}`);
+	logger.info(`[Migration] Wrote ${tasks.length} tasks to ${BACKEND_TASKS_FILE}`);
 }
 
 /**
@@ -240,22 +241,22 @@ async function migrate(dryRun: boolean): Promise<MigrationStats> {
 		errors: [],
 	};
 
-	console.log('[Migration] Starting migration...');
-	console.log(`[Migration] Dry-run mode: ${dryRun}`);
-	console.log('');
+	logger.info('[Migration] Starting migration...');
+	logger.info(`[Migration] Dry-run mode: ${dryRun}`);
+	logger.info('');
 
 	// Read orchestrator tasks
-	console.log('[Migration] Reading orchestrator tasks...');
+	logger.info('[Migration] Reading orchestrator tasks...');
 	const orchestratorTasks = await readOrchestratorTasks();
 	stats.total = orchestratorTasks.length;
 
 	if (stats.total === 0) {
-		console.log('[Migration] No tasks to migrate.');
+		logger.info('[Migration] No tasks to migrate.');
 		return stats;
 	}
 
-	console.log(`[Migration] Found ${stats.total} tasks`);
-	console.log('');
+	logger.info(`[Migration] Found ${stats.total} tasks`);
+	logger.info('');
 
 	// Transform tasks
 	const backendTasks: BackendTask[] = [];
@@ -272,14 +273,14 @@ async function migrate(dryRun: boolean): Promise<MigrationStats> {
 			stats.migrated++;
 
 			if (dryRun) {
-				console.log(`[Migration] Would migrate task: ${backendTask.id}`);
-				console.log(`  Description: ${backendTask.description}`);
-				console.log(`  Status: ${backendTask.status}`);
-				console.log(`  Priority: ${backendTask.priority}`);
-				console.log(`  Project ID: ${backendTask.projectId || '(none)'}`);
-				console.log(`  Workspace ID: ${backendTask.workspaceId || '(none)'}`);
-				console.log(`  Assigned Worker: ${backendTask.assignedWorker?.workerId || '(none)'}`);
-				console.log('');
+				logger.info(`[Migration] Would migrate task: ${backendTask.id}`);
+				logger.info(`  Description: ${backendTask.description}`);
+				logger.info(`  Status: ${backendTask.status}`);
+				logger.info(`  Priority: ${backendTask.priority}`);
+				logger.info(`  Project ID: ${backendTask.projectId || '(none)'}`);
+				logger.info(`  Workspace ID: ${backendTask.workspaceId || '(none)'}`);
+				logger.info(`  Assigned Worker: ${backendTask.assignedWorker?.workerId || '(none)'}`);
+				logger.info('');
 			}
 		} catch (error) {
 			stats.failed++;
@@ -287,19 +288,19 @@ async function migrate(dryRun: boolean): Promise<MigrationStats> {
 				taskId: orchestratorTask.id,
 				error: (error as Error).message,
 			});
-			console.error(`[Migration] Failed to transform task ${orchestratorTask.id}:`, error);
+			logger.error(`[Migration] Failed to transform task ${orchestratorTask.id}:`, error);
 		}
 	}
 
 	// Write to backend storage (only if not dry-run)
 	if (!dryRun) {
-		console.log('[Migration] Creating backup...');
+		logger.info('[Migration] Creating backup...');
 		await createBackup();
-		console.log('');
+		logger.info('');
 
-		console.log('[Migration] Writing tasks to backend storage...');
+		logger.info('[Migration] Writing tasks to backend storage...');
 		await writeBackendTasks(backendTasks);
-		console.log('');
+		logger.info('');
 	}
 
 	return stats;
@@ -311,59 +312,59 @@ async function migrate(dryRun: boolean): Promise<MigrationStats> {
 async function main(): Promise<void> {
 	const dryRun = process.argv.includes('--dry-run');
 
-	console.log('');
-	console.log('===========================================================================================');
-	console.log('ORCHESTRATOR TO BACKEND STORAGE MIGRATION');
-	console.log('===========================================================================================');
-	console.log('');
+	logger.info('');
+	logger.info('===========================================================================================');
+	logger.info('ORCHESTRATOR TO BACKEND STORAGE MIGRATION');
+	logger.info('===========================================================================================');
+	logger.info('');
 
 	try {
 		const stats = await migrate(dryRun);
 
-		console.log('===========================================================================================');
-		console.log('MIGRATION SUMMARY');
-		console.log('===========================================================================================');
-		console.log(`Total tasks: ${stats.total}`);
-		console.log(`Successfully migrated: ${stats.migrated}`);
-		console.log(`Failed: ${stats.failed}`);
-		console.log(`Skipped: ${stats.skipped}`);
-		console.log('');
+		logger.info('===========================================================================================');
+		logger.info('MIGRATION SUMMARY');
+		logger.info('===========================================================================================');
+		logger.info(`Total tasks: ${stats.total}`);
+		logger.info(`Successfully migrated: ${stats.migrated}`);
+		logger.info(`Failed: ${stats.failed}`);
+		logger.info(`Skipped: ${stats.skipped}`);
+		logger.info('');
 
 		if (stats.errors.length > 0) {
-			console.log('ERRORS:');
+			logger.info('ERRORS:');
 			for (const error of stats.errors) {
-				console.log(`  - Task ${error.taskId}: ${error.error}`);
+				logger.info(`  - Task ${error.taskId}: ${error.error}`);
 			}
-			console.log('');
+			logger.info('');
 		}
 
 		if (dryRun) {
-			console.log('DRY-RUN MODE: No changes were made.');
-			console.log('Run without --dry-run to perform the migration.');
+			logger.info('DRY-RUN MODE: No changes were made.');
+			logger.info('Run without --dry-run to perform the migration.');
 		} else {
-			console.log('Migration complete!');
-			console.log(`Backup created at: ${ORCHESTRATOR_BACKUP_DIR}`);
-			console.log(`Tasks written to: ${BACKEND_TASKS_FILE}`);
+			logger.info('Migration complete!');
+			logger.info(`Backup created at: ${ORCHESTRATOR_BACKUP_DIR}`);
+			logger.info(`Tasks written to: ${BACKEND_TASKS_FILE}`);
 		}
 
-		console.log('===========================================================================================');
-		console.log('');
+		logger.info('===========================================================================================');
+		logger.info('');
 
 		// Exit with error code if any tasks failed
 		if (stats.failed > 0) {
 			process.exit(1);
 		}
 	} catch (error) {
-		console.error('');
-		console.error('===========================================================================================');
-		console.error('MIGRATION FAILED');
-		console.error('===========================================================================================');
-		console.error((error as Error).message);
-		console.error('');
-		console.error('Stack trace:');
-		console.error((error as Error).stack);
-		console.error('===========================================================================================');
-		console.error('');
+		logger.error('');
+		logger.error('===========================================================================================');
+		logger.error('MIGRATION FAILED');
+		logger.error('===========================================================================================');
+		logger.error((error as Error).message);
+		logger.error('');
+		logger.error('Stack trace:');
+		logger.error((error as Error).stack || 'No stack trace available');
+		logger.error('===========================================================================================');
+		logger.error('');
 		process.exit(1);
 	}
 }
@@ -377,7 +378,7 @@ const isMainModule =
 
 if (isMainModule) {
 	main().catch(error => {
-		console.error('Unhandled error:', error);
+		logger.error('Unhandled error:', error);
 		process.exit(1);
 	});
 }

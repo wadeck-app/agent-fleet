@@ -1,5 +1,6 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
 import { DynamicLucideIcon } from '@framework/components/icons/DynamicLucideIcon';
+import { Button } from '@framework/components/primitives/Button';
 import { useAsyncData } from '@framework/hooks/useAsyncData';
 import { X } from 'lucide-react';
 
@@ -127,14 +128,18 @@ export function ProjectSelect({
 
 			{/* Clear button (only show when value is set) */}
 			{value && !disabled && (
-				<button
+				<Button
 					type="button"
+					variant="ghost"
+					size="icon"
 					onClick={handleClear}
-					className="absolute right-8 top-1/2 -translate-y-1/2 rounded-sm p-0.5 hover:bg-accent"
+					className={`
+       absolute top-1/2 right-8 h-auto w-auto -translate-y-1/2 rounded-sm p-0.5
+     `}
 					aria-label="Clear selection"
 				>
 					<X className="h-3 w-3 text-muted-foreground" />
-				</button>
+				</Button>
 			)}
 		</div>
 	);

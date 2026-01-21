@@ -50,7 +50,7 @@ export default class FlowsController implements LazyController<typeof FLOWS_API_
 		 * Get a specific flow definition by ID
 		 */
 		add('GET', '/api/flows/:flowId', async request => {
-			const flowId = (request.params as any).flowId as string;
+			const flowId = (request.params as { flowId: string }).flowId;
 			const flow = await this.service.getFlowById(flowId);
 
 			if (!flow) {
@@ -65,8 +65,11 @@ export default class FlowsController implements LazyController<typeof FLOWS_API_
 		 * Save/update a flow definition
 		 */
 		add('PUT', '/api/flows/:flowId', async request => {
-			const flowId = (request.params as any).flowId as string;
+			const flowId = (request.params as { flowId: string }).flowId;
+			// @formatter:off
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const flowDefinition = request.body as any;
+			// @formatter:on
 
 			await this.service.saveFlow(flowId, flowDefinition);
 

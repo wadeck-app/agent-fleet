@@ -116,7 +116,12 @@ export function TaskDetailStackedPage() {
 			</div>
 
 			{/* Logs Viewer (full width) */}
-			<div className="h-[calc(100vh-350px)] overflow-hidden rounded-lg border border-border bg-card">
+			<div
+				className={`
+      h-[calc(100vh-350px)] overflow-hidden rounded-lg border border-border
+      bg-card
+    `}
+			>
 				<TaskLogsViewer
 					logs={logs}
 					isRunning={isRunning}

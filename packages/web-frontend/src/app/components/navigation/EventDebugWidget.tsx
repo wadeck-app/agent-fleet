@@ -41,7 +41,7 @@ export function EventDebugWidget() {
 					<Activity className="size-3" />
 					<span>Active Subscriptions</span>
 				</div>
-				<Button variant="ghost" size="icon" onClick={() => setIsExpanded(false)} className="size-5">
+				<Button variant="ghost" size="icon" onClick={() => setIsExpanded(false)} className={`size-5`}>
 					<ChevronUp className="size-3" />
 				</Button>
 			</div>
@@ -55,7 +55,9 @@ export function EventDebugWidget() {
 						{subscriptions.map((sub, index) => (
 							<div
 								key={index}
-								className="truncate rounded bg-muted/50 px-1.5 py-0.5 font-mono text-blue-500"
+								className={`
+          truncate rounded bg-muted/50 px-1.5 py-0.5 font-mono text-primary
+        `}
 							>
 								{sub}
 							</div>

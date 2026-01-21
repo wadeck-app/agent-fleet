@@ -22,7 +22,10 @@ declare module 'fastify' {
  */
 const responseHelpersPlugin: FastifyPluginAsync = async fastify => {
 	// Add jsonSuccess method to reply object
+	// @formatter:off
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	fastify.decorateReply('jsonSuccess', function <T>(this: any, data: T, statusCode = 200) {
+		// @formatter:on
 		return this.status(statusCode).send({
 			success: true,
 			data,
@@ -30,7 +33,10 @@ const responseHelpersPlugin: FastifyPluginAsync = async fastify => {
 	});
 
 	// Add jsonError method to reply object
+	// @formatter:off
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	fastify.decorateReply('jsonError', function (this: any, error: string, statusCode = 400) {
+		// @formatter:on
 		return this.status(statusCode).send({
 			success: false,
 			error,

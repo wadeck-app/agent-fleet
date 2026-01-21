@@ -378,7 +378,7 @@ export function Ingredients4CarouselPage() {
 							onClick={() => setSearchQuery('')}
 							variant="ghost"
 							size="sm"
-							className="absolute right-2 top-9 h-6 w-6 -translate-y-1/2 p-0"
+							className="absolute top-9 right-2 h-6 w-6 -translate-y-1/2 p-0"
 							aria-label="Clear search"
 						>
 							<X className="h-4 w-4" />
@@ -390,7 +390,12 @@ export function Ingredients4CarouselPage() {
 			{/* Feature Info (for demo purposes) */}
 			<div className="mb-4 rounded-lg border border-border bg-muted/50 p-4 text-sm">
 				<strong>Active Features:</strong>
-				<div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+				<div
+					className={`
+       mt-2 grid grid-cols-2 gap-2 text-xs
+       sm:grid-cols-4
+     `}
+				>
 					<div>
 						<span className="text-muted-foreground">Search:</span>{' '}
 						<span className="font-mono">{searchQuery || 'none'}</span>

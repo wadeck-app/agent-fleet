@@ -7,7 +7,8 @@ import { useToast } from '@framework/features/toast/ToastContext';
 import type { Workspace } from '@shared/api/workspaces.contract';
 import { Pencil } from 'lucide-react';
 
-import { useProject } from '../../../hooks/useProject';
+import { useProject } from '@/hooks/useProject';
+
 import { workspacesApi } from '../workspaces/workspaces.api';
 import { EditWorkspaceDialog } from './EditWorkspaceDialog';
 
@@ -44,7 +45,7 @@ export const WORKSPACES_TABLE2_COLUMNS: Table2Column<Workspace>[] = [
 						title={w.color}
 					/>
 				)}
-				<span className={w.name ? 'text-sm font-medium' : 'text-sm text-muted-foreground'}>
+				<span className={w.name ? 'text-sm font-medium' : `text-sm text-muted-foreground`}>
 					{w.name || 'Unnamed'}
 				</span>
 			</div>
@@ -53,7 +54,7 @@ export const WORKSPACES_TABLE2_COLUMNS: Table2Column<Workspace>[] = [
 	{
 		key: 'path',
 		label: 'Path',
-		render: (w: Workspace) => <span className="font-mono text-xs text-muted-foreground">{w.path}</span>,
+		render: (w: Workspace) => <span className={`font-mono text-xs text-muted-foreground`}>{w.path}</span>,
 	},
 	{
 		key: 'project',

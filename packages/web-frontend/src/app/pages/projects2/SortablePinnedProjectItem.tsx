@@ -64,7 +64,7 @@ export function SortablePinnedProjectItem({
 			className={cn(
 				'flex items-center gap-1 rounded-sm transition-colors',
 				'hover:bg-accent',
-				isLoading && 'opacity-50 pointer-events-none',
+				isLoading && 'pointer-events-none opacity-50',
 				isDragging && 'z-50'
 			)}
 		>
@@ -94,7 +94,7 @@ export function SortablePinnedProjectItem({
 			)}
 
 			{/* Project Name */}
-			<span className={cn('flex-1 px-2 py-1.5 text-sm transition-opacity', isReordering && 'opacity-40')}>
+			<span className={cn('flex-1 px-2 py-1.5 text-sm transition-opacity', isReordering && `opacity-40`)}>
 				{project.name}
 			</span>
 
@@ -109,7 +109,13 @@ export function SortablePinnedProjectItem({
 					}
 				}}
 				disabled={isLoading}
-				className={cn('mr-1 opacity-70 hover:opacity-100', isDragging && 'pointer-events-none')}
+				className={cn(
+					`
+       mr-1 opacity-70
+       hover:opacity-100
+     `,
+					isDragging && `pointer-events-none`
+				)}
 				aria-label={`Unpin ${project.name}`}
 				title="Unpin project"
 			>

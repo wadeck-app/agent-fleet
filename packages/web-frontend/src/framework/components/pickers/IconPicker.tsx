@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { Input } from '@framework/components/forms/Input';
 import { Popover, PopoverContent, PopoverTrigger } from '@framework/components/forms/Popover';
 import { DynamicLucideIcon, type IconName } from '@framework/components/icons/DynamicLucideIcon';
+import { Button } from '@framework/components/primitives/Button';
 import { cn } from '@framework/lib/utils';
 import { Check, Search } from 'lucide-react';
 
@@ -135,19 +136,19 @@ export function IconPicker({ value, onChange, iconColor = '#6366F1', disabled, c
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
 			<PopoverTrigger asChild>
-				<button
+				<Button
 					type="button"
 					disabled={disabled}
 					className={cn(
 						`
-            h-8 w-full rounded-lg border border-input bg-transparent px-2.5
-            text-sm transition-colors outline-none flex items-center gap-2
-            hover:bg-accent hover:text-accent-foreground
-            focus-visible:border-ring focus-visible:ring-[3px]
-            focus-visible:ring-ring/50
-            disabled:pointer-events-none disabled:cursor-not-allowed
-            disabled:opacity-50
-          `,
+        flex h-8 w-full items-center gap-2 rounded-lg border border-input
+        bg-transparent px-2.5 text-sm transition-colors outline-none
+        hover:bg-accent hover:text-accent-foreground
+        focus-visible:border-ring focus-visible:ring-[3px]
+        focus-visible:ring-ring/50
+        disabled:pointer-events-none disabled:cursor-not-allowed
+        disabled:opacity-50
+      `,
 						className
 					)}
 				>
@@ -159,13 +160,18 @@ export function IconPicker({ value, onChange, iconColor = '#6366F1', disabled, c
 					) : (
 						<span className="flex-1 text-left text-muted-foreground">Select an icon...</span>
 					)}
-				</button>
+				</Button>
 			</PopoverTrigger>
 			<PopoverContent className="w-96 p-3" align="start">
 				<div className="space-y-3">
 					{/* Search input */}
 					<div className="relative">
-						<Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+						<Search
+							className={`
+         absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2
+         text-muted-foreground
+       `}
+						/>
 						<Input
 							type="text"
 							placeholder="Search icons..."
@@ -187,26 +193,25 @@ export function IconPicker({ value, onChange, iconColor = '#6366F1', disabled, c
 						{filteredIcons.length > 0 ? (
 							<div className="grid grid-cols-8 gap-1">
 								{filteredIcons.map(iconName => (
-									<button
+									<Button
 										key={iconName}
 										type="button"
 										onClick={() => handleIconSelect(iconName)}
 										className={cn(
 											`
-                      relative h-10 w-10 rounded-md border border-transparent
-                      flex items-center justify-center
-                      hover:bg-accent hover:border-border
-                      transition-colors
-                    `,
-											value === iconName && 'bg-accent border-border'
+             relative flex h-10 w-10 items-center justify-center rounded-md
+             border border-transparent transition-colors
+             hover:border-border hover:bg-accent
+           `,
+											value === iconName && 'border-border bg-accent'
 										)}
 										title={iconName}
 									>
-										<DynamicLucideIcon name={iconName} color={iconColor} className="h-5 w-5" />
+										<DynamicLucideIcon name={iconName} color={iconColor} className={`h-5 w-5`} />
 										{value === iconName && (
-											<Check className="absolute -right-0.5 -top-0.5 h-3 w-3 text-primary" />
+											<Check className="absolute -top-0.5 -right-0.5 h-3 w-3 text-primary" />
 										)}
-									</button>
+									</Button>
 								))}
 							</div>
 						) : (
@@ -215,7 +220,7 @@ export function IconPicker({ value, onChange, iconColor = '#6366F1', disabled, c
 					</div>
 
 					{/* Icon count */}
-					<div className="text-xs text-muted-foreground text-center">
+					<div className="text-center text-xs text-muted-foreground">
 						{filteredIcons.length} icon{filteredIcons.length !== 1 ? 's' : ''}
 						{searchQuery && ` matching "${searchQuery}"`}
 					</div>

@@ -1,4 +1,5 @@
 import { createLogger } from 'shared-common/logger';
+import type { OrchestratorStats } from 'shared-orch-worker/domain-types';
 
 import type { ActivityEntry, DashboardData } from '@app/shared/api/dashboard.contract';
 
@@ -37,8 +38,8 @@ export class DashboardService {
 			log.debug('Stats received:', { workers: stats.workers, uptime: stats.uptime });
 
 			// Calculate worker states
-			const idle = stats.workersList.filter((w: any) => !w.taskId).length;
-			const busy = stats.workersList.filter((w: any) => w.taskId).length;
+			const idle = stats.workersList.filter(w => !w.taskId).length;
+			const busy = stats.workersList.filter(w => w.taskId).length;
 
 			// Aggregate task statuses
 			const active = this.sumStatuses(stats.tasks.byStatus, ['IN_PROGRESS', 'TESTING']);
@@ -119,12 +120,13 @@ export class DashboardService {
 	 * Calculate throughput metrics
 	 */
 	private calculateThroughput(
-		stats: any,
+		stats: { uptime?: number },
 		done: number,
 		failed: number,
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		tasks: any[]
 	): { tasksPerHour: number; successRate: number; avgTaskDuration: number } {
-		const uptimeHours = stats.uptime / (1000 * 60 * 60);
+		const uptimeHours = (stats.uptime || 0) / (1000 * 60 * 60);
 		const completed = done + failed;
 
 		// Tasks per hour (based on total uptime)
@@ -149,6 +151,7 @@ export class DashboardService {
 	 */
 	private calculateAvgTaskDuration(tasks: any[]): number {
 		// Filter completed tasks that have both startedAt and completedAt
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const completedTasks = tasks.filter(
 			(task: any) =>
 				task.startedAt && task.completedAt && ['APPROVED', 'MERGED', 'CANCELLED'].includes(task.status)
@@ -160,6 +163,7 @@ export class DashboardService {
 		}
 
 		// Calculate duration for each task and get average
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const totalDuration = completedTasks.reduce((sum: number, task: any) => {
 			const startedAt = new Date(task.startedAt).getTime();
 			const completedAt = new Date(task.completedAt).getTime();
@@ -174,11 +178,12 @@ export class DashboardService {
 	 * MVP: Generates synthetic activity based on worker states
 	 * TODO: Replace with actual event tracking/history
 	 */
-	private generateRecentActivity(stats: any): ActivityEntry[] {
+	private generateRecentActivity(stats: OrchestratorStats): ActivityEntry[] {
 		const activities: ActivityEntry[] = [];
 		const now = new Date();
 
 		// Generate activity for busy workers (tasks in progress)
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		stats.workersList
 			.filter((w: any) => w.taskId)
 			.slice(0, 3)
@@ -206,6 +211,7 @@ export class DashboardService {
 		}
 
 		// Add worker connection events
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		stats.workersList.slice(0, 2).forEach((worker: any, index: number) => {
 			const timestamp = new Date(now.getTime() - (10 + index) * 60 * 1000);
 			activities.push({

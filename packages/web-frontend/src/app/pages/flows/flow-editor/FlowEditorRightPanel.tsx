@@ -115,7 +115,7 @@ export function FlowEditorRightPanel({ flowDefinition, validationResult, onIssue
 								No flow loaded
 							</div>
 						) : (
-							<pre className="h-full overflow-auto rounded bg-muted p-3 font-mono text-xs">
+							<pre className={`h-full overflow-auto rounded bg-muted p-3 font-mono text-xs`}>
 								<code>{yamlContent}</code>
 							</pre>
 						)}

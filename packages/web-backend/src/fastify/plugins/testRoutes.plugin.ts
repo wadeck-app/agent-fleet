@@ -54,11 +54,11 @@ async function clearDataHandler(request: FastifyRequest, reply: FastifyReply) {
 		return reply.status(200).send({
 			message: 'In-memory data cleared successfully for this backend process',
 		});
-	} catch (error: any) {
+	} catch (error: unknown) {
 		logger.error('Error clearing in-memory data:', error);
 		return reply.status(500).send({
 			error: 'Failed to clear in-memory data',
-			details: error.message,
+			details: error instanceof Error ? error.message : 'Unknown error',
 		});
 	}
 }

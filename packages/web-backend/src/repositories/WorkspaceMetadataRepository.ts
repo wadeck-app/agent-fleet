@@ -123,7 +123,7 @@ export class WorkspaceMetadataRepository {
 				return;
 			}
 
-			const watcher = fs.watch(metadataPath, (eventType, filename) => {
+			const watcher = fs.watch(metadataPath, (eventType, _filename) => {
 				if (eventType === 'change') {
 					log.info(`Metadata file changed for workspace: ${workspacePath}`);
 					// Notify via callback

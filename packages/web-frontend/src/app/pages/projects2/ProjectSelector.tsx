@@ -47,7 +47,12 @@ export function ProjectSelector({ projects, selectedProjectIds, onProjectSelect,
 				<div className="space-y-3">
 					{/* Search input */}
 					<div className="relative">
-						<Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+						<Search
+							className={`
+         absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2
+         text-muted-foreground
+       `}
+						/>
 						<Input
 							type="text"
 							placeholder="Search projects..."
@@ -65,14 +70,12 @@ export function ProjectSelector({ projects, selectedProjectIds, onProjectSelect,
 									const isSelected = selectedProjectIds.includes(project.id);
 
 									return (
-										<button
+										<Button
 											key={project.id}
+											variant="ghost"
 											onClick={() => handleProjectSelect(project.id)}
 											className={cn(
-												`
-												w-full rounded-md px-3 py-2 text-left transition-colors
-												hover:bg-accent
-											`,
+												'w-full justify-start px-3 py-2',
 												isSelected && 'bg-accent/50'
 											)}
 										>
@@ -100,7 +103,7 @@ export function ProjectSelector({ projects, selectedProjectIds, onProjectSelect,
 													)}
 												</div>
 											</div>
-										</button>
+										</Button>
 									);
 								})}
 							</div>
@@ -112,7 +115,11 @@ export function ProjectSelector({ projects, selectedProjectIds, onProjectSelect,
 					</div>
 
 					{/* Project count */}
-					<div className="border-t border-border pt-2 text-xs text-muted-foreground text-center">
+					<div
+						className={`
+        border-t border-border pt-2 text-center text-xs text-muted-foreground
+      `}
+					>
 						{filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''}
 						{searchQuery && ` matching "${searchQuery}"`}
 					</div>

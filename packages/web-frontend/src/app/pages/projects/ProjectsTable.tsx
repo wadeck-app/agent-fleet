@@ -41,11 +41,18 @@ export const PROJECTS_TABLE_COLUMNS: Table2Column<Project>[] = [
 		render: (project: Project) => (
 			<div className="flex items-center gap-2">
 				{project.icon && (
-					<DynamicLucideIcon name={project.icon} color={project.iconColor || '#6366F1'} className="h-5 w-5" />
+					<DynamicLucideIcon
+						name={project.icon}
+						color={project.iconColor || '#6366F1'}
+						className={`h-5 w-5`}
+					/>
 				)}
 				<Link
 					to={`/projects/${project.id}/board`}
-					className="font-medium text-primary hover:underline"
+					className={`
+       font-medium text-primary
+       hover:underline
+     `}
 					onClick={e => e.stopPropagation()}
 				>
 					{project.name}
@@ -142,7 +149,10 @@ export function ProjectsTable({
 								{onDelete && (
 									<DropdownMenuItem
 										onClick={() => onDelete(project.id)}
-										className="text-destructive focus:text-destructive"
+										className={`
+            text-destructive
+            focus:text-destructive
+          `}
 									>
 										<Trash2 className="mr-2 h-4 w-4" />
 										Delete

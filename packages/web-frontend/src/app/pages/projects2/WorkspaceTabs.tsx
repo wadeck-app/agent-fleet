@@ -1,4 +1,5 @@
 import { Badge } from '@framework/components/primitives/Badge';
+import { Button } from '@framework/components/primitives/Button';
 import type { Workspace } from '@shared/api/workspaces.contract';
 
 // Helper to extract basename from path
@@ -20,18 +21,22 @@ export function WorkspaceTabs({ workspaces, activeWorkspaceId, onWorkspaceSelect
 					const displayName = workspace.name || getBasename(workspace.path);
 
 					return (
-						<button
+						<Button
 							key={workspace.id}
+							variant="ghost"
 							onClick={() => onWorkspaceSelect(workspace.id)}
 							className={`
-								flex items-center gap-2 border-b-2 px-4 py-2.5
-								transition-colors hover:bg-accent/50
-								${
-									activeWorkspaceId === workspace.id
-										? 'border-primary bg-accent/30 text-foreground'
-										: 'border-transparent text-muted-foreground hover:text-foreground'
-								}
-							`}
+         flex items-center gap-2 border-b-2 px-4 py-2.5 transition-colors
+         hover:bg-accent/50
+         ${
+				activeWorkspaceId === workspace.id
+					? 'border-primary bg-accent/30 text-foreground'
+					: `
+       border-transparent text-muted-foreground
+       hover:text-foreground
+     `
+			}
+       `}
 						>
 							{workspace.color && (
 								<div
@@ -44,7 +49,7 @@ export function WorkspaceTabs({ workspaces, activeWorkspaceId, onWorkspaceSelect
 							<Badge variant="secondary" className="text-xs">
 								{workspace.tasksCount}
 							</Badge>
-						</button>
+						</Button>
 					);
 				})}
 			</div>

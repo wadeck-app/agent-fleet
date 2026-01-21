@@ -6,7 +6,6 @@ import { SearchBar } from '@framework/components/forms/SearchBar';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { Pagination } from '@framework/components/pagination/Pagination';
-import { Button } from '@framework/components/primitives/Button';
 import { useCacheControl2 } from '@framework/hooks2/useCacheControl2';
 import { usePagination2 } from '@framework/hooks2/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
@@ -79,6 +78,7 @@ export function InterventionsPage() {
 				total: response.pagination?.total || response.items.length,
 			};
 		},
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- Only filters.fillQuery is needed, not the entire filters object
 		[filters.fillQuery]
 	);
 
@@ -110,7 +110,12 @@ export function InterventionsPage() {
 
 			{/* Feature Info (for demo purposes - remove in production) */}
 			<FeatureInfoBox title="Active Features (UI / Debounced):">
-				<div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+				<div
+					className={`
+       mt-2 grid grid-cols-2 gap-2 text-xs
+       sm:grid-cols-4
+     `}
+				>
 					<div>
 						<span className="text-muted-foreground">Search:</span>{' '}
 						<span className="font-mono">{search.fstate.query || 'none'}</span>

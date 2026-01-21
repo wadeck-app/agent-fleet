@@ -36,7 +36,12 @@ export function LogEntry({ log, onExpand }: LogEntryProps) {
 	const hasMetadata = log.metadata && Object.keys(log.metadata).length > 0;
 
 	return (
-		<div className="flex gap-3 border-b border-border px-4 py-2 font-mono text-xs hover:bg-muted/50">
+		<div
+			className={`
+     flex gap-3 border-b border-border px-4 py-2 font-mono text-xs
+     hover:bg-muted/50
+   `}
+		>
 			{/* Timestamp */}
 			<span className="text-muted-foreground">{timestamp}</span>
 
@@ -53,7 +58,10 @@ export function LogEntry({ log, onExpand }: LogEntryProps) {
 			{hasMetadata && onExpand && (
 				<span className="cursor-pointer select-none" title="View full log details">
 					<Info
-						className="size-4 text-muted-foreground hover:text-info"
+						className={`
+        size-4 text-muted-foreground
+        hover:text-info
+      `}
 						onClick={e => {
 							e.stopPropagation();
 							onExpand(log);

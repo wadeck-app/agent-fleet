@@ -34,7 +34,12 @@ function getTypeColor(type?: VariableType): string {
 export function FlowEditorEdgePanel({ selectedEdge, nodes, onDeleteEdge }: FlowEditorEdgePanelProps) {
 	if (!selectedEdge) {
 		return (
-			<div className="flex w-96 items-center justify-center border-l bg-card p-4 text-muted-foreground">
+			<div
+				className={`
+      flex w-96 items-center justify-center border-l bg-card p-4
+      text-muted-foreground
+    `}
+			>
 				Select an edge to view details
 			</div>
 		);
@@ -82,7 +87,11 @@ export function FlowEditorEdgePanel({ selectedEdge, nodes, onDeleteEdge }: FlowE
 									<div>
 										<div className="mb-1 text-xs text-muted-foreground">Source Variable</div>
 										<div className="flex items-center gap-2">
-											<code className="flex-1 rounded bg-background px-2 py-1 font-mono text-xs">
+											<code
+												className={`
+              flex-1 rounded bg-background px-2 py-1 font-mono text-xs
+            `}
+											>
 												{edgeData.sourceVarName}
 											</code>
 											{edgeData.varType && (
@@ -98,7 +107,7 @@ export function FlowEditorEdgePanel({ selectedEdge, nodes, onDeleteEdge }: FlowE
 								{edgeData.targetVarName && (
 									<div>
 										<div className="mb-1 text-xs text-muted-foreground">Target Variable</div>
-										<code className="block rounded bg-background px-2 py-1 font-mono text-xs">
+										<code className={`block rounded bg-background px-2 py-1 font-mono text-xs`}>
 											{edgeData.targetVarName}
 										</code>
 									</div>
@@ -128,7 +137,7 @@ export function FlowEditorEdgePanel({ selectedEdge, nodes, onDeleteEdge }: FlowE
 						<div className="space-y-2">
 							<Label className="text-sm font-semibold">Condition</Label>
 							<div className="rounded-md border bg-muted/30 p-3">
-								<code className="block break-all font-mono text-xs">{edgeData.condition}</code>
+								<code className="block font-mono text-xs break-all">{edgeData.condition}</code>
 							</div>
 						</div>
 					)}

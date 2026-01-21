@@ -82,7 +82,7 @@ export class DataStoreFactory {
 	private transportServer?: ITransportServer;
 	private orchestrator: Orchestrator;
 	private orchestratorWrapper: OrchestratorWrapper;
-	private orchestratorEventBridge?: any; // OrchestratorEventBridge (using any to avoid circular import)
+	private orchestratorEventBridge?: unknown; // OrchestratorEventBridge (using unknown to avoid circular import)
 	private orchestratorEventHandler?: OrchestratorEventHandler;
 
 	constructor(storageMode: 'memory' | 'file' | 'mariadb' = 'file', orchestrator: Orchestrator) {
@@ -401,14 +401,14 @@ export class DataStoreFactory {
 	/**
 	 * Set OrchestratorEventBridge (called after bridge is created)
 	 */
-	setOrchestratorEventBridge(bridge: any): void {
+	setOrchestratorEventBridge(bridge: unknown): void {
 		this.orchestratorEventBridge = bridge;
 	}
 
 	/**
 	 * Get OrchestratorEventBridge (for cleanup on shutdown)
 	 */
-	getOrchestratorEventBridge(): any | undefined {
+	getOrchestratorEventBridge(): unknown | undefined {
 		return this.orchestratorEventBridge;
 	}
 

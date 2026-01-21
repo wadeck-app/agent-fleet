@@ -37,9 +37,9 @@ export function Page({ className = '', children, fullWidth = false }: PageProps)
 		return (
 			<div
 				className={`
-    w-full p-6
-    ${className}
-  `}
+      w-full p-6
+      ${className}
+    `}
 			>
 				{children}
 			</div>

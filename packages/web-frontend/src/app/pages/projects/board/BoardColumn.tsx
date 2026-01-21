@@ -34,9 +34,17 @@ export function BoardColumn({ status, tasks }: BoardColumnProps) {
 	});
 
 	return (
-		<div className="flex w-80 shrink-0 flex-col rounded-lg border border-border bg-muted/30">
+		<div
+			className={`
+     flex w-80 shrink-0 flex-col rounded-lg border border-border bg-muted/30
+   `}
+		>
 			{/* Column header */}
-			<div className="flex items-center justify-between border-b border-border px-4 py-3">
+			<div
+				className={`
+      flex items-center justify-between border-b border-border px-4 py-3
+    `}
+			>
 				<h3 className="text-sm font-semibold text-foreground">{getStatusLabel(status)}</h3>
 				<Badge variant="secondary" className="text-xs">
 					{tasks.length}
@@ -48,9 +56,9 @@ export function BoardColumn({ status, tasks }: BoardColumnProps) {
 				ref={setNodeRef}
 				className={cn(
 					`
-          flex max-h-[calc(100vh-280px)] min-h-[200px] flex-1 flex-col gap-3
-          overflow-y-auto p-3 transition-colors
-        `,
+       flex max-h-[calc(100vh-280px)] min-h-[200px] flex-1 flex-col gap-3
+       overflow-y-auto p-3 transition-colors
+     `,
 					isOver && 'bg-primary/5 ring-2 ring-primary/20 ring-inset'
 				)}
 			>

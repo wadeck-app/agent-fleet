@@ -128,7 +128,7 @@ export function useInfiniteCarousel<T>({
 
 	// Add comment above the target line, not at the end
 	// Build query object from current state
-	const buildQuery = useCallback(() => {
+	const _buildQuery = useCallback(() => {
 		const query: Record<string, unknown> = {
 			page: currentPage,
 			pageSize,
@@ -206,10 +206,10 @@ export function useInfiniteCarousel<T>({
 				// Remove from loaded pages so user can retry
 				loadedPages.current.delete(page);
 			} finally {
-				if (!isMounted.current) return;
-
-				setIsLoading(false);
-				setIsLoadingMore(false);
+				if (isMounted.current) {
+					setIsLoading(false);
+					setIsLoadingMore(false);
+				}
 			}
 		},
 		[fetchFn, pageSize, sortBy, sortOrder, search]

@@ -85,7 +85,9 @@ export class InterventionsService {
 			const sortOrder = query?.sortOrder || 'desc';
 
 			interventions.sort((a, b) => {
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				let aVal: any = a[sortBy as keyof Intervention];
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				let bVal: any = b[sortBy as keyof Intervention];
 
 				// Handle date comparisons
@@ -149,7 +151,10 @@ export class InterventionsService {
 			// Emit events for real-time updates
 			try {
 				this.eventBroadcaster.broadcast(B2F_INTERVENTION_CREATED, intervention);
+				// @formatter:off
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, {} as any);
+				// @formatter:on
 			} catch (broadcastError) {
 				log.error(' Failed to broadcast events:', broadcastError);
 				// Don't fail the operation if broadcast fails

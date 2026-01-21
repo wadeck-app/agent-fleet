@@ -5,7 +5,6 @@ import { FeatureInfoBox } from '@framework/components/feedback/FeatureInfoBox';
 import { SearchBar } from '@framework/components/forms/SearchBar';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
-import { Button } from '@framework/components/primitives/Button';
 import { useCacheControl2 } from '@framework/hooks2/useCacheControl2';
 import { useDebounce } from '@framework/hooks2/useDebounce';
 import { usePagination2 } from '@framework/hooks2/usePagination2';
@@ -113,7 +112,12 @@ export function WorkspacesPage() {
 
 			{/* Feature Info (for demo purposes) */}
 			<FeatureInfoBox title="Active Features (UI / Debounced):">
-				<div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+				<div
+					className={`
+       mt-2 grid grid-cols-2 gap-2 text-xs
+       sm:grid-cols-4
+     `}
+				>
 					<div>
 						<span className="text-muted-foreground">Search:</span>{' '}
 						<span className="font-mono">

@@ -260,7 +260,12 @@ export function TasksPage() {
 
 			{/* Feature Info (for demo purposes) */}
 			<FeatureInfoBox title="Active Features (UI / Debounced):">
-				<div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+				<div
+					className={`
+       mt-2 grid grid-cols-2 gap-2 text-xs
+       sm:grid-cols-4
+     `}
+				>
 					<div>
 						<span className="text-muted-foreground">Search:</span>{' '}
 						<span className="font-mono">

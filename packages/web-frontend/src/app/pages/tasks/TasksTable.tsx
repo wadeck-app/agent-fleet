@@ -70,7 +70,10 @@ export const TASKS_TABLE_COLUMNS: Table2Column<Task>[] = [
 		render: (t: Task) => (
 			<Link
 				to={`/tasks/${t.id}/logs-stacked`}
-				className="font-mono text-xs text-primary hover:underline"
+				className={`
+      font-mono text-xs text-primary
+      hover:underline
+    `}
 				onClick={e => e.stopPropagation()}
 			>
 				{t.id}

@@ -8,7 +8,7 @@ import fastifyStatic from '@fastify/static';
 import dotenv from 'dotenv';
 // ======================================================================================
 // Now import everything else
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 // File logger for debugging shutdown (console logs may be lost when tsx kills process)
 import * as fs from 'fs';
 import { Orchestrator } from 'orchestrator';
@@ -57,7 +57,7 @@ async function initializeOrchestratorClient(): Promise<Orchestrator> {
 		const { wsPort: calculatedWsPort, restPort: calculatedRestPort } = getOrchestratorPortsFromEnv();
 
 		const orchestratorWsPort = parseInt(process.env.ORCHESTRATOR_WS_PORT || calculatedWsPort.toString(), 10);
-		const orchestratorRestPort = parseInt(process.env.ORCHESTRATOR_REST_PORT || calculatedRestPort.toString(), 10);
+		const _orchestratorRestPort = parseInt(process.env.ORCHESTRATOR_REST_PORT || calculatedRestPort.toString(), 10);
 
 		logger.info(`[Orchestrator] Calculated ports from env: REST=${calculatedRestPort}, WS=${calculatedWsPort}`);
 
@@ -423,7 +423,7 @@ function logToFile(message: string) {
 	const logMessage = `[${timestamp}] [PID:${process.pid}] ${message}\n`;
 	try {
 		fs.appendFileSync(path.join(__dirname, '../shutdown-debug.log'), logMessage);
-	} catch (err) {
+	} catch (_err) {
 		// Ignore errors - we're trying to debug shutdown
 	}
 }
@@ -617,7 +617,7 @@ async function start(): Promise<void> {
 		}
 
 		// Health check handler (reused for both endpoints)
-		const healthCheckHandler = async (request: any, reply: any) => {
+		const healthCheckHandler = async (_request: FastifyRequest, reply: FastifyReply) => {
 			// Check critical dependencies
 			const checks = {
 				server: 'ok',
@@ -691,9 +691,15 @@ async function start(): Promise<void> {
 			const transportServer = factory.getTransportServer();
 			if (transportServer) {
 				// Get WebSocketTransportServer and close all connections
+				// @formatter:off
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				const wsServer = (transportServer as any).wss;
+				// @formatter:on
 				if (wsServer?.clients) {
+					// @formatter:off
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
 					wsServer.clients.forEach((client: any) => {
+						// @formatter:on
 						client.terminate();
 					});
 					logger.info(`[Fastify] Terminated ${wsServer.clients.size} WebSocket connections`);
@@ -710,7 +716,10 @@ async function start(): Promise<void> {
 		// This allows the test setup to know when the backend is ready without doing fetchs
 		if (process.env.E2E_MODE === 'true') {
 			const readyMessage = `E2E_BACKEND_READY port=${PORT} pid=${process.pid} runId=${process.env.RUN_ID || 'unknown'}`;
+			// @formatter:off
+			// eslint-disable-next-line no-console
 			console.log(readyMessage);
+			// @formatter:on
 			// Force flush stdout to ensure message is immediately sent (important on Windows)
 			if (process.stdout.write) {
 				process.stdout.write('');
@@ -737,8 +746,7 @@ async function start(): Promise<void> {
 	} catch (err) {
 		// Always log startup errors
 		logToFile(`❌ FATAL ERROR: ${err}`);
-		console.error('❌ FATAL: Failed to start backend server:', err);
-		logger.error('Failed to start server', err);
+		logger.error('❌ FATAL: Failed to start backend server:', err);
 		process.exit(1);
 	}
 }

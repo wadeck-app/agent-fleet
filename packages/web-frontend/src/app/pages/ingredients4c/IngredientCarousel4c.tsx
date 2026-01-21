@@ -213,7 +213,7 @@ export function IngredientCarousel4c({
 
 	if (error && !isLoading) {
 		return (
-			<div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+			<div className={`rounded-lg border border-destructive/50 bg-destructive/10 p-4`}>
 				<div className="flex items-center gap-2">
 					<AlertCircle className="h-5 w-5 text-destructive" />
 					<strong className="text-sm font-semibold text-destructive">Error:</strong>
@@ -292,11 +292,11 @@ export function IngredientCarousel4c({
 				<div className="relative px-12">
 					{/* Skeleton grid */}
 					<div
-						className="
-       grid grid-cols-1 gap-6
-       md:grid-cols-2
-       lg:grid-cols-3
-     "
+						className={`
+        grid grid-cols-1 gap-6
+        md:grid-cols-2
+        lg:grid-cols-3
+      `}
 					>
 						{Array.from({ length: skeletonCount }).map((_, idx) => (
 							<Card key={idx} className="animate-pulse">
@@ -331,7 +331,10 @@ export function IngredientCarousel4c({
 					<Button
 						variant="outline"
 						size="icon"
-						className="absolute left-0 top-1/2 z-50 -translate-y-1/2 bg-background shadow-lg hover:bg-accent"
+						className={`
+        absolute top-1/2 left-0 z-50 -translate-y-1/2 bg-background shadow-lg
+        hover:bg-accent
+      `}
 						disabled
 						aria-label="Previous slide"
 					>
@@ -340,7 +343,10 @@ export function IngredientCarousel4c({
 					<Button
 						variant="outline"
 						size="icon"
-						className="absolute right-0 top-1/2 z-50 -translate-y-1/2 bg-background shadow-lg hover:bg-accent"
+						className={`
+        absolute top-1/2 right-0 z-50 -translate-y-1/2 bg-background shadow-lg
+        hover:bg-accent
+      `}
 						disabled
 						aria-label="Next slide"
 					>
@@ -432,7 +438,10 @@ export function IngredientCarousel4c({
 				<Button
 					variant="outline"
 					size="icon"
-					className="absolute left-0 top-1/2 z-50 -translate-y-1/2 bg-background shadow-lg hover:bg-accent"
+					className={`
+       absolute top-1/2 left-0 z-50 -translate-y-1/2 bg-background shadow-lg
+       hover:bg-accent
+     `}
 					onClick={carousel.actions.scrollPrev}
 					disabled={!carousel.fstate.canScrollPrev}
 					aria-label="Previous slide"
@@ -442,7 +451,10 @@ export function IngredientCarousel4c({
 				<Button
 					variant="outline"
 					size="icon"
-					className="absolute right-0 top-1/2 z-50 -translate-y-1/2 bg-background shadow-lg hover:bg-accent"
+					className={`
+       absolute top-1/2 right-0 z-50 -translate-y-1/2 bg-background shadow-lg
+       hover:bg-accent
+     `}
 					onClick={carousel.actions.scrollNext}
 					// Disable right arrow when can't scroll OR no more pages to load
 					disabled={!carousel.fstate.canScrollNext && !hasMore}

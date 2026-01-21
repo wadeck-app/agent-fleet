@@ -1,5 +1,4 @@
 import { useAsyncData } from '@framework/hooks/useAsyncData';
-import type { Project } from '@shared/api/projects.contract';
 
 import { projectsApi } from '../app/pages/projects/projects.api';
 

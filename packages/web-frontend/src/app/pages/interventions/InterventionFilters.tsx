@@ -102,7 +102,12 @@ export function InterventionFilters({ filters }: InterventionFiltersProps) {
 
 			{/* Clear Filters Button - Full width on mobile, auto on larger screens */}
 			{filters.fstate.hasFilters && (
-				<div className="sm:col-span-2 lg:col-span-4">
+				<div
+					className={`
+       sm:col-span-2
+       lg:col-span-4
+     `}
+				>
 					<Button onClick={filters.actions.clearFilters} variant="outline" size="default">
 						Clear Filters
 					</Button>

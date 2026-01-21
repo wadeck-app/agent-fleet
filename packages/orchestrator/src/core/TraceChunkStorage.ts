@@ -66,7 +66,7 @@ export class TraceChunkStorage {
 		const steps = trace.steps || [];
 
 		// Load existing metadata or create new
-		let metadata = await this.loadMetadata(taskId);
+		const metadata = await this.loadMetadata(taskId);
 
 		// Determine which entries are new
 		const existingCount = metadata?.totalEntries || 0;

@@ -30,10 +30,14 @@ Eliminate all 537 TypeScript errors and 2462 ESLint errors to achieve 0 errors.
 ### ESLint Errors (2462 total)
 
 1. **no-console (370 errors)**: Unexpected console statements
-    - Replace with proper logging using the `logger` from `@shared-common/logger`
+    - Present throughout production code (controllers, services, repositories, transport adapters)
+    - Logger infrastructure from `@shared-common/logger` is in place
+    - Need to replace all remaining console.\* with appropriate logger methods
 
 2. **@typescript-eslint/no-explicit-any (248 errors)**: Use of `any` type
-    - Replace with proper types
+    - **Project policy**: `any` allowed only in tests/stories, NOT in production code
+    - Must identify which errors are in production vs tests/stories
+    - Replace with proper types in all production code
 
 3. **better-tailwindcss/enforce-consistent-class-order (223 warnings)**: Incorrect Tailwind class order
     - Auto-fixable with `npm run lint:fix`
@@ -149,19 +153,26 @@ Strategy:
 
 #### 4.2 Replace 'any' with proper types (248 errors)
 
-Priority files:
+**First**: Analyze which files are production code vs tests/stories:
+
+- Tests/stories: `any` is acceptable per project policy
+- Production code: Must fix all `any` violations
+
+Priority production files (identified from error log):
 
 - Controllers (FlowsController, MonitoringController)
 - Factories (DataStoreFactory)
 - Hooks (apiStats.hook, requestLogger.hook)
 - Plugins (responseHelpers.plugin, testRoutes.plugin)
+- Services and repositories
 
 Strategy:
 
-1. Identify the actual types from usage
-2. Define proper interfaces where needed
-3. Use generics for reusable functions
-4. Use `unknown` with type guards if type truly unknown
+1. Filter errors to identify production code violations
+2. Identify the actual types from usage context
+3. Define proper interfaces where needed
+4. Use generics for reusable functions
+5. Use `unknown` with type guards if type truly unknown (last resort)
 
 #### 4.3 Fix no-restricted-syntax (20 errors)
 

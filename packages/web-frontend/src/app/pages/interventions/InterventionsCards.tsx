@@ -35,7 +35,7 @@ export interface InterventionsCardsProps extends QueryResultDisplayerProps<Inter
 	onInterventionClick?: (id: string) => void;
 }
 
-export function InterventionsCards({ data, isLoading, error, features }: InterventionsCardsProps) {
+export function InterventionsCards({ data, isLoading, error, features: _features }: InterventionsCardsProps) {
 	// Loading state - show skeleton cards
 	if (isLoading && data.length === 0) {
 		return (
@@ -44,7 +44,7 @@ export function InterventionsCards({ data, isLoading, error, features }: Interve
 					<Card key={`skeleton-${idx}`}>
 						<CardContent className="p-3">
 							<div className="flex items-start justify-between gap-3">
-								<div className="flex-1 min-w-0 space-y-2">
+								<div className="min-w-0 flex-1 space-y-2">
 									{/* Icon + Title skeleton */}
 									<div className="flex items-center gap-2">
 										<SkeletonBox shape="square" className="h-6 w-6" />
@@ -55,7 +55,7 @@ export function InterventionsCards({ data, isLoading, error, features }: Interve
 									<SkeletonBox className="h-4 w-4/5" />
 								</div>
 								{/* Badges skeleton */}
-								<div className="flex items-center gap-2 shrink-0">
+								<div className="flex shrink-0 items-center gap-2">
 									<SkeletonBox shape="pill" className="h-6 w-16" />
 									<SkeletonBox shape="pill" className="h-6 w-16" />
 									<SkeletonBox shape="pill" className="h-6 w-20" />
@@ -72,7 +72,12 @@ export function InterventionsCards({ data, isLoading, error, features }: Interve
 	// Error state
 	if (error) {
 		return (
-			<div className="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
+			<div
+				className={`
+      rounded-lg border border-destructive bg-destructive/10 p-4
+      text-destructive
+    `}
+			>
 				Error loading interventions: {error}
 			</div>
 		);
@@ -112,30 +117,36 @@ function InterventionCard({ intervention }: { intervention: Intervention }) {
 	};
 
 	return (
-		<Card className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={handleClick}>
+		<Card
+			className={`
+     cursor-pointer transition-colors
+     hover:bg-accent/50
+   `}
+			onClick={handleClick}
+		>
 			<CardContent className="p-3">
 				<div className="flex items-start justify-between gap-3">
-					<div className="flex-1 min-w-0">
+					<div className="min-w-0 flex-1">
 						{/* Header with type badge and title */}
-						<div className="flex items-center gap-2 mb-2">
-							<Badge variant={typeVariant} className="capitalize text-xs shrink-0">
+						<div className="mb-2 flex items-center gap-2">
+							<Badge variant={typeVariant} className="shrink-0 text-xs capitalize">
 								{intervention.type}
 							</Badge>
-							<div className="font-semibold text-foreground truncate">
+							<div className="truncate font-semibold text-foreground">
 								{intervention.config?.title || 'Intervention Required'}
 							</div>
 						</div>
 
 						{/* Description */}
 						{intervention.config?.description && (
-							<div className="text-sm text-muted-foreground line-clamp-2">
+							<div className="line-clamp-2 text-sm text-muted-foreground">
 								{intervention.config.description}
 							</div>
 						)}
 					</div>
 
 					{/* Right side badges */}
-					<div className="flex items-center gap-2 shrink-0">
+					<div className="flex shrink-0 items-center gap-2">
 						<Badge variant="secondary" className="font-mono text-xs">
 							#{intervention.taskId?.slice(0, 8) || 'unknown'}
 						</Badge>

@@ -51,7 +51,10 @@ export function ColorInput({ value, onChange, placeholder = '#000000', className
 			/>
 			{/* Color preview square */}
 			<div
-				className="absolute left-2.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded border border-border"
+				className={`
+      absolute top-1/2 left-2.5 h-5 w-5 -translate-y-1/2 rounded border
+      border-border
+    `}
 				style={{ backgroundColor: displayColor }}
 				aria-hidden="true"
 			/>
