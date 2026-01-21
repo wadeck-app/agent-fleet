@@ -191,6 +191,22 @@
 			"version": 4,
 			"createdAt": "2026-01-21T13:15:27.178Z",
 			"updatedAt": "2026-01-21T13:15:39.604Z"
+		},
+		{
+			"description": "sdfgsdfg",
+			"status": "cancelled",
+			"priority": "medium",
+			"assignedWorker": {
+				"workerId": "2"
+			},
+			"flowId": "simple-implement",
+			"flowInputs": {
+				"task": "what's the sum of 2 and 3, like I am five"
+			},
+			"id": "irsl8sved",
+			"version": 4,
+			"createdAt": "2026-01-21T20:20:16.387Z",
+			"updatedAt": "2026-01-21T20:20:27.977Z"
 		}
 	]
 }

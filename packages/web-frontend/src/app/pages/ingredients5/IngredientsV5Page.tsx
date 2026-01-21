@@ -1,17 +1,22 @@
+import { useState } from 'react';
+
 import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
 import { ColumnVisibility } from '@framework/components/columns/ColumnVisibility';
 import { EmptyState } from '@framework/components/feedback/EmptyState';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
+import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
 import { Button } from '@framework/components/primitives/Button';
-import { Card } from '@framework/components/primitives/Card';
+import { SearchInput } from '@framework/components/search/SearchInput';
+import { useDebounce } from '@framework/hooks2/useDebounce';
 import { useCrudPage } from '@framework/hooks/useCrudPage';
 import { toColumnVisibilityDefs } from '@framework/utils/table/ColumnConfig';
-import { Beef, Droplet, Flame, Plus, Trash2, Utensils, Wheat } from 'lucide-react';
+import { Plus, Trash2, Utensils } from 'lucide-react';
 
 import { BulkDeleteWorkflow, IngredientDialog } from '@app/components/domain';
 
 import { INGREDIENT_TABLE_COLUMNS, IngredientTable } from '../ingredients/IngredientTable';
+import { useIngredientSearch } from './useIngredientSearch';
 import { useIngredientsV5 } from './useIngredientsV5';
 
 /**
@@ -58,99 +63,66 @@ export function IngredientsV5Page() {
 		columns: INGREDIENT_TABLE_COLUMNS,
 		useDataHook: useIngredientsV5,
 		defaultPageSize: 10,
-		enableSearch: false,
+		enableSearch: true,
+		useSearchHook: useIngredientSearch,
 	});
 
 	// Add comment above the target line, not at the end
-	// Access ingredient-specific features (macros calculation)
-	type IngredientsOperations = typeof crud.operations & {
-		macroTotals?: { totalCalories: number; totalProtein: number; totalCarbs: number; totalFat: number };
-	};
-	const macroTotals = (crud.operations as IngredientsOperations).macroTotals || {
-		totalCalories: 0,
-		totalProtein: 0,
-		totalCarbs: 0,
-		totalFat: 0,
+	// Debounce search for Active Features panel display
+	const debouncedSearchQuery = useDebounce(crud.search?.searchQuery || '', 300);
+
+	// Add comment above the target line, not at the end
+	// Delete confirmation dialog state
+	const [deleteConfirmation, setDeleteConfirmation] = useState<{
+		open: boolean;
+		ingredientId: string | null;
+	}>({
+		open: false,
+		ingredientId: null,
+	});
+
+	// Add comment above the target line, not at the end
+	// Override handleDelete to show confirmation dialog
+	const handleDelete = (id: string) => {
+		setDeleteConfirmation({
+			open: true,
+			ingredientId: id,
+		});
 	};
 
 	// Add comment above the target line, not at the end
-	// Loading state - show skeleton while initial data loads
-	if (crud.loading && !crud.items.length) {
-		return (
-			<Page>
-				<PageHeader
-					title="Ingredients v5 - Enhanced UX & DX"
-					badge={crud.totalCount}
-					action={
-						<>
-							<ColumnVisibility
-								columns={toColumnVisibilityDefs(INGREDIENT_TABLE_COLUMNS)}
-								visibleColumns={crud.columns.visibleColumns}
-								defaultVisible={new Set(crud.columns.defaultVisible)}
-								onToggle={crud.columns.columnVisibility.toggleColumn}
-								onReset={() => {
-									crud.columns.columnVisibility.resetColumns();
-									crud.columns.columnOrderState.resetOrder();
-								}}
-								onShowAll={crud.columns.columnVisibility.showAll}
-								onHideAll={crud.columns.columnVisibility.hideAll}
-								isColumnModified={crud.columns.columnVisibility.isColumnModified}
-								onResetColumn={crud.columns.columnVisibility.resetColumn}
-								columnOrder={crud.columns.columnOrder}
-								defaultOrder={crud.columns.columnIds}
-								onReorderColumns={crud.columns.columnOrderState.reorderColumns}
-								isColumnModifiedOrder={crud.columns.columnOrderState.isColumnModified}
-								onResetColumnOrder={crud.columns.columnOrderState.resetColumn}
-							/>
-							<Button onClick={crud.handlers.handleCreate}>
-								<Plus />
-								Add Ingredient
-							</Button>
-						</>
-					}
-				/>
-				<IngredientTable
-					storageId={crud.config.storageId}
-					ingredients={[]}
-					onEdit={crud.handlers.handleEdit}
-					onDelete={crud.handlers.handleDelete}
-					pagination={
-						crud.pagination.paginationData
-							? {
-									currentPage: crud.pagination.paginationData.page,
-									totalPages: crud.pagination.paginationData.totalPages,
-									totalItems: crud.pagination.paginationData.total,
-									onPageChange: crud.pagination.setPage,
-									pageSize: crud.pagination.pageSize,
-									onPageSizeChange: crud.pagination.setPageSize,
-									pageSizeOptions: [5, 10, 20, 50],
-								}
-							: undefined
-					}
-					sorting={{
-						sortConfigs: crud.sorting.sortConfigs,
-						onSortChange: crud.sorting.handleSort,
-					}}
-					visibleColumns={crud.columns.visibleColumns}
-					columnOrder={crud.columns.columnOrder}
-					initialLoading={true}
-					selectable={true}
-					selectedIds={crud.selection.selectedIds}
-					onSelectionChange={crud.selection.setSelectedIds}
-					deletingIds={crud.selection.deletingIds}
-				/>
-			</Page>
-		);
-	}
+	// Confirm delete action
+	const handleDeleteConfirm = async () => {
+		if (deleteConfirmation.ingredientId) {
+			await crud.handlers.handleDelete(deleteConfirmation.ingredientId);
+			setDeleteConfirmation({ open: false, ingredientId: null });
+		}
+	};
+
+	// Add comment above the target line, not at the end
+	// Cache ID for demo (simulate cache control)
+	const [cacheId, _setCacheId] = useState(1);
 
 	return (
 		<>
 			<Page>
 				<PageHeader
-					title="Ingredients v5 - Enhanced UX & DX"
+					title="Ingredients v5"
 					badge={crud.totalCount}
+					onRefresh={() => crud.operations.loadItems(crud.currentParams)}
+					isRefreshing={crud.isRefreshing}
 					action={
 						<>
+							<SearchInput
+								value={crud.search?.searchQuery || ''}
+								onChange={crud.search?.setSearchQuery || (() => {})}
+								onClear={crud.search?.clearSearch || (() => {})}
+								placeholder="Search ingredients..."
+								loading={crud.loading && !!crud.search?.searchQuery}
+								aria-label="Search ingredients"
+								id="ingredients-search"
+								className="w-full sm:w-64"
+							/>
 							<ColumnVisibility
 								columns={toColumnVisibilityDefs(INGREDIENT_TABLE_COLUMNS)}
 								visibleColumns={crud.columns.visibleColumns}
@@ -178,58 +150,35 @@ export function IngredientsV5Page() {
 					}
 				/>
 
-				{/* Macro Statistics Cards - NEW UX Feature! */}
-				{crud.items.length > 0 && (
-					<div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-						<Card className="p-4">
-							<div className="flex items-center gap-3">
-								<div className="rounded-lg bg-muted p-2">
-									<Flame className="size-5 text-destructive" />
-								</div>
-								<div>
-									<p className="text-sm text-muted-foreground">Total Calories</p>
-									<p className="text-2xl font-bold">{macroTotals.totalCalories}</p>
-								</div>
-							</div>
-						</Card>
-
-						<Card className="p-4">
-							<div className="flex items-center gap-3">
-								<div className="rounded-lg bg-muted p-2">
-									<Beef className="size-5 text-primary" />
-								</div>
-								<div>
-									<p className="text-sm text-muted-foreground">Total Protein</p>
-									<p className="text-2xl font-bold">{macroTotals.totalProtein}g</p>
-								</div>
-							</div>
-						</Card>
-
-						<Card className="p-4">
-							<div className="flex items-center gap-3">
-								<div className="rounded-lg bg-muted p-2">
-									<Wheat className="size-5 text-accent-foreground" />
-								</div>
-								<div>
-									<p className="text-sm text-muted-foreground">Total Carbs</p>
-									<p className="text-2xl font-bold">{macroTotals.totalCarbs}g</p>
-								</div>
-							</div>
-						</Card>
-
-						<Card className="p-4">
-							<div className="flex items-center gap-3">
-								<div className="rounded-lg bg-muted p-2">
-									<Droplet className="size-5 text-secondary-foreground" />
-								</div>
-								<div>
-									<p className="text-sm text-muted-foreground">Total Fat</p>
-									<p className="text-2xl font-bold">{macroTotals.totalFat}g</p>
-								</div>
-							</div>
-						</Card>
+				{/* Active Features Panel (for demo purposes - same as v2) */}
+				<div className="mb-4 rounded-lg border border-border bg-muted/50 p-4 text-sm">
+					<strong>Active Features (UI / Debounced):</strong>
+					<div
+						className={`
+       mt-2 grid grid-cols-2 gap-2 text-xs
+       sm:grid-cols-4
+     `}
+					>
+						<div>
+							<span className="text-muted-foreground">Search:</span>{' '}
+							<span className="font-mono">
+								{crud.search?.searchQuery
+									? `${crud.search.searchQuery} / ${debouncedSearchQuery}`
+									: 'none'}
+							</span>
+						</div>
+						<div>
+							<span className="text-muted-foreground">Sort:</span>{' '}
+							<span className="font-mono">
+								{crud.sorting.sortConfigs.map(c => `${c.key}:${c.direction}`).join(', ') || 'none'}
+							</span>
+						</div>
+						<div>
+							<span className="text-muted-foreground">Cache ID:</span>{' '}
+							<span className="font-mono">{cacheId}</span>
+						</div>
 					</div>
-				)}
+				</div>
 
 				{/* Empty State */}
 				{crud.items.length === 0 ? (
@@ -264,7 +213,7 @@ export function IngredientsV5Page() {
 							storageId={crud.config.storageId}
 							ingredients={crud.items}
 							onEdit={crud.handlers.handleEdit}
-							onDelete={crud.handlers.handleDelete}
+							onDelete={handleDelete}
 							pagination={
 								crud.pagination.paginationData
 									? {
@@ -329,6 +278,20 @@ export function IngredientsV5Page() {
 				onSubmit={crud.handlers.handleSubmit}
 				onRefresh={crud.handlers.handleRefresh}
 				isRefreshing={crud.dialog.isDialogRefreshing}
+			/>
+
+			{/* Delete Confirmation Dialog */}
+			<AlertDialogWrapper
+				open={deleteConfirmation.open}
+				onOpenChange={open => {
+					setDeleteConfirmation({ open, ingredientId: open ? deleteConfirmation.ingredientId : null });
+				}}
+				title="Delete Ingredient"
+				description="Are you sure you want to delete this ingredient? This action cannot be undone."
+				confirmLabel="Delete"
+				cancelLabel="Cancel"
+				variant="danger"
+				onConfirm={handleDeleteConfirm}
 			/>
 		</>
 	);
