@@ -120,6 +120,8 @@ describe('Intervention Flow Integration', () => {
 			emitWorkerTaskReleased: vi.fn(),
 			emitTaskUpdated: vi.fn(),
 			emit: vi.fn(),
+			on: vi.fn(),
+			off: vi.fn(),
 		} as any;
 
 		vi.mocked(logger.info).mockImplementation(() => {});

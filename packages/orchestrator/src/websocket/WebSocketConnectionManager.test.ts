@@ -66,6 +66,8 @@ describe('WebSocketConnectionManager', () => {
 			emitWorkerTaskAssigned: vi.fn(),
 			emitWorkerTaskReleased: vi.fn(),
 			emitTaskUpdated: vi.fn(),
+			on: vi.fn(),
+			off: vi.fn(),
 		} as any;
 
 		vi.mocked(logger.info).mockImplementation(() => {});
