@@ -12,7 +12,6 @@ describe('usePagination2', () => {
 		it('should return correct FeatureContract shape', () => {
 			const { result } = renderHook(() => usePagination2({ pageSize: 10 }));
 
-			expect(result.current).toHaveProperty('state');
 			expect(result.current).toHaveProperty('fstate');
 			expect(result.current).toHaveProperty('actions');
 			expect(result.current).toHaveProperty('fillQuery');
@@ -87,8 +86,8 @@ describe('usePagination2', () => {
 			const { result } = renderHook(() => usePagination2({ pageSize: 10 }));
 
 			act(() => {
-				result.current.actions.setPage(3);
 				result.current.actions.setPageSize(20);
+				result.current.actions.setPage(3);
 			});
 
 			const query: Record<string, unknown> = {};

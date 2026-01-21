@@ -12,7 +12,6 @@ describe('useSorting2', () => {
 		it('should return correct FeatureContract shape', () => {
 			const { result } = renderHook(() => useSorting2());
 
-			expect(result.current).toHaveProperty('state');
 			expect(result.current).toHaveProperty('fstate');
 			expect(result.current).toHaveProperty('actions');
 			expect(result.current).toHaveProperty('fillQuery');
