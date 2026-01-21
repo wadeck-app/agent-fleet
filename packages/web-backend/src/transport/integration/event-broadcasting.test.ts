@@ -74,9 +74,9 @@ describe('Event Broadcasting Integration', () => {
 				},
 			} as IncomingMessage;
 
-			await sessionManager.authenticateConnection('client-1', req1);
-			await sessionManager.authenticateConnection('client-2', req2);
-			await sessionManager.authenticateConnection('client-3', req3);
+			await sessionManager.authenticateConnection('client-1', req1, 'mock');
+			await sessionManager.authenticateConnection('client-2', req2, 'mock');
+			await sessionManager.authenticateConnection('client-3', req3, 'mock');
 
 			// Simulate connections
 			mockTransport.simulateConnect('client-1');
@@ -113,7 +113,7 @@ describe('Event Broadcasting Integration', () => {
 				},
 			} as IncomingMessage;
 
-			await sessionManager.authenticateConnection('client-1', req);
+			await sessionManager.authenticateConnection('client-1', req, 'mock');
 			mockTransport.simulateConnect('client-1');
 
 			// Broadcast update event
@@ -153,8 +153,8 @@ describe('Event Broadcasting Integration', () => {
 				},
 			} as IncomingMessage;
 
-			await sessionManager.authenticateConnection('client-1', req1);
-			await sessionManager.authenticateConnection('client-2', req2);
+			await sessionManager.authenticateConnection('client-1', req1, 'mock');
+			await sessionManager.authenticateConnection('client-2', req2, 'mock');
 
 			mockTransport.simulateConnect('client-1');
 			mockTransport.simulateConnect('client-2');
@@ -197,7 +197,7 @@ describe('Event Broadcasting Integration', () => {
 				},
 			} as IncomingMessage;
 
-			await sessionManager.authenticateConnection('client-1', req);
+			await sessionManager.authenticateConnection('client-1', req, 'mock');
 
 			// Subscribe to multiple events
 			sessionManager.updateSubscriptions('client-1', 'subscribe', [
@@ -228,7 +228,7 @@ describe('Event Broadcasting Integration', () => {
 				},
 			} as IncomingMessage;
 
-			await sessionManager.authenticateConnection('client-1', req);
+			await sessionManager.authenticateConnection('client-1', req, 'mock');
 
 			// Without explicit subscriptions, all events are allowed
 			expect(sessionManager.isSubscribed('client-1', 'b2f:task:created')).toBe(true);
@@ -255,8 +255,8 @@ describe('Event Broadcasting Integration', () => {
 				},
 			} as IncomingMessage;
 
-			await sessionManager.authenticateConnection('client-1', req1);
-			await sessionManager.authenticateConnection('client-2', req2);
+			await sessionManager.authenticateConnection('client-1', req1, 'mock');
+			await sessionManager.authenticateConnection('client-2', req2, 'mock');
 
 			mockTransport.simulateConnect('client-1');
 			mockTransport.simulateConnect('client-2');
@@ -304,9 +304,9 @@ describe('Event Broadcasting Integration', () => {
 				},
 			} as IncomingMessage;
 
-			await sessionManager.authenticateConnection('client-phone', req1);
-			await sessionManager.authenticateConnection('client-laptop', req2);
-			await sessionManager.authenticateConnection('client-tablet', req3);
+			await sessionManager.authenticateConnection('client-phone', req1, 'mock');
+			await sessionManager.authenticateConnection('client-laptop', req2, 'mock');
+			await sessionManager.authenticateConnection('client-tablet', req3, 'mock');
 
 			mockTransport.simulateConnect('client-phone');
 			mockTransport.simulateConnect('client-laptop');
@@ -347,7 +347,7 @@ describe('Event Broadcasting Integration', () => {
 				},
 			} as IncomingMessage;
 
-			await sessionManager.authenticateConnection('client-1', req);
+			await sessionManager.authenticateConnection('client-1', req, 'mock');
 			mockTransport.simulateConnect('client-1');
 
 			// Broadcast multiple events concurrently
@@ -405,7 +405,7 @@ describe('Event Broadcasting Integration', () => {
 				},
 			} as IncomingMessage;
 
-			await sessionManager.authenticateConnection('client-1', req);
+			await sessionManager.authenticateConnection('client-1', req, 'mock');
 			mockTransport.simulateConnect('client-1');
 
 			const task = {
@@ -439,7 +439,7 @@ describe('Event Broadcasting Integration', () => {
 				},
 			} as IncomingMessage;
 
-			await sessionManager.authenticateConnection('client-1', req);
+			await sessionManager.authenticateConnection('client-1', req, 'mock');
 			mockTransport.simulateConnect('client-1');
 
 			const worker = {
@@ -465,7 +465,7 @@ describe('Event Broadcasting Integration', () => {
 				},
 			} as IncomingMessage;
 
-			await sessionManager.authenticateConnection('client-1', req);
+			await sessionManager.authenticateConnection('client-1', req, 'mock');
 			mockTransport.simulateConnect('client-1');
 
 			const workspace = {
@@ -498,8 +498,8 @@ describe('Event Broadcasting Integration', () => {
 				},
 			} as IncomingMessage;
 
-			await sessionManager.authenticateConnection('client-1', req);
-			await sessionManager.authenticateConnection('client-2', req);
+			await sessionManager.authenticateConnection('client-1', req, 'mock');
+			await sessionManager.authenticateConnection('client-2', req, 'mock');
 
 			mockTransport.simulateConnect('client-1');
 			mockTransport.simulateConnect('client-2');
@@ -516,8 +516,8 @@ describe('Event Broadcasting Integration', () => {
 				},
 			} as IncomingMessage;
 
-			await sessionManager.authenticateConnection('client-1', req);
-			await sessionManager.authenticateConnection('client-2', req);
+			await sessionManager.authenticateConnection('client-1', req, 'mock');
+			await sessionManager.authenticateConnection('client-2', req, 'mock');
 
 			mockTransport.simulateConnect('client-1');
 			mockTransport.simulateConnect('client-2');
