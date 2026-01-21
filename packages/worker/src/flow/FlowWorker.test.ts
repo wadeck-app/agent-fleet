@@ -113,6 +113,7 @@ describe('FlowWorker', () => {
 			loadProjectFlows: vi.fn().mockResolvedValue(undefined),
 			getFlowIds: vi.fn().mockReturnValue(['test-flow']),
 			getFlow: vi.fn().mockReturnValue(mockFlow),
+			getFlowValidationResult: vi.fn().mockReturnValue({ valid: true, issues: [] }),
 			startWatching: vi.fn(),
 			stopWatching: vi.fn(),
 		};
