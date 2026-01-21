@@ -43,7 +43,9 @@ describe('EventBroadcaster', () => {
 
 	describe('broadcast', () => {
 		it('should broadcast event to all clients', () => {
-			// Arrange
+			// Arrange - simulate a connected client
+			mockServer.simulateConnect('client-1');
+
 			const task = {
 				id: 'task-1',
 				description: 'Test task',
@@ -65,7 +67,9 @@ describe('EventBroadcaster', () => {
 		});
 
 		it('should broadcast multiple events', () => {
-			// Arrange
+			// Arrange - simulate a connected client
+			mockServer.simulateConnect('client-1');
+
 			const task1 = {
 				id: 'task-1',
 				description: 'Task 1',
