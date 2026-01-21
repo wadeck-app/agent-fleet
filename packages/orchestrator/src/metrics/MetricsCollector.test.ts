@@ -3,7 +3,6 @@
  */
 import { createMockTask, createMockWorker } from 'orchestrator/test-utils/MockOrchestrator';
 import { createMockStateManager, createMockTaskManager } from 'orchestrator/test-utils/mocks';
-import { logger } from 'shared-common/logger';
 import type { Task, WorkerInfo } from 'shared-orch-worker/domain-types';
 import { TaskStatus } from 'shared-orch-worker/domain-types';
 import { setupTimers } from 'test-utils/helpers';
@@ -15,7 +14,20 @@ import { MetricsCollector } from './MetricsCollector';
 vi.mock('../core/TaskManager');
 vi.mock('../websocket/WorkerWebSocketServer');
 vi.mock('shared-common/StateManager');
-vi.mock('shared-common/logger');
+vi.mock('shared-common/logger', () => ({
+	createLogger: () => ({
+		info: vi.fn(),
+		warn: vi.fn(),
+		error: vi.fn(),
+		debug: vi.fn(),
+	}),
+	logger: {
+		info: vi.fn(),
+		warn: vi.fn(),
+		error: vi.fn(),
+		debug: vi.fn(),
+	},
+}));
 
 describe('MetricsCollector', () => {
 	let collector: MetricsCollector;

@@ -75,7 +75,7 @@ vi.mock('ws', () => {
 // Mock dependencies
 vi.mock('./TaskManager');
 vi.mock('shared-common/StateManager');
-vi.mock('shared-common/logger');
+vi.mock('shared-common/logger', () => ({	createLogger: () => ({		info: vi.fn(),		warn: vi.fn(),		error: vi.fn(),		debug: vi.fn(),	}),	logger: {		info: vi.fn(),		warn: vi.fn(),		error: vi.fn(),		debug: vi.fn(),	},}));
 
 describe('Intervention Flow Integration', () => {
 	let server: WorkerWebSocketServer;

@@ -197,7 +197,6 @@ describe('Orchestrator', () => {
 			orchestrator = new Orchestrator();
 			await expect(orchestrator.start()).rejects.toThrow('Port already in use');
 		});
-
 	});
 
 	describe('Orchestrator Class - stop', () => {
@@ -298,7 +297,6 @@ describe('Orchestrator', () => {
 			// Should not throw when UI is undefined
 			await expect(orchestrator.shutdown()).resolves.not.toThrow();
 		});
-
 	});
 
 	describe('Service Integration', () => {
@@ -424,6 +422,5 @@ describe('Orchestrator', () => {
 			// Verify TaskManager was created
 			expect(TaskManager).toHaveBeenCalled();
 		});
-
 	});
 });

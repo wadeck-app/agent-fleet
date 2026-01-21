@@ -15,7 +15,7 @@ import { TaskManager } from './TaskManager';
 // Mock dependencies
 vi.mock('shared-common/Storage');
 vi.mock('shared-common/StateManager');
-vi.mock('shared-common/logger');
+vi.mock('shared-common/logger', () => ({	createLogger: () => ({		info: vi.fn(),		warn: vi.fn(),		error: vi.fn(),		debug: vi.fn(),	}),	logger: {		info: vi.fn(),		warn: vi.fn(),		error: vi.fn(),		debug: vi.fn(),	},}));
 vi.mock('uuid', () => ({
 	v4: vi.fn(() => 'test-uuid-1234'),
 }));
