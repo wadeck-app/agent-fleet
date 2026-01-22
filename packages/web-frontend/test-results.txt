@@ -1,0 +1,971 @@
+
+> web-frontend@1.0.0 test
+> vitest run iso-functionality --run
+
+
+[1m[46m RUN [49m[22m [36mv4.0.16 [39m[90mC:/Workspace_Tooling/agent-fleet/packages/web-frontend[39m
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx
+[22m[39mAPI Base URL: Unit test mode detected, no api url
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx
+[22m[39m[dashboard.api] DASHBOARD_API_ROUTES loaded: {
+  [32m'/api/dashboard/'[39m: { GET: { response: [36m[ZodObject][39m } },
+  __baseUrl: [32m'/api/dashboard'[39m
+}
+[dashboard.api] Routes keys: [ [32m'/api/dashboard/'[39m, [32m'__baseUrl'[39m ]
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mHeader Section[2m > [22m[2mshould display correct title
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m4451.6298[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mHeader Section[2m > [22m[2mshould show refresh button
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m4506.7018[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mHeader Section[2m > [22m[2mshould refresh data when refresh button clicked
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m4623.1154[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mHeader Section[2m > [22m[2mshould refresh data when refresh button clicked
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m4714.0518[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mHeader Section[2m > [22m[2mshould refresh data when refresh button clicked
+[22m[39m[useCacheControl2] refresh() called, incrementing cacheId
+[useCacheControl2] cacheId changed: [33m0[39m -> [33m1[39m
+[useCacheControl2] fillQuery() called, adding cacheId: [33m1[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m1[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mHeader Section[2m > [22m[2mshould show isRefreshing indicator during refresh
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m4796.8425[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mHeader Section[2m > [22m[2mshould show isRefreshing indicator during refresh
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m4872.2772[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mHeader Section[2m > [22m[2mshould show isRefreshing indicator during refresh
+[22m[39m[useCacheControl2] refresh() called, incrementing cacheId
+[useCacheControl2] cacheId changed: [33m0[39m -> [33m1[39m
+[useCacheControl2] fillQuery() called, adding cacheId: [33m1[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m1[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mHeader Section[2m > [22m[2mshould show column visibility dropdown
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m4953.2802[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mHeader Section[2m > [22m[2mshould show add ingredient button
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m5514.8587[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mSearch Section[2m > [22m[2mshould show search input
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m5578.5924[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mSearch Section[2m > [22m[2mshould debounce search queries (300ms)
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m5602.8851[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mSearch Section[2m > [22m[2mshould debounce search queries (300ms)
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m0[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mSearch Section[2m > [22m[2mshould show clear button when search has value
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m10641.3505[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mSearch Section[2m > [22m[2mshould show clear button when search has value
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m0[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mSearch Section[2m > [22m[2mshould clear search when clear button clicked
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m15704.952[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mSearch Section[2m > [22m[2mshould clear search when clear button clicked
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m0[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mSearch Section[2m > [22m[2mshould clear search when clear button clicked
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name'[39m,
+  sortOrder: [32m'asc'[39m,
+  search: [32m'c'[39m,
+  cacheId: [33m0[39m
+}
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mSearch Section[2m > [22m[2mshould reset to page 1 when search changes
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m20789.2397[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mSearch Section[2m > [22m[2mshould update Active Features panel with UI and debounced search
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m21452.4494[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mSearch Section[2m > [22m[2mshould update Active Features panel with UI and debounced search
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m0[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mSearch Section[2m > [22m[2mshould update Active Features panel with UI and debounced search
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name'[39m,
+  sortOrder: [32m'asc'[39m,
+  search: [32m'h'[39m,
+  cacheId: [33m0[39m
+}
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mSearch Section[2m > [22m[2mshould update Active Features panel with UI and debounced search
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name'[39m,
+  sortOrder: [32m'asc'[39m,
+  search: [32m'hc'[39m,
+  cacheId: [33m0[39m
+}
+[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name'[39m,
+  sortOrder: [32m'asc'[39m,
+  search: [32m'hci'[39m,
+  cacheId: [33m0[39m
+}
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mSearch Section[2m > [22m[2mshould show loading state while searching
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m26574.4104[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mSearch Section[2m > [22m[2mshould show loading state while searching
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m0[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mSearch Section[2m > [22m[2mshould show loading state while searching
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name'[39m,
+  sortOrder: [32m'asc'[39m,
+  search: [32m'h'[39m,
+  cacheId: [33m0[39m
+}
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mSearch Section[2m > [22m[2mshould show loading state while searching
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name'[39m,
+  sortOrder: [32m'asc'[39m,
+  search: [32m'hc'[39m,
+  cacheId: [33m0[39m
+}
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mSearch Section[2m > [22m[2mshould show loading state while searching
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name'[39m,
+  sortOrder: [32m'asc'[39m,
+  search: [32m'hcc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m31629.6554[39m }
+[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name'[39m,
+  sortOrder: [32m'asc'[39m,
+  search: [32m'hcci'[39m,
+  cacheId: [33m0[39m
+}
+[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name'[39m,
+  sortOrder: [32m'asc'[39m,
+  search: [32m'hccik'[39m,
+  cacheId: [33m0[39m
+}
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mActive Features Panel[2m > [22m[2mshould show search (UI / Debounced)
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m31715.5342[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mActive Features Panel[2m > [22m[2mshould show search (UI / Debounced)
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m0[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mActive Features Panel[2m > [22m[2mshould show search (UI / Debounced)
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name'[39m,
+  sortOrder: [32m'asc'[39m,
+  search: [32m'h'[39m,
+  cacheId: [33m0[39m
+}
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mActive Features Panel[2m > [22m[2mshould show search (UI / Debounced)
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name'[39m,
+  sortOrder: [32m'asc'[39m,
+  search: [32m'hc'[39m,
+  cacheId: [33m0[39m
+}
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mActive Features Panel[2m > [22m[2mshould show search (UI / Debounced)
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name'[39m,
+  sortOrder: [32m'asc'[39m,
+  search: [32m'hce'[39m,
+  cacheId: [33m0[39m
+}
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mActive Features Panel[2m > [22m[2mshould show search (UI / Debounced)
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name'[39m,
+  sortOrder: [32m'asc'[39m,
+  search: [32m'hcec'[39m,
+  cacheId: [33m0[39m
+}
+[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name'[39m,
+  sortOrder: [32m'asc'[39m,
+  search: [32m'hceci'[39m,
+  cacheId: [33m0[39m
+}
+[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name'[39m,
+  sortOrder: [32m'asc'[39m,
+  search: [32m'hcecik'[39m,
+  cacheId: [33m0[39m
+}
+[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name'[39m,
+  sortOrder: [32m'asc'[39m,
+  search: [32m'hcecikn'[39m,
+  cacheId: [33m0[39m
+}
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mActive Features Panel[2m > [22m[2mshould show sort configs
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m36836.3446[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mActive Features Panel[2m > [22m[2mshould show sort configs
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m0[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mActive Features Panel[2m > [22m[2mshould show multi-column sort
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m41899.5749[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mActive Features Panel[2m > [22m[2mshould show multi-column sort
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m0[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mActive Features Panel[2m > [22m[2mshould show cache ID
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m46946.5075[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mActive Features Panel[2m > [22m[2mshould display all features in grid layout
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m46989.4818[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mBulk Actions[2m > [22m[2mshould show bulk action bar when rows selected
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m47024.8357[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mBulk Actions[2m > [22m[2mshould show correct count in bulk action bar
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m47094.2786[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mBulk Actions[2m > [22m[2mshould hide bulk action bar when selection cleared
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m47159.5176[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mBulk Actions[2m > [22m[2mshould show bulk delete button
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m47222.3418[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mBulk Actions[2m > [22m[2mshould open bulk delete workflow on button click
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m47282.6996[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mBulk Actions[2m > [22m[2mshould perform bulk delete
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m47343.7067[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould display ingredients
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m47411.0138[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould display ingredients
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m47453.5975[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould sort by column on header click
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m47508.8442[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould sort by column on header click
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m47586.0113[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould sort by column on header click
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name'[39m,
+  sortOrder: [32m'desc'[39m,
+  cacheId: [33m0[39m
+}
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould toggle sort direction on second click
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name'[39m,
+  sortOrder: [32m'desc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m47764.3209[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould toggle sort direction on second click
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m47823.6151[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould toggle sort direction on second click
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, cacheId: [33m0[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould toggle sort direction on second click
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould support multi-column sort with shift key
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, sortBy: [32m'name'[39m, sortOrder: [32m'asc'[39m, cacheId: [33m0[39m }
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m48071.5422[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould support multi-column sort with shift key
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m48141.5222[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould support multi-column sort with shift key
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name'[39m,
+  sortOrder: [32m'desc'[39m,
+  cacheId: [33m0[39m
+}
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould support multi-column sort with shift key
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould paginate results
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m48525.2064[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould paginate results
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m48585.7154[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould navigate pages
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m48605.0062[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould change page size
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m49253.0613[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould select individual rows
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m49915.3533[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould select all rows
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m49979.3047[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould select all rows
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m50026.1108[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould show edit button for each row
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m50195.5575[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould show edit button for each row
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m50232.4528[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould show delete button for each row
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m50262.9967[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould show delete button for each row
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m50299.2367[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould show refreshing state (blur effect)
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m50334.005[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould show refreshing state (blur effect)
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m50410.7112[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mTable[2m > [22m[2mshould show refreshing state (blur effect)
+[22m[39m[useCacheControl2] refresh() called, incrementing cacheId
+[useCacheControl2] cacheId changed: [33m0[39m -> [33m1[39m
+[useCacheControl2] fillQuery() called, adding cacheId: [33m1[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m1[39m
+}
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mDialogs[2m > [22m[2mCreate Dialog[2m > [22m[2mshould open create dialog when add button clicked
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m50485.1049[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mDialogs[2m > [22m[2mCreate Dialog[2m > [22m[2mshould open create dialog when add button clicked
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m50554.7469[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mDialogs[2m > [22m[2mCreate Dialog[2m > [22m[2mshould show form fields
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m50604.6355[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mDialogs[2m > [22m[2mCreate Dialog[2m > [22m[2mshould show form fields
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m50680.6779[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mDialogs[2m > [22m[2mCreate Dialog[2m > [22m[2mshould create ingredient on submit
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m50718.417[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mDialogs[2m > [22m[2mCreate Dialog[2m > [22m[2mshould create ingredient on submit
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m50791.3621[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mDialogs[2m > [22m[2mCreate Dialog[2m > [22m[2mshould close dialog after successful create
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m50830.2059[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mDialogs[2m > [22m[2mCreate Dialog[2m > [22m[2mshould close dialog after successful create
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m50886.9407[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mDialogs[2m > [22m[2mCreate Dialog[2m > [22m[2mshould show validation errors
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m50921.9326[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mDialogs[2m > [22m[2mCreate Dialog[2m > [22m[2mshould show validation errors
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m50976.3058[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mDialogs[2m > [22m[2mEdit Dialog[2m > [22m[2mshould open edit dialog when edit button clicked
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m50999.8346[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mDialogs[2m > [22m[2mEdit Dialog[2m > [22m[2mshould prefill form with existing data
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m51058.6635[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mDialogs[2m > [22m[2mEdit Dialog[2m > [22m[2mshould update ingredient on submit
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m51125.0096[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mDialogs[2m > [22m[2mEdit Dialog[2m > [22m[2mshould close dialog after successful update
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m51180.3619[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mDialogs[2m > [22m[2mDelete Confirmation Dialog[2m > [22m[2mshould open delete confirmation when delete button clicked
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m51229.1421[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mDialogs[2m > [22m[2mDelete Confirmation Dialog[2m > [22m[2mshould delete ingredient on confirm
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m51282.2722[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mDialogs[2m > [22m[2mDelete Confirmation Dialog[2m > [22m[2mshould not delete on cancel
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m51339.6741[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mDialogs[2m > [22m[2mDelete Confirmation Dialog[2m > [22m[2mshould close dialog after delete
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m51401.2065[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mState Management[2m > [22m[2mshould persist pagination state in localStorage
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m51459.2704[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mState Management[2m > [22m[2mshould persist sort state in localStorage
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'name,calories'[39m,
+  sortOrder: [32m'desc,asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m52085.1771[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mState Management[2m > [22m[2mshould persist sort state in localStorage
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m52193.9931[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mState Management[2m > [22m[2mshould persist sort state in localStorage
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: { page: [33m1[39m, pageSize: [33m10[39m, cacheId: [33m0[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mState Management[2m > [22m[2mshould persist sort state in localStorage
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'calories'[39m,
+  sortOrder: [32m'asc'[39m,
+  cacheId: [33m0[39m
+}
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mState Management[2m > [22m[2mshould persist page size in localStorage
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'calories'[39m,
+  sortOrder: [32m'asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m52544.5094[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mState Management[2m > [22m[2mshould clear selection on unmount
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'calories'[39m,
+  sortOrder: [32m'asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m53151.3194[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mEdge Cases[2m > [22m[2mshould handle empty state
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'calories'[39m,
+  sortOrder: [32m'asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m53223.3911[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mEdge Cases[2m > [22m[2mshould handle empty state
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'calories'[39m,
+  sortOrder: [32m'asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m53245.1009[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mEdge Cases[2m > [22m[2mshould handle empty state
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m53268.4502[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mEdge Cases[2m > [22m[2mshould handle API errors gracefully
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'calories'[39m,
+  sortOrder: [32m'asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m53289.1423[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mEdge Cases[2m > [22m[2mshould handle API errors gracefully
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'calories'[39m,
+  sortOrder: [32m'asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m53314.7758[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mEdge Cases[2m > [22m[2mshould handle create errors
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'calories'[39m,
+  sortOrder: [32m'asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m54338.8688[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mEdge Cases[2m > [22m[2mshould handle create errors
+[22m[39m[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m10[39m, timestamp: [33m54406.7095[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mEdge Cases[2m > [22m[2mshould handle delete errors
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'calories'[39m,
+  sortOrder: [32m'asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m54453.6235[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mEdge Cases[2m > [22m[2mshould handle loading state
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'calories'[39m,
+  sortOrder: [32m'asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m54513.1146[39m }
+
+[90mstdout[2m | src/app/pages/ingredients/__tests__/iso-functionality.test.tsx[2m > [22m[2mIngredients 'v2' - Iso-functionality[2m > [22m[2mEdge Cases[2m > [22m[2mshould handle loading state
+[22m[39m[useCacheControl2] fillQuery() called, adding cacheId: [33m0[39m
+[buildQuery] Final query: {
+  page: [33m1[39m,
+  pageSize: [33m10[39m,
+  sortBy: [32m'calories'[39m,
+  sortOrder: [32m'asc'[39m,
+  cacheId: [33m0[39m
+}
+[DELETE] useEffect - ingredients changed { isMutating: [33mfalse[39m, ingredientsCount: [33m0[39m, timestamp: [33m54534.5564[39m }
+
+ [31m❯[39m src/app/pages/ingredients/__tests__/iso-functionality.test.tsx [2m([22m[2m116 tests[22m[2m | [22m[31m96 failed[39m[2m)[22m[33m 86144[2mms[22m[39m
+       [32m✓[39m should display correct title[32m 84[2mms[22m[39m
+       [32m✓[39m should show refresh button[32m 118[2mms[22m[39m
+       [32m✓[39m should refresh data when refresh button clicked[32m 174[2mms[22m[39m
+[31m       [31m×[31m should show isRefreshing indicator during refresh[39m[32m 158[2mms[22m[39m
+[31m       [31m×[31m should show column visibility dropdown[39m[33m 562[2mms[22m[39m
+       [32m✓[39m should show add ingredient button[32m 63[2mms[22m[39m
+       [32m✓[39m should show search input[32m 25[2mms[22m[39m
+[31m       [31m×[31m should debounce search queries (300ms)[39m[33m 5038[2mms[22m[39m
+[31m       [31m×[31m should show clear button when search has value[39m[33m 5055[2mms[22m[39m
+[31m       [31m×[31m should clear search when clear button clicked[39m[33m 5091[2mms[22m[39m
+[31m       [31m×[31m should reset to page 1 when search changes[39m[33m 665[2mms[22m[39m
+[31m       [31m×[31m should update Active Features panel with UI and debounced search[39m[33m 5115[2mms[22m[39m
+[31m       [31m×[31m should show loading state while searching[39m[33m 5141[2mms[22m[39m
+[31m       [31m×[31m should show search (UI / Debounced)[39m[33m 5127[2mms[22m[39m
+[31m       [31m×[31m should show sort configs[39m[33m 5060[2mms[22m[39m
+[31m       [31m×[31m should show multi-column sort[39m[33m 5050[2mms[22m[39m
+       [32m✓[39m should show cache ID[32m 43[2mms[22m[39m
+[31m       [31m×[31m should display all features in grid layout[39m[32m 35[2mms[22m[39m
+[31m       [31m×[31m should show bulk action bar when rows selected[39m[32m 70[2mms[22m[39m
+[31m       [31m×[31m should show correct count in bulk action bar[39m[32m 65[2mms[22m[39m
+[31m       [31m×[31m should hide bulk action bar when selection cleared[39m[32m 61[2mms[22m[39m
+[31m       [31m×[31m should show bulk delete button[39m[32m 62[2mms[22m[39m
+[31m       [31m×[31m should open bulk delete workflow on button click[39m[32m 61[2mms[22m[39m
+[31m       [31m×[31m should perform bulk delete[39m[32m 62[2mms[22m[39m
+       [32m✓[39m should display ingredients[32m 104[2mms[22m[39m
+[31m       [31m×[31m should sort by column on header click[39m[32m 261[2mms[22m[39m
+[31m       [31m×[31m should toggle sort direction on second click[39m[32m 299[2mms[22m[39m
+[31m       [31m×[31m should support multi-column sort with shift key[39m[33m 443[2mms[22m[39m
+       [32m✓[39m should paginate results[32m 94[2mms[22m[39m
+[31m       [31m×[31m should navigate pages[39m[33m 648[2mms[22m[39m
+[31m       [31m×[31m should change page size[39m[33m 655[2mms[22m[39m
+[31m       [31m×[31m should select individual rows[39m[32m 70[2mms[22m[39m
+       [32m✓[39m should select all rows[32m 215[2mms[22m[39m
+       [32m✓[39m should show edit button for each row[32m 66[2mms[22m[39m
+       [32m✓[39m should show delete button for each row[32m 74[2mms[22m[39m
+[31m       [31m×[31m should show refreshing state (blur effect)[39m[32m 151[2mms[22m[39m
+[31m         [31m×[31m should open create dialog when add button clicked[39m[32m 120[2mms[22m[39m
+[31m         [31m×[31m should show form fields[39m[32m 114[2mms[22m[39m
+[31m         [31m×[31m should create ingredient on submit[39m[32m 119[2mms[22m[39m
+[31m         [31m×[31m should close dialog after successful create[39m[32m 92[2mms[22m[39m
+[31m         [31m×[31m should show validation errors[39m[32m 78[2mms[22m[39m
+[31m         [31m×[31m should open edit dialog when edit button clicked[39m[32m 56[2mms[22m[39m
+[31m         [31m×[31m should prefill form with existing data[39m[32m 64[2mms[22m[39m
+[31m         [31m×[31m should update ingredient on submit[39m[32m 56[2mms[22m[39m
+[31m         [31m×[31m should close dialog after successful update[39m[32m 52[2mms[22m[39m
+[31m         [31m×[31m should open delete confirmation when delete button clicked[39m[32m 46[2mms[22m[39m
+[31m         [31m×[31m should delete ingredient on confirm[39m[32m 57[2mms[22m[39m
+[31m         [31m×[31m should not delete on cancel[39m[32m 60[2mms[22m[39m
+[31m         [31m×[31m should close dialog after delete[39m[32m 60[2mms[22m[39m
+[31m       [31m×[31m should persist pagination state in localStorage[39m[33m 622[2mms[22m[39m
+[31m       [31m×[31m should persist sort state in localStorage[39m[33m 463[2mms[22m[39m
+[31m       [31m×[31m should persist page size in localStorage[39m[33m 604[2mms[22m[39m
+[31m       [31m×[31m should clear selection on unmount[39m[32m 70[2mms[22m[39m
+       [32m✓[39m should handle empty state[32m 69[2mms[22m[39m
+[31m       [31m×[31m should handle API errors gracefully[39m[33m 1051[2mms[22m[39m
+[31m       [31m×[31m should handle create errors[39m[32m 115[2mms[22m[39m
+[31m       [31m×[31m should handle delete errors[39m[32m 56[2mms[22m[39m
+[31m       [31m×[31m should handle loading state[39m[32m 53[2mms[22m[39m
+       [32m✓[39m should display correct title[32m 9[2mms[22m[39m
+       [32m✓[39m should show refresh button[32m 22[2mms[22m[39m
+       [32m✓[39m should refresh data when refresh button clicked[32m 76[2mms[22m[39m
+[31m       [31m×[31m should show isRefreshing indicator during refresh[39m[32m 62[2mms[22m[39m
+[31m       [31m×[31m should show column visibility dropdown[39m[32m 72[2mms[22m[39m
+       [32m✓[39m should show add ingredient button[32m 20[2mms[22m[39m
+       [32m✓[39m should show search input[32m 6[2mms[22m[39m
+[31m       [31m×[31m should debounce search queries (300ms)[39m[33m 5020[2mms[22m[39m
+[31m       [31m×[31m should show clear button when search has value[39m[33m 5039[2mms[22m[39m
+[31m       [31m×[31m should clear search when clear button clicked[39m[33m 5034[2mms[22m[39m
+[31m       [31m×[31m should reset to page 1 when search changes[39m[32m 123[2mms[22m[39m
+[31m       [31m×[31m should update Active Features panel with UI and debounced search[39m[33m 5076[2mms[22m[39m
+[31m       [31m×[31m should show loading state while searching[39m[33m 5067[2mms[22m[39m
+[31m       [31m×[31m should show search (UI / Debounced)[39m[33m 5067[2mms[22m[39m
+[31m       [31m×[31m should show sort configs[39m[32m 86[2mms[22m[39m
+[31m       [31m×[31m should show multi-column sort[39m[32m 78[2mms[22m[39m
+       [32m✓[39m should show cache ID[32m 8[2mms[22m[39m
+[31m       [31m×[31m should display all features in grid layout[39m[32m 8[2mms[22m[39m
+[31m       [31m×[31m should show bulk action bar when rows selected[39m[32m 7[2mms[22m[39m
+[31m       [31m×[31m should show correct count in bulk action bar[39m[32m 6[2mms[22m[39m
+[31m       [31m×[31m should hide bulk action bar when selection cleared[39m[32m 6[2mms[22m[39m
+[31m       [31m×[31m should show bulk delete button[39m[32m 7[2mms[22m[39m
+[31m       [31m×[31m should open bulk delete workflow on button click[39m[32m 6[2mms[22m[39m
+[31m       [31m×[31m should perform bulk delete[39m[32m 6[2mms[22m[39m
+[31m       [31m×[31m should display ingredients[39m[33m 1006[2mms[22m[39m
+[31m       [31m×[31m should sort by column on header click[39m[32m 74[2mms[22m[39m
+[31m       [31m×[31m should toggle sort direction on second click[39m[32m 73[2mms[22m[39m
+[31m       [31m×[31m should support multi-column sort with shift key[39m[32m 78[2mms[22m[39m
+[31m       [31m×[31m should paginate results[39m[33m 1022[2mms[22m[39m
+[31m       [31m×[31m should navigate pages[39m[32m 73[2mms[22m[39m
+[31m       [31m×[31m should change page size[39m[32m 69[2mms[22m[39m
+[31m       [31m×[31m should select individual rows[39m[32m 6[2mms[22m[39m
+[31m       [31m×[31m should select all rows[39m[32m 6[2mms[22m[39m
+[31m       [31m×[31m should show edit button for each row[39m[33m 1019[2mms[22m[39m
+[31m       [31m×[31m should show delete button for each row[39m[33m 1013[2mms[22m[39m
+[31m       [31m×[31m should show refreshing state (blur effect)[39m[32m 62[2mms[22m[39m
+[31m         [31m×[31m should open create dialog when add button clicked[39m[32m 54[2mms[22m[39m
+[31m         [31m×[31m should show form fields[39m[32m 46[2mms[22m[39m
+[31m         [31m×[31m should create ingredient on submit[39m[32m 46[2mms[22m[39m
+[31m         [31m×[31m should close dialog after successful create[39m[32m 30[2mms[22m[39m
+[31m         [31m×[31m should show validation errors[39m[32m 46[2mms[22m[39m
+[31m         [31m×[31m should open edit dialog when edit button clicked[39m[32m 6[2mms[22m[39m
+[31m         [31m×[31m should prefill form with existing data[39m[32m 6[2mms[22m[39m
+[31m         [31m×[31m should update ingredient on submit[39m[32m 6[2mms[22m[39m
+[31m         [31m×[31m should close dialog after successful update[39m[32m 5[2mms[22m[39m
+[31m         [31m×[31m should open delete confirmation when delete button clicked[39m[32m 6[2mms[22m[39m
+[31m         [31m×[31m should delete ingredient on confirm[39m[32m 6[2mms[22m[39m
+[31m         [31m×[31m should not delete on cancel[39m[32m 6[2mms[22m[39m
+[31m         [31m×[31m should close dialog after delete[39m[32m 6[2mms[22m[39m
+[31m       [31m×[31m should persist pagination state in localStorage[39m[32m 71[2mms[22m[39m
+[31m       [31m×[31m should persist sort state in localStorage[39m[32m 71[2mms[22m[39m
+[31m       [31m×[31m should persist page size in localStorage[39m[32m 67[2mms[22m[39m
+[31m       [31m×[31m should clear selection on unmount[39m[32m 6[2mms[22m[39m
+       [32m✓[39m should handle empty state[32m 16[2mms[22m[39m
+       [32m✓[39m should handle API errors gracefully[32m 21[2mms[22m[39m
+[31m       [31m×[31m should handle create errors[39m[32m 44[2mms[22m[39m
+[31m       [31m×[31m should handle delete errors[39m[32m 6[2mms[22m[39m
+[31m       [31m×[31m should handle loading state[39m[32m 12[2mms[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m96 failed[39m[22m[2m | [22m[1m[32m20 passed[39m[22m[90m (116)[39m
+[2m   Start at [22m 10:42:26
+[2m   Duration [22m 90.57s[2m (transform 2.37s, setup 458ms, import 3.42s, tests 86.14s, environment 435ms)[22m
+

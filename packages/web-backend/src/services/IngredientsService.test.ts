@@ -436,7 +436,7 @@ describe('IngredientsService', () => {
 		});
 
 		it('should skip validation when only version is provided', async () => {
-			const updateData: UpdateIngredient = {
+			const updateData: PatchIngredient = {
 				version: 1,
 			};
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Data2 } from '@framework/components2/data/Data2';
 import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
-import { FeatureInfoBox } from '@framework/components/feedback/FeatureInfoBox';
+import { ActiveFeaturesPanel } from '@framework/components/debug/ActiveFeaturesPanel';
 import { SearchBar } from '@framework/components/forms/SearchBar';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
@@ -259,46 +259,33 @@ export function TasksPage() {
 			)}
 
 			{/* Feature Info (for demo purposes) */}
-			<FeatureInfoBox title="Active Features (UI / Debounced):">
-				<div
-					className={`
-       mt-2 grid grid-cols-2 gap-2 text-xs
-       sm:grid-cols-4
-     `}
-				>
-					<div>
-						<span className="text-muted-foreground">Search:</span>{' '}
-						<span className="font-mono">
-							{search.fstate.query ? `${search.fstate.query} / ${debouncedSearchQuery}` : 'none'}
-						</span>
-					</div>
-					<div>
-						<span className="text-muted-foreground">Sort:</span>{' '}
-						<span className="font-mono">
-							{sorting.fstate.sortConfigs.map(c => `${c.key}:${c.direction}`).join(', ') || 'none'}
-						</span>
-					</div>
-					<div>
-						<span className="text-muted-foreground">Filters:</span>{' '}
-						<span className="font-mono">
-							{filters.fstate.hasFilters
-								? [
-										filters.fstate.status && `status:${filters.fstate.status}`,
-										filters.fstate.priority && `priority:${filters.fstate.priority}`,
-										filters.fstate.workerId && `worker:${filters.fstate.workerId}`,
-										filters.fstate.flowId && `flow:${filters.fstate.flowId}`,
-									]
-										.filter(Boolean)
-										.join(', ')
-								: 'none'}
-						</span>
-					</div>
-					<div>
-						<span className="text-muted-foreground">Cache ID:</span>{' '}
-						<span className="font-mono">{cache.fstate.cacheId}</span>
-					</div>
-				</div>
-			</FeatureInfoBox>
+			<ActiveFeaturesPanel
+				title="Active Features (UI / Debounced)"
+				features={[
+					{
+						label: 'Search',
+						value: search.fstate.query ? `${search.fstate.query} / ${debouncedSearchQuery}` : 'none',
+					},
+					{
+						label: 'Sort',
+						value: sorting.fstate.sortConfigs.map(c => `${c.key}:${c.direction}`).join(', ') || 'none',
+					},
+					{
+						label: 'Filters',
+						value: filters.fstate.hasFilters
+							? [
+									filters.fstate.status && `status:${filters.fstate.status}`,
+									filters.fstate.priority && `priority:${filters.fstate.priority}`,
+									filters.fstate.workerId && `worker:${filters.fstate.workerId}`,
+									filters.fstate.flowId && `flow:${filters.fstate.flowId}`,
+								]
+									.filter(Boolean)
+									.join(', ')
+							: 'none',
+					},
+					{ label: 'Cache ID', value: cache.fstate.cacheId.toString() },
+				]}
+			/>
 
 			{/* Data + Table */}
 			<Data2

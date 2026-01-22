@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { LogEntry } from '@shared/api/tasks.contract';
+/**
+ * Base interface for log entries that can be used with auto-scroll
+ */
+interface BaseLogEntry {
+	id: string;
+}
 
 /**
  * Hook for smart auto-scroll management
@@ -8,8 +13,8 @@ import type { LogEntry } from '@shared/api/tasks.contract';
  * - Detects when user scrolls up manually and disables auto-scroll
  * - Re-enables auto-scroll when user scrolls back to bottom
  */
-export function useAutoScroll(
-	logs: LogEntry[],
+export function useAutoScroll<T extends BaseLogEntry>(
+	logs: T[],
 	containerRef: React.RefObject<HTMLDivElement | null>,
 	isRunning: boolean
 ) {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
+import { TabButton } from '@framework/components/primitives/TabButton';
 import type { Task } from '@shared/api/tasks.contract';
 import type { Workspace } from '@shared/api/workspaces.contract';
 import { B2F_TASK_CREATED, B2F_TASK_DELETED, B2F_TASK_UPDATED } from '@shared/transport/B2FEventConstants';
@@ -12,6 +13,7 @@ import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 import { TasksTable } from '../tasks/TasksTable';
 import { tasksApi } from '../tasks/tasks.api';
 import { EditWorkspaceDialog } from '../workspaces/EditWorkspaceDialog';
+import { ScriptsPanel } from '../workspaces/scripts/ScriptsPanel';
 import { workspacesApi } from '../workspaces/workspaces.api';
 
 // Helper to extract basename from path
@@ -28,6 +30,16 @@ export function WorkspacePanel({ workspace, projectId }: WorkspacePanelProps) {
 	const [tasks, setTasks] = useState<Task[]>([]);
 	const [refreshing, setRefreshing] = useState(false);
 	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+	const [viewMode, setViewMode] = useState<'tasks' | 'scripts'>(() => {
+		// Persist view mode in localStorage per workspace
+		const stored = localStorage.getItem(`workspace-${workspace.id}-view-mode`);
+		return (stored as 'tasks' | 'scripts') || 'tasks';
+	});
+
+	// Persist view mode changes
+	useEffect(() => {
+		localStorage.setItem(`workspace-${workspace.id}-view-mode`, viewMode);
+	}, [workspace.id, viewMode]);
 
 	// Load tasks
 	const loadTasks = async () => {
@@ -83,7 +95,7 @@ export function WorkspacePanel({ workspace, projectId }: WorkspacePanelProps) {
 	} as const;
 
 	return (
-		<div className="flex h-full flex-col overflow-hidden px-6">
+		<div className="flex h-full flex-col overflow-hidden px-4">
 			{/* Workspace Metadata Card */}
 			<div className="border-b border-border bg-card p-4">
 				<div className="flex items-start justify-between">
@@ -140,24 +152,47 @@ export function WorkspacePanel({ workspace, projectId }: WorkspacePanelProps) {
 				</div>
 			</div>
 
-			{/* Task List */}
-			<div className="flex-1 overflow-hidden p-4">
-				<div className="mb-3 flex items-center justify-between">
-					<h3 className="text-sm font-semibold">Tasks ({filteredTasks.length})</h3>
+			{/* View Mode Tabs */}
+			<div className="flex flex-1 flex-col overflow-hidden">
+				<div className="border-b border-border bg-card">
+					<div className="flex items-center gap-1 px-4">
+						<TabButton active={viewMode === 'tasks'} onClick={() => setViewMode('tasks')}>
+							Tasks
+						</TabButton>
+						<TabButton active={viewMode === 'scripts'} onClick={() => setViewMode('scripts')}>
+							Scripts
+						</TabButton>
+					</div>
 				</div>
 
-				<div className="h-[calc(100%-2rem)] overflow-auto">
-					{filteredTasks.length > 0 ? (
-						<TasksTable data={filteredTasks} refreshing={refreshing} />
-					) : (
-						<div className="flex h-full items-center justify-center">
-							<div className="text-center">
-								<div className="mb-2 text-4xl text-muted-foreground">📋</div>
-								<p className="text-sm text-muted-foreground">No tasks in this workspace</p>
-							</div>
+				{/* Tasks View */}
+				{viewMode === 'tasks' && (
+					<div className="flex-1 overflow-hidden p-4">
+						<div className="mb-3 flex items-center justify-between">
+							<h3 className="text-sm font-semibold">Tasks ({filteredTasks.length})</h3>
 						</div>
-					)}
-				</div>
+
+						<div className="h-[calc(100%-2rem)] overflow-auto">
+							{filteredTasks.length > 0 ? (
+								<TasksTable data={filteredTasks} refreshing={refreshing} />
+							) : (
+								<div className="flex h-full items-center justify-center">
+									<div className="text-center">
+										<div className="mb-2 text-4xl text-muted-foreground">📋</div>
+										<p className="text-sm text-muted-foreground">No tasks in this workspace</p>
+									</div>
+								</div>
+							)}
+						</div>
+					</div>
+				)}
+
+				{/* Scripts View */}
+				{viewMode === 'scripts' && (
+					<div className="flex-1 overflow-hidden">
+						<ScriptsPanel workspaceId={workspace.id} />
+					</div>
+				)}
 			</div>
 
 			{/* Edit Workspace Dialog */}

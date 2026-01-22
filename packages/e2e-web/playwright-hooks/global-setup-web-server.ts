@@ -9,7 +9,7 @@
  * - Retries with next port if one is occupied
  */
 import type { FullConfig } from '@playwright/test';
-import { ChildProcess, spawn } from 'child_process';
+import { ChildProcess, exec, spawn } from 'child_process';
 import { readdir, stat, unlink, writeFile } from 'fs/promises';
 import * as net from 'net';
 import { mkdirSync } from 'node:fs';
@@ -17,6 +17,7 @@ import path from 'path';
 import { promisify } from 'util';
 
 const sleep = promisify(setTimeout);
+const execAsync = promisify(exec);
 
 interface ServerInfo {
 	port: number;
@@ -27,6 +28,60 @@ const projectRoot = path.resolve(__dirname, '../../..');
 const tempFolder = path.resolve(projectRoot, 'packages/e2e-web/temp');
 
 const debug = true;
+
+/**
+ * Kill a process and all its children (process tree)
+ * CRITICAL: spawn('npm run ...', {shell: true}) creates:
+ * - Parent process: npm (PID 12345)
+ * - Child process: Node.js backend (PID 67890)
+ *
+ * proc.kill() only kills npm, leaving the backend as a zombie!
+ * This function kills the entire process tree to prevent leaks.
+ */
+async function killProcessTree(proc: ChildProcess, backendPid?: number): Promise<void> {
+	if (!proc.pid) {
+		return;
+	}
+
+	try {
+		if (process.platform === 'win32') {
+			// Windows: Use /T (tree) flag to kill all child processes
+			await execAsync(`taskkill /PID ${proc.pid} /T /F`);
+			debug && console.log(`     🗑️  Killed process tree for PID ${proc.pid}`);
+
+			// Belt and suspenders: also kill backend if we have its PID
+			if (backendPid) {
+				try {
+					await execAsync(`taskkill /PID ${backendPid} /F`);
+					debug && console.log(`     🗑️  Also killed backend PID ${backendPid}`);
+				} catch {
+					// Backend might already be dead
+				}
+			}
+		} else {
+			// Unix: Kill process group (negative PID)
+			try {
+				process.kill(-proc.pid, 'SIGKILL');
+				debug && console.log(`     🗑️  Killed process group for PID ${proc.pid}`);
+			} catch {
+				// Process might already be dead
+			}
+
+			// Fallback to backend PID
+			if (backendPid) {
+				try {
+					process.kill(backendPid, 'SIGKILL');
+					debug && console.log(`     🗑️  Also killed backend PID ${backendPid}`);
+				} catch {
+					// Backend might already be dead
+				}
+			}
+		}
+	} catch (error) {
+		// Process might already be dead, that's okay
+		debug && console.log(`     ⚠️  Could not kill PID ${proc.pid}: ${error}`);
+	}
+}
 
 /**
  * Check if a port is available
@@ -70,6 +125,7 @@ async function isPortAvailable(port: number): Promise<boolean> {
 async function startServerOnAvailablePort(
 	startPort: number,
 	workspaceId: number,
+	workerId: number,
 	expectedRunId: string,
 	maxPortAttempts: number = 100
 ): Promise<{ port: number; actualPid: number; process: ChildProcess }> {
@@ -91,6 +147,7 @@ async function startServerOnAvailablePort(
 		}
 
 		debug && console.log(`     ✅ Port ${port} is available, spawning backend process...`);
+		debug && console.log(`     🔧 Worker ID: ${workerId}, PROJECT_ID will be: ${workerId}`);
 
 		const command = 'npm run dev:only-for-e2e --workspace=web-backend';
 		const serverProcess = spawn(command, {
@@ -104,6 +161,11 @@ async function startServerOnAvailablePort(
 				// Set WORKSPACE_ID to match test suite expectation
 				// This ensures spawned backend servers use the same workspace ID as the test setup
 				WORKSPACE_ID: workspaceId.toString(),
+				// Set PROJECT_ID (should remain fixed for the project)
+				PROJECT_ID: process.env.PROJECT_ID || '0',
+				// Set unique WORKER_ID per E2E worker to ensure each gets its own Orchestrator WebSocket port
+				// Worker 0 → WORKER_ID=0 → Orch WS port 3701, Worker 1 → WORKER_ID=1 → Orch WS port 3703, etc.
+				WORKER_ID: workerId.toString(),
 				// Pass RUN_ID to backend so it can identify which test run it belongs to
 				RUN_ID: process.env.RUN_ID || 'unknown',
 			},
@@ -236,7 +298,7 @@ async function startServerOnAvailablePort(
 		} catch (error) {
 			// Server failed to start, kill it and try next port
 			debug && console.log(`     ⚠️  Killing failed process on port ${port}...`);
-			serverProcess.kill();
+			await killProcessTree(serverProcess);
 
 			if (error instanceof Error && error.message === 'PORT_IN_USE') {
 				debug && console.log(`     ⚠️  Port ${port} is in use, will try next port`);
@@ -476,7 +538,7 @@ async function globalSetupWebServer(config: FullConfig) {
 					port,
 					actualPid,
 					process: serverProcess,
-				} = await startServerOnAvailablePort(startPort, workspaceId, expectedRunId, 100); // Increased to 100 to handle leftover processes
+				} = await startServerOnAvailablePort(startPort, workspaceId, i, expectedRunId, 100); // Increased to 100 to handle leftover processes
 
 				processes.push(serverProcess);
 
@@ -575,10 +637,14 @@ async function globalSetupWebServer(config: FullConfig) {
 		console.error(`\n❌ FATAL ERROR: ${errors.length}/${results.length} workers failed to start\n`);
 		errors.forEach(err => console.error(`  - ${err}`));
 
-		// Kill all started servers on error
-		for (const proc of processes) {
-			proc.kill();
-		}
+		// Kill all started servers on error (including process trees to avoid zombie backends)
+		console.log(`🧹 Cleaning up ${processes.length} started server(s)...`);
+		await Promise.all(
+			processes.map(async (proc, index) => {
+				const backendPid = servers[index]?.pid;
+				await killProcessTree(proc, backendPid);
+			})
+		);
 
 		throw new Error(`Failed to start ${errors.length} worker(s). See errors above.`);
 	}

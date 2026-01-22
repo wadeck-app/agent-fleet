@@ -117,10 +117,7 @@ const requireUserFeedbackOnError = {
 					if (!currentNode) return;
 
 					// Check if it's a showToast call
-					if (
-						currentNode.type === 'CallExpression' &&
-						currentNode.callee?.name === 'showToast'
-					) {
+					if (currentNode.type === 'CallExpression' && currentNode.callee?.name === 'showToast') {
 						hasUserFeedback = true;
 						return;
 					}
@@ -128,8 +125,7 @@ const requireUserFeedbackOnError = {
 					// Check if it's setError call (for form state)
 					if (
 						currentNode.type === 'CallExpression' &&
-						(currentNode.callee?.name === 'setError' ||
-							currentNode.callee?.property?.name === 'setError')
+						(currentNode.callee?.name === 'setError' || currentNode.callee?.property?.name === 'setError')
 					) {
 						hasUserFeedback = true;
 						return;

@@ -10,6 +10,7 @@ import type { Ingredient } from '@app/shared/api/ingredients.contract';
 import type { Intervention } from '@app/shared/api/interventions.contract';
 import type { Project } from '@app/shared/api/projects.contract';
 import type { Task } from '@app/shared/api/tasks.contract';
+import type { ScriptProcess, WorkspaceScript } from '@app/shared/api/workspaceScripts.contract';
 
 import type { AuthService } from '../auth/AuthService';
 import { MockAuthService } from '../auth/MockAuthService';
@@ -19,9 +20,11 @@ import { IngredientsRepository } from '../repositories/IngredientsRepository';
 import { InterventionsRepository } from '../repositories/InterventionsRepository';
 import { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 import { ProjectsRepository } from '../repositories/ProjectsRepository';
+import { ScriptProcessRepository } from '../repositories/ScriptProcessRepository';
 import { TasksRepository } from '../repositories/TasksRepository';
 import { type WorkerMetadata, WorkersRepository } from '../repositories/WorkersRepository';
 import { WorkspaceMetadataRepository } from '../repositories/WorkspaceMetadataRepository';
+import { WorkspaceScriptsRepository } from '../repositories/WorkspaceScriptsRepository';
 import { BooksService } from '../services/BooksService';
 import { DashboardService } from '../services/DashboardService';
 import { FlowsService } from '../services/FlowsService';
@@ -29,13 +32,17 @@ import { IngredientsService } from '../services/IngredientsService';
 import { InterventionsService } from '../services/InterventionsService';
 import { OrchestratorEventHandler } from '../services/OrchestratorEventHandler';
 import { ProjectsService } from '../services/ProjectsService';
+import { ScriptProcessManager } from '../services/ScriptProcessManager';
+import { ScriptProcessService } from '../services/ScriptProcessService';
 import { TasksService } from '../services/TasksService';
 import { WorkersService } from '../services/WorkersService';
 import { WorkspaceMetadataFile } from '../services/WorkspaceMetadataFile';
+import { WorkspaceScriptsService } from '../services/WorkspaceScriptsService';
 import { WorkspacesService } from '../services/WorkspacesService';
 import type { DataStorage } from '../storage/DataStorage';
 import { FileBasedStorage } from '../storage/FileBasedStorage';
 import { InMemoryStorage } from '../storage/InMemoryStorage';
+import { ScriptLogsStorage } from '../storage/ScriptLogsStorage';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 import type { ITransportServer } from '../transport/ITransportServer';
 import { TransportRouter } from '../transport/TransportRouter';
@@ -75,6 +82,10 @@ export class DataStoreFactory {
 	private workspacesService?: WorkspacesService;
 	private projectsService?: ProjectsService;
 	private interventionsService?: InterventionsService;
+	private workspaceScriptsService?: WorkspaceScriptsService;
+	private scriptProcessService?: ScriptProcessService;
+	private scriptProcessManager?: ScriptProcessManager;
+	private scriptLogsStorage?: ScriptLogsStorage;
 	private authService?: AuthService;
 	private sessionManager?: TransportSessionManager;
 	private transportRouter?: TransportRouter;
@@ -284,6 +295,87 @@ export class DataStoreFactory {
 		}
 
 		return this.interventionsService;
+	}
+
+	/**
+	 * Get or create ScriptLogsStorage
+	 */
+	getScriptLogsStorage(): ScriptLogsStorage {
+		if (!this.scriptLogsStorage) {
+			const dataDir = process.env.DATA_DIR || './data';
+			this.scriptLogsStorage = new ScriptLogsStorage(`${dataDir}/workspace-scripts`);
+		}
+		return this.scriptLogsStorage;
+	}
+
+	/**
+	 * Get or create ScriptProcessManager
+	 */
+	getScriptProcessManager(): ScriptProcessManager {
+		if (!this.scriptProcessManager) {
+			this.scriptProcessManager = new ScriptProcessManager();
+		}
+		return this.scriptProcessManager;
+	}
+
+	/**
+	 * Get or create WorkspaceScriptsService
+	 */
+	getWorkspaceScriptsService(): WorkspaceScriptsService {
+		if (!this.workspaceScriptsService) {
+			// Create WorkspaceScriptsRepository using persistent storage
+			const workspaceScriptsBaseRepo = new BaseRepository<WorkspaceScript>('workspace-scripts', this.storage);
+			const workspaceScriptsRepo = new WorkspaceScriptsRepository(workspaceScriptsBaseRepo);
+
+			// Create ScriptProcessRepository using persistent storage (directly with DataStorage)
+			const scriptProcessRepo = new ScriptProcessRepository(this.storage);
+
+			// Get dependencies
+			const workspacesService = this.getWorkspacesService();
+			const eventBroadcaster = this.getEventBroadcaster();
+
+			// Create WorkspaceScriptsService
+			this.workspaceScriptsService = new WorkspaceScriptsService(
+				workspaceScriptsRepo,
+				scriptProcessRepo,
+				workspacesService,
+				eventBroadcaster
+			);
+		}
+
+		return this.workspaceScriptsService;
+	}
+
+	/**
+	 * Get or create ScriptProcessService
+	 */
+	getScriptProcessService(): ScriptProcessService {
+		if (!this.scriptProcessService) {
+			// Create repositories
+			const workspaceScriptsBaseRepo = new BaseRepository<WorkspaceScript>('workspace-scripts', this.storage);
+			const workspaceScriptsRepo = new WorkspaceScriptsRepository(workspaceScriptsBaseRepo);
+
+			// Create ScriptProcessRepository using persistent storage (directly with DataStorage)
+			const scriptProcessRepo = new ScriptProcessRepository(this.storage);
+
+			// Get dependencies
+			const scriptLogsStorage = this.getScriptLogsStorage();
+			const scriptProcessManager = this.getScriptProcessManager();
+			const workspacesService = this.getWorkspacesService();
+			const eventBroadcaster = this.getEventBroadcaster();
+
+			// Create ScriptProcessService
+			this.scriptProcessService = new ScriptProcessService(
+				workspaceScriptsRepo,
+				scriptProcessRepo,
+				scriptLogsStorage,
+				scriptProcessManager,
+				workspacesService,
+				eventBroadcaster
+			);
+		}
+
+		return this.scriptProcessService;
 	}
 
 	/**
@@ -506,6 +598,14 @@ export class DataStoreFactory {
 		const { default: IngredientsController } = await import('../controllers/IngredientsController');
 		const service = this.getIngredientsService();
 		return new IngredientsController(service);
+	}
+
+	async getWorkspaceScriptsController() {
+		const { default: WorkspaceScriptsController } = await import('../controllers/WorkspaceScriptsController');
+		const workspaceScriptsService = this.getWorkspaceScriptsService();
+		const scriptProcessService = this.getScriptProcessService();
+		const scriptLogsStorage = this.getScriptLogsStorage();
+		return new WorkspaceScriptsController(workspaceScriptsService, scriptProcessService, scriptLogsStorage);
 	}
 
 	async getBooksController() {

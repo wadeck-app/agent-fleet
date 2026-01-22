@@ -50,6 +50,7 @@
 		"--------------------misc": "",
 		"clean": "npm run clean --workspaces --if-present",
 		"clean:all": "npm run clean && rimraf node_modules package-lock.json",
+		"cleanup:e2e": "node scripts/cleanup-e2e-zombies.cjs",
 		"install:all": "npm install"
 	},
 	"keywords": [

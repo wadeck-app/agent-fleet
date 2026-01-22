@@ -6,6 +6,7 @@ import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
 import { ColumnVisibility } from '@framework/components/columns/ColumnVisibility';
 import { useColumnOrder } from '@framework/components/columns/useColumnOrder';
 import { useColumnVisibility } from '@framework/components/columns/useColumnVisibility';
+import { ActiveFeaturesPanel } from '@framework/components/debug/ActiveFeaturesPanel';
 import { Input } from '@framework/components/forms/Input';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
@@ -388,41 +389,23 @@ export function Ingredients4CarouselPage() {
 			</div>
 
 			{/* Feature Info (for demo purposes) */}
-			<div className="mb-4 rounded-lg border border-border bg-muted/50 p-4 text-sm">
-				<strong>Active Features:</strong>
-				<div
-					className={`
-       mt-2 grid grid-cols-2 gap-2 text-xs
-       sm:grid-cols-4
-     `}
-				>
-					<div>
-						<span className="text-muted-foreground">Search:</span>{' '}
-						<span className="font-mono">{searchQuery || 'none'}</span>
-					</div>
-					<div>
-						<span className="text-muted-foreground">Sort:</span>{' '}
-						<span className="font-mono">
-							{sorting.fstate.sortConfigs.map(c => `${c.key}:${c.direction}`).join(', ') || 'none'}
-						</span>
-					</div>
-					<div>
-						<span className="text-muted-foreground">Loaded:</span>{' '}
-						<span className="font-mono">{ingredientsRef.current.length} items</span>
-					</div>
-					<div>
-						<span className="text-muted-foreground">Viewing:</span>{' '}
-						<span className="font-mono">
-							{carousel.fstate.currentIndex + 1}-
-							{Math.min(
-								carousel.fstate.currentIndex + carousel.fstate.itemsPerView,
-								totalItemsRef.current
-							)}{' '}
-							of {totalItemsRef.current}
-						</span>
-					</div>
-				</div>
-			</div>
+			<ActiveFeaturesPanel
+				features={[
+					{ label: 'Search', value: searchQuery || 'none' },
+					{
+						label: 'Sort',
+						value: sorting.fstate.sortConfigs.map(c => `${c.key}:${c.direction}`).join(', ') || 'none',
+					},
+					{ label: 'Loaded', value: `${ingredientsRef.current.length} items` },
+					{
+						label: 'Viewing',
+						value: `${carousel.fstate.currentIndex + 1}-${Math.min(
+							carousel.fstate.currentIndex + carousel.fstate.itemsPerView,
+							totalItemsRef.current
+						)} of ${totalItemsRef.current}`,
+					},
+				]}
+			/>
 
 			{/* Bulk Action Bar */}
 			{!selection.fstate.isEmpty && (

@@ -5,8 +5,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { HttpPollingTransportClient } from './HttpPollingTransportClient';
 import * as connectionId from '../connection-id';
+import { HttpPollingTransportClient } from './HttpPollingTransportClient';
 
 describe('HttpPollingTransportClient', () => {
 	let client: HttpPollingTransportClient;

@@ -3,12 +3,15 @@
  * Starts Storybook with automatic port retry on conflicts
  * Uses try-fail-retry to avoid TOCTOU race conditions
  */
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 const { writeFileSync } = require('fs');
 const path = require('path');
 const net = require('net');
 const { performance } = require('perf_hooks');
 const { mkdirSync } = require('node:fs');
+const { promisify } = require('util');
+
+const execAsync = promisify(exec);
 
 const MAX_RETRIES = 100;
 const workspaceId = parseInt(process.env.WORKSPACE_ID || '0', 10);
@@ -16,6 +19,33 @@ const basePort = 6100 + workspaceId * 1000;
 
 const projectRoot = path.resolve(__dirname, '../../..');
 const tempFolder = path.resolve(projectRoot, 'packages/e2e-web/temp');
+
+/**
+ * Kill a process and all its children (process tree)
+ * CRITICAL: spawn('npm run ...', {shell: true}) creates parent npm + child processes
+ * proc.kill() only kills npm, leaving children as zombies!
+ */
+async function killProcessTree(proc) {
+	if (!proc.pid) {
+		return;
+	}
+
+	try {
+		if (process.platform === 'win32') {
+			// Windows: Use /T (tree) flag to kill all child processes
+			await execAsync(`taskkill /PID ${proc.pid} /T /F`);
+		} else {
+			// Unix: Kill process group (negative PID)
+			try {
+				process.kill(-proc.pid, 'SIGKILL');
+			} catch {
+				// Process might already be dead
+			}
+		}
+	} catch (error) {
+		// Process might already be dead, that's okay
+	}
+}
 
 /**
  * Checks if a port is available by attempting to bind to it
@@ -160,7 +190,7 @@ function tryStartStorybook(port) {
 						`⚠️  Port ${port} is already in use (detected in stderr), will retry with next port...`
 					);
 					hasError = true;
-					storybookProcess.kill();
+					killProcessTree(storybookProcess);
 					rejectPromise(new Error('PORT_IN_USE'));
 				}
 			});
@@ -187,7 +217,7 @@ function tryStartStorybook(port) {
 		// If Storybook doesn't start in 10s, it's likely a port conflict
 		setTimeout(() => {
 			if (!startupComplete && !hasError) {
-				storybookProcess.kill();
+				killProcessTree(storybookProcess);
 				rejectPromise(new Error('Storybook startup timeout'));
 			}
 		}, 10000);

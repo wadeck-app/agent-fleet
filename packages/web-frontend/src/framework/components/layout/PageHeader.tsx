@@ -67,6 +67,7 @@ export function PageHeader({ title, badge, onRefresh, isRefreshing = false, acti
 						variant="ghost"
 						size="sm"
 						className="h-8 w-8 p-0"
+						aria-label="Refresh"
 					>
 						<RefreshCw
 							className={`

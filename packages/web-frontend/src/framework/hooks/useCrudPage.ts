@@ -147,6 +147,15 @@ export interface CrudPageState<TItem extends { id: string; version: number }> {
 		setShowBulkDeleteDialog: (show: boolean) => void;
 	};
 
+	// Delete confirmation
+	deleteConfirmation: {
+		isOpen: boolean;
+		itemId: string | null;
+		openDialog: (id: string) => void;
+		closeDialog: () => void;
+		confirm: () => Promise<void>;
+	};
+
 	// Dialog routing
 	dialog: {
 		isOpen: boolean;
@@ -282,6 +291,15 @@ export function useCrudPage<TItem extends { id: string; version: number }>(
 	const [isBulkDeleting, _setIsBulkDeleting] = useState(false);
 	const [isDialogRefreshing, setIsDialogRefreshing] = useState(false);
 
+	// Delete confirmation state
+	const [deleteConfirmationState, setDeleteConfirmationState] = useState<{
+		open: boolean;
+		itemId: string | null;
+	}>({
+		open: false,
+		itemId: null,
+	});
+
 	// Build query params
 	const queryParams = {
 		page: paginationState.currentPage,
@@ -338,7 +356,9 @@ export function useCrudPage<TItem extends { id: string; version: number }>(
 		navigate(`${basePath}/${item.id}/edit`);
 	};
 
-	const handleDelete = async (id: string) => {
+	// Add comment above the target line, not at the end
+	// Internal delete handler - performs actual deletion with visual feedback
+	const executeDelete = async (id: string) => {
 		// Add comment above the target line, not at the end
 		// Mark item as deleting for visual feedback
 		setDeletingIds(prev => new Set([...prev, id]));
@@ -353,6 +373,38 @@ export function useCrudPage<TItem extends { id: string; version: number }>(
 				next.delete(id);
 				return next;
 			});
+		}
+	};
+
+	// Add comment above the target line, not at the end
+	// Kept for backward compatibility - opens delete confirmation dialog
+	const handleDelete = async (id: string) => {
+		setDeleteConfirmationState({
+			open: true,
+			itemId: id,
+		});
+	};
+
+	// Add comment above the target line, not at the end
+	// Delete confirmation handlers
+	const openDeleteDialog = (id: string) => {
+		setDeleteConfirmationState({
+			open: true,
+			itemId: id,
+		});
+	};
+
+	const closeDeleteDialog = () => {
+		setDeleteConfirmationState({
+			open: false,
+			itemId: null,
+		});
+	};
+
+	const confirmDelete = async () => {
+		if (deleteConfirmationState.itemId) {
+			await executeDelete(deleteConfirmationState.itemId);
+			closeDeleteDialog();
 		}
 	};
 
@@ -449,6 +501,15 @@ export function useCrudPage<TItem extends { id: string; version: number }>(
 			isBulkDeleting,
 			showBulkDeleteDialog,
 			setShowBulkDeleteDialog,
+		},
+
+		// Delete confirmation
+		deleteConfirmation: {
+			isOpen: deleteConfirmationState.open,
+			itemId: deleteConfirmationState.itemId,
+			openDialog: openDeleteDialog,
+			closeDialog: closeDeleteDialog,
+			confirm: confirmDelete,
 		},
 
 		// Dialog routing

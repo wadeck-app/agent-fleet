@@ -6,6 +6,7 @@ import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
 import { ColumnVisibility } from '@framework/components/columns/ColumnVisibility';
 import { useColumnOrder } from '@framework/components/columns/useColumnOrder';
 import { useColumnVisibility } from '@framework/components/columns/useColumnVisibility';
+import { ActiveFeaturesPanel } from '@framework/components/debug/ActiveFeaturesPanel';
 import { Input } from '@framework/components/forms/Input';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
@@ -433,32 +434,20 @@ export function Ingredients3GridPage() {
 			</div>
 
 			{/* Feature Info (for demo purposes - remove in production) */}
-			<div className="mb-4 rounded-lg border border-border bg-muted/50 p-4 text-sm">
-				<strong>Active Features (UI / Debounced):</strong>
-				<div
-					className={`
-       mt-2 grid grid-cols-2 gap-2 text-xs
-       sm:grid-cols-4
-     `}
-				>
-					<div>
-						<span className="text-muted-foreground">Search:</span>{' '}
-						<span className="font-mono">
-							{search.fstate.query ? `${search.fstate.query} / ${debouncedSearchQuery}` : 'none'}
-						</span>
-					</div>
-					<div>
-						<span className="text-muted-foreground">Sort:</span>{' '}
-						<span className="font-mono">
-							{sorting.fstate.sortConfigs.map(c => `${c.key}:${c.direction}`).join(', ') || 'none'}
-						</span>
-					</div>
-					<div>
-						<span className="text-muted-foreground">Cache ID:</span>{' '}
-						<span className="font-mono">{cache.fstate.cacheId}</span>
-					</div>
-				</div>
-			</div>
+			<ActiveFeaturesPanel
+				title="Active Features (UI / Debounced)"
+				features={[
+					{
+						label: 'Search',
+						value: search.fstate.query ? `${search.fstate.query} / ${debouncedSearchQuery}` : 'none',
+					},
+					{
+						label: 'Sort',
+						value: sorting.fstate.sortConfigs.map(c => `${c.key}:${c.direction}`).join(', ') || 'none',
+					},
+					{ label: 'Cache ID', value: cache.fstate.cacheId.toString() },
+				]}
+			/>
 
 			{/* Bulk Action Bar */}
 			{!selection.fstate.isEmpty && (

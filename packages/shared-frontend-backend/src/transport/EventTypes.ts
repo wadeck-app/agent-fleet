@@ -3,6 +3,7 @@ import type { Intervention } from '../api/interventions.contract';
 import type { Project, ProjectBoardData, ProjectsData } from '../api/projects.contract';
 import type { Task, TasksData } from '../api/tasks.contract';
 import type { Worker, WorkersData } from '../api/workers.contract';
+import type { ScriptLogEntry, ScriptProcess, WorkspaceScript } from '../api/workspaceScripts.contract';
 import type { Workspace } from '../api/workspaces.contract';
 
 //FIXME this whole typing structure is too complicated. I don't care to know about the abbreviation/type/action kind of things
@@ -139,6 +140,34 @@ export interface BusinessEvents {
 
 	/** Project board data updated */
 	'b2f:project:board_updated': ProjectBoardData;
+
+	/** Workspace script created */
+	'b2f:workspace_script:created': WorkspaceScript;
+
+	/** Workspace script updated */
+	'b2f:workspace_script:updated': WorkspaceScript;
+
+	/** Workspace script deleted */
+	'b2f:workspace_script:deleted': WorkspaceScript;
+
+	/** Script process started */
+	'b2f:script_process:started': ScriptProcess;
+
+	/** Script process stopped */
+	'b2f:script_process:stopped': ScriptProcess;
+
+	/** Script process log updated (real-time log streaming) */
+	'b2f:script_process:log_updated': {
+		scriptId: string;
+		logs: ScriptLogEntry[];
+	};
+
+	/** Script process error */
+	'b2f:script_process:error': {
+		scriptId: string;
+		processId: string;
+		error: string;
+	};
 }
 
 /**

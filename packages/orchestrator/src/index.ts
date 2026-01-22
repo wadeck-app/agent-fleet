@@ -5,6 +5,7 @@
  */
 export { Orchestrator } from './core/Orchestrator';
 export { BackendEventBridge } from './core/BackendEventBridge';
+export { TraceChunkStorage } from './core/TraceChunkStorage';
 export type {
 	BackendEventType,
 	BackendEventData,
@@ -17,3 +18,4 @@ export type {
 	InterventionRequestedEvent,
 	TaskCompletedEvent,
 } from './core/BackendEventBridge';
+export type { ChunkMetadata, TraceMetadata, TraceChunk } from './core/TraceChunkStorage';

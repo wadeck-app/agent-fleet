@@ -180,7 +180,7 @@ export function IngredientTable2({
 			columns={columns}
 			getItemId={item => item.id}
 			renderActions={renderActions}
-			emptyMessage={tableProps.emptyMessage ?? "No ingredients found. Add your first ingredient to get started."}
+			emptyMessage={tableProps.emptyMessage ?? 'No ingredients found. Add your first ingredient to get started.'}
 			striped={tableProps.striped ?? true}
 			rowHeight={tableProps.rowHeight ?? 40}
 			data={tableProps.data ?? []}

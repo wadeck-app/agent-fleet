@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
 import { ColumnVisibility } from '@framework/components/columns/ColumnVisibility';
+import { ActiveFeaturesPanel } from '@framework/components/debug/ActiveFeaturesPanel';
 import { EmptyState } from '@framework/components/feedback/EmptyState';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
@@ -72,34 +73,6 @@ export function IngredientsV5Page() {
 	const debouncedSearchQuery = useDebounce(crud.search?.searchQuery || '', 300);
 
 	// Add comment above the target line, not at the end
-	// Delete confirmation dialog state
-	const [deleteConfirmation, setDeleteConfirmation] = useState<{
-		open: boolean;
-		ingredientId: string | null;
-	}>({
-		open: false,
-		ingredientId: null,
-	});
-
-	// Add comment above the target line, not at the end
-	// Override handleDelete to show confirmation dialog
-	const handleDelete = (id: string) => {
-		setDeleteConfirmation({
-			open: true,
-			ingredientId: id,
-		});
-	};
-
-	// Add comment above the target line, not at the end
-	// Confirm delete action
-	const handleDeleteConfirm = async () => {
-		if (deleteConfirmation.ingredientId) {
-			await crud.handlers.handleDelete(deleteConfirmation.ingredientId);
-			setDeleteConfirmation({ open: false, ingredientId: null });
-		}
-	};
-
-	// Add comment above the target line, not at the end
 	// Cache ID for demo (simulate cache control)
 	const [cacheId, _setCacheId] = useState(1);
 
@@ -151,34 +124,22 @@ export function IngredientsV5Page() {
 				/>
 
 				{/* Active Features Panel (for demo purposes - same as v2) */}
-				<div className="mb-4 rounded-lg border border-border bg-muted/50 p-4 text-sm">
-					<strong>Active Features (UI / Debounced):</strong>
-					<div
-						className={`
-       mt-2 grid grid-cols-2 gap-2 text-xs
-       sm:grid-cols-4
-     `}
-					>
-						<div>
-							<span className="text-muted-foreground">Search:</span>{' '}
-							<span className="font-mono">
-								{crud.search?.searchQuery
-									? `${crud.search.searchQuery} / ${debouncedSearchQuery}`
-									: 'none'}
-							</span>
-						</div>
-						<div>
-							<span className="text-muted-foreground">Sort:</span>{' '}
-							<span className="font-mono">
-								{crud.sorting.sortConfigs.map(c => `${c.key}:${c.direction}`).join(', ') || 'none'}
-							</span>
-						</div>
-						<div>
-							<span className="text-muted-foreground">Cache ID:</span>{' '}
-							<span className="font-mono">{cacheId}</span>
-						</div>
-					</div>
-				</div>
+				<ActiveFeaturesPanel
+					title="Active Features (UI / Debounced)"
+					features={[
+						{
+							label: 'Search',
+							value: crud.search?.searchQuery
+								? `${crud.search.searchQuery} / ${debouncedSearchQuery}`
+								: 'none',
+						},
+						{
+							label: 'Sort',
+							value: crud.sorting.sortConfigs.map(c => `${c.key}:${c.direction}`).join(', ') || 'none',
+						},
+						{ label: 'Cache ID', value: cacheId.toString() },
+					]}
+				/>
 
 				{/* Empty State */}
 				{crud.items.length === 0 ? (
@@ -213,7 +174,7 @@ export function IngredientsV5Page() {
 							storageId={crud.config.storageId}
 							ingredients={crud.items}
 							onEdit={crud.handlers.handleEdit}
-							onDelete={handleDelete}
+							onDelete={crud.handlers.handleDelete}
 							pagination={
 								crud.pagination.paginationData
 									? {
@@ -282,16 +243,18 @@ export function IngredientsV5Page() {
 
 			{/* Delete Confirmation Dialog */}
 			<AlertDialogWrapper
-				open={deleteConfirmation.open}
+				open={crud.deleteConfirmation.isOpen}
 				onOpenChange={open => {
-					setDeleteConfirmation({ open, ingredientId: open ? deleteConfirmation.ingredientId : null });
+					if (!open) {
+						crud.deleteConfirmation.closeDialog();
+					}
 				}}
 				title="Delete Ingredient"
 				description="Are you sure you want to delete this ingredient? This action cannot be undone."
 				confirmLabel="Delete"
 				cancelLabel="Cancel"
 				variant="danger"
-				onConfirm={handleDeleteConfirm}
+				onConfirm={crud.deleteConfirmation.confirm}
 			/>
 		</>
 	);

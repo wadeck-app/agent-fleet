@@ -6,7 +6,7 @@ import { type VariantProps, cva } from 'class-variance-authority';
 const tabButtonVariants = cva(
 	// @formatter:off
 	`
-   group relative flex items-center gap-2 border-b-2 px-4 py-3 transition-colors
+   group relative flex items-center gap-2 border-b-2 px-4 py-3 transition-colors cursor-pointer
    hover:bg-accent/50
    focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
    focus-visible:outline-none

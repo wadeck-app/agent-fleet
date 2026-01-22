@@ -9,6 +9,7 @@ Custom ESLint rules to enforce best practices for error handling in the frontend
 **Problem**: Direct access to `error.message` doesn't properly format Zod validation errors from API responses, resulting in generic "ValidationError" messages instead of user-friendly field-specific errors.
 
 **Detects**:
+
 ```typescript
 // ❌ BAD - Will be flagged
 catch (error) {
@@ -18,6 +19,7 @@ catch (error) {
 ```
 
 **Solution**:
+
 ```typescript
 // ✅ GOOD
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
@@ -28,6 +30,7 @@ catch (error) {
 ```
 
 **Exceptions**:
+
 - Allows `error.message` inside `console.error()`, `console.log()`, and `console.warn()` for debugging
 - Only applies inside `catch` blocks
 - Only checks variables named `error`, `err`, or `e`
@@ -39,27 +42,30 @@ catch (error) {
 **Problem**: Catching errors silently or only logging them without showing user feedback creates a poor UX where users don't know something went wrong.
 
 **Detects**:
+
 ```typescript
 // ❌ BAD - Will be flagged
 try {
-  await loadProjects();
+	await loadProjects();
 } catch (error) {
-  console.error('Failed:', error); // Only logging, no user feedback
+	console.error('Failed:', error); // Only logging, no user feedback
 }
 ```
 
 **Solution**:
+
 ```typescript
 // ✅ GOOD
 try {
-  await loadProjects();
+	await loadProjects();
 } catch (error) {
-  showToast(getErrorMessage(error), 'error'); // User sees the error
-  console.error('Failed:', error);
+	showToast(getErrorMessage(error), 'error'); // User sees the error
+	console.error('Failed:', error);
 }
 ```
 
 **Exceptions**:
+
 - Skips test files (`.test.ts`, `.spec.ts`)
 - Allows re-throwing errors (delegates feedback to caller)
 - Allows `setError()` calls (for form validation)
@@ -72,6 +78,7 @@ try {
 **Problem**: API responses may return `undefined` or `null` for array properties, causing runtime errors when calling `.map()`, `.filter()`, etc.
 
 **Detects**:
+
 ```typescript
 // ❌ BAD - Will be flagged
 const response = await api.getProjects();
@@ -79,6 +86,7 @@ const ids = response.items.map(p => p.id); // Crashes if items is undefined
 ```
 
 **Solution**:
+
 ```typescript
 // ✅ GOOD
 const response = await api.getProjects();
@@ -86,6 +94,7 @@ const ids = (response.items || []).map(p => p.id); // Safe
 ```
 
 **What it checks**:
+
 - Array methods: `.map()`, `.filter()`, `.forEach()`, `.reduce()`, `.find()`, `.some()`, `.every()`
 - API response properties: `items`, `results`, `data`, `list`, `entries`, `rows`
 - Response variable names: `response`, `data`, `result`

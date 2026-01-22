@@ -163,7 +163,8 @@ describe('Table2', () => {
 
 			render(<Table2 {...props} columns={mockColumns} getItemId={item => item.id} />);
 
-			expect(screen.getByText('Showing 1 to 3 of 50 items')).toBeInTheDocument();
+			// Calculation: page 1, pageSize 10 -> "Showing 1 to 10 of 50 items"
+			expect(screen.getByText('Showing 1 to 10 of 50 items')).toBeInTheDocument();
 			expect(screen.getByText('Page 1 of 5')).toBeInTheDocument();
 		});
 
@@ -213,9 +214,15 @@ describe('Table2', () => {
 
 			render(<Table2 {...props} columns={mockColumns} getItemId={item => item.id} />);
 
-			// Find and open page size selector
-			const pageSizeSelect = screen.getByRole('combobox', { name: /Items per page/ });
-			await userEvent.click(pageSizeSelect);
+			// Verify the label is visible
+			expect(screen.getByText('Items per page:')).toBeInTheDocument();
+
+			// Find the page size selector by finding the combobox that shows current value
+			const comboboxes = screen.getAllByRole('combobox');
+			const pageSizeSelect = comboboxes.find(cb => cb.textContent?.includes('10'));
+			expect(pageSizeSelect).toBeDefined();
+
+			await userEvent.click(pageSizeSelect!);
 
 			// Select 20
 			const option20 = screen.getByRole('option', { name: '20' });

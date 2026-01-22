@@ -124,6 +124,36 @@ export const B2F_WORKSPACE_QUOTA_EXCEEDED = 'b2f:workspace:quota_exceeded' as co
 /** Workspace archived event */
 export const B2F_WORKSPACE_ARCHIVED = 'b2f:workspace:archived' as const;
 
+// ===========================================================================================
+// WORKSPACE SCRIPT EVENTS
+// ===========================================================================================
+
+/** Workspace script created event */
+export const B2F_WORKSPACE_SCRIPT_CREATED = 'b2f:workspace_script:created' as const;
+
+/** Workspace script updated event */
+export const B2F_WORKSPACE_SCRIPT_UPDATED = 'b2f:workspace_script:updated' as const;
+
+/** Workspace script deleted event */
+export const B2F_WORKSPACE_SCRIPT_DELETED = 'b2f:workspace_script:deleted' as const;
+
+/** Script process started event */
+export const B2F_SCRIPT_PROCESS_STARTED = 'b2f:script_process:started' as const;
+
+/** Script process stopped event */
+export const B2F_SCRIPT_PROCESS_STOPPED = 'b2f:script_process:stopped' as const;
+
+/**
+ * Script process log updated event (real-time log streaming)
+ * Emitted when new log entries are available
+ * REQUIRES scriptId filter to avoid spamming all clients
+ * @see EventFilters.ts for filter requirements
+ */
+export const B2F_SCRIPT_PROCESS_LOG_UPDATED = 'b2f:script_process:log_updated' as const;
+
+/** Script process error event */
+export const B2F_SCRIPT_PROCESS_ERROR = 'b2f:script_process:error' as const;
+
 // =============================================================================
 // Dashboard Events
 // =============================================================================

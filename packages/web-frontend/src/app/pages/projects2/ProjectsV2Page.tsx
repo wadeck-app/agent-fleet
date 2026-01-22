@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { arrayMove } from '@dnd-kit/sortable';
 import { DynamicLucideIcon } from '@framework/components/icons/DynamicLucideIcon';
 import { Page } from '@framework/components/layout/Page';
-import { PageHeader } from '@framework/components/layout/PageHeader';
 import { SkeletonBox } from '@framework/components/loading/SkeletonBox';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
@@ -324,28 +323,7 @@ export function ProjectsV2Page() {
 
 	return (
 		<Page fullWidth className="flex h-screen flex-col">
-			<PageHeader
-				title="Projects v2"
-				action={
-					<div className="flex gap-2">
-						<Button
-							variant="default"
-							size="sm"
-							onClick={() => setIsManageWorkspacesDialogOpen(true)}
-							disabled={!activeProject}
-						>
-							<Settings />
-							Manage Workspaces
-						</Button>
-						<Button variant="default" size="sm" onClick={() => setIsManageDialogOpen(true)}>
-							<Settings />
-							Manage Projects
-						</Button>
-					</div>
-				}
-			/>
-
-			<div className="-mx-6 flex-1 overflow-hidden">
+			<div className="flex-1 overflow-hidden">
 				{loading ? (
 					// Loading skeleton
 					<div className="flex h-full flex-col">
@@ -403,42 +381,68 @@ export function ProjectsV2Page() {
 					</div>
 				) : (
 					<div className="flex h-full flex-col">
-						{/* Project Tabs */}
+						{/* Project Tabs with Title and Actions */}
 						<div className="border-b border-border bg-card">
-							<div className="flex items-center px-4">
-								<div className="flex items-center gap-1 overflow-x-auto py-2">
-									{pinnedProjects.map(project => {
-										const projectWorkspaceCount = workspaces.filter(w =>
-											project.workspaceIds.includes(w.id)
-										).length;
+							<div className="flex items-center justify-between px-4">
+								<div className="flex items-center gap-4 overflow-x-auto py-2">
+									<span className="text-sm font-medium text-muted-foreground">Projects v2</span>
+									<div className="flex items-center gap-1">
+										{pinnedProjects.map(project => {
+											const projectWorkspaceCount = workspaces.filter(w =>
+												project.workspaceIds.includes(w.id)
+											).length;
 
-										return (
-											<TabButton
-												key={project.id}
-												active={state.activeProjectId === project.id}
-												onClick={() => handleProjectTabClick(project.id)}
-												icon={
-													project.icon && (
-														<DynamicLucideIcon
-															name={project.icon}
-															color={project.iconColor || '#6366F1'}
-															className="h-4 w-4"
-														/>
-													)
-												}
-												badge={
-													<Badge variant="secondary" className="text-xs">
-														{projectWorkspaceCount}
-													</Badge>
-												}
-											>
-												<span className="text-sm font-medium">{project.name}</span>
-											</TabButton>
-										);
-									})}
+											return (
+												<TabButton
+													key={project.id}
+													active={state.activeProjectId === project.id}
+													onClick={() => handleProjectTabClick(project.id)}
+													icon={
+														project.icon && (
+															<DynamicLucideIcon
+																name={project.icon}
+																color={project.iconColor || '#6366F1'}
+																className="h-4 w-4"
+															/>
+														)
+													}
+													badge={
+														<Badge variant="secondary" className="text-xs">
+															{projectWorkspaceCount}
+														</Badge>
+													}
+												>
+													<span className="text-sm font-medium">{project.name}</span>
+												</TabButton>
+											);
+										})}
+									</div>
 								</div>
+								<Button variant="default" size="sm" onClick={() => setIsManageDialogOpen(true)}>
+									<Settings />
+									Manage Projects
+								</Button>
 							</div>
 						</div>
+
+						{/* Project Metadata Line */}
+						{activeProject && (
+							<div className="border-b border-border bg-muted/30 px-4 py-2">
+								<div className="flex items-center gap-2 text-sm text-muted-foreground">
+									<span className="font-semibold text-foreground">{activeProject.name}</span>
+									<span>•</span>
+									<span>{projectWorkspaces.length} workspaces</span>
+									<span>•</span>
+									<span>Created {new Date(activeProject.createdAt).toLocaleDateString()}</span>
+									{activeProject.description && (
+										<>
+											<span>•</span>
+											<span className="truncate">{activeProject.description}</span>
+										</>
+									)}
+								</div>
+							</div>
+						)}
 
 						{/* Workspace Tabs and Content */}
 						{activeProject && (
@@ -449,6 +453,7 @@ export function ProjectsV2Page() {
 											workspaces={projectWorkspaces}
 											activeWorkspaceId={state.activeWorkspaceId}
 											onWorkspaceSelect={handleWorkspaceSelect}
+											onManageClick={() => setIsManageWorkspacesDialogOpen(true)}
 										/>
 										{activeWorkspace && (
 											<WorkspacePanel workspace={activeWorkspace} projectId={activeProject.id} />

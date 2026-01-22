@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 
 import { Data2 } from '@framework/components2/data/Data2';
-import { FeatureInfoBox } from '@framework/components/feedback/FeatureInfoBox';
+import { ActiveFeaturesPanel } from '@framework/components/debug/ActiveFeaturesPanel';
 import { SearchBar } from '@framework/components/forms/SearchBar';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
@@ -109,33 +109,18 @@ export function InterventionsPage() {
 			<InterventionFilters filters={filters} />
 
 			{/* Feature Info (for demo purposes - remove in production) */}
-			<FeatureInfoBox title="Active Features (UI / Debounced):">
-				<div
-					className={`
-       mt-2 grid grid-cols-2 gap-2 text-xs
-       sm:grid-cols-4
-     `}
-				>
-					<div>
-						<span className="text-muted-foreground">Search:</span>{' '}
-						<span className="font-mono">{search.fstate.query || 'none'}</span>
-					</div>
-					<div>
-						<span className="text-muted-foreground">Sort:</span>{' '}
-						<span className="font-mono">
-							{sorting.fstate.sortConfigs.map(c => `${c.key}:${c.direction}`).join(', ') || 'none'}
-						</span>
-					</div>
-					<div>
-						<span className="text-muted-foreground">Filters:</span>{' '}
-						<span className="font-mono">{filters.fstate.hasFilters ? 'active' : 'none'}</span>
-					</div>
-					<div>
-						<span className="text-muted-foreground">Cache ID:</span>{' '}
-						<span className="font-mono">{cache.fstate.cacheId}</span>
-					</div>
-				</div>
-			</FeatureInfoBox>
+			<ActiveFeaturesPanel
+				title="Active Features (UI / Debounced)"
+				features={[
+					{ label: 'Search', value: search.fstate.query || 'none' },
+					{
+						label: 'Sort',
+						value: sorting.fstate.sortConfigs.map(c => `${c.key}:${c.direction}`).join(', ') || 'none',
+					},
+					{ label: 'Filters', value: filters.fstate.hasFilters ? 'active' : 'none' },
+					{ label: 'Cache ID', value: cache.fstate.cacheId.toString() },
+				]}
+			/>
 
 			<Data2
 				fetchData={fetchInterventions}

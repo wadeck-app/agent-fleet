@@ -26,6 +26,10 @@ import type {
 	B2F_INTERVENTION_CREATED,
 	B2F_INTERVENTION_TIMEOUT,
 	B2F_INTERVENTION_UPDATED,
+	B2F_SCRIPT_PROCESS_ERROR,
+	B2F_SCRIPT_PROCESS_LOG_UPDATED,
+	B2F_SCRIPT_PROCESS_STARTED,
+	B2F_SCRIPT_PROCESS_STOPPED,
 	B2F_TASKS_UPDATED,
 	B2F_TASK_ASSIGNED,
 	B2F_TASK_CREATED,
@@ -48,6 +52,9 @@ import type {
 	B2F_WORKSPACE_CREATED,
 	B2F_WORKSPACE_DELETED,
 	B2F_WORKSPACE_QUOTA_EXCEEDED,
+	B2F_WORKSPACE_SCRIPT_CREATED,
+	B2F_WORKSPACE_SCRIPT_DELETED,
+	B2F_WORKSPACE_SCRIPT_UPDATED,
 	B2F_WORKSPACE_STATUS_CHANGED,
 	B2F_WORKSPACE_UPDATED,
 } from './B2FEventConstants';
@@ -102,6 +109,14 @@ export interface WorkspaceFilter {
  */
 export interface InterventionFilter {
 	interventionId: string;
+}
+
+/**
+ * Filter for script-specific events
+ * Used when subscribing to events for a specific script
+ */
+export interface ScriptFilter {
+	scriptId: string;
 }
 
 // ===========================================================================================
@@ -165,6 +180,19 @@ export type B2FEventFilters = {
 	[B2F_INTERVENTION_ANSWERED]: NoFilter;
 	[B2F_INTERVENTION_TIMEOUT]: NoFilter;
 	[B2F_INTERVENTION_CANCELLED]: NoFilter;
+
+	// Workspace Script Events - Aggregate (no filter needed)
+	[B2F_WORKSPACE_SCRIPT_CREATED]: NoFilter;
+	[B2F_WORKSPACE_SCRIPT_UPDATED]: NoFilter;
+	[B2F_WORKSPACE_SCRIPT_DELETED]: NoFilter;
+
+	// Script Process Events - Aggregate (no filter needed)
+	[B2F_SCRIPT_PROCESS_STARTED]: NoFilter;
+	[B2F_SCRIPT_PROCESS_STOPPED]: NoFilter;
+	[B2F_SCRIPT_PROCESS_ERROR]: NoFilter;
+
+	// Script Process Events - Filtered (requires scriptId)
+	[B2F_SCRIPT_PROCESS_LOG_UPDATED]: ScriptFilter; // REQUIRES scriptId filter - for log streaming
 };
 
 // ===========================================================================================
@@ -253,6 +281,11 @@ export function matchesFilter<T extends B2FEvent>(
 	// Intervention filter
 	if ('interventionId' in filterObj) {
 		return payload.interventionId === (filterObj as unknown as InterventionFilter).interventionId;
+	}
+
+	// Script filter
+	if ('scriptId' in filterObj) {
+		return payload.scriptId === (filterObj as unknown as ScriptFilter).scriptId;
 	}
 
 	// Unknown filter type = no match (fail safe)

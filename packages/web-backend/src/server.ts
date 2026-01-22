@@ -419,6 +419,7 @@ function startWorkersBroadcaster(factory: DataStoreFactory): void {
 // Global server instances (needed for shutdown handlers)
 let orchestratorClient: Orchestrator | null = null;
 let fastifyInstance: FastifyInstance | null = null;
+let factoryInstance: DataStoreFactory | null = null;
 
 function logToFile(message: string) {
 	const timestamp = new Date().toISOString();
@@ -439,7 +440,21 @@ signals.forEach(signal => {
 		// Signal already logged by log.info below
 		log.info(`${signal} signal received: initiating graceful shutdown`);
 		try {
-			// Close orchestrator first (if it was initialized)
+			// Cleanup script processes first
+			if (factoryInstance) {
+				try {
+					logToFile('Cleaning up script processes...');
+					log.info('Cleaning up script processes...');
+					const scriptProcessService = factoryInstance.getScriptProcessService();
+					await scriptProcessService.cleanupAllProcesses();
+					logToFile('Script processes cleanup complete');
+				} catch (err) {
+					logToFile(`Error cleaning up script processes: ${err}`);
+					log.error('Error cleaning up script processes:', err);
+				}
+			}
+
+			// Close orchestrator second (if it was initialized)
 			if (orchestratorClient) {
 				logToFile('Shutting down orchestrator...');
 				log.info('Shutting down orchestrator...');
@@ -652,6 +667,7 @@ async function start(): Promise<void> {
 		// Storage mode: 'memory' (in-memory, data lost on restart), 'file' (persistent JSON files), 'mariadb' (not yet implemented)
 		const storageMode = (process.env.STORAGE_MODE || 'file') as 'memory' | 'file' | 'mariadb';
 		const factory = initializeFactory(storageMode, orchestratorClient);
+		factoryInstance = factory;
 
 		if (process.env.USE_PRODUCTION_DB === 'true') {
 			//TODO database integration
@@ -713,6 +729,15 @@ async function start(): Promise<void> {
 		// Start server
 		// Listen on 0.0.0.0 to allow connections from other devices on the network
 		await fastify.listen({ port: PORT, host: '0.0.0.0' });
+
+		// Check for orphaned script processes after server starts
+		try {
+			log.info('Checking for orphaned script processes...');
+			const scriptProcessService = factory.getScriptProcessService();
+			await scriptProcessService.checkOrphanedProcesses();
+		} catch (err) {
+			log.error('Error checking orphaned processes:', err);
+		}
 
 		// In E2E mode, emit a minimal success message for global-setup to detect
 		// This allows the test setup to know when the backend is ready without doing fetchs

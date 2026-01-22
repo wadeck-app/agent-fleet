@@ -1,15 +1,23 @@
 /**
- * Port calculation utility for parallel development across workspaces and projects
+ * Port calculation utility for parallel development across projects, workspaces, and workers
  *
- * Port allocation strategy:
- * - Rest Port (Orchestrator HTTP): BASE_REST_PORT + (workspaceId * 100) + (projectId * 10)
+ * Port allocation strategy (hierarchical):
+ * - Rest Port (Orchestrator HTTP): BASE_REST_PORT + (projectId * 1000) + (workspaceId * 100) + (workerId * 10)
  * - WebSocket Port (Orchestrator WS): REST_PORT + 1
  *
- * Examples:
- * - WORKSPACE_ID=0, PROJECT_ID=0: restPort=3700, wsPort=3701
- * - WORKSPACE_ID=0, PROJECT_ID=1: restPort=3710, wsPort=3711
- * - WORKSPACE_ID=1, PROJECT_ID=0: restPort=3800, wsPort=3801
- * - WORKSPACE_ID=1, PROJECT_ID=1: restPort=3810, wsPort=3811
+ * Hierarchy: PROJECT_ID (most impact) > WORKSPACE_ID (medium) > WORKER_ID (least, when present)
+ *
+ * Examples (without workerId):
+ * - PROJECT_ID=0, WORKSPACE_ID=0: restPort=7000, wsPort=7001
+ * - PROJECT_ID=0, WORKSPACE_ID=1: restPort=7100, wsPort=7101
+ * - PROJECT_ID=1, WORKSPACE_ID=0: restPort=8000, wsPort=8001
+ *
+ * Examples (with workerId for E2E parallel workers):
+ * - PROJECT_ID=0, WORKSPACE_ID=0, WORKER_ID=0: restPort=7000, wsPort=7001
+ * - PROJECT_ID=0, WORKSPACE_ID=0, WORKER_ID=1: restPort=7010, wsPort=7011
+ * - PROJECT_ID=0, WORKSPACE_ID=0, WORKER_ID=2: restPort=7020, wsPort=7021
+ * - PROJECT_ID=0, WORKSPACE_ID=1, WORKER_ID=0: restPort=7100, wsPort=7101
+ * - PROJECT_ID=1, WORKSPACE_ID=0, WORKER_ID=0: restPort=8000, wsPort=8001
  */
 
 export interface OrchestratorPorts {
@@ -17,17 +25,26 @@ export interface OrchestratorPorts {
 	wsPort: number;
 }
 
-const BASE_REST_PORT = 3700; // Base port for orchestrator REST endpoints
+const BASE_REST_PORT = 7000; // Base port for orchestrator REST/WebSocket endpoints (avoids common port conflicts)
 
 /**
- * Calculate orchestrator ports based on WORKSPACE_ID and PROJECT_ID
+ * Calculate orchestrator ports based on WORKSPACE_ID, PROJECT_ID, and optionally WORKER_ID
  *
  * @param workspaceId - Workspace identifier (WORKSPACE_ID env var), defaults to 0
  * @param projectId - Project identifier (PROJECT_ID env var), defaults to 0
+ * @param workerId - Worker identifier (WORKER_ID env var) for parallel E2E tests, defaults to 0
  * @returns Object with restPort and wsPort
  */
-export function calculateOrchestratorPorts(workspaceId: number = 0, projectId: number = 0): OrchestratorPorts {
-	const restPort = BASE_REST_PORT + workspaceId * 100 + projectId * 10;
+export function calculateOrchestratorPorts(
+	workspaceId: number = 0,
+	projectId: number = 0,
+	workerId: number = 0
+): OrchestratorPorts {
+	// Hierarchical port allocation: PROJECT > WORKSPACE > WORKER
+	// projectId * 1000: Allows 10 projects (0-9) with full isolation
+	// workspaceId * 100: Allows 10 workspaces per project (0-9)
+	// workerId * 10: Allows 10 workers per workspace (0-9)
+	const restPort = BASE_REST_PORT + projectId * 1000 + workspaceId * 100 + workerId * 10;
 	const wsPort = restPort + 1;
 
 	return { restPort, wsPort };
@@ -43,6 +60,7 @@ export function calculateOrchestratorPorts(workspaceId: number = 0, projectId: n
  * Falls back to calculating from:
  * - WORKSPACE_ID (default: 0)
  * - PROJECT_ID (default: 0)
+ * - WORKER_ID (default: 0, used for parallel E2E workers)
  *
  * @returns Object with restPort and wsPort
  */
@@ -54,11 +72,12 @@ export function getOrchestratorPortsFromEnv(): OrchestratorPorts {
 		return { restPort, wsPort };
 	}
 
-	// Fall back to calculating from WORKSPACE_ID and PROJECT_ID
+	// Fall back to calculating from WORKSPACE_ID, PROJECT_ID, and WORKER_ID
 	const workspaceId = parseInt(process.env.WORKSPACE_ID || '0', 10);
 	const projectId = parseInt(process.env.PROJECT_ID || '0', 10);
+	const workerId = parseInt(process.env.WORKER_ID || '0', 10);
 
-	return calculateOrchestratorPorts(workspaceId, projectId);
+	return calculateOrchestratorPorts(workspaceId, projectId, workerId);
 }
 
 /**
