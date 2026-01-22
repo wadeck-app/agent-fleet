@@ -9,7 +9,6 @@ import { PageHeader } from '@framework/components/layout/PageHeader';
 import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
 import { Button } from '@framework/components/primitives/Button';
 import { SearchInput } from '@framework/components/search/SearchInput';
-import { useDebounce } from '@framework/hooks2/useDebounce';
 import { useCrudPage } from '@framework/hooks/useCrudPage';
 import { toColumnVisibilityDefs } from '@framework/utils/table/ColumnConfig';
 import { Plus, Trash2, Utensils } from 'lucide-react';
@@ -69,10 +68,6 @@ export function IngredientsV5Page() {
 	});
 
 	// Add comment above the target line, not at the end
-	// Debounce search for Active Features panel display
-	const debouncedSearchQuery = useDebounce(crud.search?.searchQuery || '', 300);
-
-	// Add comment above the target line, not at the end
 	// Cache ID for demo (simulate cache control)
 	const [cacheId, _setCacheId] = useState(1);
 
@@ -130,7 +125,7 @@ export function IngredientsV5Page() {
 						{
 							label: 'Search',
 							value: crud.search?.searchQuery
-								? `${crud.search.searchQuery} / ${debouncedSearchQuery}`
+								? `${crud.search.searchQuery} / ${crud.search.debouncedSearchQuery}`
 								: 'none',
 						},
 						{

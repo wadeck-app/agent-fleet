@@ -7,6 +7,7 @@ import { usePagination } from '@framework/components/pagination/usePagination';
 import type { TableColumn } from '@framework/components/table/Table';
 import { useSorting } from '@framework/components/table/useSorting';
 import { useTableRefreshing } from '@framework/components/table/useTableRefreshing';
+import { useDebounce } from '@framework/hooks2/useDebounce';
 import { useCrudSuccessToast } from '@framework/hooks/useCrudSuccessToast';
 import { useErrorToast } from '@framework/hooks/useErrorToast';
 import { useRoutedDialog } from '@framework/hooks/useRoutedDialog';
@@ -132,6 +133,7 @@ export interface CrudPageState<TItem extends { id: string; version: number }> {
 	// Search (optional)
 	search?: {
 		searchQuery: string;
+		debouncedSearchQuery: string;
 		setSearchQuery: (query: string) => void;
 		clearSearch: () => void;
 	};
@@ -270,6 +272,10 @@ export function useCrudPage<TItem extends { id: string; version: number }>(
 
 	// Search
 	const searchState = useSearchHook?.({ onSearchChange: () => paginationState.setPage(1) });
+
+	// Add comment above the target line, not at the end
+	// Debounced search query for display purposes (e.g., ActiveFeaturesPanel)
+	const debouncedSearchQuery = useDebounce(searchState?.searchQuery || '', 300);
 
 	// Column visibility
 	const columnVisibilityState = useColumnVisibility(columnIds, {
@@ -490,7 +496,13 @@ export function useCrudPage<TItem extends { id: string; version: number }>(
 		},
 
 		// Search
-		search: enableSearch ? searchState : undefined,
+		search:
+			enableSearch && searchState
+				? {
+						...searchState,
+						debouncedSearchQuery,
+					}
+				: undefined,
 
 		// Selection & bulk actions
 		selection: {
