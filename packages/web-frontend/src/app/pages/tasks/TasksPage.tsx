@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { Data2 } from '@framework/components2/data/Data2';
 import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
@@ -13,8 +13,11 @@ import { useMultiSelect2 } from '@framework/hooks2/useMultiSelect2';
 import { usePagination2 } from '@framework/hooks2/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
 import { useSorting2 } from '@framework/hooks2/useSorting2';
+import { useBulkDeleteState } from '@framework/hooks/useBulkDeleteState';
 import { useCrudSuccessToast } from '@framework/hooks/useCrudSuccessToast';
+import { useDeleteConfirmation } from '@framework/hooks/useDeleteConfirmation';
 import { useErrorToast } from '@framework/hooks/useErrorToast';
+import { useMutationCleanup } from '@framework/hooks/useMutationCleanup';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
 import type { Task } from '@shared/api/tasks.contract';
 import { B2F_TASK_CREATED, B2F_TASK_DELETED, B2F_TASK_UPDATED } from '@shared/transport';
@@ -90,24 +93,25 @@ export function TasksPage() {
 	// Success toast helper
 	const successToast = useCrudSuccessToast('task');
 
-	// Bulk delete dialog state
-	const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
-	// Track IDs being deleted (for strike-through visual feedback)
-	const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
-	// Track if bulk delete is in progress (for blur effect)
-	const [isBulkDeleting, setIsBulkDeleting] = useState(false);
-	// Track if we're refreshing after a mutation (delete/update/create)
-	const [isRefreshingAfterMutation, setIsRefreshingAfterMutation] = useState(false);
-	// Track if we're waiting for a refresh to complete after a mutation
-	const isMutating = useRef(false);
+	// Bulk delete state management
+	const bulkDelete = useBulkDeleteState();
 
-	// Delete confirmation dialog state
-	const [deleteConfirmation, setDeleteConfirmation] = useState<{
-		open: boolean;
-		taskId: string | null;
-	}>({
-		open: false,
-		taskId: null,
+	// Delete confirmation state management
+	const deleteConfirmation = useDeleteConfirmation({
+		onConfirm: async id => {
+			bulkDelete.actions.setDeletingIds(new Set([...bulkDelete.state.deletingIds, id]));
+			bulkDelete.actions.markMutating();
+
+			try {
+				await deleteTask(id);
+				await cache.actions.refresh();
+				successToast.deleted();
+			} finally {
+				const next = new Set(bulkDelete.state.deletingIds);
+				next.delete(id);
+				bulkDelete.actions.setDeletingIds(next);
+			}
+		},
 	});
 
 	// Store fetched tasks for visual feedback
@@ -129,15 +133,12 @@ export function TasksPage() {
 		},
 	});
 
-	// Clear isRefreshingAfterMutation and isBulkDeleting when the data changes
-	useEffect(() => {
-		if (isMutating.current && tasks.length > 0) {
-			isMutating.current = false;
-			setIsRefreshingAfterMutation(false);
-			setIsBulkDeleting(false);
-			setDeletingIds(new Set());
-		}
-	}, [tasks]);
+	// Automatically clean up mutation state when data refreshes
+	useMutationCleanup({
+		data: tasks,
+		isMutating: bulkDelete.state.isMutating,
+		onCleanup: () => bulkDelete.actions.clear(),
+	});
 
 	// Fetch function - query includes all features composed by Data2
 	const fetchTasks = useCallback(async (query: ComposedQuery) => {
@@ -166,37 +167,9 @@ export function TasksPage() {
 		cache.actions.refresh();
 	};
 
-	const handleDelete = (id: string) => {
-		setDeleteConfirmation({ open: true, taskId: id });
-	};
-
-	const handleDeleteConfirm = async () => {
-		if (deleteConfirmation.taskId) {
-			// Mark as deleting for strike-through effect
-			setDeletingIds(prev => new Set([...prev, deleteConfirmation.taskId!]));
-			// Start refreshing state
-			setIsRefreshingAfterMutation(true);
-			// Mark mutation mode
-			isMutating.current = true;
-
-			try {
-				await deleteTask(deleteConfirmation.taskId);
-				await cache.actions.refresh();
-				successToast.deleted();
-			} finally {
-				setDeletingIds(prev => {
-					const next = new Set(prev);
-					next.delete(deleteConfirmation.taskId!);
-					return next;
-				});
-			}
-		}
-		setDeleteConfirmation({ open: false, taskId: null });
-	};
-
 	const handleBulkDelete = async () => {
 		if (selection.fstate.isEmpty) return;
-		setShowBulkDeleteDialog(true);
+		bulkDelete.actions.openDialog();
 	};
 
 	// Handle select all for current page
@@ -299,10 +272,10 @@ export function TasksPage() {
 				{injectedProps => (
 					<TasksTable
 						{...injectedProps}
-						onDelete={handleDelete}
-						refreshing={injectedProps.isLoading || isRefreshingAfterMutation}
-						deleting={isBulkDeleting}
-						deletingIds={deletingIds}
+						onDelete={deleteConfirmation.open}
+						refreshing={injectedProps.isLoading || bulkDelete.state.isRefreshingAfterMutation}
+						deleting={bulkDelete.state.isBulkDeleting}
+						deletingIds={bulkDelete.state.deletingIds}
 						onSelectionToggle={selection.actions.toggle}
 						onSelectAll={handleSelectAll}
 					/>
@@ -317,8 +290,8 @@ export function TasksPage() {
 
 			{/* Bulk Delete Workflow */}
 			<BulkDeleteWorkflow
-				open={showBulkDeleteDialog}
-				onOpenChange={setShowBulkDeleteDialog}
+				open={bulkDelete.state.showDialog}
+				onOpenChange={bulkDelete.actions.setShowDialog}
 				selectedIds={selection.fstate.selectedIds}
 				onClear={selection.actions.clear}
 				onBulkDelete={bulkDeleteTasks}
@@ -326,29 +299,27 @@ export function TasksPage() {
 				itemTypeName="task"
 				onDeletingChange={ids => {
 					if (ids.size > 0) {
-						setDeletingIds(ids);
+						bulkDelete.actions.setDeletingIds(ids);
 					}
 				}}
 				onBulkDeletingChange={deleting => {
 					if (deleting) {
-						setIsBulkDeleting(true);
-						isMutating.current = true;
+						bulkDelete.actions.setIsBulkDeleting(true);
+						bulkDelete.actions.markMutating();
 					}
 				}}
 			/>
 
 			{/* Delete Confirmation Dialog */}
 			<AlertDialogWrapper
-				open={deleteConfirmation.open}
-				onOpenChange={open => {
-					setDeleteConfirmation({ open, taskId: open ? deleteConfirmation.taskId : null });
-				}}
+				open={deleteConfirmation.isOpen}
+				onOpenChange={deleteConfirmation.setOpen}
 				title="Delete Task"
 				description="Are you sure you want to delete this task? This action cannot be undone."
 				confirmLabel="Delete"
 				cancelLabel="Cancel"
 				variant="danger"
-				onConfirm={handleDeleteConfirm}
+				onConfirm={deleteConfirmation.confirm}
 			/>
 		</Page>
 	);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { Data2 } from '@framework/components2/data/Data2';
 import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
@@ -14,8 +14,11 @@ import { useMultiSelect2 } from '@framework/hooks2/useMultiSelect2';
 import { usePagination2 } from '@framework/hooks2/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
 import { useSorting2 } from '@framework/hooks2/useSorting2';
+import { useBulkDeleteState } from '@framework/hooks/useBulkDeleteState';
 import { useCrudSuccessToast } from '@framework/hooks/useCrudSuccessToast';
+import { useDeleteConfirmation } from '@framework/hooks/useDeleteConfirmation';
 import { useErrorToast } from '@framework/hooks/useErrorToast';
+import { useMutationCleanup } from '@framework/hooks/useMutationCleanup';
 import type { Intervention, InterventionsQuery } from '@shared/api/interventions.contract';
 import { B2F_INTERVENTIONS_UPDATED, B2F_INTERVENTION_CREATED } from '@shared/transport';
 import { XCircle } from 'lucide-react';
@@ -89,42 +92,36 @@ export function InterventionsV2Page() {
 	// Success toast helper
 	const successToast = useCrudSuccessToast('intervention');
 
-	// Cancel confirmation dialog state
-	const [cancelConfirmation, setCancelConfirmation] = useState<{
-		open: boolean;
-		interventionId: string | null;
-	}>({
-		open: false,
-		interventionId: null,
+	// Bulk delete state management (reusing for cancel operations)
+	const bulkDelete = useBulkDeleteState();
+
+	// Delete confirmation state management (reusing for cancel operations)
+	const deleteConfirmation = useDeleteConfirmation({
+		onConfirm: async id => {
+			bulkDelete.actions.setDeletingIds(new Set([...bulkDelete.state.deletingIds, id]));
+			bulkDelete.actions.markMutating();
+
+			try {
+				await cancelIntervention(id);
+				await cache.actions.refresh();
+				successToast.deleted();
+			} finally {
+				const next = new Set(bulkDelete.state.deletingIds);
+				next.delete(id);
+				bulkDelete.actions.setDeletingIds(next);
+			}
+		},
 	});
-
-	// Bulk cancel dialog state
-	const [showBulkCancelDialog, setShowBulkCancelDialog] = useState(false);
-
-	// Track IDs being cancelled (for strike-through visual feedback)
-	const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
-
-	// Track if bulk cancel is in progress (for blur effect)
-	const [isBulkCancelling, setIsBulkCancelling] = useState(false);
-
-	// Track if we're refreshing after a mutation (cancel)
-	const [isRefreshingAfterMutation, setIsRefreshingAfterMutation] = useState(false);
-
-	// Track if we're waiting for a refresh to complete after a mutation
-	const isMutating = useRef(false);
 
 	// Store fetched interventions for visual feedback
 	const [interventions, setInterventions] = useState<Intervention[]>([]);
 
-	// Clear isRefreshingAfterMutation and isBulkCancelling when the data changes
-	useEffect(() => {
-		if (isMutating.current && interventions.length > 0) {
-			isMutating.current = false;
-			setIsRefreshingAfterMutation(false);
-			setIsBulkCancelling(false);
-			setCancellingIds(new Set());
-		}
-	}, [interventions]);
+	// Automatically clean up mutation state when data refreshes
+	useMutationCleanup({
+		data: interventions,
+		isMutating: bulkDelete.state.isMutating,
+		onCleanup: () => bulkDelete.actions.clear(),
+	});
 
 	// Real-time updates
 	useRealtimeRefresh({
@@ -147,39 +144,10 @@ export function InterventionsV2Page() {
 		};
 	}, []);
 
-	// Handle cancel single intervention
-	const handleCancel = (id: string) => {
-		setCancelConfirmation({ open: true, interventionId: id });
-	};
-
-	const handleCancelConfirm = async () => {
-		if (cancelConfirmation.interventionId) {
-			// Mark as cancelling for strike-through effect
-			setCancellingIds(prev => new Set([...prev, cancelConfirmation.interventionId!]));
-			// Start refreshing state
-			setIsRefreshingAfterMutation(true);
-			// Mark mutation mode
-			isMutating.current = true;
-
-			try {
-				await cancelIntervention(cancelConfirmation.interventionId);
-				await cache.actions.refresh();
-				successToast.deleted();
-			} finally {
-				setCancellingIds(prev => {
-					const next = new Set(prev);
-					next.delete(cancelConfirmation.interventionId!);
-					return next;
-				});
-			}
-		}
-		setCancelConfirmation({ open: false, interventionId: null });
-	};
-
 	// Handle bulk cancel
 	const handleBulkCancel = async () => {
 		if (selection.fstate.isEmpty) return;
-		setShowBulkCancelDialog(true);
+		bulkDelete.actions.openDialog();
 	};
 
 	// Adapter function to convert BulkCancelResponse to BulkDeleteResponse format
@@ -289,10 +257,10 @@ export function InterventionsV2Page() {
 					<>
 						<InterventionsTable
 							{...injectedProps}
-							onCancel={handleCancel}
-							refreshing={injectedProps.isLoading || isRefreshingAfterMutation}
-							cancelling={isBulkCancelling}
-							cancellingIds={cancellingIds}
+							onCancel={deleteConfirmation.open}
+							refreshing={injectedProps.isLoading || bulkDelete.state.isRefreshingAfterMutation}
+							cancelling={bulkDelete.state.isBulkDeleting}
+							cancellingIds={bulkDelete.state.deletingIds}
 							onSelectionToggle={selection.actions.toggle}
 							onSelectAll={handleSelectAll}
 						/>
@@ -310,8 +278,8 @@ export function InterventionsV2Page() {
 
 			{/* Bulk Cancel Workflow */}
 			<BulkDeleteWorkflow
-				open={showBulkCancelDialog}
-				onOpenChange={setShowBulkCancelDialog}
+				open={bulkDelete.state.showDialog}
+				onOpenChange={bulkDelete.actions.setShowDialog}
 				selectedIds={selection.fstate.selectedIds}
 				onClear={selection.actions.clear}
 				onBulkDelete={bulkCancelAdapter}
@@ -319,29 +287,27 @@ export function InterventionsV2Page() {
 				itemTypeName="intervention"
 				onDeletingChange={ids => {
 					if (ids.size > 0) {
-						setCancellingIds(ids);
+						bulkDelete.actions.setDeletingIds(ids);
 					}
 				}}
 				onBulkDeletingChange={cancelling => {
 					if (cancelling) {
-						setIsBulkCancelling(true);
-						isMutating.current = true;
+						bulkDelete.actions.setIsBulkDeleting(true);
+						bulkDelete.actions.markMutating();
 					}
 				}}
 			/>
 
 			{/* Cancel Confirmation Dialog */}
 			<AlertDialogWrapper
-				open={cancelConfirmation.open}
-				onOpenChange={open => {
-					setCancelConfirmation({ open, interventionId: open ? cancelConfirmation.interventionId : null });
-				}}
+				open={deleteConfirmation.isOpen}
+				onOpenChange={deleteConfirmation.setOpen}
 				title="Cancel Intervention"
 				description="Are you sure you want to cancel this intervention? This action cannot be undone."
 				confirmLabel="Cancel Intervention"
 				cancelLabel="Go Back"
 				variant="danger"
-				onConfirm={handleCancelConfirm}
+				onConfirm={deleteConfirmation.confirm}
 			/>
 		</Page>
 	);

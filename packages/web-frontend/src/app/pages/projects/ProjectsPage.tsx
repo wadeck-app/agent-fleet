@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { Data2 } from '@framework/components2/data/Data2';
 import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
@@ -13,8 +13,11 @@ import { useMultiSelect2 } from '@framework/hooks2/useMultiSelect2';
 import { usePagination2 } from '@framework/hooks2/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
 import { useSorting2 } from '@framework/hooks2/useSorting2';
+import { useBulkDeleteState } from '@framework/hooks/useBulkDeleteState';
 import { useCrudSuccessToast } from '@framework/hooks/useCrudSuccessToast';
+import { useDeleteConfirmation } from '@framework/hooks/useDeleteConfirmation';
 import { useErrorToast } from '@framework/hooks/useErrorToast';
+import { useMutationCleanup } from '@framework/hooks/useMutationCleanup';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
 import type { Project } from '@shared/api/projects.contract';
 import { B2F_PROJECT_CREATED, B2F_PROJECT_DELETED, B2F_PROJECT_UPDATED } from '@shared/transport';
@@ -94,24 +97,29 @@ export function ProjectsPage() {
 	// Success toast helper
 	const successToast = useCrudSuccessToast('project');
 
-	// Bulk delete dialog state
-	const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
-	// Track IDs being deleted (for strike-through visual feedback)
-	const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
-	// Track if bulk delete is in progress (for blur effect)
-	const [isBulkDeleting, setIsBulkDeleting] = useState(false);
-	// Track if we're refreshing after a mutation (delete/update/create)
-	const [isRefreshingAfterMutation, setIsRefreshingAfterMutation] = useState(false);
-	// Track if we're waiting for a refresh to complete after a mutation
-	const isMutating = useRef(false);
+	// Add comment above the target line, not at the end
+	// Bulk delete state management (centralized hook eliminates ~60 lines of boilerplate)
+	const bulkDelete = useBulkDeleteState();
 
-	// Delete confirmation dialog state
-	const [deleteConfirmation, setDeleteConfirmation] = useState<{
-		open: boolean;
-		projectId: string | null;
-	}>({
-		open: false,
-		projectId: null,
+	// Add comment above the target line, not at the end
+	// Delete confirmation dialog (centralized hook eliminates ~30 lines of boilerplate)
+	const deleteConfirmation = useDeleteConfirmation({
+		onConfirm: async id => {
+			// Add comment above the target line, not at the end
+			// Mark as deleting for strike-through effect
+			bulkDelete.actions.setDeletingIds(new Set([...bulkDelete.state.deletingIds, id]));
+			bulkDelete.actions.markMutating();
+
+			try {
+				await deleteProject(id);
+				await cache.actions.refresh();
+				successToast.deleted();
+			} finally {
+				const next = new Set(bulkDelete.state.deletingIds);
+				next.delete(id);
+				bulkDelete.actions.setDeletingIds(next);
+			}
+		},
 	});
 
 	// Store fetched projects for visual feedback
@@ -125,15 +133,13 @@ export function ProjectsPage() {
 		logPrefix: 'ProjectsPage',
 	});
 
-	// Clear isRefreshingAfterMutation and isBulkDeleting when the data changes
-	useEffect(() => {
-		if (isMutating.current && projects.length > 0) {
-			isMutating.current = false;
-			setIsRefreshingAfterMutation(false);
-			setIsBulkDeleting(false);
-			setDeletingIds(new Set());
-		}
-	}, [projects]);
+	// Add comment above the target line, not at the end
+	// Automatic cleanup after mutation completes (eliminates ~10 lines of useEffect boilerplate)
+	useMutationCleanup({
+		data: projects,
+		isMutating: bulkDelete.state.isMutating,
+		onCleanup: () => bulkDelete.actions.clear(),
+	});
 
 	// Fetch function - query includes all features composed by Data2
 	const fetchProjects = useCallback(async (query: ComposedQuery) => {
@@ -166,37 +172,9 @@ export function ProjectsPage() {
 		setEditDialogState({ open: true, project });
 	};
 
-	const handleDelete = (id: string) => {
-		setDeleteConfirmation({ open: true, projectId: id });
-	};
-
-	const handleDeleteConfirm = async () => {
-		if (deleteConfirmation.projectId) {
-			// Mark as deleting for strike-through effect
-			setDeletingIds(prev => new Set([...prev, deleteConfirmation.projectId!]));
-			// Start refreshing state
-			setIsRefreshingAfterMutation(true);
-			// Mark mutation mode
-			isMutating.current = true;
-
-			try {
-				await deleteProject(deleteConfirmation.projectId);
-				await cache.actions.refresh();
-				successToast.deleted();
-			} finally {
-				setDeletingIds(prev => {
-					const next = new Set(prev);
-					next.delete(deleteConfirmation.projectId!);
-					return next;
-				});
-			}
-		}
-		setDeleteConfirmation({ open: false, projectId: null });
-	};
-
 	const handleBulkDelete = async () => {
 		if (selection.fstate.isEmpty) return;
-		setShowBulkDeleteDialog(true);
+		bulkDelete.actions.openDialog();
 	};
 
 	// Handle select all for current page
@@ -283,10 +261,10 @@ export function ProjectsPage() {
 					<ProjectsTable
 						{...injectedProps}
 						onEdit={handleEdit}
-						onDelete={handleDelete}
-						refreshing={injectedProps.isLoading || isRefreshingAfterMutation}
-						deleting={isBulkDeleting}
-						deletingIds={deletingIds}
+						onDelete={deleteConfirmation.open}
+						refreshing={injectedProps.isLoading || bulkDelete.state.isRefreshingAfterMutation}
+						deleting={bulkDelete.state.isBulkDeleting}
+						deletingIds={bulkDelete.state.deletingIds}
 						onSelectionToggle={selection.actions.toggle}
 						onSelectAll={handleSelectAll}
 					/>
@@ -308,38 +286,34 @@ export function ProjectsPage() {
 
 			{/* Bulk Delete Workflow */}
 			<BulkDeleteWorkflow
-				open={showBulkDeleteDialog}
-				onOpenChange={setShowBulkDeleteDialog}
+				open={bulkDelete.state.showDialog}
+				onOpenChange={bulkDelete.actions.setShowDialog}
 				selectedIds={selection.fstate.selectedIds}
 				onClear={selection.actions.clear}
 				onBulkDelete={bulkDeleteProjects}
 				onReload={async () => cache.actions.refresh()}
 				itemTypeName="project"
 				onDeletingChange={ids => {
-					if (ids.size > 0) {
-						setDeletingIds(ids);
-					}
+					bulkDelete.actions.setDeletingIds(ids);
 				}}
 				onBulkDeletingChange={deleting => {
 					if (deleting) {
-						setIsBulkDeleting(true);
-						isMutating.current = true;
+						bulkDelete.actions.startDeleting(new Set());
+						bulkDelete.actions.markMutating();
 					}
 				}}
 			/>
 
 			{/* Delete Confirmation Dialog */}
 			<AlertDialogWrapper
-				open={deleteConfirmation.open}
-				onOpenChange={open => {
-					setDeleteConfirmation({ open, projectId: open ? deleteConfirmation.projectId : null });
-				}}
+				open={deleteConfirmation.isOpen}
+				onOpenChange={deleteConfirmation.setOpen}
 				title="Delete Project"
 				description="Are you sure you want to delete this project? This action cannot be undone."
 				confirmLabel="Delete"
 				cancelLabel="Cancel"
 				variant="danger"
-				onConfirm={handleDeleteConfirm}
+				onConfirm={deleteConfirmation.confirm}
 			/>
 		</Page>
 	);
