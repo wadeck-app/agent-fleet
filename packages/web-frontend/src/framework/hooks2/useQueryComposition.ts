@@ -45,11 +45,11 @@ export interface UseQueryCompositionResult {
  * Each feature is optional and can be null/undefined.
  */
 export interface UseQueryCompositionParams {
-	pagination?: FeatureContract<any> | null;
-	sorting?: FeatureContract<any> | null;
-	search?: FeatureContract<any> | null;
-	filter?: FeatureContract<any> | null;
-	cache?: FeatureContract<any> | null;
+	pagination?: FeatureContract<unknown> | null;
+	sorting?: FeatureContract<unknown> | null;
+	search?: FeatureContract<unknown> | null;
+	filter?: FeatureContract<unknown> | null;
+	cache?: FeatureContract<unknown> | null;
 }
 
 /**

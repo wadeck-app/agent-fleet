@@ -201,7 +201,12 @@ export function ConfigureScriptsDialog({
 						<div className="mb-3 flex items-center justify-between">
 							<h3 className="text-sm font-semibold">Available Scripts from package.json</h3>
 							<Button variant="outline" size="sm" onClick={handleDiscover} disabled={isDiscovering}>
-								<RefreshCw className={`mr-1 size-4 ${isDiscovering ? 'animate-spin' : ''}`} />
+								<RefreshCw
+									className={`
+          mr-1 size-4
+          ${isDiscovering ? 'animate-spin' : ''}
+        `}
+								/>
 								Discover
 							</Button>
 						</div>
@@ -213,7 +218,10 @@ export function ConfigureScriptsDialog({
 									return (
 										<div
 											key={script.name}
-											className="flex items-center justify-between rounded border border-border bg-card p-3"
+											className={`
+             flex items-center justify-between rounded border border-border
+             bg-card p-3
+           `}
 										>
 											<div className="flex-1">
 												<div className="font-mono text-sm font-semibold">{script.name}</div>
@@ -256,8 +264,13 @@ export function ConfigureScriptsDialog({
 
 						{editingScripts.length > 0 ? (
 							<div className="space-y-3">
-								{editingScripts.map((script, index) => (
-									<div key={script.id} className="rounded border border-border bg-card p-4">
+								{editingScripts.map((script, _index) => (
+									<div
+										key={script.id}
+										className={`
+           rounded border border-border bg-card p-4
+         `}
+									>
 										<div className="mb-3 flex items-center gap-2">
 											<GripVertical className="size-4 text-muted-foreground" />
 											<div className="flex-1 font-mono text-sm font-semibold">
@@ -305,7 +318,7 @@ export function ConfigureScriptsDialog({
 										</div>
 
 										<div className="mt-3 flex items-center gap-4">
-											<label className="flex items-center gap-2 text-xs">
+											<Label className="flex items-center gap-2 text-xs">
 												<Switch
 													checked={script.enabled}
 													onCheckedChange={checked =>
@@ -313,8 +326,8 @@ export function ConfigureScriptsDialog({
 													}
 												/>
 												<span>Enabled</span>
-											</label>
-											<label className="flex items-center gap-2 text-xs">
+											</Label>
+											<Label className="flex items-center gap-2 text-xs">
 												<Switch
 													checked={script.autoStart}
 													onCheckedChange={checked =>
@@ -322,8 +335,8 @@ export function ConfigureScriptsDialog({
 													}
 												/>
 												<span>Auto-start</span>
-											</label>
-											<label className="flex items-center gap-2 text-xs">
+											</Label>
+											<Label className="flex items-center gap-2 text-xs">
 												<Switch
 													checked={script.restartOnFailure}
 													onCheckedChange={checked =>
@@ -331,7 +344,7 @@ export function ConfigureScriptsDialog({
 													}
 												/>
 												<span>Restart on failure</span>
-											</label>
+											</Label>
 										</div>
 									</div>
 								))}

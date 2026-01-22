@@ -19,7 +19,12 @@ export function ScriptSelector({ scripts, value, onChange, disabled = false }: S
 	// If no scripts configured, show placeholder
 	if (scripts.length === 0) {
 		return (
-			<div className="flex-1 rounded border border-dashed border-border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+			<div
+				className={`
+     flex-1 rounded border border-dashed border-border bg-muted/20 px-3 py-2
+     text-sm text-muted-foreground
+   `}
+			>
 				No scripts configured
 			</div>
 		);

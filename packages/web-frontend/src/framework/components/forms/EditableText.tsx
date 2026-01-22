@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { getErrorMessage } from '@framework/utils/errors/errorUtils';
+
 import { Input } from './Input';
 
 export interface EditableTextProps {
@@ -68,8 +70,7 @@ export function EditableText({
 			await onSave(trimmed);
 			setIsEditing(false);
 		} catch (err) {
-			const message = err instanceof Error ? err.message : 'Failed to save';
-			setError(message);
+			setError(getErrorMessage(err));
 		} finally {
 			setIsSaving(false);
 		}

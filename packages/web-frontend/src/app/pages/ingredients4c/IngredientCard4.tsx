@@ -117,7 +117,12 @@ export function IngredientCard4({
       `}
 					>
 						{metadataFields.map(field => (
-							<div key={field.key} className={`flex justify-between text-xs text-muted-foreground`}>
+							<div
+								key={field.key}
+								className={`
+         flex justify-between text-xs text-muted-foreground
+       `}
+							>
 								<span>{field.label}:</span>
 								<span className={field.key === 'id' ? 'font-mono' : ''}>
 									{field.render(ingredient)}

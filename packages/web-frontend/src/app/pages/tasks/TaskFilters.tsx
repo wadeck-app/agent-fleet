@@ -2,6 +2,7 @@ import { Input } from '@framework/components/forms/Input';
 import { FilterGrid } from '@framework/components/layout/FilterGrid';
 import { Button } from '@framework/components/primitives/Button';
 import { SelectInput } from '@framework/features/forms/inputs/SelectInput';
+import type { TaskPriority, TaskStatus } from '@shared/api/tasks.contract';
 
 import type { TaskFiltersContract } from './useTaskFilters';
 
@@ -64,7 +65,7 @@ export function TaskFilters({ filters }: TaskFiltersProps) {
 				<SelectInput
 					id="status-filter"
 					value={filters.fstate.status || '__all__'}
-					onChange={val => filters.actions.setStatus(val === '__all__' ? undefined : (val as any))}
+					onChange={val => filters.actions.setStatus(val === '__all__' ? undefined : (val as TaskStatus))}
 					options={STATUS_OPTIONS}
 				/>
 			</div>
@@ -75,7 +76,7 @@ export function TaskFilters({ filters }: TaskFiltersProps) {
 				<SelectInput
 					id="priority-filter"
 					value={filters.fstate.priority || '__all__'}
-					onChange={val => filters.actions.setPriority(val === '__all__' ? undefined : (val as any))}
+					onChange={val => filters.actions.setPriority(val === '__all__' ? undefined : (val as TaskPriority))}
 					options={PRIORITY_OPTIONS}
 				/>
 			</div>

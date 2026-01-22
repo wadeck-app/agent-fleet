@@ -57,7 +57,14 @@ export function TransportModeSelector({ className }: TransportModeSelectorProps)
 	return (
 		<div className={className}>
 			<Label className="mb-2 block text-xs font-medium text-muted-foreground">Transport Mode (Dev)</Label>
-			<RadioGroup value={selectedMode} onValueChange={handleChange} className={`gap-2`} disabled={isSwitching}>
+			<RadioGroup
+				value={selectedMode}
+				onValueChange={handleChange}
+				className={`
+     gap-2
+   `}
+				disabled={isSwitching}
+			>
 				{modes.map(mode => (
 					<div key={mode.value} className="flex items-center space-x-2">
 						<RadioGroupItem value={mode.value} id={`transport-${mode.value}`} disabled={isSwitching} />

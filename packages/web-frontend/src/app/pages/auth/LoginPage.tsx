@@ -100,11 +100,7 @@ export function LoginPage() {
 	}
 
 	return (
-		<div
-			className={`
-    flex min-h-screen items-center justify-center bg-background px-4
-  `}
-		>
+		<div className={`flex min-h-screen items-center justify-center bg-background px-4`}>
 			<div className="w-full max-w-md space-y-8">
 				{/* Header */}
 				<div className="text-center">
@@ -173,11 +169,7 @@ export function LoginPage() {
 
 					{/* Demo credentials info (for development) */}
 					{process.env.NODE_ENV === 'development' && (
-						<div
-							className={`
-        mt-6 rounded-md bg-muted p-4 text-xs text-muted-foreground
-      `}
-						>
+						<div className={`mt-6 rounded-md bg-muted p-4 text-xs text-muted-foreground`}>
 							<p className="font-semibold">Demo Credentials:</p>
 							<p className="mt-1">Email: demo@example.com</p>
 							<p>Password: demo123</p>

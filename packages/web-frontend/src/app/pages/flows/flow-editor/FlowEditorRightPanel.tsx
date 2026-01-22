@@ -60,21 +60,11 @@ export function FlowEditorRightPanel({ flowDefinition, validationResult, onIssue
 				{/* Header */}
 				<div className="flex items-center justify-between border-b p-3">
 					<TabsList>
-						<TabsTrigger
-							value="yaml"
-							className={`
-        flex cursor-pointer items-center gap-2
-      `}
-						>
+						<TabsTrigger value="yaml" className={`flex cursor-pointer items-center gap-2`}>
 							<Code className="size-4" />
 							YAML
 						</TabsTrigger>
-						<TabsTrigger
-							value="validation"
-							className={`
-        flex cursor-pointer items-center gap-2
-      `}
-						>
+						<TabsTrigger value="validation" className={`flex cursor-pointer items-center gap-2`}>
 							<ShieldAlert className="size-4" />
 							Validation
 							{hasValidationIssues && (
@@ -115,7 +105,11 @@ export function FlowEditorRightPanel({ flowDefinition, validationResult, onIssue
 								No flow loaded
 							</div>
 						) : (
-							<pre className={`h-full overflow-auto rounded bg-muted p-3 font-mono text-xs`}>
+							<pre
+								className={`
+         h-full overflow-auto rounded bg-muted p-3 font-mono text-xs
+       `}
+							>
 								<code>{yamlContent}</code>
 							</pre>
 						)}

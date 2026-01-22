@@ -107,11 +107,7 @@ export function FlowEditorPage() {
 						<p className="mb-6 text-sm text-muted-foreground">{flowEditor.flowDefinition.description}</p>
 					)}
 
-					<div
-						className={`
-       flex h-[calc(100vh-12rem)] flex-col rounded-lg border bg-card
-     `}
-					>
+					<div className={`flex h-[calc(100vh-12rem)] flex-col rounded-lg border bg-card`}>
 						{/* Toolbar */}
 						<FlowEditorToolbar
 							onSave={flowEditor.saveFlow}

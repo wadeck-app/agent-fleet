@@ -70,7 +70,7 @@ export interface Data2Props<T> {
 	/** Filter feature contract (optional) */
 	filter?: FilterContract | null;
 	/** Cache control feature contract (optional) */
-	cache?: FeatureContract<any> | null;
+	cache?: FeatureContract<unknown> | null;
 	/** Multi-selection feature contract (optional) */
 	selection?: MultiSelectContract | null;
 	/** Mutation feature contract (optional) - enables direct cache mutations */

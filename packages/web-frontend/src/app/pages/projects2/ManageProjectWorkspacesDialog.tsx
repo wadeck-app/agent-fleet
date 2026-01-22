@@ -252,11 +252,7 @@ export function ManageProjectWorkspacesDialog({
 					</div>
 
 					{associatedWorkspaces.length === 0 ? (
-						<div
-							className={`
-        flex flex-col items-center justify-center py-8 text-center
-      `}
-						>
+						<div className={`flex flex-col items-center justify-center py-8 text-center`}>
 							<div className="mb-2 text-3xl text-muted-foreground">🔗</div>
 							<p className="text-sm text-muted-foreground">No associated workspaces</p>
 							<p className="text-xs text-muted-foreground">Associate workspaces from the right panel</p>
@@ -304,20 +300,12 @@ export function ManageProjectWorkspacesDialog({
 					/>
 
 					{availableWorkspaces.length === 0 ? (
-						<div
-							className={`
-        flex flex-col items-center justify-center py-8 text-center
-      `}
-						>
+						<div className={`flex flex-col items-center justify-center py-8 text-center`}>
 							<div className="mb-2 text-3xl text-muted-foreground">✨</div>
 							<p className="text-sm text-muted-foreground">All workspaces are associated</p>
 						</div>
 					) : filteredAvailableWorkspaces.length === 0 ? (
-						<div
-							className={`
-        flex flex-col items-center justify-center py-8 text-center
-      `}
-						>
+						<div className={`flex flex-col items-center justify-center py-8 text-center`}>
 							<div className="mb-2 text-3xl text-muted-foreground">🔍</div>
 							<p className="text-sm text-muted-foreground">No workspaces match your search</p>
 						</div>

@@ -39,14 +39,7 @@ export function SidebarNav({ items, className, mobile = false }: SidebarNavProps
 				{items.map((item, index) => {
 					// Check if this is a separator
 					if ('type' in item && item.type === 'separator') {
-						return (
-							<div
-								key={`separator-${index}`}
-								className={`
-        my-2 border-t border-border
-      `}
-							/>
-						);
+						return <div key={`separator-${index}`} className={`my-2 border-t border-border`} />;
 					}
 
 					// Regular nav item - TypeScript knows this is NavItemRegular after the guard above

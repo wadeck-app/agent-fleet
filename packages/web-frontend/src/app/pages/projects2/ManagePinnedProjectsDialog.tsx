@@ -172,7 +172,11 @@ export function ManagePinnedProjectsDialog({
 					</div>
 
 					{pinnedProjects.length === 0 ? (
-						<div className={`flex flex-col items-center justify-center py-8 text-center`}>
+						<div
+							className={`
+        flex flex-col items-center justify-center py-8 text-center
+      `}
+						>
 							<div className="mb-2 text-3xl text-muted-foreground">📌</div>
 							<p className="text-sm text-muted-foreground">No pinned projects</p>
 							<p className="text-xs text-muted-foreground">Pin projects from the right panel</p>
@@ -220,12 +224,20 @@ export function ManagePinnedProjectsDialog({
 					/>
 
 					{availableProjects.length === 0 ? (
-						<div className={`flex flex-col items-center justify-center py-8 text-center`}>
+						<div
+							className={`
+        flex flex-col items-center justify-center py-8 text-center
+      `}
+						>
 							<div className="mb-2 text-3xl text-muted-foreground">✨</div>
 							<p className="text-sm text-muted-foreground">All projects are pinned</p>
 						</div>
 					) : filteredAvailableProjects.length === 0 ? (
-						<div className={`flex flex-col items-center justify-center py-8 text-center`}>
+						<div
+							className={`
+        flex flex-col items-center justify-center py-8 text-center
+      `}
+						>
 							<div className="mb-2 text-3xl text-muted-foreground">🔍</div>
 							<p className="text-sm text-muted-foreground">No projects match your search</p>
 						</div>

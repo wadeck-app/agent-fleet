@@ -85,11 +85,11 @@ const mockUpdateIngredient = vi.fn((id: string, data) => {
 });
 const mockDeleteIngredient = vi.fn().mockResolvedValue(undefined);
 const mockBulkDeleteIngredients = vi.fn((ids: string[]) => Promise.resolve(createMockBulkDeleteResponse(ids)));
-const mockCalculateTotalMacros = vi.fn(ingredients => ({
-	totalCalories: ingredients.reduce((sum: number, i: any) => sum + (i.calories || 0), 0),
-	totalProtein: ingredients.reduce((sum: number, i: any) => sum + (i.protein || 0), 0),
-	totalCarbs: ingredients.reduce((sum: number, i: any) => sum + (i.carbs || 0), 0),
-	totalFat: ingredients.reduce((sum: number, i: any) => sum + (i.fat || 0), 0),
+const mockCalculateTotalMacros = vi.fn((ingredients: Ingredient[]) => ({
+	totalCalories: ingredients.reduce((sum: number, i: Ingredient) => sum + (i.calories || 0), 0),
+	totalProtein: ingredients.reduce((sum: number, i: Ingredient) => sum + (i.protein || 0), 0),
+	totalCarbs: ingredients.reduce((sum: number, i: Ingredient) => sum + (i.carbs || 0), 0),
+	totalFat: ingredients.reduce((sum: number, i: Ingredient) => sum + (i.fat || 0), 0),
 }));
 
 vi.mock('@app/pages/ingredients/IngredientsService', () => ({

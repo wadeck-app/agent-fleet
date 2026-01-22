@@ -2,6 +2,7 @@ import { Input } from '@framework/components/forms/Input';
 import { FilterGrid } from '@framework/components/layout/FilterGrid';
 import { Button } from '@framework/components/primitives/Button';
 import { SelectInput } from '@framework/features/forms/inputs/SelectInput';
+import type { InterventionStatus, InterventionType } from '@shared/api/interventions.contract';
 
 import type { InterventionFiltersContract } from './useInterventionFilters';
 
@@ -59,7 +60,9 @@ export function InterventionFilters({ filters }: InterventionFiltersProps) {
 				<SelectInput
 					id="status-filter"
 					value={filters.fstate.status || '__all__'}
-					onChange={val => filters.actions.setStatus(val === '__all__' ? undefined : (val as any))}
+					onChange={val =>
+						filters.actions.setStatus(val === '__all__' ? undefined : (val as InterventionStatus))
+					}
 					options={STATUS_OPTIONS}
 				/>
 			</div>
@@ -70,7 +73,7 @@ export function InterventionFilters({ filters }: InterventionFiltersProps) {
 				<SelectInput
 					id="type-filter"
 					value={filters.fstate.type || '__all__'}
-					onChange={val => filters.actions.setType(val === '__all__' ? undefined : (val as any))}
+					onChange={val => filters.actions.setType(val === '__all__' ? undefined : (val as InterventionType))}
 					options={TYPE_OPTIONS}
 				/>
 			</div>

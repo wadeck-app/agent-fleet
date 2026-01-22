@@ -16,7 +16,9 @@ import { useDebounce } from '@framework/hooks2/useDebounce';
 import { useInfinitePagination } from '@framework/hooks2/useInfinitePagination';
 import { useMultiSelect2 } from '@framework/hooks2/useMultiSelect2';
 import { useSorting2 } from '@framework/hooks2/useSorting2';
+import { useBulkDeleteState } from '@framework/hooks/useBulkDeleteState';
 import { useCrudSuccessToast } from '@framework/hooks/useCrudSuccessToast';
+import { useDeleteConfirmation } from '@framework/hooks/useDeleteConfirmation';
 import { useErrorToast } from '@framework/hooks/useErrorToast';
 import { useRoutedDialog } from '@framework/hooks/useRoutedDialog';
 import type { SearchContract } from '@framework/types/contracts/SearchContract';
@@ -177,27 +179,14 @@ export function Ingredients4CarouselPage() {
 	// Success toast helper
 	const successToast = useCrudSuccessToast('ingredient');
 
-	// Bulk delete dialog state
-	const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
-	// Track IDs being deleted (for strike-through visual feedback)
-	const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
-	// Track if bulk delete is in progress (for blur effect)
-	const [isBulkDeleting, setIsBulkDeleting] = useState(false);
-	// Track if we're refreshing after a mutation (delete/update/create)
-	const [isRefreshingAfterMutation, setIsRefreshingAfterMutation] = useState(false);
-	// Track if we're waiting for a refresh to complete after a mutation
-	const isMutating = useRef(false);
+	// Bulk delete state management (centralized hook eliminates ~60 lines of boilerplate)
+	const bulkDelete = useBulkDeleteState();
 
 	// Track ingredients and totalItems for dialog/UI (will be synced with Data2Infinite)
 	const ingredientsRef = useRef<Ingredient[]>([]);
 	const totalItemsRef = useRef(0);
 	// Track loading state for UI outside of Data2Infinite render props
 	const [isLoading, setIsLoading] = useState(false);
-
-	// Add comment above the target line, not at the end
-	// Note: This effect won't work correctly with refs - would need a state trigger
-	// Keeping for now but may need refactoring
-	// TODO: Fix this to properly detect when data changes after mutation
 
 	// Dialog state management using URL routing
 	const { isOpen, editingItem: editingIngredient } = useRoutedDialog({
@@ -208,13 +197,25 @@ export function Ingredients4CarouselPage() {
 		onNavigateBack: () => navigate('/ingredients4c'),
 	});
 
-	// Delete confirmation dialog state
-	const [deleteConfirmation, setDeleteConfirmation] = useState<{
-		open: boolean;
-		ingredientId: string | null;
-	}>({
-		open: false,
-		ingredientId: null,
+	// Delete confirmation dialog (centralized hook eliminates ~30 lines of boilerplate)
+	const deleteConfirmation = useDeleteConfirmation({
+		onConfirm: async id => {
+			// Mark as deleting for strike-through effect
+			bulkDelete.actions.setDeletingIds(new Set([...bulkDelete.state.deletingIds, id]));
+			bulkDelete.actions.markMutating();
+
+			try {
+				await deleteIngredient(id);
+				resetInfiniteScroll();
+				successToast.deleted();
+			} finally {
+				const next = new Set(bulkDelete.state.deletingIds);
+				next.delete(id);
+				bulkDelete.actions.setDeletingIds(next);
+				// Clear mutation state after reset completes
+				bulkDelete.actions.clear();
+			}
+		},
 	});
 
 	// Dialog refresh state
@@ -224,46 +225,12 @@ export function Ingredients4CarouselPage() {
 		navigate(`/ingredients4c/${ingredient.id}/edit`);
 	};
 
-	const handleDelete = (id: string) => {
-		setDeleteConfirmation({
-			open: true,
-			ingredientId: id,
-		});
-	};
-
-	const handleDeleteConfirm = async () => {
-		if (deleteConfirmation.ingredientId) {
-			// Mark as deleting for strike-through effect
-			setDeletingIds(prev => new Set([...prev, deleteConfirmation.ingredientId!]));
-			setIsRefreshingAfterMutation(true);
-			isMutating.current = true;
-
-			try {
-				await deleteIngredient(deleteConfirmation.ingredientId);
-
-				// Reset infinite scroll to refresh from page 1
-				resetInfiniteScroll();
-
-				// Show success toast
-				successToast.deleted();
-			} finally {
-				// Clear deleting state
-				setDeletingIds(prev => {
-					const next = new Set(prev);
-					next.delete(deleteConfirmation.ingredientId!);
-					return next;
-				});
-			}
-		}
-	};
-
 	const handleCreateNew = () => {
 		navigate('/ingredients4c/new');
 	};
 
 	const handleSubmit = async (data: CreateIngredient) => {
-		setIsRefreshingAfterMutation(true);
-		isMutating.current = true;
+		bulkDelete.actions.markMutating();
 		try {
 			const isEditing = !!editingIngredient;
 			if (editingIngredient) {
@@ -286,7 +253,8 @@ export function Ingredients4CarouselPage() {
 				successToast.created();
 			}
 		} finally {
-			// Don't clear isRefreshingAfterMutation here - let useEffect do it
+			// Clear mutation state after reset completes
+			bulkDelete.actions.clear();
 		}
 	};
 
@@ -311,7 +279,7 @@ export function Ingredients4CarouselPage() {
 
 	const handleBulkDelete = async () => {
 		if (selection.fstate.isEmpty) return;
-		setShowBulkDeleteDialog(true);
+		bulkDelete.actions.openDialog();
 	};
 
 	// Handle select all for current visible items
@@ -460,10 +428,10 @@ export function Ingredients4CarouselPage() {
 							carousel={carousel}
 							fields={visibleOrderedFields}
 							onEdit={handleEdit}
-							onDelete={handleDelete}
-							refreshing={props.isLoading || isRefreshingAfterMutation}
-							deleting={isBulkDeleting}
-							_deletingIds={deletingIds}
+							onDelete={deleteConfirmation.open}
+							refreshing={props.isLoading || bulkDelete.state.isRefreshingAfterMutation}
+							deleting={bulkDelete.state.isBulkDeleting}
+							_deletingIds={bulkDelete.state.deletingIds}
 							onSelectionToggle={selection.actions.toggle}
 							selectedIds={selection.fstate.selectedIds}
 						/>
@@ -473,24 +441,26 @@ export function Ingredients4CarouselPage() {
 
 			{/* Bulk Delete Workflow */}
 			<BulkDeleteWorkflow
-				open={showBulkDeleteDialog}
-				onOpenChange={setShowBulkDeleteDialog}
+				open={bulkDelete.state.showDialog}
+				onOpenChange={bulkDelete.actions.setShowDialog}
 				selectedIds={selection.fstate.selectedIds}
 				onClear={selection.actions.clear}
 				onBulkDelete={bulkDeleteIngredients}
 				onReload={async () => {
 					resetInfiniteScroll();
+					// Clear mutation state after reset completes
+					bulkDelete.actions.clear();
 				}}
 				itemTypeName="ingredient"
 				onDeletingChange={ids => {
 					if (ids.size > 0) {
-						setDeletingIds(ids);
+						bulkDelete.actions.setDeletingIds(ids);
 					}
 				}}
 				onBulkDeletingChange={deleting => {
 					if (deleting) {
-						setIsBulkDeleting(true);
-						isMutating.current = true;
+						bulkDelete.actions.startDeleting(new Set());
+						bulkDelete.actions.markMutating();
 					}
 				}}
 			/>
@@ -507,16 +477,14 @@ export function Ingredients4CarouselPage() {
 
 			{/* Delete Confirmation Dialog */}
 			<AlertDialogWrapper
-				open={deleteConfirmation.open}
-				onOpenChange={open => {
-					setDeleteConfirmation({ open, ingredientId: open ? deleteConfirmation.ingredientId : null });
-				}}
+				open={deleteConfirmation.isOpen}
+				onOpenChange={deleteConfirmation.setOpen}
 				title="Delete Ingredient"
 				description="Are you sure you want to delete this ingredient? This action cannot be undone."
 				confirmLabel="Delete"
 				cancelLabel="Cancel"
 				variant="danger"
-				onConfirm={handleDeleteConfirm}
+				onConfirm={deleteConfirmation.confirm}
 			/>
 		</Page>
 	);

@@ -331,7 +331,11 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 
 					{/* Warning for invalid flows in the list */}
 					{workerFlowsMetadata.some(f => !f.isValid) && (
-						<div className={`mt-2 rounded-md border border-warning/20 bg-warning/10 p-3`}>
+						<div
+							className={`
+        mt-2 rounded-md border border-warning/20 bg-warning/10 p-3
+      `}
+						>
 							<div className="flex items-start">
 								<div className="flex-shrink-0">
 									<AlertTriangle className="h-5 w-5 text-warning" />

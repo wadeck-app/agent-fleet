@@ -47,6 +47,7 @@
  * });
  * ```
  */
+import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type {
 	ConnectionState,
 	ConnectionStateHandler,
@@ -195,13 +196,14 @@ export class RestTransportClient implements ITransportClient {
 			return response.json();
 		} catch (error: any) {
 			// Re-throw with TransportError format if not already
-			if (error.status && error.message && error.code) {
+			const message = getErrorMessage(error);
+			if (error.status && message && error.code) {
 				throw error;
 			}
 
 			throw {
 				status: 0,
-				message: error.message || 'Network error',
+				message,
 				code: 'NETWORK_ERROR',
 				details: { originalError: error },
 			};

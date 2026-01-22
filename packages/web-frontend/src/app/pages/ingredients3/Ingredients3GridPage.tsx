@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { Data2 } from '@framework/components2/data/Data2';
@@ -17,8 +17,11 @@ import { useMultiSelect2 } from '@framework/hooks2/useMultiSelect2';
 import { usePagination2 } from '@framework/hooks2/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
 import { useSorting2 } from '@framework/hooks2/useSorting2';
+import { useBulkDeleteState } from '@framework/hooks/useBulkDeleteState';
 import { useCrudSuccessToast } from '@framework/hooks/useCrudSuccessToast';
+import { useDeleteConfirmation } from '@framework/hooks/useDeleteConfirmation';
 import { useErrorToast } from '@framework/hooks/useErrorToast';
+import { useMutationCleanup } from '@framework/hooks/useMutationCleanup';
 import { useRoutedDialog } from '@framework/hooks/useRoutedDialog';
 import {
 	applyColumnOrder,
@@ -161,39 +164,8 @@ export function Ingredients3GridPage() {
 	// Success toast helper
 	const successToast = useCrudSuccessToast('ingredient');
 
-	// Bulk delete dialog state
-	const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
-	// Track IDs being deleted (for strike-through visual feedback)
-	const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
-	// Track if bulk delete is in progress (for blur effect)
-	const [isBulkDeleting, setIsBulkDeleting] = useState(false);
-	// Track if we're refreshing after a mutation (delete/update/create)
-	// This keeps the blur effect active during mutation + subsequent refresh
-	const [isRefreshingAfterMutation, setIsRefreshingAfterMutation] = useState(false);
-	// Track if we're waiting for a refresh to complete after a mutation
-	const isMutating = useRef(false);
-	const _prevCacheIsRefreshing = useRef(false);
-
-	// Clear isRefreshingAfterMutation and isBulkDeleting when the data changes (refresh completed)
-	// This prevents the "flash" where blur disappears between delete and refresh
-	useEffect(() => {
-		console.log('[DELETE] useEffect - ingredients changed', {
-			isMutating: isMutating.current,
-			ingredientsCount: ingredients.length,
-			timestamp: performance.now(),
-		});
-
-		// If we were mutating, and ingredients changed (refresh completed)
-		if (isMutating.current && ingredients.length > 0) {
-			console.log('[DELETE] useEffect - clearing mutation flags', {
-				timestamp: performance.now(),
-			});
-			isMutating.current = false;
-			setIsRefreshingAfterMutation(false);
-			setIsBulkDeleting(false);
-			setDeletingIds(new Set()); // Also clear deletingIds for bulk delete
-		}
-	}, [ingredients]);
+	// Bulk delete state management (centralized hook eliminates ~60 lines of boilerplate)
+	const bulkDelete = useBulkDeleteState();
 
 	// Dialog state management using URL routing
 	const { isOpen, editingItem: editingIngredient } = useRoutedDialog({
@@ -204,13 +176,30 @@ export function Ingredients3GridPage() {
 		onNavigateBack: () => navigate('/ingredients3'),
 	});
 
-	// Delete confirmation dialog state
-	const [deleteConfirmation, setDeleteConfirmation] = useState<{
-		open: boolean;
-		ingredientId: string | null;
-	}>({
-		open: false,
-		ingredientId: null,
+	// Delete confirmation dialog (centralized hook eliminates ~30 lines of boilerplate)
+	const deleteConfirmation = useDeleteConfirmation({
+		onConfirm: async id => {
+			// Mark as deleting for strike-through effect
+			bulkDelete.actions.setDeletingIds(new Set([...bulkDelete.state.deletingIds, id]));
+			bulkDelete.actions.markMutating();
+
+			try {
+				await deleteIngredient(id);
+				await cache.actions.refresh();
+				successToast.deleted();
+			} finally {
+				const next = new Set(bulkDelete.state.deletingIds);
+				next.delete(id);
+				bulkDelete.actions.setDeletingIds(next);
+			}
+		},
+	});
+
+	// Automatic cleanup after mutation completes (eliminates ~10 lines of useEffect boilerplate)
+	useMutationCleanup({
+		data: ingredients,
+		isMutating: bulkDelete.state.isMutating,
+		onCleanup: () => bulkDelete.actions.clear(),
 	});
 
 	// Dialog refresh state
@@ -220,82 +209,12 @@ export function Ingredients3GridPage() {
 		navigate(`/ingredients3/${ingredient.id}/edit`);
 	};
 
-	const handleDelete = (id: string) => {
-		console.log('[DELETE] handleDelete called, opening confirmation dialog', {
-			id,
-			timestamp: performance.now(),
-		});
-		setDeleteConfirmation({
-			open: true,
-			ingredientId: id,
-		});
-	};
-
-	const handleDeleteConfirm = async () => {
-		console.log('[DELETE] handleDeleteConfirm called', {
-			ingredientId: deleteConfirmation.ingredientId,
-			hasId: !!deleteConfirmation.ingredientId,
-			timestamp: performance.now(),
-		});
-
-		if (deleteConfirmation.ingredientId) {
-			console.log('[DELETE] 1. Starting delete process', {
-				id: deleteConfirmation.ingredientId,
-				timestamp: performance.now(),
-			});
-
-			// Mark as deleting for strike-through effect
-			setDeletingIds(prev => new Set([...prev, deleteConfirmation.ingredientId!]));
-			// Start refreshing state before mutation (blur effect active during delete + refresh)
-			setIsRefreshingAfterMutation(true);
-			// Mark that we're in mutation mode (useEffect will clear the flag when refresh completes)
-			isMutating.current = true;
-
-			console.log('[DELETE] 2. States set (deletingIds + isRefreshingAfterMutation + isMutating)', {
-				timestamp: performance.now(),
-			});
-
-			try {
-				console.log('[DELETE] 3. Starting deleteIngredient API call', {
-					timestamp: performance.now(),
-				});
-				await deleteIngredient(deleteConfirmation.ingredientId);
-				console.log('[DELETE] 4. Delete completed, starting refresh', {
-					timestamp: performance.now(),
-				});
-
-				// Trigger Data2 refresh via cache control
-				await cache.actions.refresh();
-				console.log('[DELETE] 5. Refresh triggered (cache ID incremented)', {
-					timestamp: performance.now(),
-				});
-
-				// Show success toast
-				successToast.deleted();
-			} finally {
-				// Clear deleting state
-				setDeletingIds(prev => {
-					const next = new Set(prev);
-					next.delete(deleteConfirmation.ingredientId!);
-					return next;
-				});
-				// DON'T clear isRefreshingAfterMutation here - let useEffect do it when refresh completes
-				console.log('[DELETE] 6. Cleanup done (deletingIds cleared, waiting for refresh to complete)', {
-					timestamp: performance.now(),
-				});
-			}
-		}
-	};
-
 	const handleCreateNew = () => {
 		navigate('/ingredients3/new');
 	};
 
 	const handleSubmit = async (data: CreateIngredient) => {
-		// Start refreshing state before mutation
-		setIsRefreshingAfterMutation(true);
-		// Mark that we're in mutation mode (useEffect will clear the flag when refresh completes)
-		isMutating.current = true;
+		bulkDelete.actions.markMutating();
 		try {
 			const isEditing = !!editingIngredient;
 			if (editingIngredient) {
@@ -317,7 +236,7 @@ export function Ingredients3GridPage() {
 				successToast.created();
 			}
 		} finally {
-			// DON'T clear isRefreshingAfterMutation here - let useEffect do it when refresh completes
+			// Cleanup handled by useMutationCleanup hook
 		}
 	};
 
@@ -338,7 +257,7 @@ export function Ingredients3GridPage() {
 
 	const handleBulkDelete = async () => {
 		if (selection.fstate.isEmpty) return;
-		setShowBulkDeleteDialog(true);
+		bulkDelete.actions.openDialog();
 	};
 
 	// Handle select all for current page
@@ -472,10 +391,10 @@ export function Ingredients3GridPage() {
 						{...injectedProps}
 						fields={visibleOrderedFields}
 						onEdit={handleEdit}
-						onDelete={handleDelete}
-						refreshing={injectedProps.isLoading || isRefreshingAfterMutation}
-						deleting={isBulkDeleting}
-						_deletingIds={deletingIds}
+						onDelete={deleteConfirmation.open}
+						refreshing={injectedProps.isLoading || bulkDelete.state.isRefreshingAfterMutation}
+						deleting={bulkDelete.state.isBulkDeleting}
+						_deletingIds={bulkDelete.state.deletingIds}
 						onSelectionToggle={selection.actions.toggle}
 						_onSelectAll={handleSelectAll}
 					/>
@@ -484,29 +403,25 @@ export function Ingredients3GridPage() {
 
 			{/* Bulk Delete Workflow */}
 			<BulkDeleteWorkflow
-				open={showBulkDeleteDialog}
-				onOpenChange={setShowBulkDeleteDialog}
+				open={bulkDelete.state.showDialog}
+				onOpenChange={bulkDelete.actions.setShowDialog}
 				selectedIds={selection.fstate.selectedIds}
 				onClear={selection.actions.clear}
 				onBulkDelete={bulkDeleteIngredients}
 				onReload={async () => cache.actions.refresh()}
 				itemTypeName="ingredient"
 				onDeletingChange={ids => {
-					// Only set deletingIds if non-empty (ignore clear - let useEffect do it)
+					// Only set deletingIds if non-empty (ignore clear - let useMutationCleanup do it)
 					if (ids.size > 0) {
-						setDeletingIds(ids);
+						bulkDelete.actions.setDeletingIds(ids);
 					}
 				}}
 				onBulkDeletingChange={deleting => {
 					if (deleting) {
-						// Set flag and mark as mutating (useEffect will clear when refresh completes)
-						setIsBulkDeleting(true);
-						isMutating.current = true;
-						console.log('[BULK DELETE] onBulkDeletingChange(true) - isMutating set', {
-							timestamp: performance.now(),
-						});
+						bulkDelete.actions.startDeleting(new Set());
+						bulkDelete.actions.markMutating();
 					}
-					// Ignore deleting=false - let useEffect clear it when refresh completes
+					// Ignore deleting=false - let useMutationCleanup clear it when refresh completes
 				}}
 			/>
 
@@ -522,17 +437,14 @@ export function Ingredients3GridPage() {
 
 			{/* Delete Confirmation Dialog */}
 			<AlertDialogWrapper
-				open={deleteConfirmation.open}
-				onOpenChange={open => {
-					console.log('[DELETE] onOpenChange called', { open, timestamp: performance.now() });
-					setDeleteConfirmation({ open, ingredientId: open ? deleteConfirmation.ingredientId : null });
-				}}
+				open={deleteConfirmation.isOpen}
+				onOpenChange={deleteConfirmation.setOpen}
 				title="Delete Ingredient"
 				description="Are you sure you want to delete this ingredient? This action cannot be undone."
 				confirmLabel="Delete"
 				cancelLabel="Cancel"
 				variant="danger"
-				onConfirm={handleDeleteConfirm}
+				onConfirm={deleteConfirmation.confirm}
 			/>
 		</Page>
 	);

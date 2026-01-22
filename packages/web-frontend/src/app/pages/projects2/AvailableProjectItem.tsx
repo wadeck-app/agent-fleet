@@ -66,7 +66,13 @@ export function AvailableProjectItem({ project, onPin, isLoading = false }: Avai
 
 			{/* Project Icon */}
 			{project.icon && (
-				<DynamicLucideIcon name={project.icon} color={project.iconColor || '#6366F1'} className={`h-4 w-4`} />
+				<DynamicLucideIcon
+					name={project.icon}
+					color={project.iconColor || '#6366F1'}
+					className={`
+      h-4 w-4
+    `}
+				/>
 			)}
 
 			{/* Project Name */}

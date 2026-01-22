@@ -8,12 +8,16 @@ import { useColumnVisibility } from '@framework/components/columns/useColumnVisi
 import { EmptyState } from '@framework/components/feedback/EmptyState';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
+import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
 import { usePagination } from '@framework/components/pagination/usePagination';
 import { Button } from '@framework/components/primitives/Button';
 import { useSorting } from '@framework/components/table/useSorting';
 import { useTableRefreshing } from '@framework/components/table/useTableRefreshing';
+import { useBulkDeleteState } from '@framework/hooks/useBulkDeleteState';
 import { useCrudSuccessToast } from '@framework/hooks/useCrudSuccessToast';
+import { useDeleteConfirmation } from '@framework/hooks/useDeleteConfirmation';
 import { useErrorToast } from '@framework/hooks/useErrorToast';
+import { useMutationCleanup } from '@framework/hooks/useMutationCleanup';
 import { useRoutedDialog } from '@framework/hooks/useRoutedDialog';
 import { toColumnVisibilityDefs } from '@framework/utils/table/ColumnConfig';
 import { extractColumnIds } from '@framework/utils/table/ColumnConfig';
@@ -72,13 +76,8 @@ export function IngredientsPage() {
 	});
 	// Multi-row selection state (persists across pagination during session)
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-	// Bulk delete dialog state
-	const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
-	// Add comment above the target line, not at the end
-	// Track IDs being deleted (for strike-through visual feedback)
-	const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
-	// Track if bulk delete is in progress (for blur effect)
-	const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+	// Bulk delete state management (centralized hook eliminates ~60 lines of boilerplate)
+	const bulkDelete = useBulkDeleteState();
 	// Track if dialog refresh is in progress (for loading state in dialog)
 	const [isDialogRefreshing, setIsDialogRefreshing] = useState(false);
 
@@ -132,6 +131,31 @@ export function IngredientsPage() {
 		onNavigateBack: () => navigate('/ingredients'),
 	});
 
+	// Delete confirmation dialog (centralized hook eliminates ~30 lines of boilerplate)
+	const deleteConfirmation = useDeleteConfirmation({
+		onConfirm: async id => {
+			// Mark as deleting for strike-through effect
+			bulkDelete.actions.setDeletingIds(new Set([...bulkDelete.state.deletingIds, id]));
+			bulkDelete.actions.markMutating();
+
+			try {
+				await deleteIngredient(id);
+				successToast.deleted();
+			} finally {
+				const next = new Set(bulkDelete.state.deletingIds);
+				next.delete(id);
+				bulkDelete.actions.setDeletingIds(next);
+			}
+		},
+	});
+
+	// Automatic cleanup after mutation completes (eliminates ~10 lines of useEffect boilerplate)
+	useMutationCleanup({
+		data: ingredients,
+		isMutating: bulkDelete.state.isMutating,
+		onCleanup: () => bulkDelete.actions.clear(),
+	});
+
 	const handleSubmit = async (data: Parameters<typeof createIngredient>[0]) => {
 		const isEditing = !!editingIngredient;
 		if (editingIngredient) {
@@ -167,32 +191,13 @@ export function IngredientsPage() {
 		navigate(`/ingredients/${ingredient.id}/edit`);
 	};
 
-	const handleDelete = async (id: string) => {
-		// Add comment above the target line, not at the end
-		// Mark item as deleting for visual feedback (strike-through)
-		setDeletingIds(prev => new Set([...prev, id]));
-		try {
-			await deleteIngredient(id);
-			// Show success toast
-			successToast.deleted();
-		} finally {
-			// Add comment above the target line, not at the end
-			// Clear deleting state after deletion completes
-			setDeletingIds(prev => {
-				const next = new Set(prev);
-				next.delete(id);
-				return next;
-			});
-		}
-	};
-
 	const handleNewIngredient = () => {
 		navigate('/ingredients/new');
 	};
 
 	const handleBulkDelete = async () => {
 		if (selectedIds.size === 0) return;
-		setShowBulkDeleteDialog(true);
+		bulkDelete.actions.openDialog();
 	};
 
 	// Current params for reload after bulk delete
@@ -241,7 +246,7 @@ export function IngredientsPage() {
 					storageId={storageId}
 					ingredients={[]}
 					onEdit={handleEdit}
-					onDelete={handleDelete}
+					onDelete={deleteConfirmation.open}
 					pagination={
 						paginationData
 							? {
@@ -265,7 +270,7 @@ export function IngredientsPage() {
 					selectable={true}
 					selectedIds={selectedIds}
 					onSelectionChange={setSelectedIds}
-					deletingIds={deletingIds}
+					deletingIds={bulkDelete.state.deletingIds}
 				/>
 			</Page>
 		);
@@ -340,7 +345,7 @@ export function IngredientsPage() {
 							storageId={storageId}
 							ingredients={ingredients}
 							onEdit={handleEdit}
-							onDelete={handleDelete}
+							onDelete={deleteConfirmation.open}
 							pagination={
 								paginationData
 									? {
@@ -360,12 +365,12 @@ export function IngredientsPage() {
 							}}
 							visibleColumns={columnVisibility.visibleColumns}
 							columnOrder={columnOrder.columnOrder}
-							refreshing={isRefreshing}
-							deleting={isBulkDeleting}
+							refreshing={isRefreshing || bulkDelete.state.isRefreshingAfterMutation}
+							deleting={bulkDelete.state.isBulkDeleting}
 							selectable={true}
 							selectedIds={selectedIds}
 							onSelectionChange={setSelectedIds}
-							deletingIds={deletingIds}
+							deletingIds={bulkDelete.state.deletingIds}
 						/>
 					</>
 				)}
@@ -373,15 +378,20 @@ export function IngredientsPage() {
 
 			{/* Bulk Delete Workflow */}
 			<BulkDeleteWorkflow
-				open={showBulkDeleteDialog}
-				onOpenChange={setShowBulkDeleteDialog}
+				open={bulkDelete.state.showDialog}
+				onOpenChange={bulkDelete.actions.setShowDialog}
 				selectedIds={selectedIds}
 				onClear={() => setSelectedIds(new Set())}
 				onBulkDelete={bulkDeleteIngredients}
 				onReload={() => loadIngredients(currentParams)}
 				itemTypeName="ingredient"
-				onDeletingChange={setDeletingIds}
-				onBulkDeletingChange={setIsBulkDeleting}
+				onDeletingChange={bulkDelete.actions.setDeletingIds}
+				onBulkDeletingChange={deleting => {
+					if (deleting) {
+						bulkDelete.actions.startDeleting(new Set());
+						bulkDelete.actions.markMutating();
+					}
+				}}
 			/>
 
 			<IngredientDialog
@@ -391,6 +401,18 @@ export function IngredientsPage() {
 				onSubmit={handleSubmit}
 				onRefresh={handleRefresh}
 				isRefreshing={isDialogRefreshing}
+			/>
+
+			{/* Delete Confirmation Dialog */}
+			<AlertDialogWrapper
+				open={deleteConfirmation.isOpen}
+				onOpenChange={deleteConfirmation.setOpen}
+				title="Delete Ingredient"
+				description="Are you sure you want to delete this ingredient? This action cannot be undone."
+				confirmLabel="Delete"
+				cancelLabel="Cancel"
+				variant="danger"
+				onConfirm={deleteConfirmation.confirm}
 			/>
 		</>
 	);

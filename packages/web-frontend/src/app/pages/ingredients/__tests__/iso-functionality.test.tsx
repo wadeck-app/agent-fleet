@@ -94,7 +94,7 @@ const mocks = {
 describe.each([
 	{ version: 'v2' as const, Component: Ingredients2TablePage, path: '/ingredients2' },
 	{ version: 'v5' as const, Component: IngredientsV5Page, path: '/ingredients5' },
-])('Ingredients $version - Iso-functionality', ({ version, Component, path }) => {
+])('Ingredients $version - Iso-functionality', ({ version: _version, Component, path }) => {
 	const renderPage = () => {
 		return render(
 			<ToastProvider>
@@ -289,7 +289,7 @@ describe.each([
 
 			// Add comment above the target line, not at the end
 			// Different implementations may use different selection mechanisms (checkboxes, row clicks, etc)
-			const checkboxes = screen.queryAllByRole('checkbox');
+			const _checkboxes = screen.queryAllByRole('checkbox');
 			// Either checkboxes exist (v5 style) or selection is handled differently (v2 style)
 			expect(true).toBe(true); // Selection capability exists in both versions
 		});
@@ -305,15 +305,15 @@ describe.each([
 				{ timeout: 3000 }
 			);
 
-			const checkboxes = screen.queryAllByRole('checkbox');
+			const _checkboxes = screen.queryAllByRole('checkbox');
 
-			if (checkboxes.length > 2) {
-				await user.click(checkboxes[1]);
-				await user.click(checkboxes[2]);
+			if (_checkboxes.length > 2) {
+				await user.click(_checkboxes[1]);
+				await user.click(_checkboxes[2]);
 
 				// Both should be checked
-				expect(checkboxes[1]).toBeChecked();
-				expect(checkboxes[2]).toBeChecked();
+				expect(_checkboxes[1]).toBeChecked();
+				expect(_checkboxes[2]).toBeChecked();
 			} else {
 				// Add comment above the target line, not at the end
 				// No checkboxes - selection might use different mechanism (row clicks, etc)
@@ -337,7 +337,7 @@ describe.each([
 			);
 
 			// Just check that we have pagination UI (combobox for page size)
-			const comboboxes = screen.queryAllByRole('combobox');
+			const _comboboxes = screen.queryAllByRole('combobox');
 			// If no combobox, that's OK - pagination might be implicit in data display
 			// The key is that data is paginated (which we test via API params)
 			expect(true).toBe(true); // Pagination exists if data is displayed

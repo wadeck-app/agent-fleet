@@ -212,7 +212,7 @@ export class QueryBuilder {
 	 * @param feature - Feature contract to add
 	 * @returns this (for method chaining)
 	 */
-	add(feature: FeatureContract<any> | undefined | null): this {
+	add(feature: FeatureContract<unknown> | undefined | null): this {
 		if (!feature) return this;
 
 		feature.fillQuery(this.query);
@@ -226,7 +226,7 @@ export class QueryBuilder {
 	 * @param feature - Feature contract to add if condition is true
 	 * @returns this (for method chaining)
 	 */
-	addIf(condition: boolean, feature: FeatureContract<any> | undefined | null): this {
+	addIf(condition: boolean, feature: FeatureContract<unknown> | undefined | null): this {
 		if (!condition) return this;
 		return this.add(feature);
 	}

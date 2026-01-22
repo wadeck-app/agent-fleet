@@ -41,7 +41,14 @@ export function EventDebugWidget() {
 					<Activity className="size-3" />
 					<span>Active Subscriptions</span>
 				</div>
-				<Button variant="ghost" size="icon" onClick={() => setIsExpanded(false)} className={`size-5`}>
+				<Button
+					variant="ghost"
+					size="icon"
+					onClick={() => setIsExpanded(false)}
+					className={`
+      size-5
+    `}
+				>
 					<ChevronUp className="size-3" />
 				</Button>
 			</div>

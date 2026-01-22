@@ -73,17 +73,17 @@ export function StatusIndicator({ status, className = '' }: StatusIndicatorProps
 	return (
 		<div
 			className={`
-        flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium
-        ${config.bgColor}
-        ${config.color}
-        ${className}
-      `}
+     flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium
+     ${config.bgColor}
+     ${config.color}
+     ${className}
+   `}
 			title={config.label}
 		>
 			<span
 				className={`
-          ${status === 'starting' || status === 'stopping' ? 'animate-pulse' : ''}
-        `}
+      ${status === 'starting' || status === 'stopping' ? 'animate-pulse' : ''}
+    `}
 			>
 				{config.icon}
 			</span>

@@ -139,7 +139,12 @@ export function ScriptsPanel({ workspaceId }: ScriptsPanelProps) {
 						</div>
 					</div>
 				) : (
-					<div className={`h-full ${getLayoutClassName(mode)}`}>
+					<div
+						className={`
+       h-full
+       ${getLayoutClassName(mode)}
+     `}
+					>
 						{panels.map(panel => (
 							<ScriptPanel
 								key={panel.id}

@@ -1,7 +1,7 @@
 import { Orchestrator } from 'orchestrator';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { EventBroadcaster } from '../transport/EventBroadcaster';
+import type { EventBroadcaster } from '../transport/EventBroadcaster';
 import { DataStoreFactory } from './DataStoreFactory';
 
 /**

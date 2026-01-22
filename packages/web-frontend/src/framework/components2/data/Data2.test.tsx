@@ -6,15 +6,19 @@ import { Data2 } from './Data2';
 
 describe('Data2', () => {
 	// Mock feature for testing (uses new FeatureContract API)
-	const createMockFeature = <TQuery extends Record<string, unknown>>(query: TQuery, state: any = {}) => {
+	const createMockFeature = <TQuery extends Record<string, unknown>>(
+		query: TQuery,
+		state: any = {},
+		actions: any = {}
+	) => {
 		const fstate = state; // Stable reference
-		const actions = {}; // Stable reference
 		const fillQuery = vi.fn((q: any) => {
 			// Fill query with all properties from the query object
 			Object.assign(q, query);
 		});
 
 		return {
+			state: fstate, // SearchContract requires both state and fstate
 			fstate,
 			actions,
 			fillQuery,
@@ -37,9 +41,21 @@ describe('Data2', () => {
 				pagination: { total: 1, page: 1, pageSize: 10, totalPages: 1 },
 			});
 
-			const pagination = createMockFeature({ page: 1, pageSize: 10 });
-			const sorting = createMockFeature({ sortBy: 'name', sortOrder: 'asc' });
-			const search = createMockFeature({ search: 'chicken' });
+			const pagination = createMockFeature(
+				{ page: 1, pageSize: 10 },
+				{ currentPage: 1, pageSize: 10, canGoPrevious: false, canGoNext: vi.fn(() => false) },
+				{}
+			);
+			const sorting = createMockFeature(
+				{ sortBy: 'name', sortOrder: 'asc' },
+				{ sortConfigs: [{ key: 'name', direction: 'asc' as const }], getSortInfo: vi.fn() },
+				{}
+			);
+			const search = createMockFeature(
+				{ search: 'chicken' },
+				{ searchQuery: 'chicken' },
+				{ setQuery: vi.fn(), clearQuery: vi.fn() }
+			);
 
 			render(
 				<Data2 fetchData={mockFetch} pagination={pagination} sorting={sorting} search={search}>
@@ -63,8 +79,12 @@ describe('Data2', () => {
 				items: [],
 			});
 
-			const pagination = createMockFeature({ page: 1, pageSize: 10 });
-			const search = createMockFeature({}); // Empty search
+			const pagination = createMockFeature(
+				{ page: 1, pageSize: 10 },
+				{ currentPage: 1, pageSize: 10, canGoPrevious: false, canGoNext: vi.fn(() => false) },
+				{}
+			);
+			const search = createMockFeature({}, { searchQuery: '' }, { setQuery: vi.fn(), clearQuery: vi.fn() }); // Empty search
 
 			render(
 				<Data2 fetchData={mockFetch} pagination={pagination} search={search}>
@@ -85,7 +105,11 @@ describe('Data2', () => {
 				items: [],
 			});
 
-			const pagination = createMockFeature({ page: 1, pageSize: 10 });
+			const pagination = createMockFeature(
+				{ page: 1, pageSize: 10 },
+				{ currentPage: 1, pageSize: 10, canGoPrevious: false, canGoNext: vi.fn(() => false) },
+				{}
+			);
 
 			render(
 				<Data2 fetchData={mockFetch} pagination={pagination}>
@@ -219,7 +243,12 @@ describe('Data2', () => {
 			const setPage = vi.fn();
 			const setPageSize = vi.fn();
 			const pagination = {
-				fstate: {},
+				fstate: {
+					currentPage: 2,
+					pageSize: 10,
+					canGoPrevious: true,
+					canGoNext: vi.fn(() => false),
+				},
 				actions: { setPage, setPageSize },
 				fillQuery: vi.fn((q: any) => {
 					q.page = 2;
@@ -263,9 +292,10 @@ describe('Data2', () => {
 			const sorting = {
 				fstate: {
 					sortConfigs: [
-						{ key: 'name', direction: 'asc' },
-						{ key: 'createdAt', direction: 'desc' },
+						{ key: 'name', direction: 'asc' as const },
+						{ key: 'createdAt', direction: 'desc' as const },
 					],
+					getSortInfo: vi.fn(),
 				},
 				actions: { handleSort },
 				fillQuery: vi.fn((q: any) => {
@@ -331,7 +361,11 @@ describe('Data2', () => {
 					})
 			);
 
-			const pagination = createMockFeature({ page: 1, pageSize: 10 });
+			const pagination = createMockFeature(
+				{ page: 1, pageSize: 10 },
+				{ currentPage: 1, pageSize: 10, canGoPrevious: false, canGoNext: vi.fn(() => false) },
+				{}
+			);
 
 			const { rerender } = render(
 				<Data2 fetchData={mockFetch} pagination={pagination}>
@@ -340,7 +374,11 @@ describe('Data2', () => {
 			);
 
 			// Change pagination (triggers new fetch)
-			const newPagination = createMockFeature({ page: 2, pageSize: 10 });
+			const newPagination = createMockFeature(
+				{ page: 2, pageSize: 10 },
+				{ currentPage: 2, pageSize: 10, canGoPrevious: true, canGoNext: vi.fn(() => false) },
+				{}
+			);
 			rerender(
 				<Data2 fetchData={mockFetch} pagination={newPagination}>
 					<TestDisplayer data={[]} isLoading={false} error={null} />
@@ -378,7 +416,12 @@ describe('Data2', () => {
 				q.pageSize = 10;
 			});
 			const stableActions = { setPage: vi.fn(), setPageSize: vi.fn() };
-			const stableFstate = { page: 1, pageSize: 10 };
+			const stableFstate = {
+				currentPage: 1,
+				pageSize: 10,
+				canGoPrevious: false,
+				canGoNext: vi.fn(() => false),
+			};
 
 			const pagination = {
 				fillQuery: stableFillQuery, // SAME reference
@@ -427,7 +470,12 @@ describe('Data2', () => {
 			const pagination1 = {
 				fillQuery: fillQuery1,
 				actions: { setPage: vi.fn(), setPageSize: vi.fn() },
-				fstate: { page: 1, pageSize: 10 },
+				fstate: {
+					currentPage: 1,
+					pageSize: 10,
+					canGoPrevious: false,
+					canGoNext: vi.fn(() => false),
+				},
 			};
 
 			const { rerender } = render(
@@ -449,7 +497,12 @@ describe('Data2', () => {
 			const pagination2 = {
 				fillQuery: fillQuery2,
 				actions: { setPage: vi.fn(), setPageSize: vi.fn() },
-				fstate: { page: 2, pageSize: 10 },
+				fstate: {
+					currentPage: 2,
+					pageSize: 10,
+					canGoPrevious: true,
+					canGoNext: vi.fn(() => false),
+				},
 			};
 
 			rerender(

@@ -219,7 +219,7 @@ export class OrchestratorEventHandler {
 	 * Updates task with flow result and sets final status
 	 * @param data { taskId: string, success: boolean, flowResult: any }
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 	private async handleTaskCompleted(data: {
 		taskId: string;
 		success: boolean;

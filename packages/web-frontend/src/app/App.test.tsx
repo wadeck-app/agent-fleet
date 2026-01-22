@@ -31,6 +31,7 @@ describe('App - Theme Integration', () => {
 			},
 			login: vi.fn(),
 			logout: vi.fn(),
+			checkSession: vi.fn(),
 		});
 		// @formatter:on
 	});

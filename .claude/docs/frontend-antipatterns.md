@@ -64,6 +64,18 @@ Last updated: 2025-12-14
 | **Good Pattern** | `<MainLayout sidebar={<TaskSidebar />}><TaskList /></MainLayout>`                   |
 | **Reference**    | `.claude/docs/examples/packages/frontend/styling/page-minimal-styling-tailwind.tsx` |
 
+**Styling Distribution Rule:**
+
+Styling should follow a clear hierarchy (see `.claude/docs/frontend.md`):
+
+- **Base components** (primitives, forms): Maximum styling (89+ classes via CVA)
+- **Intermediate components** (layouts, domain): Minimal styling (structural only)
+- **Page components**: Quasi none (0-5 classes max, structural only)
+
+**Acceptable in pages:** Container width, responsive breakpoints (`w-full sm:w-64`), icon sizing (`size-4`)
+
+**Not acceptable in pages:** Layout (flex/grid), colors, spacing (padding/margin/gap), borders, shadows
+
 ---
 
 ## 6. Hardcoded Colors

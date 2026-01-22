@@ -34,11 +34,7 @@ export function FlowEditorValidationPanel({ validationResult, onIssueClick }: Fl
 			>
 				<span className="whitespace-nowrap">Validation Issues:</span>
 				{summary.errors > 0 && (
-					<span
-						className={`
-       flex items-center gap-1 whitespace-nowrap text-destructive
-     `}
-					>
+					<span className={`flex items-center gap-1 whitespace-nowrap text-destructive`}>
 						<AlertCircle className="size-4" />
 						{summary.errors} error{summary.errors > 1 ? 's' : ''}
 					</span>
@@ -79,27 +75,9 @@ export function FlowEditorValidationPanel({ validationResult, onIssueClick }: Fl
 					>
 						{/* Icon */}
 						<div className="pt-0.5">
-							{issue.severity === 'error' && (
-								<AlertCircle
-									className={`
-         size-4 text-destructive
-       `}
-								/>
-							)}
-							{issue.severity === 'warning' && (
-								<AlertTriangle
-									className={`
-         size-4 text-warning
-       `}
-								/>
-							)}
-							{issue.severity === 'info' && (
-								<Info
-									className={`
-         size-4 text-muted-foreground
-       `}
-								/>
-							)}
+							{issue.severity === 'error' && <AlertCircle className={`size-4 text-destructive`} />}
+							{issue.severity === 'warning' && <AlertTriangle className={`size-4 text-warning`} />}
+							{issue.severity === 'info' && <Info className={`size-4 text-muted-foreground`} />}
 						</div>
 
 						{/* Content */}

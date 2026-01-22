@@ -20,7 +20,19 @@ For Playwright best practices, see `.claude/docs/playwright.md`.
 3. **Page** - Compositional only, manage shared state
 4. **Layout** - Structure + responsive behavior
 
-**Reference:** `docs/examples/packages/frontend/components/`
+**Styling Distribution (Critical Rule):**
+
+CSS/Tailwind classes should decrease dramatically as you move up the hierarchy:
+
+| Level                              | Styling Amount | Examples                                             | Typical className Count    |
+| ---------------------------------- | -------------- | ---------------------------------------------------- | -------------------------- |
+| **Base** (primitives, forms)       | **Maximum**    | Button (89+ classes via CVA), Input, Card            | Many (centralized via CVA) |
+| **Intermediate** (layouts, domain) | **Minimal**    | Page layout (~10 classes), Domain components         | Few (structural only)      |
+| **End** (pages)                    | **Quasi none** | BooksPage (1-3 classes), IngredientsPage (0 classes) | 0-5 max                    |
+
+**Key Principle:** Pages should delegate styling to components. Only structural classes (responsive width, container) are acceptable at page level.
+
+**Reference:** `docs/examples/packages/frontend/components/`, `docs/examples/packages/frontend/styling/page-minimal-styling-tailwind.tsx`
 
 ### 2. State Management
 

@@ -436,7 +436,13 @@ describe('IngredientsService', () => {
 		});
 
 		it('should skip validation when only version is provided', async () => {
-			const updateData: PatchIngredient = {
+			const updateData: UpdateIngredient = {
+				name: sampleIngredient.name,
+				calories: sampleIngredient.calories,
+				protein: sampleIngredient.protein,
+				carbs: sampleIngredient.carbs,
+				fat: sampleIngredient.fat,
+				servingSize: sampleIngredient.servingSize,
 				version: 1,
 			};
 

@@ -120,7 +120,12 @@ export function InterventionDetailPage() {
 						<CardContent>
 							<div className="space-y-3">
 								{Array.from({ length: 5 }).map((_, idx) => (
-									<div key={idx} className={`flex items-center justify-between border-b py-2`}>
+									<div
+										key={idx}
+										className={`
+           flex items-center justify-between border-b py-2
+         `}
+									>
 										<div className="h-4 w-24 animate-pulse rounded bg-muted" />
 										<div className="h-6 w-32 animate-pulse rounded-full bg-muted" />
 									</div>
@@ -177,7 +182,12 @@ export function InterventionDetailPage() {
 						#{interventionId?.slice(0, 8)}
 					</Badge>
 					<Badge variant={getInterventionStatusVariant(intervention.status)}>{intervention.status}</Badge>
-					<Badge variant={getInterventionTypeVariant(intervention.type)} className={`capitalize`}>
+					<Badge
+						variant={getInterventionTypeVariant(intervention.type)}
+						className={`
+       capitalize
+     `}
+					>
 						{intervention.type}
 					</Badge>
 				</div>
@@ -253,7 +263,12 @@ export function InterventionDetailPage() {
 											</Badge>
 										</Link>
 									) : (
-										<Badge variant="outline" className={`font-mono text-xs text-muted-foreground`}>
+										<Badge
+											variant="outline"
+											className={`
+            font-mono text-xs text-muted-foreground
+          `}
+										>
 											-
 										</Badge>
 									)

@@ -410,14 +410,7 @@ describe('Table2', () => {
 			const props = createBaseProps();
 
 			const { container } = render(
-				<Table2
-					{...props}
-					columns={mockColumns}
-					getItemId={item => item.id}
-					className={`
-      custom-table-class
-    `}
-				/>
+				<Table2 {...props} columns={mockColumns} getItemId={item => item.id} className={`custom-table-class`} />
 			);
 
 			const tableContainer = container.querySelector('.custom-table-class');

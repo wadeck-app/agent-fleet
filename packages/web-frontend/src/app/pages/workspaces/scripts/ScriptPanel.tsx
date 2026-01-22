@@ -29,7 +29,14 @@ interface ScriptPanelProps {
  * - Link to script URL (if configured)
  * - Real-time logs viewer
  */
-export function ScriptPanel({ panelId, scriptId, workspaceId, scripts, onScriptChange, onRemove }: ScriptPanelProps) {
+export function ScriptPanel({
+	panelId: _panelId,
+	scriptId,
+	workspaceId,
+	scripts,
+	onScriptChange,
+	onRemove,
+}: ScriptPanelProps) {
 	const [logLevel, setLogLevel] = useState<'stdout' | 'stderr' | 'info' | 'error' | undefined>(undefined);
 	const [logSearch, setLogSearch] = useState<string | undefined>(undefined);
 
@@ -75,9 +82,17 @@ export function ScriptPanel({ panelId, scriptId, workspaceId, scripts, onScriptC
 	const canRestart = process?.status === 'running';
 
 	return (
-		<div className="flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card">
+		<div
+			className={`
+    flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card
+  `}
+		>
 			{/* Panel Header */}
-			<div className="flex items-center gap-2 border-b border-border bg-muted/30 p-3">
+			<div
+				className={`
+     flex items-center gap-2 border-b border-border bg-muted/30 p-3
+   `}
+			>
 				{/* Script Selector */}
 				<ScriptSelector
 					workspaceId={workspaceId}
@@ -150,7 +165,12 @@ export function ScriptPanel({ panelId, scriptId, workspaceId, scripts, onScriptC
 				{scriptId ? (
 					<>
 						{processError && (
-							<div className="border-b border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+							<div
+								className={`
+         border-b border-destructive/20 bg-destructive/10 p-3 text-sm
+         text-destructive
+       `}
+							>
 								<strong>Error:</strong> {processError.message}
 							</div>
 						)}

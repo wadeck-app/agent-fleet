@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { MutationContract, MutationMethods } from '@framework/types/MutationContract';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
+import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 
 import { useMutation } from './useMutation';
 
@@ -140,7 +141,7 @@ export function useDataFetch<T>(
 			} catch (err) {
 				// Handle error if not aborted
 				if (!abortController.signal.aborted) {
-					setError(err instanceof Error ? err.message : 'Failed to fetch data');
+					setError(getErrorMessage(err));
 				}
 			} finally {
 				// Clear loading state if not aborted

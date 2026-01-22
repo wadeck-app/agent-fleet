@@ -49,7 +49,12 @@ export function ActiveFeaturesPanel({ features, title = 'Active Features', class
 	return (
 		<div className={`mb-4 rounded-lg border border-border bg-muted/50 p-4 text-sm ${className}`.trim()}>
 			<strong>{title}:</strong>
-			<div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+			<div
+				className={`
+     mt-2 grid grid-cols-2 gap-2 text-xs
+     sm:grid-cols-4
+   `}
+			>
 				{features.map(({ label, value }) => (
 					<div key={label}>
 						<span className="text-muted-foreground">{label}:</span>{' '}

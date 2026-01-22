@@ -151,7 +151,7 @@ export class DashboardService {
 	 */
 	private calculateAvgTaskDuration(tasks: any[]): number {
 		// Filter completed tasks that have both startedAt and completedAt
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 		const completedTasks = tasks.filter(
 			(task: any) =>
 				task.startedAt && task.completedAt && ['APPROVED', 'MERGED', 'CANCELLED'].includes(task.status)
@@ -183,7 +183,7 @@ export class DashboardService {
 		const now = new Date();
 
 		// Generate activity for busy workers (tasks in progress)
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 		stats.workersList
 			.filter((w: any) => w.taskId)
 			.slice(0, 3)

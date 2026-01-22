@@ -6,7 +6,7 @@ import { vi } from 'vitest';
  */
 export function createControlledPromise<T>() {
 	let resolveFunc: (value: T) => void;
-	let rejectFunc: (error: any) => void;
+	let rejectFunc: (error: unknown) => void;
 
 	const promise = new Promise<T>((resolve, reject) => {
 		resolveFunc = resolve;
@@ -27,7 +27,7 @@ export function createMockTasksApi() {
 	const pendingCalls: Array<{ resolve: Function; reject: Function }> = [];
 
 	const api = {
-		getTaskLogs: vi.fn((taskId: string, query: any) => {
+		getTaskLogs: vi.fn((_taskId: string, _query: unknown) => {
 			const controlled = createControlledPromise<PaginatedLogsResponse>();
 			pendingCalls.push(controlled);
 			return controlled.promise;

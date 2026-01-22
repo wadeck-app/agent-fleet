@@ -15,6 +15,7 @@
 import { useEffect, useState } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 
+import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import { type ConnectionState } from '@shared/transport';
 import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
@@ -65,7 +66,7 @@ function TasksList() {
 				const data = await transport.request('GET', '/api/tasks/' as any);
 				setTasks(Array.isArray(data) ? data : []);
 			} catch (err) {
-				setError(err instanceof Error ? err.message : 'Failed to fetch tasks');
+				setError(getErrorMessage(err));
 			} finally {
 				setLoading(false);
 			}
@@ -145,7 +146,7 @@ function CreateTaskForm() {
 			setResult(`Created task: ${task.id}`);
 			setDescription('');
 		} catch (err) {
-			setResult(`Error: ${err instanceof Error ? err.message : 'Failed'}`);
+			setResult(`Error: ${getErrorMessage(err)}`);
 		} finally {
 			setSubmitting(false);
 		}

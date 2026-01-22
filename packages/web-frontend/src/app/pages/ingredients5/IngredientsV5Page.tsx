@@ -89,7 +89,10 @@ export function IngredientsV5Page() {
 								loading={crud.loading && !!crud.search?.searchQuery}
 								aria-label="Search ingredients"
 								id="ingredients-search"
-								className="w-full sm:w-64"
+								className={`
+          w-full
+          sm:w-64
+        `}
 							/>
 							<ColumnVisibility
 								columns={toColumnVisibilityDefs(INGREDIENT_TABLE_COLUMNS)}

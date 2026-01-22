@@ -392,7 +392,14 @@ export function ColumnVisibility({
 						</div>
 
 						<div className="mt-2 border-t pt-2">
-							<Button variant="ghost" size="sm" onClick={onReset} className={`h-7 w-full gap-1 text-xs`}>
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={onReset}
+								className={`
+         h-7 w-full gap-1 text-xs
+       `}
+							>
 								<RotateCcw className="h-3 w-3" />
 								Reset to Default
 							</Button>
