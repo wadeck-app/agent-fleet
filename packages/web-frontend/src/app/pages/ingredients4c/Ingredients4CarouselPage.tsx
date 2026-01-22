@@ -12,6 +12,7 @@ import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
 import { Button } from '@framework/components/primitives/Button';
+import { useDebounce } from '@framework/hooks2/useDebounce';
 import { useInfinitePagination } from '@framework/hooks2/useInfinitePagination';
 import { useMultiSelect2 } from '@framework/hooks2/useMultiSelect2';
 import { useSorting2 } from '@framework/hooks2/useSorting2';
@@ -58,6 +59,10 @@ export function Ingredients4CarouselPage() {
 
 	// Search state (simple - no hook needed for infinite scroll)
 	const [searchQuery, setSearchQuery] = useState('');
+
+	// Add comment above the target line, not at the end
+	// Debounced search query for SearchContract compatibility
+	const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
 	// Multi-selection feature: manages selection state
 	const selection = useMultiSelect2();
@@ -123,6 +128,7 @@ export function Ingredients4CarouselPage() {
 		const searchState = {
 			query: searchQuery,
 			trimmedQuery,
+			debouncedQuery: debouncedSearchQuery,
 			isEmpty: trimmedQuery === '',
 		};
 		return {
@@ -136,7 +142,7 @@ export function Ingredients4CarouselPage() {
 				if (trimmedQuery) q.search = trimmedQuery;
 			},
 		};
-	}, [searchQuery]);
+	}, [searchQuery, debouncedSearchQuery]);
 
 	// Infinite pagination feature - track hasMore from backend
 	const [hasMore, _setHasMore] = useState(true);

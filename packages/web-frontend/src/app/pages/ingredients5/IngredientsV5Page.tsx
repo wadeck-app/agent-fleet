@@ -183,18 +183,11 @@ export function IngredientsV5Page() {
 										}
 									: undefined
 							}
-							sorting={{
-								sortConfigs: crud.sorting.sortConfigs,
-								onSortChange: crud.sorting.handleSort,
-							}}
+							sorting={crud.sorting}
 							visibleColumns={crud.columns.visibleColumns}
 							columnOrder={crud.columns.columnOrder}
 							refreshing={crud.isRefreshing}
-							deleting={crud.selection.isBulkDeleting}
-							selectable={true}
-							selectedIds={crud.selection.selectedIds}
-							onSelectionChange={crud.selection.setSelectedIds}
-							deletingIds={crud.selection.deletingIds}
+							{...crud.selection}
 						/>
 					</>
 				)}

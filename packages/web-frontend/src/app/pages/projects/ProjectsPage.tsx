@@ -9,7 +9,6 @@ import { PageHeader } from '@framework/components/layout/PageHeader';
 import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
 import { Button } from '@framework/components/primitives/Button';
 import { useCacheControl2 } from '@framework/hooks2/useCacheControl2';
-import { useDebounce } from '@framework/hooks2/useDebounce';
 import { useMultiSelect2 } from '@framework/hooks2/useMultiSelect2';
 import { usePagination2 } from '@framework/hooks2/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
@@ -125,9 +124,6 @@ export function ProjectsPage() {
 		onEvent: cache.actions.refresh,
 		logPrefix: 'ProjectsPage',
 	});
-
-	// Debounce search query
-	const debouncedSearchQuery = useDebounce(search.fstate.query, 300);
 
 	// Clear isRefreshingAfterMutation and isBulkDeleting when the data changes
 	useEffect(() => {
@@ -261,7 +257,9 @@ export function ProjectsPage() {
 				features={[
 					{
 						label: 'Search',
-						value: search.fstate.query ? `${search.fstate.query} / ${debouncedSearchQuery}` : 'none',
+						value: search.fstate.query
+							? `${search.fstate.query} / ${search.fstate.debouncedQuery}`
+							: 'none',
 					},
 					{
 						label: 'Sort',
@@ -274,11 +272,11 @@ export function ProjectsPage() {
 			{/* Data + Table */}
 			<Data2
 				fetchData={fetchProjects}
-				pagination={pagination}
-				sorting={sorting}
-				search={search}
-				cache={cache}
-				selection={selection}
+				{...pagination}
+				{...sorting}
+				{...search}
+				{...cache}
+				{...selection}
 				delegateLoadingToChildren={true}
 			>
 				{injectedProps => (

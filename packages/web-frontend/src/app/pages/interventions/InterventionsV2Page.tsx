@@ -247,7 +247,12 @@ export function InterventionsV2Page() {
 			<ActiveFeaturesPanel
 				title="Active Features (UI / Debounced)"
 				features={[
-					{ label: 'Search', value: search.fstate.query || 'none' },
+					{
+						label: 'Search',
+						value: search.fstate.query
+							? `${search.fstate.query} / ${search.fstate.debouncedQuery}`
+							: 'none',
+					},
 					{
 						label: 'Sort',
 						value: sorting.fstate.sortConfigs.map(c => `${c.key}:${c.direction}`).join(', ') || 'none',
@@ -272,12 +277,12 @@ export function InterventionsV2Page() {
 			{/* Data + Table */}
 			<Data2
 				fetchData={fetchInterventions}
-				pagination={pagination}
-				sorting={sorting}
-				search={search}
+				{...pagination}
+				{...sorting}
+				{...search}
 				filter={filters as any}
-				cache={cache}
-				selection={selection}
+				{...cache}
+				{...selection}
 				delegateLoadingToChildren={true}
 			>
 				{injectedProps => (

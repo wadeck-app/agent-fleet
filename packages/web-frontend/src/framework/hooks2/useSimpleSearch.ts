@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
+import { useDebounce } from '@framework/hooks2/useDebounce';
 import type { SearchContract } from '@framework/types/contracts';
 
 /**
@@ -14,8 +15,9 @@ import type { SearchContract } from '@framework/types/contracts';
  * Key features:
  * - Uses URL parameters for persistence (shareable search URLs)
  * - Single input field, simple interface
+ * - Built-in debouncing (300ms delay) - no need for manual useDebounce
  * - Returns standardized FeatureContract: { state, fstate, actions, fillQuery }
- * - Includes isEmpty derived state
+ * - Includes isEmpty derived state and debouncedQuery
  * - fillQuery() only sets 'search' param when non-empty
  *
  * UI vs URL Separation:
@@ -31,6 +33,7 @@ import type { SearchContract } from '@framework/types/contracts';
  *
  * // Access state
  * console.log(search.state.query); // 'chicken' (exact what user typed)
+ * console.log(search.state.debouncedQuery); // 'chicken' (debounced 300ms)
  * console.log(search.state.isEmpty); // false
  *
  * // Call actions
@@ -89,14 +92,19 @@ export function useSimpleSearch(options?: UseSimpleSearchOptions): SearchContrac
 		setLocalQuery(urlQuery);
 	}, [urlQuery]);
 
+	// Add comment above the target line, not at the end
+	// Debounced query (300ms delay) for backend requests and display
+	const debouncedQuery = useDebounce(localQuery, 300);
+
 	// State object (current UI state)
 	const state = useMemo(
 		() => ({
 			query: localQuery,
 			trimmedQuery: localQuery.trim(),
+			debouncedQuery,
 			isEmpty: !localQuery.trim(),
 		}),
-		[localQuery]
+		[localQuery, debouncedQuery]
 	);
 
 	// Frozen state (already stable via useMemo)

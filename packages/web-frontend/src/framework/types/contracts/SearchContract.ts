@@ -49,6 +49,13 @@ export interface SearchState {
 	 */
 	trimmedQuery: string;
 
+	/**
+	 * Debounced version of query (300ms delay).
+	 * Use this for display purposes (e.g., ActiveFeaturesPanel) or when you need
+	 * to show what search query is actually being used for backend requests.
+	 */
+	debouncedQuery: string;
+
 	/** Whether search is empty (derived state for convenience) */
 	isEmpty: boolean;
 }

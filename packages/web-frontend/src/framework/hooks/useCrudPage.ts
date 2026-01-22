@@ -113,10 +113,14 @@ export interface CrudPageState<TItem extends { id: string; version: number }> {
 
 	// Sorting
 	sorting: {
+		// Core state
 		sortConfigs: Array<{ key: string; direction: 'asc' | 'desc' }>;
 		handleSort: (key: string, shiftKey: boolean) => void;
 		sortBy: string;
 		sortOrder: string;
+
+		// Spreadable props for components (alias)
+		onSortChange: (key: string, shiftKey: boolean) => void;
 	};
 
 	// Column management
@@ -140,6 +144,7 @@ export interface CrudPageState<TItem extends { id: string; version: number }> {
 
 	// Selection & bulk actions
 	selection: {
+		// Core state
 		selectedIds: Set<string>;
 		setSelectedIds: (ids: Set<string>) => void;
 		clearSelection: () => void;
@@ -147,6 +152,11 @@ export interface CrudPageState<TItem extends { id: string; version: number }> {
 		isBulkDeleting: boolean;
 		showBulkDeleteDialog: boolean;
 		setShowBulkDeleteDialog: (show: boolean) => void;
+
+		// Spreadable props for components (aliases)
+		selectable: boolean;
+		onSelectionChange: (ids: Set<string>) => void;
+		deleting: boolean;
 	};
 
 	// Delete confirmation
@@ -482,6 +492,8 @@ export function useCrudPage<TItem extends { id: string; version: number }>(
 			handleSort: sortingState.handleSort,
 			sortBy,
 			sortOrder,
+			// Spreadable alias
+			onSortChange: sortingState.handleSort,
 		},
 
 		// Column management
@@ -513,6 +525,10 @@ export function useCrudPage<TItem extends { id: string; version: number }>(
 			isBulkDeleting,
 			showBulkDeleteDialog,
 			setShowBulkDeleteDialog,
+			// Spreadable aliases for components
+			selectable: true,
+			onSelectionChange: setSelectedIds,
+			deleting: isBulkDeleting,
 		},
 
 		// Delete confirmation
