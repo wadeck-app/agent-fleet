@@ -1,22 +1,23 @@
 import { useMemo } from 'react';
 
-import { CrudDialog } from '@framework/components/overlays/CrudDialog';
-import { Button } from '@framework/components/primitives/Button';
 import type { Book, CreateBook } from '@shared/api/books.contract';
-import { RefreshCw } from 'lucide-react';
 
 import { BookForm } from '@app/pages/books/BookForm';
+
+import { EntityDialog } from './EntityDialog';
 
 /**
  * ===========================================================================================
  * BOOK DIALOG - Domain Component
  * ===========================================================================================
  *
- * Wraps BookForm in a CrudDialog with appropriate title/description based on mode.
- * - Uses CrudDialog for consistent dialog styling
- * - Determines create vs edit mode automatically
- * - Passes through all necessary handlers to BookForm
- * - Handles ISBN-specific operations (check, patch)
+ * Wraps BookForm in an EntityDialog with book-specific initial data handling.
+ * - Uses EntityDialog for consistent dialog structure
+ * - Handles book-specific operations (ISBN check, patch)
+ * - Prepares initial data and edit mode for BookForm
+ *
+ * **Refactored:** Now uses generic EntityDialog wrapper, eliminating ~70 lines of
+ * duplicated dialog boilerplate.
  *
  * ===========================================================================================
  */
@@ -45,41 +46,6 @@ export function BookDialog({
 	// Determine mode based on whether book exists
 	const isEditMode = !!book;
 
-	// Determine title based on mode
-	const title = isEditMode ? 'Edit Book' : 'New Book';
-
-	// Build header actions (refresh button + version badge)
-	const isDev = import.meta.env.DEV;
-	const headerActions = isEditMode ? (
-		<>
-			{onRefresh && (
-				<Button
-					type="button"
-					onClick={onRefresh}
-					disabled={isRefreshing}
-					variant="ghost"
-					size="icon-sm"
-					title="Refresh data"
-				>
-					<RefreshCw
-						className={`
-        size-4
-        ${isRefreshing ? 'animate-spin' : ''}
-      `}
-					/>
-				</Button>
-			)}
-			{isDev && book?.version !== undefined && (
-				<span
-					className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground"
-					title="Current version (dev only)"
-				>
-					v{book.version}
-				</span>
-			)}
-		</>
-	) : null;
-
 	// Prepare initial data for edit mode (memoized to prevent form resets)
 	// Using individual book fields as dependencies instead of book object reference
 	// This prevents form reset when book object changes but data fields remain the same
@@ -107,19 +73,13 @@ export function BookDialog({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [book?.id, book?.version]);
 
-	// Handler for dialog open change (called when user clicks overlay or ESC)
-	const handleOpenChange = (newOpen: boolean) => {
-		if (!newOpen) {
-			onClose();
-		}
-	};
-
 	return (
-		<CrudDialog
+		<EntityDialog
 			open={open}
-			onOpenChange={handleOpenChange}
-			title={title}
-			headerActions={headerActions}
+			onClose={onClose}
+			entity={book}
+			entityName="Book"
+			onRefresh={onRefresh}
 			isRefreshing={isRefreshing}
 			maxWidth="2xl"
 		>
@@ -132,6 +92,6 @@ export function BookDialog({
 				editMode={editMode}
 				submitLabel={isEditMode ? 'Update Book' : 'Add Book'}
 			/>
-		</CrudDialog>
+		</EntityDialog>
 	);
 }

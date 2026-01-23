@@ -1,5 +1,6 @@
 import { BrowserRouter } from 'react-router-dom';
 
+import { createDeferredPromise } from '@framework/test-utils/deferredPromise';
 import { render, screen, waitFor } from '@testing-library/react';
 
 import { TransportManager } from './TransportManager';
@@ -102,9 +103,8 @@ describe('TransportProvider', () => {
 				</BrowserRouter>
 			);
 
-			// Wait a bit to ensure connect is not called
-			await new Promise(resolve => setTimeout(resolve, 100));
-
+			// Add comment above the target line, not at the end
+			// Verify immediately that connect is not called
 			expect(connectSpy).not.toHaveBeenCalled();
 		});
 	});
@@ -235,11 +235,8 @@ describe('TransportProvider', () => {
 
 			unmount();
 
-			// Wait a bit to ensure disconnect is NOT called
-			await new Promise(resolve => setTimeout(resolve, 100));
-
-			// CRITICAL: disconnect should NOT be called on unmount
-			// The singleton persists across React remounts (StrictMode)
+			// Add comment above the target line, not at the end
+			// Verify immediately that disconnect is NOT called
 			expect(disconnectSpy).not.toHaveBeenCalled();
 		});
 

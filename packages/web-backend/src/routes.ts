@@ -12,10 +12,9 @@ const routes: RouteDefinition[] = [
 	['/api/workers', () => import('./controllers/WorkersController')],
 	['/api/flows', () => import('./controllers/FlowsController')],
 	['/api/tasks', () => import('./controllers/TasksController')],
-	['/api/workspaces', () => import('./controllers/WorkspacesController')],
+	['/api/workspaces', () => import('./controllers/WorkspacesWithScriptsController')],
 	['/api/projects', () => import('./controllers/ProjectsController')],
 	['/api/interventions', () => import('./controllers/InterventionsController')],
-	['/api/workspaces/:workspaceId/scripts', () => import('./controllers/WorkspaceScriptsController')],
 	['/api/monitoring/transport', () => import('./controllers/MonitoringController')],
 ];
 

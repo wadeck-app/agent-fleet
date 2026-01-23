@@ -1,37 +1,20 @@
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from '@framework/components/overlays/DropdownMenu';
-import { Button } from '@framework/components/primitives/Button';
-import { ChevronDown } from 'lucide-react';
-
 interface AppSwitcherProps {
 	className?: string;
 	compact?: boolean;
 }
 
+/**
+ * AppSwitcher - Application Title Display
+ *
+ * Displays the application name "Agent Fleet" in the sidebar.
+ * Simplified from dropdown implementation as there's only one app currently.
+ *
+ * @param compact - If true, uses smaller text size (mobile variant)
+ */
 export function AppSwitcher({ className, compact = false }: AppSwitcherProps) {
 	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<Button
-					variant="outline"
-					className={`
-       ${compact ? 'h-9 px-2 text-sm' : ''}
-       ${className || ''}
-     `}
-				>
-					<span className={compact ? 'font-medium' : 'font-semibold'}>App</span>
-					<ChevronDown className="ml-auto size-4 opacity-50" />
-				</Button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="start" className="w-[200px]">
-				<DropdownMenuItem>
-					<span className="font-medium">App</span>
-				</DropdownMenuItem>
-			</DropdownMenuContent>
-		</DropdownMenu>
+		<div className={`flex items-center ${className || ''}`}>
+			<h1 className={`font-bold text-primary ${compact ? 'text-lg' : 'text-xl'}`}>Agent Fleet</h1>
+		</div>
 	);
 }

@@ -1,0 +1,60 @@
+{
+	"workspace-scripts": [
+		{
+			"workspaceId": "50115a2e-5226-46d4-9fb8-6f9c11a16f9d",
+			"scriptName": "dev:backend",
+			"enabled": true,
+			"displayName": "dev:backend",
+			"description": "",
+			"order": 0,
+			"autoStart": false,
+			"restartOnFailure": false,
+			"id": "9loyzyifi",
+			"version": 4,
+			"createdAt": "2026-01-23T15:49:50.289Z",
+			"updatedAt": "2026-01-23T15:58:40.014Z"
+		},
+		{
+			"workspaceId": "50115a2e-5226-46d4-9fb8-6f9c11a16f9d",
+			"scriptName": "dev:worker",
+			"enabled": true,
+			"displayName": "dev:worker",
+			"description": "",
+			"order": 2,
+			"autoStart": false,
+			"restartOnFailure": false,
+			"id": "nebrwmg70",
+			"version": 4,
+			"createdAt": "2026-01-23T15:49:52.148Z",
+			"updatedAt": "2026-01-23T15:58:41.686Z"
+		},
+		{
+			"workspaceId": "50115a2e-5226-46d4-9fb8-6f9c11a16f9d",
+			"scriptName": "typecheck:watch:no-pretty",
+			"enabled": true,
+			"displayName": "typecheck:watch:no-pretty",
+			"description": "",
+			"order": 3,
+			"autoStart": false,
+			"restartOnFailure": false,
+			"id": "hzg9o1g85",
+			"version": 4,
+			"createdAt": "2026-01-23T15:50:01.215Z",
+			"updatedAt": "2026-01-23T15:58:42.381Z"
+		},
+		{
+			"workspaceId": "50115a2e-5226-46d4-9fb8-6f9c11a16f9d",
+			"scriptName": "dev:frontend",
+			"enabled": true,
+			"displayName": "dev:frontend",
+			"description": "",
+			"order": 1,
+			"autoStart": false,
+			"restartOnFailure": false,
+			"id": "zm8yedetb",
+			"version": 2,
+			"createdAt": "2026-01-23T15:58:36.224Z",
+			"updatedAt": "2026-01-23T15:58:40.717Z"
+		}
+	]
+}

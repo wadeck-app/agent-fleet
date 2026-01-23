@@ -177,9 +177,17 @@ function createLazyControllerPlugin<Routes = any>(
 			// @ts-expect-error - Dynamic service injection based on baseUrl
 			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/workspaces') {
-			service = factory.getWorkspacesService();
-			// @ts-expect-error - Dynamic service injection based on baseUrl
-			controllerInstance = new ControllerClass(service);
+			// Unified controller needs 4 services
+			const workspacesService = factory.getWorkspacesService();
+			const workspaceScriptsService = factory.getWorkspaceScriptsService();
+			const scriptProcessService = factory.getScriptProcessService();
+			const scriptLogsStorage = factory.getScriptLogsStorage();
+			controllerInstance = new (ControllerClass as any)(
+				workspacesService,
+				workspaceScriptsService,
+				scriptProcessService,
+				scriptLogsStorage
+			);
 		} else if (baseUrl === '/api/interventions') {
 			service = factory.getInterventionsService();
 			// @ts-expect-error - Dynamic service injection based on baseUrl
@@ -193,6 +201,10 @@ function createLazyControllerPlugin<Routes = any>(
 		}
 
 		// 4. Collect handler functions
+		if (!controllerInstance) {
+			throw new Error(`Failed to initialize controller for baseUrl: ${baseUrl}`);
+		}
+
 		handlerMap = new Map();
 		const collectHandlers: RouteWrapperFunc<Routes> = (method, path, handler) => {
 			const relativePath = path.startsWith(baseUrl) ? path.substring(baseUrl.length) || '/' : path;

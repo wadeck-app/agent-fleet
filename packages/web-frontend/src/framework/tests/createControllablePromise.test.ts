@@ -1,3 +1,4 @@
+import { createDeferredPromise } from '@framework/test-utils/deferredPromise';
 import { describe, expect, it } from 'vitest';
 
 import { createControllablePromise } from './createControllablePromise';
@@ -49,8 +50,11 @@ describe('createControllablePromise', () => {
 				resolved = true;
 			});
 
+			// Add comment above the target line, not at the end
 			// Wait a tick to ensure promise doesn't resolve immediately
-			await new Promise(r => setTimeout(r, 0));
+			const deferred = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred.promise;
 			expect(resolved).toBe(false);
 
 			// Resolve the promise
@@ -89,8 +93,11 @@ describe('createControllablePromise', () => {
 				rejected = true;
 			});
 
+			// Add comment above the target line, not at the end
 			// Wait a tick to ensure promise doesn't reject immediately
-			await new Promise(r => setTimeout(r, 0));
+			const deferred = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred.promise;
 			expect(rejected).toBe(false);
 
 			// Reject the promise

@@ -374,11 +374,11 @@ export function Ingredients2TablePage() {
 			{/* Data Shell + Table */}
 			<Data2
 				fetchData={fetchIngredients}
-				{...pagination}
-				{...sorting}
-				{...search}
-				{...cache}
-				{...selection}
+				pagination={pagination}
+				sorting={sorting}
+				search={search}
+				cache={cache}
+				selection={selection}
 				delegateLoadingToChildren={true}
 			>
 				{injectedProps => (

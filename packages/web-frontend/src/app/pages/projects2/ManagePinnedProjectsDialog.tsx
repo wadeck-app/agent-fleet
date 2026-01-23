@@ -10,8 +10,8 @@ import {
 	useSensors,
 } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { SearchBar } from '@framework/components/forms/SearchBar';
 import { CrudDialog } from '@framework/components/overlays/CrudDialog';
+import { SearchBar } from '@framework/features/search/SearchBar';
 import type { Project } from '@shared/api/projects.contract';
 
 import { AvailableProjectItem } from './AvailableProjectItem';

@@ -14,8 +14,6 @@ import request from 'supertest';
 import { setupTest } from 'test-utils/helpers';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { UIClientHook } from '../ui-client/UIClientHook';
-import { UIWebSocketServer } from '../websocket/UIWebSocketServer';
 import type { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
 import { RestAPI } from './RestAPI';
 import type { TaskManager } from './TaskManager';
@@ -23,16 +21,6 @@ import type { TaskManager } from './TaskManager';
 // Mock all dependencies
 vi.mock('./TaskManager');
 vi.mock('../websocket/WorkerWebSocketServer');
-vi.mock('../websocket/UIWebSocketServer', () => ({
-	UIWebSocketServer: vi.fn(function (this: any) {
-		this.start = vi.fn();
-		this.stop = vi.fn();
-		this.handleConnection = vi.fn();
-		this.getClientCount = vi.fn().mockReturnValue(0);
-		this.isRunning = vi.fn().mockReturnValue(false);
-	}),
-}));
-vi.mock('../ui-client/UIClientHook');
 vi.mock('flow-engine/workspace/WorkspaceManager');
 vi.mock('shared-common/StateManager');
 vi.mock('shared-common/logger', () => ({
@@ -1089,63 +1077,6 @@ describe('RestAPI', () => {
 
 			expect(response.status).toBe(200);
 			expect(response.body.id).toBe(taskId);
-		});
-	});
-
-	describe('UIClientHook Integration', () => {
-		it('should initialize UIWebSocketServer when UIClientHook is provided', () => {
-			const mockUIClientHook = {
-				enable: vi.fn(),
-				disable: vi.fn(),
-				isActive: vi.fn().mockReturnValue(true),
-				on: vi.fn(),
-				off: vi.fn(),
-				emit: vi.fn(),
-				removeAllListeners: vi.fn(),
-			} as any;
-
-			const apiWithUI = new RestAPI(mockTaskManager, mockWsServer, 3737, mockWorkspaceManager, mockUIClientHook);
-
-			// Verify UIWebSocketServer was instantiated
-			expect(UIWebSocketServer).toHaveBeenCalledWith(mockUIClientHook);
-		});
-
-		it('should not initialize UIWebSocketServer when UIClientHook is not provided', () => {
-			// Clear previous mock calls
-			vi.clearAllMocks();
-
-			const apiWithoutUI = new RestAPI(mockTaskManager, mockWsServer, 3737);
-
-			// Verify UIWebSocketServer was not instantiated
-			expect(UIWebSocketServer).not.toHaveBeenCalled();
-		});
-
-		it('should start UIWebSocketServer when UIClientHook is provided', () => {
-			vi.clearAllMocks();
-
-			const mockUIClientHook = {
-				enable: vi.fn(),
-				disable: vi.fn(),
-				isActive: vi.fn().mockReturnValue(true),
-				on: vi.fn(),
-				off: vi.fn(),
-				emit: vi.fn(),
-				removeAllListeners: vi.fn(),
-			} as any;
-
-			const apiWithUI = new RestAPI(mockTaskManager, mockWsServer, 3737, mockWorkspaceManager, mockUIClientHook);
-
-			// Verify UIWebSocketServer constructor was called
-			expect(UIWebSocketServer).toHaveBeenCalledWith(mockUIClientHook);
-		});
-
-		it('should not initialize UIWebSocketServer when UIClientHook is omitted', () => {
-			vi.clearAllMocks();
-
-			const apiWithoutUI = new RestAPI(mockTaskManager, mockWsServer, 3788);
-
-			// Verify UIWebSocketServer was not created
-			expect(UIWebSocketServer).not.toHaveBeenCalled();
 		});
 	});
 });

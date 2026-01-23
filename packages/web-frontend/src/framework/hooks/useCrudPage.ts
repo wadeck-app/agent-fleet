@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { useColumnOrder } from '@framework/components/columns/useColumnOrder';
@@ -7,6 +7,7 @@ import { usePagination } from '@framework/components/pagination/usePagination';
 import type { TableColumn } from '@framework/components/table/Table';
 import { useSorting } from '@framework/components/table/useSorting';
 import { useTableRefreshing } from '@framework/components/table/useTableRefreshing';
+import { useCacheControl2 } from '@framework/hooks2/useCacheControl2';
 import { useDebounce } from '@framework/hooks2/useDebounce';
 import { useCrudSuccessToast } from '@framework/hooks/useCrudSuccessToast';
 import { useErrorToast } from '@framework/hooks/useErrorToast';
@@ -115,11 +116,10 @@ export interface CrudPageState<TItem extends { id: string; version: number }> {
 	sorting: {
 		// Core state
 		sortConfigs: Array<{ key: string; direction: 'asc' | 'desc' }>;
-		handleSort: (key: string, shiftKey: boolean) => void;
 		sortBy: string;
 		sortOrder: string;
 
-		// Spreadable props for components (alias)
+		// Spreadable props for components
 		onSortChange: (key: string, shiftKey: boolean) => void;
 	};
 
@@ -209,6 +209,13 @@ export interface CrudPageState<TItem extends { id: string; version: number }> {
 		sortBy?: string;
 		sortOrder?: string;
 		search?: string;
+	};
+
+	// Cache control (for debug display and manual refresh)
+	cache: {
+		cacheId: number;
+		isRefreshing: boolean;
+		refresh: () => void;
 	};
 }
 
@@ -341,8 +348,24 @@ export function useCrudPage<TItem extends { id: string; version: number }>(
 		loadItems,
 	} = useDataHook(queryParams);
 
-	// Refreshing state for blur effect
-	const isRefreshing = useTableRefreshing(queryParams, loading);
+	// Add comment above the target line, not at the end
+	// Cache control for manual refresh and HTTP cache busting
+	const cache = useCacheControl2({ enabled: true });
+
+	// Add comment above the target line, not at the end
+	// Wrap loadItems to increment cacheId and pass it to backend
+	const loadItemsWithCache = useCallback(
+		async (params: any) => {
+			// Increment cacheId first
+			cache.actions.refresh();
+			// Pass cacheId to backend for cache busting and logging
+			await loadItems({ ...params, cacheId: cache.fstate.cacheId + 1 });
+		},
+		[loadItems, cache]
+	);
+
+	// Refreshing state for blur effect - includes cacheId to detect manual refresh
+	const isRefreshing = useTableRefreshing({ ...queryParams, cacheId: cache.fstate.cacheId }, loading);
 
 	// Add comment above the target line, not at the end
 	// Convert Error object to string for useErrorToast
@@ -489,10 +512,8 @@ export function useCrudPage<TItem extends { id: string; version: number }>(
 		// Sorting
 		sorting: {
 			sortConfigs: sortingState.sortConfigs,
-			handleSort: sortingState.handleSort,
 			sortBy,
 			sortOrder,
-			// Spreadable alias
 			onSortChange: sortingState.handleSort,
 		},
 
@@ -564,7 +585,7 @@ export function useCrudPage<TItem extends { id: string; version: number }>(
 			updateItem,
 			deleteItem,
 			bulkDeleteItems,
-			loadItems,
+			loadItems: loadItemsWithCache,
 		},
 
 		// Config
@@ -576,5 +597,12 @@ export function useCrudPage<TItem extends { id: string; version: number }>(
 
 		// Current params
 		currentParams: queryParams,
+
+		// Cache control (for debug display and manual refresh)
+		cache: {
+			cacheId: cache.fstate.cacheId,
+			isRefreshing: cache.fstate.isRefreshing,
+			refresh: cache.actions.refresh,
+		},
 	};
 }

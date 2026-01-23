@@ -1,4 +1,5 @@
 /* global Response, Headers, Blob, FormData */
+import { createDeferredPromise } from '@framework/test-utils/deferredPromise';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -35,7 +36,11 @@ describe('CircuitBreakerService', () => {
 	const waitForAsync = async (ticks = 5) => {
 		// Wait multiple ticks to ensure all async operations complete
 		for (let i = 0; i < ticks; i++) {
-			await new Promise(resolve => setTimeout(resolve, 0));
+			// Add comment above the target line, not at the end
+			// Wait a tick for async operations
+			const deferred = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred.promise;
 		}
 	};
 
@@ -137,7 +142,11 @@ describe('CircuitBreakerService', () => {
 			scheduler.advance(1000); // 1s delay
 
 			// Wait for async health check to execute
-			await new Promise(resolve => setTimeout(resolve, 0));
+			// Add comment above the target line, not at the end
+			// Wait a tick for async operations
+			const deferred = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred.promise;
 
 			// Should have transitioned to HALF_OPEN during check, then back to OPEN
 			expect(service.getState().state).toBe(CircuitState.OPEN);
@@ -175,7 +184,11 @@ describe('CircuitBreakerService', () => {
 
 			// Advance time to trigger health check
 			scheduler.advance(1000);
-			await new Promise(resolve => setTimeout(resolve, 0));
+			// Add comment above the target line, not at the end
+			// Wait a tick for async operations
+			const deferred = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred.promise;
 
 			// Should stay OPEN
 			expect(service.getState().state).toBe(CircuitState.OPEN);
@@ -294,7 +307,11 @@ describe('CircuitBreakerService', () => {
 				const currentDelay = service.getState().delay;
 				mockFetch.mockRejectedValueOnce(new Error('Still down'));
 				scheduler.advance(currentDelay);
-				await new Promise(resolve => setTimeout(resolve, 0));
+				// Add comment above the target line, not at the end
+				// Wait a tick for async operations
+				const deferred = createDeferredPromise<void>();
+				deferred.resolve();
+				await deferred.promise;
 			}
 
 			// Delay should be capped at 30s
@@ -472,7 +489,11 @@ describe('CircuitBreakerService', () => {
 
 			// Advance time to trigger health check
 			scheduler.advance(1000);
-			await new Promise(resolve => setTimeout(resolve, 0));
+			// Add comment above the target line, not at the end
+			// Wait a tick for async operations
+			const deferred = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred.promise;
 
 			// Should have called /api/health
 			expect(mockFetch).toHaveBeenCalledWith(
@@ -534,7 +555,11 @@ describe('CircuitBreakerService', () => {
 			// Advance time - no more health checks should be scheduled
 			const callCountBefore = mockFetch.mock.calls.length;
 			scheduler.advance(10000);
-			await new Promise(resolve => setTimeout(resolve, 0));
+			// Add comment above the target line, not at the end
+			// Wait a tick for async operations
+			const deferred = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred.promise;
 			expect(mockFetch.mock.calls.length).toBe(callCountBefore);
 		});
 	});

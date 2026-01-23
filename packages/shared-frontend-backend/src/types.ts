@@ -34,6 +34,7 @@ import { MONITORING_API_ROUTES } from './api/monitoring.contract';
 import { PROJECTS_API_ROUTES } from './api/projects.contract';
 import { TASKS_API_ROUTES } from './api/tasks.contract';
 import { WORKERS_API_ROUTES } from './api/workers.contract';
+import { WORKSPACE_SCRIPTS_API_ROUTES } from './api/workspaceScripts.contract';
 import { WORKSPACES_API_ROUTES } from './api/workspaces.contract';
 import type { HttpMethod } from './route-builder';
 
@@ -56,6 +57,7 @@ export const ALL_API_ROUTES = {
 	...WORKERS_API_ROUTES,
 	...TASKS_API_ROUTES,
 	...WORKSPACES_API_ROUTES,
+	...WORKSPACE_SCRIPTS_API_ROUTES,
 	...MONITORING_API_ROUTES,
 } as const;
 
@@ -66,6 +68,8 @@ export const ALL_API_ROUTES = {
  *
  * Automatically maps baseUrl → routes for each contract.
  * This allows the backend to retrieve routes without importing controllers.
+ *
+ * When multiple contracts have the same baseUrl, their routes are merged.
  *
  * Example:
  *   ROUTES_BY_BASE_URL['/api/books'] → BOOKS_API_ROUTES
@@ -83,11 +87,25 @@ const ALL_CONTRACTS = [
 	WORKERS_API_ROUTES,
 	TASKS_API_ROUTES,
 	WORKSPACES_API_ROUTES,
+	WORKSPACE_SCRIPTS_API_ROUTES,
 	MONITORING_API_ROUTES,
 ] as const;
 
-export const ROUTES_BY_BASE_URL: Record<string, any> = Object.fromEntries(
-	ALL_CONTRACTS.map(contract => [contract.__baseUrl, contract])
+// Merge routes with the same baseUrl
+export const ROUTES_BY_BASE_URL: Record<string, any> = ALL_CONTRACTS.reduce(
+	(acc, contract) => {
+		const baseUrl = contract.__baseUrl;
+		if (acc[baseUrl]) {
+			// Merge routes from both contracts
+			const { __baseUrl: _, ...existingRoutes } = acc[baseUrl];
+			const { __baseUrl: __, ...newRoutes } = contract;
+			acc[baseUrl] = { __baseUrl: baseUrl, ...existingRoutes, ...newRoutes };
+		} else {
+			acc[baseUrl] = contract;
+		}
+		return acc;
+	},
+	{} as Record<string, any>
 );
 
 /**

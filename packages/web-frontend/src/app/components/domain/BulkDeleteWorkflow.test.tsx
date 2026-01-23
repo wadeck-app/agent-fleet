@@ -408,8 +408,7 @@ describe('BulkDeleteWorkflow', () => {
 
 			mockOnBulkDelete.mockImplementation(async (ids: string[]) => {
 				callOrder.push(ids.length);
-				// Add delay to ensure sequential processing
-				await new Promise(resolve => setTimeout(resolve, 10));
+				// Sequential processing is ensured by the implementation, not by timing
 				return { deleted: ids, failed: [] };
 			});
 

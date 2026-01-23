@@ -1,3 +1,4 @@
+import { createDeferredPromise } from '@framework/test-utils/deferredPromise';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -203,9 +204,16 @@ describe('SearchInput', () => {
 
 			const input = screen.getByPlaceholderText('Search...');
 
+			// Add comment above the target line, not at the end
 			// Type in two phases to test debounce cancellation
 			await user.type(input, 'test');
-			await new Promise(resolve => setTimeout(resolve, 200)); // Wait 200ms
+
+			// Add comment above the target line, not at the end
+			// Wait briefly before typing more to test debounce reset
+			const deferred = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred.promise;
+
 			await user.type(input, 'ing');
 
 			// Should only call onChange once with final value after debounce
@@ -300,8 +308,11 @@ describe('SearchInput', () => {
 			// Unmount before debounce completes
 			unmount();
 
-			// Wait longer than debounce time
-			await new Promise(resolve => setTimeout(resolve, 500));
+			// Add comment above the target line, not at the end
+			// Wait longer than debounce time to verify cleanup
+			const deferred = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred.promise;
 
 			// onChange should not have been called after unmount
 			expect(onChange).not.toHaveBeenCalled();

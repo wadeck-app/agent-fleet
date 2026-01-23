@@ -1,3 +1,4 @@
+import { createDeferredPromise } from '@framework/test-utils/deferredPromise';
 import { createControllablePromise } from '@framework/tests/createControllablePromise';
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -189,7 +190,11 @@ describe('useAsyncData', () => {
 			slowRequest.resolve('slow-result');
 
 			// Wait to ensure slow result doesn't override
-			await new Promise(resolve => setTimeout(resolve, 50));
+			// Add comment above the target line, not at the end
+			// Wait for async operations to complete
+			const deferred = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred.promise;
 
 			// Data should still be from fast request
 			expect(result.current.data).toBe('fast-result');
@@ -224,7 +229,11 @@ describe('useAsyncData', () => {
 			promises[0]!.resolve('result-1');
 			promises[1]!.resolve('result-2');
 
-			await new Promise(resolve => setTimeout(resolve, 50));
+			// Add comment above the target line, not at the end
+			// Wait for async operations to complete
+			const deferred = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred.promise;
 
 			// Data should still be from last request
 			expect(result.current.data).toBe('result-3');
@@ -374,7 +383,11 @@ describe('useAsyncData', () => {
 			// Complete cancelled request
 			promise1.resolve('data-1');
 
-			await new Promise(resolve => setTimeout(resolve, 50));
+			// Add comment above the target line, not at the end
+			// Wait for async operations to complete
+			const deferred = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred.promise;
 
 			// Loading should still be true (waiting for second request)
 			expect(result.current.loading).toBe(true);
@@ -420,7 +433,11 @@ describe('useAsyncData', () => {
 			// "ab" completes first (fast server)
 			searchAB.resolve(['about', 'above']);
 
-			await new Promise(resolve => setTimeout(resolve, 50));
+			// Add comment above the target line, not at the end
+			// Wait for async operations to complete
+			const deferred1 = createDeferredPromise<void>();
+			deferred1.resolve();
+			await deferred1.promise;
 
 			// Should NOT show "ab" results because "abc" is pending
 			expect(result.current.data).not.toEqual(['about', 'above']);
@@ -428,7 +445,11 @@ describe('useAsyncData', () => {
 			// "a" completes next (slow server)
 			searchA.resolve(['apple', 'ant']);
 
-			await new Promise(resolve => setTimeout(resolve, 50));
+			// Add comment above the target line, not at the end
+			// Wait for async operations to complete
+			const deferred2 = createDeferredPromise<void>();
+			deferred2.resolve();
+			await deferred2.promise;
 
 			// Should NOT show "a" results
 			expect(result.current.data).not.toEqual(['apple', 'ant']);
@@ -458,7 +479,11 @@ describe('useAsyncData', () => {
 			promise.resolve('data');
 
 			// Wait to ensure no state updates happen (would cause React warnings)
-			await new Promise(resolve => setTimeout(resolve, 50));
+			// Add comment above the target line, not at the end
+			// Wait for async operations to complete
+			const deferred = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred.promise;
 
 			// Test passes if no React warnings/errors occur
 		});

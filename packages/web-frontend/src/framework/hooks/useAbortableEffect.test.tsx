@@ -1,6 +1,7 @@
 /* global AbortSignal */
 import { useState } from 'react';
 
+import { createDeferredPromise } from '@framework/test-utils/deferredPromise';
 import { createControllablePromise } from '@framework/tests/createControllablePromise';
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -185,7 +186,11 @@ describe('useAbortableEffect', () => {
 			slowRequest.resolve();
 
 			// Wait a bit to ensure slow request had time to process
-			await new Promise(resolve => setTimeout(resolve, 50));
+			// Add comment above the target line, not at the end
+			// Wait for async operations to complete
+			const deferred = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred.promise;
 
 			// Slow request result should be ignored
 			expect(results).toEqual(['fast']); // Still just 'fast', not ['fast', 'slow']
@@ -234,7 +239,11 @@ describe('useAbortableEffect', () => {
 			promises[0]!.resolve();
 			promises[1]!.resolve();
 
-			await new Promise(resolve => setTimeout(resolve, 50));
+			// Add comment above the target line, not at the end
+			// Wait for async operations to complete
+			const deferred = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred.promise;
 
 			// Still only the last result
 			expect(results).toEqual([3]);
@@ -288,7 +297,11 @@ describe('useAbortableEffect', () => {
 			// Complete first request (slow) - should be ignored
 			request1.resolve('result-1');
 
-			await new Promise(resolve => setTimeout(resolve, 50));
+			// Add comment above the target line, not at the end
+			// Wait for async operations to complete
+			const deferred = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred.promise;
 
 			// State should still be from second request
 			expect(result.current).toBe('result-2');
@@ -362,7 +375,11 @@ describe('useAbortableEffect', () => {
 			const error1 = new Error('Aborted request error');
 			promise1.reject(error1);
 
-			await new Promise(resolve => setTimeout(resolve, 50));
+			// Add comment above the target line, not at the end
+			// Wait for async operations to complete
+			const deferred = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred.promise;
 
 			// Error from aborted request should not be tracked
 			expect(errors).toEqual([]);
@@ -427,7 +444,11 @@ describe('useAbortableEffect', () => {
 			// Change effect implementation but keep dependency same
 			rerender({ dep: 1, label: 'second' });
 
-			await new Promise(resolve => setTimeout(resolve, 50));
+			// Add comment above the target line, not at the end
+			// Wait for async operations to complete
+			const deferred = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred.promise;
 
 			// Effect should NOT re-run (dependency unchanged)
 			expect(results).toEqual(['first']);

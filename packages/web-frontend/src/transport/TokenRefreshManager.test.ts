@@ -7,6 +7,7 @@
  * - Callback invocation
  * - Concurrent refresh prevention
  */
+import { createDeferredPromise } from '@framework/test-utils/deferredPromise';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type TokenRefreshConfig, TokenRefreshManager } from './TokenRefreshManager';
@@ -197,24 +198,20 @@ describe('TokenRefreshManager', () => {
 				refreshBeforeExpiry: 60000,
 			};
 
-			fetchMock.mockImplementation(
-				() =>
-					new Promise(resolve =>
-						setTimeout(
-							() =>
-								resolve({
-									ok: true,
-									json: async () => ({ expiresAt: Date.now() + 300000 }),
-								}),
-							100
-						)
-					)
-			);
+			const deferred = createDeferredPromise<any>();
+
+			fetchMock.mockImplementation(() => deferred.promise);
 
 			const manager = new TokenRefreshManager(config);
 
 			const promise1 = manager.refreshToken();
 			const promise2 = manager.refreshToken();
+
+			// Resolve the promise
+			deferred.resolve({
+				ok: true,
+				json: async () => ({ expiresAt: Date.now() + 300000 }),
+			});
 
 			const [_result1, result2] = await Promise.all([promise1, promise2]);
 

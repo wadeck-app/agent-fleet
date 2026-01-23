@@ -33,6 +33,7 @@ export interface UseIngredientsParams {
 	sortBy?: string;
 	sortOrder?: string;
 	search?: string;
+	cacheId?: number;
 }
 
 export interface UseIngredientsResult {
@@ -217,7 +218,7 @@ export function useIngredients(params?: UseIngredientsParams): UseIngredientsRes
 				}
 			}
 		},
-		[params?.page, params?.pageSize, params?.sortBy, params?.sortOrder]
+		[params?.page, params?.pageSize, params?.sortBy, params?.sortOrder, params?.search, params?.cacheId]
 	);
 
 	/**

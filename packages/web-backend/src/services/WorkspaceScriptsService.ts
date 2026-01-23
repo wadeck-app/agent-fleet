@@ -193,18 +193,23 @@ export class WorkspaceScriptsService {
 				}
 			}
 
-			// Update script
-			const script = await this.workspaceScriptsRepository.update(scriptId, {
-				scriptName: data.scriptName,
-				enabled: data.enabled,
-				displayName: data.displayName,
-				description: data.description,
-				url: data.url,
-				order: data.order,
-				autoStart: data.autoStart,
-				restartOnFailure: data.restartOnFailure,
+			// Build update object - only include fields that are provided (not undefined)
+			// This prevents overwriting existing fields with undefined values
+			const updateData: Partial<WorkspaceScript> = {
 				version: existing.version + 1,
-			});
+			};
+
+			if (data.scriptName !== undefined) updateData.scriptName = data.scriptName;
+			if (data.enabled !== undefined) updateData.enabled = data.enabled;
+			if (data.displayName !== undefined) updateData.displayName = data.displayName;
+			if (data.description !== undefined) updateData.description = data.description;
+			if (data.url !== undefined) updateData.url = data.url;
+			if (data.order !== undefined) updateData.order = data.order;
+			if (data.autoStart !== undefined) updateData.autoStart = data.autoStart;
+			if (data.restartOnFailure !== undefined) updateData.restartOnFailure = data.restartOnFailure;
+
+			// Update script
+			const script = await this.workspaceScriptsRepository.update(scriptId, updateData);
 
 			// Emit event after successful update
 			try {

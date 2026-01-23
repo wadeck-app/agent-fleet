@@ -4,6 +4,12 @@
 
 For Playwright best practices, see `.claude/docs/playwright.md`.
 
+## Validation Protocol
+
+After changes: TS → Build → **Runtime (F12 console)** → Tests
+
+**See:** `.claude/agents/frontend-dev.md`
+
 ## Tech Stack
 
 - React 19 + TypeScript 5.3+

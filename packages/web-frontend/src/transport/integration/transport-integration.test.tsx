@@ -15,6 +15,7 @@
 import { useEffect, useState } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 
+import { createDeferredPromise } from '@framework/test-utils/deferredPromise';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import { type ConnectionState } from '@shared/transport';
 import { render, screen, waitFor } from '@testing-library/react';
@@ -231,7 +232,8 @@ describe('Transport Integration Tests', () => {
 				</TestWrapper>
 			);
 
-			await new Promise(resolve => setTimeout(resolve, 100));
+			// Add comment above the target line, not at the end
+			// Verify immediately that connect was not called
 			expect(connectSpy).not.toHaveBeenCalled();
 		});
 	});

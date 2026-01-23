@@ -1,8 +1,6 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
 import type { ScriptProcessWithConfig } from '@shared/api/workspaceScripts.contract';
 
-import { StatusIndicator } from './StatusIndicator';
-
 interface ScriptSelectorProps {
 	workspaceId: string;
 	scripts: ScriptProcessWithConfig[];
@@ -43,14 +41,11 @@ export function ScriptSelector({ scripts, value, onChange, disabled = false }: S
 				<SelectItem value="empty">
 					<span className="text-muted-foreground">Select a script...</span>
 				</SelectItem>
-				{scripts.map(({ script, process }) => {
+				{scripts.map(({ script }) => {
 					const displayName = script.displayName || script.scriptName;
 					return (
 						<SelectItem key={script.id} value={script.id}>
-							<div className="flex items-center gap-2">
-								<span>{displayName}</span>
-								{process && <StatusIndicator status={process.status} />}
-							</div>
+							<span>{displayName}</span>
 						</SelectItem>
 					);
 				})}

@@ -3,11 +3,11 @@ import { useCallback, useState } from 'react';
 import { Data2 } from '@framework/components2/data/Data2';
 import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
 import { ActiveFeaturesPanel } from '@framework/components/debug/ActiveFeaturesPanel';
-import { SearchBar } from '@framework/components/forms/SearchBar';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
 import { Button } from '@framework/components/primitives/Button';
+import { SearchBar } from '@framework/features/search/SearchBar';
 import { useCacheControl2 } from '@framework/hooks2/useCacheControl2';
 import { useMultiSelect2 } from '@framework/hooks2/useMultiSelect2';
 import { usePagination2 } from '@framework/hooks2/usePagination2';
@@ -151,12 +151,16 @@ export function ProjectsPage() {
 			search: query.search,
 		});
 
+		// Handle both response types: ProjectsListResponse (items) or ProjectsData (projects)
+		// API contract allows union type, so we need to check which format was returned
+		const projectsList = 'items' in response ? response.items : (response as { projects: Project[] }).projects;
+
 		// Store projects for visual feedback
-		setProjects(response.items);
+		setProjects(projectsList);
 
 		return {
-			items: response.items,
-			pagination: response.pagination,
+			items: projectsList,
+			pagination: 'pagination' in response ? response.pagination : undefined,
 		};
 	}, []);
 

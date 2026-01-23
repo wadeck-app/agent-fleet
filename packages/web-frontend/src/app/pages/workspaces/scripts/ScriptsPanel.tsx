@@ -124,7 +124,7 @@ export function ScriptsPanel({ workspaceId }: ScriptsPanelProps) {
 			</div>
 
 			{/* Panels Grid */}
-			<div className="flex-1 overflow-auto p-4">
+			<div className="flex-1 overflow-auto pt-4">
 				{scripts.length === 0 ? (
 					<div className="flex h-full items-center justify-center">
 						<div className="text-center">
@@ -166,7 +166,6 @@ export function ScriptsPanel({ workspaceId }: ScriptsPanelProps) {
 				open={isConfigDialogOpen}
 				onClose={() => setIsConfigDialogOpen(false)}
 				scripts={scripts}
-				onRefresh={refetch}
 			/>
 		</div>
 	);

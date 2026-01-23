@@ -1,21 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 
 import { LoadingSpinner } from '@framework/components/loading/LoadingSpinner';
-import { Button } from '@framework/components/primitives/Button';
-import { TextField } from '@framework/features/forms/fields/TextField';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 
 import { useAuth } from '@app/hooks/useAuth';
 
+import { LoginForm } from './LoginForm';
+import type { LoginFormData } from './loginSchema';
+
 /**
  * Login Page Component
  *
- * Provides login form with email and password fields.
+ * Provides login form with email and password fields using React Hook Form.
  *
  * Features:
- * - Email and password input fields
- * - Form validation
+ * - Integrated form validation (React Hook Form + Zod)
  * - Loading state during login
  * - Error handling and display
  * - Redirect to home page on successful login
@@ -28,50 +28,18 @@ import { useAuth } from '@app/hooks/useAuth';
  */
 export function LoginPage() {
 	const { state, login } = useAuth();
-	const [email, setEmail] = useState('');
-	const [password, setPassword] = useState('');
 	const [error, setError] = useState<string | null>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	/**
-	 * Clear error when inputs change
-	 */
-	useEffect(() => {
-		if (error) {
-			setError(null);
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [email, password]);
-
-	/**
 	 * Handle form submission
 	 */
-	const handleSubmit = async (e: React.FormEvent) => {
-		e.preventDefault();
-
-		// Validation
-		if (!email.trim()) {
-			setError('Email is required');
-			return;
-		}
-
-		if (!password) {
-			setError('Password is required');
-			return;
-		}
-
-		// Basic email validation
-		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-		if (!emailRegex.test(email)) {
-			setError('Please enter a valid email address');
-			return;
-		}
-
+	const handleSubmit = async (data: LoginFormData) => {
 		setIsSubmitting(true);
 		setError(null);
 
 		try {
-			await login(email, password);
+			await login(data.email, data.password);
 			// Navigate is handled by useAuth hook
 		} catch (err) {
 			console.error('Login error:', err);
@@ -110,62 +78,7 @@ export function LoginPage() {
 
 				{/* Login Form */}
 				<div className="rounded-lg border border-border bg-card p-8 shadow-sm">
-					<form onSubmit={handleSubmit} className="space-y-6">
-						{/* Email Field */}
-						<TextField
-							label="Email"
-							type="email"
-							value={email}
-							onChange={setEmail}
-							placeholder="you@example.com"
-							required
-							disabled={isSubmitting}
-							error={error && !password ? error : undefined}
-						/>
-
-						{/* Password Field */}
-						<TextField
-							label="Password"
-							type="password"
-							value={password}
-							onChange={setPassword}
-							placeholder="Enter your password"
-							required
-							disabled={isSubmitting}
-							error={error && password ? error : undefined}
-						/>
-
-						{/* Error Message */}
-						{error && (
-							<div
-								className={`
-          rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3
-          text-sm text-destructive
-        `}
-								role="alert"
-							>
-								{error}
-							</div>
-						)}
-
-						{/* Submit Button */}
-						<Button
-							type="submit"
-							variant="default"
-							size="default"
-							disabled={isSubmitting}
-							className="w-full"
-						>
-							{isSubmitting ? (
-								<>
-									<LoadingSpinner size="sm" />
-									<span className="ml-2">Signing in...</span>
-								</>
-							) : (
-								'Sign in'
-							)}
-						</Button>
-					</form>
+					<LoginForm onSubmit={handleSubmit} loading={isSubmitting} error={error} />
 
 					{/* Demo credentials info (for development) */}
 					{process.env.NODE_ENV === 'development' && (

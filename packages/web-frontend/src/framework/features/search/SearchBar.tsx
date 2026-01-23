@@ -1,9 +1,8 @@
 import type React from 'react';
 
+import { Input } from '@framework/components/forms/Input';
+import { Button } from '@framework/components/primitives/Button';
 import { X } from 'lucide-react';
-
-import { Button } from '../primitives/Button';
-import { Input } from './Input';
 
 export interface SearchBarProps {
 	value: string;

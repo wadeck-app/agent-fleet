@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { ContextRow } from '@framework/components/data/ContextRow';
-import { ErrorAlert } from '@framework/components/feedback/ErrorAlert';
+import { EmptyState } from '@framework/components/feedback/EmptyState';
+import { LoadingState } from '@framework/components/feedback/LoadingState';
 import { Label } from '@framework/components/forms/Label';
 import { Textarea } from '@framework/components/forms/Textarea';
 import { Page } from '@framework/components/layout/Page';
@@ -11,11 +12,12 @@ import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
 import { useToast } from '@framework/features/toast/ToastContext';
+import { useErrorToast } from '@framework/hooks/useErrorToast';
 import { formatRelativeTime } from '@framework/utils/formatting/DateFormat';
-import type { Intervention } from '@shared/api/interventions.contract';
 import { ArrowLeft } from 'lucide-react';
 
-import { interventionsApi } from './interventions.api';
+import { useInterventionDetail } from '@app/hooks/useInterventionDetail';
+
 import { getInterventionStatusVariant, getInterventionTypeVariant } from './interventions.helpers';
 
 /**
@@ -37,117 +39,35 @@ export function InterventionDetailPage() {
 	const { interventionId } = useParams<{ interventionId: string }>();
 	const navigate = useNavigate();
 	const { showToast } = useToast();
-
-	const [intervention, setIntervention] = useState<Intervention | null>(null);
-	const [loading, setLoading] = useState(true);
 	const [comment, setComment] = useState('');
-	const [submitting, setSubmitting] = useState(false);
 
-	// Fetch intervention on mount
-	useEffect(() => {
-		if (!interventionId) return;
+	// Use custom hook for data management
+	const { intervention, loading, error, submitting, submitResponse, clearError } = useInterventionDetail({
+		interventionId,
+		onSuccess: () => navigate('/interventions'),
+		onError: errorMessage => showToast(errorMessage, 'error'),
+	});
 
-		const fetchIntervention = async () => {
-			try {
-				setLoading(true);
-				const data = await interventionsApi.getIntervention(interventionId);
-				setIntervention(data);
-			} catch (error) {
-				console.error('[InterventionDetailPage] Error fetching intervention:', error);
-			} finally {
-				setLoading(false);
-			}
-		};
-
-		fetchIntervention();
-	}, [interventionId]);
+	// Display errors as toasts
+	useErrorToast({ error, clearError });
 
 	const handleRespond = async (approved: boolean) => {
-		if (!interventionId) return;
+		await submitResponse(approved, comment);
 
-		setSubmitting(true);
-		try {
-			await interventionsApi.respondToIntervention(interventionId, {
-				value: approved,
-				comment: comment || undefined,
-			});
-
-			// Show success toast
+		// Show success toast only if no error occurred
+		if (!error) {
 			showToast(
 				approved ? 'Intervention approved successfully' : 'Intervention rejected successfully',
 				'success'
 			);
-
-			// Navigate back
-			navigate('/interventions');
-		} catch (error) {
-			console.error('[InterventionDetailPage] Failed to submit response:', error);
-			showToast('Failed to submit response. Please try again.', 'error');
-		} finally {
-			setSubmitting(false);
 		}
 	};
 
 	if (loading) {
 		return (
 			<Page>
-				<PageHeader title="Loading..." />
-				<div className="mx-auto max-w-4xl space-y-6">
-					{/* Badges skeleton */}
-					<div className="flex items-center gap-3">
-						<div className="h-6 w-24 animate-pulse rounded-full bg-muted" />
-						<div className="h-6 w-20 animate-pulse rounded-full bg-muted" />
-						<div className="h-6 w-20 animate-pulse rounded-full bg-muted" />
-					</div>
-
-					{/* Description card skeleton */}
-					<Card>
-						<CardHeader>
-							<div className="h-6 w-2/3 animate-pulse rounded bg-muted" />
-						</CardHeader>
-						<CardContent className="space-y-3">
-							<div className="h-4 w-full animate-pulse rounded bg-muted" />
-							<div className="h-4 w-5/6 animate-pulse rounded bg-muted" />
-							<div className="h-4 w-4/5 animate-pulse rounded bg-muted" />
-						</CardContent>
-					</Card>
-
-					{/* Context card skeleton */}
-					<Card>
-						<CardHeader>
-							<div className="h-6 w-32 animate-pulse rounded bg-muted" />
-						</CardHeader>
-						<CardContent>
-							<div className="space-y-3">
-								{Array.from({ length: 5 }).map((_, idx) => (
-									<div
-										key={idx}
-										className={`
-           flex items-center justify-between border-b py-2
-         `}
-									>
-										<div className="h-4 w-24 animate-pulse rounded bg-muted" />
-										<div className="h-6 w-32 animate-pulse rounded-full bg-muted" />
-									</div>
-								))}
-							</div>
-						</CardContent>
-					</Card>
-
-					{/* Response form skeleton */}
-					<Card>
-						<CardHeader>
-							<div className="h-6 w-40 animate-pulse rounded bg-muted" />
-						</CardHeader>
-						<CardContent className="space-y-4">
-							<div className="h-24 w-full animate-pulse rounded bg-muted" />
-							<div className="flex gap-3">
-								<div className="h-10 flex-1 animate-pulse rounded bg-muted" />
-								<div className="h-10 flex-1 animate-pulse rounded bg-muted" />
-							</div>
-						</CardContent>
-					</Card>
-				</div>
+				<PageHeader title="Loading Intervention..." />
+				<LoadingState message="Loading intervention details..." />
 			</Page>
 		);
 	}
@@ -156,9 +76,9 @@ export function InterventionDetailPage() {
 		return (
 			<Page>
 				<PageHeader title="Intervention Not Found" />
-				<ErrorAlert
-					message="The intervention you are looking for does not exist."
-					onDismiss={() => navigate('/interventions')}
+				<EmptyState
+					title="Intervention Not Found"
+					description="The intervention you are looking for does not exist or has been removed."
 				/>
 			</Page>
 		);

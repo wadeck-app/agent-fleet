@@ -2,10 +2,10 @@ import { useCallback } from 'react';
 
 import { Data2 } from '@framework/components2/data/Data2';
 import { ActiveFeaturesPanel } from '@framework/components/debug/ActiveFeaturesPanel';
-import { SearchBar } from '@framework/components/forms/SearchBar';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { Pagination } from '@framework/components/pagination/Pagination';
+import { SearchBar } from '@framework/features/search/SearchBar';
 import { useCacheControl2 } from '@framework/hooks2/useCacheControl2';
 import { usePagination2 } from '@framework/hooks2/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';

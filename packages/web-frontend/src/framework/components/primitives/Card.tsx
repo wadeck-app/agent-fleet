@@ -1,64 +1,117 @@
 import * as React from 'react';
 
 import { cn } from '@framework/lib/utils';
+import { type VariantProps, cva } from 'class-variance-authority';
 
-function Card({ className, size = 'default', ...props }: React.ComponentProps<'div'> & { size?: 'default' | 'sm' }) {
+/**
+ * Card Variants using CVA
+ */
+const cardVariants = cva(
+	`
+    flex flex-col overflow-hidden rounded-xl bg-card
+    text-sm text-card-foreground ring-1 ring-foreground/10
+    has-data-[slot=card-footer]:pb-0
+    has-[>img:first-child]:pt-0
+    *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl
+  `,
+	{
+		variants: {
+			size: {
+				default: 'gap-4 py-4',
+				sm: 'gap-3 py-3 has-data-[slot=card-footer]:pb-0',
+			},
+		},
+		defaultVariants: {
+			size: 'default',
+		},
+	}
+);
+
+const cardHeaderVariants = cva(
+	`
+    @container/card-header grid auto-rows-min items-start
+    gap-1 rounded-t-xl
+    has-data-[slot=card-action]:grid-cols-[1fr_auto]
+    has-data-[slot=card-description]:grid-rows-[auto_auto]
+    [.border-b]:pb-4
+  `,
+	{
+		variants: {
+			size: {
+				default: 'px-4',
+				sm: 'px-3 [.border-b]:pb-3',
+			},
+		},
+		defaultVariants: {
+			size: 'default',
+		},
+	}
+);
+
+const cardTitleVariants = cva('leading-snug font-medium', {
+	variants: {
+		size: {
+			default: 'text-base',
+			sm: 'text-sm',
+		},
+	},
+	defaultVariants: {
+		size: 'default',
+	},
+});
+
+const cardContentVariants = cva('', {
+	variants: {
+		size: {
+			default: 'px-4',
+			sm: 'px-3',
+		},
+	},
+	defaultVariants: {
+		size: 'default',
+	},
+});
+
+const cardFooterVariants = cva(
+	`
+    flex items-center rounded-b-xl border-t bg-muted/50
+  `,
+	{
+		variants: {
+			size: {
+				default: 'p-4',
+				sm: 'p-3',
+			},
+		},
+		defaultVariants: {
+			size: 'default',
+		},
+	}
+);
+
+/**
+ * Card Context to share size variant across subcomponents
+ */
+const CardContext = React.createContext<{ size?: 'default' | 'sm' }>({ size: 'default' });
+
+export interface CardProps extends React.ComponentProps<'div'>, VariantProps<typeof cardVariants> {}
+
+function Card({ className, size = 'default', ...props }: CardProps) {
 	return (
-		<div
-			data-slot="card"
-			data-size={size}
-			className={cn(
-				`
-      group/card flex flex-col gap-4 overflow-hidden rounded-xl bg-card py-4
-      text-sm text-card-foreground ring-1 ring-foreground/10
-      has-data-[slot=card-footer]:pb-0
-      has-[>img:first-child]:pt-0
-      data-[size=sm]:gap-3 data-[size=sm]:py-3
-      data-[size=sm]:has-data-[slot=card-footer]:pb-0
-      *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl
-    `,
-				className
-			)}
-			{...props}
-		/>
+		<CardContext.Provider value={{ size: size ?? undefined }}>
+			<div data-slot="card" className={cn(cardVariants({ size }), className)} {...props} />
+		</CardContext.Provider>
 	);
 }
 
 function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
-	return (
-		<div
-			data-slot="card-header"
-			className={cn(
-				`
-      group/card-header @container/card-header grid auto-rows-min items-start
-      gap-1 rounded-t-xl px-4
-      group-data-[size=sm]/card:px-3
-      has-data-[slot=card-action]:grid-cols-[1fr_auto]
-      has-data-[slot=card-description]:grid-rows-[auto_auto]
-      [.border-b]:pb-4
-      group-data-[size=sm]/card:[.border-b]:pb-3
-    `,
-				className
-			)}
-			{...props}
-		/>
-	);
+	const { size } = React.useContext(CardContext);
+	return <div data-slot="card-header" className={cn(cardHeaderVariants({ size }), className)} {...props} />;
 }
 
 function CardTitle({ className, ...props }: React.ComponentProps<'div'>) {
-	return (
-		<div
-			data-slot="card-title"
-			className={cn(
-				`
-      text-base leading-snug font-medium
-      group-data-[size=sm]/card:text-sm
-    `,
-				className
-			)}
-			{...props}
-		/>
-	);
+	const { size } = React.useContext(CardContext);
+	return <div data-slot="card-title" className={cn(cardTitleVariants({ size }), className)} {...props} />;
 }
 
 function CardDescription({ className, ...props }: React.ComponentProps<'div'>) {
@@ -92,35 +145,13 @@ function CardAction({ className, ...props }: React.ComponentProps<'div'>) {
 }
 
 function CardContent({ className, ...props }: React.ComponentProps<'div'>) {
-	return (
-		<div
-			data-slot="card-content"
-			className={cn(
-				`
-      px-4
-      group-data-[size=sm]/card:px-3
-    `,
-				className
-			)}
-			{...props}
-		/>
-	);
+	const { size } = React.useContext(CardContext);
+	return <div data-slot="card-content" className={cn(cardContentVariants({ size }), className)} {...props} />;
 }
 
 function CardFooter({ className, ...props }: React.ComponentProps<'div'>) {
-	return (
-		<div
-			data-slot="card-footer"
-			className={cn(
-				`
-      flex items-center rounded-b-xl border-t bg-muted/50 p-4
-      group-data-[size=sm]/card:p-3
-    `,
-				className
-			)}
-			{...props}
-		/>
-	);
+	const { size } = React.useContext(CardContext);
+	return <div data-slot="card-footer" className={cn(cardFooterVariants({ size }), className)} {...props} />;
 }
 
 export { Card, CardHeader, CardFooter, CardTitle, CardAction, CardDescription, CardContent };

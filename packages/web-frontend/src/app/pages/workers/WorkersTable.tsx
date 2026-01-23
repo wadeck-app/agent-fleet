@@ -1,6 +1,6 @@
 import { Table2, type Table2Column, type Table2Props } from '@framework/components2/table/Table2';
-import { EditableText } from '@framework/components/forms/EditableText';
 import { Badge } from '@framework/components/primitives/Badge';
+import { EditableText } from '@framework/features/inline-editing/EditableText';
 import { useToast } from '@framework/features/toast/ToastContext';
 import type { MutationMethods } from '@framework/types/MutationContract';
 import type { Worker } from '@shared/api/workers.contract';

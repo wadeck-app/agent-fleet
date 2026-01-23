@@ -85,9 +85,10 @@ export function useMutationCleanup<TData>({ data, isMutating, onCleanup }: UseMu
 	useEffect(() => {
 		// Only trigger cleanup if:
 		// 1. A mutation is in progress (isMutating === true)
-		// 2. Data has refreshed (data.length > 0)
-		if (isMutating && data.length > 0) {
+		// 2. Data has refreshed (data exists and has length > 0)
+		if (isMutating && data && data.length > 0) {
 			onCleanup();
 		}
-	}, [data.length, isMutating, onCleanup]);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [data?.length, isMutating]);
 }

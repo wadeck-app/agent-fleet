@@ -10,6 +10,7 @@ import tseslint from 'typescript-eslint';
 
 import { baseIgnores, baseRules } from '../../eslint.config.mjs';
 import errorHandlingRules from '../../scripts/eslint-rules/error-handling-rules.mjs';
+import testBestPracticesRules from '../../scripts/eslint-rules/test-best-practices-rules.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -172,6 +173,7 @@ export default tseslint.config(
 			react: reactPlugin,
 			'react-hooks': reactHooksPlugin,
 			'error-handling': errorHandlingRules,
+			'test-best-practices': testBestPracticesRules,
 		},
 		settings: {
 			react: {
@@ -219,7 +221,7 @@ export default tseslint.config(
 		},
 	},
 
-	// Test files - relaxed rules
+	// Test files - relaxed rules + test best practices enforcement
 	{
 		files: ['**/*.test.tsx', '**/*.test.ts'],
 		languageOptions: {
@@ -243,6 +245,8 @@ export default tseslint.config(
 			],
 			'@typescript-eslint/no-explicit-any': 'off',
 			'better-tailwindcss/no-unregistered-classes': 'off',
+			// Enforce test best practices
+			'test-best-practices/no-settimeout-in-tests': 'error',
 		},
 	},
 

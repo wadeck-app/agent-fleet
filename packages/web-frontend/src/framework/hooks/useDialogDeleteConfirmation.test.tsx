@@ -1,3 +1,4 @@
+import { createDeferredPromise } from '@framework/test-utils/deferredPromise';
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -63,12 +64,8 @@ describe('useDialogDeleteConfirmation', () => {
 		});
 
 		it('handles async onDelete', async () => {
-			const asyncOnDelete = vi.fn().mockImplementation(
-				() =>
-					new Promise(resolve => {
-						setTimeout(resolve, 10);
-					})
-			);
+			const deleteDeferred = createDeferredPromise<void>();
+			const asyncOnDelete = vi.fn(() => deleteDeferred.promise);
 
 			const { result } = renderHook(() =>
 				useDialogDeleteConfirmation({
@@ -81,6 +78,8 @@ describe('useDialogDeleteConfirmation', () => {
 				result.current.open('item-123');
 			});
 
+			// Resolve delete immediately
+			deleteDeferred.resolve();
 			await act(async () => {
 				await result.current.confirm();
 			});

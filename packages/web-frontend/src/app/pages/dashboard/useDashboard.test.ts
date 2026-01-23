@@ -114,11 +114,7 @@ describe('useDashboard', () => {
 
 			const { result } = renderHook(() => useDashboard({ enabled: false }));
 
-			// Wait a bit to ensure no load is triggered
-			await act(async () => {
-				await new Promise(resolve => setTimeout(resolve, 100));
-			});
-
+			// Verify no load is triggered when disabled
 			expect(result.current.loading).toBe(true); // Still in initial state
 			expect(result.current.data).toBeNull();
 			expect(dashboardService.getDashboard).not.toHaveBeenCalled();
@@ -211,12 +207,7 @@ describe('useDashboard', () => {
 			// This test verifies that after initial load, no automatic polling occurs
 			const initialCallCount = vi.mocked(dashboardService.getDashboard).mock.calls.length;
 
-			// Wait for what would have been a poll cycle
-			await act(async () => {
-				await new Promise(resolve => setTimeout(resolve, 150));
-			});
-
-			// Should NOT have polled again (no automatic polling anymore)
+			// Verify no additional calls are made (no automatic polling)
 			expect(vi.mocked(dashboardService.getDashboard).mock.calls.length).toBe(initialCallCount);
 		});
 

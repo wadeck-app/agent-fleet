@@ -24,22 +24,14 @@ function getBasename(path: string): string {
 interface WorkspacePanelProps {
 	workspace: Workspace;
 	projectId: string;
+	activeView: 'tasks' | 'scripts';
+	onViewChange: (view: 'tasks' | 'scripts') => void;
 }
 
-export function WorkspacePanel({ workspace, projectId }: WorkspacePanelProps) {
+export function WorkspacePanel({ workspace, projectId, activeView, onViewChange }: WorkspacePanelProps) {
 	const [tasks, setTasks] = useState<Task[]>([]);
 	const [refreshing, setRefreshing] = useState(false);
 	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-	const [viewMode, setViewMode] = useState<'tasks' | 'scripts'>(() => {
-		// Persist view mode in localStorage per workspace
-		const stored = localStorage.getItem(`workspace-${workspace.id}-view-mode`);
-		return (stored as 'tasks' | 'scripts') || 'tasks';
-	});
-
-	// Persist view mode changes
-	useEffect(() => {
-		localStorage.setItem(`workspace-${workspace.id}-view-mode`, viewMode);
-	}, [workspace.id, viewMode]);
 
 	// Load tasks
 	const loadTasks = async () => {
@@ -95,7 +87,7 @@ export function WorkspacePanel({ workspace, projectId }: WorkspacePanelProps) {
 	} as const;
 
 	return (
-		<div className="flex h-full flex-col overflow-hidden px-4">
+		<div className="flex h-full flex-col overflow-hidden">
 			{/* Workspace Metadata Card */}
 			<div className="border-b border-border bg-card p-4">
 				<div className="flex items-start justify-between">
@@ -156,17 +148,17 @@ export function WorkspacePanel({ workspace, projectId }: WorkspacePanelProps) {
 			<div className="flex flex-1 flex-col overflow-hidden">
 				<div className="border-b border-border bg-card">
 					<div className="flex items-center gap-1 px-4">
-						<TabButton active={viewMode === 'tasks'} onClick={() => setViewMode('tasks')}>
+						<TabButton active={activeView === 'tasks'} onClick={() => onViewChange('tasks')}>
 							Tasks
 						</TabButton>
-						<TabButton active={viewMode === 'scripts'} onClick={() => setViewMode('scripts')}>
+						<TabButton active={activeView === 'scripts'} onClick={() => onViewChange('scripts')}>
 							Scripts
 						</TabButton>
 					</div>
 				</div>
 
 				{/* Tasks View */}
-				{viewMode === 'tasks' && (
+				{activeView === 'tasks' && (
 					<div className="flex-1 overflow-hidden p-4">
 						<div className="mb-3 flex items-center justify-between">
 							<h3 className="text-sm font-semibold">Tasks ({filteredTasks.length})</h3>
@@ -188,7 +180,7 @@ export function WorkspacePanel({ workspace, projectId }: WorkspacePanelProps) {
 				)}
 
 				{/* Scripts View */}
-				{viewMode === 'scripts' && (
+				{activeView === 'scripts' && (
 					<div className="flex-1 overflow-hidden">
 						<ScriptsPanel workspaceId={workspace.id} />
 					</div>

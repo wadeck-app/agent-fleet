@@ -14,7 +14,7 @@ import { WorkspaceIndicator } from '@app/features/workspace/WorkspaceIndicator';
 import { AppSwitcher } from './AppSwitcher';
 import { EventDebugWidget } from './EventDebugWidget';
 import { SidebarNav } from './SidebarNav';
-import { UserMenuWithThemeMobile } from './UserMenuWithTheme';
+import { UserMenu } from './UserMenu';
 import { WorkersWidget } from './WorkersWidget';
 import { navigationItems } from './navigationConfig';
 
@@ -76,7 +76,7 @@ export function MobileSidebar() {
 					</div>
 
 					<div className="shrink-0 border-t px-5 py-3">
-						<UserMenuWithThemeMobile theme={theme} onToggleTheme={toggleTheme} />
+						<UserMenu isMobile showTheme theme={theme} onToggleTheme={toggleTheme} showTransport />
 					</div>
 				</div>
 			</SheetContent>

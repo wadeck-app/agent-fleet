@@ -20,7 +20,7 @@ export interface PageProps {
  * ```tsx
  * <Page>
  *   <PageHeader title="Books" badge={10} />
- *   <PageContent>Content</PageContent>
+ *   <BookTable books={books} />
  * </Page>
  * ```
  *

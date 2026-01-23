@@ -67,10 +67,6 @@ export function IngredientsV5Page() {
 		useSearchHook: useIngredientSearch,
 	});
 
-	// Add comment above the target line, not at the end
-	// Cache ID for demo (simulate cache control)
-	const [cacheId, _setCacheId] = useState(1);
-
 	return (
 		<>
 			<Page>
@@ -135,12 +131,12 @@ export function IngredientsV5Page() {
 							label: 'Sort',
 							value: crud.sorting.sortConfigs.map(c => `${c.key}:${c.direction}`).join(', ') || 'none',
 						},
-						{ label: 'Cache ID', value: cacheId.toString() },
+						{ label: 'Cache ID', value: crud.cache.cacheId.toString() },
 					]}
 				/>
 
 				{/* Empty State */}
-				{crud.items.length === 0 ? (
+				{!crud.loading && crud.items.length === 0 ? (
 					<EmptyState
 						icon={<Utensils className="size-16" />}
 						title="No ingredients yet"
@@ -189,6 +185,7 @@ export function IngredientsV5Page() {
 							sorting={crud.sorting}
 							visibleColumns={crud.columns.visibleColumns}
 							columnOrder={crud.columns.columnOrder}
+							initialLoading={crud.loading && crud.items.length === 0}
 							refreshing={crud.isRefreshing}
 							{...crud.selection}
 						/>

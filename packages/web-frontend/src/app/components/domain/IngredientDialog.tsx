@@ -1,24 +1,25 @@
 import { useMemo } from 'react';
 
-import { CrudDialog } from '@framework/components/overlays/CrudDialog';
-import { Button } from '@framework/components/primitives/Button';
 import type { CreateIngredient, Ingredient } from '@shared/api/ingredients.contract';
-import { RefreshCw } from 'lucide-react';
 
 import { IngredientForm } from '@app/pages/ingredients/IngredientForm';
 
+import { EntityDialog } from './EntityDialog';
+
 /**
  * ===========================================================================================
- * INGREDIENT DIALOG - Domain-Specific Component
+ * INGREDIENT DIALOG - Domain Component
  * ===========================================================================================
  *
- * Dialog wrapper for ingredient creation and editing operations.
- * - Uses CrudDialog for consistent structure and styling
- * - Wraps IngredientForm for domain-specific form logic
- * - Handles both create and edit modes
- * - Determines title/description based on mode
+ * Wraps IngredientForm in an EntityDialog for consistent dialog behavior.
+ * - Uses EntityDialog for structure, title generation, and header actions
+ * - Prepares initial data for IngredientForm in edit mode
+ * - Delegates all form logic to IngredientForm
  *
- * Usage:
+ * **Refactored:** Now uses generic EntityDialog wrapper, eliminating ~60 lines of
+ * duplicated dialog boilerplate.
+ *
+ * **Usage:**
  * ```tsx
  * <IngredientDialog
  *   open={isOpen}
@@ -52,42 +53,8 @@ export function IngredientDialog({
 	// Determine mode based on whether an ingredient is being edited
 	const isEditMode = !!ingredient;
 
-	// Set title based on mode
-	const title = isEditMode ? 'Edit Ingredient' : 'New Ingredient';
-
-	// Build header actions (refresh button + version badge)
-	const isDev = import.meta.env.DEV;
-	const headerActions = isEditMode ? (
-		<>
-			{onRefresh && (
-				<Button
-					type="button"
-					onClick={onRefresh}
-					disabled={isRefreshing}
-					variant="ghost"
-					size="icon-sm"
-					title="Refresh data"
-				>
-					<RefreshCw
-						className={`
-        size-4
-        ${isRefreshing ? 'animate-spin' : ''}
-      `}
-					/>
-				</Button>
-			)}
-			{isDev && ingredient?.version !== undefined && (
-				<span
-					className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground"
-					title="Current version (dev only)"
-				>
-					v{ingredient.version}
-				</span>
-			)}
-		</>
-	) : null;
-
 	// Prepare initial data for the form (only in edit mode)
+	// Memoized to prevent unnecessary form resets
 	const initialData = useMemo(() => {
 		if (!ingredient) return undefined;
 		return {
@@ -106,13 +73,12 @@ export function IngredientDialog({
 	const submitLabel = isEditMode ? 'Update Ingredient' : 'Create Ingredient';
 
 	return (
-		<CrudDialog
+		<EntityDialog
 			open={open}
-			onOpenChange={open => {
-				if (!open) onClose();
-			}}
-			title={title}
-			headerActions={headerActions}
+			onClose={onClose}
+			entity={ingredient}
+			entityName="Ingredient"
+			onRefresh={onRefresh}
 			isRefreshing={isRefreshing}
 			maxWidth="2xl"
 		>
@@ -122,6 +88,6 @@ export function IngredientDialog({
 				initialData={initialData}
 				submitLabel={submitLabel}
 			/>
-		</CrudDialog>
+		</EntityDialog>
 	);
 }

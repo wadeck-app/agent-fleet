@@ -1,5 +1,173 @@
 # Lessons Learned
 
+## Data2 Feature Contracts: NEVER Spread, Always Pass as Props
+
+**Problem**: Using spread syntax `{...pagination}` instead of explicit prop `pagination={pagination}` completely breaks Data2's query composition system. Symptoms:
+
+- Refresh button doesn't trigger refetch (cache id increases but no API call)
+- Search input doesn't filter table (query changes but no API call)
+- Column sorting doesn't work (clicks registered but no API call)
+
+**Root Cause**: Data2's architecture depends on receiving feature contracts as single props (e.g., `pagination`, `sorting`, `cache`). When you spread `{...cache}`, it spreads the contract's properties (`fstate`, `actions`, `fillQuery`) as individual props. useQueryComposition then receives `cache=undefined` and never reads `cache?.fillQuery`.
+
+**Wrong Approach** ❌:
+
+```tsx
+<Data2
+  fetchData={fetchIngredients}
+  {...pagination}   // ❌ Spreads fstate, actions, fillQuery
+  {...sorting}      // ❌ Data2 never receives these as feature contracts
+  {...search}
+  {...cache}
+>
+```
+
+**Correct Approach** ✅:
+
+```tsx
+<Data2
+  fetchData={fetchIngredients}
+  pagination={pagination}   // ✅ Passes entire contract object
+  sorting={sorting}
+  search={search}
+  cache={cache}
+>
+```
+
+**Why This Matters**:
+
+1. useQueryComposition (line 65-100) expects feature contracts as props: `pagination`, `sorting`, etc.
+2. It extracts `fillQuery` from each: `pagination?.fillQuery`, `cache?.fillQuery`
+3. useMemo dependencies watch these functions: `[pagination?.fillQuery, ..., cache?.fillQuery]`
+4. When fillQuery reference changes (e.g., cache.fillQuery after refresh), query recomputes
+5. queryUrl changes, triggering useDataFetch's useEffect → API refetch
+
+**The Broken Chain**:
+
+```
+User clicks refresh
+→ cache.actions.refresh() increments cacheId
+→ fstate.effectiveCacheId changes
+→ cache.fillQuery gets new reference (useCallback with [fstate.effectiveCacheId])
+→ BUT: Data2 received {...cache}, so cache prop = undefined
+→ useQueryComposition sees cache?.fillQuery = undefined (always)
+→ query never changes
+→ queryUrl stays same
+→ useDataFetch doesn't refetch
+→ ❌ Refresh button does nothing
+```
+
+**When Discovered**: January 2025 during iso-functionality testing. Tests passed but manual testing revealed all interactive features (sort/search/refresh) were broken.
+
+**Key Insight**: Spread syntax is dangerous when dealing with contract-based architectures. Always check prop expectations vs what you're passing.
+
+**Related Files**:
+
+- `packages/web-frontend/src/framework/components2/data/Data2.tsx` (lines 57-82: feature contract props)
+- `packages/web-frontend/src/framework/hooks2/useQueryComposition.ts` (line 82: fillQuery dependencies)
+- `packages/web-frontend/src/framework/hooks2/useDataFetch.ts` (line 162: queryUrl dependency)
+- `packages/web-frontend/src/app/pages/ingredients2/Ingredients2TablePage.tsx` (line 377-381: FIXED)
+
+---
+
+## useTableRefreshing + useCacheControl2: Manual Refresh with HTTP Cache Busting
+
+**Problem**: In v5 (useCrudPage), clicking the refresh button calls `loadItems(crud.currentParams)` with the SAME params. This causes TWO issues:
+
+1. No visual feedback (no blur effect on table)
+2. HTTP cache may return stale data (backend doesn't receive a fresh request)
+
+**Symptoms**:
+
+- Refresh button triggers API call but may return cached data
+- NO visual feedback (no blur effect on table)
+- User can't tell if refresh is working
+- Backend logs don't show cache-busted requests
+
+**Root Cause**: `useTableRefreshing` compares dependencies to detect changes:
+
+```typescript
+// framework/components/table/useTableRefreshing.ts lines 34-48
+const hasChanged = Object.keys(dependencies).some(key => dependencies[key] !== prevDependencies.current[key]);
+```
+
+When `loadItems(crud.currentParams)` is called with unchanged params, `hasChanged = false`, so `isRefreshing` stays false.
+
+Additionally, HTTP caching (CDN, cache-control headers) may return stale data for identical URLs.
+
+**Solution**: Use `useCacheControl2` to manage cacheId (like v2/Data2):
+
+```typescript
+// framework/hooks/useCrudPage.ts
+const cache = useCacheControl2({ enabled: true });
+
+const loadItemsWithCache = useCallback(
+	async (params: any) => {
+		// Increment cacheId first
+		cache.actions.refresh();
+		// Pass cacheId to backend for cache busting and logging
+		await loadItems({ ...params, cacheId: cache.fstate.cacheId + 1 });
+	},
+	[loadItems, cache]
+);
+
+// Include cacheId in dependencies so useTableRefreshing detects it
+const isRefreshing = useTableRefreshing({ ...queryParams, cacheId: cache.fstate.cacheId }, loading);
+```
+
+**How It Works**:
+
+1. User clicks refresh → calls `loadItemsWithCache(crud.currentParams)`
+2. `cache.actions.refresh()` increments cacheId: 0 → 1
+3. API call includes cacheId: `GET /api/ingredients?page=1&cacheId=1`
+4. `useTableRefreshing` sees dependency change: `cacheId` changed
+5. Sets `isRefreshing = true` → blur effect appears
+6. Backend receives unique URL (bypasses HTTP cache)
+7. API call completes → `loading = false`
+8. `useTableRefreshing` resets `isRefreshing = false` → blur clears
+
+**Benefits of cacheId over refreshTrigger**:
+
+- ✅ Busts HTTP cache (CDN, cache-control headers)
+- ✅ Visible in backend logs for debugging
+- ✅ Consistent with v2/Data2 architecture
+- ✅ Forces fresh data from database
+
+**Backend Integration**: Add cacheId to BaseListQuerySchema:
+
+```typescript
+// shared-frontend-backend/src/common/api-helpers.ts
+export const BaseListQuerySchema = z.object({
+	// ... existing fields
+	cacheId: z.coerce.number().int().min(0).optional(),
+});
+```
+
+**Comparison with v2 (Data2)**:
+
+- v2 uses `cache.actions.refresh()` which increments `cacheId`
+- cacheId change triggers `useDataFetch` via `queryUrl` change
+- Data2 passes `injectedProps.isLoading` to table, which drives the blur
+- **v5 NOW uses the SAME approach** via `useCacheControl2` in `useCrudPage`
+
+**Test Coverage**:
+
+- `packages/web-frontend/src/app/pages/ingredients/__tests__/refresh-loading-state.test.tsx`
+- Tests both v2 and v5 to ensure both show blur effect during refresh
+- Uses deferred promises to control API timing and verify blur appears/disappears
+
+**When Discovered**: January 2025 during v2/v5 iso-functionality testing. User reported: "la requete part, revient avec les memes données... mais le contenu de la reponse ne doit pas influencer la situation. L'emploi d'un cache id permet de forcer le re-render du component. Actuellement, le component n'est pas re-render, ni meme avec le loading state en mode blur !" Later: "je préfère cacheId alors. Le cache mais aussi pour les logs coté backend, ca aide !"
+
+**Related Files**:
+
+- `packages/web-frontend/src/framework/hooks/useCrudPage.ts` (lines 344-361: cacheId implementation)
+- `packages/web-frontend/src/framework/hooks2/useCacheControl2.ts` (cache management)
+- `packages/shared-frontend-backend/src/common/api-helpers.ts` (line 47: cacheId in schema)
+- `packages/web-frontend/src/framework/components/table/useTableRefreshing.ts` (dependency comparison logic)
+- `packages/web-frontend/src/framework/components/table/TableBody.tsx` (lines 102-105: blur effect CSS)
+
+---
+
 ## tsx watch + Terminal-Kit UI = Broken Keyboard Input
 
 **Problem**: When running terminal-kit-based UIs (OrchestratorUI, FlowWorkerUI) with `tsx watch`, keyboard input does NOT work. Keys are captured by tsx and never reach terminal-kit.
@@ -3050,3 +3218,88 @@ catch (error) {
 - `error-handling/defensive-array-access` (warn): Requires `|| []` for API array properties
 
 See `scripts/eslint-rules/README.md` for details. Run `npm run lint` to check violations.
+
+## 2026-01-22: Legacy WebSocket Code Removal
+
+**Context:** Removed legacy UIWebSocketServer and UIClientHook after discovering they were never used in production (libraryMode=true disables them).
+
+**Key Findings:**
+
+- UIWebSocketServer was only created when libraryMode=false, but production always uses libraryMode=true
+- All UI ↔ Orchestrator communication now goes through B2F (Backend-to-Frontend) event system
+- StateSnapshotService is instantiated but never called - candidate for future removal
+
+**Removed:** UIWebSocketServer.ts (204 lines), UIClientHook.ts (172 lines), tests, and integration points (~711 lines total)
+
+**Lesson:** When finding legacy code, check for feature flags (libraryMode, env vars) that may disable it in production. Dead code can be safely removed if tests pass.
+
+## Test Best Practices - Deterministic Async Testing (2026-01-23)
+
+### Problem
+
+Tests were using `setTimeout` for async delays, making tests non-deterministic, slow, and flaky.
+
+**Example of BAD pattern**:
+
+```typescript
+await new Promise(resolve => setTimeout(resolve, 100)); // ❌ Non-deterministic, arbitrary delay
+```
+
+### Solution
+
+1. **Created `createDeferredPromise()` utility** (`packages/web-frontend/src/framework/test-utils/deferredPromise.ts`)
+    - Provides externally controllable promises for deterministic async testing
+    - No arbitrary delays - resolve/reject exactly when you want
+
+2. **Created custom ESLint rule** (`scripts/eslint-rules/test-best-practices-rules.mjs`)
+    - Rule: `test-best-practices/no-settimeout-in-tests`
+    - Catches ALL setTimeout patterns in test files:
+        - Direct: `setTimeout(fn, delay)`
+        - In Promise: `new Promise(resolve => setTimeout(resolve, delay))`
+        - Global: `global.setTimeout()`, `window.setTimeout()`
+    - Provides helpful error message with correct pattern
+
+3. **Enabled rule in ESLint configs**:
+    - Root config: `eslint.config.mjs` (for backend test files)
+    - Frontend config: `packages/web-frontend/eslint.config.mjs`
+
+**Example of GOOD pattern**:
+
+```typescript
+// ✅ Deterministic, fast, explicit control
+const deferred = createDeferredPromise();
+vi.mocked(api.createWorkspaceScript).mockReturnValue(deferred.promise);
+
+// Test loading state BEFORE resolving
+expect(screen.getByText('Loading...')).toBeInTheDocument();
+
+// Resolve exactly when needed
+deferred.resolve(newScript);
+await waitFor(() => expect(screen.getByText('Success')).toBeInTheDocument());
+```
+
+### Key Insights
+
+- **setTimeout in tests is a heresy** - it's non-deterministic and makes tests slow
+- **Deferred promises provide perfect control** - resolve/reject exactly when you want
+- **ESLint enforcement prevents regression** - 80+ violations detected across codebase
+- **Testing Library's `waitFor()` is sufficient for most cases** - no need for delays
+
+### Files Changed
+
+- `scripts/eslint-rules/test-best-practices-rules.mjs` - New custom ESLint rule
+- `packages/web-frontend/src/framework/test-utils/deferredPromise.ts` - Deferred promise utility
+- `eslint.config.mjs` - Added rule to root config
+- `packages/web-frontend/eslint.config.mjs` - Added rule to frontend config
+- `packages/web-frontend/src/app/pages/workspaces/scripts/ConfigureScriptsDialog.test.tsx` - Refactored to use deferred promises
+
+### Testing the Rule
+
+The rule successfully catches:
+
+1. Direct setTimeout calls
+2. setTimeout in Promise constructor
+3. global.setTimeout / window.setTimeout
+4. All variations in arrow functions and block statements
+
+Currently detects **80 violations** across the codebase that need refactoring.

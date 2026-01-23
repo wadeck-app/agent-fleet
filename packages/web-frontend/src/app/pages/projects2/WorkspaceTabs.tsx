@@ -13,14 +13,14 @@ interface WorkspaceTabsProps {
 	workspaces: Workspace[];
 	activeWorkspaceId: string | null;
 	onWorkspaceSelect: (workspaceId: string) => void;
-	onManageClick: () => void;
+	onManageClick?: () => void;
 }
 
 export function WorkspaceTabs({ workspaces, activeWorkspaceId, onWorkspaceSelect, onManageClick }: WorkspaceTabsProps) {
 	return (
 		<div className="border-b border-border bg-muted/30">
 			<div className="flex items-center justify-between px-4">
-				<div className="flex items-center gap-1 overflow-x-auto">
+				<div className="flex items-center gap-1 overflow-x-auto py-2">
 					{workspaces.map(workspace => {
 						const displayName = workspace.name || getBasename(workspace.path);
 
@@ -49,10 +49,12 @@ export function WorkspaceTabs({ workspaces, activeWorkspaceId, onWorkspaceSelect
 						);
 					})}
 				</div>
-				<Button variant="default" size="sm" onClick={onManageClick}>
-					<Settings />
-					Manage Workspaces
-				</Button>
+				{onManageClick && (
+					<Button variant="default" size="sm" onClick={onManageClick}>
+						<Settings />
+						Manage Workspaces
+					</Button>
+				)}
 			</div>
 		</div>
 	);

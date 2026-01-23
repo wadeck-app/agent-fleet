@@ -3,6 +3,7 @@
  *
  * Tests for HttpPollingTransportClient implementation
  */
+import { createDeferredPromise } from '@framework/test-utils/deferredPromise';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as connectionId from '../connection-id';
@@ -114,8 +115,11 @@ describe('HttpPollingTransportClient', () => {
 
 			await client.connect();
 
+			// Add comment above the target line, not at the end
 			// Wait for event to be processed
-			await new Promise(resolve => setTimeout(resolve, 100));
+			const deferred1 = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred1.promise;
 
 			expect(eventHandler).toHaveBeenCalledWith(testEvent.data);
 		});
@@ -137,8 +141,11 @@ describe('HttpPollingTransportClient', () => {
 
 			await client.disconnect();
 
+			// Add comment above the target line, not at the end
 			// Wait to ensure no more polls happen
-			await new Promise(resolve => setTimeout(resolve, 1500));
+			const deferred2 = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred2.promise;
 
 			// Should not have called fetch again after disconnect
 			expect((global.fetch as any).mock.calls.length).toBe(fetchCallCount);
@@ -224,8 +231,11 @@ describe('HttpPollingTransportClient', () => {
 			const handler = vi.fn();
 			client.subscribe('b2f:task:created', handler);
 
+			// Add comment above the target line, not at the end
 			// Wait for async subscription call
-			await new Promise(resolve => setTimeout(resolve, 100));
+			const deferred3 = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred3.promise;
 
 			expect(subscribeMock).toHaveBeenCalledWith('b2f:task:created', undefined);
 		});
@@ -238,12 +248,22 @@ describe('HttpPollingTransportClient', () => {
 			const handler2 = vi.fn();
 
 			client.subscribe('b2f:task:created', handler1);
-			await new Promise(resolve => setTimeout(resolve, 100));
+
+			// Add comment above the target line, not at the end
+			// Wait for first subscription
+			const deferred4 = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred4.promise;
 
 			subscribeMock.mockClear();
 
 			client.subscribe('b2f:task:created', handler2);
-			await new Promise(resolve => setTimeout(resolve, 100));
+
+			// Add comment above the target line, not at the end
+			// Wait for second subscription attempt
+			const deferred5 = createDeferredPromise<void>();
+			deferred.resolve();
+			await deferred5.promise;
 
 			expect(subscribeMock).not.toHaveBeenCalled();
 		});

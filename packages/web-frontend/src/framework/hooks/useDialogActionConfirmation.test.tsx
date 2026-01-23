@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { createDeferredPromise } from '@framework/test-utils/deferredPromise';
 import { act, renderHook } from '@testing-library/react';
 import { AlertTriangle } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
@@ -67,12 +68,8 @@ describe('useDialogActionConfirmation', () => {
 		});
 
 		it('handles async onConfirm', async () => {
-			const asyncOnConfirm = vi.fn().mockImplementation(
-				() =>
-					new Promise(resolve => {
-						setTimeout(resolve, 10);
-					})
-			);
+			const confirmDeferred = createDeferredPromise<void>();
+			const asyncOnConfirm = vi.fn(() => confirmDeferred.promise);
 
 			const { result } = renderHook(() =>
 				useDialogActionConfirmation({
@@ -85,6 +82,8 @@ describe('useDialogActionConfirmation', () => {
 				result.current.open('context-data');
 			});
 
+			// Trigger confirm and resolve immediately
+			confirmDeferred.resolve();
 			await act(async () => {
 				await result.current.confirm();
 			});

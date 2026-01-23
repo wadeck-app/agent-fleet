@@ -6,8 +6,6 @@ import { TaskManager } from 'orchestrator/core/TaskManager';
 import { WorkerCoordinator } from 'orchestrator/core/WorkerCoordinator';
 import { MetricsCollector } from 'orchestrator/metrics/MetricsCollector';
 import { StateSnapshotService } from 'orchestrator/state/StateSnapshotService';
-import { UIClientHook } from 'orchestrator/ui-client/UIClientHook';
-import { type OrchestratorSnapshot } from 'orchestrator/ui-client/types';
 import { WorkerWebSocketServer } from 'orchestrator/websocket/WorkerWebSocketServer';
 import { type Shutdownable } from 'shared-common/Shutdownable';
 import { createLogger } from 'shared-common/logger';
@@ -37,10 +35,9 @@ export class Orchestrator implements Shutdownable {
 	// private uiInstance?: any;
 	private isRunning: boolean = false;
 
-	// New UI-related services
+	// UI-related services
 	private snapshotService?: StateSnapshotService;
 	private metricsCollector?: MetricsCollector;
-	private uiClientHook?: UIClientHook;
 	private startTime: Date;
 
 	constructor(config?: OrchestratorConfig) {
@@ -108,22 +105,10 @@ export class Orchestrator implements Shutdownable {
 			5000 // Collect metrics every 5 seconds
 		);
 
-		this.uiClientHook = new UIClientHook(this.stateManager);
-
-		// Always enable UI client hook
-		this.uiClientHook.enable();
-		log.info('Orchestrator', 'UI client hook enabled');
-
 		// Create REST API only if not in library mode
 		// In library mode, the backend (Fastify) handles HTTP/WebSocket communication
 		if (!this.libraryMode) {
-			this.restAPI = new RestAPI(
-				this.taskManager,
-				this.wsServer,
-				this.restPort,
-				this.workspaceManager,
-				this.uiClientHook
-			);
+			this.restAPI = new RestAPI(this.taskManager, this.wsServer, this.restPort, this.workspaceManager);
 		} else {
 			log.info('Orchestrator', 'REST API disabled (library mode)');
 		}
@@ -190,10 +175,6 @@ export class Orchestrator implements Shutdownable {
 		// Cleanup InterventionManager
 		this.interventionManager?.cleanup();
 		log.info('[Orchestrator] InterventionManager cleaned up');
-
-		// Disable UI client hook
-		this.uiClientHook?.disable();
-		log.info('[Orchestrator] UIClientHook disabled');
 
 		// // Unmount UI
 		// if (this.uiInstance) {
@@ -262,20 +243,6 @@ export class Orchestrator implements Shutdownable {
 	 */
 	getMetricsCollector(): MetricsCollector | undefined {
 		return this.metricsCollector;
-	}
-
-	/**
-	 * Get the UI client hook instance
-	 */
-	getUIClientHook(): UIClientHook | undefined {
-		return this.uiClientHook;
-	}
-
-	/**
-	 * Get current state snapshot (for UI connections)
-	 */
-	getStateSnapshot(): OrchestratorSnapshot | undefined {
-		return this.snapshotService?.getSnapshot();
 	}
 
 	/**

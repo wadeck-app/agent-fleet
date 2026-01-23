@@ -15,6 +15,7 @@
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 import { ToastProvider } from '@framework/features/toast/ToastContext';
+import { createDeferredPromise } from '@framework/test-utils/deferredPromise';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -204,29 +205,113 @@ describe.each([
 	// BEHAVIOR: Search
 	// ========================================================================
 	describe('Search', () => {
-		it('should have search capability', async () => {
-			renderPage();
-
-			await waitFor(() => {
-				const searchInput = screen.queryByPlaceholderText(/search/i);
-				expect(searchInput).toBeInTheDocument();
-			});
-		});
-
-		it('should accept search input', async () => {
+		it('should call API with search param after typing in search input', async () => {
 			const user = userEvent.setup();
 			renderPage();
 
+			// Wait for initial load
+			await waitFor(() => {
+				expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
+			});
+
+			mocks.getIngredients.mockClear();
+
+			const searchInput = screen.getByPlaceholderText(/search/i) as HTMLInputElement;
+
+			// Type search query
+			await user.type(searchInput, 'chicken');
+
+			// BEHAVIOR: API should be called with search parameter after debounce (300ms)
+			await waitFor(
+				() => {
+					expect(mocks.getIngredients).toHaveBeenCalled();
+					const lastCall = mocks.getIngredients.mock.calls[mocks.getIngredients.mock.calls.length - 1];
+					const params = lastCall?.[0];
+
+					expect(params).toBeDefined();
+					expect(params.search).toBe('chicken');
+				},
+				{ timeout: 1000 } // Wait for debounce
+			);
+		});
+
+		it('should reset to page 1 when search changes', async () => {
+			const user = userEvent.setup();
+			renderPage();
+
+			// Wait for initial load
+			await waitFor(() => {
+				expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
+			});
+
+			// Navigate to page 2 first (if pagination exists)
+			const pageSizeSelectors = screen.queryAllByRole('combobox');
+			if (pageSizeSelectors.length > 0) {
+				// Has pagination - try to go to another page
+				// For now, just verify search resets page via API call
+			}
+
+			mocks.getIngredients.mockClear();
+
+			const searchInput = screen.getByPlaceholderText(/search/i) as HTMLInputElement;
+
+			// Type search query
+			await user.type(searchInput, 'rice');
+
+			// BEHAVIOR: When search changes, should reset to page 1
+			await waitFor(
+				() => {
+					expect(mocks.getIngredients).toHaveBeenCalled();
+					const lastCall = mocks.getIngredients.mock.calls[mocks.getIngredients.mock.calls.length - 1];
+					const params = lastCall?.[0];
+
+					expect(params?.page).toBe(1); // Should reset to page 1
+					expect(params?.search).toBe('rice');
+				},
+				{ timeout: 1000 }
+			);
+		});
+
+		it('should clear search and show all results when clearing search input', async () => {
+			const user = userEvent.setup();
+			renderPage();
+
+			// Wait for initial load
 			await waitFor(() => {
 				expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
 			});
 
 			const searchInput = screen.getByPlaceholderText(/search/i) as HTMLInputElement;
 
+			// Type search query first
 			await user.type(searchInput, 'test');
 
-			// BEHAVIOR: Search input accepts and stores text
-			expect(searchInput.value).toContain('test');
+			// Wait for search to trigger
+			await waitFor(
+				() => {
+					const params = mocks.getIngredients.mock.calls[mocks.getIngredients.mock.calls.length - 1]?.[0];
+					expect(params?.search).toBe('test');
+				},
+				{ timeout: 1000 }
+			);
+
+			mocks.getIngredients.mockClear();
+
+			// Clear search input
+			await user.clear(searchInput);
+
+			// BEHAVIOR: Clearing search should call API without search param
+			await waitFor(
+				() => {
+					expect(mocks.getIngredients).toHaveBeenCalled();
+					const lastCall = mocks.getIngredients.mock.calls[mocks.getIngredients.mock.calls.length - 1];
+					const params = lastCall?.[0];
+
+					// Search should be undefined or empty
+					expect(params?.search === undefined || params?.search === '').toBe(true);
+				},
+				{ timeout: 1000 }
+			);
 		});
 	});
 
@@ -234,25 +319,11 @@ describe.each([
 	// BEHAVIOR: Sorting
 	// ========================================================================
 	describe('Sorting', () => {
-		it('should have sortable columns', async () => {
-			renderPage();
-
-			await waitFor(
-				() => {
-					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
-				},
-				{ timeout: 3000 }
-			);
-
-			// Column headers should exist
-			const headers = screen.getAllByRole('columnheader');
-			expect(headers.length).toBeGreaterThan(0);
-		});
-
-		it('should have clickable column headers', async () => {
+		it('should call API with sortBy and sortOrder when clicking column header', async () => {
 			const user = userEvent.setup();
 			renderPage();
 
+			// Wait for initial load
 			await waitFor(
 				() => {
 					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
@@ -260,16 +331,63 @@ describe.each([
 				{ timeout: 3000 }
 			);
 
-			const headers = screen.getAllByRole('columnheader');
+			// Clear mock calls from initial load
+			mocks.getIngredients.mockClear();
 
-			// BEHAVIOR: Column headers are clickable (sorting exists)
-			if (headers.length > 1) {
-				// Just verify we can click without error
-				await user.click(headers[1]); // Skip checkbox header
+			// Find "Name" column header (should be sortable)
+			const nameHeader = screen.getByText('Name');
+			expect(nameHeader).toBeInTheDocument();
 
-				// No assertion on API call - just verify clicking works
-				expect(true).toBe(true);
-			}
+			// Click to sort by name ascending
+			await user.click(nameHeader);
+
+			// BEHAVIOR: API should be called with sort parameters
+			await waitFor(() => {
+				expect(mocks.getIngredients).toHaveBeenCalled();
+				const lastCall = mocks.getIngredients.mock.calls[mocks.getIngredients.mock.calls.length - 1];
+				const params = lastCall?.[0];
+
+				// Should include sortBy and sortOrder
+				expect(params).toBeDefined();
+				expect(params.sortBy).toBe('name');
+				expect(params.sortOrder).toBe('asc');
+			});
+		});
+
+		it('should toggle sort direction on second click', async () => {
+			const user = userEvent.setup();
+			renderPage();
+
+			// Wait for initial load
+			await waitFor(
+				() => {
+					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
+				},
+				{ timeout: 3000 }
+			);
+
+			mocks.getIngredients.mockClear();
+
+			// Find "Calories" column header
+			const caloriesHeader = screen.getByText('Calories');
+
+			// First click - ascending
+			await user.click(caloriesHeader);
+			await waitFor(() => {
+				expect(mocks.getIngredients).toHaveBeenCalled();
+				const params = mocks.getIngredients.mock.calls[0]?.[0];
+				expect(params?.sortOrder).toBe('asc');
+			});
+
+			mocks.getIngredients.mockClear();
+
+			// Second click - descending
+			await user.click(caloriesHeader);
+			await waitFor(() => {
+				expect(mocks.getIngredients).toHaveBeenCalled();
+				const params = mocks.getIngredients.mock.calls[0]?.[0];
+				expect(params?.sortOrder).toBe('desc');
+			});
 		});
 	});
 
@@ -398,9 +516,11 @@ describe.each([
 	// BEHAVIOR: Data Refresh
 	// ========================================================================
 	describe('Data Refresh', () => {
-		it('should be able to refresh data', async () => {
+		it('should recall API when clicking refresh button', async () => {
+			const user = userEvent.setup();
 			renderPage();
 
+			// Wait for initial load
 			await waitFor(
 				() => {
 					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
@@ -408,24 +528,134 @@ describe.each([
 				{ timeout: 3000 }
 			);
 
-			const initialCalls = mocks.getIngredients.mock.calls.length;
+			mocks.getIngredients.mockClear();
 
-			// Look for any button that might trigger refresh
-			// (refresh icon, or explicit refresh button)
-			const buttons = screen.getAllByRole('button');
-			const possibleRefreshButton = buttons[0]; // Often the first button near title
+			// Find refresh button (should have aria-label="Refresh")
+			const refreshButton = screen.getByLabelText('Refresh');
+			expect(refreshButton).toBeInTheDocument();
 
-			if (possibleRefreshButton) {
-				const user = userEvent.setup();
-				await user.click(possibleRefreshButton);
+			// Click refresh
+			await user.click(refreshButton);
 
-				// Check if API was called again
-				await new Promise(resolve => setTimeout(resolve, 100));
+			// BEHAVIOR: API should be called again with same parameters
+			await waitFor(() => {
+				expect(mocks.getIngredients).toHaveBeenCalled();
+				// Should be called at least once after refresh
+				expect(mocks.getIngredients.mock.calls.length).toBeGreaterThanOrEqual(1);
+			});
+		});
 
-				const newCalls = mocks.getIngredients.mock.calls.length;
-				// Either refresh worked, or button wasn't a refresh button (both OK)
-				expect(newCalls).toBeGreaterThanOrEqual(initialCalls);
-			}
+		it('should maintain current filters/sort/page when refreshing', async () => {
+			const user = userEvent.setup();
+			renderPage();
+
+			// Wait for initial load
+			await waitFor(
+				() => {
+					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
+				},
+				{ timeout: 3000 }
+			);
+
+			// Apply a sort first
+			const nameHeader = screen.getByText('Name');
+			await user.click(nameHeader);
+
+			// Wait for sort to apply
+			await waitFor(() => {
+				const params = mocks.getIngredients.mock.calls[mocks.getIngredients.mock.calls.length - 1]?.[0];
+				expect(params?.sortBy).toBe('name');
+			});
+
+			// Capture the parameters used for the sorted call
+			const sortedParams = mocks.getIngredients.mock.calls[mocks.getIngredients.mock.calls.length - 1]?.[0];
+
+			mocks.getIngredients.mockClear();
+
+			// Click refresh
+			const refreshButton = screen.getByLabelText('Refresh');
+			await user.click(refreshButton);
+
+			// BEHAVIOR: API should be called with the same sort parameters
+			await waitFor(() => {
+				expect(mocks.getIngredients).toHaveBeenCalled();
+				const refreshParams = mocks.getIngredients.mock.calls[mocks.getIngredients.mock.calls.length - 1]?.[0];
+
+				// Should maintain the same sort
+				expect(refreshParams?.sortBy).toBe(sortedParams?.sortBy);
+				expect(refreshParams?.sortOrder).toBe(sortedParams?.sortOrder);
+				expect(refreshParams?.page).toBe(sortedParams?.page);
+			});
+		});
+
+		it('should UPDATE TABLE with new data when clicking refresh', async () => {
+			const user = userEvent.setup();
+			renderPage();
+
+			// Wait for initial load
+			await waitFor(
+				() => {
+					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
+					expect(screen.getByText('Brown Rice')).toBeInTheDocument();
+					expect(screen.getByText('Broccoli')).toBeInTheDocument();
+				},
+				{ timeout: 3000 }
+			);
+
+			// Change mock to return DIFFERENT data (new ingredient list)
+			const newIngredients = [
+				mockIngredients.chickenBreast, // Keep this one
+				// Remove Brown Rice and Broccoli
+				// Add NEW ingredients
+				{
+					...mockIngredients.chickenBreast,
+					id: 'new-1',
+					name: 'FRESH SALMON',
+					calories: 208,
+					protein: 20,
+					carbs: 0,
+					fat: 13,
+				},
+				{
+					...mockIngredients.chickenBreast,
+					id: 'new-2',
+					name: 'QUINOA',
+					calories: 120,
+					protein: 4,
+					carbs: 21,
+					fat: 2,
+				},
+			];
+
+			mocks.getIngredients.mockResolvedValueOnce({
+				items: newIngredients,
+				pagination: { page: 1, pageSize: 10, total: 3, totalPages: 1 },
+			});
+
+			// Track API call count before refresh
+			const callCountBeforeRefresh = mocks.getIngredients.mock.calls.length;
+			console.log(`[TEST] API calls before refresh: ${callCountBeforeRefresh}`);
+
+			// Click refresh button
+			const refreshButton = screen.getByLabelText('Refresh');
+			await user.click(refreshButton);
+
+			// CRITICAL BEHAVIOR: Table MUST update with NEW data
+			await waitFor(
+				() => {
+					// OLD data should be GONE
+					expect(screen.queryByText('Brown Rice')).not.toBeInTheDocument();
+					expect(screen.queryByText('Broccoli')).not.toBeInTheDocument();
+
+					// NEW data should be VISIBLE
+					expect(screen.getByText('FRESH SALMON')).toBeInTheDocument();
+					expect(screen.getByText('QUINOA')).toBeInTheDocument();
+
+					// Kept data should still be there
+					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
+				},
+				{ timeout: 5000 }
+			);
 		});
 	});
 
@@ -490,6 +720,103 @@ describe.each([
 			);
 		});
 
+		it('should show skeleton loading during initial load (not EmptyState)', async () => {
+			// Control promise timing to verify initial loading behavior
+			let resolveData: any;
+			const delayedPromise = new Promise<any>(resolve => {
+				resolveData = resolve;
+			});
+
+			mocks.getIngredients.mockReturnValueOnce(delayedPromise);
+
+			renderPage();
+
+			// Wait for page to render
+			await waitFor(() => {
+				expect(document.body).toBeInTheDocument();
+			});
+
+			// BEHAVIOR: Should NOT show "No ingredients yet" EmptyState during initial loading
+			expect(screen.queryByText(/no ingredients/i)).not.toBeInTheDocument();
+			expect(screen.queryByText(/start building/i)).not.toBeInTheDocument();
+
+			// BEHAVIOR: Should show table skeleton (table structure exists even during loading)
+			await waitFor(() => {
+				const table = screen.queryByRole('table');
+				expect(table).toBeInTheDocument();
+			});
+
+			// Resolve with data
+			resolveData?.({
+				items: mockIngredientList,
+				pagination: { page: 1, pageSize: 10, total: 3, totalPages: 1 },
+			});
+
+			// Data should appear
+			await waitFor(
+				() => {
+					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
+				},
+				{ timeout: 3000 }
+			);
+		});
+
+		it('should show EmptyState when loading completes with no data', async () => {
+			// Mock empty result
+			mocks.getIngredients.mockResolvedValueOnce({
+				items: [],
+				pagination: { page: 1, pageSize: 10, total: 0, totalPages: 0 },
+			});
+
+			renderPage();
+
+			// BEHAVIOR: After loading completes with empty data, should show EmptyState
+			await waitFor(
+				() => {
+					expect(screen.queryByText(/no ingredients/i)).toBeInTheDocument();
+				},
+				{ timeout: 3000 }
+			);
+
+			// BEHAVIOR: Should have create action available in empty state
+			const buttons = screen.getAllByRole('button');
+			const hasCreateButton = buttons.some(btn => btn.textContent?.match(/add|create|new|first/i));
+			expect(hasCreateButton).toBe(true);
+		});
+
+		it('should NOT show EmptyState during loading even if data is empty', async () => {
+			// Add comment above the target line, not at the end
+			// Control promise timing with deferred promise
+			const deferred = createDeferredPromise<any>();
+
+			mocks.getIngredients.mockReturnValueOnce(deferred.promise);
+
+			renderPage();
+
+			// Add comment above the target line, not at the end
+			// Wait for component to render in loading state
+			await waitFor(() => {
+				expect(document.body).toBeInTheDocument();
+			});
+
+			// BEHAVIOR: During loading, should NOT show EmptyState
+			expect(screen.queryByText(/no ingredients/i)).not.toBeInTheDocument();
+
+			// Resolve with empty data
+			deferred.resolve({
+				items: [],
+				pagination: { page: 1, pageSize: 10, total: 0, totalPages: 0 },
+			});
+
+			// BEHAVIOR: NOW should show EmptyState after loading completes
+			await waitFor(
+				() => {
+					expect(screen.queryByText(/no ingredients/i)).toBeInTheDocument();
+				},
+				{ timeout: 3000 }
+			);
+		});
+
 		it('should handle search during loading', async () => {
 			const user = userEvent.setup();
 
@@ -540,13 +867,11 @@ describe.each([
 				{ timeout: 3000 }
 			);
 
-			// Setup controlled promise for refresh
-			let resolveRefresh: any;
-			const refreshPromise = new Promise<any>(resolve => {
-				resolveRefresh = resolve;
-			});
+			// Add comment above the target line, not at the end
+			// Setup controlled promise for refresh with deferred promise
+			const deferredRefresh = createDeferredPromise<any>();
 
-			mocks.getIngredients.mockReturnValueOnce(refreshPromise);
+			mocks.getIngredients.mockReturnValueOnce(deferredRefresh.promise);
 
 			// Trigger refresh
 			const buttons = screen.getAllByRole('button');
@@ -554,12 +879,14 @@ describe.each([
 				await user.click(buttons[0]);
 			}
 
-			// BEHAVIOR: Original data should still be visible during refresh
-			// (or gracefully removed - either is acceptable)
-			await new Promise(resolve => setTimeout(resolve, 100));
+			// Add comment above the target line, not at the end
+			// Wait for refresh state to be triggered
+			await waitFor(() => {
+				expect(document.body).toBeInTheDocument();
+			});
 
 			// Resolve refresh
-			resolveRefresh?.({
+			deferredRefresh.resolve({
 				items: mockIngredientList,
 				pagination: { page: 1, pageSize: 10, total: 3, totalPages: 1 },
 			});

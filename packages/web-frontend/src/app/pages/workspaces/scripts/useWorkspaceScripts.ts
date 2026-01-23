@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ScriptProcessWithConfig } from '@shared/api/workspaceScripts.contract';
 import {
@@ -48,13 +48,18 @@ export function useWorkspaceScripts({
 	const [scripts, setScripts] = useState<ScriptProcessWithConfig[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<Error | null>(null);
+	const isFirstFetch = useRef(true);
 
 	// Fetch scripts from API
 	const fetchScripts = useCallback(async () => {
 		if (!enabled) return;
 
 		try {
-			setLoading(true);
+			// Only show loading on FIRST fetch, not on subsequent refetches (WebSocket updates)
+			// This prevents the UI from flickering/hiding when scripts update
+			if (isFirstFetch.current) {
+				setLoading(true);
+			}
 			setError(null);
 			const data = await workspaceScriptsApi.listWorkspaceScripts(workspaceId);
 			setScripts(data);
@@ -62,7 +67,10 @@ export function useWorkspaceScripts({
 			setError(err instanceof Error ? err : new Error('Failed to fetch workspace scripts'));
 			console.error('[useWorkspaceScripts] Error fetching scripts:', err);
 		} finally {
-			setLoading(false);
+			if (isFirstFetch.current) {
+				setLoading(false);
+				isFirstFetch.current = false;
+			}
 		}
 	}, [workspaceId, enabled]);
 

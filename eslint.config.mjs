@@ -4,6 +4,8 @@ import importPlugin from 'eslint-plugin-import';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
+import testBestPracticesRules from './scripts/eslint-rules/test-best-practices-rules.mjs';
+
 // ═══════════════════════════════════════════════════════════════════
 // DEPENDENCY MATRIX - Defines allowed imports between packages
 // ═══════════════════════════════════════════════════════════════════
@@ -202,10 +204,16 @@ export default [
 		},
 	},
 
-	// Test files - relaxed rules
+	// Test files - relaxed rules + test best practices enforcement
 	{
 		files: ['**/*.test.ts', '**/*.spec.ts', '**/__mocks__/**/*.ts'],
-		rules: testFileRules,
+		plugins: {
+			'test-best-practices': testBestPracticesRules,
+		},
+		rules: {
+			...testFileRules,
+			'test-best-practices/no-settimeout-in-tests': 'error',
+		},
 	},
 
 	// Prettier integration - disable conflicting ESLint rules

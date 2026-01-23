@@ -1,3 +1,4 @@
+import { createDeferredPromise } from '@framework/test-utils/deferredPromise';
 import type { DashboardData } from '@shared/api/dashboard.contract';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -257,7 +258,8 @@ describe('DashboardPage', () => {
 		});
 
 		it('should disable refresh button while refreshing', async () => {
-			const mockRefresh = vi.fn((): Promise<void> => new Promise(resolve => setTimeout(resolve, 100)));
+			const refreshDeferred = createDeferredPromise<void>();
+			const mockRefresh = vi.fn(() => refreshDeferred.promise);
 			vi.mocked(useDashboardModule.useDashboard).mockReturnValue({
 				data: mockDashboardData,
 				loading: false,
@@ -276,8 +278,12 @@ describe('DashboardPage', () => {
 
 			fireEvent.click(refreshButton!);
 
-			// Button should be disabled immediately
+			// Button should be disabled immediately while refresh is pending
 			expect(refreshButton).toBeDisabled();
+			expect(mockRefresh).toHaveBeenCalled();
+
+			// Resolve the refresh
+			refreshDeferred.resolve();
 
 			// Wait for refresh to complete
 			await waitFor(() => {

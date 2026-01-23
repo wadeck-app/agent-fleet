@@ -319,6 +319,22 @@
 			"version": 4,
 			"createdAt": "2026-01-21T22:39:17.256Z",
 			"updatedAt": "2026-01-21T22:39:29.751Z"
+		},
+		{
+			"description": "gfhj",
+			"status": "cancelled",
+			"priority": "medium",
+			"assignedWorker": {
+				"workerId": "2"
+			},
+			"flowId": "test-loop",
+			"flowInputs": {
+				"message": ""
+			},
+			"id": "noxk71236",
+			"version": 4,
+			"createdAt": "2026-01-22T21:10:25.315Z",
+			"updatedAt": "2026-01-22T21:10:37.816Z"
 		}
 	]
 }

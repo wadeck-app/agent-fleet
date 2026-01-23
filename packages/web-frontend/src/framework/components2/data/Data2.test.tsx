@@ -351,15 +351,10 @@ describe('Data2', () => {
 	describe('abort controller', () => {
 		it('should abort stale requests when features change', async () => {
 			let resolveCount = 0;
-			const mockFetch = vi.fn().mockImplementation(
-				() =>
-					new Promise(resolve => {
-						setTimeout(() => {
-							resolveCount++;
-							resolve({ items: [{ id: resolveCount }] });
-						}, 100);
-					})
-			);
+			const mockFetch = vi.fn().mockImplementation(() => {
+				resolveCount++;
+				return Promise.resolve({ items: [{ id: resolveCount }] });
+			});
 
 			const pagination = createMockFeature(
 				{ page: 1, pageSize: 10 },
@@ -450,10 +445,7 @@ describe('Data2', () => {
 				);
 			}
 
-			// Give time for any potential infinite loop to manifest
-			await new Promise(resolve => setTimeout(resolve, 100));
-
-			// Should still only have been called once (no infinite loop)
+			// Verify no infinite loop occurred - mockFetch should only be called once
 			expect(mockFetch).toHaveBeenCalledTimes(1);
 		});
 

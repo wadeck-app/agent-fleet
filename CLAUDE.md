@@ -35,6 +35,7 @@ FlowExecutor.test.ts
 - All documentation, code, and tests in English
 - Keep docs concise - reference actual code instead of excerpts
 - Examples must link to existing codebase files
+- **Context-efficient:** Success = minimal signal (✓), Failure = full context. See https://www.humanlayer.dev/blog/context-efficient-backpressure
 
 ## Requirements
 
@@ -43,6 +44,7 @@ FlowExecutor.test.ts
 - Document in .claude/temp folder if needed
 - <crucial>Never kill processes you didn't create</crucial>
 - Ask user if requirements unclear (AskUserQuestion tool)
+- **BLOCKING:** Changes to `packages/web-frontend/src/**` → delegate to frontend-dev agent (compilation ≠ working code)
 
 ## Communication Style
 

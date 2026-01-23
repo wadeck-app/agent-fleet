@@ -43,6 +43,8 @@ export const BaseListQuerySchema = z.object({
 	sortBy: z.string().max(200).optional(),
 	// Multi-column sorting: comma-separated orders (asc/desc)
 	sortOrder: z.string().max(50).optional(),
+	// Cache busting parameter (incremented on manual refresh for HTTP cache and backend logging)
+	cacheId: z.coerce.number().int().min(0).optional(),
 });
 
 /**
@@ -71,6 +73,7 @@ export type BaseListQueryMutable = {
 	pageSize?: number | null;
 	sortBy?: string | null;
 	sortOrder?: string | null;
+	cacheId?: number | null;
 	[key: string]: unknown; // Allow extra properties from feature-specific filters
 };
 
