@@ -78,12 +78,17 @@ export function ManageProjectWorkspacesDialog({
 	const [optimisticAssociations, setOptimisticAssociations] = useState<Set<string>>(new Set());
 	const [optimisticDissociations, setOptimisticDissociations] = useState<Set<string>>(new Set());
 
+	// Optimistic reordering: Track the optimistic order
+	const [optimisticOrder, setOptimisticOrder] = useState<string[] | null>(null);
+
 	// Clear optimistic state when dialog closes
 	useEffect(() => {
 		if (!open) {
 			setOptimisticAssociations(new Set());
 			setOptimisticDissociations(new Set());
+			setOptimisticOrder(null);
 			setLoadingItems(new Set());
+			setReorderingIds(new Set());
 		}
 	}, [open]);
 
@@ -97,23 +102,54 @@ export function ManageProjectWorkspacesDialog({
 	optimisticDissociations.forEach(id => effectiveAssociatedIds.delete(id));
 
 	// Build associated workspaces list (ordered by effectiveAssociatedIds)
-	const associatedWorkspaces = Array.from(effectiveAssociatedIds)
+	let associatedWorkspaces = Array.from(effectiveAssociatedIds)
 		.map((id: string) => workspaces.find((w: Workspace) => w.id === id))
 		.filter((w: Workspace | undefined): w is Workspace => w !== undefined);
+
+	// Apply optimistic reordering if present
+	if (optimisticOrder) {
+		// Reorder based on optimistic order
+		const orderMap = new Map(optimisticOrder.map((id, index) => [id, index]));
+		associatedWorkspaces = associatedWorkspaces.sort((a, b) => {
+			const orderA = orderMap.get(a.id) ?? Infinity;
+			const orderB = orderMap.get(b.id) ?? Infinity;
+			return orderA - orderB;
+		});
+	}
+	// Note: If no optimistic order, workspaces are in the order they were associated
+	// (project.workspaceIds array order)
 
 	// Get available (non-associated) workspaces - everything NOT in effectiveAssociatedIds
 	const availableWorkspaces = workspaces.filter((w: Workspace) => !effectiveAssociatedIds.has(w.id));
 
-	// Handle reordering with state management
+	// Handle reordering with optimistic UI
 	const handleReorder = async (activeId: string, overId: string) => {
+		// Calculate new order optimistically
+		const currentOrder = associatedWorkspaces.map((w: Workspace) => w.id);
+		const activeIndex = currentOrder.indexOf(activeId);
+		const overIndex = currentOrder.indexOf(overId);
+
+		if (activeIndex === -1 || overIndex === -1) return;
+
+		// Reorder the array
+		const newOrder = [...currentOrder];
+		newOrder.splice(activeIndex, 1);
+		newOrder.splice(overIndex, 0, activeId);
+
+		// Apply optimistic reordering
+		setOptimisticOrder(newOrder);
+
 		// Mark all associated workspaces as reordering (since we update the order)
 		const allAssociatedIds = new Set<string>(associatedWorkspaces.map((w: Workspace) => w.id));
 		setReorderingIds(allAssociatedIds);
 
 		try {
 			await onReorder(activeId, overId);
+			// Success: keep optimistic order until props sync
 		} catch (error) {
 			console.error('Failed to reorder workspaces:', error);
+			// Rollback on error
+			setOptimisticOrder(null);
 		} finally {
 			setReorderingIds(new Set());
 		}
