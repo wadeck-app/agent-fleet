@@ -5,12 +5,15 @@
  * Designed to collect ALL errors (not just the first) and provide rich metadata
  * for UI integration (workflow builder).
  *
- * This validator orchestrates five specialized validators:
+ * This validator orchestrates eight specialized validators:
  * 1. SchemaValidator - Structure, required fields, types
  * 2. GraphValidator - Cycles, reachability, DAG structure
  * 3. SemanticValidator - References, subflows, dependencies
  * 4. TemplateValidator - Variable expressions, template syntax
  * 5. DependencyOrderValidator - Variable usage respects dependency order
+ * 6. LogicalValidator - Data flow consistency, type flow, transform validation
+ * 7. ContractValidator - Pre/post condition validation
+ * 8. SimulationValidator - Conceptual dry-run, execution paths, dead-end detection
  *
  * Validation phases:
  * Phase 1: Schema validation (structural)
@@ -18,14 +21,20 @@
  * Phase 3: Semantic validation (references) - only if schema valid
  * Phase 4: Template validation (expressions) - only if schema valid
  * Phase 5: Dependency order validation (variable usage) - only if schema valid
+ * Phase 6: Logical validation (data flow consistency) - only if schema valid
+ * Phase 7: Contract validation (pre/post conditions) - only if schema valid
+ * Phase 8: Simulation validation (execution paths) - only if all previous valid
  */
 import type { FlowRegistry } from '../registry/FlowRegistry';
 import type { FlowDefinition } from '../types';
+import { ContractValidator } from './ContractValidator';
 import { DependencyOrderValidator } from './DependencyOrderValidator';
 import { GraphValidator } from './GraphValidator';
+import { LogicalValidator } from './LogicalValidator';
 // Import specialized validators
 import { SchemaValidator } from './SchemaValidator';
 import { SemanticValidator } from './SemanticValidator';
+import { SimulationValidator } from './SimulationValidator';
 import { TemplateValidator } from './TemplateValidator';
 // Import for internal use
 import type { IssueCollector, ValidationIssue, ValidationResult } from './ValidationTypes';
@@ -56,6 +65,9 @@ export class FlowValidator implements IssueCollector {
 	private semanticValidator: SemanticValidator;
 	private templateValidator: TemplateValidator;
 	private dependencyOrderValidator: DependencyOrderValidator;
+	private logicalValidator: LogicalValidator;
+	private contractValidator: ContractValidator;
+	private simulationValidator: SimulationValidator;
 
 	/**
 	 * Create a new FlowValidator
@@ -70,17 +82,20 @@ export class FlowValidator implements IssueCollector {
 		this.semanticValidator = new SemanticValidator(this, this.graphValidator, flowRegistry);
 		this.templateValidator = new TemplateValidator(this);
 		this.dependencyOrderValidator = new DependencyOrderValidator(this);
+		this.logicalValidator = new LogicalValidator(this);
+		this.contractValidator = new ContractValidator(this);
+		this.simulationValidator = new SimulationValidator(this);
 	}
 
 	/**
 	 * Validate a flow definition completely
-	 * Orchestrates the five specialized validators in sequence
+	 * Orchestrates the eight specialized validators in sequence
 	 */
 	public validate(flow: FlowDefinition): ValidationResult {
 		this.issues = [];
 
-		// Phase 1: Schema validation (structural)
-		const stepIds = this.schemaValidator.validateSchema(flow);
+		// Phase 1: Schema validation (structural) and input normalization
+		const { stepIds, normalizedInputs } = this.schemaValidator.validateSchema(flow);
 
 		// Early exit if critical errors prevent semantic validation
 		if (!this.canProceedToSemantics()) {
@@ -93,12 +108,37 @@ export class FlowValidator implements IssueCollector {
 		// Phase 3: Semantic validation (references)
 		this.semanticValidator.validateSemantics(flow, stepIds);
 
-		// Phase 4: Template validation (expressions)
-		const inputNames = new Set(Object.keys(flow.inputs || {}));
+		// Phase 4: Template validation (expressions) with auto-discovery
+		const inputNames = new Set(Object.keys(normalizedInputs));
 		this.templateValidator.validateTemplates(flow, stepIds, inputNames);
+
+		// Merge explicit inputs with auto-discovered inputs
+		const autoDiscoveredInputs = this.templateValidator.getAutoDiscoveredInputs();
+		const mergedInputs = { ...normalizedInputs };
+
+		// Add auto-discovered inputs that aren't explicitly defined
+		for (const [inputName, inputDef] of autoDiscoveredInputs) {
+			if (!mergedInputs[inputName]) {
+				mergedInputs[inputName] = inputDef;
+			}
+		}
+
+		// Store merged inputs in flow for later use (e.g., metadata generation)
+		flow._autoDiscoveredInputs = mergedInputs;
 
 		// Phase 5: Dependency order validation (variable usage respects dependency graph)
 		this.dependencyOrderValidator.validateDependencyOrder(flow);
+
+		// Phase 6: Logical validation (data flow consistency)
+		this.logicalValidator.validateLogical(flow, stepIds);
+
+		// Phase 7: Contract validation (pre/post conditions)
+		this.contractValidator.validateContracts(flow, stepIds);
+
+		// Phase 8: Simulation validation (execution paths) - only if no critical errors
+		if (this.canProceedToSimulation()) {
+			this.simulationValidator.validateSimulation(flow, stepIds);
+		}
 
 		return this.buildResult();
 	}
@@ -122,6 +162,15 @@ export class FlowValidator implements IssueCollector {
 				(issue.code === ValidationCode.MISSING_FIELD || issue.code === ValidationCode.EMPTY_COLLECTION)
 		);
 		return criticalErrors.length === 0;
+	}
+
+	/**
+	 * Check if we can proceed to simulation validation
+	 * (no structural or semantic errors)
+	 */
+	private canProceedToSimulation(): boolean {
+		const errors = this.issues.filter(issue => issue.severity === 'error');
+		return errors.length === 0;
 	}
 
 	/**

@@ -4,6 +4,10 @@ import { type VariantProps, cva } from 'class-variance-authority';
 /**
  * LoadingSpinner - For small inline loading states
  *
+ * @deprecated Use LoadingState (with LoadingDots) instead for consistency.
+ * This component creates visual inconsistency with rotating spinners vs. animated dots.
+ * Use LoadingState from @framework/components/feedback/LoadingState for all loading states.
+ *
  * Use cases:
  * - Button loading states (e.g., "Saving...")
  * - Small row/cell operations in tables
@@ -55,6 +59,9 @@ export interface LoadingSpinnerProps extends VariantProps<typeof spinnerVariants
 	className?: string;
 }
 
+/**
+ * @deprecated Use LoadingState from @framework/components/feedback/LoadingState instead
+ */
 export function LoadingSpinner({ size = 'md', message = 'Loading...', className }: LoadingSpinnerProps) {
 	return (
 		<div className={cn(containerVariants({ size }), className)}>

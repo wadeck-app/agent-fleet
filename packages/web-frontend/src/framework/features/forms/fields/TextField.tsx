@@ -39,6 +39,7 @@ export function TextField({
 	error,
 	className = '',
 	id,
+	description,
 }: TextFieldProps) {
 	const inputId = generateFieldId(label, id);
 
@@ -58,6 +59,7 @@ export function TextField({
 				disabled={disabled}
 				aria-invalid={!!error}
 			/>
+			{description && <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>}
 			{error && <FieldError>{error}</FieldError>}
 		</Field>
 	);

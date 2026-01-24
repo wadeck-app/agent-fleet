@@ -19,8 +19,6 @@ export const WorkspaceScriptSchema = BaseEntitySchema.extend({
 	description: z.string().optional(),
 	url: z.string().url().optional(), // ex: "http://localhost:3000"
 	order: z.number().int().min(0),
-	autoStart: z.boolean(), // Auto-start on workspace open
-	restartOnFailure: z.boolean(), // Auto-restart crashed scripts
 });
 
 /**
@@ -87,8 +85,6 @@ export const CreateWorkspaceScriptSchema = z.object({
 	description: z.string().optional(),
 	url: z.string().url().optional(),
 	order: z.number().int().min(0).default(0),
-	autoStart: z.boolean().default(false),
-	restartOnFailure: z.boolean().default(false),
 });
 
 /**
@@ -101,8 +97,6 @@ export const UpdateWorkspaceScriptSchema = z.object({
 	description: z.string().optional(),
 	url: z.string().url().optional(),
 	order: z.number().int().min(0).optional(),
-	autoStart: z.boolean().optional(),
-	restartOnFailure: z.boolean().optional(),
 	version: z.number().int().positive(), // Optimistic locking
 });
 

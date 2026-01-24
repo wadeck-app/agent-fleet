@@ -18,8 +18,11 @@ import type {
 	FlowDefinition,
 	FlowStep,
 	GitStrategy,
+	InputDefinition,
+	InputSpec,
 	ModelFlowStep,
 	ModelType,
+	NormalizedInputDefinition,
 	ReusePolicy,
 	ScriptFlowStep,
 	SubFlowStep,
@@ -44,9 +47,12 @@ export class SchemaValidator {
 	/**
 	 * Validate flow schema
 	 * @param flow - Flow definition to validate
-	 * @returns Set of step IDs found in the flow
+	 * @returns Object containing step IDs and normalized inputs
 	 */
-	public validateSchema(flow: FlowDefinition): Set<string> {
+	public validateSchema(flow: FlowDefinition): {
+		stepIds: Set<string>;
+		normalizedInputs: Record<string, NormalizedInputDefinition>;
+	} {
 		// Validate flow ID
 		if (!flow.id || typeof flow.id !== 'string' || flow.id.trim() === '') {
 			this.issueCollector.addIssue({
@@ -88,11 +94,13 @@ export class SchemaValidator {
 			this.validateStatusTransitions(flow.statusTransitions, flow.id);
 		}
 
-		// Validate inputs
-		this.validateInputs(flow.inputs, flow.id);
+		// Validate and normalize inputs
+		const normalizedInputs = this.validateInputs(flow.inputs, flow.id);
 
-		// Validate steps and return step IDs
-		return this.validateSteps(flow.steps, flow.id);
+		// Validate steps
+		const stepIds = this.validateSteps(flow.steps, flow.id);
+
+		return { stepIds, normalizedInputs };
 	}
 
 	/**
@@ -266,9 +274,16 @@ export class SchemaValidator {
 	}
 
 	/**
-	 * Validate inputs
+	 * Validate and normalize inputs
+	 * Validates input format and returns normalized definitions
+	 * @returns Record of normalized input definitions
 	 */
-	private validateInputs(inputs: Record<string, VariableType>, flowId: string): void {
+	private validateInputs(
+		inputs: Record<string, InputSpec>,
+		flowId: string
+	): Record<string, NormalizedInputDefinition> {
+		const normalized: Record<string, NormalizedInputDefinition> = {};
+
 		if (!inputs) {
 			this.issueCollector.addIssue({
 				severity: 'warning',
@@ -277,27 +292,137 @@ export class SchemaValidator {
 				location: { field: 'inputs' },
 				suggestion: 'Consider adding inputs if the flow needs parameters',
 			});
-			return;
+			return normalized;
 		}
 
-		const validTypes: VariableType[] = ['string', 'number', 'boolean', 'object'];
+		const validTypes: VariableType[] = [
+			// Base types
+			'string',
+			'number',
+			'boolean',
+			'object',
+			// Text types
+			'text',
+			'url',
+			'markdown',
+			// Number types
+			'integer',
+			'percentage',
+			'duration',
+			// Selection types
+			'enum',
+			'multi-enum',
+			// File types
+			'file',
+			'folder',
+			// Date types
+			'date',
+			'datetime',
+			// Code types
+			'regex',
+			// Structure types
+			'array',
+			'keyvalue',
+			// Security types
+			'password',
+			// Business types
+			'priority',
+		];
 
-		for (const [name, type] of Object.entries(inputs)) {
-			if (!validTypes.includes(type)) {
+		for (const [name, inputSpec] of Object.entries(inputs)) {
+			// Handle shorthand format (string)
+			if (typeof inputSpec === 'string') {
+				if (!validTypes.includes(inputSpec as VariableType)) {
+					this.issueCollector.addIssue({
+						severity: 'error',
+						code: ValidationCode.INVALID_VALUE,
+						message: `Invalid input type for '${name}': ${inputSpec}`,
+						location: { field: `inputs.${name}` },
+						suggestion: `Must be one of: ${validTypes.join(', ')}`,
+						context: {
+							actual: inputSpec,
+							expected: validTypes,
+							related: validTypes,
+						},
+					});
+				} else {
+					// Normalize shorthand to full definition
+					normalized[name] = {
+						type: inputSpec as VariableType,
+						required: false,
+						source: 'explicit',
+					};
+				}
+			}
+			// Handle extended format (object)
+			else if (typeof inputSpec === 'object' && inputSpec !== null) {
+				const def = inputSpec as InputDefinition;
+
+				if (!def.type) {
+					this.issueCollector.addIssue({
+						severity: 'error',
+						code: ValidationCode.MISSING_FIELD,
+						message: `Input '${name}' is missing required 'type' field`,
+						location: { field: `inputs.${name}` },
+						suggestion: 'Add a type field: string, number, boolean, or object',
+					});
+				} else if (!validTypes.includes(def.type)) {
+					this.issueCollector.addIssue({
+						severity: 'error',
+						code: ValidationCode.INVALID_VALUE,
+						message: `Invalid input type for '${name}': ${def.type}`,
+						location: { field: `inputs.${name}.type` },
+						suggestion: `Must be one of: ${validTypes.join(', ')}`,
+						context: {
+							actual: def.type,
+							expected: validTypes,
+							related: validTypes,
+						},
+					});
+				} else {
+					// Normalize extended format
+					normalized[name] = {
+						type: def.type,
+						required: def.required ?? false,
+						default: def.default,
+						description: def.description,
+						options: def.options,
+						source: 'explicit',
+					};
+
+					// Warn if default value type doesn't match declared type
+					if (def.default !== undefined) {
+						const defaultType = typeof def.default;
+						const expectedType = def.type === 'object' ? 'object' : def.type;
+
+						if (defaultType !== expectedType) {
+							this.issueCollector.addIssue({
+								severity: 'warning',
+								code: ValidationCode.TYPE_MISMATCH,
+								message: `Default value type '${defaultType}' for input '${name}' does not match declared type '${def.type}'`,
+								location: { field: `inputs.${name}.default` },
+								suggestion: `Ensure default value matches the declared type`,
+								context: {
+									actual: defaultType,
+									expected: expectedType,
+								},
+							});
+						}
+					}
+				}
+			} else {
 				this.issueCollector.addIssue({
 					severity: 'error',
 					code: ValidationCode.INVALID_VALUE,
-					message: `Invalid input type for '${name}': ${type}`,
+					message: `Invalid input specification for '${name}': expected string or object`,
 					location: { field: `inputs.${name}` },
-					suggestion: `Must be one of: ${validTypes.join(', ')}`,
-					context: {
-						actual: type,
-						expected: validTypes,
-						related: validTypes,
-					},
+					suggestion:
+						'Use either shorthand (e.g., "string") or extended format (e.g., { type: "string", required: true })',
 				});
 			}
 		}
+
+		return normalized;
 	}
 
 	/**

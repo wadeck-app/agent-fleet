@@ -7,7 +7,7 @@ import { DynamicLucideIcon } from '@framework/components/icons/DynamicLucideIcon
 import { CrudDialog } from '@framework/components/overlays/CrudDialog';
 import { ColorPicker } from '@framework/components/pickers/ColorPicker';
 import { IconPicker } from '@framework/components/pickers/IconPicker';
-import { FormContainer } from '@framework/features/forms/FormContainer';
+import { FormContainerLegacy as FormContainer } from '@framework/features/forms/FormContainer';
 import { TextAreaField } from '@framework/features/forms/fields/TextAreaField';
 import { TextField } from '@framework/features/forms/fields/TextField';
 import { useFormState } from '@framework/features/forms/useFormState';
@@ -100,6 +100,7 @@ export function CreateProjectDialog({ open, onOpenChange, onSuccess }: CreatePro
 			title="Create New Project"
 			description="Fill in the details to create a new project"
 			maxWidth="lg"
+			preventOutsideClick={true}
 		>
 			<FormContainer
 				isSubmitting={formState.isSubmitting}

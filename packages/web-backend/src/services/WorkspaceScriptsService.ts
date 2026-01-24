@@ -146,8 +146,6 @@ export class WorkspaceScriptsService {
 				description: data.description,
 				url: data.url,
 				order: data.order ?? 0,
-				autoStart: data.autoStart ?? false,
-				restartOnFailure: data.restartOnFailure ?? false,
 			});
 
 			// Emit event after successful creation
@@ -205,8 +203,6 @@ export class WorkspaceScriptsService {
 			if (data.description !== undefined) updateData.description = data.description;
 			if (data.url !== undefined) updateData.url = data.url;
 			if (data.order !== undefined) updateData.order = data.order;
-			if (data.autoStart !== undefined) updateData.autoStart = data.autoStart;
-			if (data.restartOnFailure !== undefined) updateData.restartOnFailure = data.restartOnFailure;
 
 			// Update script
 			const script = await this.workspaceScriptsRepository.update(scriptId, updateData);
@@ -309,18 +305,6 @@ export class WorkspaceScriptsService {
 			return availableScripts;
 		} catch (error) {
 			log.error(`Failed to discover scripts for workspace ${workspaceId}:`, error);
-			throw error;
-		}
-	}
-
-	/**
-	 * Get scripts configured with autoStart for a workspace
-	 */
-	async getAutoStartScripts(workspaceId: string): Promise<WorkspaceScript[]> {
-		try {
-			return await this.workspaceScriptsRepository.findAutoStartByWorkspace(workspaceId);
-		} catch (error) {
-			log.error(`Failed to get auto-start scripts for workspace ${workspaceId}:`, error);
 			throw error;
 		}
 	}

@@ -11,15 +11,39 @@
  * - inputs.* (flow inputs)
  * - steps.*.outputs.* (step outputs)
  * - task.* (task metadata)
+ *
+ * Supports auto-discovery of inputs: undeclared inputs referenced in templates
+ * can be automatically discovered and added as optional string inputs.
  */
-import type { FlowDefinition } from '../types';
+import type { FlowDefinition, NormalizedInputDefinition } from '../types';
 import { type IssueCollector, ValidationCode, type VariableReference } from './ValidationTypes';
 
 /**
  * Validates template expressions and variable references in flows
  */
 export class TemplateValidator {
-	constructor(private issueCollector: IssueCollector) {}
+	private autoDiscoveredInputs: Map<string, NormalizedInputDefinition> = new Map();
+	private enableAutoDiscovery: boolean;
+
+	/**
+	 * Create a new TemplateValidator
+	 * @param issueCollector - Collector for validation issues
+	 * @param enableAutoDiscovery - Whether to auto-discover undeclared inputs (default: true)
+	 */
+	constructor(
+		private issueCollector: IssueCollector,
+		enableAutoDiscovery: boolean = true
+	) {
+		this.enableAutoDiscovery = enableAutoDiscovery;
+	}
+
+	/**
+	 * Get auto-discovered inputs
+	 * @returns Map of input names to normalized definitions
+	 */
+	public getAutoDiscoveredInputs(): Map<string, NormalizedInputDefinition> {
+		return this.autoDiscoveredInputs;
+	}
 
 	/**
 	 * Validate all template variables in the flow
@@ -55,30 +79,61 @@ export class TemplateValidator {
 
 		for (const step of flow.steps) {
 			let text = '';
+			let fieldName = '';
 
 			// Get text to scan based on step type
 			if (step.type === 'model') {
 				text = step.prompt || '';
+				fieldName = 'prompt';
 			} else if (step.type === 'script') {
 				text = step.script || '';
+				fieldName = 'script';
+			} else if (step.type === 'subflow') {
+				// Scan SubFlowStep inputs (values, not keys)
+				// This was missing and is a critical fix for auto-discovery
+				for (const [inputKey, inputValue] of Object.entries(step.inputs || {})) {
+					if (typeof inputValue === 'string') {
+						let match;
+						const regex = new RegExp(templateRegex.source, templateRegex.flags);
+						while ((match = regex.exec(inputValue)) !== null) {
+							const expression = match[1].trim();
+							const parsed = this.parseVariableExpression(expression);
+
+							if (parsed) {
+								references.push({
+									expression,
+									type: parsed.type,
+									path: parsed.path,
+									location: {
+										stepId: step.id,
+										field: `inputs.${inputKey}`,
+									},
+								});
+							}
+						}
+					}
+				}
+				continue; // Skip the text scanning below for subflow steps
 			}
 
-			// Find all template expressions
-			let match;
-			while ((match = templateRegex.exec(text)) !== null) {
-				const expression = match[1].trim();
-				const parsed = this.parseVariableExpression(expression);
+			// Find all template expressions in text
+			if (text) {
+				let match;
+				while ((match = templateRegex.exec(text)) !== null) {
+					const expression = match[1].trim();
+					const parsed = this.parseVariableExpression(expression);
 
-				if (parsed) {
-					references.push({
-						expression,
-						type: parsed.type,
-						path: parsed.path,
-						location: {
-							stepId: step.id,
-							field: step.type === 'model' ? 'prompt' : 'script',
-						},
-					});
+					if (parsed) {
+						references.push({
+							expression,
+							type: parsed.type,
+							path: parsed.path,
+							location: {
+								stepId: step.id,
+								field: fieldName,
+							},
+						});
+					}
 				}
 			}
 		}
@@ -129,17 +184,43 @@ export class TemplateValidator {
 			// Validate input reference
 			const inputName = ref.path[0];
 			if (!inputNames.has(inputName)) {
-				this.issueCollector.addIssue({
-					severity: 'error',
-					code: ValidationCode.UNDEFINED_INPUT,
-					message: `Reference to undefined input: ${ref.expression}`,
-					location: ref.location,
-					suggestion: `Define input '${inputName}' or use an existing one: ${Array.from(inputNames).join(', ')}`,
-					context: {
-						actual: inputName,
-						related: Array.from(inputNames),
-					},
-				});
+				// Check if auto-discovery is enabled
+				if (this.enableAutoDiscovery) {
+					// Auto-discover this input if not already discovered
+					if (!this.autoDiscoveredInputs.has(inputName)) {
+						this.autoDiscoveredInputs.set(inputName, {
+							type: 'string',
+							required: false,
+							source: 'auto-discovered',
+						});
+
+						// Log info issue (not error) to inform the user
+						this.issueCollector.addIssue({
+							severity: 'info',
+							code: ValidationCode.AUTO_DISCOVERED_INPUT,
+							message: `Auto-discovered input '${inputName}' from template reference: ${ref.expression}`,
+							location: ref.location,
+							suggestion: `Consider explicitly declaring this input in the flow definition for better documentation`,
+							context: {
+								actual: inputName,
+								related: Array.from(inputNames),
+							},
+						});
+					}
+				} else {
+					// Auto-discovery disabled - report as error
+					this.issueCollector.addIssue({
+						severity: 'error',
+						code: ValidationCode.UNDEFINED_INPUT,
+						message: `Reference to undefined input: ${ref.expression}`,
+						location: ref.location,
+						suggestion: `Define input '${inputName}' or use an existing one: ${Array.from(inputNames).join(', ')}`,
+						context: {
+							actual: inputName,
+							related: Array.from(inputNames),
+						},
+					});
+				}
 			}
 		} else if (ref.type === 'step') {
 			// Validate step output reference

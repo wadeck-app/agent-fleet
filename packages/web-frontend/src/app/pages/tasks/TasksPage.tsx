@@ -18,6 +18,7 @@ import { useCrudSuccessToast } from '@framework/hooks/useCrudSuccessToast';
 import { useDeleteConfirmation } from '@framework/hooks/useDeleteConfirmation';
 import { useErrorToast } from '@framework/hooks/useErrorToast';
 import { useMutationCleanup } from '@framework/hooks/useMutationCleanup';
+import { useUrlState } from '@framework/hooks/useUrlState';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
 import type { Task } from '@shared/api/tasks.contract';
 import { B2F_TASK_CREATED, B2F_TASK_DELETED, B2F_TASK_UPDATED } from '@shared/transport';
@@ -58,7 +59,15 @@ const STORAGE_ID = 'tasks' as const;
  * ===========================================================================================
  */
 export function TasksPage() {
-	const [createDialogOpen, setCreateDialogOpen] = useState(false);
+	// URL state for dialog - replaces local state
+	// URL format: /tasks?action=create
+	const [dialogAction, setDialogAction] = useUrlState({
+		key: 'action',
+		defaultValue: null as string | null,
+	});
+
+	// Computed state - dialog is open when action=create
+	const createDialogOpen = dialogAction === 'create';
 
 	// Headless features
 	const pagination = usePagination2({
@@ -165,6 +174,8 @@ export function TasksPage() {
 
 	const handleTaskCreated = async () => {
 		cache.actions.refresh();
+		// Clear URL params to close dialog after successful creation
+		setDialogAction(null);
 	};
 
 	const handleBulkDelete = async () => {
@@ -193,7 +204,7 @@ export function TasksPage() {
 				onRefresh={cache.actions.refresh}
 				isRefreshing={cache.fstate.isRefreshing}
 				action={
-					<Button onClick={() => setCreateDialogOpen(true)} variant="default" size="sm">
+					<Button onClick={() => setDialogAction('create')} variant="default" size="sm">
 						<Plus />
 						Create Task
 					</Button>
@@ -284,7 +295,12 @@ export function TasksPage() {
 
 			<CreateTaskDialog
 				open={createDialogOpen}
-				onOpenChange={setCreateDialogOpen}
+				onOpenChange={open => {
+					// When dialog closes, clear URL params
+					if (!open) {
+						setDialogAction(null);
+					}
+				}}
 				onSuccess={handleTaskCreated}
 			/>
 

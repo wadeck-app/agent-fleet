@@ -40,6 +40,7 @@ export interface UseFormStateReturn<T> {
 	handleSubmit: (e: React.FormEvent) => Promise<void>;
 	isSubmitting: boolean;
 	validationErrors: Record<string, string>;
+	validator: (data: T) => ValidationResult;
 }
 
 export function useFormState<T>({
@@ -133,5 +134,6 @@ export function useFormState<T>({
 		handleSubmit,
 		isSubmitting,
 		validationErrors,
+		validator,
 	};
 }

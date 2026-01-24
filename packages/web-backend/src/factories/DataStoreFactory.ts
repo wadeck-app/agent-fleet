@@ -238,8 +238,11 @@ export class DataStoreFactory {
 			// Get OrchestratorRepository for task enqueueing
 			const orchestratorRepo = new OrchestratorRepository(this.orchestratorWrapper);
 
-			// Create TasksService with TasksRepository and OrchestratorRepository
-			this.tasksService = new TasksService(tasksRepo, eventBroadcaster, orchestratorRepo);
+			// Get FlowsService for flow input validation
+			const flowsService = this.getFlowsService();
+
+			// Create TasksService with TasksRepository, OrchestratorRepository, and FlowsService
+			this.tasksService = new TasksService(tasksRepo, eventBroadcaster, orchestratorRepo, flowsService);
 		}
 
 		return this.tasksService;

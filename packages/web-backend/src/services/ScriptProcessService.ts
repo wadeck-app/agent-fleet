@@ -29,7 +29,6 @@ const log = createLogger('ScriptProcessService');
  * - Start/stop/restart script processes
  * - Track process status and PID
  * - Store and retrieve logs
- * - Handle auto-restart on crash
  * - Cleanup orphaned processes
  * - Emit B2F events for process state changes
  *
@@ -48,7 +47,7 @@ const log = createLogger('ScriptProcessService');
  * 1. startProcess() → create process record → spawn process → emit B2F_SCRIPT_PROCESS_STARTED
  * 2. Process running → logs stored incrementally → emit B2F_SCRIPT_PROCESS_LOG_UPDATED
  * 3. stopProcess() → kill process → update status → emit B2F_SCRIPT_PROCESS_STOPPED
- * 4. Process crash → auto-restart if enabled → emit B2F_SCRIPT_PROCESS_ERROR
+ * 4. Process crash → mark as crashed → emit B2F_SCRIPT_PROCESS_ERROR
  *
  * ===========================================================================================
  */
@@ -304,16 +303,6 @@ export class ScriptProcessService {
 					});
 				} catch (error) {
 					log.error('Failed to broadcast process error event:', error);
-				}
-
-				// Auto-restart if enabled
-				if (script.restartOnFailure) {
-					log.info(`Auto-restarting script ${script.id} after crash`);
-					try {
-						await this.restartProcess(script.workspaceId, script.id);
-					} catch (error) {
-						log.error(`Failed to auto-restart script ${script.id}:`, error);
-					}
 				}
 			} else {
 				await this.scriptProcessRepository.markStopped(processId, exitCode ?? 0);

@@ -40,6 +40,7 @@ export function DateField({
 	error,
 	className = '',
 	id,
+	description,
 }: DateFieldProps) {
 	const inputId = generateFieldId(label, id);
 
@@ -60,6 +61,7 @@ export function DateField({
 				max={max}
 				aria-invalid={!!error}
 			/>
+			{description && <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>}
 			{error && <FieldError>{error}</FieldError>}
 		</Field>
 	);

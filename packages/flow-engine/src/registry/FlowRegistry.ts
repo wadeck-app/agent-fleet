@@ -9,7 +9,15 @@ import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 import * as path from 'path';
 
-import type { FlowDefinition, FlowStep, VariableType, WorkspaceConfig } from '../types';
+import type {
+	FlowDefinition,
+	FlowStep,
+	InputDefinition,
+	InputSpec,
+	NormalizedInputDefinition,
+	VariableType,
+	WorkspaceConfig,
+} from '../types';
 import { FlowValidator } from '../validation/FlowValidator';
 import type { ValidationResult } from '../validation/FlowValidator';
 
@@ -254,6 +262,129 @@ export class FlowRegistry {
 	}
 
 	/**
+	 * Validate input format from YAML
+	 * Ensures inputs are either valid VariableType strings or InputDefinition objects
+	 * @param rawInputs - Raw inputs from YAML (can be undefined)
+	 * @param flowId - Flow ID for error messages
+	 * @throws Error if input format is invalid
+	 */
+	private validateInputFormat(rawInputs: Record<string, any> | undefined, flowId: string): void {
+		if (!rawInputs || typeof rawInputs !== 'object') {
+			return;
+		}
+
+		const validTypes: VariableType[] = [
+			'string',
+			'number',
+			'boolean',
+			'object',
+			'text',
+			'url',
+			'markdown',
+			'integer',
+			'percentage',
+			'duration',
+			'enum',
+			'multi-enum',
+			'file',
+			'folder',
+			'date',
+			'datetime',
+			'regex',
+			'array',
+			'keyvalue',
+			'password',
+			'priority',
+		];
+
+		for (const [inputName, inputSpec] of Object.entries(rawInputs)) {
+			// Shorthand: "string", "number", etc.
+			if (typeof inputSpec === 'string') {
+				if (!validTypes.includes(inputSpec as VariableType)) {
+					throw new Error(
+						`Flow '${flowId}': Invalid input type '${inputSpec}' for input '${inputName}'. ` +
+							`Valid types: ${validTypes.join(', ')}`
+					);
+				}
+			}
+			// Extended: { type, required, default, description }
+			else if (typeof inputSpec === 'object' && inputSpec !== null) {
+				const def = inputSpec as InputDefinition;
+
+				// Validate required 'type' field
+				if (!def.type) {
+					throw new Error(`Flow '${flowId}': Input '${inputName}' is missing required 'type' field`);
+				}
+
+				if (!validTypes.includes(def.type)) {
+					throw new Error(
+						`Flow '${flowId}': Invalid input type '${def.type}' for input '${inputName}'. ` +
+							`Valid types: ${validTypes.join(', ')}`
+					);
+				}
+
+				// Validate that default value type matches declared type (basic check)
+				if (def.default !== undefined) {
+					const defaultType = typeof def.default;
+					const expectedType = def.type === 'object' ? 'object' : def.type;
+
+					if (defaultType !== expectedType && !(def.type === 'number' && defaultType === 'number')) {
+						console.warn(
+							`Flow '${flowId}': Default value type '${defaultType}' for input '${inputName}' ` +
+								`does not match declared type '${def.type}'`
+						);
+					}
+				}
+			} else {
+				throw new Error(
+					`Flow '${flowId}': Invalid input specification for '${inputName}'. ` +
+						`Expected string (shorthand) or object (extended format)`
+				);
+			}
+		}
+	}
+
+	/**
+	 * Normalize input specifications from YAML into internal representation
+	 * Handles both shorthand (type string) and extended (object) formats
+	 * This is called by SchemaValidator during validation phase
+	 * @param rawInputs - Raw inputs from YAML (can be undefined)
+	 * @returns Record of normalized input definitions
+	 */
+	public normalizeInputs(rawInputs: Record<string, any> | undefined): Record<string, NormalizedInputDefinition> {
+		if (!rawInputs || typeof rawInputs !== 'object') {
+			return {};
+		}
+
+		const normalized: Record<string, NormalizedInputDefinition> = {};
+
+		for (const [inputName, inputSpec] of Object.entries(rawInputs)) {
+			// Shorthand: "string", "number", etc.
+			if (typeof inputSpec === 'string') {
+				normalized[inputName] = {
+					type: inputSpec as VariableType,
+					required: false,
+					source: 'explicit',
+				};
+			}
+			// Extended: { type, required, default, description, options }
+			else if (typeof inputSpec === 'object' && inputSpec !== null) {
+				const def = inputSpec as InputDefinition;
+				normalized[inputName] = {
+					type: def.type,
+					required: def.required ?? false,
+					default: def.default,
+					description: def.description,
+					options: def.options,
+					source: 'explicit',
+				};
+			}
+		}
+
+		return normalized;
+	}
+
+	/**
 	 * Parse raw YAML data into a FlowDefinition
 	 */
 	private async parseFlowDefinition(id: string, data: any): Promise<FlowDefinition> {
@@ -287,6 +418,9 @@ export class FlowRegistry {
 				`Flow '${id}' has invalid version '${mergedData.version}'. Version must be in semantic version format (e.g., "1.0.0")`
 			);
 		}
+
+		// Validate input format
+		this.validateInputFormat(mergedData.inputs, id);
 
 		return {
 			id,

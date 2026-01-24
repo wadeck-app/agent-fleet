@@ -85,6 +85,12 @@ export interface EntityDialogProps<TEntity extends { id: string; version?: numbe
 	maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl';
 
 	/**
+	 * Whether to prevent closing the dialog when clicking outside
+	 * Recommended: true for forms with user input to prevent accidental data loss
+	 */
+	preventOutsideClick?: boolean;
+
+	/**
 	 * The form component to render inside the dialog
 	 */
 	children: React.ReactNode;
@@ -98,6 +104,7 @@ export function EntityDialog<TEntity extends { id: string; version?: number }>({
 	onRefresh,
 	isRefreshing = false,
 	maxWidth = '2xl',
+	preventOutsideClick = false,
 	children,
 }: EntityDialogProps<TEntity>) {
 	// Determine mode based on whether entity exists
@@ -153,6 +160,7 @@ export function EntityDialog<TEntity extends { id: string; version?: number }>({
 			headerActions={headerActions}
 			isRefreshing={isRefreshing}
 			maxWidth={maxWidth}
+			preventOutsideClick={preventOutsideClick}
 		>
 			{children}
 		</CrudDialog>

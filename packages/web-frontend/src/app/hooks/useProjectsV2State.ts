@@ -1,27 +1,26 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useRef } from 'react';
 
+import { useUrlState } from '@framework/hooks/useUrlState';
 import type { Project } from '@shared/api/projects.contract';
 
 /**
  * ===========================================================================================
- * USE PROJECTS V2 STATE - Active State Management with URL and localStorage
+ * USE PROJECTS V2 STATE - Active State Management with URL
  * ===========================================================================================
  *
- * Manages active project/workspace selection state with URL and localStorage persistence.
- * Handles auto-selection logic and state synchronization.
+ * Manages active project/workspace selection state with URL persistence.
+ * Handles auto-selection logic and state synchronization using the generic useUrlState hook.
  *
  * Features:
- * - URL persistence (primary) via query parameters
- * - localStorage persistence (fallback)
- * - Auto-select first pinned project
- * - Auto-select first workspace in project
+ * - URL persistence via query parameters
+ * - Auto-select first pinned project (if none selected)
+ * - Automatic workspace reset when project changes (nested groups)
  * - Type-safe state management
  * - Browser history support (back/forward)
  *
  * URL Structure: /projects-v2?projectId=xxx&workspaceId=yyy&view=tasks
  *
- * Priority: URL params > localStorage > auto-selection
+ * Note: Auto-selection of first workspace is handled by ProjectsV2Page, not this hook.
  *
  * ===========================================================================================
  */
@@ -32,53 +31,8 @@ export interface ProjectsV2State {
 	activeView: 'tasks' | 'scripts';
 }
 
-const STORAGE_KEY = 'projects-v2-active-state';
-
-/**
- * Load active state from localStorage
- */
-function loadActiveState(): ProjectsV2State {
-	try {
-		const stored = localStorage.getItem(STORAGE_KEY);
-		if (stored) {
-			return JSON.parse(stored);
-		}
-	} catch (error) {
-		console.error('Failed to load ProjectsV2 active state:', error);
-	}
-	return {
-		activeProjectId: null,
-		activeWorkspaceId: null,
-		activeView: 'tasks',
-	};
-}
-
-/**
- * Save active state to localStorage
- */
-function saveActiveState(state: ProjectsV2State): void {
-	try {
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-	} catch (error) {
-		console.error('Failed to save ProjectsV2 active state:', error);
-	}
-}
-
 export interface UseProjectsV2StateOptions {
-	/**
-	 * Pinned projects list for auto-selection
-	 */
 	pinnedProjects: Project[];
-
-	/**
-	 * Project workspaces list for auto-selection
-	 */
-	projectWorkspaces: Array<{ id: string }>;
-
-	/**
-	 * Currently active project ID (for auto-selecting workspace)
-	 */
-	activeProjectId: string | null;
 }
 
 export interface UseProjectsV2StateResult {
@@ -90,129 +44,87 @@ export interface UseProjectsV2StateResult {
 }
 
 /**
- * Hook for managing ProjectsV2 active state with URL and localStorage persistence
- *
- * @param options - Configuration options
- * @returns State and setter functions
- *
- * @example
- * ```typescript
- * const { state, setActiveProject, setActiveWorkspace, setActiveView } = useProjectsV2State({
- *   pinnedProjects,
- *   projectWorkspaces,
- *   activeProjectId: state.activeProjectId
- * });
- * ```
+ * Hook for managing ProjectsV2 active state with URL persistence
  */
-export function useProjectsV2State({
-	pinnedProjects,
-	projectWorkspaces,
-	activeProjectId,
-}: UseProjectsV2StateOptions): UseProjectsV2StateResult {
-	const [searchParams, setSearchParams] = useSearchParams();
-	const [state, setState] = useState<ProjectsV2State>(() => {
-		// Priority 1: URL params
-		const projectIdParam = searchParams.get('projectId');
-		const workspaceIdParam = searchParams.get('workspaceId');
-		const viewParam = searchParams.get('view');
-
-		if (projectIdParam) {
-			return {
-				activeProjectId: projectIdParam,
-				activeWorkspaceId: workspaceIdParam,
-				activeView: viewParam === 'scripts' ? 'scripts' : 'tasks',
-			};
-		}
-
-		// Priority 2: localStorage
-		return loadActiveState();
+export function useProjectsV2State({ pinnedProjects }: UseProjectsV2StateOptions): UseProjectsV2StateResult {
+	// Project ID (simple independent parameter)
+	const [projectId, setProjectId] = useUrlState({
+		key: 'projectId',
+		defaultValue: null as string | null,
 	});
 
-	// Track if this is the first render to avoid unnecessary URL updates
-	const isFirstRender = useRef(true);
+	// Workspace ID (nested under project - will be reset manually when project changes)
+	const [workspaceId, setWorkspaceId] = useUrlState({
+		key: 'workspaceId',
+		defaultValue: null as string | null,
+		// NOTE: Not using parentGroupId/parentValue here to avoid race condition
+		// Instead, we reset workspaceId manually in setActiveProject
+	});
 
-	// Sync URL with state changes (skip first render to avoid loops)
+	// View (simple independent parameter, defaults to 'tasks')
+	const [view, setView] = useUrlState<'tasks' | 'scripts'>({
+		key: 'view',
+		defaultValue: 'tasks',
+		cleanupDefault: true,
+	});
+
+	// Track if we've already done auto-selection
+	const hasAutoSelected = useRef(false);
+
+	// Auto-select first pinned project if none selected (ONLY on first mount)
 	useEffect(() => {
-		if (isFirstRender.current) {
-			isFirstRender.current = false;
+		// Only auto-select on first mount, not on subsequent renders
+		if (hasAutoSelected.current) {
 			return;
 		}
 
-		const newParams = new URLSearchParams();
-
-		if (state.activeProjectId) {
-			newParams.set('projectId', state.activeProjectId);
-		}
-
-		if (state.activeWorkspaceId) {
-			newParams.set('workspaceId', state.activeWorkspaceId);
-		}
-
-		if (state.activeView !== 'tasks') {
-			newParams.set('view', state.activeView);
-		}
-
-		// Update URL without causing navigation
-		setSearchParams(newParams, { replace: true });
-
-		// Also save to localStorage as fallback
-		saveActiveState(state);
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [state.activeProjectId, state.activeWorkspaceId, state.activeView, setSearchParams]);
-
-	// Auto-select first pinned project if none selected
-	useEffect(() => {
-		if (pinnedProjects && pinnedProjects.length > 0 && !state.activeProjectId) {
-			setState(prev => ({
-				...prev,
-				activeProjectId: pinnedProjects[0].id,
-			}));
+		if (pinnedProjects && pinnedProjects.length > 0 && !projectId) {
+			setProjectId(pinnedProjects[0].id);
+			hasAutoSelected.current = true;
+		} else if (projectId) {
+			// If there's already a projectId from URL, mark as handled
+			hasAutoSelected.current = true;
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [pinnedProjects?.length, state.activeProjectId]);
+	}, [pinnedProjects?.length]);
 
-	// Auto-select first workspace if project has workspaces and none selected
-	useEffect(() => {
-		if (activeProjectId && projectWorkspaces && projectWorkspaces.length > 0 && !state.activeWorkspaceId) {
-			setState(prev => ({
-				...prev,
-				activeWorkspaceId: projectWorkspaces[0].id,
-			}));
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [activeProjectId, projectWorkspaces?.length, state.activeWorkspaceId]);
+	const setActiveProject = useCallback(
+		(newProjectId: string) => {
+			console.log('[useProjectsV2State] setActiveProject called:', newProjectId, {
+				currentProjectId: projectId,
+				currentWorkspaceId: workspaceId,
+			});
+			setProjectId(newProjectId);
+			setWorkspaceId(null);
+			console.log('[useProjectsV2State] setActiveProject done (state update queued)');
+		},
+		[setProjectId, setWorkspaceId, projectId, workspaceId]
+	);
 
-	const setActiveProject = useCallback((projectId: string) => {
-		setState(prev => ({
-			...prev,
-			activeProjectId: projectId,
-			activeWorkspaceId: null, // Clear workspace when changing project
-		}));
-	}, []);
+	const setActiveWorkspace = useCallback(
+		(newWorkspaceId: string) => {
+			setWorkspaceId(newWorkspaceId);
+		},
+		[setWorkspaceId]
+	);
 
-	const setActiveWorkspace = useCallback((workspaceId: string) => {
-		setState(prev => ({
-			...prev,
-			activeWorkspaceId: workspaceId,
-		}));
-	}, []);
-
-	const setActiveView = useCallback((view: 'tasks' | 'scripts') => {
-		setState(prev => ({
-			...prev,
-			activeView: view,
-		}));
-	}, []);
+	const setActiveView = useCallback(
+		(newView: 'tasks' | 'scripts') => {
+			setView(newView);
+		},
+		[setView]
+	);
 
 	const clearActiveWorkspace = useCallback(() => {
-		setState(prev => ({
-			...prev,
-			activeWorkspaceId: null,
-		}));
-	}, []);
+		setWorkspaceId(null);
+	}, [setWorkspaceId]);
 
 	return {
-		state,
+		state: {
+			activeProjectId: projectId,
+			activeWorkspaceId: workspaceId,
+			activeView: view,
+		},
 		setActiveProject,
 		setActiveWorkspace,
 		setActiveView,

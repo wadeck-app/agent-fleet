@@ -783,7 +783,9 @@ export class FlowWorker implements Shutdownable {
 				hash,
 				name: flow.name,
 				description: flow.description,
-				inputs: flow.inputs,
+				// Use normalized + auto-discovered inputs if available (populated during validation)
+				// Otherwise provide empty object for flows that haven't been validated yet
+				inputs: flow._autoDiscoveredInputs || {},
 				workspace: flow.workspace,
 				statusTransitions: flow.statusTransitions,
 

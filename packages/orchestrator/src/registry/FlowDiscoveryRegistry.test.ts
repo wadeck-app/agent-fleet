@@ -24,7 +24,13 @@ function createFlowMetadata(
 		hash,
 		name: `Flow ${id}`,
 		description: `Test flow ${id}`,
-		inputs: { input1: 'string' },
+		inputs: {
+			input1: {
+				type: 'string',
+				required: false,
+				source: 'explicit',
+			},
+		},
 		workspace: {
 			mode: 'isolated',
 			gitStrategy: 'feature-branch',

@@ -2,7 +2,14 @@ import { useEffect, useState } from 'react';
 
 import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@framework/components/overlays/Dialog';
+import {
+	Dialog,
+	DialogBody,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from '@framework/components/overlays/Dialog';
 import { ColorPicker } from '@framework/components/pickers/ColorPicker';
 import { Button } from '@framework/components/primitives/Button';
 import { useAsyncData } from '@framework/hooks/useAsyncData';
@@ -69,41 +76,43 @@ export function EditWorkspaceDialog({ workspace, open, onClose, onSave }: EditWo
 					<DialogTitle>Edit Workspace</DialogTitle>
 				</DialogHeader>
 
-				<div className="space-y-4">
-					<div>
-						<Label className="text-sm font-medium">Name</Label>
-						<Input
-							value={name}
-							onChange={e => setName(e.target.value)}
-							placeholder="Enter workspace name"
-						/>
-					</div>
+				<DialogBody>
+					<div className="space-y-4">
+						<div>
+							<Label className="text-sm font-medium">Name</Label>
+							<Input
+								value={name}
+								onChange={e => setName(e.target.value)}
+								placeholder="Enter workspace name"
+							/>
+						</div>
 
-					<div>
-						<Label className="text-sm font-medium">Description</Label>
-						<Input
-							value={description}
-							onChange={e => setDescription(e.target.value)}
-							placeholder="Enter workspace description"
-						/>
-					</div>
+						<div>
+							<Label className="text-sm font-medium">Description</Label>
+							<Input
+								value={description}
+								onChange={e => setDescription(e.target.value)}
+								placeholder="Enter workspace description"
+							/>
+						</div>
 
-					<div>
-						<Label className="text-sm font-medium">Project</Label>
-						<ProjectSelect
-							value={projectId}
-							onChange={setProjectId}
-							placeholder="Select project (optional)"
-						/>
-					</div>
+						<div>
+							<Label className="text-sm font-medium">Project</Label>
+							<ProjectSelect
+								value={projectId}
+								onChange={setProjectId}
+								placeholder="Select project (optional)"
+							/>
+						</div>
 
-					<div>
-						<Label className="text-sm font-medium">Color</Label>
-						<ColorPicker value={color} onChange={setColor} />
-					</div>
+						<div>
+							<Label className="text-sm font-medium">Color</Label>
+							<ColorPicker value={color} onChange={setColor} />
+						</div>
 
-					{error && <div className="text-sm text-destructive">{error}</div>}
-				</div>
+						{error && <div className="text-sm text-destructive">{error}</div>}
+					</div>
+				</DialogBody>
 
 				<DialogFooter>
 					<Button variant="outline" onClick={onClose} disabled={isSaving}>

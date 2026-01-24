@@ -9,7 +9,7 @@
  * - Default values
  * - Required field validation
  */
-import type { OutputVariableConfig, StepOutput, TransformFunction } from '../types';
+import type { OutputVariableConfig, StepOutput, TransformFunction, VariableType } from '../types';
 
 /**
  * Output extraction error
@@ -249,12 +249,7 @@ export class OutputExtractor {
 	/**
 	 * Convert value to target type
 	 */
-	private convertType(
-		value: any,
-		targetType: 'string' | 'number' | 'boolean' | 'object',
-		varName: string,
-		stepId: string
-	): any {
+	private convertType(value: any, targetType: VariableType, varName: string, stepId: string): any {
 		// If value is already the right type, return as-is
 		if (typeof value === targetType) {
 			return value;
@@ -267,25 +262,56 @@ export class OutputExtractor {
 
 		try {
 			switch (targetType) {
+				// Base types
 				case 'string':
 					return String(value);
 
 				case 'number':
+				case 'integer':
+				case 'percentage':
+				case 'duration':
 					const num = Number(value);
 					if (isNaN(num)) {
 						throw new Error(`Cannot convert to number`);
 					}
-					return num;
+					// For integer, round to nearest integer
+					return targetType === 'integer' ? Math.round(num) : num;
 
 				case 'boolean':
 					return this.parseBoolean(value);
 
 				case 'object':
+				case 'array':
+				case 'keyvalue':
 					// Try to parse as JSON if it's a string
 					if (typeof value === 'string') {
 						return JSON.parse(value);
 					}
-					throw new Error(`Cannot convert to object`);
+					return value;
+
+				// Text types - treat as string
+				case 'text':
+				case 'url':
+				case 'markdown':
+				case 'regex':
+				case 'password':
+					return String(value);
+
+				// Selection types - keep as-is
+				case 'enum':
+				case 'multi-enum':
+				case 'priority':
+					return value;
+
+				// File/folder types - treat as string paths
+				case 'file':
+				case 'folder':
+					return String(value);
+
+				// Date types - keep as ISO string
+				case 'date':
+				case 'datetime':
+					return String(value);
 
 				default:
 					return value;

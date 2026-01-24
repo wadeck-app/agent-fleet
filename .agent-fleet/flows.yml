@@ -1141,4 +1141,635 @@ test-user-intervention:
               ping localhost -n 3 >nul
               echo [deploy] Deployment successful!
 
+# ============================================================================
+# IDEA REFINER FLOW
+# Transform high-level ideas into actionable flows and tickets
+# ============================================================================
+
+idea-refiner:
+    version: '1.0.0'
+    name: 'Idea Refiner: Transform Ideas into Flows and Tickets'
+    description: 'Analyzes an idea, recommends/generates flows, and creates structured tickets'
+    workspace:
+        mode: shared
+        gitStrategy: main-only
+        reusePolicy: always
+    statusTransitions:
+        onSuccess: approved
+        onFailure: todo
+    inputs:
+        idea:
+            type: text
+            required: true
+            description: 'High-level idea description'
+        preferExisting:
+            type: boolean
+            required: false
+            default: true
+            description: 'Prefer reusing existing flows over generating new ones'
+    steps:
+        # Step 1: Analyze the idea
+        - type: model
+          id: analyze-idea
+          name: 'Analyze Idea Requirements'
+          model: sonnet
+          prompt: |
+              Analyze this idea and extract structured requirements:
+
+              Idea: ${{ inputs.idea }}
+
+              Extract:
+              1. Core objective (what does it aim to achieve?)
+              2. Required inputs (what data/parameters are needed?)
+              3. Expected outputs (what should be produced?)
+              4. Complexity level (simple/medium/complex)
+              5. Suggested flow patterns (pipeline/conditional/loop/fan-out/etc)
+              6. Required features (user approval? parallel execution? retries?)
+
+              Return as JSON with fields: objective, inputs, outputs, complexity, patterns, features.
+              Example:
+              {
+                "objective": "Deploy application to production",
+                "inputs": ["environment", "version"],
+                "outputs": ["deploymentUrl", "status"],
+                "complexity": "medium",
+                "patterns": ["build-pipeline", "user-intervention"],
+                "features": {
+                  "userApproval": true,
+                  "parallel": false,
+                  "loops": false
+                }
+              }
+          output:
+              requirements:
+                  type: object
+                  transform: parseJSON
+
+        # Step 2: Search existing flows
+        - type: script
+          id: search-flows
+          name: 'Search for Matching Flows'
+          depends: [analyze-idea]
+          script: node scripts/recommend-flows.js '${{ steps.analyze-idea.outputs.requirements }}'
+          output:
+              recommendations:
+                  type: object
+                  transform: parseJSON
+
+        # Step 3: User decision (reuse, generate, or manual)
+        - type: user_intervention
+          id: flow-decision
+          name: 'Choose Flow Strategy'
+          depends: [search-flows]
+          interventionType: choice
+          blocking: true
+          choice:
+              question: 'How would you like to proceed with this idea?'
+              options:
+                  - id: reuse
+                    label: 'Reuse Existing Flow'
+                    description: 'Adapt one of the recommended flows to match your needs'
+                  - id: generate
+                    label: 'Generate Custom Flow'
+                    description: 'Create a new flow tailored specifically to this idea'
+                  - id: manual
+                    label: 'Create Manually'
+                    description: 'I will create the flow manually using the documentation'
+              allowMultiple: false
+          output:
+              decision: { type: string, from: 'intervention.choice' }
+              selectedFlowId: { type: string, from: 'intervention.metadata.flowId' }
+
+        # Step 4a: Adapt existing flow (if reuse chosen)
+        - type: model
+          id: adapt-flow
+          name: 'Adapt Existing Flow'
+          depends: [flow-decision]
+          when: "${{ steps.flow-decision.outputs.decision === 'reuse' }}"
+          model: sonnet
+          prompt: |
+              Adapt this flow to match the requirements:
+
+              Original Flow:
+              ${{ steps.search-flows.outputs.recommendations[0].flow }}
+
+              Requirements:
+              ${{ steps.analyze-idea.outputs.requirements }}
+
+              Adaptation Suggestions:
+              ${{ steps.search-flows.outputs.recommendations[0].adaptationSuggestions }}
+
+              Provide:
+              1. Modified flow definition (YAML)
+              2. List of changes made
+              3. Rationale for each change
+
+              Return as JSON with fields: flowYaml (string), changes (array), rationale (string).
+          output:
+              flowYaml: { type: string }
+              changes: { type: object, transform: parseJSON }
+
+        # Step 4b: Generate new flow (if generate chosen)
+        - type: script
+          id: generate-flow
+          name: 'Generate Custom Flow'
+          depends: [flow-decision]
+          when: "${{ steps.flow-decision.outputs.decision === 'generate' }}"
+          script: |
+              $requirements = '${{ steps.analyze-idea.outputs.requirements }}'
+              $flowReq = @{
+                  id = "generated-flow-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+                  name = "Generated Flow"
+                  description = '${{ inputs.idea }}'
+                  inputs = $requirements.inputs
+                  expectedOutputs = $requirements.outputs
+                  patterns = $requirements.patterns
+                  constraints = $requirements.features
+              } | ConvertTo-Json -Compress
+              node scripts/generate-flow.js "$flowReq"
+          output:
+              flowYaml: { type: string }
+              validationReport: { type: object, transform: parseJSON }
+
+        # Step 5: Validate flow (for reuse/generate paths)
+        - type: script
+          id: validate-flow
+          name: 'Validate Flow Definition'
+          depends: [adapt-flow, generate-flow]
+          when: "${{ steps.flow-decision.outputs.decision !== 'manual' }}"
+          script: |
+              $yaml = if ('${{ steps.adapt-flow.outputs.flowYaml }}' -ne '') {
+                  '${{ steps.adapt-flow.outputs.flowYaml }}'
+              } else {
+                  '${{ steps.generate-flow.outputs.flowYaml }}'
+              }
+              node scripts/validate-flow.js "$yaml"
+          output:
+              isValid: { type: boolean }
+              errors: { type: object, transform: parseJSON }
+              warnings: { type: object, transform: parseJSON }
+
+        # Step 6: Generate tickets
+        - type: model
+          id: generate-tickets
+          name: 'Generate Structured Tickets'
+          depends: [flow-decision, validate-flow]
+          model: sonnet
+          prompt: |
+              Generate structured tickets for implementing this idea:
+
+              Original Idea: ${{ inputs.idea }}
+              Requirements: ${{ steps.analyze-idea.outputs.requirements }}
+              Flow Strategy: ${{ steps.flow-decision.outputs.decision }}
+
+              Flow YAML (if applicable):
+              ${{ steps.adapt-flow.outputs.flowYaml || steps.generate-flow.outputs.flowYaml }}
+
+              Validation Results:
+              Valid: ${{ steps.validate-flow.outputs.isValid }}
+              Errors: ${{ steps.validate-flow.outputs.errors }}
+
+              Create tickets with:
+              - Title (clear, actionable)
+              - Description (detailed context)
+              - Acceptance criteria (specific, testable)
+              - Dependencies (what must be done first)
+              - Estimated complexity (1-5 scale)
+              - Labels/tags
+
+              Return as JSON array:
+              [
+                {
+                  "title": "Ticket title",
+                  "description": "Detailed description",
+                  "acceptanceCriteria": ["Criterion 1", "Criterion 2"],
+                  "dependencies": ["ticket-id-1"],
+                  "complexity": 3,
+                  "labels": ["backend", "api"]
+                }
+              ]
+          output:
+              tickets:
+                  type: object
+                  transform: parseJSON
+
+        # Step 7: Present results
+        - type: model
+          id: present-results
+          name: 'Present Results Summary'
+          depends: [generate-tickets]
+          model: haiku
+          prompt: |
+              Create a summary of the idea refinement process:
+
+              Idea: ${{ inputs.idea }}
+              Strategy: ${{ steps.flow-decision.outputs.decision }}
+              Tickets Generated: ${{ steps.generate-tickets.outputs.tickets }}
+
+              Provide:
+              1. Executive summary (2-3 sentences)
+              2. Recommended next steps
+              3. Flow status (reused/generated/manual)
+              4. Ticket overview (count, complexity distribution)
+
+              Make it concise and actionable.
+          output:
+              summary: { type: string }
+
+# =============================================================================
+# Example Flows: New Input Types (17 Types)
+# Demonstrates all new input types with realistic use cases
+# =============================================================================
+
+# Text Types Examples
+example-blog-post:
+    version: '1.0.0'
+    name: 'Example: Blog Post Generator'
+    description: 'Demonstrates text, url, and markdown types'
+    workspace:
+        mode: shared
+        gitStrategy: any
+        reusePolicy: if-available
+    inputs:
+        topic:
+            type: text
+            required: true
+            description: 'Blog post topic (can be multiple paragraphs)'
+        reference_url:
+            type: url
+            required: false
+            description: 'Optional reference URL for research'
+        existing_content:
+            type: markdown
+            required: false
+            description: 'Existing markdown content to expand on'
+    steps:
+        - type: model
+          id: generate-post
+          name: 'Generate Blog Post'
+          model: sonnet
+          prompt: |
+              Create a blog post about: ${{ inputs.topic }}
+
+              Reference URL: ${{ inputs.reference_url || 'None provided' }}
+              Existing content: ${{ inputs.existing_content || 'None' }}
+
+              Generate a well-structured blog post in markdown format.
+
+# Number Types Examples
+example-performance-metrics:
+    version: '1.0.0'
+    name: 'Example: Performance Metrics Analyzer'
+    description: 'Demonstrates integer, percentage, and duration types'
+    workspace:
+        mode: shared
+        gitStrategy: any
+        reusePolicy: if-available
+    inputs:
+        max_iterations:
+            type: integer
+            required: true
+            default: 10
+            description: 'Maximum number of test iterations'
+        success_threshold:
+            type: percentage
+            required: true
+            default: 95
+            description: 'Required success rate percentage'
+        timeout_seconds:
+            type: duration
+            required: true
+            default: 300
+            description: 'Timeout in seconds'
+    steps:
+        - type: script
+          id: run-tests
+          name: 'Run Performance Tests'
+          script: |
+              echo "Running ${{ inputs.max_iterations }} iterations"
+              echo "Success threshold: ${{ inputs.success_threshold }}%"
+              echo "Timeout: ${{ inputs.timeout_seconds }}s"
+          output:
+              result: { type: string }
+
+# Selection Types Examples
+example-deployment-workflow:
+    version: '1.0.0'
+    name: 'Example: Deployment Workflow'
+    description: 'Demonstrates enum, multi-enum, and priority types'
+    workspace:
+        mode: isolated
+        gitStrategy: feature-branch
+        reusePolicy: never
+    inputs:
+        environment:
+            type: enum
+            required: true
+            description: 'Target deployment environment'
+            options:
+                options:
+                    - { value: 'dev', label: 'Development' }
+                    - { value: 'staging', label: 'Staging' }
+                    - { value: 'production', label: 'Production' }
+        notification_channels:
+            type: multi-enum
+            required: false
+            description: 'Notification channels to alert'
+            options:
+                options:
+                    - { value: 'email', label: 'Email' }
+                    - { value: 'slack', label: 'Slack' }
+                    - { value: 'teams', label: 'Microsoft Teams' }
+                    - { value: 'webhook', label: 'Custom Webhook' }
+        deployment_priority:
+            type: priority
+            required: true
+            default: 'medium'
+            description: 'Deployment priority level'
+    steps:
+        - type: model
+          id: plan-deployment
+          name: 'Plan Deployment'
+          model: haiku
+          prompt: |
+              Plan deployment to: ${{ inputs.environment }}
+              Priority: ${{ inputs.deployment_priority }}
+              Notifications: ${{ inputs.notification_channels || 'None' }}
+
+# File and Folder Types Examples
+example-file-processor:
+    version: '1.0.0'
+    name: 'Example: File Processor'
+    description: 'Demonstrates file and folder types'
+    workspace:
+        mode: manual
+        gitStrategy: any
+        reusePolicy: always
+    inputs:
+        input_file:
+            type: file
+            required: true
+            description: 'Input file to process'
+            options:
+                extensions: ['.txt', '.md', '.json', '.yaml']
+        output_directory:
+            type: folder
+            required: true
+            description: 'Output directory for processed files'
+    steps:
+        - type: script
+          id: process-file
+          name: 'Process File'
+          script: |
+              echo "Processing file: ${{ inputs.input_file }}"
+              echo "Output to: ${{ inputs.output_directory }}"
+          output:
+              status: { type: string }
+
+# Date and DateTime Types Examples
+example-event-scheduler:
+    version: '1.0.0'
+    name: 'Example: Event Scheduler'
+    description: 'Demonstrates date and datetime types'
+    workspace:
+        mode: shared
+        gitStrategy: any
+        reusePolicy: if-available
+    inputs:
+        event_date:
+            type: date
+            required: true
+            description: 'Event date (YYYY-MM-DD)'
+        start_time:
+            type: datetime
+            required: true
+            description: 'Event start time (ISO 8601 format)'
+        end_time:
+            type: datetime
+            required: false
+            description: 'Event end time (optional)'
+    steps:
+        - type: model
+          id: schedule-event
+          name: 'Schedule Event'
+          model: haiku
+          prompt: |
+              Schedule an event:
+              Date: ${{ inputs.event_date }}
+              Start: ${{ inputs.start_time }}
+              End: ${{ inputs.end_time || 'Not specified' }}
+
+              Create a calendar entry and send reminders.
+
+# Regex Type Example
+example-log-analyzer:
+    version: '1.0.0'
+    name: 'Example: Log Analyzer'
+    description: 'Demonstrates regex type for pattern matching'
+    workspace:
+        mode: shared
+        gitStrategy: any
+        reusePolicy: if-available
+    inputs:
+        log_pattern:
+            type: regex
+            required: true
+            default: 'ERROR|WARN'
+            description: 'Regex pattern to match in logs'
+        log_file:
+            type: file
+            required: true
+            description: 'Log file to analyze'
+            options:
+                extensions: ['.log', '.txt']
+    steps:
+        - type: script
+          id: analyze-logs
+          name: 'Analyze Logs'
+          script: |
+              echo "Searching for pattern: ${{ inputs.log_pattern }}"
+              echo "In file: ${{ inputs.log_file }}"
+          output:
+              matches: { type: string }
+
+# Array Type Example
+example-batch-processor:
+    version: '1.0.0'
+    name: 'Example: Batch Processor'
+    description: 'Demonstrates array type for lists'
+    workspace:
+        mode: shared
+        gitStrategy: any
+        reusePolicy: if-available
+    inputs:
+        file_list:
+            type: array
+            required: true
+            description: 'List of files to process'
+        operations:
+            type: array
+            required: true
+            description: 'Operations to perform on each file'
+    steps:
+        - type: model
+          id: process-batch
+          name: 'Process Batch'
+          model: haiku
+          prompt: |
+              Process these files: ${{ inputs.file_list }}
+              Operations: ${{ inputs.operations }}
+
+              Execute operations on each file in the list.
+
+# KeyValue Type Example
+example-config-generator:
+    version: '1.0.0'
+    name: 'Example: Configuration Generator'
+    description: 'Demonstrates keyvalue type for settings'
+    workspace:
+        mode: shared
+        gitStrategy: any
+        reusePolicy: if-available
+    inputs:
+        environment_vars:
+            type: keyvalue
+            required: true
+            description: 'Environment variables to set'
+        feature_flags:
+            type: keyvalue
+            required: false
+            description: 'Feature flags to enable/disable'
+    steps:
+        - type: script
+          id: generate-config
+          name: 'Generate Configuration'
+          script: |
+              echo "Environment vars: ${{ inputs.environment_vars }}"
+              echo "Feature flags: ${{ inputs.feature_flags || '{}' }}"
+          output:
+              config: { type: object, transform: parseJSON }
+
+# Password Type Example
+example-credential-setup:
+    version: '1.0.0'
+    name: 'Example: Credential Setup'
+    description: 'Demonstrates password type (secure input)'
+    workspace:
+        mode: isolated
+        gitStrategy: main-only
+        reusePolicy: never
+    inputs:
+        api_key:
+            type: password
+            required: true
+            description: 'API key for external service'
+        database_password:
+            type: password
+            required: true
+            description: 'Database password'
+    steps:
+        - type: script
+          id: setup-credentials
+          name: 'Setup Credentials'
+          script: |
+              echo "Configuring credentials..."
+              # Note: In production, use secure vault storage
+          output:
+              status: { type: string }
+
+# Combined Example: All Types Together
+example-comprehensive:
+    version: '1.0.0'
+    name: 'Example: Comprehensive Input Types'
+    description: 'Demonstrates multiple input types in one flow'
+    workspace:
+        mode: isolated
+        gitStrategy: feature-branch
+        reusePolicy: never
+    inputs:
+        # Text types
+        description:
+            type: text
+            required: true
+            description: 'Project description'
+        project_url:
+            type: url
+            required: false
+            description: 'Project website URL'
+        # Number types
+        team_size:
+            type: integer
+            required: true
+            default: 5
+            description: 'Team size'
+        completion_percent:
+            type: percentage
+            required: false
+            description: 'Current completion percentage'
+        # Selection types
+        project_type:
+            type: enum
+            required: true
+            description: 'Type of project'
+            options:
+                options:
+                    - { value: 'web', label: 'Web Application' }
+                    - { value: 'mobile', label: 'Mobile App' }
+                    - { value: 'api', label: 'API Service' }
+        technologies:
+            type: multi-enum
+            required: true
+            description: 'Technologies used'
+            options:
+                options:
+                    - { value: 'react', label: 'React' }
+                    - { value: 'node', label: 'Node.js' }
+                    - { value: 'python', label: 'Python' }
+                    - { value: 'go', label: 'Go' }
+        priority:
+            type: priority
+            required: true
+            default: 'medium'
+            description: 'Project priority'
+        # Date types
+        deadline:
+            type: date
+            required: true
+            description: 'Project deadline'
+        # File types
+        config_file:
+            type: file
+            required: false
+            description: 'Configuration file'
+        # Structure types
+        dependencies:
+            type: array
+            required: false
+            description: 'List of dependencies'
+        metadata:
+            type: keyvalue
+            required: false
+            description: 'Project metadata'
+    steps:
+        - type: model
+          id: analyze-project
+          name: 'Analyze Project'
+          model: sonnet
+          prompt: |
+              Analyze this project:
+
+              Description: ${{ inputs.description }}
+              URL: ${{ inputs.project_url || 'N/A' }}
+              Type: ${{ inputs.project_type }}
+              Technologies: ${{ inputs.technologies }}
+              Team Size: ${{ inputs.team_size }}
+              Priority: ${{ inputs.priority }}
+              Deadline: ${{ inputs.deadline }}
+              Completion: ${{ inputs.completion_percent || 0 }}%
+
+              Dependencies: ${{ inputs.dependencies || '[]' }}
+              Metadata: ${{ inputs.metadata || '{}' }}
+
+              Provide project analysis and recommendations.
+
 # Temporary test flow - INVALID

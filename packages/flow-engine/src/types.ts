@@ -30,8 +30,295 @@ export type ReusePolicy = 'never' | 'if-available' | 'always';
 
 /**
  * Variable types supported in flow inputs and outputs
+ *
+ * Base types:
+ * - string, number, boolean, object (legacy, always supported)
+ *
+ * Text types:
+ * - text (multiligne), url, markdown
+ *
+ * Number types:
+ * - integer, percentage, duration
+ *
+ * Selection types:
+ * - enum, multi-enum
+ *
+ * File types:
+ * - file, folder
+ *
+ * Date types:
+ * - date, datetime
+ *
+ * Code types:
+ * - regex
+ *
+ * Structure types:
+ * - array, keyvalue
+ *
+ * Security types:
+ * - password
+ *
+ * Business types:
+ * - priority
  */
-export type VariableType = 'string' | 'number' | 'boolean' | 'object';
+export type VariableType =
+	// Base types (legacy)
+	| 'string'
+	| 'number'
+	| 'boolean'
+	| 'object'
+	// Text types
+	| 'text'
+	| 'url'
+	| 'markdown'
+	// Number types
+	| 'integer'
+	| 'percentage'
+	| 'duration'
+	// Selection types
+	| 'enum'
+	| 'multi-enum'
+	// File types
+	| 'file'
+	| 'folder'
+	// Date types
+	| 'date'
+	| 'datetime'
+	// Code types
+	| 'regex'
+	// Structure types
+	| 'array'
+	| 'keyvalue'
+	// Security types
+	| 'password'
+	// Business types
+	| 'priority';
+
+/**
+ * Options for string/text type inputs
+ */
+export interface StringOptions {
+	/** Minimum length */
+	minLength?: number;
+	/** Maximum length */
+	maxLength?: number;
+	/** Regex pattern for validation */
+	pattern?: string;
+	/** Placeholder text */
+	placeholder?: string;
+}
+
+/**
+ * Options for URL type inputs
+ */
+export interface UrlOptions {
+	/** Allowed protocols (default: ['http', 'https']) */
+	protocols?: string[];
+	/** Validate URL accessibility */
+	validate?: boolean;
+	/** Require TLS/HTTPS only */
+	requireTLS?: boolean;
+}
+
+/**
+ * Options for number/integer type inputs
+ */
+export interface NumberOptions {
+	/** Minimum value */
+	min?: number;
+	/** Maximum value */
+	max?: number;
+	/** Step/increment value */
+	step?: number;
+	/** Force integer values only (for 'number' type) */
+	integer?: boolean;
+}
+
+/**
+ * Options for duration type inputs
+ */
+export interface DurationOptions {
+	/** Unit (default: 'seconds') */
+	unit?: 'seconds' | 'minutes' | 'hours' | 'days';
+	/** Allowed units for selection */
+	allowedUnits?: Array<'seconds' | 'minutes' | 'hours' | 'days'>;
+	/** Minimum value */
+	min?: number;
+	/** Maximum value */
+	max?: number;
+}
+
+/**
+ * Enum option definition
+ */
+export interface EnumOption {
+	/** Value to be stored */
+	value: string | number;
+	/** Label to display */
+	label: string;
+	/** Optional description */
+	description?: string;
+}
+
+/**
+ * Options for enum/multi-enum type inputs
+ */
+export interface EnumOptions {
+	/** List of available options */
+	options: EnumOption[];
+	/** Enable search/filter in dropdown */
+	searchable?: boolean;
+}
+
+/**
+ * Options for file type inputs
+ */
+export interface FileOptions {
+	/** Allowed file extensions (e.g., ['.js', '.ts']) */
+	extensions?: string[];
+	/** File must exist */
+	mustExist?: boolean;
+	/** Base path (default: workspace root) */
+	basePath?: string;
+	/** Show file content preview */
+	preview?: boolean;
+}
+
+/**
+ * Options for folder type inputs
+ */
+export interface FolderOptions {
+	/** Folder must exist */
+	mustExist?: boolean;
+	/** Create folder if missing */
+	createIfMissing?: boolean;
+	/** Base path (default: workspace root) */
+	basePath?: string;
+}
+
+/**
+ * Options for date/datetime type inputs
+ */
+export interface DateOptions {
+	/** Minimum date (ISO string or relative like 'today', '+7d') */
+	min?: string;
+	/** Maximum date (ISO string or relative like 'today', '+30d') */
+	max?: string;
+	/** Date format for display (default: 'YYYY-MM-DD') */
+	format?: string;
+}
+
+/**
+ * Options for regex type inputs
+ */
+export interface RegexOptions {
+	/** Validate regex syntax */
+	validate?: boolean;
+	/** Test string to validate regex against */
+	testString?: string;
+}
+
+/**
+ * Options for array type inputs
+ */
+export interface ArrayOptions {
+	/** Type of array items */
+	itemType?: VariableType;
+	/** Minimum number of items */
+	minItems?: number;
+	/** Maximum number of items */
+	maxItems?: number;
+	/** Items must be unique */
+	unique?: boolean;
+}
+
+/**
+ * Options for keyvalue type inputs
+ */
+export interface KeyValueOptions {
+	/** Type of keys (default: 'string') */
+	keyType?: 'string';
+	/** Type of values (default: 'string') */
+	valueType?: VariableType;
+	/** Minimum number of pairs */
+	minPairs?: number;
+	/** Maximum number of pairs */
+	maxPairs?: number;
+}
+
+/**
+ * Priority levels for priority type
+ */
+export type PriorityLevel = 'low' | 'medium' | 'high' | 'critical';
+
+/**
+ * Union type of all possible options
+ */
+export type InputOptions =
+	| StringOptions
+	| UrlOptions
+	| NumberOptions
+	| DurationOptions
+	| EnumOptions
+	| FileOptions
+	| FolderOptions
+	| DateOptions
+	| RegexOptions
+	| ArrayOptions
+	| KeyValueOptions;
+
+/**
+ * Extended input definition with metadata
+ * Used for declaring inputs with additional constraints and documentation
+ */
+export interface InputDefinition {
+	/** Type of the input variable */
+	type: VariableType;
+
+	/** Whether this input is required (default: false) */
+	required?: boolean;
+
+	/** Default value if input is not provided */
+	default?: any;
+
+	/** Description for UI tooltips and documentation */
+	description?: string;
+
+	/** Type-specific options and constraints */
+	options?: InputOptions;
+}
+
+/**
+ * Input specification - either shorthand (type only) or extended (with metadata)
+ * Examples:
+ * - Shorthand: "string"
+ * - Extended: { type: "string", required: true, description: "..." }
+ */
+export type InputSpec = VariableType | InputDefinition;
+
+/**
+ * Normalized input definition (internal representation)
+ * All inputs are normalized to this format during flow parsing
+ */
+export interface NormalizedInputDefinition {
+	/** Type of the input variable */
+	type: VariableType;
+
+	/** Whether this input is required */
+	required: boolean;
+
+	/** Default value if input is not provided */
+	default?: any;
+
+	/** Description for UI tooltips and documentation */
+	description?: string;
+
+	/** Type-specific options and constraints */
+	options?: InputOptions;
+
+	/** Source of this input definition */
+	source: 'explicit' | 'auto-discovered';
+}
 
 /**
  * Workspace strategy for SubFlowStep execution
@@ -425,11 +712,18 @@ export interface FlowDefinition {
 	/** Workspace requirements */
 	workspace: WorkspaceConfig;
 
-	/** Input variables expected from task */
-	inputs: Record<string, VariableType>;
+	/** Input variables expected from task (shorthand or extended format) */
+	inputs: Record<string, InputSpec>;
 
 	/** Flow steps to execute */
 	steps: FlowStep[];
+
+	/**
+	 * Auto-discovered inputs merged with explicit inputs (internal field)
+	 * This field is populated during flow validation and contains the normalized
+	 * form of all inputs (both explicit and auto-discovered)
+	 */
+	_autoDiscoveredInputs?: Record<string, NormalizedInputDefinition>;
 
 	/** Optional lifecycle hooks */
 	hooks?: FlowHooks;
@@ -458,8 +752,8 @@ export interface FlowMetadata {
 	/** Flow description */
 	description: string;
 
-	/** Input variables expected from task */
-	inputs: Record<string, VariableType>;
+	/** Input variables with metadata (normalized form including auto-discovered inputs) */
+	inputs: Record<string, NormalizedInputDefinition>;
 
 	/** Workspace requirements */
 	workspace: WorkspaceConfig;

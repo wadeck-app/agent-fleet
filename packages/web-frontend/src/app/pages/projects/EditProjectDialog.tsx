@@ -7,7 +7,7 @@ import { DynamicLucideIcon } from '@framework/components/icons/DynamicLucideIcon
 import { CrudDialog } from '@framework/components/overlays/CrudDialog';
 import { ColorPicker } from '@framework/components/pickers/ColorPicker';
 import { IconPicker } from '@framework/components/pickers/IconPicker';
-import { FormContainer } from '@framework/features/forms/FormContainer';
+import { FormContainerLegacy as FormContainer } from '@framework/features/forms/FormContainer';
 import { TextAreaField } from '@framework/features/forms/fields/TextAreaField';
 import { TextField } from '@framework/features/forms/fields/TextField';
 import { useFormState } from '@framework/features/forms/useFormState';
@@ -121,6 +121,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: Ed
 			title="Edit Project"
 			description="Update project details"
 			maxWidth="lg"
+			preventOutsideClick={true}
 		>
 			<FormContainer
 				isSubmitting={formState.isSubmitting}

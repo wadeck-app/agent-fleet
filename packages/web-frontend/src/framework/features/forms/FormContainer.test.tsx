@@ -2,10 +2,10 @@ import { createControllablePromise } from '@framework/tests/createControllablePr
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { FormContainer } from './FormContainer';
+import { FormContainerLegacy } from './FormContainer';
 import { useFormState } from './useFormState';
 
-describe('FormContainer', () => {
+describe('FormContainerLegacy', () => {
 	const defaultProps = {
 		isSubmitting: false,
 		onSubmit: vi.fn(),
@@ -20,19 +20,19 @@ describe('FormContainer', () => {
 
 	describe('rendering', () => {
 		it('should render children content', () => {
-			render(<FormContainer {...defaultProps} />);
+			render(<FormContainerLegacy {...defaultProps} />);
 
 			expect(screen.getByText('Form content')).toBeInTheDocument();
 		});
 
 		it('should render submit button with correct label', () => {
-			render(<FormContainer {...defaultProps} />);
+			render(<FormContainerLegacy {...defaultProps} />);
 
 			expect(screen.getByRole('button', { name: 'Submit' })).toBeInTheDocument();
 		});
 
 		it('should render cancel button', () => {
-			render(<FormContainer {...defaultProps} />);
+			render(<FormContainerLegacy {...defaultProps} />);
 
 			expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
 		});
@@ -40,26 +40,26 @@ describe('FormContainer', () => {
 
 	describe('submit button states', () => {
 		it('should show submit label when not submitting', () => {
-			render(<FormContainer {...defaultProps} submitLabel="Create Item" />);
+			render(<FormContainerLegacy {...defaultProps} submitLabel="Create Item" />);
 
 			expect(screen.getByRole('button', { name: 'Create Item' })).toBeInTheDocument();
 		});
 
 		it('should show "Saving..." when submitting', () => {
-			render(<FormContainer {...defaultProps} isSubmitting={true} />);
+			render(<FormContainerLegacy {...defaultProps} isSubmitting={true} />);
 
 			expect(screen.getByRole('button', { name: 'Saving...' })).toBeInTheDocument();
 		});
 
 		it('should disable submit button when submitting', () => {
-			render(<FormContainer {...defaultProps} isSubmitting={true} />);
+			render(<FormContainerLegacy {...defaultProps} isSubmitting={true} />);
 
 			const submitButton = screen.getByRole('button', { name: 'Saving...' });
 			expect(submitButton).toBeDisabled();
 		});
 
 		it('should enable submit button when not submitting', () => {
-			render(<FormContainer {...defaultProps} isSubmitting={false} />);
+			render(<FormContainerLegacy {...defaultProps} isSubmitting={false} />);
 
 			const submitButton = screen.getByRole('button', { name: 'Submit' });
 			expect(submitButton).not.toBeDisabled();
@@ -68,14 +68,14 @@ describe('FormContainer', () => {
 
 	describe('cancel button states', () => {
 		it('should disable cancel button when submitting', () => {
-			render(<FormContainer {...defaultProps} isSubmitting={true} />);
+			render(<FormContainerLegacy {...defaultProps} isSubmitting={true} />);
 
 			const cancelButton = screen.getByRole('button', { name: 'Cancel' });
 			expect(cancelButton).toBeDisabled();
 		});
 
 		it('should enable cancel button when not submitting', () => {
-			render(<FormContainer {...defaultProps} isSubmitting={false} />);
+			render(<FormContainerLegacy {...defaultProps} isSubmitting={false} />);
 
 			const cancelButton = screen.getByRole('button', { name: 'Cancel' });
 			expect(cancelButton).not.toBeDisabled();
@@ -85,7 +85,7 @@ describe('FormContainer', () => {
 	describe('interactions', () => {
 		it('should call onSubmit when form is submitted', () => {
 			const onSubmit = vi.fn(e => e.preventDefault());
-			render(<FormContainer {...defaultProps} onSubmit={onSubmit} />);
+			render(<FormContainerLegacy {...defaultProps} onSubmit={onSubmit} />);
 
 			const form = screen.getByText('Form content').closest('form');
 			expect(form).toBeInTheDocument();
@@ -97,7 +97,7 @@ describe('FormContainer', () => {
 
 		it('should call onCancel when cancel button is clicked', () => {
 			const onCancel = vi.fn();
-			render(<FormContainer {...defaultProps} onCancel={onCancel} />);
+			render(<FormContainerLegacy {...defaultProps} onCancel={onCancel} />);
 
 			const cancelButton = screen.getByRole('button', { name: 'Cancel' });
 			fireEvent.click(cancelButton);
@@ -107,7 +107,7 @@ describe('FormContainer', () => {
 
 		it('should not call onCancel when cancel button is disabled', () => {
 			const onCancel = vi.fn();
-			render(<FormContainer {...defaultProps} onCancel={onCancel} isSubmitting={true} />);
+			render(<FormContainerLegacy {...defaultProps} onCancel={onCancel} isSubmitting={true} />);
 
 			const cancelButton = screen.getByRole('button', { name: 'Cancel' });
 			fireEvent.click(cancelButton);
@@ -119,10 +119,10 @@ describe('FormContainer', () => {
 	describe('layout', () => {
 		it('should render children in a grid layout', () => {
 			const { container } = render(
-				<FormContainer {...defaultProps}>
+				<FormContainerLegacy {...defaultProps}>
 					<div data-testid="field-1">Field 1</div>
 					<div data-testid="field-2">Field 2</div>
-				</FormContainer>
+				</FormContainerLegacy>
 			);
 
 			const grid = container.querySelector('.grid');
@@ -147,7 +147,7 @@ describe('FormContainer', () => {
 			});
 
 			return (
-				<FormContainer
+				<FormContainerLegacy
 					isSubmitting={isSubmitting}
 					onSubmit={handleSubmit}
 					onCancel={() => {}}
@@ -159,7 +159,7 @@ describe('FormContainer', () => {
 						onChange={e => updateField('name', e.target.value)}
 						placeholder="Name"
 					/>
-				</FormContainer>
+				</FormContainerLegacy>
 			);
 		}
 

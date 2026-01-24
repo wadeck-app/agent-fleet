@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { LoadingState } from '@framework/components/feedback/LoadingState';
 import { Button } from '@framework/components/primitives/Button';
 import { Plus } from 'lucide-react';
 
@@ -75,10 +76,7 @@ export function ScriptsPanel({ workspaceId }: ScriptsPanelProps) {
 	if (loading) {
 		return (
 			<div className="flex h-full items-center justify-center">
-				<div className="text-center">
-					<div className="mb-2 text-4xl">⚙️</div>
-					<p className="text-sm text-muted-foreground">Loading scripts...</p>
-				</div>
+				<LoadingState message="Loading scripts..." size="large" />
 			</div>
 		);
 	}
@@ -141,18 +139,18 @@ export function ScriptsPanel({ workspaceId }: ScriptsPanelProps) {
 				) : (
 					<div
 						className={`
-       h-full
-       ${getLayoutClassName(mode)}
-     `}
+        h-full
+        ${getLayoutClassName(mode)}
+      `}
 					>
 						{panels.map(panel => (
 							<ScriptPanel
 								key={panel.id}
 								panelId={panel.id}
-								scriptId={panel.scriptId}
+								scriptName={panel.scriptName}
 								workspaceId={workspaceId}
 								scripts={scripts}
-								onScriptChange={scriptId => setScriptForPanel(panel.id, scriptId)}
+								onScriptChange={scriptName => setScriptForPanel(panel.id, scriptName)}
 								onRemove={() => removePanel(panel.id)}
 							/>
 						))}

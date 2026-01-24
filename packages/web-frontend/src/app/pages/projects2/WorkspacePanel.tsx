@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
@@ -14,6 +15,7 @@ import { TasksTable } from '../tasks/TasksTable';
 import { tasksApi } from '../tasks/tasks.api';
 import { EditWorkspaceDialog } from '../workspaces/EditWorkspaceDialog';
 import { ScriptsPanel } from '../workspaces/scripts/ScriptsPanel';
+import { WorkspaceScriptsInline } from '../workspaces/scripts/WorkspaceScriptsInline';
 import { workspacesApi } from '../workspaces/workspaces.api';
 
 // Helper to extract basename from path
@@ -32,6 +34,8 @@ export function WorkspacePanel({ workspace, projectId, activeView, onViewChange 
 	const [tasks, setTasks] = useState<Task[]>([]);
 	const [refreshing, setRefreshing] = useState(false);
 	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+	const navigate = useNavigate();
+	const [searchParams] = useSearchParams();
 
 	// Load tasks
 	const loadTasks = async () => {
@@ -90,51 +94,38 @@ export function WorkspacePanel({ workspace, projectId, activeView, onViewChange 
 		<div className="flex h-full flex-col overflow-hidden">
 			{/* Workspace Metadata Card */}
 			<div className="border-b border-border bg-card p-4">
-				<div className="flex items-start justify-between">
-					<div className="flex-1 space-y-2">
-						<div className="flex items-center gap-3">
-							<h2 className="text-lg font-semibold">{displayName}</h2>
-							<Badge variant={statusVariant[workspace.status]}>{workspace.status}</Badge>
-							<Badge variant={modeVariant[workspace.mode]}>{workspace.mode}</Badge>
+				<div className="flex items-center justify-between">
+					<div className="flex flex-1 items-center gap-6">
+						<h2 className="text-lg font-semibold">{displayName}</h2>
+						<Badge variant={statusVariant[workspace.status]}>{workspace.status}</Badge>
+						<Badge variant={modeVariant[workspace.mode]}>{workspace.mode}</Badge>
+						<div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+							<FolderOpen className="h-4 w-4" />
+							<span className="font-mono">{workspace.path}</span>
 						</div>
-
-						{workspace.description && (
-							<p className="text-sm text-muted-foreground">{workspace.description}</p>
-						)}
-
-						<div className="flex items-center gap-4 text-sm text-muted-foreground">
-							<div className="flex items-center gap-1.5">
-								<FolderOpen className="h-4 w-4" />
-								<span className="font-mono">{workspace.path}</span>
-							</div>
-							{workspace.gitBranch && (
-								<div className="flex items-center gap-1.5">
-									<GitBranch className="h-4 w-4" />
-									<span className="font-mono">{workspace.gitBranch}</span>
-								</div>
-							)}
-						</div>
-
-						{workspace.gitStatus && (
-							<div className="flex items-center gap-3 text-xs">
-								{workspace.gitStatus.ahead > 0 && (
-									<span className="text-success">↑ {workspace.gitStatus.ahead} ahead</span>
-								)}
-								{workspace.gitStatus.behind > 0 && (
-									<span className="text-warning">↓ {workspace.gitStatus.behind} behind</span>
-								)}
-								{workspace.gitStatus.modified > 0 && (
-									<span className="text-muted-foreground">
-										{workspace.gitStatus.modified} modified
-									</span>
-								)}
-								{workspace.gitStatus.untracked > 0 && (
-									<span className="text-muted-foreground">
-										{workspace.gitStatus.untracked} untracked
-									</span>
-								)}
+						{workspace.gitBranch && (
+							<div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+								<GitBranch className="h-4 w-4" />
+								<span className="font-mono">{workspace.gitBranch}</span>
 							</div>
 						)}
+						{/* Inline Scripts Display */}
+						<WorkspaceScriptsInline
+							workspaceId={workspace.id}
+							onScriptClick={scriptName => {
+								console.log('[WorkspacePanel] Script clicked:', scriptName);
+
+								// Build new URL with script name (encoded)
+								const newParams = new URLSearchParams(searchParams);
+								newParams.set('layout', 'full');
+								newParams.set('panels', encodeURIComponent(scriptName));
+
+								onViewChange('scripts');
+
+								// Navigate with new params
+								navigate(`?${newParams.toString()}`, { replace: true });
+							}}
+						/>
 					</div>
 
 					<Button variant="outline" size="sm" onClick={() => setIsEditDialogOpen(true)}>
@@ -144,7 +135,7 @@ export function WorkspacePanel({ workspace, projectId, activeView, onViewChange 
 				</div>
 			</div>
 
-			{/* View Mode Tabs */}
+			{/* View Mode Tabs - Now using TabsWithUrlState */}
 			<div className="flex flex-1 flex-col overflow-hidden">
 				<div className="border-b border-border bg-card">
 					<div className="flex items-center gap-1 px-4">

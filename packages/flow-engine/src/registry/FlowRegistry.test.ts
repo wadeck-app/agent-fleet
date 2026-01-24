@@ -1463,5 +1463,76 @@ custom-flow:
 			expect(flow1?.version).toBe('0.0.1');
 			expect(flow2?.version).toBe('10.20.30');
 		});
+
+		it('should accept all 21 variable types in inputs', async () => {
+			vi.mocked(fs.existsSync).mockReturnValue(true);
+			vi.mocked(fs.readFileSync).mockReturnValue('yaml');
+			vi.mocked(yaml.load).mockReturnValue({
+				'test-all-types': {
+					version: '1.0.0',
+					name: 'Test All Types',
+					inputs: {
+						// Base types
+						str: 'string',
+						num: 'number',
+						bool: 'boolean',
+						obj: 'object',
+						// Text types
+						txt: 'text',
+						link: 'url',
+						doc: 'markdown',
+						// Number types
+						count: 'integer',
+						percent: 'percentage',
+						time: 'duration',
+						// Selection types
+						status: 'enum',
+						tags: 'multi-enum',
+						// File types
+						filePath: 'file',
+						dirPath: 'folder',
+						// Date types
+						day: 'date',
+						timestamp: 'datetime',
+						// Code types
+						pattern: 'regex',
+						// Structure types
+						list: 'array',
+						dict: 'keyvalue',
+						// Security types
+						secret: 'password',
+						// Business types
+						prio: 'priority',
+					},
+					workspace: { mode: 'shared', gitStrategy: 'any', reusePolicy: 'prefer' },
+					steps: [{ id: 'step1', type: 'model', prompt: 'Test' }],
+				},
+			});
+
+			await registry.loadProjectFlows();
+
+			const flow = registry.getFlow('test-all-types');
+			expect(flow).toBeDefined();
+			expect(flow?.inputs).toBeDefined();
+			expect(Object.keys(flow?.inputs || {})).toHaveLength(21);
+		});
+
+		it('should reject invalid variable type', async () => {
+			vi.mocked(fs.existsSync).mockReturnValue(true);
+			vi.mocked(fs.readFileSync).mockReturnValue('yaml');
+			vi.mocked(yaml.load).mockReturnValue({
+				'test-invalid': {
+					version: '1.0.0',
+					name: 'Test Invalid',
+					inputs: {
+						invalid: 'invalidType',
+					},
+					workspace: { mode: 'shared', gitStrategy: 'any', reusePolicy: 'prefer' },
+					steps: [{ id: 'step1', type: 'model', prompt: 'Test' }],
+				},
+			});
+
+			await expect(registry.loadProjectFlows()).rejects.toThrow(FlowValidationError);
+		});
 	});
 });

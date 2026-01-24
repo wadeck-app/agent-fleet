@@ -78,11 +78,9 @@ export function ProjectsV2Page() {
 		getProjectWorkspaces,
 	} = useProjectWorkspaces();
 
-	// Active state management (URL + localStorage + auto-selection)
+	// Active state management (URL persistence + auto-selection)
 	const { state, setActiveProject, setActiveWorkspace, setActiveView } = useProjectsV2State({
 		pinnedProjects,
-		projectWorkspaces: [],
-		activeProjectId: null,
 	});
 
 	const activeProject = projects.find(p => p.id === state.activeProjectId);
@@ -90,7 +88,15 @@ export function ProjectsV2Page() {
 
 	// Auto-select first workspace when project changes and has workspaces
 	useEffect(() => {
+		console.log('[ProjectsV2Page] Auto-select effect', {
+			activeProjectId: activeProject?.id,
+			projectWorkspacesLength: projectWorkspaces.length,
+			activeWorkspaceId: state.activeWorkspaceId,
+			willAutoSelect: activeProject && projectWorkspaces.length > 0 && !state.activeWorkspaceId,
+		});
+
 		if (activeProject && projectWorkspaces.length > 0 && !state.activeWorkspaceId) {
+			console.log('[ProjectsV2Page] AUTO-SELECTING first workspace:', projectWorkspaces[0].id);
 			setActiveWorkspace(projectWorkspaces[0].id);
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
@@ -244,45 +250,15 @@ export function ProjectsV2Page() {
 							</div>
 						</div>
 
-						{/* Project Metadata Line */}
-						{activeProject && (
-							<div className="border-b border-border bg-muted/30 px-4 py-2">
-								<div className="flex items-center justify-between">
-									<div className="flex items-center gap-2 text-sm text-muted-foreground">
-										<span className="font-semibold text-foreground">{activeProject.name}</span>
-										<span>•</span>
-										<span>{projectWorkspaces.length} workspaces</span>
-										<span>•</span>
-										<span>Created {new Date(activeProject.createdAt).toLocaleDateString()}</span>
-										{activeProject.description && (
-											<>
-												<span>•</span>
-												<span className="truncate">{activeProject.description}</span>
-											</>
-										)}
-									</div>
-									<Button
-										variant="default"
-										size="sm"
-										onClick={() => setIsManageWorkspacesDialogOpen(true)}
-									>
-										<Settings />
-										Manage Workspaces
-									</Button>
-								</div>
-							</div>
-						)}
-
 						{/* Workspace Tabs and Content */}
 						{activeProject && (
 							<div className="flex flex-1 flex-col overflow-hidden">
-								{projectWorkspaces.length > 0 && (
-									<WorkspaceTabs
-										workspaces={projectWorkspaces}
-										activeWorkspaceId={state.activeWorkspaceId}
-										onWorkspaceSelect={setActiveWorkspace}
-									/>
-								)}
+								<WorkspaceTabs
+									workspaces={projectWorkspaces}
+									activeWorkspaceId={state.activeWorkspaceId}
+									onWorkspaceSelect={setActiveWorkspace}
+									onManageClick={() => setIsManageWorkspacesDialogOpen(true)}
+								/>
 								{activeWorkspace ? (
 									<WorkspacePanel
 										workspace={activeWorkspace}

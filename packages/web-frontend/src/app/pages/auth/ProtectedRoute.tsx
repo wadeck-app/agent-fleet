@@ -1,7 +1,7 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 
-import { LoadingSpinner } from '@framework/components/loading/LoadingSpinner';
+import { LoadingState } from '@framework/components/feedback/LoadingState';
 
 import { useAuth } from '@app/hooks/useAuth';
 
@@ -79,12 +79,12 @@ export function ProtectedRoute({ children, redirectTo = '/login' }: ProtectedRou
 	const { state } = useAuth();
 
 	/**
-	 * Show loading spinner while checking authentication
+	 * Show loading state while checking authentication
 	 */
 	if (state.loading) {
 		return (
 			<div className="flex min-h-screen items-center justify-center bg-background">
-				<LoadingSpinner size="lg" message="Verifying authentication..." />
+				<LoadingState message="Verifying authentication..." size="large" />
 			</div>
 		);
 	}

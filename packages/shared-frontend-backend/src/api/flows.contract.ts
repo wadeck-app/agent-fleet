@@ -19,13 +19,58 @@ export const ValidationIssueSchema = z.object({
 
 export type ValidationIssue = z.infer<typeof ValidationIssueSchema>;
 
+// Normalized input definition schema (matches NormalizedInputDefinition from flow-engine)
+export const NormalizedInputDefinitionSchema = z.object({
+	type: z.enum([
+		// Base types
+		'string',
+		'number',
+		'boolean',
+		'object',
+		// Text types
+		'text',
+		'url',
+		'markdown',
+		// Number types
+		'integer',
+		'percentage',
+		'duration',
+		// Selection types
+		'enum',
+		'multi-enum',
+		// File types
+		'file',
+		'folder',
+		// Date types
+		'date',
+		'datetime',
+		// Code types
+		'regex',
+		// Structure types
+		'array',
+		'keyvalue',
+		// Security types
+		'password',
+		// Business types
+		'priority',
+	]),
+	required: z.boolean(),
+	default: z.any().optional(),
+	description: z.string().optional(),
+	// Type-specific options and constraints
+	options: z.any().optional(),
+	source: z.enum(['explicit', 'auto-discovered']),
+});
+
+export type NormalizedInputDefinition = z.infer<typeof NormalizedInputDefinitionSchema>;
+
 export const FlowMetadataSchema = z.object({
 	id: z.string(),
 	version: z.string(),
 	hash: z.string(),
 	name: z.string(),
 	description: z.string(),
-	inputs: z.record(z.string(), z.enum(['string', 'number', 'boolean', 'object'])).optional(),
+	inputs: z.record(z.string(), NormalizedInputDefinitionSchema),
 	isValid: z.boolean(),
 	validationErrors: z.array(ValidationIssueSchema).optional(),
 	validationWarnings: z.array(ValidationIssueSchema).optional(),

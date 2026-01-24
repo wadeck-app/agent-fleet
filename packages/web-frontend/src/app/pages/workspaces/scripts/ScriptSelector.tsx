@@ -4,8 +4,8 @@ import type { ScriptProcessWithConfig } from '@shared/api/workspaceScripts.contr
 interface ScriptSelectorProps {
 	workspaceId: string;
 	scripts: ScriptProcessWithConfig[];
-	value: string | null;
-	onChange: (scriptId: string | null) => void;
+	value: string | null; // scriptName
+	onChange: (scriptName: string | null) => void;
 	disabled?: boolean;
 }
 
@@ -44,7 +44,7 @@ export function ScriptSelector({ scripts, value, onChange, disabled = false }: S
 				{scripts.map(({ script }) => {
 					const displayName = script.displayName || script.scriptName;
 					return (
-						<SelectItem key={script.id} value={script.id}>
+						<SelectItem key={script.id} value={script.scriptName}>
 							<span>{displayName}</span>
 						</SelectItem>
 					);

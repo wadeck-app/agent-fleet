@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { useUrlState } from '@framework/hooks/useUrlState';
+import type { ScriptProcessWithConfig } from '@shared/api/workspaceScripts.contract';
+
 export type LayoutMode = 'full' | 'split' | 'grid';
 
 export interface PanelState {
 	id: string;
-	scriptId: string | null; // null = empty panel
+	scriptName: string | null;
 }
 
 interface UsePanelLayoutOptions {
 	workspaceId: string;
+	scripts?: ScriptProcessWithConfig[];
 }
 
 interface UsePanelLayoutResult {
@@ -28,119 +32,109 @@ const MAX_PANELS_BY_MODE: Record<LayoutMode, number> = {
 };
 
 /**
- * Hook for managing panel layout state
- *
- * Features:
- * - Persist layout mode and panel states in localStorage
- * - Support for Full Width (1 panel), Split (2 panels), Grid 2x2 (4 panels)
- * - Add/remove panels dynamically
- * - Assign scripts to panels
- *
- * Storage key: `workspace-${workspaceId}-panel-layout`
+ * Hook for managing panel layout state with URL persistence
  */
-export function usePanelLayout({ workspaceId }: UsePanelLayoutOptions): UsePanelLayoutResult {
-	const storageKey = `workspace-${workspaceId}-panel-layout`;
-
-	// Initialize state from localStorage or defaults
-	const [mode, setMode] = useState<LayoutMode>(() => {
-		try {
-			const stored = localStorage.getItem(storageKey);
-			if (stored) {
-				const parsed = JSON.parse(stored);
-				return parsed.mode || 'full';
-			}
-		} catch (err) {
-			console.error('[usePanelLayout] Failed to parse stored layout:', err);
-		}
-		return 'full';
+export function usePanelLayout({ workspaceId: _workspaceId }: UsePanelLayoutOptions): UsePanelLayoutResult {
+	// URL state for layout mode
+	const [mode, setMode] = useUrlState<LayoutMode>({
+		key: 'layout',
+		defaultValue: 'full',
 	});
 
-	const [panels, setPanels] = useState<PanelState[]>(() => {
-		try {
-			const stored = localStorage.getItem(storageKey);
-			if (stored) {
-				const parsed = JSON.parse(stored);
-				if (Array.isArray(parsed.panels) && parsed.panels.length > 0) {
-					return parsed.panels;
-				}
-			}
-		} catch (err) {
-			console.error('[usePanelLayout] Failed to parse stored panels:', err);
-		}
-		// Default: one empty panel
-		return [{ id: generatePanelId(), scriptId: null }];
+	// URL state for panels (serialized as comma-separated script names)
+	const [panelScriptNames, setPanelScriptNames] = useUrlState<string[]>({
+		key: 'panels',
+		defaultValue: [],
+		serialize: names => names.filter(Boolean).map(encodeURIComponent).join(','),
+		deserialize: str => str.split(',').map(decodeURIComponent).filter(Boolean),
+		cleanupDefault: true,
 	});
 
-	// Persist to localStorage whenever state changes
+	// Internal state for panel IDs (generated, not persisted)
+	// Initialize with correct count based on mode
+	const [panelIds, setPanelIds] = useState<string[]>(() => {
+		const initialMaxPanels = MAX_PANELS_BY_MODE[mode];
+		const initialCount = Math.max(initialMaxPanels, panelScriptNames.length, 1);
+		return Array.from({ length: initialCount }, () => generatePanelId());
+	});
+
+	// Sync panel count with mode
 	useEffect(() => {
-		try {
-			localStorage.setItem(
-				storageKey,
-				JSON.stringify({
-					mode,
-					panels,
-				})
-			);
-		} catch (err) {
-			console.error('[usePanelLayout] Failed to save layout to localStorage:', err);
-		}
-	}, [mode, panels, storageKey]);
-
-	// Set layout mode and adjust panels accordingly
-	const setLayoutMode = useCallback((newMode: LayoutMode) => {
-		setMode(newMode);
-		setPanels(prevPanels => {
-			const maxPanels = MAX_PANELS_BY_MODE[newMode];
-
-			// If we need more panels, add empty ones
-			if (prevPanels.length < maxPanels) {
-				const newPanels = [...prevPanels];
-				while (newPanels.length < maxPanels) {
-					newPanels.push({ id: generatePanelId(), scriptId: null });
+		const maxPanels = MAX_PANELS_BY_MODE[mode];
+		setPanelIds(prev => {
+			if (prev.length < maxPanels) {
+				const newIds = [...prev];
+				while (newIds.length < maxPanels) {
+					newIds.push(generatePanelId());
 				}
-				return newPanels;
+				return newIds;
 			}
-
-			// If we have too many panels, keep only the first N
-			if (prevPanels.length > maxPanels) {
-				return prevPanels.slice(0, maxPanels);
+			if (prev.length > maxPanels) {
+				return prev.slice(0, maxPanels);
 			}
-
-			return prevPanels;
+			return prev;
 		});
-	}, []);
 
-	// Add a new empty panel (if allowed by current mode)
+		setPanelScriptNames(prev => {
+			if (prev.length > maxPanels) {
+				return prev.slice(0, maxPanels);
+			}
+			return prev;
+		});
+	}, [mode, setPanelScriptNames]);
+
+	// Combine IDs and script names into panel states
+	const panels: PanelState[] = panelIds.map((id, index) => ({
+		id,
+		scriptName: panelScriptNames[index] || null,
+	}));
+
+	const setLayoutMode = useCallback(
+		(newMode: LayoutMode) => {
+			setMode(newMode);
+		},
+		[setMode]
+	);
+
 	const addPanel = useCallback(() => {
-		setPanels(prevPanels => {
-			const maxPanels = MAX_PANELS_BY_MODE[mode];
-			if (prevPanels.length >= maxPanels) {
-				console.warn(`[usePanelLayout] Cannot add more panels in ${mode} mode`);
-				return prevPanels;
-			}
-			return [...prevPanels, { id: generatePanelId(), scriptId: null }];
-		});
-	}, [mode]);
+		const maxPanels = MAX_PANELS_BY_MODE[mode];
+		if (panelIds.length >= maxPanels) {
+			console.warn(`[usePanelLayout] Cannot add more panels in ${mode} mode`);
+			return;
+		}
+		setPanelIds(prev => [...prev, generatePanelId()]);
+	}, [mode, panelIds.length]);
 
-	// Remove a panel by ID
-	const removePanel = useCallback((panelId: string) => {
-		setPanels(prevPanels => {
-			const filtered = prevPanels.filter(p => p.id !== panelId);
-			// Always keep at least one panel
-			if (filtered.length === 0) {
-				return [{ id: generatePanelId(), scriptId: null }];
-			}
-			return filtered;
-		});
-	}, []);
+	const removePanel = useCallback(
+		(panelId: string) => {
+			const index = panelIds.indexOf(panelId);
+			if (index === -1) return;
 
-	// Set script for a specific panel
-	const setScriptForPanel = useCallback((panelId: string, scriptId: string | null) => {
-		setPanels(prevPanels => prevPanels.map(panel => (panel.id === panelId ? { ...panel, scriptId } : panel)));
-	}, []);
+			setPanelIds(prev => {
+				const newIds = prev.filter(id => id !== panelId);
+				return newIds.length === 0 ? [generatePanelId()] : newIds;
+			});
 
-	// Check if we can add more panels
-	const canAddPanel = panels.length < MAX_PANELS_BY_MODE[mode];
+			setPanelScriptNames(prev => prev.filter((_, i) => i !== index));
+		},
+		[panelIds, setPanelScriptNames]
+	);
+
+	const setScriptForPanel = useCallback(
+		(panelId: string, scriptName: string | null) => {
+			const index = panelIds.indexOf(panelId);
+			if (index === -1) return;
+
+			setPanelScriptNames(prev => {
+				const newScriptNames = [...prev];
+				newScriptNames[index] = scriptName || '';
+				return newScriptNames;
+			});
+		},
+		[panelIds, setPanelScriptNames]
+	);
+
+	const canAddPanel = panelIds.length < MAX_PANELS_BY_MODE[mode];
 
 	return {
 		mode,
@@ -153,9 +147,6 @@ export function usePanelLayout({ workspaceId }: UsePanelLayoutOptions): UsePanel
 	};
 }
 
-/**
- * Generate a unique panel ID
- */
 function generatePanelId(): string {
 	return `panel-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }

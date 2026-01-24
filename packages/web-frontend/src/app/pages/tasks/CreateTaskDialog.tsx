@@ -1,18 +1,34 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { CrudDialog } from '@framework/components/overlays/CrudDialog';
-import { FormContainer, type SecondaryAction } from '@framework/features/forms/FormContainer';
+import { DialogBody, DialogFooter } from '@framework/components/overlays/Dialog';
+import { Badge } from '@framework/components/primitives/Badge';
+import { type FormAction, FormActions } from '@framework/features/forms/FormActions';
+import { ArrayField } from '@framework/features/forms/fields/ArrayField';
 import { ComboboxField, type ComboboxOption } from '@framework/features/forms/fields/ComboboxField';
+import { DateField } from '@framework/features/forms/fields/DateField';
+import { DateTimeField } from '@framework/features/forms/fields/DateTimeField';
+import { EnhancedNumberField } from '@framework/features/forms/fields/EnhancedNumberField';
+import { EnumField } from '@framework/features/forms/fields/EnumField';
+import { FileField } from '@framework/features/forms/fields/FileField';
+import { FolderField } from '@framework/features/forms/fields/FolderField';
+import { KeyValueField } from '@framework/features/forms/fields/KeyValueField';
+import { MarkdownField } from '@framework/features/forms/fields/MarkdownField';
+import { MultiEnumField } from '@framework/features/forms/fields/MultiEnumField';
+import { PasswordField } from '@framework/features/forms/fields/PasswordField';
+import { PriorityField } from '@framework/features/forms/fields/PriorityField';
+import { RegexField } from '@framework/features/forms/fields/RegexField';
 import { SelectField } from '@framework/features/forms/fields/SelectField';
 import { TextAreaField } from '@framework/features/forms/fields/TextAreaField';
 import { TextField } from '@framework/features/forms/fields/TextField';
+import { UrlField } from '@framework/features/forms/fields/UrlField';
 import { useFormState } from '@framework/features/forms/useFormState';
 import { useToast } from '@framework/features/toast/ToastContext';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
-import type { FlowMetadata } from '@shared/api/flows.contract';
+import type { FlowMetadata, NormalizedInputDefinition } from '@shared/api/flows.contract';
 import type { CreateTask } from '@shared/api/tasks.contract';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, GripVertical } from 'lucide-react';
 
 import { projectsApi } from '../projects/projects.api';
 import { useWorkers } from '../workers/useWorkers';
@@ -42,6 +58,13 @@ const defaultFormData: CreateTaskFormData = {
 	flowId: '',
 };
 
+// Constants for resizable splitter
+const SPLITTER_STORAGE_KEY = 'createTaskDialog.splitterPosition';
+const DEFAULT_LEFT_WIDTH = 45;
+const MIN_WIDTH = 30;
+const MAX_WIDTH = 70;
+const FORM_ID = 'create-task-form';
+
 export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDialogProps) {
 	const navigate = useNavigate();
 	const { showToast } = useToast();
@@ -51,6 +74,14 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 	const [flowInputs, setFlowInputs] = useState<Record<string, string>>({});
 	const [projects, setProjects] = useState<ComboboxOption[]>([]);
 	const [projectsLoading, setProjectsLoading] = useState(false);
+
+	// Resizable splitter state
+	const [leftWidth, setLeftWidth] = useState<number>(() => {
+		const saved = localStorage.getItem(SPLITTER_STORAGE_KEY);
+		return saved ? parseFloat(saved) : DEFAULT_LEFT_WIDTH;
+	});
+	const [isDragging, setIsDragging] = useState(false);
+	const containerRef = useRef<HTMLDivElement>(null);
 
 	// Transform workers to ComboboxOption format
 	const workerOptions: ComboboxOption[] = (workersData?.workers || []).map(w => ({
@@ -79,8 +110,9 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 			// Find the selected flow to check its inputs
 			const selectedFlow = workerFlowsMetadata.find(f => f.id === data.flowId);
 			if (data.flowId && selectedFlow?.inputs) {
-				for (const [inputName] of Object.entries(selectedFlow.inputs)) {
-					if (!flowInputs[inputName]?.trim()) {
+				for (const [inputName, inputDef] of Object.entries(selectedFlow.inputs)) {
+					// Only validate required inputs
+					if (inputDef.required && !flowInputs[inputName]?.trim()) {
 						errors[`input_${inputName}`] = `${inputName} is required`;
 					}
 				}
@@ -129,6 +161,102 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 		() => workerFlowsMetadata.find(f => f.id === formState.formData.flowId),
 		[workerFlowsMetadata, formState.formData.flowId]
 	);
+
+	// Resizable splitter handlers
+	const handleMouseDown = useCallback(() => {
+		setIsDragging(true);
+	}, []);
+
+	const handleMouseMove = useCallback(
+		(e: MouseEvent) => {
+			if (!isDragging || !containerRef.current) return;
+
+			const container = containerRef.current;
+			const containerRect = container.getBoundingClientRect();
+			const newLeftWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+
+			// Clamp between MIN_WIDTH and MAX_WIDTH
+			const clampedWidth = Math.min(Math.max(newLeftWidth, MIN_WIDTH), MAX_WIDTH);
+			setLeftWidth(clampedWidth);
+			localStorage.setItem(SPLITTER_STORAGE_KEY, clampedWidth.toString());
+		},
+		[isDragging]
+	);
+
+	const handleMouseUp = useCallback(() => {
+		setIsDragging(false);
+	}, []);
+
+	// Add event listeners for dragging
+	useEffect(() => {
+		if (isDragging) {
+			document.addEventListener('mousemove', handleMouseMove);
+			document.addEventListener('mouseup', handleMouseUp);
+			return () => {
+				document.removeEventListener('mousemove', handleMouseMove);
+				document.removeEventListener('mouseup', handleMouseUp);
+			};
+		}
+	}, [isDragging, handleMouseMove, handleMouseUp]);
+
+	// Render field based on input type
+	const renderField = (inputName: string, inputDef: NormalizedInputDefinition) => {
+		const value = flowInputs[inputName] || '';
+		const error = formState.validationErrors[`input_${inputName}`];
+		const placeholder = inputDef.default !== undefined ? `Default: ${inputDef.default}` : `Enter ${inputName}...`;
+
+		const commonProps = {
+			label: inputDef.description || inputName,
+			value,
+			onChange: (val: string) => setFlowInputs(prev => ({ ...prev, [inputName]: val })),
+			required: inputDef.required,
+			placeholder,
+			error,
+			description: inputDef.description,
+		};
+
+		switch (inputDef.type) {
+			case 'text':
+				return <TextAreaField {...commonProps} rows={4} />;
+			case 'url':
+				return <UrlField {...commonProps} />;
+			case 'markdown':
+				return <MarkdownField {...commonProps} rows={6} />;
+			case 'integer':
+			case 'percentage':
+			case 'duration':
+				return <EnhancedNumberField {...commonProps} type={inputDef.type} options={inputDef.options} />;
+			case 'enum':
+				return <EnumField {...commonProps} options={inputDef.options} />;
+			case 'multi-enum':
+				return <MultiEnumField {...commonProps} options={inputDef.options} />;
+			case 'file':
+				return <FileField {...commonProps} options={inputDef.options} />;
+			case 'folder':
+				return <FolderField {...commonProps} options={inputDef.options} />;
+			case 'date':
+				return <DateField {...commonProps} min={inputDef.options?.min} max={inputDef.options?.max} />;
+			case 'datetime':
+				return <DateTimeField {...commonProps} min={inputDef.options?.min} max={inputDef.options?.max} />;
+			case 'regex':
+				return <RegexField {...commonProps} options={inputDef.options} />;
+			case 'array':
+				return <ArrayField {...commonProps} options={inputDef.options} />;
+			case 'keyvalue':
+				return <KeyValueField {...commonProps} options={inputDef.options} />;
+			case 'password':
+				return <PasswordField {...commonProps} />;
+			case 'priority':
+				return <PriorityField {...commonProps} />;
+			case 'number':
+				return <EnhancedNumberField {...commonProps} type="number" options={inputDef.options} />;
+			case 'string':
+			case 'boolean':
+			case 'object':
+			default:
+				return <TextField {...commonProps} />;
+		}
+	};
 
 	// Load projects when dialog opens
 	useEffect(() => {
@@ -190,10 +318,11 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 	// Reset flow inputs when flow changes
 	useEffect(() => {
 		if (selectedFlow?.inputs) {
-			// Initialize flow inputs with empty strings
+			// Initialize flow inputs with default values or empty strings
 			const initialInputs: Record<string, string> = {};
-			for (const inputName of Object.keys(selectedFlow.inputs)) {
-				initialInputs[inputName] = '';
+			for (const [inputName, inputDef] of Object.entries(selectedFlow.inputs)) {
+				// Use default value if available and it's a string, otherwise empty string
+				initialInputs[inputName] = inputDef.default !== undefined ? String(inputDef.default) : '';
 			}
 			setFlowInputs(initialInputs);
 		} else {
@@ -213,6 +342,13 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 
 	// Handler for "Create and open" button
 	const handleCreateAndOpen = async () => {
+		// Validate form first
+		const validation = formState.validator(formState.formData);
+		if (!validation.valid) {
+			showToast('Please fix validation errors', 'error');
+			return;
+		}
+
 		// Transform flat form data to nested CreateTask structure
 		const createTaskData: CreateTask = {
 			description: formState.formData.description,
@@ -235,11 +371,26 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 		}
 	};
 
-	const secondaryActions: SecondaryAction[] = [
+	// Define form actions
+	const formActions: FormAction[] = [
+		{
+			label: formState.isSubmitting ? 'Saving...' : 'Créer tâche',
+			type: 'submit',
+			formId: FORM_ID,
+			disabled: formState.isSubmitting,
+		},
 		{
 			label: 'Create and open',
+			type: 'button',
 			onClick: handleCreateAndOpen,
-			variant: 'default',
+			disabled: formState.isSubmitting,
+		},
+		{
+			label: 'Annuler',
+			type: 'button',
+			variant: 'outline',
+			onClick: () => onOpenChange(false),
+			disabled: formState.isSubmitting,
 		},
 	];
 
@@ -247,175 +398,157 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 		<CrudDialog
 			open={open}
 			onOpenChange={onOpenChange}
-			title="Create New Task"
-			description="Fill in the details to create a new task"
-			maxWidth="lg"
+			title="Créer une tâche"
+			description="Remplissez les détails pour créer une nouvelle tâche"
+			maxWidth="4xl"
+			preventOutsideClick={true}
 		>
-			<FormContainer
-				isSubmitting={formState.isSubmitting}
-				onSubmit={formState.handleSubmit}
-				onCancel={() => onOpenChange(false)}
-				submitLabel="Create Task"
-				secondaryActions={secondaryActions}
-			>
-				<div className="col-span-2">
-					<TextAreaField
-						label="Description"
-						value={formState.formData.description}
-						onChange={value => formState.updateField('description', value)}
-						placeholder="Enter task description..."
-						required
-						rows={4}
-						error={formState.validationErrors.description}
-					/>
-				</div>
+			<DialogBody>
+				<form id={FORM_ID} onSubmit={formState.handleSubmit}>
+					{/* Two-column layout with resizable splitter */}
+					<div ref={containerRef} className="flex min-h-[500px] gap-0">
+						{/* Left Column - Basic Information */}
+						<div className="flex flex-col space-y-4 pr-3" style={{ width: `${leftWidth}%` }}>
+							<h3 className="text-sm font-semibold text-foreground">Informations de base</h3>
 
-				<div className="col-span-2">
-					<SelectField
-						label="Priority"
-						value={formState.formData.priority}
-						onChange={value => formState.updateField('priority', value)}
-						options={[
-							{ value: 'low', label: 'Low' },
-							{ value: 'medium', label: 'Medium' },
-							{ value: 'high', label: 'High' },
-							{ value: 'urgent', label: 'Urgent' },
-						]}
-						required
-						error={formState.validationErrors.priority}
-					/>
-				</div>
+							<TextAreaField
+								label="Description"
+								value={formState.formData.description}
+								onChange={value => formState.updateField('description', value)}
+								placeholder="Enter task description..."
+								required
+								rows={4}
+								error={formState.validationErrors.description}
+							/>
 
-				<div className="col-span-2">
-					<ComboboxField
-						label="Project (Optional)"
-						value={formState.formData.projectId}
-						onChange={value => formState.updateField('projectId', value)}
-						options={projects}
-						placeholder={projectsLoading ? 'Loading projects...' : 'Select project or leave empty...'}
-						disabled={projectsLoading}
-						error={formState.validationErrors.projectId}
-					/>
-				</div>
+							<SelectField
+								label="Priority"
+								value={formState.formData.priority}
+								onChange={value => formState.updateField('priority', value)}
+								options={[
+									{ value: 'low', label: 'Low' },
+									{ value: 'medium', label: 'Medium' },
+									{ value: 'high', label: 'High' },
+									{ value: 'urgent', label: 'Urgent' },
+								]}
+								required
+								error={formState.validationErrors.priority}
+							/>
 
-				<div className="col-span-2">
-					<ComboboxField
-						label="Assign to Worker"
-						value={formState.formData.workerId}
-						onChange={value => formState.updateField('workerId', value)}
-						options={workerOptions}
-						placeholder="Select worker..."
-						required
-						disabled={workersLoading || workerOptions.length === 0}
-						error={formState.validationErrors.workerId}
-					/>
-				</div>
+							<ComboboxField
+								label="Project (Optional)"
+								value={formState.formData.projectId}
+								onChange={value => formState.updateField('projectId', value)}
+								options={projects}
+								placeholder={
+									projectsLoading ? 'Loading projects...' : 'Select project or leave empty...'
+								}
+								disabled={projectsLoading}
+								error={formState.validationErrors.projectId}
+							/>
 
-				<div className="col-span-2">
-					<ComboboxField
-						label="Flow (Optional)"
-						value={formState.formData.flowId}
-						onChange={value => formState.updateField('flowId', value)}
-						options={flowOptions}
-						placeholder={
-							!formState.formData.workerId
-								? 'Select a worker first...'
-								: flowsLoading
-									? 'Loading flows...'
-									: flowOptions.length === 0
-										? 'No flows available'
-										: 'Select a flow...'
-						}
-						disabled={!formState.formData.workerId || flowsLoading}
-					/>
+							<ComboboxField
+								label="Assign to Worker"
+								value={formState.formData.workerId}
+								onChange={value => formState.updateField('workerId', value)}
+								options={workerOptions}
+								placeholder="Select worker..."
+								required
+								disabled={workersLoading || workerOptions.length === 0}
+								error={formState.validationErrors.workerId}
+							/>
+						</div>
 
-					{/* Warning for invalid flows in the list */}
-					{workerFlowsMetadata.some(f => !f.isValid) && (
+						{/* Resizable Splitter */}
 						<div
 							className={`
-        mt-2 rounded-md border border-warning/20 bg-warning/10 p-3
-      `}
+							group relative flex w-1 cursor-col-resize items-center justify-center
+							${isDragging ? 'bg-primary/50' : 'bg-border hover:bg-primary/30'}
+							transition-colors
+						`}
+							onMouseDown={handleMouseDown}
 						>
-							<div className="flex items-start">
-								<div className="flex-shrink-0">
-									<AlertTriangle className="h-5 w-5 text-warning" />
-								</div>
-								<div className="ml-3 flex-1">
-									<p className="text-sm text-foreground">
-										Some flows have validation errors and cannot be selected. They can be edited in
-										the Flow Editor.
-									</p>
-								</div>
+							<div className="absolute flex items-center justify-center">
+								<GripVertical
+									className={`
+									h-4 w-4
+									${isDragging ? 'text-primary' : 'text-muted-foreground group-hover:text-primary'}
+								`}
+								/>
 							</div>
 						</div>
-					)}
-				</div>
 
-				{/* Dynamic Flow Inputs Section */}
-				{selectedFlow?.inputs && Object.keys(selectedFlow.inputs).length > 0 && (
-					<div className="col-span-2 space-y-4">
-						<div
-							className={`
-         border-t border-border pt-4
-         dark:border-gray-700
-       `}
-						>
-							<h3
-								className={`
-          mb-3 text-sm font-semibold text-gray-900
-          dark:text-gray-100
-        `}
-							>
-								Flow Inputs
-							</h3>
-							<div
-								className={`
-          space-y-3 border-l-2 border-blue-500 pl-2
-          dark:border-blue-400
-        `}
-							>
-								{Object.entries(selectedFlow.inputs).map(([inputName, inputType]) => {
-									const value = flowInputs[inputName] || '';
-									const error = formState.validationErrors[`input_${inputName}`];
+						{/* Right Column - Flow Configuration */}
+						<div className="flex flex-col space-y-4 pl-3" style={{ width: `${100 - leftWidth}%` }}>
+							<h3 className="text-sm font-semibold text-foreground">Configuration du flow</h3>
 
-									// Render different input types based on the variable type
-									if (inputType === 'string') {
-										return (
-											<div key={inputName}>
-												<TextField
-													label={inputName}
-													value={value}
-													onChange={val =>
-														setFlowInputs(prev => ({ ...prev, [inputName]: val }))
-													}
-													placeholder={`Enter ${inputName}...`}
-													required
-													error={error}
-												/>
-											</div>
-										);
-									}
+							<ComboboxField
+								label="Flow (Optional)"
+								value={formState.formData.flowId}
+								onChange={value => formState.updateField('flowId', value)}
+								options={flowOptions}
+								placeholder={
+									!formState.formData.workerId
+										? 'Select a worker first...'
+										: flowsLoading
+											? 'Loading flows...'
+											: flowOptions.length === 0
+												? 'No flows available'
+												: 'Select a flow...'
+								}
+								disabled={!formState.formData.workerId || flowsLoading}
+							/>
 
-									// For now, treat all other types as text inputs
-									// TODO: Add number, boolean, object input handling
-									return (
-										<div key={inputName}>
-											<TextField
-												label={`${inputName} (${inputType})`}
-												value={value}
-												onChange={val => setFlowInputs(prev => ({ ...prev, [inputName]: val }))}
-												placeholder={`Enter ${inputName} (${inputType})...`}
-												required
-												error={error}
-											/>
+							{/* Warning for invalid flows in the list */}
+							{workerFlowsMetadata.some(f => !f.isValid) && (
+								<div className="rounded-md border border-warning/20 bg-warning/10 p-3">
+									<div className="flex items-start">
+										<div className="flex-shrink-0">
+											<AlertTriangle className="h-5 w-5 text-warning" />
 										</div>
-									);
-								})}
-							</div>
+										<div className="ml-3 flex-1">
+											<p className="text-sm text-foreground">
+												Some flows have validation errors and cannot be selected. They can be
+												edited in the Flow Editor.
+											</p>
+										</div>
+									</div>
+								</div>
+							)}
+
+							{/* Separator line after flow selector */}
+							{formState.formData.flowId &&
+								selectedFlow?.inputs &&
+								Object.keys(selectedFlow.inputs).length > 0 && (
+									<div className="border-t border-border" />
+								)}
+
+							{/* Dynamic Flow Inputs Section */}
+							{selectedFlow?.inputs && Object.keys(selectedFlow.inputs).length > 0 && (
+								<div className="space-y-4">
+									<h4 className="text-sm font-semibold text-foreground">Paramètres</h4>
+									<div className="space-y-3">
+										{Object.entries(selectedFlow.inputs).map(([inputName, inputDef]) => (
+											<div key={inputName} className="flex items-start gap-2">
+												<div className="flex-1">{renderField(inputName, inputDef)}</div>
+												{inputDef.source === 'auto-discovered' && (
+													<Badge variant="info" className="mt-8">
+														Auto
+													</Badge>
+												)}
+											</div>
+										))}
+									</div>
+								</div>
+							)}
 						</div>
 					</div>
-				)}
-			</FormContainer>
+				</form>
+			</DialogBody>
+
+			<DialogFooter>
+				<FormActions actions={formActions} isSubmitting={formState.isSubmitting} />
+			</DialogFooter>
 		</CrudDialog>
 	);
 }

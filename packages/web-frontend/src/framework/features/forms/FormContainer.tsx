@@ -1,24 +1,64 @@
 import React from 'react';
 
+/**
+ * ===========================================================================================
+ * LEGACY COMPONENTS - For backward compatibility
+ * ===========================================================================================
+ */
+import { DialogFooter } from '@framework/components/overlays/Dialog';
 import { Button } from '@framework/components/primitives/Button';
+import { cn } from '@framework/lib/utils';
 
 /**
  * ===========================================================================================
- * FORM CONTAINER - UI Component
+ * FORM CONTAINER - Pure Form Wrapper Component
  * ===========================================================================================
  *
- * Reusable form wrapper that provides consistent layout and structure.
- * Eliminates duplication of form structure across feature forms.
+ * Provides a pure form wrapper with an ID for external submission.
+ * This component is context-agnostic and works in both pages and dialogs.
  *
  * Features:
- * - Consistent form styling
+ * - Pure form wrapper with customizable ID
  * - Grid layout for fields
- * - Standard action buttons (submit/cancel)
- * - Disabled state handling
+ * - External submission support via form attribute
+ * - No UI decisions (buttons, footer, etc.)
+ *
+ * Usage:
+ * ```tsx
+ * <DialogBody>
+ *   <FormContainer id="my-form" onSubmit={handleSubmit}>
+ *     <TextField ... />
+ *     <SelectField ... />
+ *   </FormContainer>
+ * </DialogBody>
+ * <DialogFooter>
+ *   <FormActions actions={[...]} formId="my-form" />
+ * </DialogFooter>
+ * ```
  *
  * ===========================================================================================
  */
 
+export interface FormContainerProps {
+	id: string; // Form ID for external submission
+	onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+	children: React.ReactNode;
+	className?: string;
+	disableDefaultLayout?: boolean; // Set to true to disable default grid layout
+}
+
+export function FormContainer({ id, onSubmit, children, className, disableDefaultLayout }: FormContainerProps) {
+	const defaultLayoutClasses = disableDefaultLayout ? '' : 'grid gap-4 md:grid-cols-2';
+	return (
+		<form id={id} onSubmit={onSubmit} className={cn(defaultLayoutClasses, className)}>
+			{children}
+		</form>
+	);
+}
+
+/**
+ * @deprecated Use FormActions component instead
+ */
 export interface SecondaryAction {
 	label: string;
 	onClick: () => void;
@@ -26,7 +66,10 @@ export interface SecondaryAction {
 	variant?: 'default' | 'outline' | 'ghost';
 }
 
-export interface FormContainerProps {
+/**
+ * @deprecated Use new FormContainer + FormActions pattern
+ */
+export interface FormContainerLegacyProps {
 	isSubmitting: boolean;
 	onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
 	onCancel: () => void;
@@ -35,26 +78,45 @@ export interface FormContainerProps {
 	secondaryActions?: SecondaryAction[];
 }
 
-export function FormContainer({
+/**
+ * @deprecated Use new FormContainer + FormActions pattern
+ * This component is kept for backward compatibility.
+ *
+ * Migration guide:
+ * ```tsx
+ * // Old:
+ * <FormContainerLegacy onSubmit={...} onCancel={...} submitLabel="Save">
+ *   {fields}
+ * </FormContainerLegacy>
+ *
+ * // New:
+ * <DialogBody>
+ *   <FormContainer id="my-form" onSubmit={...}>
+ *     {fields}
+ *   </FormContainer>
+ * </DialogBody>
+ * <DialogFooter>
+ *   <FormActions actions={[...]} />
+ * </DialogFooter>
+ * ```
+ */
+export function FormContainerLegacy({
 	isSubmitting,
 	onSubmit,
 	onCancel,
 	submitLabel,
 	children,
 	secondaryActions,
-}: FormContainerProps) {
+}: FormContainerLegacyProps) {
 	return (
-		<form onSubmit={onSubmit}>
-			<div
-				className={`
-      grid gap-4
-      md:grid-cols-2
-    `}
-			>
-				{children}
+		<form onSubmit={onSubmit} className="flex h-full flex-col">
+			{/* Scrollable content area */}
+			<div className="-mx-4 flex-1 overflow-y-auto px-4">
+				<div className="grid gap-4 md:grid-cols-2">{children}</div>
 			</div>
 
-			<div className="mt-6 flex gap-3">
+			{/* Fixed footer with buttons */}
+			<DialogFooter>
 				<Button type="submit" disabled={isSubmitting}>
 					{isSubmitting ? 'Saving...' : submitLabel}
 				</Button>
@@ -72,7 +134,7 @@ export function FormContainer({
 				<Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
 					Cancel
 				</Button>
-			</div>
+			</DialogFooter>
 		</form>
 	);
 }

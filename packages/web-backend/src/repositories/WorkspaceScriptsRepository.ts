@@ -46,19 +46,6 @@ export class WorkspaceScriptsRepository {
 	}
 
 	/**
-	 * Find scripts configured with autoStart for a workspace
-	 */
-	async findAutoStartByWorkspace(workspaceId: string): Promise<WorkspaceScript[]> {
-		return this.base
-			.query()
-			.where('workspaceId', '=', workspaceId)
-			.where('enabled', '=', true)
-			.where('autoStart', '=', true)
-			.orderBy('order', 'ASC')
-			.execute();
-	}
-
-	/**
 	 * Find script by workspace ID and script name
 	 */
 	async findByScriptName(workspaceId: string, scriptName: string): Promise<WorkspaceScript | null> {

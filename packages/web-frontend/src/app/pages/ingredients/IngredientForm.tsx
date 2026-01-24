@@ -1,4 +1,4 @@
-import { FormContainer } from '@framework/features/forms/FormContainer';
+import { FormContainerLegacy as FormContainer } from '@framework/features/forms/FormContainer';
 import { IntegerField } from '@framework/features/forms/fields/IntegerField';
 import { NumberField } from '@framework/features/forms/fields/NumberField';
 import { TextField } from '@framework/features/forms/fields/TextField';

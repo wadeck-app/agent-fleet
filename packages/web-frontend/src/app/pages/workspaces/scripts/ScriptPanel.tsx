@@ -12,10 +12,10 @@ import { useScriptProcess } from './useScriptProcess';
 
 interface ScriptPanelProps {
 	panelId: string;
-	scriptId: string | null;
+	scriptName: string | null;
 	workspaceId: string;
 	scripts: ScriptProcessWithConfig[];
-	onScriptChange: (scriptId: string | null) => void;
+	onScriptChange: (scriptName: string | null) => void;
 	onRemove: () => void;
 }
 
@@ -31,7 +31,7 @@ interface ScriptPanelProps {
  */
 export function ScriptPanel({
 	panelId: _panelId,
-	scriptId,
+	scriptName,
 	workspaceId,
 	scripts,
 	onScriptChange,
@@ -40,8 +40,12 @@ export function ScriptPanel({
 	const [logLevel, setLogLevel] = useState<'stdout' | 'stderr' | 'info' | 'error' | undefined>(undefined);
 	const [logSearch, setLogSearch] = useState<string | undefined>(undefined);
 
-	// Find the selected script config
-	const selectedScriptConfig = useMemo(() => scripts.find(s => s.script.id === scriptId), [scripts, scriptId]);
+	// Convert scriptName to scriptId and find the selected script config
+	const selectedScriptConfig = useMemo(
+		() => scripts.find(s => s.script.scriptName === scriptName),
+		[scripts, scriptName]
+	);
+	const scriptId = selectedScriptConfig?.script.id || null;
 
 	const process = selectedScriptConfig?.process;
 	const script = selectedScriptConfig?.script;
@@ -97,7 +101,7 @@ export function ScriptPanel({
 				<ScriptSelector
 					workspaceId={workspaceId}
 					scripts={scripts}
-					value={scriptId}
+					value={scriptName}
 					onChange={onScriptChange}
 				/>
 

@@ -19,6 +19,7 @@ import { TraceChunkStorage } from '../../../orchestrator/src/core/TraceChunkStor
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 import type { TasksRepository } from '../repositories/TasksRepository';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
+import type { FlowsService } from './FlowsService';
 
 const log = createLogger('TasksService');
 
@@ -60,7 +61,8 @@ export class TasksService {
 	constructor(
 		private readonly tasksRepository: TasksRepository,
 		private readonly eventBroadcaster: EventBroadcaster,
-		private readonly orchestratorRepository: OrchestratorRepository
+		private readonly orchestratorRepository: OrchestratorRepository,
+		private readonly flowsService: FlowsService
 	) {
 		// Use the same data directory as the orchestrator
 		this.traceStorage = new TraceChunkStorage('./data/tasks');
@@ -362,6 +364,12 @@ export class TasksService {
 				errors.push('Worker assignment is required');
 			}
 
+			// Validate flow inputs if flowId is provided
+			if (data.flowId && data.flowInputs) {
+				const flowInputErrors = await this.validateFlowInputs(data.flowId, data.flowInputs);
+				errors.push(...flowInputErrors);
+			}
+
 			if (errors.length > 0) {
 				throw new Error(errors.join(', '));
 			}
@@ -402,6 +410,68 @@ export class TasksService {
 			log.error('Failed to create task:', error);
 			throw error;
 		}
+	}
+
+	/**
+	 * Validate flow inputs against flow metadata
+	 * @param flowId - Flow ID to validate against
+	 * @param flowInputs - Input values provided by user
+	 * @returns Array of validation error messages
+	 */
+	private async validateFlowInputs(flowId: string, flowInputs: Record<string, any>): Promise<string[]> {
+		const errors: string[] = [];
+
+		try {
+			// Get all flows to find the flow metadata
+			const flowsByProject = await this.flowsService.getFlows();
+
+			// Search for the flow across all projects
+			let flowMetadata: any = null;
+			for (const projectId of Object.keys(flowsByProject)) {
+				const projectFlows = flowsByProject[projectId];
+				if (projectFlows[flowId]) {
+					flowMetadata = projectFlows[flowId];
+					break;
+				}
+			}
+
+			if (!flowMetadata) {
+				errors.push(`Flow '${flowId}' not found`);
+				return errors;
+			}
+
+			// Validate required inputs are provided
+			for (const [inputName, inputDef] of Object.entries(flowMetadata.inputs || {})) {
+				const def = inputDef as any;
+
+				// Check if required input is missing
+				if (def.required && (flowInputs[inputName] === undefined || flowInputs[inputName] === null)) {
+					errors.push(`Required input '${inputName}' is missing`);
+				}
+
+				// Validate input type if provided
+				if (flowInputs[inputName] !== undefined && flowInputs[inputName] !== null) {
+					const actualType = typeof flowInputs[inputName];
+					const expectedType = def.type;
+
+					// Basic type checking
+					if (expectedType === 'string' && actualType !== 'string') {
+						errors.push(`Input '${inputName}' must be a string`);
+					} else if (expectedType === 'number' && actualType !== 'number') {
+						errors.push(`Input '${inputName}' must be a number`);
+					} else if (expectedType === 'boolean' && actualType !== 'boolean') {
+						errors.push(`Input '${inputName}' must be a boolean`);
+					} else if (expectedType === 'object' && actualType !== 'object') {
+						errors.push(`Input '${inputName}' must be an object`);
+					}
+				}
+			}
+		} catch (error) {
+			log.error('Error validating flow inputs:', error);
+			errors.push('Unable to validate flow inputs');
+		}
+
+		return errors;
 	}
 
 	/**

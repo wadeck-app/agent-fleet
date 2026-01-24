@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
 import { Button } from '@framework/components/primitives/Button';
-import { FormContainer } from '@framework/features/forms/FormContainer';
+import { FormContainerLegacy as FormContainer } from '@framework/features/forms/FormContainer';
 import { IntegerField } from '@framework/features/forms/fields/IntegerField';
 import { TextField } from '@framework/features/forms/fields/TextField';
 import { useFormState } from '@framework/features/forms/useFormState';

@@ -1,6 +1,6 @@
 import React, { type ReactNode } from 'react';
 
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './Dialog';
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './Dialog';
 
 /**
  * ===========================================================================================
@@ -25,6 +25,7 @@ export interface CrudDialogProps {
 	children: ReactNode;
 	maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl';
 	showCloseButton?: boolean;
+	preventOutsideClick?: boolean;
 }
 
 const maxWidthClasses = {
@@ -48,10 +49,15 @@ export function CrudDialog({
 	children,
 	maxWidth = '2xl',
 	showCloseButton = true,
+	preventOutsideClick = false,
 }: CrudDialogProps) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent showCloseButton={showCloseButton} className={maxWidthClasses[maxWidth]}>
+			<DialogContent
+				showCloseButton={showCloseButton}
+				preventOutsideClick={preventOutsideClick}
+				className={maxWidthClasses[maxWidth]}
+			>
 				<DialogHeader className="border-b pb-4">
 					<div className="flex items-center gap-2">
 						<DialogTitle className="text-xl font-semibold">{title}</DialogTitle>
@@ -59,14 +65,17 @@ export function CrudDialog({
 					</div>
 					{description && <DialogDescription>{description}</DialogDescription>}
 				</DialogHeader>
-				<div
-					className={`
-       transition-all duration-200
-       ${isRefreshing ? 'pointer-events-none opacity-50 blur-[1px]' : ''}
-     `}
-				>
-					{children}
-				</div>
+				{/*
+					IMPORTANT: Children should include DialogBody and DialogFooter as siblings
+					This allows the footer to be fixed at the bottom while the body scrolls
+				*/}
+				{isRefreshing ? (
+					<DialogBody className="pointer-events-none opacity-50 blur-[1px] transition-all duration-200">
+						{children}
+					</DialogBody>
+				) : (
+					children
+				)}
 			</DialogContent>
 		</Dialog>
 	);

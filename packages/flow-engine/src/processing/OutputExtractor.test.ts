@@ -217,6 +217,216 @@ describe('OutputExtractor', () => {
 		});
 	});
 
+	describe('New type conversions', () => {
+		it('should convert to integer with rounding', () => {
+			const config: StepOutput = {
+				rounded: { type: 'integer' },
+			};
+
+			const output = extractor.extract('42.7', config, 'test-step');
+
+			expect(output.rounded).toBe(43);
+			expect(typeof output.rounded).toBe('number');
+		});
+
+		it('should convert to percentage', () => {
+			const config: StepOutput = {
+				percent: { type: 'percentage' },
+			};
+
+			const output = extractor.extract('85.5', config, 'test-step');
+
+			expect(output.percent).toBe(85.5);
+			expect(typeof output.percent).toBe('number');
+		});
+
+		it('should convert to duration', () => {
+			const config: StepOutput = {
+				duration: { type: 'duration' },
+			};
+
+			const output = extractor.extract('3600', config, 'test-step');
+
+			expect(output.duration).toBe(3600);
+			expect(typeof output.duration).toBe('number');
+		});
+
+		it('should handle text type as string', () => {
+			const config: StepOutput = {
+				content: { type: 'text' },
+			};
+
+			const output = extractor.extract('Multi-line\ntext content', config, 'test-step');
+
+			expect(output.content).toBe('Multi-line\ntext content');
+			expect(typeof output.content).toBe('string');
+		});
+
+		it('should handle url type as string', () => {
+			const config: StepOutput = {
+				link: { type: 'url' },
+			};
+
+			const output = extractor.extract('https://example.com', config, 'test-step');
+
+			expect(output.link).toBe('https://example.com');
+			expect(typeof output.link).toBe('string');
+		});
+
+		it('should handle markdown type as string', () => {
+			const config: StepOutput = {
+				doc: { type: 'markdown' },
+			};
+
+			const output = extractor.extract('# Title\n\n**Bold**', config, 'test-step');
+
+			expect(output.doc).toBe('# Title\n\n**Bold**');
+			expect(typeof output.doc).toBe('string');
+		});
+
+		it('should handle regex type as string', () => {
+			const config: StepOutput = {
+				pattern: { type: 'regex' },
+			};
+
+			const output = extractor.extract('^[a-z]+$', config, 'test-step');
+
+			expect(output.pattern).toBe('^[a-z]+$');
+			expect(typeof output.pattern).toBe('string');
+		});
+
+		it('should handle password type as string', () => {
+			const config: StepOutput = {
+				secret: { type: 'password' },
+			};
+
+			const output = extractor.extract('secretpass123', config, 'test-step');
+
+			expect(output.secret).toBe('secretpass123');
+			expect(typeof output.secret).toBe('string');
+		});
+
+		it('should handle enum type as-is', () => {
+			const config: StepOutput = {
+				status: { type: 'enum' },
+			};
+
+			const output = extractor.extract('active', config, 'test-step');
+
+			expect(output.status).toBe('active');
+		});
+
+		it('should handle multi-enum type as-is', () => {
+			const config: StepOutput = {
+				tags: { type: 'multi-enum' },
+			};
+
+			const output = extractor.extract('["tag1", "tag2"]', config, 'test-step');
+
+			expect(output.tags).toBe('["tag1", "tag2"]');
+		});
+
+		it('should handle priority type as-is', () => {
+			const config: StepOutput = {
+				priority: { type: 'priority' },
+			};
+
+			const output = extractor.extract('high', config, 'test-step');
+
+			expect(output.priority).toBe('high');
+		});
+
+		it('should handle file type as string path', () => {
+			const config: StepOutput = {
+				path: { type: 'file' },
+			};
+
+			const output = extractor.extract('/path/to/file.txt', config, 'test-step');
+
+			expect(output.path).toBe('/path/to/file.txt');
+			expect(typeof output.path).toBe('string');
+		});
+
+		it('should handle folder type as string path', () => {
+			const config: StepOutput = {
+				dir: { type: 'folder' },
+			};
+
+			const output = extractor.extract('/path/to/directory', config, 'test-step');
+
+			expect(output.dir).toBe('/path/to/directory');
+			expect(typeof output.dir).toBe('string');
+		});
+
+		it('should handle date type as ISO string', () => {
+			const config: StepOutput = {
+				created: { type: 'date' },
+			};
+
+			const output = extractor.extract('2024-01-23', config, 'test-step');
+
+			expect(output.created).toBe('2024-01-23');
+			expect(typeof output.created).toBe('string');
+		});
+
+		it('should handle datetime type as ISO string', () => {
+			const config: StepOutput = {
+				timestamp: { type: 'datetime' },
+			};
+
+			const output = extractor.extract('2024-01-23T10:30:00Z', config, 'test-step');
+
+			expect(output.timestamp).toBe('2024-01-23T10:30:00Z');
+			expect(typeof output.timestamp).toBe('string');
+		});
+
+		it('should parse array type from JSON string', () => {
+			const config: StepOutput = {
+				items: { type: 'array' },
+			};
+
+			const output = extractor.extract('["item1", "item2", "item3"]', config, 'test-step');
+
+			expect(output.items).toEqual(['item1', 'item2', 'item3']);
+			expect(Array.isArray(output.items)).toBe(true);
+		});
+
+		it('should parse keyvalue type from JSON string', () => {
+			const config: StepOutput = {
+				config: { type: 'keyvalue' },
+			};
+
+			const output = extractor.extract('{"key1":"value1","key2":"value2"}', config, 'test-step');
+
+			expect(output.config).toEqual({ key1: 'value1', key2: 'value2' });
+			expect(typeof output.config).toBe('object');
+		});
+
+		it('should keep array type as-is when already parsed', () => {
+			const config: StepOutput = {
+				items: { type: 'array' },
+			};
+
+			const output = extractor.extract('ignored', config, 'test-step', {
+				items: ['a', 'b', 'c'],
+			});
+
+			expect(output.items).toEqual(['a', 'b', 'c']);
+		});
+
+		it('should keep keyvalue type as-is when already object', () => {
+			const config: StepOutput = {
+				metadata: { type: 'keyvalue' },
+			};
+
+			const output = extractor.extract('ignored', config, 'test-step', {
+				metadata: { foo: 'bar' },
+			});
+
+			expect(output.metadata).toEqual({ foo: 'bar' });
+		});
+	});
+
 	describe('Combined features', () => {
 		it('should extract, transform, and convert type', () => {
 			const config: StepOutput = {

@@ -144,8 +144,6 @@ export function ConfigureScriptsDialog({ workspaceId, open, onClose, scripts }: 
 				description: '',
 				url: '',
 				order: configuredScripts.length,
-				autoStart: false,
-				restartOnFailure: false,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 				version: 1,
@@ -284,8 +282,6 @@ export function ConfigureScriptsDialog({ workspaceId, open, onClose, scripts }: 
 				displayName: scriptName,
 				description: '',
 				order: configuredScripts.length,
-				autoStart: false,
-				restartOnFailure: false,
 			});
 
 			// 3. Success: DON'T call onRefresh()!

@@ -1,5 +1,19 @@
 # Flow Engine Usage Guide
 
+## 🆕 New to Flows? Start Here
+
+If you're creating flows for the first time, start with the **[Quick Start Guide](../.claude/docs/flows/quick-start-guide.md)** (15 minutes).
+
+**Complete Documentation Suite**:
+
+- 📚 **[Documentation Index](../.claude/docs/flows/README.md)** - All flow documentation
+- 🚀 **[Quick Start Guide](../.claude/docs/flows/quick-start-guide.md)** - Create your first flow
+- 📖 **[Schema Reference](../.claude/docs/flows/schema-reference.md)** - Complete field documentation
+- 🎨 **[Pattern Catalog](../.claude/docs/flows/pattern-catalog.md)** - Annotated examples by use case
+- ✅ **[Best Practices](../.claude/docs/flows/best-practices.md)** - Optimization and design patterns
+- 🔧 **[Troubleshooting](../.claude/docs/flows/troubleshooting.md)** - Error reference and debugging
+- 📝 **[Input Types Guide](../.claude/docs/INPUT_TYPES_GUIDE.md)** - Complete reference for 21 input types
+
 ## Overview
 
 The Flow Engine provides a powerful workflow execution system with variable interpolation using GitHub Actions syntax (`${{ }}`). This guide shows how to create and use flows effectively.
@@ -58,6 +72,96 @@ steps:
     id: check-priority
     script: echo "Priority: ${{ task.priority }}"
 ```
+
+## Flow Inputs: 21 Supported Types
+
+The Agent Fleet supports **21 input types** with specialized UI components and validation:
+
+### Quick Reference
+
+| Category      | Types                                   | Description                     |
+| ------------- | --------------------------------------- | ------------------------------- |
+| **Base**      | `string`, `number`, `boolean`, `object` | Traditional simple types        |
+| **Text**      | `text`, `url`, `markdown`               | Text with specialized rendering |
+| **Number**    | `integer`, `percentage`, `duration`     | Numeric with constraints        |
+| **Selection** | `enum`, `multi-enum`, `priority`        | Dropdown selections             |
+| **File**      | `file`, `folder`                        | File and directory paths        |
+| **Date**      | `date`, `datetime`                      | Date/time pickers               |
+| **Code**      | `regex`                                 | Regular expression patterns     |
+| **Structure** | `array`, `keyvalue`                     | Lists and key-value pairs       |
+| **Security**  | `password`                              | Masked password input           |
+
+### Three Declaration Modes
+
+**1. Auto-Discovery** (no declaration needed):
+
+```yaml
+steps:
+    - type: model
+      prompt: '${{ inputs.task }}' # 'task' auto-discovered as string
+```
+
+**2. Shorthand** (simple type):
+
+```yaml
+inputs:
+    task: string
+    count: integer
+```
+
+**3. Extended** (full metadata):
+
+```yaml
+inputs:
+    environment:
+        type: enum
+        required: true
+        description: 'Target environment'
+        default: 'dev'
+        options:
+            options:
+                - { value: 'dev', label: 'Development' }
+                - { value: 'prod', label: 'Production' }
+```
+
+### Examples by Category
+
+**Text Types:**
+
+```yaml
+inputs:
+    description: text # Multi-line textarea
+    website: url # URL with validation
+    readme: markdown # Markdown editor with preview
+```
+
+**Number Types:**
+
+```yaml
+inputs:
+    team_size: integer # Whole number (rounded)
+    success_rate: percentage # 0-100 with % suffix
+    timeout: duration # Seconds with time unit
+```
+
+**Selection Types:**
+
+```yaml
+inputs:
+    environment: enum # Single-select dropdown
+    technologies: multi-enum # Multi-select checkboxes
+    priority: priority # Color-coded priority selector
+```
+
+**Structure Types:**
+
+```yaml
+inputs:
+    dependencies: array # Dynamic list editor
+    env_vars: keyvalue # Key-value pair editor
+```
+
+**Complete Guide**: See **[Input Types Guide](../.claude/docs/INPUT_TYPES_GUIDE.md)** for detailed documentation, examples, and best practices.
 
 ## Complete Flow Example
 
@@ -600,6 +704,16 @@ steps:
 3. Check for extra whitespace or quotes
 
 ## Next Steps
+
+### For Flow Creators
+
+- **New to flows?** Start with the [Quick Start Guide](../.claude/docs/flows/quick-start-guide.md) (15 minutes)
+- **Need a specific pattern?** Browse the [Pattern Catalog](../.claude/docs/flows/pattern-catalog.md)
+- **Want to optimize?** Read [Best Practices](../.claude/docs/flows/best-practices.md)
+- **Having issues?** Check the [Troubleshooting Guide](../.claude/docs/flows/troubleshooting.md)
+- **Need field details?** See the [Schema Reference](../.claude/docs/flows/schema-reference.md)
+
+### For Developers
 
 - Review [WORKFLOW_SYSTEM_DESIGN.md](WORKFLOW_SYSTEM_DESIGN.md) for architecture details
 - See [integration.test.ts](../src/flow/integration.test.ts) for complex examples

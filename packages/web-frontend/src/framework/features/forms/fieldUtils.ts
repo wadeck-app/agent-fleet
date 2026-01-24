@@ -35,4 +35,5 @@ export interface BaseFieldProps {
 	error?: string;
 	className?: string;
 	id?: string;
+	description?: string;
 }

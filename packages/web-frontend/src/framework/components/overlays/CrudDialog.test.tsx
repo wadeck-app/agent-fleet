@@ -252,6 +252,85 @@ describe('CrudDialog', () => {
 		});
 	});
 
+	describe('preventOutsideClick behavior', () => {
+		it('should accept preventOutsideClick prop set to true', () => {
+			// Test that the component accepts the prop without errors
+			expect(() =>
+				render(
+					<CrudDialog
+						open={true}
+						onOpenChange={vi.fn()}
+						title="Create Item"
+						description="Details"
+						preventOutsideClick={true}
+					>
+						<div>Content</div>
+					</CrudDialog>
+				)
+			).not.toThrow();
+		});
+
+		it('should accept preventOutsideClick prop set to false', () => {
+			expect(() =>
+				render(
+					<CrudDialog
+						open={true}
+						onOpenChange={vi.fn()}
+						title="Create Item"
+						description="Details"
+						preventOutsideClick={false}
+					>
+						<div>Content</div>
+					</CrudDialog>
+				)
+			).not.toThrow();
+		});
+
+		it('should render without preventOutsideClick prop (default behavior)', () => {
+			expect(() =>
+				render(
+					<CrudDialog open={true} onOpenChange={vi.fn()} title="Create Item" description="Details">
+						<div>Content</div>
+					</CrudDialog>
+				)
+			).not.toThrow();
+		});
+	});
+
+	describe('scrollable content', () => {
+		it('should render content that can scroll when overflowing', () => {
+			render(
+				<CrudDialog open={true} onOpenChange={vi.fn()} title="Scrollable Dialog" description="Test scrolling">
+					<div data-testid="scrollable-content">
+						{/* Simulate many fields that would cause overflow */}
+						{Array.from({ length: 20 }).map((_, i) => (
+							<div key={i} style={{ height: '100px' }}>
+								Field {i + 1}
+							</div>
+						))}
+					</div>
+				</CrudDialog>
+			);
+
+			const content = screen.getByTestId('scrollable-content');
+			// Content should exist and be rendered
+			expect(content).toBeInTheDocument();
+		});
+
+		it('should render header with border', () => {
+			render(
+				<CrudDialog open={true} onOpenChange={vi.fn()} title="Test Header" description="Test description">
+					<div>Content</div>
+				</CrudDialog>
+			);
+
+			const header = screen.getByText('Test Header').closest('[data-slot="dialog-header"]');
+
+			// Header should have border-b class for visual separation
+			expect(header?.className).toMatch(/border-b/);
+		});
+	});
+
 	describe('complete scenarios', () => {
 		it('should render create mode dialog', () => {
 			render(
