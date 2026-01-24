@@ -11,18 +11,7 @@ function Select({ ...props }: React.ComponentProps<typeof SelectPrimitive.Root>)
 }
 
 function SelectGroup({ className, ...props }: React.ComponentProps<typeof SelectPrimitive.Group>) {
-	return (
-		<SelectPrimitive.Group
-			data-slot="select-group"
-			className={cn(
-				`
-   scroll-my-1 p-1
- `,
-				className
-			)}
-			{...props}
-		/>
-	);
+	return <SelectPrimitive.Group data-slot="select-group" className={cn(`scroll-my-1 p-1`, className)} {...props} />;
 }
 
 function SelectValue({ ...props }: React.ComponentProps<typeof SelectPrimitive.Value>) {
@@ -68,11 +57,7 @@ function SelectTrigger({
 		>
 			{children}
 			<SelectPrimitive.Icon asChild>
-				<ChevronDownIcon
-					className={`
-      pointer-events-none size-4 text-muted-foreground
-    `}
-				/>
+				<ChevronDownIcon className={`pointer-events-none size-4 text-muted-foreground`} />
 			</SelectPrimitive.Icon>
 		</SelectPrimitive.Trigger>
 	);

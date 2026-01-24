@@ -59,7 +59,11 @@ export function QuickActionsBar({ workspaceId, scripts, onConfigure }: QuickActi
 					<>
 						<span className="text-muted-foreground">•</span>
 						<span className="flex items-center gap-1">
-							<span className={`inline-block size-2 animate-pulse rounded-full bg-success`} />
+							<span
+								className={`
+         inline-block size-2 animate-pulse rounded-full bg-success
+       `}
+							/>
 							<span className="font-semibold text-success">{runningCount}</span>
 							<span className="text-muted-foreground">running</span>
 						</span>

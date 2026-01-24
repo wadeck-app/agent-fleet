@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 import type { Project } from '@shared/api/projects.contract';
 import type { Workspace } from '@shared/api/workspaces.contract';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -48,17 +48,6 @@ const getSearchParams = () => {
 	if (!currentLocation) return new URLSearchParams();
 	return new URLSearchParams(currentLocation.search);
 };
-
-// Controlled promise helper
-function createControlledPromise<T>() {
-	let resolve: (value: T) => void;
-	let reject: (reason?: unknown) => void;
-	const promise = new Promise<T>((res, rej) => {
-		resolve = res;
-		reject = rej;
-	});
-	return { promise, resolve: resolve!, reject: reject! };
-}
 
 describe('ProjectsV2Page', () => {
 	beforeEach(() => {
@@ -112,9 +101,12 @@ describe('ProjectsV2Page', () => {
 					id: '50115a2e-5226-46d4-9fb8-6f9c11a16f9d',
 					name: 'Agent Fleet Workspace',
 					path: '/workspace-agent-fleet',
+					mode: 'development' as const,
+					tasksCount: 0,
+					status: 'active' as const,
 					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
-					version: 1,
+					lastUsed: new Date().toISOString(),
+					color: '#3b82f6',
 				},
 			];
 
@@ -127,6 +119,8 @@ describe('ProjectsV2Page', () => {
 				pinProject: vi.fn(),
 				unpinProject: vi.fn(),
 				reorderProjects: vi.fn(),
+				error: null,
+				clearError: vi.fn(),
 			});
 
 			// Mock useProjectWorkspaces
@@ -141,6 +135,8 @@ describe('ProjectsV2Page', () => {
 					if (!project) return [];
 					return workspaces.filter(w => project.workspaceIds.includes(w.id));
 				},
+				error: null,
+				clearError: vi.fn(),
 			});
 
 			// Step 1: Render page with first project (Image generation) selected
@@ -211,8 +207,10 @@ describe('ProjectsV2Page', () => {
 			params = getSearchParams();
 			expect(params.get('projectId')).toBe('wwuypfn8p');
 
-			// Step 5: Wait additional time to catch any delayed reverts
-			await new Promise(resolve => setTimeout(resolve, 300));
+			// Step 5: Force microtask flush to catch any delayed reverts
+			await act(async () => {
+				await Promise.resolve();
+			});
 
 			// FINAL CHECK: projectId must STILL be 'wwuypfn8p'
 			params = getSearchParams();

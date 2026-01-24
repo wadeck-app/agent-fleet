@@ -3,6 +3,7 @@ import { useRef } from 'react';
 import { Field } from '@framework/components/advanced/Field/Field';
 import { FieldError } from '@framework/components/advanced/Field/FieldError';
 import { FieldLabel } from '@framework/components/advanced/Field/FieldLabel';
+import { Input } from '@framework/components/forms/Input';
 import { Button } from '@framework/components/primitives/Button';
 import { File, Upload, X } from 'lucide-react';
 
@@ -40,7 +41,7 @@ export function FileField({
 	label,
 	value,
 	onChange,
-	placeholder,
+	placeholder: _placeholder,
 	required = false,
 	disabled = false,
 	options,
@@ -90,11 +91,15 @@ export function FileField({
 			</FieldLabel>
 
 			<div
-				className="relative rounded-md border-2 border-dashed border-input bg-background p-4 transition-colors hover:border-primary/50"
+				className={`
+      relative rounded-md border-2 border-dashed border-input bg-background p-4
+      transition-colors
+      hover:border-primary/50
+    `}
 				onDragOver={handleDragOver}
 				onDrop={handleDrop}
 			>
-				<input
+				<Input
 					ref={fileInputRef}
 					id={inputId}
 					type="file"
@@ -123,7 +128,11 @@ export function FileField({
 						</Button>
 					</div>
 				) : (
-					<div className="flex flex-col items-center justify-center gap-2 text-center">
+					<div
+						className={`
+       flex flex-col items-center justify-center gap-2 text-center
+     `}
+					>
 						<Upload className="h-8 w-8 text-muted-foreground" />
 						<div className="text-sm">
 							<span className="font-medium text-primary">Click to upload</span>

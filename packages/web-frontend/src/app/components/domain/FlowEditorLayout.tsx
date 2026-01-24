@@ -43,9 +43,9 @@ export function FlowEditorLayout({ toolbar, canvas, propertiesPanel, rightPanel,
 					{loading && (
 						<div
 							className={`
-            absolute inset-0 z-50 flex items-center justify-center
-            bg-background/80 backdrop-blur-sm
-          `}
+         absolute inset-0 z-50 flex items-center justify-center bg-background/80
+         backdrop-blur-sm
+       `}
 						>
 							<div className="text-muted-foreground">Loading flow...</div>
 						</div>
@@ -61,9 +61,9 @@ export function FlowEditorLayout({ toolbar, canvas, propertiesPanel, rightPanel,
 					{loading && (
 						<div
 							className={`
-            absolute inset-0 z-50 flex items-center justify-center
-            bg-background/80 backdrop-blur-sm
-          `}
+         absolute inset-0 z-50 flex items-center justify-center bg-background/80
+         backdrop-blur-sm
+       `}
 						>
 							<div className="text-muted-foreground">Loading...</div>
 						</div>

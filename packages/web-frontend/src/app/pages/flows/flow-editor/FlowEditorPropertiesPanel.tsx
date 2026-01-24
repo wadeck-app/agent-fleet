@@ -507,12 +507,7 @@ export function FlowEditorPropertiesPanel({
 								</div>
 
 								<div className="space-y-2">
-									<Label
-										htmlFor="approval-allowReject"
-										className={`
-           flex items-center gap-2
-         `}
-									>
+									<Label htmlFor="approval-allowReject" className={`flex items-center gap-2`}>
 										<Checkbox
 											id="approval-allowReject"
 											checked={step.approval?.allowReject ?? true}
@@ -630,12 +625,7 @@ export function FlowEditorPropertiesPanel({
 								</div>
 
 								<div className="space-y-2">
-									<Label
-										htmlFor="choice-allowMultiple"
-										className={`
-           flex items-center gap-2
-         `}
-									>
+									<Label htmlFor="choice-allowMultiple" className={`flex items-center gap-2`}>
 										<Checkbox
 											id="choice-allowMultiple"
 											checked={step.choice?.allowMultiple ?? false}

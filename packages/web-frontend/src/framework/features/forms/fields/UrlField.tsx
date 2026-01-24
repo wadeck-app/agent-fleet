@@ -73,7 +73,11 @@ export function UrlField({
 					aria-invalid={!!validationError}
 					className="pl-9"
 				/>
-				<div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">
+				<div
+					className={`
+      pointer-events-none absolute top-1/2 left-3 -translate-y-1/2
+    `}
+				>
 					<ExternalLink className="h-4 w-4 text-muted-foreground" />
 				</div>
 			</div>

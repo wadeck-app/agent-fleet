@@ -58,15 +58,7 @@ export function PageHeader({ title, badge, onRefresh, isRefreshing = false, acti
 			<div className="flex items-center gap-2">
 				<h1 className="text-3xl font-bold">
 					{title}
-					{badge !== undefined && (
-						<span
-							className={`
-       ml-2 text-lg text-muted-foreground
-     `}
-						>
-							({badge})
-						</span>
-					)}
+					{badge !== undefined && <span className={`ml-2 text-lg text-muted-foreground`}>({badge})</span>}
 				</h1>
 				{onRefresh && (
 					<Button

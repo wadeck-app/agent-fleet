@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -71,7 +71,6 @@ describe('CreateTaskDialog', () => {
 	});
 
 	it('persists splitter position to localStorage', async () => {
-		const user = userEvent.setup();
 		render(<CreateTaskDialog {...defaultProps} />);
 
 		// Check that default position is loaded from localStorage or uses default

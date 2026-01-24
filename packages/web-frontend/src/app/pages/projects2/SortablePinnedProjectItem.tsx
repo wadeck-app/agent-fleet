@@ -94,15 +94,7 @@ export function SortablePinnedProjectItem({
 			)}
 
 			{/* Project Name */}
-			<span
-				className={cn(
-					'flex-1 px-2 py-1.5 text-sm transition-opacity',
-					isReordering &&
-						`
-     opacity-40
-   `
-				)}
-			>
+			<span className={cn('flex-1 px-2 py-1.5 text-sm transition-opacity', isReordering && `opacity-40`)}>
 				{project.name}
 			</span>
 

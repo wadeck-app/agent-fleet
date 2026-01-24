@@ -74,7 +74,11 @@ export function TaskLogsViewer({
 		return (
 			<div className="flex h-full items-center justify-center">
 				<div className="text-center">
-					<RefreshCw className={`mx-auto mb-2 size-8 animate-spin text-muted-foreground`} />
+					<RefreshCw
+						className={`
+       mx-auto mb-2 size-8 animate-spin text-muted-foreground
+     `}
+					/>
 					<p className="text-sm text-muted-foreground">Loading logs...</p>
 				</div>
 			</div>
@@ -123,7 +127,11 @@ export function TaskLogsViewer({
 						className="flex items-center gap-1 text-xs text-success"
 						title="Task is currently running and receiving real-time log updates"
 					>
-						<span className={`inline-block size-2 animate-pulse rounded-full bg-success`} />
+						<span
+							className={`
+        inline-block size-2 animate-pulse rounded-full bg-success
+      `}
+						/>
 						Live
 					</span>
 				)}

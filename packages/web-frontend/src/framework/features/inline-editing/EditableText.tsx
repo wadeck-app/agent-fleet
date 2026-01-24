@@ -199,7 +199,7 @@ export function EditableText({
 			onClick={startEdit}
 			title="Click to edit"
 		>
-			{value || <span className="italic text-muted-foreground">{placeholder}</span>}
+			{value || <span className="text-muted-foreground italic">{placeholder}</span>}
 		</div>
 	);
 }

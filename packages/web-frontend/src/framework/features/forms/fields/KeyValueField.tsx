@@ -125,20 +125,25 @@ export function KeyValueField({
 					disabled={disabled || !canAdd}
 					className="h-7"
 				>
-					<Plus className="h-3.5 w-3.5 mr-1" />
+					<Plus className="mr-1 h-3.5 w-3.5" />
 					Add Pair
 				</Button>
 			</div>
 
 			<div className="space-y-2">
 				{pairs.length === 0 ? (
-					<div className="rounded-md border border-input bg-muted/50 p-4 text-center text-sm text-muted-foreground">
+					<div
+						className={`
+       rounded-md border border-input bg-muted/50 p-4 text-center text-sm
+       text-muted-foreground
+     `}
+					>
 						No key-value pairs. Click "Add Pair" to start.
 					</div>
 				) : (
 					pairs.map((pair, index) => (
 						<div key={index} className="flex items-center gap-2">
-							<div className="flex-1 grid grid-cols-2 gap-2">
+							<div className="grid flex-1 grid-cols-2 gap-2">
 								<Input
 									type="text"
 									value={pair.key}

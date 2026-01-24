@@ -101,9 +101,9 @@ export function LoginForm({ onSubmit, loading = false, error }: LoginFormProps) 
 			{error && (
 				<div
 					className={`
-						rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm
-						text-destructive
-					`}
+       rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3
+       text-sm text-destructive
+     `}
 					role="alert"
 				>
 					{error}
@@ -111,7 +111,15 @@ export function LoginForm({ onSubmit, loading = false, error }: LoginFormProps) 
 			)}
 
 			{/* Submit Button */}
-			<Button type="submit" variant="default" size="default" disabled={loading} className="w-full">
+			<Button
+				type="submit"
+				variant="default"
+				size="default"
+				disabled={loading}
+				className={`
+     w-full
+   `}
+			>
 				{loading ? (
 					<>
 						<LoadingSpinner size="sm" />

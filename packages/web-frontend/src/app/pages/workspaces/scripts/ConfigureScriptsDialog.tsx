@@ -370,7 +370,11 @@ export function ConfigureScriptsDialog({ workspaceId, open, onClose, scripts }: 
 					</div>
 
 					{configuredScripts.length === 0 ? (
-						<div className="flex flex-col items-center justify-center py-8 text-center">
+						<div
+							className={`
+        flex flex-col items-center justify-center py-8 text-center
+      `}
+						>
 							<div className="mb-2 text-3xl text-muted-foreground">📜</div>
 							<p className="text-sm text-muted-foreground">No scripts configured</p>
 							<p className="text-xs text-muted-foreground">Add scripts from the right panel</p>
@@ -435,7 +439,11 @@ export function ConfigureScriptsDialog({ workspaceId, open, onClose, scripts }: 
 					/>
 
 					{availableScripts.length === 0 ? (
-						<div className="flex flex-col items-center justify-center py-8 text-center">
+						<div
+							className={`
+        flex flex-col items-center justify-center py-8 text-center
+      `}
+						>
 							{isDiscovering ? (
 								<>
 									<Loader2 className="mb-2 size-8 animate-spin text-muted-foreground" />
@@ -450,12 +458,20 @@ export function ConfigureScriptsDialog({ workspaceId, open, onClose, scripts }: 
 							)}
 						</div>
 					) : availableNonConfiguredScripts.length === 0 ? (
-						<div className="flex flex-col items-center justify-center py-8 text-center">
+						<div
+							className={`
+        flex flex-col items-center justify-center py-8 text-center
+      `}
+						>
 							<div className="mb-2 text-3xl text-muted-foreground">✨</div>
 							<p className="text-sm text-muted-foreground">All scripts are configured</p>
 						</div>
 					) : filteredAvailableScripts.length === 0 ? (
-						<div className="flex flex-col items-center justify-center py-8 text-center">
+						<div
+							className={`
+        flex flex-col items-center justify-center py-8 text-center
+      `}
+						>
 							<div className="mb-2 text-3xl text-muted-foreground">🔍</div>
 							<p className="text-sm text-muted-foreground">No scripts match your search</p>
 						</div>

@@ -143,11 +143,7 @@ export function ScriptLogsViewer({
 						className="flex items-center gap-1 text-xs text-success"
 						title="Script is currently running and receiving real-time log updates"
 					>
-						<span
-							className={`
-        inline-block size-2 animate-pulse rounded-full bg-success
-      `}
-						/>
+						<span className={`inline-block size-2 animate-pulse rounded-full bg-success`} />
 						Live
 					</span>
 				)}

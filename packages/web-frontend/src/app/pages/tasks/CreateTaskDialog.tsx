@@ -462,18 +462,32 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 						{/* Resizable Splitter */}
 						<div
 							className={`
-							group relative flex w-1 cursor-col-resize items-center justify-center
-							${isDragging ? 'bg-primary/50' : 'bg-border hover:bg-primary/30'}
-							transition-colors
-						`}
+         group relative flex w-1 cursor-col-resize items-center justify-center
+         ${
+				isDragging
+					? 'bg-primary/50'
+					: `
+           bg-border
+           hover:bg-primary/30
+         `
+			}
+         transition-colors
+       `}
 							onMouseDown={handleMouseDown}
 						>
 							<div className="absolute flex items-center justify-center">
 								<GripVertical
 									className={`
-									h-4 w-4
-									${isDragging ? 'text-primary' : 'text-muted-foreground group-hover:text-primary'}
-								`}
+           h-4 w-4
+           ${
+				isDragging
+					? 'text-primary'
+					: `
+             text-muted-foreground
+             group-hover:text-primary
+           `
+			}
+         `}
 								/>
 							</div>
 						</div>

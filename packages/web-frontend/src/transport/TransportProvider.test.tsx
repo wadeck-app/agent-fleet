@@ -1,6 +1,5 @@
 import { BrowserRouter } from 'react-router-dom';
 
-import { createDeferredPromise } from '@framework/test-utils/deferredPromise';
 import { render, screen, waitFor } from '@testing-library/react';
 
 import { TransportManager } from './TransportManager';

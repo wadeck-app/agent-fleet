@@ -79,7 +79,7 @@ export function MarkdownField({
 						disabled={disabled}
 						className="h-7 px-2"
 					>
-						<FileText className="h-3.5 w-3.5 mr-1" />
+						<FileText className="mr-1 h-3.5 w-3.5" />
 						Edit
 					</Button>
 					<Button
@@ -90,14 +90,17 @@ export function MarkdownField({
 						disabled={disabled || !value}
 						className="h-7 px-2"
 					>
-						<Eye className="h-3.5 w-3.5 mr-1" />
+						<Eye className="mr-1 h-3.5 w-3.5" />
 						Preview
 					</Button>
 				</div>
 			</div>
 			{showPreview ? (
 				<div
-					className="min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+					className={`
+       min-h-[120px] rounded-md border border-input bg-background px-3 py-2
+       text-sm
+     `}
 					dangerouslySetInnerHTML={{ __html: `<p>${renderMarkdownPreview(value)}</p>` }}
 				/>
 			) : (

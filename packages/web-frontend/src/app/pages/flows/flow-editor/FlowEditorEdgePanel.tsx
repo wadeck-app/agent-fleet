@@ -107,11 +107,7 @@ export function FlowEditorEdgePanel({ selectedEdge, nodes, onDeleteEdge }: FlowE
 								{edgeData.targetVarName && (
 									<div>
 										<div className="mb-1 text-xs text-muted-foreground">Target Variable</div>
-										<code
-											className={`
-            block rounded bg-background px-2 py-1 font-mono text-xs
-          `}
-										>
+										<code className={`block rounded bg-background px-2 py-1 font-mono text-xs`}>
 											{edgeData.targetVarName}
 										</code>
 									</div>

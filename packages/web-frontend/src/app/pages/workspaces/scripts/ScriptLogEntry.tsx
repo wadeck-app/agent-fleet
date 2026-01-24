@@ -62,9 +62,9 @@ export function ScriptLogEntry({ log, onExpand }: ScriptLogEntryProps) {
 			{/* Level label */}
 			<span
 				className={`
-     w-12
-     ${levelColors[log.level]}
-   `}
+      w-12
+      ${levelColors[log.level]}
+    `}
 			>
 				[{levelLabels[log.level]}]
 			</span>

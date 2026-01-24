@@ -270,9 +270,11 @@ describe('useProjectsV2State', () => {
 				expect(params.get('projectId')).toBe('agent-fleet-id');
 			});
 
-			// CRITICAL: Wait additional time to catch any auto-reselection bug
-			// If the bug exists, the projectId will revert to 'image-gen-id'
-			await new Promise(resolve => setTimeout(resolve, 100));
+			// CRITICAL: Verify no auto-reselection bug after state settles
+			// Force a microtask flush to allow any pending effects to complete
+			await act(async () => {
+				await Promise.resolve();
+			});
 
 			// BUG CHECK: ProjectId should STILL be 'agent-fleet-id', NOT 'image-gen-id'
 			expect(result.current.state.activeProjectId).toBe('agent-fleet-id');

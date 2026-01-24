@@ -120,12 +120,7 @@ export const InFormContext: Story = {
 						placeholder="••••••••"
 					/>
 				</div>
-				<button
-					type="submit"
-					className={`
-      w-full rounded-md bg-primary px-4 py-2 text-primary-foreground
-    `}
-				>
+				<button type="submit" className={`w-full rounded-md bg-primary px-4 py-2 text-primary-foreground`}>
 					Create Account
 				</button>
 			</form>

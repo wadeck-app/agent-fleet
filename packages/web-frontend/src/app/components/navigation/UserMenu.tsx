@@ -182,34 +182,72 @@ export function UserMenu({
 		switch (variant) {
 			case 'enhanced':
 				return (
-					<Button variant="ghost" className={`w-full justify-start gap-3 ${className}`}>
+					<Button
+						variant="ghost"
+						className={`
+       w-full justify-start gap-3
+       ${className}
+     `}
+					>
 						<div
-							className={`flex ${avatarSize} items-center justify-center rounded-full bg-primary text-primary-foreground`}
+							className={`
+         flex
+         ${avatarSize}
+         items-center justify-center rounded-full bg-primary
+         text-primary-foreground
+       `}
 						>
 							{userAvatar ? (
 								<img
 									src={userAvatar}
 									alt={userName}
-									className={`${avatarSize} rounded-full object-cover`}
+									className={`
+           ${avatarSize}
+           rounded-full object-cover
+         `}
 								/>
 							) : (
 								<span className="text-xs font-medium">{initials}</span>
 							)}
 						</div>
 						<div className="flex flex-1 flex-col items-start gap-0.5">
-							<span className={`${textSize} font-medium`}>{userName}</span>
+							<span
+								className={`
+         ${textSize}
+         font-medium
+       `}
+							>
+								{userName}
+							</span>
 							{userEmail && <span className="text-xs text-muted-foreground">{userEmail}</span>}
 						</div>
-						<ChevronDown className={`${iconSize} opacity-50`} />
+						<ChevronDown
+							className={`
+        ${iconSize}
+        opacity-50
+      `}
+						/>
 					</Button>
 				);
 
 			case 'compact':
 				return (
-					<Button variant="ghost" size="icon" className={`relative ${className}`}>
+					<Button
+						variant="ghost"
+						size="icon"
+						className={`
+       relative
+       ${className}
+     `}
+					>
 						<User className={iconSize} />
 						{/* Status badge */}
-						<span className="absolute bottom-0 right-0 size-2 rounded-full bg-accent ring-2 ring-background" />
+						<span
+							className={`
+        absolute right-0 bottom-0 size-2 rounded-full bg-accent ring-2
+        ring-background
+      `}
+						/>
 						<span className="sr-only">User menu</span>
 					</Button>
 				);
@@ -234,7 +272,14 @@ export function UserMenu({
 					<>
 						<DropdownMenuLabel className="font-normal">
 							<div className="flex flex-col gap-1">
-								<p className={`${textSize} font-medium`}>{userName}</p>
+								<p
+									className={`
+          ${textSize}
+          font-medium
+        `}
+								>
+									{userName}
+								</p>
 								{userEmail && <p className="text-xs text-muted-foreground">{userEmail}</p>}
 							</div>
 						</DropdownMenuLabel>
@@ -254,14 +299,24 @@ export function UserMenu({
 
 				{/* Profile */}
 				{showProfile && (
-					<DropdownMenuItem className={`cursor-pointer ${itemPadding}`}>
+					<DropdownMenuItem
+						className={`
+       cursor-pointer
+       ${itemPadding}
+     `}
+					>
 						<User className={iconSize} />
 						Profile
 					</DropdownMenuItem>
 				)}
 
 				{/* Settings */}
-				<DropdownMenuItem className={`cursor-pointer ${itemPadding}`}>
+				<DropdownMenuItem
+					className={`
+      cursor-pointer
+      ${itemPadding}
+    `}
+				>
 					<Settings className={iconSize} />
 					Settings
 				</DropdownMenuItem>
@@ -296,7 +351,13 @@ export function UserMenu({
 				{showTheme && onToggleTheme && (
 					<>
 						<DropdownMenuSeparator />
-						<DropdownMenuItem onClick={onToggleTheme} className={`cursor-pointer ${itemPadding}`}>
+						<DropdownMenuItem
+							onClick={onToggleTheme}
+							className={`
+        cursor-pointer
+        ${itemPadding}
+      `}
+						>
 							{isDark ? (
 								<>
 									<Sun className={iconSize} />
@@ -314,7 +375,13 @@ export function UserMenu({
 
 				{/* Logout */}
 				<DropdownMenuSeparator />
-				<DropdownMenuItem variant="destructive" className={`cursor-pointer ${itemPadding}`}>
+				<DropdownMenuItem
+					variant="destructive"
+					className={`
+      cursor-pointer
+      ${itemPadding}
+    `}
+				>
 					<LogOut className={iconSize} />
 					Logout
 				</DropdownMenuItem>

@@ -207,13 +207,7 @@ export function IconPicker({ value, onChange, iconColor = '#6366F1', disabled, c
 										)}
 										title={iconName}
 									>
-										<DynamicLucideIcon
-											name={iconName}
-											color={iconColor}
-											className={`
-            h-5 w-5
-          `}
-										/>
+										<DynamicLucideIcon name={iconName} color={iconColor} className={`h-5 w-5`} />
 										{value === iconName && (
 											<Check className="absolute -top-0.5 -right-0.5 h-3 w-3 text-primary" />
 										)}

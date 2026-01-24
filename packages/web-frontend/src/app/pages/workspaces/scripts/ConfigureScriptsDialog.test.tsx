@@ -221,7 +221,19 @@ describe('ConfigureScriptsDialog', () => {
 		]);
 
 		// Use deferred promise to control when the create completes
-		const createDeferred = createDeferredPromise();
+		const createDeferred = createDeferredPromise<{
+			id: string;
+			workspaceId: string;
+			scriptName: string;
+			enabled: boolean;
+			displayName: string;
+			description: string;
+			url: string;
+			order: number;
+			createdAt: string;
+			updatedAt: string;
+			version: number;
+		}>();
 		vi.mocked(workspaceScriptsApi.createWorkspaceScript).mockReturnValue(createDeferred.promise);
 
 		// 1. Open dialog with one existing script
@@ -334,7 +346,7 @@ describe('ConfigureScriptsDialog', () => {
 		const onClose = vi.fn();
 
 		// Use deferred promise to control when delete completes
-		const deleteDeferred = createDeferredPromise();
+		const deleteDeferred = createDeferredPromise<{ success: boolean }>();
 		vi.mocked(workspaceScriptsApi.deleteWorkspaceScript).mockReturnValue(deleteDeferred.promise);
 
 		const { rerender } = render(
@@ -375,7 +387,7 @@ describe('ConfigureScriptsDialog', () => {
 		expect(screen.queryByText('test')).not.toBeInTheDocument();
 
 		// Now resolve the delete
-		deleteDeferred.resolve({} as any);
+		deleteDeferred.resolve({ success: true });
 
 		// Wait for delete to complete
 		await waitFor(() => {

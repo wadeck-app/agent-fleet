@@ -55,7 +55,7 @@ const mocks = {
 describe.each([
 	{ version: 'v2' as const, Component: Ingredients2TablePage, path: '/ingredients2' },
 	{ version: 'v5' as const, Component: IngredientsV5Page, path: '/ingredients5' },
-])('$version - Refresh Loading State', ({ version, Component, path }) => {
+])('$version - Refresh Loading State', ({ version: _version, Component, path }) => {
 	const renderPage = () => {
 		return render(
 			<ToastProvider>

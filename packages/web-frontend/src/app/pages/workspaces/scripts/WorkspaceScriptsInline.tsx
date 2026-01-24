@@ -97,7 +97,12 @@ export function WorkspaceScriptsInline({ workspaceId, onScriptClick }: Workspace
 	}
 
 	return (
-		<div className="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+		<div
+			className={`
+    flex flex-1 flex-wrap items-start gap-x-3 gap-y-1.5 text-xs
+    text-muted-foreground
+  `}
+		>
 			{sortedScripts.map(scriptConfig => {
 				const { script, process } = scriptConfig;
 				const status = process?.status || 'stopped';
@@ -111,17 +116,20 @@ export function WorkspaceScriptsInline({ workspaceId, onScriptClick }: Workspace
 						{getStatusIcon(status)}
 
 						{/* Script Name (clickable) */}
-						<button
+						<Button
 							onClick={e => {
 								e.preventDefault();
 								console.log('[WorkspaceScriptsInline] Script clicked:', script.scriptName);
 								onScriptClick(script.scriptName);
 							}}
-							className="cursor-pointer underline-offset-2 hover:underline"
-							type="button"
+							variant="link"
+							className={`
+         h-auto cursor-pointer p-0 underline-offset-2
+         hover:underline
+       `}
 						>
 							{displayName}
-						</button>
+						</Button>
 
 						{/* URL/Port (clickable if present) */}
 						{script.url && urlInfo && (
@@ -129,7 +137,10 @@ export function WorkspaceScriptsInline({ workspaceId, onScriptClick }: Workspace
 								href={script.url}
 								target="_blank"
 								rel="noopener noreferrer"
-								className="flex items-center gap-0.5 text-primary hover:underline"
+								className={`
+          flex items-center gap-0.5 text-primary
+          hover:underline
+        `}
 								onClick={e => e.stopPropagation()}
 							>
 								<span>({urlInfo})</span>

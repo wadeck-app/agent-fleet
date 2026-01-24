@@ -99,7 +99,14 @@ export const UserInterventionNode = memo(({ data, selected }: UserInterventionNo
 			/>
 
 			{/* Bottom Handle (loop target) */}
-			<Handle type="target" position={Position.Bottom} id="bottom" className={`!bg-destructive`} />
+			<Handle
+				type="target"
+				position={Position.Bottom}
+				id="bottom"
+				className={`
+     !bg-destructive
+   `}
+			/>
 
 			{/* Header */}
 			<div className="mb-3 flex items-center gap-2">
@@ -168,7 +175,14 @@ export const UserInterventionNode = memo(({ data, selected }: UserInterventionNo
 			/>
 
 			{/* Bottom Handle (loop source) */}
-			<Handle type="source" position={Position.Bottom} id="bottom" className={`!bg-destructive`} />
+			<Handle
+				type="source"
+				position={Position.Bottom}
+				id="bottom"
+				className={`
+     !bg-destructive
+   `}
+			/>
 		</div>
 	);
 });

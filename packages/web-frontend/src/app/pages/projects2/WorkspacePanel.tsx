@@ -94,8 +94,8 @@ export function WorkspacePanel({ workspace, projectId, activeView, onViewChange 
 		<div className="flex h-full flex-col overflow-hidden">
 			{/* Workspace Metadata Card */}
 			<div className="border-b border-border bg-card p-4">
-				<div className="flex items-center justify-between">
-					<div className="flex flex-1 items-center gap-6">
+				<div className="flex items-start justify-between">
+					<div className="flex flex-1 items-start gap-6">
 						<h2 className="text-lg font-semibold">{displayName}</h2>
 						<Badge variant={statusVariant[workspace.status]}>{workspace.status}</Badge>
 						<Badge variant={modeVariant[workspace.mode]}>{workspace.mode}</Badge>

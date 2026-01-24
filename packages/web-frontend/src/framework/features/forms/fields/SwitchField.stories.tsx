@@ -251,12 +251,7 @@ export const WithDescriptionAndError: Story = {
 		};
 
 		return (
-			<form
-				onSubmit={handleSubmit}
-				className={`
-     w-96 space-y-6 rounded-lg border border-border p-6
-   `}
-			>
+			<form onSubmit={handleSubmit} className={`w-96 space-y-6 rounded-lg border border-border p-6`}>
 				<h3 className="text-lg font-medium">Create Account</h3>
 
 				<div className="space-y-4">

@@ -67,11 +67,11 @@ export function AvailableScriptItem({ script, onAdd, isLoading = false, isAdded 
 			</Button>
 
 			{/* Script Details */}
-			<div className="flex-1 min-w-0">
+			<div className="min-w-0 flex-1">
 				{/* Script Name */}
 				<div className="text-sm font-medium">{script.name}</div>
 				{/* Command */}
-				<div className="text-xs text-muted-foreground truncate font-mono">{script.command}</div>
+				<div className="truncate font-mono text-xs text-muted-foreground">{script.command}</div>
 			</div>
 		</div>
 	);

@@ -15,7 +15,6 @@
 import { useEffect, useState } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 
-import { createDeferredPromise } from '@framework/test-utils/deferredPromise';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import { type ConnectionState } from '@shared/transport';
 import { render, screen, waitFor } from '@testing-library/react';

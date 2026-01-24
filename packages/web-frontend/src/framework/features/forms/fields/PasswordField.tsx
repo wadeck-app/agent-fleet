@@ -68,7 +68,10 @@ export function PasswordField({
 					type="button"
 					variant="ghost"
 					size="sm"
-					className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+					className={`
+       absolute top-0 right-0 h-full px-3 py-2
+       hover:bg-transparent
+     `}
 					onClick={() => setShowPassword(!showPassword)}
 					disabled={disabled}
 					aria-label={showPassword ? 'Hide password' : 'Show password'}

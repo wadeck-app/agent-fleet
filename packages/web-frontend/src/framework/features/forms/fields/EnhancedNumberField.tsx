@@ -123,7 +123,12 @@ export function EnhancedNumberField({
 					className={suffix ? 'pr-12' : ''}
 				/>
 				{suffix && (
-					<div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+					<div
+						className={`
+       pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm
+       text-muted-foreground
+     `}
+					>
 						{suffix}
 					</div>
 				)}

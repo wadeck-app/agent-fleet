@@ -112,7 +112,14 @@ export function FormContainerLegacy({
 		<form onSubmit={onSubmit} className="flex h-full flex-col">
 			{/* Scrollable content area */}
 			<div className="-mx-4 flex-1 overflow-y-auto px-4">
-				<div className="grid gap-4 md:grid-cols-2">{children}</div>
+				<div
+					className={`
+      grid gap-4
+      md:grid-cols-2
+    `}
+				>
+					{children}
+				</div>
 			</div>
 
 			{/* Fixed footer with buttons */}

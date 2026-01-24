@@ -115,10 +115,9 @@ describe('HttpPollingTransportClient', () => {
 
 			await client.connect();
 
-			// Add comment above the target line, not at the end
 			// Wait for event to be processed
 			const deferred1 = createDeferredPromise<void>();
-			deferred.resolve();
+			deferred1.resolve();
 			await deferred1.promise;
 
 			expect(eventHandler).toHaveBeenCalledWith(testEvent.data);
@@ -141,10 +140,9 @@ describe('HttpPollingTransportClient', () => {
 
 			await client.disconnect();
 
-			// Add comment above the target line, not at the end
 			// Wait to ensure no more polls happen
 			const deferred2 = createDeferredPromise<void>();
-			deferred.resolve();
+			deferred2.resolve();
 			await deferred2.promise;
 
 			// Should not have called fetch again after disconnect
@@ -231,10 +229,9 @@ describe('HttpPollingTransportClient', () => {
 			const handler = vi.fn();
 			client.subscribe('b2f:task:created', handler);
 
-			// Add comment above the target line, not at the end
 			// Wait for async subscription call
 			const deferred3 = createDeferredPromise<void>();
-			deferred.resolve();
+			deferred3.resolve();
 			await deferred3.promise;
 
 			expect(subscribeMock).toHaveBeenCalledWith('b2f:task:created', undefined);
@@ -249,20 +246,18 @@ describe('HttpPollingTransportClient', () => {
 
 			client.subscribe('b2f:task:created', handler1);
 
-			// Add comment above the target line, not at the end
 			// Wait for first subscription
 			const deferred4 = createDeferredPromise<void>();
-			deferred.resolve();
+			deferred4.resolve();
 			await deferred4.promise;
 
 			subscribeMock.mockClear();
 
 			client.subscribe('b2f:task:created', handler2);
 
-			// Add comment above the target line, not at the end
 			// Wait for second subscription attempt
 			const deferred5 = createDeferredPromise<void>();
-			deferred.resolve();
+			deferred5.resolve();
 			await deferred5.promise;
 
 			expect(subscribeMock).not.toHaveBeenCalled();

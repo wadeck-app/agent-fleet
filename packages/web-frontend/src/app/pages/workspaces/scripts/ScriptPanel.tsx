@@ -88,15 +88,12 @@ export function ScriptPanel({
 	return (
 		<div
 			className={`
-    flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card
-  `}
+     flex h-full flex-col overflow-hidden rounded-lg border border-border
+     bg-card
+   `}
 		>
 			{/* Panel Header */}
-			<div
-				className={`
-     flex items-center gap-2 border-b border-border bg-muted/30 p-3
-   `}
-			>
+			<div className={`flex items-center gap-2 border-b border-border bg-muted/30 p-3`}>
 				{/* Script Selector */}
 				<ScriptSelector
 					workspaceId={workspaceId}
@@ -171,9 +168,9 @@ export function ScriptPanel({
 						{processError && (
 							<div
 								className={`
-         border-b border-destructive/20 bg-destructive/10 p-3 text-sm
-         text-destructive
-       `}
+          border-b border-destructive/20 bg-destructive/10 p-3 text-sm
+          text-destructive
+        `}
 							>
 								<strong>Error:</strong> {processError.message}
 							</div>

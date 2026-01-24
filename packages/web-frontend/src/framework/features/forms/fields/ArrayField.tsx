@@ -97,14 +97,19 @@ export function ArrayField({
 					disabled={disabled || !canAdd}
 					className="h-7"
 				>
-					<Plus className="h-3.5 w-3.5 mr-1" />
+					<Plus className="mr-1 h-3.5 w-3.5" />
 					Add Item
 				</Button>
 			</div>
 
 			<div className="space-y-2">
 				{items.length === 0 ? (
-					<div className="rounded-md border border-input bg-muted/50 p-4 text-center text-sm text-muted-foreground">
+					<div
+						className={`
+       rounded-md border border-input bg-muted/50 p-4 text-center text-sm
+       text-muted-foreground
+     `}
+					>
 						No items. Click "Add Item" to start.
 					</div>
 				) : (

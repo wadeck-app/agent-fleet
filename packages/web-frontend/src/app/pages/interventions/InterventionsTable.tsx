@@ -40,12 +40,7 @@ export const INTERVENTIONS_TABLE_COLUMNS: Table2Column<Intervention>[] = [
 		key: 'type',
 		label: 'Type',
 		render: (i: Intervention) => (
-			<Badge
-				variant={getInterventionTypeVariant(i.type)}
-				className={`
-     font-medium capitalize
-   `}
-			>
+			<Badge variant={getInterventionTypeVariant(i.type)} className={`font-medium capitalize`}>
 				{i.type}
 			</Badge>
 		),
@@ -67,12 +62,7 @@ export const INTERVENTIONS_TABLE_COLUMNS: Table2Column<Intervention>[] = [
 		key: 'status',
 		label: 'Status',
 		render: (i: Intervention) => (
-			<Badge
-				variant={getInterventionStatusVariant(i.status)}
-				className={`
-     font-medium
-   `}
-			>
+			<Badge variant={getInterventionStatusVariant(i.status)} className={`font-medium`}>
 				{i.status}
 			</Badge>
 		),
@@ -81,12 +71,7 @@ export const INTERVENTIONS_TABLE_COLUMNS: Table2Column<Intervention>[] = [
 		key: 'blocking',
 		label: 'Blocking',
 		render: (i: Intervention) => (
-			<Badge
-				variant={i.blocking ? 'destructive' : 'secondary'}
-				className={`
-     font-medium
-   `}
-			>
+			<Badge variant={i.blocking ? 'destructive' : 'secondary'} className={`font-medium`}>
 				{i.blocking ? 'Yes' : 'No'}
 			</Badge>
 		),

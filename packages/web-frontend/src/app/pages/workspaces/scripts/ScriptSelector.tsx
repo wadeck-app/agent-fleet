@@ -19,9 +19,9 @@ export function ScriptSelector({ scripts, value, onChange, disabled = false }: S
 		return (
 			<div
 				className={`
-     flex-1 rounded border border-dashed border-border bg-muted/20 px-3 py-2
-     text-sm text-muted-foreground
-   `}
+      flex-1 rounded border border-dashed border-border bg-muted/20 px-3 py-2
+      text-sm text-muted-foreground
+    `}
 			>
 				No scripts configured
 			</div>

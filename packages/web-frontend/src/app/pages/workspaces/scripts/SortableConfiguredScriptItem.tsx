@@ -97,7 +97,13 @@ export function SortableConfiguredScriptItem({
 
 			{/* Script Name */}
 			<span
-				className={cn('flex-1 px-2 py-1.5 font-mono text-sm transition-opacity', isReordering && 'opacity-40')}
+				className={cn(
+					'flex-1 px-2 py-1.5 font-mono text-sm transition-opacity',
+					isReordering &&
+						`
+      opacity-40
+    `
+				)}
 			>
 				{displayName}
 			</span>

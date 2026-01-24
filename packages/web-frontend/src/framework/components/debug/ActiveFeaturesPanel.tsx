@@ -51,9 +51,9 @@ export function ActiveFeaturesPanel({ features, title = 'Active Features', class
 			<strong>{title}:</strong>
 			<div
 				className={`
-     mt-2 grid grid-cols-2 gap-2 text-xs
-     sm:grid-cols-4
-   `}
+      mt-2 grid grid-cols-2 gap-2 text-xs
+      sm:grid-cols-4
+    `}
 			>
 				{features.map(({ label, value }) => (
 					<div key={label}>

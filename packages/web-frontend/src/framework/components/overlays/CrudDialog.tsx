@@ -70,7 +70,11 @@ export function CrudDialog({
 					This allows the footer to be fixed at the bottom while the body scrolls
 				*/}
 				{isRefreshing ? (
-					<DialogBody className="pointer-events-none opacity-50 blur-[1px] transition-all duration-200">
+					<DialogBody
+						className={`
+       pointer-events-none opacity-50 blur-[1px] transition-all duration-200
+     `}
+					>
 						{children}
 					</DialogBody>
 				) : (

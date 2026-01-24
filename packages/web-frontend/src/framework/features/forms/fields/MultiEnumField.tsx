@@ -4,6 +4,7 @@ import { FieldLabel } from '@framework/components/advanced/Field/FieldLabel';
 import { Checkbox } from '@framework/components/forms/Checkbox';
 import { Label } from '@framework/components/forms/Label';
 import { Badge } from '@framework/components/primitives/Badge';
+import { Button } from '@framework/components/primitives/Button';
 import { X } from 'lucide-react';
 
 import { type BaseFieldProps, generateFieldId } from '../fieldUtils';
@@ -98,17 +99,22 @@ export function MultiEnumField({
 					{selectedValues.map(val => {
 						const option = availableOptions.find(opt => opt.value === val);
 						return (
-							<Badge key={val} variant="default" className="pl-2 pr-1">
+							<Badge key={val} variant="default" className="pr-1 pl-2">
 								{option?.label || val}
-								<button
+								<Button
 									type="button"
 									onClick={() => handleRemove(val)}
 									disabled={disabled}
-									className="ml-1 rounded-full hover:bg-primary-foreground/20"
+									variant="ghost"
+									size="sm"
+									className={`
+           ml-1 h-auto rounded-full p-0
+           hover:bg-primary-foreground/20
+         `}
 									aria-label={`Remove ${option?.label || val}`}
 								>
 									<X className="h-3 w-3" />
-								</button>
+								</Button>
 							</Badge>
 						);
 					})}
@@ -130,7 +136,10 @@ export function MultiEnumField({
 							/>
 							<Label
 								htmlFor={`${inputId}-${option.value}`}
-								className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+								className={`
+          text-sm leading-none font-normal
+          peer-disabled:cursor-not-allowed peer-disabled:opacity-70
+        `}
 							>
 								{option.label}
 							</Label>

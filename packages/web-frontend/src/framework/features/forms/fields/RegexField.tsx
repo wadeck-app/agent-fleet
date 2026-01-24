@@ -95,7 +95,11 @@ export function RegexField({
 					aria-invalid={!!displayError}
 					className="pl-9 font-mono text-sm"
 				/>
-				<div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">
+				<div
+					className={`
+      pointer-events-none absolute top-1/2 left-3 -translate-y-1/2
+    `}
+				>
 					<Code className="h-4 w-4 text-muted-foreground" />
 				</div>
 			</div>

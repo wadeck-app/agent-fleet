@@ -213,11 +213,7 @@ export function IngredientCarousel4c({
 
 	if (error && !isLoading) {
 		return (
-			<div
-				className={`
-     rounded-lg border border-destructive/50 bg-destructive/10 p-4
-   `}
-			>
+			<div className={`rounded-lg border border-destructive/50 bg-destructive/10 p-4`}>
 				<div className="flex items-center gap-2">
 					<AlertCircle className="h-5 w-5 text-destructive" />
 					<strong className="text-sm font-semibold text-destructive">Error:</strong>

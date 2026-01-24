@@ -72,7 +72,7 @@ describe('useDialogActionConfirmation', () => {
 			const asyncOnConfirm = vi.fn(() => confirmDeferred.promise);
 
 			const { result } = renderHook(() =>
-				useDialogActionConfirmation({
+				useDialogActionConfirmation<string>({
 					...defaultOptions,
 					onConfirm: asyncOnConfirm,
 				})
