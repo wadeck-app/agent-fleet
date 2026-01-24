@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
-import { TabButton } from '@framework/components/primitives/TabButton';
+import { getBasename } from '@framework/utils/pathUtils';
 import type { Task } from '@shared/api/tasks.contract';
 import type { Workspace } from '@shared/api/workspaces.contract';
 import { B2F_TASK_CREATED, B2F_TASK_DELETED, B2F_TASK_UPDATED } from '@shared/transport/B2FEventConstants';
@@ -17,11 +17,7 @@ import { EditWorkspaceDialog } from '../workspaces/EditWorkspaceDialog';
 import { ScriptsPanel } from '../workspaces/scripts/ScriptsPanel';
 import { WorkspaceScriptsInline } from '../workspaces/scripts/WorkspaceScriptsInline';
 import { workspacesApi } from '../workspaces/workspaces.api';
-
-// Helper to extract basename from path
-function getBasename(path: string): string {
-	return path.split(/[/\\]/).pop() || path;
-}
+import { WorkspaceViewTabs } from './WorkspaceViewTabs';
 
 interface WorkspacePanelProps {
 	workspace: Workspace;
@@ -70,7 +66,7 @@ export function WorkspacePanel({ workspace, projectId, activeView, onViewChange 
 	// Handle workspace edit
 	const handleWorkspaceSave = async (
 		workspaceId: string,
-		data: { name?: string; description?: string; color?: string; projectId?: string | null }
+		data: { name?: string; description?: string; color?: string }
 	) => {
 		await workspacesApi.updateWorkspace(workspaceId, data);
 	};
@@ -115,11 +111,13 @@ export function WorkspacePanel({ workspace, projectId, activeView, onViewChange 
 							onScriptClick={scriptName => {
 								console.log('[WorkspacePanel] Script clicked:', scriptName);
 
-								// Build new URL with script name (encoded)
+								// Build new URL with script name (encoded) and view parameter
 								const newParams = new URLSearchParams(searchParams);
 								newParams.set('layout', 'full');
 								newParams.set('panels', encodeURIComponent(scriptName));
+								newParams.set('view', 'scripts');
 
+								// Switch to scripts view
 								onViewChange('scripts');
 
 								// Navigate with new params
@@ -135,18 +133,9 @@ export function WorkspacePanel({ workspace, projectId, activeView, onViewChange 
 				</div>
 			</div>
 
-			{/* View Mode Tabs - Now using TabsWithUrlState */}
+			{/* View Mode Tabs */}
 			<div className="flex flex-1 flex-col overflow-hidden">
-				<div className="border-b border-border bg-card">
-					<div className="flex items-center gap-1 px-4">
-						<TabButton active={activeView === 'tasks'} onClick={() => onViewChange('tasks')}>
-							Tasks
-						</TabButton>
-						<TabButton active={activeView === 'scripts'} onClick={() => onViewChange('scripts')}>
-							Scripts
-						</TabButton>
-					</div>
-				</div>
+				<WorkspaceViewTabs activeView={activeView} onViewChange={onViewChange} />
 
 				{/* Tasks View */}
 				{activeView === 'tasks' && (

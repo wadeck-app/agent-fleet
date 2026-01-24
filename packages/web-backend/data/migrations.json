@@ -1,0 +1,12 @@
+{
+	"migrations": [
+		{
+			"migrated": true,
+			"migratedAt": "2026-01-24T18:21:53.961Z",
+			"id": "mfu72ptup",
+			"version": 1,
+			"createdAt": "2026-01-24T18:21:53.961Z",
+			"updatedAt": "2026-01-24T18:21:53.961Z"
+		}
+	]
+}

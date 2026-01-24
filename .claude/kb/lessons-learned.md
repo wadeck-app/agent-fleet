@@ -1,5 +1,227 @@
 # Lessons Learned
 
+## Zod Schema Defaults: Entity vs Response Schemas
+
+**Problem**: Using `.default()` in entity schemas causes PATCH operations to overwrite fields with default values when those fields are not included in the update payload. Removing `.default()` leaves existing data with `undefined` values.
+
+**Example of the Bug**:
+
+```typescript
+// ❌ Entity schema with defaults causes PATCH bug
+export const ProjectSchema = z.object({
+	workspaceIds: z.array(z.string()).default([]), // PATCH will reset to [] if not in payload
+	archived: z.boolean().default(false), // PATCH will reset to false if not in payload
+});
+
+// When updating pinned=true, workspaceIds gets reset to []
+await updateProject(id, { pinned: true, version: 1 });
+// Result: workspaceIds = [] (lost data!)
+```
+
+**Solution**: Separate entity schema (strict, no defaults) from response schema (normalizes with `.catch()`):
+
+```typescript
+// ✅ Entity schema - strict, used for writes
+export const ProjectSchema = z.object({
+  workspaceIds: z.array(z.string()),  // No default
+  archived: z.boolean(),               // No default
+});
+
+// ✅ Response schema - normalizes legacy data, used for reads
+export const ProjectResponseSchema = z.object({
+  workspaceIds: z.array(z.string()).catch([]),    // undefined → []
+  archived: z.boolean().catch(false),              // undefined → false
+});
+
+// API routes use different schemas
+'/api/projects/:id': {
+  PATCH: {
+    body: UpdateProjectSchema,        // Based on ProjectSchema (strict)
+    response: ProjectResponseSchema,   // Normalizes on read
+  }
+}
+```
+
+**Additional Layers of Defense**:
+
+1. **Service-Level Normalization**: Apply defaults in service methods (read operations only)
+2. **Repository-Level Protection**: Add null/undefined checks (`project.workspaceIds ?? []`)
+3. **Data Migration**: One-time migration to fix existing data with undefined fields
+
+**When Discovered**: January 2026 after removing `.default()` to fix PATCH bug. Existing projects showed "0 workspaces" and crashed on `workspaceIds.includes()`.
+
+**Key Principles**:
+
+- Entity schemas define data structure (no defaults, no transformations)
+- Defaults belong in creation logic (service layer), not schema parsing
+- Response schemas can normalize legacy data with `.catch()` (read-only)
+- PATCH operations must only update specified fields (partial updates)
+- Defensive coding: check for undefined at all layers (schema, service, repository)
+
+**Related Files**:
+
+- `packages/shared-frontend-backend/src/api/projects.contract.ts`
+- `packages/web-backend/src/services/ProjectsService.ts`
+- `packages/web-backend/src/repositories/ProjectsRepository.ts`
+- `packages/web-backend/src/migrations/NormalizeProjectsMigration.ts`
+
+---
+
+## Race Condition: Double Reload from Manual + WebSocket Listeners
+
+**Problem**: When a mutation succeeds, calling manual reload functions in the `onSuccess` callback while also having a WebSocket listener that triggers the same reload creates a race condition that can corrupt UI state.
+
+**Example of Bad Pattern**:
+
+```typescript
+// ❌ Double reload - manual + WebSocket
+const handleProjectUpdated = () => {
+	loadProjects(); // Manual reload
+	loadWorkspaces(); // Manual reload
+};
+
+useRealtimeRefresh({
+	events: [B2F_PROJECT_UPDATED],
+	onEvent: () => {
+		loadProjects(); // WebSocket reload (duplicate!)
+		loadWorkspaces(); // WebSocket reload (duplicate!)
+	},
+});
+```
+
+**Solution**: Trust the WebSocket listener to handle refreshes. Remove manual reload from success callbacks:
+
+```typescript
+// ✅ Single source of truth - WebSocket handles all reloads
+const handleProjectUpdated = () => {
+	// Projects and workspaces will be reloaded automatically via WebSocket event
+};
+
+useRealtimeRefresh({
+	events: [B2F_PROJECT_UPDATED],
+	onEvent: () => {
+		loadProjects(); // Single reload source
+		loadWorkspaces();
+	},
+});
+```
+
+**When Discovered**: January 2026 during ProjectsV2Page bug investigation. User reported projects disappearing after editing.
+
+**Key Principle**: With real-time WebSocket updates, let the event listener be the single source of truth for refreshing data. Manual reloads in mutation callbacks create race conditions.
+
+**Related Files**:
+
+- `packages/web-frontend/src/app/pages/projects2/ProjectsV2Page.tsx`
+- `packages/web-frontend/src/hooks/useRealtimeRefresh.ts`
+
+---
+
+## UX Anti-Pattern: Hidden Controls on Hover
+
+**Problem**: Hiding controls (buttons, actions) behind hover states creates a terrible user experience:
+
+1. Discoverability: Users don't know the controls exist
+2. Mobile: Hover doesn't exist on touch devices
+3. Accessibility: Screen readers may not announce hidden elements
+4. Visual noise: Users must scan every element for hover interactions
+5. Frustration: Users click/tap multiple times trying to find the action
+
+**Examples of Bad UX**:
+
+```tsx
+// ❌ Edit button hidden until hover
+<TabButton
+	action={
+		<Button className="opacity-0 group-hover:opacity-100" onClick={handleEdit}>
+			<Pencil />
+		</Button>
+	}
+>
+	Project Name
+</TabButton>
+```
+
+**Solution**: Always-visible controls in clear, consistent locations:
+
+```tsx
+// ✅ Edit button always visible in toolbar
+<div className="toolbar">
+	{activeProject && (
+		<Button onClick={() => handleEdit(activeProject)}>
+			<Pencil />
+			Edit Project
+		</Button>
+	)}
+	<Button onClick={handleManage}>
+		<Settings />
+		Manage
+	</Button>
+</div>
+```
+
+**When Discovered**: January 2026 during ProjectsV2Page refactoring. User feedback highlighted frustration with hidden edit button.
+
+**Key Principle**: If a control is important enough to exist, it's important enough to be visible. Use context/state to show/hide entire sections, not individual controls.
+
+**Related Files**:
+
+- `packages/web-frontend/src/app/pages/projects2/ProjectTabs.tsx` (FIXED: removed hidden action button)
+- `packages/web-frontend/src/app/pages/projects2/ProjectsV2Page.tsx` (FIXED: added toolbar with visible buttons)
+
+---
+
+## UI Pattern: Consistent Pending/Loading States Across Related Components
+
+**Problem**: When two components represent opposite actions (pin/unpin, show/hide, etc.), inconsistent visual feedback during pending states creates a confusing user experience.
+
+**Example of Inconsistent Pattern**:
+
+```typescript
+// Component A: Pinned item (unpin action)
+<div className="item">
+  <Icon className={isReordering && 'opacity-40'} />        // Only icon dimmed
+  <Text className={isReordering && 'opacity-40'} />        // Only text dimmed
+  <Button disabled={isLoading} />                           // Button NOT dimmed
+</div>
+
+// Component B: Available item (pin action)
+<div className={isLoading && 'opacity-50'}>                // ENTIRE item dimmed
+  <Button disabled={isLoading} />
+  <Icon />
+  <Text />
+</div>
+```
+
+**Result**: User sees different visual feedback for the same conceptual operation, causing confusion about whether the action is actually processing.
+
+**Solution**: Apply loading state consistently to the entire item (parent container) in both directions:
+
+```typescript
+// ✅ Both components use consistent pattern
+<div className={(isLoading || isReordering) && 'pointer-events-none opacity-50'}>
+  <Button disabled={isLoading} />
+  <Icon />
+  <Text />
+</div>
+```
+
+**Key Principles**:
+
+1. Apply opacity/loading state to the parent container, not individual child elements
+2. Use the same opacity value (e.g., `opacity-50`) across all related components
+3. Combine multiple pending states (isLoading, isReordering, etc.) at the parent level
+4. Always include `pointer-events-none` with opacity to prevent interaction during pending state
+
+**When Discovered**: January 2026 during ProjectsV2Page bug investigation. User reported arrow button appeared active while icon/text were dimmed during unpinning.
+
+**Related Files**:
+
+- `packages/web-frontend/src/app/pages/projects2/SortablePinnedProjectItem.tsx` (FIXED: moved opacity to parent)
+- `packages/web-frontend/src/app/pages/projects2/AvailableProjectItem.tsx` (already correct pattern)
+
+---
+
 ## Data2 Feature Contracts: NEVER Spread, Always Pass as Props
 
 **Problem**: Using spread syntax `{...pagination}` instead of explicit prop `pagination={pagination}` completely breaks Data2's query composition system. Symptoms:
@@ -2383,6 +2605,239 @@ When I said "J'ai bien compris. Je vais intégrer ce feedback dans ma façon de 
 
 **When Discovered**: January 14, 2026 - During infinite scroll carousel implementation. User had to repeatedly challenge my approach: first the symptom-treating fix, then my failure to actually apply the lesson I said I learned. User quote: "et le message qui suit, tu dis deja que tu n'as pas appliqué ta lecon, c'est fou"
 
+## Bug Fixing: Write Regression Tests BEFORE Attempting Fixes
+
+**Problem**: When a user reports a bug, the immediate instinct is to analyze the code, identify a potential cause, and write a fix. This leads to:
+
+- Multiple failed fix attempts (tried 5+ different approaches in one session)
+- Tests that pass but production bug persists (timing differences)
+- User frustration: "toujours pareil", "encore une fois", "ca devrait ? t'as pas écrit de test avant de fixer ? ENCORE UNE FOIS ?"
+- Wasted time on fixes that don't actually solve the problem
+
+**Root Cause**: Without a failing test that reproduces the bug, you're:
+
+1. **Flying blind** - Can't verify the bug exists in your test environment
+2. **Guessing the fix** - No way to know if your change actually works
+3. **Creating regressions** - Changes may fix one thing but break another
+4. **Testing in production** - User becomes your QA tester
+
+**Wrong Approach** ❌:
+
+```
+User: "Project switching is broken, it flash-loads and reverts"
+Agent: "Let me analyze the code... I think the issue is in useUrlState"
+Agent: *writes fix*
+Agent: "This should fix it"
+User: "toujours pareil"
+Agent: "Let me try another fix..."
+User: "toujours pareil"
+Agent: "Maybe this approach..."
+User: "toujours pareil... donc, tu n'as pas reproduit le cas dans le test"
+```
+
+**Correct Approach** ✅:
+
+```
+User: "Project switching is broken, it flash-loads and reverts"
+Agent: "Let me reproduce this in a test first"
+Agent: *uses agent-browser to manually reproduce*
+Agent: *writes automated test following the manual steps*
+Agent: *verifies test FAILS (reproduces the bug)*
+Agent: "Test written and failing - now I'll fix it"
+Agent: *writes fix*
+Agent: *verifies test PASSES*
+Agent: *verifies with agent-browser that production works*
+```
+
+**Test-First Bug Fixing Process**:
+
+1. **Reproduce manually** - Use agent-browser to see the exact user flow
+2. **Write automated test** - Follow the manual steps in test code
+3. **Verify test FAILS** - Ensure test actually reproduces the bug
+4. **Only then fix** - Now you have a safety net
+5. **Verify test PASSES** - Your fix solved the problem
+6. **Verify manually** - Confirm in real browser with agent-browser
+
+**Example from Session - Project Switching Bug**:
+
+```typescript
+// Test written BEFORE fix - reproduces exact agent-browser steps
+it('CRITICAL: should NOT revert projectId when clicking second project', async () => {
+  // Step 1: Navigate to base URL (simulates: agent-browser open http://localhost:5030/projects-v2)
+  render(<ProjectsV2Page />, {
+    wrapper: ({ children }) => wrapper({ children, initialUrl: '/' }),
+  });
+
+  // Step 2: Wait for initial load and auto-selection (simulates: agent-browser wait 1000)
+  await waitFor(() => {
+    expect(screen.getByText('Image generation')).toBeInTheDocument();
+  });
+
+  // Step 3: Verify initial URL shows first project (simulates: agent-browser get url)
+  let params = getSearchParams();
+  expect(params.get('projectId')).toBe('jz52yz1uq');
+
+  // Step 4: Click "Agent Fleet" button (simulates: agent-browser click @e19)
+  const agentFleetButton = screen.getByText('Agent Fleet');
+  await userEvent.click(agentFleetButton);
+
+  // Step 5: Wait for all URL flushes to complete (simulates: agent-browser wait 800)
+  await waitFor(() => {
+    params = getSearchParams();
+    expect(params.get('workspaceId')).toBe('50115a2e-5226-46d4-9fb8-6f9c11a16f9d');
+  }, { timeout: 1000 });
+
+  // Step 6: CRITICAL CHECK - Final URL must have projectId=wwuypfn8p
+  // BUG: Without fix, this will be 'jz52yz1uq' (reverted!)
+  params = getSearchParams();
+  expect(params.get('projectId')).toBe('wwuypfn8p'); // ❌ FAILS before fix, ✅ PASSES after
+});
+```
+
+**Why This Matters**:
+
+1. **Confidence** - You know the fix works because test passes
+2. **No regressions** - Test will catch if bug returns in future
+3. **Efficiency** - One good test > multiple blind fix attempts
+4. **User trust** - "c'est magnifique de te voir faire les tests manuels" vs "tu te fous de ma gueule ?"
+
+**User Feedback That Triggered This Lesson**:
+
+- "Ecris un test de non regression et assure toi de reproduire le probleme AVANT de corriger"
+- "toujours pareil... donc, tu n'as pas reproduit le cas dans le test de non-regression"
+- "et encore une fois, je veux un test AVANT que tu corriges"
+- "ca devrait ? t'as pas écrit de test avant de fixer ? ENCORE UNE FOIS ?"
+
+**When Discovered**: January 24, 2026 - During ProjectsV2Page URL state race condition debugging. User had to remind me **4+ times** to write tests first before I finally did it correctly.
+
+---
+
+## Agent-Browser: Test Yourself Instead of Bothering the User
+
+**Problem**: When debugging UI issues, the default pattern is:
+
+1. Make a change
+2. Ask user: "Could you test this?"
+3. User tests, reports still broken
+4. Make another change
+5. Ask user again: "Could you test now?"
+6. Repeat 5-10 times...
+
+This is **exhausting for the user** and **inefficient** for debugging.
+
+**Root Cause**: Not utilizing available tools. The agent-browser skill provides:
+
+- Real browser testing (Chrome/Firefox)
+- Interactive snapshots with element refs
+- Click, fill, navigate commands
+- URL inspection
+- Screenshot capabilities
+
+**Wrong Approach** ❌:
+
+```
+Agent: "I've made a fix to ProjectsV2Page"
+Agent: "Could you test if the project switching works now?"
+User: "toujours pareil"
+Agent: "I've added some checks to useUrlState"
+Agent: "Could you test again?"
+User: "toujours pareil"
+Agent: "Let me try another approach..."
+Agent: "Could you verify this fixes it?"
+User: "je vais te donner accès à agent-browser comme ca tu feras les tests toi meme
+        j'en ai marre de faire et refaire les tests alors que tu ajoutes des bugs sans arret."
+```
+
+**Correct Approach** ✅:
+
+```
+Agent: "Let me test this with agent-browser before asking you"
+Agent: *agent-browser open http://localhost:5030/projects-v2*
+Agent: *agent-browser wait 1000*
+Agent: *agent-browser get url* → verify auto-selection
+Agent: *agent-browser snapshot -i* → find button refs
+Agent: *agent-browser click @e19* → click Agent Fleet
+Agent: *agent-browser get url* → check if URL correct
+Agent: "Verified: Bug is fixed. URL shows projectId=wwuypfn8p with no revert"
+User: "commentaire en passant, c'est magnifique de te voir faire les tests manuels"
+```
+
+**Agent-Browser Workflow for Bug Verification**:
+
+1. **Navigate** - Open the page: `agent-browser open http://localhost:5030/projects-v2`
+2. **Wait** - Let page load: `agent-browser wait 1000`
+3. **Inspect** - Check state: `agent-browser get url`, `agent-browser snapshot -i`
+4. **Interact** - Reproduce bug: `agent-browser click @e19`
+5. **Verify** - Check result: `agent-browser get url` again
+6. **Screenshot** - Document if needed: `agent-browser screenshot bug-fix.png`
+
+**Example from Session - Manual Testing Before Fix**:
+
+```bash
+# Step 1: Navigate to page
+agent-browser open http://localhost:5030/projects-v2
+
+# Step 2: Wait for initial load
+agent-browser wait 1000
+
+# Step 3: Verify auto-selection happened
+agent-browser get url
+# Output: http://localhost:5030/projects-v2?projectId=jz52yz1uq
+
+# Step 4: Get interactive elements
+agent-browser snapshot -i
+# Output: button "Agent Fleet 1" [ref=e19]
+
+# Step 5: Click second project
+agent-browser click @e19
+
+# Step 6: Wait for URL updates
+agent-browser wait 800
+
+# Step 7: Check if bug occurs (URL reverts?)
+agent-browser get url
+# BEFORE FIX: http://localhost:5030/projects-v2?projectId=jz52yz1uq (REVERTED! Bug confirmed)
+# AFTER FIX: http://localhost:5030/projects-v2?projectId=wwuypfn8p&workspaceId=... (CORRECT!)
+```
+
+**Benefits**:
+
+1. **User satisfaction** - "c'est magnifique de te voir faire les tests manuels, plutot de devoir le faire moi à chaque fois"
+2. **Faster debugging** - See the bug yourself instead of playing telephone
+3. **Better understanding** - Observe timing, flashing, URL changes in real-time
+4. **Confidence** - Verify fix works before claiming it's done
+5. **Better tests** - Automated tests can follow manual agent-browser steps exactly
+
+**Integration with Test-First Approach**:
+
+```
+1. User reports bug
+2. Reproduce manually with agent-browser
+3. Document exact steps (open, wait, click, verify)
+4. Write automated test following those exact steps
+5. Verify automated test FAILS (reproduces bug)
+6. Write fix
+7. Verify automated test PASSES
+8. Verify manually with agent-browser again
+9. Only then tell user it's fixed
+```
+
+**User Feedback**:
+
+- "je vais te donner accès à agent-browser comme ca tu feras les tests toi meme j'en ai marre"
+- "commentaire en passant, c'est magnifique de te voir faire les tests manuels, plutot de devoir le faire moi à chaque fois, c'est avec une paix dans l'ame que je pourrais te deleguer de plus en plus de tache à l'avenir ! <3"
+
+**When to Use Agent-Browser**:
+
+- ✅ Before claiming a bug is fixed
+- ✅ When reproducing a user-reported issue
+- ✅ When testing complex UI interactions (tabs, forms, navigation)
+- ✅ When timing matters (race conditions, async operations)
+- ✅ When writing regression tests (follow manual steps in automated tests)
+- ❌ For simple unit test failures (use vitest directly)
+
+**When Discovered**: January 24, 2026 - During ProjectsV2Page debugging. User granted agent-browser access after frustration with repeated "Could you test?" requests. Led to both successful bug reproduction AND user appreciation for self-service testing.
+
 **Remember**: "I understand" without action is meaningless. "It's fixed" without analysis is dishonest. Think critically, fix root causes, and follow through on commitments to update documentation.
 
 ---
@@ -2986,6 +3441,51 @@ This caused:
 
 **Fix**: Removed duplicate projectsApi.updateProject() call. Backend handles sync automatically.
 
+## Bidirectional Sync Bug: Use Canonical IDs (2026-01-24)
+
+**Context**: Backend bidirectional sync existed but wasn't working. workspace.projectId was saved, but project.workspaceIds stayed empty.
+
+**Root Cause**: Workspace IDs can come in two forms:
+
+1. **Metadata UUID** (canonical): `"50115a2e-5226-46d4-9fb8-6f9c11a16f9d"` - stored in workspace-metadata.json
+2. **Hash-based ID**: `"abc123def456"` - generated from workspace path when no metadata exists
+
+The bug: `WorkspacesService.updateWorkspace(workspaceId, data)` was using the incoming `workspaceId` parameter for syncing, but this could be either format. The project's workspaceIds array needs the canonical UUID to match what the frontend uses.
+
+**Symptoms**:
+
+- Backend logs showed "SUCCESS" but workspaceIds stayed empty
+- Workspace appeared in project momentarily, then disappeared
+- Tab badge showed "0" instead of "1"
+- Page refresh lost the workspace association
+
+**Lesson**:
+
+- When dealing with entities that have multiple ID formats, always use the CANONICAL ID for relationships
+- Don't trust incoming request parameters - resolve to the canonical form first
+- The metadata UUID is the source of truth, not the hash-based ID
+- Add comments explaining which ID format is being used and why
+
+**Fix**: In `WorkspacesService.updateWorkspace()`:
+
+```typescript
+// Before (BUG):
+await this.projectsRepository.addWorkspaces(newProjectId, [workspaceId]);
+
+// After (FIXED):
+const canonicalWorkspaceId = metadata.id; // Always use UUID from metadata
+await this.projectsRepository.addWorkspaces(newProjectId, [canonicalWorkspaceId]);
+```
+
+**Test Coverage**: Added `WorkspacesService.bidirectional-sync.test.ts` with 7 test cases covering:
+
+- Adding/removing workspace from project
+- Reassigning between projects
+- Using canonical UUID vs hash-based ID
+- Handling non-existent projects
+- Event emission
+- No-op when projectId unchanged
+
 ## Optimistic UI: Hierarchy of Truth (2026-01-20)
 
 **Philosophy**: In interactive UIs, there's a hierarchy of "truth" that determines what the user sees:
@@ -3303,3 +3803,593 @@ The rule successfully catches:
 4. All variations in arrow functions and block statements
 
 Currently detects **80 violations** across the codebase that need refactoring.
+
+---
+
+## UX Anti-Pattern: Hover-Only Functionality (2026-01-24)
+
+### Problem
+
+Hover-only UI elements (features that only appear on hover) are a terrible UX pattern:
+
+- **Discoverability**: Users cannot know the feature exists without accidentally hovering
+- **Mobile incompatible**: No hover state on touch devices
+- **Accessibility**: Screen readers and keyboard navigation may not trigger hover states
+- **Counter-intuitive**: Users should not have to "guess" that features exist in the UI
+
+### Rule
+
+**NEVER hide interactive elements behind hover states.**
+
+All interactive elements (buttons, icons, actions) must be:
+
+- Always visible
+- Clearly labeled or iconographically obvious
+- Accessible via keyboard and screen readers
+
+### Example: Edit Project Button
+
+Initial implementation (WRONG):
+
+```typescript
+// Button with opacity-0, visible on hover only
+<Button className="opacity-0 group-hover:opacity-100">
+  <Pencil className="size-3" />
+</Button>
+```
+
+Correct approach options:
+
+1. Always visible icon in tabs (with proper spacing)
+2. Action button in a toolbar (e.g., next to "Manage Workspaces")
+3. Context menu on right-click
+4. Dedicated "Edit" button in a visible action bar
+
+### Related Files
+
+- `packages/web-frontend/src/app/pages/projects2/ProjectTabs.tsx`
+- `packages/web-frontend/src/framework/components/primitives/TabButton.tsx`
+
+---
+
+## Zod .default() in Entity Schemas Breaks PATCH Requests (2026-01-24)
+
+### Problem
+
+Using Zod's `.default()` on entity schema fields causes PATCH requests to overwrite unmodified fields with default values, resulting in data loss.
+
+**Symptom:** When pinning/unpinning a project (sending `{pinned: true, version: 1}`), the project lost all its workspace associations (`workspaceIds` became `[]`).
+
+### Root Cause
+
+Zod's `.default()` is applied during schema parsing, **regardless of HTTP method**:
+
+```typescript
+// ❌ BAD - Defaults applied during PATCH parsing
+const ProjectSchema = z.object({
+	id: z.string().uuid(),
+	name: z.string(),
+	workspaceIds: z.array(z.string()).default([]), // Applied even in PATCH!
+	archived: z.boolean().default(false),
+	pinned: z.boolean().default(false),
+	order: z.number().default(0),
+});
+```
+
+When the backend receives a PATCH request with `{pinned: true, version: 1}`, Zod parses the body and applies defaults, resulting in:
+
+```typescript
+{
+  pinned: true,
+  version: 1,
+  workspaceIds: [],      // ❌ Default applied, overwrites existing data
+  archived: false,       // ❌ Default applied
+  order: 0              // ❌ Default applied
+}
+```
+
+The backend then merges this into the database, **overwriting fields that shouldn't have been touched**.
+
+### Solution
+
+**Remove `.default()` from entity schemas**. Apply defaults only during creation (POST), not during updates (PATCH):
+
+```typescript
+// ✅ GOOD - No defaults in entity schema
+const ProjectSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  workspaceIds: z.array(z.string()),
+  archived: z.boolean(),
+  pinned: z.boolean(),
+  order: z.number(),
+});
+
+// ✅ Apply defaults in creation logic
+async create(data: CreateProjectInput): Promise<Project> {
+  const project: Project = {
+    ...data,
+    workspaceIds: data.workspaceIds ?? [],  // Default only on creation
+    archived: data.archived ?? false,
+    order: data.order ?? 0,
+  };
+  return await this.storage.create(project);
+}
+```
+
+### Key Principles
+
+1. **Entity schemas describe the shape, not the defaults**
+    - Schemas define what fields exist and their types
+    - Defaults belong in business logic, not schemas
+
+2. **PATCH = partial update**
+    - Only sent fields should be modified
+    - Omitted fields must be preserved
+    - `.default()` violates this by filling in omitted fields
+
+3. **Creation vs Update logic is different**
+    - POST (create): Apply defaults for missing fields
+    - PATCH (update): Never touch missing fields
+    - Use separate schemas or conditional logic if needed
+
+### Files Modified
+
+- `packages/shared-frontend-backend/src/api/projects.contract.ts` - Removed `.default()` from `ProjectSchema`
+- `packages/web-backend/src/services/ProjectsService.ts` - Added defaults in `create()` method
+
+### Related Issues
+
+This same pattern affects any entity with `.default()` values:
+
+- Workspaces
+- Tasks
+- Interventions
+
+**Action:** Audit all entity schemas for `.default()` usage and apply the same fix where needed.
+
+## Bidirectional Relations: Choose Unidirectional (2026-01-24)
+
+### Problem
+
+Having a bidirectional relationship between Workspace and Project (`workspace.projectId ↔ project.workspaceIds`) created:
+
+- **Double source of truth** leading to synchronization bugs
+- **Complex sync logic** with 200+ lines of error-prone code
+- **Data inconsistencies** when one side fails to update
+- **Difficult debugging** with console.log spam everywhere
+
+**Symptom:** When associating a workspace to a project, the workspace.projectId was updated but project.workspaceIds was not consistently updated, or vice-versa.
+
+### Root Cause
+
+```typescript
+// ❌ BAD - Bidirectional relationship
+Workspace {
+  projectId?: string  // Points to Project
+}
+
+Project {
+  workspaceIds: string[]  // Contains Workspaces
+}
+
+// When updating workspace.projectId, must also:
+// 1. Remove workspace from old project.workspaceIds
+// 2. Add workspace to new project.workspaceIds
+// 3. Handle errors in either step
+// 4. Emit events for both projects
+// = 200+ lines of fragile synchronization code
+```
+
+### Solution: Unidirectional Relationship
+
+**Keep only ONE source of truth:** `project.workspaceIds[]`
+
+```typescript
+// ✅ GOOD - Unidirectional relationship
+Workspace {
+  // No projectId field
+}
+
+Project {
+  workspaceIds: string[]  // THE ONLY source of truth
+}
+
+// To find project for workspace:
+const project = await projectsRepository.getProjectForWorkspace(workspaceId);
+
+// To associate workspace to project:
+await projectsRepository.addWorkspaces(projectId, [workspaceId]);
+
+// To dissociate:
+await projectsRepository.removeWorkspace(projectId, workspaceId);
+```
+
+### Benefits
+
+1. **Simple**: One array to manage, no synchronization needed
+2. **No bugs**: Impossible to have inconsistent state
+3. **Less code**: Removed 200+ lines of complex sync logic
+4. **Clear ownership**: Project owns the relationship
+5. **Easy to query**: Standard array operations
+
+### Migration Strategy
+
+1. **Remove `projectId` from schemas**
+    - `WorkspaceSchema` (API contract)
+    - `WorkspaceMetadata` (backend)
+    - `WorkspaceFileMetadata` (file storage)
+
+2. **Simplify WorkspacesService**
+    - Remove all bidirectional sync logic
+    - Remove `projectId` from update DTO
+    - Drop from 530 lines to 400 lines
+
+3. **Add utility method**
+
+    ```typescript
+    // ProjectsRepository
+    async getProjectForWorkspace(workspaceId: string): Promise<Project | null> {
+      const projects = await this.findAll({});
+      return projects.find(p => p.workspaceIds.includes(workspaceId)) ?? null;
+    }
+    ```
+
+4. **Data migration**
+    - Read workspace metadata files with `projectId`
+    - Verify project.workspaceIds contains workspace (repair if needed)
+    - Remove `projectId` from metadata file
+    - Migration: `RemoveWorkspaceProjectIdMigration.ts`
+
+5. **Update frontend**
+    - Modify `project.workspaceIds[]` instead of `workspace.projectId`
+    - Use `PATCH /api/projects/:id` for association changes
+    - Simpler and more consistent with the data model
+
+### Key Principles
+
+1. **Single Source of Truth**: Never duplicate the same information in two places
+2. **Owner Owns the Relation**: The "parent" (Project) owns the list of "children" (Workspaces)
+3. **Query When Needed**: If you need the reverse lookup, add a query method, don't store it twice
+4. **Simpler is Better**: 10 lines of simple code > 200 lines of synchronization logic
+
+### Files Modified
+
+- `packages/shared-frontend-backend/src/api/workspaces.contract.ts` - Removed `projectId` from schemas
+- `packages/web-backend/src/repositories/WorkspaceMetadataRepository.ts` - Removed `projectId`
+- `packages/web-backend/src/services/WorkspaceMetadataFile.ts` - Removed `projectId`
+- `packages/web-backend/src/services/WorkspacesService.ts` - Removed 200+ lines of sync logic
+- `packages/web-backend/src/services/WorkspaceMapper.ts` - Removed `projectId` from mapping
+- `packages/web-backend/src/services/ProjectsService.ts` - Simplified `clearProjectFromWorkspaces`
+- `packages/web-backend/src/repositories/ProjectsRepository.ts` - Added `getProjectForWorkspace()`
+- `packages/web-backend/src/migrations/RemoveWorkspaceProjectIdMigration.ts` - Data migration
+
+### Tests
+
+- **Removed**: `WorkspacesService.bidirectional-sync.test.ts` (no longer needed)
+- **Added**: `WorkspacesService.test.ts` (simpler, focused tests)
+- **Added**: `ProjectsRepository.test.ts` (test new utility method)
+- **Added**: `RemoveWorkspaceProjectIdMigration.test.ts` (test data migration)
+
+### Related Patterns
+
+This same principle applies to any bidirectional relationship:
+
+- Parent ↔ Children: Parent owns `childIds[]`
+- User ↔ Teams: Team owns `memberIds[]`
+- Task ↔ Tags: Task owns `tagIds[]` (or use a join table for many-to-many)
+
+**Rule of thumb:** If you find yourself writing synchronization logic, you probably have the wrong data model.
+
+### Frontend Refactoring (2026-01-24)
+
+After backend was refactored, frontend needed adaptation to use the new unidirectional API:
+
+**Files Modified:**
+
+- `packages/web-frontend/src/app/hooks/useProjectWorkspaces.ts` - Updated associate/dissociate to use Projects API
+- `packages/web-frontend/src/app/pages/projects2/ProjectsV2Page.tsx` - Pass projectId to dissociate
+- `packages/web-frontend/src/app/pages/workspaces/WorkspacesTable.tsx` - Removed workspace.projectId reference
+- `packages/web-frontend/src/hooks/useWorkspaceProject.ts` - NEW: Hook to find project by workspace
+- `packages/web-frontend/src/app/pages/workspaces/EditWorkspaceDialog.tsx` - Removed project selection
+- `packages/web-frontend/src/app/pages/projects2/WorkspacePanel.tsx` - Updated save handler signature
+- `packages/web-frontend/src/app/pages/workspaces/workspaces.helpers.ts` - Updated color helpers
+
+**Key Changes:**
+
+1. **Association:** Instead of `PATCH /api/workspaces/:id` with `{ projectId }`, now `PATCH /api/projects/:id` with `{ workspaceIds: [..., newId] }`
+
+2. **Dissociation:** Now requires knowing the projectId to update `project.workspaceIds[]`
+
+3. **Finding Project for Workspace:** Created `useWorkspaceProject` hook that searches all projects to find which one contains the workspace
+
+4. **Simplified EditWorkspaceDialog:** Removed project selection since workspace-project associations must now be managed through ProjectsV2Page's "Manage Workspaces" dialog
+
+**Benefits:**
+
+- Frontend mirrors backend architecture (single source of truth)
+- No more confusion about which API to call
+- Clearer code flow
+- Easier to understand and maintain
+
+**Testing Checklist:** See `.claude/temp/testing-checklist.md`
+
+---
+
+## Post-Refactoring: Clean Up Obsolete Code and Fix Type Errors
+
+**Problem**: After a major refactoring (like removing bidirectional sync), several issues can remain:
+
+1. Tests that reference removed functionality still compile but fail at runtime
+2. Import statements reference renamed/moved modules
+3. Type generics missing in test setup code
+4. Obsolete documentation that confuses developers
+
+**Example Issues Found After Unidirectional Refactoring**:
+
+```typescript
+// projectId no longer exists
+// ❌ Issue 2: Wrong module import
+import { FileSystemStorage } from '../storage/FileSystemStorage';
+
+// ❌ Issue 1: Test file uses removed property
+// File: WorkspacesService.bidirectional-sync.test.ts
+expect(workspace.projectId).toBe(testProjectId1); // projectId no longer exists
+
+// Should be FileBasedStorage
+
+// ❌ Issue 3: Missing type generic in test
+const baseRepository = new BaseRepository('projects', storage); // Missing <Project>
+```
+
+**Solution Checklist**:
+
+1. **Search for removed properties/methods across the codebase**:
+
+    ```bash
+    # Find all references to removed feature
+    rg "workspace\.projectId" packages/
+    rg "FileSystemStorage" packages/
+    ```
+
+2. **Delete obsolete test files** that test removed functionality:
+
+    ```bash
+    rm packages/web-backend/src/services/WorkspacesService.bidirectional-sync.test.ts
+    ```
+
+3. **Fix import statements** when modules are renamed:
+
+    ```typescript
+    // ✅ Correct import
+    import { FileBasedStorage } from '../storage/FileBasedStorage';
+    ```
+
+4. **Add missing type generics** in tests:
+
+    ```typescript
+    // ✅ Explicit type parameter
+    const baseRepository = new BaseRepository<Project>('projects', storage);
+    ```
+
+5. **Run comprehensive checks**:
+    ```bash
+    npm run check        # TypeScript + ESLint + Prettier
+    npm run test:agent   # Run all tests
+    ```
+
+**When Discovered**: January 2026 after completing the unidirectional workspace-project refactoring. TypeScript compilation failed with 3 errors in test files and scripts.
+
+**Key Principle**: After major refactoring, always:
+
+- Search for references to removed features (grep/ripgrep)
+- Delete obsolete test files (don't just comment them out)
+- Fix all import statements and type annotations
+- Run `npm run check` before declaring work complete
+
+**Related Files**:
+
+- `packages/web-backend/src/services/WorkspacesService.bidirectional-sync.test.ts` (deleted)
+- `packages/web-backend/src/scripts/migrate-remove-workspace-projectid.ts` (fixed imports)
+- `packages/web-backend/src/services/WorkspacesService.test.ts` (added type generic)
+
+---
+
+## Long Debugging Sessions: Test Early, Test Often with agent-browser
+
+**Context**: January 2026 - Long refactoring session for workspace-project associations that uncovered multiple architectural issues.
+
+**Problems That Made This Session Difficult**:
+
+1. **Not Testing Early Enough**: Made backend changes without immediately verifying with agent-browser, leading to multiple rounds of "looks good in code" → "broken in UI"
+
+2. **Trusting Code Over Reality**: Assumed PATCH endpoint worked correctly because it returned 200, didn't verify the actual data being saved until much later
+
+3. **Incomplete Root Cause Analysis**: Fixed symptoms multiple times instead of identifying the real issue:
+    - Fixed race condition (symptom)
+    - Fixed pending state (symptom)
+    - Fixed Zod defaults (partial root cause)
+    - Finally discovered: **bidirectional sync fundamentally broken** (actual root cause)
+
+4. **Not Questioning Architecture Earlier**: Spent time trying to fix bidirectional sync instead of questioning whether it should exist at all with file-based storage
+
+**What Should Have Happened**:
+
+```bash
+# ✅ Correct workflow
+1. Make backend change
+2. IMMEDIATELY test with agent-browser
+3. If broken, fix root cause before proceeding
+4. Document finding in lessons-learned.md
+5. Move to next feature
+
+# ❌ What actually happened
+1. Make backend change
+2. Assume it works because tests pass
+3. Make more changes
+4. User reports bug
+5. Debug for 30+ messages
+6. Finally test with agent-browser
+7. Discover multiple issues stacked on each other
+```
+
+**Key Agent-Browser Test Scenarios to Run IMMEDIATELY**:
+
+```bash
+# After ANY workspace-project association change
+agent-browser open http://localhost:5173/projects-v2?projectId=xxx
+agent-browser snapshot -i
+# Click "Manage Workspaces" → Associate workspace
+# Verify: counter updates, workspace tab appears
+# Verify: data persists after page reload
+# Verify: pin/unpin doesn't break associations
+```
+
+**Architectural Red Flags Missed**:
+
+1. **Bidirectional relationships + file-based storage = complexity**
+    - Should have questioned this immediately
+    - In-memory storage can handle bidirectional sync with transactions
+    - File-based storage makes this extremely error-prone
+
+2. **Zod `.default()` in entity schemas**
+    - Breaks PATCH requests by filling in fields not in payload
+    - Should ONLY apply defaults in service layer during CREATE
+
+3. **Multiple reload sources** (manual + WebSocket)
+    - Race conditions waiting to happen
+    - Should have single source of truth for reloads
+
+**Lessons for Future Work**:
+
+1. **Test with agent-browser BEFORE declaring work complete**, not after user reports bugs
+2. **Question architecture when encountering repeated similar bugs** - probably indicates design flaw
+3. **When fixing a bug, verify THE ACTUAL DATA** in storage files, not just UI state
+4. **Simplify relationships** - unidirectional is almost always better than bidirectional
+5. **Don't stack fixes** - if a fix doesn't fully resolve the issue, you're treating symptoms not causes
+
+**Cost of Not Following This**:
+
+- 40+ message exchanges debugging instead of implementing features
+- User frustration ("c'est toujours le meme cmoportement, et j'apprecierait FORTEMENT que tu fasses toi meme les testes avec l'agent-brownser")
+- Multiple failed fix attempts before finding root cause
+- Full architectural refactoring required to properly fix
+
+**When Discovered**: January 2026 during projects-v2 workspace associations feature
+
+**Related Entries**:
+
+- "Zod .default() in Entity Schemas Breaks PATCH Requests"
+- "Bidirectional Relations: Choose Unidirectional Instead"
+
+**Documentation**: See `.claude/temp/typescript-fixes-summary.md` for detailed fixes
+
+---
+
+## Code Duplication in Dual-List Dialogs: Extract Generic Components Early
+
+**Date**: January 2026
+**Context**: ProjectsV2 refactoring - ManagePinnedProjectsDialog and ManageProjectWorkspacesDialog
+
+**Problem**: Massive code duplication across dual-list selector dialogs and their item components led to maintenance nightmare:
+- 75% duplication between 2 dialogs (596 lines combined)
+- 70% duplication between 4 item components (442 lines combined)
+- Helper functions duplicated 3x across files
+- Architecture grade: C+
+
+**Root Cause**: Building specialized components first instead of identifying common patterns and creating generic base components.
+
+**Solution**: Create generic reusable components with TypeScript generics and render props:
+
+1. **DualListDialog<TLeft, TRight>** - Generic two-column dialog
+   - Integrated DnD context (@dnd-kit)
+   - Integrated SearchBar
+   - Support for loading, reordering, optimistic updates
+   - Render props for complete flexibility
+
+2. **DualListItem** - Generic item component
+   - 2 variants: `available` (simple) and `sortable` (draggable)
+   - Replaces 4 specialized components
+   - Support for icon, label, badge customization
+
+3. **Centralized utilities** - Shared helper functions
+   - `getBasename()` in `pathUtils.ts` instead of 3 duplications
+
+**Results**:
+- Reduced code by ~500 lines (-23%)
+- Eliminated dialog duplication: 75% → 0%
+- Eliminated item duplication: 70% → 0%
+- Architecture grade: C+ → A-
+- Test coverage: ~15% → >70%
+- Maintainability: 3x easier (bug fix in 1 file instead of 4)
+
+**Pattern to Follow**:
+
+```typescript
+// ✅ GOOD: Generic base component with TypeScript generics + render props
+interface DualListDialogProps<TLeft, TRight> {
+  leftItems: TLeft[];
+  leftItemRenderer: (item: TLeft, actions: ItemActions) => ReactNode;
+  rightItems: TRight[];
+  rightItemRenderer: (item: TRight, actions: ItemActions) => ReactNode;
+  // ... other props
+}
+
+// Consumer provides specific rendering
+<DualListDialog<Project, Project>
+  leftItemRenderer={(project, actions) => (
+    <DualListItem variant="sortable" label={project.name} {...actions} />
+  )}
+  rightItemRenderer={(project, actions) => (
+    <DualListItem variant="available" label={project.name} {...actions} />
+  )}
+/>
+```
+
+```typescript
+// ❌ BAD: Creating specialized components for each use case
+// AvailableProjectItem.tsx (77 lines)
+// SortablePinnedProjectItem.tsx (116 lines)
+// AvailableWorkspaceItem.tsx (94 lines)
+// SortableAssociatedWorkspaceItem.tsx (155 lines)
+// = 442 lines of 70% duplicated code
+```
+
+**Key Principles**:
+
+1. **Identify Patterns Early**: When you see 2 similar components, extract generic base immediately
+2. **TypeScript Generics**: Use `<TLeft, TRight>` for type-safe reusability
+3. **Render Props**: Give consumers control of rendering via callbacks
+4. **Composition over Inheritance**: Compose generic components instead of creating subclasses
+5. **Centralize Utilities**: Extract shared helpers to dedicated utility files
+6. **Test Generics Well**: >70% coverage on generic components = confidence for all consumers
+
+**Benefits**:
+
+- **Maintenabilité**: New dual-list dialog = ~100 lines instead of 300+
+- **Testabilité**: Test generic once instead of testing 4 specialized components
+- **Performance**: ~15KB bundle size savings via tree-shaking
+- **Consistency**: All dialogs behave identically (DnD, search, loading states)
+- **Documentation**: Storybook stories on generics = instant examples for all use cases
+
+**When to Apply**:
+
+- ✅ When building the 2nd similar component (extract generic base immediately)
+- ✅ When seeing 50%+ code duplication between components
+- ✅ When helper functions are copied across files
+- ✅ When "specialized" components differ only in data types and rendering
+
+**Cost of Not Following**:
+
+- 3x more code to maintain
+- Bug fixes require touching multiple files
+- New features require copy-paste + adapt pattern
+- Test coverage remains low (too many components to test)
+- Architecture debt accumulates (C+ grade)
+
+**Documentation**: See `.claude/temp/refactoring-summary-dual-list-dialogs.md` for complete refactoring guide
+
+**Related Entries**:
+- Component architecture patterns
+- TypeScript generics best practices
+- Render props vs HOCs
