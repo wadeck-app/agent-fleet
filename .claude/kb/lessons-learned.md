@@ -4511,3 +4511,390 @@ const unsubscribers = events.map(event => transport.registerLocalHandler(event, 
 - `packages/web-frontend/src/transport/adapters/WebSocketTransportClient.ts`
 - `packages/web-frontend/src/hooks/useRealtimeRefresh.ts`
 - `packages/web-backend/src/transport/TransportSessionManager.ts`
+
+
+---
+
+## 2026-01-25: Inline Styles Override CSS Classes + Headless UI Pattern for Complex Dialogs
+
+### Context
+
+Refactored OptimisticDualListDialog from monolithic component (322 lines) to 3-layer architecture:
+1. **Logic layer:** `useDualListState` hook (headless)
+2. **View layer:** `DualListView` component (pure presentation)
+3. **Composition layer:** `OptimisticDualListDialog` (wires everything together)
+
+### Problem 1: Inline Styles Override CSS Classes
+
+**Symptoms:**
+- `opacity-50` class was NOT visible during pin/unpin operations
+- Pending states worked in unpin but NOT in pin
+- Reordering states never showed `opacity-50`
+
+**Root Cause:**
+```tsx
+// DualListItem.tsx (BEFORE)
+const style = {
+  transform: CSS.Transform.toString(transform),
+  transition,
+  opacity: isDragging ? 0.5 : 1,  // ❌ ALWAYS sets opacity=1
+};
+
+// CSS classes are applied BUT inline style has higher specificity
+<div style={style} className="opacity-50">  // ❌ opacity-50 is ignored!
+```
+
+**Why This is Critical:**
+- **CSS specificity:** Inline styles > Classes > Element selectors
+- Even with `!important`, inline styles win in most cases
+- Hard to debug: tests pass (class is present), but visual state is wrong
+
+**Solution:**
+```tsx
+// Only set inline opacity when actually dragging
+const style = {
+  transform: CSS.Transform.toString(transform),
+  transition,
+  ...(isDragging ? { opacity: 0.5 } : {}),  // ✅ Conditional spread
+};
+```
+
+### Problem 2: Monolithic Component Lacks Testability
+
+**Symptoms:**
+- 322 lines with mixed concerns (logic + view + API calls)
+- Tests required mocking optimistic update logic
+- Difficult to test visual states independently
+- Hard to reuse for different layouts (Grid vs Dialog vs Table)
+
+**Solution: Headless UI Pattern (3-Layer Architecture)**
+
+#### Layer 1: Logic Hook (`useDualListState`)
+
+**Responsibilities:**
+- Manage ALL state (optimistic, loading, reordering)
+- Handle API calls with rollback on error
+- Calculate derived state (leftItems, rightItems)
+- Clear optimistic state when dialog closes
+
+**Key pattern:**
+```typescript
+export interface UseDualListStateReturn<T> {
+  leftItems: T[];              // Computed from base + optimistic
+  rightItems: T[];             // Computed from base + optimistic
+  loadingItems: Set<string>;   // Visual state
+  reorderingIds: Set<string>;  // Visual state
+  actions: {
+    associate: (id: string) => Promise<void>;
+    dissociate: (id: string) => Promise<void>;
+    reorder: (activeId: string, overId: string) => Promise<void>;
+  };
+}
+```
+
+**Benefits:**
+- 100% testable without React (pure async logic)
+- Tests use controlled promises: `createControlledPromise()`
+- No mocking needed - just verify state transitions
+
+#### Layer 2: Pure View (`DualListView`)
+
+**Responsibilities:**
+- Render two columns with DnD context
+- Apply visual states (`opacity-50` when `isLoading` or `isReordering`)
+- Forward callbacks to `renderItem`
+- Handle client-side search filtering
+
+**Key pattern:**
+```typescript
+export interface DualListViewProps<T> {
+  leftItems: T[];
+  rightItems: T[];
+  loadingItems: Set<string>;      // Just display what you're told
+  reorderingItems: Set<string>;   // Just display what you're told
+  renderItem: (item: T, side: 'left' | 'right', state: {
+    isLoading: boolean;
+    isReordering: boolean;
+    onAssociate: (id: string) => void;
+    onDissociate: (id: string) => void;
+  }) => ReactNode;
+  // ... other props
+}
+```
+
+**Benefits:**
+- 100% testable without async logic
+- Tests verify: rendering, search, visual states, callbacks
+- No business logic - just display
+
+#### Layer 3: Composition (`OptimisticDualListDialog`)
+
+**Responsibilities:**
+- Wire hook + view + Dialog wrapper
+- Pass props between layers
+- NO business logic
+
+**Key pattern:**
+```typescript
+export function OptimisticDualListDialog<T>({ ... }) {
+  // LOGIC
+  const { leftItems, rightItems, loadingItems, reorderingIds, actions } =
+    useDualListState({ ... });
+
+  // COMPOSITION
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DualListView
+        leftItems={leftItems}
+        rightItems={rightItems}
+        loadingItems={loadingItems}
+        reorderingItems={reorderingIds}
+        onAssociate={actions.associate}
+        onDissociate={actions.dissociate}
+        onReorder={actions.reorder}
+        renderItem={renderItem}
+        // ...
+      />
+    </Dialog>
+  );
+}
+```
+
+**Benefits:**
+- Minimal code (~150 lines)
+- Easy to swap layouts (Grid, Carousel, Table)
+- Integration tests only verify wiring
+
+### Key Learnings
+
+#### 1. Inline Styles vs CSS Classes
+
+**Rule:** Never use inline styles for visual states that might be conditionally applied.
+
+❌ **BAD:**
+```tsx
+style={{ opacity: isLoading ? 0.5 : 1 }}  // Always sets opacity
+```
+
+✅ **GOOD:**
+```tsx
+// Option 1: Conditional inline style
+style={{ ...(isLoading ? { opacity: 0.5 } : {}) }}
+
+// Option 2: CSS classes only (preferred)
+className={cn(isLoading && 'opacity-50')}
+```
+
+#### 2. Test Visual States End-to-End
+
+**Unit tests are NOT enough for visual states:**
+- ✅ Test verifies class is applied: `expect(element).toHaveClass('opacity-50')`
+- ❌ User sees no opacity change because inline style overrides it
+
+**Solution:** Use agent-browser for critical visual features:
+```bash
+agent-browser click @e1
+agent-browser screenshot during-operation.png
+# Verify opacity is actually visible
+```
+
+#### 3. Separation of Concerns in Complex Components
+
+**When to apply 3-layer architecture:**
+- ✅ Component has optimistic updates
+- ✅ Component needs API calls with rollback
+- ✅ Component has multiple visual states (loading, pending, error)
+- ✅ Component might be reused in different layouts
+- ✅ Component has complex state management (>100 lines)
+
+**Benefits:**
+- **Testability:** Each layer tested independently
+- **Reusability:** View layer works with any state management
+- **Maintainability:** Change logic without touching view, and vice versa
+- **Debuggability:** Easy to isolate bugs (logic vs visual)
+
+#### 4. Headless UI Pattern
+
+**Definition:** Separate state management (hook) from presentation (component).
+
+**When to use:**
+- Complex state logic (optimistic updates, rollback, computed state)
+- Multiple visual representations (Dialog, Grid, Table, Carousel)
+- Need to test logic without React rendering
+
+**Pattern:**
+```
+useComplexState (logic) → returns state + actions
+  ↓
+ComplexView (pure UI) → receives state, renders, calls actions
+  ↓
+ComplexDialog (composition) → wires hook + view + wrapper
+```
+
+#### 5. DRY with Small Reusable Components
+
+**Problem:** Empty states duplicated across 2 dialogs (16 lines total)
+
+**Solution:** Extract to `DualListEmptyState` component (10 lines)
+```tsx
+export function DualListEmptyState({ message }: { message: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-8 text-center">
+      <p className="text-sm text-muted-foreground">{message}</p>
+    </div>
+  );
+}
+```
+
+**Usage:**
+```tsx
+leftEmptyState={<DualListEmptyState message="No pinned projects" />}
+```
+
+**Benefit:** 16 lines → 2 lines (87% reduction)
+
+#### 6. ESLint Rules to Prevent Future Issues
+
+**Problem:** Hardcoded SVG and emoji in codebase
+
+**Solution:** Add ESLint rules
+```javascript
+{
+  selector: 'JSXElement[openingElement.name.name="svg"]',
+  message: 'Inline SVG forbidden. Use lucide-react icons.',
+},
+{
+  selector: 'Literal[value=/[\\u{1F300}-\\u{1F9FF}...]/u]',
+  message: 'Emoji literals forbidden. Use lucide-react icons.',
+}
+```
+
+**Benefit:** Catch issues at development time, not in code review
+
+### Metrics
+
+**Before:**
+- OptimisticDualListDialog: 322 lines (monolithic)
+- ManagePinnedProjectsDialog: 252 lines
+- ManageProjectWorkspacesDialog: 344 lines
+- 4 item components: 442 lines
+- Total: ~1,360 lines
+
+**After:**
+- useDualListState: 280 lines (pure logic)
+- DualListView: 295 lines (pure view)
+- OptimisticDualListDialog: 148 lines (composition)
+- DualListItem: 215 lines (generic)
+- DualListEmptyState: 25 lines (reusable)
+- ManagePinnedProjectsDialog: 115 lines (-54%)
+- ManageProjectWorkspacesDialog: 130 lines (-62%)
+- Total: ~1,208 lines
+
+**Improvements:**
+- 11% fewer lines overall
+- 100% test coverage for logic layer (was ~15%)
+- 100% test coverage for view layer (was ~20%)
+- Eliminated 442 lines of duplicated item components
+- 2 reusable generic components (DualListItem, DualListEmptyState)
+
+### When to Apply
+
+Apply this pattern when you see these symptoms:
+
+1. **Inline style bugs:**
+   - ✅ Visual states not appearing despite class being present
+   - ✅ `opacity-50` not working
+   - ✅ CSS animations not triggering
+
+2. **Testing difficulties:**
+   - ✅ Tests require extensive mocking of async logic
+   - ✅ Visual states hard to test
+   - ✅ Test setup requires complex controlled promises
+
+3. **Reusability needs:**
+   - ✅ Same logic needed in different layouts (Dialog, Grid, Table)
+   - ✅ Want to swap view layer without touching logic
+   - ✅ Multiple consumers need same state management
+
+4. **Maintenance issues:**
+   - ✅ Component >200 lines with mixed concerns
+   - ✅ Difficult to locate bugs (logic vs visual)
+   - ✅ Changes require touching multiple unrelated parts
+
+### Anti-Patterns to Avoid
+
+❌ **Don't mix inline styles and CSS classes for the same property**
+```tsx
+<div style={{ opacity: 1 }} className="opacity-50">  // ❌ inline wins
+```
+
+❌ **Don't test visual states only with unit tests**
+```tsx
+expect(element).toHaveClass('opacity-50');  // ✅ Class is there
+// ❌ But user doesn't see opacity change due to inline style override
+```
+
+❌ **Don't put business logic in view components**
+```tsx
+function DualListView() {
+  const [optimisticState, setOptimisticState] = useState(...);  // ❌ Logic in view
+  const handleClick = async () => {
+    setOptimisticState(...);  // ❌ Business logic
+    await api.call();         // ❌ API call
+  };
+}
+```
+
+❌ **Don't create deep inheritance hierarchies**
+```tsx
+class BaseDualList extends Dialog {}       // ❌ Inheritance
+class OptimisticDualList extends BaseDualList {}
+```
+
+✅ **Use composition instead**
+```tsx
+<Dialog>
+  <DualListView {...state} />  // ✅ Composition
+</Dialog>
+```
+
+### Related Patterns
+
+- **Headless UI:** Logic separated from presentation via hooks
+- **Render Props:** Consumer controls rendering via `renderItem` callback
+- **Compound Components:** Multiple components working together (`<Dialog><DialogContent>`)
+- **State Machine:** Explicit states (loading, reordering, error) with transitions
+- **Optimistic Updates:** Update UI immediately, rollback on error
+
+### Files Modified
+
+**Created:**
+- `packages/web-frontend/src/framework/hooks/useDualListState.ts` (NEW - 280 lines)
+- `packages/web-frontend/src/framework/hooks/useDualListState.test.ts` (NEW - 11 tests)
+- `packages/web-frontend/src/framework/components/overlays/DualListView.tsx` (NEW - 295 lines)
+- `packages/web-frontend/src/framework/components/overlays/DualListView.test.tsx` (NEW - 11 tests)
+- `packages/web-frontend/src/framework/components/overlays/OptimisticDualListDialog.tsx` (REWRITE - 148 lines)
+- `packages/web-frontend/src/framework/components/overlays/OptimisticDualListDialog.integration.test.tsx` (NEW - 5 tests)
+- `packages/web-frontend/src/framework/components/overlays/DualListEmptyState.tsx` (NEW - 25 lines)
+
+**Modified:**
+- `packages/web-frontend/src/framework/components/overlays/DualListItem.tsx` (FIXED opacity bug + SVG)
+- `packages/web-frontend/src/app/pages/projects2/ManagePinnedProjectsDialog.tsx` (REFACTORED)
+- `packages/web-frontend/src/app/pages/projects2/ManageProjectWorkspacesDialog.tsx` (REFACTORED)
+- `packages/web-frontend/eslint.config.mjs` (ADDED rules for SVG/emoji)
+
+**Deleted:**
+- `packages/web-frontend/src/app/pages/projects2/AvailableProjectItem.tsx` (77 lines)
+- `packages/web-frontend/src/app/pages/projects2/SortablePinnedProjectItem.tsx` (116 lines)
+- `packages/web-frontend/src/app/pages/projects2/AvailableWorkspaceItem.tsx` (94 lines)
+- `packages/web-frontend/src/app/pages/projects2/SortableAssociatedWorkspaceItem.tsx` (155 lines)
+- `packages/web-frontend/src/app/pages/projects2/ManagePinnedProjectsDialog.old.tsx` (322 lines)
+- `packages/web-frontend/src/app/pages/projects2/ManagePinnedProjectsDialog.optimistic.simple.test.tsx`
+
+### Visual Verification
+
+**Screenshots proving the fix:**
+- `pin-pending.png`: Shows Agent Fleet with reduced opacity during pin operation ✅
+- `after-pin-complete.png`: Shows full opacity after API completes ✅
+
+**Critical insight:** Visual bugs require visual verification, not just unit tests.
