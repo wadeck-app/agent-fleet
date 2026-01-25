@@ -53,6 +53,7 @@ import type {
 	RequestOptions,
 	ResponseType,
 	SubscriptionMessage,
+	SubscriptionStateMessage,
 	TransportConfig,
 	TransportEvent,
 	TransportRequest,
@@ -106,6 +107,12 @@ export class WebSocketTransportClient implements ITransportClient {
 	 * Stores filters for server-side event filtering
 	 */
 	private eventFilters = new Map<string, Record<string, unknown>>();
+
+	/**
+	 * Component subscription tracking (componentId → subscriptions)
+	 * Used for state-based subscription management
+	 */
+	private componentSubscriptions = new Map<string, Array<{ event: string; filters?: Record<string, unknown> }>>();
 
 	/**
 	 * Connection state change handlers
@@ -422,6 +429,31 @@ export class WebSocketTransportClient implements ITransportClient {
 	}
 
 	/**
+	 * Register event handler locally without sending subscription message to server
+	 *
+	 * Use this when managing subscriptions via setComponentSubscriptionState()
+	 * to avoid duplicate subscription messages.
+	 *
+	 * @param event - Event type to handle
+	 * @param handler - Event handler function
+	 * @returns Unsubscribe function
+	 */
+	registerLocalHandler<E extends EventType>(event: E, handler: EventHandler<E>): UnsubscribeFunction {
+		if (!this.eventHandlers.has(event)) {
+			this.eventHandlers.set(event, new Set());
+		}
+		this.eventHandlers.get(event)!.add(handler);
+
+		return () => {
+			this.eventHandlers.get(event)?.delete(handler);
+			// Clean up empty Set
+			if (this.eventHandlers.get(event)?.size === 0) {
+				this.eventHandlers.delete(event);
+			}
+		};
+	}
+
+	/**
 	 * Subscribe to connection state changes
 	 */
 	onConnectionStateChange(handler: ConnectionStateHandler): UnsubscribeFunction {
@@ -525,6 +557,47 @@ export class WebSocketTransportClient implements ITransportClient {
 	}
 
 	/**
+	 * Set subscription state for a component (state-based API)
+	 *
+	 * Each component declares its desired subscription state independently.
+	 * The transport layer merges all component states and sends a single
+	 * subscription_state message to the server.
+	 *
+	 * @param componentId - Unique component identifier (e.g., 'TasksPage', 'WorkersWidget')
+	 * @param subscriptions - Desired subscriptions for this component
+	 *
+	 * @example
+	 * ```typescript
+	 * transport.setComponentSubscriptionState('TasksPage', [
+	 *   { event: 'b2f:task:created' },
+	 *   { event: 'b2f:task:updated', filters: { taskId: '123' } }
+	 * ]);
+	 * ```
+	 */
+	setComponentSubscriptionState(
+		componentId: string,
+		subscriptions: Array<{ event: string; filters?: Record<string, unknown> }>
+	): void {
+		// Store component's desired state
+		this.componentSubscriptions.set(componentId, subscriptions);
+
+		// Merge all component states and send to server
+		this.syncSubscriptionState();
+	}
+
+	/**
+	 * Remove all subscriptions for a component (cleanup on unmount)
+	 *
+	 * @param componentId - Component identifier to remove
+	 */
+	removeComponentSubscriptions(componentId: string): void {
+		if (this.componentSubscriptions.delete(componentId)) {
+			// Recalculate and sync global state without this component
+			this.syncSubscriptionState();
+		}
+	}
+
+	/**
 	 * Send subscription control message to server
 	 *
 	 * IMPORTANT: If not connected, subscription is queued locally and will be sent
@@ -560,10 +633,72 @@ export class WebSocketTransportClient implements ITransportClient {
 	 * Resubscribe to all events after reconnection
 	 */
 	private resubscribeAll(): void {
+		// If using component-based subscriptions, sync the global state
+		if (this.componentSubscriptions.size > 0) {
+			this.syncSubscriptionState();
+			return;
+		}
+
+		// Fallback: legacy individual subscriptions (for backward compatibility)
 		for (const [event, _handlers] of this.eventHandlers) {
 			const filters = this.eventFilters.get(event);
 			this.sendSubscriptionMessage('subscribe', [event], filters);
 		}
+	}
+
+	/**
+	 * Sync subscription state with server
+	 *
+	 * Merges all component subscription states into a global state (union)
+	 * and sends a single subscription_state message.
+	 */
+	private syncSubscriptionState(): void {
+		// Don't sync if not connected
+		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+			// Silently queue - will sync on connection
+			return;
+		}
+
+		// Merge all component states (union with deduplication)
+		const globalState = this.mergeAllComponentStates();
+
+		// Send subscription_state message
+		const message: SubscriptionStateMessage = {
+			type: 'subscription_state',
+			subscriptions: globalState,
+		};
+
+		this.ws.send(JSON.stringify(message));
+
+		// @formatter:off
+		// Context-efficient logging: show component names (more useful than count)
+		const componentNames = Array.from(this.componentSubscriptions.keys()).join(', ');
+		console.log(`[WS] Subscribed to ${globalState.length} events from: ${componentNames}`);
+		// @formatter:on
+	}
+
+	/**
+	 * Merge all component subscription states into a single global state
+	 *
+	 * Uses a Map to deduplicate subscriptions by creating a unique key
+	 * for each (event + filters) combination.
+	 *
+	 * @returns Merged array of unique subscriptions
+	 */
+	private mergeAllComponentStates(): Array<{ event: string; filters?: Record<string, unknown> }> {
+		const merged = new Map<string, { event: string; filters?: Record<string, unknown> }>();
+
+		for (const [_componentId, specs] of this.componentSubscriptions) {
+			for (const spec of specs) {
+				// Create unique key: event + stringified filters
+				const key = spec.filters ? `${spec.event}:${JSON.stringify(spec.filters)}` : spec.event;
+
+				// Add to merged map (later entries with same key will override)
+				merged.set(key, spec);
+			}
+		}
+
+		return Array.from(merged.values());
 	}
 
 	/**

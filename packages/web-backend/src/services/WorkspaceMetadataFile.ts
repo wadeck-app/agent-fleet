@@ -7,13 +7,13 @@ const log = createLogger('WorkspaceMetadataFile');
 
 /**
  * Workspace metadata stored in .agent-fleet/workspace-metadata.json
+ * Note: projectId is no longer stored here. Use Projects API to manage workspace associations.
  */
 export interface WorkspaceFileMetadata {
 	id: string;
 	name?: string;
 	description?: string;
 	color?: string;
-	projectId?: string;
 	mode?: 'development' | 'production' | 'staging';
 	createdAt: string;
 	updatedAt: string;
@@ -85,13 +85,6 @@ export class WorkspaceMetadataFile {
 			name: metadata.name !== undefined ? metadata.name : existing?.name,
 			description: metadata.description !== undefined ? metadata.description : existing?.description,
 			color: metadata.color !== undefined ? metadata.color : existing?.color,
-			// If projectId is null, explicitly remove it; if undefined, keep existing
-			projectId:
-				metadata.projectId === null
-					? undefined
-					: metadata.projectId !== undefined
-						? metadata.projectId
-						: existing?.projectId,
 			mode: metadata.mode || existing?.mode || 'development',
 			createdAt: existing?.createdAt || metadata.createdAt || now,
 			updatedAt: now,

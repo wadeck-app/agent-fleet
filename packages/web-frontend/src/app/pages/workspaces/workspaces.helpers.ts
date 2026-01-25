@@ -21,26 +21,18 @@ const COLORS = [
 ];
 
 /**
- * Get colors that are not yet used by workspaces in the same project
- * @param workspaces - All workspaces
- * @param projectId - Project ID to filter by
+ * Get colors that are not yet used by the given workspaces
+ * @param projectWorkspaces - Workspaces to check for used colors
  * @returns Array of unused color hex codes
  */
-export function getUnusedColors(workspaces: Workspace[], projectId?: string): string[] {
+export function getUnusedColors(projectWorkspaces: Workspace[]): string[] {
 	// Safety check for undefined/null workspaces
-	if (!workspaces) {
+	if (!projectWorkspaces || projectWorkspaces.length === 0) {
 		return [...COLORS];
 	}
 
-	if (!projectId) {
-		// If no project, return all colors
-		return [...COLORS];
-	}
-
-	// Get colors used by workspaces in this project
-	const usedColors = new Set(
-		workspaces.filter(w => w.projectId === projectId && w.color).map(w => w.color!.toUpperCase())
-	);
+	// Get colors used by workspaces
+	const usedColors = new Set(projectWorkspaces.filter(w => w.color).map(w => w.color!.toUpperCase()));
 
 	// Return colors not yet used
 	return COLORS.filter(color => !usedColors.has(color.toUpperCase()));
@@ -48,20 +40,18 @@ export function getUnusedColors(workspaces: Workspace[], projectId?: string): st
 
 /**
  * Suggest a color for a new/edited workspace
- * - If workspace is in a project, suggest an unused color from that project
+ * - Suggest an unused color from the provided workspaces
  * - If all colors are used, return a random color
- * - If no project, return a random color
- * @param workspaces - All workspaces
- * @param projectId - Project ID to filter by (optional)
+ * @param projectWorkspaces - Workspaces to check for used colors
  * @returns Suggested color hex code
  */
-export function suggestWorkspaceColor(workspaces: Workspace[], projectId?: string): string {
+export function suggestWorkspaceColor(projectWorkspaces: Workspace[]): string {
 	// Safety check for undefined/null workspaces
-	if (!workspaces) {
+	if (!projectWorkspaces) {
 		return COLORS[Math.floor(Math.random() * COLORS.length)];
 	}
 
-	const unusedColors = getUnusedColors(workspaces, projectId);
+	const unusedColors = getUnusedColors(projectWorkspaces);
 
 	if (unusedColors.length === 0) {
 		// All colors used, return random color from palette

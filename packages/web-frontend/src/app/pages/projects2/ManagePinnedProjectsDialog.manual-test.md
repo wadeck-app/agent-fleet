@@ -8,13 +8,13 @@ Temporarily modify the API calls to add delays to observe optimistic states.
 
 ```typescript
 const handlePin = async (projectId: string) => {
-  console.log('[TEST] Starting pin:', projectId);
-  
-  // Add 2 second delay to see optimistic state
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  
-  await actualPinFunction(projectId);
-  console.log('[TEST] Pin completed:', projectId);
+	console.log('[TEST] Starting pin:', projectId);
+
+	// Add 2 second delay to see optimistic state
+	await new Promise(resolve => setTimeout(resolve, 2000));
+
+	await actualPinFunction(projectId);
+	console.log('[TEST] Pin completed:', projectId);
 };
 ```
 
@@ -23,13 +23,15 @@ const handlePin = async (projectId: string) => {
 ### Scenario 1: PIN with Delay
 
 **Expected Behavior:**
+
 1. Click ← on "Project Gamma" in Available (right) panel
 2. **IMMEDIATELY:** Project Gamma should appear in Pinned (left) panel
 3. **IMMEDIATELY:** Project Gamma should show opacity-50 + pointer-events-none (loading state)
-4. **WAIT 2 seconds**  
+4. **WAIT 2 seconds**
 5. **AFTER API:** Loading state clears, project stays in position (or moves if server assigns different order)
 
 **Current Bug:**
+
 - Project appears in left panel immediately ✅
 - NO loading state visible ❌
 - After API, project jumps to different position ❌
@@ -37,6 +39,7 @@ const handlePin = async (projectId: string) => {
 ### Scenario 2: UNPIN with Delay
 
 **Expected Behavior:**
+
 1. Click → on "Project Alpha" in Pinned (left) panel
 2. **IMMEDIATELY:** Project Alpha should appear in Available (right) panel
 3. **IMMEDIATELY:** Project Alpha should show opacity-50 (loading state)
@@ -44,11 +47,13 @@ const handlePin = async (projectId: string) => {
 5. **AFTER API:** Loading state clears, project stays in Available
 
 **Current Behavior:**
+
 - Works correctly ✅
 
 ### Scenario 3: REORDER with Delay
 
 **Expected Behavior:**
+
 1. Drag "Project Beta" above "Project Alpha"
 2. **IMMEDIATELY:** Projects reorder
 3. **IMMEDIATELY:** ALL pinned projects show opacity-50 (reordering state)
@@ -56,6 +61,7 @@ const handlePin = async (projectId: string) => {
 5. **AFTER API:** Reordering state clears
 
 **Current Bug:**
+
 - Projects reorder immediately ✅
 - NO reordering state visible ❌
 

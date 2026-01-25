@@ -51,7 +51,6 @@ export class WorkspaceMapper {
 			name,
 			description: metadata?.description,
 			color: metadata?.color,
-			projectId: metadata?.projectId,
 		} as ApiWorkspace;
 		// @formatter:on
 	}

@@ -7,6 +7,7 @@ import type {
 	EventData,
 	EventType,
 	SubscriptionMessage,
+	SubscriptionStateMessage,
 	TransportEvent,
 	TransportRequest,
 } from '@app/shared/transport';
@@ -199,6 +200,12 @@ export class WebSocketTransportServer implements ITransportServer {
 				return;
 			}
 
+			// Handle subscription state messages (state-based API)
+			if (message.type === 'subscription_state') {
+				this.handleSubscriptionState(clientId, socket, message as SubscriptionStateMessage);
+				return;
+			}
+
 			// Handle requests
 			if (message.id && message.method) {
 				await this.handleRequest(clientId, socket, message as TransportRequest);
@@ -232,6 +239,24 @@ export class WebSocketTransportServer implements ITransportServer {
 			action,
 			events,
 			filters,
+		});
+	}
+
+	/**
+	 * Handle subscription state message (state-based API)
+	 *
+	 * Replaces all current subscriptions with the new desired state in a single operation.
+	 */
+	private handleSubscriptionState(clientId: string, socket: WebSocket, message: SubscriptionStateMessage): void {
+		const { subscriptions } = message;
+
+		// Set complete subscription state in session manager
+		this.sessionManager.setSubscriptionState(clientId, subscriptions);
+
+		// Confirm state update
+		this.sendMessage(socket, {
+			type: 'subscription_state_updated',
+			count: subscriptions.length,
 		});
 	}
 

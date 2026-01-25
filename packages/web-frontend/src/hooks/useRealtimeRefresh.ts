@@ -96,33 +96,42 @@ export function useRealtimeRefresh(options: {
 		// Don't subscribe if disabled
 		if (!enabled) return;
 
-		const logMessage = filters
-			? `[${logPrefix}] Subscribing to real-time events with filters: ${JSON.stringify(filters)}`
-			: `[${logPrefix}] Subscribing to real-time events`;
-		console.log(logMessage, events);
+		// Generate componentId from logPrefix
+		const componentId = logPrefix;
 
-		// Subscribe to all events and collect unsubscribe functions
-		// Type assertion needed because transport.subscribe has strict event type checking
-		const unsubscribers = events.map(event =>
-			transport.subscribe(
-				event as import('@shared/transport').EventType,
-				data => {
-					console.log(`[${logPrefix}] Received event: ${event}`, data);
-					// Use ref to access latest callback without causing re-subscription
-					onEventRef.current();
-				},
-				filters // Pass filters to transport
-			)
-		);
+		// Build subscription specs
+		const subscriptions = events.map(event => ({
+			event,
+			filters,
+		}));
 
-		// Cleanup: unsubscribe from all events
+		// Set component subscription state (merged with other components)
+		// This sends a single subscription_state message to the server
+		transport.setComponentSubscriptionState?.(componentId, subscriptions);
+
+		// Register event handlers locally
+		// Use registerLocalHandler (if available) to avoid duplicate subscription messages
+		// Otherwise fallback to subscribe() for transports that don't support state-based API
+		const unsubscribers = events.map(event => {
+			const handler = (data: any) => {
+				console.log(`[${logPrefix}] Received event: ${event}`, data);
+				onEventRef.current();
+			};
+
+			// Prefer registerLocalHandler for state-based subscriptions
+			if (transport.registerLocalHandler) {
+				return transport.registerLocalHandler(event as import('@shared/transport').EventType, handler);
+			}
+
+			// Fallback to subscribe() for transports without state-based support
+			return transport.subscribe(event as import('@shared/transport').EventType, handler, filters);
+		});
+
+		// Cleanup: remove component subscriptions and unsubscribe handlers
 		return () => {
-			console.log(`[${logPrefix}] Unsubscribing from real-time events`);
+			transport.removeComponentSubscriptions?.(componentId);
 			unsubscribers.forEach(unsub => unsub());
 		};
-		// Only re-subscribe when transport, enabled, logPrefix, or the actual content of events/filters changes
-		// NOT when onEvent reference changes (use ref instead)
-		// NOT when events/filters array reference changes (use stringified keys instead)
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [transport, enabled, logPrefix, eventsKey, filtersKey]);
 }

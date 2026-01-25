@@ -3,7 +3,7 @@ import { type ReactNode } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@framework/lib/utils';
-import type { LucideIcon } from 'lucide-react';
+import { GripVertical, type LucideIcon } from 'lucide-react';
 
 import { Button } from '../primitives/Button';
 
@@ -115,7 +115,8 @@ export function DualListItem({
 			? {
 					transform: CSS.Transform.toString(transform),
 					transition,
-					opacity: isDragging ? 0.5 : 1,
+					// Only set opacity for dragging state - let CSS classes handle loading/reordering
+					...(isDragging ? { opacity: 0.5 } : {}),
 				}
 			: undefined;
 
@@ -124,8 +125,7 @@ export function DualListItem({
 		'flex items-center gap-2 rounded-sm transition-colors',
 		'hover:bg-accent',
 		// Loading state disables interactions and reduces opacity
-		(isLoading || (variant === 'sortable' && isReordering)) &&
-			'pointer-events-none opacity-50',
+		(isLoading || (variant === 'sortable' && isReordering)) && 'pointer-events-none opacity-50',
 		// Dragging state increases z-index
 		variant === 'sortable' && isDragging && 'z-50'
 	);
@@ -166,7 +166,6 @@ export function DualListItem({
 	return (
 		<div ref={setNodeRef} style={style} className={containerClasses}>
 			{/* Drag Handle */}
-			{/* eslint-disable-next-line no-restricted-syntax */}
 			<button
 				{...attributes}
 				{...listeners}
@@ -178,14 +177,7 @@ export function DualListItem({
 				aria-label={`Reorder ${label}`}
 				title="Drag to reorder"
 			>
-				<svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-					<circle cx="9" cy="5" r="1" />
-					<circle cx="9" cy="12" r="1" />
-					<circle cx="9" cy="19" r="1" />
-					<circle cx="15" cy="5" r="1" />
-					<circle cx="15" cy="12" r="1" />
-					<circle cx="15" cy="19" r="1" />
-				</svg>
+				<GripVertical className="h-4 w-4" />
 			</button>
 
 			{/* Icon */}

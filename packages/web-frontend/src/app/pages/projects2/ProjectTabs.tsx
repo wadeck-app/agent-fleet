@@ -26,6 +26,7 @@ export function ProjectTabs({
 		<TabGroup
 			variant="card"
 			title="Projects v2"
+			emptyMessage="No projects configured yet"
 			actions={
 				onManageClick && (
 					<Button variant="default" size="sm" onClick={onManageClick}>

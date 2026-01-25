@@ -4292,6 +4292,7 @@ agent-browser snapshot -i
 **Context**: ProjectsV2 refactoring - ManagePinnedProjectsDialog and ManageProjectWorkspacesDialog
 
 **Problem**: Massive code duplication across dual-list selector dialogs and their item components led to maintenance nightmare:
+
 - 75% duplication between 2 dialogs (596 lines combined)
 - 70% duplication between 4 item components (442 lines combined)
 - Helper functions duplicated 3x across files
@@ -4302,20 +4303,21 @@ agent-browser snapshot -i
 **Solution**: Create generic reusable components with TypeScript generics and render props:
 
 1. **DualListDialog<TLeft, TRight>** - Generic two-column dialog
-   - Integrated DnD context (@dnd-kit)
-   - Integrated SearchBar
-   - Support for loading, reordering, optimistic updates
-   - Render props for complete flexibility
+    - Integrated DnD context (@dnd-kit)
+    - Integrated SearchBar
+    - Support for loading, reordering, optimistic updates
+    - Render props for complete flexibility
 
 2. **DualListItem** - Generic item component
-   - 2 variants: `available` (simple) and `sortable` (draggable)
-   - Replaces 4 specialized components
-   - Support for icon, label, badge customization
+    - 2 variants: `available` (simple) and `sortable` (draggable)
+    - Replaces 4 specialized components
+    - Support for icon, label, badge customization
 
 3. **Centralized utilities** - Shared helper functions
-   - `getBasename()` in `pathUtils.ts` instead of 3 duplications
+    - `getBasename()` in `pathUtils.ts` instead of 3 duplications
 
 **Results**:
+
 - Reduced code by ~500 lines (-23%)
 - Eliminated dialog duplication: 75% → 0%
 - Eliminated item duplication: 70% → 0%
@@ -4390,6 +4392,122 @@ interface DualListDialogProps<TLeft, TRight> {
 **Documentation**: See `.claude/temp/refactoring-summary-dual-list-dialogs.md` for complete refactoring guide
 
 **Related Entries**:
+
 - Component architecture patterns
 - TypeScript generics best practices
 - Render props vs HOCs
+
+---
+
+## State-Based Subscription API: Separate Handler Registration from Server Communication
+
+**Date**: 2026-01-24  
+**Context**: Implementing state-based subscription API to reduce WebSocket message overhead  
+**Impact**: 🔴 Critical - Prevents duplicate messages and log pollution
+
+### Problem
+
+When implementing the state-based subscription API, the existing `subscribe()` method mixed two responsibilities:
+
+1. **Local handler registration** (subscribing to events in the client)
+2. **Server communication** (sending subscription messages via WebSocket)
+
+This caused:
+
+- **Duplicate messages**: Both `setComponentSubscriptionState()` (new API) and `subscribe()` (old API) sent messages to the server
+- **Log pollution**: Hundreds of individual subscription logs instead of one consolidated message
+- **Confusion**: Two systems running in parallel instead of one replacing the other
+
+### Root Cause
+
+The `subscribe()` method had a side effect:
+
+```typescript
+// ❌ BAD: Mixes local registration with server communication
+subscribe(event, handler, filters) {
+  this.eventHandlers.add(handler);  // Local registration
+  this.sendSubscriptionMessage('subscribe', [event], filters);  // Server message (side effect!)
+  return unsubscribe;
+}
+```
+
+When using the new state-based API, we still needed local handler registration but NOT the server message (already sent via `subscription_state`).
+
+### Solution
+
+**Separate concerns into two methods:**
+
+```typescript
+// ✅ GOOD: Local registration only (no side effects)
+registerLocalHandler(event, handler) {
+  this.eventHandlers.add(handler);
+  return () => this.eventHandlers.delete(handler);
+}
+
+// ✅ GOOD: Full subscription (registration + server message)
+subscribe(event, handler, filters) {
+  this.registerLocalHandler(event, handler);  // Reuse local registration
+  this.sendSubscriptionMessage('subscribe', [event], filters);  // Server message
+  return unsubscribe;
+}
+```
+
+**Hook usage:**
+
+```typescript
+// Set component state (sends ONE subscription_state message)
+transport.setComponentSubscriptionState(componentId, subscriptions);
+
+// Register handlers locally (NO server messages)
+const unsubscribers = events.map(event => transport.registerLocalHandler(event, handler));
+```
+
+### Key Lessons
+
+1. **Separate side effects from pure operations**: Methods that register things locally should NOT have network side effects
+2. **State-based APIs reduce coordination bugs**: Declaring desired state is simpler than managing add/remove operations
+3. **Context-efficient logging matters**:
+    - ✅ Show component names (5 max): `[WS] Subscribed to 16 events from: WorkersWidget, ProjectsV2Page, useWorkspaceScripts`
+    - ❌ Don't show all events (15+): Too verbose
+4. **Optional methods for gradual migration**: Make new methods optional (`registerLocalHandler?()`) to avoid breaking all transport implementations at once
+5. **React StrictMode reveals subscription bugs**: Double mount/unmount in development mode helps catch cleanup issues early
+
+### Impact
+
+**Before:**
+
+```
+[WorkersWidget] Setting subscription state: 3 events
+[WS] Queuing subscription state sync (not connected yet)
+[WS] Subscription subscribe: ['b2f:workers:updated']
+[WS] Subscription subscribe: ['b2f:worker:connected']
+[WS] Subscription subscribe: ['b2f:worker:disconnected']
+[WS] Subscription state synced: 3 unique events from 1 components
+// 6 log lines, duplicate messages sent
+```
+
+**After:**
+
+```
+[WS] Subscribed to 3 events from: WorkersWidget
+// 1 log line, 1 message sent
+```
+
+### When to Apply
+
+- ✅ When a method has both local and remote side effects
+- ✅ When implementing state-based APIs alongside imperative ones
+- ✅ When seeing duplicate network messages
+- ✅ When transitioning from imperative to declarative APIs
+
+### Related Patterns
+
+- **Command-Query Separation (CQS)**: Methods should either change state OR return data, not both
+- **Single Responsibility Principle**: Each method should have one clear purpose
+- **State-based vs Event-based synchronization**: State-based is simpler for multi-component scenarios
+
+### Files Modified
+
+- `packages/web-frontend/src/transport/adapters/WebSocketTransportClient.ts`
+- `packages/web-frontend/src/hooks/useRealtimeRefresh.ts`
+- `packages/web-backend/src/transport/TransportSessionManager.ts`

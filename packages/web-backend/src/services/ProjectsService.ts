@@ -12,7 +12,6 @@ import type {
 	UpdateProject,
 } from '@app/shared/api/projects.contract';
 import type { Task } from '@app/shared/api/tasks.contract';
-import type { Workspace } from '@app/shared/api/workspaces.contract';
 import type { BulkDeleteResponse } from '@app/shared/common/api-helpers';
 import {
 	ConflictException,
@@ -68,11 +67,39 @@ export class ProjectsService {
 	) {}
 
 	/**
+	 * Normalize project data - ensure all required fields have proper defaults
+	 *
+	 * This handles legacy projects that may have undefined fields from before schema changes.
+	 * IMPORTANT: This is applied ONLY on read operations, never on write operations.
+	 *
+	 * @param project Raw project data (may have undefined fields)
+	 * @returns Normalized project with all required fields
+	 */
+	private normalizeProject(project: Project): Project {
+		return {
+			...project,
+			workspaceIds: project.workspaceIds ?? [],
+			taskCount: project.taskCount ?? 0,
+			archived: project.archived ?? false,
+			pinned: project.pinned ?? false,
+			order: project.order ?? 0,
+		};
+	}
+
+	/**
+	 * Normalize array of projects
+	 */
+	private normalizeProjects(projects: Project[]): Project[] {
+		return projects.map(p => this.normalizeProject(p));
+	}
+
+	/**
 	 * Get projects data with summary statistics
 	 */
 	async getProjectsData(): Promise<ProjectsData> {
 		try {
-			const projects = await this.repository.findAll();
+			const rawProjects = await this.repository.findAll();
+			const projects = this.normalizeProjects(rawProjects);
 
 			const summary = {
 				total: projects.length,
@@ -104,7 +131,8 @@ export class ProjectsService {
 	 */
 	async getProjectsList(query: ProjectsListQuery): Promise<ProjectsListResponse> {
 		try {
-			let projects = await this.repository.findAll(query);
+			const rawProjects = await this.repository.findAll(query);
+			let projects = this.normalizeProjects(rawProjects);
 
 			// Apply search if provided
 			if (query.search) {
@@ -168,34 +196,43 @@ export class ProjectsService {
 		if (!project) {
 			throw new NotFoundException(`Project with id ${id} not found`, ERROR_CODES.RESOURCE_NOT_FOUND);
 		}
-		return project;
+		return this.normalizeProject(project);
 	}
 
 	/**
 	 * Create a new project
 	 * Emits 'b2f:project:created' event after successful creation
+	 *
+	 * IMPORTANT: Default values are applied here at creation time, not in Zod schemas.
+	 * This prevents PATCH operations from overwriting fields with defaults when not included in payload.
 	 */
 	async create(data: CreateProject): Promise<Project> {
 		try {
 			// Business validation: Check if name is unique (optional - depends on requirements)
 			// For now, we allow duplicate names
 
-			// Create via repository
+			// Create via repository with default values
 			const project = await this.repository.create({
 				...data,
+				// Apply default values for required fields not provided by user
+				workspaceIds: data.workspaceIds ?? [],
 				taskCount: 0,
+				archived: data.archived ?? false,
 				pinned: false,
 				order: 0,
 			});
 
+			// Normalize before returning
+			const normalizedProject = this.normalizeProject(project);
+
 			// Emit event AFTER successful creation
-			this.eventBroadcaster.broadcast('b2f:project:created', project);
+			this.eventBroadcaster.broadcast('b2f:project:created', normalizedProject);
 
 			// Emit aggregate event
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as any);
 
-			return project;
+			return normalizedProject;
 		} catch (error) {
 			log.error(' Failed to create project:', error);
 			throw error;
@@ -208,7 +245,7 @@ export class ProjectsService {
 	 */
 	async update(id: string, data: UpdateProject): Promise<Project> {
 		try {
-			// Get current entity
+			// Get current entity (already normalized by getById)
 			const current = await this.getById(id);
 
 			// Optimistic locking check
@@ -226,14 +263,17 @@ export class ProjectsService {
 				version: current.version + 1,
 			});
 
+			// Normalize before returning
+			const normalizedProject = this.normalizeProject(updated);
+
 			// Emit event AFTER successful update
-			this.eventBroadcaster.broadcast('b2f:project:updated', updated);
+			this.eventBroadcaster.broadcast('b2f:project:updated', normalizedProject);
 
 			// Emit aggregate event
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as any);
 
-			return updated;
+			return normalizedProject;
 		} catch (error) {
 			log.error(' Failed to update project:', error);
 			throw error;
@@ -279,56 +319,14 @@ export class ProjectsService {
 	}
 
 	/**
-	 * Clear projectId from workspaces when project is deleted
-	 * Best-effort approach: only updates connected workspaces
+	 * Clear project association when project is deleted
+	 * Note: No longer needs to update workspace metadata since projectId is removed.
+	 * The single source of truth is project.workspaceIds[], which is deleted with the project.
 	 */
 	private async clearProjectFromWorkspaces(projectId: string, workspaceIds: string[]): Promise<void> {
-		if (workspaceIds.length === 0) {
-			return;
-		}
-
-		try {
-			// Get connected workspaces
-			const workerWorkspaces = await this.orchestratorWrapper.getConnectedWorkersWorkspaces();
-			const workspacePaths = workerWorkspaces.map(w => w.workspacePath);
-			const metadataMap = await this.workspaceMetadataRepository.getMetadataForWorkspaces(workspacePaths);
-
-			// Find workspaces that belong to this project
-			const affectedWorkspaces: Array<{ path: string; id: string }> = [];
-			for (const [path, metadata] of metadataMap.entries()) {
-				if (metadata.projectId === projectId || workspaceIds.includes(metadata.id)) {
-					affectedWorkspaces.push({ path, id: metadata.id });
-				}
-			}
-
-			// Clear projectId from each workspace
-			for (const workspace of affectedWorkspaces) {
-				try {
-					const metadata = await this.workspaceMetadataRepository.upsertMetadata(workspace.path, {
-						projectId: undefined,
-					});
-
-					// Find the worker workspace info to emit full workspace object
-					const workerWorkspace = workerWorkspaces.find(w => w.workspacePath === workspace.path);
-					if (workerWorkspace) {
-						const workspaceData = WorkspaceMapper.mapWorkerWorkspaceToApi(workerWorkspace, metadata);
-						this.eventBroadcaster.broadcast(B2F_WORKSPACE_UPDATED, workspaceData);
-						log.info(` Cleared projectId from workspace ${workspace.id} (project ${projectId} deleted)`);
-					}
-				} catch (error) {
-					log.warn(` Failed to clear projectId from workspace ${workspace.id}:`, error);
-				}
-			}
-
-			if (affectedWorkspaces.length < workspaceIds.length) {
-				log.warn(
-					`Only cleared ${affectedWorkspaces.length} of ${workspaceIds.length} workspaces (some not connected)`
-				);
-			}
-		} catch (error) {
-			log.error(' Failed to clear projectId from workspaces:', error);
-			// Don't throw - deletion should succeed even if workspace cleanup fails
-		}
+		// Nothing to do - workspaceIds are deleted with the project
+		// No bidirectional sync needed anymore
+		log.info(` Project ${projectId} deletion will remove ${workspaceIds.length} workspace associations`);
 	}
 
 	/**
@@ -369,20 +367,23 @@ export class ProjectsService {
 	 */
 	async addWorkspaces(id: string, data: AddWorkspacesToProject): Promise<Project> {
 		try {
-			// Check if project exists
+			// Check if project exists (already normalized)
 			await this.getById(id);
 
 			// Add workspaces via repository
 			const updated = await this.repository.addWorkspaces(id, data.workspaceIds);
 
+			// Normalize before returning
+			const normalizedProject = this.normalizeProject(updated);
+
 			// Emit event AFTER successful update
-			this.eventBroadcaster.broadcast('b2f:project:updated', updated);
+			this.eventBroadcaster.broadcast('b2f:project:updated', normalizedProject);
 
 			// Emit aggregate event
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as any);
 
-			return updated;
+			return normalizedProject;
 		} catch (error) {
 			log.error(' Failed to add workspaces to project:', error);
 			throw error;

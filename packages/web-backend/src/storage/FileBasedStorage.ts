@@ -107,17 +107,32 @@ export class FileBasedStorage implements DataStorage {
 		const filePath = this.getFilePath(table);
 		const items = this.tables.get(table) || [];
 
+		console.log('====== saveTable START ======');
+		console.log('table:', table);
+		console.log('filePath:', filePath);
+		console.log('items count:', items.length);
+		log.info(`[DEBUG] saveTable: Writing ${items.length} items to ${filePath}`);
+
 		try {
 			// Ensure directory exists
 			await mkdir(dirname(filePath), { recursive: true });
 
 			// Write data in format: { "tableName": [...items] }
 			const data = { [table]: items };
-			await writeFile(filePath, JSON.stringify(data, null, '\t'), 'utf-8');
+			const jsonContent = JSON.stringify(data, null, '\t');
 
-			log.info(`Saved ${items.length} items to ${filePath}`);
+			console.log('JSON content length:', jsonContent.length, 'bytes');
+			log.info(`[DEBUG] saveTable: JSON content length: ${jsonContent.length} bytes`);
+
+			await writeFile(filePath, jsonContent, 'utf-8');
+
+			console.log('====== saveTable SUCCESS ======');
+			console.log(`Saved ${items.length} items to ${filePath}`);
+			log.info(`[DEBUG] saveTable: Successfully saved ${items.length} items to ${filePath}`);
 		} catch (error) {
-			log.error(`Error saving ${filePath}:`, error);
+			console.log('====== saveTable ERROR ======');
+			console.log('Error:', error);
+			log.error(`[DEBUG] saveTable: ERROR saving ${filePath}:`, error);
 			throw new Error(`Failed to save table ${table}: ${(error as Error).message}`);
 		}
 	}
@@ -169,12 +184,29 @@ export class FileBasedStorage implements DataStorage {
 	}
 
 	async update<T extends BaseEntity>(table: string, id: string, data: Partial<Omit<T, 'id'>>): Promise<T> {
+		console.log('====== FileBasedStorage.update START ======');
+		console.log('table:', table);
+		console.log('id:', id);
+		console.log('data:', JSON.stringify(data, null, 2));
+		log.info(`[DEBUG] FileBasedStorage.update called for table=${table}, id=${id}`);
+		log.info(`[DEBUG] Update data:`, JSON.stringify(data, null, 2));
+
 		const tableData = await this.getTable<T>(table);
+		console.log(`Table ${table} has ${tableData.length} items`);
+		log.info(`[DEBUG] Table ${table} has ${tableData.length} items`);
+
 		const index = tableData.findIndex(item => item.id === id);
 
 		if (index === -1) {
+			console.log(`ERROR: Entity with id ${id} NOT FOUND in table ${table}`);
+			log.error(`[DEBUG] Entity with id ${id} NOT FOUND in table ${table}`);
 			throw new Error(`Entity with id ${id} not found in table ${table}`);
 		}
+
+		console.log(`Found entity at index ${index}`);
+		console.log('Current entity:', JSON.stringify(tableData[index], null, 2));
+		log.info(`[DEBUG] Found entity at index ${index}`);
+		log.info(`[DEBUG] Current entity:`, JSON.stringify(tableData[index], null, 2));
 
 		const updatedEntity: T = {
 			...tableData[index],
@@ -183,8 +215,15 @@ export class FileBasedStorage implements DataStorage {
 			updatedAt: new Date().toISOString(),
 		} as T;
 
+		console.log('Updated entity:', JSON.stringify(updatedEntity, null, 2));
+		log.info(`[DEBUG] Updated entity:`, JSON.stringify(updatedEntity, null, 2));
+
 		tableData[index] = updatedEntity;
+		console.log(`Calling saveTable for ${table}...`);
+		log.info(`[DEBUG] Calling saveTable for ${table}...`);
 		await this.saveTable(table);
+		console.log(`====== FileBasedStorage.update COMPLETED for ${table} ======`);
+		log.info(`[DEBUG] saveTable COMPLETED for ${table}`);
 
 		return updatedEntity;
 	}

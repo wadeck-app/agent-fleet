@@ -34,7 +34,6 @@ export const WorkspaceSchema = z.object({
 	name: z.string().optional(),
 	description: z.string().optional(),
 	color: WorkspaceColorSchema,
-	projectId: z.string().optional(),
 });
 
 export const WorkspacesDataSchema = z.object({
@@ -93,12 +92,12 @@ export type WorkspacesListResponse = z.infer<typeof WorkspacesListResponseSchema
 
 /**
  * DTO for updating workspace metadata
+ * Note: projectId association is now managed via Projects API (PATCH /api/projects/:id)
  */
 export const UpdateWorkspaceDtoSchema = z.object({
 	name: z.string().optional(),
 	description: z.string().optional(),
 	color: z.string().optional(),
-	projectId: z.string().nullable().optional(),
 });
 
 export type UpdateWorkspaceDto = z.infer<typeof UpdateWorkspaceDtoSchema>;

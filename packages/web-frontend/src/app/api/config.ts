@@ -56,7 +56,7 @@ export function getApiBaseUrl(): string {
 		return `http://${host}:${port}/api`;
 	}
 
-	throw new Error('❌❌❌ No STORYBOOK, PROD, VITE_API_BASE_URL, VITE_UNIT_TEST, DEV defined ❌❌❌');
+	throw new Error('[ERROR] No STORYBOOK, PROD, VITE_API_BASE_URL, VITE_UNIT_TEST, DEV defined');
 }
 
 /**

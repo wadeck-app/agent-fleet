@@ -20,6 +20,7 @@
 		"start:library": "cross-env ORCHESTRATOR_MODE=library node dist/server.js",
 		"start:remote": "cross-env ORCHESTRATOR_MODE=remote node dist/server.js",
 		"migrate": "tsx src/migrations/MigrateToBackendStorage.ts",
+		"migrate:remove-workspace-projectid": "tsx src/scripts/migrate-remove-workspace-projectid.ts",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",

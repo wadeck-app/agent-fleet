@@ -25,7 +25,7 @@ const tabGroupVariants = cva(
 const tabGroupWrapperVariants = cva(
 	// @formatter:off
 	`
-   flex items-center justify-between px-4
+   flex items-center justify-between px-4 min-h-[inherit]
  `
 	// @formatter:on
 );
@@ -75,6 +75,10 @@ export type TabGroupProps = React.ComponentProps<'div'> &
 		 * Actions to display at the end (e.g., manage button)
 		 */
 		actions?: React.ReactNode;
+		/**
+		 * Message to display when there are no tabs (default: "No items configured yet")
+		 */
+		emptyMessage?: string;
 	};
 
 /**
@@ -112,13 +116,30 @@ export type TabGroupProps = React.ComponentProps<'div'> &
  *   </TabButton>
  * </TabGroup>
  */
-function TabGroup({ className, variant = 'default', title, actions, children, ...props }: TabGroupProps) {
+function TabGroup({
+	className,
+	variant = 'default',
+	title,
+	actions,
+	emptyMessage = 'No items configured yet',
+	children,
+	...props
+}: TabGroupProps) {
+	// Check if children is empty
+	const hasChildren = React.Children.count(children) > 0;
+
 	return (
-		<div className={cn(tabGroupVariants({ variant }), className)} {...props}>
+		<div className={cn(tabGroupVariants({ variant }), 'min-h-[48px]', className)} {...props}>
 			<div className={tabGroupWrapperVariants()}>
 				<div className={tabGroupContentVariants({ hasTitle: !!title })}>
 					{title && <span className={tabGroupTitleVariants()}>{title}</span>}
-					<div className={tabGroupTabsVariants()}>{children}</div>
+					<div className={tabGroupTabsVariants()}>
+						{hasChildren ? (
+							children
+						) : (
+							<span className="py-2 text-sm text-muted-foreground">{emptyMessage}</span>
+						)}
+					</div>
 				</div>
 				{actions && <div>{actions}</div>}
 			</div>

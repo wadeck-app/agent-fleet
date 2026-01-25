@@ -669,6 +669,20 @@ async function start(): Promise<void> {
 		const factory = initializeFactory(storageMode, orchestratorClient);
 		factoryInstance = factory;
 
+		// Run data migrations (idempotent - safe to run multiple times)
+		try {
+			log.info('Running data migrations...');
+			const { NormalizeProjectsMigration } = await import('./migrations/NormalizeProjectsMigration');
+			const storage = factory.getStorage();
+			const normalizeProjectsMigration = new NormalizeProjectsMigration(storage);
+			const updatedProjects = await normalizeProjectsMigration.run();
+			if (updatedProjects > 0) {
+				log.info(`Migration: Normalized ${updatedProjects} projects with undefined fields`);
+			}
+		} catch (err) {
+			log.error('Failed to run migrations (non-fatal, continuing startup):', err);
+		}
+
 		if (process.env.USE_PRODUCTION_DB === 'true') {
 			//TODO database integration
 			// Seed initial data (for development)

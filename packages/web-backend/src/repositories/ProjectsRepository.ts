@@ -45,7 +45,7 @@ export class ProjectsRepository {
 		if (query?.workspaceId) {
 			// Filter projects that contain this workspaceId in their workspaceIds array
 			const allProjects = await qb.execute();
-			const filtered = allProjects.filter(p => p.workspaceIds.includes(query.workspaceId!));
+			const filtered = allProjects.filter(p => p.workspaceIds?.includes(query.workspaceId!) ?? false);
 			return filtered;
 		}
 
@@ -111,25 +111,17 @@ export class ProjectsRepository {
 			throw new Error(`Project with id ${id} not found`);
 		}
 
-		log.info(
-			`[ProjectsRepository] Adding workspaces to project ${id}. Current workspaceIds:`,
-			project.workspaceIds,
-			'Adding:',
-			workspaceIds
-		);
-
 		// Merge workspace IDs (avoid duplicates)
-		const uniqueWorkspaceIds = Array.from(new Set([...project.workspaceIds, ...workspaceIds]));
-
-		log.info(`[ProjectsRepository] Merged workspaceIds:`, uniqueWorkspaceIds);
+		// Handle undefined workspaceIds (legacy data)
+		const currentWorkspaceIds = project.workspaceIds ?? [];
+		const uniqueWorkspaceIds = Array.from(new Set([...currentWorkspaceIds, ...workspaceIds]));
 
 		const updatedProject = await this.update(id, {
 			workspaceIds: uniqueWorkspaceIds,
 			version: project.version + 1,
 		});
 
-		log.info(`[ProjectsRepository] After update, project ${id} workspaceIds:`, updatedProject.workspaceIds);
-
+		log.info(`Added workspaces to project ${id}:`, workspaceIds);
 		return updatedProject;
 	}
 
@@ -144,7 +136,9 @@ export class ProjectsRepository {
 			throw new Error(`Project with id ${id} not found`);
 		}
 
-		const updatedWorkspaceIds = project.workspaceIds.filter(wsId => wsId !== workspaceId);
+		// Handle undefined workspaceIds (legacy data)
+		const currentWorkspaceIds = project.workspaceIds ?? [];
+		const updatedWorkspaceIds = currentWorkspaceIds.filter(wsId => wsId !== workspaceId);
 
 		return this.update(id, {
 			workspaceIds: updatedWorkspaceIds,
@@ -169,5 +163,16 @@ export class ProjectsRepository {
 			taskCount: newTaskCount,
 			version: project.version + 1,
 		});
+	}
+
+	/**
+	 * Get project that contains this workspace
+	 * Single source of truth: project.workspaceIds[]
+	 * @param workspaceId Workspace ID to search for
+	 * @returns Project containing the workspace, or null if not found
+	 */
+	async getProjectForWorkspace(workspaceId: string): Promise<Project | null> {
+		const projects = await this.findAll({});
+		return projects.find(p => p.workspaceIds?.includes(workspaceId)) ?? null;
 	}
 }

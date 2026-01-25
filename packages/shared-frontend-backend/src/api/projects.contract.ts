@@ -124,18 +124,54 @@ export const ProjectIconColorSchema = z
 
 /**
  * Project schema - Full project entity
+ *
+ * IMPORTANT: No .default() here because:
+ * 1. Entity schemas represent the structure of existing data
+ * 2. Default values should be applied at creation time in the backend, not during parsing
+ * 3. PATCH operations (UpdateProjectSchema) inherit these defaults which causes fields
+ *    to be overwritten with default values when not included in the update payload
+ *
+ * Example bug: When updating pinned=true, if workspaceIds is not in the payload,
+ * the .default([]) would set workspaceIds=[] and overwrite existing workspace associations.
  */
 export const ProjectSchema = z.object({
 	id: z.string(),
 	name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
 	description: z.string().max(500, 'Description must be less than 500 characters').optional(),
-	workspaceIds: z.array(z.string()).default([]),
-	taskCount: z.number().int().min(0).default(0),
+	workspaceIds: z.array(z.string()),
+	taskCount: z.number().int().min(0),
 	icon: ProjectIconSchema,
 	iconColor: ProjectIconColorSchema,
-	archived: z.boolean().default(false),
-	pinned: z.boolean().default(false),
-	order: z.number().int().min(0).default(0),
+	archived: z.boolean(),
+	pinned: z.boolean(),
+	order: z.number().int().min(0),
+	createdAt: z.string(), // ISO 8601
+	updatedAt: z.string(), // ISO 8601
+	version: z.number().int().min(0), // For optimistic locking
+});
+
+/**
+ * Project response schema - Normalizes legacy data with undefined fields
+ *
+ * This schema is used ONLY for reading data (GET endpoints).
+ * It applies .catch() to handle projects that have undefined fields from before the schema change.
+ *
+ * Why separate schema?
+ * - ProjectSchema is strict (no defaults) to prevent PATCH bug
+ * - ProjectResponseSchema normalizes data on read to handle legacy projects
+ * - This ensures existing projects display correctly without reintroducing the PATCH bug
+ */
+export const ProjectResponseSchema = z.object({
+	id: z.string(),
+	name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
+	description: z.string().max(500, 'Description must be less than 500 characters').optional(),
+	workspaceIds: z.array(z.string()).catch([]), // Normalize undefined to []
+	taskCount: z.number().int().min(0).catch(0), // Normalize undefined to 0
+	icon: ProjectIconSchema,
+	iconColor: ProjectIconColorSchema,
+	archived: z.boolean().catch(false), // Normalize undefined to false
+	pinned: z.boolean().catch(false), // Normalize undefined to false
+	order: z.number().int().min(0).catch(0), // Normalize undefined to 0
 	createdAt: z.string(), // ISO 8601
 	updatedAt: z.string(), // ISO 8601
 	version: z.number().int().min(0), // For optimistic locking
@@ -143,6 +179,9 @@ export const ProjectSchema = z.object({
 
 /**
  * Create project request schema
+ *
+ * Fields omitted: id, timestamps, version, taskCount, pinned, order (managed by backend)
+ * Optional fields: workspaceIds, archived (defaults applied in backend)
  */
 export const CreateProjectSchema = ProjectSchema.omit({
 	id: true,
@@ -152,6 +191,10 @@ export const CreateProjectSchema = ProjectSchema.omit({
 	taskCount: true,
 	pinned: true,
 	order: true,
+}).extend({
+	// Make these fields optional for creation (defaults applied in backend)
+	workspaceIds: z.array(z.string()).optional(),
+	archived: z.boolean().optional(),
 });
 
 /**
@@ -201,14 +244,14 @@ export const ProjectsDataSchema = z.object({
 		active: z.number(),
 		archived: z.number(),
 	}),
-	projects: z.array(ProjectSchema),
+	projects: z.array(ProjectResponseSchema),
 });
 
 /**
  * Paginated projects list response
  */
 export const ProjectsListResponseSchema = z.object({
-	items: z.array(ProjectSchema),
+	items: z.array(ProjectResponseSchema),
 	pagination: z
 		.object({
 			total: z.number(),
@@ -282,7 +325,7 @@ export const PROJECTS_API_ROUTES = defineRoutes({
 		},
 		POST: {
 			body: CreateProjectSchema,
-			response: ProjectSchema,
+			response: ProjectResponseSchema,
 		},
 		DELETE: {
 			body: BulkDeleteRequestSchema,
@@ -292,12 +335,12 @@ export const PROJECTS_API_ROUTES = defineRoutes({
 	'/api/projects/:id': {
 		GET: {
 			params: z.object({ id: z.string() }),
-			response: ProjectSchema,
+			response: ProjectResponseSchema,
 		},
 		PATCH: {
 			params: z.object({ id: z.string() }),
 			body: UpdateProjectSchema,
-			response: ProjectSchema,
+			response: ProjectResponseSchema,
 		},
 		DELETE: {
 			params: z.object({ id: z.string() }),
@@ -308,7 +351,7 @@ export const PROJECTS_API_ROUTES = defineRoutes({
 		POST: {
 			params: z.object({ id: z.string() }),
 			body: AddWorkspacesToProjectSchema,
-			response: ProjectSchema,
+			response: ProjectResponseSchema,
 		},
 	},
 	'/api/projects/:id/board': {

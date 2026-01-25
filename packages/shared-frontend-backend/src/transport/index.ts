@@ -22,6 +22,8 @@ export type {
 	TransportResponse,
 	TransportEvent,
 	SubscriptionMessage,
+	SubscriptionSpec,
+	SubscriptionStateMessage,
 	TransportError,
 } from './TransportProtocol';
 

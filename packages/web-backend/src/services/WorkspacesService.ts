@@ -333,17 +333,18 @@ export class WorkspacesService {
 	 */
 
 	/**
-	 * Update workspace metadata (name, description, color, projectId)
+	 * Update workspace metadata (name, description, color)
 	 * Emits 'b2f:workspace:updated' event after successful update
-	 * Handles bidirectional sync: workspace.projectId ↔ project.workspaceIds[]
+	 * Note: Project association is now managed via Projects API (PATCH /api/projects/:id)
 	 */
 	async updateWorkspace(workspaceId: string, data: UpdateWorkspaceDto): Promise<Workspace> {
+		log.info(`Updating workspace ${workspaceId}`, { data });
+
 		try {
 			// Find workspace by ID among connected workers
 			const workerWorkspaces = await this.orchestratorWrapper.getConnectedWorkersWorkspaces();
 
-			// For now, use workspaceId as the path identifier or match by metadata ID
-			// First, try to find by checking metadata IDs
+			// Try to find workspace by metadata ID or generated ID
 			const workspacePaths = workerWorkspaces.map(w => w.workspacePath);
 			const metadataMap = await this.metadataRepository.getMetadataForWorkspaces(workspacePaths);
 
@@ -372,49 +373,12 @@ export class WorkspacesService {
 				throw new Error(`Workspace ${workspaceId} not found`);
 			}
 
-			// Get existing metadata to compare projectId
-			const existingMetadata = metadataMap.get(targetWorkspacePath);
-			const oldProjectId = existingMetadata?.projectId;
-			const newProjectId = data.projectId;
-
 			// Update metadata
 			const metadata = await this.metadataRepository.upsertMetadata(targetWorkspacePath, {
 				name: data.name,
 				description: data.description,
 				color: data.color,
-				projectId: data.projectId,
 			});
-
-			// Handle bidirectional sync with projects
-			if (oldProjectId !== newProjectId) {
-				log.info(`Project ID changed for workspace ${workspaceId}: ${oldProjectId} -> ${newProjectId}`);
-				// Remove workspace from old project if it had one
-				if (oldProjectId) {
-					try {
-						await this.projectsRepository.removeWorkspace(oldProjectId, workspaceId);
-						log.info(`Removed workspace ${workspaceId} from project ${oldProjectId}`);
-					} catch (error) {
-						log.warn(
-							`[WorkspacesService] Failed to remove workspace from old project ${oldProjectId}:`,
-							error
-						);
-					}
-				}
-
-				// Add workspace to new project if assigned
-				if (newProjectId) {
-					log.info(`Attempting to add workspace ${workspaceId} to project ${newProjectId}`);
-					try {
-						const updatedProject = await this.projectsRepository.addWorkspaces(newProjectId, [workspaceId]);
-						log.info(
-							`Added workspace ${workspaceId} to project ${newProjectId}. Project workspaceIds:`,
-							updatedProject.workspaceIds
-						);
-					} catch (error) {
-						log.warn(`[WorkspacesService] Failed to add workspace to new project ${newProjectId}:`, error);
-					}
-				}
-			}
 
 			// Start watching the metadata file if not already watching
 			this.metadataRepository.startWatching(targetWorkspacePath);
@@ -431,9 +395,10 @@ export class WorkspacesService {
 			// Emit event AFTER successful update
 			this.eventBroadcaster.broadcast(B2F_WORKSPACE_UPDATED, workspace);
 
+			log.info(`Successfully updated workspace ${workspaceId}`);
 			return workspace;
 		} catch (error) {
-			log.error('Failed to update workspace:', error);
+			log.error(`Failed to update workspace ${workspaceId}:`, error);
 			throw error;
 		}
 	}

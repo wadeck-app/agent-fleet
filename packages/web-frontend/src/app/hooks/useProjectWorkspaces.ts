@@ -32,7 +32,7 @@ export interface UseProjectWorkspacesResult {
 	error: string | null;
 	loadWorkspaces: () => Promise<void>;
 	associateWorkspace: (workspaceId: string, projectId: string) => Promise<void>;
-	dissociateWorkspace: (workspaceId: string) => Promise<void>;
+	dissociateWorkspace: (workspaceId: string, projectId: string) => Promise<void>;
 	reorderWorkspaces: (projectId: string, activeId: string, overId: string, projectVersion: number) => Promise<void>;
 	getProjectWorkspaces: (project: Project | undefined) => Workspace[];
 	clearError: () => void;
@@ -90,13 +90,21 @@ export function useProjectWorkspaces(): UseProjectWorkspacesResult {
 
 	/**
 	 * Associate a workspace with a project
-	 * Backend handles bidirectional sync: updates both workspace.projectId AND project.workspaceIds
+	 * Updates project.workspaceIds[] to include the workspace
 	 */
 	const associateWorkspace = useCallback(
 		async (workspaceId: string, projectId: string) => {
 			try {
 				setError(null);
-				await workspacesApi.updateWorkspace(workspaceId, { projectId });
+
+				// Get current project to access workspaceIds
+				const project = await projectsApi.getProjectById(projectId);
+				const newWorkspaceIds = [...project.workspaceIds, workspaceId];
+
+				await projectsApi.updateProject(projectId, {
+					workspaceIds: newWorkspaceIds,
+					version: project.version,
+				});
 
 				// Reload to get fresh data
 				await loadWorkspaces();
@@ -109,13 +117,21 @@ export function useProjectWorkspaces(): UseProjectWorkspacesResult {
 
 	/**
 	 * Dissociate a workspace from its project
-	 * Backend handles bidirectional sync: updates both workspace.projectId AND project.workspaceIds
+	 * Requires finding which project contains the workspace and removing it from project.workspaceIds[]
 	 */
 	const dissociateWorkspace = useCallback(
-		async (workspaceId: string) => {
+		async (workspaceId: string, projectId: string) => {
 			try {
 				setError(null);
-				await workspacesApi.updateWorkspace(workspaceId, { projectId: null });
+
+				// Get current project to access workspaceIds
+				const project = await projectsApi.getProjectById(projectId);
+				const newWorkspaceIds = project.workspaceIds.filter(id => id !== workspaceId);
+
+				await projectsApi.updateProject(projectId, {
+					workspaceIds: newWorkspaceIds,
+					version: project.version,
+				});
 
 				// Reload to get fresh data
 				await loadWorkspaces();

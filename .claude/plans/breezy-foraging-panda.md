@@ -1,643 +1,541 @@
-# Plan: Process Management & Logs in ProjectsV2 Workspace Panel
+# Plan: Refactorisation Architecture ProjectsV2 - Élimination Duplication Dialogs
 
 ## Contexte
 
-L'utilisateur souhaite ajouter une fonctionnalité de gestion de processus de développement (backend, frontend, etc.) dans la page ProjectsV2, spécifiquement dans le WorkspacePanel. Cette fonctionnalité permettra de:
+Suite à l'implémentation de la feature "Process Management & Logs", l'utilisateur demande un audit et refactoring complet de l'architecture ProjectsV2 pour éliminer la duplication de code massive dans les dialogs et composants.
 
-- Configurer les scripts package.json à exécuter pour un workspace donné
-- Démarrer/arrêter ces scripts
-- Visualiser les logs en temps réel
-- Configurer les liens vers l'application (URL backend/frontend)
+**Problèmes identifiés:**
 
-## Propositions de Design (ASCII Art)
+- 75% de duplication entre ManagePinnedProjectsDialog et ManageProjectWorkspacesDialog (596 lignes combinées)
+- 4 composants d'items avec 70-75% de duplication (442 lignes combinées)
+- Helper `getBasename()` dupliqué dans 3 fichiers
+- CrudDialog n'apporte rien aux dual-list selectors
+- Manque d'abstractions intermédiaires
 
-### Proposition 1: Tabs horizontaux avec vue simple (Recommended)
+**État actuel:**
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ Workspace: my-project (active) [development]                    │
-│ 📁 /path/to/workspace  🔀 main                                  │
-│ [Edit] [Configure Scripts]                                      │
-├─────────────────────────────────────────────────────────────────┤
-│ View Mode: [📋 Tasks] [▶️ Scripts]                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│ Scripts Panel:                                                   │
-│ ┌───────────────────────────────────────────────────────────┐  │
-│ │ [dev:backend ●] [dev:frontend ●] [build:all] [test:e2e]  │  │
-│ ├───────────────────────────────────────────────────────────┤  │
-│ │ Selected: dev:backend                                     │  │
-│ │                                                           │  │
-│ │ 🔴 Running (pid: 12345)    [⏹️ Stop] [♻️ Restart]        │  │
-│ │ 🔗 http://localhost:3000                                  │  │
-│ │                                                           │  │
-│ │ [Full Width]                                              │  │
-│ │                                                           │  │
-│ │ ┌─────────────────────────────────────────────────────┐  │  │
-│ │ │ [14:32:45] info  Server started on port 3000        │  │  │
-│ │ │ [14:32:46] info  Database connected                 │  │  │
-│ │ │ [14:32:47] debug Loading middleware...              │  │  │
-│ │ │ [14:32:48] info  Ready to accept connections        │  │  │
-│ │ │                                                      │  │  │
-│ │ └─────────────────────────────────────────────────────┘  │  │
-│ └───────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-```
+- ProjectsV2Page.tsx: 337 lignes (BIEN - déjà refactorisé avec hooks)
+- ManagePinnedProjectsDialog: 252 lignes
+- ManageProjectWorkspacesDialog: 344 lignes
+- 4 item components: 442 lignes total
 
-### Proposition 2: Split view côte à côte
+**Objectif:**
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ Workspace: my-project (active) [development]                    │
-│ View Mode: [📋 Tasks] [▶️ Scripts]                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│ Scripts Panel:                                                   │
-│ ┌───────────────────────────────────────────────────────────┐  │
-│ │ [dev:backend ●] [dev:frontend ●] [build:all]             │  │
-│ ├───────────────────────────────────────────────────────────┤  │
-│ │ [Side by Side]                                            │  │
-│ │                                                           │  │
-│ │ ┌──────────────────────┬──────────────────────────────┐  │  │
-│ │ │ dev:backend 🔴       │ dev:frontend 🔴              │  │  │
-│ │ │ http://localhost:3000│ http://localhost:5173        │  │  │
-│ │ │ [⏹️ Stop] [♻️ Restart]│ [⏹️ Stop] [♻️ Restart]       │  │  │
-│ │ ├──────────────────────┼──────────────────────────────┤  │  │
-│ │ │ [14:32:45] info      │ [14:35:12] info              │  │  │
-│ │ │ Server started       │ Vite dev server              │  │  │
-│ │ │                      │                              │  │  │
-│ │ │ [14:32:46] info      │ [14:35:13] info              │  │  │
-│ │ │ Database connected   │ Ready in 1.2s                │  │  │
-│ │ │                      │                              │  │  │
-│ │ │ [14:32:47] debug     │ [14:35:14] info              │  │  │
-│ │ │ Loading middleware   │ Local: http://localhost:5173 │  │  │
-│ │ │                      │                              │  │  │
-│ │ └──────────────────────┴──────────────────────────────┘  │  │
-│ └───────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Proposition 3: Multi-panel avec sélecteur dropdown
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ Workspace: my-project (active) [development]                    │
-│ View Mode: [📋 Tasks] [▶️ Scripts]                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│ Scripts Panel:                                                   │
-│ ┌───────────────────────────────────────────────────────────┐  │
-│ │ Active Scripts (2 running, 4 configured)                  │  │
-│ │                                                           │  │
-│ │ Layout: [Full Width ▼]  [+ Add Panel]                    │  │
-│ │                                                           │  │
-│ │ ┌─────────────────────────────────────────────────────┐  │  │
-│ │ │ Panel 1: [dev:backend ▼] 🔴 Running                 │  │  │
-│ │ │ http://localhost:3000  [⏹️] [♻️] [⚙️] [✖️]          │  │  │
-│ │ ├─────────────────────────────────────────────────────┤  │  │
-│ │ │ [14:32:45] info  Server started on port 3000        │  │  │
-│ │ │ [14:32:46] info  Database connected                 │  │  │
-│ │ └─────────────────────────────────────────────────────┘  │  │
-│ │                                                           │  │
-│ │ ┌─────────────────────────────────────────────────────┐  │  │
-│ │ │ Panel 2: [dev:frontend ▼] 🔴 Running               │  │  │
-│ │ │ http://localhost:5173  [⏹️] [♻️] [⚙️] [✖️]          │  │  │
-│ │ ├─────────────────────────────────────────────────────┤  │  │
-│ │ │ [14:35:12] info  Vite dev server                    │  │  │
-│ │ │ [14:35:13] info  Ready in 1.2s                      │  │  │
-│ │ └─────────────────────────────────────────────────────┘  │  │
-│ └───────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Proposition 4: Grid layout flexible (2x2 ou 1x2)
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ Workspace: my-project (active) [development]                    │
-│ View Mode: [📋 Tasks] [▶️ Scripts]                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│ Scripts Panel:                                                   │
-│ ┌───────────────────────────────────────────────────────────┐  │
-│ │ Layout: [Grid 2x2 ▼]  Active: 4 scripts                  │  │
-│ │                                                           │  │
-│ │ ┌──────────────────────┬──────────────────────────────┐  │  │
-│ │ │ dev:backend 🔴       │ dev:frontend 🔴              │  │  │
-│ │ │ http://localhost:3000│ http://localhost:5173        │  │  │
-│ │ │ [⏹️] [♻️] [⬜ Expand] │ [⏹️] [♻️] [⬜ Expand]        │  │  │
-│ │ ├──────────────────────┼──────────────────────────────┤  │  │
-│ │ │ [14:32:45] info      │ [14:35:12] info              │  │  │
-│ │ │ Server started       │ Vite dev server              │  │  │
-│ │ │ [14:32:46] info      │ [14:35:13] info              │  │  │
-│ │ │ Database connected   │ Ready in 1.2s                │  │  │
-│ │ ├──────────────────────┼──────────────────────────────┤  │  │
-│ │ │ test:watch ⚪        │ build:all ⚪                 │  │  │
-│ │ │ [▶️ Start]           │ [▶️ Start]                   │  │  │
-│ │ │                      │                              │  │  │
-│ │ │ Not running          │ Not running                  │  │  │
-│ │ │                      │                              │  │  │
-│ │ └──────────────────────┴──────────────────────────────┘  │  │
-│ └───────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Proposition 5: Accordion avec expansion
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ Workspace: my-project (active) [development]                    │
-│ View Mode: [📋 Tasks] [▶️ Scripts]                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│ Scripts Panel:                                                   │
-│ ┌───────────────────────────────────────────────────────────┐  │
-│ │ Configured Scripts (4 total)      [+ Add Script]          │  │
-│ │                                                           │  │
-│ │ ▼ dev:backend                        🔴 Running           │  │
-│ │   http://localhost:3000              [⏹️] [♻️] [⚙️]       │  │
-│ │   ┌─────────────────────────────────────────────────────┐ │  │
-│ │   │ [14:32:45] info  Server started on port 3000        │ │  │
-│ │   │ [14:32:46] info  Database connected                 │ │  │
-│ │   │ [14:32:47] debug Loading middleware...              │ │  │
-│ │   │ [14:32:48] info  Ready to accept connections        │ │  │
-│ │   │ [Auto-scroll: ON] [Search] [Filter: All Levels ▼]  │ │  │
-│ │   └─────────────────────────────────────────────────────┘ │  │
-│ │                                                           │  │
-│ │ ▼ dev:frontend                       🔴 Running           │  │
-│ │   http://localhost:5173              [⏹️] [♻️] [⚙️]       │  │
-│ │   ┌─────────────────────────────────────────────────────┐ │  │
-│ │   │ [14:35:12] info  Vite dev server starting...        │ │  │
-│ │   │ [14:35:13] info  Ready in 1.2s                      │ │  │
-│ │   └─────────────────────────────────────────────────────┘ │  │
-│ │                                                           │  │
-│ │ ▶ test:watch                         ⚪ Stopped           │  │
-│ │                                      [▶️] [⚙️]             │  │
-│ │                                                           │  │
-│ │ ▶ build:all                          ⚪ Stopped           │  │
-│ │                                      [▶️] [⚙️]             │  │
-│ └───────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Proposition 6: Dashboard style avec status cards
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ Workspace: my-project (active) [development]                    │
-│ View Mode: [📋 Tasks] [▶️ Scripts]                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│ Scripts Dashboard:                                               │
-│ ┌───────────────────────────────────────────────────────────┐  │
-│ │ Overview: 2 running / 4 configured  [Configure Scripts]   │  │
-│ │                                                           │  │
-│ │ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐        │  │
-│ │ │ dev:    │ │ dev:    │ │ test:   │ │ build:  │        │  │
-│ │ │ backend │ │ frontend│ │ watch   │ │ all     │        │  │
-│ │ │         │ │         │ │         │ │         │        │  │
-│ │ │ 🔴 Run  │ │ 🔴 Run  │ │ ⚪ Stop │ │ ⚪ Stop │        │  │
-│ │ │ :3000   │ │ :5173   │ │         │ │         │        │  │
-│ │ │ [View]  │ │ [View]  │ │ [Start] │ │ [Start] │        │  │
-│ │ └─────────┘ └─────────┘ └─────────┘ └─────────┘        │  │
-│ │                                                           │  │
-│ │ Selected Log View:                                        │  │
-│ │ [dev:backend ▼]                    [⏹️] [♻️] [↗️ Expand] │  │
-│ │ ┌─────────────────────────────────────────────────────┐  │  │
-│ │ │ [14:32:45] info  Server started on port 3000        │  │  │
-│ │ │ [14:32:46] info  Database connected                 │  │  │
-│ │ │ [14:32:47] debug Loading middleware...              │  │  │
-│ │ │ [14:32:48] info  Ready to accept connections        │  │  │
-│ │ │                                                      │  │  │
-│ │ └─────────────────────────────────────────────────────┘  │  │
-│ └───────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## Design Choisi: Proposition 3 (Multi-panel)
-
-**Choix validé par l'utilisateur**: Multi-panel avec sélecteur dropdown
-
-**Avantages**:
-
-- Vue dynamique avec ajout/suppression de panels à la volée
-- Possibilité d'afficher plusieurs logs simultanément
-- Layout flexible (Full Width, Split, Grid)
-- Plus adapté au workflow de développement multi-composants
-
-**Features implémentées**:
-
-1. **Layout Modes**:
-    - Full Width: Un seul panel occupant toute la largeur
-    - Split (Side by Side): Deux panels côte à côte
-    - Grid 2x2: Quatre panels en grille
-2. **Panel Management**:
-    - Dropdown pour sélectionner le script par panel
-    - Boutons: [⏹️ Stop] [♻️ Restart] [⚙️ Settings] [✖️ Remove Panel]
-    - [+ Add Panel] pour ajouter de nouveaux panels dynamiquement
-3. **Quick Actions Bar**:
-    - Active Scripts count (X running, Y configured)
-    - "Stop All" button
-    - Layout selector dropdown
-4. **Status Indicators**:
-    - 🔴 Running
-    - 🟢 Stopped (ready)
-    - 🟡 Starting
-    - 🔵 Stopping
-    - ⚠️ Crashed (with restart button)
-5. **Keyboard Shortcuts**:
-    - `Ctrl+Shift+R`: Restart selected script
-    - `Ctrl+Shift+S`: Stop all scripts
-    - `Ctrl+Shift+P`: Add new panel
+- Réduire ~600 lignes via généricité
+- Grade actuel: C+ → Grade cible: A-
+- Améliorer maintenabilité et testabilité
 
 ## Architecture Proposée
 
-### Phase 1: Modèle de données et Backend
+### Nouvelle Hiérarchie Dialog
 
-#### Nouveau modèle: WorkspaceScript
+```
+Dialog (Radix primitives)
+  ├─ CrudDialog (forms: create/edit entities)
+  │    └─ CreateProjectDialog, EditWorkspaceDialog, etc.
+  │
+  └─ DualListDialog (base générique pour dual-list selectors)
+       ├─ ManagePinnedProjectsDialog (spécialisé)
+       └─ ManageProjectWorkspacesDialog (spécialisé)
+```
+
+### Nouveaux Composants Génériques
+
+#### 1. DualListDialog<TLeft, TRight>
+
+**Fichier:** `packages/web-frontend/src/framework/components/overlays/DualListDialog.tsx`
+
+**Responsabilités:**
+
+- Layout deux colonnes (grid-cols-2 gap-6)
+- DnD context avec sensors configurés
+- SearchBar intégré (colonne droite)
+- Gestion des états: loading, reordering
+- Empty states génériques
+- Optimistic updates (optionnel)
+
+**Interface:**
 
 ```typescript
-{
-  id: string;
-  workspaceId: string;
-  scriptName: string;          // ex: "dev:backend"
-  enabled: boolean;
-  displayName?: string;         // custom display name
-  description?: string;
-  url?: string;                 // ex: "http://localhost:3000"
-  order: number;
-  autoStart: boolean;           // Auto-start on workspace open (Phase 2)
-  restartOnFailure: boolean;    // Auto-restart crashed scripts (Phase 2)
-  createdAt: string;
-  updatedAt: string;
-  version: number;              // Optimistic locking (consistent with Task model)
+interface DualListDialogProps<TLeft, TRight> {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	title: string;
+	maxWidth?: '4xl' | '5xl';
+
+	// Left panel (associated items)
+	leftTitle: string;
+	leftItems: TLeft[];
+	leftItemKey: (item: TLeft) => string;
+	leftItemRenderer: (item: TLeft, actions: ItemActions) => ReactNode;
+	leftEmptyState?: ReactNode;
+	onReorder?: (activeId: string, overId: string) => Promise<void>;
+
+	// Right panel (available items)
+	rightTitle: string;
+	rightItems: TRight[];
+	rightItemKey: (item: TRight) => string;
+	rightItemRenderer: (item: TRight, actions: ItemActions) => ReactNode;
+	rightEmptyState?: ReactNode;
+	searchPlaceholder?: string;
+	searchFilter: (item: TRight, query: string) => boolean;
+
+	// State management
+	loadingItems?: Set<string>;
+	reorderingItems?: Set<string>;
+
+	// Optimistic updates (optional)
+	optimisticMode?: {
+		associations: Set<string>;
+		dissociations: Set<string>;
+	};
+}
+
+interface ItemActions {
+	isLoading: boolean;
+	isReordering: boolean;
 }
 ```
 
-#### Nouveau modèle: ScriptProcess
+**Features intégrées:**
+
+- DnD avec `@dnd-kit` (sensors pré-configurés)
+- Search avec debounce
+- Loading overlays
+- Empty states conditionnels
+- Help text (ex: "Drag to reorder, click → to unpin")
+
+#### 2. DualListItem<T>
+
+**Fichier:** `packages/web-frontend/src/framework/components/overlays/DualListItem.tsx`
+
+**Composant générique pour items dans DualListDialog:**
 
 ```typescript
-{
-  id: string;
-  workspaceScriptId: string;
-  pid?: number;
-  status: 'stopped' | 'starting' | 'running' | 'stopping' | 'error' | 'crashed';
-  startedAt?: string;
-  stoppedAt?: string;
-  exitCode?: number;
-  error?: string;
-  restartCount: number;         // Track restart attempts (Phase 2)
-  lastHeartbeat?: string;       // Process health check (Phase 2)
+interface DualListItemProps<T> {
+	item: T;
+	variant: 'available' | 'sortable';
+
+	// Rendering
+	icon?: ReactNode;
+	label: string;
+	badge?: ReactNode;
+
+	// Actions
+	onAction: (itemId: string) => void;
+	actionIcon: typeof ArrowLeft | typeof ArrowRight | typeof GripVertical;
+	actionLabel: string;
+
+	// State
+	isLoading?: boolean;
+	isReordering?: boolean;
+	isDragging?: boolean;
 }
 ```
 
-#### Nouvelles API Routes (workspaceScripts.contract.ts)
+**Variants:**
+
+- `available`: Simple item avec action button (←)
+- `sortable`: Draggable item avec grip handle + action button (→)
+
+### Composants Refactorés
+
+#### ManagePinnedProjectsDialog (APRÈS)
+
+**Taille estimée:** 80 lignes (vs 252 actuellement)
 
 ```typescript
-POST   /api/workspaces/:workspaceId/scripts              - Create script config
-GET    /api/workspaces/:workspaceId/scripts              - List scripts
-GET    /api/workspaces/:workspaceId/scripts/available    - Discover available scripts from package.json (NEW)
-PATCH  /api/workspaces/:workspaceId/scripts/:id          - Update script config (with version for optimistic locking)
-DELETE /api/workspaces/:workspaceId/scripts/:id          - Delete script config
+export function ManagePinnedProjectsDialog({ ... }: ManagePinnedProjectsDialogProps) {
+  const [loadingItems, setLoadingItems] = useState<Set<string>>(new Set());
+  const [reorderingIds, setReorderingIds] = useState<Set<string>>(new Set());
 
-POST   /api/workspaces/:workspaceId/scripts/:id/start    - Start process
-POST   /api/workspaces/:workspaceId/scripts/:id/stop     - Stop process
-POST   /api/workspaces/:workspaceId/scripts/:id/restart  - Restart process
-GET    /api/workspaces/:workspaceId/scripts/:id/logs     - Get logs (paginated, similar to task logs)
-GET    /api/workspaces/:workspaceId/scripts/:id/status   - Get process status
-DELETE /api/workspaces/:workspaceId/scripts/:id/logs     - Clear logs (Phase 2)
-GET    /api/workspaces/:workspaceId/scripts/:id/health   - Health check endpoint (Phase 2)
-```
+  const handlePin = async (projectId: string) => { /* ... */ };
+  const handleUnpin = async (projectId: string) => { /* ... */ };
+  const handleReorder = async (activeId: string, overId: string) => { /* ... */ };
 
-#### Nouveaux services Backend
-
-- `WorkspaceScriptsService.ts` - CRUD for script configs
-- `ScriptProcessManager.ts` - **NEW CLASS** wrapping child_process.spawn() with cross-platform support
-- `ScriptProcessService.ts` - Process lifecycle management using ScriptProcessManager
-- `ScriptLogsStorage.ts` - **EXTENDS TraceChunkStorage** with same 500-entry chunks pattern
-
-### Phase 2: Frontend Components
-
-#### Nouveaux composants
-
-```
-packages/web-frontend/src/app/pages/workspaces/
-├── scripts/
-│   ├── ConfigureScriptsDialog.tsx           - Dialog to configure scripts (with auto-discovery)
-│   ├── ScriptsPanel.tsx                     - Main container with layout management
-│   ├── ScriptPanel.tsx                      - Single panel component (dropdown + controls + logs)
-│   ├── LayoutSelector.tsx                   - Dropdown to select layout (Full/Split/Grid)
-│   ├── ScriptSelector.tsx                   - Dropdown to select script for a panel
-│   ├── ScriptLogsViewer.tsx                 - Logs viewer per panel (adapt from TaskLogsViewer)
-│   ├── ScriptLogEntry.tsx                   - Single log entry (reuse LogEntry component)
-│   ├── QuickActionsBar.tsx                  - Top bar with counts and "Stop All" button
-│   ├── useWorkspaceScripts.ts               - Hook to fetch/manage scripts
-│   ├── useScriptProcess.ts                  - Hook to control process (start/stop/restart)
-│   ├── useScriptLogs.ts                     - Hook to stream logs (adapt from useTaskLogs)
-│   ├── usePanelLayout.ts                    - Hook to manage panel layout state
-│   └── workspaceScripts.api.ts              - API client
-```
-
-#### Modifications des composants existants
-
-- `WorkspacePanel.tsx` - Add view mode toggle (Tasks / Scripts)
-- `WorkspacesTable.tsx` - Add "Configure Scripts" action in dropdown
-- `EditWorkspaceDialog.tsx` - (Optional) Add quick script config section
-
-### Phase 3: Process Management Backend
-
-#### Approche technique validée
-
-1. **Spawning processes**:
-    - Réutiliser `ScriptExecutor` (packages/flow-engine/src/executor/ScriptExecutor.ts)
-    - Déjà gère Windows (création de fichiers .bat) et Unix
-    - Support du streaming de logs en temps réel
-    - Commande: `npm run ${scriptName}` depuis le workspace path
-
-2. **Process tracking**:
-    - `ScriptProcessManager` class maintient `Map<scriptId, ChildProcess>`
-    - Store PIDs dans database (ScriptProcess table)
-    - Interface:
-        ```typescript
-        class ScriptProcessManager {
-        	async startScript(scriptId: string, config: ScriptConfig): Promise<void>;
-        	async stopScript(scriptId: string, signal?: NodeJS.Signals): Promise<void>;
-        	async restartScript(scriptId: string): Promise<void>;
-        	getProcessStatus(scriptId: string): ProcessStatus;
-        	isRunning(scriptId: string): boolean;
-        	async cleanupAllProcesses(): Promise<void>; // Shutdown hook
-        }
-        ```
-
-3. **Log storage**:
-    - `ScriptLogsStorage extends TraceChunkStorage`
-    - Base path: `./data/workspace-scripts/{scriptId}/logs/`
-    - 500-entry chunks (même pattern que task logs)
-    - Pagination support pour l'API
-    - Réutilisation de LogEntry interface
-
-4. **Package.json parsing**:
-    - Backend-side dans `WorkspaceScriptsService.discoverAvailableScripts()`
-    - Read package.json depuis workspace.path
-    - Parse scripts section
-    - Return script names with metadata
-
-5. **Cleanup sur backend restart**:
-    - **On startup**: Query all ScriptProcess with status='running'
-    - Check if PIDs still exist (cross-platform: `process.kill(pid, 0)` Unix, `tasklist` Windows)
-    - Kill orphans or mark as 'crashed'
-    - **On shutdown**: Graceful cleanup hook
-        ```typescript
-        process.on('SIGTERM', async () => {
-        	await scriptProcessManager.cleanupAllProcesses();
-        	await server.close();
-        });
-        ```
-
-6. **Process monitoring** (Phase 2):
-    - Heartbeat checks every 30s to detect crashes
-    - Auto-restart si restartOnFailure=true
-
-#### Events B2F à ajouter
-
-```typescript
-B2F_WORKSPACE_SCRIPT_CREATED;
-B2F_WORKSPACE_SCRIPT_UPDATED;
-B2F_WORKSPACE_SCRIPT_DELETED;
-B2F_SCRIPT_PROCESS_STARTED;
-B2F_SCRIPT_PROCESS_STOPPED;
-B2F_SCRIPT_PROCESS_LOG_UPDATED; // Similar to B2F_TASK_TRACE_UPDATED
-B2F_SCRIPT_PROCESS_ERROR;
-```
-
-### Phase 4: UI/UX Details
-
-#### ViewMode Toggle
-
-```typescript
-type ViewMode = 'tasks' | 'scripts';
-```
-
-- Toggle button in WorkspacePanel below metadata card
-- Persisted in localStorage per workspace
-
-#### Script Configuration Dialog
-
-- Modal dialog with form to add/edit scripts
-- Script selector from package.json (parsed from workspace path)
-- Fields: displayName, description, url, enabled
-- Drag-and-drop reordering
-
-#### Panel Layout State Management
-
-**usePanelLayout hook** gère l'état des panels:
-
-```typescript
-type LayoutMode = 'full' | 'split' | 'grid';
-
-interface PanelState {
-	id: string;
-	scriptId: string | null; // null = empty panel
-}
-
-interface PanelLayoutState {
-	mode: LayoutMode;
-	panels: PanelState[]; // 1 panel (full), 2 panels (split), 4 panels (grid)
+  return (
+    <DualListDialog<Project, Project>
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Customize Project Tabs"
+      leftTitle="Pinned Projects"
+      leftItems={pinnedProjects}
+      leftItemKey={p => p.id}
+      leftItemRenderer={(project, { isLoading, isReordering }) => (
+        <DualListItem
+          item={project}
+          variant="sortable"
+          icon={project.icon && <DynamicLucideIcon name={project.icon} color={project.iconColor} />}
+          label={project.name}
+          badge={<Badge>{workspaceCount}</Badge>}
+          onAction={handleUnpin}
+          actionIcon={ArrowRight}
+          actionLabel="Unpin project"
+          isLoading={isLoading}
+          isReordering={isReordering}
+        />
+      )}
+      rightTitle="Available Projects"
+      rightItems={availableProjects}
+      rightItemKey={p => p.id}
+      rightItemRenderer={(project, { isLoading }) => (
+        <DualListItem
+          item={project}
+          variant="available"
+          icon={project.icon && <DynamicLucideIcon name={project.icon} color={project.iconColor} />}
+          label={project.name}
+          onAction={handlePin}
+          actionIcon={ArrowLeft}
+          actionLabel="Pin project"
+          isLoading={isLoading}
+        />
+      )}
+      searchPlaceholder="Search projects..."
+      searchFilter={(p, q) =>
+        p.name.toLowerCase().includes(q.toLowerCase()) ||
+        p.description?.toLowerCase().includes(q.toLowerCase())
+      }
+      onReorder={handleReorder}
+      loadingItems={loadingItems}
+      reorderingItems={reorderingIds}
+    />
+  );
 }
 ```
 
-**Persistence**: localStorage per workspace
-**Key**: `workspace-${workspaceId}-panel-layout`
+#### ManageProjectWorkspacesDialog (APRÈS)
 
-**Actions**:
+**Taille estimée:** 120 lignes (vs 344 actuellement)
 
-- `setLayoutMode(mode)` - Change layout (réorganise les panels)
-- `addPanel()` - Ajoute un nouveau panel (max selon layout)
-- `removePanel(panelId)` - Supprime un panel
-- `setScriptForPanel(panelId, scriptId)` - Assigne un script à un panel
+Même structure que ManagePinnedProjectsDialog, avec en plus:
 
-#### Log Viewer Features per Panel
+- `optimisticMode` prop pour gérer les associations/dissociations optimistes
+- `useEffect` pour clear optimistic state on close
 
-- Real-time streaming via SSE (independent per panel)
-- Auto-scroll (toggle per panel)
-- Search/filter by text (per panel)
-- Level filter (stdout/stderr/info/error) per panel
-- Export logs (per panel)
-- Clear logs button (per panel)
+**Réduction:** 224 lignes économisées
+
+### Composants à Supprimer
+
+Les 4 composants d'items actuels seront supprimés:
+
+- ❌ `AvailableProjectItem.tsx` (77 lignes)
+- ❌ `SortablePinnedProjectItem.tsx` (116 lignes)
+- ❌ `AvailableWorkspaceItem.tsx` (94 lignes)
+- ❌ `SortableAssociatedWorkspaceItem.tsx` (155 lignes)
+
+**Total:** 442 lignes supprimées
+
+Remplacés par:
+
+- ✅ `DualListItem.tsx` (~100 lignes) - composant générique
+
+**Économie nette:** 342 lignes
+
+### Utilitaires Partagés
+
+**Fichier:** `packages/web-frontend/src/framework/utils/pathUtils.ts`
+
+```typescript
+/**
+ * Extract basename from a file path (cross-platform)
+ * @example getBasename('/path/to/file.txt') => 'file.txt'
+ * @example getBasename('C:\\path\\to\\file.txt') => 'file.txt'
+ */
+export function getBasename(path: string): string {
+	return path.split(/[/\\]/).pop() || path;
+}
+```
+
+**Remplacement dans:**
+
+- AvailableWorkspaceItem.tsx (lines 40-43) ❌ SUPPRIMÉ
+- SortableAssociatedWorkspaceItem.tsx (lines 45-48) ❌ SUPPRIMÉ
+- WorkspacePanel.tsx (lines 21-24) → `import { getBasename } from '@framework/utils/pathUtils'`
+- WorkspaceTabs.tsx (lines 8-11) → `import { getBasename } from '@framework/utils/pathUtils'`
+
+## Ordre d'Implémentation
+
+### Phase 1: Fondations (2h)
+
+1. **Créer utilitaires partagés** (15min)
+    - `packages/web-frontend/src/framework/utils/pathUtils.ts`
+    - Export `getBasename()`
+    - Tests unitaires
+
+2. **Créer DualListItem générique** (1h)
+    - `packages/web-frontend/src/framework/components/overlays/DualListItem.tsx`
+    - Support variants: available, sortable
+    - Props: icon, label, badge, action button
+    - Loading/reordering states
+    - Storybook stories
+
+3. **Créer DualListDialog générique** (45min)
+    - `packages/web-frontend/src/framework/components/overlays/DualListDialog.tsx`
+    - Layout deux colonnes
+    - DnD context intégré
+    - SearchBar intégré
+    - Generic avec `<TLeft, TRight>`
+    - Storybook stories
+
+### Phase 2: Migration Dialogs (3h)
+
+4. **Refactor ManagePinnedProjectsDialog** (1h30)
+    - Remplacer contenu par DualListDialog
+    - Passer de 252 à ~80 lignes
+    - Supprimer AvailableProjectItem
+    - Supprimer SortablePinnedProjectItem
+    - Tests: vérifier que dialog fonctionne identiquement
+
+5. **Refactor ManageProjectWorkspacesDialog** (1h30)
+    - Remplacer contenu par DualListDialog
+    - Ajouter optimistic updates mode
+    - Passer de 344 à ~120 lignes
+    - Supprimer AvailableWorkspaceItem
+    - Supprimer SortableAssociatedWorkspaceItem
+    - Tests: vérifier optimistic updates
+
+### Phase 3: Cleanup & Polish (1h)
+
+6. **Remplacer getBasename() dupliqués** (30min)
+    - WorkspacePanel.tsx
+    - WorkspaceTabs.tsx
+    - Vérifier que tous les imports fonctionnent
+
+7. **Tests & Documentation** (30min)
+    - Tests unitaires pour DualListDialog
+    - Tests unitaires pour DualListItem
+    - Tests d'intégration pour dialogs refactorés
+    - Storybook documentation
+
+### Phase 4: Validation (30min)
+
+8. **Vérification End-to-End**
+    - Naviguer vers ProjectsV2
+    - Ouvrir "Manage Projects" dialog
+    - Tester drag & drop reordering
+    - Tester pin/unpin
+    - Tester search
+    - Ouvrir "Manage Workspaces" dialog
+    - Tester associate/dissociate avec optimistic updates
+    - Tester reordering
+    - Vérifier que toutes les fonctionnalités marchent
+
+9. **npm run check**
+    - TypeScript errors: 0 (cible)
+    - ESLint warnings: acceptable
+    - Prettier: auto-fix
 
 ## Fichiers Critiques
 
-### Fichiers de référence (à lire/réutiliser)
+### Fichiers à Créer
 
-- `packages/orchestrator/src/core/TraceChunkStorage.ts` - Pattern pour ScriptLogsStorage (500-entry chunks, pagination)
-- `packages/flow-engine/src/executor/ScriptExecutor.ts` - Réutiliser pour process spawning (Windows .bat handling)
-- `packages/web-backend/src/services/TasksService.ts` - Pattern service avec events et repository
-- `packages/web-frontend/src/app/pages/tasks/components/TaskLogsViewer.tsx` - UI component pattern pour logs
-- `packages/web-frontend/src/app/pages/tasks/hooks/useTaskLogs.ts` - Hook pattern pour log streaming
+- `packages/web-frontend/src/framework/utils/pathUtils.ts` (NEW)
+- `packages/web-frontend/src/framework/utils/pathUtils.test.ts` (NEW)
+- `packages/web-frontend/src/framework/components/overlays/DualListDialog.tsx` (NEW)
+- `packages/web-frontend/src/framework/components/overlays/DualListDialog.stories.tsx` (NEW)
+- `packages/web-frontend/src/framework/components/overlays/DualListDialog.test.tsx` (NEW)
+- `packages/web-frontend/src/framework/components/overlays/DualListItem.tsx` (NEW)
+- `packages/web-frontend/src/framework/components/overlays/DualListItem.stories.tsx` (NEW)
+- `packages/web-frontend/src/framework/components/overlays/DualListItem.test.tsx` (NEW)
 
-### Fichiers à créer (Backend)
+### Fichiers à Modifier
 
-- `packages/shared-frontend-backend/src/api/workspaceScripts.contract.ts` (NEW)
-- `packages/web-backend/src/controllers/WorkspaceScriptsController.ts` (NEW)
-- `packages/web-backend/src/services/WorkspaceScriptsService.ts` (NEW)
-- `packages/web-backend/src/services/ScriptProcessManager.ts` (NEW - wrapper autour de ScriptExecutor)
-- `packages/web-backend/src/services/ScriptProcessService.ts` (NEW)
-- `packages/web-backend/src/repositories/WorkspaceScriptsRepository.ts` (NEW)
-- `packages/web-backend/src/storage/ScriptLogsStorage.ts` (NEW - extends TraceChunkStorage)
+- `packages/web-frontend/src/app/pages/projects2/ManagePinnedProjectsDialog.tsx` (REFACTOR - 252 → 80 lignes)
+- `packages/web-frontend/src/app/pages/projects2/ManageProjectWorkspacesDialog.tsx` (REFACTOR - 344 → 120 lignes)
+- `packages/web-frontend/src/app/pages/projects2/WorkspacePanel.tsx` (UPDATE import getBasename)
+- `packages/web-frontend/src/app/pages/projects2/WorkspaceTabs.tsx` (UPDATE import getBasename)
 
-### Fichiers à modifier (Backend)
+### Fichiers à Supprimer
 
-- `packages/shared-frontend-backend/src/transport/B2FEventConstants.ts` (UPDATE - add script events)
-- `packages/shared-frontend-backend/src/transport/EventFilters.ts` (UPDATE - add script filters)
-- `packages/web-backend/src/server.ts` (UPDATE - register routes, cleanup hook)
+- `packages/web-frontend/src/app/pages/projects2/AvailableProjectItem.tsx` (DELETE - 77 lignes)
+- `packages/web-frontend/src/app/pages/projects2/SortablePinnedProjectItem.tsx` (DELETE - 116 lignes)
+- `packages/web-frontend/src/app/pages/projects2/AvailableWorkspaceItem.tsx` (DELETE - 94 lignes)
+- `packages/web-frontend/src/app/pages/projects2/SortableAssociatedWorkspaceItem.tsx` (DELETE - 155 lignes)
 
-### Fichiers à créer (Frontend)
+## Métriques de Succès
 
-- `packages/web-frontend/src/app/pages/workspaces/scripts/` (NEW directory)
-    - `ConfigureScriptsDialog.tsx` - Configuration dialog avec auto-discovery
-    - `ScriptsPanel.tsx` - Main container avec layout management
-    - `ScriptPanel.tsx` - Single panel component
-    - `LayoutSelector.tsx` - Layout dropdown (Full/Split/Grid)
-    - `ScriptSelector.tsx` - Script dropdown per panel
-    - `ScriptLogsViewer.tsx` - Logs viewer (adapt from TaskLogsViewer)
-    - `ScriptLogEntry.tsx` - Log entry (reuse LogEntry)
-    - `QuickActionsBar.tsx` - Top bar avec counts et "Stop All"
-    - `useWorkspaceScripts.ts` - Scripts CRUD hook
-    - `useScriptProcess.ts` - Process control hook
-    - `useScriptLogs.ts` - Log streaming hook (adapt from useTaskLogs)
-    - `usePanelLayout.ts` - Panel layout state management
-    - `workspaceScripts.api.ts` - API client
+| Métrique               | Avant | Après  | Cible |
+| ---------------------- | ----- | ------ | ----- |
+| Total lignes projects2 | 2,196 | ~1,550 | -30%  |
+| Duplication dialogs    | 75%   | 0%     | <10%  |
+| Duplication items      | 70%   | 0%     | <10%  |
+| Helper duplication     | 3x    | 1x     | 1x    |
+| Composants génériques  | 0     | 2      | 2+    |
+| Test coverage          | ~15%  | ~70%   | >70%  |
+| Grade architecture     | C+    | A-     | A-    |
 
-### Fichiers à modifier (Frontend)
+**Réduction totale estimée:** ~646 lignes (-29%)
 
-- `packages/web-frontend/src/app/pages/projects2/WorkspacePanel.tsx` (UPDATE - add view mode toggle)
-- `packages/web-frontend/src/app/pages/workspaces/WorkspacesTable.tsx` (UPDATE - add action)
+## Risques & Mitigation
+
+### Risque 1: Breaking changes dans dialogs
+
+**Mitigation:**
+
+- Tests manuels complets après refactoring
+- Vérifier chaque feature: search, drag-drop, optimistic updates
+- Garder les anciennes versions en commentaire pendant développement
+
+### Risque 2: Généricité trop complexe
+
+**Mitigation:**
+
+- DualListDialog doit rester simple et prévisible
+- Éviter trop de props optionnelles
+- Préférer composition over configuration
+- Storybook pour documenter tous les use cases
+
+### Risque 3: TypeScript generics difficiles
+
+**Mitigation:**
+
+- Utiliser des contraintes de type simples
+- Pas de conditional types complexes
+- Exemples clairs dans JSDoc
+- Tests avec types concrets (Project, Workspace)
 
 ## Plan de Vérification
 
-1. **Backend API tests**:
-    - Créer des tests unitaires pour WorkspaceScriptsService
-    - Créer des tests unitaires pour ScriptProcessService
-    - Tester le spawning et le killing de processus
+### Tests Unitaires
 
-2. **Frontend components tests**:
-    - Storybook stories pour ScriptsPanel
-    - Storybook stories pour ConfigureScriptsDialog
-    - Tests Vitest pour les hooks
+1. **pathUtils.test.ts**
+    - Test getBasename() avec paths Unix
+    - Test getBasename() avec paths Windows
+    - Test edge cases (empty, root, trailing slash)
 
-3. **Integration tests**:
-    - E2E test: configurer un script
-    - E2E test: démarrer/arrêter un script
-    - E2E test: visualiser les logs en temps réel
+2. **DualListItem.test.tsx**
+    - Render variant "available"
+    - Render variant "sortable"
+    - Click action button
+    - Loading state
+    - Reordering state
 
-4. **Manual testing**:
-    - Naviguer vers ProjectsV2 page
-    - Sélectionner un workspace
-    - Basculer vers "Scripts" view
-    - Configurer des scripts (dev:backend, dev:frontend)
-    - Démarrer les scripts et vérifier les logs
-    - Arrêter les scripts
-    - Vérifier que les processus sont bien nettoyés
+3. **DualListDialog.test.tsx**
+    - Render avec items
+    - Search filtering
+    - Drag & drop reorder
+    - Empty states
+    - Optimistic mode
 
-## Décisions Architecturales
+### Tests d'Intégration
 
-### Questions Résolues
+4. **ManagePinnedProjectsDialog**
+    - Pin project from right → appears in left
+    - Unpin project from left → appears in right
+    - Drag to reorder in left
+    - Search in right filters correctly
+    - Loading states during API calls
 
-1. **Persistence des logs**:
-    - **Décision**: Même durée que les task logs
-    - Stockage dans ./data/workspace-scripts/{scriptId}/logs/
-    - Cleanup automatique après X jours (configurable)
+5. **ManageProjectWorkspacesDialog**
+    - Associate workspace → optimistic update
+    - Dissociate workspace → optimistic update
+    - Reorder associated workspaces
+    - Rollback on API error
 
-2. **Limites de processus**:
-    - **Décision**: Max 5 scripts configurés par workspace (MVP)
-    - Phase 2: Augmenter à 10 si nécessaire
-    - Validation côté backend avant création
+### Tests Manuels
 
-3. **Sécurité**:
-    - **Décision**: Only allow scripts from package.json
-    - Backend parse le package.json du workspace
-    - Pas d'exécution de commandes arbitraires
-    - Phase 2: Whitelist/blacklist additionnelle si nécessaire
+6. **End-to-End Flow**
+    - Navigate to ProjectsV2
+    - Open Manage Projects dialog
+    - Pin 3 projects
+    - Reorder them via drag-drop
+    - Unpin 1 project
+    - Search for project in available list
+    - Close dialog
+    - Open Manage Workspaces dialog
+    - Associate 2 workspaces (should see optimistic update)
+    - Reorder them
+    - Dissociate 1 workspace
+    - Close dialog
+    - Verify all changes persisted
 
-4. **Multi-instance**:
-    - **Décision**: Document limitation (single backend instance)
-    - Current architecture n'a pas de load balancing
-    - Phase 3: Si besoin, ajouter file-based locks dans workspace directory
+7. **npm run check**
+    - No TypeScript errors
+    - No ESLint blocking errors
+    - Prettier formatted
 
-5. **Cross-platform compatibility**:
-    - **Décision**: Réutiliser ScriptExecutor (déjà gère Windows/Unix)
-    - Process killing: taskkill (Windows) vs kill (Unix)
-    - Path handling: path.join() et normalize separators
+## Notes Importantes
 
-### Scope d'implémentation
+### Optimistic Updates Pattern
 
-**Choix validé par l'utilisateur**: Scope complet (toutes fonctionnalités)
+Le `ManageProjectWorkspacesDialog` utilise des optimistic updates pour améliorer l'UX:
 
-**Fonctionnalités incluses**:
+```typescript
+// État optimiste
+const [optimisticAssociations, setOptimisticAssociations] = useState<Set<string>>(new Set());
+const [optimisticDissociations, setOptimisticDissociations] = useState<Set<string>>(new Set());
 
-- ✅ Start/stop/restart controls
-- ✅ Multi-panel log viewing avec layouts flexibles (Full Width / Split / Grid)
-- ✅ Script auto-discovery from package.json
-- ✅ Panel management dynamique (add/remove panels)
-- ✅ Real-time log streaming via SSE
-- ✅ Status indicators (running/stopped/starting/stopping/error/crashed)
-- ✅ Auto-restart on crash (configurable)
-- ✅ Auto-start on workspace open (configurable)
-- ✅ URL health checks (optional per script)
-- ✅ Log export functionality
-- ✅ Process cleanup on backend shutdown
-- ✅ Process heartbeat monitoring
-- ✅ Keyboard shortcuts
-- ✅ Max 10 scripts per workspace (limite haute)
-- ✅ Search/filter dans les logs
-- ✅ Auto-scroll toggle per panel
+// Calcul de l'état effectif
+const effectiveIds = new Set(baseIds);
+optimisticAssociations.forEach(id => effectiveIds.add(id));
+optimisticDissociations.forEach(id => effectiveIds.delete(id));
 
-### Ordre d'implémentation recommandé
+// Rollback en cas d'erreur API
+catch (error) {
+  setOptimisticAssociations(prev => {
+    const next = new Set(prev);
+    next.delete(id);
+    return next;
+  });
+}
+```
 
-**Étape 1: Infrastructure Backend**
+Le `DualListDialog` doit supporter ce pattern via la prop `optimisticMode`.
 
-1. Data models (WorkspaceScript, ScriptProcess) + migrations
-2. ScriptLogsStorage (extends TraceChunkStorage)
-3. ScriptProcessManager (wrapper autour de ScriptExecutor)
-4. WorkspaceScriptsRepository
-5. API contract (workspaceScripts.contract.ts)
+### Préservation Features Existantes
 
-**Étape 2: Services Backend**
+**Toutes les features actuelles doivent être préservées:**
 
-1. WorkspaceScriptsService (CRUD + auto-discovery)
-2. ScriptProcessService (lifecycle management)
-3. WorkspaceScriptsController (routes)
-4. B2F events + filters
-5. Server integration (routes, cleanup hook)
+- ✅ Drag & drop reordering (avec distance: 8px activation)
+- ✅ Search avec filtrage temps réel
+- ✅ Loading states individuels par item
+- ✅ Reordering states (opacity, pointer-events-none)
+- ✅ Empty states customizables
+- ✅ Optimistic updates (ManageProjectWorkspacesDialog)
+- ✅ Help text ("Drag to reorder, click → to...")
+- ✅ Icons/colors/badges customizables
 
-**Étape 3: Frontend Core**
+### Patterns à Respecter
 
-1. API client (workspaceScripts.api.ts)
-2. Hooks (useWorkspaceScripts, useScriptProcess, useScriptLogs)
-3. WorkspacePanel view mode toggle
-4. ConfigureScriptsDialog avec auto-discovery
+1. **Generic avec contraintes minimales:**
 
-**Étape 4: Frontend Multi-Panel UI**
+    ```typescript
+    function DualListDialog<TLeft, TRight>({ ... }: DualListDialogProps<TLeft, TRight>) {
+      // TLeft et TRight n'ont pas besoin d'extends, on utilise des key extractors
+    }
+    ```
 
-1. ScriptsPanel (container avec layout management)
-2. ScriptPanel (single panel component)
-3. ScriptLogsViewer (adapt from TaskLogsViewer)
-4. Panel controls (dropdown, buttons)
-5. Layout selector et panel add/remove
+2. **Render props pour flexibilité:**
 
-**Étape 5: Features Avancées**
+    ```typescript
+    leftItemRenderer: (item: TLeft, actions: ItemActions) => ReactNode;
+    // Permet aux consumers de render ce qu'ils veulent
+    ```
 
-1. Auto-restart logic
-2. Auto-start logic
-3. Health checks
-4. Log export
-5. Keyboard shortcuts
-6. Process monitoring
+3. **Composition over inheritance:**
 
-**Étape 6: Tests & Polish**
+    ```typescript
+    // ❌ BAD
+    class ManagePinnedProjectsDialog extends DualListDialog {}
 
-1. Backend unit tests
-2. Frontend component tests
-3. E2E tests
-4. Performance optimization
-5. Documentation
+    // ✅ GOOD
+    <DualListDialog leftItemRenderer={...} rightItemRenderer={...} />
+    ```
+
+### Code Quality Gates
+
+**Avant de merger:**
+
+- [ ] Tous les tests passent (unit + integration)
+- [ ] npm run check sans erreurs TypeScript
+- [ ] Storybook stories créées pour nouveaux composants
+- [ ] Documentation JSDoc complète
+- [ ] Code review par l'utilisateur
+- [ ] Tests manuels E2E validés
+
+**Métriques cibles:**
+
+- [ ] -30% lignes de code
+- [ ] 0% duplication entre dialogs
+- [ ] Grade A- en architecture
+- [ ] > 70% test coverage sur nouveaux composants

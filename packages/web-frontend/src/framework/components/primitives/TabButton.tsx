@@ -36,13 +36,14 @@ export type TabButtonProps = React.ComponentProps<'button'> &
 	VariantProps<typeof tabButtonVariants> & {
 		icon?: React.ReactNode;
 		badge?: React.ReactNode;
+		action?: React.ReactNode;
 	};
 
 /**
  * TabButton - A styled button for navigation tabs
  *
  * Provides consistent styling for tab navigation with active/inactive states.
- * Supports optional icon and badge elements.
+ * Supports optional icon, badge, and action elements.
  *
  * @example
  * <TabButton active={activeTab === 'overview'} onClick={() => setActiveTab('overview')}>
@@ -54,12 +55,13 @@ export type TabButtonProps = React.ComponentProps<'button'> &
  *   active={activeTab === 'settings'}
  *   icon={<Settings className="size-4" />}
  *   badge={<Badge>3</Badge>}
+ *   action={<Button size="icon-sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleEdit(); }}><Edit /></Button>}
  *   onClick={() => setActiveTab('settings')}
  * >
  *   Settings
  * </TabButton>
  */
-function TabButton({ className, active = false, icon, badge, children, ...props }: TabButtonProps) {
+function TabButton({ className, active = false, icon, badge, action, children, ...props }: TabButtonProps) {
 	const Comp = 'button';
 
 	return (
@@ -67,6 +69,7 @@ function TabButton({ className, active = false, icon, badge, children, ...props 
 			{icon}
 			{children}
 			{badge}
+			{action}
 		</Comp>
 	);
 }

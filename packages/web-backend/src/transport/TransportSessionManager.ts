@@ -386,6 +386,67 @@ export class TransportSessionManager {
 	}
 
 	/**
+	 * Set complete subscription state for a connection (state-based API)
+	 *
+	 * Replaces all current subscriptions with the new state in a single atomic operation.
+	 * This is more efficient than individual subscribe/unsubscribe messages and simplifies
+	 * multi-component subscription management.
+	 *
+	 * @param connId - Connection ID
+	 * @param subscriptions - Complete desired subscription state
+	 *
+	 * @example
+	 * ```typescript
+	 * manager.setSubscriptionState('conn-1', [
+	 *   { event: 'b2f:task:created' },
+	 *   { event: 'b2f:task:updated', filters: { taskId: '123' } }
+	 * ]);
+	 * ```
+	 */
+	setSubscriptionState(
+		connId: string,
+		subscriptions: Array<{ event: string; filters?: Record<string, unknown> }>
+	): void {
+		const session = this.sessions.get(connId);
+		if (!session) {
+			log.warn(`Cannot set subscription state: session ${connId} not found`);
+			return;
+		}
+
+		// Calculate delta for logging
+		const oldEvents = new Set(session.subscribedEvents);
+		const newEvents = new Set(subscriptions.map(s => s.event));
+
+		const added = subscriptions.filter(s => !oldEvents.has(s.event));
+		const removed = Array.from(oldEvents).filter(e => !newEvents.has(e));
+
+		// Replace subscription state atomically
+		session.subscribedEvents.clear();
+		session.eventFilters.clear();
+
+		subscriptions.forEach(({ event, filters }) => {
+			session.subscribedEvents.add(event);
+			if (filters) {
+				session.eventFilters.set(event, filters);
+			}
+		});
+
+		// Log delta (context-efficient: only log if there are changes)
+		if (added.length > 0 || removed.length > 0) {
+			const parts: string[] = [];
+			if (added.length > 0) {
+				parts.push(`+${added.length} events`);
+			}
+			if (removed.length > 0) {
+				parts.push(`-${removed.length} events`);
+			}
+			log.info(
+				`Connection ${connId} subscription state updated: ${parts.join(', ')} (total: ${subscriptions.length})`
+			);
+		}
+	}
+
+	/**
 	 * Check if connection is subscribed to an event
 	 *
 	 * @param connId - Connection ID

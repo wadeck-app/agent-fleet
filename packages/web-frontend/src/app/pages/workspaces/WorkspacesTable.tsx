@@ -7,7 +7,7 @@ import { useToast } from '@framework/features/toast/ToastContext';
 import type { Workspace } from '@shared/api/workspaces.contract';
 import { Pencil } from 'lucide-react';
 
-import { useProject } from '@/hooks/useProject';
+import { useWorkspaceProject } from '@/hooks/useWorkspaceProject';
 
 import { workspacesApi } from '../workspaces/workspaces.api';
 import { EditWorkspaceDialog } from './EditWorkspaceDialog';
@@ -15,12 +15,8 @@ import { EditWorkspaceDialog } from './EditWorkspaceDialog';
 /**
  * Component to display project name for a workspace
  */
-function ProjectName({ projectId }: { projectId?: string }) {
-	const { project, isLoading } = useProject(projectId);
-
-	if (!projectId) {
-		return <span className="text-sm text-muted-foreground">-</span>;
-	}
+function ProjectName({ workspaceId }: { workspaceId: string }) {
+	const { project, isLoading } = useWorkspaceProject(workspaceId);
 
 	if (isLoading) {
 		return <span className="text-sm text-muted-foreground">Loading...</span>;
@@ -59,7 +55,7 @@ export const WORKSPACES_TABLE2_COLUMNS: Table2Column<Workspace>[] = [
 	{
 		key: 'project',
 		label: 'Project',
-		render: (w: Workspace) => <ProjectName projectId={w.projectId} />,
+		render: (w: Workspace) => <ProjectName workspaceId={w.id} />,
 	},
 	{
 		key: 'description',
@@ -116,10 +112,7 @@ export function WorkspacesTable(props: WorkspacesTableProps) {
 	const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
 	const { showToast } = useToast();
 
-	const handleSave = async (
-		workspaceId: string,
-		data: { name?: string; description?: string; color?: string; projectId?: string | null }
-	) => {
+	const handleSave = async (workspaceId: string, data: { name?: string; description?: string; color?: string }) => {
 		await workspacesApi.updateWorkspace(workspaceId, data);
 		// Cache will auto-refresh via useRealtimeRefresh subscription to B2F_WORKSPACE_UPDATED
 

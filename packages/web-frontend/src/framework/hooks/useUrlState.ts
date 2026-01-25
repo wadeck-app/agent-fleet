@@ -5,6 +5,9 @@ import { useSearchParams } from 'react-router-dom';
 const pendingUpdates = new Map<string, string | null>();
 let flushPending: (() => void) | null = null;
 
+// Global cache of last known values for all params to avoid reading stale searchParams
+const _lastKnownValues = new Map<string, string | null>();
+
 /**
  * ===========================================================================================
  * URL STATE MANAGEMENT HOOK
@@ -142,6 +145,10 @@ export function useUrlState<T>({
 	// Track the last URL value we synced to detect external changes
 	const lastSyncedUrlValue = useRef<string | null>(null);
 
+	// Ref to always have access to latest searchParams without adding to effect deps
+	const searchParamsRef = useRef(searchParams);
+	searchParamsRef.current = searchParams;
+
 	// Initialize state from URL or default
 	const [state, setState] = useState<T>(() => {
 		const urlValue = searchParams.get(paramName);
@@ -173,9 +180,25 @@ export function useUrlState<T>({
 		// Determine what the new URL value should be
 		const newUrlValue = shouldCleanup ? null : serialize(state);
 
-		// CRITICAL: Don't write if value hasn't changed
+		// CRITICAL: Don't write if value hasn't changed from what we last synced
 		// This prevents re-triggering flushes with stale values after Listen effects run
 		if (lastSyncedUrlValue.current === newUrlValue) {
+			return;
+		}
+
+		// CRITICAL: Check current URL AND pendingUpdates to prevent stale writes
+		const currentUrlValue = searchParamsRef.current.get(paramName);
+		const pendingValue = pendingUpdates.get(paramName);
+
+		// If URL already has this exact value, don't write
+		if (currentUrlValue === newUrlValue) {
+			lastSyncedUrlValue.current = newUrlValue;
+			return;
+		}
+
+		// CRITICAL: If pendingUpdates already has a value queued, don't overwrite it
+		// This prevents stale closures from overwriting newer values
+		if (pendingValue !== undefined && pendingValue !== newUrlValue) {
 			return;
 		}
 
@@ -188,37 +211,45 @@ export function useUrlState<T>({
 		// Schedule flush if not already scheduled
 		if (!flushPending) {
 			flushPending = () => {
-				console.log('[useUrlState] FLUSHING pending updates:', Array.from(pendingUpdates.entries()));
+				// Capture pending updates snapshot
+				const updates = Array.from(pendingUpdates.entries());
 
-				// Use functional update to avoid stale closure bug
-				// This ensures we read the LATEST searchParams, not one captured in closure
-				setSearchParams(
-					prev => {
-						const newParams = new URLSearchParams(prev);
-
-						// Apply all pending updates
-						for (const [key, value] of pendingUpdates.entries()) {
-							if (value === null) {
-								newParams.delete(key);
-							} else {
-								newParams.set(key, value);
-							}
-						}
-
-						console.log('[useUrlState] Calling setSearchParams with:', newParams.toString());
-						return newParams;
-					},
-					{ replace: true }
-				);
-
-				// Clear queue
+				// Clear queue immediately to prevent duplicate writes
 				pendingUpdates.clear();
-				flushPending = null;
+
+				// CRITICAL: Use searchParamsRef to read LATEST URL, not stale `prev` from closure
+				const currentParams = new URLSearchParams(searchParamsRef.current);
+
+				// Apply all pending updates
+				for (const [key, value] of updates) {
+					if (value === null) {
+						currentParams.delete(key);
+					} else {
+						currentParams.set(key, value);
+					}
+				}
+
+				// Non-functional update since we already read latest params via ref
+				setSearchParams(currentParams, { replace: true });
+
+				// CRITICAL: Reset flushPending in a microtask to allow any Sync effects
+				// triggered by setSearchParams to add to pendingUpdates before next flush
+				queueMicrotask(() => {
+					// Only reset if no new updates were added
+					if (pendingUpdates.size === 0) {
+						flushPending = null;
+					} else {
+						// New updates added, schedule another flush
+						const nextFlush = flushPending!;
+						queueMicrotask(nextFlush);
+					}
+				});
 			};
 
 			// Schedule flush in microtask to batch all synchronous updates
 			queueMicrotask(flushPending);
 		}
+		// NOTE: searchParams NOT in deps - we use searchParamsRef to read latest value
 		// eslint-disable-next-line react-hooks/exhaustive-deps, no-restricted-syntax
 	}, [state, paramName, groupId, cleanupDefault]);
 
@@ -231,11 +262,6 @@ export function useUrlState<T>({
 		if (urlValue === lastSyncedUrlValue.current) {
 			return; // This is our own change, ignore it
 		}
-
-		console.log(`[useUrlState:${paramName}] External URL change detected`, {
-			urlValue: urlValue,
-			lastSynced: lastSyncedUrlValue.current,
-		});
 
 		// Update lastSyncedUrlValue to prevent future redundant updates
 		lastSyncedUrlValue.current = urlValue;

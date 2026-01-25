@@ -69,6 +69,11 @@ const frontendRules = {
 				'Inline SVG elements are forbidden. Use lucide-react icons instead (e.g., import { IconName } from "lucide-react").',
 		},
 		{
+			selector: 'Literal[value=/[\\u{1F300}-\\u{1F9FF}\\u{2600}-\\u{26FF}\\u{2700}-\\u{27BF}]/u]',
+			message:
+				'Emoji literals are forbidden. Use lucide-react icons instead (e.g., <Smile />) or create a DynamicLucideIcon component.',
+		},
+		{
 			selector: 'JSXElement[openingElement.name.name="button"]',
 			message: 'Native <button> is forbidden. Use <Button> from @/components/ui/Button instead.',
 		},

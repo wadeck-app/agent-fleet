@@ -251,6 +251,64 @@ export interface ITransportClient extends ITransport {
 	 * ```
 	 */
 	getLocalSubscriptions(): string[];
+
+	/**
+	 * Set subscription state for a component (state-based API)
+	 *
+	 * Each component declares its desired subscription state independently.
+	 * The transport layer merges all component states and sends a single
+	 * subscription_state message to the server.
+	 *
+	 * @param componentId - Unique component identifier (e.g., 'TasksPage', 'WorkersWidget')
+	 * @param subscriptions - Desired subscriptions for this component
+	 *
+	 * @example
+	 * ```typescript
+	 * transport.setComponentSubscriptionState('TasksPage', [
+	 *   { event: 'b2f:task:created' },
+	 *   { event: 'b2f:task:updated', filters: { taskId: '123' } }
+	 * ]);
+	 * ```
+	 */
+	setComponentSubscriptionState?(
+		componentId: string,
+		subscriptions: Array<{ event: string; filters?: Record<string, unknown> }>
+	): void;
+
+	/**
+	 * Remove all subscriptions for a component (cleanup on unmount)
+	 *
+	 * @param componentId - Component identifier to remove
+	 *
+	 * @example
+	 * ```typescript
+	 * transport.removeComponentSubscriptions('TasksPage');
+	 * ```
+	 */
+	removeComponentSubscriptions?(componentId: string): void;
+
+	/**
+	 * Register event handler locally without sending subscription message to server
+	 *
+	 * Use this when managing subscriptions via setComponentSubscriptionState()
+	 * to avoid duplicate subscription messages. This only registers the handler
+	 * locally; the actual server subscription is managed by setComponentSubscriptionState().
+	 *
+	 * @param event - Event type to handle
+	 * @param handler - Event handler function
+	 * @returns Unsubscribe function
+	 *
+	 * @example
+	 * ```typescript
+	 * const unsubscribe = transport.registerLocalHandler?.('b2f:task:created', (data) => {
+	 *   console.log('Task created:', data);
+	 * });
+	 * ```
+	 */
+	registerLocalHandler?<E extends import('@shared/transport').EventType>(
+		event: E,
+		handler: import('@shared/transport').EventHandler<E>
+	): () => void;
 }
 
 /**

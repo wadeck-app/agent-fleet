@@ -2,6 +2,7 @@ import type { PaginatedLogsResponse } from '@shared/api/tasks.contract';
 import { vi } from 'vitest';
 
 /**
+ * TODO translate
  * Crée une promise contrôlable pour tester les race conditions
  */
 export function createControlledPromise<T>() {
@@ -21,6 +22,7 @@ export function createControlledPromise<T>() {
 }
 
 /**
+ * TODO translate
  * Mock API avec timing contrôlé
  */
 export function createMockTasksApi() {

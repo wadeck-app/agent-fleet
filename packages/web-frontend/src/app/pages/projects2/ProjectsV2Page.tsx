@@ -1,18 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
-import { DynamicLucideIcon } from '@framework/components/icons/DynamicLucideIcon';
 import { Page } from '@framework/components/layout/Page';
 import { SkeletonBox } from '@framework/components/loading/SkeletonBox';
-import { Badge } from '@framework/components/primitives/Badge';
-import { Button } from '@framework/components/primitives/Button';
-import { TabButton } from '@framework/components/primitives/TabButton';
+import type { Project } from '@shared/api/projects.contract';
 import {
 	B2F_PROJECT_CREATED,
 	B2F_PROJECT_DELETED,
 	B2F_PROJECT_UPDATED,
 	B2F_WORKSPACE_UPDATED,
 } from '@shared/transport/B2FEventConstants';
-import { Settings } from 'lucide-react';
 
 import { ProjectEmptyState } from '@/app/components/domain/ProjectEmptyState';
 import { WorkspaceEmptyState } from '@/app/components/domain/WorkspaceEmptyState';
@@ -20,10 +17,11 @@ import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 import { useProjectWorkspaces } from '@app/hooks/useProjectWorkspaces';
 import { useProjects } from '@app/hooks/useProjects';
-import { useProjectsV2State } from '@app/hooks/useProjectsV2State';
 
+import { EditProjectDialog } from '../projects/EditProjectDialog';
 import { ManagePinnedProjectsDialog } from './ManagePinnedProjectsDialog';
 import { ManageProjectWorkspacesDialog } from './ManageProjectWorkspacesDialog';
+import { ProjectTabs } from './ProjectTabs';
 import { WorkspacePanel } from './WorkspacePanel';
 import { WorkspaceTabs } from './WorkspaceTabs';
 
@@ -56,6 +54,22 @@ export function ProjectsV2Page() {
 	// Dialog state
 	const [isManageDialogOpen, setIsManageDialogOpen] = useState(false);
 	const [isManageWorkspacesDialogOpen, setIsManageWorkspacesDialogOpen] = useState(false);
+	const [editDialogState, setEditDialogState] = useState<{
+		open: boolean;
+		project: Project | null;
+	}>({
+		open: false,
+		project: null,
+	});
+
+	// URL as source of truth (read-only)
+	const [searchParams, setSearchParams] = useSearchParams();
+	const projectId = searchParams.get('projectId');
+	const workspaceId = searchParams.get('workspaceId');
+	const view = (searchParams.get('view') as 'tasks' | 'scripts') || 'tasks';
+
+	// Track if we've done initial auto-selection
+	const hasAutoSelected = useRef(false);
 
 	// Hooks for data management
 	const {
@@ -78,29 +92,47 @@ export function ProjectsV2Page() {
 		getProjectWorkspaces,
 	} = useProjectWorkspaces();
 
-	// Active state management (URL persistence + auto-selection)
-	const { state, setActiveProject, setActiveWorkspace, setActiveView } = useProjectsV2State({
-		pinnedProjects,
-	});
-
-	const activeProject = projects.find(p => p.id === state.activeProjectId);
+	const activeProject = projects.find(p => p.id === projectId);
 	const projectWorkspaces = getProjectWorkspaces(activeProject);
 
-	// Auto-select first workspace when project changes and has workspaces
-	useEffect(() => {
-		console.log('[ProjectsV2Page] Auto-select effect', {
-			activeProjectId: activeProject?.id,
-			projectWorkspacesLength: projectWorkspaces.length,
-			activeWorkspaceId: state.activeWorkspaceId,
-			willAutoSelect: activeProject && projectWorkspaces.length > 0 && !state.activeWorkspaceId,
-		});
+	// Track previous projectId to detect changes
+	const prevProjectId = useRef<string | null>(null);
 
-		if (activeProject && projectWorkspaces.length > 0 && !state.activeWorkspaceId) {
-			console.log('[ProjectsV2Page] AUTO-SELECTING first workspace:', projectWorkspaces[0].id);
-			setActiveWorkspace(projectWorkspaces[0].id);
+	// One-time auto-selection on mount and when projectId changes (URL → State, not bidirectional)
+	useEffect(() => {
+		// Reset hasAutoSelected when projectId changes
+		if (prevProjectId.current !== projectId) {
+			hasAutoSelected.current = false;
+			prevProjectId.current = projectId;
+		}
+
+		// Skip if already done or still loading
+		if (hasAutoSelected.current || projectsLoading) {
+			return;
+		}
+
+		// Auto-select first pinned project if none selected
+		if (!projectId && pinnedProjects.length > 0) {
+			console.log('[ProjectsV2Page] Auto-selecting first project:', pinnedProjects[0].id);
+			setSearchParams({ projectId: pinnedProjects[0].id }, { replace: true });
+			hasAutoSelected.current = true;
+			return;
+		}
+
+		// Auto-select first workspace if project has workspaces but none selected
+		if (projectId && activeProject && projectWorkspaces.length > 0 && !workspaceId) {
+			console.log('[ProjectsV2Page] Auto-selecting first workspace:', projectWorkspaces[0].id);
+			setSearchParams({ projectId, workspaceId: projectWorkspaces[0].id }, { replace: true });
+			hasAutoSelected.current = true;
+			return;
+		}
+
+		// Mark as done if URL already has valid params
+		if (projectId) {
+			hasAutoSelected.current = true;
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [activeProject?.id, projectWorkspaces.length, state.activeWorkspaceId]);
+	}, [projectId, workspaceId, projectsLoading, pinnedProjects.length, activeProject?.id, projectWorkspaces.length]);
 
 	// Subscribe to real-time updates
 	useRealtimeRefresh({
@@ -112,34 +144,38 @@ export function ProjectsV2Page() {
 		logPrefix: 'ProjectsV2Page',
 	});
 
-	// Handlers - now just thin wrappers around hook functions
-	const handleProjectSelect = async (projectId: string) => {
-		const project = projects.find(p => p.id === projectId);
+	// Handlers - explicit URL updates (User Action → URL)
+	const handleProjectSelect = async (newProjectId: string) => {
+		const project = projects.find(p => p.id === newProjectId);
 		if (!project) return;
 
-		if (project.pinned) {
-			setActiveProject(projectId);
-		} else {
-			await pinProject(projectId, project.version);
-			setActiveProject(projectId);
+		if (!project.pinned) {
+			await pinProject(newProjectId, project.version);
+		}
+
+		// Explicit URL update - clear workspace when changing projects
+		setSearchParams({ projectId: newProjectId });
+	};
+
+	const handleProjectRemove = async (removedProjectId: string) => {
+		const project = projects.find(p => p.id === removedProjectId);
+		if (!project) return;
+
+		await unpinProject(removedProjectId, project.version);
+
+		// If removing current project, switch to first remaining
+		const remainingPinned = pinnedProjects.filter(p => p.id !== removedProjectId);
+		if (projectId === removedProjectId && remainingPinned.length > 0) {
+			setSearchParams({ projectId: remainingPinned[0].id });
+		} else if (projectId === removedProjectId) {
+			// No projects left, clear URL
+			setSearchParams({});
 		}
 	};
 
-	const handleProjectRemove = async (projectId: string) => {
-		const project = projects.find(p => p.id === projectId);
-		if (!project) return;
-
-		await unpinProject(projectId, project.version);
-
-		// Update active project if removing the current one
-		const remainingPinned = pinnedProjects.filter(p => p.id !== projectId);
-		if (state.activeProjectId === projectId && remainingPinned.length > 0) {
-			setActiveProject(remainingPinned[0].id);
-		}
-	};
-
-	const handleProjectTabClick = (projectId: string) => {
-		setActiveProject(projectId);
+	const handleProjectTabClick = (newProjectId: string) => {
+		// Explicit URL update - clear workspace when switching projects
+		setSearchParams({ projectId: newProjectId });
 	};
 
 	const handleWorkspaceAssociate = async (workspaceId: string) => {
@@ -148,7 +184,8 @@ export function ProjectsV2Page() {
 	};
 
 	const handleWorkspaceDissociate = async (workspaceId: string) => {
-		await dissociateWorkspace(workspaceId);
+		if (!activeProject) return;
+		await dissociateWorkspace(workspaceId, activeProject.id);
 	};
 
 	const handleWorkspaceReorder = async (activeId: string, overId: string) => {
@@ -156,8 +193,35 @@ export function ProjectsV2Page() {
 		await reorderWorkspaces(activeProject.id, activeId, overId, activeProject.version);
 	};
 
-	const activeWorkspace = projectWorkspaces.find(w => w.id === state.activeWorkspaceId);
+	const activeWorkspace = projectWorkspaces.find(w => w.id === workspaceId);
 	const loading = projectsLoading || workspacesLoading;
+
+	// Handlers for workspace and view selection
+	const handleWorkspaceSelect = (newWorkspaceId: string) => {
+		if (!projectId) return;
+		// Explicit URL update - keep projectId, set workspaceId
+		setSearchParams({ projectId, workspaceId: newWorkspaceId });
+	};
+
+	const handleViewChange = (newView: 'tasks' | 'scripts') => {
+		if (!projectId) return;
+		// Explicit URL update - preserve projectId and workspaceId
+		const params: Record<string, string> = { projectId };
+		if (workspaceId) params.workspaceId = workspaceId;
+		if (newView !== 'tasks') params.view = newView; // Only add if not default
+		setSearchParams(params);
+	};
+
+	const handleEditProject = (project: Project) => {
+		setEditDialogState({ open: true, project });
+	};
+
+	// Note: No need to manually reload here - the realtime WebSocket listener
+	// (useRealtimeRefresh hook) already handles reloading when B2F_PROJECT_UPDATED is received.
+	// Having both would cause a double reload and potential race conditions.
+	const handleProjectUpdated = () => {
+		// Projects and workspaces will be reloaded automatically via WebSocket event
+	};
 
 	return (
 		<Page fullWidth className="flex h-screen flex-col">
@@ -206,65 +270,30 @@ export function ProjectsV2Page() {
 					<ProjectEmptyState onManageClick={() => setIsManageDialogOpen(true)} />
 				) : (
 					<div className="flex h-full flex-col">
-						{/* Project Tabs with Title and Actions */}
-						<div className="border-b border-border bg-card">
-							<div className="flex items-center justify-between px-4">
-								<div className="flex items-center gap-4 overflow-x-auto py-2">
-									<span className="text-sm font-medium text-muted-foreground">Projects v2</span>
-									<div className="flex items-center gap-1">
-										{pinnedProjects.map(project => {
-											const projectWorkspaceCount = workspaces.filter(w =>
-												project.workspaceIds.includes(w.id)
-											).length;
-
-											return (
-												<TabButton
-													key={project.id}
-													active={state.activeProjectId === project.id}
-													onClick={() => handleProjectTabClick(project.id)}
-													icon={
-														project.icon && (
-															<DynamicLucideIcon
-																name={project.icon}
-																color={project.iconColor || '#6366F1'}
-																className="h-4 w-4"
-															/>
-														)
-													}
-													badge={
-														<Badge variant="secondary" className="text-xs">
-															{projectWorkspaceCount}
-														</Badge>
-													}
-												>
-													<span className="text-sm font-medium">{project.name}</span>
-												</TabButton>
-											);
-										})}
-									</div>
-								</div>
-								<Button variant="default" size="sm" onClick={() => setIsManageDialogOpen(true)}>
-									<Settings />
-									Manage Projects
-								</Button>
-							</div>
-						</div>
+						<ProjectTabs
+							projects={pinnedProjects}
+							workspaces={workspaces}
+							activeProjectId={projectId}
+							onProjectSelect={handleProjectTabClick}
+							onManageClick={() => setIsManageDialogOpen(true)}
+						/>
 
 						{/* Workspace Tabs and Content */}
 						{activeProject && (
 							<div className="flex flex-1 flex-col overflow-hidden">
 								<WorkspaceTabs
 									workspaces={projectWorkspaces}
-									activeWorkspaceId={state.activeWorkspaceId}
-									onWorkspaceSelect={setActiveWorkspace}
+									activeWorkspaceId={workspaceId}
+									onWorkspaceSelect={handleWorkspaceSelect}
+									onEditProjectClick={() => handleEditProject(activeProject)}
 									onManageClick={() => setIsManageWorkspacesDialogOpen(true)}
 								/>
 								{activeWorkspace ? (
 									<WorkspacePanel
 										workspace={activeWorkspace}
 										projectId={activeProject.id}
-										activeView={state.activeView}
-										onViewChange={setActiveView}
+										activeView={view}
+										onViewChange={handleViewChange}
 									/>
 								) : (
 									<WorkspaceEmptyState onManageClick={() => setIsManageWorkspacesDialogOpen(true)} />
@@ -274,6 +303,14 @@ export function ProjectsV2Page() {
 					</div>
 				)}
 			</div>
+
+			{/* Edit Project Dialog */}
+			<EditProjectDialog
+				project={editDialogState.project}
+				open={editDialogState.open}
+				onOpenChange={open => setEditDialogState({ open, project: open ? editDialogState.project : null })}
+				onSuccess={handleProjectUpdated}
+			/>
 
 			{/* Manage Pinned Projects Dialog */}
 			<ManagePinnedProjectsDialog

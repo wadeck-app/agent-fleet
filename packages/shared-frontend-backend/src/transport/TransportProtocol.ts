@@ -97,3 +97,55 @@ export interface SubscriptionMessage {
 	 */
 	filters?: Record<string, unknown>;
 }
+
+/**
+ * Subscription Specification
+ * Describes a single event subscription with optional filters
+ */
+export interface SubscriptionSpec {
+	/** Event type to subscribe to */
+	event: string;
+	/**
+	 * Optional filters for server-side event filtering
+	 * Example: { taskId: '123', status: 'IN_PROGRESS' }
+	 * Backend will only send events matching ALL specified filters
+	 */
+	filters?: Record<string, unknown>;
+}
+
+/**
+ * Subscription State Message
+ * State-based subscription control for efficient subscription management
+ *
+ * Instead of sending individual subscribe/unsubscribe messages,
+ * clients declare their desired subscription state. The server
+ * replaces the entire subscription set with the new state.
+ *
+ * Benefits:
+ * - Single WebSocket message instead of multiple individual messages
+ * - Automatic cleanup (unlisted events are unsubscribed)
+ * - Simpler reconciliation on reconnection
+ * - Better support for multi-component subscriptions
+ *
+ * @example
+ * ```typescript
+ * // Client declares desired state
+ * const message: SubscriptionStateMessage = {
+ *   type: 'subscription_state',
+ *   subscriptions: [
+ *     { event: 'b2f:task:created' },
+ *     { event: 'b2f:task:updated', filters: { taskId: '123' } },
+ *     { event: 'b2f:task:deleted' }
+ *   ]
+ * };
+ * ```
+ */
+export interface SubscriptionStateMessage {
+	/** Message type identifier */
+	type: 'subscription_state';
+	/**
+	 * Complete desired subscription state
+	 * Server will replace all current subscriptions with this list
+	 */
+	subscriptions: SubscriptionSpec[];
+}

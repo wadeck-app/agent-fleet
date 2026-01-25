@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
-
-import { DualListDialog } from '@framework/components/overlays/DualListDialog';
+import { DualListEmptyState } from '@framework/components/overlays/DualListEmptyState';
 import { DualListItem } from '@framework/components/overlays/DualListItem';
+import { OptimisticDualListDialog } from '@framework/components/overlays/OptimisticDualListDialog';
 import { Badge } from '@framework/components/primitives/Badge';
 import { getBasename } from '@framework/utils/pathUtils';
 import type { Project } from '@shared/api/projects.contract';
@@ -10,36 +9,25 @@ import { ArrowLeft, ArrowRight } from 'lucide-react';
 
 /**
  * ===========================================================================================
- * MANAGE PROJECT WORKSPACES DIALOG COMPONENT
+ * MANAGE PROJECT WORKSPACES DIALOG - REFACTORED
  * ===========================================================================================
  *
  * Dialog for managing workspaces associated with a project with drag & drop reordering.
- * Built using generic DualListDialog and DualListItem components for maximum reusability.
+ * Now uses OptimisticDualListDialog for all state management.
  *
- * Features:
- * - Two-column layout: Associated (left) and Available (right) workspaces
- * - Drag & drop to reorder associated workspaces
- * - Arrow buttons (→ to dissociate, ← to associate)
- * - Real-time search functionality for available workspaces
- * - Auto-save: changes persist immediately to the server
- * - Optimistic UI updates for immediate feedback
+ * Reduced from 339 lines → ~120 lines (65% reduction!)
+ *
+ * All optimistic update logic is handled by OptimisticDualListDialog:
+ * - Optimistic associate/dissociate with immediate visual feedback
+ * - Optimistic reordering
  * - Loading states during API calls
- * - Reordering states with visual feedback
- * - Toast notifications for errors only
+ * - Reordering states with visual feedback (opacity-50)
+ * - Automatic rollback on errors
+ * - Clear states on dialog close
  *
- * Refactored: Reduced from 344 lines to ~200 lines by using generic components
- * (Note: Still preserves complex optimistic update logic)
- *
- * Usage:
- *   <ManageProjectWorkspacesDialog
- *     open={isOpen}
- *     onOpenChange={setIsOpen}
- *     project={activeProject}
- *     workspaces={allWorkspaces}
- *     onAssociate={handleAssociate}
- *     onDissociate={handleDissociate}
- *     onReorder={handleReorder}
- *   />
+ * This component only:
+ * - Passes data and handlers to OptimisticDualListDialog
+ * - Customizes rendering (workspace display, badges, colors)
  *
  * ===========================================================================================
  */
@@ -70,188 +58,28 @@ export function ManageProjectWorkspacesDialog({
 	onDissociate,
 	onReorder,
 }: ManageProjectWorkspacesDialogProps) {
-	const [loadingItems, setLoadingItems] = useState<Set<string>>(new Set());
-	const [reorderingIds, setReorderingIds] = useState<Set<string>>(new Set());
-
-	// Optimistic UI: Track pending associations/dissociations
-	// These represent user intent and override server state until confirmed
-	const [optimisticAssociations, setOptimisticAssociations] = useState<Set<string>>(new Set());
-	const [optimisticDissociations, setOptimisticDissociations] = useState<Set<string>>(new Set());
-
-	// Optimistic reordering: Track the optimistic order
-	const [optimisticOrder, setOptimisticOrder] = useState<string[] | null>(null);
-
-	// Clear optimistic state when dialog closes
-	useEffect(() => {
-		if (!open) {
-			setOptimisticAssociations(new Set());
-			setOptimisticDissociations(new Set());
-			setOptimisticOrder(null);
-			setLoadingItems(new Set());
-			setReorderingIds(new Set());
-		}
-	}, [open]);
-
-	// Get associated workspaces with optimistic updates
-	// Hierarchy: User intent (optimistic) > Server state
-	const baseAssociatedIds = new Set(project?.workspaceIds || []);
-
-	// Apply optimistic updates to associated IDs
-	const effectiveAssociatedIds = new Set(baseAssociatedIds);
-	optimisticAssociations.forEach(id => effectiveAssociatedIds.add(id));
-	optimisticDissociations.forEach(id => effectiveAssociatedIds.delete(id));
-
-	// Build associated workspaces list (ordered by effectiveAssociatedIds)
-	let associatedWorkspaces = Array.from(effectiveAssociatedIds)
-		.map((id: string) => workspaces.find((w: Workspace) => w.id === id))
-		.filter((w: Workspace | undefined): w is Workspace => w !== undefined);
-
-	// Apply optimistic reordering if present
-	if (optimisticOrder) {
-		// Reorder based on optimistic order
-		const orderMap = new Map(optimisticOrder.map((id, index) => [id, index]));
-		associatedWorkspaces = associatedWorkspaces.sort((a, b) => {
-			const orderA = orderMap.get(a.id) ?? Infinity;
-			const orderB = orderMap.get(b.id) ?? Infinity;
-			return orderA - orderB;
-		});
-	}
-	// Note: If no optimistic order, workspaces are in the order they were associated
-	// (project.workspaceIds array order)
-
-	// Get available (non-associated) workspaces - everything NOT in effectiveAssociatedIds
-	const availableWorkspaces = workspaces.filter((w: Workspace) => !effectiveAssociatedIds.has(w.id));
-
-	// Handle reordering with optimistic UI
-	const handleReorder = async (activeId: string, overId: string) => {
-		// Calculate new order optimistically
-		const currentOrder = associatedWorkspaces.map((w: Workspace) => w.id);
-		const activeIndex = currentOrder.indexOf(activeId);
-		const overIndex = currentOrder.indexOf(overId);
-
-		if (activeIndex === -1 || overIndex === -1) return;
-
-		// Reorder the array
-		const newOrder = [...currentOrder];
-		newOrder.splice(activeIndex, 1);
-		newOrder.splice(overIndex, 0, activeId);
-
-		// Apply optimistic reordering
-		setOptimisticOrder(newOrder);
-
-		// Mark all associated workspaces as reordering (since we update the order)
-		const allAssociatedIds = new Set<string>(associatedWorkspaces.map((w: Workspace) => w.id));
-		setReorderingIds(allAssociatedIds);
-
-		try {
-			await onReorder(activeId, overId);
-			// Success: keep optimistic order until props sync
-		} catch (error) {
-			console.error('Failed to reorder workspaces:', error);
-			// Rollback on error
-			setOptimisticOrder(null);
-		} finally {
-			setReorderingIds(new Set());
-		}
-	};
-
-	// Handle associate action with optimistic UI
-	const handleAssociate = async (workspaceId: string) => {
-		// 1. Optimistic update: Move immediately (user intent is truth)
-		setOptimisticAssociations(prev => new Set(prev).add(workspaceId));
-		// Clear opposite optimistic state if present (e.g., user clicked dissociate then associate)
-		setOptimisticDissociations(prev => {
-			if (prev.has(workspaceId)) {
-				const next = new Set(prev);
-				next.delete(workspaceId);
-				return next;
-			}
-			return prev;
-		});
-		setLoadingItems(prev => new Set(prev).add(workspaceId));
-
-		try {
-			// 2. API call to persist
-			await onAssociate(workspaceId);
-
-			// 3. Success: DON'T clear optimistic yet!
-			//    Keep it until props sync (WebSocket event) or dialog closes
-			//    Otherwise workspace will jump back to Available
-		} catch (error) {
-			// 4. Error: Rollback optimistic update
-			console.error('Failed to associate workspace:', error);
-			setOptimisticAssociations(prev => {
-				const next = new Set(prev);
-				next.delete(workspaceId);
-				return next;
-			});
-			// TODO: Show error toast
-		} finally {
-			// Clear loading state when API call completes
-			setLoadingItems(prev => {
-				const next = new Set(prev);
-				next.delete(workspaceId);
-				return next;
-			});
-		}
-	};
-
-	// Handle dissociate action with optimistic UI
-	const handleDissociate = async (workspaceId: string) => {
-		// 1. Optimistic update: Remove immediately (user intent is truth)
-		setOptimisticDissociations(prev => new Set(prev).add(workspaceId));
-		// Clear opposite optimistic state if present (e.g., user clicked associate then dissociate)
-		setOptimisticAssociations(prev => {
-			if (prev.has(workspaceId)) {
-				const next = new Set(prev);
-				next.delete(workspaceId);
-				return next;
-			}
-			return prev;
-		});
-		setLoadingItems(prev => new Set(prev).add(workspaceId));
-
-		try {
-			// 2. API call to persist
-			await onDissociate(workspaceId);
-
-			// 3. Success: DON'T clear optimistic yet!
-			//    Keep it until props sync (WebSocket event) or dialog closes
-		} catch (error) {
-			// 4. Error: Rollback optimistic update
-			console.error('Failed to dissociate workspace:', error);
-			setOptimisticDissociations(prev => {
-				const next = new Set(prev);
-				next.delete(workspaceId);
-				return next;
-			});
-			// TODO: Show error toast
-		} finally {
-			// Clear loading state when API call completes
-			setLoadingItems(prev => {
-				const next = new Set(prev);
-				next.delete(workspaceId);
-				return next;
-			});
-		}
-	};
+	// Get IDs of currently associated workspaces
+	const associatedIds = new Set(project?.workspaceIds || []);
 
 	return (
-		<DualListDialog
+		<OptimisticDualListDialog
 			open={open}
 			onOpenChange={onOpenChange}
 			title={project ? `Manage Workspaces for ${project.name}` : 'Manage Workspaces'}
 			maxWidth="4xl"
-			// Left panel: Associated workspaces
+			// Data
+			allItems={workspaces}
+			associatedIds={associatedIds}
+			itemKey={workspace => workspace.id}
+			// Rendering
 			leftTitle="Associated Workspaces"
-			leftItems={associatedWorkspaces}
-			leftItemKey={workspace => workspace.id}
-			leftItemRenderer={(workspace, actions) => {
+			rightTitle="Available Workspaces"
+			renderItem={(workspace, side, actions) => {
 				const displayName = workspace.name || getBasename(workspace.path);
 				return (
 					<DualListItem
 						itemId={workspace.id}
-						variant="sortable"
+						variant={side === 'left' ? 'sortable' : 'available'}
 						icon={
 							workspace.color && (
 								<div
@@ -267,62 +95,19 @@ export function ManageProjectWorkspacesDialog({
 								{workspace.tasksCount}
 							</Badge>
 						}
-						onAction={handleDissociate}
-						actionIcon={ArrowRight}
-						actionLabel={`Dissociate ${displayName}`}
+						onAction={side === 'left' ? actions.onDissociate : actions.onAssociate}
+						actionIcon={side === 'left' ? ArrowRight : ArrowLeft}
+						actionLabel={side === 'left' ? `Dissociate ${displayName}` : `Associate ${displayName}`}
 						isLoading={actions.isLoading}
 						isReordering={actions.isReordering}
 					/>
 				);
 			}}
-			leftEmptyState={
-				<div className="flex flex-col items-center justify-center py-8 text-center">
-					<div className="mb-2 text-3xl text-muted-foreground">🔗</div>
-					<p className="text-sm text-muted-foreground">No associated workspaces</p>
-					<p className="text-xs text-muted-foreground">Associate workspaces from the right panel</p>
-				</div>
-			}
+			leftEmptyState={<DualListEmptyState message="No associated workspaces" />}
+			rightEmptyState={<DualListEmptyState message="All workspaces are associated" />}
 			leftHelpText="Drag to reorder, click → to dissociate"
-			onReorder={handleReorder}
-			// Right panel: Available workspaces
-			rightTitle="Available Workspaces"
-			rightItems={availableWorkspaces}
-			rightItemKey={workspace => workspace.id}
-			rightItemRenderer={(workspace, actions) => {
-				const displayName = workspace.name || getBasename(workspace.path);
-				return (
-					<DualListItem
-						itemId={workspace.id}
-						variant="available"
-						icon={
-							workspace.color && (
-								<div
-									className="h-3 w-3 rounded-full border border-border"
-									style={{ backgroundColor: workspace.color }}
-									title={workspace.color}
-								/>
-							)
-						}
-						label={displayName}
-						badge={
-							<Badge variant="secondary" className="text-xs" title={`${workspace.tasksCount} task(s)`}>
-								{workspace.tasksCount}
-							</Badge>
-						}
-						onAction={handleAssociate}
-						actionIcon={ArrowLeft}
-						actionLabel={`Associate ${displayName}`}
-						isLoading={actions.isLoading}
-					/>
-				);
-			}}
-			rightEmptyState={
-				<div className="flex flex-col items-center justify-center py-8 text-center">
-					<div className="mb-2 text-3xl text-muted-foreground">✨</div>
-					<p className="text-sm text-muted-foreground">All workspaces are associated</p>
-				</div>
-			}
 			rightHelpText="Click ← to associate"
+			// Search
 			searchPlaceholder="Search workspaces..."
 			searchFilter={(workspace, query) => {
 				const displayName = workspace.name || getBasename(workspace.path);
@@ -331,8 +116,10 @@ export function ManageProjectWorkspacesDialog({
 					workspace.path.toLowerCase().includes(query.toLowerCase())
 				);
 			}}
-			loadingItems={loadingItems}
-			reorderingItems={reorderingIds}
+			// Actions (OptimisticDualListDialog handles the optimistic logic)
+			onAssociate={onAssociate}
+			onDissociate={onDissociate}
+			onReorder={onReorder}
 		/>
 	);
 }

@@ -8,13 +8,13 @@ const log = createLogger('WorkspaceMetadataRepository');
 /**
  * Workspace metadata (user-editable fields)
  * Compatible with WorkspaceFileMetadata
+ * Note: projectId association is managed via Projects (project.workspaceIds)
  */
 export interface WorkspaceMetadata {
 	id: string;
 	name?: string;
 	description?: string;
 	color?: string;
-	projectId?: string;
 	mode?: 'development' | 'production' | 'staging';
 	createdAt: string;
 	updatedAt: string;
@@ -77,16 +77,10 @@ export class WorkspaceMetadataRepository {
 			name?: string;
 			description?: string;
 			color?: string;
-			projectId?: string | null;
 			mode?: 'development' | 'production' | 'staging';
 		}
 	): Promise<WorkspaceMetadata> {
-		// Convert null to undefined for projectId to match WorkspaceFileMetadata type
-		const sanitizedData = {
-			...data,
-			projectId: data.projectId === null ? undefined : data.projectId,
-		};
-		const fileMetadata = await this.metadataFile.write(workspacePath, sanitizedData);
+		const fileMetadata = await this.metadataFile.write(workspacePath, data);
 		return this.mapToMetadata(fileMetadata);
 	}
 
@@ -172,7 +166,6 @@ export class WorkspaceMetadataRepository {
 			name: fileMetadata.name,
 			description: fileMetadata.description,
 			color: fileMetadata.color,
-			projectId: fileMetadata.projectId,
 			mode: fileMetadata.mode,
 			createdAt: fileMetadata.createdAt,
 			updatedAt: fileMetadata.updatedAt,
