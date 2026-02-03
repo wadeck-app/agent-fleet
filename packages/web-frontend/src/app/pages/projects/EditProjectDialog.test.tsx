@@ -202,7 +202,7 @@ describe('EditProjectDialog', () => {
 			// Update description to be too long (>500 characters)
 			const descriptionInput = screen.getByLabelText(/Description/i);
 			await user.clear(descriptionInput);
-			await user.type(descriptionInput, 'a'.repeat(501));
+			await user.paste('a'.repeat(501));
 
 			// Try to submit
 			const submitButton = screen.getByRole('button', { name: /Save Changes/i });

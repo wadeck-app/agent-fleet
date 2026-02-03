@@ -50,7 +50,7 @@ export interface FormContainerProps {
 export function FormContainer({ id, onSubmit, children, className, disableDefaultLayout }: FormContainerProps) {
 	const defaultLayoutClasses = disableDefaultLayout ? '' : 'grid gap-4 md:grid-cols-2';
 	return (
-		<form id={id} onSubmit={onSubmit} className={cn(defaultLayoutClasses, className)}>
+		<form id={id} onSubmit={onSubmit} className={cn(defaultLayoutClasses, className)} noValidate>
 			{children}
 		</form>
 	);

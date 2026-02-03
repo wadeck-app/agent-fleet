@@ -5284,3 +5284,93 @@ screen.getByLabelText(/Name/i)
 
 **Remember**: Tests are tools to verify code, not sources of truth. When tests contradict reality, investigate the tests first.
 
+---
+
+## HTML5 Native Form Validation Blocks Custom Validation (2026-02-03)
+
+### Problem
+
+Validation errors were NOT displayed in EditProjectDialog tests:
+- Clearing required field and clicking submit → no error message shown
+- `aria-invalid` stayed `false`
+- Dialog stayed open (correct) but user got no feedback
+- **Both tests AND production app** had this bug
+
+### Root Cause Analysis
+
+1. **Initial investigation**: Used `agent-browser` to verify real app behavior - errors didn't appear there either
+2. **Deep dive**: Added console.log to validator and handleSubmit
+   - Validator ran and detected errors correctly
+   - But `handleSubmit` was NEVER called!
+3. **Discovery**: HTML5 `required` attribute on input prevented form submission
+   - TextField component sets `required={true}` → adds HTML `required` attribute
+   - Browser's native validation blocked submission BEFORE JavaScript validation ran
+   - No handleSubmit → no `setValidationErrors` → no error messages displayed
+
+### Solution
+
+Added `noValidate` attribute to `<form>` element in `FormContainer.tsx`:
+
+```typescript
+// Before
+<form id={id} onSubmit={onSubmit} className={...}>
+
+// After
+<form id={id} onSubmit={onSubmit} className={...} noValidate>
+```
+
+This disables browser's native HTML5 validation and lets our custom JavaScript validation handle everything.
+
+### Secondary Issue
+
+Test "should validate description length" timed out because `user.type(descriptionInput, 'a'.repeat(501))` types 501 characters one by one. **Solution**: Use `user.paste()` for long strings.
+
+```typescript
+// Before (5+ seconds)
+await user.type(descriptionInput, 'a'.repeat(501));
+
+// After (instant)
+await user.paste('a'.repeat(501));
+```
+
+### Key Lessons
+
+1. **HTML5 validation interferes with custom validation**
+   - `required`, `min`, `max`, `pattern` attributes trigger browser validation
+   - Browser validation shows native tooltips, not our styled error messages
+   - Always use `noValidate` on forms with custom validation
+
+2. **agent-browser reveals production bugs tests miss**
+   - Tests can hide bugs by not checking what users actually see
+   - Real browser testing caught: no error message, no aria-invalid
+   - This was a **production bug**, not just a test issue
+
+3. **Performance matters in tests**
+   - `user.type()` simulates each keystroke (slow for long text)
+   - `user.paste()` is instant for bulk text entry
+   - Use `type` for short user inputs, `paste` for long test data
+
+4. **Console.log debugging flow**
+   - Log validator execution → error detection worked ✓
+   - Log handleSubmit calls → never executed ✗
+   - This pinpointed the issue: form submission blocked before handleSubmit
+
+### Impact
+
+**Before**: 5 failing tests, validation broken in production
+**After**: All 31 tests pass, validation works correctly
+
+### Files Modified
+
+- `packages/web-frontend/src/framework/features/forms/FormContainer.tsx`
+  - Added `noValidate` to disable HTML5 validation
+- `packages/web-frontend/src/app/pages/projects/EditProjectDialog.test.tsx`
+  - Changed `user.type(text)` to `user.paste(text)` for long strings
+
+### When to Remember This
+
+- Creating forms with custom validation
+- Tests expect validation errors but they don't appear
+- Form submission seems blocked without error feedback
+- Using TextField/Input with `required` prop
+
