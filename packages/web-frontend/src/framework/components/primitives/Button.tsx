@@ -102,7 +102,14 @@ export type ButtonProps = React.ComponentProps<'button'> &
 		asChild?: boolean;
 	};
 
-function Button({ className, variant = 'default', size = 'default', asChild = false, ...props }: ButtonProps) {
+function Button({
+	className,
+	variant = 'default',
+	size = 'default',
+	asChild = false,
+	type = 'button',
+	...props
+}: ButtonProps) {
 	const Comp = asChild ? Slot : 'button';
 
 	return (
@@ -110,6 +117,7 @@ function Button({ className, variant = 'default', size = 'default', asChild = fa
 			data-slot="button"
 			data-variant={variant}
 			data-size={size}
+			type={type}
 			className={cn(buttonVariants({ variant, size, className }))}
 			{...props}
 		/>

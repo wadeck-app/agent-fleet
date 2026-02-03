@@ -145,6 +145,8 @@ export const ProjectSchema = z.object({
 	archived: z.boolean(),
 	pinned: z.boolean(),
 	order: z.number().int().min(0),
+	gitRepositoryUrl: z.string().url().optional(),
+	gitDefaultBranch: z.string().optional(),
 	createdAt: z.string(), // ISO 8601
 	updatedAt: z.string(), // ISO 8601
 	version: z.number().int().min(0), // For optimistic locking
@@ -172,6 +174,8 @@ export const ProjectResponseSchema = z.object({
 	archived: z.boolean().catch(false), // Normalize undefined to false
 	pinned: z.boolean().catch(false), // Normalize undefined to false
 	order: z.number().int().min(0).catch(0), // Normalize undefined to 0
+	gitRepositoryUrl: z.string().url().optional(),
+	gitDefaultBranch: z.string().optional(),
 	createdAt: z.string(), // ISO 8601
 	updatedAt: z.string(), // ISO 8601
 	version: z.number().int().min(0), // For optimistic locking

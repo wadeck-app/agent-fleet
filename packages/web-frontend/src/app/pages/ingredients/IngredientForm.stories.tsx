@@ -1,3 +1,4 @@
+import { CrudDialog } from '@framework/components/overlays/CrudDialog';
 import type { CreateIngredient } from '@shared/api/ingredients.contract';
 import type { Meta, StoryObj } from '@storybook/react';
 
@@ -6,10 +7,22 @@ import { IngredientForm } from './IngredientForm';
 /**
  * IngredientForm component stories demonstrating ingredient creation/editing patterns.
  * Feature component for ingredient form with validation.
+ *
+ * Note: Forms are wrapped in CrudDialog to provide proper DialogBody/DialogFooter context.
  */
+
+// Wrapper component for Storybook to provide dialog context
+function IngredientFormWrapper(props: React.ComponentProps<typeof IngredientForm>) {
+	return (
+		<CrudDialog open={true} onOpenChange={() => {}} title="Ingredient Form Demo" showCloseButton={false}>
+			<IngredientForm {...props} />
+		</CrudDialog>
+	);
+}
+
 const meta = {
 	title: 'Features/IngredientForm',
-	component: IngredientForm,
+	component: IngredientFormWrapper,
 	parameters: {
 		layout: 'padded',
 	},
@@ -18,7 +31,7 @@ const meta = {
 		onSubmit: { action: 'submitted' },
 		onCancel: { action: 'cancelled' },
 	},
-} satisfies Meta<typeof IngredientForm>;
+} satisfies Meta<typeof IngredientFormWrapper>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -128,13 +141,15 @@ export const ValidationDemo: Story = {
 					<li>Serving size must be positive</li>
 				</ul>
 			</div>
-			<IngredientForm
-				onSubmit={async data => {
-					console.log('Submitted:', data);
-					await new Promise(resolve => setTimeout(resolve, 1000));
-				}}
-				onCancel={() => console.log('Cancelled')}
-			/>
+			<CrudDialog open={true} onOpenChange={() => {}} title="Validation Demo" showCloseButton={false}>
+				<IngredientForm
+					onSubmit={async data => {
+						console.log('Submitted:', data);
+						await new Promise(resolve => setTimeout(resolve, 1000));
+					}}
+					onCancel={() => console.log('Cancelled')}
+				/>
+			</CrudDialog>
 		</div>
 	),
 };
@@ -148,17 +163,19 @@ export const InContext: Story = {
 				<h1 className="text-2xl font-bold">Add New Ingredient</h1>
 				<p className="text-muted-foreground">Enter nutritional information for the ingredient</p>
 			</div>
-			<IngredientForm
-				onSubmit={async data => {
-					console.log('Submitted:', data);
-					await new Promise(resolve => setTimeout(resolve, 1000));
-					alert('Ingredient added successfully!');
-				}}
-				onCancel={() => {
-					console.log('Cancelled');
-					alert('Form cancelled');
-				}}
-			/>
+			<CrudDialog open={true} onOpenChange={() => {}} title="Add Ingredient" showCloseButton={false}>
+				<IngredientForm
+					onSubmit={async data => {
+						console.log('Submitted:', data);
+						await new Promise(resolve => setTimeout(resolve, 1000));
+						alert('Ingredient added successfully!');
+					}}
+					onCancel={() => {
+						console.log('Cancelled');
+						alert('Form cancelled');
+					}}
+				/>
+			</CrudDialog>
 		</div>
 	),
 };
@@ -175,29 +192,33 @@ export const Comparison: Story = {
 		>
 			<div>
 				<h3 className="mb-4 text-lg font-semibold">Create New Ingredient</h3>
-				<IngredientForm
-					onSubmit={async data => console.log('Create:', data)}
-					onCancel={() => console.log('Cancel create')}
-					submitLabel="Create Ingredient"
-				/>
+				<CrudDialog open={true} onOpenChange={() => {}} title="Create Ingredient" showCloseButton={false}>
+					<IngredientForm
+						onSubmit={async data => console.log('Create:', data)}
+						onCancel={() => console.log('Cancel create')}
+						submitLabel="Create Ingredient"
+					/>
+				</CrudDialog>
 			</div>
 			<div>
 				<h3 className="mb-4 text-lg font-semibold">Edit Existing Ingredient</h3>
-				<IngredientForm
-					onSubmit={async data => console.log('Update:', data)}
-					onCancel={() => console.log('Cancel update')}
-					submitLabel="Update Ingredient"
-					initialData={{
-						name: 'Salmon',
-						calories: 208,
-						protein: 20,
-						carbs: 0,
-						fat: 13,
-						servingSize: 100,
-						unit: 'g',
-						category: 'Protein',
-					}}
-				/>
+				<CrudDialog open={true} onOpenChange={() => {}} title="Edit Ingredient" showCloseButton={false}>
+					<IngredientForm
+						onSubmit={async data => console.log('Update:', data)}
+						onCancel={() => console.log('Cancel update')}
+						submitLabel="Update Ingredient"
+						initialData={{
+							name: 'Salmon',
+							calories: 208,
+							protein: 20,
+							carbs: 0,
+							fat: 13,
+							servingSize: 100,
+							unit: 'g',
+							category: 'Protein',
+						}}
+					/>
+				</CrudDialog>
 			</div>
 		</div>
 	),

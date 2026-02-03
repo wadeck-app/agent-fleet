@@ -132,6 +132,9 @@ export function FlowEditorPage() {
 								flowDefinition={flowEditor.flowDefinition}
 								validationResult={flowEditor.validationResult}
 								onIssueClick={flowEditor.focusNodeFromIssue}
+								nodes={flowEditor.nodes}
+								allEdges={flowEditor.allEdges}
+								onApplyYamlChanges={flowEditor.applyYamlChanges}
 							/>
 						}
 						loading={flowEditor.loading}

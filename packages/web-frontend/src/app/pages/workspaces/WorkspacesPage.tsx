@@ -1,9 +1,10 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 
 import { Data2 } from '@framework/components2/data/Data2';
 import { ActiveFeaturesPanel } from '@framework/components/debug/ActiveFeaturesPanel';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
+import { Button } from '@framework/components/primitives/Button';
 import { SearchBar } from '@framework/features/search/SearchBar';
 import { useCacheControl2 } from '@framework/hooks2/useCacheControl2';
 import { useDebounce } from '@framework/hooks2/useDebounce';
@@ -18,9 +19,11 @@ import {
 	B2F_WORKSPACE_DELETED,
 	B2F_WORKSPACE_UPDATED,
 } from '@shared/transport';
+import { Plus } from 'lucide-react';
 
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
+import { CreateWorkspaceDialog } from './CreateWorkspaceDialog';
 import { WorkspacesTable } from './WorkspacesTable';
 import { workspacesApi } from './workspaces.api';
 
@@ -42,6 +45,8 @@ const STORAGE_ID = 'workspaces' as const;
  * ===========================================================================================
  */
 export function WorkspacesPage() {
+	const [createDialogOpen, setCreateDialogOpen] = useState(false);
+
 	// Headless features
 	const pagination = usePagination2({
 		pageSize: 10,
@@ -97,9 +102,25 @@ export function WorkspacesPage() {
 		};
 	}, []);
 
+	// Handle workspace creation
+	const handleCreateWorkspace = useCallback(() => {
+		cache.actions.refresh();
+		setCreateDialogOpen(false);
+	}, [cache.actions]);
+
 	return (
 		<Page>
-			<PageHeader title="Workspaces" onRefresh={cache.actions.refresh} isRefreshing={cache.fstate.isRefreshing} />
+			<PageHeader
+				title="Workspaces"
+				onRefresh={cache.actions.refresh}
+				isRefreshing={cache.fstate.isRefreshing}
+				action={
+					<Button onClick={() => setCreateDialogOpen(true)}>
+						<Plus className="h-4 w-4 mr-2" />
+						Create Workspace
+					</Button>
+				}
+			/>
 
 			{/* Search Bar */}
 			<SearchBar
@@ -137,6 +158,13 @@ export function WorkspacesPage() {
 			>
 				<WorkspacesTable />
 			</Data2>
+
+			{/* Create Workspace Dialog */}
+			<CreateWorkspaceDialog
+				open={createDialogOpen}
+				onOpenChange={setCreateDialogOpen}
+				onSuccess={handleCreateWorkspace}
+			/>
 		</Page>
 	);
 }

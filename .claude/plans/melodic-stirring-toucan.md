@@ -27,41 +27,19 @@ L'utilisateur souhaite ajouter un bouton de création de tâche directement dans
 1. **WorkspacesTable** (`WorkspacesTable.tsx`) - Liste des workspaces avec bouton Edit
 2. **WorkspacePanel** (`WorkspacePanel.tsx`) - Vue détail d'un workspace dans un projet
 
-## Questions à clarifier
+## Décisions validées par l'utilisateur
 
-Avant de procéder, voici les points à clarifier avec l'utilisateur:
+1. **Emplacement du bouton**: Dans les deux emplacements (WorkspacePanel + WorkspacesTable)
+2. **Comportement si pas de worker connecté**: Désactiver le bouton avec tooltip "No active worker"
+3. **Type de dialog**: Réutiliser CreateTaskDialog complet (avec flows, etc.)
+4. **Champs auto-assignés**: Verrouiller complètement (masquer/désactiver workspaceId, projectId, workerId)
 
-1. **Emplacement du bouton**: Où souhaitez-vous le bouton?
-    - Option A: Dans WorkspacesTable (liste) uniquement
-    - Option B: Dans WorkspacePanel (vue détail) uniquement
-    - Option C: Dans les deux emplacements
+## Approche d'implémentation
 
-2. **Comportement si pas de projet**: Que faire si le workspace n'est pas associé à un projet?
-    - Masquer le bouton?
-    - Afficher le bouton mais permettre de créer une tâche sans projet?
-    - Afficher un message d'erreur?
+### Design des boutons
 
-3. **Comportement si pas de worker connecté**: Que faire si aucun worker n'est actif pour ce workspace?
-    - Masquer le bouton?
-    - Afficher le bouton mais forcer à sélectionner un worker?
-    - Afficher un message d'erreur?
-
-4. **Type de dialog**: Quel niveau de détails?
-    - Option A: Réutiliser CreateTaskDialog complet (avec flows, etc.)
-    - Option B: Créer un dialog simplifié (description + priority uniquement)
-
-5. **Champs pré-remplis vs verrouillés**: Comment gérer les champs auto-assignés?
-    - Pré-remplir mais permettre modification (workspaceId, projectId, workerId)
-    - Verrouiller complètement (masquer/désactiver ces champs)
-
-## Approches recommandées
-
-### Approche recommandée: Bouton dans les deux emplacements
-
-**Justification:**
-
-- WorkspacePanel: Contexte fort (l'utilisateur est focalisé sur un workspace)
-- WorkspacesTable: Permet création rapide depuis la liste
+**WorkspacePanel:** Contexte fort (l'utilisateur est focalisé sur un workspace)
+**WorkspacesTable:** Permet création rapide depuis la liste
 
 ### Design proposé
 
@@ -79,12 +57,9 @@ Actions column: [Edit ✏️] [Create Task ➕]
 
 ### Gestion des cas limites
 
-**Proposition par défaut:**
-
 1. **Pas de projet associé**: Afficher le bouton, créer la tâche sans projectId
-2. **Pas de worker connecté**: Masquer le bouton ou désactiver avec tooltip "No active worker"
-3. **Dialog**: Réutiliser CreateTaskDialog complet avec pré-remplissage
-4. **Champs auto-assignés**: Pré-remplir workspaceId/projectId/workerId mais permettre modification
+2. **Pas de worker connecté**: Désactiver le bouton avec tooltip "No active worker"
+3. **Champs verrouillés**: Masquer ou désactiver les champs workspaceId, projectId, workerId dans le dialog
 
 ## Plan d'implémentation détaillé
 
@@ -169,7 +144,7 @@ export function useCanCreateTaskFromWorkspace(workspace: Workspace): {
     	Create Task
     </Button>
     ```
-4. Render du dialog avec pré-remplissage:
+4. Render du dialog avec verrouillage des champs:
     ```tsx
     <CreateTaskDialog
     	open={showCreateTask}
@@ -180,6 +155,7 @@ export function useCanCreateTaskFromWorkspace(workspace: Workspace): {
     		projectId: workspace.projectId,
     		assignedTo: { workerId: workspace.activeWorkerId },
     	}}
+    	lockedFields={['workspaceId', 'projectId', 'workerId']}
     />
     ```
 
@@ -193,9 +169,22 @@ export function useCanCreateTaskFromWorkspace(workspace: Workspace): {
 
 1. Ajouter colonne "Create Task" dans les actions
 2. State pour gérer quel workspace est en cours de création de tâche
-3. Render du dialog avec pré-remplissage
+3. Render du dialog avec verrouillage:
+    ```tsx
+    <CreateTaskDialog
+    	open={creatingTaskForWorkspace === workspace.id}
+    	onClose={() => setCreatingTaskForWorkspace(null)}
+    	onSuccess={handleTaskCreated}
+    	defaultValues={{
+    		workspaceId: workspace.id,
+    		projectId: workspace.projectId,
+    		assignedTo: { workerId: workspace.activeWorkerId },
+    	}}
+    	lockedFields={['workspaceId', 'projectId', 'workerId']}
+    />
+    ```
 
-### Phase 6: Frontend - Adapter CreateTaskDialog pour supporter les valeurs par défaut
+### Phase 6: Frontend - Adapter CreateTaskDialog pour verrouiller les champs
 
 **Fichier à modifier:**
 
@@ -203,8 +192,12 @@ export function useCanCreateTaskFromWorkspace(workspace: Workspace): {
 
 **Changements:**
 
-1. Ajouter prop `defaultValues?` au composant
-2. Initialiser le form avec ces valeurs:
+1. Ajouter props:
+    - `defaultValues?` - Valeurs par défaut pour pré-remplir
+    - `lockedFields?: string[]` - Champs à verrouiller (masquer de l'UI)
+
+2. Initialiser le form avec les valeurs:
+
     ```tsx
     const form = useForm({
     	defaultValues: defaultValues || {
@@ -214,7 +207,18 @@ export function useCanCreateTaskFromWorkspace(workspace: Workspace): {
     	},
     });
     ```
-3. Option: Désactiver/masquer les champs pré-remplis si nécessaire
+
+3. **Masquer les champs verrouillés:**
+    - Si `lockedFields` contient `'workspaceId'` → Ne pas afficher le sélecteur de workspace
+    - Si `lockedFields` contient `'projectId'` → Ne pas afficher le sélecteur de projet
+    - Si `lockedFields` contient `'workerId'` → Ne pas afficher le sélecteur de worker
+    - Les valeurs sont envoyées au backend mais l'utilisateur ne peut pas les modifier
+
+4. **Alternative**: Au lieu de masquer, désactiver avec indicateur visuel:
+    ```tsx
+    <Select disabled={lockedFields?.includes('workerId')}>
+        <Badge>Auto-assigned to workspace</Badge>
+    ```
 
 ### Phase 7: Tests
 
@@ -227,7 +231,7 @@ export function useCanCreateTaskFromWorkspace(workspace: Workspace): {
 
 1. Bouton visible quand workspace a un worker actif
 2. Bouton désactivé quand pas de worker actif
-3. Dialog s'ouvre avec valeurs pré-remplies
+3. Dialog s'ouvre avec valeurs pré-remplies et champs verrouillés (workspace/projet/worker non modifiables)
 4. Création de tâche réussie refresh la liste
 5. Gestion d'erreur si création échoue
 
@@ -260,11 +264,14 @@ export function useCanCreateTaskFromWorkspace(workspace: Workspace): {
 2. **Test WorkspacePanel:**
     - Naviguer vers un projet
     - Vérifier que le bouton "Create Task" est visible à côté du bouton Edit
-    - Cliquer sur le bouton
-    - Vérifier que le dialog s'ouvre avec workspaceId/projectId/workerId pré-remplis
+    - Si le workspace a un worker actif → Bouton enabled
+    - Si le workspace n'a pas de worker actif → Bouton disabled avec tooltip
+    - Cliquer sur le bouton (si enabled)
+    - Vérifier que le dialog s'ouvre sans les champs workspace/projet/worker (verrouillés)
     - Remplir description et priority
     - Créer la tâche
     - Vérifier que la tâche apparaît dans la liste des tâches du workspace
+    - Vérifier que la tâche est assignée au bon workspace/projet/worker
 
 3. **Test WorkspacesTable:**
     - Naviguer vers /workspaces
@@ -299,13 +306,13 @@ Ne pas ajouter le bouton dans WorkspacesTable.
 - **Inconvénient**: Perd l'accès rapide depuis la liste
 - **Decision**: Rejeter, les deux emplacements sont utiles
 
-### Alternative 3: Verrouiller les champs auto-assignés
+### Alternative 3: Pré-remplir mais laisser modifiable
 
-Masquer/désactiver workspaceId/projectId/workerId dans le dialog.
+Pré-remplir workspaceId/projectId/workerId mais permettre modification.
 
-- **Avantage**: Garantit l'assignation au workspace
-- **Inconvénient**: Perd la flexibilité si l'utilisateur veut changer
-- **Decision**: Rejeter, pré-remplir mais laisser modifiable
+- **Avantage**: Plus flexible, l'utilisateur peut changer si nécessaire
+- **Inconvénient**: Peut causer confusion, ne garantit pas l'assignation au workspace
+- **Decision**: Rejeté - L'utilisateur préfère verrouiller complètement pour éviter les erreurs
 
 ## Risques et mitigations
 
@@ -317,9 +324,9 @@ Masquer/désactiver workspaceId/projectId/workerId dans le dialog.
 
 - **Mitigation**: Utiliser les données au moment de l'ouverture du dialog
 
-**Risque 3**: Confusion si l'utilisateur modifie les champs pré-remplis
+**Risque 3**: Frustration si l'utilisateur veut changer le worker/projet après ouverture du dialog
 
-- **Mitigation**: Ajouter un indicateur visuel (badge "Auto-assigned") sur les champs
+- **Mitigation**: Les champs sont verrouillés par design (choix utilisateur). Si besoin de changer, utiliser le CreateTaskDialog standard depuis /tasks
 
 ## Notes d'implémentation
 

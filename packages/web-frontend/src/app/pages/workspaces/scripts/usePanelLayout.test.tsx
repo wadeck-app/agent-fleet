@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useEffect } from 'react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 import { act, renderHook, waitFor } from '@testing-library/react';
@@ -13,6 +14,14 @@ import { usePanelLayout } from './usePanelLayout';
  * - Layout modes (full, split, grid)
  * - Panel IDs are preserved (not regenerated)
  * - URL sync bidirectional
+ *
+ * NOTE: LocationTracker implementation is critical for test reliability.
+ * It must use useEffect to update currentLocation because:
+ * 1. useUrlState batches updates in microtasks via queueMicrotask()
+ * 2. React Router updates location asynchronously
+ * 3. LocationTracker must re-render when location changes
+ * 4. useEffect ensures currentLocation is updated after each render
+ * Without this, tests would read stale location values before URL updates complete.
  */
 
 // Helper to get current URL search params
@@ -21,7 +30,16 @@ let currentLocation: ReturnType<typeof useLocation> | null = null;
 // Helper to wrap hook with router context
 const wrapper = ({ children, initialUrl = '/' }: { children: ReactNode; initialUrl?: string }) => {
 	const LocationTracker = () => {
-		currentLocation = useLocation();
+		const location = useLocation();
+
+		// Update currentLocation on every render AND whenever location changes
+		useEffect(() => {
+			currentLocation = location;
+		}, [location]);
+
+		// Also update immediately during render to catch synchronous changes
+		currentLocation = location;
+
 		return null;
 	};
 
@@ -36,6 +54,7 @@ const wrapper = ({ children, initialUrl = '/' }: { children: ReactNode; initialU
 };
 
 // Helper to get search params from router
+// NOTE: Always reads fresh location from currentLocation which is updated on every LocationTracker render
 const getSearchParams = () => {
 	if (!currentLocation) return new URLSearchParams();
 	return new URLSearchParams(currentLocation.search);
@@ -49,6 +68,8 @@ describe('usePanelLayout - URL State Management', () => {
 		localStorage.clear();
 		// Clear location
 		window.history.replaceState({}, '', '/');
+		// Clear currentLocation to ensure fresh state
+		currentLocation = null;
 	});
 
 	describe('Critical: Script Names in URL (not IDs)', () => {

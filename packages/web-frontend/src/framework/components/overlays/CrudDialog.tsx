@@ -68,6 +68,7 @@ export function CrudDialog({
 				{/*
 					IMPORTANT: Children should include DialogBody and DialogFooter as siblings
 					This allows the footer to be fixed at the bottom while the body scrolls
+					The flex-1 min-h-0 ensures proper height constraints for scrollable content
 				*/}
 				{isRefreshing ? (
 					<DialogBody
@@ -78,7 +79,7 @@ export function CrudDialog({
 						{children}
 					</DialogBody>
 				) : (
-					children
+					<div className="flex min-h-0 flex-1 flex-col">{children}</div>
 				)}
 			</DialogContent>
 		</Dialog>

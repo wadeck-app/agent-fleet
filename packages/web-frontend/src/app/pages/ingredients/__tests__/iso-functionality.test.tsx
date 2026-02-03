@@ -114,6 +114,11 @@ describe.each([
 		vi.clearAllMocks();
 
 		// Add comment above the target line, not at the end
+		// Clear localStorage to ensure clean state for each test
+		// This prevents v5 from loading persisted sort state that would interfere with sorting tests
+		localStorage.clear();
+
+		// Add comment above the target line, not at the end
 		// Configure mock implementations
 		mocks.getIngredients.mockResolvedValue({
 			items: mockIngredientList,
@@ -334,12 +339,12 @@ describe.each([
 			// Clear mock calls from initial load
 			mocks.getIngredients.mockClear();
 
-			// Find "Name" column header (should be sortable)
-			const nameHeader = screen.getByText('Name');
-			expect(nameHeader).toBeInTheDocument();
+			// Find "Calories" column header (use a column without default sort)
+			const caloriesHeader = screen.getByText('Calories');
+			expect(caloriesHeader).toBeInTheDocument();
 
-			// Click to sort by name ascending
-			await user.click(nameHeader);
+			// Click to sort by calories
+			await user.click(caloriesHeader);
 
 			// BEHAVIOR: API should be called with sort parameters
 			await waitFor(() => {
@@ -349,7 +354,7 @@ describe.each([
 
 				// Should include sortBy and sortOrder
 				expect(params).toBeDefined();
-				expect(params.sortBy).toBe('name');
+				expect(params.sortBy).toBe('calories');
 				expect(params.sortOrder).toBe('asc');
 			});
 		});

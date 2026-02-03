@@ -7,15 +7,17 @@ import { getBasename } from '@framework/utils/pathUtils';
 import type { Task } from '@shared/api/tasks.contract';
 import type { Workspace } from '@shared/api/workspaces.contract';
 import { B2F_TASK_CREATED, B2F_TASK_DELETED, B2F_TASK_UPDATED } from '@shared/transport/B2FEventConstants';
-import { FolderOpen, GitBranch, Pencil } from 'lucide-react';
+import { FolderOpen, GitBranch, ListTodo, Pencil } from 'lucide-react';
 
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
+import { CreateTaskDialog } from '../tasks/CreateTaskDialog';
 import { TasksTable } from '../tasks/TasksTable';
 import { tasksApi } from '../tasks/tasks.api';
 import { EditWorkspaceDialog } from '../workspaces/EditWorkspaceDialog';
 import { ScriptsPanel } from '../workspaces/scripts/ScriptsPanel';
 import { WorkspaceScriptsInline } from '../workspaces/scripts/WorkspaceScriptsInline';
+import { useCanCreateTaskFromWorkspace } from '../workspaces/useCanCreateTaskFromWorkspace';
 import { workspacesApi } from '../workspaces/workspaces.api';
 import { WorkspaceViewTabs } from './WorkspaceViewTabs';
 
@@ -30,8 +32,12 @@ export function WorkspacePanel({ workspace, projectId, activeView, onViewChange 
 	const [tasks, setTasks] = useState<Task[]>([]);
 	const [refreshing, setRefreshing] = useState(false);
 	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+	const [isCreateTaskDialogOpen, setIsCreateTaskDialogOpen] = useState(false);
 	const navigate = useNavigate();
 	const [searchParams] = useSearchParams();
+
+	// Check if we can create task from this workspace
+	const { canCreate, reason } = useCanCreateTaskFromWorkspace(workspace);
 
 	// Load tasks
 	const loadTasks = async () => {
@@ -126,10 +132,22 @@ export function WorkspacePanel({ workspace, projectId, activeView, onViewChange 
 						/>
 					</div>
 
-					<Button variant="outline" size="sm" onClick={() => setIsEditDialogOpen(true)}>
-						<Pencil className="h-4 w-4" />
-						Edit
-					</Button>
+					<div className="flex gap-2">
+						<Button variant="outline" size="sm" onClick={() => setIsEditDialogOpen(true)}>
+							<Pencil className="h-4 w-4" />
+							Edit
+						</Button>
+						<Button
+							variant="default"
+							size="sm"
+							onClick={() => setIsCreateTaskDialogOpen(true)}
+							disabled={!canCreate}
+							title={canCreate ? 'Create task for this workspace' : reason}
+						>
+							<ListTodo className="h-4 w-4" />
+							Create Task
+						</Button>
+					</div>
 				</div>
 			</div>
 
@@ -173,6 +191,18 @@ export function WorkspacePanel({ workspace, projectId, activeView, onViewChange 
 				open={isEditDialogOpen}
 				onClose={() => setIsEditDialogOpen(false)}
 				onSave={handleWorkspaceSave}
+			/>
+
+			{/* Create Task Dialog */}
+			<CreateTaskDialog
+				open={isCreateTaskDialogOpen}
+				onOpenChange={setIsCreateTaskDialogOpen}
+				onSuccess={loadTasks}
+				defaultValues={{
+					workerId: workspace.activeWorkerId || '',
+					projectId: workspace.projectId || '',
+				}}
+				lockedFields={['workerId', 'projectId']}
 			/>
 		</div>
 	);

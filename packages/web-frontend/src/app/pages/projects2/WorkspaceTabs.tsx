@@ -4,7 +4,7 @@ import { TabButton } from '@framework/components/primitives/TabButton';
 import { TabGroup } from '@framework/components/primitives/TabGroup';
 import { getBasename } from '@framework/utils/pathUtils';
 import type { Workspace } from '@shared/api/workspaces.contract';
-import { Pencil, Settings } from 'lucide-react';
+import { FolderPlus, Pencil, Settings } from 'lucide-react';
 
 interface WorkspaceTabsProps {
 	workspaces: Workspace[];
@@ -12,6 +12,7 @@ interface WorkspaceTabsProps {
 	onWorkspaceSelect: (workspaceId: string) => void;
 	onEditProjectClick?: () => void;
 	onManageClick?: () => void;
+	onCreateWorkspaceClick?: () => void;
 }
 
 export function WorkspaceTabs({
@@ -20,14 +21,21 @@ export function WorkspaceTabs({
 	onWorkspaceSelect,
 	onEditProjectClick,
 	onManageClick,
+	onCreateWorkspaceClick,
 }: WorkspaceTabsProps) {
 	return (
 		<TabGroup
 			variant="default"
 			emptyMessage="No workspaces configured yet"
 			actions={
-				(onEditProjectClick || onManageClick) && (
+				(onEditProjectClick || onManageClick || onCreateWorkspaceClick) && (
 					<div className="flex items-center gap-2">
+						{onCreateWorkspaceClick && (
+							<Button variant="default" size="sm" onClick={onCreateWorkspaceClick}>
+								<FolderPlus />
+								Create Workspace
+							</Button>
+						)}
 						{onEditProjectClick && (
 							<Button variant="default" size="sm" onClick={onEditProjectClick}>
 								<Pencil />

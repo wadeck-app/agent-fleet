@@ -19,6 +19,32 @@
 			"version": 1,
 			"createdAt": "2026-01-18T23:07:41.541Z",
 			"updatedAt": "2026-01-18T23:07:41.541Z"
+		},
+		{
+			"taskId": "ixnvl4swp",
+			"stepId": "approval",
+			"type": "approval",
+			"status": "answered",
+			"blocking": true,
+			"config": {
+				"title": "Approve Deployment to Production",
+				"description": "Data hash: abc123. Please review and approve this deployment.",
+				"allowReject": true
+			},
+			"source": {
+				"type": "flow_step",
+				"stepId": "approval"
+			},
+			"id": "ixnvl4swp-approval-1769459547933",
+			"version": 2,
+			"createdAt": "2026-01-26T20:32:27.935Z",
+			"updatedAt": "2026-01-26T20:50:25.974Z",
+			"response": {
+				"value": true,
+				"answeredBy": "web-user",
+				"comment": "continue seulement"
+			},
+			"answeredAt": "2026-01-26T20:50:25.974Z"
 		}
 	]
 }

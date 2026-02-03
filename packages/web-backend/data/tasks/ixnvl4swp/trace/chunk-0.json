@@ -1,0 +1,79 @@
+{
+	"chunkIndex": 0,
+	"entries": [
+		{
+			"stepId": "prepare",
+			"stepName": "Prepare Data",
+			"stepType": "script",
+			"startTime": 1769459546892,
+			"retries": 0,
+			"script": "echo [prepare] Processing: \nping localhost -n 2 >nul\necho [prepare] Data ready for review\necho data_hash=abc123\n",
+			"exitCode": 0,
+			"stdout": "[prepare] Processing: \r\n[prepare] Data ready for review\r\ndata_hash=abc123",
+			"stderr": "",
+			"endTime": 1769459547930,
+			"durationMs": 1037,
+			"outputs": {
+				"exitCode": 0,
+				"stdout": "[prepare] Processing: \r\n[prepare] Data ready for review\r\ndata_hash=abc123",
+				"stderr": "",
+				"success": true,
+				"data_hash": "abc123"
+			}
+		},
+		{
+			"stepId": "approval",
+			"stepName": "Approve Deployment",
+			"stepType": "user_intervention",
+			"startTime": 1769459547932,
+			"retries": 0,
+			"interventionType": "approval",
+			"interventionBlocking": true,
+			"endTime": 1769460625978,
+			"durationMs": 1078046,
+			"interventionResponse": {
+				"value": true,
+				"comment": "continue seulement",
+				"answeredAt": "2026-01-26T20:50:25.976Z",
+				"answeredBy": "web-user"
+			},
+			"outputs": {
+				"intervention": {
+					"value": true,
+					"comment": "continue seulement",
+					"answeredBy": "web-user",
+					"answeredAt": "2026-01-26T20:50:25.976Z",
+					"userResponse": true,
+					"approved": true,
+					"rejected": false,
+					"answer": true,
+					"choice": true
+				},
+				"approved": true,
+				"userResponse": "true",
+				"comment": "continue seulement",
+				"answeredBy": "web-user"
+			}
+		},
+		{
+			"stepId": "deploy",
+			"stepName": "Deploy to Production",
+			"stepType": "script",
+			"startTime": 1769460625978,
+			"retries": 0,
+			"script": "echo [deploy] User decision: true\necho [deploy] Deploying data: abc123\nping localhost -n 3 >nul\necho [deploy] Deployment successful!\n",
+			"exitCode": 0,
+			"stdout": "[deploy] User decision: true\r\n[deploy] Deploying data: abc123\r\n[deploy] Deployment successful!",
+			"stderr": "",
+			"endTime": 1769460628037,
+			"durationMs": 2059,
+			"outputs": {
+				"rawOutput": "[deploy] User decision: true\r\n[deploy] Deploying data: abc123\r\n[deploy] Deployment successful!",
+				"exitCode": 0,
+				"stdout": "[deploy] User decision: true\r\n[deploy] Deploying data: abc123\r\n[deploy] Deployment successful!",
+				"stderr": "",
+				"success": true
+			}
+		}
+	]
+}

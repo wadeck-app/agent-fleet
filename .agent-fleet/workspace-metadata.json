@@ -1,9 +1,9 @@
 {
-	"id": "50115a2e-5226-46d4-9fb8-6f9c11a16f9d",
-	"name": "Dev Workspace23",
-	"description": "Main development workspace2",
-	"color": "#F97316",
-	"mode": "development",
-	"createdAt": "2025-12-31T21:52:47.320Z",
-	"updatedAt": "2026-01-24T17:39:03.907Z"
+  "id": "50115a2e-5226-46d4-9fb8-6f9c11a16f9d",
+  "name": "Dev Workspace",
+  "description": "Main development workspace2",
+  "color": "#F97316",
+  "mode": "development",
+  "createdAt": "2025-12-31T21:52:47.320Z",
+  "updatedAt": "2026-02-02T20:37:45.900Z"
 }

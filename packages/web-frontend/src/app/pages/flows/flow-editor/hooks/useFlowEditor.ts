@@ -471,21 +471,55 @@ export function useFlowEditor(flowId: string | undefined) {
 					}
 
 					// Handle regular step nodes
+					const updatedStep = {
+						...node.data.step,
+						...updates,
+					} as FlowStep;
+
+					// Re-extract ports if script/prompt changed (for auto-discovery of inputs)
+					let updatedPorts = {
+						inputPorts: node.data.inputPorts,
+						outputPorts: node.data.outputPorts,
+					};
+
+					if (flowDefinition && ('script' in updates || 'prompt' in updates)) {
+						// Create a temporary flow definition with the updated step to extract ports
+						// Check if this step exists in flowDefinition.steps
+						const stepExists = flowDefinition.steps.some(s => s.id === nodeId);
+						const tempSteps = stepExists
+							? flowDefinition.steps.map(s => (s.id === nodeId ? updatedStep : s))
+							: [...flowDefinition.steps, updatedStep];
+
+						const tempFlow: FlowDefinition = {
+							...flowDefinition,
+							steps: tempSteps,
+						};
+
+						// Re-extract ports using the updated step
+						const portsMap = extractAllPorts(tempFlow);
+						const ports = portsMap.get(nodeId);
+						if (ports) {
+							updatedPorts = {
+								inputPorts: ports.inputPorts,
+								outputPorts: ports.outputPorts,
+							};
+						}
+					}
+
 					return {
 						...node,
 						data: {
 							...node.data,
-							step: {
-								...node.data.step,
-								...updates,
-							} as FlowStep,
+							step: updatedStep,
+							inputPorts: updatedPorts.inputPorts,
+							outputPorts: updatedPorts.outputPorts,
 						},
 					} as FlowNode;
 				})
 			);
 			setIsDirty(true);
 		},
-		[setNodes]
+		[setNodes, flowDefinition]
 	);
 
 	// Delete node
@@ -543,6 +577,17 @@ export function useFlowEditor(flowId: string | undefined) {
 		// TODO: Pan/zoom to node
 	}, []);
 
+	// Apply YAML changes from editor
+	const applyYamlChanges = useCallback(
+		(newFlow: FlowDefinition, newNodes: FlowNode[], newEdges: FlowEdge[]) => {
+			setFlowDefinition(newFlow);
+			setNodes(newNodes);
+			setEdges(newEdges);
+			setIsDirty(true);
+		},
+		[setNodes, setEdges]
+	);
+
 	// Save data flow edges to localStorage when they change
 	useEffect(() => {
 		if (!flowDefinition) return;
@@ -574,7 +619,8 @@ export function useFlowEditor(flowId: string | undefined) {
 		// State
 		flowDefinition,
 		nodes,
-		edges: filteredEdges, // Return filtered edges instead of all edges
+		edges: filteredEdges, // For visual display
+		allEdges: edges, // For preview computation (includes hidden edges)
 		selectedNodeId,
 		selectedNode,
 		selectedEdgeId,
@@ -612,6 +658,7 @@ export function useFlowEditor(flowId: string | undefined) {
 		validateFlow,
 		saveFlow,
 		focusNodeFromIssue,
+		applyYamlChanges,
 		setEdges, // Export setEdges for edge deletion
 	};
 }

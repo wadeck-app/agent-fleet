@@ -80,7 +80,10 @@ export interface FormContainerLegacyProps {
 
 /**
  * @deprecated Use new FormContainer + FormActions pattern
- * This component is kept for backward compatibility.
+ * This component is kept for backward compatibility only.
+ *
+ * ALL production components have been migrated to the new pattern.
+ * This component should NOT be used in new code.
  *
  * Migration guide:
  * ```tsx
@@ -99,6 +102,14 @@ export interface FormContainerLegacyProps {
  *   <FormActions actions={[...]} />
  * </DialogFooter>
  * ```
+ *
+ * Migrated components:
+ * - CreateProjectDialog ✓
+ * - EditProjectDialog ✓
+ * - CreateWorkspaceDialog ✓
+ * - EditWorkspaceDialog ✓
+ * - BookForm ✓
+ * - IngredientForm ✓
  */
 export function FormContainerLegacy({
 	isSubmitting,
@@ -109,7 +120,7 @@ export function FormContainerLegacy({
 	secondaryActions,
 }: FormContainerLegacyProps) {
 	return (
-		<form onSubmit={onSubmit} className="flex h-full flex-col">
+		<form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
 			{/* Scrollable content area */}
 			<div className="-mx-4 flex-1 overflow-y-auto px-4">
 				<div

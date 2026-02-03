@@ -306,4 +306,87 @@ describe('WorkspacesService', () => {
 			expect(mockMetadataRepository.startWatching).toHaveBeenCalledWith(testWorkspacePath);
 		});
 	});
+
+	describe('workspace enrichment (activeWorkerId and projectId)', () => {
+		it('should include activeWorkerId in workspace data', async () => {
+			// Act
+			const data = await workspacesService.getWorkspacesData();
+
+			// Assert
+			expect(data.workspaces).toHaveLength(1);
+			expect(data.workspaces[0].activeWorkerId).toBe('worker-1');
+		});
+
+		it('should include projectId when workspace is associated with a project', async () => {
+			// Setup: Create a project with this workspace
+			const project = await projectsRepository.create({
+				name: 'Test Project',
+				description: 'Test Description',
+				archived: false,
+				taskCount: 0,
+				pinned: false,
+				order: 0,
+				workspaceIds: [testWorkspaceId],
+			});
+
+			// Act
+			const data = await workspacesService.getWorkspacesData();
+
+			// Assert
+			expect(data.workspaces).toHaveLength(1);
+			expect(data.workspaces[0].projectId).toBe(project.id);
+		});
+
+		it('should not include projectId when workspace is not associated with any project', async () => {
+			// Act
+			const data = await workspacesService.getWorkspacesData();
+
+			// Assert
+			expect(data.workspaces).toHaveLength(1);
+			expect(data.workspaces[0].projectId).toBeUndefined();
+		});
+
+		it('should include enrichment data in getWorkspacesList', async () => {
+			// Setup: Create a project with this workspace
+			const project = await projectsRepository.create({
+				name: 'Test Project',
+				description: 'Test Description',
+				archived: false,
+				taskCount: 0,
+				pinned: false,
+				order: 0,
+				workspaceIds: [testWorkspaceId],
+			});
+
+			// Act
+			const list = await workspacesService.getWorkspacesList({ page: 1, pageSize: 10 });
+
+			// Assert
+			expect(list.items).toHaveLength(1);
+			expect(list.items[0].activeWorkerId).toBe('worker-1');
+			expect(list.items[0].projectId).toBe(project.id);
+		});
+
+		it('should include enrichment data in updateWorkspace', async () => {
+			// Setup: Create a project with this workspace
+			const project = await projectsRepository.create({
+				name: 'Test Project',
+				description: 'Test Description',
+				archived: false,
+				taskCount: 0,
+				pinned: false,
+				order: 0,
+				workspaceIds: [testWorkspaceId],
+			});
+
+			// Act
+			const updatedWorkspace = await workspacesService.updateWorkspace(testWorkspaceId, {
+				name: 'Updated Name',
+			});
+
+			// Assert
+			expect(updatedWorkspace.activeWorkerId).toBe('worker-1');
+			expect(updatedWorkspace.projectId).toBe(project.id);
+		});
+	});
 });

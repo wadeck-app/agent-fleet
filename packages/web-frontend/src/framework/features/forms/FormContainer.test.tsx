@@ -130,6 +130,17 @@ describe('FormContainerLegacy', () => {
 			expect(screen.getByTestId('field-1')).toBeInTheDocument();
 			expect(screen.getByTestId('field-2')).toBeInTheDocument();
 		});
+
+		it('should render form with proper flex constraints for scrolling', () => {
+			const { container } = render(<FormContainerLegacy {...defaultProps} />);
+
+			const form = container.querySelector('form');
+			expect(form).toBeInTheDocument();
+
+			// Verify the form has the correct flex classes for proper height constraints
+			// The form should have flex-1 and min-h-0 to properly constrain height in flex container
+			expect(form).toHaveClass('flex', 'flex-1', 'min-h-0', 'flex-col');
+		});
 	});
 
 	describe('integration with useFormState', () => {

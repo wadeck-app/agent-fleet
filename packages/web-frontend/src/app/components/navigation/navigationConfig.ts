@@ -85,7 +85,7 @@ export const navigationItems: NavItem[] = [
 	},
 	{
 		path: '/ingredients5',
-		label: 'Ingredients v5 ✨',
+		label: 'Ingredients v5',
 		icon: Sparkles,
 	},
 	{

@@ -5,9 +5,11 @@ import { FieldError } from '@framework/components/advanced/Field/FieldError';
 import { FieldLabel } from '@framework/components/advanced/Field/FieldLabel';
 import { DynamicLucideIcon } from '@framework/components/icons/DynamicLucideIcon';
 import { CrudDialog } from '@framework/components/overlays/CrudDialog';
+import { DialogBody, DialogFooter } from '@framework/components/overlays/Dialog';
 import { ColorPicker } from '@framework/components/pickers/ColorPicker';
 import { IconPicker } from '@framework/components/pickers/IconPicker';
-import { FormContainerLegacy as FormContainer } from '@framework/features/forms/FormContainer';
+import { type FormAction, FormActions } from '@framework/features/forms/FormActions';
+import { FormContainer } from '@framework/features/forms/FormContainer';
 import { TextAreaField } from '@framework/features/forms/fields/TextAreaField';
 import { TextField } from '@framework/features/forms/fields/TextField';
 import { useFormState } from '@framework/features/forms/useFormState';
@@ -28,6 +30,8 @@ interface CreateProjectFormData {
 	description: string;
 	icon: string;
 	iconColor: string;
+	gitRepositoryUrl: string;
+	gitDefaultBranch: string;
 }
 
 const defaultFormData: CreateProjectFormData = {
@@ -35,7 +39,11 @@ const defaultFormData: CreateProjectFormData = {
 	description: '',
 	icon: 'FolderKanban',
 	iconColor: '#6366F1',
+	gitRepositoryUrl: '',
+	gitDefaultBranch: '',
 };
+
+const FORM_ID = 'create-project-form';
 
 export function CreateProjectDialog({ open, onOpenChange, onSuccess }: CreateProjectDialogProps) {
 	const { showToast } = useToast();
@@ -59,6 +67,14 @@ export function CreateProjectDialog({ open, onOpenChange, onSuccess }: CreatePro
 				errors.iconColor = 'Icon color must be a valid hex color (e.g., #6366F1)';
 			}
 
+			if (data.gitRepositoryUrl && data.gitRepositoryUrl.trim()) {
+				try {
+					new URL(data.gitRepositoryUrl);
+				} catch {
+					errors.gitRepositoryUrl = 'Must be a valid URL';
+				}
+			}
+
 			return {
 				valid: Object.keys(errors).length === 0,
 				errors: Object.values(errors),
@@ -69,6 +85,7 @@ export function CreateProjectDialog({ open, onOpenChange, onSuccess }: CreatePro
 			'Name must be less than 100 characters': 'name',
 			'Description must be less than 500 characters': 'description',
 			'Icon color must be a valid hex color (e.g., #6366F1)': 'iconColor',
+			'Must be a valid URL': 'gitRepositoryUrl',
 		},
 		onSubmit: async data => {
 			const createProjectData: CreateProject = {
@@ -78,6 +95,8 @@ export function CreateProjectDialog({ open, onOpenChange, onSuccess }: CreatePro
 				iconColor: data.iconColor?.trim() || undefined,
 				workspaceIds: [],
 				archived: false,
+				gitRepositoryUrl: data.gitRepositoryUrl?.trim() || undefined,
+				gitDefaultBranch: data.gitDefaultBranch?.trim() || undefined,
 			};
 
 			try {
@@ -93,6 +112,23 @@ export function CreateProjectDialog({ open, onOpenChange, onSuccess }: CreatePro
 		},
 	});
 
+	// Define form actions
+	const formActions: FormAction[] = [
+		{
+			label: formState.isSubmitting ? 'Saving...' : 'Create Project',
+			type: 'submit',
+			formId: FORM_ID,
+			disabled: formState.isSubmitting,
+		},
+		{
+			label: 'Annuler',
+			type: 'button',
+			variant: 'outline',
+			onClick: () => onOpenChange(false),
+			disabled: formState.isSubmitting,
+		},
+	];
+
 	return (
 		<CrudDialog
 			open={open}
@@ -102,67 +138,90 @@ export function CreateProjectDialog({ open, onOpenChange, onSuccess }: CreatePro
 			maxWidth="lg"
 			preventOutsideClick={true}
 		>
-			<FormContainer
-				isSubmitting={formState.isSubmitting}
-				onSubmit={formState.handleSubmit}
-				onCancel={() => onOpenChange(false)}
-				submitLabel="Create Project"
-			>
-				<div className="col-span-2">
-					<TextField
-						label="Name"
-						value={formState.formData.name}
-						onChange={value => formState.updateField('name', value)}
-						placeholder="Enter project name..."
-						required
-						error={formState.validationErrors.name}
-					/>
-				</div>
-
-				<div className="col-span-2">
-					<TextAreaField
-						label="Description"
-						value={formState.formData.description}
-						onChange={value => formState.updateField('description', value)}
-						placeholder="Enter project description (optional)..."
-						rows={4}
-						error={formState.validationErrors.description}
-					/>
-				</div>
-
-				<div className="col-span-2">
-					<Field>
-						<FieldLabel>Icon</FieldLabel>
-						<IconPicker
-							value={formState.formData.icon}
-							onChange={value => formState.updateField('icon', value)}
-							iconColor={formState.formData.iconColor}
-						/>
-						{formState.validationErrors.icon && <FieldError>{formState.validationErrors.icon}</FieldError>}
-					</Field>
-				</div>
-
-				<div className="col-span-2">
-					<Field>
-						<FieldLabel>Icon Color</FieldLabel>
-						<ColorPicker
-							value={formState.formData.iconColor}
-							onChange={value => formState.updateField('iconColor', value)}
-						/>
-						{formState.validationErrors.iconColor && (
-							<FieldError>{formState.validationErrors.iconColor}</FieldError>
-						)}
-					</Field>
-					<div className="mt-2 flex items-center gap-2">
-						<span className="text-xs text-muted-foreground">Preview:</span>
-						<DynamicLucideIcon
-							name={formState.formData.icon}
-							color={formState.formData.iconColor || '#6366F1'}
-							className="h-6 w-6"
+			<DialogBody>
+				<FormContainer id={FORM_ID} onSubmit={formState.handleSubmit}>
+					<div className="col-span-2">
+						<TextField
+							label="Name"
+							value={formState.formData.name}
+							onChange={value => formState.updateField('name', value)}
+							placeholder="Enter project name..."
+							required
+							error={formState.validationErrors.name}
 						/>
 					</div>
-				</div>
-			</FormContainer>
+
+					<div className="col-span-2">
+						<TextAreaField
+							label="Description"
+							value={formState.formData.description}
+							onChange={value => formState.updateField('description', value)}
+							placeholder="Enter project description (optional)..."
+							rows={4}
+							error={formState.validationErrors.description}
+						/>
+					</div>
+
+					<div className="col-span-2">
+						<Field>
+							<FieldLabel>Icon</FieldLabel>
+							<IconPicker
+								value={formState.formData.icon}
+								onChange={value => formState.updateField('icon', value)}
+								iconColor={formState.formData.iconColor}
+							/>
+							{formState.validationErrors.icon && (
+								<FieldError>{formState.validationErrors.icon}</FieldError>
+							)}
+						</Field>
+					</div>
+
+					<div className="col-span-2">
+						<Field>
+							<FieldLabel>Icon Color</FieldLabel>
+							<ColorPicker
+								value={formState.formData.iconColor}
+								onChange={value => formState.updateField('iconColor', value)}
+							/>
+							{formState.validationErrors.iconColor && (
+								<FieldError>{formState.validationErrors.iconColor}</FieldError>
+							)}
+						</Field>
+						<div className="mt-2 flex items-center gap-2">
+							<span className="text-xs text-muted-foreground">Preview:</span>
+							<DynamicLucideIcon
+								name={formState.formData.icon}
+								color={formState.formData.iconColor || '#6366F1'}
+								className="h-6 w-6"
+							/>
+						</div>
+					</div>
+
+					<div className="col-span-2">
+						<TextField
+							label="Git Repository URL"
+							value={formState.formData.gitRepositoryUrl}
+							onChange={value => formState.updateField('gitRepositoryUrl', value)}
+							placeholder="https://github.com/user/repo.git (optional)"
+							error={formState.validationErrors.gitRepositoryUrl}
+						/>
+					</div>
+
+					<div className="col-span-2">
+						<TextField
+							label="Default Branch"
+							value={formState.formData.gitDefaultBranch}
+							onChange={value => formState.updateField('gitDefaultBranch', value)}
+							placeholder="main (optional)"
+							error={formState.validationErrors.gitDefaultBranch}
+						/>
+					</div>
+				</FormContainer>
+			</DialogBody>
+
+			<DialogFooter>
+				<FormActions actions={formActions} isSubmitting={formState.isSubmitting} />
+			</DialogFooter>
 		</CrudDialog>
 	);
 }

@@ -39,6 +39,15 @@ interface CreateTaskDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	onSuccess: () => void;
+	/**
+	 * Default values to pre-fill the form
+	 */
+	defaultValues?: Partial<CreateTaskFormData>;
+	/**
+	 * Fields to lock (hide from UI). User cannot modify these fields.
+	 * Supported: 'workerId', 'projectId'
+	 */
+	lockedFields?: Array<'workerId' | 'projectId'>;
 }
 
 // Flat form data structure for useFormState compatibility
@@ -65,7 +74,13 @@ const MIN_WIDTH = 30;
 const MAX_WIDTH = 70;
 const FORM_ID = 'create-task-form';
 
-export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDialogProps) {
+export function CreateTaskDialog({
+	open,
+	onOpenChange,
+	onSuccess,
+	defaultValues,
+	lockedFields = [],
+}: CreateTaskDialogProps) {
 	const navigate = useNavigate();
 	const { showToast } = useToast();
 	const { data: workersData, loading: workersLoading } = useWorkers();
@@ -90,7 +105,7 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 	}));
 
 	const formState = useFormState<CreateTaskFormData>({
-		defaultData: defaultFormData,
+		defaultData: { ...defaultFormData, ...defaultValues },
 		validator: data => {
 			const errors: Record<string, string> = {};
 
@@ -102,7 +117,8 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 				errors.priority = 'Priority is required';
 			}
 
-			if (!data.workerId) {
+			// Only validate workerId if not locked (locked fields are pre-filled)
+			if (!lockedFields.includes('workerId') && !data.workerId) {
 				errors.workerId = 'Worker assignment is required';
 			}
 
@@ -408,7 +424,7 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 					{/* Two-column layout with resizable splitter */}
 					<div ref={containerRef} className="flex min-h-[500px] gap-0">
 						{/* Left Column - Basic Information */}
-						<div className="flex flex-col space-y-4 pr-3" style={{ width: `${leftWidth}%` }}>
+						<div className="flex flex-col space-y-4 pr-3 pb-6" style={{ width: `${leftWidth}%` }}>
 							<h3 className="text-sm font-semibold text-foreground">Informations de base</h3>
 
 							<TextAreaField
@@ -435,28 +451,57 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 								error={formState.validationErrors.priority}
 							/>
 
-							<ComboboxField
-								label="Project (Optional)"
-								value={formState.formData.projectId}
-								onChange={value => formState.updateField('projectId', value)}
-								options={projects}
-								placeholder={
-									projectsLoading ? 'Loading projects...' : 'Select project or leave empty...'
-								}
-								disabled={projectsLoading}
-								error={formState.validationErrors.projectId}
-							/>
+							{/* Hide project field if locked */}
+							{!lockedFields.includes('projectId') && (
+								<ComboboxField
+									label="Project (Optional)"
+									value={formState.formData.projectId}
+									onChange={value => formState.updateField('projectId', value)}
+									options={projects}
+									placeholder={
+										projectsLoading ? 'Loading projects...' : 'Select project or leave empty...'
+									}
+									disabled={projectsLoading}
+									error={formState.validationErrors.projectId}
+								/>
+							)}
 
-							<ComboboxField
-								label="Assign to Worker"
-								value={formState.formData.workerId}
-								onChange={value => formState.updateField('workerId', value)}
-								options={workerOptions}
-								placeholder="Select worker..."
-								required
-								disabled={workersLoading || workerOptions.length === 0}
-								error={formState.validationErrors.workerId}
-							/>
+							{/* Hide worker field if locked */}
+							{!lockedFields.includes('workerId') && (
+								<ComboboxField
+									label="Assign to Worker"
+									value={formState.formData.workerId}
+									onChange={value => formState.updateField('workerId', value)}
+									options={workerOptions}
+									placeholder="Select worker..."
+									required
+									disabled={workersLoading || workerOptions.length === 0}
+									error={formState.validationErrors.workerId}
+								/>
+							)}
+
+							{/* Show badges for locked fields */}
+							{lockedFields.length > 0 && (
+								<div className="rounded-md border border-primary/20 bg-primary/10 p-3">
+									<p className="text-sm font-medium text-foreground">Auto-assigned:</p>
+									<div className="mt-2 flex flex-wrap gap-2">
+										{lockedFields.includes('workerId') && formState.formData.workerId && (
+											<Badge variant="info">Worker: {formState.formData.workerId}</Badge>
+										)}
+										{lockedFields.includes('projectId') &&
+											formState.formData.projectId &&
+											projects.find(p => p.value === formState.formData.projectId) && (
+												<Badge variant="info">
+													Project:{' '}
+													{
+														projects.find(p => p.value === formState.formData.projectId)
+															?.label
+													}
+												</Badge>
+											)}
+									</div>
+								</div>
+							)}
 						</div>
 
 						{/* Resizable Splitter */}
@@ -493,7 +538,7 @@ export function CreateTaskDialog({ open, onOpenChange, onSuccess }: CreateTaskDi
 						</div>
 
 						{/* Right Column - Flow Configuration */}
-						<div className="flex flex-col space-y-4 pl-3" style={{ width: `${100 - leftWidth}%` }}>
+						<div className="flex flex-col space-y-4 pl-3 pb-6" style={{ width: `${100 - leftWidth}%` }}>
 							<h3 className="text-sm font-semibold text-foreground">Configuration du flow</h3>
 
 							<ComboboxField

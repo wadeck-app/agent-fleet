@@ -1,3 +1,4 @@
+import { CrudDialog } from '@framework/components/overlays/CrudDialog';
 import type { CreateBook } from '@shared/api/books.contract';
 import type { Meta, StoryObj } from '@storybook/react';
 
@@ -6,10 +7,22 @@ import { BookForm } from './BookForm';
 /**
  * BookForm component stories demonstrating book creation/editing patterns.
  * Feature component for book form with validation.
+ *
+ * Note: Forms are wrapped in CrudDialog to provide proper DialogBody/DialogFooter context.
  */
+
+// Wrapper component for Storybook to provide dialog context
+function BookFormWrapper(props: React.ComponentProps<typeof BookForm>) {
+	return (
+		<CrudDialog open={true} onOpenChange={() => {}} title="Book Form Demo" showCloseButton={false}>
+			<BookForm {...props} />
+		</CrudDialog>
+	);
+}
+
 const meta = {
 	title: 'Features/BookForm',
-	component: BookForm,
+	component: BookFormWrapper,
 	parameters: {
 		layout: 'padded',
 	},
@@ -18,7 +31,7 @@ const meta = {
 		onSubmit: { action: 'submitted' },
 		onCancel: { action: 'cancelled' },
 	},
-} satisfies Meta<typeof BookForm>;
+} satisfies Meta<typeof BookFormWrapper>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -104,13 +117,15 @@ export const ValidationDemo: Story = {
 					<li>Published year cannot be too far in the future</li>
 				</ul>
 			</div>
-			<BookForm
-				onSubmit={async data => {
-					console.log('Submitted:', data);
-					await new Promise(resolve => setTimeout(resolve, 1000));
-				}}
-				onCancel={() => console.log('Cancelled')}
-			/>
+			<CrudDialog open={true} onOpenChange={() => {}} title="Validation Demo" showCloseButton={false}>
+				<BookForm
+					onSubmit={async data => {
+						console.log('Submitted:', data);
+						await new Promise(resolve => setTimeout(resolve, 1000));
+					}}
+					onCancel={() => console.log('Cancelled')}
+				/>
+			</CrudDialog>
 		</div>
 	),
 };
@@ -127,17 +142,19 @@ export const InContext: Story = {
 				<h1 className="text-2xl font-bold">Add New Book</h1>
 				<p className="text-muted-foreground">Fill in the details to add a book to your library</p>
 			</div>
-			<BookForm
-				onSubmit={async data => {
-					console.log('Submitted:', data);
-					await new Promise(resolve => setTimeout(resolve, 1000));
-					alert('Book added successfully!');
-				}}
-				onCancel={() => {
-					console.log('Cancelled');
-					alert('Form cancelled');
-				}}
-			/>
+			<CrudDialog open={true} onOpenChange={() => {}} title="Add Book" showCloseButton={false}>
+				<BookForm
+					onSubmit={async data => {
+						console.log('Submitted:', data);
+						await new Promise(resolve => setTimeout(resolve, 1000));
+						alert('Book added successfully!');
+					}}
+					onCancel={() => {
+						console.log('Cancelled');
+						alert('Form cancelled');
+					}}
+				/>
+			</CrudDialog>
 		</div>
 	),
 };
@@ -157,27 +174,31 @@ export const Comparison: Story = {
 		>
 			<div>
 				<h3 className="mb-4 text-lg font-semibold">Create New Book</h3>
-				<BookForm
-					onSubmit={async data => console.log('Create:', data)}
-					onCancel={() => console.log('Cancel create')}
-					submitLabel="Create Book"
-				/>
+				<CrudDialog open={true} onOpenChange={() => {}} title="Create Book" showCloseButton={false}>
+					<BookForm
+						onSubmit={async data => console.log('Create:', data)}
+						onCancel={() => console.log('Cancel create')}
+						submitLabel="Create Book"
+					/>
+				</CrudDialog>
 			</div>
 			<div>
 				<h3 className="mb-4 text-lg font-semibold">Edit Existing Book</h3>
-				<BookForm
-					onSubmit={async data => console.log('Update:', data)}
-					onCancel={() => console.log('Cancel update')}
-					submitLabel="Update Book"
-					initialData={{
-						title: 'To Kill a Mockingbird',
-						author: 'Harper Lee',
-						isbn: '978-0-06-112008-4',
-						publishedYear: 1960,
-						genre: 'Classic Fiction',
-						pages: 324,
-					}}
-				/>
+				<CrudDialog open={true} onOpenChange={() => {}} title="Edit Book" showCloseButton={false}>
+					<BookForm
+						onSubmit={async data => console.log('Update:', data)}
+						onCancel={() => console.log('Cancel update')}
+						submitLabel="Update Book"
+						initialData={{
+							title: 'To Kill a Mockingbird',
+							author: 'Harper Lee',
+							isbn: '978-0-06-112008-4',
+							publishedYear: 1960,
+							genre: 'Classic Fiction',
+							pages: 324,
+						}}
+					/>
+				</CrudDialog>
 			</div>
 		</div>
 	),
@@ -311,41 +332,43 @@ export const EditModeISBNConflict: Story = {
 					<li>Error message will appear below the ISBN field</li>
 				</ul>
 			</div>
-			<BookForm
-				mode="edit"
-				onSubmit={async (data: CreateBook) => {
-					console.log('Form submitted:', data);
-					await new Promise(resolve => setTimeout(resolve, 1000));
-				}}
-				onCancel={() => console.log('Form cancelled')}
-				submitLabel="Update Book"
-				onCheckISBN={async (isbn: string, excludeBookId?: string) => {
-					console.log('Checking ISBN:', isbn, 'excluding book:', excludeBookId);
-					await new Promise(resolve => setTimeout(resolve, 800));
-					return null;
-				}}
-				onPatchISBN={async (id: string, data) => {
-					console.log('Patching ISBN for book:', id, 'with data:', data);
-					await new Promise(resolve => setTimeout(resolve, 1000));
-					// Simulate version conflict
-					throw {
-						status: 409,
-						message: 'Version conflict detected: book was modified by another user',
-					};
-				}}
-				editMode={{
-					bookId: 'book-456',
-					version: 1,
-				}}
-				initialData={{
-					title: 'Brave New World',
-					author: 'Aldous Huxley',
-					isbn: '978-0-06-085052-4',
-					publishedYear: 1932,
-					genre: 'Dystopian Fiction',
-					pages: 268,
-				}}
-			/>
+			<CrudDialog open={true} onOpenChange={() => {}} title="Version Conflict Demo" showCloseButton={false}>
+				<BookForm
+					mode="edit"
+					onSubmit={async (data: CreateBook) => {
+						console.log('Form submitted:', data);
+						await new Promise(resolve => setTimeout(resolve, 1000));
+					}}
+					onCancel={() => console.log('Form cancelled')}
+					submitLabel="Update Book"
+					onCheckISBN={async (isbn: string, excludeBookId?: string) => {
+						console.log('Checking ISBN:', isbn, 'excluding book:', excludeBookId);
+						await new Promise(resolve => setTimeout(resolve, 800));
+						return null;
+					}}
+					onPatchISBN={async (id: string, data) => {
+						console.log('Patching ISBN for book:', id, 'with data:', data);
+						await new Promise(resolve => setTimeout(resolve, 1000));
+						// Simulate version conflict
+						throw {
+							status: 409,
+							message: 'Version conflict detected: book was modified by another user',
+						};
+					}}
+					editMode={{
+						bookId: 'book-456',
+						version: 1,
+					}}
+					initialData={{
+						title: 'Brave New World',
+						author: 'Aldous Huxley',
+						isbn: '978-0-06-085052-4',
+						publishedYear: 1932,
+						genre: 'Dystopian Fiction',
+						pages: 268,
+					}}
+				/>
+			</CrudDialog>
 		</div>
 	),
 };

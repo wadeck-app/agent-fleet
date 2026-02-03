@@ -1,4 +1,6 @@
-import { FormContainerLegacy as FormContainer } from '@framework/features/forms/FormContainer';
+import { DialogBody, DialogFooter } from '@framework/components/overlays/Dialog';
+import { type FormAction, FormActions } from '@framework/features/forms/FormActions';
+import { FormContainer } from '@framework/features/forms/FormContainer';
 import { IntegerField } from '@framework/features/forms/fields/IntegerField';
 import { NumberField } from '@framework/features/forms/fields/NumberField';
 import { TextField } from '@framework/features/forms/fields/TextField';
@@ -48,6 +50,8 @@ const errorFieldMapping = {
 	'Serving size': 'servingSize' as const,
 };
 
+const FORM_ID = 'ingredient-form';
+
 export function IngredientForm({
 	onSubmit,
 	onCancel,
@@ -62,85 +66,105 @@ export function IngredientForm({
 		onSubmit,
 	});
 
+	// Define form actions
+	const formActions: FormAction[] = [
+		{
+			label: isSubmitting ? 'Saving...' : submitLabel,
+			type: 'submit',
+			formId: FORM_ID,
+			disabled: isSubmitting,
+		},
+		{
+			label: 'Cancel',
+			type: 'button',
+			variant: 'outline',
+			onClick: onCancel,
+			disabled: isSubmitting,
+		},
+	];
+
 	return (
-		<FormContainer
-			isSubmitting={isSubmitting}
-			onSubmit={handleSubmit}
-			onCancel={onCancel}
-			submitLabel={submitLabel}
-		>
-			<TextField
-				label="Name"
-				value={formData.name}
-				onChange={value => updateField('name', value)}
-				placeholder="e.g., Chicken Breast"
-				required
-				className="md:col-span-2"
-				error={validationErrors.name}
-			/>
+		<>
+			<DialogBody>
+				<FormContainer id={FORM_ID} onSubmit={handleSubmit}>
+					<TextField
+						label="Name"
+						value={formData.name}
+						onChange={value => updateField('name', value)}
+						placeholder="e.g., Chicken Breast"
+						required
+						className="md:col-span-2"
+						error={validationErrors.name}
+					/>
 
-			<IntegerField
-				label="Calories (kcal)"
-				value={formData.calories}
-				onChange={value => updateField('calories', value)}
-				placeholder="0"
-				required
-				error={validationErrors.calories}
-			/>
+					<IntegerField
+						label="Calories (kcal)"
+						value={formData.calories}
+						onChange={value => updateField('calories', value)}
+						placeholder="0"
+						required
+						error={validationErrors.calories}
+					/>
 
-			<NumberField
-				label="Protein (g)"
-				value={formData.protein}
-				onChange={value => updateField('protein', value)}
-				placeholder="0.0"
-				required
-				error={validationErrors.protein}
-				step={0.1}
-			/>
+					<NumberField
+						label="Protein (g)"
+						value={formData.protein}
+						onChange={value => updateField('protein', value)}
+						placeholder="0.0"
+						required
+						error={validationErrors.protein}
+						step={0.1}
+					/>
 
-			<NumberField
-				label="Carbs (g)"
-				value={formData.carbs}
-				onChange={value => updateField('carbs', value)}
-				placeholder="0.0"
-				required
-				error={validationErrors.carbs}
-				step={0.1}
-			/>
+					<NumberField
+						label="Carbs (g)"
+						value={formData.carbs}
+						onChange={value => updateField('carbs', value)}
+						placeholder="0.0"
+						required
+						error={validationErrors.carbs}
+						step={0.1}
+					/>
 
-			<NumberField
-				label="Fat (g)"
-				value={formData.fat}
-				onChange={value => updateField('fat', value)}
-				placeholder="0.0"
-				required
-				error={validationErrors.fat}
-				step={0.1}
-			/>
+					<NumberField
+						label="Fat (g)"
+						value={formData.fat}
+						onChange={value => updateField('fat', value)}
+						placeholder="0.0"
+						required
+						error={validationErrors.fat}
+						step={0.1}
+					/>
 
-			<IntegerField
-				label="Serving Size"
-				value={formData.servingSize}
-				onChange={value => updateField('servingSize', value)}
-				placeholder="100"
-				required
-				error={validationErrors.servingSize}
-			/>
+					<IntegerField
+						label="Serving Size"
+						value={formData.servingSize}
+						onChange={value => updateField('servingSize', value)}
+						placeholder="100"
+						required
+						error={validationErrors.servingSize}
+					/>
 
-			<TextField
-				label="Unit"
-				value={formData.unit || ''}
-				onChange={value => updateField('unit', value)}
-				placeholder="g, ml, oz..."
-			/>
+					<TextField
+						label="Unit"
+						value={formData.unit || ''}
+						onChange={value => updateField('unit', value)}
+						placeholder="g, ml, oz..."
+					/>
 
-			<TextField
-				label="Category"
-				value={formData.category || ''}
-				onChange={value => updateField('category', value)}
-				placeholder="e.g., Protein, Vegetables"
-				className="md:col-span-2"
-			/>
-		</FormContainer>
+					<TextField
+						label="Category"
+						value={formData.category || ''}
+						onChange={value => updateField('category', value)}
+						placeholder="e.g., Protein, Vegetables"
+						className="md:col-span-2"
+					/>
+				</FormContainer>
+			</DialogBody>
+
+			<DialogFooter>
+				<FormActions actions={formActions} isSubmitting={isSubmitting} />
+			</DialogFooter>
+		</>
 	);
 }

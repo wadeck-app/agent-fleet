@@ -335,6 +335,30 @@
 			"version": 4,
 			"createdAt": "2026-01-22T21:10:25.315Z",
 			"updatedAt": "2026-01-22T21:10:37.816Z"
+		},
+		{
+			"description": "asdfasdf",
+			"status": "cancelled",
+			"priority": "medium",
+			"assignedWorker": {
+				"workerId": "2"
+			},
+			"flowId": "test-user-intervention",
+			"flowInputs": {
+				"message": "",
+				"reference_url || 'None provided'": "",
+				"existing_content || 'None'": "",
+				"notification_channels || 'None'": "",
+				"end_time || 'Not specified'": "",
+				"project_url || 'N/A'": "",
+				"completion_percent || 0": "",
+				"dependencies || '[]'": ""
+			},
+			"projectId": "wwuypfn8p",
+			"id": "ixnvl4swp",
+			"version": 4,
+			"createdAt": "2026-01-26T20:32:26.613Z",
+			"updatedAt": "2026-01-26T20:50:28.040Z"
 		}
 	]
 }

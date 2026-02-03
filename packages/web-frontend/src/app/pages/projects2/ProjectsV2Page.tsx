@@ -19,6 +19,7 @@ import { useProjectWorkspaces } from '@app/hooks/useProjectWorkspaces';
 import { useProjects } from '@app/hooks/useProjects';
 
 import { EditProjectDialog } from '../projects/EditProjectDialog';
+import { CreateWorkspaceDialog } from '../workspaces/CreateWorkspaceDialog';
 import { ManagePinnedProjectsDialog } from './ManagePinnedProjectsDialog';
 import { ManageProjectWorkspacesDialog } from './ManageProjectWorkspacesDialog';
 import { ProjectTabs } from './ProjectTabs';
@@ -54,6 +55,7 @@ export function ProjectsV2Page() {
 	// Dialog state
 	const [isManageDialogOpen, setIsManageDialogOpen] = useState(false);
 	const [isManageWorkspacesDialogOpen, setIsManageWorkspacesDialogOpen] = useState(false);
+	const [isCreateWorkspaceDialogOpen, setIsCreateWorkspaceDialogOpen] = useState(false);
 	const [editDialogState, setEditDialogState] = useState<{
 		open: boolean;
 		project: Project | null;
@@ -223,6 +225,15 @@ export function ProjectsV2Page() {
 		// Projects and workspaces will be reloaded automatically via WebSocket event
 	};
 
+	const handleCreateWorkspace = () => {
+		setIsCreateWorkspaceDialogOpen(true);
+	};
+
+	const handleWorkspaceCreated = () => {
+		// Workspaces will be reloaded automatically via WebSocket event
+		setIsCreateWorkspaceDialogOpen(false);
+	};
+
 	return (
 		<Page fullWidth className="flex h-screen flex-col">
 			<div className="flex-1 overflow-hidden">
@@ -287,6 +298,7 @@ export function ProjectsV2Page() {
 									onWorkspaceSelect={handleWorkspaceSelect}
 									onEditProjectClick={() => handleEditProject(activeProject)}
 									onManageClick={() => setIsManageWorkspacesDialogOpen(true)}
+									onCreateWorkspaceClick={handleCreateWorkspace}
 								/>
 								{activeWorkspace ? (
 									<WorkspacePanel
@@ -332,6 +344,13 @@ export function ProjectsV2Page() {
 				onAssociate={handleWorkspaceAssociate}
 				onDissociate={handleWorkspaceDissociate}
 				onReorder={handleWorkspaceReorder}
+			/>
+
+			{/* Create Workspace Dialog */}
+			<CreateWorkspaceDialog
+				open={isCreateWorkspaceDialogOpen}
+				onOpenChange={setIsCreateWorkspaceDialogOpen}
+				onSuccess={handleWorkspaceCreated}
 			/>
 		</Page>
 	);

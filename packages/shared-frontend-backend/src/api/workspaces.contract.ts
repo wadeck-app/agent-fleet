@@ -34,6 +34,8 @@ export const WorkspaceSchema = z.object({
 	name: z.string().optional(),
 	description: z.string().optional(),
 	color: WorkspaceColorSchema,
+	activeWorkerId: z.string().optional(),
+	projectId: z.string().optional(),
 });
 
 export const WorkspacesDataSchema = z.object({
@@ -91,6 +93,28 @@ export type WorkspacesListQuery = z.infer<typeof WorkspacesListQuerySchema>;
 export type WorkspacesListResponse = z.infer<typeof WorkspacesListResponseSchema>;
 
 /**
+ * DTO for creating a new workspace
+ */
+export const CreateWorkspaceDtoSchema = z.object({
+	path: z.string().min(1, 'Path is required'),
+	name: z.string().optional(),
+	description: z.string().optional(),
+	color: WorkspaceColorSchema,
+	mode: WorkspaceModeSchema.optional(),
+
+	gitOptions: z
+		.object({
+			strategy: z.enum(['none', 'clone', 'worktree']),
+			repositoryUrl: z.string().url().optional(), // For clone
+			sourceWorkspaceId: z.string().optional(), // For worktree
+			branch: z.string().optional(), // Branch to checkout/create
+		})
+		.optional(),
+});
+
+export type CreateWorkspaceDto = z.infer<typeof CreateWorkspaceDtoSchema>;
+
+/**
  * DTO for updating workspace metadata
  * Note: projectId association is now managed via Projects API (PATCH /api/projects/:id)
  */
@@ -107,6 +131,10 @@ export const WORKSPACES_API_ROUTES = defineRoutes({
 		GET: {
 			query: WorkspacesListQuerySchema.optional(),
 			response: z.union([WorkspacesDataSchema, WorkspacesListResponseSchema]),
+		},
+		POST: {
+			body: CreateWorkspaceDtoSchema,
+			response: WorkspaceSchema,
 		},
 	},
 	'/api/workspaces/:id': {

@@ -2,17 +2,15 @@
 	"projects": [
 		{
 			"name": "Agent Fleet",
-			"workspaceIds": [
-				"50115a2e-5226-46d4-9fb8-6f9c11a16f9d"
-			],
+			"workspaceIds": ["50115a2e-5226-46d4-9fb8-6f9c11a16f9d"],
 			"icon": "Users",
 			"iconColor": "#10B981",
 			"archived": false,
 			"taskCount": 0,
 			"id": "wwuypfn8p",
-			"version": 100,
+			"version": 101,
 			"createdAt": "2026-01-17T20:24:15.224Z",
-			"updatedAt": "2026-01-25T10:54:57.139Z",
+			"updatedAt": "2026-01-25T12:35:08.115Z",
 			"pinned": true,
 			"order": 1
 		},
@@ -26,9 +24,9 @@
 			"pinned": true,
 			"order": 0,
 			"id": "jz52yz1uq",
-			"version": 74,
+			"version": 77,
 			"createdAt": "2026-01-18T11:17:46.747Z",
-			"updatedAt": "2026-01-25T10:54:57.112Z"
+			"updatedAt": "2026-01-25T12:35:07.509Z"
 		}
 	]
 }

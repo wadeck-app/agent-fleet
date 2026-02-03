@@ -329,6 +329,22 @@ describe('CrudDialog', () => {
 			// Header should have border-b class for visual separation
 			expect(header?.className).toMatch(/border-b/);
 		});
+
+		it('should wrap children in flex container for proper height constraints', () => {
+			render(
+				<CrudDialog open={true} onOpenChange={vi.fn()} title="Test Dialog" description="Test">
+					<div data-testid="child-content">Content</div>
+				</CrudDialog>
+			);
+
+			const content = screen.getByTestId('child-content');
+			// The child should be wrapped in a flex container
+			const wrapper = content.parentElement;
+			expect(wrapper?.className).toMatch(/flex/);
+			expect(wrapper?.className).toMatch(/flex-col/);
+			expect(wrapper?.className).toMatch(/flex-1/);
+			expect(wrapper?.className).toMatch(/min-h-0/);
+		});
 	});
 
 	describe('complete scenarios', () => {

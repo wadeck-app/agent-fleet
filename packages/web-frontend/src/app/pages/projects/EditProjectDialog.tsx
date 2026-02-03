@@ -5,9 +5,11 @@ import { FieldError } from '@framework/components/advanced/Field/FieldError';
 import { FieldLabel } from '@framework/components/advanced/Field/FieldLabel';
 import { DynamicLucideIcon } from '@framework/components/icons/DynamicLucideIcon';
 import { CrudDialog } from '@framework/components/overlays/CrudDialog';
+import { DialogBody, DialogFooter } from '@framework/components/overlays/Dialog';
 import { ColorPicker } from '@framework/components/pickers/ColorPicker';
 import { IconPicker } from '@framework/components/pickers/IconPicker';
-import { FormContainerLegacy as FormContainer } from '@framework/features/forms/FormContainer';
+import { type FormAction, FormActions } from '@framework/features/forms/FormActions';
+import { FormContainer } from '@framework/features/forms/FormContainer';
 import { TextAreaField } from '@framework/features/forms/fields/TextAreaField';
 import { TextField } from '@framework/features/forms/fields/TextField';
 import { useFormState } from '@framework/features/forms/useFormState';
@@ -29,6 +31,8 @@ interface EditProjectFormData {
 	description: string;
 	icon: string;
 	iconColor: string;
+	gitRepositoryUrl: string;
+	gitDefaultBranch: string;
 	version: number;
 }
 
@@ -37,23 +41,43 @@ const defaultFormData: EditProjectFormData = {
 	description: '',
 	icon: 'FolderKanban',
 	iconColor: '#6366F1',
+	gitRepositoryUrl: '',
+	gitDefaultBranch: '',
 	version: 0,
 };
+
+const FORM_ID = 'edit-project-form';
 
 export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: EditProjectDialogProps) {
 	const { showToast } = useToast();
 
+	const initialData = React.useMemo(
+		() =>
+			project
+				? {
+						name: project.name,
+						description: project.description || '',
+						icon: project.icon || 'FolderKanban',
+						iconColor: project.iconColor || '#6366F1',
+						gitRepositoryUrl: project.gitRepositoryUrl || '',
+						gitDefaultBranch: project.gitDefaultBranch || '',
+						version: project.version,
+					}
+				: undefined,
+		[
+			project?.name,
+			project?.description,
+			project?.icon,
+			project?.iconColor,
+			project?.gitRepositoryUrl,
+			project?.gitDefaultBranch,
+			project?.version,
+		]
+	);
+
 	const formState = useFormState<EditProjectFormData>({
 		defaultData: defaultFormData,
-		initialData: project
-			? {
-					name: project.name,
-					description: project.description || '',
-					icon: project.icon || 'FolderKanban',
-					iconColor: project.iconColor || '#6366F1',
-					version: project.version,
-				}
-			: undefined,
+		initialData,
 		validator: data => {
 			const errors: Record<string, string> = {};
 
@@ -71,6 +95,14 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: Ed
 				errors.iconColor = 'Icon color must be a valid hex color (e.g., #6366F1)';
 			}
 
+			if (data.gitRepositoryUrl && data.gitRepositoryUrl.trim()) {
+				try {
+					new URL(data.gitRepositoryUrl);
+				} catch {
+					errors.gitRepositoryUrl = 'Must be a valid URL';
+				}
+			}
+
 			return {
 				valid: Object.keys(errors).length === 0,
 				errors: Object.values(errors),
@@ -81,6 +113,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: Ed
 			'Name must be less than 100 characters': 'name',
 			'Description must be less than 500 characters': 'description',
 			'Icon color must be a valid hex color (e.g., #6366F1)': 'iconColor',
+			'Must be a valid URL': 'gitRepositoryUrl',
 		},
 		onSubmit: async data => {
 			if (!project) return;
@@ -90,6 +123,8 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: Ed
 				description: data.description?.trim() || undefined,
 				icon: (data.icon?.trim() || undefined) as UpdateProject['icon'],
 				iconColor: data.iconColor?.trim() || undefined,
+				gitRepositoryUrl: data.gitRepositoryUrl?.trim() || undefined,
+				gitDefaultBranch: data.gitDefaultBranch?.trim() || undefined,
 				version: data.version,
 			};
 
@@ -114,6 +149,28 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: Ed
 		},
 	});
 
+	// Define form actions
+	const formActions: FormAction[] = [
+		{
+			label: formState.isSubmitting ? 'Saving...' : 'Save Changes',
+			type: 'submit',
+			formId: FORM_ID,
+			disabled: formState.isSubmitting,
+		},
+		{
+			label: 'Annuler',
+			type: 'button',
+			variant: 'outline',
+			onClick: () => onOpenChange(false),
+			disabled: formState.isSubmitting,
+		},
+	];
+
+	// Don't render form content if project is null
+	if (!project) {
+		return null;
+	}
+
 	return (
 		<CrudDialog
 			open={open}
@@ -123,67 +180,90 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: Ed
 			maxWidth="lg"
 			preventOutsideClick={true}
 		>
-			<FormContainer
-				isSubmitting={formState.isSubmitting}
-				onSubmit={formState.handleSubmit}
-				onCancel={() => onOpenChange(false)}
-				submitLabel="Save Changes"
-			>
-				<div className="col-span-2">
-					<TextField
-						label="Name"
-						value={formState.formData.name}
-						onChange={value => formState.updateField('name', value)}
-						placeholder="Enter project name..."
-						required
-						error={formState.validationErrors.name}
-					/>
-				</div>
-
-				<div className="col-span-2">
-					<TextAreaField
-						label="Description"
-						value={formState.formData.description}
-						onChange={value => formState.updateField('description', value)}
-						placeholder="Enter project description (optional)..."
-						rows={4}
-						error={formState.validationErrors.description}
-					/>
-				</div>
-
-				<div className="col-span-2">
-					<Field>
-						<FieldLabel>Icon</FieldLabel>
-						<IconPicker
-							value={formState.formData.icon}
-							onChange={value => formState.updateField('icon', value)}
-							iconColor={formState.formData.iconColor}
-						/>
-						{formState.validationErrors.icon && <FieldError>{formState.validationErrors.icon}</FieldError>}
-					</Field>
-				</div>
-
-				<div className="col-span-2">
-					<Field>
-						<FieldLabel>Icon Color</FieldLabel>
-						<ColorPicker
-							value={formState.formData.iconColor}
-							onChange={value => formState.updateField('iconColor', value)}
-						/>
-						{formState.validationErrors.iconColor && (
-							<FieldError>{formState.validationErrors.iconColor}</FieldError>
-						)}
-					</Field>
-					<div className="mt-2 flex items-center gap-2">
-						<span className="text-xs text-muted-foreground">Preview:</span>
-						<DynamicLucideIcon
-							name={formState.formData.icon}
-							color={formState.formData.iconColor || '#6366F1'}
-							className="h-6 w-6"
+			<DialogBody>
+				<FormContainer id={FORM_ID} onSubmit={formState.handleSubmit}>
+					<div className="col-span-2">
+						<TextField
+							label="Name"
+							value={formState.formData.name}
+							onChange={value => formState.updateField('name', value)}
+							placeholder="Enter project name..."
+							required
+							error={formState.validationErrors.name}
 						/>
 					</div>
-				</div>
-			</FormContainer>
+
+					<div className="col-span-2">
+						<TextAreaField
+							label="Description"
+							value={formState.formData.description}
+							onChange={value => formState.updateField('description', value)}
+							placeholder="Enter project description (optional)..."
+							rows={4}
+							error={formState.validationErrors.description}
+						/>
+					</div>
+
+					<div className="col-span-2">
+						<Field>
+							<FieldLabel>Icon</FieldLabel>
+							<IconPicker
+								value={formState.formData.icon}
+								onChange={value => formState.updateField('icon', value)}
+								iconColor={formState.formData.iconColor}
+							/>
+							{formState.validationErrors.icon && (
+								<FieldError>{formState.validationErrors.icon}</FieldError>
+							)}
+						</Field>
+					</div>
+
+					<div className="col-span-2">
+						<Field>
+							<FieldLabel>Icon Color</FieldLabel>
+							<ColorPicker
+								value={formState.formData.iconColor}
+								onChange={value => formState.updateField('iconColor', value)}
+							/>
+							{formState.validationErrors.iconColor && (
+								<FieldError>{formState.validationErrors.iconColor}</FieldError>
+							)}
+						</Field>
+						<div className="mt-2 flex items-center gap-2">
+							<span className="text-xs text-muted-foreground">Preview:</span>
+							<DynamicLucideIcon
+								name={formState.formData.icon}
+								color={formState.formData.iconColor || '#6366F1'}
+								className="h-6 w-6"
+							/>
+						</div>
+					</div>
+
+					<div className="col-span-2">
+						<TextField
+							label="Git Repository URL"
+							value={formState.formData.gitRepositoryUrl}
+							onChange={value => formState.updateField('gitRepositoryUrl', value)}
+							placeholder="https://github.com/user/repo.git (optional)"
+							error={formState.validationErrors.gitRepositoryUrl}
+						/>
+					</div>
+
+					<div className="col-span-2">
+						<TextField
+							label="Default Branch"
+							value={formState.formData.gitDefaultBranch}
+							onChange={value => formState.updateField('gitDefaultBranch', value)}
+							placeholder="main (optional)"
+							error={formState.validationErrors.gitDefaultBranch}
+						/>
+					</div>
+				</FormContainer>
+			</DialogBody>
+
+			<DialogFooter>
+				<FormActions actions={formActions} isSubmitting={formState.isSubmitting} />
+			</DialogFooter>
 		</CrudDialog>
 	);
 }

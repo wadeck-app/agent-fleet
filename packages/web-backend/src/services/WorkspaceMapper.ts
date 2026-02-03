@@ -22,7 +22,12 @@ export class WorkspaceMapper {
 	/**
 	 * Map a single worker workspace to API format
 	 */
-	static mapWorkerWorkspaceToApi(workerWorkspace: WorkerWorkspace, metadata?: WorkspaceMetadata): ApiWorkspace {
+	static mapWorkerWorkspaceToApi(
+		workerWorkspace: WorkerWorkspace,
+		metadata?: WorkspaceMetadata,
+		activeWorkerId?: string,
+		projectId?: string
+	): ApiWorkspace {
 		// @formatter:off
 		// Generate stable ID from workspace path (or use metadata ID if available)
 		const id = metadata?.id || this.generateIdFromPath(workerWorkspace.workspacePath);
@@ -51,6 +56,9 @@ export class WorkspaceMapper {
 			name,
 			description: metadata?.description,
 			color: metadata?.color,
+			// Enriched fields
+			activeWorkerId,
+			projectId,
 		} as ApiWorkspace;
 		// @formatter:on
 	}
@@ -60,11 +68,21 @@ export class WorkspaceMapper {
 	 */
 	static mapWorkerWorkspacesToApi(
 		workerWorkspaces: WorkerWorkspace[],
-		metadataMap: Map<string, WorkspaceMetadata>
+		metadataMap: Map<string, WorkspaceMetadata>,
+		enrichmentData?: {
+			activeWorkerMap: Map<string, string>; // workspaceId -> workerId
+			projectMap: Map<string, string>; // workspaceId -> projectId
+		}
 	): ApiWorkspace[] {
-		return workerWorkspaces.map(workspace =>
-			this.mapWorkerWorkspaceToApi(workspace, metadataMap.get(workspace.workspacePath))
-		);
+		return workerWorkspaces.map(workspace => {
+			const metadata = metadataMap.get(workspace.workspacePath);
+			// Use metadata ID if available, otherwise use generated ID
+			const workspaceId = metadata?.id || this.generateIdFromPath(workspace.workspacePath);
+			const activeWorkerId = enrichmentData?.activeWorkerMap.get(workspaceId);
+			const projectId = enrichmentData?.projectMap.get(workspaceId);
+
+			return this.mapWorkerWorkspaceToApi(workspace, metadata, activeWorkerId, projectId);
+		});
 	}
 
 	/**
@@ -74,6 +92,41 @@ export class WorkspaceMapper {
 		const hash = crypto.createHash('sha256').update(workspacePath).digest('hex');
 		// Return first 16 chars of hash for readability
 		return hash.substring(0, 16);
+	}
+
+	/**
+	 * Map a workspace path and metadata to API format (for newly created workspaces)
+	 */
+	static mapPathToWorkspace(
+		workspacePath: string,
+		metadata: WorkspaceMetadata,
+		gitBranch?: string,
+		activeWorkerId?: string,
+		projectId?: string
+	): ApiWorkspace {
+		// @formatter:off
+		const id = metadata.id || this.generateIdFromPath(workspacePath);
+		const name = metadata.name || this.extractWorkspaceName(workspacePath);
+
+		return {
+			id,
+			path: workspacePath,
+			mode: metadata.mode || 'development',
+			tasksCount: 0,
+			gitBranch,
+			status: 'active' as const,
+			createdAt: metadata.createdAt,
+			lastUsed: metadata.updatedAt,
+			gitStatus: undefined,
+			activeTasks: [],
+			name,
+			description: metadata.description,
+			color: metadata.color,
+			// Enriched fields
+			activeWorkerId,
+			projectId,
+		} as ApiWorkspace;
+		// @formatter:on
 	}
 
 	/**

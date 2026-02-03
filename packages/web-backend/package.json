@@ -45,6 +45,7 @@
 		"shared-common": "*",
 		"shared-frontend-backend": "*",
 		"shared-orch-worker": "*",
+		"simple-git": "^3.30.0",
 		"zod": "^4.1.13",
 		"zod-to-json-schema": "^3.25.0"
 	},

@@ -5,12 +5,14 @@ import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import { useToast } from '@framework/features/toast/ToastContext';
 import type { Workspace } from '@shared/api/workspaces.contract';
-import { Pencil } from 'lucide-react';
+import { ListTodo, Pencil } from 'lucide-react';
 
 import { useWorkspaceProject } from '@/hooks/useWorkspaceProject';
 
+import { CreateTaskDialog } from '../tasks/CreateTaskDialog';
 import { workspacesApi } from '../workspaces/workspaces.api';
 import { EditWorkspaceDialog } from './EditWorkspaceDialog';
+import { useCanCreateTaskFromWorkspace } from './useCanCreateTaskFromWorkspace';
 
 /**
  * Component to display project name for a workspace
@@ -110,14 +112,13 @@ export interface WorkspacesTableProps extends Partial<Table2Props<Workspace>> {
  */
 export function WorkspacesTable(props: WorkspacesTableProps) {
 	const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
+	const [creatingTaskForWorkspace, setCreatingTaskForWorkspace] = useState<Workspace | null>(null);
 	const { showToast } = useToast();
 
 	const handleSave = async (workspaceId: string, data: { name?: string; description?: string; color?: string }) => {
 		await workspacesApi.updateWorkspace(workspaceId, data);
 		// Cache will auto-refresh via useRealtimeRefresh subscription to B2F_WORKSPACE_UPDATED
-
-		// Show success toast
-		showToast('Workspace updated successfully', 'success');
+		// Toast is now shown by EditWorkspaceDialog
 	};
 
 	// Add Actions column dynamically
@@ -126,11 +127,27 @@ export function WorkspacesTable(props: WorkspacesTableProps) {
 		{
 			key: 'actions',
 			label: 'Actions',
-			render: (w: Workspace) => (
-				<Button variant="ghost" size="sm" onClick={() => setEditingWorkspace(w)}>
-					<Pencil className="h-4 w-4" />
-				</Button>
-			),
+			render: (w: Workspace) => {
+				// eslint-disable-next-line react-hooks/rules-of-hooks
+				const { canCreate, reason } = useCanCreateTaskFromWorkspace(w);
+
+				return (
+					<div className="flex gap-2">
+						<Button variant="ghost" size="sm" onClick={() => setEditingWorkspace(w)} title="Edit workspace">
+							<Pencil className="h-4 w-4" />
+						</Button>
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={() => setCreatingTaskForWorkspace(w)}
+							disabled={!canCreate}
+							title={canCreate ? 'Create task' : reason}
+						>
+							<ListTodo className="h-4 w-4" />
+						</Button>
+					</div>
+				);
+			},
 		},
 	];
 
@@ -155,6 +172,22 @@ export function WorkspacesTable(props: WorkspacesTableProps) {
 					open={!!editingWorkspace}
 					onClose={() => setEditingWorkspace(null)}
 					onSave={handleSave}
+				/>
+			)}
+
+			{creatingTaskForWorkspace && (
+				<CreateTaskDialog
+					open={!!creatingTaskForWorkspace}
+					onOpenChange={open => !open && setCreatingTaskForWorkspace(null)}
+					onSuccess={() => {
+						// Toast is shown by CreateTaskDialog
+						setCreatingTaskForWorkspace(null);
+					}}
+					defaultValues={{
+						workerId: creatingTaskForWorkspace.activeWorkerId || '',
+						projectId: creatingTaskForWorkspace.projectId || '',
+					}}
+					lockedFields={['workerId', 'projectId']}
 				/>
 			)}
 		</>

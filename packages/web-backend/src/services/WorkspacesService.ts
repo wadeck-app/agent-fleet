@@ -2,6 +2,7 @@ import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper'
 import { createLogger } from 'shared-common/logger';
 
 import type {
+	CreateWorkspaceDto,
 	UpdateWorkspaceDto,
 	Workspace,
 	WorkspacesData,
@@ -13,6 +14,7 @@ import { B2F_WORKSPACES_UPDATED, B2F_WORKSPACE_UPDATED } from '@app/shared/trans
 import type { ProjectsRepository } from '../repositories/ProjectsRepository';
 import type { WorkspaceMetadataRepository } from '../repositories/WorkspaceMetadataRepository';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
+import { WorkspaceCreationService } from './WorkspaceCreationService';
 import { WorkspaceMapper } from './WorkspaceMapper';
 
 const log = createLogger('WorkspacesService');
@@ -49,12 +51,16 @@ const log = createLogger('WorkspacesService');
  */
 
 export class WorkspacesService {
+	private readonly creationService: WorkspaceCreationService;
+
 	constructor(
 		private readonly eventBroadcaster: EventBroadcaster,
 		private readonly orchestratorWrapper: OrchestratorWrapper,
 		private readonly metadataRepository: WorkspaceMetadataRepository,
 		private readonly projectsRepository: ProjectsRepository
 	) {
+		this.creationService = new WorkspaceCreationService();
+
 		// Configure metadata file watcher to emit B2F_WORKSPACES_UPDATED on changes
 		this.metadataRepository.setChangeCallback((workspacePath: string) => {
 			log.info(`Metadata changed for workspace: ${workspacePath}`);
@@ -100,6 +106,56 @@ export class WorkspacesService {
 	}
 
 	/**
+	 * Build enrichment data for workspaces (activeWorkerId and projectId)
+	 */
+	private async buildEnrichmentData(
+		workerWorkspaces: Array<{
+			workerId: string;
+			workspacePath: string;
+			projectId: string;
+			connectedAt: string;
+		}>,
+		uniqueWorkspaces: Array<{
+			workerId: string;
+			workspacePath: string;
+			projectId: string;
+			connectedAt: string;
+		}>,
+		metadataMap: Map<string, any>
+	): Promise<{
+		activeWorkerMap: Map<string, string>;
+		projectMap: Map<string, string>;
+	}> {
+		const activeWorkerMap = new Map<string, string>();
+		const projectMap = new Map<string, string>();
+
+		// Build maps for all unique workspaces
+		for (const workspace of uniqueWorkspaces) {
+			const metadata = metadataMap.get(workspace.workspacePath);
+			// Use metadata ID if available, otherwise use generated ID
+			const workspaceId = metadata?.id || WorkspaceMapper.generateIdFromPath(workspace.workspacePath);
+
+			// Find active worker: look for matching workspace in original workerWorkspaces
+			const activeWorker = workerWorkspaces.find(w => {
+				const wMetadata = metadataMap.get(w.workspacePath);
+				const wId = wMetadata?.id || WorkspaceMapper.generateIdFromPath(w.workspacePath);
+				return wId === workspaceId;
+			});
+			if (activeWorker) {
+				activeWorkerMap.set(workspaceId, activeWorker.workerId);
+			}
+
+			// Find associated project via reverse lookup
+			const project = await this.projectsRepository.getProjectForWorkspace(workspaceId);
+			if (project) {
+				projectMap.set(workspaceId, project.id);
+			}
+		}
+
+		return { activeWorkerMap, projectMap };
+	}
+
+	/**
 	 * Get workspaces data with summary statistics
 	 */
 	async getWorkspacesData(): Promise<WorkspacesData> {
@@ -116,8 +172,11 @@ export class WorkspacesService {
 			const workspacePaths = uniqueWorkspaces.map(w => w.workspacePath);
 			const metadataMap = await this.metadataRepository.getMetadataForWorkspaces(workspacePaths);
 
+			// Build enrichment data (activeWorkerId and projectId)
+			const enrichmentData = await this.buildEnrichmentData(workerWorkspaces, uniqueWorkspaces, metadataMap);
+
 			// Map to API format
-			const workspaces = WorkspaceMapper.mapWorkerWorkspacesToApi(uniqueWorkspaces, metadataMap);
+			const workspaces = WorkspaceMapper.mapWorkerWorkspacesToApi(uniqueWorkspaces, metadataMap, enrichmentData);
 
 			// Calculate summary statistics
 			const summary = this.calculateSummary(workspaces);
@@ -167,8 +226,11 @@ export class WorkspacesService {
 				this.metadataRepository.startWatching(workspacePath);
 			}
 
+			// Build enrichment data (activeWorkerId and projectId)
+			const enrichmentData = await this.buildEnrichmentData(workerWorkspaces, uniqueWorkspaces, metadataMap);
+
 			// Map to API format
-			let workspaces = WorkspaceMapper.mapWorkerWorkspacesToApi(uniqueWorkspaces, metadataMap);
+			let workspaces = WorkspaceMapper.mapWorkerWorkspacesToApi(uniqueWorkspaces, metadataMap, enrichmentData);
 
 			// Apply domain filters (status, mode)
 			if (query.status) {
@@ -333,6 +395,32 @@ export class WorkspacesService {
 	 */
 
 	/**
+	 * Create a new workspace
+	 * Emits 'b2f:workspaces:updated' event after successful creation
+	 */
+	async createWorkspace(data: CreateWorkspaceDto): Promise<Workspace> {
+		log.info('Creating workspace', { path: data.path });
+
+		try {
+			// Create workspace using creation service
+			const workspace = await this.creationService.createWorkspace(data);
+
+			// Start watching metadata file
+			this.metadataRepository.startWatching(data.path);
+
+			// Emit event AFTER successful creation
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			this.eventBroadcaster.broadcast(B2F_WORKSPACES_UPDATED, {} as any);
+
+			log.info('Successfully created workspace', { id: workspace.id });
+			return workspace;
+		} catch (error) {
+			log.error('Failed to create workspace:', error);
+			throw error;
+		}
+	}
+
+	/**
 	 * Update workspace metadata (name, description, color)
 	 * Emits 'b2f:workspace:updated' event after successful update
 	 * Note: Project association is now managed via Projects API (PATCH /api/projects/:id)
@@ -389,8 +477,18 @@ export class WorkspacesService {
 				throw new Error(`Workspace ${workspaceId} not found among connected workers`);
 			}
 
+			// Build enrichment data for this workspace
+			const enrichmentData = await this.buildEnrichmentData(workerWorkspaces, [workerWorkspace], metadataMap);
+			const activeWorkerId = enrichmentData.activeWorkerMap.get(workspaceId);
+			const projectId = enrichmentData.projectMap.get(workspaceId);
+
 			// Map to API format with updated metadata
-			const workspace = WorkspaceMapper.mapWorkerWorkspaceToApi(workerWorkspace, metadata);
+			const workspace = WorkspaceMapper.mapWorkerWorkspaceToApi(
+				workerWorkspace,
+				metadata,
+				activeWorkerId,
+				projectId
+			);
 
 			// Emit event AFTER successful update
 			this.eventBroadcaster.broadcast(B2F_WORKSPACE_UPDATED, workspace);

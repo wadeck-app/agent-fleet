@@ -2,11 +2,11 @@
 	"migrations": [
 		{
 			"migrated": true,
-			"migratedAt": "2026-01-24T19:35:49.409Z",
-			"id": "v4sitoowv",
+			"migratedAt": "2026-01-25T20:48:36.713Z",
+			"id": "6mndk1pam",
 			"version": 1,
-			"createdAt": "2026-01-24T19:35:49.409Z",
-			"updatedAt": "2026-01-24T19:35:49.409Z"
+			"createdAt": "2026-01-25T20:48:36.713Z",
+			"updatedAt": "2026-01-25T20:48:36.713Z"
 		}
 	]
 }

@@ -59,7 +59,8 @@ export function SortableConfiguredScriptItem({
 	const style = {
 		transform: CSS.Transform.toString(transform),
 		transition,
-		opacity: isDragging ? 0.5 : isLoading ? 0.7 : 1,
+		// Only set opacity for dragging state - let CSS classes handle loading/reordering
+		...(isDragging ? { opacity: 0.5 } : {}),
 	};
 
 	const displayName = script.displayName || script.scriptName;
@@ -75,7 +76,7 @@ export function SortableConfiguredScriptItem({
 			className={cn(
 				'flex items-center gap-1 rounded-sm transition-colors',
 				'hover:bg-accent',
-				isLoading && 'pointer-events-none opacity-50',
+				(isLoading || isReordering) && 'pointer-events-none opacity-50',
 				isDragging && 'z-50'
 			)}
 		>
@@ -96,24 +97,10 @@ export function SortableConfiguredScriptItem({
 			</button>
 
 			{/* Script Name */}
-			<span
-				className={cn(
-					'flex-1 px-2 py-1.5 font-mono text-sm transition-opacity',
-					isReordering &&
-						`
-      opacity-40
-    `
-				)}
-			>
-				{displayName}
-			</span>
+			<span className="flex-1 px-2 py-1.5 font-mono text-sm">{displayName}</span>
 
 			{/* Status Badge */}
-			<Badge
-				variant={badgeVariant}
-				className={cn('text-xs transition-opacity', isReordering && 'opacity-40')}
-				title={`Status: ${status}`}
-			>
+			<Badge variant={badgeVariant} className="text-xs" title={`Status: ${status}`}>
 				{statusSymbol}
 			</Badge>
 

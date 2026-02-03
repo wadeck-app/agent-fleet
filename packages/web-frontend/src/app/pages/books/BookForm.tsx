@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 
 import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
+import { DialogBody, DialogFooter } from '@framework/components/overlays/Dialog';
 import { Button } from '@framework/components/primitives/Button';
-import { FormContainerLegacy as FormContainer } from '@framework/features/forms/FormContainer';
+import { type FormAction, FormActions } from '@framework/features/forms/FormActions';
+import { FormContainer } from '@framework/features/forms/FormContainer';
 import { IntegerField } from '@framework/features/forms/fields/IntegerField';
 import { TextField } from '@framework/features/forms/fields/TextField';
 import { useFormState } from '@framework/features/forms/useFormState';
@@ -83,6 +85,8 @@ const errorFieldMapping = {
 	Pages: 'pages' as const,
 	'Published year': 'publishedYear' as const,
 };
+
+const FORM_ID = 'book-form';
 
 export function BookForm({
 	onSubmit,
@@ -203,106 +207,128 @@ export function BookForm({
 		setIsbnCheckError(null);
 	};
 
+	// Define form actions
+	const formActions: FormAction[] = [
+		{
+			label: isSubmitting ? 'Saving...' : submitLabel,
+			type: 'submit',
+			formId: FORM_ID,
+			disabled: isSubmitting,
+		},
+		{
+			label: 'Cancel',
+			type: 'button',
+			variant: 'outline',
+			onClick: onCancel,
+			disabled: isSubmitting,
+		},
+	];
+
 	return (
-		<FormContainer
-			isSubmitting={isSubmitting}
-			onSubmit={handleSubmit}
-			onCancel={onCancel}
-			submitLabel={submitLabel}
-		>
-			<TextField
-				label="Title"
-				value={formData.title}
-				onChange={value => updateField('title', value)}
-				placeholder="e.g., The Great Gatsby"
-				required
-				className="md:col-span-2"
-				error={validationErrors.title}
-			/>
+		<>
+			<DialogBody>
+				<FormContainer id={FORM_ID} onSubmit={handleSubmit}>
+					<TextField
+						label="Title"
+						value={formData.title}
+						onChange={value => updateField('title', value)}
+						placeholder="e.g., The Great Gatsby"
+						required
+						className="md:col-span-2"
+						error={validationErrors.title}
+					/>
 
-			<TextField
-				label="Author"
-				value={formData.author}
-				onChange={value => updateField('author', value)}
-				placeholder="e.g., F. Scott Fitzgerald"
-				required
-				className="md:col-span-2"
-				error={validationErrors.author}
-			/>
+					<TextField
+						label="Author"
+						value={formData.author}
+						onChange={value => updateField('author', value)}
+						placeholder="e.g., F. Scott Fitzgerald"
+						required
+						className="md:col-span-2"
+						error={validationErrors.author}
+					/>
 
-			{/* ISBN Field with Check button */}
-			<div
-				className={`
+					{/* ISBN Field with Check button */}
+					<div
+						className={`
       flex flex-col gap-2
       md:col-span-2
     `}
-			>
-				<Label htmlFor="field-isbn" className="text-sm leading-snug font-medium">
-					ISBN
-				</Label>
-				<div className="flex items-center gap-2">
-					<Input
-						id="field-isbn"
-						type="text"
-						value={formData.isbn || ''}
-						onChange={e => handleIsbnChange(e.target.value)}
-						placeholder="e.g., 978-0-7432-7356-5"
-						className="flex-1"
-						aria-invalid={!!isbnCheckError}
-					/>
-					{onCheckISBN && (
-						<Button
-							type="button"
-							onClick={handleCheckISBN}
-							disabled={isbnValidationState === 'checking' || !formData.isbn?.trim()}
-							size="default"
-						>
-							{isbnValidationState === 'checking' ? 'Checking...' : 'Check'}
-						</Button>
-					)}
-					{editMode && formData.isbn && (
-						<Button
-							type="button"
-							onClick={handlePatchISBN}
-							disabled={isPatchingISBN || isbnValidationState === 'checking' || !formData.isbn?.trim()}
-							variant="outline"
-							size="default"
-						>
-							{isPatchingISBN ? 'Saving...' : 'Save ISBN'}
-						</Button>
-					)}
-					{isbnValidationState === 'valid' && (
-						<div className="flex h-8 items-center text-primary" title="ISBN is available">
-							<Check className="size-6" />
+					>
+						<Label htmlFor="field-isbn" className="text-sm leading-snug font-medium">
+							ISBN
+						</Label>
+						<div className="flex items-center gap-2">
+							<Input
+								id="field-isbn"
+								type="text"
+								value={formData.isbn || ''}
+								onChange={e => handleIsbnChange(e.target.value)}
+								placeholder="e.g., 978-0-7432-7356-5"
+								className="flex-1"
+								aria-invalid={!!isbnCheckError}
+							/>
+							{onCheckISBN && (
+								<Button
+									type="button"
+									onClick={handleCheckISBN}
+									disabled={isbnValidationState === 'checking' || !formData.isbn?.trim()}
+									size="default"
+								>
+									{isbnValidationState === 'checking' ? 'Checking...' : 'Check'}
+								</Button>
+							)}
+							{editMode && formData.isbn && (
+								<Button
+									type="button"
+									onClick={handlePatchISBN}
+									disabled={
+										isPatchingISBN || isbnValidationState === 'checking' || !formData.isbn?.trim()
+									}
+									variant="outline"
+									size="default"
+								>
+									{isPatchingISBN ? 'Saving...' : 'Save ISBN'}
+								</Button>
+							)}
+							{isbnValidationState === 'valid' && (
+								<div className="flex h-8 items-center text-primary" title="ISBN is available">
+									<Check className="size-6" />
+								</div>
+							)}
 						</div>
-					)}
-				</div>
-				{isbnCheckError && <p className="text-xs text-destructive">{isbnCheckError}</p>}
-			</div>
+						{isbnCheckError && <p className="text-xs text-destructive">{isbnCheckError}</p>}
+					</div>
 
-			<IntegerField
-				label="Published Year"
-				value={formData.publishedYear ?? 0}
-				onChange={value => updateField('publishedYear', value)}
-				placeholder="e.g., 1925"
-				error={validationErrors.publishedYear}
-			/>
+					<IntegerField
+						label="Published Year"
+						value={formData.publishedYear ?? 0}
+						onChange={value => updateField('publishedYear', value)}
+						placeholder="e.g., 1925"
+						error={validationErrors.publishedYear}
+					/>
 
-			<IntegerField
-				label="Pages"
-				value={formData.pages ?? 0}
-				onChange={value => updateField('pages', value)}
-				placeholder="e.g., 180"
-				error={validationErrors.pages}
-			/>
+					<IntegerField
+						label="Pages"
+						value={formData.pages ?? 0}
+						onChange={value => updateField('pages', value)}
+						placeholder="e.g., 180"
+						error={validationErrors.pages}
+					/>
 
-			<TextField
-				label="Genre"
-				value={formData.genre || ''}
-				onChange={value => updateField('genre', value)}
-				placeholder="e.g., Fiction, Biography"
-				className="md:col-span-2"
-			/>
-		</FormContainer>
+					<TextField
+						label="Genre"
+						value={formData.genre || ''}
+						onChange={value => updateField('genre', value)}
+						placeholder="e.g., Fiction, Biography"
+						className="md:col-span-2"
+					/>
+				</FormContainer>
+			</DialogBody>
+
+			<DialogFooter>
+				<FormActions actions={formActions} isSubmitting={isSubmitting} />
+			</DialogFooter>
+		</>
 	);
 }

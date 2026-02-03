@@ -65,7 +65,7 @@ export function useFormState<T>({
 	const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
 	// Track previous initialData to detect changes
-	const prevInitialDataRef = useRef(initialData);
+	const prevInitialDataRef = useRef<T | undefined>(undefined);
 	// Track if user has modified the form (form is "dirty")
 	const isDirtyRef = useRef(false);
 

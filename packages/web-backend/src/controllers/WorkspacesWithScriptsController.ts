@@ -51,6 +51,10 @@ export default class WorkspacesWithScriptsController implements LazyController<M
 			return this.workspacesService.getWorkspacesData();
 		});
 
+		add('POST', '/api/workspaces/', async ({ body }) => {
+			return this.workspacesService.createWorkspace(body);
+		});
+
 		add('PATCH', '/api/workspaces/:id', async ({ params, body }) => {
 			return this.workspacesService.updateWorkspace(params.id, body);
 		});
