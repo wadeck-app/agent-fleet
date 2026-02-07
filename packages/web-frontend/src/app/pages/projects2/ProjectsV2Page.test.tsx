@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
+import { ToastProvider } from '@framework/features/toast/ToastContext';
 import type { Project } from '@shared/api/projects.contract';
 import type { Workspace } from '@shared/api/workspaces.contract';
 import { act, render, screen, waitFor } from '@testing-library/react';
@@ -35,12 +36,14 @@ const wrapper = ({ children, initialUrl = '/' }: { children: ReactNode; initialU
 	};
 
 	return (
-		<MemoryRouter initialEntries={[initialUrl]}>
-			<LocationTracker />
-			<Routes>
-				<Route path="/" element={<div>{children}</div>} />
-			</Routes>
-		</MemoryRouter>
+		<ToastProvider>
+			<MemoryRouter initialEntries={[initialUrl]}>
+				<LocationTracker />
+				<Routes>
+					<Route path="/" element={<div>{children}</div>} />
+				</Routes>
+			</MemoryRouter>
+		</ToastProvider>
 	);
 };
 

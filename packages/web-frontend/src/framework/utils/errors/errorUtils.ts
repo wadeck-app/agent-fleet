@@ -51,6 +51,13 @@ export function getErrorMessage(err: unknown): string {
 		}
 		return err;
 	}
+	// Handle plain objects with message property (e.g., TransportError)
+	if (typeof err === 'object' && err !== null && 'message' in err) {
+		const message = (err as { message: unknown }).message;
+		if (typeof message === 'string') {
+			return message;
+		}
+	}
 	return 'An unknown error occurred';
 }
 

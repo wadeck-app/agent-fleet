@@ -1,8 +1,7 @@
+import type { ItemActions } from '@framework/components2/list/EditableListField';
+import { RemoveItemButton } from '@framework/components2/list/RemoveItemButton';
 import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
-import { Button } from '@framework/components/primitives/Button';
-import type { ItemActions } from '@framework/components2/list/EditableListField';
-import { Trash2 } from 'lucide-react';
 
 /**
  * ===========================================================================================
@@ -71,9 +70,7 @@ export function KeyValueItemRenderer({ item, actions }: KeyValueItemRendererProp
 			</div>
 
 			<div className="flex items-end">
-				<Button type="button" variant="ghost" size="icon-sm" onClick={actions.remove} title="Remove">
-					<Trash2 className="size-4 text-destructive" />
-				</Button>
+				<RemoveItemButton onRemove={actions.remove} title="Remove variable" />
 			</div>
 		</div>
 	);

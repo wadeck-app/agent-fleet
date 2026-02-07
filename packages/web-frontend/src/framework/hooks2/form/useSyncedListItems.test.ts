@@ -134,7 +134,7 @@ describe('useSyncedListItems', () => {
 		it('should sync when items are reordered', () => {
 			const onSync = vi.fn();
 			const { result } = renderHook(() =>
-				useSyncedListItems<TestItem>({
+				useSyncedListItems<TestItem, string[]>({
 					initialItems: [
 						{ key: 'first', value: '1' },
 						{ key: 'second', value: '2' },

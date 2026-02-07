@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 
+import { EditableListField } from '@framework/components2/list/EditableListField';
+import { type KeyValueItem, KeyValueItemRenderer } from '@framework/components2/list/renderers/KeyValueItemRenderer';
+import { type OutputItem, OutputItemRenderer } from '@framework/components2/list/renderers/OutputItemRenderer';
 import { Checkbox } from '@framework/components/forms/Checkbox';
 import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
@@ -19,26 +22,23 @@ import {
 } from '@framework/components/overlays/AlertDialog';
 import { Button } from '@framework/components/primitives/Button';
 import { Separator } from '@framework/components/primitives/Separator';
-import { EditableListField } from '@framework/components2/list/EditableListField';
-import {
-	KeyValueItemRenderer,
-	type KeyValueItem,
-} from '@framework/components2/list/renderers/KeyValueItemRenderer';
-import {
-	OutputItemRenderer,
-	type OutputItem,
-} from '@framework/components2/list/renderers/OutputItemRenderer';
-import { useListItems } from '@framework/hooks2/useListItems';
+import { useListItems } from '@framework/hooks2/form/useListItems';
 import type { ValidationIssue } from 'flow-engine/validation/ValidationTypes';
 import { AlertCircle, AlertTriangle, ChevronDown, Info, Trash2 } from 'lucide-react';
 
 import type { ConstantNodeData } from './nodes/ConstantNode';
 import type { FlowNode } from './types';
+import { isConstantNodeData, isStepNodeData } from './types';
 import type { FlowStep } from './types/flow-engine.types';
+
+/**
+ * Update data type - can be either FlowStep updates or ConstantNodeData updates
+ */
+type NodeUpdateData = Partial<FlowStep> | ConstantNodeData;
 
 interface FlowEditorPropertiesPanelProps {
 	selectedNode: FlowNode | null;
-	onUpdateNode: (nodeId: string, updates: Partial<FlowStep>) => void;
+	onUpdateNode: (nodeId: string, updates: NodeUpdateData) => void;
 	onDeleteNode: (nodeId: string) => void;
 }
 
@@ -114,8 +114,8 @@ export function FlowEditorPropertiesPanel({
 	}
 
 	// Handle constant nodes (UI-only, different data structure)
-	if (selectedNode.type === 'constant') {
-		const constantData = selectedNode.data as unknown as ConstantNodeData;
+	if (selectedNode.type === 'constant' && isConstantNodeData(selectedNode.data)) {
+		const constantData = selectedNode.data;
 		return (
 			<div className="w-96 overflow-auto border-l bg-card">
 				<div className="space-y-4 p-4">
@@ -137,8 +137,7 @@ export function FlowEditorPropertiesPanel({
 							onChange={e => {
 								// Update constant node data
 								const newData: ConstantNodeData = { ...constantData, label: e.target.value };
-								// Note: This requires special handling in useFlowEditor
-								onUpdateNode(selectedNode.id, newData as unknown as Partial<FlowStep>);
+								onUpdateNode(selectedNode.id, newData);
 							}}
 							placeholder="Optional label"
 						/>
@@ -170,7 +169,7 @@ export function FlowEditorPropertiesPanel({
 									}
 								}
 								const newData: ConstantNodeData = { ...constantData, value: newValue };
-								onUpdateNode(selectedNode.id, newData as unknown as Partial<FlowStep>);
+								onUpdateNode(selectedNode.id, newData);
 							}}
 							rows={4}
 							placeholder={`Enter ${constantData.type} value`}
@@ -212,15 +211,27 @@ export function FlowEditorPropertiesPanel({
 		);
 	}
 
+	// Type guard to ensure we have StepNodeData after constant check
+	if (!isStepNodeData(selectedNode.data)) {
+		return (
+			<div className="w-96 overflow-auto border-l bg-card">
+				<div className="space-y-4 p-4">
+					<div className="text-destructive">Invalid node data structure</div>
+				</div>
+			</div>
+		);
+	}
+
 	const step = selectedNode.data.step;
 
 	const handleUpdate = (field: string, value: string) => {
 		onUpdateNode(selectedNode.id, { [field]: value } as Partial<FlowStep>);
 	};
 
-	// Environment variables list management
+	// Environment variables list management (only for script steps)
+	const stepEnv = step.type === 'script' && 'env' in step ? step.env : undefined;
 	const envItems = useListItems<KeyValueItem>({
-		initialItems: Object.entries(step.env || {}).map(([key, value]) => ({
+		initialItems: Object.entries(stepEnv || {}).map(([key, value]) => ({
 			key,
 			value: String(value),
 		})),
@@ -229,11 +240,14 @@ export function FlowEditorPropertiesPanel({
 
 	// Sync env items back to step data (only when items change, not on mount)
 	useEffect(() => {
+		// Only sync for script steps
+		if (step.type !== 'script') return;
+
 		const envObj = Object.fromEntries(
 			envItems.fstate.items.filter(item => item.key.trim()).map(item => [item.key, item.value])
 		);
 		// Only update if changed to avoid infinite loop
-		const currentEnv = step.env || {};
+		const currentEnv = step.type === 'script' && 'env' in step ? step.env || {} : {};
 		const isDifferent =
 			Object.keys(envObj).length !== Object.keys(currentEnv).length ||
 			Object.entries(envObj).some(([k, v]) => currentEnv[k] !== v);
@@ -241,7 +255,7 @@ export function FlowEditorPropertiesPanel({
 			onUpdateNode(selectedNode.id, { env: envObj } as Partial<FlowStep>);
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [envItems.fstate.items]);
+	}, [envItems.fstate.items, step.type]);
 
 	// Output configuration list management
 	const outputItems = useListItems<OutputItem>({
@@ -321,66 +335,70 @@ export function FlowEditorPropertiesPanel({
 					<>
 						<div className="space-y-4">
 							{/* Inputs */}
-							{selectedNode.data.inputPorts && selectedNode.data.inputPorts.length > 0 && (
-								<div className="space-y-2">
-									<Label className="text-sm font-semibold">Inputs</Label>
-									<div className="space-y-2 rounded-md border bg-muted/30 p-3">
-										{selectedNode.data.inputPorts.map(port => (
-											<div
-												key={port.id}
-												className="flex items-center justify-between gap-2 text-sm"
-											>
-												<div className="flex min-w-0 flex-1 items-center gap-2">
-													<span className="truncate font-mono text-xs">{port.name}</span>
-													{port.uncertain && (
-														<AlertTriangle className="size-3 flex-shrink-0 text-warning" />
-													)}
-												</div>
-												<span
-													className={`
+							{selectedNode.data.inputPorts &&
+								Array.isArray(selectedNode.data.inputPorts) &&
+								selectedNode.data.inputPorts.length > 0 && (
+									<div className="space-y-2">
+										<Label className="text-sm font-semibold">Inputs</Label>
+										<div className="space-y-2 rounded-md border bg-muted/30 p-3">
+											{selectedNode.data.inputPorts.map(port => (
+												<div
+													key={port.id}
+													className="flex items-center justify-between gap-2 text-sm"
+												>
+													<div className="flex min-w-0 flex-1 items-center gap-2">
+														<span className="truncate font-mono text-xs">{port.name}</span>
+														{port.uncertain && (
+															<AlertTriangle className="size-3 flex-shrink-0 text-warning" />
+														)}
+													</div>
+													<span
+														className={`
                flex-shrink-0 rounded bg-background px-2 py-0.5 font-mono text-xs
                text-muted-foreground
              `}
-												>
-													{port.type}
-												</span>
-											</div>
-										))}
+													>
+														{port.type}
+													</span>
+												</div>
+											))}
+										</div>
 									</div>
-								</div>
-							)}
+								)}
 
 							{/* Outputs */}
-							{selectedNode.data.outputPorts && selectedNode.data.outputPorts.length > 0 && (
-								<div className="space-y-2">
-									<Label className="text-sm font-semibold">Outputs</Label>
-									<div className="space-y-2 rounded-md border bg-muted/30 p-3">
-										{selectedNode.data.outputPorts.map(port => (
-											<div
-												key={port.id}
-												className="flex items-center justify-between gap-2 text-sm"
-											>
-												<div className="flex min-w-0 flex-1 items-center gap-2">
-													<span className="truncate font-mono text-xs">{port.name}</span>
-													{port.required && (
-														<span className="flex-shrink-0 text-xs text-destructive">
-															*
-														</span>
-													)}
-												</div>
-												<span
-													className={`
+							{selectedNode.data.outputPorts &&
+								Array.isArray(selectedNode.data.outputPorts) &&
+								selectedNode.data.outputPorts.length > 0 && (
+									<div className="space-y-2">
+										<Label className="text-sm font-semibold">Outputs</Label>
+										<div className="space-y-2 rounded-md border bg-muted/30 p-3">
+											{selectedNode.data.outputPorts.map(port => (
+												<div
+													key={port.id}
+													className="flex items-center justify-between gap-2 text-sm"
+												>
+													<div className="flex min-w-0 flex-1 items-center gap-2">
+														<span className="truncate font-mono text-xs">{port.name}</span>
+														{port.required && (
+															<span className="flex-shrink-0 text-xs text-destructive">
+																*
+															</span>
+														)}
+													</div>
+													<span
+														className={`
                flex-shrink-0 rounded bg-background px-2 py-0.5 font-mono text-xs
                text-muted-foreground
              `}
-												>
-													{port.type}
-												</span>
-											</div>
-										))}
+													>
+														{port.type}
+													</span>
+												</div>
+											))}
+										</div>
 									</div>
-								</div>
-							)}
+								)}
 						</div>
 
 						<Separator />
@@ -420,9 +438,10 @@ export function FlowEditorPropertiesPanel({
 								Template with variable interpolation support
 							</p>
 							<FieldValidationMessage
-								issues={selectedNode.data.validationIssues.filter(
-									issue => issue.location?.field === 'prompt'
-								)}
+								issues={(Array.isArray(selectedNode.data.validationIssues)
+									? selectedNode.data.validationIssues
+									: []
+								).filter(issue => issue.location?.field === 'prompt')}
 							/>
 						</div>
 					</>
@@ -442,9 +461,10 @@ export function FlowEditorPropertiesPanel({
 							/>
 							<p className="text-xs text-muted-foreground">Shell script or command to execute</p>
 							<FieldValidationMessage
-								issues={selectedNode.data.validationIssues.filter(
-									issue => issue.location?.field === 'script'
-								)}
+								issues={(Array.isArray(selectedNode.data.validationIssues)
+									? selectedNode.data.validationIssues
+									: []
+								).filter(issue => issue.location?.field === 'script')}
 							/>
 						</div>
 
@@ -462,7 +482,9 @@ export function FlowEditorPropertiesPanel({
 							label="Environment Variables"
 							description="Environment variables to set for script execution"
 							items={envItems}
-							renderItem={(item, _index, actions) => <KeyValueItemRenderer item={item} actions={actions} />}
+							renderItem={(item, _index, actions) => (
+								<KeyValueItemRenderer item={item} actions={actions} />
+							)}
 							createDefault={() => ({ key: '', value: '' })}
 							addButtonLabel="Add Variable"
 							emptyMessage="No environment variables defined"
@@ -503,9 +525,10 @@ export function FlowEditorPropertiesPanel({
 							/>
 							<p className="text-xs text-muted-foreground">Template inputs to pass to the subflow</p>
 							<FieldValidationMessage
-								issues={selectedNode.data.validationIssues.filter(
-									issue => issue.location?.field === 'inputs'
-								)}
+								issues={(Array.isArray(selectedNode.data.validationIssues)
+									? selectedNode.data.validationIssues
+									: []
+								).filter(issue => issue.location?.field === 'inputs')}
 							/>
 						</div>
 
@@ -637,9 +660,10 @@ export function FlowEditorPropertiesPanel({
 										placeholder="e.g., Approve Deployment to Production"
 									/>
 									<FieldValidationMessage
-										issues={selectedNode.data.validationIssues.filter(
-											issue => issue.location?.field === 'approval.title'
-										)}
+										issues={(Array.isArray(selectedNode.data.validationIssues)
+											? selectedNode.data.validationIssues
+											: []
+										).filter(issue => issue.location?.field === 'approval.title')}
 									/>
 								</div>
 
@@ -692,9 +716,10 @@ export function FlowEditorPropertiesPanel({
 										placeholder="Enter your question here"
 									/>
 									<FieldValidationMessage
-										issues={selectedNode.data.validationIssues.filter(
-											issue => issue.location?.field === 'question.question'
-										)}
+										issues={(Array.isArray(selectedNode.data.validationIssues)
+											? selectedNode.data.validationIssues
+											: []
+										).filter(issue => issue.location?.field === 'question.question')}
 									/>
 								</div>
 
@@ -741,9 +766,10 @@ export function FlowEditorPropertiesPanel({
 										placeholder="What would you like the user to choose?"
 									/>
 									<FieldValidationMessage
-										issues={selectedNode.data.validationIssues.filter(
-											issue => issue.location?.field === 'choice.question'
-										)}
+										issues={(Array.isArray(selectedNode.data.validationIssues)
+											? selectedNode.data.validationIssues
+											: []
+										).filter(issue => issue.location?.field === 'choice.question')}
 									/>
 								</div>
 
@@ -770,9 +796,10 @@ export function FlowEditorPropertiesPanel({
 										Array of options with id, label, and optional description
 									</p>
 									<FieldValidationMessage
-										issues={selectedNode.data.validationIssues.filter(
-											issue => issue.location?.field === 'choice.options'
-										)}
+										issues={(Array.isArray(selectedNode.data.validationIssues)
+											? selectedNode.data.validationIssues
+											: []
+										).filter(issue => issue.location?.field === 'choice.options')}
 									/>
 								</div>
 
@@ -830,9 +857,10 @@ export function FlowEditorPropertiesPanel({
 									JavaScript expression for conditional execution
 								</p>
 								<FieldValidationMessage
-									issues={selectedNode.data.validationIssues.filter(
-										issue => issue.location?.field === 'when'
-									)}
+									issues={(Array.isArray(selectedNode.data.validationIssues)
+										? selectedNode.data.validationIssues
+										: []
+									).filter(issue => issue.location?.field === 'when')}
 								/>
 							</div>
 
@@ -840,8 +868,10 @@ export function FlowEditorPropertiesPanel({
 								label="Output Configuration"
 								description="Define output variable extraction and transformation"
 								items={outputItems}
-								renderItem={(item, _index, actions) => <OutputItemRenderer item={item} actions={actions} />}
-								createDefault={() => ({ name: '', type: 'string' })}
+								renderItem={(item, _index, actions) => (
+									<OutputItemRenderer item={item} actions={actions} />
+								)}
+								createDefault={() => ({ name: '', type: 'string' as OutputItem['type'] })}
 								addButtonLabel="Add Output Variable"
 								emptyMessage="No output variables defined"
 								getItemId={(item, index) => item.name || `output-${index}`}

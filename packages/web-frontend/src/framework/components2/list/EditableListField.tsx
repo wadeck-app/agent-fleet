@@ -1,20 +1,12 @@
 import type { ReactNode } from 'react';
 
-import {
-	DndContext,
-	type DragEndEvent,
-	KeyboardSensor,
-	PointerSensor,
-	closestCenter,
-	useSensor,
-	useSensors,
-} from '@dnd-kit/core';
-import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { DndContext, closestCenter } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Label } from '@framework/components/forms/Label';
-import { Button } from '@framework/components/primitives/Button';
-import type { ListItemsContract } from '@framework/hooks2/useListItems';
-import { Plus } from 'lucide-react';
+import { useDragAndDrop } from '@framework/hooks2/form/useDragAndDrop';
+import type { ListItemsContract } from '@framework/hooks2/form/useListItems';
 
+import { AddButton } from './AddButton';
 import { SortableItem } from './SortableItem';
 
 /**
@@ -128,26 +120,14 @@ export function EditableListField<T>({
 	// Default getItemId function falls back to index
 	const resolveItemId = getItemId || ((_item: T, index: number) => index);
 
-	// Setup dnd-kit sensors for drag & drop
-	const sensors = useSensors(
-		useSensor(PointerSensor, {
-			activationConstraint: {
-				distance: 8, // Require 8px movement before drag starts (prevents accidental drags)
-			},
-		}),
-		useSensor(KeyboardSensor, {
-			coordinateGetter: sortableKeyboardCoordinates,
-		})
-	);
-
-	const handleDragEnd = (event: DragEndEvent) => {
-		const { active, over } = event;
-		if (over && active.id !== over.id) {
-			const fromIndex = fstate.items.findIndex((item, i) => resolveItemId(item, i) === active.id);
-			const toIndex = fstate.items.findIndex((item, i) => resolveItemId(item, i) === over.id);
-			actions.reorder(fromIndex, toIndex);
-		}
-	};
+	// Setup drag & drop functionality
+	const dnd = useDragAndDrop({
+		items: fstate.items,
+		getItemId: resolveItemId,
+		onReorder: actions.reorder,
+		disabled: !enableReordering,
+		activationConstraint: { distance: 8 },
+	});
 
 	const handleAddItem = () => {
 		if (fstate.canAdd) {
@@ -167,21 +147,17 @@ export function EditableListField<T>({
 
 			{/* Items List or Empty State */}
 			{fstate.isEmpty ? (
-				<div className="rounded-md border border-dashed bg-muted/30 p-8 text-center">
-					{renderEmpty ? (
-						renderEmpty()
-					) : (
-						<p className="text-sm text-muted-foreground">{emptyMessage}</p>
-					)}
+				<div className="rounded-md border border-dashed bg-muted/30 px-8 py-4 text-center">
+					{renderEmpty ? renderEmpty() : <p className="text-sm text-muted-foreground">{emptyMessage}</p>}
 				</div>
 			) : (
 				<DndContext
-					sensors={enableReordering ? sensors : undefined}
+					sensors={enableReordering ? dnd.sensors : undefined}
 					collisionDetection={closestCenter}
-					onDragEnd={handleDragEnd}
+					onDragEnd={dnd.handleDragEnd}
 				>
 					<SortableContext
-						items={fstate.items.map((item, i) => resolveItemId(item, i))}
+						items={dnd.sortableIds}
 						strategy={verticalListSortingStrategy}
 						disabled={!enableReordering}
 					>
@@ -203,18 +179,9 @@ export function EditableListField<T>({
 			)}
 
 			{/* Add Button */}
-			<div className="mt-3">
-				<Button
-					type="button"
-					variant="outline"
-					size="sm"
-					onClick={handleAddItem}
-					disabled={!fstate.canAdd}
-				>
-					<Plus className="size-4" />
-					{addButtonLabel}
-				</Button>
-			</div>
+			<AddButton onClick={handleAddItem} disabled={!fstate.canAdd}>
+				{addButtonLabel}
+			</AddButton>
 
 			{/* Error Message */}
 			{error && <p className="mt-2 text-xs text-destructive">{error}</p>}

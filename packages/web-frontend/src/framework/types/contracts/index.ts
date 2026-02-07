@@ -40,3 +40,7 @@ export type {
 	CacheControlQuery,
 	CacheControlContract,
 } from './CacheControlContract';
+
+export type { FeatureFormContract, FeatureFormState } from './FeatureFormContract';
+
+export type { FeatureDataContract, FeatureDataState } from './FeatureDataContract';

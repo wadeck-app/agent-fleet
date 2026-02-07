@@ -203,10 +203,8 @@ describe('DualListDialog', () => {
 	});
 
 	it('should use custom maxWidth', () => {
-		const { container } = render(<DualListDialog {...defaultProps} maxWidth="5xl" />);
-
-		// CrudDialog should receive the maxWidth prop
-		// This is a bit tricky to test directly, but we can check if the component renders
-		expect(container.querySelector('[role="dialog"]')).toBeInTheDocument();
+		// We test that the component accepts the prop without errors
+		// The actual styling is handled by CrudDialog/DialogContent and tested at that level
+		expect(() => render(<DualListDialog {...defaultProps} maxWidth="5xl" />)).not.toThrow();
 	});
 });

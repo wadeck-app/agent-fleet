@@ -5382,3 +5382,71 @@ await user.paste('a'.repeat(501));
 - Tests expect validation errors but they don't appear
 - Form submission seems blocked without error feedback
 - Using TextField/Input with `required` prop
+
+## EditableListField Refactoring - Architecture Patterns
+
+### FeatureFormContract vs FeatureContract (FeatureDataContract)
+
+- **FeatureContract** (aliased as `FeatureDataContract`): For data-fetching hooks that interact with backend queries. Includes `fillQuery`.
+- **FeatureFormContract**: For form hooks managing local state only. No `fillQuery` - purely local state management.
+- Examples: `useListItems`, `useSyncedListItems` use `FeatureFormContract`; `usePagination2`, `useSorting2` use `FeatureContract`.
+
+### hooks2/ Organization
+
+Required subfolders: `form/`, `data/`, `utility/`. Tests colocated next to implementation. No barrel `index.ts` files - always import directly from source files.
+
+### React Hooks in Tests: useMemoCache Issue
+
+**Problem**: Hooks using React Compiler's `useMemoCache` fail when called outside React render cycle.
+
+```typescript
+// ❌ FAILS - hook called outside component
+it('test', () => {
+  const items = useListItems(); // TypeError: Cannot read 'useMemoCache'
+  render(<Component items={items} />);
+});
+
+// ✅ WORKS - hook called inside component
+function TestWrapper(props) {
+  const items = useListItems(props.hookOptions);
+  return <Component items={items} {...props.fieldProps} />;
+}
+it('test', () => {
+  render(<TestWrapper fieldProps={{...}} />);
+});
+```
+
+### Controlled Component Tests: Don't Assert Final Value
+
+**Problem**: When testing controlled components with mock actions, `user.clear()` + `user.type()` doesn't update the actual input value (since props don't change). The last mock call won't have the expected full string.
+
+```typescript
+// ❌ FAILS - controlled input doesn't update, final value is wrong
+await user.clear(input);
+await user.type(input, 'NEW_VALUE');
+expect(mockUpdate).toHaveBeenCalledWith({ key: 'NEW_VALUE' }); // Fails
+
+// ✅ WORKS - verify the property key was updated
+await user.clear(input);
+expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ key: expect.any(String) }));
+```
+
+### Reusable Components Extraction
+
+Extracted shared UI patterns into reusable components:
+
+- `DragHandle` - GripVertical icon button for dnd-kit drag handles
+- `RemoveItemButton` - Trash2 icon button with ghost variant
+- `AddButton` - Plus icon button with dashed border outline
+
+When using `RemoveItemButton`, pass a specific `title` prop per context (e.g., "Remove output", "Remove variable") for better accessibility.
+
+### Storybook: Stories with Custom Render
+
+When stories use custom `render` functions instead of `args`, TypeScript requires `as unknown as Story` cast:
+
+```typescript
+export const MyStory = ({
+  render: () => <Component ... />
+}) as unknown as Story;
+```

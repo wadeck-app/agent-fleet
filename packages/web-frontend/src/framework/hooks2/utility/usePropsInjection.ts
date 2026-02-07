@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
 
-import type { FilterContract } from '@framework/hooks2/useCategoryFilter2';
-import type { UseDataFetchState } from '@framework/hooks2/useDataFetch';
-import type { MultiSelectContract } from '@framework/hooks2/useMultiSelect2';
-import type { PaginationContract } from '@framework/hooks2/usePagination2';
-import type { SortingContract } from '@framework/hooks2/useSorting2';
+import type { FilterContract } from '@framework/hooks2/data/useCategoryFilter2';
+import type { UseDataFetchState } from '@framework/hooks2/data/useDataFetch';
+import type { PaginationContract } from '@framework/hooks2/data/usePagination2';
+import type { SortingContract } from '@framework/hooks2/data/useSorting2';
+import type { MultiSelectContract } from '@framework/hooks2/utility/useMultiSelect2';
 import type { QueryResultDisplayerProps } from '@framework/types/QueryResultDisplayerContract';
 import type { SearchContract } from '@framework/types/contracts/SearchContract';
 

@@ -178,7 +178,13 @@ export function useUrlState<T>({
 		const shouldCleanup = cleanupDefault && state === defaultValue;
 
 		// Determine what the new URL value should be
-		const newUrlValue = shouldCleanup ? null : serialize(state);
+		let newUrlValue: string | null;
+		try {
+			newUrlValue = shouldCleanup ? null : serialize(state);
+		} catch (error) {
+			console.error(`[useUrlState] Failed to serialize value for param ${paramName}:`, error);
+			return;
+		}
 
 		// CRITICAL: Don't write if value hasn't changed from what we last synced
 		// This prevents re-triggering flushes with stale values after Listen effects run
@@ -186,19 +192,12 @@ export function useUrlState<T>({
 			return;
 		}
 
-		// CRITICAL: Check current URL AND pendingUpdates to prevent stale writes
+		// CRITICAL: Check current URL to prevent unnecessary writes
 		const currentUrlValue = searchParamsRef.current.get(paramName);
-		const pendingValue = pendingUpdates.get(paramName);
 
 		// If URL already has this exact value, don't write
 		if (currentUrlValue === newUrlValue) {
 			lastSyncedUrlValue.current = newUrlValue;
-			return;
-		}
-
-		// CRITICAL: If pendingUpdates already has a value queued, don't overwrite it
-		// This prevents stale closures from overwriting newer values
-		if (pendingValue !== undefined && pendingValue !== newUrlValue) {
 			return;
 		}
 

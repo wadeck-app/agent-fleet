@@ -135,14 +135,12 @@ describe('WebSocketTransportClient - Component Subscriptions', () => {
 
 		it('should not send message when not connected', () => {
 			// Client not connected
-			const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+			const mockWs = MockWebSocket.getLastInstance();
 
 			client.setComponentSubscriptionState('TasksPage', [{ event: 'b2f:task:created' }]);
 
-			// Should log queuing message
-			expect(consoleSpy).toHaveBeenCalledWith('[WS] Queuing subscription state sync (not connected yet)');
-
-			consoleSpy.mockRestore();
+			// Should not send any messages (silently queued)
+			expect(mockWs?.sentMessages || []).toHaveLength(0);
 		});
 
 		it('should merge subscriptions from multiple components', async () => {

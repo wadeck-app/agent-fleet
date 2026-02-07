@@ -14,13 +14,13 @@ describe('useListItems', () => {
 	});
 
 	describe('contract shape', () => {
-		it('should return correct FeatureContract shape', () => {
+		it('should return correct FeatureFormContract shape', () => {
 			const { result } = renderHook(() => useListItems<TestItem>());
 
 			expect(result.current).toHaveProperty('fstate');
 			expect(result.current).toHaveProperty('actions');
-			expect(result.current).toHaveProperty('fillQuery');
-			expect(typeof result.current.fillQuery).toBe('function');
+			// FeatureFormContract does NOT have fillQuery (form-only hooks)
+			expect(result.current).not.toHaveProperty('fillQuery');
 		});
 
 		it('should have correct fstate shape', () => {
@@ -368,17 +368,6 @@ describe('useListItems', () => {
 			});
 
 			expect(result.current.fstate.isEmpty).toBe(false);
-		});
-	});
-
-	describe('fillQuery', () => {
-		it('should be a no-op function', () => {
-			const { result } = renderHook(() => useListItems<TestItem>());
-
-			const query = { existing: 'value' };
-			result.current.fillQuery(query);
-
-			expect(query).toEqual({ existing: 'value' });
 		});
 	});
 });

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
 
-import { KeyValueItemRenderer, type KeyValueItem } from './KeyValueItemRenderer';
+import { type KeyValueItem, KeyValueItemRenderer } from './KeyValueItemRenderer';
 
 /**
  * KeyValueItemRenderer stories demonstrating the key-value pair editor.
@@ -91,7 +91,7 @@ export const WithSpecialCharacters: Story = {
  * Multiple items showcase.
  * Shows how multiple renderers look when stacked.
  */
-export const MultipleItems: Story = {
+export const MultipleItems = {
 	render: () => {
 		const items: KeyValueItem[] = [
 			{ key: 'NODE_ENV', value: 'production' },
@@ -114,4 +114,4 @@ export const MultipleItems: Story = {
 			</div>
 		);
 	},
-};
+} as unknown as Story;

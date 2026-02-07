@@ -59,7 +59,8 @@ export function FlowDiffViewer({ lines, summary }: FlowDiffViewerProps) {
 						className={cn(
 							'flex gap-2 border-l-2 px-3 py-0.5',
 							line.type === 'added' && 'border-success bg-success/10 text-success',
-							line.type === 'removed' && `border-destructive bg-destructive/10 text-destructive line-through`,
+							line.type === 'removed' &&
+								`border-destructive bg-destructive/10 text-destructive line-through`,
 							line.type === 'modified' && 'border-warning bg-muted/10',
 							line.type === 'unchanged' && 'border-transparent text-muted-foreground'
 						)}

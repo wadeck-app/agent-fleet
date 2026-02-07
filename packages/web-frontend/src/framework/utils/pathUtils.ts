@@ -33,6 +33,6 @@ export function getBasename(path: string): string {
 	// Split by both forward slash and backslash, filter out empty strings
 	const segments = path.split(/[/\\]/).filter(Boolean);
 
-	// Return the last segment, or the original path if no segments found
-	return segments.length > 0 ? segments[segments.length - 1] : path;
+	// Return the last segment, or empty string if no segments found (path was only separators)
+	return segments.length > 0 ? segments[segments.length - 1] : '';
 }

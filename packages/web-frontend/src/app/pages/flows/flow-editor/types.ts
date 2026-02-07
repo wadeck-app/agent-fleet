@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { ValidationIssue } from 'flow-engine/validation/ValidationTypes';
 
+import type { ConstantNodeData } from './nodes/ConstantNode';
 import type { FlowDefinition, FlowStep, VariableType } from './types/flow-engine.types';
 import type { VariablePort } from './utils/VariableExtractor';
 
@@ -37,9 +38,29 @@ export interface EdgeData extends Record<string, unknown> {
 }
 
 /**
- * Node type with our custom data
+ * Union type for all possible node data types
  */
-export type FlowNode = Node<StepNodeData, string | undefined>;
+export type FlowNodeData = StepNodeData | ConstantNodeData;
+
+/**
+ * Type guard to check if node data is StepNodeData
+ */
+export function isStepNodeData(data: FlowNodeData): data is StepNodeData {
+	return 'step' in data;
+}
+
+/**
+ * Type guard to check if node data is ConstantNodeData
+ */
+export function isConstantNodeData(data: FlowNodeData): data is ConstantNodeData {
+	return 'value' in data && 'type' in data && !('step' in data);
+}
+
+/**
+ * Node type with our custom data.
+ * Supports both step nodes (FlowStep) and constant nodes (ConstantNodeData).
+ */
+export type FlowNode = Node<FlowNodeData, string | undefined>;
 
 /**
  * Edge type with our custom data

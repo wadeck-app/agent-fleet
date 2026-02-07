@@ -1,13 +1,13 @@
 import { type ReactElement, type ReactNode, cloneElement } from 'react';
 
 import { LoadingDots } from '@framework/components/loading/LoadingDots';
-import type { FilterContract } from '@framework/hooks2/useCategoryFilter2';
-import { type FetchDataResult, useDataFetch } from '@framework/hooks2/useDataFetch';
-import type { MultiSelectContract } from '@framework/hooks2/useMultiSelect2';
-import type { PaginationContract } from '@framework/hooks2/usePagination2';
-import { usePropsInjection } from '@framework/hooks2/usePropsInjection';
-import { useQueryComposition } from '@framework/hooks2/useQueryComposition';
-import type { SortingContract } from '@framework/hooks2/useSorting2';
+import type { FilterContract } from '@framework/hooks2/data/useCategoryFilter2';
+import { type FetchDataResult, useDataFetch } from '@framework/hooks2/data/useDataFetch';
+import type { PaginationContract } from '@framework/hooks2/data/usePagination2';
+import { useQueryComposition } from '@framework/hooks2/data/useQueryComposition';
+import type { SortingContract } from '@framework/hooks2/data/useSorting2';
+import type { MultiSelectContract } from '@framework/hooks2/utility/useMultiSelect2';
+import { usePropsInjection } from '@framework/hooks2/utility/usePropsInjection';
 import type { FeatureContract } from '@framework/types/FeatureContract';
 import type { MutationContract } from '@framework/types/MutationContract';
 import type { QueryResultDisplayerProps } from '@framework/types/QueryResultDisplayerContract';

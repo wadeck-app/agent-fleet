@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
 
-import { OutputItemRenderer, type OutputItem } from './OutputItemRenderer';
+import { type OutputItem, OutputItemRenderer } from './OutputItemRenderer';
 
 /**
  * OutputItemRenderer stories demonstrating the output configuration editor.
@@ -133,7 +133,7 @@ export const WithPattern: Story = {
  * Showcase all 5 output types.
  * Demonstrates how different types look when rendered.
  */
-export const AllTypes: Story = {
+export const AllTypes = {
 	render: () => {
 		const items: OutputItem[] = [
 			{ name: 'message', type: 'string', pattern: 'Result: (.*)' },
@@ -158,7 +158,7 @@ export const AllTypes: Story = {
 			</div>
 		);
 	},
-};
+} as unknown as Story;
 
 /**
  * Empty state for new output.

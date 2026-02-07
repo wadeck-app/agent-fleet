@@ -38,7 +38,7 @@ describe('App - Theme Integration', () => {
 
 	it('should render user menu in navigation', () => {
 		render(<App />);
-		const userMenuButton = screen.getByText('User');
+		const userMenuButton = screen.getByRole('button', { name: 'User menu' });
 		expect(userMenuButton).toBeInTheDocument();
 	});
 

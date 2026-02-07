@@ -6,10 +6,10 @@ import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { Pagination } from '@framework/components/pagination/Pagination';
 import { SearchBar } from '@framework/features/search/SearchBar';
-import { useCacheControl2 } from '@framework/hooks2/useCacheControl2';
-import { usePagination2 } from '@framework/hooks2/usePagination2';
-import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
-import { useSorting2 } from '@framework/hooks2/useSorting2';
+import { useCacheControl2 } from '@framework/hooks2/data/useCacheControl2';
+import { usePagination2 } from '@framework/hooks2/data/usePagination2';
+import { useSimpleSearch } from '@framework/hooks2/data/useSimpleSearch';
+import { useSorting2 } from '@framework/hooks2/data/useSorting2';
 import type { InterventionsQuery } from '@shared/api/interventions.contract';
 import { B2F_INTERVENTIONS_UPDATED, B2F_INTERVENTION_CREATED } from '@shared/transport';
 

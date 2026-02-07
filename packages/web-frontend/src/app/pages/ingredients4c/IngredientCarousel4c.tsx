@@ -44,7 +44,7 @@ import type { Table2Column } from '@framework/components2/table/Table2';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
 import { Button } from '@framework/components/primitives/Button';
 import { Card, CardContent, CardFooter, CardHeader } from '@framework/components/primitives/Card';
-import type { SortingContract } from '@framework/hooks2/useSorting2';
+import type { SortingContract } from '@framework/hooks2/data/useSorting2';
 import { cn } from '@framework/lib/utils';
 import { formatDate } from '@framework/utils/formatting/DateFormat';
 import type { Ingredient } from '@shared/api/ingredients.contract';

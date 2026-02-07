@@ -6,11 +6,11 @@ import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { Button } from '@framework/components/primitives/Button';
 import { SearchBar } from '@framework/features/search/SearchBar';
-import { useCacheControl2 } from '@framework/hooks2/useCacheControl2';
-import { useDebounce } from '@framework/hooks2/useDebounce';
-import { usePagination2 } from '@framework/hooks2/usePagination2';
-import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
-import { useSorting2 } from '@framework/hooks2/useSorting2';
+import { useCacheControl2 } from '@framework/hooks2/data/useCacheControl2';
+import { usePagination2 } from '@framework/hooks2/data/usePagination2';
+import { useSimpleSearch } from '@framework/hooks2/data/useSimpleSearch';
+import { useSorting2 } from '@framework/hooks2/data/useSorting2';
+import { useDebounce } from '@framework/hooks2/utility/useDebounce';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
 import {
 	B2F_PROJECT_DELETED,

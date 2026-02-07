@@ -9,6 +9,7 @@ Ce plan adresse 15 problèmes architecturaux identifiés dans l'implémentation 
 ## Contexte
 
 L'implémentation EditableListField (complétée précédemment) présente des incohérences avec les conventions architecturales du projet. Ce plan couvre les corrections nécessaires pour:
+
 - Respecter les patterns établis (contracts, exports, organisation)
 - Améliorer la réutilisabilité (extraction de features communes)
 - Corriger les erreurs TypeScript dans flow-editor
@@ -18,7 +19,8 @@ L'implémentation EditableListField (complétée précédemment) présente des i
 
 ## Corrections Identifiées (15 items)
 
-### 1. **__test-imports__.ts Non Conforme** ⚠️ CRITIQUE
+### 1. \***\*test-imports**.ts Non Conforme\*\* ⚠️ CRITIQUE
+
 **Problème**: Le fichier ne suit pas les conventions de test du projet
 **Convention**: Tests nommés `[FileName].test.ts`, helpers dans `framework/test-utils/`
 **Action**: Supprimer ou renommer selon usage réel
@@ -26,17 +28,21 @@ L'implémentation EditableListField (complétée précédemment) présente des i
 ---
 
 ### 2. **useEffect avec Dépendances Dangereuses** ⚠️ CRITIQUE
+
 **Problème**: Risques de boucles infinies
 **Fichiers à vérifier**:
+
 - `FlowSettingsDialog.tsx:36-38` - State update HORS useEffect (CRITIQUE)
 - `FlowEditorPropertiesPanel.tsx:231-244, 257-278` - Array deps avec comparaison (OK mais à documenter)
-**Action**: Corriger FlowSettingsDialog, valider autres useEffect
+  **Action**: Corriger FlowSettingsDialog, valider autres useEffect
 
 ---
 
 ### 3. **if/return Inline** ⚠️ STYLE
+
 **Problème**: `if (cond) return;` sur une ligne
 **Convention**: Multi-lignes toujours
+
 ```typescript
 // ❌ Actuel
 if (items.length === 0) return null;
@@ -46,26 +52,31 @@ if (items.length === 0) {
   return null;
 }
 ```
+
 **Fichiers**: `useListItems.ts`, possiblement autres
 
 ---
 
 ### 4. **FeatureContract Mal Utilisé** ⚠️ ARCHITECTURE
+
 **Problème**: `useListItems` retourne `FeatureContract` mais n'a pas de `fillQuery` pertinent (local state seulement)
 **Convention découverte**: `FeatureContract` = features pour backend queries (pagination, sorting, caching)
 **Solution**: Créer nouveau contrat:
+
 ```typescript
 // FeatureFormContract.ts (NOUVEAU)
 export interface FeatureFormContract<TState> {
-  fstate: TState;
-  actions: Record<string, Function>;
-  // Pas de fillQuery - c'est pour les forms
+	fstate: TState;
+	actions: Record<string, Function>;
+	// Pas de fillQuery - c'est pour les forms
 }
 
 // FeatureDataContract.ts (alias de FeatureContract)
 export type FeatureDataContract<TState> = FeatureContract<TState>;
 ```
+
 **Action**:
+
 - Créer `FeatureFormContract` pour hooks form (useListItems, futurs)
 - Aliaser `FeatureDataContract` pour clarifier usage backend
 - Refactorer `useListItems` pour utiliser `FeatureFormContract`
@@ -73,36 +84,39 @@ export type FeatureDataContract<TState> = FeatureContract<TState>;
 ---
 
 ### 5. **UseSyncedListItemsOptions Non Héritant** ⚠️ ARCHITECTURE
+
 **Problème**: Options dupliquent celles de `UseListItemsOptions`
 **Solution**:
+
 ```typescript
 // ❌ Actuel
 export interface UseSyncedListItemsOptions<T, R = T[]> {
-  initialItems?: T[];
-  minItems?: number;
-  maxItems?: number;
-  createDefault?: () => T;
-  transform: (items: T[]) => R;
-  onSync: (transformed: R) => void;
-  filter?: (item: T) => boolean;
+	initialItems?: T[];
+	minItems?: number;
+	maxItems?: number;
+	createDefault?: () => T;
+	transform: (items: T[]) => R;
+	onSync: (transformed: R) => void;
+	filter?: (item: T) => boolean;
 }
 
 // ✅ Attendu
-export interface UseSyncedListItemsOptions<T, R = T[]>
-  extends UseListItemsOptions<T> {
-  // Aspects spécifiques au syncing
-  transform: (items: T[]) => R;
-  onSync: (transformed: R) => void;
-  filter?: (item: T) => boolean;
+export interface UseSyncedListItemsOptions<T, R = T[]> extends UseListItemsOptions<T> {
+	// Aspects spécifiques au syncing
+	transform: (items: T[]) => R;
+	onSync: (transformed: R) => void;
+	filter?: (item: T) => boolean;
 }
 ```
 
 ---
 
 ### 6. **Refactoring hooks2/ - Pas de Subfolders** ⚠️ ORGANISATION
+
 **Problème**: Tous les hooks dans un seul dossier plat
 **Convention découverte**: `components2/` a des subfolders (`form/`, `data-view/`)
 **Solution**: Créer structure similaire
+
 ```
 framework/hooks2/
   ├── form/               (NOUVEAU)
@@ -118,24 +132,29 @@ framework/hooks2/
       ├── useDebounce.ts
       └── useInfinitePagination.ts
 ```
+
 **Action**: Migrer tous les hooks existants
 
 ---
 
 ### 7. **index.ts qui Font Seulement Import/Export** ⚠️ ANTI-PATTERN
+
 **Problème**: Fichiers barrel inutiles
 **Fichiers concernés**:
+
 - `framework/components2/list/index.ts`
 - `framework/components2/list/renderers/index.ts`
 - `framework/hooks2/index.ts` (si existe)
-**Action**: Supprimer ces fichiers, importer directement depuis les sources
+  **Action**: Supprimer ces fichiers, importer directement depuis les sources
 
 ---
 
 ### 8. **GripVertical Dupliqué** ⚠️ RÉUTILISABILITÉ
+
 **Problème**: `SortableItem` implémente GripVertical avec classes, pattern réutilisable ailleurs
 **Observation**: Même pattern pourrait être dans DataView, autres listes
 **Solution**: Extraire composant
+
 ```typescript
 // framework/components2/primitives/DragHandle.tsx (NOUVEAU)
 export function DragHandle({
@@ -159,70 +178,80 @@ export function DragHandle({
   );
 }
 ```
+
 **Action**: Créer `DragHandle.tsx`, utiliser dans `SortableItem`
 
 ---
 
 ### 9. **EditableListField Isolé - Devrait Faire Partie d'une Famille Form** ⚠️ ARCHITECTURE
+
 **Problème**: EditableListField seul, pas de pattern commun avec autres form fields
 **Observation**: Autres form fields (`Input`, `Select`, `Checkbox`) partagent patterns:
+
 - Tous supportent `className`, `...props`
 - Tous utilisent `cn()` pour merge classes
 - Tous exportent via `export { Component }`
-**Solution**: Créer interface commune
+  **Solution**: Créer interface commune
+
 ```typescript
 // framework/types/FormFieldProps.ts (NOUVEAU ou extension)
 export interface BaseFormFieldProps {
-  label?: string;
-  description?: string;
-  error?: string;
-  className?: string;
-  disabled?: boolean;
+	label?: string;
+	description?: string;
+	error?: string;
+	className?: string;
+	disabled?: boolean;
 }
 
 // EditableListField devrait étendre:
 export interface EditableListFieldProps<T> extends BaseFormFieldProps {
-  items: ListItemsContract<T>;
-  // ... autres props
+	items: ListItemsContract<T>;
+	// ... autres props
 }
 ```
+
 **Action**: Standardiser props EditableListField avec autres form fields
 
 ---
 
 ### 10. **sensors/handleDragEnd dans EditableListField - Pas Lean** ⚠️ ARCHITECTURE
+
 **Problème**: Code DnD directement dans composant (10+ lignes), complexifie testing
 **Solution**: Extraire en hook feature
+
 ```typescript
 // framework/hooks2/form/useDragAndDrop.ts (NOUVEAU)
 export function useDragAndDrop<T>(options: {
-  items: T[];
-  onReorder: (fromIndex: number, toIndex: number) => void;
-  getItemId: (item: T, index: number) => string | number;
-  disabled?: boolean;
+	items: T[];
+	onReorder: (fromIndex: number, toIndex: number) => void;
+	getItemId: (item: T, index: number) => string | number;
+	disabled?: boolean;
 }) {
-  const sensors = useSensors(
-    useSensor(PointerSensor, { ...config }),
-    useSensor(KeyboardSensor, { ...config })
-  );
+	const sensors = useSensors(useSensor(PointerSensor, { ...config }), useSensor(KeyboardSensor, { ...config }));
 
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    // ... logic extraction
-  }, [options.items, options.onReorder]);
+	const handleDragEnd = useCallback(
+		(event: DragEndEvent) => {
+			// ... logic extraction
+		},
+		[options.items, options.onReorder]
+	);
 
-  return {
-    sensors,
-    handleDragEnd,
-    sortableIds: options.items.map((item, i) => options.getItemId(item, i)),
-  };
+	return {
+		sensors,
+		handleDragEnd,
+		sortableIds: options.items.map((item, i) => options.getItemId(item, i)),
+	};
 }
 ```
+
 **Bénéfice**: EditableListField devient +50% plus court, testable séparément
 
 ---
 
 ### 11. **Add Button avec Trop de Classes CSS** ⚠️ RÉUTILISABILITÉ
+
 **Problème**: Bouton "Add" inline avec multiples classes Tailwind
+
 ```typescript
 // ❌ Actuel
 <Button
@@ -236,8 +265,10 @@ export function useDragAndDrop<T>(options: {
   {addButtonLabel}
 </Button>
 ```
+
 **Convention découverte**: Button.tsx a déjà variants (icon, icon-sm, etc.)
 **Solution**: Créer variant ou composant spécialisé
+
 ```typescript
 // Option 1: Nouveau variant dans Button.tsx
 const buttonVariants = cva('...', {
@@ -265,13 +296,16 @@ export function AddButton({ children, onClick, disabled }: AddButtonProps) {
   );
 }
 ```
+
 **Préférence**: Option 2 (composant) pour réutilisabilité
 
 ---
 
 ### 12. **Composants framework/components/forms - Exports Non Conformes** ⚠️ CODE EXISTANT
+
 **Problème**: Certains composants n'utilisent pas `export function`, juste `export { }` à la fin
 **Convention correcte** (découverte):
+
 ```typescript
 // ✅ Pattern établi
 function Input({ ...props }) {
@@ -279,13 +313,16 @@ function Input({ ...props }) {
 }
 export { Input };
 ```
+
 **Action**: Audit des composants forms pour cohérence (PAS de changement si déjà conforme)
 
 ---
 
 ### 13. **OutputItemRenderer - Manque d'Exemples UX** ⚠️ UX
+
 **Problème**: Champ "Extraction Pattern" sans guidance, difficile pour utilisateur
 **Solution**: Ajouter exemples inline
+
 ```typescript
 <TextField
   label="Extraction Pattern (optional)"
@@ -304,12 +341,15 @@ export { Input };
   }
 />
 ```
+
 **Action**: Enrichir description avec 3-4 exemples concrets
 
 ---
 
 ### 14. **Remove Button Dupliqué dans Renderers** ⚠️ RÉUTILISABILITÉ
+
 **Problème**: Même bouton "Remove" répété dans 3 renderers
+
 ```typescript
 // KeyValueItemRenderer.tsx:78
 <Button variant="ghost" size="sm" onClick={actions.remove} title="Remove">
@@ -326,7 +366,9 @@ export { Input };
   <Trash2 className="size-4" />
 </Button>
 ```
+
 **Solution**: Extraire composant ou feature
+
 ```typescript
 // framework/components2/list/RemoveItemButton.tsx (NOUVEAU)
 export interface RemoveItemButtonProps {
@@ -354,7 +396,9 @@ export function RemoveItemButton({
   );
 }
 ```
+
 **Usage dans renderers**:
+
 ```typescript
 <RemoveItemButton onRemove={actions.remove} />
 ```
@@ -362,37 +406,42 @@ export function RemoveItemButton({
 ---
 
 ### 15. **Erreurs TypeScript dans flows/flow-editor** ⚠️ CRITIQUE
+
 **Fichiers avec erreurs**:
 
 1. **FlowSettingsDialog.tsx:36-38** (CRITICAL)
-   - State update HORS useEffect
-   - Fix: Wrapper dans useEffect avec deps `[flowDefinition.id, flowDefinition.version]`
+    - State update HORS useEffect
+    - Fix: Wrapper dans useEffect avec deps `[flowDefinition.id, flowDefinition.version]`
 
 2. **FlowEditorPage.tsx:103-109** (HIGH)
-   - 6x `as any` assertions
-   - Fix: Corriger types dans `useFlowEditor` hook
+    - 6x `as any` assertions
+    - Fix: Corriger types dans `useFlowEditor` hook
 
 3. **FlowEditorPropertiesPanel.tsx:118, 141, 173** (MEDIUM)
-   - Double cast `as unknown as`
-   - Fix: Créer interfaces propres pour ConstantNodeData
+    - Double cast `as unknown as`
+    - Fix: Créer interfaces propres pour ConstantNodeData
 
 4. **FlowEditorRightPanel.tsx:75** (LOW)
-   - Variable `_yamlError` non utilisée
-   - Fix: Supprimer ou utiliser
+    - Variable `_yamlError` non utilisée
+    - Fix: Supprimer ou utiliser
 
 ---
 
 ## Plan d'Implémentation
 
 ### Phase 1: Architecture Critique (Contracts & Organisation)
+
 **Priorité: CRITIQUE - Fondations**
 
 #### 1.1 Créer Nouveaux Contracts
+
 **Fichiers**:
+
 - `framework/types/contracts/FeatureFormContract.ts` (NOUVEAU)
 - `framework/types/contracts/FeatureDataContract.ts` (NOUVEAU - alias)
 
 **Contenu FeatureFormContract**:
+
 ```typescript
 /**
  * Contract for form-related feature hooks (local state management).
@@ -400,15 +449,16 @@ export function RemoveItemButton({
  * do not interact with backend queries.
  */
 export interface FeatureFormContract<TState> {
-  /** Frozen state (memoized) - stable reference for useEffect dependencies */
-  fstate: TState;
+	/** Frozen state (memoized) - stable reference for useEffect dependencies */
+	fstate: TState;
 
-  /** State-modifying actions - all memoized */
-  actions: Record<string, Function>;
+	/** State-modifying actions - all memoized */
+	actions: Record<string, Function>;
 }
 ```
 
 **Contenu FeatureDataContract**:
+
 ```typescript
 /**
  * Contract for data-fetching feature hooks (backend integration).
@@ -420,13 +470,16 @@ export type FeatureDataContract<TState> = FeatureContract<TState>;
 ```
 
 #### 1.2 Refactorer useListItems
+
 **Fichier**: `framework/hooks2/useListItems.ts`
 **Changements**:
+
 - Changer type de retour: `FeatureContract` → `FeatureFormContract`
 - Supprimer `fillQuery: () => {}` (inutile)
 - Corriger inline if/return
 
 **Avant**:
+
 ```typescript
 export type ListItemsContract<T> = FeatureContract<ListItemsState<T>>;
 
@@ -441,6 +494,7 @@ export function useListItems<T>(...): ListItemsContract<T> {
 ```
 
 **Après**:
+
 ```typescript
 export type ListItemsContract<T> = FeatureFormContract<ListItemsState<T>>;
 
@@ -464,7 +518,9 @@ export function useListItems<T>(...): ListItemsContract<T> {
 ```
 
 #### 1.3 Organiser hooks2/ en Subfolders
+
 **Structure cible**:
+
 ```
 framework/hooks2/
   ├── form/
@@ -490,6 +546,7 @@ framework/hooks2/
 ```
 
 **Migration Steps**:
+
 1. Créer subfolders `form/`, `data/`, `utility/`
 2. Déplacer fichiers (git mv pour préserver historique)
 3. Mettre à jour tous les imports dans le codebase
@@ -500,13 +557,16 @@ framework/hooks2/
 ---
 
 ### Phase 2: Extraction de Composants Réutilisables
+
 **Priorité: HAUTE - Amélioration Architecture**
 
 #### 2.1 Extraire DragHandle
+
 **Fichier**: `framework/components2/primitives/DragHandle.tsx` (NOUVEAU)
 **Tests**: `framework/components2/primitives/DragHandle.test.tsx` (NOUVEAU)
 
 **Implémentation**:
+
 ```typescript
 import { GripVertical } from 'lucide-react';
 import { cn } from '@framework/lib/utils';
@@ -539,6 +599,7 @@ export function DragHandle({
 ```
 
 **Refactorer SortableItem.tsx**:
+
 ```typescript
 import { DragHandle } from '@framework/components2/primitives/DragHandle';
 
@@ -560,10 +621,12 @@ export function SortableItem({ id, disabled = false, children }: SortableItemPro
 **Estimation**: 50 lignes (composant) + 80 lignes (tests)
 
 #### 2.2 Extraire RemoveItemButton
+
 **Fichier**: `framework/components2/list/RemoveItemButton.tsx` (NOUVEAU)
 **Tests**: `framework/components2/list/RemoveItemButton.test.tsx` (NOUVEAU)
 
 **Implémentation**:
+
 ```typescript
 import { Trash2 } from 'lucide-react';
 import { Button } from '@framework/components/primitives/Button';
@@ -598,6 +661,7 @@ export function RemoveItemButton({
 ```
 
 **Refactorer 3 renderers**:
+
 ```typescript
 // KeyValueItemRenderer.tsx
 import { RemoveItemButton } from '@framework/components2/list/RemoveItemButton';
@@ -617,10 +681,12 @@ export function KeyValueItemRenderer({ item, actions }: KeyValueItemRendererProp
 **Estimation**: 40 lignes (composant) + 60 lignes (tests) + 30 lignes (refactors)
 
 #### 2.3 Créer AddButton Composant
+
 **Fichier**: `framework/components2/list/AddButton.tsx` (NOUVEAU)
 **Tests**: `framework/components2/list/AddButton.test.tsx` (NOUVEAU)
 
 **Implémentation**:
+
 ```typescript
 import { Plus } from 'lucide-react';
 import { Button } from '@framework/components/primitives/Button';
@@ -658,6 +724,7 @@ export function AddButton({
 ```
 
 **Refactorer EditableListField.tsx**:
+
 ```typescript
 import { AddButton } from './AddButton';
 
@@ -678,95 +745,89 @@ export function EditableListField<T>({ ... }) {
 ---
 
 ### Phase 3: Extraction de Feature Hook (DnD)
+
 **Priorité: HAUTE - Simplification Composant**
 
 #### 3.1 Créer useDragAndDrop Hook
+
 **Fichier**: `framework/hooks2/form/useDragAndDrop.ts` (NOUVEAU)
 **Tests**: `framework/hooks2/form/useDragAndDrop.test.ts` (NOUVEAU)
 
 **Interface**:
+
 ```typescript
-import { useSensor, useSensors, PointerSensor, KeyboardSensor } from '@dnd-kit/core';
+import { KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 
 export interface UseDragAndDropOptions<T> {
-  items: T[];
-  getItemId: (item: T, index: number) => string | number;
-  onReorder: (fromIndex: number, toIndex: number) => void;
-  disabled?: boolean;
-  activationConstraint?: {
-    distance?: number;
-    delay?: number;
-    tolerance?: number;
-  };
+	items: T[];
+	getItemId: (item: T, index: number) => string | number;
+	onReorder: (fromIndex: number, toIndex: number) => void;
+	disabled?: boolean;
+	activationConstraint?: {
+		distance?: number;
+		delay?: number;
+		tolerance?: number;
+	};
 }
 
 export interface UseDragAndDropReturn {
-  sensors: any[]; // SensorDescriptor[] from dnd-kit
-  handleDragEnd: (event: DragEndEvent) => void;
-  sortableIds: (string | number)[];
+	sensors: any[]; // SensorDescriptor[] from dnd-kit
+	handleDragEnd: (event: DragEndEvent) => void;
+	sortableIds: (string | number)[];
 }
 
-export function useDragAndDrop<T>(
-  options: UseDragAndDropOptions<T>
-): UseDragAndDropReturn {
-  const {
-    items,
-    getItemId,
-    onReorder,
-    disabled = false,
-    activationConstraint = { distance: 8 },
-  } = options;
+export function useDragAndDrop<T>(options: UseDragAndDropOptions<T>): UseDragAndDropReturn {
+	const { items, getItemId, onReorder, disabled = false, activationConstraint = { distance: 8 } } = options;
 
-  // Setup sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
+	// Setup sensors
+	const sensors = useSensors(
+		useSensor(PointerSensor, { activationConstraint }),
+		useSensor(KeyboardSensor, {
+			coordinateGetter: sortableKeyboardCoordinates,
+		})
+	);
 
-  // Handle drag end
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event;
+	// Handle drag end
+	const handleDragEnd = useCallback(
+		(event: DragEndEvent) => {
+			const { active, over } = event;
 
-      if (!over || active.id === over.id || disabled) {
-        return;
-      }
+			if (!over || active.id === over.id || disabled) {
+				return;
+			}
 
-      // Find indices by ID
-      const sortableIds = items.map((item, i) => getItemId(item, i));
-      const fromIndex = sortableIds.indexOf(active.id);
-      const toIndex = sortableIds.indexOf(over.id);
+			// Find indices by ID
+			const sortableIds = items.map((item, i) => getItemId(item, i));
+			const fromIndex = sortableIds.indexOf(active.id);
+			const toIndex = sortableIds.indexOf(over.id);
 
-      if (fromIndex !== -1 && toIndex !== -1) {
-        onReorder(fromIndex, toIndex);
-      }
-    },
-    [items, getItemId, onReorder, disabled]
-  );
+			if (fromIndex !== -1 && toIndex !== -1) {
+				onReorder(fromIndex, toIndex);
+			}
+		},
+		[items, getItemId, onReorder, disabled]
+	);
 
-  // Compute sortable IDs
-  const sortableIds = useMemo(
-    () => items.map((item, i) => getItemId(item, i)),
-    [items, getItemId]
-  );
+	// Compute sortable IDs
+	const sortableIds = useMemo(() => items.map((item, i) => getItemId(item, i)), [items, getItemId]);
 
-  return {
-    sensors: disabled ? [] : sensors,
-    handleDragEnd,
-    sortableIds,
-  };
+	return {
+		sensors: disabled ? [] : sensors,
+		handleDragEnd,
+		sortableIds,
+	};
 }
 ```
 
 **Estimation**: 90 lignes (hook) + 150 lignes (tests)
 
 #### 3.2 Refactorer EditableListField
+
 **Fichier**: `framework/components2/list/EditableListField.tsx`
 
 **Avant** (~203 lignes):
+
 ```typescript
 export function EditableListField<T>({ ... }) {
   const { fstate, actions } = items;
@@ -800,6 +861,7 @@ export function EditableListField<T>({ ... }) {
 ```
 
 **Après** (~140 lignes):
+
 ```typescript
 import { useDragAndDrop } from '@framework/hooks2/form/useDragAndDrop';
 
@@ -829,40 +891,43 @@ export function EditableListField<T>({ ... }) {
 ---
 
 ### Phase 4: Corrections TypeScript Critiques
+
 **Priorité: CRITIQUE - Bugs Existants**
 
 #### 4.1 Fix FlowSettingsDialog.tsx (CRITICAL)
+
 **Fichier**: `packages/web-frontend/src/app/pages/flows/flow-editor/FlowSettingsDialog.tsx`
 **Ligne**: 36-38
 
 **Avant** (state update hors useEffect):
+
 ```typescript
 // ❌ RISQUE: Infinite loop si condition toujours vraie
 if (flowDefinition.id !== localFlow.id || flowDefinition.version !== localFlow.version) {
-  setLocalFlow(flowDefinition);
+	setLocalFlow(flowDefinition);
 }
 ```
 
 **Après**:
+
 ```typescript
 // ✅ Correct: useEffect avec deps appropriées
 useEffect(() => {
-  if (
-    flowDefinition.id !== localFlow.id ||
-    flowDefinition.version !== localFlow.version
-  ) {
-    setLocalFlow(flowDefinition);
-  }
+	if (flowDefinition.id !== localFlow.id || flowDefinition.version !== localFlow.version) {
+		setLocalFlow(flowDefinition);
+	}
 }, [flowDefinition.id, flowDefinition.version, localFlow.id, localFlow.version]);
 ```
 
 #### 4.2 Fix FlowEditorPage.tsx (HIGH)
+
 **Fichier**: `packages/web-frontend/src/app/pages/flows/flow-editor/FlowEditorPage.tsx`
 **Lignes**: 103-109
 
 **Problème**: 6x `as any` assertions
 
 **Investigation requise**: Vérifier types dans `useFlowEditor` hook
+
 - `nodes` devrait être `Node[]` from react-flow
 - `edges` devrait être `Edge[]` from react-flow
 - Handlers doivent correspondre aux types react-flow
@@ -870,18 +935,20 @@ useEffect(() => {
 **Fix**: Corriger types dans `useFlowEditor.ts`, supprimer `as any`
 
 #### 4.3 Fix FlowEditorPropertiesPanel.tsx (MEDIUM)
+
 **Fichier**: `packages/web-frontend/src/app/pages/flows/flow-editor/FlowEditorPropertiesPanel.tsx`
 **Lignes**: 118, 141, 173
 
 **Problème**: Double cast `as unknown as`
 
 **Solution**: Créer interface ConstantNodeData propre
+
 ```typescript
 // flow-editor/types.ts (NOUVEAU ou EXISTANT)
 export interface ConstantNodeData {
-  label?: string;
-  value?: string | number | boolean;
-  type?: 'string' | 'number' | 'boolean';
+	label?: string;
+	value?: string | number | boolean;
+	type?: 'string' | 'number' | 'boolean';
 }
 
 // Utiliser dans FlowEditorPropertiesPanel:
@@ -889,10 +956,12 @@ const constantData = selectedNode.data as ConstantNodeData; // ✅ Cast direct
 ```
 
 #### 4.4 Fix FlowEditorRightPanel.tsx (LOW)
+
 **Fichier**: `packages/web-frontend/src/app/pages/flows/flow-editor/FlowEditorRightPanel.tsx`
 **Ligne**: 75
 
 **Action**: Supprimer variable inutilisée
+
 ```typescript
 // ❌ Supprimer
 const [_yamlError, setYamlError] = useState<string | null>(null);
@@ -902,12 +971,15 @@ const [_yamlError, setYamlError] = useState<string | null>(null);
 ---
 
 ### Phase 5: Améliorations UX & Nettoyage
+
 **Priorité: MOYENNE - Polish**
 
 #### 5.1 Enrichir OutputItemRenderer avec Exemples
+
 **Fichier**: `framework/components2/list/renderers/OutputItemRenderer.tsx`
 
 **Avant**:
+
 ```typescript
 <TextField
   label="Extraction Pattern (optional)"
@@ -917,6 +989,7 @@ const [_yamlError, setYamlError] = useState<string | null>(null);
 ```
 
 **Après**:
+
 ```typescript
 <TextField
   label="Extraction Pattern (optional)"
@@ -953,10 +1026,12 @@ const [_yamlError, setYamlError] = useState<string | null>(null);
 
 **Estimation**: +20 lignes
 
-#### 5.2 Supprimer __test-imports__.ts
+#### 5.2 Supprimer **test-imports**.ts
+
 **Fichier**: `packages/web-frontend/src/framework/components2/list/__test-imports__.ts`
 
 **Action**:
+
 1. Vérifier si utilisé quelque part
 2. Si oui, remplacer par imports directs
 3. Supprimer fichier
@@ -964,11 +1039,14 @@ const [_yamlError, setYamlError] = useState<string | null>(null);
 **Convention**: Tests importent directement depuis sources, pas de barrels
 
 #### 5.3 Supprimer index.ts Barrels
+
 **Fichiers**:
+
 - `framework/components2/list/index.ts`
 - `framework/components2/list/renderers/index.ts`
 
 **Action**: Supprimer, forcer imports directs
+
 ```typescript
 // ❌ Avant
 import { EditableListField } from '@framework/components2/list';
@@ -978,8 +1056,10 @@ import { EditableListField } from '@framework/components2/list/EditableListField
 ```
 
 #### 5.4 Audit Exports framework/components/forms
+
 **Action**: Vérifier tous les composants utilisent pattern `export { Component }`
 **Fichiers à vérifier**:
+
 - Input.tsx ✓
 - Select.tsx ✓
 - Checkbox.tsx ✓
@@ -993,9 +1073,11 @@ import { EditableListField } from '@framework/components2/list/EditableListField
 **Si non conforme**: Aucune action (code existant, ne pas toucher si fonctionne)
 
 #### 5.5 Corriger if/return Inline dans useListItems
+
 **Fichier**: `framework/hooks2/form/useListItems.ts` (après migration)
 
 **Chercher patterns**:
+
 ```typescript
 // ❌ À corriger
 if (condition) return value;
@@ -1009,58 +1091,64 @@ if (condition) {
 **Estimation**: ~5 occurrences potentielles
 
 #### 5.6 UseSyncedListItemsOptions Héritage
+
 **Fichier**: `framework/hooks2/form/useSyncedListItems.ts` (après migration)
 
 **Avant**:
+
 ```typescript
 export interface UseSyncedListItemsOptions<T, R = T[]> {
-  initialItems?: T[];
-  minItems?: number;
-  maxItems?: number;
-  createDefault?: () => T;
-  // Specific
-  transform: (items: T[]) => R;
-  onSync: (transformed: R) => void;
-  filter?: (item: T) => boolean;
+	initialItems?: T[];
+	minItems?: number;
+	maxItems?: number;
+	createDefault?: () => T;
+	// Specific
+	transform: (items: T[]) => R;
+	onSync: (transformed: R) => void;
+	filter?: (item: T) => boolean;
 }
 ```
 
 **Après**:
+
 ```typescript
-export interface UseSyncedListItemsOptions<T, R = T[]>
-  extends UseListItemsOptions<T> {
-  // Only sync-specific options
-  transform: (items: T[]) => R;
-  onSync: (transformed: R) => void;
-  filter?: (item: T) => boolean;
+export interface UseSyncedListItemsOptions<T, R = T[]> extends UseListItemsOptions<T> {
+	// Only sync-specific options
+	transform: (items: T[]) => R;
+	onSync: (transformed: R) => void;
+	filter?: (item: T) => boolean;
 }
 ```
 
 ---
 
 ### Phase 6: Documentation Lessons Learned
+
 **Priorité: CRITIQUE - Éviter Répétition**
 
 #### 6.1 Mettre à Jour .claude/kb/lessons-learned.md
+
 **Fichier**: `.claude/kb/lessons-learned.md`
 
 **Sections à ajouter**:
 
-```markdown
+````markdown
 ## Architecture - Contracts & Hooks
 
 ### FeatureContract vs FeatureFormContract
+
 - **FeatureContract** (alias FeatureDataContract): Pour hooks data-fetching (backend)
-  - Inclut `fillQuery` pour générer requêtes backend
-  - Exemples: usePagination2, useSorting2, useCacheControl2
+    - Inclut `fillQuery` pour générer requêtes backend
+    - Exemples: usePagination2, useSorting2, useCacheControl2
 - **FeatureFormContract**: Pour hooks form (local state)
-  - PAS de `fillQuery` (local seulement)
-  - Exemples: useListItems, useSyncedListItems
+    - PAS de `fillQuery` (local seulement)
+    - Exemples: useListItems, useSyncedListItems
 
 ❌ **Erreur fréquente**: Utiliser FeatureContract pour local state
 ✅ **Correct**: FeatureFormContract pour forms, FeatureDataContract pour backend
 
 ### Organisation hooks2/
+
 - **Subfolders obligatoires**: `form/`, `data/`, `utility/`
 - **Tests colocalisés**: `useFeature.test.ts` à côté de `useFeature.ts`
 - **Pas de barrels**: Imports directs depuis sources
@@ -1070,24 +1158,30 @@ export interface UseSyncedListItemsOptions<T, R = T[]>
 ## TypeScript - useEffect & State Updates
 
 ### State Update DOIT être dans useEffect
+
 ❌ **Erreur critique**:
+
 ```typescript
 if (condition) {
-  setState(newValue); // ⚠️ Hors useEffect = risque infinite loop
+	setState(newValue); // ⚠️ Hors useEffect = risque infinite loop
 }
 ```
+````
 
 ✅ **Correct**:
+
 ```typescript
 useEffect(() => {
-  if (condition) {
-    setState(newValue);
-  }
+	if (condition) {
+		setState(newValue);
+	}
 }, [dependencies]);
 ```
 
 ### Array Dependencies avec Comparaison
+
 ✅ **Pattern valide** (si comparaison avant setState):
+
 ```typescript
 useEffect(() => {
   const transformed = items.map(...);
@@ -1103,12 +1197,15 @@ useEffect(() => {
 ## Code Style
 
 ### if/return Multi-lignes TOUJOURS
+
 ❌ **Interdit**:
+
 ```typescript
 if (condition) return value;
 ```
 
 ✅ **Obligatoire**:
+
 ```typescript
 if (condition) {
   return value;
@@ -1116,7 +1213,9 @@ if (condition) {
 ```
 
 ### Export Pattern Composants
+
 ✅ **Standard établi**:
+
 ```typescript
 function Component({ ...props }) {
   return <div>...</div>;
@@ -1131,23 +1230,29 @@ export { Component };
 ## Réutilisabilité - Extraction de Features
 
 ### Quand Extraire un Composant
+
 **Signaux**:
+
 - Code dupliqué dans 3+ endroits
 - Pattern visuel cohérent (ex: bouton Remove avec icône)
 - Classes CSS répétées (ex: drag handle)
 
 **Exemples extraits**:
+
 - `DragHandle` - GripVertical avec classes standards
 - `RemoveItemButton` - Trash icon avec variant ghost
 - `AddButton` - Plus icon avec border-dashed
 
 ### Quand Extraire un Hook
+
 **Signaux**:
+
 - Logique >10 lignes dans composant
 - Testing complexifié par logique inline
 - Réutilisabilité potentielle
 
 **Exemple**: `useDragAndDrop` extrait de EditableListField
+
 - Avant: 60 lignes DnD inline
 - Après: 5 lignes hook call
 - Bénéfice: Testing séparé, composant 30% plus court
@@ -1157,7 +1262,9 @@ export { Component };
 ## UX - Guidance Utilisateur
 
 ### Champs Patterns/Regex DOIVENT avoir exemples
+
 ❌ **Insuffisant**:
+
 ```typescript
 <TextField
   label="Pattern"
@@ -1166,6 +1273,7 @@ export { Component };
 ```
 
 ✅ **Attendu**:
+
 ```typescript
 <TextField
   label="Pattern"
@@ -1186,21 +1294,26 @@ export { Component };
 ## Anti-Patterns Identifiés
 
 ### ❌ Barrel Files (index.ts import/export)
+
 **Problème**: Complexifie imports, cache dépendances
 **Solution**: Imports directs depuis sources
 
 ### ❌ Hooks Flat Directory
+
 **Problème**: Tous les hooks dans un dossier → difficile à naviguer
 **Solution**: Subfolders par catégorie (form/, data/, utility/)
 
 ### ❌ Type Assertions Multiples
+
 **Problème**: `as unknown as Type` cache erreurs de design
 **Solution**: Créer interfaces propres, corriger types upstream
 
 ### ❌ State Update Hors useEffect
+
 **Problème**: Risque infinite loop
 **Solution**: TOUJOURS wrapper dans useEffect avec deps correctes
-```
+
+````
 
 **Estimation**: +150 lignes documentation
 
@@ -1254,9 +1367,10 @@ npm run test:agent:frontend
 
 # Build
 npm run build
-```
+````
 
 ### Tests Manuels
+
 1. Flow Editor → Vérifier env/output/inputs fields fonctionnent
 2. Drag & drop → Vérifier reordering marche toujours
 3. Remove buttons → Vérifier suppression items
@@ -1264,6 +1378,7 @@ npm run build
 5. Patterns extraction → Vérifier exemples visibles
 
 ### Validation Architecture
+
 - [ ] Tous hooks dans subfolders form/data/utility
 - [ ] Aucun index.ts barrel
 - [ ] FeatureFormContract utilisé par useListItems
@@ -1281,15 +1396,15 @@ npm run build
 
 ## Estimation Totale
 
-| Phase | Tâches | Fichiers | Lignes | Temps |
-|-------|--------|----------|--------|-------|
-| 1. Architecture Critique | Contracts + Migration | 30+ | ~100 | 4h |
-| 2. Composants Réutilisables | DragHandle, Remove, Add | 6 | ~400 | 3h |
-| 3. Hook DnD | useDragAndDrop + refactor | 3 | ~250 | 2h |
-| 4. Fixes TypeScript | 4 fichiers flow-editor | 4 | ~50 | 2h |
-| 5. UX & Nettoyage | Exemples + suppression | 8 | ~100 | 2h |
-| 6. Documentation | Lessons learned | 1 | ~150 | 1h |
-| **TOTAL** | **15 corrections** | **52+** | **~1050** | **14h** |
+| Phase                       | Tâches                    | Fichiers | Lignes    | Temps   |
+| --------------------------- | ------------------------- | -------- | --------- | ------- |
+| 1. Architecture Critique    | Contracts + Migration     | 30+      | ~100      | 4h      |
+| 2. Composants Réutilisables | DragHandle, Remove, Add   | 6        | ~400      | 3h      |
+| 3. Hook DnD                 | useDragAndDrop + refactor | 3        | ~250      | 2h      |
+| 4. Fixes TypeScript         | 4 fichiers flow-editor    | 4        | ~50       | 2h      |
+| 5. UX & Nettoyage           | Exemples + suppression    | 8        | ~100      | 2h      |
+| 6. Documentation            | Lessons learned           | 1        | ~150      | 1h      |
+| **TOTAL**                   | **15 corrections**        | **52+**  | **~1050** | **14h** |
 
 ---
 

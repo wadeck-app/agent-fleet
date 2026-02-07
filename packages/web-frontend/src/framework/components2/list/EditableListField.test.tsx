@@ -1,30 +1,44 @@
+import { useListItems } from '@framework/hooks2/form/useListItems';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { useListItems } from '@framework/hooks2/useListItems';
-
+import type { ItemActions } from './EditableListField';
 import { EditableListField } from './EditableListField';
 
+interface TestItem {
+	id: string;
+	name: string;
+}
+
+const renderTestItem = (item: TestItem) => <div data-testid={`item-${item.id}`}>{item.name}</div>;
+
+/**
+ * Wrapper component that calls useListItems inside the React render cycle.
+ * Required because useListItems uses React Compiler's useMemoCache.
+ */
+function TestWrapper({
+	hookOptions = {},
+	fieldProps,
+}: {
+	hookOptions?: Parameters<typeof useListItems<TestItem>>[0];
+	fieldProps: Omit<React.ComponentProps<typeof EditableListField<TestItem>>, 'items'>;
+}) {
+	const items = useListItems<TestItem>(hookOptions);
+	return <EditableListField items={items} {...fieldProps} />;
+}
+
 describe('EditableListField', () => {
-	interface TestItem {
-		id: string;
-		name: string;
-	}
-
-	const renderTestItem = (item: TestItem) => <div data-testid={`item-${item.id}`}>{item.name}</div>;
-
 	describe('rendering', () => {
 		it('should render label and description', () => {
-			const items = useListItems<TestItem>();
-
-			const { container } = render(
-				<EditableListField
-					label="Test Label"
-					description="Test description"
-					items={items}
-					renderItem={renderTestItem}
-					createDefault={() => ({ id: '1', name: 'default' })}
+			render(
+				<TestWrapper
+					fieldProps={{
+						label: 'Test Label',
+						description: 'Test description',
+						renderItem: renderTestItem,
+						createDefault: () => ({ id: '1', name: 'default' }),
+					}}
 				/>
 			);
 
@@ -33,14 +47,13 @@ describe('EditableListField', () => {
 		});
 
 		it('should render empty state when no items', () => {
-			const items = useListItems<TestItem>();
-
 			render(
-				<EditableListField
-					items={items}
-					renderItem={renderTestItem}
-					createDefault={() => ({ id: '1', name: 'default' })}
-					emptyMessage="No items found"
+				<TestWrapper
+					fieldProps={{
+						renderItem: renderTestItem,
+						createDefault: () => ({ id: '1', name: 'default' }),
+						emptyMessage: 'No items found',
+					}}
 				/>
 			);
 
@@ -48,14 +61,13 @@ describe('EditableListField', () => {
 		});
 
 		it('should render custom empty state', () => {
-			const items = useListItems<TestItem>();
-
 			render(
-				<EditableListField
-					items={items}
-					renderItem={renderTestItem}
-					createDefault={() => ({ id: '1', name: 'default' })}
-					renderEmpty={() => <div>Custom empty state</div>}
+				<TestWrapper
+					fieldProps={{
+						renderItem: renderTestItem,
+						createDefault: () => ({ id: '1', name: 'default' }),
+						renderEmpty: () => <div>Custom empty state</div>,
+					}}
 				/>
 			);
 
@@ -63,15 +75,19 @@ describe('EditableListField', () => {
 		});
 
 		it('should render list of items', () => {
-			const items = useListItems<TestItem>({
-				initialItems: [
-					{ id: '1', name: 'Item 1' },
-					{ id: '2', name: 'Item 2' },
-				],
-			});
-
 			render(
-				<EditableListField items={items} renderItem={renderTestItem} createDefault={() => ({ id: '1', name: 'default' })} />
+				<TestWrapper
+					hookOptions={{
+						initialItems: [
+							{ id: '1', name: 'Item 1' },
+							{ id: '2', name: 'Item 2' },
+						],
+					}}
+					fieldProps={{
+						renderItem: renderTestItem,
+						createDefault: () => ({ id: '1', name: 'default' }),
+					}}
+				/>
 			);
 
 			expect(screen.getByTestId('item-1')).toBeInTheDocument();
@@ -79,14 +95,13 @@ describe('EditableListField', () => {
 		});
 
 		it('should render add button with custom label', () => {
-			const items = useListItems<TestItem>();
-
 			render(
-				<EditableListField
-					items={items}
-					renderItem={renderTestItem}
-					createDefault={() => ({ id: '1', name: 'default' })}
-					addButtonLabel="Add New Item"
+				<TestWrapper
+					fieldProps={{
+						renderItem: renderTestItem,
+						createDefault: () => ({ id: '1', name: 'default' }),
+						addButtonLabel: 'Add New Item',
+					}}
 				/>
 			);
 
@@ -94,14 +109,13 @@ describe('EditableListField', () => {
 		});
 
 		it('should render error message', () => {
-			const items = useListItems<TestItem>();
-
 			render(
-				<EditableListField
-					items={items}
-					renderItem={renderTestItem}
-					createDefault={() => ({ id: '1', name: 'default' })}
-					error="This is an error"
+				<TestWrapper
+					fieldProps={{
+						renderItem: renderTestItem,
+						createDefault: () => ({ id: '1', name: 'default' }),
+						error: 'This is an error',
+					}}
 				/>
 			);
 
@@ -112,45 +126,35 @@ describe('EditableListField', () => {
 	describe('add functionality', () => {
 		it('should add item when button clicked', async () => {
 			const user = userEvent.setup();
-			const items = useListItems<TestItem>();
 
-			const { rerender } = render(
-				<EditableListField
-					items={items}
-					renderItem={renderTestItem}
-					createDefault={() => ({ id: 'new', name: 'New Item' })}
-					addButtonLabel="Add"
+			render(
+				<TestWrapper
+					fieldProps={{
+						renderItem: renderTestItem,
+						createDefault: () => ({ id: 'new', name: 'New Item' }),
+						addButtonLabel: 'Add',
+					}}
 				/>
 			);
 
 			const addButton = screen.getByText('Add');
 			await user.click(addButton);
 
-			// Force re-render to see the new item
-			rerender(
-				<EditableListField
-					items={items}
-					renderItem={renderTestItem}
-					createDefault={() => ({ id: 'new', name: 'New Item' })}
-					addButtonLabel="Add"
-				/>
-			);
-
 			expect(screen.getByTestId('item-new')).toBeInTheDocument();
 		});
 
 		it('should disable add button when max items reached', () => {
-			const items = useListItems<TestItem>({
-				initialItems: [{ id: '1', name: 'Item 1' }],
-				maxItems: 1,
-			});
-
 			render(
-				<EditableListField
-					items={items}
-					renderItem={renderTestItem}
-					createDefault={() => ({ id: '1', name: 'default' })}
-					addButtonLabel="Add"
+				<TestWrapper
+					hookOptions={{
+						initialItems: [{ id: '1', name: 'Item 1' }],
+						maxItems: 1,
+					}}
+					fieldProps={{
+						renderItem: renderTestItem,
+						createDefault: () => ({ id: '1', name: 'default' }),
+						addButtonLabel: 'Add',
+					}}
 				/>
 			);
 
@@ -161,18 +165,24 @@ describe('EditableListField', () => {
 
 	describe('item actions', () => {
 		it('should pass update action to renderItem', () => {
-			const items = useListItems<TestItem>({
-				initialItems: [{ id: '1', name: 'Item 1' }],
-			});
-
-			const renderWithUpdate = vi.fn((item, _index, actions) => (
+			const renderWithUpdate = vi.fn((item: TestItem, _index: number, actions: ItemActions<TestItem>) => (
 				<div>
 					<span>{item.name}</span>
 					<button onClick={() => actions.update({ name: 'Updated' })}>Update</button>
 				</div>
 			));
 
-			render(<EditableListField items={items} renderItem={renderWithUpdate} createDefault={() => ({ id: '1', name: 'default' })} />);
+			render(
+				<TestWrapper
+					hookOptions={{
+						initialItems: [{ id: '1', name: 'Item 1' }],
+					}}
+					fieldProps={{
+						renderItem: renderWithUpdate,
+						createDefault: () => ({ id: '1', name: 'default' }),
+					}}
+				/>
+			);
 
 			expect(renderWithUpdate).toHaveBeenCalled();
 			expect(renderWithUpdate).toHaveBeenCalledWith(
@@ -186,18 +196,24 @@ describe('EditableListField', () => {
 		});
 
 		it('should pass remove action to renderItem', () => {
-			const items = useListItems<TestItem>({
-				initialItems: [{ id: '1', name: 'Item 1' }],
-			});
-
-			const renderWithRemove = vi.fn((item, _index, actions) => (
+			const renderWithRemove = vi.fn((item: TestItem, _index: number, actions: ItemActions<TestItem>) => (
 				<div>
 					<span>{item.name}</span>
 					<button onClick={actions.remove}>Remove</button>
 				</div>
 			));
 
-			render(<EditableListField items={items} renderItem={renderWithRemove} createDefault={() => ({ id: '1', name: 'default' })} />);
+			render(
+				<TestWrapper
+					hookOptions={{
+						initialItems: [{ id: '1', name: 'Item 1' }],
+					}}
+					fieldProps={{
+						renderItem: renderWithRemove,
+						createDefault: () => ({ id: '1', name: 'default' }),
+					}}
+				/>
+			);
 
 			expect(renderWithRemove).toHaveBeenCalledWith(
 				{ id: '1', name: 'Item 1' },
@@ -212,40 +228,38 @@ describe('EditableListField', () => {
 
 	describe('drag and drop', () => {
 		it('should render drag handles when reordering enabled', () => {
-			const items = useListItems<TestItem>({
-				initialItems: [{ id: '1', name: 'Item 1' }],
-			});
-
 			const { container } = render(
-				<EditableListField
-					items={items}
-					renderItem={renderTestItem}
-					createDefault={() => ({ id: '1', name: 'default' })}
-					enableReordering={true}
+				<TestWrapper
+					hookOptions={{
+						initialItems: [{ id: '1', name: 'Item 1' }],
+					}}
+					fieldProps={{
+						renderItem: renderTestItem,
+						createDefault: () => ({ id: '1', name: 'default' }),
+						enableReordering: true,
+					}}
 				/>
 			);
 
-			// Check for the presence of drag handle (GripVertical icon will be in the DOM)
-			const dragHandle = container.querySelector('button');
+			// DragHandle renders a button with type="button"
+			const dragHandle = container.querySelector('button[type="button"]');
 			expect(dragHandle).toBeInTheDocument();
 		});
 
 		it('should not render drag handles when reordering disabled', () => {
-			const items = useListItems<TestItem>({
-				initialItems: [{ id: '1', name: 'Item 1' }],
-			});
-
 			render(
-				<EditableListField
-					items={items}
-					renderItem={renderTestItem}
-					createDefault={() => ({ id: '1', name: 'default' })}
-					enableReordering={false}
+				<TestWrapper
+					hookOptions={{
+						initialItems: [{ id: '1', name: 'Item 1' }],
+					}}
+					fieldProps={{
+						renderItem: renderTestItem,
+						createDefault: () => ({ id: '1', name: 'default' }),
+						enableReordering: false,
+					}}
 				/>
 			);
 
-			// With reordering disabled, there should be no drag button before the item
-			// The only button should be inside renderTestItem (if any)
 			const item = screen.getByTestId('item-1');
 			expect(item).toBeInTheDocument();
 		});
@@ -253,14 +267,13 @@ describe('EditableListField', () => {
 
 	describe('className prop', () => {
 		it('should apply custom className', () => {
-			const items = useListItems<TestItem>();
-
 			const { container } = render(
-				<EditableListField
-					items={items}
-					renderItem={renderTestItem}
-					createDefault={() => ({ id: '1', name: 'default' })}
-					className="custom-class"
+				<TestWrapper
+					fieldProps={{
+						renderItem: renderTestItem,
+						createDefault: () => ({ id: '1', name: 'default' }),
+						className: 'custom-class',
+					}}
 				/>
 			);
 

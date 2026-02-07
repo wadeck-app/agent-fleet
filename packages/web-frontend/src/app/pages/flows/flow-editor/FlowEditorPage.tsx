@@ -100,13 +100,13 @@ export function FlowEditorPage() {
 						}
 						canvas={
 							<FlowEditorCanvas
-								nodes={flowEditor.nodes as any}
-								edges={flowEditor.edges as any}
-								onNodesChange={flowEditor.onNodesChange as any}
-								onEdgesChange={flowEditor.onEdgesChange as any}
+								nodes={flowEditor.nodes}
+								edges={flowEditor.edges}
+								onNodesChange={flowEditor.onNodesChange}
+								onEdgesChange={flowEditor.onEdgesChange}
 								onConnect={flowEditor.onConnect}
-								onNodeClick={flowEditor.onNodeClick as any}
-								onEdgeClick={flowEditor.onEdgeClick as any}
+								onNodeClick={flowEditor.onNodeClick}
+								onEdgeClick={flowEditor.onEdgeClick}
 								onPaneClick={flowEditor.onPaneClick}
 								selectedNodeId={flowEditor.selectedNodeId}
 								selectedEdgeId={flowEditor.selectedEdgeId}

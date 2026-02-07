@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
-import type { FeatureContract } from '@framework/types/FeatureContract';
+import type { FeatureFormContract } from '@framework/types/contracts';
 
 /**
  * ===========================================================================================
@@ -8,14 +8,14 @@ import type { FeatureContract } from '@framework/types/FeatureContract';
  * ===========================================================================================
  *
  * Generic hook for managing a list of items with CRUD operations.
- * Follows the FeatureContract pattern established by usePagination2.
+ * Follows the FeatureFormContract pattern (form-specific, no backend queries).
  *
  * Key features:
  * - Type-safe CRUD operations (add, remove, update, set, clear)
  * - Min/max constraints with derived canAdd/canRemove flags
  * - Frozen state (fstate) for stable useEffect dependencies
  * - Grouped actions for clean API
- * - No backend query (local state only) so fillQuery is a no-op
+ * - Local state only (no fillQuery, does not contribute to backend queries)
  *
  * Example usage:
  * ```typescript
@@ -71,13 +71,13 @@ export interface ListItemsState<T> {
  * Type alias for list items feature contract.
  * Ensures type safety when passing to EditableListField.
  */
-export type ListItemsContract<T> = FeatureContract<ListItemsState<T>>;
+export type ListItemsContract<T> = FeatureFormContract<ListItemsState<T>>;
 
 /**
- * Headless list items hook following the FeatureContract pattern.
+ * Headless list items hook following the FeatureFormContract pattern.
  *
  * @param options - Configuration options
- * @returns ListItemsContract with fstate, actions, fillQuery
+ * @returns ListItemsContract with fstate and actions
  */
 export function useListItems<T>(options: UseListItemsOptions<T> = {}): ListItemsContract<T> {
 	const { initialItems = [], minItems = 0, maxItems = Infinity, createDefault } = options;
@@ -110,7 +110,9 @@ export function useListItems<T>(options: UseListItemsOptions<T> = {}): ListItems
 			 * Add a new item to the end of the list
 			 */
 			add: (item: T) => {
-				if (!canAdd) return;
+				if (!canAdd) {
+					return;
+				}
 				setItems(prev => [...prev, item]);
 			},
 
@@ -118,8 +120,12 @@ export function useListItems<T>(options: UseListItemsOptions<T> = {}): ListItems
 			 * Remove an item by index
 			 */
 			remove: (index: number) => {
-				if (!canRemove) return;
-				if (index < 0 || index >= count) return;
+				if (!canRemove) {
+					return;
+				}
+				if (index < 0 || index >= count) {
+					return;
+				}
 				setItems(prev => prev.filter((_, i) => i !== index));
 			},
 
@@ -127,7 +133,9 @@ export function useListItems<T>(options: UseListItemsOptions<T> = {}): ListItems
 			 * Update an item by index with partial data
 			 */
 			update: (index: number, partial: Partial<T>) => {
-				if (index < 0 || index >= count) return;
+				if (index < 0 || index >= count) {
+					return;
+				}
 				setItems(prev => prev.map((item, i) => (i === index ? { ...item, ...partial } : item)));
 			},
 
@@ -151,9 +159,15 @@ export function useListItems<T>(options: UseListItemsOptions<T> = {}): ListItems
 			 * Reorder items by moving from one index to another
 			 */
 			reorder: (fromIndex: number, toIndex: number) => {
-				if (fromIndex < 0 || fromIndex >= count) return;
-				if (toIndex < 0 || toIndex >= count) return;
-				if (fromIndex === toIndex) return;
+				if (fromIndex < 0 || fromIndex >= count) {
+					return;
+				}
+				if (toIndex < 0 || toIndex >= count) {
+					return;
+				}
+				if (fromIndex === toIndex) {
+					return;
+				}
 
 				setItems(prev => {
 					const result = [...prev];
@@ -166,14 +180,8 @@ export function useListItems<T>(options: UseListItemsOptions<T> = {}): ListItems
 		[canAdd, canRemove, count, minItems]
 	);
 
-	// Fill backend query parameters (no-op for local state)
-	const fillQuery = useCallback((_query: Record<string, unknown>) => {
-		// No backend query for list items - this is purely local state
-	}, []);
-
 	return {
 		fstate,
 		actions,
-		fillQuery,
 	};
 }

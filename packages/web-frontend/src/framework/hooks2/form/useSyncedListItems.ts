@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-import type { ListItemsContract } from './useListItems';
+import type { ListItemsContract, UseListItemsOptions } from './useListItems';
 import { useListItems } from './useListItems';
 
 /**
@@ -41,10 +41,7 @@ import { useListItems } from './useListItems';
  * ===========================================================================================
  */
 
-export interface UseSyncedListItemsOptions<T, R = T[]> {
-	/** Initial items to populate the list */
-	initialItems?: T[];
-
+export interface UseSyncedListItemsOptions<T, R = T[]> extends UseListItemsOptions<T> {
 	/** Transform function to convert items array to desired format */
 	transform: (items: T[]) => R;
 
@@ -53,15 +50,6 @@ export interface UseSyncedListItemsOptions<T, R = T[]> {
 
 	/** Optional filter to exclude items from sync */
 	filter?: (item: T) => boolean;
-
-	/** Minimum number of items (default: 0) */
-	minItems?: number;
-
-	/** Maximum number of items (default: Infinity) */
-	maxItems?: number;
-
-	/** Factory function to create default items when adding */
-	createDefault?: () => T;
 }
 
 /**

@@ -9,53 +9,53 @@ Implementation of the composable EditableListField pattern for generic list edit
 ### Core Framework (4 files)
 
 1. **`packages/web-frontend/src/framework/hooks2/useListItems.ts`** (180 lines)
-   - Generic CRUD hook for list management
-   - Follows FeatureContract pattern (fstate, actions, fillQuery)
-   - Supports min/max constraints
-   - Includes reorder functionality
+    - Generic CRUD hook for list management
+    - Follows FeatureContract pattern (fstate, actions, fillQuery)
+    - Supports min/max constraints
+    - Includes reorder functionality
 
 2. **`packages/web-frontend/src/framework/components2/list/EditableListField.tsx`** (170 lines)
-   - Main composable component for editable lists
-   - Drag & drop support via dnd-kit
-   - Empty state customization
-   - Generic via TypeScript generics `<T>`
+    - Main composable component for editable lists
+    - Drag & drop support via dnd-kit
+    - Empty state customization
+    - Generic via TypeScript generics `<T>`
 
 3. **`packages/web-frontend/src/framework/components2/list/SortableItem.tsx`** (65 lines)
-   - Drag & drop wrapper component
-   - Visual drag handle with GripVertical icon
-   - Disabled state support
+    - Drag & drop wrapper component
+    - Visual drag handle with GripVertical icon
+    - Disabled state support
 
 4. **`packages/web-frontend/src/framework/components2/list/index.ts`** (25 lines)
-   - Barrel export for list components
+    - Barrel export for list components
 
 ### Item Renderers (4 files)
 
 5. **`packages/web-frontend/src/framework/components2/list/renderers/KeyValueItemRenderer.tsx`** (75 lines)
-   - Environment variables renderer (key-value pairs)
-   - Two input fields + remove button
-   - Used in FlowEditorPropertiesPanel for `env` field
+    - Environment variables renderer (key-value pairs)
+    - Two input fields + remove button
+    - Used in FlowEditorPropertiesPanel for `env` field
 
 6. **`packages/web-frontend/src/framework/components2/list/renderers/OutputItemRenderer.tsx`** (115 lines)
-   - Output configuration renderer
-   - Variable name + type selector + optional pattern field
-   - Conditional pattern field (only for string type)
-   - Used in FlowEditorPropertiesPanel for `output` field
+    - Output configuration renderer
+    - Variable name + type selector + optional pattern field
+    - Conditional pattern field (only for string type)
+    - Used in FlowEditorPropertiesPanel for `output` field
 
 7. **`packages/web-frontend/src/framework/components2/list/renderers/InputDefinitionRenderer.tsx`** (105 lines)
-   - Flow input definitions renderer
-   - Input name + type selector (21+ types)
-   - Used in FlowSettingsDialog for `inputs` field
+    - Flow input definitions renderer
+    - Input name + type selector (21+ types)
+    - Used in FlowSettingsDialog for `inputs` field
 
 8. **`packages/web-frontend/src/framework/components2/list/renderers/index.ts`** (15 lines)
-   - Barrel export for renderers
+    - Barrel export for renderers
 
 ### Integration (2 files modified)
 
 9. **`packages/web-frontend/src/app/pages/flows/flow-editor/FlowEditorPropertiesPanel.tsx`**
-   - Added imports for EditableListField and renderers
-   - Replaced JSON textarea for `env` with EditableListField + KeyValueItemRenderer
-   - Replaced JSON textarea for `output` with EditableListField + OutputItemRenderer
-   - Added useListItems hooks with proper sync logic (prevents infinite loops)
+    - Added imports for EditableListField and renderers
+    - Replaced JSON textarea for `env` with EditableListField + KeyValueItemRenderer
+    - Replaced JSON textarea for `output` with EditableListField + OutputItemRenderer
+    - Added useListItems hooks with proper sync logic (prevents infinite loops)
 
 10. **`packages/web-frontend/src/app/pages/flows/flow-editor/FlowSettingsDialog.tsx`**
     - Added imports for EditableListField and InputDefinitionRenderer
@@ -92,6 +92,7 @@ Implementation of the composable EditableListField pattern for generic list edit
 ## Architecture
 
 ### Pattern Hierarchy
+
 ```
 useListItems<T> (Hook)
     ↓ provides ListItemsContract
@@ -103,6 +104,7 @@ ItemRenderer (KeyValue/Output/InputDef)
 ### Data Flow
 
 #### Environment Variables (FlowEditorPropertiesPanel)
+
 ```
 step.env (Record<string, string>)
     → useListItems initialItems
@@ -115,6 +117,7 @@ step.env (Record<string, string>)
 ```
 
 #### Output Configuration (FlowEditorPropertiesPanel)
+
 ```
 step.output (Record<string, OutputConfig>)
     → useListItems initialItems
@@ -127,6 +130,7 @@ step.output (Record<string, OutputConfig>)
 ```
 
 #### Flow Inputs (FlowSettingsDialog)
+
 ```
 localFlow.inputs (Record<string, VariableType>)
     → useListItems initialItems
@@ -141,27 +145,32 @@ localFlow.inputs (Record<string, VariableType>)
 ## Key Design Decisions
 
 ### 1. Infinite Loop Prevention
+
 - Each useEffect includes a `isDifferent` check before calling update functions
 - Prevents re-triggering when the data hasn't actually changed
 - Uses shallow comparison for simple types, JSON.stringify for objects
 
 ### 2. Empty Key/Name Filtering
+
 - `filter(item => item.key.trim())` for env variables
 - `filter(item => item.name.trim())` for outputs and inputs
 - Prevents empty entries from being saved to flow definition
 
 ### 3. Type Safety
+
 - All components use TypeScript generics `<T>`
 - Item renderers have specific item types (KeyValueItem, OutputItem, InputDefinitionItem)
 - Full type safety from hook to renderer
 
 ### 4. Drag & Drop
+
 - Optional via `enableReordering` prop
 - Uses dnd-kit library (already installed)
 - Visual drag handle only appears when enabled
 - 8px activation distance to prevent accidental drags
 
 ### 5. Constraints
+
 - `minItems` and `maxItems` support
 - `canAdd` and `canRemove` derived state
 - Buttons automatically disabled when constraints reached
@@ -169,18 +178,21 @@ localFlow.inputs (Record<string, VariableType>)
 ## Testing Strategy
 
 ### Unit Tests (Hooks)
+
 - Test all CRUD operations
 - Test constraint enforcement
 - Test derived state calculations
 - Test fstate stability
 
 ### Component Tests
+
 - Test rendering with various props
 - Test user interactions
 - Test item actions (update/remove)
 - Test accessibility
 
 ### Integration Tests (Manual)
+
 - Test in Flow Editor with real flows
 - Test with existing flow data
 - Test creating new items
@@ -209,12 +221,14 @@ npm run test
 ## Benefits Delivered
 
 ### User Experience
+
 - ✅ Intuitive UI (no manual JSON editing)
 - ✅ Visual guidance (labels, placeholders, descriptions)
 - ✅ Immediate validation (constraints enforced in UI)
 - ✅ Drag & drop reordering (when enabled)
 
 ### Developer Experience
+
 - ✅ Reusable pattern (env, output, inputs + future use cases)
 - ✅ DRY code (single pattern replaces 3+ implementations)
 - ✅ Type-safe (TypeScript generics throughout)
@@ -222,6 +236,7 @@ npm run test
 - ✅ Composable (features can be mixed and matched)
 
 ### Maintenance
+
 - ✅ Single pattern to maintain
 - ✅ Centralized tests
 - ✅ Clear documentation
@@ -230,38 +245,39 @@ npm run test
 ## Comparison with Previous Implementation
 
 ### Before
+
 ```tsx
 // Environment Variables - JSON textarea
 <Textarea
-  value={JSON.stringify(step.env || {}, null, 2)}
-  onChange={e => {
-    try {
-      const parsed = JSON.parse(e.target.value);
-      onUpdateNode(id, { env: parsed });
-    } catch {
-      // Invalid JSON ignored
-    }
-  }}
+	value={JSON.stringify(step.env || {}, null, 2)}
+	onChange={e => {
+		try {
+			const parsed = JSON.parse(e.target.value);
+			onUpdateNode(id, { env: parsed });
+		} catch {
+			// Invalid JSON ignored
+		}
+	}}
 />
 ```
 
 ### After
+
 ```tsx
 // Environment Variables - EditableListField
 <EditableListField
-  label="Environment Variables"
-  items={envItems}
-  renderItem={(item, _, actions) => (
-    <KeyValueItemRenderer item={item} actions={actions} />
-  )}
-  createDefault={() => ({ key: '', value: '' })}
-  addButtonLabel="Add Variable"
+	label="Environment Variables"
+	items={envItems}
+	renderItem={(item, _, actions) => <KeyValueItemRenderer item={item} actions={actions} />}
+	createDefault={() => ({ key: '', value: '' })}
+	addButtonLabel="Add Variable"
 />
 ```
 
 ## Future Extensions
 
 The pattern can easily be extended for:
+
 - Script arguments (array of strings)
 - Retry policies (array of retry configs)
 - Webhooks (array of webhook configs)
@@ -272,13 +288,13 @@ Simply create a new item renderer and use it with EditableListField.
 
 ## Lines of Code Summary
 
-| Category | Files | Total Lines |
-|----------|-------|-------------|
-| Core Framework | 4 | ~440 |
-| Item Renderers | 4 | ~310 |
-| Integration | 2 | ~80 (changes) |
-| Tests | 5 | ~950 |
-| **Total** | **15** | **~1,780** |
+| Category       | Files  | Total Lines   |
+| -------------- | ------ | ------------- |
+| Core Framework | 4      | ~440          |
+| Item Renderers | 4      | ~310          |
+| Integration    | 2      | ~80 (changes) |
+| Tests          | 5      | ~950          |
+| **Total**      | **15** | **~1,780**    |
 
 ## Coverage Achieved
 

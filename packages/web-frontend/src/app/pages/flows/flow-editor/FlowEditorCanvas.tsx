@@ -3,10 +3,8 @@ import { useCallback } from 'react';
 import {
 	Background,
 	Controls,
-	type Edge,
 	type EdgeMouseHandler,
 	MiniMap,
-	type Node,
 	type NodeMouseHandler,
 	type OnConnect,
 	type OnEdgesChange,
@@ -17,15 +15,16 @@ import {
 
 import { edgeTypes } from './edges';
 import { nodeTypes } from './nodes';
+import type { FlowEdge, FlowNode } from './types';
 
 interface FlowEditorCanvasProps {
-	nodes: Node[];
-	edges: Edge[];
-	onNodesChange: OnNodesChange;
-	onEdgesChange: OnEdgesChange;
+	nodes: FlowNode[];
+	edges: FlowEdge[];
+	onNodesChange: OnNodesChange<FlowNode>;
+	onEdgesChange: OnEdgesChange<FlowEdge>;
 	onConnect: OnConnect;
-	onNodeClick: NodeMouseHandler;
-	onEdgeClick: EdgeMouseHandler;
+	onNodeClick: NodeMouseHandler<FlowNode>;
+	onEdgeClick: EdgeMouseHandler<FlowEdge>;
 	onPaneClick: () => void;
 	selectedNodeId: string | null;
 	selectedEdgeId: string | null;

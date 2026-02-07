@@ -281,7 +281,7 @@ describe('Transport Integration Tests', () => {
 			);
 
 			await waitFor(() => {
-				expect(screen.getByRole('alert')).toHaveTextContent('Failed to fetch tasks');
+				expect(screen.getByRole('alert')).toHaveTextContent('Connection failed');
 			});
 		});
 	});

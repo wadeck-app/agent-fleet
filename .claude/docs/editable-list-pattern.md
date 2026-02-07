@@ -17,9 +17,9 @@ import { useListItems } from '@framework/hooks2/useListItems';
 
 ```typescript
 interface MyItem {
-  id: string;
-  name: string;
-  value: number;
+	id: string;
+	name: string;
+	value: number;
 }
 ```
 
@@ -79,6 +79,7 @@ function MyComponent() {
 The framework includes three pre-built renderers:
 
 ### KeyValueItemRenderer
+
 For environment variables or any key-value pairs.
 
 ```typescript
@@ -97,6 +98,7 @@ const items = useListItems<KeyValueItem>({
 ```
 
 ### OutputItemRenderer
+
 For output configuration with name, type, and optional pattern.
 
 ```typescript
@@ -115,6 +117,7 @@ const items = useListItems<OutputItem>({
 ```
 
 ### InputDefinitionRenderer
+
 For flow input definitions with name and type.
 
 ```typescript
@@ -138,34 +141,35 @@ const items = useListItems<InputDefinitionItem>({
 
 ```typescript
 interface UseListItemsOptions<T> {
-  initialItems?: T[];
-  minItems?: number;
-  maxItems?: number;
-  createDefault?: () => T;
+	initialItems?: T[];
+	minItems?: number;
+	maxItems?: number;
+	createDefault?: () => T;
 }
 
-function useListItems<T>(options?: UseListItemsOptions<T>): ListItemsContract<T>
+function useListItems<T>(options?: UseListItemsOptions<T>): ListItemsContract<T>;
 ```
 
 **Returns:**
+
 ```typescript
 interface ListItemsContract<T> {
-  fstate: {
-    items: T[];
-    count: number;
-    isEmpty: boolean;
-    canAdd: boolean;
-    canRemove: boolean;
-  };
-  actions: {
-    add: (item: T) => void;
-    remove: (index: number) => void;
-    update: (index: number, partial: Partial<T>) => void;
-    set: (items: T[]) => void;
-    clear: () => void;
-    reorder: (fromIndex: number, toIndex: number) => void;
-  };
-  fillQuery: (query: Record<string, unknown>) => void;
+	fstate: {
+		items: T[];
+		count: number;
+		isEmpty: boolean;
+		canAdd: boolean;
+		canRemove: boolean;
+	};
+	actions: {
+		add: (item: T) => void;
+		remove: (index: number) => void;
+		update: (index: number, partial: Partial<T>) => void;
+		set: (items: T[]) => void;
+		clear: () => void;
+		reorder: (fromIndex: number, toIndex: number) => void;
+	};
+	fillQuery: (query: Record<string, unknown>) => void;
 }
 ```
 
@@ -173,25 +177,26 @@ interface ListItemsContract<T> {
 
 ```typescript
 interface EditableListFieldProps<T> {
-  // Core
-  items: ListItemsContract<T>;
-  renderItem: (item: T, index: number, actions: ItemActions<T>) => ReactNode;
-  createDefault: () => T;
+	// Core
+	items: ListItemsContract<T>;
+	renderItem: (item: T, index: number, actions: ItemActions<T>) => ReactNode;
+	createDefault: () => T;
 
-  // Optional
-  label?: string;
-  description?: string;
-  error?: string;
-  renderEmpty?: () => ReactNode;
-  addButtonLabel?: string;
-  emptyMessage?: string;
-  enableReordering?: boolean;
-  getItemId?: (item: T, index: number) => string | number;
-  className?: string;
+	// Optional
+	label?: string;
+	description?: string;
+	error?: string;
+	renderEmpty?: () => ReactNode;
+	addButtonLabel?: string;
+	emptyMessage?: string;
+	enableReordering?: boolean;
+	getItemId?: (item: T, index: number) => string | number;
+	className?: string;
 }
 ```
 
 **getItemId prop:**
+
 - Function to extract unique ID from item for React keys
 - Falls back to array index if not provided (not recommended for dynamic lists)
 - Essential when using `enableReordering={true}`
@@ -201,8 +206,8 @@ interface EditableListFieldProps<T> {
 
 ```typescript
 interface ItemActions<T> {
-  update: (partial: Partial<T>) => void;
-  remove: () => void;
+	update: (partial: Partial<T>) => void;
+	remove: () => void;
 }
 ```
 
@@ -222,11 +227,13 @@ By default, EditableListField uses array indices as React keys. For dynamic list
 ```
 
 **Why this matters:**
+
 - Prevents React from re-rendering wrong components during reordering
 - Improves performance by allowing React to track items correctly
 - Essential when using drag-and-drop reordering
 
 **Best practices:**
+
 ```typescript
 // ✅ Good: Use stable ID from item
 getItemId={(item) => item.id}
@@ -249,15 +256,15 @@ When you need to sync list items with external state (like a form or API):
 const items = useListItems<MyItem>({ initialItems: externalData });
 
 useEffect(() => {
-  // Convert items back to external format
-  const syncedData = items.fstate.items.map(item => ({
-    // Transform as needed
-  }));
+	// Convert items back to external format
+	const syncedData = items.fstate.items.map(item => ({
+		// Transform as needed
+	}));
 
-  // Only update if different to avoid infinite loops
-  if (JSON.stringify(syncedData) !== JSON.stringify(externalData)) {
-    onExternalUpdate(syncedData);
-  }
+	// Only update if different to avoid infinite loops
+	if (JSON.stringify(syncedData) !== JSON.stringify(externalData)) {
+		onExternalUpdate(syncedData);
+	}
 }, [items.fstate.items]);
 ```
 
@@ -287,21 +294,23 @@ const envItems = useSyncedListItems<KeyValueItem, Record<string, string>>({
 ```
 
 **Benefits of useSyncedListItems:**
+
 - Automatic syncing on every change
 - Built-in filtering support
 - Reduces boilerplate code
 - Type-safe transformations
 
 **API:**
+
 ```typescript
 interface UseSyncedListItemsOptions<T, R = T[]> {
-  initialItems?: T[];
-  transform: (items: T[]) => R;
-  onSync: (transformed: R) => void;
-  filter?: (item: T) => boolean;
-  minItems?: number;
-  maxItems?: number;
-  createDefault?: () => T;
+	initialItems?: T[];
+	transform: (items: T[]) => R;
+	onSync: (transformed: R) => void;
+	filter?: (item: T) => boolean;
+	minItems?: number;
+	maxItems?: number;
+	createDefault?: () => T;
 }
 ```
 
@@ -368,23 +377,25 @@ Provide a custom empty state:
 ## Best Practices
 
 ### 1. Type Safety
+
 Always define strict types for your items:
 
 ```typescript
 // ✅ Good
 interface TodoItem {
-  id: string;
-  text: string;
-  completed: boolean;
+	id: string;
+	text: string;
+	completed: boolean;
 }
 
 // ❌ Bad
 interface TodoItem {
-  [key: string]: any;
+	[key: string]: any;
 }
 ```
 
 ### 2. Unique Keys
+
 When rendering lists, ensure items have unique identifiers:
 
 ```typescript
@@ -396,30 +407,33 @@ createDefault={() => ({
 ```
 
 ### 3. Filter Empty Values
+
 When syncing to external state, filter out empty/invalid items:
 
 ```typescript
 const validItems = items.fstate.items
-  .filter(item => item.name.trim()) // Remove empty names
-  .filter(item => item.value > 0);  // Remove invalid values
+	.filter(item => item.name.trim()) // Remove empty names
+	.filter(item => item.value > 0); // Remove invalid values
 ```
 
 ### 4. Memoize Item Renderers
+
 For large lists, memoize your item renderer:
 
 ```typescript
 const MyItemRenderer = React.memo(({ item, actions }: ItemRendererProps) => {
-  // ... rendering logic
+	// ... rendering logic
 });
 ```
 
 ### 5. Handle Constraints
+
 Use minItems/maxItems to enforce business rules:
 
 ```typescript
 const items = useListItems<MyItem>({
-  minItems: 1,  // Must have at least 1 item
-  maxItems: 10, // Cannot have more than 10 items
+	minItems: 1, // Must have at least 1 item
+	maxItems: 10, // Cannot have more than 10 items
 });
 ```
 
@@ -428,18 +442,18 @@ const items = useListItems<MyItem>({
 ### Testing the Hook
 
 ```typescript
-import { renderHook, act } from '@testing-library/react';
 import { useListItems } from '@framework/hooks2/useListItems';
+import { act, renderHook } from '@testing-library/react';
 
 test('should add item', () => {
-  const { result } = renderHook(() => useListItems<MyItem>());
+	const { result } = renderHook(() => useListItems<MyItem>());
 
-  act(() => {
-    result.current.actions.add({ id: '1', name: 'Test', value: 10 });
-  });
+	act(() => {
+		result.current.actions.add({ id: '1', name: 'Test', value: 10 });
+	});
 
-  expect(result.current.fstate.items).toHaveLength(1);
-  expect(result.current.fstate.items[0].name).toBe('Test');
+	expect(result.current.fstate.items).toHaveLength(1);
+	expect(result.current.fstate.items[0].name).toBe('Test');
 });
 ```
 
@@ -472,6 +486,7 @@ test('should add item when button clicked', async () => {
 ### From JSON Textarea
 
 **Before:**
+
 ```typescript
 <Textarea
   value={JSON.stringify(data, null, 2)}
@@ -487,6 +502,7 @@ test('should add item when button clicked', async () => {
 ```
 
 **After:**
+
 ```typescript
 const items = useListItems<MyItem>({
   initialItems: Object.entries(data).map(([key, value]) => ({ key, value })),
@@ -504,24 +520,26 @@ const items = useListItems<MyItem>({
 ### From Custom List Implementation
 
 **Before:**
+
 ```typescript
 const [items, setItems] = useState([]);
 
 const handleAdd = () => {
-  setItems([...items, { id: uuid(), name: '' }]);
+	setItems([...items, { id: uuid(), name: '' }]);
 };
 
-const handleRemove = (index) => {
-  setItems(items.filter((_, i) => i !== index));
+const handleRemove = index => {
+	setItems(items.filter((_, i) => i !== index));
 };
 
 // ... more handlers
 ```
 
 **After:**
+
 ```typescript
 const items = useListItems<MyItem>({
-  initialItems: [],
+	initialItems: [],
 });
 
 // Use items.actions.add, items.actions.remove directly
@@ -529,13 +547,13 @@ const items = useListItems<MyItem>({
 
 ## Comparison with Similar Patterns
 
-| Feature | EditableListField | DataView/Table | Form Array |
-|---------|-------------------|----------------|------------|
-| Composable | ✅ | ✅ | ✅ |
-| Generic | ✅ | ✅ | ❌ |
-| Drag & Drop | ✅ | ❌ | ❌ |
-| Constraints | ✅ | ❌ | ✅ |
-| Headless | ✅ | ✅ | ❌ |
+| Feature     | EditableListField | DataView/Table | Form Array |
+| ----------- | ----------------- | -------------- | ---------- |
+| Composable  | ✅                | ✅             | ✅         |
+| Generic     | ✅                | ✅             | ❌         |
+| Drag & Drop | ✅                | ❌             | ❌         |
+| Constraints | ✅                | ❌             | ✅         |
+| Headless    | ✅                | ✅             | ❌         |
 
 ## Examples from Codebase
 

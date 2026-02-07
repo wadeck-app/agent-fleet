@@ -1,9 +1,8 @@
+import type { ItemActions } from '@framework/components2/list/EditableListField';
+import { RemoveItemButton } from '@framework/components2/list/RemoveItemButton';
 import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
-import { Button } from '@framework/components/primitives/Button';
-import type { ItemActions } from '@framework/components2/list/EditableListField';
-import { Trash2 } from 'lucide-react';
 
 import type { VariableType } from '../../../../app/pages/flows/flow-editor/types/flow-engine.types';
 
@@ -103,9 +102,7 @@ export function InputDefinitionRenderer({ item, actions }: InputDefinitionRender
 			</div>
 
 			<div className="flex items-end">
-				<Button type="button" variant="ghost" size="icon-sm" onClick={actions.remove} title="Remove">
-					<Trash2 className="size-4 text-destructive" />
-				</Button>
+				<RemoveItemButton onRemove={actions.remove} title="Remove input definition" />
 			</div>
 		</div>
 	);

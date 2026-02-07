@@ -1,7 +1,7 @@
 import { type ReactNode, useMemo } from 'react';
 
-import { useDataAccumulator } from '@framework/hooks2/useDataAccumulator';
-import type { InfinitePaginationContract } from '@framework/hooks2/useInfinitePagination';
+import { useDataAccumulator } from '@framework/hooks2/data/useDataAccumulator';
+import type { InfinitePaginationContract } from '@framework/hooks2/data/useInfinitePagination';
 import type { QueryResultDisplayerProps } from '@framework/types/QueryResultDisplayerContract';
 
 import { Data2, type Data2Props } from './Data2';

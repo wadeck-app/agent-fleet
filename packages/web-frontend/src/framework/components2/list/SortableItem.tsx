@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical } from 'lucide-react';
+import { DragHandle } from '@framework/components2/primitives/DragHandle';
 
 /**
  * ===========================================================================================
@@ -53,16 +53,7 @@ export function SortableItem({ id, disabled = false, children }: SortableItemPro
 		<div ref={setNodeRef} style={style} className="relative">
 			<div className="flex items-start gap-2">
 				{/* Drag Handle */}
-				{!disabled && (
-					<button
-						type="button"
-						className="mt-2 cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing"
-						{...attributes}
-						{...listeners}
-					>
-						<GripVertical className="size-4" />
-					</button>
-				)}
+				{!disabled && <DragHandle className="mt-2" disabled={disabled} {...attributes} {...listeners} />}
 
 				{/* Content */}
 				<div className="flex-1">{children}</div>

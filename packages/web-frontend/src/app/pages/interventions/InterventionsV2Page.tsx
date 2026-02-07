@@ -9,11 +9,11 @@ import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWr
 import { Pagination } from '@framework/components/pagination/Pagination';
 import { Button } from '@framework/components/primitives/Button';
 import { SearchBar } from '@framework/features/search/SearchBar';
-import { useCacheControl2 } from '@framework/hooks2/useCacheControl2';
-import { useMultiSelect2 } from '@framework/hooks2/useMultiSelect2';
-import { usePagination2 } from '@framework/hooks2/usePagination2';
-import { useSimpleSearch } from '@framework/hooks2/useSimpleSearch';
-import { useSorting2 } from '@framework/hooks2/useSorting2';
+import { useCacheControl2 } from '@framework/hooks2/data/useCacheControl2';
+import { usePagination2 } from '@framework/hooks2/data/usePagination2';
+import { useSimpleSearch } from '@framework/hooks2/data/useSimpleSearch';
+import { useSorting2 } from '@framework/hooks2/data/useSorting2';
+import { useMultiSelect2 } from '@framework/hooks2/utility/useMultiSelect2';
 import { useBulkDeleteState } from '@framework/hooks/useBulkDeleteState';
 import { useCrudSuccessToast } from '@framework/hooks/useCrudSuccessToast';
 import { useDeleteConfirmation } from '@framework/hooks/useDeleteConfirmation';

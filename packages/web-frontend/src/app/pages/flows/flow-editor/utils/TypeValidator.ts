@@ -36,13 +36,13 @@ export function getHandleType(handleId: string, node: FlowNode): VariableType | 
 	}
 
 	// Check input ports
-	if (node.data.inputPorts) {
+	if ('inputPorts' in node.data && Array.isArray(node.data.inputPorts)) {
 		const port = node.data.inputPorts.find(p => p.id === handleId);
 		if (port) return port.type;
 	}
 
 	// Check output ports
-	if (node.data.outputPorts) {
+	if ('outputPorts' in node.data && Array.isArray(node.data.outputPorts)) {
 		const port = node.data.outputPorts.find(p => p.id === handleId);
 		if (port) return port.type;
 	}

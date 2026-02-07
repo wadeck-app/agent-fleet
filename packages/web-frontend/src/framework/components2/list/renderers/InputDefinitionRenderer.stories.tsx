@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
 
-import { InputDefinitionRenderer, type InputDefinitionItem } from './InputDefinitionRenderer';
+import { type InputDefinitionItem, InputDefinitionRenderer } from './InputDefinitionRenderer';
 
 /**
  * InputDefinitionRenderer stories demonstrating the input definition editor.
@@ -182,7 +182,7 @@ export const DateTimeType: Story = {
  * Showcase all 21+ variable types.
  * Demonstrates the full range of supported types.
  */
-export const AllTypes: Story = {
+export const AllTypes = {
 	render: () => {
 		const items: InputDefinitionItem[] = [
 			{ name: 'textInput', type: 'string' },
@@ -223,13 +223,13 @@ export const AllTypes: Story = {
 			</div>
 		);
 	},
-};
+} as unknown as Story;
 
 /**
  * Multiple common inputs.
  * Shows typical flow input configuration.
  */
-export const CommonInputs: Story = {
+export const CommonInputs = {
 	render: () => {
 		const items: InputDefinitionItem[] = [
 			{ name: 'projectName', type: 'string' },
@@ -253,7 +253,7 @@ export const CommonInputs: Story = {
 			</div>
 		);
 	},
-};
+} as unknown as Story;
 
 /**
  * Long input name.

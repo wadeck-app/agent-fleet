@@ -124,7 +124,15 @@ export function ProjectsV2Page() {
 		// Auto-select first workspace if project has workspaces but none selected
 		if (projectId && activeProject && projectWorkspaces.length > 0 && !workspaceId) {
 			console.log('[ProjectsV2Page] Auto-selecting first workspace:', projectWorkspaces[0].id);
-			setSearchParams({ projectId, workspaceId: projectWorkspaces[0].id }, { replace: true });
+			// Use functional form to ensure we use the current projectId from URL
+			setSearchParams(
+				prev => {
+					const currentProjectId = prev.get('projectId');
+					if (!currentProjectId) return prev;
+					return { projectId: currentProjectId, workspaceId: projectWorkspaces[0].id };
+				},
+				{ replace: true }
+			);
 			hasAutoSelected.current = true;
 			return;
 		}
@@ -200,18 +208,26 @@ export function ProjectsV2Page() {
 
 	// Handlers for workspace and view selection
 	const handleWorkspaceSelect = (newWorkspaceId: string) => {
-		if (!projectId) return;
-		// Explicit URL update - keep projectId, set workspaceId
-		setSearchParams({ projectId, workspaceId: newWorkspaceId });
+		// Use functional form to avoid stale closure issues
+		setSearchParams(prev => {
+			const currentProjectId = prev.get('projectId');
+			if (!currentProjectId) return prev;
+			return { projectId: currentProjectId, workspaceId: newWorkspaceId };
+		});
 	};
 
 	const handleViewChange = (newView: 'tasks' | 'scripts') => {
-		if (!projectId) return;
-		// Explicit URL update - preserve projectId and workspaceId
-		const params: Record<string, string> = { projectId };
-		if (workspaceId) params.workspaceId = workspaceId;
-		if (newView !== 'tasks') params.view = newView; // Only add if not default
-		setSearchParams(params);
+		// Use functional form to avoid stale closure issues
+		setSearchParams(prev => {
+			const currentProjectId = prev.get('projectId');
+			const currentWorkspaceId = prev.get('workspaceId');
+			if (!currentProjectId) return prev;
+
+			const params: Record<string, string> = { projectId: currentProjectId };
+			if (currentWorkspaceId) params.workspaceId = currentWorkspaceId;
+			if (newView !== 'tasks') params.view = newView; // Only add if not default
+			return params;
+		});
 	};
 
 	const handleEditProject = (project: Project) => {

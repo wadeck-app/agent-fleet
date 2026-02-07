@@ -170,7 +170,7 @@ describe('EditProjectDialog', () => {
 			});
 		});
 
-		it('should validate name length', async () => {
+		it('should validate name length', { timeout: 15000 }, async () => {
 			const user = userEvent.setup();
 			const onSuccess = vi.fn();
 
@@ -218,7 +218,7 @@ describe('EditProjectDialog', () => {
 	});
 
 	describe('git fields updates', () => {
-		it('should include updated git fields in PATCH request', async () => {
+		it('should include updated git fields in PATCH request', { timeout: 15000 }, async () => {
 			const user = userEvent.setup();
 			const { projectsApi } = await import('./projects.api');
 

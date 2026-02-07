@@ -23,7 +23,7 @@ import { useFlowPreview } from './hooks/useFlowPreview';
 import type { FlowEdge, FlowNode } from './types';
 import type { FlowDefinition } from './types/flow-engine.types';
 import { cn } from './utils/cn';
-import { computeFlowDiff, type DiffSegment } from './utils/computeFlowDiff';
+import { type DiffSegment, computeFlowDiff } from './utils/computeFlowDiff';
 import { flowDefinitionToReactFlow } from './utils/flowToReactFlow';
 import { applyDagreLayout } from './utils/layoutAlgorithms';
 
@@ -72,7 +72,7 @@ export function FlowEditorRightPanel({
 	const [yamlTab, setYamlTab] = useState<'original' | 'preview'>('preview');
 	const [isEditingYaml, setIsEditingYaml] = useState(false);
 	const [editedYaml, setEditedYaml] = useState('');
-	const [_yamlError, setYamlError] = useState<string | null>(null);
+	const [yamlError, setYamlError] = useState<string | null>(null);
 
 	// Compute preview and diff
 	const previewFlow = useFlowPreview(flowDefinition, nodes, allEdges);
@@ -313,7 +313,9 @@ export function FlowEditorRightPanel({
 																	)}
 																/>
 															)}
-															{line.segments ? renderSegments(line.segments) : line.content}
+															{line.segments
+																? renderSegments(line.segments)
+																: line.content}
 														</pre>
 													);
 												})}

@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
 
+import { EditableListField } from '@framework/components2/list/EditableListField';
+import {
+	type InputDefinitionItem,
+	InputDefinitionRenderer,
+} from '@framework/components2/list/renderers/InputDefinitionRenderer';
 import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
@@ -13,12 +18,7 @@ import {
 	DialogTitle,
 } from '@framework/components/overlays/Dialog';
 import { Button } from '@framework/components/primitives/Button';
-import { EditableListField } from '@framework/components2/list/EditableListField';
-import {
-	InputDefinitionRenderer,
-	type InputDefinitionItem,
-} from '@framework/components2/list/renderers/InputDefinitionRenderer';
-import { useListItems } from '@framework/hooks2/useListItems';
+import { useListItems } from '@framework/hooks2/form/useListItems';
 
 import type { FlowDefinition, GitStrategy, ReusePolicy, WorkspaceMode } from './types/flow-engine.types';
 
@@ -33,9 +33,12 @@ export function FlowSettingsDialog({ open, onOpenChange, flowDefinition, onSave 
 	const [localFlow, setLocalFlow] = useState<FlowDefinition>(flowDefinition);
 
 	// Update local state when flow definition changes
-	if (flowDefinition.id !== localFlow.id || flowDefinition.version !== localFlow.version) {
-		setLocalFlow(flowDefinition);
-	}
+	useEffect(() => {
+		if (flowDefinition.id !== localFlow.id || flowDefinition.version !== localFlow.version) {
+			setLocalFlow(flowDefinition);
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [flowDefinition.id, flowDefinition.version]);
 
 	// Input definitions list management
 	const inputItems = useListItems<InputDefinitionItem>({
@@ -237,8 +240,10 @@ export function FlowSettingsDialog({ open, onOpenChange, flowDefinition, onSave 
 							label="Flow Inputs"
 							description="Define input variables that this flow accepts from tasks"
 							items={inputItems}
-							renderItem={(item, _index, actions) => <InputDefinitionRenderer item={item} actions={actions} />}
-							createDefault={() => ({ name: '', type: 'string' })}
+							renderItem={(item, _index, actions) => (
+								<InputDefinitionRenderer item={item} actions={actions} />
+							)}
+							createDefault={() => ({ name: '', type: 'string' as InputDefinitionItem['type'] })}
 							addButtonLabel="Add Input"
 							emptyMessage="No inputs defined"
 							getItemId={(item, index) => item.name || `input-${index}`}

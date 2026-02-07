@@ -4,7 +4,7 @@ import { Button } from '@framework/components/primitives/Button';
 import { Separator } from '@framework/components/primitives/Separator';
 import { ArrowRight, Trash2 } from 'lucide-react';
 
-import type { FlowEdge, FlowNode } from './types';
+import { type FlowEdge, type FlowNode, isStepNodeData } from './types';
 import type { VariableType } from './types/flow-engine.types';
 
 interface FlowEditorEdgePanelProps {
@@ -49,7 +49,7 @@ export function FlowEditorEdgePanel({ selectedEdge, nodes, onDeleteEdge }: FlowE
 	const targetNode = nodes.find(n => n.id === selectedEdge.target);
 	const edgeData = selectedEdge.data;
 
-	// Get node names
+	// Get node names with proper type checking
 	const getNodeName = (node: FlowNode | undefined) => {
 		if (!node) return 'Unknown';
 		if (node.type === 'constant') {
@@ -57,7 +57,11 @@ export function FlowEditorEdgePanel({ selectedEdge, nodes, onDeleteEdge }: FlowE
 			const constantData = node.data as { label?: string };
 			return constantData.label || 'Constant';
 		}
-		return node.data.step?.name || node.id;
+		// Check if data has step property using type guard
+		if (isStepNodeData(node.data)) {
+			return node.data.step.name || node.id;
+		}
+		return node.id;
 	};
 
 	const sourceNodeName = getNodeName(sourceNode);

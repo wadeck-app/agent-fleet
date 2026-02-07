@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-import { useDebounce } from '@framework/hooks2/useDebounce';
+import { useDebounce } from '@framework/hooks2/utility/useDebounce';
 import type { SearchContract } from '@framework/types/contracts';
 
 /**

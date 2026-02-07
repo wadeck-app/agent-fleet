@@ -1,10 +1,9 @@
+import type { ItemActions } from '@framework/components2/list/EditableListField';
+import { RemoveItemButton } from '@framework/components2/list/RemoveItemButton';
 import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
 import { Textarea } from '@framework/components/forms/Textarea';
-import { Button } from '@framework/components/primitives/Button';
-import type { ItemActions } from '@framework/components2/list/EditableListField';
-import { Trash2 } from 'lucide-react';
 
 /**
  * ===========================================================================================
@@ -84,9 +83,7 @@ export function OutputItemRenderer({ item, actions }: OutputItemRendererProps) {
 				</div>
 
 				<div className="flex items-end">
-					<Button type="button" variant="ghost" size="icon-sm" onClick={actions.remove} title="Remove">
-						<Trash2 className="size-4 text-destructive" />
-					</Button>
+					<RemoveItemButton onRemove={actions.remove} title="Remove output" />
 				</div>
 			</div>
 
@@ -104,7 +101,10 @@ export function OutputItemRenderer({ item, actions }: OutputItemRendererProps) {
 						rows={2}
 						className="font-mono text-xs"
 					/>
-					<p className="text-xs text-muted-foreground">Regex pattern for extracting the value from output</p>
+					<p className="text-xs text-muted-foreground">
+						Regex pattern for extracting the value from output. Examples: <code>Result: (.*)</code> |{' '}
+						<code>Score: (\d+)</code> | <code>Status: (pass|fail)</code>
+					</p>
 				</div>
 			)}
 		</div>

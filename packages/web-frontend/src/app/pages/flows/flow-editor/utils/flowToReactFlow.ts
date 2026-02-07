@@ -127,7 +127,10 @@ export function reactFlowToFlowDefinition(
 
 	// Convert nodes back to steps (only backend nodes, excluding constants)
 	const steps: FlowStep[] = backendNodes.map(node => {
-		const step = { ...node.data.step };
+		if (!('step' in node.data) || !node.data.step) {
+			throw new Error(`Node ${node.id} is missing step data`);
+		}
+		const step = { ...node.data.step } as FlowStep;
 
 		// Add dependencies from edges
 		const deps = dependencyMap.get(node.id);

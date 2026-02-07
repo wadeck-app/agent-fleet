@@ -1,9 +1,8 @@
+import { useListItems } from '@framework/hooks2/form/useListItems';
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { useListItems } from '@framework/hooks2/useListItems';
-
 import { EditableListField } from './EditableListField';
-import { KeyValueItemRenderer, type KeyValueItem } from './renderers/KeyValueItemRenderer';
+import { type KeyValueItem, KeyValueItemRenderer } from './renderers/KeyValueItemRenderer';
 
 /**
  * EditableListField component stories demonstrating all features and states.
@@ -25,7 +24,7 @@ type Story = StoryObj<typeof meta>;
  * List with pre-populated items using KeyValueItemRenderer.
  * Demonstrates basic usage with multiple items.
  */
-export const WithItems: Story = {
+export const WithItems = {
 	render: () => {
 		const items = useListItems<KeyValueItem>({
 			initialItems: [
@@ -47,13 +46,13 @@ export const WithItems: Story = {
 			/>
 		);
 	},
-};
+} as unknown as Story;
 
 /**
  * Empty list with custom empty message.
  * Shows the dashed border empty state.
  */
-export const Empty: Story = {
+export const Empty = {
 	render: () => {
 		const items = useListItems<KeyValueItem>({
 			initialItems: [],
@@ -72,13 +71,13 @@ export const Empty: Story = {
 			/>
 		);
 	},
-};
+} as unknown as Story;
 
 /**
  * List at maximum capacity.
  * The "Add Item" button is disabled when maxItems is reached.
  */
-export const MaxItems: Story = {
+export const MaxItems = {
 	render: () => {
 		const items = useListItems<KeyValueItem>({
 			initialItems: [
@@ -101,13 +100,13 @@ export const MaxItems: Story = {
 			/>
 		);
 	},
-};
+} as unknown as Story;
 
 /**
  * List at minimum capacity.
  * Items cannot be removed when the list is at minItems.
  */
-export const MinItems: Story = {
+export const MinItems = {
 	render: () => {
 		const items = useListItems<KeyValueItem>({
 			initialItems: [{ key: 'REQUIRED_VAR', value: 'required_value' }],
@@ -126,13 +125,13 @@ export const MinItems: Story = {
 			/>
 		);
 	},
-};
+} as unknown as Story;
 
 /**
  * List with drag-and-drop reordering enabled.
  * Items can be dragged by the grip handle to reorder them.
  */
-export const WithDragDrop: Story = {
+export const WithDragDrop = {
 	render: () => {
 		const items = useListItems<KeyValueItem>({
 			initialItems: [
@@ -156,13 +155,13 @@ export const WithDragDrop: Story = {
 			/>
 		);
 	},
-};
+} as unknown as Story;
 
 /**
  * List without drag-and-drop (static order).
  * No grip handles are shown; items stay in fixed order.
  */
-export const WithoutDragDrop: Story = {
+export const WithoutDragDrop = {
 	render: () => {
 		const items = useListItems<KeyValueItem>({
 			initialItems: [
@@ -185,13 +184,13 @@ export const WithoutDragDrop: Story = {
 			/>
 		);
 	},
-};
+} as unknown as Story;
 
 /**
  * List with validation error.
  * Shows how error messages are displayed below the list.
  */
-export const WithError: Story = {
+export const WithError = {
 	render: () => {
 		const items = useListItems<KeyValueItem>({
 			initialItems: [{ key: '', value: 'missing_key' }],
@@ -210,13 +209,13 @@ export const WithError: Story = {
 			/>
 		);
 	},
-};
+} as unknown as Story;
 
 /**
  * Custom empty state renderer.
  * Demonstrates using renderEmpty to provide a custom component.
  */
-export const CustomEmptyState: Story = {
+export const CustomEmptyState = {
 	render: () => {
 		const items = useListItems<KeyValueItem>({
 			initialItems: [],
@@ -241,4 +240,4 @@ export const CustomEmptyState: Story = {
 			/>
 		);
 	},
-};
+} as unknown as Story;
