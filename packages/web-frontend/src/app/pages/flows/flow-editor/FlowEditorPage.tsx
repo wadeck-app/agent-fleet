@@ -17,6 +17,7 @@ import { FlowEditorEdgePanel } from './FlowEditorEdgePanel';
 import { FlowEditorPropertiesPanel } from './FlowEditorPropertiesPanel';
 import { FlowEditorRightPanel } from './FlowEditorRightPanel';
 import { FlowEditorToolbar } from './FlowEditorToolbar';
+import { FlowSettingsDialog } from './FlowSettingsDialog';
 import { EdgeSelectionProvider } from './contexts/EdgeSelectionContext';
 import { useFlowEditor } from './hooks/useFlowEditor';
 import { useFlowsList } from './hooks/useFlowsList';
@@ -30,6 +31,9 @@ export function FlowEditorPage() {
 
 	// Track previous isSaving state to detect save completion
 	const [wasSaving, setWasSaving] = useState(false);
+
+	// Settings dialog state
+	const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
 
 	// Show success toast when save completes successfully
 	useEffect(() => {
@@ -79,6 +83,7 @@ export function FlowEditorPage() {
 								onSave={flowEditor.saveFlow}
 								onValidate={flowEditor.validateFlow}
 								onAutoLayout={flowEditor.autoLayout}
+								onOpenSettings={() => setSettingsDialogOpen(true)}
 								onAddNode={flowEditor.addNode}
 								onLoadFlow={handleLoadFlow}
 								availableFlows={flows}
@@ -139,6 +144,16 @@ export function FlowEditorPage() {
 						}
 						loading={flowEditor.loading}
 					/>
+
+					{/* Flow Settings Dialog */}
+					{flowEditor.flowDefinition && (
+						<FlowSettingsDialog
+							open={settingsDialogOpen}
+							onOpenChange={setSettingsDialogOpen}
+							flowDefinition={flowEditor.flowDefinition}
+							onSave={flowEditor.updateFlowDefinition}
+						/>
+					)}
 				</Page>
 			</EdgeSelectionProvider>
 		</ReactFlowProvider>

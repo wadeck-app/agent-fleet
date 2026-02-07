@@ -1,0 +1,235 @@
+import { useState } from 'react';
+
+import { Input } from '@framework/components/forms/Input';
+import { Label } from '@framework/components/forms/Label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
+import { Textarea } from '@framework/components/forms/Textarea';
+import {
+	Dialog,
+	DialogBody,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from '@framework/components/overlays/Dialog';
+import { Button } from '@framework/components/primitives/Button';
+
+import { FlowInputDefinitionsField } from './FlowInputDefinitionsField';
+import type { FlowDefinition, GitStrategy, ReusePolicy, WorkspaceMode } from './types/flow-engine.types';
+
+interface FlowSettingsDialogProps {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	flowDefinition: FlowDefinition;
+	onSave: (updates: Partial<FlowDefinition>) => void;
+}
+
+export function FlowSettingsDialog({ open, onOpenChange, flowDefinition, onSave }: FlowSettingsDialogProps) {
+	const [localFlow, setLocalFlow] = useState<FlowDefinition>(flowDefinition);
+
+	// Update local state when flow definition changes
+	if (flowDefinition.id !== localFlow.id || flowDefinition.version !== localFlow.version) {
+		setLocalFlow(flowDefinition);
+	}
+
+	const handleSave = () => {
+		onSave({
+			version: localFlow.version,
+			description: localFlow.description,
+			workspace: localFlow.workspace,
+			inputs: localFlow.inputs,
+		});
+		onOpenChange(false);
+	};
+
+	const handleCancel = () => {
+		// Reset to original flow definition
+		setLocalFlow(flowDefinition);
+		onOpenChange(false);
+	};
+
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent className="sm:max-w-2xl" preventOutsideClick>
+				<DialogHeader>
+					<DialogTitle>Flow Settings</DialogTitle>
+				</DialogHeader>
+
+				<DialogBody>
+					<div className="space-y-6">
+						{/* Version */}
+						<div className="space-y-2">
+							<Label htmlFor="flow-version">Version</Label>
+							<Input
+								id="flow-version"
+								value={localFlow.version}
+								onChange={e =>
+									setLocalFlow(prev => ({
+										...prev,
+										version: e.target.value,
+									}))
+								}
+								placeholder="e.g., 1.0.0"
+							/>
+							<p className="text-xs text-muted-foreground">Semantic version of the flow (e.g., 1.0.0)</p>
+						</div>
+
+						{/* Description */}
+						<div className="space-y-2">
+							<Label htmlFor="flow-description">Description</Label>
+							<Textarea
+								id="flow-description"
+								value={localFlow.description}
+								onChange={e =>
+									setLocalFlow(prev => ({
+										...prev,
+										description: e.target.value,
+									}))
+								}
+								rows={3}
+								placeholder="Describe what this flow does"
+							/>
+							<p className="text-xs text-muted-foreground">Brief description of the flow purpose</p>
+						</div>
+
+						{/* Workspace Config */}
+						<div className="space-y-4">
+							<h3 className="text-sm font-semibold">Workspace Configuration</h3>
+
+							<div className="space-y-2">
+								<Label htmlFor="workspace-mode">Mode</Label>
+								<Select
+									value={localFlow.workspace.mode}
+									onValueChange={value =>
+										setLocalFlow(prev => ({
+											...prev,
+											workspace: {
+												...prev.workspace,
+												mode: value as WorkspaceMode,
+											},
+										}))
+									}
+								>
+									<SelectTrigger className="w-full">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="isolated">Isolated</SelectItem>
+										<SelectItem value="shared">Shared</SelectItem>
+										<SelectItem value="manual">Manual</SelectItem>
+									</SelectContent>
+								</Select>
+								<p className="text-xs text-muted-foreground">
+									Isolated: Fresh workspace per execution. Shared: Reuse existing. Manual:
+									User-specified
+								</p>
+							</div>
+
+							<div className="space-y-2">
+								<Label htmlFor="git-strategy">Git Strategy</Label>
+								<Select
+									value={localFlow.workspace.gitStrategy}
+									onValueChange={value =>
+										setLocalFlow(prev => ({
+											...prev,
+											workspace: {
+												...prev.workspace,
+												gitStrategy: value as GitStrategy,
+											},
+										}))
+									}
+								>
+									<SelectTrigger className="w-full">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="main-only">Main Only</SelectItem>
+										<SelectItem value="feature-branch">Feature Branch</SelectItem>
+										<SelectItem value="any">Any</SelectItem>
+										<SelectItem value="worktree">Worktree</SelectItem>
+									</SelectContent>
+								</Select>
+								<p className="text-xs text-muted-foreground">
+									Which Git branches are allowed for workspace checkout
+								</p>
+							</div>
+
+							<div className="space-y-2">
+								<Label htmlFor="reuse-policy">Reuse Policy</Label>
+								<Select
+									value={localFlow.workspace.reusePolicy}
+									onValueChange={value =>
+										setLocalFlow(prev => ({
+											...prev,
+											workspace: {
+												...prev.workspace,
+												reusePolicy: value as ReusePolicy,
+											},
+										}))
+									}
+								>
+									<SelectTrigger className="w-full">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="never">Never</SelectItem>
+										<SelectItem value="if-available">If Available</SelectItem>
+										<SelectItem value="always">Always</SelectItem>
+									</SelectContent>
+								</Select>
+								<p className="text-xs text-muted-foreground">When to reuse existing workspaces</p>
+							</div>
+
+							<div className="space-y-2">
+								<Label htmlFor="concurrency-key">Concurrency Key (optional)</Label>
+								<Input
+									id="concurrency-key"
+									value={localFlow.workspace.concurrencyKey || ''}
+									onChange={e =>
+										setLocalFlow(prev => ({
+											...prev,
+											workspace: {
+												...prev.workspace,
+												concurrencyKey: e.target.value || undefined,
+											},
+										}))
+									}
+									placeholder="Optional key for workspace locking"
+								/>
+								<p className="text-xs text-muted-foreground">
+									Optional key for workspace concurrency control
+								</p>
+							</div>
+						</div>
+
+						{/* Flow Inputs */}
+						<div className="space-y-2">
+							<Label>Flow Inputs</Label>
+							<FlowInputDefinitionsField
+								inputs={localFlow.inputs}
+								onChange={inputs =>
+									setLocalFlow(prev => ({
+										...prev,
+										inputs,
+									}))
+								}
+							/>
+							<p className="text-xs text-muted-foreground">
+								Define input variables that this flow accepts from tasks
+							</p>
+						</div>
+					</div>
+				</DialogBody>
+
+				<DialogFooter>
+					<Button variant="outline" onClick={handleCancel}>
+						Cancel
+					</Button>
+					<Button variant="default" onClick={handleSave}>
+						Save Settings
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
+	);
+}

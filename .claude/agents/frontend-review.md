@@ -4,6 +4,7 @@ description: Use this agent when reviewing React frontend code. This agent shoul
 tools: Glob, Grep, Read, NotebookEdit, WebFetch, TodoWrite, BashOutput, Skill, SlashCommand
 model: haiku
 color: pink
+memory: project
 ---
 
 Ultrathink

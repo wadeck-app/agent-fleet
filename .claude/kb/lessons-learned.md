@@ -5153,6 +5153,7 @@ function Button({
 **Root Cause**: Optimistic state (`optimisticAdditions`, `optimisticRemovals`) was never cleaned up when WebSocket events confirmed server-side changes. This caused stale optimistic state to corrupt the `effectiveConfiguredIds` calculation:
 
 **Bug Sequence**:
+
 1. User clicks ADD → `optimisticAdditions.add('build')`
 2. API succeeds → WebSocket event arrives → `scripts` props updated with new script
 3. **BUG**: `optimisticAdditions` still contains 'build' (not cleaned up!)
@@ -5167,50 +5168,53 @@ function Button({
 ```typescript
 // CRITICAL: Clean up optimistic states when WebSocket updates arrive
 useEffect(() => {
-    const currentScriptNames = new Set(scripts.map(s => s.script.scriptName));
+	const currentScriptNames = new Set(scripts.map(s => s.script.scriptName));
 
-    // Clean up optimistic additions that have been confirmed by server
-    setOptimisticAdditions(prev => {
-        const next = new Set(prev);
-        let changed = false;
-        prev.forEach(name => {
-            if (currentScriptNames.has(name)) {
-                next.delete(name);
-                changed = true;
-            }
-        });
-        return changed ? next : prev;
-    });
+	// Clean up optimistic additions that have been confirmed by server
+	setOptimisticAdditions(prev => {
+		const next = new Set(prev);
+		let changed = false;
+		prev.forEach(name => {
+			if (currentScriptNames.has(name)) {
+				next.delete(name);
+				changed = true;
+			}
+		});
+		return changed ? next : prev;
+	});
 
-    // Clean up optimistic removals that have been confirmed by server  
-    setOptimisticRemovals(prev => {
-        const next = new Set(prev);
-        let changed = false;
-        prev.forEach(name => {
-            if (!currentScriptNames.has(name)) {
-                next.delete(name);
-                changed = true;
-            }
-        });
-        return changed ? next : prev;
-    });
+	// Clean up optimistic removals that have been confirmed by server
+	setOptimisticRemovals(prev => {
+		const next = new Set(prev);
+		let changed = false;
+		prev.forEach(name => {
+			if (!currentScriptNames.has(name)) {
+				next.delete(name);
+				changed = true;
+			}
+		});
+		return changed ? next : prev;
+	});
 }, [scripts]);
 ```
 
 **Test Coverage**: Created `useConfigureScriptsState.websocket.test.ts` with 3 critical tests:
+
 1. Cleanup optimistic additions when WebSocket confirms creation
-2. Cleanup optimistic removals when WebSocket confirms deletion  
+2. Cleanup optimistic removals when WebSocket confirms deletion
 3. Multiple rapid add/remove cycles with WebSocket updates (regression test)
 
 **Key Insight**: Optimistic UI with real-time updates requires THREE synchronization points:
+
 1. **Optimistic application** (flushSync before API call)
 2. **Error rollback** (flushSync in catch block)
 3. **Server confirmation cleanup** (useEffect on props change) ← This was missing!
 
 **Files Modified**:
+
 - `packages/web-frontend/src/app/pages/workspaces/scripts/useConfigureScriptsState.ts`
-  - Added cleanup useEffect (lines 124-154)
-  - Added flushSync to all state updates for race condition prevention
+    - Added cleanup useEffect (lines 124-154)
+    - Added flushSync to all state updates for race condition prevention
 
 **When Discovered**: February 2, 2026 - User reported persistent "already exists" errors despite flushSync fixes. Multiple debugging iterations revealed the WebSocket synchronization gap.
 
@@ -5223,60 +5227,64 @@ useEffect(() => {
 **Problem**: 67 frontend tests were failing. Initial assumption was that the code was broken and needed fixing.
 
 **Reality Check**: Used `agent-browser` to manually test EditProjectDialog in real browser. **Everything worked perfectly**:
+
 - Dialog rendered correctly ✅
-- All form fields appeared ✅  
+- All form fields appeared ✅
 - Fields were pre-populated ✅
 - User could modify and submit ✅
 
 **Root Cause**: Tests were wrong, not the code. The specific bug: `screen.getByLabelText('Name')` failed because labels with `required` prop render as `"Name*"` (with asterisk).
 
 **Solution**: Replace exact string matchers with regex patterns:
+
 ```typescript
 // ❌ Fails with required fields
-screen.getByLabelText('Name')
+screen.getByLabelText('Name');
 
 // ✅ Works with asterisks
-screen.getByLabelText(/Name/i)
+screen.getByLabelText(/Name/i);
 ```
 
 **Key Lessons**:
 
 1. **Verify in real browser first** before assuming tests are correct
-   - Use `agent-browser` to test actual user flows
-   - Compare what tests expect vs what browser shows
-   - Tests can lie, browsers don't
+    - Use `agent-browser` to test actual user flows
+    - Compare what tests expect vs what browser shows
+    - Tests can lie, browsers don't
 
 2. **Parallel investigation is faster**
-   - Launched 6 agents simultaneously to analyze different test files
-   - Each agent analyzed root cause independently
-   - Dramatically faster than sequential debugging
+    - Launched 6 agents simultaneously to analyze different test files
+    - Each agent analyzed root cause independently
+    - Dramatically faster than sequential debugging
 
 3. **Question test value aggressively**
-   - Removed 75% of dialog tests (113 → 28 tests)
-   - Many tested implementation details (CSS classes, toast messages)
-   - Kept only business-critical tests (validation, data integrity, error handling)
+    - Removed 75% of dialog tests (113 → 28 tests)
+    - Many tested implementation details (CSS classes, toast messages)
+    - Kept only business-critical tests (validation, data integrity, error handling)
 
 4. **Testing Library gotchas**:
-   - `getByLabelText` matches **full text content** including child elements
-   - Required fields add `<span>*</span>` inside labels
-   - Use regex `/pattern/i` for robust label matching
-   - Or use `getByRole` with accessible names instead
+    - `getByLabelText` matches **full text content** including child elements
+    - Required fields add `<span>*</span>` inside labels
+    - Use regex `/pattern/i` for robust label matching
+    - Or use `getByRole` with accessible names instead
 
 5. **agent-browser methodology**:
-   - Open real app: `agent-browser open http://localhost:5173`
-   - Navigate and interact: `click @eX`, `fill @eX "value"`
-   - Compare behavior with test expectations
-   - Take screenshots to document actual vs expected
+    - Open real app: `agent-browser open http://localhost:5173`
+    - Navigate and interact: `click @eX`, `fill @eX "value"`
+    - Compare behavior with test expectations
+    - Take screenshots to document actual vs expected
 
 **Impact**: Reduced failing tests from 67 → 5 by fixing matcher patterns and removing low-value tests.
 
 **Files Modified**:
+
 - `packages/web-frontend/src/app/pages/projects/EditProjectDialog.test.tsx`
-  - Changed all `getByLabelText('Name')` to `getByLabelText(/Name/i)`
-  - Removed 43 low-value tests (toast messages, CSS classes, redundant edge cases)
-  - Kept 11 critical tests (validation, data integrity, error handling)
+    - Changed all `getByLabelText('Name')` to `getByLabelText(/Name/i)`
+    - Removed 43 low-value tests (toast messages, CSS classes, redundant edge cases)
+    - Kept 11 critical tests (validation, data integrity, error handling)
 
 **When to Use This Approach**:
+
 - Tests fail but feature "seems to work" manually
 - Multiple similar tests fail with same pattern
 - Tests timeout or can't find elements that should exist
@@ -5291,6 +5299,7 @@ screen.getByLabelText(/Name/i)
 ### Problem
 
 Validation errors were NOT displayed in EditProjectDialog tests:
+
 - Clearing required field and clicking submit → no error message shown
 - `aria-invalid` stayed `false`
 - Dialog stayed open (correct) but user got no feedback
@@ -5300,12 +5309,12 @@ Validation errors were NOT displayed in EditProjectDialog tests:
 
 1. **Initial investigation**: Used `agent-browser` to verify real app behavior - errors didn't appear there either
 2. **Deep dive**: Added console.log to validator and handleSubmit
-   - Validator ran and detected errors correctly
-   - But `handleSubmit` was NEVER called!
+    - Validator ran and detected errors correctly
+    - But `handleSubmit` was NEVER called!
 3. **Discovery**: HTML5 `required` attribute on input prevented form submission
-   - TextField component sets `required={true}` → adds HTML `required` attribute
-   - Browser's native validation blocked submission BEFORE JavaScript validation ran
-   - No handleSubmit → no `setValidationErrors` → no error messages displayed
+    - TextField component sets `required={true}` → adds HTML `required` attribute
+    - Browser's native validation blocked submission BEFORE JavaScript validation ran
+    - No handleSubmit → no `setValidationErrors` → no error messages displayed
 
 ### Solution
 
@@ -5336,24 +5345,24 @@ await user.paste('a'.repeat(501));
 ### Key Lessons
 
 1. **HTML5 validation interferes with custom validation**
-   - `required`, `min`, `max`, `pattern` attributes trigger browser validation
-   - Browser validation shows native tooltips, not our styled error messages
-   - Always use `noValidate` on forms with custom validation
+    - `required`, `min`, `max`, `pattern` attributes trigger browser validation
+    - Browser validation shows native tooltips, not our styled error messages
+    - Always use `noValidate` on forms with custom validation
 
 2. **agent-browser reveals production bugs tests miss**
-   - Tests can hide bugs by not checking what users actually see
-   - Real browser testing caught: no error message, no aria-invalid
-   - This was a **production bug**, not just a test issue
+    - Tests can hide bugs by not checking what users actually see
+    - Real browser testing caught: no error message, no aria-invalid
+    - This was a **production bug**, not just a test issue
 
 3. **Performance matters in tests**
-   - `user.type()` simulates each keystroke (slow for long text)
-   - `user.paste()` is instant for bulk text entry
-   - Use `type` for short user inputs, `paste` for long test data
+    - `user.type()` simulates each keystroke (slow for long text)
+    - `user.paste()` is instant for bulk text entry
+    - Use `type` for short user inputs, `paste` for long test data
 
 4. **Console.log debugging flow**
-   - Log validator execution → error detection worked ✓
-   - Log handleSubmit calls → never executed ✗
-   - This pinpointed the issue: form submission blocked before handleSubmit
+    - Log validator execution → error detection worked ✓
+    - Log handleSubmit calls → never executed ✗
+    - This pinpointed the issue: form submission blocked before handleSubmit
 
 ### Impact
 
@@ -5363,9 +5372,9 @@ await user.paste('a'.repeat(501));
 ### Files Modified
 
 - `packages/web-frontend/src/framework/features/forms/FormContainer.tsx`
-  - Added `noValidate` to disable HTML5 validation
+    - Added `noValidate` to disable HTML5 validation
 - `packages/web-frontend/src/app/pages/projects/EditProjectDialog.test.tsx`
-  - Changed `user.type(text)` to `user.paste(text)` for long strings
+    - Changed `user.type(text)` to `user.paste(text)` for long strings
 
 ### When to Remember This
 
@@ -5373,4 +5382,3 @@ await user.paste('a'.repeat(501));
 - Tests expect validation errors but they don't appear
 - Form submission seems blocked without error feedback
 - Using TextField/Input with `required` prop
-

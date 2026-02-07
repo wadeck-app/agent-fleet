@@ -5,12 +5,18 @@ import type { FlowDefinition } from '../types/flow-engine.types';
 
 export type DiffLineType = 'added' | 'removed' | 'unchanged' | 'modified';
 
+export interface DiffSegment {
+	type: 'added' | 'removed' | 'unchanged';
+	text: string;
+}
+
 export interface DiffLine {
 	type: DiffLineType;
 	lineNumber: number;
 	originalLineNumber?: number;
 	content: string;
 	count?: number;
+	segments?: DiffSegment[]; // For character-level diff in modified lines
 }
 
 export interface DiffSummary {
@@ -83,14 +89,38 @@ export function computeFlowDiff(
 		}
 	}
 
-	// Detect modifications (adjacent add+remove)
+	// Detect modifications (adjacent add+remove with same YAML key)
 	for (let i = 0; i < lines.length - 1; i++) {
 		if (lines[i].type === 'removed' && lines[i + 1].type === 'added') {
-			lines[i].type = 'modified';
-			lines[i + 1].type = 'modified';
-			summary.modifications++;
-			summary.additions--;
-			summary.deletions--;
+			// Extract YAML key (before first ':') and indentation level
+			const removedKey = lines[i].content.match(/^(\s*)([^:]+):/);
+			const addedKey = lines[i + 1].content.match(/^(\s*)([^:]+):/);
+
+			// Only mark as modified if same key and same indentation
+			if (
+				removedKey &&
+				addedKey &&
+				removedKey[1] === addedKey[1] && // Same indentation
+				removedKey[2].trim() === addedKey[2].trim() // Same key
+			) {
+				// Compute character-level diff
+				const charDiff = diff.diffChars(lines[i].content, lines[i + 1].content);
+				const segments: DiffSegment[] = charDiff.map(part => ({
+					type: part.added ? 'added' : part.removed ? 'removed' : 'unchanged',
+					text: part.value,
+				}));
+
+				// Replace removed line with modified line containing segments
+				lines[i].type = 'modified';
+				lines[i].segments = segments;
+
+				// Remove the added line (we merged it into the modified line)
+				lines.splice(i + 1, 1);
+
+				summary.modifications++;
+				summary.additions--;
+				summary.deletions--;
+			}
 		}
 	}
 

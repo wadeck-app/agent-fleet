@@ -1,7 +1,19 @@
 import { Button } from '@framework/components/primitives/Button';
 import { Separator } from '@framework/components/primitives/Separator';
 import type { FlowListItem } from '@shared/api/flows.contract';
-import { Bell, Brain, CheckCircle, GitBranch, Hash, Layout, Save, Tag, Terminal, Workflow } from 'lucide-react';
+import {
+	Bell,
+	Brain,
+	CheckCircle,
+	GitBranch,
+	Hash,
+	Layout,
+	Save,
+	Settings,
+	Tag,
+	Terminal,
+	Workflow,
+} from 'lucide-react';
 
 import { FlowSelector } from './FlowSelector';
 
@@ -9,6 +21,7 @@ interface FlowEditorToolbarProps {
 	onSave: () => void;
 	onValidate: () => void;
 	onAutoLayout: () => void;
+	onOpenSettings: () => void;
 	onAddNode: (type: 'model' | 'script' | 'subflow' | 'constant' | 'user_intervention') => void;
 	onLoadFlow: (flowId: string) => void;
 	availableFlows: FlowListItem[];
@@ -28,6 +41,7 @@ export function FlowEditorToolbar({
 	onSave,
 	onValidate,
 	onAutoLayout,
+	onOpenSettings,
 	onAddNode,
 	onLoadFlow,
 	availableFlows,
@@ -148,6 +162,10 @@ export function FlowEditorToolbar({
 				{/* Flow Actions */}
 				<div className="flex items-center gap-2">
 					<span className="mr-1 text-xs font-medium text-muted-foreground">Actions:</span>
+					<Button variant="outline" size="sm" onClick={onOpenSettings} className="h-8">
+						<Settings className="mr-2 size-4" />
+						Settings
+					</Button>
 					<Button variant="outline" size="sm" onClick={onAutoLayout} className="h-8">
 						<Layout className="mr-2 size-4" />
 						Auto Layout

@@ -23,9 +23,32 @@ import { useFlowPreview } from './hooks/useFlowPreview';
 import type { FlowEdge, FlowNode } from './types';
 import type { FlowDefinition } from './types/flow-engine.types';
 import { cn } from './utils/cn';
-import { computeFlowDiff } from './utils/computeFlowDiff';
+import { computeFlowDiff, type DiffSegment } from './utils/computeFlowDiff';
 import { flowDefinitionToReactFlow } from './utils/flowToReactFlow';
 import { applyDagreLayout } from './utils/layoutAlgorithms';
+
+/**
+ * Render character-level diff segments with highlighting
+ */
+function renderSegments(segments: DiffSegment[]) {
+	return segments.map((segment, idx) => {
+		if (segment.type === 'added') {
+			return (
+				<span key={idx} className="bg-success/30 text-success">
+					{segment.text}
+				</span>
+			);
+		}
+		if (segment.type === 'removed') {
+			return (
+				<span key={idx} className="bg-destructive/30 text-destructive">
+					{segment.text}
+				</span>
+			);
+		}
+		return <span key={idx}>{segment.text}</span>;
+	});
+}
 
 interface FlowEditorRightPanelProps {
 	flowDefinition: FlowDefinition | null;
@@ -261,18 +284,36 @@ export function FlowEditorRightPanel({
 										) : (
 											<div className="flex flex-col font-mono text-xs">
 												{diffLines.map((line, idx) => {
+													// Use relative positioning for colored bar
+													const hasBar =
+														line.type === 'added' ||
+														line.type === 'removed' ||
+														line.type === 'modified';
+													const barColor =
+														line.type === 'added'
+															? 'bg-success'
+															: line.type === 'removed'
+																? 'bg-destructive'
+																: 'bg-warning';
+
 													return (
 														<pre
 															key={idx}
 															className={cn(
-																'm-0 px-3 py-0.5',
-																line.type === 'added' && 'border-l-2 border-success',
-																line.type === 'removed' &&
-																	'border-l-2 border-destructive line-through opacity-70',
-																line.type === 'modified' && 'border-l-2 border-warning'
+																'm-0 py-0.5 whitespace-pre',
+																hasBar ? 'relative pl-3' : 'px-3',
+																line.type === 'removed' && 'line-through opacity-70'
 															)}
 														>
-															{line.content}
+															{hasBar && (
+																<span
+																	className={cn(
+																		'absolute left-0 top-0 bottom-0 w-0.5',
+																		barColor
+																	)}
+																/>
+															)}
+															{line.segments ? renderSegments(line.segments) : line.content}
 														</pre>
 													);
 												})}

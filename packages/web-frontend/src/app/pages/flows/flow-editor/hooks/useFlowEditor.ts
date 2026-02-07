@@ -588,6 +588,18 @@ export function useFlowEditor(flowId: string | undefined) {
 		[setNodes, setEdges]
 	);
 
+	// Update flow definition (for flow-level properties like workspace config)
+	const updateFlowDefinition = useCallback((updates: Partial<FlowDefinition>) => {
+		setFlowDefinition(prev => {
+			if (!prev) return prev;
+			return {
+				...prev,
+				...updates,
+			};
+		});
+		setIsDirty(true);
+	}, []);
+
 	// Save data flow edges to localStorage when they change
 	useEffect(() => {
 		if (!flowDefinition) return;
@@ -653,6 +665,7 @@ export function useFlowEditor(flowId: string | undefined) {
 		loadFlow,
 		addNode,
 		updateNodeData,
+		updateFlowDefinition,
 		deleteNode,
 		autoLayout,
 		validateFlow,

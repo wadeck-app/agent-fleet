@@ -4,6 +4,7 @@ description: Use this agent when reviewing backend code. This agent should be ca
 tools: Glob, Grep, Read, NotebookEdit, WebFetch, TodoWrite, BashOutput, Skill, SlashCommand
 model: haiku
 color: cyan
+memory: project
 ---
 
 Ultrathink

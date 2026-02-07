@@ -388,6 +388,28 @@ export function FlowEditorPropertiesPanel({
 								placeholder="Optional working directory"
 							/>
 						</div>
+
+						<div className="space-y-2">
+							<Label htmlFor="env">Environment Variables (JSON)</Label>
+							<Textarea
+								id="env"
+								value={JSON.stringify(step.env || {}, null, 2)}
+								onChange={e => {
+									try {
+										const parsed = JSON.parse(e.target.value);
+										onUpdateNode(selectedNode.id, { env: parsed } as Partial<FlowStep>);
+									} catch (_err) {
+										// Invalid JSON, ignore
+									}
+								}}
+								rows={4}
+								className="font-mono text-sm"
+								placeholder='{"KEY": "value"}'
+							/>
+							<p className="text-xs text-muted-foreground">
+								Environment variables to set for script execution
+							</p>
+						</div>
 					</>
 				)}
 
@@ -428,6 +450,29 @@ export function FlowEditorPropertiesPanel({
 								)}
 							/>
 						</div>
+
+						<div className="space-y-2">
+							<Label htmlFor="workspaceStrategy">Workspace Strategy</Label>
+							<Select
+								value={step.workspaceStrategy || 'inherit'}
+								onValueChange={value =>
+									onUpdateNode(selectedNode.id, {
+										workspaceStrategy: value as 'inherit' | 'separate',
+									} as Partial<FlowStep>)
+								}
+							>
+								<SelectTrigger className="w-full">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="inherit">Inherit</SelectItem>
+									<SelectItem value="separate">Separate</SelectItem>
+								</SelectContent>
+							</Select>
+							<p className="text-xs text-muted-foreground">
+								Inherit: use parent workspace. Separate: create new workspace for subflow
+							</p>
+						</div>
 					</>
 				)}
 
@@ -467,6 +512,55 @@ export function FlowEditorPropertiesPanel({
 								/>
 								Blocking (wait for user response)
 							</Label>
+						</div>
+
+						{/* Timeout Configuration */}
+						<div className="space-y-2">
+							<Label htmlFor="timeout-minutes">Timeout (optional)</Label>
+							<div className="flex gap-2">
+								<Input
+									id="timeout-minutes"
+									type="number"
+									value={step.timeout?.minutes || ''}
+									onChange={e =>
+										onUpdateNode(selectedNode.id, {
+											timeout: {
+												...step.timeout,
+												minutes: Number(e.target.value) || undefined,
+												onTimeout: step.timeout?.onTimeout || 'fail',
+											},
+										} as Partial<FlowStep>)
+									}
+									placeholder="0"
+									className="flex-1"
+								/>
+								<Select
+									value={step.timeout?.onTimeout || 'fail'}
+									onValueChange={value =>
+										onUpdateNode(selectedNode.id, {
+											timeout: step.timeout?.minutes
+												? {
+														...step.timeout,
+														onTimeout: value as 'fail' | 'continue' | 'default',
+													}
+												: undefined,
+										} as Partial<FlowStep>)
+									}
+									disabled={!step.timeout?.minutes}
+								>
+									<SelectTrigger className="w-32">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="fail">Fail</SelectItem>
+										<SelectItem value="continue">Continue</SelectItem>
+										<SelectItem value="default">Default</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
+							<p className="text-xs text-muted-foreground">
+								Minutes before timeout. Action: fail (stop), continue (proceed), or use default value
+							</p>
 						</div>
 
 						{/* Approval Configuration */}
@@ -682,6 +776,46 @@ export function FlowEditorPropertiesPanel({
 										issue => issue.location?.field === 'when'
 									)}
 								/>
+							</div>
+
+							<div className="space-y-2">
+								<Label htmlFor="output">Output Configuration (JSON)</Label>
+								<Textarea
+									id="output"
+									value={JSON.stringify(step.output || {}, null, 2)}
+									onChange={e => {
+										try {
+											const parsed = JSON.parse(e.target.value);
+											onUpdateNode(selectedNode.id, { output: parsed } as Partial<FlowStep>);
+										} catch (_err) {
+											// Invalid JSON, ignore
+										}
+									}}
+									rows={6}
+									className="font-mono text-sm"
+									placeholder='{"varName": {"type": "string", "pattern": "..."}}'
+								/>
+								<p className="text-xs text-muted-foreground">
+									Define output variable extraction and transformation
+								</p>
+							</div>
+
+							<div className="space-y-2">
+								<Label htmlFor="skipOnLoop" className="flex items-center gap-2">
+									<Checkbox
+										id="skipOnLoop"
+										checked={step.skipOnLoop ?? false}
+										onCheckedChange={checked =>
+											onUpdateNode(selectedNode.id, {
+												skipOnLoop: checked as boolean,
+											} as Partial<FlowStep>)
+										}
+									/>
+									Skip On Loop
+								</Label>
+								<p className="text-xs text-muted-foreground">
+									Skip this step on retry/loop iterations (only run once)
+								</p>
 							</div>
 						</div>
 					)}

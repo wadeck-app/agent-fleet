@@ -460,7 +460,6 @@ describe('EditProjectDialog', () => {
 				expect(submitButton).toBeDisabled();
 			});
 		});
-
 	});
 
 	describe('dialog controls', () => {

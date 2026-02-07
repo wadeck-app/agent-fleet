@@ -4,6 +4,7 @@ description: Use this agent when reviewing test code. This agent should be calle
 tools: Glob, Grep, Read, NotebookEdit, WebFetch, TodoWrite, BashOutput, Skill, SlashCommand
 model: haiku
 color: green
+memory: project
 ---
 
 Ultrathink

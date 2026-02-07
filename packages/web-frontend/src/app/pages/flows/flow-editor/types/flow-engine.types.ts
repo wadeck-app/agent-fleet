@@ -11,7 +11,38 @@ export type ReusePolicy = 'never' | 'if-available' | 'always';
 /**
  * Variable types supported in flow inputs and outputs
  */
-export type VariableType = 'string' | 'number' | 'boolean' | 'object';
+export type VariableType =
+	// Base types (legacy)
+	| 'string'
+	| 'number'
+	| 'boolean'
+	| 'object'
+	// Text types
+	| 'text'
+	| 'url'
+	| 'markdown'
+	// Number types
+	| 'integer'
+	| 'percentage'
+	| 'duration'
+	// Selection types
+	| 'enum'
+	| 'multi-enum'
+	// File types
+	| 'file'
+	| 'folder'
+	// Date types
+	| 'date'
+	| 'datetime'
+	// Code types
+	| 'regex'
+	// Structure types
+	| 'array'
+	| 'keyvalue'
+	// Security types
+	| 'password'
+	// Business types
+	| 'priority';
 
 /**
  * Built-in transform functions for output parsing

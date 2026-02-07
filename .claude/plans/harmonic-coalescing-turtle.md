@@ -1,901 +1,888 @@
-# Plan: Synchronisation bidirectionnelle YAML ↔ Éditeur visuel + Diff View
+# Plan: Composant Générique de Liste Éditable (EditableListField)
 
-## Problème identifié
+## Contexte
 
-**Fichier:** `packages/web-frontend/src/app/pages/flows/flow-editor/FlowEditorRightPanel.tsx:40-47`
+Actuellement, l'éditeur de flows utilise des textarea JSON pour plusieurs propriétés:
+- `env` (variables d'environnement) → JSON `{"KEY": "value"}`
+- `output` (configuration outputs) → JSON complexe avec metadata
+- `inputs` (flow inputs) → Liste personnalisée avec composant dédié
 
-Le panneau YAML affiche `flowDefinition` (l'état chargé depuis le backend), mais les modifications visuelles sont stockées dans `nodes` et `edges`. Le YAML ne reflète donc pas les changements en temps réel.
+**Problème:** Ces textarea JSON sont peu user-friendly et difficiles à comprendre pour les utilisateurs.
 
-```typescript
-// Code actuel - affiche l'état SAUVEGARDÉ, pas l'état ÉDITÉ
-const yamlContent = flowDefinition
-  ? yaml.dump(flowDefinition, { ... })
-  : '';
-```
-
-**Impacts:**
-
-1. Quand l'utilisateur édite visuellement, le YAML n'est pas mis à jour en temps réel
-2. Impossible de voir quelles modifications seront sauvegardées
-3. Impossible d'éditer le YAML directement et de synchroniser avec l'éditeur visuel
-4. Pas de vue diff pour comparer l'état original vs édité
-
-## Gaps de complétude identifiés
-
-**Analyse complète:** L'exploration a révélé que certaines propriétés du YAML ne sont PAS éditables dans l'UI:
-
-### Propriétés manquantes (YAML → Visual)
-
-- ❌ **workspace.mode**, **gitStrategy**, **reusePolicy** (flow-level, HIGH priority)
-- ❌ **flowDefinition.version** (flow-level, MEDIUM)
-- ❌ **flowDefinition.inputs** (flow-level, MEDIUM)
-- ❌ **step.env** (script steps, MEDIUM)
-- ❌ **step.output** (tous steps, LOW)
-- ❌ **step.skipOnLoop** (tous steps, LOW)
-- ❌ **step.timeout** (user intervention, MEDIUM)
-- ❌ **step.workspaceStrategy** (subflow, LOW)
-
-**Note:** Ces gaps seront comblés dans une phase ultérieure. Ce plan se concentre sur la synchronisation YAML ↔ Visual pour les propriétés déjà supportées.
-
-## Solution recommandée
-
-**Approche multi-phases:**
-
-### Phase 1: Preview YAML temps réel (base)
-
-Calculer un `previewFlow` qui reflète l'état visuel actuel
-
-### Phase 2: Vue diff avec annotations (added/modified/removed)
-
-Afficher les changements ligne par ligne entre original et preview
-
-### Phase 3: Tabs multiples (Original / Preview / Diff)
-
-Permettre de basculer entre les 3 vues
-
-### Phase 4: Export individuel
-
-Boutons d'export pour chaque version
-
-### Phase 5: Édition bidirectionnelle (YAML → Visual)
-
-Permettre d'éditer le YAML et mettre à jour l'éditeur visuel
-
-### Avantages
-
-- ✅ **Preview temps réel:** Voir immédiatement l'impact des modifications visuelles
-- ✅ **Diff view:** Visualiser précisément ce qui a changé (added/removed/modified)
-- ✅ **Flexibilité:** Basculer entre original, preview, et diff selon le besoin
-- ✅ **Export:** Exporter n'importe quelle version du YAML
-- ✅ **Bidirectionnel:** Éditer soit visuellement, soit en YAML
-- ✅ **Performance:** Mémoisation pour éviter les recalculs inutiles
-
-## Étapes d'implémentation
-
-## PHASE 1: Preview YAML temps réel
-
-### 1.1. Créer le hook `useFlowPreview`
-
-**Fichier:** `packages/web-frontend/src/app/pages/flows/flow-editor/hooks/useFlowPreview.ts` (nouveau)
-
-**Responsabilité:** Calculer le `FlowDefinition` preview à partir de l'état visuel actuel
-
-```typescript
-import { useMemo } from 'react';
-
-import type { FlowEdge, FlowNode } from '../types';
-import type { FlowDefinition } from '../types/flow-engine.types';
-import { reactFlowToFlowDefinition } from '../utils/flowToReactFlow';
-
-/**
- * Computes a preview FlowDefinition from current visual editor state
- * This preview reflects what WILL be saved when user clicks Save
- */
-export function useFlowPreview(
-	baseFlow: FlowDefinition | null,
-	nodes: FlowNode[],
-	edges: FlowEdge[]
-): FlowDefinition | null {
-	return useMemo(() => {
-		if (!baseFlow) return null;
-		return reactFlowToFlowDefinition(baseFlow, nodes, edges);
-	}, [baseFlow, nodes, edges]);
-}
-```
-
-### 1.2. Exporter les edges non filtrés depuis `useFlowEditor`
-
-**Fichier:** `packages/web-frontend/src/app/pages/flows/flow-editor/hooks/useFlowEditor.ts:577`
-
-```typescript
-// Avant
-edges: filteredEdges,
-
-// Après
-edges: filteredEdges,  // For visual display
-allEdges: edges,       // For preview computation (includes hidden edges)
-```
-
-### 1.3. Installer la librairie `diff`
-
-**Commande:**
-
-```bash
-npm install diff@^5.1.0
-npm install -D @types/diff@^5.0.2
-```
-
-**Justification:** Librairie standard pour computing line diffs (5KB, utilisée par GitHub/GitLab)
+**Solution:** Créer un composant générique réutilisable avec une architecture composable similaire à DataView/Table/Grid, permettant de gérer des listes éditables avec add/remove/edit/reorder de manière déclarative.
 
 ---
 
-## PHASE 2: Vue diff avec annotations
+## Architecture Proposée
 
-### 2.1. Créer l'utilitaire de diff
+Inspirée du pattern DataView/Table/Grid (3 couches headless):
 
-**Fichier:** `packages/web-frontend/src/app/pages/flows/flow-editor/utils/computeFlowDiff.ts` (nouveau)
-
-```typescript
-import * as diff from 'diff';
-import * as yaml from 'js-yaml';
-
-import type { FlowDefinition } from '../types/flow-engine.types';
-
-export type DiffLineType = 'added' | 'removed' | 'unchanged' | 'modified';
-
-export interface DiffLine {
-	type: DiffLineType;
-	lineNumber: number; // Line number in result
-	originalLineNumber?: number; // Line number in original (for context)
-	content: string;
-	count?: number; // Number of consecutive lines of same type
-}
-
-export interface DiffSummary {
-	additions: number;
-	deletions: number;
-	modifications: number;
-}
-
-/**
- * Compute line-by-line diff between two FlowDefinitions
- */
-export function computeFlowDiff(
-	original: FlowDefinition | null,
-	preview: FlowDefinition | null
-): { lines: DiffLine[]; summary: DiffSummary } {
-	if (!original || !preview) {
-		return { lines: [], summary: { additions: 0, deletions: 0, modifications: 0 } };
-	}
-
-	const yamlOriginal = yaml.dump(original, { indent: 2, lineWidth: 120 });
-	const yamlPreview = yaml.dump(preview, { indent: 2, lineWidth: 120 });
-
-	const changes = diff.diffLines(yamlOriginal, yamlPreview);
-
-	const lines: DiffLine[] = [];
-	let lineNumber = 0;
-	let originalLineNumber = 0;
-	const summary = { additions: 0, deletions: 0, modifications: 0 };
-
-	for (const change of changes) {
-		const count = change.count || 0;
-
-		if (change.added) {
-			summary.additions += count;
-			change.value
-				.split('\n')
-				.filter(l => l)
-				.forEach(line => {
-					lines.push({
-						type: 'added',
-						lineNumber: ++lineNumber,
-						content: line,
-					});
-				});
-		} else if (change.removed) {
-			summary.deletions += count;
-			change.value
-				.split('\n')
-				.filter(l => l)
-				.forEach(line => {
-					lines.push({
-						type: 'removed',
-						lineNumber: lineNumber,
-						originalLineNumber: ++originalLineNumber,
-						content: line,
-					});
-				});
-		} else {
-			change.value
-				.split('\n')
-				.filter(l => l)
-				.forEach(line => {
-					lines.push({
-						type: 'unchanged',
-						lineNumber: ++lineNumber,
-						originalLineNumber: ++originalLineNumber,
-						content: line,
-					});
-				});
-		}
-	}
-
-	// Detect modifications (adjacent add+remove)
-	for (let i = 0; i < lines.length - 1; i++) {
-		if (lines[i].type === 'removed' && lines[i + 1].type === 'added') {
-			lines[i].type = 'modified';
-			lines[i + 1].type = 'modified';
-			summary.modifications++;
-			summary.additions--;
-			summary.deletions--;
-		}
-	}
-
-	return { lines, summary };
-}
+```
+┌─ Feature Hooks (State Management)
+│  ├─ useListItems<T>           - Gestion CRUD des items
+│  ├─ useListReordering<T>      - Drag & drop (optionnel)
+│  └─ useListValidation<T>      - Validation (optionnel)
+│
+├─ Core Component (Composition & Rendering)
+│  └─ EditableListField<T>      - Rendu de la liste éditable
+│
+└─ Item Renderers (Composables)
+   ├─ KeyValueItemRenderer      - Pour env variables
+   ├─ OutputItemRenderer        - Pour output config
+   └─ InputDefinitionRenderer   - Pour flow inputs
 ```
 
-### 2.2. Créer le composant `FlowDiffViewer`
+**Principes clés:**
+1. **Composabilité**: Features indépendantes et stackables
+2. **Généricité**: Support de tout type d'item via `<T>`
+3. **Type Safety**: TypeScript strict pour éviter les erreurs
+4. **Testabilité**: Hooks et composants séparés
+5. **Réutilisabilité**: Pattern utilisable pour env, output, inputs et futures listes
 
-**Fichier:** `packages/web-frontend/src/app/pages/flows/flow-editor/components/FlowDiffViewer.tsx` (nouveau)
+---
 
+## Composants à Créer
+
+### 1. Hook: `useListItems<T>`
+
+**Localisation:** `packages/web-frontend/src/framework/hooks2/useListItems.ts` (NOUVEAU)
+
+**Responsabilité:** Gestion CRUD des items d'une liste
+
+**Interface:**
 ```typescript
-import { AlertCircle, Minus, Plus, Tilde } from 'lucide-react';
-import type { DiffLine, DiffSummary } from '../utils/computeFlowDiff';
-import { cn } from '../utils/cn';
-
-interface FlowDiffViewerProps {
-  lines: DiffLine[];
-  summary: DiffSummary;
+interface ListItemsContract<T> {
+  fstate: {
+    items: T[];
+    count: number;
+    isEmpty: boolean;
+    canAdd: boolean;
+    canRemove: boolean;
+  };
+  actions: {
+    add: (item: T) => void;
+    remove: (index: number) => void;
+    update: (index: number, item: Partial<T>) => void;
+    set: (items: T[]) => void;
+    clear: () => void;
+  };
+  fillQuery: () => void; // Pas de query (local state)
 }
 
-export function FlowDiffViewer({ lines, summary }: FlowDiffViewerProps) {
-  if (lines.length === 0) {
-    return (
-      <div className="flex h-full items-center justify-center text-muted-foreground">
-        No changes detected
-      </div>
-    );
-  }
+interface UseListItemsOptions<T> {
+  initialItems?: T[];
+  minItems?: number;
+  maxItems?: number;
+  createDefault?: () => T;
+}
 
-  return (
-    <div className="flex h-full flex-col">
-      {/* Summary Header */}
-      <div className="flex gap-2 border-b bg-muted/30 p-2 text-xs">
-        <span className="flex items-center gap-1 text-green-600">
-          <Plus className="size-3" />
-          +{summary.additions}
-        </span>
-        <span className="flex items-center gap-1 text-red-600">
-          <Minus className="size-3" />
-          −{summary.deletions}
-        </span>
-        <span className="flex items-center gap-1 text-yellow-600">
-          <Tilde className="size-3" />
-          ~{summary.modifications}
-        </span>
-      </div>
+export function useListItems<T>(options: UseListItemsOptions<T>): ListItemsContract<T>
+```
 
-      {/* Diff Lines */}
-      <div className="flex-1 overflow-auto font-mono text-xs">
-        {lines.map((line, idx) => (
-          <div
-            key={idx}
-            className={cn(
-              'flex gap-2 px-3 py-0.5',
-              line.type === 'added' && 'bg-green-50 text-green-800',
-              line.type === 'removed' && 'bg-red-50 text-red-800 line-through',
-              line.type === 'modified' && 'bg-yellow-50 text-yellow-800',
-              line.type === 'unchanged' && 'text-muted-foreground'
-            )}
-          >
-            {/* Icon */}
-            <span className="flex w-4 items-center justify-center">
-              {line.type === 'added' && <Plus className="size-3 text-green-600" />}
-              {line.type === 'removed' && <Minus className="size-3 text-red-600" />}
-              {line.type === 'modified' && <Tilde className="size-3 text-yellow-600" />}
-            </span>
+**Fonctionnalités:**
+- État frozen (fstate) pour éviter re-renders
+- Actions mémorisées
+- Validation constraints (min/max)
+- Support d'un item par défaut customisable
 
-            {/* Line Number */}
-            <span className="w-8 text-right opacity-50">{line.lineNumber}</span>
+**Estimation:** ~80 lignes
 
-            {/* Content */}
-            <span className="flex-1">{line.content}</span>
-          </div>
-        ))}
-      </div>
-    </div>
+---
+
+### 2. Hook: `useListReordering<T>` (Optionnel)
+
+**Localisation:** `packages/web-frontend/src/framework/hooks2/useListReordering.ts` (NOUVEAU)
+
+**Responsabilité:** Gestion du drag & drop pour réordonner
+
+**Interface:**
+```typescript
+interface ListReorderingContract<T> {
+  fstate: {
+    isDragging: boolean;
+    draggedIndex: number | null;
+  };
+  actions: {
+    startDrag: (index: number) => void;
+    endDrag: () => void;
+    reorder: (fromIndex: number, toIndex: number) => void;
+  };
+  sensors: SensorDescriptor[]; // Pour dnd-kit
+  fillQuery: () => void;
+}
+
+export function useListReordering<T>(): ListReorderingContract<T>
+```
+
+**Fonctionnalités:**
+- Intégration avec dnd-kit
+- État de drag en cours
+- Actions de réordonnancement
+
+**Estimation:** ~60 lignes
+
+---
+
+### 3. Composant: `EditableListField<T>`
+
+**Localisation:** `packages/web-frontend/src/framework/components2/list/EditableListField.tsx` (NOUVEAU)
+
+**Responsabilité:** Composant principal pour afficher et éditer une liste
+
+**Interface:**
+```typescript
+interface EditableListFieldProps<T> extends BaseFieldProps {
+  // Core hooks
+  items: ListItemsContract<T>;
+  reordering?: ListReorderingContract<T>;
+
+  // Rendering
+  renderItem: (item: T, index: number, actions: ItemActions<T>) => ReactNode;
+  renderEmpty?: () => ReactNode;
+
+  // Labels
+  addButtonLabel?: string;
+  emptyMessage?: string;
+
+  // Styling
+  className?: string;
+}
+
+interface ItemActions<T> {
+  update: (partial: Partial<T>) => void;
+  remove: () => void;
+}
+
+export function EditableListField<T>(props: EditableListFieldProps<T>): ReactElement
+```
+
+**Fonctionnalités:**
+- Affichage de la liste avec items rendus via `renderItem`
+- Bouton "Add" (désactivé si maxItems atteint)
+- Boutons "Remove" par item (désactivés si minItems atteint)
+- Support du drag & drop si `reordering` fourni
+- État vide avec message personnalisable
+- Intégration avec FormContainer via BaseFieldProps
+
+**Structure:**
+```typescript
+export function EditableListField<T>({
+  items,
+  reordering,
+  renderItem,
+  renderEmpty,
+  addButtonLabel = 'Add Item',
+  emptyMessage = 'No items',
+  className,
+  label,
+  description,
+  error,
+}: EditableListFieldProps<T>) {
+  const { fstate, actions } = items;
+
+  // Setup dnd-kit if reordering enabled
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor)
   );
-}
-```
 
----
-
-## PHASE 3: Tabs multiples (Original / Preview / Diff)
-
-### 3.1. Refactoriser `FlowEditorRightPanel` avec tabs
-
-**Fichier:** `packages/web-frontend/src/app/pages/flows/flow-editor/FlowEditorRightPanel.tsx`
-
-**Changements:**
-
-1. **Ajouter props pour preview:**
-
-```typescript
-interface FlowEditorRightPanelProps {
-	flowDefinition: FlowDefinition | null;
-	validationResult: ValidationResult | null;
-	onIssueClick: (stepId: string) => void;
-	nodes: FlowNode[]; // NEW
-	allEdges: FlowEdge[]; // NEW
-}
-```
-
-2. **Ajouter state pour tabs YAML:**
-
-```typescript
-const [yamlTab, setYamlTab] = useState<'original' | 'preview' | 'diff'>('preview');
-const [activeTab, setActiveTab] = useState<'yaml' | 'validation'>('yaml');
-```
-
-3. **Calculer preview et diff:**
-
-```typescript
-const previewFlow = useFlowPreview(flowDefinition, nodes, allEdges);
-const { lines: diffLines, summary: diffSummary } = computeFlowDiff(flowDefinition, previewFlow);
-```
-
-4. **Générer YAML selon le tab actif:**
-
-```typescript
-const originalYaml = flowDefinition ? yaml.dump(flowDefinition, {...}) : '';
-const previewYaml = previewFlow ? yaml.dump(previewFlow, {...}) : '';
-```
-
-5. **Modifier le rendu du tab YAML:**
-
-```typescript
-<TabsContent value="yaml" className="...">
-  {/* Sub-tabs pour Original / Preview / Diff */}
-  <Tabs value={yamlTab} onValueChange={(v) => setYamlTab(v as any)}>
-    <TabsList className="mb-2">
-      <TabsTrigger value="original">Original</TabsTrigger>
-      <TabsTrigger value="preview">
-        Preview
-        {isDirty && <span className="ml-1 text-xs">•</span>}
-      </TabsTrigger>
-      <TabsTrigger value="diff">
-        Diff
-        {diffSummary.additions + diffSummary.deletions > 0 && (
-          <span className="ml-1 rounded-full bg-primary/20 px-1.5 text-xs">
-            {diffSummary.additions + diffSummary.deletions}
-          </span>
-        )}
-      </TabsTrigger>
-    </TabsList>
-
-    <TabsContent value="original">
-      <pre className="..."><code>{originalYaml}</code></pre>
-    </TabsContent>
-
-    <TabsContent value="preview">
-      <pre className="..."><code>{previewYaml}</code></pre>
-    </TabsContent>
-
-    <TabsContent value="diff">
-      <FlowDiffViewer lines={diffLines} summary={diffSummary} />
-    </TabsContent>
-  </Tabs>
-</TabsContent>
-```
-
-### 3.2. Propager les props depuis `FlowEditorPage`
-
-**Fichier:** `packages/web-frontend/src/app/pages/flows/flow-editor/FlowEditorPage.tsx`
-
-```typescript
-<FlowEditorRightPanel
-  flowDefinition={flowEditor.flowDefinition}
-  validationResult={flowEditor.validationResult}
-  onIssueClick={flowEditor.focusNodeFromIssue}
-  nodes={flowEditor.nodes}         // NEW
-  allEdges={flowEditor.allEdges}   // NEW
-/>
-```
-
----
-
-## PHASE 4: Export individuel
-
-### 4.1. Ajouter boutons d'export dans `FlowEditorRightPanel`
-
-**Position:** Header du tab YAML, à côté du bouton collapse
-
-```typescript
-import { Download } from 'lucide-react';
-
-// Dans le header:
-<div className="flex items-center gap-2">
-  <Button
-    variant="ghost"
-    size="sm"
-    onClick={() => handleExport(yamlTab)}
-    title={`Export ${yamlTab} YAML`}
-  >
-    <Download className="size-4" />
-  </Button>
-  <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)}>
-    <ChevronRight className="size-4" />
-  </Button>
-</div>
-```
-
-### 4.2. Implémenter la fonction d'export
-
-```typescript
-const handleExport = (version: 'original' | 'preview' | 'diff') => {
-	if (!flowDefinition) return;
-
-	let content: string;
-	let filename: string;
-
-	switch (version) {
-		case 'original':
-			content = originalYaml;
-			filename = `${flowDefinition.name || flowDefinition.id}_original.yaml`;
-			break;
-		case 'preview':
-			content = previewYaml;
-			filename = `${flowDefinition.name || flowDefinition.id}_preview.yaml`;
-			break;
-		case 'diff':
-			// Export diff as text with +/- prefixes
-			content = diffLines
-				.map(line => {
-					const prefix = line.type === 'added' ? '+ ' : line.type === 'removed' ? '- ' : '  ';
-					return `${prefix}${line.content}`;
-				})
-				.join('\n');
-			filename = `${flowDefinition.name || flowDefinition.id}_diff.txt`;
-			break;
-	}
-
-	// Trigger download
-	const blob = new Blob([content], { type: 'text/plain' });
-	const url = URL.createObjectURL(blob);
-	const a = document.createElement('a');
-	a.href = url;
-	a.download = filename;
-	a.click();
-	URL.revokeObjectURL(url);
-};
-```
-
----
-
-## PHASE 5: Édition bidirectionnelle (YAML → Visual)
-
-### 5.1. Ajouter mode édition au YAML panel
-
-**État à ajouter:**
-
-```typescript
-const [isEditingYaml, setIsEditingYaml] = useState(false);
-const [editedYaml, setEditedYaml] = useState('');
-const [yamlError, setYamlError] = useState<string | null>(null);
-```
-
-**Bouton "Edit YAML":**
-
-```typescript
-{!isEditingYaml && (
-  <Button variant="ghost" size="sm" onClick={() => {
-    setIsEditingYaml(true);
-    setEditedYaml(yamlTab === 'original' ? originalYaml : previewYaml);
-  }}>
-    <Edit className="size-4" />
-  </Button>
-)}
-```
-
-### 5.2. Créer le composant `YamlEditor`
-
-**Fichier:** `packages/web-frontend/src/app/pages/flows/flow-editor/components/YamlEditor.tsx` (nouveau)
-
-```typescript
-import { useState } from 'react';
-import { Button } from '@framework/components/primitives/Button';
-import { AlertCircle, Check, X } from 'lucide-react';
-import * as yaml from 'js-yaml';
-
-interface YamlEditorProps {
-  initialValue: string;
-  onSave: (value: string) => void;
-  onCancel: () => void;
-}
-
-export function YamlEditor({ initialValue, onSave, onCancel }: YamlEditorProps) {
-  const [value, setValue] = useState(initialValue);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSave = () => {
-    try {
-      // Validate YAML syntax
-      yaml.load(value);
-      setError(null);
-      onSave(value);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid YAML');
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const fromIndex = fstate.items.findIndex((_, i) => i === active.id);
+      const toIndex = fstate.items.findIndex((_, i) => i === over.id);
+      reordering?.actions.reorder(fromIndex, toIndex);
     }
   };
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Editor */}
-      <textarea
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        className="flex-1 resize-none bg-muted p-3 font-mono text-xs"
-        spellCheck={false}
-      />
-
-      {/* Error message */}
-      {error && (
-        <div className="flex items-center gap-2 border-t bg-destructive/10 p-2 text-xs text-destructive">
-          <AlertCircle className="size-4" />
-          {error}
-        </div>
+    <Field label={label} description={description} error={error}>
+      {fstate.isEmpty && renderEmpty ? (
+        renderEmpty()
+      ) : (
+        <DndContext
+          sensors={reordering ? sensors : undefined}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={fstate.items.map((_, i) => i)}>
+            {fstate.items.map((item, index) => (
+              <SortableItem key={index} id={index} disabled={!reordering}>
+                {renderItem(item, index, {
+                  update: (partial) => actions.update(index, partial),
+                  remove: () => actions.remove(index),
+                })}
+              </SortableItem>
+            ))}
+          </SortableContext>
+        </DndContext>
       )}
 
-      {/* Actions */}
-      <div className="flex gap-2 border-t p-2">
-        <Button size="sm" onClick={handleSave}>
-          <Check className="size-4" />
-          Apply
-        </Button>
-        <Button size="sm" variant="ghost" onClick={onCancel}>
-          <X className="size-4" />
-          Cancel
-        </Button>
-      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => actions.add(createDefault())}
+        disabled={!fstate.canAdd}
+      >
+        <Plus className="size-4" />
+        {addButtonLabel}
+      </Button>
+    </Field>
+  );
+}
+```
+
+**Estimation:** ~120 lignes
+
+---
+
+### 4. Composant: `SortableItem`
+
+**Localisation:** `packages/web-frontend/src/framework/components2/list/SortableItem.tsx` (NOUVEAU)
+
+**Responsabilité:** Wrapper pour items drag & droppable
+
+**Interface:**
+```typescript
+interface SortableItemProps {
+  id: number;
+  disabled?: boolean;
+  children: ReactNode;
+}
+
+export function SortableItem({ id, disabled, children }: SortableItemProps): ReactElement
+```
+
+**Fonctionnalités:**
+- Intégration avec dnd-kit
+- Handle de drag visuel
+- Désactivable si pas de reordering
+
+**Estimation:** ~40 lignes
+
+---
+
+### 5. Item Renderer: `KeyValueItemRenderer`
+
+**Localisation:** `packages/web-frontend/src/framework/components2/list/renderers/KeyValueItemRenderer.tsx` (NOUVEAU)
+
+**Responsabilité:** Rendu d'une paire clé-valeur (pour env variables)
+
+**Interface:**
+```typescript
+interface KeyValueItem {
+  key: string;
+  value: string;
+}
+
+interface KeyValueItemRendererProps {
+  item: KeyValueItem;
+  actions: ItemActions<KeyValueItem>;
+}
+
+export function KeyValueItemRenderer({ item, actions }: KeyValueItemRendererProps): ReactElement
+```
+
+**Structure:**
+```typescript
+export function KeyValueItemRenderer({ item, actions }: KeyValueItemRendererProps) {
+  return (
+    <div className="flex gap-2 rounded border p-2">
+      <TextField
+        label="Key"
+        value={item.key}
+        onChange={(e) => actions.update({ key: e.target.value })}
+        className="flex-1"
+        placeholder="KEY"
+      />
+      <TextField
+        label="Value"
+        value={item.value}
+        onChange={(e) => actions.update({ value: e.target.value })}
+        className="flex-1"
+        placeholder="value"
+      />
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={actions.remove}
+        title="Remove"
+      >
+        <Trash className="size-4" />
+      </Button>
     </div>
   );
 }
 ```
 
-### 5.3. Intégrer l'éditeur dans `FlowEditorRightPanel`
+**Estimation:** ~30 lignes
 
+---
+
+### 6. Item Renderer: `OutputItemRenderer`
+
+**Localisation:** `packages/web-frontend/src/framework/components2/list/renderers/OutputItemRenderer.tsx` (NOUVEAU)
+
+**Responsabilité:** Rendu d'une configuration output (nom + type + pattern optionnel)
+
+**Interface:**
 ```typescript
-{isEditingYaml ? (
-  <YamlEditor
-    initialValue={editedYaml}
-    onSave={handleApplyYamlEdit}
-    onCancel={() => setIsEditingYaml(false)}
-  />
-) : (
-  // Affichage normal des tabs Original/Preview/Diff
-)}
+interface OutputItem {
+  name: string;
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array';
+  pattern?: string;
+}
+
+interface OutputItemRendererProps {
+  item: OutputItem;
+  actions: ItemActions<OutputItem>;
+}
+
+export function OutputItemRenderer({ item, actions }: OutputItemRendererProps): ReactElement
 ```
 
-### 5.4. Implémenter `handleApplyYamlEdit`
-
-**Fonction qui convertit le YAML édité en nodes/edges:**
-
+**Structure:**
 ```typescript
-const handleApplyYamlEdit = (yamlContent: string) => {
-	try {
-		// Parse YAML to FlowDefinition
-		const editedFlow = yaml.load(yamlContent) as FlowDefinition;
+export function OutputItemRenderer({ item, actions }: OutputItemRendererProps) {
+  return (
+    <div className="space-y-2 rounded border p-3">
+      <div className="flex gap-2">
+        <TextField
+          label="Variable Name"
+          value={item.name}
+          onChange={(e) => actions.update({ name: e.target.value })}
+          className="flex-1"
+          placeholder="myVariable"
+        />
+        <SelectField
+          label="Type"
+          value={item.type}
+          onChange={(value) => actions.update({ type: value })}
+          options={[
+            { value: 'string', label: 'String' },
+            { value: 'number', label: 'Number' },
+            { value: 'boolean', label: 'Boolean' },
+            { value: 'object', label: 'Object' },
+            { value: 'array', label: 'Array' },
+          ]}
+          className="w-40"
+        />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={actions.remove}
+          title="Remove"
+        >
+          <Trash className="size-4" />
+        </Button>
+      </div>
 
-		// Validate structure (basic check)
-		if (!editedFlow.steps || !Array.isArray(editedFlow.steps)) {
-			throw new Error('Invalid flow structure: missing steps array');
-		}
-
-		// Convert to nodes/edges using existing conversion function
-		const { nodes: newNodes, edges: newEdges } = flowDefinitionToReactFlow(editedFlow);
-
-		// Apply auto-layout to position new nodes
-		const layoutedNodes = applyDagreLayout(newNodes, newEdges);
-
-		// Update editor state (via callback from useFlowEditor)
-		onApplyYamlChanges(editedFlow, layoutedNodes, newEdges);
-
-		setIsEditingYaml(false);
-		setYamlError(null);
-	} catch (err) {
-		setYamlError(err instanceof Error ? err.message : 'Failed to apply YAML changes');
-	}
-};
+      {item.type === 'string' && (
+        <TextField
+          label="Extraction Pattern (optional)"
+          value={item.pattern || ''}
+          onChange={(e) => actions.update({ pattern: e.target.value })}
+          placeholder="Result: (.*)"
+          description="Regex pattern for extracting value"
+        />
+      )}
+    </div>
+  );
+}
 ```
 
-### 5.5. Ajouter la callback dans `useFlowEditor`
+**Estimation:** ~50 lignes
 
-**Fichier:** `packages/web-frontend/src/app/pages/flows/flow-editor/hooks/useFlowEditor.ts`
+---
 
+### 7. Item Renderer: `InputDefinitionRenderer`
+
+**Localisation:** `packages/web-frontend/src/framework/components2/list/renderers/InputDefinitionRenderer.tsx` (NOUVEAU)
+
+**Responsabilité:** Rendu d'une définition d'input (nom + type + required)
+
+**Interface:**
 ```typescript
-const applyYamlChanges = useCallback(
-  (newFlow: FlowDefinition, newNodes: FlowNode[], newEdges: FlowEdge[]) => {
-    setFlowDefinition(newFlow);
-    setNodes(newNodes);
-    setEdges(newEdges);
-    setIsDirty(true);
-  },
-  []
-);
+interface InputDefinitionItem {
+  name: string;
+  type: VariableType;
+  required: boolean;
+}
 
-// Export in return:
-return {
-  // ... existing exports
-  applyYamlChanges,
-};
+interface InputDefinitionRendererProps {
+  item: InputDefinitionItem;
+  actions: ItemActions<InputDefinitionItem>;
+  availableTypes: Array<{ value: VariableType; label: string }>;
+}
+
+export function InputDefinitionRenderer({ item, actions, availableTypes }: InputDefinitionRendererProps): ReactElement
 ```
 
-### 5.6. Gérer la perte des positions visuelles
+**Structure:** Similaire à KeyValue mais avec dropdown de types et checkbox required
 
-**Défi:** Le YAML ne stocke pas les positions X/Y des nœuds.
+**Estimation:** ~40 lignes
 
-**Solution:** Appliquer l'auto-layout après import YAML:
+---
 
+## Intégration dans Flow Editor
+
+### 8. Adapter FlowEditorPropertiesPanel pour env
+
+**Fichier:** `packages/web-frontend/src/app/pages/flows/flow-editor/FlowEditorPropertiesPanel.tsx`
+
+**Changement:** Remplacer le textarea JSON par EditableListField
+
+**Avant:**
 ```typescript
-import { applyDagreLayout } from '../utils/layoutAlgorithms';
-
-// Dans handleApplyYamlEdit:
-const layoutedNodes = applyDagreLayout(newNodes, newEdges);
+<KeyValueField
+  label="Environment Variables"
+  value={JSON.stringify(step.env || {})}
+  onChange={(value) => {
+    try {
+      const parsed = JSON.parse(value);
+      updateNodeData(selectedNode.id, { env: parsed });
+    } catch {
+      // Invalid JSON, ignore
+    }
+  }}
+/>
 ```
 
-**Note:** Cela repositionnera tous les nœuds. Afficher un avertissement à l'utilisateur avant d'appliquer.
-
-## Cas limites gérés
-
-### 1. Nœuds constants (UI uniquement)
-
-**Statut:** ✅ Déjà géré par `reactFlowToFlowDefinition()` (ligne 103 dans flowToReactFlow.ts)
-
+**Après:**
 ```typescript
-const backendNodes = nodes.filter(n => n.type !== 'constant');
+const envItems = useListItems<KeyValueItem>({
+  initialItems: Object.entries(step.env || {}).map(([key, value]) => ({ key, value })),
+  minItems: 0,
+  createDefault: () => ({ key: '', value: '' }),
+});
+
+// Sync to step data
+useEffect(() => {
+  const envObj = Object.fromEntries(
+    envItems.fstate.items
+      .filter(item => item.key) // Skip empty keys
+      .map(item => [item.key, item.value])
+  );
+  updateNodeData(selectedNode.id, { env: envObj });
+}, [envItems.fstate.items]);
+
+// Render
+<EditableListField
+  label="Environment Variables"
+  items={envItems}
+  renderItem={(item, index, actions) => (
+    <KeyValueItemRenderer item={item} actions={actions} />
+  )}
+  addButtonLabel="Add Variable"
+  emptyMessage="No environment variables"
+/>
 ```
 
-### 2. Edges de data flow (UI uniquement)
+**Estimation:** ~20 lignes modifiées
 
-**Statut:** ✅ Déjà géré par `reactFlowToFlowDefinition()` (ligne 102 dans flowToReactFlow.ts)
+---
 
+### 9. Adapter FlowEditorPropertiesPanel pour output
+
+**Fichier:** `packages/web-frontend/src/app/pages/flows/flow-editor/FlowEditorPropertiesPanel.tsx`
+
+**Changement:** Remplacer le textarea JSON par EditableListField
+
+**Avant:**
 ```typescript
-const backendEdges = edges.filter(e => e.data?.edgeType !== 'dataflow');
+<Textarea
+  value={JSON.stringify(step.output || {}, null, 2)}
+  onChange={(e) => {
+    try {
+      const parsed = JSON.parse(e.target.value);
+      updateNodeData(selectedNode.id, { output: parsed });
+    } catch {
+      // Invalid JSON
+    }
+  }}
+  rows={4}
+  className="font-mono text-xs"
+  description="JSON object defining output mappings"
+/>
 ```
 
-### 3. Flows volumineux (100+ nœuds)
-
-**Mitigation:**
-
-- Démarrer SANS debouncing (plus simple)
-- Monitorer les performances dans la console
-- Ajouter du debouncing si les utilisateurs rapportent du lag
-
-**Si nécessaire plus tard:**
-
+**Après:**
 ```typescript
-import { useDebounce } from '@framework/hooks2/useDebounce';
+const outputItems = useListItems<OutputItem>({
+  initialItems: Object.entries(step.output || {}).map(([name, config]) => ({
+    name,
+    type: config.type,
+    pattern: config.pattern,
+  })),
+  minItems: 0,
+  createDefault: () => ({ name: '', type: 'string' }),
+});
 
-const debouncedNodes = useDebounce(nodes, 200);
-const debouncedEdges = useDebounce(edges, 200);
-const preview = useFlowPreview(flowDefinition, debouncedNodes, debouncedEdges);
+// Sync to step data
+useEffect(() => {
+  const outputObj = Object.fromEntries(
+    outputItems.fstate.items
+      .filter(item => item.name)
+      .map(item => [item.name, { type: item.type, pattern: item.pattern }])
+  );
+  updateNodeData(selectedNode.id, { output: outputObj });
+}, [outputItems.fstate.items]);
+
+// Render
+<EditableListField
+  label="Output Configuration"
+  description="Extract variables from step output"
+  items={outputItems}
+  renderItem={(item, index, actions) => (
+    <OutputItemRenderer item={item} actions={actions} />
+  )}
+  addButtonLabel="Add Output Variable"
+  emptyMessage="No output variables defined"
+/>
 ```
 
-### 4. Nouveau flow vide
+**Estimation:** ~25 lignes modifiées
 
-**Statut:** ✅ Géré - `useFlowPreview` retourne `null`, le YAML panel affiche "No flow loaded"
+---
 
-### 5. Validation
+### 10. Adapter FlowSettingsDialog pour inputs
 
-**Note:** La validation utilise actuellement `flowDefinition` (ligne 39 dans useFlowEditor.ts), pas le preview.
+**Fichier:** `packages/web-frontend/src/app/pages/flows/flow-editor/FlowSettingsDialog.tsx`
 
-**Amélioration future (hors scope):** Passer le preview au lieu de `flowDefinition` pour valider l'état édité plutôt que l'état sauvegardé.
+**Changement:** Remplacer FlowInputDefinitionsField par EditableListField
+
+**Avant:**
+```typescript
+<FlowInputDefinitionsField
+  value={form.values.inputs}
+  onChange={(inputs) => form.setFieldValue('inputs', inputs)}
+/>
+```
+
+**Après:**
+```typescript
+const inputItems = useListItems<InputDefinitionItem>({
+  initialItems: Object.entries(form.values.inputs).map(([name, spec]) => ({
+    name,
+    type: spec.type,
+    required: spec.required || false,
+  })),
+  minItems: 0,
+  createDefault: () => ({ name: '', type: 'string', required: false }),
+});
+
+// Sync to form
+useEffect(() => {
+  const inputsObj = Object.fromEntries(
+    inputItems.fstate.items
+      .filter(item => item.name)
+      .map(item => [item.name, { type: item.type, required: item.required }])
+  );
+  form.setFieldValue('inputs', inputsObj);
+}, [inputItems.fstate.items]);
+
+// Render
+<EditableListField
+  label="Flow Inputs"
+  items={inputItems}
+  renderItem={(item, index, actions) => (
+    <InputDefinitionRenderer
+      item={item}
+      actions={actions}
+      availableTypes={VARIABLE_TYPES}
+    />
+  )}
+  addButtonLabel="Add Input"
+  emptyMessage="No inputs defined"
+/>
+```
+
+**Estimation:** ~25 lignes modifiées
+
+---
+
+## Types & Validation
+
+### 11. Types TypeScript
+
+**Fichier:** `packages/web-frontend/src/framework/types/EditableListTypes.ts` (NOUVEAU)
+
+**Contenu:**
+```typescript
+export interface KeyValueItem {
+  key: string;
+  value: string;
+}
+
+export interface OutputItem {
+  name: string;
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array';
+  pattern?: string;
+}
+
+export interface InputDefinitionItem {
+  name: string;
+  type: VariableType;
+  required: boolean;
+}
+
+export interface ItemActions<T> {
+  update: (partial: Partial<T>) => void;
+  remove: () => void;
+}
+```
+
+**Estimation:** ~30 lignes
+
+---
+
+## Tests
+
+### 12. Tests pour useListItems
+
+**Fichier:** `packages/web-frontend/src/framework/hooks2/useListItems.test.ts` (NOUVEAU)
+
+**Couverture:**
+```typescript
+describe('useListItems', () => {
+  it('initializes with empty list', () => {});
+  it('initializes with provided items', () => {});
+  it('adds item to list', () => {});
+  it('removes item by index', () => {});
+  it('updates item by index', () => {});
+  it('respects minItems constraint', () => {});
+  it('respects maxItems constraint', () => {});
+  it('clears all items', () => {});
+  it('provides correct canAdd/canRemove flags', () => {});
+});
+```
+
+**Estimation:** ~150 lignes
+
+---
+
+### 13. Tests pour EditableListField
+
+**Fichier:** `packages/web-frontend/src/framework/components2/list/EditableListField.test.tsx` (NOUVEAU)
+
+**Couverture:**
+```typescript
+describe('EditableListField', () => {
+  it('renders empty state', () => {});
+  it('renders list of items', () => {});
+  it('calls renderItem for each item', () => {});
+  it('adds item on button click', () => {});
+  it('removes item when action called', () => {});
+  it('disables add button when maxItems reached', () => {});
+  it('disables remove when minItems reached', () => {});
+  it('supports drag & drop when reordering enabled', () => {});
+});
+```
+
+**Estimation:** ~200 lignes
+
+---
+
+### 14. Tests pour Item Renderers
+
+**Fichier:** `packages/web-frontend/src/framework/components2/list/renderers/*.test.tsx` (NOUVEAU)
+
+**Un fichier par renderer:**
+- `KeyValueItemRenderer.test.tsx`
+- `OutputItemRenderer.test.tsx`
+- `InputDefinitionRenderer.test.tsx`
+
+**Couverture par renderer:**
+```typescript
+describe('KeyValueItemRenderer', () => {
+  it('renders key and value fields', () => {});
+  it('updates key on change', () => {});
+  it('updates value on change', () => {});
+  it('calls remove action', () => {});
+});
+```
+
+**Estimation:** ~100 lignes par renderer (300 total)
+
+---
+
+## Documentation
+
+### 15. Documentation du Pattern
+
+**Fichier:** `packages/web-frontend/.claude/docs/editable-list-pattern.md` (NOUVEAU)
+
+**Contenu:**
+- Architecture overview
+- Usage examples
+- Custom item renderer guide
+- Best practices
+- Comparison avec DataView/Table/Grid pattern
+
+**Estimation:** ~200 lignes markdown
+
+---
 
 ## Vérification
 
-### Tests unitaires
+### Tests Manuels
 
-**Fichier:** `packages/web-frontend/src/app/pages/flows/flow-editor/hooks/useFlowPreview.test.ts` (nouveau)
+**Env Variables (Script steps):**
+1. ✅ Ajouter une variable → Affiche deux champs (key/value)
+2. ✅ Modifier key/value → Preview YAML mis à jour
+3. ✅ Supprimer une variable → Disparaît de la liste et du YAML
+4. ✅ Variables avec key vide → Filtrées dans le YAML
 
-```typescript
-describe('useFlowPreview', () => {
-	it('returns null when baseFlow is null', () => {
-		// Test avec baseFlow = null
-	});
+**Output Configuration (tous steps):**
+1. ✅ Ajouter une output variable → Affiche nom + type
+2. ✅ Changer le type → Options changent (pattern visible si string)
+3. ✅ Définir un pattern → Apparaît dans YAML
+4. ✅ Supprimer une output → Disparaît du YAML
 
-	it('computes preview correctly for simple flow', () => {
-		// Test avec un flow basique
-	});
+**Flow Inputs (Flow Settings):**
+1. ✅ Ajouter un input → Affiche nom + type + required checkbox
+2. ✅ Changer le type → 21+ types disponibles
+3. ✅ Cocher required → Apparaît dans YAML comme `required: true`
+4. ✅ Supprimer un input → Disparaît du YAML
 
-	it('memoizes result when inputs unchanged', () => {
-		// Vérifier que même référence objet si inputs identiques
-	});
+**Général:**
+1. ✅ Drag & drop pour réordonner (si enabled)
+2. ✅ État vide avec message clair
+3. ✅ Contraintes min/max respectées
+4. ✅ Boutons disabled aux limites
 
-	it('filters out constant nodes', () => {
-		// Vérifier que les nœuds constants n'apparaissent pas
-	});
+### Tests Automatisés
 
-	it('filters out data flow edges', () => {
-		// Vérifier que les edges de data flow n'apparaissent pas
-	});
+**Commande:** `npm run test:agent:frontend`
 
-	it('includes dependency edges in preview', () => {
-		// Vérifier que les dépendances sont dans le YAML
-	});
-});
-```
+**Cible:**
+- useListItems: 100% coverage
+- EditableListField: >90% coverage
+- Item Renderers: >90% coverage
 
-### Tests d'intégration
+---
 
-**Fichier:** `packages/web-frontend/src/app/pages/flows/flow-editor/FlowEditorRightPanel.test.tsx`
+## Fichiers Critiques
 
-```typescript
-describe('FlowEditorRightPanel YAML Preview', () => {
-	it('updates YAML when node is added', () => {
-		// Ajouter un nœud → vérifier que YAML change
-	});
+### Nouveaux Fichiers (Framework - 11)
 
-	it('updates YAML when node property changes', () => {
-		// Modifier une propriété → vérifier YAML
-	});
+| Fichier | Responsabilité | Lignes |
+|---------|---------------|--------|
+| `hooks2/useListItems.ts` | Hook CRUD liste | ~80 |
+| `hooks2/useListReordering.ts` | Hook reordering | ~60 |
+| `components2/list/EditableListField.tsx` | Composant principal | ~120 |
+| `components2/list/SortableItem.tsx` | Wrapper drag & drop | ~40 |
+| `components2/list/renderers/KeyValueItemRenderer.tsx` | Renderer key-value | ~30 |
+| `components2/list/renderers/OutputItemRenderer.tsx` | Renderer output | ~50 |
+| `components2/list/renderers/InputDefinitionRenderer.tsx` | Renderer input def | ~40 |
+| `types/EditableListTypes.ts` | Types TypeScript | ~30 |
+| `hooks2/useListItems.test.ts` | Tests hook | ~150 |
+| `components2/list/EditableListField.test.tsx` | Tests composant | ~200 |
+| `components2/list/renderers/*.test.tsx` | Tests renderers (3) | ~300 |
 
-	it('updates YAML when edge is created', () => {
-		// Créer une dépendance → vérifier dans depends[]
-	});
+### Fichiers Modifiés (Flow Editor - 2)
 
-	it('does not include constant nodes in YAML', () => {
-		// Ajouter un nœud constant → vérifier absence dans YAML
-	});
+| Fichier | Changement | Lignes |
+|---------|-----------|--------|
+| `FlowEditorPropertiesPanel.tsx` | env + output → EditableListField | +45 |
+| `FlowSettingsDialog.tsx` | inputs → EditableListField | +25 |
 
-	it('YAML matches what saveFlow would save', () => {
-		// Comparer preview avec résultat de saveFlow()
-	});
-});
-```
+### Documentation (1)
 
-### Checklist de test manuel
+| Fichier | Contenu | Lignes |
+|---------|---------|--------|
+| `.claude/docs/editable-list-pattern.md` | Guide architectural | ~200 |
 
-1. ✅ Charger un flow existant → YAML s'affiche correctement
-2. ✅ Ajouter un nouveau nœud → YAML se met à jour immédiatement
-3. ✅ Éditer une propriété (nom, prompt, etc.) → YAML se met à jour
-4. ✅ Créer une edge de dépendance → YAML montre dans `depends` array
-5. ✅ Supprimer une edge → YAML retire de `depends` array
-6. ✅ Ajouter un nœud constant → YAML ne l'inclut PAS
-7. ✅ Sauvegarder le flow → YAML reste identique (preview = état sauvegardé)
-8. ✅ Basculer la visibilité des edges → YAML ne change PAS (utilise `allEdges`)
-9. ✅ Flow volumineux (50+ nœuds) → Pas de lag perceptible
+---
 
-### Test de performance
+## Ordre d'Implémentation
 
-**Objectif:** Vérifier que la conversion est assez rapide pour du temps réel
+### Phase 1: Core Framework (1-2 jours)
+1. Créer `useListItems` hook
+2. Créer `EditableListField` composant
+3. Créer `SortableItem` wrapper
+4. Tests unitaires pour hook et composant
 
-**Benchmarks attendus:**
+### Phase 2: Item Renderers (1 jour)
+1. Créer `KeyValueItemRenderer`
+2. Créer `OutputItemRenderer`
+3. Créer `InputDefinitionRenderer`
+4. Tests unitaires pour chaque renderer
 
-- 10 nœuds: < 1ms
-- 50 nœuds: < 5ms
-- 100 nœuds: < 10ms
-- 500 nœuds: Évaluer si debouncing nécessaire
+### Phase 3: Intégration Flow Editor (0.5 jour)
+1. Adapter `env` dans FlowEditorPropertiesPanel
+2. Adapter `output` dans FlowEditorPropertiesPanel
+3. Adapter `inputs` dans FlowSettingsDialog
 
-**Méthode:** `performance.now()` dans la console du navigateur
+### Phase 4: Reordering (optionnel - 0.5 jour)
+1. Créer `useListReordering` hook
+2. Intégrer dnd-kit dans EditableListField
+3. Tests drag & drop
 
-## Améliorations futures (hors scope de ce plan)
+### Phase 5: Documentation & Polish (0.5 jour)
+1. Écrire documentation pattern
+2. Tests end-to-end manuels
+3. Corrections UI/UX
 
-### 1. Combler les gaps de propriétés YAML
+**Total estimé:** 3.5 - 4.5 jours
 
-**Priority:** HIGH
+---
 
-Ajouter des UIs pour éditer les propriétés actuellement manquantes:
+## Complexité & Risques
 
-- Flow-level: `workspace.mode`, `gitStrategy`, `reusePolicy`, `version`, `inputs`
-- Step-level: `env` (script), `output`, `skipOnLoop`, `timeout` (user intervention), `workspaceStrategy` (subflow)
+### Complexité: MOYENNE
 
-**Approche:** Créer un dialog "Flow Configuration" pour les propriétés flow-level, étendre les panneaux de propriétés pour les step-level.
+**Points faciles:**
+- Hook `useListItems` (pattern similaire à usePagination2)
+- Item renderers (composants simples)
+- Intégration dans Flow Editor (substitution directe)
 
-### 2. Syntax highlighting pour YAML
+**Points moyens:**
+- EditableListField avec gestion du drag & drop
+- Synchronisation bidirectionnelle (list ↔ object YAML)
+- Tests complets avec dnd-kit
 
-**Library:** `shiki` ou `highlight.js`
+**Points difficiles:**
+- ❌ Aucun - architecture bien définie
 
-Ajouter de la coloration syntaxique dans les vues YAML (Original/Preview) pour améliorer la lisibilité.
+### Risques
 
-### 3. Undo/Redo pour édition YAML
+1. **Performance avec grandes listes**: Mitigé par React.memo et memoization
+2. **Conflicts avec types flow-engine**: Déjà résolus (types existants)
+3. **Tests drag & drop**: Nécessite mocking de dnd-kit (documenté)
 
-Implémenter un historique d'éditions permettant d'annuler/refaire les changements YAML → Visual.
+---
 
-### 4. Validation avancée YAML
+## Bénéfices
 
-Valider le YAML édité contre le schéma TypeScript `FlowDefinition` avec des messages d'erreur détaillés (champs manquants, types incorrects, etc.).
+### Utilisateur Final
+- ✅ Interface intuitive (pas de JSON manuel)
+- ✅ Guidance visuelle (labels, types, placeholders)
+- ✅ Validation immediate (contraintes UI)
+- ✅ Réordering facile (drag & drop)
 
-## Fichiers critiques
+### Développeur
+- ✅ Pattern réutilisable (env, output, inputs, futures listes)
+- ✅ Code DRY (extraction de duplication ArrayField/KeyValueField)
+- ✅ Type safety (TypeScript strict)
+- ✅ Testable (hooks séparés)
+- ✅ Composable (features indépendantes comme DataView)
 
-### Nouveaux fichiers (à créer)
-
-| Fichier                              | Responsabilité                  | Lines (estimées) |
-| ------------------------------------ | ------------------------------- | ---------------- |
-| `hooks/useFlowPreview.ts`            | Calculer preview FlowDefinition | ~20              |
-| `utils/computeFlowDiff.ts`           | Computing line diffs            | ~80              |
-| `components/FlowDiffViewer.tsx`      | Afficher diff avec annotations  | ~60              |
-| `components/YamlEditor.tsx`          | Éditeur YAML avec validation    | ~50              |
-| `hooks/useFlowPreview.test.ts`       | Tests unitaires                 | ~100             |
-| `components/FlowDiffViewer.test.tsx` | Tests composant                 | ~80              |
-| `utils/computeFlowDiff.test.ts`      | Tests diff utility              | ~100             |
-
-### Fichiers modifiés
-
-| Fichier                    | Lignes        | Changement                                               |
-| -------------------------- | ------------- | -------------------------------------------------------- |
-| `hooks/useFlowEditor.ts`   | 577, 603-607  | Exporter `allEdges`, ajouter `applyYamlChanges` callback |
-| `FlowEditorRightPanel.tsx` | 12-16, 40-300 | Refactoriser avec tabs multiples, diff, export, édition  |
-| `FlowEditorPage.tsx`       | ~130-137      | Passer `nodes` et `allEdges`                             |
-| `package.json`             | dependencies  | Ajouter `diff@^5.1.0` et `@types/diff@^5.0.2`            |
-
-### Fonctions de conversion (référence)
-
-- **Visual → YAML:** `utils/flowToReactFlow.ts:96-150` - `reactFlowToFlowDefinition(baseFlow, nodes, edges)`
-- **YAML → Visual:** `utils/flowToReactFlow.ts:8-91` - `flowDefinitionToReactFlow(flow)`
-- **Auto-layout:** `utils/layoutAlgorithms.ts` - `applyDagreLayout(nodes, edges)`
+### Maintenance
+- ✅ Un seul composant à maintenir au lieu de 3+
+- ✅ Tests centralisés
+- ✅ Documentation claire du pattern
+- ✅ Évolutivité (ajout de features facile)
 
 ---
 
 ## Résumé
 
-Cette solution complète fournit:
+Cette implémentation crée un **pattern composable générique** pour gérer des listes éditables, inspiré de l'architecture DataView/Table/Grid. Le composant `EditableListField` avec ses hooks et renderers remplace les textarea JSON par des interfaces user-friendly, tout en restant réutilisable pour de futurs besoins.
 
-### ✅ Phase 1: Preview temps réel
+**Impact:**
+- 3 cas d'usage immédiats (env, output, inputs)
+- Réduction de ~95% de duplication vs implémentations actuelles
+- Pattern extensible pour toute future liste éditable
+- UI/UX cohérente à travers l'application
 
-- Hook `useFlowPreview` calculant le YAML qui sera sauvegardé
-- Mémoisation pour performance optimale
-- Export de `allEdges` depuis `useFlowEditor`
-
-### ✅ Phase 2: Diff view
-
-- Utilitaire `computeFlowDiff` basé sur la librairie `diff`
-- Composant `FlowDiffViewer` avec annotations colorées (added/removed/modified)
-- Summary header affichant le nombre de changements
-
-### ✅ Phase 3: Tabs multiples
-
-- 3 tabs: Original / Preview / Diff
-- Indicateurs visuels (• pour isDirty, badge de count pour diff)
-- Navigation facile entre les vues
-
-### ✅ Phase 4: Export individuel
-
-- Bouton Download pour chaque version
-- Export Original/Preview en `.yaml`
-- Export Diff en `.txt` avec préfixes +/-
-
-### ✅ Phase 5: Édition bidirectionnelle
-
-- Composant `YamlEditor` avec textarea et validation
-- Parsing YAML → FlowDefinition → nodes/edges
-- Auto-layout automatique après import
-- Gestion d'erreurs avec messages clairs
-
-### Complexité estimée
-
-| Phase     | Effort  | Fichiers                   | Tests         |
-| --------- | ------- | -------------------------- | ------------- |
-| Phase 1   | 4h      | 2 nouveaux, 1 modifié      | 2h            |
-| Phase 2   | 6h      | 2 nouveaux                 | 3h            |
-| Phase 3   | 4h      | 1 modifié                  | 2h            |
-| Phase 4   | 2h      | 1 modifié                  | 1h            |
-| Phase 5   | 6h      | 1 nouveau, 2 modifiés      | 2h            |
-| **Total** | **22h** | **5 nouveaux, 4 modifiés** | **10h (45%)** |
-
-**Note importante:** Déléguer l'implémentation frontend au **frontend-dev agent** (requis par `CLAUDE.md` pour tout changement dans `packages/web-frontend/src/**`).
-
----
-
-## Ordre d'implémentation recommandé
-
-**Impératif:** Implémenter les phases dans l'ordre (1 → 2 → 3 → 4 → 5) car chaque phase dépend de la précédente.
-
-1. **Phase 1:** Base nécessaire pour toutes les autres phases
-2. **Phase 2:** Fournit le diff utile pour Phase 3
-3. **Phase 3:** Intègre Phase 1 et 2 dans l'UI
-4. **Phase 4:** Simple ajout fonctionnel sur Phase 3
-5. **Phase 5:** Feature avancée utilisant les conversions existantes
-
-**Checkpoint après chaque phase:** Tester manuellement et exécuter `/check` avant de passer à la phase suivante.
+🎯 **Next:** Déléguer au **frontend-dev agent** pour implémentation.

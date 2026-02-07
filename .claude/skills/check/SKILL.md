@@ -4,6 +4,7 @@ description: Check TypeScript/ESLint errors across the monorepo (backend, fronte
 allowed-tools:
     - Bash
     - Read
+#context: fork
 ---
 
 # Check Agent Skill

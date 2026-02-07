@@ -2,9 +2,12 @@
 name: agent-browser
 description: Automates browser interactions for web testing, form filling, screenshots, and data extraction. Use when the user needs to navigate websites, interact with web pages, fill forms, take screenshots, test web applications, or extract information from web pages.
 allowed-tools: Bash(agent-browser:*)
+#context: fork
 ---
 
 # Browser Automation with agent-browser
+
+**IMPORTANT:** Always run agent-browser in **headless mode** (default). Only use `--headed` flag if the user explicitly requests to see the browser window, as it can interfere with their work.
 
 ## Quick start
 
