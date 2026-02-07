@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Checkbox } from '@framework/components/forms/Checkbox';
 import { Input } from '@framework/components/forms/Input';
@@ -19,6 +19,16 @@ import {
 } from '@framework/components/overlays/AlertDialog';
 import { Button } from '@framework/components/primitives/Button';
 import { Separator } from '@framework/components/primitives/Separator';
+import { EditableListField } from '@framework/components2/list/EditableListField';
+import {
+	KeyValueItemRenderer,
+	type KeyValueItem,
+} from '@framework/components2/list/renderers/KeyValueItemRenderer';
+import {
+	OutputItemRenderer,
+	type OutputItem,
+} from '@framework/components2/list/renderers/OutputItemRenderer';
+import { useListItems } from '@framework/hooks2/useListItems';
 import type { ValidationIssue } from 'flow-engine/validation/ValidationTypes';
 import { AlertCircle, AlertTriangle, ChevronDown, Info, Trash2 } from 'lucide-react';
 
@@ -208,6 +218,65 @@ export function FlowEditorPropertiesPanel({
 		onUpdateNode(selectedNode.id, { [field]: value } as Partial<FlowStep>);
 	};
 
+	// Environment variables list management
+	const envItems = useListItems<KeyValueItem>({
+		initialItems: Object.entries(step.env || {}).map(([key, value]) => ({
+			key,
+			value: String(value),
+		})),
+		minItems: 0,
+	});
+
+	// Sync env items back to step data (only when items change, not on mount)
+	useEffect(() => {
+		const envObj = Object.fromEntries(
+			envItems.fstate.items.filter(item => item.key.trim()).map(item => [item.key, item.value])
+		);
+		// Only update if changed to avoid infinite loop
+		const currentEnv = step.env || {};
+		const isDifferent =
+			Object.keys(envObj).length !== Object.keys(currentEnv).length ||
+			Object.entries(envObj).some(([k, v]) => currentEnv[k] !== v);
+		if (isDifferent) {
+			onUpdateNode(selectedNode.id, { env: envObj } as Partial<FlowStep>);
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [envItems.fstate.items]);
+
+	// Output configuration list management
+	const outputItems = useListItems<OutputItem>({
+		initialItems: Object.entries(step.output || {}).map(([name, config]: [string, any]) => ({
+			name,
+			type: config.type || 'string',
+			pattern: config.pattern,
+		})),
+		minItems: 0,
+	});
+
+	// Sync output items back to step data (only when items change, not on mount)
+	useEffect(() => {
+		const outputObj = Object.fromEntries(
+			outputItems.fstate.items
+				.filter(item => item.name.trim())
+				.map(item => {
+					const config: any = { type: item.type };
+					if (item.pattern) {
+						config.pattern = item.pattern;
+					}
+					return [item.name, config];
+				})
+		);
+		// Only update if changed to avoid infinite loop
+		const currentOutput = step.output || {};
+		const isDifferent =
+			Object.keys(outputObj).length !== Object.keys(currentOutput).length ||
+			Object.entries(outputObj).some(([k, v]) => JSON.stringify(currentOutput[k]) !== JSON.stringify(v));
+		if (isDifferent) {
+			onUpdateNode(selectedNode.id, { output: outputObj } as Partial<FlowStep>);
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [outputItems.fstate.items]);
+
 	return (
 		<div className="w-96 overflow-auto border-l bg-card">
 			<div className="space-y-4 p-4">
@@ -389,27 +458,16 @@ export function FlowEditorPropertiesPanel({
 							/>
 						</div>
 
-						<div className="space-y-2">
-							<Label htmlFor="env">Environment Variables (JSON)</Label>
-							<Textarea
-								id="env"
-								value={JSON.stringify(step.env || {}, null, 2)}
-								onChange={e => {
-									try {
-										const parsed = JSON.parse(e.target.value);
-										onUpdateNode(selectedNode.id, { env: parsed } as Partial<FlowStep>);
-									} catch (_err) {
-										// Invalid JSON, ignore
-									}
-								}}
-								rows={4}
-								className="font-mono text-sm"
-								placeholder='{"KEY": "value"}'
-							/>
-							<p className="text-xs text-muted-foreground">
-								Environment variables to set for script execution
-							</p>
-						</div>
+						<EditableListField
+							label="Environment Variables"
+							description="Environment variables to set for script execution"
+							items={envItems}
+							renderItem={(item, _index, actions) => <KeyValueItemRenderer item={item} actions={actions} />}
+							createDefault={() => ({ key: '', value: '' })}
+							addButtonLabel="Add Variable"
+							emptyMessage="No environment variables defined"
+							getItemId={(item, index) => item.key || `env-${index}`}
+						/>
 					</>
 				)}
 
@@ -778,27 +836,16 @@ export function FlowEditorPropertiesPanel({
 								/>
 							</div>
 
-							<div className="space-y-2">
-								<Label htmlFor="output">Output Configuration (JSON)</Label>
-								<Textarea
-									id="output"
-									value={JSON.stringify(step.output || {}, null, 2)}
-									onChange={e => {
-										try {
-											const parsed = JSON.parse(e.target.value);
-											onUpdateNode(selectedNode.id, { output: parsed } as Partial<FlowStep>);
-										} catch (_err) {
-											// Invalid JSON, ignore
-										}
-									}}
-									rows={6}
-									className="font-mono text-sm"
-									placeholder='{"varName": {"type": "string", "pattern": "..."}}'
-								/>
-								<p className="text-xs text-muted-foreground">
-									Define output variable extraction and transformation
-								</p>
-							</div>
+							<EditableListField
+								label="Output Configuration"
+								description="Define output variable extraction and transformation"
+								items={outputItems}
+								renderItem={(item, _index, actions) => <OutputItemRenderer item={item} actions={actions} />}
+								createDefault={() => ({ name: '', type: 'string' })}
+								addButtonLabel="Add Output Variable"
+								emptyMessage="No output variables defined"
+								getItemId={(item, index) => item.name || `output-${index}`}
+							/>
 
 							<div className="space-y-2">
 								<Label htmlFor="skipOnLoop" className="flex items-center gap-2">

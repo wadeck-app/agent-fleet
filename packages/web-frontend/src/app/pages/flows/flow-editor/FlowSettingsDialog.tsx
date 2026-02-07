@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
@@ -13,8 +13,13 @@ import {
 	DialogTitle,
 } from '@framework/components/overlays/Dialog';
 import { Button } from '@framework/components/primitives/Button';
+import { EditableListField } from '@framework/components2/list/EditableListField';
+import {
+	InputDefinitionRenderer,
+	type InputDefinitionItem,
+} from '@framework/components2/list/renderers/InputDefinitionRenderer';
+import { useListItems } from '@framework/hooks2/useListItems';
 
-import { FlowInputDefinitionsField } from './FlowInputDefinitionsField';
 import type { FlowDefinition, GitStrategy, ReusePolicy, WorkspaceMode } from './types/flow-engine.types';
 
 interface FlowSettingsDialogProps {
@@ -31,6 +36,31 @@ export function FlowSettingsDialog({ open, onOpenChange, flowDefinition, onSave 
 	if (flowDefinition.id !== localFlow.id || flowDefinition.version !== localFlow.version) {
 		setLocalFlow(flowDefinition);
 	}
+
+	// Input definitions list management
+	const inputItems = useListItems<InputDefinitionItem>({
+		initialItems: Object.entries(localFlow.inputs || {}).map(([name, type]) => ({
+			name,
+			type,
+		})),
+		minItems: 0,
+	});
+
+	// Sync input items back to local flow (only when items change, not on mount)
+	useEffect(() => {
+		const inputsObj = Object.fromEntries(
+			inputItems.fstate.items.filter(item => item.name.trim()).map(item => [item.name, item.type])
+		);
+		// Only update if changed to avoid infinite loop
+		const currentInputs = localFlow.inputs || {};
+		const isDifferent =
+			Object.keys(inputsObj).length !== Object.keys(currentInputs).length ||
+			Object.entries(inputsObj).some(([k, v]) => currentInputs[k] !== v);
+		if (isDifferent) {
+			setLocalFlow(prev => ({ ...prev, inputs: inputsObj }));
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [inputItems.fstate.items]);
 
 	const handleSave = () => {
 		onSave({
@@ -203,21 +233,16 @@ export function FlowSettingsDialog({ open, onOpenChange, flowDefinition, onSave 
 						</div>
 
 						{/* Flow Inputs */}
-						<div className="space-y-2">
-							<Label>Flow Inputs</Label>
-							<FlowInputDefinitionsField
-								inputs={localFlow.inputs}
-								onChange={inputs =>
-									setLocalFlow(prev => ({
-										...prev,
-										inputs,
-									}))
-								}
-							/>
-							<p className="text-xs text-muted-foreground">
-								Define input variables that this flow accepts from tasks
-							</p>
-						</div>
+						<EditableListField
+							label="Flow Inputs"
+							description="Define input variables that this flow accepts from tasks"
+							items={inputItems}
+							renderItem={(item, _index, actions) => <InputDefinitionRenderer item={item} actions={actions} />}
+							createDefault={() => ({ name: '', type: 'string' })}
+							addButtonLabel="Add Input"
+							emptyMessage="No inputs defined"
+							getItemId={(item, index) => item.name || `input-${index}`}
+						/>
 					</div>
 				</DialogBody>
 

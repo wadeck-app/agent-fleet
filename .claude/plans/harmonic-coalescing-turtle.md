@@ -1,888 +1,1303 @@
-# Plan: Composant Générique de Liste Éditable (EditableListField)
+# Plan: Refactoring Architectural EditableListField
+
+## STATUS: PLANNING - Corrections Architecturales
+
+Ce plan adresse 15 problèmes architecturaux identifiés dans l'implémentation EditableListField, pour aligner le code avec les conventions du projet.
+
+---
 
 ## Contexte
 
-Actuellement, l'éditeur de flows utilise des textarea JSON pour plusieurs propriétés:
-- `env` (variables d'environnement) → JSON `{"KEY": "value"}`
-- `output` (configuration outputs) → JSON complexe avec metadata
-- `inputs` (flow inputs) → Liste personnalisée avec composant dédié
-
-**Problème:** Ces textarea JSON sont peu user-friendly et difficiles à comprendre pour les utilisateurs.
-
-**Solution:** Créer un composant générique réutilisable avec une architecture composable similaire à DataView/Table/Grid, permettant de gérer des listes éditables avec add/remove/edit/reorder de manière déclarative.
+L'implémentation EditableListField (complétée précédemment) présente des incohérences avec les conventions architecturales du projet. Ce plan couvre les corrections nécessaires pour:
+- Respecter les patterns établis (contracts, exports, organisation)
+- Améliorer la réutilisabilité (extraction de features communes)
+- Corriger les erreurs TypeScript dans flow-editor
+- Améliorer l'UX (exemples de patterns, guidance)
 
 ---
 
-## Architecture Proposée
+## Corrections Identifiées (15 items)
 
-Inspirée du pattern DataView/Table/Grid (3 couches headless):
-
-```
-┌─ Feature Hooks (State Management)
-│  ├─ useListItems<T>           - Gestion CRUD des items
-│  ├─ useListReordering<T>      - Drag & drop (optionnel)
-│  └─ useListValidation<T>      - Validation (optionnel)
-│
-├─ Core Component (Composition & Rendering)
-│  └─ EditableListField<T>      - Rendu de la liste éditable
-│
-└─ Item Renderers (Composables)
-   ├─ KeyValueItemRenderer      - Pour env variables
-   ├─ OutputItemRenderer        - Pour output config
-   └─ InputDefinitionRenderer   - Pour flow inputs
-```
-
-**Principes clés:**
-1. **Composabilité**: Features indépendantes et stackables
-2. **Généricité**: Support de tout type d'item via `<T>`
-3. **Type Safety**: TypeScript strict pour éviter les erreurs
-4. **Testabilité**: Hooks et composants séparés
-5. **Réutilisabilité**: Pattern utilisable pour env, output, inputs et futures listes
+### 1. **__test-imports__.ts Non Conforme** ⚠️ CRITIQUE
+**Problème**: Le fichier ne suit pas les conventions de test du projet
+**Convention**: Tests nommés `[FileName].test.ts`, helpers dans `framework/test-utils/`
+**Action**: Supprimer ou renommer selon usage réel
 
 ---
 
-## Composants à Créer
+### 2. **useEffect avec Dépendances Dangereuses** ⚠️ CRITIQUE
+**Problème**: Risques de boucles infinies
+**Fichiers à vérifier**:
+- `FlowSettingsDialog.tsx:36-38` - State update HORS useEffect (CRITIQUE)
+- `FlowEditorPropertiesPanel.tsx:231-244, 257-278` - Array deps avec comparaison (OK mais à documenter)
+**Action**: Corriger FlowSettingsDialog, valider autres useEffect
 
-### 1. Hook: `useListItems<T>`
+---
 
-**Localisation:** `packages/web-frontend/src/framework/hooks2/useListItems.ts` (NOUVEAU)
-
-**Responsabilité:** Gestion CRUD des items d'une liste
-
-**Interface:**
+### 3. **if/return Inline** ⚠️ STYLE
+**Problème**: `if (cond) return;` sur une ligne
+**Convention**: Multi-lignes toujours
 ```typescript
-interface ListItemsContract<T> {
-  fstate: {
-    items: T[];
-    count: number;
-    isEmpty: boolean;
-    canAdd: boolean;
-    canRemove: boolean;
-  };
-  actions: {
-    add: (item: T) => void;
-    remove: (index: number) => void;
-    update: (index: number, item: Partial<T>) => void;
-    set: (items: T[]) => void;
-    clear: () => void;
-  };
-  fillQuery: () => void; // Pas de query (local state)
+// ❌ Actuel
+if (items.length === 0) return null;
+
+// ✅ Attendu
+if (items.length === 0) {
+  return null;
+}
+```
+**Fichiers**: `useListItems.ts`, possiblement autres
+
+---
+
+### 4. **FeatureContract Mal Utilisé** ⚠️ ARCHITECTURE
+**Problème**: `useListItems` retourne `FeatureContract` mais n'a pas de `fillQuery` pertinent (local state seulement)
+**Convention découverte**: `FeatureContract` = features pour backend queries (pagination, sorting, caching)
+**Solution**: Créer nouveau contrat:
+```typescript
+// FeatureFormContract.ts (NOUVEAU)
+export interface FeatureFormContract<TState> {
+  fstate: TState;
+  actions: Record<string, Function>;
+  // Pas de fillQuery - c'est pour les forms
 }
 
-interface UseListItemsOptions<T> {
+// FeatureDataContract.ts (alias de FeatureContract)
+export type FeatureDataContract<TState> = FeatureContract<TState>;
+```
+**Action**:
+- Créer `FeatureFormContract` pour hooks form (useListItems, futurs)
+- Aliaser `FeatureDataContract` pour clarifier usage backend
+- Refactorer `useListItems` pour utiliser `FeatureFormContract`
+
+---
+
+### 5. **UseSyncedListItemsOptions Non Héritant** ⚠️ ARCHITECTURE
+**Problème**: Options dupliquent celles de `UseListItemsOptions`
+**Solution**:
+```typescript
+// ❌ Actuel
+export interface UseSyncedListItemsOptions<T, R = T[]> {
   initialItems?: T[];
   minItems?: number;
   maxItems?: number;
   createDefault?: () => T;
+  transform: (items: T[]) => R;
+  onSync: (transformed: R) => void;
+  filter?: (item: T) => boolean;
 }
 
-export function useListItems<T>(options: UseListItemsOptions<T>): ListItemsContract<T>
+// ✅ Attendu
+export interface UseSyncedListItemsOptions<T, R = T[]>
+  extends UseListItemsOptions<T> {
+  // Aspects spécifiques au syncing
+  transform: (items: T[]) => R;
+  onSync: (transformed: R) => void;
+  filter?: (item: T) => boolean;
+}
 ```
-
-**Fonctionnalités:**
-- État frozen (fstate) pour éviter re-renders
-- Actions mémorisées
-- Validation constraints (min/max)
-- Support d'un item par défaut customisable
-
-**Estimation:** ~80 lignes
 
 ---
 
-### 2. Hook: `useListReordering<T>` (Optionnel)
-
-**Localisation:** `packages/web-frontend/src/framework/hooks2/useListReordering.ts` (NOUVEAU)
-
-**Responsabilité:** Gestion du drag & drop pour réordonner
-
-**Interface:**
-```typescript
-interface ListReorderingContract<T> {
-  fstate: {
-    isDragging: boolean;
-    draggedIndex: number | null;
-  };
-  actions: {
-    startDrag: (index: number) => void;
-    endDrag: () => void;
-    reorder: (fromIndex: number, toIndex: number) => void;
-  };
-  sensors: SensorDescriptor[]; // Pour dnd-kit
-  fillQuery: () => void;
-}
-
-export function useListReordering<T>(): ListReorderingContract<T>
+### 6. **Refactoring hooks2/ - Pas de Subfolders** ⚠️ ORGANISATION
+**Problème**: Tous les hooks dans un seul dossier plat
+**Convention découverte**: `components2/` a des subfolders (`form/`, `data-view/`)
+**Solution**: Créer structure similaire
 ```
-
-**Fonctionnalités:**
-- Intégration avec dnd-kit
-- État de drag en cours
-- Actions de réordonnancement
-
-**Estimation:** ~60 lignes
+framework/hooks2/
+  ├── form/               (NOUVEAU)
+  │   ├── useListItems.ts
+  │   ├── useSyncedListItems.ts
+  │   └── [futurs hooks form]
+  ├── data/               (NOUVEAU)
+  │   ├── usePagination2.ts
+  │   ├── useSorting2.ts
+  │   ├── useCacheControl2.ts
+  │   └── [autres hooks data]
+  └── utility/            (NOUVEAU - optionnel)
+      ├── useDebounce.ts
+      └── useInfinitePagination.ts
+```
+**Action**: Migrer tous les hooks existants
 
 ---
 
-### 3. Composant: `EditableListField<T>`
+### 7. **index.ts qui Font Seulement Import/Export** ⚠️ ANTI-PATTERN
+**Problème**: Fichiers barrel inutiles
+**Fichiers concernés**:
+- `framework/components2/list/index.ts`
+- `framework/components2/list/renderers/index.ts`
+- `framework/hooks2/index.ts` (si existe)
+**Action**: Supprimer ces fichiers, importer directement depuis les sources
 
-**Localisation:** `packages/web-frontend/src/framework/components2/list/EditableListField.tsx` (NOUVEAU)
+---
 
-**Responsabilité:** Composant principal pour afficher et éditer une liste
-
-**Interface:**
+### 8. **GripVertical Dupliqué** ⚠️ RÉUTILISABILITÉ
+**Problème**: `SortableItem` implémente GripVertical avec classes, pattern réutilisable ailleurs
+**Observation**: Même pattern pourrait être dans DataView, autres listes
+**Solution**: Extraire composant
 ```typescript
-interface EditableListFieldProps<T> extends BaseFieldProps {
-  // Core hooks
+// framework/components2/primitives/DragHandle.tsx (NOUVEAU)
+export function DragHandle({
+  disabled = false,
+  className,
+  ...props
+}: DragHandleProps) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing",
+        disabled && "cursor-not-allowed opacity-50",
+        className
+      )}
+      disabled={disabled}
+      {...props}
+    >
+      <GripVertical className="size-4" />
+    </button>
+  );
+}
+```
+**Action**: Créer `DragHandle.tsx`, utiliser dans `SortableItem`
+
+---
+
+### 9. **EditableListField Isolé - Devrait Faire Partie d'une Famille Form** ⚠️ ARCHITECTURE
+**Problème**: EditableListField seul, pas de pattern commun avec autres form fields
+**Observation**: Autres form fields (`Input`, `Select`, `Checkbox`) partagent patterns:
+- Tous supportent `className`, `...props`
+- Tous utilisent `cn()` pour merge classes
+- Tous exportent via `export { Component }`
+**Solution**: Créer interface commune
+```typescript
+// framework/types/FormFieldProps.ts (NOUVEAU ou extension)
+export interface BaseFormFieldProps {
+  label?: string;
+  description?: string;
+  error?: string;
+  className?: string;
+  disabled?: boolean;
+}
+
+// EditableListField devrait étendre:
+export interface EditableListFieldProps<T> extends BaseFormFieldProps {
   items: ListItemsContract<T>;
-  reordering?: ListReorderingContract<T>;
+  // ... autres props
+}
+```
+**Action**: Standardiser props EditableListField avec autres form fields
 
-  // Rendering
-  renderItem: (item: T, index: number, actions: ItemActions<T>) => ReactNode;
-  renderEmpty?: () => ReactNode;
+---
 
-  // Labels
-  addButtonLabel?: string;
-  emptyMessage?: string;
+### 10. **sensors/handleDragEnd dans EditableListField - Pas Lean** ⚠️ ARCHITECTURE
+**Problème**: Code DnD directement dans composant (10+ lignes), complexifie testing
+**Solution**: Extraire en hook feature
+```typescript
+// framework/hooks2/form/useDragAndDrop.ts (NOUVEAU)
+export function useDragAndDrop<T>(options: {
+  items: T[];
+  onReorder: (fromIndex: number, toIndex: number) => void;
+  getItemId: (item: T, index: number) => string | number;
+  disabled?: boolean;
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { ...config }),
+    useSensor(KeyboardSensor, { ...config })
+  );
 
-  // Styling
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    // ... logic extraction
+  }, [options.items, options.onReorder]);
+
+  return {
+    sensors,
+    handleDragEnd,
+    sortableIds: options.items.map((item, i) => options.getItemId(item, i)),
+  };
+}
+```
+**Bénéfice**: EditableListField devient +50% plus court, testable séparément
+
+---
+
+### 11. **Add Button avec Trop de Classes CSS** ⚠️ RÉUTILISABILITÉ
+**Problème**: Bouton "Add" inline avec multiples classes Tailwind
+```typescript
+// ❌ Actuel
+<Button
+  variant="outline"
+  size="sm"
+  onClick={() => actions.add(createDefault())}
+  disabled={!fstate.canAdd}
+  className="mt-3 w-full justify-center gap-2 border-dashed"
+>
+  <Plus className="size-4" />
+  {addButtonLabel}
+</Button>
+```
+**Convention découverte**: Button.tsx a déjà variants (icon, icon-sm, etc.)
+**Solution**: Créer variant ou composant spécialisé
+```typescript
+// Option 1: Nouveau variant dans Button.tsx
+const buttonVariants = cva('...', {
+  variants: {
+    variant: {
+      ...,
+      'add': 'mt-3 w-full justify-center gap-2 border-dashed border-border ...'
+    }
+  }
+});
+
+// Option 2: Composant dédié
+export function AddButton({ children, onClick, disabled }: AddButtonProps) {
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="mt-3 w-full justify-center gap-2 border-dashed"
+      onClick={onClick}
+      disabled={disabled}
+    >
+      <Plus className="size-4" />
+      {children}
+    </Button>
+  );
+}
+```
+**Préférence**: Option 2 (composant) pour réutilisabilité
+
+---
+
+### 12. **Composants framework/components/forms - Exports Non Conformes** ⚠️ CODE EXISTANT
+**Problème**: Certains composants n'utilisent pas `export function`, juste `export { }` à la fin
+**Convention correcte** (découverte):
+```typescript
+// ✅ Pattern établi
+function Input({ ...props }) {
+  return <input ... />;
+}
+export { Input };
+```
+**Action**: Audit des composants forms pour cohérence (PAS de changement si déjà conforme)
+
+---
+
+### 13. **OutputItemRenderer - Manque d'Exemples UX** ⚠️ UX
+**Problème**: Champ "Extraction Pattern" sans guidance, difficile pour utilisateur
+**Solution**: Ajouter exemples inline
+```typescript
+<TextField
+  label="Extraction Pattern (optional)"
+  value={item.pattern || ''}
+  onChange={(e) => actions.update({ pattern: e.target.value })}
+  placeholder="Result: (.*)"
+  description={
+    <div className="space-y-1">
+      <p>Regex pattern to extract value from output</p>
+      <div className="text-xs space-y-0.5">
+        <p><code>Result: (.*)</code> - Extract after "Result: "</p>
+        <p><code>(\d+) items</code> - Extract number before " items"</p>
+        <p><code>{"Status: (\\w+)"}</code> - Extract word after "Status: "</p>
+      </div>
+    </div>
+  }
+/>
+```
+**Action**: Enrichir description avec 3-4 exemples concrets
+
+---
+
+### 14. **Remove Button Dupliqué dans Renderers** ⚠️ RÉUTILISABILITÉ
+**Problème**: Même bouton "Remove" répété dans 3 renderers
+```typescript
+// KeyValueItemRenderer.tsx:78
+<Button variant="ghost" size="sm" onClick={actions.remove} title="Remove">
+  <Trash2 className="size-4" />
+</Button>
+
+// OutputItemRenderer.tsx:88
+<Button variant="ghost" size="sm" onClick={actions.remove} title="Remove">
+  <Trash2 className="size-4" />
+</Button>
+
+// InputDefinitionRenderer.tsx:97
+<Button variant="ghost" size="sm" onClick={actions.remove} title="Remove">
+  <Trash2 className="size-4" />
+</Button>
+```
+**Solution**: Extraire composant ou feature
+```typescript
+// framework/components2/list/RemoveItemButton.tsx (NOUVEAU)
+export interface RemoveItemButtonProps {
+  onRemove: () => void;
+  disabled?: boolean;
   className?: string;
 }
 
-interface ItemActions<T> {
-  update: (partial: Partial<T>) => void;
-  remove: () => void;
+export function RemoveItemButton({
+  onRemove,
+  disabled = false,
+  className
+}: RemoveItemButtonProps) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={onRemove}
+      disabled={disabled}
+      title="Remove item"
+      className={cn("shrink-0", className)}
+    >
+      <Trash2 className="size-4" />
+    </Button>
+  );
 }
-
-export function EditableListField<T>(props: EditableListFieldProps<T>): ReactElement
+```
+**Usage dans renderers**:
+```typescript
+<RemoveItemButton onRemove={actions.remove} />
 ```
 
-**Fonctionnalités:**
-- Affichage de la liste avec items rendus via `renderItem`
-- Bouton "Add" (désactivé si maxItems atteint)
-- Boutons "Remove" par item (désactivés si minItems atteint)
-- Support du drag & drop si `reordering` fourni
-- État vide avec message personnalisable
-- Intégration avec FormContainer via BaseFieldProps
+---
 
-**Structure:**
+### 15. **Erreurs TypeScript dans flows/flow-editor** ⚠️ CRITIQUE
+**Fichiers avec erreurs**:
+
+1. **FlowSettingsDialog.tsx:36-38** (CRITICAL)
+   - State update HORS useEffect
+   - Fix: Wrapper dans useEffect avec deps `[flowDefinition.id, flowDefinition.version]`
+
+2. **FlowEditorPage.tsx:103-109** (HIGH)
+   - 6x `as any` assertions
+   - Fix: Corriger types dans `useFlowEditor` hook
+
+3. **FlowEditorPropertiesPanel.tsx:118, 141, 173** (MEDIUM)
+   - Double cast `as unknown as`
+   - Fix: Créer interfaces propres pour ConstantNodeData
+
+4. **FlowEditorRightPanel.tsx:75** (LOW)
+   - Variable `_yamlError` non utilisée
+   - Fix: Supprimer ou utiliser
+
+---
+
+## Plan d'Implémentation
+
+### Phase 1: Architecture Critique (Contracts & Organisation)
+**Priorité: CRITIQUE - Fondations**
+
+#### 1.1 Créer Nouveaux Contracts
+**Fichiers**:
+- `framework/types/contracts/FeatureFormContract.ts` (NOUVEAU)
+- `framework/types/contracts/FeatureDataContract.ts` (NOUVEAU - alias)
+
+**Contenu FeatureFormContract**:
 ```typescript
-export function EditableListField<T>({
-  items,
-  reordering,
-  renderItem,
-  renderEmpty,
-  addButtonLabel = 'Add Item',
-  emptyMessage = 'No items',
-  className,
-  label,
-  description,
-  error,
-}: EditableListFieldProps<T>) {
-  const { fstate, actions } = items;
+/**
+ * Contract for form-related feature hooks (local state management).
+ * Unlike FeatureDataContract, does not include fillQuery as form hooks
+ * do not interact with backend queries.
+ */
+export interface FeatureFormContract<TState> {
+  /** Frozen state (memoized) - stable reference for useEffect dependencies */
+  fstate: TState;
 
-  // Setup dnd-kit if reordering enabled
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor)
-  );
+  /** State-modifying actions - all memoized */
+  actions: Record<string, Function>;
+}
+```
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      const fromIndex = fstate.items.findIndex((_, i) => i === active.id);
-      const toIndex = fstate.items.findIndex((_, i) => i === over.id);
-      reordering?.actions.reorder(fromIndex, toIndex);
-    }
+**Contenu FeatureDataContract**:
+```typescript
+/**
+ * Contract for data-fetching feature hooks (backend integration).
+ * Includes fillQuery for populating backend query objects.
+ *
+ * This is an alias of FeatureContract for clarity.
+ */
+export type FeatureDataContract<TState> = FeatureContract<TState>;
+```
+
+#### 1.2 Refactorer useListItems
+**Fichier**: `framework/hooks2/useListItems.ts`
+**Changements**:
+- Changer type de retour: `FeatureContract` → `FeatureFormContract`
+- Supprimer `fillQuery: () => {}` (inutile)
+- Corriger inline if/return
+
+**Avant**:
+```typescript
+export type ListItemsContract<T> = FeatureContract<ListItemsState<T>>;
+
+export function useListItems<T>(...): ListItemsContract<T> {
+  // ...
+  return {
+    fstate,
+    actions,
+    fillQuery: () => {}, // ❌ Inutile
   };
+}
+```
 
+**Après**:
+```typescript
+export type ListItemsContract<T> = FeatureFormContract<ListItemsState<T>>;
+
+export function useListItems<T>(...): ListItemsContract<T> {
+  // ...
+  if (items.length === 0) {
+    return null; // ❌ inline
+  }
+
+  // Corriger:
+  if (items.length === 0) {
+    return null;
+  }
+
+  return {
+    fstate,
+    actions,
+    // fillQuery supprimé ✓
+  };
+}
+```
+
+#### 1.3 Organiser hooks2/ en Subfolders
+**Structure cible**:
+```
+framework/hooks2/
+  ├── form/
+  │   ├── useListItems.ts          (DÉPLACÉ)
+  │   ├── useListItems.test.ts     (DÉPLACÉ)
+  │   ├── useSyncedListItems.ts    (DÉPLACÉ)
+  │   └── useSyncedListItems.test.ts
+  ├── data/
+  │   ├── usePagination2.ts        (DÉPLACÉ)
+  │   ├── usePagination2.test.ts
+  │   ├── useSorting2.ts
+  │   ├── useSorting2.test.ts
+  │   ├── useCacheControl2.ts
+  │   ├── useCacheControl2.test.ts
+  │   ├── useCategoryFilter2.ts
+  │   ├── useSearchInput2.ts
+  │   └── useMultiSelect2.ts
+  └── utility/
+      ├── useDebounce.ts           (DÉPLACÉ)
+      ├── useDataAccumulator.ts
+      ├── useDataFetch.ts
+      └── useInfinitePagination.ts
+```
+
+**Migration Steps**:
+1. Créer subfolders `form/`, `data/`, `utility/`
+2. Déplacer fichiers (git mv pour préserver historique)
+3. Mettre à jour tous les imports dans le codebase
+4. Supprimer les index.ts barrels si présents
+
+**Estimation**: ~30 fichiers à déplacer + ~100 imports à corriger
+
+---
+
+### Phase 2: Extraction de Composants Réutilisables
+**Priorité: HAUTE - Amélioration Architecture**
+
+#### 2.1 Extraire DragHandle
+**Fichier**: `framework/components2/primitives/DragHandle.tsx` (NOUVEAU)
+**Tests**: `framework/components2/primitives/DragHandle.test.tsx` (NOUVEAU)
+
+**Implémentation**:
+```typescript
+import { GripVertical } from 'lucide-react';
+import { cn } from '@framework/lib/utils';
+
+export interface DragHandleProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  disabled?: boolean;
+}
+
+export function DragHandle({
+  disabled = false,
+  className,
+  ...props
+}: DragHandleProps) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        'cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing',
+        disabled && 'cursor-not-allowed opacity-50',
+        className
+      )}
+      disabled={disabled}
+      {...props}
+    >
+      <GripVertical className="size-4" />
+    </button>
+  );
+}
+```
+
+**Refactorer SortableItem.tsx**:
+```typescript
+import { DragHandle } from '@framework/components2/primitives/DragHandle';
+
+export function SortableItem({ id, disabled = false, children }: SortableItemProps) {
+  // ... useSortable logic
+  return (
+    <div ref={setNodeRef} style={style} className="relative">
+      <div className="flex items-start gap-2">
+        {!disabled && (
+          <DragHandle {...attributes} {...listeners} className="mt-2" />
+        )}
+        <div className="flex-1">{children}</div>
+      </div>
+    </div>
+  );
+}
+```
+
+**Estimation**: 50 lignes (composant) + 80 lignes (tests)
+
+#### 2.2 Extraire RemoveItemButton
+**Fichier**: `framework/components2/list/RemoveItemButton.tsx` (NOUVEAU)
+**Tests**: `framework/components2/list/RemoveItemButton.test.tsx` (NOUVEAU)
+
+**Implémentation**:
+```typescript
+import { Trash2 } from 'lucide-react';
+import { Button } from '@framework/components/primitives/Button';
+import { cn } from '@framework/lib/utils';
+
+export interface RemoveItemButtonProps {
+  onRemove: () => void;
+  disabled?: boolean;
+  className?: string;
+  title?: string;
+}
+
+export function RemoveItemButton({
+  onRemove,
+  disabled = false,
+  className,
+  title = 'Remove item',
+}: RemoveItemButtonProps) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={onRemove}
+      disabled={disabled}
+      title={title}
+      className={cn('shrink-0', className)}
+    >
+      <Trash2 className="size-4" />
+    </Button>
+  );
+}
+```
+
+**Refactorer 3 renderers**:
+```typescript
+// KeyValueItemRenderer.tsx
+import { RemoveItemButton } from '@framework/components2/list/RemoveItemButton';
+
+export function KeyValueItemRenderer({ item, actions }: KeyValueItemRendererProps) {
+  return (
+    <div className="flex gap-2 rounded border p-2">
+      {/* ... inputs ... */}
+      <RemoveItemButton onRemove={actions.remove} />
+    </div>
+  );
+}
+
+// Même pattern pour OutputItemRenderer et InputDefinitionRenderer
+```
+
+**Estimation**: 40 lignes (composant) + 60 lignes (tests) + 30 lignes (refactors)
+
+#### 2.3 Créer AddButton Composant
+**Fichier**: `framework/components2/list/AddButton.tsx` (NOUVEAU)
+**Tests**: `framework/components2/list/AddButton.test.tsx` (NOUVEAU)
+
+**Implémentation**:
+```typescript
+import { Plus } from 'lucide-react';
+import { Button } from '@framework/components/primitives/Button';
+import { cn } from '@framework/lib/utils';
+
+export interface AddButtonProps {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  className?: string;
+}
+
+export function AddButton({
+  children,
+  onClick,
+  disabled = false,
+  className,
+}: AddButtonProps) {
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'mt-3 w-full justify-center gap-2 border-dashed',
+        className
+      )}
+    >
+      <Plus className="size-4" />
+      {children}
+    </Button>
+  );
+}
+```
+
+**Refactorer EditableListField.tsx**:
+```typescript
+import { AddButton } from './AddButton';
+
+export function EditableListField<T>({ ... }) {
   return (
     <Field label={label} description={description} error={error}>
-      {fstate.isEmpty && renderEmpty ? (
-        renderEmpty()
-      ) : (
-        <DndContext
-          sensors={reordering ? sensors : undefined}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext items={fstate.items.map((_, i) => i)}>
-            {fstate.items.map((item, index) => (
-              <SortableItem key={index} id={index} disabled={!reordering}>
-                {renderItem(item, index, {
-                  update: (partial) => actions.update(index, partial),
-                  remove: () => actions.remove(index),
-                })}
-              </SortableItem>
-            ))}
-          </SortableContext>
-        </DndContext>
-      )}
-
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => actions.add(createDefault())}
-        disabled={!fstate.canAdd}
-      >
-        <Plus className="size-4" />
+      {/* ... liste items ... */}
+      <AddButton onClick={() => actions.add(createDefault())} disabled={!fstate.canAdd}>
         {addButtonLabel}
-      </Button>
+      </AddButton>
     </Field>
   );
 }
 ```
 
-**Estimation:** ~120 lignes
+**Estimation**: 45 lignes (composant) + 70 lignes (tests)
 
 ---
 
-### 4. Composant: `SortableItem`
+### Phase 3: Extraction de Feature Hook (DnD)
+**Priorité: HAUTE - Simplification Composant**
 
-**Localisation:** `packages/web-frontend/src/framework/components2/list/SortableItem.tsx` (NOUVEAU)
+#### 3.1 Créer useDragAndDrop Hook
+**Fichier**: `framework/hooks2/form/useDragAndDrop.ts` (NOUVEAU)
+**Tests**: `framework/hooks2/form/useDragAndDrop.test.ts` (NOUVEAU)
 
-**Responsabilité:** Wrapper pour items drag & droppable
-
-**Interface:**
+**Interface**:
 ```typescript
-interface SortableItemProps {
-  id: number;
+import { useSensor, useSensors, PointerSensor, KeyboardSensor } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+
+export interface UseDragAndDropOptions<T> {
+  items: T[];
+  getItemId: (item: T, index: number) => string | number;
+  onReorder: (fromIndex: number, toIndex: number) => void;
   disabled?: boolean;
-  children: ReactNode;
+  activationConstraint?: {
+    distance?: number;
+    delay?: number;
+    tolerance?: number;
+  };
 }
 
-export function SortableItem({ id, disabled, children }: SortableItemProps): ReactElement
+export interface UseDragAndDropReturn {
+  sensors: any[]; // SensorDescriptor[] from dnd-kit
+  handleDragEnd: (event: DragEndEvent) => void;
+  sortableIds: (string | number)[];
+}
+
+export function useDragAndDrop<T>(
+  options: UseDragAndDropOptions<T>
+): UseDragAndDropReturn {
+  const {
+    items,
+    getItemId,
+    onReorder,
+    disabled = false,
+    activationConstraint = { distance: 8 },
+  } = options;
+
+  // Setup sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Handle drag end
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+
+      if (!over || active.id === over.id || disabled) {
+        return;
+      }
+
+      // Find indices by ID
+      const sortableIds = items.map((item, i) => getItemId(item, i));
+      const fromIndex = sortableIds.indexOf(active.id);
+      const toIndex = sortableIds.indexOf(over.id);
+
+      if (fromIndex !== -1 && toIndex !== -1) {
+        onReorder(fromIndex, toIndex);
+      }
+    },
+    [items, getItemId, onReorder, disabled]
+  );
+
+  // Compute sortable IDs
+  const sortableIds = useMemo(
+    () => items.map((item, i) => getItemId(item, i)),
+    [items, getItemId]
+  );
+
+  return {
+    sensors: disabled ? [] : sensors,
+    handleDragEnd,
+    sortableIds,
+  };
+}
 ```
 
-**Fonctionnalités:**
-- Intégration avec dnd-kit
-- Handle de drag visuel
-- Désactivable si pas de reordering
+**Estimation**: 90 lignes (hook) + 150 lignes (tests)
 
-**Estimation:** ~40 lignes
+#### 3.2 Refactorer EditableListField
+**Fichier**: `framework/components2/list/EditableListField.tsx`
 
----
-
-### 5. Item Renderer: `KeyValueItemRenderer`
-
-**Localisation:** `packages/web-frontend/src/framework/components2/list/renderers/KeyValueItemRenderer.tsx` (NOUVEAU)
-
-**Responsabilité:** Rendu d'une paire clé-valeur (pour env variables)
-
-**Interface:**
+**Avant** (~203 lignes):
 ```typescript
-interface KeyValueItem {
-  key: string;
-  value: string;
-}
+export function EditableListField<T>({ ... }) {
+  const { fstate, actions } = items;
 
-interface KeyValueItemRendererProps {
-  item: KeyValueItem;
-  actions: ItemActions<KeyValueItem>;
-}
+  // ❌ Beaucoup de code DnD inline
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
-export function KeyValueItemRenderer({ item, actions }: KeyValueItemRendererProps): ReactElement
-```
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const sortableIds = fstate.items.map((item, i) => getItemId(item, i));
+      const fromIndex = sortableIds.indexOf(active.id);
+      const toIndex = sortableIds.indexOf(over.id);
+      if (fromIndex !== -1 && toIndex !== -1) {
+        actions.reorder(fromIndex, toIndex);
+      }
+    }
+  };
 
-**Structure:**
-```typescript
-export function KeyValueItemRenderer({ item, actions }: KeyValueItemRendererProps) {
   return (
-    <div className="flex gap-2 rounded border p-2">
-      <TextField
-        label="Key"
-        value={item.key}
-        onChange={(e) => actions.update({ key: e.target.value })}
-        className="flex-1"
-        placeholder="KEY"
-      />
-      <TextField
-        label="Value"
-        value={item.value}
-        onChange={(e) => actions.update({ value: e.target.value })}
-        className="flex-1"
-        placeholder="value"
-      />
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={actions.remove}
-        title="Remove"
-      >
-        <Trash className="size-4" />
-      </Button>
-    </div>
+    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <SortableContext items={fstate.items.map((item, i) => getItemId(item, i))}>
+        {/* ... */}
+      </SortableContext>
+    </DndContext>
   );
 }
 ```
 
-**Estimation:** ~30 lignes
+**Après** (~140 lignes):
+```typescript
+import { useDragAndDrop } from '@framework/hooks2/form/useDragAndDrop';
+
+export function EditableListField<T>({ ... }) {
+  const { fstate, actions } = items;
+
+  // ✅ DnD abstrait dans hook
+  const dnd = useDragAndDrop({
+    items: fstate.items,
+    getItemId,
+    onReorder: actions.reorder,
+    disabled: !enableReordering,
+  });
+
+  return (
+    <DndContext sensors={dnd.sensors} onDragEnd={dnd.handleDragEnd}>
+      <SortableContext items={dnd.sortableIds}>
+        {/* ... */}
+      </SortableContext>
+    </DndContext>
+  );
+}
+```
+
+**Réduction**: ~60 lignes supprimées, composant 30% plus court
 
 ---
 
-### 6. Item Renderer: `OutputItemRenderer`
+### Phase 4: Corrections TypeScript Critiques
+**Priorité: CRITIQUE - Bugs Existants**
 
-**Localisation:** `packages/web-frontend/src/framework/components2/list/renderers/OutputItemRenderer.tsx` (NOUVEAU)
+#### 4.1 Fix FlowSettingsDialog.tsx (CRITICAL)
+**Fichier**: `packages/web-frontend/src/app/pages/flows/flow-editor/FlowSettingsDialog.tsx`
+**Ligne**: 36-38
 
-**Responsabilité:** Rendu d'une configuration output (nom + type + pattern optionnel)
-
-**Interface:**
+**Avant** (state update hors useEffect):
 ```typescript
-interface OutputItem {
-  name: string;
-  type: 'string' | 'number' | 'boolean' | 'object' | 'array';
-  pattern?: string;
+// ❌ RISQUE: Infinite loop si condition toujours vraie
+if (flowDefinition.id !== localFlow.id || flowDefinition.version !== localFlow.version) {
+  setLocalFlow(flowDefinition);
 }
-
-interface OutputItemRendererProps {
-  item: OutputItem;
-  actions: ItemActions<OutputItem>;
-}
-
-export function OutputItemRenderer({ item, actions }: OutputItemRendererProps): ReactElement
 ```
 
-**Structure:**
+**Après**:
 ```typescript
-export function OutputItemRenderer({ item, actions }: OutputItemRendererProps) {
-  return (
-    <div className="space-y-2 rounded border p-3">
-      <div className="flex gap-2">
-        <TextField
-          label="Variable Name"
-          value={item.name}
-          onChange={(e) => actions.update({ name: e.target.value })}
-          className="flex-1"
-          placeholder="myVariable"
-        />
-        <SelectField
-          label="Type"
-          value={item.type}
-          onChange={(value) => actions.update({ type: value })}
-          options={[
-            { value: 'string', label: 'String' },
-            { value: 'number', label: 'Number' },
-            { value: 'boolean', label: 'Boolean' },
-            { value: 'object', label: 'Object' },
-            { value: 'array', label: 'Array' },
-          ]}
-          className="w-40"
-        />
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={actions.remove}
-          title="Remove"
-        >
-          <Trash className="size-4" />
-        </Button>
+// ✅ Correct: useEffect avec deps appropriées
+useEffect(() => {
+  if (
+    flowDefinition.id !== localFlow.id ||
+    flowDefinition.version !== localFlow.version
+  ) {
+    setLocalFlow(flowDefinition);
+  }
+}, [flowDefinition.id, flowDefinition.version, localFlow.id, localFlow.version]);
+```
+
+#### 4.2 Fix FlowEditorPage.tsx (HIGH)
+**Fichier**: `packages/web-frontend/src/app/pages/flows/flow-editor/FlowEditorPage.tsx`
+**Lignes**: 103-109
+
+**Problème**: 6x `as any` assertions
+
+**Investigation requise**: Vérifier types dans `useFlowEditor` hook
+- `nodes` devrait être `Node[]` from react-flow
+- `edges` devrait être `Edge[]` from react-flow
+- Handlers doivent correspondre aux types react-flow
+
+**Fix**: Corriger types dans `useFlowEditor.ts`, supprimer `as any`
+
+#### 4.3 Fix FlowEditorPropertiesPanel.tsx (MEDIUM)
+**Fichier**: `packages/web-frontend/src/app/pages/flows/flow-editor/FlowEditorPropertiesPanel.tsx`
+**Lignes**: 118, 141, 173
+
+**Problème**: Double cast `as unknown as`
+
+**Solution**: Créer interface ConstantNodeData propre
+```typescript
+// flow-editor/types.ts (NOUVEAU ou EXISTANT)
+export interface ConstantNodeData {
+  label?: string;
+  value?: string | number | boolean;
+  type?: 'string' | 'number' | 'boolean';
+}
+
+// Utiliser dans FlowEditorPropertiesPanel:
+const constantData = selectedNode.data as ConstantNodeData; // ✅ Cast direct
+```
+
+#### 4.4 Fix FlowEditorRightPanel.tsx (LOW)
+**Fichier**: `packages/web-frontend/src/app/pages/flows/flow-editor/FlowEditorRightPanel.tsx`
+**Ligne**: 75
+
+**Action**: Supprimer variable inutilisée
+```typescript
+// ❌ Supprimer
+const [_yamlError, setYamlError] = useState<string | null>(null);
+// ... lignes 124, 126: setYamlError calls inutiles
+```
+
+---
+
+### Phase 5: Améliorations UX & Nettoyage
+**Priorité: MOYENNE - Polish**
+
+#### 5.1 Enrichir OutputItemRenderer avec Exemples
+**Fichier**: `framework/components2/list/renderers/OutputItemRenderer.tsx`
+
+**Avant**:
+```typescript
+<TextField
+  label="Extraction Pattern (optional)"
+  placeholder="Result: (.*)"
+  description="Regex pattern for extracting value"
+/>
+```
+
+**Après**:
+```typescript
+<TextField
+  label="Extraction Pattern (optional)"
+  placeholder="Result: (.*)"
+  description={
+    <div className="space-y-1 text-xs">
+      <p className="text-muted-foreground">
+        Regex pattern to extract value from step output
+      </p>
+      <div className="mt-2 space-y-1 rounded-md bg-muted/30 p-2 font-mono">
+        <div>
+          <code className="text-foreground">Result: (.*)</code>
+          <span className="ml-2 text-muted-foreground">
+            → Extract text after "Result: "
+          </span>
+        </div>
+        <div>
+          <code className="text-foreground">(\d+) items</code>
+          <span className="ml-2 text-muted-foreground">
+            → Extract number before " items"
+          </span>
+        </div>
+        <div>
+          <code className="text-foreground">Status: (\w+)</code>
+          <span className="ml-2 text-muted-foreground">
+            → Extract word after "Status: "
+          </span>
+        </div>
       </div>
-
-      {item.type === 'string' && (
-        <TextField
-          label="Extraction Pattern (optional)"
-          value={item.pattern || ''}
-          onChange={(e) => actions.update({ pattern: e.target.value })}
-          placeholder="Result: (.*)"
-          description="Regex pattern for extracting value"
-        />
-      )}
     </div>
-  );
-}
-```
-
-**Estimation:** ~50 lignes
-
----
-
-### 7. Item Renderer: `InputDefinitionRenderer`
-
-**Localisation:** `packages/web-frontend/src/framework/components2/list/renderers/InputDefinitionRenderer.tsx` (NOUVEAU)
-
-**Responsabilité:** Rendu d'une définition d'input (nom + type + required)
-
-**Interface:**
-```typescript
-interface InputDefinitionItem {
-  name: string;
-  type: VariableType;
-  required: boolean;
-}
-
-interface InputDefinitionRendererProps {
-  item: InputDefinitionItem;
-  actions: ItemActions<InputDefinitionItem>;
-  availableTypes: Array<{ value: VariableType; label: string }>;
-}
-
-export function InputDefinitionRenderer({ item, actions, availableTypes }: InputDefinitionRendererProps): ReactElement
-```
-
-**Structure:** Similaire à KeyValue mais avec dropdown de types et checkbox required
-
-**Estimation:** ~40 lignes
-
----
-
-## Intégration dans Flow Editor
-
-### 8. Adapter FlowEditorPropertiesPanel pour env
-
-**Fichier:** `packages/web-frontend/src/app/pages/flows/flow-editor/FlowEditorPropertiesPanel.tsx`
-
-**Changement:** Remplacer le textarea JSON par EditableListField
-
-**Avant:**
-```typescript
-<KeyValueField
-  label="Environment Variables"
-  value={JSON.stringify(step.env || {})}
-  onChange={(value) => {
-    try {
-      const parsed = JSON.parse(value);
-      updateNodeData(selectedNode.id, { env: parsed });
-    } catch {
-      // Invalid JSON, ignore
-    }
-  }}
+  }
 />
 ```
 
-**Après:**
-```typescript
-const envItems = useListItems<KeyValueItem>({
-  initialItems: Object.entries(step.env || {}).map(([key, value]) => ({ key, value })),
-  minItems: 0,
-  createDefault: () => ({ key: '', value: '' }),
-});
+**Estimation**: +20 lignes
 
-// Sync to step data
+#### 5.2 Supprimer __test-imports__.ts
+**Fichier**: `packages/web-frontend/src/framework/components2/list/__test-imports__.ts`
+
+**Action**:
+1. Vérifier si utilisé quelque part
+2. Si oui, remplacer par imports directs
+3. Supprimer fichier
+
+**Convention**: Tests importent directement depuis sources, pas de barrels
+
+#### 5.3 Supprimer index.ts Barrels
+**Fichiers**:
+- `framework/components2/list/index.ts`
+- `framework/components2/list/renderers/index.ts`
+
+**Action**: Supprimer, forcer imports directs
+```typescript
+// ❌ Avant
+import { EditableListField } from '@framework/components2/list';
+
+// ✅ Après
+import { EditableListField } from '@framework/components2/list/EditableListField';
+```
+
+#### 5.4 Audit Exports framework/components/forms
+**Action**: Vérifier tous les composants utilisent pattern `export { Component }`
+**Fichiers à vérifier**:
+- Input.tsx ✓
+- Select.tsx ✓
+- Checkbox.tsx ✓
+- Label.tsx
+- Textarea.tsx
+- Switch.tsx
+- RadioGroup.tsx
+- Command.tsx
+- Popover.tsx
+
+**Si non conforme**: Aucune action (code existant, ne pas toucher si fonctionne)
+
+#### 5.5 Corriger if/return Inline dans useListItems
+**Fichier**: `framework/hooks2/form/useListItems.ts` (après migration)
+
+**Chercher patterns**:
+```typescript
+// ❌ À corriger
+if (condition) return value;
+
+// ✅ Format attendu
+if (condition) {
+  return value;
+}
+```
+
+**Estimation**: ~5 occurrences potentielles
+
+#### 5.6 UseSyncedListItemsOptions Héritage
+**Fichier**: `framework/hooks2/form/useSyncedListItems.ts` (après migration)
+
+**Avant**:
+```typescript
+export interface UseSyncedListItemsOptions<T, R = T[]> {
+  initialItems?: T[];
+  minItems?: number;
+  maxItems?: number;
+  createDefault?: () => T;
+  // Specific
+  transform: (items: T[]) => R;
+  onSync: (transformed: R) => void;
+  filter?: (item: T) => boolean;
+}
+```
+
+**Après**:
+```typescript
+export interface UseSyncedListItemsOptions<T, R = T[]>
+  extends UseListItemsOptions<T> {
+  // Only sync-specific options
+  transform: (items: T[]) => R;
+  onSync: (transformed: R) => void;
+  filter?: (item: T) => boolean;
+}
+```
+
+---
+
+### Phase 6: Documentation Lessons Learned
+**Priorité: CRITIQUE - Éviter Répétition**
+
+#### 6.1 Mettre à Jour .claude/kb/lessons-learned.md
+**Fichier**: `.claude/kb/lessons-learned.md`
+
+**Sections à ajouter**:
+
+```markdown
+## Architecture - Contracts & Hooks
+
+### FeatureContract vs FeatureFormContract
+- **FeatureContract** (alias FeatureDataContract): Pour hooks data-fetching (backend)
+  - Inclut `fillQuery` pour générer requêtes backend
+  - Exemples: usePagination2, useSorting2, useCacheControl2
+- **FeatureFormContract**: Pour hooks form (local state)
+  - PAS de `fillQuery` (local seulement)
+  - Exemples: useListItems, useSyncedListItems
+
+❌ **Erreur fréquente**: Utiliser FeatureContract pour local state
+✅ **Correct**: FeatureFormContract pour forms, FeatureDataContract pour backend
+
+### Organisation hooks2/
+- **Subfolders obligatoires**: `form/`, `data/`, `utility/`
+- **Tests colocalisés**: `useFeature.test.ts` à côté de `useFeature.ts`
+- **Pas de barrels**: Imports directs depuis sources
+
+---
+
+## TypeScript - useEffect & State Updates
+
+### State Update DOIT être dans useEffect
+❌ **Erreur critique**:
+```typescript
+if (condition) {
+  setState(newValue); // ⚠️ Hors useEffect = risque infinite loop
+}
+```
+
+✅ **Correct**:
+```typescript
 useEffect(() => {
-  const envObj = Object.fromEntries(
-    envItems.fstate.items
-      .filter(item => item.key) // Skip empty keys
-      .map(item => [item.key, item.value])
-  );
-  updateNodeData(selectedNode.id, { env: envObj });
-}, [envItems.fstate.items]);
-
-// Render
-<EditableListField
-  label="Environment Variables"
-  items={envItems}
-  renderItem={(item, index, actions) => (
-    <KeyValueItemRenderer item={item} actions={actions} />
-  )}
-  addButtonLabel="Add Variable"
-  emptyMessage="No environment variables"
-/>
+  if (condition) {
+    setState(newValue);
+  }
+}, [dependencies]);
 ```
 
-**Estimation:** ~20 lignes modifiées
-
----
-
-### 9. Adapter FlowEditorPropertiesPanel pour output
-
-**Fichier:** `packages/web-frontend/src/app/pages/flows/flow-editor/FlowEditorPropertiesPanel.tsx`
-
-**Changement:** Remplacer le textarea JSON par EditableListField
-
-**Avant:**
+### Array Dependencies avec Comparaison
+✅ **Pattern valide** (si comparaison avant setState):
 ```typescript
-<Textarea
-  value={JSON.stringify(step.output || {}, null, 2)}
-  onChange={(e) => {
-    try {
-      const parsed = JSON.parse(e.target.value);
-      updateNodeData(selectedNode.id, { output: parsed });
-    } catch {
-      // Invalid JSON
-    }
-  }}
-  rows={4}
-  className="font-mono text-xs"
-  description="JSON object defining output mappings"
-/>
-```
-
-**Après:**
-```typescript
-const outputItems = useListItems<OutputItem>({
-  initialItems: Object.entries(step.output || {}).map(([name, config]) => ({
-    name,
-    type: config.type,
-    pattern: config.pattern,
-  })),
-  minItems: 0,
-  createDefault: () => ({ name: '', type: 'string' }),
-});
-
-// Sync to step data
 useEffect(() => {
-  const outputObj = Object.fromEntries(
-    outputItems.fstate.items
-      .filter(item => item.name)
-      .map(item => [item.name, { type: item.type, pattern: item.pattern }])
-  );
-  updateNodeData(selectedNode.id, { output: outputObj });
-}, [outputItems.fstate.items]);
+  const transformed = items.map(...);
+  const isDifferent = /* comparison logic */;
+  if (isDifferent) { // ✓ Comparison prevents loop
+    onUpdate(transformed);
+  }
+}, [items]); // items is array, but safe
+```
 
-// Render
-<EditableListField
-  label="Output Configuration"
-  description="Extract variables from step output"
-  items={outputItems}
-  renderItem={(item, index, actions) => (
-    <OutputItemRenderer item={item} actions={actions} />
-  )}
-  addButtonLabel="Add Output Variable"
-  emptyMessage="No output variables defined"
+---
+
+## Code Style
+
+### if/return Multi-lignes TOUJOURS
+❌ **Interdit**:
+```typescript
+if (condition) return value;
+```
+
+✅ **Obligatoire**:
+```typescript
+if (condition) {
+  return value;
+}
+```
+
+### Export Pattern Composants
+✅ **Standard établi**:
+```typescript
+function Component({ ...props }) {
+  return <div>...</div>;
+}
+export { Component };
+```
+
+❌ **Pas de**: `export default`, `export function Component`, `export const Component`
+
+---
+
+## Réutilisabilité - Extraction de Features
+
+### Quand Extraire un Composant
+**Signaux**:
+- Code dupliqué dans 3+ endroits
+- Pattern visuel cohérent (ex: bouton Remove avec icône)
+- Classes CSS répétées (ex: drag handle)
+
+**Exemples extraits**:
+- `DragHandle` - GripVertical avec classes standards
+- `RemoveItemButton` - Trash icon avec variant ghost
+- `AddButton` - Plus icon avec border-dashed
+
+### Quand Extraire un Hook
+**Signaux**:
+- Logique >10 lignes dans composant
+- Testing complexifié par logique inline
+- Réutilisabilité potentielle
+
+**Exemple**: `useDragAndDrop` extrait de EditableListField
+- Avant: 60 lignes DnD inline
+- Après: 5 lignes hook call
+- Bénéfice: Testing séparé, composant 30% plus court
+
+---
+
+## UX - Guidance Utilisateur
+
+### Champs Patterns/Regex DOIVENT avoir exemples
+❌ **Insuffisant**:
+```typescript
+<TextField
+  label="Pattern"
+  description="Regex pattern"
 />
 ```
 
-**Estimation:** ~25 lignes modifiées
-
----
-
-### 10. Adapter FlowSettingsDialog pour inputs
-
-**Fichier:** `packages/web-frontend/src/app/pages/flows/flow-editor/FlowSettingsDialog.tsx`
-
-**Changement:** Remplacer FlowInputDefinitionsField par EditableListField
-
-**Avant:**
+✅ **Attendu**:
 ```typescript
-<FlowInputDefinitionsField
-  value={form.values.inputs}
-  onChange={(inputs) => form.setFieldValue('inputs', inputs)}
+<TextField
+  label="Pattern"
+  description={
+    <div>
+      <p>Regex examples:</p>
+      <code>Result: (.*)</code> - Extract after "Result: "
+      <code>(\d+) items</code> - Extract number
+    </div>
+  }
 />
 ```
 
-**Après:**
-```typescript
-const inputItems = useListItems<InputDefinitionItem>({
-  initialItems: Object.entries(form.values.inputs).map(([name, spec]) => ({
-    name,
-    type: spec.type,
-    required: spec.required || false,
-  })),
-  minItems: 0,
-  createDefault: () => ({ name: '', type: 'string', required: false }),
-});
-
-// Sync to form
-useEffect(() => {
-  const inputsObj = Object.fromEntries(
-    inputItems.fstate.items
-      .filter(item => item.name)
-      .map(item => [item.name, { type: item.type, required: item.required }])
-  );
-  form.setFieldValue('inputs', inputsObj);
-}, [inputItems.fstate.items]);
-
-// Render
-<EditableListField
-  label="Flow Inputs"
-  items={inputItems}
-  renderItem={(item, index, actions) => (
-    <InputDefinitionRenderer
-      item={item}
-      actions={actions}
-      availableTypes={VARIABLE_TYPES}
-    />
-  )}
-  addButtonLabel="Add Input"
-  emptyMessage="No inputs defined"
-/>
-```
-
-**Estimation:** ~25 lignes modifiées
+**Règle**: Minimum 3 exemples concrets pour champs techniques
 
 ---
 
-## Types & Validation
+## Anti-Patterns Identifiés
 
-### 11. Types TypeScript
+### ❌ Barrel Files (index.ts import/export)
+**Problème**: Complexifie imports, cache dépendances
+**Solution**: Imports directs depuis sources
 
-**Fichier:** `packages/web-frontend/src/framework/types/EditableListTypes.ts` (NOUVEAU)
+### ❌ Hooks Flat Directory
+**Problème**: Tous les hooks dans un dossier → difficile à naviguer
+**Solution**: Subfolders par catégorie (form/, data/, utility/)
 
-**Contenu:**
-```typescript
-export interface KeyValueItem {
-  key: string;
-  value: string;
-}
+### ❌ Type Assertions Multiples
+**Problème**: `as unknown as Type` cache erreurs de design
+**Solution**: Créer interfaces propres, corriger types upstream
 
-export interface OutputItem {
-  name: string;
-  type: 'string' | 'number' | 'boolean' | 'object' | 'array';
-  pattern?: string;
-}
-
-export interface InputDefinitionItem {
-  name: string;
-  type: VariableType;
-  required: boolean;
-}
-
-export interface ItemActions<T> {
-  update: (partial: Partial<T>) => void;
-  remove: () => void;
-}
+### ❌ State Update Hors useEffect
+**Problème**: Risque infinite loop
+**Solution**: TOUJOURS wrapper dans useEffect avec deps correctes
 ```
 
-**Estimation:** ~30 lignes
+**Estimation**: +150 lignes documentation
 
 ---
 
-## Tests
+## Résumé des Fichiers Impactés
 
-### 12. Tests pour useListItems
+### Nouveaux Fichiers (10)
+1. `framework/types/contracts/FeatureFormContract.ts`
+2. `framework/types/contracts/FeatureDataContract.ts`
+3. `framework/components2/primitives/DragHandle.tsx` + test
+4. `framework/components2/list/RemoveItemButton.tsx` + test
+5. `framework/components2/list/AddButton.tsx` + test
+6. `framework/hooks2/form/useDragAndDrop.ts` + test
 
-**Fichier:** `packages/web-frontend/src/framework/hooks2/useListItems.test.ts` (NOUVEAU)
+### Fichiers Migrés (20+)
+- Tous hooks de `hooks2/` vers `hooks2/form/`, `hooks2/data/`, `hooks2/utility/`
+- Tests associés
 
-**Couverture:**
-```typescript
-describe('useListItems', () => {
-  it('initializes with empty list', () => {});
-  it('initializes with provided items', () => {});
-  it('adds item to list', () => {});
-  it('removes item by index', () => {});
-  it('updates item by index', () => {});
-  it('respects minItems constraint', () => {});
-  it('respects maxItems constraint', () => {});
-  it('clears all items', () => {});
-  it('provides correct canAdd/canRemove flags', () => {});
-});
-```
+### Fichiers Modifiés (15)
+1. `framework/hooks2/form/useListItems.ts` - Contract + if/return
+2. `framework/hooks2/form/useSyncedListItems.ts` - Options héritage
+3. `framework/components2/list/EditableListField.tsx` - useDragAndDrop + AddButton
+4. `framework/components2/list/SortableItem.tsx` - DragHandle
+5. `framework/components2/list/renderers/KeyValueItemRenderer.tsx` - RemoveItemButton
+6. `framework/components2/list/renderers/OutputItemRenderer.tsx` - RemoveItemButton + exemples
+7. `framework/components2/list/renderers/InputDefinitionRenderer.tsx` - RemoveItemButton
+8. `packages/web-frontend/src/app/pages/flows/flow-editor/FlowSettingsDialog.tsx` - useEffect fix
+9. `packages/web-frontend/src/app/pages/flows/flow-editor/FlowEditorPage.tsx` - Types fix
+10. `packages/web-frontend/src/app/pages/flows/flow-editor/FlowEditorPropertiesPanel.tsx` - Types fix
+11. `packages/web-frontend/src/app/pages/flows/flow-editor/FlowEditorRightPanel.tsx` - Cleanup
+12. `.claude/kb/lessons-learned.md` - Documentation complète
+13. ~100+ fichiers - Imports mis à jour après migration hooks
 
-**Estimation:** ~150 lignes
-
----
-
-### 13. Tests pour EditableListField
-
-**Fichier:** `packages/web-frontend/src/framework/components2/list/EditableListField.test.tsx` (NOUVEAU)
-
-**Couverture:**
-```typescript
-describe('EditableListField', () => {
-  it('renders empty state', () => {});
-  it('renders list of items', () => {});
-  it('calls renderItem for each item', () => {});
-  it('adds item on button click', () => {});
-  it('removes item when action called', () => {});
-  it('disables add button when maxItems reached', () => {});
-  it('disables remove when minItems reached', () => {});
-  it('supports drag & drop when reordering enabled', () => {});
-});
-```
-
-**Estimation:** ~200 lignes
-
----
-
-### 14. Tests pour Item Renderers
-
-**Fichier:** `packages/web-frontend/src/framework/components2/list/renderers/*.test.tsx` (NOUVEAU)
-
-**Un fichier par renderer:**
-- `KeyValueItemRenderer.test.tsx`
-- `OutputItemRenderer.test.tsx`
-- `InputDefinitionRenderer.test.tsx`
-
-**Couverture par renderer:**
-```typescript
-describe('KeyValueItemRenderer', () => {
-  it('renders key and value fields', () => {});
-  it('updates key on change', () => {});
-  it('updates value on change', () => {});
-  it('calls remove action', () => {});
-});
-```
-
-**Estimation:** ~100 lignes par renderer (300 total)
-
----
-
-## Documentation
-
-### 15. Documentation du Pattern
-
-**Fichier:** `packages/web-frontend/.claude/docs/editable-list-pattern.md` (NOUVEAU)
-
-**Contenu:**
-- Architecture overview
-- Usage examples
-- Custom item renderer guide
-- Best practices
-- Comparison avec DataView/Table/Grid pattern
-
-**Estimation:** ~200 lignes markdown
+### Fichiers Supprimés (3)
+1. `framework/components2/list/__test-imports__.ts`
+2. `framework/components2/list/index.ts`
+3. `framework/components2/list/renderers/index.ts`
 
 ---
 
 ## Vérification
 
-### Tests Manuels
-
-**Env Variables (Script steps):**
-1. ✅ Ajouter une variable → Affiche deux champs (key/value)
-2. ✅ Modifier key/value → Preview YAML mis à jour
-3. ✅ Supprimer une variable → Disparaît de la liste et du YAML
-4. ✅ Variables avec key vide → Filtrées dans le YAML
-
-**Output Configuration (tous steps):**
-1. ✅ Ajouter une output variable → Affiche nom + type
-2. ✅ Changer le type → Options changent (pattern visible si string)
-3. ✅ Définir un pattern → Apparaît dans YAML
-4. ✅ Supprimer une output → Disparaît du YAML
-
-**Flow Inputs (Flow Settings):**
-1. ✅ Ajouter un input → Affiche nom + type + required checkbox
-2. ✅ Changer le type → 21+ types disponibles
-3. ✅ Cocher required → Apparaît dans YAML comme `required: true`
-4. ✅ Supprimer un input → Disparaît du YAML
-
-**Général:**
-1. ✅ Drag & drop pour réordonner (si enabled)
-2. ✅ État vide avec message clair
-3. ✅ Contraintes min/max respectées
-4. ✅ Boutons disabled aux limites
-
 ### Tests Automatisés
+```bash
+# TypeScript check
+npm run check:ts
 
-**Commande:** `npm run test:agent:frontend`
+# Tests unitaires
+npm run test:agent:frontend
 
-**Cible:**
-- useListItems: 100% coverage
-- EditableListField: >90% coverage
-- Item Renderers: >90% coverage
+# Build
+npm run build
+```
 
----
+### Tests Manuels
+1. Flow Editor → Vérifier env/output/inputs fields fonctionnent
+2. Drag & drop → Vérifier reordering marche toujours
+3. Remove buttons → Vérifier suppression items
+4. Add buttons → Vérifier ajout items
+5. Patterns extraction → Vérifier exemples visibles
 
-## Fichiers Critiques
-
-### Nouveaux Fichiers (Framework - 11)
-
-| Fichier | Responsabilité | Lignes |
-|---------|---------------|--------|
-| `hooks2/useListItems.ts` | Hook CRUD liste | ~80 |
-| `hooks2/useListReordering.ts` | Hook reordering | ~60 |
-| `components2/list/EditableListField.tsx` | Composant principal | ~120 |
-| `components2/list/SortableItem.tsx` | Wrapper drag & drop | ~40 |
-| `components2/list/renderers/KeyValueItemRenderer.tsx` | Renderer key-value | ~30 |
-| `components2/list/renderers/OutputItemRenderer.tsx` | Renderer output | ~50 |
-| `components2/list/renderers/InputDefinitionRenderer.tsx` | Renderer input def | ~40 |
-| `types/EditableListTypes.ts` | Types TypeScript | ~30 |
-| `hooks2/useListItems.test.ts` | Tests hook | ~150 |
-| `components2/list/EditableListField.test.tsx` | Tests composant | ~200 |
-| `components2/list/renderers/*.test.tsx` | Tests renderers (3) | ~300 |
-
-### Fichiers Modifiés (Flow Editor - 2)
-
-| Fichier | Changement | Lignes |
-|---------|-----------|--------|
-| `FlowEditorPropertiesPanel.tsx` | env + output → EditableListField | +45 |
-| `FlowSettingsDialog.tsx` | inputs → EditableListField | +25 |
-
-### Documentation (1)
-
-| Fichier | Contenu | Lignes |
-|---------|---------|--------|
-| `.claude/docs/editable-list-pattern.md` | Guide architectural | ~200 |
+### Validation Architecture
+- [ ] Tous hooks dans subfolders form/data/utility
+- [ ] Aucun index.ts barrel
+- [ ] FeatureFormContract utilisé par useListItems
+- [ ] useEffect correctement utilisé partout
+- [ ] if/return multi-lignes partout
+- [ ] DragHandle réutilisé
+- [ ] RemoveItemButton réutilisé
+- [ ] AddButton réutilisé
+- [ ] useDragAndDrop extrait
+- [ ] Erreurs TypeScript corrigées
+- [ ] Exemples patterns visibles
+- [ ] Lessons learned documenté
 
 ---
 
-## Ordre d'Implémentation
+## Estimation Totale
 
-### Phase 1: Core Framework (1-2 jours)
-1. Créer `useListItems` hook
-2. Créer `EditableListField` composant
-3. Créer `SortableItem` wrapper
-4. Tests unitaires pour hook et composant
-
-### Phase 2: Item Renderers (1 jour)
-1. Créer `KeyValueItemRenderer`
-2. Créer `OutputItemRenderer`
-3. Créer `InputDefinitionRenderer`
-4. Tests unitaires pour chaque renderer
-
-### Phase 3: Intégration Flow Editor (0.5 jour)
-1. Adapter `env` dans FlowEditorPropertiesPanel
-2. Adapter `output` dans FlowEditorPropertiesPanel
-3. Adapter `inputs` dans FlowSettingsDialog
-
-### Phase 4: Reordering (optionnel - 0.5 jour)
-1. Créer `useListReordering` hook
-2. Intégrer dnd-kit dans EditableListField
-3. Tests drag & drop
-
-### Phase 5: Documentation & Polish (0.5 jour)
-1. Écrire documentation pattern
-2. Tests end-to-end manuels
-3. Corrections UI/UX
-
-**Total estimé:** 3.5 - 4.5 jours
+| Phase | Tâches | Fichiers | Lignes | Temps |
+|-------|--------|----------|--------|-------|
+| 1. Architecture Critique | Contracts + Migration | 30+ | ~100 | 4h |
+| 2. Composants Réutilisables | DragHandle, Remove, Add | 6 | ~400 | 3h |
+| 3. Hook DnD | useDragAndDrop + refactor | 3 | ~250 | 2h |
+| 4. Fixes TypeScript | 4 fichiers flow-editor | 4 | ~50 | 2h |
+| 5. UX & Nettoyage | Exemples + suppression | 8 | ~100 | 2h |
+| 6. Documentation | Lessons learned | 1 | ~150 | 1h |
+| **TOTAL** | **15 corrections** | **52+** | **~1050** | **14h** |
 
 ---
 
-## Complexité & Risques
+## Prochaines Étapes
 
-### Complexité: MOYENNE
+1. **Validation User**: Approuver ce plan
+2. **Implémentation**: Suivre phases 1-6
+3. **Review**: Tester + valider checklist
+4. **Lessons Learned**: S'assurer que la doc est complète pour éviter répétition
 
-**Points faciles:**
-- Hook `useListItems` (pattern similaire à usePagination2)
-- Item renderers (composants simples)
-- Intégration dans Flow Editor (substitution directe)
-
-**Points moyens:**
-- EditableListField avec gestion du drag & drop
-- Synchronisation bidirectionnelle (list ↔ object YAML)
-- Tests complets avec dnd-kit
-
-**Points difficiles:**
-- ❌ Aucun - architecture bien définie
-
-### Risques
-
-1. **Performance avec grandes listes**: Mitigé par React.memo et memoization
-2. **Conflicts avec types flow-engine**: Déjà résolus (types existants)
-3. **Tests drag & drop**: Nécessite mocking de dnd-kit (documenté)
-
----
-
-## Bénéfices
-
-### Utilisateur Final
-- ✅ Interface intuitive (pas de JSON manuel)
-- ✅ Guidance visuelle (labels, types, placeholders)
-- ✅ Validation immediate (contraintes UI)
-- ✅ Réordering facile (drag & drop)
-
-### Développeur
-- ✅ Pattern réutilisable (env, output, inputs, futures listes)
-- ✅ Code DRY (extraction de duplication ArrayField/KeyValueField)
-- ✅ Type safety (TypeScript strict)
-- ✅ Testable (hooks séparés)
-- ✅ Composable (features indépendantes comme DataView)
-
-### Maintenance
-- ✅ Un seul composant à maintenir au lieu de 3+
-- ✅ Tests centralisés
-- ✅ Documentation claire du pattern
-- ✅ Évolutivité (ajout de features facile)
-
----
-
-## Résumé
-
-Cette implémentation crée un **pattern composable générique** pour gérer des listes éditables, inspiré de l'architecture DataView/Table/Grid. Le composant `EditableListField` avec ses hooks et renderers remplace les textarea JSON par des interfaces user-friendly, tout en restant réutilisable pour de futurs besoins.
-
-**Impact:**
-- 3 cas d'usage immédiats (env, output, inputs)
-- Réduction de ~95% de duplication vs implémentations actuelles
-- Pattern extensible pour toute future liste éditable
-- UI/UX cohérente à travers l'application
-
-🎯 **Next:** Déléguer au **frontend-dev agent** pour implémentation.
+🎯 **Objectif**: Code aligné avec conventions, réutilisable, documenté
