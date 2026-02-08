@@ -47,9 +47,17 @@ export class InMemoryStorage implements DataStorage {
 	async create<T extends BaseEntity>(table: string, data: Omit<T, keyof BaseEntity>): Promise<T> {
 		const tableData = this.getTable<T>(table);
 
+		// Extract id if provided in data (for testing with explicit IDs)
+		const dataAsAny = data as any;
+		const providedId = dataAsAny.id;
+		const entityId = providedId ? providedId : this.generateId();
+
+		// Remove id from data if it was provided to avoid duplication
+		const { id: _removed, ...dataWithoutId } = dataAsAny;
+
 		const newEntity: T = {
-			...data,
-			id: this.generateId(),
+			...dataWithoutId,
+			id: entityId,
 			version: 1,
 			createdAt: new Date().toISOString(),
 			updatedAt: new Date().toISOString(),

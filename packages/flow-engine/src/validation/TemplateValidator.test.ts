@@ -291,6 +291,57 @@ describe('TemplateValidator', () => {
 			expect(issueCollector.issues).toHaveLength(0);
 		});
 
+		it('should not leak auto-discovered inputs between successive validations (regression)', () => {
+			// Flow A references an undeclared input "extra_param"
+			const flowA: FlowDefinition = {
+				id: 'flow-a',
+				version: '1.0.0',
+				name: 'Flow A',
+				description: 'Test',
+				workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+				inputs: {},
+				steps: [
+					{
+						id: 'step1',
+						name: 'Step 1',
+						type: 'model',
+						model: 'sonnet',
+						prompt: '${{ inputs.extra_param }}',
+					},
+				],
+			};
+
+			// Flow B only uses its own declared input "task"
+			const flowB: FlowDefinition = {
+				id: 'flow-b',
+				version: '1.0.0',
+				name: 'Flow B',
+				description: 'Test',
+				workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+				inputs: { task: 'string' },
+				steps: [
+					{
+						id: 'step1',
+						name: 'Step 1',
+						type: 'model',
+						model: 'sonnet',
+						prompt: '${{ inputs.task }}',
+					},
+				],
+			};
+
+			// Validate flow A first — "extra_param" gets auto-discovered
+			validator.validateTemplates(flowA, new Set(['step1']), new Set<string>());
+			const autoAfterA = validator.getAutoDiscoveredInputs();
+			expect(autoAfterA.has('extra_param')).toBe(true);
+
+			// Validate flow B — auto-discovered inputs should reset, "extra_param" must NOT leak
+			validator.validateTemplates(flowB, new Set(['step1']), new Set(['task']));
+			const autoAfterB = validator.getAutoDiscoveredInputs();
+			expect(autoAfterB.has('extra_param')).toBe(false);
+			expect(autoAfterB.size).toBe(0);
+		});
+
 		it('should handle whitespace in template expressions', () => {
 			const flow: FlowDefinition = {
 				id: 'test-flow',

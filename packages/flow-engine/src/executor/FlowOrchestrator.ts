@@ -168,9 +168,24 @@ export class FlowOrchestrator {
 			const startTime = Date.now();
 			this.logStepExecution(toExecute, startTime);
 
-			// Execute ready steps in parallel
+			// Execute ready steps in parallel.
+			// The onStepTraceCreated callback adds each step trace to trace.steps
+			// as soon as it's created, BEFORE execution begins. This makes
+			// liveLogEntries visible to the 500ms polling during execution.
 			const stepTraces = await Promise.all(
-				toExecute.map(step => this.stepRunner.executeStep(step, workspace, context))
+				toExecute.map(step =>
+					this.stepRunner.executeStep(step, workspace, context, inProgressTrace => {
+						// Add or replace the in-progress trace for real-time visibility
+						const existingIndex = trace.steps.findIndex(t => t.stepId === inProgressTrace.stepId);
+						if (existingIndex >= 0) {
+							// Replace (happens on retry)
+							trace.steps[existingIndex] = inProgressTrace;
+						} else {
+							trace.steps.push(inProgressTrace);
+						}
+						onTraceUpdate?.(trace);
+					})
+				)
 			);
 
 			// Log completion
@@ -231,7 +246,10 @@ export class FlowOrchestrator {
 			const step = ready[i];
 			const stepTrace = stepTraces[i];
 
-			trace.steps.push(stepTrace);
+			// Only add if not already present (may have been added by onStepTraceCreated callback)
+			if (!trace.steps.includes(stepTrace)) {
+				trace.steps.push(stepTrace);
+			}
 
 			// Notify callback of trace update (for real-time updates)
 			if (onTraceUpdate) {

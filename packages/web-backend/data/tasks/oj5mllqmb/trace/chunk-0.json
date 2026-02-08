@@ -1,0 +1,192 @@
+{
+	"chunkIndex": 0,
+	"entries": [
+		{
+			"stepId": "stream-test",
+			"stepName": "Stream JSON Test",
+			"stepType": "model",
+			"startTime": 1770508153909,
+			"retries": 0,
+			"prompt": "Read the file package.json in the current directory, then tell me the project name and version. Keep your answer short (2 lines max).",
+			"model": "haiku",
+			"liveLogEntries": [
+				{
+					"id": "stream-test-live-0",
+					"timestamp": 1770508157024,
+					"level": "debug",
+					"message": "Session: us.anthropic.claude-haiku-4-5-20251001-v1:0, 17 tools",
+					"eventType": "system",
+					"metadata": {
+						"model": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+						"toolCount": 17,
+						"raw": {
+							"type": "system",
+							"subtype": "init",
+							"cwd": "C:\\Workspace_Tooling\\agent-fleet\\packages\\worker",
+							"session_id": "0797d15d-6495-4b36-907a-7a3d2648b701",
+							"tools": [
+								"Task",
+								"TaskOutput",
+								"Bash",
+								"Glob",
+								"Grep",
+								"ExitPlanMode",
+								"Read",
+								"Edit",
+								"Write",
+								"NotebookEdit",
+								"WebFetch",
+								"TodoWrite",
+								"TaskStop",
+								"AskUserQuestion",
+								"Skill",
+								"EnterPlanMode",
+								"ToolSearch"
+							],
+							"mcp_servers": [],
+							"model": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+							"permissionMode": "bypassPermissions",
+							"slash_commands": [
+								"debug",
+								"agent-browser",
+								"check",
+								"get-timestamp",
+								"run-test",
+								"kill-port",
+								"compact",
+								"context",
+								"cost",
+								"init",
+								"pr-comments",
+								"release-notes",
+								"review",
+								"security-review",
+								"insights"
+							],
+							"apiKeySource": "none",
+							"claude_code_version": "2.1.37",
+							"output_style": "default",
+							"agents": [
+								"Bash",
+								"general-purpose",
+								"statusline-setup",
+								"Explore",
+								"Plan",
+								"backend-dev",
+								"backend-review",
+								"frontend-dev",
+								"frontend-review",
+								"test-review"
+							],
+							"skills": ["debug", "agent-browser", "check", "get-timestamp", "run-test"],
+							"plugins": [],
+							"uuid": "7634d15f-f08f-4c66-afbb-ae0787286770"
+						}
+					}
+				},
+				{
+					"id": "stream-test-live-1",
+					"timestamp": 1770508159416,
+					"level": "info",
+					"message": "Claude: I'll read the file to see what it contains.",
+					"eventType": "assistant_text",
+					"metadata": {
+						"fullText": "I'll read the file to see what it contains."
+					}
+				},
+				{
+					"id": "stream-test-live-2",
+					"timestamp": 1770508159634,
+					"level": "warning",
+					"message": "Tool: Read(file_path=C:\\Workspace_Tooling\\agent-fleet\\packages\\worker\\.agent-fleet-prompt-stream-test.txt)",
+					"eventType": "tool_use",
+					"metadata": {
+						"toolName": "Read",
+						"input": {
+							"file_path": "C:\\Workspace_Tooling\\agent-fleet\\packages\\worker\\.agent-fleet-prompt-stream-test.txt"
+						}
+					}
+				},
+				{
+					"id": "stream-test-live-3",
+					"timestamp": 1770508160770,
+					"level": "debug",
+					"message": "Tool result [toolu_bdrk_01FsKiaEPpGPs4JHGhPeUvtH]:      1→Read the file package.json in the current directory, then tell me the project name and version. Keep your answer short (2 lines max).\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what i...",
+					"eventType": "tool_result",
+					"metadata": {
+						"toolUseId": "toolu_bdrk_01FsKiaEPpGPs4JHGhPeUvtH",
+						"fullContent": "     1→Read the file package.json in the current directory, then tell me the project name and version. Keep your answer short (2 lines max).\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n"
+					}
+				},
+				{
+					"id": "stream-test-live-4",
+					"timestamp": 1770508162761,
+					"level": "info",
+					"message": "Claude: This is a prompt asking me to read the package.json and report the project name and version. Let me do that.",
+					"eventType": "assistant_text",
+					"metadata": {
+						"fullText": "This is a prompt asking me to read the package.json and report the project name and version. Let me do that."
+					}
+				},
+				{
+					"id": "stream-test-live-5",
+					"timestamp": 1770508162986,
+					"level": "warning",
+					"message": "Tool: Read(file_path=C:\\Workspace_Tooling\\agent-fleet\\packages\\worker\\package.json)",
+					"eventType": "tool_use",
+					"metadata": {
+						"toolName": "Read",
+						"input": {
+							"file_path": "C:\\Workspace_Tooling\\agent-fleet\\packages\\worker\\package.json"
+						}
+					}
+				},
+				{
+					"id": "stream-test-live-6",
+					"timestamp": 1770508163865,
+					"level": "debug",
+					"message": "Tool result [toolu_bdrk_01FLva8P3q74B1enzxXBYM6R]:      1→{\n     2→\t\"name\": \"worker\",\n     3→\t\"version\": \"1.0.0\",\n     4→\t\"private\": true,\n     5→\t\"type\": \"module\",\n     6→\t\"scripts\": {\n     7→\t\t\"dev\": \"tsx watch --inspect=0 src/flow/FlowWorker.ts --no-ui --project-root=../..\",\n     8→\t\t\"build\": \"tsc --build tsconfig.json\",\n     9→\t\t\"dev:debug\": \"ts...",
+					"eventType": "tool_result",
+					"metadata": {
+						"toolUseId": "toolu_bdrk_01FLva8P3q74B1enzxXBYM6R",
+						"fullContent": "     1→{\n     2→\t\"name\": \"worker\",\n     3→\t\"version\": \"1.0.0\",\n     4→\t\"private\": true,\n     5→\t\"type\": \"module\",\n     6→\t\"scripts\": {\n     7→\t\t\"dev\": \"tsx watch --inspect=0 src/flow/FlowWorker.ts --no-ui --project-root=../..\",\n     8→\t\t\"build\": \"tsc --build tsconfig.json\",\n     9→\t\t\"dev:debug\": \"tsx src/flow/FlowWorker.ts --no-ui --no-ui --project-root=../..\",\n    10→\t\t\"dev:ui\": \"nodemon --args ''\",\n    11→\t\t\"test\": \"vitest run\",\n    12→\t\t\"test:watch\": \"vitest\",\n    13→\t\t\"test:coverage\": \"vitest run --coverage\",\n    14→\t\t\"lint\": \"eslint src\",\n    15→\t\t\"lint:fix\": \"eslint src --fix\",\n    16→\t\t\"clean\": \"rimraf dist\"\n    17→\t},\n    18→\t\"dependencies\": {\n    19→\t\t\"shared-orch-worker\": \"*\",\n    20→\t\t\"shared-common\": \"*\",\n    21→\t\t\"flow-engine\": \"*\",\n    22→\t\t\"dotenv\": \"^16.3.1\",\n    23→\t\t\"ws\": \"^8.16.0\",\n    24→\t\t\"react\": \"^19.2.0\",\n    25→\t\t\"ink\": \"^6.5.1\",\n    26→\t\t\"terminal-kit\": \"^3.1.2\"\n    27→\t},\n    28→\t\"devDependencies\": {\n    29→\t\t\"test-utils\": \"*\",\n    30→\t\t\"@types/ws\": \"^8.5.10\",\n    31→\t\t\"@types/terminal-kit\": \"^2.5.7\",\n    32→\t\t\"@types/react\": \"^19.2.7\",\n    33→\t\t\"typescript\": \"^5.3.3\",\n    34→\t\t\"vitest\": \"^4.0.14\",\n    35→\t\t\"tsx\": \"^4.7.0\",\n    36→\t\t\"nodemon\": \"^3.1.11\"\n    37→\t}\n    38→}\n    39→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n"
+					}
+				},
+				{
+					"id": "stream-test-live-7",
+					"timestamp": 1770508165717,
+					"level": "info",
+					"message": "Claude: **Project:** worker  \n**Version:** 1.0.0",
+					"eventType": "assistant_text",
+					"metadata": {
+						"fullText": "**Project:** worker  \n**Version:** 1.0.0"
+					}
+				},
+				{
+					"id": "stream-test-live-8",
+					"timestamp": 1770508165726,
+					"level": "info",
+					"message": "Completed: 3 turns, $? USD, 8.7s",
+					"eventType": "result",
+					"metadata": {
+						"numTurns": 3,
+						"durationMs": 8740,
+						"resultText": "**Project:** worker  \n**Version:** 1.0.0"
+					}
+				}
+			],
+			"response": "**Project:** worker  \n**Version:** 1.0.0",
+			"stdout": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\",\"session_id\":\"0797d15d-6495-4b36-907a-7a3d2648b701\",\"tools\":[\"Task\",\"TaskOutput\",\"Bash\",\"Glob\",\"Grep\",\"ExitPlanMode\",\"Read\",\"Edit\",\"Write\",\"NotebookEdit\",\"WebFetch\",\"TodoWrite\",\"TaskStop\",\"AskUserQuestion\",\"Skill\",\"EnterPlanMode\",\"ToolSearch\"],\"mcp_servers\":[],\"model\":\"us.anthropic.claude-haiku-4-5-20251001-v1:0\",\"permissionMode\":\"bypassPermissions\",\"slash_commands\":[\"debug\",\"agent-browser\",\"check\",\"get-timestamp\",\"run-test\",\"kill-port\",\"compact\",\"context\",\"cost\",\"init\",\"pr-comments\",\"release-notes\",\"review\",\"security-review\",\"insights\"],\"apiKeySource\":\"none\",\"claude_code_version\":\"2.1.37\",\"output_style\":\"default\",\"agents\":[\"Bash\",\"general-purpose\",\"statusline-setup\",\"Explore\",\"Plan\",\"backend-dev\",\"backend-review\",\"frontend-dev\",\"frontend-review\",\"test-review\"],\"skills\":[\"debug\",\"agent-browser\",\"check\",\"get-timestamp\",\"run-test\"],\"plugins\":[],\"uuid\":\"7634d15f-f08f-4c66-afbb-ae0787286770\"}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_0161SmtqFufu1rRDYM41nDBP\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"I'll read the file to see what it contains.\"}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":3,\"cache_creation_input_tokens\":20780,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":20780,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"0797d15d-6495-4b36-907a-7a3d2648b701\",\"uuid\":\"2171c32c-2fbd-409f-bbca-20b76c25fccf\"}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_0161SmtqFufu1rRDYM41nDBP\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"toolu_bdrk_01FsKiaEPpGPs4JHGhPeUvtH\",\"name\":\"Read\",\"input\":{\"file_path\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\\\\.agent-fleet-prompt-stream-test.txt\"}}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":3,\"cache_creation_input_tokens\":20780,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":20780,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"0797d15d-6495-4b36-907a-7a3d2648b701\",\"uuid\":\"f1935d33-2ce6-4db5-a16a-47519124a124\"}\n{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"tool_use_id\":\"toolu_bdrk_01FsKiaEPpGPs4JHGhPeUvtH\",\"type\":\"tool_result\",\"content\":\"     1→Read the file package.json in the current directory, then tell me the project name and version. Keep your answer short (2 lines max).\\n\\n<system-reminder>\\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\\n</system-reminder>\\n\"}]},\"parent_tool_use_id\":null,\"session_id\":\"0797d15d-6495-4b36-907a-7a3d2648b701\",\"uuid\":\"55a4e37b-31f4-45b8-9129-61c7ed0da084\",\"tool_use_result\":{\"type\":\"text\",\"file\":{\"filePath\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\\\\.agent-fleet-prompt-stream-test.txt\",\"content\":\"Read the file package.json in the current directory, then tell me the project name and version. Keep your answer short (2 lines max).\",\"numLines\":1,\"startLine\":1,\"totalLines\":1}}}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_015Eb33R8ZtQZS2CxnjYYrQ9\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"This is a prompt asking me to read the package.json and report the project name and version. Let me do that.\"}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":6,\"cache_creation_input_tokens\":214,\"cache_read_input_tokens\":20780,\"cache_creation\":{\"ephemeral_5m_input_tokens\":214,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"0797d15d-6495-4b36-907a-7a3d2648b701\",\"uuid\":\"6e79285d-35c4-417c-9f65-51d705b8edea\"}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_015Eb33R8ZtQZS2CxnjYYrQ9\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"toolu_bdrk_01FLva8P3q74B1enzxXBYM6R\",\"name\":\"Read\",\"input\":{\"file_path\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\\\\package.json\"}}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":6,\"cache_creation_input_tokens\":214,\"cache_read_input_tokens\":20780,\"cache_creation\":{\"ephemeral_5m_input_tokens\":214,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"0797d15d-6495-4b36-907a-7a3d2648b701\",\"uuid\":\"3eea1ccb-0481-421e-9ffd-21ad8aebd844\"}\n{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"tool_use_id\":\"toolu_bdrk_01FLva8P3q74B1enzxXBYM6R\",\"type\":\"tool_result\",\"content\":\"     1→{\\n     2→\\t\\\"name\\\": \\\"worker\\\",\\n     3→\\t\\\"version\\\": \\\"1.0.0\\\",\\n     4→\\t\\\"private\\\": true,\\n     5→\\t\\\"type\\\": \\\"module\\\",\\n     6→\\t\\\"scripts\\\": {\\n     7→\\t\\t\\\"dev\\\": \\\"tsx watch --inspect=0 src/flow/FlowWorker.ts --no-ui --project-root=../..\\\",\\n     8→\\t\\t\\\"build\\\": \\\"tsc --build tsconfig.json\\\",\\n     9→\\t\\t\\\"dev:debug\\\": \\\"tsx src/flow/FlowWorker.ts --no-ui --no-ui --project-root=../..\\\",\\n    10→\\t\\t\\\"dev:ui\\\": \\\"nodemon --args ''\\\",\\n    11→\\t\\t\\\"test\\\": \\\"vitest run\\\",\\n    12→\\t\\t\\\"test:watch\\\": \\\"vitest\\\",\\n    13→\\t\\t\\\"test:coverage\\\": \\\"vitest run --coverage\\\",\\n    14→\\t\\t\\\"lint\\\": \\\"eslint src\\\",\\n    15→\\t\\t\\\"lint:fix\\\": \\\"eslint src --fix\\\",\\n    16→\\t\\t\\\"clean\\\": \\\"rimraf dist\\\"\\n    17→\\t},\\n    18→\\t\\\"dependencies\\\": {\\n    19→\\t\\t\\\"shared-orch-worker\\\": \\\"*\\\",\\n    20→\\t\\t\\\"shared-common\\\": \\\"*\\\",\\n    21→\\t\\t\\\"flow-engine\\\": \\\"*\\\",\\n    22→\\t\\t\\\"dotenv\\\": \\\"^16.3.1\\\",\\n    23→\\t\\t\\\"ws\\\": \\\"^8.16.0\\\",\\n    24→\\t\\t\\\"react\\\": \\\"^19.2.0\\\",\\n    25→\\t\\t\\\"ink\\\": \\\"^6.5.1\\\",\\n    26→\\t\\t\\\"terminal-kit\\\": \\\"^3.1.2\\\"\\n    27→\\t},\\n    28→\\t\\\"devDependencies\\\": {\\n    29→\\t\\t\\\"test-utils\\\": \\\"*\\\",\\n    30→\\t\\t\\\"@types/ws\\\": \\\"^8.5.10\\\",\\n    31→\\t\\t\\\"@types/terminal-kit\\\": \\\"^2.5.7\\\",\\n    32→\\t\\t\\\"@types/react\\\": \\\"^19.2.7\\\",\\n    33→\\t\\t\\\"typescript\\\": \\\"^5.3.3\\\",\\n    34→\\t\\t\\\"vitest\\\": \\\"^4.0.14\\\",\\n    35→\\t\\t\\\"tsx\\\": \\\"^4.7.0\\\",\\n    36→\\t\\t\\\"nodemon\\\": \\\"^3.1.11\\\"\\n    37→\\t}\\n    38→}\\n    39→\\n\\n<system-reminder>\\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\\n</system-reminder>\\n\"}]},\"parent_tool_use_id\":null,\"session_id\":\"0797d15d-6495-4b36-907a-7a3d2648b701\",\"uuid\":\"24b07f08-9ce3-4424-adde-2834228914a9\",\"tool_use_result\":{\"type\":\"text\",\"file\":{\"filePath\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\\\\package.json\",\"content\":\"{\\n\\t\\\"name\\\": \\\"worker\\\",\\n\\t\\\"version\\\": \\\"1.0.0\\\",\\n\\t\\\"private\\\": true,\\n\\t\\\"type\\\": \\\"module\\\",\\n\\t\\\"scripts\\\": {\\n\\t\\t\\\"dev\\\": \\\"tsx watch --inspect=0 src/flow/FlowWorker.ts --no-ui --project-root=../..\\\",\\n\\t\\t\\\"build\\\": \\\"tsc --build tsconfig.json\\\",\\n\\t\\t\\\"dev:debug\\\": \\\"tsx src/flow/FlowWorker.ts --no-ui --no-ui --project-root=../..\\\",\\n\\t\\t\\\"dev:ui\\\": \\\"nodemon --args ''\\\",\\n\\t\\t\\\"test\\\": \\\"vitest run\\\",\\n\\t\\t\\\"test:watch\\\": \\\"vitest\\\",\\n\\t\\t\\\"test:coverage\\\": \\\"vitest run --coverage\\\",\\n\\t\\t\\\"lint\\\": \\\"eslint src\\\",\\n\\t\\t\\\"lint:fix\\\": \\\"eslint src --fix\\\",\\n\\t\\t\\\"clean\\\": \\\"rimraf dist\\\"\\n\\t},\\n\\t\\\"dependencies\\\": {\\n\\t\\t\\\"shared-orch-worker\\\": \\\"*\\\",\\n\\t\\t\\\"shared-common\\\": \\\"*\\\",\\n\\t\\t\\\"flow-engine\\\": \\\"*\\\",\\n\\t\\t\\\"dotenv\\\": \\\"^16.3.1\\\",\\n\\t\\t\\\"ws\\\": \\\"^8.16.0\\\",\\n\\t\\t\\\"react\\\": \\\"^19.2.0\\\",\\n\\t\\t\\\"ink\\\": \\\"^6.5.1\\\",\\n\\t\\t\\\"terminal-kit\\\": \\\"^3.1.2\\\"\\n\\t},\\n\\t\\\"devDependencies\\\": {\\n\\t\\t\\\"test-utils\\\": \\\"*\\\",\\n\\t\\t\\\"@types/ws\\\": \\\"^8.5.10\\\",\\n\\t\\t\\\"@types/terminal-kit\\\": \\\"^2.5.7\\\",\\n\\t\\t\\\"@types/react\\\": \\\"^19.2.7\\\",\\n\\t\\t\\\"typescript\\\": \\\"^5.3.3\\\",\\n\\t\\t\\\"vitest\\\": \\\"^4.0.14\\\",\\n\\t\\t\\\"tsx\\\": \\\"^4.7.0\\\",\\n\\t\\t\\\"nodemon\\\": \\\"^3.1.11\\\"\\n\\t}\\n}\\n\",\"numLines\":39,\"startLine\":1,\"totalLines\":39}}}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_01S52ZS6s3kBCvKSMSDmbuNx\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"**Project:** worker  \\n**Version:** 1.0.0\"}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":6,\"cache_creation_input_tokens\":755,\"cache_read_input_tokens\":20994,\"cache_creation\":{\"ephemeral_5m_input_tokens\":755,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"0797d15d-6495-4b36-907a-7a3d2648b701\",\"uuid\":\"86f3f8c9-4ca9-492b-b9c0-9750376e043e\"}\n{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"duration_ms\":8740,\"duration_api_ms\":6827,\"num_turns\":3,\"result\":\"**Project:** worker  \\n**Version:** 1.0.0\",\"stop_reason\":null,\"session_id\":\"0797d15d-6495-4b36-907a-7a3d2648b701\",\"total_cost_usd\":0.03241865,\"usage\":{\"input_tokens\":15,\"cache_creation_input_tokens\":21749,\"cache_read_input_tokens\":41774,\"output_tokens\":208,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":21749}},\"modelUsage\":{\"us.anthropic.claude-haiku-4-5-20251001-v1:0\":{\"inputTokens\":15,\"outputTokens\":208,\"cacheReadInputTokens\":41774,\"cacheCreationInputTokens\":21749,\"webSearchRequests\":0,\"costUSD\":0.03241865,\"contextWindow\":200000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"uuid\":\"5d3c9bc6-c247-4e5b-9f20-b157f4ce0bd4\"}\n",
+			"stderr": "",
+			"exitCode": 0,
+			"endTime": 1770508165764,
+			"durationMs": 11855,
+			"outputs": {
+				"rawOutput": "**Project:** worker  \n**Version:** 1.0.0",
+				"response": "**Project:** worker  \n**Version:** 1.0.0",
+				"stdout": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\",\"session_id\":\"0797d15d-6495-4b36-907a-7a3d2648b701\",\"tools\":[\"Task\",\"TaskOutput\",\"Bash\",\"Glob\",\"Grep\",\"ExitPlanMode\",\"Read\",\"Edit\",\"Write\",\"NotebookEdit\",\"WebFetch\",\"TodoWrite\",\"TaskStop\",\"AskUserQuestion\",\"Skill\",\"EnterPlanMode\",\"ToolSearch\"],\"mcp_servers\":[],\"model\":\"us.anthropic.claude-haiku-4-5-20251001-v1:0\",\"permissionMode\":\"bypassPermissions\",\"slash_commands\":[\"debug\",\"agent-browser\",\"check\",\"get-timestamp\",\"run-test\",\"kill-port\",\"compact\",\"context\",\"cost\",\"init\",\"pr-comments\",\"release-notes\",\"review\",\"security-review\",\"insights\"],\"apiKeySource\":\"none\",\"claude_code_version\":\"2.1.37\",\"output_style\":\"default\",\"agents\":[\"Bash\",\"general-purpose\",\"statusline-setup\",\"Explore\",\"Plan\",\"backend-dev\",\"backend-review\",\"frontend-dev\",\"frontend-review\",\"test-review\"],\"skills\":[\"debug\",\"agent-browser\",\"check\",\"get-timestamp\",\"run-test\"],\"plugins\":[],\"uuid\":\"7634d15f-f08f-4c66-afbb-ae0787286770\"}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_0161SmtqFufu1rRDYM41nDBP\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"I'll read the file to see what it contains.\"}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":3,\"cache_creation_input_tokens\":20780,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":20780,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"0797d15d-6495-4b36-907a-7a3d2648b701\",\"uuid\":\"2171c32c-2fbd-409f-bbca-20b76c25fccf\"}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_0161SmtqFufu1rRDYM41nDBP\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"toolu_bdrk_01FsKiaEPpGPs4JHGhPeUvtH\",\"name\":\"Read\",\"input\":{\"file_path\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\\\\.agent-fleet-prompt-stream-test.txt\"}}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":3,\"cache_creation_input_tokens\":20780,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":20780,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"0797d15d-6495-4b36-907a-7a3d2648b701\",\"uuid\":\"f1935d33-2ce6-4db5-a16a-47519124a124\"}\n{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"tool_use_id\":\"toolu_bdrk_01FsKiaEPpGPs4JHGhPeUvtH\",\"type\":\"tool_result\",\"content\":\"     1→Read the file package.json in the current directory, then tell me the project name and version. Keep your answer short (2 lines max).\\n\\n<system-reminder>\\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\\n</system-reminder>\\n\"}]},\"parent_tool_use_id\":null,\"session_id\":\"0797d15d-6495-4b36-907a-7a3d2648b701\",\"uuid\":\"55a4e37b-31f4-45b8-9129-61c7ed0da084\",\"tool_use_result\":{\"type\":\"text\",\"file\":{\"filePath\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\\\\.agent-fleet-prompt-stream-test.txt\",\"content\":\"Read the file package.json in the current directory, then tell me the project name and version. Keep your answer short (2 lines max).\",\"numLines\":1,\"startLine\":1,\"totalLines\":1}}}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_015Eb33R8ZtQZS2CxnjYYrQ9\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"This is a prompt asking me to read the package.json and report the project name and version. Let me do that.\"}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":6,\"cache_creation_input_tokens\":214,\"cache_read_input_tokens\":20780,\"cache_creation\":{\"ephemeral_5m_input_tokens\":214,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"0797d15d-6495-4b36-907a-7a3d2648b701\",\"uuid\":\"6e79285d-35c4-417c-9f65-51d705b8edea\"}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_015Eb33R8ZtQZS2CxnjYYrQ9\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"toolu_bdrk_01FLva8P3q74B1enzxXBYM6R\",\"name\":\"Read\",\"input\":{\"file_path\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\\\\package.json\"}}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":6,\"cache_creation_input_tokens\":214,\"cache_read_input_tokens\":20780,\"cache_creation\":{\"ephemeral_5m_input_tokens\":214,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"0797d15d-6495-4b36-907a-7a3d2648b701\",\"uuid\":\"3eea1ccb-0481-421e-9ffd-21ad8aebd844\"}\n{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"tool_use_id\":\"toolu_bdrk_01FLva8P3q74B1enzxXBYM6R\",\"type\":\"tool_result\",\"content\":\"     1→{\\n     2→\\t\\\"name\\\": \\\"worker\\\",\\n     3→\\t\\\"version\\\": \\\"1.0.0\\\",\\n     4→\\t\\\"private\\\": true,\\n     5→\\t\\\"type\\\": \\\"module\\\",\\n     6→\\t\\\"scripts\\\": {\\n     7→\\t\\t\\\"dev\\\": \\\"tsx watch --inspect=0 src/flow/FlowWorker.ts --no-ui --project-root=../..\\\",\\n     8→\\t\\t\\\"build\\\": \\\"tsc --build tsconfig.json\\\",\\n     9→\\t\\t\\\"dev:debug\\\": \\\"tsx src/flow/FlowWorker.ts --no-ui --no-ui --project-root=../..\\\",\\n    10→\\t\\t\\\"dev:ui\\\": \\\"nodemon --args ''\\\",\\n    11→\\t\\t\\\"test\\\": \\\"vitest run\\\",\\n    12→\\t\\t\\\"test:watch\\\": \\\"vitest\\\",\\n    13→\\t\\t\\\"test:coverage\\\": \\\"vitest run --coverage\\\",\\n    14→\\t\\t\\\"lint\\\": \\\"eslint src\\\",\\n    15→\\t\\t\\\"lint:fix\\\": \\\"eslint src --fix\\\",\\n    16→\\t\\t\\\"clean\\\": \\\"rimraf dist\\\"\\n    17→\\t},\\n    18→\\t\\\"dependencies\\\": {\\n    19→\\t\\t\\\"shared-orch-worker\\\": \\\"*\\\",\\n    20→\\t\\t\\\"shared-common\\\": \\\"*\\\",\\n    21→\\t\\t\\\"flow-engine\\\": \\\"*\\\",\\n    22→\\t\\t\\\"dotenv\\\": \\\"^16.3.1\\\",\\n    23→\\t\\t\\\"ws\\\": \\\"^8.16.0\\\",\\n    24→\\t\\t\\\"react\\\": \\\"^19.2.0\\\",\\n    25→\\t\\t\\\"ink\\\": \\\"^6.5.1\\\",\\n    26→\\t\\t\\\"terminal-kit\\\": \\\"^3.1.2\\\"\\n    27→\\t},\\n    28→\\t\\\"devDependencies\\\": {\\n    29→\\t\\t\\\"test-utils\\\": \\\"*\\\",\\n    30→\\t\\t\\\"@types/ws\\\": \\\"^8.5.10\\\",\\n    31→\\t\\t\\\"@types/terminal-kit\\\": \\\"^2.5.7\\\",\\n    32→\\t\\t\\\"@types/react\\\": \\\"^19.2.7\\\",\\n    33→\\t\\t\\\"typescript\\\": \\\"^5.3.3\\\",\\n    34→\\t\\t\\\"vitest\\\": \\\"^4.0.14\\\",\\n    35→\\t\\t\\\"tsx\\\": \\\"^4.7.0\\\",\\n    36→\\t\\t\\\"nodemon\\\": \\\"^3.1.11\\\"\\n    37→\\t}\\n    38→}\\n    39→\\n\\n<system-reminder>\\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\\n</system-reminder>\\n\"}]},\"parent_tool_use_id\":null,\"session_id\":\"0797d15d-6495-4b36-907a-7a3d2648b701\",\"uuid\":\"24b07f08-9ce3-4424-adde-2834228914a9\",\"tool_use_result\":{\"type\":\"text\",\"file\":{\"filePath\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\\\\package.json\",\"content\":\"{\\n\\t\\\"name\\\": \\\"worker\\\",\\n\\t\\\"version\\\": \\\"1.0.0\\\",\\n\\t\\\"private\\\": true,\\n\\t\\\"type\\\": \\\"module\\\",\\n\\t\\\"scripts\\\": {\\n\\t\\t\\\"dev\\\": \\\"tsx watch --inspect=0 src/flow/FlowWorker.ts --no-ui --project-root=../..\\\",\\n\\t\\t\\\"build\\\": \\\"tsc --build tsconfig.json\\\",\\n\\t\\t\\\"dev:debug\\\": \\\"tsx src/flow/FlowWorker.ts --no-ui --no-ui --project-root=../..\\\",\\n\\t\\t\\\"dev:ui\\\": \\\"nodemon --args ''\\\",\\n\\t\\t\\\"test\\\": \\\"vitest run\\\",\\n\\t\\t\\\"test:watch\\\": \\\"vitest\\\",\\n\\t\\t\\\"test:coverage\\\": \\\"vitest run --coverage\\\",\\n\\t\\t\\\"lint\\\": \\\"eslint src\\\",\\n\\t\\t\\\"lint:fix\\\": \\\"eslint src --fix\\\",\\n\\t\\t\\\"clean\\\": \\\"rimraf dist\\\"\\n\\t},\\n\\t\\\"dependencies\\\": {\\n\\t\\t\\\"shared-orch-worker\\\": \\\"*\\\",\\n\\t\\t\\\"shared-common\\\": \\\"*\\\",\\n\\t\\t\\\"flow-engine\\\": \\\"*\\\",\\n\\t\\t\\\"dotenv\\\": \\\"^16.3.1\\\",\\n\\t\\t\\\"ws\\\": \\\"^8.16.0\\\",\\n\\t\\t\\\"react\\\": \\\"^19.2.0\\\",\\n\\t\\t\\\"ink\\\": \\\"^6.5.1\\\",\\n\\t\\t\\\"terminal-kit\\\": \\\"^3.1.2\\\"\\n\\t},\\n\\t\\\"devDependencies\\\": {\\n\\t\\t\\\"test-utils\\\": \\\"*\\\",\\n\\t\\t\\\"@types/ws\\\": \\\"^8.5.10\\\",\\n\\t\\t\\\"@types/terminal-kit\\\": \\\"^2.5.7\\\",\\n\\t\\t\\\"@types/react\\\": \\\"^19.2.7\\\",\\n\\t\\t\\\"typescript\\\": \\\"^5.3.3\\\",\\n\\t\\t\\\"vitest\\\": \\\"^4.0.14\\\",\\n\\t\\t\\\"tsx\\\": \\\"^4.7.0\\\",\\n\\t\\t\\\"nodemon\\\": \\\"^3.1.11\\\"\\n\\t}\\n}\\n\",\"numLines\":39,\"startLine\":1,\"totalLines\":39}}}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_01S52ZS6s3kBCvKSMSDmbuNx\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"**Project:** worker  \\n**Version:** 1.0.0\"}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":6,\"cache_creation_input_tokens\":755,\"cache_read_input_tokens\":20994,\"cache_creation\":{\"ephemeral_5m_input_tokens\":755,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"0797d15d-6495-4b36-907a-7a3d2648b701\",\"uuid\":\"86f3f8c9-4ca9-492b-b9c0-9750376e043e\"}\n{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"duration_ms\":8740,\"duration_api_ms\":6827,\"num_turns\":3,\"result\":\"**Project:** worker  \\n**Version:** 1.0.0\",\"stop_reason\":null,\"session_id\":\"0797d15d-6495-4b36-907a-7a3d2648b701\",\"total_cost_usd\":0.03241865,\"usage\":{\"input_tokens\":15,\"cache_creation_input_tokens\":21749,\"cache_read_input_tokens\":41774,\"output_tokens\":208,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":21749}},\"modelUsage\":{\"us.anthropic.claude-haiku-4-5-20251001-v1:0\":{\"inputTokens\":15,\"outputTokens\":208,\"cacheReadInputTokens\":41774,\"cacheCreationInputTokens\":21749,\"webSearchRequests\":0,\"costUSD\":0.03241865,\"contextWindow\":200000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"uuid\":\"5d3c9bc6-c247-4e5b-9f20-b157f4ce0bd4\"}\n",
+				"stderr": ""
+			}
+		}
+	]
+}

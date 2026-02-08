@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Input } from '@framework/components/forms/Input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
@@ -16,6 +16,7 @@ import type { LogEntry as LogEntryType, LogLevel } from '@shared/api/tasks.contr
 import { Download, RefreshCw } from 'lucide-react';
 
 import { useAutoScroll } from '../hooks/useAutoScroll';
+import { useLogSelection } from '../hooks/useLogSelection';
 import { LogEntry } from './LogEntry';
 
 interface TaskLogsViewerProps {
@@ -57,7 +58,14 @@ export function TaskLogsViewer({
 		scrollToBottom: _scrollToBottom,
 	} = useAutoScroll(logs, containerRef, isRunning);
 
+	const { selectedLogIds, handleLogClick, scrollToSelection } = useLogSelection(logs);
+
 	const [expandedLog, setExpandedLog] = useState<LogEntryType | null>(null);
+
+	// Scroll to selection after logs are rendered
+	useEffect(() => {
+		scrollToSelection();
+	}, [scrollToSelection]);
 
 	const handleExport = () => {
 		const jsonStr = JSON.stringify(logs, null, 2);
@@ -173,7 +181,13 @@ export function TaskLogsViewer({
 				) : (
 					<>
 						{logs.map(log => (
-							<LogEntry key={log.id} log={log} onExpand={setExpandedLog} />
+							<LogEntry
+								key={log.id}
+								log={log}
+								onExpand={setExpandedLog}
+								isSelected={selectedLogIds.has(log.id)}
+								onClick={handleLogClick}
+							/>
 						))}
 
 						{/* Running indicator */}
@@ -197,7 +211,7 @@ export function TaskLogsViewer({
 
 			{/* Expanded Log Dialog - using design system Dialog */}
 			<Dialog open={expandedLog !== null} onOpenChange={open => !open && setExpandedLog(null)}>
-				<DialogContent className="max-w-3xl">
+				<DialogContent className="sm:max-w-5xl">
 					<DialogHeader>
 						<DialogTitle>Log Entry Details</DialogTitle>
 						<DialogDescription>
@@ -205,8 +219,8 @@ export function TaskLogsViewer({
 						</DialogDescription>
 					</DialogHeader>
 
-					<div className="max-h-[60vh] overflow-auto">
-						<pre className="rounded bg-muted p-4 font-mono text-xs">
+					<div className="max-h-[60vh] overflow-auto rounded">
+						<pre className="min-w-fit bg-muted p-4 font-mono text-xs">
 							{JSON.stringify(expandedLog, null, 2)}
 						</pre>
 					</div>

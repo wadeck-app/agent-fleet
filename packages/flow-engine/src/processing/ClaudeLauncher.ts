@@ -6,8 +6,8 @@
  * - Background mode (capture stdout/stderr)
  */
 import { execSync, spawn } from 'child_process';
-import * as fs from 'fs';
-import * as path from 'path';
+
+import { type StreamJsonEventCallback, StreamJsonParser } from './StreamJsonParser';
 
 /**
  * Result from launching Claude in interactive mode
@@ -36,7 +36,7 @@ export interface ClaudeLaunchOptions {
 	/** Prompt to send to Claude */
 	prompt: string;
 
-	/** Step ID (for temp file naming) */
+	/** Step ID */
 	stepId: string;
 
 	/** Model to use (optional) */
@@ -47,6 +47,18 @@ export interface ClaudeLaunchOptions {
 
 	/** Callback when process starts */
 	onProcessStarted?: (process: any) => void;
+
+	/** Enable --output-format stream-json */
+	streamJson?: boolean;
+
+	/** Enable --verbose flag */
+	verbose?: boolean;
+
+	/** Enable --dangerously-skip-permissions (default: true) */
+	skipPermissions?: boolean;
+
+	/** Callback for stream-json events (requires streamJson=true) */
+	onStreamEvent?: StreamJsonEventCallback;
 }
 
 /**
@@ -84,8 +96,8 @@ export class ClaudeLauncher {
 			claudePath,
 			options.prompt,
 			options.model,
-			undefined, // No temp file for interactive mode
-			true // interactive
+			true, // interactive
+			options
 		);
 
 		console.log(`\n🤖 Launching Claude (${options.model || 'default'}) in interactive mode...`);
@@ -100,28 +112,17 @@ export class ClaudeLauncher {
 	public async launchBackground(options: ClaudeLaunchOptions): Promise<ClaudeBackgroundResult> {
 		const claudePath = this.findClaudePath();
 
-		// Create temp prompt file
-		const tempPromptFile = path.join(options.workingDir, `.agent-fleet-prompt-${options.stepId}.txt`);
-		fs.writeFileSync(tempPromptFile, options.prompt, 'utf8');
+		const { command, args } = this.buildCommand(
+			claudePath,
+			options.prompt,
+			options.model,
+			false, // background
+			options
+		);
 
-		try {
-			const { command, args } = this.buildCommand(
-				claudePath,
-				options.prompt,
-				options.model,
-				tempPromptFile,
-				false // background
-			);
+		console.log(`Launching Claude (${options.model || 'default'}) in background mode...`);
 
-			console.log(`🤖 Launching Claude (${options.model || 'default'}) in background mode...`);
-
-			return await this.executeBackground(command, args, options);
-		} finally {
-			// Cleanup temp file
-			if (fs.existsSync(tempPromptFile)) {
-				fs.unlinkSync(tempPromptFile);
-			}
-		}
+		return await this.executeBackground(command, args, options);
 	}
 
 	/**
@@ -131,18 +132,33 @@ export class ClaudeLauncher {
 		claudePath: string,
 		prompt: string,
 		model: string | undefined,
-		tempPromptFile: string | undefined,
-		interactive: boolean
+		interactive: boolean,
+		options?: Pick<ClaudeLaunchOptions, 'skipPermissions' | 'streamJson' | 'verbose'>
 	): { command: string; args: string[] } {
 		let command: string;
 		let args: string[];
 
+		// --dangerously-skip-permissions is enabled by default unless explicitly disabled
+		const skipPermissions = options?.skipPermissions !== false;
+
 		if (process.platform === 'win32' && claudePath.endsWith('.cmd')) {
 			command = 'cmd.exe';
-			args = ['/c', claudePath, '--dangerously-skip-permissions'];
+			args = ['/c', claudePath];
 		} else {
 			command = claudePath;
-			args = ['--dangerously-skip-permissions'];
+			args = [];
+		}
+
+		if (skipPermissions) {
+			args.push('--dangerously-skip-permissions');
+		}
+
+		if (options?.streamJson) {
+			args.push('--output-format', 'stream-json');
+		}
+
+		if (options?.verbose) {
+			args.push('--verbose');
 		}
 
 		if (model) {
@@ -150,11 +166,11 @@ export class ClaudeLauncher {
 		}
 
 		if (interactive) {
-			// Interactive mode: pass prompt directly
+			// Interactive mode: pass prompt as positional arg
 			args.push(prompt);
 		} else {
-			// Background mode: use temp file
-			args.push('-p', tempPromptFile!);
+			// Background mode: prompt piped via stdin, -p for print mode
+			args.push('-p');
 		}
 
 		return { command, args };
@@ -221,18 +237,28 @@ export class ClaudeLauncher {
 				options.onProcessStarted(claudeProcess);
 			}
 
-			// Close stdin immediately
+			// Pipe prompt via stdin then close
 			if (claudeProcess.stdin) {
+				claudeProcess.stdin.write(options.prompt);
 				claudeProcess.stdin.end();
 			}
 
 			let stdout = '';
 			let stderr = '';
 
+			// When stream-json is enabled and a callback is provided, parse NDJSON in real-time
+			const parser =
+				options.streamJson && options.onStreamEvent ? new StreamJsonParser(options.onStreamEvent) : null;
+
 			claudeProcess.stdout?.on('data', data => {
 				const output = data.toString();
 				stdout += output;
-				console.log(`[Claude] ${output.trim()}`);
+
+				if (parser) {
+					parser.feed(output);
+				} else {
+					console.log(`[Claude] ${output.trim()}`);
+				}
 			});
 
 			claudeProcess.stderr?.on('data', data => {
@@ -242,6 +268,10 @@ export class ClaudeLauncher {
 			});
 
 			claudeProcess.on('close', code => {
+				if (parser) {
+					parser.flush();
+				}
+
 				resolve({
 					stdout,
 					stderr,

@@ -666,58 +666,91 @@ export class TasksService {
 				};
 				allLogs.push(stepLog);
 
-				// Add additional logs for detailed output (prompt, response, stdout, stderr)
-				if (step.prompt) {
-					allLogs.push({
-						id: `${taskId}-${step.stepId}-${logCounter++}`,
-						timestamp: step.startTime + 1, // Slight offset for ordering within step
+				// When liveLogEntries are present, use them instead of legacy entries
+				const hasLiveLogEntries = Array.isArray(step.liveLogEntries) && step.liveLogEntries.length > 0;
 
-						level: 'debug' as LogLevel,
-						message: `Prompt: ${step.prompt.substring(0, 200)}${step.prompt.length > 200 ? '...' : ''}`,
-						stepId: step.stepId,
-						stepName: step.stepName,
-						stepType: step.stepType,
-						metadata: { fullPrompt: step.prompt },
-					});
-				}
+				if (hasLiveLogEntries) {
+					// Convert liveLogEntries to LogEntry format
+					for (const entry of step.liveLogEntries) {
+						allLogs.push({
+							id: `${taskId}-${step.stepId}-live-${logCounter++}`,
+							timestamp: entry.timestamp,
+							level: entry.level as LogLevel,
+							message: entry.message,
+							stepId: step.stepId,
+							stepName: step.stepName,
+							stepType: step.stepType,
+							metadata: { ...entry.metadata, eventType: entry.eventType, source: 'stream-json' },
+						});
+					}
 
-				if (step.response) {
-					allLogs.push({
-						id: `${taskId}-${step.stepId}-${logCounter++}`,
-						timestamp: step.endTime || step.startTime + 2,
-						level: 'info' as LogLevel,
-						message: `Response: ${step.response.substring(0, 200)}${step.response.length > 200 ? '...' : ''}`,
-						stepId: step.stepId,
-						stepName: step.stepName,
-						stepType: step.stepType,
-						metadata: { fullResponse: step.response },
-					});
-				}
+					// Still include stderr if present (not covered by stream-json)
+					if (step.stderr) {
+						allLogs.push({
+							id: `${taskId}-${step.stepId}-${logCounter++}`,
+							timestamp: step.endTime || step.startTime + 4,
+							level: 'error' as LogLevel,
+							message: `stderr: ${step.stderr.substring(0, 200)}${step.stderr.length > 200 ? '...' : ''}`,
+							stepId: step.stepId,
+							stepName: step.stepName,
+							stepType: step.stepType,
+							metadata: { fullStderr: step.stderr },
+						});
+					}
+				} else {
+					// Legacy path: add additional logs for detailed output
+					if (step.prompt) {
+						allLogs.push({
+							id: `${taskId}-${step.stepId}-${logCounter++}`,
+							timestamp: step.startTime + 1, // Slight offset for ordering within step
 
-				if (step.stdout) {
-					allLogs.push({
-						id: `${taskId}-${step.stepId}-${logCounter++}`,
-						timestamp: step.endTime || step.startTime + 3,
-						level: 'info' as LogLevel,
-						message: `stdout: ${step.stdout.substring(0, 200)}${step.stdout.length > 200 ? '...' : ''}`,
-						stepId: step.stepId,
-						stepName: step.stepName,
-						stepType: step.stepType,
-						metadata: { fullStdout: step.stdout },
-					});
-				}
+							level: 'debug' as LogLevel,
+							message: `Prompt: ${step.prompt.substring(0, 200)}${step.prompt.length > 200 ? '...' : ''}`,
+							stepId: step.stepId,
+							stepName: step.stepName,
+							stepType: step.stepType,
+							metadata: { fullPrompt: step.prompt },
+						});
+					}
 
-				if (step.stderr) {
-					allLogs.push({
-						id: `${taskId}-${step.stepId}-${logCounter++}`,
-						timestamp: step.endTime || step.startTime + 4,
-						level: 'error' as LogLevel,
-						message: `stderr: ${step.stderr.substring(0, 200)}${step.stderr.length > 200 ? '...' : ''}`,
-						stepId: step.stepId,
-						stepName: step.stepName,
-						stepType: step.stepType,
-						metadata: { fullStderr: step.stderr },
-					});
+					if (step.response) {
+						allLogs.push({
+							id: `${taskId}-${step.stepId}-${logCounter++}`,
+							timestamp: step.endTime || step.startTime + 2,
+							level: 'info' as LogLevel,
+							message: `Response: ${step.response.substring(0, 200)}${step.response.length > 200 ? '...' : ''}`,
+							stepId: step.stepId,
+							stepName: step.stepName,
+							stepType: step.stepType,
+							metadata: { fullResponse: step.response },
+						});
+					}
+
+					if (step.stdout) {
+						allLogs.push({
+							id: `${taskId}-${step.stepId}-${logCounter++}`,
+							timestamp: step.endTime || step.startTime + 3,
+							level: 'info' as LogLevel,
+							message: `stdout: ${step.stdout.substring(0, 200)}${step.stdout.length > 200 ? '...' : ''}`,
+							stepId: step.stepId,
+							stepName: step.stepName,
+							stepType: step.stepType,
+							metadata: { fullStdout: step.stdout },
+						});
+					}
+
+					if (step.stderr) {
+						allLogs.push({
+							id: `${taskId}-${step.stepId}-${logCounter++}`,
+							timestamp: step.endTime || step.startTime + 4,
+							level: 'error' as LogLevel,
+							message: `stderr: ${step.stderr.substring(0, 200)}${step.stderr.length > 200 ? '...' : ''}`,
+							stepId: step.stepId,
+							stepName: step.stepName,
+							stepType: step.stepType,
+							metadata: { fullStderr: step.stderr },
+						});
+					}
 				}
 			});
 

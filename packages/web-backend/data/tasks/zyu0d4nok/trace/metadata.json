@@ -1,0 +1,14 @@
+{
+  "totalEntries": 1,
+  "chunkSize": 500,
+  "totalChunks": 1,
+  "lastUpdated": "2026-02-08T09:30:36.646Z",
+  "chunks": [
+    {
+      "index": 0,
+      "start": 0,
+      "end": 0,
+      "count": 1
+    }
+  ]
+}

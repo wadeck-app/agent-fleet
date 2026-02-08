@@ -75,7 +75,12 @@ export class TraceChunkStorage {
 		const newSteps = steps.slice(existingCount);
 
 		if (newSteps.length === 0) {
-			return; // No new entries
+			// No new steps — but existing steps may have been updated (e.g. liveLogEntries growing)
+			// Check if the last step has changed and needs to be rewritten
+			if (steps.length > 0) {
+				await this.updateLastStepIfChanged(taskId, steps);
+			}
+			return;
 		}
 
 		// Calculate chunks for new steps
@@ -139,6 +144,36 @@ export class TraceChunkStorage {
 		};
 
 		await fs.writeFile(chunkPath, JSON.stringify(chunk, null, 2), 'utf-8');
+	}
+
+	/**
+	 * Update the last step in storage if its content has changed.
+	 * This handles in-progress steps where liveLogEntries grow over time.
+	 */
+	private async updateLastStepIfChanged(taskId: string, steps: any[]): Promise<void> {
+		const lastStepIndex = steps.length - 1;
+		const chunkIndex = Math.floor(lastStepIndex / this.CHUNK_SIZE);
+		const positionInChunk = lastStepIndex % this.CHUNK_SIZE;
+
+		const chunk = await this.loadChunk(taskId, chunkIndex);
+		if (!chunk || !chunk.entries[positionInChunk]) {
+			return;
+		}
+
+		const storedStep = chunk.entries[positionInChunk];
+		const incomingStep = steps[lastStepIndex];
+
+		// Quick comparison: check if liveLogEntries count differs
+		const storedLiveCount = Array.isArray(storedStep.liveLogEntries) ? storedStep.liveLogEntries.length : 0;
+		const incomingLiveCount = Array.isArray(incomingStep.liveLogEntries) ? incomingStep.liveLogEntries.length : 0;
+
+		// Also compare endTime to detect step completion
+		const hasChanged = storedLiveCount !== incomingLiveCount || storedStep.endTime !== incomingStep.endTime;
+
+		if (hasChanged) {
+			chunk.entries[positionInChunk] = incomingStep;
+			await this.writeChunk(taskId, chunkIndex, chunk.entries);
+		}
 	}
 
 	/**

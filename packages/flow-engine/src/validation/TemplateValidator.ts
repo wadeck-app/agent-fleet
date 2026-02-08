@@ -53,6 +53,9 @@ export class TemplateValidator {
 	 * @param inputNames - Set of valid input names (from SchemaValidator)
 	 */
 	public validateTemplates(flow: FlowDefinition, stepIds: Set<string>, inputNames: Set<string>): void {
+		// Reset auto-discovered inputs for this flow (prevents leaking between flows)
+		this.autoDiscoveredInputs = new Map();
+
 		// Collect all variable references from templates
 		const references = this.extractVariableReferences(flow);
 

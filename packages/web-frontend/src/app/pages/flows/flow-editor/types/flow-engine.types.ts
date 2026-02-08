@@ -155,6 +155,12 @@ export interface UserInterventionStep extends BaseFlowStep {
 
 export type FlowStep = ModelFlowStep | ScriptFlowStep | SubFlowStep | UserInterventionStep;
 
+export interface ExecutionConfig {
+	streamJson?: boolean;
+	verbose?: boolean;
+	skipPermissions?: boolean;
+}
+
 export interface FlowDefinition {
 	id: string;
 	version: string;
@@ -164,6 +170,7 @@ export interface FlowDefinition {
 	/** Input variables expected from task with their types */
 	inputs: Record<string, VariableType>;
 	steps: FlowStep[];
+	execution?: ExecutionConfig;
 }
 
 /**

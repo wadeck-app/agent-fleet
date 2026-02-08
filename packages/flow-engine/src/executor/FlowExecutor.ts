@@ -118,6 +118,7 @@ export class FlowExecutor {
 			interventionHandler,
 			flowRegistry: this.flowRegistry,
 			flowExecutor: this,
+			executionConfig: flow.execution,
 		});
 
 		// Recreate orchestrator with updated step runner

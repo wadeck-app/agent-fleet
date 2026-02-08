@@ -360,8 +360,35 @@ export function CreateTaskDialog({
 	const handleCreateAndOpen = async () => {
 		// Validate form first
 		const validation = formState.validator(formState.formData);
+		console.log('[CreateTaskDialog] handleCreateAndOpen validation:', {
+			valid: validation.valid,
+			errors: validation.errors,
+			formData: formState.formData,
+			flowInputs,
+			selectedFlowInputs: selectedFlow?.inputs,
+		});
 		if (!validation.valid) {
-			showToast('Please fix validation errors', 'error');
+			// Show specific errors in the toast + set field-level errors
+			const errorMessages = validation.errors.join(', ');
+			showToast(`Validation failed: ${errorMessages}`, 'error');
+
+			// Set field-level validation errors so fields are highlighted
+			const fieldErrors: Record<string, string> = {};
+			for (const error of validation.errors) {
+				for (const [errorKey, fieldName] of Object.entries(formState.validationErrors)) {
+					if (error.includes(errorKey)) {
+						fieldErrors[fieldName] = error;
+					}
+				}
+				// Also map flow input errors
+				if (error.includes(' is required')) {
+					const inputName = error.replace(' is required', '');
+					fieldErrors[`input_${inputName}`] = error;
+				}
+			}
+			// Trigger validation display via handleSubmit (which sets validationErrors)
+			const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+			await formState.handleSubmit(fakeEvent);
 			return;
 		}
 
@@ -378,8 +405,8 @@ export function CreateTaskDialog({
 		try {
 			const createdTask = await tasksService.createTask(createTaskData);
 			showToast('Task created successfully', 'success');
-			onSuccess();
-			onOpenChange(false);
+			// Only navigate — do NOT call onSuccess/onOpenChange as they use
+			// setSearchParams({ replace: true }) which overrides the navigation
 			navigate(`/tasks/${createdTask.id}`);
 		} catch (error) {
 			showToast(getErrorMessage(error), 'error');

@@ -102,6 +102,30 @@ describe('ClaudeLauncher', () => {
 			);
 		});
 
+		it('should omit --dangerously-skip-permissions when skipPermissions is false', async () => {
+			const mockProcess = {
+				on: vi.fn((event, callback) => {
+					if (event === 'close') {
+						setTimeout(() => callback(0), 10);
+					}
+					return mockProcess;
+				}),
+			};
+
+			vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
+			vi.spyOn(manager, 'findClaudePath').mockReturnValue('/usr/bin/claude');
+
+			await manager.launchInteractive({
+				workingDir: '/test',
+				prompt: 'Test',
+				stepId: 'test',
+				skipPermissions: false,
+			});
+
+			const calledArgs = (child_process.spawn as any).mock.calls[0][1];
+			expect(calledArgs).not.toContain('--dangerously-skip-permissions');
+		});
+
 		it('should call onProcessStarted callback', async () => {
 			const mockProcess = {
 				on: vi.fn((event, callback) => {
@@ -147,6 +171,82 @@ describe('ClaudeLauncher', () => {
 					stepId: 'test',
 				})
 			).rejects.toThrow('Process failed');
+		});
+	});
+
+	describe('buildCommand flags', () => {
+		it('should include --output-format stream-json when streamJson is true', async () => {
+			const mockProcess = {
+				on: vi.fn((event, callback) => {
+					if (event === 'close') {
+						setTimeout(() => callback(0), 10);
+					}
+					return mockProcess;
+				}),
+			};
+
+			vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
+			vi.spyOn(manager, 'findClaudePath').mockReturnValue('/usr/bin/claude');
+
+			await manager.launchInteractive({
+				workingDir: '/test',
+				prompt: 'Test',
+				stepId: 'test',
+				streamJson: true,
+			});
+
+			const calledArgs = (child_process.spawn as any).mock.calls[0][1];
+			expect(calledArgs).toContain('--output-format');
+			expect(calledArgs).toContain('stream-json');
+		});
+
+		it('should include --verbose when verbose is true', async () => {
+			const mockProcess = {
+				on: vi.fn((event, callback) => {
+					if (event === 'close') {
+						setTimeout(() => callback(0), 10);
+					}
+					return mockProcess;
+				}),
+			};
+
+			vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
+			vi.spyOn(manager, 'findClaudePath').mockReturnValue('/usr/bin/claude');
+
+			await manager.launchInteractive({
+				workingDir: '/test',
+				prompt: 'Test',
+				stepId: 'test',
+				verbose: true,
+			});
+
+			const calledArgs = (child_process.spawn as any).mock.calls[0][1];
+			expect(calledArgs).toContain('--verbose');
+		});
+
+		it('should not include streaming flags when not set', async () => {
+			const mockProcess = {
+				on: vi.fn((event, callback) => {
+					if (event === 'close') {
+						setTimeout(() => callback(0), 10);
+					}
+					return mockProcess;
+				}),
+			};
+
+			vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
+			vi.spyOn(manager, 'findClaudePath').mockReturnValue('/usr/bin/claude');
+
+			await manager.launchInteractive({
+				workingDir: '/test',
+				prompt: 'Test',
+				stepId: 'test',
+			});
+
+			const calledArgs = (child_process.spawn as any).mock.calls[0][1];
+			expect(calledArgs).not.toContain('--output-format');
+			expect(calledArgs).not.toContain('stream-json');
+			expect(calledArgs).not.toContain('--verbose');
 		});
 	});
 

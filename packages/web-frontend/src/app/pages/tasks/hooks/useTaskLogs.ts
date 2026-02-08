@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { LogEntry, LogLevel, PaginatedLogsResponse } from '@shared/api/tasks.contract';
 
@@ -44,20 +44,32 @@ export function useTaskLogs({ taskId, level, search, limit = 100 }: UseTaskLogsO
 	const [nextCursor, setNextCursor] = useState<number | null>(null);
 	const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+	// Track previous taskId with ref (not state) to avoid infinite loops
+	const prevTaskIdRef = useRef(taskId);
+
 	// Fetch initial logs or when filters change
 	useEffect(() => {
 		const abortController = new AbortController();
 
+		const taskChanged = prevTaskIdRef.current !== taskId;
+		prevTaskIdRef.current = taskId;
+
+		// Only show loading spinner for initial load or task change (not filter changes)
+		if (taskChanged || logs.length === 0) {
+			setIsLoading(true);
+		}
+
+		// Only clear buffer when task changes or manual refresh
+		if (taskChanged) {
+			logBuffer.clear();
+			setLogs([]);
+			setNextCursor(null);
+		}
+
+		setError(null);
+
 		(async () => {
 			try {
-				setIsLoading(true);
-				setError(null);
-
-				// Clear buffer and logs
-				logBuffer.clear();
-				setLogs([]);
-				setNextCursor(null);
-
 				const response: PaginatedLogsResponse = await tasksApi.getTaskLogs(taskId, {
 					cursor: undefined,
 					limit,
@@ -66,7 +78,8 @@ export function useTaskLogs({ taskId, level, search, limit = 100 }: UseTaskLogsO
 				});
 
 				if (!abortController.signal.aborted) {
-					// Initialize buffer with logs (already sorted by backend)
+					// Replace buffer with new filtered data
+					logBuffer.clear();
 					logBuffer.addLogs(response.logs);
 					setLogs(logBuffer.getLogs());
 					setTotal(response.total);
@@ -87,6 +100,7 @@ export function useTaskLogs({ taskId, level, search, limit = 100 }: UseTaskLogsO
 		return () => {
 			abortController.abort();
 		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [taskId, level, search, limit, refreshTrigger, logBuffer]);
 
 	// Load more logs (for infinite scroll)

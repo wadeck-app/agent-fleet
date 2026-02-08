@@ -182,14 +182,9 @@ describe.each([
 		it('should display fetched ingredient data', async () => {
 			renderPage();
 
-			await waitFor(
-				() => {
-					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
-					expect(screen.getByText('Brown Rice')).toBeInTheDocument();
-					expect(screen.getByText('Broccoli')).toBeInTheDocument();
-				},
-				{ timeout: 3000 }
-			);
+			await screen.findByText('Chicken Breast');
+			expect(screen.getByText('Brown Rice')).toBeInTheDocument();
+			expect(screen.getByText('Broccoli')).toBeInTheDocument();
 		});
 
 		it('should pass pagination parameters to API', async () => {
@@ -227,17 +222,14 @@ describe.each([
 			await user.type(searchInput, 'chicken');
 
 			// BEHAVIOR: API should be called with search parameter after debounce (300ms)
-			await waitFor(
-				() => {
-					expect(mocks.getIngredients).toHaveBeenCalled();
-					const lastCall = mocks.getIngredients.mock.calls[mocks.getIngredients.mock.calls.length - 1];
-					const params = lastCall?.[0];
+			await waitFor(() => {
+				expect(mocks.getIngredients).toHaveBeenCalled();
+				const lastCall = mocks.getIngredients.mock.calls[mocks.getIngredients.mock.calls.length - 1];
+				const params = lastCall?.[0];
 
-					expect(params).toBeDefined();
-					expect(params.search).toBe('chicken');
-				},
-				{ timeout: 1000 } // Wait for debounce
-			);
+				expect(params).toBeDefined();
+				expect(params.search).toBe('chicken');
+			});
 		});
 
 		it('should reset to page 1 when search changes', async () => {
@@ -245,9 +237,7 @@ describe.each([
 			renderPage();
 
 			// Wait for initial load
-			await waitFor(() => {
-				expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
-			});
+			await screen.findByText('Chicken Breast');
 
 			// Navigate to page 2 first (if pagination exists)
 			const pageSizeSelectors = screen.queryAllByRole('combobox');
@@ -264,17 +254,14 @@ describe.each([
 			await user.type(searchInput, 'rice');
 
 			// BEHAVIOR: When search changes, should reset to page 1
-			await waitFor(
-				() => {
-					expect(mocks.getIngredients).toHaveBeenCalled();
-					const lastCall = mocks.getIngredients.mock.calls[mocks.getIngredients.mock.calls.length - 1];
-					const params = lastCall?.[0];
+			await waitFor(() => {
+				expect(mocks.getIngredients).toHaveBeenCalled();
+				const lastCall = mocks.getIngredients.mock.calls[mocks.getIngredients.mock.calls.length - 1];
+				const params = lastCall?.[0];
 
-					expect(params?.page).toBe(1); // Should reset to page 1
-					expect(params?.search).toBe('rice');
-				},
-				{ timeout: 1000 }
-			);
+				expect(params?.page).toBe(1); // Should reset to page 1
+				expect(params?.search).toBe('rice');
+			});
 		});
 
 		it('should clear search and show all results when clearing search input', async () => {
@@ -292,13 +279,10 @@ describe.each([
 			await user.type(searchInput, 'test');
 
 			// Wait for search to trigger
-			await waitFor(
-				() => {
-					const params = mocks.getIngredients.mock.calls[mocks.getIngredients.mock.calls.length - 1]?.[0];
-					expect(params?.search).toBe('test');
-				},
-				{ timeout: 1000 }
-			);
+			await waitFor(() => {
+				const params = mocks.getIngredients.mock.calls[mocks.getIngredients.mock.calls.length - 1]?.[0];
+				expect(params?.search).toBe('test');
+			});
 
 			mocks.getIngredients.mockClear();
 
@@ -306,17 +290,14 @@ describe.each([
 			await user.clear(searchInput);
 
 			// BEHAVIOR: Clearing search should call API without search param
-			await waitFor(
-				() => {
-					expect(mocks.getIngredients).toHaveBeenCalled();
-					const lastCall = mocks.getIngredients.mock.calls[mocks.getIngredients.mock.calls.length - 1];
-					const params = lastCall?.[0];
+			await waitFor(() => {
+				expect(mocks.getIngredients).toHaveBeenCalled();
+				const lastCall = mocks.getIngredients.mock.calls[mocks.getIngredients.mock.calls.length - 1];
+				const params = lastCall?.[0];
 
-					// Search should be undefined or empty
-					expect(params?.search === undefined || params?.search === '').toBe(true);
-				},
-				{ timeout: 1000 }
-			);
+				// Search should be undefined or empty
+				expect(params?.search === undefined || params?.search === '').toBe(true);
+			});
 		});
 	});
 
@@ -329,12 +310,7 @@ describe.each([
 			renderPage();
 
 			// Wait for initial load
-			await waitFor(
-				() => {
-					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
-				},
-				{ timeout: 3000 }
-			);
+			await screen.findByText('Chicken Breast');
 
 			// Clear mock calls from initial load
 			mocks.getIngredients.mockClear();
@@ -364,12 +340,7 @@ describe.each([
 			renderPage();
 
 			// Wait for initial load
-			await waitFor(
-				() => {
-					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
-				},
-				{ timeout: 3000 }
-			);
+			await screen.findByText('Chicken Breast');
 
 			mocks.getIngredients.mockClear();
 
@@ -403,12 +374,7 @@ describe.each([
 		it('should have selectable rows', async () => {
 			renderPage();
 
-			await waitFor(
-				() => {
-					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
-				},
-				{ timeout: 3000 }
-			);
+			await screen.findByText('Chicken Breast');
 
 			// Add comment above the target line, not at the end
 			// Different implementations may use different selection mechanisms (checkboxes, row clicks, etc)
@@ -421,12 +387,7 @@ describe.each([
 			const user = userEvent.setup();
 			renderPage();
 
-			await waitFor(
-				() => {
-					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
-				},
-				{ timeout: 3000 }
-			);
+			await screen.findByText('Chicken Breast');
 
 			const _checkboxes = screen.queryAllByRole('checkbox');
 
@@ -452,12 +413,7 @@ describe.each([
 		it('should have page size controls', async () => {
 			renderPage();
 
-			await waitFor(
-				() => {
-					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
-				},
-				{ timeout: 3000 }
-			);
+			await screen.findByText('Chicken Breast');
 
 			// Just check that we have pagination UI (combobox for page size)
 			const _comboboxes = screen.queryAllByRole('combobox');
@@ -474,12 +430,7 @@ describe.each([
 		it('should have create action available', async () => {
 			renderPage();
 
-			await waitFor(
-				() => {
-					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
-				},
-				{ timeout: 3000 }
-			);
+			await screen.findByText('Chicken Breast');
 
 			// Find button with create/add intent (flexible matching)
 			const buttons = screen.getAllByRole('button');
@@ -491,12 +442,7 @@ describe.each([
 		it('should have edit actions for each row', async () => {
 			renderPage();
 
-			await waitFor(
-				() => {
-					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
-				},
-				{ timeout: 3000 }
-			);
+			await screen.findByText('Chicken Breast');
 
 			const editButtons = screen.queryAllByRole('button', { name: /edit/i });
 			expect(editButtons.length).toBeGreaterThan(0);
@@ -505,12 +451,7 @@ describe.each([
 		it('should have delete actions for each row', async () => {
 			renderPage();
 
-			await waitFor(
-				() => {
-					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
-				},
-				{ timeout: 3000 }
-			);
+			await screen.findByText('Chicken Breast');
 
 			const deleteButtons = screen.queryAllByRole('button', { name: /delete/i });
 			expect(deleteButtons.length).toBeGreaterThan(0);
@@ -526,12 +467,7 @@ describe.each([
 			renderPage();
 
 			// Wait for initial load
-			await waitFor(
-				() => {
-					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
-				},
-				{ timeout: 3000 }
-			);
+			await screen.findByText('Chicken Breast');
 
 			mocks.getIngredients.mockClear();
 
@@ -555,12 +491,7 @@ describe.each([
 			renderPage();
 
 			// Wait for initial load
-			await waitFor(
-				() => {
-					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
-				},
-				{ timeout: 3000 }
-			);
+			await screen.findByText('Chicken Breast');
 
 			// Apply a sort first
 			const nameHeader = screen.getByText('Name');
@@ -598,14 +529,9 @@ describe.each([
 			renderPage();
 
 			// Wait for initial load
-			await waitFor(
-				() => {
-					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
-					expect(screen.getByText('Brown Rice')).toBeInTheDocument();
-					expect(screen.getByText('Broccoli')).toBeInTheDocument();
-				},
-				{ timeout: 3000 }
-			);
+			await screen.findByText('Chicken Breast');
+			expect(screen.getByText('Brown Rice')).toBeInTheDocument();
+			expect(screen.getByText('Broccoli')).toBeInTheDocument();
 
 			// Change mock to return DIFFERENT data (new ingredient list)
 			const newIngredients = [
@@ -646,21 +572,17 @@ describe.each([
 			await user.click(refreshButton);
 
 			// CRITICAL BEHAVIOR: Table MUST update with NEW data
-			await waitFor(
-				() => {
-					// OLD data should be GONE
-					expect(screen.queryByText('Brown Rice')).not.toBeInTheDocument();
-					expect(screen.queryByText('Broccoli')).not.toBeInTheDocument();
-
-					// NEW data should be VISIBLE
-					expect(screen.getByText('FRESH SALMON')).toBeInTheDocument();
-					expect(screen.getByText('QUINOA')).toBeInTheDocument();
-
-					// Kept data should still be there
-					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
-				},
-				{ timeout: 5000 }
-			);
+			await screen.findByText('FRESH SALMON');
+			await screen.findByText('QUINOA');
+			// OLD data should be GONE
+			await waitFor(() => {
+				expect(screen.queryByText('Brown Rice')).not.toBeInTheDocument();
+			});
+			await waitFor(() => {
+				expect(screen.queryByText('Broccoli')).not.toBeInTheDocument();
+			});
+			// Kept data should still be there
+			expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
 		});
 	});
 
@@ -717,12 +639,7 @@ describe.each([
 			});
 
 			// BEHAVIOR: Data should appear after loading completes
-			await waitFor(
-				() => {
-					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
-				},
-				{ timeout: 3000 }
-			);
+			await screen.findByText('Chicken Breast');
 		});
 
 		it('should show skeleton loading during initial load (not EmptyState)', async () => {
@@ -758,12 +675,7 @@ describe.each([
 			});
 
 			// Data should appear
-			await waitFor(
-				() => {
-					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
-				},
-				{ timeout: 3000 }
-			);
+			await screen.findByText('Chicken Breast');
 		});
 
 		it('should show EmptyState when loading completes with no data', async () => {
@@ -776,12 +688,7 @@ describe.each([
 			renderPage();
 
 			// BEHAVIOR: After loading completes with empty data, should show EmptyState
-			await waitFor(
-				() => {
-					expect(screen.queryByText(/no ingredients/i)).toBeInTheDocument();
-				},
-				{ timeout: 3000 }
-			);
+			await screen.findByText(/no ingredients/i);
 
 			// BEHAVIOR: Should have create action available in empty state
 			const buttons = screen.getAllByRole('button');
@@ -814,12 +721,7 @@ describe.each([
 			});
 
 			// BEHAVIOR: NOW should show EmptyState after loading completes
-			await waitFor(
-				() => {
-					expect(screen.queryByText(/no ingredients/i)).toBeInTheDocument();
-				},
-				{ timeout: 3000 }
-			);
+			await screen.findByText(/no ingredients/i);
 		});
 
 		it('should handle search during loading', async () => {
@@ -852,12 +754,7 @@ describe.each([
 			});
 
 			// Data should eventually appear
-			await waitFor(
-				() => {
-					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
-				},
-				{ timeout: 3000 }
-			);
+			await screen.findByText('Chicken Breast');
 		});
 
 		it('should handle refresh without disrupting UI', async () => {
@@ -865,12 +762,7 @@ describe.each([
 			renderPage();
 
 			// Wait for initial load
-			await waitFor(
-				() => {
-					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
-				},
-				{ timeout: 3000 }
-			);
+			await screen.findByText('Chicken Breast');
 
 			// Add comment above the target line, not at the end
 			// Setup controlled promise for refresh with deferred promise
@@ -897,12 +789,7 @@ describe.each([
 			});
 
 			// Data should be available after refresh
-			await waitFor(
-				() => {
-					expect(screen.getByText('Chicken Breast')).toBeInTheDocument();
-				},
-				{ timeout: 3000 }
-			);
+			await screen.findByText('Chicken Breast');
 		});
 	});
 });

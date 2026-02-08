@@ -8,6 +8,7 @@ import {
 import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
+import { Switch } from '@framework/components/forms/Switch';
 import { Textarea } from '@framework/components/forms/Textarea';
 import {
 	Dialog,
@@ -20,7 +21,13 @@ import {
 import { Button } from '@framework/components/primitives/Button';
 import { useListItems } from '@framework/hooks2/form/useListItems';
 
-import type { FlowDefinition, GitStrategy, ReusePolicy, WorkspaceMode } from './types/flow-engine.types';
+import type {
+	ExecutionConfig,
+	FlowDefinition,
+	GitStrategy,
+	ReusePolicy,
+	WorkspaceMode,
+} from './types/flow-engine.types';
 
 interface FlowSettingsDialogProps {
 	open: boolean;
@@ -35,7 +42,16 @@ export function FlowSettingsDialog({ open, onOpenChange, flowDefinition, onSave 
 	// Update local state when flow definition changes
 	useEffect(() => {
 		if (flowDefinition.id !== localFlow.id || flowDefinition.version !== localFlow.version) {
-			setLocalFlow(flowDefinition);
+			// Initialize with defaults for execution config if not present
+			const updatedFlow = {
+				...flowDefinition,
+				execution: flowDefinition.execution || {
+					streamJson: true,
+					verbose: true,
+					skipPermissions: true,
+				},
+			};
+			setLocalFlow(updatedFlow);
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [flowDefinition.id, flowDefinition.version]);
@@ -71,6 +87,7 @@ export function FlowSettingsDialog({ open, onOpenChange, flowDefinition, onSave 
 			description: localFlow.description,
 			workspace: localFlow.workspace,
 			inputs: localFlow.inputs,
+			execution: localFlow.execution,
 		});
 		onOpenChange(false);
 	};
@@ -248,6 +265,77 @@ export function FlowSettingsDialog({ open, onOpenChange, flowDefinition, onSave 
 							emptyMessage="No inputs defined"
 							getItemId={(item, index) => item.name || `input-${index}`}
 						/>
+
+						{/* Execution Config */}
+						<div className="space-y-4">
+							<h3 className="text-sm font-semibold">Execution</h3>
+
+							<div className="flex items-center justify-between">
+								<div className="space-y-0.5">
+									<Label htmlFor="stream-json">Stream JSON output</Label>
+									<p className="text-xs text-muted-foreground">
+										Stream step outputs as JSON for real-time monitoring
+									</p>
+								</div>
+								<Switch
+									id="stream-json"
+									checked={localFlow.execution?.streamJson ?? true}
+									onCheckedChange={checked =>
+										setLocalFlow(prev => ({
+											...prev,
+											execution: {
+												...prev.execution,
+												streamJson: checked,
+											},
+										}))
+									}
+								/>
+							</div>
+
+							<div className="flex items-center justify-between">
+								<div className="space-y-0.5">
+									<Label htmlFor="verbose">Verbose logging</Label>
+									<p className="text-xs text-muted-foreground">
+										Enable detailed logging for debugging
+									</p>
+								</div>
+								<Switch
+									id="verbose"
+									checked={localFlow.execution?.verbose ?? true}
+									onCheckedChange={checked =>
+										setLocalFlow(prev => ({
+											...prev,
+											execution: {
+												...prev.execution,
+												verbose: checked,
+											},
+										}))
+									}
+								/>
+							</div>
+
+							<div className="flex items-center justify-between">
+								<div className="space-y-0.5">
+									<Label htmlFor="skip-permissions">Skip permissions</Label>
+									<p className="text-xs text-muted-foreground">
+										Bypass permission checks (use with caution in development only)
+									</p>
+								</div>
+								<Switch
+									id="skip-permissions"
+									checked={localFlow.execution?.skipPermissions ?? true}
+									onCheckedChange={checked =>
+										setLocalFlow(prev => ({
+											...prev,
+											execution: {
+												...prev.execution,
+												skipPermissions: checked,
+											},
+										}))
+									}
+								/>
+							</div>
+						</div>
 					</div>
 				</DialogBody>
 

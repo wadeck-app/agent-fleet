@@ -1,12 +1,22 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CreateTaskDialog } from './CreateTaskDialog';
 
+// Declare mocks via vi.hoisted so they are available inside vi.mock factories (which are hoisted)
+const { mockNavigate, mockUseWorkers, mockCreateTask } = vi.hoisted(() => ({
+	mockNavigate: vi.fn(),
+	mockUseWorkers: vi.fn(() => ({
+		data: { workers: [] },
+		loading: false,
+	})),
+	mockCreateTask: vi.fn().mockResolvedValue({ id: 'task-1' }),
+}));
+
 // Mock dependencies
 vi.mock('react-router-dom', () => ({
-	useNavigate: () => vi.fn(),
+	useNavigate: () => mockNavigate,
 }));
 
 vi.mock('@framework/features/toast/ToastContext', () => ({
@@ -16,10 +26,7 @@ vi.mock('@framework/features/toast/ToastContext', () => ({
 }));
 
 vi.mock('../workers/useWorkers', () => ({
-	useWorkers: () => ({
-		data: { workers: [] },
-		loading: false,
-	}),
+	useWorkers: mockUseWorkers,
 }));
 
 vi.mock('../projects/projects.api', () => ({
@@ -36,7 +43,7 @@ vi.mock('../workers/workers.api', () => ({
 
 vi.mock('./TasksService', () => ({
 	tasksService: {
-		createTask: vi.fn().mockResolvedValue({ id: 'task-1' }),
+		createTask: mockCreateTask,
 	},
 }));
 
@@ -49,8 +56,8 @@ describe('CreateTaskDialog', () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
-		// Clear localStorage before each test
 		localStorage.clear();
+		mockNavigate.mockReset();
 	});
 
 	it('renders two-column layout with resizable splitter', () => {
@@ -116,5 +123,48 @@ describe('CreateTaskDialog', () => {
 		// The component should load the saved position
 		const storedPosition = localStorage.getItem('createTaskDialog.splitterPosition');
 		expect(storedPosition).toBe('60');
+	});
+
+	it('navigates to task detail page on "Create and open" without calling onSuccess/onOpenChange', async () => {
+		const user = userEvent.setup();
+		const onSuccess = vi.fn();
+		const onOpenChange = vi.fn();
+
+		// Mock workers to provide a valid worker for selection
+		mockUseWorkers.mockReturnValue({
+			data: {
+				workers: [{ workerId: 'worker-1', connected: true, state: 'idle' as const }],
+			},
+			loading: false,
+		} as any);
+
+		// Mock tasksService to return a task with an ID
+		mockCreateTask.mockResolvedValue({ id: 'task-123' });
+
+		render(<CreateTaskDialog {...defaultProps} onSuccess={onSuccess} onOpenChange={onOpenChange} />);
+
+		// Fill in required description field using fireEvent (faster than user.type per-character)
+		const descriptionField = screen.getByLabelText(/Description/i);
+		fireEvent.change(descriptionField, { target: { value: 'Test' } });
+
+		// Select worker from dropdown
+		const workerField = screen.getByLabelText(/Assign to Worker/i);
+		await user.click(workerField);
+		const workerOption = await screen.findByText('worker-1 (idle)');
+		await user.click(workerOption);
+
+		// Click "Create and open" button
+		const createAndOpenButton = screen.getByRole('button', { name: /Create and open/i });
+		await user.click(createAndOpenButton);
+
+		// Wait for async operations to complete
+		await vi.waitFor(() => {
+			expect(mockNavigate).toHaveBeenCalledWith('/tasks/task-123');
+		});
+
+		// Regression: onSuccess/onOpenChange must NOT be called —
+		// they trigger setSearchParams({ replace: true }) which overrides the navigation
+		expect(onSuccess).not.toHaveBeenCalled();
+		expect(onOpenChange).not.toHaveBeenCalled();
 	});
 });

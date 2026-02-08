@@ -1,5 +1,5 @@
 import type { Project } from '@shared/api/projects.contract';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -170,7 +170,7 @@ describe('EditProjectDialog', () => {
 			});
 		});
 
-		it('should validate name length', { timeout: 15000 }, async () => {
+		it('should validate name length', async () => {
 			const user = userEvent.setup();
 			const onSuccess = vi.fn();
 
@@ -178,8 +178,7 @@ describe('EditProjectDialog', () => {
 
 			// Update name to be too long (>100 characters)
 			const nameInput = screen.getByLabelText(/Name/i);
-			await user.clear(nameInput);
-			await user.type(nameInput, 'a'.repeat(101));
+			fireEvent.change(nameInput, { target: { value: 'a'.repeat(101) } });
 
 			// Try to submit
 			const submitButton = screen.getByRole('button', { name: /Save Changes/i });
@@ -218,7 +217,7 @@ describe('EditProjectDialog', () => {
 	});
 
 	describe('git fields updates', () => {
-		it('should include updated git fields in PATCH request', { timeout: 15000 }, async () => {
+		it('should include updated git fields in PATCH request', async () => {
 			const user = userEvent.setup();
 			const { projectsApi } = await import('./projects.api');
 
@@ -226,8 +225,7 @@ describe('EditProjectDialog', () => {
 
 			// Update git fields
 			const repoUrlInput = screen.getByLabelText(/Git Repository URL/i);
-			await user.clear(repoUrlInput);
-			await user.type(repoUrlInput, 'https://github.com/updated/repo.git');
+			fireEvent.change(repoUrlInput, { target: { value: 'https://github.com/updated/repo.git' } });
 
 			const branchInput = screen.getByLabelText(/Default Branch/i);
 			await user.clear(branchInput);

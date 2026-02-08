@@ -272,12 +272,12 @@ export function TasksPage() {
 			{/* Data + Table */}
 			<Data2
 				fetchData={fetchTasks}
-				{...pagination}
-				{...sorting}
-				{...search}
+				pagination={pagination}
+				sorting={sorting}
+				search={search}
 				filter={filters as any}
-				{...cache}
-				{...selection}
+				cache={cache}
+				selection={selection}
 				delegateLoadingToChildren={true}
 			>
 				{injectedProps => (

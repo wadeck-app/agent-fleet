@@ -5450,3 +5450,38 @@ export const MyStory = ({
   render: () => <Component ... />
 }) as unknown as Story;
 ```
+
+## Stream-JSON Integration Pattern for ClaudeLauncher
+
+**Context**: When integrating Claude CLI's `--output-format stream-json` with real-time log streaming, the NDJSON parser must handle:
+
+1. Partial lines across stdout chunks (buffering)
+2. Non-JSON lines (silent skip — Claude may emit setup text)
+3. The `result` event contains a `.result` field with the clean text output — use this instead of raw NDJSON stdout for OutputExtractor
+
+**Pattern**: The StreamJsonParser feeds chunks into a line buffer, StreamEventMapper maps typed events to LiveLogEntry objects, and the entries are pushed to `stepTrace.liveLogEntries[]` which gets picked up by the existing 500ms trace polling mechanism in FlowWorker.
+
+**Key defaults**: `streamJson`, `verbose`, and `skipPermissions` all default to `true` when undefined (using `!== false` check), preserving backward compatibility when `ExecutionConfig` is not specified in a flow definition.
+
+## Data2 Feature Contracts: Named Props, Never Spread
+
+**Problem**: Passing feature hooks to `Data2` via spread (`{...pagination}`) instead of named props (`pagination={pagination}`) causes all features to be silently ignored. The spread puts `fstate/actions/fillQuery` as top-level props, but Data2 destructures them as `pagination`, `sorting`, etc. — all undefined.
+
+**Symptoms**:
+
+- `[buildQuery] Final query: {}` in console (no pagination, sorting, or cache params)
+- Table shows "No data" despite API working
+- No network requests because cache busting (cacheId) is missing
+- No error shown because `delegateLoadingToChildren={true}` suppresses Data2 error display
+
+**Fix**: Always use named props:
+
+```tsx
+// ❌ WRONG - spreads fstate/actions/fillQuery as top-level props, overwriting each other
+<Data2 {...pagination} {...sorting} {...search} {...cache} {...selection}>
+
+// ✅ CORRECT - each feature contract is passed by name
+<Data2 pagination={pagination} sorting={sorting} search={search} cache={cache} selection={selection}>
+```
+
+**File**: `TasksPage.tsx` line 273-281

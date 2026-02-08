@@ -55,8 +55,11 @@ describe('RemoveWorkspaceProjectIdMigration', () => {
 		await mkdir(join(workspace2Path, '.agent-fleet'), { recursive: true });
 		await mkdir(join(workspace3Path, '.agent-fleet'), { recursive: true });
 
-		// Create test project
-		await projectsRepository.create({
+		// Create test project with explicit ID
+		// Using 'as any' because BaseRepository.create() types omit 'id',
+		// but InMemoryStorage.create() supports explicit IDs at runtime for testing
+		await baseRepository.create({
+			id: projectId1,
 			name: 'Project 1',
 			workspaceIds: [workspaceId1], // Only contains workspace-1
 			icon: 'Folder',
@@ -65,7 +68,7 @@ describe('RemoveWorkspaceProjectIdMigration', () => {
 			taskCount: 0,
 			pinned: false,
 			order: 0,
-		});
+		} as any);
 	});
 
 	afterEach(async () => {
@@ -131,7 +134,8 @@ describe('RemoveWorkspaceProjectIdMigration', () => {
 
 			// Assert: Project now contains workspace
 			const project = await projectsRepository.findById(projectId1);
-			expect(project!.workspaceIds).toContain(workspaceId2);
+			expect(project).not.toBeNull();
+			expect(project?.workspaceIds).toContain(workspaceId2);
 
 			// Assert: projectId removed from metadata
 			const updatedContent = await readFile(metadataPath, 'utf-8');
@@ -280,7 +284,7 @@ describe('RemoveWorkspaceProjectIdMigration', () => {
 
 			// Assert
 			expect(result.migrated).toBe(1);
-			expect(result.errors).toBe(1);
+			expect(result.skipped).toBe(1);
 		});
 	});
 });

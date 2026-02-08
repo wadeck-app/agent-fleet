@@ -432,6 +432,7 @@ export class FlowRegistry {
 			steps: (mergedData.steps || []).map((step: any) => this.parseFlowStep(step)),
 			hooks: mergedData.hooks,
 			statusTransitions: mergedData.statusTransitions,
+			execution: mergedData.execution,
 		};
 	}
 

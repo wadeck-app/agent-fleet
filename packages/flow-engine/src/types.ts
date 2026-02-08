@@ -694,6 +694,36 @@ export interface StatusTransitions {
 }
 
 /**
+ * Execution configuration for Claude CLI invocations
+ */
+export interface ExecutionConfig {
+	/** Enable --output-format=stream-json (default: true) */
+	streamJson?: boolean;
+	/** Enable --verbose flag (default: true) */
+	verbose?: boolean;
+	/** Enable --dangerously-skip-permissions (default: true) */
+	skipPermissions?: boolean;
+}
+
+/**
+ * Live log entry streamed during model step execution
+ */
+export interface LiveLogEntry {
+	/** Unique entry identifier */
+	id: string;
+	/** Unix timestamp in ms */
+	timestamp: number;
+	/** Log level for display */
+	level: 'debug' | 'info' | 'warning' | 'error';
+	/** Human-readable message */
+	message: string;
+	/** Stream-json event type: 'system', 'assistant', 'user', 'result' */
+	eventType: string;
+	/** Additional metadata (full content for expand-on-click) */
+	metadata?: Record<string, any>;
+}
+
+/**
  * Complete flow definition
  */
 export interface FlowDefinition {
@@ -730,6 +760,9 @@ export interface FlowDefinition {
 
 	/** Optional status transitions configuration (defaults: onSuccess=review, onFailure=changes_requested) */
 	statusTransitions?: StatusTransitions;
+
+	/** Optional execution configuration for Claude CLI */
+	execution?: ExecutionConfig;
 }
 
 /**
@@ -907,6 +940,9 @@ export interface StepTrace {
 
 	/** Number of retry attempts */
 	retries?: number;
+
+	/** Live log entries streamed during model step execution */
+	liveLogEntries?: LiveLogEntry[];
 }
 
 /**

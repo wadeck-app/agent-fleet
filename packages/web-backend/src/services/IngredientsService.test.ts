@@ -436,15 +436,8 @@ describe('IngredientsService', () => {
 		});
 
 		it('should skip validation when only version is provided', async () => {
-			const updateData: UpdateIngredient = {
-				name: sampleIngredient.name,
-				calories: sampleIngredient.calories,
-				protein: sampleIngredient.protein,
-				carbs: sampleIngredient.carbs,
-				fat: sampleIngredient.fat,
-				servingSize: sampleIngredient.servingSize,
-				version: 1,
-			};
+			// Version-only update: tests the runtime path where Object.keys(data).length <= 1
+			const updateData = { version: 1 } as UpdateIngredient;
 
 			const updatedIngredient: Ingredient = {
 				...sampleIngredient,

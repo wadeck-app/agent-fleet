@@ -21,6 +21,33 @@ simple-implement:
           model: haiku
           prompt: '${{ inputs.task }}'
 
+stream-json:
+    version: '1.0.0'
+    name: 'Stream JSON Logging'
+    description: 'Tests real-time streaming of Claude CLI output via stream-json format. Uses a prompt that forces tool usage to generate varied log entry types.'
+    workspace:
+        mode: manual
+        gitStrategy: any
+        reusePolicy: always
+    statusTransitions:
+        onSuccess: approved
+        onFailure: todo
+    execution:
+        streamJson: true
+        verbose: true
+        skipPermissions: true
+    inputs:
+        task:
+            type: string
+            default: 'Read the file package.json in the current directory, then tell me the project name and version. Keep your answer short (2 lines max).'
+            description: 'Task prompt (default triggers tool usage for visible stream events)'
+    steps:
+        - type: model
+          id: stream
+          name: 'Stream JSON'
+          model: haiku
+          prompt: '${{ inputs.task }}'
+
 debug-local:
     version: '1.0.0'
     name: 'Debug in Current Workspace'

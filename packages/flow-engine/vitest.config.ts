@@ -33,6 +33,8 @@ export default defineConfig({
 			'test-utils/index': path.resolve(__dirname, '../test-utils/src/index.ts'),
 			'test-utils': path.resolve(__dirname, '../test-utils/src'),
 			'shared-common': path.resolve(__dirname, '../shared-common/src'),
+			'shared-orch-worker': path.resolve(__dirname, '../shared-orch-worker/src'),
+			'flow-engine': path.resolve(__dirname, '.'),
 		},
 		extensions: ['.ts', '.tsx', '', '.jsx', '.json'],
 	},

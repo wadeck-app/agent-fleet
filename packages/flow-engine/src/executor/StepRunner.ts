@@ -5,10 +5,13 @@
  */
 import { ClaudeLauncher } from '../processing/ClaudeLauncher';
 import { OutputExtractor } from '../processing/OutputExtractor';
+import { StreamEventMapper } from '../processing/StreamEventMapper';
 import { type TemplateContext, TemplateRenderer } from '../processing/TemplateRenderer';
 import type { FlowRegistry } from '../registry/FlowRegistry';
 import type {
+	ExecutionConfig,
 	FlowStep,
+	LiveLogEntry,
 	ModelFlowStep,
 	ScriptFlowStep,
 	StepTrace,
@@ -54,6 +57,9 @@ export interface StepRunnerConfig {
 
 	/** Intervention handler for user intervention steps (optional, set after construction) */
 	interventionHandler?: InterventionHandler;
+
+	/** Execution configuration for Claude CLI flags */
+	executionConfig?: ExecutionConfig;
 }
 
 /**
@@ -96,9 +102,17 @@ export class StepRunner {
 	}
 
 	/**
-	 * Execute a step with retry logic
+	 * Execute a step with retry logic.
+	 * @param onStepTraceCreated - Called when the StepTrace is created, before execution begins.
+	 *   This allows callers (e.g. FlowOrchestrator) to make the trace visible for real-time updates
+	 *   while the step is still running.
 	 */
-	public async executeStep(step: FlowStep, workspace: Workspace, context: TemplateContext): Promise<StepTrace> {
+	public async executeStep(
+		step: FlowStep,
+		workspace: Workspace,
+		context: TemplateContext,
+		onStepTraceCreated?: (stepTrace: StepTrace) => void
+	): Promise<StepTrace> {
 		const maxAttempts = step.retry?.maxAttempts || 1;
 		const backoffStrategy = step.retry?.backoff || 'linear';
 
@@ -115,6 +129,10 @@ export class StepRunner {
 				startTime: Date.now(),
 				retries: attempt - 1,
 			};
+
+			// Notify caller that the trace exists — enables real-time visibility
+			// during execution (e.g. for streaming liveLogEntries)
+			onStepTraceCreated?.(stepTrace);
 
 			try {
 				let result: StepTrace;
@@ -236,6 +254,22 @@ export class StepRunner {
 		stepTrace.prompt = renderedPrompt;
 		stepTrace.model = step.model;
 
+		// Read execution config (defaults: all enabled)
+		const execConfig = this.config.executionConfig;
+		const streamJson = execConfig?.streamJson !== false;
+		const verbose = execConfig?.verbose !== false;
+		const skipPermissions = execConfig?.skipPermissions !== false;
+
+		// Set up streaming if enabled
+		let finalResultText: string | undefined;
+		const liveLogEntries: LiveLogEntry[] = [];
+		let streamEventMapper: StreamEventMapper | undefined;
+
+		if (streamJson && !this.config.interactive) {
+			stepTrace.liveLogEntries = liveLogEntries;
+			streamEventMapper = new StreamEventMapper(step.id);
+		}
+
 		const launchOptions = {
 			workingDir: workspace.path,
 			prompt: renderedPrompt,
@@ -243,6 +277,21 @@ export class StepRunner {
 			model: step.model,
 			env: this.config.claudeEnv,
 			onProcessStarted: this.config.onClaudeProcessStarted,
+			streamJson: streamJson && !this.config.interactive,
+			verbose: verbose && !this.config.interactive,
+			skipPermissions,
+			onStreamEvent: streamEventMapper
+				? (event: import('../processing/StreamJsonParser').StreamJsonEvent) => {
+						const entry = streamEventMapper!.map(event);
+						if (entry) {
+							liveLogEntries.push(entry);
+						}
+						// Capture the final result text for output extraction
+						if (event.type === 'result' && event.data.result) {
+							finalResultText = event.data.result;
+						}
+					}
+				: undefined,
 		};
 
 		try {
@@ -270,21 +319,29 @@ export class StepRunner {
 				// Background mode
 				const result = await this.claudeManager.launchBackground(launchOptions);
 
-				stepTrace.response = result.stdout;
+				// When stream-json is active, use the clean result text instead of raw NDJSON
+				const responseText = streamJson && finalResultText != null ? finalResultText : result.stdout;
+
+				stepTrace.response = responseText;
 				stepTrace.stdout = result.stdout;
 				stepTrace.stderr = result.stderr;
 				stepTrace.exitCode = result.exitCode;
 				stepTrace.endTime = Date.now();
 				stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
 
+				// Cap live log entries to prevent memory issues
+				if (stepTrace.liveLogEntries) {
+					stepTrace.liveLogEntries = StreamEventMapper.capEntries(stepTrace.liveLogEntries);
+				}
+
 				if (result.exitCode !== 0) {
 					stepTrace.error = `Claude exited with code ${result.exitCode}\n${result.stderr}`;
 					return stepTrace;
 				}
 
-				// Extract outputs
-				stepTrace.outputs = this.outputExtractor.extract(result.stdout, step.output, step.id, {
-					response: result.stdout,
+				// Extract outputs using clean response text
+				stepTrace.outputs = this.outputExtractor.extract(responseText, step.output, step.id, {
+					response: responseText,
 					stdout: result.stdout,
 					stderr: result.stderr,
 				});
