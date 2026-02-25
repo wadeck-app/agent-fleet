@@ -5485,3 +5485,19 @@ export const MyStory = ({
 ```
 
 **File**: `TasksPage.tsx` line 273-281
+
+## react-markdown v10 Does NOT Support GFM Tables by Default
+
+**Problem**: `react-markdown` v10 uses CommonMark parsing. GFM extensions (tables, strikethrough, autolinks, task lists) are NOT included by default. Defining custom `table`/`th`/`td` components in the `components` prop has no effect if the markdown parser doesn't recognize the table syntax.
+
+**Solution**: Install and configure `remark-gfm` plugin:
+```bash
+npm install remark-gfm
+```
+```tsx
+import remarkGfm from 'remark-gfm';
+
+<ReactMarkdown remarkPlugins={[remarkGfm]} components={{ table: ..., th: ..., td: ... }}>
+```
+
+**File**: `LogEntry.tsx`

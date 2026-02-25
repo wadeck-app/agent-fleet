@@ -202,6 +202,46 @@ describe('LogEntry', () => {
 		expect(screen.queryByTitle('Expand full message')).not.toBeInTheDocument();
 	});
 
+	it('renders GFM tables as HTML table elements', () => {
+		const logWithTable: LogEntryType = {
+			...baseLog,
+			message: 'Here is a table:\n\n| Name | Value |\n|------|-------|\n| Alpha | 100 |\n| Beta | 200 |',
+		};
+
+		const { container } = render(<LogEntry log={logWithTable} />);
+
+		// remark-gfm should parse the table markdown into a real <table>
+		const table = container.querySelector('table');
+		expect(table).toBeInTheDocument();
+
+		// Verify headers
+		const headers = container.querySelectorAll('th');
+		expect(headers).toHaveLength(2);
+		expect(headers[0]).toHaveTextContent('Name');
+		expect(headers[1]).toHaveTextContent('Value');
+
+		// Verify data cells
+		const cells = container.querySelectorAll('td');
+		expect(cells).toHaveLength(4);
+		expect(cells[0]).toHaveTextContent('Alpha');
+		expect(cells[1]).toHaveTextContent('100');
+		expect(cells[2]).toHaveTextContent('Beta');
+		expect(cells[3]).toHaveTextContent('200');
+	});
+
+	it('renders GFM strikethrough text', () => {
+		const logWithStrikethrough: LogEntryType = {
+			...baseLog,
+			message: 'This is ~~deleted~~ text',
+		};
+
+		const { container } = render(<LogEntry log={logWithStrikethrough} />);
+
+		const delElement = container.querySelector('del');
+		expect(delElement).toBeInTheDocument();
+		expect(delElement).toHaveTextContent('deleted');
+	});
+
 	it('expand button click does not trigger row selection', async () => {
 		const user = userEvent.setup();
 		const onClick = vi.fn();

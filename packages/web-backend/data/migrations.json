@@ -2,11 +2,11 @@
 	"migrations": [
 		{
 			"migrated": true,
-			"migratedAt": "2026-02-08T15:24:42.997Z",
-			"id": "jc99b8wdw",
+			"migratedAt": "2026-02-25T12:55:32.105Z",
+			"id": "ag21je1en",
 			"version": 1,
-			"createdAt": "2026-02-08T15:24:42.997Z",
-			"updatedAt": "2026-02-08T15:24:42.997Z"
+			"createdAt": "2026-02-25T12:55:32.105Z",
+			"updatedAt": "2026-02-25T12:55:32.105Z"
 		}
 	]
 }

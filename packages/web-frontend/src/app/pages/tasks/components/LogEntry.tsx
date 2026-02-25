@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 
 import type { LogEntry as LogEntryType } from '@shared/api/tasks.contract';
 import { ChevronsDownUp, ChevronsUpDown, Info } from 'lucide-react';
+import remarkGfm from 'remark-gfm';
 
 interface LogEntryProps {
 	log: LogEntryType;
@@ -58,7 +59,7 @@ export function LogEntry({ log, onExpand, isSelected = false, onClick }: LogEntr
 				return (
 					<>
 						Tool: <strong>{match[1]}</strong>
-						{match[2]}
+						<span className="text-muted-foreground">{match[2]}</span>
 					</>
 				);
 			}
@@ -71,6 +72,7 @@ export function LogEntry({ log, onExpand, isSelected = false, onClick }: LogEntr
 
 		return (
 			<ReactMarkdown
+				remarkPlugins={[remarkGfm]}
 				components={{
 					// Paragraphs: render as div to allow block content, compact spacing
 					p: ({ children }) => <div className="my-0.5">{children}</div>,
@@ -149,9 +151,9 @@ export function LogEntry({ log, onExpand, isSelected = false, onClick }: LogEntr
 							{children}
 						</a>
 					),
-					// Lists: with proper bullets/numbers and indentation
-					ul: ({ children }) => <ul className="my-0.5 ml-4 list-disc">{children}</ul>,
-					ol: ({ children }) => <ol className="my-0.5 ml-4 list-decimal">{children}</ol>,
+					// Lists: list-inside keeps text aligned with surrounding paragraphs
+					ul: ({ children }) => <ul className="my-0.5 list-inside list-disc">{children}</ul>,
+					ol: ({ children }) => <ol className="my-0.5 list-inside list-decimal">{children}</ol>,
 					li: ({ children }) => <li className="my-0">{children}</li>,
 					// Blockquotes
 					blockquote: ({ children }) => (
@@ -223,37 +225,32 @@ export function LogEntry({ log, onExpand, isSelected = false, onClick }: LogEntr
 			{/* Action icons stacked vertically */}
 			<div className="flex flex-col items-center gap-1">
 				{hasMetadata && onExpand && (
-					<span className="cursor-pointer select-none" title="View full log details">
-						<Info
-							className="size-4 text-muted-foreground hover:text-info"
-							onClick={e => {
-								e.stopPropagation();
-								onExpand(log);
-							}}
-						/>
+					<span
+						className="cursor-pointer select-none"
+						title="View full log details"
+						data-testid="log-details"
+						onClick={e => {
+							e.stopPropagation();
+							onExpand(log);
+						}}
+					>
+						<Info className="size-4 text-muted-foreground hover:text-info" />
 					</span>
 				)}
 				{shouldShowExpandButton && (
 					<span
 						className="cursor-pointer select-none"
 						title={isExpanded ? 'Collapse message' : 'Expand full message'}
+						data-testid="log-expand"
+						onClick={e => {
+							e.stopPropagation();
+							setIsExpanded(!isExpanded);
+						}}
 					>
 						{isExpanded ? (
-							<ChevronsDownUp
-								className="size-4 text-muted-foreground hover:text-info"
-								onClick={e => {
-									e.stopPropagation();
-									setIsExpanded(false);
-								}}
-							/>
+							<ChevronsDownUp className="size-4 text-muted-foreground hover:text-info" />
 						) : (
-							<ChevronsUpDown
-								className="size-4 text-muted-foreground hover:text-info"
-								onClick={e => {
-									e.stopPropagation();
-									setIsExpanded(true);
-								}}
-							/>
+							<ChevronsUpDown className="size-4 text-muted-foreground hover:text-info" />
 						)}
 					</span>
 				)}

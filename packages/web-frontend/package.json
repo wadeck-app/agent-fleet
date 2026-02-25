@@ -52,6 +52,7 @@
 		"react-hook-form": "^7.71.1",
 		"react-markdown": "^10.1.0",
 		"react-router-dom": "^7.10.1",
+		"remark-gfm": "^4.0.1",
 		"shadcn": "^3.6.1",
 		"shared-frontend-backend": "*",
 		"tailwind-merge": "^3.4.0",
