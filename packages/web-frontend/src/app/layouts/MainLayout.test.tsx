@@ -78,9 +78,10 @@ describe('MainLayout', () => {
 				</MemoryRouter>
 			);
 
-			expect(screen.queryByText('☰')).not.toBeInTheDocument();
-			expect(screen.queryByText('✕')).not.toBeInTheDocument();
-		});
+		// Look for buttons in the header - desktop layout shouldn't have the mobile menu toggle
+		const buttons = screen.queryAllByRole('button');
+		expect(buttons).toHaveLength(0);
+	});
 
 		it('should render info panel when content is set', () => {
 			function TestComponent() {
@@ -167,7 +168,7 @@ describe('MainLayout', () => {
 				</MemoryRouter>
 			);
 
-			expect(screen.getByText('☰')).toBeInTheDocument();
+			expect(screen.getByRole('button')).toBeInTheDocument();
 		});
 
 		it('should toggle mobile menu when button is clicked', () => {
@@ -184,23 +185,23 @@ describe('MainLayout', () => {
 			expect(navLinks).toHaveLength(0);
 
 			// Open menu
-			const menuButton = screen.getByText('☰');
+			const menuButton = screen.getByRole('button');
 			act(() => {
 				menuButton.click();
 			});
 
 			// Menu now open
-			expect(screen.getByText('✕')).toBeInTheDocument();
+			expect(screen.getByRole('button')).toBeInTheDocument();
 			expect(screen.getByText('Recettes')).toBeInTheDocument();
 
 			// Close menu
-			const closeButton = screen.getByText('✕');
+			const closeButton = screen.getByRole('button');
 			act(() => {
 				closeButton.click();
 			});
 
 			// Menu closed again
-			expect(screen.getByText('☰')).toBeInTheDocument();
+			expect(screen.getByRole('button')).toBeInTheDocument();
 		});
 
 		it('should close mobile menu when nav link is clicked', () => {
@@ -213,7 +214,7 @@ describe('MainLayout', () => {
 			);
 
 			// Open menu
-			const menuButton = screen.getByText('☰');
+			const menuButton = screen.getByRole('button');
 			act(() => {
 				menuButton.click();
 			});
@@ -241,7 +242,7 @@ describe('MainLayout', () => {
 			);
 
 			// Open menu
-			const menuButton = screen.getByText('☰');
+			const menuButton = screen.getByRole('button');
 			act(() => {
 				menuButton.click();
 			});
