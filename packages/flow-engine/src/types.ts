@@ -685,12 +685,25 @@ export interface FlowHooks {
 /**
  * Status transitions configuration for flow completion
  */
-export interface StatusTransitions {
-	/** Task status to set when flow completes successfully */
-	onSuccess: TaskStatus;
+/**
+ * Extended status transition config that can update both a Task and its linked Ticket
+ */
+export interface StatusTransitionConfig {
+	/** Task status to set */
+	task?: TaskStatus;
+	/**
+	 * Ticket status to set on the linked ticket (identified by Task.ticketId)
+	 * Uses string to avoid importing TicketStatus here (validated at runtime)
+	 */
+	ticket?: string;
+}
 
-	/** Task status to set when flow fails */
-	onFailure: TaskStatus;
+export interface StatusTransitions {
+	/** Task status or extended config to apply on flow success */
+	onSuccess: TaskStatus | StatusTransitionConfig;
+
+	/** Task status or extended config to apply on flow failure */
+	onFailure: TaskStatus | StatusTransitionConfig;
 }
 
 /**
