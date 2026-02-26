@@ -1,9 +1,8 @@
+import { useDualListState } from '@framework/hooks/useDualListState';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createControlledPromise } from '@/test/utils/asyncUtils';
-
-import { useDualListState } from './useDualListState';
 
 /**
  * ===========================================================================================

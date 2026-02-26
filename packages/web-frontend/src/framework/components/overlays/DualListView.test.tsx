@@ -1,3 +1,4 @@
+import { Button } from '@framework/components/primitives/Button';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -134,7 +135,7 @@ describe('DualListView - Rendering', () => {
 describe('DualListView - Visual States', () => {
 	it('should pass isLoading=true to renderItem for loading items', () => {
 		const loadingItems = new Set(['item-1']);
-		const renderItem = vi.fn((item, side, visualState) => (
+		const renderItem = vi.fn((item, _side, visualState) => (
 			<div data-testid={`item-${item.id}`} className={visualState.isLoading ? 'loading' : ''}>
 				{item.name}
 			</div>
@@ -170,7 +171,7 @@ describe('DualListView - Visual States', () => {
 
 	it('should pass isReordering=true to renderItem for reordering items', () => {
 		const reorderingItems = new Set(['item-1', 'item-2']);
-		const renderItem = vi.fn((item, side, visualState) => (
+		const renderItem = vi.fn((item, _side, visualState) => (
 			<div data-testid={`item-${item.id}`} className={visualState.isReordering ? 'reordering' : ''}>
 				{item.name}
 			</div>
@@ -213,7 +214,7 @@ describe('DualListView - Visual States', () => {
 	it('should apply both loading and reordering states simultaneously', () => {
 		const loadingItems = new Set(['item-1']);
 		const reorderingItems = new Set(['item-1', 'item-2']);
-		const renderItem = vi.fn((item, side, visualState) => (
+		const renderItem = vi.fn((item, _side, visualState) => (
 			<div
 				data-testid={`item-${item.id}`}
 				className={`${visualState.isLoading ? 'loading' : ''} ${visualState.isReordering ? 'reordering' : ''}`}
@@ -367,7 +368,7 @@ describe('DualListView - Callbacks', () => {
 				renderItem={(item, side, _visualState) => (
 					<div data-testid={`item-${item.id}`}>
 						<span>{item.name}</span>
-						<button
+						<Button
 							onClick={() => {
 								// Consumer decides when to call callbacks
 								if (side === 'left') {
@@ -378,7 +379,7 @@ describe('DualListView - Callbacks', () => {
 							}}
 						>
 							{side === 'left' ? 'Remove' : 'Add'}
-						</button>
+						</Button>
 					</div>
 				)}
 				searchFilter={(item, query) => item.name.toLowerCase().includes(query.toLowerCase())}

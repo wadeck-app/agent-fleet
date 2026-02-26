@@ -1,7 +1,7 @@
 import type { FileEntry } from '@shared/api/workspaceFiles.contract';
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FileTree } from './FileTree';
 import * as useDirectoryListingModule from './useDirectoryListing';
@@ -18,13 +18,18 @@ describe('FileTree', () => {
 		vi.clearAllMocks();
 	});
 
+	afterEach(() => {
+		// Critical: Unmount all components and clean up React state
+		cleanup();
+	});
+
 	it('should render directory entries', async () => {
-		vi.spyOn(useDirectoryListingModule, 'useDirectoryListing').mockReturnValue({
-			entries: mockEntries,
+		vi.spyOn(useDirectoryListingModule, 'useDirectoryListing').mockImplementation((_, path) => ({
+			entries: path === '.' ? mockEntries : [],
 			loading: false,
 			error: null,
 			refresh: vi.fn(),
-		});
+		}));
 
 		render(<FileTree workspaceId="workspace-1" onFileSelect={vi.fn()} selectedPath={null} />);
 
@@ -64,12 +69,12 @@ describe('FileTree', () => {
 		const user = userEvent.setup();
 		const handleFileSelect = vi.fn();
 
-		vi.spyOn(useDirectoryListingModule, 'useDirectoryListing').mockReturnValue({
-			entries: mockEntries,
+		vi.spyOn(useDirectoryListingModule, 'useDirectoryListing').mockImplementation((_, path) => ({
+			entries: path === '.' ? mockEntries : [],
 			loading: false,
 			error: null,
 			refresh: vi.fn(),
-		});
+		}));
 
 		render(<FileTree workspaceId="workspace-1" onFileSelect={handleFileSelect} selectedPath={null} />);
 
@@ -82,12 +87,12 @@ describe('FileTree', () => {
 	it('should expand directory when clicked', async () => {
 		const user = userEvent.setup();
 
-		vi.spyOn(useDirectoryListingModule, 'useDirectoryListing').mockReturnValue({
-			entries: mockEntries,
+		vi.spyOn(useDirectoryListingModule, 'useDirectoryListing').mockImplementation((_, path) => ({
+			entries: path === '.' ? mockEntries : [],
 			loading: false,
 			error: null,
 			refresh: vi.fn(),
-		});
+		}));
 
 		render(<FileTree workspaceId="workspace-1" onFileSelect={vi.fn()} selectedPath={null} />);
 
@@ -99,12 +104,12 @@ describe('FileTree', () => {
 	});
 
 	it('should highlight selected file', async () => {
-		vi.spyOn(useDirectoryListingModule, 'useDirectoryListing').mockReturnValue({
-			entries: mockEntries,
+		vi.spyOn(useDirectoryListingModule, 'useDirectoryListing').mockImplementation((_, path) => ({
+			entries: path === '.' ? mockEntries : [],
 			loading: false,
 			error: null,
 			refresh: vi.fn(),
-		});
+		}));
 
 		render(<FileTree workspaceId="workspace-1" onFileSelect={vi.fn()} selectedPath="README.md" />);
 
@@ -125,12 +130,12 @@ describe('FileTree', () => {
 			{ name: 'dir2', path: 'dir2', type: 'directory' },
 		];
 
-		vi.spyOn(useDirectoryListingModule, 'useDirectoryListing').mockReturnValue({
-			entries: mixedEntries,
+		vi.spyOn(useDirectoryListingModule, 'useDirectoryListing').mockImplementation((_, path) => ({
+			entries: path === '.' ? mixedEntries : [],
 			loading: false,
 			error: null,
 			refresh: vi.fn(),
-		});
+		}));
 
 		render(<FileTree workspaceId="workspace-1" onFileSelect={vi.fn()} selectedPath={null} />);
 

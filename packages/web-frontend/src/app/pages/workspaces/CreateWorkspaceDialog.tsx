@@ -16,14 +16,14 @@ import { TextField } from '@framework/features/forms/fields/TextField';
 import { useFormState } from '@framework/features/forms/useFormState';
 import { useToast } from '@framework/features/toast/ToastContext';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
-import type { CreateWorkspaceDto } from '@shared/api/workspaces.contract';
+import type { CreateWorkspaceDto, Workspace } from '@shared/api/workspaces.contract';
 
 import { workspacesApi } from './workspaces.api';
 
 interface CreateWorkspaceDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	onSuccess: (workspaceId: string) => void;
+	onSuccess: (workspace: Workspace) => void;
 	projectId?: string;
 }
 
@@ -151,7 +151,7 @@ export function CreateWorkspaceDialog({ open, onOpenChange, onSuccess, projectId
 			try {
 				const workspace = await workspacesApi.createWorkspace(createWorkspaceData);
 				showToast('Workspace created successfully', 'success');
-				onSuccess(workspace.id);
+				onSuccess(workspace);
 				onOpenChange(false);
 			} catch (error) {
 				showToast(getErrorMessage(error), 'error');
