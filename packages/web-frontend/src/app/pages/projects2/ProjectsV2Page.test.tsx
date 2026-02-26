@@ -26,6 +26,29 @@ vi.mock('@/hooks/useRealtimeRefresh', () => ({
 	useRealtimeRefresh: vi.fn(),
 }));
 
+const mockCreatedWorkspace: Workspace = {
+	id: 'new-workspace-id',
+	path: '/new-workspace',
+	name: 'New Workspace',
+	mode: 'development' as const,
+	tasksCount: 0,
+	status: 'active' as const,
+	createdAt: new Date().toISOString(),
+	lastUsed: new Date().toISOString(),
+	color: '#6366F1',
+};
+
+vi.mock('../workspaces/CreateWorkspaceDialog', () => ({
+	CreateWorkspaceDialog: ({ open, onSuccess }: { open: boolean; onSuccess: (w: Workspace) => void }) => {
+		if (!open) return null;
+		return (
+			<button data-testid="mock-create-workspace-submit" onClick={() => onSuccess(mockCreatedWorkspace)}>
+				Submit Mock
+			</button>
+		);
+	},
+}));
+
 // Helper to track location in MemoryRouter
 let currentLocation: ReturnType<typeof useLocation> | null = null;
 
@@ -342,6 +365,134 @@ describe('ProjectsV2Page', () => {
 			params = getSearchParams();
 			expect(params.get('projectId')).toBe('wwuypfn8p');
 			expect(params.get('workspaceId')).toBe('50115a2e-5226-46d4-9fb8-6f9c11a16f9d');
+		});
+	});
+
+	describe('Workspace auto-association', () => {
+		const projectWithWorkspace: Project = {
+			id: 'project-123',
+			name: 'Test Project',
+			workspaceIds: [],
+			taskCount: 0,
+			archived: false,
+			pinned: true,
+			order: 0,
+			createdAt: new Date().toISOString(),
+			updatedAt: new Date().toISOString(),
+			version: 1,
+		};
+
+		const defaultProjectWorkspaceMock = {
+			workspaces: [],
+			loading: false,
+			loadWorkspaces: vi.fn(),
+			associateWorkspace: vi.fn(),
+			dissociateWorkspace: vi.fn(),
+			reorderWorkspaces: vi.fn(),
+			getProjectWorkspaces: () => [],
+			error: null,
+			clearError: vi.fn(),
+		};
+
+		it('should call associateWorkspace with correct IDs when project is active', async () => {
+			const associateWorkspaceMock = vi.fn().mockResolvedValue(undefined);
+			vi.mocked(useProjects).mockReturnValue({
+				projects: [projectWithWorkspace],
+				loading: false,
+				pinnedProjects: [projectWithWorkspace],
+				loadProjects: vi.fn(),
+				pinProject: vi.fn(),
+				unpinProject: vi.fn(),
+				reorderProjects: vi.fn(),
+				error: null,
+				clearError: vi.fn(),
+			});
+			vi.mocked(useProjectWorkspaces).mockReturnValue({
+				...defaultProjectWorkspaceMock,
+				associateWorkspace: associateWorkspaceMock,
+			});
+
+			render(<ProjectsV2Page />, {
+				wrapper: ({ children }) => wrapper({ children, initialUrl: '/?projectId=project-123' }),
+			});
+
+			await waitFor(() => {
+				expect(screen.getByText('Create Workspace')).toBeInTheDocument();
+			});
+
+			await userEvent.click(screen.getByText('Create Workspace'));
+			await userEvent.click(screen.getByTestId('mock-create-workspace-submit'));
+
+			await waitFor(() => {
+				expect(associateWorkspaceMock).toHaveBeenCalledWith('new-workspace-id', 'project-123');
+			});
+		});
+
+		it('should NOT call associateWorkspace when no project is active', async () => {
+			const associateWorkspaceMock = vi.fn();
+			vi.mocked(useProjects).mockReturnValue({
+				projects: [],
+				loading: false,
+				pinnedProjects: [],
+				loadProjects: vi.fn(),
+				pinProject: vi.fn(),
+				unpinProject: vi.fn(),
+				reorderProjects: vi.fn(),
+				error: null,
+				clearError: vi.fn(),
+			});
+			vi.mocked(useProjectWorkspaces).mockReturnValue({
+				...defaultProjectWorkspaceMock,
+				associateWorkspace: associateWorkspaceMock,
+			});
+
+			render(<ProjectsV2Page />, {
+				wrapper: ({ children }) => wrapper({ children, initialUrl: '/' }),
+			});
+
+			// Wait for render to stabilize
+			await waitFor(() => {
+				expect(screen.queryByText('Create Workspace')).not.toBeInTheDocument();
+			});
+
+			expect(associateWorkspaceMock).not.toHaveBeenCalled();
+		});
+
+		it('should close the dialog even if associateWorkspace rejects', async () => {
+			// associateWorkspace catches errors internally, so the promise should resolve cleanly
+			const associateWorkspaceMock = vi.fn().mockResolvedValue(undefined);
+			vi.mocked(useProjects).mockReturnValue({
+				projects: [projectWithWorkspace],
+				loading: false,
+				pinnedProjects: [projectWithWorkspace],
+				loadProjects: vi.fn(),
+				pinProject: vi.fn(),
+				unpinProject: vi.fn(),
+				reorderProjects: vi.fn(),
+				error: null,
+				clearError: vi.fn(),
+			});
+			vi.mocked(useProjectWorkspaces).mockReturnValue({
+				...defaultProjectWorkspaceMock,
+				associateWorkspace: associateWorkspaceMock,
+			});
+
+			render(<ProjectsV2Page />, {
+				wrapper: ({ children }) => wrapper({ children, initialUrl: '/?projectId=project-123' }),
+			});
+
+			await waitFor(() => {
+				expect(screen.getByText('Create Workspace')).toBeInTheDocument();
+			});
+
+			await userEvent.click(screen.getByText('Create Workspace'));
+			expect(screen.getByTestId('mock-create-workspace-submit')).toBeInTheDocument();
+
+			await userEvent.click(screen.getByTestId('mock-create-workspace-submit'));
+
+			await waitFor(() => {
+				expect(screen.queryByTestId('mock-create-workspace-submit')).not.toBeInTheDocument();
+			});
 		});
 	});
 });

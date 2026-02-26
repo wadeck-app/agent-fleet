@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Page } from '@framework/components/layout/Page';
 import { SkeletonBox } from '@framework/components/loading/SkeletonBox';
 import type { Project } from '@shared/api/projects.contract';
+import type { Workspace } from '@shared/api/workspaces.contract';
 import {
 	B2F_PROJECT_CREATED,
 	B2F_PROJECT_DELETED,
@@ -245,7 +246,10 @@ export function ProjectsV2Page() {
 		setIsCreateWorkspaceDialogOpen(true);
 	};
 
-	const handleWorkspaceCreated = () => {
+	const handleWorkspaceCreated = async (workspace: Workspace) => {
+		if (activeProject) {
+			await associateWorkspace(workspace.id, activeProject.id);
+		}
 		// Workspaces will be reloaded automatically via WebSocket event
 		setIsCreateWorkspaceDialogOpen(false);
 	};
