@@ -442,10 +442,12 @@ describe('EditProjectDialog', () => {
 			const user = userEvent.setup();
 			const { projectsApi } = await import('./projects.api');
 
-			// Make API call take some time
-			(projectsApi.updateProject as any).mockImplementation(
-				() => new Promise(resolve => setTimeout(() => resolve({ id: 'project-1', version: 2 }), 100))
-			);
+			// Make API call take some time using Promise that never resolves immediately
+			let resolvePromise: (value: any) => void;
+			const pendingPromise = new Promise(resolve => {
+				resolvePromise = resolve;
+			});
+			(projectsApi.updateProject as any).mockReturnValue(pendingPromise);
 
 			render(<EditProjectDialog {...defaultProps} />);
 
@@ -457,6 +459,9 @@ describe('EditProjectDialog', () => {
 			await waitFor(() => {
 				expect(submitButton).toBeDisabled();
 			});
+
+			// Clean up - resolve the promise
+			resolvePromise!({ id: 'project-1', version: 2 });
 		});
 	});
 
@@ -605,7 +610,7 @@ describe('EditProjectDialog', () => {
 		});
 
 		it('should not submit when project is null', async () => {
-			const user = userEvent.setup();
+			const _user = userEvent.setup();
 			const { projectsApi } = await import('./projects.api');
 
 			render(<EditProjectDialog {...defaultProps} project={null} />);

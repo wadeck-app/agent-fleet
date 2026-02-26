@@ -18,6 +18,7 @@
 		"build:frontend": "npm run build --workspace=web-frontend",
 		"build:shared": "npm run build --workspace=shared-common && npm run build --workspace=shared-orch-worker && npm run build --workspace=shared-frontend-backend && npm run build --workspace=shared-orch-backend",
 		"--------------------dev": "",
+		"dev": "concurrently -n backend,frontend,worker,ts -c blue,green,yellow,cyan \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:worker\" \"npm run typecheck:watch:no-pretty\"",
 		"dev:orchestrator": "npm run dev --workspace=orchestrator",
 		"dev:worker": "npm run dev --workspace=worker",
 		"dev:backend": "npm run dev --workspace=web-backend",

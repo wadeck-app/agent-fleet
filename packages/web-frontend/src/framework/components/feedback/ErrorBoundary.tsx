@@ -4,6 +4,7 @@ import { Button } from '@framework/components/primitives/Button';
 import type { AppError } from '@framework/utils/errors/AppError';
 import { ErrorSeverity, toAppError } from '@framework/utils/errors/AppError';
 import { errorLogger } from '@framework/utils/errors/ErrorLogger';
+import { AlertCircle, AlertTriangle, Info } from 'lucide-react';
 
 /**
  * ===========================================================================================
@@ -117,20 +118,21 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 	}
 
 	/**
-	 * Get severity icon
+	 * Get severity icon component
 	 */
-	private getSeverityIcon(severity: ErrorSeverity): string {
+	private getSeverityIcon(severity: ErrorSeverity): ReactNode {
+		const iconClass = 'h-16 w-16';
 		switch (severity) {
 			case ErrorSeverity.LOW:
-				return 'ℹ️';
+				return <Info className={iconClass} />;
 			case ErrorSeverity.MEDIUM:
-				return '⚠️';
+				return <AlertTriangle className={iconClass} />;
 			case ErrorSeverity.HIGH:
-				return '🚨';
+				return <AlertCircle className={iconClass} />;
 			case ErrorSeverity.CRITICAL:
-				return '🚨';
+				return <AlertCircle className={iconClass} />;
 			default:
-				return '⚠️';
+				return <AlertTriangle className={iconClass} />;
 		}
 	}
 
@@ -155,7 +157,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
      `}
 				>
 					<div className="max-w-md space-y-4">
-						<div className="text-6xl">{severityIcon}</div>
+						<div className="flex justify-center">{severityIcon}</div>
 						<h2 className="text-2xl font-bold text-destructive">
 							{error.severity === ErrorSeverity.CRITICAL ? 'Critical Error' : 'Something went wrong'}
 						</h2>

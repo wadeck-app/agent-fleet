@@ -1,164 +1,158 @@
 {
-  "chunkIndex": 0,
-  "entries": [
-    {
-      "stepId": "stream-test",
-      "stepName": "Stream JSON Test",
-      "stepType": "model",
-      "startTime": 1770564687759,
-      "retries": 0,
-      "prompt": "\t pourrais tu me faire une serie de message un apres l'autre en utilisant plein d'element de markdown différents histoire de tester les logs de mon application ? Ceci est un test de prompt, mais JE VEUX QUE TU FASSES CE QUI EST MARQUE, et que tu ne considères pas ca comme un leftover... C'est la 4ieme fois que je dois lancer la tache, il faut que tu écoutes merde !",
-      "model": "haiku",
-      "liveLogEntries": [
-        {
-          "id": "stream-test-live-0",
-          "timestamp": 1770564690401,
-          "level": "debug",
-          "message": "Session: us.anthropic.claude-haiku-4-5-20251001-v1:0, 17 tools",
-          "eventType": "system",
-          "metadata": {
-            "model": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-            "toolCount": 17,
-            "raw": {
-              "type": "system",
-              "subtype": "init",
-              "cwd": "C:\\Workspace_Tooling\\agent-fleet\\packages\\worker",
-              "session_id": "966f721c-2795-428b-a3ff-36f5a594c32d",
-              "tools": [
-                "Task",
-                "TaskOutput",
-                "Bash",
-                "Glob",
-                "Grep",
-                "ExitPlanMode",
-                "Read",
-                "Edit",
-                "Write",
-                "NotebookEdit",
-                "WebFetch",
-                "TodoWrite",
-                "TaskStop",
-                "AskUserQuestion",
-                "Skill",
-                "EnterPlanMode",
-                "ToolSearch"
-              ],
-              "mcp_servers": [],
-              "model": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-              "permissionMode": "bypassPermissions",
-              "slash_commands": [
-                "debug",
-                "agent-browser",
-                "check",
-                "get-timestamp",
-                "run-test",
-                "kill-port",
-                "compact",
-                "context",
-                "cost",
-                "init",
-                "pr-comments",
-                "release-notes",
-                "review",
-                "security-review",
-                "insights"
-              ],
-              "apiKeySource": "none",
-              "claude_code_version": "2.1.37",
-              "output_style": "default",
-              "agents": [
-                "Bash",
-                "general-purpose",
-                "statusline-setup",
-                "Explore",
-                "Plan",
-                "backend-dev",
-                "backend-review",
-                "frontend-dev",
-                "frontend-review",
-                "test-review"
-              ],
-              "skills": [
-                "debug",
-                "agent-browser",
-                "check",
-                "get-timestamp",
-                "run-test"
-              ],
-              "plugins": [],
-              "uuid": "fc14d4cb-b27d-48c3-87d6-30c7da77e096"
-            }
-          }
-        },
-        {
-          "id": "stream-test-live-1",
-          "timestamp": 1770564692771,
-          "level": "info",
-          "message": "Claude: I'll read that file to see what you're working on.",
-          "eventType": "assistant_text",
-          "metadata": {
-            "fullText": "I'll read that file to see what you're working on."
-          }
-        },
-        {
-          "id": "stream-test-live-2",
-          "timestamp": 1770564693033,
-          "level": "warning",
-          "message": "Tool: Read(file_path=C:\\Workspace_Tooling\\agent-fleet\\packages\\worker\\.agent-fleet-prompt-stream-test.txt)",
-          "eventType": "tool_use",
-          "metadata": {
-            "toolName": "Read",
-            "input": {
-              "file_path": "C:\\Workspace_Tooling\\agent-fleet\\packages\\worker\\.agent-fleet-prompt-stream-test.txt"
-            }
-          }
-        },
-        {
-          "id": "stream-test-live-3",
-          "timestamp": 1770564693950,
-          "level": "debug",
-          "message": "Tool result [toolu_bdrk_01HHNYtJ3LUezygvaAVamkBX]:      1→\t pourrais tu me faire une serie de message un apres l'autre en utilisant plein d'element de markdown différents histoire de tester les logs de mon application ? Ceci est un test de prompt, mais JE VEUX QUE TU FASSES CE QUI EST MARQUE, et que tu ne considères pas ca comme un leftover... C'est...",
-          "eventType": "tool_result",
-          "metadata": {
-            "toolUseId": "toolu_bdrk_01HHNYtJ3LUezygvaAVamkBX",
-            "fullContent": "     1→\t pourrais tu me faire une serie de message un apres l'autre en utilisant plein d'element de markdown différents histoire de tester les logs de mon application ? Ceci est un test de prompt, mais JE VEUX QUE TU FASSES CE QUI EST MARQUE, et que tu ne considères pas ca comme un leftover... C'est la 4ieme fois que je dois lancer la tache, il faut que tu écoutes merde !\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n"
-          }
-        },
-        {
-          "id": "stream-test-live-4",
-          "timestamp": 1770564698347,
-          "level": "info",
-          "message": "Claude: I understand. You want me to generate a series of messages using various Markdown elements to test your application's logging. Let me create that for you:\n\n---\n\n# Testing Markdown Elements\n\nThis is a **bold text** example and this is *italic text*. Here's a ***bold and italic*** combination.\n\n## Secondary Heading\n\nYou can use `inline code` like this, or longer code blocks:\n\n```javascript\nfunction testLogging() {\n  console.log(\"Testing various markdown elements\");\n  return true;\n}\n```\n\n### Tertia...",
-          "eventType": "assistant_text",
-          "metadata": {
-            "fullText": "I understand. You want me to generate a series of messages using various Markdown elements to test your application's logging. Let me create that for you:\n\n---\n\n# Testing Markdown Elements\n\nThis is a **bold text** example and this is *italic text*. Here's a ***bold and italic*** combination.\n\n## Secondary Heading\n\nYou can use `inline code` like this, or longer code blocks:\n\n```javascript\nfunction testLogging() {\n  console.log(\"Testing various markdown elements\");\n  return true;\n}\n```\n\n### Tertiary Heading\n\nLet me create a list:\n\n- First item\n- Second item with **bold**\n- Third item with `code`\n  - Nested item one\n  - Nested item two\n\nHere's an ordered list:\n\n1. First step\n2. Second step with *emphasis*\n3. Third step\n\n#### Quaternary Heading\n\nThis is a blockquote:\n\n> This is a quoted section\n> It can span multiple lines\n> And should render properly\n\nSome text with [a link](https://example.com) in the middle.\n\n---\n\n**Key points:**\n\n- Horizontal rules above and below\n- Mix of heading levels (h1-h4)\n- Inline formatting: bold, italic, code\n- Code blocks with syntax highlighting\n- Unordered and ordered lists\n- Nested list items\n- Blockquotes\n- Links\n- Multiple paragraphs\n\n---\n\nThis should give your logging system a comprehensive test of Markdown rendering capabilities. Let me know if you need additional elements tested!"
-          }
-        },
-        {
-          "id": "stream-test-live-5",
-          "timestamp": 1770564698353,
-          "level": "info",
-          "message": "Completed: 2 turns, $? USD, 8.0s",
-          "eventType": "result",
-          "metadata": {
-            "numTurns": 2,
-            "durationMs": 7983,
-            "resultText": "I understand. You want me to generate a series of messages using various Markdown elements to test your application's logging. Let me create that for you:\n\n---\n\n# Testing Markdown Elements\n\nThis is a **bold text** example and this is *italic text*. Here's a ***bold and italic*** combination.\n\n## Secondary Heading\n\nYou can use `inline code` like this, or longer code blocks:\n\n```javascript\nfunction testLogging() {\n  console.log(\"Testing various markdown elements\");\n  return true;\n}\n```\n\n### Tertiary Heading\n\nLet me create a list:\n\n- First item\n- Second item with **bold**\n- Third item with `code`\n  - Nested item one\n  - Nested item two\n\nHere's an ordered list:\n\n1. First step\n2. Second step with *emphasis*\n3. Third step\n\n#### Quaternary Heading\n\nThis is a blockquote:\n\n> This is a quoted section\n> It can span multiple lines\n> And should render properly\n\nSome text with [a link](https://example.com) in the middle.\n\n---\n\n**Key points:**\n\n- Horizontal rules above and below\n- Mix of heading levels (h1-h4)\n- Inline formatting: bold, italic, code\n- Code blocks with syntax highlighting\n- Unordered and ordered lists\n- Nested list items\n- Blockquotes\n- Links\n- Multiple paragraphs\n\n---\n\nThis should give your logging system a comprehensive test of Markdown rendering capabilities. Let me know if you need additional elements tested!"
-          }
-        }
-      ],
-      "response": "I understand. You want me to generate a series of messages using various Markdown elements to test your application's logging. Let me create that for you:\n\n---\n\n# Testing Markdown Elements\n\nThis is a **bold text** example and this is *italic text*. Here's a ***bold and italic*** combination.\n\n## Secondary Heading\n\nYou can use `inline code` like this, or longer code blocks:\n\n```javascript\nfunction testLogging() {\n  console.log(\"Testing various markdown elements\");\n  return true;\n}\n```\n\n### Tertiary Heading\n\nLet me create a list:\n\n- First item\n- Second item with **bold**\n- Third item with `code`\n  - Nested item one\n  - Nested item two\n\nHere's an ordered list:\n\n1. First step\n2. Second step with *emphasis*\n3. Third step\n\n#### Quaternary Heading\n\nThis is a blockquote:\n\n> This is a quoted section\n> It can span multiple lines\n> And should render properly\n\nSome text with [a link](https://example.com) in the middle.\n\n---\n\n**Key points:**\n\n- Horizontal rules above and below\n- Mix of heading levels (h1-h4)\n- Inline formatting: bold, italic, code\n- Code blocks with syntax highlighting\n- Unordered and ordered lists\n- Nested list items\n- Blockquotes\n- Links\n- Multiple paragraphs\n\n---\n\nThis should give your logging system a comprehensive test of Markdown rendering capabilities. Let me know if you need additional elements tested!",
-      "stdout": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\",\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"tools\":[\"Task\",\"TaskOutput\",\"Bash\",\"Glob\",\"Grep\",\"ExitPlanMode\",\"Read\",\"Edit\",\"Write\",\"NotebookEdit\",\"WebFetch\",\"TodoWrite\",\"TaskStop\",\"AskUserQuestion\",\"Skill\",\"EnterPlanMode\",\"ToolSearch\"],\"mcp_servers\":[],\"model\":\"us.anthropic.claude-haiku-4-5-20251001-v1:0\",\"permissionMode\":\"bypassPermissions\",\"slash_commands\":[\"debug\",\"agent-browser\",\"check\",\"get-timestamp\",\"run-test\",\"kill-port\",\"compact\",\"context\",\"cost\",\"init\",\"pr-comments\",\"release-notes\",\"review\",\"security-review\",\"insights\"],\"apiKeySource\":\"none\",\"claude_code_version\":\"2.1.37\",\"output_style\":\"default\",\"agents\":[\"Bash\",\"general-purpose\",\"statusline-setup\",\"Explore\",\"Plan\",\"backend-dev\",\"backend-review\",\"frontend-dev\",\"frontend-review\",\"test-review\"],\"skills\":[\"debug\",\"agent-browser\",\"check\",\"get-timestamp\",\"run-test\"],\"plugins\":[],\"uuid\":\"fc14d4cb-b27d-48c3-87d6-30c7da77e096\"}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_01AAT1UhVXC8QUFEAcdQYQkG\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"I'll read that file to see what you're working on.\"}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":3,\"cache_creation_input_tokens\":5701,\"cache_read_input_tokens\":15672,\"cache_creation\":{\"ephemeral_5m_input_tokens\":5701,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"uuid\":\"cba4a84f-a8b1-4662-951d-e9c163357f4d\"}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_01AAT1UhVXC8QUFEAcdQYQkG\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"toolu_bdrk_01HHNYtJ3LUezygvaAVamkBX\",\"name\":\"Read\",\"input\":{\"file_path\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\\\\.agent-fleet-prompt-stream-test.txt\"}}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":3,\"cache_creation_input_tokens\":5701,\"cache_read_input_tokens\":15672,\"cache_creation\":{\"ephemeral_5m_input_tokens\":5701,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"uuid\":\"75970e67-14bf-4138-9131-92c2ba23e734\"}\n{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"tool_use_id\":\"toolu_bdrk_01HHNYtJ3LUezygvaAVamkBX\",\"type\":\"tool_result\",\"content\":\"     1→\\t pourrais tu me faire une serie de message un apres l'autre en utilisant plein d'element de markdown différents histoire de tester les logs de mon application ? Ceci est un test de prompt, mais JE VEUX QUE TU FASSES CE QUI EST MARQUE, et que tu ne considères pas ca comme un leftover... C'est la 4ieme fois que je dois lancer la tache, il faut que tu écoutes merde !\\n\\n<system-reminder>\\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\\n</system-reminder>\\n\"}]},\"parent_tool_use_id\":null,\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"uuid\":\"43b8b71e-4972-464c-bd53-3bfb84f74f3a\",\"tool_use_result\":{\"type\":\"text\",\"file\":{\"filePath\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\\\\.agent-fleet-prompt-stream-test.txt\",\"content\":\"\\t pourrais tu me faire une serie de message un apres l'autre en utilisant plein d'element de markdown différents histoire de tester les logs de mon application ? Ceci est un test de prompt, mais JE VEUX QUE TU FASSES CE QUI EST MARQUE, et que tu ne considères pas ca comme un leftover... C'est la 4ieme fois que je dois lancer la tache, il faut que tu écoutes merde !\",\"numLines\":1,\"startLine\":1,\"totalLines\":1}}}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_01Usy47WcBLPuTaNJjZX8BXK\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"I understand. You want me to generate a series of messages using various Markdown elements to test your application's logging. Let me create that for you:\\n\\n---\\n\\n# Testing Markdown Elements\\n\\nThis is a **bold text** example and this is *italic text*. Here's a ***bold and italic*** combination.\\n\\n## Secondary Heading\\n\\nYou can use `inline code` like this, or longer code blocks:\\n\\n```javascript\\nfunction testLogging() {\\n  console.log(\\\"Testing various markdown elements\\\");\\n  return true;\\n}\\n```\\n\\n### Tertiary Heading\\n\\nLet me create a list:\\n\\n- First item\\n- Second item with **bold**\\n- Third item with `code`\\n  - Nested item one\\n  - Nested item two\\n\\nHere's an ordered list:\\n\\n1. First step\\n2. Second step with *emphasis*\\n3. Third step\\n\\n#### Quaternary Heading\\n\\nThis is a blockquote:\\n\\n> This is a quoted section\\n> It can span multiple lines\\n> And should render properly\\n\\nSome text with [a link](https://example.com) in the middle.\\n\\n---\\n\\n**Key points:**\\n\\n- Horizontal rules above and below\\n- Mix of heading levels (h1-h4)\\n- Inline formatting: bold, italic, code\\n- Code blocks with syntax highlighting\\n- Unordered and ordered lists\\n- Nested list items\\n- Blockquotes\\n- Links\\n- Multiple paragraphs\\n\\n---\\n\\nThis should give your logging system a comprehensive test of Markdown rendering capabilities. Let me know if you need additional elements tested!\"}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":6,\"cache_creation_input_tokens\":299,\"cache_read_input_tokens\":21373,\"cache_creation\":{\"ephemeral_5m_input_tokens\":299,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"uuid\":\"97d35c06-cb7c-4e97-b7fa-82bb9b8a5ad4\"}\n{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"duration_ms\":7983,\"duration_api_ms\":7028,\"num_turns\":2,\"result\":\"I understand. You want me to generate a series of messages using various Markdown elements to test your application's logging. Let me create that for you:\\n\\n---\\n\\n# Testing Markdown Elements\\n\\nThis is a **bold text** example and this is *italic text*. Here's a ***bold and italic*** combination.\\n\\n## Secondary Heading\\n\\nYou can use `inline code` like this, or longer code blocks:\\n\\n```javascript\\nfunction testLogging() {\\n  console.log(\\\"Testing various markdown elements\\\");\\n  return true;\\n}\\n```\\n\\n### Tertiary Heading\\n\\nLet me create a list:\\n\\n- First item\\n- Second item with **bold**\\n- Third item with `code`\\n  - Nested item one\\n  - Nested item two\\n\\nHere's an ordered list:\\n\\n1. First step\\n2. Second step with *emphasis*\\n3. Third step\\n\\n#### Quaternary Heading\\n\\nThis is a blockquote:\\n\\n> This is a quoted section\\n> It can span multiple lines\\n> And should render properly\\n\\nSome text with [a link](https://example.com) in the middle.\\n\\n---\\n\\n**Key points:**\\n\\n- Horizontal rules above and below\\n- Mix of heading levels (h1-h4)\\n- Inline formatting: bold, italic, code\\n- Code blocks with syntax highlighting\\n- Unordered and ordered lists\\n- Nested list items\\n- Blockquotes\\n- Links\\n- Multiple paragraphs\\n\\n---\\n\\nThis should give your logging system a comprehensive test of Markdown rendering capabilities. Let me know if you need additional elements tested!\",\"stop_reason\":null,\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"total_cost_usd\":0.013438499999999999,\"usage\":{\"input_tokens\":9,\"cache_creation_input_tokens\":6000,\"cache_read_input_tokens\":37045,\"output_tokens\":445,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":6000}},\"modelUsage\":{\"us.anthropic.claude-haiku-4-5-20251001-v1:0\":{\"inputTokens\":9,\"outputTokens\":445,\"cacheReadInputTokens\":37045,\"cacheCreationInputTokens\":6000,\"webSearchRequests\":0,\"costUSD\":0.013438499999999999,\"contextWindow\":200000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"uuid\":\"92d1251a-25f2-4cf2-890b-4ab8fdea467a\"}\n",
-      "stderr": "",
-      "exitCode": 0,
-      "endTime": 1770564698399,
-      "durationMs": 10640,
-      "outputs": {
-        "rawOutput": "I understand. You want me to generate a series of messages using various Markdown elements to test your application's logging. Let me create that for you:\n\n---\n\n# Testing Markdown Elements\n\nThis is a **bold text** example and this is *italic text*. Here's a ***bold and italic*** combination.\n\n## Secondary Heading\n\nYou can use `inline code` like this, or longer code blocks:\n\n```javascript\nfunction testLogging() {\n  console.log(\"Testing various markdown elements\");\n  return true;\n}\n```\n\n### Tertiary Heading\n\nLet me create a list:\n\n- First item\n- Second item with **bold**\n- Third item with `code`\n  - Nested item one\n  - Nested item two\n\nHere's an ordered list:\n\n1. First step\n2. Second step with *emphasis*\n3. Third step\n\n#### Quaternary Heading\n\nThis is a blockquote:\n\n> This is a quoted section\n> It can span multiple lines\n> And should render properly\n\nSome text with [a link](https://example.com) in the middle.\n\n---\n\n**Key points:**\n\n- Horizontal rules above and below\n- Mix of heading levels (h1-h4)\n- Inline formatting: bold, italic, code\n- Code blocks with syntax highlighting\n- Unordered and ordered lists\n- Nested list items\n- Blockquotes\n- Links\n- Multiple paragraphs\n\n---\n\nThis should give your logging system a comprehensive test of Markdown rendering capabilities. Let me know if you need additional elements tested!",
-        "response": "I understand. You want me to generate a series of messages using various Markdown elements to test your application's logging. Let me create that for you:\n\n---\n\n# Testing Markdown Elements\n\nThis is a **bold text** example and this is *italic text*. Here's a ***bold and italic*** combination.\n\n## Secondary Heading\n\nYou can use `inline code` like this, or longer code blocks:\n\n```javascript\nfunction testLogging() {\n  console.log(\"Testing various markdown elements\");\n  return true;\n}\n```\n\n### Tertiary Heading\n\nLet me create a list:\n\n- First item\n- Second item with **bold**\n- Third item with `code`\n  - Nested item one\n  - Nested item two\n\nHere's an ordered list:\n\n1. First step\n2. Second step with *emphasis*\n3. Third step\n\n#### Quaternary Heading\n\nThis is a blockquote:\n\n> This is a quoted section\n> It can span multiple lines\n> And should render properly\n\nSome text with [a link](https://example.com) in the middle.\n\n---\n\n**Key points:**\n\n- Horizontal rules above and below\n- Mix of heading levels (h1-h4)\n- Inline formatting: bold, italic, code\n- Code blocks with syntax highlighting\n- Unordered and ordered lists\n- Nested list items\n- Blockquotes\n- Links\n- Multiple paragraphs\n\n---\n\nThis should give your logging system a comprehensive test of Markdown rendering capabilities. Let me know if you need additional elements tested!",
-        "stdout": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\",\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"tools\":[\"Task\",\"TaskOutput\",\"Bash\",\"Glob\",\"Grep\",\"ExitPlanMode\",\"Read\",\"Edit\",\"Write\",\"NotebookEdit\",\"WebFetch\",\"TodoWrite\",\"TaskStop\",\"AskUserQuestion\",\"Skill\",\"EnterPlanMode\",\"ToolSearch\"],\"mcp_servers\":[],\"model\":\"us.anthropic.claude-haiku-4-5-20251001-v1:0\",\"permissionMode\":\"bypassPermissions\",\"slash_commands\":[\"debug\",\"agent-browser\",\"check\",\"get-timestamp\",\"run-test\",\"kill-port\",\"compact\",\"context\",\"cost\",\"init\",\"pr-comments\",\"release-notes\",\"review\",\"security-review\",\"insights\"],\"apiKeySource\":\"none\",\"claude_code_version\":\"2.1.37\",\"output_style\":\"default\",\"agents\":[\"Bash\",\"general-purpose\",\"statusline-setup\",\"Explore\",\"Plan\",\"backend-dev\",\"backend-review\",\"frontend-dev\",\"frontend-review\",\"test-review\"],\"skills\":[\"debug\",\"agent-browser\",\"check\",\"get-timestamp\",\"run-test\"],\"plugins\":[],\"uuid\":\"fc14d4cb-b27d-48c3-87d6-30c7da77e096\"}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_01AAT1UhVXC8QUFEAcdQYQkG\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"I'll read that file to see what you're working on.\"}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":3,\"cache_creation_input_tokens\":5701,\"cache_read_input_tokens\":15672,\"cache_creation\":{\"ephemeral_5m_input_tokens\":5701,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"uuid\":\"cba4a84f-a8b1-4662-951d-e9c163357f4d\"}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_01AAT1UhVXC8QUFEAcdQYQkG\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"toolu_bdrk_01HHNYtJ3LUezygvaAVamkBX\",\"name\":\"Read\",\"input\":{\"file_path\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\\\\.agent-fleet-prompt-stream-test.txt\"}}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":3,\"cache_creation_input_tokens\":5701,\"cache_read_input_tokens\":15672,\"cache_creation\":{\"ephemeral_5m_input_tokens\":5701,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"uuid\":\"75970e67-14bf-4138-9131-92c2ba23e734\"}\n{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"tool_use_id\":\"toolu_bdrk_01HHNYtJ3LUezygvaAVamkBX\",\"type\":\"tool_result\",\"content\":\"     1→\\t pourrais tu me faire une serie de message un apres l'autre en utilisant plein d'element de markdown différents histoire de tester les logs de mon application ? Ceci est un test de prompt, mais JE VEUX QUE TU FASSES CE QUI EST MARQUE, et que tu ne considères pas ca comme un leftover... C'est la 4ieme fois que je dois lancer la tache, il faut que tu écoutes merde !\\n\\n<system-reminder>\\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\\n</system-reminder>\\n\"}]},\"parent_tool_use_id\":null,\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"uuid\":\"43b8b71e-4972-464c-bd53-3bfb84f74f3a\",\"tool_use_result\":{\"type\":\"text\",\"file\":{\"filePath\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\\\\.agent-fleet-prompt-stream-test.txt\",\"content\":\"\\t pourrais tu me faire une serie de message un apres l'autre en utilisant plein d'element de markdown différents histoire de tester les logs de mon application ? Ceci est un test de prompt, mais JE VEUX QUE TU FASSES CE QUI EST MARQUE, et que tu ne considères pas ca comme un leftover... C'est la 4ieme fois que je dois lancer la tache, il faut que tu écoutes merde !\",\"numLines\":1,\"startLine\":1,\"totalLines\":1}}}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_01Usy47WcBLPuTaNJjZX8BXK\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"I understand. You want me to generate a series of messages using various Markdown elements to test your application's logging. Let me create that for you:\\n\\n---\\n\\n# Testing Markdown Elements\\n\\nThis is a **bold text** example and this is *italic text*. Here's a ***bold and italic*** combination.\\n\\n## Secondary Heading\\n\\nYou can use `inline code` like this, or longer code blocks:\\n\\n```javascript\\nfunction testLogging() {\\n  console.log(\\\"Testing various markdown elements\\\");\\n  return true;\\n}\\n```\\n\\n### Tertiary Heading\\n\\nLet me create a list:\\n\\n- First item\\n- Second item with **bold**\\n- Third item with `code`\\n  - Nested item one\\n  - Nested item two\\n\\nHere's an ordered list:\\n\\n1. First step\\n2. Second step with *emphasis*\\n3. Third step\\n\\n#### Quaternary Heading\\n\\nThis is a blockquote:\\n\\n> This is a quoted section\\n> It can span multiple lines\\n> And should render properly\\n\\nSome text with [a link](https://example.com) in the middle.\\n\\n---\\n\\n**Key points:**\\n\\n- Horizontal rules above and below\\n- Mix of heading levels (h1-h4)\\n- Inline formatting: bold, italic, code\\n- Code blocks with syntax highlighting\\n- Unordered and ordered lists\\n- Nested list items\\n- Blockquotes\\n- Links\\n- Multiple paragraphs\\n\\n---\\n\\nThis should give your logging system a comprehensive test of Markdown rendering capabilities. Let me know if you need additional elements tested!\"}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":6,\"cache_creation_input_tokens\":299,\"cache_read_input_tokens\":21373,\"cache_creation\":{\"ephemeral_5m_input_tokens\":299,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"uuid\":\"97d35c06-cb7c-4e97-b7fa-82bb9b8a5ad4\"}\n{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"duration_ms\":7983,\"duration_api_ms\":7028,\"num_turns\":2,\"result\":\"I understand. You want me to generate a series of messages using various Markdown elements to test your application's logging. Let me create that for you:\\n\\n---\\n\\n# Testing Markdown Elements\\n\\nThis is a **bold text** example and this is *italic text*. Here's a ***bold and italic*** combination.\\n\\n## Secondary Heading\\n\\nYou can use `inline code` like this, or longer code blocks:\\n\\n```javascript\\nfunction testLogging() {\\n  console.log(\\\"Testing various markdown elements\\\");\\n  return true;\\n}\\n```\\n\\n### Tertiary Heading\\n\\nLet me create a list:\\n\\n- First item\\n- Second item with **bold**\\n- Third item with `code`\\n  - Nested item one\\n  - Nested item two\\n\\nHere's an ordered list:\\n\\n1. First step\\n2. Second step with *emphasis*\\n3. Third step\\n\\n#### Quaternary Heading\\n\\nThis is a blockquote:\\n\\n> This is a quoted section\\n> It can span multiple lines\\n> And should render properly\\n\\nSome text with [a link](https://example.com) in the middle.\\n\\n---\\n\\n**Key points:**\\n\\n- Horizontal rules above and below\\n- Mix of heading levels (h1-h4)\\n- Inline formatting: bold, italic, code\\n- Code blocks with syntax highlighting\\n- Unordered and ordered lists\\n- Nested list items\\n- Blockquotes\\n- Links\\n- Multiple paragraphs\\n\\n---\\n\\nThis should give your logging system a comprehensive test of Markdown rendering capabilities. Let me know if you need additional elements tested!\",\"stop_reason\":null,\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"total_cost_usd\":0.013438499999999999,\"usage\":{\"input_tokens\":9,\"cache_creation_input_tokens\":6000,\"cache_read_input_tokens\":37045,\"output_tokens\":445,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":6000}},\"modelUsage\":{\"us.anthropic.claude-haiku-4-5-20251001-v1:0\":{\"inputTokens\":9,\"outputTokens\":445,\"cacheReadInputTokens\":37045,\"cacheCreationInputTokens\":6000,\"webSearchRequests\":0,\"costUSD\":0.013438499999999999,\"contextWindow\":200000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"uuid\":\"92d1251a-25f2-4cf2-890b-4ab8fdea467a\"}\n",
-        "stderr": ""
-      }
-    }
-  ]
+	"chunkIndex": 0,
+	"entries": [
+		{
+			"stepId": "stream-test",
+			"stepName": "Stream JSON Test",
+			"stepType": "model",
+			"startTime": 1770564687759,
+			"retries": 0,
+			"prompt": "\t pourrais tu me faire une serie de message un apres l'autre en utilisant plein d'element de markdown différents histoire de tester les logs de mon application ? Ceci est un test de prompt, mais JE VEUX QUE TU FASSES CE QUI EST MARQUE, et que tu ne considères pas ca comme un leftover... C'est la 4ieme fois que je dois lancer la tache, il faut que tu écoutes merde !",
+			"model": "haiku",
+			"liveLogEntries": [
+				{
+					"id": "stream-test-live-0",
+					"timestamp": 1770564690401,
+					"level": "debug",
+					"message": "Session: us.anthropic.claude-haiku-4-5-20251001-v1:0, 17 tools",
+					"eventType": "system",
+					"metadata": {
+						"model": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+						"toolCount": 17,
+						"raw": {
+							"type": "system",
+							"subtype": "init",
+							"cwd": "C:\\Workspace_Tooling\\agent-fleet\\packages\\worker",
+							"session_id": "966f721c-2795-428b-a3ff-36f5a594c32d",
+							"tools": [
+								"Task",
+								"TaskOutput",
+								"Bash",
+								"Glob",
+								"Grep",
+								"ExitPlanMode",
+								"Read",
+								"Edit",
+								"Write",
+								"NotebookEdit",
+								"WebFetch",
+								"TodoWrite",
+								"TaskStop",
+								"AskUserQuestion",
+								"Skill",
+								"EnterPlanMode",
+								"ToolSearch"
+							],
+							"mcp_servers": [],
+							"model": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+							"permissionMode": "bypassPermissions",
+							"slash_commands": [
+								"debug",
+								"agent-browser",
+								"check",
+								"get-timestamp",
+								"run-test",
+								"kill-port",
+								"compact",
+								"context",
+								"cost",
+								"init",
+								"pr-comments",
+								"release-notes",
+								"review",
+								"security-review",
+								"insights"
+							],
+							"apiKeySource": "none",
+							"claude_code_version": "2.1.37",
+							"output_style": "default",
+							"agents": [
+								"Bash",
+								"general-purpose",
+								"statusline-setup",
+								"Explore",
+								"Plan",
+								"backend-dev",
+								"backend-review",
+								"frontend-dev",
+								"frontend-review",
+								"test-review"
+							],
+							"skills": ["debug", "agent-browser", "check", "get-timestamp", "run-test"],
+							"plugins": [],
+							"uuid": "fc14d4cb-b27d-48c3-87d6-30c7da77e096"
+						}
+					}
+				},
+				{
+					"id": "stream-test-live-1",
+					"timestamp": 1770564692771,
+					"level": "info",
+					"message": "Claude: I'll read that file to see what you're working on.",
+					"eventType": "assistant_text",
+					"metadata": {
+						"fullText": "I'll read that file to see what you're working on."
+					}
+				},
+				{
+					"id": "stream-test-live-2",
+					"timestamp": 1770564693033,
+					"level": "warning",
+					"message": "Tool: Read(file_path=C:\\Workspace_Tooling\\agent-fleet\\packages\\worker\\.agent-fleet-prompt-stream-test.txt)",
+					"eventType": "tool_use",
+					"metadata": {
+						"toolName": "Read",
+						"input": {
+							"file_path": "C:\\Workspace_Tooling\\agent-fleet\\packages\\worker\\.agent-fleet-prompt-stream-test.txt"
+						}
+					}
+				},
+				{
+					"id": "stream-test-live-3",
+					"timestamp": 1770564693950,
+					"level": "debug",
+					"message": "Tool result [toolu_bdrk_01HHNYtJ3LUezygvaAVamkBX]:      1→\t pourrais tu me faire une serie de message un apres l'autre en utilisant plein d'element de markdown différents histoire de tester les logs de mon application ? Ceci est un test de prompt, mais JE VEUX QUE TU FASSES CE QUI EST MARQUE, et que tu ne considères pas ca comme un leftover... C'est...",
+					"eventType": "tool_result",
+					"metadata": {
+						"toolUseId": "toolu_bdrk_01HHNYtJ3LUezygvaAVamkBX",
+						"fullContent": "     1→\t pourrais tu me faire une serie de message un apres l'autre en utilisant plein d'element de markdown différents histoire de tester les logs de mon application ? Ceci est un test de prompt, mais JE VEUX QUE TU FASSES CE QUI EST MARQUE, et que tu ne considères pas ca comme un leftover... C'est la 4ieme fois que je dois lancer la tache, il faut que tu écoutes merde !\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n"
+					}
+				},
+				{
+					"id": "stream-test-live-4",
+					"timestamp": 1770564698347,
+					"level": "info",
+					"message": "Claude: I understand. You want me to generate a series of messages using various Markdown elements to test your application's logging. Let me create that for you:\n\n---\n\n# Testing Markdown Elements\n\nThis is a **bold text** example and this is *italic text*. Here's a ***bold and italic*** combination.\n\n## Secondary Heading\n\nYou can use `inline code` like this, or longer code blocks:\n\n```javascript\nfunction testLogging() {\n  console.log(\"Testing various markdown elements\");\n  return true;\n}\n```\n\n### Tertia...",
+					"eventType": "assistant_text",
+					"metadata": {
+						"fullText": "I understand. You want me to generate a series of messages using various Markdown elements to test your application's logging. Let me create that for you:\n\n---\n\n# Testing Markdown Elements\n\nThis is a **bold text** example and this is *italic text*. Here's a ***bold and italic*** combination.\n\n## Secondary Heading\n\nYou can use `inline code` like this, or longer code blocks:\n\n```javascript\nfunction testLogging() {\n  console.log(\"Testing various markdown elements\");\n  return true;\n}\n```\n\n### Tertiary Heading\n\nLet me create a list:\n\n- First item\n- Second item with **bold**\n- Third item with `code`\n  - Nested item one\n  - Nested item two\n\nHere's an ordered list:\n\n1. First step\n2. Second step with *emphasis*\n3. Third step\n\n#### Quaternary Heading\n\nThis is a blockquote:\n\n> This is a quoted section\n> It can span multiple lines\n> And should render properly\n\nSome text with [a link](https://example.com) in the middle.\n\n---\n\n**Key points:**\n\n- Horizontal rules above and below\n- Mix of heading levels (h1-h4)\n- Inline formatting: bold, italic, code\n- Code blocks with syntax highlighting\n- Unordered and ordered lists\n- Nested list items\n- Blockquotes\n- Links\n- Multiple paragraphs\n\n---\n\nThis should give your logging system a comprehensive test of Markdown rendering capabilities. Let me know if you need additional elements tested!"
+					}
+				},
+				{
+					"id": "stream-test-live-5",
+					"timestamp": 1770564698353,
+					"level": "info",
+					"message": "Completed: 2 turns, $? USD, 8.0s",
+					"eventType": "result",
+					"metadata": {
+						"numTurns": 2,
+						"durationMs": 7983,
+						"resultText": "I understand. You want me to generate a series of messages using various Markdown elements to test your application's logging. Let me create that for you:\n\n---\n\n# Testing Markdown Elements\n\nThis is a **bold text** example and this is *italic text*. Here's a ***bold and italic*** combination.\n\n## Secondary Heading\n\nYou can use `inline code` like this, or longer code blocks:\n\n```javascript\nfunction testLogging() {\n  console.log(\"Testing various markdown elements\");\n  return true;\n}\n```\n\n### Tertiary Heading\n\nLet me create a list:\n\n- First item\n- Second item with **bold**\n- Third item with `code`\n  - Nested item one\n  - Nested item two\n\nHere's an ordered list:\n\n1. First step\n2. Second step with *emphasis*\n3. Third step\n\n#### Quaternary Heading\n\nThis is a blockquote:\n\n> This is a quoted section\n> It can span multiple lines\n> And should render properly\n\nSome text with [a link](https://example.com) in the middle.\n\n---\n\n**Key points:**\n\n- Horizontal rules above and below\n- Mix of heading levels (h1-h4)\n- Inline formatting: bold, italic, code\n- Code blocks with syntax highlighting\n- Unordered and ordered lists\n- Nested list items\n- Blockquotes\n- Links\n- Multiple paragraphs\n\n---\n\nThis should give your logging system a comprehensive test of Markdown rendering capabilities. Let me know if you need additional elements tested!"
+					}
+				}
+			],
+			"response": "I understand. You want me to generate a series of messages using various Markdown elements to test your application's logging. Let me create that for you:\n\n---\n\n# Testing Markdown Elements\n\nThis is a **bold text** example and this is *italic text*. Here's a ***bold and italic*** combination.\n\n## Secondary Heading\n\nYou can use `inline code` like this, or longer code blocks:\n\n```javascript\nfunction testLogging() {\n  console.log(\"Testing various markdown elements\");\n  return true;\n}\n```\n\n### Tertiary Heading\n\nLet me create a list:\n\n- First item\n- Second item with **bold**\n- Third item with `code`\n  - Nested item one\n  - Nested item two\n\nHere's an ordered list:\n\n1. First step\n2. Second step with *emphasis*\n3. Third step\n\n#### Quaternary Heading\n\nThis is a blockquote:\n\n> This is a quoted section\n> It can span multiple lines\n> And should render properly\n\nSome text with [a link](https://example.com) in the middle.\n\n---\n\n**Key points:**\n\n- Horizontal rules above and below\n- Mix of heading levels (h1-h4)\n- Inline formatting: bold, italic, code\n- Code blocks with syntax highlighting\n- Unordered and ordered lists\n- Nested list items\n- Blockquotes\n- Links\n- Multiple paragraphs\n\n---\n\nThis should give your logging system a comprehensive test of Markdown rendering capabilities. Let me know if you need additional elements tested!",
+			"stdout": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\",\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"tools\":[\"Task\",\"TaskOutput\",\"Bash\",\"Glob\",\"Grep\",\"ExitPlanMode\",\"Read\",\"Edit\",\"Write\",\"NotebookEdit\",\"WebFetch\",\"TodoWrite\",\"TaskStop\",\"AskUserQuestion\",\"Skill\",\"EnterPlanMode\",\"ToolSearch\"],\"mcp_servers\":[],\"model\":\"us.anthropic.claude-haiku-4-5-20251001-v1:0\",\"permissionMode\":\"bypassPermissions\",\"slash_commands\":[\"debug\",\"agent-browser\",\"check\",\"get-timestamp\",\"run-test\",\"kill-port\",\"compact\",\"context\",\"cost\",\"init\",\"pr-comments\",\"release-notes\",\"review\",\"security-review\",\"insights\"],\"apiKeySource\":\"none\",\"claude_code_version\":\"2.1.37\",\"output_style\":\"default\",\"agents\":[\"Bash\",\"general-purpose\",\"statusline-setup\",\"Explore\",\"Plan\",\"backend-dev\",\"backend-review\",\"frontend-dev\",\"frontend-review\",\"test-review\"],\"skills\":[\"debug\",\"agent-browser\",\"check\",\"get-timestamp\",\"run-test\"],\"plugins\":[],\"uuid\":\"fc14d4cb-b27d-48c3-87d6-30c7da77e096\"}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_01AAT1UhVXC8QUFEAcdQYQkG\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"I'll read that file to see what you're working on.\"}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":3,\"cache_creation_input_tokens\":5701,\"cache_read_input_tokens\":15672,\"cache_creation\":{\"ephemeral_5m_input_tokens\":5701,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"uuid\":\"cba4a84f-a8b1-4662-951d-e9c163357f4d\"}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_01AAT1UhVXC8QUFEAcdQYQkG\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"toolu_bdrk_01HHNYtJ3LUezygvaAVamkBX\",\"name\":\"Read\",\"input\":{\"file_path\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\\\\.agent-fleet-prompt-stream-test.txt\"}}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":3,\"cache_creation_input_tokens\":5701,\"cache_read_input_tokens\":15672,\"cache_creation\":{\"ephemeral_5m_input_tokens\":5701,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"uuid\":\"75970e67-14bf-4138-9131-92c2ba23e734\"}\n{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"tool_use_id\":\"toolu_bdrk_01HHNYtJ3LUezygvaAVamkBX\",\"type\":\"tool_result\",\"content\":\"     1→\\t pourrais tu me faire une serie de message un apres l'autre en utilisant plein d'element de markdown différents histoire de tester les logs de mon application ? Ceci est un test de prompt, mais JE VEUX QUE TU FASSES CE QUI EST MARQUE, et que tu ne considères pas ca comme un leftover... C'est la 4ieme fois que je dois lancer la tache, il faut que tu écoutes merde !\\n\\n<system-reminder>\\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\\n</system-reminder>\\n\"}]},\"parent_tool_use_id\":null,\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"uuid\":\"43b8b71e-4972-464c-bd53-3bfb84f74f3a\",\"tool_use_result\":{\"type\":\"text\",\"file\":{\"filePath\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\\\\.agent-fleet-prompt-stream-test.txt\",\"content\":\"\\t pourrais tu me faire une serie de message un apres l'autre en utilisant plein d'element de markdown différents histoire de tester les logs de mon application ? Ceci est un test de prompt, mais JE VEUX QUE TU FASSES CE QUI EST MARQUE, et que tu ne considères pas ca comme un leftover... C'est la 4ieme fois que je dois lancer la tache, il faut que tu écoutes merde !\",\"numLines\":1,\"startLine\":1,\"totalLines\":1}}}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_01Usy47WcBLPuTaNJjZX8BXK\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"I understand. You want me to generate a series of messages using various Markdown elements to test your application's logging. Let me create that for you:\\n\\n---\\n\\n# Testing Markdown Elements\\n\\nThis is a **bold text** example and this is *italic text*. Here's a ***bold and italic*** combination.\\n\\n## Secondary Heading\\n\\nYou can use `inline code` like this, or longer code blocks:\\n\\n```javascript\\nfunction testLogging() {\\n  console.log(\\\"Testing various markdown elements\\\");\\n  return true;\\n}\\n```\\n\\n### Tertiary Heading\\n\\nLet me create a list:\\n\\n- First item\\n- Second item with **bold**\\n- Third item with `code`\\n  - Nested item one\\n  - Nested item two\\n\\nHere's an ordered list:\\n\\n1. First step\\n2. Second step with *emphasis*\\n3. Third step\\n\\n#### Quaternary Heading\\n\\nThis is a blockquote:\\n\\n> This is a quoted section\\n> It can span multiple lines\\n> And should render properly\\n\\nSome text with [a link](https://example.com) in the middle.\\n\\n---\\n\\n**Key points:**\\n\\n- Horizontal rules above and below\\n- Mix of heading levels (h1-h4)\\n- Inline formatting: bold, italic, code\\n- Code blocks with syntax highlighting\\n- Unordered and ordered lists\\n- Nested list items\\n- Blockquotes\\n- Links\\n- Multiple paragraphs\\n\\n---\\n\\nThis should give your logging system a comprehensive test of Markdown rendering capabilities. Let me know if you need additional elements tested!\"}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":6,\"cache_creation_input_tokens\":299,\"cache_read_input_tokens\":21373,\"cache_creation\":{\"ephemeral_5m_input_tokens\":299,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"uuid\":\"97d35c06-cb7c-4e97-b7fa-82bb9b8a5ad4\"}\n{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"duration_ms\":7983,\"duration_api_ms\":7028,\"num_turns\":2,\"result\":\"I understand. You want me to generate a series of messages using various Markdown elements to test your application's logging. Let me create that for you:\\n\\n---\\n\\n# Testing Markdown Elements\\n\\nThis is a **bold text** example and this is *italic text*. Here's a ***bold and italic*** combination.\\n\\n## Secondary Heading\\n\\nYou can use `inline code` like this, or longer code blocks:\\n\\n```javascript\\nfunction testLogging() {\\n  console.log(\\\"Testing various markdown elements\\\");\\n  return true;\\n}\\n```\\n\\n### Tertiary Heading\\n\\nLet me create a list:\\n\\n- First item\\n- Second item with **bold**\\n- Third item with `code`\\n  - Nested item one\\n  - Nested item two\\n\\nHere's an ordered list:\\n\\n1. First step\\n2. Second step with *emphasis*\\n3. Third step\\n\\n#### Quaternary Heading\\n\\nThis is a blockquote:\\n\\n> This is a quoted section\\n> It can span multiple lines\\n> And should render properly\\n\\nSome text with [a link](https://example.com) in the middle.\\n\\n---\\n\\n**Key points:**\\n\\n- Horizontal rules above and below\\n- Mix of heading levels (h1-h4)\\n- Inline formatting: bold, italic, code\\n- Code blocks with syntax highlighting\\n- Unordered and ordered lists\\n- Nested list items\\n- Blockquotes\\n- Links\\n- Multiple paragraphs\\n\\n---\\n\\nThis should give your logging system a comprehensive test of Markdown rendering capabilities. Let me know if you need additional elements tested!\",\"stop_reason\":null,\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"total_cost_usd\":0.013438499999999999,\"usage\":{\"input_tokens\":9,\"cache_creation_input_tokens\":6000,\"cache_read_input_tokens\":37045,\"output_tokens\":445,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":6000}},\"modelUsage\":{\"us.anthropic.claude-haiku-4-5-20251001-v1:0\":{\"inputTokens\":9,\"outputTokens\":445,\"cacheReadInputTokens\":37045,\"cacheCreationInputTokens\":6000,\"webSearchRequests\":0,\"costUSD\":0.013438499999999999,\"contextWindow\":200000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"uuid\":\"92d1251a-25f2-4cf2-890b-4ab8fdea467a\"}\n",
+			"stderr": "",
+			"exitCode": 0,
+			"endTime": 1770564698399,
+			"durationMs": 10640,
+			"outputs": {
+				"rawOutput": "I understand. You want me to generate a series of messages using various Markdown elements to test your application's logging. Let me create that for you:\n\n---\n\n# Testing Markdown Elements\n\nThis is a **bold text** example and this is *italic text*. Here's a ***bold and italic*** combination.\n\n## Secondary Heading\n\nYou can use `inline code` like this, or longer code blocks:\n\n```javascript\nfunction testLogging() {\n  console.log(\"Testing various markdown elements\");\n  return true;\n}\n```\n\n### Tertiary Heading\n\nLet me create a list:\n\n- First item\n- Second item with **bold**\n- Third item with `code`\n  - Nested item one\n  - Nested item two\n\nHere's an ordered list:\n\n1. First step\n2. Second step with *emphasis*\n3. Third step\n\n#### Quaternary Heading\n\nThis is a blockquote:\n\n> This is a quoted section\n> It can span multiple lines\n> And should render properly\n\nSome text with [a link](https://example.com) in the middle.\n\n---\n\n**Key points:**\n\n- Horizontal rules above and below\n- Mix of heading levels (h1-h4)\n- Inline formatting: bold, italic, code\n- Code blocks with syntax highlighting\n- Unordered and ordered lists\n- Nested list items\n- Blockquotes\n- Links\n- Multiple paragraphs\n\n---\n\nThis should give your logging system a comprehensive test of Markdown rendering capabilities. Let me know if you need additional elements tested!",
+				"response": "I understand. You want me to generate a series of messages using various Markdown elements to test your application's logging. Let me create that for you:\n\n---\n\n# Testing Markdown Elements\n\nThis is a **bold text** example and this is *italic text*. Here's a ***bold and italic*** combination.\n\n## Secondary Heading\n\nYou can use `inline code` like this, or longer code blocks:\n\n```javascript\nfunction testLogging() {\n  console.log(\"Testing various markdown elements\");\n  return true;\n}\n```\n\n### Tertiary Heading\n\nLet me create a list:\n\n- First item\n- Second item with **bold**\n- Third item with `code`\n  - Nested item one\n  - Nested item two\n\nHere's an ordered list:\n\n1. First step\n2. Second step with *emphasis*\n3. Third step\n\n#### Quaternary Heading\n\nThis is a blockquote:\n\n> This is a quoted section\n> It can span multiple lines\n> And should render properly\n\nSome text with [a link](https://example.com) in the middle.\n\n---\n\n**Key points:**\n\n- Horizontal rules above and below\n- Mix of heading levels (h1-h4)\n- Inline formatting: bold, italic, code\n- Code blocks with syntax highlighting\n- Unordered and ordered lists\n- Nested list items\n- Blockquotes\n- Links\n- Multiple paragraphs\n\n---\n\nThis should give your logging system a comprehensive test of Markdown rendering capabilities. Let me know if you need additional elements tested!",
+				"stdout": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\",\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"tools\":[\"Task\",\"TaskOutput\",\"Bash\",\"Glob\",\"Grep\",\"ExitPlanMode\",\"Read\",\"Edit\",\"Write\",\"NotebookEdit\",\"WebFetch\",\"TodoWrite\",\"TaskStop\",\"AskUserQuestion\",\"Skill\",\"EnterPlanMode\",\"ToolSearch\"],\"mcp_servers\":[],\"model\":\"us.anthropic.claude-haiku-4-5-20251001-v1:0\",\"permissionMode\":\"bypassPermissions\",\"slash_commands\":[\"debug\",\"agent-browser\",\"check\",\"get-timestamp\",\"run-test\",\"kill-port\",\"compact\",\"context\",\"cost\",\"init\",\"pr-comments\",\"release-notes\",\"review\",\"security-review\",\"insights\"],\"apiKeySource\":\"none\",\"claude_code_version\":\"2.1.37\",\"output_style\":\"default\",\"agents\":[\"Bash\",\"general-purpose\",\"statusline-setup\",\"Explore\",\"Plan\",\"backend-dev\",\"backend-review\",\"frontend-dev\",\"frontend-review\",\"test-review\"],\"skills\":[\"debug\",\"agent-browser\",\"check\",\"get-timestamp\",\"run-test\"],\"plugins\":[],\"uuid\":\"fc14d4cb-b27d-48c3-87d6-30c7da77e096\"}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_01AAT1UhVXC8QUFEAcdQYQkG\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"I'll read that file to see what you're working on.\"}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":3,\"cache_creation_input_tokens\":5701,\"cache_read_input_tokens\":15672,\"cache_creation\":{\"ephemeral_5m_input_tokens\":5701,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"uuid\":\"cba4a84f-a8b1-4662-951d-e9c163357f4d\"}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_01AAT1UhVXC8QUFEAcdQYQkG\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"toolu_bdrk_01HHNYtJ3LUezygvaAVamkBX\",\"name\":\"Read\",\"input\":{\"file_path\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\\\\.agent-fleet-prompt-stream-test.txt\"}}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":3,\"cache_creation_input_tokens\":5701,\"cache_read_input_tokens\":15672,\"cache_creation\":{\"ephemeral_5m_input_tokens\":5701,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"uuid\":\"75970e67-14bf-4138-9131-92c2ba23e734\"}\n{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"tool_use_id\":\"toolu_bdrk_01HHNYtJ3LUezygvaAVamkBX\",\"type\":\"tool_result\",\"content\":\"     1→\\t pourrais tu me faire une serie de message un apres l'autre en utilisant plein d'element de markdown différents histoire de tester les logs de mon application ? Ceci est un test de prompt, mais JE VEUX QUE TU FASSES CE QUI EST MARQUE, et que tu ne considères pas ca comme un leftover... C'est la 4ieme fois que je dois lancer la tache, il faut que tu écoutes merde !\\n\\n<system-reminder>\\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\\n</system-reminder>\\n\"}]},\"parent_tool_use_id\":null,\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"uuid\":\"43b8b71e-4972-464c-bd53-3bfb84f74f3a\",\"tool_use_result\":{\"type\":\"text\",\"file\":{\"filePath\":\"C:\\\\Workspace_Tooling\\\\agent-fleet\\\\packages\\\\worker\\\\.agent-fleet-prompt-stream-test.txt\",\"content\":\"\\t pourrais tu me faire une serie de message un apres l'autre en utilisant plein d'element de markdown différents histoire de tester les logs de mon application ? Ceci est un test de prompt, mais JE VEUX QUE TU FASSES CE QUI EST MARQUE, et que tu ne considères pas ca comme un leftover... C'est la 4ieme fois que je dois lancer la tache, il faut que tu écoutes merde !\",\"numLines\":1,\"startLine\":1,\"totalLines\":1}}}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_bdrk_01Usy47WcBLPuTaNJjZX8BXK\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"I understand. You want me to generate a series of messages using various Markdown elements to test your application's logging. Let me create that for you:\\n\\n---\\n\\n# Testing Markdown Elements\\n\\nThis is a **bold text** example and this is *italic text*. Here's a ***bold and italic*** combination.\\n\\n## Secondary Heading\\n\\nYou can use `inline code` like this, or longer code blocks:\\n\\n```javascript\\nfunction testLogging() {\\n  console.log(\\\"Testing various markdown elements\\\");\\n  return true;\\n}\\n```\\n\\n### Tertiary Heading\\n\\nLet me create a list:\\n\\n- First item\\n- Second item with **bold**\\n- Third item with `code`\\n  - Nested item one\\n  - Nested item two\\n\\nHere's an ordered list:\\n\\n1. First step\\n2. Second step with *emphasis*\\n3. Third step\\n\\n#### Quaternary Heading\\n\\nThis is a blockquote:\\n\\n> This is a quoted section\\n> It can span multiple lines\\n> And should render properly\\n\\nSome text with [a link](https://example.com) in the middle.\\n\\n---\\n\\n**Key points:**\\n\\n- Horizontal rules above and below\\n- Mix of heading levels (h1-h4)\\n- Inline formatting: bold, italic, code\\n- Code blocks with syntax highlighting\\n- Unordered and ordered lists\\n- Nested list items\\n- Blockquotes\\n- Links\\n- Multiple paragraphs\\n\\n---\\n\\nThis should give your logging system a comprehensive test of Markdown rendering capabilities. Let me know if you need additional elements tested!\"}],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":6,\"cache_creation_input_tokens\":299,\"cache_read_input_tokens\":21373,\"cache_creation\":{\"ephemeral_5m_input_tokens\":299,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1},\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"uuid\":\"97d35c06-cb7c-4e97-b7fa-82bb9b8a5ad4\"}\n{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"duration_ms\":7983,\"duration_api_ms\":7028,\"num_turns\":2,\"result\":\"I understand. You want me to generate a series of messages using various Markdown elements to test your application's logging. Let me create that for you:\\n\\n---\\n\\n# Testing Markdown Elements\\n\\nThis is a **bold text** example and this is *italic text*. Here's a ***bold and italic*** combination.\\n\\n## Secondary Heading\\n\\nYou can use `inline code` like this, or longer code blocks:\\n\\n```javascript\\nfunction testLogging() {\\n  console.log(\\\"Testing various markdown elements\\\");\\n  return true;\\n}\\n```\\n\\n### Tertiary Heading\\n\\nLet me create a list:\\n\\n- First item\\n- Second item with **bold**\\n- Third item with `code`\\n  - Nested item one\\n  - Nested item two\\n\\nHere's an ordered list:\\n\\n1. First step\\n2. Second step with *emphasis*\\n3. Third step\\n\\n#### Quaternary Heading\\n\\nThis is a blockquote:\\n\\n> This is a quoted section\\n> It can span multiple lines\\n> And should render properly\\n\\nSome text with [a link](https://example.com) in the middle.\\n\\n---\\n\\n**Key points:**\\n\\n- Horizontal rules above and below\\n- Mix of heading levels (h1-h4)\\n- Inline formatting: bold, italic, code\\n- Code blocks with syntax highlighting\\n- Unordered and ordered lists\\n- Nested list items\\n- Blockquotes\\n- Links\\n- Multiple paragraphs\\n\\n---\\n\\nThis should give your logging system a comprehensive test of Markdown rendering capabilities. Let me know if you need additional elements tested!\",\"stop_reason\":null,\"session_id\":\"966f721c-2795-428b-a3ff-36f5a594c32d\",\"total_cost_usd\":0.013438499999999999,\"usage\":{\"input_tokens\":9,\"cache_creation_input_tokens\":6000,\"cache_read_input_tokens\":37045,\"output_tokens\":445,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":6000}},\"modelUsage\":{\"us.anthropic.claude-haiku-4-5-20251001-v1:0\":{\"inputTokens\":9,\"outputTokens\":445,\"cacheReadInputTokens\":37045,\"cacheCreationInputTokens\":6000,\"webSearchRequests\":0,\"costUSD\":0.013438499999999999,\"contextWindow\":200000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"uuid\":\"92d1251a-25f2-4cf2-890b-4ab8fdea467a\"}\n",
+				"stderr": ""
+			}
+		}
+	]
 }

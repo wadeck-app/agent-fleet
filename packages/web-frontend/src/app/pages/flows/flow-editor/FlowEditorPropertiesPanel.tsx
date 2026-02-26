@@ -98,8 +98,78 @@ export function FlowEditorPropertiesPanel({
 	onUpdateNode,
 	onDeleteNode,
 }: FlowEditorPropertiesPanelProps) {
+	// All hooks must be called unconditionally
 	const [showAdvanced, setShowAdvanced] = useState(false);
 
+	// Extract step data safely (will be undefined if no selected node or wrong type)
+	const step = selectedNode && isStepNodeData(selectedNode.data) ? selectedNode.data.step : null;
+	const stepEnv = step?.type === 'script' && 'env' in step ? step.env : undefined;
+
+	// Environment variables list management (only for script steps)
+	const envItems = useListItems<KeyValueItem>({
+		initialItems: Object.entries(stepEnv || {}).map(([key, value]) => ({
+			key,
+			value: String(value),
+		})),
+		minItems: 0,
+	});
+
+	// Output configuration list management
+	const outputItems = useListItems<OutputItem>({
+		initialItems: Object.entries(step?.output || {}).map(([name, config]: [string, any]) => ({
+			name,
+			type: config.type || 'string',
+			pattern: config.pattern,
+		})),
+		minItems: 0,
+	});
+
+	// Sync env items back to step data (only when items change, not on mount)
+	useEffect(() => {
+		// Only sync for script steps
+		if (!selectedNode || !step || step.type !== 'script') return;
+
+		const envObj = Object.fromEntries(
+			envItems.fstate.items.filter(item => item.key.trim()).map(item => [item.key, item.value])
+		);
+		// Only update if changed to avoid infinite loop
+		const currentEnv = step.type === 'script' && 'env' in step ? step.env || {} : {};
+		const isDifferent =
+			Object.keys(envObj).length !== Object.keys(currentEnv).length ||
+			Object.entries(envObj).some(([k, v]) => currentEnv[k] !== v);
+		if (isDifferent) {
+			onUpdateNode(selectedNode.id, { env: envObj } as Partial<FlowStep>);
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [envItems.fstate.items, step?.type]);
+
+	// Sync output items back to step data (only when items change, not on mount)
+	useEffect(() => {
+		if (!selectedNode || !step) return;
+
+		const outputObj = Object.fromEntries(
+			outputItems.fstate.items
+				.filter(item => item.name.trim())
+				.map(item => {
+					const config: any = { type: item.type };
+					if (item.pattern) {
+						config.pattern = item.pattern;
+					}
+					return [item.name, config];
+				})
+		);
+		// Only update if changed to avoid infinite loop
+		const currentOutput = step.output || {};
+		const isDifferent =
+			Object.keys(outputObj).length !== Object.keys(currentOutput).length ||
+			Object.entries(outputObj).some(([k, v]) => JSON.stringify(currentOutput[k]) !== JSON.stringify(v));
+		if (isDifferent) {
+			onUpdateNode(selectedNode.id, { output: outputObj } as Partial<FlowStep>);
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [outputItems.fstate.items]);
+
+	// Render early returns after all hooks
 	if (!selectedNode) {
 		return (
 			<div
@@ -222,74 +292,15 @@ export function FlowEditorPropertiesPanel({
 		);
 	}
 
-	const step = selectedNode.data.step;
+	// TypeScript guard: step is guaranteed non-null here (selectedNode is non-null and isStepNodeData was confirmed)
+	if (!step) {
+		return null;
+	}
 
+	// At this point step is guaranteed to be non-null
 	const handleUpdate = (field: string, value: string) => {
 		onUpdateNode(selectedNode.id, { [field]: value } as Partial<FlowStep>);
 	};
-
-	// Environment variables list management (only for script steps)
-	const stepEnv = step.type === 'script' && 'env' in step ? step.env : undefined;
-	const envItems = useListItems<KeyValueItem>({
-		initialItems: Object.entries(stepEnv || {}).map(([key, value]) => ({
-			key,
-			value: String(value),
-		})),
-		minItems: 0,
-	});
-
-	// Sync env items back to step data (only when items change, not on mount)
-	useEffect(() => {
-		// Only sync for script steps
-		if (step.type !== 'script') return;
-
-		const envObj = Object.fromEntries(
-			envItems.fstate.items.filter(item => item.key.trim()).map(item => [item.key, item.value])
-		);
-		// Only update if changed to avoid infinite loop
-		const currentEnv = step.type === 'script' && 'env' in step ? step.env || {} : {};
-		const isDifferent =
-			Object.keys(envObj).length !== Object.keys(currentEnv).length ||
-			Object.entries(envObj).some(([k, v]) => currentEnv[k] !== v);
-		if (isDifferent) {
-			onUpdateNode(selectedNode.id, { env: envObj } as Partial<FlowStep>);
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [envItems.fstate.items, step.type]);
-
-	// Output configuration list management
-	const outputItems = useListItems<OutputItem>({
-		initialItems: Object.entries(step.output || {}).map(([name, config]: [string, any]) => ({
-			name,
-			type: config.type || 'string',
-			pattern: config.pattern,
-		})),
-		minItems: 0,
-	});
-
-	// Sync output items back to step data (only when items change, not on mount)
-	useEffect(() => {
-		const outputObj = Object.fromEntries(
-			outputItems.fstate.items
-				.filter(item => item.name.trim())
-				.map(item => {
-					const config: any = { type: item.type };
-					if (item.pattern) {
-						config.pattern = item.pattern;
-					}
-					return [item.name, config];
-				})
-		);
-		// Only update if changed to avoid infinite loop
-		const currentOutput = step.output || {};
-		const isDifferent =
-			Object.keys(outputObj).length !== Object.keys(currentOutput).length ||
-			Object.entries(outputObj).some(([k, v]) => JSON.stringify(currentOutput[k]) !== JSON.stringify(v));
-		if (isDifferent) {
-			onUpdateNode(selectedNode.id, { output: outputObj } as Partial<FlowStep>);
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [outputItems.fstate.items]);
 
 	return (
 		<div className="w-96 overflow-auto border-l bg-card">
@@ -298,7 +309,7 @@ export function FlowEditorPropertiesPanel({
 				<div>
 					<h3 className="mb-1 text-lg font-semibold">Step Properties</h3>
 					<p className="text-xs text-muted-foreground">
-						Type: <span className="font-mono">{step.type}</span>
+						Type: <span className="font-mono">{step!.type}</span>
 					</p>
 				</div>
 

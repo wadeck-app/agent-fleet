@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { Table2, type Table2Column, type Table2Props } from '@framework/components2/table/Table2';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
-import { useToast } from '@framework/features/toast/ToastContext';
 import type { Workspace } from '@shared/api/workspaces.contract';
 import { ListTodo, Pencil } from 'lucide-react';
 
@@ -113,7 +112,6 @@ export interface WorkspacesTableProps extends Partial<Table2Props<Workspace>> {
 export function WorkspacesTable(props: WorkspacesTableProps) {
 	const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
 	const [creatingTaskForWorkspace, setCreatingTaskForWorkspace] = useState<Workspace | null>(null);
-	const { showToast } = useToast();
 
 	const handleSave = async (workspaceId: string, data: { name?: string; description?: string; color?: string }) => {
 		await workspacesApi.updateWorkspace(workspaceId, data);

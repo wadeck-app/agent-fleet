@@ -11,8 +11,7 @@ import {
 	useSensors,
 } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-
-import { SearchBar } from '../../features/search/SearchBar';
+import { SearchBar } from '@framework/features/search/SearchBar';
 
 /**
  * ===========================================================================================

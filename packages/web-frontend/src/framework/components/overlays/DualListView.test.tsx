@@ -1,3 +1,4 @@
+import { Button } from '@framework/components/primitives/Button';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -76,7 +77,7 @@ describe('DualListView - Rendering', () => {
 				rightTitle="Available Projects"
 				leftHelpText="Drag to reorder"
 				rightHelpText="Click to pin"
-				renderItem={(item: MockItem, side) => <div>{item.name}</div>}
+				renderItem={(item: MockItem, _side) => <div>{item.name}</div>}
 				searchFilter={(item: MockItem, query) => item.name.toLowerCase().includes(query.toLowerCase())}
 				onAssociate={vi.fn()}
 				onDissociate={vi.fn()}
@@ -100,7 +101,7 @@ describe('DualListView - Rendering', () => {
 				leftTitle="Associated"
 				rightTitle="Available"
 				leftEmptyState={<div data-testid="custom-empty">No associated items</div>}
-				renderItem={(item, side) => <div>{item.name}</div>}
+				renderItem={(item, _side) => <div>{item.name}</div>}
 				searchFilter={(item, query) => item.name.toLowerCase().includes(query.toLowerCase())}
 				onAssociate={vi.fn()}
 				onDissociate={vi.fn()}
@@ -120,7 +121,7 @@ describe('DualListView - Rendering', () => {
 				reorderingItems={new Set()}
 				leftTitle="Associated"
 				rightTitle="Available"
-				renderItem={(item, side) => <div>{item.name}</div>}
+				renderItem={(item, _side) => <div>{item.name}</div>}
 				searchFilter={(item, query) => item.name.toLowerCase().includes(query.toLowerCase())}
 				onAssociate={vi.fn()}
 				onDissociate={vi.fn()}
@@ -134,7 +135,7 @@ describe('DualListView - Rendering', () => {
 describe('DualListView - Visual States', () => {
 	it('should pass isLoading=true to renderItem for loading items', () => {
 		const loadingItems = new Set(['item-1']);
-		const renderItem = vi.fn((item, side, visualState) => (
+		const renderItem = vi.fn((item, _side, visualState) => (
 			<div data-testid={`item-${item.id}`} className={visualState.isLoading ? 'loading' : ''}>
 				{item.name}
 			</div>
@@ -170,7 +171,7 @@ describe('DualListView - Visual States', () => {
 
 	it('should pass isReordering=true to renderItem for reordering items', () => {
 		const reorderingItems = new Set(['item-1', 'item-2']);
-		const renderItem = vi.fn((item, side, visualState) => (
+		const renderItem = vi.fn((item, _side, visualState) => (
 			<div data-testid={`item-${item.id}`} className={visualState.isReordering ? 'reordering' : ''}>
 				{item.name}
 			</div>
@@ -213,7 +214,7 @@ describe('DualListView - Visual States', () => {
 	it('should apply both loading and reordering states simultaneously', () => {
 		const loadingItems = new Set(['item-1']);
 		const reorderingItems = new Set(['item-1', 'item-2']);
-		const renderItem = vi.fn((item, side, visualState) => (
+		const renderItem = vi.fn((item, _side, visualState) => (
 			<div
 				data-testid={`item-${item.id}`}
 				className={`${visualState.isLoading ? 'loading' : ''} ${visualState.isReordering ? 'reordering' : ''}`}
@@ -265,7 +266,7 @@ describe('DualListView - Search', () => {
 				leftTitle="Associated"
 				rightTitle="Available"
 				searchPlaceholder="Search items..."
-				renderItem={(item, side) => <div data-testid={`item-${item.id}`}>{item.name}</div>}
+				renderItem={(item, _side) => <div data-testid={`item-${item.id}`}>{item.name}</div>}
 				searchFilter={(item, query) => item.name.toLowerCase().includes(query.toLowerCase())}
 				onAssociate={vi.fn()}
 				onDissociate={vi.fn()}
@@ -301,7 +302,7 @@ describe('DualListView - Search', () => {
 				reorderingItems={new Set()}
 				leftTitle="Associated"
 				rightTitle="Available"
-				renderItem={(item, side) => <div data-testid={`item-${item.id}`}>{item.name}</div>}
+				renderItem={(item, _side) => <div data-testid={`item-${item.id}`}>{item.name}</div>}
 				searchFilter={(item, query) => item.name.toLowerCase().includes(query.toLowerCase())}
 				onAssociate={vi.fn()}
 				onDissociate={vi.fn()}
@@ -364,10 +365,10 @@ describe('DualListView - Callbacks', () => {
 				reorderingItems={new Set()}
 				leftTitle="Associated"
 				rightTitle="Available"
-				renderItem={(item, side, visualState) => (
+				renderItem={(item, side, _visualState) => (
 					<div data-testid={`item-${item.id}`}>
 						<span>{item.name}</span>
-						<button
+						<Button
 							onClick={() => {
 								// Consumer decides when to call callbacks
 								if (side === 'left') {
@@ -378,7 +379,7 @@ describe('DualListView - Callbacks', () => {
 							}}
 						>
 							{side === 'left' ? 'Remove' : 'Add'}
-						</button>
+						</Button>
 					</div>
 				)}
 				searchFilter={(item, query) => item.name.toLowerCase().includes(query.toLowerCase())}

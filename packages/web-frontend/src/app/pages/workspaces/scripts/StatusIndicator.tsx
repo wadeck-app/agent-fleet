@@ -16,37 +16,37 @@ const STATUS_CONFIG: Record<
 > = {
 	running: {
 		label: 'Running',
-		icon: '●',
+		icon: 'O',
 		color: 'text-success',
 		bgColor: 'bg-success/10',
 	},
 	stopped: {
 		label: 'Stopped',
-		icon: '○',
+		icon: 'o',
 		color: 'text-muted-foreground',
 		bgColor: 'bg-muted/10',
 	},
 	starting: {
 		label: 'Starting',
-		icon: '◐',
+		icon: '~',
 		color: 'text-warning',
 		bgColor: 'bg-warning/10',
 	},
 	stopping: {
 		label: 'Stopping',
-		icon: '◑',
+		icon: '~',
 		color: 'text-info',
 		bgColor: 'bg-info/10',
 	},
 	crashed: {
 		label: 'Crashed',
-		icon: '⚠',
+		icon: '!',
 		color: 'text-warning',
 		bgColor: 'bg-warning/10',
 	},
 	error: {
 		label: 'Error',
-		icon: '✖',
+		icon: 'X',
 		color: 'text-destructive',
 		bgColor: 'bg-destructive/10',
 	},

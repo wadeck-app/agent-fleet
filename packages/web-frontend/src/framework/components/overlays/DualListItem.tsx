@@ -166,7 +166,9 @@ export function DualListItem({
 	return (
 		<div ref={setNodeRef} style={style} className={containerClasses}>
 			{/* Drag Handle */}
-			<button
+			<Button
+				variant="ghost"
+				size="icon"
 				{...attributes}
 				{...listeners}
 				className={cn(
@@ -178,7 +180,7 @@ export function DualListItem({
 				title="Drag to reorder"
 			>
 				<GripVertical className="h-4 w-4" />
-			</button>
+			</Button>
 
 			{/* Icon */}
 			{icon}

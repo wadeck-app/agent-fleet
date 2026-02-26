@@ -1,15 +1,15 @@
 {
-  "chunkIndex": 0,
-  "entries": [
-    {
-      "stepId": "stream-test",
-      "stepName": "Stream JSON Test",
-      "stepType": "model",
-      "startTime": 1770509996893,
-      "retries": 0,
-      "prompt": "On va faire plusieurs tests. Tu vas m'expliquer en 5 etapes comment calculer une racine carrée, puis tu valides l'approche avec une page wikipedia relative au mathématique, ensuite tu vas faire un Read sur le package.json du projet et me donner la taille complète. Comme ca on va pouvoir voir si tes logs sont bon.,",
-      "model": "haiku",
-      "liveLogEntries": []
-    }
-  ]
+	"chunkIndex": 0,
+	"entries": [
+		{
+			"stepId": "stream-test",
+			"stepName": "Stream JSON Test",
+			"stepType": "model",
+			"startTime": 1770509996893,
+			"retries": 0,
+			"prompt": "On va faire plusieurs tests. Tu vas m'expliquer en 5 etapes comment calculer une racine carrée, puis tu valides l'approche avec une page wikipedia relative au mathématique, ensuite tu vas faire un Read sur le package.json du projet et me donner la taille complète. Comme ca on va pouvoir voir si tes logs sont bon.,",
+			"model": "haiku",
+			"liveLogEntries": []
+		}
+	]
 }

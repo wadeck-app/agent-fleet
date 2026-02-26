@@ -67,7 +67,7 @@ export function SortableConfiguredScriptItem({
 
 	// Badge variant based on status
 	const badgeVariant = status === 'running' ? 'default' : status === 'error' ? 'destructive' : 'secondary';
-	const statusSymbol = status === 'running' ? '●' : status === 'error' ? '✕' : '○';
+	const statusSymbol = status === 'running' ? 'O' : status === 'error' ? 'X' : 'o';
 
 	return (
 		<div

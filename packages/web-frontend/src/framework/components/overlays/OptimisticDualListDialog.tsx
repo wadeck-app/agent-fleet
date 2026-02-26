@@ -1,6 +1,5 @@
-import type { ReactNode } from 'react';
+import { type UseDualListStateProps, useDualListState } from '@framework/hooks/useDualListState';
 
-import { type UseDualListStateProps, useDualListState } from '../../hooks/useDualListState';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './Dialog';
 import { DualListView, type DualListViewProps } from './DualListView';
 

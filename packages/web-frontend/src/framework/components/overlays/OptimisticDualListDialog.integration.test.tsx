@@ -65,7 +65,7 @@ describe('OptimisticDualListDialog - Composition', () => {
 				itemKey={item => item.id}
 				leftTitle="Associated Items"
 				rightTitle="Available Items"
-				renderItem={(item, side) => <div data-testid={`${side}-${item.id}`}>{item.name}</div>}
+				renderItem={(item, _side) => <div data-testid={`${_side}-${item.id}`}>{item.name}</div>}
 				searchFilter={(item, query) => item.name.toLowerCase().includes(query.toLowerCase())}
 				onAssociate={vi.fn()}
 				onDissociate={vi.fn()}
@@ -95,7 +95,7 @@ describe('OptimisticDualListDialog - Composition', () => {
 				rightTitle="Available"
 				leftEmptyState={<div data-testid="left-empty">No associated items</div>}
 				rightEmptyState={<div data-testid="right-empty">No available items</div>}
-				renderItem={(item: MockItem, side) => <div>{item.name}</div>}
+				renderItem={(item: MockItem, _side) => <div>{item.name}</div>}
 				searchFilter={(item: MockItem, query) => item.name.toLowerCase().includes(query.toLowerCase())}
 				onAssociate={vi.fn()}
 				onDissociate={vi.fn()}
@@ -117,7 +117,7 @@ describe('OptimisticDualListDialog - Composition', () => {
 				itemKey={item => item.id}
 				leftTitle="Associated"
 				rightTitle="Available"
-				renderItem={(item, side) => <div>{item.name}</div>}
+				renderItem={(item, _side) => <div>{item.name}</div>}
 				searchFilter={(item, query) => item.name.toLowerCase().includes(query.toLowerCase())}
 				onAssociate={vi.fn()}
 				onDissociate={vi.fn()}
@@ -129,11 +129,11 @@ describe('OptimisticDualListDialog - Composition', () => {
 	});
 
 	it('should pass visual state flags to renderItem', () => {
-		const renderItem = vi.fn((item, side, visualState) => (
+		const renderItem = vi.fn((item, _side, _visualState) => (
 			<div data-testid={`item-${item.id}`}>
 				{item.name}
-				{visualState.isLoading && <span data-testid={`loading-${item.id}`}>Loading...</span>}
-				{visualState.isReordering && <span data-testid={`reordering-${item.id}`}>Reordering...</span>}
+				{_visualState.isLoading && <span data-testid={`loading-${item.id}`}>Loading...</span>}
+				{_visualState.isReordering && <span data-testid={`reordering-${item.id}`}>Reordering...</span>}
 			</div>
 		));
 

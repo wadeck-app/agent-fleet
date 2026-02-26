@@ -3,7 +3,8 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { createControlledPromise } from '../../../test/utils/asyncUtils';
+import { createControlledPromise } from '@/test/utils/asyncUtils';
+
 import { ManagePinnedProjectsDialog } from './ManagePinnedProjectsDialog';
 
 /**

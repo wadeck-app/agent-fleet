@@ -28,10 +28,10 @@ export function ScriptLogEntry({ log, onExpand }: ScriptLogEntryProps) {
 	};
 
 	const levelIcons = {
-		stdout: '→',
-		stderr: '⚠',
-		info: 'ℹ',
-		error: '✖',
+		stdout: '>',
+		stderr: '!',
+		info: 'i',
+		error: 'X',
 	};
 
 	const levelLabels = {

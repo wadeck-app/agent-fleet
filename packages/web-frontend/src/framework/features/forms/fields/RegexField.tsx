@@ -106,7 +106,7 @@ export function RegexField({
 			{description && <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>}
 			{!displayError && value && options?.testString && (
 				<p className="mt-1.5 text-xs text-muted-foreground">
-					Test: {new RegExp(value).test(options.testString) ? '✓ Match' : '✗ No match'}
+					Test: {new RegExp(value).test(options.testString) ? 'Match' : 'No match'}
 				</p>
 			)}
 			{displayError && <FieldError>{displayError}</FieldError>}
