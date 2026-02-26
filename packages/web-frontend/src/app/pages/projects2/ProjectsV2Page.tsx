@@ -5,6 +5,7 @@ import { Page } from '@framework/components/layout/Page';
 import { SkeletonBox } from '@framework/components/loading/SkeletonBox';
 import { useDialogParam } from '@framework/hooks/useDialogParam';
 import type { Project } from '@shared/api/projects.contract';
+import type { Workspace } from '@shared/api/workspaces.contract';
 import {
 	B2F_PROJECT_CREATED,
 	B2F_PROJECT_DELETED,
@@ -267,9 +268,12 @@ export function ProjectsV2Page() {
 		createWorkspaceDialog.open();
 	};
 
-	const handleWorkspaceCreated = () => {
+	const handleWorkspaceCreated = async (workspace: Workspace) => {
+		if (activeProject) {
+			await associateWorkspace(workspace.id, activeProject.id);
+		}
+		// Workspaces will be reloaded automatically via WebSocket event
 		createWorkspaceDialog.close();
-		loadWorkspaces();
 	};
 
 	return (

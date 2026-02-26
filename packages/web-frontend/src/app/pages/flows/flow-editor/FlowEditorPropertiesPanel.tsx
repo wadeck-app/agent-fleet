@@ -98,6 +98,7 @@ export function FlowEditorPropertiesPanel({
 	onUpdateNode,
 	onDeleteNode,
 }: FlowEditorPropertiesPanelProps) {
+	// All hooks must be called unconditionally
 	const [showAdvanced, setShowAdvanced] = useState(false);
 
 	// Extract step data before conditional returns
@@ -302,7 +303,7 @@ export function FlowEditorPropertiesPanel({
 				<div>
 					<h3 className="mb-1 text-lg font-semibold">Step Properties</h3>
 					<p className="text-xs text-muted-foreground">
-						Type: <span className="font-mono">{step.type}</span>
+						Type: <span className="font-mono">{step!.type}</span>
 					</p>
 				</div>
 

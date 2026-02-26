@@ -35,12 +35,14 @@ describe('MyComponent', () => {
 ```
 
 **Why `vi.restoreAllMocks()` matters:**
+
 - `vi.clearAllMocks()` only clears call history, not the spy objects themselves
 - `vi.spyOn()` creates new spy wrappers each test that accumulate in memory
 - `vi.restoreAllMocks()` removes spies and restores original implementations
 - FileTree tests: 7 tests × each creating 1 spy = linear memory growth until OOM
 
 **Fixed files (2026-02-26):**
+
 - `src/app/pages/projects2/files/FileTree.test.tsx` (added `vi.restoreAllMocks()`)
 - `src/app/pages/projects2/files/FileBrowserPanel.test.tsx` (added `vi.restoreAllMocks()`)
 - `src/app/pages/projects2/files/FileEditorPanel.test.tsx` (added `vi.restoreAllMocks()`)

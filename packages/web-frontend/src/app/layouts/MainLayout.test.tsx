@@ -78,10 +78,9 @@ describe('MainLayout', () => {
 				</MemoryRouter>
 			);
 
-		// Look for buttons in the header - desktop layout shouldn't have the mobile menu toggle
-		const buttons = screen.queryAllByRole('button');
-		expect(buttons).toHaveLength(0);
-	});
+			expect(screen.queryByRole('button', { name: 'Open menu' })).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: 'Close menu' })).not.toBeInTheDocument();
+		});
 
 		it('should render info panel when content is set', () => {
 			function TestComponent() {
@@ -168,7 +167,7 @@ describe('MainLayout', () => {
 				</MemoryRouter>
 			);
 
-			expect(screen.getByRole('button')).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Open menu' })).toBeInTheDocument();
 		});
 
 		it('should toggle mobile menu when button is clicked', () => {
@@ -185,23 +184,23 @@ describe('MainLayout', () => {
 			expect(navLinks).toHaveLength(0);
 
 			// Open menu
-			const menuButton = screen.getByRole('button');
+			const menuButton = screen.getByRole('button', { name: 'Open menu' });
 			act(() => {
 				menuButton.click();
 			});
 
 			// Menu now open
-			expect(screen.getByRole('button')).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Close menu' })).toBeInTheDocument();
 			expect(screen.getByText('Recettes')).toBeInTheDocument();
 
 			// Close menu
-			const closeButton = screen.getByRole('button');
+			const closeButton = screen.getByRole('button', { name: 'Close menu' });
 			act(() => {
 				closeButton.click();
 			});
 
 			// Menu closed again
-			expect(screen.getByRole('button')).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Open menu' })).toBeInTheDocument();
 		});
 
 		it('should close mobile menu when nav link is clicked', () => {
@@ -214,7 +213,7 @@ describe('MainLayout', () => {
 			);
 
 			// Open menu
-			const menuButton = screen.getByRole('button');
+			const menuButton = screen.getByRole('button', { name: 'Open menu' });
 			act(() => {
 				menuButton.click();
 			});
@@ -242,7 +241,7 @@ describe('MainLayout', () => {
 			);
 
 			// Open menu
-			const menuButton = screen.getByRole('button');
+			const menuButton = screen.getByRole('button', { name: 'Open menu' });
 			act(() => {
 				menuButton.click();
 			});

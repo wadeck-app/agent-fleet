@@ -54,6 +54,7 @@ export default function MainLayout() {
 						</div>
 						<Button
 							variant="ghost"
+							aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
 							onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
 							className="text-white"
 						>
