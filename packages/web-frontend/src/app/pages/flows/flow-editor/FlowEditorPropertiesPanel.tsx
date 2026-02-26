@@ -101,7 +101,7 @@ export function FlowEditorPropertiesPanel({
 	// All hooks must be called unconditionally
 	const [showAdvanced, setShowAdvanced] = useState(false);
 
-	// Extract step data safely (will be undefined if no selected node or wrong type)
+	// Extract step data before conditional returns
 	const step = selectedNode && isStepNodeData(selectedNode.data) ? selectedNode.data.step : null;
 	const stepEnv = step?.type === 'script' && 'env' in step ? step.env : undefined;
 
@@ -126,8 +126,9 @@ export function FlowEditorPropertiesPanel({
 
 	// Sync env items back to step data (only when items change, not on mount)
 	useEffect(() => {
+		if (!selectedNode || !step) return;
 		// Only sync for script steps
-		if (!selectedNode || !step || step.type !== 'script') return;
+		if (step.type !== 'script') return;
 
 		const envObj = Object.fromEntries(
 			envItems.fstate.items.filter(item => item.key.trim()).map(item => [item.key, item.value])
@@ -141,7 +142,7 @@ export function FlowEditorPropertiesPanel({
 			onUpdateNode(selectedNode.id, { env: envObj } as Partial<FlowStep>);
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [envItems.fstate.items, step?.type]);
+	}, [envItems.fstate.items, step?.type, selectedNode?.id]);
 
 	// Sync output items back to step data (only when items change, not on mount)
 	useEffect(() => {
@@ -167,9 +168,8 @@ export function FlowEditorPropertiesPanel({
 			onUpdateNode(selectedNode.id, { output: outputObj } as Partial<FlowStep>);
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [outputItems.fstate.items]);
+	}, [outputItems.fstate.items, selectedNode?.id]);
 
-	// Render early returns after all hooks
 	if (!selectedNode) {
 		return (
 			<div
@@ -282,7 +282,7 @@ export function FlowEditorPropertiesPanel({
 	}
 
 	// Type guard to ensure we have StepNodeData after constant check
-	if (!isStepNodeData(selectedNode.data)) {
+	if (!isStepNodeData(selectedNode.data) || !step) {
 		return (
 			<div className="w-96 overflow-auto border-l bg-card">
 				<div className="space-y-4 p-4">
@@ -292,12 +292,6 @@ export function FlowEditorPropertiesPanel({
 		);
 	}
 
-	// TypeScript guard: step is guaranteed non-null here (selectedNode is non-null and isStepNodeData was confirmed)
-	if (!step) {
-		return null;
-	}
-
-	// At this point step is guaranteed to be non-null
 	const handleUpdate = (field: string, value: string) => {
 		onUpdateNode(selectedNode.id, { [field]: value } as Partial<FlowStep>);
 	};

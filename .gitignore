@@ -59,4 +59,5 @@ Thumbs.db
 # Custom
 nul
 packages/data/
+packages/web-backend/data/
 _results/

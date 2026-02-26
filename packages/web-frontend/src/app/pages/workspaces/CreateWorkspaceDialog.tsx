@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { Field } from '@framework/components/advanced/Field/Field';
 import { FieldError } from '@framework/components/advanced/Field/FieldError';
@@ -8,6 +8,7 @@ import { DialogBody, DialogFooter } from '@framework/components/overlays/Dialog'
 import { ColorPicker } from '@framework/components/pickers/ColorPicker';
 import { type FormAction, FormActions } from '@framework/features/forms/FormActions';
 import { FormContainer } from '@framework/features/forms/FormContainer';
+import { ComboboxField, type ComboboxOption } from '@framework/features/forms/fields/ComboboxField';
 import { RadioGroupField, type RadioOption } from '@framework/features/forms/fields/RadioGroupField';
 import { SelectField, type SelectOption } from '@framework/features/forms/fields/SelectField';
 import { TextAreaField } from '@framework/features/forms/fields/TextAreaField';
@@ -23,6 +24,7 @@ interface CreateWorkspaceDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	onSuccess: (workspace: Workspace) => void;
+	projectId?: string;
 }
 
 interface CreateWorkspaceFormData {
@@ -31,7 +33,7 @@ interface CreateWorkspaceFormData {
 	description: string;
 	color: string;
 	mode: 'development' | 'production' | 'staging';
-	gitStrategy: 'none' | 'clone' | 'worktree';
+	gitStrategy: 'none' | 'existing' | 'clone' | 'worktree';
 	repositoryUrl: string;
 	branch: string;
 	sourceWorkspaceId: string;
@@ -55,16 +57,26 @@ const modeOptions: SelectOption[] = [
 	{ value: 'staging', label: 'Staging' },
 ];
 
-const gitStrategyOptions: RadioOption[] = [
-	{ value: 'none', label: 'None (Empty folder)' },
-	{ value: 'clone', label: 'Clone Repository' },
-	{ value: 'worktree', label: 'Git Worktree (Coming Soon)', disabled: true },
-];
+// Git strategy options will be computed dynamically based on projectId availability
 
 const FORM_ID = 'create-workspace-form';
 
-export function CreateWorkspaceDialog({ open, onOpenChange, onSuccess }: CreateWorkspaceDialogProps) {
+export function CreateWorkspaceDialog({ open, onOpenChange, onSuccess, projectId }: CreateWorkspaceDialogProps) {
 	const { showToast } = useToast();
+	const [workspaceOptions, setWorkspaceOptions] = useState<ComboboxOption[]>([]);
+	const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(false);
+
+	// Compute git strategy options dynamically based on projectId availability
+	const gitStrategyOptions: RadioOption[] = [
+		{ value: 'none', label: 'New Empty Folder' },
+		{ value: 'existing', label: 'Existing Folder' },
+		{ value: 'clone', label: 'Clone Repository' },
+		{
+			value: 'worktree',
+			label: projectId ? 'Git Worktree' : 'Git Worktree (Coming Soon)',
+			disabled: !projectId,
+		},
+	];
 
 	const formState = useFormState<CreateWorkspaceFormData>({
 		defaultData: defaultFormData,
@@ -87,6 +99,15 @@ export function CreateWorkspaceDialog({ open, onOpenChange, onSuccess }: CreateW
 				}
 			}
 
+			if (data.gitStrategy === 'worktree') {
+				if (!data.sourceWorkspaceId?.trim()) {
+					errors.sourceWorkspaceId = 'Source workspace is required for worktree strategy';
+				}
+				if (!data.branch?.trim()) {
+					errors.branch = 'Branch is required for worktree strategy';
+				}
+			}
+
 			return {
 				valid: Object.keys(errors).length === 0,
 				errors: Object.values(errors),
@@ -96,6 +117,8 @@ export function CreateWorkspaceDialog({ open, onOpenChange, onSuccess }: CreateW
 			'Path is required': 'path',
 			'Repository URL is required for clone strategy': 'repositoryUrl',
 			'Must be a valid URL': 'repositoryUrl',
+			'Source workspace is required for worktree strategy': 'sourceWorkspaceId',
+			'Branch is required for worktree strategy': 'branch',
 		},
 		onSubmit: async data => {
 			const createWorkspaceData: CreateWorkspaceDto = {
@@ -138,6 +161,37 @@ export function CreateWorkspaceDialog({ open, onOpenChange, onSuccess }: CreateW
 		},
 	});
 
+	// Fetch workspaces when worktree strategy is selected and projectId is available
+	useEffect(() => {
+		if (formState.formData.gitStrategy !== 'worktree' || !projectId) {
+			setWorkspaceOptions([]);
+			return;
+		}
+
+		setIsLoadingWorkspaces(true);
+		workspacesApi
+			.getWorkspaces()
+			.then(data => {
+				// Filter workspaces that belong to the current project AND have a git branch
+				const filteredWorkspaces = data.workspaces.filter(ws => ws.projectId === projectId && ws.gitBranch);
+				setWorkspaceOptions(
+					filteredWorkspaces.map(ws => ({
+						value: ws.id,
+						label: ws.name || ws.path,
+					}))
+				);
+			})
+			.catch(error => {
+				console.error('Failed to fetch workspaces:', error);
+				showToast('Failed to load workspaces', 'error');
+				setWorkspaceOptions([]);
+			})
+			.finally(() => {
+				setIsLoadingWorkspaces(false);
+			});
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [formState.formData.gitStrategy, projectId]);
+
 	// Define form actions
 	const formActions: FormAction[] = [
 		{
@@ -147,7 +201,7 @@ export function CreateWorkspaceDialog({ open, onOpenChange, onSuccess }: CreateW
 			disabled: formState.isSubmitting,
 		},
 		{
-			label: 'Annuler',
+			label: 'Cancel',
 			type: 'button',
 			variant: 'outline',
 			onClick: () => onOpenChange(false),
@@ -263,20 +317,35 @@ export function CreateWorkspaceDialog({ open, onOpenChange, onSuccess }: CreateW
 						</>
 					)}
 
+					{formState.formData.gitStrategy === 'existing' && (
+						<div className="col-span-2">
+							<p className="text-xs text-muted-foreground">
+								The folder must already exist. Git connection will be auto-detected if present.
+							</p>
+						</div>
+					)}
+
 					{formState.formData.gitStrategy === 'worktree' && (
 						<>
 							<div className="col-span-2">
-								<TextField
+								<ComboboxField
 									label="Source Workspace"
 									value={formState.formData.sourceWorkspaceId}
 									onChange={value => formState.updateField('sourceWorkspaceId', value)}
-									placeholder="Coming Soon"
-									disabled
+									options={workspaceOptions}
+									placeholder={
+										isLoadingWorkspaces ? 'Loading workspaces...' : 'Select source workspace'
+									}
+									disabled={isLoadingWorkspaces || workspaceOptions.length === 0}
+									required
 									error={formState.validationErrors.sourceWorkspaceId}
 								/>
-								<p className="mt-1 text-xs text-muted-foreground">
-									Git worktree support is coming soon. Please use clone strategy for now.
-								</p>
+								{!isLoadingWorkspaces && workspaceOptions.length === 0 && (
+									<p className="mt-1 text-xs text-muted-foreground">
+										No git workspaces available in this project. Please create a workspace with git
+										first.
+									</p>
+								)}
 							</div>
 
 							<div className="col-span-2">
@@ -285,7 +354,7 @@ export function CreateWorkspaceDialog({ open, onOpenChange, onSuccess }: CreateW
 									value={formState.formData.branch}
 									onChange={value => formState.updateField('branch', value)}
 									placeholder="feature/new-branch"
-									disabled
+									required
 									error={formState.validationErrors.branch}
 								/>
 							</div>

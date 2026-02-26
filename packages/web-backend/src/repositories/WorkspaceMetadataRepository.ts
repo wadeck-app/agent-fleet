@@ -1,174 +1,125 @@
-import * as fs from 'fs';
 import { createLogger } from 'shared-common/logger';
 
-import type { WorkspaceFileMetadata, WorkspaceMetadataFile } from '../services/WorkspaceMetadataFile';
+import type { WorkspaceMetadataEntity } from '@app/shared/api/workspaces.contract';
+
+import type { BaseRepository } from './BaseRepository';
 
 const log = createLogger('WorkspaceMetadataRepository');
-
-/**
- * Workspace metadata (user-editable fields)
- * Compatible with WorkspaceFileMetadata
- * Note: projectId association is managed via Projects (project.workspaceIds)
- */
-export interface WorkspaceMetadata {
-	id: string;
-	name?: string;
-	description?: string;
-	color?: string;
-	mode?: 'development' | 'production' | 'staging';
-	createdAt: string;
-	updatedAt: string;
-}
 
 /**
  * ===========================================================================================
  * WORKSPACE METADATA REPOSITORY
  * ===========================================================================================
  *
- * Repository for workspace metadata (name, description, mode).
- * Uses file-based storage (.agent-fleet/workspace-metadata.json) instead of in-memory storage.
+ * Centralized repository for workspace metadata (name, description, color, mode).
+ * Uses BaseRepository + FileBasedStorage pattern (data/workspaces.json).
  *
- * Watches metadata files for changes and notifies via callback.
+ * Replaces the previous FS-watcher-based approach with centralized persistence.
  *
  * ===========================================================================================
  */
 export class WorkspaceMetadataRepository {
-	private watchers: Map<string, fs.FSWatcher> = new Map();
-	private changeCallback?: (workspacePath: string) => void;
+	constructor(private readonly base: BaseRepository<WorkspaceMetadataEntity>) {}
 
-	constructor(private readonly metadataFile: WorkspaceMetadataFile) {}
+	async findAll(): Promise<WorkspaceMetadataEntity[]> {
+		return this.base.findAll();
+	}
 
-	/**
-	 * Get metadata for a workspace by path
-	 */
-	async getMetadataByPath(workspacePath: string): Promise<WorkspaceMetadata | null> {
-		const fileMetadata = await this.metadataFile.read(workspacePath);
-		if (!fileMetadata) {
-			return null;
-		}
-		return this.mapToMetadata(fileMetadata);
+	async findById(id: string): Promise<WorkspaceMetadataEntity | null> {
+		return this.base.findById(id);
 	}
 
 	/**
-	 * Get metadata for multiple workspaces by path
+	 * Find a workspace entity by its filesystem path
 	 */
-	async getMetadataForWorkspaces(workspacePaths: string[]): Promise<Map<string, WorkspaceMetadata>> {
-		const map = new Map<string, WorkspaceMetadata>();
+	async findByPath(path: string): Promise<WorkspaceMetadataEntity | null> {
+		const results = await this.base.query().where('path', '=', path).execute();
+		return results[0] ?? null;
+	}
 
-		// Read metadata for each workspace path
-		await Promise.all(
-			workspacePaths.map(async path => {
-				const metadata = await this.getMetadataByPath(path);
-				if (metadata) {
-					map.set(path, metadata);
-				}
-			})
-		);
-
+	/**
+	 * Find workspace entities for multiple paths
+	 * @returns Map<path, entity>
+	 */
+	async findByPaths(paths: string[]): Promise<Map<string, WorkspaceMetadataEntity>> {
+		const all = await this.findAll();
+		const pathSet = new Set(paths);
+		const map = new Map<string, WorkspaceMetadataEntity>();
+		for (const entity of all) {
+			if (pathSet.has(entity.path)) {
+				map.set(entity.path, entity);
+			}
+		}
 		return map;
 	}
 
 	/**
-	 * Update or create metadata for a workspace
+	 * Create a new workspace metadata entity
+	 * @throws Error if path already exists
 	 */
-	async upsertMetadata(
-		workspacePath: string,
-		data: {
-			name?: string;
-			description?: string;
-			color?: string;
-			mode?: 'development' | 'production' | 'staging';
+	async create(
+		data: Omit<WorkspaceMetadataEntity, 'id' | 'version' | 'createdAt' | 'updatedAt'>
+	): Promise<WorkspaceMetadataEntity> {
+		// Enforce path uniqueness
+		const existing = await this.findByPath(data.path);
+		if (existing) {
+			throw new Error(`Workspace metadata already exists for path: ${data.path}`);
 		}
-	): Promise<WorkspaceMetadata> {
-		const fileMetadata = await this.metadataFile.write(workspacePath, data);
-		return this.mapToMetadata(fileMetadata);
+		return this.base.create(data);
 	}
 
 	/**
-	 * Ensure metadata file exists for a workspace
+	 * Update workspace metadata fields
 	 */
-	async ensureMetadata(workspacePath: string): Promise<WorkspaceMetadata> {
-		const fileMetadata = await this.metadataFile.ensureFile(workspacePath);
-		return this.mapToMetadata(fileMetadata);
+	async update(
+		id: string,
+		data: Partial<Pick<WorkspaceMetadataEntity, 'name' | 'description' | 'color' | 'mode' | 'gitBranch'>>
+	): Promise<WorkspaceMetadataEntity> {
+		return this.base.update(id, data);
+	}
+
+	async delete(id: string): Promise<void> {
+		return this.base.delete(id);
 	}
 
 	/**
-	 * Set callback to be called when metadata file changes
+	 * Upsert by path: update if exists, create if not
 	 */
-	setChangeCallback(callback: (workspacePath: string) => void): void {
-		this.changeCallback = callback;
+	async upsertByPath(
+		path: string,
+		data: Partial<Pick<WorkspaceMetadataEntity, 'name' | 'description' | 'color' | 'mode' | 'gitBranch'>>
+	): Promise<WorkspaceMetadataEntity> {
+		const existing = await this.findByPath(path);
+		if (existing) {
+			return this.update(existing.id, data);
+		}
+		return this.base.create({
+			path,
+			name: data.name,
+			description: data.description,
+			color: data.color,
+			mode: data.mode ?? 'development',
+			gitBranch: data.gitBranch,
+		});
 	}
 
 	/**
-	 * Start watching a workspace metadata file for changes
+	 * Ensure a workspace entity exists for the given path.
+	 * Returns existing entity or creates one with defaults.
 	 */
-	startWatching(workspacePath: string): void {
-		// Don't watch if already watching
-		if (this.watchers.has(workspacePath)) {
-			return;
+	async ensureByPath(path: string): Promise<WorkspaceMetadataEntity> {
+		const existing = await this.findByPath(path);
+		if (existing) {
+			return existing;
 		}
 
-		try {
-			const metadataPath = this.metadataFile.getMetadataFilePath(workspacePath);
-
-			// Only watch if file exists
-			if (!fs.existsSync(metadataPath)) {
-				log.info(`Metadata file doesn't exist yet: ${metadataPath}`);
-				return;
-			}
-
-			const watcher = fs.watch(metadataPath, (eventType, _filename) => {
-				if (eventType === 'change') {
-					log.info(`Metadata file changed for workspace: ${workspacePath}`);
-					// Notify via callback
-					if (this.changeCallback) {
-						this.changeCallback(workspacePath);
-					}
-				}
-			});
-
-			this.watchers.set(workspacePath, watcher);
-			log.info(`Started watching: ${workspacePath}`);
-		} catch (error) {
-			log.error(`Failed to watch ${workspacePath}:`, error);
-		}
-	}
-
-	/**
-	 * Stop watching a workspace metadata file
-	 */
-	stopWatching(workspacePath: string): void {
-		const watcher = this.watchers.get(workspacePath);
-		if (watcher) {
-			watcher.close();
-			this.watchers.delete(workspacePath);
-			log.info(`Stopped watching: ${workspacePath}`);
-		}
-	}
-
-	/**
-	 * Stop watching all workspace metadata files
-	 */
-	stopAllWatching(): void {
-		for (const [workspacePath, watcher] of this.watchers) {
-			watcher.close();
-			log.info(`Stopped watching: ${workspacePath}`);
-		}
-		this.watchers.clear();
-	}
-
-	/**
-	 * Map WorkspaceFileMetadata to WorkspaceMetadata
-	 */
-	private mapToMetadata(fileMetadata: WorkspaceFileMetadata): WorkspaceMetadata {
-		return {
-			id: fileMetadata.id,
-			name: fileMetadata.name,
-			description: fileMetadata.description,
-			color: fileMetadata.color,
-			mode: fileMetadata.mode,
-			createdAt: fileMetadata.createdAt,
-			updatedAt: fileMetadata.updatedAt,
-		};
+		// Extract name from path
+		const name = path.split(/[/\\]/).filter(Boolean).pop() || 'Workspace';
+		log.info(`Creating default workspace entity for path: ${path}`);
+		return this.base.create({
+			path,
+			name,
+			mode: 'development',
+		});
 	}
 }

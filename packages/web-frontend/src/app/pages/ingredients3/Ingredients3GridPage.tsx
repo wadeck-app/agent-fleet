@@ -379,11 +379,11 @@ export function Ingredients3GridPage() {
 			{/* Data Shell + Grid */}
 			<Data2
 				fetchData={fetchIngredients}
-				{...pagination}
-				{...sorting}
-				{...search}
-				{...cache}
-				{...selection}
+				pagination={pagination}
+				sorting={sorting}
+				search={search}
+				cache={cache}
+				selection={selection}
 				delegateLoadingToChildren={true}
 			>
 				{injectedProps => (

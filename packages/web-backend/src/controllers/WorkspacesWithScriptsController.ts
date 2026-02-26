@@ -1,7 +1,9 @@
+import { WORKSPACE_FILES_API_ROUTES } from '@app/shared/api/workspaceFiles.contract';
 import { WORKSPACE_SCRIPTS_API_ROUTES } from '@app/shared/api/workspaceScripts.contract';
 import { WORKSPACES_API_ROUTES } from '@app/shared/api/workspaces.contract';
 
 import type { ScriptProcessService } from '../services/ScriptProcessService';
+import type { WorkspaceFileService } from '../services/WorkspaceFileService';
 import type { WorkspaceScriptsService } from '../services/WorkspaceScriptsService';
 import type { WorkspacesService } from '../services/WorkspacesService';
 import type { ScriptLogsStorage } from '../storage/ScriptLogsStorage';
@@ -13,6 +15,7 @@ import type { LazyController } from '../utils/lazy-controller-plugin';
  */
 const MERGED_ROUTES = {
 	...WORKSPACES_API_ROUTES,
+	...WORKSPACE_FILES_API_ROUTES,
 	...WORKSPACE_SCRIPTS_API_ROUTES,
 	__baseUrl: '/api/workspaces',
 };
@@ -36,7 +39,8 @@ export default class WorkspacesWithScriptsController implements LazyController<M
 		private readonly workspacesService: WorkspacesService,
 		private readonly workspaceScriptsService: WorkspaceScriptsService,
 		private readonly scriptProcessService: ScriptProcessService,
-		private readonly scriptLogsStorage: ScriptLogsStorage
+		private readonly scriptLogsStorage: ScriptLogsStorage,
+		private readonly workspaceFileService: WorkspaceFileService
 	) {}
 
 	configureRoutes(add: RouteWrapperFunc<MergedRoutes>) {
@@ -57,6 +61,25 @@ export default class WorkspacesWithScriptsController implements LazyController<M
 
 		add('PATCH', '/api/workspaces/:id', async ({ params, body }) => {
 			return this.workspacesService.updateWorkspace(params.id, body);
+		});
+
+		// ========================================
+		// File Routes
+		// ========================================
+
+		add('GET', '/api/workspaces/:workspaceId/files/tree', async ({ params, query }) => {
+			const workspacePath = await this.workspaceFileService.resolveWorkspacePath(params.workspaceId);
+			return this.workspaceFileService.listDirectory(workspacePath, query.path);
+		});
+
+		add('GET', '/api/workspaces/:workspaceId/files/content', async ({ params, query }) => {
+			const workspacePath = await this.workspaceFileService.resolveWorkspacePath(params.workspaceId);
+			return this.workspaceFileService.readFile(workspacePath, query.path);
+		});
+
+		add('PUT', '/api/workspaces/:workspaceId/files/content', async ({ params, query, body }) => {
+			const workspacePath = await this.workspaceFileService.resolveWorkspacePath(params.workspaceId);
+			return this.workspaceFileService.writeFile(workspacePath, query.path, body.content);
 		});
 
 		// ========================================

@@ -19,12 +19,9 @@ import {
 	HttpException,
 	NotFoundException,
 } from '@app/shared/exceptions/http-exceptions';
-import { B2F_WORKSPACE_UPDATED } from '@app/shared/transport';
 
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 import type { ProjectsRepository } from '../repositories/ProjectsRepository';
-import type { WorkspaceMetadataRepository } from '../repositories/WorkspaceMetadataRepository';
-import { WorkspaceMapper } from '../services/WorkspaceMapper';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 
 const log = createLogger('ProjectsService');
@@ -62,7 +59,6 @@ export class ProjectsService {
 		private readonly repository: ProjectsRepository,
 		private readonly orchestratorRepository: OrchestratorRepository,
 		private readonly eventBroadcaster: EventBroadcaster,
-		private readonly workspaceMetadataRepository: WorkspaceMetadataRepository,
 		private readonly orchestratorWrapper: OrchestratorWrapper
 	) {}
 

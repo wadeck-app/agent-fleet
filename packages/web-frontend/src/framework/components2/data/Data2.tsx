@@ -93,6 +93,19 @@ export interface Data2Props<T> {
 	 * Default: false (Data2 shows loading indicator)
 	 */
 	delegateLoadingToChildren?: boolean;
+
+	// @formatter:off
+	/**
+	 * GUARD: Prevent accidental spread of FeatureContract into Data2 props.
+	 * Writing `<Data2 {...cache}>` compiles silently but breaks all features
+	 * because fstate/actions/fillQuery overwrite each other and the named props
+	 * (pagination, sorting, cache, etc.) remain undefined.
+	 * Use named props instead: `<Data2 cache={cache} pagination={pagination}>`.
+	 */
+	fstate?: never;
+	actions?: never;
+	fillQuery?: never;
+	// @formatter:on
 }
 
 /**

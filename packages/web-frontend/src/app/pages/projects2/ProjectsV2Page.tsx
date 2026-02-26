@@ -3,12 +3,14 @@ import { useSearchParams } from 'react-router-dom';
 
 import { Page } from '@framework/components/layout/Page';
 import { SkeletonBox } from '@framework/components/loading/SkeletonBox';
+import { useDialogParam } from '@framework/hooks/useDialogParam';
 import type { Project } from '@shared/api/projects.contract';
 import type { Workspace } from '@shared/api/workspaces.contract';
 import {
 	B2F_PROJECT_CREATED,
 	B2F_PROJECT_DELETED,
 	B2F_PROJECT_UPDATED,
+	B2F_WORKSPACES_UPDATED,
 	B2F_WORKSPACE_UPDATED,
 } from '@shared/transport/B2FEventConstants';
 
@@ -54,22 +56,17 @@ import { WorkspaceTabs } from './WorkspaceTabs';
 
 export function ProjectsV2Page() {
 	// Dialog state
-	const [isManageDialogOpen, setIsManageDialogOpen] = useState(false);
-	const [isManageWorkspacesDialogOpen, setIsManageWorkspacesDialogOpen] = useState(false);
-	const [isCreateWorkspaceDialogOpen, setIsCreateWorkspaceDialogOpen] = useState(false);
-	const [editDialogState, setEditDialogState] = useState<{
-		open: boolean;
-		project: Project | null;
-	}>({
-		open: false,
-		project: null,
-	});
+	const manageDialog = useDialogParam('manage-pinned');
+	const manageWorkspacesDialog = useDialogParam('manage-workspaces');
+	const createWorkspaceDialog = useDialogParam('create-workspace');
+	const editDialog = useDialogParam('edit-project');
+	const [editProject, setEditProject] = useState<Project | null>(null);
 
 	// URL as source of truth (read-only)
 	const [searchParams, setSearchParams] = useSearchParams();
 	const projectId = searchParams.get('projectId');
 	const workspaceId = searchParams.get('workspaceId');
-	const view = (searchParams.get('view') as 'tasks' | 'scripts') || 'tasks';
+	const view = (searchParams.get('view') as 'tasks' | 'scripts' | 'files') || 'tasks';
 
 	// Track if we've done initial auto-selection
 	const hasAutoSelected = useRef(false);
@@ -147,7 +144,13 @@ export function ProjectsV2Page() {
 
 	// Subscribe to real-time updates
 	useRealtimeRefresh({
-		events: [B2F_PROJECT_CREATED, B2F_PROJECT_UPDATED, B2F_PROJECT_DELETED, B2F_WORKSPACE_UPDATED],
+		events: [
+			B2F_PROJECT_CREATED,
+			B2F_PROJECT_UPDATED,
+			B2F_PROJECT_DELETED,
+			B2F_WORKSPACE_UPDATED,
+			B2F_WORKSPACES_UPDATED,
+		],
 		onEvent: () => {
 			loadProjects();
 			loadWorkspaces();
@@ -194,9 +197,22 @@ export function ProjectsV2Page() {
 		await associateWorkspace(workspaceId, activeProject.id);
 	};
 
-	const handleWorkspaceDissociate = async (workspaceId: string) => {
+	const handleWorkspaceDissociate = async (dissociatedWorkspaceId: string) => {
 		if (!activeProject) return;
-		await dissociateWorkspace(workspaceId, activeProject.id);
+		await dissociateWorkspace(dissociatedWorkspaceId, activeProject.id);
+		// If the dissociated workspace was the currently selected one, select the next available
+		if (dissociatedWorkspaceId === workspaceId) {
+			const remaining = projectWorkspaces.filter(w => w.id !== dissociatedWorkspaceId);
+			setSearchParams(prev => {
+				const currentProjectId = prev.get('projectId');
+				if (!currentProjectId) return prev;
+				const params: Record<string, string> = { projectId: currentProjectId };
+				if (remaining.length > 0) {
+					params.workspaceId = remaining[0].id;
+				}
+				return params;
+			});
+		}
 	};
 
 	const handleWorkspaceReorder = async (activeId: string, overId: string) => {
@@ -217,22 +233,28 @@ export function ProjectsV2Page() {
 		});
 	};
 
-	const handleViewChange = (newView: 'tasks' | 'scripts') => {
+	const handleViewChange = (newView: 'tasks' | 'scripts' | 'files') => {
 		// Use functional form to avoid stale closure issues
 		setSearchParams(prev => {
 			const currentProjectId = prev.get('projectId');
 			const currentWorkspaceId = prev.get('workspaceId');
+			const currentFile = prev.get('file');
+			const currentLine = prev.get('line');
 			if (!currentProjectId) return prev;
 
 			const params: Record<string, string> = { projectId: currentProjectId };
 			if (currentWorkspaceId) params.workspaceId = currentWorkspaceId;
 			if (newView !== 'tasks') params.view = newView; // Only add if not default
+			// Preserve file and line params when switching to/within files view
+			if (newView === 'files' && currentFile) params.file = currentFile;
+			if (newView === 'files' && currentLine) params.line = currentLine;
 			return params;
 		});
 	};
 
 	const handleEditProject = (project: Project) => {
-		setEditDialogState({ open: true, project });
+		setEditProject(project);
+		editDialog.open();
 	};
 
 	// Note: No need to manually reload here - the realtime WebSocket listener
@@ -243,7 +265,7 @@ export function ProjectsV2Page() {
 	};
 
 	const handleCreateWorkspace = () => {
-		setIsCreateWorkspaceDialogOpen(true);
+		createWorkspaceDialog.open();
 	};
 
 	const handleWorkspaceCreated = async (workspace: Workspace) => {
@@ -251,7 +273,7 @@ export function ProjectsV2Page() {
 			await associateWorkspace(workspace.id, activeProject.id);
 		}
 		// Workspaces will be reloaded automatically via WebSocket event
-		setIsCreateWorkspaceDialogOpen(false);
+		createWorkspaceDialog.close();
 	};
 
 	return (
@@ -298,7 +320,7 @@ export function ProjectsV2Page() {
 						</div>
 					</div>
 				) : pinnedProjects.length === 0 ? (
-					<ProjectEmptyState onManageClick={() => setIsManageDialogOpen(true)} />
+					<ProjectEmptyState onManageClick={() => manageDialog.open()} />
 				) : (
 					<div className="flex h-full flex-col">
 						<ProjectTabs
@@ -306,7 +328,7 @@ export function ProjectsV2Page() {
 							workspaces={workspaces}
 							activeProjectId={projectId}
 							onProjectSelect={handleProjectTabClick}
-							onManageClick={() => setIsManageDialogOpen(true)}
+							onManageClick={() => manageDialog.open()}
 						/>
 
 						{/* Workspace Tabs and Content */}
@@ -317,7 +339,7 @@ export function ProjectsV2Page() {
 									activeWorkspaceId={workspaceId}
 									onWorkspaceSelect={handleWorkspaceSelect}
 									onEditProjectClick={() => handleEditProject(activeProject)}
-									onManageClick={() => setIsManageWorkspacesDialogOpen(true)}
+									onManageClick={() => manageWorkspacesDialog.open()}
 									onCreateWorkspaceClick={handleCreateWorkspace}
 								/>
 								{activeWorkspace ? (
@@ -328,7 +350,7 @@ export function ProjectsV2Page() {
 										onViewChange={handleViewChange}
 									/>
 								) : (
-									<WorkspaceEmptyState onManageClick={() => setIsManageWorkspacesDialogOpen(true)} />
+									<WorkspaceEmptyState onManageClick={() => manageWorkspacesDialog.open()} />
 								)}
 							</div>
 						)}
@@ -338,16 +360,19 @@ export function ProjectsV2Page() {
 
 			{/* Edit Project Dialog */}
 			<EditProjectDialog
-				project={editDialogState.project}
-				open={editDialogState.open}
-				onOpenChange={open => setEditDialogState({ open, project: open ? editDialogState.project : null })}
+				project={editProject}
+				open={editDialog.isOpen}
+				onOpenChange={open => {
+					editDialog.onOpenChange(open);
+					if (!open) setEditProject(null);
+				}}
 				onSuccess={handleProjectUpdated}
 			/>
 
 			{/* Manage Pinned Projects Dialog */}
 			<ManagePinnedProjectsDialog
-				open={isManageDialogOpen}
-				onOpenChange={setIsManageDialogOpen}
+				open={manageDialog.isOpen}
+				onOpenChange={manageDialog.onOpenChange}
 				projects={projects}
 				pinnedProjects={pinnedProjects}
 				onPin={handleProjectSelect}
@@ -357,8 +382,8 @@ export function ProjectsV2Page() {
 
 			{/* Manage Project Workspaces Dialog */}
 			<ManageProjectWorkspacesDialog
-				open={isManageWorkspacesDialogOpen}
-				onOpenChange={setIsManageWorkspacesDialogOpen}
+				open={manageWorkspacesDialog.isOpen}
+				onOpenChange={manageWorkspacesDialog.onOpenChange}
 				project={activeProject}
 				workspaces={workspaces}
 				onAssociate={handleWorkspaceAssociate}
@@ -368,9 +393,10 @@ export function ProjectsV2Page() {
 
 			{/* Create Workspace Dialog */}
 			<CreateWorkspaceDialog
-				open={isCreateWorkspaceDialogOpen}
-				onOpenChange={setIsCreateWorkspaceDialogOpen}
+				open={createWorkspaceDialog.isOpen}
+				onOpenChange={createWorkspaceDialog.onOpenChange}
 				onSuccess={handleWorkspaceCreated}
+				projectId={projectId ?? undefined}
 			/>
 		</Page>
 	);

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { useAbortableEffect } from '@framework/hooks/useAbortableEffect';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
@@ -68,6 +68,10 @@ export function useBooks(params?: UseBooksParams): UseBooksResult {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
+	// Track latest params so loadBooks() can use them when called without args (e.g. after CRUD operations)
+	const paramsRef = useRef(params);
+	paramsRef.current = params;
+
 	/**
 	 * Load books from the API with pagination and sorting
 	 *
@@ -78,7 +82,8 @@ export function useBooks(params?: UseBooksParams): UseBooksResult {
 		try {
 			setLoading(true);
 			setError(null);
-			const data = await booksService.getBooks(newParams);
+			const effectiveParams = newParams ?? paramsRef.current;
+			const data = await booksService.getBooks(effectiveParams);
 			setBooks(data.items);
 			setPagination(data.pagination ?? null);
 		} catch (err) {

@@ -177,16 +177,18 @@ function createLazyControllerPlugin<Routes = any>(
 			// @ts-expect-error - Dynamic service injection based on baseUrl
 			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/workspaces') {
-			// Unified controller needs 4 services
+			// Unified controller needs 5 services
 			const workspacesService = factory.getWorkspacesService();
 			const workspaceScriptsService = factory.getWorkspaceScriptsService();
 			const scriptProcessService = factory.getScriptProcessService();
 			const scriptLogsStorage = factory.getScriptLogsStorage();
+			const workspaceFileService = factory.getWorkspaceFileService();
 			controllerInstance = new (ControllerClass as any)(
 				workspacesService,
 				workspaceScriptsService,
 				scriptProcessService,
-				scriptLogsStorage
+				scriptLogsStorage,
+				workspaceFileService
 			);
 		} else if (baseUrl === '/api/interventions') {
 			service = factory.getInterventionsService();

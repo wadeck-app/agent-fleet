@@ -1,4 +1,5 @@
 import type { ScriptLogEntry as ScriptLogEntryType } from '@shared/api/workspaceScripts.contract';
+import { AlertTriangle, ArrowRight, Info, X } from 'lucide-react';
 
 interface ScriptLogEntryProps {
 	log: ScriptLogEntryType;
@@ -27,12 +28,14 @@ export function ScriptLogEntry({ log, onExpand }: ScriptLogEntryProps) {
 		error: 'text-destructive',
 	};
 
-	const levelIcons = {
-		stdout: '>',
-		stderr: '!',
-		info: 'i',
-		error: 'X',
+	const levelIconComponents = {
+		stdout: ArrowRight,
+		stderr: AlertTriangle,
+		info: Info,
+		error: X,
 	};
+
+	const LevelIcon = levelIconComponents[log.level];
 
 	const levelLabels = {
 		stdout: 'OUT',
@@ -56,7 +59,7 @@ export function ScriptLogEntry({ log, onExpand }: ScriptLogEntryProps) {
 
 			{/* Level icon + color */}
 			<span className={levelColors[log.level]} title={levelLabels[log.level]}>
-				{levelIcons[log.level]}
+				<LevelIcon className="size-4" />
 			</span>
 
 			{/* Level label */}

@@ -80,7 +80,7 @@ describe('EditProjectDialog', () => {
 			render(<EditProjectDialog {...defaultProps} />);
 
 			expect(screen.getByRole('button', { name: /Save Changes/i })).toBeInTheDocument();
-			expect(screen.getByRole('button', { name: /Annuler/i })).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: /Cancel/i })).toBeInTheDocument();
 		});
 
 		it('should not render when open is false', () => {
@@ -442,12 +442,13 @@ describe('EditProjectDialog', () => {
 			const user = userEvent.setup();
 			const { projectsApi } = await import('./projects.api');
 
-			// Make API call take some time using Promise that never resolves immediately
-			let resolvePromise: (value: any) => void;
-			const pendingPromise = new Promise(resolve => {
-				resolvePromise = resolve;
+			// Use a Promise to simulate async behavior
+			let resolveUpdate: (value: any) => void;
+			const updatePromise = new Promise(resolve => {
+				resolveUpdate = resolve;
 			});
-			(projectsApi.updateProject as any).mockReturnValue(pendingPromise);
+
+			(projectsApi.updateProject as any).mockImplementation(() => updatePromise);
 
 			render(<EditProjectDialog {...defaultProps} />);
 
@@ -460,8 +461,8 @@ describe('EditProjectDialog', () => {
 				expect(submitButton).toBeDisabled();
 			});
 
-			// Clean up - resolve the promise
-			resolvePromise!({ id: 'project-1', version: 2 });
+			// Clean up by resolving the promise
+			resolveUpdate!({ id: 'project-1', version: 2 });
 		});
 	});
 
@@ -472,7 +473,7 @@ describe('EditProjectDialog', () => {
 
 			render(<EditProjectDialog {...defaultProps} onOpenChange={onOpenChange} />);
 
-			const cancelButton = screen.getByRole('button', { name: /Annuler/i });
+			const cancelButton = screen.getByRole('button', { name: /Cancel/i });
 			await user.click(cancelButton);
 
 			expect(onOpenChange).toHaveBeenCalledWith(false);
@@ -610,7 +611,6 @@ describe('EditProjectDialog', () => {
 		});
 
 		it('should not submit when project is null', async () => {
-			const _user = userEvent.setup();
 			const { projectsApi } = await import('./projects.api');
 
 			render(<EditProjectDialog {...defaultProps} project={null} />);

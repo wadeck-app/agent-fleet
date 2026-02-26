@@ -103,17 +103,17 @@ export class WorkspaceGitService {
 			const branches = await git.branch();
 			const branchExists = branches.all.includes(branch);
 
-			if (!branchExists) {
-				// Create new branch from current HEAD
-				await git.checkoutBranch(branch, 'HEAD');
-				log.info('Created new branch', { branch });
-			}
-
 			// Ensure parent directory exists
 			await mkdir(dirname(targetPath), { recursive: true });
 
-			// Create worktree
-			await git.raw(['worktree', 'add', targetPath, branch]);
+			if (branchExists) {
+				// Branch exists — use it directly
+				await git.raw(['worktree', 'add', targetPath, branch]);
+			} else {
+				// Create new branch and worktree in one step (avoids checking out in source repo)
+				await git.raw(['worktree', 'add', '-b', branch, targetPath]);
+				log.info('Created new branch via worktree', { branch });
+			}
 
 			log.info('Successfully created worktree', { targetPath, branch });
 

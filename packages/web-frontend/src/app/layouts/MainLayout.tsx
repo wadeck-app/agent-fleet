@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 
-import { DynamicLucideIcon } from '@framework/components/icons/DynamicLucideIcon';
 import { Button } from '@framework/components/primitives/Button';
 import { useDocumentTitle } from '@framework/hooks/useDocumentTitle';
 import { useMediaQuery } from '@framework/hooks/useMediaQuery';
-import { Menu, X } from 'lucide-react';
+import { BarChart3, BookOpen, Menu, MessageCircle, Salad, X } from 'lucide-react';
 
 import { useInfoPanel } from '@app/contexts/InfoPanelContext';
 import { WorkspaceIndicator } from '@app/features/workspace/WorkspaceIndicator';
@@ -22,10 +21,10 @@ export default function MainLayout() {
 	}, [location.pathname, setInfoPanelContent]);
 
 	const navItems = [
-		{ path: '/ingredients', label: 'Ingrédients', icon: 'Salad' },
-		{ path: '/recipes', label: 'Recettes', icon: 'Book' },
-		{ path: '/tracking', label: 'Suivi Quotidien', icon: 'BarChart3' },
-		{ path: '/chat', label: 'Chat IA', icon: 'MessageCircle' },
+		{ path: '/ingredients', label: 'Ingrédients', icon: Salad },
+		{ path: '/recipes', label: 'Recettes', icon: BookOpen },
+		{ path: '/tracking', label: 'Suivi Quotidien', icon: BarChart3 },
+		{ path: '/chat', label: 'Chat IA', icon: MessageCircle },
 	];
 
 	const isActive = (path: string) => location.pathname === path;
@@ -59,7 +58,7 @@ export default function MainLayout() {
 							onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
 							className="text-white"
 						>
-							{mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+							{mobileMenuOpen ? <X className="size-6" /> : <Menu className="size-6" />}
 						</Button>
 					</header>
 
@@ -77,7 +76,7 @@ export default function MainLayout() {
          `}
 									onClick={() => setMobileMenuOpen(false)}
 								>
-									<DynamicLucideIcon name={item.icon} className="h-5 w-5" />
+									<item.icon className="size-5" />
 									<span>{item.label}</span>
 								</Link>
 							))}
@@ -108,7 +107,7 @@ export default function MainLayout() {
            ${isActive(item.path) ? 'bg-[#3498db]' : ''}
          `}
 								>
-									<DynamicLucideIcon name={item.icon} className="h-5 w-5" />
+									<item.icon className="size-5" />
 									<span>{item.label}</span>
 								</Link>
 							))}

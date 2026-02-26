@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 
 import { Data2 } from '@framework/components2/data/Data2';
 import { ActiveFeaturesPanel } from '@framework/components/debug/ActiveFeaturesPanel';
@@ -11,6 +11,7 @@ import { usePagination2 } from '@framework/hooks2/data/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/data/useSimpleSearch';
 import { useSorting2 } from '@framework/hooks2/data/useSorting2';
 import { useDebounce } from '@framework/hooks2/utility/useDebounce';
+import { useDialogParam } from '@framework/hooks/useDialogParam';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
 import {
 	B2F_PROJECT_DELETED,
@@ -45,7 +46,7 @@ const STORAGE_ID = 'workspaces' as const;
  * ===========================================================================================
  */
 export function WorkspacesPage() {
-	const [createDialogOpen, setCreateDialogOpen] = useState(false);
+	const createDialog = useDialogParam('create-workspace');
 
 	// Headless features
 	const pagination = usePagination2({
@@ -105,8 +106,8 @@ export function WorkspacesPage() {
 	// Handle workspace creation
 	const handleCreateWorkspace = useCallback(() => {
 		cache.actions.refresh();
-		setCreateDialogOpen(false);
-	}, [cache.actions]);
+		createDialog.close();
+	}, [cache.actions, createDialog]);
 
 	return (
 		<Page>
@@ -115,7 +116,7 @@ export function WorkspacesPage() {
 				onRefresh={cache.actions.refresh}
 				isRefreshing={cache.fstate.isRefreshing}
 				action={
-					<Button onClick={() => setCreateDialogOpen(true)}>
+					<Button onClick={createDialog.open}>
 						<Plus className="h-4 w-4 mr-2" />
 						Create Workspace
 					</Button>
@@ -161,8 +162,8 @@ export function WorkspacesPage() {
 
 			{/* Create Workspace Dialog */}
 			<CreateWorkspaceDialog
-				open={createDialogOpen}
-				onOpenChange={setCreateDialogOpen}
+				open={createDialog.isOpen}
+				onOpenChange={createDialog.onOpenChange}
 				onSuccess={handleCreateWorkspace}
 			/>
 		</Page>

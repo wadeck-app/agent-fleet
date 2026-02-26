@@ -167,12 +167,12 @@ export function DualListItem({
 		<div ref={setNodeRef} style={style} className={containerClasses}>
 			{/* Drag Handle */}
 			<Button
-				variant="ghost"
-				size="icon"
 				{...attributes}
 				{...listeners}
+				variant="ghost"
+				size="icon-xs"
 				className={cn(
-					'cursor-grab touch-none p-2 opacity-40 transition-opacity duration-150',
+					'cursor-grab touch-none opacity-40 transition-opacity duration-150',
 					'hover:opacity-70',
 					'active:cursor-grabbing'
 				)}

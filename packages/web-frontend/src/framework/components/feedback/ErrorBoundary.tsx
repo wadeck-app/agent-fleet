@@ -120,19 +120,18 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 	/**
 	 * Get severity icon component
 	 */
-	private getSeverityIcon(severity: ErrorSeverity): ReactNode {
-		const iconClass = 'h-16 w-16';
+	private getSeverityIcon(severity: ErrorSeverity) {
 		switch (severity) {
 			case ErrorSeverity.LOW:
-				return <Info className={iconClass} />;
+				return Info;
 			case ErrorSeverity.MEDIUM:
-				return <AlertTriangle className={iconClass} />;
+				return AlertTriangle;
 			case ErrorSeverity.HIGH:
-				return <AlertCircle className={iconClass} />;
+				return AlertCircle;
 			case ErrorSeverity.CRITICAL:
-				return <AlertCircle className={iconClass} />;
+				return AlertCircle;
 			default:
-				return <AlertTriangle className={iconClass} />;
+				return AlertTriangle;
 		}
 	}
 
@@ -145,7 +144,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
 			const error = this.state.error;
 			const severityStyles = this.getSeverityStyles(error.severity);
-			const severityIcon = this.getSeverityIcon(error.severity);
+			const SeverityIcon = this.getSeverityIcon(error.severity);
 
 			// Render default fallback UI with AppError integration
 			return (
@@ -157,7 +156,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
      `}
 				>
 					<div className="max-w-md space-y-4">
-						<div className="flex justify-center">{severityIcon}</div>
+						<SeverityIcon className="mx-auto size-16 text-destructive" />
 						<h2 className="text-2xl font-bold text-destructive">
 							{error.severity === ErrorSeverity.CRITICAL ? 'Critical Error' : 'Something went wrong'}
 						</h2>

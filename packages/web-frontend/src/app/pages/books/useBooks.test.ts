@@ -588,4 +588,114 @@ describe('useBooks', () => {
 			expect(result.current.error).toBeNull();
 		});
 	});
+
+	describe('params preservation after CRUD', () => {
+		const sortParams = { sortBy: 'title', sortOrder: 'asc', page: 3, pageSize: 20 };
+
+		it('should reload with current params after createBook', async () => {
+			vi.mocked(booksService.getBooks).mockResolvedValue({
+				items: mockBooks,
+				pagination: { total: 2, page: 3, pageSize: 20, totalPages: 1 },
+			});
+
+			const newBook: CreateBook = {
+				title: 'Design Patterns',
+				author: 'Gang of Four',
+				pages: 395,
+				genre: 'Programming',
+			};
+
+			const createdBook: Book = withMetadata({ id: '3', ...newBook });
+			vi.mocked(booksService.createBook).mockResolvedValue(createdBook);
+
+			const { result } = renderHook(() => useBooks(sortParams));
+
+			await waitFor(() => {
+				expect(result.current.loading).toBe(false);
+			});
+
+			await act(async () => {
+				await result.current.createBook(newBook);
+			});
+
+			const calls = vi.mocked(booksService.getBooks).mock.calls;
+			const lastCall = calls[calls.length - 1][0];
+			expect(lastCall).toEqual(
+				expect.objectContaining({
+					sortBy: 'title',
+					sortOrder: 'asc',
+					page: 3,
+					pageSize: 20,
+				})
+			);
+		});
+
+		it('should reload with current params after updateBook', async () => {
+			vi.mocked(booksService.getBooks).mockResolvedValue({
+				items: mockBooks,
+				pagination: { total: 2, page: 3, pageSize: 20, totalPages: 1 },
+			});
+
+			const updateData = {
+				title: 'Clean Code (Updated)',
+				author: 'Robert C. Martin',
+				pages: 500,
+				genre: 'Programming',
+				version: 1,
+			};
+
+			const updatedBook: Book = withMetadata({ id: '1', ...updateData });
+			vi.mocked(booksService.updateBook).mockResolvedValue(updatedBook);
+
+			const { result } = renderHook(() => useBooks(sortParams));
+
+			await waitFor(() => {
+				expect(result.current.loading).toBe(false);
+			});
+
+			await act(async () => {
+				await result.current.updateBook('1', updateData);
+			});
+
+			const calls = vi.mocked(booksService.getBooks).mock.calls;
+			const lastCall = calls[calls.length - 1][0];
+			expect(lastCall).toEqual(
+				expect.objectContaining({
+					sortBy: 'title',
+					sortOrder: 'asc',
+					page: 3,
+					pageSize: 20,
+				})
+			);
+		});
+
+		it('should reload with current params after deleteBook', async () => {
+			vi.mocked(booksService.getBooks).mockResolvedValue({
+				items: mockBooks,
+				pagination: { total: 2, page: 3, pageSize: 20, totalPages: 1 },
+			});
+			vi.mocked(booksService.deleteBook).mockResolvedValue(undefined);
+
+			const { result } = renderHook(() => useBooks(sortParams));
+
+			await waitFor(() => {
+				expect(result.current.loading).toBe(false);
+			});
+
+			await act(async () => {
+				await result.current.deleteBook('1');
+			});
+
+			const calls = vi.mocked(booksService.getBooks).mock.calls;
+			const lastCall = calls[calls.length - 1][0];
+			expect(lastCall).toEqual(
+				expect.objectContaining({
+					sortBy: 'title',
+					sortOrder: 'asc',
+					page: 3,
+					pageSize: 20,
+				})
+			);
+		});
+	});
 });

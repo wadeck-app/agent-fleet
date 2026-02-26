@@ -404,4 +404,123 @@ describe('useIngredients', () => {
 			expect(ingredientsService.calculateTotalMacros).toHaveBeenCalledWith(mockIngredients);
 		});
 	});
+
+	describe('params preservation after CRUD', () => {
+		const sortParams = { sortBy: 'calories', sortOrder: 'desc', page: 2, pageSize: 5 };
+
+		it('should reload with current params after createIngredient', async () => {
+			vi.mocked(ingredientsService.getIngredients).mockResolvedValue({
+				items: mockIngredients,
+				pagination: { total: 2, page: 2, pageSize: 5, totalPages: 1 },
+			});
+
+			const newIngredient: CreateIngredient = {
+				name: 'Salmon',
+				calories: 208,
+				protein: 20,
+				carbs: 0,
+				fat: 13,
+				servingSize: 100,
+				unit: 'g',
+				category: 'Protein',
+			};
+
+			const createdIngredient: Ingredient = withMetadata({ id: '3', ...newIngredient });
+			vi.mocked(ingredientsService.createIngredient).mockResolvedValue(createdIngredient);
+
+			const { result } = renderHook(() => useIngredients(sortParams));
+
+			await waitFor(() => {
+				expect(result.current.loading).toBe(false);
+			});
+
+			await act(async () => {
+				await result.current.createIngredient(newIngredient);
+			});
+
+			// The reload after create should preserve sort/pagination params
+			const calls = vi.mocked(ingredientsService.getIngredients).mock.calls;
+			const lastCall = calls[calls.length - 1][0];
+			expect(lastCall).toEqual(
+				expect.objectContaining({
+					sortBy: 'calories',
+					sortOrder: 'desc',
+					page: 2,
+					pageSize: 5,
+				})
+			);
+		});
+
+		it('should reload with current params after updateIngredient', async () => {
+			vi.mocked(ingredientsService.getIngredients).mockResolvedValue({
+				items: mockIngredients,
+				pagination: { total: 2, page: 2, pageSize: 5, totalPages: 1 },
+			});
+
+			const updateData = {
+				name: 'Updated Chicken',
+				calories: 170,
+				protein: 32,
+				carbs: 1,
+				fat: 4,
+				servingSize: 100,
+				version: 1,
+				unit: 'g',
+				category: 'Protein',
+			};
+
+			const updatedIngredient: Ingredient = withMetadata({ id: '1', ...updateData });
+			vi.mocked(ingredientsService.updateIngredient).mockResolvedValue(updatedIngredient);
+
+			const { result } = renderHook(() => useIngredients(sortParams));
+
+			await waitFor(() => {
+				expect(result.current.loading).toBe(false);
+			});
+
+			await act(async () => {
+				await result.current.updateIngredient('1', updateData);
+			});
+
+			const calls = vi.mocked(ingredientsService.getIngredients).mock.calls;
+			const lastCall = calls[calls.length - 1][0];
+			expect(lastCall).toEqual(
+				expect.objectContaining({
+					sortBy: 'calories',
+					sortOrder: 'desc',
+					page: 2,
+					pageSize: 5,
+				})
+			);
+		});
+
+		it('should reload with current params after deleteIngredient', async () => {
+			vi.mocked(ingredientsService.getIngredients).mockResolvedValue({
+				items: mockIngredients,
+				pagination: { total: 2, page: 2, pageSize: 5, totalPages: 1 },
+			});
+			vi.mocked(ingredientsService.deleteIngredient).mockResolvedValue(undefined);
+
+			const { result } = renderHook(() => useIngredients(sortParams));
+
+			await waitFor(() => {
+				expect(result.current.loading).toBe(false);
+			});
+
+			await act(async () => {
+				await result.current.deleteIngredient('1');
+			});
+
+			const calls = vi.mocked(ingredientsService.getIngredients).mock.calls;
+			const lastCall = calls[calls.length - 1][0];
+			expect(lastCall).toEqual(
+				expect.objectContaining({
+					sortBy: 'calories',
+					sortOrder: 'desc',
+					page: 2,
+					pageSize: 5,
+				})
+			);
+		});
+	});
 });

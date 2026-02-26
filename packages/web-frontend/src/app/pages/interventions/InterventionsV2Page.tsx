@@ -245,12 +245,12 @@ export function InterventionsV2Page() {
 			{/* Data + Table */}
 			<Data2
 				fetchData={fetchInterventions}
-				{...pagination}
-				{...sorting}
-				{...search}
+				pagination={pagination}
+				sorting={sorting}
+				search={search}
 				filter={filters as any}
-				{...cache}
-				{...selection}
+				cache={cache}
+				selection={selection}
 				delegateLoadingToChildren={true}
 			>
 				{injectedProps => (

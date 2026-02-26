@@ -1,4 +1,5 @@
 import type { ScriptProcessStatus } from '@shared/api/workspaceScripts.contract';
+import { AlertTriangle, Circle, CircleDashed, CircleDot, type LucideIcon, X } from 'lucide-react';
 
 interface StatusIndicatorProps {
 	status?: ScriptProcessStatus;
@@ -9,44 +10,44 @@ const STATUS_CONFIG: Record<
 	ScriptProcessStatus,
 	{
 		label: string;
-		icon: string;
+		icon: LucideIcon;
 		color: string;
 		bgColor: string;
 	}
 > = {
 	running: {
 		label: 'Running',
-		icon: 'O',
+		icon: CircleDot,
 		color: 'text-success',
 		bgColor: 'bg-success/10',
 	},
 	stopped: {
 		label: 'Stopped',
-		icon: 'o',
+		icon: Circle,
 		color: 'text-muted-foreground',
 		bgColor: 'bg-muted/10',
 	},
 	starting: {
 		label: 'Starting',
-		icon: '~',
+		icon: CircleDashed,
 		color: 'text-warning',
 		bgColor: 'bg-warning/10',
 	},
 	stopping: {
 		label: 'Stopping',
-		icon: '~',
+		icon: CircleDashed,
 		color: 'text-info',
 		bgColor: 'bg-info/10',
 	},
 	crashed: {
 		label: 'Crashed',
-		icon: '!',
+		icon: AlertTriangle,
 		color: 'text-warning',
 		bgColor: 'bg-warning/10',
 	},
 	error: {
 		label: 'Error',
-		icon: 'X',
+		icon: X,
 		color: 'text-destructive',
 		bgColor: 'bg-destructive/10',
 	},
@@ -69,6 +70,7 @@ export function StatusIndicator({ status, className = '' }: StatusIndicatorProps
 	}
 
 	const config = STATUS_CONFIG[status];
+	const IconComponent = config.icon;
 
 	return (
 		<div
@@ -80,13 +82,12 @@ export function StatusIndicator({ status, className = '' }: StatusIndicatorProps
    `}
 			title={config.label}
 		>
-			<span
+			<IconComponent
 				className={`
+      size-3
       ${status === 'starting' || status === 'stopping' ? 'animate-pulse' : ''}
     `}
-			>
-				{config.icon}
-			</span>
+			/>
 			<span>{config.label}</span>
 		</div>
 	);

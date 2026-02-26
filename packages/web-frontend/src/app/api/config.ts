@@ -51,7 +51,7 @@ export function getApiBaseUrl(): string {
 		const projectId = parseInt(import.meta.env.VITE_PROJECT_ID || '0', 10);
 		const workspaceId = parseInt(import.meta.env.VITE_WORKSPACE_ID || '0', 10);
 
-		const port = 3000 + projectId * 10 + workspaceId * 100;
+		const port = 3000 + projectId * 100 + workspaceId * 10;
 
 		return `http://${host}:${port}/api`;
 	}

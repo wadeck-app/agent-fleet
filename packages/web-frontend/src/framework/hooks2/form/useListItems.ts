@@ -80,7 +80,7 @@ export type ListItemsContract<T> = FeatureFormContract<ListItemsState<T>>;
  * @returns ListItemsContract with fstate and actions
  */
 export function useListItems<T>(options: UseListItemsOptions<T> = {}): ListItemsContract<T> {
-	const { initialItems = [], minItems = 0, maxItems = Infinity, createDefault: _createDefault } = options;
+	const { initialItems = [], minItems = 0, maxItems = Infinity } = options;
 
 	// Internal state
 	const [items, setItems] = useState<T[]>(initialItems);
