@@ -67,7 +67,9 @@ export function TicketsPage() {
 			try {
 				setProjectsLoading(true);
 				const response = await projectsApi.getProjectsList({ archived: false });
-				setProjects(response.items);
+				const projectsList =
+					'items' in response ? response.items : (response as { projects: Project[] }).projects;
+				setProjects(projectsList);
 			} catch (error) {
 				console.error('Failed to load projects:', getErrorMessage(error));
 			} finally {
@@ -105,12 +107,15 @@ export function TicketsPage() {
 			{/* Filters */}
 			<div className="mb-4 flex items-center gap-4">
 				<div className="w-64">
-					<Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+					<Select
+						value={selectedProjectId === '' ? '__all__' : selectedProjectId}
+						onValueChange={v => setSelectedProjectId(v === '__all__' ? '' : v)}
+					>
 						<SelectTrigger>
 							<SelectValue placeholder={projectsLoading ? 'Loading projects...' : 'All Projects'} />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem value="">All Projects</SelectItem>
+							<SelectItem value="__all__">All Projects</SelectItem>
 							{projects.map(project => (
 								<SelectItem key={project.id} value={project.id}>
 									{project.name}

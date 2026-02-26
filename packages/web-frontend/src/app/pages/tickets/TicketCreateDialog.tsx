@@ -56,7 +56,9 @@ export function TicketCreateDialog({ open, onOpenChange, onSuccess }: TicketCrea
 			try {
 				setProjectsLoading(true);
 				const response = await projectsApi.getProjectsList({ archived: false });
-				setProjects(response.items ?? []);
+				const projectsList =
+					'items' in response ? response.items : (response as { projects: Project[] }).projects;
+				setProjects(projectsList ?? []);
 			} catch (error) {
 				showToast(getErrorMessage(error), 'error');
 			} finally {
