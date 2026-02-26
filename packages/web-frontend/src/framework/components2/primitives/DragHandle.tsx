@@ -1,3 +1,4 @@
+import { Button } from '@framework/components/primitives/Button';
 import { cn } from '@framework/lib/utils';
 import { GripVertical } from 'lucide-react';
 
@@ -35,8 +36,10 @@ export interface DragHandleProps extends React.ButtonHTMLAttributes<HTMLButtonEl
 
 export function DragHandle({ disabled = false, className, ...props }: DragHandleProps) {
 	return (
-		<button
+		<Button
 			type="button"
+			variant="ghost"
+			size="icon-xs"
 			className={cn(
 				'cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing',
 				disabled && 'cursor-not-allowed opacity-50',
@@ -46,6 +49,6 @@ export function DragHandle({ disabled = false, className, ...props }: DragHandle
 			{...props}
 		>
 			<GripVertical className="size-4" />
-		</button>
+		</Button>
 	);
 }

@@ -4,7 +4,7 @@ import { Field } from '@framework/components/advanced/Field/Field';
 import { FieldError } from '@framework/components/advanced/Field/FieldError';
 import { FieldLabel } from '@framework/components/advanced/Field/FieldLabel';
 import { Input } from '@framework/components/forms/Input';
-import { Code } from 'lucide-react';
+import { Check, Code, X } from 'lucide-react';
 
 import { type BaseFieldProps, generateFieldId } from '../fieldUtils';
 
@@ -105,8 +105,17 @@ export function RegexField({
 			</div>
 			{description && <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>}
 			{!displayError && value && options?.testString && (
-				<p className="mt-1.5 text-xs text-muted-foreground">
-					Test: {new RegExp(value).test(options.testString) ? '✓ Match' : '✗ No match'}
+				<p className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground">
+					Test:{' '}
+					{new RegExp(value).test(options.testString) ? (
+						<>
+							<Check className="size-3 text-success" /> Match
+						</>
+					) : (
+						<>
+							<X className="size-3 text-destructive" /> No match
+						</>
+					)}
 				</p>
 			)}
 			{displayError && <FieldError>{displayError}</FieldError>}

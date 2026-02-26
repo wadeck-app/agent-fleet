@@ -16,11 +16,11 @@ Thin wrapper around `useUrlState` for dialog state:
 
 ```typescript
 export function useDialogParam(dialogName: string): {
-  isOpen: boolean;
-  open: () => void;
-  close: () => void;
-  onOpenChange: (open: boolean) => void;
-}
+	isOpen: boolean;
+	open: () => void;
+	close: () => void;
+	onOpenChange: (open: boolean) => void;
+};
 ```
 
 - Uses `useUrlState({ key: 'dialog', defaultValue: null })`
@@ -40,33 +40,38 @@ Only one dialog can be open at a time (which is correct for modals).
 For each dialog, replace `useState<boolean>` with `useDialogParam('dialog-name')`.
 
 ### WorkspacesPage (`pages/workspaces/WorkspacesPage.tsx`)
-| Dialog | useState var | Dialog name |
-|--------|-------------|-------------|
+
+| Dialog                | useState var       | Dialog name        |
+| --------------------- | ------------------ | ------------------ |
 | CreateWorkspaceDialog | `createDialogOpen` | `create-workspace` |
 
 ### ProjectsPage (`pages/projects/ProjectsPage.tsx`)
-| Dialog | useState var | Dialog name |
-|--------|-------------|-------------|
-| CreateProjectDialog | `createDialogOpen` | `create-project` |
-| EditProjectDialog | `editDialogState` | `edit-project` (+ keep entity in local state) |
+
+| Dialog              | useState var       | Dialog name                                   |
+| ------------------- | ------------------ | --------------------------------------------- |
+| CreateProjectDialog | `createDialogOpen` | `create-project`                              |
+| EditProjectDialog   | `editDialogState`  | `edit-project` (+ keep entity in local state) |
 
 ### ProjectsV2Page (`pages/projects2/ProjectsV2Page.tsx`)
-| Dialog | useState var | Dialog name |
-|--------|-------------|-------------|
-| ManagePinnedProjectsDialog | `isManageDialogOpen` | `manage-pinned` |
+
+| Dialog                        | useState var                   | Dialog name         |
+| ----------------------------- | ------------------------------ | ------------------- |
+| ManagePinnedProjectsDialog    | `isManageDialogOpen`           | `manage-pinned`     |
 | ManageProjectWorkspacesDialog | `isManageWorkspacesDialogOpen` | `manage-workspaces` |
-| CreateWorkspaceDialog | `isCreateWorkspaceDialogOpen` | `create-workspace` |
-| EditProjectDialog | `editDialogState` | `edit-project` |
+| CreateWorkspaceDialog         | `isCreateWorkspaceDialogOpen`  | `create-workspace`  |
+| EditProjectDialog             | `editDialogState`              | `edit-project`      |
 
 ### WorkspacePanel (`pages/projects2/WorkspacePanel.tsx`)
-| Dialog | useState var | Dialog name |
-|--------|-------------|-------------|
-| EditWorkspaceDialog | `isEditDialogOpen` | `edit-workspace` |
-| CreateTaskDialog | `isCreateTaskDialogOpen` | `create-task` |
+
+| Dialog              | useState var             | Dialog name      |
+| ------------------- | ------------------------ | ---------------- |
+| EditWorkspaceDialog | `isEditDialogOpen`       | `edit-workspace` |
+| CreateTaskDialog    | `isCreateTaskDialogOpen` | `create-task`    |
 
 ### FlowEditorPage (`pages/flows/flow-editor/FlowEditorPage.tsx`)
-| Dialog | useState var | Dialog name |
-|--------|-------------|-------------|
+
+| Dialog             | useState var         | Dialog name     |
+| ------------------ | -------------------- | --------------- |
 | FlowSettingsDialog | `settingsDialogOpen` | `flow-settings` |
 
 **Note for edit dialogs:** The entity being edited stays in `useState` (it's runtime data, not URL-serializable). The URL only controls open/close. On refresh, the dialog opens but the entity may need to be re-fetched — which is acceptable and better than losing the dialog entirely.
@@ -83,15 +88,15 @@ Test: open/close toggles, URL param sync, onOpenChange callback.
 
 ## Files Modified
 
-| File | Action |
-|------|--------|
-| `framework/hooks/useDialogParam.ts` | **New** — hook |
-| `framework/hooks/useDialogParam.test.ts` | **New** — tests |
-| `pages/workspaces/WorkspacesPage.tsx` | Migrate CreateWorkspaceDialog |
-| `pages/projects/ProjectsPage.tsx` | Migrate CreateProjectDialog + EditProjectDialog |
-| `pages/projects2/ProjectsV2Page.tsx` | Migrate 4 dialogs |
-| `pages/projects2/WorkspacePanel.tsx` | Migrate EditWorkspaceDialog + CreateTaskDialog |
-| `pages/flows/flow-editor/FlowEditorPage.tsx` | Migrate FlowSettingsDialog |
+| File                                         | Action                                          |
+| -------------------------------------------- | ----------------------------------------------- |
+| `framework/hooks/useDialogParam.ts`          | **New** — hook                                  |
+| `framework/hooks/useDialogParam.test.ts`     | **New** — tests                                 |
+| `pages/workspaces/WorkspacesPage.tsx`        | Migrate CreateWorkspaceDialog                   |
+| `pages/projects/ProjectsPage.tsx`            | Migrate CreateProjectDialog + EditProjectDialog |
+| `pages/projects2/ProjectsV2Page.tsx`         | Migrate 4 dialogs                               |
+| `pages/projects2/WorkspacePanel.tsx`         | Migrate EditWorkspaceDialog + CreateTaskDialog  |
+| `pages/flows/flow-editor/FlowEditorPage.tsx` | Migrate FlowSettingsDialog                      |
 
 ---
 

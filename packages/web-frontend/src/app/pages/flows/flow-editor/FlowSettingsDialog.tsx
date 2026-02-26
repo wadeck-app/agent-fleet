@@ -21,12 +21,7 @@ import {
 import { Button } from '@framework/components/primitives/Button';
 import { useListItems } from '@framework/hooks2/form/useListItems';
 
-import type {
-	FlowDefinition,
-	GitStrategy,
-	ReusePolicy,
-	WorkspaceMode,
-} from './types/flow-engine.types';
+import type { FlowDefinition, GitStrategy, ReusePolicy, WorkspaceMode } from './types/flow-engine.types';
 
 interface FlowSettingsDialogProps {
 	open: boolean;

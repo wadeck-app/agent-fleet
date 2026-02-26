@@ -620,12 +620,14 @@ describe('useBooks', () => {
 
 			const calls = vi.mocked(booksService.getBooks).mock.calls;
 			const lastCall = calls[calls.length - 1][0];
-			expect(lastCall).toEqual(expect.objectContaining({
-				sortBy: 'title',
-				sortOrder: 'asc',
-				page: 3,
-				pageSize: 20,
-			}));
+			expect(lastCall).toEqual(
+				expect.objectContaining({
+					sortBy: 'title',
+					sortOrder: 'asc',
+					page: 3,
+					pageSize: 20,
+				})
+			);
 		});
 
 		it('should reload with current params after updateBook', async () => {
@@ -657,12 +659,14 @@ describe('useBooks', () => {
 
 			const calls = vi.mocked(booksService.getBooks).mock.calls;
 			const lastCall = calls[calls.length - 1][0];
-			expect(lastCall).toEqual(expect.objectContaining({
-				sortBy: 'title',
-				sortOrder: 'asc',
-				page: 3,
-				pageSize: 20,
-			}));
+			expect(lastCall).toEqual(
+				expect.objectContaining({
+					sortBy: 'title',
+					sortOrder: 'asc',
+					page: 3,
+					pageSize: 20,
+				})
+			);
 		});
 
 		it('should reload with current params after deleteBook', async () => {
@@ -684,12 +688,14 @@ describe('useBooks', () => {
 
 			const calls = vi.mocked(booksService.getBooks).mock.calls;
 			const lastCall = calls[calls.length - 1][0];
-			expect(lastCall).toEqual(expect.objectContaining({
-				sortBy: 'title',
-				sortOrder: 'asc',
-				page: 3,
-				pageSize: 20,
-			}));
+			expect(lastCall).toEqual(
+				expect.objectContaining({
+					sortBy: 'title',
+					sortOrder: 'asc',
+					page: 3,
+					pageSize: 20,
+				})
+			);
 		});
 	});
 });

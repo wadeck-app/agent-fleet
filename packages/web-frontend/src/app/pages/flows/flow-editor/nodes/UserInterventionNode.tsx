@@ -2,7 +2,7 @@ import { memo } from 'react';
 
 import { Badge } from '@framework/components/primitives/Badge';
 import { Handle, Position } from '@xyflow/react';
-import { AlertCircle, Bell } from 'lucide-react';
+import { AlertCircle, Bell, HelpCircle, MessageCircle, Pause, User } from 'lucide-react';
 
 import type { StepNodeData } from '../types';
 import { cn } from '../utils/cn';
@@ -39,19 +39,21 @@ export const UserInterventionNode = memo(({ data, selected }: UserInterventionNo
 		}
 	};
 
-	// Get icon emoji based on intervention type
-	const getInterventionEmoji = () => {
+	// Get icon component based on intervention type
+	const getInterventionIcon = () => {
 		switch (step.interventionType) {
 			case 'approval':
-				return '⏸️';
+				return Pause;
 			case 'question':
-				return '💬';
+				return MessageCircle;
 			case 'choice':
-				return '❓';
+				return HelpCircle;
 			default:
-				return '👤';
+				return User;
 		}
 	};
+
+	const InterventionIcon = getInterventionIcon();
 
 	return (
 		<div
@@ -112,7 +114,7 @@ export const UserInterventionNode = memo(({ data, selected }: UserInterventionNo
 			<div className="mb-3 flex items-center gap-2">
 				<Bell className="size-4 text-amber-500" />
 				<span className="truncate text-sm font-semibold">{step.name}</span>
-				<span className="text-lg">{getInterventionEmoji()}</span>
+				<InterventionIcon className="size-4 text-muted-foreground" />
 			</div>
 
 			{/* Intervention Type Badge */}

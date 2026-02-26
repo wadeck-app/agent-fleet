@@ -64,15 +64,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: Ed
 						version: project.version,
 					}
 				: undefined,
-		[
-			project?.name,
-			project?.description,
-			project?.icon,
-			project?.iconColor,
-			project?.gitRepositoryUrl,
-			project?.gitDefaultBranch,
-			project?.version,
-		]
+		[project]
 	);
 
 	const formState = useFormState<EditProjectFormData>({

@@ -4,7 +4,7 @@ import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
 
-import type { VariableType } from '../../../../app/pages/flows/flow-editor/types/flow-engine.types';
+import type { VariableType } from '@/app/pages/flows/flow-editor/types/flow-engine.types';
 
 /**
  * ===========================================================================================

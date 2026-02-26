@@ -166,11 +166,13 @@ export function DualListItem({
 	return (
 		<div ref={setNodeRef} style={style} className={containerClasses}>
 			{/* Drag Handle */}
-			<button
+			<Button
 				{...attributes}
 				{...listeners}
+				variant="ghost"
+				size="icon-xs"
 				className={cn(
-					'cursor-grab touch-none p-2 opacity-40 transition-opacity duration-150',
+					'cursor-grab touch-none opacity-40 transition-opacity duration-150',
 					'hover:opacity-70',
 					'active:cursor-grabbing'
 				)}
@@ -178,7 +180,7 @@ export function DualListItem({
 				title="Drag to reorder"
 			>
 				<GripVertical className="h-4 w-4" />
-			</button>
+			</Button>
 
 			{/* Icon */}
 			{icon}

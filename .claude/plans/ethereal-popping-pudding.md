@@ -53,8 +53,8 @@ Change `handleWorkspaceCreated` to call `loadWorkspaces()` directly instead of r
 
 ```typescript
 const handleWorkspaceCreated = () => {
-    setIsCreateWorkspaceDialogOpen(false);
-    loadWorkspaces();
+	setIsCreateWorkspaceDialogOpen(false);
+	loadWorkspaces();
 };
 ```
 
@@ -62,10 +62,10 @@ const handleWorkspaceCreated = () => {
 
 ## File Changes
 
-| File | Change |
-|------|--------|
-| `packages/web-backend/src/services/WorkspacesService.ts` | Add `recentlyCreatedWorkspaces` map + merge logic (~30 lines) |
-| `packages/web-frontend/src/app/pages/projects2/ProjectsV2Page.tsx` | Add `loadWorkspaces()` call in `handleWorkspaceCreated` |
+| File                                                               | Change                                                        |
+| ------------------------------------------------------------------ | ------------------------------------------------------------- |
+| `packages/web-backend/src/services/WorkspacesService.ts`           | Add `recentlyCreatedWorkspaces` map + merge logic (~30 lines) |
+| `packages/web-frontend/src/app/pages/projects2/ProjectsV2Page.tsx` | Add `loadWorkspaces()` call in `handleWorkspaceCreated`       |
 
 ---
 

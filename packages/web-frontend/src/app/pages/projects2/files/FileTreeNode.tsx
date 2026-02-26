@@ -59,9 +59,9 @@ export function FileTreeNode({
 				<span className="ml-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
 					{isDirectory ? (
 						isExpanded ? (
-							<FolderOpen className="h-4 w-4 text-blue-500" />
+							<FolderOpen className="h-4 w-4 text-primary" />
 						) : (
-							<Folder className="h-4 w-4 text-blue-500" />
+							<Folder className="h-4 w-4 text-primary" />
 						)
 					) : (
 						<File className="h-4 w-4 text-muted-foreground" />

@@ -7,6 +7,7 @@ When a page-builder AI agent assembles a CRUD page, the current architecture req
 This study implements 5 different composition architectures, each producing 3 identical views (table, list, cards) for the "ingredients" entity. Goal: determine which approach minimizes agent error surface while maintaining flexibility.
 
 **Success criteria:**
+
 - All 15 pages produce pixel-perfect identical rendering (enforced by sharing the same rendering components)
 - All 15 pages pass the same shared test suite
 - Each approach is self-contained in its own directory
@@ -59,23 +60,27 @@ packages/web-frontend/src/app/pages/architecture-comparison/
 ## Implementation Phases
 
 ### Phase 0: Git branch
+
 - Create `feature/architecture-comparison` from `main`
 
 ### Phase 1: Shared Rendering Components
 
 **IngredientTableView.tsx** — Re-export `IngredientTable2` from `ingredients2/`:
+
 ```tsx
 export { IngredientTable2 as IngredientTableView } from '@app/pages/ingredients2/IngredientTable2';
 export { INGREDIENT_TABLE2_COLUMNS } from '@app/pages/ingredients2/IngredientTable2';
 ```
 
 **IngredientCardView.tsx** — Re-export `IngredientGrid3` from `ingredients3/`:
+
 ```tsx
 export { IngredientGrid3 as IngredientCardView } from '@app/pages/ingredients3/IngredientGrid3';
 export { INGREDIENT_GRID_FIELDS } from '@app/pages/ingredients3/IngredientGrid3';
 ```
 
 **IngredientListView.tsx** — NEW component (~250 lines). Must implement `QueryResultDisplayerProps<Ingredient>`:
+
 - Layout: vertical stack, each item is a horizontal band
 - Left: selection checkbox
 - Main: Name (bold) + category (muted) on top line, nutritional values as inline badges below
@@ -86,6 +91,7 @@ export { INGREDIENT_GRID_FIELDS } from '@app/pages/ingredients3/IngredientGrid3'
 - Reuses existing components: `Pagination`, `PageSizeSelector`, `Button`, `Checkbox`
 
 **ingredient-columns.ts** — Re-exports for convenience:
+
 ```tsx
 export { INGREDIENT_TABLE2_COLUMNS } from '@app/pages/ingredients2/IngredientTable2';
 export { INGREDIENT_GRID_FIELDS } from '@app/pages/ingredients3/IngredientGrid3';
@@ -94,11 +100,13 @@ export { INGREDIENT_GRID_FIELDS } from '@app/pages/ingredients3/IngredientGrid3'
 ### Phase 2: Shared Test Infrastructure
 
 **test-helpers.ts** — Centralized mock data + utilities:
+
 - `mockIngredients[]` (3 items: Chicken Breast/Protein, Brown Rice/Grain, Broccoli/Vegetable)
 - `createBaseProps()` factory returning `QueryResultDisplayerProps<Ingredient>` with defaults
 - `renderWithRouter(ui, route?)` wrapper for router-dependent components
 
 **ViewTestSuite.test.tsx** — Parameterized over the 3 view components:
+
 ```tsx
 const views = [
   { name: 'TableView', Component: IngredientTableView, ... },
@@ -122,6 +130,7 @@ describe.each(views)('$name', ({ Component }) => {
 ### Phase 3: V1-Baseline (reference implementation)
 
 Copy existing `Ingredients2TablePage` → `V1TablePage.tsx`, adapting:
+
 - Import `IngredientTableView` from shared
 - `storageId: 'comparison-v1-table'`
 - `basePath: '/comparison/v1/table'`
@@ -133,6 +142,7 @@ These are ~450 lines each. They represent the status quo: maximum plumbing, maxi
 ### Phase 4: V2-SingleHook (Refine/TanStack style)
 
 **useIngredientsPage.ts** (~250 lines) — Single composition hook:
+
 - Input: `{ storageId, basePath, pageSize?, pageSizeOptions?, defaultSort? }`
 - Creates internally: usePagination2, useSorting2, useSimpleSearch, useCacheControl2, useMultiSelect2
 - Wires: search → pagination reset, cache refresh after CRUD
@@ -140,6 +150,7 @@ These are ~450 lines each. They represent the status quo: maximum plumbing, maxi
 - Returns organized prop bundles: `{ data2Props, headerProps, searchProps, bulkActionProps, contentProps, dialogProps, deleteConfirmationProps, bulkDeleteWorkflowProps }`
 
 **Page components** (~40 lines each) — JSX only:
+
 ```tsx
 function V2TablePage() {
   const page = useIngredientsPage({ storageId: '...', basePath: '...', pageSize: 10 });
@@ -162,6 +173,7 @@ function V2TablePage() {
 ### Phase 5: V3-Compound (React Admin style)
 
 **DataPage.tsx** (~350 lines) — Compound component with scoped context:
+
 - `<DataPage>` root: creates all hooks, provides context
 - `<DataPage.Header>`: consumes context for refresh
 - `<DataPage.Search>`: consumes context for search state
@@ -174,88 +186,94 @@ function V2TablePage() {
 Context is **scoped** (not global). Lives only within `<DataPage>` tree.
 
 **Page components** (~30 lines each):
+
 ```tsx
 function V3TablePage() {
-  return (
-    <DataPage storageId="..." basePath="..." pageSize={10}>
-      <DataPage.Header title="Ingredients" createButton />
-      <DataPage.Search placeholder="Search ingredients..." />
-      <DataPage.BulkActions />
-      <DataPage.Content>
-        {props => <IngredientTableView {...props} />}
-      </DataPage.Content>
-      <DataPage.CreateDialog component={IngredientDialog} />
-      <DataPage.DeleteConfirmation entity="ingredient" />
-      <DataPage.BulkDelete entity="ingredient" />
-    </DataPage>
-  );
+	return (
+		<DataPage storageId="..." basePath="..." pageSize={10}>
+			<DataPage.Header title="Ingredients" createButton />
+			<DataPage.Search placeholder="Search ingredients..." />
+			<DataPage.BulkActions />
+			<DataPage.Content>{props => <IngredientTableView {...props} />}</DataPage.Content>
+			<DataPage.CreateDialog component={IngredientDialog} />
+			<DataPage.DeleteConfirmation entity="ingredient" />
+			<DataPage.BulkDelete entity="ingredient" />
+		</DataPage>
+	);
 }
 ```
 
 ### Phase 6: V4-ConfigDriven
 
 **EntityPage.tsx** (~400 lines) — Single component, everything via config:
+
 - Creates all hooks internally
 - Renders fixed layout: Header → Search → BulkActions → Data2+Content → Dialogs
 - Config props: `fetchData`, `renderContent`, `pagination`, `sorting`, `search`, `createDialog`, `deleteApi`, `bulkDeleteApi`, etc.
 
 **Page components** (~20 lines each):
+
 ```tsx
 function V4TablePage() {
-  return (
-    <EntityPage
-      entity="ingredient" title="Ingredients"
-      storageId="..." basePath="..."
-      fetchData={fetchIngredients}
-      renderContent={props => <IngredientTableView {...props} />}
-      pagination={{ pageSize: 10 }}
-      sorting={{ default: [{ key: 'name', direction: 'asc' }] }}
-      search={{ placeholder: 'Search ingredients...' }}
-      createDialog={IngredientDialog}
-      deleteApi={ingredientsService.deleteIngredient}
-      bulkDeleteApi={ingredientsService.bulkDeleteIngredients}
-    />
-  );
+	return (
+		<EntityPage
+			entity="ingredient"
+			title="Ingredients"
+			storageId="..."
+			basePath="..."
+			fetchData={fetchIngredients}
+			renderContent={props => <IngredientTableView {...props} />}
+			pagination={{ pageSize: 10 }}
+			sorting={{ default: [{ key: 'name', direction: 'asc' }] }}
+			search={{ placeholder: 'Search ingredients...' }}
+			createDialog={IngredientDialog}
+			deleteApi={ingredientsService.deleteIngredient}
+			bulkDeleteApi={ingredientsService.bulkDeleteIngredients}
+		/>
+	);
 }
 ```
 
 ### Phase 7: V5-HookPlusShell (Hybrid)
 
 **usePageFeatures.ts** (~250 lines) — Like V2 but returns props shaped for the shell:
+
 - Same internal logic as V2
 - Returns: `{ shellProps, data2Props, contentProps, dialogs: ReactNode }`
 
 **CrudPageShell.tsx** (~100 lines) — Layout with named slots:
+
 ```tsx
 function CrudPageShell({ title, headerAction, search, bulkActions, content, dialogs, ...headerProps }) {
-  return (
-    <Page>
-      <PageHeader title={title} action={headerAction} {...headerProps} />
-      {search}
-      {bulkActions}
-      {content}
-      {dialogs}
-    </Page>
-  );
+	return (
+		<Page>
+			<PageHeader title={title} action={headerAction} {...headerProps} />
+			{search}
+			{bulkActions}
+			{content}
+			{dialogs}
+		</Page>
+	);
 }
 ```
 
 **Page components** (~25 lines each):
+
 ```tsx
 function V5TablePage() {
-  const page = usePageFeatures({ storageId: '...', basePath: '...', pageSize: 10 });
-  return (
-    <CrudPageShell
-      {...page.shellProps}
-      title="Ingredients"
-      content={
-        <Data2 {...page.data2Props}>
-          {injected => <IngredientTableView {...injected} {...page.contentProps} />}
-        </Data2>
-      }
-      dialogs={page.dialogs}
-    />
-  );
+	const page = usePageFeatures({ storageId: '...', basePath: '...', pageSize: 10 });
+	return (
+		<CrudPageShell
+			{...page.shellProps}
+			title="Ingredients"
+			content={
+				<Data2 {...page.data2Props}>
+					{injected => <IngredientTableView {...injected} {...page.contentProps} />}
+				</Data2>
+			}
+			dialogs={page.dialogs}
+		/>
+	);
 }
 ```
 
@@ -264,6 +282,7 @@ function V5TablePage() {
 **ComparisonIndex.tsx** — Grid of links to all 15 pages, organized by approach × view.
 
 **App.tsx** — Add routes:
+
 ```
 /comparison                    → ComparisonIndex
 /comparison/v{1-5}/{table|list|cards}          → Page
@@ -285,33 +304,33 @@ function V5TablePage() {
 
 ## Key Reusable Existing Code
 
-| What | Path |
-|------|------|
-| Table rendering | `pages/ingredients2/IngredientTable2.tsx` |
-| Card rendering | `pages/ingredients3/IngredientGrid3.tsx` + `IngredientCard3.tsx` |
-| Column definitions | `IngredientTable2.tsx` → `INGREDIENT_TABLE2_COLUMNS` |
-| Field definitions | `IngredientGrid3.tsx` → `INGREDIENT_GRID_FIELDS` |
-| API client | `pages/ingredients/ingredients.api.ts` |
-| Service | `pages/ingredients/IngredientsService.ts` |
-| CRUD hook | `pages/ingredients/useIngredientsCrud.ts` |
-| Dialog | `components/domain/IngredientDialog.tsx` |
-| Bulk delete | `components/domain/BulkDeleteWorkflow.tsx` |
-| Feature hooks | `framework/hooks2/data/usePagination2.ts`, `useSorting2.ts`, `useSimpleSearch.ts`, `useCacheControl2.ts` |
-| Selection hook | `framework/hooks2/utility/useMultiSelect2.ts` |
-| CRUD helpers | `framework/hooks/useBulkDeleteState.ts`, `useDeleteConfirmation.ts`, `useCrudSuccessToast.ts`, `useMutationCleanup.ts` |
-| Data2 | `framework/components2/data/Data2.tsx` |
-| Layout | `framework/components/layout/Page.tsx`, `PageHeader.tsx` |
-| QueryResultDisplayerProps | `framework/types/QueryResultDisplayerContract.ts` |
+| What                      | Path                                                                                                                   |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Table rendering           | `pages/ingredients2/IngredientTable2.tsx`                                                                              |
+| Card rendering            | `pages/ingredients3/IngredientGrid3.tsx` + `IngredientCard3.tsx`                                                       |
+| Column definitions        | `IngredientTable2.tsx` → `INGREDIENT_TABLE2_COLUMNS`                                                                   |
+| Field definitions         | `IngredientGrid3.tsx` → `INGREDIENT_GRID_FIELDS`                                                                       |
+| API client                | `pages/ingredients/ingredients.api.ts`                                                                                 |
+| Service                   | `pages/ingredients/IngredientsService.ts`                                                                              |
+| CRUD hook                 | `pages/ingredients/useIngredientsCrud.ts`                                                                              |
+| Dialog                    | `components/domain/IngredientDialog.tsx`                                                                               |
+| Bulk delete               | `components/domain/BulkDeleteWorkflow.tsx`                                                                             |
+| Feature hooks             | `framework/hooks2/data/usePagination2.ts`, `useSorting2.ts`, `useSimpleSearch.ts`, `useCacheControl2.ts`               |
+| Selection hook            | `framework/hooks2/utility/useMultiSelect2.ts`                                                                          |
+| CRUD helpers              | `framework/hooks/useBulkDeleteState.ts`, `useDeleteConfirmation.ts`, `useCrudSuccessToast.ts`, `useMutationCleanup.ts` |
+| Data2                     | `framework/components2/data/Data2.tsx`                                                                                 |
+| Layout                    | `framework/components/layout/Page.tsx`, `PageHeader.tsx`                                                               |
+| QueryResultDisplayerProps | `framework/types/QueryResultDisplayerContract.ts`                                                                      |
 
 ---
 
 ## Approach Comparison (what to evaluate after implementation)
 
-| Criteria | V1 Baseline | V2 SingleHook | V3 Compound | V4 Config | V5 Hook+Shell |
-|----------|-------------|---------------|-------------|-----------|---------------|
-| Lines per page | ~450 | ~40 | ~30 | ~20 | ~25 |
-| New abstractions | 0 | 1 hook | 1 compound + context | 1 component | 1 hook + 1 shell |
-| Agent error surface | High | Low | Low | Lowest | Low |
-| Flexibility | Maximum | High | Medium | Low | High |
-| Discoverability | Low | High | High | High | High |
-| Testing complexity | Low | Low | Medium (context) | Low | Low |
+| Criteria            | V1 Baseline | V2 SingleHook | V3 Compound          | V4 Config   | V5 Hook+Shell    |
+| ------------------- | ----------- | ------------- | -------------------- | ----------- | ---------------- |
+| Lines per page      | ~450        | ~40           | ~30                  | ~20         | ~25              |
+| New abstractions    | 0           | 1 hook        | 1 compound + context | 1 component | 1 hook + 1 shell |
+| Agent error surface | High        | Low           | Low                  | Lowest      | Low              |
+| Flexibility         | Maximum     | High          | Medium               | Low         | High             |
+| Discoverability     | Low         | High          | High                 | High        | High             |
+| Testing complexity  | Low         | Low           | Medium (context)     | Low         | Low              |

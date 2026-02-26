@@ -410,14 +410,11 @@ describe('useLogSelection', () => {
 
 		it('should not re-initialize from hash when logs change', () => {
 			window.location.hash = '#log-log-2';
-			const { result, rerender } = renderHook(
-				({ logs }) => useLogSelection(logs),
-				{
-					initialProps: {
-						logs: [createLog('log-1', 100), createLog('log-2', 200)],
-					},
-				}
-			);
+			const { result, rerender } = renderHook(({ logs }) => useLogSelection(logs), {
+				initialProps: {
+					logs: [createLog('log-1', 100), createLog('log-2', 200)],
+				},
+			});
 
 			expect(result.current.selectedLogIds.has('log-2')).toBe(true);
 
@@ -439,12 +436,9 @@ describe('useLogSelection', () => {
 
 		it('should handle empty logs array on mount with hash', () => {
 			window.location.hash = '#log-log-1';
-			const { result, rerender } = renderHook(
-				({ logs }: { logs: LogEntry[] }) => useLogSelection(logs),
-				{
-					initialProps: { logs: [] as LogEntry[] },
-				}
-			);
+			const { result, rerender } = renderHook(({ logs }: { logs: LogEntry[] }) => useLogSelection(logs), {
+				initialProps: { logs: [] as LogEntry[] },
+			});
 
 			// No selection until logs arrive
 			expect(result.current.selectedLogIds.size).toBe(0);
@@ -557,10 +551,7 @@ describe('useLogSelection', () => {
 		});
 
 		it('should handle logs with special characters in IDs', () => {
-			const logs = [
-				createLog('log-1:special', 100),
-				createLog('log-2:special', 200),
-			];
+			const logs = [createLog('log-1:special', 100), createLog('log-2:special', 200)];
 			const { result } = renderHook(() => useLogSelection(logs));
 
 			act(() => {
@@ -571,14 +562,11 @@ describe('useLogSelection', () => {
 		});
 
 		it('should preserve selection state across re-renders', () => {
-			const { result, rerender } = renderHook(
-				({ logs }) => useLogSelection(logs),
-				{
-					initialProps: {
-						logs: [createLog('log-1', 100), createLog('log-2', 200)],
-					},
-				}
-			);
+			const { result, rerender } = renderHook(({ logs }) => useLogSelection(logs), {
+				initialProps: {
+					logs: [createLog('log-1', 100), createLog('log-2', 200)],
+				},
+			});
 
 			act(() => {
 				result.current.handleLogClick('log-1', false);

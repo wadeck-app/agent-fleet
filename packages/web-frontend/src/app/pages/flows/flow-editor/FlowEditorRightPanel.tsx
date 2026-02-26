@@ -72,7 +72,7 @@ export function FlowEditorRightPanel({
 	const [yamlTab, setYamlTab] = useState<'original' | 'preview'>('preview');
 	const [isEditingYaml, setIsEditingYaml] = useState(false);
 	const [editedYaml, setEditedYaml] = useState('');
-	const [yamlError, setYamlError] = useState<string | null>(null);
+	const [_yamlError, setYamlError] = useState<string | null>(null);
 
 	// Compute preview and diff
 	const previewFlow = useFlowPreview(flowDefinition, nodes, allEdges);

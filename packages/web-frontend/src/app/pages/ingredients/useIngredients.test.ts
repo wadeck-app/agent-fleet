@@ -441,12 +441,14 @@ describe('useIngredients', () => {
 			// The reload after create should preserve sort/pagination params
 			const calls = vi.mocked(ingredientsService.getIngredients).mock.calls;
 			const lastCall = calls[calls.length - 1][0];
-			expect(lastCall).toEqual(expect.objectContaining({
-				sortBy: 'calories',
-				sortOrder: 'desc',
-				page: 2,
-				pageSize: 5,
-			}));
+			expect(lastCall).toEqual(
+				expect.objectContaining({
+					sortBy: 'calories',
+					sortOrder: 'desc',
+					page: 2,
+					pageSize: 5,
+				})
+			);
 		});
 
 		it('should reload with current params after updateIngredient', async () => {
@@ -482,12 +484,14 @@ describe('useIngredients', () => {
 
 			const calls = vi.mocked(ingredientsService.getIngredients).mock.calls;
 			const lastCall = calls[calls.length - 1][0];
-			expect(lastCall).toEqual(expect.objectContaining({
-				sortBy: 'calories',
-				sortOrder: 'desc',
-				page: 2,
-				pageSize: 5,
-			}));
+			expect(lastCall).toEqual(
+				expect.objectContaining({
+					sortBy: 'calories',
+					sortOrder: 'desc',
+					page: 2,
+					pageSize: 5,
+				})
+			);
 		});
 
 		it('should reload with current params after deleteIngredient', async () => {
@@ -509,12 +513,14 @@ describe('useIngredients', () => {
 
 			const calls = vi.mocked(ingredientsService.getIngredients).mock.calls;
 			const lastCall = calls[calls.length - 1][0];
-			expect(lastCall).toEqual(expect.objectContaining({
-				sortBy: 'calories',
-				sortOrder: 'desc',
-				page: 2,
-				pageSize: 5,
-			}));
+			expect(lastCall).toEqual(
+				expect.objectContaining({
+					sortBy: 'calories',
+					sortOrder: 'desc',
+					page: 2,
+					pageSize: 5,
+				})
+			);
 		});
 	});
 });

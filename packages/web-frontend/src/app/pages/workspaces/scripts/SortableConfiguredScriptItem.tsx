@@ -4,7 +4,7 @@ import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import { cn } from '@framework/lib/utils';
 import type { WorkspaceScript } from '@shared/api/workspaceScripts.contract';
-import { ArrowRight, GripVertical } from 'lucide-react';
+import { ArrowRight, Circle, CircleDot, GripVertical, X } from 'lucide-react';
 
 /**
  * ===========================================================================================
@@ -67,7 +67,7 @@ export function SortableConfiguredScriptItem({
 
 	// Badge variant based on status
 	const badgeVariant = status === 'running' ? 'default' : status === 'error' ? 'destructive' : 'secondary';
-	const statusSymbol = status === 'running' ? '●' : status === 'error' ? '✕' : '○';
+	const StatusIcon = status === 'running' ? CircleDot : status === 'error' ? X : Circle;
 
 	return (
 		<div
@@ -101,7 +101,7 @@ export function SortableConfiguredScriptItem({
 
 			{/* Status Badge */}
 			<Badge variant={badgeVariant} className="text-xs" title={`Status: ${status}`}>
-				{statusSymbol}
+				<StatusIcon className="size-3" />
 			</Badge>
 
 			{/* Remove Button (Arrow Right) - Positioned on the right */}

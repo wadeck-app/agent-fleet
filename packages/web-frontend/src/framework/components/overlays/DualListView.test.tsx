@@ -76,7 +76,7 @@ describe('DualListView - Rendering', () => {
 				rightTitle="Available Projects"
 				leftHelpText="Drag to reorder"
 				rightHelpText="Click to pin"
-				renderItem={(item: MockItem, side) => <div>{item.name}</div>}
+				renderItem={(item: MockItem, _side) => <div>{item.name}</div>}
 				searchFilter={(item: MockItem, query) => item.name.toLowerCase().includes(query.toLowerCase())}
 				onAssociate={vi.fn()}
 				onDissociate={vi.fn()}
@@ -100,7 +100,7 @@ describe('DualListView - Rendering', () => {
 				leftTitle="Associated"
 				rightTitle="Available"
 				leftEmptyState={<div data-testid="custom-empty">No associated items</div>}
-				renderItem={(item, side) => <div>{item.name}</div>}
+				renderItem={(item, _side) => <div>{item.name}</div>}
 				searchFilter={(item, query) => item.name.toLowerCase().includes(query.toLowerCase())}
 				onAssociate={vi.fn()}
 				onDissociate={vi.fn()}
@@ -120,7 +120,7 @@ describe('DualListView - Rendering', () => {
 				reorderingItems={new Set()}
 				leftTitle="Associated"
 				rightTitle="Available"
-				renderItem={(item, side) => <div>{item.name}</div>}
+				renderItem={(item, _side) => <div>{item.name}</div>}
 				searchFilter={(item, query) => item.name.toLowerCase().includes(query.toLowerCase())}
 				onAssociate={vi.fn()}
 				onDissociate={vi.fn()}
@@ -265,7 +265,7 @@ describe('DualListView - Search', () => {
 				leftTitle="Associated"
 				rightTitle="Available"
 				searchPlaceholder="Search items..."
-				renderItem={(item, side) => <div data-testid={`item-${item.id}`}>{item.name}</div>}
+				renderItem={(item, _side) => <div data-testid={`item-${item.id}`}>{item.name}</div>}
 				searchFilter={(item, query) => item.name.toLowerCase().includes(query.toLowerCase())}
 				onAssociate={vi.fn()}
 				onDissociate={vi.fn()}
@@ -301,7 +301,7 @@ describe('DualListView - Search', () => {
 				reorderingItems={new Set()}
 				leftTitle="Associated"
 				rightTitle="Available"
-				renderItem={(item, side) => <div data-testid={`item-${item.id}`}>{item.name}</div>}
+				renderItem={(item, _side) => <div data-testid={`item-${item.id}`}>{item.name}</div>}
 				searchFilter={(item, query) => item.name.toLowerCase().includes(query.toLowerCase())}
 				onAssociate={vi.fn()}
 				onDissociate={vi.fn()}
@@ -364,7 +364,7 @@ describe('DualListView - Callbacks', () => {
 				reorderingItems={new Set()}
 				leftTitle="Associated"
 				rightTitle="Available"
-				renderItem={(item, side, visualState) => (
+				renderItem={(item, side, _visualState) => (
 					<div data-testid={`item-${item.id}`}>
 						<span>{item.name}</span>
 						<button
