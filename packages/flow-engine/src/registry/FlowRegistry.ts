@@ -188,7 +188,20 @@ export class FlowRegistry {
 				throw new Error('Invalid YAML structure: expected object');
 			}
 
+			// Handle 'includes:' directive - load additional flow files
+			const includes = parsed['includes'] as string[] | undefined;
+			if (includes !== undefined) {
+				if (!Array.isArray(includes)) {
+					throw new Error(`'includes' in flows.yml must be an array of file paths`);
+				}
+				for (const includeFile of includes) {
+					await this.loadIncludedFlowFile(includeFile);
+				}
+			}
+
+			const RESERVED_KEYS = new Set(['includes']);
 			for (const [id, flowData] of Object.entries(parsed)) {
+				if (RESERVED_KEYS.has(id)) continue;
 				try {
 					const flow = await this.parseFlowDefinition(id, flowData);
 
@@ -433,6 +446,7 @@ export class FlowRegistry {
 			hooks: mergedData.hooks,
 			statusTransitions: mergedData.statusTransitions,
 			execution: mergedData.execution,
+			trigger: mergedData.trigger,
 		};
 	}
 
@@ -470,6 +484,67 @@ export class FlowRegistry {
 			return parsed;
 		} catch (error) {
 			throw new Error(`Failed to load external flow file '${sourcePath}' for flow '${flowId}': ${error}`);
+		}
+	}
+
+	/**
+	 * Load all flows from an included flow file (via 'includes:' directive)
+	 * Applies same security constraints as external flow files
+	 * @param filePath - Relative path to the included file (must be sibling .yml)
+	 */
+	private async loadIncludedFlowFile(filePath: string): Promise<void> {
+		// Reuse path security validation
+		this.validateExternalFilePath(filePath, `includes:${filePath}`);
+
+		const flowsDir = path.dirname(this.configPath);
+		const absolutePath = path.resolve(flowsDir, filePath);
+
+		if (!fs.existsSync(absolutePath)) {
+			console.log(`Included flow file not found (skipping): ${filePath}`);
+			return;
+		}
+
+		try {
+			const content = fs.readFileSync(absolutePath, 'utf-8');
+			const parsedInclude = yaml.load(content) as Record<string, any>;
+
+			if (!parsedInclude || typeof parsedInclude !== 'object') {
+				throw new Error(`Invalid YAML structure in ${filePath}: expected object`);
+			}
+
+			// Track for hot-reload
+			this.trackExternalFile(absolutePath);
+
+			console.log(`Loading flows from included file: ${filePath}`);
+			for (const [id, flowData] of Object.entries(parsedInclude)) {
+				try {
+					const flow = await this.parseFlowDefinition(id, flowData);
+					const validationResult = this.validator.validate(flow);
+
+					if (!validationResult.valid) {
+						console.error(
+							`\n⚠️  Flow '${id}' (from ${filePath}) has validation errors (loading anyway for editing):`
+						);
+						for (const issue of validationResult.issues) {
+							if (issue.severity === 'error') {
+								console.error(`  [ERROR] ${issue.message}`);
+							}
+						}
+					} else {
+						console.log(`✓ Loaded flow: ${id} (from ${filePath})`);
+					}
+
+					this.flows.set(id, flow);
+					this.flowValidationResults.set(id, validationResult);
+				} catch (error) {
+					console.error(
+						`\n❌ Failed to parse flow '${id}' from ${filePath}:`,
+						error instanceof Error ? error.message : String(error)
+					);
+				}
+			}
+		} catch (error) {
+			throw new Error(`Failed to load included flow file '${filePath}': ${error}`);
 		}
 	}
 

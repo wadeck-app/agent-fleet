@@ -8,6 +8,7 @@ import {
 	PackageSearch,
 	Sparkles,
 	Table2,
+	Ticket,
 	Users,
 	Workflow,
 } from 'lucide-react';
@@ -68,6 +69,11 @@ export const navigationItems: NavItem[] = [
 		path: '/tasks',
 		label: 'Tasks',
 		icon: ListTodo,
+	},
+	{
+		path: '/tickets',
+		label: 'Tickets',
+		icon: Ticket,
 	},
 	{
 		type: 'separator',

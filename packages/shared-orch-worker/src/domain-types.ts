@@ -87,6 +87,9 @@ export interface Task {
 	// User Intervention (Approach 3: Hybrid - lightweight references)
 	activeInterventionId?: string; // ID of current pending intervention
 	interventionHistory?: string[]; // IDs of past interventions
+
+	// Ticket linkage
+	ticketId?: string; // ID of the parent Ticket (if this Task was created from a ticket)
 }
 
 export interface TaskComment {
@@ -185,6 +188,46 @@ export interface Intervention {
 	timeout?: InterventionTimeout;
 
 	response?: InterventionResponse;
+}
+
+/**
+ * Ticket status lifecycle
+ */
+export enum TicketStatus {
+	BACKLOG = 'backlog',
+	TODO = 'todo',
+	IN_PROGRESS = 'in_progress',
+	DONE = 'done',
+	CANCELLED = 'cancelled',
+	PENDING_INTEGRATION = 'pending_integration',
+	INTEGRATED = 'integrated',
+}
+
+/**
+ * Ticket - higher-level work item (Jira/GitLab-style) that can spawn Tasks
+ */
+export interface Ticket {
+	id: string;
+	projectId: string;
+	title: string;
+	description: string;
+	status: TicketStatus;
+	/** Free-form labels for categorization (autocompleted from project) */
+	labels: string[];
+	/** Key::value fields (GitLab-style) */
+	fields: Record<string, string>;
+	/** Direct parent ticket ID (supports N-level hierarchy) */
+	parentId?: string;
+	/** IDs of execution Tasks generated for this ticket */
+	taskIds: string[];
+	/** AI-generated implementation flow ID (stored in flows-custom.yml) */
+	flowId?: string;
+	/** Float order for drag-and-drop sorting (Jira midpoint strategy) */
+	order: number;
+	/** Optimistic locking version */
+	version: number;
+	createdAt: string;
+	updatedAt: string;
 }
 
 /**

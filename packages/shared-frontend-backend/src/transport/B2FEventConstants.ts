@@ -207,3 +207,22 @@ export const B2F_INTERVENTION_TIMEOUT = 'b2f:intervention:timeout' as const;
 
 /** Intervention cancelled event */
 export const B2F_INTERVENTION_CANCELLED = 'b2f:intervention:cancelled' as const;
+
+// ===========================================================================================
+// TICKET EVENTS
+// ===========================================================================================
+
+/** Tickets list updated event (aggregate) */
+export const B2F_TICKETS_UPDATED = 'b2f:tickets:updated' as const;
+
+/** Ticket created event */
+export const B2F_TICKET_CREATED = 'b2f:ticket:created' as const;
+
+/** Ticket updated event */
+export const B2F_TICKET_UPDATED = 'b2f:ticket:updated' as const;
+
+/** Ticket deleted event */
+export const B2F_TICKET_DELETED = 'b2f:ticket:deleted' as const;
+
+/** Ticket status changed event */
+export const B2F_TICKET_STATUS_CHANGED = 'b2f:ticket:status_changed' as const;

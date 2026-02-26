@@ -788,6 +788,7 @@ export class FlowWorker implements Shutdownable {
 				inputs: flow._autoDiscoveredInputs || {},
 				workspace: flow.workspace,
 				statusTransitions: flow.statusTransitions,
+				trigger: flow.trigger,
 
 				// Validation state
 				isValid: validationResult?.valid ?? true, // Default to valid if not validated

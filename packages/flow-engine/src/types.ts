@@ -694,6 +694,23 @@ export interface StatusTransitions {
 }
 
 /**
+ * Event-based flow trigger - fires when a matching event is emitted
+ */
+export interface EventFlowTrigger {
+	/** Trigger type discriminator */
+	type: 'event';
+	/** Event name to listen for (e.g., 'ticket.status.changed') */
+	event: string;
+	/** Optional filter criteria - all specified fields must match */
+	filter?: Record<string, string | undefined>;
+}
+
+/**
+ * Union of all supported flow trigger types (extensible)
+ */
+export type FlowTrigger = EventFlowTrigger;
+
+/**
  * Execution configuration for Claude CLI invocations
  */
 export interface ExecutionConfig {
@@ -763,6 +780,9 @@ export interface FlowDefinition {
 
 	/** Optional execution configuration for Claude CLI */
 	execution?: ExecutionConfig;
+
+	/** Optional trigger for automatic flow execution based on events */
+	trigger?: FlowTrigger;
 }
 
 /**
@@ -793,6 +813,9 @@ export interface FlowMetadata {
 
 	/** Optional status transitions configuration */
 	statusTransitions?: StatusTransitions;
+
+	/** Optional trigger for automatic flow execution */
+	trigger?: FlowTrigger;
 
 	/** Whether the flow passed validation */
 	isValid: boolean;

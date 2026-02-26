@@ -198,6 +198,10 @@ function createLazyControllerPlugin<Routes = any>(
 			service = factory.getProjectsService();
 			// @ts-expect-error - Dynamic service injection based on baseUrl
 			controllerInstance = new ControllerClass(service);
+		} else if (baseUrl === '/api/tickets') {
+			service = factory.getTicketsService();
+			// @ts-expect-error - Dynamic service injection based on baseUrl
+			controllerInstance = new ControllerClass(service);
 		} else {
 			throw new Error(`No service mapping found for baseUrl: ${baseUrl}`);
 		}

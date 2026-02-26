@@ -10,11 +10,13 @@ import type { Ingredient } from '@app/shared/api/ingredients.contract';
 import type { Intervention } from '@app/shared/api/interventions.contract';
 import type { Project } from '@app/shared/api/projects.contract';
 import type { Task } from '@app/shared/api/tasks.contract';
+import type { Ticket } from '@app/shared/api/tickets.contract';
 import type { ScriptProcess, WorkspaceScript } from '@app/shared/api/workspaceScripts.contract';
 import type { WorkspaceMetadataEntity } from '@app/shared/api/workspaces.contract';
 
 import type { AuthService } from '../auth/AuthService';
 import { MockAuthService } from '../auth/MockAuthService';
+import { LocalClaudeAgentExecutor } from '../providers/LocalClaudeAgentExecutor';
 import { BaseRepository } from '../repositories/BaseRepository';
 import { BooksRepository } from '../repositories/BooksRepository';
 import { IngredientsRepository } from '../repositories/IngredientsRepository';
@@ -23,6 +25,7 @@ import { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 import { ProjectsRepository } from '../repositories/ProjectsRepository';
 import { ScriptProcessRepository } from '../repositories/ScriptProcessRepository';
 import { TasksRepository } from '../repositories/TasksRepository';
+import { TicketsRepository } from '../repositories/TicketsRepository';
 import { type WorkerMetadata, WorkersRepository } from '../repositories/WorkersRepository';
 import { WorkspaceMetadataRepository } from '../repositories/WorkspaceMetadataRepository';
 import { WorkspaceScriptsRepository } from '../repositories/WorkspaceScriptsRepository';
@@ -36,6 +39,7 @@ import { ProjectsService } from '../services/ProjectsService';
 import { ScriptProcessManager } from '../services/ScriptProcessManager';
 import { ScriptProcessService } from '../services/ScriptProcessService';
 import { TasksService } from '../services/TasksService';
+import { TicketsService } from '../services/TicketsService';
 import { WorkersService } from '../services/WorkersService';
 import { WorkspaceFileService } from '../services/WorkspaceFileService';
 import { WorkspaceScriptsService } from '../services/WorkspaceScriptsService';
@@ -80,6 +84,7 @@ export class DataStoreFactory {
 	private workersService?: WorkersService;
 	private flowsService?: FlowsService;
 	private tasksService?: TasksService;
+	private ticketsService?: TicketsService;
 	private workspacesService?: WorkspacesService;
 	private projectsService?: ProjectsService;
 	private interventionsService?: InterventionsService;
@@ -248,6 +253,32 @@ export class DataStoreFactory {
 		}
 
 		return this.tasksService;
+	}
+
+	/**
+	 * Get or create TicketsService
+	 */
+	getTicketsService(): TicketsService {
+		if (!this.ticketsService) {
+			// Create TicketsRepository using persistent storage
+			const ticketsBaseRepo = new BaseRepository<Ticket>('tickets', this.storage);
+			const ticketsRepo = new TicketsRepository(ticketsBaseRepo);
+
+			// Get EventBroadcaster
+			const eventBroadcaster = this.getEventBroadcaster();
+
+			// Create TasksRepository for ticket-to-task conversion
+			const tasksBaseRepo = new BaseRepository<Task>('tasks', this.storage);
+			const tasksRepo = new TasksRepository(tasksBaseRepo);
+
+			// Create AgentExecutor stub
+			const agentExecutor = new LocalClaudeAgentExecutor();
+
+			// Create TicketsService
+			this.ticketsService = new TicketsService(ticketsRepo, eventBroadcaster, tasksRepo, agentExecutor);
+		}
+
+		return this.ticketsService;
 	}
 
 	/**
@@ -631,6 +662,12 @@ export class DataStoreFactory {
 		const transportServer = this.getTransportServer();
 		const sessionManager = this.getSessionManager();
 		return new MonitoringController(transportServer, sessionManager);
+	}
+
+	async getTicketsController() {
+		const { default: TicketsController } = await import('../controllers/TicketsController');
+		const service = this.getTicketsService();
+		return new TicketsController(service);
 	}
 
 	/**

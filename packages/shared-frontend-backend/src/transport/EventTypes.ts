@@ -2,6 +2,7 @@ import type { DashboardData } from '../api/dashboard.contract';
 import type { Intervention } from '../api/interventions.contract';
 import type { Project, ProjectBoardData, ProjectsData } from '../api/projects.contract';
 import type { Task, TasksData } from '../api/tasks.contract';
+import type { Ticket } from '../api/tickets.contract';
 import type { Worker, WorkersData } from '../api/workers.contract';
 import type { ScriptLogEntry, ScriptProcess, WorkspaceScript } from '../api/workspaceScripts.contract';
 import type { Workspace } from '../api/workspaces.contract';
@@ -168,6 +169,9 @@ export interface BusinessEvents {
 		processId: string;
 		error: string;
 	};
+
+	/** Tickets list updated (aggregate) */
+	'b2f:tickets:updated': Record<string, never>;
 }
 
 /**
@@ -185,6 +189,7 @@ export type EventTypes = ResourceEvent<'task', Task> &
 	ResourceEvent<'worker', Worker> &
 	ResourceEvent<'workspace', Workspace> &
 	ResourceEvent<'project', Project> &
+	ResourceEvent<'ticket', Ticket> &
 	BusinessEvents;
 
 /**
