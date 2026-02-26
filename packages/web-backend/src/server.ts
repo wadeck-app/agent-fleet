@@ -239,12 +239,12 @@ if (process.env.DISABLE_AUTH_DEV === 'true') {
 // Note: Fastify instance is created inside start() function to allow retry on EADDRINUSE
 
 // Calculate ports from PROJECT_ID for parallel development between projects
-// PROJECT_ID=0 → Frontend:5000, Backend:3000 | WORKSPACE_ID=1 → Frontend:5010, Backend:3010
+// PROJECT_ID=0 → Backend:3000 | PROJECT_ID=1 → Backend:3100 | PROJECT_ID=3,WORKSPACE_ID=1 → Backend:3310
 const projectId = parseInt(process.env.PROJECT_ID || '0', 10);
 // Calculate PORT from WORKSPACE_ID for parallel development
-// WORKSPACE_ID=0 → 3000, WORKSPACE_ID=1 → 3100, WORKSPACE_ID=2 → 3200, etc.
+// WORKSPACE_ID=0 → 3000, WORKSPACE_ID=1 → 3010, WORKSPACE_ID=2 → 3020, etc.
 const workspaceId = parseInt(process.env.WORKSPACE_ID || '0', 10);
-const calculatedPort = 3000 + projectId * 10 + workspaceId * 100;
+const calculatedPort = 3000 + projectId * 100 + workspaceId * 10;
 const PORT = parseInt(process.env.PORT || calculatedPort.toString(), 10);
 
 // Helper function to get network addresses

@@ -344,4 +344,222 @@ describe('ProjectsV2Page', () => {
 			expect(params.get('workspaceId')).toBe('50115a2e-5226-46d4-9fb8-6f9c11a16f9d');
 		});
 	});
+
+	describe('BUG: Workspace dissociation stale URL', () => {
+		it('should switch to remaining workspace when active workspace is dissociated', async () => {
+			// Setup: project with 2 workspaces (ws-1 and ws-2), initial URL has workspaceId=ws-1
+			// When ws-1 (the active workspace) is dissociated, URL should switch to ws-2
+			const projects: Project[] = [
+				{
+					id: 'proj-1',
+					name: 'Test Project',
+					workspaceIds: ['ws-1', 'ws-2'],
+					taskCount: 0,
+					archived: false,
+					pinned: true,
+					order: 0,
+					createdAt: new Date().toISOString(),
+					updatedAt: new Date().toISOString(),
+					version: 1,
+				},
+			];
+
+			const workspaces: Workspace[] = [
+				{
+					id: 'ws-1',
+					name: 'Workspace 1',
+					path: '/workspace-1',
+					mode: 'development' as const,
+					tasksCount: 0,
+					status: 'active' as const,
+					createdAt: new Date().toISOString(),
+					lastUsed: new Date().toISOString(),
+					color: '#3b82f6',
+				},
+				{
+					id: 'ws-2',
+					name: 'Workspace 2',
+					path: '/workspace-2',
+					mode: 'development' as const,
+					tasksCount: 0,
+					status: 'active' as const,
+					createdAt: new Date().toISOString(),
+					lastUsed: new Date().toISOString(),
+					color: '#10b981',
+				},
+			];
+
+			const dissociateWorkspaceMock = vi.fn().mockResolvedValue(undefined);
+
+			vi.mocked(useProjects).mockReturnValue({
+				projects,
+				loading: false,
+				pinnedProjects: projects,
+				loadProjects: vi.fn(),
+				pinProject: vi.fn(),
+				unpinProject: vi.fn(),
+				reorderProjects: vi.fn(),
+				error: null,
+				clearError: vi.fn(),
+			});
+
+			vi.mocked(useProjectWorkspaces).mockReturnValue({
+				workspaces,
+				loading: false,
+				loadWorkspaces: vi.fn(),
+				associateWorkspace: vi.fn(),
+				dissociateWorkspace: dissociateWorkspaceMock,
+				reorderWorkspaces: vi.fn(),
+				getProjectWorkspaces: (project: Project | undefined) => {
+					if (!project) return [];
+					return workspaces.filter(w => project.workspaceIds.includes(w.id));
+				},
+				error: null,
+				clearError: vi.fn(),
+			});
+
+			// Render page with ws-1 selected
+			render(<ProjectsV2Page />, {
+				wrapper: ({ children }) => wrapper({ children, initialUrl: '/?projectId=proj-1&workspaceId=ws-1' }),
+			});
+
+			// Wait for page to load
+			await waitFor(() => {
+				expect(screen.getByText('Test Project')).toBeInTheDocument();
+			});
+
+			// Verify initial URL has ws-1
+			let params = getSearchParams();
+			expect(params.get('projectId')).toBe('proj-1');
+			expect(params.get('workspaceId')).toBe('ws-1');
+
+			// Open the Manage Workspaces dialog by clicking the "Manage Workspaces" button
+			const manageButton = screen.getByText('Manage Workspaces');
+			await userEvent.click(manageButton);
+
+			// Wait for dialog to appear (should show "Manage Workspaces for Test Project")
+			await waitFor(() => {
+				expect(screen.getByText('Manage Workspaces for Test Project')).toBeInTheDocument();
+			});
+
+			// Click the dissociate button for ws-1 (the active workspace)
+			// The button has aria-label="Dissociate Workspace 1"
+			const dissociateButton = screen.getByLabelText('Dissociate Workspace 1');
+			await userEvent.click(dissociateButton);
+
+			// Wait for dissociateWorkspace to be called and URL to update
+			await waitFor(() => {
+				expect(dissociateWorkspaceMock).toHaveBeenCalledWith('ws-1', 'proj-1');
+			});
+
+			// CRITICAL CHECK: URL should switch to ws-2
+			await waitFor(() => {
+				params = getSearchParams();
+				expect(params.get('workspaceId')).toBe('ws-2');
+			});
+			expect(params.get('projectId')).toBe('proj-1');
+		});
+
+		it('should clear workspaceId when last workspace is dissociated', async () => {
+			// Setup: project with 1 workspace (ws-1), initial URL has workspaceId=ws-1
+			// When ws-1 is dissociated, URL should clear workspaceId but keep projectId
+			const projects: Project[] = [
+				{
+					id: 'proj-1',
+					name: 'Test Project',
+					workspaceIds: ['ws-1'],
+					taskCount: 0,
+					archived: false,
+					pinned: true,
+					order: 0,
+					createdAt: new Date().toISOString(),
+					updatedAt: new Date().toISOString(),
+					version: 1,
+				},
+			];
+
+			const workspaces: Workspace[] = [
+				{
+					id: 'ws-1',
+					name: 'Workspace 1',
+					path: '/workspace-1',
+					mode: 'development' as const,
+					tasksCount: 0,
+					status: 'active' as const,
+					createdAt: new Date().toISOString(),
+					lastUsed: new Date().toISOString(),
+					color: '#3b82f6',
+				},
+			];
+
+			const dissociateWorkspaceMock = vi.fn().mockResolvedValue(undefined);
+
+			vi.mocked(useProjects).mockReturnValue({
+				projects,
+				loading: false,
+				pinnedProjects: projects,
+				loadProjects: vi.fn(),
+				pinProject: vi.fn(),
+				unpinProject: vi.fn(),
+				reorderProjects: vi.fn(),
+				error: null,
+				clearError: vi.fn(),
+			});
+
+			vi.mocked(useProjectWorkspaces).mockReturnValue({
+				workspaces,
+				loading: false,
+				loadWorkspaces: vi.fn(),
+				associateWorkspace: vi.fn(),
+				dissociateWorkspace: dissociateWorkspaceMock,
+				reorderWorkspaces: vi.fn(),
+				getProjectWorkspaces: (project: Project | undefined) => {
+					if (!project) return [];
+					return workspaces.filter(w => project.workspaceIds.includes(w.id));
+				},
+				error: null,
+				clearError: vi.fn(),
+			});
+
+			// Render page with ws-1 selected
+			render(<ProjectsV2Page />, {
+				wrapper: ({ children }) => wrapper({ children, initialUrl: '/?projectId=proj-1&workspaceId=ws-1' }),
+			});
+
+			// Wait for page to load
+			await waitFor(() => {
+				expect(screen.getByText('Test Project')).toBeInTheDocument();
+			});
+
+			// Verify initial URL has ws-1
+			let params = getSearchParams();
+			expect(params.get('projectId')).toBe('proj-1');
+			expect(params.get('workspaceId')).toBe('ws-1');
+
+			// Open the Manage Workspaces dialog
+			const manageButton = screen.getByText('Manage Workspaces');
+			await userEvent.click(manageButton);
+
+			// Wait for dialog to appear
+			await waitFor(() => {
+				expect(screen.getByText('Manage Workspaces for Test Project')).toBeInTheDocument();
+			});
+
+			// Click the dissociate button for ws-1
+			const dissociateButton = screen.getByLabelText('Dissociate Workspace 1');
+			await userEvent.click(dissociateButton);
+
+			// Wait for dissociateWorkspace to be called and URL to update
+			await waitFor(() => {
+				expect(dissociateWorkspaceMock).toHaveBeenCalledWith('ws-1', 'proj-1');
+			});
+
+			// CRITICAL CHECK: URL should have projectId but no workspaceId
+			await waitFor(() => {
+				params = getSearchParams();
+				expect(params.get('workspaceId')).toBeNull();
+			});
+			expect(params.get('projectId')).toBe('proj-1');
+		});
+	});
 });

@@ -1,9 +1,10 @@
 import { z } from 'zod';
 
+import { BaseEntitySchema } from '../common/base-entity';
 import { defineRoutes } from '../route-builder';
 
 export const WorkspaceModeSchema = z.enum(['development', 'production', 'staging']);
-export const WorkspaceStatusSchema = z.enum(['active', 'locked', 'cleaning', 'error']);
+export const WorkspaceStatusSchema = z.enum(['active', 'idle', 'locked', 'cleaning', 'error']);
 
 /**
  * Workspace color schema - hex color string
@@ -12,6 +13,21 @@ export const WorkspaceColorSchema = z
 	.string()
 	.regex(/^#[0-9A-Fa-f]{6}$/, 'Must be a valid hex color')
 	.optional();
+
+/**
+ * Centralized workspace metadata entity stored in data/workspaces.json
+ */
+export const WorkspaceMetadataEntitySchema = BaseEntitySchema.extend({
+	// Absolute filesystem path (unique key)
+	path: z.string(),
+	name: z.string().optional(),
+	description: z.string().optional(),
+	color: WorkspaceColorSchema,
+	mode: WorkspaceModeSchema,
+	gitBranch: z.string().optional(),
+});
+
+export type WorkspaceMetadataEntity = z.infer<typeof WorkspaceMetadataEntitySchema>;
 
 export const GitStatusSchema = z.object({
 	ahead: z.number(),
@@ -43,6 +59,7 @@ export const WorkspacesDataSchema = z.object({
 	summary: z.object({
 		total: z.number(),
 		active: z.number(),
+		idle: z.number(),
 		locked: z.number(),
 		cleaning: z.number(),
 		errorCount: z.number(),
@@ -104,7 +121,7 @@ export const CreateWorkspaceDtoSchema = z.object({
 
 	gitOptions: z
 		.object({
-			strategy: z.enum(['none', 'clone', 'worktree']),
+			strategy: z.enum(['none', 'existing', 'clone', 'worktree']),
 			repositoryUrl: z.string().url().optional(), // For clone
 			sourceWorkspaceId: z.string().optional(), // For worktree
 			branch: z.string().optional(), // Branch to checkout/create

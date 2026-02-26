@@ -44,7 +44,7 @@ export function InterventionDetailPage() {
 	// Use custom hook for data management
 	const { intervention, loading, error, submitting, submitResponse, clearError } = useInterventionDetail({
 		interventionId,
-		onSuccess: () => navigate('/interventions'),
+		onSuccess: () => navigate('/interventions-v2'),
 		onError: errorMessage => showToast(errorMessage, 'error'),
 	});
 
@@ -89,7 +89,7 @@ export function InterventionDetailPage() {
 			<PageHeader
 				title="Intervention Required"
 				action={
-					<Button onClick={() => navigate('/interventions')} variant="outline" size="sm">
+					<Button onClick={() => navigate('/interventions-v2')} variant="outline" size="sm">
 						<ArrowLeft className="mr-2 h-4 w-4" />
 						Back to Interventions
 					</Button>

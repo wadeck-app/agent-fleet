@@ -361,7 +361,7 @@ export function useCrudPage<TItem extends { id: string; version: number }>(
 			// Pass cacheId to backend for cache busting and logging
 			await loadItems({ ...params, cacheId: cache.fstate.cacheId + 1 });
 		},
-		[loadItems, cache]
+		[loadItems, cache.actions, cache.fstate.cacheId]
 	);
 
 	// Refreshing state for blur effect - includes cacheId to detect manual refresh

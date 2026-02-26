@@ -11,6 +11,7 @@ import type { Intervention } from '@app/shared/api/interventions.contract';
 import type { Project } from '@app/shared/api/projects.contract';
 import type { Task } from '@app/shared/api/tasks.contract';
 import type { ScriptProcess, WorkspaceScript } from '@app/shared/api/workspaceScripts.contract';
+import type { WorkspaceMetadataEntity } from '@app/shared/api/workspaces.contract';
 
 import type { AuthService } from '../auth/AuthService';
 import { MockAuthService } from '../auth/MockAuthService';
@@ -36,7 +37,7 @@ import { ScriptProcessManager } from '../services/ScriptProcessManager';
 import { ScriptProcessService } from '../services/ScriptProcessService';
 import { TasksService } from '../services/TasksService';
 import { WorkersService } from '../services/WorkersService';
-import { WorkspaceMetadataFile } from '../services/WorkspaceMetadataFile';
+import { WorkspaceFileService } from '../services/WorkspaceFileService';
 import { WorkspaceScriptsService } from '../services/WorkspaceScriptsService';
 import { WorkspacesService } from '../services/WorkspacesService';
 import type { DataStorage } from '../storage/DataStorage';
@@ -83,6 +84,7 @@ export class DataStoreFactory {
 	private projectsService?: ProjectsService;
 	private interventionsService?: InterventionsService;
 	private workspaceScriptsService?: WorkspaceScriptsService;
+	private workspaceFileService?: WorkspaceFileService;
 	private scriptProcessService?: ScriptProcessService;
 	private scriptProcessManager?: ScriptProcessManager;
 	private scriptLogsStorage?: ScriptLogsStorage;
@@ -253,9 +255,9 @@ export class DataStoreFactory {
 	 */
 	getWorkspacesService(): WorkspacesService {
 		if (!this.workspacesService) {
-			// Create WorkspaceMetadataFile service
-			const metadataFile = new WorkspaceMetadataFile();
-			const metadataRepo = new WorkspaceMetadataRepository(metadataFile);
+			// Create centralized WorkspaceMetadataRepository (data/workspaces.json)
+			const workspacesBaseRepo = new BaseRepository<WorkspaceMetadataEntity>('workspaces', this.storage);
+			const metadataRepo = new WorkspaceMetadataRepository(workspacesBaseRepo);
 
 			// Create ProjectsRepository
 			const projectsBaseRepo = new BaseRepository<Project>('projects', this.storage);
@@ -264,7 +266,7 @@ export class DataStoreFactory {
 			// Get EventBroadcaster
 			const eventBroadcaster = this.getEventBroadcaster();
 
-			// Create WorkspacesService with OrchestratorWrapper directly
+			// Create WorkspacesService with centralized repository
 			this.workspacesService = new WorkspacesService(
 				eventBroadcaster,
 				this.orchestratorWrapper,
@@ -274,6 +276,18 @@ export class DataStoreFactory {
 		}
 
 		return this.workspacesService;
+	}
+
+	/**
+	 * Get or create WorkspaceFileService
+	 */
+	getWorkspaceFileService(): WorkspaceFileService {
+		if (!this.workspaceFileService) {
+			const workspacesService = this.getWorkspacesService();
+			this.workspaceFileService = new WorkspaceFileService(workspacesService);
+		}
+
+		return this.workspaceFileService;
 	}
 
 	/**
@@ -395,10 +409,6 @@ export class DataStoreFactory {
 			// Create OrchestratorRepository for task data
 			const orchestratorRepo = new OrchestratorRepository(this.orchestratorWrapper);
 
-			// Create WorkspaceMetadataFile service for workspace cleanup
-			const metadataFile = new WorkspaceMetadataFile();
-			const workspaceMetadataRepo = new WorkspaceMetadataRepository(metadataFile);
-
 			// Get EventBroadcaster
 			const eventBroadcaster = this.getEventBroadcaster();
 
@@ -407,7 +417,6 @@ export class DataStoreFactory {
 				projectsRepo,
 				orchestratorRepo,
 				eventBroadcaster,
-				workspaceMetadataRepo,
 				this.orchestratorWrapper
 			);
 		}

@@ -79,7 +79,7 @@ export function Toast({ message, type = 'success', duration = 3000, onClose }: T
 
 	return (
 		<div className={cn(toastVariants({ type }))}>
-			<div className="flex items-center justify-between gap-4">
+			<div className="flex items-start justify-between gap-4">
 				<span className="text-sm font-medium">{message}</span>
 				<Button
 					variant="ghost"

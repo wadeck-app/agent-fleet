@@ -82,6 +82,7 @@ export const WORKSPACES_TABLE2_COLUMNS: Table2Column<Workspace>[] = [
 				locked: 'warning',
 				cleaning: 'secondary',
 				error: 'destructive',
+				idle: 'outline',
 			} as const;
 
 			return (

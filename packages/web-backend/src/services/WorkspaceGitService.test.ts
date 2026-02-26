@@ -231,13 +231,12 @@ describe('WorkspaceGitService', () => {
 			});
 		});
 
-		it('should create new branch for worktree if branch does not exist', async () => {
+		it('should create new branch via worktree add -b if branch does not exist', async () => {
 			// Setup mocks
 			vi.mocked(mockGit.checkIsRepo!).mockResolvedValue(true);
 			vi.mocked(mockGit.branch!).mockResolvedValue({
 				all: ['main', 'develop'],
 			} as any);
-			vi.mocked(mockGit.checkoutBranch!).mockResolvedValue({} as any);
 			vi.mocked(mockGit.raw!).mockResolvedValue('');
 			vi.mocked(mockGit.status!).mockResolvedValue({
 				current: 'new-feature',
@@ -261,9 +260,15 @@ describe('WorkspaceGitService', () => {
 			// Execute
 			await service.createWorktree('C:\\source\\workspace', 'C:\\worktree\\workspace', 'new-feature');
 
-			// Verify
-			expect(mockGit.checkoutBranch).toHaveBeenCalledWith('new-feature', 'HEAD');
-			expect(mockGit.raw).toHaveBeenCalledWith(['worktree', 'add', 'C:\\worktree\\workspace', 'new-feature']);
+			// Verify: branch creation + worktree in one step (no checkoutBranch)
+			expect(mockGit.checkoutBranch).not.toHaveBeenCalled();
+			expect(mockGit.raw).toHaveBeenCalledWith([
+				'worktree',
+				'add',
+				'-b',
+				'new-feature',
+				'C:\\worktree\\workspace',
+			]);
 		});
 
 		it('should reject if source is not a git repository', async () => {

@@ -5,6 +5,7 @@ import { LoadingState } from '@framework/components/feedback/LoadingState';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { useToast } from '@framework/features/toast/ToastContext';
+import { useDialogParam } from '@framework/hooks/useDialogParam';
 import { ReactFlowProvider } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -33,7 +34,7 @@ export function FlowEditorPage() {
 	const [wasSaving, setWasSaving] = useState(false);
 
 	// Settings dialog state
-	const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+	const settingsDialog = useDialogParam('flow-settings');
 
 	// Show success toast when save completes successfully
 	useEffect(() => {
@@ -83,7 +84,7 @@ export function FlowEditorPage() {
 								onSave={flowEditor.saveFlow}
 								onValidate={flowEditor.validateFlow}
 								onAutoLayout={flowEditor.autoLayout}
-								onOpenSettings={() => setSettingsDialogOpen(true)}
+								onOpenSettings={settingsDialog.open}
 								onAddNode={flowEditor.addNode}
 								onLoadFlow={handleLoadFlow}
 								availableFlows={flows}
@@ -148,8 +149,8 @@ export function FlowEditorPage() {
 					{/* Flow Settings Dialog */}
 					{flowEditor.flowDefinition && (
 						<FlowSettingsDialog
-							open={settingsDialogOpen}
-							onOpenChange={setSettingsDialogOpen}
+							open={settingsDialog.isOpen}
+							onOpenChange={settingsDialog.onOpenChange}
 							flowDefinition={flowEditor.flowDefinition}
 							onSave={flowEditor.updateFlowDefinition}
 						/>

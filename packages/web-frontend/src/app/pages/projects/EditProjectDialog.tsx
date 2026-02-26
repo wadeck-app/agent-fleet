@@ -158,7 +158,14 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: Ed
 			disabled: formState.isSubmitting,
 		},
 		{
-			label: 'Annuler',
+			label: 'Refresh',
+			type: 'button',
+			variant: 'outline',
+			onClick: () => onSuccess(),
+			disabled: formState.isSubmitting,
+		},
+		{
+			label: 'Cancel',
 			type: 'button',
 			variant: 'outline',
 			onClick: () => onOpenChange(false),

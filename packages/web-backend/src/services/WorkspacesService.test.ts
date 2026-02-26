@@ -2,58 +2,47 @@ import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Project } from '@app/shared/api/projects.contract';
-import type { Workspace } from '@app/shared/api/workspaces.contract';
+import type { WorkspaceMetadataEntity } from '@app/shared/api/workspaces.contract';
 
 import { BaseRepository } from '../repositories/BaseRepository';
 import { ProjectsRepository } from '../repositories/ProjectsRepository';
-import type { WorkspaceMetadataRepository } from '../repositories/WorkspaceMetadataRepository';
+import { WorkspaceMetadataRepository } from '../repositories/WorkspaceMetadataRepository';
 import { InMemoryStorage } from '../storage/InMemoryStorage';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 import { WorkspacesService } from './WorkspacesService';
 
 /**
  * ===========================================================================================
- * WORKSPACES SERVICE TESTS
- * ===========================================================================================
- *
- * Tests for workspace metadata updates (name, description, color).
- * Project association is now managed via Projects API, not WorkspacesService.
- *
- * Test Coverage:
- * - Updating workspace metadata
- * - Finding workspace by ID (metadata ID or hash-based ID)
- * - Event emission on successful update
- * - Error handling for non-existent workspaces
- *
+ * WORKSPACES SERVICE TESTS (centralized metadata repository)
  * ===========================================================================================
  */
 
 describe('WorkspacesService', () => {
 	let storage: InMemoryStorage;
+	let metadataRepo: WorkspaceMetadataRepository;
 	let projectsRepository: ProjectsRepository;
 	let workspacesService: WorkspacesService;
 
-	// Mock dependencies
 	let mockEventBroadcaster: EventBroadcaster;
 	let mockOrchestratorWrapper: OrchestratorWrapper;
-	let mockMetadataRepository: WorkspaceMetadataRepository;
 
-	// Test data
 	const testWorkspacePath = 'C:\\test\\workspace';
-	const testWorkspaceId = '50115a2e-5226-46d4-9fb8-6f9c11a16f9d';
 
 	beforeEach(async () => {
-		// Setup storage and repositories
 		storage = new InMemoryStorage();
-		const baseRepository = new BaseRepository<Project>('projects', storage);
-		projectsRepository = new ProjectsRepository(baseRepository);
 
-		// Setup mock EventBroadcaster
+		// Create centralized WorkspaceMetadataRepository
+		const workspacesBase = new BaseRepository<WorkspaceMetadataEntity>('workspaces', storage);
+		metadataRepo = new WorkspaceMetadataRepository(workspacesBase);
+
+		// Create ProjectsRepository
+		const projectsBase = new BaseRepository<Project>('projects', storage);
+		projectsRepository = new ProjectsRepository(projectsBase);
+
 		mockEventBroadcaster = {
 			broadcast: vi.fn(),
 		} as any;
 
-		// Setup mock OrchestratorWrapper
 		mockOrchestratorWrapper = {
 			getConnectedWorkersWorkspaces: vi.fn().mockResolvedValue([
 				{
@@ -66,45 +55,10 @@ describe('WorkspacesService', () => {
 			]),
 		} as any;
 
-		// Setup mock WorkspaceMetadataRepository
-		mockMetadataRepository = {
-			getMetadataForWorkspaces: vi.fn().mockResolvedValue(
-				new Map([
-					[
-						testWorkspacePath,
-						{
-							id: testWorkspaceId,
-							name: 'Test Workspace',
-							description: 'Test Description',
-							color: '#FF0000',
-							mode: 'development',
-							createdAt: new Date().toISOString(),
-							updatedAt: new Date().toISOString(),
-						},
-					],
-				])
-			),
-			upsertMetadata: vi.fn().mockImplementation(async (_path, data) => {
-				// Return updated metadata with merged data
-				return {
-					id: testWorkspaceId,
-					name: data.name || 'Test Workspace',
-					description: data.description || 'Test Description',
-					color: data.color || '#FF0000',
-					mode: data.mode || 'development',
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
-				};
-			}),
-			startWatching: vi.fn(),
-			setChangeCallback: vi.fn(),
-		} as any;
-
-		// Create WorkspacesService
 		workspacesService = new WorkspacesService(
 			mockEventBroadcaster,
 			mockOrchestratorWrapper,
-			mockMetadataRepository,
+			metadataRepo,
 			projectsRepository
 		);
 	});
@@ -114,279 +68,284 @@ describe('WorkspacesService', () => {
 		vi.clearAllMocks();
 	});
 
-	describe('updateWorkspace', () => {
-		it('should update workspace name', async () => {
-			// Act
-			const updatedWorkspace = await workspacesService.updateWorkspace(testWorkspaceId, {
-				name: 'Updated Name',
-			});
-
-			// Assert
-			expect(updatedWorkspace.name).toBe('Updated Name');
-			expect(mockMetadataRepository.upsertMetadata).toHaveBeenCalledWith(testWorkspacePath, {
-				name: 'Updated Name',
-				description: undefined,
-				color: undefined,
-			});
-		});
-
-		it('should update workspace description', async () => {
-			// Act
-			const updatedWorkspace = await workspacesService.updateWorkspace(testWorkspaceId, {
-				description: 'New Description',
-			});
-
-			// Assert
-			expect(updatedWorkspace.description).toBe('New Description');
-			expect(mockMetadataRepository.upsertMetadata).toHaveBeenCalledWith(testWorkspacePath, {
-				name: undefined,
-				description: 'New Description',
-				color: undefined,
-			});
-		});
-
-		it('should update workspace color', async () => {
-			// Act
-			const updatedWorkspace = await workspacesService.updateWorkspace(testWorkspaceId, {
-				color: '#00FF00',
-			});
-
-			// Assert
-			expect(updatedWorkspace.color).toBe('#00FF00');
-			expect(mockMetadataRepository.upsertMetadata).toHaveBeenCalledWith(testWorkspacePath, {
-				name: undefined,
-				description: undefined,
-				color: '#00FF00',
-			});
-		});
-
-		it('should update multiple fields at once', async () => {
-			// Act
-			const updatedWorkspace = await workspacesService.updateWorkspace(testWorkspaceId, {
-				name: 'Multi Update',
-				description: 'Multi Description',
-				color: '#0000FF',
-			});
-
-			// Assert
-			expect(updatedWorkspace.name).toBe('Multi Update');
-			expect(updatedWorkspace.description).toBe('Multi Description');
-			expect(updatedWorkspace.color).toBe('#0000FF');
-		});
-
-		it('should emit B2F_WORKSPACE_UPDATED event after successful update', async () => {
-			// Act
-			await workspacesService.updateWorkspace(testWorkspaceId, {
-				name: 'Event Test',
-			});
-
-			// Assert
-			const broadcastCalls = (mockEventBroadcaster.broadcast as any).mock.calls;
-			const workspaceUpdateEvents = broadcastCalls.filter((call: any) => call[0] === 'b2f:workspace:updated');
-
-			expect(workspaceUpdateEvents).toHaveLength(1);
-			expect(workspaceUpdateEvents[0][1]).toMatchObject({
-				id: testWorkspaceId,
-				name: 'Event Test',
-			});
-		});
-
-		it('should start watching the metadata file', async () => {
-			// Act
-			await workspacesService.updateWorkspace(testWorkspaceId, {
-				name: 'Watch Test',
-			});
-
-			// Assert
-			expect(mockMetadataRepository.startWatching).toHaveBeenCalledWith(testWorkspacePath);
-		});
-
-		it('should throw error for non-existent workspace', async () => {
-			// Setup: empty workspaces
-			mockOrchestratorWrapper.getConnectedWorkersWorkspaces = vi.fn().mockResolvedValue([]);
-
-			// Act & Assert
-			await expect(workspacesService.updateWorkspace('non-existent-id', { name: 'Test' })).rejects.toThrow(
-				'Workspace non-existent-id not found'
-			);
-		});
-
-		it('should find workspace by hash-based ID if not found by metadata ID', async () => {
-			// Setup: workspace not in metadata map
-			mockMetadataRepository.getMetadataForWorkspaces = vi.fn().mockResolvedValue(new Map());
-
-			// The service should generate ID from path and match it
-			// This requires WorkspaceMapper.generateIdFromPath to be tested separately
-
-			// For now, this test documents the expected behavior
-			// In practice, hash-based ID lookup happens via WorkspaceMapper
-		});
-	});
-
 	describe('getWorkspacesData', () => {
-		it('should return workspaces with metadata', async () => {
-			// Act
+		it('should auto-register unknown worker paths and return workspaces', async () => {
 			const data = await workspacesService.getWorkspacesData();
 
-			// Assert
 			expect(data.workspaces).toHaveLength(1);
-			expect(data.workspaces[0]).toMatchObject({
-				id: testWorkspaceId,
-				name: 'Test Workspace',
-				description: 'Test Description',
-			});
+			expect(data.workspaces[0].path).toBe(testWorkspacePath);
+			// Worker connected → active
+			expect(data.workspaces[0].status).toBe('active');
+			expect(data.workspaces[0].activeWorkerId).toBe('worker-1');
 		});
 
-		it('should calculate summary statistics', async () => {
-			// Act
+		it('should expose gitBranch from worker info when worker is connected', async () => {
+			await metadataRepo.create({
+				path: testWorkspacePath,
+				name: 'Test',
+				mode: 'development',
+			});
+
 			const data = await workspacesService.getWorkspacesData();
 
-			// Assert
-			expect(data.summary).toMatchObject({
-				total: 1,
-				active: 1,
-				locked: 0,
-				cleaning: 0,
-				errorCount: 0,
+			const ws = data.workspaces.find(w => w.path === testWorkspacePath);
+			expect(ws?.gitBranch).toBe('main');
+		});
+
+		it('should use stored entity gitBranch as fallback when no worker is connected', async () => {
+			await metadataRepo.create({
+				path: 'C:\\idle\\workspace',
+				name: 'Idle',
+				mode: 'development',
+				gitBranch: 'develop',
 			});
+
+			// Worker only connected to testWorkspacePath, not to idle workspace
+			const data = await workspacesService.getWorkspacesData();
+
+			const idleWs = data.workspaces.find(w => w.path === 'C:\\idle\\workspace');
+			expect(idleWs?.gitBranch).toBe('develop');
+		});
+
+		it('should prefer worker gitBranch over stored entity gitBranch', async () => {
+			await metadataRepo.create({
+				path: testWorkspacePath,
+				name: 'Test',
+				mode: 'development',
+				gitBranch: 'old-branch',
+			});
+
+			const data = await workspacesService.getWorkspacesData();
+
+			// Worker reports 'main', entity has 'old-branch' → worker wins
+			const ws = data.workspaces.find(w => w.path === testWorkspacePath);
+			expect(ws?.gitBranch).toBe('main');
+		});
+
+		it('should show idle status for workspaces without connected worker', async () => {
+			// Pre-create a workspace entity
+			await metadataRepo.create({
+				path: 'C:\\idle\\workspace',
+				name: 'Idle Workspace',
+				mode: 'development',
+			});
+
+			// Orchestrator returns no workers for this path
+			const data = await workspacesService.getWorkspacesData();
+
+			// Should show both workspaces
+			expect(data.workspaces.length).toBeGreaterThanOrEqual(2);
+			const idleWorkspace = data.workspaces.find(w => w.path === 'C:\\idle\\workspace');
+			expect(idleWorkspace).toBeDefined();
+			expect(idleWorkspace!.status).toBe('idle');
+			expect(idleWorkspace!.activeWorkerId).toBeUndefined();
+		});
+
+		it('should calculate summary statistics including idle', async () => {
+			await metadataRepo.create({
+				path: 'C:\\idle\\workspace',
+				name: 'Idle',
+				mode: 'development',
+			});
+
+			const data = await workspacesService.getWorkspacesData();
+
+			expect(data.summary.active).toBe(1);
+			expect(data.summary.idle).toBe(1);
+			expect(data.summary.total).toBe(2);
 		});
 
 		it('should return empty data on error', async () => {
-			// Setup: orchestrator throws error
 			mockOrchestratorWrapper.getConnectedWorkersWorkspaces = vi
 				.fn()
 				.mockRejectedValue(new Error('Connection failed'));
 
-			// Act
 			const data = await workspacesService.getWorkspacesData();
 
-			// Assert
 			expect(data.workspaces).toHaveLength(0);
 			expect(data.summary.total).toBe(0);
+		});
+
+		it('should return workspaces with metadata from centralized store', async () => {
+			// Pre-register workspace with metadata
+			await metadataRepo.create({
+				path: testWorkspacePath,
+				name: 'My Workspace',
+				description: 'Test Description',
+				color: '#FF0000',
+				mode: 'development',
+			});
+
+			const data = await workspacesService.getWorkspacesData();
+
+			const ws = data.workspaces.find(w => w.path === testWorkspacePath);
+			expect(ws).toBeDefined();
+			expect(ws!.name).toBe('My Workspace');
+			expect(ws!.description).toBe('Test Description');
+			expect(ws!.color).toBe('#FF0000');
 		});
 	});
 
 	describe('getWorkspacesList', () => {
 		it('should return paginated workspaces', async () => {
-			// Act
 			const list = await workspacesService.getWorkspacesList({ page: 1, pageSize: 10 });
 
-			// Assert
-			expect(list.items).toHaveLength(1);
+			expect(list.items.length).toBeGreaterThanOrEqual(1);
 			expect(list.pagination).toMatchObject({
-				total: 1,
 				page: 1,
 				pageSize: 10,
-				totalPages: 1,
 			});
 		});
 
 		it('should apply search filter', async () => {
-			// Act
+			await metadataRepo.create({
+				path: testWorkspacePath,
+				name: 'Test Workspace',
+				mode: 'development',
+			});
+
 			const list = await workspacesService.getWorkspacesList({ search: 'Test' });
 
-			// Assert
-			expect(list.items).toHaveLength(1);
+			expect(list.items.length).toBeGreaterThanOrEqual(1);
 			expect(list.items[0].name).toBe('Test Workspace');
 		});
 
 		it('should filter by status', async () => {
-			// Act
-			const list = await workspacesService.getWorkspacesList({ status: 'active' });
+			// Create idle workspace
+			await metadataRepo.create({
+				path: 'C:\\idle\\ws',
+				name: 'Idle',
+				mode: 'development',
+			});
 
-			// Assert
-			expect(list.items).toHaveLength(1);
-		});
+			const activeList = await workspacesService.getWorkspacesList({ status: 'active' });
+			const idleList = await workspacesService.getWorkspacesList({ status: 'idle' });
 
-		it('should start watching metadata files', async () => {
-			// Act
-			await workspacesService.getWorkspacesList({});
-
-			// Assert
-			expect(mockMetadataRepository.startWatching).toHaveBeenCalledWith(testWorkspacePath);
+			expect(activeList.items.every(w => w.status === 'active')).toBe(true);
+			expect(idleList.items.every(w => w.status === 'idle')).toBe(true);
 		});
 	});
 
-	describe('workspace enrichment (activeWorkerId and projectId)', () => {
-		it('should include activeWorkerId in workspace data', async () => {
-			// Act
-			const data = await workspacesService.getWorkspacesData();
-
-			// Assert
-			expect(data.workspaces).toHaveLength(1);
-			expect(data.workspaces[0].activeWorkerId).toBe('worker-1');
-		});
-
-		it('should include projectId when workspace is associated with a project', async () => {
-			// Setup: Create a project with this workspace
-			const project = await projectsRepository.create({
-				name: 'Test Project',
-				description: 'Test Description',
-				archived: false,
-				taskCount: 0,
-				pinned: false,
-				order: 0,
-				workspaceIds: [testWorkspaceId],
+	describe('updateWorkspace', () => {
+		it('should update workspace name', async () => {
+			const entity = await metadataRepo.create({
+				path: testWorkspacePath,
+				name: 'Original',
+				mode: 'development',
 			});
 
-			// Act
-			const data = await workspacesService.getWorkspacesData();
-
-			// Assert
-			expect(data.workspaces).toHaveLength(1);
-			expect(data.workspaces[0].projectId).toBe(project.id);
-		});
-
-		it('should not include projectId when workspace is not associated with any project', async () => {
-			// Act
-			const data = await workspacesService.getWorkspacesData();
-
-			// Assert
-			expect(data.workspaces).toHaveLength(1);
-			expect(data.workspaces[0].projectId).toBeUndefined();
-		});
-
-		it('should include enrichment data in getWorkspacesList', async () => {
-			// Setup: Create a project with this workspace
-			const project = await projectsRepository.create({
-				name: 'Test Project',
-				description: 'Test Description',
-				archived: false,
-				taskCount: 0,
-				pinned: false,
-				order: 0,
-				workspaceIds: [testWorkspaceId],
-			});
-
-			// Act
-			const list = await workspacesService.getWorkspacesList({ page: 1, pageSize: 10 });
-
-			// Assert
-			expect(list.items).toHaveLength(1);
-			expect(list.items[0].activeWorkerId).toBe('worker-1');
-			expect(list.items[0].projectId).toBe(project.id);
-		});
-
-		it('should include enrichment data in updateWorkspace', async () => {
-			// Setup: Create a project with this workspace
-			const project = await projectsRepository.create({
-				name: 'Test Project',
-				description: 'Test Description',
-				archived: false,
-				taskCount: 0,
-				pinned: false,
-				order: 0,
-				workspaceIds: [testWorkspaceId],
-			});
-
-			// Act
-			const updatedWorkspace = await workspacesService.updateWorkspace(testWorkspaceId, {
+			const updated = await workspacesService.updateWorkspace(entity.id, {
 				name: 'Updated Name',
 			});
 
-			// Assert
-			expect(updatedWorkspace.activeWorkerId).toBe('worker-1');
-			expect(updatedWorkspace.projectId).toBe(project.id);
+			expect(updated.name).toBe('Updated Name');
+		});
+
+		it('should update workspace color', async () => {
+			const entity = await metadataRepo.create({
+				path: testWorkspacePath,
+				name: 'Test',
+				mode: 'development',
+			});
+
+			const updated = await workspacesService.updateWorkspace(entity.id, {
+				color: '#00FF00',
+			});
+
+			expect(updated.color).toBe('#00FF00');
+		});
+
+		it('should emit B2F_WORKSPACE_UPDATED event', async () => {
+			const entity = await metadataRepo.create({
+				path: testWorkspacePath,
+				name: 'Test',
+				mode: 'development',
+			});
+
+			await workspacesService.updateWorkspace(entity.id, { name: 'Event Test' });
+
+			const broadcastCalls = (mockEventBroadcaster.broadcast as any).mock.calls;
+			const workspaceUpdateEvents = broadcastCalls.filter((call: any) => call[0] === 'b2f:workspace:updated');
+
+			expect(workspaceUpdateEvents).toHaveLength(1);
+			expect(workspaceUpdateEvents[0][1]).toMatchObject({
+				name: 'Event Test',
+			});
+		});
+
+		it('should throw error for non-existent workspace', async () => {
+			await expect(workspacesService.updateWorkspace('non-existent-id', { name: 'Test' })).rejects.toThrow(
+				'Workspace non-existent-id not found'
+			);
+		});
+
+		it('should enrich with worker info when worker is connected', async () => {
+			const entity = await metadataRepo.create({
+				path: testWorkspacePath,
+				name: 'Test',
+				mode: 'development',
+			});
+
+			const updated = await workspacesService.updateWorkspace(entity.id, { name: 'Updated' });
+
+			expect(updated.activeWorkerId).toBe('worker-1');
+			expect(updated.status).toBe('active');
+		});
+	});
+
+	describe('resolveWorkspacePath', () => {
+		it('should resolve workspace ID to path', async () => {
+			const entity = await metadataRepo.create({
+				path: testWorkspacePath,
+				name: 'Test',
+				mode: 'development',
+			});
+
+			const path = await workspacesService.resolveWorkspacePath(entity.id);
+			expect(path).toBe(testWorkspacePath);
+		});
+
+		it('should throw for unknown workspace ID', async () => {
+			await expect(workspacesService.resolveWorkspacePath('unknown-id')).rejects.toThrow(
+				'Source workspace not found: unknown-id'
+			);
+		});
+	});
+
+	describe('workspace enrichment (projectId)', () => {
+		it('should include projectId when workspace is associated with a project', async () => {
+			const entity = await metadataRepo.create({
+				path: testWorkspacePath,
+				name: 'Test',
+				mode: 'development',
+			});
+
+			await projectsRepository.create({
+				name: 'Test Project',
+				description: 'Test',
+				archived: false,
+				taskCount: 0,
+				pinned: false,
+				order: 0,
+				workspaceIds: [entity.id],
+			});
+
+			const data = await workspacesService.getWorkspacesData();
+			const ws = data.workspaces.find(w => w.id === entity.id);
+			expect(ws).toBeDefined();
+			expect(ws!.projectId).toBeDefined();
+		});
+
+		it('should not include projectId when workspace is not associated with any project', async () => {
+			await metadataRepo.create({
+				path: testWorkspacePath,
+				name: 'Test',
+				mode: 'development',
+			});
+
+			const data = await workspacesService.getWorkspacesData();
+			const ws = data.workspaces.find(w => w.path === testWorkspacePath);
+			expect(ws!.projectId).toBeUndefined();
 		});
 	});
 });

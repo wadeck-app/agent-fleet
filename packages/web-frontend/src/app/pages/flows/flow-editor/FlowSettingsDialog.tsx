@@ -22,7 +22,6 @@ import { Button } from '@framework/components/primitives/Button';
 import { useListItems } from '@framework/hooks2/form/useListItems';
 
 import type {
-	ExecutionConfig,
 	FlowDefinition,
 	GitStrategy,
 	ReusePolicy,

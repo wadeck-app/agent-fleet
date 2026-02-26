@@ -6,7 +6,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "node .claude/scripts/PreBashForbiddenCommands.js"
+						"command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/PreBashForbiddenCommands.js\""
 					}
 				]
 			}
@@ -16,7 +16,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "node .claude/scripts/Stop.js"
+						"command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/Stop.js\""
 					}
 				]
 			}

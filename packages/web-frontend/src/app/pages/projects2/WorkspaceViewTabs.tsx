@@ -2,8 +2,8 @@ import { TabButton } from '@framework/components/primitives/TabButton';
 import { TabGroup } from '@framework/components/primitives/TabGroup';
 
 interface WorkspaceViewTabsProps {
-	activeView: 'tasks' | 'scripts';
-	onViewChange: (view: 'tasks' | 'scripts') => void;
+	activeView: 'tasks' | 'scripts' | 'files';
+	onViewChange: (view: 'tasks' | 'scripts' | 'files') => void;
 }
 
 export function WorkspaceViewTabs({ activeView, onViewChange }: WorkspaceViewTabsProps) {
@@ -14,6 +14,9 @@ export function WorkspaceViewTabs({ activeView, onViewChange }: WorkspaceViewTab
 			</TabButton>
 			<TabButton active={activeView === 'scripts'} onClick={() => onViewChange('scripts')}>
 				Scripts
+			</TabButton>
+			<TabButton active={activeView === 'files'} onClick={() => onViewChange('files')}>
+				Files
 			</TabButton>
 		</TabGroup>
 	);

@@ -80,7 +80,7 @@ describe('EditProjectDialog', () => {
 			render(<EditProjectDialog {...defaultProps} />);
 
 			expect(screen.getByRole('button', { name: /Save Changes/i })).toBeInTheDocument();
-			expect(screen.getByRole('button', { name: /Annuler/i })).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: /Cancel/i })).toBeInTheDocument();
 		});
 
 		it('should not render when open is false', () => {
@@ -467,7 +467,7 @@ describe('EditProjectDialog', () => {
 
 			render(<EditProjectDialog {...defaultProps} onOpenChange={onOpenChange} />);
 
-			const cancelButton = screen.getByRole('button', { name: /Annuler/i });
+			const cancelButton = screen.getByRole('button', { name: /Cancel/i });
 			await user.click(cancelButton);
 
 			expect(onOpenChange).toHaveBeenCalledWith(false);

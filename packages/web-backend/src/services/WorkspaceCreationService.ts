@@ -1,53 +1,57 @@
 import { mkdir, rm } from 'fs/promises';
 import { createLogger } from 'shared-common/logger';
 
-import type { CreateWorkspaceDto, Workspace } from '@app/shared/api/workspaces.contract';
+import type { CreateWorkspaceDto } from '@app/shared/api/workspaces.contract';
 
 import { WorkspaceGitService } from './WorkspaceGitService';
-import { WorkspaceMapper } from './WorkspaceMapper';
-import { WorkspaceMetadataFile } from './WorkspaceMetadataFile';
 import { WorkspacePathValidator } from './WorkspacePathValidator';
 
 const log = createLogger('WorkspaceCreationService');
+
+/**
+ * Result of workspace creation (filesystem + git only)
+ * Metadata persistence is handled by WorkspacesService
+ */
+export interface WorkspaceCreationResult {
+	path: string;
+	gitBranch?: string;
+}
 
 /**
  * ===========================================================================================
  * WORKSPACE CREATION SERVICE
  * ===========================================================================================
  *
- * Orchestrates the workspace creation process:
+ * Orchestrates the workspace creation process (filesystem + git only):
  * 1. Validates workspace path (security checks)
  * 2. Creates directory structure
  * 3. Executes git operations (clone/worktree/none)
- * 4. Initializes workspace metadata
- * 5. Returns workspace DTO
+ * 4. Returns { path, gitBranch }
  *
- * Responsibilities:
- * - Coordinate between path validation, git operations, and metadata management
- * - Handle cleanup on failure (remove partially created directories)
- * - Provide clear error messages for user-facing errors
+ * Metadata persistence is NOT handled here — that responsibility
+ * belongs to WorkspacesService which uses the centralized repository.
  *
  * ===========================================================================================
  */
 export class WorkspaceCreationService {
 	private readonly pathValidator: WorkspacePathValidator;
 	private readonly gitService: WorkspaceGitService;
-	private readonly metadataFile: WorkspaceMetadataFile;
 
 	constructor() {
 		this.pathValidator = new WorkspacePathValidator();
 		this.gitService = new WorkspaceGitService();
-		this.metadataFile = new WorkspaceMetadataFile();
 	}
 
 	/**
-	 * Create a new workspace with optional git initialization
+	 * Create a new workspace directory with optional git initialization
 	 *
-	 * @param data - Workspace creation data
-	 * @returns Created workspace
+	 * @returns { path, gitBranch } — filesystem result only
 	 * @throws Error if creation fails (with user-friendly message)
 	 */
-	async createWorkspace(data: CreateWorkspaceDto): Promise<Workspace> {
+	async createWorkspace(
+		data: CreateWorkspaceDto,
+		resolvedPaths?: { sourceWorkspacePath?: string }
+	): Promise<WorkspaceCreationResult> {
 		log.info('Creating workspace', { path: data.path, gitStrategy: data.gitOptions?.strategy });
 
 		let workspaceCreated = false;
@@ -74,9 +78,15 @@ export class WorkspaceCreationService {
 					}
 				}
 
-				// Directory exists and is valid - we'll just add metadata to it
 				log.info('Using existing directory for workspace', { path: data.path });
 			} else {
+				// For 'existing' strategy, the folder MUST already exist
+				if (data.gitOptions?.strategy === 'existing') {
+					throw new Error(
+						'Directory does not exist. The "existing" strategy requires a pre-existing folder.'
+					);
+				}
+
 				// Step 3: Create directory if it doesn't exist
 				await mkdir(data.path, { recursive: true });
 				workspaceCreated = true;
@@ -96,7 +106,7 @@ export class WorkspaceCreationService {
 							data.gitOptions.repositoryUrl,
 							data.path,
 							data.gitOptions.branch,
-							true // shallow clone by default
+							true
 						);
 
 						gitBranch = gitState.branch;
@@ -107,28 +117,28 @@ export class WorkspaceCreationService {
 						if (!data.gitOptions.sourceWorkspaceId) {
 							throw new Error('Source workspace ID is required for worktree strategy');
 						}
+						if (!resolvedPaths?.sourceWorkspacePath) {
+							throw new Error('Source workspace path must be resolved before worktree creation');
+						}
 
-						// TODO: Look up source workspace path from ID
-						// For now, we'll throw an error indicating this needs to be implemented
-						throw new Error(
-							'Worktree strategy requires source workspace path lookup (not yet implemented)'
+						const branch = data.gitOptions.branch || 'feature-branch';
+						const gitState = await this.gitService.createWorktree(
+							resolvedPaths.sourceWorkspacePath,
+							data.path,
+							branch
 						);
-
-						// Future implementation:
-						// const sourceWorkspacePath = await this.lookupWorkspacePath(data.gitOptions.sourceWorkspaceId);
-						// const gitState = await this.gitService.createWorktree(
-						//   sourceWorkspacePath,
-						//   data.path,
-						//   data.gitOptions.branch || 'feature-branch'
-						// );
-						// gitBranch = gitState.branch;
-						// break;
+						gitBranch = gitState.branch;
+						break;
 					}
 
-					case 'none':
-					default:
-						// No git initialization needed
+					case 'existing':
 						break;
+
+					case 'none':
+						break;
+
+					default:
+						throw new Error(`Unknown git strategy: ${data.gitOptions.strategy satisfies never}`);
 				}
 			}
 
@@ -141,20 +151,9 @@ export class WorkspaceCreationService {
 				}
 			}
 
-			// Step 5: Initialize workspace metadata
-			const metadata = await this.metadataFile.write(data.path, {
-				name: data.name,
-				description: data.description,
-				color: data.color,
-				mode: data.mode || 'development',
-			});
+			log.info('Successfully created workspace directory', { path: data.path, gitBranch });
 
-			// Step 6: Map to workspace DTO
-			const workspace = WorkspaceMapper.mapPathToWorkspace(data.path, metadata, gitBranch);
-
-			log.info('Successfully created workspace', { id: workspace.id, path: data.path });
-
-			return workspace;
+			return { path: data.path, gitBranch };
 		} catch (error) {
 			log.error('Failed to create workspace', { path: data.path, error });
 
@@ -168,7 +167,6 @@ export class WorkspaceCreationService {
 				}
 			}
 
-			// Re-throw with user-friendly message
 			throw this.normalizeError(error);
 		}
 	}
@@ -178,11 +176,8 @@ export class WorkspaceCreationService {
 	 */
 	private normalizeError(error: unknown): Error {
 		if (error instanceof Error) {
-			// Already a proper error with message
 			return error;
 		}
-
-		// Unknown error type
 		return new Error('Failed to create workspace: Unknown error');
 	}
 }

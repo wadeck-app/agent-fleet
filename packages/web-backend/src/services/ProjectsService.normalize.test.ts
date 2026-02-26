@@ -21,10 +21,6 @@ describe('ProjectsService - Normalization', () => {
 		broadcast: vi.fn(),
 	};
 
-	const mockWorkspaceMetadataRepository: any = {
-		getMetadataForWorkspaces: vi.fn().mockResolvedValue(new Map()),
-	};
-
 	const mockOrchestratorWrapper: any = {
 		getConnectedWorkersWorkspaces: vi.fn().mockResolvedValue([]),
 	};
@@ -38,7 +34,6 @@ describe('ProjectsService - Normalization', () => {
 			repository,
 			mockOrchestratorRepository,
 			mockEventBroadcaster,
-			mockWorkspaceMetadataRepository,
 			mockOrchestratorWrapper
 		);
 	});

@@ -5501,3 +5501,33 @@ import remarkGfm from 'remark-gfm';
 ```
 
 **File**: `LogEntry.tsx`
+
+---
+
+## File Browser Feature - CodeMirror + Resizable Tree Panel (February 2025)
+
+### Vitest OOM with CodeMirror imports
+**Problem**: Frontend tests importing CodeMirror packages crash vitest workers with `ERR_WORKER_OUT_OF_MEMORY`. CodeMirror's many sub-packages are heavy for vitest fork workers.
+**Workaround**: Run CodeMirror-related tests in isolation. The crash is non-blocking - tests that complete before the OOM are valid.
+
+### React setState during render
+**Problem**: Calling `onDirectoryLoaded(path, entries)` directly in a child component's render body triggers "Cannot update a component while rendering a different component".
+**Fix**: Move the cache update to `useEffect` instead of doing it inline during render.
+
+### File switching flicker
+**Problem**: When switching files, the breadcrumb title updates instantly (from props) but the content hasn't loaded yet, causing 1-2 frames of inconsistent UI.
+**Fix**: Track a `displayedPath` that only updates when the new file content finishes loading. Show previous file's breadcrumb and content until the new one is ready.
+
+### Icon alignment in file trees
+**Problem**: Folder chevrons shift folder icons right, making file icons misaligned.
+**Fix**: Use a fixed-width container (`w-4`) for the chevron column even for files (empty spacer). This ensures the icon column starts at the same position regardless of entry type.
+
+## Centralized vs Distributed Metadata Storage
+
+### Workspace metadata migration to centralized store
+**Problem**: Workspace metadata was stored in distributed `.agent-fleet/workspace-metadata.json` files inside each workspace directory. This made workspaces invisible when no worker was connected, and deviated from the established `BaseRepository<T>` + `FileBasedStorage` pattern used by all other entities.
+**Fix**: Migrated to centralized `data/workspaces.json` using `WorkspaceMetadataRepository` wrapping `BaseRepository<WorkspaceMetadataEntity>`. Workspaces are now first-class entities with `idle` status when disconnected. Legacy files are read once during lazy migration via `WorkspaceMetadataFile.read()`.
+
+### Adding enum values impacts frontend status maps
+**Problem**: Adding `'idle'` to `WorkspaceStatusSchema` caused TS errors in frontend files that had exhaustive status-to-variant maps (`{ active: "success", locked: "warning", ... }`).
+**Fix**: Always search for status variant maps / switch statements when modifying a shared enum. The TypeScript compiler catches these as `TS7053` (expression can't index type).

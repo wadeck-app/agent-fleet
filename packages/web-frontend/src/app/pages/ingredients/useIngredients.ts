@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { useAbortableEffect } from '@framework/hooks/useAbortableEffect';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
@@ -78,6 +78,10 @@ export function useIngredients(params?: UseIngredientsParams): UseIngredientsRes
 		totalPages: number;
 	} | null>(null);
 
+	// Track latest params so loadIngredients() can use them when called without args (e.g. after CRUD operations)
+	const paramsRef = useRef(params);
+	paramsRef.current = params;
+
 	/**
 	 * Load ingredients from the API with pagination/sorting support
 	 *
@@ -91,7 +95,8 @@ export function useIngredients(params?: UseIngredientsParams): UseIngredientsRes
 		try {
 			setLoading(true);
 			setError(null);
-			const data = await ingredientsService.getIngredients(newParams);
+			const effectiveParams = newParams ?? paramsRef.current;
+			const data = await ingredientsService.getIngredients(effectiveParams);
 			setIngredients(data.items);
 			setPagination(data.pagination ?? null);
 		} catch (err) {

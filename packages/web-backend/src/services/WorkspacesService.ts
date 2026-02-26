@@ -5,6 +5,7 @@ import type {
 	CreateWorkspaceDto,
 	UpdateWorkspaceDto,
 	Workspace,
+	WorkspaceMetadataEntity,
 	WorkspacesData,
 	WorkspacesListQuery,
 	WorkspacesListResponse,
@@ -15,7 +16,9 @@ import type { ProjectsRepository } from '../repositories/ProjectsRepository';
 import type { WorkspaceMetadataRepository } from '../repositories/WorkspaceMetadataRepository';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 import { WorkspaceCreationService } from './WorkspaceCreationService';
-import { WorkspaceMapper } from './WorkspaceMapper';
+import { WorkspaceGitService } from './WorkspaceGitService';
+import { type WorkerInfo, WorkspaceMapper } from './WorkspaceMapper';
+import { WorkspaceMetadataFile } from './WorkspaceMetadataFile';
 
 const log = createLogger('WorkspacesService');
 
@@ -25,33 +28,22 @@ const log = createLogger('WorkspacesService');
  * ===========================================================================================
  *
  * Business logic layer for workspace management.
- * Responsibilities:
- * - Generate mock workspace data (MVP - orchestrator doesn't have workspaces API yet)
- * - Calculate summary statistics
- * - Transform workspace data into frontend DTO
- * - Emit real-time events for workspace state changes
+ * Uses centralized WorkspaceMetadataRepository (data/workspaces.json).
  *
- * Does NOT contain:
- * - HTTP concerns (in controller)
- * - Data fetching/caching (would be in repository when real API exists)
- *
- * Event Emission Strategy:
- * - Events are emitted AFTER successful operations
- * - Broadcast failures are logged but don't fail the operation
- * - Type-safe event emission using EventBroadcaster
- *
- * Future CRUD Operations (when implemented):
- * - createWorkspace() → emit 'b2f:workspace:created'
- * - updateWorkspace() → emit 'b2f:workspace:updated'
- * - deleteWorkspace() → emit 'b2f:workspace:deleted'
- * - archiveWorkspace() → emit 'b2f:workspace:archived'
- * - checkQuota() → emit 'b2f:workspace:quota_exceeded' (when quota exceeded)
+ * Key behaviors:
+ * - All workspaces are always visible (idle when no worker connected, active when connected)
+ * - Lazy migration: unknown worker paths auto-register from legacy metadata files
+ * - No more FS watchers — centralized persistence via BaseRepository
  *
  * ===========================================================================================
  */
 
 export class WorkspacesService {
 	private readonly creationService: WorkspaceCreationService;
+	private readonly gitService: WorkspaceGitService;
+	private readonly legacyMetadataFile: WorkspaceMetadataFile;
+	// Interim in-memory cache for newly created workspaces (safety net until DB migration lands)
+	private readonly recentlyCreatedWorkspaces: Map<string, Workspace> = new Map();
 
 	constructor(
 		private readonly eventBroadcaster: EventBroadcaster,
@@ -60,125 +52,149 @@ export class WorkspacesService {
 		private readonly projectsRepository: ProjectsRepository
 	) {
 		this.creationService = new WorkspaceCreationService();
-
-		// Configure metadata file watcher to emit B2F_WORKSPACES_UPDATED on changes
-		this.metadataRepository.setChangeCallback((workspacePath: string) => {
-			log.info(`Metadata changed for workspace: ${workspacePath}`);
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			this.eventBroadcaster.broadcast(B2F_WORKSPACES_UPDATED, {} as any);
-		});
+		this.gitService = new WorkspaceGitService();
+		// Keep legacy reader for one-time migration of existing workspaces
+		this.legacyMetadataFile = new WorkspaceMetadataFile();
 	}
-	/**
-	 * Deduplicate worker workspaces by path (multiple workers can work in same workspace)
-	 */
-	private deduplicateWorkspaces(
-		workerWorkspaces: Array<{
-			workerId: string;
-			workspacePath: string;
-			projectId: string;
-			connectedAt: string;
-		}>
-	): Array<{
-		workerId: string;
-		workspacePath: string;
-		projectId: string;
-		connectedAt: string;
-	}> {
-		const pathMap = new Map<
-			string,
-			{
-				workerId: string;
-				workspacePath: string;
-				projectId: string;
-				connectedAt: string;
-			}
-		>();
 
-		for (const workspace of workerWorkspaces) {
-			const existing = pathMap.get(workspace.workspacePath);
-			// Keep the one with most recent connectedAt
-			if (!existing || workspace.connectedAt > existing.connectedAt) {
-				pathMap.set(workspace.workspacePath, workspace);
+	/**
+	 * Build worker info map from connected workers (keyed by workspace path)
+	 */
+	private async buildWorkerInfoMap(): Promise<Map<string, WorkerInfo>> {
+		const workerWorkspaces = await this.orchestratorWrapper.getConnectedWorkersWorkspaces();
+		const workerByPath = new Map<string, WorkerInfo>();
+
+		for (const ww of workerWorkspaces) {
+			const existing = workerByPath.get(ww.workspacePath);
+			// Keep the most recently connected worker per path
+			if (!existing || ww.connectedAt > existing.connectedAt) {
+				workerByPath.set(ww.workspacePath, {
+					workerId: ww.workerId,
+					connectedAt: ww.connectedAt,
+					gitBranch: ww.gitBranch,
+				});
 			}
 		}
 
-		return Array.from(pathMap.values());
+		return workerByPath;
 	}
 
 	/**
-	 * Build enrichment data for workspaces (activeWorkerId and projectId)
+	 * Auto-register unknown worker paths into centralized store.
+	 * Handles lazy migration from legacy .agent-fleet/workspace-metadata.json files.
 	 */
-	private async buildEnrichmentData(
-		workerWorkspaces: Array<{
-			workerId: string;
-			workspacePath: string;
-			projectId: string;
-			connectedAt: string;
-		}>,
-		uniqueWorkspaces: Array<{
-			workerId: string;
-			workspacePath: string;
-			projectId: string;
-			connectedAt: string;
-		}>,
-		metadataMap: Map<string, any>
-	): Promise<{
-		activeWorkerMap: Map<string, string>;
-		projectMap: Map<string, string>;
-	}> {
-		const activeWorkerMap = new Map<string, string>();
-		const projectMap = new Map<string, string>();
-
-		// Build maps for all unique workspaces
-		for (const workspace of uniqueWorkspaces) {
-			const metadata = metadataMap.get(workspace.workspacePath);
-			// Use metadata ID if available, otherwise use generated ID
-			const workspaceId = metadata?.id || WorkspaceMapper.generateIdFromPath(workspace.workspacePath);
-
-			// Find active worker: look for matching workspace in original workerWorkspaces
-			const activeWorker = workerWorkspaces.find(w => {
-				const wMetadata = metadataMap.get(w.workspacePath);
-				const wId = wMetadata?.id || WorkspaceMapper.generateIdFromPath(w.workspacePath);
-				return wId === workspaceId;
-			});
-			if (activeWorker) {
-				activeWorkerMap.set(workspaceId, activeWorker.workerId);
+	private async autoRegisterWorkerPaths(
+		workerByPath: Map<string, WorkerInfo>,
+		knownPaths: Set<string>
+	): Promise<void> {
+		for (const workerPath of workerByPath.keys()) {
+			if (knownPaths.has(workerPath)) {
+				continue;
 			}
 
-			// Find associated project via reverse lookup
+			try {
+				// Try reading legacy metadata file
+				const legacyData = await this.legacyMetadataFile.read(workerPath);
+				if (legacyData) {
+					log.info(`Migrating legacy workspace metadata for: ${workerPath}`);
+					await this.metadataRepository.upsertByPath(workerPath, {
+						name: legacyData.name,
+						description: legacyData.description,
+						color: legacyData.color,
+						mode: legacyData.mode,
+					});
+				} else {
+					// No legacy file — create with defaults
+					await this.metadataRepository.ensureByPath(workerPath);
+				}
+			} catch (error) {
+				log.error(`Failed to auto-register workspace path: ${workerPath}`, error);
+			}
+		}
+	}
+
+	/**
+	 * Merge recently created workspaces into the result if not already present.
+	 * Cleans up entries once the centralized store tracks them.
+	 * Interim safety net — will be removed when DB migration lands.
+	 */
+	private mergeRecentlyCreated(knownPaths: Set<string>, workspaces: Workspace[]): Workspace[] {
+		// Clean up entries that the store already tracks
+		for (const path of this.recentlyCreatedWorkspaces.keys()) {
+			if (knownPaths.has(path)) {
+				this.recentlyCreatedWorkspaces.delete(path);
+			}
+		}
+		// Add remaining recently created workspaces
+		for (const workspace of this.recentlyCreatedWorkspaces.values()) {
+			if (!knownPaths.has(workspace.path)) {
+				workspaces.push(workspace);
+			}
+		}
+		return workspaces;
+	}
+
+	/**
+	 * Build projectId lookup map for workspaces
+	 */
+	private async buildProjectMap(workspaceIds: string[]): Promise<Map<string, string>> {
+		const projectMap = new Map<string, string>();
+		for (const workspaceId of workspaceIds) {
 			const project = await this.projectsRepository.getProjectForWorkspace(workspaceId);
 			if (project) {
 				projectMap.set(workspaceId, project.id);
 			}
 		}
-
-		return { activeWorkerMap, projectMap };
+		return projectMap;
 	}
 
 	/**
 	 * Get workspaces data with summary statistics
 	 */
 	async getWorkspacesData(): Promise<WorkspacesData> {
-		log.info('Fetching workspaces from connected workers...');
+		log.info('Fetching workspaces data...');
 
 		try {
-			// Fetch workspaces from connected workers
-			const workerWorkspaces = await this.orchestratorWrapper.getConnectedWorkersWorkspaces();
+			// 1. Get connected workers info
+			const workerByPath = await this.buildWorkerInfoMap();
 
-			// Deduplicate by workspace path (multiple workers can work in same workspace)
-			const uniqueWorkspaces = this.deduplicateWorkspaces(workerWorkspaces);
+			// 2. Get all centralized entities
+			let entities = await this.metadataRepository.findAll();
+			const knownPaths = new Set(entities.map(e => e.path));
 
-			// Fetch metadata for all workspace paths
-			const workspacePaths = uniqueWorkspaces.map(w => w.workspacePath);
-			const metadataMap = await this.metadataRepository.getMetadataForWorkspaces(workspacePaths);
+			// 3. Auto-register unknown worker paths (lazy migration)
+			await this.autoRegisterWorkerPaths(workerByPath, knownPaths);
 
-			// Build enrichment data (activeWorkerId and projectId)
-			const enrichmentData = await this.buildEnrichmentData(workerWorkspaces, uniqueWorkspaces, metadataMap);
+			// Re-fetch if new entities were created
+			if ([...workerByPath.keys()].some(p => !knownPaths.has(p))) {
+				entities = await this.metadataRepository.findAll();
+			}
 
-			// Map to API format
-			const workspaces = WorkspaceMapper.mapWorkerWorkspacesToApi(uniqueWorkspaces, metadataMap, enrichmentData);
+			// 4. Build project map
+			const projectMap = await this.buildProjectMap(entities.map(e => e.id));
 
-			// Calculate summary statistics
+			// 5. Lazy init: resolve git branches for entities without stored branch and no worker
+			const lazyBranchMap = await this.resolveLazyGitBranches(entities, workerByPath);
+
+			// 6. Map to API format
+			const workspaces = entities.map(entity => {
+				const lazyBranch = lazyBranchMap.get(entity.id);
+				const effectiveEntity = lazyBranch ? { ...entity, gitBranch: lazyBranch } : entity;
+				return WorkspaceMapper.mapEntityToApi(
+					effectiveEntity,
+					workerByPath.get(entity.path),
+					projectMap.get(entity.id)
+				);
+			});
+
+			// 7. Merge recently created workspaces (interim safety net)
+			const entityPaths = new Set(entities.map(e => e.path));
+			this.mergeRecentlyCreated(entityPaths, workspaces);
+
+			// 8. Fire-and-forget: persist branch changes for future responses
+			this.refreshGitBranchesAsync(entities, workerByPath, lazyBranchMap);
+
+			// 9. Calculate summary
 			const summary = this.calculateSummary(workspaces);
 
 			return {
@@ -188,16 +204,9 @@ export class WorkspacesService {
 			};
 		} catch (error) {
 			log.error('Failed to fetch workspaces:', error);
-			// Return empty data on error
 			return {
 				timestamp: new Date().toISOString(),
-				summary: {
-					total: 0,
-					active: 0,
-					locked: 0,
-					cleaning: 0,
-					errorCount: 0,
-				},
+				summary: { total: 0, active: 0, idle: 0, locked: 0, cleaning: 0, errorCount: 0 },
 				workspaces: [],
 			};
 		}
@@ -205,34 +214,51 @@ export class WorkspacesService {
 
 	/**
 	 * Get workspaces list with pagination, sorting, and search support
-	 * (Data2 architecture)
 	 */
 	async getWorkspacesList(query: WorkspacesListQuery): Promise<WorkspacesListResponse> {
-		log.info('Fetching workspaces list from connected workers...');
+		log.info('Fetching workspaces list...');
 
 		try {
-			// Fetch workspaces from connected workers
-			const workerWorkspaces = await this.orchestratorWrapper.getConnectedWorkersWorkspaces();
+			// 1. Get connected workers info
+			const workerByPath = await this.buildWorkerInfoMap();
 
-			// Deduplicate by workspace path (multiple workers can work in same workspace)
-			const uniqueWorkspaces = this.deduplicateWorkspaces(workerWorkspaces);
+			// 2. Get all centralized entities
+			let entities = await this.metadataRepository.findAll();
+			const knownPaths = new Set(entities.map(e => e.path));
 
-			// Fetch metadata for all workspace paths
-			const workspacePaths = uniqueWorkspaces.map(w => w.workspacePath);
-			const metadataMap = await this.metadataRepository.getMetadataForWorkspaces(workspacePaths);
+			// 3. Auto-register unknown worker paths (lazy migration)
+			await this.autoRegisterWorkerPaths(workerByPath, knownPaths);
 
-			// Start watching metadata files for all connected workspaces
-			for (const workspacePath of workspacePaths) {
-				this.metadataRepository.startWatching(workspacePath);
+			// Re-fetch if new entities were created
+			if ([...workerByPath.keys()].some(p => !knownPaths.has(p))) {
+				entities = await this.metadataRepository.findAll();
 			}
 
-			// Build enrichment data (activeWorkerId and projectId)
-			const enrichmentData = await this.buildEnrichmentData(workerWorkspaces, uniqueWorkspaces, metadataMap);
+			// 4. Build project map
+			const projectMap = await this.buildProjectMap(entities.map(e => e.id));
 
-			// Map to API format
-			let workspaces = WorkspaceMapper.mapWorkerWorkspacesToApi(uniqueWorkspaces, metadataMap, enrichmentData);
+			// 5. Lazy init: resolve git branches for entities without stored branch and no worker
+			const lazyBranchMap = await this.resolveLazyGitBranches(entities, workerByPath);
 
-			// Apply domain filters (status, mode)
+			// 6. Map to API format
+			let workspaces = entities.map(entity => {
+				const lazyBranch = lazyBranchMap.get(entity.id);
+				const effectiveEntity = lazyBranch ? { ...entity, gitBranch: lazyBranch } : entity;
+				return WorkspaceMapper.mapEntityToApi(
+					effectiveEntity,
+					workerByPath.get(entity.path),
+					projectMap.get(entity.id)
+				);
+			});
+
+			// 7. Merge recently created workspaces (interim safety net)
+			const entityPaths = new Set(entities.map(e => e.path));
+			this.mergeRecentlyCreated(entityPaths, workspaces);
+
+			// 8. Fire-and-forget: persist branch changes for future responses
+			this.refreshGitBranchesAsync(entities, workerByPath, lazyBranchMap);
+
+			// Apply domain filters
 			if (query.status) {
 				workspaces = workspaces.filter(w => w.status === query.status);
 			}
@@ -240,12 +266,12 @@ export class WorkspacesService {
 				workspaces = workspaces.filter(w => w.mode === query.mode);
 			}
 
-			// Apply search if provided
+			// Apply search
 			if (query.search) {
 				workspaces = this.applySearch(workspaces, query.search);
 			}
 
-			// Apply sorting if provided
+			// Apply sorting
 			if (query.sortBy && query.sortOrder) {
 				workspaces = this.applySorting(workspaces, query.sortBy, query.sortOrder);
 			}
@@ -260,16 +286,10 @@ export class WorkspacesService {
 
 			return {
 				items: paginatedWorkspaces,
-				pagination: {
-					total,
-					page,
-					pageSize,
-					totalPages,
-				},
+				pagination: { total, page, pageSize, totalPages },
 			};
 		} catch (error) {
 			log.error('Failed to fetch workspaces list:', error);
-			// Return empty list on error
 			return {
 				items: [],
 				pagination: {
@@ -283,7 +303,108 @@ export class WorkspacesService {
 	}
 
 	/**
-	 * Apply search filter across workspace fields (including metadata)
+	 * Create a new workspace
+	 * 1. Delegate filesystem + git to WorkspaceCreationService
+	 * 2. Persist metadata via centralized repository
+	 * 3. Map to API DTO and broadcast event
+	 */
+	async createWorkspace(data: CreateWorkspaceDto): Promise<Workspace> {
+		log.info('Creating workspace', { path: data.path });
+
+		try {
+			// Resolve source workspace path for worktree strategy
+			let resolvedPaths: { sourceWorkspacePath?: string } | undefined;
+			if (data.gitOptions?.strategy === 'worktree' && data.gitOptions.sourceWorkspaceId) {
+				const sourceWorkspacePath = await this.resolveWorkspacePath(data.gitOptions.sourceWorkspaceId);
+				resolvedPaths = { sourceWorkspacePath };
+			}
+
+			// Create workspace directory + git operations
+			const { path, gitBranch } = await this.creationService.createWorkspace(data, resolvedPaths);
+
+			// Persist metadata in centralized store (include gitBranch if resolved)
+			const entity = await this.metadataRepository.create({
+				path,
+				name: data.name,
+				description: data.description,
+				color: data.color,
+				mode: data.mode || 'development',
+				gitBranch,
+			});
+
+			// Map to API format (newly created → no worker connected yet → idle)
+			// gitBranch is stored in entity so WorkspaceMapper uses entity.gitBranch as fallback
+			const workspace = WorkspaceMapper.mapEntityToApi(entity);
+
+			// Cache for interim visibility (safety net)
+			this.recentlyCreatedWorkspaces.set(workspace.path, workspace);
+
+			// Broadcast event
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			this.eventBroadcaster.broadcast(B2F_WORKSPACES_UPDATED, {} as any);
+
+			log.info('Successfully created workspace', { id: workspace.id });
+			return workspace;
+		} catch (error) {
+			log.error('Failed to create workspace:', error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Update workspace metadata (name, description, color)
+	 */
+	async updateWorkspace(workspaceId: string, data: UpdateWorkspaceDto): Promise<Workspace> {
+		log.info(`Updating workspace ${workspaceId}`, { data });
+
+		try {
+			// Find directly in centralized store
+			const entity = await this.metadataRepository.findById(workspaceId);
+			if (!entity) {
+				throw new Error(`Workspace ${workspaceId} not found`);
+			}
+
+			// Update metadata
+			const updated = await this.metadataRepository.update(workspaceId, {
+				name: data.name,
+				description: data.description,
+				color: data.color,
+			});
+
+			// Enrich with worker info
+			const workerByPath = await this.buildWorkerInfoMap();
+			const workerInfo = workerByPath.get(updated.path);
+
+			// Find project
+			const project = await this.projectsRepository.getProjectForWorkspace(workspaceId);
+
+			// Map to API format
+			const workspace = WorkspaceMapper.mapEntityToApi(updated, workerInfo, project?.id);
+
+			// Broadcast event
+			this.eventBroadcaster.broadcast(B2F_WORKSPACE_UPDATED, workspace);
+
+			log.info(`Successfully updated workspace ${workspaceId}`);
+			return workspace;
+		} catch (error) {
+			log.error(`Failed to update workspace ${workspaceId}:`, error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Resolve a workspace ID to its filesystem path
+	 */
+	async resolveWorkspacePath(workspaceId: string): Promise<string> {
+		const entity = await this.metadataRepository.findById(workspaceId);
+		if (entity) {
+			return entity.path;
+		}
+		throw new Error(`Source workspace not found: ${workspaceId}`);
+	}
+
+	/**
+	 * Apply search filter across workspace fields
 	 */
 	private applySearch(workspaces: Workspace[], searchQuery: string): Workspace[] {
 		const lowerQuery = searchQuery.toLowerCase().trim();
@@ -328,12 +449,68 @@ export class WorkspacesService {
 	}
 
 	/**
+	 * Resolve git branches for entities that have no stored gitBranch and no connected worker.
+	 * Reads the filesystem synchronously (awaited) so the current response can include the branch.
+	 * Returns a map of entity ID → resolved branch name.
+	 */
+	private async resolveLazyGitBranches(
+		entities: WorkspaceMetadataEntity[],
+		workerByPath: Map<string, WorkerInfo>
+	): Promise<Map<string, string>> {
+		const needsLazyInit = entities.filter(e => !e.gitBranch && !workerByPath.has(e.path));
+		if (needsLazyInit.length === 0) {
+			return new Map();
+		}
+
+		const resolved = await Promise.all(
+			needsLazyInit.map(async e => ({
+				id: e.id,
+				branch: (await this.gitService.getGitState(e.path))?.branch,
+			}))
+		);
+
+		const map = new Map<string, string>();
+		for (const { id, branch } of resolved) {
+			if (branch && branch !== 'unknown') {
+				map.set(id, branch);
+			}
+		}
+		return map;
+	}
+
+	/**
+	 * Fire-and-forget: persist gitBranch changes to the metadata store.
+	 * - Worker gitBranch differs from entity → update
+	 * - Lazy-resolved branch → persist for future responses
+	 */
+	private refreshGitBranchesAsync(
+		entities: WorkspaceMetadataEntity[],
+		workerByPath: Map<string, WorkerInfo>,
+		lazyBranchMap: Map<string, string>
+	): void {
+		void (async () => {
+			for (const entity of entities) {
+				try {
+					const workerBranch = workerByPath.get(entity.path)?.gitBranch;
+					if (workerBranch && workerBranch !== entity.gitBranch) {
+						await this.metadataRepository.update(entity.id, { gitBranch: workerBranch });
+					} else if (lazyBranchMap.has(entity.id)) {
+						await this.metadataRepository.update(entity.id, { gitBranch: lazyBranchMap.get(entity.id) });
+					}
+				} catch (error) {
+					log.warn(`Failed to refresh gitBranch for workspace ${entity.id}`, error);
+				}
+			}
+		})();
+	}
+
+	/**
 	 * Calculate summary statistics from workspace list
-	 * @param workspaces - Array of workspaces
 	 */
 	private calculateSummary(workspaces: Workspace[]): {
 		total: number;
 		active: number;
+		idle: number;
 		locked: number;
 		cleaning: number;
 		errorCount: number;
@@ -341,16 +518,19 @@ export class WorkspacesService {
 		const summary = {
 			total: workspaces.length,
 			active: 0,
+			idle: 0,
 			locked: 0,
 			cleaning: 0,
 			errorCount: 0,
 		};
 
-		// Count workspaces by status
-		workspaces.forEach(workspace => {
+		for (const workspace of workspaces) {
 			switch (workspace.status) {
 				case 'active':
 					summary.active++;
+					break;
+				case 'idle':
+					summary.idle++;
 					break;
 				case 'locked':
 					summary.locked++;
@@ -362,223 +542,8 @@ export class WorkspacesService {
 					summary.errorCount++;
 					break;
 			}
-		});
+		}
 
 		return summary;
 	}
-
-	// ===========================================================================================
-	// CRUD METHODS (TO BE IMPLEMENTED)
-	// ===========================================================================================
-	// When CRUD operations are implemented, use these as templates for event emission
-
-	/**
-	 * Create a new workspace (PLACEHOLDER - not implemented)
-	 * When implemented, emit 'b2f:workspace:created' event
-	 *
-	 * @example
-	 * ```typescript
-	 * async createWorkspace(data: CreateWorkspaceDto): Promise<Workspace> {
-	 *   try {
-	 *     const workspace = await this.repository.createWorkspace(data);
-	 *
-	 *     // Emit event AFTER successful creation
-	 *     this.eventBroadcaster.broadcast('b2f:workspace:created', workspace);
-	 *
-	 *     return workspace;
-	 *   } catch (error) {
-	 *     console.error('[WorkspacesService] Failed to create workspace:', error);
-	 *     throw error;
-	 *   }
-	 * }
-	 * ```
-	 */
-
-	/**
-	 * Create a new workspace
-	 * Emits 'b2f:workspaces:updated' event after successful creation
-	 */
-	async createWorkspace(data: CreateWorkspaceDto): Promise<Workspace> {
-		log.info('Creating workspace', { path: data.path });
-
-		try {
-			// Create workspace using creation service
-			const workspace = await this.creationService.createWorkspace(data);
-
-			// Start watching metadata file
-			this.metadataRepository.startWatching(data.path);
-
-			// Emit event AFTER successful creation
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			this.eventBroadcaster.broadcast(B2F_WORKSPACES_UPDATED, {} as any);
-
-			log.info('Successfully created workspace', { id: workspace.id });
-			return workspace;
-		} catch (error) {
-			log.error('Failed to create workspace:', error);
-			throw error;
-		}
-	}
-
-	/**
-	 * Update workspace metadata (name, description, color)
-	 * Emits 'b2f:workspace:updated' event after successful update
-	 * Note: Project association is now managed via Projects API (PATCH /api/projects/:id)
-	 */
-	async updateWorkspace(workspaceId: string, data: UpdateWorkspaceDto): Promise<Workspace> {
-		log.info(`Updating workspace ${workspaceId}`, { data });
-
-		try {
-			// Find workspace by ID among connected workers
-			const workerWorkspaces = await this.orchestratorWrapper.getConnectedWorkersWorkspaces();
-
-			// Try to find workspace by metadata ID or generated ID
-			const workspacePaths = workerWorkspaces.map(w => w.workspacePath);
-			const metadataMap = await this.metadataRepository.getMetadataForWorkspaces(workspacePaths);
-
-			let targetWorkspacePath: string | null = null;
-
-			// Check metadata IDs first
-			for (const [path, metadata] of metadataMap.entries()) {
-				if (metadata.id === workspaceId) {
-					targetWorkspacePath = path;
-					break;
-				}
-			}
-
-			// If not found in metadata, check generated IDs from paths
-			if (!targetWorkspacePath) {
-				for (const workerWorkspace of workerWorkspaces) {
-					const generatedId = WorkspaceMapper.generateIdFromPath(workerWorkspace.workspacePath);
-					if (generatedId === workspaceId) {
-						targetWorkspacePath = workerWorkspace.workspacePath;
-						break;
-					}
-				}
-			}
-
-			if (!targetWorkspacePath) {
-				throw new Error(`Workspace ${workspaceId} not found`);
-			}
-
-			// Update metadata
-			const metadata = await this.metadataRepository.upsertMetadata(targetWorkspacePath, {
-				name: data.name,
-				description: data.description,
-				color: data.color,
-			});
-
-			// Start watching the metadata file if not already watching
-			this.metadataRepository.startWatching(targetWorkspacePath);
-
-			// Find the worker workspace info
-			const workerWorkspace = workerWorkspaces.find(w => w.workspacePath === targetWorkspacePath);
-			if (!workerWorkspace) {
-				throw new Error(`Workspace ${workspaceId} not found among connected workers`);
-			}
-
-			// Build enrichment data for this workspace
-			const enrichmentData = await this.buildEnrichmentData(workerWorkspaces, [workerWorkspace], metadataMap);
-			const activeWorkerId = enrichmentData.activeWorkerMap.get(workspaceId);
-			const projectId = enrichmentData.projectMap.get(workspaceId);
-
-			// Map to API format with updated metadata
-			const workspace = WorkspaceMapper.mapWorkerWorkspaceToApi(
-				workerWorkspace,
-				metadata,
-				activeWorkerId,
-				projectId
-			);
-
-			// Emit event AFTER successful update
-			this.eventBroadcaster.broadcast(B2F_WORKSPACE_UPDATED, workspace);
-
-			log.info(`Successfully updated workspace ${workspaceId}`);
-			return workspace;
-		} catch (error) {
-			log.error(`Failed to update workspace ${workspaceId}:`, error);
-			throw error;
-		}
-	}
-
-	/**
-	 * Archive workspace (PLACEHOLDER - not implemented)
-	 * When implemented, emit 'b2f:workspace:archived' event
-	 *
-	 * @example
-	 * ```typescript
-	 * async archiveWorkspace(workspaceId: string): Promise<Workspace> {
-	 *   try {
-	 *     const archivedAt = Date.now();
-	 *     const workspace = await this.repository.archiveWorkspace(workspaceId);
-	 *
-	 *     // Emit event AFTER successful archival
-	 *     this.eventBroadcaster.broadcast('b2f:workspace:archived', {
-	 *       workspaceId,
-	 *       archivedAt,
-	 *     });
-	 *
-	 *     return workspace;
-	 *   } catch (error) {
-	 *     console.error('[WorkspacesService] Failed to archive workspace:', error);
-	 *     throw error;
-	 *   }
-	 * }
-	 * ```
-	 */
-
-	/**
-	 * Check workspace quota (PLACEHOLDER - not implemented)
-	 * When implemented, emit 'b2f:workspace:quota_exceeded' event when quota is exceeded
-	 *
-	 * @example
-	 * ```typescript
-	 * async checkQuota(workspaceId: string, quotaType: string): Promise<boolean> {
-	 *   try {
-	 *     const quota = await this.repository.getWorkspaceQuota(workspaceId, quotaType);
-	 *
-	 *     if (quota.usage >= quota.limit) {
-	 *       // Emit event when quota is exceeded
-	 *       this.eventBroadcaster.broadcast('b2f:workspace:quota_exceeded', {
-	 *         workspaceId,
-	 *         quotaType,
-	 *         usage: quota.usage,
-	 *         limit: quota.limit,
-	 *       });
-	 *
-	 *       return true; // Quota exceeded
-	 *     }
-	 *
-	 *     return false; // Within quota
-	 *   } catch (error) {
-	 *     console.error('[WorkspacesService] Failed to check quota:', error);
-	 *     throw error;
-	 *   }
-	 * }
-	 * ```
-	 */
-
-	/**
-	 * Delete workspace (PLACEHOLDER - not implemented)
-	 * When implemented, emit 'b2f:workspace:deleted' event
-	 *
-	 * @example
-	 * ```typescript
-	 * async deleteWorkspace(workspaceId: string): Promise<void> {
-	 *   try {
-	 *     await this.repository.deleteWorkspace(workspaceId);
-	 *
-	 *     // Emit event AFTER successful deletion
-	 *     this.eventBroadcaster.broadcast('b2f:workspace:deleted', {
-	 *       id: workspaceId,
-	 *       deletedAt: Date.now(),
-	 *     } as any); // Type assertion needed as Workspace requires all fields
-	 *
-	 *   } catch (error) {
-	 *     console.error('[WorkspacesService] Failed to delete workspace:', error);
-	 *     throw error;
-	 *   }
-	 * }
-	 * ```
-	 */
 }

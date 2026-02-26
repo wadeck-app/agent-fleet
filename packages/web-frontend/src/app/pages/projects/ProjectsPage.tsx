@@ -16,6 +16,7 @@ import { useMultiSelect2 } from '@framework/hooks2/utility/useMultiSelect2';
 import { useBulkDeleteState } from '@framework/hooks/useBulkDeleteState';
 import { useCrudSuccessToast } from '@framework/hooks/useCrudSuccessToast';
 import { useDeleteConfirmation } from '@framework/hooks/useDeleteConfirmation';
+import { useDialogParam } from '@framework/hooks/useDialogParam';
 import { useErrorToast } from '@framework/hooks/useErrorToast';
 import { useMutationCleanup } from '@framework/hooks/useMutationCleanup';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
@@ -56,14 +57,9 @@ const STORAGE_ID = 'projects' as const;
  * ===========================================================================================
  */
 export function ProjectsPage() {
-	const [createDialogOpen, setCreateDialogOpen] = useState(false);
-	const [editDialogState, setEditDialogState] = useState<{
-		open: boolean;
-		project: Project | null;
-	}>({
-		open: false,
-		project: null,
-	});
+	const createDialog = useDialogParam('create-project');
+	const editDialog = useDialogParam('edit-project');
+	const [editProject, setEditProject] = useState<Project | null>(null);
 
 	// Headless features
 	const pagination = usePagination2({
@@ -173,7 +169,8 @@ export function ProjectsPage() {
 	};
 
 	const handleEdit = (project: Project) => {
-		setEditDialogState({ open: true, project });
+		setEditProject(project);
+		editDialog.open();
 	};
 
 	const handleBulkDelete = async () => {
@@ -202,7 +199,7 @@ export function ProjectsPage() {
 				onRefresh={cache.actions.refresh}
 				isRefreshing={cache.fstate.isRefreshing}
 				action={
-					<Button onClick={() => setCreateDialogOpen(true)} variant="default" size="sm">
+					<Button onClick={createDialog.open} variant="default" size="sm">
 						<Plus />
 						Create Project
 					</Button>
@@ -254,11 +251,11 @@ export function ProjectsPage() {
 			{/* Data + Table */}
 			<Data2
 				fetchData={fetchProjects}
-				{...pagination}
-				{...sorting}
-				{...search}
-				{...cache}
-				{...selection}
+				pagination={pagination}
+				sorting={sorting}
+				search={search}
+				cache={cache}
+				selection={selection}
 				delegateLoadingToChildren={true}
 			>
 				{injectedProps => (
@@ -276,15 +273,18 @@ export function ProjectsPage() {
 			</Data2>
 
 			<CreateProjectDialog
-				open={createDialogOpen}
-				onOpenChange={setCreateDialogOpen}
+				open={createDialog.isOpen}
+				onOpenChange={createDialog.onOpenChange}
 				onSuccess={handleProjectCreated}
 			/>
 
 			<EditProjectDialog
-				project={editDialogState.project}
-				open={editDialogState.open}
-				onOpenChange={open => setEditDialogState({ open, project: open ? editDialogState.project : null })}
+				project={editProject}
+				open={editDialog.isOpen}
+				onOpenChange={open => {
+					editDialog.onOpenChange(open);
+					if (!open) setEditProject(null);
+				}}
 				onSuccess={handleProjectUpdated}
 			/>
 

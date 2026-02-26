@@ -19,7 +19,6 @@ import { Ingredients3GridPage } from '@app/pages/ingredients3/Ingredients3GridPa
 import { Ingredients4CarouselPage as Ingredients4cCarouselPage } from '@app/pages/ingredients4c/Ingredients4CarouselPage';
 import { IngredientsV5Page } from '@app/pages/ingredients5/IngredientsV5Page';
 import { InterventionDetailPage } from '@app/pages/interventions/InterventionDetailPage';
-import { InterventionsPage } from '@app/pages/interventions/InterventionsPage';
 import { InterventionsV2Page } from '@app/pages/interventions/InterventionsV2Page';
 import { ProjectsV2Page } from '@app/pages/projects2/ProjectsV2Page';
 import { ProjectBoardPage } from '@app/pages/projects/ProjectBoardPage';
@@ -61,7 +60,6 @@ function Layout() {
 						<Route path="/projects" element={<ProjectsPage />} />
 						<Route path="/projects-v2" element={<ProjectsV2Page />} />
 						<Route path="/projects/:projectId/board" element={<ProjectBoardPage />} />
-						<Route path="/interventions" element={<InterventionsPage />} />
 						<Route path="/interventions-v2" element={<InterventionsV2Page />} />
 						<Route path="/interventions/:interventionId" element={<InterventionDetailPage />} />
 						<Route path="/workspaces" element={<WorkspacesPage />} />

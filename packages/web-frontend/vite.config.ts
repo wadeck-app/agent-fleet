@@ -64,13 +64,13 @@ export default defineConfig(({ mode }) => {
 	const env = loadEnvFiles(baseDir, mode);
 
 	// Calculate ports from PROJECT_ID for parallel development between projects
-	// PROJECT_ID=0 → Frontend:5000, Backend:3000 | PROJECT_ID=1 → Frontend:5010, Backend:3010
+	// PROJECT_ID=0 → Frontend:5000, Backend:3000 | PROJECT_ID=1 → Frontend:5100, Backend:3100
 	const projectId = parseInt(env.VITE_PROJECT_ID || env.PROJECT_ID || '0', 10);
 	// Calculate ports from WORKSPACE_ID for parallel development between workspaces
-	// WORKSPACE_ID=0 → Frontend:5000, Backend:3000 | WORKSPACE_ID=1 → Frontend:5100, Backend:3100
+	// WORKSPACE_ID=0 → Frontend:5000, Backend:3000 | WORKSPACE_ID=1 → Frontend:5010, Backend:3010
 	const workspaceId = parseInt(env.VITE_WORKSPACE_ID || env.WORKSPACE_ID || '0', 10);
-	const frontendPort = 5000 + projectId * 10 + workspaceId * 100;
-	const backendPort = 3000 + projectId * 10 + workspaceId * 100;
+	const frontendPort = 5000 + projectId * 100 + workspaceId * 10;
+	const backendPort = 3000 + projectId * 100 + workspaceId * 10;
 
 	// Plugin to filter network addresses display
 	function filterNetworkAddresses(backendApiUrl: string): Plugin {
