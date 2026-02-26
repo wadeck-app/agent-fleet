@@ -1,9 +1,9 @@
 import { MemoryRouter } from 'react-router-dom';
 
 import type { FileEntry } from '@shared/api/workspaceFiles.contract';
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FileBrowserPanel } from './FileBrowserPanel';
 import * as useDirectoryListingModule from './useDirectoryListing';
@@ -41,6 +41,13 @@ describe('FileBrowserPanel', () => {
 			save: vi.fn(),
 			refresh: vi.fn(),
 		});
+	});
+
+	afterEach(() => {
+		// Restore all mocks to prevent memory leaks from accumulated spies
+		vi.restoreAllMocks();
+		// Critical: Unmount all components and clean up React state
+		cleanup();
 	});
 
 	it('should render file tree and empty state', async () => {
