@@ -1,5 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FileEditorPanel } from './FileEditorPanel';
 import * as useFileContentModule from './useFileContent';
@@ -11,6 +11,13 @@ describe('FileEditorPanel', () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
+	});
+
+	afterEach(() => {
+		// Restore all mocks to prevent memory leaks from accumulated spies
+		vi.restoreAllMocks();
+		// Critical: Unmount all components and clean up React state
+		cleanup();
 	});
 
 	it('should show loading state initially', () => {

@@ -40,7 +40,9 @@ const log = createLogger('BackendServer');
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Always load from backend/.env
+// Load root .env first, then backend/.env (local overrides root)
+const rootEnvPath = path.join(__dirname, '../../.env');
+dotenv.config({ path: rootEnvPath });
 const envPath = path.join(__dirname, '../.env');
 dotenv.config({ path: envPath });
 
