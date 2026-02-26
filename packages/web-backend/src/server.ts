@@ -198,6 +198,7 @@ async function initializeTransportServer(app: FastifyInstance, factory: DataStor
 // This prevents any accidental writes to production database during testing
 if (process.env.E2E_MODE === 'true') {
 	process.env.USE_PRODUCTION_DB = 'false';
+	process.env.STORAGE_MODE = 'memory';
 }
 
 // SECURITY: Prevent DISABLE_AUTH_DEV in production
