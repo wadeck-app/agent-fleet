@@ -205,7 +205,8 @@ export function TicketDetailPage() {
 					...updates,
 					version: ticket.version,
 				});
-				refresh();
+				// Await refresh so the saving indicator stays visible until data reloads
+				await refresh();
 			} catch (err) {
 				setSavingField(null);
 				revertFn?.();
@@ -339,7 +340,7 @@ export function TicketDetailPage() {
 				{/* Header Row: Title, Status, Delete */}
 				<div
 					className={cn(
-						'flex items-start gap-4',
+						'flex items-start gap-4 transition-opacity duration-300',
 						(savingField === 'title' || savingField === 'status') && 'opacity-60 pointer-events-none'
 					)}
 				>
@@ -381,7 +382,12 @@ export function TicketDetailPage() {
 				</div>
 
 				{/* Description */}
-				<div className={cn(savingField === 'description' && 'opacity-60 pointer-events-none')}>
+				<div
+					className={cn(
+						'transition-opacity duration-300',
+						savingField === 'description' && 'opacity-60 pointer-events-none'
+					)}
+				>
 					<Label htmlFor="ticket-description">Description</Label>
 					<Textarea
 						id="ticket-description"
@@ -394,7 +400,12 @@ export function TicketDetailPage() {
 				</div>
 
 				{/* Labels */}
-				<div className={cn(savingField === 'labels' && 'opacity-60 pointer-events-none')}>
+				<div
+					className={cn(
+						'transition-opacity duration-300',
+						savingField === 'labels' && 'opacity-60 pointer-events-none'
+					)}
+				>
 					<Label>Labels</Label>
 					<div className="space-y-2">
 						{/* Selected labels */}
@@ -450,7 +461,12 @@ export function TicketDetailPage() {
 				</div>
 
 				{/* Fields (Key-Value Pairs) */}
-				<div className={cn(savingField === 'fields' && 'opacity-60 pointer-events-none')}>
+				<div
+					className={cn(
+						'transition-opacity duration-300',
+						savingField === 'fields' && 'opacity-60 pointer-events-none'
+					)}
+				>
 					<EditableListField
 						label="Custom Fields"
 						items={fieldsItems}
