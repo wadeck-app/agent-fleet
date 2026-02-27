@@ -28,6 +28,42 @@ vi.mock('./TicketCreateDialog', () => ({
 	TicketCreateDialog: () => null,
 }));
 
+vi.mock('./tickets.api', () => ({
+	ticketsApi: {
+		reorderTicket: vi.fn(),
+	},
+}));
+
+vi.mock('react-router-dom', () => ({
+	useNavigate: () => vi.fn(),
+}));
+
+vi.mock('@dnd-kit/core', () => ({
+	DndContext: ({ children }: any) => children,
+	closestCenter: vi.fn(),
+}));
+
+vi.mock('@dnd-kit/sortable', () => ({
+	SortableContext: ({ children }: any) => children,
+	verticalListSortingStrategy: {},
+}));
+
+vi.mock('@framework/components2/list/SortableItem', () => ({
+	SortableItem: ({ children }: any) => children,
+}));
+
+vi.mock('@framework/components2/primitives/DragHandle', () => ({
+	DragHandle: () => null,
+}));
+
+vi.mock('@framework/hooks2/form/useDragAndDrop', () => ({
+	useDragAndDrop: () => ({
+		sensors: [],
+		handleDragEnd: vi.fn(),
+		sortableIds: [],
+	}),
+}));
+
 describe('TicketsPage', () => {
 	const mockTickets: Ticket[] = [
 		{

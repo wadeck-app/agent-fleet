@@ -83,7 +83,9 @@ describe('Orchestrator', () => {
 			stop: vi.fn().mockResolvedValue(undefined),
 			getWorkers: vi.fn().mockReturnValue([]),
 			getConnectionManager: vi.fn().mockReturnValue({
-				getFlowDiscoveryRegistry: vi.fn().mockReturnValue({}),
+				getFlowDiscoveryRegistry: vi.fn().mockReturnValue({
+					setEventSubscriptionRegistry: vi.fn(),
+				}),
 			}),
 		} as any;
 		vi.mocked(WorkerWebSocketServer).mockImplementation(function (this: any) {

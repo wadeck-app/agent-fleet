@@ -22,6 +22,7 @@ export interface UseTicketsResult {
 	loading: boolean;
 	error: string | null;
 	reload: () => Promise<void>;
+	refresh: () => Promise<void>;
 }
 
 export function useTickets(query?: TicketsQuery): UseTicketsResult {
@@ -55,10 +56,21 @@ export function useTickets(query?: TicketsQuery): UseTicketsResult {
 		[loadTickets]
 	);
 
+	const refreshTickets = useCallback(async () => {
+		try {
+			const response = await ticketsApi.getTicketsList(query);
+			setTickets(response.items);
+		} catch {
+			// silent – stale data stays visible
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [queryKey]);
+
 	return {
 		tickets,
 		loading,
 		error,
 		reload: loadTickets,
+		refresh: refreshTickets,
 	};
 }

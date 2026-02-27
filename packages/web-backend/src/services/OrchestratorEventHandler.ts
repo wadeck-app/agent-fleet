@@ -5,6 +5,7 @@ import { B2F_TASK_TRACE_UPDATED } from '@app/shared/transport/B2FEventConstants'
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 import type { InterventionsService } from './InterventionsService';
 import type { TasksService } from './TasksService';
+import type { TicketsService } from './TicketsService';
 import type { WorkersService } from './WorkersService';
 
 const log = createLogger('OrchestratorEventHandler');
@@ -49,7 +50,8 @@ export class OrchestratorEventHandler {
 		private readonly tasksService: TasksService,
 		private readonly interventionsService: InterventionsService,
 		private readonly workersService: WorkersService,
-		private readonly eventBroadcaster: EventBroadcaster
+		private readonly eventBroadcaster: EventBroadcaster,
+		private readonly ticketsService?: TicketsService
 	) {}
 
 	/**
@@ -217,12 +219,15 @@ export class OrchestratorEventHandler {
 	/**
 	 * Handle task_completed event
 	 * Updates task with flow result and sets final status
-	 * @param data { taskId: string, success: boolean, flowResult: any }
+	 * @param data { taskId: string, success: boolean, flowResult: any, newStatus?: string, ticketId?: string, ticketStatus?: string }
 	 */
 
 	private async handleTaskCompleted(data: {
 		taskId: string;
 		success: boolean;
+		newStatus?: string;
+		ticketId?: string;
+		ticketStatus?: string;
 		flowResult: {
 			status: 'completed' | 'failed';
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -243,6 +248,17 @@ export class OrchestratorEventHandler {
 			await this.tasksService.updateTaskStatus(data.taskId, finalStatus);
 
 			log.info(`Task ${data.taskId} marked as ${finalStatus}`);
+
+			// Update linked ticket status if provided
+			if (data.ticketId && data.ticketStatus && this.ticketsService) {
+				try {
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					await this.ticketsService.updateTicketStatusById(data.ticketId, data.ticketStatus as any);
+					log.info(`Ticket ${data.ticketId} status updated to ${data.ticketStatus}`);
+				} catch (error) {
+					log.error(`Failed to update ticket ${data.ticketId} status:`, error);
+				}
+			}
 		} catch (error) {
 			log.error(`Failed to handle task_completed for ${data.taskId}:`, error);
 		}

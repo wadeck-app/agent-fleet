@@ -586,6 +586,12 @@ async function start(): Promise<void> {
 			}
 		}
 
+		// Register DevHolds plugin for testing (dev-only)
+		if (process.env.NODE_ENV !== 'production') {
+			const { registerDevHoldsPlugin } = await import('./fastify/plugins/devHolds.plugin.js');
+			await registerDevHoldsPlugin(fastify);
+		}
+
 		// CORS configuration
 		// In development, accept all origins to allow access from mobile devices
 		// In production, restrict to specific origin from environment variable

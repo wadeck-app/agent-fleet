@@ -1,4 +1,5 @@
 import { createLogger } from 'shared-common/logger';
+import type { TicketStatus } from 'shared-orch-worker/domain-types';
 
 import type {
 	AnalyzeTicket,
@@ -22,6 +23,7 @@ import {
 	B2F_TICKET_UPDATED,
 } from '@app/shared/transport';
 
+import type { EventBus } from '../events/EventBus';
 import type { AgentExecutor } from '../providers/AgentExecutor';
 import type { TasksRepository } from '../repositories/TasksRepository';
 import type { TicketsRepository } from '../repositories/TicketsRepository';
@@ -65,7 +67,8 @@ export class TicketsService {
 		private readonly ticketsRepository: TicketsRepository,
 		private readonly eventBroadcaster: EventBroadcaster,
 		private readonly tasksRepository: TasksRepository,
-		private readonly agentExecutor: AgentExecutor
+		private readonly agentExecutor: AgentExecutor,
+		private readonly eventBus?: EventBus
 	) {}
 
 	/**
@@ -220,6 +223,14 @@ export class TicketsService {
 					oldStatus: currentTicket.status,
 					newStatus: data.status,
 				} as any);
+
+				// Emit internal event for backend-to-backend routing
+				this.eventBus?.emit('ticket.status.changed', {
+					ticketId: id,
+					projectId: updatedTicket.projectId,
+					oldStatus: currentTicket.status,
+					newStatus: data.status,
+				});
 			}
 
 			// Emit aggregate event for dashboard updates
@@ -359,5 +370,18 @@ export class TicketsService {
 		}
 
 		return { parentTicket, subTickets, createdFlowIds, flowValidationWarnings };
+	}
+
+	/**
+	 * Update ticket status by ID
+	 * Used by OrchestratorEventHandler to update ticket status after task completion
+	 */
+	async updateTicketStatusById(ticketId: string, newStatus: TicketStatus): Promise<void> {
+		const ticket = await this.ticketsRepository.findById(ticketId);
+		if (!ticket) {
+			log.warn(`updateTicketStatusById: ticket ${ticketId} not found`);
+			return;
+		}
+		await this.updateTicket(ticketId, { status: newStatus, version: ticket.version });
 	}
 }

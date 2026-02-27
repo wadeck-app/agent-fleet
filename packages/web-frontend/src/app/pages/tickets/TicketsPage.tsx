@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
+import { DndContext, closestCenter } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableItem } from '@framework/components2/list/SortableItem';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
 import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
+import { useDragAndDrop } from '@framework/hooks2/form/useDragAndDrop';
 import { useDialogParam } from '@framework/hooks/useDialogParam';
+import { cn } from '@framework/lib/utils';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { Project } from '@shared/api/projects.contract';
 import type { Ticket, TicketStatus } from '@shared/api/tickets.contract';
@@ -13,6 +19,7 @@ import { Plus } from 'lucide-react';
 
 import { projectsApi } from '../projects/projects.api';
 import { TicketCreateDialog } from './TicketCreateDialog';
+import { ticketsApi } from './tickets.api';
 import { useTickets } from './useTickets';
 
 /**
@@ -52,13 +59,75 @@ function formatStatus(status: TicketStatus): string {
  * ===========================================================================================
  */
 export function TicketsPage() {
+	const navigate = useNavigate();
 	const [selectedProjectId, setSelectedProjectId] = useState<string>('');
 	const [projects, setProjects] = useState<Project[]>([]);
 	const [projectsLoading, setProjectsLoading] = useState(false);
+	const [isSaving, setIsSaving] = useState(false);
 	const createDialog = useDialogParam('create-ticket');
 
-	const { tickets, loading, reload } = useTickets({
+	const { tickets, loading, reload, refresh } = useTickets({
 		projectId: selectedProjectId || undefined,
+	});
+
+	// Local display state for optimistic drag-and-drop updates
+	const [localTickets, setLocalTickets] = useState<Ticket[]>([]);
+
+	// Sync local tickets from server data (initial load + explicit reload)
+	useEffect(() => {
+		if (!loading) {
+			setLocalTickets(tickets);
+		}
+	}, [tickets, loading]);
+
+	// Setup drag and drop
+	const dnd = useDragAndDrop({
+		items: localTickets,
+		getItemId: ticket => ticket.id,
+		onReorder: async (fromIndex, toIndex) => {
+			const snapshot = [...localTickets];
+			const movedTicket = localTickets[fromIndex];
+
+			// Calculate new order based on final neighbors after the move
+			let newOrder: number;
+			if (toIndex === 0) {
+				// Moving to top
+				newOrder = localTickets[0].order / 2;
+			} else if (toIndex === localTickets.length - 1) {
+				// Moving to bottom
+				newOrder = localTickets[localTickets.length - 1].order + 1000;
+			} else if (fromIndex < toIndex) {
+				// Moving down: item lands AFTER the item at toIndex
+				newOrder = (localTickets[toIndex].order + localTickets[toIndex + 1].order) / 2;
+			} else {
+				// Moving up: item lands BEFORE the item at toIndex
+				newOrder = (localTickets[toIndex - 1].order + localTickets[toIndex].order) / 2;
+			}
+
+			// Optimistic local reorder (no loading flash)
+			const reordered = [...localTickets];
+			reordered.splice(fromIndex, 1);
+			reordered.splice(toIndex, 0, { ...movedTicket, order: newOrder });
+			setLocalTickets(reordered);
+
+			try {
+				setIsSaving(true);
+				await ticketsApi.reorderTicket(movedTicket.id, {
+					order: newOrder,
+					version: movedTicket.version,
+				});
+				// Silent background sync — no loading flash
+				void refresh();
+			} catch (err) {
+				console.error('Failed to reorder ticket:', getErrorMessage(err));
+				// Revert to snapshot on error
+				setLocalTickets(snapshot);
+			} finally {
+				setIsSaving(false);
+			}
+		},
+		disabled: false,
+		activationConstraint: { distance: 8 },
 	});
 
 	// Load projects for filter dropdown
@@ -86,8 +155,7 @@ export function TicketsPage() {
 	};
 
 	const handleTicketClick = (ticket: Ticket) => {
-		console.log('Ticket clicked:', ticket);
-		// TODO: Open ticket detail view/drawer
+		navigate(`/tickets/${ticket.id}`);
 	};
 
 	return (
@@ -127,53 +195,52 @@ export function TicketsPage() {
 			</div>
 
 			{/* Tickets List */}
-			<div className="space-y-2">
-				{loading && (
-					<div className="rounded-lg border border-border bg-card p-4 text-center text-muted-foreground">
-						Loading tickets...
-					</div>
-				)}
+			{loading && (
+				<div className="rounded-lg border border-border bg-card p-4 text-center text-muted-foreground">
+					Loading tickets...
+				</div>
+			)}
 
-				{!loading && tickets.length === 0 && (
-					<div className="rounded-lg border border-border bg-card p-8 text-center">
-						<p className="text-lg font-medium text-foreground">No tickets found</p>
-						<p className="mt-2 text-sm text-muted-foreground">Create your first ticket to get started</p>
-					</div>
-				)}
+			{!loading && localTickets.length === 0 && (
+				<div className="rounded-lg border border-border bg-card p-8 text-center">
+					<p className="text-lg font-medium text-foreground">No tickets found</p>
+					<p className="mt-2 text-sm text-muted-foreground">Create your first ticket to get started</p>
+				</div>
+			)}
 
-				{!loading &&
-					tickets.map(ticket => (
-						<div
-							key={ticket.id}
-							className="cursor-pointer rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent"
-							onClick={() => handleTicketClick(ticket)}
-						>
-							<div className="flex items-start justify-between">
-								<div className="flex-1">
-									<h3 className="font-medium text-foreground">{ticket.title}</h3>
-									{ticket.description && (
-										<p className="mt-1 text-sm text-muted-foreground line-clamp-2">
-											{ticket.description}
-										</p>
-									)}
-									<div className="mt-2 flex items-center gap-2">
-										<Badge variant={STATUS_VARIANTS[ticket.status]}>
-											{formatStatus(ticket.status)}
-										</Badge>
-										{ticket.labels.map(label => (
-											<Badge key={label} variant="outline">
-												{label}
+			{localTickets.length > 0 && (
+				<DndContext sensors={dnd.sensors} collisionDetection={closestCenter} onDragEnd={dnd.handleDragEnd}>
+					<SortableContext items={dnd.sortableIds} strategy={verticalListSortingStrategy}>
+						<div className={cn('space-y-2', isSaving && 'pointer-events-none opacity-50 blur-sm')}>
+							{localTickets.map(ticket => (
+								<SortableItem key={ticket.id} id={ticket.id}>
+									<div
+										className="cursor-pointer rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent"
+										onClick={() => handleTicketClick(ticket)}
+									>
+										<h3 className="font-medium text-foreground">{ticket.title}</h3>
+										{ticket.description && (
+											<p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+												{ticket.description}
+											</p>
+										)}
+										<div className="mt-2 flex items-center gap-2">
+											<Badge variant={STATUS_VARIANTS[ticket.status]}>
+												{formatStatus(ticket.status)}
 											</Badge>
-										))}
+											{ticket.labels.map(label => (
+												<Badge key={label} variant="outline">
+													{label}
+												</Badge>
+											))}
+										</div>
 									</div>
-								</div>
-								<div className="ml-4 text-sm text-muted-foreground">
-									Order: {ticket.order.toFixed(2)}
-								</div>
-							</div>
+								</SortableItem>
+							))}
 						</div>
-					))}
-			</div>
+					</SortableContext>
+				</DndContext>
+			)}
 
 			{/* Create Dialog */}
 			<TicketCreateDialog
