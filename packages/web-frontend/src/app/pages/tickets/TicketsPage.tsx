@@ -11,6 +11,7 @@ import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import { useDragAndDrop } from '@framework/hooks2/form/useDragAndDrop';
 import { useDialogParam } from '@framework/hooks/useDialogParam';
+import { cn } from '@framework/lib/utils';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { Project } from '@shared/api/projects.contract';
 import type { Ticket, TicketStatus } from '@shared/api/tickets.contract';
@@ -208,40 +209,37 @@ export function TicketsPage() {
 			)}
 
 			{localTickets.length > 0 && (
-				<div className="relative">
-					<DndContext sensors={dnd.sensors} collisionDetection={closestCenter} onDragEnd={dnd.handleDragEnd}>
-						<SortableContext items={dnd.sortableIds} strategy={verticalListSortingStrategy}>
-							<div className="space-y-2">
-								{localTickets.map(ticket => (
-									<SortableItem key={ticket.id} id={ticket.id}>
-										<div
-											className="cursor-pointer rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent"
-											onClick={() => handleTicketClick(ticket)}
-										>
-											<h3 className="font-medium text-foreground">{ticket.title}</h3>
-											{ticket.description && (
-												<p className="mt-1 text-sm text-muted-foreground line-clamp-2">
-													{ticket.description}
-												</p>
-											)}
-											<div className="mt-2 flex items-center gap-2">
-												<Badge variant={STATUS_VARIANTS[ticket.status]}>
-													{formatStatus(ticket.status)}
+				<DndContext sensors={dnd.sensors} collisionDetection={closestCenter} onDragEnd={dnd.handleDragEnd}>
+					<SortableContext items={dnd.sortableIds} strategy={verticalListSortingStrategy}>
+						<div className={cn('space-y-2', isSaving && 'pointer-events-none opacity-50 blur-sm')}>
+							{localTickets.map(ticket => (
+								<SortableItem key={ticket.id} id={ticket.id}>
+									<div
+										className="cursor-pointer rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent"
+										onClick={() => handleTicketClick(ticket)}
+									>
+										<h3 className="font-medium text-foreground">{ticket.title}</h3>
+										{ticket.description && (
+											<p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+												{ticket.description}
+											</p>
+										)}
+										<div className="mt-2 flex items-center gap-2">
+											<Badge variant={STATUS_VARIANTS[ticket.status]}>
+												{formatStatus(ticket.status)}
+											</Badge>
+											{ticket.labels.map(label => (
+												<Badge key={label} variant="outline">
+													{label}
 												</Badge>
-												{ticket.labels.map(label => (
-													<Badge key={label} variant="outline">
-														{label}
-													</Badge>
-												))}
-											</div>
+											))}
 										</div>
-									</SortableItem>
-								))}
-							</div>
-						</SortableContext>
-					</DndContext>
-					{isSaving && <div className="absolute inset-0 z-10 bg-background/60 backdrop-blur-sm" />}
-				</div>
+									</div>
+								</SortableItem>
+							))}
+						</div>
+					</SortableContext>
+				</DndContext>
 			)}
 
 			{/* Create Dialog */}
