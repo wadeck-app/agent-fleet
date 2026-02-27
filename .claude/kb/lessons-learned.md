@@ -5631,10 +5631,12 @@ await waitFor(() => {
 **Symptoms**: Agent adds `opacity-60 pointer-events-none` to a section during save, checks visually with screenshots, sees no change — even though the code is correct.
 
 **Root causes** (both must be fixed):
+
 1. On localhost, the PATCH call completes in < 20ms — faster than one frame
 2. `finally { setSavingField(null) }` fires in the same microtask batch as `setSavingField(field)` if the awaited promise resolves synchronously (e.g., from cache)
 
 **Fix**:
+
 1. Add `transition-opacity duration-300` to the wrapper so even a fast flip produces a 300ms CSS animation
 2. `await refresh()` inside the `try` block (not just fire-and-forget) so the saving state persists through the data reload
 

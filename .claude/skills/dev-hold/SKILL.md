@@ -45,11 +45,11 @@ agent-browser screenshot /tmp/after-save.png
 
 ## Pattern matching
 
-| Pattern | Matches |
-| ------- | ------- |
-| `"PATCH /api/tickets"` | `PATCH /api/tickets/abc123` |
-| `"/api/tickets"` | any method on `/api/tickets/*` |
-| `"GET /api/tasks"` | `GET /api/tasks?status=running` |
+| Pattern                | Matches                         |
+| ---------------------- | ------------------------------- |
+| `"PATCH /api/tickets"` | `PATCH /api/tickets/abc123`     |
+| `"/api/tickets"`       | any method on `/api/tickets/*`  |
+| `"GET /api/tasks"`     | `GET /api/tasks?status=running` |
 
 ## Other endpoints
 
@@ -65,9 +65,9 @@ Holds **auto-expire after 30 seconds** to prevent server lockup.
 
 ## Why not alternatives?
 
-| Approach | Problem |
-| -------- | ------- |
-| `window.fetch` override | Breaks on page reload |
-| `agent-browser wait N` | Fragile — fast localhost < 1 frame |
-| Network throttle | Slows all requests including assets |
-| **DevHold** | ✅ Exact, deterministic, per-endpoint |
+| Approach                | Problem                               |
+| ----------------------- | ------------------------------------- |
+| `window.fetch` override | Breaks on page reload                 |
+| `agent-browser wait N`  | Fragile — fast localhost < 1 frame    |
+| Network throttle        | Slows all requests including assets   |
+| **DevHold**             | ✅ Exact, deterministic, per-endpoint |

@@ -19,9 +19,11 @@ Two problems compound:
 
 **1. Port conflict → silent interactive prompt**
 When the chosen port is taken, Storybook displays an interactive prompt instead of exiting:
+
 ```
 Port 6100 is not available. Would you like to run Storybook on port 6101 instead? » (Y/n)
 ```
+
 No `EADDRINUSE` in stderr, no process exit — the script gets no signal. The 10s timeout is
 the only escape hatch.
 
@@ -31,12 +33,12 @@ load, so the timeout fires as a false "port conflict" even when Storybook is jus
 
 ## Measured Data
 
-| Scenario | Duration |
-|---|---|
-| `storybook dev` cold start | ~7s |
-| `storybook build` (full static) | ~17s |
-| `serve` static files startup | < 1s |
-| 10s timeout margin | ~2-3s |
+| Scenario                        | Duration |
+| ------------------------------- | -------- |
+| `storybook dev` cold start      | ~7s      |
+| `storybook build` (full static) | ~17s     |
+| `serve` static files startup    | < 1s     |
+| 10s timeout margin              | ~2-3s    |
 
 ## What Was Ruled Out
 
@@ -61,9 +63,9 @@ to 35s as a safety net for genuine crashes only.
 
 ```js
 if (text.includes('Would you like to run Storybook on port') && !startupComplete) {
-    hasError = true;
-    killProcessTree(storybookProcess);
-    rejectPromise(new Error('PORT_IN_USE'));
+	hasError = true;
+	killProcessTree(storybookProcess);
+	rejectPromise(new Error('PORT_IN_USE'));
 }
 ```
 
@@ -112,11 +114,13 @@ logic handles it without any changes to the retry loop. The 10s timeout can stay
 reduced to 5s (static server is up in < 1s).
 
 **Pros:**
+
 - Eliminates all startup fragility (no compilation, no prompts)
 - Standard CI/CD approach
 - Port entirely controlled by the script
 
 **Cons:**
+
 - Requires a build step before running the suite (~17s, once per worktree per session)
 - Stories must be rebuilt after component changes (during development)
 - More moving parts (build output directory, serve dependency)
