@@ -322,6 +322,54 @@ agent-browser record start ./debug.webm   # Record video from current page
 agent-browser record stop                 # Save recording
 ```
 
+## Testing In-Flight States (DevHold API)
+
+To capture a screenshot **during** a loading/saving state, use the DevHold API (dev-only, backend at `http://localhost:3320`). This avoids unreliable `window.fetch` overrides or guessed sleep timers.
+
+**Backend port** = `3000 + (PROJECT_ID * 100) + (WORKSPACE_ID * 10)`. For this workspace: `http://localhost:3320`.
+
+### Workflow
+
+```bash
+# 1. Register a hold — server will pause matching requests
+curl -s -X POST http://localhost:3320/dev/hold \
+  -H "Content-Type: application/json" \
+  -d '{"pattern":"PATCH /api/tickets"}' | jq -r '.holdId'
+# → hold-abc123
+
+# 2. Trigger the browser action (blur, click, drag…)
+agent-browser click @e20
+
+# 3. Screenshot while the request is blocked (loading state visible)
+agent-browser screenshot /tmp/during-save.png
+
+# 4. Release — server processes the request
+curl -s -X DELETE http://localhost:3320/dev/hold/hold-abc123
+
+# 5. Wait for UI to settle, then screenshot final state
+agent-browser wait --load networkidle
+agent-browser screenshot /tmp/after-save.png
+```
+
+### Pattern matching
+
+| Hold pattern | Matches |
+|---|---|
+| `"PATCH /api/tickets"` | `PATCH /api/tickets/abc123` |
+| `"/api/tickets"` | any method on `/api/tickets/*` |
+| `"GET /api/tasks"` | `GET /api/tasks?status=running` |
+
+### List / cleanup
+
+```bash
+curl http://localhost:3320/dev/holds          # list active holds
+curl -X DELETE http://localhost:3320/dev/hold/<id>  # release one
+```
+
+Holds auto-expire after **30 seconds** to prevent server lockup.
+
+> **Why not `window.fetch` override?** It breaks on page reload. Why not `agent-browser wait N`? Too fragile and too slow. DevHold gives exact, deterministic control.
+
 ## Deep-dive documentation
 
 For detailed patterns and best practices, see:

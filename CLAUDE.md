@@ -45,6 +45,7 @@ FlowExecutor.test.ts
 - <crucial>Never kill processes you didn't create</crucial>
 - Ask user if requirements unclear (AskUserQuestion tool)
 - **BLOCKING:** Changes to `packages/web-frontend/src/**` → delegate to frontend-dev agent (compilation ≠ working code)
+- **Capturing in-flight UI states** (loading spinners, opacity during save): use the DevHold API — see the `agent-browser` skill for the full workflow
 
 ## Communication Style
 

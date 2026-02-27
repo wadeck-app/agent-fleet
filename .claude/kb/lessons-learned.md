@@ -5621,3 +5621,37 @@ await waitFor(() => {
 	expect(result.current.state.activeProjectId).toBe('proj-2');
 });
 ```
+
+---
+
+## React 18 Batching Kills In-Flight UI States in Screenshots
+
+**Problem**: Adding `opacity-60` to a div while an async save is in progress works fine at normal speed, but when trying to capture it with `agent-browser screenshot`, the intermediate state is invisible. React 18 automatically batches `setState(loading)` + `setState(null)` if both happen before the next paint, so the component skips the loading render entirely.
+
+**Symptoms**: Agent adds `opacity-60 pointer-events-none` to a section during save, checks visually with screenshots, sees no change — even though the code is correct.
+
+**Root causes** (both must be fixed):
+1. On localhost, the PATCH call completes in < 20ms — faster than one frame
+2. `finally { setSavingField(null) }` fires in the same microtask batch as `setSavingField(field)` if the awaited promise resolves synchronously (e.g., from cache)
+
+**Fix**:
+1. Add `transition-opacity duration-300` to the wrapper so even a fast flip produces a 300ms CSS animation
+2. `await refresh()` inside the `try` block (not just fire-and-forget) so the saving state persists through the data reload
+
+**For screenshots specifically**: Use the **DevHold API** to deterministically freeze the server mid-request. See the `agent-browser` skill → "Testing In-Flight States" section.
+
+```typescript
+// ✅ Correct pattern
+setSavingField(field);
+try {
+  await ticketsApi.updateTicket(id, updates);
+  await refresh();          // ← await, not fire-and-forget
+} finally {
+  setSavingField(null);
+}
+
+// ✅ CSS wrapper
+<div className={cn('transition-opacity duration-300', savingField === 'title' && 'opacity-60 pointer-events-none')}>
+```
+
+**Related files**: `packages/web-frontend/src/app/pages/tickets/TicketDetailPage.tsx`
