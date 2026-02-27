@@ -17,6 +17,7 @@ During E2E tests, the global setup spawns 5 backend workers **in parallel**, eac
 **File**: `packages/web-backend/build.mjs`
 
 Parameterize the output file via env var:
+
 ```javascript
 outfile: process.env.OUTFILE || 'dist/server',
 ```
@@ -32,11 +33,13 @@ outfile: process.env.OUTFILE || 'dist/server',
 **File**: `packages/e2e-web/playwright-hooks/global-setup-web-server.ts`
 
 At the top of `globalSetupWebServer()`, before `serverPromises`, add:
+
 ```typescript
 console.log('🔨 Building backend for E2E (once for all workers)...');
 await execAsync('npm run build:for-e2e --workspace=web-backend', { cwd: projectRoot });
 console.log('✅ Backend built successfully (dist/server-test)');
 ```
+
 `execAsync` is already imported.
 
 ### 4. Switch workers to pre-compiled backend
@@ -44,10 +47,13 @@ console.log('✅ Backend built successfully (dist/server-test)');
 **File**: `packages/e2e-web/playwright-hooks/global-setup-web-server.ts`
 
 In `startServerOnAvailablePort`, change:
+
 ```typescript
 const command = 'npm run dev:only-for-e2e --workspace=web-backend';
 ```
+
 to:
+
 ```typescript
 const command = 'npm run start:only-for-e2e --workspace=web-backend';
 ```
@@ -67,6 +73,7 @@ A compiled backend starts in ~1-2s. Set timeout to **10s** as safe buffer.
 **File**: `packages/web-backend/.gitignore` (or root `.gitignore`)
 
 Add:
+
 ```
 dist/server-test
 dist/server-test.map
@@ -74,12 +81,12 @@ dist/server-test.map
 
 ## Files to Modify
 
-| File | Change |
-|------|--------|
-| `packages/web-backend/build.mjs` | `outfile: process.env.OUTFILE \|\| 'dist/server'` |
-| `packages/web-backend/package.json` | Add `build:for-e2e` + `start:only-for-e2e`, fix `dist/server.js` → `dist/server` (3 scripts) |
-| `packages/e2e-web/playwright-hooks/global-setup-web-server.ts` | Add build step + switch to `start:only-for-e2e` + fix timeout to 10s |
-| `.gitignore` (root or web-backend) | Add `dist/server-test*` |
+| File                                                           | Change                                                                                       |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `packages/web-backend/build.mjs`                               | `outfile: process.env.OUTFILE \|\| 'dist/server'`                                            |
+| `packages/web-backend/package.json`                            | Add `build:for-e2e` + `start:only-for-e2e`, fix `dist/server.js` → `dist/server` (3 scripts) |
+| `packages/e2e-web/playwright-hooks/global-setup-web-server.ts` | Add build step + switch to `start:only-for-e2e` + fix timeout to 10s                         |
+| `.gitignore` (root or web-backend)                             | Add `dist/server-test*`                                                                      |
 
 ## Verification
 
