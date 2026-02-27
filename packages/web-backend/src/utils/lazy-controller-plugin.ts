@@ -108,13 +108,24 @@ function createLazyControllerPlugin<Routes = any>(
 	let controllerInstance: LazyController<Routes> | null = null;
 	let router: InternalRouter<Routes> | null = null;
 	let handlerMap: Map<string, (validated: any) => Promise<any>> | null = null;
+	// Initialization promise ensures concurrent requests wait for a single init
+	let initializationPromise: Promise<void> | null = null;
 
 	/**
-	 * Initialize controller on-demand (first request or /api call)
+	 * Initialize controller on-demand (first request or /api call).
+	 * Uses a shared promise to prevent race conditions under concurrent requests:
+	 * without this, a second request could see router!=null but handlerMap==null.
 	 */
 	const initializeController = async () => {
-		if (router !== null) return; // Already initialized
+		if (initializationPromise !== null) {
+			await initializationPromise;
+			return;
+		}
+		initializationPromise = doInitialize();
+		await initializationPromise;
+	};
 
+	const doInitialize = async () => {
 		// console.log(`[LAZY] Initializing controller for ${baseUrl}...`);
 
 		// 1. Get routes from shared (no controller import yet!)
