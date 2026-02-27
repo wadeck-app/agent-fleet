@@ -651,8 +651,7 @@ describe('ProjectsV2Page', () => {
 			});
 
 			render(<ProjectsV2Page />, {
-				wrapper: ({ children }) =>
-					wrapper({ children, initialUrl: '/?projectId=proj-bg&workspaceId=ws-bg' }),
+				wrapper: ({ children }) => wrapper({ children, initialUrl: '/?projectId=proj-bg&workspaceId=ws-bg' }),
 			});
 
 			// WorkspacePanel must be mounted — h2 heading visible, not replaced by skeleton
