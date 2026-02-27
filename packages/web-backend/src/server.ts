@@ -41,9 +41,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Load env files in order: root .env → root .env.local (workspace overrides) → backend/.env
-const rootEnvPath = path.join(__dirname, '../../.env');
+// __dirname = packages/web-backend/src → ../../../ = project root
+const rootEnvPath = path.join(__dirname, '../../../.env');
 dotenv.config({ path: rootEnvPath });
-const rootEnvLocalPath = path.join(__dirname, '../../.env.local');
+const rootEnvLocalPath = path.join(__dirname, '../../../.env.local');
 dotenv.config({ path: rootEnvLocalPath, override: true });
 const envPath = path.join(__dirname, '../.env');
 dotenv.config({ path: envPath });
@@ -73,12 +74,22 @@ async function initializeOrchestratorClient(): Promise<Orchestrator> {
 
 		log.info(`[Orchestrator] Calculated ports from env: REST=${calculatedRestPort}, WS=${calculatedWsPort}`);
 
+		// Determine storage mode early to create the right storage for orchestrator
+		const storageMode = (process.env.STORAGE_MODE || 'file') as 'memory' | 'file' | 'mariadb';
+		const { OrchestratorStorageAdapter } = await import('./orchestrator/OrchestratorStorageAdapter');
+		const { InMemoryStorage } = await import('./storage/InMemoryStorage');
+		const { FileBasedStorage } = await import('./storage/FileBasedStorage');
+		const orchestratorDataStorage =
+			storageMode === 'memory' ? new InMemoryStorage() : new FileBasedStorage(process.env.DATA_DIR || './data');
+		const orchestratorStorage = new OrchestratorStorageAdapter(orchestratorDataStorage);
+
 		const orchestratorConfig = {
 			wsPort: orchestratorWsPort,
 			// restPort,
 			projectRoot: process.cwd(),
 			// Always include libraryMode
 			libraryMode: true,
+			storage: orchestratorStorage,
 		};
 		const orchestrator = new Orchestrator(orchestratorConfig);
 		await orchestrator.start();
