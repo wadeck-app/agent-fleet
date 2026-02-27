@@ -75,6 +75,22 @@ const aliasPlugin = {
 				path: path.resolve(__dirname, '../shared-frontend-backend/src/index.ts'),
 			};
 		});
+
+		// Resolve shared-common (monorepo package without compiled exports)
+		build.onResolve({ filter: /^shared-common(\/|$)/ }, args => {
+			const subpath = args.path.replace(/^shared-common\/?/, '');
+			return {
+				path: path.resolve(__dirname, '../shared-common/src', `${subpath || 'index'}.ts`),
+			};
+		});
+
+		// Resolve shared-orch-worker (monorepo package without compiled exports)
+		build.onResolve({ filter: /^shared-orch-worker(\/|$)/ }, args => {
+			const subpath = args.path.replace(/^shared-orch-worker\/?/, '');
+			return {
+				path: path.resolve(__dirname, '../shared-orch-worker/src', `${subpath || 'index'}.ts`),
+			};
+		});
 	},
 };
 
@@ -107,6 +123,13 @@ try {
 
 		plugins: [aliasPlugin],
 
+		// CJS interop: some dependencies (e.g. @fastify/cookie) use require() internally.
+		// In ESM bundles, require is undefined. This banner injects a require shim so
+		// esbuild's __require wrapper can call native Node.js modules at runtime.
+		banner: {
+			js: "import { createRequire } from 'module';\nconst require = createRequire(import.meta.url);",
+		},
+
 		// ====================================================================
 		// BUNDLING & OPTIMIZATION
 		// ====================================================================
@@ -131,9 +154,6 @@ try {
 		external: [
 			// terminal-kit has non-JS files (README) that cause build issues
 			'terminal-kit',
-			// Monorepo packages - let Node.js resolve via package.json exports
-			'shared-orch-worker',
-			'shared-common',
 		],
 
 		// ====================================================================

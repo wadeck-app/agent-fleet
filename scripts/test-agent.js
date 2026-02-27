@@ -292,9 +292,9 @@ async function main() {
 		await runTestSuite(suite, filters);
 		const result = results[results.length - 1];
 		if (result.passed) {
-			console.log(chalk.green('✓'));
+			console.log(chalk.green('✓') + chalk.gray(` ${(result.duration / 1000).toFixed(1)}s`));
 		} else {
-			console.log(chalk.red('✗'));
+			console.log(chalk.red('✗') + chalk.gray(` ${(result.duration / 1000).toFixed(1)}s`));
 		}
 	}
 

@@ -18,6 +18,7 @@ const workspaceId = parseInt(process.env.WORKSPACE_ID || '0', 10);
 const basePort = 6100 + workspaceId * 1000;
 
 const projectRoot = path.resolve(__dirname, '../../..');
+const staticDir = path.resolve(projectRoot, 'packages/e2e-web/temp/storybook-static');
 const tempFolder = path.resolve(projectRoot, 'packages/e2e-web/temp');
 
 /**
@@ -107,12 +108,12 @@ function tryStartStorybook(port) {
 	return new Promise((resolvePromise, rejectPromise) => {
 		console.log(`🚀 Attempting to start Storybook on port ${port}...`);
 
-		// CRITICAL: Launch Storybook EXACTLY as Playwright's webServer does
-		// Use npm run storybook:e2e (same as Playwright webServer does)
-		// On Windows, use shell to find npm in PATH
+		// Serve pre-built static Storybook: starts in <1s, no compilation, no interactive prompt
+		// Static dir built once in main() via storybook:build-e2e before this function is called
+		// On Windows, use shell to resolve npx from PATH
 		const isWindows = process.platform === 'win32';
 
-		const command = 'npm run storybook:only-for-e2e --workspace=web-frontend';
+		const command = `npx serve "${staticDir}" -l ${port} --single --no-clipboard`;
 		const storybookProcess = spawn(command, {
 			// Run from project root
 			cwd: projectRoot,
@@ -140,8 +141,23 @@ function tryStartStorybook(port) {
 				// Forward to console for visibility
 				process.stdout.write(text);
 
-				// Success indicators (Storybook is ready)
-				if ((text.includes('Local:') || text.includes('On your network')) && !startupComplete) {
+				// Port conflict: Storybook shows interactive prompt instead of exiting
+				if (text.includes('Would you like to run Storybook on port') && !startupComplete) {
+					console.log(
+						`⚠️  Port ${port} is already in use (detected interactive prompt), will retry with next port...`
+					);
+					hasError = true;
+					killProcessTree(storybookProcess);
+					rejectPromise(new Error('PORT_IN_USE'));
+				}
+
+				// Success indicators (serve ready): "Local:" (box format) or "Accepting connections" (info format)
+				if (
+					(text.includes('Local:') ||
+						text.includes('On your network') ||
+						text.includes('Accepting connections')) &&
+					!startupComplete
+				) {
 					startupComplete = true;
 
 					// Extract actual port from Storybook output
@@ -214,13 +230,13 @@ function tryStartStorybook(port) {
 			// If startupComplete is true, this is intentional exit (Playwright killed it)
 		});
 
-		// If Storybook doesn't start in 10s, it's likely a port conflict
+		// Safety net for genuine crashes — static server starts in <1s, 5s covers slow machines
 		setTimeout(() => {
 			if (!startupComplete && !hasError) {
 				killProcessTree(storybookProcess);
 				rejectPromise(new Error('Storybook startup timeout'));
 			}
-		}, 10000);
+		}, 5000);
 	});
 }
 
@@ -230,6 +246,12 @@ function tryStartStorybook(port) {
 async function main() {
 	const startTime = performance.now();
 	console.log(`🔍 Starting Storybook with port retry (base port: ${basePort})`);
+
+	// Build Storybook once before spawning the server (avoids compilation on each retry)
+	console.log('🔨 Building Storybook for E2E (once, ~17s)...');
+	const buildStart = performance.now();
+	await execAsync('npm run storybook:build-e2e --workspace=web-frontend', { cwd: projectRoot });
+	console.log(`✅ Storybook built in ${((performance.now() - buildStart) / 1000).toFixed(1)}s`);
 
 	// Find first available port to use as starting point
 	console.log(`🔎 Checking for available ports starting from ${basePort}...`);

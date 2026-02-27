@@ -88,8 +88,13 @@ async function apiHomeHandler(request: FastifyRequest, reply: FastifyReply) {
 
 	function getVersion() {
 		if (!versionCache) {
-			const packageJson = JSON.parse(readFileSync(path.resolve(__dirname, '../../../package.json'), 'utf-8'));
-			versionCache = packageJson.version;
+			try {
+				const packageJson = JSON.parse(readFileSync(path.resolve(__dirname, '../../../package.json'), 'utf-8'));
+				versionCache = packageJson.version;
+			} catch {
+				// In bundled builds, import.meta.url points to the bundle; path resolution differs
+				versionCache = 'unknown';
+			}
 		}
 
 		return versionCache;

@@ -10,7 +10,7 @@
  */
 import type { FullConfig } from '@playwright/test';
 import { ChildProcess, exec, spawn } from 'child_process';
-import { readdir, stat, unlink, writeFile } from 'fs/promises';
+import { readFile, readdir, stat, unlink, writeFile } from 'fs/promises';
 import * as net from 'net';
 import { mkdirSync } from 'node:fs';
 import path from 'path';
@@ -200,11 +200,18 @@ async function startServerOnAvailablePort(
 				}
 
 				if (message.includes('EADDRINUSE') || message.includes('port already in use')) {
-					portBindError = true;
-					console.error(
-						`     ❌ Port ${port} binding failed (EADDRINUSE detected) (alreadyResolved=${alreadyResolved})`
-					);
-					reject(new Error('PORT_IN_USE'));
+					if (message.includes(port.toString())) {
+						// HTTP port conflict — this is a real problem for this worker
+						portBindError = true;
+						console.error(
+							`     ❌ Port ${port} binding failed (EADDRINUSE detected) (alreadyResolved=${alreadyResolved})`
+						);
+						reject(new Error('PORT_IN_USE'));
+					} else {
+						// Internal port conflict (e.g. Orchestrator WS port) — not our HTTP port
+						// Log as warning but don't reject: server may still start successfully
+						console.warn(`     ⚠️  Internal EADDRINUSE (not HTTP port ${port}): ${message.trim()}`);
+					}
 				}
 			});
 
@@ -348,6 +355,51 @@ function isSingleTestRun(config: FullConfig): boolean {
 }
 
 /**
+ * Kills backend servers from any previous test run that didn't clean up properly.
+ * Reads all .test-servers-*.json files (regardless of age) and kills their PIDs.
+ * This prevents EADDRINUSE cascades when a run is interrupted without teardown.
+ */
+async function killStaleServers(): Promise<void> {
+	try {
+		const files = await readdir(tempFolder);
+		const serverFiles = files.filter(f => f.startsWith('.test-servers-'));
+
+		if (serverFiles.length === 0) {
+			return;
+		}
+
+		console.log(`🧹 Found ${serverFiles.length} stale server file(s) — killing leftover processes...`);
+
+		for (const filename of serverFiles) {
+			const filePath = path.join(tempFolder, filename);
+			try {
+				const data = await readFile(filePath, 'utf-8');
+				const servers: ServerInfo[] = JSON.parse(data);
+
+				for (const server of servers) {
+					try {
+						if (process.platform === 'win32') {
+							await execAsync(`taskkill /PID ${server.pid} /T /F`);
+						} else {
+							process.kill(server.pid, 'SIGKILL');
+						}
+						console.log(`   🗑️  Killed stale server PID ${server.pid} (port ${server.port})`);
+					} catch {
+						// Process already dead — that's fine
+					}
+				}
+
+				await unlink(filePath);
+			} catch {
+				// File may have been removed concurrently, ignore
+			}
+		}
+	} catch {
+		// Temp folder doesn't exist yet — nothing to clean up
+	}
+}
+
+/**
  * Cleans up orphaned port files from previous test runs
  * Removes files older than 1 hour based on both:
  * - Timestamp in filename (RUN_ID format: timestamp-pid)
@@ -469,6 +521,9 @@ async function globalSetupWebServer(config: FullConfig) {
 		// @ts-ignore - Store RUN_ID in process.env for global-teardown and hooks to use
 		process.env.RUN_ID = runId;
 	}
+
+	// Kill any servers left over from a previous run that didn't clean up (interrupted, crashed, etc.)
+	await killStaleServers();
 
 	// Clean up orphaned port files from interrupted test runs (> 1 hour old)
 	await cleanupOrphanedFiles();

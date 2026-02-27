@@ -13,11 +13,18 @@ import type { TaskManager } from './TaskManager';
 const log = createLogger('RestAPI');
 
 // Read version from package.json
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const packageJsonPath = path.join(__dirname, '../../package.json');
-const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
-const ORCHESTRATOR_VERSION = packageJson.version;
+// Path resolution uses import.meta.url which points to the source file in dev mode
+// but to the bundle file in compiled mode — use a fallback to avoid crashing the server
+let ORCHESTRATOR_VERSION = 'unknown';
+try {
+	const __filename = fileURLToPath(import.meta.url);
+	const __dirname = path.dirname(__filename);
+	const packageJsonPath = path.join(__dirname, '../../package.json');
+	const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+	ORCHESTRATOR_VERSION = packageJson.version;
+} catch {
+	// In bundled builds, import.meta.url points to the bundle; path resolution differs
+}
 
 export class RestAPI {
 	private app: Express;

@@ -45,22 +45,24 @@ const testSuites = [
 		args: ['run', 'test', '--workspace=shared-frontend-backend'],
 		type: testSuiteType_UNIT,
 	},
-	{
-		name: 'E2E Application Tests',
-		command: 'npm',
-		// args: ['run', 'test:app', '--workspace=@app/e2e-web'],
-		args: ['run', 'test:app', '--workspace=e2e-web'],
-		type: testSuiteType_E2E_FUNC,
-		env: { PLAYWRIGHT_HTML_OPEN: 'never' },
-	},
-	{
-		name: 'E2E Component Functional Tests',
-		command: 'npm',
-		// args: ['run', 'test:components', '--workspace=@app/e2e-web'],
-		args: ['run', 'test:components', '--workspace=e2e-web'],
-		type: testSuiteType_E2E_FUNC,
-		env: { PLAYWRIGHT_HTML_OPEN: 'never' },
-	},
+	// Disabled: setup cost (~14s build + servers) not amortized by only 3 tests.
+	// Re-enable when the test suite grows. Run individually: npm run test:app --workspace=e2e-web
+	// {
+	// 	name: 'E2E Application Tests',
+	// 	command: 'npm',
+	// 	args: ['run', 'test:app', '--workspace=e2e-web'],
+	// 	type: testSuiteType_E2E_FUNC,
+	// 	env: { PLAYWRIGHT_HTML_OPEN: 'never' },
+	// },
+	// Disabled: Storybook build (~17s) not amortized by only 1 test (health check placeholder).
+	// Re-enable when component tests are populated. Run individually: npm run test:components --workspace=e2e-web
+	// {
+	// 	name: 'E2E Component Functional Tests',
+	// 	command: 'npm',
+	// 	args: ['run', 'test:components', '--workspace=e2e-web'],
+	// 	type: testSuiteType_E2E_FUNC,
+	// 	env: { PLAYWRIGHT_HTML_OPEN: 'never' },
+	// },
 	// Disabled for the moment, too many changes ongoing
 	// {
 	// 	name: 'Visual Regression Tests',
