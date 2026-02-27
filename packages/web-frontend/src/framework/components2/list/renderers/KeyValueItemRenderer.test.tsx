@@ -17,7 +17,7 @@ describe('KeyValueItemRenderer', () => {
 
 	describe('rendering', () => {
 		it('should render key and value inputs', () => {
-			const item: KeyValueItem = { key: 'TEST_KEY', value: 'test value' };
+			const item: KeyValueItem = { id: 'item-1', key: 'TEST_KEY', value: 'test value' };
 
 			render(<KeyValueItemRenderer item={item} actions={mockActions} />);
 
@@ -29,7 +29,7 @@ describe('KeyValueItemRenderer', () => {
 		});
 
 		it('should render remove button', () => {
-			const item: KeyValueItem = { key: 'KEY', value: 'value' };
+			const item: KeyValueItem = { id: 'item-1', key: 'KEY', value: 'value' };
 
 			render(<KeyValueItemRenderer item={item} actions={mockActions} />);
 
@@ -38,7 +38,7 @@ describe('KeyValueItemRenderer', () => {
 		});
 
 		it('should render with empty values', () => {
-			const item: KeyValueItem = { key: '', value: '' };
+			const item: KeyValueItem = { id: 'item-1', key: '', value: '' };
 
 			render(<KeyValueItemRenderer item={item} actions={mockActions} />);
 
@@ -50,7 +50,7 @@ describe('KeyValueItemRenderer', () => {
 	describe('interactions', () => {
 		it('should call update when key changes', async () => {
 			const user = userEvent.setup();
-			const item: KeyValueItem = { key: 'OLD_KEY', value: 'value' };
+			const item: KeyValueItem = { id: 'item-1', key: 'OLD_KEY', value: 'value' };
 
 			render(<KeyValueItemRenderer item={item} actions={mockActions} />);
 
@@ -63,7 +63,7 @@ describe('KeyValueItemRenderer', () => {
 
 		it('should call update when value changes', async () => {
 			const user = userEvent.setup();
-			const item: KeyValueItem = { key: 'KEY', value: 'old value' };
+			const item: KeyValueItem = { id: 'item-1', key: 'KEY', value: 'old value' };
 
 			render(<KeyValueItemRenderer item={item} actions={mockActions} />);
 
@@ -76,7 +76,7 @@ describe('KeyValueItemRenderer', () => {
 
 		it('should call remove when remove button clicked', async () => {
 			const user = userEvent.setup();
-			const item: KeyValueItem = { key: 'KEY', value: 'value' };
+			const item: KeyValueItem = { id: 'item-1', key: 'KEY', value: 'value' };
 
 			render(<KeyValueItemRenderer item={item} actions={mockActions} />);
 
@@ -89,7 +89,7 @@ describe('KeyValueItemRenderer', () => {
 
 	describe('accessibility', () => {
 		it('should have proper labels', () => {
-			const item: KeyValueItem = { key: 'KEY', value: 'value' };
+			const item: KeyValueItem = { id: 'item-1', key: 'KEY', value: 'value' };
 
 			render(<KeyValueItemRenderer item={item} actions={mockActions} />);
 
@@ -98,7 +98,7 @@ describe('KeyValueItemRenderer', () => {
 		});
 
 		it('should have proper button title for accessibility', () => {
-			const item: KeyValueItem = { key: 'KEY', value: 'value' };
+			const item: KeyValueItem = { id: 'item-1', key: 'KEY', value: 'value' };
 
 			render(<KeyValueItemRenderer item={item} actions={mockActions} />);
 
