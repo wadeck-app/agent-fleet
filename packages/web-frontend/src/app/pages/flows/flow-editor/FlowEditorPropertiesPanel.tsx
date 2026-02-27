@@ -108,6 +108,7 @@ export function FlowEditorPropertiesPanel({
 	// Environment variables list management (only for script steps)
 	const envItems = useListItems<KeyValueItem>({
 		initialItems: Object.entries(stepEnv || {}).map(([key, value]) => ({
+			id: crypto.randomUUID(),
 			key,
 			value: String(value),
 		})),
@@ -490,10 +491,10 @@ export function FlowEditorPropertiesPanel({
 							renderItem={(item, _index, actions) => (
 								<KeyValueItemRenderer item={item} actions={actions} />
 							)}
-							createDefault={() => ({ key: '', value: '' })}
+							createDefault={() => ({ id: crypto.randomUUID(), key: '', value: '' })}
 							addButtonLabel="Add Variable"
 							emptyMessage="No environment variables defined"
-							getItemId={(item, index) => item.key || `env-${index}`}
+							getItemId={item => item.id}
 						/>
 					</>
 				)}

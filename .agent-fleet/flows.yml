@@ -2,6 +2,28 @@
 includes:
     - flows-custom.yml
 
+ticket-auto-process:
+    version: '1.0.0'
+    name: 'Auto-process ticket'
+    trigger:
+        type: event
+        event: ticket.status.changed
+        filter:
+            newStatus: pending_integration
+    statusTransitions:
+        onSuccess:
+            task: approved
+            ticket: integrated
+        onFailure:
+            task: changes_requested
+            ticket: todo
+    steps:
+        - type: model
+          id: process
+          name: 'Process ticket'
+          model: haiku
+          prompt: 'Ticket received for integration. Confirm you are ready to proceed.'
+
 simple-implement:
     version: '1.0.0'
     name: '(Dummy) Simple Implementation'

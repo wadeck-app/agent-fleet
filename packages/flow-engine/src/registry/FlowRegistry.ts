@@ -508,7 +508,13 @@ export class FlowRegistry {
 			const content = fs.readFileSync(absolutePath, 'utf-8');
 			const parsedInclude = yaml.load(content) as Record<string, any>;
 
-			if (!parsedInclude || typeof parsedInclude !== 'object') {
+			// null = empty file or comments-only — valid, just no flows to load
+			if (parsedInclude === null || parsedInclude === undefined) {
+				this.trackExternalFile(absolutePath);
+				return;
+			}
+
+			if (typeof parsedInclude !== 'object') {
 				throw new Error(`Invalid YAML structure in ${filePath}: expected object`);
 			}
 

@@ -31,7 +31,7 @@ type Story = StoryObj<typeof meta>;
  */
 export const Default: Story = {
 	args: {
-		item: { key: '', value: '' },
+		item: { id: 'item-1', key: '', value: '' },
 		actions: {
 			update: fn(),
 			remove: fn(),
@@ -45,7 +45,7 @@ export const Default: Story = {
  */
 export const WithValues: Story = {
 	args: {
-		item: { key: 'NODE_ENV', value: 'production' },
+		item: { id: 'item-1', key: 'NODE_ENV', value: 'production' },
 		actions: {
 			update: fn(),
 			remove: fn(),
@@ -60,6 +60,7 @@ export const WithValues: Story = {
 export const LongValues: Story = {
 	args: {
 		item: {
+			id: 'item-1',
 			key: 'VERY_LONG_ENVIRONMENT_VARIABLE_KEY_NAME',
 			value: 'This is a very long value that should be handled gracefully by the input field without breaking layout',
 		},
@@ -77,6 +78,7 @@ export const LongValues: Story = {
 export const WithSpecialCharacters: Story = {
 	args: {
 		item: {
+			id: 'item-1',
 			key: 'API_KEY_$SECRET',
 			value: 'sk-1234567890@#$%^&*()',
 		},
@@ -94,9 +96,9 @@ export const WithSpecialCharacters: Story = {
 export const MultipleItems = {
 	render: () => {
 		const items: KeyValueItem[] = [
-			{ key: 'NODE_ENV', value: 'production' },
-			{ key: 'DEBUG', value: 'false' },
-			{ key: 'PORT', value: '3000' },
+			{ id: 'item-1', key: 'NODE_ENV', value: 'production' },
+			{ id: 'item-2', key: 'DEBUG', value: 'false' },
+			{ id: 'item-3', key: 'PORT', value: '3000' },
 		];
 
 		return (
