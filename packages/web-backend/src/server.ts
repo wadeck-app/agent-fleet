@@ -40,11 +40,19 @@ const log = createLogger('BackendServer');
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load root .env first, then backend/.env (local overrides root)
+// Load env files in order: root .env → root .env.local (workspace overrides) → backend/.env
 const rootEnvPath = path.join(__dirname, '../../.env');
 dotenv.config({ path: rootEnvPath });
+const rootEnvLocalPath = path.join(__dirname, '../../.env.local');
+dotenv.config({ path: rootEnvLocalPath, override: true });
 const envPath = path.join(__dirname, '../.env');
 dotenv.config({ path: envPath });
+
+if (process.env.WORKSPACE_ID === undefined) {
+	throw new Error(
+		'WORKSPACE_ID is not defined. Set it in root .env.local (e.g., WORKSPACE_ID=0 for main workspace, WORKSPACE_ID=1 for ws1, etc.)'
+	);
+}
 
 /**
  * Initialize OrchestratorClient based on environment configuration
