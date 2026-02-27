@@ -15,6 +15,7 @@ import { LoadingSpinner } from '@framework/components/loading/LoadingSpinner';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import { useListItems } from '@framework/hooks2/form/useListItems';
+import { cn } from '@framework/lib/utils';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { Ticket, TicketStatus } from '@shared/api/tickets.contract';
 import { ArrowLeft, Trash2 } from 'lucide-react';
@@ -122,6 +123,7 @@ export function TicketDetailPage() {
 	const [labelInput, setLabelInput] = useState('');
 	const [labelSuggestions, setLabelSuggestions] = useState<string[]>([]);
 	const [showLabelSuggestions, setShowLabelSuggestions] = useState(false);
+	const [savingField, setSavingField] = useState<string | null>(null);
 
 	// Sub-tickets and tasks
 	const [subTickets, setSubTickets] = useState<Ticket[]>([]);
@@ -193,11 +195,11 @@ export function TicketDetailPage() {
 
 	// Update ticket helper
 	const updateTicket = useCallback(
-		async (updates: Partial<Ticket>) => {
+		async (field: string, updates: Partial<Ticket>, revertFn?: () => void) => {
 			if (!ticket || !id) {
 				return;
 			}
-
+			setSavingField(field);
 			try {
 				await ticketsApi.updateTicket(id, {
 					...updates,
@@ -205,9 +207,13 @@ export function TicketDetailPage() {
 				});
 				refresh();
 			} catch (err) {
+				setSavingField(null);
+				revertFn?.();
 				console.error('Failed to update ticket:', getErrorMessage(err));
 				// Show error to user
 				alert(`Failed to update ticket: ${getErrorMessage(err)}`);
+			} finally {
+				setSavingField(null);
 			}
 		},
 		[ticket, id, refresh]
@@ -216,21 +222,24 @@ export function TicketDetailPage() {
 	// Handle title blur
 	const handleTitleBlur = () => {
 		if (localTitle !== ticket?.title) {
-			updateTicket({ title: localTitle });
+			updateTicket('title', { title: localTitle }, () => setLocalTitle(ticket!.title));
 		}
 	};
 
 	// Handle description blur
 	const handleDescriptionBlur = () => {
 		if (localDescription !== ticket?.description) {
-			updateTicket({ description: localDescription });
+			updateTicket('description', { description: localDescription }, () =>
+				setLocalDescription(ticket!.description)
+			);
 		}
 	};
 
 	// Handle status change
 	const handleStatusChange = (newStatus: string) => {
+		const previousStatus = localStatus;
 		setLocalStatus(newStatus as TicketStatus);
-		updateTicket({ status: newStatus as TicketStatus });
+		updateTicket('status', { status: newStatus as TicketStatus }, () => setLocalStatus(previousStatus));
 	};
 
 	// Handle label addition
@@ -238,18 +247,20 @@ export function TicketDetailPage() {
 		if (!label.trim() || localLabels.includes(label)) {
 			return;
 		}
+		const previousLabels = localLabels;
 		const newLabels = [...localLabels, label.trim()];
 		setLocalLabels(newLabels);
 		setLabelInput('');
 		setShowLabelSuggestions(false);
-		updateTicket({ labels: newLabels });
+		updateTicket('labels', { labels: newLabels }, () => setLocalLabels(previousLabels));
 	};
 
 	// Handle label removal
 	const handleRemoveLabel = (label: string) => {
+		const previousLabels = localLabels;
 		const newLabels = localLabels.filter(l => l !== label);
 		setLocalLabels(newLabels);
-		updateTicket({ labels: newLabels });
+		updateTicket('labels', { labels: newLabels }, () => setLocalLabels(previousLabels));
 	};
 
 	// Handle fields save
@@ -265,7 +276,12 @@ export function TicketDetailPage() {
 			{} as Record<string, string>
 		);
 
-		updateTicket({ fields: fieldsObject });
+		// Store previous fields for revert
+		const previousFields = ticket?.fields
+			? Object.entries(ticket.fields).map(([key, value]) => ({ key, value }))
+			: [];
+
+		updateTicket('fields', { fields: fieldsObject }, () => fieldsItems.actions.set(previousFields));
 	};
 
 	// Handle delete
@@ -321,7 +337,12 @@ export function TicketDetailPage() {
 
 			<div className="space-y-6">
 				{/* Header Row: Title, Status, Delete */}
-				<div className="flex items-start gap-4">
+				<div
+					className={cn(
+						'flex items-start gap-4',
+						(savingField === 'title' || savingField === 'status') && 'opacity-60 pointer-events-none'
+					)}
+				>
 					<div className="flex-1">
 						<Label htmlFor="ticket-title">Title</Label>
 						<Input
@@ -360,7 +381,7 @@ export function TicketDetailPage() {
 				</div>
 
 				{/* Description */}
-				<div>
+				<div className={cn(savingField === 'description' && 'opacity-60 pointer-events-none')}>
 					<Label htmlFor="ticket-description">Description</Label>
 					<Textarea
 						id="ticket-description"
@@ -373,7 +394,7 @@ export function TicketDetailPage() {
 				</div>
 
 				{/* Labels */}
-				<div>
+				<div className={cn(savingField === 'labels' && 'opacity-60 pointer-events-none')}>
 					<Label>Labels</Label>
 					<div className="space-y-2">
 						{/* Selected labels */}
@@ -429,7 +450,7 @@ export function TicketDetailPage() {
 				</div>
 
 				{/* Fields (Key-Value Pairs) */}
-				<div>
+				<div className={cn(savingField === 'fields' && 'opacity-60 pointer-events-none')}>
 					<EditableListField
 						label="Custom Fields"
 						items={fieldsItems}
