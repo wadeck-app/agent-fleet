@@ -5539,3 +5539,77 @@ import remarkGfm from 'remark-gfm';
 
 **Problem**: Adding `'idle'` to `WorkspaceStatusSchema` caused TS errors in frontend files that had exhaustive status-to-variant maps (`{ active: "success", locked: "warning", ... }`).
 **Fix**: Always search for status variant maps / switch statements when modifying a shared enum. The TypeScript compiler catches these as `TS7053` (expression can't index type).
+
+---
+
+## E2E Test Infrastructure
+
+### STORAGE_MODE must be explicitly set for E2E isolation
+
+**Problem**: The backend uses `STORAGE_MODE || 'file'` as default. The E2E global setup sets `E2E_MODE=true` and `USE_PRODUCTION_DB=false`, but never sets `STORAGE_MODE=memory`. Despite comments saying "safe with in-memory DB", all E2E backends were writing to `./data/*.json`. This caused test data pollution across runs: a run that crashed mid-way left dirty files that broke subsequent runs.
+
+**Fix**: In `packages/web-backend/src/server.ts`, the `E2E_MODE=true` block now also forces `STORAGE_MODE=memory`:
+```typescript
+if (process.env.E2E_MODE === 'true') {
+    process.env.USE_PRODUCTION_DB = 'false';
+    process.env.STORAGE_MODE = 'memory';  // ← added
+}
+```
+Each E2E worker process (5 parallel backends) now gets a fully isolated `InMemoryStorage`. No shared file state between runs.
+
+**Reference**: `assistant-integration` repo used the same `USE_PRODUCTION_DB` flag but tied it directly to in-memory repositories, making it impossible to forget.
+
+### Lazy controller race condition under concurrent requests
+
+**Problem**: `lazy-controller-plugin.ts` initialized controllers on first request using `router !== null` as guard. Under concurrent requests (common in E2E with 5 parallel backends), Request A would set `router` then `await loader()` (yielding), and Request B would see `router !== null`, return early, then try `handlerMap!.get(...)` while `handlerMap` was still `null`. This caused `TypeError: Cannot read properties of null (reading 'get')` 500 errors on early requests. The bug was latent but unmasked by switching to in-memory storage (faster init → tighter timing window).
+
+**Fix**: Use a single `initializationPromise` so all concurrent callers wait on the same initialization:
+```typescript
+let initializationPromise: Promise<void> | null = null;
+
+const initializeController = async () => {
+    if (initializationPromise !== null) {
+        await initializationPromise;
+        return;
+    }
+    initializationPromise = doInitialize();
+    await initializationPromise;
+};
+```
+
+### E2E locators must be unambiguous across all page states
+
+**Problem**: `page.locator('button:has-text("Add Book")')` matched both the toolbar button and the form submit button (which also reads "Add Book") when the form was open. This caused strict mode violations and flaky timeouts.
+
+**Fix**: Add `data-testid="add-book-button"` to the toolbar button in the component, and use `page.getByTestId('add-book-button')` in the page object. Text-based locators are fragile when the same text can appear in multiple interactive elements.
+
+### Custom ESLint rule: no setTimeout in tests
+
+**Project rule**: `test-best-practices/no-settimeout-in-tests` forbids `new Promise(resolve => setTimeout(resolve, N))` in test files. Use `waitFor(() => expect(...))` from `@testing-library/react` to wait for async state — it retries automatically and doesn't introduce arbitrary delays.
+
+```typescript
+// ❌ Forbidden
+await new Promise(resolve => setTimeout(resolve, 0));
+
+// ✅ Correct
+await waitFor(() => {
+    expect(result.current.state.someValue).toBe(expectedValue);
+});
+```
+
+### useUrlState / queueMicrotask flush in hook tests
+
+**Problem**: Hook tests that call `setActiveProject()` (which internally uses `queueMicrotask()` to flush URL state) and then immediately assert can race against the microtask. The assertion sees stale state.
+
+**Fix**: Wrap the post-action assertion in `waitFor()` to let the microtask queue drain before checking:
+```typescript
+act(() => { result.current.setActiveProject('proj-2'); });
+// ✅ Wait for queueMicrotask flush
+await waitFor(() => {
+    expect(result.current.state.activeProjectId).toBe('proj-2');
+});
+rerender(); rerender(); rerender();
+await waitFor(() => {
+    expect(result.current.state.activeProjectId).toBe('proj-2');
+});
+```
