@@ -1,0 +1,232 @@
+import { z } from 'zod';
+
+import { BaseListQuerySchema, DeleteResponseSchema, createListResponseSchema } from '../common/api-helpers';
+import { defineRoutes } from '../route-builder';
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+export const TicketStatusSchema = z.enum([
+	'backlog',
+	'todo',
+	'in_progress',
+	'done',
+	'cancelled',
+	'pending_integration',
+	'integrated',
+]);
+
+// ---------------------------------------------------------------------------
+// Core Ticket schema
+// ---------------------------------------------------------------------------
+
+export const TicketSchema = z.object({
+	id: z.string(),
+	projectId: z.string(),
+	title: z.string(),
+	description: z.string(),
+	status: TicketStatusSchema,
+	labels: z.array(z.string()),
+	fields: z.record(z.string(), z.string()),
+	parentId: z.string().optional(),
+	taskIds: z.array(z.string()),
+	flowId: z.string().optional(),
+	/** Float order for drag-and-drop sorting (Jira midpoint strategy) */
+	order: z.number(),
+	version: z.number().int().positive(),
+	createdAt: z.string(),
+	updatedAt: z.string(),
+});
+
+// ---------------------------------------------------------------------------
+// Query / list schemas
+// ---------------------------------------------------------------------------
+
+export const TicketsQuerySchema = BaseListQuerySchema.extend({
+	projectId: z.string().optional(),
+	status: TicketStatusSchema.optional(),
+	parentId: z.string().optional(),
+	label: z.string().optional(),
+});
+
+export const TicketsListResponseSchema = createListResponseSchema(TicketSchema);
+
+// ---------------------------------------------------------------------------
+// Create / update schemas
+// ---------------------------------------------------------------------------
+
+export const CreateTicketSchema = z.object({
+	projectId: z.string().min(1),
+	title: z.string().min(1).max(500),
+	description: z.string(),
+	status: TicketStatusSchema.default('backlog'),
+	labels: z.array(z.string()).default([]),
+	fields: z.record(z.string(), z.string()).default({}),
+	parentId: z.string().optional(),
+	flowId: z.string().optional(),
+	/** Initial order value — defaults to 1000 * (sibling count + 1) if omitted */
+	order: z.number().optional(),
+});
+
+export const UpdateTicketSchema = z.object({
+	title: z.string().min(1).max(500).optional(),
+	description: z.string().optional(),
+	status: TicketStatusSchema.optional(),
+	labels: z.array(z.string()).optional(),
+	fields: z.record(z.string(), z.string()).optional(),
+	parentId: z.string().nullable().optional(),
+	flowId: z.string().nullable().optional(),
+	/** Optimistic locking: must match current version */
+	version: z.number().int().positive(),
+});
+
+export const ReorderTicketSchema = z.object({
+	/** New float order value */
+	order: z.number(),
+	/** Optimistic locking: must match current version */
+	version: z.number().int().positive(),
+});
+
+// ---------------------------------------------------------------------------
+// Label autocomplete
+// ---------------------------------------------------------------------------
+
+export const LabelsQuerySchema = z.object({
+	projectId: z.string().min(1),
+	q: z.string().optional(),
+});
+
+export const LabelsResponseSchema = z.object({
+	labels: z.array(z.string()),
+});
+
+// ---------------------------------------------------------------------------
+// AI analysis schemas
+// ---------------------------------------------------------------------------
+
+export const AnalyzeTicketSchema = z.object({
+	description: z.string().min(1),
+	projectId: z.string().min(1),
+	/** Previous answers to clarification questions (for second-pass calls) */
+	clarificationAnswers: z.record(z.string(), z.string()).optional(),
+});
+
+export const SubTicketPlanSchema = z.object({
+	title: z.string(),
+	description: z.string(),
+	/** AI-generated YAML for this sub-ticket's implementation flow */
+	flowYaml: z.string(),
+});
+
+export const TicketAnalysisPlanSchema = z.object({
+	title: z.string(),
+	labels: z.array(z.string()),
+	fields: z.record(z.string(), z.string()),
+	complexity: z.enum(['simple', 'medium', 'complex']),
+	analysis: z.string(),
+	subTickets: z.array(SubTicketPlanSchema),
+	/** If true, frontend should show a clarification dialog before proceeding */
+	needsClarification: z.boolean().optional(),
+	/** Questions to ask the user before finalizing the plan */
+	clarificationQuestions: z.array(z.string()).optional(),
+});
+
+// ---------------------------------------------------------------------------
+// Create-from-plan schema
+// ---------------------------------------------------------------------------
+
+export const CreateFromPlanSchema = z.object({
+	projectId: z.string().min(1),
+	plan: TicketAnalysisPlanSchema,
+});
+
+export const CreateFromPlanResponseSchema = z.object({
+	parentTicket: TicketSchema,
+	subTickets: z.array(TicketSchema),
+	/** Flow IDs that were created */
+	createdFlowIds: z.array(z.string()),
+	/** Sub-tickets that failed flow validation (created without a flow) */
+	flowValidationWarnings: z.array(
+		z.object({
+			subTicketTitle: z.string(),
+			errors: z.array(z.string()),
+		})
+	),
+});
+
+// ---------------------------------------------------------------------------
+// TypeScript types
+// ---------------------------------------------------------------------------
+
+export type TicketStatus = z.infer<typeof TicketStatusSchema>;
+export type Ticket = z.infer<typeof TicketSchema>;
+export type TicketsQuery = z.infer<typeof TicketsQuerySchema>;
+export type TicketsListResponse = z.infer<typeof TicketsListResponseSchema>;
+export type CreateTicket = z.infer<typeof CreateTicketSchema>;
+export type UpdateTicket = z.infer<typeof UpdateTicketSchema>;
+export type ReorderTicket = z.infer<typeof ReorderTicketSchema>;
+export type LabelsQuery = z.infer<typeof LabelsQuerySchema>;
+export type LabelsResponse = z.infer<typeof LabelsResponseSchema>;
+export type AnalyzeTicket = z.infer<typeof AnalyzeTicketSchema>;
+export type SubTicketPlan = z.infer<typeof SubTicketPlanSchema>;
+export type TicketAnalysisPlan = z.infer<typeof TicketAnalysisPlanSchema>;
+export type CreateFromPlan = z.infer<typeof CreateFromPlanSchema>;
+export type CreateFromPlanResponse = z.infer<typeof CreateFromPlanResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Route definitions
+// ---------------------------------------------------------------------------
+
+export const TICKETS_API_ROUTES = defineRoutes({
+	'/api/tickets/': {
+		GET: {
+			query: TicketsQuerySchema,
+			response: TicketsListResponseSchema,
+		},
+		POST: {
+			body: CreateTicketSchema,
+			response: TicketSchema,
+		},
+	},
+	'/api/tickets/labels': {
+		GET: {
+			query: LabelsQuerySchema,
+			response: LabelsResponseSchema,
+		},
+	},
+	'/api/tickets/analyze': {
+		POST: {
+			body: AnalyzeTicketSchema,
+			response: TicketAnalysisPlanSchema,
+		},
+	},
+	'/api/tickets/create-from-plan': {
+		POST: {
+			body: CreateFromPlanSchema,
+			response: CreateFromPlanResponseSchema,
+		},
+	},
+	'/api/tickets/:id': {
+		GET: {
+			params: z.object({ id: z.string() }),
+			response: TicketSchema,
+		},
+		PATCH: {
+			params: z.object({ id: z.string() }),
+			body: UpdateTicketSchema,
+			response: TicketSchema,
+		},
+		DELETE: {
+			params: z.object({ id: z.string() }),
+			response: DeleteResponseSchema,
+		},
+	},
+	'/api/tickets/:id/reorder': {
+		PATCH: {
+			params: z.object({ id: z.string() }),
+			body: ReorderTicketSchema,
+			response: TicketSchema,
+		},
+	},
+});

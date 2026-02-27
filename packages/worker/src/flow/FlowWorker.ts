@@ -788,6 +788,7 @@ export class FlowWorker implements Shutdownable {
 				inputs: flow._autoDiscoveredInputs || {},
 				workspace: flow.workspace,
 				statusTransitions: flow.statusTransitions,
+				trigger: flow.trigger,
 
 				// Validation state
 				isValid: validationResult?.valid ?? true, // Default to valid if not validated
@@ -858,8 +859,17 @@ export class FlowWorker implements Shutdownable {
 		// Determine status transitions based on flow configuration
 		const defaultOnSuccess = TaskStatus.REVIEW;
 		const defaultOnFailure = TaskStatus.CHANGES_REQUESTED;
-		const successStatus = flow.statusTransitions?.onSuccess ?? defaultOnSuccess;
-		const failureStatus = flow.statusTransitions?.onFailure ?? defaultOnFailure;
+		// Extract TaskStatus from either a plain string or StatusTransitionConfig object
+		const resolveTaskStatus = (
+			value: TaskStatus | import('flow-engine/types').StatusTransitionConfig | undefined,
+			defaultValue: TaskStatus
+		): TaskStatus => {
+			if (!value) return defaultValue;
+			if (typeof value === 'string') return value;
+			return value.task ?? defaultValue;
+		};
+		const successStatus = resolveTaskStatus(flow.statusTransitions?.onSuccess, defaultOnSuccess);
+		const failureStatus = resolveTaskStatus(flow.statusTransitions?.onFailure, defaultOnFailure);
 
 		this.logger.info(` Executing flow: ${flow.name} (${flow.id})`);
 		this.sendTaskStarted(TaskStatus.IN_PROGRESS);

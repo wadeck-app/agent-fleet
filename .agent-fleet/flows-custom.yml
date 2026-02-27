@@ -1,0 +1,8 @@
+# ============================================================================
+# flows-custom.yml — Machine-managed AI-generated implementation flows
+#
+# This file is automatically managed by the backend when creating tickets.
+# DO NOT edit manually unless you know what you're doing.
+#
+# Flow IDs follow the pattern: ticket-{ticketId}-impl
+# ============================================================================

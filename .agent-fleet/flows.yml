@@ -1,3 +1,7 @@
+# Machine-managed flows (AI-generated implementations) are loaded from this file
+includes:
+    - flows-custom.yml
+
 simple-implement:
     version: '1.0.0'
     name: '(Dummy) Simple Implementation'

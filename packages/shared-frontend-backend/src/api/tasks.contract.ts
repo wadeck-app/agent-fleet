@@ -97,6 +97,8 @@ export const TaskSchema = z.object({
 	// Project and workspace assignment
 	projectId: z.string().optional(),
 	workspaceId: z.string().optional(),
+	// Ticket linkage
+	ticketId: z.string().optional(),
 });
 
 /**
@@ -214,6 +216,7 @@ export const CreateTaskSchema = z.object({
 	flowInputs: z.record(z.string(), z.any()).optional(),
 	projectId: z.string().optional(),
 	workspaceId: z.string().optional(),
+	ticketId: z.string().optional(),
 });
 
 export type CreateTask = z.infer<typeof CreateTaskSchema>;

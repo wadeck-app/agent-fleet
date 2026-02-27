@@ -685,13 +685,43 @@ export interface FlowHooks {
 /**
  * Status transitions configuration for flow completion
  */
-export interface StatusTransitions {
-	/** Task status to set when flow completes successfully */
-	onSuccess: TaskStatus;
-
-	/** Task status to set when flow fails */
-	onFailure: TaskStatus;
+/**
+ * Extended status transition config that can update both a Task and its linked Ticket
+ */
+export interface StatusTransitionConfig {
+	/** Task status to set */
+	task?: TaskStatus;
+	/**
+	 * Ticket status to set on the linked ticket (identified by Task.ticketId)
+	 * Uses string to avoid importing TicketStatus here (validated at runtime)
+	 */
+	ticket?: string;
 }
+
+export interface StatusTransitions {
+	/** Task status or extended config to apply on flow success */
+	onSuccess: TaskStatus | StatusTransitionConfig;
+
+	/** Task status or extended config to apply on flow failure */
+	onFailure: TaskStatus | StatusTransitionConfig;
+}
+
+/**
+ * Event-based flow trigger - fires when a matching event is emitted
+ */
+export interface EventFlowTrigger {
+	/** Trigger type discriminator */
+	type: 'event';
+	/** Event name to listen for (e.g., 'ticket.status.changed') */
+	event: string;
+	/** Optional filter criteria - all specified fields must match */
+	filter?: Record<string, string | undefined>;
+}
+
+/**
+ * Union of all supported flow trigger types (extensible)
+ */
+export type FlowTrigger = EventFlowTrigger;
 
 /**
  * Execution configuration for Claude CLI invocations
@@ -763,6 +793,9 @@ export interface FlowDefinition {
 
 	/** Optional execution configuration for Claude CLI */
 	execution?: ExecutionConfig;
+
+	/** Optional trigger for automatic flow execution based on events */
+	trigger?: FlowTrigger;
 }
 
 /**
@@ -793,6 +826,9 @@ export interface FlowMetadata {
 
 	/** Optional status transitions configuration */
 	statusTransitions?: StatusTransitions;
+
+	/** Optional trigger for automatic flow execution */
+	trigger?: FlowTrigger;
 
 	/** Whether the flow passed validation */
 	isValid: boolean;
