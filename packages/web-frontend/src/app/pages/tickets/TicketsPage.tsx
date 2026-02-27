@@ -64,46 +64,61 @@ export function TicketsPage() {
 	const [projectsLoading, setProjectsLoading] = useState(false);
 	const createDialog = useDialogParam('create-ticket');
 
-	const { tickets, loading, reload } = useTickets({
+	const { tickets, loading, reload, refresh } = useTickets({
 		projectId: selectedProjectId || undefined,
 	});
 
+	// Local display state for optimistic drag-and-drop updates
+	const [localTickets, setLocalTickets] = useState<Ticket[]>([]);
+
+	// Sync local tickets from server data (initial load + explicit reload)
+	useEffect(() => {
+		if (!loading) {
+			setLocalTickets(tickets);
+		}
+	}, [tickets, loading]);
+
 	// Setup drag and drop
 	const dnd = useDragAndDrop({
-		items: tickets,
+		items: localTickets,
 		getItemId: ticket => ticket.id,
 		onReorder: async (fromIndex, toIndex) => {
-			const movedTicket = tickets[fromIndex];
-			const targetTickets = [...tickets];
+			const snapshot = [...localTickets];
+			const movedTicket = localTickets[fromIndex];
 
-			// Calculate new order
+			// Calculate new order based on final neighbors after the move
 			let newOrder: number;
-
 			if (toIndex === 0) {
-				// Dropped at start: half of first item's order
-				newOrder = targetTickets[0].order / 2;
-			} else if (toIndex === targetTickets.length - 1) {
-				// Dropped at end: last item's order + 1000
-				newOrder = targetTickets[targetTickets.length - 1].order + 1000;
+				// Moving to top
+				newOrder = localTickets[0].order / 2;
+			} else if (toIndex === localTickets.length - 1) {
+				// Moving to bottom
+				newOrder = localTickets[localTickets.length - 1].order + 1000;
+			} else if (fromIndex < toIndex) {
+				// Moving down: item lands AFTER the item at toIndex
+				newOrder = (localTickets[toIndex].order + localTickets[toIndex + 1].order) / 2;
 			} else {
-				// Dropped in middle: midpoint between prev and next
-				const prevOrder = toIndex < fromIndex ? targetTickets[toIndex].order : targetTickets[toIndex - 1].order;
-				const nextOrder = toIndex < fromIndex ? targetTickets[toIndex + 1].order : targetTickets[toIndex].order;
-				newOrder = (prevOrder + nextOrder) / 2;
+				// Moving up: item lands BEFORE the item at toIndex
+				newOrder = (localTickets[toIndex - 1].order + localTickets[toIndex].order) / 2;
 			}
 
+			// Optimistic local reorder (no loading flash)
+			const reordered = [...localTickets];
+			reordered.splice(fromIndex, 1);
+			reordered.splice(toIndex, 0, { ...movedTicket, order: newOrder });
+			setLocalTickets(reordered);
+
 			try {
-				// Optimistically update order
 				await ticketsApi.reorderTicket(movedTicket.id, {
 					order: newOrder,
 					version: movedTicket.version,
 				});
-				// Reload to get fresh data
-				reload();
+				// Silent background sync — no loading flash
+				void refresh();
 			} catch (err) {
 				console.error('Failed to reorder ticket:', getErrorMessage(err));
-				// Reload on error to revert optimistic update
-				reload();
+				// Revert to snapshot on error
+				setLocalTickets(snapshot);
 			}
 		},
 		disabled: false,
@@ -181,18 +196,18 @@ export function TicketsPage() {
 				</div>
 			)}
 
-			{!loading && tickets.length === 0 && (
+			{!loading && localTickets.length === 0 && (
 				<div className="rounded-lg border border-border bg-card p-8 text-center">
 					<p className="text-lg font-medium text-foreground">No tickets found</p>
 					<p className="mt-2 text-sm text-muted-foreground">Create your first ticket to get started</p>
 				</div>
 			)}
 
-			{!loading && tickets.length > 0 && (
+			{localTickets.length > 0 && (
 				<DndContext sensors={dnd.sensors} collisionDetection={closestCenter} onDragEnd={dnd.handleDragEnd}>
 					<SortableContext items={dnd.sortableIds} strategy={verticalListSortingStrategy}>
 						<div className="space-y-2">
-							{tickets.map(ticket => (
+							{localTickets.map(ticket => (
 								<SortableItem key={ticket.id} id={ticket.id}>
 									<div
 										className="cursor-pointer rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent"
