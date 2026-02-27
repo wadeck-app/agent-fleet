@@ -326,15 +326,20 @@ describe('useProjectsV2State', () => {
 				result.current.setActiveProject('proj-2');
 			});
 
-			expect(result.current.state.activeProjectId).toBe('proj-2');
+			// Wait for state to settle after setActiveProject (queueMicrotask flush)
+			await waitFor(() => {
+				expect(result.current.state.activeProjectId).toBe('proj-2');
+			});
 
 			// Force multiple rerenders (simulating React updates)
 			rerender();
 			rerender();
 			rerender();
 
-			// ProjectId should STILL be proj-2
-			expect(result.current.state.activeProjectId).toBe('proj-2');
+			// ProjectId should STILL be proj-2 after all rerenders
+			await waitFor(() => {
+				expect(result.current.state.activeProjectId).toBe('proj-2');
+			});
 		});
 	});
 

@@ -263,7 +263,7 @@ export function BooksPage() {
 								isColumnModifiedOrder={columnOrder.isColumnModified}
 								onResetColumnOrder={columnOrder.resetColumn}
 							/>
-							<Button onClick={handleNewBook}>
+							<Button onClick={handleNewBook} data-testid="add-book-button">
 								<Plus />
 								Add Book
 							</Button>

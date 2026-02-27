@@ -26,7 +26,7 @@ export class BooksPage extends BasePage {
 	constructor(page: Page) {
 		super(page);
 		this.booksTab = page.locator('text=Books');
-		this.addBookButton = page.locator('button:has-text("Add Book")');
+		this.addBookButton = page.getByTestId('add-book-button');
 		this.editBookTitle = page.locator('h2:has-text("Edit Book")');
 		this.titleField = page.locator('#field-title');
 		this.authorField = page.locator('#field-author');
