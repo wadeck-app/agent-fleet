@@ -28,9 +28,9 @@ export const WithItems = {
 	render: () => {
 		const items = useListItems<KeyValueItem>({
 			initialItems: [
-				{ key: 'NODE_ENV', value: 'production' },
-				{ key: 'DEBUG', value: 'false' },
-				{ key: 'PORT', value: '3000' },
+				{ id: 'item-1', key: 'NODE_ENV', value: 'production' },
+				{ id: 'item-2', key: 'DEBUG', value: 'false' },
+				{ id: 'item-3', key: 'PORT', value: '3000' },
 			],
 		});
 
@@ -40,9 +40,9 @@ export const WithItems = {
 				description="Configure environment variables for the script"
 				items={items}
 				renderItem={(item, _index, actions) => <KeyValueItemRenderer item={item} actions={actions} />}
-				createDefault={() => ({ key: '', value: '' })}
+				createDefault={() => ({ id: crypto.randomUUID(), key: '', value: '' })}
 				addButtonLabel="Add Variable"
-				getItemId={item => item.key || `env-${Math.random()}`}
+				getItemId={item => item.id}
 			/>
 		);
 	},
@@ -64,10 +64,10 @@ export const Empty = {
 				description="No variables configured yet"
 				items={items}
 				renderItem={(item, _index, actions) => <KeyValueItemRenderer item={item} actions={actions} />}
-				createDefault={() => ({ key: '', value: '' })}
+				createDefault={() => ({ id: crypto.randomUUID(), key: '', value: '' })}
 				addButtonLabel="Add Variable"
 				emptyMessage="No environment variables defined. Click 'Add Variable' to create one."
-				getItemId={item => item.key || `env-${Math.random()}`}
+				getItemId={item => item.id}
 			/>
 		);
 	},
@@ -81,9 +81,9 @@ export const MaxItems = {
 	render: () => {
 		const items = useListItems<KeyValueItem>({
 			initialItems: [
-				{ key: 'VAR1', value: 'value1' },
-				{ key: 'VAR2', value: 'value2' },
-				{ key: 'VAR3', value: 'value3' },
+				{ id: 'item-1', key: 'VAR1', value: 'value1' },
+				{ id: 'item-2', key: 'VAR2', value: 'value2' },
+				{ id: 'item-3', key: 'VAR3', value: 'value3' },
 			],
 			maxItems: 3,
 		});
@@ -94,9 +94,9 @@ export const MaxItems = {
 				description="This list cannot exceed 3 items"
 				items={items}
 				renderItem={(item, _index, actions) => <KeyValueItemRenderer item={item} actions={actions} />}
-				createDefault={() => ({ key: '', value: '' })}
+				createDefault={() => ({ id: crypto.randomUUID(), key: '', value: '' })}
 				addButtonLabel="Add Variable"
-				getItemId={item => item.key || `env-${Math.random()}`}
+				getItemId={item => item.id}
 			/>
 		);
 	},
@@ -109,7 +109,7 @@ export const MaxItems = {
 export const MinItems = {
 	render: () => {
 		const items = useListItems<KeyValueItem>({
-			initialItems: [{ key: 'REQUIRED_VAR', value: 'required_value' }],
+			initialItems: [{ id: 'item-1', key: 'REQUIRED_VAR', value: 'required_value' }],
 			minItems: 1,
 		});
 
@@ -119,9 +119,9 @@ export const MinItems = {
 				description="At least one variable must be present"
 				items={items}
 				renderItem={(item, _index, actions) => <KeyValueItemRenderer item={item} actions={actions} />}
-				createDefault={() => ({ key: '', value: '' })}
+				createDefault={() => ({ id: crypto.randomUUID(), key: '', value: '' })}
 				addButtonLabel="Add Variable"
-				getItemId={item => item.key || `env-${Math.random()}`}
+				getItemId={item => item.id}
 			/>
 		);
 	},
@@ -135,10 +135,10 @@ export const WithDragDrop = {
 	render: () => {
 		const items = useListItems<KeyValueItem>({
 			initialItems: [
-				{ key: 'FIRST', value: '1' },
-				{ key: 'SECOND', value: '2' },
-				{ key: 'THIRD', value: '3' },
-				{ key: 'FOURTH', value: '4' },
+				{ id: 'item-1', key: 'FIRST', value: '1' },
+				{ id: 'item-2', key: 'SECOND', value: '2' },
+				{ id: 'item-3', key: 'THIRD', value: '3' },
+				{ id: 'item-4', key: 'FOURTH', value: '4' },
 			],
 		});
 
@@ -148,10 +148,10 @@ export const WithDragDrop = {
 				description="Drag items by the grip handle to reorder them"
 				items={items}
 				renderItem={(item, _index, actions) => <KeyValueItemRenderer item={item} actions={actions} />}
-				createDefault={() => ({ key: '', value: '' })}
+				createDefault={() => ({ id: crypto.randomUUID(), key: '', value: '' })}
 				addButtonLabel="Add Variable"
 				enableReordering
-				getItemId={item => item.key || `env-${Math.random()}`}
+				getItemId={item => item.id}
 			/>
 		);
 	},
@@ -165,9 +165,9 @@ export const WithoutDragDrop = {
 	render: () => {
 		const items = useListItems<KeyValueItem>({
 			initialItems: [
-				{ key: 'STATIC_1', value: 'value1' },
-				{ key: 'STATIC_2', value: 'value2' },
-				{ key: 'STATIC_3', value: 'value3' },
+				{ id: 'item-1', key: 'STATIC_1', value: 'value1' },
+				{ id: 'item-2', key: 'STATIC_2', value: 'value2' },
+				{ id: 'item-3', key: 'STATIC_3', value: 'value3' },
 			],
 		});
 
@@ -177,10 +177,10 @@ export const WithoutDragDrop = {
 				description="Items cannot be reordered"
 				items={items}
 				renderItem={(item, _index, actions) => <KeyValueItemRenderer item={item} actions={actions} />}
-				createDefault={() => ({ key: '', value: '' })}
+				createDefault={() => ({ id: crypto.randomUUID(), key: '', value: '' })}
 				addButtonLabel="Add Variable"
 				enableReordering={false}
-				getItemId={item => item.key || `env-${Math.random()}`}
+				getItemId={item => item.id}
 			/>
 		);
 	},
@@ -193,7 +193,7 @@ export const WithoutDragDrop = {
 export const WithError = {
 	render: () => {
 		const items = useListItems<KeyValueItem>({
-			initialItems: [{ key: '', value: 'missing_key' }],
+			initialItems: [{ id: 'item-1', key: '', value: 'missing_key' }],
 		});
 
 		return (
@@ -202,10 +202,10 @@ export const WithError = {
 				description="This list has validation errors"
 				items={items}
 				renderItem={(item, _index, actions) => <KeyValueItemRenderer item={item} actions={actions} />}
-				createDefault={() => ({ key: '', value: '' })}
+				createDefault={() => ({ id: crypto.randomUUID(), key: '', value: '' })}
 				addButtonLabel="Add Variable"
 				error="All variables must have a non-empty key"
-				getItemId={item => item.key || `env-${Math.random()}`}
+				getItemId={item => item.id}
 			/>
 		);
 	},
@@ -226,7 +226,7 @@ export const CustomEmptyState = {
 				label="Custom Empty UI"
 				items={items}
 				renderItem={(item, _index, actions) => <KeyValueItemRenderer item={item} actions={actions} />}
-				createDefault={() => ({ key: '', value: '' })}
+				createDefault={() => ({ id: crypto.randomUUID(), key: '', value: '' })}
 				addButtonLabel="Add Variable"
 				renderEmpty={() => (
 					<div className="text-center">
@@ -236,7 +236,7 @@ export const CustomEmptyState = {
 						</p>
 					</div>
 				)}
-				getItemId={item => item.key || `env-${Math.random()}`}
+				getItemId={item => item.id}
 			/>
 		);
 	},

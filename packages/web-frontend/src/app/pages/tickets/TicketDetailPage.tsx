@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { ItemActions } from '@framework/components2/list/EditableListField';
 import { EditableListField } from '@framework/components2/list/EditableListField';
 import { RemoveItemButton } from '@framework/components2/list/RemoveItemButton';
+import type { KeyValueItem } from '@framework/components2/list/renderers/KeyValueItemRenderer';
 import { ErrorAlert } from '@framework/components/feedback/ErrorAlert';
 import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
@@ -45,25 +46,17 @@ function formatStatus(status: TicketStatus): string {
 }
 
 /**
- * Key-Value field item interface
- */
-interface KeyValueItem {
-	key: string;
-	value: string;
-}
-
-/**
  * Key-Value field renderer for EditableListField
  */
 function KeyValueRenderer({ item, actions }: { item: KeyValueItem; actions: ItemActions<KeyValueItem> }) {
 	return (
 		<div className="flex gap-2 rounded-md border bg-card p-3">
 			<div className="flex-1 space-y-1">
-				<Label htmlFor={`key-${item.key}`} className="text-xs">
+				<Label htmlFor={`key-${item.id}`} className="text-xs">
 					Key
 				</Label>
 				<Input
-					id={`key-${item.key}`}
+					id={`key-${item.id}`}
 					value={item.key}
 					onChange={e => actions.update({ key: e.target.value })}
 					placeholder="key"
@@ -72,11 +65,11 @@ function KeyValueRenderer({ item, actions }: { item: KeyValueItem; actions: Item
 			</div>
 
 			<div className="flex-1 space-y-1">
-				<Label htmlFor={`value-${item.key}`} className="text-xs">
+				<Label htmlFor={`value-${item.id}`} className="text-xs">
 					Value
 				</Label>
 				<Input
-					id={`value-${item.key}`}
+					id={`value-${item.id}`}
 					value={item.value}
 					onChange={e => actions.update({ value: e.target.value })}
 					placeholder="value"
@@ -144,7 +137,11 @@ export function TicketDetailPage() {
 			setLocalLabels(ticket.labels);
 
 			// Convert fields object to array
-			const fieldsArray = Object.entries(ticket.fields).map(([key, value]) => ({ key, value }));
+			const fieldsArray = Object.entries(ticket.fields).map(([key, value]) => ({
+				id: crypto.randomUUID(),
+				key,
+				value,
+			}));
 			fieldsItems.actions.set(fieldsArray);
 		}
 		// Only re-sync when the ticket itself changes, not when the actions reference changes
@@ -279,7 +276,7 @@ export function TicketDetailPage() {
 
 		// Store previous fields for revert
 		const previousFields = ticket?.fields
-			? Object.entries(ticket.fields).map(([key, value]) => ({ key, value }))
+			? Object.entries(ticket.fields).map(([key, value]) => ({ id: crypto.randomUUID(), key, value }))
 			: [];
 
 		updateTicket('fields', { fields: fieldsObject }, () => fieldsItems.actions.set(previousFields));
@@ -340,7 +337,7 @@ export function TicketDetailPage() {
 				{/* Header Row: Title, Status, Delete */}
 				<div
 					className={cn(
-						'relative flex items-start gap-4',
+						'relative flex items-end gap-4',
 						(savingField === 'title' || savingField === 'status') &&
 							'pointer-events-none opacity-50 blur-sm'
 					)}
@@ -354,13 +351,13 @@ export function TicketDetailPage() {
 							onBlur={handleTitleBlur}
 							placeholder="Ticket title"
 							autoComplete="off"
-							className="text-lg font-medium"
+							className="mt-1 text-lg font-medium"
 						/>
 					</div>
 					<div className="w-48">
 						<Label htmlFor="ticket-status">Status</Label>
 						<Select value={localStatus} onValueChange={handleStatusChange}>
-							<SelectTrigger id="ticket-status">
+							<SelectTrigger id="ticket-status" className="mt-1">
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
@@ -374,8 +371,8 @@ export function TicketDetailPage() {
 							</SelectContent>
 						</Select>
 					</div>
-					<div className="pt-6">
-						<Button variant="destructive" size="sm" onClick={handleDelete}>
+					<div>
+						<Button variant="destructive" onClick={handleDelete}>
 							<Trash2 className="size-4" />
 							Delete
 						</Button>
@@ -397,17 +394,18 @@ export function TicketDetailPage() {
 						onBlur={handleDescriptionBlur}
 						placeholder="Ticket description"
 						rows={6}
+						className="mt-1"
 					/>
 				</div>
 
 				{/* Labels */}
 				<div className={cn('relative', savingField === 'labels' && 'pointer-events-none opacity-50 blur-sm')}>
 					<Label>Labels</Label>
-					<div className="space-y-2">
+					<div className="mt-2 space-y-2">
 						{/* Selected labels */}
 						<div className="flex flex-wrap gap-2">
 							{localLabels.map(label => (
-								<Badge key={label} variant="outline" className="cursor-pointer">
+								<Badge key={label} variant="outline" className="cursor-pointer px-3 py-1 text-sm">
 									{label}
 									<Button
 										type="button"
@@ -434,7 +432,7 @@ export function TicketDetailPage() {
 										handleAddLabel(labelInput);
 									}
 								}}
-								placeholder="Type to add label..."
+								placeholder="Type label and press Enter to add..."
 								className="w-full"
 							/>
 							{showLabelSuggestions && labelSuggestions.length > 0 && (
@@ -464,8 +462,8 @@ export function TicketDetailPage() {
 						renderItem={(item, _index, actions) => <KeyValueRenderer item={item} actions={actions} />}
 						addButtonLabel="Add Field"
 						emptyMessage="No custom fields"
-						createDefault={() => ({ key: '', value: '' })}
-						getItemId={(item, index) => item.key || `field-${index}`}
+						createDefault={() => ({ id: crypto.randomUUID(), key: '', value: '' })}
+						getItemId={item => item.id}
 					/>
 					<Button variant="outline" size="sm" onClick={handleFieldsSave} className="mt-2">
 						Save Fields
@@ -480,7 +478,7 @@ export function TicketDetailPage() {
 						<p className="text-sm text-muted-foreground">No sub-tickets</p>
 					)}
 					{!loadingSubTickets && subTickets.length > 0 && (
-						<div className="space-y-2">
+						<div className="mt-2 space-y-2">
 							{subTickets.map(subTicket => (
 								<Link
 									key={subTicket.id}
@@ -504,7 +502,7 @@ export function TicketDetailPage() {
 					<Label>Linked Tasks</Label>
 					{ticket.taskIds.length === 0 && <p className="text-sm text-muted-foreground">No linked tasks</p>}
 					{ticket.taskIds.length > 0 && (
-						<div className="space-y-2">
+						<div className="mt-2 space-y-2">
 							{ticket.taskIds.map(taskId => (
 								<Link
 									key={taskId}

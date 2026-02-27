@@ -31,6 +31,7 @@ import { Label } from '@framework/components/forms/Label';
  */
 
 export interface KeyValueItem {
+	id: string;
 	key: string;
 	value: string;
 }
@@ -44,11 +45,11 @@ export function KeyValueItemRenderer({ item, actions }: KeyValueItemRendererProp
 	return (
 		<div className="flex gap-2 rounded-md border bg-card p-3">
 			<div className="flex-1 space-y-1">
-				<Label htmlFor={`key-${item.key}`} className="text-xs">
+				<Label htmlFor={`key-${item.id}`} className="text-xs">
 					Key
 				</Label>
 				<Input
-					id={`key-${item.key}`}
+					id={`key-${item.id}`}
 					value={item.key}
 					onChange={e => actions.update({ key: e.target.value })}
 					placeholder="KEY"
@@ -57,11 +58,11 @@ export function KeyValueItemRenderer({ item, actions }: KeyValueItemRendererProp
 			</div>
 
 			<div className="flex-1 space-y-1">
-				<Label htmlFor={`value-${item.key}`} className="text-xs">
+				<Label htmlFor={`value-${item.id}`} className="text-xs">
 					Value
 				</Label>
 				<Input
-					id={`value-${item.key}`}
+					id={`value-${item.id}`}
 					value={item.value}
 					onChange={e => actions.update({ value: e.target.value })}
 					placeholder="value"
