@@ -586,6 +586,144 @@ describe('ProjectsV2Page', () => {
 		});
 	});
 
+	describe('BUG: Edit dialog re-opens after background workspace refresh', () => {
+		// Root cause: loadWorkspaces() called setLoading(true) on every refresh (including WebSocket).
+		// This caused: loading=true → skeleton → WorkspacePanel unmounts → URL cleanup effect skipped
+		// → WorkspacePanel remounts reading stale ?dialog=edit-workspace → modal re-opens.
+		// Fix: loading skeleton only when workspaces.length === 0 (initial load, no data yet).
+
+		const bgProjects: Project[] = [
+			{
+				id: 'proj-bg',
+				name: 'Background Test Project',
+				workspaceIds: ['ws-bg'],
+				taskCount: 0,
+				archived: false,
+				pinned: true,
+				order: 0,
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString(),
+				version: 1,
+			},
+		];
+
+		const bgWorkspaces: Workspace[] = [
+			{
+				id: 'ws-bg',
+				name: 'Background Workspace',
+				path: '/background-workspace',
+				mode: 'development' as const,
+				tasksCount: 0,
+				status: 'active' as const,
+				createdAt: new Date().toISOString(),
+				lastUsed: new Date().toISOString(),
+				color: '#6366F1',
+			},
+		];
+
+		it('should NOT show loading skeleton during background refresh when workspaces already loaded', () => {
+			vi.mocked(useProjects).mockReturnValue({
+				projects: bgProjects,
+				loading: false,
+				pinnedProjects: bgProjects,
+				loadProjects: vi.fn(),
+				pinProject: vi.fn(),
+				unpinProject: vi.fn(),
+				reorderProjects: vi.fn(),
+				error: null,
+				clearError: vi.fn(),
+			});
+
+			// workspacesLoading=true simulates a WebSocket background refresh, but data is present
+			vi.mocked(useProjectWorkspaces).mockReturnValue({
+				workspaces: bgWorkspaces,
+				loading: true,
+				loadWorkspaces: vi.fn(),
+				associateWorkspace: vi.fn(),
+				dissociateWorkspace: vi.fn(),
+				reorderWorkspaces: vi.fn(),
+				getProjectWorkspaces: (project: Project | undefined) => {
+					if (!project) return [];
+					return bgWorkspaces.filter(w => project.workspaceIds.includes(w.id));
+				},
+				error: null,
+				clearError: vi.fn(),
+			});
+
+			render(<ProjectsV2Page />, {
+				wrapper: ({ children }) =>
+					wrapper({ children, initialUrl: '/?projectId=proj-bg&workspaceId=ws-bg' }),
+			});
+
+			// WorkspacePanel must be mounted — h2 heading visible, not replaced by skeleton
+			// (name also appears in WorkspaceTabs, so we scope to heading role)
+			expect(screen.getByRole('heading', { name: 'Background Workspace' })).toBeInTheDocument();
+		});
+
+		it('should keep edit dialog open when background workspace refresh fires', async () => {
+			vi.mocked(useProjects).mockReturnValue({
+				projects: bgProjects,
+				loading: false,
+				pinnedProjects: bgProjects,
+				loadProjects: vi.fn(),
+				pinProject: vi.fn(),
+				unpinProject: vi.fn(),
+				reorderProjects: vi.fn(),
+				error: null,
+				clearError: vi.fn(),
+			});
+
+			vi.mocked(useProjectWorkspaces).mockReturnValue({
+				workspaces: bgWorkspaces,
+				loading: false,
+				loadWorkspaces: vi.fn(),
+				associateWorkspace: vi.fn(),
+				dissociateWorkspace: vi.fn(),
+				reorderWorkspaces: vi.fn(),
+				getProjectWorkspaces: (project: Project | undefined) => {
+					if (!project) return [];
+					return bgWorkspaces.filter(w => project.workspaceIds.includes(w.id));
+				},
+				error: null,
+				clearError: vi.fn(),
+			});
+
+			const { rerender } = render(<ProjectsV2Page />, {
+				wrapper: ({ children }) =>
+					wrapper({
+						children,
+						initialUrl: '/?projectId=proj-bg&workspaceId=ws-bg&dialog=edit-workspace',
+					}),
+			});
+
+			// Dialog should be open from URL param
+			await waitFor(() => {
+				expect(screen.getByText('Edit Workspace')).toBeInTheDocument();
+			});
+
+			// Simulate WebSocket background refresh: workspacesLoading flips to true, data still present
+			vi.mocked(useProjectWorkspaces).mockReturnValue({
+				workspaces: bgWorkspaces,
+				loading: true,
+				loadWorkspaces: vi.fn(),
+				associateWorkspace: vi.fn(),
+				dissociateWorkspace: vi.fn(),
+				reorderWorkspaces: vi.fn(),
+				getProjectWorkspaces: (project: Project | undefined) => {
+					if (!project) return [];
+					return bgWorkspaces.filter(w => project.workspaceIds.includes(w.id));
+				},
+				error: null,
+				clearError: vi.fn(),
+			});
+
+			rerender(<ProjectsV2Page />);
+
+			// Dialog must still be open — WorkspacePanel must NOT have been unmounted
+			expect(screen.getByText('Edit Workspace')).toBeInTheDocument();
+		});
+	});
+
 	describe('Workspace auto-association', () => {
 		const projectWithWorkspace: Project = {
 			id: 'project-123',
