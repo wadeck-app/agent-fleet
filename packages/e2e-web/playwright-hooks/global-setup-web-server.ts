@@ -149,7 +149,7 @@ async function startServerOnAvailablePort(
 		debug && console.log(`     ✅ Port ${port} is available, spawning backend process...`);
 		debug && console.log(`     🔧 Worker ID: ${workerId}, PROJECT_ID will be: ${workerId}`);
 
-		const command = 'npm run dev:only-for-e2e --workspace=web-backend';
+		const command = 'npm run start:only-for-e2e --workspace=web-backend';
 		const serverProcess = spawn(command, {
 			env: {
 				...process.env,
@@ -277,15 +277,15 @@ async function startServerOnAvailablePort(
 				}
 			});
 
-			// Timeout after 5 seconds
+			// Timeout after 10s: compiled backend starts in <2s, 10s covers slow machines
 			setTimeout(() => {
 				if (!serverExited && !alreadyResolved) {
-					const msg = `Server startup timeout (5s) on port ${port}. Stdout received: ${stdoutReceived}. PID: ${serverProcess.pid}`;
+					const msg = `Server startup timeout (10s) on port ${port}. Stdout received: ${stdoutReceived}. PID: ${serverProcess.pid}`;
 					// ALWAYS log timeouts
 					console.error(`     ❌ ${msg}`);
 					reject(new Error(msg));
 				}
-			}, 5000);
+			}, 10_000);
 		});
 
 		try {
@@ -426,9 +426,9 @@ function analyzeServerCrash(serverOutput: string, exitCode: number): boolean {
 	const httpRequestPattern =
 		/\[\s*(INFO|WARN|ERROR)\s*\]\s+(GET|POST|PUT|DELETE|PATCH|OPTIONS)\s+\/\S+\s+\d{3}\s+\d+ms/;
 	const hasHttpLogs = httpRequestPattern.test(serverOutput);
-	// Note: Use includes() without the backticks to match both `dev:only-for-e2e` and 'dev:only-for-e2e'
+	// Note: Use includes() without the backticks to match both `start:only-for-e2e` and 'start:only-for-e2e'
 	const hasNpmLifecycleError =
-		serverOutput.includes('npm error Lifecycle script') && serverOutput.includes('dev:only-for-e2e');
+		serverOutput.includes('npm error Lifecycle script') && serverOutput.includes('start:only-for-e2e');
 
 	if (exitCode === 1 && hasHttpLogs && hasNpmLifecycleError) {
 		// This is the exact pattern from normal test completion
@@ -497,6 +497,11 @@ async function globalSetupWebServer(config: FullConfig) {
 		}
 		console.log('');
 	}
+
+	// Build backend once before spawning all workers (avoids 5× parallel tsx compilations)
+	console.log('🔨 Building backend for E2E (once for all workers)...');
+	await execAsync('npm run build:for-e2e --workspace=web-backend', { cwd: projectRoot });
+	console.log('✅ Backend built successfully (dist/server-test)');
 
 	// Calculate base port from WORKSPACE_ID for parallel testing across workspaces
 	// WORKSPACE_ID=0 → 4000-4999, WORKSPACE_ID=1 → 5000-5999, WORKSPACE_ID=2 → 6000-6999, etc.

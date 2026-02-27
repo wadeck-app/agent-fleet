@@ -87,7 +87,7 @@ try {
 		entryPoints: ['src/server.ts'],
 
 		// SINGLE BUNDLE mode (current)
-		outfile: 'dist/server',
+		outfile: process.env.OUTFILE || 'dist/server',
 
 		// CODE SPLITTING mode (uncomment to enable, comment outfile above)
 		// outdir: 'dist',
