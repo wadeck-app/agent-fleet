@@ -11,7 +11,6 @@ import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import { useDragAndDrop } from '@framework/hooks2/form/useDragAndDrop';
 import { useDialogParam } from '@framework/hooks/useDialogParam';
-import { cn } from '@framework/lib/utils';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { Project } from '@shared/api/projects.contract';
 import type { Ticket, TicketStatus } from '@shared/api/tickets.contract';
@@ -209,7 +208,7 @@ export function TicketsPage() {
 			)}
 
 			{localTickets.length > 0 && (
-				<div className={cn('transition-opacity duration-300', isSaving && 'opacity-60 pointer-events-none')}>
+				<div className="relative">
 					<DndContext sensors={dnd.sensors} collisionDetection={closestCenter} onDragEnd={dnd.handleDragEnd}>
 						<SortableContext items={dnd.sortableIds} strategy={verticalListSortingStrategy}>
 							<div className="space-y-2">
@@ -241,6 +240,7 @@ export function TicketsPage() {
 							</div>
 						</SortableContext>
 					</DndContext>
+					{isSaving && <div className="absolute inset-0 z-10 bg-background/60 backdrop-blur-sm" />}
 				</div>
 			)}
 

@@ -15,7 +15,6 @@ import { LoadingSpinner } from '@framework/components/loading/LoadingSpinner';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import { useListItems } from '@framework/hooks2/form/useListItems';
-import { cn } from '@framework/lib/utils';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { Ticket, TicketStatus } from '@shared/api/tickets.contract';
 import { ArrowLeft, Trash2 } from 'lucide-react';
@@ -338,12 +337,7 @@ export function TicketDetailPage() {
 
 			<div className="space-y-6">
 				{/* Header Row: Title, Status, Delete */}
-				<div
-					className={cn(
-						'flex items-start gap-4 transition-opacity duration-300',
-						(savingField === 'title' || savingField === 'status') && 'opacity-60 pointer-events-none'
-					)}
-				>
+				<div className="relative flex items-start gap-4">
 					<div className="flex-1">
 						<Label htmlFor="ticket-title">Title</Label>
 						<Input
@@ -379,15 +373,13 @@ export function TicketDetailPage() {
 							Delete
 						</Button>
 					</div>
+					{(savingField === 'title' || savingField === 'status') && (
+						<div className="absolute inset-0 z-10 bg-background/60 backdrop-blur-sm" />
+					)}
 				</div>
 
 				{/* Description */}
-				<div
-					className={cn(
-						'transition-opacity duration-300',
-						savingField === 'description' && 'opacity-60 pointer-events-none'
-					)}
-				>
+				<div className="relative">
 					<Label htmlFor="ticket-description">Description</Label>
 					<Textarea
 						id="ticket-description"
@@ -397,15 +389,13 @@ export function TicketDetailPage() {
 						placeholder="Ticket description"
 						rows={6}
 					/>
+					{savingField === 'description' && (
+						<div className="absolute inset-0 z-10 bg-background/60 backdrop-blur-sm" />
+					)}
 				</div>
 
 				{/* Labels */}
-				<div
-					className={cn(
-						'transition-opacity duration-300',
-						savingField === 'labels' && 'opacity-60 pointer-events-none'
-					)}
-				>
+				<div className="relative">
 					<Label>Labels</Label>
 					<div className="space-y-2">
 						{/* Selected labels */}
@@ -458,15 +448,13 @@ export function TicketDetailPage() {
 							)}
 						</div>
 					</div>
+					{savingField === 'labels' && (
+						<div className="absolute inset-0 z-10 bg-background/60 backdrop-blur-sm" />
+					)}
 				</div>
 
 				{/* Fields (Key-Value Pairs) */}
-				<div
-					className={cn(
-						'transition-opacity duration-300',
-						savingField === 'fields' && 'opacity-60 pointer-events-none'
-					)}
-				>
+				<div className="relative">
 					<EditableListField
 						label="Custom Fields"
 						items={fieldsItems}
@@ -479,6 +467,9 @@ export function TicketDetailPage() {
 					<Button variant="outline" size="sm" onClick={handleFieldsSave} className="mt-2">
 						Save Fields
 					</Button>
+					{savingField === 'fields' && (
+						<div className="absolute inset-0 z-10 bg-background/60 backdrop-blur-sm" />
+					)}
 				</div>
 
 				{/* Sub-tickets */}
