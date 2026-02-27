@@ -219,6 +219,9 @@ export class WorkerCoordinator {
 				void this.eventBridge.sendToBackend('task_completed', {
 					taskId: message.taskId,
 					flowResult: message.result,
+					newStatus: message.newStatus,
+					ticketId: message.ticketId,
+					ticketStatus: message.ticketStatus,
 				});
 
 				// Try to assign next task to this now-idle worker
@@ -235,6 +238,9 @@ export class WorkerCoordinator {
 						status: 'failed',
 						error: message.error,
 					},
+					newStatus: message.newStatus,
+					ticketId: message.ticketId,
+					ticketStatus: message.ticketStatus,
 				});
 
 				// Try to assign next task to this now-idle worker

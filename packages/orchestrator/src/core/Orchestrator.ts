@@ -5,6 +5,7 @@ import { RestAPI } from 'orchestrator/core/RestAPI';
 import { TaskManager } from 'orchestrator/core/TaskManager';
 import { WorkerCoordinator } from 'orchestrator/core/WorkerCoordinator';
 import { MetricsCollector } from 'orchestrator/metrics/MetricsCollector';
+import { EventSubscriptionRegistry } from 'orchestrator/registry/EventSubscriptionRegistry';
 import { StateSnapshotService } from 'orchestrator/state/StateSnapshotService';
 import { WorkerWebSocketServer } from 'orchestrator/websocket/WorkerWebSocketServer';
 import { type Shutdownable } from 'shared-common/Shutdownable';
@@ -28,6 +29,7 @@ export class Orchestrator implements Shutdownable {
 	private taskManager: TaskManager;
 	private workerCoordinator: WorkerCoordinator;
 	private backendEventBridge: BackendEventBridge;
+	private eventSubscriptionRegistry: EventSubscriptionRegistry;
 	private interventionManager?: InterventionManager;
 	private wsServer?: WorkerWebSocketServer;
 	private restAPI?: RestAPI;
@@ -48,6 +50,7 @@ export class Orchestrator implements Shutdownable {
 		this.stateManager = new StateManager();
 		this.taskManager = new TaskManager(this.stateManager);
 		this.backendEventBridge = new BackendEventBridge();
+		this.eventSubscriptionRegistry = new EventSubscriptionRegistry();
 		this.workerCoordinator = new WorkerCoordinator(this.backendEventBridge, this.stateManager);
 		this.startTime = new Date();
 
@@ -91,6 +94,9 @@ export class Orchestrator implements Shutdownable {
 		// Inject flow discovery registry into TaskManager for flow validation
 		const flowRegistry = this.wsServer.getConnectionManager().getFlowDiscoveryRegistry();
 		this.taskManager.setFlowDiscoveryRegistry(flowRegistry);
+
+		// Inject event subscription registry into flow discovery registry
+		flowRegistry.setEventSubscriptionRegistry(this.eventSubscriptionRegistry);
 
 		// Create workspace manager
 		this.workspaceManager = new WorkspaceManager(this.projectRoot);
@@ -257,5 +263,12 @@ export class Orchestrator implements Shutdownable {
 	 */
 	getBackendEventBridge(): BackendEventBridge {
 		return this.backendEventBridge;
+	}
+
+	/**
+	 * Get the event subscription registry instance
+	 */
+	getEventSubscriptionRegistry(): EventSubscriptionRegistry {
+		return this.eventSubscriptionRegistry;
 	}
 }

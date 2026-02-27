@@ -26,6 +26,7 @@ import { ProjectsPage } from '@app/pages/projects/ProjectsPage';
 import { TaskDetailSplitPage } from '@app/pages/tasks/TaskDetailSplitPage';
 import { TaskDetailStackedPage } from '@app/pages/tasks/TaskDetailStackedPage';
 import { TasksPage } from '@app/pages/tasks/TasksPage';
+import { TicketDetailPage } from '@app/pages/tickets/TicketDetailPage';
 import { TicketsPage } from '@app/pages/tickets/TicketsPage';
 import { WorkersPage } from '@app/pages/workers/WorkersPage';
 import { WorkspacesPage } from '@app/pages/workspaces/WorkspacesPage';
@@ -59,6 +60,7 @@ function Layout() {
 						<Route path="/tasks/:id/logs-stacked" element={<TaskDetailStackedPage />} />
 						<Route path="/tasks/:id" element={<TaskDetailStackedPage />} />
 						<Route path="/tickets" element={<TicketsPage />} />
+						<Route path="/tickets/:id" element={<TicketDetailPage />} />
 						<Route path="/projects" element={<ProjectsPage />} />
 						<Route path="/projects-v2" element={<ProjectsV2Page />} />
 						<Route path="/projects/:projectId/board" element={<ProjectBoardPage />} />

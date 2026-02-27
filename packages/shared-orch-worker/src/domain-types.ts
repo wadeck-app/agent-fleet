@@ -33,6 +33,7 @@ export interface FlowMetadata {
 		};
 		suggestion?: string;
 	}>;
+	trigger?: FlowTrigger;
 }
 
 export enum TaskStatus {
@@ -188,6 +189,15 @@ export interface Intervention {
 	timeout?: InterventionTimeout;
 
 	response?: InterventionResponse;
+}
+
+/**
+ * Flow trigger configuration for event-based execution
+ */
+export interface FlowTrigger {
+	type: 'event';
+	event: string;
+	filter?: Record<string, string | undefined>;
 }
 
 /**

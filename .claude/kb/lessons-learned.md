@@ -5549,12 +5549,14 @@ import remarkGfm from 'remark-gfm';
 **Problem**: The backend uses `STORAGE_MODE || 'file'` as default. The E2E global setup sets `E2E_MODE=true` and `USE_PRODUCTION_DB=false`, but never sets `STORAGE_MODE=memory`. Despite comments saying "safe with in-memory DB", all E2E backends were writing to `./data/*.json`. This caused test data pollution across runs: a run that crashed mid-way left dirty files that broke subsequent runs.
 
 **Fix**: In `packages/web-backend/src/server.ts`, the `E2E_MODE=true` block now also forces `STORAGE_MODE=memory`:
+
 ```typescript
 if (process.env.E2E_MODE === 'true') {
-    process.env.USE_PRODUCTION_DB = 'false';
-    process.env.STORAGE_MODE = 'memory';  // ← added
+	process.env.USE_PRODUCTION_DB = 'false';
+	process.env.STORAGE_MODE = 'memory'; // ← added
 }
 ```
+
 Each E2E worker process (5 parallel backends) now gets a fully isolated `InMemoryStorage`. No shared file state between runs.
 
 **Reference**: `assistant-integration` repo used the same `USE_PRODUCTION_DB` flag but tied it directly to in-memory repositories, making it impossible to forget.
@@ -5564,16 +5566,17 @@ Each E2E worker process (5 parallel backends) now gets a fully isolated `InMemor
 **Problem**: `lazy-controller-plugin.ts` initialized controllers on first request using `router !== null` as guard. Under concurrent requests (common in E2E with 5 parallel backends), Request A would set `router` then `await loader()` (yielding), and Request B would see `router !== null`, return early, then try `handlerMap!.get(...)` while `handlerMap` was still `null`. This caused `TypeError: Cannot read properties of null (reading 'get')` 500 errors on early requests. The bug was latent but unmasked by switching to in-memory storage (faster init → tighter timing window).
 
 **Fix**: Use a single `initializationPromise` so all concurrent callers wait on the same initialization:
+
 ```typescript
 let initializationPromise: Promise<void> | null = null;
 
 const initializeController = async () => {
-    if (initializationPromise !== null) {
-        await initializationPromise;
-        return;
-    }
-    initializationPromise = doInitialize();
-    await initializationPromise;
+	if (initializationPromise !== null) {
+		await initializationPromise;
+		return;
+	}
+	initializationPromise = doInitialize();
+	await initializationPromise;
 };
 ```
 
@@ -5593,7 +5596,7 @@ await new Promise(resolve => setTimeout(resolve, 0));
 
 // ✅ Correct
 await waitFor(() => {
-    expect(result.current.state.someValue).toBe(expectedValue);
+	expect(result.current.state.someValue).toBe(expectedValue);
 });
 ```
 
@@ -5602,14 +5605,19 @@ await waitFor(() => {
 **Problem**: Hook tests that call `setActiveProject()` (which internally uses `queueMicrotask()` to flush URL state) and then immediately assert can race against the microtask. The assertion sees stale state.
 
 **Fix**: Wrap the post-action assertion in `waitFor()` to let the microtask queue drain before checking:
+
 ```typescript
-act(() => { result.current.setActiveProject('proj-2'); });
+act(() => {
+	result.current.setActiveProject('proj-2');
+});
 // ✅ Wait for queueMicrotask flush
 await waitFor(() => {
-    expect(result.current.state.activeProjectId).toBe('proj-2');
+	expect(result.current.state.activeProjectId).toBe('proj-2');
 });
-rerender(); rerender(); rerender();
+rerender();
+rerender();
+rerender();
 await waitFor(() => {
-    expect(result.current.state.activeProjectId).toBe('proj-2');
+	expect(result.current.state.activeProjectId).toBe('proj-2');
 });
 ```

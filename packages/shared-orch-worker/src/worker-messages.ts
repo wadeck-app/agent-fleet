@@ -2,7 +2,7 @@
 import type { ProtocolMessage, createMessageInternal_Timestamp } from 'shared-common/protocol';
 import { createMessageInternal } from 'shared-common/protocol';
 
-import type { FlowMetadata, TaskStatus } from './domain-types';
+import type { FlowMetadata, TaskStatus, TicketStatus } from './domain-types';
 
 export enum W2OMessageType {
 	// W2O Messages (Worker → Orchestrator)
@@ -80,6 +80,8 @@ export interface W2OTaskCompletedMessage extends W2OBaseMessage {
 	taskId: string;
 	newStatus?: TaskStatus;
 	result?: any;
+	ticketId?: string;
+	ticketStatus?: TicketStatus;
 }
 
 export interface W2OTaskFailedMessage extends W2OBaseMessage {
@@ -88,6 +90,8 @@ export interface W2OTaskFailedMessage extends W2OBaseMessage {
 	taskId: string;
 	error: string;
 	newStatus?: TaskStatus;
+	ticketId?: string;
+	ticketStatus?: TicketStatus;
 }
 
 export interface W2OTaskTraceUpdateMessage extends W2OBaseMessage {

@@ -870,6 +870,13 @@ export class FlowWorker implements Shutdownable {
 		};
 		const successStatus = resolveTaskStatus(flow.statusTransitions?.onSuccess, defaultOnSuccess);
 		const failureStatus = resolveTaskStatus(flow.statusTransitions?.onFailure, defaultOnFailure);
+		// Extract TicketStatus from StatusTransitionConfig object
+		const resolveTicketStatus = (
+			value: TaskStatus | import('flow-engine/types').StatusTransitionConfig | undefined
+		): import('shared-orch-worker/domain-types').TicketStatus | undefined =>
+			typeof value === 'object' ? value.ticket : undefined;
+		const successTicketStatus = resolveTicketStatus(flow.statusTransitions?.onSuccess);
+		const failureTicketStatus = resolveTicketStatus(flow.statusTransitions?.onFailure);
 
 		this.logger.info(` Executing flow: ${flow.name} (${flow.id})`);
 		this.sendTaskStarted(TaskStatus.IN_PROGRESS);
@@ -1014,7 +1021,9 @@ export class FlowWorker implements Shutdownable {
 						outputs: result.outputs,
 						trace: result.trace,
 					},
-					successStatus
+					successStatus,
+					this.currentTask?.ticketId,
+					successTicketStatus
 				);
 			} else {
 				this.logger.error(` Flow failed: ${result.error}`);
@@ -1022,7 +1031,12 @@ export class FlowWorker implements Shutdownable {
 				// // Update UI
 				// this.workerUIManager.taskFailed(result.error || 'Flow execution failed');
 
-				this.sendTaskFailed(result.error || 'Flow execution failed', failureStatus);
+				this.sendTaskFailed(
+					result.error || 'Flow execution failed',
+					failureStatus,
+					this.currentTask?.ticketId,
+					failureTicketStatus
+				);
 			}
 		} catch (error) {
 			this.logger.error(` Task execution error:`, error);
@@ -1037,7 +1051,12 @@ export class FlowWorker implements Shutdownable {
 			};
 
 			// Send failure with configured status
-			this.sendTaskFailed((error as Error).message, failureStatus);
+			this.sendTaskFailed(
+				(error as Error).message,
+				failureStatus,
+				this.currentTask?.ticketId,
+				failureTicketStatus
+			);
 		} finally {
 			// Release workspace
 			if (workspace) {
@@ -1155,7 +1174,12 @@ export class FlowWorker implements Shutdownable {
 	/**
 	 * Send task completed notification
 	 */
-	protected sendTaskCompleted(result?: any, newStatus?: TaskStatus): void {
+	protected sendTaskCompleted(
+		result?: any,
+		newStatus?: TaskStatus,
+		ticketId?: string,
+		ticketStatus?: import('shared-orch-worker/domain-types').TicketStatus
+	): void {
 		if (!this.currentTask) return;
 
 		this.sendMessage(
@@ -1164,6 +1188,8 @@ export class FlowWorker implements Shutdownable {
 				taskId: this.currentTask.id,
 				result,
 				newStatus,
+				ticketId,
+				ticketStatus,
 			})
 		);
 
@@ -1176,7 +1202,12 @@ export class FlowWorker implements Shutdownable {
 	/**
 	 * Send task failed notification
 	 */
-	protected sendTaskFailed(error: string, newStatus?: TaskStatus): void {
+	protected sendTaskFailed(
+		error: string,
+		newStatus?: TaskStatus,
+		ticketId?: string,
+		ticketStatus?: import('shared-orch-worker/domain-types').TicketStatus
+	): void {
 		if (!this.currentTask) return;
 
 		this.sendMessage(
@@ -1185,6 +1216,8 @@ export class FlowWorker implements Shutdownable {
 				taskId: this.currentTask.id,
 				error,
 				newStatus,
+				ticketId,
+				ticketStatus,
 			})
 		);
 

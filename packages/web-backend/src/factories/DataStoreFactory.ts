@@ -16,6 +16,7 @@ import type { WorkspaceMetadataEntity } from '@app/shared/api/workspaces.contrac
 
 import type { AuthService } from '../auth/AuthService';
 import { MockAuthService } from '../auth/MockAuthService';
+import { EventBus } from '../events/EventBus';
 import { LocalClaudeAgentExecutor } from '../providers/LocalClaudeAgentExecutor';
 import { BaseRepository } from '../repositories/BaseRepository';
 import { BooksRepository } from '../repositories/BooksRepository';
@@ -102,6 +103,7 @@ export class DataStoreFactory {
 	private orchestratorWrapper: OrchestratorWrapper;
 	private orchestratorEventBridge?: unknown; // OrchestratorEventBridge (using unknown to avoid circular import)
 	private orchestratorEventHandler?: OrchestratorEventHandler;
+	private readonly eventBus = new EventBus();
 
 	constructor(storageMode: 'memory' | 'file' | 'mariadb' = 'file', orchestrator: Orchestrator) {
 		// Create primary storage based on mode
@@ -275,7 +277,13 @@ export class DataStoreFactory {
 			const agentExecutor = new LocalClaudeAgentExecutor();
 
 			// Create TicketsService
-			this.ticketsService = new TicketsService(ticketsRepo, eventBroadcaster, tasksRepo, agentExecutor);
+			this.ticketsService = new TicketsService(
+				ticketsRepo,
+				eventBroadcaster,
+				tasksRepo,
+				agentExecutor,
+				this.eventBus
+			);
 		}
 
 		return this.ticketsService;
@@ -563,7 +571,8 @@ export class DataStoreFactory {
 				tasksService,
 				interventionsService,
 				workersService,
-				eventBroadcaster
+				eventBroadcaster,
+				this.getTicketsService()
 			);
 		}
 
@@ -580,6 +589,22 @@ export class DataStoreFactory {
 
 		backendEventBridge.registerHandler(async (event: string, data: unknown) => {
 			await handler.handleOrchestratorEvent(event, data);
+		});
+
+		// Wire EventBus → EventSubscriptionRegistry → TaskManager
+		this.eventBus.on('ticket.status.changed', async payload => {
+			const registry = this.orchestrator.getEventSubscriptionRegistry();
+			const matches = registry.findMatching({
+				event: 'ticket.status.changed',
+				payload: { newStatus: payload.newStatus, projectId: payload.projectId },
+			});
+			for (const sub of matches) {
+				await this.orchestrator.getTaskManager().createTask(`ticket.status.changed: ${payload.ticketId}`, {
+					flowId: sub.flowId,
+					projectId: payload.projectId,
+					ticketId: payload.ticketId,
+				});
+			}
 		});
 
 		log.info('Orchestrator integration initialized');

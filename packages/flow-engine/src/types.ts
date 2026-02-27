@@ -4,7 +4,7 @@
  * This module defines all the core interfaces and types for the workflow engine,
  * including flow definitions, steps, workspaces, and execution traces.
  */
-import type { TaskStatus } from 'shared-orch-worker/domain-types';
+import type { TaskStatus, TicketStatus } from 'shared-orch-worker/domain-types';
 
 import type { ValidationIssue } from './validation/ValidationTypes';
 
@@ -691,11 +691,8 @@ export interface FlowHooks {
 export interface StatusTransitionConfig {
 	/** Task status to set */
 	task?: TaskStatus;
-	/**
-	 * Ticket status to set on the linked ticket (identified by Task.ticketId)
-	 * Uses string to avoid importing TicketStatus here (validated at runtime)
-	 */
-	ticket?: string;
+	/** Ticket status to set on the linked ticket (identified by Task.ticketId) */
+	ticket?: TicketStatus;
 }
 
 export interface StatusTransitions {

@@ -9,6 +9,8 @@
  */
 import type { FlowMetadata } from 'flow-engine/types';
 
+import type { EventSubscriptionRegistry } from './EventSubscriptionRegistry';
+
 /**
  * Error thrown when two workers report the same flow version with different hashes
  */
@@ -79,6 +81,15 @@ export class FlowDiscoveryRegistry {
 	private workers: Map<string, WorkerFlowRegistry> = new Map();
 	private flowVersionIndex: Map<string, FlowVersionEntry> = new Map();
 	private projectFlowIndex: Map<string, Map<string, FlowVersionEntry[]>> = new Map();
+
+	constructor(private eventSubscriptionRegistry?: EventSubscriptionRegistry) {}
+
+	/**
+	 * Set event subscription registry (called after initialization)
+	 */
+	setEventSubscriptionRegistry(registry: EventSubscriptionRegistry): void {
+		this.eventSubscriptionRegistry = registry;
+	}
 
 	/**
 	 * Register a worker with its flows
@@ -158,6 +169,9 @@ export class FlowDiscoveryRegistry {
 				this.projectFlowIndex.delete(worker.projectId);
 			}
 		}
+
+		// Unregister event subscriptions for this worker
+		this.eventSubscriptionRegistry?.unregisterWorker(workerId);
 	}
 
 	/**
@@ -381,6 +395,20 @@ export class FlowDiscoveryRegistry {
 			const filtered = flowEntries.filter(e => e.workerId !== workerId || e.version !== flow.version);
 			filtered.push(entry);
 			projectFlows.set(flow.id, filtered);
+
+			// Register event trigger subscription if flow has one
+			if (flow.trigger?.type === 'event' && this.eventSubscriptionRegistry) {
+				const worker = this.workers.get(workerId);
+				if (worker) {
+					this.eventSubscriptionRegistry.register({
+						workerId,
+						flowId: flow.id,
+						projectId,
+						event: flow.trigger.event,
+						filter: flow.trigger.filter,
+					});
+				}
+			}
 		}
 	}
 
