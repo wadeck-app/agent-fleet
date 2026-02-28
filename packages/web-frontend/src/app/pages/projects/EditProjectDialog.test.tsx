@@ -328,7 +328,7 @@ describe('EditProjectDialog', () => {
 		});
 
 		it('should trim whitespace from git fields', async () => {
-			const user = userEvent.setup();
+			const user = userEvent.setup({ delay: null });
 			const { projectsApi } = await import('./projects.api');
 
 			render(<EditProjectDialog {...defaultProps} />);
