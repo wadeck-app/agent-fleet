@@ -9,7 +9,7 @@ import type {
 	InterventionType,
 } from 'shared-orch-worker/domain-types';
 
-import { Storage } from './Storage';
+import type { IOrchestratorStorage } from '../storage/IOrchestratorStorage';
 import type { TaskManager } from './TaskManager';
 
 const log = createLogger('InterventionManager');
@@ -28,6 +28,7 @@ export class InterventionManager {
 	private pendingInterventions: Map<string, Intervention> = new Map();
 	private timeoutHandles: Map<string, NodeJS.Timeout> = new Map();
 	private taskManager: TaskManager;
+	private storage: IOrchestratorStorage;
 	private sendResponseCallback?: (
 		taskId: string,
 		interventionId: string,
@@ -41,8 +42,9 @@ export class InterventionManager {
 		cancelled?: boolean
 	) => boolean;
 
-	constructor(taskManager: TaskManager) {
+	constructor(taskManager: TaskManager, storage: IOrchestratorStorage) {
 		this.taskManager = taskManager;
+		this.storage = storage;
 	}
 
 	/**
@@ -111,7 +113,7 @@ export class InterventionManager {
 		}
 
 		// Save to storage
-		await Storage.saveIntervention(intervention);
+		await this.storage.saveIntervention(intervention);
 
 		// Track in memory
 		this.pendingInterventions.set(intervention.id, intervention);
@@ -137,21 +139,21 @@ export class InterventionManager {
 		}
 
 		// Load from storage
-		return await Storage.loadIntervention(interventionId);
+		return await this.storage.loadIntervention(interventionId);
 	}
 
 	/**
 	 * Get all interventions for a task
 	 */
 	async getInterventionsByTaskId(taskId: string): Promise<Intervention[]> {
-		return await Storage.findInterventionsByTaskId(taskId);
+		return await this.storage.findInterventionsByTaskId(taskId);
 	}
 
 	/**
 	 * Get pending interventions
 	 */
 	async getPendingInterventions(): Promise<Intervention[]> {
-		return await Storage.findInterventionsByStatus('pending');
+		return await this.storage.findInterventionsByStatus('pending');
 	}
 
 	/**
@@ -183,7 +185,7 @@ export class InterventionManager {
 		};
 
 		// Save to storage
-		await Storage.saveIntervention(intervention);
+		await this.storage.saveIntervention(intervention);
 
 		// Remove from pending and cancel timeout
 		this.pendingInterventions.delete(interventionId);
@@ -226,7 +228,7 @@ export class InterventionManager {
 		}
 
 		intervention.status = 'cancelled';
-		await Storage.saveIntervention(intervention);
+		await this.storage.saveIntervention(intervention);
 
 		this.pendingInterventions.delete(interventionId);
 		this.cancelTimeout(interventionId);
@@ -277,10 +279,12 @@ export class InterventionManager {
 				case 'fail':
 					// Fail the intervention (no response)
 					break;
+				default:
+					throw new Error(`Unrecognized onTimeout value: ${(intervention.timeout as any).onTimeout}`);
 			}
 		}
 
-		await Storage.saveIntervention(intervention);
+		await this.storage.saveIntervention(intervention);
 		this.pendingInterventions.delete(interventionId);
 		this.timeoutHandles.delete(interventionId);
 
@@ -351,7 +355,7 @@ export class InterventionManager {
 	 * Called on startup to restore state
 	 */
 	async loadPendingInterventions(): Promise<void> {
-		const pending = await Storage.findInterventionsByStatus('pending');
+		const pending = await this.storage.findInterventionsByStatus('pending');
 
 		for (const intervention of pending) {
 			this.pendingInterventions.set(intervention.id, intervention);

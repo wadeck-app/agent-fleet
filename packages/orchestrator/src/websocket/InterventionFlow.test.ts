@@ -15,6 +15,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { InterventionManager } from '../core/InterventionManager';
 import type { WorkerCoordinator } from '../core/WorkerCoordinator';
+import { InMemoryOrchestratorStorage } from '../storage/InMemoryOrchestratorStorage';
 import { WorkerWebSocketServer } from '../websocket/WorkerWebSocketServer';
 
 // Mock WebSocket class
@@ -87,6 +88,7 @@ describe('Intervention Flow Integration', () => {
 	let mockTaskManager: any;
 	let mockStateManager: StateManager;
 	let interventionManager: InterventionManager;
+	let interventionStorage: InMemoryOrchestratorStorage;
 	let mockWss: any;
 
 	beforeEach(() => {
@@ -146,8 +148,11 @@ describe('Intervention Flow Integration', () => {
 		vi.mocked(logger.info).mockImplementation(() => {});
 		vi.mocked(logger.error).mockImplementation(() => {});
 
-		// Create real InterventionManager (still uses TaskManager for now)
-		interventionManager = new InterventionManager(mockTaskManager);
+		// Create InMemoryOrchestratorStorage to avoid filesystem I/O in tests
+		interventionStorage = new InMemoryOrchestratorStorage();
+
+		// Create real InterventionManager with in-memory storage
+		interventionManager = new InterventionManager(mockTaskManager, interventionStorage);
 
 		// Create server
 		server = new WorkerWebSocketServer(mockWorkerCoordinator, mockStateManager, interventionManager, 3738);

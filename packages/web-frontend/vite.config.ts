@@ -159,6 +159,14 @@ export default defineConfig(({ mode }) => {
 				],
 			},
 		},
+		// Inject server-side env values (from root .env) into import.meta.env for browser use.
+		// Standard Vite env loading only reads the package directory, not the monorepo root,
+		// so PROJECT_ID and WORKSPACE_ID (defined in root .env) would otherwise be invisible
+		// to the browser. This makes getApiBaseUrl() compute the correct backend port.
+		define: {
+			'import.meta.env.VITE_PROJECT_ID': JSON.stringify(String(projectId)),
+			'import.meta.env.VITE_WORKSPACE_ID': JSON.stringify(String(workspaceId)),
+		},
 		// Don't optimize shared packages so they stay reactive to changes
 		optimizeDeps: {
 			exclude: ['@shared', 'shared-frontend-backend'],

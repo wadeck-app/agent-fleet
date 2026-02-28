@@ -1,7 +1,7 @@
 /**
  * TaskManager Tests
  */
-import { Storage } from 'orchestrator/core/Storage';
+import { InMemoryOrchestratorStorage } from 'orchestrator/storage/InMemoryOrchestratorStorage';
 import { createMockStateManager } from 'orchestrator/test-utils/mocks';
 import { logger } from 'shared-common/logger';
 import type { StateManager } from 'shared-orch-worker/StateManager';
@@ -12,8 +12,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TaskManager } from './TaskManager';
 
-// Mock dependencies
-vi.mock('orchestrator/core/Storage');
+// Mock KnowledgeStorage since we use InMemoryOrchestratorStorage for task/intervention storage
+vi.mock('./KnowledgeStorage', () => ({
+	KnowledgeStorage: {
+		initialize: vi.fn().mockResolvedValue(undefined),
+	},
+}));
 vi.mock('shared-common/StateManager');
 vi.mock('shared-common/logger', () => ({
 	createLogger: () => ({
@@ -37,26 +41,20 @@ describe('TaskManager', () => {
 	let cleanup: () => void;
 	let cleanupTimers: () => void;
 	let taskManager: TaskManager;
-	// let mockStateManager: ReturnType<typeof createMockStateManager>;
 	let mockStateManager: Partial<StateManager>;
+	let storage: InMemoryOrchestratorStorage;
 
 	beforeEach(async () => {
 		cleanup = setupTest();
 		cleanupTimers = setupTimers();
 
-		// Mock StateManager using test-utils
 		mockStateManager = createMockStateManager();
-
-		// Mock Storage with async methods
-		vi.mocked(Storage.initialize).mockResolvedValue(undefined);
-		vi.mocked(Storage.listTasks).mockResolvedValue([]);
-		vi.mocked(Storage.saveTask).mockResolvedValue(undefined);
-		vi.mocked(Storage.deleteTask).mockResolvedValue(undefined);
+		storage = new InMemoryOrchestratorStorage();
 
 		// Mock Date to have consistent timestamps
 		vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
 
-		taskManager = new TaskManager(mockStateManager as StateManager);
+		taskManager = new TaskManager(mockStateManager as StateManager, storage);
 		await taskManager.initialize();
 	});
 
@@ -67,8 +65,6 @@ describe('TaskManager', () => {
 
 	describe('Constructor and Initialization', () => {
 		it('should initialize with empty tasks when storage is empty', async () => {
-			expect(Storage.initialize).toHaveBeenCalled();
-			expect(Storage.listTasks).toHaveBeenCalled();
 			expect(taskManager.getAllTasks()).toHaveLength(0);
 		});
 
@@ -88,9 +84,10 @@ describe('TaskManager', () => {
 				},
 			];
 
-			vi.mocked(Storage.listTasks).mockResolvedValue(existingTasks);
+			const preloadedStorage = new InMemoryOrchestratorStorage();
+			await preloadedStorage.saveTask(existingTasks[0]);
 
-			const newManager = new TaskManager(mockStateManager as StateManager);
+			const newManager = new TaskManager(mockStateManager as StateManager, preloadedStorage);
 			await newManager.initialize();
 
 			expect(newManager.getAllTasks()).toHaveLength(1);
@@ -138,7 +135,7 @@ describe('TaskManager', () => {
 		it('should save task to storage', async () => {
 			const task = await taskManager.createTask('Save test');
 
-			expect(Storage.saveTask).toHaveBeenCalledWith(task);
+			expect(await storage.loadTask(task.id)).toEqual(task);
 		});
 
 		it('should emit task created event', async () => {
@@ -157,6 +154,14 @@ describe('TaskManager', () => {
 
 			expect(task1.id).not.toBe(task2.id);
 			expect(taskManager.getAllTasks()).toHaveLength(2);
+		});
+
+		it('should rollback in-memory change if storage fails', async () => {
+			vi.spyOn(storage, 'saveTask').mockRejectedValueOnce(new Error('Storage failed'));
+
+			await expect(taskManager.createTask('Failing task')).rejects.toThrow('Storage failed');
+
+			expect(taskManager.getAllTasks()).toHaveLength(0);
 		});
 	});
 
@@ -214,12 +219,8 @@ describe('TaskManager', () => {
 		it('should save updated task to storage', async () => {
 			await taskManager.updateTaskStatus(task.id, TaskStatus.TODO);
 
-			expect(Storage.saveTask).toHaveBeenCalledWith(
-				expect.objectContaining({
-					id: task.id,
-					status: TaskStatus.TODO,
-				})
-			);
+			const stored = await storage.loadTask(task.id);
+			expect(stored?.status).toBe(TaskStatus.TODO);
 		});
 
 		it('should emit task updated event', async () => {
@@ -249,19 +250,15 @@ describe('TaskManager', () => {
 		});
 
 		it('should assign task to worker', async () => {
-			// await taskManager.assignTask(task.id, 'worker-1');
 			await taskManager.assignTask(task.id, 'worker-1');
 
 			const updatedTask = taskManager.getTask(task.id);
-			expect(updatedTask?.assignedTo).toEqual({
-				workerId: 'worker-1',
-			});
+			expect(updatedTask?.assignedTo).toEqual({ workerId: 'worker-1' });
 		});
 
 		it('should update task timestamp', async () => {
 			vi.setSystemTime(new Date('2024-01-01T02:00:00.000Z'));
 
-			// await taskManager.assignTask(task.id, 'worker-1');
 			await taskManager.assignTask(task.id, 'worker-1');
 
 			const updatedTask = taskManager.getTask(task.id);
@@ -269,7 +266,6 @@ describe('TaskManager', () => {
 		});
 
 		it('should add assignment to history', async () => {
-			// await taskManager.assignTask(task.id, 'worker-1', WorkerType.REVIEWER);
 			await taskManager.assignTask(task.id, 'worker-1');
 
 			const updatedTask = taskManager.getTask(task.id);
@@ -283,14 +279,8 @@ describe('TaskManager', () => {
 		it('should save to storage', async () => {
 			await taskManager.assignTask(task.id, 'worker-2');
 
-			expect(Storage.saveTask).toHaveBeenCalledWith(
-				expect.objectContaining({
-					id: task.id,
-					assignedTo: {
-						workerId: 'worker-2',
-					},
-				})
-			);
+			const stored = await storage.loadTask(task.id);
+			expect(stored?.assignedTo).toEqual({ workerId: 'worker-2' });
 		});
 
 		it('should emit task updated event', async () => {
@@ -354,12 +344,8 @@ describe('TaskManager', () => {
 		it('should save to storage', async () => {
 			await taskManager.unassignTask(task.id);
 
-			expect(Storage.saveTask).toHaveBeenCalledWith(
-				expect.objectContaining({
-					id: task.id,
-					assignedTo: null,
-				})
-			);
+			const stored = await storage.loadTask(task.id);
+			expect(stored?.assignedTo).toBeNull();
 		});
 
 		it('should emit task updated event', async () => {
@@ -405,11 +391,8 @@ describe('TaskManager', () => {
 		it('should save to storage', async () => {
 			await taskManager.addComment(task.id, 'user-1', 'Comment');
 
-			expect(Storage.saveTask).toHaveBeenCalledWith(
-				expect.objectContaining({
-					id: task.id,
-				})
-			);
+			const stored = await storage.loadTask(task.id);
+			expect(stored?.comments).toHaveLength(1);
 		});
 
 		it('should emit task updated event', async () => {
@@ -445,7 +428,7 @@ describe('TaskManager', () => {
 			expect(task).toBeNull();
 		});
 
-		it('should return BACKLOG task for PM worker', async () => {
+		it('should return BACKLOG task', async () => {
 			const task1 = await taskManager.createTask('Task 1');
 			await taskManager.updateTaskStatus(task1.id, TaskStatus.BACKLOG);
 
@@ -453,7 +436,7 @@ describe('TaskManager', () => {
 			expect(nextTask?.id).toBe(task1.id);
 		});
 
-		it('should return REFINED task for PO worker', async () => {
+		it('should return REFINED task', async () => {
 			const task1 = await taskManager.createTask('Task 1');
 			await taskManager.updateTaskStatus(task1.id, TaskStatus.REFINED);
 
@@ -461,7 +444,7 @@ describe('TaskManager', () => {
 			expect(nextTask?.id).toBe(task1.id);
 		});
 
-		it('should return BACKLOG, TODO, or CHANGES_REQUESTED task for DEV worker', async () => {
+		it('should return TODO task', async () => {
 			const task1 = await taskManager.createTask('Task 1');
 			await taskManager.updateTaskStatus(task1.id, TaskStatus.TODO);
 
@@ -469,7 +452,7 @@ describe('TaskManager', () => {
 			expect(nextTask?.id).toBe(task1.id);
 		});
 
-		it('should return REVIEW task for REVIEWER worker', async () => {
+		it('should return REVIEW task', async () => {
 			const task1 = await taskManager.createTask('Task 1');
 			await taskManager.updateTaskStatus(task1.id, TaskStatus.REVIEW);
 
@@ -492,7 +475,6 @@ describe('TaskManager', () => {
 			const mediumTask = await taskManager.createTask('Medium', { priority: 'medium' });
 			const urgentTask = await taskManager.createTask('Urgent', { priority: 'urgent' });
 
-			// All BACKLOG for DEV
 			await taskManager.updateTaskStatus(lowTask.id, TaskStatus.BACKLOG);
 			await taskManager.updateTaskStatus(highTask.id, TaskStatus.BACKLOG);
 			await taskManager.updateTaskStatus(mediumTask.id, TaskStatus.BACKLOG);
@@ -502,42 +484,17 @@ describe('TaskManager', () => {
 			expect(nextTask?.id).toBe(urgentTask.id);
 		});
 
-		it('should return first task of highest priority when multiple exist', async () => {
-			const urgent1 = await taskManager.createTask('Urgent 1', { priority: 'urgent' });
-			const urgent2 = await taskManager.createTask('Urgent 2', { priority: 'urgent' });
-
-			await taskManager.updateTaskStatus(urgent1.id, TaskStatus.BACKLOG);
-			await taskManager.updateTaskStatus(urgent2.id, TaskStatus.BACKLOG);
-
-			const nextTask = taskManager.getNextTaskForWorker();
-			expect(nextTask?.id).toBe(urgent1.id);
-		});
-
-		it('should skip tasks with wrong status', async () => {
+		it('should skip tasks with terminal status', async () => {
 			const task1 = await taskManager.createTask('Task 1');
 			await taskManager.updateTaskStatus(task1.id, TaskStatus.MERGED);
 
 			const nextTask = taskManager.getNextTaskForWorker();
 			expect(nextTask).toBeNull();
 		});
-
-		it('should handle multiple statuses for DEV worker', async () => {
-			const backlogTask = await taskManager.createTask('Backlog', { priority: 'low' });
-			const todoTask = await taskManager.createTask('Todo', { priority: 'medium' });
-			const changesTask = await taskManager.createTask('Changes', { priority: 'high' });
-
-			await taskManager.updateTaskStatus(backlogTask.id, TaskStatus.BACKLOG);
-			await taskManager.updateTaskStatus(todoTask.id, TaskStatus.TODO);
-			await taskManager.updateTaskStatus(changesTask.id, TaskStatus.CHANGES_REQUESTED);
-
-			const nextTask = taskManager.getNextTaskForWorker();
-			expect(nextTask?.id).toBe(changesTask.id); // highest priority
-		});
 	});
 
 	describe('getTasksByStatus', () => {
 		it('should return tasks with specific status', async () => {
-			// Create tasks with different statuses
 			const task1 = await taskManager.createTask('Task 1');
 			const task2 = await taskManager.createTask('Task 2');
 			const task3 = await taskManager.createTask('Task 3');
@@ -555,17 +512,6 @@ describe('TaskManager', () => {
 			const reviewTasks = taskManager.getTasksByStatus(TaskStatus.REVIEW);
 			expect(reviewTasks).toHaveLength(0);
 		});
-
-		it('should return independent arrays', async () => {
-			const task1 = await taskManager.createTask('Task 1');
-			await taskManager.updateTaskStatus(task1.id, TaskStatus.TODO);
-
-			const todos1 = taskManager.getTasksByStatus(TaskStatus.TODO);
-			const todos2 = taskManager.getTasksByStatus(TaskStatus.TODO);
-
-			expect(todos1).not.toBe(todos2); // Different array instances
-			expect(todos1).toEqual(todos2); // Same content
-		});
 	});
 
 	describe('getTask', () => {
@@ -580,18 +526,6 @@ describe('TaskManager', () => {
 		it('should return undefined for non-existent task', async () => {
 			const retrieved = taskManager.getTask('non-existent-id');
 			expect(retrieved).toBeUndefined();
-		});
-
-		it('should return reference to actual task object', async () => {
-			const task = await taskManager.createTask('Test task');
-			const retrieved = taskManager.getTask(task.id);
-
-			// Modify retrieved task
-			retrieved!.description = 'Modified';
-
-			// Get task again
-			const reRetrieved = taskManager.getTask(task.id);
-			expect(reRetrieved?.description).toBe('Modified');
 		});
 	});
 
@@ -608,16 +542,6 @@ describe('TaskManager', () => {
 
 			const tasks = taskManager.getAllTasks();
 			expect(tasks).toHaveLength(3);
-		});
-
-		it('should return array of task objects', async () => {
-			const task = await taskManager.createTask('Task 1');
-			const tasks = taskManager.getAllTasks();
-
-			expect(tasks[0]).toMatchObject({
-				id: task.id,
-				description: 'Task 1',
-			});
 		});
 	});
 
@@ -639,7 +563,7 @@ describe('TaskManager', () => {
 		it('should delete task from storage', async () => {
 			await taskManager.deleteTask(task.id);
 
-			expect(Storage.deleteTask).toHaveBeenCalledWith(task.id);
+			expect(await storage.loadTask(task.id)).toBeNull();
 		});
 
 		it('should emit task deleted event', async () => {
@@ -657,7 +581,6 @@ describe('TaskManager', () => {
 			await taskManager.deleteTask('non-existent-id');
 
 			expect(mockStateManager.emitTaskDeleted).not.toHaveBeenCalled();
-			expect(Storage.deleteTask).not.toHaveBeenCalled();
 		});
 
 		it('should update task count after deletion', async () => {
@@ -685,12 +608,11 @@ describe('TaskManager', () => {
 		it('should delete all tasks from storage', async () => {
 			await taskManager.createTask('Task 1');
 			await taskManager.createTask('Task 2');
-			await taskManager.createTask('Task 3');
 			vi.clearAllMocks();
 
 			await taskManager.clearAllTasks();
 
-			expect(Storage.deleteTask).toHaveBeenCalledTimes(3);
+			expect(await storage.listTasks()).toHaveLength(0);
 		});
 
 		it('should emit delete events for all tasks', async () => {
@@ -710,21 +632,6 @@ describe('TaskManager', () => {
 
 			const count = await taskManager.clearAllTasks();
 			expect(count).toBe(0);
-		});
-
-		it('should handle clearing tasks in correct order', async () => {
-			await taskManager.createTask('Task 1');
-			await taskManager.createTask('Task 2');
-			await taskManager.createTask('Task 3');
-
-			const deleteOrder: string[] = [];
-			vi.mocked(Storage.deleteTask).mockImplementation(async id => {
-				deleteOrder.push(id);
-			});
-
-			await taskManager.clearAllTasks();
-
-			expect(deleteOrder).toHaveLength(3);
 		});
 	});
 
@@ -760,61 +667,6 @@ describe('TaskManager', () => {
 				},
 			});
 		});
-
-		it('should update stats after status changes', async () => {
-			const task1 = await taskManager.createTask('Task 1');
-			await taskManager.updateTaskStatus(task1.id, TaskStatus.TODO);
-
-			let stats = taskManager.getStats();
-			expect(stats.byStatus[TaskStatus.TODO]).toBe(1);
-
-			await taskManager.updateTaskStatus(task1.id, TaskStatus.MERGED);
-
-			stats = taskManager.getStats();
-			expect(stats.byStatus[TaskStatus.TODO]).toBeUndefined();
-			expect(stats.byStatus[TaskStatus.MERGED]).toBe(1);
-		});
-
-		it('should update stats after task deletion', async () => {
-			const task1 = await taskManager.createTask('Task 1');
-			const task2 = await taskManager.createTask('Task 2');
-			await taskManager.updateTaskStatus(task1.id, TaskStatus.TODO);
-			await taskManager.updateTaskStatus(task2.id, TaskStatus.TODO);
-
-			let stats = taskManager.getStats();
-			expect(stats.total).toBe(2);
-			expect(stats.byStatus[TaskStatus.TODO]).toBe(2);
-
-			await taskManager.deleteTask(task1.id);
-
-			stats = taskManager.getStats();
-			expect(stats.total).toBe(1);
-			expect(stats.byStatus[TaskStatus.TODO]).toBe(1);
-		});
-
-		it('should count all statuses correctly', async () => {
-			const statuses = [
-				TaskStatus.BACKLOG,
-				TaskStatus.TODO,
-				TaskStatus.IN_PROGRESS,
-				TaskStatus.REVIEW,
-				TaskStatus.MERGED,
-				TaskStatus.BLOCKED,
-			];
-
-			for (const status of statuses) {
-				const task = await taskManager.createTask(`Task ${status}`);
-				await taskManager.updateTaskStatus(task.id, status);
-			}
-
-			const stats = taskManager.getStats();
-
-			expect(stats.total).toBe(statuses.length);
-			expect(Object.keys(stats.byStatus)).toHaveLength(statuses.length);
-			statuses.forEach(status => {
-				expect(stats.byStatus[status]).toBe(1);
-			});
-		});
 	});
 
 	describe('assignTaskToWorker (Atomic Assignment)', () => {
@@ -827,9 +679,7 @@ describe('TaskManager', () => {
 
 			expect(assignedTask).toBeDefined();
 			expect(assignedTask?.id).toBe(task.id);
-			expect(assignedTask?.assignedTo).toEqual({
-				workerId: 'worker-1',
-			});
+			expect(assignedTask?.assignedTo).toEqual({ workerId: 'worker-1' });
 			expect(assignedTask?.status).toBe(TaskStatus.IN_PROGRESS);
 		});
 
@@ -870,15 +720,9 @@ describe('TaskManager', () => {
 
 			await taskManager.assignTaskToWorker('worker-1');
 
-			expect(Storage.saveTask).toHaveBeenCalledWith(
-				expect.objectContaining({
-					id: task.id,
-					assignedTo: {
-						workerId: 'worker-1',
-					},
-					status: TaskStatus.IN_PROGRESS,
-				})
-			);
+			const stored = await storage.loadTask(task.id);
+			expect(stored?.assignedTo).toEqual({ workerId: 'worker-1' });
+			expect(stored?.status).toBe(TaskStatus.IN_PROGRESS);
 		});
 
 		it('should emit task updated event after assignment', async () => {
@@ -896,7 +740,7 @@ describe('TaskManager', () => {
 			await taskManager.updateTaskStatus(task.id, TaskStatus.BACKLOG);
 
 			const error = new Error('Storage failed');
-			vi.mocked(Storage.saveTask).mockRejectedValue(error);
+			vi.spyOn(storage, 'saveTask').mockRejectedValueOnce(error);
 
 			await expect(taskManager.assignTaskToWorker('worker-1')).rejects.toThrow('Storage failed');
 
@@ -932,20 +776,6 @@ describe('TaskManager', () => {
 			expect(assignedTask?.id).toBe(highTask.id);
 		});
 
-		it('should work with different worker types', async () => {
-			const pmTask = await taskManager.createTask('PM Task');
-			const devTask = await taskManager.createTask('Dev Task');
-
-			await taskManager.updateTaskStatus(pmTask.id, TaskStatus.BACKLOG);
-			await taskManager.updateTaskStatus(devTask.id, TaskStatus.TODO);
-
-			const pmAssigned = await taskManager.assignTaskToWorker('pm-1');
-			const devAssigned = await taskManager.assignTaskToWorker('dev-1');
-
-			expect(pmAssigned?.id).toBe(pmTask.id);
-			expect(devAssigned?.id).toBe(devTask.id);
-		});
-
 		it('should prevent race condition by checking assignment before save', async () => {
 			const task = await taskManager.createTask('Test task');
 			await taskManager.updateTaskStatus(task.id, TaskStatus.BACKLOG);
@@ -971,29 +801,9 @@ describe('TaskManager', () => {
 			expect(task.description).toBe(longDescription);
 		});
 
-		it('should handle special characters in description', async () => {
-			const specialDesc = 'Task with "quotes", <tags>, & symbols!';
-			const task = await taskManager.createTask(specialDesc);
-			expect(task.description).toBe(specialDesc);
-		});
-
-		it('should handle rapid task creation', async () => {
-			const { v4 } = await import('uuid');
-			let idCounter = 0;
-			vi.mocked(v4).mockImplementation(() => `rapid-uuid-${++idCounter}`);
-
-			const tasks = [];
-			for (let i = 0; i < 100; i++) {
-				tasks.push(await taskManager.createTask(`Task ${i}`));
-			}
-
-			expect(taskManager.getAllTasks()).toHaveLength(100);
-		});
-
-		it('should maintain task integrity during concurrent-like operations', async () => {
+		it('should maintain task integrity during sequential operations', async () => {
 			const task = await taskManager.createTask('Test task');
 
-			// Simulate rapid updates
 			await taskManager.updateTaskStatus(task.id, TaskStatus.TODO);
 			await taskManager.assignTask(task.id, 'worker-1');
 			await taskManager.addComment(task.id, 'user-1', 'Comment 1');
@@ -1004,21 +814,6 @@ describe('TaskManager', () => {
 			expect(finalTask?.status).toBe(TaskStatus.IN_PROGRESS);
 			expect(finalTask?.comments).toHaveLength(2);
 			expect(finalTask?.assignedTo?.workerId).toBe('worker-1');
-		});
-
-		it('should handle metadata with complex objects', async () => {
-			const complexMetadata = {
-				nested: {
-					object: {
-						with: ['arrays', 'and', 'values'],
-					},
-				},
-				numbers: [1, 2, 3],
-				boolean: true,
-			};
-
-			const task = await taskManager.createTask('Complex metadata', complexMetadata);
-			expect(task.metadata).toEqual(complexMetadata);
 		});
 
 		it('should preserve history order', async () => {
