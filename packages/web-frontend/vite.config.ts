@@ -41,10 +41,24 @@ function loadEnvFiles(basePath: string, mode: string): Record<string, string> {
 		parseEnvFile(content);
 	}
 
+	// Load root .env.local (local overrides for shared config, e.g. WORKSPACE_ID)
+	const rootEnvLocalPath = path.join(basePath, '../../.env.local');
+	if (fs.existsSync(rootEnvLocalPath)) {
+		const content = fs.readFileSync(rootEnvLocalPath, 'utf-8');
+		parseEnvFile(content);
+	}
+
 	// Load package .env (overrides root .env if same variables)
 	const packageEnvPath = path.join(basePath, '.env');
 	if (fs.existsSync(packageEnvPath)) {
 		const content = fs.readFileSync(packageEnvPath, 'utf-8');
+		parseEnvFile(content);
+	}
+
+	// Load package .env.local (local overrides for package config)
+	const packageEnvLocalPath = path.join(basePath, '.env.local');
+	if (fs.existsSync(packageEnvLocalPath)) {
+		const content = fs.readFileSync(packageEnvLocalPath, 'utf-8');
 		parseEnvFile(content);
 	}
 
