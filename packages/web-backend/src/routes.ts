@@ -8,6 +8,7 @@ const routes: RouteDefinition[] = [
 	['/api/auth', () => import('./controllers/AuthController')],
 	['/api/ingredients', () => import('./controllers/IngredientsController')],
 	['/api/books', () => import('./controllers/BooksController')],
+	['/api/products', () => import('./controllers/ProductsController')],
 	['/api/dashboard', () => import('./controllers/DashboardController')],
 	['/api/workers', () => import('./controllers/WorkersController')],
 	['/api/flows', () => import('./controllers/FlowsController')],

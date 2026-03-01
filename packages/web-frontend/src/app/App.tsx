@@ -9,6 +9,20 @@ import { TransportProvider } from '@transport/TransportProvider';
 import { API_BASE_URL } from '@app/api/config';
 import { DesktopSidebar } from '@app/components/navigation/DesktopSidebar';
 import { MobileSidebar } from '@app/components/navigation/MobileSidebar';
+// Lego Approach 1 — Widget Isolated
+import { S1Page as LegoA1S1Page } from '@app/pages/_lego/_1_widget-isolated/S1_SimpleTable/S1Page';
+import { S2Page as LegoA1S2Page } from '@app/pages/_lego/_1_widget-isolated/S2_TablePagination/S2Page';
+import { S3Page as LegoA1S3Page } from '@app/pages/_lego/_1_widget-isolated/S3_FullFeatured/S3Page';
+import { S4Page as LegoA1S4Page } from '@app/pages/_lego/_1_widget-isolated/S4_GridPopup/S4Page';
+import { S5Page as LegoA1S5Page } from '@app/pages/_lego/_1_widget-isolated/S5_Carousel/S5Page';
+import { S6Page as LegoA1S6Page } from '@app/pages/_lego/_1_widget-isolated/S6_ItemDetail/S6Page';
+// Lego Approach 2 — Context Provider
+import { S1Page as LegoA2S1Page } from '@app/pages/_lego/_2_context-provider/S1_SimpleTable/S1Page';
+import { S2Page as LegoA2S2Page } from '@app/pages/_lego/_2_context-provider/S2_TablePagination/S2Page';
+import { S3Page as LegoA2S3Page } from '@app/pages/_lego/_2_context-provider/S3_FullFeatured/S3Page';
+import { S4Page as LegoA2S4Page } from '@app/pages/_lego/_2_context-provider/S4_GridPopup/S4Page';
+import { S5Page as LegoA2S5Page } from '@app/pages/_lego/_2_context-provider/S5_Carousel/S5Page';
+import { S6Page as LegoA2S6Page } from '@app/pages/_lego/_2_context-provider/S6_ItemDetail/S6Page';
 import { LoginPage } from '@app/pages/auth/LoginPage';
 import { ProtectedRoute } from '@app/pages/auth/ProtectedRoute';
 import { BooksPage } from '@app/pages/books/BooksPage';
@@ -84,6 +98,20 @@ function Layout() {
 						<Route path="/books/:id/:mode" element={<BooksPage />} />
 						<Route path="/flows/new" element={<FlowEditorPage />} />
 						<Route path="/flows/:flowId/edit" element={<FlowEditorPage />} />
+						{/* Lego Approach 1 — Widget Isolated */}
+						<Route path="/lego/1/s1" element={<LegoA1S1Page />} />
+						<Route path="/lego/1/s2" element={<LegoA1S2Page />} />
+						<Route path="/lego/1/s3" element={<LegoA1S3Page />} />
+						<Route path="/lego/1/s4" element={<LegoA1S4Page />} />
+						<Route path="/lego/1/s5" element={<LegoA1S5Page />} />
+						<Route path="/lego/1/s6" element={<LegoA1S6Page />} />
+						{/* Lego Approach 2 — Context Provider */}
+						<Route path="/lego/2/s1" element={<LegoA2S1Page />} />
+						<Route path="/lego/2/s2" element={<LegoA2S2Page />} />
+						<Route path="/lego/2/s3" element={<LegoA2S3Page />} />
+						<Route path="/lego/2/s4" element={<LegoA2S4Page />} />
+						<Route path="/lego/2/s5" element={<LegoA2S5Page />} />
+						<Route path="/lego/2/s6" element={<LegoA2S6Page />} />
 						<Route path="/" element={<DashboardPage />} />
 					</Routes>
 				</ProtectedRoute>

@@ -1,5 +1,6 @@
 import {
 	BookOpen,
+	Boxes,
 	FolderKanban,
 	Layers,
 	LayoutDashboard,
@@ -103,5 +104,69 @@ export const navigationItems: NavItem[] = [
 		path: '/books',
 		label: 'Books',
 		icon: BookOpen,
+	},
+	{
+		type: 'separator',
+	},
+	// Lego Experiments — Framework architecture patterns
+	{
+		path: '/lego/1/s1',
+		label: 'Lego A1-S1: Simple Table',
+		icon: Table2,
+	},
+	{
+		path: '/lego/1/s2',
+		label: 'Lego A1-S2: Table + Pagination',
+		icon: Table2,
+	},
+	{
+		path: '/lego/1/s3',
+		label: 'Lego A1-S3: Full Featured',
+		icon: Table2,
+	},
+	{
+		path: '/lego/1/s4',
+		label: 'Lego A1-S4: Grid + CRUD',
+		icon: LayoutGrid,
+	},
+	{
+		path: '/lego/1/s5',
+		label: 'Lego A1-S5: Carousel',
+		icon: Layers,
+	},
+	{
+		path: '/lego/1/s6',
+		label: 'Lego A1-S6: Item Detail',
+		icon: Boxes,
+	},
+	{
+		path: '/lego/2/s1',
+		label: 'Lego A2-S1: Simple Table',
+		icon: Table2,
+	},
+	{
+		path: '/lego/2/s2',
+		label: 'Lego A2-S2: Table + Pagination',
+		icon: Table2,
+	},
+	{
+		path: '/lego/2/s3',
+		label: 'Lego A2-S3: Full Featured',
+		icon: Table2,
+	},
+	{
+		path: '/lego/2/s4',
+		label: 'Lego A2-S4: Grid + CRUD',
+		icon: LayoutGrid,
+	},
+	{
+		path: '/lego/2/s5',
+		label: 'Lego A2-S5: Carousel',
+		icon: Layers,
+	},
+	{
+		path: '/lego/2/s6',
+		label: 'Lego A2-S6: Item Detail',
+		icon: Boxes,
 	},
 ];

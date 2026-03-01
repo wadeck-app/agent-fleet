@@ -8,6 +8,7 @@ import { createLogger } from 'shared-common/logger';
 import type { Book } from '@app/shared/api/books.contract';
 import type { Ingredient } from '@app/shared/api/ingredients.contract';
 import type { Intervention } from '@app/shared/api/interventions.contract';
+import type { Product } from '@app/shared/api/products.contract';
 import type { Project } from '@app/shared/api/projects.contract';
 import type { Task } from '@app/shared/api/tasks.contract';
 import type { Ticket } from '@app/shared/api/tickets.contract';
@@ -23,6 +24,7 @@ import { BooksRepository } from '../repositories/BooksRepository';
 import { IngredientsRepository } from '../repositories/IngredientsRepository';
 import { InterventionsRepository } from '../repositories/InterventionsRepository';
 import { OrchestratorRepository } from '../repositories/OrchestratorRepository';
+import { ProductsRepository } from '../repositories/ProductsRepository';
 import { ProjectsRepository } from '../repositories/ProjectsRepository';
 import { ScriptProcessRepository } from '../repositories/ScriptProcessRepository';
 import { TasksRepository } from '../repositories/TasksRepository';
@@ -36,6 +38,7 @@ import { FlowsService } from '../services/FlowsService';
 import { IngredientsService } from '../services/IngredientsService';
 import { InterventionsService } from '../services/InterventionsService';
 import { OrchestratorEventHandler } from '../services/OrchestratorEventHandler';
+import { ProductsService } from '../services/ProductsService';
 import { ProjectsService } from '../services/ProjectsService';
 import { ScriptProcessManager } from '../services/ScriptProcessManager';
 import { ScriptProcessService } from '../services/ScriptProcessService';
@@ -81,6 +84,7 @@ export class DataStoreFactory {
 	private referenceStorage: InMemoryStorage;
 	private ingredientsService?: IngredientsService;
 	private booksService?: BooksService;
+	private productsService?: ProductsService;
 	private dashboardService?: DashboardService;
 	private workersService?: WorkersService;
 	private flowsService?: FlowsService;
@@ -181,6 +185,24 @@ export class DataStoreFactory {
 		}
 
 		return this.booksService;
+	}
+
+	/**
+	 * Get or create ProductsService
+	 */
+	getProductsService(): ProductsService {
+		if (!this.productsService) {
+			// Create BaseRepository using referenceStorage (in-memory)
+			const baseRepo = new BaseRepository<Product>('products', this.referenceStorage);
+
+			// Create entity Repository
+			const repo = new ProductsRepository(baseRepo);
+
+			// Create Service
+			this.productsService = new ProductsService(repo);
+		}
+
+		return this.productsService;
 	}
 
 	/**
@@ -680,6 +702,12 @@ export class DataStoreFactory {
 		const { default: BooksController } = await import('../controllers/BooksController');
 		const service = this.getBooksService();
 		return new BooksController(service);
+	}
+
+	async getProductsController() {
+		const { default: ProductsController } = await import('../controllers/ProductsController');
+		const service = this.getProductsService();
+		return new ProductsController(service);
 	}
 
 	async getMonitoringController() {
