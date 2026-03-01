@@ -7,7 +7,7 @@
  * Focus on OBSERVABLE RESULTS: API calls, data presence, state changes.
  * Avoid implementation details: UI structure, dialog mechanics, button placement.
  *
- * Every test MUST pass for both Approach 1 (Widget-Isolated) and Approach 2 (Context-Provider).
+ * Every test MUST pass for all 4 approaches.
  * If a test fails for one approach, the TEST is wrong.
  *
  * Tests all scenarios: S1 (Simple), S2 (Pagination), S3 (Full-Featured)
@@ -30,6 +30,14 @@ import { S3Page as A1S3Page } from '@app/pages/_lego/_1_widget-isolated/S3_FullF
 import { S1Page as A2S1Page } from '@app/pages/_lego/_2_context-provider/S1_SimpleTable/S1Page';
 import { S2Page as A2S2Page } from '@app/pages/_lego/_2_context-provider/S2_TablePagination/S2Page';
 import { S3Page as A2S3Page } from '@app/pages/_lego/_2_context-provider/S3_FullFeatured/S3Page';
+// Approach 3: Feature-Hooks
+import { S1Page as A3S1Page } from '@app/pages/_lego/_3_feature-hooks/S1_SimpleTable/S1Page';
+import { S2Page as A3S2Page } from '@app/pages/_lego/_3_feature-hooks/S2_TablePagination/S2Page';
+import { S3Page as A3S3Page } from '@app/pages/_lego/_3_feature-hooks/S3_FullFeatured/S3Page';
+// Approach 4: Context-Children
+import { S1Page as A4S1Page } from '@app/pages/_lego/_4_context-children/S1_SimpleTable/S1Page';
+import { S2Page as A4S2Page } from '@app/pages/_lego/_4_context-children/S2_TablePagination/S2Page';
+import { S3Page as A4S3Page } from '@app/pages/_lego/_4_context-children/S3_FullFeatured/S3Page';
 
 import { mockProductList, mockProducts } from './productMocks';
 
@@ -135,6 +143,32 @@ const scenarios = [
 		PageComponent: A2S3Page,
 		features: ['search', 'pagination', 'sorting', 'column-visibility', 'bulk-delete', 'crud'],
 		path: '/lego/2/s3',
+	},
+	{ name: 'Approach3 S1', PageComponent: A3S1Page, features: [], path: '/lego/3/s1' },
+	{
+		name: 'Approach3 S2',
+		PageComponent: A3S2Page,
+		features: ['pagination', 'column-reordering'],
+		path: '/lego/3/s2',
+	},
+	{
+		name: 'Approach3 S3',
+		PageComponent: A3S3Page,
+		features: ['search', 'pagination', 'sorting', 'column-visibility', 'bulk-delete', 'crud'],
+		path: '/lego/3/s3',
+	},
+	{ name: 'Approach4 S1', PageComponent: A4S1Page, features: [], path: '/lego/4/s1' },
+	{
+		name: 'Approach4 S2',
+		PageComponent: A4S2Page,
+		features: ['pagination', 'column-reordering'],
+		path: '/lego/4/s2',
+	},
+	{
+		name: 'Approach4 S3',
+		PageComponent: A4S3Page,
+		features: ['search', 'pagination', 'sorting', 'column-visibility', 'bulk-delete', 'crud'],
+		path: '/lego/4/s3',
 	},
 ];
 

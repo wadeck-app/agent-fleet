@@ -1,11 +1,6 @@
 import { useMemo, useState } from 'react';
 
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from '@framework/components/overlays/DropdownMenu';
+import { ColumnVisibility } from '@framework/components/columns/ColumnVisibility';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import { SearchInput } from '@framework/components/search/SearchInput';
@@ -15,7 +10,7 @@ import type { ColumnDef } from '@framework/lego/types/ColTypes';
 import type { DataTableFeature } from '@framework/lego/types/FeatureTypes';
 import { resolveFeature } from '@framework/lego/types/FeatureTypes';
 import type { Product } from '@shared/api/products.contract';
-import { Check, Edit, Minus, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
+import { Check, Edit, Plus, Trash2, X } from 'lucide-react';
 
 import { useProductDomain } from './ProductDomainContext';
 
@@ -60,6 +55,7 @@ export function ViewDataTable<T extends Product = Product>({
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 	const [dialogOpen, setDialogOpen] = useState(false);
 	const [editingItem, setEditingItem] = useState<T | null>(null);
+	const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => new Set(columns.map(c => c.key as string)));
 
 	/**
 	 * Resolve features
@@ -140,7 +136,7 @@ export function ViewDataTable<T extends Product = Product>({
 						return (
 							<span>
 								{prefix}
-								{Number(value).toLocaleString()}
+								{typeof value === 'number' ? value.toFixed(2) : String(value)}
 								{suffix}
 							</span>
 						);
@@ -158,7 +154,7 @@ export function ViewDataTable<T extends Product = Product>({
 						return value ? (
 							<Check className="size-4 text-primary" />
 						) : (
-							<Minus className="size-4 text-muted-foreground" />
+							<X className="size-4 text-muted-foreground" />
 						);
 					}
 
@@ -172,6 +168,11 @@ export function ViewDataTable<T extends Product = Product>({
 				},
 			})),
 		[columns]
+	);
+
+	const filteredColumns = useMemo(
+		() => tableColumns.filter(col => visibleColumns.has(col.key as string)),
+		[tableColumns, visibleColumns]
 	);
 
 	/**
@@ -226,23 +227,14 @@ export function ViewDataTable<T extends Product = Product>({
 	 * Render actions menu
 	 */
 	const renderActions = (item: T) => (
-		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<Button variant="ghost" size="icon">
-					<MoreHorizontal className="size-4" />
-				</Button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end">
-				<DropdownMenuItem onClick={() => handleEdit(item)}>
-					<Edit className="mr-2 size-4" />
-					Edit
-				</DropdownMenuItem>
-				<DropdownMenuItem onClick={() => handleDelete(item)}>
-					<Trash2 className="mr-2 size-4" />
-					Delete
-				</DropdownMenuItem>
-			</DropdownMenuContent>
-		</DropdownMenu>
+		<div className="flex gap-1">
+			<Button onClick={() => handleEdit(item)} size="sm" variant="ghost">
+				<Edit className="size-3" />
+			</Button>
+			<Button onClick={() => handleDelete(item)} size="sm" variant="ghost">
+				<Trash2 className="size-3" />
+			</Button>
+		</div>
 	);
 
 	return (
@@ -254,11 +246,27 @@ export function ViewDataTable<T extends Product = Product>({
 						onChange={value => context.actions.setQuery({ search: value })}
 						onClear={() => context.actions.setQuery({ search: '' })}
 						placeholder="Search products..."
+						className="flex-1"
 					/>
+					{columnVisibilityConfig && (
+						<ColumnVisibility
+							columns={columns.map(c => ({ id: c.key as string, label: c.label }))}
+							visibleColumns={visibleColumns}
+							onToggle={id => {
+								const newSet = new Set(visibleColumns);
+								if (newSet.has(id)) newSet.delete(id);
+								else newSet.add(id);
+								setVisibleColumns(newSet);
+							}}
+							onReset={() => setVisibleColumns(new Set(columns.map(c => c.key as string)))}
+							onShowAll={() => setVisibleColumns(new Set(columns.map(c => c.key as string)))}
+							onHideAll={() => setVisibleColumns(new Set())}
+						/>
+					)}
 					{crudConfig && (
 						<Button onClick={handleCreate}>
-							<Plus className="mr-2 size-4" />
-							Create
+							<Plus className="size-4" />
+							Add
 						</Button>
 					)}
 				</div>
@@ -276,7 +284,7 @@ export function ViewDataTable<T extends Product = Product>({
 
 			<Table
 				data={context.items as T[]}
-				columns={tableColumns}
+				columns={filteredColumns}
 				getItemId={item => item.id}
 				selectable={!!bulkDeleteConfig}
 				selectedIds={selectedIds}
@@ -305,7 +313,7 @@ export function ViewDataTable<T extends Product = Product>({
 							}
 						: undefined
 				}
-				columnVisibility={!!columnVisibilityConfig}
+				columnVisibility={false}
 				getRowClassName={
 					enableRowClick
 						? item =>

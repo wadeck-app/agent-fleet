@@ -28,9 +28,9 @@ const columns = [
 	col.number<Product>('price', 'Price', { prefix: '$', sortable: true }),
 	col.enum<Product>('category', 'Category', PRODUCT_CATEGORIES, { badge: true }),
 	col.enum<Product>('status', 'Status', PRODUCT_STATUSES, { badge: true }),
-	col.number<Product>('rating', 'Rating', { sortable: true }),
-	col.number<Product>('stock', 'Stock', { sortable: true }),
 	col.boolean<Product>('featured', 'Featured'),
+	col.number<Product>('stock', 'Stock', { sortable: true }),
+	col.number<Product>('rating', 'Rating', { sortable: true }),
 	col.date<Product>('createdAt', 'Created'),
 ];
 

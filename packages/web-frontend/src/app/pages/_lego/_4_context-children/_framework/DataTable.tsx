@@ -367,7 +367,8 @@ DataTableRoot.Body = function Body() {
 			onSelectionChange={ctx.setSelectedIds}
 			renderActions={hasActions ? renderActions : undefined}
 			loading={ctx.loading}
-			sorting={sortConfigs.length > 0 ? { sortConfigs, onSortChange: handleSortChange } : undefined}
+			emptyMessage="No items found"
+			sorting={{ sortConfigs, onSortChange: handleSortChange }}
 		/>
 	);
 };
@@ -389,7 +390,9 @@ DataTableRoot.Pagination = function PaginationControls({
 	return (
 		<>
 			<div className="text-sm text-muted-foreground">
-				Showing {ctx.items.length} of {ctx.pagination.total} items
+				Showing {(ctx.pagination.page - 1) * ctx.pagination.pageSize + 1} to{' '}
+				{Math.min(ctx.pagination.page * ctx.pagination.pageSize, ctx.pagination.total)} of{' '}
+				{ctx.pagination.total} items
 			</div>
 			<div className="flex items-center gap-4">
 				<PageSizeSelector value={ctx.pageSize} onChange={ctx.setPageSize} options={pageSizes} />

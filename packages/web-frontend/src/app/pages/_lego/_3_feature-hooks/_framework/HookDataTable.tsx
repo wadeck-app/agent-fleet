@@ -1,18 +1,13 @@
 import { type MutableRefObject, useEffect, useMemo, useState } from 'react';
 
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from '@framework/components/overlays/DropdownMenu';
+import { ColumnVisibility } from '@framework/components/columns/ColumnVisibility';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import { SearchInput } from '@framework/components/search/SearchInput';
 import { Table } from '@framework/components/table/Table';
 import type { TableColumn } from '@framework/components/table/Table';
 import type { ColumnDef } from '@framework/lego';
-import { Check, Edit, Minus, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
+import { Check, Edit, Plus, Trash2, X } from 'lucide-react';
 
 import { useWidgetDataFetch } from '@app/pages/_lego/_1_widget-isolated/_framework/useWidgetDataFetch';
 
@@ -95,6 +90,8 @@ export function HookDataTable<T extends { id: string }>({
 	const bulkDeleteFeature = features.find(f => f.type === 'bulk-delete') as BulkDeleteFeatureHook | undefined;
 	const crudFeature = features.find(f => f.type === 'crud') as CrudFeatureHook | undefined;
 
+	const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => new Set(columns.map(c => c.key as string)));
+
 	// Convert ColumnDef to TableColumn
 	const tableColumns: TableColumn<T>[] = useMemo(
 		() =>
@@ -137,7 +134,7 @@ export function HookDataTable<T extends { id: string }>({
 						return value ? (
 							<Check className="size-4 text-primary" />
 						) : (
-							<Minus className="size-4 text-muted-foreground" />
+							<X className="size-4 text-muted-foreground" />
 						);
 					}
 
@@ -151,6 +148,11 @@ export function HookDataTable<T extends { id: string }>({
 				},
 			})),
 		[columns]
+	);
+
+	const filteredColumns = useMemo(
+		() => tableColumns.filter(col => visibleColumns.has(col.key as string)),
+		[tableColumns, visibleColumns]
 	);
 
 	// Build query from feature hooks
@@ -256,23 +258,14 @@ export function HookDataTable<T extends { id: string }>({
 
 	// Render actions dropdown
 	const renderActions = (item: T) => (
-		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<Button variant="ghost" size="icon">
-					<MoreHorizontal className="size-4" />
-				</Button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end">
-				<DropdownMenuItem onClick={() => handleEdit(item)}>
-					<Edit className="mr-2 size-4" />
-					Edit
-				</DropdownMenuItem>
-				<DropdownMenuItem onClick={() => handleDelete(item)}>
-					<Trash2 className="mr-2 size-4" />
-					Delete
-				</DropdownMenuItem>
-			</DropdownMenuContent>
-		</DropdownMenu>
+		<div className="flex gap-1">
+			<Button onClick={() => handleEdit(item)} size="sm" variant="ghost">
+				<Edit className="size-3" />
+			</Button>
+			<Button onClick={() => handleDelete(item)} size="sm" variant="ghost">
+				<Trash2 className="size-3" />
+			</Button>
+		</div>
 	);
 
 	return (
@@ -289,9 +282,24 @@ export function HookDataTable<T extends { id: string }>({
 							className="flex-1"
 						/>
 					)}
+					{columnVisibilityFeature && (
+						<ColumnVisibility
+							columns={columns.map(c => ({ id: c.key as string, label: c.label }))}
+							visibleColumns={visibleColumns}
+							onToggle={id => {
+								const newSet = new Set(visibleColumns);
+								if (newSet.has(id)) newSet.delete(id);
+								else newSet.add(id);
+								setVisibleColumns(newSet);
+							}}
+							onReset={() => setVisibleColumns(new Set(columns.map(c => c.key as string)))}
+							onShowAll={() => setVisibleColumns(new Set(columns.map(c => c.key as string)))}
+							onHideAll={() => setVisibleColumns(new Set())}
+						/>
+					)}
 					{crudFeature && (
 						<Button onClick={handleCreate}>
-							<Plus className="mr-2 size-4" />
+							<Plus className="size-4" />
 							Add
 						</Button>
 					)}
@@ -312,7 +320,7 @@ export function HookDataTable<T extends { id: string }>({
 			{/* Table component */}
 			<Table
 				data={items}
-				columns={tableColumns}
+				columns={filteredColumns}
 				getItemId={item => item.id}
 				selectable={!!bulkDeleteFeature}
 				selectedIds={selectedIds}
@@ -343,7 +351,7 @@ export function HookDataTable<T extends { id: string }>({
 							}
 						: undefined
 				}
-				columnVisibility={!!columnVisibilityFeature}
+				columnVisibility={false}
 				getRowClassName={onRowSelect ? () => 'cursor-pointer hover:bg-accent/20' : undefined}
 			/>
 

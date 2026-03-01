@@ -7,7 +7,7 @@
  * Focus on OBSERVABLE RESULTS: API calls, data mutations, form interactions.
  * Avoid implementation details: Dialog internals, form structure, specific UI elements.
  *
- * Every test MUST pass for both Approach 1 (Widget-Isolated) and Approach 2 (Context-Provider).
+ * Every test MUST pass for all 4 approaches.
  * If a test fails for one approach, the TEST is wrong.
  *
  * Tests only S3 (Full-Featured) scenarios which include CRUD functionality.
@@ -25,6 +25,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { S3Page as A1S3Page } from '@app/pages/_lego/_1_widget-isolated/S3_FullFeatured/S3Page';
 // Approach 2: Context-Provider
 import { S3Page as A2S3Page } from '@app/pages/_lego/_2_context-provider/S3_FullFeatured/S3Page';
+// Approach 3: Feature-Hooks
+import { S3Page as A3S3Page } from '@app/pages/_lego/_3_feature-hooks/S3_FullFeatured/S3Page';
+// Approach 4: Context-Children
+import { S3Page as A4S3Page } from '@app/pages/_lego/_4_context-children/S3_FullFeatured/S3Page';
 
 import { mockProducts as _mockProducts, mockProductList } from './productMocks';
 
@@ -95,6 +99,8 @@ const mocks = {
 const scenarios = [
 	{ name: 'Approach1 S3', PageComponent: A1S3Page, path: '/lego/1/s3' },
 	{ name: 'Approach2 S3', PageComponent: A2S3Page, path: '/lego/2/s3' },
+	{ name: 'Approach3 S3', PageComponent: A3S3Page, path: '/lego/3/s3' },
+	{ name: 'Approach4 S3', PageComponent: A4S3Page, path: '/lego/4/s3' },
 ];
 
 describe.each(scenarios)('Lego Products $name - CRUD Flows', ({ name: _name, PageComponent, path }) => {

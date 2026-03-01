@@ -28,10 +28,14 @@ const columns = [
 	col.date<Product>('createdAt', 'Created'),
 ];
 
+const readOnlyService = {
+	getProducts: productsService.getProducts,
+};
+
 export function S1Page() {
 	return (
 		<PageLayout>
-			<DataTable service={productsService} columns={columns}>
+			<DataTable service={readOnlyService} columns={columns}>
 				<div className="space-y-4">
 					<DataTable.Body />
 				</div>
