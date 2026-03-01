@@ -1,13 +1,11 @@
-import { type MutableRefObject, useCallback, useEffect, useState } from 'react';
+import { type MutableRefObject, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
 import { ColumnVisibility } from '@framework/components/columns/ColumnVisibility';
-import { Checkbox } from '@framework/components/forms/Checkbox';
-import { PageSizeSelector } from '@framework/components/pagination/PageSizeSelector';
-import { Pagination } from '@framework/components/pagination/Pagination';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import { SearchInput } from '@framework/components/search/SearchInput';
+import { Table, type TableColumn } from '@framework/components/table/Table';
 import type {
 	BulkDeleteConfig,
 	ColumnDef,
@@ -19,7 +17,7 @@ import type {
 	SortingConfig,
 } from '@framework/lego';
 import { resolveFeature } from '@framework/lego';
-import { ArrowDown, ArrowUp, Check, Edit, Plus, Trash2, X } from 'lucide-react';
+import { Check, Edit, Plus, Trash2, X } from 'lucide-react';
 
 import { useWidgetDataFetch } from './useWidgetDataFetch';
 import { useWidgetQuery } from './useWidgetQuery';
@@ -128,7 +126,57 @@ export function WidgetDataTable<T extends { id: string }>({
 		}
 	}, [refresh, onRefreshRef]);
 
-	const visibleColumnDefs = columns.filter(c => visibleColumns.has(c.key as string));
+	// Build TableColumn array from ColumnDef array using renderCellValue logic
+	const tableColumns: TableColumn<T>[] = useMemo(() => {
+		const renderCellValue = (item: T, col: ColumnDef<T>): ReactNode => {
+			if (col.render) return col.render(item);
+
+			const value = item[col.key];
+
+			if (col.type === 'boolean') {
+				return value ? (
+					<Check className="size-4 text-primary" />
+				) : (
+					<X className="size-4 text-muted-foreground" />
+				);
+			}
+
+			if (col.type === 'number' && typeof value === 'number') {
+				return (
+					<span>
+						{col.prefix}
+						{value.toFixed(2)}
+						{col.suffix}
+					</span>
+				);
+			}
+
+			if (col.type === 'enum' && col.badge) {
+				return <Badge variant="secondary">{String(value)}</Badge>;
+			}
+
+			if (col.type === 'date') {
+				if (value instanceof Date) {
+					return value.toLocaleDateString();
+				}
+				if (typeof value === 'string') {
+					return new Date(value).toLocaleDateString();
+				}
+			}
+
+			return String(value || '');
+		};
+
+		return columns.map(col => ({
+			key: col.key as string,
+			label: col.label,
+			sortable: col.sortable,
+			render: (item: T, _isEditing: boolean) => renderCellValue(item, col),
+		}));
+	}, [columns]);
+
+	// Filter visible columns for Table
+	const visibleTableColumns = tableColumns.filter(col => visibleColumns.has(col.key));
 
 	const handleSort = useCallback(
 		(key: string) => {
@@ -145,41 +193,6 @@ export function WidgetDataTable<T extends { id: string }>({
 		},
 		[sortState, setSort]
 	);
-
-	const renderCellValue = (item: T, col: ColumnDef<T>) => {
-		if (col.render) return col.render(item);
-
-		const value = item[col.key];
-
-		if (col.type === 'boolean') {
-			return value ? <Check className="size-4 text-primary" /> : <X className="size-4 text-muted-foreground" />;
-		}
-
-		if (col.type === 'number' && typeof value === 'number') {
-			return (
-				<span>
-					{col.prefix}
-					{value.toFixed(2)}
-					{col.suffix}
-				</span>
-			);
-		}
-
-		if (col.type === 'enum' && col.badge) {
-			return <Badge variant="secondary">{String(value)}</Badge>;
-		}
-
-		if (col.type === 'date') {
-			if (value instanceof Date) {
-				return value.toLocaleDateString();
-			}
-			if (typeof value === 'string') {
-				return new Date(value).toLocaleDateString();
-			}
-		}
-
-		return String(value || '');
-	};
 
 	const handleCreate = () => {
 		setEditingItem(null);
@@ -208,23 +221,19 @@ export function WidgetDataTable<T extends { id: string }>({
 		}
 	};
 
-	const toggleSelectAll = () => {
-		if (selectedIds.size === items.length) {
-			setSelectedIds(new Set());
-		} else {
-			setSelectedIds(new Set(items.map(i => i.id)));
-		}
-	};
-
-	const toggleSelect = (id: string) => {
-		const newSet = new Set(selectedIds);
-		if (newSet.has(id)) {
-			newSet.delete(id);
-		} else {
-			newSet.add(id);
-		}
-		setSelectedIds(newSet);
-	};
+	// Build renderActions function for CRUD buttons
+	const renderActions = crudConfig
+		? (item: T, _isEditing: boolean) => (
+				<div className="flex gap-1">
+					<Button onClick={() => handleEdit(item)} size="sm" variant="ghost">
+						<Edit className="size-3" />
+					</Button>
+					<Button onClick={() => handleDelete(item.id)} size="sm" variant="ghost">
+						<Trash2 className="size-3" />
+					</Button>
+				</div>
+			)
+		: undefined;
 
 	const handleDialogClose = () => {
 		setDialogOpen(false);
@@ -291,116 +300,38 @@ export function WidgetDataTable<T extends { id: string }>({
 				</BulkActionBar>
 			)}
 
-			<div className="flex-1 overflow-hidden rounded-lg border border-border bg-card">
-				<div className="h-full overflow-auto">
-					<table className="w-full">
-						<thead className="sticky top-0 bg-muted">
-							<tr>
-								{(bulkDeleteConfig || crudConfig) && (
-									<th className="w-12 p-2">
-										<Checkbox
-											checked={selectedIds.size === items.length && items.length > 0}
-											onCheckedChange={toggleSelectAll}
-										/>
-									</th>
-								)}
-								{visibleColumnDefs.map(col => (
-									<th key={col.key as string} className="p-2 text-left">
-										{col.sortable && sortingConfig ? (
-											<Button
-												variant="ghost"
-												onClick={() => handleSort(col.key as string)}
-												className="flex items-center gap-1 font-semibold"
-											>
-												{col.label}
-												{sortState?.key === col.key &&
-													(sortState.order === 'asc' ? (
-														<ArrowUp className="size-3" />
-													) : (
-														<ArrowDown className="size-3" />
-													))}
-											</Button>
-										) : (
-											<span className="font-semibold">{col.label}</span>
-										)}
-									</th>
-								))}
-								{crudConfig && <th className="w-24 p-2">Actions</th>}
-							</tr>
-						</thead>
-						<tbody>
-							{loading && (
-								<tr>
-									<td colSpan={visibleColumnDefs.length + 2} className="p-8 text-center">
-										Loading...
-									</td>
-								</tr>
-							)}
-							{!loading && items.length === 0 && (
-								<tr>
-									<td colSpan={visibleColumnDefs.length + 2} className="p-8 text-center">
-										No items found
-									</td>
-								</tr>
-							)}
-							{!loading &&
-								items.map(item => (
-									<tr key={item.id} className="border-t border-border hover:bg-muted/50">
-										{(bulkDeleteConfig || crudConfig) && (
-											<td className="p-2">
-												<Checkbox
-													checked={selectedIds.has(item.id)}
-													onCheckedChange={() => toggleSelect(item.id)}
-												/>
-											</td>
-										)}
-										{visibleColumnDefs.map(col => (
-											<td key={col.key as string} className="p-2">
-												{renderCellValue(item, col)}
-											</td>
-										))}
-										{crudConfig && (
-											<td className="p-2">
-												<div className="flex gap-1">
-													<Button onClick={() => handleEdit(item)} size="sm" variant="ghost">
-														<Edit className="size-3" />
-													</Button>
-													<Button
-														onClick={() => handleDelete(item.id)}
-														size="sm"
-														variant="ghost"
-													>
-														<Trash2 className="size-3" />
-													</Button>
-												</div>
-											</td>
-										)}
-									</tr>
-								))}
-						</tbody>
-					</table>
-				</div>
-			</div>
-
-			{paginationConfig && (
-				<div className="flex items-center justify-between">
-					<div className="text-sm text-muted-foreground">
-						Showing {items.length} of {pagination.total} items
-					</div>
-					<div className="flex items-center gap-4">
-						<PageSizeSelector
-							value={query.pageSize}
-							onChange={setPageSize}
-							options={paginationConfig.pageSizes || [10, 20, 50]}
-						/>
-						<Pagination
-							currentPage={pagination.page}
-							totalPages={pagination.totalPages}
-							onPageChange={setPage}
-						/>
-					</div>
-				</div>
-			)}
+			<Table
+				data={items}
+				columns={visibleTableColumns}
+				getItemId={item => item.id}
+				selectable={!!(bulkDeleteConfig || crudConfig)}
+				selectedIds={selectedIds}
+				onSelectionChange={setSelectedIds}
+				renderActions={renderActions}
+				loading={loading}
+				emptyMessage="No items found"
+				pagination={
+					paginationConfig
+						? {
+								currentPage: pagination.page,
+								totalPages: pagination.totalPages,
+								totalItems: pagination.total,
+								onPageChange: setPage,
+								pageSize: query.pageSize,
+								onPageSizeChange: setPageSize,
+								pageSizeOptions: paginationConfig.pageSizes || [10, 20, 50],
+							}
+						: undefined
+				}
+				sorting={
+					sortingConfig
+						? {
+								sortConfigs: sortState ? [{ key: sortState.key, direction: sortState.order }] : [],
+								onSortChange: handleSort,
+							}
+						: undefined
+				}
+			/>
 
 			{dialogOpen && crudConfig && crudConfig.dialog && (
 				<crudConfig.dialog item={editingItem} onSave={handleDialogSave} onClose={handleDialogClose} />

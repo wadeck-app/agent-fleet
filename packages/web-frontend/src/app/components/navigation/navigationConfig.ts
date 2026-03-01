@@ -136,4 +136,30 @@ export const navigationItems: NavItem[] = [
 			{ path: '/lego/2/s6', label: 'S6: Item Detail', icon: SplitSquareHorizontal },
 		],
 	},
+	{
+		type: 'group',
+		label: 'Lego — Feature Hooks',
+		icon: Boxes,
+		items: [
+			{ path: '/lego/3/s1', label: 'S1: Simple Table', icon: Table2 },
+			{ path: '/lego/3/s2', label: 'S2: Pagination', icon: Table2 },
+			{ path: '/lego/3/s3', label: 'S3: Full Featured', icon: Table2 },
+			{ path: '/lego/3/s4', label: 'S4: Grid + CRUD', icon: LayoutGrid },
+			{ path: '/lego/3/s5', label: 'S5: Carousel', icon: Layers },
+			{ path: '/lego/3/s6', label: 'S6: Item Detail', icon: SplitSquareHorizontal },
+		],
+	},
+	{
+		type: 'group',
+		label: 'Lego — Context Children',
+		icon: Boxes,
+		items: [
+			{ path: '/lego/4/s1', label: 'S1: Simple Table', icon: Table2 },
+			{ path: '/lego/4/s2', label: 'S2: Pagination', icon: Table2 },
+			{ path: '/lego/4/s3', label: 'S3: Full Featured', icon: Table2 },
+			{ path: '/lego/4/s4', label: 'S4: Grid + CRUD', icon: LayoutGrid },
+			{ path: '/lego/4/s5', label: 'S5: Carousel', icon: Layers },
+			{ path: '/lego/4/s6', label: 'S6: Item Detail', icon: SplitSquareHorizontal },
+		],
+	},
 ];

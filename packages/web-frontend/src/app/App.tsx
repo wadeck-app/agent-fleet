@@ -23,6 +23,20 @@ import { S3Page as LegoA2S3Page } from '@app/pages/_lego/_2_context-provider/S3_
 import { S4Page as LegoA2S4Page } from '@app/pages/_lego/_2_context-provider/S4_GridPopup/S4Page';
 import { S5Page as LegoA2S5Page } from '@app/pages/_lego/_2_context-provider/S5_Carousel/S5Page';
 import { S6Page as LegoA2S6Page } from '@app/pages/_lego/_2_context-provider/S6_ItemDetail/S6Page';
+// Lego Approach 3 — Feature Hooks
+import { S1Page as LegoA3S1Page } from '@app/pages/_lego/_3_feature-hooks/S1_SimpleTable/S1Page';
+import { S2Page as LegoA3S2Page } from '@app/pages/_lego/_3_feature-hooks/S2_TablePagination/S2Page';
+import { S3Page as LegoA3S3Page } from '@app/pages/_lego/_3_feature-hooks/S3_FullFeatured/S3Page';
+import { S4Page as LegoA3S4Page } from '@app/pages/_lego/_3_feature-hooks/S4_GridPopup/S4Page';
+import { S5Page as LegoA3S5Page } from '@app/pages/_lego/_3_feature-hooks/S5_Carousel/S5Page';
+import { S6Page as LegoA3S6Page } from '@app/pages/_lego/_3_feature-hooks/S6_ItemDetail/S6Page';
+// Lego Approach 4 — Context Children
+import { S1Page as LegoA4S1Page } from '@app/pages/_lego/_4_context-children/S1_SimpleTable/S1Page';
+import { S2Page as LegoA4S2Page } from '@app/pages/_lego/_4_context-children/S2_TablePagination/S2Page';
+import { S3Page as LegoA4S3Page } from '@app/pages/_lego/_4_context-children/S3_FullFeatured/S3Page';
+import { S4Page as LegoA4S4Page } from '@app/pages/_lego/_4_context-children/S4_GridPopup/S4Page';
+import { S5Page as LegoA4S5Page } from '@app/pages/_lego/_4_context-children/S5_Carousel/S5Page';
+import { S6Page as LegoA4S6Page } from '@app/pages/_lego/_4_context-children/S6_ItemDetail/S6Page';
 import { LoginPage } from '@app/pages/auth/LoginPage';
 import { ProtectedRoute } from '@app/pages/auth/ProtectedRoute';
 import { BooksPage } from '@app/pages/books/BooksPage';
@@ -112,6 +126,20 @@ function Layout() {
 						<Route path="/lego/2/s4" element={<LegoA2S4Page />} />
 						<Route path="/lego/2/s5" element={<LegoA2S5Page />} />
 						<Route path="/lego/2/s6" element={<LegoA2S6Page />} />
+						{/* Lego Approach 3 — Feature Hooks */}
+						<Route path="/lego/3/s1" element={<LegoA3S1Page />} />
+						<Route path="/lego/3/s2" element={<LegoA3S2Page />} />
+						<Route path="/lego/3/s3" element={<LegoA3S3Page />} />
+						<Route path="/lego/3/s4" element={<LegoA3S4Page />} />
+						<Route path="/lego/3/s5" element={<LegoA3S5Page />} />
+						<Route path="/lego/3/s6" element={<LegoA3S6Page />} />
+						{/* Lego Approach 4 — Context Children */}
+						<Route path="/lego/4/s1" element={<LegoA4S1Page />} />
+						<Route path="/lego/4/s2" element={<LegoA4S2Page />} />
+						<Route path="/lego/4/s3" element={<LegoA4S3Page />} />
+						<Route path="/lego/4/s4" element={<LegoA4S4Page />} />
+						<Route path="/lego/4/s5" element={<LegoA4S5Page />} />
+						<Route path="/lego/4/s6" element={<LegoA4S6Page />} />
 						<Route path="/" element={<DashboardPage />} />
 					</Routes>
 				</ProtectedRoute>
