@@ -1,4 +1,4 @@
-import type { Ticket, TicketsQuery } from '@app/shared/api/tickets.contract';
+import type { CreateTicketComment, Ticket, TicketComment, TicketsQuery } from '@app/shared/api/tickets.contract';
 
 import type { BaseRepository } from './BaseRepository';
 
@@ -93,6 +93,41 @@ export class TicketsRepository {
 	 */
 	async delete(id: string): Promise<void> {
 		return this.base.delete(id);
+	}
+
+	/**
+	 * Add a comment to a ticket (embedded in the ticket document)
+	 */
+	async addComment(ticketId: string, data: CreateTicketComment): Promise<TicketComment> {
+		const ticket = (await this.base.findById(ticketId)) as (Ticket & { comments?: TicketComment[] }) | null;
+		if (!ticket) {
+			throw new Error(`Ticket ${ticketId} not found`);
+		}
+
+		const comment: TicketComment = {
+			id: Math.random().toString(36).substring(2, 11),
+			ticketId,
+			content: data.content,
+			author: data.author,
+			createdAt: new Date().toISOString(),
+		};
+
+		const existing = ticket.comments ?? [];
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		await (this.base as any).update(ticketId, { comments: [...existing, comment] });
+
+		return comment;
+	}
+
+	/**
+	 * Get all comments for a ticket
+	 */
+	async getComments(ticketId: string): Promise<TicketComment[]> {
+		const ticket = (await this.base.findById(ticketId)) as (Ticket & { comments?: TicketComment[] }) | null;
+		if (!ticket) {
+			throw new Error(`Ticket ${ticketId} not found`);
+		}
+		return ticket.comments ?? [];
 	}
 
 	/**

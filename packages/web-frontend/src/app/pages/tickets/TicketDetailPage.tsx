@@ -21,6 +21,7 @@ import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { Ticket, TicketStatus } from '@shared/api/tickets.contract';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 
+import { TicketCommentsSection } from './TicketCommentsSection';
 import { ticketsApi } from './tickets.api';
 import { useTicket } from './useTicket';
 
@@ -515,6 +516,9 @@ export function TicketDetailPage() {
 						</div>
 					)}
 				</div>
+
+				{/* Comments */}
+				<TicketCommentsSection ticketId={id!} />
 			</div>
 		</Page>
 	);

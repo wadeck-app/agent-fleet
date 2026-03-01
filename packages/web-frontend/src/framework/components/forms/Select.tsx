@@ -66,7 +66,7 @@ function SelectTrigger({
 function SelectContent({
 	className,
 	children,
-	position = 'item-aligned',
+	position = 'popper',
 	align = 'center',
 	...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {
@@ -105,7 +105,6 @@ function SelectContent({
 					data-position={position}
 					className={cn(
 						`
-        data-[position=popper]:h-[var(--radix-select-trigger-height)]
         data-[position=popper]:w-full
         data-[position=popper]:min-w-[var(--radix-select-trigger-width)]
       `,

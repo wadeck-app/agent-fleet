@@ -591,19 +591,54 @@ export class DataStoreFactory {
 			await handler.handleOrchestratorEvent(event, data);
 		});
 
-		// Wire EventBus → EventSubscriptionRegistry → TaskManager
+		// Wire EventBus → EventSubscriptionRegistry → TaskManager → WorkerCoordinator
 		this.eventBus.on('ticket.status.changed', async payload => {
 			const registry = this.orchestrator.getEventSubscriptionRegistry();
+			// NOTE: projectId is intentionally omitted — worker uses package.json name ("agent-fleet")
+			// while payload uses DB project ID ("9zonezaue"). Single-project-per-server
+			// architecture means there is no cross-project leakage risk here.
 			const matches = registry.findMatching({
 				event: 'ticket.status.changed',
-				payload: { newStatus: payload.newStatus, projectId: payload.projectId },
+				payload: { newStatus: payload.newStatus },
 			});
 			for (const sub of matches) {
-				await this.orchestrator.getTaskManager().createTask(`ticket.status.changed: ${payload.ticketId}`, {
-					flowId: sub.flowId,
-					projectId: payload.projectId,
-					ticketId: payload.ticketId,
-				});
+				const task = await this.orchestrator
+					.getTaskManager()
+					.createTask(`ticket.status.changed: ${payload.ticketId}`, {
+						flowId: sub.flowId,
+						projectId: payload.projectId,
+						ticketId: payload.ticketId,
+					});
+				// Dispatch to WorkerCoordinator so idle workers pick it up
+				this.orchestrator.getWorkerCoordinator().enqueueTask(task);
+			}
+		});
+
+		this.eventBus.on('ticket.created', async payload => {
+			const registry = this.orchestrator.getEventSubscriptionRegistry();
+			// NOTE: projectId omitted — see ticket.status.changed comment above
+			const matches = registry.findMatching({
+				event: 'ticket.created',
+				payload: {},
+			});
+			// Calculate backend URL so flows can call back into the API
+			const projectId = Number(process.env.PROJECT_ID ?? 3);
+			const workspaceId = Number(process.env.WORKSPACE_ID ?? 0);
+			const backendPort = process.env.PORT ?? String(3000 + projectId * 100 + workspaceId * 10);
+			const backendUrl = `http://localhost:${backendPort}`;
+			for (const sub of matches) {
+				const task = await this.orchestrator.getTaskManager().createTask(
+					`ticket.created: ${payload.ticketId}`,
+					{ flowId: sub.flowId, projectId: payload.projectId, ticketId: payload.ticketId },
+					{
+						ticketId: payload.ticketId,
+						ticketTitle: payload.title,
+						ticketDescription: payload.description,
+						backendUrl,
+					}
+				);
+				// Dispatch to WorkerCoordinator so idle workers pick it up
+				this.orchestrator.getWorkerCoordinator().enqueueTask(task);
 			}
 		});
 

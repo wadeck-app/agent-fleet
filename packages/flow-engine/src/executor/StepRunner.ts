@@ -202,12 +202,19 @@ export class StepRunner {
 
 		stepTrace.script = renderedScript;
 
+		// Render env values with variable interpolation (same as script)
+		const renderedEnv = step.env
+			? Object.fromEntries(
+					Object.entries(step.env).map(([k, v]) => [k, this.templateRenderer.render(v, context, true)])
+				)
+			: undefined;
+
 		// Execute script with real-time streaming
 		const workingDir = step.workingDir || workspace.path;
 		const result = await this.scriptExecutor.execute({
 			script: renderedScript,
 			workingDir,
-			env: step.env,
+			env: renderedEnv,
 			streaming: true,
 			stepId: step.id,
 		});

@@ -11,18 +11,47 @@ ticket-auto-process:
         filter:
             newStatus: pending_integration
     statusTransitions:
-        onSuccess:
-            task: approved
-            ticket: integrated
-        onFailure:
-            task: changes_requested
-            ticket: todo
+        onSuccess: approved
+        onFailure: changes_requested
     steps:
         - type: model
           id: process
           name: 'Process ticket'
           model: haiku
           prompt: 'Ticket received for integration. Confirm you are ready to proceed.'
+
+ticket-analyze-complexity:
+    version: '1.0.0'
+    name: 'Analyze ticket complexity'
+    trigger:
+        type: event
+        event: ticket.created
+    steps:
+        - type: model
+          id: analyze
+          name: 'Analyze complexity'
+          model: haiku
+          prompt: |
+              Analyze the complexity of this ticket and provide a concise assessment.
+
+              Title: ${{ inputs.ticketTitle }}
+              Description: ${{ inputs.ticketDescription }}
+
+              Respond with:
+              - Complexity: [low / medium / high]
+              - Key factors: (1-2 sentences)
+              - Suggested effort: [hours estimate]
+
+              Keep the response under 5 sentences. Be direct.
+        - type: script
+          id: post-comment
+          name: 'Post analysis as ticket comment'
+          depends: [analyze]
+          env:
+              TICKET_ID: '${{ inputs.ticketId }}'
+              COMMENT: '${{ steps.analyze.outputs.response }}'
+              BACKEND_URL: '${{ inputs.backendUrl }}'
+          script: node -e "const b=JSON.stringify({content:process.env.COMMENT,author:'worker-ai'});fetch(process.env.BACKEND_URL+'/api/tickets/'+process.env.TICKET_ID+'/comments',{method:'POST',headers:{'Content-Type':'application/json'},body:b}).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(()=>process.exit(0)).catch(e=>{console.error(e.message);process.exit(1);})"
 
 simple-implement:
     version: '1.0.0'

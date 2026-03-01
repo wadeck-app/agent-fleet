@@ -14,11 +14,22 @@ export interface TicketStatusChangedPayload {
 }
 
 /**
+ * Payload for ticket created event
+ */
+export interface TicketCreatedPayload {
+	ticketId: string;
+	projectId: string;
+	title: string;
+	description: string;
+}
+
+/**
  * All internal server-side event payloads
  * Keys follow the pattern `domain.action`
  */
 export interface InternalEventMap {
 	'ticket.status.changed': TicketStatusChangedPayload;
+	'ticket.created': TicketCreatedPayload;
 }
 
 export type InternalEventName = keyof InternalEventMap;

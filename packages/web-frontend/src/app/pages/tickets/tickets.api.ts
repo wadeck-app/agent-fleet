@@ -10,6 +10,7 @@ import type {
 	ReorderTicket,
 	Ticket,
 	TicketAnalysisPlan,
+	TicketCommentsResponse,
 	TicketsListResponse,
 	TicketsQuery,
 	UpdateTicket,
@@ -91,5 +92,12 @@ export const ticketsApi = {
 	 */
 	createFromPlan: (body: CreateFromPlan): Promise<CreateFromPlanResponse> => {
 		return typedFetch('POST', '/api/tickets/create-from-plan', { body });
+	},
+
+	/**
+	 * Get ticket comments
+	 */
+	getComments: (ticketId: string): Promise<TicketCommentsResponse> => {
+		return typedFetch('GET', '/api/tickets/:ticketId/comments', { params: { ticketId } });
 	},
 } as const;

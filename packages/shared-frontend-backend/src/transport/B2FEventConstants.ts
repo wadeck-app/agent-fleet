@@ -226,3 +226,6 @@ export const B2F_TICKET_DELETED = 'b2f:ticket:deleted' as const;
 
 /** Ticket status changed event */
 export const B2F_TICKET_STATUS_CHANGED = 'b2f:ticket:status_changed' as const;
+
+/** Ticket comment added event — carries the full comment so subscribers can append without re-fetching */
+export const B2F_TICKET_COMMENT_ADDED = 'b2f:ticket:comment_added' as const;

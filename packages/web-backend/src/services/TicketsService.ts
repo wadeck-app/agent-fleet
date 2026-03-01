@@ -6,10 +6,13 @@ import type {
 	CreateFromPlan,
 	CreateFromPlanResponse,
 	CreateTicket,
+	CreateTicketComment,
 	LabelsResponse,
 	ReorderTicket,
 	Ticket,
 	TicketAnalysisPlan,
+	TicketComment,
+	TicketCommentsResponse,
 	TicketsListResponse,
 	TicketsQuery,
 	UpdateTicket,
@@ -17,6 +20,7 @@ import type {
 import { ConflictException, ERROR_CODES, NotFoundException } from '@app/shared/exceptions/http-exceptions';
 import {
 	B2F_TICKETS_UPDATED,
+	B2F_TICKET_COMMENT_ADDED,
 	B2F_TICKET_CREATED,
 	B2F_TICKET_DELETED,
 	B2F_TICKET_STATUS_CHANGED,
@@ -149,6 +153,14 @@ export class TicketsService {
 			// Emit aggregate event for dashboard updates
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast(B2F_TICKETS_UPDATED, {} as any);
+
+			// Emit internal event for worker flow triggers
+			this.eventBus?.emit('ticket.created', {
+				ticketId: ticket.id,
+				projectId: ticket.projectId,
+				title: ticket.title,
+				description: ticket.description,
+			});
 
 			return ticket;
 		} catch (error) {
@@ -383,5 +395,26 @@ export class TicketsService {
 			return;
 		}
 		await this.updateTicket(ticketId, { status: newStatus, version: ticket.version });
+	}
+
+	/**
+	 * Add a comment to a ticket
+	 */
+	async addComment(ticketId: string, data: CreateTicketComment): Promise<TicketComment> {
+		// Verify ticket exists
+		await this.getTicketById(ticketId);
+		const comment = await this.ticketsRepository.addComment(ticketId, data);
+		this.eventBroadcaster.broadcast(B2F_TICKET_COMMENT_ADDED, comment);
+		return comment;
+	}
+
+	/**
+	 * Get all comments for a ticket
+	 */
+	async getComments(ticketId: string): Promise<TicketCommentsResponse> {
+		// Verify ticket exists
+		await this.getTicketById(ticketId);
+		const comments = await this.ticketsRepository.getComments(ticketId);
+		return { comments };
 	}
 }

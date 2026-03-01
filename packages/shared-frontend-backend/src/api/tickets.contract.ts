@@ -40,6 +40,30 @@ export const TicketSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// Comment schemas
+// ---------------------------------------------------------------------------
+
+export const TicketCommentSchema = z.object({
+	id: z.string(),
+	ticketId: z.string(),
+	content: z.string(),
+	author: z.string().optional(),
+	createdAt: z.string(),
+});
+export type TicketComment = z.infer<typeof TicketCommentSchema>;
+
+export const CreateTicketCommentSchema = z.object({
+	content: z.string().min(1),
+	author: z.string().optional(),
+});
+export type CreateTicketComment = z.infer<typeof CreateTicketCommentSchema>;
+
+export const TicketCommentsResponseSchema = z.object({
+	comments: z.array(TicketCommentSchema),
+});
+export type TicketCommentsResponse = z.infer<typeof TicketCommentsResponseSchema>;
+
+// ---------------------------------------------------------------------------
 // Query / list schemas
 // ---------------------------------------------------------------------------
 
@@ -227,6 +251,17 @@ export const TICKETS_API_ROUTES = defineRoutes({
 			params: z.object({ id: z.string() }),
 			body: ReorderTicketSchema,
 			response: TicketSchema,
+		},
+	},
+	'/api/tickets/:ticketId/comments': {
+		GET: {
+			params: z.object({ ticketId: z.string() }),
+			response: TicketCommentsResponseSchema,
+		},
+		POST: {
+			params: z.object({ ticketId: z.string() }),
+			body: CreateTicketCommentSchema,
+			response: TicketCommentSchema,
 		},
 	},
 });
