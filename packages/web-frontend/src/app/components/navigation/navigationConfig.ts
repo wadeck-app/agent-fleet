@@ -8,6 +8,7 @@ import {
 	ListTodo,
 	PackageSearch,
 	Sparkles,
+	SplitSquareHorizontal,
 	Table2,
 	Ticket,
 	Users,
@@ -110,63 +111,29 @@ export const navigationItems: NavItem[] = [
 	},
 	// Lego Experiments — Framework architecture patterns
 	{
-		path: '/lego/1/s1',
-		label: 'Lego A1-S1: Simple Table',
-		icon: Table2,
-	},
-	{
-		path: '/lego/1/s2',
-		label: 'Lego A1-S2: Table + Pagination',
-		icon: Table2,
-	},
-	{
-		path: '/lego/1/s3',
-		label: 'Lego A1-S3: Full Featured',
-		icon: Table2,
-	},
-	{
-		path: '/lego/1/s4',
-		label: 'Lego A1-S4: Grid + CRUD',
-		icon: LayoutGrid,
-	},
-	{
-		path: '/lego/1/s5',
-		label: 'Lego A1-S5: Carousel',
-		icon: Layers,
-	},
-	{
-		path: '/lego/1/s6',
-		label: 'Lego A1-S6: Item Detail',
+		type: 'group',
+		label: 'Lego — Widget Isolated',
 		icon: Boxes,
+		items: [
+			{ path: '/lego/1/s1', label: 'S1: Simple Table', icon: Table2 },
+			{ path: '/lego/1/s2', label: 'S2: Pagination', icon: Table2 },
+			{ path: '/lego/1/s3', label: 'S3: Full Featured', icon: Table2 },
+			{ path: '/lego/1/s4', label: 'S4: Grid + CRUD', icon: LayoutGrid },
+			{ path: '/lego/1/s5', label: 'S5: Carousel', icon: Layers },
+			{ path: '/lego/1/s6', label: 'S6: Item Detail', icon: SplitSquareHorizontal },
+		],
 	},
 	{
-		path: '/lego/2/s1',
-		label: 'Lego A2-S1: Simple Table',
-		icon: Table2,
-	},
-	{
-		path: '/lego/2/s2',
-		label: 'Lego A2-S2: Table + Pagination',
-		icon: Table2,
-	},
-	{
-		path: '/lego/2/s3',
-		label: 'Lego A2-S3: Full Featured',
-		icon: Table2,
-	},
-	{
-		path: '/lego/2/s4',
-		label: 'Lego A2-S4: Grid + CRUD',
-		icon: LayoutGrid,
-	},
-	{
-		path: '/lego/2/s5',
-		label: 'Lego A2-S5: Carousel',
-		icon: Layers,
-	},
-	{
-		path: '/lego/2/s6',
-		label: 'Lego A2-S6: Item Detail',
+		type: 'group',
+		label: 'Lego — Context Provider',
 		icon: Boxes,
+		items: [
+			{ path: '/lego/2/s1', label: 'S1: Simple Table', icon: Table2 },
+			{ path: '/lego/2/s2', label: 'S2: Pagination', icon: Table2 },
+			{ path: '/lego/2/s3', label: 'S3: Full Featured', icon: Table2 },
+			{ path: '/lego/2/s4', label: 'S4: Grid + CRUD', icon: LayoutGrid },
+			{ path: '/lego/2/s5', label: 'S5: Carousel', icon: Layers },
+			{ path: '/lego/2/s6', label: 'S6: Item Detail', icon: SplitSquareHorizontal },
+		],
 	},
 ];

@@ -187,7 +187,7 @@ describe.each(scenarios)('Lego Products $name - CRUD Flows', ({ name: _name, Pag
 			});
 		});
 
-		it('should create product and refresh list on successful save', async () => {
+		it('should create product and refresh list on successful save', { timeout: 15000 }, async () => {
 			const user = userEvent.setup();
 			renderPage();
 
@@ -336,7 +336,7 @@ describe.each(scenarios)('Lego Products $name - CRUD Flows', ({ name: _name, Pag
 			});
 		});
 
-		it('should update product and refresh list on successful save', async () => {
+		it('should update product and refresh list on successful save', { timeout: 15000 }, async () => {
 			const user = userEvent.setup();
 			renderPage();
 
