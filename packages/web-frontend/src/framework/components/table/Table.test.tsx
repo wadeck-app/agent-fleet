@@ -180,4 +180,137 @@ describe('Table', () => {
 		expect(screen.getByText('Editing: Item 2')).toBeInTheDocument();
 		expect(screen.getByText('Item 3')).toBeInTheDocument();
 	});
+
+	describe('Pagination', () => {
+		it('should render pagination with correct item range using pageSize', () => {
+			const onPageChange = vi.fn();
+
+			render(
+				<Table
+					data={mockData}
+					columns={mockColumns}
+					getItemId={item => item.id}
+					pagination={{
+						currentPage: 1,
+						totalPages: 2,
+						totalItems: 12,
+						pageSize: 10,
+						onPageChange,
+					}}
+				/>
+			);
+
+			// Should show "Showing 1 to 10 of 12 items" (using pageSize=10)
+			// NOT "Showing 1 to 6 of 12 items" (using ceil(12/2)=6)
+			expect(screen.getByText(/Showing 1 to 10 of 12 items/)).toBeInTheDocument();
+		});
+
+		it('should calculate correct item range for page 2', () => {
+			const onPageChange = vi.fn();
+
+			render(
+				<Table
+					data={mockData}
+					columns={mockColumns}
+					getItemId={item => item.id}
+					pagination={{
+						currentPage: 2,
+						totalPages: 2,
+						totalItems: 12,
+						pageSize: 10,
+						onPageChange,
+					}}
+				/>
+			);
+
+			// Page 2: should show items 11-12
+			expect(screen.getByText(/Showing 11 to 12 of 12 items/)).toBeInTheDocument();
+		});
+
+		it('should fallback to calculated perPage when pageSize is undefined', () => {
+			const onPageChange = vi.fn();
+
+			render(
+				<Table
+					data={mockData}
+					columns={mockColumns}
+					getItemId={item => item.id}
+					pagination={{
+						currentPage: 1,
+						totalPages: 2,
+						totalItems: 12,
+						onPageChange,
+					}}
+				/>
+			);
+
+			// Without pageSize, should fallback to ceil(12/2)=6
+			expect(screen.getByText(/Showing 1 to 6 of 12 items/)).toBeInTheDocument();
+		});
+
+		it('should show 0 to 0 when no data', () => {
+			const onPageChange = vi.fn();
+
+			render(
+				<Table
+					data={[]}
+					columns={mockColumns}
+					getItemId={item => item.id}
+					pagination={{
+						currentPage: 1,
+						totalPages: 1,
+						totalItems: 0,
+						pageSize: 10,
+						onPageChange,
+					}}
+				/>
+			);
+
+			expect(screen.getByText(/Showing 0 to 0 of 0 items/)).toBeInTheDocument();
+		});
+
+		it('should handle edge case with more pages than items per page', () => {
+			const onPageChange = vi.fn();
+
+			render(
+				<Table
+					data={mockData}
+					columns={mockColumns}
+					getItemId={item => item.id}
+					pagination={{
+						currentPage: 3,
+						totalPages: 5,
+						totalItems: 23,
+						pageSize: 5,
+						onPageChange,
+					}}
+				/>
+			);
+
+			// Page 3 with pageSize=5: items 11-15
+			expect(screen.getByText(/Showing 11 to 15 of 23 items/)).toBeInTheDocument();
+		});
+
+		it('should not exceed totalItems on last page', () => {
+			const onPageChange = vi.fn();
+
+			render(
+				<Table
+					data={mockData}
+					columns={mockColumns}
+					getItemId={item => item.id}
+					pagination={{
+						currentPage: 5,
+						totalPages: 5,
+						totalItems: 23,
+						pageSize: 5,
+						onPageChange,
+					}}
+				/>
+			);
+
+			// Last page: items 21-23 (not 21-25)
+			expect(screen.getByText(/Showing 21 to 23 of 23 items/)).toBeInTheDocument();
+		});
+	});
 });

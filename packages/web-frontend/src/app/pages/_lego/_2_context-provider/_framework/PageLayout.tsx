@@ -16,5 +16,5 @@ export interface PageLayoutProps {
 }
 
 export function PageLayout({ children }: PageLayoutProps) {
-	return <div className="space-y-4 p-4">{children}</div>;
+	return <>{children}</>;
 }

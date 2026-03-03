@@ -36,7 +36,8 @@ export function S1Page() {
 	return (
 		<PageLayout>
 			<DataTable service={readOnlyService} columns={columns}>
-				<div className="space-y-4">
+				<div className="flex h-full flex-col gap-4">
+					<DataTable.Toolbar>{null}</DataTable.Toolbar>
 					<DataTable.Body />
 				</div>
 			</DataTable>

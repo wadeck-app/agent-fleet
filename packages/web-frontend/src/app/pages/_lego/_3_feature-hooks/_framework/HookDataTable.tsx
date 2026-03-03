@@ -269,42 +269,40 @@ export function HookDataTable<T extends { id: string }>({
 	);
 
 	return (
-		<div className="space-y-4">
+		<div className="flex h-full flex-col gap-4">
 			{/* Toolbar */}
-			{(searchFeature || crudFeature) && (
-				<div className="flex items-center gap-2">
-					{searchFeature && (
-						<SearchInput
-							value={searchFeature.value}
-							onChange={searchFeature.onChange}
-							onClear={() => searchFeature.onChange('')}
-							placeholder={searchFeature.placeholder || 'Search...'}
-							className="flex-1"
-						/>
-					)}
-					{columnVisibilityFeature && (
-						<ColumnVisibility
-							columns={columns.map(c => ({ id: c.key as string, label: c.label }))}
-							visibleColumns={visibleColumns}
-							onToggle={id => {
-								const newSet = new Set(visibleColumns);
-								if (newSet.has(id)) newSet.delete(id);
-								else newSet.add(id);
-								setVisibleColumns(newSet);
-							}}
-							onReset={() => setVisibleColumns(new Set(columns.map(c => c.key as string)))}
-							onShowAll={() => setVisibleColumns(new Set(columns.map(c => c.key as string)))}
-							onHideAll={() => setVisibleColumns(new Set())}
-						/>
-					)}
-					{crudFeature && (
-						<Button onClick={handleCreate}>
-							<Plus className="size-4" />
-							Add
-						</Button>
-					)}
-				</div>
-			)}
+			<div className="flex items-center gap-2">
+				{searchFeature && (
+					<SearchInput
+						value={searchFeature.value}
+						onChange={searchFeature.onChange}
+						onClear={() => searchFeature.onChange('')}
+						placeholder={searchFeature.placeholder || 'Search...'}
+						className="flex-1"
+					/>
+				)}
+				{columnVisibilityFeature && (
+					<ColumnVisibility
+						columns={columns.map(c => ({ id: c.key as string, label: c.label }))}
+						visibleColumns={visibleColumns}
+						onToggle={id => {
+							const newSet = new Set(visibleColumns);
+							if (newSet.has(id)) newSet.delete(id);
+							else newSet.add(id);
+							setVisibleColumns(newSet);
+						}}
+						onReset={() => setVisibleColumns(new Set(columns.map(c => c.key as string)))}
+						onShowAll={() => setVisibleColumns(new Set(columns.map(c => c.key as string)))}
+						onHideAll={() => setVisibleColumns(new Set())}
+					/>
+				)}
+				{crudFeature && (
+					<Button onClick={handleCreate}>
+						<Plus className="size-4" />
+						Add
+					</Button>
+				)}
+			</div>
 
 			{/* Bulk delete bar */}
 			{bulkDeleteFeature && selectedIds.size > 0 && (

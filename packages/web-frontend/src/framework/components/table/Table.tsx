@@ -252,17 +252,19 @@ export function Table<T>({
 			{pagination && (
 				<div className="flex items-center justify-between">
 					<div className="text-sm text-muted-foreground">
-						Showing{' '}
-						{data.length > 0
-							? (pagination.currentPage - 1) * Math.ceil(pagination.totalItems / pagination.totalPages) +
-								1
-							: 0}{' '}
-						to{' '}
-						{Math.min(
-							pagination.currentPage * Math.ceil(pagination.totalItems / pagination.totalPages),
-							pagination.totalItems
-						)}{' '}
-						of {pagination.totalItems} items
+						{(() => {
+							// Use pageSize when available, fallback to calculated value for backward compatibility
+							const perPage =
+								pagination.pageSize ?? Math.ceil(pagination.totalItems / pagination.totalPages);
+							const startItem = data.length > 0 ? (pagination.currentPage - 1) * perPage + 1 : 0;
+							const endItem = Math.min(pagination.currentPage * perPage, pagination.totalItems);
+
+							return (
+								<>
+									Showing {startItem} to {endItem} of {pagination.totalItems} items
+								</>
+							);
+						})()}
 					</div>
 					<div className="flex items-center gap-4">
 						{/* Page Size Selector */}

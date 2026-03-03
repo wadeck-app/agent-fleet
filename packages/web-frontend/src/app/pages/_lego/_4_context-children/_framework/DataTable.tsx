@@ -396,6 +396,9 @@ DataTableRoot.Pagination = function PaginationControls({
 			</div>
 			<div className="flex items-center gap-4">
 				<PageSizeSelector value={ctx.pageSize} onChange={ctx.setPageSize} options={pageSizes} />
+				<div className="text-sm text-muted-foreground">
+					Page {ctx.pagination.page} of {ctx.pagination.totalPages}
+				</div>
 				<Pagination
 					currentPage={ctx.pagination.page}
 					totalPages={ctx.pagination.totalPages}
