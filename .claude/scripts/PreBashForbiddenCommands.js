@@ -164,7 +164,9 @@ Command: ${command}`,
 	// A ws* agent is never allowed to put commits on "integration" or "main".
 	// Only the main agent-fleet workspace can integrate changes.
 
-	const projectDir = env.CLAUDE_PROJECT_DIR || '';
+	// CLAUDE_PROJECT_DIR may not be set in all contexts; fall back to deriving it
+	// from __dirname: .../agent-fleet_ws3/.claude/scripts → two levels up = project root
+	const projectDir = env.CLAUDE_PROJECT_DIR || dirname(dirname(__dirname));
 	const projectDirName = basename(projectDir.replace(/\\/g, '/'));
 	const isWorkspaceWorktree = /_ws\d+$/.test(projectDirName);
 
@@ -173,8 +175,34 @@ Command: ${command}`,
 		const isMerge = /\bgit\s+merge\b/i.test(command) && !/--abort|--continue/.test(command);
 		const isPush = /\bgit\s+push\b/i.test(command);
 
+		// Vector 4 — checkout to protected branch (bypass: git checkout integration && git merge ws1)
+		// Block unconditionally: ws agents have no reason to checkout integration/main
+		// Use (?:[^/\w]|$) instead of \b to avoid false positives on "integration/main" in commit messages
+		const isCheckoutToProtected = /git\s+checkout\s+(integration|main)(?:[^/\w]|$)/i.test(command);
+
+		if (isCheckoutToProtected) {
+			const response = {
+				hookSpecificOutput: {
+					hookEventName: 'PreToolUse',
+					permissionDecision: 'deny',
+					permissionDecisionReason: `PROTECTED BRANCH — OPERATION FORBIDDEN
+
+Workspace "${projectDirName}" cannot checkout "integration" or "main".
+Only the main agent-fleet workspace manages branch integration.
+
+Use the "prepare-merge" skill to prepare your branch, then let the integration agent handle the merge.
+
+Command: ${command}`,
+				},
+			};
+			console.log(JSON.stringify(response));
+			process.exit(0);
+			return;
+		}
+
 		if (isCommit || isMerge || isPush) {
-			// Vector 1 — branch check inside CLAUDE_PROJECT_DIR (handles git checkout integration)
+			// Vector 1 — branch check at hook evaluation time
+			// Catches the case where the agent already switched to a protected branch in a prior command
 			let currentBranch = '';
 			try {
 				currentBranch = execSync(`git -C "${projectDir}" branch --show-current`, {
@@ -201,7 +229,7 @@ Command: ${command}`,
 				const response = {
 					hookSpecificOutput: {
 						hookEventName: 'PreToolUse',
-						permissionDecision: 'block',
+						permissionDecision: 'deny',
 						permissionDecisionReason: `PROTECTED BRANCH — OPERATION FORBIDDEN
 
 Workspace "${projectDirName}" cannot commit, merge into, or push to "integration" or "main".
