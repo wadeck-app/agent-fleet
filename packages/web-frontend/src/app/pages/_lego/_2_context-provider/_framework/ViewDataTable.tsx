@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 
 import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
 import { ColumnVisibility } from '@framework/components/columns/ColumnVisibility';
-import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import { SearchInput } from '@framework/components/search/SearchInput';
 import { Table } from '@framework/components/table/Table';
@@ -17,9 +16,9 @@ import type {
 	SearchConfig,
 	SortingConfig,
 } from '@framework/lego';
-import { resolveFeature } from '@framework/lego';
+import { renderColumnValue, resolveFeature } from '@framework/lego';
 import type { Product } from '@shared/api/products.contract';
-import { Check, Edit, Plus, Trash2, X } from 'lucide-react';
+import { Edit, Plus, Trash2 } from 'lucide-react';
 
 import { useProductDomain } from './ProductDomainContext';
 
@@ -47,18 +46,29 @@ import { useProductDomain } from './ProductDomainContext';
  * - CRUD: calls context.actions.create/update/delete
  *
  * ===========================================================================================
+ * DESIGN NOTES - Approach A2 Trade-offs
+ * ===========================================================================================
+ *
+ * A2.d - Complexity Layer:
+ * A2 adds a complexity layer vs A1 (the Provider). The provider becomes a factory
+ * when features grow - each new feature requires expanding the provider interface.
+ * This creates coupling between the provider and all consuming views.
+ *
+ * ===========================================================================================
  */
 
 export interface ViewDataTableProps<T = Product> {
 	columns: ColumnDef<T>[];
 	features: DataTableFeature[];
 	enableRowClick?: boolean;
+	onRowClick?: (item: T) => void;
 }
 
 export function ViewDataTable<T extends Product = Product>({
 	columns,
 	features,
-	enableRowClick: _enableRowClick = false,
+	enableRowClick = false,
+	onRowClick,
 }: ViewDataTableProps<T>) {
 	const context = useProductDomain();
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -92,46 +102,7 @@ export function ViewDataTable<T extends Product = Product>({
 				key: col.key,
 				label: col.label,
 				sortable: col.sortable,
-				render: (item: T, _isEditing: boolean) => {
-					if (col.render) {
-						return col.render(item);
-					}
-
-					const value = item[col.key];
-
-					if (col.type === 'boolean') {
-						return value ? (
-							<Check className="size-4 text-primary" />
-						) : (
-							<X className="size-4 text-muted-foreground" />
-						);
-					}
-
-					if (col.type === 'number' && typeof value === 'number') {
-						return (
-							<span>
-								{col.prefix}
-								{value.toFixed(2)}
-								{col.suffix}
-							</span>
-						);
-					}
-
-					if (col.type === 'enum' && col.badge) {
-						return <Badge variant="secondary">{String(value)}</Badge>;
-					}
-
-					if (col.type === 'date') {
-						if (value instanceof Date) {
-							return value.toLocaleDateString();
-						}
-						if (typeof value === 'string') {
-							return new Date(value).toLocaleDateString();
-						}
-					}
-
-					return String(value || '');
-				},
+				render: (item: T, _isEditing: boolean) => renderColumnValue(col, item),
 			})),
 		[columns]
 	);
@@ -167,6 +138,9 @@ export function ViewDataTable<T extends Product = Product>({
 		setDialogOpen(true);
 	};
 
+	// NOTE A2.c: Actions return void - no toast/feedback to user on error.
+	// The context actions (delete, bulkDelete) silently fail if errors occur.
+	// User receives no confirmation or error message after the operation.
 	const handleDelete = async (id: string) => {
 		if (confirm('Delete this item?')) {
 			await context.actions.delete(id);
@@ -207,38 +181,40 @@ export function ViewDataTable<T extends Product = Product>({
 
 	return (
 		<div className="flex h-full flex-col gap-4">
-			<div className="flex items-center gap-2">
-				{searchConfig && (
-					<SearchInput
-						value={context.query.search}
-						onChange={value => context.actions.setQuery({ search: value })}
-						onClear={() => context.actions.setQuery({ search: '' })}
-						placeholder="Search..."
-						className="flex-1"
-					/>
-				)}
-				{columnVisibilityConfig && (
-					<ColumnVisibility
-						columns={columns.map(c => ({ id: c.key as string, label: c.label }))}
-						visibleColumns={visibleColumns}
-						onToggle={id => {
-							const newSet = new Set(visibleColumns);
-							if (newSet.has(id)) newSet.delete(id);
-							else newSet.add(id);
-							setVisibleColumns(newSet);
-						}}
-						onReset={() => setVisibleColumns(new Set(columns.map(c => c.key as string)))}
-						onShowAll={() => setVisibleColumns(new Set(columns.map(c => c.key as string)))}
-						onHideAll={() => setVisibleColumns(new Set())}
-					/>
-				)}
-				{crudConfig && (
-					<Button onClick={handleCreate}>
-						<Plus className="size-4" />
-						Add
-					</Button>
-				)}
-			</div>
+			{(searchConfig || columnVisibilityConfig || crudConfig) && (
+				<div className="flex items-center gap-2">
+					{searchConfig && (
+						<SearchInput
+							value={context.query.search}
+							onChange={value => context.actions.setQuery({ search: value })}
+							onClear={() => context.actions.setQuery({ search: '' })}
+							placeholder="Search..."
+							className="flex-1"
+						/>
+					)}
+					{columnVisibilityConfig && (
+						<ColumnVisibility
+							columns={columns.map(c => ({ id: c.key as string, label: c.label }))}
+							visibleColumns={visibleColumns}
+							onToggle={id => {
+								const newSet = new Set(visibleColumns);
+								if (newSet.has(id)) newSet.delete(id);
+								else newSet.add(id);
+								setVisibleColumns(newSet);
+							}}
+							onReset={() => setVisibleColumns(new Set(columns.map(c => c.key as string)))}
+							onShowAll={() => setVisibleColumns(new Set(columns.map(c => c.key as string)))}
+							onHideAll={() => setVisibleColumns(new Set())}
+						/>
+					)}
+					{crudConfig && (
+						<Button onClick={handleCreate}>
+							<Plus className="size-4" />
+							Add
+						</Button>
+					)}
+				</div>
+			)}
 
 			{bulkDeleteConfig && selectedIds.size > 0 && (
 				<BulkActionBar
@@ -263,6 +239,7 @@ export function ViewDataTable<T extends Product = Product>({
 				renderActions={renderActions}
 				loading={context.loading}
 				emptyMessage="No items found"
+				onRowClick={enableRowClick ? onRowClick : undefined}
 				pagination={
 					paginationConfig
 						? {

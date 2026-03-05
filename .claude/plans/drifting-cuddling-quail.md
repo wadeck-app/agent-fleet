@@ -1,231 +1,321 @@
-# 2026-03-02 — Lego Visual Cross-Approach Regression Tests
+# 2026-03-04 — Lego Feedback Implementation Plan
 
 ## Context
 
-The Lego experiment has 4 parallel approaches (A1–A4) implementing the same DataTable CRUD UI.
-The requirement is that all 4 approaches render **pixel-identical** output.
-Currently this is verified manually via `agent-browser` screenshots.
-Goal: automate that comparison so any visual divergence between approaches is caught immediately.
+Following the completion of the 16-test visual regression suite (A1–A4 × S1/S2/S3/S6), the user
+provided comprehensive feedback covering: code quality issues, missing scenarios in A5, a new
+approach A6 to create (Data2-based), 5 new cross-approach scenarios, unit tests per approach,
+and a final antifragility analysis. This plan covers all items from the feedback tracking file
+`.claude/plans/2026-03-04_lego-feedback-todo.md`.
 
-Two residual visual differences must be fixed **before** establishing baselines:
+Current state:
 
-1. A2 `ViewDataTable`: `placeholder="Search products..."` → `"Search..."`
-2. A1/A2/A3 footer shows `"Showing 1 to 6 of 12 items"` instead of `"1 to 10 of 12"` — backend Products API returns `pageSize: 6` in pagination response regardless of what the frontend requested
-
----
-
-## Existing infrastructure
-
-| File                                                    | Role                                                       |
-| ------------------------------------------------------- | ---------------------------------------------------------- |
-| `packages/e2e-web/playwright.config.visual.ts`          | Storybook-based visual regression (component-level)        |
-| `packages/e2e-web/playwright.config.integration.ts`     | E2E app tests (complex: per-worker backend, dynamic ports) |
-| `packages/e2e-web/playwright-hooks/hooks-web-server.ts` | Runtime fixture: dynamic baseURL + API routing per-worker  |
-| `packages/e2e-web/test-visual/`                         | Home of Storybook visual tests + snapshots                 |
-
-The new tests need a **running app with real data** (frontend + backend), but NOT the full integration-test isolation. They are **dev-only** tests (not CI-graded), so `reuseExistingServer: true` is appropriate.
+- Visual tests pass for A1–A5 × S1/S2/S3/S6 (16 tests)
+- A5 has only 4 scenarios (S1, S2, S3, S6) — missing 6
+- A6 does not exist
+- A5 S3Page has a `className=` violation that will fail the no-classname test
+- Several code quality issues across A1–A4
 
 ---
 
-## Implementation Plan
+## Phase 1 — Code quality fixes + A5 className violation (frontend-dev agent)
 
-### Phase 1 — Fix remaining visual differences (frontend-dev agent)
+**Delegate to frontend-dev agent. Run `/check` + unit tests after.**
 
-**File 1**: `packages/web-frontend/src/app/pages/_lego/_2_context-provider/_framework/ViewDataTable.tsx`
+### 1.1 Fix A5 S3Page className violation (BLOCKING — test will fail)
 
-- Change `placeholder="Search products..."` → `placeholder="Search..."`
+`packages/web-frontend/src/app/pages/_lego/_5_query-pipeline/S3_FullFeatured/S3Page.tsx`
 
-**File 2 (investigation + fix)**: Backend `packages/web-backend/src/services/ProductsService.ts`
+Currently wraps children in `<div className="flex h-full flex-col gap-4">` directly in the page.
 
-- Root cause: `pagination.pageSize` in response = 6 (hardcoded default) instead of echoing the requested pageSize
-- Pattern to follow: `packages/web-backend/src/services/BooksService.ts`
-- Fix: ensure pagination response reflects the actual `pageSize` from the request params
+Fix: Create `PipelineContent` wrapper component in the A5 framework:
 
-Run `/check` and `/run-test` after these fixes. All 192 unit tests must still pass.
+- **New file**: `packages/web-frontend/src/app/pages/_lego/_5_query-pipeline/_framework/PipelineContent.tsx`
+    - Renders `<div className="flex h-full flex-col gap-4">{children}</div>`
+- Update S3Page.tsx, S2Page.tsx, S6Page.tsx to use `<PipelineContent>` instead of raw `<div className>`
 
----
+### 1.2 G1 — Audit and remove `index.ts` files in lego
 
-### Phase 2 — New Playwright config (frontend-dev agent)
+Glob `packages/web-frontend/src/app/pages/_lego/**/*.ts` for any `index.ts`. Remove them if found.
 
-**New file**: `packages/e2e-web/playwright.config.lego-visual.ts`
+### 1.3 G2 — Remove one-liner if/return patterns
 
-```typescript
-import { defineConfig, devices } from '@playwright/test';
-import path from 'path';
+Grep `packages/web-frontend/src/app/pages/_lego/` for:
 
-const projectRoot = path.resolve(__dirname, '../..');
+- Pattern: `if \(.*\) return` on a single line
+- Add braces to all `if` bodies that lack them across A1–A5
 
-export default defineConfig({
-	testDir: path.resolve(projectRoot, 'packages/e2e-web/test-lego-visual'),
-	outputDir: path.resolve(projectRoot, 'packages/e2e-web/test-lego-visual/_results/_misc'),
-	timeout: 30_000,
-	fullyParallel: false, // serial within describe blocks must be respected
-	workers: 1, // single worker: avoids port/state race conditions
-	retries: 0,
-	reporter: [['html', { outputFolder: 'test-lego-visual/_results/html', open: 'on-failure' }], ['list']],
-	use: {
-		baseURL: `http://localhost:${process.env.LEGO_APP_PORT || 5310}`,
-		screenshot: 'only-on-failure',
-		video: 'retain-on-failure',
-		actionTimeout: 10_000,
-		navigationTimeout: 15_000,
-	},
-	snapshotPathTemplate: '{testDir}/{testFilePath}--snapshots/{arg}-{projectName}{ext}',
-	projects: [
-		{
-			name: 'lego-visual',
-			use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 900 } },
-			expect: {
-				toHaveScreenshot: {
-					maxDiffPixelRatio: 0.002,
-					maxDiffPixels: 100,
-					threshold: 0.2,
-					animations: 'disabled',
-				},
-			},
-		},
-	],
-	// Reuse the already-running dev server (dev-only, not CI)
-	webServer: {
-		command: 'echo "Dev server expected to be already running"',
-		url: `http://localhost:${process.env.LEGO_APP_PORT || 5310}`,
-		reuseExistingServer: true,
-	},
-});
-```
+### 1.4 A3.a — Verify MutableRefObject in HookDataTable
+
+`packages/web-frontend/src/app/pages/_lego/_3_feature-hooks/_framework/HookDataTable.tsx`
+
+If `MutableRefObject` is still used, replace with `RefObject`. If already `RefObject`, no change needed.
+
+### 1.5 A4.d — Remove null Toolbar from A4 S1Page
+
+`packages/web-frontend/src/app/pages/_lego/_4_context-children/S1_SimpleTable/S1Page.tsx`
+
+Remove any `<DataTable.Toolbar>{null}</DataTable.Toolbar>` if present.
+
+### 1.6 A4.c — Remove className from A4 pages
+
+Grep A4 page files (`_4_context-children/**/*Page.tsx`) for `className=`. Remove all; delegate styling to PageLayout or framework components.
+
+### 1.7 A3.b — Extract column render logic in HookDataTable
+
+`packages/web-frontend/src/app/pages/_lego/_3_feature-hooks/_framework/HookDataTable.tsx`
+
+Extract the inline column render function into a separate `HookColumnRenderer.tsx` helper or local function to reduce complexity.
+
+### 1.8 A2.b — Fix `void fetchProducts()` pattern
+
+`packages/web-frontend/src/app/pages/_lego/_2_context-provider/_framework/`
+
+The `void fetchProducts()` anti-pattern bypasses error handling. Fix by adding `.catch()` or wrapping in try/catch. Document the limitation.
+
+**Verification**: `/check` must pass, all unit tests must pass.
 
 ---
 
-### Phase 3 — Test file (frontend-dev agent)
+## Phase 2 — A5 missing scenarios (frontend-dev agent)
 
-**New file**: `packages/e2e-web/test-lego-visual/lego.cross-approach.visual.ts`
+**Delegate to frontend-dev agent. A5 needs 6 more scenarios.**
 
-**Key design decisions:**
+Reference: A1 implementations at `packages/web-frontend/src/app/pages/_lego/_1_widget-isolated/`
 
-- A1 is the **reference** (its screenshots are the stored baselines)
-- A2/A3/A4 compare against the **same snapshot file** as A1
-- `test.describe.serial` ensures A1 runs before comparators within each scenario
-- Updating baselines: run `--update-snapshots --grep "⚡"` (only A1 "⚡ baseline" tests match)
-- Normal run: all 4 approaches run; A2/A3/A4 compare against A1's stored PNG
+For each scenario, create the A5 equivalent using `PipelineDataTable` + pipeline modifiers:
 
-**Scenarios covered:** S1 (Simple Table), S3 (Full Featured)
+| Scenario                    | Folder                               | A1 reference                                            |
+| --------------------------- | ------------------------------------ | ------------------------------------------------------- |
+| S4 — Grid popup             | `S4_GridPopup/S4Page.tsx`            | `_1_widget-isolated/S4_GridPopup/S4Page.tsx`            |
+| S5 — Carousel               | `S5_Carousel/S5Page.tsx`             | `_1_widget-isolated/S5_Carousel/S5Page.tsx`             |
+| S7 — Master-detail nav      | `S7_MasterDetailNav/S7Page.tsx`      | `_1_widget-isolated/S7_MasterDetailNav/S7Page.tsx`      |
+| S9 — Two independent tables | `S9_TwoIndependentTables/S9Page.tsx` | `_1_widget-isolated/S9_TwoIndependentTables/S9Page.tsx` |
+| S10 — Inline editing        | `S10_InlineEditing/S10Page.tsx`      | `_1_widget-isolated/S10_InlineEditing/S10Page.tsx`      |
+| S11 — Three edit modes      | `S11_ThreeEditModes/S11Page.tsx`     | `_1_widget-isolated/S11_ThreeEditModes/S11Page.tsx`     |
 
-```typescript
-import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
+All under `packages/web-frontend/src/app/pages/_lego/_5_query-pipeline/`.
 
-// Wait for table data to be fully rendered
-async function waitForTableData(page: Page): Promise<void> {
-	await page.waitForLoadState('networkidle');
-	await page.locator('tbody tr').first().waitFor({ state: 'visible', timeout: 10_000 });
-}
+Add routes in `packages/web-frontend/src/app/App.tsx` for `/lego/5/s4`, `/lego/5/s5`, `/lego/5/s7`, `/lego/5/s9`, `/lego/5/s10`, `/lego/5/s11`.
 
-const APPROACHES = [
-	{ id: 1, name: 'widget-isolated' },
-	{ id: 2, name: 'context-provider' },
-	{ id: 3, name: 'feature-hooks' },
-	{ id: 4, name: 'context-children' },
-] as const;
+**Zero className in page files** — use `PipelineContent` or new pipeline framework wrappers.
 
-const SCENARIOS = [
-	{ id: 's1', name: 'Simple Table' },
-	{ id: 's3', name: 'Full Featured' },
-] as const;
-
-for (const scenario of SCENARIOS) {
-	test.describe.serial(`${scenario.id.toUpperCase()} — ${scenario.name}`, () => {
-		// A1 establishes the baseline — only this test runs with --update-snapshots
-		test(`⚡ A1 baseline (${APPROACHES[0].name})`, async ({ page }) => {
-			await page.goto(`/lego/1/${scenario.id}`);
-			await waitForTableData(page);
-			await expect(page).toHaveScreenshot([scenario.id, 'reference.png']);
-		});
-
-		// A2/A3/A4 compare against A1's reference
-		for (const approach of APPROACHES.slice(1)) {
-			test(`A${approach.id} matches reference (${approach.name})`, async ({ page }) => {
-				await page.goto(`/lego/${approach.id}/${scenario.id}`);
-				await waitForTableData(page);
-				await expect(page).toHaveScreenshot([scenario.id, 'reference.png']);
-			});
-		}
-	});
-}
-```
+**Verification**: `/check` must pass.
 
 ---
 
-### Phase 4 — NPM scripts
+## Phase 3 — Create A6 (Data2-based approach) (frontend-dev agent)
 
-**Update** `packages/e2e-web/package.json` — add:
+**New approach: `_6_data2-based/`**
 
-```json
-"test:lego-visual": "playwright test --config=playwright.config.lego-visual.ts",
-"test:lego-visual:update-baseline": "playwright test --config=playwright.config.lego-visual.ts --update-snapshots --grep=\"⚡\"",
-"test:lego-visual:ui": "playwright test --config=playwright.config.lego-visual.ts --ui"
-```
+Architecture: Uses `Data2` + `Table2` + `hooks2` family. No eventBus, no context/provider, no pipeline.
+Independent feature hooks compose the query; `Data2` fetches and injects data via render props.
+
+Key dependencies:
+
+- `Data2`: `packages/web-frontend/src/framework/components2/data/Data2.tsx`
+- `Table2`: `packages/web-frontend/src/framework/components2/table/Table2.tsx`
+- Hooks: `packages/web-frontend/src/framework/hooks2/data/usePagination2.ts`, `useSorting2.ts`, `useSimpleSearch.ts`, etc.
+
+### 3.1 Create framework scaffolding
+
+New folder: `packages/web-frontend/src/app/pages/_lego/_6_data2-based/_framework/`
+
+- `PageLayout.tsx` — reuse or copy from A5 framework
+- `Data2Table.tsx` — wrapper component composing Data2 + Table2 with standard features
+
+Pattern for each page: page creates hooks (usePagination2, useSorting2, etc.) and passes contracts to `<Data2>`. Children render via render prop or cloneElement.
+
+### 3.2 Implement all 10 scenarios
+
+Reference A1 for feature requirements. Use Data2 pattern throughout.
+
+| Scenario                    | Notes                                                                  |
+| --------------------------- | ---------------------------------------------------------------------- |
+| S1 — Simple table           | Basic Data2 + Table2, no features                                      |
+| S2 — Table with pagination  | Add `usePagination2`                                                   |
+| S3 — Full featured          | Add usePagination2 + useSorting2 + useSimpleSearch + column visibility |
+| S4 — Grid popup             | Grid layout variant                                                    |
+| S5 — Carousel               | Carousel layout                                                        |
+| S6 — Item detail            | Split layout, Data2 for list + single-item fetch for detail            |
+| S7 — Master-detail nav      | Navigation pattern                                                     |
+| S9 — Two independent tables | Two independent Data2 instances                                        |
+| S10 — Inline editing        | Mutation via MutationContract                                          |
+| S11 — Three edit modes      | Dialog / inline / form-below                                           |
+
+### 3.3 Add routes
+
+`packages/web-frontend/src/app/App.tsx` — add `/lego/6/s1` through `/lego/6/s11`.
+
+**Verification**: `/check` must pass.
 
 ---
 
-### Phase 5 — Establish baselines and verify
+## Phase 4 — New cross-approach scenarios (frontend-dev agents, parallel)
 
-```bash
-# 1. Ensure dev server is running (both frontend + backend)
-cd packages/web-frontend && npm run dev   # in one terminal
-cd packages/web-backend && npm run dev    # in another
+**5 new scenarios to implement across ALL 6 approaches.**
 
-# 2. Establish A1 baselines
-cd packages/e2e-web && npm run test:lego-visual:update-baseline
+### S_BUS — EventBus exploitation (A1.e)
 
-# 3. Run full cross-approach comparison
-npm run test:lego-visual
+- Table + selected item panel below
+- Click row → load item, refresh on re-click
+- Keyboard arrows to navigate rows
+- URL contains selected item id (`?id=xxx`)
+- Implement for all approaches (A1 eventBus natural fit; A2–A6 via prop/state)
 
-# Expected: 8 tests pass (4 approaches × 2 scenarios)
-```
+### S_2TABLES — Two independent tables (A2.e)
+
+- Same page, two tables, different item types (e.g., Products + Books)
+- Tables are fully independent (separate state/queries)
+- Implement for all approaches
+
+### S_EDIT — Three edit modes fork (A4.b)
+
+- Fork of SimpleTable with edit capability via (a) dialog, (b) inline cell editing, (c) form below
+- Implement for all approaches
+
+### S_FORK_FEAT — Feature fork (A2.g)
+
+- Fork of an existing page adding a new feature (e.g., multi-level sorting or side-by-side item comparison)
+- Implement for all approaches
+
+### S_WS — WebSocket real-time (A1.f)
+
+- Real-time table with WebSocket updates (items added/updated/removed live)
+- Requires backend WebSocket endpoint
+- Implement for all approaches — goal is to observe architectural impact
+
+Folder naming: `S_BUS/`, `S_2TABLES/`, `S_EDIT/`, `S_FORK_FEAT/`, `S_WS/` under each approach directory.
+Routes: `/lego/{1-6}/s_bus`, `/lego/{1-6}/s_2tables`, etc.
+
+**Delegation strategy**: Run 2–3 frontend-dev agents in parallel, each handling a subset of approaches for a given scenario.
+
+**Verification**: `/check` must pass per agent.
 
 ---
 
-## Snapshot directory structure
+## Phase 5 — Expand visual tests to all scenarios (frontend-dev agent)
 
-```
-packages/e2e-web/test-lego-visual/
-  lego.cross-approach.visual.ts
-  lego.cross-approach.visual.ts--snapshots/
-    s1/
-      reference-lego-visual.png    ← A1 baseline for S1
-    s3/
-      reference-lego-visual.png    ← A1 baseline for S3
-  _results/
-    html/
-```
+`packages/e2e-web/test-lego-visual/lego.cross-approach.visual.ts`
+
+Extend `APPROACHES` to include A6. Extend `SCENARIOS` to cover all scenarios including S4, S5, S7, S9, S10, S11, S_BUS, S_2TABLES, S_EDIT, S_FORK_FEAT, S_WS (once implemented).
+
+Some scenarios require custom `waitFor` logic (e.g., S6 has a detail panel — wait for split layout, not just first tbody row).
+
+**Steps**:
+
+1. Establish A1 baselines: `npm run test:lego-visual:update-baseline`
+2. Run full suite: `npm run test:lego-visual`
+3. Fix any visual regressions until all tests pass
 
 ---
 
-## Workflow for future changes
+## Phase 6 — Unit tests per approach (one frontend-dev agent per approach)
 
-| Intent                          | Command                                                    |
-| ------------------------------- | ---------------------------------------------------------- |
-| Verify all 4 match              | `npm run test:lego-visual`                                 |
-| Intentional visual change in A1 | `npm run test:lego-visual:update-baseline` then re-run all |
-| Debug a failure                 | `npm run test:lego-visual:ui`                              |
+**T1 — Unit tests for each approach, placed next to implementation.**
+
+Per approach, test:
+
+- Core data hook/service integration (mock service, verify query params)
+- Feature composition (pagination changes trigger refetch)
+- Timing (loading state set/unset correctly)
+- Error handling (service throws → error state shown)
+- Concurrency (rapid state changes → only last result used)
+
+Key files to test:
+
+| Approach | Primary test target                              |
+| -------- | ------------------------------------------------ |
+| A1       | `WidgetDataTable.tsx` + `useWidgetQuery.ts`      |
+| A2       | `ProductDomainContext.tsx` + `ViewDataTable.tsx` |
+| A3       | `HookDataTable.tsx` + each feature hook          |
+| A4       | `DataTableContext.ts` + `DataTable.tsx`          |
+| A5       | `usePipeline.ts` + `PipelineContext.tsx`         |
+| A6       | Data2 composition in `Data2Table.tsx`            |
+
+Test files placed next to implementation: e.g., `WidgetDataTable.test.tsx`.
+
+---
+
+## Phase 7 — Documentation items (frontend-dev agent)
+
+Add JSDoc / inline documentation to the following files:
+
+| Item | File                                                | Content                                                                                            |
+| ---- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| A1.b | `_1_widget-isolated/_framework/WidgetDataTable.tsx` | "Immutable lego brick" strategy: features pre-determined in widget, extension via slots + eventBus |
+| A1.h | Same                                                | Adding new display feature requires modifying all WidgetXxx components                             |
+| A2.a | `_2_context-provider/_framework/DomainContext.tsx`  | DomainContext tightly coupled to item list; limits for single-item or multi-source pages           |
+| A2.c | `_2_context-provider/_framework/ViewDataTable.tsx`  | `actions` in useMemo return void — no user feedback/toasts                                         |
+| A2.d | Same                                                | A2 adds complexity layer vs A1; provider becomes a factory when features grow                      |
+| A2.f | `_2_context-provider/` page or layout               | Provider positioned above page — why: context must wrap all consumers                              |
+| A2.h | `_2_context-provider/_framework/`                   | Tension: simple views (pro) vs provider factory (con)                                              |
+| A3.c | `_3_feature-hooks/_framework/HookDataTable.tsx`     | Same limitation as A1.h: display features hard-coded in HookXxx                                    |
+| A3.d | Analysis doc                                        | "Verbose pages" is a feature, not a bug — explicit composition is readable                         |
+| A4.a | `_4_context-children/_framework/DataTable.tsx`      | New feature requires modifying DataTable base; frozen evolution path                               |
+| A4.e | Analysis doc                                        | Pages very verbose (cons): each slot must be explicitly composed                                   |
+
+---
+
+## Phase 8 — Antifragility analysis (3 sub-agents in parallel — G6)
+
+Once all phases complete, launch 3 independent Explore sub-agents to analyze:
+
+1. **Agent A** — Antifragile characteristics: which approaches improve under stress (new features, new scenarios, unexpected requirements)?
+2. **Agent B** — Robust characteristics: which approaches handle known scenarios well but break under novel requirements?
+3. **Agent C** — Fragile characteristics: which approaches require modification of core code for each new requirement?
+
+Each agent reads all 6 approaches and produces a comparative table using Taleb's framework:
+
+- Antifragile: gains from disorder (A3 feature-hooks, A6 Data2-based?)
+- Robust: resists disorder but doesn't benefit
+- Fragile: harmed by disorder (A1 widget-isolated, A4 context-children?)
+
+Compile into a final `_lego/ANALYSIS.md`.
 
 ---
 
 ## Execution order
 
 ```
-Phase 1 — frontend-dev agent:
-  - Fix A2 placeholder
-  - Fix backend pagination (Products service)
-  - /check + /run-test → must pass
+Phase 1 — frontend-dev agent (1)
+  → Code quality + A5 className fix + /check + unit tests
 
-Phase 2+3+4 — frontend-dev agent (same agent):
-  - Create playwright.config.lego-visual.ts
-  - Create test-lego-visual/ + test file
-  - Add npm scripts
+Phase 2 — frontend-dev agent (1)
+  → A5 missing 6 scenarios + /check
 
-Phase 5 — manual or agent-browser:
-  - Start dev servers
-  - npm run test:lego-visual:update-baseline  (creates A1 baselines)
-  - npm run test:lego-visual                  (verifies all 4 match)
+Phase 3 — frontend-dev agent (1)
+  → A6 creation (all 10 scenarios) + /check
+
+Phase 4 — frontend-dev agents (2–3 in parallel)
+  → New cross-approach scenarios (S_BUS, S_2TABLES, S_EDIT, S_FORK_FEAT, S_WS) + /check
+
+Phase 5 — frontend-dev agent (1)
+  → Expand visual tests + update baselines + run full suite
+
+Phase 6 — frontend-dev agents (1 per approach, 6 in parallel)
+  → Unit tests per approach
+
+Phase 7 — frontend-dev agent (1)
+  → Documentation items
+
+Phase 8 — 3 Explore sub-agents in parallel
+  → Antifragility analysis → ANALYSIS.md
 ```
+
+---
+
+## Critical files
+
+| File                                                      | Phase | Action                                    |
+| --------------------------------------------------------- | ----- | ----------------------------------------- |
+| `_5_query-pipeline/S3_FullFeatured/S3Page.tsx`            | 1     | Remove className div, use PipelineContent |
+| `_5_query-pipeline/_framework/PipelineContent.tsx`        | 1     | Create new                                |
+| `_3_feature-hooks/_framework/HookDataTable.tsx`           | 1     | Verify RefObject, extract column renderer |
+| `_4_context-children/S1_SimpleTable/S1Page.tsx`           | 1     | Remove null Toolbar if present            |
+| `_2_context-provider/_framework/` (fetchProducts)         | 1     | Fix void pattern                          |
+| `_5_query-pipeline/S4_GridPopup/` → `S11_ThreeEditModes/` | 2     | Create (6 files)                          |
+| `_6_data2-based/` (entire approach)                       | 3     | Create from scratch                       |
+| `App.tsx`                                                 | 2+3+4 | Add routes per phase                      |
+| `test-lego-visual/lego.cross-approach.visual.ts`          | 5     | Expand scenarios + add A6                 |
+| `_lego/__tests__/no-classname-in-pages.test.ts`           | 1     | Verify covers A5/A6 (no exclusions)       |

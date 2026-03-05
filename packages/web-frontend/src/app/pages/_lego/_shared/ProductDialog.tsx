@@ -53,7 +53,9 @@ export function ProductDialog({ open, onClose, item, onSave, onRefresh, isRefres
 	// Prepare initial data for the form (only in edit mode)
 	// Memoized to prevent unnecessary form resets
 	const initialData = useMemo(() => {
-		if (!item) return undefined;
+		if (!item) {
+			return undefined;
+		}
 		return {
 			name: item.name,
 			description: item.description,

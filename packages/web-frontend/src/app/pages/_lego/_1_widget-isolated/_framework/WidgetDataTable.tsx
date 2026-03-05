@@ -1,8 +1,7 @@
-import { type MutableRefObject, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { type RefObject, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
 import { ColumnVisibility } from '@framework/components/columns/ColumnVisibility';
-import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import { SearchInput } from '@framework/components/search/SearchInput';
 import { Table, type TableColumn } from '@framework/components/table/Table';
@@ -16,9 +15,10 @@ import type {
 	SearchConfig,
 	SortingConfig,
 } from '@framework/lego';
-import { resolveFeature } from '@framework/lego';
-import { Check, Edit, Plus, Trash2, X } from 'lucide-react';
+import { renderColumnValue, resolveFeature } from '@framework/lego';
+import { Edit, Plus, Trash2 } from 'lucide-react';
 
+import { useGlobalPageEventsOptional } from './GlobalEventContext';
 import { useWidgetDataFetch } from './useWidgetDataFetch';
 import { useWidgetQuery } from './useWidgetQuery';
 
@@ -35,6 +35,22 @@ import { useWidgetQuery } from './useWidgetQuery';
  * - Event bus integration (emits/listens)
  * - Feature-driven UI composition
  * - Zero CSS at page level
+ *
+ * ===========================================================================================
+ * DESIGN NOTES - Approach A1 Trade-offs
+ * ===========================================================================================
+ *
+ * A1.b - Immutable Lego Brick Strategy:
+ * This widget is a self-contained unit with a fixed feature set. Features are pre-determined
+ * and configured via the `features` prop array. Extension happens through:
+ * - Slots (e.g., renderActions, onRowClick callbacks)
+ * - Event bus (emits/listens for cross-widget communication)
+ * The widget itself is immutable - you cannot compose new features into it at runtime.
+ *
+ * A1.h - Display Feature Rigidity:
+ * Adding a new display feature (e.g., new column type, card layout, grid view) requires
+ * modifying ALL WidgetXxx components (WidgetDataTable, WidgetDetailPanel, WidgetItemGrid, etc.).
+ * There is no composition point for new display variants. The widget is a closed system.
  *
  * ===========================================================================================
  */
@@ -63,7 +79,7 @@ export interface WidgetDataTableProps<T> {
 	features: DataTableFeature[];
 	emits?: string[];
 	listens?: string[];
-	onRefreshRef?: MutableRefObject<(() => void) | undefined>;
+	onRefreshRef?: RefObject<(() => void) | undefined>;
 }
 
 export function WidgetDataTable<T extends { id: string }>({
@@ -72,24 +88,37 @@ export function WidgetDataTable<T extends { id: string }>({
 	features,
 	onRefreshRef,
 }: WidgetDataTableProps<T>) {
+	const eventBus = useGlobalPageEventsOptional();
+
 	const { query, setSearch, setPage, setPageSize, setSort } = useWidgetQuery(features);
 
-	const searchConfig = features
-		.map(f => resolveFeature<SearchConfig>(f as string | SearchConfig, 'search'))
-		.find(Boolean);
-	const paginationConfig = features
-		.map(f => resolveFeature<PaginationConfig>(f as string | PaginationConfig, 'pagination'))
-		.find(Boolean);
-	const sortingConfig = features
-		.map(f => resolveFeature<SortingConfig>(f as string | SortingConfig, 'sorting'))
-		.find(Boolean);
-	const columnVisibilityConfig = features
-		.map(f => resolveFeature<ColumnVisibilityConfig>(f as string | ColumnVisibilityConfig, 'column-visibility'))
-		.find(Boolean);
-	const bulkDeleteConfig = features
-		.map(f => resolveFeature<BulkDeleteConfig>(f as string | BulkDeleteConfig, 'bulk-delete'))
-		.find(Boolean);
-	const crudConfig = features.map(f => resolveFeature<CrudConfig>(f as string | CrudConfig, 'crud')).find(Boolean);
+	const featureConfigs = useMemo(() => {
+		return {
+			search: features.map(f => resolveFeature<SearchConfig>(f as string | SearchConfig, 'search')).find(Boolean),
+			pagination: features
+				.map(f => resolveFeature<PaginationConfig>(f as string | PaginationConfig, 'pagination'))
+				.find(Boolean),
+			sorting: features
+				.map(f => resolveFeature<SortingConfig>(f as string | SortingConfig, 'sorting'))
+				.find(Boolean),
+			columnVisibility: features
+				.map(f =>
+					resolveFeature<ColumnVisibilityConfig>(f as string | ColumnVisibilityConfig, 'column-visibility')
+				)
+				.find(Boolean),
+			bulkDelete: features
+				.map(f => resolveFeature<BulkDeleteConfig>(f as string | BulkDeleteConfig, 'bulk-delete'))
+				.find(Boolean),
+			crud: features.map(f => resolveFeature<CrudConfig>(f as string | CrudConfig, 'crud')).find(Boolean),
+		};
+	}, [features]);
+
+	const searchConfig = featureConfigs.search;
+	const paginationConfig = featureConfigs.pagination;
+	const sortingConfig = featureConfigs.sorting;
+	const columnVisibilityConfig = featureConfigs.columnVisibility;
+	const bulkDeleteConfig = featureConfigs.bulkDelete;
+	const crudConfig = featureConfigs.crud;
 
 	const { items, loading, pagination, refresh } = useWidgetDataFetch({
 		fetchFn: async q => {
@@ -126,52 +155,13 @@ export function WidgetDataTable<T extends { id: string }>({
 		}
 	}, [refresh, onRefreshRef]);
 
-	// Build TableColumn array from ColumnDef array using renderCellValue logic
+	// Build TableColumn array from ColumnDef array
 	const tableColumns: TableColumn<T>[] = useMemo(() => {
-		const renderCellValue = (item: T, col: ColumnDef<T>): ReactNode => {
-			if (col.render) return col.render(item);
-
-			const value = item[col.key];
-
-			if (col.type === 'boolean') {
-				return value ? (
-					<Check className="size-4 text-primary" />
-				) : (
-					<X className="size-4 text-muted-foreground" />
-				);
-			}
-
-			if (col.type === 'number' && typeof value === 'number') {
-				return (
-					<span>
-						{col.prefix}
-						{value.toFixed(2)}
-						{col.suffix}
-					</span>
-				);
-			}
-
-			if (col.type === 'enum' && col.badge) {
-				return <Badge variant="secondary">{String(value)}</Badge>;
-			}
-
-			if (col.type === 'date') {
-				if (value instanceof Date) {
-					return value.toLocaleDateString();
-				}
-				if (typeof value === 'string') {
-					return new Date(value).toLocaleDateString();
-				}
-			}
-
-			return String(value || '');
-		};
-
 		return columns.map(col => ({
 			key: col.key as string,
 			label: col.label,
 			sortable: col.sortable,
-			render: (item: T, _isEditing: boolean) => renderCellValue(item, col),
+			render: (item: T, _isEditing: boolean) => renderColumnValue(col, item),
 		}));
 	}, [columns]);
 
@@ -205,7 +195,9 @@ export function WidgetDataTable<T extends { id: string }>({
 	};
 
 	const handleDelete = async (id: string) => {
-		if (!service.deleteProduct) return;
+		if (!service.deleteProduct) {
+			return;
+		}
 		if (confirm('Delete this item?')) {
 			await service.deleteProduct(id);
 			refresh();
@@ -213,7 +205,9 @@ export function WidgetDataTable<T extends { id: string }>({
 	};
 
 	const handleBulkDelete = async () => {
-		if (!service.bulkDeleteProducts) return;
+		if (!service.bulkDeleteProducts) {
+			return;
+		}
 		if (confirm(`Delete ${selectedIds.size} items?`)) {
 			await service.bulkDeleteProducts(Array.from(selectedIds));
 			setSelectedIds(new Set());
@@ -252,40 +246,42 @@ export function WidgetDataTable<T extends { id: string }>({
 
 	return (
 		<div className="flex h-full flex-col gap-4">
-			<div className="flex items-center gap-2">
-				{searchConfig && (
-					<SearchInput
-						value={query.search}
-						onChange={setSearch}
-						placeholder={searchConfig.placeholder || 'Search...'}
-						className="flex-1"
-					/>
-				)}
-				{columnVisibilityConfig && (
-					<ColumnVisibility
-						columns={columns.map(c => ({ id: c.key as string, label: c.label }))}
-						visibleColumns={visibleColumns}
-						onToggle={id => {
-							const newSet = new Set(visibleColumns);
-							if (newSet.has(id)) {
-								newSet.delete(id);
-							} else {
-								newSet.add(id);
-							}
-							setVisibleColumns(newSet);
-						}}
-						onReset={() => setVisibleColumns(new Set(columns.map(c => c.key as string)))}
-						onShowAll={() => setVisibleColumns(new Set(columns.map(c => c.key as string)))}
-						onHideAll={() => setVisibleColumns(new Set())}
-					/>
-				)}
-				{crudConfig && (
-					<Button onClick={handleCreate}>
-						<Plus className="size-4" />
-						Add
-					</Button>
-				)}
-			</div>
+			{(searchConfig || columnVisibilityConfig || crudConfig) && (
+				<div className="flex items-center gap-2">
+					{searchConfig && (
+						<SearchInput
+							value={query.search}
+							onChange={setSearch}
+							placeholder={searchConfig.placeholder || 'Search...'}
+							className="flex-1"
+						/>
+					)}
+					{columnVisibilityConfig && (
+						<ColumnVisibility
+							columns={columns.map(c => ({ id: c.key as string, label: c.label }))}
+							visibleColumns={visibleColumns}
+							onToggle={id => {
+								const newSet = new Set(visibleColumns);
+								if (newSet.has(id)) {
+									newSet.delete(id);
+								} else {
+									newSet.add(id);
+								}
+								setVisibleColumns(newSet);
+							}}
+							onReset={() => setVisibleColumns(new Set(columns.map(c => c.key as string)))}
+							onShowAll={() => setVisibleColumns(new Set(columns.map(c => c.key as string)))}
+							onHideAll={() => setVisibleColumns(new Set())}
+						/>
+					)}
+					{crudConfig && (
+						<Button onClick={handleCreate}>
+							<Plus className="size-4" />
+							Add
+						</Button>
+					)}
+				</div>
+			)}
 
 			{bulkDeleteConfig && selectedIds.size > 0 && (
 				<BulkActionBar
@@ -331,6 +327,14 @@ export function WidgetDataTable<T extends { id: string }>({
 							}
 						: undefined
 				}
+				onRowClick={
+					eventBus
+						? item => {
+								eventBus.emit('product:selected', { id: item.id, items });
+							}
+						: undefined
+				}
+				getRowClassName={eventBus ? () => 'cursor-pointer hover:bg-accent/20' : undefined}
 			/>
 
 			{dialogOpen && crudConfig && crudConfig.dialog && (

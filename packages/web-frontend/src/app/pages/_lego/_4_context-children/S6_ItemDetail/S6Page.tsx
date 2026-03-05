@@ -1,10 +1,13 @@
 import { col } from '@framework/lego';
 import type { Product } from '@shared/api/products.contract';
-import { PRODUCT_CATEGORIES } from '@shared/api/products.contract';
+import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
-import { DataTable, PageLayout } from '../_framework';
+import { DataTable } from '../_framework/DataTable';
+import { DetailPanel } from '../_framework/DetailPanel';
+import { PageLayout } from '../_framework/PageLayout';
+import { SplitLayout } from '../_framework/SplitLayout';
 
 /**
  * ===========================================================================================
@@ -23,39 +26,40 @@ import { DataTable, PageLayout } from '../_framework';
  */
 
 const tableColumns = [
-	col.text<Product>('name', 'Name'),
-	col.number<Product>('price', 'Price', { prefix: '$' }),
+	col.text<Product>('name', 'Name', { sortable: true, sticky: 'left' }),
+	col.number<Product>('price', 'Price', { prefix: '$', sortable: true }),
 	col.enum<Product>('category', 'Category', PRODUCT_CATEGORIES, { badge: true }),
+];
+
+const detailColumns = [
+	col.text<Product>('name', 'Name'),
+	col.text<Product>('description', 'Description'),
+	col.number<Product>('price', 'Price', { prefix: '$' }),
+	col.number<Product>('stock', 'Stock'),
+	col.enum<Product>('category', 'Category', PRODUCT_CATEGORIES, { badge: true }),
+	col.enum<Product>('status', 'Status', PRODUCT_STATUSES, { badge: true }),
+	col.number<Product>('rating', 'Rating'),
+	col.boolean<Product>('featured', 'Featured'),
+	col.date<Product>('createdAt', 'Created'),
 ];
 
 export function S6Page() {
 	return (
 		<PageLayout>
-			<div className="grid h-full gap-4 lg:grid-cols-2">
-				{/* Master Table */}
-				<div className="flex flex-col">
-					<h2 className="mb-4 text-lg font-semibold">Products</h2>
-					<DataTable service={productsService} columns={tableColumns}>
-						<div className="space-y-4">
+			<DataTable service={productsService} columns={tableColumns}>
+				<SplitLayout
+					left={
+						<DataTable.Content>
 							<DataTable.Body />
 							<DataTable.Footer>
 								<DataTable.Pagination defaultSize={10} />
 							</DataTable.Footer>
-						</div>
-					</DataTable>
-				</div>
-
-				{/* Detail Panel */}
-				<div className="flex flex-col">
-					<h2 className="mb-4 text-lg font-semibold">Details</h2>
-					<div className="flex-1 rounded-lg border border-border bg-card p-4">
-						<p className="text-muted-foreground">
-							Simplified implementation. Full DetailPanel compound component would follow the same
-							pattern.
-						</p>
-					</div>
-				</div>
-			</div>
+						</DataTable.Content>
+					}
+					right={<DetailPanel<Product> columns={detailColumns} />}
+					rightWidth="md"
+				/>
+			</DataTable>
 		</PageLayout>
 	);
 }

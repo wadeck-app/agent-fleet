@@ -5,7 +5,9 @@ import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contr
 import { ProductDialogAdapter } from '@app/pages/_lego/_shared/ProductDialogAdapter';
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
-import { DataTable, PageLayout } from '../_framework';
+import { DataTable } from '../_framework/DataTable';
+import { useDataTable } from '../_framework/DataTableContext';
+import { PageLayout } from '../_framework/PageLayout';
 
 /**
  * ===========================================================================================
@@ -37,23 +39,49 @@ const columns = [
 	col.date<Product>('createdAt', 'Created'),
 ];
 
+function S3Content() {
+	const ctx = useDataTable<Product>();
+
+	const handleSave = async (data: unknown) => {
+		if (ctx.editingItem) {
+			await ctx.service.updateProduct?.(ctx.editingItem.id, data);
+		} else {
+			await ctx.service.createProduct?.(data);
+		}
+		ctx.setDialogOpen(false);
+		ctx.refresh();
+	};
+
+	return (
+		<>
+			<DataTable.Content>
+				<DataTable.Toolbar>
+					<DataTable.Search />
+					<DataTable.ColumnVisibility />
+					<DataTable.CreateButton dialog={ProductDialogAdapter} />
+				</DataTable.Toolbar>
+				<DataTable.BulkBar />
+				<DataTable.Body />
+				<DataTable.Footer>
+					<DataTable.Pagination defaultSize={10} pageSizes={[10, 20, 50]} />
+				</DataTable.Footer>
+			</DataTable.Content>
+			{ctx.dialogOpen && (
+				<ProductDialogAdapter
+					item={ctx.editingItem}
+					onSave={handleSave}
+					onClose={() => ctx.setDialogOpen(false)}
+				/>
+			)}
+		</>
+	);
+}
+
 export function S3Page() {
 	return (
 		<PageLayout>
-			<DataTable service={productsService} columns={columns}>
-				<div className="flex h-full flex-col gap-4">
-					<DataTable.Toolbar>
-						<DataTable.Search />
-						<DataTable.ColumnVisibility />
-						<DataTable.CreateButton dialog={ProductDialogAdapter} />
-					</DataTable.Toolbar>
-					<DataTable.BulkBar />
-					<DataTable.Body />
-					<DataTable.Footer>
-						<DataTable.Pagination defaultSize={10} pageSizes={[10, 20, 50]} />
-					</DataTable.Footer>
-					<DataTable.Dialog dialog={ProductDialogAdapter} />
-				</div>
+			<DataTable service={productsService} columns={columns} enableSorting={true} enableCrud={true}>
+				<S3Content />
 			</DataTable>
 		</PageLayout>
 	);

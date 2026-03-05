@@ -147,7 +147,9 @@ describe.each(scenarios)('Lego Products $name - CRUD Flows', ({ name: _name, Pag
 
 		mocks.updateProduct.mockImplementation((id: string, data) => {
 			const existing = mockProductList.find(p => p.id === id);
-			if (!existing) return Promise.reject(new Error(`Product ${id} not found`));
+			if (!existing) {
+				return Promise.reject(new Error(`Product ${id} not found`));
+			}
 			return Promise.resolve({ ...existing, ...data, id, updatedAt: new Date(), version: existing.version + 1 });
 		});
 

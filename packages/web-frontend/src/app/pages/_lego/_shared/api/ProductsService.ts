@@ -173,7 +173,9 @@ export class ProductsService {
 	 * Example of business logic that would live in the service layer
 	 */
 	calculateAverageRating(products: Product[]): number {
-		if (products.length === 0) return 0;
+		if (products.length === 0) {
+			return 0;
+		}
 		const totalRating = products.reduce((acc, product) => acc + product.rating, 0);
 		return totalRating / products.length;
 	}

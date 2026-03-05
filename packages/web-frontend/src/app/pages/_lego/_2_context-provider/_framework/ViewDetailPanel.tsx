@@ -179,9 +179,9 @@ export function ViewDetailPanel<T extends Product = Product>({ columns, features
 
 	if (!selectedItem) {
 		return (
-			<Card className="p-8">
-				<div className="text-center text-muted-foreground">Select an item to view details</div>
-			</Card>
+			<div className="flex h-full items-center justify-center text-muted-foreground">
+				Select an item to view details
+			</div>
 		);
 	}
 

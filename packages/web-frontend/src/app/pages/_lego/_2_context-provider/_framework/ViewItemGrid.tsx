@@ -4,13 +4,12 @@ import { Checkbox } from '@framework/components/forms/Checkbox';
 import { Pagination } from '@framework/components/pagination/Pagination';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
-import { Card } from '@framework/components/primitives/Card';
 import { SearchInput } from '@framework/components/search/SearchInput';
 import type { ColumnDef } from '@framework/lego/types/ColTypes';
 import type { ItemGridFeature } from '@framework/lego/types/FeatureTypes';
 import { resolveFeature } from '@framework/lego/types/FeatureTypes';
 import type { Product } from '@shared/api/products.contract';
-import { Check, Edit, Minus, Plus, Trash2 } from 'lucide-react';
+import { Check, Edit, Plus, Trash2, X } from 'lucide-react';
 
 import { useProductDomain } from './ProductDomainContext';
 
@@ -136,49 +135,45 @@ export function ViewItemGrid<T extends Product = Product>({ columns, features }:
 
 		const value = item[col.key];
 
-		if (col.type === 'number') {
-			const prefix = col.prefix ?? '';
-			const suffix = col.suffix ?? '';
-			return `${prefix}${Number(value).toLocaleString()}${suffix}`;
+		if (col.type === 'boolean') {
+			return value ? <Check className="size-4 text-primary" /> : <X className="size-4 text-muted-foreground" />;
+		}
+
+		if (col.type === 'number' && typeof value === 'number') {
+			return (
+				<span>
+					{col.prefix}
+					{value.toFixed(2)}
+					{col.suffix}
+				</span>
+			);
 		}
 
 		if (col.type === 'enum' && col.badge) {
 			return <Badge variant="secondary">{String(value)}</Badge>;
 		}
 
-		if (col.type === 'boolean') {
-			return value ? (
-				<Check className="size-4 text-primary" />
-			) : (
-				<Minus className="size-4 text-muted-foreground" />
-			);
-		}
-
-		if (col.type === 'date') {
-			return value ? new Date(value as string | number | Date).toLocaleDateString() : '–';
-		}
-
-		return String(value ?? '');
+		return String(value || '');
 	};
 
 	return (
-		<div className="space-y-4">
-			{searchConfig && (
-				<div className="flex items-center gap-2">
+		<div className="flex h-full flex-col gap-4">
+			<div className="flex items-center gap-2">
+				{searchConfig && (
 					<SearchInput
 						value={context.query.search}
 						onChange={value => context.actions.setQuery({ search: value })}
-						onClear={() => context.actions.setQuery({ search: '' })}
-						placeholder="Search products..."
+						placeholder="Search..."
+						className="flex-1"
 					/>
-					{crudConfig && (
-						<Button onClick={handleCreate}>
-							<Plus className="mr-2 size-4" />
-							Create
-						</Button>
-					)}
-				</div>
-			)}
+				)}
+				{crudConfig && (
+					<Button onClick={handleCreate}>
+						<Plus className="size-4" />
+						Add
+					</Button>
+				)}
+			</div>
 
 			{bulkDeleteConfig && selectedIds.size > 0 && (
 				<div className="flex items-center justify-between rounded-md bg-muted p-4">
@@ -191,44 +186,42 @@ export function ViewItemGrid<T extends Product = Product>({ columns, features }:
 			)}
 
 			{context.loading ? (
-				<div className="text-center text-muted-foreground">Loading...</div>
+				<div className="p-8 text-center">Loading...</div>
 			) : context.items.length === 0 ? (
-				<div className="text-center text-muted-foreground">No items found</div>
+				<div className="p-8 text-center">No items found</div>
 			) : (
-				<div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 					{(context.items as T[]).map(item => (
-						<Card key={item.id} className="p-4">
+						<div key={item.id} className="rounded-lg border border-border bg-card p-4">
+							{bulkDeleteConfig && (
+								<div className="mb-2">
+									<Checkbox
+										checked={selectedIds.has(item.id)}
+										onCheckedChange={() => toggleSelection(item.id)}
+									/>
+								</div>
+							)}
 							<div className="space-y-2">
-								{bulkDeleteConfig && (
-									<div className="flex items-center justify-end">
-										<Checkbox
-											checked={selectedIds.has(item.id)}
-											onCheckedChange={() => toggleSelection(item.id)}
-										/>
-									</div>
-								)}
-
-								{columns.map(col => (
-									<div key={String(col.key)} className="flex justify-between">
-										<span className="font-medium">{col.label}:</span>
-										<span>{renderFieldValue(item, col)}</span>
+								{columns.slice(0, 4).map(col => (
+									<div key={String(col.key)} className="text-sm">
+										<span className="font-semibold">{col.label}: </span>
+										{renderFieldValue(item, col)}
 									</div>
 								))}
-
-								{crudConfig && (
-									<div className="flex gap-2 pt-2">
-										<Button variant="outline" size="sm" onClick={() => handleEdit(item)}>
-											<Edit className="mr-2 size-4" />
-											Edit
-										</Button>
-										<Button variant="destructive" size="sm" onClick={() => handleDelete(item)}>
-											<Trash2 className="mr-2 size-4" />
-											Delete
-										</Button>
-									</div>
-								)}
 							</div>
-						</Card>
+							{crudConfig && (
+								<div className="mt-4 flex gap-2">
+									<Button onClick={() => handleEdit(item)} size="sm" variant="outline">
+										<Edit className="size-3" />
+										Edit
+									</Button>
+									<Button onClick={() => handleDelete(item)} size="sm" variant="destructive">
+										<Trash2 className="size-3" />
+										Delete
+									</Button>
+								</div>
+							)}
+						</div>
 					))}
 				</div>
 			)}

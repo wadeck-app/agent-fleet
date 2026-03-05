@@ -6,7 +6,10 @@ import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contr
 
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
-import { HookDataTable, HookDetailPanel, SplitLayout, usePaginationFeature } from '../_framework';
+import { HookDataTable } from '../_framework/HookDataTable';
+import { HookDetailPanel } from '../_framework/HookDetailPanel';
+import { SplitLayout } from '../_framework/SplitLayout';
+import { usePaginationFeature } from '../_framework/usePaginationFeature';
 
 /**
  * ===========================================================================================
@@ -53,18 +56,17 @@ export function S6Page() {
 	const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
 
 	return (
-		<SplitLayout>
-			<div className="flex-1">
+		<SplitLayout
+			left={
 				<HookDataTable
 					service={productsService}
 					columns={tableColumns}
 					features={[pagination]}
 					onRowSelect={setSelectedId}
 				/>
-			</div>
-			<div className="w-96">
-				<HookDetailPanel service={productsService} columns={detailColumns} selectedId={selectedId} />
-			</div>
-		</SplitLayout>
+			}
+			right={<HookDetailPanel service={productsService} columns={detailColumns} selectedId={selectedId} />}
+			rightWidth="md"
+		/>
 	);
 }

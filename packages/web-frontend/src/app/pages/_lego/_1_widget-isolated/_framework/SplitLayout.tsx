@@ -1,6 +1,6 @@
 import React, { type ReactNode } from 'react';
 
-import { createPageEventContext } from './PageEventContext';
+import { GlobalPageEventProvider } from './GlobalEventContext';
 
 /**
  * ===========================================================================================
@@ -15,32 +15,39 @@ import { createPageEventContext } from './PageEventContext';
  * - Integrated event bus context
  * - Responsive flex layout
  * - Type-safe events per page
+ * - Configurable right panel width
  *
  * Usage:
  * ```tsx
- * type ProductPageEvents = {
- *   'product:selected': { id: string };
- * };
- *
- * <SplitLayout<ProductPageEvents>>
- *   <WidgetDataTable ... emits={['product:selected']} />
- *   <WidgetDetailPanel ... listens={['product:selected']} />
- * </SplitLayout>
+ * <SplitLayout
+ *   left={<WidgetDataTable ... emits={['product:selected']} />}
+ *   right={<WidgetDetailPanel ... listens={['product:selected']} />}
+ *   rightWidth="md"
+ * />
  * ```
  *
  * ===========================================================================================
  */
 
 export interface SplitLayoutProps {
-	children: ReactNode;
+	left: ReactNode;
+	right: ReactNode;
+	rightWidth?: 'sm' | 'md' | 'lg';
 }
 
-export function SplitLayout({ children }: SplitLayoutProps): React.ReactElement {
-	const { PageEventProvider } = createPageEventContext<Record<string, unknown>>();
+const RIGHT_WIDTH_CLASSES = {
+	sm: 'w-72',
+	md: 'w-96',
+	lg: 'w-[36rem]',
+} as const;
 
+export function SplitLayout({ left, right, rightWidth = 'md' }: SplitLayoutProps): React.ReactElement {
 	return (
-		<PageEventProvider>
-			<div className="flex h-full gap-4">{children}</div>
-		</PageEventProvider>
+		<GlobalPageEventProvider>
+			<div className="flex h-full gap-4">
+				<div className="flex-1">{left}</div>
+				<div className={RIGHT_WIDTH_CLASSES[rightWidth]}>{right}</div>
+			</div>
+		</GlobalPageEventProvider>
 	);
 }

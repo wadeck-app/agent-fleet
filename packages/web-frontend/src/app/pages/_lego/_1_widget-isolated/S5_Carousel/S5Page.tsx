@@ -4,7 +4,8 @@ import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contr
 
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
-import { PageLayout, WidgetCarousel } from '../_framework';
+import { PageLayout } from '../_framework/PageEventContext';
+import { WidgetCarousel } from '../_framework/WidgetCarousel';
 
 /**
  * ===========================================================================================

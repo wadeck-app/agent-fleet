@@ -4,7 +4,9 @@ import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contr
 
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
-import { HookDataTable, PageLayout, usePaginationFeature } from '../_framework';
+import { HookDataTable } from '../_framework/HookDataTable';
+import { PageLayout } from '../_framework/PageLayout';
+import { usePaginationFeature } from '../_framework/usePaginationFeature';
 
 /**
  * ===========================================================================================
@@ -30,7 +32,7 @@ const columns = [
 	col.enum<Product>('category', 'Category', PRODUCT_CATEGORIES, { badge: true }),
 	col.enum<Product>('status', 'Status', PRODUCT_STATUSES, { badge: true }),
 	col.boolean<Product>('featured', 'Featured'),
-	col.number<Product>('stock', 'Stock', { sortable: true }),
+	col.date<Product>('createdAt', 'Created'),
 ];
 
 export function S2Page() {

@@ -1,13 +1,13 @@
-import { type MutableRefObject, useEffect, useMemo, useState } from 'react';
+import { type RefObject, useEffect, useMemo, useState } from 'react';
 
 import { ColumnVisibility } from '@framework/components/columns/ColumnVisibility';
-import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import { SearchInput } from '@framework/components/search/SearchInput';
 import { Table } from '@framework/components/table/Table';
 import type { TableColumn } from '@framework/components/table/Table';
 import type { ColumnDef } from '@framework/lego';
-import { Check, Edit, Plus, Trash2, X } from 'lucide-react';
+import { renderColumnValue } from '@framework/lego';
+import { Edit, Plus, Trash2 } from 'lucide-react';
 
 import { useWidgetDataFetch } from '@app/pages/_lego/_1_widget-isolated/_framework/useWidgetDataFetch';
 
@@ -35,6 +35,16 @@ import type { SortingFeatureHook } from './useSortingFeature';
  * - A1: Widget owns state (internal hooks)
  * - A2: Context owns state (shared via provider)
  * - A3: Page owns hooks (passed as props) ← This approach
+ *
+ * ===========================================================================================
+ * DESIGN NOTES - Approach A3 Trade-offs
+ * ===========================================================================================
+ *
+ * A3.c - Display Feature Rigidity (Same as A1.h):
+ * Display features (columns, grid layout, card view) are hard-coded in HookXxx components.
+ * Adding a new display variant requires modifying HookDataTable or creating a new HookXxx
+ * component. There is no composition point for display variants - the widget is a closed
+ * system for rendering strategies.
  *
  * ===========================================================================================
  */
@@ -69,8 +79,9 @@ export interface HookDataTableProps<T> {
 	};
 	columns: ColumnDef<T>[];
 	features: DataTableFeatureHook[];
-	onRefreshRef?: MutableRefObject<(() => void) | undefined>;
+	onRefreshRef?: RefObject<(() => void) | undefined>;
 	onRowSelect?: (id: string) => void;
+	onItemsLoaded?: (items: T[]) => void;
 }
 
 export function HookDataTable<T extends { id: string }>({
@@ -79,6 +90,7 @@ export function HookDataTable<T extends { id: string }>({
 	features,
 	onRefreshRef,
 	onRowSelect,
+	onItemsLoaded,
 }: HookDataTableProps<T>) {
 	// Extract feature hooks by type
 	const searchFeature = features.find(f => f.type === 'search') as SearchFeatureHook | undefined;
@@ -99,53 +111,7 @@ export function HookDataTable<T extends { id: string }>({
 				key: col.key as string,
 				label: col.label,
 				sortable: col.sortable,
-				render: (item: T) => {
-					if (col.render) {
-						return col.render(item);
-					}
-
-					const value = item[col.key];
-
-					if (col.type === 'text') {
-						return <span>{String(value ?? '')}</span>;
-					}
-
-					if (col.type === 'number') {
-						const prefix = col.prefix ?? '';
-						const suffix = col.suffix ?? '';
-						return (
-							<span>
-								{prefix}
-								{typeof value === 'number' ? value.toFixed(2) : String(value)}
-								{suffix}
-							</span>
-						);
-					}
-
-					if (col.type === 'enum' && col.badge) {
-						return <Badge variant="secondary">{String(value)}</Badge>;
-					}
-
-					if (col.type === 'enum') {
-						return <span>{String(value)}</span>;
-					}
-
-					if (col.type === 'boolean') {
-						return value ? (
-							<Check className="size-4 text-primary" />
-						) : (
-							<X className="size-4 text-muted-foreground" />
-						);
-					}
-
-					if (col.type === 'date') {
-						return (
-							<span>{value ? new Date(value as string | number | Date).toLocaleDateString() : '–'}</span>
-						);
-					}
-
-					return <span>{String(value ?? '')}</span>;
-				},
+				render: (item: T) => renderColumnValue(col, item),
 			})),
 		[columns]
 	);
@@ -207,6 +173,12 @@ export function HookDataTable<T extends { id: string }>({
 		}
 	}, [refresh, onRefreshRef]);
 
+	useEffect(() => {
+		if (onItemsLoaded) {
+			onItemsLoaded(items);
+		}
+	}, [items, onItemsLoaded]);
+
 	// CRUD handlers
 	const handleCreate = () => {
 		setEditingItem(null);
@@ -219,7 +191,9 @@ export function HookDataTable<T extends { id: string }>({
 	};
 
 	const handleDelete = async (item: T) => {
-		if (!service.deleteProduct) return;
+		if (!service.deleteProduct) {
+			return;
+		}
 		if (confirm('Are you sure you want to delete this item?')) {
 			await service.deleteProduct(item.id);
 			refresh();
@@ -227,7 +201,9 @@ export function HookDataTable<T extends { id: string }>({
 	};
 
 	const handleBulkDelete = async () => {
-		if (!service.bulkDeleteProducts) return;
+		if (!service.bulkDeleteProducts) {
+			return;
+		}
 		if (confirm(`Are you sure you want to delete ${selectedIds.size} items?`)) {
 			await service.bulkDeleteProducts(Array.from(selectedIds));
 			setSelectedIds(new Set());
@@ -248,7 +224,9 @@ export function HookDataTable<T extends { id: string }>({
 
 	// Sorting handler
 	const handleSortChange = (key: string) => {
-		if (!sortingFeature) return;
+		if (!sortingFeature) {
+			return;
+		}
 
 		const currentSort = sortingFeature.sortBy === key ? sortingFeature.sortOrder : null;
 		const nextOrder: 'asc' | 'desc' = currentSort === 'asc' ? 'desc' : 'asc';
@@ -271,38 +249,40 @@ export function HookDataTable<T extends { id: string }>({
 	return (
 		<div className="flex h-full flex-col gap-4">
 			{/* Toolbar */}
-			<div className="flex items-center gap-2">
-				{searchFeature && (
-					<SearchInput
-						value={searchFeature.value}
-						onChange={searchFeature.onChange}
-						onClear={() => searchFeature.onChange('')}
-						placeholder={searchFeature.placeholder || 'Search...'}
-						className="flex-1"
-					/>
-				)}
-				{columnVisibilityFeature && (
-					<ColumnVisibility
-						columns={columns.map(c => ({ id: c.key as string, label: c.label }))}
-						visibleColumns={visibleColumns}
-						onToggle={id => {
-							const newSet = new Set(visibleColumns);
-							if (newSet.has(id)) newSet.delete(id);
-							else newSet.add(id);
-							setVisibleColumns(newSet);
-						}}
-						onReset={() => setVisibleColumns(new Set(columns.map(c => c.key as string)))}
-						onShowAll={() => setVisibleColumns(new Set(columns.map(c => c.key as string)))}
-						onHideAll={() => setVisibleColumns(new Set())}
-					/>
-				)}
-				{crudFeature && (
-					<Button onClick={handleCreate}>
-						<Plus className="size-4" />
-						Add
-					</Button>
-				)}
-			</div>
+			{(searchFeature || columnVisibilityFeature || crudFeature) && (
+				<div className="flex items-center gap-2">
+					{searchFeature && (
+						<SearchInput
+							value={searchFeature.value}
+							onChange={searchFeature.onChange}
+							onClear={() => searchFeature.onChange('')}
+							placeholder={searchFeature.placeholder || 'Search...'}
+							className="flex-1"
+						/>
+					)}
+					{columnVisibilityFeature && (
+						<ColumnVisibility
+							columns={columns.map(c => ({ id: c.key as string, label: c.label }))}
+							visibleColumns={visibleColumns}
+							onToggle={id => {
+								const newSet = new Set(visibleColumns);
+								if (newSet.has(id)) newSet.delete(id);
+								else newSet.add(id);
+								setVisibleColumns(newSet);
+							}}
+							onReset={() => setVisibleColumns(new Set(columns.map(c => c.key as string)))}
+							onShowAll={() => setVisibleColumns(new Set(columns.map(c => c.key as string)))}
+							onHideAll={() => setVisibleColumns(new Set())}
+						/>
+					)}
+					{crudFeature && (
+						<Button onClick={handleCreate}>
+							<Plus className="size-4" />
+							Add
+						</Button>
+					)}
+				</div>
+			)}
 
 			{/* Bulk delete bar */}
 			{bulkDeleteFeature && selectedIds.size > 0 && (

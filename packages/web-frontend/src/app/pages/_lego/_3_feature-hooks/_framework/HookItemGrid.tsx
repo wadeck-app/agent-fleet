@@ -2,12 +2,12 @@ import { type MutableRefObject, useEffect, useMemo, useState } from 'react';
 
 import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
 import { Checkbox } from '@framework/components/forms/Checkbox';
-import { PageSizeSelector } from '@framework/components/pagination/PageSizeSelector';
 import { Pagination } from '@framework/components/pagination/Pagination';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
+import { SearchInput } from '@framework/components/search/SearchInput';
 import type { ColumnDef } from '@framework/lego';
-import { Edit, Plus, Trash2 } from 'lucide-react';
+import { Check, Edit, Plus, Trash2, X } from 'lucide-react';
 
 import { useWidgetDataFetch } from '@app/pages/_lego/_1_widget-isolated/_framework/useWidgetDataFetch';
 
@@ -110,7 +110,9 @@ export function HookItemGrid<T extends { id: string }>({
 	};
 
 	const handleDelete = async (id: string) => {
-		if (!service.deleteProduct) return;
+		if (!service.deleteProduct) {
+			return;
+		}
 		if (confirm('Delete this item?')) {
 			await service.deleteProduct(id);
 			refresh();
@@ -118,7 +120,9 @@ export function HookItemGrid<T extends { id: string }>({
 	};
 
 	const handleBulkDelete = async () => {
-		if (!service.bulkDeleteProducts) return;
+		if (!service.bulkDeleteProducts) {
+			return;
+		}
 		if (confirm(`Delete ${selectedIds.size} items?`)) {
 			await service.bulkDeleteProducts(Array.from(selectedIds));
 			setSelectedIds(new Set());
@@ -151,14 +155,45 @@ export function HookItemGrid<T extends { id: string }>({
 		refresh();
 	};
 
-	const getFieldValue = (item: T, key: string | number | symbol): any => {
-		return item[key as keyof T];
+	const renderCellValue = (item: T, col: ColumnDef<T>) => {
+		if (col.render) {
+			return col.render(item);
+		}
+
+		const value = item[col.key];
+
+		if (col.type === 'boolean') {
+			return value ? <Check className="size-4 text-primary" /> : <X className="size-4 text-muted-foreground" />;
+		}
+
+		if (col.type === 'number' && typeof value === 'number') {
+			return (
+				<span>
+					{col.prefix}
+					{value.toFixed(2)}
+					{col.suffix}
+				</span>
+			);
+		}
+
+		if (col.type === 'enum' && col.badge) {
+			return <Badge variant="secondary">{String(value)}</Badge>;
+		}
+
+		return String(value || '');
 	};
 
 	return (
 		<div className="flex h-full flex-col gap-4">
-			<div className="flex items-center justify-between">
-				<h2 className="text-lg font-semibold">Products</h2>
+			<div className="flex items-center gap-2">
+				{searchFeature && (
+					<SearchInput
+						value={searchFeature.value}
+						onChange={searchFeature.onChange}
+						placeholder={searchFeature.placeholder || 'Search...'}
+						className="flex-1"
+					/>
+				)}
 				{crudFeature && (
 					<Button onClick={handleCreate}>
 						<Plus className="size-4" />
@@ -185,11 +220,11 @@ export function HookItemGrid<T extends { id: string }>({
 			{!loading && items.length === 0 && <div className="p-8 text-center">No items found</div>}
 
 			{!loading && items.length > 0 && (
-				<div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 					{items.map(item => (
-						<div key={item.id} className="relative rounded-lg border border-border bg-card p-4">
-							{(bulkDeleteFeature || crudFeature) && (
-								<div className="absolute right-2 top-2">
+						<div key={item.id} className="rounded-lg border border-border bg-card p-4">
+							{bulkDeleteFeature && (
+								<div className="mb-2">
 									<Checkbox
 										checked={selectedIds.has(item.id)}
 										onCheckedChange={() => toggleSelect(item.id)}
@@ -197,19 +232,12 @@ export function HookItemGrid<T extends { id: string }>({
 								</div>
 							)}
 							<div className="space-y-2">
-								{columns.slice(0, 4).map(col => {
-									const value = getFieldValue(item, col.key);
-									return (
-										<div key={col.key as string}>
-											<span className="text-sm font-semibold">{col.label}: </span>
-											{col.type === 'enum' && col.badge ? (
-												<Badge variant="secondary">{String(value)}</Badge>
-											) : (
-												<span className="text-sm">{String(value || '')}</span>
-											)}
-										</div>
-									);
-								})}
+								{columns.slice(0, 4).map(col => (
+									<div key={col.key as string} className="text-sm">
+										<span className="font-semibold">{col.label}: </span>
+										{renderCellValue(item, col)}
+									</div>
+								))}
 							</div>
 							{crudFeature && (
 								<div className="mt-4 flex gap-2">
@@ -217,7 +245,7 @@ export function HookItemGrid<T extends { id: string }>({
 										<Edit className="size-3" />
 										Edit
 									</Button>
-									<Button onClick={() => handleDelete(item.id)} size="sm" variant="outline">
+									<Button onClick={() => handleDelete(item.id)} size="sm" variant="destructive">
 										<Trash2 className="size-3" />
 										Delete
 									</Button>
@@ -231,20 +259,13 @@ export function HookItemGrid<T extends { id: string }>({
 			{paginationFeature && (
 				<div className="flex items-center justify-between">
 					<div className="text-sm text-muted-foreground">
-						Showing {items.length} of {pagination.total} items
+						Page {pagination.page} of {pagination.totalPages}
 					</div>
-					<div className="flex items-center gap-4">
-						<PageSizeSelector
-							value={paginationFeature.pageSize}
-							onChange={paginationFeature.setPageSize}
-							options={paginationFeature.pageSizes || [10, 20, 50]}
-						/>
-						<Pagination
-							currentPage={pagination.page}
-							totalPages={pagination.totalPages}
-							onPageChange={paginationFeature.setPage}
-						/>
-					</div>
+					<Pagination
+						currentPage={pagination.page}
+						totalPages={pagination.totalPages}
+						onPageChange={paginationFeature.setPage}
+					/>
 				</div>
 			)}
 

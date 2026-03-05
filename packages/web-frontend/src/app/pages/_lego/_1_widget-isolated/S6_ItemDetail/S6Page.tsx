@@ -4,7 +4,9 @@ import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contr
 
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
-import { SplitLayout, WidgetDataTable, WidgetDetailPanel } from '../_framework';
+import { SplitLayout } from '../_framework/SplitLayout';
+import { WidgetDataTable } from '../_framework/WidgetDataTable';
+import { WidgetDetailPanel } from '../_framework/WidgetDetailPanel';
 
 /**
  * ===========================================================================================
@@ -46,23 +48,24 @@ const detailColumns = [
 
 export function S6Page() {
 	return (
-		<SplitLayout>
-			<div className="flex-1">
+		<SplitLayout
+			left={
 				<WidgetDataTable
 					service={productsService}
 					columns={tableColumns}
 					features={['pagination']}
 					emits={['product:selected']}
 				/>
-			</div>
-			<div className="w-96">
+			}
+			right={
 				<WidgetDetailPanel
 					service={productsService}
 					columns={detailColumns}
 					features={['inline-edit']}
 					listens={['product:selected']}
 				/>
-			</div>
-		</SplitLayout>
+			}
+			rightWidth="md"
+		/>
 	);
 }

@@ -59,7 +59,9 @@ export function HookDetailPanel<T extends { id: string }>({ service, columns, se
 	};
 
 	const handleSave = async (key: string) => {
-		if (!item || !service.updateProduct) return;
+		if (!item || !service.updateProduct) {
+			return;
+		}
 
 		try {
 			const updatedData = { ...item, [key]: editValue };
@@ -80,80 +82,83 @@ export function HookDetailPanel<T extends { id: string }>({ service, columns, se
 		return item[key as keyof T];
 	};
 
+	if (loading) {
+		return <div className="flex h-full items-center justify-center">Loading...</div>;
+	}
+
+	if (!item) {
+		return (
+			<div className="flex h-full items-center justify-center text-muted-foreground">
+				Select an item to view details
+			</div>
+		);
+	}
+
 	return (
 		<div className="flex h-full flex-col gap-4 rounded-lg border border-border bg-card p-4">
 			<h2 className="text-lg font-semibold">Product Details</h2>
+			<div className="space-y-4">
+				{columns.map(col => {
+					const value = getFieldValue(item, col.key);
+					const isEditing = editingField === col.key;
 
-			{loading && <div className="p-8 text-center">Loading...</div>}
-
-			{!loading && !item && (
-				<div className="p-8 text-center text-muted-foreground">Select an item to view details</div>
-			)}
-
-			{!loading && item && (
-				<div className="space-y-4">
-					{columns.map(col => {
-						const value = getFieldValue(item, col.key);
-						const isEditing = editingField === col.key;
-
-						return (
-							<div key={col.key as string} className="flex items-start justify-between gap-2">
-								<div className="flex-1">
-									<div className="text-sm font-semibold text-muted-foreground">{col.label}</div>
-									{isEditing ? (
-										<Input
-											type="text"
-											value={editValue}
-											onChange={e => setEditValue(e.target.value)}
-											className="mt-1 w-full rounded border border-border bg-background px-2 py-1"
-										/>
-									) : (
-										<div className="mt-1">
-											{col.type === 'boolean' ? (
-												value ? (
-													<Check className="size-4 text-primary" />
-												) : (
-													<X className="size-4 text-muted-foreground" />
-												)
-											) : col.type === 'enum' && col.badge ? (
-												<Badge variant="secondary">{String(value)}</Badge>
+					return (
+						<div key={col.key as string} className="flex items-start justify-between gap-2">
+							<div className="flex-1">
+								<div className="text-sm font-semibold text-muted-foreground">{col.label}</div>
+								{isEditing ? (
+									<Input
+										type="text"
+										value={editValue}
+										onChange={e => setEditValue(e.target.value)}
+										className="mt-1 w-full rounded border border-border bg-background px-2 py-1"
+									/>
+								) : (
+									<div className="mt-1">
+										{col.type === 'boolean' ? (
+											value ? (
+												<Check className="size-4 text-primary" />
 											) : (
-												<span>{String(value || '')}</span>
-											)}
-										</div>
-									)}
-								</div>
-								{service.updateProduct && (
-									<div className="flex gap-1">
-										{isEditing ? (
-											<>
-												<Button
-													onClick={() => handleSave(col.key as string)}
-													size="sm"
-													variant="ghost"
-												>
-													<Save className="size-3" />
-												</Button>
-												<Button onClick={handleCancel} size="sm" variant="ghost">
-													<X className="size-3" />
-												</Button>
-											</>
+												<X className="size-4 text-muted-foreground" />
+											)
+										) : col.type === 'enum' && col.badge ? (
+											<Badge variant="secondary">{String(value)}</Badge>
 										) : (
-											<Button
-												onClick={() => handleEdit(col.key as string, value)}
-												size="sm"
-												variant="ghost"
-											>
-												<Edit className="size-3" />
-											</Button>
+											<span>{String(value || '')}</span>
 										)}
 									</div>
 								)}
 							</div>
-						);
-					})}
-				</div>
-			)}
+							{service.updateProduct && (
+								<div className="flex gap-1">
+									{isEditing ? (
+										<>
+											<Button
+												onClick={() => handleSave(col.key as string)}
+												size="sm"
+												variant="ghost"
+											>
+												<Save className="size-3" />
+											</Button>
+											<Button onClick={handleCancel} size="sm" variant="ghost">
+												<X className="size-3" />
+											</Button>
+										</>
+									) : (
+										<Button
+											onClick={() => handleEdit(col.key as string, value)}
+											size="sm"
+											variant="ghost"
+										>
+											<Edit className="size-3" />
+										</Button>
+									)}
+								</div>
+							)}
+						</div>
+					);
+				})}
+			</div>
 		</div>
 	);
 }

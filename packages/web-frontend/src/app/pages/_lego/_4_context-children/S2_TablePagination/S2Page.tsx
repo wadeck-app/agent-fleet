@@ -4,7 +4,8 @@ import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contr
 
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
-import { DataTable, PageLayout } from '../_framework';
+import { DataTable } from '../_framework/DataTable';
+import { PageLayout } from '../_framework/PageLayout';
 
 /**
  * ===========================================================================================
@@ -32,12 +33,12 @@ export function S2Page() {
 	return (
 		<PageLayout>
 			<DataTable service={productsService} columns={columns}>
-				<div className="space-y-4">
+				<DataTable.ContentList>
 					<DataTable.Body />
 					<DataTable.Footer>
 						<DataTable.Pagination defaultSize={10} />
 					</DataTable.Footer>
-				</div>
+				</DataTable.ContentList>
 			</DataTable>
 		</PageLayout>
 	);

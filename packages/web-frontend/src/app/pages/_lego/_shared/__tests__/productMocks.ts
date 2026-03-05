@@ -122,14 +122,18 @@ const mockGetProduct = vi.fn((id: string) => {
 const mockCreateProduct = vi.fn(data => Promise.resolve(withMetadata({ id: `new-${Date.now()}`, ...data })));
 const mockUpdateProduct = vi.fn((id: string, data) => {
 	const existing = mockProductList.find(p => p.id === id);
-	if (!existing) return Promise.reject(new Error(`Product ${id} not found`));
+	if (!existing) {
+		return Promise.reject(new Error(`Product ${id} not found`));
+	}
 	return Promise.resolve(withMetadata({ ...existing, ...data, id }));
 });
 const mockDeleteProduct = vi.fn().mockResolvedValue(undefined);
 const mockBulkDeleteProducts = vi.fn((ids: string[]) => Promise.resolve(createMockBulkDeleteResponse(ids)));
 const mockValidateProductData = vi.fn(() => ({ valid: true, errors: [] }));
 const mockCalculateAverageRating = vi.fn((products: Product[]) => {
-	if (products.length === 0) return 0;
+	if (products.length === 0) {
+		return 0;
+	}
 	return products.reduce((sum: number, p: Product) => sum + (p.rating || 0), 0) / products.length;
 });
 const mockCalculateInventoryValue = vi.fn((products: Product[]) =>

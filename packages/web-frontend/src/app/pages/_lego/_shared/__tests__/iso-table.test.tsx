@@ -38,6 +38,9 @@ import { S3Page as A3S3Page } from '@app/pages/_lego/_3_feature-hooks/S3_FullFea
 import { S1Page as A4S1Page } from '@app/pages/_lego/_4_context-children/S1_SimpleTable/S1Page';
 import { S2Page as A4S2Page } from '@app/pages/_lego/_4_context-children/S2_TablePagination/S2Page';
 import { S3Page as A4S3Page } from '@app/pages/_lego/_4_context-children/S3_FullFeatured/S3Page';
+// Approach 5: Query-Pipeline
+import { S1Page as A5S1Page } from '@app/pages/_lego/_5_query-pipeline/S1_SimpleTable/S1Page';
+import { S3Page as A5S3Page } from '@app/pages/_lego/_5_query-pipeline/S3_FullFeatured/S3Page';
 
 import { mockProductList, mockProducts } from './productMocks';
 
@@ -170,6 +173,13 @@ const scenarios = [
 		features: ['search', 'pagination', 'sorting', 'column-visibility', 'bulk-delete', 'crud'],
 		path: '/lego/4/s3',
 	},
+	{ name: 'Approach5 S1', PageComponent: A5S1Page, features: [], path: '/lego/5/s1' },
+	{
+		name: 'Approach5 S3',
+		PageComponent: A5S3Page,
+		features: ['search', 'pagination'],
+		path: '/lego/5/s3',
+	},
 ];
 
 describe.each(scenarios)(
@@ -219,7 +229,9 @@ describe.each(scenarios)(
 
 			mocks.updateProduct.mockImplementation((id: string, data) => {
 				const existing = mockProductList.find(p => p.id === id);
-				if (!existing) return Promise.reject(new Error(`Product ${id} not found`));
+				if (!existing) {
+					return Promise.reject(new Error(`Product ${id} not found`));
+				}
 				return Promise.resolve({
 					...existing,
 					...data,
@@ -245,7 +257,9 @@ describe.each(scenarios)(
 			mocks.validateProductData.mockReturnValue({ valid: true, errors: [] });
 
 			mocks.calculateAverageRating.mockImplementation(products => {
-				if (products.length === 0) return 0;
+				if (products.length === 0) {
+					return 0;
+				}
 				return products.reduce((sum: number, p: any) => sum + (p.rating || 0), 0) / products.length;
 			});
 

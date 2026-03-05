@@ -55,7 +55,9 @@ export function createEventBus<TEvents extends Record<string, unknown>>(): Event
 	return {
 		emit(event, payload) {
 			const eventHandlers = handlers.get(event);
-			if (!eventHandlers) return;
+			if (!eventHandlers) {
+				return;
+			}
 
 			eventHandlers.forEach(handler => {
 				try {
@@ -80,7 +82,9 @@ export function createEventBus<TEvents extends Record<string, unknown>>(): Event
 
 		off(event, handler) {
 			const eventHandlers = handlers.get(event);
-			if (!eventHandlers) return;
+			if (!eventHandlers) {
+				return;
+			}
 
 			eventHandlers.delete(handler as (payload: unknown) => void);
 

@@ -4,7 +4,9 @@ import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contr
 
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
-import { HookCarousel, PageLayout, usePaginationFeature } from '../_framework';
+import { HookCarousel } from '../_framework/HookCarousel';
+import { PageLayout } from '../_framework/PageLayout';
+import { usePaginationFeature } from '../_framework/usePaginationFeature';
 
 /**
  * ===========================================================================================
@@ -26,15 +28,15 @@ import { HookCarousel, PageLayout, usePaginationFeature } from '../_framework';
 
 const columns = [
 	col.text<Product>('name', 'Name'),
-	col.text<Product>('description', 'Description'),
 	col.number<Product>('price', 'Price', { prefix: '$' }),
 	col.enum<Product>('category', 'Category', PRODUCT_CATEGORIES, { badge: true }),
 	col.enum<Product>('status', 'Status', PRODUCT_STATUSES, { badge: true }),
+	col.boolean<Product>('featured', 'Featured'),
 	col.number<Product>('rating', 'Rating'),
 ];
 
 export function S5Page() {
-	const pagination = usePaginationFeature({ defaultSize: 5 });
+	const pagination = usePaginationFeature({ defaultSize: 10 });
 
 	return (
 		<PageLayout>

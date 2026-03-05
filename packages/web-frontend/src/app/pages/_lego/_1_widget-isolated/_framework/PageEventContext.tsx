@@ -64,9 +64,15 @@ export function createPageEventContext<TEvents extends Record<string, unknown>>(
 		return bus;
 	}
 
+	function usePageEventsOptional(): EventBus<TEvents> | null {
+		const bus = useContext(EventContext);
+		return bus;
+	}
+
 	return {
 		PageEventProvider,
 		usePageEvents,
+		usePageEventsOptional,
 	};
 }
 

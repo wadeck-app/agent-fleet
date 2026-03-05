@@ -1,11 +1,9 @@
 import { type MutableRefObject, useEffect, useMemo, useState } from 'react';
 
-import { PageSizeSelector } from '@framework/components/pagination/PageSizeSelector';
-import { Pagination } from '@framework/components/pagination/Pagination';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import type { ColumnDef } from '@framework/lego';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 import { useWidgetDataFetch } from '@app/pages/_lego/_1_widget-isolated/_framework/useWidgetDataFetch';
 
@@ -17,7 +15,8 @@ import type { PaginationFeatureHook } from './usePaginationFeature';
  * ===========================================================================================
  *
  * Carousel widget that accepts feature hooks from the page.
- * Displays items in a carousel layout with navigation controls.
+ * Displays ALL items in a horizontal scrolling layout with page-based navigation.
+ * Matches WidgetCarousel's behavior exactly.
  *
  * ===========================================================================================
  */
@@ -75,7 +74,9 @@ export function HookCarousel<T extends { id: string }>({
 		query,
 	});
 
-	const [currentIndex, setCurrentIndex] = useState(0);
+	const [visibleFields, setVisibleFields] = useState<Set<string>>(new Set(columns.map(c => c.key as string)));
+
+	const visibleColumnDefs = columns.filter(c => visibleFields.has(c.key as string));
 
 	useEffect(() => {
 		if (onRefreshRef) {
@@ -83,87 +84,105 @@ export function HookCarousel<T extends { id: string }>({
 		}
 	}, [refresh, onRefreshRef]);
 
-	// Reset index when items change
-	useEffect(() => {
-		setCurrentIndex(0);
-	}, [items]);
+	const renderCellValue = (item: T, col: ColumnDef<T>) => {
+		if (col.render) {
+			return col.render(item);
+		}
 
-	const currentItem = items[currentIndex];
+		const value = item[col.key];
 
-	const handlePrevious = () => {
-		setCurrentIndex(prev => (prev > 0 ? prev - 1 : items.length - 1));
+		if (col.type === 'boolean') {
+			return value ? <Check className="size-4 text-primary" /> : <X className="size-4 text-muted-foreground" />;
+		}
+
+		if (col.type === 'number' && typeof value === 'number') {
+			return (
+				<span>
+					{col.prefix}
+					{value.toFixed(2)}
+					{col.suffix}
+				</span>
+			);
+		}
+
+		if (col.type === 'enum' && col.badge) {
+			return <Badge variant="secondary">{String(value)}</Badge>;
+		}
+
+		return String(value || '');
+	};
+
+	const handlePrev = () => {
+		if (pagination.page > 1) {
+			paginationFeature?.setPage(pagination.page - 1);
+		}
 	};
 
 	const handleNext = () => {
-		setCurrentIndex(prev => (prev < items.length - 1 ? prev + 1 : 0));
-	};
-
-	const getFieldValue = (item: T, key: string | number | symbol): any => {
-		return item[key as keyof T];
+		if (pagination.page < pagination.totalPages) {
+			paginationFeature?.setPage(pagination.page + 1);
+		}
 	};
 
 	return (
 		<div className="flex h-full flex-col gap-4">
-			<div className="flex items-center justify-between">
-				<h2 className="text-lg font-semibold">Product Carousel</h2>
+			<div className="flex flex-wrap gap-2">
+				{columns.map(col => (
+					<Button
+						key={col.key as string}
+						size="sm"
+						variant={visibleFields.has(col.key as string) ? 'default' : 'outline'}
+						onClick={() => {
+							const newSet = new Set(visibleFields);
+							if (newSet.has(col.key as string)) {
+								newSet.delete(col.key as string);
+							} else {
+								newSet.add(col.key as string);
+							}
+							setVisibleFields(newSet);
+						}}
+					>
+						{col.label}
+					</Button>
+				))}
 			</div>
 
-			{loading && <div className="p-8 text-center">Loading...</div>}
-
-			{!loading && items.length === 0 && <div className="p-8 text-center">No items found</div>}
-
-			{!loading && items.length > 0 && currentItem && (
-				<div className="flex-1 rounded-lg border border-border bg-card p-8">
-					<div className="flex h-full items-center justify-between gap-4">
-						<Button onClick={handlePrevious} variant="outline" size="icon">
-							<ChevronLeft className="size-6" />
-						</Button>
-
-						<div className="flex-1 space-y-4">
-							{columns.slice(0, 6).map(col => {
-								const value = getFieldValue(currentItem, col.key);
-								return (
-									<div key={col.key as string}>
-										<div className="text-sm font-semibold text-muted-foreground">{col.label}</div>
-										<div className="text-lg">
-											{col.type === 'enum' && col.badge ? (
-												<Badge variant="secondary">{String(value)}</Badge>
-											) : (
-												<span>{String(value || '')}</span>
-											)}
+			<div className="relative flex-1">
+				{loading ? (
+					<div className="flex h-full items-center justify-center">Loading...</div>
+				) : items.length === 0 ? (
+					<div className="flex h-full items-center justify-center">No items found</div>
+				) : (
+					<div className="flex gap-4 overflow-x-auto">
+						{items.map(item => (
+							<div key={item.id} className="min-w-[300px] rounded-lg border border-border bg-card p-4">
+								<div className="space-y-2">
+									{visibleColumnDefs.map(col => (
+										<div key={col.key as string} className="text-sm">
+											<span className="font-semibold">{col.label}: </span>
+											{renderCellValue(item, col)}
 										</div>
-									</div>
-								);
-							})}
-							<div className="mt-4 text-center text-sm text-muted-foreground">
-								{currentIndex + 1} of {items.length}
+									))}
+								</div>
 							</div>
-						</div>
-
-						<Button onClick={handleNext} variant="outline" size="icon">
-							<ChevronRight className="size-6" />
-						</Button>
+						))}
 					</div>
-				</div>
-			)}
+				)}
+			</div>
 
 			{paginationFeature && (
 				<div className="flex items-center justify-between">
+					<Button onClick={handlePrev} disabled={pagination.page === 1} size="sm">
+						<ChevronLeft className="size-4" />
+						Prev
+					</Button>
 					<div className="text-sm text-muted-foreground">
-						Showing {items.length} of {pagination.total} items
+						Page {pagination.page} of {pagination.totalPages}
 					</div>
-					<div className="flex items-center gap-4">
-						<PageSizeSelector
-							value={paginationFeature.pageSize}
-							onChange={paginationFeature.setPageSize}
-							options={paginationFeature.pageSizes || [5, 10, 20]}
-						/>
-						<Pagination
-							currentPage={pagination.page}
-							totalPages={pagination.totalPages}
-							onPageChange={paginationFeature.setPage}
-						/>
-					</div>
+					<Button onClick={handleNext} disabled={pagination.page === pagination.totalPages} size="sm">
+						Next
+						<ChevronRight className="size-4" />
+					</Button>
 				</div>
 			)}
 		</div>

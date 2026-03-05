@@ -15,7 +15,7 @@ import { ViewCarousel } from '../_framework/ViewCarousel';
  * Demonstrates focused item view with smooth navigation.
  *
  * Features: field-visibility, pagination
- * Columns: name, description, price, category, status, rating, stock, featured
+ * Columns: name, price, category, status, featured, rating
  *
  * Zero className, zero inline styles, zero hooks, zero state — pure composition.
  *
@@ -24,13 +24,11 @@ import { ViewCarousel } from '../_framework/ViewCarousel';
 
 const columns = [
 	col.text<Product>('name', 'Name'),
-	col.text<Product>('description', 'Description'),
 	col.number<Product>('price', 'Price', { prefix: '$' }),
 	col.enum<Product>('category', 'Category', PRODUCT_CATEGORIES, { badge: true }),
 	col.enum<Product>('status', 'Status', PRODUCT_STATUSES, { badge: true }),
-	col.number<Product>('rating', 'Rating'),
-	col.number<Product>('stock', 'Stock'),
 	col.boolean<Product>('featured', 'Featured'),
+	col.number<Product>('rating', 'Rating'),
 ];
 
 export function S5Page() {

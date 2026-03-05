@@ -70,7 +70,9 @@ export function WidgetCarousel<T extends { id: string }>({ service, columns, fea
 	const visibleColumnDefs = columns.filter(c => visibleFields.has(c.key as string));
 
 	const renderCellValue = (item: T, col: ColumnDef<T>) => {
-		if (col.render) return col.render(item);
+		if (col.render) {
+			return col.render(item);
+		}
 
 		const value = item[col.key];
 

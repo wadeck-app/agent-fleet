@@ -5,16 +5,14 @@ import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contr
 import { ProductDialogAdapter } from '@app/pages/_lego/_shared/ProductDialogAdapter';
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
-import {
-	HookDataTable,
-	PageLayout,
-	useBulkDeleteFeature,
-	useColumnVisibilityFeature,
-	useCrudFeature,
-	usePaginationFeature,
-	useSearchFeature,
-	useSortingFeature,
-} from '../_framework';
+import { HookDataTable } from '../_framework/HookDataTable';
+import { PageLayout } from '../_framework/PageLayout';
+import { useBulkDeleteFeature } from '../_framework/useBulkDeleteFeature';
+import { useColumnVisibilityFeature } from '../_framework/useColumnVisibilityFeature';
+import { useCrudFeature } from '../_framework/useCrudFeature';
+import { usePaginationFeature } from '../_framework/usePaginationFeature';
+import { useSearchFeature } from '../_framework/useSearchFeature';
+import { useSortingFeature } from '../_framework/useSortingFeature';
 
 /**
  * ===========================================================================================

@@ -67,6 +67,9 @@ export interface TableProps<T> {
 	// Row classes
 	getRowClassName?: (item: T) => string;
 
+	// Row click handler
+	onRowClick?: (item: T) => void;
+
 	// Empty state
 	emptyMessage?: string;
 
@@ -109,6 +112,7 @@ export function Table<T>({
 	renderActions,
 	editingId = null,
 	getRowClassName,
+	onRowClick,
 	emptyMessage = 'No data available',
 	loading = false,
 	loadingMessage = 'Loading...',
@@ -243,6 +247,7 @@ export function Table<T>({
 							getRowClassName={getRowClassName}
 							renderActions={renderActions}
 							onToggleSelection={handleToggleSelection}
+							onRowClick={onRowClick}
 						/>
 					</table>
 				</div>

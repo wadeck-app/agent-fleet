@@ -5,15 +5,17 @@ import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contr
 import { ProductDialogAdapter } from '@app/pages/_lego/_shared/ProductDialogAdapter';
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
-import { DataTable, PageLayout } from '../_framework';
+import { DataTable } from '../_framework/DataTable';
+import { useDataTable } from '../_framework/DataTableContext';
+import { PageLayout } from '../_framework/PageLayout';
 
 /**
  * ===========================================================================================
- * S4: GRID POPUP (SIMPLIFIED)
+ * S4: GRID POPUP
  * ===========================================================================================
  *
- * Simplified implementation using DataTable.
- * Full ItemGrid compound component would follow the same pattern.
+ * Items displayed as a CSS grid of cards with search, pagination, and CRUD via dialog.
+ * Uses DataTable.Grid (card grid) + DataTable.GridFooter instead of DataTable.Body (table).
  *
  * Features:
  * - search
@@ -30,21 +32,45 @@ const columns = [
 	col.enum<Product>('status', 'Status', PRODUCT_STATUSES, { badge: true }),
 ];
 
+function S4Content() {
+	const ctx = useDataTable<Product>();
+
+	const handleSave = async (data: unknown) => {
+		if (ctx.editingItem) {
+			await ctx.service.updateProduct?.(ctx.editingItem.id, data);
+		} else {
+			await ctx.service.createProduct?.(data);
+		}
+		ctx.setDialogOpen(false);
+		ctx.refresh();
+	};
+
+	return (
+		<>
+			<DataTable.Content>
+				<DataTable.Toolbar>
+					<DataTable.Search />
+					<DataTable.CreateButton dialog={ProductDialogAdapter} />
+				</DataTable.Toolbar>
+				<DataTable.Grid />
+				<DataTable.GridFooter />
+			</DataTable.Content>
+			{ctx.dialogOpen && (
+				<ProductDialogAdapter
+					item={ctx.editingItem}
+					onSave={handleSave}
+					onClose={() => ctx.setDialogOpen(false)}
+				/>
+			)}
+		</>
+	);
+}
+
 export function S4Page() {
 	return (
 		<PageLayout>
-			<DataTable service={productsService} columns={columns}>
-				<div className="flex h-full flex-col gap-4">
-					<DataTable.Toolbar>
-						<DataTable.Search />
-						<DataTable.CreateButton dialog={ProductDialogAdapter} />
-					</DataTable.Toolbar>
-					<DataTable.Body />
-					<DataTable.Footer>
-						<DataTable.Pagination defaultSize={12} />
-					</DataTable.Footer>
-					<DataTable.Dialog dialog={ProductDialogAdapter} />
-				</div>
+			<DataTable service={productsService} columns={columns} enableCrud={true}>
+				<S4Content />
 			</DataTable>
 		</PageLayout>
 	);

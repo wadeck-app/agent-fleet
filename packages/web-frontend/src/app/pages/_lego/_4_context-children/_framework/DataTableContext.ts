@@ -45,6 +45,10 @@ export interface DataTableContextValue<T> {
 	// Selection
 	selectedIds: Set<string>;
 	setSelectedIds: (ids: Set<string>) => void;
+	selectedItemId?: string;
+	setSelectedItemId: (id?: string) => void;
+	selectedItem: T | null;
+	selectedItemLoading: boolean;
 
 	// Column visibility
 	visibleColumns: Set<string>;
@@ -59,12 +63,15 @@ export interface DataTableContextValue<T> {
 	// Config
 	service: {
 		getProducts: (q: any) => Promise<any>;
+		getProduct?: (id: string) => Promise<any>;
 		createProduct?: (data: any) => Promise<any>;
 		updateProduct?: (id: string, data: any) => Promise<any>;
 		deleteProduct?: (id: string) => Promise<void>;
 		bulkDeleteProducts?: (ids: string[]) => Promise<unknown>;
 	};
 	columns: ColumnDef<T>[];
+	enableSorting: boolean;
+	enableCrud: boolean;
 }
 
 // Create context with null default (must be used within DataTable)

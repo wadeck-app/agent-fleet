@@ -1,10 +1,6 @@
-import { useMemo } from 'react';
-
-import { Button } from '@framework/components/primitives/Button';
 import type { ColumnDef } from '@framework/lego/types/ColTypes';
 import type { DataTableFeature } from '@framework/lego/types/FeatureTypes';
 import type { Product } from '@shared/api/products.contract';
-import { Eye } from 'lucide-react';
 
 import { useProductDomain } from './ProductDomainContext';
 import { ViewDataTable } from './ViewDataTable';
@@ -14,7 +10,7 @@ import { ViewDataTable } from './ViewDataTable';
  * SELECTABLE VIEW DATA TABLE
  * ===========================================================================================
  *
- * Extension of ViewDataTable that adds a "View" action column for row selection.
+ * Extension of ViewDataTable that enables row click to select items.
  * Used in master-detail scenarios where clicking a row should update context.selectedItem.
  *
  * ===========================================================================================
@@ -31,26 +27,12 @@ export function SelectableViewDataTable<T extends Product = Product>({
 }: SelectableViewDataTableProps<T>) {
 	const context = useProductDomain();
 
-	/**
-	 * Add a "View" action column
-	 */
-	const columnsWithAction: ColumnDef<T>[] = useMemo(
-		() => [
-			...columns,
-			{
-				key: '__select__' as keyof T & string,
-				label: 'Actions',
-				type: 'custom',
-				render: (item: T) => (
-					<Button variant="ghost" size="sm" onClick={() => context.actions.select(item as any)}>
-						<Eye className="mr-2 size-4" />
-						View
-					</Button>
-				),
-			},
-		],
-		[columns, context.actions]
+	return (
+		<ViewDataTable
+			columns={columns}
+			features={features}
+			enableRowClick
+			onRowClick={item => void context.actions.selectItem(item.id)}
+		/>
 	);
-
-	return <ViewDataTable columns={columnsWithAction} features={features} enableRowClick />;
 }

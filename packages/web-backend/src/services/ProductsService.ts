@@ -10,6 +10,7 @@ import type {
 import { ConflictException, ERROR_CODES, NotFoundException } from '@app/shared/exceptions/http-exceptions';
 
 import type { ProductsRepository } from '../repositories/ProductsRepository';
+import { ProductsWebSocketService } from './ProductsWebSocketService';
 
 /**
  * ===========================================================================================
@@ -22,12 +23,17 @@ import type { ProductsRepository } from '../repositories/ProductsRepository';
  * - Optimistic locking (version management)
  * - Business validation
  * - Search/filter orchestration
+ * - Broadcasting real-time events via WebSocket
  *
  * ===========================================================================================
  */
 
 export class ProductsService {
-	constructor(private readonly repository: ProductsRepository) {}
+	private wsService: ProductsWebSocketService;
+
+	constructor(private readonly repository: ProductsRepository) {
+		this.wsService = ProductsWebSocketService.getInstance();
+	}
 
 	/**
 	 * List products with pagination and filters
@@ -76,7 +82,15 @@ export class ProductsService {
 	 */
 	async create(data: CreateProduct): Promise<Product> {
 		// Create via repository
-		return this.repository.create(data);
+		const product = await this.repository.create(data);
+
+		// Broadcast creation event
+		this.wsService.broadcast({
+			type: 'product:created',
+			product,
+		});
+
+		return product;
 	}
 
 	/**
@@ -101,6 +115,12 @@ export class ProductsService {
 			version: current.version + 1,
 		});
 
+		// Broadcast update event
+		this.wsService.broadcast({
+			type: 'product:updated',
+			product: updated,
+		});
+
 		return updated;
 	}
 
@@ -113,6 +133,12 @@ export class ProductsService {
 
 		// Delete via repository
 		await this.repository.delete(id);
+
+		// Broadcast deletion event
+		this.wsService.broadcast({
+			type: 'product:deleted',
+			id,
+		});
 	}
 
 	/**
@@ -132,6 +158,12 @@ export class ProductsService {
 				await this.repository.delete(id);
 
 				deleted.push(id);
+
+				// Broadcast deletion event for each successful delete
+				this.wsService.broadcast({
+					type: 'product:deleted',
+					id,
+				});
 			} catch (error) {
 				// Collect failure information
 				if (error instanceof NotFoundException) {

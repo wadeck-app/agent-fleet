@@ -5,7 +5,11 @@ import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contr
 import { ProductDialogAdapter } from '@app/pages/_lego/_shared/ProductDialogAdapter';
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
-import { HookItemGrid, PageLayout, useCrudFeature, usePaginationFeature } from '../_framework';
+import { HookItemGrid } from '../_framework/HookItemGrid';
+import { PageLayout } from '../_framework/PageLayout';
+import { useCrudFeature } from '../_framework/useCrudFeature';
+import { usePaginationFeature } from '../_framework/usePaginationFeature';
+import { useSearchFeature } from '../_framework/useSearchFeature';
 
 /**
  * ===========================================================================================
@@ -34,12 +38,13 @@ const columns = [
 ];
 
 export function S4Page() {
-	const pagination = usePaginationFeature({ defaultSize: 12 });
+	const search = useSearchFeature();
+	const pagination = usePaginationFeature({ defaultSize: 10 });
 	const crud = useCrudFeature(ProductDialogAdapter);
 
 	return (
 		<PageLayout>
-			<HookItemGrid service={productsService} columns={columns} features={[pagination, crud]} />
+			<HookItemGrid service={productsService} columns={columns} features={[search, pagination, crud]} />
 		</PageLayout>
 	);
 }

@@ -4,7 +4,8 @@ import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contr
 
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
-import { DataTable, PageLayout } from '../_framework';
+import { DataTable } from '../_framework/DataTable';
+import { PageLayout } from '../_framework/PageLayout';
 
 /**
  * ===========================================================================================
@@ -36,10 +37,9 @@ export function S1Page() {
 	return (
 		<PageLayout>
 			<DataTable service={readOnlyService} columns={columns}>
-				<div className="flex h-full flex-col gap-4">
-					<DataTable.Toolbar>{null}</DataTable.Toolbar>
+				<DataTable.Content>
 					<DataTable.Body />
-				</div>
+				</DataTable.Content>
 			</DataTable>
 		</PageLayout>
 	);

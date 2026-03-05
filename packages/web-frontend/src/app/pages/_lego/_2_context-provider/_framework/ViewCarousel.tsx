@@ -1,13 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
-import { Card } from '@framework/components/primitives/Card';
 import type { ColumnDef } from '@framework/lego/types/ColTypes';
 import type { CarouselFeature } from '@framework/lego/types/FeatureTypes';
 import { resolveFeature } from '@framework/lego/types/FeatureTypes';
 import type { Product } from '@shared/api/products.contract';
-import { Check, ChevronLeft, ChevronRight, Minus } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 import { useProductDomain } from './ProductDomainContext';
 
@@ -36,13 +35,8 @@ export interface ViewCarouselProps<T = Product> {
 
 export function ViewCarousel<T extends Product = Product>({ columns, features }: ViewCarouselProps<T>) {
 	const context = useProductDomain();
-	const [currentIndex, setCurrentIndex] = useState(0);
-	const [visibleFields, setVisibleFields] = useState<Set<string>>(new Set(columns.map(col => String(col.key))));
-	const autoplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const [visibleFields, setVisibleFields] = useState<Set<string>>(new Set(columns.map(c => c.key as string)));
 
-	/**
-	 * Resolve features
-	 */
 	const paginationConfig = useMemo(
 		() =>
 			features.find(f => {
@@ -51,12 +45,10 @@ export function ViewCarousel<T extends Product = Product>({ columns, features }:
 			}),
 		[features]
 	);
-
 	const autoplayConfig = useMemo(() => {
 		const found = features.find(f => typeof f === 'object' && f.type === 'autoplay');
 		return found && typeof found === 'object' && found.type === 'autoplay' ? found : null;
 	}, [features]);
-
 	const fieldVisibilityConfig = useMemo(
 		() =>
 			features.find(f => {
@@ -68,49 +60,30 @@ export function ViewCarousel<T extends Product = Product>({ columns, features }:
 
 	const items = context.items as T[];
 
-	/**
-	 * Navigation handlers
-	 */
 	const handlePrev = () => {
-		setCurrentIndex(prev => (prev > 0 ? prev - 1 : items.length - 1));
+		if (context.pagination.page > 1) {
+			context.actions.setQuery({ page: context.pagination.page - 1 });
+		}
 	};
 
 	const handleNext = () => {
-		setCurrentIndex(prev => (prev < items.length - 1 ? prev + 1 : 0));
-	};
-
-	/**
-	 * Autoplay effect
-	 */
-	useEffect(() => {
-		if (autoplayConfig && items.length > 0) {
-			const interval = autoplayConfig.interval ?? 3000;
-			autoplayTimerRef.current = setInterval(() => {
-				setCurrentIndex(prev => (prev < items.length - 1 ? prev + 1 : 0));
-			}, interval);
-
-			return () => {
-				if (autoplayTimerRef.current) {
-					clearInterval(autoplayTimerRef.current);
-				}
-			};
+		if (context.pagination.page < context.pagination.totalPages) {
+			context.actions.setQuery({ page: context.pagination.page + 1 });
 		}
-	}, [autoplayConfig, items.length]);
-
-	/**
-	 * Toggle field visibility
-	 */
-	const toggleFieldVisibility = (key: string) => {
-		setVisibleFields(prev => {
-			const next = new Set(prev);
-			if (next.has(key)) {
-				next.delete(key);
-			} else {
-				next.add(key);
-			}
-			return next;
-		});
 	};
+
+	useEffect(() => {
+		if (autoplayConfig) {
+			const interval = setInterval(() => {
+				if (context.pagination.page < context.pagination.totalPages) {
+					context.actions.setQuery({ page: context.pagination.page + 1 });
+				} else {
+					context.actions.setQuery({ page: 1 });
+				}
+			}, autoplayConfig.interval || 3000);
+			return () => clearInterval(interval);
+		}
+	}, [autoplayConfig, context.pagination.page, context.pagination.totalPages, context.actions]);
 
 	/**
 	 * Render a field value based on column definition
@@ -122,51 +95,47 @@ export function ViewCarousel<T extends Product = Product>({ columns, features }:
 
 		const value = item[col.key];
 
-		if (col.type === 'number') {
-			const prefix = col.prefix ?? '';
-			const suffix = col.suffix ?? '';
-			return `${prefix}${Number(value).toLocaleString()}${suffix}`;
+		if (col.type === 'boolean') {
+			return value ? <Check className="size-4 text-primary" /> : <X className="size-4 text-muted-foreground" />;
+		}
+
+		if (col.type === 'number' && typeof value === 'number') {
+			return (
+				<span>
+					{col.prefix}
+					{value.toFixed(2)}
+					{col.suffix}
+				</span>
+			);
 		}
 
 		if (col.type === 'enum' && col.badge) {
 			return <Badge variant="secondary">{String(value)}</Badge>;
 		}
 
-		if (col.type === 'boolean') {
-			return value ? (
-				<Check className="size-4 text-primary" />
-			) : (
-				<Minus className="size-4 text-muted-foreground" />
-			);
-		}
-
-		if (col.type === 'date') {
-			return value ? new Date(value as string | number | Date).toLocaleDateString() : '–';
-		}
-
-		return String(value ?? '');
+		return String(value || '');
 	};
 
-	const currentItem = items[currentIndex];
-
-	if (context.loading) {
-		return <div className="text-center text-muted-foreground">Loading...</div>;
-	}
-
-	if (items.length === 0) {
-		return <div className="text-center text-muted-foreground">No items found</div>;
-	}
+	const visibleColumnDefs = columns.filter(c => visibleFields.has(c.key as string));
 
 	return (
-		<div className="space-y-4">
+		<div className="flex h-full flex-col gap-4">
 			{fieldVisibilityConfig && (
 				<div className="flex flex-wrap gap-2">
 					{columns.map(col => (
 						<Button
-							key={String(col.key)}
-							variant={visibleFields.has(String(col.key)) ? 'default' : 'outline'}
+							key={col.key as string}
 							size="sm"
-							onClick={() => toggleFieldVisibility(String(col.key))}
+							variant={visibleFields.has(col.key as string) ? 'default' : 'outline'}
+							onClick={() => {
+								const newSet = new Set(visibleFields);
+								if (newSet.has(col.key as string)) {
+									newSet.delete(col.key as string);
+								} else {
+									newSet.add(col.key as string);
+								}
+								setVisibleFields(newSet);
+							}}
 						>
 							{col.label}
 						</Button>
@@ -174,28 +143,44 @@ export function ViewCarousel<T extends Product = Product>({ columns, features }:
 				</div>
 			)}
 
-			<Card className="p-8">
-				<div className="space-y-4">
-					{columns
-						.filter(col => visibleFields.has(String(col.key)))
-						.map(col => (
-							<div key={String(col.key)} className="flex justify-between">
-								<span className="font-medium">{col.label}:</span>
-								<span>{renderFieldValue(currentItem, col)}</span>
+			<div className="relative flex-1">
+				{context.loading ? (
+					<div className="flex h-full items-center justify-center">Loading...</div>
+				) : items.length === 0 ? (
+					<div className="flex h-full items-center justify-center">No items found</div>
+				) : (
+					<div className="flex gap-4 overflow-x-auto">
+						{items.map(item => (
+							<div key={item.id} className="min-w-[300px] rounded-lg border border-border bg-card p-4">
+								<div className="space-y-2">
+									{visibleColumnDefs.map(col => (
+										<div key={String(col.key)} className="text-sm">
+											<span className="font-semibold">{col.label}: </span>
+											{renderFieldValue(item, col)}
+										</div>
+									))}
+								</div>
 							</div>
 						))}
-				</div>
-			</Card>
+					</div>
+				)}
+			</div>
 
 			{paginationConfig && (
 				<div className="flex items-center justify-between">
-					<Button variant="outline" size="icon" onClick={handlePrev} disabled={items.length <= 1}>
+					<Button onClick={handlePrev} disabled={context.pagination.page === 1} size="sm">
 						<ChevronLeft className="size-4" />
+						Prev
 					</Button>
-					<span className="text-sm text-muted-foreground">
-						{currentIndex + 1} / {items.length}
-					</span>
-					<Button variant="outline" size="icon" onClick={handleNext} disabled={items.length <= 1}>
+					<div className="text-sm text-muted-foreground">
+						Page {context.pagination.page} of {context.pagination.totalPages}
+					</div>
+					<Button
+						onClick={handleNext}
+						disabled={context.pagination.page === context.pagination.totalPages}
+						size="sm"
+					>
+						Next
 						<ChevronRight className="size-4" />
 					</Button>
 				</div>

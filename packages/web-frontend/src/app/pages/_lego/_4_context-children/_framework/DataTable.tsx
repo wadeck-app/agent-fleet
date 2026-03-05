@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode } from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
 import { ColumnVisibility } from '@framework/components/columns/ColumnVisibility';
@@ -11,7 +12,8 @@ import { SearchInput } from '@framework/components/search/SearchInput';
 import type { TableColumn } from '@framework/components/table/Table';
 import { Table } from '@framework/components/table/Table';
 import type { ColumnDef } from '@framework/lego';
-import { Check, Edit, Plus, Trash2, X } from 'lucide-react';
+import { renderColumnValue } from '@framework/lego';
+import { Check, ChevronLeft, ChevronRight, Edit, Plus, Trash2, X } from 'lucide-react';
 
 import { DataTableContext } from './DataTableContext';
 import { useDataTable } from './DataTableContext';
@@ -43,6 +45,22 @@ import { useTableDataFetch } from './useTableDataFetch';
  * ```
  *
  * ===========================================================================================
+ * DESIGN NOTES - Approach A4 Trade-offs
+ * ===========================================================================================
+ *
+ * A4.a - Frozen Evolution Path:
+ * New features require modifying DataTable.tsx (the base compound component).
+ * The compound component pattern creates a "frozen evolution path": adding a new slot
+ * (e.g., DataTable.FilterBar, DataTable.ExportButton) requires touching the base component
+ * and adding it as a static property. There is no way to extend the component externally.
+ *
+ * A4.e - Verbosity Trade-off:
+ * Pages using DataTable are very verbose: each slot (Toolbar, Body, Footer, Pagination)
+ * must be explicitly composed. This verbosity is a deliberate trade-off:
+ * - Pro: Explicit > implicit - the page structure is clear and visible
+ * - Con: Significant boilerplate - simple tables require many lines of composition code
+ *
+ * ===========================================================================================
  */
 
 export interface DataTableRootProps<T extends { id: string }> {
@@ -64,10 +82,13 @@ export interface DataTableRootProps<T extends { id: string }> {
 		updateProduct?: (id: string, data: any) => Promise<any>;
 		deleteProduct?: (id: string) => Promise<void>;
 		bulkDeleteProducts?: (ids: string[]) => Promise<unknown>;
+		getProduct?: (id: string) => Promise<T>;
 	};
 	columns: ColumnDef<T>[];
 	children: ReactNode;
 	defaultPageSize?: number;
+	enableSorting?: boolean;
+	enableCrud?: boolean;
 }
 
 // Root component — creates context, fetches data
@@ -76,13 +97,19 @@ function DataTableRoot<T extends { id: string }>({
 	columns,
 	children,
 	defaultPageSize = 10,
+	enableSorting = false,
+	enableCrud = false,
 }: DataTableRootProps<T>) {
+	const [searchParams, setSearchParams] = useSearchParams();
 	const [search, setSearch] = useState('');
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(defaultPageSize);
 	const [sortBy, setSortBy] = useState<string | undefined>();
 	const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | undefined>();
 	const [selectedIds, setSelectedIds] = useState(new Set<string>());
+	const [selectedItemId, setSelectedItemId] = useState<string | undefined>();
+	const [selectedItem, setSelectedItem] = useState<T | null>(null);
+	const [selectedItemLoading, setSelectedItemLoading] = useState(false);
 	const [visibleColumns, setVisibleColumns] = useState(new Set(columns.map(c => c.key as string)));
 	const [editingItem, setEditingItem] = useState<T | null>(null);
 	const [dialogOpen, setDialogOpen] = useState(false);
@@ -92,9 +119,14 @@ function DataTableRoot<T extends { id: string }>({
 		setSortOrder(order);
 	}, []);
 
-	const query = { search, page, pageSize, sortBy, sortOrder };
-	const { items, loading, pagination, refresh } = useTableDataFetch({
-		fetchFn: async q => {
+	// Stable references — prevent infinite refetch loops
+	const query = useMemo(
+		() => ({ search, page, pageSize, sortBy, sortOrder }),
+		[search, page, pageSize, sortBy, sortOrder]
+	);
+
+	const fetchFn = useCallback(
+		async (q: { search: string; page: number; pageSize: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }) => {
 			const params: {
 				search?: string;
 				page?: number;
@@ -111,8 +143,41 @@ function DataTableRoot<T extends { id: string }>({
 			}
 			return await service.getProducts(params);
 		},
-		query,
-	});
+		[service]
+	);
+
+	const { items, loading, pagination, refresh } = useTableDataFetch({ fetchFn, query });
+
+	useEffect(() => {
+		const idFromUrl = searchParams.get('id');
+		if (idFromUrl) {
+			setSelectedItemId(idFromUrl);
+		}
+	}, [searchParams]);
+
+	useEffect(() => {
+		if (!selectedItemId || !service.getProduct) {
+			setSelectedItem(null);
+			return;
+		}
+
+		const getProduct = service.getProduct;
+		const loadItem = async () => {
+			setSelectedItemLoading(true);
+			try {
+				const item = await getProduct(selectedItemId);
+				setSelectedItem(item as T);
+				setSearchParams({ id: selectedItemId });
+			} catch (error) {
+				console.error('Failed to load item:', error);
+				setSelectedItem(null);
+			} finally {
+				setSelectedItemLoading(false);
+			}
+		};
+
+		void loadItem();
+	}, [selectedItemId, service, setSearchParams]);
 
 	return (
 		<DataTableContext.Provider
@@ -132,6 +197,10 @@ function DataTableRoot<T extends { id: string }>({
 				setSort,
 				selectedIds,
 				setSelectedIds,
+				selectedItemId,
+				setSelectedItemId,
+				selectedItem,
+				selectedItemLoading,
 				visibleColumns,
 				setVisibleColumns,
 				editingItem,
@@ -140,12 +209,24 @@ function DataTableRoot<T extends { id: string }>({
 				setDialogOpen,
 				service,
 				columns,
+				enableSorting,
+				enableCrud,
 			}}
 		>
 			{children}
 		</DataTableContext.Provider>
 	);
 }
+
+// Main content layout — vertical flex column with gaps (flex h-full flex-col gap-4)
+DataTableRoot.Content = function Content({ children }: { children: ReactNode }) {
+	return <div className="flex h-full flex-col gap-4">{children}</div>;
+};
+
+// List content layout — vertical stack with spacing (space-y-4)
+DataTableRoot.ContentList = function ContentList({ children }: { children: ReactNode }) {
+	return <div className="space-y-4">{children}</div>;
+};
 
 // Toolbar container
 DataTableRoot.Toolbar = function Toolbar({ children }: { children: ReactNode }) {
@@ -201,10 +282,14 @@ DataTableRoot.CreateButton = function CreateButton({ dialog: _Dialog }: { dialog
 // Bulk action bar
 DataTableRoot.BulkBar = function BulkBar() {
 	const ctx = useDataTable();
-	if (ctx.selectedIds.size === 0) return null;
+	if (ctx.selectedIds.size === 0) {
+		return null;
+	}
 
 	const handleBulkDelete = async () => {
-		if (!ctx.service.bulkDeleteProducts) return;
+		if (!ctx.service.bulkDeleteProducts) {
+			return;
+		}
 		if (confirm(`Delete ${ctx.selectedIds.size} items?`)) {
 			await ctx.service.bulkDeleteProducts(Array.from(ctx.selectedIds));
 			ctx.setSelectedIds(new Set());
@@ -226,6 +311,84 @@ DataTableRoot.BulkBar = function BulkBar() {
 	);
 };
 
+// Grid body — renders items as CSS grid of cards (for S4 Grid Popup scenario)
+DataTableRoot.Grid = function Grid() {
+	const ctx = useDataTable();
+
+	const handleEdit = (item: any) => {
+		ctx.setEditingItem(item);
+		ctx.setDialogOpen(true);
+	};
+
+	const handleDelete = async (id: string) => {
+		if (!ctx.service.deleteProduct) return;
+		if (confirm('Delete this item?')) {
+			await ctx.service.deleteProduct(id);
+			ctx.refresh();
+		}
+	};
+
+	if (ctx.loading) {
+		return <div className="p-8 text-center">Loading...</div>;
+	}
+	if (ctx.items.length === 0) {
+		return <div className="p-8 text-center">No items found</div>;
+	}
+
+	const hasActions = ctx.enableCrud && (ctx.service.updateProduct || ctx.service.deleteProduct);
+	const visibleColumns = ctx.columns.slice(0, 4); // Show first 4 columns (matches WidgetItemGrid)
+
+	return (
+		<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+			{(ctx.items as any[]).map(item => (
+				<div key={item.id} className="rounded-lg border border-border bg-card p-4">
+					<div className="space-y-2">
+						{visibleColumns.map(col => (
+							<div key={col.key as string} className="text-sm">
+								<span className="font-semibold">{col.label}: </span>
+								{renderColumnValue(col, item)}
+							</div>
+						))}
+					</div>
+					{hasActions && (
+						<div className="mt-4 flex gap-2">
+							{ctx.service.updateProduct && (
+								<Button onClick={() => handleEdit(item)} size="sm" variant="outline">
+									<Edit className="size-3" />
+									Edit
+								</Button>
+							)}
+							{ctx.service.deleteProduct && (
+								<Button onClick={() => handleDelete(item.id)} size="sm" variant="destructive">
+									<Trash2 className="size-3" />
+									Delete
+								</Button>
+							)}
+						</div>
+					)}
+				</div>
+			))}
+		</div>
+	);
+};
+
+// Grid footer — matches WidgetItemGrid's "Page X of Y + Pagination" layout
+DataTableRoot.GridFooter = function GridFooter() {
+	const ctx = useDataTable();
+	return (
+		<div className="flex items-center justify-between">
+			<div className="text-sm text-muted-foreground">
+				Page {ctx.pagination.page} of {ctx.pagination.totalPages}
+			</div>
+			<Pagination
+				currentPage={ctx.pagination.page}
+				totalPages={ctx.pagination.totalPages}
+				onPageChange={ctx.setPage}
+			/>
+		</div>
+	);
+};
+
 // Table body
 DataTableRoot.Body = function Body() {
 	const ctx = useDataTable();
@@ -240,7 +403,9 @@ DataTableRoot.Body = function Body() {
 				if (existingIndex >= 0) {
 					// Toggle existing sort: asc -> desc -> remove
 					const existing = prev[existingIndex];
-					if (!existing) return prev;
+					if (!existing) {
+						return prev;
+					}
 
 					if (existing.direction === 'asc') {
 						// Change to desc
@@ -278,49 +443,10 @@ DataTableRoot.Body = function Body() {
 
 	// Build TableColumn[] from ColumnDef[]
 	const tableColumns: TableColumn<any>[] = visibleColumnDefs.map(col => {
-		const renderCell = (item: any) => {
-			if (col.render) return col.render(item);
-
-			const value = item[col.key];
-
-			if (col.type === 'boolean') {
-				return value ? (
-					<Check className="size-4 text-primary" />
-				) : (
-					<X className="size-4 text-muted-foreground" />
-				);
-			}
-
-			if (col.type === 'number' && typeof value === 'number') {
-				return (
-					<span>
-						{col.prefix}
-						{value.toFixed(2)}
-						{col.suffix}
-					</span>
-				);
-			}
-
-			if (col.type === 'enum' && col.badge) {
-				return <Badge variant="secondary">{String(value)}</Badge>;
-			}
-
-			if (col.type === 'date') {
-				if (value instanceof Date) {
-					return value.toLocaleDateString();
-				}
-				if (typeof value === 'string') {
-					return new Date(value).toLocaleDateString();
-				}
-			}
-
-			return String(value || '');
-		};
-
 		return {
 			key: col.key as string,
 			label: col.label,
-			render: (item: any) => renderCell(item),
+			render: (item: any) => renderColumnValue(col, item),
 			sortable: col.sortable,
 		};
 	});
@@ -331,7 +457,9 @@ DataTableRoot.Body = function Body() {
 	};
 
 	const handleDelete = async (id: string) => {
-		if (!ctx.service.deleteProduct) return;
+		if (!ctx.service.deleteProduct) {
+			return;
+		}
 		if (confirm('Delete this item?')) {
 			await ctx.service.deleteProduct(id);
 			ctx.refresh();
@@ -355,7 +483,7 @@ DataTableRoot.Body = function Body() {
 		);
 	};
 
-	const hasActions = ctx.service.updateProduct || ctx.service.deleteProduct;
+	const hasActions = ctx.enableCrud && (ctx.service.updateProduct || ctx.service.deleteProduct);
 
 	return (
 		<Table
@@ -368,7 +496,9 @@ DataTableRoot.Body = function Body() {
 			renderActions={hasActions ? renderActions : undefined}
 			loading={ctx.loading}
 			emptyMessage="No items found"
-			sorting={{ sortConfigs, onSortChange: handleSortChange }}
+			sorting={ctx.enableSorting ? { sortConfigs, onSortChange: handleSortChange } : undefined}
+			onRowClick={(item: any) => ctx.setSelectedItemId(item.id)}
+			getRowClassName={() => 'cursor-pointer hover:bg-accent/20'}
 		/>
 	);
 };
@@ -409,22 +539,102 @@ DataTableRoot.Pagination = function PaginationControls({
 	);
 };
 
-// Dialog renderer
-DataTableRoot.Dialog = function DialogRenderer({ dialog: Dialog }: { dialog: ComponentType<any> }) {
-	const ctx = useDataTable();
-	if (!ctx.dialogOpen || !Dialog) return null;
+// Detail panel with navigation
+DataTableRoot.DetailPanel = function DetailPanel<T extends { id: string }>({ columns }: { columns: ColumnDef<T>[] }) {
+	const ctx = useDataTable<T>();
 
-	const handleSave = async (data: unknown) => {
-		if (ctx.editingItem) {
-			await ctx.service.updateProduct?.((ctx.editingItem as { id: string }).id, data);
-		} else {
-			await ctx.service.createProduct?.(data);
+	const renderFieldValue = (col: ColumnDef<T>) => {
+		if (!ctx.selectedItem) {
+			return null;
 		}
-		ctx.setDialogOpen(false);
-		ctx.refresh();
+
+		if (col.render) {
+			return col.render(ctx.selectedItem);
+		}
+
+		const value = ctx.selectedItem[col.key];
+
+		if (col.type === 'boolean') {
+			return value ? <Check className="size-4 text-primary" /> : <X className="size-4 text-muted-foreground" />;
+		}
+
+		if (col.type === 'number' && typeof value === 'number') {
+			return (
+				<span>
+					{col.prefix}
+					{value.toFixed(2)}
+					{col.suffix}
+				</span>
+			);
+		}
+
+		if (col.type === 'enum' && col.badge) {
+			return <Badge variant="secondary">{String(value)}</Badge>;
+		}
+
+		if (col.type === 'date') {
+			if (value instanceof Date) {
+				return value.toLocaleDateString();
+			}
+			if (typeof value === 'string') {
+				return new Date(value).toLocaleDateString();
+			}
+		}
+
+		return String(value || '');
 	};
 
-	return <Dialog item={ctx.editingItem} onSave={handleSave} onClose={() => ctx.setDialogOpen(false)} />;
+	if (ctx.selectedItemLoading) {
+		return <div className="flex h-full items-center justify-center">Loading...</div>;
+	}
+
+	if (!ctx.selectedItem) {
+		return (
+			<div className="flex h-full items-center justify-center text-muted-foreground">
+				Select an item to view details
+			</div>
+		);
+	}
+
+	const currentIndex = ctx.items.findIndex(i => i.id === ctx.selectedItem?.id);
+	const canNavigatePrev = currentIndex > 0;
+	const canNavigateNext = currentIndex >= 0 && currentIndex < ctx.items.length - 1;
+
+	const handlePrev = () => {
+		if (canNavigatePrev) {
+			ctx.setSelectedItemId(ctx.items[currentIndex - 1].id);
+		}
+	};
+
+	const handleNext = () => {
+		if (canNavigateNext) {
+			ctx.setSelectedItemId(ctx.items[currentIndex + 1].id);
+		}
+	};
+
+	return (
+		<div className="flex h-full flex-col gap-4 rounded-lg border border-border bg-card p-4">
+			<div className="flex items-center justify-between">
+				<h2 className="text-lg font-semibold">Details</h2>
+				<div className="flex gap-1">
+					<Button size="sm" variant="ghost" onClick={handlePrev} disabled={!canNavigatePrev}>
+						<ChevronLeft className="size-4" />
+					</Button>
+					<Button size="sm" variant="ghost" onClick={handleNext} disabled={!canNavigateNext}>
+						<ChevronRight className="size-4" />
+					</Button>
+				</div>
+			</div>
+			<div className="space-y-3">
+				{columns.map(col => (
+					<div key={col.key as string} className="border-b border-border pb-2">
+						<div className="text-sm font-semibold text-muted-foreground">{col.label}</div>
+						<div className="mt-1">{renderFieldValue(col)}</div>
+					</div>
+				))}
+			</div>
+		</div>
+	);
 };
 
 export const DataTable = DataTableRoot;

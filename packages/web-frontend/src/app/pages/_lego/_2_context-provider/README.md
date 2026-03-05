@@ -43,7 +43,9 @@ All pages demonstrate zero className, zero inline styles, zero hooks, zero state
 import { col } from '@framework/lego/helpers/col';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 
-import { PageLayout, ProductProvider, ViewDataTable } from './_framework';
+import { PageLayout } from './_framework/PageLayout';
+import { ProductProvider } from './_framework/ProductDomainContext';
+import { ViewDataTable } from './_framework/ViewDataTable';
 
 const columns = [
 	col.text('name', 'Name', { sortable: true }),

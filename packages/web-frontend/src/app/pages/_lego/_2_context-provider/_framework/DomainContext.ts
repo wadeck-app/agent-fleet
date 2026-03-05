@@ -67,6 +67,11 @@ export interface DomainContextValue<T, TQuery, TActions> {
 	selectedItem: T | null;
 
 	/**
+	 * Loading state for individual item fetch (detail panel)
+	 */
+	selectedItemLoading: boolean;
+
+	/**
 	 * Available actions (create, update, delete, etc.)
 	 */
 	actions: TActions;

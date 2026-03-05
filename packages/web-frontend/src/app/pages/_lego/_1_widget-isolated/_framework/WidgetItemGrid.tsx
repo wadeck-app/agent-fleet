@@ -78,7 +78,9 @@ export function WidgetItemGrid<T extends { id: string }>({ service, columns, fea
 	const [editingItem, setEditingItem] = useState<T | null>(null);
 
 	const renderCellValue = (item: T, col: ColumnDef<T>) => {
-		if (col.render) return col.render(item);
+		if (col.render) {
+			return col.render(item);
+		}
 
 		const value = item[col.key];
 
@@ -114,7 +116,9 @@ export function WidgetItemGrid<T extends { id: string }>({ service, columns, fea
 	};
 
 	const handleDelete = async (id: string) => {
-		if (!service.deleteProduct) return;
+		if (!service.deleteProduct) {
+			return;
+		}
 		if (confirm('Delete this item?')) {
 			await service.deleteProduct(id);
 			refresh();

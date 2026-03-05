@@ -28,7 +28,6 @@ const columns = [
 	col.number<Product>('price', 'Price', { prefix: '$' }),
 	col.enum<Product>('category', 'Category', PRODUCT_CATEGORIES, { badge: true }),
 	col.enum<Product>('status', 'Status', PRODUCT_STATUSES, { badge: true }),
-	col.number<Product>('rating', 'Rating'),
 ];
 
 export function S4Page() {
