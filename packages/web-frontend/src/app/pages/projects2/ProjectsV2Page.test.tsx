@@ -723,6 +723,108 @@ describe('ProjectsV2Page', () => {
 		});
 	});
 
+	describe('View param preservation', () => {
+		it('should preserve view param when switching workspaces', async () => {
+			const projects: Project[] = [
+				{
+					id: 'proj-1',
+					name: 'Test Project',
+					workspaceIds: ['ws-1', 'ws-2'],
+					taskCount: 0,
+					archived: false,
+					pinned: true,
+					order: 0,
+					createdAt: new Date().toISOString(),
+					updatedAt: new Date().toISOString(),
+					version: 1,
+				},
+			];
+
+			const workspaces: Workspace[] = [
+				{
+					id: 'ws-1',
+					name: 'Workspace 1',
+					path: '/workspace-1',
+					mode: 'development' as const,
+					tasksCount: 0,
+					status: 'active' as const,
+					createdAt: new Date().toISOString(),
+					lastUsed: new Date().toISOString(),
+					color: '#3b82f6',
+				},
+				{
+					id: 'ws-2',
+					name: 'Workspace 2',
+					path: '/workspace-2',
+					mode: 'development' as const,
+					tasksCount: 0,
+					status: 'active' as const,
+					createdAt: new Date().toISOString(),
+					lastUsed: new Date().toISOString(),
+					color: '#10b981',
+				},
+			];
+
+			vi.mocked(useProjects).mockReturnValue({
+				projects,
+				loading: false,
+				pinnedProjects: projects,
+				loadProjects: vi.fn(),
+				pinProject: vi.fn(),
+				unpinProject: vi.fn(),
+				reorderProjects: vi.fn(),
+				error: null,
+				clearError: vi.fn(),
+			});
+
+			vi.mocked(useProjectWorkspaces).mockReturnValue({
+				workspaces,
+				loading: false,
+				loadWorkspaces: vi.fn(),
+				associateWorkspace: vi.fn(),
+				dissociateWorkspace: vi.fn(),
+				reorderWorkspaces: vi.fn(),
+				getProjectWorkspaces: (project: Project | undefined) => {
+					if (!project) return [];
+					return workspaces.filter(w => project.workspaceIds.includes(w.id));
+				},
+				error: null,
+				clearError: vi.fn(),
+			});
+
+			// Render with view=files param
+			render(<ProjectsV2Page />, {
+				wrapper: ({ children }) =>
+					wrapper({ children, initialUrl: '/?projectId=proj-1&workspaceId=ws-1&view=files' }),
+			});
+
+			// Wait for page to load
+			await waitFor(() => {
+				expect(screen.getByText('Test Project')).toBeInTheDocument();
+			});
+
+			// Verify initial URL has view=files
+			let params = getSearchParams();
+			expect(params.get('projectId')).toBe('proj-1');
+			expect(params.get('workspaceId')).toBe('ws-1');
+			expect(params.get('view')).toBe('files');
+
+			// Click the second workspace tab
+			const ws2Tab = screen.getByText('Workspace 2');
+			await userEvent.click(ws2Tab);
+
+			// Wait for URL to update
+			await waitFor(() => {
+				params = getSearchParams();
+				expect(params.get('workspaceId')).toBe('ws-2');
+			});
+
+			// CRITICAL CHECK: view param should be preserved
+			expect(params.get('projectId')).toBe('proj-1');
+			expect(params.get('view')).toBe('files');
+		});
+	});
+
 	describe('Workspace auto-association', () => {
 		const projectWithWorkspace: Project = {
 			id: 'project-123',

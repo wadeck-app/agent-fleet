@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 
 import {
 	Background,
@@ -11,6 +11,7 @@ import {
 	type OnEdgesDelete,
 	type OnNodesChange,
 	ReactFlow,
+	useReactFlow,
 } from '@xyflow/react';
 
 import { edgeTypes } from './edges';
@@ -28,6 +29,7 @@ interface FlowEditorCanvasProps {
 	onPaneClick: () => void;
 	selectedNodeId: string | null;
 	selectedEdgeId: string | null;
+	fitViewTrigger: number;
 }
 
 export function FlowEditorCanvas({
@@ -41,7 +43,18 @@ export function FlowEditorCanvas({
 	onPaneClick,
 	selectedNodeId,
 	selectedEdgeId,
+	fitViewTrigger,
 }: FlowEditorCanvasProps) {
+	const { fitView } = useReactFlow();
+
+	// Fit view whenever a new flow is loaded (trigger increments on each load)
+	useEffect(() => {
+		if (fitViewTrigger === 0) return;
+		// Defer to let ReactFlow finish rendering the new nodes
+		const timeout = setTimeout(() => fitView({ padding: 0.1, duration: 300 }), 50);
+		return () => clearTimeout(timeout);
+	}, [fitViewTrigger, fitView]);
+
 	const onDragOver = useCallback((event: React.DragEvent) => {
 		event.preventDefault();
 		event.dataTransfer.dropEffect = 'move';

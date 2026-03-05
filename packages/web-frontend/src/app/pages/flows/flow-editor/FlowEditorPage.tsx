@@ -111,6 +111,7 @@ export function FlowEditorPage() {
 								onPaneClick={flowEditor.onPaneClick}
 								selectedNodeId={flowEditor.selectedNodeId}
 								selectedEdgeId={flowEditor.selectedEdgeId}
+								fitViewTrigger={flowEditor.fitViewTrigger}
 							/>
 						}
 						propertiesPanel={

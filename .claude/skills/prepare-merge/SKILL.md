@@ -1,11 +1,11 @@
 ---
 name: prepare-merge
-description: From a "workspace-X" branch, prepare the branch to be integrated back to "integration"
+description: From a "workspace-X"/"wsX" branch, prepare the branch to be integrated back to "integration"
 ---
 
 ## Standard Process
 
-### From workspace-X
+### From workspace-X / wsX
 
 1. **Ensure ALL tests/checks pass** - If there are failures, correct them.
     - **CRITICAL**: ALL 6 test suites MUST pass (Backend, Frontend, Shared, E2E App, E2E Components, Visual)

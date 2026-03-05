@@ -189,6 +189,9 @@ export default defineConfig(({ mode }) => {
 			globals: true,
 			environment: 'jsdom',
 			setupFiles: './src/framework/tests/setup.ts',
+			// Cap fork workers to avoid OOM when multiple workspaces run simultaneously.
+			// CodeMirror imports are heavy; uncapped parallelism exhausts available RAM.
+			maxWorkers: 4,
 			css: true,
 			// Include test files only from src directory
 			include: ['src/**/*.test.{ts,tsx}', 'src/**/*.spec.{ts,tsx}'],

@@ -90,23 +90,13 @@ export function useProjectWorkspaces(): UseProjectWorkspacesResult {
 
 	/**
 	 * Associate a workspace with a project
-	 * Updates project.workspaceIds[] to include the workspace
+	 * Uses atomic addWorkspacesToProject API to avoid race conditions from WebSocket updates
 	 */
 	const associateWorkspace = useCallback(
 		async (workspaceId: string, projectId: string) => {
 			try {
 				setError(null);
-
-				// Get current project to access workspaceIds
-				const project = await projectsApi.getProjectById(projectId);
-				const newWorkspaceIds = [...project.workspaceIds, workspaceId];
-
-				await projectsApi.updateProject(projectId, {
-					workspaceIds: newWorkspaceIds,
-					version: project.version,
-				});
-
-				// Reload to get fresh data
+				await projectsApi.addWorkspacesToProject(projectId, [workspaceId]);
 				await loadWorkspaces();
 			} catch (err) {
 				setError(getErrorMessage(err));

@@ -124,6 +124,8 @@ import { TaskDetailStackedPage } from '@app/pages/tasks/TaskDetailStackedPage';
 import { TasksPage } from '@app/pages/tasks/TasksPage';
 import { TicketDetailPage } from '@app/pages/tickets/TicketDetailPage';
 import { TicketsPage } from '@app/pages/tickets/TicketsPage';
+import { WorkerDetailSplitPage } from '@app/pages/workers/WorkerDetailSplitPage';
+import { WorkerDetailStackedPage } from '@app/pages/workers/WorkerDetailStackedPage';
 import { WorkersPage } from '@app/pages/workers/WorkersPage';
 import { WorkspacesPage } from '@app/pages/workspaces/WorkspacesPage';
 
@@ -151,6 +153,9 @@ function Layout() {
 					<Routes>
 						<Route path="/dashboard" element={<DashboardPage />} />
 						<Route path="/workers" element={<WorkersPage />} />
+						<Route path="/workers/:workerId" element={<WorkerDetailSplitPage />} />
+						<Route path="/workers/:workerId/split" element={<WorkerDetailSplitPage />} />
+						<Route path="/workers/:workerId/stacked" element={<WorkerDetailStackedPage />} />
 						<Route path="/tasks" element={<TasksPage />} />
 						<Route path="/tasks/:id/logs-split" element={<TaskDetailSplitPage />} />
 						<Route path="/tasks/:id/logs-stacked" element={<TaskDetailStackedPage />} />
