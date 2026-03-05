@@ -41,10 +41,24 @@ function loadEnvFiles(basePath: string, mode: string): Record<string, string> {
 		parseEnvFile(content);
 	}
 
+	// Load root .env.local (local overrides for shared config, e.g. WORKSPACE_ID)
+	const rootEnvLocalPath = path.join(basePath, '../../.env.local');
+	if (fs.existsSync(rootEnvLocalPath)) {
+		const content = fs.readFileSync(rootEnvLocalPath, 'utf-8');
+		parseEnvFile(content);
+	}
+
 	// Load package .env (overrides root .env if same variables)
 	const packageEnvPath = path.join(basePath, '.env');
 	if (fs.existsSync(packageEnvPath)) {
 		const content = fs.readFileSync(packageEnvPath, 'utf-8');
+		parseEnvFile(content);
+	}
+
+	// Load package .env.local (local overrides for package config)
+	const packageEnvLocalPath = path.join(basePath, '.env.local');
+	if (fs.existsSync(packageEnvLocalPath)) {
+		const content = fs.readFileSync(packageEnvLocalPath, 'utf-8');
 		parseEnvFile(content);
 	}
 
@@ -159,6 +173,14 @@ export default defineConfig(({ mode }) => {
 				],
 			},
 		},
+		// Inject server-side env values (from root .env) into import.meta.env for browser use.
+		// Standard Vite env loading only reads the package directory, not the monorepo root,
+		// so PROJECT_ID and WORKSPACE_ID (defined in root .env) would otherwise be invisible
+		// to the browser. This makes getApiBaseUrl() compute the correct backend port.
+		define: {
+			'import.meta.env.VITE_PROJECT_ID': JSON.stringify(String(projectId)),
+			'import.meta.env.VITE_WORKSPACE_ID': JSON.stringify(String(workspaceId)),
+		},
 		// Don't optimize shared packages so they stay reactive to changes
 		optimizeDeps: {
 			exclude: ['@shared', 'shared-frontend-backend'],
@@ -169,6 +191,9 @@ export default defineConfig(({ mode }) => {
 			globals: true,
 			environment: 'jsdom',
 			setupFiles: './src/framework/tests/setup.ts',
+			// Cap fork workers to avoid OOM when multiple workspaces run simultaneously.
+			// CodeMirror imports are heavy; uncapped parallelism exhausts available RAM.
+			maxWorkers: 4,
 			css: true,
 			// Include test files only from src directory
 			include: ['src/**/*.test.{ts,tsx}', 'src/**/*.spec.{ts,tsx}'],

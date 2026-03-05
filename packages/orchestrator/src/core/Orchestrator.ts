@@ -12,9 +12,18 @@ import { type Shutdownable } from 'shared-common/Shutdownable';
 import { createLogger } from 'shared-common/logger';
 import { StateManager } from 'shared-orch-worker/StateManager';
 
+import { FileBasedOrchestratorStorage } from '../storage/FileBasedOrchestratorStorage';
+import type { IOrchestratorStorage } from '../storage/IOrchestratorStorage';
+
 const log = createLogger('Orchestrator');
 
-export type OrchestratorConfig = { restPort?: number; wsPort?: number; projectRoot?: string; libraryMode?: boolean };
+export type OrchestratorConfig = {
+	restPort?: number;
+	wsPort?: number;
+	projectRoot?: string;
+	libraryMode?: boolean;
+	storage?: IOrchestratorStorage;
+};
 
 /**
  * Orchestrator class that coordinates all services
@@ -26,6 +35,7 @@ export class Orchestrator implements Shutdownable {
 	private projectRoot: string;
 	private libraryMode: boolean;
 	private stateManager: StateManager;
+	private storage: IOrchestratorStorage;
 	private taskManager: TaskManager;
 	private workerCoordinator: WorkerCoordinator;
 	private backendEventBridge: BackendEventBridge;
@@ -48,7 +58,8 @@ export class Orchestrator implements Shutdownable {
 		this.projectRoot = config?.projectRoot || process.cwd();
 		this.libraryMode = config?.libraryMode ?? false;
 		this.stateManager = new StateManager();
-		this.taskManager = new TaskManager(this.stateManager);
+		this.storage = config?.storage ?? new FileBasedOrchestratorStorage();
+		this.taskManager = new TaskManager(this.stateManager, this.storage);
 		this.backendEventBridge = new BackendEventBridge();
 		this.eventSubscriptionRegistry = new EventSubscriptionRegistry();
 		this.workerCoordinator = new WorkerCoordinator(this.backendEventBridge, this.stateManager);
@@ -74,7 +85,7 @@ export class Orchestrator implements Shutdownable {
 		await this.taskManager.initialize();
 
 		// Initialize InterventionManager
-		this.interventionManager = new InterventionManager(this.taskManager);
+		this.interventionManager = new InterventionManager(this.taskManager, this.storage);
 		await this.interventionManager.loadPendingInterventions();
 		log.info('Orchestrator', 'InterventionManager initialized');
 

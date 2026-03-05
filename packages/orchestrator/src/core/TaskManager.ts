@@ -1,4 +1,3 @@
-import { Storage } from 'orchestrator/core/Storage';
 import { createLogger } from 'shared-common/logger';
 import type { StateManager } from 'shared-orch-worker/StateManager';
 import type { Task, TaskHistoryEntry } from 'shared-orch-worker/domain-types';
@@ -6,6 +5,8 @@ import { TaskStatus } from 'shared-orch-worker/domain-types';
 import { v4 as uuidv4 } from 'uuid';
 
 import type { FlowDiscoveryRegistry } from '../registry/FlowDiscoveryRegistry';
+import type { IOrchestratorStorage } from '../storage/IOrchestratorStorage';
+import { KnowledgeStorage } from './KnowledgeStorage';
 
 const log = createLogger('TaskManager');
 
@@ -17,6 +18,7 @@ interface WorkerIdleEntry {
 export class TaskManager {
 	private tasks: Map<string, Task>;
 	private stateManager: StateManager;
+	private storage: IOrchestratorStorage;
 	private initialized: boolean = false;
 	private flowDiscoveryRegistry?: FlowDiscoveryRegistry;
 
@@ -25,9 +27,10 @@ export class TaskManager {
 	private workerQueues: Map<string, Task[]> = new Map();
 	private idleWorkers: WorkerIdleEntry[] = [];
 
-	constructor(stateManager: StateManager) {
+	constructor(stateManager: StateManager, storage: IOrchestratorStorage) {
 		this.tasks = new Map();
 		this.stateManager = stateManager;
+		this.storage = storage;
 	}
 
 	/**
@@ -48,7 +51,7 @@ export class TaskManager {
 		}
 
 		try {
-			await Storage.initialize();
+			await KnowledgeStorage.initialize();
 			await this.loadTasks();
 			this.initialized = true;
 		} catch (error) {
@@ -61,7 +64,7 @@ export class TaskManager {
 	 * Load all tasks from storage
 	 */
 	private async loadTasks(): Promise<void> {
-		const tasks = await Storage.listTasks();
+		const tasks = await this.storage.listTasks();
 		tasks.forEach(task => {
 			this.tasks.set(task.id, task);
 		});
@@ -131,7 +134,7 @@ export class TaskManager {
 		this.tasks.set(task.id, task);
 
 		try {
-			await Storage.saveTask(task);
+			await this.storage.saveTask(task);
 		} catch (error) {
 			// Rollback in-memory change if storage fails
 			this.tasks.delete(task.id);
@@ -168,7 +171,7 @@ export class TaskManager {
 		this.tasks.set(task.id, task);
 
 		try {
-			await Storage.saveTask(task);
+			await this.storage.saveTask(task);
 		} catch (error) {
 			// Rollback in-memory change if storage fails
 			this.tasks.set(task.id, oldTask);
@@ -217,7 +220,7 @@ export class TaskManager {
 		});
 
 		try {
-			await Storage.saveTask(task);
+			await this.storage.saveTask(task);
 		} catch (error) {
 			// Rollback in-memory changes if storage fails
 			task.status = oldStatus;
@@ -236,7 +239,6 @@ export class TaskManager {
 	/**
 	 * Assign a task to a worker
 	 */
-	// async assignTask(taskId: string, workerId: string, workerType: WorkerType): Promise<void> {
 	async assignTask(taskId: string, workerId: string): Promise<void> {
 		const task = this.tasks.get(taskId);
 		if (!task) {
@@ -246,7 +248,6 @@ export class TaskManager {
 		const oldAssignment = task.assignedTo;
 		const oldHistory = [...task.history];
 
-		// task.assignedTo = { workerId, workerType };
 		task.assignedTo = { workerId };
 		task.updatedAt = new Date().toISOString();
 
@@ -254,11 +255,10 @@ export class TaskManager {
 			timestamp: task.updatedAt,
 			event: 'assigned',
 			workerId,
-			// workerType,
 		});
 
 		try {
-			await Storage.saveTask(task);
+			await this.storage.saveTask(task);
 		} catch (error) {
 			// Rollback in-memory changes if storage fails
 			task.assignedTo = oldAssignment;
@@ -269,7 +269,6 @@ export class TaskManager {
 			throw error;
 		}
 
-		// log.info(`[TaskManager] Task ${taskId} assigned to ${workerType} worker ${workerId}`);
 		log.info(`[TaskManager] Task ${taskId} assigned to worker ${workerId}`);
 		this.stateManager.emitTaskUpdated(task);
 	}
@@ -295,7 +294,7 @@ export class TaskManager {
 		});
 
 		try {
-			await Storage.saveTask(task);
+			await this.storage.saveTask(task);
 		} catch (error) {
 			// Rollback in-memory changes if storage fails
 			task.assignedTo = oldAssignment;
@@ -330,7 +329,7 @@ export class TaskManager {
 		task.updatedAt = new Date().toISOString();
 
 		try {
-			await Storage.saveTask(task);
+			await this.storage.saveTask(task);
 		} catch (error) {
 			// Rollback in-memory changes if storage fails
 			task.comments = oldComments;
@@ -345,34 +344,15 @@ export class TaskManager {
 
 	/**
 	 * Get the next available task for a worker type (without assigning it)
-	 * Note: This method is kept for backward compatibility but should not be used
-	 * in scenarios where race conditions are a concern. Use assignTaskToWorker instead.
 	 */
-	// getNextTaskForWorker(workerType: WorkerType): Task | null {
 	getNextTaskForWorker(): Task | null {
-		// return this.getNextAvailableTask(workerType);
 		return this.getNextAvailableTask();
 	}
 
 	/**
-	 * Internal method to find the next available task for a worker type
+	 * Internal method to find the next available task
 	 */
-	// private getNextAvailableTask(workerType: WorkerType): Task | null {
 	private getNextAvailableTask(): Task | null {
-		// // Determine which status to look for based on worker type
-		// const statusMap: Record<WorkerType, TaskStatus[]> = {
-		// 	[WorkerType.PM]: [TaskStatus.BACKLOG],
-		// 	[WorkerType.PO]: [TaskStatus.REFINED],
-		// 	// DEV accepts BACKLOG for MVP (until we have PM workers)
-		// 	[WorkerType.DEV]: [TaskStatus.BACKLOG, TaskStatus.TODO, TaskStatus.CHANGES_REQUESTED],
-		// 	[WorkerType.REVIEWER]: [TaskStatus.REVIEW],
-		// };
-
-		// const targetStatuses = statusMap[workerType] || [];
-
-		// Find the first unassigned task with the right status
-		// Prioritize by priority: urgent > high > medium > low
-
 		// Exclude terminal statuses that should not be assigned
 		const terminalStatuses: TaskStatus[] = [TaskStatus.MERGED, TaskStatus.CANCELLED, TaskStatus.APPROVED];
 
@@ -381,7 +361,6 @@ export class TaskManager {
 
 		for (const priority of priorityOrder) {
 			for (const task of this.tasks.values()) {
-				// if (targetStatuses.includes(task.status) && !task.assignedTo && task.priority === priority) {
 				if (!task.assignedTo && task.priority === priority && !terminalStatuses.includes(task.status)) {
 					return task;
 				}
@@ -396,7 +375,6 @@ export class TaskManager {
 	 * Returns the assigned task or null if no tasks are available.
 	 * This prevents race conditions where multiple workers claim the same task.
 	 */
-	// async assignTaskToWorker(workerId: string, workerType: WorkerType): Promise<Task | null> {
 	async assignTaskToWorker(workerId: string): Promise<Task | null> {
 		// PRIORITY 1: Check if worker has a specific queue with pre-assigned tasks
 		const workerQueue = this.workerQueues.get(workerId);
@@ -423,7 +401,7 @@ export class TaskManager {
 				});
 
 				try {
-					await Storage.saveTask(task);
+					await this.storage.saveTask(task);
 					log.info(`[TaskManager] Started pre-assigned task ${task.id} for worker ${workerId}`);
 					this.stateManager.emitTaskUpdated(task);
 					return task;
@@ -442,7 +420,6 @@ export class TaskManager {
 		}
 
 		// PRIORITY 2: Find next available task from global backlog
-		// const task = this.getNextAvailableTask(workerType);
 		const task = this.getNextAvailableTask();
 
 		if (!task) {
@@ -461,7 +438,6 @@ export class TaskManager {
 		const oldStartedAt = task.startedAt;
 		const oldHistory = [...task.history];
 
-		// task.assignedTo = { workerId, workerType };
 		task.assignedTo = { workerId };
 		task.status = TaskStatus.IN_PROGRESS;
 		task.updatedAt = new Date().toISOString();
@@ -472,12 +448,10 @@ export class TaskManager {
 			timestamp: task.updatedAt,
 			event: 'assigned',
 			workerId,
-			// workerType,
 		});
 
 		try {
-			await Storage.saveTask(task);
-			// log.info(`[TaskManager] Task ${task.id} atomically assigned to ${workerType} worker ${workerId}`);
+			await this.storage.saveTask(task);
 			log.info(`[TaskManager] Task ${task.id} atomically assigned to worker ${workerId}`);
 			this.stateManager.emitTaskUpdated(task);
 			return task;
@@ -526,7 +500,7 @@ export class TaskManager {
 
 		try {
 			// Remove from storage first
-			await Storage.deleteTask(taskId);
+			await this.storage.deleteTask(taskId);
 
 			// Remove from memory
 			this.tasks.delete(taskId);
@@ -551,7 +525,7 @@ export class TaskManager {
 
 		try {
 			// Delete all from storage in parallel
-			await Promise.all(taskIds.map(taskId => Storage.deleteTask(taskId)));
+			await Promise.all(taskIds.map(taskId => this.storage.deleteTask(taskId)));
 
 			// Remove from memory and emit events
 			for (const taskId of taskIds) {
@@ -648,8 +622,6 @@ export class TaskManager {
 	/**
 	 * Find a matching task for a worker
 	 * Checks worker's personal queue first, then global backlog
-	 * @param workerId - The worker requesting a task
-	 * @returns Task or null if no matching task found
 	 */
 	findMatchingTask(workerId: string): Task | null {
 		// Check worker's personal queue first
@@ -662,8 +634,6 @@ export class TaskManager {
 
 		// Check global backlog
 		if (this.globalBacklog.length > 0) {
-			// For now, just return the first task (FIFO)
-			// In Phase 5, we'll add flow compatibility checking
 			const task = this.globalBacklog.shift()!;
 			log.info(`[TaskManager] Found task ${task.id} in global backlog for worker ${workerId}`);
 			return task;
@@ -700,7 +670,7 @@ export class TaskManager {
 		});
 
 		try {
-			await Storage.saveTask(task);
+			await this.storage.saveTask(task);
 			log.info(`[TaskManager] Task ${taskId} awaiting user intervention ${interventionId}`);
 			this.stateManager.emitTaskUpdated(task);
 		} catch (error) {
@@ -746,7 +716,7 @@ export class TaskManager {
 		});
 
 		try {
-			await Storage.saveTask(task);
+			await this.storage.saveTask(task);
 			log.info(`[TaskManager] Task ${taskId} resumed after intervention ${interventionId}`);
 			this.stateManager.emitTaskUpdated(task);
 		} catch (error) {
