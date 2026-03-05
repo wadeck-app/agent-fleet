@@ -32,6 +32,8 @@ export const WorkerSchema = z.object({
 	lastHeartbeat: z.string().optional(), // ISO timestamp
 	tasksCompleted: z.number().optional(),
 	successRate: z.number().optional(), // 0-100 percentage
+	projectId: z.string().optional(),
+	workspacePath: z.string().optional(),
 });
 
 /**
@@ -133,6 +135,10 @@ export const WORKERS_API_ROUTES = defineRoutes({
 		},
 	},
 	'/api/workers/:workerId': {
+		GET: {
+			params: z.object({ workerId: z.string() }),
+			response: WorkerSchema,
+		},
 		PATCH: {
 			params: z.object({ workerId: z.string() }),
 			body: UpdateWorkerNameSchema,

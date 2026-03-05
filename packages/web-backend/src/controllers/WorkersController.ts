@@ -56,6 +56,14 @@ export default class WorkersController implements LazyController<typeof WORKERS_
 		});
 
 		/**
+		 * GET /api/workers/:workerId
+		 * Get a single worker by ID
+		 */
+		add('GET', '/api/workers/:workerId', async ({ params }) => {
+			return this.service.getWorker(params.workerId);
+		});
+
+		/**
 		 * GET /api/workers/:workerId/flows
 		 * Get flows for a specific worker
 		 */

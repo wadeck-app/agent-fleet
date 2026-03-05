@@ -241,6 +241,78 @@ export class WorkersService {
 	}
 
 	/**
+	 * Get a single worker by ID
+	 */
+	async getWorker(workerId: string): Promise<Worker> {
+		let runtimeWorker: any = null;
+		let workerWorkspace: any = null;
+
+		// Try to fetch runtime data from orchestrator
+		try {
+			const stats = await this.orchestratorWrapper.getStats();
+			runtimeWorker = stats.workersList.find((w: any) => w.id === workerId);
+
+			// If worker is connected, fetch workspace info
+			if (runtimeWorker) {
+				const orchestrator = this.orchestratorWrapper.getOrchestrator();
+				const wsServer = orchestrator.getWsServer();
+				const connectedWorkspaces = wsServer?.getConnectionManager().getConnectedWorkspaces() ?? [];
+				workerWorkspace = connectedWorkspaces.find((w: any) => w.workerId === workerId);
+			}
+		} catch (error) {
+			// Orchestrator is offline - will check metadata below
+			log.debug('Orchestrator unavailable, checking metadata for worker:', workerId);
+		}
+
+		// Fetch worker metadata (name, version)
+		const metadata = await this.workersRepository.findByWorkerId(workerId);
+
+		// If worker not found in orchestrator and has no metadata, throw NotFoundException
+		if (!runtimeWorker && !metadata) {
+			throw new NotFoundException(`Worker ${workerId} not found`, ERROR_CODES.RESOURCE_NOT_FOUND, { workerId });
+		}
+
+		// Build worker response
+		if (runtimeWorker) {
+			// Worker is connected - merge runtime + workspace + metadata
+			const worker: Worker = {
+				workerId,
+				name: metadata?.name,
+				version: metadata?.version,
+				connected: true,
+				taskId: runtimeWorker.taskId ?? undefined,
+				state: runtimeWorker.taskId ? 'busy' : 'idle',
+				taskStartedAt: runtimeWorker.taskStartedAt ?? undefined,
+				uptime: undefined,
+				lastHeartbeat: undefined,
+				tasksCompleted: undefined,
+				successRate: undefined,
+				projectId: workerWorkspace?.projectId,
+				workspacePath: workerWorkspace?.workspacePath,
+			};
+			return worker;
+		} else {
+			// Worker is disconnected - only metadata available
+			const worker: Worker = {
+				workerId,
+				name: metadata?.name,
+				version: metadata?.version,
+				connected: false,
+				state: 'idle',
+				taskId: undefined,
+				taskStartedAt: undefined,
+				uptime: undefined,
+				lastHeartbeat: undefined,
+				tasksCompleted: undefined,
+				successRate: undefined,
+				projectId: undefined,
+				workspacePath: undefined,
+			};
+			return worker;
+		}
+	}
+
+	/**
 	 * Get flows for a specific worker
 	 */
 	async getWorkerFlows(workerId: string): Promise<WorkerFlows> {
