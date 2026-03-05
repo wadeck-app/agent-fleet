@@ -29,6 +29,14 @@ export class WorkersService {
 	}
 
 	/**
+	 * Get a single worker by ID
+	 * @param workerId Worker ID
+	 */
+	async getWorker(workerId: string): Promise<Worker> {
+		return workersApi.getWorker(workerId);
+	}
+
+	/**
 	 * Rename a worker
 	 * @param workerId Worker ID
 	 * @param name New name for the worker
