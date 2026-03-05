@@ -232,7 +232,10 @@ export function ProjectsV2Page() {
 		setSearchParams(prev => {
 			const currentProjectId = prev.get('projectId');
 			if (!currentProjectId) return prev;
-			return { projectId: currentProjectId, workspaceId: newWorkspaceId };
+			const currentView = prev.get('view');
+			const params: Record<string, string> = { projectId: currentProjectId, workspaceId: newWorkspaceId };
+			if (currentView) params.view = currentView;
+			return params;
 		});
 	};
 
