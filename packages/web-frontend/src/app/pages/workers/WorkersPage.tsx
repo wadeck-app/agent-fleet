@@ -1,5 +1,4 @@
 import { useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 import { Data2 } from '@framework/components2/data/Data2';
 import { ActiveFeaturesPanel } from '@framework/components/debug/ActiveFeaturesPanel';
@@ -39,8 +38,6 @@ const STORAGE_ID = 'workers' as const;
  * ===========================================================================================
  */
 export function WorkersPage() {
-	const navigate = useNavigate();
-
 	// Headless features
 	const pagination = usePagination2({
 		pageSize: 10,
@@ -97,14 +94,6 @@ export function WorkersPage() {
 		};
 	}, []);
 
-	// Handle row click to navigate to worker detail
-	const handleRowClick = useCallback(
-		(worker: Worker) => {
-			navigate(`/workers/${worker.workerId}`);
-		},
-		[navigate]
-	);
-
 	return (
 		<Page>
 			<PageHeader title="Workers" onRefresh={cache.actions.refresh} isRefreshing={cache.fstate.isRefreshing} />
@@ -144,7 +133,7 @@ export function WorkersPage() {
 				mutation={mutation}
 				delegateLoadingToChildren={true}
 			>
-				<WorkersTable onRowClick={handleRowClick} />
+				<WorkersTable />
 			</Data2>
 		</Page>
 	);
