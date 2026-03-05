@@ -1,4 +1,5 @@
-import { dirname } from 'path';
+import { execSync } from 'child_process';
+import { basename, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 // Get __dirname equivalent in ES modules
@@ -158,6 +159,66 @@ Command: ${command}`,
 		process.exit(0);
 		return;
 	}
+
+	// ─── Workspace worktree: protect integration and main ───────────────────────
+	// A ws* agent is never allowed to put commits on "integration" or "main".
+	// Only the main agent-fleet workspace can integrate changes.
+
+	const projectDir = env.CLAUDE_PROJECT_DIR || '';
+	const projectDirName = basename(projectDir.replace(/\\/g, '/'));
+	const isWorkspaceWorktree = /_ws\d+$/.test(projectDirName);
+
+	if (isWorkspaceWorktree) {
+		const isCommit = /\bgit\s+commit\b/i.test(command);
+		const isMerge = /\bgit\s+merge\b/i.test(command) && !/--abort|--continue/.test(command);
+		const isPush = /\bgit\s+push\b/i.test(command);
+
+		if (isCommit || isMerge || isPush) {
+			// Vector 1 — branch check inside CLAUDE_PROJECT_DIR (handles git checkout integration)
+			let currentBranch = '';
+			try {
+				currentBranch = execSync(`git -C "${projectDir}" branch --show-current`, {
+					encoding: 'utf8',
+					stdio: ['ignore', 'pipe', 'ignore'],
+				}).trim();
+			} catch {
+				// git unavailable — fail safe: let command through (no false positives)
+			}
+			const isOnProtectedBranch = ['integration', 'main'].includes(currentBranch);
+
+			// Vector 2 — explicit push to protected branch (git push origin integration)
+			// Only for push: for merges, the branch in the command is the SOURCE (not target)
+			// e.g. "git merge origin/integration" is legitimate (pulling updates into ws branch)
+			const pushToProtected = isPush && /\b(integration|main)\b/.test(command);
+
+			// Vector 3 — cross-directory bypass (cd ../agent-fleet && git merge ws1)
+			// Detect if the command references the main worktree path (without _ws suffix)
+			const mainDirName = projectDirName.replace(/_ws\d+$/, ''); // "agent-fleet"
+			const crossDirRegex = new RegExp(`${mainDirName}(?!_ws)`, 'i');
+			const referencesMainWorktree = crossDirRegex.test(command);
+
+			if (isOnProtectedBranch || pushToProtected || referencesMainWorktree) {
+				const response = {
+					hookSpecificOutput: {
+						hookEventName: 'PreToolUse',
+						permissionDecision: 'block',
+						permissionDecisionReason: `PROTECTED BRANCH — OPERATION FORBIDDEN
+
+Workspace "${projectDirName}" cannot commit, merge into, or push to "integration" or "main".
+Only the main agent-fleet workspace manages branch integration.
+
+Use the "prepare-merge" skill to prepare your branch, then let the integration agent handle the merge.
+
+Command: ${command}`,
+					},
+				};
+				console.log(JSON.stringify(response));
+				process.exit(0);
+				return;
+			}
+		}
+	}
+	// ────────────────────────────────────────────────────────────────────────────
 
 	// Allow the command
 	const response = {
