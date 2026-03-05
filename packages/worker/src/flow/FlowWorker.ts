@@ -540,26 +540,11 @@ export class FlowWorker implements Shutdownable {
 		this.logger.info(` Received REQUEST_FLOW_DEFINITION for ${flowId}`);
 
 		try {
-			// Read flows from local flows.yml file
-			const flowsFilePath = path.join(this.projectRoot, '.agent-fleet', 'flows.yml');
-
-			if (!existsSync(flowsFilePath)) {
-				throw new Error(`Flows file not found: ${flowsFilePath}`);
-			}
-
-			const fileContents = readFileSync(flowsFilePath, 'utf8');
-			const flows = yaml.load(fileContents) as Record<string, any>;
-
-			const flowDefinition = flows[flowId];
+			// Use registry to support both default flows and project flows
+			const flowDefinition = this.flowRegistry.getFlow(flowId);
 			if (!flowDefinition) {
-				throw new Error(`Flow ${flowId} not found in flows.yml`);
+				throw new Error(`Flow ${flowId} not found`);
 			}
-
-			// Add the id to the definition
-			const completeDefinition = {
-				id: flowId,
-				...flowDefinition,
-			};
 
 			// Send response
 			this.sendMessage(
@@ -567,7 +552,7 @@ export class FlowWorker implements Shutdownable {
 					workerId: this.workerId,
 					requestId,
 					flowId,
-					flowDefinition: completeDefinition,
+					flowDefinition,
 				})
 			);
 

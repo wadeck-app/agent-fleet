@@ -189,9 +189,9 @@ export class FlowsService {
 			}
 		}
 
-		// Flow not found in any project
-		log.warn(`Flow ${flowId} not found in any project`);
-		return null;
+		// Flow not found via orchestrator — fall back to local flows.yml
+		log.warn(`Flow ${flowId} not found in any project, falling back to local file`);
+		return this.getFlowByIdFromFile(flowId);
 	}
 
 	/**
