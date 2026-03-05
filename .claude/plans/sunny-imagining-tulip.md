@@ -2,6 +2,8 @@
 
 **Date:** 2026-03-01 **Branch:** ws2
 
+**Status:** ✅ COMPLETED 2026-03-06 — all items done, branch ready for merge
+
 **Updated:** 2026-03-05 - Fixing round-2 feedback items
 
 ---
