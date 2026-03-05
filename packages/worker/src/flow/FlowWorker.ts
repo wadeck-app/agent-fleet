@@ -1341,21 +1341,24 @@ if (isMainModule) {
 	const entryLog = createLogger('FlowWorker:main');
 	entryLog.info('Starting Flow Worker...');
 
-	// Load environment variables from root .env and package .env files
-	// Root .env is loaded first, then package .env (which can override)
+	// Load environment variables in order: root .env → root .env.local (workspace overrides) → package .env
+	// root .env.local contains WORKSPACE_ID per workspace (same pattern as web-backend/src/server.ts)
 	// Calculate paths relative to the worker's source directory structure:
 	// __dirname = packages/worker/src/flow
 	// root .env = . (project root)
 	// package .env = packages/worker
 	const __dirname = fileURLToPath(new URL('.', import.meta.url));
 	const rootEnvPath = join(__dirname, '../../../../.env');
+	const rootEnvLocalPath = join(__dirname, '../../../../.env.local');
 	const packageEnvPath = join(__dirname, '../../.env');
 
 	entryLog.info('Loading .env files:');
-	entryLog.info(`- Root:    ${rootEnvPath}`);
-	entryLog.info(`- Package: ${packageEnvPath}`);
+	entryLog.info(`- Root:       ${rootEnvPath}`);
+	entryLog.info(`- Root local: ${rootEnvLocalPath}`);
+	entryLog.info(`- Package:    ${packageEnvPath}`);
 
 	dotenv.config({ path: rootEnvPath });
+	dotenv.config({ path: rootEnvLocalPath, override: true });
 	dotenv.config({ path: packageEnvPath });
 
 	entryLog.info(`Loaded WORKSPACE_ID=${process.env.WORKSPACE_ID}, PROJECT_ID=${process.env.PROJECT_ID}`);

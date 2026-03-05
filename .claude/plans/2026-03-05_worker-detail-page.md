@@ -7,6 +7,7 @@ identity info (name, ID, state, connection), workspace association (1 workspace 
 task history (filtered by workerId), registered flows, and key metrics.
 
 Two layouts are implemented simultaneously so the user can test and choose:
+
 - **Split**: fixed 300px info sidebar + tabbed main content (mirrors `TaskDetailSplitPage`)
 - **Stacked**: compact header with metrics + full-width tabbed content (mirrors `TaskDetailStackedPage`)
 
@@ -56,11 +57,12 @@ Add `getWorker(workerId: string): Promise<Worker>` method:
 2. Query `wsServer.getConnectionManager().getConnectedWorkspaces()` → find `{ projectId, workspacePath }` for this worker
 3. Query `workersRepository.findByWorkerId(workerId)` → find metadata (name, version)
 4. Build response:
-   - **Connected**: merge runtime + workspace + metadata → `connected: true`
-   - **Disconnected** (not in orchestrator but has metadata): `connected: false`, no workspace/task data
-   - **Unknown** (not in orchestrator AND no metadata): throw `NotFoundException`
+    - **Connected**: merge runtime + workspace + metadata → `connected: true`
+    - **Disconnected** (not in orchestrator but has metadata): `connected: false`, no workspace/task data
+    - **Unknown** (not in orchestrator AND no metadata): throw `NotFoundException`
 
 Access pattern for WebSocketConnectionManager (already used in `getWorkerFlows`):
+
 ```typescript
 const orchestrator = this.orchestratorWrapper.getOrchestrator();
 const wsServer = orchestrator.getWsServer();
@@ -75,9 +77,10 @@ const workerWorkspace = connectedWorkspaces.find(w => w.workerId === workerId);
 **File:** `packages/web-backend/src/controllers/WorkersController.ts`
 
 Add route alongside existing PATCH:
+
 ```typescript
 add('GET', '/api/workers/:workerId', async ({ params }) => {
-  return this.service.getWorker(params.workerId);
+	return this.service.getWorker(params.workerId);
 });
 ```
 
@@ -87,6 +90,7 @@ add('GET', '/api/workers/:workerId', async ({ params }) => {
 
 **File:** `packages/web-frontend/src/app/pages/workers/workers.api.ts`
 Add:
+
 ```typescript
 getWorker: (workerId: string): Promise<Worker> =>
   typedFetch('GET', '/api/workers/:workerId', { params: { workerId } }),
@@ -94,6 +98,7 @@ getWorker: (workerId: string): Promise<Worker> =>
 
 **File:** `packages/web-frontend/src/app/pages/workers/WorkersService.ts`
 Add:
+
 ```typescript
 async getWorker(workerId: string): Promise<Worker> {
   return workersApi.getWorker(workerId);
@@ -107,16 +112,19 @@ async getWorker(workerId: string): Promise<Worker> {
 All in `packages/web-frontend/src/app/pages/workers/hooks/`
 
 ### `useWorker.ts`
+
 - Fetches `GET /api/workers/:workerId`
 - Subscribes to realtime refresh on `B2F_WORKER_UPDATED`, `B2F_WORKER_CONNECTED`, `B2F_WORKER_DISCONNECTED` (filtered by workerId)
 - Returns `{ worker, isLoading, isError, error, refetch }`
 
 ### `useWorkerTaskHistory.ts`
+
 - Calls the existing tasks API (`/api/tasks/`) with `workerId` filter
 - Uses `usePagination2` + `useSorting2` + `Data2` pattern (same as `WorkersPage`)
 - Default sort: `createdAt desc`
 
 ### `useWorkerFlows.ts`
+
 - Calls existing `workersApi.getWorkerFlows(workerId)` (already implemented)
 - Returns `{ flows, isLoading, isError, refetch }`
 
@@ -127,7 +135,9 @@ All in `packages/web-frontend/src/app/pages/workers/hooks/`
 All in `packages/web-frontend/src/app/pages/workers/components/`
 
 ### `WorkerInfoPanel.tsx`
+
 Sections using `ContextRow` + `Badge` + `EditableText`:
+
 - **Identity**: workerId (mono), name (EditableText, same logic as WorkersTable), state Badge, connection Badge
 - **Workspace**: projectId, workspacePath — shown when connected; "Offline" when not
 - **Current Task**: taskId (link → `/tasks/:id`), taskStartedAt formatted relative — shown only if busy
@@ -137,18 +147,22 @@ Sections using `ContextRow` + `Badge` + `EditableText`:
 Props: `worker: Worker` (rename callback reuses `workersService.renameWorker`)
 
 ### `WorkerMetricsGrid.tsx`
+
 4 `MetricItem` in a `grid grid-cols-2 gap-4`:
+
 - Tasks Completed (`tasksCompleted ?? "N/A"`)
 - Success Rate (`successRate ? "${successRate}%" : "N/A"`)
 - Uptime (`uptime ? formatDuration(uptime) : "N/A"`)
 - Last Heartbeat (`lastHeartbeat ? formatRelative(lastHeartbeat) : "N/A"`)
 
 ### `WorkerTaskHistoryTable.tsx`
+
 `Data2` + `Table2` with fixed `workerId` filter.
 Columns: Task ID (link ↗), Status (Badge), Priority (Badge), Created At, Flow ID.
 Realtime: `useRealtimeRefresh` on `B2F_TASK_UPDATED` filtered by workerId.
 
 ### `WorkerFlowsList.tsx`
+
 List of `FlowMetadata`. Each row: flow name, version, isValid Badge (success/destructive), description.
 
 ---
@@ -156,31 +170,35 @@ List of `FlowMetadata`. Each row: flow name, version, isValid Badge (success/des
 ## Step 7 — Frontend: Pages (new files)
 
 ### `WorkerDetailSplitPage.tsx`
+
 ```
 packages/web-frontend/src/app/pages/workers/WorkerDetailSplitPage.tsx
 ```
+
 - `useParams<{ workerId }>()` + `useWorker(workerId)`
 - Loading/error states (LoadingSpinner, ErrorAlert)
 - Layout: `grid grid-cols-[300px_1fr] h-[calc(100vh-200px)]`
 - Left: `WorkerInfoPanel` (scrollable)
 - Right: `TabsWithUrlState` (paramKey="tab", defaultValue="overview", groupId="worker")
-  - Tab "overview": `WorkerMetricsGrid`
-  - Tab "tasks": `WorkerTaskHistoryTable`
-  - Tab "flows": `WorkerFlowsList`
+    - Tab "overview": `WorkerMetricsGrid`
+    - Tab "tasks": `WorkerTaskHistoryTable`
+    - Tab "flows": `WorkerFlowsList`
 - PageHeader: title = worker name or ID, action = `[Stacked ⇄]` button
 
 ### `WorkerDetailStackedPage.tsx`
+
 ```
 packages/web-frontend/src/app/pages/workers/WorkerDetailStackedPage.tsx
 ```
+
 - Same data hooks
 - Layout: stacked, full-width
 - Below PageHeader: `WorkerMetricsGrid` (always visible, 4 compact metric cards)
 - Worker identity info (id, state, connection, workspace) inline in PageHeader subtitle area
 - `TabsWithUrlState` (defaultValue="tasks")
-  - Tab "tasks": `WorkerTaskHistoryTable` (full width)
-  - Tab "flows": `WorkerFlowsList`
-  - Tab "info": `WorkerInfoPanel` (full-width variant, no fixed height)
+    - Tab "tasks": `WorkerTaskHistoryTable` (full width)
+    - Tab "flows": `WorkerFlowsList`
+    - Tab "info": `WorkerInfoPanel` (full-width variant, no fixed height)
 - PageHeader action: `[Split ⇄]` button
 
 ---
@@ -188,11 +206,14 @@ packages/web-frontend/src/app/pages/workers/WorkerDetailStackedPage.tsx
 ## Step 8 — Navigation
 
 ### `WorkersTable.tsx`
+
 Add `onRowClick` prop to `Table2` (prop exists, just not wired) that navigates to `/workers/:workerId`.
 Cursor pointer on rows.
 
 ### `App.tsx`
+
 Add 3 routes after existing `/workers` route:
+
 ```tsx
 <Route path="/workers/:workerId" element={<WorkerDetailSplitPage />} />
 <Route path="/workers/:workerId/split" element={<WorkerDetailSplitPage />} />
@@ -214,21 +235,22 @@ Add 3 routes after existing `/workers` route:
 - `WorkerDetailStackedPage.test.tsx` — same
 
 Backend:
+
 - `WorkersService.getWorker` — connected, disconnected (metadata exists), not found (404)
 
 ---
 
 ## Files Modified (existing)
 
-| File | Change |
-|------|--------|
-| `packages/shared-frontend-backend/src/api/workers.contract.ts` | Add GET route + `projectId`/`workspacePath` to WorkerSchema |
-| `packages/web-backend/src/services/WorkersService.ts` | Add `getWorker()` |
-| `packages/web-backend/src/controllers/WorkersController.ts` | Add GET route |
-| `packages/web-frontend/src/app/pages/workers/workers.api.ts` | Add `getWorker()` |
-| `packages/web-frontend/src/app/pages/workers/WorkersService.ts` | Add `getWorker()` |
-| `packages/web-frontend/src/app/pages/workers/WorkersTable.tsx` | Wire `onRowClick` → navigate |
-| `packages/web-frontend/src/app/App.tsx` | Add 3 routes |
+| File                                                            | Change                                                      |
+| --------------------------------------------------------------- | ----------------------------------------------------------- |
+| `packages/shared-frontend-backend/src/api/workers.contract.ts`  | Add GET route + `projectId`/`workspacePath` to WorkerSchema |
+| `packages/web-backend/src/services/WorkersService.ts`           | Add `getWorker()`                                           |
+| `packages/web-backend/src/controllers/WorkersController.ts`     | Add GET route                                               |
+| `packages/web-frontend/src/app/pages/workers/workers.api.ts`    | Add `getWorker()`                                           |
+| `packages/web-frontend/src/app/pages/workers/WorkersService.ts` | Add `getWorker()`                                           |
+| `packages/web-frontend/src/app/pages/workers/WorkersTable.tsx`  | Wire `onRowClick` → navigate                                |
+| `packages/web-frontend/src/app/App.tsx`                         | Add 3 routes                                                |
 
 ---
 
