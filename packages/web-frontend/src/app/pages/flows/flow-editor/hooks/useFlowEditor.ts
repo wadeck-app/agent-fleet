@@ -30,6 +30,7 @@ export function useFlowEditor(flowId: string | undefined) {
 	const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 	const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
 	const [isDirty, setIsDirty] = useState(false);
+	const [fitViewTrigger, setFitViewTrigger] = useState(0);
 	// Separate loading states: initialLoading for first load, loading for flow switches
 	const [initialLoading, setInitialLoading] = useState(true);
 	const [loading, setLoading] = useState(false);
@@ -110,6 +111,7 @@ export function useFlowEditor(flowId: string | undefined) {
 			const flow = await flowsApi.getFlowById(id);
 			setFlowDefinition(flow as unknown as FlowDefinition); // Cast to FlowDefinition type
 			setIsDirty(false);
+			setFitViewTrigger(prev => prev + 1);
 		} catch (err) {
 			setError(`Failed to load flow: ${getErrorMessage(err)}`);
 			setFlowDefinition(null);
@@ -136,6 +138,7 @@ export function useFlowEditor(flowId: string | undefined) {
 				steps: [],
 			};
 			setFlowDefinition(newFlow);
+			setFitViewTrigger(prev => prev + 1);
 			setInitialLoading(false);
 			setLoading(false);
 			return;
@@ -637,6 +640,7 @@ export function useFlowEditor(flowId: string | undefined) {
 	return {
 		// State
 		flowDefinition,
+		fitViewTrigger,
 		nodes,
 		edges: filteredEdges, // For visual display
 		allEdges: edges, // For preview computation (includes hidden edges)
