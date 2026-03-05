@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 import { Table2, type Table2Column, type Table2Props } from '@framework/components2/table/Table2';
 import { Badge } from '@framework/components/primitives/Badge';
 import { EditableText } from '@framework/features/inline-editing/EditableText';
@@ -44,7 +46,11 @@ function createWorkersColumns(
 		{
 			key: 'workerId',
 			label: 'Worker ID',
-			render: (w: Worker) => <span className={`font-mono text-xs text-muted-foreground`}>{w.workerId}</span>,
+			render: (w: Worker) => (
+				<Link to={`/workers/${w.workerId}`} className="font-mono text-xs text-primary hover:underline">
+					{w.workerId}
+				</Link>
+			),
 		},
 		{
 			key: 'name',
@@ -86,9 +92,7 @@ function createWorkersColumns(
 	];
 }
 
-export interface WorkersTableProps extends Partial<Table2Props<Worker>> {
-	onRowClick?: (worker: Worker) => void;
-}
+export interface WorkersTableProps extends Partial<Table2Props<Worker>> {}
 
 /**
  * Workers table component using Table2
@@ -112,7 +116,6 @@ export function WorkersTable(props: WorkersTableProps) {
 			sorting={props.sorting}
 			features={props.features}
 			refreshing={props.refreshing}
-			onRowClick={props.onRowClick}
 		/>
 	);
 }

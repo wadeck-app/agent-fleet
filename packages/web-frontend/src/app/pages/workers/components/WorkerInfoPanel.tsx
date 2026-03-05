@@ -1,21 +1,25 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { Badge } from '@framework/components/primitives/Badge';
 import { EditableText } from '@framework/features/inline-editing/EditableText';
 import { useToast } from '@framework/features/toast/ToastContext';
+import { cn } from '@framework/lib/utils';
 import type { Worker } from '@shared/api/workers.contract';
 
 import { workersService } from '@/app/pages/workers/WorkersService';
 
 interface WorkerInfoPanelProps {
 	worker: Worker;
+	onRename?: () => void;
 }
 
 /**
  * Sidebar panel with full worker details (for split layout)
  */
-export function WorkerInfoPanel({ worker }: WorkerInfoPanelProps) {
+export function WorkerInfoPanel({ worker, onRename }: WorkerInfoPanelProps) {
 	const { showToast } = useToast();
+	const [isSavingName, setIsSavingName] = useState(false);
 
 	const formatDate = (isoString: string) => {
 		return new Date(isoString).toLocaleString('en-US', {
@@ -29,14 +33,18 @@ export function WorkerInfoPanel({ worker }: WorkerInfoPanelProps) {
 	};
 
 	const handleRenameWorker = async (newName: string) => {
+		setIsSavingName(true);
 		try {
 			// Pass version for optimistic locking (1 for first rename when no metadata exists)
 			const version = worker.version ?? 1;
 			await workersService.renameWorker(worker.workerId, newName, version);
+			await onRename?.();
 			showToast('Worker renamed successfully', 'success');
 		} catch (error) {
 			console.error('Failed to rename worker:', error);
 			throw error; // Re-throw to show error in EditableText
+		} finally {
+			setIsSavingName(false);
 		}
 	};
 
@@ -48,7 +56,7 @@ export function WorkerInfoPanel({ worker }: WorkerInfoPanelProps) {
 				<p className="font-mono text-xs text-foreground">{worker.workerId}</p>
 			</div>
 
-			<div>
+			<div className={cn('transition-opacity', isSavingName && 'pointer-events-none opacity-50 blur-sm')}>
 				<h3 className="mb-2 text-sm font-semibold text-muted-foreground">Name</h3>
 				<EditableText
 					value={worker.name}

@@ -97,7 +97,7 @@ export function WorkerDetailStackedPage() {
 					<WorkerFlowsList workerId={workerId} />
 				</TabsContent>
 				<TabsContent value="info">
-					<WorkerInfoPanel worker={worker} />
+					<WorkerInfoPanel worker={worker} onRename={refetch} />
 				</TabsContent>
 			</TabsWithUrlState>
 		</Page>

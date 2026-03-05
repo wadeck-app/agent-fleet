@@ -80,7 +80,7 @@ export function WorkerDetailSplitPage() {
 
 			<div className="grid h-[calc(100vh-200px)] grid-cols-[300px_1fr] gap-4">
 				{/* Left: Worker Info Panel */}
-				<WorkerInfoPanel worker={worker} />
+				<WorkerInfoPanel worker={worker} onRename={refetch} />
 
 				{/* Right: Tabs */}
 				<TabsWithUrlState paramKey="tab" defaultValue="overview" groupId="worker">
