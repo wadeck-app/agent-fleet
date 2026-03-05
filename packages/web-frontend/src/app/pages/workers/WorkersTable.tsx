@@ -87,7 +87,7 @@ function createWorkersColumns(
 }
 
 export interface WorkersTableProps extends Partial<Table2Props<Worker>> {
-	// Add any custom props if needed
+	onRowClick?: (worker: Worker) => void;
 }
 
 /**
@@ -112,6 +112,7 @@ export function WorkersTable(props: WorkersTableProps) {
 			sorting={props.sorting}
 			features={props.features}
 			refreshing={props.refreshing}
+			onRowClick={props.onRowClick}
 		/>
 	);
 }

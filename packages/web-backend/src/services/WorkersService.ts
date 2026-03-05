@@ -242,6 +242,9 @@ export class WorkersService {
 
 	/**
 	 * Get a single worker by ID
+	 * @param workerId Worker ID
+	 * @returns Worker data with projectId and workspacePath if connected
+	 * @throws NotFoundException if worker not found in orchestrator and has no metadata
 	 */
 	async getWorker(workerId: string): Promise<Worker> {
 		let runtimeWorker: any = null;

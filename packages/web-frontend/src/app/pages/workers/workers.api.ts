@@ -39,6 +39,13 @@ export const workersApi = {
 	},
 
 	/**
+	 * Get a single worker by ID
+	 */
+	getWorker: (workerId: string): Promise<Worker> => {
+		return typedFetch('GET', '/api/workers/:workerId', { params: { workerId } });
+	},
+
+	/**
 	 * Update worker name
 	 */
 	updateWorkerName: (workerId: string, name: string, version: number): Promise<Worker> => {
