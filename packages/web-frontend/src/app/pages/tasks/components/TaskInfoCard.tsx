@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 import { Badge } from '@framework/components/primitives/Badge';
 import type { Task } from '@shared/api/tasks.contract';
 
@@ -176,6 +178,23 @@ export function TaskInfoCard({ task, collapsible = true, defaultOpen: _defaultOp
 							})}
 						</tbody>
 					</table>
+				</div>
+			)}
+
+			{/* Triggered by Section */}
+			{task.ticketId && (
+				<div className="border-t border-border p-4">
+					<h3 className="mb-3 text-sm font-semibold text-foreground">Triggered by</h3>
+					<div className="flex items-center gap-2">
+						{task.metadata?.triggerEvent && (
+							<Badge variant="outline" className="font-mono text-xs">
+								{task.metadata.triggerEvent as string}
+							</Badge>
+						)}
+						<Link to={`/tickets/${task.ticketId}`} className="text-xs text-primary hover:underline">
+							View ticket {task.ticketId}
+						</Link>
+					</div>
 				</div>
 			)}
 		</div>

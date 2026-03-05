@@ -12,8 +12,12 @@ vi.mock('./tickets.api', () => ({
 	},
 }));
 
-vi.mock('@/hooks/useRealtimeRefresh', () => ({
-	useRealtimeRefresh: vi.fn(),
+vi.mock('@/transport', () => ({
+	useTransport: vi.fn(() => ({
+		transport: {
+			subscribe: vi.fn(() => vi.fn()),
+		},
+	})),
 }));
 
 describe('TicketCommentsSection', () => {
@@ -55,7 +59,10 @@ describe('TicketCommentsSection', () => {
 
 			render(<TicketCommentsSection ticketId="ticket-1" />);
 
-			expect(screen.getByText('Loading comments...')).toBeInTheDocument();
+			// Loading state shows Comments label with a spinner (no text)
+			expect(screen.getByText('Comments')).toBeInTheDocument();
+			// Content area should not have comments
+			expect(screen.queryByText('No comments yet.')).not.toBeInTheDocument();
 		});
 
 		it('should render comments after loading', async () => {
@@ -94,14 +101,13 @@ describe('TicketCommentsSection', () => {
 				comments: [],
 			});
 
-			const { container } = render(<TicketCommentsSection ticketId="ticket-1" />);
+			render(<TicketCommentsSection ticketId="ticket-1" />);
 
 			await waitFor(() => {
 				expect(ticketsApi.getComments).toHaveBeenCalled();
 			});
 
-			// Component should render nothing (return null)
-			expect(container.firstChild).toBeNull();
+			expect(screen.getByText('No comments yet.')).toBeInTheDocument();
 		});
 
 		it('should show error state when fetch fails', async () => {
@@ -167,7 +173,7 @@ describe('TicketCommentsSection', () => {
 	});
 
 	describe('content rendering', () => {
-		it('should preserve whitespace in multiline comments', async () => {
+		it('should render multiline comments', async () => {
 			(ticketsApi.getComments as any).mockResolvedValue({
 				comments: mockComments,
 			});
@@ -178,9 +184,8 @@ describe('TicketCommentsSection', () => {
 				expect(ticketsApi.getComments).toHaveBeenCalled();
 			});
 
-			// Find the multiline comment
-			const multilineComment = screen.getByText(/Third comment with multiline/);
-			expect(multilineComment).toHaveClass('whitespace-pre-wrap');
+			// Comments are rendered via ReactMarkdown — verify the content appears
+			expect(screen.getByText(/Third comment with multiline/)).toBeInTheDocument();
 		});
 	});
 });

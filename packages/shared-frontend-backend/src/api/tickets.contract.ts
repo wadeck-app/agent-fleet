@@ -64,6 +64,33 @@ export const TicketCommentsResponseSchema = z.object({
 export type TicketCommentsResponse = z.infer<typeof TicketCommentsResponseSchema>;
 
 // ---------------------------------------------------------------------------
+// Ticket history (audit log / event trail)
+// ---------------------------------------------------------------------------
+
+export const TicketHistoryEventSchema = z.enum([
+	'ticket.created',
+	'ticket.updated',
+	'ticket.transitioned',
+	'ticket.comment_created',
+]);
+
+export const TicketHistoryEntrySchema = z.object({
+	id: z.string(),
+	ticketId: z.string(),
+	event: TicketHistoryEventSchema,
+	timestamp: z.string(),
+	/** Who triggered the event (user, worker-ai, etc.) */
+	author: z.string().optional(),
+	/** Event-specific payload: changed fields, old/new values, comment content, etc. */
+	data: z.record(z.string(), z.unknown()),
+});
+export type TicketHistoryEntry = z.infer<typeof TicketHistoryEntrySchema>;
+
+export const TicketHistoryResponseSchema = z.object({
+	entries: z.array(TicketHistoryEntrySchema),
+});
+
+// ---------------------------------------------------------------------------
 // Query / list schemas
 // ---------------------------------------------------------------------------
 
@@ -163,6 +190,8 @@ export const TicketAnalysisPlanSchema = z.object({
 export const CreateFromPlanSchema = z.object({
 	projectId: z.string().min(1),
 	plan: TicketAnalysisPlanSchema,
+	/** Original user description — used as parent ticket description instead of AI analysis */
+	originalDescription: z.string().optional(),
 });
 
 export const CreateFromPlanResponseSchema = z.object({
@@ -197,6 +226,8 @@ export type SubTicketPlan = z.infer<typeof SubTicketPlanSchema>;
 export type TicketAnalysisPlan = z.infer<typeof TicketAnalysisPlanSchema>;
 export type CreateFromPlan = z.infer<typeof CreateFromPlanSchema>;
 export type CreateFromPlanResponse = z.infer<typeof CreateFromPlanResponseSchema>;
+export type TicketHistoryEvent = z.infer<typeof TicketHistoryEventSchema>;
+export type TicketHistoryResponse = z.infer<typeof TicketHistoryResponseSchema>;
 
 // ---------------------------------------------------------------------------
 // Route definitions
@@ -262,6 +293,12 @@ export const TICKETS_API_ROUTES = defineRoutes({
 			params: z.object({ ticketId: z.string() }),
 			body: CreateTicketCommentSchema,
 			response: TicketCommentSchema,
+		},
+	},
+	'/api/tickets/:ticketId/history': {
+		GET: {
+			params: z.object({ ticketId: z.string() }),
+			response: TicketHistoryResponseSchema,
 		},
 	},
 });

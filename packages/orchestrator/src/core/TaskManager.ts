@@ -112,8 +112,9 @@ export class TaskManager {
 			updatedAt: new Date().toISOString(),
 			assignedTo: null,
 			comments: [],
-			// Promote flowId to top-level so FlowWorker can access task.flowId directly
+			// Promote flowId and ticketId to top-level so FlowWorker can access them directly
 			flowId: metadata.flowId as string | undefined,
+			ticketId: metadata.ticketId as string | undefined,
 			flowInputs: flowInputs ?? {},
 			metadata: {
 				...metadata,

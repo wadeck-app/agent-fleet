@@ -1,4 +1,11 @@
-import type { CreateTicketComment, Ticket, TicketComment, TicketsQuery } from '@app/shared/api/tickets.contract';
+import type {
+	CreateTicketComment,
+	Ticket,
+	TicketComment,
+	TicketHistoryEntry,
+	TicketHistoryEvent,
+	TicketsQuery,
+} from '@app/shared/api/tickets.contract';
 
 import type { BaseRepository } from './BaseRepository';
 
@@ -128,6 +135,47 @@ export class TicketsRepository {
 			throw new Error(`Ticket ${ticketId} not found`);
 		}
 		return ticket.comments ?? [];
+	}
+
+	/**
+	 * Append a history entry to the ticket's audit trail
+	 */
+	async addHistoryEntry(
+		ticketId: string,
+		event: TicketHistoryEvent,
+		data: Record<string, unknown>,
+		author?: string
+	): Promise<TicketHistoryEntry> {
+		const ticket = (await this.base.findById(ticketId)) as (Ticket & { history?: TicketHistoryEntry[] }) | null;
+		if (!ticket) {
+			throw new Error(`Ticket ${ticketId} not found`);
+		}
+
+		const entry: TicketHistoryEntry = {
+			id: Math.random().toString(36).substring(2, 11),
+			ticketId,
+			event,
+			timestamp: new Date().toISOString(),
+			author,
+			data,
+		};
+
+		const existing = ticket.history ?? [];
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		await (this.base as any).update(ticketId, { history: [...existing, entry] });
+
+		return entry;
+	}
+
+	/**
+	 * Get the full audit trail for a ticket (chronological order)
+	 */
+	async getHistory(ticketId: string): Promise<TicketHistoryEntry[]> {
+		const ticket = (await this.base.findById(ticketId)) as (Ticket & { history?: TicketHistoryEntry[] }) | null;
+		if (!ticket) {
+			throw new Error(`Ticket ${ticketId} not found`);
+		}
+		return (ticket.history ?? []).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 	}
 
 	/**

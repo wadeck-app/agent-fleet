@@ -5657,3 +5657,160 @@ try {
 ```
 
 **Related files**: `packages/web-frontend/src/app/pages/tickets/TicketDetailPage.tsx`
+
+## UX: Silent Auto-Save = Bad UX (Must Have Feedback) (2026-03-04)
+
+**Problem**: User had to repeatedly request save feedback. Textarea fields that auto-save on blur with no visual feedback leave the user wondering "was my change saved?".
+
+**Rule**: ANY field that saves automatically (on blur, on change, or via batch) MUST show:
+
+- A "Saving..." indicator while saving
+- A "Saved" confirmation (or error state) after the attempt
+
+**Preferred pattern**: Batch "Save changes" button that is:
+
+- Disabled (with tooltip "No unsaved changes") when nothing is dirty
+- Enabled as soon as ANY field is modified
+- Shows "Saving..." state while submitting
+- Triggers `ticket.updated` event on success
+
+**Bad**:
+
+```tsx
+onBlur={() => { if (localValue !== original) updateTicket(...); }}
+// No feedback = user doesn't know if save happened
+```
+
+**Good**:
+
+```tsx
+// isDirty = localValue !== original
+<Button disabled={!isDirty} onClick={handleSave}>
+	{saving ? 'Saving...' : 'Save changes'}
+</Button>
+// + useEffect to show toast on success/error
+```
+
+**Note**: Status changes (selects) CAN remain immediate since they show the new value as visual feedback.
+
+## Flow Script Steps: Windows Exit Code 3221226505 (STATUS_ASSERTION_FAILURE) (2026-03-04)
+
+**Context**: Task `6a444eb1` for flow `ticket-analyze-complexity` on ticket `vre45bpa0` failed with Windows exit code `3221226505`.
+
+**Root cause**: `3221226505` decimal = `0xC0000409` = `STATUS_STACK_BUFFER_OVERRUN` on Windows. In Node.js, this manifests as a libuv assertion failure (`UV_HANDLE_CLOSING`) when spawning child processes from within a worker process that is already in a shutdown or busy state.
+
+**Contributing factors**:
+
+1. The `post-comment` script step uses `node -e "..."` inline — spawns a new child process
+2. On Windows, when the worker process is under load, libuv can assert when the child process tries to exit
+3. The `ticketDescription` was "Analysis for: test for no comment" — a redundant description from the old `createFromPlan` that set `description: plan.analysis` (which starts with "Analysis for: ...")
+
+**Mitigation**:
+
+- The bad `ticketDescription` is fixed by refactoring `TicketCreateDialog` (task #11) to not use `createFromPlan` when a title is provided, and using proper analysis content in description when using `createFromPlan`
+- For the Windows crash itself: Node.js v24.11.1 is current; the crash may be environment-specific. If it recurs, consider replacing the inline `node -e "..."` with a file-based script (`node path/to/script.js`) to reduce process startup overhead
+
+**Status**: Not fully reproducible; task data shows "backlog" (orchestrator-level failure not synced to web-backend). Monitor for recurrence.
+
+## "Fixed" Claims Without Testing Are False (2026-03-05)
+
+**Problem**: Claiming an issue is "fixed" without actually testing it in the browser leads to the same issue being reported again in the next feedback round.
+
+**Root causes encountered**:
+
+1. `node -e "fetch(...)"` → exit code 3221226505 — test written + flows.yml updated, but the task shown to user was from BEFORE the fix. Must trigger a NEW task after fixing to prove it works.
+2. `createFromPlan` description fix — backend was correct but `LocalClaudeAgentExecutor` (stub) copies description as title. Fix was partial.
+3. Layout loading states — multiple independent data fetches cause simultaneous spinners. Not visible until you use `dev-hold` + `agent-browser`.
+
+**Mandatory testing protocol**:
+
+- For flow script fixes: trigger a NEW ticket transition/creation after the fix and navigate to the new task to confirm exit code = 0
+- For UI states: use `dev-hold` + `agent-browser` skills. Do NOT assume loading states are clean.
+- For "stub" executors: document clearly that a real AI executor is needed for AI-powered features. The `LocalClaudeAgentExecutor` in web-backend is a stub that copies description as title.
+
+## Ticket History / Audit Trail Pattern (2026-03-05)
+
+**Architecture**: History entries are embedded in the ticket document (same pattern as comments).
+
+```typescript
+// TicketsRepository.addHistoryEntry(ticketId, event, data, author?)
+// TicketsRepository.getHistory(ticketId) → sorted chronologically
+// API: GET /api/tickets/:ticketId/history → { entries: TicketHistoryEntry[] }
+```
+
+**Events recorded**:
+
+- `ticket.created` — on creation, includes initial status/labels/title
+- `ticket.updated` — on any field change, includes `{ fieldName: { before, after } }` per field
+- `ticket.transitioned` — on status change, includes `{ from, to }`
+- `ticket.comment_created` — on comment add, includes `{ content, author, commentId }`
+
+Note: `ticket.transitioned` is ALSO recorded even though it's a subset of `ticket.updated` (status field), because it provides semantic clarity in the history view.
+
+**Display**: `TicketEventHistorySection` and `TicketAuditLogSection` both use `ticketsApi.getHistory()`, not `tasksApi.getTasksList()`. Tasks are shown separately in `TriggeredTasksSection`.
+
+## authorType Enrichment for Flow Filtering (2026-03-05)
+
+**Pattern**: To allow flows to filter events by author type without hardcoding worker detection at the event bus level, enrich the payload in `DataStoreFactory` before calling `registry.findMatching()`:
+
+```typescript
+const authorType = payload.author?.startsWith('worker-') ? 'worker' : 'human';
+const matches = registry.findMatching({ event: 'ticket.comment_created', payload: { ...payload, authorType } });
+```
+
+Flows can then use `filter: { authorType: human }` or `filter: { authorType: worker }`.
+
+**Why this is correct**: The event bus should emit for ALL comments. Loop prevention is the FLOW's responsibility via the filter, not the event bus's. This allows workers to subscribe to each other's comments.
+
+## No Unicode Arrows in UI — Use Lucide Icons (2026-03-05)
+
+**Rule**: Never use `→` or `←` or other Unicode arrows in UI text/links. Always use Lucide icon components.
+
+**Wrong**:
+
+```tsx
+<Link to="/tasks/123">→ View Task</Link>
+```
+
+**Correct**:
+
+```tsx
+import { ArrowRight } from 'lucide-react';
+
+// ...
+<Link to="/tasks/123" className="inline-flex items-center gap-1">
+	<ArrowRight size={12} /> View Task
+</Link>;
+```
+
+This applies to all links, buttons, and navigational elements. Lucide provides consistent sizing, theming, and accessibility vs. raw Unicode characters.
+
+## Toast API Signature: Positional Args, Not Object (2026-03-05)
+
+**Correct signature**: `showToast(message: string, type?: ToastType)`
+
+**Wrong** (what agent invented):
+
+```tsx
+showToast({ message: 'Error!', type: 'error' });
+```
+
+**Correct**:
+
+```tsx
+showToast('Error!', 'error');
+```
+
+Always read `ToastContext.tsx` before using the toast API. The signature uses positional arguments.
+
+## LoadingSpinner Renders Message Internally (2026-03-05)
+
+`<LoadingSpinner size="sm" />` renders BOTH a spinning div AND a `<p>Loading...</p>` text internally (from `message` prop defaulting to `'Loading...'`).
+
+Do NOT add a separate `<span>Loading...</span>` next to it — that produces duplicate text.
+
+**Options**:
+
+- Pass `message=""` to suppress internal text: `<LoadingSpinner size="sm" message="" />`
+- Use `<Loader2 className="size-4 animate-spin" />` (Lucide) directly for inline loading without text
+- Use `<LoadingSpinner size="sm" />` alone when you want spinner + text together

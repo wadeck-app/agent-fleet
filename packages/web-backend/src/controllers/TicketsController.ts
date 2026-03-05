@@ -121,5 +121,13 @@ export default class TicketsController implements LazyController<typeof TICKETS_
 		add('POST', '/api/tickets/:ticketId/comments', async ({ params, body }) => {
 			return this.service.addComment(params.ticketId, body);
 		});
+
+		/**
+		 * GET /api/tickets/:ticketId/history
+		 * Get the full audit/event history for a ticket
+		 */
+		add('GET', '/api/tickets/:ticketId/history', async ({ params }) => {
+			return this.service.getHistory(params.ticketId);
+		});
 	}
 }

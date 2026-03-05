@@ -24,12 +24,47 @@ export interface TicketCreatedPayload {
 }
 
 /**
+ * Payload for ticket updated event (any field change)
+ */
+export interface TicketUpdatedPayload {
+	ticketId: string;
+	projectId: string;
+	title: string;
+	changedFields: string[];
+}
+
+/**
+ * Payload for ticket transitioned event (status change)
+ */
+export interface TicketTransitionedPayload {
+	ticketId: string;
+	projectId: string;
+	title: string;
+	oldStatus: string;
+	newStatus: string;
+}
+
+/**
+ * Payload for ticket comment created event
+ */
+export interface TicketCommentCreatedPayload {
+	ticketId: string;
+	projectId: string;
+	commentId: string;
+	content: string;
+	author: string | undefined;
+}
+
+/**
  * All internal server-side event payloads
  * Keys follow the pattern `domain.action`
  */
 export interface InternalEventMap {
 	'ticket.status.changed': TicketStatusChangedPayload;
 	'ticket.created': TicketCreatedPayload;
+	'ticket.updated': TicketUpdatedPayload;
+	'ticket.transitioned': TicketTransitionedPayload;
+	'ticket.comment_created': TicketCommentCreatedPayload;
 }
 
 export type InternalEventName = keyof InternalEventMap;

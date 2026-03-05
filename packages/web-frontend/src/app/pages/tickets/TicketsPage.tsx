@@ -13,6 +13,7 @@ import { useDragAndDrop } from '@framework/hooks2/form/useDragAndDrop';
 import { useDialogParam } from '@framework/hooks/useDialogParam';
 import { cn } from '@framework/lib/utils';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
+import { formatRelativeTime } from '@framework/utils/formatting/DateFormat';
 import type { Project } from '@shared/api/projects.contract';
 import type { Ticket, TicketStatus } from '@shared/api/tickets.contract';
 import { Plus } from 'lucide-react';
@@ -76,7 +77,12 @@ export function TicketsPage() {
 	// Sync local tickets from server data (initial load + explicit reload)
 	useEffect(() => {
 		if (!loading) {
-			setLocalTickets(tickets);
+			const sorted = [...tickets].sort((a, b) => {
+				const dateA = new Date(a.updatedAt ?? a.createdAt).getTime();
+				const dateB = new Date(b.updatedAt ?? b.createdAt).getTime();
+				return dateB - dateA;
+			});
+			setLocalTickets(sorted);
 		}
 	}, [tickets, loading]);
 
@@ -233,6 +239,10 @@ export function TicketsPage() {
 													{label}
 												</Badge>
 											))}
+										</div>
+										<div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
+											<span>Updated {formatRelativeTime(ticket.updatedAt)}</span>
+											<span>Created {formatRelativeTime(ticket.createdAt)}</span>
 										</div>
 									</div>
 								</SortableItem>

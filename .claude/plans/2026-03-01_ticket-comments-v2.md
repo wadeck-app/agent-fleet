@@ -34,19 +34,23 @@ No install needed. Pattern established in `LogEntry.tsx` — use targeted Tailwi
 **`packages/web-frontend/src/app/pages/tickets/TicketCommentsSection.tsx`**
 
 Add imports:
+
 ```typescript
 import ReactMarkdown from 'react-markdown';
+
 import remarkGfm from 'remark-gfm';
 ```
 
 Replace the `<p className="whitespace-pre-wrap text-sm">` with:
+
 ```tsx
 <div className="text-sm [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_strong]:font-semibold [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-xs [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-    <ReactMarkdown remarkPlugins={[remarkGfm]}>{comment.content}</ReactMarkdown>
+	<ReactMarkdown remarkPlugins={[remarkGfm]}>{comment.content}</ReactMarkdown>
 </div>
 ```
 
 ### Verification
+
 - Create a ticket, wait for `ticket-analyze-complexity` to post — `**bold**` and `- bullet` render as HTML
 
 ---
@@ -58,14 +62,13 @@ Replace the `<p className="whitespace-pre-wrap text-sm">` with:
 **`packages/web-frontend/src/app/pages/tickets/TicketsPage.tsx`**
 
 In the `useEffect` that syncs `tickets → localTickets`, sort before setting:
+
 ```typescript
 useEffect(() => {
-    if (!loading) {
-        const sorted = [...tickets].sort(
-            (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        );
-        setLocalTickets(sorted);
-    }
+	if (!loading) {
+		const sorted = [...tickets].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+		setLocalTickets(sorted);
+	}
 }, [tickets, loading]);
 ```
 
@@ -73,6 +76,7 @@ useEffect(() => {
 The `order` float is persisted correctly — only the visual position regresses. Accept for now.
 
 ### Verification
+
 - Create ticket A then B, then update A → A appears first on reload
 
 ---
@@ -84,6 +88,7 @@ The `order` float is persisted correctly — only the visual position regresses.
 **`packages/web-frontend/src/app/pages/tickets/tickets.api.ts`**
 
 Add `addComment` method:
+
 ```typescript
 addComment: (ticketId: string, body: CreateTicketComment): Promise<TicketComment> =>
     typedFetch('POST', '/api/tickets/:ticketId/comments', { params: { ticketId }, body }),
@@ -100,6 +105,7 @@ addComment: (ticketId: string, body: CreateTicketComment): Promise<TicketComment
 **Risk R2:** Worker will loop if `author` filter is not enforced correctly — see Feature 4.
 
 ### Verification
+
 - Comment form visible on all ticket detail pages
 - Posting a comment: appears immediately (via real-time event)
 - Empty textarea → Send button disabled
@@ -113,16 +119,18 @@ addComment: (ticketId: string, body: CreateTicketComment): Promise<TicketComment
 **`packages/web-backend/src/events/EventBus.ts`**
 
 Add payload interface:
+
 ```typescript
 export interface TicketCommentAddedPayload {
-    ticketId: string;
-    projectId: string;
-    commentId: string;
-    author: string;
+	ticketId: string;
+	projectId: string;
+	commentId: string;
+	author: string;
 }
 ```
 
 Add to `InternalEventMap`:
+
 ```typescript
 'ticket.comment_added': TicketCommentAddedPayload;
 ```
@@ -154,22 +162,25 @@ Extract the port calculation used in the `ticket.created` listener into a privat
 `getBackendUrl(): string` to avoid duplication.
 
 Add listener after the `ticket.created` block:
+
 ```typescript
 this.eventBus.on('ticket.comment_added', async payload => {
-    const registry = this.orchestrator.getEventSubscriptionRegistry();
-    const matches = registry.findMatching({
-        event: 'ticket.comment_added',
-        payload: { author: payload.author },
-    });
-    const backendUrl = this.getBackendUrl();
-    for (const sub of matches) {
-        const task = await this.orchestrator.getTaskManager().createTask(
-            `ticket.comment_added: ${payload.ticketId}`,
-            { flowId: sub.flowId, projectId: payload.projectId, ticketId: payload.ticketId },
-            { ticketId: payload.ticketId, commentId: payload.commentId, author: payload.author, backendUrl }
-        );
-        this.orchestrator.getWorkerCoordinator().enqueueTask(task);
-    }
+	const registry = this.orchestrator.getEventSubscriptionRegistry();
+	const matches = registry.findMatching({
+		event: 'ticket.comment_added',
+		payload: { author: payload.author },
+	});
+	const backendUrl = this.getBackendUrl();
+	for (const sub of matches) {
+		const task = await this.orchestrator
+			.getTaskManager()
+			.createTask(
+				`ticket.comment_added: ${payload.ticketId}`,
+				{ flowId: sub.flowId, projectId: payload.projectId, ticketId: payload.ticketId },
+				{ ticketId: payload.ticketId, commentId: payload.commentId, author: payload.author, backendUrl }
+			);
+		this.orchestrator.getWorkerCoordinator().enqueueTask(task);
+	}
 });
 ```
 
@@ -266,21 +277,21 @@ Step 4 — Test all:
 
 ## Required Tests (70% min, 90% target)
 
-| File | What to test |
-|------|-------------|
-| `TicketsService.test.ts` | `addComment` broadcasts `B2F_TICKET_COMMENT_ADDED` and emits `ticket.comment_added` with correct payload |
-| `EventBus.test.ts` | `ticket.comment_added` listener fires with typed payload |
+| File                             | What to test                                                                                                                    |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `TicketsService.test.ts`         | `addComment` broadcasts `B2F_TICKET_COMMENT_ADDED` and emits `ticket.comment_added` with correct payload                        |
+| `EventBus.test.ts`               | `ticket.comment_added` listener fires with typed payload                                                                        |
 | `TicketCommentsSection.test.tsx` | Form renders; submit calls `addComment({ content, author: 'user' })`; button disabled when empty; button disabled while sending |
-| `TicketsPage.test.tsx` | Tickets sorted by `updatedAt` desc after load |
+| `TicketsPage.test.tsx`           | Tickets sorted by `updatedAt` desc after load                                                                                   |
 
 ---
 
 ## Risks
 
-| # | Risk | Mitigation |
-|---|------|------------|
-| R1 | Drag-and-drop visual regression after sort | Accepted, comment in code |
-| R2 | Infinite loop worker ↔ user | Filter `author: user` exact match — worker posts `worker-ai` |
-| R3 | `prose` classes absent | Use targeted overrides as in `LogEntry.tsx` |
-| R4 | Large comment threads → big stdout | Not a concern at current scale |
-| R5 | `author` undefined → empty string | `'' !== 'user'` → no match, safe |
+| #   | Risk                                       | Mitigation                                                   |
+| --- | ------------------------------------------ | ------------------------------------------------------------ |
+| R1  | Drag-and-drop visual regression after sort | Accepted, comment in code                                    |
+| R2  | Infinite loop worker ↔ user                | Filter `author: user` exact match — worker posts `worker-ai` |
+| R3  | `prose` classes absent                     | Use targeted overrides as in `LogEntry.tsx`                  |
+| R4  | Large comment threads → big stdout         | Not a concern at current scale                               |
+| R5  | `author` undefined → empty string          | `'' !== 'user'` → no match, safe                             |

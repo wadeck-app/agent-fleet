@@ -608,7 +608,10 @@ export class DataStoreFactory {
 						flowId: sub.flowId,
 						projectId: payload.projectId,
 						ticketId: payload.ticketId,
+						triggerEvent: 'ticket.status.changed',
 					});
+				// Sync task to web-backend storage for API visibility (ticketId filter, etc.)
+				await this.getTasksService().syncFromOrchestratorTask(task, 'ticket.status.changed');
 				// Dispatch to WorkerCoordinator so idle workers pick it up
 				this.orchestrator.getWorkerCoordinator().enqueueTask(task);
 			}
@@ -629,7 +632,12 @@ export class DataStoreFactory {
 			for (const sub of matches) {
 				const task = await this.orchestrator.getTaskManager().createTask(
 					`ticket.created: ${payload.ticketId}`,
-					{ flowId: sub.flowId, projectId: payload.projectId, ticketId: payload.ticketId },
+					{
+						flowId: sub.flowId,
+						projectId: payload.projectId,
+						ticketId: payload.ticketId,
+						triggerEvent: 'ticket.created',
+					},
 					{
 						ticketId: payload.ticketId,
 						ticketTitle: payload.title,
@@ -637,7 +645,101 @@ export class DataStoreFactory {
 						backendUrl,
 					}
 				);
+				// Sync task to web-backend storage for API visibility (ticketId filter, etc.)
+				await this.getTasksService().syncFromOrchestratorTask(task, 'ticket.created');
 				// Dispatch to WorkerCoordinator so idle workers pick it up
+				this.orchestrator.getWorkerCoordinator().enqueueTask(task);
+			}
+		});
+
+		// Calculate backend URL (shared across new event handlers)
+		const projectIdNum = Number(process.env.PROJECT_ID ?? 3);
+		const workspaceIdNum = Number(process.env.WORKSPACE_ID ?? 0);
+		const backendPortNum = process.env.PORT ?? String(3000 + projectIdNum * 100 + workspaceIdNum * 10);
+		const backendUrl = `http://localhost:${backendPortNum}`;
+
+		this.eventBus.on('ticket.updated', async payload => {
+			const registry = this.orchestrator.getEventSubscriptionRegistry();
+			const matches = registry.findMatching({ event: 'ticket.updated', payload: {} });
+			for (const sub of matches) {
+				const task = await this.orchestrator.getTaskManager().createTask(
+					`ticket.updated: ${payload.ticketId}`,
+					{
+						flowId: sub.flowId,
+						projectId: payload.projectId,
+						ticketId: payload.ticketId,
+						triggerEvent: 'ticket.updated',
+					},
+					{
+						ticketId: payload.ticketId,
+						ticketTitle: payload.title,
+						changedFields: payload.changedFields.join(', '),
+						backendUrl,
+					}
+				);
+				await this.getTasksService().syncFromOrchestratorTask(task, 'ticket.updated');
+				this.orchestrator.getWorkerCoordinator().enqueueTask(task);
+			}
+		});
+
+		this.eventBus.on('ticket.transitioned', async payload => {
+			const registry = this.orchestrator.getEventSubscriptionRegistry();
+			const matches = registry.findMatching({
+				event: 'ticket.transitioned',
+				payload: { newStatus: payload.newStatus },
+			});
+			for (const sub of matches) {
+				const task = await this.orchestrator.getTaskManager().createTask(
+					`ticket.transitioned: ${payload.ticketId}`,
+					{
+						flowId: sub.flowId,
+						projectId: payload.projectId,
+						ticketId: payload.ticketId,
+						triggerEvent: 'ticket.transitioned',
+					},
+					{
+						ticketId: payload.ticketId,
+						ticketTitle: payload.title,
+						oldStatus: payload.oldStatus,
+						newStatus: payload.newStatus,
+						backendUrl,
+					}
+				);
+				await this.getTasksService().syncFromOrchestratorTask(task, 'ticket.transitioned');
+				this.orchestrator.getWorkerCoordinator().enqueueTask(task);
+			}
+		});
+
+		this.eventBus.on('ticket.comment_created', async payload => {
+			const registry = this.orchestrator.getEventSubscriptionRegistry();
+			// Enrich payload with authorType so flows can filter by author category
+			// (e.g., filter: { authorType: 'human' } to skip worker-ai comments)
+			const authorType = payload.author?.startsWith('worker-') ? 'worker' : 'human';
+			log.info(
+				`[DEBUG] ticket.comment_created: ticketId=${payload.ticketId} author=${payload.author} authorType=${authorType}`
+			);
+			const matches = registry.findMatching({ event: 'ticket.comment_created', payload: { authorType } });
+			log.info(
+				`[DEBUG] ticket.comment_created: ${matches.length} matching subscriptions (flows: ${matches.map(m => m.flowId).join(', ')})`
+			);
+			for (const sub of matches) {
+				const task = await this.orchestrator.getTaskManager().createTask(
+					`ticket.comment_created: ${payload.ticketId}`,
+					{
+						flowId: sub.flowId,
+						projectId: payload.projectId,
+						ticketId: payload.ticketId,
+						triggerEvent: 'ticket.comment_created',
+					},
+					{
+						ticketId: payload.ticketId,
+						commentId: payload.commentId,
+						commentContent: payload.content,
+						commentAuthor: payload.author ?? 'user',
+						backendUrl,
+					}
+				);
+				await this.getTasksService().syncFromOrchestratorTask(task, 'ticket.comment_created');
 				this.orchestrator.getWorkerCoordinator().enqueueTask(task);
 			}
 		});
