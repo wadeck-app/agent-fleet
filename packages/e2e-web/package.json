@@ -24,6 +24,9 @@
 		"test:visual:ui": "npm run test:visual:generate && playwright test --config=playwright.config.visual.ts --project=visual-* --ui",
 		"-buggy-test:visual:approve": "node ../../scripts/approve-actual-snapshots.js",
 		"test:visual:update": "npm run test:visual:generate && playwright test --config=playwright.config.visual.ts --project=visual-* --update-snapshots",
+		"test:lego-visual": "playwright test --config=playwright.config.lego-visual.ts",
+		"test:lego-visual:update-baseline": "playwright test --config=playwright.config.lego-visual.ts --update-snapshots --grep=\"⚡\"",
+		"test:lego-visual:ui": "playwright test --config=playwright.config.lego-visual.ts --ui",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix"
 	},

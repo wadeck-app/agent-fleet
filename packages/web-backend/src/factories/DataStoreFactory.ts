@@ -8,6 +8,7 @@ import { createLogger } from 'shared-common/logger';
 import type { Book } from '@app/shared/api/books.contract';
 import type { Ingredient } from '@app/shared/api/ingredients.contract';
 import type { Intervention } from '@app/shared/api/interventions.contract';
+import type { Product } from '@app/shared/api/products.contract';
 import type { Project } from '@app/shared/api/projects.contract';
 import type { Task } from '@app/shared/api/tasks.contract';
 import type { Ticket } from '@app/shared/api/tickets.contract';
@@ -23,6 +24,7 @@ import { BooksRepository } from '../repositories/BooksRepository';
 import { IngredientsRepository } from '../repositories/IngredientsRepository';
 import { InterventionsRepository } from '../repositories/InterventionsRepository';
 import { OrchestratorRepository } from '../repositories/OrchestratorRepository';
+import { ProductsRepository } from '../repositories/ProductsRepository';
 import { ProjectsRepository } from '../repositories/ProjectsRepository';
 import { ScriptProcessRepository } from '../repositories/ScriptProcessRepository';
 import { TasksRepository } from '../repositories/TasksRepository';
@@ -36,6 +38,7 @@ import { FlowsService } from '../services/FlowsService';
 import { IngredientsService } from '../services/IngredientsService';
 import { InterventionsService } from '../services/InterventionsService';
 import { OrchestratorEventHandler } from '../services/OrchestratorEventHandler';
+import { ProductsService } from '../services/ProductsService';
 import { ProjectsService } from '../services/ProjectsService';
 import { ScriptProcessManager } from '../services/ScriptProcessManager';
 import { ScriptProcessService } from '../services/ScriptProcessService';
@@ -81,6 +84,7 @@ export class DataStoreFactory {
 	private referenceStorage: InMemoryStorage;
 	private ingredientsService?: IngredientsService;
 	private booksService?: BooksService;
+	private productsService?: ProductsService;
 	private dashboardService?: DashboardService;
 	private workersService?: WorkersService;
 	private flowsService?: FlowsService;
@@ -181,6 +185,24 @@ export class DataStoreFactory {
 		}
 
 		return this.booksService;
+	}
+
+	/**
+	 * Get or create ProductsService
+	 */
+	getProductsService(): ProductsService {
+		if (!this.productsService) {
+			// Create BaseRepository using referenceStorage (in-memory)
+			const baseRepo = new BaseRepository<Product>('products', this.referenceStorage);
+
+			// Create entity Repository
+			const repo = new ProductsRepository(baseRepo);
+
+			// Create Service
+			this.productsService = new ProductsService(repo);
+		}
+
+		return this.productsService;
 	}
 
 	/**
@@ -680,6 +702,12 @@ export class DataStoreFactory {
 		const { default: BooksController } = await import('../controllers/BooksController');
 		const service = this.getBooksService();
 		return new BooksController(service);
+	}
+
+	async getProductsController() {
+		const { default: ProductsController } = await import('../controllers/ProductsController');
+		const service = this.getProductsService();
+		return new ProductsController(service);
 	}
 
 	async getMonitoringController() {
@@ -1490,6 +1518,178 @@ export class DataStoreFactory {
 				version: 1,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
+			},
+		]);
+
+		// Seed products (for Lego experiments)
+		await this.referenceStorage.seed<Product>('products', [
+			{
+				id: '1',
+				name: 'Gaming Laptop Pro',
+				description: 'High-performance gaming laptop with RTX 4080 GPU, 32GB RAM, 1TB NVMe SSD.',
+				category: 'electronics',
+				price: 1999.99,
+				stock: 15,
+				status: 'active',
+				rating: 4.7,
+				featured: true,
+				version: 1,
+				createdAt: new Date('2025-01-10').toISOString(),
+				updatedAt: new Date('2025-01-10').toISOString(),
+			},
+			{
+				id: '2',
+				name: 'Wireless Noise-Cancelling Headphones',
+				description: 'Premium over-ear headphones with 30h battery life and ANC technology.',
+				category: 'electronics',
+				price: 299.99,
+				stock: 42,
+				status: 'active',
+				rating: 4.5,
+				featured: false,
+				version: 1,
+				createdAt: new Date('2025-01-12').toISOString(),
+				updatedAt: new Date('2025-01-12').toISOString(),
+			},
+			{
+				id: '3',
+				name: 'Mechanical Keyboard RGB',
+				description: 'Compact TKL mechanical keyboard with Cherry MX switches and per-key RGB.',
+				category: 'electronics',
+				price: 129.99,
+				stock: 78,
+				status: 'active',
+				rating: 4.3,
+				featured: false,
+				version: 1,
+				createdAt: new Date('2025-01-15').toISOString(),
+				updatedAt: new Date('2025-01-15').toISOString(),
+			},
+			{
+				id: '4',
+				name: 'Trail Running Shoes',
+				description: 'Lightweight trail shoes with aggressive grip sole and waterproof upper.',
+				category: 'sports',
+				price: 149.99,
+				stock: 60,
+				status: 'active',
+				rating: 4.6,
+				featured: true,
+				version: 1,
+				createdAt: new Date('2025-01-20').toISOString(),
+				updatedAt: new Date('2025-01-20').toISOString(),
+			},
+			{
+				id: '5',
+				name: 'Yoga Mat Premium',
+				description: 'Extra-thick 6mm non-slip yoga mat with carry strap, eco-friendly material.',
+				category: 'sports',
+				price: 59.99,
+				stock: 120,
+				status: 'active',
+				rating: 4.4,
+				featured: false,
+				version: 1,
+				createdAt: new Date('2025-01-22').toISOString(),
+				updatedAt: new Date('2025-01-22').toISOString(),
+			},
+			{
+				id: '6',
+				name: 'Merino Wool Sweater',
+				description: '100% merino wool crew-neck sweater, available in 8 colours.',
+				category: 'clothing',
+				price: 89.99,
+				stock: 95,
+				status: 'active',
+				rating: 4.2,
+				featured: false,
+				version: 1,
+				createdAt: new Date('2025-01-25').toISOString(),
+				updatedAt: new Date('2025-01-25').toISOString(),
+			},
+			{
+				id: '7',
+				name: 'Smart Home Hub',
+				description: 'Central hub for smart home devices — supports Zigbee, Z-Wave, and Wi-Fi.',
+				category: 'home',
+				price: 79.99,
+				stock: 33,
+				status: 'active',
+				rating: 3.9,
+				featured: false,
+				version: 1,
+				createdAt: new Date('2025-02-01').toISOString(),
+				updatedAt: new Date('2025-02-01').toISOString(),
+			},
+			{
+				id: '8',
+				name: '4K Ultra Wide Monitor',
+				description: '34" curved ultrawide 4K display, 144Hz, HDR400, USB-C 90W charging.',
+				category: 'electronics',
+				price: 749.99,
+				stock: 8,
+				status: 'active',
+				rating: 4.8,
+				featured: true,
+				version: 1,
+				createdAt: new Date('2025-02-05').toISOString(),
+				updatedAt: new Date('2025-02-05').toISOString(),
+			},
+			{
+				id: '9',
+				name: 'Protein Powder Vanilla',
+				description: 'Whey protein isolate, 25g protein per serving, low sugar, 2kg bag.',
+				category: 'food',
+				price: 49.99,
+				stock: 200,
+				status: 'active',
+				rating: 4.1,
+				featured: false,
+				version: 1,
+				createdAt: new Date('2025-02-10').toISOString(),
+				updatedAt: new Date('2025-02-10').toISOString(),
+			},
+			{
+				id: '10',
+				name: 'LEGO Technic Set',
+				description: 'Advanced 1500-piece Technic set with working suspension and gearbox.',
+				category: 'toys',
+				price: 119.99,
+				stock: 25,
+				status: 'active',
+				rating: 4.9,
+				featured: true,
+				version: 1,
+				createdAt: new Date('2025-02-15').toISOString(),
+				updatedAt: new Date('2025-02-15').toISOString(),
+			},
+			{
+				id: '11',
+				name: 'Vintage Denim Jacket',
+				description: 'Classic 90s-inspired denim jacket, stonewashed finish, unisex cut.',
+				category: 'clothing',
+				price: 74.99,
+				stock: 0,
+				status: 'archived',
+				rating: 3.8,
+				featured: false,
+				version: 2,
+				createdAt: new Date('2024-12-01').toISOString(),
+				updatedAt: new Date('2025-01-05').toISOString(),
+			},
+			{
+				id: '12',
+				name: 'Ergonomic Office Chair',
+				description: 'Lumbar support, adjustable armrests, breathable mesh back, 5-year warranty.',
+				category: 'home',
+				price: 459.99,
+				stock: 12,
+				status: 'draft',
+				rating: 0,
+				featured: false,
+				version: 1,
+				createdAt: new Date('2025-02-20').toISOString(),
+				updatedAt: new Date('2025-02-20').toISOString(),
 			},
 		]);
 

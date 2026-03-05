@@ -719,6 +719,10 @@ async function start(): Promise<void> {
 			// Initialize WebSocket transport server
 			await initializeTransportServer(fastify, factory);
 
+			// Register WebSocket routes for products (must be done AFTER @fastify/websocket is registered)
+			const { registerProductsWebSocketRoutes } = await import('./routes-websocket.js');
+			await registerProductsWebSocketRoutes(fastify, factory);
+
 			// Initialize orchestrator integration (connect BackendEventBridge to OrchestratorEventHandler)
 			// MUST be done AFTER initializeTransportServer creates EventBroadcaster
 			factory.initializeOrchestratorIntegration();
@@ -731,6 +735,10 @@ async function start(): Promise<void> {
 			// Initialize WebSocket transport server
 			await initializeTransportServer(fastify, factory);
 
+			// Register WebSocket routes for products (must be done AFTER @fastify/websocket is registered)
+			const { registerProductsWebSocketRoutes } = await import('./routes-websocket.js');
+			await registerProductsWebSocketRoutes(fastify, factory);
+
 			// Initialize orchestrator integration (connect BackendEventBridge to OrchestratorEventHandler)
 			// MUST be done AFTER initializeTransportServer creates EventBroadcaster
 			factory.initializeOrchestratorIntegration();
@@ -739,6 +747,10 @@ async function start(): Promise<void> {
 			// Initialize WebSocket transport server for E2E tests
 			await initializeTransportServer(fastify, factory);
 
+			// Register WebSocket routes for products (must be done AFTER @fastify/websocket is registered)
+			const { registerProductsWebSocketRoutes } = await import('./routes-websocket.js');
+			await registerProductsWebSocketRoutes(fastify, factory);
+
 			// Initialize orchestrator integration (connect BackendEventBridge to OrchestratorEventHandler)
 			// MUST be done AFTER initializeTransportServer creates EventBroadcaster
 			factory.initializeOrchestratorIntegration();
@@ -746,8 +758,13 @@ async function start(): Promise<void> {
 
 		// Add onClose hook to terminate all WebSocket connections before shutdown
 		// This prevents Fastify from hanging when trying to close with active connections
-		fastify.addHook('onClose', (instance, done) => {
+		fastify.addHook('onClose', async instance => {
 			log.info('[Fastify] onClose: Terminating all active WebSocket connections...');
+
+			// Close products WebSocket connections
+			const { ProductsWebSocketService } = await import('./services/ProductsWebSocketService.js');
+			ProductsWebSocketService.getInstance().closeAll();
+
 			const transportServer = factory.getTransportServer();
 			if (transportServer) {
 				// Get WebSocketTransportServer and close all connections
@@ -765,7 +782,6 @@ async function start(): Promise<void> {
 					log.info(`[Fastify] Terminated ${wsServer.clients.size} WebSocket connections`);
 				}
 			}
-			done();
 		});
 
 		// Start server

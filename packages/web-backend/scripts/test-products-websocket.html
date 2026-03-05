@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Products WebSocket Test Client</title>
+		<style>
+			body {
+				font-family: Arial, sans-serif;
+				max-width: 1200px;
+				margin: 0 auto;
+				padding: 20px;
+				background-color: #f5f5f5;
+			}
+			.container {
+				background: white;
+				border-radius: 8px;
+				padding: 20px;
+				margin-bottom: 20px;
+				box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+			}
+			h1 {
+				color: #333;
+				margin-top: 0;
+			}
+			h2 {
+				color: #666;
+				border-bottom: 2px solid #eee;
+				padding-bottom: 10px;
+			}
+			.status {
+				padding: 10px;
+				border-radius: 4px;
+				margin-bottom: 10px;
+				font-weight: bold;
+			}
+			.status.connected {
+				background-color: #d4edda;
+				color: #155724;
+			}
+			.status.disconnected {
+				background-color: #f8d7da;
+				color: #721c24;
+			}
+			button {
+				background-color: #007bff;
+				color: white;
+				border: none;
+				padding: 10px 20px;
+				border-radius: 4px;
+				cursor: pointer;
+				margin-right: 10px;
+				margin-bottom: 10px;
+			}
+			button:hover {
+				background-color: #0056b3;
+			}
+			button:disabled {
+				background-color: #ccc;
+				cursor: not-allowed;
+			}
+			#events {
+				max-height: 400px;
+				overflow-y: auto;
+				background-color: #f8f9fa;
+				border: 1px solid #dee2e6;
+				border-radius: 4px;
+				padding: 10px;
+			}
+			.event {
+				padding: 8px;
+				margin-bottom: 8px;
+				border-radius: 4px;
+				border-left: 4px solid #007bff;
+				background-color: white;
+			}
+			.event.snapshot {
+				border-left-color: #28a745;
+			}
+			.event.created {
+				border-left-color: #17a2b8;
+			}
+			.event.updated {
+				border-left-color: #ffc107;
+			}
+			.event.deleted {
+				border-left-color: #dc3545;
+			}
+			.event.pong {
+				border-left-color: #6c757d;
+			}
+			.event .time {
+				color: #6c757d;
+				font-size: 12px;
+			}
+			.event .type {
+				font-weight: bold;
+				color: #007bff;
+			}
+			.event pre {
+				margin: 5px 0 0 0;
+				padding: 5px;
+				background-color: #f8f9fa;
+				border-radius: 4px;
+				font-size: 12px;
+				overflow-x: auto;
+			}
+			#productsTable {
+				width: 100%;
+				border-collapse: collapse;
+			}
+			#productsTable th,
+			#productsTable td {
+				padding: 8px;
+				text-align: left;
+				border-bottom: 1px solid #ddd;
+			}
+			#productsTable th {
+				background-color: #f8f9fa;
+				font-weight: bold;
+			}
+			#productsTable tr:hover {
+				background-color: #f8f9fa;
+			}
+			.input-group {
+				margin-bottom: 10px;
+			}
+			.input-group label {
+				display: inline-block;
+				width: 100px;
+				font-weight: bold;
+			}
+			.input-group input {
+				padding: 5px;
+				border: 1px solid #ddd;
+				border-radius: 4px;
+				width: 200px;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Products WebSocket Test Client</h1>
+
+		<div class="container">
+			<h2>Connection</h2>
+			<div id="status" class="status disconnected">Disconnected</div>
+			<div class="input-group">
+				<label for="wsUrl">WebSocket URL:</label>
+				<input type="text" id="wsUrl" value="ws://localhost:3010/api/products/events" />
+			</div>
+			<button id="connectBtn" onclick="connect()">Connect</button>
+			<button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+			<button onclick="sendPing()" disabled id="pingBtn">Send Ping</button>
+			<button onclick="clearEvents()">Clear Events</button>
+		</div>
+
+		<div class="container">
+			<h2>Current Products (<span id="productCount">0</span>)</h2>
+			<table id="productsTable">
+				<thead>
+					<tr>
+						<th>ID</th>
+						<th>Name</th>
+						<th>Category</th>
+						<th>Price</th>
+						<th>Stock</th>
+						<th>Status</th>
+						<th>Version</th>
+					</tr>
+				</thead>
+				<tbody id="productsBody"></tbody>
+			</table>
+		</div>
+
+		<div class="container">
+			<h2>Events</h2>
+			<div id="events"></div>
+		</div>
+
+		<script>
+			let ws = null;
+			const products = new Map();
+
+			function connect() {
+				const url = document.getElementById('wsUrl').value;
+				ws = new WebSocket(url);
+
+				ws.onopen = () => {
+					log('Connected', 'info');
+					updateStatus(true);
+				};
+
+				ws.onmessage = event => {
+					const message = JSON.parse(event.data);
+					handleMessage(message);
+				};
+
+				ws.onerror = error => {
+					log('Error: ' + error.message, 'error');
+				};
+
+				ws.onclose = () => {
+					log('Disconnected', 'info');
+					updateStatus(false);
+				};
+			}
+
+			function disconnect() {
+				if (ws) {
+					ws.close();
+					ws = null;
+				}
+			}
+
+			function sendPing() {
+				if (ws && ws.readyState === WebSocket.OPEN) {
+					ws.send(JSON.stringify({ type: 'ping' }));
+					log('Sent ping', 'info');
+				}
+			}
+
+			function handleMessage(message) {
+				switch (message.type) {
+					case 'products:snapshot':
+						log('Received snapshot with ' + message.products.length + ' products', 'snapshot');
+						products.clear();
+						message.products.forEach(product => {
+							products.set(product.id, product);
+						});
+						updateProductsTable();
+						break;
+
+					case 'product:created':
+						log('Product created: ' + message.product.name, 'created', message.product);
+						products.set(message.product.id, message.product);
+						updateProductsTable();
+						break;
+
+					case 'product:updated':
+						log('Product updated: ' + message.product.name, 'updated', message.product);
+						products.set(message.product.id, message.product);
+						updateProductsTable();
+						break;
+
+					case 'product:deleted':
+						log('Product deleted: ' + message.id, 'deleted', { id: message.id });
+						products.delete(message.id);
+						updateProductsTable();
+						break;
+
+					case 'pong':
+						log('Received pong', 'pong');
+						break;
+
+					case 'error':
+						log('Error: ' + message.message, 'error');
+						break;
+
+					default:
+						log('Unknown message type: ' + message.type, 'info', message);
+				}
+			}
+
+			function log(message, type = 'info', data = null) {
+				const events = document.getElementById('events');
+				const time = new Date().toLocaleTimeString();
+				const eventDiv = document.createElement('div');
+				eventDiv.className = 'event ' + type;
+				eventDiv.innerHTML = `
+                <div class="time">${time}</div>
+                <div class="type">${type.toUpperCase()}</div>
+                <div>${message}</div>
+                ${data ? '<pre>' + JSON.stringify(data, null, 2) + '</pre>' : ''}
+            `;
+				events.insertBefore(eventDiv, events.firstChild);
+			}
+
+			function updateStatus(connected) {
+				const status = document.getElementById('status');
+				const connectBtn = document.getElementById('connectBtn');
+				const disconnectBtn = document.getElementById('disconnectBtn');
+				const pingBtn = document.getElementById('pingBtn');
+
+				if (connected) {
+					status.className = 'status connected';
+					status.textContent = 'Connected';
+					connectBtn.disabled = true;
+					disconnectBtn.disabled = false;
+					pingBtn.disabled = false;
+				} else {
+					status.className = 'status disconnected';
+					status.textContent = 'Disconnected';
+					connectBtn.disabled = false;
+					disconnectBtn.disabled = true;
+					pingBtn.disabled = true;
+				}
+			}
+
+			function updateProductsTable() {
+				const tbody = document.getElementById('productsBody');
+				const productCount = document.getElementById('productCount');
+
+				tbody.innerHTML = '';
+				productCount.textContent = products.size;
+
+				const sortedProducts = Array.from(products.values()).sort((a, b) => a.name.localeCompare(b.name));
+
+				sortedProducts.forEach(product => {
+					const row = tbody.insertRow();
+					row.innerHTML = `
+                    <td>${product.id.substring(0, 8)}...</td>
+                    <td>${product.name}</td>
+                    <td>${product.category}</td>
+                    <td>$${product.price.toFixed(2)}</td>
+                    <td>${product.stock}</td>
+                    <td>${product.status}</td>
+                    <td>${product.version}</td>
+                `;
+				});
+			}
+
+			function clearEvents() {
+				document.getElementById('events').innerHTML = '';
+			}
+
+			// Auto-connect on load
+			window.onload = () => {
+				log('Test client loaded. Click Connect to start.', 'info');
+			};
+		</script>
+	</body>
+</html>

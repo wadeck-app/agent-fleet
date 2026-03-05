@@ -67,6 +67,9 @@ export interface TableProps<T> {
 	// Row classes
 	getRowClassName?: (item: T) => string;
 
+	// Row click handler
+	onRowClick?: (item: T) => void;
+
 	// Empty state
 	emptyMessage?: string;
 
@@ -109,6 +112,7 @@ export function Table<T>({
 	renderActions,
 	editingId = null,
 	getRowClassName,
+	onRowClick,
 	emptyMessage = 'No data available',
 	loading = false,
 	loadingMessage = 'Loading...',
@@ -243,6 +247,7 @@ export function Table<T>({
 							getRowClassName={getRowClassName}
 							renderActions={renderActions}
 							onToggleSelection={handleToggleSelection}
+							onRowClick={onRowClick}
 						/>
 					</table>
 				</div>
@@ -252,17 +257,19 @@ export function Table<T>({
 			{pagination && (
 				<div className="flex items-center justify-between">
 					<div className="text-sm text-muted-foreground">
-						Showing{' '}
-						{data.length > 0
-							? (pagination.currentPage - 1) * Math.ceil(pagination.totalItems / pagination.totalPages) +
-								1
-							: 0}{' '}
-						to{' '}
-						{Math.min(
-							pagination.currentPage * Math.ceil(pagination.totalItems / pagination.totalPages),
-							pagination.totalItems
-						)}{' '}
-						of {pagination.totalItems} items
+						{(() => {
+							// Use pageSize when available, fallback to calculated value for backward compatibility
+							const perPage =
+								pagination.pageSize ?? Math.ceil(pagination.totalItems / pagination.totalPages);
+							const startItem = data.length > 0 ? (pagination.currentPage - 1) * perPage + 1 : 0;
+							const endItem = Math.min(pagination.currentPage * perPage, pagination.totalItems);
+
+							return (
+								<>
+									Showing {startItem} to {endItem} of {pagination.totalItems} items
+								</>
+							);
+						})()}
 					</div>
 					<div className="flex items-center gap-4">
 						{/* Page Size Selector */}
