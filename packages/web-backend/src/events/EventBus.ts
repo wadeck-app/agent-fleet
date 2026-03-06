@@ -50,6 +50,8 @@ export interface TicketTransitionedPayload {
 export interface TicketCommentCreatedPayload {
 	ticketId: string;
 	projectId: string;
+	title: string;
+	description: string;
 	commentId: string;
 	content: string;
 	author: string | undefined;

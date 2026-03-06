@@ -11,6 +11,9 @@ export const TicketStatusSchema = z.enum([
 	'backlog',
 	'todo',
 	'in_progress',
+	// Plan review lifecycle: AI posts action plan → plan_in_review, user approves → plan_approved
+	'plan_in_review',
+	'plan_approved',
 	'done',
 	'cancelled',
 	'pending_integration',

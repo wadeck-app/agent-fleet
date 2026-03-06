@@ -20,42 +20,143 @@ ticket-auto-process:
           model: haiku
           prompt: 'Ticket received for integration. Confirm you are ready to proceed.'
 
-ticket-analyze-complexity:
+ticket-intake:
     version: '1.0.0'
-    name: 'Analyze ticket complexity'
+    name: 'Generate action plan for new ticket'
     trigger:
         type: event
         event: ticket.created
     steps:
         - type: model
-          id: analyze
-          name: 'Analyze complexity'
+          id: plan
+          name: 'Generate action plan'
           model: haiku
           prompt: |
-              Analyze the complexity of this ticket and provide a concise assessment.
+              A new ticket was just created. Your job is to produce an **action plan** — a complete numbered list of steps covering the full lifecycle of this request, from start to finish.
+
+              The plan will be reviewed and refined by the user before execution. Think of it as a first proposal.
 
               Title: ${{ inputs.ticketTitle }}
               Description: ${{ inputs.ticketDescription }}
 
-              Respond with:
-              - Complexity: [low / medium / high]
-              - Key factors: (1-2 sentences)
-              - Suggested effort: [hours estimate]
+              RULES:
+              - Output the plan as a **numbered markdown list** (`1.`, `2.`, …)
+              - Each step can be 1–3 sentences — enough detail that a worker could act on it without guessing
+              - Always show the COMPLETE lifecycle: even when an interview or clarification phase is needed, include the subsequent steps (marked with `[after X]` if they depend on a prior outcome)
+              - Adapt the nature of the plan to the request: question, implementation, bug fix, research, process improvement, design comparison, etc.
+              - Do NOT execute anything — only plan
+              - Do NOT assume this is a software ticket — tickets can be about anything
 
-              Keep the response under 5 sentences. Be direct.
+              EXAMPLES:
+
+              ---
+              Title: Cube root of 5
+              Description: How do I calculate the cube root of 5?
+
+              Plan:
+              1. Apply the cube root formula: 5^(1/3) ≈ 1.7099759466766968. No external tool needed — this is a direct calculation.
+              2. Verify with Newton's method for cube roots: start from x₀ = 2, iterate x = (2x + n/x²) / 3 until convergence (3 iterations suffice for 10 digits of precision).
+              3. Present the result with a concise explanation of both methods for the user's reference.
+
+              ---
+              Title: Homepage redesign direction
+              Description: We need to redesign the homepage but I'm not sure what direction to take.
+
+              Plan:
+              1. Gather requirements: ask the user (a) what is the primary goal of the redesign (brand refresh, conversion lift, mobile UX), and (b) what constraints exist (brand guide, tech stack, timeline, budget).
+              2. [After requirements] Produce 2–3 design directions, each described in 3–4 sentences covering tone, structure, and key visual choices. Include a reference or mood-board link if relevant.
+              3. [After user selects a direction] Design the selected direction in detail: wireframes or mockups as appropriate for the project's maturity.
+              4. [After design approval] Deliver implementation specs or handoff assets to the engineering/design team.
+              5. [After delivery] Validate with a brief usability check or stakeholder review; iterate if needed.
+
+              ---
+              Title: Choose a state management library
+              Description: We need to pick a state management library for our new React app. Options are Redux Toolkit, Zustand, and Jotai.
+
+              Plan:
+              1. Define evaluation criteria with the team: bundle size, DX (boilerplate, TypeScript support), async data handling, DevTools quality, community size, and team familiarity.
+              2. Benchmark each option (Redux Toolkit, Zustand, Jotai) against each criterion — produce a structured comparison table.
+              3. Add a small proof-of-concept for the top 2 candidates (same feature, both implementations) to surface real DX differences.
+              4. Present the comparison table + PoC findings; recommend a preferred option with clear justification.
+              5. [After user decision] Draft the integration guide for the chosen library: setup, store structure, async patterns, and test strategy.
+              6. [After approval] Archive the PoC code for the non-selected options; finalise the setup plan for adoption.
+
+              ---
+              Title: Checkout button unresponsive on mobile
+              Description: The checkout button sometimes doesn't respond on mobile devices.
+
+              Plan:
+              1. Audit the checkout button component: read its event handlers (onClick, onTouchStart/End), z-index stack, pointer-events CSS, and any debounce/throttle logic.
+              2. Identify the most likely root cause from: touch events firing before click registration, overlapping elements blocking pointer events, missing `touch-action` CSS, or aggressive debouncing on mobile.
+              3. Propose a targeted fix with explanation of the confirmed root cause and why the fix addresses it.
+              4. [After approval] Implement the fix; keep the change minimal and isolated to reduce regression risk.
+              5. Add a regression test simulating a mobile touch event on the checkout button.
+              6. Run the full test suite and review the diff before merging.
+
+              ---
+              Title: Speed up employee onboarding
+              Description: New employee onboarding currently takes 3 weeks and involves too many manual steps that could be automated.
+
+              Plan:
+              1. Interview HR and 2–3 recent hires to document every onboarding step: tools provisioned, approvals required, documents signed, training scheduled, and handoff points.
+              2. Tag each step as: (a) already automated, (b) automatable, or (c) requires human judgment. Estimate time spent on each manual step.
+              3. Propose an optimised process: which steps to automate first (highest time-savings × lowest effort), which tools or integrations are needed, and expected new timeline.
+              4. [After approval] Implement the highest-impact automation first (e.g. account provisioning, document signing, training scheduling).
+              5. Validate with the next cohort of new hires: collect timing data and qualitative feedback.
+              6. Iterate: adjust the process based on findings; re-measure total onboarding time against the baseline.
+
+              ---
+              Now generate the action plan for this ticket.
         - type: script
-          id: post-comment
-          name: 'Post analysis as ticket comment'
-          depends: [analyze]
+          id: post-plan
+          name: 'Post plan as ticket comment'
+          depends: [plan]
           env:
               TICKET_ID: '${{ inputs.ticketId }}'
-              COMMENT: '${{ steps.analyze.outputs.response }}'
+              COMMENT: '${{ steps.plan.outputs.response }}'
+              FLOW_ID: '${{ inputs.flowId }}'
               BACKEND_URL: '${{ inputs.backendUrl }}'
-          script: node -e "const http=require('http'),u=new URL(process.env.BACKEND_URL+'/api/tickets/'+process.env.TICKET_ID+'/comments'),b=JSON.stringify({content:process.env.COMMENT,author:'worker-ai'});const req=http.request({hostname:u.hostname,port:+(u.port||80),path:u.pathname,method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(b)}},r=>{r.on('data',()=>{});r.on('end',()=>process.exit(0));});req.on('error',e=>{console.error(e.message);process.exit(1);});req.write(b);req.end();"
+          script: node -e "const http=require('http'),fid=process.env.FLOW_ID,u=new URL(process.env.BACKEND_URL+'/api/tickets/'+process.env.TICKET_ID+'/comments'),b=JSON.stringify({content:process.env.COMMENT,author:'worker-ai:'+fid});const req=http.request({hostname:u.hostname,port:+(u.port||80),path:u.pathname,method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(b)}},r=>{r.on('data',()=>{});r.on('end',()=>process.exit(0));});req.on('error',e=>{console.error(e.message);process.exit(1);});req.write(b);req.end();"
+        - type: script
+          id: set-status-plan-in-review
+          name: 'Set ticket status to plan_in_review'
+          depends: [post-plan]
+          env:
+              TICKET_ID: '${{ inputs.ticketId }}'
+              BACKEND_URL: '${{ inputs.backendUrl }}'
+          script: |
+              node -e "
+              const http = require('http');
+              const u = new URL(process.env.BACKEND_URL + '/api/tickets/' + process.env.TICKET_ID);
+              const opts = { hostname: u.hostname, port: +(u.port || 80), path: u.pathname };
+
+              http.get(opts, (res) => {
+                let body = '';
+                res.on('data', (d) => body += d);
+                res.on('end', () => {
+                  const version = JSON.parse(body).version;
+                  const payload = JSON.stringify({ status: 'plan_in_review', version });
+                  const req = http.request(
+                    { ...opts, method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } },
+                    (r2) => {
+                      let rb = '';
+                      r2.on('data', (d) => rb += d);
+                      r2.on('end', () => {
+                        if (r2.statusCode >= 400) { console.error('PATCH failed:', r2.statusCode, rb); process.exit(1); }
+                        process.exit(0);
+                      });
+                    }
+                  );
+                  req.on('error', (e) => { console.error(e.message); process.exit(1); });
+                  req.write(payload);
+                  req.end();
+                });
+              }).on('error', (e) => { console.error(e.message); process.exit(1); });
+              "
 
 ticket-respond-to-comment:
     version: '1.0.0'
-    name: 'Respond to ticket comment'
+    name: 'Revise action plan based on user feedback'
     trigger:
         type: event
         event: ticket.comment_created
@@ -63,81 +164,58 @@ ticket-respond-to-comment:
             authorType: human # only respond to human comments (not worker-ai) to prevent infinite loops
     steps:
         - type: model
-          id: respond
-          name: 'Generate response'
+          id: revise
+          name: 'Revise action plan'
           model: haiku
           prompt: |
-              You are an AI assistant helping with a software ticket. A user posted a comment and you need to respond helpfully.
+              A user posted feedback on an action plan for a ticket. Your job is to produce a **complete revised plan** based on the feedback.
 
-              Ticket ID: ${{ inputs.ticketId }}
-              Comment from ${{ inputs.commentAuthor }}: ${{ inputs.commentContent }}
+              TICKET CONTEXT:
+              Title: ${{ inputs.ticketTitle }}
+              Description: ${{ inputs.ticketDescription }}
 
-              Provide a concise, helpful response. Be direct and actionable. Keep it under 5 sentences.
+              CONVERSATION HISTORY (most recent last):
+              ${{ inputs.recentComments }}
+
+              USER FEEDBACK (latest comment from ${{ inputs.commentAuthor }}):
+              ${{ inputs.commentContent }}
+
+              RULES:
+              - Your output MUST be a **complete numbered action plan** (`1.`, `2.`, …) covering the full lifecycle
+              - Each step: 1–3 sentences with enough detail for a worker to act without guessing
+              - Always show the COMPLETE lifecycle — even when more info is still needed, show what happens after the pending clarification using `[after X]` markers
+              - If the user is asking a question, answer it briefly in one sentence before the plan, then output the full updated plan
+              - Do NOT just ask questions without a plan — embed any needed information-gathering as explicit plan steps
+              - Do NOT assume this is a software ticket
+              - Do NOT repeat back the user's feedback
+
+              EXAMPLE OF CORRECT BEHAVIOUR when user asks a clarifying question:
+
+              User feedback: "Should we support dark mode on mobile too?"
+
+              BAD response (asking back without a plan):
+              "Good question! Could you clarify what platforms are in scope?"
+
+              GOOD response (answer + full plan):
+              Yes, mobile dark mode is in scope if the app has a mobile-specific layout; otherwise the same CSS variables apply to all viewports.
+
+              Revised plan:
+              1. Audit the current colour system: identify all hardcoded colour values and any existing CSS variable or theme token usage.
+              2. Define a dark-mode colour palette that passes WCAG AA contrast on both desktop and mobile viewports.
+              3. Implement theme switching using a CSS class on `<body>` (or a CSS media query for OS-level preference) so the same tokens work across all screen sizes.
+              4. Add a toggle control in the app settings (user-level preference, persisted to localStorage).
+              5. Write visual regression tests covering key screens in both themes on desktop and mobile breakpoints.
+              6. Review contrast ratios and toggle behaviour before merging.
         - type: script
-          id: post-response
-          name: 'Post response as ticket comment'
-          depends: [respond]
+          id: post-revision
+          name: 'Post revised plan as ticket comment'
+          depends: [revise]
           env:
               TICKET_ID: '${{ inputs.ticketId }}'
-              COMMENT: '${{ steps.respond.outputs.response }}'
+              COMMENT: '${{ steps.revise.outputs.response }}'
+              FLOW_ID: '${{ inputs.flowId }}'
               BACKEND_URL: '${{ inputs.backendUrl }}'
-          script: node -e "const http=require('http'),u=new URL(process.env.BACKEND_URL+'/api/tickets/'+process.env.TICKET_ID+'/comments'),b=JSON.stringify({content:process.env.COMMENT,author:'worker-ai'});const req=http.request({hostname:u.hostname,port:+(u.port||80),path:u.pathname,method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(b)}},r=>{r.on('data',()=>{});r.on('end',()=>process.exit(0));});req.on('error',e=>{console.error(e.message);process.exit(1);});req.write(b);req.end();"
-
-ticket-handle-transition:
-    version: '1.0.0'
-    name: 'Handle ticket transition'
-    trigger:
-        type: event
-        event: ticket.transitioned
-    steps:
-        - type: model
-          id: acknowledge
-          name: 'Acknowledge transition'
-          model: haiku
-          prompt: |
-              A ticket has transitioned status.
-
-              Ticket: ${{ inputs.ticketTitle }}
-              Transition: ${{ inputs.oldStatus }} → ${{ inputs.newStatus }}
-
-              Write a brief acknowledgment (1-2 sentences) noting the status change and any relevant next steps.
-        - type: script
-          id: post-acknowledgment
-          name: 'Post acknowledgment as ticket comment'
-          depends: [acknowledge]
-          env:
-              TICKET_ID: '${{ inputs.ticketId }}'
-              COMMENT: '${{ steps.acknowledge.outputs.response }}'
-              BACKEND_URL: '${{ inputs.backendUrl }}'
-          script: node -e "const http=require('http'),u=new URL(process.env.BACKEND_URL+'/api/tickets/'+process.env.TICKET_ID+'/comments'),b=JSON.stringify({content:process.env.COMMENT,author:'worker-ai'});const req=http.request({hostname:u.hostname,port:+(u.port||80),path:u.pathname,method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(b)}},r=>{r.on('data',()=>{});r.on('end',()=>process.exit(0));});req.on('error',e=>{console.error(e.message);process.exit(1);});req.write(b);req.end();"
-
-ticket-updated-respond:
-    version: '1.0.0'
-    name: 'Respond to ticket update'
-    trigger:
-        type: event
-        event: ticket.updated
-    steps:
-        - type: model
-          id: analyze-change
-          name: 'Analyze ticket update'
-          model: haiku
-          prompt: |
-              A ticket has been updated.
-
-              Ticket: ${{ inputs.ticketTitle }}
-              Changed fields: ${{ inputs.changedFields }}
-
-              Write a brief acknowledgment (1-2 sentences) noting the update. Be concise and helpful.
-        - type: script
-          id: post-update-comment
-          name: 'Post update acknowledgment as ticket comment'
-          depends: [analyze-change]
-          env:
-              TICKET_ID: '${{ inputs.ticketId }}'
-              COMMENT: '${{ steps.analyze-change.outputs.response }}'
-              BACKEND_URL: '${{ inputs.backendUrl }}'
-          script: node -e "const http=require('http'),u=new URL(process.env.BACKEND_URL+'/api/tickets/'+process.env.TICKET_ID+'/comments'),b=JSON.stringify({content:process.env.COMMENT,author:'worker-ai'});const req=http.request({hostname:u.hostname,port:+(u.port||80),path:u.pathname,method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(b)}},r=>{r.on('data',()=>{});r.on('end',()=>process.exit(0));});req.on('error',e=>{console.error(e.message);process.exit(1);});req.write(b);req.end();"
+          script: node -e "const http=require('http'),fid=process.env.FLOW_ID,u=new URL(process.env.BACKEND_URL+'/api/tickets/'+process.env.TICKET_ID+'/comments'),b=JSON.stringify({content:process.env.COMMENT,author:'worker-ai:'+fid});const req=http.request({hostname:u.hostname,port:+(u.port||80),path:u.pathname,method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(b)}},r=>{r.on('data',()=>{});r.on('end',()=>process.exit(0));});req.on('error',e=>{console.error(e.message);process.exit(1);});req.write(b);req.end();"
 
 simple-implement:
     version: '1.0.0'

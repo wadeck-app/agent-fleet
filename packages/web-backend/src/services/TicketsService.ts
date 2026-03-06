@@ -560,6 +560,8 @@ export class TicketsService {
 		this.eventBus?.emit('ticket.comment_created', {
 			ticketId,
 			projectId: ticket.projectId,
+			title: ticket.title,
+			description: ticket.description,
 			commentId: comment.id,
 			content: comment.content,
 			author: comment.author,
