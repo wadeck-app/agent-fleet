@@ -62,6 +62,16 @@
 		scrollbar-gutter: stable;
 	}
 
+	/* Dark mode: soften body text, keep bold/strong at full foreground brightness */
+	.dark body {
+		color: oklch(0.985 0 0 / 75%);
+	}
+	.dark strong,
+	.dark b {
+		color: oklch(0.985 0 0);
+		font-weight: 700;
+	}
+
 	/* Scrollbar Styling - Theme Adaptive */
 	::-webkit-scrollbar {
 		width: 12px;

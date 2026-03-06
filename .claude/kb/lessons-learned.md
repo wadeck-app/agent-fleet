@@ -5814,3 +5814,24 @@ Do NOT add a separate `<span>Loading...</span>` next to it — that produces dup
 - Pass `message=""` to suppress internal text: `<LoadingSpinner size="sm" message="" />`
 - Use `<Loader2 className="size-4 animate-spin" />` (Lucide) directly for inline loading without text
 - Use `<LoadingSpinner size="sm" />` alone when you want spinner + text together
+
+## Always Take Before/After Screenshots for Every Visual Change (2026-03-06)
+
+**Rule**: For every UI/design change, take a before screenshot BEFORE modifying code, then an after screenshot AFTER the change. Show both to the user.
+
+**Why**: Without comparison proof, there is no way to know if the change actually rendered — Vite HMR may not have reloaded, the wrong component may have been edited, or the change may be invisible. Screenshots caught all three failure modes in this session.
+
+**Checklist**:
+
+1. Open the page in a fresh browser session, navigate to the relevant section
+2. `agent-browser screenshot screenshot-xxx-before.png` — capture current state
+3. Make the code change
+4. Wait for HMR or reload browser, verify via `agent-browser eval` that the DOM reflects the new class
+5. `agent-browser screenshot screenshot-xxx-after.png` — capture new state
+6. Read both images and verify the diff is visible
+
+**Gotchas**:
+
+- `querySelector('.some-class')[0]` returns the FIRST element in the DOM — verify it's from the right component using `grep -rn "some-class" src/`
+- `TicketCommentsSection` uses a shared `MARKDOWN_COMPONENTS` const — changes to inline components in `TicketDetailLayoutG` do NOT affect the Comments tab which delegates to `TicketCommentsSection`
+- Vite HMR sometimes requires a full `agent-browser close` + fresh open if repeated reloads don't pick up changes

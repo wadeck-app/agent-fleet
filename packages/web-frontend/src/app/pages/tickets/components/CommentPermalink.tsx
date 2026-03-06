@@ -31,7 +31,7 @@ export function CommentPermalink({ commentId, createdAt }: CommentPermalinkProps
 	};
 
 	return (
-		<div onClick={handleClick}>
+		<div className="flex items-center" onClick={handleClick}>
 			<CopyLinkButton
 				url={url}
 				label={formatRelativeTime(createdAt)}

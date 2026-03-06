@@ -329,6 +329,66 @@ export class TicketsService {
 				});
 			}
 
+			// Emit granular label events when labels changed
+			if (changedFields.includes('labels') && data.labels) {
+				const oldLabels: string[] = currentTicket.labels ?? [];
+				const newLabels: string[] = data.labels;
+				const addedLabels = newLabels.filter(l => !oldLabels.includes(l));
+				const removedLabels = oldLabels.filter(l => !newLabels.includes(l));
+				for (const label of addedLabels) {
+					this.eventBus?.emit('ticket.label.added', {
+						ticketId: id,
+						projectId: updatedTicket.projectId,
+						label,
+					});
+				}
+				for (const label of removedLabels) {
+					this.eventBus?.emit('ticket.label.removed', {
+						ticketId: id,
+						projectId: updatedTicket.projectId,
+						label,
+					});
+				}
+			}
+
+			// Emit granular field events when custom fields changed
+			if (changedFields.includes('fields') && data.fields) {
+				const oldFields: Record<string, string> = currentTicket.fields ?? {};
+				const newFields: Record<string, string> = data.fields;
+				const allKeys = new Set([...Object.keys(oldFields), ...Object.keys(newFields)]);
+				for (const key of allKeys) {
+					const existed = key in oldFields;
+					const exists = key in newFields;
+					if (!existed && exists) {
+						this.eventBus?.emit('ticket.field.created', {
+							ticketId: id,
+							projectId: updatedTicket.projectId,
+							key,
+							value: newFields[key],
+						});
+					} else if (existed && !exists) {
+						this.eventBus?.emit('ticket.field.deleted', {
+							ticketId: id,
+							projectId: updatedTicket.projectId,
+							key,
+							oldValue: oldFields[key],
+						});
+					} else if (existed && exists && oldFields[key] !== newFields[key]) {
+						this.eventBus?.emit('ticket.field.updated', {
+							ticketId: id,
+							projectId: updatedTicket.projectId,
+							key,
+							oldValue: oldFields[key],
+							newValue: newFields[key],
+						});
+					}
+				}
+			}
+
+			// Emit aggregate event for dashboard updates
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			this.eventBroadcaster.broadcast(B2F_TICKETS_UPDATED, {} as any);
+
 			return updatedTicket;
 		} catch (error) {
 			log.error('Failed to update ticket:', error);
