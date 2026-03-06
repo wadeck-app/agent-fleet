@@ -257,21 +257,80 @@ Add JSDoc / inline documentation to the following files:
 
 ---
 
-## Phase 8 — Antifragility analysis (3 sub-agents in parallel — G6)
+## Phase 8 — Multi-axis analysis (7 sub-agents in parallel, model: claude-haiku-4-5-20251001)
 
-Once all phases complete, launch 3 independent Explore sub-agents to analyze:
+Once all phases complete, launch 7 independent Explore sub-agents simultaneously.
+Each reads all 6 approaches and produces its section of `_lego/ANALYSIS.md`.
 
-1. **Agent A** — Antifragile characteristics: which approaches improve under stress (new features, new scenarios, unexpected requirements)?
-2. **Agent B** — Robust characteristics: which approaches handle known scenarios well but break under novel requirements?
-3. **Agent C** — Fragile characteristics: which approaches require modification of core code for each new requirement?
+**IMPORTANT**: All agents use model `claude-haiku-4-5-20251001` (cost efficiency for analysis).
 
-Each agent reads all 6 approaches and produces a comparative table using Taleb's framework:
+### Agent 1 — Antifragilité
 
-- Antifragile: gains from disorder (A3 feature-hooks, A6 Data2-based?)
-- Robust: resists disorder but doesn't benefit
-- Fragile: harmed by disorder (A1 widget-isolated, A4 context-children?)
+Analyze the git history (`git log --all --oneline`) and each approach's source code to answer:
+- When new scenarios were added (S4–S11, S_BUS, S_WS, etc.), how much did each approach need to change?
+- When A6 was created from scratch, how much did existing code need to adapt?
+- Does the architecture gain from disorder (new scenarios easy to add), stay neutral, or break?
+- Focus on: did adding a new scenario require modifying framework files, or only adding a new page?
 
-Compile into a final `_lego/ANALYSIS.md`.
+Evidence: compare `_framework/` file change frequency via git log. Open vs closed architecture.
+
+### Agent 2 — Testabilité
+
+For each approach's unit test files (A1–A6), analyze:
+- How many mocks are needed to test core behavior? (fewer = better)
+- Can tests control time/concurrency? (fake timers, abort signal testing, sequential state checks)
+- How complete is the coverage of: loading state, error state, pagination side-effects, concurrent requests?
+- Does the architecture naturally lend itself to isolated unit testing (pure functions, injected deps)?
+
+Evidence: read the test files and count mock setup lines vs assertion lines.
+
+### Agent 3 — Simplicité des pages
+
+For each approach, read 3 representative page files (S1, S3, S_WS) and measure:
+- Line count of each page
+- Number of concepts a developer must understand to write a new page (hooks, context, pipeline, etc.)
+- Whether the page is "just configuration" vs "imperative logic"
+- Whether a junior developer could write a new page by copy-pasting from an existing one
+
+### Agent 4 — Cohérence
+
+For each approach, analyze how uniform the pattern is across pages:
+- Do all pages follow the exact same structure/idiom? Or do some pages deviate?
+- Are framework components reused as-is, or customized per-page?
+- Is there a "blessed path" that all pages follow, or multiple valid patterns?
+
+Evidence: compare page files across the same approach (S1 vs S3 vs S_WS for each approach).
+
+### Agent 5 — New feature extensibility
+
+For each approach, analyze what it takes to add a brand-new feature (e.g., row click → detail, or export button):
+- Does the framework component need to be modified? (bad — closed)
+- Can the feature be added at the page level only? (good — open)
+- Can the feature be added as a composable hook/modifier? (best — antifragile)
+
+Evidence: look at how S_WS (WebSocket) was implemented per approach — did it require framework changes?
+
+### Agent 6 — Maintenabilité
+
+For each approach, evaluate:
+- Code quality: naming clarity, single responsibility, no god components
+- Pattern stability: are there anti-patterns that compound over time (prop drilling, void promises, etc.)?
+- Refactoring cost: if a new developer joins and needs to change the pagination behavior globally, how many files change?
+
+### Agent 7 — Error avoidance (LLM agent friendliness)
+
+A critical dimension: when an LLM agent (like Claude Code) writes a new page or adds a feature, how likely is it to make mistakes?
+- Is the pattern self-documenting / hard to misuse?
+- Is there a single obvious way to do things, or multiple competing patterns?
+- Does the architecture protect against style drift (className leaking into pages, void callbacks, etc.)?
+- Evidence: look at the actual errors that occurred during implementation (see git history commit messages, and ANALYSIS.md if it exists)
+
+---
+
+**Compilation**: After all 7 agents report, compile results into `_lego/ANALYSIS.md` with:
+- One section per analysis axis with a comparative table (A1–A6)
+- A final summary table: overall score per approach (1–5 per axis)
+- Recommended approach for each use case (LLM agent, junior dev, senior dev, testability-first)
 
 ---
 

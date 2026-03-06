@@ -4,12 +4,14 @@ import { Data2 } from '@framework/components2/data/Data2';
 import { Table2, type Table2Column } from '@framework/components2/table/Table2';
 import type { FetchDataResult } from '@framework/hooks2/data/useDataFetch';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
+import { col } from '@framework/lego';
 import type { Product } from '@shared/api/products.contract';
-import { PRODUCT_CATEGORIES } from '@shared/api/products.contract';
+import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
 import { PageLayout } from '../_framework/PageLayout';
+import { adaptCol } from '../_framework/adaptCol';
 
 /**
  * ===========================================================================================
@@ -33,24 +35,12 @@ import { PageLayout } from '../_framework/PageLayout';
  */
 
 const columns: Table2Column<Product>[] = [
-	{
-		key: 'name',
-		label: 'Name',
-		render: item => item.name,
-	},
-	{
-		key: 'price',
-		label: 'Price',
-		render: item => `$${item.price.toFixed(2)}`,
-	},
-	{
-		key: 'category',
-		label: 'Category',
-		render: item => {
-			const categoryLabel = PRODUCT_CATEGORIES.find(cat => cat === item.category);
-			return categoryLabel ? categoryLabel.charAt(0).toUpperCase() + categoryLabel.slice(1) : item.category;
-		},
-	},
+	adaptCol(col.text<Product>('name', 'Name', { sortable: true, sticky: 'left' })),
+	adaptCol(col.number<Product>('price', 'Price', { prefix: '$', sortable: true })),
+	adaptCol(col.enum<Product>('category', 'Category', PRODUCT_CATEGORIES, { badge: true })),
+	adaptCol(col.enum<Product>('status', 'Status', PRODUCT_STATUSES, { badge: true })),
+	adaptCol(col.boolean<Product>('featured', 'Featured')),
+	adaptCol(col.date<Product>('createdAt', 'Created')),
 ];
 
 export function S1Page() {
