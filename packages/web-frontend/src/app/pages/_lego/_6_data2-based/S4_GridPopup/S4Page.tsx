@@ -9,14 +9,16 @@ import type { FetchDataResult } from '@framework/hooks2/data/useDataFetch';
 import { usePagination2 } from '@framework/hooks2/data/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/data/useSimpleSearch';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
+import { col } from '@framework/lego';
 import type { CreateProduct, Product } from '@shared/api/products.contract';
-import { PRODUCT_CATEGORIES } from '@shared/api/products.contract';
+import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 
 import { ProductDialogAdapter } from '@app/pages/_lego/_shared/ProductDialogAdapter';
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
 import { Data2ItemGrid } from '../_framework/Data2ItemGrid';
 import { PageLayout } from '../_framework/PageLayout';
+import { adaptCol } from '../_framework/adaptCol';
 
 /**
  * ===========================================================================================
@@ -41,29 +43,10 @@ import { PageLayout } from '../_framework/PageLayout';
  */
 
 const columns: Table2Column<Product>[] = [
-	{
-		key: 'name',
-		label: 'Name',
-		render: item => item.name,
-	},
-	{
-		key: 'price',
-		label: 'Price',
-		render: item => `$${item.price.toFixed(2)}`,
-	},
-	{
-		key: 'category',
-		label: 'Category',
-		render: item => {
-			const categoryLabel = PRODUCT_CATEGORIES.find(cat => cat === item.category);
-			return categoryLabel ? categoryLabel.charAt(0).toUpperCase() + categoryLabel.slice(1) : item.category;
-		},
-	},
-	{
-		key: 'stock',
-		label: 'Stock',
-		render: item => item.stock.toString(),
-	},
+	adaptCol(col.text<Product>('name', 'Name')),
+	adaptCol(col.number<Product>('price', 'Price', { prefix: '$' })),
+	adaptCol(col.enum<Product>('category', 'Category', PRODUCT_CATEGORIES, { badge: true })),
+	adaptCol(col.enum<Product>('status', 'Status', PRODUCT_STATUSES, { badge: true })),
 ];
 
 export function S4Page() {

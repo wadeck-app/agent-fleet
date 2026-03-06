@@ -10,6 +10,7 @@ import { usePagination2 } from '@framework/hooks2/data/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/data/useSimpleSearch';
 import { useSorting2 } from '@framework/hooks2/data/useSorting2';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
+import { col } from '@framework/lego';
 import type { Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 import { Star } from 'lucide-react';
@@ -17,6 +18,7 @@ import { Star } from 'lucide-react';
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
 import { PageLayout } from '../_framework/PageLayout';
+import { adaptCol } from '../_framework/adaptCol';
 
 /**
  * ===========================================================================================
@@ -134,46 +136,14 @@ export function SForkFeatPage() {
 				</Button>
 			),
 		},
-		{
-			key: 'name',
-			label: 'Name',
-			render: item => item.name,
-			sortable: true,
-		},
-		{
-			key: 'price',
-			label: 'Price',
-			render: item => `$${item.price.toFixed(2)}`,
-			sortable: true,
-		},
-		{
-			key: 'category',
-			label: 'Category',
-			render: item => {
-				const categoryLabel = PRODUCT_CATEGORIES.find(cat => cat === item.category);
-				return categoryLabel ? categoryLabel.charAt(0).toUpperCase() + categoryLabel.slice(1) : item.category;
-			},
-		},
-		{
-			key: 'status',
-			label: 'Status',
-			render: item => {
-				const statusLabel = PRODUCT_STATUSES.find(s => s === item.status);
-				return statusLabel ? statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1) : item.status;
-			},
-		},
-		{
-			key: 'stock',
-			label: 'Stock',
-			render: item => item.stock.toString(),
-			sortable: true,
-		},
-		{
-			key: 'rating',
-			label: 'Rating',
-			render: item => `${item.rating.toFixed(1)} / 5`,
-			sortable: true,
-		},
+		adaptCol(col.text<Product>('name', 'Name', { sortable: true })),
+		adaptCol(col.number<Product>('price', 'Price', { prefix: '$', sortable: true })),
+		adaptCol(col.enum<Product>('category', 'Category', PRODUCT_CATEGORIES, { badge: true })),
+		adaptCol(col.enum<Product>('status', 'Status', PRODUCT_STATUSES, { badge: true })),
+		adaptCol(col.number<Product>('stock', 'Stock', { sortable: true })),
+		adaptCol(col.number<Product>('rating', 'Rating', { sortable: true })),
+		adaptCol(col.boolean<Product>('featured', 'Featured')),
+		adaptCol(col.date<Product>('createdAt', 'Created')),
 	];
 
 	const bookmarkCount = Array.from(bookmarks).length;
@@ -207,7 +177,9 @@ export function SForkFeatPage() {
 					search={search}
 					cache={cache}
 				>
-					{injectedProps => <Table2 {...injectedProps} columns={columns} getItemId={item => item.id} />}
+					{injectedProps => (
+						<Table2 {...injectedProps} columns={columns} getItemId={item => item.id} simplePagination />
+					)}
 				</Data2>
 			</div>
 		</PageLayout>

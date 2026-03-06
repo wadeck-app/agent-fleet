@@ -107,25 +107,21 @@ export function Data2Carousel<T>({ data, isLoading, error, pagination, columns, 
 			)}
 
 			{pagination && (
-				<div className="flex items-center justify-center gap-4">
+				<div className="flex items-center justify-between">
 					<Button
-						variant="outline"
-						size="sm"
 						onClick={() => pagination.onPageChange(pagination.currentPage - 1)}
 						disabled={pagination.currentPage === 1 || isLoading}
-					>
-						Previous
-					</Button>
-
-					<div className="text-sm text-muted-foreground">
-						{pagination.currentPage} / {pagination.totalPages}
-					</div>
-
-					<Button
-						variant="outline"
 						size="sm"
+					>
+						Prev
+					</Button>
+					<div className="text-sm text-muted-foreground">
+						Page {pagination.currentPage} of {pagination.totalPages}
+					</div>
+					<Button
 						onClick={() => pagination.onPageChange(pagination.currentPage + 1)}
 						disabled={pagination.currentPage >= pagination.totalPages || isLoading}
+						size="sm"
 					>
 						Next
 					</Button>
