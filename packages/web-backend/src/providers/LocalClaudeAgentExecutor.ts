@@ -1,4 +1,4 @@
-import { execSync, spawnSync } from 'child_process';
+import { execSync, spawn } from 'child_process';
 import { createLogger } from 'shared-common/logger';
 
 import type { TicketAnalysisPlan } from '@app/shared/api/tickets.contract';
@@ -24,7 +24,18 @@ export class LocalClaudeAgentExecutor implements AgentExecutor {
 
 	private static readonly MAX_TITLE_LENGTH = 60;
 
-	private callClaude(prompt: string): string {
+	/**
+	 * Maximum description length sent to Claude.
+	 * Descriptions beyond this are truncated to avoid "input too long" errors.
+	 */
+	private static readonly MAX_DESCRIPTION_INPUT = 2000;
+
+	/**
+	 * Invoke the Claude CLI with the given prompt and return its stdout.
+	 * Uses async spawn (NOT spawnSync) so the Node.js event loop is never blocked.
+	 * Rejects after 30s timeout.
+	 */
+	private callClaude(prompt: string): Promise<string> {
 		const claudePath = this.findClaudePath();
 
 		// When using Bedrock, the model ID must use the Bedrock cross-region inference profile format
@@ -45,74 +56,147 @@ export class LocalClaudeAgentExecutor implements AgentExecutor {
 		const env = { ...process.env };
 		delete env['CLAUDECODE'];
 
-		const result = spawnSync(command, cmdArgs, {
-			input: prompt,
-			encoding: 'utf8',
-			timeout: 30000,
-			// Prevent console window from appearing on Windows when spawning from a headless process
-			windowsHide: true,
-			env,
-		});
+		return new Promise<string>((resolve, reject) => {
+			const child = spawn(command, cmdArgs, { env, windowsHide: true });
 
-		const output = result.stdout?.trim() ?? '';
-		if (!output || result.status !== 0) {
-			const stderr = result.stderr?.trim() ?? '';
-			const msg =
-				stderr ||
-				`Claude exited with status ${result.status ?? 'null'}, error: ${result.error?.message ?? 'none'}`;
-			log.error('Claude CLI failed', { status: result.status, stderr, error: result.error?.message });
-			throw new Error(msg);
-		}
-		return output;
+			let stdout = '';
+			let stderr = '';
+
+			child.stdout.on('data', (data: Buffer) => {
+				stdout += data.toString();
+			});
+			child.stderr.on('data', (data: Buffer) => {
+				stderr += data.toString();
+			});
+
+			child.stdin.write(prompt);
+			child.stdin.end();
+
+			const timer = setTimeout(() => {
+				child.kill();
+				reject(new Error('Claude CLI timed out after 30s'));
+			}, 30000);
+
+			child.on('close', (code: number | null) => {
+				clearTimeout(timer);
+				const output = stdout.trim();
+				if (!output || code !== 0) {
+					const msg = stderr.trim() || `Claude exited with status ${code ?? 'null'}`;
+					log.error('Claude CLI failed', { code, stderr: stderr.trim() });
+					reject(new Error(msg));
+				} else {
+					resolve(output);
+				}
+			});
+
+			child.on('error', (err: Error) => {
+				clearTimeout(timer);
+				reject(err);
+			});
+		});
 	}
 
-	private generateTitleViaClaude(description: string): string {
+	/**
+	 * Ask Claude for 3 title candidates in a single call and pick the longest one
+	 * that fits within MAX_TITLE_LENGTH. Retries once with an explicit shorten
+	 * request if all candidates are over the limit.
+	 */
+	private async generateTitleViaClaude(description: string): Promise<string> {
 		const max = LocalClaudeAgentExecutor.MAX_TITLE_LENGTH;
-		const prompt = `TASK: Generate a ticket title that summarizes what the user wants done.
+
+		// Truncate description to avoid "input too long" errors from the Claude CLI
+		const input =
+			description.length > LocalClaudeAgentExecutor.MAX_DESCRIPTION_INPUT
+				? description.substring(0, LocalClaudeAgentExecutor.MAX_DESCRIPTION_INPUT) + '...'
+				: description;
+
+		const prompt = `TASK: Generate 3 different short titles that summarize the following request or topic.
+Tickets can be about anything: questions, tasks, bugs, ideas, research, etc.
 
 RULES:
-- Output ONLY the title text (5-6 words, max ${max} characters)
-- The title must describe the request, NOT answer or solve it
-- Do NOT output sentences, paragraphs, or explanations
-- Do NOT use quotes, markdown, or punctuation at the end
+- Output EXACTLY 3 lines, one title per line, no numbering or bullets
+- Each title: 5-6 words, max ${max} characters
+- Titles must describe or name the topic, NOT answer or solve it
+- No quotes, markdown, or punctuation at the end
 
 EXAMPLES:
-Description: "The login button doesn't work when the email contains special characters like + or &"
-Title: Fix login with special character emails
+Description: "The login button doesn't work when the email address contains special characters like + or &"
+Titles:
+Fix login with special character emails
+Login fails for emails with special chars
+Special character email login broken
 
-Description: "Add a way for users to export their data to CSV format from the dashboard"
-Title: Add CSV data export to dashboard
+Description: "How do you explain gravity to a 5-year-old child in simple words?"
+Titles:
+Explain gravity simply to children
+Child-friendly explanation of gravity
+How to explain gravity to kids
 
-Description: "I need to understand why the worker keeps disconnecting every 5 minutes even when idle"
-Title: Investigate idle worker disconnections
+Description: "I've been trying to figure out why our CI pipeline keeps failing on the integration tests. I noticed it started after we merged the PR that updated the database connection pool settings."
+Titles:
+Fix CI integration test flakiness
+Investigate CI tests failing after pool update
+Debug connection pool in CI tests
 
-Description: "The dark mode colors look wrong on the settings page, dropdown menus show white text on white background"
-Title: Fix dark mode settings dropdown colors
-
-Description: "I've been trying to figure out why our CI pipeline keeps failing on the integration tests. I noticed it started after we merged the PR that updated the database connection pool settings. The tests pass locally every time, but on CI they fail about 70% of the time with a timeout error. I checked the logs and it seems like the connection pool is exhausted before the tests complete. I tried increasing the pool size in the CI config but it didn't help. I think there might be a race condition in how we initialize the test database or how we clean up between tests. Could someone investigate this and find a proper fix?"
-Title: Fix CI integration test flakiness
+Description: "We need a process to onboard new employees faster, currently it takes 3 weeks and involves too many manual steps that could be automated"
+Titles:
+Streamline new employee onboarding process
+Automate slow employee onboarding steps
+Reduce onboarding time and manual work
 
 DESCRIPTION:
-${description}
+${input}
 
-TITLE (5-6 words, max ${max} characters):`;
+3 TITLES (one per line, no numbering):`;
 
-		let title = this.callClaude(prompt);
-		log.info('Generated title via Claude CLI', { title, length: title.length });
+		const output = await this.callClaude(prompt);
+		log.info('Claude returned title candidates', { output });
 
-		if (title.length > max) {
-			log.warn('Title too long, retrying with shorten prompt', { title, length: title.length });
-			const retryPrompt = `The following ticket title is too long (${title.length} characters, max is ${max}):
-"${title}"
+		// Pick the longest candidate that fits within the limit
+		const candidates = output
+			.split('\n')
+			.map(l => l.trim())
+			.filter(l => l.length > 0 && l.length <= max);
 
-Shorten it to under ${max} characters while keeping the meaning. Output ONLY the shortened title, nothing else.
-
-SHORTENED TITLE:`;
-			title = this.callClaude(retryPrompt);
-			log.info('Regenerated title after length check', { title, length: title.length });
+		if (candidates.length > 0) {
+			const best = candidates.reduce((longest, curr) => (curr.length > longest.length ? curr : longest));
+			log.info('Selected best title from candidates', { best, length: best.length });
+			return best;
 		}
 
-		return title;
+		// All candidates are too long — retry once with an explicit shorten request
+		const tooLong = output
+			.split('\n')
+			.map(l => l.trim())
+			.filter(l => l.length > 0)
+			.slice(0, 3);
+
+		log.warn('All title candidates exceeded max length, retrying', { tooLong, max });
+
+		const retryPrompt = `These ticket titles are all too long (max ${max} characters):
+${tooLong.join('\n')}
+
+Shorten each to under ${max} characters while keeping the meaning.
+Output EXACTLY 3 lines, one shortened title per line, no numbering.
+
+3 SHORT TITLES:`;
+
+		const retryOutput = await this.callClaude(retryPrompt);
+		const retryCandidates = retryOutput
+			.split('\n')
+			.map(l => l.trim())
+			.filter(l => l.length > 0 && l.length <= max);
+
+		if (retryCandidates.length > 0) {
+			const best = retryCandidates.reduce((longest, curr) => (curr.length > longest.length ? curr : longest));
+			log.info('Selected best title after retry', { best, length: best.length });
+			return best;
+		}
+
+		// Final fallback: truncate the first candidate to the limit
+		const fallback = (tooLong[0] ?? retryOutput.trim()).substring(0, max).trim();
+		log.warn('Using truncated fallback title', { fallback });
+		return fallback;
 	}
 
 	async analyzeTicketDescription(input: TicketAnalysisInput): Promise<TicketAnalysisPlan> {
@@ -122,16 +206,16 @@ SHORTENED TITLE:`;
 
 		let title: string;
 		try {
-			title = this.generateTitleViaClaude(input.description);
+			title = await this.generateTitleViaClaude(input.description);
 			log.info('Generated title via Claude CLI', { title });
 		} catch (error) {
 			log.warn('Claude CLI unavailable, falling back to heuristic title', { error });
-			// Fallback: first sentence capped at 80 chars
+			// Fallback: first sentence capped at 60 chars
 			const firstSentence = input.description.split(/[.!?\n]/)[0].trim();
 			title =
-				firstSentence.length > 0 && firstSentence.length <= 80
+				firstSentence.length > 0 && firstSentence.length <= 60
 					? firstSentence
-					: input.description.substring(0, 60).trim() + (input.description.length > 60 ? '...' : '');
+					: input.description.substring(0, 57).trim() + '...';
 		}
 
 		return {

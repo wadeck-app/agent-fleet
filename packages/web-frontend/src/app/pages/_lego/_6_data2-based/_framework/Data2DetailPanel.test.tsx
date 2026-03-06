@@ -55,7 +55,12 @@ describe('Data2DetailPanel (A6)', () => {
 
 	const renderPanel = (selectedId?: string) => {
 		return render(
-			<Data2DetailPanel service={mockService} columns={mockColumns} selectedId={selectedId} title="Product Details" />
+			<Data2DetailPanel
+				service={mockService}
+				columns={mockColumns}
+				selectedId={selectedId}
+				title="Product Details"
+			/>
 		);
 	};
 
@@ -136,7 +141,12 @@ describe('Data2DetailPanel (A6)', () => {
 
 			// Clear selection
 			rerender(
-				<Data2DetailPanel service={mockService} columns={mockColumns} selectedId={undefined} title="Product Details" />
+				<Data2DetailPanel
+					service={mockService}
+					columns={mockColumns}
+					selectedId={undefined}
+					title="Product Details"
+				/>
 			);
 
 			// Should show empty state
@@ -208,7 +218,12 @@ describe('Data2DetailPanel (A6)', () => {
 
 			// Change selectedId to trigger refetch
 			rerender(
-				<Data2DetailPanel service={mockService} columns={mockColumns} selectedId="prod-2" title="Product Details" />
+				<Data2DetailPanel
+					service={mockService}
+					columns={mockColumns}
+					selectedId="prod-2"
+					title="Product Details"
+				/>
 			);
 
 			// Wait for data to load

@@ -7,29 +7,29 @@
 
 ## Approaches Under Analysis
 
-| ID | Name               | Core pattern                                          |
-|----|--------------------|-------------------------------------------------------|
-| A1 | widget-isolated    | Self-contained widgets with feature array + event bus |
-| A2 | context-provider   | Domain context provider + view components             |
-| A3 | feature-hooks      | Composable feature hooks passed to a data table       |
-| A4 | context-children   | Compound component pattern (DataTable.* slots)        |
-| A5 | query-pipeline     | Query-modifier pipeline (pure function transforms)    |
-| A6 | data2-based        | Data2 render-prop orchestrator + Table2 + hooks2      |
+| ID  | Name             | Core pattern                                          |
+| --- | ---------------- | ----------------------------------------------------- |
+| A1  | widget-isolated  | Self-contained widgets with feature array + event bus |
+| A2  | context-provider | Domain context provider + view components             |
+| A3  | feature-hooks    | Composable feature hooks passed to a data table       |
+| A4  | context-children | Compound component pattern (DataTable.\* slots)       |
+| A5  | query-pipeline   | Query-modifier pipeline (pure function transforms)    |
+| A6  | data2-based      | Data2 render-prop orchestrator + Table2 + hooks2      |
 
 ---
 
 ## Axis 1 — Antifragilite
 
-*How well does each approach absorb new scenarios without requiring framework changes?*
+_How well does each approach absorb new scenarios without requiring framework changes?_
 
-| Approach | Framework churn (commits) | New scenario = new page only? | Architecture type              | Score (1-5) |
-|----------|--------------------------|-------------------------------|--------------------------------|-------------|
-| A1       | 3                        | Mostly yes; S_WS uses shared hooks | Widget-isolated + event bus | 4           |
-| A2       | 4                        | Yes, with provider wrapper    | Context-based domain view      | 4           |
-| A3       | 5                        | Yes, feature hooks are stable | Feature-hook composition       | 4           |
-| A4       | 4                        | Yes, children context is lean | Context-children pattern       | 4           |
-| A5       | 1                        | Yes, 100% page-only           | Query-modifier pipeline        | 5           |
-| A6       | 2                        | Mostly yes; minor post-launch adapter | Data2-based adapter     | 4           |
+| Approach | Framework churn (commits) | New scenario = new page only?         | Architecture type           | Score (1-5) |
+| -------- | ------------------------- | ------------------------------------- | --------------------------- | ----------- |
+| A1       | 3                         | Mostly yes; S_WS uses shared hooks    | Widget-isolated + event bus | 4           |
+| A2       | 4                         | Yes, with provider wrapper            | Context-based domain view   | 4           |
+| A3       | 5                         | Yes, feature hooks are stable         | Feature-hook composition    | 4           |
+| A4       | 4                         | Yes, children context is lean         | Context-children pattern    | 4           |
+| A5       | 1                         | Yes, 100% page-only                   | Query-modifier pipeline     | 5           |
+| A6       | 2                         | Mostly yes; minor post-launch adapter | Data2-based adapter         | 4           |
 
 ### Key Findings
 
@@ -59,16 +59,16 @@ modifications despite introducing a fundamentally new data source.
 
 ## Axis 2 — Testabilite
 
-*How easy is it to write complete, isolated unit tests for each approach?*
+_How easy is it to write complete, isolated unit tests for each approach?_
 
-| Approach | vi.mock count | vi.fn count | Covers loading? | Covers error? | Covers concurrency? | Score (1-5) |
-|----------|---------------|-------------|-----------------|---------------|---------------------|-------------|
-| A1       | 1             | 1           | Yes (deferred)  | Yes           | No                  | 3           |
-| A2       | 1             | 6           | Yes             | Yes (recovery)| No                  | 2           |
-| A3       | 0             | 1           | Yes (deferred)  | Yes           | No                  | 4           |
-| A4       | 0             | 1           | Yes (deferred + transitions) | Yes | Partial (deferred isolation) | 4 |
-| A5       | 0             | 1           | Yes (implicit)  | Yes           | No                  | 4           |
-| A6       | 0             | 1           | Yes (deferred)  | Yes           | No                  | 4           |
+| Approach | vi.mock count | vi.fn count | Covers loading?              | Covers error?  | Covers concurrency?          | Score (1-5) |
+| -------- | ------------- | ----------- | ---------------------------- | -------------- | ---------------------------- | ----------- |
+| A1       | 1             | 1           | Yes (deferred)               | Yes            | No                           | 3           |
+| A2       | 1             | 6           | Yes                          | Yes (recovery) | No                           | 2           |
+| A3       | 0             | 1           | Yes (deferred)               | Yes            | No                           | 4           |
+| A4       | 0             | 1           | Yes (deferred + transitions) | Yes            | Partial (deferred isolation) | 4           |
+| A5       | 0             | 1           | Yes (implicit)               | Yes            | No                           | 4           |
+| A6       | 0             | 1           | Yes (deferred)               | Yes            | No                           | 4           |
 
 ### Key Findings
 
@@ -90,6 +90,7 @@ acceptable for list/detail patterns but would be a risk in real-time collaborati
 ### Evidence
 
 A2 requires 6 hoisted mocks for any test:
+
 ```typescript
 const { mockGetProducts, mockGetProduct, mockCreateProduct, ... } = vi.hoisted(() => ({
     mockGetProducts: vi.fn(), mockGetProduct: vi.fn(), // + 4 more
@@ -98,6 +99,7 @@ vi.mock('@app/pages/_lego/_shared/api/ProductsService', () => ({ productsService
 ```
 
 A4 loading state transition verification (deferred promise pattern):
+
 ```typescript
 const deferred = createDeferredPromise<any>();
 mockGetProducts.mockReturnValue(deferred.promise);
@@ -112,16 +114,16 @@ A5 modifier sequencing test verifies `custom1: 'overridden'` (last modifier wins
 
 ## Axis 3 — Simplicite des pages
 
-*How simple is it to write a new page: few lines, few concepts, copy-paste friendly?*
+_How simple is it to write a new page: few lines, few concepts, copy-paste friendly?_
 
-| Approach | S1 lines | S3 lines | Concepts to learn             | Style                  | Copy-paste friendly? | Score (1-5) |
-|----------|----------|----------|-------------------------------|------------------------|----------------------|-------------|
-| A1       | 7        | 17       | 1 (features array)            | Pure config            | Yes; adjust features only | 5      |
-| A2       | 7        | 18       | 1 + provider wrap             | Pure config + setup    | Yes; wrap + features | 4           |
-| A3       | 7        | 18       | 6+ (one hook per feature)     | Mixed hooks + array    | Hard; write all hook calls | 2     |
-| A4       | 15       | 22       | 2 (compound + context hook)   | Imperative nesting     | Moderate; complex JSX tree | 3   |
-| A5       | 9        | 15       | 2 (modifiers + composition)   | Mixed config/imperative| Yes; duplicate modifiers | 4     |
-| A6       | 16       | 42       | 3+ (Data2, hooks, render props)| Imperative orchestration | No; hook wiring required | 1  |
+| Approach | S1 lines | S3 lines | Concepts to learn               | Style                    | Copy-paste friendly?       | Score (1-5) |
+| -------- | -------- | -------- | ------------------------------- | ------------------------ | -------------------------- | ----------- |
+| A1       | 7        | 17       | 1 (features array)              | Pure config              | Yes; adjust features only  | 5           |
+| A2       | 7        | 18       | 1 + provider wrap               | Pure config + setup      | Yes; wrap + features       | 4           |
+| A3       | 7        | 18       | 6+ (one hook per feature)       | Mixed hooks + array      | Hard; write all hook calls | 2           |
+| A4       | 15       | 22       | 2 (compound + context hook)     | Imperative nesting       | Moderate; complex JSX tree | 3           |
+| A5       | 9        | 15       | 2 (modifiers + composition)     | Mixed config/imperative  | Yes; duplicate modifiers   | 4           |
+| A6       | 16       | 42       | 3+ (Data2, hooks, render props) | Imperative orchestration | No; hook wiring required   | 1           |
 
 ### Key Findings
 
@@ -147,6 +149,7 @@ copy-paste cost is high.
 A1 S1Page core: `<WidgetDataTable service={productsService} columns={columns} features={[]} />` (1 line)
 
 A3 S3Page requires 6 separate hook instantiations:
+
 ```tsx
 const search = useSearchFeature({ placeholder: 'Search...' });
 const pagination = usePaginationFeature({ defaultSize: 10, pageSizes: [10, 20, 50] });
@@ -163,16 +166,16 @@ A6 S3Page exceeds A1 by 25 lines due to imperative hook composition.
 
 ## Axis 4 — Coherence
 
-*How uniform is each approach's pattern across all 15 scenarios?*
+_How uniform is each approach's pattern across all 15 scenarios?_
 
 | Approach | Pattern uniformity | Drift risk  | Blessed path exists? | Score (1-5) |
-|----------|--------------------|-------------|---------------------|-------------|
-| A1       | Very high          | Low         | Yes                 | 5           |
-| A2       | Very high          | Low         | Yes                 | 5           |
-| A3       | Medium-high        | Medium      | Partial             | 3           |
-| A4       | Medium             | Medium-high | Partial             | 3           |
-| A5       | Medium             | Medium      | Partial             | 3           |
-| A6       | Medium-high        | Medium      | Partial             | 3           |
+| -------- | ------------------ | ----------- | -------------------- | ----------- |
+| A1       | Very high          | Low         | Yes                  | 5           |
+| A2       | Very high          | Low         | Yes                  | 5           |
+| A3       | Medium-high        | Medium      | Partial              | 3           |
+| A4       | Medium             | Medium-high | Partial              | 3           |
+| A5       | Medium             | Medium      | Partial              | 3           |
+| A6       | Medium-high        | Medium      | Partial              | 3           |
 
 ### Key Findings
 
@@ -190,7 +193,7 @@ A3's `S_BUS` jumps to 63 lines with custom state, `useRef`, and keyboard handler
 
 **WebSocket pages uniformly break the pattern across all approaches.** `S_WS` scenarios discard the
 approach's standard components and render raw `<Table>` / `<Table2>` components directly with inline
-state. This is consistent *across* approaches but inconsistent *within* them, revealing a shared
+state. This is consistent _across_ approaches but inconsistent _within_ them, revealing a shared
 abstraction boundary.
 
 ### Evidence
@@ -205,16 +208,16 @@ abstraction boundary.
 
 ## Axis 5 — New Feature Extensibility
 
-*To add a brand-new feature, must the framework be modified, or can it be added at the page level only?*
+_To add a brand-new feature, must the framework be modified, or can it be added at the page level only?_
 
-| Approach | S_WS: framework change? | S_BUS: framework change? | Feature at page level? | Architecture   | Score (1-5) |
-|----------|------------------------|--------------------------|------------------------|----------------|-------------|
-| A1       | Yes                    | Yes                      | No                     | Closed (immutable widgets) | 1 |
-| A2       | Yes                    | Yes                      | No                     | Closed (provider + views)  | 2 |
-| A3       | No                     | Partial                  | Mostly                 | Semi-open (hooks + wrappers) | 3 |
-| A4       | No                     | Partial                  | Mostly                 | Semi-open (compound children) | 3 |
-| A5       | No                     | Partial                  | Mostly                 | Semi-open (modifiers + composition) | 4 |
-| A6       | No                     | Partial                  | Mostly                 | Semi-open (adapters + injection) | 3 |
+| Approach | S_WS: framework change? | S_BUS: framework change? | Feature at page level? | Architecture                        | Score (1-5) |
+| -------- | ----------------------- | ------------------------ | ---------------------- | ----------------------------------- | ----------- |
+| A1       | Yes                     | Yes                      | No                     | Closed (immutable widgets)          | 1           |
+| A2       | Yes                     | Yes                      | No                     | Closed (provider + views)           | 2           |
+| A3       | No                      | Partial                  | Mostly                 | Semi-open (hooks + wrappers)        | 3           |
+| A4       | No                      | Partial                  | Mostly                 | Semi-open (compound children)       | 3           |
+| A5       | No                      | Partial                  | Mostly                 | Semi-open (modifiers + composition) | 4           |
+| A6       | No                      | Partial                  | Mostly                 | Semi-open (adapters + injection)    | 3           |
 
 ### Key Findings
 
@@ -246,25 +249,25 @@ itself. A6 introduced `adaptCol` as a composable adapter without altering either
 
 ## Axis 6 — Maintenabilite
 
-*Code quality, anti-pattern count, and cost of a global refactor.*
+_Code quality, anti-pattern count, and cost of a global refactor._
 
-| Approach | Largest file (lines)        | `any` count | Anti-patterns found                         | Global change cost | Score (1-5) |
-|----------|-----------------------------|-------------|---------------------------------------------|--------------------|-------------|
-| A1       | 345 (WidgetDataTable)        | 3           | None critical                               | 3 files            | 4           |
-| A2       | 290 (ProductDomainContext)   | 1           | `void` fire-and-forget (4x), console.error  | 3 files            | 3           |
-| A3       | 349 (HookDataTable)          | 9           | `void` fire-and-forget (2x), prop drilling  | 3 files            | 3           |
-| A4       | 640 (DataTable)              | 12          | God component, frozen extension point       | 2-4 files          | 2           |
-| A5       | 154 (usePipeline)            | 2           | State override complexity                   | 3 files            | 3           |
-| A6       | 112 (Data2DetailPanel)       | 0           | None                                        | 1-2 files          | 5           |
+| Approach | Largest file (lines)       | `any` count | Anti-patterns found                        | Global change cost | Score (1-5) |
+| -------- | -------------------------- | ----------- | ------------------------------------------ | ------------------ | ----------- |
+| A1       | 345 (WidgetDataTable)      | 3           | None critical                              | 3 files            | 4           |
+| A2       | 290 (ProductDomainContext) | 1           | `void` fire-and-forget (4x), console.error | 3 files            | 3           |
+| A3       | 349 (HookDataTable)        | 9           | `void` fire-and-forget (2x), prop drilling | 3 files            | 3           |
+| A4       | 640 (DataTable)            | 12          | God component, frozen extension point      | 2-4 files          | 2           |
+| A5       | 154 (usePipeline)          | 2           | State override complexity                  | 3 files            | 3           |
+| A6       | 112 (Data2DetailPanel)     | 0           | None                                       | 1-2 files          | 5           |
 
 **Anti-pattern inventory:**
 
-| Anti-pattern               | A1 | A2 | A3 | A4 | A5 | A6 |
-|----------------------------|----|----|----|----|----|-----|
-| `any` types                | 3  | 1  | 9  | 12 | 2  | 0   |
-| `void` async (fire-and-forget) | 0 | 4 | 2 | 1 | 0 | 0 |
-| `console.log` in framework | 0  | 1  | 0  | 0  | 0  | 0   |
-| God component (>400 lines) | 0  | 0  | 0  | 1  | 0  | 0   |
+| Anti-pattern                   | A1  | A2  | A3  | A4  | A5  | A6  |
+| ------------------------------ | --- | --- | --- | --- | --- | --- |
+| `any` types                    | 3   | 1   | 9   | 12  | 2   | 0   |
+| `void` async (fire-and-forget) | 0   | 4   | 2   | 1   | 0   | 0   |
+| `console.log` in framework     | 0   | 1   | 0   | 0   | 0   | 0   |
+| God component (>400 lines)     | 0   | 0   | 0   | 1   | 0   | 0   |
 
 ### Key Findings
 
@@ -289,6 +292,7 @@ both modifiers AND overrides when debugging query behavior.
 ### Evidence
 
 Pagination refactoring cost (make `defaultPageSize` a global constant):
+
 - A1: `useWidgetQuery.ts` + `WidgetDataTable.tsx` + `WidgetCarousel.tsx` -> 3 files
 - A2: `ProductDomainContext.tsx` + `ViewDataTable.tsx` -> 2-3 files
 - A3: `usePaginationFeature.ts` + `HookDataTable.tsx` -> 2-3 files
@@ -300,21 +304,21 @@ Pagination refactoring cost (make `defaultPageSize` a global constant):
 
 ## Axis 7 — Error Avoidance (LLM Agent Friendliness)
 
-*When an LLM coding agent writes a new page or adds a feature, how likely is it to make mistakes?*
+_When an LLM coding agent writes a new page or adds a feature, how likely is it to make mistakes?_
 
-| Approach | Self-documenting? | Style drift protection? | Single path? | Silent failure risk            | Score (1-5) |
-|----------|-----------------|------------------------|--------------|--------------------------------|-------------|
-| A1       | High            | Yes (structural test)  | Yes          | Low (compile-time errors)      | 4.5         |
-| A2       | Medium          | Yes (structural test)  | Partial      | Medium (missing provider)      | 3.5         |
-| A3       | Low             | Yes (structural test)  | No           | High (missing hook -> silent)  | 2.5         |
-| A4       | Low             | Yes (structural test)  | No           | High (missing slot -> silent)  | 2.0         |
-| A5       | Low             | Partial (inline style gap) | No       | Medium-high (modifier order)   | 2.5         |
-| A6       | High            | Yes (structural test)  | Yes          | Low-medium (stale closures)    | 4.0         |
+| Approach | Self-documenting? | Style drift protection?    | Single path? | Silent failure risk           | Score (1-5) |
+| -------- | ----------------- | -------------------------- | ------------ | ----------------------------- | ----------- |
+| A1       | High              | Yes (structural test)      | Yes          | Low (compile-time errors)     | 4.5         |
+| A2       | Medium            | Yes (structural test)      | Partial      | Medium (missing provider)     | 3.5         |
+| A3       | Low               | Yes (structural test)      | No           | High (missing hook -> silent) | 2.5         |
+| A4       | Low               | Yes (structural test)      | No           | High (missing slot -> silent) | 2.0         |
+| A5       | Low               | Partial (inline style gap) | No           | Medium-high (modifier order)  | 2.5         |
+| A6       | High              | Yes (structural test)      | Yes          | Low-medium (stale closures)   | 4.0         |
 
 **API surface complexity (concept count required):**
 
 | Approach | Concepts to master before writing a new page |
-|----------|----------------------------------------------|
+| -------- | -------------------------------------------- |
 | A1       | 1 (features array)                           |
 | A2       | 2 (features array + provider wrap)           |
 | A3       | 7 (6 feature hooks + composition pattern)    |
@@ -343,18 +347,21 @@ to style drift via JS-style attributes.
 ### Evidence
 
 A1 self-limiting API — LLM cannot pass invalid props:
+
 ```tsx
 <WidgetDataTable service={productsService} columns={columns} features={[]} />
 // Cannot pass onSearch, onPaginate — the widget API doesn't accept them
 ```
 
 A3 silent failure — hook type extraction returns `undefined` without error:
+
 ```typescript
 // HookDataTable.tsx:
-features.find(f => f.type === 'search')  // undefined if not present; feature silently absent
+features.find(f => f.type === 'search'); // undefined if not present; feature silently absent
 ```
 
 A5 structural gap — S3Page.tsx passes the className test but violates intent:
+
 ```tsx
 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 // Not caught by no-classname-in-pages.test.ts (tests for string attribute, not JS object)
@@ -364,30 +371,30 @@ A5 structural gap — S3Page.tsx passes the className test but violates intent:
 
 ## Final Scoring Table
 
-| Axis                             | A1    | A2    | A3    | A4    | A5    | A6    |
-|----------------------------------|-------|-------|-------|-------|-------|-------|
-| 1. Antifragilite                 | 4     | 4     | 4     | 4     | **5** | 4     |
-| 2. Testabilite                   | 3     | 2     | 4     | 4     | 4     | 4     |
-| 3. Simplicite des pages          | **5** | 4     | 2     | 3     | 4     | 1     |
-| 4. Coherence                     | **5** | **5** | 3     | 3     | 3     | 3     |
-| 5. New feature extensibility     | 1     | 2     | 3     | 3     | 4     | 3     |
-| 6. Maintenabilite                | 4     | 3     | 3     | 2     | 3     | **5** |
-| 7. Error avoidance               | 4.5   | 3.5   | 2.5   | 2.0   | 2.5   | 4.0   |
-| **Total**                        | **26.5** | **23.5** | **21.5** | **21.0** | **25.5** | **24.0** |
+| Axis                         | A1       | A2       | A3       | A4       | A5       | A6       |
+| ---------------------------- | -------- | -------- | -------- | -------- | -------- | -------- |
+| 1. Antifragilite             | 4        | 4        | 4        | 4        | **5**    | 4        |
+| 2. Testabilite               | 3        | 2        | 4        | 4        | 4        | 4        |
+| 3. Simplicite des pages      | **5**    | 4        | 2        | 3        | 4        | 1        |
+| 4. Coherence                 | **5**    | **5**    | 3        | 3        | 3        | 3        |
+| 5. New feature extensibility | 1        | 2        | 3        | 3        | 4        | 3        |
+| 6. Maintenabilite            | 4        | 3        | 3        | 2        | 3        | **5**    |
+| 7. Error avoidance           | 4.5      | 3.5      | 2.5      | 2.0      | 2.5      | 4.0      |
+| **Total**                    | **26.5** | **23.5** | **21.5** | **21.0** | **25.5** | **24.0** |
 
 ---
 
 ## Recommended Approach by Use Case
 
-| Use case                                   | Recommended | Rationale                                                                 |
-|--------------------------------------------|-------------|---------------------------------------------------------------------------|
-| **Junior developer writing new pages**     | A1          | Pure config, 1 concept, copy-paste friendly, impossible to misuse         |
-| **LLM agent generating code**              | A1          | Self-limiting API, declarative features, no silent failure modes          |
-| **Testability-first team**                 | A5 or A4    | Minimal mocks, pure function modifiers (A5) or deferred state checks (A4) |
-| **Long-term maintainability**              | A6          | No god components, no anti-patterns, lowest global refactor cost          |
+| Use case                                   | Recommended | Rationale                                                                    |
+| ------------------------------------------ | ----------- | ---------------------------------------------------------------------------- |
+| **Junior developer writing new pages**     | A1          | Pure config, 1 concept, copy-paste friendly, impossible to misuse            |
+| **LLM agent generating code**              | A1          | Self-limiting API, declarative features, no silent failure modes             |
+| **Testability-first team**                 | A5 or A4    | Minimal mocks, pure function modifiers (A5) or deferred state checks (A4)    |
+| **Long-term maintainability**              | A6          | No god components, no anti-patterns, lowest global refactor cost             |
 | **Maximum new feature extensibility**      | A5          | Modifier pattern is open by design; pipeline grows without framework changes |
-| **Pattern uniformity across a large team** | A1 or A2    | Single blessed path, zero structural drift, all pages look identical      |
-| **Senior developer, complex scenarios**    | A5          | Pipeline modifiers are powerful and composable; testable pure functions   |
+| **Pattern uniformity across a large team** | A1 or A2    | Single blessed path, zero structural drift, all pages look identical         |
+| **Senior developer, complex scenarios**    | A5          | Pipeline modifiers are powerful and composable; testable pure functions      |
 
 ---
 
