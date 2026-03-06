@@ -22,9 +22,10 @@ export class LocalClaudeAgentExecutor implements AgentExecutor {
 		}
 	}
 
-	private generateTitleViaClaude(description: string): string {
+	private static readonly MAX_TITLE_LENGTH = 60;
+
+	private callClaude(prompt: string): string {
 		const claudePath = this.findClaudePath();
-		const prompt = `Generate a concise ticket title (5-8 words max). Return ONLY the title text, no quotes, no punctuation at the end, no explanation.\n\nDescription:\n${description}`;
 
 		// When using Bedrock, the model ID must use the Bedrock cross-region inference profile format
 		const useBedrock = process.env['CLAUDE_CODE_USE_BEDROCK'] === 'true';
@@ -53,8 +54,8 @@ export class LocalClaudeAgentExecutor implements AgentExecutor {
 			env,
 		});
 
-		const title = result.stdout?.trim() ?? '';
-		if (!title || result.status !== 0) {
+		const output = result.stdout?.trim() ?? '';
+		if (!output || result.status !== 0) {
 			const stderr = result.stderr?.trim() ?? '';
 			const msg =
 				stderr ||
@@ -62,6 +63,55 @@ export class LocalClaudeAgentExecutor implements AgentExecutor {
 			log.error('Claude CLI failed', { status: result.status, stderr, error: result.error?.message });
 			throw new Error(msg);
 		}
+		return output;
+	}
+
+	private generateTitleViaClaude(description: string): string {
+		const max = LocalClaudeAgentExecutor.MAX_TITLE_LENGTH;
+		const prompt = `TASK: Generate a ticket title that summarizes what the user wants done.
+
+RULES:
+- Output ONLY the title text (5-6 words, max ${max} characters)
+- The title must describe the request, NOT answer or solve it
+- Do NOT output sentences, paragraphs, or explanations
+- Do NOT use quotes, markdown, or punctuation at the end
+
+EXAMPLES:
+Description: "The login button doesn't work when the email contains special characters like + or &"
+Title: Fix login with special character emails
+
+Description: "Add a way for users to export their data to CSV format from the dashboard"
+Title: Add CSV data export to dashboard
+
+Description: "I need to understand why the worker keeps disconnecting every 5 minutes even when idle"
+Title: Investigate idle worker disconnections
+
+Description: "The dark mode colors look wrong on the settings page, dropdown menus show white text on white background"
+Title: Fix dark mode settings dropdown colors
+
+Description: "I've been trying to figure out why our CI pipeline keeps failing on the integration tests. I noticed it started after we merged the PR that updated the database connection pool settings. The tests pass locally every time, but on CI they fail about 70% of the time with a timeout error. I checked the logs and it seems like the connection pool is exhausted before the tests complete. I tried increasing the pool size in the CI config but it didn't help. I think there might be a race condition in how we initialize the test database or how we clean up between tests. Could someone investigate this and find a proper fix?"
+Title: Fix CI integration test flakiness
+
+DESCRIPTION:
+${description}
+
+TITLE (5-6 words, max ${max} characters):`;
+
+		let title = this.callClaude(prompt);
+		log.info('Generated title via Claude CLI', { title, length: title.length });
+
+		if (title.length > max) {
+			log.warn('Title too long, retrying with shorten prompt', { title, length: title.length });
+			const retryPrompt = `The following ticket title is too long (${title.length} characters, max is ${max}):
+"${title}"
+
+Shorten it to under ${max} characters while keeping the meaning. Output ONLY the shortened title, nothing else.
+
+SHORTENED TITLE:`;
+			title = this.callClaude(retryPrompt);
+			log.info('Regenerated title after length check', { title, length: title.length });
+		}
+
 		return title;
 	}
 

@@ -212,19 +212,42 @@ export const B2F_INTERVENTION_CANCELLED = 'b2f:intervention:cancelled' as const;
 // TICKET EVENTS
 // ===========================================================================================
 
-/** Tickets list updated event (aggregate) */
+/**
+ * Tickets LIST needs to refresh.
+ * Broadcast when: ticket created, ticket deleted, reorder, or a list-visible field changed
+ * (title, status, labels). List pages subscribe to this event only.
+ * NOT broadcast for description/fields/flowId/taskIds changes (not visible in the list).
+ */
 export const B2F_TICKETS_UPDATED = 'b2f:tickets:updated' as const;
 
-/** Ticket created event */
+/**
+ * A specific ticket was created.
+ * Broadcast on every createTicket(). Always paired with B2F_TICKETS_UPDATED.
+ * Payload: full Ticket object.
+ */
 export const B2F_TICKET_CREATED = 'b2f:ticket:created' as const;
 
-/** Ticket updated event */
+/**
+ * A specific ticket was updated (any field).
+ * Broadcast on every updateTicket() and reorderTicket().
+ * Payload: { ticketId } — use as server-side filter so only the detail page
+ * for that specific ticket receives it. NOT broadcast on create or delete.
+ */
 export const B2F_TICKET_UPDATED = 'b2f:ticket:updated' as const;
 
-/** Ticket deleted event */
+/**
+ * A specific ticket was deleted.
+ * Broadcast on deleteTicket(). Always paired with B2F_TICKETS_UPDATED.
+ * Payload: { id } — detail pages should navigate away on receiving this.
+ */
 export const B2F_TICKET_DELETED = 'b2f:ticket:deleted' as const;
 
-/** Ticket status changed event */
+/**
+ * A ticket's status field specifically changed.
+ * Broadcast alongside B2F_TICKET_UPDATED when status changes, for subscribers
+ * that only care about status transitions (e.g. kanban boards, flow triggers).
+ * Payload: { ticketId, oldStatus, newStatus }.
+ */
 export const B2F_TICKET_STATUS_CHANGED = 'b2f:ticket:status_changed' as const;
 
 /** Ticket comment added event — carries the full comment so subscribers can append without re-fetching */

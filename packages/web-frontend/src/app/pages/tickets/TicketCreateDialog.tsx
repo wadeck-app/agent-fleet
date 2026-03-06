@@ -26,12 +26,12 @@ interface TicketCreateDialogProps {
  * TICKET CREATE DIALOG
  * ===========================================================================================
  *
- * Simple dialog for creating tickets with optional AI analysis:
+ * Simple dialog for creating tickets with optional AI title generation:
  * 1. User selects project and enters description (required)
  * 2. User optionally enters title (if empty, AI will generate it)
  * 3. Click "Create" to create the ticket:
- *    - If title is empty: analyze with AI first, then create with plan
- *    - If title is provided: create directly without AI analysis
+ *    - If title is empty: create with placeholder, AI generates real title async
+ *    - If title is provided: create directly without AI
  *
  * ===========================================================================================
  */
@@ -44,7 +44,6 @@ export function TicketCreateDialog({ open, onOpenChange, onSuccess }: TicketCrea
 	const [title, setTitle] = useState('');
 	const [description, setDescription] = useState('');
 	const [creating, setCreating] = useState(false);
-	const [analyzing, setAnalyzing] = useState(false);
 
 	// Load projects when dialog opens
 	useEffect(() => {
@@ -56,7 +55,7 @@ export function TicketCreateDialog({ open, onOpenChange, onSuccess }: TicketCrea
 				const response = await projectsApi.getProjectsList({ archived: false });
 				const projectsList =
 					'items' in response ? response.items : (response as { projects: Project[] }).projects;
-				setProjects(projectsList ?? []);
+				setProjects((projectsList ?? []).sort((a, b) => a.name.localeCompare(b.name)));
 			} catch (error) {
 				showToast(getErrorMessage(error), 'error');
 			} finally {
@@ -89,22 +88,14 @@ export function TicketCreateDialog({ open, onOpenChange, onSuccess }: TicketCrea
 		try {
 			setCreating(true);
 
-			// If title is empty: analyze with AI first, then create from plan
 			if (!title.trim()) {
-				setAnalyzing(true);
-				const plan = await ticketsApi.analyzeTicket({
+				// Create immediately — title will be generated asynchronously by the backend
+				await ticketsApi.createWithAiTitle({
+					projectId: selectedProjectId,
 					description,
-					projectId: selectedProjectId,
-				});
-				setAnalyzing(false);
-
-				await ticketsApi.createFromPlan({
-					projectId: selectedProjectId,
-					plan,
-					originalDescription: description,
 				});
 			} else {
-				// If title is provided: create directly
+				// Title provided: create directly
 				await ticketsApi.createTicket({
 					projectId: selectedProjectId,
 					title: title.trim(),
@@ -121,7 +112,6 @@ export function TicketCreateDialog({ open, onOpenChange, onSuccess }: TicketCrea
 		} catch (error) {
 			showToast(getErrorMessage(error), 'error');
 		} finally {
-			setAnalyzing(false);
 			setCreating(false);
 		}
 	};
@@ -191,14 +181,6 @@ export function TicketCreateDialog({ open, onOpenChange, onSuccess }: TicketCrea
 							disabled={creating}
 						/>
 					</div>
-
-					{/* AI analysis status message */}
-					{analyzing && (
-						<div className="flex items-center gap-2 text-sm text-muted-foreground">
-							<Sparkles className="size-4 animate-pulse" />
-							<span>Analyzing with AI...</span>
-						</div>
-					)}
 				</div>
 			</DialogBody>
 
@@ -215,7 +197,7 @@ export function TicketCreateDialog({ open, onOpenChange, onSuccess }: TicketCrea
 					{creating ? (
 						<>
 							<Sparkles className="mr-2 size-4 animate-spin" />
-							{analyzing ? 'Analyzing...' : 'Creating...'}
+							Creating...
 						</>
 					) : (
 						'Create'

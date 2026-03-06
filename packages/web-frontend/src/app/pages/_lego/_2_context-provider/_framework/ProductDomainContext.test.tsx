@@ -22,15 +22,21 @@ import { ProductProvider, useProductDomain } from './ProductDomainContext';
 
 // vi.mock is hoisted to the top of the file by Vitest, so mock variables must
 // also be hoisted via vi.hoisted() to avoid "Cannot access before initialization" errors.
-const { mockGetProducts, mockGetProduct, mockCreateProduct, mockUpdateProduct, mockDeleteProduct, mockBulkDeleteProducts } =
-	vi.hoisted(() => ({
-		mockGetProducts: vi.fn(),
-		mockGetProduct: vi.fn(),
-		mockCreateProduct: vi.fn(),
-		mockUpdateProduct: vi.fn(),
-		mockDeleteProduct: vi.fn(),
-		mockBulkDeleteProducts: vi.fn(),
-	}));
+const {
+	mockGetProducts,
+	mockGetProduct,
+	mockCreateProduct,
+	mockUpdateProduct,
+	mockDeleteProduct,
+	mockBulkDeleteProducts,
+} = vi.hoisted(() => ({
+	mockGetProducts: vi.fn(),
+	mockGetProduct: vi.fn(),
+	mockCreateProduct: vi.fn(),
+	mockUpdateProduct: vi.fn(),
+	mockDeleteProduct: vi.fn(),
+	mockBulkDeleteProducts: vi.fn(),
+}));
 
 vi.mock('@app/pages/_lego/_shared/api/ProductsService', () => ({
 	productsService: {

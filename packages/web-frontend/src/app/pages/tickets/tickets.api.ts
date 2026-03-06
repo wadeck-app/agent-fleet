@@ -6,6 +6,7 @@ import type {
 	CreateFromPlanResponse,
 	CreateTicket,
 	CreateTicketComment,
+	CreateWithAiTitle,
 	LabelsQuery,
 	LabelsResponse,
 	ReorderTicket,
@@ -95,6 +96,13 @@ export const ticketsApi = {
 	 */
 	createFromPlan: (body: CreateFromPlan): Promise<CreateFromPlanResponse> => {
 		return typedFetch('POST', '/api/tickets/create-from-plan', { body });
+	},
+
+	/**
+	 * Create ticket immediately with placeholder title, generate real title async
+	 */
+	createWithAiTitle: (body: CreateWithAiTitle): Promise<Ticket> => {
+		return typedFetch('POST', '/api/tickets/create-with-ai-title', { body });
 	},
 
 	/**

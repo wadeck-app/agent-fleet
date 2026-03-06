@@ -5,6 +5,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { ticketsApi } from './tickets.api';
 import { useTickets } from './useTickets';
 
+// useRealtimeRefresh requires TransportProvider — mock it since WebSocket
+// behaviour is tested in its own dedicated test suite
+vi.mock('@/hooks/useRealtimeRefresh', () => ({
+	useRealtimeRefresh: vi.fn(),
+}));
+
 /**
  * ===========================================================================================
  * USE TICKETS HOOK TESTS
