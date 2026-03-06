@@ -181,7 +181,7 @@ export function TicketCommentsSection({ ticketId, sortOrder = 'asc', showLabel =
 						<div
 							key={comment.id}
 							id={`comment-${comment.id}`}
-							className={`rounded-md border bg-card p-4 border-l-[3px] ${selectedCommentId === comment.id ? 'border-l-primary' : 'border-l-transparent'}`}
+							className={`rounded-md border bg-card p-4 ${selectedCommentId === comment.id ? 'border-l-2 border-l-primary' : ''}`}
 						>
 							<div className="mb-2 flex items-center gap-2">
 								{comment.author && (

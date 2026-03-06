@@ -115,7 +115,7 @@ export function TriggeredTasksSection({
 						<div
 							key={task.id}
 							id={`task-${task.id}`}
-							className={`flex items-center gap-2 border-b border-l-[3px] py-1.5 pl-1 last:border-b-0 text-xs ${selectedTaskId === task.id ? 'border-l-primary' : 'border-l-transparent'}`}
+							className={`flex items-center gap-2 border-b py-1.5 last:border-b-0 text-xs ${selectedTaskId === task.id ? 'border-l-2 border-l-primary pl-1' : 'pl-0'}`}
 						>
 							{task.flowId && <span className="font-mono text-muted-foreground">{task.flowId}</span>}
 							<Badge variant={STATUS_VARIANTS[task.status] ?? 'secondary'} className="shrink-0 text-xs">
