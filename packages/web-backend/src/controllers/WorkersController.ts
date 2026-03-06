@@ -48,6 +48,14 @@ export default class WorkersController implements LazyController<typeof WORKERS_
 		});
 
 		/**
+		 * GET /api/workers/event-subscriptions
+		 * Get all active event subscriptions (must be before /:workerId to avoid param capture)
+		 */
+		add('GET', '/api/workers/event-subscriptions', async () => {
+			return this.service.getEventSubscriptions();
+		});
+
+		/**
 		 * GET /api/workers/:workerId
 		 * Get a single worker by ID
 		 */

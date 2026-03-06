@@ -5,11 +5,15 @@ import type {
 	CreateFromPlan,
 	CreateFromPlanResponse,
 	CreateTicket,
+	CreateTicketComment,
 	LabelsQuery,
 	LabelsResponse,
 	ReorderTicket,
 	Ticket,
 	TicketAnalysisPlan,
+	TicketComment,
+	TicketCommentsResponse,
+	TicketHistoryResponse,
 	TicketsListResponse,
 	TicketsQuery,
 	UpdateTicket,
@@ -91,5 +95,26 @@ export const ticketsApi = {
 	 */
 	createFromPlan: (body: CreateFromPlan): Promise<CreateFromPlanResponse> => {
 		return typedFetch('POST', '/api/tickets/create-from-plan', { body });
+	},
+
+	/**
+	 * Get ticket comments
+	 */
+	getComments: (ticketId: string): Promise<TicketCommentsResponse> => {
+		return typedFetch('GET', '/api/tickets/:ticketId/comments', { params: { ticketId } });
+	},
+
+	/**
+	 * Add a comment to a ticket
+	 */
+	addComment: (ticketId: string, body: CreateTicketComment): Promise<TicketComment> => {
+		return typedFetch('POST', '/api/tickets/:ticketId/comments', { params: { ticketId }, body });
+	},
+
+	/**
+	 * Get the full audit/event history for a ticket
+	 */
+	getHistory: (ticketId: string): Promise<TicketHistoryResponse> => {
+		return typedFetch('GET', '/api/tickets/:ticketId/history', { params: { ticketId } });
 	},
 } as const;

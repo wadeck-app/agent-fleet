@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 import { Badge } from '@framework/components/primitives/Badge';
 import type { Task } from '@shared/api/tasks.contract';
 
@@ -91,6 +93,23 @@ export function TaskInfoPanel({ task }: TaskInfoPanelProps) {
 				<div>
 					<h3 className="mb-2 text-sm font-semibold text-muted-foreground">Flow</h3>
 					<p className="font-mono text-xs text-foreground">{task.flowId}</p>
+				</div>
+			)}
+
+			{/* Triggered by */}
+			{task.ticketId && (
+				<div>
+					<h3 className="mb-2 text-sm font-semibold text-muted-foreground">Triggered by</h3>
+					<div className="flex items-center gap-2">
+						{task.metadata?.triggerEvent && (
+							<Badge variant="outline" className="font-mono text-xs">
+								{task.metadata.triggerEvent as string}
+							</Badge>
+						)}
+						<Link to={`/tickets/${task.ticketId}`} className="text-xs text-primary hover:underline">
+							View ticket {task.ticketId}
+						</Link>
+					</div>
 				</div>
 			)}
 

@@ -6,10 +6,14 @@ import type {
 	CreateFromPlan,
 	CreateFromPlanResponse,
 	CreateTicket,
+	CreateTicketComment,
 	LabelsResponse,
 	ReorderTicket,
 	Ticket,
 	TicketAnalysisPlan,
+	TicketComment,
+	TicketCommentsResponse,
+	TicketHistoryResponse,
 	TicketsListResponse,
 	TicketsQuery,
 	UpdateTicket,
@@ -17,6 +21,7 @@ import type {
 import { ConflictException, ERROR_CODES, NotFoundException } from '@app/shared/exceptions/http-exceptions';
 import {
 	B2F_TICKETS_UPDATED,
+	B2F_TICKET_COMMENT_ADDED,
 	B2F_TICKET_CREATED,
 	B2F_TICKET_DELETED,
 	B2F_TICKET_STATUS_CHANGED,
@@ -143,12 +148,28 @@ export class TicketsService {
 				order,
 			});
 
+			// Record creation in history
+			await this.ticketsRepository.addHistoryEntry(ticket.id, 'ticket.created', {
+				title: ticket.title,
+				description: ticket.description,
+				status: ticket.status,
+				labels: ticket.labels,
+			});
+
 			// Emit specific event AFTER successful creation
 			this.eventBroadcaster.broadcast(B2F_TICKET_CREATED, ticket);
 
 			// Emit aggregate event for dashboard updates
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast(B2F_TICKETS_UPDATED, {} as any);
+
+			// Emit internal event for worker flow triggers
+			this.eventBus?.emit('ticket.created', {
+				ticketId: ticket.id,
+				projectId: ticket.projectId,
+				title: ticket.title,
+				description: ticket.description,
+			});
 
 			return ticket;
 		} catch (error) {
@@ -216,7 +237,37 @@ export class TicketsService {
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast(B2F_TICKET_UPDATED, { ticketId: id } as any);
 
-			// If status changed, emit status change event
+			// Determine which fields changed
+			const changedFields: string[] = [];
+			for (const key of Object.keys(data) as Array<keyof typeof data>) {
+				if (key === 'version') continue;
+				if (JSON.stringify(data[key]) !== JSON.stringify(currentTicket[key as keyof typeof currentTicket])) {
+					changedFields.push(key);
+				}
+			}
+
+			// Record field changes in history and emit events
+			if (changedFields.length > 0) {
+				// Build before/after snapshot for changed fields only (excluding version, taskIds)
+				const changes: Record<string, { from: unknown; to: unknown }> = {};
+				for (const field of changedFields) {
+					if (field === 'taskIds') continue;
+					changes[field] = {
+						from: currentTicket[field as keyof typeof currentTicket],
+						to: updatedTicket[field as keyof typeof updatedTicket],
+					};
+				}
+				await this.ticketsRepository.addHistoryEntry(id, 'ticket.updated', { changes });
+
+				this.eventBus?.emit('ticket.updated', {
+					ticketId: id,
+					projectId: updatedTicket.projectId,
+					title: updatedTicket.title,
+					changedFields,
+				});
+			}
+
+			// If status changed, emit status change events
 			if (data.status && data.status !== currentTicket.status) {
 				this.eventBroadcaster.broadcast(B2F_TICKET_STATUS_CHANGED, {
 					ticketId: id,
@@ -224,12 +275,27 @@ export class TicketsService {
 					newStatus: data.status,
 				} as any);
 
-				// Emit internal event for backend-to-backend routing
+				// Emit internal event for backend-to-backend routing (legacy)
 				this.eventBus?.emit('ticket.status.changed', {
 					ticketId: id,
 					projectId: updatedTicket.projectId,
 					oldStatus: currentTicket.status,
 					newStatus: data.status,
+				});
+
+				// Emit semantic transition event for flow triggers
+				this.eventBus?.emit('ticket.transitioned', {
+					ticketId: id,
+					projectId: updatedTicket.projectId,
+					title: updatedTicket.title,
+					oldStatus: currentTicket.status,
+					newStatus: data.status,
+				});
+
+				// Record status transition as a dedicated history entry
+				await this.ticketsRepository.addHistoryEntry(id, 'ticket.transitioned', {
+					from: currentTicket.status,
+					to: data.status,
 				});
 			}
 
@@ -335,13 +401,13 @@ export class TicketsService {
 	 * Create tickets from an AI-generated plan
 	 */
 	async createFromPlan(data: CreateFromPlan): Promise<CreateFromPlanResponse> {
-		const { plan, projectId } = data;
+		const { plan, projectId, originalDescription } = data;
 
-		// Create parent ticket
+		// Create parent ticket — use original description if provided, fall back to AI analysis
 		const parentTicket = await this.createTicket({
 			projectId,
 			title: plan.title,
-			description: plan.analysis,
+			description: originalDescription || plan.analysis,
 			labels: plan.labels,
 			fields: plan.fields,
 			status: 'backlog',
@@ -383,5 +449,59 @@ export class TicketsService {
 			return;
 		}
 		await this.updateTicket(ticketId, { status: newStatus, version: ticket.version });
+	}
+
+	/**
+	 * Add a comment to a ticket
+	 */
+	async addComment(ticketId: string, data: CreateTicketComment): Promise<TicketComment> {
+		// Verify ticket exists
+		const ticket = await this.getTicketById(ticketId);
+		const comment = await this.ticketsRepository.addComment(ticketId, data);
+		this.eventBroadcaster.broadcast(B2F_TICKET_COMMENT_ADDED, comment);
+
+		// Record comment in history
+		await this.ticketsRepository.addHistoryEntry(
+			ticketId,
+			'ticket.comment_created',
+			{
+				commentId: comment.id,
+				content: comment.content,
+				author: comment.author,
+			},
+			comment.author
+		);
+
+		// Emit internal event for flow triggers — all comments including worker-ai
+		// (loop prevention is the flow/worker's responsibility, not the event bus)
+		this.eventBus?.emit('ticket.comment_created', {
+			ticketId,
+			projectId: ticket.projectId,
+			commentId: comment.id,
+			content: comment.content,
+			author: comment.author,
+		});
+
+		return comment;
+	}
+
+	/**
+	 * Get all comments for a ticket
+	 */
+	async getComments(ticketId: string): Promise<TicketCommentsResponse> {
+		// Verify ticket exists
+		await this.getTicketById(ticketId);
+		const comments = await this.ticketsRepository.getComments(ticketId);
+		return { comments };
+	}
+
+	/**
+	 * Get the full audit/event history for a ticket
+	 */
+	async getHistory(ticketId: string): Promise<TicketHistoryResponse> {
+		// Verify ticket exists
+		await this.getTicketById(ticketId);
+		const entries = await this.ticketsRepository.getHistory(ticketId);
+		return { entries };
 	}
 }

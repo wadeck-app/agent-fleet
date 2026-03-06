@@ -635,10 +635,10 @@ export class FlowRegistry {
 	 */
 	private parseWorkspaceConfig(data: any): WorkspaceConfig {
 		return {
-			mode: data.mode || 'isolated',
-			gitStrategy: data.gitStrategy || 'main-only',
-			reusePolicy: data.reusePolicy || 'never',
-			concurrencyKey: data.concurrencyKey,
+			mode: data?.mode || 'isolated',
+			gitStrategy: data?.gitStrategy || 'main-only',
+			reusePolicy: data?.reusePolicy || 'never',
+			concurrencyKey: data?.concurrencyKey,
 		};
 	}
 

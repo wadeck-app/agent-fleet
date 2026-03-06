@@ -23,6 +23,17 @@ export interface EventSubscription {
  */
 export interface EventDispatchCriteria {
 	event: string;
+	/**
+	 * Optional project ID filter.
+	 * When provided, only subscriptions whose projectId matches are returned.
+	 * When omitted, all subscriptions for the event are returned regardless of project.
+	 *
+	 * NOTE: Workers register with projectId = package.json name (e.g. "agent-fleet"),
+	 * while backend events carry DB-generated project IDs (e.g. "9zonezaue").
+	 * In single-project-per-server deployments (current architecture), omit projectId
+	 * since there is no cross-project leakage risk.
+	 */
+	projectId?: string;
 	/** Payload fields to match against subscription filters */
 	payload: Record<string, string | undefined>;
 }
@@ -61,7 +72,14 @@ export class EventSubscriptionRegistry {
 		if (!this.subscriptions.has(key)) {
 			this.subscriptions.set(key, []);
 		}
-		this.subscriptions.get(key)!.push(subscription);
+		const list = this.subscriptions.get(key)!;
+		// Idempotent: replace existing entry for the same event (handles hot-reload re-registration)
+		const existingIdx = list.findIndex(s => s.event === subscription.event);
+		if (existingIdx >= 0) {
+			list[existingIdx] = subscription;
+		} else {
+			list.push(subscription);
+		}
 		log.debug(
 			`Registered event subscription: ${subscription.event} → ${subscription.flowId} (worker: ${subscription.workerId})`
 		);
@@ -88,6 +106,7 @@ export class EventSubscriptionRegistry {
 		for (const subscriptionList of this.subscriptions.values()) {
 			for (const sub of subscriptionList) {
 				if (sub.event !== criteria.event) continue;
+				if (criteria.projectId !== undefined && sub.projectId !== criteria.projectId) continue;
 
 				if (this.matchesFilter(sub.filter, criteria.payload)) {
 					matches.push(sub);

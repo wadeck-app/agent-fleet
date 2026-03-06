@@ -8,7 +8,7 @@ interface UseTicketState {
 	ticket: Ticket | null;
 	loading: boolean;
 	error: Error | null;
-	refresh: () => void;
+	refresh: () => Promise<void>;
 }
 
 /**

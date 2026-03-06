@@ -101,6 +101,25 @@ export const UpdateWorkerNameSchema = z.object({
 export type UpdateWorkerNameRequest = z.infer<typeof UpdateWorkerNameSchema>;
 
 /**
+ * Active event subscription (registered by a worker for an event-triggered flow)
+ */
+export const EventSubscriptionSchema = z.object({
+	event: z.string(),
+	filter: z.record(z.string(), z.string()).optional(),
+	workerId: z.string(),
+	flowId: z.string(),
+	projectId: z.string(),
+});
+
+export type EventSubscriptionItem = z.infer<typeof EventSubscriptionSchema>;
+
+export const EventSubscriptionsResponseSchema = z.object({
+	subscriptions: z.array(EventSubscriptionSchema),
+});
+
+export type EventSubscriptionsResponse = z.infer<typeof EventSubscriptionsResponseSchema>;
+
+/**
  * Workers API routes
  */
 export const WORKERS_API_ROUTES = defineRoutes({
@@ -108,6 +127,11 @@ export const WORKERS_API_ROUTES = defineRoutes({
 		GET: {
 			query: WorkersListQuerySchema.optional(),
 			response: z.union([WorkersDataSchema, WorkersListResponseSchema]),
+		},
+	},
+	'/api/workers/event-subscriptions': {
+		GET: {
+			response: EventSubscriptionsResponseSchema,
 		},
 	},
 	'/api/workers/:workerId': {

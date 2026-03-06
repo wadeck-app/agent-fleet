@@ -89,12 +89,14 @@ export class Orchestrator implements Shutdownable {
 		await this.interventionManager.loadPendingInterventions();
 		log.info('Orchestrator', 'InterventionManager initialized');
 
-		// Create WebSocket server
+		// Create WebSocket server — pass eventSubscriptionRegistry at construction so
+		// subscriptions are registered even for workers that connect during startup
 		this.wsServer = new WorkerWebSocketServer(
 			this.workerCoordinator,
 			this.stateManager,
 			this.interventionManager,
-			this.wsPort
+			this.wsPort,
+			this.eventSubscriptionRegistry
 		);
 
 		// Wire up intervention response callback
@@ -105,9 +107,6 @@ export class Orchestrator implements Shutdownable {
 		// Inject flow discovery registry into TaskManager for flow validation
 		const flowRegistry = this.wsServer.getConnectionManager().getFlowDiscoveryRegistry();
 		this.taskManager.setFlowDiscoveryRegistry(flowRegistry);
-
-		// Inject event subscription registry into flow discovery registry
-		flowRegistry.setEventSubscriptionRegistry(this.eventSubscriptionRegistry);
 
 		// Create workspace manager
 		this.workspaceManager = new WorkspaceManager(this.projectRoot);

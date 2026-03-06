@@ -3,6 +3,8 @@
  *
  * These tests run real scripts without mocking to validate multiline script handling.
  */
+import * as http from 'http';
+import type { AddressInfo } from 'net';
 import { describe, expect, it } from 'vitest';
 
 import { ScriptExecutor } from './ScriptExecutor';
@@ -93,6 +95,58 @@ echo This should not print`;
 			expect(result.exitCode).toBe(0);
 			expect(result.stdout).toContain('Single line');
 		});
+
+		/**
+		 * Regression test: node -e "fetch(...)" caused STATUS_STACK_BUFFER_OVERRUN (exit code 3221226505)
+		 * on Windows due to undici native thread initialization.
+		 * Fix: use Node.js built-in http.request instead of fetch().
+		 */
+		it('should post JSON via node http.request without crashing (regression: fetch caused STATUS_STACK_BUFFER_OVERRUN)', async () => {
+			let receivedBody = '';
+
+			// Start a mock HTTP server to receive the comment POST
+			const server = http.createServer((req, res) => {
+				let body = '';
+				req.on('data', chunk => {
+					body += chunk;
+				});
+				req.on('end', () => {
+					receivedBody = body;
+					res.writeHead(200, { 'Content-Type': 'application/json' });
+					res.end('{"id":"test-comment-id"}');
+				});
+			});
+
+			await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+			const address = server.address() as AddressInfo;
+
+			try {
+				// This is the exact script pattern used in flows.yml for ticket comment posting.
+				// The old version used fetch() and crashed with exit 3221226505 on Windows.
+				const script = `node -e "const http=require('http'),u=new URL(process.env.BACKEND_URL+'/api/tickets/'+process.env.TICKET_ID+'/comments'),b=JSON.stringify({content:process.env.COMMENT,author:'worker-ai'});const req=http.request({hostname:u.hostname,port:+(u.port||80),path:u.pathname,method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(b)}},r=>{r.on('data',()=>{});r.on('end',()=>process.exit(0));});req.on('error',e=>{console.error(e.message);process.exit(1);});req.write(b);req.end();"`;
+
+				const result = await executor.execute({
+					script,
+					env: {
+						BACKEND_URL: `http://127.0.0.1:${address.port}`,
+						TICKET_ID: 'test-ticket-123',
+						COMMENT:
+							'Analysis complete: complexity is high\nKey factors: async operations\n"quoted" content handled',
+					},
+				});
+
+				expect(result.exitCode).not.toBe(3221226505); // Must not crash with Windows STACK_BUFFER_OVERRUN
+				expect(result.exitCode).toBe(0);
+				expect(result.success).toBe(true);
+
+				const body = JSON.parse(receivedBody) as { content: string; author: string };
+				expect(body.author).toBe('worker-ai');
+				expect(body.content).toContain('Analysis complete');
+				expect(body.content).toContain('"quoted" content handled');
+			} finally {
+				server.close();
+			}
+		}, 10000);
 	});
 
 	// Unix/Linux multiline scripts should work without temp files
