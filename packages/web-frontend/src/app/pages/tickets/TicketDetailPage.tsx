@@ -16,6 +16,7 @@ import { TicketDetailLayoutC } from './TicketDetailLayoutC';
 import { TicketDetailLayoutD } from './TicketDetailLayoutD';
 import { TicketDetailLayoutE } from './TicketDetailLayoutE';
 import { TicketDetailLayoutF } from './TicketDetailLayoutF';
+import { TicketDetailLayoutG } from './TicketDetailLayoutG';
 import { ticketsApi } from './tickets.api';
 import { useTicket } from './useTicket';
 
@@ -25,7 +26,7 @@ import { useTicket } from './useTicket';
  * ===========================================================================================
  *
  * Ticket detail page with multiple layout options.
- * Layouts: A (Jira), B (GitHub), C (YouTrack), D (Linear), E (GitLab), F (AI Mode)
+ * Layouts: A (Jira), B (GitHub), C (YouTrack), D (Linear), E (GitLab), F (AI Mode), G (Hybrid)
  *
  * ===========================================================================================
  */
@@ -76,6 +77,10 @@ export function TicketDetailPage() {
 				return (
 					<TicketDetailLayoutF ticket={ticket} ticketId={id} onUpdate={handleUpdate} onRefresh={refresh} />
 				);
+			case 'g':
+				return (
+					<TicketDetailLayoutG ticket={ticket} ticketId={id} onUpdate={handleUpdate} onRefresh={refresh} />
+				);
 			default:
 				throw new Error(`Unknown layout: ${layout}`);
 		}
@@ -103,13 +108,21 @@ export function TicketDetailPage() {
 		<Page>
 			{/* Layout switcher always visible */}
 			<div className="mb-4 flex items-center justify-between">
-				<Button
-					variant="ghost"
-					onClick={() => navigate('/tickets')}
-					className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-				>
-					<ArrowLeft size={16} /> Tickets
-				</Button>
+				<div className="flex items-center gap-2">
+					<Button
+						variant="ghost"
+						onClick={() => navigate('/tickets')}
+						className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+					>
+						<ArrowLeft size={16} /> Tickets
+					</Button>
+					{id && (
+						<>
+							<span className="text-sm text-muted-foreground">/</span>
+							<span className="font-mono text-xs text-muted-foreground">{id}</span>
+						</>
+					)}
+				</div>
 				<LayoutSwitcher current={layout} onChange={setLayout} />
 			</div>
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { Label } from '@framework/components/forms/Label';
@@ -33,10 +33,31 @@ const STATUS_VARIANTS: Record<TaskStatus, 'default' | 'secondary' | 'info' | 'su
 	cancelled: 'destructive',
 };
 
-export function TriggeredTasksSection({ ticketId }: { ticketId: string }) {
+export function TriggeredTasksSection({
+	ticketId,
+	sortOrder = 'asc',
+	showLabel = true,
+}: {
+	ticketId: string;
+	sortOrder?: 'asc' | 'desc';
+	showLabel?: boolean;
+}) {
 	const [tasks, setTasks] = useState<Task[]>([]);
 	const [loading, setLoading] = useState(true);
 	const { transport } = useTransport();
+
+	// Derive selected task from URL hash (permanent, no timeout)
+	const selectedTaskId = window.location.hash.startsWith('#task-')
+		? window.location.hash.slice('#task-'.length)
+		: null;
+
+	// Sort tasks based on sortOrder
+	const sortedTasks = useMemo(() => {
+		if (!tasks) return [];
+		const sorted = [...tasks];
+		sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+		return sortOrder === 'desc' ? sorted.reverse() : sorted;
+	}, [tasks, sortOrder]);
 
 	const fetchTasks = async () => {
 		try {
@@ -54,6 +75,14 @@ export function TriggeredTasksSection({ ticketId }: { ticketId: string }) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [ticketId]);
 
+	// Scroll to selected task after tasks load
+	useEffect(() => {
+		if (!selectedTaskId) return;
+		const el = document.getElementById(`task-${selectedTaskId}`);
+		if (!el) return;
+		el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+	}, [tasks, selectedTaskId]);
+
 	// Realtime refresh on tasks updated
 	useEffect(() => {
 		const unsub = transport.subscribe(B2F_TASKS_UPDATED, () => {
@@ -66,7 +95,7 @@ export function TriggeredTasksSection({ ticketId }: { ticketId: string }) {
 	if (loading) {
 		return (
 			<div>
-				<Label>Triggered Tasks</Label>
+				{showLabel && <Label>Triggered Tasks</Label>}
 				<div className="mt-2 flex items-center gap-2">
 					<Loader2 className="size-4 animate-spin text-muted-foreground" />
 					<span className="text-sm text-muted-foreground">Loading...</span>
@@ -77,43 +106,36 @@ export function TriggeredTasksSection({ ticketId }: { ticketId: string }) {
 
 	return (
 		<div>
-			<Label>Triggered Tasks</Label>
-			{tasks.length === 0 ? (
+			{showLabel && <Label>Triggered Tasks</Label>}
+			{sortedTasks.length === 0 ? (
 				<p className="mt-2 text-sm text-muted-foreground">No triggered tasks yet</p>
 			) : (
-				<div className="mt-2 space-y-2">
-					{tasks.map(task => (
-						<Link
+				<div className="mt-2">
+					{sortedTasks.map(task => (
+						<div
 							key={task.id}
-							to={`/tasks/${task.id}`}
-							className="block rounded-md border bg-card p-3 transition-colors hover:bg-accent/50"
+							id={`task-${task.id}`}
+							className={`flex items-center gap-2 border-b border-l-[3px] py-1.5 pl-1 last:border-b-0 text-xs ${selectedTaskId === task.id ? 'border-l-primary' : 'border-l-transparent'}`}
 						>
-							<div className="flex items-start justify-between gap-2">
-								<p className="flex-1 truncate text-sm font-medium">{task.description}</p>
-								<Badge
-									variant={STATUS_VARIANTS[task.status] ?? 'secondary'}
-									className="shrink-0 text-xs"
-								>
-									{task.status}
-								</Badge>
-							</div>
-							<div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-								{task.flowId && (
-									<span className="font-mono text-xs text-muted-foreground">{task.flowId}</span>
-								)}
-								{task.metadata?.triggerEvent && (
-									<>
-										<span className="text-xs text-muted-foreground">·</span>
-										<span className="font-mono text-xs text-muted-foreground">
-											{task.metadata.triggerEvent as string}
-										</span>
-									</>
-								)}
-								<span className="ml-auto text-xs text-muted-foreground">
-									{formatRelativeTime(task.createdAt)}
+							{task.flowId && <span className="font-mono text-muted-foreground">{task.flowId}</span>}
+							<Badge variant={STATUS_VARIANTS[task.status] ?? 'secondary'} className="shrink-0 text-xs">
+								{task.status}
+							</Badge>
+							{task.metadata?.triggerEvent && (
+								<span className="font-mono text-muted-foreground">
+									{task.metadata.triggerEvent as string}
 								</span>
-							</div>
-						</Link>
+							)}
+							<span className="text-muted-foreground">{formatRelativeTime(task.createdAt)}</span>
+							<span className="flex-1" />
+							<Link
+								to={`/tasks/${task.id}`}
+								title={`Task ID: ${task.id}`}
+								className="shrink-0 text-xs text-primary hover:underline"
+							>
+								view task: <span className="font-mono">{task.id.slice(0, 8)}…</span>
+							</Link>
+						</div>
 					))}
 				</div>
 			)}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { Label } from '@framework/components/forms/Label';
 import { Badge } from '@framework/components/primitives/Badge';
@@ -57,10 +57,26 @@ function renderEventDescription(entry: TicketHistoryEntry): string {
 	}
 }
 
-export function TicketEventHistorySection({ ticketId }: { ticketId: string }) {
+export function TicketEventHistorySection({
+	ticketId,
+	sortOrder = 'asc',
+	showLabel = true,
+}: {
+	ticketId: string;
+	sortOrder?: 'asc' | 'desc';
+	showLabel?: boolean;
+}) {
 	const [entries, setEntries] = useState<TicketHistoryEntry[]>([]);
 	const [loading, setLoading] = useState(true);
 	const { transport } = useTransport();
+
+	// Sort entries based on sortOrder
+	const sortedEntries = useMemo(() => {
+		if (!entries) return [];
+		const sorted = [...entries];
+		sorted.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+		return sortOrder === 'desc' ? sorted.reverse() : sorted;
+	}, [entries, sortOrder]);
 
 	const fetchHistory = async () => {
 		try {
@@ -109,7 +125,7 @@ export function TicketEventHistorySection({ ticketId }: { ticketId: string }) {
 	if (loading) {
 		return (
 			<div>
-				<Label>Event History</Label>
+				{showLabel && <Label>Event History</Label>}
 				<div className="mt-2 flex items-center gap-2">
 					<Loader2 className="size-4 animate-spin text-muted-foreground" />
 					<span className="text-sm text-muted-foreground">Loading...</span>
@@ -120,12 +136,12 @@ export function TicketEventHistorySection({ ticketId }: { ticketId: string }) {
 
 	return (
 		<div>
-			<Label>Event History</Label>
-			{entries.length === 0 ? (
+			{showLabel && <Label>Event History</Label>}
+			{sortedEntries.length === 0 ? (
 				<p className="mt-2 text-sm text-muted-foreground">No events yet</p>
 			) : (
 				<div className="mt-2 space-y-2">
-					{entries.map(entry => (
+					{sortedEntries.map(entry => (
 						<div key={entry.id} className="rounded-md border bg-card p-3">
 							<div className="flex flex-wrap items-center gap-2">
 								<Badge variant={EVENT_VARIANTS[entry.event] ?? 'default'} className="text-xs">

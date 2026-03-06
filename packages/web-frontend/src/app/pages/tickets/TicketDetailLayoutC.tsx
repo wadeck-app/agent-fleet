@@ -7,10 +7,14 @@ import { SelectWithSpinner } from '@framework/components/forms/SelectWithSpinner
 import { Textarea } from '@framework/components/forms/Textarea';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
+import {
+	TabsContent,
+	TabsList,
+	TabsTrigger,
+	TabsWithUrlState,
+} from '@framework/components/primitives/TabsWithUrlState';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@framework/components/primitives/Tooltip';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@framework/components/primitives/tabs';
 import { useToast } from '@framework/features/toast/ToastContext';
-import { useUrlState } from '@framework/hooks/useUrlState';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { Ticket, TicketStatus } from '@shared/api/tickets.contract';
 import { Loader2 } from 'lucide-react';
@@ -31,17 +35,12 @@ interface TicketDetailLayoutCProps {
 	onRefresh: () => Promise<void>;
 }
 
-type TabKey = 'comments' | 'tasks' | 'history' | 'audit';
-
 /**
  * Layout C (YouTrack) - Compact header with tabs
  */
 export function TicketDetailLayoutC({ ticket, ticketId, onUpdate, onRefresh }: TicketDetailLayoutCProps) {
 	const { showToast } = useToast();
-	const [activeTab, setActiveTab] = useUrlState<TabKey>({
-		key: 'tab',
-		defaultValue: 'comments',
-	});
+
 	const [localDescription, setLocalDescription] = useState(ticket.description);
 	const [localStatus, setLocalStatus] = useState<TicketStatus>(ticket.status);
 	const [dirtyFields, setDirtyFields] = useState<Partial<Ticket>>({});
@@ -202,7 +201,7 @@ export function TicketDetailLayoutC({ ticket, ticketId, onUpdate, onRefresh }: T
 			</div>
 
 			{/* Tabs */}
-			<Tabs value={activeTab} onValueChange={value => setActiveTab(value as TabKey)}>
+			<TabsWithUrlState paramKey="tab" defaultValue="comments">
 				<TabsList>
 					<TabsTrigger value="comments" asChild>
 						<Link to={`?tab=comments`}>Comments ({countsLoading ? '?' : commentsState.count})</Link>
@@ -233,7 +232,7 @@ export function TicketDetailLayoutC({ ticket, ticketId, onUpdate, onRefresh }: T
 				<TabsContent value="audit">
 					<TicketAuditLogSection ticketId={ticketId} />
 				</TabsContent>
-			</Tabs>
+			</TabsWithUrlState>
 		</div>
 	);
 }

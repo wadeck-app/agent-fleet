@@ -67,6 +67,17 @@ export interface InternalEventMap {
 	'ticket.updated': TicketUpdatedPayload;
 	'ticket.transitioned': TicketTransitionedPayload;
 	'ticket.comment_created': TicketCommentCreatedPayload;
+	'ticket.label.added': { ticketId: string; projectId: string; label: string };
+	'ticket.label.removed': { ticketId: string; projectId: string; label: string };
+	'ticket.field.created': { ticketId: string; projectId: string; key: string; value: string };
+	'ticket.field.deleted': { ticketId: string; projectId: string; key: string; oldValue: string };
+	'ticket.field.updated': {
+		ticketId: string;
+		projectId: string;
+		key: string;
+		oldValue: string;
+		newValue: string;
+	};
 }
 
 export type InternalEventName = keyof InternalEventMap;

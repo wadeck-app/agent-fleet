@@ -30,7 +30,7 @@ export function SelectWithSpinner({ loading, children, disabled, ...props }: Sel
 				{children}
 			</Select>
 			{loading && (
-				<div className="absolute inset-0 flex items-center justify-end pr-8 pointer-events-none">
+				<div className="absolute inset-y-0 right-2 flex items-center pointer-events-none">
 					<Loader2 className="size-3 animate-spin text-muted-foreground" />
 				</div>
 			)}
