@@ -169,9 +169,14 @@ export class FileBasedStorage implements DataStorage {
 	async create<T extends BaseEntity>(table: string, data: Omit<T, keyof BaseEntity>): Promise<T> {
 		const tableData = await this.getTable<T>(table);
 
+		// Extract id if provided in data (for syncing from external sources with explicit IDs)
+		const dataAsAny = data as any;
+		const entityId = dataAsAny.id ? dataAsAny.id : this.generateId();
+		const { id: _removed, ...dataWithoutId } = dataAsAny;
+
 		const newEntity: T = {
-			...data,
-			id: this.generateId(),
+			...dataWithoutId,
+			id: entityId,
 			version: 1,
 			createdAt: new Date().toISOString(),
 			updatedAt: new Date().toISOString(),

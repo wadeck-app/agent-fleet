@@ -99,6 +99,8 @@ export const TaskSchema = z.object({
 	workspaceId: z.string().optional(),
 	// Ticket linkage
 	ticketId: z.string().optional(),
+	// Arbitrary metadata (triggerEvent, etc.)
+	metadata: z.record(z.string(), z.any()).optional(),
 });
 
 /**
@@ -132,6 +134,7 @@ export const TasksListQuerySchema = z.object({
 	flowId: z.string().optional(),
 	projectId: z.string().optional(),
 	workspaceId: z.string().optional(),
+	ticketId: z.string().optional(),
 });
 
 /**

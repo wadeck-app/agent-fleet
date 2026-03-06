@@ -32,7 +32,7 @@ function SelectTrigger({
 			data-size={size}
 			className={cn(
 				`
-      flex w-full items-center justify-between gap-1.5 rounded-lg border
+      flex w-full cursor-pointer items-center justify-between gap-1.5 rounded-lg border
       border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap
       transition-colors outline-none select-none
       focus-visible:border-ring focus-visible:ring-[3px]
@@ -66,7 +66,7 @@ function SelectTrigger({
 function SelectContent({
 	className,
 	children,
-	position = 'item-aligned',
+	position = 'popper',
 	align = 'center',
 	...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {
@@ -105,7 +105,6 @@ function SelectContent({
 					data-position={position}
 					className={cn(
 						`
-        data-[position=popper]:h-[var(--radix-select-trigger-height)]
         data-[position=popper]:w-full
         data-[position=popper]:min-w-[var(--radix-select-trigger-width)]
       `,

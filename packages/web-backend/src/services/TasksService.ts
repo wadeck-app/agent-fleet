@@ -113,6 +113,11 @@ export class TasksService {
 			log.info('Fetching tasks for paginated list...');
 			let tasks = await this.tasksRepository.findAll(query);
 
+			// Filter by ticketId (top-level field, not metadata scan)
+			if (query.ticketId) {
+				tasks = tasks.filter(t => t.ticketId === query.ticketId);
+			}
+
 			// Apply search if provided
 			if (query.search) {
 				tasks = this.applySearch(tasks, query.search);
@@ -586,6 +591,47 @@ export class TasksService {
 	 * }
 	 * ```
 	 */
+
+	// ===========================================================================================
+	// SYNC METHODS
+	// ===========================================================================================
+
+	/**
+	 * Sync a task created by the orchestrator into the web-backend storage.
+	 * This ensures tasks triggered by ticket events are visible via the tasks API.
+	 * Uses the orchestrator task's ID so /tasks/:id links work correctly.
+	 */
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	async syncFromOrchestratorTask(orchestratorTask: any, triggerEvent: string): Promise<void> {
+		try {
+			const existing = await this.tasksRepository.findById(orchestratorTask.id);
+			if (existing) {
+				// Already synced — skip
+				return;
+			}
+
+			await this.tasksRepository.create({
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				...(orchestratorTask.id ? ({ id: orchestratorTask.id } as any) : {}),
+				description: orchestratorTask.description,
+				status: 'backlog',
+				priority: orchestratorTask.priority || 'medium',
+				assignedWorker: orchestratorTask.assignedTo?.workerId
+					? { workerId: orchestratorTask.assignedTo.workerId }
+					: null,
+				flowId: orchestratorTask.flowId,
+				flowInputs: orchestratorTask.flowInputs || {},
+				projectId: orchestratorTask.metadata?.projectId as string | undefined,
+				ticketId: orchestratorTask.ticketId,
+				metadata: { triggerEvent, ...orchestratorTask.metadata },
+			});
+
+			log.info(`[syncFromOrchestratorTask] Synced task ${orchestratorTask.id} (triggerEvent=${triggerEvent})`);
+		} catch (error) {
+			log.error(`[syncFromOrchestratorTask] Failed to sync task ${orchestratorTask.id}:`, error);
+			// Don't throw — sync failure should not block task execution
+		}
+	}
 
 	// ===========================================================================================
 	// LOGS METHODS

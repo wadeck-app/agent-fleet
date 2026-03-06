@@ -17,6 +17,7 @@ import { B2F_WORKER_CONNECTED, B2F_WORKER_DISCONNECTED, B2F_WORKER_UPDATED } fro
 
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
+import { EventSubscriptionsPanel } from './EventSubscriptionsPanel';
 import { WorkersTable } from './WorkersTable';
 import { workersApi } from './workers.api';
 
@@ -135,6 +136,9 @@ export function WorkersPage() {
 			>
 				<WorkersTable />
 			</Data2>
+
+			{/* Event Subscriptions Panel */}
+			<EventSubscriptionsPanel />
 		</Page>
 	);
 }

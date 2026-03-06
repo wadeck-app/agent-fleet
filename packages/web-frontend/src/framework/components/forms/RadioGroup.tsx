@@ -17,7 +17,7 @@ function RadioGroupItem({ className, ...props }: React.ComponentProps<typeof Rad
 			className={cn(
 				`
       group/radio-group-item peer relative flex aspect-square size-4 shrink-0
-      rounded-full border border-input text-primary outline-none
+      cursor-pointer rounded-full border border-input text-primary outline-none
       after:absolute after:-inset-x-3 after:-inset-y-2
       focus-visible:border-ring focus-visible:ring-[3px]
       focus-visible:ring-ring/50

@@ -96,7 +96,7 @@ describe('TicketCreateDialog', () => {
 			expect(screen.getByText('Create Ticket')).toBeInTheDocument();
 			expect(screen.getByText('Describe the ticket and let AI help you organize it')).toBeInTheDocument();
 			expect(screen.getByLabelText(/Description/i)).toBeInTheDocument();
-			expect(screen.getByRole('button', { name: /Analyze with AI/i })).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: /^Create$/i })).toBeInTheDocument();
 		});
 
 		it('should not render content when closed', () => {
@@ -114,12 +114,12 @@ describe('TicketCreateDialog', () => {
 			});
 		});
 
-		it('should show Analyze with AI button', () => {
+		it('should show Create button disabled initially', () => {
 			render(<TicketCreateDialog {...defaultProps} />);
 
-			const analyzeButton = screen.getByRole('button', { name: /Analyze with AI/i });
-			expect(analyzeButton).toBeInTheDocument();
-			expect(analyzeButton).toBeDisabled(); // Should be disabled initially (no description)
+			const createButton = screen.getByRole('button', { name: /^Create$/i });
+			expect(createButton).toBeInTheDocument();
+			expect(createButton).toBeDisabled(); // Disabled without description or project
 		});
 	});
 
@@ -184,7 +184,7 @@ describe('TicketCreateDialog', () => {
 	});
 
 	describe('form interactions', () => {
-		it('should enable Analyze button when description and project are provided', async () => {
+		it('should enable Create button when description and project are provided', async () => {
 			const user = userEvent.setup();
 			render(<TicketCreateDialog {...defaultProps} />);
 
@@ -194,15 +194,15 @@ describe('TicketCreateDialog', () => {
 			});
 
 			// Initially disabled
-			const analyzeButton = screen.getByRole('button', { name: /Analyze with AI/i });
-			expect(analyzeButton).toBeDisabled();
+			const createButton = screen.getByRole('button', { name: /^Create$/i });
+			expect(createButton).toBeDisabled();
 
 			// Enter description
 			const descriptionTextarea = screen.getByLabelText(/Description/i);
 			await user.type(descriptionTextarea, 'Test ticket description');
 
 			// Still disabled without project
-			expect(analyzeButton).toBeDisabled();
+			expect(createButton).toBeDisabled();
 		});
 
 		it('should call analyzeTicket API when Analyze button is clicked', async () => {

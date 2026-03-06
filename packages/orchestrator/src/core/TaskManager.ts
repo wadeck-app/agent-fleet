@@ -78,7 +78,11 @@ export class TaskManager {
 	/**
 	 * Create a new task
 	 */
-	async createTask(description: string, metadata: Partial<Task['metadata']> = {}): Promise<Task> {
+	async createTask(
+		description: string,
+		metadata: Partial<Task['metadata']> = {},
+		flowInputs?: Record<string, string>
+	): Promise<Task> {
 		// Validate flow if flowId is provided
 		if (metadata.flowId && this.flowDiscoveryRegistry) {
 			const flowMetadata = this.flowDiscoveryRegistry.getFlowMetadataById(metadata.flowId);
@@ -111,6 +115,10 @@ export class TaskManager {
 			updatedAt: new Date().toISOString(),
 			assignedTo: null,
 			comments: [],
+			// Promote flowId and ticketId to top-level so FlowWorker can access them directly
+			flowId: metadata.flowId as string | undefined,
+			ticketId: metadata.ticketId as string | undefined,
+			flowInputs: flowInputs ?? {},
 			metadata: {
 				...metadata,
 			},

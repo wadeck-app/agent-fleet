@@ -3,6 +3,7 @@ import { createLogger } from 'shared-common/logger';
 
 import type { WorkerFlows } from '@app/shared/api/flows.contract';
 import {
+	type EventSubscriptionsResponse,
 	type UpdateWorkerNameRequest,
 	type Worker,
 	type WorkersData,
@@ -339,6 +340,31 @@ export class WorkersService {
 		} catch (_error) {
 			// Orchestrator is offline or worker not found - return empty flows
 			return [];
+		}
+	}
+
+	/**
+	 * Get all active event subscriptions registered by connected workers
+	 */
+	async getEventSubscriptions(): Promise<EventSubscriptionsResponse> {
+		try {
+			const orchestrator = this.orchestratorWrapper.getOrchestrator();
+			const registry = orchestrator.getEventSubscriptionRegistry();
+			// Strip undefined filter values — orchestrator uses undefined as wildcard,
+			// but the API contract only exposes concrete string key=value pairs
+			const subscriptions = registry.getAll().map(sub => ({
+				...sub,
+				filter: sub.filter
+					? (Object.fromEntries(
+							Object.entries(sub.filter).filter(
+								(entry): entry is [string, string] => entry[1] !== undefined
+							)
+						) as Record<string, string>)
+					: undefined,
+			}));
+			return { subscriptions };
+		} catch (_error) {
+			return { subscriptions: [] };
 		}
 	}
 

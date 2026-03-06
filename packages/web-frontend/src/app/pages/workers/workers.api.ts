@@ -1,7 +1,13 @@
 import { createTypedFetch } from '@framework/api/api-base';
 import type { WorkerFlows } from '@shared/api/flows.contract';
 import { WORKERS_API_ROUTES } from '@shared/api/workers.contract';
-import type { Worker, WorkersData, WorkersListQuery, WorkersListResponse } from '@shared/api/workers.contract';
+import type {
+	EventSubscriptionsResponse,
+	Worker,
+	WorkersData,
+	WorkersListQuery,
+	WorkersListResponse,
+} from '@shared/api/workers.contract';
 
 /**
  * ===========================================================================================
@@ -47,5 +53,12 @@ export const workersApi = {
 			params: { workerId },
 			body: { name, version },
 		});
+	},
+
+	/**
+	 * Get all active event subscriptions
+	 */
+	getEventSubscriptions: (): Promise<EventSubscriptionsResponse> => {
+		return typedFetch('GET', '/api/workers/event-subscriptions', {});
 	},
 } as const;

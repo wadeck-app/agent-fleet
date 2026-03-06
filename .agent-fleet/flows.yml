@@ -11,18 +11,133 @@ ticket-auto-process:
         filter:
             newStatus: pending_integration
     statusTransitions:
-        onSuccess:
-            task: approved
-            ticket: integrated
-        onFailure:
-            task: changes_requested
-            ticket: todo
+        onSuccess: approved
+        onFailure: changes_requested
     steps:
         - type: model
           id: process
           name: 'Process ticket'
           model: haiku
           prompt: 'Ticket received for integration. Confirm you are ready to proceed.'
+
+ticket-analyze-complexity:
+    version: '1.0.0'
+    name: 'Analyze ticket complexity'
+    trigger:
+        type: event
+        event: ticket.created
+    steps:
+        - type: model
+          id: analyze
+          name: 'Analyze complexity'
+          model: haiku
+          prompt: |
+              Analyze the complexity of this ticket and provide a concise assessment.
+
+              Title: ${{ inputs.ticketTitle }}
+              Description: ${{ inputs.ticketDescription }}
+
+              Respond with:
+              - Complexity: [low / medium / high]
+              - Key factors: (1-2 sentences)
+              - Suggested effort: [hours estimate]
+
+              Keep the response under 5 sentences. Be direct.
+        - type: script
+          id: post-comment
+          name: 'Post analysis as ticket comment'
+          depends: [analyze]
+          env:
+              TICKET_ID: '${{ inputs.ticketId }}'
+              COMMENT: '${{ steps.analyze.outputs.response }}'
+              BACKEND_URL: '${{ inputs.backendUrl }}'
+          script: node -e "const http=require('http'),u=new URL(process.env.BACKEND_URL+'/api/tickets/'+process.env.TICKET_ID+'/comments'),b=JSON.stringify({content:process.env.COMMENT,author:'worker-ai'});const req=http.request({hostname:u.hostname,port:+(u.port||80),path:u.pathname,method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(b)}},r=>{r.on('data',()=>{});r.on('end',()=>process.exit(0));});req.on('error',e=>{console.error(e.message);process.exit(1);});req.write(b);req.end();"
+
+ticket-respond-to-comment:
+    version: '1.0.0'
+    name: 'Respond to ticket comment'
+    trigger:
+        type: event
+        event: ticket.comment_created
+        filter:
+            authorType: human # only respond to human comments (not worker-ai) to prevent infinite loops
+    steps:
+        - type: model
+          id: respond
+          name: 'Generate response'
+          model: haiku
+          prompt: |
+              You are an AI assistant helping with a software ticket. A user posted a comment and you need to respond helpfully.
+
+              Ticket ID: ${{ inputs.ticketId }}
+              Comment from ${{ inputs.commentAuthor }}: ${{ inputs.commentContent }}
+
+              Provide a concise, helpful response. Be direct and actionable. Keep it under 5 sentences.
+        - type: script
+          id: post-response
+          name: 'Post response as ticket comment'
+          depends: [respond]
+          env:
+              TICKET_ID: '${{ inputs.ticketId }}'
+              COMMENT: '${{ steps.respond.outputs.response }}'
+              BACKEND_URL: '${{ inputs.backendUrl }}'
+          script: node -e "const http=require('http'),u=new URL(process.env.BACKEND_URL+'/api/tickets/'+process.env.TICKET_ID+'/comments'),b=JSON.stringify({content:process.env.COMMENT,author:'worker-ai'});const req=http.request({hostname:u.hostname,port:+(u.port||80),path:u.pathname,method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(b)}},r=>{r.on('data',()=>{});r.on('end',()=>process.exit(0));});req.on('error',e=>{console.error(e.message);process.exit(1);});req.write(b);req.end();"
+
+ticket-handle-transition:
+    version: '1.0.0'
+    name: 'Handle ticket transition'
+    trigger:
+        type: event
+        event: ticket.transitioned
+    steps:
+        - type: model
+          id: acknowledge
+          name: 'Acknowledge transition'
+          model: haiku
+          prompt: |
+              A ticket has transitioned status.
+
+              Ticket: ${{ inputs.ticketTitle }}
+              Transition: ${{ inputs.oldStatus }} → ${{ inputs.newStatus }}
+
+              Write a brief acknowledgment (1-2 sentences) noting the status change and any relevant next steps.
+        - type: script
+          id: post-acknowledgment
+          name: 'Post acknowledgment as ticket comment'
+          depends: [acknowledge]
+          env:
+              TICKET_ID: '${{ inputs.ticketId }}'
+              COMMENT: '${{ steps.acknowledge.outputs.response }}'
+              BACKEND_URL: '${{ inputs.backendUrl }}'
+          script: node -e "const http=require('http'),u=new URL(process.env.BACKEND_URL+'/api/tickets/'+process.env.TICKET_ID+'/comments'),b=JSON.stringify({content:process.env.COMMENT,author:'worker-ai'});const req=http.request({hostname:u.hostname,port:+(u.port||80),path:u.pathname,method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(b)}},r=>{r.on('data',()=>{});r.on('end',()=>process.exit(0));});req.on('error',e=>{console.error(e.message);process.exit(1);});req.write(b);req.end();"
+
+ticket-updated-respond:
+    version: '1.0.0'
+    name: 'Respond to ticket update'
+    trigger:
+        type: event
+        event: ticket.updated
+    steps:
+        - type: model
+          id: analyze-change
+          name: 'Analyze ticket update'
+          model: haiku
+          prompt: |
+              A ticket has been updated.
+
+              Ticket: ${{ inputs.ticketTitle }}
+              Changed fields: ${{ inputs.changedFields }}
+
+              Write a brief acknowledgment (1-2 sentences) noting the update. Be concise and helpful.
+        - type: script
+          id: post-update-comment
+          name: 'Post update acknowledgment as ticket comment'
+          depends: [analyze-change]
+          env:
+              TICKET_ID: '${{ inputs.ticketId }}'
+              COMMENT: '${{ steps.analyze-change.outputs.response }}'
+              BACKEND_URL: '${{ inputs.backendUrl }}'
+          script: node -e "const http=require('http'),u=new URL(process.env.BACKEND_URL+'/api/tickets/'+process.env.TICKET_ID+'/comments'),b=JSON.stringify({content:process.env.COMMENT,author:'worker-ai'});const req=http.request({hostname:u.hostname,port:+(u.port||80),path:u.pathname,method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(b)}},r=>{r.on('data',()=>{});r.on('end',()=>process.exit(0));});req.on('error',e=>{console.error(e.message);process.exit(1);});req.write(b);req.end();"
 
 simple-implement:
     version: '1.0.0'

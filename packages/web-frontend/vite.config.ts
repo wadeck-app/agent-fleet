@@ -184,6 +184,8 @@ export default defineConfig(({ mode }) => {
 		// Don't optimize shared packages so they stay reactive to changes
 		optimizeDeps: {
 			exclude: ['@shared', 'shared-frontend-backend'],
+			// ESM-only packages must be pre-bundled to avoid HMR cache invalidation issues
+			include: ['react-markdown', 'remark-gfm'],
 		},
 		test: {
 			globals: true,

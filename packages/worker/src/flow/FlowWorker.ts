@@ -676,6 +676,21 @@ export class FlowWorker implements Shutdownable {
 			const flowIds = this.flowRegistry.getFlowIds();
 			this.logger.info(` Loaded ${flowIds.length} flows: ${flowIds.join(', ')}`);
 
+			// If the WebSocket was already open when we finished loading (race condition:
+			// sendWorkerReady fired before loadProjectFlows completed), send FLOWS_UPDATED
+			// so the orchestrator gets the full flow list including event-triggered flows.
+			if (this.ws?.readyState === WebSocket.OPEN) {
+				const flowMetadata = this.buildFlowMetadata();
+				this.sendMessage(
+					createW2OMessage(W2OMessageType.FLOWS_UPDATED, {
+						workerId: this.workerId,
+						projectId: this.projectId,
+						flows: flowMetadata,
+					})
+				);
+				this.logger.info(` Sent FLOWS_UPDATED after initial load (${flowMetadata.length} flows)`);
+			}
+
 			// Start watching flows file for changes with hot-reload callback
 			this.flowRegistry.startWatching();
 

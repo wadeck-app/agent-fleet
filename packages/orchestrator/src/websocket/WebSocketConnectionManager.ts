@@ -14,6 +14,7 @@ import type { W2OMessage } from 'shared-orch-worker/worker-messages';
 import { WebSocket } from 'ws';
 
 import type { WorkerCoordinator } from '../core/WorkerCoordinator';
+import type { EventSubscriptionRegistry } from '../registry/EventSubscriptionRegistry';
 import { FlowDiscoveryRegistry, FlowVersionMismatchError } from '../registry/FlowDiscoveryRegistry';
 
 const log = createLogger('WebSocketConnectionManager');
@@ -42,11 +43,15 @@ export class WebSocketConnectionManager {
 	private flowDiscoveryRegistry: FlowDiscoveryRegistry;
 	private taskAssignedListener: (data: { workerId: string; taskId: string }) => void;
 
-	constructor(workerCoordinator: WorkerCoordinator, stateManager: StateManager) {
+	constructor(
+		workerCoordinator: WorkerCoordinator,
+		stateManager: StateManager,
+		eventSubscriptionRegistry?: EventSubscriptionRegistry
+	) {
 		this.workers = new Map();
 		this.workerCoordinator = workerCoordinator;
 		this.stateManager = stateManager;
-		this.flowDiscoveryRegistry = new FlowDiscoveryRegistry();
+		this.flowDiscoveryRegistry = new FlowDiscoveryRegistry(eventSubscriptionRegistry);
 
 		// Store listener reference so we can remove it later during cleanup
 		this.taskAssignedListener = (data: { workerId: string; taskId: string }) => {
