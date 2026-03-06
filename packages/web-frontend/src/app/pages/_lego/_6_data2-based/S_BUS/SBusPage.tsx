@@ -5,6 +5,7 @@ import { Data2 } from '@framework/components2/data/Data2';
 import { Table2, type Table2Column } from '@framework/components2/table/Table2';
 import type { FetchDataResult } from '@framework/hooks2/data/useDataFetch';
 import { usePagination2 } from '@framework/hooks2/data/usePagination2';
+import { col } from '@framework/lego';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
 import type { Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
@@ -14,6 +15,7 @@ import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 import { Data2DetailPanel } from '../_framework/Data2DetailPanel';
 import { PageLayout } from '../_framework/PageLayout';
 import { SplitLayout } from '../_framework/SplitLayout';
+import { adaptCol } from '../_framework/adaptCol';
 
 /**
  * ===========================================================================================
@@ -39,81 +41,28 @@ import { SplitLayout } from '../_framework/SplitLayout';
  */
 
 const tableColumns: Table2Column<Product>[] = [
-	{
-		key: 'name',
-		label: 'Name',
-		render: item => item.name,
-		sortable: true,
-	},
-	{
-		key: 'price',
-		label: 'Price',
-		render: item => `$${item.price.toFixed(2)}`,
-		sortable: true,
-	},
-	{
-		key: 'category',
-		label: 'Category',
-		render: item => {
-			const categoryLabel = PRODUCT_CATEGORIES.find(cat => cat === item.category);
-			return categoryLabel ? categoryLabel.charAt(0).toUpperCase() + categoryLabel.slice(1) : item.category;
-		},
-	},
+	adaptCol(col.text<Product>('name', 'Name', { sortable: true })),
+	adaptCol(col.number<Product>('price', 'Price', { prefix: '$', sortable: true })),
+	adaptCol(col.enum<Product>('category', 'Category', PRODUCT_CATEGORIES, { badge: true })),
 ];
 
+// Detail panel columns - use adaptCol for render logic but ensure label is string
+// Data2DetailPanel expects { key, label: string, render }, not full Table2Column
 const detailColumns = [
-	{
-		key: 'name',
-		label: 'Name',
-		render: (item: Product) => item.name,
-	},
-	{
-		key: 'description',
-		label: 'Description',
-		render: (item: Product) => item.description,
-	},
-	{
-		key: 'price',
-		label: 'Price',
-		render: (item: Product) => `$${item.price.toFixed(2)}`,
-	},
-	{
-		key: 'stock',
-		label: 'Stock',
-		render: (item: Product) => item.stock.toString(),
-	},
-	{
-		key: 'category',
-		label: 'Category',
-		render: (item: Product) => {
-			const categoryLabel = PRODUCT_CATEGORIES.find(cat => cat === item.category);
-			return categoryLabel ? categoryLabel.charAt(0).toUpperCase() + categoryLabel.slice(1) : item.category;
-		},
-	},
-	{
-		key: 'status',
-		label: 'Status',
-		render: (item: Product) => {
-			const statusLabel = PRODUCT_STATUSES.find(s => s === item.status);
-			return statusLabel ? statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1) : item.status;
-		},
-	},
-	{
-		key: 'rating',
-		label: 'Rating',
-		render: (item: Product) => `${item.rating.toFixed(1)} / 5`,
-	},
-	{
-		key: 'featured',
-		label: 'Featured',
-		render: (item: Product) => (item.featured ? 'Yes' : 'No'),
-	},
-	{
-		key: 'createdAt',
-		label: 'Created',
-		render: (item: Product) => new Date(item.createdAt).toLocaleDateString(),
-	},
-];
+	adaptCol(col.text<Product>('name', 'Name')),
+	adaptCol(col.text<Product>('description', 'Description')),
+	adaptCol(col.number<Product>('price', 'Price', { prefix: '$' })),
+	adaptCol(col.number<Product>('stock', 'Stock')),
+	adaptCol(col.enum<Product>('category', 'Category', PRODUCT_CATEGORIES, { badge: true })),
+	adaptCol(col.enum<Product>('status', 'Status', PRODUCT_STATUSES, { badge: true })),
+	adaptCol(col.number<Product>('rating', 'Rating', { suffix: ' / 5' })),
+	adaptCol(col.boolean<Product>('featured', 'Featured')),
+	adaptCol(col.date<Product>('createdAt', 'Created')),
+].map(col => ({
+	key: col.key,
+	label: typeof col.label === 'string' ? col.label : String(col.key),
+	render: col.render,
+}));
 
 export function SBusPage() {
 	const pagination = usePagination2({ pageSize: 10 });
@@ -181,6 +130,7 @@ export function SBusPage() {
 									columns={tableColumns}
 									getItemId={item => item.id}
 									onRowClick={handleRowClick}
+									simplePagination
 								/>
 							)}
 						</Data2>

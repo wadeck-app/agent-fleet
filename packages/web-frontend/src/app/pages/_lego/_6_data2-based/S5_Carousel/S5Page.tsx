@@ -61,19 +61,14 @@ const columns: Table2Column<Product>[] = [
 		},
 	},
 	{
-		key: 'stock',
-		label: 'Stock',
-		render: item => item.stock.toString(),
+		key: 'featured',
+		label: 'Featured',
+		render: item => (item.featured ? 'Yes' : 'No'),
 	},
 	{
 		key: 'rating',
 		label: 'Rating',
 		render: item => `${item.rating.toFixed(1)} / 5`,
-	},
-	{
-		key: 'featured',
-		label: 'Featured',
-		render: item => (item.featured ? 'Yes' : 'No'),
 	},
 ];
 

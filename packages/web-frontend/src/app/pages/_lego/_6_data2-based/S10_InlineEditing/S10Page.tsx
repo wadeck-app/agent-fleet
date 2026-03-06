@@ -9,6 +9,7 @@ import type { FetchDataResult } from '@framework/hooks2/data/useDataFetch';
 import { usePagination2 } from '@framework/hooks2/data/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/data/useSimpleSearch';
 import { useSorting2 } from '@framework/hooks2/data/useSorting2';
+import { col } from '@framework/lego';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
 import type { CreateProduct, Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
@@ -17,6 +18,7 @@ import { ProductDialogAdapter } from '@app/pages/_lego/_shared/ProductDialogAdap
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
 import { PageLayout } from '../_framework/PageLayout';
+import { adaptCol } from '../_framework/adaptCol';
 
 /**
  * ===========================================================================================
@@ -43,56 +45,14 @@ import { PageLayout } from '../_framework/PageLayout';
  */
 
 const columns: Table2Column<Product>[] = [
-	{
-		key: 'name',
-		label: 'Name',
-		render: item => item.name,
-		sortable: true,
-	},
-	{
-		key: 'price',
-		label: 'Price',
-		render: item => `$${item.price.toFixed(2)}`,
-		sortable: true,
-	},
-	{
-		key: 'category',
-		label: 'Category',
-		render: item => {
-			const categoryLabel = PRODUCT_CATEGORIES.find(cat => cat === item.category);
-			return categoryLabel ? categoryLabel.charAt(0).toUpperCase() + categoryLabel.slice(1) : item.category;
-		},
-	},
-	{
-		key: 'status',
-		label: 'Status',
-		render: item => {
-			const statusLabel = PRODUCT_STATUSES.find(s => s === item.status);
-			return statusLabel ? statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1) : item.status;
-		},
-	},
-	{
-		key: 'featured',
-		label: 'Featured',
-		render: item => (item.featured ? 'Yes' : 'No'),
-	},
-	{
-		key: 'stock',
-		label: 'Stock',
-		render: item => item.stock.toString(),
-		sortable: true,
-	},
-	{
-		key: 'rating',
-		label: 'Rating',
-		render: item => `${item.rating.toFixed(1)} / 5`,
-		sortable: true,
-	},
-	{
-		key: 'createdAt',
-		label: 'Created',
-		render: item => new Date(item.createdAt).toLocaleDateString(),
-	},
+	adaptCol(col.text<Product>('name', 'Name', { sortable: true, sticky: 'left' })),
+	adaptCol(col.number<Product>('price', 'Price', { prefix: '$', sortable: true })),
+	adaptCol(col.enum<Product>('category', 'Category', PRODUCT_CATEGORIES, { badge: true })),
+	adaptCol(col.enum<Product>('status', 'Status', PRODUCT_STATUSES, { badge: true })),
+	adaptCol(col.boolean<Product>('featured', 'Featured')),
+	adaptCol(col.number<Product>('stock', 'Stock', { sortable: true })),
+	adaptCol(col.number<Product>('rating', 'Rating', { sortable: true })),
+	adaptCol(col.date<Product>('createdAt', 'Created')),
 ];
 
 export function S10Page() {
@@ -191,6 +151,7 @@ export function S10Page() {
 							columns={columns}
 							getItemId={item => item.id}
 							renderActions={renderActions}
+							simplePagination
 						/>
 					)}
 				</Data2>

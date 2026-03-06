@@ -36,6 +36,17 @@ import { useSortingFeature } from '../_framework/useSortingFeature';
  * - State lives in page hooks, widget is controlled
  *
  * ===========================================================================================
+ * DESIGN NOTES - Approach A3 Trade-offs
+ * ===========================================================================================
+ *
+ * A3.d - Verbose Composition is Intentional:
+ * This page requires explicit hook declarations (6 lines: search, pagination, sorting, etc.)
+ * and explicit features array composition. This verbosity is a deliberate trade-off:
+ * - Pro: Explicit dependencies make the feature set readable and independently testable
+ * - Pro: Each hook can be extracted, mocked, or replaced without touching the widget
+ * - Con: Simple tables still require significant boilerplate for basic features
+ *
+ * ===========================================================================================
  */
 
 const columns = [

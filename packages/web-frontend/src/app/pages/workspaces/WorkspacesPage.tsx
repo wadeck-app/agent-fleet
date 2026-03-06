@@ -116,8 +116,8 @@ export function WorkspacesPage() {
 				onRefresh={cache.actions.refresh}
 				isRefreshing={cache.fstate.isRefreshing}
 				action={
-					<Button onClick={createDialog.open}>
-						<Plus className="h-4 w-4 mr-2" />
+					<Button onClick={createDialog.open} variant="default" size="sm">
+						<Plus />
 						Create Workspace
 					</Button>
 				}

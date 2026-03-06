@@ -96,6 +96,8 @@ export interface Table2Props<T> extends QueryResultDisplayerProps<T> {
 	onSelectAll?: (ids: string[]) => void;
 	/** Row click callback - called when user clicks a row */
 	onRowClick?: (item: T) => void;
+	/** Use simple pagination footer (Page X of Y + Pagination only) instead of full format */
+	simplePagination?: boolean;
 }
 
 /**
@@ -123,6 +125,7 @@ export function Table2<T>({
 	onSelectionToggle,
 	onSelectAll,
 	onRowClick,
+	simplePagination = false,
 }: Table2Props<T>) {
 	const selectAllCheckboxRef = useRef<HTMLButtonElement | null>(null);
 
@@ -248,45 +251,59 @@ export function Table2<T>({
 			</div>
 
 			{/* Pagination Controls */}
-			{pagination && (
-				<div className="flex items-center justify-between">
-					{/* Items count */}
-					<div className="text-sm text-muted-foreground">
-						{data.length > 0 ? (
-							<>
-								Showing {(pagination.currentPage - 1) * pagination.pageSize + 1} to{' '}
-								{Math.min(pagination.currentPage * pagination.pageSize, pagination.totalItems)} of{' '}
-								{pagination.totalItems} items
-							</>
-						) : (
-							<>No items</>
-						)}
-					</div>
-
-					{/* Page controls */}
-					<div className="flex items-center gap-4">
-						{/* Page Size Selector */}
-						<PageSizeSelector
-							value={pagination.pageSize}
-							onChange={pagination.onPageSizeChange}
-							options={pagination.pageSizeOptions || [5, 10, 20, 50]}
-							size="sm"
-						/>
-
-						{/* Current page indicator */}
+			{pagination &&
+				(simplePagination ? (
+					// Simple pagination footer (matches A1 WidgetDataTable format)
+					<div className="flex items-center justify-between">
 						<div className="text-sm text-muted-foreground">
 							Page {pagination.currentPage} of {pagination.totalPages}
 						</div>
-
-						{/* Pagination buttons */}
 						<Pagination
 							currentPage={pagination.currentPage}
 							totalPages={pagination.totalPages}
 							onPageChange={pagination.onPageChange}
 						/>
 					</div>
-				</div>
-			)}
+				) : (
+					// Full pagination footer with item count and page size selector
+					<div className="flex items-center justify-between">
+						{/* Items count */}
+						<div className="text-sm text-muted-foreground">
+							{data.length > 0 ? (
+								<>
+									Showing {(pagination.currentPage - 1) * pagination.pageSize + 1} to{' '}
+									{Math.min(pagination.currentPage * pagination.pageSize, pagination.totalItems)} of{' '}
+									{pagination.totalItems} items
+								</>
+							) : (
+								<>No items</>
+							)}
+						</div>
+
+						{/* Page controls */}
+						<div className="flex items-center gap-4">
+							{/* Page Size Selector */}
+							<PageSizeSelector
+								value={pagination.pageSize}
+								onChange={pagination.onPageSizeChange}
+								options={pagination.pageSizeOptions || [5, 10, 20, 50]}
+								size="sm"
+							/>
+
+							{/* Current page indicator */}
+							<div className="text-sm text-muted-foreground">
+								Page {pagination.currentPage} of {pagination.totalPages}
+							</div>
+
+							{/* Pagination buttons */}
+							<Pagination
+								currentPage={pagination.currentPage}
+								totalPages={pagination.totalPages}
+								onPageChange={pagination.onPageChange}
+							/>
+						</div>
+					</div>
+				))}
 		</div>
 	);
 }

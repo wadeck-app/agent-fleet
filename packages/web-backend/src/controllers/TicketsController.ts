@@ -63,6 +63,14 @@ export default class TicketsController implements LazyController<typeof TICKETS_
 		});
 
 		/**
+		 * POST /api/tickets/create-with-ai-title
+		 * Create ticket immediately with placeholder title, generate real title async
+		 */
+		add('POST', '/api/tickets/create-with-ai-title', async ({ body }) => {
+			return this.service.createWithAiTitle(body);
+		});
+
+		/**
 		 * POST /api/tickets/create-from-plan
 		 * Create tickets from an AI-generated plan
 		 */

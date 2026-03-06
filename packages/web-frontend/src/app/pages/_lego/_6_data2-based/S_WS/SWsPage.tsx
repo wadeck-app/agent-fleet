@@ -3,12 +3,14 @@ import { useState } from 'react';
 import { Table2, type Table2Column } from '@framework/components2/table/Table2';
 import { Badge } from '@framework/components/primitives/Badge';
 import { SearchInput } from '@framework/components/search/SearchInput';
+import { col } from '@framework/lego';
 import type { Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 
 import { useProductsWebSocket } from '@app/pages/_lego/_shared/api/useProductsWebSocket';
 
 import { PageLayout } from '../_framework/PageLayout';
+import { adaptCol } from '../_framework/adaptCol';
 
 /**
  * ===========================================================================================
@@ -35,37 +37,11 @@ import { PageLayout } from '../_framework/PageLayout';
  */
 
 const columns: Table2Column<Product>[] = [
-	{
-		key: 'name',
-		label: 'Name',
-		render: item => item.name,
-	},
-	{
-		key: 'price',
-		label: 'Price',
-		render: item => `$${item.price.toFixed(2)}`,
-	},
-	{
-		key: 'category',
-		label: 'Category',
-		render: item => {
-			const categoryLabel = PRODUCT_CATEGORIES.find(cat => cat === item.category);
-			return categoryLabel ? categoryLabel.charAt(0).toUpperCase() + categoryLabel.slice(1) : item.category;
-		},
-	},
-	{
-		key: 'status',
-		label: 'Status',
-		render: item => {
-			const statusLabel = PRODUCT_STATUSES.find(s => s === item.status);
-			return statusLabel ? statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1) : item.status;
-		},
-	},
-	{
-		key: 'stock',
-		label: 'Stock',
-		render: item => item.stock.toString(),
-	},
+	adaptCol(col.text<Product>('name', 'Name')),
+	adaptCol(col.number<Product>('price', 'Price', { prefix: '$' })),
+	adaptCol(col.enum<Product>('category', 'Category', PRODUCT_CATEGORIES, { badge: true })),
+	adaptCol(col.enum<Product>('status', 'Status', PRODUCT_STATUSES, { badge: true })),
+	adaptCol(col.number<Product>('stock', 'Stock')),
 ];
 
 export function SWsPage() {
