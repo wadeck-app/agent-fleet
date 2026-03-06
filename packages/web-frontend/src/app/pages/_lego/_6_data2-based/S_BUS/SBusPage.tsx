@@ -46,6 +46,8 @@ const tableColumns: Table2Column<Product>[] = [
 	adaptCol(col.enum<Product>('category', 'Category', PRODUCT_CATEGORIES, { badge: true })),
 ];
 
+// Detail panel columns - use adaptCol for render logic but ensure label is string
+// Data2DetailPanel expects { key, label: string, render }, not full Table2Column
 const detailColumns = [
 	adaptCol(col.text<Product>('name', 'Name')),
 	adaptCol(col.text<Product>('description', 'Description')),
@@ -56,7 +58,11 @@ const detailColumns = [
 	adaptCol(col.number<Product>('rating', 'Rating', { suffix: ' / 5' })),
 	adaptCol(col.boolean<Product>('featured', 'Featured')),
 	adaptCol(col.date<Product>('createdAt', 'Created')),
-];
+].map(col => ({
+	key: col.key,
+	label: typeof col.label === 'string' ? col.label : String(col.key),
+	render: col.render,
+}));
 
 export function SBusPage() {
 	const pagination = usePagination2({ pageSize: 10 });
