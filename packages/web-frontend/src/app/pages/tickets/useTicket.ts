@@ -1,6 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { Ticket } from '@shared/api/tickets.contract';
+// B2F_TICKET_UPDATED — single-ticket signal, filtered by ticketId server-side.
+// Triggers a silent refresh so the detail page stays in sync (e.g. async AI title update).
+import { B2F_TICKET_UPDATED } from '@shared/transport';
+
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 import { ticketsApi } from './tickets.api';
 
@@ -56,6 +61,9 @@ export function useTicket(id: string | undefined): UseTicketState {
 		};
 	}, [id]);
 
+	// Stable filter object — prevents useRealtimeRefresh from re-subscribing on every render
+	const ticketFilter = useMemo(() => (id ? { ticketId: id } : undefined), [id]);
+
 	// Silent refetch (for real-time updates) - doesn't show loading spinner
 	const refresh = useCallback(async () => {
 		if (!id) {
@@ -70,6 +78,14 @@ export function useTicket(id: string | undefined): UseTicketState {
 			// Silently fail - don't disrupt UX for background updates
 		}
 	}, [id]);
+
+	// Subscribe to updates for this specific ticket (server-side filter by ticketId)
+	useRealtimeRefresh({
+		events: [B2F_TICKET_UPDATED],
+		onEvent: refresh,
+		filters: ticketFilter,
+		logPrefix: 'useTicket',
+	});
 
 	return {
 		ticket,

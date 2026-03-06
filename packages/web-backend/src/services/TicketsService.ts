@@ -122,8 +122,11 @@ export class TicketsService {
 
 	/**
 	 * Create a new ticket
+	 * @param emitInternalCreatedEvent - set to false when the ticket is created with a
+	 * placeholder title (AI async flow). The internal 'ticket.created' EventBus event
+	 * will be emitted later by generateAndUpdateTitle() once the real title is set.
 	 */
-	async createTicket(data: CreateTicket): Promise<Ticket> {
+	async createTicket(data: CreateTicket, emitInternalCreatedEvent = true): Promise<Ticket> {
 		try {
 			// Validate required fields
 			if (!data.projectId?.trim()) {
@@ -176,13 +179,16 @@ export class TicketsService {
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast(B2F_TICKETS_UPDATED, {} as any);
 
-			// Emit internal event for worker flow triggers
-			this.eventBus?.emit('ticket.created', {
-				ticketId: ticket.id,
-				projectId: ticket.projectId,
-				title: ticket.title,
-				description: ticket.description,
-			});
+			// Emit internal event for worker flow triggers — skipped when title is a placeholder
+			// (AI async flow: deferred to generateAndUpdateTitle once the real title is ready)
+			if (emitInternalCreatedEvent) {
+				this.eventBus?.emit('ticket.created', {
+					ticketId: ticket.id,
+					projectId: ticket.projectId,
+					title: ticket.title,
+					description: ticket.description,
+				});
+			}
 
 			return ticket;
 		} catch (error) {
@@ -538,27 +544,58 @@ export class TicketsService {
 			projectId,
 			context: { existingLabels },
 		});
-		await this.updateTicket(ticketId, { title: plan.title, version });
+		const updatedTicket = await this.updateTicket(ticketId, { title: plan.title, version });
+		// updateTicket() already broadcasts:
+		//   B2F_TICKET_UPDATED (with ticketId, for the detail page)
+		//   B2F_TICKETS_UPDATED (because title is a list-visible field)
+		// No B2F_TICKET_CREATED here — it was already sent at initial creation.
+
+		// Now that the ticket has a real title, emit the internal 'ticket.created' event.
+		// This was deliberately deferred from createTicket() so that flow triggers and
+		// other backend consumers receive a meaningful title, not the placeholder.
+		this.eventBus?.emit('ticket.created', {
+			ticketId: updatedTicket.id,
+			projectId: updatedTicket.projectId,
+			title: updatedTicket.title,
+			description: updatedTicket.description,
+		});
 	}
 
 	/**
 	 * Create ticket with AI-generated title (async)
-	 * Creates ticket immediately with placeholder, generates real title in background
+	 * Creates ticket immediately with placeholder, generates real title in background.
+	 *
+	 * B2F WebSocket flow:
+	 * 1. createTicket() → B2F_TICKET_CREATED + B2F_TICKETS_UPDATED  (list shows placeholder)
+	 * 2. HTTP response returned to client immediately
+	 * 3. generateAndUpdateTitle() → B2F_TICKET_UPDATED + B2F_TICKETS_UPDATED  (list shows real title)
+	 *
+	 * Internal EventBus flow:
+	 * - 'ticket.created' is NOT emitted at step 1 (placeholder title is meaningless for consumers)
+	 * - 'ticket.created' IS emitted at step 3 once the real title is set
 	 */
 	async createWithAiTitle(data: CreateWithAiTitle): Promise<Ticket> {
-		const ticket = await this.createTicket({
-			projectId: data.projectId,
-			title: TicketsService.PENDING_TITLE,
-			description: data.description,
-			labels: [],
-			fields: {},
-			status: 'backlog',
-		});
-
-		// Fire and forget — errors are logged, not surfaced to caller
-		this.generateAndUpdateTitle(ticket.id, data.description, data.projectId, ticket.version).catch(err =>
-			log.error('Failed to generate async title', { ticketId: ticket.id, err })
+		// emitInternalCreatedEvent=false: defers 'ticket.created' EventBus emission to
+		// generateAndUpdateTitle(), once the AI has set a real title
+		const ticket = await this.createTicket(
+			{
+				projectId: data.projectId,
+				title: TicketsService.PENDING_TITLE,
+				description: data.description,
+				labels: [],
+				fields: {},
+				status: 'backlog',
+			},
+			false // defer 'ticket.created' EventBus event to generateAndUpdateTitle()
 		);
+
+		// Defer to next I/O cycle so the HTTP response is flushed before AI work starts.
+		// This prevents the async title generation from delaying the client's response.
+		setImmediate(() => {
+			this.generateAndUpdateTitle(ticket.id, data.description, data.projectId, ticket.version).catch(err =>
+				log.error('Failed to generate async title', { ticketId: ticket.id, err })
+			);
+		});
 
 		return ticket;
 	}

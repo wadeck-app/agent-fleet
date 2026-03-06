@@ -1,5 +1,5 @@
-import { renderColumnValue, type ColumnDef } from '@framework/lego';
 import type { Table2Column } from '@framework/components2/table/Table2';
+import { type ColumnDef, renderColumnValue } from '@framework/lego';
 
 /**
  * ===========================================================================================

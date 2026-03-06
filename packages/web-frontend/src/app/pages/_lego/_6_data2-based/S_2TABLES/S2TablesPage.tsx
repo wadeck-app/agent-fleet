@@ -8,8 +8,8 @@ import { SearchInput } from '@framework/components/search/SearchInput';
 import type { FetchDataResult } from '@framework/hooks2/data/useDataFetch';
 import { usePagination2 } from '@framework/hooks2/data/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/data/useSimpleSearch';
-import type { ComposedQuery } from '@framework/utils2/buildQuery';
 import { col } from '@framework/lego';
+import type { ComposedQuery } from '@framework/utils2/buildQuery';
 import type { Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 
@@ -107,7 +107,12 @@ export function S2TablesPage() {
 
 						<Data2 fetchData={fetchAllProducts} pagination={pagination1} search={search1}>
 							{injectedProps => (
-								<Table2 {...injectedProps} columns={columns} getItemId={item => item.id} simplePagination />
+								<Table2
+									{...injectedProps}
+									columns={columns}
+									getItemId={item => item.id}
+									simplePagination
+								/>
 							)}
 						</Data2>
 					</div>

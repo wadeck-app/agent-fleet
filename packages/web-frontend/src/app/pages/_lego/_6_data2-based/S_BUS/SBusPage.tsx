@@ -5,8 +5,8 @@ import { Data2 } from '@framework/components2/data/Data2';
 import { Table2, type Table2Column } from '@framework/components2/table/Table2';
 import type { FetchDataResult } from '@framework/hooks2/data/useDataFetch';
 import { usePagination2 } from '@framework/hooks2/data/usePagination2';
-import type { ComposedQuery } from '@framework/utils2/buildQuery';
 import { col } from '@framework/lego';
+import type { ComposedQuery } from '@framework/utils2/buildQuery';
 import type { Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 
