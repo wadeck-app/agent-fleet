@@ -86,25 +86,34 @@ export class ScriptExecutor {
 		const env = { ...process.env, ...options.env };
 		const shell = options.shell !== undefined ? options.shell : true;
 
-		// Handle multiline scripts on Windows by creating a temporary .bat file
+		// Handle multiline scripts on Windows: cmd.exe cannot handle multi-line shell commands,
+		// so we write them to a temp file and execute that instead.
 		let scriptToExecute = options.script;
 		let tempFilePath: string | null = null;
 		const isWindows = process.platform === 'win32';
 		const isMultiline = options.script.includes('\n') || options.script.includes('\r\n');
 
 		if (isWindows && isMultiline && shell) {
-			// Create a temporary .bat file for multiline scripts
-			// This is necessary because cmd.exe via spawn() only executes the first line
 			const tempDir = os.tmpdir();
 			const timestamp = Date.now();
 			const random = Math.random().toString(36).substring(7);
-			tempFilePath = path.join(tempDir, `agent-fleet-script-${timestamp}-${random}.bat`);
 
-			// Write script to temp file with @echo off to suppress command echoing
-			fs.writeFileSync(tempFilePath, `@echo off\r\n${options.script}`, 'utf8');
-
-			// Execute the temp file instead of the raw script
-			scriptToExecute = tempFilePath;
+			// Detect `node -e "..."` pattern: cmd.exe cannot handle multi-line quoted strings,
+			// so we extract the JS content and write it to a .js file instead of a .bat file.
+			const nodeEMatch = /^node\s+-e\s+(["'])([\s\S]*?)\1\s*$/.exec(options.script.trim());
+			if (nodeEMatch) {
+				const jsContent = nodeEMatch[2];
+				tempFilePath = path.join(tempDir, `agent-fleet-script-${timestamp}-${random}.js`);
+				fs.writeFileSync(tempFilePath, jsContent, 'utf8');
+				// Wrap in quotes to handle paths with spaces
+				scriptToExecute = `node "${tempFilePath}"`;
+			} else {
+				// Generic multiline shell script: write to a .bat file
+				// This is necessary because cmd.exe via spawn() only executes the first line
+				tempFilePath = path.join(tempDir, `agent-fleet-script-${timestamp}-${random}.bat`);
+				fs.writeFileSync(tempFilePath, `@echo off\r\n${options.script}`, 'utf8');
+				scriptToExecute = tempFilePath;
+			}
 		}
 
 		return new Promise((resolve, reject) => {

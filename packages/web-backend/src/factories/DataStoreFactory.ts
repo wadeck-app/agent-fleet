@@ -664,6 +664,8 @@ export class DataStoreFactory {
 						ticketId: payload.ticketId,
 						ticketTitle: payload.title,
 						ticketDescription: payload.description,
+						// flowId lets the flow scripts identify themselves (e.g. for comment author attribution)
+						flowId: sub.flowId,
 						backendUrl,
 					}
 				);
@@ -696,6 +698,7 @@ export class DataStoreFactory {
 						ticketId: payload.ticketId,
 						ticketTitle: payload.title,
 						changedFields: payload.changedFields.join(', '),
+						flowId: sub.flowId,
 						backendUrl,
 					}
 				);
@@ -724,6 +727,7 @@ export class DataStoreFactory {
 						ticketTitle: payload.title,
 						oldStatus: payload.oldStatus,
 						newStatus: payload.newStatus,
+						flowId: sub.flowId,
 						backendUrl,
 					}
 				);
@@ -744,6 +748,19 @@ export class DataStoreFactory {
 			log.info(
 				`[DEBUG] ticket.comment_created: ${matches.length} matching subscriptions (flows: ${matches.map(m => m.flowId).join(', ')})`
 			);
+
+			// Fetch recent comments (last 10) so flows have full conversation context
+			let recentComments = '';
+			try {
+				const commentsResponse = await this.getTicketsService().getComments(payload.ticketId);
+				recentComments = commentsResponse.comments
+					.slice(-10)
+					.map(c => `[${c.author ?? 'user'}]: ${c.content}`)
+					.join('\n\n---\n\n');
+			} catch (err) {
+				log.warn(`Failed to fetch recent comments for ticket ${payload.ticketId}`, { err });
+			}
+
 			for (const sub of matches) {
 				const task = await this.orchestrator.getTaskManager().createTask(
 					`ticket.comment_created: ${payload.ticketId}`,
@@ -755,9 +772,13 @@ export class DataStoreFactory {
 					},
 					{
 						ticketId: payload.ticketId,
+						ticketTitle: payload.title,
+						ticketDescription: payload.description,
 						commentId: payload.commentId,
 						commentContent: payload.content,
 						commentAuthor: payload.author ?? 'user',
+						recentComments,
+						flowId: sub.flowId,
 						backendUrl,
 					}
 				);

@@ -29,6 +29,8 @@ const STATUS_VARIANTS: Record<TicketStatus, 'default' | 'secondary' | 'info' | '
 		backlog: 'secondary',
 		todo: 'default',
 		in_progress: 'info',
+		plan_in_review: 'warning',
+		plan_approved: 'success',
 		done: 'success',
 		cancelled: 'destructive',
 		pending_integration: 'warning',
@@ -324,6 +326,8 @@ export function TicketDetailLayoutD({ ticket, ticketId, onRefresh }: TicketDetai
 								<SelectItem value="backlog">Backlog</SelectItem>
 								<SelectItem value="todo">Todo</SelectItem>
 								<SelectItem value="in_progress">In Progress</SelectItem>
+								<SelectItem value="plan_in_review">Plan In Review</SelectItem>
+								<SelectItem value="plan_approved">Plan Approved</SelectItem>
 								<SelectItem value="done">Done</SelectItem>
 								<SelectItem value="cancelled">Cancelled</SelectItem>
 								<SelectItem value="pending_integration">Pending Integration</SelectItem>

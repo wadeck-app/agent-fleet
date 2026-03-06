@@ -31,6 +31,8 @@ const STATUS_VARIANTS: Record<TicketStatus, 'default' | 'secondary' | 'info' | '
 		backlog: 'secondary',
 		todo: 'default',
 		in_progress: 'info',
+		plan_in_review: 'warning',
+		plan_approved: 'success',
 		done: 'success',
 		cancelled: 'destructive',
 		pending_integration: 'warning',

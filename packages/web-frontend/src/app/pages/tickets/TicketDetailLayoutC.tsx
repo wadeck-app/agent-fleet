@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { Label } from '@framework/components/forms/Label';
 import { SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
@@ -9,16 +10,19 @@ import { Button } from '@framework/components/primitives/Button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@framework/components/primitives/Tooltip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@framework/components/primitives/tabs';
 import { useToast } from '@framework/features/toast/ToastContext';
+import { useUrlState } from '@framework/hooks/useUrlState';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { Ticket, TicketStatus } from '@shared/api/tickets.contract';
 import { Loader2 } from 'lucide-react';
 
-import { tasksApi } from '../tasks/tasks.api';
 import { TicketAuditLogSection } from './TicketAuditLogSection';
 import { TicketCommentsSection } from './TicketCommentsSection';
 import { TicketEventHistorySection } from './TicketEventHistorySection';
 import { TriggeredTasksSection } from './TriggeredTasksSection';
 import { ticketsApi } from './tickets.api';
+import { useTicketCommentsCount } from './useTicketCommentsCount';
+import { useTicketHistoryCount } from './useTicketHistoryCount';
+import { useTriggeredTasksCount } from './useTriggeredTasksCount';
 
 interface TicketDetailLayoutCProps {
 	ticket: Ticket;
@@ -34,39 +38,22 @@ type TabKey = 'comments' | 'tasks' | 'history' | 'audit';
  */
 export function TicketDetailLayoutC({ ticket, ticketId, onUpdate, onRefresh }: TicketDetailLayoutCProps) {
 	const { showToast } = useToast();
-	const [activeTab, setActiveTab] = useState<TabKey>('comments');
+	const [activeTab, setActiveTab] = useUrlState<TabKey>({
+		key: 'tab',
+		defaultValue: 'comments',
+	});
 	const [localDescription, setLocalDescription] = useState(ticket.description);
 	const [localStatus, setLocalStatus] = useState<TicketStatus>(ticket.status);
-	const [commentsCount, setCommentsCount] = useState(0);
-	const [tasksCount, setTasksCount] = useState(0);
-	const [historyCount, setHistoryCount] = useState(0);
-	const [countsLoading, setCountsLoading] = useState(true);
 	const [dirtyFields, setDirtyFields] = useState<Partial<Ticket>>({});
 	const [saving, setSaving] = useState(false);
 	const [statusSaving, setStatusSaving] = useState(false);
 
-	// Fetch counts
-	useEffect(() => {
-		const fetchCounts = async () => {
-			try {
-				setCountsLoading(true);
-				const [commentsRes, tasksRes, historyRes] = await Promise.all([
-					ticketsApi.getComments(ticketId),
-					tasksApi.getTasksList({ ticketId, pageSize: 1 }),
-					ticketsApi.getHistory(ticketId),
-				]);
-				setCommentsCount(commentsRes.comments.length);
-				setTasksCount(tasksRes.pagination?.total || 0);
-				setHistoryCount(historyRes.entries.length);
-			} catch (err) {
-				console.error('Failed to fetch counts:', err);
-			} finally {
-				setCountsLoading(false);
-			}
-		};
+	// Use hooks that automatically refresh on WebSocket events
+	const commentsState = useTicketCommentsCount(ticketId);
+	const tasksState = useTriggeredTasksCount(ticketId);
+	const historyState = useTicketHistoryCount(ticketId);
 
-		fetchCounts();
-	}, [ticketId]);
+	const countsLoading = commentsState.loading || tasksState.loading || historyState.loading;
 
 	const handleDescriptionChange = (value: string) => {
 		setLocalDescription(value);
@@ -142,6 +129,8 @@ export function TicketDetailLayoutC({ ticket, ticketId, onUpdate, onRefresh }: T
 							<SelectItem value="backlog">Backlog</SelectItem>
 							<SelectItem value="todo">Todo</SelectItem>
 							<SelectItem value="in_progress">In Progress</SelectItem>
+							<SelectItem value="plan_in_review">Plan In Review</SelectItem>
+							<SelectItem value="plan_approved">Plan Approved</SelectItem>
 							<SelectItem value="done">Done</SelectItem>
 							<SelectItem value="cancelled">Cancelled</SelectItem>
 							<SelectItem value="pending_integration">Pending Integration</SelectItem>
@@ -215,10 +204,18 @@ export function TicketDetailLayoutC({ ticket, ticketId, onUpdate, onRefresh }: T
 			{/* Tabs */}
 			<Tabs value={activeTab} onValueChange={value => setActiveTab(value as TabKey)}>
 				<TabsList>
-					<TabsTrigger value="comments">Comments ({countsLoading ? '?' : commentsCount})</TabsTrigger>
-					<TabsTrigger value="tasks">Triggered ({countsLoading ? '?' : tasksCount})</TabsTrigger>
-					<TabsTrigger value="history">History ({countsLoading ? '?' : historyCount})</TabsTrigger>
-					<TabsTrigger value="audit">Audit ({countsLoading ? '?' : historyCount})</TabsTrigger>
+					<TabsTrigger value="comments" asChild>
+						<Link to={`?tab=comments`}>Comments ({countsLoading ? '?' : commentsState.count})</Link>
+					</TabsTrigger>
+					<TabsTrigger value="tasks" asChild>
+						<Link to={`?tab=tasks`}>Triggered ({countsLoading ? '?' : tasksState.count})</Link>
+					</TabsTrigger>
+					<TabsTrigger value="history" asChild>
+						<Link to={`?tab=history`}>History ({countsLoading ? '?' : historyState.count})</Link>
+					</TabsTrigger>
+					<TabsTrigger value="audit" asChild>
+						<Link to={`?tab=audit`}>Audit ({countsLoading ? '?' : historyState.count})</Link>
+					</TabsTrigger>
 				</TabsList>
 
 				<TabsContent value="comments">
