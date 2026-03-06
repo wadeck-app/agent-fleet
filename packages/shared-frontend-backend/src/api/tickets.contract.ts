@@ -163,6 +163,12 @@ export const AnalyzeTicketSchema = z.object({
 	clarificationAnswers: z.record(z.string(), z.string()).optional(),
 });
 
+export const CreateWithAiTitleSchema = z.object({
+	projectId: z.string(),
+	description: z.string(),
+});
+export type CreateWithAiTitle = z.infer<typeof CreateWithAiTitleSchema>;
+
 export const SubTicketPlanSchema = z.object({
 	title: z.string(),
 	description: z.string(),
@@ -254,6 +260,12 @@ export const TICKETS_API_ROUTES = defineRoutes({
 		POST: {
 			body: AnalyzeTicketSchema,
 			response: TicketAnalysisPlanSchema,
+		},
+	},
+	'/api/tickets/create-with-ai-title': {
+		POST: {
+			body: CreateWithAiTitleSchema,
+			response: TicketSchema,
 		},
 	},
 	'/api/tickets/create-from-plan': {

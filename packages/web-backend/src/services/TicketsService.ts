@@ -7,6 +7,7 @@ import type {
 	CreateFromPlanResponse,
 	CreateTicket,
 	CreateTicketComment,
+	CreateWithAiTitle,
 	LabelsResponse,
 	ReorderTicket,
 	Ticket,
@@ -58,16 +59,28 @@ const log = createLogger('TicketsService');
  * - Broadcast failures are logged but don't fail the operation
  * - Type-safe event emission using EventBroadcaster
  *
- * CRUD Operations:
- * - createTicket() → emit 'ticket:created'
- * - updateTicket() → emit 'ticket:updated'
- * - deleteTicket() → emit 'ticket:deleted'
- * - reorderTicket() → emit 'ticket:updated'
+ * B2F Event routing per operation (see B2FEventConstants.ts for full semantics):
+ * - createTicket()  → B2F_TICKET_CREATED + B2F_TICKETS_UPDATED
+ * - updateTicket()  → B2F_TICKET_UPDATED (always, filtered by ticketId for detail page)
+ *                     B2F_TICKETS_UPDATED (only when title/status/labels changed)
+ *                     B2F_TICKET_STATUS_CHANGED (additionally when status changes)
+ * - deleteTicket()  → B2F_TICKET_DELETED + B2F_TICKETS_UPDATED
+ * - reorderTicket() → B2F_TICKETS_UPDATED only (order not visible in detail page)
  *
  * ===========================================================================================
  */
 
 export class TicketsService {
+	private static readonly PENDING_TITLE = '[generating title...]';
+
+	/**
+	 * Fields whose values are rendered in the tickets list view.
+	 * Only changes to these fields warrant broadcasting B2F_TICKETS_UPDATED.
+	 * Other fields (description, fields, flowId, taskIds, parentId, order) are
+	 * detail-only — their changes only need B2F_TICKET_UPDATED.
+	 */
+	private static readonly LIST_VISIBLE_FIELDS: ReadonlySet<string> = new Set(['title', 'status', 'labels']);
+
 	constructor(
 		private readonly ticketsRepository: TicketsRepository,
 		private readonly eventBroadcaster: EventBroadcaster,
@@ -233,17 +246,26 @@ export class TicketsService {
 			};
 			const updatedTicket = await this.ticketsRepository.update(id, updatePayload);
 
-			// Emit specific event AFTER successful update
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			this.eventBroadcaster.broadcast(B2F_TICKET_UPDATED, { ticketId: id } as any);
-
-			// Determine which fields changed
+			// Determine which fields changed (computed before broadcasts to drive routing logic)
 			const changedFields: string[] = [];
 			for (const key of Object.keys(data) as Array<keyof typeof data>) {
 				if (key === 'version') continue;
 				if (JSON.stringify(data[key]) !== JSON.stringify(currentTicket[key as keyof typeof currentTicket])) {
 					changedFields.push(key);
 				}
+			}
+
+			// B2F_TICKET_UPDATED — always broadcast for detail page subscribers.
+			// Use { ticketId } as server-side filter so only the open detail page for this ticket receives it.
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			this.eventBroadcaster.broadcast(B2F_TICKET_UPDATED, { ticketId: id } as any);
+
+			// B2F_TICKETS_UPDATED — only broadcast when a list-visible field actually changed
+			// (title, status, labels). Avoids unnecessary list refreshes for description/fields/etc.
+			const listNeedsRefresh = changedFields.some(f => TicketsService.LIST_VISIBLE_FIELDS.has(f));
+			if (listNeedsRefresh) {
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				this.eventBroadcaster.broadcast(B2F_TICKETS_UPDATED, {} as any);
 			}
 
 			// Record field changes in history and emit events
@@ -269,6 +291,8 @@ export class TicketsService {
 
 			// If status changed, emit status change events
 			if (data.status && data.status !== currentTicket.status) {
+				// B2F_TICKET_STATUS_CHANGED — targeted event for kanban boards and flow triggers
+				// that only care about status transitions (not all ticket updates).
 				this.eventBroadcaster.broadcast(B2F_TICKET_STATUS_CHANGED, {
 					ticketId: id,
 					oldStatus: currentTicket.status,
@@ -298,10 +322,6 @@ export class TicketsService {
 					to: data.status,
 				});
 			}
-
-			// Emit aggregate event for dashboard updates
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			this.eventBroadcaster.broadcast(B2F_TICKETS_UPDATED, {} as any);
 
 			return updatedTicket;
 		} catch (error) {
@@ -355,11 +375,8 @@ export class TicketsService {
 				version: currentTicket.version + 1,
 			});
 
-			// Emit specific event AFTER successful update
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			this.eventBroadcaster.broadcast(B2F_TICKET_UPDATED, { ticketId: id } as any);
-
-			// Emit aggregate event for dashboard updates
+			// B2F_TICKETS_UPDATED only — order affects list sorting but is not shown in the detail page.
+			// B2F_TICKET_UPDATED is intentionally NOT broadcast here.
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast(B2F_TICKETS_UPDATED, {} as any);
 
@@ -503,5 +520,46 @@ export class TicketsService {
 		await this.getTicketById(ticketId);
 		const entries = await this.ticketsRepository.getHistory(ticketId);
 		return { entries };
+	}
+
+	/**
+	 * Generate AI title and update ticket
+	 * Private helper for async title generation
+	 */
+	private async generateAndUpdateTitle(
+		ticketId: string,
+		description: string,
+		projectId: string,
+		version: number
+	): Promise<void> {
+		const existingLabels = (await this.searchLabels(projectId)).labels;
+		const plan = await this.agentExecutor.analyzeTicketDescription({
+			description,
+			projectId,
+			context: { existingLabels },
+		});
+		await this.updateTicket(ticketId, { title: plan.title, version });
+	}
+
+	/**
+	 * Create ticket with AI-generated title (async)
+	 * Creates ticket immediately with placeholder, generates real title in background
+	 */
+	async createWithAiTitle(data: CreateWithAiTitle): Promise<Ticket> {
+		const ticket = await this.createTicket({
+			projectId: data.projectId,
+			title: TicketsService.PENDING_TITLE,
+			description: data.description,
+			labels: [],
+			fields: {},
+			status: 'backlog',
+		});
+
+		// Fire and forget — errors are logged, not surfaced to caller
+		this.generateAndUpdateTitle(ticket.id, data.description, data.projectId, ticket.version).catch(err =>
+			log.error('Failed to generate async title', { ticketId: ticket.id, err })
+		);
+
+		return ticket;
 	}
 }

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Table2, type Table2Column, type Table2Props } from '@framework/components2/table/Table2';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@framework/components/primitives/Tooltip';
 import type { Workspace } from '@shared/api/workspaces.contract';
 import { ListTodo, Pencil } from 'lucide-react';
 
@@ -84,10 +85,27 @@ export const WORKSPACES_TABLE2_COLUMNS: Table2Column<Workspace>[] = [
 				idle: 'outline',
 			} as const;
 
+			const statusTooltip = {
+				active: 'A worker is connected to this workspace',
+				idle: 'No worker currently connected',
+				locked: 'Workspace is locked',
+				cleaning: 'Workspace is being cleaned',
+				error: 'Workspace is in error state',
+			} as const;
+
 			return (
-				<Badge variant={variantMap[w.status]} className="font-medium">
-					{w.status}
-				</Badge>
+				<TooltipProvider delayDuration={300}>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Badge variant={variantMap[w.status]} className="font-medium">
+								{w.status}
+							</Badge>
+						</TooltipTrigger>
+						<TooltipContent>
+							<p>{statusTooltip[w.status]}</p>
+						</TooltipContent>
+					</Tooltip>
+				</TooltipProvider>
 			);
 		},
 	},

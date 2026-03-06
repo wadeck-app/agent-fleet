@@ -196,6 +196,7 @@ export function IconPicker({ value, onChange, iconColor = '#6366F1', disabled, c
 									<Button
 										key={iconName}
 										type="button"
+										variant="ghost"
 										onClick={() => handleIconSelect(iconName)}
 										className={cn(
 											`

@@ -90,6 +90,14 @@ export function WorkspacePanel({ workspace, projectId, activeView, onViewChange 
 		idle: 'outline',
 	} as const;
 
+	const statusTooltip = {
+		active: 'A worker is connected to this workspace',
+		idle: 'No worker currently connected',
+		locked: 'Workspace is locked',
+		cleaning: 'Workspace is being cleaned',
+		error: 'Workspace is in error state',
+	} as const;
+
 	const modeVariant = {
 		development: 'default',
 		production: 'destructive',
@@ -109,7 +117,7 @@ export function WorkspacePanel({ workspace, projectId, activeView, onViewChange 
 									<Badge variant={statusVariant[workspace.status]}>{workspace.status}</Badge>
 								</TooltipTrigger>
 								<TooltipContent>
-									<p>Workspace status</p>
+									<p>{statusTooltip[workspace.status]}</p>
 								</TooltipContent>
 							</Tooltip>
 							<Tooltip>
