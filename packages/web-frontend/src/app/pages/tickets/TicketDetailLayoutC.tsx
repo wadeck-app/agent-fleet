@@ -6,8 +6,13 @@ import { SelectWithSpinner } from '@framework/components/forms/SelectWithSpinner
 import { Textarea } from '@framework/components/forms/Textarea';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
+import {
+	TabsContent,
+	TabsList,
+	TabsTrigger,
+	TabsWithUrlState,
+} from '@framework/components/primitives/TabsWithUrlState';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@framework/components/primitives/Tooltip';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@framework/components/primitives/tabs';
 import { useToast } from '@framework/features/toast/ToastContext';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { Ticket, TicketStatus } from '@shared/api/tickets.contract';
@@ -27,14 +32,11 @@ interface TicketDetailLayoutCProps {
 	onRefresh: () => Promise<void>;
 }
 
-type TabKey = 'comments' | 'tasks' | 'history' | 'audit';
-
 /**
  * Layout C (YouTrack) - Compact header with tabs
  */
 export function TicketDetailLayoutC({ ticket, ticketId, onUpdate, onRefresh }: TicketDetailLayoutCProps) {
 	const { showToast } = useToast();
-	const [activeTab, setActiveTab] = useState<TabKey>('comments');
 	const [localDescription, setLocalDescription] = useState(ticket.description);
 	const [localStatus, setLocalStatus] = useState<TicketStatus>(ticket.status);
 	const [commentsCount, setCommentsCount] = useState(0);
@@ -213,7 +215,7 @@ export function TicketDetailLayoutC({ ticket, ticketId, onUpdate, onRefresh }: T
 			</div>
 
 			{/* Tabs */}
-			<Tabs value={activeTab} onValueChange={value => setActiveTab(value as TabKey)}>
+			<TabsWithUrlState paramKey="tab" defaultValue="comments">
 				<TabsList>
 					<TabsTrigger value="comments">Comments ({countsLoading ? '?' : commentsCount})</TabsTrigger>
 					<TabsTrigger value="tasks">Triggered ({countsLoading ? '?' : tasksCount})</TabsTrigger>
@@ -236,7 +238,7 @@ export function TicketDetailLayoutC({ ticket, ticketId, onUpdate, onRefresh }: T
 				<TabsContent value="audit">
 					<TicketAuditLogSection ticketId={ticketId} />
 				</TabsContent>
-			</Tabs>
+			</TabsWithUrlState>
 		</div>
 	);
 }

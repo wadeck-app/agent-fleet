@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 
 import { Label } from '@framework/components/forms/Label';
@@ -21,7 +21,7 @@ import { ticketsApi } from './tickets.api';
 // change and fully re-renders the markdown DOM (visible as content "flickering").
 const MARKDOWN_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>['components'] = {
 	p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
-	strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+	strong: ({ children }) => <strong className="font-bold">{children}</strong>,
 	em: ({ children }) => <em className="italic">{children}</em>,
 	code: ({ children, className }) => {
 		const isBlock = className?.startsWith('language-');
@@ -48,6 +48,8 @@ const MARKDOWN_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>['component
 
 interface TicketCommentsSectionProps {
 	ticketId: string;
+	sortOrder?: 'asc' | 'desc';
+	showLabel?: boolean;
 }
 
 /**
@@ -66,13 +68,21 @@ interface TicketCommentsSectionProps {
  *
  * ===========================================================================================
  */
-export function TicketCommentsSection({ ticketId }: TicketCommentsSectionProps) {
+export function TicketCommentsSection({ ticketId, sortOrder = 'asc', showLabel = true }: TicketCommentsSectionProps) {
 	const [comments, setComments] = useState<TicketComment[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<Error | null>(null);
 	const [newComment, setNewComment] = useState('');
 	const [submitting, setSubmitting] = useState(false);
 	const { transport } = useTransport();
+
+	// Sort comments based on sortOrder
+	const sortedComments = useMemo(() => {
+		if (!comments) return [];
+		const sorted = [...comments];
+		sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+		return sortOrder === 'desc' ? sorted.reverse() : sorted;
+	}, [comments, sortOrder]);
 
 	// Fetch comments
 	const fetchComments = async () => {
@@ -127,22 +137,23 @@ export function TicketCommentsSection({ ticketId }: TicketCommentsSectionProps) 
 		return unsub;
 	}, [ticketId, transport]);
 
-	// Scroll to and highlight comment from URL hash
+	// Derive selected comment from URL hash (permanent, no timeout)
+	const selectedCommentId = window.location.hash.startsWith('#comment-')
+		? window.location.hash.slice('#comment-'.length)
+		: null;
+
+	// Scroll to selected comment after comments load
 	useEffect(() => {
-		const hash = window.location.hash;
-		if (!hash.startsWith('#comment-')) return;
-		const targetId = hash.slice('#comment-'.length);
-		const el = document.getElementById(`comment-${targetId}`);
+		if (!selectedCommentId) return;
+		const el = document.getElementById(`comment-${selectedCommentId}`);
 		if (!el) return;
 		el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-		el.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
-		setTimeout(() => el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2'), 3000);
-	}, [comments]);
+	}, [comments, selectedCommentId]);
 
 	if (loading) {
 		return (
 			<div>
-				<Label>Comments</Label>
+				{showLabel && <Label>Comments</Label>}
 				<div className="mt-2 flex justify-center">
 					<Loader2 className="size-4 animate-spin text-muted-foreground" />
 				</div>
@@ -153,7 +164,7 @@ export function TicketCommentsSection({ ticketId }: TicketCommentsSectionProps) 
 	if (error) {
 		return (
 			<div>
-				<Label>Comments</Label>
+				{showLabel && <Label>Comments</Label>}
 				<p className="mt-2 text-sm text-destructive">Failed to load comments</p>
 			</div>
 		);
@@ -161,13 +172,17 @@ export function TicketCommentsSection({ ticketId }: TicketCommentsSectionProps) 
 
 	return (
 		<div>
-			<Label>Comments</Label>
-			{comments.length === 0 ? (
+			{showLabel && <Label>Comments</Label>}
+			{sortedComments.length === 0 ? (
 				<p className="mt-2 text-sm text-muted-foreground">No comments yet.</p>
 			) : (
 				<div className="mt-2 space-y-4">
-					{comments.map(comment => (
-						<div key={comment.id} id={`comment-${comment.id}`} className="rounded-md border bg-card p-4">
+					{sortedComments.map(comment => (
+						<div
+							key={comment.id}
+							id={`comment-${comment.id}`}
+							className={`rounded-md border bg-card p-4 border-l-[3px] ${selectedCommentId === comment.id ? 'border-l-primary' : 'border-l-transparent'}`}
+						>
 							<div className="mb-2 flex items-center gap-2">
 								{comment.author && (
 									<Badge variant="outline" className="text-xs">

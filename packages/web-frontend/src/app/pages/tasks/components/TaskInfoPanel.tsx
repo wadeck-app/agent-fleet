@@ -106,8 +106,12 @@ export function TaskInfoPanel({ task }: TaskInfoPanelProps) {
 								{task.metadata.triggerEvent as string}
 							</Badge>
 						)}
-						<Link to={`/tickets/${task.ticketId}`} className="text-xs text-primary hover:underline">
-							View ticket {task.ticketId}
+						<Link
+							to={`/tickets/${task.ticketId}?tab=tasks#task-${task.id}`}
+							title={`Ticket ID: ${task.ticketId}`}
+							className="shrink-0 text-xs text-primary hover:underline"
+						>
+							view ticket: <span className="font-mono">{task.ticketId.slice(0, 8)}…</span>
 						</Link>
 					</div>
 				</div>

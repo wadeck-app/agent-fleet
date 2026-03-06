@@ -8,6 +8,7 @@ const LAYOUTS = [
 	{ key: 'd', label: 'Linear' },
 	{ key: 'e', label: 'GitLab' },
 	{ key: 'f', label: 'AI Mode' },
+	{ key: 'g', label: 'Hybrid' },
 ] as const;
 
 export type LayoutKey = (typeof LAYOUTS)[number]['key'];
