@@ -6,6 +6,7 @@ import type {
 	CreateProject,
 	Project,
 	ProjectBoardData,
+	ProjectStatusConfig,
 	ProjectsData,
 	ProjectsListQuery,
 	ProjectsListResponse,
@@ -510,5 +511,50 @@ export class ProjectsService {
 			log.error(' Failed to decrement task count:', error);
 			throw error;
 		}
+	}
+
+	/**
+	 * Get the status configuration for a project.
+	 * Returns DEFAULT_STATUS_CONFIG if none has been saved yet.
+	 * Throws NotFoundException if the project does not exist.
+	 *
+	 * @param projectId Project ID
+	 */
+	async getStatusConfig(projectId: string): Promise<ProjectStatusConfig> {
+		// Verifies project existence (throws NotFoundException if not found)
+		await this.getById(projectId);
+		return this.repository.getStatusConfig(projectId);
+	}
+
+	/**
+	 * Save the status configuration for a project.
+	 *
+	 * Validation (fail-fast):
+	 * - Every transition's from/to values must reference a status id defined in statuses[]
+	 *
+	 * @param projectId Project ID
+	 * @param config New ProjectStatusConfig to persist
+	 */
+	async saveStatusConfig(projectId: string, config: ProjectStatusConfig): Promise<ProjectStatusConfig> {
+		// Verify project exists first
+		await this.getById(projectId);
+
+		// Fail-fast: validate that all transition references point to known status IDs
+		const knownIds = new Set(config.statuses.map(s => s.id));
+		for (const transition of config.transitions) {
+			if (!knownIds.has(transition.from)) {
+				throw new Error(
+					`Invalid transition: "from" value "${transition.from}" does not reference a known status id`
+				);
+			}
+			if (!knownIds.has(transition.to)) {
+				throw new Error(
+					`Invalid transition: "to" value "${transition.to}" does not reference a known status id`
+				);
+			}
+		}
+
+		await this.repository.saveStatusConfig(projectId, config);
+		return config;
 	}
 }

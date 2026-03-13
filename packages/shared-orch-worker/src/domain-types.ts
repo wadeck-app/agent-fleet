@@ -201,17 +201,20 @@ export interface FlowTrigger {
 }
 
 /**
- * Ticket status lifecycle
+ * Ticket status — project-configurable string (no longer a fixed enum).
+ * Use DEFAULT_TICKET_STATUSES for the built-in set.
  */
-export enum TicketStatus {
-	BACKLOG = 'backlog',
-	TODO = 'todo',
-	IN_PROGRESS = 'in_progress',
-	DONE = 'done',
-	CANCELLED = 'cancelled',
-	PENDING_INTEGRATION = 'pending_integration',
-	INTEGRATED = 'integrated',
-}
+export type TicketStatus = string;
+
+export const DEFAULT_TICKET_STATUSES = [
+	'backlog',
+	'todo',
+	'in_progress',
+	'done',
+	'cancelled',
+	'pending_integration',
+	'integrated',
+] as const;
 
 /**
  * Ticket - higher-level work item (Jira/GitLab-style) that can spawn Tasks

@@ -108,5 +108,21 @@ export default class ProjectsController implements LazyController<typeof PROJECT
 		add('GET', '/api/projects/:id/board', async ({ params }) => {
 			return this.service.getProjectBoard(params.id);
 		});
+
+		/**
+		 * GET /api/projects/:projectId/status-config
+		 * Get the status configuration for a project (returns default if not set)
+		 */
+		add('GET', '/api/projects/:projectId/status-config', async ({ params }) => {
+			return this.service.getStatusConfig(params.projectId);
+		});
+
+		/**
+		 * PUT /api/projects/:projectId/status-config
+		 * Save/replace the status configuration for a project
+		 */
+		add('PUT', '/api/projects/:projectId/status-config', async ({ params, body }) => {
+			return this.service.saveStatusConfig(params.projectId, body);
+		});
 	}
 }

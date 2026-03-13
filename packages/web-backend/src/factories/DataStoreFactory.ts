@@ -1,5 +1,8 @@
+import { FlowRegistry } from 'flow-engine';
+import * as fs from 'fs';
 import type { Orchestrator } from 'orchestrator';
 import { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
+import * as path from 'path';
 import { getOrchestratorRestUrl } from 'shared-common/PortCalculator';
 import { createLogger } from 'shared-common/logger';
 
@@ -15,12 +18,15 @@ import type { Ticket } from '@app/shared/api/tickets.contract';
 import type { ScriptProcess, WorkspaceScript } from '@app/shared/api/workspaceScripts.contract';
 import type { WorkspaceMetadataEntity } from '@app/shared/api/workspaces.contract';
 
+import { FlowDesignerAgent } from '../agents/FlowDesignerAgent';
 import type { AuthService } from '../auth/AuthService';
 import { MockAuthService } from '../auth/MockAuthService';
 import { EventBus } from '../events/EventBus';
 import { LocalClaudeAgentExecutor } from '../providers/LocalClaudeAgentExecutor';
 import { BaseRepository } from '../repositories/BaseRepository';
 import { BooksRepository } from '../repositories/BooksRepository';
+import { FlowFeedbackRepository } from '../repositories/FlowFeedbackRepository';
+import { FlowProposalsRepository } from '../repositories/FlowProposalsRepository';
 import { IngredientsRepository } from '../repositories/IngredientsRepository';
 import { InterventionsRepository } from '../repositories/InterventionsRepository';
 import { OrchestratorRepository } from '../repositories/OrchestratorRepository';
@@ -34,6 +40,9 @@ import { WorkspaceMetadataRepository } from '../repositories/WorkspaceMetadataRe
 import { WorkspaceScriptsRepository } from '../repositories/WorkspaceScriptsRepository';
 import { BooksService } from '../services/BooksService';
 import { DashboardService } from '../services/DashboardService';
+import { FlowFeedbackService } from '../services/FlowFeedbackService';
+import { FlowKnowledgeService } from '../services/FlowKnowledgeService';
+import { FlowProposalsService } from '../services/FlowProposalsService';
 import { FlowsService } from '../services/FlowsService';
 import { IngredientsService } from '../services/IngredientsService';
 import { InterventionsService } from '../services/InterventionsService';
@@ -90,6 +99,9 @@ export class DataStoreFactory {
 	private flowsService?: FlowsService;
 	private tasksService?: TasksService;
 	private ticketsService?: TicketsService;
+	private flowFeedbackService?: FlowFeedbackService;
+	private flowKnowledgeService?: FlowKnowledgeService;
+	private flowProposalsService?: FlowProposalsService;
 	private workspacesService?: WorkspacesService;
 	private projectsService?: ProjectsService;
 	private interventionsService?: InterventionsService;
@@ -309,6 +321,103 @@ export class DataStoreFactory {
 		}
 
 		return this.ticketsService;
+	}
+
+	/**
+	 * Get or create FlowFeedbackService
+	 */
+	getFlowFeedbackService(): FlowFeedbackService {
+		if (!this.flowFeedbackService) {
+			// Create repositories for feedback and retrospectives.
+			// Using `as any` because FlowFeedback/FlowRetrospective do not extend BaseEntity;
+			// the StoredFlowFeedback/StoredFlowRetrospective intersection types in
+			// FlowFeedbackRepository bridge the gap at the type level.
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const feedbackBase = new BaseRepository<any>('flow-feedback', this.storage);
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const retroBase = new BaseRepository<any>('flow-retrospectives', this.storage);
+			const feedbackRepo = new FlowFeedbackRepository(feedbackBase, retroBase);
+
+			// Get TicketsRepository (tickets are stored in the primary storage)
+			const ticketsBaseRepo = new BaseRepository<Ticket>('tickets', this.storage);
+			const ticketsRepo = new TicketsRepository(ticketsBaseRepo);
+
+			this.flowFeedbackService = new FlowFeedbackService(feedbackRepo, ticketsRepo);
+		}
+
+		return this.flowFeedbackService;
+	}
+
+	/**
+	 * Resolve the monorepo root directory (directory containing package.json with "workspaces").
+	 * Falls back to process.cwd() if not found.
+	 */
+	private resolveMonorepoRoot(): string {
+		let currentDir = process.cwd();
+		while (currentDir !== path.dirname(currentDir)) {
+			const packageJsonPath = path.join(currentDir, 'package.json');
+			if (fs.existsSync(packageJsonPath)) {
+				const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+				if (packageJson.workspaces) {
+					return currentDir;
+				}
+			}
+			currentDir = path.dirname(currentDir);
+		}
+		return process.cwd();
+	}
+
+	/**
+	 * Get or create FlowKnowledgeService
+	 */
+	getFlowKnowledgeService(): FlowKnowledgeService {
+		if (!this.flowKnowledgeService) {
+			const flowsService = this.getFlowsService();
+			const feedbackService = this.getFlowFeedbackService();
+			const ticketsBaseRepo = new BaseRepository<Ticket>('tickets', this.storage);
+			const ticketsRepo = new TicketsRepository(ticketsBaseRepo);
+			this.flowKnowledgeService = new FlowKnowledgeService(flowsService, feedbackService, ticketsRepo);
+		}
+		return this.flowKnowledgeService;
+	}
+
+	/**
+	 * Get or create FlowProposalsService (wires all dependencies including FlowDesignerAgent)
+	 */
+	getFlowProposalsService(): FlowProposalsService {
+		if (!this.flowProposalsService) {
+			// Create FlowProposalsRepository
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const proposalsBase = new BaseRepository<any>('flow-proposals', this.storage);
+			const proposalsRepo = new FlowProposalsRepository(proposalsBase);
+
+			// Create TicketsRepository
+			const ticketsBaseRepo = new BaseRepository<Ticket>('tickets', this.storage);
+			const ticketsRepo = new TicketsRepository(ticketsBaseRepo);
+
+			// Create FlowRegistry pointing to monorepo root
+			const projectRoot = this.resolveMonorepoRoot();
+			const registry = new FlowRegistry(projectRoot);
+
+			// Create FlowDesignerAgent
+			const designerAgent = new FlowDesignerAgent(registry);
+
+			// Create FlowKnowledgeService
+			const knowledgeService = this.getFlowKnowledgeService();
+
+			// Get EventBroadcaster
+			const eventBroadcaster = this.getEventBroadcaster();
+
+			this.flowProposalsService = new FlowProposalsService(
+				proposalsRepo,
+				ticketsRepo,
+				designerAgent,
+				knowledgeService,
+				registry,
+				eventBroadcaster
+			);
+		}
+		return this.flowProposalsService;
 	}
 
 	/**
@@ -815,7 +924,8 @@ export class DataStoreFactory {
 	async getFlowsController() {
 		const { default: FlowsController } = await import('../controllers/FlowsController');
 		const service = this.getFlowsService();
-		return new FlowsController(service);
+		const flowFeedbackService = this.getFlowFeedbackService();
+		return new FlowsController(service, flowFeedbackService);
 	}
 
 	async getWorkspacesController() {
@@ -878,7 +988,9 @@ export class DataStoreFactory {
 	async getTicketsController() {
 		const { default: TicketsController } = await import('../controllers/TicketsController');
 		const service = this.getTicketsService();
-		return new TicketsController(service);
+		const flowFeedbackService = this.getFlowFeedbackService();
+		const flowProposalsService = this.getFlowProposalsService();
+		return new TicketsController(service, flowFeedbackService, flowProposalsService);
 	}
 
 	/**

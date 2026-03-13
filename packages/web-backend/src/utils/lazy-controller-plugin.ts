@@ -177,8 +177,9 @@ function createLazyControllerPlugin<Routes = any>(
 			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/flows') {
 			service = factory.getFlowsService();
+			const flowFeedbackService = factory.getFlowFeedbackService();
 			// @ts-expect-error - Dynamic service injection based on baseUrl
-			controllerInstance = new ControllerClass(service);
+			controllerInstance = new ControllerClass(service, flowFeedbackService);
 		} else if (baseUrl === '/api/workers') {
 			service = factory.getWorkersService();
 			// @ts-expect-error - Dynamic service injection based on baseUrl
@@ -215,8 +216,10 @@ function createLazyControllerPlugin<Routes = any>(
 			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/tickets') {
 			service = factory.getTicketsService();
+			const flowFeedbackService = factory.getFlowFeedbackService();
+			const flowProposalsService = factory.getFlowProposalsService();
 			// @ts-expect-error - Dynamic service injection based on baseUrl
-			controllerInstance = new ControllerClass(service);
+			controllerInstance = new ControllerClass(service, flowFeedbackService, flowProposalsService);
 		} else {
 			throw new Error(`No service mapping found for baseUrl: ${baseUrl}`);
 		}

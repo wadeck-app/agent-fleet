@@ -2,23 +2,19 @@ import { z } from 'zod';
 
 import { BaseListQuerySchema, DeleteResponseSchema, createListResponseSchema } from '../common/api-helpers';
 import { defineRoutes } from '../route-builder';
+import {
+	CreateFlowFeedbackSchema,
+	CreateFlowRetrospectiveSchema,
+	FlowFeedbackSchema,
+	FlowRetrospectiveSchema,
+} from './flow-feedback.contract';
 
 // ---------------------------------------------------------------------------
 // Enums
 // ---------------------------------------------------------------------------
 
-export const TicketStatusSchema = z.enum([
-	'backlog',
-	'todo',
-	'in_progress',
-	// Plan review lifecycle: AI posts action plan → plan_in_review, user approves → plan_approved
-	'plan_in_review',
-	'plan_approved',
-	'done',
-	'cancelled',
-	'pending_integration',
-	'integrated',
-]);
+// Status is project-configurable — accept any string value.
+export const TicketStatusSchema = z.string();
 
 // ---------------------------------------------------------------------------
 // Core Ticket schema
@@ -35,6 +31,9 @@ export const TicketSchema = z.object({
 	parentId: z.string().optional(),
 	taskIds: z.array(z.string()),
 	flowId: z.string().optional(),
+	currentFlowProposalId: z.string().optional(),
+	flowFeedbackId: z.string().optional(),
+	flowRetrospectiveId: z.string().optional(),
 	/** Float order for drag-and-drop sorting (Jira midpoint strategy) */
 	order: z.number(),
 	version: z.number().int().positive(),
@@ -75,6 +74,14 @@ export const TicketHistoryEventSchema = z.enum([
 	'ticket.updated',
 	'ticket.transitioned',
 	'ticket.comment_created',
+	'flow.design_requested',
+	'flow.proposed',
+	'flow.review_comment_added',
+	'flow.review_thread_resolved',
+	'flow.approved',
+	'flow.rejected',
+	'flow.feedback_submitted',
+	'flow.retrospective_generated',
 ]);
 
 export const TicketHistoryEntrySchema = z.object({
@@ -314,6 +321,24 @@ export const TICKETS_API_ROUTES = defineRoutes({
 		GET: {
 			params: z.object({ ticketId: z.string() }),
 			response: TicketHistoryResponseSchema,
+		},
+	},
+	'/api/tickets/:ticketId/feedback': {
+		POST: {
+			params: z.object({ ticketId: z.string() }),
+			body: CreateFlowFeedbackSchema,
+			response: FlowFeedbackSchema,
+		},
+	},
+	'/api/tickets/:ticketId/retrospective': {
+		POST: {
+			params: z.object({ ticketId: z.string() }),
+			body: CreateFlowRetrospectiveSchema,
+			response: FlowRetrospectiveSchema,
+		},
+		GET: {
+			params: z.object({ ticketId: z.string() }),
+			response: FlowRetrospectiveSchema,
 		},
 	},
 });

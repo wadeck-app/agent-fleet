@@ -20,6 +20,7 @@ import remarkGfm from 'remark-gfm';
 import { tasksApi } from '../tasks/tasks.api';
 import { CommentPermalink } from './components/CommentPermalink';
 import { ticketsApi } from './tickets.api';
+import { useProjectStatusConfig } from './useProjectStatusConfig';
 
 interface TicketDetailLayoutEProps {
 	ticket: Ticket;
@@ -55,6 +56,7 @@ type TimelineItem =
  */
 export function TicketDetailLayoutE({ ticket, ticketId, onUpdate, onRefresh }: TicketDetailLayoutEProps) {
 	const { showToast } = useToast();
+	const { config: statusConfig } = useProjectStatusConfig(ticket.projectId);
 	const [localDescription, setLocalDescription] = useState(ticket.description);
 	const [localStatus, setLocalStatus] = useState<TicketStatus>(ticket.status);
 	const [timeline, setTimeline] = useState<TimelineItem[]>([]);
@@ -358,15 +360,11 @@ export function TicketDetailLayoutE({ ticket, ticketId, onUpdate, onRefresh }: T
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value="backlog">Backlog</SelectItem>
-								<SelectItem value="todo">Todo</SelectItem>
-								<SelectItem value="in_progress">In Progress</SelectItem>
-								<SelectItem value="plan_in_review">Plan In Review</SelectItem>
-								<SelectItem value="plan_approved">Plan Approved</SelectItem>
-								<SelectItem value="done">Done</SelectItem>
-								<SelectItem value="cancelled">Cancelled</SelectItem>
-								<SelectItem value="pending_integration">Pending Integration</SelectItem>
-								<SelectItem value="integrated">Integrated</SelectItem>
+								{statusConfig.statuses.map(s => (
+									<SelectItem key={s.id} value={s.id}>
+										{s.label}
+									</SelectItem>
+								))}
 							</SelectContent>
 						</SelectWithSpinner>
 					</div>

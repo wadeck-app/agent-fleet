@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { defineRoutes } from '../route-builder';
+import { FlowFeedbackSchema } from './flow-feedback.contract';
 
 // Validation issue schema for flow validation errors and warnings
 export const ValidationIssueSchema = z.object({
@@ -136,6 +137,12 @@ export const FLOWS_API_ROUTES = defineRoutes({
 			params: FlowIdParamSchema,
 			body: FlowDefinitionSchema,
 			response: z.object({ success: z.boolean() }),
+		},
+	},
+	'/api/flows/:flowId/feedback': {
+		GET: {
+			params: z.object({ flowId: z.string() }),
+			response: z.object({ items: z.array(FlowFeedbackSchema) }),
 		},
 	},
 });

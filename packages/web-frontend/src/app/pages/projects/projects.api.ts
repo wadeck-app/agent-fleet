@@ -4,6 +4,7 @@ import type {
 	CreateProject,
 	Project,
 	ProjectBoardData,
+	ProjectStatusConfig,
 	ProjectsListQuery,
 	ProjectsListResponse,
 	UpdateProject,
@@ -81,5 +82,12 @@ export const projectsApi = {
 	 */
 	getProjectBoard: (id: string): Promise<ProjectBoardData> => {
 		return typedFetch('GET', '/api/projects/:id/board', { params: { id } });
+	},
+
+	/**
+	 * Get the status configuration for a project
+	 */
+	getStatusConfig: (projectId: string): Promise<ProjectStatusConfig> => {
+		return typedFetch('GET', '/api/projects/:projectId/status-config', { params: { projectId } });
 	},
 } as const;
