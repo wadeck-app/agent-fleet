@@ -458,20 +458,21 @@ Sections dédiées (séparées des commentaires) :
 
 ### Backend (unitaire) — DONE 2026-03-13
 
-| Fichier | Tests |
-|---|---|
-| `FlowDesignerAgent.test.ts` | 9 |
-| `FlowKnowledgeService.test.ts` | 9 |
-| `FlowProposalsService.test.ts` | 11 |
-| `FlowFeedbackService.test.ts` | 8 |
-| `ProjectsService.statusConfig.test.ts` | 8 |
-| `TicketsController.test.ts` | 37 |
-| `FlowFeedbackController.test.ts` | 9 |
-| `FlowFeedbackRepository.test.ts` | 20 |
-| `FlowProposalsRepository.test.ts` | 12 |
-| `ProjectsController.test.ts` | 27 |
+| Fichier                                | Tests |
+| -------------------------------------- | ----- |
+| `FlowDesignerAgent.test.ts`            | 9     |
+| `FlowKnowledgeService.test.ts`         | 9     |
+| `FlowProposalsService.test.ts`         | 11    |
+| `FlowFeedbackService.test.ts`          | 8     |
+| `ProjectsService.statusConfig.test.ts` | 8     |
+| `TicketsController.test.ts`            | 37    |
+| `FlowFeedbackController.test.ts`       | 9     |
+| `FlowFeedbackRepository.test.ts`       | 20    |
+| `FlowProposalsRepository.test.ts`      | 12    |
+| `ProjectsController.test.ts`           | 27    |
 
 Bugs fixes dans ce cycle :
+
 - `FlowProposalsRepository.create()` : version proposal ecrasee par BaseEntity.version (regression test ajoutee)
 - `FlowProposalsService.getProposals()` : tri secondaire par proposedAt
 - `FlowProposalSection` : confidence score x100 corrige

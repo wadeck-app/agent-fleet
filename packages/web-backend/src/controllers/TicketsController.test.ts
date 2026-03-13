@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type {
+	CreateFlowFeedback,
+	CreateFlowRetrospective,
+	FlowFeedback,
+	FlowRetrospective,
+} from '@app/shared/api/flow-feedback.contract';
+import type {
 	AddReviewComment,
 	CreateReviewThread,
 	FlowProposal,
@@ -24,7 +30,6 @@ import type {
 	TicketsListResponse,
 	UpdateTicket,
 } from '@app/shared/api/tickets.contract';
-import type { CreateFlowFeedback, CreateFlowRetrospective, FlowFeedback, FlowRetrospective } from '@app/shared/api/flow-feedback.contract';
 import { NotFoundException } from '@app/shared/exceptions/http-exceptions';
 
 import type { FlowFeedbackService } from '../services/FlowFeedbackService';
@@ -164,11 +169,7 @@ describe('TicketsController', () => {
 			resolveThread: vi.fn(),
 		} as unknown as FlowProposalsService;
 
-		controller = new TicketsController(
-			mockTicketsService,
-			mockFlowFeedbackService,
-			mockFlowProposalsService
-		);
+		controller = new TicketsController(mockTicketsService, mockFlowFeedbackService, mockFlowProposalsService);
 
 		routes = new Map();
 		// Use `any` cast because routes span two route definition objects (TICKETS + FLOW_PROPOSALS)
@@ -205,13 +206,11 @@ describe('TicketsController', () => {
 			expect(routes.has('POST /api/tickets/:ticketId/flow-proposals/:proposalId/reject')).toBe(true);
 			expect(routes.has('POST /api/tickets/:ticketId/flow-proposals/:proposalId/review-threads')).toBe(true);
 			expect(
-				routes.has(
-					'POST /api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId/comments'
-				)
+				routes.has('POST /api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId/comments')
 			).toBe(true);
-			expect(
-				routes.has('PATCH /api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId')
-			).toBe(true);
+			expect(routes.has('PATCH /api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId')).toBe(
+				true
+			);
 		});
 
 		it('should expose static routes property merging both contracts', () => {
@@ -426,9 +425,9 @@ describe('TicketsController', () => {
 
 			const handler = routes.get('PATCH /api/tickets/:id');
 
-			await expect(
-				handler!({ params: { id: 'not-found' }, body: { title: 'x', version: 1 } })
-			).rejects.toThrow(NotFoundException);
+			await expect(handler!({ params: { id: 'not-found' }, body: { title: 'x', version: 1 } })).rejects.toThrow(
+				NotFoundException
+			);
 		});
 	});
 
@@ -484,9 +483,9 @@ describe('TicketsController', () => {
 
 			const handler = routes.get('PATCH /api/tickets/:id/reorder');
 
-			await expect(
-				handler!({ params: { id: 'missing' }, body: { order: 500, version: 1 } })
-			).rejects.toThrow(NotFoundException);
+			await expect(handler!({ params: { id: 'missing' }, body: { order: 500, version: 1 } })).rejects.toThrow(
+				NotFoundException
+			);
 		});
 	});
 
@@ -643,9 +642,7 @@ describe('TicketsController', () => {
 
 			const handler = routes.get('GET /api/tickets/:ticketId/retrospective');
 
-			await expect(
-				handler!({ params: { ticketId: 'ticket-1' } })
-			).rejects.toThrow(NotFoundException);
+			await expect(handler!({ params: { ticketId: 'ticket-1' } })).rejects.toThrow(NotFoundException);
 		});
 	});
 
@@ -689,9 +686,9 @@ describe('TicketsController', () => {
 
 			const handler = routes.get('GET /api/tickets/:ticketId/flow-proposals/:proposalId');
 
-			await expect(
-				handler!({ params: { ticketId: 'ticket-1', proposalId: 'missing' } })
-			).rejects.toThrow(NotFoundException);
+			await expect(handler!({ params: { ticketId: 'ticket-1', proposalId: 'missing' } })).rejects.toThrow(
+				NotFoundException
+			);
 		});
 	});
 
@@ -710,10 +707,7 @@ describe('TicketsController', () => {
 				body: { context: 'Focus on auth flow' },
 			});
 
-			expect(mockFlowProposalsService.requestFlowDesign).toHaveBeenCalledWith(
-				'ticket-1',
-				'Focus on auth flow'
-			);
+			expect(mockFlowProposalsService.requestFlowDesign).toHaveBeenCalledWith('ticket-1', 'Focus on auth flow');
 			expect(result).toEqual(proposal);
 		});
 	});
@@ -741,9 +735,9 @@ describe('TicketsController', () => {
 
 			const handler = routes.get('POST /api/tickets/:ticketId/flow-proposals/:proposalId/approve');
 
-			await expect(
-				handler!({ params: { ticketId: 'ticket-1', proposalId: 'missing' } })
-			).rejects.toThrow(NotFoundException);
+			await expect(handler!({ params: { ticketId: 'ticket-1', proposalId: 'missing' } })).rejects.toThrow(
+				NotFoundException
+			);
 		});
 	});
 
@@ -780,11 +774,7 @@ describe('TicketsController', () => {
 				body: {},
 			});
 
-			expect(mockFlowProposalsService.rejectProposal).toHaveBeenCalledWith(
-				'ticket-1',
-				'proposal-1',
-				undefined
-			);
+			expect(mockFlowProposalsService.rejectProposal).toHaveBeenCalledWith('ticket-1', 'proposal-1', undefined);
 		});
 	});
 
@@ -809,11 +799,7 @@ describe('TicketsController', () => {
 				body,
 			});
 
-			expect(mockFlowProposalsService.addReviewThread).toHaveBeenCalledWith(
-				'ticket-1',
-				'proposal-1',
-				body
-			);
+			expect(mockFlowProposalsService.addReviewThread).toHaveBeenCalledWith('ticket-1', 'proposal-1', body);
 			expect(result).toEqual(thread);
 		});
 	});
@@ -863,11 +849,7 @@ describe('TicketsController', () => {
 				params: { ticketId: 'ticket-1', proposalId: 'proposal-1', threadId: 'thread-1' },
 			});
 
-			expect(mockFlowProposalsService.resolveThread).toHaveBeenCalledWith(
-				'ticket-1',
-				'proposal-1',
-				'thread-1'
-			);
+			expect(mockFlowProposalsService.resolveThread).toHaveBeenCalledWith('ticket-1', 'proposal-1', 'thread-1');
 			expect(result).toEqual(resolved);
 		});
 

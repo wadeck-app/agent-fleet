@@ -28,6 +28,7 @@ import { ArrowDown, ArrowUp, Loader2, MessageSquare, Zap } from 'lucide-react';
 import remarkGfm from 'remark-gfm';
 
 import { tasksApi } from '../tasks/tasks.api';
+import { FlowFeedbackSection } from './FlowFeedbackSection';
 import { FlowProposalSection } from './FlowProposalSection';
 import { TicketAuditLogSection } from './TicketAuditLogSection';
 import { TicketCommentsSection } from './TicketCommentsSection';
@@ -453,6 +454,7 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 							<TabsTrigger value="audit">Audit</TabsTrigger>
 							<TabsTrigger value="activity">Activity</TabsTrigger>
 							<TabsTrigger value="flow">Flow Design</TabsTrigger>
+							{ticket.currentFlowProposalId && <TabsTrigger value="feedback">Feedback</TabsTrigger>}
 						</TabsList>
 						<TooltipProvider>
 							<Tooltip>
@@ -503,6 +505,17 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 							}}
 						/>
 					</TabsContent>
+
+					{ticket.currentFlowProposalId && (
+						<TabsContent value="feedback">
+							<FlowFeedbackSection
+								ticketId={ticketId}
+								flowFeedbackId={ticket.flowFeedbackId}
+								flowRetrospectiveId={ticket.flowRetrospectiveId}
+								onFeedbackSubmitted={() => void onRefresh()}
+							/>
+						</TabsContent>
+					)}
 
 					<TabsContent value="activity">
 						{loadingTimeline && (

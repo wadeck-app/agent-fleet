@@ -1,8 +1,68 @@
-# ============================================================================
-# flows-custom.yml — Machine-managed AI-generated implementation flows
-#
-# This file is automatically managed by the backend when creating tickets.
-# DO NOT edit manually unless you know what you're doing.
-#
-# Flow IDs follow the pattern: ticket-{ticketId}-impl
-# ============================================================================
+payment-race-condition-fix:
+    version: 1.0.0
+    name: Payment Race Condition Fix
+    description: >-
+        Diagnose and fix race condition in payment processing when concurrent requests update the same record. Includes
+        analysis, solution design, implementation, and testing.
+    workspace:
+        mode: isolated
+        gitStrategy: feature-branch
+        reusePolicy: never
+    inputs:
+        - id: paymentFlowPath
+          name: Payment Flow File Path
+          type: file
+          description: Path to the payment processing code
+          required: true
+    steps:
+        - id: analyze
+          type: model
+          name: Analyze Race Condition
+          model: sonnet
+          prompt: >-
+              Analyze this payment processing code for race conditions:
+
+
+              ${{ inputs.paymentFlowPath }}
+
+
+              Identify: 1) where concurrent updates occur, 2) which data fields are at risk, 3) impact on transactions.
+              Recommend locking/isolation strategies.
+        - id: design
+          type: model
+          name: Design Solution
+          model: sonnet
+          depends:
+              - analyze
+          prompt: >-
+              Based on this analysis: ${{ steps.analyze.outputs.result }}
+
+
+              Design a fix using: database transactions, pessimistic/optimistic locking, or distributed locks. Provide
+              pseudocode and implementation approach.
+        - id: implement
+          type: script
+          name: Implement Fix
+          depends:
+              - design
+          script: >-
+              git checkout -b fix/payment-race-condition && echo 'Creating implementation based on design' && npm test --
+              --testPathPattern=payment
+          captureOutput: true
+        - id: verify
+          type: script
+          name: Concurrent Request Test
+          depends:
+              - implement
+          script: npm test -- --testPathPattern=concurrency && npm run lint
+          captureOutput: true
+        - id: review
+          type: user_intervention
+          name: Review Solution
+          depends:
+              - verify
+          interventionType: approval
+          blocking: true
+          approval:
+              title: Approve Payment Race Condition Fix
+              description: Review the design and test results above. Approve to proceed with merge.

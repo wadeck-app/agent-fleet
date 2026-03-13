@@ -128,7 +128,9 @@ export class FlowProposalsService {
 	 */
 	async getProposals(ticketId: string): Promise<FlowProposal[]> {
 		const all = await this.proposalsRepository.findByTicketId(ticketId);
-		return all.sort((a, b) => b.version - a.version || new Date(b.proposedAt).getTime() - new Date(a.proposedAt).getTime());
+		return all.sort(
+			(a, b) => b.version - a.version || new Date(b.proposedAt).getTime() - new Date(a.proposedAt).getTime()
+		);
 	}
 
 	/**

@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { CreateFlowFeedback, CreateFlowRetrospective, FlowFeedback, FlowRetrospective } from '@app/shared/api/flow-feedback.contract';
+import type {
+	CreateFlowFeedback,
+	CreateFlowRetrospective,
+	FlowFeedback,
+	FlowRetrospective,
+} from '@app/shared/api/flow-feedback.contract';
 
 import type { FlowFeedbackService } from '../services/FlowFeedbackService';
 import type { RouteWrapperFunc } from '../utils/fastify-wrapper';
@@ -119,35 +124,22 @@ describe('FlowFeedbackController', () => {
 			const mockAdd = vi.fn();
 			controller.configureRoutes(mockAdd as unknown as RouteWrapperFunc<any>);
 
-			expect(mockAdd).toHaveBeenCalledWith(
-				'POST',
-				'/api/tickets/:ticketId/feedback',
-				expect.any(Function)
-			);
+			expect(mockAdd).toHaveBeenCalledWith('POST', '/api/tickets/:ticketId/feedback', expect.any(Function));
 		});
 
 		it('registers POST /api/tickets/:ticketId/retrospective', () => {
 			const mockAdd = vi.fn();
 			controller.configureRoutes(mockAdd as unknown as RouteWrapperFunc<any>);
 
-			expect(mockAdd).toHaveBeenCalledWith(
-				'POST',
-				'/api/tickets/:ticketId/retrospective',
-				expect.any(Function)
-			);
+			expect(mockAdd).toHaveBeenCalledWith('POST', '/api/tickets/:ticketId/retrospective', expect.any(Function));
 		});
 
 		it('registers GET /api/tickets/:ticketId/retrospective', () => {
 			const mockAdd = vi.fn();
 			controller.configureRoutes(mockAdd as unknown as RouteWrapperFunc<any>);
 
-			expect(mockAdd).toHaveBeenCalledWith(
-				'GET',
-				'/api/tickets/:ticketId/retrospective',
-				expect.any(Function)
-			);
+			expect(mockAdd).toHaveBeenCalledWith('GET', '/api/tickets/:ticketId/retrospective', expect.any(Function));
 		});
-
 	});
 
 	// -------------------------------------------------------------------------
@@ -231,5 +223,4 @@ describe('FlowFeedbackController', () => {
 			);
 		});
 	});
-
 });
