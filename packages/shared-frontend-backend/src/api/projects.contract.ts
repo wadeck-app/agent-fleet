@@ -122,6 +122,48 @@ export const ProjectIconColorSchema = z
 	.regex(/^#[0-9A-Fa-f]{6}$/, 'Must be a valid hex color')
 	.optional();
 
+// ---------------------------------------------------------------------------
+// Project status configuration
+// (defined before ProjectSchema so it can be referenced as an optional field)
+// ---------------------------------------------------------------------------
+
+export const StatusDefinitionSchema = z.object({
+	id: z.string(),
+	label: z.string(),
+	terminal: z.boolean().default(false),
+	color: z.string().optional(),
+});
+
+export const StatusTransitionSchema = z.object({
+	from: z.string(),
+	to: z.string(),
+});
+
+export const ProjectStatusConfigSchema = z.object({
+	statuses: z.array(StatusDefinitionSchema),
+	transitions: z.array(StatusTransitionSchema),
+});
+
+export type ProjectStatusConfig = z.infer<typeof ProjectStatusConfigSchema>;
+export type StatusDefinition = z.infer<typeof StatusDefinitionSchema>;
+export type StatusTransition = z.infer<typeof StatusTransitionSchema>;
+
+export const DEFAULT_STATUS_CONFIG: ProjectStatusConfig = {
+	statuses: [
+		{ id: 'backlog', label: 'Backlog', terminal: false },
+		{ id: 'todo', label: 'To Do', terminal: false },
+		{ id: 'in_progress', label: 'In Progress', terminal: false },
+		{ id: 'flow_analysis', label: 'Flow Analysis', terminal: false },
+		{ id: 'flow_proposed', label: 'Flow Proposed', terminal: false },
+		{ id: 'flow_approved', label: 'Flow Approved', terminal: false },
+		{ id: 'done', label: 'Done', terminal: true },
+		{ id: 'cancelled', label: 'Cancelled', terminal: true },
+		{ id: 'pending_integration', label: 'Pending Integration', terminal: false },
+		{ id: 'integrated', label: 'Integrated', terminal: true },
+	],
+	transitions: [],
+};
+
 /**
  * Project schema - Full project entity
  *
@@ -147,6 +189,8 @@ export const ProjectSchema = z.object({
 	order: z.number().int().min(0),
 	gitRepositoryUrl: z.string().url().optional(),
 	gitDefaultBranch: z.string().optional(),
+	// Stored separately from the core project fields — optional for backward compatibility
+	statusConfig: ProjectStatusConfigSchema.optional(),
 	createdAt: z.string(), // ISO 8601
 	updatedAt: z.string(), // ISO 8601
 	version: z.number().int().min(0), // For optimistic locking
@@ -176,6 +220,7 @@ export const ProjectResponseSchema = z.object({
 	order: z.number().int().min(0).catch(0), // Normalize undefined to 0
 	gitRepositoryUrl: z.string().url().optional(),
 	gitDefaultBranch: z.string().optional(),
+	statusConfig: ProjectStatusConfigSchema.optional(),
 	createdAt: z.string(), // ISO 8601
 	updatedAt: z.string(), // ISO 8601
 	version: z.number().int().min(0), // For optimistic locking
@@ -362,6 +407,17 @@ export const PROJECTS_API_ROUTES = defineRoutes({
 		GET: {
 			params: z.object({ id: z.string() }),
 			response: ProjectBoardDataSchema,
+		},
+	},
+	'/api/projects/:projectId/status-config': {
+		GET: {
+			params: z.object({ projectId: z.string() }),
+			response: ProjectStatusConfigSchema,
+		},
+		PUT: {
+			params: z.object({ projectId: z.string() }),
+			body: ProjectStatusConfigSchema,
+			response: ProjectStatusConfigSchema,
 		},
 	},
 });

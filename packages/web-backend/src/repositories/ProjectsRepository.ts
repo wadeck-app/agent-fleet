@@ -1,6 +1,7 @@
 import { createLogger } from 'shared-common/logger';
 
-import type { Project, ProjectsListQuery } from '@app/shared/api/projects.contract';
+import type { Project, ProjectStatusConfig, ProjectsListQuery } from '@app/shared/api/projects.contract';
+import { DEFAULT_STATUS_CONFIG } from '@app/shared/api/projects.contract';
 
 import type { BaseRepository } from './BaseRepository';
 
@@ -174,5 +175,35 @@ export class ProjectsRepository {
 	async getProjectForWorkspace(workspaceId: string): Promise<Project | null> {
 		const projects = await this.findAll({});
 		return projects.find(p => p.workspaceIds?.includes(workspaceId)) ?? null;
+	}
+
+	/**
+	 * Get the status configuration for a project.
+	 * Returns DEFAULT_STATUS_CONFIG if the project has no custom config yet.
+	 *
+	 * @param projectId Project ID
+	 * @returns The stored ProjectStatusConfig or the default one
+	 */
+	async getStatusConfig(projectId: string): Promise<ProjectStatusConfig> {
+		const project = await this.findById(projectId);
+		if (!project) {
+			throw new Error(`Project with id ${projectId} not found`);
+		}
+		return project.statusConfig ?? DEFAULT_STATUS_CONFIG;
+	}
+
+	/**
+	 * Persist the status configuration for a project.
+	 *
+	 * @param projectId Project ID
+	 * @param config The new ProjectStatusConfig to store
+	 */
+	async saveStatusConfig(projectId: string, config: ProjectStatusConfig): Promise<void> {
+		const project = await this.findById(projectId);
+		if (!project) {
+			throw new Error(`Project with id ${projectId} not found`);
+		}
+		await this.update(projectId, { statusConfig: config });
+		log.info(`Saved status config for project ${projectId}`);
 	}
 }

@@ -942,6 +942,57 @@ export class FlowRegistry {
 	}
 
 	/**
+	 * Save a custom flow to .agent-fleet/flows-custom.yml and register it in memory.
+	 * Creates the file if it doesn't exist.
+	 * Uses simple atomic write (write to temp file, rename) to avoid partial writes.
+	 * @param flow - Flow definition to save
+	 */
+	public async saveCustomFlow(flow: FlowDefinition): Promise<void> {
+		const customFlowsPath = path.join(path.dirname(this.configPath), 'flows-custom.yml');
+		const tmpPath = `${customFlowsPath}.tmp`;
+
+		// Load existing custom flows from file (if exists)
+		let existingFlows: Record<string, any> = {};
+		if (fs.existsSync(customFlowsPath)) {
+			try {
+				const content = fs.readFileSync(customFlowsPath, 'utf-8');
+				const parsed = yaml.load(content) as Record<string, any> | null;
+				if (parsed && typeof parsed === 'object') {
+					existingFlows = parsed;
+				}
+			} catch (error) {
+				console.error(`[FlowRegistry] Failed to read existing custom flows: ${error}`);
+			}
+		}
+
+		// Add or replace the flow by its ID
+		existingFlows[flow.id] = {
+			version: flow.version,
+			name: flow.name,
+			description: flow.description,
+			workspace: flow.workspace,
+			inputs: flow.inputs,
+			steps: flow.steps,
+			...(flow.hooks !== undefined && { hooks: flow.hooks }),
+			...(flow.statusTransitions !== undefined && { statusTransitions: flow.statusTransitions }),
+			...(flow.execution !== undefined && { execution: flow.execution }),
+			...(flow.trigger !== undefined && { trigger: flow.trigger }),
+		};
+
+		// Serialize to YAML
+		const content = yaml.dump(existingFlows, { lineWidth: 120 });
+
+		// Atomic write: write to temp file, then rename
+		fs.writeFileSync(tmpPath, content, 'utf-8');
+		fs.renameSync(tmpPath, customFlowsPath);
+
+		// Register in memory immediately
+		this.registerFlow(flow);
+
+		console.log(`[FlowRegistry] Saved custom flow '${flow.id}' to ${customFlowsPath}`);
+	}
+
+	/**
 	 * Compute a deterministic hash of flow content
 	 * Hash includes: steps, workspace config, and inputs
 	 * Hash excludes: id, name, description, hooks, statusTransitions

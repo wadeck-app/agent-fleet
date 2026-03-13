@@ -1,6 +1,7 @@
 import { FLOWS_API_ROUTES } from '@app/shared/api/flows.contract';
 import { HttpException } from '@app/shared/exceptions/http-exceptions';
 
+import type { FlowFeedbackService } from '../services/FlowFeedbackService';
 import type { FlowsService } from '../services/FlowsService';
 import type { RouteWrapperFunc } from '../utils/fastify-wrapper';
 import type { LazyController } from '../utils/lazy-controller-plugin';
@@ -26,7 +27,10 @@ import type { LazyController } from '../utils/lazy-controller-plugin';
 export default class FlowsController implements LazyController<typeof FLOWS_API_ROUTES> {
 	static routes = FLOWS_API_ROUTES;
 
-	constructor(private readonly service: FlowsService) {}
+	constructor(
+		private readonly service: FlowsService,
+		private readonly flowFeedbackService: FlowFeedbackService
+	) {}
 
 	configureRoutes(add: RouteWrapperFunc<typeof FLOWS_API_ROUTES>) {
 		/**
@@ -74,6 +78,14 @@ export default class FlowsController implements LazyController<typeof FLOWS_API_
 			await this.service.saveFlow(flowId, flowDefinition);
 
 			return { success: true };
+		});
+
+		/**
+		 * GET /api/flows/:flowId/feedback
+		 * Get all feedback items for a flow run
+		 */
+		add('GET', '/api/flows/:flowId/feedback', async ({ params }) => {
+			return this.flowFeedbackService.getFeedbackForFlow(params.flowId);
 		});
 	}
 }

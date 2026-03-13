@@ -24,6 +24,7 @@ import { TicketCommentsSection } from './TicketCommentsSection';
 import { TicketEventHistorySection } from './TicketEventHistorySection';
 import { TriggeredTasksSection } from './TriggeredTasksSection';
 import { ticketsApi } from './tickets.api';
+import { useProjectStatusConfig } from './useProjectStatusConfig';
 import { useTicketCommentsCount } from './useTicketCommentsCount';
 import { useTicketHistoryCount } from './useTicketHistoryCount';
 import { useTriggeredTasksCount } from './useTriggeredTasksCount';
@@ -40,6 +41,7 @@ interface TicketDetailLayoutCProps {
  */
 export function TicketDetailLayoutC({ ticket, ticketId, onUpdate, onRefresh }: TicketDetailLayoutCProps) {
 	const { showToast } = useToast();
+	const { config: statusConfig } = useProjectStatusConfig(ticket.projectId);
 
 	const [localDescription, setLocalDescription] = useState(ticket.description);
 	const [localStatus, setLocalStatus] = useState<TicketStatus>(ticket.status);
@@ -125,15 +127,11 @@ export function TicketDetailLayoutC({ ticket, ticketId, onUpdate, onRefresh }: T
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem value="backlog">Backlog</SelectItem>
-							<SelectItem value="todo">Todo</SelectItem>
-							<SelectItem value="in_progress">In Progress</SelectItem>
-							<SelectItem value="plan_in_review">Plan In Review</SelectItem>
-							<SelectItem value="plan_approved">Plan Approved</SelectItem>
-							<SelectItem value="done">Done</SelectItem>
-							<SelectItem value="cancelled">Cancelled</SelectItem>
-							<SelectItem value="pending_integration">Pending Integration</SelectItem>
-							<SelectItem value="integrated">Integrated</SelectItem>
+							{statusConfig.statuses.map(s => (
+								<SelectItem key={s.id} value={s.id}>
+									{s.label}
+								</SelectItem>
+							))}
 						</SelectContent>
 					</SelectWithSpinner>
 				</div>

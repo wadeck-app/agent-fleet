@@ -23,19 +23,23 @@ import { TicketAuditLogSection } from './TicketAuditLogSection';
 import { TicketCommentsSection } from './TicketCommentsSection';
 import { TriggeredTasksSection } from './TriggeredTasksSection';
 import { ticketsApi } from './tickets.api';
+import { useProjectStatusConfig } from './useProjectStatusConfig';
 
-const STATUS_VARIANTS: Record<TicketStatus, 'default' | 'secondary' | 'info' | 'success' | 'warning' | 'destructive'> =
-	{
-		backlog: 'secondary',
-		todo: 'default',
-		in_progress: 'info',
-		plan_in_review: 'warning',
-		plan_approved: 'success',
-		done: 'success',
-		cancelled: 'destructive',
-		pending_integration: 'warning',
-		integrated: 'success',
-	};
+// Status badge variant mapping - keyed by status id, falls back to 'secondary' for unknown statuses
+const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'info' | 'success' | 'warning' | 'destructive'> = {
+	backlog: 'secondary',
+	todo: 'default',
+	in_progress: 'info',
+	flow_analysis: 'info',
+	flow_proposed: 'warning',
+	flow_approved: 'success',
+	plan_in_review: 'warning',
+	plan_approved: 'success',
+	done: 'success',
+	cancelled: 'destructive',
+	pending_integration: 'warning',
+	integrated: 'success',
+};
 
 function formatStatus(status: TicketStatus): string {
 	return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -89,6 +93,7 @@ interface TicketDetailLayoutDProps {
 export function TicketDetailLayoutD({ ticket, ticketId, onRefresh }: TicketDetailLayoutDProps) {
 	const navigate = useNavigate();
 	const { showToast } = useToast();
+	const { config: statusConfig } = useProjectStatusConfig(ticket.projectId);
 
 	// Local state for editable fields
 	const [localTitle, setLocalTitle] = useState('');
@@ -323,15 +328,11 @@ export function TicketDetailLayoutD({ ticket, ticketId, onRefresh }: TicketDetai
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value="backlog">Backlog</SelectItem>
-								<SelectItem value="todo">Todo</SelectItem>
-								<SelectItem value="in_progress">In Progress</SelectItem>
-								<SelectItem value="plan_in_review">Plan In Review</SelectItem>
-								<SelectItem value="plan_approved">Plan Approved</SelectItem>
-								<SelectItem value="done">Done</SelectItem>
-								<SelectItem value="cancelled">Cancelled</SelectItem>
-								<SelectItem value="pending_integration">Pending Integration</SelectItem>
-								<SelectItem value="integrated">Integrated</SelectItem>
+								{statusConfig.statuses.map(s => (
+									<SelectItem key={s.id} value={s.id}>
+										{s.label}
+									</SelectItem>
+								))}
 							</SelectContent>
 						</SelectWithSpinner>
 					</div>
@@ -462,7 +463,7 @@ export function TicketDetailLayoutD({ ticket, ticketId, onRefresh }: TicketDetai
 							>
 								<div className="flex items-center justify-between">
 									<span className="font-medium">{subTicket.title}</span>
-									<Badge variant={STATUS_VARIANTS[subTicket.status]}>
+									<Badge variant={STATUS_VARIANTS[subTicket.status] ?? 'secondary'}>
 										{formatStatus(subTicket.status)}
 									</Badge>
 								</div>

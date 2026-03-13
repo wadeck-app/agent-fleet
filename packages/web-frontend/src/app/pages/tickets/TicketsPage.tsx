@@ -24,20 +24,22 @@ import { ticketsApi } from './tickets.api';
 import { useTickets } from './useTickets';
 
 /**
- * Status badge variant mapping
+ * Status badge variant mapping - keyed by status id, falls back to 'secondary' for unknown statuses
  */
-const STATUS_VARIANTS: Record<TicketStatus, 'default' | 'secondary' | 'info' | 'success' | 'warning' | 'destructive'> =
-	{
-		backlog: 'secondary',
-		todo: 'default',
-		in_progress: 'info',
-		plan_in_review: 'warning',
-		plan_approved: 'success',
-		done: 'success',
-		cancelled: 'destructive',
-		pending_integration: 'warning',
-		integrated: 'success',
-	};
+const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'info' | 'success' | 'warning' | 'destructive'> = {
+	backlog: 'secondary',
+	todo: 'default',
+	in_progress: 'info',
+	flow_analysis: 'info',
+	flow_proposed: 'warning',
+	flow_approved: 'success',
+	plan_in_review: 'warning',
+	plan_approved: 'success',
+	done: 'success',
+	cancelled: 'destructive',
+	pending_integration: 'warning',
+	integrated: 'success',
+};
 
 /**
  * Format status for display
@@ -233,7 +235,7 @@ export function TicketsPage() {
 											</p>
 										)}
 										<div className="mt-2 flex items-center gap-2">
-											<Badge variant={STATUS_VARIANTS[ticket.status]}>
+											<Badge variant={STATUS_VARIANTS[ticket.status] ?? 'secondary'}>
 												{formatStatus(ticket.status)}
 											</Badge>
 											{ticket.labels.map(label => (

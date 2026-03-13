@@ -28,11 +28,14 @@ import { ArrowDown, ArrowUp, Loader2, MessageSquare, Zap } from 'lucide-react';
 import remarkGfm from 'remark-gfm';
 
 import { tasksApi } from '../tasks/tasks.api';
+import { FlowFeedbackSection } from './FlowFeedbackSection';
+import { FlowProposalSection } from './FlowProposalSection';
 import { TicketAuditLogSection } from './TicketAuditLogSection';
 import { TicketCommentsSection } from './TicketCommentsSection';
 import { TriggeredTasksSection } from './TriggeredTasksSection';
 import { CommentPermalink } from './components/CommentPermalink';
 import { ticketsApi } from './tickets.api';
+import { useProjectStatusConfig } from './useProjectStatusConfig';
 
 interface TicketDetailLayoutGProps {
 	ticket: Ticket;
@@ -128,6 +131,7 @@ function KeyValueRenderer({
  */
 export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: TicketDetailLayoutGProps) {
 	const { showToast } = useToast();
+	const { config: statusConfig } = useProjectStatusConfig(ticket.projectId);
 	const titleRef = useRef<HTMLDivElement>(null);
 	const descriptionRef = useRef<HTMLDivElement>(null);
 	const [localStatus, setLocalStatus] = useState<TicketStatus>(ticket.status);
@@ -449,6 +453,8 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 							<TabsTrigger value="tasks">Triggered ({countsLoading ? '?' : tasksCount})</TabsTrigger>
 							<TabsTrigger value="audit">Audit</TabsTrigger>
 							<TabsTrigger value="activity">Activity</TabsTrigger>
+							<TabsTrigger value="flow">Flow Design</TabsTrigger>
+							{ticket.currentFlowProposalId && <TabsTrigger value="feedback">Feedback</TabsTrigger>}
 						</TabsList>
 						<TooltipProvider>
 							<Tooltip>
@@ -490,6 +496,26 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 					<TabsContent value="audit">
 						<TicketAuditLogSection ticketId={ticketId} sortOrder={sortOrder} showLabel={false} />
 					</TabsContent>
+
+					<TabsContent value="flow">
+						<FlowProposalSection
+							ticketId={ticketId}
+							onTicketRefresh={() => {
+								void onRefresh();
+							}}
+						/>
+					</TabsContent>
+
+					{ticket.currentFlowProposalId && (
+						<TabsContent value="feedback">
+							<FlowFeedbackSection
+								ticketId={ticketId}
+								flowFeedbackId={ticket.flowFeedbackId}
+								flowRetrospectiveId={ticket.flowRetrospectiveId}
+								onFeedbackSubmitted={() => void onRefresh()}
+							/>
+						</TabsContent>
+					)}
 
 					<TabsContent value="activity">
 						{loadingTimeline && (
@@ -661,13 +687,11 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value="backlog">Backlog</SelectItem>
-								<SelectItem value="todo">Todo</SelectItem>
-								<SelectItem value="in_progress">In Progress</SelectItem>
-								<SelectItem value="done">Done</SelectItem>
-								<SelectItem value="cancelled">Cancelled</SelectItem>
-								<SelectItem value="pending_integration">Pending Integration</SelectItem>
-								<SelectItem value="integrated">Integrated</SelectItem>
+								{statusConfig.statuses.map(s => (
+									<SelectItem key={s.id} value={s.id}>
+										{s.label}
+									</SelectItem>
+								))}
 							</SelectContent>
 						</SelectWithSpinner>
 					</div>
