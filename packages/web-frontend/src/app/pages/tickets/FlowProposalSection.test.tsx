@@ -63,7 +63,7 @@ describe('FlowProposalSection', () => {
 	});
 
 	describe('loading state', () => {
-		it('should show "Loading flow proposals..." when isLoading is true', () => {
+		it('should show loading spinner when isLoading is true', () => {
 			vi.mocked(useFlowProposals).mockReturnValue({
 				...defaultHookResult,
 				isLoading: true,
@@ -71,7 +71,7 @@ describe('FlowProposalSection', () => {
 
 			render(<FlowProposalSection ticketId="ticket-1" />);
 
-			expect(screen.getByText('Loading flow proposals...')).toBeInTheDocument();
+			expect(screen.getByText('Loading...')).toBeInTheDocument();
 		});
 	});
 
@@ -196,8 +196,8 @@ describe('FlowProposalSection', () => {
 
 			render(<FlowProposalSection ticketId="ticket-1" />);
 
-			// Click Reject to show the rejection form
-			await user.click(screen.getByRole('button', { name: /^Reject$/i }));
+			// Click "Reject ▾" to show the rejection form
+			await user.click(screen.getByRole('button', { name: /Reject/i }));
 
 			// Rejection textarea should appear
 			expect(screen.getByPlaceholderText(/Reason for rejection/i)).toBeInTheDocument();
@@ -206,7 +206,7 @@ describe('FlowProposalSection', () => {
 			await user.type(screen.getByPlaceholderText(/Reason for rejection/i), 'Not good enough');
 
 			// Confirm reject
-			await user.click(screen.getByRole('button', { name: /Confirm reject/i }));
+			await user.click(screen.getByRole('button', { name: /Confirm rejection/i }));
 
 			await waitFor(() => {
 				expect(flowProposalsApi.rejectProposal).toHaveBeenCalledWith('ticket-1', 'prop-1', 'Not good enough');

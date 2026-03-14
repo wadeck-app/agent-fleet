@@ -140,12 +140,11 @@ describe('usePipeline (Approach 5)', () => {
 			initialProps: { mods: initialModifiers },
 		});
 
-		// Initial fetch
+		// Initial fetch — wait for both the call and the state update
 		await waitFor(() => {
 			expect(mockGetProducts).toHaveBeenCalledTimes(1);
+			expect(result.current.items).toHaveLength(2);
 		});
-
-		expect(result.current.items).toHaveLength(2);
 
 		// Change modifiers (new page)
 		const newModifiers = [withPagination(2, 2)];

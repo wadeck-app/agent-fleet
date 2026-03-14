@@ -21,6 +21,8 @@ interface FlowFeedbackSectionProps {
 	flowFeedbackId?: string;
 	/** If set, a retrospective exists */
 	flowRetrospectiveId?: string;
+	/** The current flow proposal ID — used as flowId in the feedback body */
+	currentFlowProposalId?: string;
 	/** Called after feedback is successfully submitted */
 	onFeedbackSubmitted?: () => void;
 }
@@ -57,7 +59,7 @@ function ArrayFieldInput({ label, items, onChange, placeholder, required }: Arra
 
 	return (
 		<div className="space-y-1">
-			<Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+			<Label className="text-xs font-medium text-muted-foreground tracking-wide">
 				{label}
 				{required && <span className="ml-1 text-destructive">*</span>}
 			</Label>
@@ -123,34 +125,32 @@ function RatingInput({ value, onChange }: RatingInputProps) {
 
 interface FlowFeedbackFormProps {
 	ticketId: string;
+	currentFlowProposalId?: string;
 	onSubmitted: () => void;
 }
 
-function FlowFeedbackForm({ ticketId, onSubmitted }: FlowFeedbackFormProps) {
+function FlowFeedbackForm({ ticketId, currentFlowProposalId, onSubmitted }: FlowFeedbackFormProps) {
 	const { showToast } = useToast();
 	const [rating, setRating] = useState(0);
 	const [wentWell, setWentWell] = useState<string[]>([]);
 	const [wentWrong, setWentWrong] = useState<string[]>([]);
 	const [suggestions, setSuggestions] = useState<string[]>([]);
-	const [author, setAuthor] = useState('');
-	const [flowId, setFlowId] = useState('');
-	const [taskId, setTaskId] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
-	const canSubmit = rating >= 1 && author.trim() && flowId.trim() && taskId.trim() && !isSubmitting;
+	const canSubmit = rating >= 1 && !isSubmitting;
 
 	const handleSubmit = async () => {
 		if (!canSubmit) return;
 
 		const body: CreateFlowFeedback = {
 			ticketId,
-			flowId: flowId.trim(),
-			taskId: taskId.trim(),
+			flowId: currentFlowProposalId ?? '',
+			taskId: '',
 			rating,
 			wentWell,
 			wentWrong,
 			suggestions: suggestions.length > 0 ? suggestions : undefined,
-			author: author.trim(),
+			author: 'user',
 		};
 
 		setIsSubmitting(true);
@@ -166,90 +166,51 @@ function FlowFeedbackForm({ ticketId, onSubmitted }: FlowFeedbackFormProps) {
 	};
 
 	return (
-		<div className="space-y-4">
-			<p className="text-sm font-medium">Submit Flow Execution Feedback</p>
+		<div className="relative">
+			<div className={`space-y-4 ${isSubmitting ? 'pointer-events-none opacity-50' : ''}`}>
+				<p className="text-sm font-medium">Submit Flow Execution Feedback</p>
 
-			{/* Rating */}
-			<div className="space-y-1">
-				<Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-					Rating <span className="text-destructive">*</span>
-				</Label>
-				<RatingInput value={rating} onChange={setRating} />
+				{/* Rating */}
+				<div className="space-y-1">
+					<Label className="text-xs font-medium text-muted-foreground tracking-wide">
+						Rating <span className="text-destructive">*</span>
+					</Label>
+					<RatingInput value={rating} onChange={setRating} />
+				</div>
+
+				{/* Array fields */}
+				<ArrayFieldInput
+					label="What went well"
+					items={wentWell}
+					onChange={setWentWell}
+					placeholder="Add an item and press Enter..."
+				/>
+				<ArrayFieldInput
+					label="What went wrong"
+					items={wentWrong}
+					onChange={setWentWrong}
+					placeholder="Add an item and press Enter..."
+				/>
+				<ArrayFieldInput
+					label="Suggestions"
+					items={suggestions}
+					onChange={setSuggestions}
+					placeholder="Add a suggestion and press Enter..."
+				/>
+
+				<Button onClick={() => void handleSubmit()} disabled={!canSubmit}>
+					{isSubmitting ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+					Submit Feedback
+				</Button>
 			</div>
-
-			{/* Identity fields */}
-			<div className="grid grid-cols-3 gap-3">
-				<div className="space-y-1">
-					<Label
-						htmlFor="ff-author"
-						className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
-					>
-						Author <span className="text-destructive">*</span>
-					</Label>
-					<Input
-						id="ff-author"
-						value={author}
-						onChange={e => setAuthor(e.target.value)}
-						placeholder="Your name"
-						className="text-sm"
-					/>
+			{isSubmitting && (
+				<div className="absolute inset-0 flex items-center justify-center">
+					<div className="flex flex-col items-center gap-2 text-muted-foreground">
+						<Loader2 className="size-5 animate-spin" />
+						<span className="text-sm">Submitting feedback...</span>
+					</div>
 				</div>
-				<div className="space-y-1">
-					<Label
-						htmlFor="ff-flow-id"
-						className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
-					>
-						Flow ID <span className="text-destructive">*</span>
-					</Label>
-					<Input
-						id="ff-flow-id"
-						value={flowId}
-						onChange={e => setFlowId(e.target.value)}
-						placeholder="e.g. my-flow-id"
-						className="font-mono text-sm"
-					/>
-				</div>
-				<div className="space-y-1">
-					<Label
-						htmlFor="ff-task-id"
-						className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
-					>
-						Task ID <span className="text-destructive">*</span>
-					</Label>
-					<Input
-						id="ff-task-id"
-						value={taskId}
-						onChange={e => setTaskId(e.target.value)}
-						placeholder="e.g. task-abc"
-						className="font-mono text-sm"
-					/>
-				</div>
-			</div>
-
-			{/* Array fields */}
-			<ArrayFieldInput
-				label="What went well"
-				items={wentWell}
-				onChange={setWentWell}
-				placeholder="Add an item and press Enter..."
-			/>
-			<ArrayFieldInput
-				label="What went wrong"
-				items={wentWrong}
-				onChange={setWentWrong}
-				placeholder="Add an item and press Enter..."
-			/>
-			<ArrayFieldInput
-				label="Suggestions (optional)"
-				items={suggestions}
-				onChange={setSuggestions}
-				placeholder="Add a suggestion and press Enter..."
-			/>
-
-			<Button onClick={() => void handleSubmit()} disabled={!canSubmit}>
-				{isSubmitting ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-				Submit Feedback
-			</Button>
+			)}
 		</div>
 	);
 }
@@ -295,9 +256,9 @@ function RetrospectiveCard({ ticketId }: RetrospectiveCardProps) {
 
 	if (isLoading) {
 		return (
-			<div className="flex items-center gap-2 py-4">
-				<Loader2 className="size-4 animate-spin text-muted-foreground" />
-				<span className="text-sm text-muted-foreground">Loading retrospective...</span>
+			<div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
+				<Loader2 className="size-6 animate-spin" />
+				<p className="text-sm">Loading...</p>
 			</div>
 		);
 	}
@@ -331,18 +292,14 @@ function RetrospectiveCard({ ticketId }: RetrospectiveCardProps) {
 				<div className="border-t space-y-4 p-3">
 					{/* Execution summary */}
 					<div className="space-y-1">
-						<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-							Execution Summary
-						</p>
+						<p className="text-xs font-medium text-muted-foreground tracking-wide">Execution summary</p>
 						<p className="text-sm whitespace-pre-wrap">{retro.executionSummary}</p>
 					</div>
 
 					{/* Went well */}
 					{retro.wentWell.length > 0 && (
 						<div className="space-y-1">
-							<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-								What Went Well
-							</p>
+							<p className="text-xs font-medium text-muted-foreground tracking-wide">What went well</p>
 							<ul className="list-disc list-inside space-y-0.5">
 								{retro.wentWell.map((item, i) => (
 									<li key={i} className="text-sm">
@@ -356,9 +313,7 @@ function RetrospectiveCard({ ticketId }: RetrospectiveCardProps) {
 					{/* Went wrong */}
 					{retro.wentWrong.length > 0 && (
 						<div className="space-y-1">
-							<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-								What Went Wrong
-							</p>
+							<p className="text-xs font-medium text-muted-foreground tracking-wide">What went wrong</p>
 							<ul className="list-disc list-inside space-y-0.5">
 								{retro.wentWrong.map((item, i) => (
 									<li key={i} className="text-sm">
@@ -372,9 +327,7 @@ function RetrospectiveCard({ ticketId }: RetrospectiveCardProps) {
 					{/* Suggestions */}
 					{retro.suggestions.length > 0 && (
 						<div className="space-y-1">
-							<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-								Suggestions
-							</p>
+							<p className="text-xs font-medium text-muted-foreground tracking-wide">Suggestions</p>
 							<ul className="list-disc list-inside space-y-0.5">
 								{retro.suggestions.map((item, i) => (
 									<li key={i} className="text-sm">
@@ -410,8 +363,11 @@ export function FlowFeedbackSection({
 	ticketId,
 	flowFeedbackId,
 	flowRetrospectiveId,
+	currentFlowProposalId,
 	onFeedbackSubmitted,
 }: FlowFeedbackSectionProps) {
+	const [showNewForm, setShowNewForm] = useState(false);
+
 	return (
 		<div className="space-y-6 py-2">
 			{/* Retrospective (shown when available, regardless of feedback state) */}
@@ -422,17 +378,27 @@ export function FlowFeedbackSection({
 			)}
 
 			{/* Feedback section */}
-			{!flowFeedbackId ? (
-				<FlowFeedbackForm ticketId={ticketId} onSubmitted={() => onFeedbackSubmitted?.()} />
-			) : (
-				!flowRetrospectiveId && (
-					<div className="rounded-md border bg-card p-3 flex items-center gap-2">
+			{flowFeedbackId && !showNewForm ? (
+				<div className="rounded-md border bg-card p-3 space-y-2">
+					<div className="flex items-center gap-2">
 						<Badge variant="success">Submitted</Badge>
 						<span className="text-sm text-muted-foreground">
 							Feedback has been submitted for this ticket.
 						</span>
 					</div>
-				)
+					<Button variant="outline" size="sm" onClick={() => setShowNewForm(true)}>
+						Add another feedback
+					</Button>
+				</div>
+			) : (
+				<FlowFeedbackForm
+					ticketId={ticketId}
+					currentFlowProposalId={currentFlowProposalId}
+					onSubmitted={() => {
+						setShowNewForm(false);
+						onFeedbackSubmitted?.();
+					}}
+				/>
 			)}
 		</div>
 	);

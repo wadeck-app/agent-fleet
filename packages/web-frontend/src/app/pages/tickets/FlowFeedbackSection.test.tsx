@@ -121,12 +121,12 @@ describe('FlowFeedbackSection', () => {
 			vi.mocked(feedbackApi.submitFeedback).mockResolvedValue({
 				id: 'feedback-new',
 				ticketId: 'ticket-1',
-				flowId: 'flow-abc',
-				taskId: 'task-xyz',
+				flowId: 'proposal-123',
+				taskId: '',
 				rating: 4,
 				wentWell: [],
 				wentWrong: [],
-				author: 'Alice',
+				author: 'user',
 				submittedAt: new Date().toISOString(),
 			});
 
@@ -135,21 +135,13 @@ describe('FlowFeedbackSection', () => {
 					ticketId="ticket-1"
 					flowFeedbackId={undefined}
 					flowRetrospectiveId={undefined}
+					currentFlowProposalId="proposal-123"
 					onFeedbackSubmitted={onFeedbackSubmitted}
 				/>
 			);
 
-			// Click rating 4 out of 5
+			// Click rating 4 out of 5 (only required field)
 			await user.click(screen.getByRole('button', { name: /Rate 4 out of 5/i }));
-
-			// Fill author
-			await user.type(screen.getByRole('textbox', { name: /Author/i }), 'Alice');
-
-			// Fill flow ID
-			await user.type(screen.getByRole('textbox', { name: /Flow ID/i }), 'flow-abc');
-
-			// Fill task ID
-			await user.type(screen.getByRole('textbox', { name: /Task ID/i }), 'task-xyz');
 
 			// Submit
 			await user.click(screen.getByRole('button', { name: /Submit Feedback/i }));
@@ -159,10 +151,10 @@ describe('FlowFeedbackSection', () => {
 					'ticket-1',
 					expect.objectContaining({
 						ticketId: 'ticket-1',
-						flowId: 'flow-abc',
-						taskId: 'task-xyz',
+						flowId: 'proposal-123',
+						taskId: '',
 						rating: 4,
-						author: 'Alice',
+						author: 'user',
 					})
 				);
 			});
@@ -185,11 +177,8 @@ describe('FlowFeedbackSection', () => {
 				/>
 			);
 
-			// Fill required fields
+			// Fill only required field: rating
 			await user.click(screen.getByRole('button', { name: /Rate 3 out of 5/i }));
-			await user.type(screen.getByRole('textbox', { name: /Author/i }), 'Bob');
-			await user.type(screen.getByRole('textbox', { name: /Flow ID/i }), 'flow-1');
-			await user.type(screen.getByRole('textbox', { name: /Task ID/i }), 'task-1');
 
 			await user.click(screen.getByRole('button', { name: /Submit Feedback/i }));
 
@@ -201,6 +190,25 @@ describe('FlowFeedbackSection', () => {
 			});
 
 			expect(onFeedbackSubmitted).not.toHaveBeenCalled();
+		});
+
+		it('should show "Add another feedback" button when feedback already submitted', async () => {
+			const user = userEvent.setup();
+
+			render(
+				<FlowFeedbackSection
+					ticketId="ticket-1"
+					flowFeedbackId="feedback-123"
+					flowRetrospectiveId={undefined}
+				/>
+			);
+
+			expect(screen.getByRole('button', { name: /Add another feedback/i })).toBeInTheDocument();
+
+			// Clicking it should reveal the form again
+			await user.click(screen.getByRole('button', { name: /Add another feedback/i }));
+
+			expect(screen.getByText('Submit Flow Execution Feedback')).toBeInTheDocument();
 		});
 	});
 });

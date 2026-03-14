@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
 import { Textarea } from '@framework/components/forms/Textarea';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@framework/components/primitives/Tooltip';
 import { useToast } from '@framework/features/toast/ToastContext';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { FlowProposal, FlowProposalStatus, FlowReviewThread } from '@shared/api/flow-proposals.contract';
@@ -260,10 +261,11 @@ interface ProposalViewProps {
 	proposal: FlowProposal;
 	ticketId: string;
 	onRefresh: () => void;
+	onReviewUpdated: () => void;
 	onRequestNew: () => void;
 }
 
-function ProposalView({ proposal, ticketId, onRefresh, onRequestNew }: ProposalViewProps) {
+function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onRequestNew }: ProposalViewProps) {
 	const { showToast } = useToast();
 	const [reasoningOpen, setReasoningOpen] = useState(false);
 	const [showAddThread, setShowAddThread] = useState(false);
@@ -271,6 +273,13 @@ function ProposalView({ proposal, ticketId, onRefresh, onRequestNew }: ProposalV
 	const [showRejectForm, setShowRejectForm] = useState(false);
 	const [isApproving, setIsApproving] = useState(false);
 	const [isRejecting, setIsRejecting] = useState(false);
+	const rejectFormRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		if (showRejectForm) {
+			rejectFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+		}
+	}, [showRejectForm]);
 
 	const proposalYaml = yaml.dump(proposal.proposedFlow, { indent: 2, lineWidth: 120 });
 
@@ -305,6 +314,8 @@ function ProposalView({ proposal, ticketId, onRefresh, onRequestNew }: ProposalV
 	const isPendingReview = proposal.status === 'pending_review';
 	const isTerminal = proposal.status === 'approved' || proposal.status === 'rejected';
 
+	const reasoningSentences = proposal.reasoning.split(/\.\s+|\n/).filter(s => s.trim());
+
 	return (
 		<div className="space-y-4">
 			{/* Header */}
@@ -314,9 +325,22 @@ function ProposalView({ proposal, ticketId, onRefresh, onRequestNew }: ProposalV
 				</Badge>
 				<Badge variant={getStatusBadgeVariant(proposal.status)}>{getStatusLabel(proposal.status)}</Badge>
 				{proposal.confidenceScore !== undefined && (
-					<span className="text-sm text-muted-foreground">
-						Confidence: {Math.round(proposal.confidenceScore)}%
-					</span>
+					<TooltipProvider>
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<span className="cursor-help text-sm text-muted-foreground underline decoration-dotted">
+									Confidence: {Math.round(proposal.confidenceScore)}%
+								</span>
+							</TooltipTrigger>
+							<TooltipContent className="max-w-[300px] text-xs">
+								<p>
+									Confidence reflects how well the flow agent understood the ticket requirements.
+									Below 90% typically means: missing details in the ticket description, ambiguous
+									requirements, or open questions the agent could not resolve.
+								</p>
+							</TooltipContent>
+						</Tooltip>
+					</TooltipProvider>
 				)}
 				<span className="ml-auto text-xs text-muted-foreground">
 					Proposed {new Date(proposal.proposedAt).toLocaleString()}
@@ -326,7 +350,7 @@ function ProposalView({ proposal, ticketId, onRefresh, onRequestNew }: ProposalV
 			{/* Adaptations */}
 			{proposal.adaptations && proposal.adaptations.length > 0 && (
 				<div className="space-y-1">
-					<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Adaptations</p>
+					<p className="text-xs font-medium text-muted-foreground tracking-wide">Adaptations</p>
 					<ul className="list-disc list-inside space-y-0.5">
 						{proposal.adaptations.map((a, i) => (
 							<li key={i} className="text-sm">
@@ -354,14 +378,24 @@ function ProposalView({ proposal, ticketId, onRefresh, onRequestNew }: ProposalV
 				</Button>
 				{reasoningOpen && (
 					<div className="border-t px-3 py-3">
-						<p className="text-sm whitespace-pre-wrap">{proposal.reasoning}</p>
+						{reasoningSentences.length > 1 ? (
+							<ul className="list-disc list-inside space-y-1">
+								{reasoningSentences.map((sentence, i) => (
+									<li key={i} className="text-sm">
+										{sentence.trim().replace(/\.$/, '')}
+									</li>
+								))}
+							</ul>
+						) : (
+							<p className="text-sm whitespace-pre-wrap">{proposal.reasoning}</p>
+						)}
 					</div>
 				)}
 			</div>
 
 			{/* Flow YAML */}
 			<div className="space-y-1">
-				<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Proposed Flow</p>
+				<p className="text-xs font-medium text-muted-foreground tracking-wide">Proposed flow</p>
 				<pre className="overflow-x-auto rounded-md bg-muted p-4 text-xs font-mono leading-relaxed">
 					{proposalYaml}
 				</pre>
@@ -370,8 +404,8 @@ function ProposalView({ proposal, ticketId, onRefresh, onRequestNew }: ProposalV
 			{/* Review threads */}
 			{proposal.reviewThreads.length > 0 && (
 				<div className="space-y-2">
-					<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-						Review Threads ({proposal.reviewThreads.length})
+					<p className="text-xs font-medium text-muted-foreground tracking-wide">
+						Review threads ({proposal.reviewThreads.length})
 					</p>
 					{proposal.reviewThreads.map(thread => (
 						<ReviewThreadItem
@@ -379,7 +413,7 @@ function ProposalView({ proposal, ticketId, onRefresh, onRequestNew }: ProposalV
 							thread={thread}
 							ticketId={ticketId}
 							proposalId={proposal.id}
-							onResolved={onRefresh}
+							onResolved={onReviewUpdated}
 						/>
 					))}
 				</div>
@@ -394,7 +428,7 @@ function ProposalView({ proposal, ticketId, onRefresh, onRequestNew }: ProposalV
 							proposalId={proposal.id}
 							onAdded={() => {
 								setShowAddThread(false);
-								onRefresh();
+								onReviewUpdated();
 							}}
 							onCancel={() => setShowAddThread(false)}
 						/>
@@ -415,7 +449,8 @@ function ProposalView({ proposal, ticketId, onRefresh, onRequestNew }: ProposalV
 					</Button>
 
 					{showRejectForm ? (
-						<div className="flex-1 space-y-2">
+						<div ref={rejectFormRef} className="flex-1 space-y-2">
+							<Label className="text-sm font-medium">Rejection reason</Label>
 							<Textarea
 								value={rejectReason}
 								onChange={e => setRejectReason(e.target.value)}
@@ -425,7 +460,7 @@ function ProposalView({ proposal, ticketId, onRefresh, onRequestNew }: ProposalV
 							<div className="flex gap-2">
 								<Button variant="destructive" size="sm" onClick={handleReject} disabled={isRejecting}>
 									{isRejecting ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
-									Confirm reject
+									Confirm rejection
 								</Button>
 								<Button
 									variant="ghost"
@@ -441,11 +476,12 @@ function ProposalView({ proposal, ticketId, onRefresh, onRequestNew }: ProposalV
 						</div>
 					) : (
 						<Button
-							variant="destructive"
+							variant="outline"
 							onClick={() => setShowRejectForm(true)}
 							disabled={isApproving || isRejecting}
+							className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
 						>
-							Reject
+							Reject ▾
 						</Button>
 					)}
 				</div>
@@ -506,9 +542,9 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 	// Loading state
 	if (isLoading) {
 		return (
-			<div className="flex items-center gap-2 py-6">
-				<Loader2 className="size-4 animate-spin text-muted-foreground" />
-				<span className="text-sm text-muted-foreground">Loading flow proposals...</span>
+			<div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
+				<Loader2 className="size-6 animate-spin" />
+				<p className="text-sm">Loading...</p>
 			</div>
 		);
 	}
@@ -528,9 +564,9 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 	// Requesting state (shown while the AI call is in progress after click)
 	if (isRequesting) {
 		return (
-			<div className="flex items-center gap-2 py-6">
-				<Loader2 className="size-4 animate-spin text-muted-foreground" />
-				<span className="text-sm text-muted-foreground">Requesting AI flow design...</span>
+			<div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
+				<Loader2 className="size-6 animate-spin" />
+				<p className="text-sm">Requesting AI flow design...</p>
 			</div>
 		);
 	}
@@ -574,9 +610,11 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 						refresh();
 						onTicketRefresh?.();
 					}}
+					onReviewUpdated={() => {
+						// Re-fetch proposals without triggering parent ticket refresh
+						refresh();
+					}}
 					onRequestNew={() => {
-						// Scroll to top of section and show request form by clearing proposals locally
-						// We trigger a new request directly for better UX
 						setContext('');
 					}}
 				/>
