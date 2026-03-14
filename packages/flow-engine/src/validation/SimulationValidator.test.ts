@@ -2,7 +2,7 @@
  * SimulationValidator Tests
  *
  * Tests for simulation-based validation:
- * - Arithmetic detection in template expressions
+ * - Whitelist-based template expression validation
  * - Dependency chain analysis
  * - Execution path analysis
  */
@@ -12,6 +12,33 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { FlowDefinition } from '../types';
 import { SimulationValidator } from './SimulationValidator';
 import { ValidationCode } from './ValidationTypes';
+
+/** Build a minimal single-step model flow with the given prompt text. */
+function makeFlow(prompt: string): { flow: FlowDefinition; stepIds: Set<string> } {
+	const flow: FlowDefinition = {
+		id: 'test-flow',
+		version: '1.0.0',
+		name: 'Test Flow',
+		description: 'Test',
+		workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+		inputs: {},
+		steps: [
+			{
+				id: 'step1',
+				name: 'Step 1',
+				type: 'model',
+				model: 'sonnet',
+				prompt,
+			},
+		],
+	};
+	return { flow, stepIds: new Set(['step1']) };
+}
+
+/** Filter issues to INVALID_TEMPLATE_SYNTAX only. */
+function syntaxErrors(issueCollector: MockIssueCollector) {
+	return issueCollector.issues.filter(i => i.code === ValidationCode.INVALID_TEMPLATE_SYNTAX);
+}
 
 describe('SimulationValidator', () => {
 	let validator: SimulationValidator;
@@ -23,136 +50,139 @@ describe('SimulationValidator', () => {
 	});
 
 	// ---------------------------------------------------------------------------
-	// Arithmetic detection
+	// Template expression validation (whitelist)
 	// ---------------------------------------------------------------------------
 
-	describe('arithmetic detection in template expressions', () => {
-		it('should NOT flag hyphens in step IDs as arithmetic (regression)', () => {
-			const flow: FlowDefinition = {
-				id: 'test-flow',
-				version: '1.0.0',
-				name: 'Test Flow',
-				description: 'Test',
-				workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
-				inputs: {},
-				steps: [
-					{
-						id: 'analyze-storage',
-						name: 'Analyze Storage',
-						type: 'model',
-						model: 'sonnet',
-						prompt: 'Analyze the storage system',
-					},
-					{
-						id: 'implement-changes',
-						name: 'Implement Changes',
-						type: 'model',
-						model: 'sonnet',
-						depends: ['analyze-storage'],
-						prompt: 'Based on ${{ steps.analyze-storage.outputs.result }}, implement the changes',
-					},
-				],
-			};
+	describe('template expression validation (whitelist)', () => {
+		// --- VALID — should produce NO INVALID_TEMPLATE_SYNTAX errors ---
 
-			const stepIds = new Set(['analyze-storage', 'implement-changes']);
+		it('should accept inputs.simple-name', () => {
+			const { flow, stepIds } = makeFlow('Value: ${{ inputs.simple-name }}');
 			validator.validateSimulation(flow, stepIds);
-
-			const arithmeticErrors = issueCollector.issues.filter(
-				i => i.code === ValidationCode.INVALID_TEMPLATE_SYNTAX && i.message.includes('arithmetic')
-			);
-			expect(arithmeticErrors).toHaveLength(0);
+			expect(syntaxErrors(issueCollector)).toHaveLength(0);
 		});
 
-		it('should NOT flag multi-segment hyphenated step IDs as arithmetic', () => {
-			const flow: FlowDefinition = {
-				id: 'test-flow',
-				version: '1.0.0',
-				name: 'Test Flow',
-				description: 'Test',
-				workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
-				inputs: {},
-				steps: [
-					{
-						id: 'fetch-and-parse-data',
-						name: 'Fetch And Parse Data',
-						type: 'script',
-						script: 'echo done',
-					},
-					{
-						id: 'generate-final-report',
-						name: 'Generate Final Report',
-						type: 'model',
-						model: 'sonnet',
-						depends: ['fetch-and-parse-data'],
-						prompt: 'Generate report using ${{ steps.fetch-and-parse-data.outputs.result }}',
-					},
-				],
-			};
-
-			const stepIds = new Set(['fetch-and-parse-data', 'generate-final-report']);
+		it('should accept inputs.camelCase', () => {
+			const { flow, stepIds } = makeFlow('Value: ${{ inputs.camelCase }}');
 			validator.validateSimulation(flow, stepIds);
-
-			const arithmeticErrors = issueCollector.issues.filter(
-				i => i.code === ValidationCode.INVALID_TEMPLATE_SYNTAX && i.message.includes('arithmetic')
-			);
-			expect(arithmeticErrors).toHaveLength(0);
+			expect(syntaxErrors(issueCollector)).toHaveLength(0);
 		});
 
-		it('should flag actual arithmetic with spaces around operators', () => {
-			const flow: FlowDefinition = {
-				id: 'test-flow',
-				version: '1.0.0',
-				name: 'Test Flow',
-				description: 'Test',
-				workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
-				inputs: {},
-				steps: [
-					{
-						id: 'step1',
-						name: 'Step 1',
-						type: 'model',
-						model: 'sonnet',
-						prompt: 'Count is ${{ steps.x.outputs.count + 1 }}',
-					},
-				],
-			};
-
-			const stepIds = new Set(['step1']);
+		it('should accept inputs.with_underscore', () => {
+			const { flow, stepIds } = makeFlow('Value: ${{ inputs.with_underscore }}');
 			validator.validateSimulation(flow, stepIds);
-
-			const arithmeticErrors = issueCollector.issues.filter(
-				i => i.code === ValidationCode.INVALID_TEMPLATE_SYNTAX && i.message.includes('arithmetic')
-			);
-			expect(arithmeticErrors).toHaveLength(1);
-			expect(arithmeticErrors[0].severity).toBe('error');
+			expect(syntaxErrors(issueCollector)).toHaveLength(0);
 		});
 
-		it('should flag multiplication with spaces in template expressions', () => {
-			const flow: FlowDefinition = {
-				id: 'test-flow',
-				version: '1.0.0',
-				name: 'Test Flow',
-				description: 'Test',
-				workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
-				inputs: {},
-				steps: [
-					{
-						id: 'step1',
-						name: 'Step 1',
-						type: 'model',
-						model: 'sonnet',
-						prompt: 'Value is ${{ steps.x.outputs.val * 2 }}',
-					},
-				],
-			};
-
-			const stepIds = new Set(['step1']);
+		it('should accept steps.analyze-storage.outputs.result (regression #9)', () => {
+			const { flow, stepIds } = makeFlow('Based on ${{ steps.analyze-storage.outputs.result }}, proceed');
 			validator.validateSimulation(flow, stepIds);
+			expect(syntaxErrors(issueCollector)).toHaveLength(0);
+		});
 
-			const arithmeticErrors = issueCollector.issues.filter(
-				i => i.code === ValidationCode.INVALID_TEMPLATE_SYNTAX && i.message.includes('arithmetic')
-			);
-			expect(arithmeticErrors).toHaveLength(1);
+		it('should accept steps.fetch-and-parse-data.outputs.entityTypes (multi-hyphen regression)', () => {
+			const { flow, stepIds } = makeFlow('Report: ${{ steps.fetch-and-parse-data.outputs.entityTypes }}');
+			validator.validateSimulation(flow, stepIds);
+			expect(syntaxErrors(issueCollector)).toHaveLength(0);
+		});
+
+		it('should accept steps.myStep.outputs.result', () => {
+			const { flow, stepIds } = makeFlow('Result: ${{ steps.myStep.outputs.result }}');
+			validator.validateSimulation(flow, stepIds);
+			expect(syntaxErrors(issueCollector)).toHaveLength(0);
+		});
+
+		it('should accept steps.step_1.outputs.count', () => {
+			const { flow, stepIds } = makeFlow('Count: ${{ steps.step_1.outputs.count }}');
+			validator.validateSimulation(flow, stepIds);
+			expect(syntaxErrors(issueCollector)).toHaveLength(0);
+		});
+
+		it('should accept flow.allLogs', () => {
+			const { flow, stepIds } = makeFlow('Logs: ${{ flow.allLogs }}');
+			validator.validateSimulation(flow, stepIds);
+			expect(syntaxErrors(issueCollector)).toHaveLength(0);
+		});
+
+		it('should accept task.priority', () => {
+			const { flow, stepIds } = makeFlow('Priority: ${{ task.priority }}');
+			validator.validateSimulation(flow, stepIds);
+			expect(syntaxErrors(issueCollector)).toHaveLength(0);
+		});
+
+		// --- INVALID — should produce INVALID_TEMPLATE_SYNTAX error ---
+
+		it('should flag arithmetic with spaces: steps.x.outputs.count + 1', () => {
+			const { flow, stepIds } = makeFlow('Count is ${{ steps.x.outputs.count + 1 }}');
+			validator.validateSimulation(flow, stepIds);
+			const errors = syntaxErrors(issueCollector);
+			expect(errors.length).toBeGreaterThanOrEqual(1);
+			expect(errors[0].severity).toBe('error');
+		});
+
+		it('should flag arithmetic without spaces: steps.x.outputs.count+1 (key regression)', () => {
+			const { flow, stepIds } = makeFlow('Count is ${{ steps.x.outputs.count+1 }}');
+			validator.validateSimulation(flow, stepIds);
+			const errors = syntaxErrors(issueCollector);
+			expect(errors.length).toBeGreaterThanOrEqual(1);
+			expect(errors[0].severity).toBe('error');
+		});
+
+		it('should flag arithmetic: inputs.x * 2', () => {
+			const { flow, stepIds } = makeFlow('Value: ${{ inputs.x * 2 }}');
+			validator.validateSimulation(flow, stepIds);
+			const errors = syntaxErrors(issueCollector);
+			expect(errors.length).toBeGreaterThanOrEqual(1);
+			expect(errors[0].severity).toBe('error');
+		});
+
+		it('should flag wrong structure (too deep): steps.x.y.z.w.v', () => {
+			const { flow, stepIds } = makeFlow('Value: ${{ steps.x.y.z.w.v }}');
+			validator.validateSimulation(flow, stepIds);
+			const errors = syntaxErrors(issueCollector);
+			expect(errors.length).toBeGreaterThanOrEqual(1);
+			expect(errors[0].severity).toBe('error');
+		});
+
+		it('should flag unknown context: unknown.something', () => {
+			const { flow, stepIds } = makeFlow('Value: ${{ unknown.something }}');
+			validator.validateSimulation(flow, stepIds);
+			const errors = syntaxErrors(issueCollector);
+			expect(errors.length).toBeGreaterThanOrEqual(1);
+			expect(errors[0].severity).toBe('error');
+		});
+
+		it('should flag function call: format(inputs.x)', () => {
+			const { flow, stepIds } = makeFlow('Value: ${{ format(inputs.x) }}');
+			validator.validateSimulation(flow, stepIds);
+			const errors = syntaxErrors(issueCollector);
+			expect(errors.length).toBeGreaterThanOrEqual(1);
+			expect(errors[0].severity).toBe('error');
+		});
+
+		it('should flag incomplete step reference: steps.x (missing .outputs.varName)', () => {
+			const { flow, stepIds } = makeFlow('Value: ${{ steps.x }}');
+			validator.validateSimulation(flow, stepIds);
+			const errors = syntaxErrors(issueCollector);
+			expect(errors.length).toBeGreaterThanOrEqual(1);
+			expect(errors[0].severity).toBe('error');
+		});
+
+		it('should flag empty expression', () => {
+			// ${{  }} — two spaces inside, trimmed to empty string
+			const { flow, stepIds } = makeFlow('Value: ${{  }}');
+			validator.validateSimulation(flow, stepIds);
+			const errors = syntaxErrors(issueCollector);
+			expect(errors.length).toBeGreaterThanOrEqual(1);
+			expect(errors[0].severity).toBe('error');
+		});
+
+		it('should flag incomplete output path: steps.x.outputs (missing var name)', () => {
+			const { flow, stepIds } = makeFlow('Value: ${{ steps.x.outputs }}');
+			validator.validateSimulation(flow, stepIds);
+			const errors = syntaxErrors(issueCollector);
+			expect(errors.length).toBeGreaterThanOrEqual(1);
+			expect(errors[0].severity).toBe('error');
 		});
 	});
 });

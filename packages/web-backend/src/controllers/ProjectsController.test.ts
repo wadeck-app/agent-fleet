@@ -224,7 +224,7 @@ describe('ProjectsController', () => {
 	describe('DELETE /api/projects/ — bulk delete', () => {
 		it('passes ids array to service.bulkDelete', async () => {
 			const bulkDeleteResponse = {
-				success: true,
+				success: true as const,
 				totalRequested: 2,
 				totalDeleted: 2,
 				totalFailed: 0,

@@ -324,6 +324,42 @@ export class SimulationValidator {
 	}
 
 	/**
+	 * Whitelist regex for valid template expressions.
+	 * Valid forms:
+	 *   inputs.<id>
+	 *   steps.<id>.outputs.<id>
+	 *   flow.<id>
+	 *   task.<id>
+	 * Where <id> is [a-zA-Z0-9_-]+
+	 */
+	private static readonly VALID_TEMPLATE_EXPRESSION =
+		/^(inputs\.[a-zA-Z0-9_-]+|steps\.[a-zA-Z0-9_-]+\.outputs\.[a-zA-Z0-9_-]+|flow\.[a-zA-Z0-9_-]+|task\.[a-zA-Z0-9_-]+)$/;
+
+	/**
+	 * Validate a single template expression against the whitelist.
+	 * Adds an INVALID_TEMPLATE_SYNTAX error if it does not match.
+	 */
+	private validateTemplateExpression(expression: string, step: FlowStep, flow: FlowDefinition): void {
+		if (!SimulationValidator.VALID_TEMPLATE_EXPRESSION.test(expression)) {
+			this.issueCollector.addIssue({
+				severity: 'error',
+				code: ValidationCode.INVALID_TEMPLATE_SYNTAX,
+				message: `Invalid template expression: \${{ ${expression} }}`,
+				location: {
+					stepId: step.id,
+					field: step.type === 'model' ? 'prompt' : 'script',
+					path: `${flow.id}.steps[${step.id}]`,
+				},
+				suggestion: `Valid forms: \${{ inputs.name }}, \${{ steps.step-id.outputs.varName }}, \${{ flow.allLogs }}, \${{ task.priority }}`,
+				context: {
+					actual: expression,
+					expected: 'inputs.<id> | steps.<id>.outputs.<id> | flow.<id> | task.<id>',
+				},
+			});
+		}
+	}
+
+	/**
 	 * Simulate template rendering to find issues
 	 */
 	private simulateTemplateRendering(flow: FlowDefinition): void {
@@ -331,76 +367,12 @@ export class SimulationValidator {
 		for (const step of flow.steps) {
 			const text = this.getStepText(step);
 
-			// Detect arithmetic in templates (not supported).
-			// Require whitespace on both sides of the operator to avoid false positives
-			// on hyphens within identifiers like ${{ steps.analyze-storage.outputs.result }}.
-			const arithmeticPattern = /\$\{\{\s*[^}]*\s[+\-*/]\s[^}]*\}\}/g;
-			const arithmeticMatches = text.match(arithmeticPattern);
-
-			if (arithmeticMatches) {
-				for (const match of arithmeticMatches) {
-					this.issueCollector.addIssue({
-						severity: 'error',
-						code: ValidationCode.INVALID_TEMPLATE_SYNTAX,
-						message: `Template expression contains arithmetic which is not supported: ${match}`,
-						location: {
-							stepId: step.id,
-							field: step.type === 'model' ? 'prompt' : 'script',
-							path: `${flow.id}.steps[${step.id}]`,
-						},
-						suggestion: `Move arithmetic to a script step and use the result: set /a result=\${value}+1`,
-						context: {
-							actual: match,
-							expected: 'Simple variable references only (e.g., ${{ inputs.value }})',
-						},
-					});
-				}
-			}
-
-			// Detect function calls in templates (not supported)
-			const functionPattern = /\$\{\{\s*[^}]*\([^)]*\)\s*\}\}/g;
-			const functionMatches = text.match(functionPattern);
-
-			if (functionMatches) {
-				for (const match of functionMatches) {
-					this.issueCollector.addIssue({
-						severity: 'warning',
-						code: ValidationCode.INVALID_TEMPLATE_SYNTAX,
-						message: `Template expression contains function call which may not work: ${match}`,
-						location: {
-							stepId: step.id,
-							field: step.type === 'model' ? 'prompt' : 'script',
-							path: `${flow.id}.steps[${step.id}]`,
-						},
-						suggestion: `Templates only support property access, not function calls`,
-						context: {
-							actual: match,
-						},
-					});
-				}
-			}
-
-			// Detect nested property access beyond expected depth
-			const deepAccessPattern = /\$\{\{\s*\w+\.\w+\.\w+\.\w+\.\w+\s*\}\}/g;
-			const deepAccessMatches = text.match(deepAccessPattern);
-
-			if (deepAccessMatches) {
-				for (const match of deepAccessMatches) {
-					this.issueCollector.addIssue({
-						severity: 'warning',
-						code: ValidationCode.INVALID_TEMPLATE_SYNTAX,
-						message: `Template expression has deep nested property access: ${match}`,
-						location: {
-							stepId: step.id,
-							field: step.type === 'model' ? 'prompt' : 'script',
-							path: `${flow.id}.steps[${step.id}]`,
-						},
-						suggestion: `Consider simplifying or extracting the value in a previous step`,
-						context: {
-							actual: match,
-						},
-					});
-				}
+			// Extract all template expressions and validate each against the whitelist
+			const templateRegex = /\$\{\{\s*([^}]+?)\s*\}\}/g;
+			let match;
+			while ((match = templateRegex.exec(text)) !== null) {
+				const expression = match[1].trim();
+				this.validateTemplateExpression(expression, step, flow);
 			}
 		}
 	}
