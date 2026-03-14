@@ -44,6 +44,10 @@ storybook-static
 .claude/temp
 .DS_Store
 
+# Agent memory files
+.claude/agent-memory
+packages/**/.claude/agent-memory
+
 # Malformed HTML files (design prototypes)
 docs/design*/**/*.html
 

@@ -36,6 +36,8 @@ import { TriggeredTasksSection } from './TriggeredTasksSection';
 import { CommentPermalink } from './components/CommentPermalink';
 import { ticketsApi } from './tickets.api';
 import { useProjectStatusConfig } from './useProjectStatusConfig';
+import { useTicketCommentsCount } from './useTicketCommentsCount';
+import { useTriggeredTasksCount } from './useTriggeredTasksCount';
 
 interface TicketDetailLayoutGProps {
 	ticket: Ticket;
@@ -149,10 +151,10 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 	// Tracks the original key of each item by ID (undefined = newly added row)
 	const [originalKeys, setOriginalKeys] = useState<Record<string, string>>({});
 
-	// Tab counts
-	const [commentsCount, setCommentsCount] = useState(0);
-	const [tasksCount, setTasksCount] = useState(0);
-	const [countsLoading, setCountsLoading] = useState(true);
+	// Tab counts — real-time via WS-aware hooks
+	const { count: commentsCount, loading: commentsCountLoading } = useTicketCommentsCount(ticketId);
+	const { count: tasksCount, loading: tasksCountLoading } = useTriggeredTasksCount(ticketId);
+	const countsLoading = commentsCountLoading || tasksCountLoading;
 
 	// Activity timeline
 	const [timeline, setTimeline] = useState<TimelineItem[]>([]);
@@ -197,27 +199,6 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [ticket]);
-
-	// Fetch tab counts
-	useEffect(() => {
-		const fetchCounts = async () => {
-			try {
-				setCountsLoading(true);
-				const [commentsRes, tasksRes] = await Promise.all([
-					ticketsApi.getComments(ticketId),
-					tasksApi.getTasksList({ ticketId, pageSize: 1 }),
-				]);
-				setCommentsCount(commentsRes.comments.length);
-				setTasksCount(tasksRes.pagination?.total || 0);
-			} catch (err) {
-				console.error('Failed to fetch counts:', err);
-			} finally {
-				setCountsLoading(false);
-			}
-		};
-
-		fetchCounts();
-	}, [ticketId]);
 
 	// Fetch activity timeline (comments + tasks interleaved, sorted by date)
 	useEffect(() => {
@@ -714,6 +695,10 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 										{s.label}
 									</SelectItem>
 								))}
+								{/* Fallback: show raw status value when config hasn't loaded yet — bug #5 */}
+								{!statusConfig.statuses.find(s => s.id === localStatus) && (
+									<SelectItem value={localStatus}>{localStatus}</SelectItem>
+								)}
 							</SelectContent>
 						</SelectWithSpinner>
 					</div>

@@ -172,6 +172,22 @@ describe('TicketCommentsSection', () => {
 		});
 	});
 
+	describe('accessibility — bug #6', () => {
+		it('should have the "Add a comment" label linked to the textarea via htmlFor', async () => {
+			(ticketsApi.getComments as any).mockResolvedValue({ comments: [] });
+
+			render(<TicketCommentsSection ticketId="ticket-1" />);
+
+			await waitFor(() => {
+				expect(ticketsApi.getComments).toHaveBeenCalled();
+			});
+
+			// The label should be associated with the textarea
+			const textarea = screen.getByLabelText('Add a comment');
+			expect(textarea.tagName).toBe('TEXTAREA');
+		});
+	});
+
 	describe('content rendering', () => {
 		it('should render multiline comments', async () => {
 			(ticketsApi.getComments as any).mockResolvedValue({

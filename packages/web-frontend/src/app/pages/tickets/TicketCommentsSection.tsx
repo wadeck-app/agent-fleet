@@ -203,8 +203,10 @@ export function TicketCommentsSection({ ticketId, sortOrder = 'asc', showLabel =
 
 			{/* Add comment form - always visible */}
 			<div className="mt-4 space-y-2">
-				<Label>Add a comment</Label>
+				{/* htmlFor links label to textarea for accessibility — bug #6 fix */}
+				<Label htmlFor="add-comment-textarea">Add a comment</Label>
 				<Textarea
+					id="add-comment-textarea"
 					value={newComment}
 					onChange={e => setNewComment(e.target.value)}
 					onKeyDown={e => {
