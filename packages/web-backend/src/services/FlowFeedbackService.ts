@@ -8,9 +8,11 @@ import type {
 	FlowRetrospective,
 } from '@app/shared/api/flow-feedback.contract';
 import { ERROR_CODES, NotFoundException } from '@app/shared/exceptions/http-exceptions';
+import { B2F_TICKET_FEEDBACK_SUBMITTED } from '@app/shared/transport';
 
 import type { FlowFeedbackRepository } from '../repositories/FlowFeedbackRepository';
 import type { TicketsRepository } from '../repositories/TicketsRepository';
+import type { EventBroadcaster } from '../transport/EventBroadcaster';
 
 const log = createLogger('FlowFeedbackService');
 
@@ -32,7 +34,8 @@ const log = createLogger('FlowFeedbackService');
 export class FlowFeedbackService {
 	constructor(
 		private readonly repository: FlowFeedbackRepository,
-		private readonly ticketsRepository: TicketsRepository
+		private readonly ticketsRepository: TicketsRepository,
+		private readonly eventBroadcaster: EventBroadcaster
 	) {}
 
 	/**
@@ -67,6 +70,13 @@ export class FlowFeedbackService {
 		// Link feedback ID to ticket record
 		await this.ticketsRepository.update(ticketId, {
 			flowFeedbackId: created.id,
+		});
+
+		// Notify subscribers that feedback was submitted for this ticket
+		this.eventBroadcaster.broadcast(B2F_TICKET_FEEDBACK_SUBMITTED, {
+			ticketId,
+			feedbackId: created.id,
+			rating: created.rating,
 		});
 
 		log.info(`Flow feedback ${created.id} submitted for ticket ${ticketId}`);

@@ -342,7 +342,7 @@ export class DataStoreFactory {
 			const ticketsBaseRepo = new BaseRepository<Ticket>('tickets', this.storage);
 			const ticketsRepo = new TicketsRepository(ticketsBaseRepo);
 
-			this.flowFeedbackService = new FlowFeedbackService(feedbackRepo, ticketsRepo);
+			this.flowFeedbackService = new FlowFeedbackService(feedbackRepo, ticketsRepo, this.getEventBroadcaster());
 		}
 
 		return this.flowFeedbackService;

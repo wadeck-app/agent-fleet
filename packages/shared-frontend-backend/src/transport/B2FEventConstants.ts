@@ -252,3 +252,6 @@ export const B2F_TICKET_STATUS_CHANGED = 'b2f:ticket:status_changed' as const;
 
 /** Ticket comment added event — carries the full comment so subscribers can append without re-fetching */
 export const B2F_TICKET_COMMENT_ADDED = 'b2f:ticket:comment_added' as const;
+
+/** Flow feedback submitted for a ticket */
+export const B2F_TICKET_FEEDBACK_SUBMITTED = 'b2f:ticket:feedback_submitted' as const;

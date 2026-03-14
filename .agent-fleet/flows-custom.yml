@@ -66,3 +66,69 @@ payment-race-condition-fix:
           approval:
               title: Approve Payment Race Condition Fix
               description: Review the design and test results above. Approve to proceed with merge.
+generic-storage-management-debugger:
+    version: 1.0.0
+    name: Generic Storage Management Debugger Page
+    description: >-
+        Design and implement a debugger/viewer page for managing and inspecting storage data globally across all entities,
+        with JSON and CSV export support.
+    workspace:
+        mode: shared
+        gitStrategy: feature-branch
+        reusePolicy: never
+    inputs:
+        debugFeatures:
+            type: multi-enum
+            description: Features to enable in debugger
+            options:
+                - id: view
+                  label: View/Search Data
+                - id: export
+                  label: Export (JSON & CSV)
+                - id: filter
+                  label: Advanced Filtering
+                - id: history
+                  label: Change History
+    steps:
+        - id: analyze-architecture
+          name: Analyze Storage Architecture
+          type: model
+          model: sonnet
+          prompt: >-
+              Review storage layers in packages/web-backend and packages/web-frontend. Document all entities, schemas, access
+              patterns. Recommend generic debugger interface supporting JSON/CSV exports.
+        - id: design-ui-api
+          name: Design UI & Backend API
+          type: model
+          model: sonnet
+          depends:
+              - analyze-architecture
+          prompt: >-
+              Based on ${{ steps.analyze-architecture.outputs.result }}, design: (1) Backend API: GET /api/debug/storage with
+              filtering/pagination, POST /api/debug/export?format=json|csv. (2) Frontend: entity selector, search, data table,
+              filter panel, export buttons using Radix UI.
+        - id: implement-solution
+          name: Implement Backend & Frontend
+          type: script
+          depends:
+              - design-ui-api
+          script: >-
+              cd packages/web-backend && npm run dev:stub -- 'Implement storage debugger: backend API endpoints
+              (/api/debug/storage, /api/debug/export with JSON/CSV format), frontend StorageDebugger.tsx component with Radix
+              UI, entity selector, search, filtering, sorting, export functionality.'
+          captureOutput: true
+        - id: review-approval
+          name: Request Review & Approval
+          type: user_intervention
+          depends:
+              - implement-solution
+          interventionType: approval
+          approval:
+              title: Approve Storage Debugger?
+              description: Review backend API design and frontend component implementation. Ensure JSON/CSV exports work correctly.
+              allowReject: true
+          onFailure:
+              goto: design-ui-api
+              maxIterations: 2
+              resetOnSuccess: true
+              addComment: true

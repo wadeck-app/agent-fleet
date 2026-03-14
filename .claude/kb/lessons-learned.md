@@ -5850,6 +5850,22 @@ Hiding creates surprises. Disabled + explained = discovery.
 **Bug**: Regex `[+\-*/]` in `SimulationValidator.ts` matches hyphens in step IDs (e.g. `analyze-storage`).
 **Fix**: Require whitespace on both sides: `\s[+\-*/]\s` — distinguishes operators from identifier hyphens.
 
+## UI Labels: NEVER use UPPERCASE text in the application
+
+**Rule**: Never render label text in ALL CAPS / UPPERCASE in the UI. It reduces readability and is inconsistent with the rest of the application.
+
+**Bad**: `PROPOSED FLOW`, `ADAPTATIONS`, `WHAT WENT WELL` (via CSS `text-transform: uppercase` or `uppercase` Tailwind class on label text)
+**Good**: `Proposed flow`, `Adaptations`, `What went well`
+
+This applies to:
+
+- Section headings in proposal/feedback views
+- Tab labels
+- Form field labels (remove `uppercase tracking-wide` from Label className)
+- Any text rendered from LLM responses that may include uppercase sections
+
+When displaying LLM output, normalize section headings to Title Case in the UI layer if the LLM uses uppercase.
+
 ## FlowDesignerAgent: output patterns need capture groups
 
 **Rule**: `script` step `output.X.pattern` MUST use `(...)` capture groups. Without them, `LogicalValidator` throws `"has no capture group"`.

@@ -252,6 +252,11 @@ Rules:
 - Reuse existing flows as subflows when it makes sense
 - Address ALL review thread comments if this is a redesign
 - Give an honest confidence score (0-100)
+
+- PRESERVATION RULE — When adapting an existing flow based on user feedback:
+  - Preserve ALL existing steps, configuration, and structure that the user did NOT explicitly mention in their feedback.
+  - Only modify exactly what the user requested. Do not "improve" or "clean up" parts the user didn't mention — even if you think the changes would be beneficial.
+  - If you're unsure whether to modify something, keep the existing version.
 - KEEP THE FLOW CONCISE: maximum 5 steps total, each step prompt/command under 80 words
 - Keep the total JSON output under 3000 characters — omit optional fields if needed
 - CRITICAL depends rule: if step B uses \`\${{ steps.A.outputs.result }}\`, step B MUST include \`"depends": ["A"]\`. The field is \`"depends"\` (NOT "dependsOn"). This is MANDATORY — the validator will reject the flow otherwise. Example:

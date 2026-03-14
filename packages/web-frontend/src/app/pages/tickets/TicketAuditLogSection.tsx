@@ -258,12 +258,10 @@ export function TicketAuditLogSection({
 	if (loading) {
 		return (
 			<div>
-				{showLabel && (
-					<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Audit Log</p>
-				)}
-				<div className="flex items-center gap-2">
-					<Loader2 className="size-4 animate-spin text-muted-foreground" />
-					<span className="text-sm text-muted-foreground">Loading...</span>
+				{showLabel && <p className="text-xs font-medium text-muted-foreground tracking-wide mb-2">Audit Log</p>}
+				<div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
+					<Loader2 className="size-6 animate-spin" />
+					<p className="text-sm">Loading...</p>
 				</div>
 			</div>
 		);
@@ -271,9 +269,7 @@ export function TicketAuditLogSection({
 
 	return (
 		<div>
-			{showLabel && (
-				<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Audit Log</p>
-			)}
+			{showLabel && <p className="text-xs font-medium text-muted-foreground tracking-wide mb-2">Audit Log</p>}
 			{sortedEntries.length === 0 ? (
 				<p className="text-sm text-muted-foreground">No activity yet</p>
 			) : (

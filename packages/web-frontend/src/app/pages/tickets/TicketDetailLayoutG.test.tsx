@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TicketDetailLayoutG } from './TicketDetailLayoutG';
+import { useTicketActivityCount } from './useTicketActivityCount';
+import { useTicketAuditCount } from './useTicketAuditCount';
 import { useTicketCommentsCount } from './useTicketCommentsCount';
 import { useTriggeredTasksCount } from './useTriggeredTasksCount';
 
@@ -11,6 +13,7 @@ import { useTriggeredTasksCount } from './useTriggeredTasksCount';
 vi.mock('./tickets.api', () => ({
 	ticketsApi: {
 		getComments: vi.fn().mockResolvedValue({ comments: [] }),
+		getHistory: vi.fn().mockResolvedValue({ entries: [] }),
 		updateTicket: vi.fn(),
 	},
 }));
@@ -53,6 +56,20 @@ vi.mock('./useTriggeredTasksCount', () => ({
 		loading: true,
 		error: null,
 		refresh: vi.fn(),
+	})),
+}));
+
+vi.mock('./useTicketAuditCount', () => ({
+	useTicketAuditCount: vi.fn(() => ({
+		count: 0,
+		loading: true,
+	})),
+}));
+
+vi.mock('./useTicketActivityCount', () => ({
+	useTicketActivityCount: vi.fn(() => ({
+		count: 0,
+		loading: true,
 	})),
 }));
 
@@ -181,6 +198,9 @@ describe('TicketDetailLayoutG', () => {
 			error: null,
 			refresh: vi.fn(),
 		});
+
+		vi.mocked(useTicketAuditCount).mockReturnValue({ count: 0, loading: true });
+		vi.mocked(useTicketActivityCount).mockReturnValue({ count: 0, loading: true });
 	});
 
 	describe('bug #3 — comments count real-time via hooks', () => {
@@ -213,13 +233,15 @@ describe('TicketDetailLayoutG', () => {
 				error: null,
 				refresh: vi.fn(),
 			});
-			// Tasks must also be loaded for countsLoading to be false
+			// All count hooks must be done loading for countsLoading to be false
 			(useTriggeredTasksCount as any).mockReturnValue({
 				count: 0,
 				loading: false,
 				error: null,
 				refresh: vi.fn(),
 			});
+			vi.mocked(useTicketAuditCount).mockReturnValue({ count: 0, loading: false });
+			vi.mocked(useTicketActivityCount).mockReturnValue({ count: 0, loading: false });
 
 			render(<TicketDetailLayoutG {...defaultProps} />);
 			expect(screen.getByText('Comments (5)')).toBeInTheDocument();
@@ -229,7 +251,7 @@ describe('TicketDetailLayoutG', () => {
 			// Start with both loading
 			const { rerender } = render(<TicketDetailLayoutG {...defaultProps} />);
 
-			// Now both loaded with new values
+			// Now all loaded with new values
 			(useTicketCommentsCount as any).mockReturnValue({
 				count: 3,
 				loading: false,
@@ -242,6 +264,8 @@ describe('TicketDetailLayoutG', () => {
 				error: null,
 				refresh: vi.fn(),
 			});
+			vi.mocked(useTicketAuditCount).mockReturnValue({ count: 0, loading: false });
+			vi.mocked(useTicketActivityCount).mockReturnValue({ count: 0, loading: false });
 
 			rerender(<TicketDetailLayoutG {...defaultProps} />);
 			expect(screen.getByText('Comments (3)')).toBeInTheDocument();

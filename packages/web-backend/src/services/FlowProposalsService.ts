@@ -10,7 +10,9 @@ import type {
 	FlowReviewComment,
 	FlowReviewThread,
 } from '@app/shared/api/flow-proposals.contract';
+import type { Ticket } from '@app/shared/api/tickets.contract';
 import { ERROR_CODES, NotFoundException } from '@app/shared/exceptions/http-exceptions';
+import { B2F_TICKET_UPDATED } from '@app/shared/transport';
 
 import { FlowDesignerAgent } from '../agents/FlowDesignerAgent';
 import type { FlowProposalsRepository } from '../repositories/FlowProposalsRepository';
@@ -201,13 +203,13 @@ export class FlowProposalsService {
 	// ---------------------------------------------------------------------------
 
 	/**
-	 * Reject a pending proposal and immediately trigger a redesign.
-	 * - Marks the current proposal as rejected
-	 * - Re-invokes FlowDesignerAgent with the rejected proposal as context
-	 * - Creates a new proposal (version N+1) with status pending_review
-	 * - Updates ticket with the new proposal ID
+	 * Reject a pending proposal and trigger a redesign asynchronously.
 	 *
-	 * Returns the NEW proposal (so the UI can show it immediately).
+	 * The rejection is saved immediately and this method returns quickly (202 semantics).
+	 * The redesign (FlowDesignerAgent call) runs in the background. When complete,
+	 * a B2F_TICKET_UPDATED event is broadcast so the UI can refresh the proposal list.
+	 *
+	 * Returns the REJECTED proposal so the UI can reflect the rejection immediately.
 	 */
 	async rejectProposal(ticketId: string, proposalId: string, reason?: string): Promise<FlowProposal> {
 		const proposal = await this.getProposal(ticketId, proposalId);
@@ -223,8 +225,8 @@ export class FlowProposalsService {
 			throw new NotFoundException(`Ticket ${ticketId} not found`, ERROR_CODES.RESOURCE_NOT_FOUND);
 		}
 
-		// Mark current proposal as rejected
-		await this.proposalsRepository.update(proposalId, {
+		// Mark current proposal as rejected immediately
+		const rejectedProposal = await this.proposalsRepository.update(proposalId, {
 			status: 'rejected',
 			rejectedAt: new Date().toISOString(),
 		});
@@ -235,67 +237,95 @@ export class FlowProposalsService {
 			reason,
 		});
 
-		log.info('Proposal rejected, triggering redesign', { ticketId, proposalId });
+		log.info('Proposal rejected, triggering async redesign', { ticketId, proposalId });
 
-		// Build context for redesign
-		const knowledgeContext = await this.knowledgeService.buildKnowledgeContext(
-			ticket.projectId,
-			ticket.description
-		);
+		// Fire the redesign asynchronously — do not block the HTTP response
+		void this.triggerRedesignAsync(ticketId, proposalId, proposal, ticket);
 
-		// Re-invoke FlowDesignerAgent with previous proposal as context
-		const designOutput = await this.designerAgent.designFlow({
-			ticket: {
-				title: ticket.title,
-				description: ticket.description,
-				labels: ticket.labels,
-				fields: ticket.fields,
-			},
-			projectId: ticket.projectId,
-			knowledgeContext,
-			previousProposal: {
-				proposedFlowYaml: FlowDesignerAgent.serializeFlowToYaml(
-					proposal.proposedFlow as Record<string, unknown>
-				),
-				reasoning: proposal.reasoning,
-				reviewThreads: proposal.reviewThreads,
-			},
-		});
+		return rejectedProposal;
+	}
 
-		// Create new proposal
-		const newProposal: FlowProposal = {
-			id: randomUUID(),
-			ticketId,
-			version: proposal.version + 1,
-			status: 'pending_review',
-			proposedFlow: designOutput.proposedFlow,
-			reasoning: designOutput.reasoning,
-			reusedFromFlowId: designOutput.reusedFromFlowId,
-			reusedSubFlows: designOutput.reusedSubFlows,
-			adaptations: designOutput.adaptations,
-			confidenceScore: designOutput.confidenceScore,
-			reviewThreads: [],
-			proposedAt: new Date().toISOString(),
-		};
+	/**
+	 * Run redesign in background after a rejection.
+	 * Errors are logged but do not propagate (fire-and-forget).
+	 */
+	private async triggerRedesignAsync(
+		ticketId: string,
+		rejectedProposalId: string,
+		rejectedProposal: FlowProposal,
+		ticket: Ticket
+	): Promise<void> {
+		try {
+			// Build context for redesign
+			const knowledgeContext = await this.knowledgeService.buildKnowledgeContext(
+				ticket.projectId,
+				ticket.description
+			);
 
-		const created = await this.proposalsRepository.create(newProposal);
+			// Re-invoke FlowDesignerAgent with previous proposal as context
+			const designOutput = await this.designerAgent.designFlow({
+				ticket: {
+					title: ticket.title,
+					description: ticket.description,
+					labels: ticket.labels,
+					fields: ticket.fields,
+				},
+				projectId: ticket.projectId,
+				knowledgeContext,
+				previousProposal: {
+					proposedFlowYaml: FlowDesignerAgent.serializeFlowToYaml(
+						rejectedProposal.proposedFlow as Record<string, unknown>
+					),
+					reasoning: rejectedProposal.reasoning,
+					reviewThreads: rejectedProposal.reviewThreads,
+				},
+			});
 
-		// Update ticket
-		await this.ticketsRepository.update(ticketId, {
-			currentFlowProposalId: created.id,
-			status: 'flow_proposed',
-		});
-		await this.ticketsRepository.addHistoryEntry(ticketId, 'flow.proposed', {
-			proposalId: created.id,
-			version: created.version,
-		});
+			// Create new proposal
+			const newProposal: FlowProposal = {
+				id: randomUUID(),
+				ticketId,
+				version: rejectedProposal.version + 1,
+				status: 'pending_review',
+				proposedFlow: designOutput.proposedFlow,
+				reasoning: designOutput.reasoning,
+				reusedFromFlowId: designOutput.reusedFromFlowId,
+				reusedSubFlows: designOutput.reusedSubFlows,
+				adaptations: designOutput.adaptations,
+				confidenceScore: designOutput.confidenceScore,
+				reviewThreads: [],
+				proposedAt: new Date().toISOString(),
+			};
 
-		log.info('New proposal created after rejection', {
-			ticketId,
-			newProposalId: created.id,
-			version: created.version,
-		});
-		return created;
+			const created = await this.proposalsRepository.create(newProposal);
+
+			// Update ticket
+			await this.ticketsRepository.update(ticketId, {
+				currentFlowProposalId: created.id,
+				status: 'flow_proposed',
+			});
+			await this.ticketsRepository.addHistoryEntry(ticketId, 'flow.proposed', {
+				proposalId: created.id,
+				version: created.version,
+			});
+
+			log.info('New proposal created after rejection', {
+				ticketId,
+				rejectedProposalId,
+				newProposalId: created.id,
+				version: created.version,
+			});
+
+			// Notify subscribers that the ticket was updated (new proposal available)
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			this.eventBroadcaster.broadcast(B2F_TICKET_UPDATED, { ticketId } as any);
+		} catch (err) {
+			log.error('Async redesign failed after rejection', {
+				ticketId,
+				rejectedProposalId,
+				error: err instanceof Error ? err.message : String(err),
+			});
+		}
 	}
 
 	// ---------------------------------------------------------------------------

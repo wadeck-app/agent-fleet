@@ -36,6 +36,8 @@ import { TriggeredTasksSection } from './TriggeredTasksSection';
 import { CommentPermalink } from './components/CommentPermalink';
 import { ticketsApi } from './tickets.api';
 import { useProjectStatusConfig } from './useProjectStatusConfig';
+import { useTicketActivityCount } from './useTicketActivityCount';
+import { useTicketAuditCount } from './useTicketAuditCount';
 import { useTicketCommentsCount } from './useTicketCommentsCount';
 import { useTriggeredTasksCount } from './useTriggeredTasksCount';
 
@@ -154,7 +156,9 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 	// Tab counts — real-time via WS-aware hooks
 	const { count: commentsCount, loading: commentsCountLoading } = useTicketCommentsCount(ticketId);
 	const { count: tasksCount, loading: tasksCountLoading } = useTriggeredTasksCount(ticketId);
-	const countsLoading = commentsCountLoading || tasksCountLoading;
+	const { count: auditCount, loading: auditCountLoading } = useTicketAuditCount(ticketId);
+	const { count: activityCount, loading: activityCountLoading } = useTicketActivityCount(ticketId);
+	const countsLoading = commentsCountLoading || tasksCountLoading || auditCountLoading || activityCountLoading;
 
 	// Activity timeline
 	const [timeline, setTimeline] = useState<TimelineItem[]>([]);
@@ -432,11 +436,15 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 						<TabsList>
 							<TabsTrigger value="comments">Comments ({countsLoading ? '?' : commentsCount})</TabsTrigger>
 							<TabsTrigger value="tasks">Triggered ({countsLoading ? '?' : tasksCount})</TabsTrigger>
-							<TabsTrigger value="audit">Audit</TabsTrigger>
-							<TabsTrigger value="activity">Activity</TabsTrigger>
-							<TabsTrigger value="flow">Flow Design</TabsTrigger>
+							<TabsTrigger value="audit">Audit ({countsLoading ? '?' : auditCount})</TabsTrigger>
+							<TabsTrigger value="activity">Activity ({countsLoading ? '?' : activityCount})</TabsTrigger>
+							<TabsTrigger value="flow">
+								{ticket.currentFlowProposalId ? 'Flow Design (1)' : 'Flow Design'}
+							</TabsTrigger>
 							{ticket.currentFlowProposalId ? (
-								<TabsTrigger value="feedback">Feedback</TabsTrigger>
+								<TabsTrigger value="feedback">
+									Feedback{ticket.flowFeedbackId ? ' (1)' : ''}
+								</TabsTrigger>
 							) : (
 								<TooltipProvider>
 									<Tooltip>
@@ -511,6 +519,7 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 								ticketId={ticketId}
 								flowFeedbackId={ticket.flowFeedbackId}
 								flowRetrospectiveId={ticket.flowRetrospectiveId}
+								currentFlowProposalId={ticket.currentFlowProposalId}
 								onFeedbackSubmitted={() => void onRefresh()}
 							/>
 						) : (
@@ -522,9 +531,9 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 
 					<TabsContent value="activity">
 						{loadingTimeline && (
-							<div className="flex items-center gap-2 py-4">
-								<Loader2 className="size-4 animate-spin text-muted-foreground" />
-								<span className="text-sm text-muted-foreground">Loading activity...</span>
+							<div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
+								<Loader2 className="size-6 animate-spin" />
+								<p className="text-sm">Loading...</p>
 							</div>
 						)}
 						{!loadingTimeline && timeline.length === 0 && (
@@ -676,45 +685,43 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 				</TabsWithUrlState>
 			</div>
 
-			{/* Right sidebar (25%): Status + Labels + Custom Fields */}
-			<div className="col-span-1 space-y-4">
-				<div>
-					<Label htmlFor="status">Status</Label>
-					<div className="mt-1">
-						<SelectWithSpinner
-							value={localStatus}
-							onValueChange={newStatus => void handleStatusChange(newStatus)}
-							loading={statusSaving}
-						>
-							<SelectTrigger id="status" className="w-full">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								{statusConfig.statuses.map(s => (
-									<SelectItem key={s.id} value={s.id}>
-										{s.label}
-									</SelectItem>
-								))}
-								{/* Fallback: show raw status value when config hasn't loaded yet — bug #5 */}
-								{!statusConfig.statuses.find(s => s.id === localStatus) && (
-									<SelectItem value={localStatus}>{localStatus}</SelectItem>
-								)}
-							</SelectContent>
-						</SelectWithSpinner>
-					</div>
-				</div>
+			{/* Right sidebar (25%): Status + Labels + Custom Fields — two-column label/control grid */}
+			<div className="col-span-1">
+				<div className="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-3">
+					{/* Status row */}
+					<Label htmlFor="status" className="pt-2 text-right text-sm font-medium">
+						Status
+					</Label>
+					<SelectWithSpinner
+						value={localStatus}
+						onValueChange={newStatus => void handleStatusChange(newStatus)}
+						loading={statusSaving}
+					>
+						<SelectTrigger id="status" className="w-full">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							{statusConfig.statuses.map(s => (
+								<SelectItem key={s.id} value={s.id}>
+									{s.label}
+								</SelectItem>
+							))}
+							{/* Fallback: show raw status value when config hasn't loaded yet — bug #5 */}
+							{!statusConfig.statuses.find(s => s.id === localStatus) && (
+								<SelectItem value={localStatus}>{localStatus}</SelectItem>
+							)}
+						</SelectContent>
+					</SelectWithSpinner>
 
-				<div
-					className={`rounded-md border-2 p-2 transition-colors ${dirtyFields.labels ? 'border-primary' : 'border-transparent'} ${saving ? 'opacity-50 pointer-events-none' : ''}`}
-				>
-					<div className="flex items-center justify-between">
-						<Label>Labels</Label>
+					{/* Labels row */}
+					<div className="pt-2 text-right text-sm font-medium">
+						Labels
 						{dirtyFields.labels &&
 							(() => {
 								const removedCount = ticket.labels.filter(l => !localLabels.includes(l)).length;
 								const addedCount = localLabels.filter(l => !ticket.labels.includes(l)).length;
 								return (
-									<span className="flex gap-1 text-xs">
+									<span className="ml-1 flex gap-1 text-xs">
 										{addedCount > 0 && (
 											<span className="text-primary font-medium">+{addedCount}</span>
 										)}
@@ -725,50 +732,51 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 								);
 							})()}
 					</div>
-					<div className="mt-2 space-y-2">
-						<div className="flex flex-wrap gap-2">
-							{localLabels.map(label => {
-								const isNew = !ticket.labels.includes(label);
-								return (
-									<Badge
-										key={label}
-										variant="outline"
-										className={`cursor-pointer rounded-full px-2 py-1 text-xs ${isNew ? 'ring-1 ring-primary' : ''}`}
-									>
-										{label}
-										<Button
-											type="button"
-											variant="ghost"
-											onClick={() => handleRemoveLabel(label)}
-											className="ml-1 h-auto p-0 text-muted-foreground hover:text-foreground"
+					<div
+						className={`rounded-md border-2 p-2 transition-colors ${dirtyFields.labels ? 'border-primary' : 'border-transparent'} ${saving ? 'opacity-50 pointer-events-none' : ''}`}
+					>
+						<div className="space-y-2">
+							<div className="flex flex-wrap gap-2">
+								{localLabels.map(label => {
+									const isNew = !ticket.labels.includes(label);
+									return (
+										<Badge
+											key={label}
+											variant="outline"
+											className={`cursor-pointer rounded-full px-2 py-1 text-xs ${isNew ? 'ring-1 ring-primary' : ''}`}
 										>
-											×
-										</Button>
-									</Badge>
-								);
-							})}
-							{localLabels.length === 0 && <p className="text-xs text-muted-foreground">None</p>}
+											{label}
+											<Button
+												type="button"
+												variant="ghost"
+												onClick={() => handleRemoveLabel(label)}
+												className="ml-1 h-auto p-0 text-muted-foreground hover:text-foreground"
+											>
+												×
+											</Button>
+										</Badge>
+									);
+								})}
+								{localLabels.length === 0 && <p className="text-xs text-muted-foreground">None</p>}
+							</div>
+							<Input
+								value={labelInput}
+								onChange={e => setLabelInput(e.target.value)}
+								onKeyDown={e => {
+									if (e.key === 'Enter') {
+										e.preventDefault();
+										handleAddLabel(labelInput);
+									}
+								}}
+								placeholder="Type label and press Enter..."
+								className="w-full text-xs"
+							/>
 						</div>
-						<Input
-							value={labelInput}
-							onChange={e => setLabelInput(e.target.value)}
-							onKeyDown={e => {
-								if (e.key === 'Enter') {
-									e.preventDefault();
-									handleAddLabel(labelInput);
-								}
-							}}
-							placeholder="Type label and press Enter..."
-							className="w-full text-xs"
-						/>
 					</div>
-				</div>
 
-				<div
-					className={`rounded-md border-2 p-2 transition-colors ${fieldsChanged ? 'border-primary' : 'border-transparent'} ${saving ? 'opacity-50 pointer-events-none' : ''}`}
-				>
-					<div className="flex items-center justify-between">
-						<Label>Custom Fields</Label>
+					{/* Custom Fields row */}
+					<div className="pt-2 text-right text-sm font-medium">
+						Custom Fields
 						{fieldsChanged &&
 							(() => {
 								const currentFields = fieldsItems.fstate.items.reduce(
@@ -784,7 +792,7 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 									k => k in ticket.fields && currentFields[k] !== ticket.fields[k]
 								).length;
 								return (
-									<span className="flex gap-1 text-xs">
+									<span className="ml-1 flex gap-1 text-xs">
 										{added > 0 && <span className="font-medium text-primary">+{added}</span>}
 										{modified > 0 && (
 											<span className="font-medium text-foreground">~{modified}</span>
@@ -796,32 +804,38 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 								);
 							})()}
 					</div>
-					<div className="mt-2 space-y-2">
-						{fieldsItems.fstate.items.length === 0 ? (
-							<p className="text-xs text-muted-foreground">No custom fields</p>
-						) : (
-							fieldsItems.fstate.items.map((item, index) => (
-								<KeyValueRenderer
-									key={item.id}
-									item={item}
-									actions={{
-										update: partial => fieldsItems.actions.update(index, partial),
-										remove: () => fieldsItems.actions.remove(index),
-									}}
-									originalFields={ticket.fields}
-									originalKey={originalKeys[item.id]}
-								/>
-							))
-						)}
-						<div className="flex justify-end">
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								onClick={() => fieldsItems.actions.add({ id: crypto.randomUUID(), key: '', value: '' })}
-							>
-								+ Add Field
-							</Button>
+					<div
+						className={`rounded-md border-2 p-2 transition-colors ${fieldsChanged ? 'border-primary' : 'border-transparent'} ${saving ? 'opacity-50 pointer-events-none' : ''}`}
+					>
+						<div className="space-y-2">
+							{fieldsItems.fstate.items.length === 0 ? (
+								<p className="text-xs text-muted-foreground">No custom fields</p>
+							) : (
+								fieldsItems.fstate.items.map((item, index) => (
+									<KeyValueRenderer
+										key={item.id}
+										item={item}
+										actions={{
+											update: partial => fieldsItems.actions.update(index, partial),
+											remove: () => fieldsItems.actions.remove(index),
+										}}
+										originalFields={ticket.fields}
+										originalKey={originalKeys[item.id]}
+									/>
+								))
+							)}
+							<div className="flex justify-end">
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={() =>
+										fieldsItems.actions.add({ id: crypto.randomUUID(), key: '', value: '' })
+									}
+								>
+									+ Add Field
+								</Button>
+							</div>
 						</div>
 					</div>
 				</div>

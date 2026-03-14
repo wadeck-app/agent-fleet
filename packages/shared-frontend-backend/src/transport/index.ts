@@ -92,6 +92,7 @@ export {
 	B2F_TICKET_DELETED,
 	B2F_TICKET_STATUS_CHANGED,
 	B2F_TICKET_COMMENT_ADDED,
+	B2F_TICKET_FEEDBACK_SUBMITTED,
 } from './B2FEventConstants';
 
 // Event Filters - Type-safe subscription filters

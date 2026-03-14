@@ -237,43 +237,68 @@ describe('FlowProposalsService', () => {
 	// ---------------------------------------------------------------------------
 
 	describe('rejectProposal', () => {
-		it('rejects old proposal and creates new proposal v2', async () => {
+		it('rejects proposal immediately and returns rejected proposal (not the new one)', async () => {
+			const proposal = makeProposal({ version: 1 });
+			const ticket = makeTicket();
+			const rejectedProposal = { ...proposal, status: 'rejected' as const, rejectedAt: '2026-01-02T00:00:00Z' };
+
+			vi.mocked(stubs.proposalsRepository.findById).mockResolvedValue(proposal);
+			vi.mocked(stubs.ticketsRepository.findById).mockResolvedValue(ticket);
+			vi.mocked(stubs.proposalsRepository.update).mockResolvedValue(rejectedProposal);
+			// designFlow is called async — stub it to resolve eventually
+			vi.mocked(stubs.designerAgent.designFlow).mockResolvedValue(makeDesignOutput());
+			vi.mocked(stubs.proposalsRepository.create).mockResolvedValue(makeProposal({ id: 'prop-2', version: 2 }));
+			vi.mocked(stubs.ticketsRepository.update).mockResolvedValue(ticket);
+			vi.mocked(stubs.ticketsRepository.addHistoryEntry).mockResolvedValue({} as any);
+
+			const result = await service.rejectProposal('ticket-1', 'prop-1', 'Not enough steps');
+
+			// Returns rejected proposal immediately (not the redesigned one)
+			expect(result).toBe(rejectedProposal);
+			expect(result.status).toBe('rejected');
+
+			// Old proposal marked as rejected
+			expect(stubs.proposalsRepository.update).toHaveBeenCalledWith(
+				'prop-1',
+				expect.objectContaining({ status: 'rejected' })
+			);
+
+			// History event for rejection recorded synchronously
+			expect(stubs.ticketsRepository.addHistoryEntry).toHaveBeenCalledWith(
+				'ticket-1',
+				'flow.rejected',
+				expect.objectContaining({ proposalId: 'prop-1', reason: 'Not enough steps' })
+			);
+		});
+
+		it('triggers async redesign after rejection', async () => {
 			const proposal = makeProposal({ version: 1 });
 			const ticket = makeTicket();
 			const newProposal = makeProposal({ id: 'prop-2', version: 2 });
 
 			vi.mocked(stubs.proposalsRepository.findById).mockResolvedValue(proposal);
 			vi.mocked(stubs.ticketsRepository.findById).mockResolvedValue(ticket);
-			vi.mocked(stubs.proposalsRepository.update).mockResolvedValue({ ...proposal, status: 'rejected' });
+			vi.mocked(stubs.proposalsRepository.update).mockResolvedValue({ ...proposal, status: 'rejected' as const });
 			vi.mocked(stubs.designerAgent.designFlow).mockResolvedValue(makeDesignOutput());
 			vi.mocked(stubs.proposalsRepository.create).mockResolvedValue(newProposal);
 			vi.mocked(stubs.ticketsRepository.update).mockResolvedValue(ticket);
 			vi.mocked(stubs.ticketsRepository.addHistoryEntry).mockResolvedValue({} as any);
 
-			const result = await service.rejectProposal('ticket-1', 'prop-1', 'Not enough steps');
+			await service.rejectProposal('ticket-1', 'prop-1', 'Not enough steps');
 
-			// Old proposal rejected
-			expect(stubs.proposalsRepository.update).toHaveBeenCalledWith(
-				'prop-1',
-				expect.objectContaining({
-					status: 'rejected',
-				})
-			);
+			// Allow async redesign microtasks to flush
+			await new Promise(resolve => setTimeout(resolve, 0));
 
-			// History event for rejection
-			expect(stubs.ticketsRepository.addHistoryEntry).toHaveBeenCalledWith(
-				'ticket-1',
-				'flow.rejected',
-				expect.objectContaining({ proposalId: 'prop-1', reason: 'Not enough steps' })
-			);
-
-			// New proposal created
+			// New proposal created asynchronously
 			expect(stubs.proposalsRepository.create).toHaveBeenCalledWith(
 				expect.objectContaining({ version: 2, status: 'pending_review' })
 			);
 
-			// Returns new proposal
-			expect(result).toBe(newProposal);
+			// Ticket updated and B2F event broadcast after redesign
+			expect(stubs.eventBroadcaster.broadcast).toHaveBeenCalledWith(
+				'b2f:ticket:updated',
+				expect.objectContaining({ ticketId: 'ticket-1' })
+			);
 		});
 
 		it('passes previous proposal context to designerAgent on redesign', async () => {
@@ -282,13 +307,16 @@ describe('FlowProposalsService', () => {
 
 			vi.mocked(stubs.proposalsRepository.findById).mockResolvedValue(proposal);
 			vi.mocked(stubs.ticketsRepository.findById).mockResolvedValue(ticket);
-			vi.mocked(stubs.proposalsRepository.update).mockResolvedValue({ ...proposal, status: 'rejected' });
+			vi.mocked(stubs.proposalsRepository.update).mockResolvedValue({ ...proposal, status: 'rejected' as const });
 			vi.mocked(stubs.designerAgent.designFlow).mockResolvedValue(makeDesignOutput());
 			vi.mocked(stubs.proposalsRepository.create).mockResolvedValue(makeProposal({ id: 'prop-2', version: 2 }));
 			vi.mocked(stubs.ticketsRepository.update).mockResolvedValue(ticket);
 			vi.mocked(stubs.ticketsRepository.addHistoryEntry).mockResolvedValue({} as any);
 
 			await service.rejectProposal('ticket-1', 'prop-1');
+
+			// Allow async redesign microtasks to flush
+			await new Promise(resolve => setTimeout(resolve, 0));
 
 			expect(stubs.designerAgent.designFlow).toHaveBeenCalledWith(
 				expect.objectContaining({

@@ -5,6 +5,7 @@ import { NotFoundException } from '@app/shared/exceptions/http-exceptions';
 
 import type { FlowFeedbackRepository } from '../repositories/FlowFeedbackRepository';
 import type { TicketsRepository } from '../repositories/TicketsRepository';
+import type { EventBroadcaster } from '../transport/EventBroadcaster';
 import { FlowFeedbackService } from './FlowFeedbackService';
 
 // ---------------------------------------------------------------------------
@@ -38,8 +39,16 @@ function makeFlowFeedbackRepoStub() {
 	} as unknown as FlowFeedbackRepository;
 }
 
-function makeService(feedbackRepo: FlowFeedbackRepository, ticketsRepo: TicketsRepository) {
-	return new FlowFeedbackService(feedbackRepo, ticketsRepo);
+function makeEventBroadcasterStub(): EventBroadcaster {
+	return { broadcast: vi.fn() } as unknown as EventBroadcaster;
+}
+
+function makeService(
+	feedbackRepo: FlowFeedbackRepository,
+	ticketsRepo: TicketsRepository,
+	eventBroadcaster: EventBroadcaster = makeEventBroadcasterStub()
+) {
+	return new FlowFeedbackService(feedbackRepo, ticketsRepo, eventBroadcaster);
 }
 
 // ---------------------------------------------------------------------------
@@ -111,6 +120,22 @@ describe('FlowFeedbackService', () => {
 				TICKET_ID,
 				expect.objectContaining({ flowFeedbackId: expect.any(String) })
 			);
+		});
+
+		it('emits b2f:ticket:feedback_submitted event after saving feedback', async () => {
+			const ticketsRepo = makeTicketsRepoStub({ [TICKET_ID]: existingTicket });
+			const feedbackRepo = makeFlowFeedbackRepoStub();
+			const broadcaster = makeEventBroadcasterStub();
+			const service = makeService(feedbackRepo, ticketsRepo, broadcaster);
+
+			const result = await service.submitFeedback(TICKET_ID, createFeedbackData);
+
+			expect(broadcaster.broadcast).toHaveBeenCalledOnce();
+			expect(broadcaster.broadcast).toHaveBeenCalledWith('b2f:ticket:feedback_submitted', {
+				ticketId: TICKET_ID,
+				feedbackId: result.id,
+				rating: result.rating,
+			});
 		});
 
 		it('throws NotFoundException when ticket does not exist', async () => {
