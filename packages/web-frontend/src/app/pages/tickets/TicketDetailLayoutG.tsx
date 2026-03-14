@@ -454,7 +454,25 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 							<TabsTrigger value="audit">Audit</TabsTrigger>
 							<TabsTrigger value="activity">Activity</TabsTrigger>
 							<TabsTrigger value="flow">Flow Design</TabsTrigger>
-							{ticket.currentFlowProposalId && <TabsTrigger value="feedback">Feedback</TabsTrigger>}
+							{ticket.currentFlowProposalId ? (
+								<TabsTrigger value="feedback">Feedback</TabsTrigger>
+							) : (
+								<TooltipProvider>
+									<Tooltip>
+										<TooltipTrigger asChild>
+											{/* span wrapper required: disabled button does not fire mouse events for tooltip */}
+											<span>
+												<TabsTrigger value="feedback" disabled>
+													Feedback
+												</TabsTrigger>
+											</span>
+										</TooltipTrigger>
+										<TooltipContent>
+											<p>Request a flow design first</p>
+										</TooltipContent>
+									</Tooltip>
+								</TooltipProvider>
+							)}
 						</TabsList>
 						<TooltipProvider>
 							<Tooltip>
@@ -506,16 +524,20 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 						/>
 					</TabsContent>
 
-					{ticket.currentFlowProposalId && (
-						<TabsContent value="feedback">
+					<TabsContent value="feedback">
+						{ticket.currentFlowProposalId ? (
 							<FlowFeedbackSection
 								ticketId={ticketId}
 								flowFeedbackId={ticket.flowFeedbackId}
 								flowRetrospectiveId={ticket.flowRetrospectiveId}
 								onFeedbackSubmitted={() => void onRefresh()}
 							/>
-						</TabsContent>
-					)}
+						) : (
+							<p className="py-4 text-sm text-muted-foreground">
+								No flow design has been requested yet. Use the Flow Design tab to request one.
+							</p>
+						)}
+					</TabsContent>
 
 					<TabsContent value="activity">
 						{loadingTimeline && (

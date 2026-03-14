@@ -260,6 +260,9 @@ Rules:
 - workspace MUST include \`"reusePolicy": "never"\` (or \`"if-available"\` or \`"always"\`)
 - Do NOT include \`statusTransitions\` — omit it entirely, the defaults are fine
 - Do NOT use \`condition\` fields on any step — keep all steps unconditional
+- For \`model\` steps: do NOT include an \`output\` configuration — the model response is captured automatically as the step result
+- For \`script\` steps: if you include \`output.X.pattern\`, the pattern MUST contain a capture group \`(...)\` to extract the value. Example: \`"pattern": "(.*)"\` captures the full line, \`"pattern": "result: (\\\\w+)"\` captures a word after "result: ". A pattern without \`(...)\` will fail validation.
+- When in doubt, omit \`output\` entirely — the step result is always accessible via \`\${{ steps.X.outputs.result }}\`
 
 You MUST output ONLY a JSON object wrapped in \`\`\`json ... \`\`\` markers.
 The JSON must have exactly these fields:

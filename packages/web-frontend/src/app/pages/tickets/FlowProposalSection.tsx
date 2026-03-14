@@ -484,6 +484,7 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 
 	const [context, setContext] = useState('');
 	const [isRequesting, setIsRequesting] = useState(false);
+	const [requestError, setRequestError] = useState<string | null>(null);
 
 	const handleRequestDesign = async () => {
 		setIsRequesting(true);
@@ -491,9 +492,12 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 			await flowProposalsApi.requestFlowDesign(ticketId, context || undefined);
 			showToast('Flow design requested — AI is processing...', 'success');
 			setContext('');
+			setRequestError(null);
 			refresh();
 		} catch (err) {
-			showToast(`Failed to request flow design: ${getErrorMessage(err)}`, 'error');
+			const msg = getErrorMessage(err);
+			showToast(`Failed to request flow design: ${msg}`, 'error');
+			setRequestError(msg);
 		} finally {
 			setIsRequesting(false);
 		}
@@ -536,11 +540,20 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 		return (
 			<div className="space-y-4 py-4">
 				<p className="text-sm text-muted-foreground">No flow design has been requested yet for this ticket.</p>
+				{requestError && (
+					<div className="rounded-md border border-destructive/50 bg-destructive/10 p-3">
+						<p className="text-sm font-medium text-destructive">Request failed</p>
+						<p className="mt-1 whitespace-pre-wrap text-xs text-destructive/80">{requestError}</p>
+					</div>
+				)}
 				<div className="space-y-2">
 					<Label className="text-sm font-medium">Additional context (optional)</Label>
 					<Textarea
 						value={context}
-						onChange={e => setContext(e.target.value)}
+						onChange={e => {
+							setContext(e.target.value);
+							setRequestError(null);
+						}}
 						placeholder="Provide extra context or constraints for the AI flow designer..."
 						className="text-sm"
 					/>

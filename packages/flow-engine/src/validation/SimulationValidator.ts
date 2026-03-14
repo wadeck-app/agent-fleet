@@ -331,8 +331,10 @@ export class SimulationValidator {
 		for (const step of flow.steps) {
 			const text = this.getStepText(step);
 
-			// Detect arithmetic in templates (not supported)
-			const arithmeticPattern = /\$\{\{\s*[^}]*[+\-*/]\s*[^}]*\}\}/g;
+			// Detect arithmetic in templates (not supported).
+			// Require whitespace on both sides of the operator to avoid false positives
+			// on hyphens within identifiers like ${{ steps.analyze-storage.outputs.result }}.
+			const arithmeticPattern = /\$\{\{\s*[^}]*\s[+\-*/]\s[^}]*\}\}/g;
 			const arithmeticMatches = text.match(arithmeticPattern);
 
 			if (arithmeticMatches) {

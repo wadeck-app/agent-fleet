@@ -209,11 +209,7 @@ describe('FlowProposalSection', () => {
 			await user.click(screen.getByRole('button', { name: /Confirm reject/i }));
 
 			await waitFor(() => {
-				expect(flowProposalsApi.rejectProposal).toHaveBeenCalledWith(
-					'ticket-1',
-					'prop-1',
-					'Not good enough'
-				);
+				expect(flowProposalsApi.rejectProposal).toHaveBeenCalledWith('ticket-1', 'prop-1', 'Not good enough');
 			});
 		});
 

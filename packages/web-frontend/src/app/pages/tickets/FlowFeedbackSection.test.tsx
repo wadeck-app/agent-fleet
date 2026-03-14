@@ -33,11 +33,7 @@ describe('FlowFeedbackSection', () => {
 	describe('when no feedback and no retrospective', () => {
 		it('should show FlowFeedbackForm with "Submit Flow Execution Feedback" heading', () => {
 			render(
-				<FlowFeedbackSection
-					ticketId="ticket-1"
-					flowFeedbackId={undefined}
-					flowRetrospectiveId={undefined}
-				/>
+				<FlowFeedbackSection ticketId="ticket-1" flowFeedbackId={undefined} flowRetrospectiveId={undefined} />
 			);
 
 			expect(screen.getByText('Submit Flow Execution Feedback')).toBeInTheDocument();
@@ -74,11 +70,7 @@ describe('FlowFeedbackSection', () => {
 			});
 
 			render(
-				<FlowFeedbackSection
-					ticketId="ticket-1"
-					flowFeedbackId={undefined}
-					flowRetrospectiveId="retro-1"
-				/>
+				<FlowFeedbackSection ticketId="ticket-1" flowFeedbackId={undefined} flowRetrospectiveId="retro-1" />
 			);
 
 			await waitFor(() => {
@@ -100,11 +92,7 @@ describe('FlowFeedbackSection', () => {
 			});
 
 			render(
-				<FlowFeedbackSection
-					ticketId="ticket-1"
-					flowFeedbackId={undefined}
-					flowRetrospectiveId="retro-1"
-				/>
+				<FlowFeedbackSection ticketId="ticket-1" flowFeedbackId={undefined} flowRetrospectiveId="retro-1" />
 			);
 
 			await waitFor(() => {
@@ -116,11 +104,7 @@ describe('FlowFeedbackSection', () => {
 			vi.mocked(feedbackApi.getRetrospective).mockRejectedValue(new Error('Server down'));
 
 			render(
-				<FlowFeedbackSection
-					ticketId="ticket-1"
-					flowFeedbackId={undefined}
-					flowRetrospectiveId="retro-1"
-				/>
+				<FlowFeedbackSection ticketId="ticket-1" flowFeedbackId={undefined} flowRetrospectiveId="retro-1" />
 			);
 
 			await waitFor(() => {

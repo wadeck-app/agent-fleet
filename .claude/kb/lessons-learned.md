@@ -5835,3 +5835,22 @@ Do NOT add a separate `<span>Loading...</span>` next to it — that produces dup
 - `querySelector('.some-class')[0]` returns the FIRST element in the DOM — verify it's from the right component using `grep -rn "some-class" src/`
 - `TicketCommentsSection` uses a shared `MARKDOWN_COMPONENTS` const — changes to inline components in `TicketDetailLayoutG` do NOT affect the Comments tab which delegates to `TicketCommentsSection`
 - Vite HMR sometimes requires a full `agent-browser close` + fresh open if repeated reloads don't pick up changes
+
+## UX Principle: Never Hide Features
+
+**Rule**: Never conditionally hide a feature/tab based on missing state. Always show it as `disabled` with a tooltip explaining why.
+
+**Bad**: `{ticket.currentFlowProposalId && <TabsTrigger value="feedback">}`
+**Good**: `<TabsTrigger value="feedback" disabled={!ticket.currentFlowProposalId}>` + `<Tooltip>Request a flow design first</Tooltip>`
+
+Hiding creates surprises. Disabled + explained = discovery.
+
+## FlowValidator: SimulationValidator arithmetic false positive
+
+**Bug**: Regex `[+\-*/]` in `SimulationValidator.ts` matches hyphens in step IDs (e.g. `analyze-storage`).
+**Fix**: Require whitespace on both sides: `\s[+\-*/]\s` — distinguishes operators from identifier hyphens.
+
+## FlowDesignerAgent: output patterns need capture groups
+
+**Rule**: `script` step `output.X.pattern` MUST use `(...)` capture groups. Without them, `LogicalValidator` throws `"has no capture group"`.
+**Prompt instruction added**: Avoid `output` on `model` steps; for `script` steps, always use `(.*)`-style patterns; when in doubt, omit `output` entirely.
