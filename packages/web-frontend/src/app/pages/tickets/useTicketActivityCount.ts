@@ -26,11 +26,13 @@ export function useTicketActivityCount(ticketId: string): UseTicketActivityCount
 	const refresh = useCallback(async () => {
 		try {
 			setLoading(true);
-			const [commentsRes, tasksRes] = await Promise.all([
+			const [commentsRes, tasksRes, historyRes] = await Promise.all([
 				ticketsApi.getComments(ticketId),
 				tasksApi.getTasksList({ ticketId, pageSize: 1 }),
+				ticketsApi.getHistory(ticketId),
 			]);
-			setCount(commentsRes.comments.length + (tasksRes.pagination?.total ?? 0));
+			const feedbackCount = historyRes.entries.filter(e => e.event === 'flow.feedback_submitted').length;
+			setCount(commentsRes.comments.length + (tasksRes.pagination?.total ?? 0) + feedbackCount);
 		} catch (err) {
 			console.error('Failed to fetch activity count:', err);
 		} finally {

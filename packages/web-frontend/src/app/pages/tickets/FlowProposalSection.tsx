@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
@@ -9,8 +10,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@frame
 import { useToast } from '@framework/features/toast/ToastContext';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { FlowProposal, FlowProposalStatus, FlowReviewThread } from '@shared/api/flow-proposals.contract';
+import { B2F_TICKET_UPDATED } from '@shared/transport';
 import * as yaml from 'js-yaml';
 import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+
+import { useTransport } from '@/transport';
 
 import { flowProposalsApi } from './flowProposalsApi';
 import { useFlowProposals } from './useFlowProposals';
@@ -44,6 +48,30 @@ function getStatusLabel(status: FlowProposalStatus): string {
 		case 'superseded':
 			return 'Superseded';
 	}
+}
+
+/** I2 fix: Extract sentences from reasoning that signal uncertainty or open questions */
+function extractUncertaintySentences(reasoning: string): string[] {
+	const uncertaintyWords = [
+		'unclear',
+		'not specified',
+		'missing',
+		'unknown',
+		'uncertain',
+		'ambiguous',
+		'may not',
+		'might not',
+		'could not',
+	];
+	const sentences = reasoning
+		.split(/(?<=[.!?])\s+|\n/)
+		.map(s => s.trim())
+		.filter(s => s.length > 0);
+
+	return sentences.filter(s => {
+		const lower = s.toLowerCase();
+		return s.includes('?') || uncertaintyWords.some(w => lower.includes(w));
+	});
 }
 
 interface ReviewThreadItemProps {
@@ -263,9 +291,11 @@ interface ProposalViewProps {
 	onRefresh: () => void;
 	onReviewUpdated: () => void;
 	onRequestNew: () => void;
+	/** Called after successful rejection so the parent can show the redesigning banner */
+	onRejected: () => void;
 }
 
-function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onRequestNew }: ProposalViewProps) {
+function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onRequestNew, onRejected }: ProposalViewProps) {
 	const { showToast } = useToast();
 	const [reasoningOpen, setReasoningOpen] = useState(false);
 	const [showAddThread, setShowAddThread] = useState(false);
@@ -300,10 +330,10 @@ function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onReques
 		setIsRejecting(true);
 		try {
 			await flowProposalsApi.rejectProposal(ticketId, proposal.id, rejectReason || undefined);
-			showToast('Proposal rejected', 'success');
+			showToast('Proposal rejected. AI is redesigning...', 'success');
 			setShowRejectForm(false);
 			setRejectReason('');
-			onRefresh();
+			onRejected();
 		} catch (err) {
 			showToast(`Failed to reject: ${getErrorMessage(err)}`, 'error');
 		} finally {
@@ -315,6 +345,13 @@ function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onReques
 	const isTerminal = proposal.status === 'approved' || proposal.status === 'rejected';
 
 	const reasoningSentences = proposal.reasoning.split(/\.\s+|\n/).filter(s => s.trim());
+
+	// I2 fix: extract uncertainty sentences to make confidence tooltip actionable
+	const uncertaintySentences = useMemo(() => extractUncertaintySentences(proposal.reasoning), [proposal.reasoning]);
+
+	// K fix: extract the flow ID from proposedFlow for the editor link
+	const proposedFlowId =
+		typeof proposal.proposedFlow['id'] === 'string' ? (proposal.proposedFlow['id'] as string) : null;
 
 	return (
 		<div className="space-y-4">
@@ -332,12 +369,24 @@ function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onReques
 									Confidence: {Math.round(proposal.confidenceScore)}%
 								</span>
 							</TooltipTrigger>
+							{/* I2 fix: show specific uncertainty sentences when available */}
 							<TooltipContent className="max-w-[300px] text-xs">
-								<p>
-									Confidence reflects how well the flow agent understood the ticket requirements.
-									Below 90% typically means: missing details in the ticket description, ambiguous
-									requirements, or open questions the agent could not resolve.
-								</p>
+								{uncertaintySentences.length > 0 ? (
+									<div className="space-y-1">
+										<p className="font-medium">The agent had these uncertainties:</p>
+										<ul className="list-disc list-inside space-y-0.5">
+											{uncertaintySentences.map((s, i) => (
+												<li key={i}>{s.trim().replace(/\.$/, '')}</li>
+											))}
+										</ul>
+									</div>
+								) : (
+									<p>
+										Confidence reflects how well the flow agent understood the ticket requirements.
+										Below 90% typically means: missing details in the ticket description, ambiguous
+										requirements, or open questions the agent could not resolve.
+									</p>
+								)}
 							</TooltipContent>
 						</Tooltip>
 					</TooltipProvider>
@@ -347,19 +396,21 @@ function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onReques
 				</span>
 			</div>
 
-			{/* Adaptations */}
-			{proposal.adaptations && proposal.adaptations.length > 0 && (
-				<div className="space-y-1">
-					<p className="text-xs font-medium text-muted-foreground tracking-wide">Adaptations</p>
-					<ul className="list-disc list-inside space-y-0.5">
-						{proposal.adaptations.map((a, i) => (
-							<li key={i} className="text-sm">
-								{a}
-							</li>
-						))}
-					</ul>
-				</div>
-			)}
+			{/* Adaptations — only on redesigns (version > 1) or explicit flow reuse (ba fix) */}
+			{proposal.adaptations &&
+				proposal.adaptations.length > 0 &&
+				(proposal.version > 1 || proposal.reusedFromFlowId) && (
+					<div className="space-y-1">
+						<p className="text-xs font-medium text-muted-foreground tracking-wide">Adaptations</p>
+						<ul className="list-disc list-inside space-y-0.5">
+							{proposal.adaptations.map((a, i) => (
+								<li key={i} className="text-sm">
+									{a}
+								</li>
+							))}
+						</ul>
+					</div>
+				)}
 
 			{/* Reasoning collapsible */}
 			<div className="rounded-md border">
@@ -393,9 +444,18 @@ function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onReques
 				)}
 			</div>
 
-			{/* Flow YAML */}
+			{/* Flow YAML with K fix: Open in Flow Editor link */}
 			<div className="space-y-1">
-				<p className="text-xs font-medium text-muted-foreground tracking-wide">Proposed flow</p>
+				<div className="flex items-center justify-between">
+					<p className="text-xs font-medium text-muted-foreground tracking-wide">Proposed flow</p>
+					{/* K fix: link to the flow editor — by flowId if it's in the registry, else /flows/new */}
+					<Link
+						to={proposedFlowId ? `/flows/${proposedFlowId}/edit` : '/flows/new'}
+						className="text-xs text-primary hover:underline"
+					>
+						Open in Flow Editor
+					</Link>
+				</div>
 				<pre className="overflow-x-auto rounded-md bg-muted p-4 text-xs font-mono leading-relaxed">
 					{proposalYaml}
 				</pre>
@@ -481,7 +541,8 @@ function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onReques
 							disabled={isApproving || isRejecting}
 							className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
 						>
-							Reject ▾
+							Reject
+							<ChevronRight className="ml-1 size-4" />
 						</Button>
 					)}
 				</div>
@@ -515,18 +576,36 @@ function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onReques
  * ===========================================================================================
  */
 export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalSectionProps) {
-	const { proposals, currentProposal, isLoading, error, refresh } = useFlowProposals(ticketId);
+	const { proposals, currentProposal, isLoading, error, refresh, refreshSilent } = useFlowProposals(ticketId);
 	const { showToast } = useToast();
+	const { transport } = useTransport();
 
 	const [context, setContext] = useState('');
 	const [isRequesting, setIsRequesting] = useState(false);
 	const [requestError, setRequestError] = useState<string | null>(null);
+	/** True after a rejection, while the AI is redesigning. Cleared on WS event. */
+	const [isRedesigning, setIsRedesigning] = useState(false);
+
+	// Subscribe to ticket updates — when a redesign completes, a new proposal arrives
+	// and the ticket is updated (r2 fix). Also clears the redesigning banner (r1 fix).
+	useEffect(() => {
+		const unsub = transport.subscribe(
+			B2F_TICKET_UPDATED,
+			() => {
+				setIsRedesigning(false);
+				refresh();
+				onTicketRefresh?.();
+			},
+			{ ticketId }
+		);
+		return unsub;
+	}, [ticketId, transport, refresh, onTicketRefresh]);
 
 	const handleRequestDesign = async () => {
 		setIsRequesting(true);
 		try {
 			await flowProposalsApi.requestFlowDesign(ticketId, context || undefined);
-			showToast('Flow design requested — AI is processing...', 'success');
+			showToast('Flow design requested. AI is processing...', 'success');
 			setContext('');
 			setRequestError(null);
 			refresh();
@@ -561,40 +640,46 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 		);
 	}
 
-	// Requesting state (shown while the AI call is in progress after click)
-	if (isRequesting) {
-		return (
-			<div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
-				<Loader2 className="size-6 animate-spin" />
-				<p className="text-sm">Requesting AI flow design...</p>
-			</div>
-		);
-	}
-
-	// No proposals yet — show request form
+	// No proposals yet — show request form (with blur overlay when requesting)
 	if (proposals.length === 0) {
 		return (
-			<div className="space-y-4 py-4">
-				<p className="text-sm text-muted-foreground">No flow design has been requested yet for this ticket.</p>
-				{requestError && (
-					<div className="rounded-md border border-destructive/50 bg-destructive/10 p-3">
-						<p className="text-sm font-medium text-destructive">Request failed</p>
-						<p className="mt-1 whitespace-pre-wrap text-xs text-destructive/80">{requestError}</p>
+			<div className="relative space-y-4 py-4">
+				<div className={isRequesting ? 'pointer-events-none opacity-50' : undefined}>
+					<p className="text-sm text-muted-foreground">
+						No flow design has been requested yet for this ticket.
+					</p>
+					{requestError && (
+						<div className="mt-2 rounded-md border border-destructive/50 bg-destructive/10 p-3">
+							<p className="text-sm font-medium text-destructive">Request failed</p>
+							<p className="mt-1 whitespace-pre-wrap text-xs text-destructive/80">{requestError}</p>
+						</div>
+					)}
+					<div className="mt-4 space-y-2">
+						<Label className="text-sm font-medium">Additional context (optional)</Label>
+						<Textarea
+							value={context}
+							onChange={e => {
+								setContext(e.target.value);
+								setRequestError(null);
+							}}
+							placeholder="Provide extra context or constraints for the AI flow designer..."
+							className="text-sm"
+						/>
+					</div>
+					<div className="mt-4">
+						<Button onClick={handleRequestDesign} disabled={isRequesting}>
+							Request Flow Design
+						</Button>
+					</div>
+				</div>
+				{isRequesting && (
+					<div className="absolute inset-0 flex items-center justify-center">
+						<div className="flex flex-col items-center gap-2 text-muted-foreground">
+							<Loader2 className="size-5 animate-spin" />
+							<span className="text-sm">Requesting AI flow design...</span>
+						</div>
 					</div>
 				)}
-				<div className="space-y-2">
-					<Label className="text-sm font-medium">Additional context (optional)</Label>
-					<Textarea
-						value={context}
-						onChange={e => {
-							setContext(e.target.value);
-							setRequestError(null);
-						}}
-						placeholder="Provide extra context or constraints for the AI flow designer..."
-						className="text-sm"
-					/>
-				</div>
-				<Button onClick={handleRequestDesign}>Request Flow Design</Button>
 			</div>
 		);
 	}
@@ -602,6 +687,14 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 	// Has proposal — render the current one with option to request a new one
 	return (
 		<div className="space-y-6 py-2">
+			{/* Redesigning banner — shown after rejection until WS event clears it (r1 fix) */}
+			{isRedesigning && (
+				<div className="flex items-center gap-3 rounded-md border border-warning/50 bg-warning/10 px-4 py-3">
+					<Loader2 className="size-4 shrink-0 animate-spin text-warning" />
+					<p className="text-sm text-warning">Rejection submitted. AI is redesigning the flow...</p>
+				</div>
+			)}
+
 			{currentProposal && (
 				<ProposalView
 					proposal={currentProposal}
@@ -611,17 +704,20 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 						onTicketRefresh?.();
 					}}
 					onReviewUpdated={() => {
-						// Re-fetch proposals without triggering parent ticket refresh
-						refresh();
+						// Silent re-fetch: preserves scroll position (item O fix)
+						refreshSilent();
 					}}
 					onRequestNew={() => {
 						setContext('');
 					}}
+					onRejected={() => {
+						setIsRedesigning(true);
+					}}
 				/>
 			)}
 
-			{/* Request a new design (only when not pending_review) */}
-			{currentProposal && currentProposal.status !== 'pending_review' && (
+			{/* Request a new design (only when not pending_review and not already redesigning) */}
+			{currentProposal && currentProposal.status !== 'pending_review' && !isRedesigning && (
 				<div className="border-t pt-4 space-y-3">
 					<p className="text-sm font-medium">Request a new flow design</p>
 					<Textarea

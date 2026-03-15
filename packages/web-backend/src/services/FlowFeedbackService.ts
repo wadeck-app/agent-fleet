@@ -60,12 +60,22 @@ export class FlowFeedbackService {
 
 		const created = await this.repository.create(feedback);
 
-		// Append audit history entry
-		await this.ticketsRepository.addHistoryEntry(ticketId, 'flow.feedback_submitted', {
-			feedbackId: created.id,
-			flowId: created.flowId,
-			rating: created.rating,
-		});
+		// Append audit history entry with full feedback content for the audit log (item AB fix)
+		await this.ticketsRepository.addHistoryEntry(
+			ticketId,
+			'flow.feedback_submitted',
+			{
+				feedbackId: created.id,
+				flowId: created.flowId,
+				rating: created.rating,
+				// Surface feedback content so Activity/Audit tabs can display meaningful detail
+				wentWell: created.wentWell,
+				wentWrong: created.wentWrong,
+				suggestions: created.suggestions ?? [],
+			},
+			// Pass author so the Activity tab can show who submitted (item AA fix)
+			created.author
+		);
 
 		// Link feedback ID to ticket record
 		await this.ticketsRepository.update(ticketId, {

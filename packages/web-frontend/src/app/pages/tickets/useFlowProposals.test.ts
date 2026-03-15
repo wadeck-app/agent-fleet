@@ -100,4 +100,29 @@ describe('useFlowProposals', () => {
 			expect(flowProposalsApi.getFlowProposals).toHaveBeenCalledTimes(2);
 		});
 	});
+
+	it('should set isLoading=true on refresh() but NOT on refreshSilent() (o fix)', async () => {
+		vi.mocked(flowProposalsApi.getFlowProposals).mockResolvedValue({ items: [mockProposal] });
+
+		const { result } = renderHook(() => useFlowProposals('ticket-1'));
+
+		await waitFor(() => {
+			expect(result.current.isLoading).toBe(false);
+		});
+
+		// refreshSilent should NOT set isLoading=true
+		let loadingDuringRefresh = false;
+		vi.mocked(flowProposalsApi.getFlowProposals).mockImplementation(async () => {
+			loadingDuringRefresh = result.current.isLoading;
+			return { items: [mockProposal] };
+		});
+
+		result.current.refreshSilent();
+
+		await waitFor(() => {
+			expect(flowProposalsApi.getFlowProposals).toHaveBeenCalledTimes(2);
+		});
+
+		expect(loadingDuringRefresh).toBe(false);
+	});
 });

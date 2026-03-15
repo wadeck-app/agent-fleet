@@ -27,6 +27,15 @@ export const feedbackApi = {
 	},
 
 	/**
+	 * Get all feedback items for a flow proposal
+	 */
+	getFeedbackByFlow: (flowId: string): Promise<{ items: FlowFeedback[] }> => {
+		return typedFetch('GET', '/api/flows/:flowId/feedback', {
+			params: { flowId },
+		});
+	},
+
+	/**
 	 * Get the retrospective for a ticket
 	 */
 	getRetrospective: (ticketId: string): Promise<FlowRetrospective> => {

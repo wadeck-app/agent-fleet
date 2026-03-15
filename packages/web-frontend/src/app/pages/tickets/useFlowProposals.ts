@@ -20,7 +20,14 @@ export interface UseFlowProposalsResult {
 	currentProposal: FlowProposal | null;
 	isLoading: boolean;
 	error: Error | null;
+	/** Full refresh — shows loading indicator, replaces all proposals. */
 	refresh: () => void;
+	/**
+	 * Silent refresh — re-fetches proposals in the background without
+	 * triggering isLoading=true. Preserves scroll position after review-thread
+	 * updates (item O fix).
+	 */
+	refreshSilent: () => void;
 }
 
 export function useFlowProposals(ticketId: string): UseFlowProposalsResult {
@@ -29,13 +36,17 @@ export function useFlowProposals(ticketId: string): UseFlowProposalsResult {
 	const [error, setError] = useState<Error | null>(null);
 	// Increment this counter to trigger a re-fetch
 	const [refreshCounter, setRefreshCounter] = useState(0);
+	// When true, next re-fetch skips setting isLoading=true
+	const [isSilent, setIsSilent] = useState(false);
 
 	useEffect(() => {
 		const abortController = new AbortController();
 
 		(async () => {
 			try {
-				setIsLoading(true);
+				if (!isSilent) {
+					setIsLoading(true);
+				}
 				setError(null);
 				const result = await flowProposalsApi.getFlowProposals(ticketId);
 				if (!abortController.signal.aborted) {
@@ -48,6 +59,7 @@ export function useFlowProposals(ticketId: string): UseFlowProposalsResult {
 			} finally {
 				if (!abortController.signal.aborted) {
 					setIsLoading(false);
+					setIsSilent(false);
 				}
 			}
 		})();
@@ -55,13 +67,20 @@ export function useFlowProposals(ticketId: string): UseFlowProposalsResult {
 		return () => {
 			abortController.abort();
 		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [ticketId, refreshCounter]);
 
 	const refresh = useCallback(() => {
+		setIsSilent(false);
+		setRefreshCounter(prev => prev + 1);
+	}, []);
+
+	const refreshSilent = useCallback(() => {
+		setIsSilent(true);
 		setRefreshCounter(prev => prev + 1);
 	}, []);
 
 	const currentProposal = proposals.length > 0 ? proposals[0] : null;
 
-	return { proposals, currentProposal, isLoading, error, refresh };
+	return { proposals, currentProposal, isLoading, error, refresh, refreshSilent };
 }

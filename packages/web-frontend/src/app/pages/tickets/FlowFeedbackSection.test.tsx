@@ -15,6 +15,7 @@ vi.mock('./feedbackApi', () => ({
 	feedbackApi: {
 		submitFeedback: vi.fn(),
 		getRetrospective: vi.fn(),
+		getFeedbackByFlow: vi.fn(),
 	},
 }));
 
@@ -209,6 +210,106 @@ describe('FlowFeedbackSection', () => {
 			await user.click(screen.getByRole('button', { name: /Add another feedback/i }));
 
 			expect(screen.getByText('Submit Flow Execution Feedback')).toBeInTheDocument();
+		});
+
+		it('should show Cancel button after clicking "Add another feedback" (y1 fix)', async () => {
+			const user = userEvent.setup();
+
+			render(
+				<FlowFeedbackSection
+					ticketId="ticket-1"
+					flowFeedbackId="feedback-123"
+					flowRetrospectiveId={undefined}
+				/>
+			);
+
+			// Open the new-feedback form
+			await user.click(screen.getByRole('button', { name: /Add another feedback/i }));
+
+			// Cancel button should now be visible
+			expect(screen.getByRole('button', { name: /Cancel/i })).toBeInTheDocument();
+		});
+
+		it('should hide form and show submitted state when Cancel is clicked (y1 fix)', async () => {
+			const user = userEvent.setup();
+
+			render(
+				<FlowFeedbackSection
+					ticketId="ticket-1"
+					flowFeedbackId="feedback-123"
+					flowRetrospectiveId={undefined}
+				/>
+			);
+
+			// Open the form then cancel
+			await user.click(screen.getByRole('button', { name: /Add another feedback/i }));
+			await user.click(screen.getByRole('button', { name: /Cancel/i }));
+
+			// Should go back to submitted state
+			expect(screen.getByText('Feedback has been submitted for this ticket.')).toBeInTheDocument();
+			expect(screen.queryByText('Submit Flow Execution Feedback')).not.toBeInTheDocument();
+		});
+
+		it('should NOT show Cancel button on first-time feedback form (y1 fix)', () => {
+			render(
+				<FlowFeedbackSection ticketId="ticket-1" flowFeedbackId={undefined} flowRetrospectiveId={undefined} />
+			);
+
+			// Cancel button must NOT be present when no feedback exists yet
+			expect(screen.queryByRole('button', { name: /Cancel/i })).not.toBeInTheDocument();
+		});
+	});
+
+	describe('submitted feedback display (z fix)', () => {
+		it('should fetch and display submitted feedback when flowFeedbackId and currentFlowProposalId are set', async () => {
+			vi.mocked(feedbackApi.getFeedbackByFlow).mockResolvedValue({
+				items: [
+					{
+						id: 'fb-1',
+						ticketId: 'ticket-1',
+						flowId: 'proposal-123',
+						taskId: '',
+						rating: 4,
+						wentWell: ['Step A worked'],
+						wentWrong: ['Step B failed'],
+						suggestions: ['Improve Step B'],
+						author: 'user',
+						submittedAt: new Date().toISOString(),
+					},
+				],
+			});
+
+			render(
+				<FlowFeedbackSection
+					ticketId="ticket-1"
+					flowFeedbackId="feedback-123"
+					currentFlowProposalId="proposal-123"
+					flowRetrospectiveId={undefined}
+				/>
+			);
+
+			await waitFor(() => {
+				expect(feedbackApi.getFeedbackByFlow).toHaveBeenCalledWith('proposal-123');
+			});
+
+			await waitFor(() => {
+				expect(screen.getByText('Step A worked')).toBeInTheDocument();
+				expect(screen.getByText('Step B failed')).toBeInTheDocument();
+				expect(screen.getByText('Improve Step B')).toBeInTheDocument();
+			});
+		});
+
+		it('should not call getFeedbackByFlow when no currentFlowProposalId', () => {
+			render(
+				<FlowFeedbackSection
+					ticketId="ticket-1"
+					flowFeedbackId="feedback-123"
+					flowRetrospectiveId={undefined}
+					currentFlowProposalId={undefined}
+				/>
+			);
+
+			expect(feedbackApi.getFeedbackByFlow).not.toHaveBeenCalled();
 		});
 	});
 });

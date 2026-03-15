@@ -38,6 +38,23 @@ Follow this structure for new entities:
 4. `{Entity}Form.tsx` - Pure form component using useFormState
 5. `index.ts` - Barrel export for the entity
 
+## Tickets Feature Patterns
+
+### WS-aware tab count hooks
+- `useTicketCommentsCount(ticketId)` — fetches + subscribes to `B2F_TICKET_COMMENT_ADDED`
+- `useTriggeredTasksCount(ticketId)` — fetches + subscribes to `B2F_TASKS_UPDATED`
+- Use these instead of inline `useEffect` in layout components
+
+### SelectWithSpinner
+- Located: `packages/web-frontend/src/framework/components/forms/SelectWithSpinner.tsx`
+- Spinner is a flex sibling OUTSIDE the Select, not absolutely positioned inside
+- Wrapper uses `flex min-w-[120px]` to prevent narrow selects when value is empty
+
+### SelectValue fallback for status selects
+- When `useProjectStatusConfig` is loading, `SelectValue` renders empty
+- Fix: `<SelectValue placeholder={localStatus} />` — shows raw status string as fallback
+- Applied to all TicketDetailLayout[A-G].tsx components
+
 ## Validation
 
 ### Available Validators

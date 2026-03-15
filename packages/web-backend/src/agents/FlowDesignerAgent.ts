@@ -221,6 +221,19 @@ ${similarTicketsText}`);
 				})
 				.join('\n\n');
 
+			// Build an explicit whitelist of what the reviewer referenced (Option B)
+			// Extract selected text and line ranges from all review threads to create a precise scope
+			const threadScopes = previousProposal.reviewThreads.map(t => {
+				if (t.selector.selectedText) {
+					return `"${t.selector.selectedText}"`;
+				}
+				return `lines ${t.selector.startLine}-${t.selector.endLine}`;
+			});
+			const allowedChangesText =
+				threadScopes.length > 0
+					? `The ONLY sections you are allowed to modify are those explicitly referenced in the review threads:\n${threadScopes.map(s => `  - ${s}`).join('\n')}`
+					: 'Address the review thread comments above.';
+
 			sections.push(`## Previous Proposal (REJECTED — redesign required)
 
 ### Previous Reasoning
@@ -232,7 +245,14 @@ ${previousProposal.proposedFlowYaml}
 \`\`\`
 
 ### Review Thread Comments (address ALL of these)
-${threadsText || '(no review comments)'}`);
+${threadsText || '(no review comments)'}
+
+### STRICT PRESERVATION CONSTRAINT
+${allowedChangesText}
+
+ALL OTHER steps, fields, and configuration MUST remain byte-for-byte identical to the Previous Flow YAML above.
+Do NOT rename steps. Do NOT combine steps. Do NOT reorder steps. Do NOT add steps. Do NOT remove steps.
+Only modify the specific content referenced in the review threads. If you are unsure whether something should change, keep the original version exactly.`);
 		}
 
 		// 5. User context (optional override)
@@ -275,7 +295,7 @@ The JSON must have exactly these fields:
 - "reasoning": string explaining your design choices and why you chose specific steps/flows
 - "reusedFromFlowId": optional string — ID of an existing flow you based this on
 - "reusedSubFlows": optional array of strings — IDs of flows used as subflows
-- "adaptations": optional array of strings — list of adaptations made to reused flows
+- "adaptations": ONLY fill if this is a redesign (you received a ## Previous Proposal section) OR if you explicitly reused an existing flow as a base. Leave as [] if designing from scratch.
 - "confidenceScore": number between 0 and 100
 
 The "proposedFlow.id" must be a lowercase-kebab-case string derived from the ticket title.
@@ -333,6 +353,60 @@ Output ONLY the \`\`\`json block, nothing else.`);
 	}
 
 	// ---------------------------------------------------------------------------
+	// Redesign preservation audit (Option A guardrail)
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * Compare step IDs/count in the redesigned flow against the original proposal.
+	 * Logs a warning if any step was removed or renamed without being explicitly referenced
+	 * in a review thread. Does NOT throw — warnings only (to avoid infinite retry loops).
+	 */
+	private auditRedesignPreservation(
+		result: FlowDesignOutput,
+		previousProposal: NonNullable<FlowDesignInput['previousProposal']>
+	): void {
+		const newFlow = result.proposedFlow as Record<string, unknown>;
+		const newSteps = Array.isArray(newFlow['steps']) ? (newFlow['steps'] as Array<Record<string, unknown>>) : [];
+		const newStepIds = new Set(newSteps.map(s => String(s['id'] ?? '')).filter(Boolean));
+
+		// Parse original step IDs from the previous YAML (best-effort: extract "id:" lines)
+		const originalStepIdMatches = previousProposal.proposedFlowYaml.matchAll(/^\s+-?\s*id:\s*(\S+)/gm);
+		const originalStepIds = new Set(
+			Array.from(originalStepIdMatches)
+				.map(m => m[1])
+				.filter(Boolean)
+		);
+
+		// Collect step IDs explicitly referenced in review threads (via selectedText or heuristic)
+		const referencedTexts = previousProposal.reviewThreads.flatMap(t => [
+			t.selector.selectedText ?? '',
+			...t.comments.map(c => c.content),
+		]);
+
+		const missingStepIds = [...originalStepIds].filter(
+			id =>
+				!newStepIds.has(id) &&
+				// Only warn if the step was NOT mentioned in any review thread comment/selection
+				!referencedTexts.some(text => text.includes(id))
+		);
+
+		if (missingStepIds.length > 0) {
+			log.warn('Redesign preservation warning: LLM removed/renamed step(s) not referenced in review threads', {
+				missingStepIds,
+				originalStepIds: [...originalStepIds],
+				newStepIds: [...newStepIds],
+			});
+		}
+
+		if (originalStepIds.size > 0 && newSteps.length !== originalStepIds.size) {
+			log.warn('Redesign preservation warning: step count changed', {
+				originalCount: originalStepIds.size,
+				newCount: newSteps.length,
+			});
+		}
+	}
+
+	// ---------------------------------------------------------------------------
 	// Main method
 	// ---------------------------------------------------------------------------
 
@@ -355,6 +429,12 @@ Output ONLY the \`\`\`json block, nothing else.`);
 		log.info('Claude returned flow design response', { outputLength: output.length });
 
 		const result = this.parseClaudeResponse(output);
+
+		// Option A guardrail: on redesign, warn if the LLM changed steps that were NOT referenced
+		// in review threads (e.g. combined, removed, or renamed unrequested steps).
+		if (input.previousProposal) {
+			this.auditRedesignPreservation(result, input.previousProposal);
+		}
 
 		// Validate the proposed flow using FlowRegistry
 		const validationResult = this.registry.validateFlow(result.proposedFlow as unknown as FlowDefinition);

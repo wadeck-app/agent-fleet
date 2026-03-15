@@ -73,6 +73,15 @@ vi.mock('./useTicketActivityCount', () => ({
 	})),
 }));
 
+vi.mock('./useFlowFeedbackCount', () => ({
+	useFlowFeedbackCount: vi.fn(() => ({
+		count: 0,
+		loading: false,
+		error: null,
+		refresh: vi.fn(),
+	})),
+}));
+
 vi.mock('./TicketCommentsSection', () => ({
 	TicketCommentsSection: () => <div data-testid="comments-section" />,
 }));

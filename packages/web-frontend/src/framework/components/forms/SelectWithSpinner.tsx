@@ -28,7 +28,7 @@ interface SelectWithSpinnerProps extends React.ComponentProps<typeof Select> {
  */
 export function SelectWithSpinner({ loading, children, disabled, ...props }: SelectWithSpinnerProps) {
 	return (
-		<div className="flex w-full min-w-[120px] items-center gap-1">
+		<div className="flex w-full min-w-[120px] items-center gap-2">
 			<div className="min-w-0 flex-1">
 				<Select disabled={disabled || loading} {...props}>
 					{children}

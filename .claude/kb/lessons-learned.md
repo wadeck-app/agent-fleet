@@ -5870,3 +5870,75 @@ When displaying LLM output, normalize section headings to Title Case in the UI l
 
 **Rule**: `script` step `output.X.pattern` MUST use `(...)` capture groups. Without them, `LogicalValidator` throws `"has no capture group"`.
 **Prompt instruction added**: Avoid `output` on `model` steps; for `script` steps, always use `(.*)`-style patterns; when in doubt, omit `output` entirely.
+
+## Quality standard: DONE means reproduced + verified, not "code reviewed"
+
+**Rule**: Never mark a fix as DONE without:
+
+1. Reproducing the original bug (agent-browser screenshot or failing unit test)
+2. Applying the fix
+3. Verifying the fix resolves the original reproduction (agent-browser after fix, or passing test)
+
+Code inspection alone is NOT verification. "I added `w-full` to the class" is not a test.
+Visual/layout fixes MUST use agent-browser. In-flight states (blur during save) MUST use dev-hold skill.
+
+## Long dash (—) is forbidden in all UI strings
+
+**Rule**: Never use em-dash `—` or en-dash `–` in UI text: toast messages, labels, descriptions, tooltips.
+**Bad**: `"Flow design requested — AI is processing..."`
+**Good**: `"Flow design requested. AI is processing..."`
+This was explicitly stated by the user. Applies to all strings, including LLM-generated text displayed in the UI.
+
+## Chevron-down icon means dropdown MENU, not collapsible
+
+**Rule**: `ChevronDown` (▾) signals a dropdown/select menu to the user. Do NOT use it on buttons that expand inline content.
+
+- For collapsible/expandable inline content: use `ChevronRight` that rotates to `ChevronDown` (CSS `rotate-90`), or no icon at all.
+- `▾` next to "Reject" implies there are multiple reject options to choose from (like a split button), which is wrong.
+- Follow established patterns: GitHub "close with comment" uses a separate arrow-only button; collapsible sections use rotating chevron.
+
+## After async submit/add, NEVER reload the tab — use local state + WS
+
+**Rule**: Submitting a form, adding a thread, rejecting a proposal must NOT cause the entire tab to remount/reload.
+
+- After add: insert the new item into local state directly
+- After submit: transition to "submitted" state locally
+- WS events update counts; don't use them as a signal to refetch everything
+  Reloading the tab loses scroll position, interrupts the user, and is visually jarring.
+
+## Form blur on submit MUST be tested with dev-hold skill
+
+**Rule**: Any "form stays visible but blurred during async operation" fix must be verified with:
+
+```bash
+# 1. dev-hold to pause the server endpoint
+# 2. agent-browser to trigger the action
+# 3. agent-browser screenshot to capture the in-flight state
+# 4. verify blur is visible before response returns
+```
+
+Code inspection cannot verify this — the loading state is transient.
+
+## FlowDesignerAgent: "adaptations" appears on first design — UI must filter
+
+**Root cause**: `FlowKnowledgeService` injects all project tickets with `flowId` as "Similar Tickets" into the prompt.
+The LLM sees these past flows and fills the `adaptations` field even on a first design, sometimes referencing
+"as requested in ticket" for things from OTHER tickets (not the current one).
+
+**Fix**: Only display the `adaptations` section in the UI when `proposal.version > 1` (it's a redesign)
+OR when `reusedFromFlowId` is set. On a fresh design (version = 1, no reuse), adaptations should not be shown
+even if the LLM populated the field.
+
+Also add to prompt: `"adaptations": fill ONLY if redesigning from a previous proposal or explicitly reusing an existing flow. Leave empty array otherwise.`
+
+## Activity log and audit log must be verified by triggering events in browser
+
+**Rule**: "The service emits the event" is not sufficient evidence that the activity/audit log shows it.
+After any backend event fix, open the Activity and Audit tabs in the browser and verify the entry appears
+with the expected content (not just the event type — also the message/detail).
+
+## SelectWithSpinner layout: verify visually, not by class name
+
+Applying `gap-1` may be too tight depending on context. Apply the fix, then screenshot and compare
+against other similar instances in the app (e.g., the status select in layout B or D sidebar).
+Gap should feel natural — adjacent but with breathing room (`gap-2` is often more appropriate).

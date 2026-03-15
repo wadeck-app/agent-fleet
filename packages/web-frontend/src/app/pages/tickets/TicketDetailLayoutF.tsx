@@ -190,13 +190,14 @@ export function TicketDetailLayoutF({ ticket, ticketId, onUpdate, onRefresh }: T
 
 				<div>
 					<Label htmlFor="status">Status</Label>
-					<div className="mt-1">
+					{/* w-48 constrains the flex container so the spinner stays adjacent to the select (a1 fix) */}
+					<div className="mt-1 w-48">
 						<SelectWithSpinner
 							value={localStatus}
 							onValueChange={newStatus => void handleStatusChange(newStatus)}
 							loading={statusSaving}
 						>
-							<SelectTrigger id="status" className="w-48">
+							<SelectTrigger id="status" className="w-full">
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>

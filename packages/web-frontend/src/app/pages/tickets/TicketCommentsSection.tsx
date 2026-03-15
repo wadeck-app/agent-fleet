@@ -154,8 +154,9 @@ export function TicketCommentsSection({ ticketId, sortOrder = 'asc', showLabel =
 		return (
 			<div>
 				{showLabel && <Label>Comments</Label>}
-				<div className="mt-2 flex justify-center">
-					<Loader2 className="size-4 animate-spin text-muted-foreground" />
+				<div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
+					<Loader2 className="size-6 animate-spin" />
+					<p className="text-sm">Loading...</p>
 				</div>
 			</div>
 		);

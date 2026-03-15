@@ -23,5 +23,10 @@ describe('feedbackApi', () => {
 			expect(feedbackApi).toHaveProperty('getRetrospective');
 			expect(typeof feedbackApi.getRetrospective).toBe('function');
 		});
+
+		it('should export getFeedbackByFlow as a function', () => {
+			expect(feedbackApi).toHaveProperty('getFeedbackByFlow');
+			expect(typeof feedbackApi.getFeedbackByFlow).toBe('function');
+		});
 	});
 });

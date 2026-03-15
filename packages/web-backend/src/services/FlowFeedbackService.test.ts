@@ -108,11 +108,18 @@ describe('FlowFeedbackService', () => {
 			expect(result.id).toBeTruthy();
 			expect(result.submittedAt).toBeTruthy();
 
-			// History entry appended
+			// History entry appended with full feedback content and author (items AA+AB)
 			expect(ticketsRepo.addHistoryEntry).toHaveBeenCalledWith(
 				TICKET_ID,
 				'flow.feedback_submitted',
-				expect.objectContaining({ feedbackId: expect.any(String) })
+				expect.objectContaining({
+					feedbackId: expect.any(String),
+					rating: 4,
+					wentWell: ['Good step 1'],
+					wentWrong: [],
+					suggestions: [],
+				}),
+				'tester'
 			);
 
 			// Ticket updated with feedbackId

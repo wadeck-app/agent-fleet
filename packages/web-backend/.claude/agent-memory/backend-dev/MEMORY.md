@@ -1,9 +1,11 @@
 # Backend Dev Agent Memory
 
 ## Controller test patterns
+
 - See `patterns.md` for the established controller unit test pattern used in this project.
 
 ## Key facts
+
 - `TicketsListResponse.pagination` is **optional** (from `createListResponseSchema` in api-helpers.ts)
 - `TicketsService.getTicketById` returns `Promise<Ticket>` (never null) — the service throws NotFoundException internally. The controller has its own null guard that throws a plain `Error`.
 - `FlowProposalsService` method: `requestFlowDesign(ticketId, userContext?)` — second param is `userContext`, not `context`

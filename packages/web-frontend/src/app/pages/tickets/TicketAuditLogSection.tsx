@@ -156,6 +156,31 @@ function getAuditEntryData(
 
 			return { label: 'Ticket updated', content: null };
 		}
+		case 'flow.feedback_submitted': {
+			const rating = entry.data.rating as number | undefined;
+			const wentWell = entry.data.wentWell as string[] | undefined;
+			const wentWrong = entry.data.wentWrong as string[] | undefined;
+			return {
+				label: 'Flow feedback submitted',
+				content: (
+					<span className="text-xs text-muted-foreground">
+						{rating != null && <strong>Rating: {rating}/5</strong>}
+						{wentWell && wentWell.length > 0 && (
+							<span>
+								{' · '}Went well: {wentWell.slice(0, 2).join(', ')}
+								{wentWell.length > 2 ? '…' : ''}
+							</span>
+						)}
+						{wentWrong && wentWrong.length > 0 && (
+							<span>
+								{' · '}Issues: {wentWrong.slice(0, 2).join(', ')}
+								{wentWrong.length > 2 ? '…' : ''}
+							</span>
+						)}
+					</span>
+				),
+			};
+		}
 		default:
 			return { label: entry.event, content: null };
 	}

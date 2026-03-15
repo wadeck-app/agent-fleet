@@ -23,7 +23,7 @@ import { useListItems } from '@framework/hooks2/form/useListItems';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import { formatRelativeTime } from '@framework/utils/formatting/DateFormat';
 import type { Task, TaskStatus } from '@shared/api/tasks.contract';
-import type { Ticket, TicketComment, TicketStatus } from '@shared/api/tickets.contract';
+import type { Ticket, TicketComment, TicketHistoryEntry, TicketStatus } from '@shared/api/tickets.contract';
 import { ArrowDown, ArrowUp, Loader2, MessageSquare, Zap } from 'lucide-react';
 import remarkGfm from 'remark-gfm';
 
@@ -35,6 +35,7 @@ import { TicketCommentsSection } from './TicketCommentsSection';
 import { TriggeredTasksSection } from './TriggeredTasksSection';
 import { CommentPermalink } from './components/CommentPermalink';
 import { ticketsApi } from './tickets.api';
+import { useFlowFeedbackCount } from './useFlowFeedbackCount';
 import { useProjectStatusConfig } from './useProjectStatusConfig';
 import { useTicketActivityCount } from './useTicketActivityCount';
 import { useTicketAuditCount } from './useTicketAuditCount';
@@ -71,7 +72,8 @@ const TASK_STATUS_VARIANTS: Record<
 
 type TimelineItem =
 	| { type: 'comment'; id: string; createdAt: string; data: TicketComment }
-	| { type: 'task'; id: string; createdAt: string; data: Task };
+	| { type: 'task'; id: string; createdAt: string; data: Task }
+	| { type: 'feedback'; id: string; createdAt: string; data: TicketHistoryEntry };
 
 // KeyValueRenderer component for custom fields
 function KeyValueRenderer({
@@ -158,7 +160,12 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 	const { count: tasksCount, loading: tasksCountLoading } = useTriggeredTasksCount(ticketId);
 	const { count: auditCount, loading: auditCountLoading } = useTicketAuditCount(ticketId);
 	const { count: activityCount, loading: activityCountLoading } = useTicketActivityCount(ticketId);
-	const countsLoading = commentsCountLoading || tasksCountLoading || auditCountLoading || activityCountLoading;
+	const { count: feedbackCount, loading: feedbackCountLoading } = useFlowFeedbackCount(
+		ticket.currentFlowProposalId,
+		ticketId
+	);
+	const countsLoading =
+		commentsCountLoading || tasksCountLoading || auditCountLoading || activityCountLoading || feedbackCountLoading;
 
 	// Activity timeline
 	const [timeline, setTimeline] = useState<TimelineItem[]>([]);
@@ -204,15 +211,18 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [ticket]);
 
-	// Fetch activity timeline (comments + tasks interleaved, sorted by date)
+	// Fetch activity timeline (comments + tasks + feedback entries interleaved, sorted by date)
 	useEffect(() => {
 		const fetchTimeline = async () => {
 			try {
 				setLoadingTimeline(true);
-				const [commentsRes, tasksRes] = await Promise.all([
+				const [commentsRes, tasksRes, historyRes] = await Promise.all([
 					ticketsApi.getComments(ticketId),
 					tasksApi.getTasksList({ ticketId, pageSize: 100 }),
+					ticketsApi.getHistory(ticketId),
 				]);
+
+				const feedbackEntries = historyRes.entries.filter(e => e.event === 'flow.feedback_submitted');
 
 				const items: TimelineItem[] = [
 					...commentsRes.comments.map(c => ({
@@ -226,6 +236,12 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 						id: t.id,
 						createdAt: t.createdAt,
 						data: t,
+					})),
+					...feedbackEntries.map(e => ({
+						type: 'feedback' as const,
+						id: e.id,
+						createdAt: e.timestamp,
+						data: e,
 					})),
 				];
 
@@ -443,7 +459,7 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 							</TabsTrigger>
 							{ticket.currentFlowProposalId ? (
 								<TabsTrigger value="feedback">
-									Feedback{ticket.flowFeedbackId ? ' (1)' : ''}
+									Feedback{!feedbackCountLoading && feedbackCount > 0 ? ` (${feedbackCount})` : ''}
 								</TabsTrigger>
 							) : (
 								<TooltipProvider>
@@ -546,11 +562,17 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 										<div className="flex flex-col items-center">
 											<div
 												className={`flex size-8 shrink-0 items-center justify-center rounded-full ${
-													item.type === 'comment' ? 'bg-muted' : 'bg-accent'
+													item.type === 'comment'
+														? 'bg-muted'
+														: item.type === 'feedback'
+															? 'bg-success/20'
+															: 'bg-accent'
 												}`}
 											>
 												{item.type === 'comment' ? (
 													<MessageSquare className="size-4 text-muted-foreground" />
+												) : item.type === 'feedback' ? (
+													<span className="text-xs font-bold text-success">★</span>
 												) : (
 													<Zap className="size-4 text-accent-foreground" />
 												)}
@@ -676,6 +698,29 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 													)}
 												</div>
 											)}
+
+											{item.type === 'feedback' && (
+												<div>
+													<div className="mb-1 flex items-center gap-2">
+														<Badge variant="success" className="text-xs">
+															Feedback
+														</Badge>
+														{item.data.author && (
+															<Badge variant="outline" className="text-xs">
+																{item.data.author}
+															</Badge>
+														)}
+														<span className="ml-auto text-xs text-muted-foreground">
+															{formatRelativeTime(item.data.timestamp)}
+														</span>
+													</div>
+													{(item.data.data.rating as number) > 0 && (
+														<p className="text-sm">
+															Rating: <strong>{item.data.data.rating as number}/5</strong>
+														</p>
+													)}
+												</div>
+											)}
 										</div>
 									</div>
 								))}
@@ -685,156 +730,164 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 				</TabsWithUrlState>
 			</div>
 
-			{/* Right sidebar (25%): Status + Labels + Custom Fields — two-column label/control grid */}
+			{/* Right sidebar (25%): Status + Labels + Custom Fields — stacked layout */}
 			<div className="col-span-1">
-				<div className="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-3">
-					{/* Status row */}
-					<Label htmlFor="status" className="pt-2 text-right text-sm font-medium">
-						Status
-					</Label>
-					<SelectWithSpinner
-						value={localStatus}
-						onValueChange={newStatus => void handleStatusChange(newStatus)}
-						loading={statusSaving}
-					>
-						<SelectTrigger id="status" className="w-full">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							{statusConfig.statuses.map(s => (
-								<SelectItem key={s.id} value={s.id}>
-									{s.label}
-								</SelectItem>
-							))}
-							{/* Fallback: show raw status value when config hasn't loaded yet — bug #5 */}
-							{!statusConfig.statuses.find(s => s.id === localStatus) && (
-								<SelectItem value={localStatus}>{localStatus}</SelectItem>
-							)}
-						</SelectContent>
-					</SelectWithSpinner>
-
-					{/* Labels row */}
-					<div className="pt-2 text-right text-sm font-medium">
-						Labels
-						{dirtyFields.labels &&
-							(() => {
-								const removedCount = ticket.labels.filter(l => !localLabels.includes(l)).length;
-								const addedCount = localLabels.filter(l => !ticket.labels.includes(l)).length;
-								return (
-									<span className="ml-1 flex gap-1 text-xs">
-										{addedCount > 0 && (
-											<span className="text-primary font-medium">+{addedCount}</span>
-										)}
-										{removedCount > 0 && (
-											<span className="text-destructive font-medium">−{removedCount}</span>
-										)}
-									</span>
-								);
-							})()}
+				<div className="flex flex-col gap-4">
+					{/* Status */}
+					<div className="flex flex-col gap-1">
+						<Label htmlFor="status" className="text-sm font-medium">
+							Status
+						</Label>
+						<SelectWithSpinner
+							value={localStatus}
+							onValueChange={newStatus => void handleStatusChange(newStatus)}
+							loading={statusSaving}
+						>
+							<SelectTrigger id="status" className="w-full">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{statusConfig.statuses.map(s => (
+									<SelectItem key={s.id} value={s.id}>
+										{s.label}
+									</SelectItem>
+								))}
+								{/* Fallback: show raw status value when config hasn't loaded yet — bug #5 */}
+								{!statusConfig.statuses.find(s => s.id === localStatus) && (
+									<SelectItem value={localStatus}>{localStatus}</SelectItem>
+								)}
+							</SelectContent>
+						</SelectWithSpinner>
 					</div>
-					<div
-						className={`rounded-md border-2 p-2 transition-colors ${dirtyFields.labels ? 'border-primary' : 'border-transparent'} ${saving ? 'opacity-50 pointer-events-none' : ''}`}
-					>
-						<div className="space-y-2">
-							<div className="flex flex-wrap gap-2">
-								{localLabels.map(label => {
-									const isNew = !ticket.labels.includes(label);
+
+					{/* Labels */}
+					<div className="flex flex-col gap-1">
+						<div className="flex items-center gap-1 text-sm font-medium">
+							Labels
+							{dirtyFields.labels &&
+								(() => {
+									const removedCount = ticket.labels.filter(l => !localLabels.includes(l)).length;
+									const addedCount = localLabels.filter(l => !ticket.labels.includes(l)).length;
 									return (
-										<Badge
-											key={label}
-											variant="outline"
-											className={`cursor-pointer rounded-full px-2 py-1 text-xs ${isNew ? 'ring-1 ring-primary' : ''}`}
-										>
-											{label}
-											<Button
-												type="button"
-												variant="ghost"
-												onClick={() => handleRemoveLabel(label)}
-												className="ml-1 h-auto p-0 text-muted-foreground hover:text-foreground"
-											>
-												×
-											</Button>
-										</Badge>
+										<span className="flex gap-1 text-xs">
+											{addedCount > 0 && (
+												<span className="font-medium text-primary">+{addedCount}</span>
+											)}
+											{removedCount > 0 && (
+												<span className="font-medium text-destructive">−{removedCount}</span>
+											)}
+										</span>
 									);
-								})}
-								{localLabels.length === 0 && <p className="text-xs text-muted-foreground">None</p>}
+								})()}
+						</div>
+						<div
+							className={`rounded-md border-2 py-1 transition-colors ${dirtyFields.labels ? 'border-primary' : 'border-transparent'} ${saving ? 'opacity-50 pointer-events-none' : ''}`}
+						>
+							<div className="space-y-2">
+								<div className="flex flex-wrap gap-2">
+									{localLabels.map(label => {
+										const isNew = !ticket.labels.includes(label);
+										return (
+											<Badge
+												key={label}
+												variant="outline"
+												className={`cursor-pointer rounded-full px-2 py-1 text-xs ${isNew ? 'ring-1 ring-primary' : ''}`}
+											>
+												{label}
+												<Button
+													type="button"
+													variant="ghost"
+													onClick={() => handleRemoveLabel(label)}
+													className="ml-1 h-auto p-0 text-muted-foreground hover:text-foreground"
+												>
+													×
+												</Button>
+											</Badge>
+										);
+									})}
+									{localLabels.length === 0 && <p className="text-xs text-muted-foreground">None</p>}
+								</div>
+								<Input
+									value={labelInput}
+									onChange={e => setLabelInput(e.target.value)}
+									onKeyDown={e => {
+										if (e.key === 'Enter') {
+											e.preventDefault();
+											handleAddLabel(labelInput);
+										}
+									}}
+									placeholder="Type label and press Enter..."
+									className="w-full text-xs"
+								/>
 							</div>
-							<Input
-								value={labelInput}
-								onChange={e => setLabelInput(e.target.value)}
-								onKeyDown={e => {
-									if (e.key === 'Enter') {
-										e.preventDefault();
-										handleAddLabel(labelInput);
-									}
-								}}
-								placeholder="Type label and press Enter..."
-								className="w-full text-xs"
-							/>
 						</div>
 					</div>
 
-					{/* Custom Fields row */}
-					<div className="pt-2 text-right text-sm font-medium">
-						Custom Fields
-						{fieldsChanged &&
-							(() => {
-								const currentFields = fieldsItems.fstate.items.reduce(
-									(acc, item) => {
-										if (item.key) acc[item.key] = item.value;
-										return acc;
-									},
-									{} as Record<string, string>
-								);
-								const added = Object.keys(currentFields).filter(k => !(k in ticket.fields)).length;
-								const removed = Object.keys(ticket.fields).filter(k => !(k in currentFields)).length;
-								const modified = Object.keys(currentFields).filter(
-									k => k in ticket.fields && currentFields[k] !== ticket.fields[k]
-								).length;
-								return (
-									<span className="ml-1 flex gap-1 text-xs">
-										{added > 0 && <span className="font-medium text-primary">+{added}</span>}
-										{modified > 0 && (
-											<span className="font-medium text-foreground">~{modified}</span>
-										)}
-										{removed > 0 && (
-											<span className="font-medium text-destructive">−{removed}</span>
-										)}
-									</span>
-								);
-							})()}
-					</div>
-					<div
-						className={`rounded-md border-2 p-2 transition-colors ${fieldsChanged ? 'border-primary' : 'border-transparent'} ${saving ? 'opacity-50 pointer-events-none' : ''}`}
-					>
-						<div className="space-y-2">
-							{fieldsItems.fstate.items.length === 0 ? (
-								<p className="text-xs text-muted-foreground">No custom fields</p>
-							) : (
-								fieldsItems.fstate.items.map((item, index) => (
-									<KeyValueRenderer
-										key={item.id}
-										item={item}
-										actions={{
-											update: partial => fieldsItems.actions.update(index, partial),
-											remove: () => fieldsItems.actions.remove(index),
-										}}
-										originalFields={ticket.fields}
-										originalKey={originalKeys[item.id]}
-									/>
-								))
-							)}
-							<div className="flex justify-end">
-								<Button
-									type="button"
-									variant="outline"
-									size="sm"
-									onClick={() =>
-										fieldsItems.actions.add({ id: crypto.randomUUID(), key: '', value: '' })
-									}
-								>
-									+ Add Field
-								</Button>
+					{/* Custom Fields */}
+					<div className="flex flex-col gap-1">
+						<div className="flex items-center gap-1 text-sm font-medium">
+							Custom Fields
+							{fieldsChanged &&
+								(() => {
+									const currentFields = fieldsItems.fstate.items.reduce(
+										(acc, item) => {
+											if (item.key) acc[item.key] = item.value;
+											return acc;
+										},
+										{} as Record<string, string>
+									);
+									const added = Object.keys(currentFields).filter(k => !(k in ticket.fields)).length;
+									const removed = Object.keys(ticket.fields).filter(
+										k => !(k in currentFields)
+									).length;
+									const modified = Object.keys(currentFields).filter(
+										k => k in ticket.fields && currentFields[k] !== ticket.fields[k]
+									).length;
+									return (
+										<span className="flex gap-1 text-xs">
+											{added > 0 && <span className="font-medium text-primary">+{added}</span>}
+											{modified > 0 && (
+												<span className="font-medium text-foreground">~{modified}</span>
+											)}
+											{removed > 0 && (
+												<span className="font-medium text-destructive">−{removed}</span>
+											)}
+										</span>
+									);
+								})()}
+						</div>
+						<div
+							className={`rounded-md border-2 py-1 transition-colors ${fieldsChanged ? 'border-primary' : 'border-transparent'} ${saving ? 'opacity-50 pointer-events-none' : ''}`}
+						>
+							<div className="space-y-2">
+								{fieldsItems.fstate.items.length === 0 ? (
+									<p className="text-xs text-muted-foreground">No custom fields</p>
+								) : (
+									fieldsItems.fstate.items.map((item, index) => (
+										<KeyValueRenderer
+											key={item.id}
+											item={item}
+											actions={{
+												update: partial => fieldsItems.actions.update(index, partial),
+												remove: () => fieldsItems.actions.remove(index),
+											}}
+											originalFields={ticket.fields}
+											originalKey={originalKeys[item.id]}
+										/>
+									))
+								)}
+								<div className="flex justify-end">
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={() =>
+											fieldsItems.actions.add({ id: crypto.randomUUID(), key: '', value: '' })
+										}
+									>
+										+ Add Field
+									</Button>
+								</div>
 							</div>
 						</div>
 					</div>
