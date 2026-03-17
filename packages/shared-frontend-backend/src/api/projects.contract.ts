@@ -156,6 +156,8 @@ export const DEFAULT_STATUS_CONFIG: ProjectStatusConfig = {
 		{ id: 'flow_analysis', label: 'Flow Analysis', terminal: false },
 		{ id: 'flow_proposed', label: 'Flow Proposed', terminal: false },
 		{ id: 'flow_approved', label: 'Flow Approved', terminal: false },
+		// Set by the ticket-intake flow after posting an action plan for review
+		{ id: 'plan_in_review', label: 'Plan in Review', terminal: false },
 		{ id: 'done', label: 'Done', terminal: true },
 		{ id: 'cancelled', label: 'Cancelled', terminal: true },
 		{ id: 'pending_integration', label: 'Pending Integration', terminal: false },

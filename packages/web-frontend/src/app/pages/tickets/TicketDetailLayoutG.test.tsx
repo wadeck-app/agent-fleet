@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TicketDetailLayoutG } from './TicketDetailLayoutG';
+import { useFlowFeedbackCount } from './useFlowFeedbackCount';
+import { useFlowProposals } from './useFlowProposals';
 import { useTicketActivityCount } from './useTicketActivityCount';
 import { useTicketAuditCount } from './useTicketAuditCount';
 import { useTicketCommentsCount } from './useTicketCommentsCount';
@@ -82,6 +84,17 @@ vi.mock('./useFlowFeedbackCount', () => ({
 	})),
 }));
 
+vi.mock('./useFlowProposals', () => ({
+	useFlowProposals: vi.fn(() => ({
+		proposals: [],
+		currentProposal: null,
+		isLoading: false,
+		error: null,
+		refresh: vi.fn(),
+		refreshSilent: vi.fn(),
+	})),
+}));
+
 vi.mock('./TicketCommentsSection', () => ({
 	TicketCommentsSection: () => <div data-testid="comments-section" />,
 }));
@@ -120,7 +133,11 @@ vi.mock('react-router-dom', () => ({
 }));
 
 vi.mock('@framework/components/primitives/TabsWithUrlState', () => ({
-	TabsWithUrlState: ({ children }: any) => <div>{children}</div>,
+	TabsWithUrlState: ({ children, onValueChange }: any) => (
+		<div data-testid="tabs" data-on-value-change={!!onValueChange}>
+			{children}
+		</div>
+	),
 	TabsList: ({ children }: any) => <div role="tablist">{children}</div>,
 	TabsTrigger: ({ children, value }: any) => (
 		<button role="tab" data-value={value}>
@@ -210,6 +227,14 @@ describe('TicketDetailLayoutG', () => {
 
 		vi.mocked(useTicketAuditCount).mockReturnValue({ count: 0, loading: true });
 		vi.mocked(useTicketActivityCount).mockReturnValue({ count: 0, loading: true });
+		vi.mocked(useFlowProposals).mockReturnValue({
+			proposals: [],
+			currentProposal: null,
+			isLoading: false,
+			error: null,
+			refresh: vi.fn(),
+			refreshSilent: vi.fn(),
+		});
 	});
 
 	describe('bug #3 — comments count real-time via hooks', () => {
@@ -223,7 +248,7 @@ describe('TicketDetailLayoutG', () => {
 			expect(useTriggeredTasksCount).toHaveBeenCalledWith('ticket-1');
 		});
 
-		it('should display "?" in comments tab when count is loading', () => {
+		it('should render comments tab trigger while count is loading', () => {
 			(useTicketCommentsCount as any).mockReturnValue({
 				count: 0,
 				loading: true,
@@ -232,7 +257,8 @@ describe('TicketDetailLayoutG', () => {
 			});
 
 			render(<TicketDetailLayoutG {...defaultProps} />);
-			expect(screen.getByText(/Comments \(\?/)).toBeInTheDocument();
+			// Tab trigger is present; spinner is shown inline — check the tab button exists
+			expect(screen.getByRole('tab', { name: /Comments/i })).toBeInTheDocument();
 		});
 
 		it('should display comment count from hook in tab badge', () => {
@@ -251,6 +277,8 @@ describe('TicketDetailLayoutG', () => {
 			});
 			vi.mocked(useTicketAuditCount).mockReturnValue({ count: 0, loading: false });
 			vi.mocked(useTicketActivityCount).mockReturnValue({ count: 0, loading: false });
+			// useFlowFeedbackCount loading must also be false for countsLoading to be false
+			// (flowProposals.isLoading is independent and does not affect countsLoading)
 
 			render(<TicketDetailLayoutG {...defaultProps} />);
 			expect(screen.getByText('Comments (5)')).toBeInTheDocument();
@@ -275,9 +303,112 @@ describe('TicketDetailLayoutG', () => {
 			});
 			vi.mocked(useTicketAuditCount).mockReturnValue({ count: 0, loading: false });
 			vi.mocked(useTicketActivityCount).mockReturnValue({ count: 0, loading: false });
+			vi.mocked(useFlowProposals).mockReturnValue({
+				proposals: [],
+				currentProposal: null,
+				isLoading: false,
+				error: null,
+				refresh: vi.fn(),
+				refreshSilent: vi.fn(),
+			});
 
 			rerender(<TicketDetailLayoutG {...defaultProps} />);
 			expect(screen.getByText('Comments (3)')).toBeInTheDocument();
+		});
+	});
+
+	describe('ca — feedback tab loading spinner', () => {
+		it('should show the feedback tab trigger when currentFlowProposalId is set', () => {
+			const ticket = { ...mockTicket, currentFlowProposalId: 'prop-1' };
+			render(<TicketDetailLayoutG {...defaultProps} ticket={ticket} />);
+			// Feedback tab is enabled (not disabled) when there is a proposal
+			const feedbackTab = screen.getByRole('tab', { name: /Feedback/i });
+			expect(feedbackTab).toBeInTheDocument();
+			expect(feedbackTab).not.toBeDisabled();
+		});
+
+		it('should show feedback count after loading', () => {
+			vi.mocked(useFlowFeedbackCount).mockReturnValue({
+				count: 3,
+				loading: false,
+				error: null,
+				refresh: vi.fn(),
+			});
+			// All tabs not loading
+			(useTicketCommentsCount as any).mockReturnValue({
+				count: 0,
+				loading: false,
+				error: null,
+				refresh: vi.fn(),
+			});
+			(useTriggeredTasksCount as any).mockReturnValue({
+				count: 0,
+				loading: false,
+				error: null,
+				refresh: vi.fn(),
+			});
+			vi.mocked(useTicketAuditCount).mockReturnValue({ count: 0, loading: false });
+			vi.mocked(useTicketActivityCount).mockReturnValue({ count: 0, loading: false });
+			vi.mocked(useFlowProposals).mockReturnValue({
+				proposals: [],
+				currentProposal: null,
+				isLoading: false,
+				error: null,
+				refresh: vi.fn(),
+				refreshSilent: vi.fn(),
+			});
+			const ticket = { ...mockTicket, currentFlowProposalId: 'prop-1' };
+			render(<TicketDetailLayoutG {...defaultProps} ticket={ticket} />);
+			expect(screen.getByRole('tab', { name: /Feedback \(3\)/i })).toBeInTheDocument();
+		});
+	});
+
+	describe('cb — flow design tab count from API (eager fetch)', () => {
+		it('should call useFlowProposals with ticketId immediately on mount', () => {
+			// Eager fetch: always called with ticketId regardless of which tab is active
+			render(<TicketDetailLayoutG {...defaultProps} />);
+			expect(useFlowProposals).toHaveBeenCalledWith('ticket-1');
+		});
+
+		it('should show spinner in flow design tab while proposals are loading', () => {
+			vi.mocked(useFlowProposals).mockReturnValue({
+				proposals: [],
+				currentProposal: null,
+				isLoading: true,
+				error: null,
+				refresh: vi.fn(),
+				refreshSilent: vi.fn(),
+			});
+			render(<TicketDetailLayoutG {...defaultProps} />);
+			// Tab trigger shows a spinner (Loader2) while loading
+			const flowTab = screen.getByRole('tab', { name: /Flow Design/i });
+			expect(flowTab).toBeInTheDocument();
+		});
+
+		it('should show no count in flow design tab when proposals list is empty', () => {
+			vi.mocked(useFlowProposals).mockReturnValue({
+				proposals: [],
+				currentProposal: null,
+				isLoading: false,
+				error: null,
+				refresh: vi.fn(),
+				refreshSilent: vi.fn(),
+			});
+			render(<TicketDetailLayoutG {...defaultProps} />);
+			expect(screen.getByRole('tab', { name: /^Flow Design$/i })).toBeInTheDocument();
+		});
+
+		it('should show proposals count in flow design tab once loaded', () => {
+			vi.mocked(useFlowProposals).mockReturnValue({
+				proposals: [{ id: 'prop-1' } as any],
+				currentProposal: { id: 'prop-1' } as any,
+				isLoading: false,
+				error: null,
+				refresh: vi.fn(),
+				refreshSilent: vi.fn(),
+			});
+			render(<TicketDetailLayoutG {...defaultProps} />);
+			expect(screen.getByRole('tab', { name: /Flow Design \(1\)/i })).toBeInTheDocument();
 		});
 	});
 

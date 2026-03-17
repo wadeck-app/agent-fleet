@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import { Link } from 'react-router-dom';
 
 import type { ItemActions } from '@framework/components2/list/EditableListField';
 import { RemoveItemButton } from '@framework/components2/list/RemoveItemButton';
@@ -21,21 +19,18 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@frame
 import { useToast } from '@framework/features/toast/ToastContext';
 import { useListItems } from '@framework/hooks2/form/useListItems';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
-import { formatRelativeTime } from '@framework/utils/formatting/DateFormat';
-import type { Task, TaskStatus } from '@shared/api/tasks.contract';
-import type { Ticket, TicketComment, TicketHistoryEntry, TicketStatus } from '@shared/api/tickets.contract';
-import { ArrowDown, ArrowUp, Loader2, MessageSquare, Zap } from 'lucide-react';
-import remarkGfm from 'remark-gfm';
+import type { Ticket, TicketStatus } from '@shared/api/tickets.contract';
+import { ArrowDown, ArrowUp, Loader2 } from 'lucide-react';
 
-import { tasksApi } from '../tasks/tasks.api';
 import { FlowFeedbackSection } from './FlowFeedbackSection';
 import { FlowProposalSection } from './FlowProposalSection';
+import { TicketActivitySection } from './TicketActivitySection';
 import { TicketAuditLogSection } from './TicketAuditLogSection';
 import { TicketCommentsSection } from './TicketCommentsSection';
 import { TriggeredTasksSection } from './TriggeredTasksSection';
-import { CommentPermalink } from './components/CommentPermalink';
 import { ticketsApi } from './tickets.api';
 import { useFlowFeedbackCount } from './useFlowFeedbackCount';
+import { useFlowProposals } from './useFlowProposals';
 import { useProjectStatusConfig } from './useProjectStatusConfig';
 import { useTicketActivityCount } from './useTicketActivityCount';
 import { useTicketAuditCount } from './useTicketAuditCount';
@@ -49,31 +44,19 @@ interface TicketDetailLayoutGProps {
 	onRefresh: () => Promise<void>;
 }
 
-const TASK_STATUS_VARIANTS: Record<
-	TaskStatus,
-	'default' | 'secondary' | 'info' | 'success' | 'warning' | 'destructive'
-> = {
-	backlog: 'secondary',
-	refining: 'secondary',
-	refined: 'secondary',
-	prioritizing: 'secondary',
-	todo: 'default',
-	in_progress: 'info',
-	awaiting_user: 'warning',
-	testing: 'info',
-	review: 'warning',
-	reviewing: 'warning',
-	changes_requested: 'destructive',
-	approved: 'success',
-	merged: 'success',
-	blocked: 'destructive',
-	cancelled: 'destructive',
-};
-
-type TimelineItem =
-	| { type: 'comment'; id: string; createdAt: string; data: TicketComment }
-	| { type: 'task'; id: string; createdAt: string; data: Task }
-	| { type: 'feedback'; id: string; createdAt: string; data: TicketHistoryEntry };
+/** Renders the count badge inside a tab trigger, with a spinner while loading. */
+function TabCountBadge({ count, loading }: { count: number; loading: boolean }) {
+	if (loading) {
+		return (
+			<>
+				{' '}
+				(<Loader2 className="inline size-3 animate-spin" />)
+			</>
+		);
+	}
+	if (count === 0) return null;
+	return <> ({count})</>;
+}
 
 // KeyValueRenderer component for custom fields
 function KeyValueRenderer({
@@ -164,12 +147,9 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 		ticket.currentFlowProposalId,
 		ticketId
 	);
-	const countsLoading =
-		commentsCountLoading || tasksCountLoading || auditCountLoading || activityCountLoading || feedbackCountLoading;
-
-	// Activity timeline
-	const [timeline, setTimeline] = useState<TimelineItem[]>([]);
-	const [loadingTimeline, setLoadingTimeline] = useState(true);
+	// Eager fetch for the Flow Design tab count badge — mirrors the pattern of other tab count hooks.
+	// FlowProposalSection fetches its own data independently when it first mounts.
+	const flowProposals = useFlowProposals(ticketId);
 
 	// Initialize contentEditable on mount
 	useEffect(() => {
@@ -182,17 +162,24 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	// Sync local state with ticket
+	// Sync local state with ticket — only reset fields that have no pending dirty changes
 	useEffect(() => {
 		setLocalStatus(ticket.status);
-		setLocalLabels(ticket.labels);
+		// Only reset labels if the user has no pending changes (prevents overwriting in-progress edits)
+		setDirtyFields(prev => {
+			if (!prev.labels) {
+				setLocalLabels(ticket.labels);
+			}
+			return prev;
+		});
 
 		const fieldsArray = Object.entries(ticket.fields).map(([key, value]) => ({
 			id: crypto.randomUUID(),
 			key,
 			value,
 		}));
-		fieldsItems.actions.set(fieldsArray);
+		const setItems = fieldsItems.actions.set;
+		setItems(fieldsArray);
 
 		// Track original keys for dirty-state detection in KeyValueRenderer
 		const newOrigKeys: Record<string, string> = {};
@@ -210,64 +197,6 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [ticket]);
-
-	// Fetch activity timeline (comments + tasks + feedback entries interleaved, sorted by date)
-	useEffect(() => {
-		const fetchTimeline = async () => {
-			try {
-				setLoadingTimeline(true);
-				const [commentsRes, tasksRes, historyRes] = await Promise.all([
-					ticketsApi.getComments(ticketId),
-					tasksApi.getTasksList({ ticketId, pageSize: 100 }),
-					ticketsApi.getHistory(ticketId),
-				]);
-
-				const feedbackEntries = historyRes.entries.filter(e => e.event === 'flow.feedback_submitted');
-
-				const items: TimelineItem[] = [
-					...commentsRes.comments.map(c => ({
-						type: 'comment' as const,
-						id: c.id,
-						createdAt: c.createdAt,
-						data: c,
-					})),
-					...tasksRes.items.map(t => ({
-						type: 'task' as const,
-						id: t.id,
-						createdAt: t.createdAt,
-						data: t,
-					})),
-					...feedbackEntries.map(e => ({
-						type: 'feedback' as const,
-						id: e.id,
-						createdAt: e.timestamp,
-						data: e,
-					})),
-				];
-
-				items.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-				setTimeline(items);
-			} catch (err) {
-				console.error('Failed to fetch timeline:', err);
-			} finally {
-				setLoadingTimeline(false);
-			}
-		};
-
-		fetchTimeline();
-	}, [ticketId]);
-
-	// Scroll to and highlight comment from URL hash
-	useEffect(() => {
-		const hash = window.location.hash;
-		if (!hash.startsWith('#comment-')) return;
-		const targetId = hash.slice('#comment-'.length);
-		const el = document.getElementById(`comment-${targetId}`);
-		if (!el) return;
-		el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-		el.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
-		setTimeout(() => el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2'), 3000);
-	}, [timeline]);
 
 	const handleTitleChange = (value: string) => {
 		if (value !== ticket.title) {
@@ -450,16 +379,36 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 				<TabsWithUrlState paramKey="tab" defaultValue="comments">
 					<div className="flex items-center justify-between">
 						<TabsList>
-							<TabsTrigger value="comments">Comments ({countsLoading ? '?' : commentsCount})</TabsTrigger>
-							<TabsTrigger value="tasks">Triggered ({countsLoading ? '?' : tasksCount})</TabsTrigger>
-							<TabsTrigger value="audit">Audit ({countsLoading ? '?' : auditCount})</TabsTrigger>
-							<TabsTrigger value="activity">Activity ({countsLoading ? '?' : activityCount})</TabsTrigger>
+							<TabsTrigger value="comments">
+								Comments
+								<TabCountBadge count={commentsCount} loading={commentsCountLoading} />
+							</TabsTrigger>
+							<TabsTrigger value="tasks">
+								Triggered
+								<TabCountBadge count={tasksCount} loading={tasksCountLoading} />
+							</TabsTrigger>
+							<TabsTrigger value="audit">
+								Audit
+								<TabCountBadge count={auditCount} loading={auditCountLoading} />
+							</TabsTrigger>
+							<TabsTrigger value="activity">
+								Activity
+								<TabCountBadge count={activityCount} loading={activityCountLoading} />
+							</TabsTrigger>
+							{/* cb fix: use proposals.length from the API response (with spinner while loading),
+							    not ticket.currentFlowProposalId which is pre-loaded and shows instantly */}
 							<TabsTrigger value="flow">
-								{ticket.currentFlowProposalId ? 'Flow Design (1)' : 'Flow Design'}
+								Flow Design
+								<TabCountBadge
+									count={flowProposals.proposals.length}
+									loading={flowProposals.isLoading}
+								/>
 							</TabsTrigger>
 							{ticket.currentFlowProposalId ? (
 								<TabsTrigger value="feedback">
-									Feedback{!feedbackCountLoading && feedbackCount > 0 ? ` (${feedbackCount})` : ''}
+									{/* ca fix: show spinner while loading, then count when available */}
+									Feedback
+									<TabCountBadge count={feedbackCount} loading={feedbackCountLoading} />
 								</TabsTrigger>
 							) : (
 								<TooltipProvider>
@@ -533,7 +482,6 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 						{ticket.currentFlowProposalId ? (
 							<FlowFeedbackSection
 								ticketId={ticketId}
-								flowFeedbackId={ticket.flowFeedbackId}
 								flowRetrospectiveId={ticket.flowRetrospectiveId}
 								currentFlowProposalId={ticket.currentFlowProposalId}
 								onFeedbackSubmitted={() => void onRefresh()}
@@ -546,186 +494,7 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 					</TabsContent>
 
 					<TabsContent value="activity">
-						{loadingTimeline && (
-							<div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
-								<Loader2 className="size-6 animate-spin" />
-								<p className="text-sm">Loading...</p>
-							</div>
-						)}
-						{!loadingTimeline && timeline.length === 0 && (
-							<p className="py-4 text-sm text-muted-foreground">No activity yet</p>
-						)}
-						{!loadingTimeline && timeline.length > 0 && (
-							<div className="mt-4 space-y-4">
-								{(sortOrder === 'desc' ? [...timeline].reverse() : timeline).map(item => (
-									<div key={`${item.type}-${item.id}`} className="flex gap-3">
-										<div className="flex flex-col items-center">
-											<div
-												className={`flex size-8 shrink-0 items-center justify-center rounded-full ${
-													item.type === 'comment'
-														? 'bg-muted'
-														: item.type === 'feedback'
-															? 'bg-success/20'
-															: 'bg-accent'
-												}`}
-											>
-												{item.type === 'comment' ? (
-													<MessageSquare className="size-4 text-muted-foreground" />
-												) : item.type === 'feedback' ? (
-													<span className="text-xs font-bold text-success">★</span>
-												) : (
-													<Zap className="size-4 text-accent-foreground" />
-												)}
-											</div>
-											{item !== timeline[timeline.length - 1] && (
-												<div className="h-full w-px bg-border" />
-											)}
-										</div>
-
-										<div
-											id={item.type === 'comment' ? `comment-${item.id}` : undefined}
-											className="mb-1 flex-1 rounded-md border bg-card p-4"
-										>
-											{item.type === 'comment' && (
-												<div>
-													<div className="mb-2 flex items-center gap-2">
-														{item.data.author && (
-															<Badge variant="outline" className="text-xs">
-																{item.data.author}
-															</Badge>
-														)}
-														<CommentPermalink
-															commentId={item.id}
-															createdAt={item.data.createdAt}
-														/>
-													</div>
-													<div className="max-w-none text-sm">
-														<ReactMarkdown
-															remarkPlugins={[remarkGfm]}
-															components={{
-																p: ({ children }) => (
-																	<p className="mb-1 last:mb-0">{children}</p>
-																),
-																strong: ({ children }) => (
-																	<strong className="font-bold">{children}</strong>
-																),
-																em: ({ children }) => (
-																	<em className="italic">{children}</em>
-																),
-																code: ({ children, className }) => {
-																	const isBlock = className?.startsWith('language-');
-																	if (isBlock) {
-																		return (
-																			<code className={className}>
-																				{children}
-																			</code>
-																		);
-																	}
-																	return (
-																		<code className="rounded bg-muted px-1 py-0.5 text-[0.85em] font-mono">
-																			{children}
-																		</code>
-																	);
-																},
-																pre: ({ children }) => (
-																	<pre className="my-2 overflow-x-auto rounded-md bg-muted p-3 text-xs">
-																		{children}
-																	</pre>
-																),
-																ul: ({ children }) => (
-																	<ul className="my-1 ml-4 list-disc">{children}</ul>
-																),
-																ol: ({ children }) => (
-																	<ol className="my-1 ml-4 list-decimal">
-																		{children}
-																	</ol>
-																),
-																li: ({ children }) => (
-																	<li className="my-0.5">{children}</li>
-																),
-																blockquote: ({ children }) => (
-																	<blockquote className="my-1 border-l-2 border-muted-foreground pl-3 text-muted-foreground">
-																		{children}
-																	</blockquote>
-																),
-																a: ({ children, href }) => (
-																	<a
-																		href={href}
-																		className="text-primary underline hover:no-underline"
-																		target="_blank"
-																		rel="noopener noreferrer"
-																	>
-																		{children}
-																	</a>
-																),
-															}}
-														>
-															{item.data.content}
-														</ReactMarkdown>
-													</div>
-												</div>
-											)}
-
-											{item.type === 'task' && (
-												<div>
-													<div className="mb-2 flex items-center gap-2">
-														<Badge
-															variant={
-																TASK_STATUS_VARIANTS[item.data.status] ?? 'secondary'
-															}
-														>
-															{item.data.status}
-														</Badge>
-														{item.data.metadata?.triggerEvent && (
-															<Badge variant="outline" className="font-mono text-xs">
-																{item.data.metadata.triggerEvent as string}
-															</Badge>
-														)}
-														<span className="ml-auto text-xs text-muted-foreground">
-															{formatRelativeTime(item.data.createdAt)}
-														</span>
-													</div>
-													<Link
-														to={`/tasks/${item.data.id}`}
-														className="text-sm text-primary hover:underline"
-													>
-														Task {item.data.id}
-													</Link>
-													{item.data.flowId && (
-														<div className="mt-1 font-mono text-xs text-muted-foreground">
-															{item.data.flowId}
-														</div>
-													)}
-												</div>
-											)}
-
-											{item.type === 'feedback' && (
-												<div>
-													<div className="mb-1 flex items-center gap-2">
-														<Badge variant="success" className="text-xs">
-															Feedback
-														</Badge>
-														{item.data.author && (
-															<Badge variant="outline" className="text-xs">
-																{item.data.author}
-															</Badge>
-														)}
-														<span className="ml-auto text-xs text-muted-foreground">
-															{formatRelativeTime(item.data.timestamp)}
-														</span>
-													</div>
-													{(item.data.data.rating as number) > 0 && (
-														<p className="text-sm">
-															Rating: <strong>{item.data.data.rating as number}/5</strong>
-														</p>
-													)}
-												</div>
-											)}
-										</div>
-									</div>
-								))}
-							</div>
-						)}
+						<TicketActivitySection ticketId={ticketId} sortOrder={sortOrder} />
 					</TabsContent>
 				</TabsWithUrlState>
 			</div>
@@ -781,7 +550,7 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 								})()}
 						</div>
 						<div
-							className={`rounded-md border-2 py-1 transition-colors ${dirtyFields.labels ? 'border-primary' : 'border-transparent'} ${saving ? 'opacity-50 pointer-events-none' : ''}`}
+							className={`rounded-md py-1 transition-all ${dirtyFields.labels ? 'ring-2 ring-primary' : ''} ${saving ? 'opacity-50 pointer-events-none' : ''}`}
 						>
 							<div className="space-y-2">
 								<div className="flex flex-wrap gap-2">
@@ -791,7 +560,7 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 											<Badge
 												key={label}
 												variant="outline"
-												className={`cursor-pointer rounded-full px-2 py-1 text-xs ${isNew ? 'ring-1 ring-primary' : ''}`}
+												className={`cursor-pointer rounded-full px-2 py-1 text-sm ${isNew ? 'ring-1 ring-primary' : ''}`}
 											>
 												{label}
 												<Button
@@ -805,7 +574,7 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 											</Badge>
 										);
 									})}
-									{localLabels.length === 0 && <p className="text-xs text-muted-foreground">None</p>}
+									{localLabels.length === 0 && <p className="text-sm text-muted-foreground">None</p>}
 								</div>
 								<Input
 									value={labelInput}
@@ -817,7 +586,7 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 										}
 									}}
 									placeholder="Type label and press Enter..."
-									className="w-full text-xs"
+									className="w-full text-sm"
 								/>
 							</div>
 						</div>
@@ -857,11 +626,11 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 								})()}
 						</div>
 						<div
-							className={`rounded-md border-2 py-1 transition-colors ${fieldsChanged ? 'border-primary' : 'border-transparent'} ${saving ? 'opacity-50 pointer-events-none' : ''}`}
+							className={`rounded-md py-1 transition-all ${fieldsChanged ? 'ring-2 ring-primary' : ''} ${saving ? 'opacity-50 pointer-events-none' : ''}`}
 						>
 							<div className="space-y-2">
 								{fieldsItems.fstate.items.length === 0 ? (
-									<p className="text-xs text-muted-foreground">No custom fields</p>
+									<p className="text-sm text-muted-foreground">No custom fields</p>
 								) : (
 									fieldsItems.fstate.items.map((item, index) => (
 										<KeyValueRenderer

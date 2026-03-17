@@ -182,6 +182,11 @@ export interface BusinessEvents {
 		feedbackId: string;
 		rating: number;
 	};
+
+	/** A new flow proposal was created or updated (async redesign completed) */
+	'b2f:flow:proposal_updated': {
+		ticketId: string;
+	};
 }
 
 /**

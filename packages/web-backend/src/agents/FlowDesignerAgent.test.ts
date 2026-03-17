@@ -114,6 +114,45 @@ describe('FlowDesignerAgent', () => {
 		expect(result.proposedFlow).toMatchObject({ id: 'test-flow', version: '1.0.0' });
 		expect(result.reasoning).toBe('This flow handles the ticket requirements.');
 		expect(result.confidenceScore).toBe(85);
+		expect(result.openQuestions).toBeUndefined();
+	});
+
+	it('parses openQuestions when present in Claude response', async () => {
+		const jsonWithQuestions = JSON.stringify({
+			proposedFlow: {
+				id: 'test-flow',
+				version: '1.0.0',
+				name: 'Test Flow',
+				description: 'A test flow',
+				workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+				inputs: { taskDescription: 'string' },
+				steps: [{ type: 'model', id: 'step1', name: 'Step 1', model: 'haiku', prompt: 'Do the thing' }],
+			},
+			reasoning: 'Some reasoning.',
+			confidenceScore: 60,
+			openQuestions: ['What auth method is required?', 'What is the expected data volume?'],
+		});
+		spawnMock.mockReturnValue(makeSpawnChild({ stdout: '```json\n' + jsonWithQuestions + '\n```' }) as any);
+
+		const result = await agent.designFlow(makeInput());
+
+		expect(result.openQuestions).toEqual(['What auth method is required?', 'What is the expected data volume?']);
+	});
+
+	it('prompt contains openQuestions field description', async () => {
+		let capturedPrompt = '';
+		spawnMock.mockImplementation((command, args, opts) => {
+			const child = makeSpawnChild({ stdout: makeValidClaudeOutput() });
+			(child as any).stdin.write = vi.fn((data: string) => {
+				capturedPrompt += data;
+			});
+			return child as any;
+		});
+
+		await agent.designFlow(makeInput());
+
+		expect(capturedPrompt).toContain('"openQuestions"');
+		expect(capturedPrompt).toContain('confidenceScore < 85');
 	});
 
 	it('prompt contains capabilities doc (section headers)', async () => {
@@ -230,6 +269,48 @@ describe('FlowDesignerAgent', () => {
 		spawnMock.mockReturnValue(makeSpawnChild({ stdout: '', stderr: 'auth error', exitCode: 1 }) as any);
 
 		await expect(agent.designFlow(makeInput())).rejects.toThrow('auth error');
+	});
+
+	it('sanitizes em-dashes and en-dashes from LLM output before storing', async () => {
+		// LLM ignores the formatting rule and returns em-dashes in reasoning text
+		const flowWithDashes = JSON.stringify({
+			proposedFlow: {
+				id: 'test-flow',
+				version: '1.0.0',
+				name: 'Test Flow',
+				description: 'A test flow',
+				workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+				inputs: { taskDescription: 'string' },
+				steps: [{ type: 'model', id: 'step1', name: 'Step 1', model: 'haiku', prompt: 'Do the thing' }],
+			},
+			// Contains em-dash (\u2014) and en-dash (\u2013) in reasoning
+			reasoning: 'This flow handles the ticket \u2014 it is complex \u2013 but manageable.',
+			confidenceScore: 80,
+		});
+		const outputWithDashes = '```json\n' + flowWithDashes + '\n```';
+		spawnMock.mockReturnValue(makeSpawnChild({ stdout: outputWithDashes }) as any);
+
+		const result = await agent.designFlow(makeInput());
+
+		// Em-dashes must be replaced with ' - ', en-dashes with '-'
+		expect(result.reasoning).not.toContain('\u2014');
+		expect(result.reasoning).not.toContain('\u2013');
+		expect(result.reasoning).toContain(' - ');
+	});
+
+	it('prompt contains em-dash formatting rule', async () => {
+		let capturedPrompt = '';
+		spawnMock.mockImplementation(() => {
+			const child = makeSpawnChild({ stdout: makeValidClaudeOutput() });
+			(child as any).stdin.write = vi.fn((data: string) => {
+				capturedPrompt += data;
+			});
+			return child as any;
+		});
+
+		await agent.designFlow(makeInput());
+
+		expect(capturedPrompt).toContain('Do NOT use em-dashes');
 	});
 
 	it('serializeFlowToYaml returns valid YAML string', () => {

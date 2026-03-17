@@ -17,11 +17,9 @@ import { feedbackApi } from './feedbackApi';
 
 interface FlowFeedbackSectionProps {
 	ticketId: string;
-	/** If set, feedback was already submitted */
-	flowFeedbackId?: string;
 	/** If set, a retrospective exists */
 	flowRetrospectiveId?: string;
-	/** The current flow proposal ID — used as flowId in the feedback body */
+	/** The current flow proposal ID — used as flowId in the feedback body and to fetch submitted feedback */
 	currentFlowProposalId?: string;
 	/** Called after feedback is successfully submitted */
 	onFeedbackSubmitted?: () => void;
@@ -226,128 +224,6 @@ function FlowFeedbackForm({ ticketId, currentFlowProposalId, onSubmitted, onCanc
 }
 
 // ---------------------------------------------------------------------------
-// SubmittedFeedbackCard — fetches and displays submitted feedback (z fix)
-// ---------------------------------------------------------------------------
-
-interface SubmittedFeedbackCardProps {
-	/** The flow proposal ID used to fetch feedback items */
-	flowId: string;
-}
-
-function SubmittedFeedbackCard({ flowId }: SubmittedFeedbackCardProps) {
-	const [feedbackItems, setFeedbackItems] = useState<FlowFeedback[]>([]);
-	const [isLoading, setIsLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-
-	useEffect(() => {
-		let cancelled = false;
-		setIsLoading(true);
-		setError(null);
-
-		feedbackApi
-			.getFeedbackByFlow(flowId)
-			.then(data => {
-				if (!cancelled) {
-					setFeedbackItems(data.items);
-					setIsLoading(false);
-				}
-			})
-			.catch(err => {
-				if (!cancelled) {
-					setError(getErrorMessage(err));
-					setIsLoading(false);
-				}
-			});
-
-		return () => {
-			cancelled = true;
-		};
-	}, [flowId]);
-
-	if (isLoading) {
-		return (
-			<div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
-				<Loader2 className="size-6 animate-spin" />
-				<p className="text-sm">Loading...</p>
-			</div>
-		);
-	}
-
-	if (error) {
-		return <p className="text-sm text-muted-foreground">Could not load submitted feedback: {error}</p>;
-	}
-
-	if (feedbackItems.length === 0) {
-		return null;
-	}
-
-	return (
-		<div className="space-y-3">
-			{feedbackItems.map(item => (
-				<div key={item.id} className="rounded-md border bg-card p-4 space-y-3">
-					{/* Rating */}
-					<div className="flex items-center gap-2">
-						<div className="flex gap-0.5">
-							{[1, 2, 3, 4, 5].map(n => (
-								<Star
-									key={n}
-									className={`size-4 fill-current ${n <= item.rating ? 'text-warning' : 'text-muted-foreground/20'}`}
-								/>
-							))}
-						</div>
-						<span className="text-xs text-muted-foreground">
-							{new Date(item.submittedAt).toLocaleString()}
-						</span>
-					</div>
-
-					{/* What went well */}
-					{item.wentWell.length > 0 && (
-						<div className="space-y-1">
-							<p className="text-xs font-medium text-muted-foreground tracking-wide">What went well</p>
-							<ul className="list-disc list-inside space-y-0.5">
-								{item.wentWell.map((w, i) => (
-									<li key={i} className="text-sm">
-										{w}
-									</li>
-								))}
-							</ul>
-						</div>
-					)}
-
-					{/* What went wrong */}
-					{item.wentWrong.length > 0 && (
-						<div className="space-y-1">
-							<p className="text-xs font-medium text-muted-foreground tracking-wide">What went wrong</p>
-							<ul className="list-disc list-inside space-y-0.5">
-								{item.wentWrong.map((w, i) => (
-									<li key={i} className="text-sm">
-										{w}
-									</li>
-								))}
-							</ul>
-						</div>
-					)}
-
-					{/* Suggestions */}
-					{item.suggestions && item.suggestions.length > 0 && (
-						<div className="space-y-1">
-							<p className="text-xs font-medium text-muted-foreground tracking-wide">Suggestions</p>
-							<ul className="list-disc list-inside space-y-0.5">
-								{item.suggestions.map((s, i) => (
-									<li key={i} className="text-sm">
-										{s}
-									</li>
-								))}
-							</ul>
-						</div>
-					)}
-				</div>
-			))}
-		</div>
-	);
-}
-
-// ---------------------------------------------------------------------------
 // RetrospectiveCard — fetches and displays retrospective
 // ---------------------------------------------------------------------------
 
@@ -493,12 +369,45 @@ function RetrospectiveCard({ ticketId }: RetrospectiveCardProps) {
  */
 export function FlowFeedbackSection({
 	ticketId,
-	flowFeedbackId,
 	flowRetrospectiveId,
 	currentFlowProposalId,
 	onFeedbackSubmitted,
 }: FlowFeedbackSectionProps) {
+	const [feedbackItems, setFeedbackItems] = useState<FlowFeedback[]>([]);
+	const [loading, setLoading] = useState(true);
 	const [showNewForm, setShowNewForm] = useState(false);
+
+	const fetchFeedback = async () => {
+		if (!currentFlowProposalId) {
+			setLoading(false);
+			return;
+		}
+		setLoading(true);
+		try {
+			const data = await feedbackApi.getFeedbackByFlow(currentFlowProposalId);
+			setFeedbackItems(data.items);
+		} catch {
+			// non-fatal — show empty state
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	useEffect(() => {
+		void fetchFeedback();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [currentFlowProposalId]);
+
+	if (loading) {
+		return (
+			<div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
+				<Loader2 className="size-6 animate-spin" />
+				<p className="text-sm">Loading...</p>
+			</div>
+		);
+	}
+
+	const hasFeedback = feedbackItems.length > 0;
 
 	return (
 		<div className="space-y-6 py-2">
@@ -509,8 +418,8 @@ export function FlowFeedbackSection({
 				</div>
 			)}
 
-			{/* Submitted feedback state — displayed when feedback exists and not adding new (z fix) */}
-			{flowFeedbackId && !showNewForm && (
+			{/* Submitted feedback state */}
+			{hasFeedback && !showNewForm && (
 				<div className="space-y-3">
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-2">
@@ -523,22 +432,90 @@ export function FlowFeedbackSection({
 							Add another feedback
 						</Button>
 					</div>
-					{/* Show submitted feedback content when flowId is available (z fix) */}
-					{currentFlowProposalId && <SubmittedFeedbackCard flowId={currentFlowProposalId} />}
+					<div className="space-y-3">
+						{feedbackItems.map(item => (
+							<div key={item.id} className="rounded-md border bg-card p-4 space-y-3">
+								<div className="flex items-center gap-2">
+									<div className="flex gap-0.5">
+										{[1, 2, 3, 4, 5].map(n => (
+											<Star
+												key={n}
+												className={`size-4 fill-current ${n <= item.rating ? 'text-warning' : 'text-muted-foreground/20'}`}
+											/>
+										))}
+									</div>
+									<span className="text-xs text-muted-foreground">
+										{new Date(item.submittedAt).toLocaleString()}
+									</span>
+								</div>
+								{/* What went well — always shown, with "Nothing noted" placeholder when empty */}
+								<div className="space-y-1">
+									<p className="text-xs font-medium text-muted-foreground tracking-wide">
+										What went well
+									</p>
+									{item.wentWell.length > 0 ? (
+										<ul className="list-disc list-inside space-y-0.5">
+											{item.wentWell.map((w, i) => (
+												<li key={i} className="text-sm">
+													{w}
+												</li>
+											))}
+										</ul>
+									) : (
+										<p className="text-sm text-muted-foreground italic">Nothing noted</p>
+									)}
+								</div>
+								{/* What went wrong — always shown, with "Nothing noted" placeholder when empty */}
+								<div className="space-y-1">
+									<p className="text-xs font-medium text-muted-foreground tracking-wide">
+										What went wrong
+									</p>
+									{item.wentWrong.length > 0 ? (
+										<ul className="list-disc list-inside space-y-0.5">
+											{item.wentWrong.map((w, i) => (
+												<li key={i} className="text-sm">
+													{w}
+												</li>
+											))}
+										</ul>
+									) : (
+										<p className="text-sm text-muted-foreground italic">Nothing noted</p>
+									)}
+								</div>
+								{/* Suggestions — always shown, with "Nothing noted" placeholder when empty */}
+								<div className="space-y-1">
+									<p className="text-xs font-medium text-muted-foreground tracking-wide">
+										Suggestions
+									</p>
+									{item.suggestions && item.suggestions.length > 0 ? (
+										<ul className="list-disc list-inside space-y-0.5">
+											{item.suggestions.map((s, i) => (
+												<li key={i} className="text-sm">
+													{s}
+												</li>
+											))}
+										</ul>
+									) : (
+										<p className="text-sm text-muted-foreground italic">Nothing noted</p>
+									)}
+								</div>
+							</div>
+						))}
+					</div>
 				</div>
 			)}
 
 			{/* Feedback form — shown when no feedback yet, or when adding another */}
-			{(!flowFeedbackId || showNewForm) && (
+			{(!hasFeedback || showNewForm) && (
 				<FlowFeedbackForm
 					ticketId={ticketId}
 					currentFlowProposalId={currentFlowProposalId}
 					onSubmitted={() => {
 						setShowNewForm(false);
+						void fetchFeedback();
 						onFeedbackSubmitted?.();
 					}}
-					// Pass cancel only when re-adding (a previous feedback already exists) — y1 fix
-					onCancel={flowFeedbackId ? () => setShowNewForm(false) : undefined}
+					onCancel={hasFeedback ? () => setShowNewForm(false) : undefined}
 				/>
 			)}
 		</div>

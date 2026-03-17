@@ -525,8 +525,9 @@ describe('FlowProposalSection', () => {
 			expect(screen.getByText('Adaptations')).toBeInTheDocument();
 		});
 
-		it('DOES render adaptations section when reusedFromFlowId is set (even version=1)', () => {
-			const reusedWithAdaptations: FlowProposal = {
+		it('does NOT render adaptations section when reusedFromFlowId is set but version=1 (ba/ce fix: version must be > 1)', () => {
+			// ba/ce fix: reusedFromFlowId alone is not enough — version must be > 1
+			const reusedV1WithAdaptations: FlowProposal = {
 				...mockProposal,
 				version: 1,
 				reusedFromFlowId: 'base-flow-123',
@@ -534,8 +535,8 @@ describe('FlowProposalSection', () => {
 			};
 			vi.mocked(useFlowProposals).mockReturnValue({
 				...defaultHookResult,
-				proposals: [reusedWithAdaptations],
-				currentProposal: reusedWithAdaptations,
+				proposals: [reusedV1WithAdaptations],
+				currentProposal: reusedV1WithAdaptations,
 			});
 
 			render(
@@ -544,18 +545,19 @@ describe('FlowProposalSection', () => {
 				</MemoryRouter>
 			);
 
-			expect(screen.getByText('Adaptations')).toBeInTheDocument();
+			expect(screen.queryByText('Adaptations')).not.toBeInTheDocument();
 		});
 	});
 
 	// ---------------------------------------------------------------------------
-	// I2 fix: confidence tooltip shows specific uncertainty sentences
+	// I2 fix: confidence tooltip shows openQuestions or uncertainty sentences
 	// ---------------------------------------------------------------------------
-	describe('i2 — confidence tooltip uncertainty sentences', () => {
-		it('shows generic text when reasoning has no uncertainty sentences', () => {
+	describe('i2 — confidence tooltip open questions', () => {
+		it('confidence trigger is present when openQuestions is empty and reasoning has no uncertainty', () => {
 			const proposalWithClearReasoning: FlowProposal = {
 				...mockProposal,
 				confidenceScore: 95,
+				openQuestions: [],
 				reasoning: 'The flow is straightforward. All requirements are clear. Steps were defined precisely.',
 			};
 			vi.mocked(useFlowProposals).mockReturnValue({
@@ -570,19 +572,49 @@ describe('FlowProposalSection', () => {
 				</MemoryRouter>
 			);
 
-			// The confidence score element should be present
+			// Confidence trigger must be present; tooltip content not tested here (requires hover)
 			expect(screen.getByText(/Confidence: 95%/)).toBeInTheDocument();
 		});
 
-		it('reasoning with question marks is extractable by extractUncertaintySentences helper', () => {
-			// Test the pure function directly
-			const reasoning =
-				'The flow is mostly clear. What should happen if the API times out? Some steps may not handle edge cases correctly.';
-			// Import indirectly by testing the rendered output
+		it('shows "Open questions:" label with bullet list when openQuestions has items (after hover)', async () => {
+			const user = userEvent.setup();
+			const proposalWithQuestions: FlowProposal = {
+				...mockProposal,
+				confidenceScore: 60,
+				openQuestions: ['What auth method is required?', 'What is the expected data volume?'],
+			};
+			vi.mocked(useFlowProposals).mockReturnValue({
+				...defaultHookResult,
+				proposals: [proposalWithQuestions],
+				currentProposal: proposalWithQuestions,
+			});
+
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
+
+			const trigger = screen.getByText(/Confidence: 60%/);
+			expect(trigger).toBeInTheDocument();
+
+			await user.hover(trigger);
+
+			await waitFor(() => {
+				expect(screen.getByText('Open questions:')).toBeInTheDocument();
+			});
+			expect(screen.getByText(/What auth method is required/)).toBeInTheDocument();
+			expect(screen.getByText(/What is the expected data volume/)).toBeInTheDocument();
+		});
+
+		it('falls back to extractUncertaintySentences when openQuestions is absent and reasoning has uncertainty signals (after hover)', async () => {
+			const user = userEvent.setup();
 			const proposalWithUnclearReasoning: FlowProposal = {
 				...mockProposal,
 				confidenceScore: 65,
-				reasoning,
+				openQuestions: undefined,
+				reasoning:
+					'The flow is mostly clear. What should happen if the API times out? Some steps may not handle edge cases correctly.',
 			};
 			vi.mocked(useFlowProposals).mockReturnValue({
 				...defaultHookResult,
@@ -596,16 +628,21 @@ describe('FlowProposalSection', () => {
 				</MemoryRouter>
 			);
 
-			// The confidence score should be visible — tooltip appears on hover, hard to test without interaction
-			expect(screen.getByText(/Confidence: 65%/)).toBeInTheDocument();
+			const trigger = screen.getByText(/Confidence: 65%/);
+			await user.hover(trigger);
+
+			await waitFor(() => {
+				expect(screen.getByText('Open questions:')).toBeInTheDocument();
+			});
 		});
 	});
 
 	// ---------------------------------------------------------------------------
-	// K fix: Open in Flow Editor link present
+	// K fix: Open in Flow Editor — disabled for non-approved, active link when approved
 	// ---------------------------------------------------------------------------
 	describe('k — open in flow editor link', () => {
-		it('shows "Open in Flow Editor" link next to the YAML block', () => {
+		it('shows disabled "Open in Flow Editor" button (not a link) for non-approved proposals', () => {
+			// K fix: pending_review proposals show a disabled button; link only shown when approved
 			vi.mocked(useFlowProposals).mockReturnValue({
 				...defaultHookResult,
 				proposals: [mockProposal],
@@ -618,14 +655,22 @@ describe('FlowProposalSection', () => {
 				</MemoryRouter>
 			);
 
-			expect(screen.getByRole('link', { name: /Open in Flow Editor/i })).toBeInTheDocument();
+			// Disabled button is present, not a link
+			const btn = screen.getByRole('button', { name: /Open in Flow Editor/i });
+			expect(btn).toBeDisabled();
+			expect(screen.queryByRole('link', { name: /Open in Flow Editor/i })).not.toBeInTheDocument();
 		});
 
-		it('links to /flows/{flowId}/edit when proposedFlow has an id', () => {
+		it('shows active link to /flows/{flowId}/edit when proposal is approved', () => {
+			const approvedProposal: FlowProposal = {
+				...mockProposal,
+				status: 'approved',
+				approvedAt: new Date().toISOString(),
+			};
 			vi.mocked(useFlowProposals).mockReturnValue({
 				...defaultHookResult,
-				proposals: [mockProposal],
-				currentProposal: mockProposal,
+				proposals: [approvedProposal],
+				currentProposal: approvedProposal,
 			});
 
 			render(

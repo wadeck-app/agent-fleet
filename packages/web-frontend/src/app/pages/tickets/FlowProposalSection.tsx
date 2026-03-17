@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 
 import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
@@ -10,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@frame
 import { useToast } from '@framework/features/toast/ToastContext';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { FlowProposal, FlowProposalStatus, FlowReviewThread } from '@shared/api/flow-proposals.contract';
-import { B2F_TICKET_UPDATED } from '@shared/transport';
+import { B2F_FLOW_PROPOSAL_UPDATED } from '@shared/transport';
 import * as yaml from 'js-yaml';
 import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 
@@ -123,7 +122,9 @@ function ReviewThreadItem({ thread, ticketId, proposalId, onResolved }: ReviewTh
 		<div className="rounded-md border bg-card p-3 space-y-2">
 			<div className="flex items-center gap-2">
 				<span className="font-mono text-xs text-muted-foreground">
-					Lines {thread.selector.startLine}–{thread.selector.endLine}
+					Lines {thread.selector.startLine}
+					{'\u2013'}
+					{thread.selector.endLine}
 				</span>
 				<Badge variant={thread.status === 'open' ? 'warning' : 'success'} className="text-xs">
 					{thread.status}
@@ -218,7 +219,7 @@ function AddReviewThreadForm({ ticketId, proposalId, onAdded, onCancel }: AddRev
 		const start = parseInt(startLine, 10);
 		const end = parseInt(endLine, 10);
 		if (isNaN(start) || isNaN(end) || start < 1 || end < start) {
-			showToast('Please enter valid line numbers (start ≤ end, both ≥ 1)', 'error');
+			showToast('Please enter valid line numbers (start <= end, both >= 1)', 'error');
 			return;
 		}
 		if (!comment.trim()) {
@@ -346,8 +347,13 @@ function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onReques
 
 	const reasoningSentences = proposal.reasoning.split(/\.\s+|\n/).filter(s => s.trim());
 
-	// I2 fix: extract uncertainty sentences to make confidence tooltip actionable
-	const uncertaintySentences = useMemo(() => extractUncertaintySentences(proposal.reasoning), [proposal.reasoning]);
+	// I2 fix: openQuestions takes priority; fall back to extracting from reasoning text
+	const tooltipQuestions = useMemo<string[]>(() => {
+		if (proposal.openQuestions && proposal.openQuestions.length > 0) {
+			return proposal.openQuestions;
+		}
+		return extractUncertaintySentences(proposal.reasoning);
+	}, [proposal.openQuestions, proposal.reasoning]);
 
 	// K fix: extract the flow ID from proposedFlow for the editor link
 	const proposedFlowId =
@@ -369,13 +375,13 @@ function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onReques
 									Confidence: {Math.round(proposal.confidenceScore)}%
 								</span>
 							</TooltipTrigger>
-							{/* I2 fix: show specific uncertainty sentences when available */}
+							{/* I2 fix: show openQuestions list if available, fall back to extracted sentences, else generic */}
 							<TooltipContent className="max-w-[300px] text-xs">
-								{uncertaintySentences.length > 0 ? (
+								{tooltipQuestions.length > 0 ? (
 									<div className="space-y-1">
-										<p className="font-medium">The agent had these uncertainties:</p>
+										<p className="font-medium">Open questions:</p>
 										<ul className="list-disc list-inside space-y-0.5">
-											{uncertaintySentences.map((s, i) => (
+											{tooltipQuestions.map((s, i) => (
 												<li key={i}>{s.trim().replace(/\.$/, '')}</li>
 											))}
 										</ul>
@@ -396,21 +402,19 @@ function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onReques
 				</span>
 			</div>
 
-			{/* Adaptations — only on redesigns (version > 1) or explicit flow reuse (ba fix) */}
-			{proposal.adaptations &&
-				proposal.adaptations.length > 0 &&
-				(proposal.version > 1 || proposal.reusedFromFlowId) && (
-					<div className="space-y-1">
-						<p className="text-xs font-medium text-muted-foreground tracking-wide">Adaptations</p>
-						<ul className="list-disc list-inside space-y-0.5">
-							{proposal.adaptations.map((a, i) => (
-								<li key={i} className="text-sm">
-									{a}
-								</li>
-							))}
-						</ul>
-					</div>
-				)}
+			{/* Adaptations — only on redesigns (version > 1), not on first design (ba/ce fix) */}
+			{proposal.adaptations && proposal.adaptations.length > 0 && proposal.version > 1 && (
+				<div className="space-y-1">
+					<p className="text-xs font-medium text-muted-foreground tracking-wide">Adaptations</p>
+					<ul className="list-disc list-inside space-y-0.5">
+						{proposal.adaptations.map((a, i) => (
+							<li key={i} className="text-sm">
+								{a}
+							</li>
+						))}
+					</ul>
+				</div>
+			)}
 
 			{/* Reasoning collapsible */}
 			<div className="rounded-md border">
@@ -448,13 +452,39 @@ function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onReques
 			<div className="space-y-1">
 				<div className="flex items-center justify-between">
 					<p className="text-xs font-medium text-muted-foreground tracking-wide">Proposed flow</p>
-					{/* K fix: link to the flow editor — by flowId if it's in the registry, else /flows/new */}
-					<Link
-						to={proposedFlowId ? `/flows/${proposedFlowId}/edit` : '/flows/new'}
-						className="text-xs text-primary hover:underline"
-					>
-						Open in Flow Editor
-					</Link>
+					{/* K fix: only show an active link when the proposal is approved (flow registered in registry).
+					    For non-approved proposals the flow ID is not yet in the registry, so open in new tab
+					    once approved, otherwise show a disabled button with a tooltip. */}
+					{proposal.status === 'approved' && proposedFlowId ? (
+						<a
+							href={`/flows/${proposedFlowId}/edit`}
+							target="_blank"
+							rel="noopener noreferrer"
+							className="text-xs text-primary hover:underline"
+						>
+							Open in Flow Editor
+						</a>
+					) : (
+						<TooltipProvider>
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<span className="cursor-not-allowed">
+										<Button
+											variant="ghost"
+											size="sm"
+											className="h-auto p-0 text-xs text-muted-foreground"
+											disabled
+										>
+											Open in Flow Editor
+										</Button>
+									</span>
+								</TooltipTrigger>
+								<TooltipContent>
+									<p>Flow not yet registered in the registry. Approve the proposal to register it.</p>
+								</TooltipContent>
+							</Tooltip>
+						</TooltipProvider>
+					)}
 				</div>
 				<pre className="overflow-x-auto rounded-md bg-muted p-4 text-xs font-mono leading-relaxed">
 					{proposalYaml}
@@ -508,8 +538,21 @@ function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onReques
 						Approve
 					</Button>
 
-					{showRejectForm ? (
-						<div ref={rejectFormRef} className="flex-1 space-y-2">
+					{/* p fix: toggle button stays visible; label is "Reject" when closed, "Cancel" when open */}
+					<Button
+						variant="outline"
+						onClick={() => {
+							setShowRejectForm(v => !v);
+							if (showRejectForm) setRejectReason('');
+						}}
+						disabled={isApproving || isRejecting}
+						className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+					>
+						{showRejectForm ? 'Cancel' : 'Reject'}
+					</Button>
+
+					{showRejectForm && (
+						<div ref={rejectFormRef} className="w-full space-y-2">
 							<Label className="text-sm font-medium">Rejection reason</Label>
 							<Textarea
 								value={rejectReason}
@@ -517,33 +560,11 @@ function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onReques
 								placeholder="Reason for rejection (optional)..."
 								className="text-sm"
 							/>
-							<div className="flex gap-2">
-								<Button variant="destructive" size="sm" onClick={handleReject} disabled={isRejecting}>
-									{isRejecting ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
-									Confirm rejection
-								</Button>
-								<Button
-									variant="ghost"
-									size="sm"
-									onClick={() => {
-										setShowRejectForm(false);
-										setRejectReason('');
-									}}
-								>
-									Cancel
-								</Button>
-							</div>
+							<Button variant="destructive" size="sm" onClick={handleReject} disabled={isRejecting}>
+								{isRejecting ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
+								Confirm rejection
+							</Button>
 						</div>
-					) : (
-						<Button
-							variant="outline"
-							onClick={() => setShowRejectForm(true)}
-							disabled={isApproving || isRejecting}
-							className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-						>
-							Reject
-							<ChevronRight className="ml-1 size-4" />
-						</Button>
 					)}
 				</div>
 			)}
@@ -552,9 +573,10 @@ function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onReques
 			{isTerminal && (
 				<div className="flex items-center gap-3 border-t pt-4">
 					<p className="text-sm text-muted-foreground">
+						{/* g2 fix: replaced em-dash fallback with descriptive text */}
 						{proposal.status === 'approved'
-							? `Approved at ${proposal.approvedAt ? new Date(proposal.approvedAt).toLocaleString() : '—'}`
-							: `Rejected at ${proposal.rejectedAt ? new Date(proposal.rejectedAt).toLocaleString() : '—'}`}
+							? `Approved at ${proposal.approvedAt ? new Date(proposal.approvedAt).toLocaleString() : 'unknown date'}`
+							: `Rejected at ${proposal.rejectedAt ? new Date(proposal.rejectedAt).toLocaleString() : 'unknown date'}`}
 					</p>
 					<Button variant="outline" size="sm" onClick={onRequestNew}>
 						Request new design
@@ -586,11 +608,23 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 	/** True after a rejection, while the AI is redesigning. Cleared on WS event. */
 	const [isRedesigning, setIsRedesigning] = useState(false);
 
-	// Subscribe to ticket updates — when a redesign completes, a new proposal arrives
-	// and the ticket is updated (r2 fix). Also clears the redesigning banner (r1 fix).
+	// r1 fix: ref on the root proposals div to scroll to top when redesigning banner appears
+	const proposalsSectionRef = useRef<HTMLDivElement>(null);
+
+	// r1 fix: scroll to top when isRedesigning becomes true so the banner is visible
+	useEffect(() => {
+		if (isRedesigning) {
+			proposalsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		}
+	}, [isRedesigning]);
+
+	// cc fix: subscribe to the flow-specific event so title/label/status updates do NOT
+	// trigger a Flow Design refresh. Only fires when a redesign completes asynchronously.
+	// ca fix: use refresh() (not refreshSilent()) so the content shows a loading state
+	// while fetching the new proposal.
 	useEffect(() => {
 		const unsub = transport.subscribe(
-			B2F_TICKET_UPDATED,
+			B2F_FLOW_PROPOSAL_UPDATED,
 			() => {
 				setIsRedesigning(false);
 				refresh();
@@ -640,7 +674,7 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 		);
 	}
 
-	// No proposals yet — show request form (with blur overlay when requesting)
+	// No proposals yet -- show request form (with blur overlay when requesting)
 	if (proposals.length === 0) {
 		return (
 			<div className="relative space-y-4 py-4">
@@ -684,10 +718,11 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 		);
 	}
 
-	// Has proposal — render the current one with option to request a new one
+	// Has proposal -- render the current one with option to request a new one
 	return (
-		<div className="space-y-6 py-2">
-			{/* Redesigning banner — shown after rejection until WS event clears it (r1 fix) */}
+		// r1 fix: ref attached so scrollIntoView brings the redesigning banner into view after rejection
+		<div ref={proposalsSectionRef} className="space-y-6 py-2">
+			{/* Redesigning banner -- shown after rejection until WS event clears it (r1 fix) */}
 			{isRedesigning && (
 				<div className="flex items-center gap-3 rounded-md border border-warning/50 bg-warning/10 px-4 py-3">
 					<Loader2 className="size-4 shrink-0 animate-spin text-warning" />

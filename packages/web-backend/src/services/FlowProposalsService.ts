@@ -12,7 +12,7 @@ import type {
 } from '@app/shared/api/flow-proposals.contract';
 import type { Ticket } from '@app/shared/api/tickets.contract';
 import { ERROR_CODES, NotFoundException } from '@app/shared/exceptions/http-exceptions';
-import { B2F_TICKET_UPDATED } from '@app/shared/transport';
+import { B2F_FLOW_PROPOSAL_UPDATED, B2F_TICKET_UPDATED } from '@app/shared/transport';
 
 import { FlowDesignerAgent } from '../agents/FlowDesignerAgent';
 import type { FlowProposalsRepository } from '../repositories/FlowProposalsRepository';
@@ -101,6 +101,7 @@ export class FlowProposalsService {
 			reusedSubFlows: designOutput.reusedSubFlows,
 			adaptations: designOutput.adaptations,
 			confidenceScore: designOutput.confidenceScore,
+			openQuestions: designOutput.openQuestions,
 			reviewThreads: [],
 			proposedAt: new Date().toISOString(),
 		};
@@ -293,6 +294,7 @@ export class FlowProposalsService {
 				reusedSubFlows: designOutput.reusedSubFlows,
 				adaptations: designOutput.adaptations,
 				confidenceScore: designOutput.confidenceScore,
+				openQuestions: designOutput.openQuestions,
 				reviewThreads: [],
 				proposedAt: new Date().toISOString(),
 			};
@@ -316,9 +318,13 @@ export class FlowProposalsService {
 				version: created.version,
 			});
 
-			// Notify subscribers that the ticket was updated (new proposal available)
+			// Notify the ticket detail page that the ticket changed (e.g. currentFlowProposalId updated)
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast(B2F_TICKET_UPDATED, { ticketId } as any);
+			// Notify flow-proposal subscribers specifically — allows the UI to refresh ONLY the
+			// Flow Design tab content without refreshing on unrelated ticket updates (cc fix).
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			this.eventBroadcaster.broadcast(B2F_FLOW_PROPOSAL_UPDATED, { ticketId } as any);
 		} catch (err) {
 			log.error('Async redesign failed after rejection', {
 				ticketId,

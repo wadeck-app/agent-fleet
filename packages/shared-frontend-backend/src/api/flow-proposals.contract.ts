@@ -46,6 +46,7 @@ export const FlowProposalSchema = z.object({
 	reusedSubFlows: z.array(z.string()).optional(),
 	adaptations: z.array(z.string()).optional(),
 	confidenceScore: z.number().optional(),
+	openQuestions: z.array(z.string()).optional(),
 	reviewThreads: z.array(FlowReviewThreadSchema),
 	proposedAt: z.string(),
 	approvedAt: z.string().optional(),

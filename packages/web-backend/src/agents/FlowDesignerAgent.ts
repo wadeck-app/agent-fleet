@@ -22,6 +22,8 @@ export interface FlowDesignOutput {
 	reusedSubFlows?: string[];
 	adaptations?: string[];
 	confidenceScore?: number;
+	/** Specific open questions or concerns that lower confidence. Only filled when confidence < 85. */
+	openQuestions?: string[];
 }
 
 export interface FlowDesignInput {
@@ -264,6 +266,11 @@ ${input.userContext}`);
 		// 6. Instructions
 		sections.push(`## Instructions
 
+FORMATTING RULES (apply to ALL text fields — reasoning, step names, descriptions, prompts):
+- Do NOT use em-dashes (\u2014). Use a regular hyphen (-) or a comma or a period instead.
+- Do NOT use en-dashes (\u2013). Use a regular hyphen (-) instead.
+- Use plain ASCII punctuation only.
+
 Design a FlowDefinition for the ticket above using the flow engine capabilities documented above.
 
 Rules:
@@ -297,6 +304,7 @@ The JSON must have exactly these fields:
 - "reusedSubFlows": optional array of strings — IDs of flows used as subflows
 - "adaptations": ONLY fill if this is a redesign (you received a ## Previous Proposal section) OR if you explicitly reused an existing flow as a base. Leave as [] if designing from scratch.
 - "confidenceScore": number between 0 and 100
+- "openQuestions": optional array of strings — specific questions or concerns about the ticket that lower your confidence. Examples: "What is the expected data volume?", "Is OAuth2 or simple auth required?", "Should failure retry or stop the flow?". Fill this ONLY when confidenceScore < 85. Leave empty (or omit) when confidence is 85 or higher.
 
 The "proposedFlow.id" must be a lowercase-kebab-case string derived from the ticket title.
 The "proposedFlow.version" must be "1.0.0".
@@ -311,11 +319,15 @@ Output ONLY the \`\`\`json block, nothing else.`);
 	// ---------------------------------------------------------------------------
 
 	private parseClaudeResponse(output: string): FlowDesignOutput {
+		// Sanitize em-dashes and en-dashes before any further processing.
+		// The LLM sometimes ignores the formatting rule in the prompt; this is a defense-in-depth layer.
+		const sanitized = output.replace(/\u2014/g, ' - ').replace(/\u2013/g, '-');
+
 		// Extract JSON from ```json ... ``` markers
-		const jsonMatch = output.match(/```json\s*([\s\S]*?)```/);
+		const jsonMatch = sanitized.match(/```json\s*([\s\S]*?)```/);
 		if (!jsonMatch || !jsonMatch[1]) {
 			throw new Error(
-				`Claude response does not contain a valid \`\`\`json block. Response: ${output.substring(0, 500)}`
+				`Claude response does not contain a valid \`\`\`json block. Response: ${sanitized.substring(0, 500)}`
 			);
 		}
 
@@ -349,6 +361,7 @@ Output ONLY the \`\`\`json block, nothing else.`);
 			adaptations: Array.isArray(obj['adaptations']) ? (obj['adaptations'] as string[]) : undefined,
 			confidenceScore:
 				typeof obj['confidenceScore'] === 'number' ? (obj['confidenceScore'] as number) : undefined,
+			openQuestions: Array.isArray(obj['openQuestions']) ? (obj['openQuestions'] as string[]) : undefined,
 		};
 	}
 

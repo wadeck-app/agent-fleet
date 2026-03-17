@@ -160,24 +160,53 @@ function getAuditEntryData(
 			const rating = entry.data.rating as number | undefined;
 			const wentWell = entry.data.wentWell as string[] | undefined;
 			const wentWrong = entry.data.wentWrong as string[] | undefined;
+			const suggestions = entry.data.suggestions as string[] | undefined;
 			return {
 				label: 'Flow feedback submitted',
 				content: (
-					<span className="text-xs text-muted-foreground">
-						{rating != null && <strong>Rating: {rating}/5</strong>}
+					<div className="space-y-1.5">
+						{rating != null && (
+							<p className="text-xs">
+								Rating: <strong>{rating}/5</strong>
+							</p>
+						)}
 						{wentWell && wentWell.length > 0 && (
-							<span>
-								{' · '}Went well: {wentWell.slice(0, 2).join(', ')}
-								{wentWell.length > 2 ? '…' : ''}
-							</span>
+							<div className="space-y-0.5">
+								<p className="text-xs text-muted-foreground">What went well</p>
+								<ul className="list-disc list-inside">
+									{wentWell.map((w, i) => (
+										<li key={i} className="text-xs">
+											{w}
+										</li>
+									))}
+								</ul>
+							</div>
 						)}
 						{wentWrong && wentWrong.length > 0 && (
-							<span>
-								{' · '}Issues: {wentWrong.slice(0, 2).join(', ')}
-								{wentWrong.length > 2 ? '…' : ''}
-							</span>
+							<div className="space-y-0.5">
+								<p className="text-xs text-muted-foreground">What went wrong</p>
+								<ul className="list-disc list-inside">
+									{wentWrong.map((w, i) => (
+										<li key={i} className="text-xs">
+											{w}
+										</li>
+									))}
+								</ul>
+							</div>
 						)}
-					</span>
+						{suggestions && suggestions.length > 0 && (
+							<div className="space-y-0.5">
+								<p className="text-xs text-muted-foreground">Suggestions</p>
+								<ul className="list-disc list-inside">
+									{suggestions.map((s, i) => (
+										<li key={i} className="text-xs">
+											{s}
+										</li>
+									))}
+								</ul>
+							</div>
+						)}
+					</div>
 				),
 			};
 		}
