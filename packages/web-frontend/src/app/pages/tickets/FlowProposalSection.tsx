@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
@@ -47,30 +47,6 @@ function getStatusLabel(status: FlowProposalStatus): string {
 		case 'superseded':
 			return 'Superseded';
 	}
-}
-
-/** I2 fix: Extract sentences from reasoning that signal uncertainty or open questions */
-function extractUncertaintySentences(reasoning: string): string[] {
-	const uncertaintyWords = [
-		'unclear',
-		'not specified',
-		'missing',
-		'unknown',
-		'uncertain',
-		'ambiguous',
-		'may not',
-		'might not',
-		'could not',
-	];
-	const sentences = reasoning
-		.split(/(?<=[.!?])\s+|\n/)
-		.map(s => s.trim())
-		.filter(s => s.length > 0);
-
-	return sentences.filter(s => {
-		const lower = s.toLowerCase();
-		return s.includes('?') || uncertaintyWords.some(w => lower.includes(w));
-	});
 }
 
 interface ReviewThreadItemProps {
@@ -294,9 +270,19 @@ interface ProposalViewProps {
 	onRequestNew: () => void;
 	/** Called after successful rejection so the parent can show the redesigning banner */
 	onRejected: () => void;
+	/** Answers filled in the "Questions from the AI" section — forwarded to the parent for re-design context */
+	onQuestionAnswersChange: (answers: Record<number, string>) => void;
 }
 
-function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onRequestNew, onRejected }: ProposalViewProps) {
+function ProposalView({
+	proposal,
+	ticketId,
+	onRefresh,
+	onReviewUpdated,
+	onRequestNew,
+	onRejected,
+	onQuestionAnswersChange,
+}: ProposalViewProps) {
 	const { showToast } = useToast();
 	const [reasoningOpen, setReasoningOpen] = useState(false);
 	const [showAddThread, setShowAddThread] = useState(false);
@@ -304,6 +290,9 @@ function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onReques
 	const [showRejectForm, setShowRejectForm] = useState(false);
 	const [isApproving, setIsApproving] = useState(false);
 	const [isRejecting, setIsRejecting] = useState(false);
+	// c fix: open questions inline section
+	const [showQuestions, setShowQuestions] = useState(false);
+	const [questionAnswers, setQuestionAnswers] = useState<Record<number, string>>({});
 	const rejectFormRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -311,6 +300,13 @@ function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onReques
 			rejectFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 		}
 	}, [showRejectForm]);
+
+	// Propagate answer changes to parent so it can pass them to handleRequestDesign
+	const handleAnswerChange = (index: number, value: string) => {
+		const updated = { ...questionAnswers, [index]: value };
+		setQuestionAnswers(updated);
+		onQuestionAnswersChange(updated);
+	};
 
 	const proposalYaml = yaml.dump(proposal.proposedFlow, { indent: 2, lineWidth: 120 });
 
@@ -342,22 +338,38 @@ function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onReques
 		}
 	};
 
+	/** c fix: prepend filled question answers to the rejection reason when the form opens */
+	const handleToggleRejectForm = () => {
+		const opening = !showRejectForm;
+		setShowRejectForm(opening);
+		if (!opening) {
+			setRejectReason('');
+			return;
+		}
+		// Prepend answers to reason textarea
+		const filledAnswers = Object.entries(questionAnswers)
+			.filter(([, answer]) => answer.trim())
+			.map(([idxStr, answer]) => {
+				const idx = parseInt(idxStr, 10);
+				const question = proposal.openQuestions?.[idx] ?? `Question ${idx + 1}`;
+				return `Q: ${question}\nA: ${answer}`;
+			});
+		if (filledAnswers.length > 0) {
+			setRejectReason(`Answers to AI questions:\n${filledAnswers.join('\n\n')}\n\n`);
+		}
+	};
+
 	const isPendingReview = proposal.status === 'pending_review';
 	const isTerminal = proposal.status === 'approved' || proposal.status === 'rejected';
 
 	const reasoningSentences = proposal.reasoning.split(/\.\s+|\n/).filter(s => s.trim());
 
-	// I2 fix: openQuestions takes priority; fall back to extracting from reasoning text
-	const tooltipQuestions = useMemo<string[]>(() => {
-		if (proposal.openQuestions && proposal.openQuestions.length > 0) {
-			return proposal.openQuestions;
-		}
-		return extractUncertaintySentences(proposal.reasoning);
-	}, [proposal.openQuestions, proposal.reasoning]);
-
 	// K fix: extract the flow ID from proposedFlow for the editor link
 	const proposedFlowId =
 		typeof proposal.proposedFlow['id'] === 'string' ? (proposal.proposedFlow['id'] as string) : null;
+
+	// c fix: open questions from the proposal (API-provided list)
+	const openQuestions = proposal.openQuestions ?? [];
 
 	return (
 		<div className="space-y-4">
@@ -375,24 +387,13 @@ function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onReques
 									Confidence: {Math.round(proposal.confidenceScore)}%
 								</span>
 							</TooltipTrigger>
-							{/* I2 fix: show openQuestions list if available, fall back to extracted sentences, else generic */}
+							{/* c fix: tooltip shows generic description only — open questions moved to inline section */}
 							<TooltipContent className="max-w-[300px] text-xs">
-								{tooltipQuestions.length > 0 ? (
-									<div className="space-y-1">
-										<p className="font-medium">Open questions:</p>
-										<ul className="list-disc list-inside space-y-0.5">
-											{tooltipQuestions.map((s, i) => (
-												<li key={i}>{s.trim().replace(/\.$/, '')}</li>
-											))}
-										</ul>
-									</div>
-								) : (
-									<p>
-										Confidence reflects how well the flow agent understood the ticket requirements.
-										Below 90% typically means: missing details in the ticket description, ambiguous
-										requirements, or open questions the agent could not resolve.
-									</p>
-								)}
+								<p>
+									Confidence reflects how well the flow agent understood the ticket requirements.
+									Below 90% typically means: missing details in the ticket description, ambiguous
+									requirements, or open questions the agent could not resolve.
+								</p>
 							</TooltipContent>
 						</Tooltip>
 					</TooltipProvider>
@@ -413,6 +414,48 @@ function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onReques
 							</li>
 						))}
 					</ul>
+				</div>
+			)}
+
+			{/* c fix: Questions from the AI — collapsible inline section (replaces tooltip openQuestions) */}
+			{openQuestions.length > 0 && (
+				<div className="rounded-md border">
+					<Button
+						type="button"
+						variant="ghost"
+						onClick={() => setShowQuestions(v => !v)}
+						className="flex w-full items-center justify-start gap-2 px-3 py-2 text-sm font-medium hover:bg-muted/50"
+					>
+						{showQuestions ? (
+							<ChevronDown className="size-4 shrink-0" />
+						) : (
+							<ChevronRight className="size-4 shrink-0" />
+						)}
+						Questions from the AI
+						<span className="ml-auto text-xs font-normal text-muted-foreground">
+							{openQuestions.length} question{openQuestions.length !== 1 ? 's' : ''}
+						</span>
+					</Button>
+					{showQuestions && (
+						<div className="border-t px-3 py-3 space-y-4">
+							<p className="text-xs text-muted-foreground">
+								The AI raised these questions about the requirements. Answering them will improve the
+								next design. Answers are automatically included when you reject the proposal.
+							</p>
+							{openQuestions.map((question, i) => (
+								<div key={i} className="space-y-1">
+									<p className="text-sm font-medium">{question}</p>
+									<Textarea
+										value={questionAnswers[i] ?? ''}
+										onChange={e => handleAnswerChange(i, e.target.value)}
+										placeholder="Your answer (optional)..."
+										className="text-sm"
+										rows={2}
+									/>
+								</div>
+							))}
+						</div>
+					)}
 				</div>
 			)}
 
@@ -538,17 +581,15 @@ function ProposalView({ proposal, ticketId, onRefresh, onReviewUpdated, onReques
 						Approve
 					</Button>
 
-					{/* p fix: toggle button stays visible; label is "Reject" when closed, "Cancel" when open */}
+					{/* p fix: toggle button uses destructive variant when closed ("...") and outline when open (cancel).
+					    "Reject..." communicates that clicking opens a form (desktop convention). */}
 					<Button
-						variant="outline"
-						onClick={() => {
-							setShowRejectForm(v => !v);
-							if (showRejectForm) setRejectReason('');
-						}}
+						variant={showRejectForm ? 'outline' : 'destructive'}
+						className={showRejectForm ? 'border-destructive text-destructive hover:bg-destructive/10' : ''}
+						onClick={handleToggleRejectForm}
 						disabled={isApproving || isRejecting}
-						className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
 					>
-						{showRejectForm ? 'Cancel' : 'Reject'}
+						{showRejectForm ? 'Cancel' : 'Reject...'}
 					</Button>
 
 					{showRejectForm && (
@@ -607,6 +648,8 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 	const [requestError, setRequestError] = useState<string | null>(null);
 	/** True after a rejection, while the AI is redesigning. Cleared on WS event. */
 	const [isRedesigning, setIsRedesigning] = useState(false);
+	/** c fix: question answers from the ProposalView, forwarded to requestFlowDesign */
+	const [currentQuestionAnswers, setCurrentQuestionAnswers] = useState<Record<number, string>>({});
 
 	// r1 fix: ref on the root proposals div to scroll to top when redesigning banner appears
 	const proposalsSectionRef = useRef<HTMLDivElement>(null);
@@ -638,9 +681,18 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 	const handleRequestDesign = async () => {
 		setIsRequesting(true);
 		try {
-			await flowProposalsApi.requestFlowDesign(ticketId, context || undefined);
+			// c fix: include filled question answers as questionsContext
+			const filledAnswers = currentProposal?.openQuestions
+				?.map((question, i) => ({ question, answer: currentQuestionAnswers[i] ?? '' }))
+				.filter(qa => qa.answer.trim());
+			await flowProposalsApi.requestFlowDesign(
+				ticketId,
+				context || undefined,
+				filledAnswers && filledAnswers.length > 0 ? filledAnswers : undefined
+			);
 			showToast('Flow design requested. AI is processing...', 'success');
 			setContext('');
+			setCurrentQuestionAnswers({});
 			setRequestError(null);
 			refresh();
 		} catch (err) {
@@ -748,6 +800,7 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 					onRejected={() => {
 						setIsRedesigning(true);
 					}}
+					onQuestionAnswersChange={setCurrentQuestionAnswers}
 				/>
 			)}
 

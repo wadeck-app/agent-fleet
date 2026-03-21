@@ -51,6 +51,15 @@ function ArrayFieldInput({ label, items, onChange, placeholder, required }: Arra
 		}
 	};
 
+	// aa/ab fix: commit draft on blur so typing and clicking Submit doesn't discard the item
+	const handleBlur = () => {
+		const trimmed = draft.trim();
+		if (trimmed) {
+			onChange([...items, trimmed]);
+			setDraft('');
+		}
+	};
+
 	const handleRemove = (index: number) => {
 		onChange(items.filter((_, i) => i !== index));
 	};
@@ -81,6 +90,7 @@ function ArrayFieldInput({ label, items, onChange, placeholder, required }: Arra
 				value={draft}
 				onChange={e => setDraft(e.target.value)}
 				onKeyDown={handleKeyDown}
+				onBlur={handleBlur}
 				placeholder={placeholder ?? 'Type and press Enter to add...'}
 				className="text-sm"
 			/>
@@ -118,48 +128,108 @@ function RatingInput({ value, onChange }: RatingInputProps) {
 }
 
 // ---------------------------------------------------------------------------
-// FlowFeedbackForm — submits new feedback
+// FeedbackCard — displays a single submitted feedback item
 // ---------------------------------------------------------------------------
 
+interface FeedbackCardProps {
+	item: FlowFeedback;
+}
+
+function FeedbackCard({ item }: FeedbackCardProps) {
+	return (
+		<div className="rounded-md border bg-card p-4 space-y-3">
+			<div className="flex items-center gap-2">
+				<div className="flex gap-0.5">
+					{[1, 2, 3, 4, 5].map(n => (
+						<Star
+							key={n}
+							className={`size-4 fill-current ${n <= item.rating ? 'text-warning' : 'text-muted-foreground/20'}`}
+						/>
+					))}
+				</div>
+				<span className="text-xs text-muted-foreground">{new Date(item.submittedAt).toLocaleString()}</span>
+			</div>
+			{/* What went well — always shown, with "Nothing noted" placeholder when empty */}
+			<div className="space-y-1">
+				<p className="text-xs font-medium text-muted-foreground tracking-wide">What went well</p>
+				{item.wentWell.length > 0 ? (
+					<ul className="list-disc list-inside space-y-0.5">
+						{item.wentWell.map((w, i) => (
+							<li key={i} className="text-sm">
+								{w}
+							</li>
+						))}
+					</ul>
+				) : (
+					<p className="text-sm text-muted-foreground italic">Nothing noted</p>
+				)}
+			</div>
+			{/* What went wrong — always shown, with "Nothing noted" placeholder when empty */}
+			<div className="space-y-1">
+				<p className="text-xs font-medium text-muted-foreground tracking-wide">What went wrong</p>
+				{item.wentWrong.length > 0 ? (
+					<ul className="list-disc list-inside space-y-0.5">
+						{item.wentWrong.map((w, i) => (
+							<li key={i} className="text-sm">
+								{w}
+							</li>
+						))}
+					</ul>
+				) : (
+					<p className="text-sm text-muted-foreground italic">Nothing noted</p>
+				)}
+			</div>
+			{/* Suggestions — always shown, with "Nothing noted" placeholder when empty */}
+			<div className="space-y-1">
+				<p className="text-xs font-medium text-muted-foreground tracking-wide">Suggestions</p>
+				{item.suggestions && item.suggestions.length > 0 ? (
+					<ul className="list-disc list-inside space-y-0.5">
+						{item.suggestions.map((s, i) => (
+							<li key={i} className="text-sm">
+								{s}
+							</li>
+						))}
+					</ul>
+				) : (
+					<p className="text-sm text-muted-foreground italic">Nothing noted</p>
+				)}
+			</div>
+		</div>
+	);
+}
+
+// ---------------------------------------------------------------------------
+// FlowFeedbackForm — collects feedback values and calls onSubmit
+// ---------------------------------------------------------------------------
+
+interface FormValues {
+	rating: number;
+	wentWell: string[];
+	wentWrong: string[];
+	suggestions: string[];
+}
+
 interface FlowFeedbackFormProps {
-	ticketId: string;
-	currentFlowProposalId?: string;
-	onSubmitted: () => void;
+	initialValues?: FormValues;
+	onSubmit: (values: FormValues) => Promise<void>;
 	/** Optional cancel handler — shown only when a previous feedback already exists */
 	onCancel?: () => void;
 }
 
-function FlowFeedbackForm({ ticketId, currentFlowProposalId, onSubmitted, onCancel }: FlowFeedbackFormProps) {
-	const { showToast } = useToast();
-	const [rating, setRating] = useState(0);
-	const [wentWell, setWentWell] = useState<string[]>([]);
-	const [wentWrong, setWentWrong] = useState<string[]>([]);
-	const [suggestions, setSuggestions] = useState<string[]>([]);
+function FlowFeedbackForm({ initialValues, onSubmit, onCancel }: FlowFeedbackFormProps) {
+	const [rating, setRating] = useState(initialValues?.rating ?? 0);
+	const [wentWell, setWentWell] = useState<string[]>(initialValues?.wentWell ?? []);
+	const [wentWrong, setWentWrong] = useState<string[]>(initialValues?.wentWrong ?? []);
+	const [suggestions, setSuggestions] = useState<string[]>(initialValues?.suggestions ?? []);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	const canSubmit = rating >= 1 && !isSubmitting;
 
 	const handleSubmit = async () => {
 		if (!canSubmit) return;
-
-		const body: CreateFlowFeedback = {
-			ticketId,
-			flowId: currentFlowProposalId ?? '',
-			taskId: '',
-			rating,
-			wentWell,
-			wentWrong,
-			suggestions: suggestions.length > 0 ? suggestions : undefined,
-			author: 'user',
-		};
-
 		setIsSubmitting(true);
 		try {
-			await feedbackApi.submitFeedback(ticketId, body);
-			showToast('Feedback submitted successfully', 'success');
-			onSubmitted();
-		} catch (err) {
-			showToast(`Failed to submit feedback: ${getErrorMessage(err)}`, 'error');
+			await onSubmit({ rating, wentWell, wentWrong, suggestions });
 		} finally {
 			setIsSubmitting(false);
 		}
@@ -373,9 +443,16 @@ export function FlowFeedbackSection({
 	currentFlowProposalId,
 	onFeedbackSubmitted,
 }: FlowFeedbackSectionProps) {
+	const { showToast } = useToast();
 	const [feedbackItems, setFeedbackItems] = useState<FlowFeedback[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [showNewForm, setShowNewForm] = useState(false);
+	// d fix: optimistic card shown while the API call is in flight
+	const [optimisticItem, setOptimisticItem] = useState<FlowFeedback | null>(null);
+	// d fix: form values to restore on error
+	const [restoredValues, setRestoredValues] = useState<
+		{ rating: number; wentWell: string[]; wentWrong: string[]; suggestions: string[] } | undefined
+	>(undefined);
 
 	const fetchFeedback = async () => {
 		if (!currentFlowProposalId) {
@@ -398,6 +475,55 @@ export function FlowFeedbackSection({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [currentFlowProposalId]);
 
+	const handleSubmit = async (values: {
+		rating: number;
+		wentWell: string[];
+		wentWrong: string[];
+		suggestions: string[];
+	}) => {
+		const body: CreateFlowFeedback = {
+			ticketId,
+			flowId: currentFlowProposalId ?? '',
+			taskId: '',
+			rating: values.rating,
+			wentWell: values.wentWell,
+			wentWrong: values.wentWrong,
+			suggestions: values.suggestions.length > 0 ? values.suggestions : undefined,
+			author: 'user',
+		};
+
+		// d fix: immediately show an optimistic card
+		const optimistic: FlowFeedback = {
+			id: `optimistic-${Date.now()}`,
+			ticketId,
+			flowId: currentFlowProposalId ?? '',
+			taskId: '',
+			rating: values.rating,
+			wentWell: values.wentWell,
+			wentWrong: values.wentWrong,
+			suggestions: values.suggestions.length > 0 ? values.suggestions : undefined,
+			author: 'user',
+			submittedAt: new Date().toISOString(),
+		};
+		setOptimisticItem(optimistic);
+		setShowNewForm(false);
+		setRestoredValues(undefined);
+
+		try {
+			await feedbackApi.submitFeedback(ticketId, body);
+			showToast('Feedback submitted successfully', 'success');
+			setOptimisticItem(null);
+			void fetchFeedback();
+			onFeedbackSubmitted?.();
+		} catch (err) {
+			// d fix: on error — remove optimistic card, restore form with entered values
+			setOptimisticItem(null);
+			setRestoredValues(values);
+			setShowNewForm(feedbackItems.length > 0);
+			showToast(`Failed to submit feedback: ${getErrorMessage(err)}`, 'error');
+		}
+	};
+
 	if (loading) {
 		return (
 			<div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
@@ -408,6 +534,8 @@ export function FlowFeedbackSection({
 	}
 
 	const hasFeedback = feedbackItems.length > 0;
+	// Show form when: no items and no optimistic pending, or explicitly adding another
+	const showForm = (!hasFeedback || showNewForm) && !optimisticItem;
 
 	return (
 		<div className="space-y-6 py-2">
@@ -418,8 +546,18 @@ export function FlowFeedbackSection({
 				</div>
 			)}
 
+			{/* d fix: optimistic pending card — shown while API call is in flight */}
+			{optimisticItem && (
+				<div className="relative opacity-60">
+					<FeedbackCard item={optimisticItem} />
+					<div className="absolute inset-0 flex items-center justify-center rounded-lg bg-background/40">
+						<Loader2 className="size-5 animate-spin text-muted-foreground" />
+					</div>
+				</div>
+			)}
+
 			{/* Submitted feedback state */}
-			{hasFeedback && !showNewForm && (
+			{hasFeedback && !showNewForm && !optimisticItem && (
 				<div className="space-y-3">
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-2">
@@ -434,87 +572,17 @@ export function FlowFeedbackSection({
 					</div>
 					<div className="space-y-3">
 						{feedbackItems.map(item => (
-							<div key={item.id} className="rounded-md border bg-card p-4 space-y-3">
-								<div className="flex items-center gap-2">
-									<div className="flex gap-0.5">
-										{[1, 2, 3, 4, 5].map(n => (
-											<Star
-												key={n}
-												className={`size-4 fill-current ${n <= item.rating ? 'text-warning' : 'text-muted-foreground/20'}`}
-											/>
-										))}
-									</div>
-									<span className="text-xs text-muted-foreground">
-										{new Date(item.submittedAt).toLocaleString()}
-									</span>
-								</div>
-								{/* What went well — always shown, with "Nothing noted" placeholder when empty */}
-								<div className="space-y-1">
-									<p className="text-xs font-medium text-muted-foreground tracking-wide">
-										What went well
-									</p>
-									{item.wentWell.length > 0 ? (
-										<ul className="list-disc list-inside space-y-0.5">
-											{item.wentWell.map((w, i) => (
-												<li key={i} className="text-sm">
-													{w}
-												</li>
-											))}
-										</ul>
-									) : (
-										<p className="text-sm text-muted-foreground italic">Nothing noted</p>
-									)}
-								</div>
-								{/* What went wrong — always shown, with "Nothing noted" placeholder when empty */}
-								<div className="space-y-1">
-									<p className="text-xs font-medium text-muted-foreground tracking-wide">
-										What went wrong
-									</p>
-									{item.wentWrong.length > 0 ? (
-										<ul className="list-disc list-inside space-y-0.5">
-											{item.wentWrong.map((w, i) => (
-												<li key={i} className="text-sm">
-													{w}
-												</li>
-											))}
-										</ul>
-									) : (
-										<p className="text-sm text-muted-foreground italic">Nothing noted</p>
-									)}
-								</div>
-								{/* Suggestions — always shown, with "Nothing noted" placeholder when empty */}
-								<div className="space-y-1">
-									<p className="text-xs font-medium text-muted-foreground tracking-wide">
-										Suggestions
-									</p>
-									{item.suggestions && item.suggestions.length > 0 ? (
-										<ul className="list-disc list-inside space-y-0.5">
-											{item.suggestions.map((s, i) => (
-												<li key={i} className="text-sm">
-													{s}
-												</li>
-											))}
-										</ul>
-									) : (
-										<p className="text-sm text-muted-foreground italic">Nothing noted</p>
-									)}
-								</div>
-							</div>
+							<FeedbackCard key={item.id} item={item} />
 						))}
 					</div>
 				</div>
 			)}
 
 			{/* Feedback form — shown when no feedback yet, or when adding another */}
-			{(!hasFeedback || showNewForm) && (
+			{showForm && (
 				<FlowFeedbackForm
-					ticketId={ticketId}
-					currentFlowProposalId={currentFlowProposalId}
-					onSubmitted={() => {
-						setShowNewForm(false);
-						void fetchFeedback();
-						onFeedbackSubmitted?.();
-					}}
+					initialValues={restoredValues}
+					onSubmit={handleSubmit}
 					onCancel={hasFeedback ? () => setShowNewForm(false) : undefined}
 				/>
 			)}

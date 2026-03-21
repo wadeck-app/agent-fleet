@@ -132,3 +132,82 @@ generic-storage-management-debugger:
               maxIterations: 2
               resetOnSuccess: true
               addComment: true
+storage-viewer-management-debugger:
+    version: 1.0.0
+    name: Storage Viewer and Management Debugger Page
+    description: >-
+        Design and implement a global storage viewer/debugger page to inspect, query, and export storage data across all
+        entities with JSON and CSV export capabilities.
+    workspace:
+        mode: isolated
+        gitStrategy: feature-branch
+        reusePolicy: never
+    inputs:
+        storageScope:
+            type: enum
+            description: Which storage system to debug
+            options:
+                - id: all
+                  label: All Storage
+                - id: memory
+                  label: In-Memory Storage
+                - id: database
+                  label: Database Storage
+            required: true
+        exportFormat:
+            type: multi-enum
+            description: Export formats to support
+            options:
+                - id: json
+                  label: JSON
+                - id: csv
+                  label: CSV
+            required: false
+    steps:
+        - id: analyze-requirements
+          name: Analyze Storage Architecture
+          type: model
+          model: sonnet
+          prompt: >-
+              Analyze the agent-fleet storage architecture. Document: 1) all storage types (in-memory, database), 2) entity
+              types stored, 3) current access patterns, 4) proposed viewer UI layout, 5) data query API needs. Keep response
+              concise and structured.
+        - id: design-viewer-api
+          name: Design Storage Viewer API
+          type: model
+          model: sonnet
+          depends:
+              - analyze-requirements
+          prompt: >-
+              Based on storage analysis, design REST API endpoints for: 1) list entities by type, 2) query storage with
+              filters, 3) export to JSON/CSV. Include schemas, response formats, and error handling. Target 80 words.
+        - id: implement-viewer
+          name: Implement Storage Viewer Page
+          type: script
+          depends:
+              - design-viewer-api
+          script: cd packages/web-frontend && npm run build
+          workingDir: .
+          captureOutput: true
+        - id: review-implementation
+          name: Review Storage Viewer Implementation
+          type: user_intervention
+          depends:
+              - implement-viewer
+          interventionType: approval
+          approval:
+              title: Approve Storage Viewer Implementation
+              description: Review the storage viewer UI, API endpoints, and export functionality. Approve to proceed with testing.
+              allowReject: true
+          onFailure:
+              goto: design-viewer-api
+              maxIterations: 4
+              resetOnSuccess: true
+        - id: execute-tests
+          name: Test Storage Viewer
+          type: script
+          depends:
+              - review-implementation
+          script: npm run test:agent -- storage-viewer
+          workingDir: .
+          captureOutput: true

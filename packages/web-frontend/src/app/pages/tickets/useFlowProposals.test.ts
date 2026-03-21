@@ -17,6 +17,18 @@ vi.mock('./flowProposalsApi', () => ({
 	},
 }));
 
+// f fix: useFlowProposals now calls useRealtimeRefresh which requires a transport context
+vi.mock('@/transport', () => ({
+	useTransport: () => ({
+		transport: {
+			subscribe: vi.fn(() => () => {}),
+			registerLocalHandler: undefined,
+			setComponentSubscriptionState: undefined,
+			removeComponentSubscriptions: undefined,
+		},
+	}),
+}));
+
 const mockProposal: FlowProposal = {
 	id: 'prop-1',
 	ticketId: 'ticket-1',

@@ -46,6 +46,8 @@ export interface FlowDesignInput {
 	userContext?: string;
 }
 
+type EvaluationAxis = 'completeness' | 'feasibility' | 'coherence' | 'feedback_coverage';
+
 // ---------------------------------------------------------------------------
 // Agent
 // ---------------------------------------------------------------------------
@@ -66,7 +68,12 @@ export interface FlowDesignInput {
 export class FlowDesignerAgent {
 	private static readonly TIMEOUT_MS = 120_000; // 120s — flow design is complex
 
-	constructor(private readonly registry: FlowRegistry) {}
+	private readonly model: string;
+
+	constructor(private readonly registry: FlowRegistry) {
+		const useBedrock = process.env['CLAUDE_CODE_USE_BEDROCK'] === 'true';
+		this.model = useBedrock ? 'us.anthropic.claude-haiku-4-5-20251001-v1:0' : 'claude-haiku-4-5-20251001';
+	}
 
 	// ---------------------------------------------------------------------------
 	// Claude CLI helpers (copied from LocalClaudeAgentExecutor pattern)
@@ -89,17 +96,14 @@ export class FlowDesignerAgent {
 	private callClaude(prompt: string): Promise<string> {
 		const claudePath = this.findClaudePath();
 
-		const useBedrock = process.env['CLAUDE_CODE_USE_BEDROCK'] === 'true';
-		const modelId = useBedrock ? 'us.anthropic.claude-haiku-4-5-20251001-v1:0' : 'claude-haiku-4-5-20251001';
-
 		let command: string;
 		let cmdArgs: string[];
 		if (process.platform === 'win32' && claudePath.endsWith('.cmd')) {
 			command = 'cmd.exe';
-			cmdArgs = ['/c', claudePath, '--dangerously-skip-permissions', '--model', modelId, '-p'];
+			cmdArgs = ['/c', claudePath, '--dangerously-skip-permissions', '--model', this.model, '-p'];
 		} else {
 			command = claudePath;
-			cmdArgs = ['--dangerously-skip-permissions', '--model', modelId, '-p'];
+			cmdArgs = ['--dangerously-skip-permissions', '--model', this.model, '-p'];
 		}
 
 		// Strip CLAUDECODE so this works when called from within a Claude Code session
@@ -303,7 +307,6 @@ The JSON must have exactly these fields:
 - "reusedFromFlowId": optional string — ID of an existing flow you based this on
 - "reusedSubFlows": optional array of strings — IDs of flows used as subflows
 - "adaptations": ONLY fill if this is a redesign (you received a ## Previous Proposal section) OR if you explicitly reused an existing flow as a base. Leave as [] if designing from scratch.
-- "confidenceScore": number between 0 and 100
 - "openQuestions": optional array of strings — specific questions or concerns about the ticket that lower your confidence. Examples: "What is the expected data volume?", "Is OAuth2 or simple auth required?", "Should failure retry or stop the flow?". Fill this ONLY when confidenceScore < 85. Leave empty (or omit) when confidence is 85 or higher.
 
 The "proposedFlow.id" must be a lowercase-kebab-case string derived from the ticket title.
@@ -420,6 +423,99 @@ Output ONLY the \`\`\`json block, nothing else.`);
 	}
 
 	// ---------------------------------------------------------------------------
+	// Multi-axis confidence evaluator
+	// ---------------------------------------------------------------------------
+
+	private static readonly AXIS_DESCRIPTIONS: Record<EvaluationAxis, string> = {
+		completeness: 'COMPLETENESS: Does the proposed flow cover all requirements from the ticket?',
+		feasibility: 'FEASIBILITY: Are the steps practical and executable given the described system?',
+		coherence: 'COHERENCE: Is the flow internally consistent (correct dependencies, logical step order)?',
+		feedback_coverage: 'FEEDBACK COVERAGE: Does the redesign address the rejection feedback provided?',
+	};
+
+	/**
+	 * Run a single evaluator call for one axis. Returns a score 0-100.
+	 * On any error, logs a warning and returns 50 (neutral fallback — never fails the whole design).
+	 */
+	private async evaluateProposal(params: {
+		ticket: { title: string; description: string };
+		proposedFlowYaml: string;
+		axis: EvaluationAxis;
+		feedbackContext?: string;
+	}): Promise<number> {
+		const axisDescription = FlowDesignerAgent.AXIS_DESCRIPTIONS[params.axis];
+
+		const feedbackSection =
+			params.axis === 'feedback_coverage' && params.feedbackContext
+				? `\nPrevious rejection feedback:\n${params.feedbackContext}\n`
+				: '';
+
+		const prompt = `You are an expert flow design evaluator. Score the following flow proposal on ${axisDescription}.
+
+Ticket: ${params.ticket.title} — ${params.ticket.description}
+
+Proposed flow (YAML):
+${params.proposedFlowYaml}
+${feedbackSection}
+Return ONLY valid JSON: {"score": <0-100>, "reasoning": "<one sentence>"}
+Score 0 = completely fails on this axis, 100 = perfectly satisfies this axis.`;
+
+		try {
+			const output = await this.callClaude(prompt);
+			const sanitized = output.replace(/\u2014/g, ' - ').replace(/\u2013/g, '-');
+
+			// Try to parse JSON directly, or extract from ```json block
+			let jsonText = sanitized.trim();
+			const blockMatch = sanitized.match(/```json\s*([\s\S]*?)```/);
+			if (blockMatch?.[1]) {
+				jsonText = blockMatch[1].trim();
+			}
+
+			const parsed = JSON.parse(jsonText) as Record<string, unknown>;
+			const score = typeof parsed['score'] === 'number' ? parsed['score'] : NaN;
+
+			if (isNaN(score)) {
+				log.warn(`Evaluator for axis "${params.axis}" returned non-numeric score`, { parsed });
+				return 50;
+			}
+
+			// Clamp to [0, 100]
+			return Math.max(0, Math.min(100, Math.round(score)));
+		} catch (err) {
+			log.warn(`Evaluator for axis "${params.axis}" failed — using neutral fallback score 50`, { err });
+			return 50;
+		}
+	}
+
+	/**
+	 * Run all evaluation axes in parallel and return the average score.
+	 * For redesigns (with feedback context), a 4th axis "feedback_coverage" is added.
+	 */
+	private async computeConfidenceScore(params: {
+		ticket: { title: string; description: string };
+		proposedFlowYaml: string;
+		feedbackContext?: string;
+	}): Promise<number> {
+		const baseAxes: EvaluationAxis[] = ['completeness', 'feasibility', 'coherence'];
+		const axes: EvaluationAxis[] = params.feedbackContext ? [...baseAxes, 'feedback_coverage'] : baseAxes;
+
+		const scores = await Promise.all(
+			axes.map(axis =>
+				this.evaluateProposal({
+					ticket: params.ticket,
+					proposedFlowYaml: params.proposedFlowYaml,
+					axis,
+					feedbackContext: params.feedbackContext,
+				})
+			)
+		);
+
+		log.info('Evaluator scores', { axes, scores });
+		const average = Math.round(scores.reduce((sum, s) => sum + s, 0) / scores.length);
+		return average;
+	}
+
+	// ---------------------------------------------------------------------------
 	// Main method
 	// ---------------------------------------------------------------------------
 
@@ -459,7 +555,28 @@ Output ONLY the \`\`\`json block, nothing else.`);
 			throw new Error(`Claude-generated flow failed validation: ${errors}`);
 		}
 
-		log.info('Flow design validated successfully', { flowId: (result.proposedFlow as any).id });
+		// Run multi-axis evaluators in parallel to compute an objective confidence score.
+		// This replaces the LLM's self-reported confidenceScore with an independent assessment.
+		const proposedFlowYaml = FlowDesignerAgent.serializeFlowToYaml(result.proposedFlow);
+		// Feedback context for redesigns: concatenate review thread comments
+		// feedbackContext is only set for redesigns (previousProposal present).
+		// This triggers the 4th evaluator axis (feedback_coverage) exclusively for v2+ proposals.
+		const feedbackContext = input.previousProposal
+			? input.previousProposal.reviewThreads.flatMap(t => t.comments.map(c => c.content)).join('\n') || undefined
+			: undefined;
+
+		const evaluatedConfidence = await this.computeConfidenceScore({
+			ticket: { title: input.ticket.title, description: input.ticket.description },
+			proposedFlowYaml,
+			feedbackContext,
+		});
+
+		result.confidenceScore = evaluatedConfidence;
+
+		log.info('Flow design validated successfully', {
+			flowId: (result.proposedFlow as Record<string, unknown>)['id'],
+			confidenceScore: evaluatedConfidence,
+		});
 		return result;
 	}
 

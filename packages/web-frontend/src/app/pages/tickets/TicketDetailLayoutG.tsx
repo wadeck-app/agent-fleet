@@ -54,7 +54,6 @@ function TabCountBadge({ count, loading }: { count: number; loading: boolean }) 
 			</>
 		);
 	}
-	if (count === 0) return null;
 	return <> ({count})</>;
 }
 

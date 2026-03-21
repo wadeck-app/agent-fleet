@@ -72,6 +72,8 @@ export const UpdateReviewThreadSchema = z.object({
 export const RequestFlowDesignSchema = z.object({
 	/** Optional override prompt/context from the user */
 	context: z.string().optional(),
+	/** Answers to open questions surfaced by the AI in a previous proposal */
+	questionsContext: z.array(z.object({ question: z.string(), answer: z.string() })).optional(),
 });
 
 export const RejectProposalSchema = z.object({

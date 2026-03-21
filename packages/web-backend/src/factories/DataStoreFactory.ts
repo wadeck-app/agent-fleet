@@ -97,6 +97,7 @@ export class DataStoreFactory {
 	private dashboardService?: DashboardService;
 	private workersService?: WorkersService;
 	private flowsService?: FlowsService;
+	private flowRegistry?: FlowRegistry;
 	private tasksService?: TasksService;
 	private ticketsService?: TicketsService;
 	private flowFeedbackService?: FlowFeedbackService;
@@ -259,8 +260,8 @@ export class DataStoreFactory {
 			// Get EventBroadcaster
 			const eventBroadcaster = this.getEventBroadcaster();
 
-			// Create FlowsService with OrchestratorWrapper
-			this.flowsService = new FlowsService(this.orchestratorWrapper, eventBroadcaster);
+			// Pass the shared registry so approved custom flows are visible via GET /api/flows/:flowId
+			this.flowsService = new FlowsService(this.orchestratorWrapper, eventBroadcaster, this.getFlowRegistry());
 		}
 
 		return this.flowsService;
@@ -368,6 +369,17 @@ export class DataStoreFactory {
 	}
 
 	/**
+	 * Get or create FlowRegistry (shared instance — used by both FlowProposalsService and FlowsService)
+	 */
+	private getFlowRegistry(): FlowRegistry {
+		if (!this.flowRegistry) {
+			const projectRoot = this.resolveMonorepoRoot();
+			this.flowRegistry = new FlowRegistry(projectRoot);
+		}
+		return this.flowRegistry;
+	}
+
+	/**
 	 * Get or create FlowKnowledgeService
 	 */
 	getFlowKnowledgeService(): FlowKnowledgeService {
@@ -395,9 +407,8 @@ export class DataStoreFactory {
 			const ticketsBaseRepo = new BaseRepository<Ticket>('tickets', this.storage);
 			const ticketsRepo = new TicketsRepository(ticketsBaseRepo);
 
-			// Create FlowRegistry pointing to monorepo root
-			const projectRoot = this.resolveMonorepoRoot();
-			const registry = new FlowRegistry(projectRoot);
+			// Use the shared FlowRegistry (same instance used by FlowsService)
+			const registry = this.getFlowRegistry();
 
 			// Create FlowDesignerAgent
 			const designerAgent = new FlowDesignerAgent(registry);

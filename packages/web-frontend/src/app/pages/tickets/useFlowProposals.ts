@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { FlowProposal } from '@shared/api/flow-proposals.contract';
+import { B2F_FLOW_PROPOSAL_UPDATED } from '@shared/transport';
+
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 import { flowProposalsApi } from './flowProposalsApi';
 
@@ -79,6 +82,18 @@ export function useFlowProposals(ticketId: string): UseFlowProposalsResult {
 		setIsSilent(true);
 		setRefreshCounter(prev => prev + 1);
 	}, []);
+
+	// Stable filter object — prevents useRealtimeRefresh from re-subscribing on every render
+	const ticketFilter = useMemo(() => ({ ticketId }), [ticketId]);
+
+	// Subscribe to proposal updates so the tab count badge refreshes automatically
+	// when a redesign completes (B2F_FLOW_PROPOSAL_UPDATED fires from the backend).
+	useRealtimeRefresh({
+		events: [B2F_FLOW_PROPOSAL_UPDATED],
+		onEvent: refresh,
+		filters: ticketFilter,
+		logPrefix: 'useFlowProposals',
+	});
 
 	const currentProposal = proposals.length > 0 ? proposals[0] : null;
 

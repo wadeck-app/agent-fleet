@@ -171,7 +171,8 @@ describe('FlowProposalSection', () => {
 			await user.click(screen.getByRole('button', { name: /Request Flow Design/i }));
 
 			await waitFor(() => {
-				expect(flowProposalsApi.requestFlowDesign).toHaveBeenCalledWith('ticket-1', undefined);
+				// c fix: questionsContext is now the third argument (undefined when no answers filled)
+				expect(flowProposalsApi.requestFlowDesign).toHaveBeenCalledWith('ticket-1', undefined, undefined);
 			});
 		});
 	});
@@ -550,10 +551,10 @@ describe('FlowProposalSection', () => {
 	});
 
 	// ---------------------------------------------------------------------------
-	// I2 fix: confidence tooltip shows openQuestions or uncertainty sentences
+	// C fix: open questions moved from tooltip to inline "Questions from the AI" section
 	// ---------------------------------------------------------------------------
-	describe('i2 — confidence tooltip open questions', () => {
-		it('confidence trigger is present when openQuestions is empty and reasoning has no uncertainty', () => {
+	describe('c — open questions inline section', () => {
+		it('confidence trigger is present without showing tooltip open questions', () => {
 			const proposalWithClearReasoning: FlowProposal = {
 				...mockProposal,
 				confidenceScore: 95,
@@ -572,11 +573,34 @@ describe('FlowProposalSection', () => {
 				</MemoryRouter>
 			);
 
-			// Confidence trigger must be present; tooltip content not tested here (requires hover)
 			expect(screen.getByText(/Confidence: 95%/)).toBeInTheDocument();
+			// No inline questions section when openQuestions is empty
+			expect(screen.queryByText('Questions from the AI')).not.toBeInTheDocument();
 		});
 
-		it('shows "Open questions:" label with bullet list when openQuestions has items (after hover)', async () => {
+		it('shows "Questions from the AI" collapsible section when openQuestions has items', () => {
+			const proposalWithQuestions: FlowProposal = {
+				...mockProposal,
+				confidenceScore: 60,
+				openQuestions: ['What auth method is required?', 'What is the expected data volume?'],
+			};
+			vi.mocked(useFlowProposals).mockReturnValue({
+				...defaultHookResult,
+				proposals: [proposalWithQuestions],
+				currentProposal: proposalWithQuestions,
+			});
+
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
+
+			// The collapsible toggle must be visible
+			expect(screen.getByText('Questions from the AI')).toBeInTheDocument();
+		});
+
+		it('expands "Questions from the AI" section and shows questions with answer textareas', async () => {
 			const user = userEvent.setup();
 			const proposalWithQuestions: FlowProposal = {
 				...mockProposal,
@@ -595,31 +619,25 @@ describe('FlowProposalSection', () => {
 				</MemoryRouter>
 			);
 
-			const trigger = screen.getByText(/Confidence: 60%/);
-			expect(trigger).toBeInTheDocument();
-
-			await user.hover(trigger);
+			// Expand the section
+			await user.click(screen.getByText('Questions from the AI'));
 
 			await waitFor(() => {
-				expect(screen.getByText('Open questions:')).toBeInTheDocument();
+				expect(screen.getByText('What auth method is required?')).toBeInTheDocument();
+				expect(screen.getByText('What is the expected data volume?')).toBeInTheDocument();
 			});
-			expect(screen.getByText(/What auth method is required/)).toBeInTheDocument();
-			expect(screen.getByText(/What is the expected data volume/)).toBeInTheDocument();
 		});
 
-		it('falls back to extractUncertaintySentences when openQuestions is absent and reasoning has uncertainty signals (after hover)', async () => {
-			const user = userEvent.setup();
-			const proposalWithUnclearReasoning: FlowProposal = {
+		it('does not show "Questions from the AI" section when openQuestions is absent', () => {
+			const proposalWithNoQuestions: FlowProposal = {
 				...mockProposal,
-				confidenceScore: 65,
+				confidenceScore: 90,
 				openQuestions: undefined,
-				reasoning:
-					'The flow is mostly clear. What should happen if the API times out? Some steps may not handle edge cases correctly.',
 			};
 			vi.mocked(useFlowProposals).mockReturnValue({
 				...defaultHookResult,
-				proposals: [proposalWithUnclearReasoning],
-				currentProposal: proposalWithUnclearReasoning,
+				proposals: [proposalWithNoQuestions],
+				currentProposal: proposalWithNoQuestions,
 			});
 
 			render(
@@ -628,12 +646,7 @@ describe('FlowProposalSection', () => {
 				</MemoryRouter>
 			);
 
-			const trigger = screen.getByText(/Confidence: 65%/);
-			await user.hover(trigger);
-
-			await waitFor(() => {
-				expect(screen.getByText('Open questions:')).toBeInTheDocument();
-			});
+			expect(screen.queryByText('Questions from the AI')).not.toBeInTheDocument();
 		});
 	});
 

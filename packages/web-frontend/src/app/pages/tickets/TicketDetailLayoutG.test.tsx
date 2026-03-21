@@ -385,7 +385,7 @@ describe('TicketDetailLayoutG', () => {
 			expect(flowTab).toBeInTheDocument();
 		});
 
-		it('should show no count in flow design tab when proposals list is empty', () => {
+		it('should show "(0)" count in flow design tab when proposals list is empty (a fix: always show count)', () => {
 			vi.mocked(useFlowProposals).mockReturnValue({
 				proposals: [],
 				currentProposal: null,
@@ -395,7 +395,8 @@ describe('TicketDetailLayoutG', () => {
 				refreshSilent: vi.fn(),
 			});
 			render(<TicketDetailLayoutG {...defaultProps} />);
-			expect(screen.getByRole('tab', { name: /^Flow Design$/i })).toBeInTheDocument();
+			// a fix: count badge always shown, even when 0
+			expect(screen.getByRole('tab', { name: /Flow Design \(0\)/i })).toBeInTheDocument();
 		});
 
 		it('should show proposals count in flow design tab once loaded', () => {

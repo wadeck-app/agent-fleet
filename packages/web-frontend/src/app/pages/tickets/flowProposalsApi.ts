@@ -25,10 +25,14 @@ export const flowProposalsApi = {
 	/**
 	 * Request an AI-generated flow design for a ticket
 	 */
-	requestFlowDesign: (ticketId: string, context?: string): Promise<FlowProposal> => {
+	requestFlowDesign: (
+		ticketId: string,
+		context?: string,
+		questionsContext?: Array<{ question: string; answer: string }>
+	): Promise<FlowProposal> => {
 		return typedFetch('POST', '/api/tickets/:ticketId/request-flow-design', {
 			params: { ticketId },
-			body: { context },
+			body: { context, questionsContext },
 		});
 	},
 
