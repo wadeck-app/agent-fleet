@@ -27,6 +27,7 @@
 import { AUTH_API_ROUTES } from './api/auth.contract';
 import { BOOKS_API_ROUTES } from './api/books.contract';
 import { DASHBOARD_API_ROUTES } from './api/dashboard.contract';
+import { FLOW_FEEDBACK_MANAGEMENT_ROUTES } from './api/flow-feedback.contract';
 import { FLOW_PROPOSALS_API_ROUTES } from './api/flow-proposals.contract';
 import { FLOWS_API_ROUTES } from './api/flows.contract';
 import { INGREDIENTS_API_ROUTES } from './api/ingredients.contract';
@@ -97,6 +98,7 @@ const ALL_CONTRACTS = [
 	TASKS_API_ROUTES,
 	TICKETS_API_ROUTES,
 	FLOW_PROPOSALS_API_ROUTES,
+	FLOW_FEEDBACK_MANAGEMENT_ROUTES,
 	WORKSPACES_API_ROUTES,
 	WORKSPACE_FILES_API_ROUTES,
 	WORKSPACE_SCRIPTS_API_ROUTES,

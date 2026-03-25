@@ -1,6 +1,11 @@
 import { createTypedFetch } from '@framework/api/api-base';
-import type { CreateFlowFeedback, FlowFeedback, FlowRetrospective } from '@shared/api/flow-feedback.contract';
-import { FLOW_FEEDBACK_API_ROUTES } from '@shared/api/flow-feedback.contract';
+import type {
+	CreateFlowFeedback,
+	FlowFeedback,
+	FlowRetrospective,
+	UpdateFlowFeedback,
+} from '@shared/api/flow-feedback.contract';
+import { FLOW_FEEDBACK_API_ROUTES, FLOW_FEEDBACK_MANAGEMENT_ROUTES } from '@shared/api/flow-feedback.contract';
 
 /**
  * ===========================================================================================
@@ -14,6 +19,7 @@ import { FLOW_FEEDBACK_API_ROUTES } from '@shared/api/flow-feedback.contract';
  */
 
 const typedFetch = createTypedFetch(FLOW_FEEDBACK_API_ROUTES);
+const managementTypedFetch = createTypedFetch(FLOW_FEEDBACK_MANAGEMENT_ROUTES);
 
 export const feedbackApi = {
 	/**
@@ -42,5 +48,24 @@ export const feedbackApi = {
 		return typedFetch('GET', '/api/tickets/:ticketId/retrospective', {
 			params: { ticketId },
 		});
+	},
+
+	/**
+	 * Update an existing feedback item (rating, wentWell, wentWrong, suggestions)
+	 */
+	updateFeedback: (feedbackId: string, data: UpdateFlowFeedback): Promise<FlowFeedback> => {
+		return managementTypedFetch('PUT', '/api/flow-feedback/:feedbackId', {
+			params: { feedbackId },
+			body: data,
+		});
+	},
+
+	/**
+	 * Delete a feedback item by ID
+	 */
+	deleteFeedback: (feedbackId: string): Promise<void> => {
+		return managementTypedFetch('DELETE', '/api/flow-feedback/:feedbackId', {
+			params: { feedbackId },
+		}) as unknown as Promise<void>;
 	},
 } as const;

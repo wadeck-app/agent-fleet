@@ -129,7 +129,8 @@ export function TicketCreateDialog({ open, onOpenChange, onSuccess }: TicketCrea
 				<div className="space-y-4">
 					{/* Project Selection */}
 					<div>
-						<Label className="mb-1">
+						{/* T8 fix: connect label to select trigger via htmlFor/id */}
+						<Label htmlFor="project-select" className="mb-1">
 							Project <span className="text-destructive">*</span>
 						</Label>
 						<Select
@@ -137,7 +138,7 @@ export function TicketCreateDialog({ open, onOpenChange, onSuccess }: TicketCrea
 							onValueChange={setSelectedProjectId}
 							disabled={projectsLoading || creating}
 						>
-							<SelectTrigger>
+							<SelectTrigger id="project-select">
 								<SelectValue
 									placeholder={projectsLoading ? 'Loading projects...' : 'Select project...'}
 								/>

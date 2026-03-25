@@ -11,12 +11,12 @@
 ### What exists today
 
 - `FlowProposalSection.tsx` renders the YAML in a plain `<pre>` block:
-  ```tsx
-  <pre className="overflow-x-auto rounded-md bg-muted p-4 text-xs font-mono leading-relaxed">
-    {proposalYaml}
-  </pre>
-  ```
-  No line-number column, no hover state, no selection detection.
+
+    ```tsx
+    <pre className="overflow-x-auto rounded-md bg-muted p-4 text-xs font-mono leading-relaxed">{proposalYaml}</pre>
+    ```
+
+    No line-number column, no hover state, no selection detection.
 
 - `AddReviewThreadForm` is a separate form shown **below** the YAML that requires the
   user to manually type start/end line numbers into two `<Input type="number">` fields,
@@ -111,17 +111,18 @@ Line 7     - id: fetch_data
 ```
 
 Resolved threads are collapsed by default:
+
 ```
   ✓ Thread resolved (1 comment)  [Show]
 ```
 
 ### 2.2 Visual differentiation: open vs resolved vs stale
 
-| State    | Line indicator       | Thread card                         |
-|----------|----------------------|-------------------------------------|
-| open     | Amber `MessageSquare`| Full card, amber left border        |
-| resolved | Muted `CheckCircle2` | Collapsed grey card, "Show" toggle  |
-| stale    | Muted `AlertCircle`  | Grey card, "Stale — from v{N}" chip |
+| State    | Line indicator        | Thread card                         |
+| -------- | --------------------- | ----------------------------------- |
+| open     | Amber `MessageSquare` | Full card, amber left border        |
+| resolved | Muted `CheckCircle2`  | Collapsed grey card, "Show" toggle  |
+| stale    | Muted `AlertCircle`   | Grey card, "Stale — from v{N}" chip |
 
 ### 2.3 Terminal proposal states
 
@@ -139,18 +140,20 @@ their referenced lines have changed in the newer version.
 **File:** `packages/web-frontend/src/app/pages/tickets/AnnotatedYamlViewer.tsx`
 
 Props:
+
 ```ts
 interface AnnotatedYamlViewerProps {
-  yaml: string;
-  threads: FlowReviewThread[];
-  readOnly?: boolean;
-  onCreateThread: (selector: FlowReviewSelector, comment: string) => Promise<void>;
-  onAddReply: (threadId: string, content: string) => Promise<void>;
-  onResolve: (threadId: string) => Promise<void>;
+	yaml: string;
+	threads: FlowReviewThread[];
+	readOnly?: boolean;
+	onCreateThread: (selector: FlowReviewSelector, comment: string) => Promise<void>;
+	onAddReply: (threadId: string, content: string) => Promise<void>;
+	onResolve: (threadId: string) => Promise<void>;
 }
 ```
 
 Internal state:
+
 ```ts
 const [hoveredLine, setHoveredLine] = useState<number | null>(null);
 const [selectionStart, setSelectionStart] = useState<number | null>(null);
@@ -159,6 +162,7 @@ const [openFormAtLine, setOpenFormAtLine] = useState<number | null>(null);
 ```
 
 Implementation:
+
 1. Split `yaml` by `\n` to get `lines: string[]`
 2. Build a `Map<number, FlowReviewThread[]>` keyed by `thread.selector.endLine`
    (threads are injected below their last referenced line)
@@ -183,20 +187,21 @@ instead of outer border). Keep existing reply/resolve logic unchanged.
 ### 3.4 Modified: `ProposalView` in `FlowProposalSection.tsx`
 
 Replace:
+
 ```tsx
-<pre className="...">
-  {proposalYaml}
-</pre>
+<pre className="...">{proposalYaml}</pre>
 ```
+
 with:
+
 ```tsx
 <AnnotatedYamlViewer
-  yaml={proposalYaml}
-  threads={proposal.reviewThreads}
-  readOnly={!isPendingReview}
-  onCreateThread={handleCreateThread}
-  onAddReply={handleAddReply}
-  onResolve={handleResolveThread}
+	yaml={proposalYaml}
+	threads={proposal.reviewThreads}
+	readOnly={!isPendingReview}
+	onCreateThread={handleCreateThread}
+	onAddReply={handleAddReply}
+	onResolve={handleResolveThread}
 />
 ```
 
@@ -213,20 +218,20 @@ One optional contract improvement for the cg integration:
 ```ts
 // flow-proposals.contract.ts
 export const FlowReviewThreadSchema = z.object({
-  // ... existing fields
-  staleReason: z.string().optional(),   // e.g. "Lines 5-8 no longer exist in v3"
+	// ... existing fields
+	staleReason: z.string().optional(), // e.g. "Lines 5-8 no longer exist in v3"
 });
 ```
 
 ### 3.6 Keyboard shortcuts
 
-| Shortcut             | Action                                   |
-|----------------------|------------------------------------------|
-| Click line number    | Start selection anchor                   |
-| Shift+click line num | Extend selection                         |
-| `Ctrl/Cmd+Shift+C`   | Open comment form for current selection  |
-| `Escape`             | Cancel selection / close inline form     |
-| `Ctrl/Cmd+Enter`     | Submit inline comment form               |
+| Shortcut             | Action                                  |
+| -------------------- | --------------------------------------- |
+| Click line number    | Start selection anchor                  |
+| Shift+click line num | Extend selection                        |
+| `Ctrl/Cmd+Shift+C`   | Open comment form for current selection |
+| `Escape`             | Cancel selection / close inline form    |
+| `Ctrl/Cmd+Enter`     | Submit inline comment form              |
 
 ---
 
@@ -280,6 +285,7 @@ before creating the new proposal. The new proposal starts with `reviewThreads: [
 **Recommendation:** Keep comments anchored to YAML lines only — not to graph nodes.
 
 Reasons:
+
 1. The YAML is the authoritative representation; the graph is derived
 2. Adding graph-node-level comments would require a second selector type and dual
    rendering in both `AnnotatedYamlViewer` and the graph canvas
@@ -287,10 +293,16 @@ Reasons:
    topology may change completely
 
 If graph-node comments are desired later, the contract extension would be:
+
 ```ts
 export const FlowReviewSelectorSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('line'), startLine: z.number(), endLine: z.number(), selectedText: z.string().optional() }),
-  z.object({ type: z.literal('node'), nodeId: z.string() }),
+	z.object({
+		type: z.literal('line'),
+		startLine: z.number(),
+		endLine: z.number(),
+		selectedText: z.string().optional(),
+	}),
+	z.object({ type: z.literal('node'), nodeId: z.string() }),
 ]);
 ```
 
@@ -303,6 +315,7 @@ export const FlowReviewSelectorSchema = z.discriminatedUnion('type', [
 **Complexity: M | Frontend only**
 
 Tasks:
+
 1. Create `AnnotatedYamlViewer.tsx` with `readOnly={true}` only — line numbers, gutter
    indicators, thread cards injected inline (collapsed resolved threads)
 2. Create `InlineThreadCard.tsx` (read-only, refactored from `ReviewThreadItem`)
@@ -317,6 +330,7 @@ Deliverable: YAML block shows line numbers + inline thread cards. No new comment
 **Complexity: M | Frontend only**
 
 Tasks:
+
 1. Add `onCreateThread` prop and `readOnly={false}` support to `AnnotatedYamlViewer`
 2. Implement hover state and `+` button per line
 3. Create `InlineCommentForm.tsx` with auto-focus, `Ctrl+Enter` submit, `Escape` cancel
@@ -333,6 +347,7 @@ Deliverable: Full single-line inline comment flow. Old form removed.
 **Complexity: S | Frontend only**
 
 Tasks:
+
 1. Add `selectionStart`/`selectionEnd` state to `AnnotatedYamlViewer`
 2. Click line number gutter → set `selectionStart`; shift-click → set `selectionEnd`
 3. Highlight selected range rows with `bg-accent/20`
@@ -346,6 +361,7 @@ Tasks:
 **Complexity: S | Frontend only**
 
 Tasks:
+
 1. Add reply form toggle to `InlineThreadCard`
 2. Add resolve button with optimistic update (collapse immediately, revert on error)
 3. Wire `onAddReply` / `onResolve` callbacks through `AnnotatedYamlViewer`
@@ -356,6 +372,7 @@ Tasks:
 **Complexity: S | Frontend + Backend**
 
 Tasks:
+
 1. Replace `<pre>` in `ProposalHistoryEntry` (cg plan) with
    `<AnnotatedYamlViewer readOnly={true} threads={historyProposal.reviewThreads} ...>`
 2. Backend: implement `markStaleThreads` in `FlowProposalsService.triggerRedesignAsync`
@@ -368,33 +385,37 @@ Tasks:
 
 **Q1 (Phase 2):** Should removal of `AddReviewThreadForm` be atomic with Phase 2, or
 kept as fallback for one release?
+
 > Recommendation: remove atomically — the new UX is strictly better.
 
 **Q2 (Phase 3):** Multi-line selection via gutter-click or browser native text selection?
+
 > Recommendation: gutter-click (click line number to anchor, shift-click to extend).
 > Matches GitHub's model and avoids browser selection API complexity.
 
 **Q3 (Phase 5):** Staleness check uses exact line content match — YAML reformatting
 could produce false positives. Should we use:
-  - (a) Exact string match (simple, false positives on reformat)
-  - (b) Semantic YAML key/value comparison (accurate, complex)
-> Recommendation: start with (a), note in stale chip "Line content changed in v{N}".
+
+- (a) Exact string match (simple, false positives on reformat)
+- (b) Semantic YAML key/value comparison (accurate, complex)
+    > Recommendation: start with (a), note in stale chip "Line content changed in v{N}".
 
 **Q4 (design):** Should resolved threads be hidden by default (GitHub-style) with a
 "Show N resolved threads" toggle, or always visible in collapsed form?
+
 > Recommendation: hidden by default, toggle to show.
 
 ---
 
 ## Summary Table
 
-| Phase | Complexity | New files                                           | Modified files                              | Backend | Blocked by        |
-|-------|------------|-----------------------------------------------------|---------------------------------------------|---------|-------------------|
-| 1     | M          | `AnnotatedYamlViewer.tsx`, `InlineThreadCard.tsx`   | `FlowProposalSection.tsx`                   | No      | —                 |
-| 2     | M          | `InlineCommentForm.tsx`                             | `FlowProposalSection.tsx`, `AnnotatedYamlViewer.tsx` | No | Phase 1      |
-| 3     | S          | —                                                   | `AnnotatedYamlViewer.tsx`                   | No      | Phase 2           |
-| 4     | S          | —                                                   | `InlineThreadCard.tsx`                      | No      | Phase 2           |
-| 5     | S          | —                                                   | `FlowProposalSection.tsx`, `FlowProposalsService.ts`, `flow-proposals.contract.ts` | Yes | cg Phase 2 + Phase 1 |
+| Phase | Complexity | New files                                         | Modified files                                                                     | Backend | Blocked by           |
+| ----- | ---------- | ------------------------------------------------- | ---------------------------------------------------------------------------------- | ------- | -------------------- |
+| 1     | M          | `AnnotatedYamlViewer.tsx`, `InlineThreadCard.tsx` | `FlowProposalSection.tsx`                                                          | No      | —                    |
+| 2     | M          | `InlineCommentForm.tsx`                           | `FlowProposalSection.tsx`, `AnnotatedYamlViewer.tsx`                               | No      | Phase 1              |
+| 3     | S          | —                                                 | `AnnotatedYamlViewer.tsx`                                                          | No      | Phase 2              |
+| 4     | S          | —                                                 | `InlineThreadCard.tsx`                                                             | No      | Phase 2              |
+| 5     | S          | —                                                 | `FlowProposalSection.tsx`, `FlowProposalsService.ts`, `flow-proposals.contract.ts` | Yes     | cg Phase 2 + Phase 1 |
 
 All frontend work must be delegated to the `frontend-dev` sub-agent per project rules.
 

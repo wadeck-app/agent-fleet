@@ -5,6 +5,7 @@ import * as yaml from 'js-yaml';
 import { createLogger } from 'shared-common/logger';
 
 import type { FlowReviewThread } from '@app/shared/api/flow-proposals.contract';
+import type { TicketComment } from '@app/shared/api/tickets.contract';
 
 import type { FlowKnowledgeContext } from '../services/FlowKnowledgeService';
 
@@ -44,6 +45,11 @@ export interface FlowDesignInput {
 	};
 	/** Optional extra context from user */
 	userContext?: string;
+	/**
+	 * Existing ticket comments — used to inject the action plan from worker-ai:ticket-intake
+	 * into the prompt so the LLM knows what was planned during ticket intake.
+	 */
+	ticketComments?: TicketComment[];
 }
 
 type EvaluationAxis = 'completeness' | 'feasibility' | 'coherence' | 'feedback_coverage';
@@ -172,7 +178,18 @@ ${input.ticket.description}
 **Labels**: ${input.ticket.labels.length > 0 ? input.ticket.labels.join(', ') : '(none)'}
 **Custom fields**: ${Object.keys(input.ticket.fields).length > 0 ? JSON.stringify(input.ticket.fields, null, 2) : '(none)'}`);
 
-		// 3. Knowledge context
+		// 3. Ticket intake action plan (from worker-ai:ticket-intake comments, if any)
+		const intakeComments = (input.ticketComments ?? []).filter(c => c.author && c.author.includes('ticket-intake'));
+		if (intakeComments.length > 0) {
+			const intakeText = intakeComments.map(c => c.content).join('\n\n');
+			sections.push(`## Existing Action Plan (from ticket intake)
+
+The following content was produced during ticket intake analysis. Use it as authoritative context for the flow design — the steps described here should map directly to flow steps where applicable.
+
+${intakeText}`);
+		}
+
+		// 4. Knowledge context
 		const flowsListText =
 			ctx.availableFlows.length > 0
 				? ctx.availableFlows.map(f => `- **${f.id}**: ${f.name} — ${f.description}`).join('\n')
@@ -214,7 +231,7 @@ ${retroText}
 ### Similar Tickets (previously executed flows)
 ${similarTicketsText}`);
 
-		// 4. Re-design context (if applicable)
+		// 5. Re-design context (if applicable)
 		if (input.previousProposal) {
 			const { previousProposal } = input;
 			const threadsText = previousProposal.reviewThreads
@@ -261,13 +278,13 @@ Do NOT rename steps. Do NOT combine steps. Do NOT reorder steps. Do NOT add step
 Only modify the specific content referenced in the review threads. If you are unsure whether something should change, keep the original version exactly.`);
 		}
 
-		// 5. User context (optional override)
+		// 6. User context (optional override)
 		if (input.userContext) {
 			sections.push(`## Additional User Context
 ${input.userContext}`);
 		}
 
-		// 6. Instructions
+		// 7. Instructions
 		sections.push(`## Instructions
 
 FORMATTING RULES (apply to ALL text fields — reasoning, step names, descriptions, prompts):
@@ -294,6 +311,8 @@ Rules:
   step A: \`{ "id": "analyze", "type": "model", ... }\`
   step B: \`{ "id": "implement", "type": "model", "depends": ["analyze"], "prompt": "Based on \${{ steps.analyze.outputs.result }}..." }\`
 - workspace MUST include \`"reusePolicy": "never"\` (or \`"if-available"\` or \`"always"\`)
+- Steps of type "model" MUST include a "model" field: one of sonnet | haiku | opus (REQUIRED — no default value)
+- workspace.gitStrategy is REQUIRED: one of main-only | feature-branch | any | worktree (REQUIRED)
 - Do NOT include \`statusTransitions\` — omit it entirely, the defaults are fine
 - Do NOT use \`condition\` fields on any step — keep all steps unconditional
 - For \`model\` steps: do NOT include an \`output\` configuration — the model response is captured automatically as the step result
@@ -516,13 +535,23 @@ Score 0 = completely fails on this axis, 100 = perfectly satisfies this axis.`;
 	}
 
 	// ---------------------------------------------------------------------------
+	// Call + parse helper
+	// ---------------------------------------------------------------------------
+
+	private async callAndParse(prompt: string): Promise<FlowDesignOutput> {
+		const output = await this.callClaude(prompt);
+		log.debug('Claude response length', { length: output.length });
+		return this.parseClaudeResponse(output);
+	}
+
+	// ---------------------------------------------------------------------------
 	// Main method
 	// ---------------------------------------------------------------------------
 
 	/**
 	 * Design a flow for the given ticket using Claude.
 	 *
-	 * @throws Error if Claude CLI fails, response is unparseable, or flow validation fails.
+	 * @throws Error if Claude CLI fails, response is unparseable, or flow validation fails after retries.
 	 */
 	async designFlow(input: FlowDesignInput): Promise<FlowDesignOutput> {
 		log.info('Designing flow', {
@@ -531,28 +560,50 @@ Score 0 = completely fails on this axis, 100 = perfectly satisfies this axis.`;
 			isRedesign: !!input.previousProposal,
 		});
 
-		const prompt = this.buildPrompt(input);
-		log.debug('Sending prompt to Claude', { promptLength: prompt.length });
+		// Build prompt and run first design attempt
+		const mainPrompt = this.buildPrompt(input);
+		log.debug('Sending prompt to Claude', { promptLength: mainPrompt.length });
 
-		const output = await this.callClaude(prompt);
-		log.info('Claude returned flow design response', { outputLength: output.length });
+		const MAX_RETRIES = 2;
+		let result = await this.callAndParse(mainPrompt);
+		log.info('Claude returned flow design response', { outputLength: mainPrompt.length });
 
-		const result = this.parseClaudeResponse(output);
+		for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+			const validationResult = this.registry.validateFlow(result.proposedFlow as unknown as FlowDefinition);
+			if (validationResult.valid) break;
+
+			const errorMessages = validationResult.issues
+				.filter(i => i.severity === 'error')
+				.map(i => `- ${i.message}`)
+				.join('\n');
+
+			if (attempt === MAX_RETRIES - 1) {
+				throw new Error(
+					`Claude-generated flow failed validation after ${MAX_RETRIES} retries: ${validationResult.issues
+						.filter(i => i.severity === 'error')
+						.map(i => i.message)
+						.join('; ')}`
+				);
+			}
+
+			log.warn('Flow validation failed, sending correction prompt', {
+				attempt: attempt + 1,
+				errors: errorMessages,
+			});
+			const correctionPrompt = [
+				'Your flow design failed validation with these errors:',
+				errorMessages,
+				'',
+				'Return ONLY the corrected JSON object, fixing all listed errors.',
+				'Do not change anything else in the flow.',
+			].join('\n');
+			result = await this.callAndParse(correctionPrompt);
+		}
 
 		// Option A guardrail: on redesign, warn if the LLM changed steps that were NOT referenced
 		// in review threads (e.g. combined, removed, or renamed unrequested steps).
 		if (input.previousProposal) {
 			this.auditRedesignPreservation(result, input.previousProposal);
-		}
-
-		// Validate the proposed flow using FlowRegistry
-		const validationResult = this.registry.validateFlow(result.proposedFlow as unknown as FlowDefinition);
-		if (!validationResult.valid) {
-			const errors = validationResult.issues
-				.filter(i => i.severity === 'error')
-				.map(i => i.message)
-				.join('; ');
-			throw new Error(`Claude-generated flow failed validation: ${errors}`);
 		}
 
 		// Run multi-axis evaluators in parallel to compute an objective confidence score.

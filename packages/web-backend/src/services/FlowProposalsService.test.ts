@@ -69,6 +69,7 @@ function makeStubs() {
 		update: vi.fn(),
 		addHistoryEntry: vi.fn(),
 		findByProject: vi.fn(),
+		getComments: vi.fn().mockResolvedValue([]),
 	} as unknown as TicketsRepository;
 
 	const designerAgent: FlowDesignerAgent = {
@@ -127,6 +128,7 @@ describe('FlowProposalsService', () => {
 			const proposal = makeProposal({ id: 'new-prop' });
 
 			vi.mocked(stubs.ticketsRepository.findById).mockResolvedValue(ticket);
+			vi.mocked(stubs.proposalsRepository.findByTicketId).mockResolvedValue([]);
 			vi.mocked(stubs.designerAgent.designFlow).mockResolvedValue(makeDesignOutput());
 			vi.mocked(stubs.proposalsRepository.create).mockResolvedValue(proposal);
 			vi.mocked(stubs.ticketsRepository.update).mockResolvedValue({ ...ticket });
@@ -165,9 +167,38 @@ describe('FlowProposalsService', () => {
 			await expect(service.requestFlowDesign('nonexistent')).rejects.toThrow('Ticket nonexistent not found');
 		});
 
+		it('passes ticketComments to designerAgent (intake action plan injection)', async () => {
+			const ticket = makeTicket();
+			const intakeComment = {
+				id: 'cmt-1',
+				ticketId: 'ticket-1',
+				content: 'Action plan: step 1 — analyze, step 2 — implement',
+				author: 'worker-ai:ticket-intake',
+				createdAt: '2026-01-01T00:00:00Z',
+			};
+			vi.mocked(stubs.ticketsRepository.findById).mockResolvedValue(ticket);
+			vi.mocked(stubs.ticketsRepository.getComments as ReturnType<typeof vi.fn>).mockResolvedValue([
+				intakeComment,
+			]);
+			vi.mocked(stubs.proposalsRepository.findByTicketId).mockResolvedValue([]);
+			vi.mocked(stubs.designerAgent.designFlow).mockResolvedValue(makeDesignOutput());
+			vi.mocked(stubs.proposalsRepository.create).mockResolvedValue(makeProposal());
+			vi.mocked(stubs.ticketsRepository.update).mockResolvedValue(ticket);
+			vi.mocked(stubs.ticketsRepository.addHistoryEntry).mockResolvedValue({} as any);
+
+			await service.requestFlowDesign('ticket-1');
+
+			expect(stubs.designerAgent.designFlow).toHaveBeenCalledWith(
+				expect.objectContaining({
+					ticketComments: [intakeComment],
+				})
+			);
+		});
+
 		it('passes userContext to designerAgent', async () => {
 			const ticket = makeTicket();
 			vi.mocked(stubs.ticketsRepository.findById).mockResolvedValue(ticket);
+			vi.mocked(stubs.proposalsRepository.findByTicketId).mockResolvedValue([]);
 			vi.mocked(stubs.designerAgent.designFlow).mockResolvedValue(makeDesignOutput());
 			vi.mocked(stubs.proposalsRepository.create).mockResolvedValue(makeProposal());
 			vi.mocked(stubs.ticketsRepository.update).mockResolvedValue(ticket);
@@ -244,6 +275,7 @@ describe('FlowProposalsService', () => {
 
 			vi.mocked(stubs.proposalsRepository.findById).mockResolvedValue(proposal);
 			vi.mocked(stubs.ticketsRepository.findById).mockResolvedValue(ticket);
+			vi.mocked(stubs.proposalsRepository.findByTicketId).mockResolvedValue([proposal]);
 			vi.mocked(stubs.proposalsRepository.update).mockResolvedValue(rejectedProposal);
 			// designFlow is called async — stub it to resolve eventually
 			vi.mocked(stubs.designerAgent.designFlow).mockResolvedValue(makeDesignOutput());
@@ -278,6 +310,7 @@ describe('FlowProposalsService', () => {
 
 			vi.mocked(stubs.proposalsRepository.findById).mockResolvedValue(proposal);
 			vi.mocked(stubs.ticketsRepository.findById).mockResolvedValue(ticket);
+			vi.mocked(stubs.proposalsRepository.findByTicketId).mockResolvedValue([proposal]);
 			vi.mocked(stubs.proposalsRepository.update).mockResolvedValue({ ...proposal, status: 'rejected' as const });
 			vi.mocked(stubs.designerAgent.designFlow).mockResolvedValue(makeDesignOutput());
 			vi.mocked(stubs.proposalsRepository.create).mockResolvedValue(newProposal);
@@ -301,12 +334,48 @@ describe('FlowProposalsService', () => {
 			);
 		});
 
+		it('passes ticketComments to designerAgent on redesign (intake action plan injection)', async () => {
+			const proposal = makeProposal();
+			const ticket = makeTicket();
+			const intakeComment = {
+				id: 'cmt-1',
+				ticketId: 'ticket-1',
+				content: 'Action plan: step 1 — analyze',
+				author: 'worker-ai:ticket-intake',
+				createdAt: '2026-01-01T00:00:00Z',
+			};
+
+			vi.mocked(stubs.proposalsRepository.findById).mockResolvedValue(proposal);
+			vi.mocked(stubs.ticketsRepository.findById).mockResolvedValue(ticket);
+			vi.mocked(stubs.ticketsRepository.getComments as ReturnType<typeof vi.fn>).mockResolvedValue([
+				intakeComment,
+			]);
+			vi.mocked(stubs.proposalsRepository.findByTicketId).mockResolvedValue([proposal]);
+			vi.mocked(stubs.proposalsRepository.update).mockResolvedValue({ ...proposal, status: 'rejected' as const });
+			vi.mocked(stubs.designerAgent.designFlow).mockResolvedValue(makeDesignOutput());
+			vi.mocked(stubs.proposalsRepository.create).mockResolvedValue(makeProposal({ id: 'prop-2', version: 2 }));
+			vi.mocked(stubs.ticketsRepository.update).mockResolvedValue(ticket);
+			vi.mocked(stubs.ticketsRepository.addHistoryEntry).mockResolvedValue({} as any);
+
+			await service.rejectProposal('ticket-1', 'prop-1');
+
+			// Allow async redesign microtasks to flush
+			await new Promise(resolve => setTimeout(resolve, 0));
+
+			expect(stubs.designerAgent.designFlow).toHaveBeenCalledWith(
+				expect.objectContaining({
+					ticketComments: [intakeComment],
+				})
+			);
+		});
+
 		it('passes previous proposal context to designerAgent on redesign', async () => {
 			const proposal = makeProposal();
 			const ticket = makeTicket();
 
 			vi.mocked(stubs.proposalsRepository.findById).mockResolvedValue(proposal);
 			vi.mocked(stubs.ticketsRepository.findById).mockResolvedValue(ticket);
+			vi.mocked(stubs.proposalsRepository.findByTicketId).mockResolvedValue([proposal]);
 			vi.mocked(stubs.proposalsRepository.update).mockResolvedValue({ ...proposal, status: 'rejected' as const });
 			vi.mocked(stubs.designerAgent.designFlow).mockResolvedValue(makeDesignOutput());
 			vi.mocked(stubs.proposalsRepository.create).mockResolvedValue(makeProposal({ id: 'prop-2', version: 2 }));

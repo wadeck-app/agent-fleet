@@ -76,6 +76,9 @@ export class FlowProposalsService {
 			ticket.description
 		);
 
+		// Fetch comments to inject intake action plan into the prompt
+		const ticketComments = await this.ticketsRepository.getComments(ticketId);
+
 		// Call FlowDesignerAgent
 		const designOutput = await this.designerAgent.designFlow({
 			ticket: {
@@ -87,13 +90,18 @@ export class FlowProposalsService {
 			projectId: ticket.projectId,
 			knowledgeContext,
 			userContext,
+			ticketComments,
 		});
+
+		// dl fix: compute version from existing proposals instead of hardcoding 1
+		const existingProposals = await this.proposalsRepository.findByTicketId(ticketId);
+		const maxVersion = existingProposals.reduce((m, p) => Math.max(m, p.version), 0);
 
 		// Create proposal
 		const proposal: FlowProposal = {
 			id: randomUUID(),
 			ticketId,
-			version: 1,
+			version: maxVersion + 1,
 			status: 'pending_review',
 			proposedFlow: designOutput.proposedFlow,
 			reasoning: designOutput.reasoning,
@@ -115,8 +123,12 @@ export class FlowProposalsService {
 		});
 		await this.ticketsRepository.addHistoryEntry(ticketId, 'flow.proposed', {
 			proposalId: created.id,
-			version: 1,
+			version: maxVersion + 1,
 		});
+
+		// Notify flow-proposal subscribers so the UI refreshes without page reload (dj fix)
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		this.eventBroadcaster.broadcast(B2F_FLOW_PROPOSAL_UPDATED, { ticketId } as any);
 
 		log.info('Flow proposal created', { ticketId, proposalId: created.id });
 		return created;
@@ -263,6 +275,9 @@ export class FlowProposalsService {
 				ticket.description
 			);
 
+			// Fetch comments to inject intake action plan into the redesign prompt
+			const ticketComments = await this.ticketsRepository.getComments(ticketId);
+
 			// Re-invoke FlowDesignerAgent with previous proposal as context
 			const designOutput = await this.designerAgent.designFlow({
 				ticket: {
@@ -273,6 +288,7 @@ export class FlowProposalsService {
 				},
 				projectId: ticket.projectId,
 				knowledgeContext,
+				ticketComments,
 				previousProposal: {
 					proposedFlowYaml: FlowDesignerAgent.serializeFlowToYaml(
 						rejectedProposal.proposedFlow as Record<string, unknown>

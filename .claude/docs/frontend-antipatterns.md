@@ -217,6 +217,28 @@ Before submitting code, verify:
 
 ---
 
+## 17. hover:bg-accent/50 invisible inside bg-muted containers
+
+| Issue            | Description                                                                                                                                             |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Problem**      | `hover:bg-accent/50` produces no visible effect when the element is inside a `bg-muted` container                                                       |
+| **Root cause**   | In this project's theme `--accent === --muted` (`oklch(0.967 0.001 286.375)`). The semi-transparent accent composited over muted yields the same color. |
+| **Symptom**      | Hover class is applied (check computed styles) but background doesn't visually change                                                                   |
+| **Bad Pattern**  | `hover:bg-accent/50` on `TabsTrigger` inside `TabsList` (which has `bg-muted`)                                                                          |
+| **Good Pattern** | `hover:bg-muted-foreground/10` — adds a foreground tint, visible in both light and dark mode                                                            |
+
+**Diagnosis:**
+
+```js
+const r = window.getComputedStyle(document.documentElement);
+console.log(r.getPropertyValue('--accent'), r.getPropertyValue('--muted'));
+// If equal → bg-accent and bg-muted are the same color
+```
+
+**Rule:** Use `hover:bg-accent/50` only on `background`-colored containers. Inside `bg-muted`, use `hover:bg-muted-foreground/10`.
+
+---
+
 ## Related Documentation
 
 - `.claude/docs/frontend.md` - Frontend architecture and patterns

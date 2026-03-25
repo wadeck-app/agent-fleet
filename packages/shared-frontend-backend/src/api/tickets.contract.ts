@@ -81,6 +81,8 @@ export const TicketHistoryEventSchema = z.enum([
 	'flow.approved',
 	'flow.rejected',
 	'flow.feedback_submitted',
+	'flow.feedback_updated',
+	'flow.feedback_deleted',
 	'flow.retrospective_generated',
 ]);
 

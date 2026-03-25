@@ -13,6 +13,7 @@ const routes: RouteDefinition[] = [
 	['/api/workers', () => import('./controllers/WorkersController')],
 	['/api/flows', () => import('./controllers/FlowsController')],
 	['/api/tasks', () => import('./controllers/TasksController')],
+	['/api/flow-feedback', () => import('./controllers/FlowFeedbackController')],
 	['/api/tickets', () => import('./controllers/TicketsController')],
 	['/api/workspaces', () => import('./controllers/WorkspacesWithScriptsController')],
 	['/api/projects', () => import('./controllers/ProjectsController')],

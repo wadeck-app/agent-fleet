@@ -122,7 +122,7 @@ export function TicketActivitySection({ ticketId, sortOrder }: TicketActivitySec
 
 	return (
 		<div className="mt-4 space-y-4">
-			{sorted.map(item => (
+			{sorted.map((item, index) => (
 				<div key={`${item.type}-${item.id}`} className="flex gap-3">
 					<div className="flex flex-col items-center">
 						<div
@@ -142,7 +142,8 @@ export function TicketActivitySection({ ticketId, sortOrder }: TicketActivitySec
 								<Zap className="size-4 text-accent-foreground" />
 							)}
 						</div>
-						{item !== timeline[timeline.length - 1] && <div className="h-full w-px bg-border" />}
+						{/* B3 fix: use index on sorted array instead of reference comparison against timeline */}
+						{index < sorted.length - 1 && <div className="h-full w-px bg-border" />}
 					</div>
 
 					<div

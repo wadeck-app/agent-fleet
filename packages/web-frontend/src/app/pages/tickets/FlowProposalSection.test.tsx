@@ -654,8 +654,9 @@ describe('FlowProposalSection', () => {
 	// K fix: Open in Flow Editor — disabled for non-approved, active link when approved
 	// ---------------------------------------------------------------------------
 	describe('k — open in flow editor link', () => {
-		it('shows disabled "Open in Flow Editor" button (not a link) for non-approved proposals', () => {
-			// K fix: pending_review proposals show a disabled button; link only shown when approved
+		it('shows enabled "Visualize" button (not a link) for non-approved proposals', () => {
+			// D2 fix: pending_review proposals show a "Visualize" Dialog trigger; "Open in Flow Editor"
+			// link is only shown when the proposal is approved (flow registered in registry)
 			vi.mocked(useFlowProposals).mockReturnValue({
 				...defaultHookResult,
 				proposals: [mockProposal],
@@ -668,10 +669,12 @@ describe('FlowProposalSection', () => {
 				</MemoryRouter>
 			);
 
-			// Disabled button is present, not a link
-			const btn = screen.getByRole('button', { name: /Open in Flow Editor/i });
-			expect(btn).toBeDisabled();
+			// Enabled "Visualize" button is present for non-approved proposals
+			const btn = screen.getByRole('button', { name: /Visualize/i });
+			expect(btn).not.toBeDisabled();
+			// No "Open in Flow Editor" link or button for non-approved proposals
 			expect(screen.queryByRole('link', { name: /Open in Flow Editor/i })).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /Open in Flow Editor/i })).not.toBeInTheDocument();
 		});
 
 		it('shows active link to /flows/{flowId}/edit when proposal is approved', () => {

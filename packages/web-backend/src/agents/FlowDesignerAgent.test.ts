@@ -232,6 +232,104 @@ describe('FlowDesignerAgent', () => {
 		expect(capturedPrompt).toContain('automate the deployment pipeline');
 	});
 
+	it('prompt includes intake action plan when ticketComments from ticket-intake author are provided', async () => {
+		let capturedPrompt = '';
+		let callCount = 0;
+		spawnMock.mockImplementation(() => {
+			callCount++;
+			const stdout = callCount === 1 ? makeValidClaudeOutput() : makeEvaluatorOutput(80);
+			const child = makeSpawnChild({ stdout });
+			if (callCount === 1) {
+				(child as any).stdin.write = vi.fn((data: string) => {
+					capturedPrompt += data;
+				});
+			}
+			return child as any;
+		});
+
+		await agent.designFlow(
+			makeInput({
+				ticketComments: [
+					{
+						id: 'cmt-1',
+						ticketId: 'ticket-1',
+						content: 'Action plan: step 1 analyze the codebase, step 2 implement the feature',
+						author: 'worker-ai:ticket-intake',
+						createdAt: '2026-01-01T00:00:00Z',
+					},
+					{
+						id: 'cmt-2',
+						ticketId: 'ticket-1',
+						// Non-intake comment — must NOT appear in the intake section
+						content: 'Please prioritize security',
+						author: 'alice',
+						createdAt: '2026-01-01T00:00:00Z',
+					},
+				],
+			})
+		);
+
+		// Intake section header and content must be present
+		expect(capturedPrompt).toContain('## Existing Action Plan (from ticket intake)');
+		expect(capturedPrompt).toContain('Action plan: step 1 analyze the codebase');
+		// Non-intake comment must NOT be in the intake section (alice's comment)
+		// Note: we only check it's not labelled as intake, not that it's absent entirely
+		expect(capturedPrompt).not.toContain('Please prioritize security');
+	});
+
+	it('prompt does NOT include intake section when no ticket-intake comments are provided', async () => {
+		let capturedPrompt = '';
+		let callCount = 0;
+		spawnMock.mockImplementation(() => {
+			callCount++;
+			const stdout = callCount === 1 ? makeValidClaudeOutput() : makeEvaluatorOutput(80);
+			const child = makeSpawnChild({ stdout });
+			if (callCount === 1) {
+				(child as any).stdin.write = vi.fn((data: string) => {
+					capturedPrompt += data;
+				});
+			}
+			return child as any;
+		});
+
+		await agent.designFlow(
+			makeInput({
+				ticketComments: [
+					{
+						id: 'cmt-1',
+						ticketId: 'ticket-1',
+						content: 'Unrelated comment from user',
+						author: 'alice',
+						createdAt: '2026-01-01T00:00:00Z',
+					},
+				],
+			})
+		);
+
+		expect(capturedPrompt).not.toContain('## Existing Action Plan (from ticket intake)');
+	});
+
+	it('prompt does NOT include intake section when ticketComments is undefined', async () => {
+		let capturedPrompt = '';
+		let callCount = 0;
+		spawnMock.mockImplementation(() => {
+			callCount++;
+			const stdout = callCount === 1 ? makeValidClaudeOutput() : makeEvaluatorOutput(80);
+			const child = makeSpawnChild({ stdout });
+			if (callCount === 1) {
+				(child as any).stdin.write = vi.fn((data: string) => {
+					capturedPrompt += data;
+				});
+			}
+			return child as any;
+		});
+
+		// makeInput() provides no ticketComments
+		await agent.designFlow(makeInput());
+
+		expect(capturedPrompt).not.toContain('## Existing Action Plan (from ticket intake)');
+	});
+
 	it('prompt includes previous proposal YAML and review threads on redesign', async () => {
 		let capturedPrompt = '';
 		let callCount = 0;
@@ -294,7 +392,9 @@ describe('FlowDesignerAgent', () => {
 	});
 
 	it('throws when flow fails registry validation', async () => {
-		mockSpawnWithEvaluators(spawnMock, makeValidClaudeOutput(), 80);
+		// With the retry loop, all calls (main + correction attempts) must return parseable Claude output.
+		// validateFlow always returns invalid, so after MAX_RETRIES the error is thrown.
+		spawnMock.mockImplementation(() => makeSpawnChild({ stdout: makeValidClaudeOutput() }) as any);
 
 		(registry.validateFlow as ReturnType<typeof vi.fn>).mockReturnValue({
 			valid: false,
@@ -512,6 +612,52 @@ describe('FlowDesignerAgent', () => {
 
 			// All 3 evaluators return 70 → average = 70
 			expect(result.confidenceScore).toBe(70);
+		});
+	});
+
+	describe('validation retry loop', () => {
+		it('retries once on invalid flow then succeeds', async () => {
+			// Call 1: main design → invalid flow (validateFlow fails first time)
+			// Call 2: correction → valid flow (validateFlow passes second time)
+			// Calls 3-5: evaluators
+			let callCount = 0;
+			spawnMock.mockImplementation(() => {
+				callCount++;
+				const stdout = callCount <= 2 ? makeValidClaudeOutput() : makeEvaluatorOutput(80);
+				return makeSpawnChild({ stdout }) as any;
+			});
+
+			(registry.validateFlow as ReturnType<typeof vi.fn>)
+				.mockReturnValueOnce({
+					valid: false,
+					issues: [{ severity: 'error', message: 'missing model field', location: {} }],
+					summary: { errors: 1, warnings: 0 },
+				})
+				.mockReturnValue({
+					valid: true,
+					issues: [],
+					summary: { errors: 0, warnings: 0 },
+				});
+
+			const result = await agent.designFlow(makeInput());
+
+			// Result must be valid after the correction
+			expect(result.proposedFlow).toMatchObject({ id: 'test-flow' });
+			// spawn called: 1 main + 1 correction + 3 evaluators = 5
+			expect(spawnMock).toHaveBeenCalledTimes(5);
+		});
+
+		it('throws after max retries if still invalid', async () => {
+			// All calls return parseable Claude output but validateFlow always fails
+			spawnMock.mockImplementation(() => makeSpawnChild({ stdout: makeValidClaudeOutput() }) as any);
+
+			(registry.validateFlow as ReturnType<typeof vi.fn>).mockReturnValue({
+				valid: false,
+				issues: [{ severity: 'error', message: 'workspace.gitStrategy is required', location: {} }],
+				summary: { errors: 1, warnings: 0 },
+			});
+
+			await expect(agent.designFlow(makeInput())).rejects.toThrow(/after 2 retries/i);
 		});
 	});
 

@@ -21,8 +21,16 @@ export const FlowFeedbackSchema = z.object({
 
 export const CreateFlowFeedbackSchema = FlowFeedbackSchema.omit({ id: true, submittedAt: true });
 
+export const UpdateFlowFeedbackSchema = z.object({
+	rating: z.number().int().min(1).max(5).optional(),
+	wentWell: z.array(z.string()).optional(),
+	wentWrong: z.array(z.string()).optional(),
+	suggestions: z.array(z.string()).optional(),
+});
+
 export type FlowFeedback = z.infer<typeof FlowFeedbackSchema>;
 export type CreateFlowFeedback = z.infer<typeof CreateFlowFeedbackSchema>;
+export type UpdateFlowFeedback = z.infer<typeof UpdateFlowFeedbackSchema>;
 
 // ---------------------------------------------------------------------------
 // Flow retrospective schemas
@@ -77,3 +85,24 @@ export const FLOW_FEEDBACK_API_ROUTES = defineRoutes({
 });
 
 export type FlowFeedbackApiRoutes = typeof FLOW_FEEDBACK_API_ROUTES;
+
+// ---------------------------------------------------------------------------
+// Management routes (update/delete) — separate contract so __baseUrl stays
+// '/api/flow-feedback' and does not collide with /api/tickets
+// ---------------------------------------------------------------------------
+
+export const FLOW_FEEDBACK_MANAGEMENT_ROUTES = defineRoutes({
+	'/api/flow-feedback/:feedbackId': {
+		PUT: {
+			params: z.object({ feedbackId: z.string() }),
+			body: UpdateFlowFeedbackSchema,
+			response: FlowFeedbackSchema,
+		},
+		DELETE: {
+			params: z.object({ feedbackId: z.string() }),
+			response: z.object({}),
+		},
+	},
+});
+
+export type FlowFeedbackManagementRoutes = typeof FLOW_FEEDBACK_MANAGEMENT_ROUTES;

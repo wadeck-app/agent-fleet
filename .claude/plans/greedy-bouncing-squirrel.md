@@ -5,11 +5,27 @@
 
 ---
 
+## Statut global (2026-03-20)
+
+| Groupe                          | Items                                                                 | Statut                     |
+| ------------------------------- | --------------------------------------------------------------------- | -------------------------- |
+| A — Backend critique            | A1/dj, A2/dl, A3/ec                                                   | ✅ DONE — npm run check ✅ |
+| C/dn — Race condition triggered | dn                                                                    | ✅ DONE — npm run check ✅ |
+| B — Frontend UX simples         | B1/da, B2/db, B3/de, B4/dg, B5/di, B6/dm, B7/p-fix2, B8/eb, B9/c-fix2 | ✅ DONE — npm run check ✅ |
+| D — Frontend medium             | D1/dc CollapsibleSection, D2/do-2 preview modal                       | ✅ DONE — npm run check ✅ |
+| E — Update/delete feedback      | E1 backend, E2 frontend                                               | ✅ DONE — npm run check ✅ |
+| F — Label audit                 | 21 issues framework+tickets+tasks+interventions                       | ✅ DONE — npm run check ✅ |
+
+**Tests utilisateur :** différés à la fin de tous les groupes.
+
+---
+
 ## Contexte
 
 Suite aux rounds de feedback UX 3-5, un ensemble de bugs et améliorations ont été identifiés
 mais pas encore implémentés. Ce plan couvre l'intégralité des points ouverts, organisés en
 groupes logiques par dépendance et domaine. Chaque item inclut :
+
 - **Avant :** comment observer/reproduire le problème actuel
 - **Fix :** description précise du changement
 - **Après :** comment vérifier que c'est résolu
@@ -29,12 +45,15 @@ ne se rafraîchissent pas automatiquement. L'utilisateur doit recharger la page.
 
 **Fix :** Après le `await this.ticketsRepository.update(ticketId, { currentFlowProposalId, status })`,
 ajouter :
+
 ```typescript
 this.eventBroadcaster.broadcast(B2F_FLOW_PROPOSAL_UPDATED, { ticketId } as any);
 ```
+
 Même pattern que ligne 323-327 dans `triggerRedesignAsync`.
 
 **Après :**
+
 - Demander un flow design → onglet "Flow Design (1)" apparaît sans rechargement
 - Le contenu de l'onglet se met à jour avec la nouvelle proposal
 - Tester avec `dev-hold` sur l'endpoint pour capturer l'état intermédiaire
@@ -53,6 +72,7 @@ un `useRealtimeRefresh` pour `B2F_FLOW_PROPOSAL_UPDATED` → les deux instances 
 `requestFlowDesign` ligne 96 : `version: 1` hardcodé.
 
 **Fix :** Avant de créer la proposal, récupérer les proposals existantes et calculer le max :
+
 ```typescript
 const existingProposals = await this.proposalsRepository.findByTicketId(ticketId);
 const maxVersion = existingProposals.reduce((m, p) => Math.max(m, p.version), 0);
@@ -64,6 +84,7 @@ const proposal: FlowProposal = {
 ```
 
 **Après :**
+
 - Après approval d'un v2 + nouvelle demande → proposal créée avec version 3
 - `proposals[0]` = v3 (trié DESC) → affiché comme currentProposal
 - Vérifier via API : `GET /api/tickets/:id/flow-proposals` → `[v3 pending_review, v2 approved, ...]`
@@ -84,6 +105,7 @@ Bloc actuel (lignes 548-556) : `throw new Error(...)` immédiat.
 
 **Fix — Partie 1 : Prompt hardening**
 Dans `buildPrompt`, dans la section RULES/FORMATTING (après ligne 296), ajouter :
+
 ```
 - Steps of type "model" MUST include a "model" field: "sonnet", "haiku", or "opus" (REQUIRED, no default)
 - workspace.gitStrategy is REQUIRED: one of main-only | feature-branch | any | worktree
@@ -92,6 +114,7 @@ Dans `buildPrompt`, dans la section RULES/FORMATTING (après ligne 296), ajouter
 **Fix — Partie 2 : Retry loop (max 2 retries)**
 Extraire `callClaude` + `parseClaudeResponse` dans une méthode privée `callAndParse(prompt)`.
 Remplacer le bloc de validation par :
+
 ```typescript
 private async callAndParse(prompt: string): Promise<FlowDesignOutput> {
   const output = await this.callClaude(prompt);
@@ -116,6 +139,7 @@ for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
 ```
 
 **Après :**
+
 - Créer un ticket avec description complexe → le design doit aboutir sans erreur
 - Vérifier dans les logs que les retries se produisent quand nécessaire
 - Tests unitaires : mock le premier appel avec flow invalide, second appel avec flow valide → résultat final valide
@@ -135,8 +159,13 @@ méthodes `updateFeedback` et `deleteFeedback` (item dd) devront aussi émettre 
 
 **Fix :** Dans `updateFeedback` et `deleteFeedback` (nouvelles méthodes, voir Groupe E),
 toujours émettre `B2F_TICKET_FEEDBACK_SUBMITTED` après la mutation :
+
 ```typescript
-this.eventBroadcaster.broadcast(B2F_TICKET_FEEDBACK_SUBMITTED, { ticketId, feedbackId: feedback.id, rating: feedback.rating });
+this.eventBroadcaster.broadcast(B2F_TICKET_FEEDBACK_SUBMITTED, {
+	ticketId,
+	feedbackId: feedback.id,
+	rating: feedback.rating,
+});
 ```
 
 **Cohérence :** `useFlowFeedbackCount` et `FlowFeedbackSection` répondent à cet event.
@@ -157,11 +186,13 @@ Toute mutation (create/update/delete) le déclenchera → liste et count à jour
 l'onglet Feedback. Les cartes sont dans l'ordre de récupération API (non garanti).
 
 **Fix :**
+
 - `FlowFeedbackSection` accepte `sortOrder: 'asc' | 'desc'` prop (comme les autres sections)
 - Passer depuis LayoutG : `<FlowFeedbackSection ... sortOrder={sortOrder} />`
 - Trier les items avant rendu : `[...feedbackItems].sort((a, b) => sortOrder === 'asc' ? a.submittedAt.localeCompare(b.submittedAt) : b.submittedAt.localeCompare(a.submittedAt))`
 
 **Après :**
+
 - Naviguer vers onglet Feedback, noter l'ordre des dates
 - Cliquer "Oldest/Newest first" → ordre inversé
 - Screenshot avant/après toggle
@@ -191,9 +222,12 @@ Compare avec `timeline` (unsorted) mais mappe sur `sorted`. En mode "Newest firs
 `sorted[0]` = `timeline[timeline.length - 1]` → condition fausse → ligne manquante sur le premier item.
 
 **Fix :** Changer la comparaison pour utiliser l'index dans le tableau trié :
+
 ```tsx
 // Remplacer la ligne 145 par :
-{index < sorted.length - 1 && <div className="h-full w-px bg-border" />}
+{
+	index < sorted.length - 1 && <div className="h-full w-px bg-border" />;
+}
 // (ajouter `index` comme second argument du .map)
 ```
 
@@ -226,13 +260,13 @@ textarea reste éditable. Incohérent avec les autres formulaires (FlowFeedbackS
 handleStatusChange) qui utilisent `pointer-events-none opacity-50` pendant la requête.
 
 **Fix :** Envelopper le contenu du formulaire de demande dans :
+
 ```tsx
-<div className={isRequesting ? 'pointer-events-none opacity-50' : ''}>
-  {/* textarea + bouton */}
-</div>
+<div className={isRequesting ? 'pointer-events-none opacity-50' : ''}>{/* textarea + bouton */}</div>
 ```
 
 **Après :**
+
 - Utiliser `dev-hold` sur `POST /api/tickets/:id/flow-proposals/request`
 - Cliquer "Request new design" → formulaire grisé + spinner sur le bouton
 - Screenshot de l'état en attente
@@ -249,12 +283,14 @@ badge count. `useFlowFeedbackCount` retourne déjà `count: 0, loading: false` q
 
 **Fix :** Remplacer le rendu conditionnel du TabsTrigger Feedback.
 Le `TabCountBadge` peut coexister avec l'état `disabled`. La structure devient :
+
 ```tsx
 <TabsTrigger value="feedback" disabled={!ticket.currentFlowProposalId}>
-  Feedback
-  <TabCountBadge count={feedbackCount} loading={feedbackCountLoading} />
+	Feedback
+	<TabCountBadge count={feedbackCount} loading={feedbackCountLoading} />
 </TabsTrigger>
 ```
+
 Enlever le wrapper TooltipProvider/Tooltip autour du trigger — conserver le tooltip en
 utilisant `title` ou un composant différent. Ou garder le tooltip mais l'appliquer à un
 `<span>` wrapper sans modifier la logique du badge.
@@ -268,13 +304,16 @@ utilisant `title` ou un composant différent. Ou garder le tooltip mais l'appliq
 **Fichier :** `packages/web-frontend/src/app/pages/tickets/FlowProposalSection.tsx`
 
 **Avant :**
+
 - "Confirm rejection" (ligne 604) : `size="sm"` → plus petit qu'"Approve" (pas de size)
 - "Cancel" = le toggle Reject.../Cancel — confus UX
 
 **Fix :**
+
 1. Retirer `size="sm"` de "Confirm rejection"
 2. Le bouton toggle garde un label FIXE "Reject..." (ne bascule plus vers "Cancel")
 3. Dans le formulaire en-dessous, ajouter un bouton "Cancel" à côté de "Confirm rejection" :
+
 ```tsx
 <div className="flex gap-2">
   <Button variant="destructive" onClick={handleReject} disabled={isRejecting}>
@@ -286,9 +325,11 @@ utilisant `title` ou un composant différent. Ou garder le tooltip mais l'appliq
   </Button>
 </div>
 ```
+
 4. Mettre à jour `handleToggleRejectForm` pour ne gérer que l'ouverture (plus de toggle fermeture)
 
 **Après :**
+
 - [Approve] [Reject...] → clic "Reject..." → formulaire apparaît
 - Dans formulaire : [Confirm rejection] [Cancel] — même taille qu'Approve
 - Screenshot des 3 états : repos, formulaire ouvert, en cours de soumission
@@ -304,17 +345,22 @@ utilisant `title` ou un composant différent. Ou garder le tooltip mais l'appliq
 contenus.
 
 **Fix :** Dans le cas `ticket.comment_created`, remplacer `<p>{content}</p>` par :
+
 ```tsx
 import ReactMarkdown from 'react-markdown';
+
 import remarkGfm from 'remark-gfm';
+
 // ...
 <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose prose-sm dark:prose-invert max-w-none">
-  {content}
-</ReactMarkdown>
+	{content}
+</ReactMarkdown>;
 ```
+
 Même pattern que `TicketCommentsSection.tsx`.
 
 **Après :**
+
 - Ajouter un commentaire avec `**gras**` et `- liste` → vérifier rendu dans Audit
 
 ---
@@ -327,21 +373,24 @@ Même pattern que `TicketCommentsSection.tsx`.
 `htmlFor` et son `<Textarea>` n'a pas d'`id`. Violation de l'audit label (item dh).
 
 **Fix :**
+
 ```tsx
-{openQuestions.map((question, i) => (
-  <div key={i} className="space-y-1">
-    <Label htmlFor={`question-answer-${i}`} className="text-sm font-medium">
-      {question}
-    </Label>
-    <Textarea
-      id={`question-answer-${i}`}
-      value={questionAnswers[i] ?? ''}
-      onChange={e => handleAnswerChange(i, e.target.value)}
-      placeholder="Your answer (optional)..."
-      rows={2}
-    />
-  </div>
-))}
+{
+	openQuestions.map((question, i) => (
+		<div key={i} className="space-y-1">
+			<Label htmlFor={`question-answer-${i}`} className="text-sm font-medium">
+				{question}
+			</Label>
+			<Textarea
+				id={`question-answer-${i}`}
+				value={questionAnswers[i] ?? ''}
+				onChange={e => handleAnswerChange(i, e.target.value)}
+				placeholder="Your answer (optional)..."
+				rows={2}
+			/>
+		</div>
+	));
+}
 ```
 
 **Après :** Cliquer sur le label d'une question → focus sur le textarea associé.
@@ -360,19 +409,23 @@ Même pattern que `TicketCommentsSection.tsx`.
 `B2F_TASKS_UPDATED` est broadcast avec payload vide `{}` par l'OrchestratorEventBridge.
 
 **Investigation requise (à faire avant fix) :**
+
 1. Créer un ticket et observer si `B2F_TASKS_UPDATED` apparaît dans les logs WS du navigateur
 2. Vérifier via `GET /api/tasks?ticketId=XXX` si la tâche est créée avec le bon `ticketId`
 3. Si la tâche n'a pas de `ticketId` → le fix est dans la création de tâche côté orchestrateur
 4. Si `B2F_TASKS_UPDATED` ne fire pas → fix dans l'OrchestratorEventBridge
 
 **Fix probable :** Si `B2F_TASKS_UPDATED` fire mais l'event n'est pas capturé :
+
 - Vérifier que `useRealtimeRefresh` gère correctement les events sans filter (payload vide)
 - Ajouter `B2F_TASK_CREATED` en plus de `B2F_TASKS_UPDATED` dans le hook
 
 Si la tâche n'a pas `ticketId` :
+
 - Investiguer comment la tâche est créée dans `OrchestratorEventBridge` ou le service associé
 
 **Après :**
+
 - Créer un ticket → observer le tab "Triggered" se mettre à jour automatiquement
 
 ---
@@ -388,14 +441,16 @@ Si la tâche n'a pas `ticketId` :
 "Reasoning" a sa propre logique de collapse inline.
 
 **Fix — Étape 1 : Créer CollapsibleSection.tsx :**
+
 ```tsx
 interface CollapsibleSectionProps {
-  title: string;
-  defaultOpen?: boolean;
-  headerRight?: React.ReactNode; // ex: "Open in Flow Editor"
-  children: React.ReactNode;
+	title: string;
+	defaultOpen?: boolean;
+	headerRight?: React.ReactNode; // ex: "Open in Flow Editor"
+	children: React.ReactNode;
 }
 ```
+
 Composant réutilisable avec état `open` (useState), toggle ChevronRight/Down,
 header avec title + headerRight, body conditionnel.
 
@@ -405,6 +460,7 @@ header avec title + headerRight, body conditionnel.
 Le lien "Open in Flow Editor" passe dans `headerRight`.
 
 **Après :**
+
 - L'onglet Flow Design montre la proposal avec Reasoning et Proposed flow tous deux repliés
 - Cliquer pour expand → YAML visible
 - Re-cliquer → replié
@@ -421,30 +477,37 @@ L'utilisateur ne peut pas visualiser le flow avant d'approuver.
 
 **Fix :** Remplacer le bouton désactivé (quand non-approuvé) par un bouton "Visualize"
 qui ouvre un `<Dialog>` modal affichant les steps du flow sous forme de cartes :
+
 ```tsx
 // Pas d'appel backend — utiliser proposal.proposedFlow directement (déjà dans le state)
 <Dialog>
-  <DialogTrigger asChild>
-    <Button variant="outline" size="sm">Visualize</Button>
-  </DialogTrigger>
-  <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-    <DialogHeader><DialogTitle>{proposedFlow.name}</DialogTitle></DialogHeader>
-    {proposedFlow.steps.map(step => (
-      <div key={step.id} className="rounded-md border p-3">
-        <div className="flex items-center gap-2">
-          <Badge variant="outline">{step.type}</Badge>
-          <span className="font-medium">{step.name || step.id}</span>
-        </div>
-        {step.depends && <p className="text-xs text-muted-foreground">depends: {step.depends.join(', ')}</p>}
-        {'prompt' in step && <p className="text-xs text-muted-foreground line-clamp-3">{step.prompt}</p>}
-      </div>
-    ))}
-  </DialogContent>
+	<DialogTrigger asChild>
+		<Button variant="outline" size="sm">
+			Visualize
+		</Button>
+	</DialogTrigger>
+	<DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+		<DialogHeader>
+			<DialogTitle>{proposedFlow.name}</DialogTitle>
+		</DialogHeader>
+		{proposedFlow.steps.map(step => (
+			<div key={step.id} className="rounded-md border p-3">
+				<div className="flex items-center gap-2">
+					<Badge variant="outline">{step.type}</Badge>
+					<span className="font-medium">{step.name || step.id}</span>
+				</div>
+				{step.depends && <p className="text-xs text-muted-foreground">depends: {step.depends.join(', ')}</p>}
+				{'prompt' in step && <p className="text-xs text-muted-foreground line-clamp-3">{step.prompt}</p>}
+			</div>
+		))}
+	</DialogContent>
 </Dialog>
 ```
+
 **Pas de changement backend, pas de fichier temporaire.**
 
 **Après :**
+
 - Proposal pending_review → bouton "Visualize" visible
 - Cliquer → modal avec liste des steps (type, nom, dépendances, aperçu prompt)
 - Proposal approved → bouton "Open in Flow Editor" (lien réel)
@@ -456,12 +519,14 @@ qui ouvre un `<Dialog>` modal affichant les steps du flow sous forme de cartes :
 ### E1 — Backend : nouveaux endpoints
 
 **Fichiers :**
+
 - `packages/web-backend/src/repositories/FlowFeedbackRepository.ts` — ajouter `findById`, `update`, `delete`
 - `packages/web-backend/src/services/FlowFeedbackService.ts` — ajouter `updateFeedback`, `deleteFeedback`
 - `packages/web-backend/src/controllers/FlowFeedbackController.ts` — ajouter `PUT /api/flow-feedback/:feedbackId`, `DELETE /api/flow-feedback/:feedbackId`
 - `packages/shared-frontend-backend/src/api/flow-feedback.contract.ts` — ajouter `UpdateFlowFeedbackSchema`
 
 **Repository (nouveaux méthodes) :**
+
 ```typescript
 async findById(id: string): Promise<FlowFeedback | null>
 async update(id: string, data: Partial<FlowFeedback>): Promise<FlowFeedback>
@@ -469,6 +534,7 @@ async delete(id: string): Promise<void>
 ```
 
 **Service (nouvelles méthodes) :**
+
 ```typescript
 async updateFeedback(feedbackId: string, data: UpdateFlowFeedback): Promise<FlowFeedback>
   // Valider que le feedback existe, update, émettre B2F_TICKET_FEEDBACK_SUBMITTED, ajouter history entry
@@ -478,12 +544,13 @@ async deleteFeedback(ticketId: string, feedbackId: string): Promise<void>
 ```
 
 **Contract (nouveau schema) :**
+
 ```typescript
 export const UpdateFlowFeedbackSchema = z.object({
-  rating: z.number().min(1).max(5).optional(),
-  wentWell: z.array(z.string()).optional(),
-  wentWrong: z.array(z.string()).optional(),
-  suggestions: z.array(z.string()).optional(),
+	rating: z.number().min(1).max(5).optional(),
+	wentWell: z.array(z.string()).optional(),
+	wentWrong: z.array(z.string()).optional(),
+	suggestions: z.array(z.string()).optional(),
 });
 ```
 
@@ -493,18 +560,21 @@ export const UpdateFlowFeedbackSchema = z.object({
 **Fichier :** `packages/web-frontend/src/app/pages/tickets/feedbackApi.ts`
 
 **feedbackApi ajouts :**
+
 ```typescript
 updateFeedback: (feedbackId: string, data: UpdateFlowFeedback) => typedFetch('PUT', ...)
 deleteFeedback: (feedbackId: string) => typedFetch('DELETE', ...)
 ```
 
 **UI :**
+
 - Chaque `FeedbackCard` reçoit des callbacks `onEdit` et `onDelete`
 - `onEdit` : bascule la carte en mode édition inline (même composant ArrayFieldInput + RatingInput, pré-rempli)
 - `onDelete` : ouvre un `<AlertDialog>` de confirmation avant de supprimer
 - Après suppression : carte retirée, count mis à jour via WS event
 
 **Après :**
+
 - Modifier la note d'un feedback → carte mise à jour
 - Supprimer un feedback → confirmation → carte disparaît, count décrémenté
 - Recharger la page → modification persistée
@@ -517,10 +587,12 @@ deleteFeedback: (feedbackId: string) => typedFetch('DELETE', ...)
 **Référence :** `.claude/plans/2026-03-20_label-input-audit.md`
 
 **Priorité 1 — Framework (impact global) :**
+
 - `ColumnVisibility.tsx` : ajouter `id={col-${column.id}}` + `htmlFor`
 - `SortableColumnItem.tsx` : extraire checkbox du label, ajouter `htmlFor`/`id`
 
 **Priorité 2 — Tickets (voir audit plan pour détails) :**
+
 - `FlowProposalSection.tsx` : T1 (Start/End line), T2 (Rejection reason), T3 (Additional context + "Request new flow design" → remplacer `<p>` par `<Label htmlFor>`)
 - `FlowFeedbackSection.tsx` : T4 (ArrayFieldInput)
 - `TicketDetailLayoutD/G.tsx` : T5, T7 (Labels input)
@@ -528,10 +600,12 @@ deleteFeedback: (feedbackId: string) => typedFetch('DELETE', ...)
 - `TicketCreateDialog.tsx` : T8 (Project select)
 
 **Priorité 3 — Tasks/Interventions :**
+
 - `TaskFilters.tsx` : TK1 (4 divs → Labels)
 - `InterventionFilters.tsx` : IV1 (3 divs → Labels)
 
 **Après :**
+
 - Cliquer sur chaque label modifié → focus sur le champ associé
 - Passer `htmlFor` sans `id` (ou vice-versa) → tester qu'aucune régression n'est introduite
 
@@ -561,12 +635,14 @@ Backend → agent `backend-dev`. Ne pas mélanger dans un même agent.
 ## Tests de régression à valider après chaque groupe
 
 ### Après Groupe A
+
 - [ ] `npm run check` passe
 - [ ] Tests unitaires `FlowDesignerAgent.test.ts` passent (A3 ajoute des tests pour le retry)
 - [ ] `GET /api/tickets/:id/flow-proposals` retourne la bonne version après A2
 - [ ] `B2F_FLOW_PROPOSAL_UPDATED` observable dans les WS logs après A1
 
 ### Après Groupe B
+
 - [ ] Tous les onglets testés dans les deux modes sort (Oldest/Newest)
 - [ ] Screenshots `dev-hold` pour di (formulaire grisé)
 - [ ] Aucun onglet sans badge count (dm/ea)
@@ -574,16 +650,19 @@ Backend → agent `backend-dev`. Ne pas mélanger dans un même agent.
 - [ ] Markdown rendu dans Audit (eb)
 
 ### Après Groupe D
+
 - [ ] "Visualize" ouvre une modal non-bloquante (do-2)
 - [ ] CollapsibleSection réutilisé pour Reasoning ET Proposed flow (dc)
 - [ ] Aucun onglet masqué derrière la modal
 
 ### Après Groupe E
+
 - [ ] CRUD complet sur feedback avec WS live (count mis à jour sans reload)
 - [ ] Tests backend pour `updateFeedback` et `deleteFeedback`
 - [ ] Cohérence avec l'audit trail (history entries)
 
 ### Après Groupe F
+
 - [ ] Clic sur chaque label corrigé → focus sur le champ
 - [ ] Aucune régression dans les formulaires existants
 

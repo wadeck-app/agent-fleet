@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
 import { Textarea } from '@framework/components/forms/Textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@framework/components/overlays/Dialog';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@framework/components/primitives/Tooltip';
@@ -10,11 +11,19 @@ import { useToast } from '@framework/features/toast/ToastContext';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { FlowProposal, FlowProposalStatus, FlowReviewThread } from '@shared/api/flow-proposals.contract';
 import { B2F_FLOW_PROPOSAL_UPDATED } from '@shared/transport';
+import { Background, Controls, MiniMap, ReactFlow, ReactFlowProvider } from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import * as yaml from 'js-yaml';
-import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 import { useTransport } from '@/transport';
 
+import { edgeTypes } from '../flows/flow-editor/edges';
+import { nodeTypes } from '../flows/flow-editor/nodes';
+import type { FlowEdge, FlowNode } from '../flows/flow-editor/types';
+import { isStepNodeData } from '../flows/flow-editor/types';
+import { flowDefinitionToReactFlow } from '../flows/flow-editor/utils/flowToReactFlow';
+import { CollapsibleSection } from './CollapsibleSection';
 import { flowProposalsApi } from './flowProposalsApi';
 import { useFlowProposals } from './useFlowProposals';
 
@@ -223,8 +232,12 @@ function AddReviewThreadForm({ ticketId, proposalId, onAdded, onCancel }: AddRev
 			<p className="text-sm font-medium">Add review thread</p>
 			<div className="flex gap-2">
 				<div className="flex-1 space-y-1">
-					<Label className="text-xs text-muted-foreground">Start line</Label>
+					{/* T1 fix: connect label to input via htmlFor/id */}
+					<Label htmlFor="review-start-line" className="text-xs text-muted-foreground">
+						Start line
+					</Label>
 					<Input
+						id="review-start-line"
 						type="number"
 						min={1}
 						value={startLine}
@@ -233,8 +246,12 @@ function AddReviewThreadForm({ ticketId, proposalId, onAdded, onCancel }: AddRev
 					/>
 				</div>
 				<div className="flex-1 space-y-1">
-					<Label className="text-xs text-muted-foreground">End line</Label>
+					{/* T1 fix: connect label to input via htmlFor/id */}
+					<Label htmlFor="review-end-line" className="text-xs text-muted-foreground">
+						End line
+					</Label>
 					<Input
+						id="review-end-line"
 						type="number"
 						min={1}
 						value={endLine}
@@ -262,12 +279,265 @@ function AddReviewThreadForm({ ticketId, proposalId, onAdded, onCancel }: AddRev
 	);
 }
 
+// ---------------------------------------------------------------------------
+// FlowStepDetailsPanel — read-only details panel for a selected flow node
+// ---------------------------------------------------------------------------
+
+interface FlowStepDetailsPanelProps {
+	selectedNode: FlowNode | null;
+}
+
+const SECTION_LABEL_CLASS = 'text-xs font-medium text-muted-foreground uppercase tracking-wide';
+const CODE_BLOCK_CLASS = 'font-mono text-xs bg-muted rounded p-2 overflow-x-auto whitespace-pre-wrap break-all';
+const MAX_TEXT_LENGTH = 500;
+
+function truncate(text: string): string {
+	if (text.length <= MAX_TEXT_LENGTH) return text;
+	return text.slice(0, MAX_TEXT_LENGTH) + '\u2026';
+}
+
+function FlowStepDetailsPanel({ selectedNode }: FlowStepDetailsPanelProps) {
+	if (!selectedNode) {
+		return (
+			<div className="overflow-y-auto h-[75vh] border-l bg-card p-4 flex items-center justify-center">
+				<p className="text-sm text-muted-foreground text-center">Click a step to see its details</p>
+			</div>
+		);
+	}
+
+	const data = selectedNode.data;
+	if (!isStepNodeData(data)) {
+		return (
+			<div className="overflow-y-auto h-[75vh] border-l bg-card p-4 flex items-center justify-center">
+				<p className="text-sm text-muted-foreground text-center">No details available for this node</p>
+			</div>
+		);
+	}
+
+	const step = data.step;
+
+	return (
+		<div className="overflow-y-auto h-[75vh] border-l bg-card p-4 space-y-3">
+			{/* Header: name + type badge */}
+			<div className="space-y-1">
+				<p className="text-base font-bold leading-tight">{step.name}</p>
+				<Badge variant="outline" className="text-xs font-mono">
+					{step.type}
+				</Badge>
+			</div>
+
+			{/* ID */}
+			<div className="space-y-1">
+				<p className={SECTION_LABEL_CLASS}>ID</p>
+				<p className="font-mono text-xs text-muted-foreground">{step.id}</p>
+			</div>
+
+			{/* depends */}
+			{step.depends && step.depends.length > 0 && (
+				<div className="space-y-1">
+					<p className={SECTION_LABEL_CLASS}>Depends on</p>
+					<div className="flex flex-wrap gap-1">
+						{step.depends.map(dep => (
+							<Badge key={dep} variant="secondary" className="font-mono text-xs">
+								{dep}
+							</Badge>
+						))}
+					</div>
+				</div>
+			)}
+
+			{/* when */}
+			{step.when && (
+				<div className="space-y-1">
+					<p className={SECTION_LABEL_CLASS}>When</p>
+					<pre className={CODE_BLOCK_CLASS}>{step.when}</pre>
+				</div>
+			)}
+
+			{/* Type-specific fields */}
+			{step.type === 'model' && (
+				<>
+					<div className="space-y-1">
+						<p className={SECTION_LABEL_CLASS}>Model</p>
+						<p className="text-sm">{step.model}</p>
+					</div>
+					<div className="space-y-1">
+						<p className={SECTION_LABEL_CLASS}>Prompt</p>
+						<pre className={CODE_BLOCK_CLASS}>{truncate(step.prompt)}</pre>
+					</div>
+				</>
+			)}
+
+			{step.type === 'script' && (
+				<div className="space-y-1">
+					<p className={SECTION_LABEL_CLASS}>Script</p>
+					<pre className={CODE_BLOCK_CLASS}>{truncate(step.script)}</pre>
+				</div>
+			)}
+
+			{step.type === 'subflow' && (
+				<>
+					<div className="space-y-1">
+						<p className={SECTION_LABEL_CLASS}>Flow ID</p>
+						<p className="font-mono text-xs">{step.flowId}</p>
+					</div>
+					{step.workspaceStrategy && (
+						<div className="space-y-1">
+							<p className={SECTION_LABEL_CLASS}>Workspace Strategy</p>
+							<p className="text-sm">{step.workspaceStrategy}</p>
+						</div>
+					)}
+					{step.inputs && Object.keys(step.inputs).length > 0 && (
+						<div className="space-y-1">
+							<p className={SECTION_LABEL_CLASS}>Inputs</p>
+							<pre className={CODE_BLOCK_CLASS}>{JSON.stringify(step.inputs, null, 2)}</pre>
+						</div>
+					)}
+				</>
+			)}
+
+			{step.type === 'user_intervention' && (
+				<>
+					<div className="space-y-1">
+						<p className={SECTION_LABEL_CLASS}>Intervention Type</p>
+						<p className="text-sm">{step.interventionType}</p>
+					</div>
+					{step.blocking !== undefined && (
+						<div className="space-y-1">
+							<p className={SECTION_LABEL_CLASS}>Blocking</p>
+							<p className="text-sm">{step.blocking ? 'Yes' : 'No'}</p>
+						</div>
+					)}
+					{step.interventionType === 'approval' && step.approval && (
+						<div className="space-y-1">
+							<p className={SECTION_LABEL_CLASS}>Approval</p>
+							<pre className={CODE_BLOCK_CLASS}>{JSON.stringify(step.approval, null, 2)}</pre>
+						</div>
+					)}
+					{step.interventionType === 'question' && step.question && (
+						<div className="space-y-1">
+							<p className={SECTION_LABEL_CLASS}>Question</p>
+							<pre className={CODE_BLOCK_CLASS}>{JSON.stringify(step.question, null, 2)}</pre>
+						</div>
+					)}
+					{step.interventionType === 'choice' && step.choice && (
+						<div className="space-y-1">
+							<p className={SECTION_LABEL_CLASS}>Choice</p>
+							<pre className={CODE_BLOCK_CLASS}>{JSON.stringify(step.choice, null, 2)}</pre>
+						</div>
+					)}
+				</>
+			)}
+
+			{/* onFailure */}
+			{step.onFailure && (
+				<div className="space-y-1">
+					<p className={SECTION_LABEL_CLASS}>On Failure</p>
+					<pre className={CODE_BLOCK_CLASS}>{JSON.stringify(step.onFailure, null, 2)}</pre>
+				</div>
+			)}
+
+			{/* output */}
+			{step.output && Object.keys(step.output).length > 0 && (
+				<div className="space-y-1">
+					<p className={SECTION_LABEL_CLASS}>Output</p>
+					<pre className={CODE_BLOCK_CLASS}>{JSON.stringify(step.output, null, 2)}</pre>
+				</div>
+			)}
+		</div>
+	);
+}
+
+// ---------------------------------------------------------------------------
+// VisualizeFlowDialog — read-only ReactFlow graph for a proposed flow
+// ---------------------------------------------------------------------------
+
+interface VisualizeFlowDialogProps {
+	proposal: FlowProposal;
+}
+
+function VisualizeFlowDialog({ proposal }: VisualizeFlowDialogProps) {
+	const [selectedNode, setSelectedNode] = useState<FlowNode | null>(null);
+
+	const flowName =
+		typeof (proposal.proposedFlow as Record<string, unknown>)['name'] === 'string'
+			? String((proposal.proposedFlow as Record<string, unknown>)['name'])
+			: 'Flow preview';
+
+	// Convert proposedFlow to ReactFlow nodes/edges using the same utility as the flow editor
+	let nodes: FlowNode[] = [];
+	let edges: FlowEdge[] = [];
+	try {
+		const converted = flowDefinitionToReactFlow(
+			proposal.proposedFlow as unknown as Parameters<typeof flowDefinitionToReactFlow>[0]
+		);
+		nodes = converted.nodes;
+		edges = converted.edges;
+	} catch {
+		// Fallback: if conversion fails, show nothing (canvas will be empty)
+	}
+
+	return (
+		<Dialog>
+			<DialogTrigger asChild>
+				<Button variant="outline" size="sm" className="h-auto py-1 text-xs">
+					Visualize
+				</Button>
+			</DialogTrigger>
+			<DialogContent className="sm:max-w-[85vw] w-[85vw]">
+				<DialogHeader>
+					<DialogTitle>{flowName}</DialogTitle>
+				</DialogHeader>
+				{/* Two-column layout: ReactFlow canvas left, step details panel right */}
+				<div className="grid grid-cols-[1fr_320px] overflow-hidden rounded-md border">
+					{/* Left column: ReactFlow canvas */}
+					<div className="h-[75vh] w-full overflow-hidden">
+						<ReactFlowProvider>
+							<ReactFlow
+								nodes={nodes}
+								edges={edges}
+								nodeTypes={nodeTypes}
+								edgeTypes={edgeTypes}
+								fitView
+								nodesDraggable={false}
+								nodesConnectable={false}
+								elementsSelectable={true}
+								panOnDrag={true}
+								zoomOnScroll={true}
+								proOptions={{ hideAttribution: true }}
+								className="h-full w-full bg-muted/20"
+								onNodeClick={(_event, node) => setSelectedNode(node as FlowNode)}
+								onPaneClick={() => setSelectedNode(null)}
+							>
+								<Background />
+								<Controls position="bottom-left" />
+								<MiniMap
+									nodeColor={node => {
+										if (node.type === 'model') return 'hsl(var(--primary))';
+										if (node.type === 'script') return 'hsl(var(--secondary))';
+										if (node.type === 'subflow') return 'hsl(var(--accent))';
+										return 'hsl(var(--muted))';
+									}}
+									className="!border-border !bg-card"
+									zoomable
+									pannable
+								/>
+							</ReactFlow>
+						</ReactFlowProvider>
+					</div>
+					{/* Right column: step details panel */}
+					<FlowStepDetailsPanel selectedNode={selectedNode} />
+				</div>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
 interface ProposalViewProps {
 	proposal: FlowProposal;
 	ticketId: string;
 	onRefresh: () => void;
 	onReviewUpdated: () => void;
-	onRequestNew: () => void;
 	/** Called after successful rejection so the parent can show the redesigning banner */
 	onRejected: () => void;
 	/** Answers filled in the "Questions from the AI" section — forwarded to the parent for re-design context */
@@ -279,19 +549,15 @@ function ProposalView({
 	ticketId,
 	onRefresh,
 	onReviewUpdated,
-	onRequestNew,
 	onRejected,
 	onQuestionAnswersChange,
 }: ProposalViewProps) {
 	const { showToast } = useToast();
-	const [reasoningOpen, setReasoningOpen] = useState(false);
 	const [showAddThread, setShowAddThread] = useState(false);
 	const [rejectReason, setRejectReason] = useState('');
 	const [showRejectForm, setShowRejectForm] = useState(false);
 	const [isApproving, setIsApproving] = useState(false);
 	const [isRejecting, setIsRejecting] = useState(false);
-	// c fix: open questions inline section
-	const [showQuestions, setShowQuestions] = useState(false);
 	const [questionAnswers, setQuestionAnswers] = useState<Record<number, string>>({});
 	const rejectFormRef = useRef<HTMLDivElement>(null);
 
@@ -338,15 +604,10 @@ function ProposalView({
 		}
 	};
 
-	/** c fix: prepend filled question answers to the rejection reason when the form opens */
+	/** B7 fix: handleToggleRejectForm only opens the form — closing is done by the Cancel button inside */
 	const handleToggleRejectForm = () => {
-		const opening = !showRejectForm;
-		setShowRejectForm(opening);
-		if (!opening) {
-			setRejectReason('');
-			return;
-		}
-		// Prepend answers to reason textarea
+		// Prepend filled question answers to the rejection reason textarea
+		setShowRejectForm(true);
 		const filledAnswers = Object.entries(questionAnswers)
 			.filter(([, answer]) => answer.trim())
 			.map(([idxStr, answer]) => {
@@ -417,88 +678,64 @@ function ProposalView({
 				</div>
 			)}
 
-			{/* c fix: Questions from the AI — collapsible inline section (replaces tooltip openQuestions) */}
+			{/* W5 fix: Questions from the AI — uses CollapsibleSection instead of manual chevron toggle */}
 			{openQuestions.length > 0 && (
-				<div className="rounded-md border">
-					<Button
-						type="button"
-						variant="ghost"
-						onClick={() => setShowQuestions(v => !v)}
-						className="flex w-full items-center justify-start gap-2 px-3 py-2 text-sm font-medium hover:bg-muted/50"
-					>
-						{showQuestions ? (
-							<ChevronDown className="size-4 shrink-0" />
-						) : (
-							<ChevronRight className="size-4 shrink-0" />
-						)}
-						Questions from the AI
-						<span className="ml-auto text-xs font-normal text-muted-foreground">
+				<CollapsibleSection
+					title="Questions from the AI"
+					defaultOpen={false}
+					headerRight={
+						<span className="text-xs font-normal text-muted-foreground">
 							{openQuestions.length} question{openQuestions.length !== 1 ? 's' : ''}
 						</span>
-					</Button>
-					{showQuestions && (
-						<div className="border-t px-3 py-3 space-y-4">
-							<p className="text-xs text-muted-foreground">
-								The AI raised these questions about the requirements. Answering them will improve the
-								next design. Answers are automatically included when you reject the proposal.
-							</p>
-							{openQuestions.map((question, i) => (
-								<div key={i} className="space-y-1">
-									<p className="text-sm font-medium">{question}</p>
-									<Textarea
-										value={questionAnswers[i] ?? ''}
-										onChange={e => handleAnswerChange(i, e.target.value)}
-										placeholder="Your answer (optional)..."
-										className="text-sm"
-										rows={2}
-									/>
-								</div>
-							))}
-						</div>
-					)}
-				</div>
+					}
+				>
+					<div className="space-y-4">
+						<p className="text-sm text-muted-foreground">
+							The AI raised these questions about the requirements. Answering them will improve the next
+							design. Answers are automatically included when you reject the proposal.
+						</p>
+						{/* B9 fix: connect labels to textareas via htmlFor/id */}
+						{openQuestions.map((question, i) => (
+							<div key={i} className="space-y-1">
+								<Label htmlFor={`question-answer-${i}`} className="text-sm font-medium">
+									{question}
+								</Label>
+								<Textarea
+									id={`question-answer-${i}`}
+									value={questionAnswers[i] ?? ''}
+									onChange={e => handleAnswerChange(i, e.target.value)}
+									placeholder="Your answer (optional)..."
+									className="text-sm"
+									rows={2}
+								/>
+							</div>
+						))}
+					</div>
+				</CollapsibleSection>
 			)}
 
-			{/* Reasoning collapsible */}
-			<div className="rounded-md border">
-				<Button
-					type="button"
-					variant="ghost"
-					onClick={() => setReasoningOpen(v => !v)}
-					className="flex w-full items-center justify-start gap-2 px-3 py-2 text-sm font-medium hover:bg-muted/50"
-				>
-					{reasoningOpen ? (
-						<ChevronDown className="size-4 shrink-0" />
-					) : (
-						<ChevronRight className="size-4 shrink-0" />
-					)}
-					Reasoning
-				</Button>
-				{reasoningOpen && (
-					<div className="border-t px-3 py-3">
-						{reasoningSentences.length > 1 ? (
-							<ul className="list-disc list-inside space-y-1">
-								{reasoningSentences.map((sentence, i) => (
-									<li key={i} className="text-sm">
-										{sentence.trim().replace(/\.$/, '')}
-									</li>
-								))}
-							</ul>
-						) : (
-							<p className="text-sm whitespace-pre-wrap">{proposal.reasoning}</p>
-						)}
-					</div>
+			{/* D1 fix: Reasoning collapsed by default using CollapsibleSection */}
+			<CollapsibleSection title="Reasoning" defaultOpen={false}>
+				{reasoningSentences.length > 1 ? (
+					<ul className="list-disc list-inside space-y-1">
+						{reasoningSentences.map((sentence, i) => (
+							<li key={i} className="text-sm">
+								{sentence.trim().replace(/\.$/, '')}
+							</li>
+						))}
+					</ul>
+				) : (
+					<p className="text-sm whitespace-pre-wrap">{proposal.reasoning}</p>
 				)}
-			</div>
+			</CollapsibleSection>
 
-			{/* Flow YAML with K fix: Open in Flow Editor link */}
-			<div className="space-y-1">
-				<div className="flex items-center justify-between">
-					<p className="text-xs font-medium text-muted-foreground tracking-wide">Proposed flow</p>
-					{/* K fix: only show an active link when the proposal is approved (flow registered in registry).
-					    For non-approved proposals the flow ID is not yet in the registry, so open in new tab
-					    once approved, otherwise show a disabled button with a tooltip. */}
-					{proposal.status === 'approved' && proposedFlowId ? (
+			{/* D1/D2 fix: Proposed flow collapsed by default; Visualize button for non-approved proposals */}
+			<CollapsibleSection
+				title="Proposed flow"
+				defaultOpen={false}
+				headerRight={
+					proposal.status === 'approved' && proposedFlowId ? (
+						/* K fix: real link only when approved (flow registered in registry) */
 						<a
 							href={`/flows/${proposedFlowId}/edit`}
 							target="_blank"
@@ -508,31 +745,15 @@ function ProposalView({
 							Open in Flow Editor
 						</a>
 					) : (
-						<TooltipProvider>
-							<Tooltip>
-								<TooltipTrigger asChild>
-									<span className="cursor-not-allowed">
-										<Button
-											variant="ghost"
-											size="sm"
-											className="h-auto p-0 text-xs text-muted-foreground"
-											disabled
-										>
-											Open in Flow Editor
-										</Button>
-									</span>
-								</TooltipTrigger>
-								<TooltipContent>
-									<p>Flow not yet registered in the registry. Approve the proposal to register it.</p>
-								</TooltipContent>
-							</Tooltip>
-						</TooltipProvider>
-					)}
-				</div>
+						/* D2 fix: Visualize button opens a ReactFlow read-only modal for non-approved proposals */
+						<VisualizeFlowDialog proposal={proposal} />
+					)
+				}
+			>
 				<pre className="overflow-x-auto rounded-md bg-muted p-4 text-xs font-mono leading-relaxed">
 					{proposalYaml}
 				</pre>
-			</div>
+			</CollapsibleSection>
 
 			{/* Review threads */}
 			{proposal.reviewThreads.length > 0 && (
@@ -581,47 +802,62 @@ function ProposalView({
 						Approve
 					</Button>
 
-					{/* p fix: toggle button uses destructive variant when closed ("...") and outline when open (cancel).
-					    "Reject..." communicates that clicking opens a form (desktop convention). */}
+					{/* B7 fix: toggle button is always "Reject..." (destructive) — no longer toggles to "Cancel".
+					    Cancel is now inside the reject form. */}
 					<Button
-						variant={showRejectForm ? 'outline' : 'destructive'}
-						className={showRejectForm ? 'border-destructive text-destructive hover:bg-destructive/10' : ''}
+						variant="destructive"
 						onClick={handleToggleRejectForm}
-						disabled={isApproving || isRejecting}
+						disabled={isApproving || isRejecting || showRejectForm}
 					>
-						{showRejectForm ? 'Cancel' : 'Reject...'}
+						Reject...
 					</Button>
 
 					{showRejectForm && (
 						<div ref={rejectFormRef} className="w-full space-y-2">
-							<Label className="text-sm font-medium">Rejection reason</Label>
+							{/* T2 fix: connect label to textarea via htmlFor/id */}
+							<Label htmlFor="reject-reason" className="text-sm font-medium">
+								Rejection reason
+							</Label>
 							<Textarea
 								value={rejectReason}
 								onChange={e => setRejectReason(e.target.value)}
+								id="reject-reason"
 								placeholder="Reason for rejection (optional)..."
 								className="text-sm"
 							/>
-							<Button variant="destructive" size="sm" onClick={handleReject} disabled={isRejecting}>
-								{isRejecting ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
-								Confirm rejection
-							</Button>
+							{/* B7 fix: "Confirm rejection" has no size= (default size, same as Approve).
+							    "Cancel" button is placed next to it inside the form. */}
+							<div className="flex gap-2">
+								<Button variant="destructive" onClick={handleReject} disabled={isRejecting}>
+									{isRejecting ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
+									Confirm rejection
+								</Button>
+								<Button
+									variant="outline"
+									onClick={() => {
+										setShowRejectForm(false);
+										setRejectReason('');
+									}}
+									disabled={isRejecting}
+								>
+									Cancel
+								</Button>
+							</div>
 						</div>
 					)}
 				</div>
 			)}
 
-			{/* Terminal state: show option to request new design */}
+			{/* B4 fix: terminal state shows timestamp only — "Request new design" button removed.
+			    The re-request form at the bottom of the page is the only entry point. */}
 			{isTerminal && (
-				<div className="flex items-center gap-3 border-t pt-4">
+				<div className="border-t pt-4">
 					<p className="text-sm text-muted-foreground">
 						{/* g2 fix: replaced em-dash fallback with descriptive text */}
 						{proposal.status === 'approved'
 							? `Approved at ${proposal.approvedAt ? new Date(proposal.approvedAt).toLocaleString() : 'unknown date'}`
 							: `Rejected at ${proposal.rejectedAt ? new Date(proposal.rejectedAt).toLocaleString() : 'unknown date'}`}
 					</p>
-					<Button variant="outline" size="sm" onClick={onRequestNew}>
-						Request new design
-					</Button>
 				</div>
 			)}
 		</div>
@@ -741,13 +977,17 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 						</div>
 					)}
 					<div className="mt-4 space-y-2">
-						<Label className="text-sm font-medium">Additional context (optional)</Label>
+						{/* T3 fix: connect label to textarea via htmlFor/id */}
+						<Label htmlFor="context-input" className="text-sm font-medium">
+							Additional context (optional)
+						</Label>
 						<Textarea
 							value={context}
 							onChange={e => {
 								setContext(e.target.value);
 								setRequestError(null);
 							}}
+							id="context-input"
 							placeholder="Provide extra context or constraints for the AI flow designer..."
 							className="text-sm"
 						/>
@@ -794,9 +1034,6 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 						// Silent re-fetch: preserves scroll position (item O fix)
 						refreshSilent();
 					}}
-					onRequestNew={() => {
-						setContext('');
-					}}
 					onRejected={() => {
 						setIsRedesigning(true);
 					}}
@@ -807,13 +1044,20 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 			{/* Request a new design (only when not pending_review and not already redesigning) */}
 			{currentProposal && currentProposal.status !== 'pending_review' && !isRedesigning && (
 				<div className="border-t pt-4 space-y-3">
-					<p className="text-sm font-medium">Request a new flow design</p>
-					<Textarea
-						value={context}
-						onChange={e => setContext(e.target.value)}
-						placeholder="Provide additional context or describe what to change..."
-						className="text-sm"
-					/>
+					{/* T3 fix: replace <p> with <Label htmlFor> to properly associate with the textarea */}
+					<Label htmlFor="new-design-context" className="text-sm font-medium">
+						Request a new flow design
+					</Label>
+					{/* B5 fix: blur textarea while request is in flight */}
+					<div className={isRequesting ? 'pointer-events-none opacity-50' : ''}>
+						<Textarea
+							value={context}
+							onChange={e => setContext(e.target.value)}
+							id="new-design-context"
+							placeholder="Provide additional context or describe what to change..."
+							className="text-sm"
+						/>
+					</div>
 					<Button onClick={handleRequestDesign} disabled={isRequesting}>
 						{isRequesting ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
 						Request new design

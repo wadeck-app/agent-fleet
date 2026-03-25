@@ -1,11 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type {
-	CreateFlowFeedback,
-	CreateFlowRetrospective,
-	FlowFeedback,
-	FlowRetrospective,
-} from '@app/shared/api/flow-feedback.contract';
+import type { FlowFeedback, UpdateFlowFeedback } from '@app/shared/api/flow-feedback.contract';
 
 import type { FlowFeedbackService } from '../services/FlowFeedbackService';
 import type { RouteWrapperFunc } from '../utils/fastify-wrapper';
@@ -21,6 +16,8 @@ function makeService(): FlowFeedbackService {
 		submitRetrospective: vi.fn(),
 		getRetrospective: vi.fn(),
 		getFeedbackForFlow: vi.fn(),
+		updateFeedback: vi.fn(),
+		deleteFeedback: vi.fn(),
 	} as unknown as FlowFeedbackService;
 }
 
@@ -54,12 +51,13 @@ function captureHandler(
 // Fixtures
 // ---------------------------------------------------------------------------
 
+const FEEDBACK_ID = 'fb-1';
 const TICKET_ID = 'ticket-abc';
 const FLOW_ID = 'flow-xyz';
 const TASK_ID = 'task-123';
 
 const sampleFeedback: FlowFeedback = {
-	id: 'fb-1',
+	id: FEEDBACK_ID,
 	ticketId: TICKET_ID,
 	flowId: FLOW_ID,
 	taskId: TASK_ID,
@@ -70,36 +68,9 @@ const sampleFeedback: FlowFeedback = {
 	author: 'tester',
 };
 
-const sampleRetrospective: FlowRetrospective = {
-	id: 'retro-1',
-	ticketId: TICKET_ID,
-	flowId: FLOW_ID,
-	taskId: TASK_ID,
-	wentWell: ['step A'],
-	wentWrong: ['step B'],
-	suggestions: ['improvement'],
-	executionSummary: 'Flow ran successfully.',
-	generatedAt: '2024-01-01T00:00:00.000Z',
-};
-
-const createFeedbackBody: CreateFlowFeedback = {
-	ticketId: TICKET_ID,
-	flowId: FLOW_ID,
-	taskId: TASK_ID,
-	rating: 4,
-	wentWell: ['Good step 1'],
-	wentWrong: [],
-	author: 'tester',
-};
-
-const createRetroBody: CreateFlowRetrospective = {
-	ticketId: TICKET_ID,
-	flowId: FLOW_ID,
-	taskId: TASK_ID,
-	wentWell: ['step A'],
-	wentWrong: ['step B'],
-	suggestions: ['improvement'],
-	executionSummary: 'Flow ran successfully.',
+const updateBody: UpdateFlowFeedback = {
+	rating: 5,
+	wentWell: ['Even better step 1'],
 };
 
 // ---------------------------------------------------------------------------
@@ -120,107 +91,70 @@ describe('FlowFeedbackController', () => {
 	// -------------------------------------------------------------------------
 
 	describe('configureRoutes - route registration', () => {
-		it('registers POST /api/tickets/:ticketId/feedback', () => {
+		it('registers PUT /api/flow-feedback/:feedbackId', () => {
 			const mockAdd = vi.fn();
 			controller.configureRoutes(mockAdd as unknown as RouteWrapperFunc<any>);
 
-			expect(mockAdd).toHaveBeenCalledWith('POST', '/api/tickets/:ticketId/feedback', expect.any(Function));
+			expect(mockAdd).toHaveBeenCalledWith('PUT', '/api/flow-feedback/:feedbackId', expect.any(Function));
 		});
 
-		it('registers POST /api/tickets/:ticketId/retrospective', () => {
+		it('registers DELETE /api/flow-feedback/:feedbackId', () => {
 			const mockAdd = vi.fn();
 			controller.configureRoutes(mockAdd as unknown as RouteWrapperFunc<any>);
 
-			expect(mockAdd).toHaveBeenCalledWith('POST', '/api/tickets/:ticketId/retrospective', expect.any(Function));
-		});
-
-		it('registers GET /api/tickets/:ticketId/retrospective', () => {
-			const mockAdd = vi.fn();
-			controller.configureRoutes(mockAdd as unknown as RouteWrapperFunc<any>);
-
-			expect(mockAdd).toHaveBeenCalledWith('GET', '/api/tickets/:ticketId/retrospective', expect.any(Function));
+			expect(mockAdd).toHaveBeenCalledWith('DELETE', '/api/flow-feedback/:feedbackId', expect.any(Function));
 		});
 	});
 
 	// -------------------------------------------------------------------------
-	// POST /api/tickets/:ticketId/feedback
+	// PUT /api/flow-feedback/:feedbackId
 	// -------------------------------------------------------------------------
 
-	describe('POST /api/tickets/:ticketId/feedback', () => {
-		it('delegates to service.submitFeedback with ticketId and body', async () => {
-			vi.mocked(mockService.submitFeedback).mockResolvedValue(sampleFeedback);
+	describe('PUT /api/flow-feedback/:feedbackId', () => {
+		it('delegates to service.updateFeedback with feedbackId and body', async () => {
+			vi.mocked(mockService.updateFeedback).mockResolvedValue({ ...sampleFeedback, ...updateBody });
 
-			const handler = captureHandler(controller, 'POST', '/api/tickets/:ticketId/feedback');
-			const result = await handler({ params: { ticketId: TICKET_ID }, body: createFeedbackBody });
+			const handler = captureHandler(controller, 'PUT', '/api/flow-feedback/:feedbackId');
+			const result = await handler({ params: { feedbackId: FEEDBACK_ID }, body: updateBody });
 
-			expect(mockService.submitFeedback).toHaveBeenCalledOnce();
-			expect(mockService.submitFeedback).toHaveBeenCalledWith(TICKET_ID, createFeedbackBody);
-			expect(result).toEqual(sampleFeedback);
+			expect(mockService.updateFeedback).toHaveBeenCalledOnce();
+			expect(mockService.updateFeedback).toHaveBeenCalledWith(FEEDBACK_ID, updateBody);
+			expect(result).toMatchObject({ id: FEEDBACK_ID, rating: 5 });
 		});
 
 		it('propagates errors thrown by the service', async () => {
-			vi.mocked(mockService.submitFeedback).mockRejectedValue(new Error('ticket not found'));
+			vi.mocked(mockService.updateFeedback).mockRejectedValue(new Error('Feedback not found'));
 
-			const handler = captureHandler(controller, 'POST', '/api/tickets/:ticketId/feedback');
+			const handler = captureHandler(controller, 'PUT', '/api/flow-feedback/:feedbackId');
 
-			await expect(handler({ params: { ticketId: 'missing' }, body: createFeedbackBody })).rejects.toThrow(
-				'ticket not found'
+			await expect(handler({ params: { feedbackId: 'missing' }, body: updateBody })).rejects.toThrow(
+				'Feedback not found'
 			);
 		});
 	});
 
 	// -------------------------------------------------------------------------
-	// POST /api/tickets/:ticketId/retrospective
+	// DELETE /api/flow-feedback/:feedbackId
 	// -------------------------------------------------------------------------
 
-	describe('POST /api/tickets/:ticketId/retrospective', () => {
-		it('delegates to service.submitRetrospective with ticketId and body', async () => {
-			vi.mocked(mockService.submitRetrospective).mockResolvedValue(sampleRetrospective);
+	describe('DELETE /api/flow-feedback/:feedbackId', () => {
+		it('delegates to service.deleteFeedback with feedbackId and returns empty object', async () => {
+			vi.mocked(mockService.deleteFeedback).mockResolvedValue(undefined);
 
-			const handler = captureHandler(controller, 'POST', '/api/tickets/:ticketId/retrospective');
-			const result = await handler({ params: { ticketId: TICKET_ID }, body: createRetroBody });
+			const handler = captureHandler(controller, 'DELETE', '/api/flow-feedback/:feedbackId');
+			const result = await handler({ params: { feedbackId: FEEDBACK_ID } });
 
-			expect(mockService.submitRetrospective).toHaveBeenCalledOnce();
-			expect(mockService.submitRetrospective).toHaveBeenCalledWith(TICKET_ID, createRetroBody);
-			expect(result).toEqual(sampleRetrospective);
+			expect(mockService.deleteFeedback).toHaveBeenCalledOnce();
+			expect(mockService.deleteFeedback).toHaveBeenCalledWith(FEEDBACK_ID);
+			expect(result).toEqual({});
 		});
 
 		it('propagates errors thrown by the service', async () => {
-			vi.mocked(mockService.submitRetrospective).mockRejectedValue(new Error('ticket not found'));
+			vi.mocked(mockService.deleteFeedback).mockRejectedValue(new Error('Feedback not found'));
 
-			const handler = captureHandler(controller, 'POST', '/api/tickets/:ticketId/retrospective');
+			const handler = captureHandler(controller, 'DELETE', '/api/flow-feedback/:feedbackId');
 
-			await expect(handler({ params: { ticketId: 'ghost' }, body: createRetroBody })).rejects.toThrow(
-				'ticket not found'
-			);
-		});
-	});
-
-	// -------------------------------------------------------------------------
-	// GET /api/tickets/:ticketId/retrospective
-	// -------------------------------------------------------------------------
-
-	describe('GET /api/tickets/:ticketId/retrospective', () => {
-		it('delegates to service.getRetrospective with ticketId', async () => {
-			vi.mocked(mockService.getRetrospective).mockResolvedValue(sampleRetrospective);
-
-			const handler = captureHandler(controller, 'GET', '/api/tickets/:ticketId/retrospective');
-			const result = await handler({ params: { ticketId: TICKET_ID } });
-
-			expect(mockService.getRetrospective).toHaveBeenCalledOnce();
-			expect(mockService.getRetrospective).toHaveBeenCalledWith(TICKET_ID);
-			expect(result).toEqual(sampleRetrospective);
-		});
-
-		it('propagates NotFoundException when service throws (no retrospective found)', async () => {
-			const notFound = new Error('No retrospective found for ticket no-ticket');
-			vi.mocked(mockService.getRetrospective).mockRejectedValue(notFound);
-
-			const handler = captureHandler(controller, 'GET', '/api/tickets/:ticketId/retrospective');
-
-			await expect(handler({ params: { ticketId: 'no-ticket' } })).rejects.toThrow(
-				'No retrospective found for ticket no-ticket'
-			);
+			await expect(handler({ params: { feedbackId: 'missing' } })).rejects.toThrow('Feedback not found');
 		});
 	});
 });

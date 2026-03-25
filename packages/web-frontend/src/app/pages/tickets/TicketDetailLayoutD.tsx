@@ -365,7 +365,8 @@ export function TicketDetailLayoutD({ ticket, ticketId, onRefresh }: TicketDetai
 
 			{/* Labels */}
 			<div className="relative">
-				<Label>Labels</Label>
+				{/* T5 fix: connect label to input via htmlFor/id */}
+				<Label htmlFor="label-input">Labels</Label>
 				<div className="mt-2 space-y-2">
 					<div className="flex flex-wrap gap-2">
 						{localLabels.map(label => (
@@ -395,6 +396,7 @@ export function TicketDetailLayoutD({ ticket, ticketId, onRefresh }: TicketDetai
 									handleAddLabel(labelInput);
 								}
 							}}
+							id="label-input"
 							placeholder="Type label and press Enter to add..."
 							className="w-full"
 						/>

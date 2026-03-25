@@ -1,4 +1,5 @@
 import { Input } from '@framework/components/forms/Input';
+import { Label } from '@framework/components/forms/Label';
 import { FilterGrid } from '@framework/components/layout/FilterGrid';
 import { Button } from '@framework/components/primitives/Button';
 import { SelectInput } from '@framework/features/forms/inputs/SelectInput';
@@ -61,7 +62,10 @@ export function TaskFilters({ filters }: TaskFiltersProps) {
 		<FilterGrid cols={4}>
 			{/* Status Filter */}
 			<div>
-				<div className="mb-2 text-xs font-medium text-muted-foreground">Status</div>
+				{/* TK1 fix: use Label with htmlFor */}
+				<Label htmlFor="status-filter" className="mb-2 block text-xs font-medium text-muted-foreground">
+					Status
+				</Label>
 				<SelectInput
 					id="status-filter"
 					value={filters.fstate.status || '__all__'}
@@ -72,7 +76,9 @@ export function TaskFilters({ filters }: TaskFiltersProps) {
 
 			{/* Priority Filter */}
 			<div>
-				<div className="mb-2 text-xs font-medium text-muted-foreground">Priority</div>
+				<Label htmlFor="priority-filter" className="mb-2 block text-xs font-medium text-muted-foreground">
+					Priority
+				</Label>
 				<SelectInput
 					id="priority-filter"
 					value={filters.fstate.priority || '__all__'}
@@ -83,7 +89,9 @@ export function TaskFilters({ filters }: TaskFiltersProps) {
 
 			{/* Worker ID Filter */}
 			<div>
-				<div className="mb-2 text-xs font-medium text-muted-foreground">Worker ID</div>
+				<Label htmlFor="worker-filter" className="mb-2 block text-xs font-medium text-muted-foreground">
+					Worker ID
+				</Label>
 				<Input
 					id="worker-filter"
 					type="text"
@@ -95,7 +103,9 @@ export function TaskFilters({ filters }: TaskFiltersProps) {
 
 			{/* Flow ID Filter */}
 			<div>
-				<div className="mb-2 text-xs font-medium text-muted-foreground">Flow ID</div>
+				<Label htmlFor="flow-filter" className="mb-2 block text-xs font-medium text-muted-foreground">
+					Flow ID
+				</Label>
 				<Input
 					id="flow-filter"
 					type="text"

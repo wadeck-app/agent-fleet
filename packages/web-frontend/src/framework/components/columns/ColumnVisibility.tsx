@@ -335,6 +335,7 @@ export function ColumnVisibility({
 											>
 												{/* eslint-disable-next-line no-restricted-syntax */}
 												<label
+													htmlFor={`col-${column.id}`}
 													className={cn(
 														`
                 flex flex-1 cursor-pointer items-center gap-2 px-2 py-1.5
@@ -351,6 +352,7 @@ export function ColumnVisibility({
 													}
 												>
 													<Checkbox
+														id={`col-${column.id}`}
 														checked={isVisible}
 														onCheckedChange={() => handleToggle(column.id)}
 														disabled={isDisabled}

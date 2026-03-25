@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
@@ -6,6 +7,7 @@ import { formatRelativeTime } from '@framework/utils/formatting/DateFormat';
 import type { TicketHistoryEntry } from '@shared/api/tickets.contract';
 import { B2F_TASKS_UPDATED, B2F_TICKET_COMMENT_ADDED, B2F_TICKET_UPDATED } from '@shared/transport';
 import { Loader2 } from 'lucide-react';
+import remarkGfm from 'remark-gfm';
 
 import { useTransport } from '@/transport';
 
@@ -55,21 +57,26 @@ function getAuditEntryData(
 				return { label: 'Comment added', content: null };
 			}
 			if (content.length <= 100 || isExpanded) {
-				return { label: 'Comment added', content: <p>{content}</p> };
+				// B8 fix: render comment content as markdown (same as TicketCommentsSection)
+				return {
+					label: 'Comment added',
+					content: <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>,
+				};
 			}
+			// B8 fix: render truncated content as markdown with an expand button
 			return {
 				label: 'Comment added',
 				content: (
-					<p>
-						{content.slice(0, 100)}{' '}
+					<div>
+						<ReactMarkdown remarkPlugins={[remarkGfm]}>{`${content.slice(0, 100)}...`}</ReactMarkdown>
 						<Button
 							variant="ghost"
 							className="h-auto cursor-pointer p-0 text-xs underline hover:text-foreground"
 							onClick={() => onExpand(entry.id)}
 						>
-							[...]
+							Show more
 						</Button>
-					</p>
+					</div>
 				),
 			};
 		}

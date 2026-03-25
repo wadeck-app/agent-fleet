@@ -18,6 +18,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@framework/components/primitives/Tooltip';
 import { useToast } from '@framework/features/toast/ToastContext';
 import { useListItems } from '@framework/hooks2/form/useListItems';
+import { cn } from '@framework/lib/utils';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { Ticket, TicketStatus } from '@shared/api/tickets.contract';
 import { ArrowDown, ArrowUp, Loader2 } from 'lucide-react';
@@ -417,6 +418,10 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 											<span>
 												<TabsTrigger value="feedback" disabled>
 													Feedback
+													<TabCountBadge
+														count={feedbackCount}
+														loading={feedbackCountLoading}
+													/>
 												</TabsTrigger>
 											</span>
 										</TooltipTrigger>
@@ -483,7 +488,8 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 								ticketId={ticketId}
 								flowRetrospectiveId={ticket.flowRetrospectiveId}
 								currentFlowProposalId={ticket.currentFlowProposalId}
-								onFeedbackSubmitted={() => void onRefresh()}
+								onFeedbackSubmitted={() => {}}
+								sortOrder={sortOrder}
 							/>
 						) : (
 							<p className="py-4 text-sm text-muted-foreground">
@@ -529,6 +535,10 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 					</div>
 
 					{/* Labels */}
+					{/* T7 fix: sr-only label associates "Labels" text with the input */}
+					<Label htmlFor="labels-input" className="sr-only">
+						Labels
+					</Label>
 					<div className="flex flex-col gap-1">
 						<div className="flex items-center gap-1 text-sm font-medium">
 							Labels
@@ -549,7 +559,11 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 								})()}
 						</div>
 						<div
-							className={`rounded-md py-1 transition-all ${dirtyFields.labels ? 'ring-2 ring-primary' : ''} ${saving ? 'opacity-50 pointer-events-none' : ''}`}
+							className={cn(
+								'rounded-md py-1 transition-all',
+								dirtyFields.labels && 'ring-2 ring-primary',
+								saving && 'opacity-50 pointer-events-none'
+							)}
 						>
 							<div className="space-y-2">
 								<div className="flex flex-wrap gap-2">
@@ -559,7 +573,10 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 											<Badge
 												key={label}
 												variant="outline"
-												className={`cursor-pointer rounded-full px-2 py-1 text-sm ${isNew ? 'ring-1 ring-primary' : ''}`}
+												className={cn(
+													'cursor-pointer rounded-full px-2 py-1 text-sm',
+													isNew && 'ring-1 ring-primary'
+												)}
 											>
 												{label}
 												<Button
@@ -584,6 +601,7 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 											handleAddLabel(labelInput);
 										}
 									}}
+									id="labels-input"
 									placeholder="Type label and press Enter..."
 									className="w-full text-sm"
 								/>
@@ -625,7 +643,11 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 								})()}
 						</div>
 						<div
-							className={`rounded-md py-1 transition-all ${fieldsChanged ? 'ring-2 ring-primary' : ''} ${saving ? 'opacity-50 pointer-events-none' : ''}`}
+							className={cn(
+								'rounded-md py-1 transition-all',
+								fieldsChanged && 'ring-2 ring-primary',
+								saving && 'opacity-50 pointer-events-none'
+							)}
 						>
 							<div className="space-y-2">
 								{fieldsItems.fstate.items.length === 0 ? (

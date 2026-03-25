@@ -366,6 +366,10 @@ export function TicketDetailLayoutF({ ticket, ticketId, onUpdate, onRefresh }: T
 				</div>
 
 				<div className="flex-shrink-0 border-t p-4">
+					{/* T6 fix: add label for the AI reply textarea (visually hidden but accessible) */}
+					<Label htmlFor="ai-reply" className="sr-only">
+						Reply
+					</Label>
 					<div className="flex gap-2">
 						<Textarea
 							value={replyContent}
@@ -376,6 +380,7 @@ export function TicketDetailLayoutF({ ticket, ticketId, onUpdate, onRefresh }: T
 									void handleSendReply();
 								}
 							}}
+							id="ai-reply"
 							placeholder="Ask the AI assistant..."
 							rows={3}
 							className="flex-1"

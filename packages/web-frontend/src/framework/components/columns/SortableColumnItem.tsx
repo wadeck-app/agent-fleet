@@ -106,9 +106,10 @@ export function SortableColumnItem({
 				<GripVertical className="h-4 w-4" />
 			</button>
 
-			{/* Checkbox + Label */}
+			{/* H2 fix: Checkbox + Label with explicit htmlFor/id for accessibility */}
 			{/* eslint-disable-next-line no-restricted-syntax */}
 			<label
+				htmlFor={`col-${column.id}`}
 				className={cn(
 					'flex flex-1 cursor-pointer items-center gap-2 px-2 py-1.5 text-sm',
 					isDisabled && 'cursor-not-allowed'
@@ -121,7 +122,12 @@ export function SortableColumnItem({
 							: `Show ${column.label}`
 				}
 			>
-				<Checkbox checked={isVisible} onCheckedChange={onToggle} disabled={isDisabled} />
+				<Checkbox
+					id={`col-${column.id}`}
+					checked={isVisible}
+					onCheckedChange={onToggle}
+					disabled={isDisabled}
+				/>
 				<span className="flex-1">{column.label}</span>
 
 				{/* Modified Indicator */}

@@ -26,11 +26,14 @@ function makeTicketsRepoStub(tickets: Record<string, any> = {}) {
 	} as unknown as TicketsRepository;
 }
 
-function makeFlowFeedbackRepoStub() {
+function makeFlowFeedbackRepoStub(existingFeedback?: FlowFeedback) {
 	return {
 		create: vi.fn(async (f: FlowFeedback) => ({ ...f, id: f.id ?? 'generated-id' })),
+		findById: vi.fn(async (id: string) => (existingFeedback?.id === id ? existingFeedback : null)),
 		findByTicketId: vi.fn(async () => []),
 		findByFlowId: vi.fn(async () => []),
+		update: vi.fn(async (id: string, data: Partial<FlowFeedback>) => ({ ...existingFeedback, ...data, id })),
+		delete: vi.fn(async () => undefined),
 		createRetrospective: vi.fn(async (r: FlowRetrospective) => ({
 			...r,
 			id: r.id ?? 'generated-retro-id',
@@ -245,6 +248,103 @@ describe('FlowFeedbackService', () => {
 			const service = makeService(makeFlowFeedbackRepoStub(), makeTicketsRepoStub({}));
 
 			await expect(service.getRetrospective('no-ticket')).rejects.toThrow(NotFoundException);
+		});
+	});
+
+	describe('updateFeedback', () => {
+		const existingFeedback: FlowFeedback = {
+			id: 'fb-1',
+			ticketId: TICKET_ID,
+			flowId: FLOW_ID,
+			taskId: TASK_ID,
+			rating: 3,
+			wentWell: ['old'],
+			wentWrong: [],
+			submittedAt: '2024-01-01T00:00:00.000Z',
+			author: 'tester',
+		};
+
+		it('updates the feedback and returns the updated record', async () => {
+			const feedbackRepo = makeFlowFeedbackRepoStub(existingFeedback);
+			const broadcaster = makeEventBroadcasterStub();
+			const service = makeService(feedbackRepo, makeTicketsRepoStub({}), broadcaster);
+
+			const result = await service.updateFeedback('fb-1', { rating: 5, wentWell: ['new'] });
+
+			expect(feedbackRepo.findById).toHaveBeenCalledWith('fb-1');
+			expect(feedbackRepo.update).toHaveBeenCalledWith('fb-1', { rating: 5, wentWell: ['new'] });
+			expect(result).toMatchObject({ id: 'fb-1', rating: 5, wentWell: ['new'] });
+		});
+
+		it('emits b2f:ticket:feedback_submitted event after update', async () => {
+			const feedbackRepo = makeFlowFeedbackRepoStub(existingFeedback);
+			const broadcaster = makeEventBroadcasterStub();
+			const service = makeService(feedbackRepo, makeTicketsRepoStub({}), broadcaster);
+
+			await service.updateFeedback('fb-1', { rating: 5 });
+
+			expect(broadcaster.broadcast).toHaveBeenCalledOnce();
+			expect(broadcaster.broadcast).toHaveBeenCalledWith('b2f:ticket:feedback_submitted', {
+				ticketId: TICKET_ID,
+				feedbackId: 'fb-1',
+				rating: 5,
+			});
+		});
+
+		it('throws NotFoundException when feedback does not exist', async () => {
+			const feedbackRepo = makeFlowFeedbackRepoStub();
+			const service = makeService(feedbackRepo, makeTicketsRepoStub({}));
+
+			await expect(service.updateFeedback('missing', { rating: 5 })).rejects.toThrow(NotFoundException);
+			expect(feedbackRepo.update).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('deleteFeedback', () => {
+		const existingFeedback: FlowFeedback = {
+			id: 'fb-1',
+			ticketId: TICKET_ID,
+			flowId: FLOW_ID,
+			taskId: TASK_ID,
+			rating: 4,
+			wentWell: ['step 1'],
+			wentWrong: [],
+			submittedAt: '2024-01-01T00:00:00.000Z',
+			author: 'tester',
+		};
+
+		it('deletes the feedback by ID', async () => {
+			const feedbackRepo = makeFlowFeedbackRepoStub(existingFeedback);
+			const service = makeService(feedbackRepo, makeTicketsRepoStub({}));
+
+			await service.deleteFeedback('fb-1');
+
+			expect(feedbackRepo.findById).toHaveBeenCalledWith('fb-1');
+			expect(feedbackRepo.delete).toHaveBeenCalledWith('fb-1');
+		});
+
+		it('emits b2f:ticket:feedback_submitted event after delete', async () => {
+			const feedbackRepo = makeFlowFeedbackRepoStub(existingFeedback);
+			const broadcaster = makeEventBroadcasterStub();
+			const service = makeService(feedbackRepo, makeTicketsRepoStub({}), broadcaster);
+
+			await service.deleteFeedback('fb-1');
+
+			expect(broadcaster.broadcast).toHaveBeenCalledOnce();
+			expect(broadcaster.broadcast).toHaveBeenCalledWith('b2f:ticket:feedback_submitted', {
+				ticketId: TICKET_ID,
+				feedbackId: 'fb-1',
+				rating: 4,
+				deleted: true,
+			});
+		});
+
+		it('throws NotFoundException when feedback does not exist', async () => {
+			const feedbackRepo = makeFlowFeedbackRepoStub();
+			const service = makeService(feedbackRepo, makeTicketsRepoStub({}));
+
+			await expect(service.deleteFeedback('missing')).rejects.toThrow(NotFoundException);
+			expect(feedbackRepo.delete).not.toHaveBeenCalled();
 		});
 	});
 });
