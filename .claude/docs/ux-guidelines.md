@@ -39,6 +39,7 @@ Buttons, controls, and information must be permanently visible. Never reveal som
 ## 5. Optimistic updates + blur effect on save — CRITICAL
 
 When the user triggers a save/update:
+
 1. Apply the change to the UI immediately (optimistic)
 2. Show a blur/opacity effect on the element while the request is in flight
 3. On error: revert and show error feedback
