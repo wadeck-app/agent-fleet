@@ -1,6 +1,8 @@
 ---
 name: merge-to-integration
 description: From "integration" branch, merge a "workspace-x" branch
+disable-model-invocation: true
+context: fork
 ---
 
 The arguments $ARGUMENTS[0] is the branch we want to integrate, called "target branch" in the rest of this doc.

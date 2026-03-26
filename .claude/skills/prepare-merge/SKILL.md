@@ -1,6 +1,7 @@
 ---
 name: prepare-merge
 description: From a "workspace-X"/"wsX" branch, prepare the branch to be integrated back to "integration"
+context: fork
 ---
 
 ## Standard Process

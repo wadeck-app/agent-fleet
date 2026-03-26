@@ -1,6 +1,7 @@
 ---
 name: prepare-ws
 description: From a "workspace-X"/"wsX" branch, keep the branch up to date with "integration"
+context: fork
 ---
 
 ## Standard Process
