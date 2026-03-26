@@ -22,7 +22,10 @@ The arguments $ARGUMENTS[0] is the branch we want to integrate, called "target b
 
 3. Again ensure all the tests are passing in the current version.
    If there are failures, revert the merge and inform the user that the branch was not ready. Stop there.
-4. If all the tests are passing, the merge is considered complete. You can provide a concise summary of the changes made in the branch to be included in the merge commit message.
+
+4. Now, run the check skill, if there are errors, revert the merge and inform the user that the branch was not ready. Stop there.
+
+5. If all the tests/checks are passing, the merge is considered complete. You can provide a concise summary of the changes made in the branch to be included in the merge commit message.
 
 Do NOT resolve conflicts yourself, it's expected to be done by the "prepare-merge" skill used by another agent or by the user.
 Always ensure that the code is compiling without errors.
