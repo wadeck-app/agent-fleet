@@ -4,6 +4,7 @@ description: Run all tests with minimal context-efficient output. Use when verif
 allowed-tools:
     - Bash
     - Read
+context: fork
 #context: fork
 ---
 
