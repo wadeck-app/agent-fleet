@@ -1,3 +1,4 @@
+import type { FlowRegistry } from 'flow-engine';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
@@ -32,7 +33,9 @@ export class FlowsService {
 
 	constructor(
 		private readonly orchestratorWrapper: OrchestratorWrapper,
-		private readonly eventBroadcaster: EventBroadcaster
+		private readonly eventBroadcaster: EventBroadcaster,
+		// Optional: provides fallback for custom flows registered at runtime (e.g. approved proposals)
+		private readonly registry?: FlowRegistry
 	) {
 		// Find monorepo root: go up until we find package.json with "workspaces"
 		let currentDir = process.cwd();
@@ -101,6 +104,34 @@ export class FlowsService {
 	}
 
 	/**
+	 * Merge a file-based flow list with flows from the registry that are not yet in the list.
+	 * Custom flows approved at runtime are registered in the FlowRegistry in memory but may
+	 * not yet be present in flows.yml — this prevents 404s on GET /api/flows/:flowId.
+	 */
+	private mergeWithRegistryFlows(fileFlows: FlowListItem[]): FlowListItem[] {
+		if (!this.registry) {
+			return fileFlows;
+		}
+		const knownIds = new Set(fileFlows.map(f => f.id));
+		const registryFlows = this.registry.getAllFlows();
+		const extraFlows: FlowListItem[] = [];
+		for (const flow of registryFlows) {
+			if (!knownIds.has(flow.id)) {
+				extraFlows.push({
+					id: flow.id,
+					name: flow.name,
+					description: flow.description,
+					version: flow.version,
+				});
+			}
+		}
+		if (extraFlows.length > 0) {
+			log.info(`Registry provided ${extraFlows.length} additional flow(s) not in flows.yml`);
+		}
+		return [...fileFlows, ...extraFlows];
+	}
+
+	/**
 	 * Get list of all available flows
 	 * Tries orchestrator first, falls back to local flows.yml
 	 */
@@ -128,11 +159,13 @@ export class FlowsService {
 				return flowList;
 			}
 
-			// Otherwise fallback to local file
-			return this.getFlowsListFromFile();
+			// Fallback to local file, supplemented with registry flows not in the file
+			const fileFlows = this.getFlowsListFromFile();
+			return this.mergeWithRegistryFlows(fileFlows);
 		} catch (error) {
 			log.error('Error loading flows list from orchestrator, trying local file:', error);
-			return this.getFlowsListFromFile();
+			const fileFlows = this.getFlowsListFromFile();
+			return this.mergeWithRegistryFlows(fileFlows);
 		}
 	}
 
@@ -189,9 +222,21 @@ export class FlowsService {
 			}
 		}
 
-		// Flow not found via orchestrator — fall back to local flows.yml
+		// Flow not found via orchestrator — fall back to local flows.yml then registry
 		log.warn(`Flow ${flowId} not found in any project, falling back to local file`);
-		return this.getFlowByIdFromFile(flowId);
+		const fromFile = this.getFlowByIdFromFile(flowId);
+		if (fromFile) {
+			return fromFile;
+		}
+
+		// Last resort: check registry (covers custom flows approved at runtime)
+		const fromRegistry = this.registry?.getFlow(flowId);
+		if (fromRegistry) {
+			log.info(` Flow ${flowId} found in registry (custom/approved flow)`);
+			return fromRegistry;
+		}
+
+		return null;
 	}
 
 	/**

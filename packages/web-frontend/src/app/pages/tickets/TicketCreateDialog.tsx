@@ -10,7 +10,7 @@ import { Button } from '@framework/components/primitives/Button';
 import { useToast } from '@framework/features/toast/ToastContext';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { Project } from '@shared/api/projects.contract';
-import { Sparkles } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 import { projectsApi } from '../projects/projects.api';
 import { ticketsApi } from './tickets.api';
@@ -129,7 +129,8 @@ export function TicketCreateDialog({ open, onOpenChange, onSuccess }: TicketCrea
 				<div className="space-y-4">
 					{/* Project Selection */}
 					<div>
-						<Label className="mb-1">
+						{/* T8 fix: connect label to select trigger via htmlFor/id */}
+						<Label htmlFor="project-select" className="mb-1">
 							Project <span className="text-destructive">*</span>
 						</Label>
 						<Select
@@ -137,7 +138,7 @@ export function TicketCreateDialog({ open, onOpenChange, onSuccess }: TicketCrea
 							onValueChange={setSelectedProjectId}
 							disabled={projectsLoading || creating}
 						>
-							<SelectTrigger>
+							<SelectTrigger id="project-select">
 								<SelectValue
 									placeholder={projectsLoading ? 'Loading projects...' : 'Select project...'}
 								/>
@@ -196,7 +197,7 @@ export function TicketCreateDialog({ open, onOpenChange, onSuccess }: TicketCrea
 				>
 					{creating ? (
 						<>
-							<Sparkles className="mr-2 size-4 animate-spin" />
+							<Loader2 className="mr-2 size-4 animate-spin" />
 							Creating...
 						</>
 					) : (

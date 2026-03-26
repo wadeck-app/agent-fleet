@@ -190,13 +190,14 @@ export function TicketDetailLayoutF({ ticket, ticketId, onUpdate, onRefresh }: T
 
 				<div>
 					<Label htmlFor="status">Status</Label>
-					<div className="mt-1">
+					{/* w-48 constrains the flex container so the spinner stays adjacent to the select (a1 fix) */}
+					<div className="mt-1 w-48">
 						<SelectWithSpinner
 							value={localStatus}
 							onValueChange={newStatus => void handleStatusChange(newStatus)}
 							loading={statusSaving}
 						>
-							<SelectTrigger id="status" className="w-48">
+							<SelectTrigger id="status" className="w-full">
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
@@ -205,6 +206,11 @@ export function TicketDetailLayoutF({ ticket, ticketId, onUpdate, onRefresh }: T
 										{s.label}
 									</SelectItem>
 								))}
+
+								{/* Fallback: show raw status value when config hasn't loaded yet — bug #5 */}
+								{!statusConfig.statuses.find(s => s.id === localStatus) && (
+									<SelectItem value={localStatus}>{localStatus}</SelectItem>
+								)}
 							</SelectContent>
 						</SelectWithSpinner>
 					</div>
@@ -360,6 +366,10 @@ export function TicketDetailLayoutF({ ticket, ticketId, onUpdate, onRefresh }: T
 				</div>
 
 				<div className="flex-shrink-0 border-t p-4">
+					{/* T6 fix: add label for the AI reply textarea (visually hidden but accessible) */}
+					<Label htmlFor="ai-reply" className="sr-only">
+						Reply
+					</Label>
 					<div className="flex gap-2">
 						<Textarea
 							value={replyContent}
@@ -370,6 +380,7 @@ export function TicketDetailLayoutF({ ticket, ticketId, onUpdate, onRefresh }: T
 									void handleSendReply();
 								}
 							}}
+							id="ai-reply"
 							placeholder="Ask the AI assistant..."
 							rows={3}
 							className="flex-1"

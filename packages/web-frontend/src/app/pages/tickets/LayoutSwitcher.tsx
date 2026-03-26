@@ -1,5 +1,4 @@
-import { Button } from '@framework/components/primitives/Button';
-import { cn } from '@framework/lib/utils';
+import { Tabs, TabsList, TabsTrigger } from '@framework/components/primitives/tabs';
 
 const LAYOUTS = [
 	{ key: 'a', label: 'Jira' },
@@ -16,27 +15,21 @@ const STORAGE_KEY = 'ticketDetailLayout';
 
 export function LayoutSwitcher({ current, onChange }: { current: LayoutKey; onChange: (key: LayoutKey) => void }) {
 	return (
-		<div className="flex gap-1 rounded-md border bg-muted p-1">
-			{LAYOUTS.map(({ key, label }) => (
-				<Button
-					key={key}
-					variant="ghost"
-					title={label}
-					onClick={() => {
-						localStorage.setItem(STORAGE_KEY, key);
-						onChange(key);
-					}}
-					className={cn(
-						'h-auto rounded px-2 py-1 text-xs font-medium transition-colors',
-						current === key
-							? 'bg-background text-foreground shadow-sm'
-							: 'text-muted-foreground hover:text-foreground'
-					)}
-				>
-					{key.toUpperCase()}
-				</Button>
-			))}
-		</div>
+		<Tabs
+			value={current}
+			onValueChange={value => {
+				localStorage.setItem(STORAGE_KEY, value);
+				onChange(value as LayoutKey);
+			}}
+		>
+			<TabsList>
+				{LAYOUTS.map(({ key, label }) => (
+					<TabsTrigger key={key} value={key} title={label}>
+						{key.toUpperCase()}
+					</TabsTrigger>
+				))}
+			</TabsList>
+		</Tabs>
 	);
 }
 

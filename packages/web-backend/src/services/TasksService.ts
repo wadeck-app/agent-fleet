@@ -627,6 +627,12 @@ export class TasksService {
 			});
 
 			log.info(`[syncFromOrchestratorTask] Synced task ${orchestratorTask.id} (triggerEvent=${triggerEvent})`);
+
+			// Broadcast AFTER persistence so the frontend fetches an up-to-date task list.
+			// OrchestratorEventBridge intentionally suppresses B2F_TASKS_UPDATED on
+			// TASK_CREATED to avoid this race condition (task not yet in storage).
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
 		} catch (error) {
 			log.error(`[syncFromOrchestratorTask] Failed to sync task ${orchestratorTask.id}:`, error);
 			// Don't throw — sync failure should not block task execution

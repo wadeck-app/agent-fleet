@@ -66,3 +66,148 @@ payment-race-condition-fix:
           approval:
               title: Approve Payment Race Condition Fix
               description: Review the design and test results above. Approve to proceed with merge.
+generic-storage-management-debugger:
+    version: 1.0.0
+    name: Generic Storage Management Debugger Page
+    description: >-
+        Design and implement a debugger/viewer page for managing and inspecting storage data globally across all entities,
+        with JSON and CSV export support.
+    workspace:
+        mode: shared
+        gitStrategy: feature-branch
+        reusePolicy: never
+    inputs:
+        debugFeatures:
+            type: multi-enum
+            description: Features to enable in debugger
+            options:
+                - id: view
+                  label: View/Search Data
+                - id: export
+                  label: Export (JSON & CSV)
+                - id: filter
+                  label: Advanced Filtering
+                - id: history
+                  label: Change History
+    steps:
+        - id: analyze-architecture
+          name: Analyze Storage Architecture
+          type: model
+          model: sonnet
+          prompt: >-
+              Review storage layers in packages/web-backend and packages/web-frontend. Document all entities, schemas, access
+              patterns. Recommend generic debugger interface supporting JSON/CSV exports.
+        - id: design-ui-api
+          name: Design UI & Backend API
+          type: model
+          model: sonnet
+          depends:
+              - analyze-architecture
+          prompt: >-
+              Based on ${{ steps.analyze-architecture.outputs.result }}, design: (1) Backend API: GET /api/debug/storage with
+              filtering/pagination, POST /api/debug/export?format=json|csv. (2) Frontend: entity selector, search, data table,
+              filter panel, export buttons using Radix UI.
+        - id: implement-solution
+          name: Implement Backend & Frontend
+          type: script
+          depends:
+              - design-ui-api
+          script: >-
+              cd packages/web-backend && npm run dev:stub -- 'Implement storage debugger: backend API endpoints
+              (/api/debug/storage, /api/debug/export with JSON/CSV format), frontend StorageDebugger.tsx component with Radix
+              UI, entity selector, search, filtering, sorting, export functionality.'
+          captureOutput: true
+        - id: review-approval
+          name: Request Review & Approval
+          type: user_intervention
+          depends:
+              - implement-solution
+          interventionType: approval
+          approval:
+              title: Approve Storage Debugger?
+              description: Review backend API design and frontend component implementation. Ensure JSON/CSV exports work correctly.
+              allowReject: true
+          onFailure:
+              goto: design-ui-api
+              maxIterations: 2
+              resetOnSuccess: true
+              addComment: true
+storage-viewer-management-debugger:
+    version: 1.0.0
+    name: Storage Viewer and Management Debugger Page
+    description: >-
+        Design and implement a global storage viewer/debugger page to inspect, query, and export storage data across all
+        entities with JSON and CSV export capabilities.
+    workspace:
+        mode: isolated
+        gitStrategy: feature-branch
+        reusePolicy: never
+    inputs:
+        storageScope:
+            type: enum
+            description: Which storage system to debug
+            options:
+                - id: all
+                  label: All Storage
+                - id: memory
+                  label: In-Memory Storage
+                - id: database
+                  label: Database Storage
+            required: true
+        exportFormat:
+            type: multi-enum
+            description: Export formats to support
+            options:
+                - id: json
+                  label: JSON
+                - id: csv
+                  label: CSV
+            required: false
+    steps:
+        - id: analyze-requirements
+          name: Analyze Storage Architecture
+          type: model
+          model: sonnet
+          prompt: >-
+              Analyze the agent-fleet storage architecture. Document: 1) all storage types (in-memory, database), 2) entity
+              types stored, 3) current access patterns, 4) proposed viewer UI layout, 5) data query API needs. Keep response
+              concise and structured.
+        - id: design-viewer-api
+          name: Design Storage Viewer API
+          type: model
+          model: sonnet
+          depends:
+              - analyze-requirements
+          prompt: >-
+              Based on storage analysis, design REST API endpoints for: 1) list entities by type, 2) query storage with
+              filters, 3) export to JSON/CSV. Include schemas, response formats, and error handling. Target 80 words.
+        - id: implement-viewer
+          name: Implement Storage Viewer Page
+          type: script
+          depends:
+              - design-viewer-api
+          script: cd packages/web-frontend && npm run build
+          workingDir: .
+          captureOutput: true
+        - id: review-implementation
+          name: Review Storage Viewer Implementation
+          type: user_intervention
+          depends:
+              - implement-viewer
+          interventionType: approval
+          approval:
+              title: Approve Storage Viewer Implementation
+              description: Review the storage viewer UI, API endpoints, and export functionality. Approve to proceed with testing.
+              allowReject: true
+          onFailure:
+              goto: design-viewer-api
+              maxIterations: 4
+              resetOnSuccess: true
+        - id: execute-tests
+          name: Test Storage Viewer
+          type: script
+          depends:
+              - review-implementation
+          script: npm run test:agent -- storage-viewer
+          workingDir: .
+          captureOutput: true

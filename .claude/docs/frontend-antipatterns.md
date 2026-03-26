@@ -217,6 +217,54 @@ Before submitting code, verify:
 
 ---
 
+## 17. hover:bg-accent/50 invisible inside bg-muted containers
+
+| Issue            | Description                                                                                                                                             |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Problem**      | `hover:bg-accent/50` produces no visible effect when the element is inside a `bg-muted` container                                                       |
+| **Root cause**   | In this project's theme `--accent === --muted` (`oklch(0.967 0.001 286.375)`). The semi-transparent accent composited over muted yields the same color. |
+| **Symptom**      | Hover class is applied (check computed styles) but background doesn't visually change                                                                   |
+| **Bad Pattern**  | `hover:bg-accent/50` on `TabsTrigger` inside `TabsList` (which has `bg-muted`)                                                                          |
+| **Good Pattern** | `hover:bg-muted-foreground/10` — adds a foreground tint, visible in both light and dark mode                                                            |
+
+**Diagnosis:**
+
+```js
+const r = window.getComputedStyle(document.documentElement);
+console.log(r.getPropertyValue('--accent'), r.getPropertyValue('--muted'));
+// If equal → bg-accent and bg-muted are the same color
+```
+
+**Rule:** Use `hover:bg-accent/50` only on `background`-colored containers. Inside `bg-muted`, use `hover:bg-muted-foreground/10`.
+
+---
+
+## 18. Hiding action buttons on hover
+
+| Issue            | Description                                                                                                                            |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Problem**      | Using `invisible group-hover:visible` (or `opacity-0 group-hover:opacity-100`) to hide buttons until the user hovers over a row        |
+| **Root cause**   | Actions that only appear on hover are invisible on touch devices, not keyboard-navigable, and force the user to "hunt" for affordances |
+| **Bad Pattern**  | `<button className="invisible group-hover/comment:visible">` on per-item edit/delete buttons                                           |
+| **Good Pattern** | Keep action buttons always visible; use `size="icon"` + `variant="ghost"` to keep them compact and unobtrusive                         |
+
+**Rule:** Action buttons (edit, delete, etc.) must always be visible. Never hide them behind hover states.
+
+---
+
+## 19. Uppercase text in labels
+
+| Issue            | Description                                                                                                |
+| ---------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Problem**      | Using `uppercase` (CSS `text-transform: uppercase` or Tailwind `uppercase` class) on labels or any UI text |
+| **Root cause**   | Project design convention: all-caps text is not allowed anywhere in the UI                                 |
+| **Bad Pattern**  | `<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Step ID</p>`             |
+| **Good Pattern** | `<p className="text-xs font-medium text-muted-foreground">Step ID</p>`                                     |
+
+**Rule:** Never use `uppercase` or `tracking-wide` (which implies all-caps intent) on labels or UI text. Use `font-medium`/`font-semibold` and `text-muted-foreground` for visual hierarchy instead.
+
+---
+
 ## Related Documentation
 
 - `.claude/docs/frontend.md` - Frontend architecture and patterns

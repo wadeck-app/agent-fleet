@@ -150,7 +150,9 @@ export class LogicalValidator {
 		const pattern = config.pattern!;
 
 		// Check if pattern has capture groups
-		const hasCaptureGroup = pattern.includes('(') && pattern.includes(')') && !pattern.match(/\(\?:/);
+		// True capturing group = opening paren NOT followed by ?: (non-capturing) or ?= / ?! (lookahead).
+		// Using a regex avoids the false negative when a pattern has both (?:...) and (...).
+		const hasCaptureGroup = /\((?!\?)/.test(pattern);
 
 		if (!hasCaptureGroup) {
 			this.issueCollector.addIssue({

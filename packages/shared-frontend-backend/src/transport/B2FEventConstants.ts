@@ -252,3 +252,14 @@ export const B2F_TICKET_STATUS_CHANGED = 'b2f:ticket:status_changed' as const;
 
 /** Ticket comment added event — carries the full comment so subscribers can append without re-fetching */
 export const B2F_TICKET_COMMENT_ADDED = 'b2f:ticket:comment_added' as const;
+
+/** Flow feedback submitted for a ticket */
+export const B2F_TICKET_FEEDBACK_SUBMITTED = 'b2f:ticket:feedback_submitted' as const;
+
+/**
+ * A new flow proposal was created or updated for a ticket (async redesign completed).
+ * Broadcast by FlowProposalsService after the FlowDesignerAgent finishes.
+ * Payload: { ticketId } — use as server-side filter so only the affected ticket's UI receives it.
+ * Use this instead of B2F_TICKET_UPDATED to avoid refreshing Flow Design tab on unrelated updates.
+ */
+export const B2F_FLOW_PROPOSAL_UPDATED = 'b2f:flow:proposal_updated' as const;

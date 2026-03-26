@@ -1,4 +1,5 @@
 import { Input } from '@framework/components/forms/Input';
+import { Label } from '@framework/components/forms/Label';
 import { FilterGrid } from '@framework/components/layout/FilterGrid';
 import { Button } from '@framework/components/primitives/Button';
 import { SelectInput } from '@framework/features/forms/inputs/SelectInput';
@@ -56,7 +57,10 @@ export function InterventionFilters({ filters }: InterventionFiltersProps) {
 		<FilterGrid cols={4}>
 			{/* Status Filter */}
 			<div>
-				<div className="mb-2 text-xs font-medium text-muted-foreground">Status</div>
+				{/* IV1 fix: use Label with htmlFor */}
+				<Label htmlFor="status-filter" className="mb-2 block text-xs font-medium text-muted-foreground">
+					Status
+				</Label>
 				<SelectInput
 					id="status-filter"
 					value={filters.fstate.status || '__all__'}
@@ -69,7 +73,9 @@ export function InterventionFilters({ filters }: InterventionFiltersProps) {
 
 			{/* Type Filter */}
 			<div>
-				<div className="mb-2 text-xs font-medium text-muted-foreground">Type</div>
+				<Label htmlFor="type-filter" className="mb-2 block text-xs font-medium text-muted-foreground">
+					Type
+				</Label>
 				<SelectInput
 					id="type-filter"
 					value={filters.fstate.type || '__all__'}
@@ -80,7 +86,9 @@ export function InterventionFilters({ filters }: InterventionFiltersProps) {
 
 			{/* Blocking Filter */}
 			<div>
-				<div className="mb-2 text-xs font-medium text-muted-foreground">Blocking</div>
+				<Label htmlFor="blocking-filter" className="mb-2 block text-xs font-medium text-muted-foreground">
+					Blocking
+				</Label>
 				<SelectInput
 					id="blocking-filter"
 					value={filters.fstate.blocking === undefined ? '__all__' : String(filters.fstate.blocking)}
@@ -93,7 +101,9 @@ export function InterventionFilters({ filters }: InterventionFiltersProps) {
 
 			{/* Task ID Filter */}
 			<div>
-				<div className="mb-2 text-xs font-medium text-muted-foreground">Task ID</div>
+				<Label htmlFor="task-filter" className="mb-2 block text-xs font-medium text-muted-foreground">
+					Task ID
+				</Label>
 				<Input
 					id="task-filter"
 					type="text"

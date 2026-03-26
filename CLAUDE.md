@@ -71,6 +71,14 @@ FlowExecutor.test.ts
 
 If the user is wrong, say it. If you disagree, explain why. Act as a peer, not a servant.
 
+## UX Patterns
+
+**Optimistic updates** — mandatory pattern for all local mutations:
+
+- **Create/Update**: update local state immediately → display item as `opacity-50 pointer-events-none` (pending) → on success: remove blur → on error: rollback + toast.
+- **Delete**: mark item with `line-through opacity-50` (pending) → on success: remove from list → on error: rollback + toast.
+- Never trigger a full list re-fetch after a local mutation — the WS event is only for _external_ updates (other tab/user).
+
 ## Additional references (only consult when needed)
 
 - `.claude/kb/lessons-learned.md` - Project-specific gotchas and solutions. **Important**: Append it with what you are learning!

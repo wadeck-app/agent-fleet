@@ -11,7 +11,10 @@ interface SelectWithSpinnerProps extends React.ComponentProps<typeof Select> {
 }
 
 /**
- * Select component with integrated loading spinner overlay.
+ * Select component with a loading spinner placed BESIDE the select (not inside it).
+ *
+ * The spinner is rendered as a flex sibling to the right of the select, so it never
+ * overlaps the trigger's chevron arrow (bug #1 fix).
  *
  * Usage:
  * ```tsx
@@ -25,14 +28,14 @@ interface SelectWithSpinnerProps extends React.ComponentProps<typeof Select> {
  */
 export function SelectWithSpinner({ loading, children, disabled, ...props }: SelectWithSpinnerProps) {
 	return (
-		<div className="relative inline-block">
-			<Select disabled={disabled || loading} {...props}>
-				{children}
-			</Select>
+		<div className="flex w-full min-w-[120px] items-center gap-2">
+			<div className="min-w-0 flex-1">
+				<Select disabled={disabled || loading} {...props}>
+					{children}
+				</Select>
+			</div>
 			{loading && (
-				<div className="absolute inset-y-0 right-2 flex items-center pointer-events-none">
-					<Loader2 className="size-3 animate-spin text-muted-foreground" />
-				</div>
+				<Loader2 data-testid="select-spinner" className="size-3 shrink-0 animate-spin text-muted-foreground" />
 			)}
 		</div>
 	);

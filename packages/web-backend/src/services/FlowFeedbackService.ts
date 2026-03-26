@@ -6,11 +6,14 @@ import type {
 	CreateFlowRetrospective,
 	FlowFeedback,
 	FlowRetrospective,
+	UpdateFlowFeedback,
 } from '@app/shared/api/flow-feedback.contract';
 import { ERROR_CODES, NotFoundException } from '@app/shared/exceptions/http-exceptions';
+import { B2F_TICKET_FEEDBACK_SUBMITTED } from '@app/shared/transport';
 
 import type { FlowFeedbackRepository } from '../repositories/FlowFeedbackRepository';
 import type { TicketsRepository } from '../repositories/TicketsRepository';
+import type { EventBroadcaster } from '../transport/EventBroadcaster';
 
 const log = createLogger('FlowFeedbackService');
 
@@ -32,7 +35,8 @@ const log = createLogger('FlowFeedbackService');
 export class FlowFeedbackService {
 	constructor(
 		private readonly repository: FlowFeedbackRepository,
-		private readonly ticketsRepository: TicketsRepository
+		private readonly ticketsRepository: TicketsRepository,
+		private readonly eventBroadcaster: EventBroadcaster
 	) {}
 
 	/**
@@ -57,16 +61,33 @@ export class FlowFeedbackService {
 
 		const created = await this.repository.create(feedback);
 
-		// Append audit history entry
-		await this.ticketsRepository.addHistoryEntry(ticketId, 'flow.feedback_submitted', {
-			feedbackId: created.id,
-			flowId: created.flowId,
-			rating: created.rating,
-		});
+		// Append audit history entry with full feedback content for the audit log (item AB fix)
+		await this.ticketsRepository.addHistoryEntry(
+			ticketId,
+			'flow.feedback_submitted',
+			{
+				feedbackId: created.id,
+				flowId: created.flowId,
+				rating: created.rating,
+				// Surface feedback content so Activity/Audit tabs can display meaningful detail
+				wentWell: created.wentWell,
+				wentWrong: created.wentWrong,
+				suggestions: created.suggestions ?? [],
+			},
+			// Pass author so the Activity tab can show who submitted (item AA fix)
+			created.author
+		);
 
 		// Link feedback ID to ticket record
 		await this.ticketsRepository.update(ticketId, {
 			flowFeedbackId: created.id,
+		});
+
+		// Notify subscribers that feedback was submitted for this ticket
+		this.eventBroadcaster.broadcast(B2F_TICKET_FEEDBACK_SUBMITTED, {
+			ticketId,
+			feedbackId: created.id,
+			rating: created.rating,
 		});
 
 		log.info(`Flow feedback ${created.id} submitted for ticket ${ticketId}`);
@@ -108,6 +129,70 @@ export class FlowFeedbackService {
 
 		log.info(`Flow retrospective ${created.id} generated for ticket ${ticketId}`);
 		return created;
+	}
+
+	/**
+	 * Update an existing feedback entry.
+	 *
+	 * - Finds feedback by ID (throws NotFoundException if not found)
+	 * - Persists the partial update
+	 * - Emits B2F_TICKET_FEEDBACK_SUBMITTED so subscribers receive the latest state
+	 */
+	async updateFeedback(feedbackId: string, data: UpdateFlowFeedback): Promise<FlowFeedback> {
+		const existing = await this.repository.findById(feedbackId);
+		if (!existing) {
+			throw new NotFoundException(`Feedback ${feedbackId} not found`, ERROR_CODES.RESOURCE_NOT_FOUND);
+		}
+
+		const updated = await this.repository.update(feedbackId, data);
+
+		// Append audit history entry so the audit log reflects the update
+		if (updated.ticketId) {
+			await this.ticketsRepository.addHistoryEntry(updated.ticketId, 'flow.feedback_updated', {
+				feedbackId,
+				rating: updated.rating,
+			});
+		}
+
+		this.eventBroadcaster.broadcast(B2F_TICKET_FEEDBACK_SUBMITTED, {
+			ticketId: updated.ticketId,
+			feedbackId: updated.id,
+			rating: updated.rating,
+		});
+
+		log.info(`Flow feedback ${feedbackId} updated`);
+		return updated;
+	}
+
+	/**
+	 * Delete an existing feedback entry.
+	 *
+	 * - Finds feedback by ID to obtain the ticketId (throws NotFoundException if not found)
+	 * - Deletes from repository
+	 * - Emits B2F_TICKET_FEEDBACK_SUBMITTED so subscribers can clear the feedback display
+	 */
+	async deleteFeedback(feedbackId: string): Promise<void> {
+		const existing = await this.repository.findById(feedbackId);
+		if (!existing) {
+			throw new NotFoundException(`Feedback ${feedbackId} not found`, ERROR_CODES.RESOURCE_NOT_FOUND);
+		}
+
+		await this.repository.delete(feedbackId);
+
+		// Clear the flowFeedbackId link on the ticket so it no longer points to a deleted entry
+		if (existing.ticketId) {
+			await this.ticketsRepository.update(existing.ticketId, { flowFeedbackId: undefined });
+		}
+
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		this.eventBroadcaster.broadcast(B2F_TICKET_FEEDBACK_SUBMITTED, {
+			ticketId: existing.ticketId,
+			feedbackId: existing.id,
+			rating: existing.rating,
+			deleted: true,
+		} as any);
+
+		log.info(`Flow feedback ${feedbackId} deleted`);
 	}
 
 	/**

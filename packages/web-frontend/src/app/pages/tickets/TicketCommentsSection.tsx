@@ -154,8 +154,9 @@ export function TicketCommentsSection({ ticketId, sortOrder = 'asc', showLabel =
 		return (
 			<div>
 				{showLabel && <Label>Comments</Label>}
-				<div className="mt-2 flex justify-center">
-					<Loader2 className="size-4 animate-spin text-muted-foreground" />
+				<div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
+					<Loader2 className="size-6 animate-spin" />
+					<p className="text-sm">Loading...</p>
 				</div>
 			</div>
 		);
@@ -203,8 +204,10 @@ export function TicketCommentsSection({ ticketId, sortOrder = 'asc', showLabel =
 
 			{/* Add comment form - always visible */}
 			<div className="mt-4 space-y-2">
-				<Label>Add a comment</Label>
+				{/* htmlFor links label to textarea for accessibility — bug #6 fix */}
+				<Label htmlFor="add-comment-textarea">Add a comment</Label>
 				<Textarea
+					id="add-comment-textarea"
 					value={newComment}
 					onChange={e => setNewComment(e.target.value)}
 					onKeyDown={e => {

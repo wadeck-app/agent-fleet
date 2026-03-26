@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
@@ -6,6 +7,7 @@ import { formatRelativeTime } from '@framework/utils/formatting/DateFormat';
 import type { TicketHistoryEntry } from '@shared/api/tickets.contract';
 import { B2F_TASKS_UPDATED, B2F_TICKET_COMMENT_ADDED, B2F_TICKET_UPDATED } from '@shared/transport';
 import { Loader2 } from 'lucide-react';
+import remarkGfm from 'remark-gfm';
 
 import { useTransport } from '@/transport';
 
@@ -55,21 +57,26 @@ function getAuditEntryData(
 				return { label: 'Comment added', content: null };
 			}
 			if (content.length <= 100 || isExpanded) {
-				return { label: 'Comment added', content: <p>{content}</p> };
+				// B8 fix: render comment content as markdown (same as TicketCommentsSection)
+				return {
+					label: 'Comment added',
+					content: <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>,
+				};
 			}
+			// B8 fix: render truncated content as markdown with an expand button
 			return {
 				label: 'Comment added',
 				content: (
-					<p>
-						{content.slice(0, 100)}{' '}
+					<div>
+						<ReactMarkdown remarkPlugins={[remarkGfm]}>{`${content.slice(0, 100)}...`}</ReactMarkdown>
 						<Button
 							variant="ghost"
 							className="h-auto cursor-pointer p-0 text-xs underline hover:text-foreground"
 							onClick={() => onExpand(entry.id)}
 						>
-							[...]
+							Show more
 						</Button>
-					</p>
+					</div>
 				),
 			};
 		}
@@ -155,6 +162,60 @@ function getAuditEntryData(
 			}
 
 			return { label: 'Ticket updated', content: null };
+		}
+		case 'flow.feedback_submitted': {
+			const rating = entry.data.rating as number | undefined;
+			const wentWell = entry.data.wentWell as string[] | undefined;
+			const wentWrong = entry.data.wentWrong as string[] | undefined;
+			const suggestions = entry.data.suggestions as string[] | undefined;
+			return {
+				label: 'Flow feedback submitted',
+				content: (
+					<div className="space-y-1.5">
+						{rating != null && (
+							<p className="text-xs">
+								Rating: <strong>{rating}/5</strong>
+							</p>
+						)}
+						{wentWell && wentWell.length > 0 && (
+							<div className="space-y-0.5">
+								<p className="text-xs text-muted-foreground">What went well</p>
+								<ul className="list-disc list-inside">
+									{wentWell.map((w, i) => (
+										<li key={i} className="text-xs">
+											{w}
+										</li>
+									))}
+								</ul>
+							</div>
+						)}
+						{wentWrong && wentWrong.length > 0 && (
+							<div className="space-y-0.5">
+								<p className="text-xs text-muted-foreground">What went wrong</p>
+								<ul className="list-disc list-inside">
+									{wentWrong.map((w, i) => (
+										<li key={i} className="text-xs">
+											{w}
+										</li>
+									))}
+								</ul>
+							</div>
+						)}
+						{suggestions && suggestions.length > 0 && (
+							<div className="space-y-0.5">
+								<p className="text-xs text-muted-foreground">Suggestions</p>
+								<ul className="list-disc list-inside">
+									{suggestions.map((s, i) => (
+										<li key={i} className="text-xs">
+											{s}
+										</li>
+									))}
+								</ul>
+							</div>
+						)}
+					</div>
+				),
+			};
 		}
 		default:
 			return { label: entry.event, content: null };
@@ -258,12 +319,10 @@ export function TicketAuditLogSection({
 	if (loading) {
 		return (
 			<div>
-				{showLabel && (
-					<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Audit Log</p>
-				)}
-				<div className="flex items-center gap-2">
-					<Loader2 className="size-4 animate-spin text-muted-foreground" />
-					<span className="text-sm text-muted-foreground">Loading...</span>
+				{showLabel && <p className="text-xs font-medium text-muted-foreground tracking-wide mb-2">Audit Log</p>}
+				<div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
+					<Loader2 className="size-6 animate-spin" />
+					<p className="text-sm">Loading...</p>
 				</div>
 			</div>
 		);
@@ -271,9 +330,7 @@ export function TicketAuditLogSection({
 
 	return (
 		<div>
-			{showLabel && (
-				<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Audit Log</p>
-			)}
+			{showLabel && <p className="text-xs font-medium text-muted-foreground tracking-wide mb-2">Audit Log</p>}
 			{sortedEntries.length === 0 ? (
 				<p className="text-sm text-muted-foreground">No activity yet</p>
 			) : (

@@ -167,6 +167,10 @@ describe('TicketsController', () => {
 			addReviewThread: vi.fn(),
 			addCommentToThread: vi.fn(),
 			resolveThread: vi.fn(),
+			updateThread: vi.fn(),
+			deleteThread: vi.fn(),
+			deleteComment: vi.fn(),
+			updateComment: vi.fn(),
 		} as unknown as FlowProposalsService;
 
 		controller = new TicketsController(mockTicketsService, mockFlowFeedbackService, mockFlowProposalsService);
@@ -211,6 +215,19 @@ describe('TicketsController', () => {
 			expect(routes.has('PATCH /api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId')).toBe(
 				true
 			);
+			expect(
+				routes.has('DELETE /api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId')
+			).toBe(true);
+			expect(
+				routes.has(
+					'DELETE /api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId/comments/:commentId'
+				)
+			).toBe(true);
+			expect(
+				routes.has(
+					'PATCH /api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId/comments/:commentId'
+				)
+			).toBe(true);
 		});
 
 		it('should expose static routes property merging both contracts', () => {
@@ -834,27 +851,30 @@ describe('TicketsController', () => {
 	});
 
 	// ---------------------------------------------------------------------------
-	// PATCH .../review-threads/:threadId — resolve thread
+	// PATCH .../review-threads/:threadId — update thread
 	// ---------------------------------------------------------------------------
 
-	describe('PATCH .../review-threads/:threadId — resolve thread', () => {
-		it('should call resolveThread with ticketId, proposalId, and threadId', async () => {
+	describe('PATCH .../review-threads/:threadId — update thread', () => {
+		it('should call updateThread with ticketId, proposalId, threadId, and body', async () => {
 			const resolved = { ...makeSampleThread(), status: 'resolved' as const };
-			vi.mocked(mockFlowProposalsService.resolveThread).mockResolvedValue(resolved);
+			vi.mocked(mockFlowProposalsService.updateThread).mockResolvedValue(resolved);
 
 			const handler = routes.get(
 				'PATCH /api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId'
 			);
 			const result = await handler!({
 				params: { ticketId: 'ticket-1', proposalId: 'proposal-1', threadId: 'thread-1' },
+				body: { status: 'resolved' },
 			});
 
-			expect(mockFlowProposalsService.resolveThread).toHaveBeenCalledWith('ticket-1', 'proposal-1', 'thread-1');
+			expect(mockFlowProposalsService.updateThread).toHaveBeenCalledWith('ticket-1', 'proposal-1', 'thread-1', {
+				status: 'resolved',
+			});
 			expect(result).toEqual(resolved);
 		});
 
 		it('should propagate NotFoundException when thread does not exist', async () => {
-			vi.mocked(mockFlowProposalsService.resolveThread).mockRejectedValue(
+			vi.mocked(mockFlowProposalsService.updateThread).mockRejectedValue(
 				new NotFoundException('Thread missing not found')
 			);
 
@@ -863,7 +883,153 @@ describe('TicketsController', () => {
 			);
 
 			await expect(
+				handler!({
+					params: { ticketId: 'ticket-1', proposalId: 'proposal-1', threadId: 'missing' },
+					body: { status: 'resolved' },
+				})
+			).rejects.toThrow(NotFoundException);
+		});
+	});
+
+	// ---------------------------------------------------------------------------
+	// DELETE .../review-threads/:threadId — delete thread
+	// ---------------------------------------------------------------------------
+
+	describe('DELETE .../review-threads/:threadId — delete thread', () => {
+		it('should call deleteThread with ticketId, proposalId, and threadId', async () => {
+			vi.mocked(mockFlowProposalsService.deleteThread).mockResolvedValue({ success: true });
+
+			const handler = routes.get(
+				'DELETE /api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId'
+			);
+			const result = await handler!({
+				params: { ticketId: 'ticket-1', proposalId: 'proposal-1', threadId: 'thread-1' },
+			});
+
+			expect(mockFlowProposalsService.deleteThread).toHaveBeenCalledWith('ticket-1', 'proposal-1', 'thread-1');
+			expect(result).toEqual({ success: true });
+		});
+
+		it('should propagate NotFoundException when thread does not exist', async () => {
+			vi.mocked(mockFlowProposalsService.deleteThread).mockRejectedValue(
+				new NotFoundException('Thread missing not found')
+			);
+
+			const handler = routes.get(
+				'DELETE /api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId'
+			);
+
+			await expect(
 				handler!({ params: { ticketId: 'ticket-1', proposalId: 'proposal-1', threadId: 'missing' } })
+			).rejects.toThrow(NotFoundException);
+		});
+	});
+
+	// ---------------------------------------------------------------------------
+	// DELETE .../review-threads/:threadId/comments/:commentId — delete comment
+	// ---------------------------------------------------------------------------
+
+	describe('DELETE .../review-threads/:threadId/comments/:commentId — delete comment', () => {
+		it('should call deleteComment with all ids and return threadDeleted: true when last comment', async () => {
+			vi.mocked(mockFlowProposalsService.deleteComment).mockResolvedValue({
+				success: true,
+				threadDeleted: true,
+			});
+
+			const handler = routes.get(
+				'DELETE /api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId/comments/:commentId'
+			);
+			const result = await handler!({
+				params: {
+					ticketId: 'ticket-1',
+					proposalId: 'proposal-1',
+					threadId: 'thread-1',
+					commentId: 'comment-1',
+				},
+			});
+
+			expect(mockFlowProposalsService.deleteComment).toHaveBeenCalledWith(
+				'ticket-1',
+				'proposal-1',
+				'thread-1',
+				'comment-1'
+			);
+			expect(result).toEqual({ success: true, threadDeleted: true });
+		});
+
+		it('should return threadDeleted: false when other comments remain', async () => {
+			vi.mocked(mockFlowProposalsService.deleteComment).mockResolvedValue({
+				success: true,
+				threadDeleted: false,
+			});
+
+			const handler = routes.get(
+				'DELETE /api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId/comments/:commentId'
+			);
+			const result = await handler!({
+				params: {
+					ticketId: 'ticket-1',
+					proposalId: 'proposal-1',
+					threadId: 'thread-1',
+					commentId: 'comment-1',
+				},
+			});
+
+			expect(result).toEqual({ success: true, threadDeleted: false });
+		});
+	});
+
+	// ---------------------------------------------------------------------------
+	// PATCH .../review-threads/:threadId/comments/:commentId — update comment
+	// ---------------------------------------------------------------------------
+
+	describe('PATCH .../review-threads/:threadId/comments/:commentId — update comment', () => {
+		it('should call updateComment with all ids and body, return updated comment', async () => {
+			const updated = { ...makeSampleComment(), content: 'Updated content' };
+			vi.mocked(mockFlowProposalsService.updateComment).mockResolvedValue(updated);
+
+			const handler = routes.get(
+				'PATCH /api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId/comments/:commentId'
+			);
+			const result = await handler!({
+				params: {
+					ticketId: 'ticket-1',
+					proposalId: 'proposal-1',
+					threadId: 'thread-1',
+					commentId: 'comment-1',
+				},
+				body: { content: 'Updated content' },
+			});
+
+			expect(mockFlowProposalsService.updateComment).toHaveBeenCalledWith(
+				'ticket-1',
+				'proposal-1',
+				'thread-1',
+				'comment-1',
+				{ content: 'Updated content' }
+			);
+			expect(result).toEqual(updated);
+		});
+
+		it('should propagate NotFoundException when comment does not exist', async () => {
+			vi.mocked(mockFlowProposalsService.updateComment).mockRejectedValue(
+				new NotFoundException('Comment missing not found')
+			);
+
+			const handler = routes.get(
+				'PATCH /api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId/comments/:commentId'
+			);
+
+			await expect(
+				handler!({
+					params: {
+						ticketId: 'ticket-1',
+						proposalId: 'proposal-1',
+						threadId: 'thread-1',
+						commentId: 'missing',
+					},
+					body: { content: 'x' },
+				})
 			).rejects.toThrow(NotFoundException);
 		});
 	});

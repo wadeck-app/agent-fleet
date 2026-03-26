@@ -96,9 +96,9 @@ export function TriggeredTasksSection({
 		return (
 			<div>
 				{showLabel && <Label>Triggered Tasks</Label>}
-				<div className="mt-2 flex items-center gap-2">
-					<Loader2 className="size-4 animate-spin text-muted-foreground" />
-					<span className="text-sm text-muted-foreground">Loading...</span>
+				<div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
+					<Loader2 className="size-6 animate-spin" />
+					<p className="text-sm">Loading...</p>
 				</div>
 			</div>
 		);

@@ -165,6 +165,10 @@ export function TicketDetailLayoutB({ ticket, ticketId, onUpdate, onRefresh }: T
 											{s.label}
 										</SelectItem>
 									))}
+									{/* Fallback: show raw status value when config hasn't loaded yet — bug #5 */}
+									{!statusConfig.statuses.find(s => s.id === localStatus) && (
+										<SelectItem value={localStatus}>{localStatus}</SelectItem>
+									)}
 								</SelectContent>
 							</SelectWithSpinner>
 						</div>

@@ -1,3 +1,5 @@
+import { MemoryRouter } from 'react-router-dom';
+
 import type { FlowProposal } from '@shared/api/flow-proposals.contract';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -33,6 +35,15 @@ vi.mock('@framework/features/toast/ToastContext', () => ({
 	useToast: () => ({ showToast: mockShowToast }),
 }));
 
+// Mock useTransport — FlowProposalSection subscribes to B2F_TICKET_UPDATED (r2 fix)
+vi.mock('@/transport', () => ({
+	useTransport: () => ({
+		transport: {
+			subscribe: vi.fn(() => () => {}),
+		},
+	}),
+}));
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -55,6 +66,7 @@ const defaultHookResult = {
 	isLoading: false,
 	error: null,
 	refresh: vi.fn(),
+	refreshSilent: vi.fn(),
 };
 
 describe('FlowProposalSection', () => {
@@ -63,15 +75,19 @@ describe('FlowProposalSection', () => {
 	});
 
 	describe('loading state', () => {
-		it('should show "Loading flow proposals..." when isLoading is true', () => {
+		it('should show loading spinner when isLoading is true', () => {
 			vi.mocked(useFlowProposals).mockReturnValue({
 				...defaultHookResult,
 				isLoading: true,
 			});
 
-			render(<FlowProposalSection ticketId="ticket-1" />);
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
 
-			expect(screen.getByText('Loading flow proposals...')).toBeInTheDocument();
+			expect(screen.getByText('Loading...')).toBeInTheDocument();
 		});
 	});
 
@@ -84,7 +100,11 @@ describe('FlowProposalSection', () => {
 				refresh: mockRefresh,
 			});
 
-			render(<FlowProposalSection ticketId="ticket-1" />);
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
 
 			expect(screen.getByText(/Failed to load proposals:/)).toBeInTheDocument();
 			expect(screen.getByRole('button', { name: /Retry/i })).toBeInTheDocument();
@@ -99,7 +119,11 @@ describe('FlowProposalSection', () => {
 				refresh: mockRefresh,
 			});
 
-			render(<FlowProposalSection ticketId="ticket-1" />);
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
 
 			await user.click(screen.getByRole('button', { name: /Retry/i }));
 
@@ -111,7 +135,11 @@ describe('FlowProposalSection', () => {
 		it('should show "No flow design has been requested yet" message', () => {
 			vi.mocked(useFlowProposals).mockReturnValue(defaultHookResult);
 
-			render(<FlowProposalSection ticketId="ticket-1" />);
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
 
 			expect(screen.getByText(/No flow design has been requested yet/)).toBeInTheDocument();
 		});
@@ -119,7 +147,11 @@ describe('FlowProposalSection', () => {
 		it('should show "Request Flow Design" button', () => {
 			vi.mocked(useFlowProposals).mockReturnValue(defaultHookResult);
 
-			render(<FlowProposalSection ticketId="ticket-1" />);
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
 
 			expect(screen.getByRole('button', { name: /Request Flow Design/i })).toBeInTheDocument();
 		});
@@ -130,12 +162,17 @@ describe('FlowProposalSection', () => {
 			vi.mocked(useFlowProposals).mockReturnValue({ ...defaultHookResult, refresh: mockRefresh });
 			vi.mocked(flowProposalsApi.requestFlowDesign).mockResolvedValue(mockProposal);
 
-			render(<FlowProposalSection ticketId="ticket-1" />);
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
 
 			await user.click(screen.getByRole('button', { name: /Request Flow Design/i }));
 
 			await waitFor(() => {
-				expect(flowProposalsApi.requestFlowDesign).toHaveBeenCalledWith('ticket-1', undefined);
+				// c fix: questionsContext is now the third argument (undefined when no answers filled)
+				expect(flowProposalsApi.requestFlowDesign).toHaveBeenCalledWith('ticket-1', undefined, undefined);
 			});
 		});
 	});
@@ -148,7 +185,11 @@ describe('FlowProposalSection', () => {
 				currentProposal: mockProposal,
 			});
 
-			render(<FlowProposalSection ticketId="ticket-1" />);
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
 
 			expect(screen.getByText('v1')).toBeInTheDocument();
 			expect(screen.getByText('Pending Review')).toBeInTheDocument();
@@ -169,7 +210,11 @@ describe('FlowProposalSection', () => {
 				status: 'approved',
 			});
 
-			render(<FlowProposalSection ticketId="ticket-1" onTicketRefresh={onTicketRefresh} />);
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" onTicketRefresh={onTicketRefresh} />
+				</MemoryRouter>
+			);
 
 			await user.click(screen.getByRole('button', { name: /^Approve$/i }));
 
@@ -194,10 +239,14 @@ describe('FlowProposalSection', () => {
 				status: 'rejected',
 			});
 
-			render(<FlowProposalSection ticketId="ticket-1" />);
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
 
-			// Click Reject to show the rejection form
-			await user.click(screen.getByRole('button', { name: /^Reject$/i }));
+			// Click "Reject ▾" to show the rejection form
+			await user.click(screen.getByRole('button', { name: /Reject/i }));
 
 			// Rejection textarea should appear
 			expect(screen.getByPlaceholderText(/Reason for rejection/i)).toBeInTheDocument();
@@ -206,14 +255,10 @@ describe('FlowProposalSection', () => {
 			await user.type(screen.getByPlaceholderText(/Reason for rejection/i), 'Not good enough');
 
 			// Confirm reject
-			await user.click(screen.getByRole('button', { name: /Confirm reject/i }));
+			await user.click(screen.getByRole('button', { name: /Confirm rejection/i }));
 
 			await waitFor(() => {
-				expect(flowProposalsApi.rejectProposal).toHaveBeenCalledWith(
-					'ticket-1',
-					'prop-1',
-					'Not good enough'
-				);
+				expect(flowProposalsApi.rejectProposal).toHaveBeenCalledWith('ticket-1', 'prop-1', 'Not good enough');
 			});
 		});
 
@@ -225,7 +270,11 @@ describe('FlowProposalSection', () => {
 				currentProposal: mockProposal,
 			});
 
-			render(<FlowProposalSection ticketId="ticket-1" />);
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
 
 			await user.click(screen.getByRole('button', { name: /Add review thread/i }));
 
@@ -251,7 +300,11 @@ describe('FlowProposalSection', () => {
 				createdAt: new Date().toISOString(),
 			});
 
-			render(<FlowProposalSection ticketId="ticket-1" />);
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
 
 			await user.click(screen.getByRole('button', { name: /Add review thread/i }));
 
@@ -294,7 +347,11 @@ describe('FlowProposalSection', () => {
 				currentProposal: approvedProposal,
 			});
 
-			render(<FlowProposalSection ticketId="ticket-1" />);
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
 
 			expect(screen.getByText('Approved')).toBeInTheDocument();
 		});
@@ -306,7 +363,11 @@ describe('FlowProposalSection', () => {
 				currentProposal: approvedProposal,
 			});
 
-			render(<FlowProposalSection ticketId="ticket-1" />);
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
 
 			// The approved timestamp is displayed via toLocaleString() — just check "Approved at" label exists
 			expect(screen.getByText(/Approved at/i)).toBeInTheDocument();
@@ -319,11 +380,323 @@ describe('FlowProposalSection', () => {
 				currentProposal: approvedProposal,
 			});
 
-			render(<FlowProposalSection ticketId="ticket-1" />);
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
 
 			// Both ProposalView inline button and the outer section button appear for terminal states
 			const buttons = screen.getAllByRole('button', { name: /Request new design/i });
 			expect(buttons.length).toBeGreaterThanOrEqual(1);
+		});
+	});
+
+	// ---------------------------------------------------------------------------
+	// G1 fix: form stays visible with blur overlay when requesting
+	// ---------------------------------------------------------------------------
+	describe('g1 — request form blur during isRequesting', () => {
+		it('form wrapper has opacity-50 class while request is in-flight', async () => {
+			const user = userEvent.setup();
+			let resolveRequest!: () => void;
+			vi.mocked(useFlowProposals).mockReturnValue(defaultHookResult);
+			vi.mocked(flowProposalsApi.requestFlowDesign).mockReturnValue(
+				new Promise(res => {
+					resolveRequest = () => res(mockProposal);
+				})
+			);
+
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
+
+			await user.click(screen.getByRole('button', { name: /Request Flow Design/i }));
+
+			// Blurred wrapper should have opacity-50 class
+			expect(document.querySelector('.opacity-50')).not.toBeNull();
+
+			// Clean up
+			resolveRequest();
+		});
+	});
+
+	// ---------------------------------------------------------------------------
+	// P fix: reject button uses ChevronRight, not ▾
+	// ---------------------------------------------------------------------------
+	describe('p — reject button icon pattern', () => {
+		it('reject button does not contain ▾ character', () => {
+			vi.mocked(useFlowProposals).mockReturnValue({
+				...defaultHookResult,
+				proposals: [mockProposal],
+				currentProposal: mockProposal,
+			});
+
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
+
+			const rejectButton = screen.getByRole('button', { name: /Reject/i });
+			expect(rejectButton.textContent).not.toContain('▾');
+		});
+	});
+
+	// ---------------------------------------------------------------------------
+	// R1 fix: redesigning banner shown after rejection
+	// ---------------------------------------------------------------------------
+	describe('r1 — redesigning banner after rejection', () => {
+		it('shows "AI is redesigning" banner after rejection is confirmed', async () => {
+			const user = userEvent.setup();
+			const mockRefresh = vi.fn();
+			vi.mocked(useFlowProposals).mockReturnValue({
+				...defaultHookResult,
+				proposals: [mockProposal],
+				currentProposal: mockProposal,
+				refresh: mockRefresh,
+			});
+			vi.mocked(flowProposalsApi.rejectProposal).mockResolvedValue({
+				...mockProposal,
+				status: 'rejected',
+			});
+
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
+
+			// Open reject form
+			await user.click(screen.getByRole('button', { name: /Reject/i }));
+			// Confirm rejection
+			await user.click(screen.getByRole('button', { name: /Confirm rejection/i }));
+
+			await waitFor(() => {
+				expect(screen.getByText(/AI is redesigning/i)).toBeInTheDocument();
+			});
+		});
+	});
+
+	// ---------------------------------------------------------------------------
+	// BA fix: adaptations hidden on first design (version === 1, no reusedFromFlowId)
+	// ---------------------------------------------------------------------------
+	describe('ba — adaptations section visibility', () => {
+		it('does NOT render adaptations section for first design (version=1, no reusedFromFlowId)', () => {
+			const firstDesignWithAdaptations: FlowProposal = {
+				...mockProposal,
+				version: 1,
+				reusedFromFlowId: undefined,
+				adaptations: ['Adapted step X from ticket Y'],
+			};
+			vi.mocked(useFlowProposals).mockReturnValue({
+				...defaultHookResult,
+				proposals: [firstDesignWithAdaptations],
+				currentProposal: firstDesignWithAdaptations,
+			});
+
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
+
+			expect(screen.queryByText('Adaptations')).not.toBeInTheDocument();
+		});
+
+		it('DOES render adaptations section on redesign (version > 1)', () => {
+			const redesignWithAdaptations: FlowProposal = {
+				...mockProposal,
+				version: 2,
+				adaptations: ['Changed step A per reviewer comment'],
+			};
+			vi.mocked(useFlowProposals).mockReturnValue({
+				...defaultHookResult,
+				proposals: [redesignWithAdaptations],
+				currentProposal: redesignWithAdaptations,
+			});
+
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
+
+			expect(screen.getByText('Adaptations')).toBeInTheDocument();
+		});
+
+		it('does NOT render adaptations section when reusedFromFlowId is set but version=1 (ba/ce fix: version must be > 1)', () => {
+			// ba/ce fix: reusedFromFlowId alone is not enough — version must be > 1
+			const reusedV1WithAdaptations: FlowProposal = {
+				...mockProposal,
+				version: 1,
+				reusedFromFlowId: 'base-flow-123',
+				adaptations: ['Reused base flow, adjusted inputs'],
+			};
+			vi.mocked(useFlowProposals).mockReturnValue({
+				...defaultHookResult,
+				proposals: [reusedV1WithAdaptations],
+				currentProposal: reusedV1WithAdaptations,
+			});
+
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
+
+			expect(screen.queryByText('Adaptations')).not.toBeInTheDocument();
+		});
+	});
+
+	// ---------------------------------------------------------------------------
+	// C fix: open questions moved from tooltip to inline "Questions from the AI" section
+	// ---------------------------------------------------------------------------
+	describe('c — open questions inline section', () => {
+		it('confidence trigger is present without showing tooltip open questions', () => {
+			const proposalWithClearReasoning: FlowProposal = {
+				...mockProposal,
+				confidenceScore: 95,
+				openQuestions: [],
+				reasoning: 'The flow is straightforward. All requirements are clear. Steps were defined precisely.',
+			};
+			vi.mocked(useFlowProposals).mockReturnValue({
+				...defaultHookResult,
+				proposals: [proposalWithClearReasoning],
+				currentProposal: proposalWithClearReasoning,
+			});
+
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
+
+			expect(screen.getByText(/Confidence: 95%/)).toBeInTheDocument();
+			// No inline questions section when openQuestions is empty
+			expect(screen.queryByText('Questions from the AI')).not.toBeInTheDocument();
+		});
+
+		it('shows "Questions from the AI" collapsible section when openQuestions has items', () => {
+			const proposalWithQuestions: FlowProposal = {
+				...mockProposal,
+				confidenceScore: 60,
+				openQuestions: ['What auth method is required?', 'What is the expected data volume?'],
+			};
+			vi.mocked(useFlowProposals).mockReturnValue({
+				...defaultHookResult,
+				proposals: [proposalWithQuestions],
+				currentProposal: proposalWithQuestions,
+			});
+
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
+
+			// The collapsible toggle must be visible
+			expect(screen.getByText('Questions from the AI')).toBeInTheDocument();
+		});
+
+		it('expands "Questions from the AI" section and shows questions with answer textareas', async () => {
+			const user = userEvent.setup();
+			const proposalWithQuestions: FlowProposal = {
+				...mockProposal,
+				confidenceScore: 60,
+				openQuestions: ['What auth method is required?', 'What is the expected data volume?'],
+			};
+			vi.mocked(useFlowProposals).mockReturnValue({
+				...defaultHookResult,
+				proposals: [proposalWithQuestions],
+				currentProposal: proposalWithQuestions,
+			});
+
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
+
+			// Expand the section
+			await user.click(screen.getByText('Questions from the AI'));
+
+			await waitFor(() => {
+				expect(screen.getByText('What auth method is required?')).toBeInTheDocument();
+				expect(screen.getByText('What is the expected data volume?')).toBeInTheDocument();
+			});
+		});
+
+		it('does not show "Questions from the AI" section when openQuestions is absent', () => {
+			const proposalWithNoQuestions: FlowProposal = {
+				...mockProposal,
+				confidenceScore: 90,
+				openQuestions: undefined,
+			};
+			vi.mocked(useFlowProposals).mockReturnValue({
+				...defaultHookResult,
+				proposals: [proposalWithNoQuestions],
+				currentProposal: proposalWithNoQuestions,
+			});
+
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
+
+			expect(screen.queryByText('Questions from the AI')).not.toBeInTheDocument();
+		});
+	});
+
+	// ---------------------------------------------------------------------------
+	// K fix: Open in Flow Editor — disabled for non-approved, active link when approved
+	// ---------------------------------------------------------------------------
+	describe('k — open in flow editor link', () => {
+		it('shows enabled "Visualize" button (not a link) for non-approved proposals', () => {
+			// D2 fix: pending_review proposals show a "Visualize" Dialog trigger; "Open in Flow Editor"
+			// link is only shown when the proposal is approved (flow registered in registry)
+			vi.mocked(useFlowProposals).mockReturnValue({
+				...defaultHookResult,
+				proposals: [mockProposal],
+				currentProposal: mockProposal,
+			});
+
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
+
+			// Enabled "Visualize" button is present for non-approved proposals
+			const btn = screen.getByRole('button', { name: /Visualize/i });
+			expect(btn).not.toBeDisabled();
+			// No "Open in Flow Editor" link or button for non-approved proposals
+			expect(screen.queryByRole('link', { name: /Open in Flow Editor/i })).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /Open in Flow Editor/i })).not.toBeInTheDocument();
+		});
+
+		it('shows active link to /flows/{flowId}/edit when proposal is approved', () => {
+			const approvedProposal: FlowProposal = {
+				...mockProposal,
+				status: 'approved',
+				approvedAt: new Date().toISOString(),
+			};
+			vi.mocked(useFlowProposals).mockReturnValue({
+				...defaultHookResult,
+				proposals: [approvedProposal],
+				currentProposal: approvedProposal,
+			});
+
+			render(
+				<MemoryRouter>
+					<FlowProposalSection ticketId="ticket-1" />
+				</MemoryRouter>
+			);
+
+			const link = screen.getByRole('link', { name: /Open in Flow Editor/i });
+			expect(link.getAttribute('href')).toBe('/flows/flow-abc/edit');
 		});
 	});
 });

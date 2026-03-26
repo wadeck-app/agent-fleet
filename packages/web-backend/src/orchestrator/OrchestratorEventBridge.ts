@@ -129,8 +129,10 @@ export class OrchestratorEventBridge {
 			// Task events (aggregate only - specific task events are emitted by TasksService)
 			stateManager.on(StateEvent.TASK_CREATED, () => {
 				log.debug('TASK_CREATED');
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
+				// Do NOT broadcast B2F_TASKS_UPDATED here: this event fires before
+				// TasksService.syncFromOrchestratorTask() has persisted the task to web-backend
+				// storage, so the frontend would fetch an empty list (count = 0). The broadcast
+				// is issued by syncFromOrchestratorTask() after the task is safely persisted.
 			});
 
 			stateManager.on(StateEvent.TASK_UPDATED, () => {

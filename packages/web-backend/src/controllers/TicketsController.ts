@@ -249,13 +249,65 @@ export default class TicketsController implements LazyController<typeof TICKETS_
 
 		/**
 		 * PATCH /api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId
-		 * Resolve a review thread
+		 * Update a review thread (resolve and/or change selector)
 		 */
 		addProposal(
 			'PATCH',
 			'/api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId',
+			async ({ params, body }) => {
+				return this.flowProposalsService.updateThread(
+					params.ticketId,
+					params.proposalId,
+					params.threadId,
+					body
+				);
+			}
+		);
+
+		/**
+		 * DELETE /api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId
+		 * Delete a review thread and all its comments
+		 */
+		addProposal(
+			'DELETE',
+			'/api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId',
 			async ({ params }) => {
-				return this.flowProposalsService.resolveThread(params.ticketId, params.proposalId, params.threadId);
+				return this.flowProposalsService.deleteThread(params.ticketId, params.proposalId, params.threadId);
+			}
+		);
+
+		/**
+		 * DELETE /api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId/comments/:commentId
+		 * Delete a comment (deletes thread if it was the last comment)
+		 */
+		addProposal(
+			'DELETE',
+			'/api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId/comments/:commentId',
+			async ({ params }) => {
+				return this.flowProposalsService.deleteComment(
+					params.ticketId,
+					params.proposalId,
+					params.threadId,
+					params.commentId
+				);
+			}
+		);
+
+		/**
+		 * PATCH /api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId/comments/:commentId
+		 * Edit a comment's content
+		 */
+		addProposal(
+			'PATCH',
+			'/api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId/comments/:commentId',
+			async ({ params, body }) => {
+				return this.flowProposalsService.updateComment(
+					params.ticketId,
+					params.proposalId,
+					params.threadId,
+					params.commentId,
+					body
+				);
 			}
 		);
 	}

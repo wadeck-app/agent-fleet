@@ -175,6 +175,18 @@ export interface BusinessEvents {
 
 	/** Comment added to a ticket — carries the full comment so subscribers can append without re-fetching */
 	'b2f:ticket:comment_added': TicketComment;
+
+	/** Flow feedback submitted for a ticket */
+	'b2f:ticket:feedback_submitted': {
+		ticketId: string;
+		feedbackId: string;
+		rating: number;
+	};
+
+	/** A new flow proposal was created or updated (async redesign completed) */
+	'b2f:flow:proposal_updated': {
+		ticketId: string;
+	};
 }
 
 /**

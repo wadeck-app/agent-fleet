@@ -1,4 +1,4 @@
-import { TICKETS_API_ROUTES } from '@app/shared/api/tickets.contract';
+import { FLOW_FEEDBACK_MANAGEMENT_ROUTES } from '@app/shared/api/flow-feedback.contract';
 
 import type { FlowFeedbackService } from '../services/FlowFeedbackService';
 import type { RouteWrapperFunc } from '../utils/fastify-wrapper';
@@ -9,49 +9,41 @@ import type { LazyController } from '../utils/lazy-controller-plugin';
  * FLOW FEEDBACK CONTROLLER - LAYERED ARCHITECTURE
  * ===========================================================================================
  *
- * Presentation layer for flow feedback and retrospectives.
- * Routes live under /api/tickets/:ticketId because they are ticket-scoped subresources.
+ * Presentation layer for flow feedback management (update/delete).
+ * Routes live under /api/flow-feedback because they are feedback-ID-scoped operations.
  *
  * Handled routes:
- * - POST /api/tickets/:ticketId/feedback       → submitFeedback
- * - POST /api/tickets/:ticketId/retrospective  → submitRetrospective
- * - GET  /api/tickets/:ticketId/retrospective  → getRetrospective
+ * - PUT    /api/flow-feedback/:feedbackId  → updateFeedback
+ * - DELETE /api/flow-feedback/:feedbackId  → deleteFeedback
  *
- * Note: GET /api/flows/:flowId/feedback is handled in FlowsController.
+ * Note: Creation (POST) and retrieval routes are handled in TicketsController and
+ * FlowsController respectively; those are ticket-scoped or flow-scoped subresources.
  *
- * This controller is NOT registered separately in routes.ts; its service is injected
- * into TicketsController which is already registered at /api/tickets.
+ * This controller is registered separately in routes.ts at /api/flow-feedback.
  *
  * ===========================================================================================
  */
-export default class FlowFeedbackController implements LazyController<typeof TICKETS_API_ROUTES> {
-	static routes = TICKETS_API_ROUTES;
+export default class FlowFeedbackController implements LazyController<typeof FLOW_FEEDBACK_MANAGEMENT_ROUTES> {
+	static routes = FLOW_FEEDBACK_MANAGEMENT_ROUTES;
 
 	constructor(private readonly service: FlowFeedbackService) {}
 
-	configureRoutes(add: RouteWrapperFunc<typeof TICKETS_API_ROUTES>) {
+	configureRoutes(add: RouteWrapperFunc<typeof FLOW_FEEDBACK_MANAGEMENT_ROUTES>) {
 		/**
-		 * POST /api/tickets/:ticketId/feedback
-		 * Submit human feedback for a completed flow run
+		 * PUT /api/flow-feedback/:feedbackId
+		 * Update an existing feedback entry
 		 */
-		add('POST', '/api/tickets/:ticketId/feedback', async ({ params, body }) => {
-			return this.service.submitFeedback(params.ticketId, body);
+		add('PUT', '/api/flow-feedback/:feedbackId', async ({ params, body }) => {
+			return this.service.updateFeedback(params.feedbackId, body);
 		});
 
 		/**
-		 * POST /api/tickets/:ticketId/retrospective
-		 * Submit an AI-generated retrospective
+		 * DELETE /api/flow-feedback/:feedbackId
+		 * Delete a feedback entry
 		 */
-		add('POST', '/api/tickets/:ticketId/retrospective', async ({ params, body }) => {
-			return this.service.submitRetrospective(params.ticketId, body);
-		});
-
-		/**
-		 * GET /api/tickets/:ticketId/retrospective
-		 * Get the retrospective for a ticket
-		 */
-		add('GET', '/api/tickets/:ticketId/retrospective', async ({ params }) => {
-			return this.service.getRetrospective(params.ticketId);
+		add('DELETE', '/api/flow-feedback/:feedbackId', async ({ params }) => {
+			await this.service.deleteFeedback(params.feedbackId);
+			return {};
 		});
 	}
 }

@@ -1,14 +1,6 @@
 import type { FlowFeedback, FlowRetrospective } from '@app/shared/api/flow-feedback.contract';
-import type { BaseEntity } from '@app/shared/common/base-entity';
 
 import type { BaseRepository } from './BaseRepository';
-
-/**
- * Internal stored types that satisfy BaseEntity constraint (adds version, createdAt, updatedAt).
- * The storage layer auto-generates these fields on create.
- */
-type StoredFlowFeedback = FlowFeedback & BaseEntity;
-type StoredFlowRetrospective = FlowRetrospective & BaseEntity;
 
 /**
  * ===========================================================================================
@@ -20,16 +12,18 @@ type StoredFlowRetrospective = FlowRetrospective & BaseEntity;
  * - feedbackBase: stores FlowFeedback entities (collection: 'flow-feedback')
  * - retroBase: stores FlowRetrospective entities (collection: 'flow-retrospectives')
  *
- * The StoredFlowFeedback / StoredFlowRetrospective internal types satisfy the
- * BaseEntity constraint required by BaseRepository while keeping the public API
- * in terms of the shared contract types (FlowFeedback / FlowRetrospective).
+ * Both constructor parameters use BaseRepository<any> (same pattern as FlowProposalsRepository)
+ * because FlowFeedback / FlowRetrospective do not extend BaseEntity, making the intersection
+ * type unnecessary at the constructor level.
  *
  * ===========================================================================================
  */
 export class FlowFeedbackRepository {
 	constructor(
-		private readonly feedbackBase: BaseRepository<StoredFlowFeedback>,
-		private readonly retroBase: BaseRepository<StoredFlowRetrospective>
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		private readonly feedbackBase: BaseRepository<any>,
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		private readonly retroBase: BaseRepository<any>
 	) {}
 
 	/**
@@ -38,9 +32,7 @@ export class FlowFeedbackRepository {
 	 * The storage layer automatically adds version, createdAt, updatedAt.
 	 */
 	async create(feedback: FlowFeedback): Promise<FlowFeedback> {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const stored = await this.feedbackBase.create(feedback as any);
-		return stored;
+		return this.feedbackBase.create(feedback);
 	}
 
 	/**
@@ -51,10 +43,32 @@ export class FlowFeedbackRepository {
 	}
 
 	/**
+	 * Find a single feedback entry by ID.
+	 * Returns null if not found.
+	 */
+	async findById(id: string): Promise<FlowFeedback | null> {
+		return this.feedbackBase.findById(id);
+	}
+
+	/**
 	 * Find all feedback entries for a given flow.
 	 */
 	async findByFlowId(flowId: string): Promise<FlowFeedback[]> {
 		return this.feedbackBase.findBy('flowId', flowId);
+	}
+
+	/**
+	 * Update an existing feedback entry by ID.
+	 */
+	async update(id: string, data: Partial<FlowFeedback>): Promise<FlowFeedback> {
+		return this.feedbackBase.update(id, data);
+	}
+
+	/**
+	 * Delete a feedback entry by ID.
+	 */
+	async delete(id: string): Promise<void> {
+		await this.feedbackBase.delete(id);
 	}
 
 	/**
@@ -63,9 +77,7 @@ export class FlowFeedbackRepository {
 	 * The storage layer automatically adds version, createdAt, updatedAt.
 	 */
 	async createRetrospective(retro: FlowRetrospective): Promise<FlowRetrospective> {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const stored = await this.retroBase.create(retro as any);
-		return stored;
+		return this.retroBase.create(retro);
 	}
 
 	/**
