@@ -8,6 +8,7 @@ import type {
 	CreateReviewThread,
 	FlowProposal,
 	FlowReviewComment,
+	FlowReviewSelector,
 	FlowReviewThread,
 } from '@app/shared/api/flow-proposals.contract';
 import type { Ticket } from '@app/shared/api/tickets.contract';
@@ -434,9 +435,15 @@ export class FlowProposalsService {
 	}
 
 	/**
-	 * Mark a review thread as resolved.
+	 * Update a review thread's status and/or selector.
+	 * When status changes to 'resolved', records a history entry.
 	 */
-	async resolveThread(ticketId: string, proposalId: string, threadId: string): Promise<FlowReviewThread> {
+	async updateThread(
+		ticketId: string,
+		proposalId: string,
+		threadId: string,
+		data: { status?: 'resolved'; selector?: FlowReviewSelector }
+	): Promise<FlowReviewThread> {
 		const proposal = await this.getProposal(ticketId, proposalId);
 
 		const thread = proposal.reviewThreads.find(t => t.id === threadId);
@@ -447,21 +454,147 @@ export class FlowProposalsService {
 			);
 		}
 
-		const resolvedThread: FlowReviewThread = {
+		const updatedThread: FlowReviewThread = {
 			...thread,
-			status: 'resolved',
-			resolvedAt: new Date().toISOString(),
+			...(data.status === 'resolved' && {
+				status: 'resolved',
+				resolvedAt: new Date().toISOString(),
+			}),
+			...(data.selector !== undefined && { selector: data.selector }),
 		};
 
-		const updatedThreads = proposal.reviewThreads.map(t => (t.id === threadId ? resolvedThread : t));
+		const updatedThreads = proposal.reviewThreads.map(t => (t.id === threadId ? updatedThread : t));
 		await this.proposalsRepository.update(proposalId, { reviewThreads: updatedThreads });
 
-		await this.ticketsRepository.addHistoryEntry(ticketId, 'flow.review_thread_resolved', {
+		if (data.status === 'resolved') {
+			await this.ticketsRepository.addHistoryEntry(ticketId, 'flow.review_thread_resolved', {
+				proposalId,
+				threadId,
+			});
+		}
+
+		log.info('Thread updated', {
+			ticketId,
 			proposalId,
 			threadId,
+			status: data.status,
+			hasSelector: !!data.selector,
 		});
+		return updatedThread;
+	}
 
-		log.info('Thread resolved', { ticketId, proposalId, threadId });
-		return resolvedThread;
+	/**
+	 * @deprecated Use updateThread instead.
+	 */
+	async resolveThread(ticketId: string, proposalId: string, threadId: string): Promise<FlowReviewThread> {
+		return this.updateThread(ticketId, proposalId, threadId, { status: 'resolved' });
+	}
+
+	/**
+	 * Delete an entire review thread and all its comments.
+	 */
+	async deleteThread(ticketId: string, proposalId: string, threadId: string): Promise<{ success: true }> {
+		const proposal = await this.getProposal(ticketId, proposalId);
+
+		const thread = proposal.reviewThreads.find(t => t.id === threadId);
+		if (!thread) {
+			throw new NotFoundException(
+				`Thread ${threadId} not found in proposal ${proposalId}`,
+				ERROR_CODES.RESOURCE_NOT_FOUND
+			);
+		}
+
+		const updatedThreads = proposal.reviewThreads.filter(t => t.id !== threadId);
+		await this.proposalsRepository.update(proposalId, { reviewThreads: updatedThreads });
+
+		log.info('Thread deleted', { ticketId, proposalId, threadId });
+		return { success: true };
+	}
+
+	/**
+	 * Delete a single comment from a thread.
+	 * If the comment is the last one in the thread, the whole thread is deleted.
+	 */
+	async deleteComment(
+		ticketId: string,
+		proposalId: string,
+		threadId: string,
+		commentId: string
+	): Promise<{ success: true; threadDeleted: boolean }> {
+		const proposal = await this.getProposal(ticketId, proposalId);
+
+		const thread = proposal.reviewThreads.find(t => t.id === threadId);
+		if (!thread) {
+			throw new NotFoundException(
+				`Thread ${threadId} not found in proposal ${proposalId}`,
+				ERROR_CODES.RESOURCE_NOT_FOUND
+			);
+		}
+
+		const comment = thread.comments.find(c => c.id === commentId);
+		if (!comment) {
+			throw new NotFoundException(
+				`Comment ${commentId} not found in thread ${threadId}`,
+				ERROR_CODES.RESOURCE_NOT_FOUND
+			);
+		}
+
+		if (thread.comments.length === 1) {
+			// Last comment — delete the whole thread
+			const updatedThreads = proposal.reviewThreads.filter(t => t.id !== threadId);
+			await this.proposalsRepository.update(proposalId, { reviewThreads: updatedThreads });
+			log.info('Last comment deleted — thread removed', { ticketId, proposalId, threadId, commentId });
+			return { success: true, threadDeleted: true };
+		}
+
+		const updatedThread: FlowReviewThread = {
+			...thread,
+			comments: thread.comments.filter(c => c.id !== commentId),
+		};
+		const updatedThreads = proposal.reviewThreads.map(t => (t.id === threadId ? updatedThread : t));
+		await this.proposalsRepository.update(proposalId, { reviewThreads: updatedThreads });
+
+		log.info('Comment deleted', { ticketId, proposalId, threadId, commentId });
+		return { success: true, threadDeleted: false };
+	}
+
+	/**
+	 * Update the content of a specific comment.
+	 */
+	async updateComment(
+		ticketId: string,
+		proposalId: string,
+		threadId: string,
+		commentId: string,
+		data: { content: string }
+	): Promise<FlowReviewComment> {
+		const proposal = await this.getProposal(ticketId, proposalId);
+
+		const thread = proposal.reviewThreads.find(t => t.id === threadId);
+		if (!thread) {
+			throw new NotFoundException(
+				`Thread ${threadId} not found in proposal ${proposalId}`,
+				ERROR_CODES.RESOURCE_NOT_FOUND
+			);
+		}
+
+		const comment = thread.comments.find(c => c.id === commentId);
+		if (!comment) {
+			throw new NotFoundException(
+				`Comment ${commentId} not found in thread ${threadId}`,
+				ERROR_CODES.RESOURCE_NOT_FOUND
+			);
+		}
+
+		const updatedComment: FlowReviewComment = { ...comment, content: data.content };
+		const updatedThread: FlowReviewThread = {
+			...thread,
+			comments: thread.comments.map(c => (c.id === commentId ? updatedComment : c)),
+		};
+		const updatedThreads = proposal.reviewThreads.map(t => (t.id === threadId ? updatedThread : t));
+		await this.proposalsRepository.update(proposalId, { reviewThreads: updatedThreads });
+
+		log.info('Comment updated', { ticketId, proposalId, threadId, commentId });
+		return updatedComment;
 	}
 }

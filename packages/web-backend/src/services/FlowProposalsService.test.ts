@@ -1,7 +1,7 @@
 import type { FlowRegistry } from 'flow-engine';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { FlowProposal } from '@app/shared/api/flow-proposals.contract';
+import type { FlowProposal, FlowReviewThread } from '@app/shared/api/flow-proposals.contract';
 import type { Ticket } from '@app/shared/api/tickets.contract';
 
 import type { FlowDesignerAgent } from '../agents/FlowDesignerAgent';
@@ -428,7 +428,7 @@ describe('FlowProposalsService', () => {
 	});
 
 	// ---------------------------------------------------------------------------
-	// resolveThread
+	// resolveThread (backward compat — delegates to updateThread)
 	// ---------------------------------------------------------------------------
 
 	describe('resolveThread', () => {
@@ -465,6 +465,258 @@ describe('FlowProposalsService', () => {
 			await expect(service.resolveThread('ticket-1', 'prop-1', 'nonexistent')).rejects.toThrow(
 				/Thread nonexistent not found/
 			);
+		});
+	});
+
+	// ---------------------------------------------------------------------------
+	// updateThread
+	// ---------------------------------------------------------------------------
+
+	describe('updateThread', () => {
+		function makeThread(overrides?: Partial<FlowReviewThread>): FlowReviewThread {
+			return {
+				id: 'thread-1',
+				proposalId: 'prop-1',
+				selector: { startLine: 1, endLine: 2 },
+				status: 'open',
+				comments: [],
+				createdAt: '2026-01-01T00:00:00Z',
+				...overrides,
+			};
+		}
+
+		it('resolves thread and records history when status is provided', async () => {
+			const thread = makeThread();
+			const proposal = makeProposal({ reviewThreads: [thread] });
+
+			vi.mocked(stubs.proposalsRepository.findById).mockResolvedValue(proposal);
+			vi.mocked(stubs.proposalsRepository.update).mockResolvedValue(proposal);
+			vi.mocked(stubs.ticketsRepository.addHistoryEntry).mockResolvedValue({} as any);
+
+			const result = await service.updateThread('ticket-1', 'prop-1', 'thread-1', { status: 'resolved' });
+
+			expect(result.status).toBe('resolved');
+			expect(result.resolvedAt).toBeDefined();
+			expect(stubs.ticketsRepository.addHistoryEntry).toHaveBeenCalledWith(
+				'ticket-1',
+				'flow.review_thread_resolved',
+				expect.any(Object)
+			);
+		});
+
+		it('updates selector without recording history', async () => {
+			const thread = makeThread();
+			const proposal = makeProposal({ reviewThreads: [thread] });
+			const newSelector = { startLine: 10, endLine: 15 };
+
+			vi.mocked(stubs.proposalsRepository.findById).mockResolvedValue(proposal);
+			vi.mocked(stubs.proposalsRepository.update).mockResolvedValue(proposal);
+			vi.mocked(stubs.ticketsRepository.addHistoryEntry).mockResolvedValue({} as any);
+
+			const result = await service.updateThread('ticket-1', 'prop-1', 'thread-1', { selector: newSelector });
+
+			expect(result.selector).toEqual(newSelector);
+			expect(result.status).toBe('open');
+			expect(stubs.ticketsRepository.addHistoryEntry).not.toHaveBeenCalled();
+		});
+
+		it('throws NotFoundException when thread is not found', async () => {
+			const proposal = makeProposal({ reviewThreads: [] });
+			vi.mocked(stubs.proposalsRepository.findById).mockResolvedValue(proposal);
+
+			await expect(
+				service.updateThread('ticket-1', 'prop-1', 'nonexistent', { status: 'resolved' })
+			).rejects.toThrow(/Thread nonexistent not found/);
+		});
+	});
+
+	// ---------------------------------------------------------------------------
+	// deleteThread
+	// ---------------------------------------------------------------------------
+
+	describe('deleteThread', () => {
+		it('removes the thread from the proposal', async () => {
+			const thread = {
+				id: 'thread-1',
+				proposalId: 'prop-1',
+				selector: { startLine: 1, endLine: 2 },
+				status: 'open' as const,
+				comments: [],
+				createdAt: '2026-01-01T00:00:00Z',
+			};
+			const proposal = makeProposal({ reviewThreads: [thread] });
+
+			vi.mocked(stubs.proposalsRepository.findById).mockResolvedValue(proposal);
+			vi.mocked(stubs.proposalsRepository.update).mockResolvedValue(proposal);
+
+			const result = await service.deleteThread('ticket-1', 'prop-1', 'thread-1');
+
+			expect(result).toEqual({ success: true });
+			expect(stubs.proposalsRepository.update).toHaveBeenCalledWith(
+				'prop-1',
+				expect.objectContaining({ reviewThreads: [] })
+			);
+		});
+
+		it('throws NotFoundException when thread is not found', async () => {
+			const proposal = makeProposal({ reviewThreads: [] });
+			vi.mocked(stubs.proposalsRepository.findById).mockResolvedValue(proposal);
+
+			await expect(service.deleteThread('ticket-1', 'prop-1', 'nonexistent')).rejects.toThrow(
+				/Thread nonexistent not found/
+			);
+		});
+	});
+
+	// ---------------------------------------------------------------------------
+	// deleteComment
+	// ---------------------------------------------------------------------------
+
+	describe('deleteComment', () => {
+		function makeComment(id: string, threadId = 'thread-1') {
+			return {
+				id,
+				threadId,
+				content: `Comment ${id}`,
+				author: 'alice',
+				createdAt: '2026-01-01T00:00:00Z',
+			};
+		}
+
+		it('deletes the whole thread when the comment is the last one (threadDeleted: true)', async () => {
+			const comment = makeComment('comment-1');
+			const thread = {
+				id: 'thread-1',
+				proposalId: 'prop-1',
+				selector: { startLine: 1, endLine: 2 },
+				status: 'open' as const,
+				comments: [comment],
+				createdAt: '2026-01-01T00:00:00Z',
+			};
+			const proposal = makeProposal({ reviewThreads: [thread] });
+
+			vi.mocked(stubs.proposalsRepository.findById).mockResolvedValue(proposal);
+			vi.mocked(stubs.proposalsRepository.update).mockResolvedValue(proposal);
+
+			const result = await service.deleteComment('ticket-1', 'prop-1', 'thread-1', 'comment-1');
+
+			expect(result).toEqual({ success: true, threadDeleted: true });
+			expect(stubs.proposalsRepository.update).toHaveBeenCalledWith(
+				'prop-1',
+				expect.objectContaining({ reviewThreads: [] })
+			);
+		});
+
+		it('removes only the comment when other comments remain (threadDeleted: false)', async () => {
+			const comment1 = makeComment('comment-1');
+			const comment2 = makeComment('comment-2');
+			const thread = {
+				id: 'thread-1',
+				proposalId: 'prop-1',
+				selector: { startLine: 1, endLine: 2 },
+				status: 'open' as const,
+				comments: [comment1, comment2],
+				createdAt: '2026-01-01T00:00:00Z',
+			};
+			const proposal = makeProposal({ reviewThreads: [thread] });
+
+			vi.mocked(stubs.proposalsRepository.findById).mockResolvedValue(proposal);
+			vi.mocked(stubs.proposalsRepository.update).mockResolvedValue(proposal);
+
+			const result = await service.deleteComment('ticket-1', 'prop-1', 'thread-1', 'comment-1');
+
+			expect(result).toEqual({ success: true, threadDeleted: false });
+			const updateCall = vi.mocked(stubs.proposalsRepository.update).mock.calls[0];
+			const updatedThreads = (updateCall?.[1] as any).reviewThreads;
+			expect(updatedThreads[0].comments).toHaveLength(1);
+			expect(updatedThreads[0].comments[0].id).toBe('comment-2');
+		});
+
+		it('throws NotFoundException when thread is not found', async () => {
+			const proposal = makeProposal({ reviewThreads: [] });
+			vi.mocked(stubs.proposalsRepository.findById).mockResolvedValue(proposal);
+
+			await expect(service.deleteComment('ticket-1', 'prop-1', 'nonexistent', 'comment-1')).rejects.toThrow(
+				/Thread nonexistent not found/
+			);
+		});
+
+		it('throws NotFoundException when comment is not found', async () => {
+			const thread = {
+				id: 'thread-1',
+				proposalId: 'prop-1',
+				selector: { startLine: 1, endLine: 2 },
+				status: 'open' as const,
+				comments: [],
+				createdAt: '2026-01-01T00:00:00Z',
+			};
+			const proposal = makeProposal({ reviewThreads: [thread] });
+			vi.mocked(stubs.proposalsRepository.findById).mockResolvedValue(proposal);
+
+			await expect(service.deleteComment('ticket-1', 'prop-1', 'thread-1', 'nonexistent')).rejects.toThrow(
+				/Comment nonexistent not found/
+			);
+		});
+	});
+
+	// ---------------------------------------------------------------------------
+	// updateComment
+	// ---------------------------------------------------------------------------
+
+	describe('updateComment', () => {
+		it('updates the content of the specified comment', async () => {
+			const comment = {
+				id: 'comment-1',
+				threadId: 'thread-1',
+				content: 'Original content',
+				author: 'alice',
+				createdAt: '2026-01-01T00:00:00Z',
+			};
+			const thread = {
+				id: 'thread-1',
+				proposalId: 'prop-1',
+				selector: { startLine: 1, endLine: 2 },
+				status: 'open' as const,
+				comments: [comment],
+				createdAt: '2026-01-01T00:00:00Z',
+			};
+			const proposal = makeProposal({ reviewThreads: [thread] });
+
+			vi.mocked(stubs.proposalsRepository.findById).mockResolvedValue(proposal);
+			vi.mocked(stubs.proposalsRepository.update).mockResolvedValue(proposal);
+
+			const result = await service.updateComment('ticket-1', 'prop-1', 'thread-1', 'comment-1', {
+				content: 'Updated content',
+			});
+
+			expect(result.content).toBe('Updated content');
+			expect(result.id).toBe('comment-1');
+		});
+
+		it('throws NotFoundException when thread is not found', async () => {
+			const proposal = makeProposal({ reviewThreads: [] });
+			vi.mocked(stubs.proposalsRepository.findById).mockResolvedValue(proposal);
+
+			await expect(
+				service.updateComment('ticket-1', 'prop-1', 'nonexistent', 'comment-1', { content: 'x' })
+			).rejects.toThrow(/Thread nonexistent not found/);
+		});
+
+		it('throws NotFoundException when comment is not found', async () => {
+			const thread = {
+				id: 'thread-1',
+				proposalId: 'prop-1',
+				selector: { startLine: 1, endLine: 2 },
+				status: 'open' as const,
+				comments: [],
+				createdAt: '2026-01-01T00:00:00Z',
+			};
+			const proposal = makeProposal({ reviewThreads: [thread] });
+			vi.mocked(stubs.proposalsRepository.findById).mockResolvedValue(proposal);
+
+			await expect(
+				service.updateComment('ticket-1', 'prop-1', 'thread-1', 'nonexistent', { content: 'x' })
+			).rejects.toThrow(/Comment nonexistent not found/);
 		});
 	});
 });

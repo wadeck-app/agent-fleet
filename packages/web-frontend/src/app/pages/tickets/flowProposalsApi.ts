@@ -112,4 +112,67 @@ export const flowProposalsApi = {
 			body: { status: 'resolved' },
 		});
 	},
+
+	/**
+	 * Delete a review thread and all its comments
+	 */
+	deleteThread: (ticketId: string, proposalId: string, threadId: string): Promise<{ success: true }> => {
+		return typedFetch('DELETE', '/api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId', {
+			params: { ticketId, proposalId, threadId },
+		});
+	},
+
+	/**
+	 * Delete a single comment from a review thread.
+	 * If the deleted comment was the last one, threadDeleted will be true.
+	 */
+	deleteComment: (
+		ticketId: string,
+		proposalId: string,
+		threadId: string,
+		commentId: string
+	): Promise<{ success: true; threadDeleted: boolean }> => {
+		return typedFetch(
+			'DELETE',
+			'/api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId/comments/:commentId',
+			{
+				params: { ticketId, proposalId, threadId, commentId },
+			}
+		);
+	},
+
+	/**
+	 * Update a review thread selector (line range / selected text)
+	 */
+	updateThread: (
+		ticketId: string,
+		proposalId: string,
+		threadId: string,
+		data: { selector?: { startLine: number; endLine: number; selectedText?: string } }
+	): Promise<FlowReviewThread> => {
+		return typedFetch('PATCH', '/api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId', {
+			params: { ticketId, proposalId, threadId },
+			body: data,
+		});
+	},
+
+	/**
+	 * Edit the content of a single review comment
+	 */
+	updateComment: (
+		ticketId: string,
+		proposalId: string,
+		threadId: string,
+		commentId: string,
+		data: { content: string }
+	): Promise<FlowReviewComment> => {
+		return typedFetch(
+			'PATCH',
+			'/api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId/comments/:commentId',
+			{
+				params: { ticketId, proposalId, threadId, commentId },
+				body: data,
+			}
+		);
+	},
 } as const;

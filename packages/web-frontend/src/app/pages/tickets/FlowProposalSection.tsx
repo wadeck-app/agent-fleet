@@ -14,14 +14,14 @@ import { B2F_FLOW_PROPOSAL_UPDATED } from '@shared/transport';
 import { Background, Controls, MiniMap, ReactFlow, ReactFlowProvider } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import * as yaml from 'js-yaml';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Pencil, Trash2 } from 'lucide-react';
 
 import { useTransport } from '@/transport';
 
+import { FlowEditorPropertiesPanel } from '../flows/flow-editor/FlowEditorPropertiesPanel';
 import { edgeTypes } from '../flows/flow-editor/edges';
 import { nodeTypes } from '../flows/flow-editor/nodes';
 import type { FlowEdge, FlowNode } from '../flows/flow-editor/types';
-import { isStepNodeData } from '../flows/flow-editor/types';
 import { flowDefinitionToReactFlow } from '../flows/flow-editor/utils/flowToReactFlow';
 import { CollapsibleSection } from './CollapsibleSection';
 import { flowProposalsApi } from './flowProposalsApi';
@@ -63,14 +63,40 @@ interface ReviewThreadItemProps {
 	ticketId: string;
 	proposalId: string;
 	onResolved: () => void;
+	/** Called after the thread is fully deleted (parent removes it from the list) */
+	onDeleted: () => void;
+	/** Called after the thread selector is updated */
+	onUpdated: () => void;
 }
 
-function ReviewThreadItem({ thread, ticketId, proposalId, onResolved }: ReviewThreadItemProps) {
+function ReviewThreadItem({ thread, ticketId, proposalId, onResolved, onDeleted, onUpdated }: ReviewThreadItemProps) {
 	const { showToast } = useToast();
 	const [replyText, setReplyText] = useState('');
 	const [showReplyForm, setShowReplyForm] = useState(false);
 	const [isReplying, setIsReplying] = useState(false);
 	const [isResolving, setIsResolving] = useState(false);
+
+	// Delete thread state
+	const [isPendingDelete, setIsPendingDelete] = useState(false);
+
+	// Edit thread selector state
+	const [isEditingSelector, setIsEditingSelector] = useState(false);
+	const [editStartLine, setEditStartLine] = useState(String(thread.selector.startLine));
+	const [editEndLine, setEditEndLine] = useState(String(thread.selector.endLine));
+	const [editSelectedText, setEditSelectedText] = useState(thread.selector.selectedText ?? '');
+	const [isSavingSelector, setIsSavingSelector] = useState(false);
+	// Optimistic local selector (shown while saving)
+	const [localSelector, setLocalSelector] = useState(thread.selector);
+
+	// Per-comment delete state
+	const [pendingDeleteCommentId, setPendingDeleteCommentId] = useState<string | null>(null);
+
+	// Per-comment edit state
+	const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+	const [editCommentContent, setEditCommentContent] = useState('');
+	const [isSavingComment, setIsSavingComment] = useState(false);
+	// Optimistic local comment content map
+	const [localCommentContent, setLocalCommentContent] = useState<Record<string, string>>({});
 
 	const handleReply = async () => {
 		if (!replyText.trim()) return;
@@ -103,38 +129,280 @@ function ReviewThreadItem({ thread, ticketId, proposalId, onResolved }: ReviewTh
 		}
 	};
 
-	return (
-		<div className="rounded-md border bg-card p-3 space-y-2">
-			<div className="flex items-center gap-2">
-				<span className="font-mono text-xs text-muted-foreground">
-					Lines {thread.selector.startLine}
-					{'\u2013'}
-					{thread.selector.endLine}
-				</span>
-				<Badge variant={thread.status === 'open' ? 'warning' : 'success'} className="text-xs">
-					{thread.status}
-				</Badge>
-				{thread.selector.selectedText && (
-					<code className="ml-auto max-w-[200px] truncate rounded bg-muted px-1 py-0.5 font-mono text-xs">
-						{thread.selector.selectedText}
-					</code>
-				)}
-			</div>
+	const handleDeleteThread = async () => {
+		setIsPendingDelete(true);
+		try {
+			await flowProposalsApi.deleteThread(ticketId, proposalId, thread.id);
+			onDeleted();
+			showToast('Thread deleted', 'success');
+		} catch (err) {
+			setIsPendingDelete(false);
+			showToast(`Failed to delete thread: ${getErrorMessage(err)}`, 'error');
+		}
+	};
 
-			<div className="space-y-2">
-				{thread.comments.map(comment => (
-					<div key={comment.id} className="rounded border-l-2 border-muted-foreground/30 pl-3">
-						<div className="flex items-center gap-2 mb-1">
-							<Badge variant="outline" className="text-xs">
-								{comment.author}
-							</Badge>
-							<span className="text-xs text-muted-foreground">
-								{new Date(comment.createdAt).toLocaleString()}
-							</span>
+	const handleOpenEditSelector = () => {
+		setEditStartLine(String(localSelector.startLine));
+		setEditEndLine(String(localSelector.endLine));
+		setEditSelectedText(localSelector.selectedText ?? '');
+		setIsEditingSelector(true);
+	};
+
+	const handleSaveSelector = async () => {
+		const start = parseInt(editStartLine, 10);
+		const end = parseInt(editEndLine, 10);
+		if (isNaN(start) || isNaN(end) || start < 1 || end < start) {
+			showToast('Invalid line range (start <= end, both >= 1)', 'error');
+			return;
+		}
+		// Optimistic update
+		const prevSelector = localSelector;
+		const newSelector = {
+			...localSelector,
+			startLine: start,
+			endLine: end,
+			selectedText: editSelectedText || undefined,
+		};
+		setLocalSelector(newSelector);
+		setIsEditingSelector(false);
+		setIsSavingSelector(true);
+		try {
+			await flowProposalsApi.updateThread(ticketId, proposalId, thread.id, {
+				selector: { startLine: start, endLine: end, selectedText: editSelectedText || undefined },
+			});
+			onUpdated();
+			showToast('Thread updated', 'success');
+		} catch (err) {
+			setLocalSelector(prevSelector);
+			setIsEditingSelector(true);
+			showToast(`Failed to update thread: ${getErrorMessage(err)}`, 'error');
+		} finally {
+			setIsSavingSelector(false);
+		}
+	};
+
+	const handleDeleteComment = async (commentId: string) => {
+		setPendingDeleteCommentId(commentId);
+		try {
+			const result = await flowProposalsApi.deleteComment(ticketId, proposalId, thread.id, commentId);
+			if (result.threadDeleted) {
+				onDeleted();
+				showToast('Comment deleted (thread removed)', 'success');
+			} else {
+				onResolved();
+				showToast('Comment deleted', 'success');
+			}
+		} catch (err) {
+			setPendingDeleteCommentId(null);
+			showToast(`Failed to delete comment: ${getErrorMessage(err)}`, 'error');
+		}
+	};
+
+	const handleStartEditComment = (commentId: string, currentContent: string) => {
+		setEditingCommentId(commentId);
+		setEditCommentContent(currentContent);
+	};
+
+	const handleSaveComment = async () => {
+		if (!editingCommentId || !editCommentContent.trim()) return;
+		const commentId = editingCommentId;
+		const newContent = editCommentContent.trim();
+		// Optimistic update
+		const prevContent =
+			localCommentContent[commentId] ?? thread.comments.find(c => c.id === commentId)?.content ?? '';
+		setLocalCommentContent(prev => ({ ...prev, [commentId]: newContent }));
+		setEditingCommentId(null);
+		setIsSavingComment(true);
+		try {
+			await flowProposalsApi.updateComment(ticketId, proposalId, thread.id, commentId, { content: newContent });
+			onResolved();
+			showToast('Comment updated', 'success');
+		} catch (err) {
+			setLocalCommentContent(prev => ({ ...prev, [commentId]: prevContent }));
+			setEditingCommentId(commentId);
+			showToast(`Failed to update comment: ${getErrorMessage(err)}`, 'error');
+		} finally {
+			setIsSavingComment(false);
+		}
+	};
+
+	return (
+		<div
+			className={`rounded-md border bg-card p-3 space-y-2 transition-opacity${isPendingDelete ? ' opacity-50 pointer-events-none' : ''}`}
+		>
+			{/* Thread header */}
+			{isEditingSelector ? (
+				<div className="space-y-2">
+					<p className="text-xs font-medium text-muted-foreground">Edit line range</p>
+					<div className="flex gap-2">
+						<div className="flex-1 space-y-1">
+							<Label htmlFor={`edit-start-${thread.id}`} className="text-xs text-muted-foreground">
+								Start line
+							</Label>
+							<Input
+								id={`edit-start-${thread.id}`}
+								type="number"
+								min={1}
+								value={editStartLine}
+								onChange={e => setEditStartLine(e.target.value)}
+								className="h-7 text-xs"
+							/>
 						</div>
-						<p className="text-sm">{comment.content}</p>
+						<div className="flex-1 space-y-1">
+							<Label htmlFor={`edit-end-${thread.id}`} className="text-xs text-muted-foreground">
+								End line
+							</Label>
+							<Input
+								id={`edit-end-${thread.id}`}
+								type="number"
+								min={1}
+								value={editEndLine}
+								onChange={e => setEditEndLine(e.target.value)}
+								className="h-7 text-xs"
+							/>
+						</div>
+						<div className="flex-[2] space-y-1">
+							<Label htmlFor={`edit-text-${thread.id}`} className="text-xs text-muted-foreground">
+								Selected text (optional)
+							</Label>
+							<Input
+								id={`edit-text-${thread.id}`}
+								type="text"
+								value={editSelectedText}
+								onChange={e => setEditSelectedText(e.target.value)}
+								className="h-7 text-xs"
+							/>
+						</div>
 					</div>
-				))}
+					<div className="flex gap-2">
+						<Button size="sm" onClick={handleSaveSelector} disabled={isSavingSelector}>
+							{isSavingSelector ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
+							Save
+						</Button>
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={() => setIsEditingSelector(false)}
+							disabled={isSavingSelector}
+						>
+							Cancel
+						</Button>
+					</div>
+				</div>
+			) : (
+				<div className="flex items-center gap-2">
+					<span className="font-mono text-xs text-muted-foreground">
+						Lines {localSelector.startLine}
+						{'\u2013'}
+						{localSelector.endLine}
+					</span>
+					<Badge variant={thread.status === 'open' ? 'warning' : 'success'} className="text-xs">
+						{thread.status}
+					</Badge>
+					{localSelector.selectedText && (
+						<code className="max-w-[200px] truncate rounded bg-muted px-1 py-0.5 font-mono text-xs">
+							{localSelector.selectedText}
+						</code>
+					)}
+					{/* Thread-level edit/delete buttons — always visible */}
+					<div className="ml-auto flex items-center gap-1">
+						<Button
+							variant="ghost"
+							size="icon-xs"
+							className="text-muted-foreground"
+							onClick={handleOpenEditSelector}
+							title="Edit line range"
+						>
+							<Pencil />
+						</Button>
+						<Button
+							variant="ghost"
+							size="icon-xs"
+							className="text-muted-foreground hover:text-destructive"
+							onClick={handleDeleteThread}
+							title="Delete thread"
+						>
+							<Trash2 />
+						</Button>
+					</div>
+				</div>
+			)}
+
+			{/* Comments */}
+			<div className="space-y-2">
+				{thread.comments.map(comment => {
+					const isPendingCommentDelete = pendingDeleteCommentId === comment.id;
+					const isEditingThis = editingCommentId === comment.id;
+					const displayContent = localCommentContent[comment.id] ?? comment.content;
+
+					return (
+						<div
+							key={comment.id}
+							className={`rounded border-l-2 border-muted-foreground/30 pl-3 transition-opacity${isPendingCommentDelete ? ' opacity-50 line-through pointer-events-none' : ''}`}
+						>
+							<div className="flex items-center gap-2 mb-1">
+								<Badge variant="outline" className="text-xs">
+									{comment.author}
+								</Badge>
+								<span className="text-xs text-muted-foreground">
+									{new Date(comment.createdAt).toLocaleString()}
+								</span>
+								{/* Per-comment action icons — always visible */}
+								<div className="ml-auto flex items-center gap-1">
+									<Button
+										variant="ghost"
+										size="icon-xs"
+										className="text-muted-foreground"
+										onClick={() => handleStartEditComment(comment.id, displayContent)}
+										title="Edit comment"
+									>
+										<Pencil />
+									</Button>
+									<Button
+										variant="ghost"
+										size="icon-xs"
+										className="text-muted-foreground hover:text-destructive"
+										onClick={() => handleDeleteComment(comment.id)}
+										title="Delete comment"
+									>
+										<Trash2 />
+									</Button>
+								</div>
+							</div>
+
+							{isEditingThis ? (
+								<div className="space-y-2 mt-1">
+									<Textarea
+										value={editCommentContent}
+										onChange={e => setEditCommentContent(e.target.value)}
+										className="text-sm"
+										rows={3}
+									/>
+									<div className="flex gap-2">
+										<Button
+											size="sm"
+											onClick={handleSaveComment}
+											disabled={isSavingComment || !editCommentContent.trim()}
+										>
+											{isSavingComment ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
+											Save
+										</Button>
+										<Button
+											variant="ghost"
+											size="sm"
+											onClick={() => setEditingCommentId(null)}
+											disabled={isSavingComment}
+										>
+											Cancel
+										</Button>
+									</div>
+								</div>
+							) : (
+								<p className="text-sm">{displayContent}</p>
+							)}
+						</div>
+					);
+				})}
 			</div>
 
 			<div className="flex items-center gap-2">
@@ -280,175 +548,6 @@ function AddReviewThreadForm({ ticketId, proposalId, onAdded, onCancel }: AddRev
 }
 
 // ---------------------------------------------------------------------------
-// FlowStepDetailsPanel — read-only details panel for a selected flow node
-// ---------------------------------------------------------------------------
-
-interface FlowStepDetailsPanelProps {
-	selectedNode: FlowNode | null;
-}
-
-const SECTION_LABEL_CLASS = 'text-xs font-medium text-muted-foreground uppercase tracking-wide';
-const CODE_BLOCK_CLASS = 'font-mono text-xs bg-muted rounded p-2 overflow-x-auto whitespace-pre-wrap break-all';
-const MAX_TEXT_LENGTH = 500;
-
-function truncate(text: string): string {
-	if (text.length <= MAX_TEXT_LENGTH) return text;
-	return text.slice(0, MAX_TEXT_LENGTH) + '\u2026';
-}
-
-function FlowStepDetailsPanel({ selectedNode }: FlowStepDetailsPanelProps) {
-	if (!selectedNode) {
-		return (
-			<div className="overflow-y-auto h-[75vh] border-l bg-card p-4 flex items-center justify-center">
-				<p className="text-sm text-muted-foreground text-center">Click a step to see its details</p>
-			</div>
-		);
-	}
-
-	const data = selectedNode.data;
-	if (!isStepNodeData(data)) {
-		return (
-			<div className="overflow-y-auto h-[75vh] border-l bg-card p-4 flex items-center justify-center">
-				<p className="text-sm text-muted-foreground text-center">No details available for this node</p>
-			</div>
-		);
-	}
-
-	const step = data.step;
-
-	return (
-		<div className="overflow-y-auto h-[75vh] border-l bg-card p-4 space-y-3">
-			{/* Header: name + type badge */}
-			<div className="space-y-1">
-				<p className="text-base font-bold leading-tight">{step.name}</p>
-				<Badge variant="outline" className="text-xs font-mono">
-					{step.type}
-				</Badge>
-			</div>
-
-			{/* ID */}
-			<div className="space-y-1">
-				<p className={SECTION_LABEL_CLASS}>ID</p>
-				<p className="font-mono text-xs text-muted-foreground">{step.id}</p>
-			</div>
-
-			{/* depends */}
-			{step.depends && step.depends.length > 0 && (
-				<div className="space-y-1">
-					<p className={SECTION_LABEL_CLASS}>Depends on</p>
-					<div className="flex flex-wrap gap-1">
-						{step.depends.map(dep => (
-							<Badge key={dep} variant="secondary" className="font-mono text-xs">
-								{dep}
-							</Badge>
-						))}
-					</div>
-				</div>
-			)}
-
-			{/* when */}
-			{step.when && (
-				<div className="space-y-1">
-					<p className={SECTION_LABEL_CLASS}>When</p>
-					<pre className={CODE_BLOCK_CLASS}>{step.when}</pre>
-				</div>
-			)}
-
-			{/* Type-specific fields */}
-			{step.type === 'model' && (
-				<>
-					<div className="space-y-1">
-						<p className={SECTION_LABEL_CLASS}>Model</p>
-						<p className="text-sm">{step.model}</p>
-					</div>
-					<div className="space-y-1">
-						<p className={SECTION_LABEL_CLASS}>Prompt</p>
-						<pre className={CODE_BLOCK_CLASS}>{truncate(step.prompt)}</pre>
-					</div>
-				</>
-			)}
-
-			{step.type === 'script' && (
-				<div className="space-y-1">
-					<p className={SECTION_LABEL_CLASS}>Script</p>
-					<pre className={CODE_BLOCK_CLASS}>{truncate(step.script)}</pre>
-				</div>
-			)}
-
-			{step.type === 'subflow' && (
-				<>
-					<div className="space-y-1">
-						<p className={SECTION_LABEL_CLASS}>Flow ID</p>
-						<p className="font-mono text-xs">{step.flowId}</p>
-					</div>
-					{step.workspaceStrategy && (
-						<div className="space-y-1">
-							<p className={SECTION_LABEL_CLASS}>Workspace Strategy</p>
-							<p className="text-sm">{step.workspaceStrategy}</p>
-						</div>
-					)}
-					{step.inputs && Object.keys(step.inputs).length > 0 && (
-						<div className="space-y-1">
-							<p className={SECTION_LABEL_CLASS}>Inputs</p>
-							<pre className={CODE_BLOCK_CLASS}>{JSON.stringify(step.inputs, null, 2)}</pre>
-						</div>
-					)}
-				</>
-			)}
-
-			{step.type === 'user_intervention' && (
-				<>
-					<div className="space-y-1">
-						<p className={SECTION_LABEL_CLASS}>Intervention Type</p>
-						<p className="text-sm">{step.interventionType}</p>
-					</div>
-					{step.blocking !== undefined && (
-						<div className="space-y-1">
-							<p className={SECTION_LABEL_CLASS}>Blocking</p>
-							<p className="text-sm">{step.blocking ? 'Yes' : 'No'}</p>
-						</div>
-					)}
-					{step.interventionType === 'approval' && step.approval && (
-						<div className="space-y-1">
-							<p className={SECTION_LABEL_CLASS}>Approval</p>
-							<pre className={CODE_BLOCK_CLASS}>{JSON.stringify(step.approval, null, 2)}</pre>
-						</div>
-					)}
-					{step.interventionType === 'question' && step.question && (
-						<div className="space-y-1">
-							<p className={SECTION_LABEL_CLASS}>Question</p>
-							<pre className={CODE_BLOCK_CLASS}>{JSON.stringify(step.question, null, 2)}</pre>
-						</div>
-					)}
-					{step.interventionType === 'choice' && step.choice && (
-						<div className="space-y-1">
-							<p className={SECTION_LABEL_CLASS}>Choice</p>
-							<pre className={CODE_BLOCK_CLASS}>{JSON.stringify(step.choice, null, 2)}</pre>
-						</div>
-					)}
-				</>
-			)}
-
-			{/* onFailure */}
-			{step.onFailure && (
-				<div className="space-y-1">
-					<p className={SECTION_LABEL_CLASS}>On Failure</p>
-					<pre className={CODE_BLOCK_CLASS}>{JSON.stringify(step.onFailure, null, 2)}</pre>
-				</div>
-			)}
-
-			{/* output */}
-			{step.output && Object.keys(step.output).length > 0 && (
-				<div className="space-y-1">
-					<p className={SECTION_LABEL_CLASS}>Output</p>
-					<pre className={CODE_BLOCK_CLASS}>{JSON.stringify(step.output, null, 2)}</pre>
-				</div>
-			)}
-		</div>
-	);
-}
-
-// ---------------------------------------------------------------------------
 // VisualizeFlowDialog — read-only ReactFlow graph for a proposed flow
 // ---------------------------------------------------------------------------
 
@@ -489,7 +588,7 @@ function VisualizeFlowDialog({ proposal }: VisualizeFlowDialogProps) {
 					<DialogTitle>{flowName}</DialogTitle>
 				</DialogHeader>
 				{/* Two-column layout: ReactFlow canvas left, step details panel right */}
-				<div className="grid grid-cols-[1fr_320px] overflow-hidden rounded-md border">
+				<div className="grid grid-cols-[1fr_384px] overflow-hidden rounded-md border">
 					{/* Left column: ReactFlow canvas */}
 					<div className="h-[75vh] w-full overflow-hidden">
 						<ReactFlowProvider>
@@ -525,8 +624,13 @@ function VisualizeFlowDialog({ proposal }: VisualizeFlowDialogProps) {
 							</ReactFlow>
 						</ReactFlowProvider>
 					</div>
-					{/* Right column: step details panel */}
-					<FlowStepDetailsPanel selectedNode={selectedNode} />
+					{/* Right column: read-only step details panel */}
+					<FlowEditorPropertiesPanel
+						selectedNode={selectedNode}
+						readOnly
+						onUpdateNode={() => {}}
+						onDeleteNode={() => {}}
+					/>
 				</div>
 			</DialogContent>
 		</Dialog>
@@ -768,6 +872,8 @@ function ProposalView({
 							ticketId={ticketId}
 							proposalId={proposal.id}
 							onResolved={onReviewUpdated}
+							onDeleted={onReviewUpdated}
+							onUpdated={onReviewUpdated}
 						/>
 					))}
 				</div>

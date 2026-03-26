@@ -66,7 +66,12 @@ export const AddReviewCommentSchema = z.object({
 });
 
 export const UpdateReviewThreadSchema = z.object({
-	status: z.enum(['resolved']),
+	status: z.enum(['resolved']).optional(),
+	selector: FlowReviewSelectorSchema.optional(),
+});
+
+export const UpdateReviewCommentSchema = z.object({
+	content: z.string().min(1),
 });
 
 export const RequestFlowDesignSchema = z.object({
@@ -89,6 +94,7 @@ export type FlowReviewThread = z.infer<typeof FlowReviewThreadSchema>;
 export type FlowProposal = z.infer<typeof FlowProposalSchema>;
 export type CreateReviewThread = z.infer<typeof CreateReviewThreadSchema>;
 export type AddReviewComment = z.infer<typeof AddReviewCommentSchema>;
+export type UpdateReviewComment = z.infer<typeof UpdateReviewCommentSchema>;
 
 export const FLOW_PROPOSALS_API_ROUTES = defineRoutes({
 	'/api/tickets/:ticketId/request-flow-design': {
@@ -143,6 +149,31 @@ export const FLOW_PROPOSALS_API_ROUTES = defineRoutes({
 			params: z.object({ ticketId: z.string(), proposalId: z.string(), threadId: z.string() }),
 			body: UpdateReviewThreadSchema,
 			response: FlowReviewThreadSchema,
+		},
+		DELETE: {
+			params: z.object({ ticketId: z.string(), proposalId: z.string(), threadId: z.string() }),
+			response: z.object({ success: z.literal(true) }),
+		},
+	},
+	'/api/tickets/:ticketId/flow-proposals/:proposalId/review-threads/:threadId/comments/:commentId': {
+		DELETE: {
+			params: z.object({
+				ticketId: z.string(),
+				proposalId: z.string(),
+				threadId: z.string(),
+				commentId: z.string(),
+			}),
+			response: z.object({ success: z.literal(true), threadDeleted: z.boolean() }),
+		},
+		PATCH: {
+			params: z.object({
+				ticketId: z.string(),
+				proposalId: z.string(),
+				threadId: z.string(),
+				commentId: z.string(),
+			}),
+			body: UpdateReviewCommentSchema,
+			response: FlowReviewCommentSchema,
 		},
 	},
 });
