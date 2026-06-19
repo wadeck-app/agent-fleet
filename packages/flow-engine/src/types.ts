@@ -1,12 +1,13 @@
+import type { ValidationIssue } from './validation/ValidationTypes';
+
 /**
  * Core type definitions for the Flow System
  *
  * This module defines all the core interfaces and types for the workflow engine,
  * including flow definitions, steps, workspaces, and execution traces.
  */
-import type { TaskStatus, TicketStatus } from 'shared-orch-worker/domain-types';
-
-import type { ValidationIssue } from './validation/ValidationTypes';
+export type TaskStatus = string;
+export type TicketStatus = string;
 
 /**
  * Supported model types for step execution

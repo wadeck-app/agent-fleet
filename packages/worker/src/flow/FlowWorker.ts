@@ -865,18 +865,25 @@ export class FlowWorker implements Shutdownable {
 			defaultValue: TaskStatus
 		): TaskStatus => {
 			if (!value) return defaultValue;
-			if (typeof value === 'string') return value;
-			return value.task ?? defaultValue;
+			if (typeof value === 'string') return value as TaskStatus;
+			return (value.task as TaskStatus) ?? defaultValue;
 		};
-		const successStatus = resolveTaskStatus(flow.statusTransitions?.onSuccess, defaultOnSuccess);
-		const failureStatus = resolveTaskStatus(flow.statusTransitions?.onFailure, defaultOnFailure);
+		type FlowTransitionValue = TaskStatus | import('flow-engine/types').StatusTransitionConfig | undefined;
+		const successStatus = resolveTaskStatus(
+			flow.statusTransitions?.onSuccess as FlowTransitionValue,
+			defaultOnSuccess
+		);
+		const failureStatus = resolveTaskStatus(
+			flow.statusTransitions?.onFailure as FlowTransitionValue,
+			defaultOnFailure
+		);
 		// Extract TicketStatus from StatusTransitionConfig object
 		const resolveTicketStatus = (
 			value: TaskStatus | import('flow-engine/types').StatusTransitionConfig | undefined
 		): import('shared-orch-worker/domain-types').TicketStatus | undefined =>
 			typeof value === 'object' ? value.ticket : undefined;
-		const successTicketStatus = resolveTicketStatus(flow.statusTransitions?.onSuccess);
-		const failureTicketStatus = resolveTicketStatus(flow.statusTransitions?.onFailure);
+		const successTicketStatus = resolveTicketStatus(flow.statusTransitions?.onSuccess as FlowTransitionValue);
+		const failureTicketStatus = resolveTicketStatus(flow.statusTransitions?.onFailure as FlowTransitionValue);
 
 		this.logger.info(` Executing flow: ${flow.name} (${flow.id})`);
 		this.sendTaskStarted(TaskStatus.IN_PROGRESS);

@@ -1,0 +1,16 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"outDir": "dist",
+		"rootDir": "src",
+		"baseUrl": ".",
+		"paths": {
+			"flow-engine": ["../flow-engine/src"],
+			"flow-engine/*": ["../flow-engine/src/*"],
+			"shared-common": ["../shared-common/src"],
+			"shared-common/*": ["../shared-common/src/*"]
+		}
+	},
+	"include": ["src"],
+	"references": [{ "path": "../flow-engine" }, { "path": "../shared-common" }]
+}

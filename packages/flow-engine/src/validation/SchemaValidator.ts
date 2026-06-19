@@ -12,8 +12,6 @@
  * This validator focuses on STRUCTURE, not semantics (e.g., it doesn't validate
  * that step references are valid - that's done by other validators).
  */
-import { TaskStatus } from 'shared-orch-worker/domain-types';
-
 import type {
 	FlowDefinition,
 	FlowStep,
@@ -41,8 +39,12 @@ export class SchemaValidator {
 	/**
 	 * Create a new SchemaValidator
 	 * @param issueCollector - Collector for validation issues
+	 * @param validTaskStatuses - Valid task status values; if empty, status values are not validated
 	 */
-	constructor(private issueCollector: IssueCollector) {}
+	constructor(
+		private issueCollector: IssueCollector,
+		private validTaskStatuses: string[] = []
+	) {}
 
 	/**
 	 * Validate flow schema
@@ -219,8 +221,7 @@ export class SchemaValidator {
 			return; // Optional field, no error if missing
 		}
 
-		// Get all valid task statuses
-		const validStatuses: TaskStatus[] = Object.values(TaskStatus);
+		const validStatuses = this.validTaskStatuses;
 
 		// Validate onSuccess
 		if (!config.onSuccess) {
@@ -229,10 +230,13 @@ export class SchemaValidator {
 				code: ValidationCode.MISSING_FIELD,
 				message: 'statusTransitions must have onSuccess field',
 				location: { field: 'statusTransitions.onSuccess' },
-				suggestion: `Choose one of: ${validStatuses.join(', ')}`,
+				suggestion:
+					validStatuses.length > 0
+						? `Choose one of: ${validStatuses.join(', ')}`
+						: 'Provide a valid status string',
 				context: { related: validStatuses },
 			});
-		} else if (!validStatuses.includes(config.onSuccess)) {
+		} else if (validStatuses.length > 0 && !validStatuses.includes(config.onSuccess)) {
 			this.issueCollector.addIssue({
 				severity: 'error',
 				code: ValidationCode.INVALID_VALUE,
@@ -254,10 +258,13 @@ export class SchemaValidator {
 				code: ValidationCode.MISSING_FIELD,
 				message: 'statusTransitions must have onFailure field',
 				location: { field: 'statusTransitions.onFailure' },
-				suggestion: `Choose one of: ${validStatuses.join(', ')}`,
+				suggestion:
+					validStatuses.length > 0
+						? `Choose one of: ${validStatuses.join(', ')}`
+						: 'Provide a valid status string',
 				context: { related: validStatuses },
 			});
-		} else if (!validStatuses.includes(config.onFailure)) {
+		} else if (validStatuses.length > 0 && !validStatuses.includes(config.onFailure)) {
 			this.issueCollector.addIssue({
 				severity: 'error',
 				code: ValidationCode.INVALID_VALUE,

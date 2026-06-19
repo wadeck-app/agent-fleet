@@ -1,28 +1,29 @@
 {
-	"name": "flow-engine",
+	"name": "flow-cli",
 	"version": "1.0.0",
+	"private": true,
 	"type": "module",
-	"main": "./src/index.ts",
+	"bin": {
+		"flow": "./bin/flow.js"
+	},
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
+		"dev": "tsx src/cli.ts",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
 		"lint": "eslint src",
 		"lint:fix": "eslint src --fix",
-		"clean": "rimraf dist dist-types"
+		"clean": "rimraf dist"
 	},
 	"dependencies": {
+		"flow-engine": "*",
 		"shared-common": "*",
-		"js-yaml": "^4.1.1",
-		"zod": "^4.1.13",
-		"simple-git": "^3.30.0",
-		"uuid": "^9.0.1"
+		"commander": "^12.1.0",
+		"js-yaml": "^4.1.1"
 	},
 	"devDependencies": {
-		"test-utils": "*",
 		"@types/js-yaml": "^4.0.9",
-		"@types/uuid": "^9.0.8",
 		"typescript": "^5.3.3",
 		"vitest": "^4.0.14",
 		"tsx": "^4.7.0"

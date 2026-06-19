@@ -1,2 +1,11 @@
 export { FlowCapabilitiesGenerator } from './docs/FlowCapabilitiesGenerator';
 export { FlowRegistry } from './registry/FlowRegistry';
+export { FlowExecutor } from './executor/FlowExecutor';
+export type { FlowExecutionOptions } from './executor/FlowExecutor';
+export { FlowValidator } from './validation/FlowValidator';
+export type { ValidationIssue, ValidationResult } from './validation/FlowValidator';
+export type { InterventionHandler, InterventionRequest, InterventionResponse } from './executor/InterventionHandler';
+export { FlowGenerator } from './generation/FlowGenerator';
+export type { FlowGenerationResult, FlowConstraints } from './generation/FlowGenerator';
+export { FlowRecommendationEngine } from './analysis/FlowRecommendationEngine';
+export type { IdeaRequirements } from './analysis/FlowRecommendationEngine';

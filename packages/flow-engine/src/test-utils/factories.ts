@@ -18,20 +18,38 @@ import type {
 	Workspace,
 	WorkspaceMode,
 } from 'flow-engine/types';
-import type { TaskStatus } from 'shared-orch-worker/domain-types';
-import { type Task, type WorkerInfo } from 'shared-orch-worker/domain-types';
 
 //FIXME clean unused methods
+
+interface MockTask {
+	id: string;
+	description: string;
+	status: string;
+	priority: string;
+	createdAt: string;
+	updatedAt: string;
+	assignedTo: string | null;
+	comments: unknown[];
+	metadata: Record<string, unknown>;
+	history: unknown[];
+}
+
+interface MockWorkerInfo {
+	id: string;
+	connectedAt: string;
+	taskId: string | null;
+	taskStartedAt: string | null;
+}
 
 /**
  * Create a mock Task for testing
  */
-export function createMockTask(overrides?: Partial<Task>): Task {
+export function createMockTask(overrides?: Partial<MockTask>): MockTask {
 	const now = new Date().toISOString();
 	return {
 		id: 'test-task-1',
 		description: 'Test task description',
-		status: 'pending' as TaskStatus,
+		status: 'pending',
 		priority: 'medium',
 		createdAt: now,
 		updatedAt: now,
@@ -96,10 +114,9 @@ export function createMockWorkspace(overrides?: Partial<Workspace>): Workspace {
 /**
  * Create a mock WorkerInfo for testing
  */
-export function createMockWorker(overrides?: Partial<WorkerInfo>): WorkerInfo {
+export function createMockWorker(overrides?: Partial<MockWorkerInfo>): MockWorkerInfo {
 	return {
 		id: 'worker-1',
-		// type: 'dev' as WorkerType,
 		//FIXME no new Date in test (flaky)
 		connectedAt: new Date().toISOString(),
 		taskId: null,
@@ -194,7 +211,7 @@ export function createMockSubFlowStep(overrides?: Partial<SubFlowStep>): SubFlow
 /**
  * Create multiple mock tasks with sequential IDs
  */
-export function createMockTasks(count: number, overrides?: Partial<Task>): Task[] {
+export function createMockTasks(count: number, overrides?: Partial<MockTask>): MockTask[] {
 	return Array.from({ length: count }, (_, i) =>
 		createMockTask({
 			id: `task-${i + 1}`,
@@ -206,7 +223,7 @@ export function createMockTasks(count: number, overrides?: Partial<Task>): Task[
 /**
  * Create multiple mock workers with sequential IDs
  */
-export function createMockWorkers(count: number, overrides?: Partial<WorkerInfo>): WorkerInfo[] {
+export function createMockWorkers(count: number, overrides?: Partial<MockWorkerInfo>): MockWorkerInfo[] {
 	return Array.from({ length: count }, (_, i) =>
 		createMockWorker({
 			id: `worker-${i + 1}`,

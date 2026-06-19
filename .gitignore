@@ -60,3 +60,5 @@ nul
 packages/data/
 packages/web-backend/data/
 _results/
+.claude/w-learning/state.json
+*.flow-test.yml

@@ -72,12 +72,13 @@ export class FlowValidator implements IssueCollector {
 	/**
 	 * Create a new FlowValidator
 	 * @param flowRegistry - Optional FlowRegistry for subflow validation
+	 * @param validTaskStatuses - Valid task status values for statusTransitions validation; if empty, values are not validated
 	 */
-	constructor(flowRegistry?: FlowRegistry) {
+	constructor(flowRegistry?: FlowRegistry, validTaskStatuses: string[] = []) {
 		this.flowRegistry = flowRegistry;
 
 		// Initialize specialized validators with this as IssueCollector
-		this.schemaValidator = new SchemaValidator(this);
+		this.schemaValidator = new SchemaValidator(this, validTaskStatuses);
 		this.graphValidator = new GraphValidator(this, flowRegistry);
 		this.semanticValidator = new SemanticValidator(this, this.graphValidator, flowRegistry);
 		this.templateValidator = new TemplateValidator(this);
