@@ -48,7 +48,16 @@ export function MarkdownField({
 	const inputId = generateFieldId(label, id);
 	const [showPreview, setShowPreview] = useState(false);
 
-	// Simple markdown rendering (just basic formatting)
+	// ⚠️ WARNING — FIX ME (XSS)
+	// renderMarkdownPreview injects regex-substituted HTML via dangerouslySetInnerHTML
+	// without escaping $1 capture groups first. A value containing e.g.
+	//   **<img onerror=alert(1)>**
+	// produces <strong><img onerror=alert(1)></strong> which executes in the browser.
+	// inputDef.default (a server-supplied value) can reach this path via CreateTaskDialog.
+	//
+	// FIX: replace this function + dangerouslySetInnerHTML below with <ReactMarkdown>
+	// (already a project dependency — see TicketCommentsSection.tsx for usage pattern).
+	// No DOMPurify needed: ReactMarkdown renders via React components, never innerHTML.
 	const renderMarkdownPreview = (text: string): string => {
 		if (!text) return '';
 
