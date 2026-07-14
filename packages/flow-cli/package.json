@@ -20,7 +20,8 @@
 		"flow-engine": "*",
 		"shared-common": "*",
 		"commander": "^12.1.0",
-		"js-yaml": "^4.1.1"
+		"js-yaml": "^4.1.1",
+		"@wadeck/singleton-daemon-kit": "^1.0.0"
 	},
 	"devDependencies": {
 		"@types/js-yaml": "^4.0.9",
