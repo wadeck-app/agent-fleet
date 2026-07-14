@@ -8,6 +8,7 @@
 	},
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
+		"build-launcher": "node scripts/build-launcher.mjs",
 		"dev": "tsx src/cli.ts",
 		"test": "vitest run",
 		"test:watch": "vitest",

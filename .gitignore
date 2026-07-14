@@ -7,6 +7,9 @@ dist/
 dist-types/
 *.tsbuildinfo
 
+# Go launcher build artifacts — not committed, built at deploy time
+packages/*/launcher-go/
+
 # Prevent compiled files in src/ (should only be in dist/)
 packages/*/src/**/*.js
 packages/*/src/**/*.d.ts
