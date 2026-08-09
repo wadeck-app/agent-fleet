@@ -83,6 +83,7 @@ export class ScriptExecutor {
 	public async execute(options: ScriptExecutionOptions): Promise<ScriptExecutionResult> {
 		const startTime = Date.now();
 		const workingDir = options.workingDir || process.cwd();
+		// TODO(flow-cli): full process.env inheritance breaks env isolation — flow-cli workers must not use this default
 		const env = { ...process.env, ...options.env };
 		const shell = options.shell !== undefined ? options.shell : true;
 
