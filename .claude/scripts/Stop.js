@@ -3,7 +3,6 @@ import fs from 'fs/promises';
 import path from 'path';
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
-import WebSocket from 'ws';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -170,6 +169,7 @@ process.stdin.on('end', async () => {
 		logToFile(`Connecting to worker socket: ${workerSocket}`);
 
 		try {
+			const { default: WebSocket } = await import('ws');
 			const ws = new WebSocket(workerSocket);
 
 			ws.on('open', () => {

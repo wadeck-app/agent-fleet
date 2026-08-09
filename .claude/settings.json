@@ -10,16 +10,6 @@
 					}
 				]
 			}
-		],
-		"Stop": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"command": "node .claude/scripts/Stop.js"
-					}
-				]
-			}
 		]
 	},
 	"plansDirectory": "./.claude/plans"

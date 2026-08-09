@@ -189,7 +189,8 @@ export class ClaudeLauncher {
 				cwd: options.workingDir,
 				stdio: 'inherit',
 				shell: false,
-				env: {
+				// TODO(flow-cli): full process.env inheritance breaks env isolation — flow-cli workers must not use this default
+			env: {
 					...process.env,
 					...options.env,
 				},
@@ -226,7 +227,8 @@ export class ClaudeLauncher {
 				cwd: options.workingDir,
 				stdio: ['pipe', 'pipe', 'pipe'],
 				shell: false,
-				env: {
+				// TODO(flow-cli): full process.env inheritance breaks env isolation — flow-cli workers must not use this default
+			env: {
 					...process.env,
 					...options.env,
 				},

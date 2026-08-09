@@ -1,308 +1,104 @@
-# Agent Fleet 🚀
+# Agent Fleet
 
 Multi-agent orchestration system for autonomous software development using Claude Code.
 
 ## Architecture
 
+Two independent systems live in this monorepo:
+
+1. **Agent Fleet** — the current production system: orchestrator + workers + web UI
+2. **Flow CLI** — in design (see `specs/2026-07-30-flow-cli/`) — a standalone daemon-based CLI for running flows without the web stack
+
 ```
-┌─────────────────┐
-│  Entry Point    │  CLI/API for creating tasks
-│  (User Input)   │
-└────────┬────────┘
-         │
-         v
-┌─────────────────┐
-│ Orchestrator    │  ← REST API (port 3737)
-│ - Task Queue    │  ← WebSocket Server (port 3738)
-│ - Worker Pool   │  ← Task Management (JSON files)
-└────────┬────────┘
-         │
-         ├─────────────────┬──────────────┬──────────────┐
-         v                 v              v              v
-    ┌────────┐      ┌──────────┐   ┌──────────┐   ┌──────────┐
-    │   PM   │      │    PO    │   │   Dev    │   │ Reviewer │
-    │Worker  │      │ Worker   │   │ Worker   │   │  Worker  │
-    └───┬────┘      └────┬─────┘   └────┬─────┘   └────┬─────┘
-        │                │              │              │
-        v                v              v              v
-    ┌────────────────────────────────────────────────────────┐
-    │              Claude Code (non-interactive)             │
-    │              with socket-enabled hooks                 │
-    └────────────────────────────────────────────────────────┘
+web-frontend  ──HTTP/WS──>  web-backend  ──embedded──>  orchestrator
+                                                              │
+                                                         WebSocket
+                                                              │
+                                              ┌───────────────┼───────────────┐
+                                          worker          worker          worker
+                                              │
+                                        flow-engine
+                                        (StepRunner, ClaudeLauncher, ...)
 ```
 
-## Features
+## Packages
 
-- **REST API** for task management and system monitoring
-- **WebSocket** for real-time worker communication
-- **Task Queue** with priority and status management
-- **Worker Types**: PM (refinement), PO (prioritization), Dev (implementation), Reviewer
-- **File-based Storage** (easily upgradeable to database)
-- **TypeScript** for type safety
+### Runtime processes
 
-## Quick Start
+| Package | Role |
+|---|---|
+| `packages/orchestrator` | Long-running coordinator. Owns task queue, worker pool, WebSocket server for workers (port 3738), REST API (port 3737), intervention routing, and event bridge to web-backend. Can run as a standalone process or embedded inside web-backend. |
+| `packages/worker` | Long-running agent process. Connects to orchestrator via WebSocket, receives task assignments, runs `FlowExecutor` from `flow-engine`, manages Claude subprocess lifecycle, reports results. |
+| `packages/web-backend` | Fastify HTTP/WebSocket server. REST API for the frontend, SSE/WebSocket event broadcasting, auth (JWT), workspace/project/flow/task CRUD, storage. Embeds `orchestrator` in library mode. |
+| `packages/web-frontend` | React SPA (Vite). Dashboard, task management, visual flow editor (`@xyflow/react`), real-time event consumption. |
+| `packages/legacy-cli` | Thin CLI binary (`fleet-task`). Submits tasks to the orchestrator REST API from the command line. No web UI needed. |
 
-### 1. Install Dependencies
+### Libraries
+
+| Package | Role |
+|---|---|
+| `packages/flow-engine` | Pure engine library. Flow YAML parsing, validation (graph, schema, semantic), step execution (`StepRunner`, `FlowExecutor`, `FlowOrchestrator`), Claude process launching, workspace management, flow registry. No process lifecycle — consumed by orchestrator and worker. |
+| `packages/shared-common` | Zero-dependency utilities: WebSocket message serialization protocol, structured logger, port calculator, shutdown interface, error helpers. |
+| `packages/shared-orch-worker` | Contract layer between orchestrator and worker processes. Typed message envelopes (`O2WMessage`, `W2OMessage`), task domain types (`TaskStatus`, `Task`), orchestrator event types, `StateManager`. |
+| `packages/shared-frontend-backend` | HTTP API contract layer between web-backend and web-frontend. Typed API contracts per domain, route-builder helpers, WebSocket/SSE/polling transport protocol types. |
+
+### Test infrastructure
+
+| Package | Role |
+|---|---|
+| `packages/test-utils` | Shared test factories, mock builders, REST API helpers. Dev-only dependency. |
+| `packages/e2e-web` | Playwright end-to-end test suite against the full running web app and Storybook. |
+
+## Dependency graph
+
+```
+shared-common           (no local deps)
+shared-orch-worker      (no local deps)
+flow-engine          ←  shared-common, shared-orch-worker
+orchestrator         ←  flow-engine, shared-common, shared-orch-worker
+worker               ←  flow-engine, shared-common, shared-orch-worker
+shared-frontend-backend ← shared-common
+web-backend          ←  orchestrator, shared-common, shared-frontend-backend, shared-orch-worker
+web-frontend         ←  shared-frontend-backend
+legacy-cli           ←  orchestrator, shared-common, shared-orch-worker
+```
+
+## Quick start
 
 ```bash
 npm install
-```
 
-### 2. Start the Orchestrator
-
-```bash
+# Start the full stack (orchestrator + web-backend)
 npm run dev
-```
 
-This will start:
-
-- REST API on `http://localhost:3737`
-- WebSocket server on `ws://localhost:3738`
-
-### 3. Start a Flow Worker (in another terminal)
-
-```bash
+# Start a worker (separate terminal)
 npm run worker:flow
-```
 
-### 4. Create a Task
-
-```bash
-# Create a task
+# Submit a task via CLI
 npm run add-task create "Add user authentication" high
-
-# List all tasks
-npm run add-task list
-
-# View stats
-npm run add-task stats
 ```
 
-### 5. Run Test
+Web UI: `http://localhost:5173`
+Orchestrator API: `http://localhost:3737`
+
+## Flow CLI (in design)
+
+A standalone alternative to the web stack. One binary, no server required.
 
 ```bash
-npm test
+flow run ./my-flow.yml --input branch=feat/my-feature
+flow attach <execution-id>
+flow logs <execution-id>
 ```
 
-## Project Structure
-
-```
-agent-fleet/
-├── src/
-│   ├── orchestrator/
-│   │   ├── index.ts              # Main entry point
-│   │   ├── task-manager.ts       # Task management logic
-│   │   ├── websocket-server.ts   # WebSocket server for workers
-│   │   └── rest-api.ts           # REST API with Express
-│   ├── workers/
-│   │   ├── base/
-│   │   │   └── BaseWorker.ts     # Base worker class
-│   │   └── flow/
-│   │       └── FlowWorker.ts     # Flow-based worker
-│   ├── shared/
-│   │   ├── types.ts              # Shared TypeScript types
-│   │   ├── protocol.ts           # Message protocol
-│   │   └── storage.ts            # Storage abstraction layer
-│   └── cli/
-│       └── entry-point.ts        # CLI for task creation
-├── data/
-│   ├── tasks/                    # Task JSON files
-│   ├── contexts/                 # Task context directories
-│   └── knowledge/                # Knowledge base (JSONL)
-├── test/
-│   └── simple-task.ts            # Simple test script
-├── package.json
-├── tsconfig.json
-└── README.md
-```
-
-## API Reference
-
-### REST API Endpoints
-
-#### `GET /health`
-
-Health check endpoint.
-
-#### `GET /stats`
-
-Get system statistics including worker count, task counts, etc.
-
-#### `POST /tasks`
-
-Create a new task.
-
-**Body:**
-
-```json
-{
-	"description": "Task description",
-	"priority": "low|medium|high|urgent",
-	"metadata": {}
-}
-```
-
-#### `GET /tasks`
-
-List all tasks. Optional query param: `?status=backlog`
-
-#### `GET /tasks/:id`
-
-Get a specific task by ID.
-
-#### `PATCH /tasks/:id/status`
-
-Update task status.
-
-**Body:**
-
-```json
-{
-	"status": "backlog|refining|todo|in_progress|review|..."
-}
-```
-
-#### `POST /tasks/:id/comments`
-
-Add a comment to a task.
-
-**Body:**
-
-```json
-{
-	"author": "user",
-	"content": "Comment text"
-}
-```
-
-#### `GET /workers`
-
-List all connected workers.
-
-### WebSocket Protocol
-
-Workers connect to `ws://localhost:3738` and exchange JSON messages.
-
-**Message Types:**
-
-- `WORKER_READY` - Worker announces it's ready
-- `ASSIGN_TASK` - Orchestrator assigns a task
-- `TASK_STARTED` - Worker started working on task
-- `TASK_PROGRESS` - Worker reports progress
-- `TASK_COMPLETED` - Worker completed task
-- `TASK_FAILED` - Worker failed task
-- `TASK_QUESTION` - Worker has a question (blocks task)
-- `STOP_REQUESTED` - Claude requests stop (via hook)
-- `KILL_CLAUDE` - Orchestrator tells worker to kill Claude
-- `HOOK_EVENT` - Worker reports hook event
-
-## Task Statuses
-
-Tasks flow through these statuses:
-
-1. **backlog** - Initial state
-2. **refining** - PM is refining the task
-3. **refined** - Ready for prioritization
-4. **prioritizing** - PO is prioritizing
-5. **todo** - Ready for development
-6. **in_progress** - Dev is working on it
-7. **testing** - Running tests
-8. **review** - Ready for review
-9. **reviewing** - Reviewer is reviewing
-10. **changes_requested** - Needs changes
-11. **approved** - Approved for merge
-12. **merged** - Completed
-13. **blocked** - Blocked (question, dependency, error)
-14. **cancelled** - Cancelled
-
-## Worker Types
-
-### Flow Worker
-
-Executes flows defined in `.agent-fleet/flows.yaml`. Each flow consists of multiple steps orchestrated through a DAG execution engine. Uses Claude Code to perform autonomous development tasks with workspace management.
+See `specs/2026-07-30-flow-cli/` for the full architecture spec (27 decisions, actively being brainstormed).
 
 ## Development
 
-### Build
-
 ```bash
-npm run build
+npm run build       # build all packages
+npm test            # run all tests
+npm run check       # TypeScript + ESLint across monorepo
 ```
 
-### Run in Dev Mode
-
-```bash
-npm run dev
-```
-
-### Add a Task via CLI
-
-```bash
-npm run add-task create "Description" [priority]
-```
-
-### Run a Worker
-
-```bash
-# Flow worker
-npm run worker:flow
-
-# Flow worker with interactive mode
-npm run worker:flow:i
-```
-
-## Environment Variables
-
-Workers receive these environment variables:
-
-- `CLAUDE_WORKER_ID` - Unique worker ID
-- `CLAUDE_WORKER_SOCKET` - WebSocket URL to orchestrator
-- `CLAUDE_TASK_ID` - Current task ID
-- `CLAUDE_CONTEXT_DIR` - Directory for task context files
-
-## Hooks Integration
-
-Claude Code hooks (`.claude/scripts/`) can communicate with the orchestrator via the worker process using environment variables.
-
-Example: `Stop.js` can send a `STOP_REQUESTED` message to the orchestrator when Claude is done.
-
-## Roadmap
-
-### Phase 1: MVP ✅
-
-- [x] Orchestrator with REST API
-- [x] WebSocket server for workers
-- [x] Task management (JSON files)
-- [x] Dev worker (basic)
-- [x] CLI for task creation
-- [ ] Stop hook integration
-
-### Phase 2: Multi-Agent System
-
-- [ ] PM worker (task refinement)
-- [ ] PO worker (prioritization)
-- [ ] Reviewer worker (code review)
-- [ ] Git worktree automation
-- [ ] GitHub PR creation
-
-### Phase 3: Intelligence
-
-- [ ] Knowledge base integration
-- [ ] Context management
-- [ ] Dependency detection
-- [ ] Retry logic & error handling
-
-### Phase 4: UI
-
-- [ ] Web dashboard
-- [ ] Real-time task visualization
-- [ ] Branch preview
-- [ ] User inbox for questions
-
-## Contributing
-
-This is an experimental project. Feel free to explore and extend!
-
-## License
-
-MIT
+Test files live next to implementation (`FlowExecutor.ts` / `FlowExecutor.test.ts`).
