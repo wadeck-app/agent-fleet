@@ -3,7 +3,7 @@
 ## Context
 
 You are implementing `flow-cli`, a standalone CLI tool for executing YAML-described flows.
-The architecture is fully specified in `specs/2026-07-30-flow-cli/`. Read ALL files in that directory before writing any code.
+The architecture is fully specified in `.claude/specs/2026-07-30-flow-cli/`. Read ALL files in that directory before writing any code.
 
 The monorepo lives at `C:\Users\Wadeck\Workspace\__exp\agent-fleet`.
 The singleton-daemon-kit library is at `C:\Users\Wadeck\Workspace\__exp\singleton-daemon-kit` (source: https://github.com/Wadeck/singleton-daemon-kit). It is an external npm package `@wadeck/singleton-daemon-kit` — NOT a monorepo workspace package. Requires the private GitLab registry configured in `~/.npmrc`.
@@ -195,7 +195,7 @@ Do NOT reuse `FlowExecutor`, `FlowOrchestrator`, `StepRunner` — these run in-p
 
 ## IPC protocol
 
-See `specs/2026-07-30-flow-cli/ipc-protocol.md` for exact message types.
+See `.claude/specs/2026-07-30-flow-cli/ipc-protocol.md` for exact message types.
 
 Channel 1 (CLI↔Daemon): HTTP/1.1 loopback via singleton-daemon-kit. Port discovered from `os.homedir()/.flow-daemon/config.port`.
 Channel 2 (Daemon↔Worker): WebSocket on `HTTP_PORT + 1`. Workers receive `FLOW_DAEMON_PORT` and `FLOW_WS_PORT` as env vars at spawn.

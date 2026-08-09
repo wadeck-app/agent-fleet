@@ -1,8 +1,19 @@
 # Lessons learned
 
-<!-- Last updated: 2026-08-09T00:18:40.057Z -->
+<!-- Last updated: 2026-08-09T07:43:23.539Z -->
 
 ## Recurring feedback
+
+<!-- session 709369ee 2026-08-09 -->
+- Multiple parallel agents (ae20, abf1, a272, a359, ac24, a3fe, ae2b) read identical spec files in same session without coordination — overlapping work; delegate once, not multiple times per question.
+- Repeated file reads with line offsets instead of buffering context — inefficient token use; when reading chunks of same file, read once or batch contiguous ranges.
+- User repeatedly calls `claude --dangerously-skip-permissions` with fresh-engineer prompts as subprocess, not via Agent tool — suggests permission prompts are friction during iterative spec validation
+- Multiple Goldfish review passes needed (3+ iterations: prompt-1/2/3, then iter1/iter2) before implementation prompt stabilized — iterative refinement pattern, not one-pass validation
+- Multiple goldfish review iterations (iter3 → iter4 → iter5 → iter5b) with interspersed file edits on both implementation-prompt.md and flow-cli-implementation.md plan; pattern suggests either incremental refinement working as intended, or uncertainty about spec/plan quality requiring multiple passes
+
+<!-- session 4b92a7f9 2026-08-09 -->
+- Technical reviews require full verbatim content, not summaries. User explicitly corrected: "Read all the following files completely and return their full content" after agent provided summaries.
+- User invokes claude CLI with `--dangerously-skip-permissions` at least 4 times (23:42:59, 23:53:35, 23:55:43, 00:16:16). This workaround should be replaced with proper permission configuration in .claude/settings.json or project settings.
 
 <!-- session 44b25955 2026-08-09 -->
 - User workflow pattern observed: create comprehensive spec → spawn multiple independent coherence/audit agents → iterate spec based on findings → create plan → create implementation prompt. This is a deliberate heavy-review cycle for specs
@@ -90,6 +101,18 @@
 - Multiple independent agents (Explore, general-purpose) read identical spec files sequentially without coordination, causing redundant I/O. Agents should receive shared context or hand off findings rather than re-audit.
 
 ## Agent errors
+
+<!-- session 709369ee 2026-08-09 -->
+- goldfish-review agent fetched a Medium article instead of executing the intended review behavior — skill documentation or naming misleading about what task it performs.
+- Multiple "Agent unknown" entries with descriptive task names — placeholder/incomplete agent initialization or test harness noise in logs.
+- Plan file receives batch edits after agent analyses (23:38–23:40 block with targeted Greps: D23, daemon cwd, WebSocket, ValidationError) — suggests agent findings not clearly summarized, requiring manual dig-through to apply
+- Multiple parallel Explore agents (efd0bc56, e99131f8, 5ca40801) launched around 00:01:30-00:03 reading same spec/source files; potential coordination gap or duplicate work in agent orchestration
+- Multiple sequential Explore agents spawned for codebase investigation, causing redundant reads of `ipc-protocol.md`, `execution-model.md`, and `types.ts` — should coordinate with a single agent + comprehensive brief or give agents explicit context of prior findings
+
+<!-- session 4b92a7f9 2026-08-09 -->
+- Explore agent returned summaries when detailed analysis required; when user says "technical review", assume full context needed, not high-level navigation.
+- Agent spent multiple rounds (WebFetch attempts) looking up "goldfish review" methodology externally instead of checking project documentation first.
+- Goldfish review ran 3+ times on implementation-prompt with iterative rewrites (goldfish-prompt-1/2/3 → goldfish-iter1/2), indicating initial spec had gaps; should validate all spec documents through goldfish-review before marking ready for implementation.
 
 <!-- session 44b25955 2026-08-09 -->
 - Attempted to use skills before they existed or were loaded: get-timestamp (2026-08-08 22:04:24), check (2026-08-08 22:18:38), goldfish-review (2026-08-08 22:51:27) → all returned "NOT YET KNOWN" warnings; agent then wrote the missing goldfish-review skill definition
@@ -204,6 +227,20 @@
 
 ## Documentation gaps
 
+<!-- session 709369ee 2026-08-09 -->
+- Skill "check" and "goldfish-review" initially not recognized — skill registration/discovery mechanism unclear or skills not yet indexed at session start.
+- Agents performed extensive Grep searches for undefined patterns (D28, CANCELLED, worker-register, Q24-Q30, bufferSpillMs, heartbeat monitoring) — spec lacks index/cross-reference; decisions and open questions not linked or queryable.
+- Implementation prompt expanded mid-session (5416 → 6926 chars, then multiple edits) after Goldfish checks — initial spec had gaps or unclear sections that reviews surfaced
+- goldfish-review skill showed as "NOT YET KNOWN" (2026-08-08 23:56:24), forcing fallback to manual claude CLI calls with --dangerously-skip-permissions; should clarify skill availability or correct invocation method
+
+<!-- session 4b92a7f9 2026-08-09 -->
+- "goldfish review" methodology not documented in project CLAUDE.md or skill definitions initially—required external research and later skill creation (22:28:12 SKILL.md write).
+- Architectural decisions (D23, D31, D34, D37) referenced via grep searches but apparently hard to navigate — spec decisions.md should have a stable index or link anchor system for cross-referencing from implementation prompts.
+- Secrets model, ValidationError format, and WebSocket protocol v1 details were search targets but results unclear — these should be extracted into a glossary or reference section, not buried in narrative.
+- Daemon `cwd` parameter behavior required grep search to locate — should be documented in ipc-protocol.md or daemon-lifecycle.md with explicit usage examples.
+- Workspace-related types require multiple grep searches with varying patterns (WorkspaceConfig, WorkspaceMode, DeclaredWorkspace, DeclaredWorkspaceProvider). Suggests scattered or unclear naming in codebase — add to lessons-learned with discovered type locations and intent.
+- Multiple parallel Explore agents read overlapping spec/source files (specs/2026-07-30-flow-cli/decisions.md, packages/flow-engine/src/types.ts) — future exploratory tasks should be consolidated into a single focused search to reduce redundant reads.
+
 <!-- session 44b25955 2026-08-09 -->
 - Multiple parallel agents (ae2b, a3fe, a359, ac24) independently read the same spec files (specs/2026-07-30-flow-cli/*) without coordination — no apparent way for agents to share cached reads or coordinate queries
 - Specs lack cross-reference index for decisions (agents repeatedly grep for D23, D31, D34, D37 instead of locating them directly). Consider adding decision quick-reference or anchor links.
@@ -306,6 +343,14 @@
 - Extensive Grep searches for domain concepts (RE-QUEUED, bufferSpill, reconnectTimeout, idleTimeout, drainTimeout, heartbeat monitoring, etc.) suggest spec lacks clear glossary or index of key terms. Future audits should define these upfront.
 
 ## Known constraints
+
+<!-- session 709369ee 2026-08-09 -->
+- Spec review process intermixed with spec edits (coherence audit + fix in same pass) — should be separate: read → audit → report, then separately: fix → verify.
+- Heavy reliance on Explore agent + general-purpose agents for reading specs/source; findings integrated via manual plan edits rather than structured report — spec completeness varies across documents, no single source of truth for what needs building
+- Delegation guidance in CLAUDE.md emphasizes "delegate early and often" but doesn't address sequencing/coordination when multiple agents explore overlapping code paths — redundancy suggests need for explicit handoff protocol between delegated agents
+
+<!-- session 4b92a7f9 2026-08-09 -->
+- User invoked multiple fresh-engineer agents with `--dangerously-skip-permissions` to stress-test spec clarity — this is intentional validation, not a mistake; specs must be completable by zero-context engineers without permission prompts.
 
 <!-- session 44b25955 2026-08-09 -->
 - Per CLAUDE.md: "Delegate to sub-agents early and often" — user is following this, with 4+ parallel agents spawned for spec reviews; sessions should anticipate this pattern
