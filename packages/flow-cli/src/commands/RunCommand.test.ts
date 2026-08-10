@@ -1,8 +1,11 @@
+import * as fs from 'fs';
 import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FlowCliRunner } from '../FlowCliRunner.js';
 import { registerRunCommand } from './RunCommand.js';
+
+vi.mock('fs');
 
 const mockRun = vi.fn();
 // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
@@ -14,6 +17,7 @@ vi.mock('../FlowCliRunner.js', () => ({
 }));
 
 const MockedFlowCliRunner = vi.mocked(FlowCliRunner);
+const mockedFs = vi.mocked(fs);
 
 function makeProgram(): Command {
 	const program = new Command();
@@ -28,6 +32,8 @@ describe('RunCommand', () => {
 	let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 	beforeEach(() => {
+		// Default: no .agent-fleet found → cwd used as projectRoot
+		mockedFs.existsSync = vi.fn().mockReturnValue(false);
 		exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
 			throw new Error('process.exit');
 		});
@@ -130,12 +136,28 @@ describe('RunCommand', () => {
 		expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid input format'));
 	});
 
-	it('passes --cwd option to FlowCliRunner constructor', async () => {
+	it('uses cwd as projectRoot when no .agent-fleet directory found', async () => {
 		mockRun.mockResolvedValue({ success: true, outputs: {} });
+		mockedFs.existsSync = vi.fn().mockReturnValue(false);
 
 		const program = makeProgram();
 		await program.parseAsync(['run', 'my-flow', '--cwd', '/tmp/my-project'], { from: 'user' });
 
 		expect(MockedFlowCliRunner).toHaveBeenCalledWith('/tmp/my-project');
+	});
+
+	it('walks up from --cwd to find .agent-fleet and uses that as projectRoot', async () => {
+		mockRun.mockResolvedValue({ success: true, outputs: {} });
+		// Simulate .agent-fleet existing at /tmp (parent of /tmp/my-project/subdir)
+		mockedFs.existsSync = vi.fn().mockImplementation((p: unknown) => {
+			return String(p).endsWith('.agent-fleet');
+		});
+
+		const program = makeProgram();
+		await program.parseAsync(['run', 'my-flow', '--cwd', '/tmp/my-project/subdir'], { from: 'user' });
+
+		// Should use the directory where .agent-fleet was found, not the subdir
+		const calledWith = MockedFlowCliRunner.mock.calls[0]?.[0] as string;
+		expect(calledWith).not.toBe('/tmp/my-project/subdir');
 	});
 });

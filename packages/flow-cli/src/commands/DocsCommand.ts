@@ -12,7 +12,12 @@ export function registerDocsCommand(program: Command): void {
 			const content = generator.generate();
 
 			if (options.output) {
-				fs.writeFileSync(options.output, content, 'utf-8');
+				try {
+					fs.writeFileSync(options.output, content, 'utf-8');
+				} catch (err) {
+					console.error(`Failed to write to ${options.output}: ${err instanceof Error ? err.message : String(err)}`);
+					process.exit(1);
+				}
 				console.log(`✓ Docs written to ${options.output}`);
 			} else {
 				process.stdout.write(content + '\n');

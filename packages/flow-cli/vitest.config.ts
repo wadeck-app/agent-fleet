@@ -23,8 +23,7 @@ export default defineConfig({
 		environment: 'node',
 		include: ['src/**/*.test.ts'],
 		exclude: ['**/node_modules/**', '**/dist/**'],
-		clearMocks: true,
-		mockReset: true,
+		mockReset: true, // implies clearMocks — no need to set both
 		restoreMocks: true,
 	},
 	resolve: {

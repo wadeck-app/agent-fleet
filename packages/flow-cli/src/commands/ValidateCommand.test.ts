@@ -71,7 +71,7 @@ describe('ValidateCommand', () => {
 		expect(exitSpy).not.toHaveBeenCalled();
 	});
 
-	it('prints error count and exits 1 when flow has errors', async () => {
+	it('prints error count to stderr and exits 1 when flow has errors', async () => {
 		mockedFs.existsSync = vi.fn().mockReturnValue(true);
 		mockedFs.readFileSync = vi.fn().mockReturnValue('id: bad-flow\nsteps: []');
 		mockValidate.mockReturnValue({
@@ -89,7 +89,11 @@ describe('ValidateCommand', () => {
 		);
 
 		expect(exitSpy).toHaveBeenCalledWith(1);
-		expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('2 error'));
+		// ✗ summary and error details must both be on stderr, NOT stdout
+		expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('2 error'));
+		expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Errors:'));
+		expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining('✗'));
+		expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining('Errors:'));
 	});
 
 	it('prints "File not found" and exits 1 when file does not exist', async () => {

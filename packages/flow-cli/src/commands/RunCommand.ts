@@ -1,6 +1,22 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import type { Command } from 'commander';
 
 import { FlowCliRunner } from '../FlowCliRunner.js';
+
+/**
+ * Walk up from `startDir` to find the directory that contains `.agent-fleet/`.
+ * Returns null if no such directory is found (e.g. running outside a project).
+ */
+function findProjectRoot(startDir: string): string | null {
+	let dir = path.resolve(startDir);
+	const { root } = path.parse(dir);
+	while (dir !== root) {
+		if (fs.existsSync(path.join(dir, '.agent-fleet'))) return dir;
+		dir = path.dirname(dir);
+	}
+	return null;
+}
 
 function parseInputs(rawInputs: string[]): Record<string, string> {
 	const result: Record<string, string> = {};
@@ -39,7 +55,9 @@ export function registerRunCommand(program: Command): void {
 			const cwd = options.cwd ?? process.cwd();
 			const inputs = parseInputs(options.inputs);
 
-			const runner = new FlowCliRunner(cwd);
+			// projectRoot is resolved from cwd — walk up to find .agent-fleet anchor directory
+			const projectRoot = findProjectRoot(cwd) ?? cwd;
+			const runner = new FlowCliRunner(projectRoot);
 
 			const start = Date.now();
 			let result;

@@ -3,12 +3,11 @@ import type {
 	FlowDefinition,
 	FlowStep,
 	ModelFlowStep,
-	ScriptFlowStep,
 	SubFlowStep,
 	UserInterventionStep,
 } from 'flow-engine/types';
-import * as fs from 'fs';
-import * as yaml from 'js-yaml';
+
+import { loadYaml } from '../utils/loadYaml.js';
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
@@ -26,8 +25,7 @@ function stepType(step: FlowStep): string {
 		const s = step as UserInterventionStep;
 		return s.interventionType;
 	}
-	// exhaustive — FlowStep union is fully handled above
-	return (step as { type: string }).type;
+	throw new Error(`Unknown step type: ${(step as { type: string }).type}`);
 }
 
 function shortWhen(expr: string): string {
@@ -206,24 +204,14 @@ export function registerShowCommand(program: Command): void {
 		.command('show <file>')
 		.description('Display a summary of a flow YAML file')
 		.action((file: string) => {
-			if (!fs.existsSync(file)) {
-				console.error(`File not found: ${file}`);
+			const raw = loadYaml(file);
+
+			const flow = raw as FlowDefinition;
+			if (!Array.isArray(flow.steps) || !flow.workspace) {
+				console.error(`Invalid flow: missing required fields 'steps' or 'workspace' in ${file}`);
 				process.exit(1);
 			}
 
-			let raw: unknown;
-			try {
-				const content = fs.readFileSync(file, 'utf-8');
-				raw = yaml.load(content);
-				if (raw === null || raw === undefined) {
-					console.error(`File is empty: ${file}`);
-					process.exit(1);
-				}
-			} catch (err) {
-				console.error(`Failed to parse YAML: ${err instanceof Error ? err.message : String(err)}`);
-				process.exit(1);
-			}
-
-			renderFlow(raw as FlowDefinition);
+			renderFlow(flow);
 		});
 }

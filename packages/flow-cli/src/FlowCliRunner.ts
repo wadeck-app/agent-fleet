@@ -1,16 +1,26 @@
 import { FlowExecutor, FlowRegistry } from 'flow-engine';
-import type { FlowExecutionResult } from 'flow-engine/types';
+import type { FlowDefinition, FlowExecutionResult, Workspace } from 'flow-engine/types';
 import * as fs from 'fs';
-import * as yaml from 'js-yaml';
 import * as path from 'path';
+import * as yaml from 'js-yaml';
 
 import { ThrowInterventionHandler } from './interventions/ThrowInterventionHandler.js';
+
+function createCliWorkspace(taskId: string, workspacePath: string): Workspace {
+	return {
+		id: `ws-${taskId}`,
+		path: workspacePath,
+		mode: 'manual',
+		concurrency: { key: taskId, activeTasks: new Set<string>(), locked: false },
+		createdAt: new Date().toISOString(),
+		lastUsedAt: new Date().toISOString(),
+		usageCount: 1,
+	};
+}
 
 export interface RunOptions {
 	/** Direct YAML file path, or a flow ID to look up in flows.yml */
 	flowRef: string;
-	/** Optional path to flows.yml (defaults to .agent-fleet/flows.yml in cwd) */
-	flowsFile?: string;
 	/** Input key=value pairs */
 	inputs?: Record<string, string>;
 	/** Working directory (defaults to cwd) */
@@ -23,7 +33,7 @@ export class FlowCliRunner {
 
 	constructor(projectRoot: string) {
 		this.registry = new FlowRegistry(projectRoot);
-		this.executor = new FlowExecutor(false, this.registry);
+		this.executor = new FlowExecutor(/* verbose= */ false, this.registry);
 	}
 
 	/**
@@ -32,7 +42,8 @@ export class FlowCliRunner {
 	 */
 	private loadFlowFromFile(filePath: string): string {
 		const content = fs.readFileSync(filePath, 'utf-8');
-		const raw = yaml.load(content);
+		// JSON_SCHEMA prevents unexpected type coercions (Dates, Buffers, etc.)
+		const raw = yaml.load(content, { schema: yaml.JSON_SCHEMA });
 		if (!raw || typeof raw !== 'object') {
 			throw new Error(`Flow file must contain a valid object: ${filePath}`);
 		}
@@ -41,7 +52,7 @@ export class FlowCliRunner {
 			throw new Error(`Flow file must have a string 'id' field: ${filePath}`);
 		}
 		try {
-			this.registry.registerFlow(flow as unknown as Parameters<FlowRegistry['registerFlow']>[0]);
+			this.registry.registerFlow(flow as FlowDefinition);
 		} catch (err) {
 			throw new Error(
 				`Invalid flow in ${path.basename(filePath)}: ${err instanceof Error ? err.message : String(err)}`
@@ -71,17 +82,7 @@ export class FlowCliRunner {
 		}
 
 		const taskId = `cli-${Date.now()}`;
-
-		// Use cwd as a manual workspace — no git operations
-		const workspace = {
-			id: `ws-${taskId}`,
-			path: cwd,
-			mode: 'manual' as const,
-			concurrency: { key: taskId, activeTasks: new Set<string>(), locked: false },
-			createdAt: new Date().toISOString(),
-			lastUsedAt: new Date().toISOString(),
-			usageCount: 1,
-		};
+		const workspace = createCliWorkspace(taskId, cwd);
 
 		return this.executor.execute({
 			taskId,
