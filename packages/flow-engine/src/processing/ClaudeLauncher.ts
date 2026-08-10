@@ -45,6 +45,9 @@ export interface ClaudeLaunchOptions {
 	/** Environment variables for Claude */
 	env?: Record<string, string>;
 
+	/** When true, use ONLY env (no process.env merge) — enforces NOTHING default isolation */
+	isolateEnv?: boolean;
+
 	/** Callback when process starts */
 	onProcessStarted?: (process: any) => void;
 
@@ -59,6 +62,9 @@ export interface ClaudeLaunchOptions {
 
 	/** Callback for stream-json events (requires streamJson=true) */
 	onStreamEvent?: StreamJsonEventCallback;
+
+	/** MCP config file path for --mcp-config flag */
+	mcpConfigPath?: string;
 }
 
 /**
@@ -133,7 +139,7 @@ export class ClaudeLauncher {
 		prompt: string,
 		model: string | undefined,
 		interactive: boolean,
-		options?: Pick<ClaudeLaunchOptions, 'skipPermissions' | 'streamJson' | 'verbose'>
+		options?: Pick<ClaudeLaunchOptions, 'skipPermissions' | 'streamJson' | 'verbose' | 'mcpConfigPath'>
 	): { command: string; args: string[] } {
 		let command: string;
 		let args: string[];
@@ -159,6 +165,10 @@ export class ClaudeLauncher {
 
 		if (options?.verbose) {
 			args.push('--verbose');
+		}
+
+		if (options?.mcpConfigPath) {
+			args.push('--mcp-config', options.mcpConfigPath, '--strict-mcp-config');
 		}
 
 		if (model) {
@@ -189,11 +199,7 @@ export class ClaudeLauncher {
 				cwd: options.workingDir,
 				stdio: 'inherit',
 				shell: false,
-				// TODO(flow-cli): full process.env inheritance breaks env isolation — flow-cli workers must not use this default
-			env: {
-					...process.env,
-					...options.env,
-				},
+				env: options.isolateEnv ? { ...options.env } : { ...process.env, ...options.env },
 			});
 
 			// Call callback to store process reference
@@ -227,11 +233,7 @@ export class ClaudeLauncher {
 				cwd: options.workingDir,
 				stdio: ['pipe', 'pipe', 'pipe'],
 				shell: false,
-				// TODO(flow-cli): full process.env inheritance breaks env isolation — flow-cli workers must not use this default
-			env: {
-					...process.env,
-					...options.env,
-				},
+				env: options.isolateEnv ? { ...options.env } : { ...process.env, ...options.env },
 			});
 
 			// Call callback to store process reference

@@ -1,0 +1,10 @@
+id: invalid
+version: '1.0.0'
+name: Invalid Flow
+description: Flow with missing required fields
+workspace:
+    mode: shared
+    gitStrategy: any
+    reusePolicy: if-available
+inputs: {}
+steps: []

@@ -44,6 +44,7 @@ yarn-error.log*
 
 # Testing
 coverage/
+.vitest-cache/
 
 # Temporary files
 tmp/

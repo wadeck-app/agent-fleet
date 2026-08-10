@@ -28,9 +28,15 @@ export type StreamJsonEventCallback = (event: StreamJsonEvent) => void;
 export class StreamJsonParser {
 	private buffer: string = '';
 	private readonly onEvent: StreamJsonEventCallback;
+	private _sessionId: string | undefined;
 
 	constructor(onEvent: StreamJsonEventCallback) {
 		this.onEvent = onEvent;
+	}
+
+	/** Session ID from the system init event — available after first feed() call that includes it */
+	get sessionId(): string | undefined {
+		return this._sessionId;
 	}
 
 	/**
@@ -103,9 +109,9 @@ export class StreamJsonParser {
 		// System/init events
 		if (type === 'system') {
 			subtype = 'init';
-			// TODO(flow-cli): data.session_id must be captured here and returned to the caller.
-			// /resume requires --resume <sessionId> — without it, retries start a fresh conversation
-			// and the correction prompt has no context. See D25.
+			if (data.session_id && !this._sessionId) {
+				this._sessionId = String(data.session_id);
+			}
 		}
 
 		return { type, subtype, data };

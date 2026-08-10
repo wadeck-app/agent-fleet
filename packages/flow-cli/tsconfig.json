@@ -1,0 +1,15 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"outDir": "dist-types",
+		"rootDir": "src",
+		"paths": {
+			"flow-engine": ["../flow-engine/src/index"],
+			"flow-engine/*": ["../flow-engine/src/*"],
+			"@wadeck/singleton-daemon-kit": ["./node_modules/@wadeck/singleton-daemon-kit/dist/index.d.ts"]
+		}
+	},
+	"include": ["src"],
+	"exclude": ["dist", "node_modules"],
+	"references": [{ "path": "../flow-engine" }]
+}

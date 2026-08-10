@@ -1,8 +1,15 @@
 # Lessons learned
 
-<!-- Last updated: 2026-08-09T07:43:23.539Z -->
+<!-- Last updated: 2026-08-10T17:48:15.345Z -->
 
 ## Recurring feedback
+
+<!-- session 249bf70f 2026-08-09 -->
+- Plan files must have inline progress tracking (checkboxes, completion %). User emphasized resumability: "ton plan doit pouvoir être repris si tu crashes" — external task lists don't preserve state. Build progress markers INTO the spec file itself.
+
+<!-- session d8d895df 2026-08-09 -->
+- Bash flag `--dangerously-skip-permissions` used repeatedly in fresh-engineer prompts (23:12:17, 23:32:51, 23:40:24) to bypass security checks for analysis. Confirm this is intentional pattern and not a workaround for permission configuration issues.
+- 15+ rapid edits to .claude/plans/2026-08-09-flow-cli-implementation.md (00:10–00:14) and implementation-prompt.md (multiple sequences) — suggests very granular incremental edits rather than consolidated changes
 
 <!-- session 709369ee 2026-08-09 -->
 - Multiple parallel agents (ae20, abf1, a272, a359, ac24, a3fe, ae2b) read identical spec files in same session without coordination — overlapping work; delegate once, not multiple times per question.
@@ -101,6 +108,17 @@
 - Multiple independent agents (Explore, general-purpose) read identical spec files sequentially without coordination, causing redundant I/O. Agents should receive shared context or hand off findings rather than re-audit.
 
 ## Agent errors
+
+<!-- session 249bf70f 2026-08-09 -->
+- Started with `NodeNext` module resolution instead of checking existing monorepo patterns first (flow-engine uses `bundler`). Cost multiple compile attempts and a rebuild strategy pivot to esbuild.
+- Architecture.md had ASCII box formatting errors (75 vs 76 char widths, inconsistent inner alignment) and topologically wrong dependency arrows. User called this out as "moche" — verify diagram correctness and alignment before committing documentation.
+- ESM module mocking failed with `vi.fn()` — attempted to spy on McpServer export but ESM namespaces are read-only. Pivoted to factory injection pattern for testability.
+- Top-level `main()` call in TaskIndex.ts executed during test import, breaking tests. Fixed with `import.meta.url === `file://${process.argv[1]}`  guard.
+
+<!-- session d8d895df 2026-08-09 -->
+- Implementation-prompt.md is write/edit cycled 8+ times (23:15:28→23:40:14) with each cycle preceded by fresh-engineer validation. Pattern suggests either specs are unstable or validation findings warrant foundational fixes rather than patches.
+- goldfish-review skill invoked at 23:56:24 was unknown/not-yet-loaded — agent silently continued without retry, then switched to bash+external claude CLI calls as workaround
+- Multiple Explore agents reading identical files in parallel (types.ts, ipc-protocol.md, execution-model.md, decisions.md) — inefficient duplication that violates the "delegate early and often" principle stated in CLAUDE.md; agents should coordinate work division or one agent should handle reads with results shared
 
 <!-- session 709369ee 2026-08-09 -->
 - goldfish-review agent fetched a Medium article instead of executing the intended review behavior — skill documentation or naming misleading about what task it performs.
@@ -227,6 +245,17 @@
 
 ## Documentation gaps
 
+<!-- session 249bf70f 2026-08-09 -->
+- testing-scenarios.md showed implementation details (`node dist/cli/index.js`) instead of user-facing commands (`flow`/`task`). Examples should assume post-deployment environment, not dev build paths.
+- package.json `"bin"` entries were declared but no postinstall/linking setup documented. Unclear whether `npm link` or install should make commands available globally.
+- Skills scope was unclear — flow-design skill wasn't created until explicitly requested. Should have proactively identified and delivered all skills named in the plan before marking implementation done.
+- architecture.md has 5+ incorrect method names (e.g., `enqueueExec()` vs actual `enqueueExecution()`). Doc review at end of session found systematic drift between architecture.md and actual source code.
+
+<!-- session d8d895df 2026-08-09 -->
+- Custom skills (check, goldfish-review, get-timestamp) referenced but marked unknown initially; ReportFindings tool marked unknown when invoked — unclear whether skills need pre-registration or if deferred schema loading is expected behavior.
+- Grep searches for `singleton-daemon-kit`, `DAGValidator`, `GraphValidator` (23:25:19-23:25:50) return no results. If these are expected abstractions from specs, they may be missing from codebase or named differently than documentation assumes.
+- File reads with line-range parameters used repeatedly on same files (decisions.md read at lines 1–50, 200–500, 564–644, etc.) — suggests agent struggled to locate specific content, should have used Grep instead
+
 <!-- session 709369ee 2026-08-09 -->
 - Skill "check" and "goldfish-review" initially not recognized — skill registration/discovery mechanism unclear or skills not yet indexed at session start.
 - Agents performed extensive Grep searches for undefined patterns (D28, CANCELLED, worker-register, Q24-Q30, bufferSpillMs, heartbeat monitoring) — spec lacks index/cross-reference; decisions and open questions not linked or queryable.
@@ -343,6 +372,19 @@
 - Extensive Grep searches for domain concepts (RE-QUEUED, bufferSpill, reconnectTimeout, idleTimeout, drainTimeout, heartbeat monitoring, etc.) suggest spec lacks clear glossary or index of key terms. Future audits should define these upfront.
 
 ## Known constraints
+
+<!-- session 249bf70f 2026-08-09 -->
+- Monorepo module resolution: some packages use `bundler` (no .js extensions), others need `NodeNext` (.js extensions required). Must inspect existing tsconfig patterns before choosing strategy. Check `tsconfig.base.json` and existing package configs.
+- Cannot write skill files directly to `~/.claude/skills/` from agent (home directory permission boundary). Must deliver as repo files and document manual copy step, or ask user to authorize the write.
+- ESM named exports cannot be mocked directly — use factory functions for injectable dependencies in tests.
+- TypeScript `ts-errors.log` contains pre-existing noise from other packages' missing `dist-types` — ignore when validating flow-cli changes.
+
+<!-- session d8d895df 2026-08-09 -->
+- Project dynamically creates custom skills mid-session (e.g., goldfish-review SKILL.md); specs follow formalized date-prefixed structure with standard files (index.md, decisions.md, scenarios.md, open-questions.md, implementation-prompt.md); multiple parallel agents for concurrent spec reviews (coherence, goldfish, consistency, quality) is expected workflow.
+- Multiple goldfish verification cycles running in rapid succession (fresh-engineer, comprehension, critic, implementation-readiness checks at 23:17, 23:20, 23:24, 23:32, 23:36, 23:40). Each followed by implementation-prompt refinement. Verify whether all passes are needed or if pattern can be consolidated.
+- Plan document `2026-08-09-flow-cli-implementation.md` is edited 20+ times sequentially (22:56:34-23:39:49) while zones-attestations specs are also being iteratively refined in parallel. Concurrent mutations on planning docs may indicate unclear ownership or plan scope creep.
+- Agent repeatedly invokes external `claude` CLI via bash with `--dangerously-skip-permissions` flag (23:42:43, 23:45:41, 23:47:43, 23:53:35+) — indicates goldfish/fresh-context review requires external process spawning, not in-band tool
+- Gap between 00:21 and 07:45 followed by git operation removing `.claude/w-learning/` from tracking — suggests prior attempt to save learning/memory in wrong location or incorrect folder structure created during earlier session
 
 <!-- session 709369ee 2026-08-09 -->
 - Spec review process intermixed with spec edits (coherence audit + fix in same pass) — should be separate: read → audit → report, then separately: fix → verify.

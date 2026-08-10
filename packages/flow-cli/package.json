@@ -1,0 +1,28 @@
+{
+	"name": "flow-cli",
+	"version": "1.0.0",
+	"type": "module",
+	"bin": {
+		"flow": "./dist/cli/FlowIndex.js",
+		"task": "./dist/cli/TaskIndex.js"
+	},
+	"scripts": {
+		"build": "node build.mjs",
+		"pretest": "node build.mjs",
+		"test": "vitest run",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"@wadeck/singleton-daemon-kit": "^1.0.0",
+		"js-yaml": "^4.1.1",
+		"ws": "^8.0.0"
+	},
+	"devDependencies": {
+		"flow-engine": "*",
+		"typescript": "^5.3.3",
+		"vitest": "^4.0.14",
+		"@types/node": "*",
+		"@types/ws": "^8.0.0",
+		"@types/js-yaml": "^4.0.9"
+	}
+}

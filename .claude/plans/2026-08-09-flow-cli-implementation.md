@@ -1,5 +1,64 @@
 # Flow CLI — Implementation Prompt
 
+## Progress
+
+> Last updated: 2026-08-09. Update this section after each step completes.
+
+### Steps
+
+| Step | Status | Notes |
+|------|--------|-------|
+| Step 1 — Minimal plumbing (script step end-to-end) | ✅ Done | Daemon, worker, WebSocket, ExecutionStore, LogWriter, FlowValidator, RunCommand, ValidateCommand, integration test passing |
+| Step 2 — Model steps | ✅ Done | ClaudeLauncher env isolation fixed, StreamJsonParser sessionId capture, StepExecutor.executeModel wired with OutputExtractor + TemplateRenderer |
+| Step 3 — Secrets and env isolation | ✅ Done | Secret, SecretProvider, LogMasker implemented and tested |
+| Step 4 — MCP server + provideSteps | ✅ Done | McpServer (JSON-RPC 2.0 on random port), inject_steps IPC message, StepQueue.injectSteps, wired into StepExecutor.executeModel |
+| Step 5 — Hooks | ✅ Done | HookDispatcher (cli + http), onFlowStart/End/Error, onStepStart/End/Failed, onTaskCreated, onStatusChange |
+| Step 6 — task CLI | ✅ Done | task new/list/show/approve/set-status, TaskStore (.flows/tasks/), hooks wiring |
+
+### Additional fixes applied (not in original steps)
+
+- `ScriptExecutor.ts` (flow-engine): added `isolateEnv` option
+- `ClaudeLauncher.ts` (flow-engine): added `isolateEnv` + `mcpConfigPath` options
+- `CommandHandler.ts`: D8 — user_intervention steps rejected with UNSUPPORTED_STEP_TYPE error
+- `ExecutionStore.ts`: D22 — pruneOldExecutions() added, retainDays wired from config
+- `RunCommand.ts`: dead imports removed (CommandHandler/StepQueue/WorkerPool)
+- esbuild-based build (`build.mjs`) — tsc NodeNext incompatible with flow-engine bundler resolution
+
+### Test coverage status
+
+- `ExecutionStore.test.ts` — ✅ full coverage including pruneOldExecutions
+- `LogWriter.test.ts` — ✅
+- `StepQueue.test.ts` — ✅
+- `FlowValidator.test.ts` — ✅
+- `DeclaredWorkspaceProvider.test.ts` — ✅
+- `Secret.test.ts` — ✅
+- `LogMasker.test.ts` — ✅
+- `SecretProvider.test.ts` — ✅
+- `StepExecutor.test.ts` — ✅ (script + subflow; model step not unit-tested — requires Claude)
+- `EndToEnd.test.ts` — ✅ script step integration test passing
+- `McpServer.test.ts` — ✅
+- `HookDispatcher.test.ts` — ✅
+- `TaskStore.test.ts` — ✅
+- `TaskIndex.test.ts` — ✅
+- `StepExecutor.test.ts` (model step + McpServer mock) — ✅
+- Total: 114 tests, 14 test files, all passing
+
+### Security fixes applied (from code review)
+
+- `WebSocketServer.ts`: bind to `127.0.0.1` only (was `0.0.0.0` — exposed to network)
+- `SecretProvider.ts`: path traversal validation — resolved path must stay within workspaceDir
+- `Daemon.ts`: hook failures now logged (`dispatchHook` helper) instead of silently swallowed
+- `SecretProvider.test.ts`: added path traversal test cases (`../../etc/passwd`, `../sibling/secret`)
+
+### Known decisions made during implementation
+
+- Build: esbuild (`build.mjs`) instead of tsc — flow-engine uses `module: bundler`, incompatible with NodeNext
+- vitest: custom resolver plugin in `vitest.config.ts` handles `flow-engine/src/...` subpath imports
+- Worker dispatch: `tryDispatch()` loops on `!stepQueue.isEmpty()` (not `canSpawn()`) — canSpawn is only checked inside the loop
+- `StepExecutor` constructor takes a `sendMessage` callback — injected by Worker.ts so log/inject messages reach the daemon
+
+---
+
 ## Context
 
 You are implementing `flow-cli`, a standalone CLI tool for executing YAML-described flows.

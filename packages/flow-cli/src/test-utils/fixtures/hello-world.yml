@@ -1,0 +1,14 @@
+id: hello-world
+version: '1.0.0'
+name: Hello World
+description: Minimal test flow
+workspace:
+    mode: shared
+    gitStrategy: any
+    reusePolicy: if-available
+inputs: {}
+steps:
+    - id: greet
+      name: Greet
+      type: script
+      script: echo "hello"

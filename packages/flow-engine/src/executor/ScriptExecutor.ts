@@ -42,6 +42,9 @@ export interface ScriptExecutionOptions {
 	/** Environment variables (merged with process.env) */
 	env?: Record<string, string>;
 
+	/** When true, use ONLY env (no process.env merge) — enforces NOTHING default isolation */
+	isolateEnv?: boolean;
+
 	/** Timeout in milliseconds (0 = no timeout) */
 	timeout?: number;
 
@@ -83,8 +86,7 @@ export class ScriptExecutor {
 	public async execute(options: ScriptExecutionOptions): Promise<ScriptExecutionResult> {
 		const startTime = Date.now();
 		const workingDir = options.workingDir || process.cwd();
-		// TODO(flow-cli): full process.env inheritance breaks env isolation — flow-cli workers must not use this default
-		const env = { ...process.env, ...options.env };
+		const env = options.isolateEnv ? { ...options.env } : { ...process.env, ...options.env };
 		const shell = options.shell !== undefined ? options.shell : true;
 
 		// Handle multiline scripts on Windows by creating a temporary .bat file
