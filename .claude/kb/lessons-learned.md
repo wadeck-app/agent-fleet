@@ -1,5 +1,27 @@
 # Lessons Learned
 
+## singleton-daemon-kit SDK — When to Use It vs When Not To
+
+**Context**: `packages/flow-cli` exposes two CLIs: `flow` and `task`. Both use a tsx launcher (`bin/*.js`) so they work globally via `npm link`. Only `flow` uses `@wadeck/singleton-daemon-kit`.
+
+**When the SDK is needed — `flow`**:
+The `flow` CLI drives a long-running daemon (queue of steps, WebSocket workers, executions in progress). The SDK provides:
+- Port file → only one daemon instance runs at a time
+- PID liveness + takeover → clean recovery if daemon died without cleanup
+- mtime-based heartbeat → detect zombie daemons without TCP polling
+- Auth token → secure CLI→daemon loopback communication
+- Idle timer → daemon exits cleanly when queue is empty
+- Go launcher → native binary, no visible Node dependency for end users
+
+**When the SDK is NOT needed — `task`**:
+`task` is purely file-based: reads/writes JSON under `.flows/tasks/`, dispatches hooks via `HookDispatcher`. No daemon, no long-running process, no network. Using the SDK would be architecturally wrong — no singleton to manage, no port file, no idle timer relevant.
+
+**The rule**: Use the SDK only when the CLI needs a persistent daemon (singleton process lifecycle). A CLI that does pure file I/O only needs the tsx launcher (`bin/*.js`) to resolve tsx correctly in a hoisted monorepo.
+
+**Verified**: August 2026, decisions D14/D15/D33 in `specs/2026-07-30-flow-cli/decisions.md`.
+
+---
+
 ## Zod Schema Defaults: Entity vs Response Schemas
 
 **Problem**: Using `.default()` in entity schemas causes PATCH operations to overwrite fields with default values when those fields are not included in the update payload. Removing `.default()` leaves existing data with `undefined` values.

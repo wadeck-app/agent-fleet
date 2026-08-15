@@ -4,7 +4,8 @@
 	"private": true,
 	"type": "module",
 	"bin": {
-		"flow": "./bin/flow.js"
+		"flow": "./bin/flow.js",
+		"task": "./bin/task.js"
 	},
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
