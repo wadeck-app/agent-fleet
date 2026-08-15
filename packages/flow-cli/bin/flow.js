@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Resolve tsx and cli.ts relative to this file so the binary works globally via npm link
+// Resolve tsx and FlowIndex.ts relative to this file so the binary works globally via npm link
 import { spawn } from 'child_process';
 import { existsSync } from 'fs';
 import { createRequire } from 'module';
@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const packageDir = resolve(__dirname, '..');
-const cli = resolve(__dirname, '..', 'src', 'cli.ts');
+const cli = resolve(__dirname, '..', 'src', 'cli', 'FlowIndex.ts');
 
 // Locate tsx via require.resolve starting from the package dir (handles workspace hoisting)
 const require = createRequire(join(packageDir, 'package.json'));

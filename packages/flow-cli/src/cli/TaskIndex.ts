@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 import type { HookConfig } from '../hooks/HookDispatcher.js';
@@ -83,6 +84,12 @@ export async function runTaskCommand(args: string[], cwd: string): Promise<Comma
 			exitCode: 0,
 			output: 'Usage: task [--config <dir>] <init|new|list|show|approve|set-status>',
 		};
+	}
+
+	if (command === '--version' || command === '-V') {
+		const require = createRequire(import.meta.url);
+		const pkg = require('../../package.json') as { version: string };
+		return { exitCode: 0, output: pkg.version };
 	}
 
 	if (command === 'init') {
