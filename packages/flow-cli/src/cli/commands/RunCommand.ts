@@ -159,7 +159,7 @@ async function sendToDaemon(
 			await startDaemon(config);
 			return (await makeClient().send('run', cmd)) as DaemonResponse;
 		} catch (e2) {
-			console.error('Daemon could not be started.');
+			console.error('Daemon could not be started:', e2);
 			process.exit(3); // D34: exit 3 = daemon start failed
 		}
 	}

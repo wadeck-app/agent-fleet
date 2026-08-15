@@ -43,18 +43,25 @@ describe('runTaskCommand — version and help', () => {
 });
 
 describe('runTaskCommand — project guard', () => {
-	it('fails with actionable message when project not initialized', async () => {
+	it('fails with human-readable message when project not initialized', async () => {
 		const result = await runTaskCommand(['list'], tmpDir);
 		expect(result.exitCode).toBe(1);
 		expect(result.output).toContain('task init');
+		expect(result.output).not.toMatch(/^\{/); // not JSON
 	});
 
-	it('list, new, show, approve, set-status all require init', async () => {
+	it('--json flag returns JSON error', async () => {
+		const result = await runTaskCommand(['--json', 'list'], tmpDir);
+		expect(result.exitCode).toBe(1);
+		const parsed = JSON.parse(result.output) as { error: string };
+		expect(parsed.error).toContain('project not initialized');
+	});
+
+	it('list, new, show, set-status all require init', async () => {
 		const commands = [
 			['list'],
 			['new', 'test task'],
 			['show', 'abc123'],
-			['approve', 'abc123'],
 			['set-status', 'abc123', 'done'],
 		];
 		for (const cmd of commands) {
@@ -62,6 +69,13 @@ describe('runTaskCommand — project guard', () => {
 			expect(result.exitCode, `command "${cmd[0]}" should require init`).toBe(1);
 			expect(result.output).toContain('task init');
 		}
+	});
+
+	it('approve is no longer a valid command', async () => {
+		await runTaskCommand(['init'], tmpDir);
+		const result = await runTaskCommand(['approve', 'abc123'], tmpDir);
+		expect(result.exitCode).toBe(1);
+		expect(result.output).toContain('unknown command');
 	});
 });
 
@@ -83,5 +97,70 @@ describe('runTaskCommand — init', () => {
 		await runTaskCommand(['init'], tmpDir);
 		const result = await runTaskCommand(['list'], tmpDir);
 		expect(result.exitCode).toBe(0);
+	});
+});
+
+describe('runTaskCommand — prefix match', () => {
+	beforeEach(async () => {
+		await runTaskCommand(['init'], tmpDir);
+	});
+
+	it('show accepts a full id', async () => {
+		const created = await runTaskCommand(['new', 'prefix test'], tmpDir);
+		const task = JSON.parse(created.output) as { id: string };
+		const result = await runTaskCommand(['show', task.id], tmpDir);
+		expect(result.exitCode).toBe(0);
+		const shown = JSON.parse(result.output) as { id: string };
+		expect(shown.id).toBe(task.id);
+	});
+
+	it('show accepts a prefix', async () => {
+		const created = await runTaskCommand(['new', 'prefix test'], tmpDir);
+		const task = JSON.parse(created.output) as { id: string };
+		const prefix = task.id.slice(0, 3);
+		const result = await runTaskCommand(['show', prefix], tmpDir);
+		expect(result.exitCode).toBe(0);
+		const shown = JSON.parse(result.output) as { id: string };
+		expect(shown.id).toBe(task.id);
+	});
+
+	it('show fails with not found for unknown prefix', async () => {
+		const result = await runTaskCommand(['show', 'zzzzz'], tmpDir);
+		expect(result.exitCode).toBe(1);
+		expect(result.output).toContain('not found');
+	});
+
+	it('set-status accepts a prefix', async () => {
+		const created = await runTaskCommand(['new', 'status test'], tmpDir);
+		const task = JSON.parse(created.output) as { id: string };
+		const prefix = task.id.slice(0, 4);
+		const result = await runTaskCommand(['set-status', prefix, 'in-progress'], tmpDir);
+		expect(result.exitCode).toBe(0);
+		const updated = JSON.parse(result.output) as { status: string };
+		expect(updated.status).toBe('in-progress');
+	});
+});
+
+describe('runTaskCommand — set-status error messages', () => {
+	beforeEach(async () => {
+		await runTaskCommand(['init'], tmpDir);
+	});
+
+	it('shows human-readable error with Did you mean suggestion', async () => {
+		const created = await runTaskCommand(['new', 'typo test'], tmpDir);
+		const task = JSON.parse(created.output) as { id: string };
+		const result = await runTaskCommand(['set-status', task.id, 'in-progres'], tmpDir);
+		expect(result.exitCode).toBe(1);
+		expect(result.output).toContain('unknown status');
+		expect(result.output).toContain('Did you mean: in-progress');
+	});
+
+	it('--json returns structured error for invalid status', async () => {
+		const created = await runTaskCommand(['new', 'json err test'], tmpDir);
+		const task = JSON.parse(created.output) as { id: string };
+		const result = await runTaskCommand(['--json', 'set-status', task.id, 'nope'], tmpDir);
+		expect(result.exitCode).toBe(1);
+		const parsed = JSON.parse(result.output) as { error: string };
+		expect(parsed.error).toContain('Invalid status');
 	});
 });

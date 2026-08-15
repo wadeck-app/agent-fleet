@@ -64,6 +64,18 @@ export class TaskStore {
 		}
 	}
 
+	findByPrefix(prefix: string): TaskRecord {
+		const lower = prefix.toLowerCase();
+		const matches = this.readIndex().tasks.filter(t => t.id.toLowerCase().startsWith(lower));
+		if (matches.length === 0) {
+			throw new Error(`Task not found: ${prefix}`);
+		}
+		if (matches.length > 1) {
+			throw new Error(`Ambiguous prefix "${prefix}" matches: ${matches.map(t => t.id).join(', ')}`);
+		}
+		return this.get(matches[0]!.id);
+	}
+
 	updateStatus(id: string, status: TaskStatus): TaskRecord {
 		const record = this.get(id);
 		const now = new Date().toISOString();

@@ -77,6 +77,8 @@ export async function startDaemon(config: FlowConfig = DEFAULT_CONFIG, daemonDir
 	let logWriter: LogWriter;
 	let daemonHandle: DaemonHandle;
 
+	fs.mkdirSync(resolvedDaemonDir, { recursive: true, mode: 0o700 });
+
 	daemonHandle = await createDaemon({
 		configDir: resolvedDaemonDir,
 		idleTimeout: null,

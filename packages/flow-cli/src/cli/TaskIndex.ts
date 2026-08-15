@@ -31,6 +31,36 @@ statuses:
 #   onStatusChange: ""
 `;
 
+function levenshtein(a: string, b: string): number {
+	const m = a.length;
+	const n = b.length;
+	const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
+		Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+	);
+	for (let i = 1; i <= m; i++) {
+		for (let j = 1; j <= n; j++) {
+			dp[i]![j] =
+				a[i - 1] === b[j - 1]
+					? dp[i - 1]![j - 1]!
+					: 1 + Math.min(dp[i - 1]![j]!, dp[i]![j - 1]!, dp[i - 1]![j - 1]!);
+		}
+	}
+	return dp[m]![n]!;
+}
+
+function suggest(input: string, candidates: string[]): string | undefined {
+	let best: string | undefined;
+	let bestDist = Infinity;
+	for (const c of candidates) {
+		const d = levenshtein(input.toLowerCase(), c.toLowerCase());
+		if (d < bestDist) {
+			bestDist = d;
+			best = c;
+		}
+	}
+	return bestDist <= 3 ? best : undefined;
+}
+
 function parseHookCommand(cmd: string): HookConfig {
 	const parts = cmd.trim().split(/\s+/);
 	return { type: 'cli', command: parts[0]!, args: parts.slice(1) };
@@ -55,20 +85,31 @@ function buildHookDispatcher(
 
 function parseArgs(args: string[]): {
 	configDir: string | undefined;
+	jsonMode: boolean;
 	command: string | undefined;
 	rest: string[];
 } {
 	let i = 0;
 	let configDir: string | undefined;
+	let jsonMode = false;
 
-	if (args[i] === '--config' && args[i + 1] !== undefined) {
-		configDir = args[i + 1]!;
-		i += 2;
+	while (i < args.length) {
+		if (args[i] === '--config' && args[i + 1] !== undefined) {
+			configDir = args[i + 1]!;
+			i += 2;
+		} else if (args[i] === '--json') {
+			jsonMode = true;
+			i++;
+		} else {
+			break;
+		}
 	}
 
 	const command = args[i];
-	const rest = args.slice(i + 1);
-	return { configDir, command, rest };
+	const rest = args.slice(i + 1).filter(a => a !== '--json');
+	if (args.slice(i + 1).includes('--json')) jsonMode = true;
+
+	return { configDir, jsonMode, command, rest };
 }
 
 export interface CommandResult {
@@ -76,13 +117,22 @@ export interface CommandResult {
 	output: string;
 }
 
+function errorOutput(jsonMode: boolean, message: string, hint?: string): CommandResult {
+	if (jsonMode) {
+		return { exitCode: 1, output: JSON.stringify({ error: message }) };
+	}
+	const lines = [`Error: ${message}`];
+	if (hint) lines.push(hint);
+	return { exitCode: 1, output: lines.join('\n') };
+}
+
 export async function runTaskCommand(args: string[], cwd: string): Promise<CommandResult> {
-	const { configDir: configDirArg, command, rest } = parseArgs(args);
+	const { configDir: configDirArg, jsonMode, command, rest } = parseArgs(args);
 
 	if (!command || command === '--help') {
 		return {
 			exitCode: 0,
-			output: 'Usage: task [--config <dir>] <init|new|list|show|approve|set-status>',
+			output: 'Usage: task [--config <dir>] [--json] <init|new|list|show|set-status>',
 		};
 	}
 
@@ -103,10 +153,7 @@ export async function runTaskCommand(args: string[], cwd: string): Promise<Comma
 	}
 
 	if (!isProjectInitialized(cwd)) {
-		return {
-			exitCode: 1,
-			output: JSON.stringify({ error: 'project not initialized, run: task init' }),
-		};
+		return errorOutput(jsonMode, 'project not initialized', 'Run: task init');
 	}
 
 	const config = loadTaskConfig({ configDir: configDirArg, projectDir: cwd });
@@ -123,10 +170,7 @@ export async function runTaskCommand(args: string[], cwd: string): Promise<Comma
 		case 'new': {
 			const description = rest[0];
 			if (!description) {
-				return {
-					exitCode: 1,
-					output: JSON.stringify({ error: 'Missing description. Usage: task new <description>' }),
-				};
+				return errorOutput(jsonMode, 'missing description', 'Usage: task new <description>');
 			}
 			const task = store.create(description);
 			await hookDispatcher.dispatch('onTaskCreated', {
@@ -147,45 +191,13 @@ export async function runTaskCommand(args: string[], cwd: string): Promise<Comma
 		case 'show': {
 			const id = rest[0];
 			if (!id) {
-				return {
-					exitCode: 1,
-					output: JSON.stringify({ error: 'Missing id. Usage: task show <id>' }),
-				};
+				return errorOutput(jsonMode, 'missing id', 'Usage: task show <id>');
 			}
 			try {
-				const task = store.get(id);
+				const task = store.findByPrefix(id);
 				return { exitCode: 0, output: JSON.stringify(task, null, 2) };
 			} catch (error) {
-				return {
-					exitCode: 1,
-					output: JSON.stringify({ error: (error as Error).message }),
-				};
-			}
-		}
-
-		case 'approve': {
-			const id = rest[0];
-			if (!id) {
-				return {
-					exitCode: 1,
-					output: JSON.stringify({ error: 'Missing id. Usage: task approve <id>' }),
-				};
-			}
-			try {
-				const before = store.get(id);
-				const updated = store.updateStatus(id, 'approved' as TaskStatus);
-				await hookDispatcher.dispatch('onStatusChange', {
-					taskId: updated.id,
-					oldStatus: before.status,
-					newStatus: updated.status,
-					...projectEnv,
-				});
-				return { exitCode: 0, output: JSON.stringify(updated, null, 2) };
-			} catch (error) {
-				return {
-					exitCode: 1,
-					output: JSON.stringify({ error: (error as Error).message }),
-				};
+				return errorOutput(jsonMode, (error as Error).message);
 			}
 		}
 
@@ -193,24 +205,32 @@ export async function runTaskCommand(args: string[], cwd: string): Promise<Comma
 			const id = rest[0];
 			const statusArg = rest[1];
 			if (!id || !statusArg) {
-				return {
-					exitCode: 1,
-					output: JSON.stringify({
-						error: 'Missing arguments. Usage: task set-status <id> <status>',
-					}),
-				};
+				return errorOutput(
+					jsonMode,
+					'missing arguments',
+					'Usage: task set-status <id> <status>'
+				);
 			}
 			if (!config.statuses.includes(statusArg)) {
+				const hint = suggest(statusArg, config.statuses);
+				const validLine = `Valid statuses: ${config.statuses.join(', ')}`;
+				const hintLine = hint ? `\nDid you mean: ${hint}?` : '';
+				if (jsonMode) {
+					return {
+						exitCode: 1,
+						output: JSON.stringify({
+							error: `Invalid status: ${statusArg}. Valid values: ${config.statuses.join(', ')}`,
+						}),
+					};
+				}
 				return {
 					exitCode: 1,
-					output: JSON.stringify({
-						error: `Invalid status: ${statusArg}. Valid values: ${config.statuses.join(', ')}`,
-					}),
+					output: `Error: unknown status "${statusArg}"\n${validLine}${hintLine}`,
 				};
 			}
 			try {
-				const before = store.get(id);
-				const updated = store.updateStatus(id, statusArg as TaskStatus);
+				const before = store.findByPrefix(id);
+				const updated = store.updateStatus(before.id, statusArg as TaskStatus);
 				await hookDispatcher.dispatch('onStatusChange', {
 					taskId: updated.id,
 					oldStatus: before.status,
@@ -219,20 +239,16 @@ export async function runTaskCommand(args: string[], cwd: string): Promise<Comma
 				});
 				return { exitCode: 0, output: JSON.stringify(updated, null, 2) };
 			} catch (error) {
-				return {
-					exitCode: 1,
-					output: JSON.stringify({ error: (error as Error).message }),
-				};
+				return errorOutput(jsonMode, (error as Error).message);
 			}
 		}
 
 		default:
-			return {
-				exitCode: 1,
-				output: JSON.stringify({
-					error: `Unknown command: ${command}. Valid commands: init, new, list, show, approve, set-status`,
-				}),
-			};
+			return errorOutput(
+				jsonMode,
+				`unknown command: ${command}`,
+				'Valid commands: init, new, list, show, set-status'
+			);
 	}
 }
 
@@ -255,7 +271,7 @@ const isEntryPoint =
 
 if (isEntryPoint) {
 	main().catch(error => {
-		process.stderr.write(JSON.stringify({ error: String(error) }) + '\n');
+		process.stderr.write(`Error: ${String(error)}\n`);
 		process.exit(1);
 	});
 }
