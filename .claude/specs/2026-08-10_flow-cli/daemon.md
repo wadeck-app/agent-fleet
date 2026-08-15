@@ -6,12 +6,12 @@ Source: `packages/flow-cli/src/engine-daemon.ts`
 
 ## Configuration
 
-| Property | Value |
-|---|---|
-| TCP port | `47832` (static, hardcoded) |
-| Idle timeout | `300_000` ms (5 minutes) |
-| Drain timeout | `30_000` ms (30 seconds) |
-| SDK | `@wadeck/singleton-daemon-kit` — `createDaemon()` |
+| Property      | Value                                             |
+| ------------- | ------------------------------------------------- |
+| TCP port      | `47832` (static, hardcoded)                       |
+| Idle timeout  | `300_000` ms (5 minutes)                          |
+| Drain timeout | `30_000` ms (30 seconds)                          |
+| SDK           | `@wadeck/singleton-daemon-kit` — `createDaemon()` |
 
 ## Daemon entry point
 
@@ -29,13 +29,14 @@ Response: `RunResult`
 
 ```ts
 interface RunResult {
-  runId: string;
-  status: 'started' | 'queued';
-  queuePosition?: number;   // only present when status === 'queued'
+	runId: string;
+	status: 'started' | 'queued';
+	queuePosition?: number; // only present when status === 'queued'
 }
 ```
 
 Logic:
+
 - Generate UUID `runId`
 - If `running.length > 0` (a flow is already running): push to queue, return `{ runId, status: 'queued', queuePosition: queue.length }`
 - Otherwise: push `runId` to `running`, schedule `setImmediate` that removes it from `running` and promotes next queued item, return `{ runId, status: 'started' }`
@@ -48,8 +49,8 @@ Response: `QueueStatus`
 
 ```ts
 interface QueueStatus {
-  pending: number;   // queue.length
-  running: number;   // running.length
+	pending: number; // queue.length
+	running: number; // running.length
 }
 ```
 
@@ -61,12 +62,13 @@ Response: `CancelResult`
 
 ```ts
 interface CancelResult {
-  ok: boolean;
-  reason?: string;
+	ok: boolean;
+	reason?: string;
 }
 ```
 
 Logic:
+
 - In queue → splice, return `{ ok: true }`
 - In running → return `{ ok: false, reason: 'Cannot cancel running flow' }`
 - Not found → return `{ ok: false, reason: 'runId not found' }`
@@ -75,8 +77,8 @@ Logic:
 
 ```ts
 class FlowEngine {
-  private queue:   Array<{ runId: string; flowRef: string; inputs?: unknown }> = [];
-  private running: string[] = [];  // acts as a concurrency slot of exactly 1
+	private queue: Array<{ runId: string; flowRef: string; inputs?: unknown }> = [];
+	private running: string[] = []; // acts as a concurrency slot of exactly 1
 }
 ```
 

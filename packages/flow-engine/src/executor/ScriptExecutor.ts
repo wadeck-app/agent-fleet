@@ -53,6 +53,13 @@ export interface ScriptExecutionOptions {
 
 	/** Step ID for streaming output labels (optional) */
 	stepId?: string;
+
+	/**
+	 * When true (default), the subprocess only receives PATH, TEMP/TMP, HOME,
+	 * and the step's declared env vars. No credentials from the parent process leak.
+	 * Set to false only when full env inheritance is explicitly required.
+	 */
+	isolateEnv?: boolean;
 }
 
 /**
@@ -83,7 +90,28 @@ export class ScriptExecutor {
 	public async execute(options: ScriptExecutionOptions): Promise<ScriptExecutionResult> {
 		const startTime = Date.now();
 		const workingDir = options.workingDir || process.cwd();
-		const env = { ...process.env, ...options.env };
+		const shouldIsolate = options.isolateEnv !== false; // default true
+		const baseEnv: NodeJS.ProcessEnv = shouldIsolate
+			? {
+					PATH: process.env['PATH'],
+					HOME: process.env['HOME'],
+					TMPDIR: process.env['TMPDIR'],
+					TEMP: process.env['TEMP'],
+					TMP: process.env['TMP'],
+					// Windows
+					...(process.platform === 'win32' && process.env['SystemRoot']
+						? { SystemRoot: process.env['SystemRoot'] }
+						: {}),
+					...(process.platform === 'win32' && process.env['USERPROFILE']
+						? { USERPROFILE: process.env['USERPROFILE'] }
+						: {}),
+				}
+			: { ...process.env };
+		const rawEnv = { ...baseEnv, ...options.env };
+		const cleanEnv: Record<string, string> = {};
+		for (const [k, v] of Object.entries(rawEnv)) {
+			if (v !== undefined) cleanEnv[k] = v;
+		}
 		const shell = options.shell !== undefined ? options.shell : true;
 
 		// Handle multiline scripts on Windows: cmd.exe cannot handle multi-line shell commands,
@@ -135,7 +163,7 @@ export class ScriptExecutor {
 			// Spawn process
 			const child = spawn(scriptToExecute, [], {
 				cwd: workingDir,
-				env,
+				env: cleanEnv,
 				shell,
 				stdio: ['ignore', 'pipe', 'pipe'], // stdin ignored, capture stdout/stderr
 			});

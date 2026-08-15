@@ -11,6 +11,7 @@
 		"build": "npm run build --workspaces --if-present",
 		"build:orchestrator": "npm run build --workspace=orchestrator",
 		"build:worker": "npm run build --workspace=worker",
+		"build:flow-cli": "npm run build --workspace=flow-cli",
 		"build:flow-engine": "npm run build --workspace=flow-engine",
 		"build:test-utils": "npm run build --workspace=test-utils",
 		"build:cli": "npm run build --workspace=cli",

@@ -1,0 +1,23 @@
+{
+	"version": "4.0.16",
+	"results": [
+		[":src/daemon/StepQueue.test.ts", { "duration": 5.554899999999975, "failed": false }],
+		[":src/daemon/WorkerPool.test.ts", { "duration": 6.858299999999986, "failed": false }],
+		[":src/hooks/HookDispatcher.test.ts", { "duration": 7.345100000000002, "failed": false }],
+		[":src/storage/ExecutionStore.test.ts", { "duration": 99.81790000000001, "failed": false }],
+		[":src/daemon/CommandHandler.test.ts", { "duration": 21.38079999999991, "failed": false }],
+		[":src/secrets/LogMasker.test.ts", { "duration": 6.149000000000001, "failed": false }],
+		[":src/secrets/SecretProvider.test.ts", { "duration": 7.678899999999999, "failed": false }],
+		[":src/cli/commands/ValidateCommand.test.ts", { "duration": 12.706799999999987, "failed": false }],
+		[":src/storage/LogWriter.test.ts", { "duration": 34.972999999999956, "failed": false }],
+		[":src/task/TaskStore.test.ts", { "duration": 72.73610000000002, "failed": false }],
+		[":src/validation/FlowValidator.test.ts", { "duration": 0, "failed": false }],
+		[":src/cli/commands/ShowCommand.test.ts", { "duration": 11.834499999999991, "failed": false }],
+		[":src/worker/WorkerAdapter.test.ts", { "duration": 4.38069999999999, "failed": false }],
+		[":src/secrets/Secret.test.ts", { "duration": 4.000800000000027, "failed": false }],
+		[":src/__tests__/EndToEnd.integration.test.ts", { "duration": 0, "failed": false }],
+		[":src/utils/loadYaml.test.ts", { "duration": 21.214400000000012, "failed": false }],
+		[":src/validation/debug.test.ts", { "duration": 1.9110000000000014, "failed": false }],
+		[":src/validation/FlowFileValidator.test.ts", { "duration": 10.501099999999951, "failed": false }]
+	]
+}

@@ -26,11 +26,11 @@ then applies them inconsistently. A flow makes them **structural and non-bypassa
 
 Three distinct agents with different permissions:
 
-| Agent | Reads | Writes |
-|---|---|---|
-| **Compliance agent** | flows, policies | `.agent-fleet/policies/` only |
+| Agent                  | Reads                       | Writes                          |
+| ---------------------- | --------------------------- | ------------------------------- |
+| **Compliance agent**   | flows, policies             | `.agent-fleet/policies/` only   |
 | **Flow creator agent** | flows, policies (read-only) | `.agent-fleet/flows-custom.yml` |
-| **Executor agent** | flows, policies (read-only) | nothing |
+| **Executor agent**     | flows, policies (read-only) | nothing                         |
 
 The agent executing a step has **no awareness of the flow or policy engine**. It receives a
 prompt, produces outputs, terminates. All orchestration is invisible to it.
@@ -64,16 +64,16 @@ prompt, produces outputs, terminates. All orchestration is invisible to it.
 
 ## 4. CLI Surface
 
-| Command | Purpose |
-|---|---|
-| `flow list` | Compact table of all registered flows — agent entry point before proposing |
-| `flow show <file>` | ASCII table summary of a flow file |
-| `flow validate <file>` | Schema + rule check |
-| `flow validate <file> --policy` | Static lint against active policies |
-| `flow run <file> --inputs k=v` | Submit to engine queue |
-| `flow docs` | Full capabilities reference |
-| `flow policy show <file>` | Which policies apply to this flow (static) |
-| `flow policy show --run <id>` | Post-run audit: declared vs actual |
+| Command                         | Purpose                                                                    |
+| ------------------------------- | -------------------------------------------------------------------------- |
+| `flow list`                     | Compact table of all registered flows — agent entry point before proposing |
+| `flow show <file>`              | ASCII table summary of a flow file                                         |
+| `flow validate <file>`          | Schema + rule check                                                        |
+| `flow validate <file> --policy` | Static lint against active policies                                        |
+| `flow run <file> --inputs k=v`  | Submit to engine queue                                                     |
+| `flow docs`                     | Full capabilities reference                                                |
+| `flow policy show <file>`       | Which policies apply to this flow (static)                                 |
+| `flow policy show --run <id>`   | Post-run audit: declared vs actual                                         |
 
 ### `flow list` output
 
@@ -118,6 +118,7 @@ Single binary `engine.js` with two startup roles:
 2. Spawn `engine.js` — becomes daemon or nudges existing one
 
 Engine responds:
+
 - `"accepted"` — executor slot available, execution starts
 - `"busy"` — all slots occupied; queue file persisted, will drain when a slot frees
 
@@ -170,6 +171,7 @@ survives. Next engine invocation finds it and resumes.
 ### Two modes
 
 **Mode 1 — Static lint** (`flow validate --policy`): validate a proposed flow before execution.
+
 ```
 WARN  step 3 touches web-frontend but no agent-browser step found
 WARN  no test step after implementation steps
@@ -185,17 +187,18 @@ Every completed step produces a `StepTrace`:
 
 ```typescript
 interface StepTrace {
-  stepId: string;
-  stageId?: string;
-  files: string[];      // modified file paths
-  deltas: FileDelta[];  // full diffs
-  outputs: Record<string, unknown>;
+	stepId: string;
+	stageId?: string;
+	files: string[]; // modified file paths
+	deltas: FileDelta[]; // full diffs
+	outputs: Record<string, unknown>;
 }
 ```
 
 ### Trigger points
 
 The flow engine calls the policy engine at:
+
 - After each individual step
 - At each stage boundary (after all parallel steps in a stage complete)
 
@@ -247,6 +250,7 @@ step/stage completes
 ```
 
 Justification must be a **falsifiable claim**:
+
 - "only CSS files changed" → checker verifies all paths match `*.css`
 - "no render logic changed" → checker scans diffs for JSX patterns
 - Vague claims ("it's fine") → LOW confidence automatically
@@ -274,6 +278,7 @@ Steps injected by the policy engine use the `policy:` prefix:
 ```
 
 `policy:` steps:
+
 - Cannot be authored by agents or flow creators
 - Cannot be removed or modified by agents
 - Tags come from a trusted registry
@@ -288,8 +293,8 @@ Steps injected by the policy engine use the `policy:` prefix:
 ```yaml
 - trigger: files-modified-match("packages/web-frontend/**/*.tsx")
   on-rejection:
-    goto: implement-ui
-    max: 2
+      goto: implement-ui
+      max: 2
 ```
 
 Reuses the existing `err -> goto N  max:Mx` primitive. Policy recovery is always the
@@ -298,11 +303,13 @@ compliance agent's jurisdiction — the flow creator has no say.
 ### Compliance agent vs policy engine
 
 **Compliance agent** — authoring time only:
+
 - Invoked when a policy file is created/modified
 - Invoked when a new flow is proposed (lints against active policies before approval)
 - NOT active during execution
 
 **Policy engine** — runtime enforcer, autonomous:
+
 - Loads policy files at flow start
 - Observes, injects, escalates without calling the compliance agent
 - Rules are data; the engine enforces them
@@ -327,14 +334,14 @@ A stage groups steps for policy scoping:
 
 ```yaml
 stages:
-  - id: locate
-    steps: [analyze, reproduce]
+    - id: locate
+      steps: [analyze, reproduce]
 
-  - id: implement
-    steps: [fix-backend, fix-frontend, add-tests]
+    - id: implement
+      steps: [fix-backend, fix-frontend, add-tests]
 
-  - id: verify
-    steps: [run-tests, agent-browser]
+    - id: verify
+      steps: [run-tests, agent-browser]
 ```
 
 Stage boundaries are natural injection points — avoid interrupting mid-implementation.
@@ -369,6 +376,7 @@ what has proven reproducible.
 **`flow policy show <flow.yml>`** — static: which policies would apply to this flow.
 
 **`flow policy show --run <runId>`** — post-run audit:
+
 - **Declared flow** — steps from the original YAML
 - **Actual flow** — steps that actually ran (includes `policy:` injected steps)
 - **Policy log** — triggers fired, justifications accepted/rejected, gates hit
@@ -386,35 +394,37 @@ The declared vs actual diff is crystallization signal: persistent injections →
 Two expression styles:
 
 **Style A — Declarative** (simple rules, 90% of cases):
+
 ```yaml
 # .agent-fleet/policies/frontend-visual.yml
 version: 1
 id: require-agent-browser
 trigger:
-  files-modified-match: "packages/web-frontend/**/*.tsx"
-  scope: stage
+    files-modified-match: 'packages/web-frontend/**/*.tsx'
+    scope: stage
 evaluate-at: stage-boundary
 requires-tag: agent-browser
 justification-threshold: high
-severity: warn              # warn (non-blocking) | error (blocking)
+severity: warn # warn (non-blocking) | error (blocking)
 on-missing:
-  inject:
-    type: user_intervention
-    interventionType: approval
-    title: "Frontend render logic changed — visual verification required"
+    inject:
+        type: user_intervention
+        interventionType: approval
+        title: 'Frontend render logic changed — visual verification required'
 on-rejection:
-  goto: implement-ui
-  max: 2
+    goto: implement-ui
+    max: 2
 ```
 
 **Style B — Flow-as-policy** (complex verification):
+
 ```yaml
 # .agent-fleet/policies/security-auth.yml
 version: 1
 id: security-audit
 trigger:
-  files-modified-match: ["**/auth/**", "**/jwt/**"]
-  scope: last-step
+    files-modified-match: ['**/auth/**', '**/jwt/**']
+    scope: last-step
 evaluate-at: after-step
 check-flow: verify-security-impact.yml
 justification-threshold: medium
@@ -430,12 +440,12 @@ how it was triggered.
 ```typescript
 // PolicyContext — always the same shape, regardless of which policy triggered
 interface PolicyContext {
-  policyId: string;
-  triggeringStepId: string;
-  triggeringStageId?: string;
-  matchedFiles: string[];      // file paths matching the trigger pattern (pre-filtered)
-  stepTracePath: string;       // path to .agent-fleet/runs/<runId>/steps.jsonl
-  runId: string;
+	policyId: string;
+	triggeringStepId: string;
+	triggeringStageId?: string;
+	matchedFiles: string[]; // file paths matching the trigger pattern (pre-filtered)
+	stepTracePath: string; // path to .agent-fleet/runs/<runId>/steps.jsonl
+	runId: string;
 }
 ```
 
@@ -482,6 +492,7 @@ steps:
 ```
 
 **Key design points:**
+
 - Script step extracts only relevant diffs — model receives a small, focused file, not a large blob
 - Check-flow is fully standalone and independently testable (pass mock files as inputs)
 - Policy engine reads the `verdict` output; any value other than `SAFE` triggers the configured action
@@ -498,6 +509,7 @@ flow validate my-flow.yml --policy --report report.md # Markdown file written
 ```
 
 Plain text (stdout, default):
+
 ```
 WARN  [frontend-visual]      step 3 touches *.tsx but no agent-browser tag downstream
 ERROR [security-auth]        auth/** modified but no security gate found
@@ -505,11 +517,14 @@ OK    [require-tests]        test step present downstream
 ```
 
 Markdown report (for human/agent auditor):
+
 ```markdown
 # Policy Validation Report — my-flow.yml
+
 Generated: 2026-06-21T10:00:00Z
 
 ## Summary
+
 - 1 error (blocking)
 - 1 warning
 - 1 passed
@@ -517,10 +532,12 @@ Generated: 2026-06-21T10:00:00Z
 ## Violations
 
 ### ERROR — security-auth
+
 Step `implement-api` modifies `src/auth/jwt.ts` but no security gate exists downstream.
 **Fix:** Add a step tagged `security-review` after `implement-api`, or add policy exemption.
 
 ### WARN — frontend-visual
+
 ...
 ```
 
@@ -530,11 +547,11 @@ Exit code: 0 = ok + warnings only, 1 = any `severity: error` violation.
 
 ```yaml
 # .agent-fleet/engine-config.yml  (optional — these are the defaults)
-maxConcurrentRuns: 2    # Claude API rate limits make >3 parallel impractical
-port: 47832             # localhost TCP port — cross-platform (Windows-safe)
+maxConcurrentRuns: 2 # Claude API rate limits make >3 parallel impractical
+port: 47832 # localhost TCP port — cross-platform (Windows-safe)
 queueDir: .agent-fleet/queue
 runsDir: .agent-fleet/runs
-logLevel: info          # debug | info | warn | error
+logLevel: info # debug | info | warn | error
 ```
 
 **On idle:** daemon exits immediately when queue is empty and no executor is active.
@@ -543,21 +560,25 @@ No timer — "nothing to do" = exit.
 **Port file — atomic, locked, with heartbeat:**
 
 Port file lives **next to the config file** (not in `.agent-fleet/`):
-- `engine-config.yml` → `engine-config.port`  (sibling, location-independent)
-- `engine-test.yml`   → `engine-test.port`
+
+- `engine-config.yml` → `engine-config.port` (sibling, location-independent)
+- `engine-test.yml` → `engine-test.port`
 
 Content:
+
 ```json
 { "port": 47832, "pid": 12345, "startedAt": "2026-06-21T10:00:00Z" }
 ```
 
 Guarantees:
+
 - **Atomic write** — write to temp sibling, `rename()` (atomic on all OS)
 - **Advisory lock** — daemon holds an exclusive lock on the file while running
 - **Heartbeat** — daemon updates the file's `mtime` every 5s
 - **Stale detection** — caller checks mtime: older than 2× heartbeat interval (10s) → daemon dead → delete and start fresh
 
 **Multiple engines via `--engine-config`** (mirrors wdrive/driver pattern):
+
 ```bash
 flow run my-flow.yml                                                   # default engine
 flow run my-flow.yml --engine-config /any/path/engine-test.yml        # test engine
@@ -581,34 +602,34 @@ Stages are a **top-level section**, not an overlay on `steps`. Steps live inside
 ```yaml
 # With stages — steps are inside each stage
 stages:
-  - id: locate
-    steps:
-      - id: analyze
-        type: model
+    - id: locate
+      steps:
+          - id: analyze
+            type: model
 
-  - id: implement
-    steps:
-      - id: fix-backend
-        type: model
-        depends: [analyze]
-      - id: fix-frontend
-        type: model
-        depends: [analyze]
+    - id: implement
+      steps:
+          - id: fix-backend
+            type: model
+            depends: [analyze]
+          - id: fix-frontend
+            type: model
+            depends: [analyze]
 
-  - id: verify
-    steps:
-      - id: run-tests
-        type: script
-        depends: [fix-backend, fix-frontend]
+    - id: verify
+      steps:
+          - id: run-tests
+            type: script
+            depends: [fix-backend, fix-frontend]
 
 # Without stages — use top-level steps shorthand
 # treated internally as a single implicit stage: "general"
 steps:
-  - id: analyze
-    type: model
-  - id: run-tests
-    type: script
-    depends: [analyze]
+    - id: analyze
+      type: model
+    - id: run-tests
+      type: script
+      depends: [analyze]
 ```
 
 `FlowExecutor` needs: read steps from `stages[].steps` (or top-level `steps`), detect when
@@ -623,29 +644,31 @@ implicit output** on every model step — always captured from `--output-format 
 always stored in `StepTrace`, always referenceable via `steps.<stepId>.sessionId`.
 
 Chain two model steps explicitly:
+
 ```yaml
 steps:
-  - id: analyze
-    type: model
-    prompt: "Analyze the auth module..."
-    outputs: [summary, riskLevel]
-    # sessionId always captured implicitly — no need to declare
+    - id: analyze
+      type: model
+      prompt: 'Analyze the auth module...'
+      outputs: [summary, riskLevel]
+      # sessionId always captured implicitly — no need to declare
 
-  - id: deep-dive
-    type: model
-    resume-session: "{{ steps.analyze.sessionId }}"   # chain via step ID
-    prompt: "Go deeper on the HIGH risk items..."
-    outputs: [findings]
+    - id: deep-dive
+      type: model
+      resume-session: '{{ steps.analyze.sessionId }}' # chain via step ID
+      prompt: 'Go deeper on the HIGH risk items...'
+      outputs: [findings]
 ```
 
 `steps.<stepId>.sessionId` → engine passes `--resume <sessionId>` to the subprocess.
 Session continuity is explicit opt-in — not the default.
 
 A step can also receive a **file as context** (no session required):
+
 ```yaml
 - id: review
   type: model
-  context-files: ["{{ inputs.stepTracePath }}", "src/auth/jwt.ts"]
+  context-files: ['{{ inputs.stepTracePath }}', 'src/auth/jwt.ts']
 ```
 
 #### Session compaction before reuse
@@ -670,21 +693,23 @@ Steps start with minimal context. Zero cost.
 Steps request structured responses. Two-tier enforcement:
 
 Step YAML declares the output schema:
+
 ```yaml
 - id: classify-change
   type: model
-  prompt: "Review the diff and classify the impact."
+  prompt: 'Review the diff and classify the impact.'
   outputs:
-    - name: verdict
-      type: enum
-      values: [SAFE, NEEDS_REVIEW, BLOCK]
-    - name: reasoning
-      type: text
-    - name: affectedAreas
-      type: json   # string[]
+      - name: verdict
+        type: enum
+        values: [SAFE, NEEDS_REVIEW, BLOCK]
+      - name: reasoning
+        type: text
+      - name: affectedAreas
+        type: json # string[]
 ```
 
 Engine auto-appends to the prompt:
+
 ```
 ---
 Respond with JSON exactly matching this structure:
@@ -701,6 +726,7 @@ If you cannot produce valid JSON, use these XML tags instead:
 ```
 
 Engine post-processing (deterministic, no LLM):
+
 ```typescript
 // 1. Try JSON parse (--output-format json gives full response object)
 const json = tryParseJson(claudeOutput.result);
@@ -731,6 +757,7 @@ enforced by convention.
 
 The flow CLI has **zero dependency** on the agent-fleet backend, orchestrator, or UI.
 It operates purely on:
+
 - Local filesystem (`.agent-fleet/`)
 - Engine daemon (localhost TCP)
 - Claude subprocesses (spawned directly)
@@ -745,6 +772,7 @@ server is a separate, independent product that happens to also use flows.
 ### The planner is a PM
 
 The agent responsible for authoring flows is a **planner** (or orchestrator). Its role:
+
 - Receive a task from the user
 - Propose a **plan** (natural language) + a **flow YAML** (structured process)
 - Iterate on both based on user feedback
@@ -810,6 +838,7 @@ a broken flow — errors are fixed by the planner, not surfaced as noise.
 ### Direct YAML editing
 
 The user can also edit the flow YAML directly and ask the planner to validate:
+
 ```
 User: [edits fix-jwt-expiry.yml manually]
 User: "validate and show"
@@ -833,12 +862,14 @@ flow run .claude/plans/fix-jwt-expiry.yml --inputs description="different bug"
 ### Flow promotion (optional)
 
 If a flow proved useful and is generic enough to reuse:
+
 ```bash
 flow promote .claude/plans/fix-jwt-expiry.yml          # uses id: field from the YAML
 flow promote .claude/plans/fix-jwt-expiry.yml --id fix-bug   # override the ID
 ```
 
 On ID collision:
+
 ```
 ERROR  flow 'fix-bug' already exists in flows-custom.yml
        Use --force to overwrite, or --id <new-id> to register under a different name
@@ -871,26 +902,27 @@ onError = execution was fine, result was negative
 ```yaml
 - id: run-tests
   type: script
-  onError:              # tests ran, exit 1 = tests failed → retry loop
-    goto: implement
-    max: 3
-  onFailure:            # script crashed / timed out → escalate, don't retry blindly
-    escalate: human
+  onError: # tests ran, exit 1 = tests failed → retry loop
+      goto: implement
+      max: 3
+  onFailure: # script crashed / timed out → escalate, don't retry blindly
+      escalate: human
 
 - id: analyze
   type: model
-  onError:              # model ran, produced a negative verdict
-    goto: ...
-  onFailure:            # [?] granular per-failure-type routing — complex, real-world value uncertain
-    subprocess-crash:  retry max:3 backoff:exponential
-    timeout:           escalate human
-    output-missing:    retry max:1
-    model-refusal:     escalate human   # same prompt → same refusal, don't retry
+  onError: # model ran, produced a negative verdict
+      goto: ...
+  onFailure: # [?] granular per-failure-type routing — complex, real-world value uncertain
+      subprocess-crash: retry max:3 backoff:exponential
+      timeout: escalate human
+      output-missing: retry max:1
+      model-refusal: escalate human # same prompt → same refusal, don't retry
   # Simpler alternative: onFailure: escalate human (one handler for all crash types)
   # Revisit once we have real failure data from production runs
 ```
 
 `flow show` notation:
+
 - `err -> N  max:Mx` — onError loop (negative result, retry implementation)
 - `fail -> human` — onFailure escalation (crash, displayed differently)
 
@@ -907,6 +939,7 @@ at the end of the step — it knows what it touched and can stage selectively. A
 by the engine risks including unwanted files (temp files, logs, generated artifacts).
 
 The step prompt instructs the agent to commit before finishing:
+
 ```
 ... implement the fix ...
 When done, commit your changes with:
@@ -915,6 +948,7 @@ When done, commit your changes with:
 ```
 
 On step restart:
+
 ```
 git reset --hard <pre-step-commit-sha>   # restore exact workspace state
 # then re-run the step
@@ -929,9 +963,11 @@ Engine validates `allowed_tools` at flow start: any parallel step with write too
 error. Parallel write steps → TODO (deferred).
 
 **Clean state enforcement (optional per flow):**
+
 ```yaml
 enforceCleanStateAfterStep: true
 ```
+
 After each step: engine checks for uncommitted changes. If found → step considered incomplete.
 Forces model steps to finish their work before the engine advances. Can also be enforced via
 a policy rule rather than a flow-level flag — cleaner separation.
@@ -943,7 +979,7 @@ No manual declaration needed for model steps. Engine derives idempotency from to
 ```yaml
 - id: analyze
   type: model
-  allowed_tools: [Read, Grep, Glob]        # readonly → idempotent, safe to restart
+  allowed_tools: [Read, Grep, Glob] # readonly → idempotent, safe to restart
   # no git reset needed on restart
 
 - id: implement
@@ -953,10 +989,11 @@ No manual declaration needed for model steps. Engine derives idempotency from to
 ```
 
 Script steps require explicit declaration:
+
 ```yaml
 - id: send-notification
   type: script
-  idempotent: false    # external side effects — restart requires human confirmation
+  idempotent: false # external side effects — restart requires human confirmation
 ```
 
 **Restart is always human-triggered.** `flow resume <runId>` — human only. An agent cannot
@@ -966,28 +1003,34 @@ trigger a restart of a non-idempotent step. Engine pauses and waits.
 
 **Approach D — In-flow routing (`onError.goto`)** [validated] always active
 Declared by the flow author for anticipated negative results.
+
 ```yaml
 - id: run-tests
   onError:
-    goto: implement
-    max: 3
+      goto: implement
+      max: 3
 ```
 
 **Approach B — Pause + resume** [validated] default for unexpected failures
+
 ```
 FAIL Step 'run-tests' — run paused  [run: abc123]
   Workspace restored to pre-step state (git reset).
   Fix the issue then: flow resume abc123
 ```
+
 Resume re-runs from the failed step. Workspace is clean (git reset already applied).
 
 **Approach C — Partial re-run (`--from-step`)** [validated] power-user escape hatch
+
 ```bash
 flow run fix-jwt.yml --from-step implement --reuse-run abc123 --inputs description="JWT bug"
 ```
+
 Injects prior step outputs, resets workspace to pre-step commit, starts at named step.
 
 **Approach A — Re-run from scratch** [validated] always available
+
 ```bash
 flow run fix-jwt.yml --inputs description="JWT bug"   # fresh branch, fresh start
 ```
@@ -1026,10 +1069,12 @@ flow test-step fix-jwt.yml implement \
 Only inputs the target step actually consumes. Nothing from the flow's own input schema.
 
 **Optional context (not core, but useful):**
+
 ```bash
 flow test-step fix-jwt.yml implement --reuse-run abc123    # inject outputs from a real run
 flow test-step fix-jwt.yml implement --context ctx.json    # explicit context file
 ```
+
 Both are conveniences on top of `--input` — not the core value. `--reuse-run abc123` is
 equivalent to `--context` reading from an existing run directory.
 
@@ -1041,6 +1086,7 @@ which is where assertions actually matter.
 
 `flow test-step` must be documented well enough that an LLM agent can debug a misbehaving
 flow on its own:
+
 1. How to isolate a failing step
 2. How to distinguish prompt-quality issues vs model issues vs malformed inputs
 3. How to build a minimal reproducing `--context` file
@@ -1053,13 +1099,16 @@ Single-run testing isn't enough for LLM steps — same input can produce differe
 Need batch running, statistical assertions, and A/B comparison.
 
 **Layer 1 — Repeatability**
+
 ```bash
 flow test-step fix-jwt.yml analyze --input description="JWT bug" --runs 10
 ```
+
 Runs the step N times with identical input, stores all N results under `runs/test-<id>/`.
 Determinism levers: `temperature: 0`, pinned model version (not `-latest`), frozen `--context`.
 
 **Layer 2 — Test suite file**
+
 ```yaml
 # fix-jwt.flow-test.yml
 suite: fix-jwt analyze step
@@ -1067,76 +1116,80 @@ step: analyze
 flow: .claude/plans/fix-jwt.yml
 
 variants:
-  - id: baseline
-    inputs: { description: "JWT expiry check missing in validateToken()" }
-  - id: vague-input
-    inputs: { description: "auth is broken" }
-  - id: complex-input
-    inputs: { description: "Multiple JWT issues: expiry not checked, refresh token reuse possible" }
+    - id: baseline
+      inputs: { description: 'JWT expiry check missing in validateToken()' }
+    - id: vague-input
+      inputs: { description: 'auth is broken' }
+    - id: complex-input
+      inputs: { description: 'Multiple JWT issues: expiry not checked, refresh token reuse possible' }
 
 runs-per-variant: 10
 
 assertions:
-  # structural — always checked
-  - output: riskLevel
-    type: enum
-    values: [LOW, MEDIUM, HIGH, CRITICAL]
+    # structural — always checked
+    - output: riskLevel
+      type: enum
+      values: [LOW, MEDIUM, HIGH, CRITICAL]
 
-  # value — checked per run
-  - output: summary
-    not-empty: true
-    max-length: 500
+    # value — checked per run
+    - output: summary
+      not-empty: true
+      max-length: 500
 
-  # statistical — checked across the batch
-  - output: riskLevel
-    when: variant == baseline
-    passes: "== HIGH"
-    min-pass-rate: 0.8       # must pass on 8/10 runs
+    # statistical — checked across the batch
+    - output: riskLevel
+      when: variant == baseline
+      passes: '== HIGH'
+      min-pass-rate: 0.8 # must pass on 8/10 runs
 
-  # deterministic script evaluator
-  - output: affectedFiles
-    evaluator: scripts/assert-files-exist.js   # exit 0 = pass, exit 1 = fail
+    # deterministic script evaluator
+    - output: affectedFiles
+      evaluator: scripts/assert-files-exist.js # exit 0 = pass, exit 1 = fail
 
-  # LLM judge evaluator — for quality checks a script can't express
-  - output: summary
-    evaluator-model: haiku
-    evaluator-prompt: |
-      Does this summary correctly identify a JWT expiry issue?
-      Summary: {{ output }}
-      Answer YES or NO.
-    passes: "== YES"
-    min-pass-rate: 0.9
+    # LLM judge evaluator — for quality checks a script can't express
+    - output: summary
+      evaluator-model: haiku
+      evaluator-prompt: |
+          Does this summary correctly identify a JWT expiry issue?
+          Summary: {{ output }}
+          Answer YES or NO.
+      passes: '== YES'
+      min-pass-rate: 0.9
 ```
 
 **Layer 3 — A/B testing between configurations**
+
 ```yaml
 ab-tests:
-  - name: "detailed vs terse prompt"
-    variants: [baseline, terse-prompt]
-    compare:
-      - metric: summary length (chars)
-        prefer: shorter
-      - metric: riskLevel accuracy
-        evaluator-model: haiku
-        prefer: higher-pass-rate
+    - name: 'detailed vs terse prompt'
+      variants: [baseline, terse-prompt]
+      compare:
+          - metric: summary length (chars)
+            prefer: shorter
+          - metric: riskLevel accuracy
+            evaluator-model: haiku
+            prefer: higher-pass-rate
 
-  - name: "sonnet vs haiku"
-    model-variants:
-      baseline: claude-sonnet-4-6
-      fast: claude-haiku-4-5-20251001
-    compare:
-      - metric: riskLevel accuracy
-      - metric: duration
-        prefer: faster
+    - name: 'sonnet vs haiku'
+      model-variants:
+          baseline: claude-sonnet-4-6
+          fast: claude-haiku-4-5-20251001
+      compare:
+          - metric: riskLevel accuracy
+          - metric: duration
+            prefer: faster
 ```
+
 Compares prompt variants, model choices, output formats — whatever axis is relevant.
 
 **Layer 4 — Running the suite**
+
 ```bash
 flow test fix-jwt.flow-test.yml                       # run full suite
 flow test fix-jwt.flow-test.yml --variant baseline     # single variant
 flow test fix-jwt.flow-test.yml --dry-run              # validate config, no LLM calls
 ```
+
 ```
 VARIANT  baseline        10/10 runs   assertions: 4 pass  0 fail  duration: avg 3.2s
 VARIANT  vague-input     10/10 runs   assertions: 3 pass  1 fail  (riskLevel pass-rate 0.6 < 0.8)
@@ -1147,11 +1200,11 @@ A/B  detailed vs terse: terse-prompt wins on length (avg 120 vs 280 chars), tie 
 
 ### CLI surface addition
 
-| Command | Purpose |
-|---|---|
-| `flow test-step <file> <stepId> [--input k=v] [--reuse-run id] [--context file] [--runs N]` | Run one step in isolation |
-| `flow test <suite.flow-test.yml>` | Run a full test suite (batching, assertions, A/B) |
-| `flow test <suite.flow-test.yml> --variant <id>` | Run a single variant |
+| Command                                                                                     | Purpose                                           |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `flow test-step <file> <stepId> [--input k=v] [--reuse-run id] [--context file] [--runs N]` | Run one step in isolation                         |
+| `flow test <suite.flow-test.yml>`                                                           | Run a full test suite (batching, assertions, A/B) |
+| `flow test <suite.flow-test.yml> --variant <id>`                                            | Run a single variant                              |
 
 ### Status
 
@@ -1189,24 +1242,24 @@ Tracks what has been validated, what is open, and what is deferred.
 - Flow authoring DX: flow lives next to spec, no proposals dir, promote is explicit+optional
 - Crystallization: human-driven, session traces feed recommendations, no auto-apply
 - **Error DX:**
-  - `onFailure` (crash) vs `onError` (negative result) — distinct routing
-  - Git snapshot per step: `flow/<runId>` branch, agent commits at end of each write step (not engine auto-commit — risks staging unwanted files)
-  - Parallel steps must be readonly (write-parallel → TODO deferred)
-  - `enforceCleanStateAfterStep` optional flag / policy rule
-  - Idempotency derived from `allowed_tools` (write tools → non-idempotent)
-  - Restart is human-only (`flow resume`) — agents cannot trigger restart
-  - Approach D (onError.goto) always + B (pause+resume) default + C (--from-step) escape hatch
+    - `onFailure` (crash) vs `onError` (negative result) — distinct routing
+    - Git snapshot per step: `flow/<runId>` branch, agent commits at end of each write step (not engine auto-commit — risks staging unwanted files)
+    - Parallel steps must be readonly (write-parallel → TODO deferred)
+    - `enforceCleanStateAfterStep` optional flag / policy rule
+    - Idempotency derived from `allowed_tools` (write tools → non-idempotent)
+    - Restart is human-only (`flow resume`) — agents cannot trigger restart
+    - Approach D (onError.goto) always + B (pause+resume) default + C (--from-step) escape hatch
 
 ### Open — next to discuss
 
 - **`flow test-step` / `flow test` suite tooling** (section 14): core `test-step` primitive
   agreed on (step-level inputs only, no flow-level noise). Suite file schema (variants,
   assertions, evaluators, A/B tests) is a proposal — needs explicit validation next session:
-  - Assertion types (structural / value / statistical / script evaluator / LLM evaluator) — confirm shape
-  - A/B test schema — confirm `compare` metrics and `prefer` semantics
-  - `--runs N` and pass-rate thresholds — confirm defaults
-  - Approach D (manual output assertions on `test-step` itself) — deprioritized, "nice to have,
-    not the core value" per user feedback; batch/suite tooling is where assertions matter
+    - Assertion types (structural / value / statistical / script evaluator / LLM evaluator) — confirm shape
+    - A/B test schema — confirm `compare` metrics and `prefer` semantics
+    - `--runs N` and pass-rate thresholds — confirm defaults
+    - Approach D (manual output assertions on `test-step` itself) — deprioritized, "nice to have,
+      not the core value" per user feedback; batch/suite tooling is where assertions matter
 
 ### Deferred (not blocking, revisit later)
 
@@ -1226,18 +1279,21 @@ Each step delivers working software with tests, covering progressively more comp
 Later steps depend on earlier ones being stable.
 
 ### Step 1 — `flow list` command (quick win)
+
 - New `ListCommand.ts` in `flow-cli`
 - Scans `flows.yml` + `flows-custom.yml`, prints compact table
 - Unit test: mock registry, verify output format
 - e2e: `flow list` against `.agent-fleet/flows.yml`
 
 ### Step 2 — Run storage (no daemon yet)
+
 - `FlowCliRunner` writes `StepTrace[]` to `.agent-fleet/runs/<runId>/steps.jsonl` after each step
 - Writes `declared.yml`, `meta.json`, `outputs.json` on complete/fail
 - Unit tests: verify files written, correct schema
 - e2e: `flow run` on a simple flow, inspect run directory
 
 ### Step 3 — Engine daemon + queue
+
 - `engine.js` binary: socket detection, daemon mode, forwarder mode
 - Queue: write `<runId>.json` before spawning, executor picks it up
 - Semaphore: max 2 concurrent executors
@@ -1246,6 +1302,7 @@ Later steps depend on earlier ones being stable.
 - e2e: `flow run` submits to daemon, second `flow run` reuses same daemon
 
 ### Step 4 — Stages in flow YAML + FlowExecutor
+
 - Add `stages:` field to flow schema
 - `FlowExecutor` tracks current stage, emits stage-boundary event
 - `flow show` displays stage groupings
@@ -1253,6 +1310,7 @@ Later steps depend on earlier ones being stable.
 - e2e: flow with two stages, verify boundary event fires after all parallel steps
 
 ### Step 5 — Policy engine (static lint only)
+
 - `PolicyEngine` class: loads `.agent-fleet/policies/*.yml`, validates flow against rules
 - `flow validate --policy` command
 - Policy YAML schema v1: `trigger` (files-modified-match), `evaluate-at`, `requires-tag`
@@ -1260,6 +1318,7 @@ Later steps depend on earlier ones being stable.
 - e2e: policy file with frontend rule, validate a flow that violates it
 
 ### Step 6 — Policy engine (live observation, no justification yet)
+
 - `PolicyEngine.observe(traces)` hook called by `FlowExecutor` after each step + stage boundary
 - Detects violations, injects `policy:` steps into the live flow
 - `steps.jsonl` includes injected steps with `policy:` prefix
@@ -1267,6 +1326,7 @@ Later steps depend on earlier ones being stable.
 - e2e: flow touches frontend, engine injects agent-browser gate automatically
 
 ### Step 7 — Justification + confidence
+
 - After violation detected, executor prompts step agent for justification
 - Policy-checker agent verifies the claim against `StepTrace` diffs
 - Confidence routing: HIGH → accept, MEDIUM → subprocess, LOW → user_intervention
@@ -1274,12 +1334,14 @@ Later steps depend on earlier ones being stable.
 - e2e: CSS-only change justification accepted (HIGH), render logic change escalates to human
 
 ### Step 8 — `flow policy show`
+
 - Static view: `flow policy show <file>` — which policies apply
 - Post-run view: `flow policy show --run <id>` — declared vs actual, policy log
 - Unit tests: diff computation, policy log parsing
 - e2e: run a flow with injections, verify post-run audit output
 
 ### Step 9 — Crystallization tooling
+
 - `flow analyze --run <id>` — surfaces crystallization candidates from run trace
 - Highlights: injected steps that could become template steps, retry hot spots
 - No auto-apply — output is recommendations only

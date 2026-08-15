@@ -26,28 +26,28 @@ No TypeScript compilation step is required.
 
 ```json
 {
-  "appName": "flow",
-  "nodeScript": "flow.cjs",
-  "defaultConfigDir": ".flow-cli",
-  "cliFlags": ["--quit", "--restart", "--queue-status", "--cancel"]
+	"appName": "flow",
+	"nodeScript": "flow.cjs",
+	"defaultConfigDir": ".flow-cli",
+	"cliFlags": ["--quit", "--restart", "--queue-status", "--cancel"]
 }
 ```
 
-| Field | Value | Meaning |
-|---|---|---|
-| `appName` | `"flow"` | Name of the produced binary |
-| `nodeScript` | `"flow.cjs"` | The compiled CJS entry point the Go binary wraps |
-| `defaultConfigDir` | `".flow-cli"` | Default daemon config/port-file directory |
-| `cliFlags` | 4 flags | Extra flags the Go binary intercepts before passing through to Node |
+| Field              | Value         | Meaning                                                             |
+| ------------------ | ------------- | ------------------------------------------------------------------- |
+| `appName`          | `"flow"`      | Name of the produced binary                                         |
+| `nodeScript`       | `"flow.cjs"`  | The compiled CJS entry point the Go binary wraps                    |
+| `defaultConfigDir` | `".flow-cli"` | Default daemon config/port-file directory                           |
+| `cliFlags`         | 4 flags       | Extra flags the Go binary intercepts before passing through to Node |
 
 **Extra flags added by the Go launcher:**
 
-| Flag | Purpose |
-|---|---|
-| `--quit` | Send quit signal to the running daemon |
-| `--restart` | Restart the daemon |
-| `--queue-status` | Query daemon queue status |
-| `--cancel` | Cancel a queued/running flow |
+| Flag             | Purpose                                |
+| ---------------- | -------------------------------------- |
+| `--quit`         | Send quit signal to the running daemon |
+| `--restart`      | Restart the daemon                     |
+| `--queue-status` | Query daemon queue status              |
+| `--cancel`       | Cancel a queued/running flow           |
 
 ### `scripts/build-launcher.mjs`
 

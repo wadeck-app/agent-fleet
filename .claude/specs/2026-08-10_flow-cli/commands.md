@@ -15,6 +15,7 @@ Source: `packages/flow-cli/src/cli.ts`, `packages/flow-cli/src/commands/`
 **Signature:** `flow show <file>` — no flags.
 
 **Behavior:**
+
 1. Exit 1 if `file` does not exist (stderr: `File not found: <file>`)
 2. Exit 1 if file is empty after YAML parse (stderr: `File is empty: <file>`)
 3. Exit 1 on YAML parse error (stderr: `Failed to parse YAML: <message>`)
@@ -42,6 +43,7 @@ trigger: event:<event> <k=v>,...                      ← only if trigger.type =
 ```
 
 **Column widths (computed per flow):**
+
 - `COL_NUM = 3`
 - `COL_ID = min(30, max(12, longest(id.length + blocking_suffix))) + 2`
 - `COL_TYPE = min(20, max(10, longest_type_string)) + 2`
@@ -52,15 +54,15 @@ All columns are left-padded to their width via `pad(s, width)`. Separator is `-`
 
 **Step rows — field rules:**
 
-| Field | Rule |
-|---|---|
-| `#` | 1-based position in `flow.steps` array |
-| `ID` | `step.id` + ` (!)` if `type === 'user_intervention'` and `blocking !== false` |
-| `TYPE` | `model` → model name string; `script` → `"script"`; `subflow` → `"subflow:<flowId>"`; `user_intervention` → `interventionType` string |
-| `DEPENDS` | `-` if no deps; step numbers (1-based) joined by `, `; if `when` present → `"1, 2: if(<cond>)"` where cond has `${{`/`}}` stripped, `steps.X.outputs.` stripped, truncated to 28 chars + `..` if > 30 chars |
-| `OUTPUTS` | `-` if no `output` field; otherwise `Object.keys(step.output).join(', ')` |
-| Loop suffix | `  err -> N  max:Mx` appended after OUTPUTS if `step.onFailure?.goto` is set; N is 1-based step index of target (falls back to step ID if not found); `max:Mx` only if `maxIterations != null` |
-| Retry suffix | `  retry:Nx` appended if `step.retry?.maxAttempts` is set |
+| Field        | Rule                                                                                                                                                                                                        |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `#`          | 1-based position in `flow.steps` array                                                                                                                                                                      |
+| `ID`         | `step.id` + ` (!)` if `type === 'user_intervention'` and `blocking !== false`                                                                                                                               |
+| `TYPE`       | `model` → model name string; `script` → `"script"`; `subflow` → `"subflow:<flowId>"`; `user_intervention` → `interventionType` string                                                                       |
+| `DEPENDS`    | `-` if no deps; step numbers (1-based) joined by `, `; if `when` present → `"1, 2: if(<cond>)"` where cond has `${{`/`}}` stripped, `steps.X.outputs.` stripped, truncated to 28 chars + `..` if > 30 chars |
+| `OUTPUTS`    | `-` if no `output` field; otherwise `Object.keys(step.output).join(', ')`                                                                                                                                   |
+| Loop suffix  | `  err -> N  max:Mx` appended after OUTPUTS if `step.onFailure?.goto` is set; N is 1-based step index of target (falls back to step ID if not found); `max:Mx` only if `maxIterations != null`              |
+| Retry suffix | `  retry:Nx` appended if `step.retry?.maxAttempts` is set                                                                                                                                                   |
 
 **Footer:** `  N steps:  K <type>   K <type>  ...` — grouped by type; for `model` steps the model name is used (not the string `"model"`).
 
@@ -81,6 +83,7 @@ All columns are left-padded to their width via `pad(s, width)`. Separator is `-`
 **Signature:** `flow validate <file>` — no flags.
 
 **Behavior:**
+
 1. Exit 1 if file not found, empty, or YAML parse error (same stderr messages as `show`)
 2. Calls `new FlowValidator().validate(raw)` from `flow-engine`
 3. Splits issues by severity: `error`, `warning`, `info`
@@ -125,12 +128,14 @@ flow run <flowRef>
 ```
 
 **`--inputs` parsing:**
+
 - Uses `(val, acc: string[]) => { acc.push(val); return acc; }` accumulator; default `[]`
 - Split on first `=` (index via `indexOf('=')`)
 - Exit 1 (stderr) if no `=` found: `Invalid input format: '<entry>'. Expected key=value.`
 - Exit 1 (stderr) if key is empty: `Invalid input format: '<entry>'. Key cannot be empty.`
 
 **Behavior:**
+
 1. Parse `--cwd` and `--inputs`
 2. Construct `new FlowCliRunner(cwd)`
 3. Record `start = Date.now()`
@@ -156,6 +161,7 @@ flow docs
 ```
 
 **Behavior:**
+
 1. `new FlowCapabilitiesGenerator().generate()` — produces a Markdown string
 2. If `--output` → `fs.writeFileSync(file, content, 'utf-8')` + stdout `✓ Docs written to <file>`
 3. If no `--output` → `process.stdout.write(content + '\n')`

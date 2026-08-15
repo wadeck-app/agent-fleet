@@ -1,0 +1,19 @@
+id: invalid-flow
+version: '1.0.0'
+name: Invalid Test Flow
+description: A flow with invalid dependency references (for validation error testing)
+
+workspace:
+    mode: manual
+    gitStrategy: any
+    reusePolicy: if-available
+
+inputs: {}
+
+steps:
+    - id: step-one
+      name: Only Step
+      type: script
+      script: echo "hello"
+      depends:
+          - nonexistent-step

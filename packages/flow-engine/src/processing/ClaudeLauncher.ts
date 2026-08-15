@@ -59,6 +59,13 @@ export interface ClaudeLaunchOptions {
 
 	/** Callback for stream-json events (requires streamJson=true) */
 	onStreamEvent?: StreamJsonEventCallback;
+
+	/**
+	 * When true (default), claude subprocess only receives PATH, ANTHROPIC_API_KEY,
+	 * HOME, and any explicitly passed env vars. No other credentials leak.
+	 * Set to false only when full env inheritance is explicitly required.
+	 */
+	isolateEnv?: boolean;
 }
 
 /**
@@ -185,14 +192,34 @@ export class ClaudeLauncher {
 		options: ClaudeLaunchOptions
 	): Promise<ClaudeInteractiveResult> {
 		return new Promise((resolve, reject) => {
+			const shouldIsolate = options.isolateEnv !== false; // default true
+			const baseEnvInteractive: NodeJS.ProcessEnv = shouldIsolate
+				? {
+						PATH: process.env['PATH'],
+						HOME: process.env['HOME'],
+						// Claude requires ANTHROPIC_API_KEY — pass it explicitly
+						...(process.env['ANTHROPIC_API_KEY']
+							? { ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'] }
+							: {}),
+						// Windows
+						...(process.platform === 'win32' && process.env['SystemRoot']
+							? { SystemRoot: process.env['SystemRoot'] }
+							: {}),
+						...(process.platform === 'win32' && process.env['USERPROFILE']
+							? { USERPROFILE: process.env['USERPROFILE'] }
+							: {}),
+					}
+				: { ...process.env };
+			const rawEnvInteractive = { ...baseEnvInteractive, ...(options.env ?? {}) };
+			const processEnvInteractive: Record<string, string> = {};
+			for (const [k, v] of Object.entries(rawEnvInteractive)) {
+				if (v !== undefined) processEnvInteractive[k] = v;
+			}
 			const claudeProcess = spawn(command, args, {
 				cwd: options.workingDir,
 				stdio: 'inherit',
 				shell: false,
-				env: {
-					...process.env,
-					...options.env,
-				},
+				env: processEnvInteractive,
 			});
 
 			// Call callback to store process reference
@@ -222,14 +249,34 @@ export class ClaudeLauncher {
 		options: ClaudeLaunchOptions
 	): Promise<ClaudeBackgroundResult> {
 		return new Promise((resolve, reject) => {
+			const shouldIsolate = options.isolateEnv !== false; // default true
+			const baseEnvBackground: NodeJS.ProcessEnv = shouldIsolate
+				? {
+						PATH: process.env['PATH'],
+						HOME: process.env['HOME'],
+						// Claude requires ANTHROPIC_API_KEY — pass it explicitly
+						...(process.env['ANTHROPIC_API_KEY']
+							? { ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'] }
+							: {}),
+						// Windows
+						...(process.platform === 'win32' && process.env['SystemRoot']
+							? { SystemRoot: process.env['SystemRoot'] }
+							: {}),
+						...(process.platform === 'win32' && process.env['USERPROFILE']
+							? { USERPROFILE: process.env['USERPROFILE'] }
+							: {}),
+					}
+				: { ...process.env };
+			const rawEnvBackground = { ...baseEnvBackground, ...(options.env ?? {}) };
+			const processEnvBackground: Record<string, string> = {};
+			for (const [k, v] of Object.entries(rawEnvBackground)) {
+				if (v !== undefined) processEnvBackground[k] = v;
+			}
 			const claudeProcess = spawn(command, args, {
 				cwd: options.workingDir,
 				stdio: ['pipe', 'pipe', 'pipe'],
 				shell: false,
-				env: {
-					...process.env,
-					...options.env,
-				},
+				env: processEnvBackground,
 			});
 
 			// Call callback to store process reference

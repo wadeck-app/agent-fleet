@@ -15,12 +15,11 @@ The `ENGINE_COMMANDS_STUB` satisfies `EngineCommands` and provides no-op default
 Spawns the daemon as a fully detached background process:
 
 ```ts
-child_process.spawn(
-  process.execPath,
-  [path.join(import.meta.dirname, 'engine-daemon-entry.js'), configDir],
-  { detached: true, stdio: 'ignore' }
-)
-child.unref()
+child_process.spawn(process.execPath, [path.join(import.meta.dirname, 'engine-daemon-entry.js'), configDir], {
+	detached: true,
+	stdio: 'ignore',
+});
+child.unref();
 ```
 
 - Uses `spawn` (not `fork`) — important for Windows compatibility
@@ -40,26 +39,26 @@ Returns the typed client after ensuring the daemon is running.
 3. `spawnDaemon(configDir)` — detached spawn, no await
 4. Record `deadline = Date.now() + 5000`
 5. Loop while `Date.now() < deadline`:
-   - Sleep 100 ms (`setTimeout` via `Promise`)
-   - `await readPortFile(configDir)` — reads the port file the SDK writes when the daemon binds
-   - If non-null → return `client`
+    - Sleep 100 ms (`setTimeout` via `Promise`)
+    - `await readPortFile(configDir)` — reads the port file the SDK writes when the daemon binds
+    - If non-null → return `client`
 6. If loop expires → throw:
-   ```
-   Error: Engine daemon failed to start within 5s — check logs (configDir: <configDir>)
-   ```
+    ```
+    Error: Engine daemon failed to start within 5s — check logs (configDir: <configDir>)
+    ```
 
-| Constant | Value |
-|---|---|
-| `AUTO_START_TIMEOUT_MS` | `5_000` ms |
-| `AUTO_START_POLL_INTERVAL_MS` | `100` ms |
+| Constant                      | Value      |
+| ----------------------------- | ---------- |
+| `AUTO_START_TIMEOUT_MS`       | `5_000` ms |
+| `AUTO_START_POLL_INTERVAL_MS` | `100` ms   |
 
 ## Type contract
 
 ```ts
 type EngineCommands = {
-  'run-flow':     (payload?: unknown) => Promise<RunResult>;
-  'queue-status': (payload?: unknown) => Promise<QueueStatus>;
-  'cancel':       (payload?: unknown) => Promise<CancelResult>;
+	'run-flow': (payload?: unknown) => Promise<RunResult>;
+	'queue-status': (payload?: unknown) => Promise<QueueStatus>;
+	cancel: (payload?: unknown) => Promise<CancelResult>;
 } & CommandMap;
 ```
 
