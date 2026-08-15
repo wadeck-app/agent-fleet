@@ -1,4 +1,8 @@
+import { ConditionEvaluator } from 'flow-engine/processing/ConditionEvaluator';
+
 import type { AssignableStep, ExecutionContext, InjectedStep } from '../ipc/Protocol';
+
+const conditionEvaluator = new ConditionEvaluator();
 
 export interface ReadyStep {
 	stepId: string;
@@ -183,8 +187,8 @@ export class StepQueue {
 	}
 
 	private enqueueReady(entry: ExecutionEntry): void {
-		// D30: when: condition expressions are not evaluated in v1. Steps are enqueued
-		// solely based on depends being satisfied. Tracked for v2 (ConditionEvaluator).
+		const skipped: string[] = [];
+
 		for (const [stepId, deps] of entry.pendingDeps) {
 			if (
 				deps.size === 0 &&
@@ -194,8 +198,40 @@ export class StepQueue {
 			) {
 				const stepConfig = entry.steps.get(stepId)!;
 				entry.pendingDeps.delete(stepId);
+
+				const when = (stepConfig as { when?: string }).when;
+				if (when !== undefined) {
+					const depIds: string[] = (stepConfig as { depends?: string[] }).depends ?? [];
+					const mergedOutput = Object.assign(
+						{},
+						...depIds.map(depId => entry.context.stepOutputs[depId] ?? {})
+					) as Record<string, unknown>;
+
+					const shouldRun = conditionEvaluator.evaluate(
+						when,
+						{ output: mergedOutput, inputs: entry.context.inputs, task: {} },
+						stepId
+					);
+
+					if (!shouldRun) {
+						entry.completedSteps.add(stepId);
+						skipped.push(stepId);
+						continue;
+					}
+				}
+
 				this.queue.push({ stepId, stepConfig, executionContext: entry.context });
 			}
+		}
+
+		// Remove skipped steps from all pending dependency sets so their dependents become ready
+		if (skipped.length > 0) {
+			for (const skippedId of skipped) {
+				for (const deps of entry.pendingDeps.values()) {
+					deps.delete(skippedId);
+				}
+			}
+			this.enqueueReady(entry);
 		}
 	}
 }

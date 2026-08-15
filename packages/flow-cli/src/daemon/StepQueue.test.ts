@@ -173,6 +173,93 @@ describe('StepQueue', () => {
 		});
 	});
 
+	describe('when: condition evaluation', () => {
+		const makeStepWithWhen = (id: string, when?: string, depends?: string[]): AssignableStep =>
+			({
+				id,
+				name: id,
+				type: 'script',
+				script: 'echo test',
+				...(when !== undefined && { when }),
+				...(depends !== undefined && { depends }),
+			}) as unknown as AssignableStep;
+
+		it('enqueues step when when: is absent', () => {
+			const step = makeStepWithWhen('step-a');
+			queue.enqueueExecution(makeContext('exec-1'), [step], new Map());
+			expect(queue.dequeue()?.stepId).toBe('step-a');
+		});
+
+		it('enqueues step when when: evaluates to true', () => {
+			const ctx = makeContext('exec-1');
+			const step = makeStepWithWhen('step-a', 'true');
+			queue.enqueueExecution(ctx, [step], new Map());
+			expect(queue.dequeue()?.stepId).toBe('step-a');
+		});
+
+		it('skips step (does not enqueue) when when: evaluates to false', () => {
+			const step = makeStepWithWhen('step-a', 'false');
+			queue.enqueueExecution(makeContext('exec-1'), [step], new Map());
+			expect(queue.isEmpty()).toBe(true);
+		});
+
+		it('provides step dependency outputs as output context', () => {
+			const ctx = makeContext('exec-1');
+			const stepA = makeStepWithWhen('step-a');
+			// step-b depends on step-a and checks output.result === 'ok'
+			const stepB = makeStepWithWhen('step-b', "output.result === 'ok'", ['step-a']);
+			queue.enqueueExecution(ctx, [stepA, stepB], new Map([['step-b', ['step-a']]]));
+
+			queue.dequeue(); // drain step-a
+			queue.onStepCompleted('exec-1', 'step-a', { result: 'ok' });
+
+			// step-b when: should see result='ok' → true → enqueued
+			expect(queue.dequeue()?.stepId).toBe('step-b');
+		});
+
+		it('skips step when dependency output does not satisfy when:', () => {
+			const ctx = makeContext('exec-1');
+			const stepA = makeStepWithWhen('step-a');
+			const stepB = makeStepWithWhen('step-b', "output.result === 'ok'", ['step-a']);
+			queue.enqueueExecution(ctx, [stepA, stepB], new Map([['step-b', ['step-a']]]));
+
+			queue.dequeue();
+			queue.onStepCompleted('exec-1', 'step-a', { result: 'fail' });
+
+			// step-b when: result='fail' → false → skipped
+			expect(queue.isEmpty()).toBe(true);
+		});
+
+		it('provides execution inputs as inputs context', () => {
+			const ctx = { ...makeContext('exec-1'), inputs: { env: 'prod' } };
+			const step = makeStepWithWhen('step-a', "inputs.env === 'prod'");
+			queue.enqueueExecution(ctx, [step], new Map());
+			expect(queue.dequeue()?.stepId).toBe('step-a');
+		});
+
+		it('skips step and resolves its dependents so downstream steps still run', () => {
+			// step-a → step-b (when: false, skipped) → step-c (should still run)
+			const stepA = makeStepWithWhen('step-a');
+			const stepB = makeStepWithWhen('step-b', 'false', ['step-a']);
+			const stepC = makeStepWithWhen('step-c', undefined, ['step-b']);
+			const deps = new Map([['step-b', ['step-a']], ['step-c', ['step-b']]]);
+			queue.enqueueExecution(makeContext('exec-1'), [stepA, stepB, stepC], deps);
+
+			queue.dequeue(); // step-a
+			queue.onStepCompleted('exec-1', 'step-a', {});
+
+			// step-b is skipped, step-c should be ready
+			expect(queue.dequeue()?.stepId).toBe('step-c');
+		});
+
+		it('throws ConditionEvaluationError if when: is not a boolean expression', () => {
+			const step = makeStepWithWhen('step-a', '"not-a-boolean"');
+			expect(() =>
+				queue.enqueueExecution(makeContext('exec-1'), [step], new Map())
+			).toThrow(/boolean/);
+		});
+	});
+
 	describe('reQueueStep()', () => {
 		it('puts the step back at the front of the queue', () => {
 			const stepA = makeStep('step-a');

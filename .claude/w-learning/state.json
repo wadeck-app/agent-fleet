@@ -481,12 +481,8 @@
       }
     },
     "4a6762f1-9d8f-4364-8e13-3c22d9c8e88f": "skipped:too-short",
-    "4bc6cb96-8804-49a3-8c3a-eccd6335edd4": "skipped:too-short"
+    "4bc6cb96-8804-49a3-8c3a-eccd6335edd4": "skipped:too-short",
+    "f716f570-a0a8-4002-97d0-3b77ff486d2d": "pending"
   },
-  "last_consolidation": "2026-08-15T16:26:30.411Z",
-  "last_analysis_summary": {
-    "sessionId": "f5ca1287-2b09-44b4-99ba-7cb16b28cc7a",
-    "findings": 10,
-    "at": "2026-08-15T20:40:23.844Z"
-  }
+  "last_consolidation": "2026-08-15T16:26:30.411Z"
 }
