@@ -78,6 +78,9 @@ export class TaskStore {
 
 	updateStatus(id: string, status: TaskStatus): TaskRecord {
 		const record = this.get(id);
+		if (record.status === status) {
+			throw new Error(`Task "${id}" is already in status "${status}"`);
+		}
 		const now = new Date().toISOString();
 
 		record.status = status;

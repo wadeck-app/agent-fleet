@@ -1,6 +1,7 @@
 import type { StepRunner } from 'flow-engine';
 import type { TemplateContext } from 'flow-engine/processing/TemplateRenderer';
-import type { ModelFlowStep, ScriptFlowStep, Workspace } from 'flow-engine/types';
+import type { LiveLogEntry, ModelFlowStep, ScriptFlowStep, Workspace } from 'flow-engine/types';
+import { randomUUID } from 'node:crypto';
 
 import type { AssignableStep, ExecutionContext, InjectedStep, WorkerToDaemon } from '../ipc/Protocol';
 import { McpServer } from './McpServer';
@@ -10,6 +11,26 @@ export type SendMessageFn = (msg: WorkerToDaemon) => void;
 // Factory that creates a StepRunner configured for the given MCP config path.
 // Pass an empty string when no MCP server is needed (script steps).
 export type StepRunnerFactory = (mcpConfigPath: string) => StepRunner;
+
+function sendStdoutAsLogs(
+	stdout: string | undefined,
+	executionId: string,
+	stepId: string,
+	sendMessage: SendMessageFn
+): void {
+	if (!stdout?.trim()) return;
+	for (const line of stdout.split('\n')) {
+		if (!line.trim()) continue;
+		const entry: LiveLogEntry = {
+			id: randomUUID(),
+			timestamp: Date.now(),
+			level: 'info',
+			message: line,
+			eventType: 'result',
+		};
+		sendMessage({ type: 'log', executionId, stepId, entry });
+	}
+}
 
 export class WorkerAdapter {
 	private readonly stepRunnerFactory: StepRunnerFactory;
@@ -44,6 +65,7 @@ export class WorkerAdapter {
 			inputs: context.inputs,
 			stepOutputs: new Map(Object.entries(context.stepOutputs)),
 			taskMetadata: {},
+			context: { cwd: context.cwd, projectDir: context.cwd, workspaceDir: context.workspaceDir },
 		};
 
 		// For model steps, wire up the MCP server for provideSteps injection
@@ -60,6 +82,7 @@ export class WorkerAdapter {
 
 			try {
 				const trace = await runner.executeStep(step as unknown as ModelFlowStep, workspace, templateContext);
+				sendStdoutAsLogs(trace.stdout, context.executionId, step.id, sendMessage);
 				// trace.outputs is undefined for model steps that produce no structured output —
 				// an empty map is the correct representation (no outputs to propagate to dependents).
 				return (trace.outputs ?? {}) as Record<string, unknown>;
@@ -75,6 +98,7 @@ export class WorkerAdapter {
 
 		const runner = this.stepRunnerFactory('');
 		const trace = await runner.executeStep(step as unknown as ScriptFlowStep, workspace, templateContext);
+		sendStdoutAsLogs(trace.stdout, context.executionId, step.id, sendMessage);
 		// trace.outputs is undefined for script steps without captureOutput — empty map is correct.
 		return (trace.outputs ?? {}) as Record<string, unknown>;
 	}

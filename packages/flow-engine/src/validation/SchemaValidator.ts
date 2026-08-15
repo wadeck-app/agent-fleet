@@ -147,7 +147,7 @@ export class SchemaValidator {
 		}
 
 		// Validate git strategy
-		const validStrategies: GitStrategy[] = ['main-only', 'feature-branch', 'any', 'worktree'];
+		const validStrategies: GitStrategy[] = ['main-only', 'feature-branch', 'any', 'worktree', 'none'];
 		if (!config.gitStrategy) {
 			this.issueCollector.addIssue({
 				severity: 'error',

@@ -171,6 +171,7 @@ export class CommandHandler {
 			// in v1. Required input fields in the flow YAML are not checked here. Tracked for v2.
 			stepOutputs: {},
 			workspaceDir,
+			cwd: cmd.cwd,
 		};
 
 		// Build dependency map

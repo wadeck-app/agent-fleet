@@ -312,9 +312,8 @@ export class SimulationValidator {
 			text += JSON.stringify(step.inputs);
 		}
 
-		if (step.when) {
-			text += step.when;
-		}
+		// 'when' is a JavaScript condition expression evaluated by ConditionEvaluator,
+		// not a template interpolation — do not validate its ${{ }} content with the whitelist.
 
 		if (step.onFailure?.addComment) {
 			text += step.onFailure.addComment;
@@ -333,7 +332,7 @@ export class SimulationValidator {
 	 * Where <id> is [a-zA-Z0-9_-]+
 	 */
 	private static readonly VALID_TEMPLATE_EXPRESSION =
-		/^(inputs\.[a-zA-Z0-9_-]+|steps\.[a-zA-Z0-9_-]+\.outputs\.[a-zA-Z0-9_-]+|flow\.[a-zA-Z0-9_-]+|task\.[a-zA-Z0-9_-]+)$/;
+		/^(inputs\.[a-zA-Z0-9_-]+|steps\.[a-zA-Z0-9_-]+\.outputs\.[a-zA-Z0-9_-]+|flow\.[a-zA-Z0-9_-]+|task\.[a-zA-Z0-9_-]+|context\.[a-zA-Z0-9_-]+)$/;
 
 	/**
 	 * Validate a single template expression against the whitelist.
@@ -350,10 +349,10 @@ export class SimulationValidator {
 					field: step.type === 'model' ? 'prompt' : 'script',
 					path: `${flow.id}.steps[${step.id}]`,
 				},
-				suggestion: `Valid forms: \${{ inputs.name }}, \${{ steps.step-id.outputs.varName }}, \${{ flow.allLogs }}, \${{ task.priority }}`,
+				suggestion: `Valid forms: \${{ inputs.name }}, \${{ steps.step-id.outputs.varName }}, \${{ flow.allLogs }}, \${{ task.priority }}, \${{ context.cwd }}`,
 				context: {
 					actual: expression,
-					expected: 'inputs.<id> | steps.<id>.outputs.<id> | flow.<id> | task.<id>',
+					expected: 'inputs.<id> | steps.<id>.outputs.<id> | flow.<id> | task.<id> | context.<id>',
 				},
 			});
 		}

@@ -19,6 +19,7 @@ const makeContext = (): ExecutionContext => ({
 	inputs: {},
 	stepOutputs: {},
 	workspaceDir: '/tmp/ws',
+	cwd: '/tmp/ws',
 });
 
 const makeScriptStep = (): AssignableStep =>
@@ -81,6 +82,48 @@ describe('WorkerAdapter', () => {
 		expect(result).toEqual({ result: 'ok' });
 		// Factory called with empty string for non-model steps
 		expect(mockFactory).toHaveBeenCalledWith('');
+	});
+
+	it('sends stdout lines as log messages for script step', async () => {
+		mockExecuteStep.mockResolvedValue({ stdout: 'hello\nworld\n', outputs: {} });
+		await adapter.execute(makeScriptStep(), makeContext(), sendMessage);
+		const logCalls = (sendMessage as ReturnType<typeof vi.fn>).mock.calls
+			.map(c => c[0])
+			.filter((m: any) => m.type === 'log');
+		expect(logCalls).toHaveLength(2);
+		expect(logCalls[0].entry.message).toBe('hello');
+		expect(logCalls[1].entry.message).toBe('world');
+		expect(logCalls[0].stepId).toBe('script-step');
+		expect(logCalls[0].executionId).toBe('testexec');
+	});
+
+	it('does not send log messages for empty stdout', async () => {
+		mockExecuteStep.mockResolvedValue({ stdout: '\n  \n', outputs: {} });
+		await adapter.execute(makeScriptStep(), makeContext(), sendMessage);
+		const logCalls = (sendMessage as ReturnType<typeof vi.fn>).mock.calls
+			.map(c => c[0])
+			.filter((m: any) => m.type === 'log');
+		expect(logCalls).toHaveLength(0);
+	});
+
+	it('does not send log messages when stdout is undefined', async () => {
+		mockExecuteStep.mockResolvedValue({ outputs: {} });
+		await adapter.execute(makeScriptStep(), makeContext(), sendMessage);
+		const logCalls = (sendMessage as ReturnType<typeof vi.fn>).mock.calls
+			.map(c => c[0])
+			.filter((m: any) => m.type === 'log');
+		expect(logCalls).toHaveLength(0);
+	});
+
+	it('sends stdout lines as log messages for model step', async () => {
+		mockExecuteStep.mockResolvedValue({ stdout: 'model output', outputs: {} });
+		await adapter.execute(makeModelStep(), makeContext(), sendMessage);
+		const logCalls = (sendMessage as ReturnType<typeof vi.fn>).mock.calls
+			.map(c => c[0])
+			.filter((m: any) => m.type === 'log');
+		expect(logCalls).toHaveLength(1);
+		expect(logCalls[0].entry.message).toBe('model output');
+		expect(logCalls[0].stepId).toBe('model-step');
 	});
 
 	it('returns outputs for a model step and calls McpServer start/stop', async () => {

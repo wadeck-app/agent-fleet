@@ -69,6 +69,14 @@ describe('TaskStore', () => {
 			expect(updated.updatedAt).not.toBe(record.updatedAt);
 		});
 
+		it('throws if task is already in the requested status', () => {
+			const record = store.create('Already in status task');
+			store.updateStatus(record.id, 'in-progress');
+			expect(() => store.updateStatus(record.id, 'in-progress')).toThrow(
+				'already in status "in-progress"'
+			);
+		});
+
 		it('updates the index entry status', () => {
 			const record = store.create('Index-status task');
 			store.updateStatus(record.id, 'done');

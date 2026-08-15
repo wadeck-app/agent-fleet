@@ -305,8 +305,11 @@ custom-flow:
 				},
 			});
 
-			// FlowRegistry now throws errors for invalid flows
-			await expect(registry.loadProjectFlows()).rejects.toThrow('Flow validation failed');
+			// FlowRegistry loads all flows (valid and invalid); invalid flows are marked but not rejected.
+			await registry.loadProjectFlows();
+			expect(registry.getFlow('valid-flow')).toBeDefined();
+			expect(registry.getFlow('invalid-flow')).toBeDefined();
+			expect(registry.getFlowValidationResult('invalid-flow')?.valid).toBe(false);
 		});
 	});
 
@@ -382,7 +385,7 @@ custom-flow:
 			expect((step as any).env).toEqual({ NODE_ENV: 'test' });
 		});
 
-		it('should default to model type when type is not specified', async () => {
+		it('should not load flow when step is missing required type field', async () => {
 			vi.mocked(fs.existsSync).mockReturnValue(true);
 			vi.mocked(fs.readFileSync).mockReturnValue('yaml');
 			vi.mocked(yaml.load).mockReturnValue({
@@ -395,18 +398,15 @@ custom-flow:
 							id: 'step1',
 							name: 'Step 1',
 							prompt: 'Test',
+							// Missing required 'type' field — parseFlowDefinition throws
 						},
 					],
 				},
 			});
 
 			await registry.loadProjectFlows();
-
-			const flow = registry.getFlow('default-type-flow');
-			const step = flow?.steps[0];
-
-			expect(step?.type).toBe('model');
-			expect((step as any).model).toBe('haiku'); // Default model
+			// Parse error is logged but not rethrown; flow is not loaded.
+			expect(registry.getFlow('default-type-flow')).toBeUndefined();
 		});
 
 		it('should parse workspace config with defaults', async () => {
@@ -786,8 +786,10 @@ custom-flow:
 				},
 			});
 
-			// FlowRegistry now throws errors for invalid flows (empty steps array is invalid)
-			await expect(registry.loadProjectFlows()).rejects.toThrow('Flow validation failed');
+			// Empty steps is a validation error — flow is loaded but marked invalid.
+			await registry.loadProjectFlows();
+			expect(registry.getFlow('empty-steps')).toBeDefined();
+			expect(registry.getFlowValidationResult('empty-steps')?.valid).toBe(false);
 		});
 
 		it('should handle missing step name', async () => {
@@ -1085,37 +1087,40 @@ custom-flow:
 			expect(flow?.steps[0].id).toBe('step2'); // Local override
 		});
 
-		it('should reject external file with path traversal', async () => {
+		it('should not load flow with path traversal in external source', async () => {
 			vi.mocked(fs.existsSync).mockReturnValue(true);
 			vi.mocked(fs.readFileSync).mockReturnValue('flows content');
 			vi.mocked(yaml.load).mockReturnValue({
 				'evil-flow': { source: '../evil.yml' },
 			});
 
-			await expect(registry.loadProjectFlows()).rejects.toThrow('Flow validation failed');
+			await registry.loadProjectFlows();
+			expect(registry.getFlow('evil-flow')).toBeUndefined();
 		});
 
-		it('should reject external file not in same directory', async () => {
+		it('should not load flow with external source in subdirectory', async () => {
 			vi.mocked(fs.existsSync).mockReturnValue(true);
 			vi.mocked(fs.readFileSync).mockReturnValue('flows content');
 			vi.mocked(yaml.load).mockReturnValue({
 				'subdir-flow': { source: 'subdir/flow.yml' },
 			});
 
-			await expect(registry.loadProjectFlows()).rejects.toThrow('Flow validation failed');
+			await registry.loadProjectFlows();
+			expect(registry.getFlow('subdir-flow')).toBeUndefined();
 		});
 
-		it('should reject external file without .yml extension', async () => {
+		it('should not load flow with external source lacking .yml extension', async () => {
 			vi.mocked(fs.existsSync).mockReturnValue(true);
 			vi.mocked(fs.readFileSync).mockReturnValue('flows content');
 			vi.mocked(yaml.load).mockReturnValue({
 				'txt-flow': { source: 'flow.txt' },
 			});
 
-			await expect(registry.loadProjectFlows()).rejects.toThrow('Flow validation failed');
+			await registry.loadProjectFlows();
+			expect(registry.getFlow('txt-flow')).toBeUndefined();
 		});
 
-		it('should error if external file missing', async () => {
+		it('should not load flow when external file is missing', async () => {
 			vi.mocked(fs.existsSync).mockImplementation((path: any) => {
 				// flows.yml exists, but external file doesn't
 				return path.toString().endsWith('flows.yml');
@@ -1125,7 +1130,8 @@ custom-flow:
 				'missing-flow': { source: 'missing.yml' },
 			});
 
-			await expect(registry.loadProjectFlows()).rejects.toThrow('Flow validation failed');
+			await registry.loadProjectFlows();
+			expect(registry.getFlow('missing-flow')).toBeUndefined();
 		});
 
 		it('should error if external file does not contain flow ID', async () => {
@@ -1157,7 +1163,10 @@ custom-flow:
 				throw new Error('Unexpected yaml.load call');
 			});
 
-			await expect(registry.loadProjectFlows()).rejects.toThrow('Flow validation failed');
+			// parseFlowDefinition throws when external file lacks the flow ID —
+			// the error is logged but not rethrown; the flow is simply not loaded.
+			await registry.loadProjectFlows();
+			expect(registry.getFlow('custom-flow')).toBeUndefined();
 		});
 
 		it('should watch external files for changes', async () => {
@@ -1401,7 +1410,9 @@ custom-flow:
 				},
 			});
 
-			await expect(registry.loadProjectFlows()).rejects.toThrow('Flow validation failed');
+			// parseFlowDefinition throws on missing version — logged, not rethrown; flow not loaded.
+			await registry.loadProjectFlows();
+			expect(registry.getFlow('no-version')).toBeUndefined();
 		});
 
 		it('Test 8.2: should accept valid semver versions', async () => {
@@ -1434,7 +1445,9 @@ custom-flow:
 				},
 			});
 
-			await expect(registry.loadProjectFlows()).rejects.toThrow('Flow validation failed');
+			// parseFlowDefinition throws on invalid semver — logged, not rethrown; flow not loaded.
+			await registry.loadProjectFlows();
+			expect(registry.getFlow('invalid-version')).toBeUndefined();
 		});
 
 		it('Test 8.4: should accept different valid semver formats', async () => {
@@ -1532,7 +1545,9 @@ custom-flow:
 				},
 			});
 
-			await expect(registry.loadProjectFlows()).rejects.toThrow(FlowValidationError);
+			// parseFlowDefinition throws on invalid input type — logged, not rethrown; flow not loaded.
+			await registry.loadProjectFlows();
+			expect(registry.getFlow('test-invalid')).toBeUndefined();
 		});
 	});
 });

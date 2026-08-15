@@ -8,6 +8,8 @@ export interface ExecutionContext {
 	inputs: Record<string, string>;
 	stepOutputs: Record<string, Record<string, unknown>>;
 	workspaceDir: string;
+	/** Original CWD from which `flow run` was invoked — used as ${{ context.cwd }} in templates */
+	cwd: string;
 }
 
 export type ClientCommand = {

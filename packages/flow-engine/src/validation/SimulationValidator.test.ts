@@ -184,5 +184,33 @@ describe('SimulationValidator', () => {
 			expect(errors.length).toBeGreaterThanOrEqual(1);
 			expect(errors[0].severity).toBe('error');
 		});
+
+		// --- context.* — runtime execution context variables ---
+
+		it('should accept context.cwd', () => {
+			const { flow, stepIds } = makeFlow('Dir: ${{ context.cwd }}');
+			validator.validateSimulation(flow, stepIds);
+			expect(syntaxErrors(issueCollector)).toHaveLength(0);
+		});
+
+		it('should accept context.workspaceDir', () => {
+			const { flow, stepIds } = makeFlow('Workspace: ${{ context.workspaceDir }}');
+			validator.validateSimulation(flow, stepIds);
+			expect(syntaxErrors(issueCollector)).toHaveLength(0);
+		});
+
+		it('should accept context.key_with-mixed_chars', () => {
+			const { flow, stepIds } = makeFlow('Value: ${{ context.key_with-mixed_chars }}');
+			validator.validateSimulation(flow, stepIds);
+			expect(syntaxErrors(issueCollector)).toHaveLength(0);
+		});
+
+		it('should flag context without a key: context (bare root)', () => {
+			const { flow, stepIds } = makeFlow('Value: ${{ context }}');
+			validator.validateSimulation(flow, stepIds);
+			const errors = syntaxErrors(issueCollector);
+			expect(errors.length).toBeGreaterThanOrEqual(1);
+			expect(errors[0].severity).toBe('error');
+		});
 	});
 });

@@ -14,6 +14,7 @@ const makeContext = (executionId: string): ExecutionContext => ({
 	inputs: {},
 	stepOutputs: {},
 	workspaceDir: '/tmp',
+	cwd: '/tmp',
 });
 
 describe('StepQueue', () => {

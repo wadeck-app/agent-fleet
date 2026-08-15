@@ -22,7 +22,7 @@ export type WorkspaceMode = 'isolated' | 'shared' | 'manual';
 /**
  * Git strategy defines which branches can be used
  */
-export type GitStrategy = 'main-only' | 'feature-branch' | 'any' | 'worktree';
+export type GitStrategy = 'main-only' | 'feature-branch' | 'any' | 'worktree' | 'none';
 
 /**
  * Reuse policy determines when workspaces can be reused

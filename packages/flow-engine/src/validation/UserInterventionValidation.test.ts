@@ -19,7 +19,7 @@ const __dirname = path.dirname(__filename);
 describe('UserIntervention Flow Validation', () => {
 	it('should successfully validate test-user-intervention flow from flows.yml', () => {
 		// Load flows.yml
-		const flowsPath = path.join(__dirname, '../../../../../.agent-fleet/flows.yml');
+		const flowsPath = path.join(__dirname, '../../../../.agent-fleet/flows.yml');
 		const flowsContent = fs.readFileSync(flowsPath, 'utf8');
 		const flows = yaml.load(flowsContent) as Record<string, any>;
 

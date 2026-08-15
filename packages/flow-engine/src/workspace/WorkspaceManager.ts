@@ -389,8 +389,8 @@ export class WorkspaceManager {
 	): Promise<WorkspaceGitState | undefined> {
 		const { gitStrategy } = config;
 
-		// If no git strategy, skip git setup (for testing or non-git workspaces)
-		if (!gitStrategy) {
+		// If no git strategy or explicitly 'none', skip git setup entirely
+		if (!gitStrategy || gitStrategy === 'none') {
 			return undefined;
 		}
 

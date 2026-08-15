@@ -30,16 +30,76 @@ function parseTimeout(value: string): number {
 	}
 }
 
-async function waitForCompletion(executionId: string, daemonDir: string, timeoutMs: number): Promise<ExecutionState> {
+interface LogLine {
+	prefix: string;
+	timestamp: string;
+	level: string;
+	message: string;
+}
+
+// TODO(Option B): replace file-tail with WebSocket Channel 3 (CLI→Daemon) for real-time
+// streaming without polling delay. See docs/architecture.md for Channel 3 spec.
+export function tailLogFile(
+	logFile: string,
+	executionId: string,
+	lastByte: number,
+	onLog: (stepId: string, message: string) => void
+): number {
+	if (!fs.existsSync(logFile)) return lastByte;
+
+	const stat = fs.statSync(logFile);
+	if (stat.size <= lastByte) return lastByte;
+
+	const buf = Buffer.alloc(stat.size - lastByte);
+	const fd = fs.openSync(logFile, 'r');
+	fs.readSync(fd, buf, 0, buf.length, lastByte);
+	fs.closeSync(fd);
+
+	const chunk = buf.toString('utf8');
+	const lines = chunk.split('\n');
+
+	for (const raw of lines) {
+		const trimmed = raw.trim();
+		if (!trimmed) continue;
+		let line: LogLine;
+		try {
+			line = JSON.parse(trimmed) as LogLine;
+		} catch {
+			continue;
+		}
+		const prefix = `[${executionId}|`;
+		if (!line.prefix.startsWith(prefix)) continue;
+		const stepId = line.prefix.slice(prefix.length, -1);
+		if (stepId === '__execution') continue;
+		onLog(stepId, line.message);
+	}
+
+	return stat.size;
+}
+
+async function waitForCompletion(
+	executionId: string,
+	daemonDir: string,
+	timeoutMs: number,
+	onLog?: (stepId: string, message: string) => void
+): Promise<ExecutionState> {
 	const store = new ExecutionStore(path.join(daemonDir, 'executions'));
+	const logFile = path.join(daemonDir, 'logs', `${new Date().toISOString().slice(0, 10)}.ndjson`);
 	const deadline = Date.now() + timeoutMs;
 	let delay = 200;
+	let lastByte = 0;
 	while (Date.now() < deadline) {
+		if (onLog) {
+			lastByte = tailLogFile(logFile, executionId, lastByte, onLog);
+		}
 		// Only read once the file exists — avoids swallowing real I/O errors (disk-full, bad JSON)
 		// by conflating them with the normal "not yet written" case.
 		if (store.exists(executionId)) {
 			const state = store.read(executionId);
-			if (state.status === 'completed' || state.status === 'failed') return state;
+			if (state.status === 'completed' || state.status === 'failed') {
+				if (onLog) tailLogFile(logFile, executionId, lastByte, onLog);
+				return state;
+			}
 		}
 		await new Promise(r => setTimeout(r, delay));
 		delay = Math.min(delay * 1.5, 2000);
@@ -214,7 +274,7 @@ export function registerRunCommand(program: Command): void {
 				if (fs.existsSync(flowFile)) {
 					const secretError = validateSecretInputs(flowFile, inputs);
 					if (secretError) {
-						console.error(`✗ ${secretError}`);
+						console.error(`Error:${secretError}`);
 						process.exit(2);
 					}
 				}
@@ -242,7 +302,7 @@ export function registerRunCommand(program: Command): void {
 					if (options.json && !options.human) {
 						process.stderr.write(JSON.stringify({ code: response.code, message: response.message }) + '\n');
 					} else {
-						console.error(`✗ ${response.message}`);
+						console.error(`Error:${response.message}`);
 					}
 					process.exit(response.code === 'VALIDATION_FAILED' ? 2 : 1);
 				}
@@ -261,14 +321,18 @@ export function registerRunCommand(program: Command): void {
 				// --wait: poll until done
 				const timeoutMs = parseTimeout(options.timeout);
 				const start = Date.now();
+				const logCallback =
+					!options.quiet && !(options.json && !options.human)
+						? (stepId: string, message: string) => process.stdout.write(`[${stepId}] ${message}\n`)
+						: undefined;
 				let finalState: ExecutionState;
 				try {
-					finalState = await waitForCompletion(executionId, daemonDir, timeoutMs);
+					finalState = await waitForCompletion(executionId, daemonDir, timeoutMs, logCallback);
 				} catch (err) {
 					if (options.json && !options.human) {
 						process.stderr.write(JSON.stringify({ error: 'execution_timeout', executionId }) + '\n');
 					} else {
-						console.error('✗ Execution timed out.');
+						console.error('Error:Execution timed out.');
 					}
 					process.exit(124); // timeout exit code
 				}
@@ -284,9 +348,9 @@ export function registerRunCommand(program: Command): void {
 					);
 				} else {
 					if (finalState.status === 'completed') {
-						console.log(`✓ Flow completed in ${durationMs}ms`);
+						console.log(`Flow completed in ${durationMs}ms`);
 					} else {
-						console.error(`✗ Flow failed`);
+						console.error(`Error:Flow failed`);
 						process.exit(1);
 					}
 				}

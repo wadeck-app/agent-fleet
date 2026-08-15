@@ -77,7 +77,9 @@ describe('TemplateValidator', () => {
 			const stepIds = new Set(['greet']);
 			const inputNames = new Set(['username']);
 
-			validator.validateTemplates(flow, stepIds, inputNames);
+			// Disable auto-discovery so undeclared inputs produce UNDEFINED_INPUT errors
+			const strictValidator = new TemplateValidator(issueCollector, false);
+			strictValidator.validateTemplates(flow, stepIds, inputNames);
 
 			expect(issueCollector.issues).toHaveLength(1);
 			expect(issueCollector.issues[0].code).toBe(ValidationCode.UNDEFINED_INPUT);
@@ -100,6 +102,7 @@ describe('TemplateValidator', () => {
 						type: 'model',
 						model: 'sonnet',
 						prompt: 'First step',
+						output: { result: { type: 'string' } },
 					},
 					{
 						id: 'step2',

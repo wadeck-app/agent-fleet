@@ -36,6 +36,9 @@ export interface TemplateContext {
 	/** Claude environment variables */
 	claudeEnv?: Record<string, string>;
 
+	/** Execution context variables (e.g. cwd) accessible via ${{ context.* }} */
+	context?: Record<string, string>;
+
 	/** Callback when Claude process starts */
 	onClaudeProcessStarted?: (process: any) => void;
 }
@@ -132,9 +135,16 @@ export class TemplateRenderer {
 			}
 			const path = parts.slice(1);
 			return this.resolveNested(context.taskMetadata, path, expression);
+		} else if (root === 'context') {
+			// ${{ context.cwd }} or other execution context values
+			if (parts.length < 2) {
+				throw new TemplateRenderError('context requires a property: context.cwd', expression, root);
+			}
+			const path = parts.slice(1);
+			return this.resolveNested(context.context ?? {}, path, expression);
 		} else {
 			throw new TemplateRenderError(
-				`Unknown root context: '${root}'. Use 'inputs', 'steps', or 'task'`,
+				`Unknown root context: '${root}'. Use 'inputs', 'steps', 'task', or 'context'`,
 				expression,
 				root
 			);
