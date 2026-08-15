@@ -1,8 +1,12 @@
 # Lessons learned
 
-<!-- Last updated: 2026-08-09T00:18:40.057Z -->
+<!-- Last updated: 2026-08-15T16:26:38.926Z -->
 
 ## Recurring feedback
+
+<!-- session 0b3d4416 2026-06-19 -->
+- User explicitly corrected emoji/unicode in code — cites CLAUDE.md rule "avoid all emojis or special unicode please". Removed all ✅🔲📋✦❓ from plan file after user reminder.
+- Subprocess skill invocation had a warning ("NOT YET KNOWN"). May need ToolSearch to load subprocess schema first before calling via Skill, or skill definition needs verification.
 
 <!-- session 44b25955 2026-08-09 -->
 
@@ -112,6 +116,10 @@
 - Multiple independent agents (Explore, general-purpose) read identical spec files sequentially without coordination, causing redundant I/O. Agents should receive shared context or hand off findings rather than re-audit.
 
 ## Agent errors
+
+<!-- session 0b3d4416 2026-06-19 -->
+- GenerateCommand model parameter unsafely cast to union without validation — `as "gpt-4-turbo" | ...` silently accepts any string. Should validate before cast.
+- Package exports configuration: tried adding "exports" field to flow-engine/package.json, then reverted to only "main". Unclear strategy for module resolution in this monorepo—should clarify with existing packages or docs.
 
 <!-- session 44b25955 2026-08-09 -->
 
@@ -249,6 +257,10 @@
 
 ## Documentation gaps
 
+<!-- session 0b3d4416 2026-06-19 -->
+- Mock ESM import patterns unclear — multiple attempts to fix mockImplementation/mockReturnValue in vitest tests before settling on correct pattern. Project lacks clear examples for mocking flow-engine exports.
+- Flow skill definition (flow/SKILL.md) required extensive iteration to document generation constraints (model preferences, flow structure rules, output format). This detail wasn't obvious from code alone—consider linking skill docs to architecture docs or constraint definitions.
+
 <!-- session 44b25955 2026-08-09 -->
 
 - Multiple parallel agents (ae2b, a3fe, a359, ac24) independently read the same spec files (specs/2026-07-30-flow-cli/\*) without coordination — no apparent way for agents to share cached reads or coordinate queries
@@ -375,6 +387,12 @@
 - Extensive Grep searches for domain concepts (RE-QUEUED, bufferSpill, reconnectTimeout, idleTimeout, drainTimeout, heartbeat monitoring, etc.) suggest spec lacks clear glossary or index of key terms. Future audits should define these upfront.
 
 ## Known constraints
+
+<!-- session 0b3d4416 2026-06-19 -->
+- flow-cli package NOT included in test-config.js — blocks `run-test` skill, requires manual `npm run test --workspace=flow-cli`. Test infrastructure assumes all packages in specific list.
+- TypeScript path aliases with wildcards (`"flow-engine/*"`) do NOT resolve bare imports (`import from "flow-engine"`). Requires explicit bare-name entry: `"flow-engine": ["../flow-engine/src"]` in tsconfig paths.
+- FlowCliRunner must load both flows.yml (built-in flows) AND flows-custom.yml (generated flows) via FlowRegistry, not just flows.yml.
+- Flow CLI validation requires global npm linking (npm link in flow-cli package, then `flow --version` / `flow show` to verify entire build+link chain works).
 
 <!-- session 44b25955 2026-08-09 -->
 

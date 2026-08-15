@@ -78,8 +78,8 @@ npm run worker:flow
 npm run add-task create "Add user authentication" high
 ```
 
-Web UI: `http://localhost:5173`
-Orchestrator API: `http://localhost:3737`
+Web UI: `http://localhost:5320`
+Web backend API: `http://localhost:3320`
 
 ## Flow CLI (in design)
 

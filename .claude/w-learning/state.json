@@ -363,12 +363,99 @@
     "e26223c5-4bd2-4135-a5b5-82676eba8d23": "skipped:too-short",
     "7f531072-c8e6-4b79-bc06-12941736d3f5": "skipped:too-short",
     "561c8280-4d7b-46f3-a375-a7cc2c9c0beb": "skipped:too-short",
-    "83c965a3-7e99-44b6-a662-3ad0802bb6b1": "skipped:too-short"
+    "83c965a3-7e99-44b6-a662-3ad0802bb6b1": "skipped:too-short",
+    "0b3d4416-9ce9-4434-8e5b-bb17a4e4b31c": {
+      "analyzedAt": "2026-08-15T16:26:38.928Z",
+      "linesAt": 2885,
+      "findings": 10,
+      "subagentsAt": {
+        "agent-a09b48eaf4a8e5a59.jsonl": 117,
+        "agent-a2cbc0c29fd48a123.jsonl": 90,
+        "agent-a321e264e30d04b8a.jsonl": 89,
+        "agent-a34b858eff8825727.jsonl": 51,
+        "agent-a6c804aa9f971d9f4.jsonl": 20,
+        "agent-a7b60143c164565df.jsonl": 46,
+        "agent-a7fe4283349e6e07d.jsonl": 106,
+        "agent-a8792438f5b6d7fbb.jsonl": 8,
+        "agent-ae735298654fb9b89.jsonl": 98
+      },
+      "logLinesAt": {
+        "w-command-log": 228,
+        "w-guardrails": 0
+      }
+    },
+    "1ae6d2e3-289a-435c-a617-82e6e7c6b393": "skipped:too-short",
+    "2865280e-4176-477f-8b43-71ec2541507b": "skipped:too-short",
+    "36b7bcaa-98f7-43ed-b603-6da933e6791b": {
+      "analyzedAt": "2026-08-15T16:26:14.337Z",
+      "linesAt": 23,
+      "findings": 7,
+      "subagentsAt": {
+        "agent-acee7d9307187a232.jsonl": 81
+      },
+      "logLinesAt": {
+        "w-command-log": 228,
+        "w-guardrails": 0
+      }
+    },
+    "37cfd2c5-e769-418c-9de7-8e7591fb2d2b": "skipped:too-short",
+    "3bf08e36-3777-4ad3-8e98-112893ee2349": "skipped:too-short",
+    "4d86f39a-c453-4054-809f-0e85b1d5a775": "skipped:too-short",
+    "5526bd4e-3ea8-4da7-9078-0a17316a6b31": "skipped:too-short",
+    "71d89f2f-3160-40f8-84c8-b9600c370912": "skipped:too-short",
+    "79dc72e9-e6a2-4787-86d2-aa96405aab47": "skipped:too-short",
+    "8f0de2d0-2c96-45b5-917f-d013db32eacb": "skipped:too-short",
+    "a1de39d7-13fe-4d84-8506-14f67da7d60a": "skipped:too-short",
+    "aed75160-931f-4284-8a15-ed52b28debe7": "skipped:too-short",
+    "bc8e2100-e219-48eb-b363-3fb78e4e9e83": {
+      "analyzedAt": "2026-08-15T16:26:19.789Z",
+      "linesAt": 721,
+      "findings": 4,
+      "subagentsAt": {
+        "agent-a02c8f338e7f15a27.jsonl": 71,
+        "agent-a1f1027e38c1e1819.jsonl": 39,
+        "agent-a223b4f1fa4111a5b.jsonl": 9,
+        "agent-a2414e244cde32f5a.jsonl": 30,
+        "agent-a2d748af52fc52128.jsonl": 39,
+        "agent-a38734e5103cef440.jsonl": 87,
+        "agent-a63c13d6b1873330e.jsonl": 28,
+        "agent-a69a6fc5dc8c75220.jsonl": 42,
+        "agent-a8c19e979a9b1b877.jsonl": 22,
+        "agent-a8dd57314ccafe8ed.jsonl": 28,
+        "agent-a8faa107bac016e35.jsonl": 49,
+        "agent-a8ff3628c758d71e6.jsonl": 9,
+        "agent-ac83f90a41bc76656.jsonl": 9,
+        "agent-ad0786d74cab39ede.jsonl": 37,
+        "agent-ad203c596d1bdab47.jsonl": 75,
+        "agent-ad4a0b634af26ae09.jsonl": 44,
+        "agent-ad89919d52aa4be56.jsonl": 49,
+        "agent-ae1409b117a217f15.jsonl": 56,
+        "agent-aeb8915fae7c9e381.jsonl": 49,
+        "agent-af875e644e76fdb18.jsonl": 9,
+        "agent-af9a9eadd4f43636d.jsonl": 44
+      },
+      "logLinesAt": {
+        "w-command-log": 0,
+        "w-guardrails": 0
+      }
+    },
+    "c19c5db3-50de-4e26-a9e2-3a59417336d0": "skipped:too-short",
+    "e2a430f1-1eb4-4d82-8079-f48daa5ebd44": "skipped:too-short",
+    "ef519c74-9371-4780-89e2-4d2db0015fbd": "skipped:too-short",
+    "ab1b13c6-9d55-493d-811d-8f1e0245141e": "skipped:too-short",
+    "16d6632e-81a4-4d6b-b0e7-e064f39a2e12": "skipped:too-short",
+    "5ee75e26-ba77-4a3f-a81a-00a57acc1d1a": "skipped:too-short",
+    "46a0e21c-4a1f-4e88-902b-a6fd5458a88c": "skipped:too-short",
+    "02487d8e-a1d1-420c-aec7-9ffc039fc3bd": "skipped:too-short",
+    "8207e252-062a-40b2-9f05-95e803bd853f": "skipped:too-short",
+    "ef4482c6-3472-401f-a143-004158ef1c95": "skipped:too-short",
+    "aad79fcf-fe41-4bdb-b89e-9701dc1d1845": "skipped:too-short",
+    "fce1ed36-6f7d-4411-9378-396aa073eb8e": "skipped:too-short"
   },
-  "last_consolidation": "2026-07-31T03:12:00.780Z",
+  "last_consolidation": "2026-08-15T16:26:30.411Z",
   "last_analysis_summary": {
-    "sessionId": "44b25955-fc15-4bfd-9c09-8da9c42cdce7",
-    "findings": 15,
-    "at": "2026-08-09T00:18:40.064Z"
+    "sessionId": "0b3d4416-9ce9-4434-8e5b-bb17a4e4b31c",
+    "findings": 10,
+    "at": "2026-08-15T16:26:38.929Z"
   }
 }
