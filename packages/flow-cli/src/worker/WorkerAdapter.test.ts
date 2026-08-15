@@ -52,6 +52,9 @@ describe('WorkerAdapter', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        // mockReset:true in vitest config resets implementations; restore them here.
+        mockMcpStart.mockResolvedValue({ configPath: '/tmp/mcp.json' });
+        mockMcpStop.mockResolvedValue(undefined);
         mockExecuteStep = vi.fn().mockResolvedValue({ outputs: { result: 'ok' } });
         const mockRunner = { executeStep: mockExecuteStep };
         // Factory returns a fresh mock runner for each call

@@ -3,14 +3,18 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { CommandHandler } from './CommandHandler';
 
-const { mockAllocate } = vi.hoisted(() => ({
+const { mockAllocate, hoistedState } = vi.hoisted(() => ({
     mockAllocate: vi.fn().mockResolvedValue({ path: '/tmp/test-workspace' }),
+    // Mutable reference populated by the vi.mock factory; used to restore
+    // os.homedir() after mockReset:true clears the implementation each test.
+    hoistedState: { actualHomedir: '' as string },
 }));
 
 // Wrap node:os so that homedir() is a vi.fn() and can be overridden per-test.
 // vi.spyOn on ESM namespace objects fails with "Cannot redefine property".
 vi.mock('node:os', async (importOriginal) => {
     const actual = await importOriginal() as typeof import('node:os');
+    hoistedState.actualHomedir = actual.homedir();
     return {
         ...actual,
         homedir: vi.fn().mockImplementation(() => actual.homedir()),
@@ -141,6 +145,9 @@ beforeEach(() => {
     daemonDir = path.join(tmpDir, 'daemon');
     fs.mkdirSync(daemonDir, { recursive: true });
     vi.clearAllMocks();
+    // mockReset:true in vitest config resets all implementations; restore them here.
+    vi.mocked(os.homedir).mockReturnValue(hoistedState.actualHomedir);
+    mockAllocate.mockResolvedValue({ path: '/tmp/test-workspace' });
 });
 
 afterEach(() => {
