@@ -1,6 +1,8 @@
 // Domain types shared between Orchestrator and Worker
 import { z } from 'zod';
 
+export { TaskStatus } from 'shared-common/TaskStatus';
+
 // TODO: This is a simplified version. Full FlowMetadata is in flow-engine package
 export interface FlowMetadata {
 	id: string;
@@ -36,23 +38,6 @@ export interface FlowMetadata {
 	trigger?: FlowTrigger;
 }
 
-export enum TaskStatus {
-	BACKLOG = 'backlog',
-	REFINING = 'refining',
-	REFINED = 'refined',
-	PRIORITIZING = 'prioritizing',
-	TODO = 'todo',
-	IN_PROGRESS = 'in_progress',
-	TESTING = 'testing',
-	REVIEW = 'review',
-	REVIEWING = 'reviewing',
-	CHANGES_REQUESTED = 'changes_requested',
-	APPROVED = 'approved',
-	MERGED = 'merged',
-	BLOCKED = 'blocked',
-	CANCELLED = 'cancelled',
-	AWAITING_USER = 'awaiting_user',
-}
 
 export interface Task {
 	id: string;

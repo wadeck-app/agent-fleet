@@ -1,0 +1,13 @@
+{
+  "frameworkVersion": "1.20260714213531.21",
+  "files": {
+    "C:\\Workspace_Tooling\\agent-fleet_cli-v2\\.violations\\config.ts": {
+      "mtimeMs": 1786799275206.8958,
+      "compiledPath": "C:\\Workspace_Tooling\\agent-fleet_cli-v2\\.violations\\.cache\\config.js"
+    },
+    "C:\\Workspace_Tooling\\agent-fleet_cli-v2\\.violations\\rules\\no-raw-err-in-cli.ts": {
+      "mtimeMs": 1786799289454.127,
+      "compiledPath": "C:\\Workspace_Tooling\\agent-fleet_cli-v2\\.violations\\.cache\\rules\\no-raw-err-in-cli.js"
+    }
+  }
+}

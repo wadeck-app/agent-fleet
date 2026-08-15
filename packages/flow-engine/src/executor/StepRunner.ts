@@ -217,6 +217,8 @@ export class StepRunner {
 			env: renderedEnv,
 			streaming: true,
 			stepId: step.id,
+			// StepRunner is invoked by the orchestrator which manages its own env strategy
+			isolateEnv: false,
 		});
 
 		// Populate trace
@@ -287,6 +289,8 @@ export class StepRunner {
 			streamJson: streamJson && !this.config.interactive,
 			verbose: verbose && !this.config.interactive,
 			skipPermissions,
+			// StepRunner is invoked by the orchestrator which manages its own env strategy
+			isolateEnv: false,
 			onStreamEvent: streamEventMapper
 				? (event: import('../processing/StreamJsonParser').StreamJsonEvent) => {
 						const entry = streamEventMapper!.map(event);

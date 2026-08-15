@@ -1,8 +1,8 @@
 {
 	"files": [],
 	"references": [
-		{ "path": "packages/cli" },
 		{ "path": "packages/e2e-web" },
+		{ "path": "packages/flow-cli" },
 		{ "path": "packages/flow-engine" },
 		{ "path": "packages/orchestrator" },
 		{ "path": "packages/shared-common" },

@@ -5942,3 +5942,42 @@ with the expected content (not just the event type — also the message/detail).
 Applying `gap-1` may be too tight depending on context. Apply the fix, then screenshot and compare
 against other similar instances in the app (e.g., the status select in layout B or D sidebar).
 Gap should feel natural — adjacent but with breathing room (`gap-2` is often more appropriate).
+
+## Security findings must not be esquivé — 2026-08-15
+
+Each security finding requires: (1) risk analysis with concrete threat scenario, (2) cost analysis (technical + UX impact of fixing), (3) concrete proposals with pros/cons, (4) explicit recommendation.
+
+Saying "documented v1 limitation" is not a substitute for analysis. A deferred fix still needs: why deferred, what is the residual risk, what is the detection/mitigation in place, when should it be revisited.
+
+Findings that touch user-facing logs, env vars, or auth must be treated as HIGH priority regardless of whether they are "local tool". Local tools become CI tools, shared runners, and Docker containers — the threat model changes without the code changing.
+
+Specific rules going forward:
+- Never skip a finding with just "v1 decision". Always ask: what is the blast radius if exploited?
+- process.env forwarding to subprocesses = always flag as HIGH if it includes credentials
+- User-visible error messages must never contain path information, env var names, or internal state
+- Log sensitivity must be explicit: user-facing stderr = human-friendly only, file logs = full technical detail
+- Design decisions (like LogMasker threshold) must be recorded in threat model, not just in code comments
+
+## process.env to subprocesses — opt-out not opt-in — 2026-08-15
+
+When adding env isolation to subprocess spawning, default to SECURE (isolate) and require explicit opt-out for legacy/permissive behavior. Do NOT default to the insecure behavior and require opt-in for security.
+
+Rationale: if the codebase is not in production yet and no flows exist, there is no cost to breaking the insecure default. Once in production, changing defaults becomes painful. Fix it now.
+
+Pattern: `isolateEnv?: boolean = true` — callers that need full env must explicitly pass `isolateEnv: false`.
+
+Applied to: ScriptExecutor.ts (flow-engine), ClaudeLauncher.ts (flow-engine), WorkerPool.ts (flow-cli).
+
+## Security proposals must present multiple options — 2026-08-15
+
+Never present a single option for a security decision. Always analyse at least 3 options with pros/cons before recommending. The user must be able to choose. "One option" proposals are lazy and remove decision agency.
+
+## Threat model before solutions — 2026-08-15
+
+Always build the threat model (who are the actors, what can they actually do, what does the fix actually prevent) BEFORE proposing solutions. A solution that doesn't address the actual threat is not a solution.
+
+Proven by: WebSocket auth analysis — the "fix" (random token) would not have protected against the primary threat actor (same-user process). The threat model revealed there was nothing to implement.
+
+## Messages must be self-contained — 2026-08-15
+
+Never use abbreviations (L1/L2/L3, etc.) that were defined in a previous message. Every message with a decision request must be readable standalone. Repeating 3 lines of context is cheaper than forcing the reader to scroll.
