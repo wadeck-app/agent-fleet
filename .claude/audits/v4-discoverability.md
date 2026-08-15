@@ -12,9 +12,11 @@ Audited: Protocol.ts, CommandHandler.ts, StepQueue.ts, WorkerPool.ts, WorkerAdap
 ## New observations
 
 ### CommandHandler.dispatchHook signature change
+
 `dispatchHook(executionId, event, payload)` — new first parameter makes call sites clearer (callers now explicitly pass the execution scope). Positive change from this iteration.
 
 ### removeExecutionHooks is a new public method
+
 `CommandHandler.removeExecutionHooks(executionId)` is called in Daemon.ts at execution completion/failure. Naming is clear and the method's purpose is obvious. No issues.
 
 ## Remaining issues (unchanged from V3)

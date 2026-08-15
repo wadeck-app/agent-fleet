@@ -3,15 +3,18 @@
 ## Findings
 
 ### Security: 0 HIGH, 1 MED, 1 LOW
+
 - **MED S5**: LogMasker `< 4` threshold — intentional anti-false-positive (documented, NOT fixed per loop instructions)
 - **LOW S8**: `String(chunk)` explicit encoding → FIXED
 
 ### Quality: 0 HIGH, 2 MED, 1 LOW
+
 - **MED M2**: Duplicate validation logic (CommandHandler vs FlowValidator CLI) — deferred
 - **MED M3**: HookDispatcher mutable state per-run — deferred (complex refactor)
 - **LOW M4**: StepRunner `any` cast — blocked on flow-engine API
 
 ### Maintenance: 2 HIGH, 4 MED, 2 LOW
+
 - **HIGH H2**: HookDispatcher mutable state → deferred (same as quality M3)
 - **HIGH H4**: God closure — structural debt, deferred
 - **MED M3**: Worker.ts JSON parse silent → FIXED (logs to stderr)
@@ -22,9 +25,11 @@
 - **LOW L5**: ExecutionStore readdirSync not wrapped → FIXED
 
 ### Discoverability: 0 HIGH, 5 MED, 3 LOW
+
 - All renaming/doc suggestions — deferred
 
 ### Readability: 3 HIGH, 4 MED, 3 LOW
+
 - **HIGH #1**: StepQueue silent return → FIXED (stderr log + throw)
 - **HIGH #2**: Bare catch in polling loop — deferred (needs ExecutionStore.exists())
 - **HIGH #3**: `trace.outputs ?? {}` — intentional per flow-engine contract, comment added in plan
@@ -65,6 +70,7 @@
 ## Decision: CONTINUE → Iteration 4
 
 Rationale: Two HIGH findings remain unfixed:
+
 - HookDispatcher mutable state (Quality M3 / Maintenance H2): can misdirect hooks under concurrency > 1
 - Readability #2 (bare catch in polling loop): swallows real I/O errors
 - Readability #3 (trace.outputs ?? {}): needs comment or throw to clarify intent

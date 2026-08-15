@@ -7,39 +7,40 @@ Three scenarios form a complete end-to-end flow validatable without real infrast
 ```yaml
 id: deploy-flow
 inputs:
-  - name: branch
-    required: true
+    - name: branch
+      required: true
 
 steps:
-  - id: run-tests
-    script: npm test -- --coverage --reporter=json
-    produces:
-      - attestation: tests-passed
-        from: exit-code
-      - attestation: coverage-report
-        from: { file: coverage/report.json, format: jest }
-        failIfAbsent: false
+    - id: run-tests
+      script: npm test -- --coverage --reporter=json
+      produces:
+          - attestation: tests-passed
+            from: exit-code
+          - attestation: coverage-report
+            from: { file: coverage/report.json, format: jest }
+            failIfAbsent: false
 
-  - id: dummy-deploy
-    script: |
-      if [ -z "$PROD_API_KEY" ]; then exit 1; fi
-      echo "OK"
-    zone: production
-    depends: [run-tests]
-    env:
-      PROD_API_KEY: ${{ secrets.PROD_API_KEY }}
+    - id: dummy-deploy
+      script: |
+          if [ -z "$PROD_API_KEY" ]; then exit 1; fi
+          echo "OK"
+      zone: production
+      depends: [run-tests]
+      env:
+          PROD_API_KEY: ${{ secrets.PROD_API_KEY }}
 ```
 
 Scope config (`<project-root>/.flows/zones.yml`):
+
 ```yaml
 secrets:
-  - id: PROD_API_KEY
-    zone: production
+    - id: PROD_API_KEY
+      zone: production
 
 zones:
-  production:
-    requires:
-      - attestation: tests-passed
+    production:
+        requires:
+            - attestation: tests-passed
 ```
 
 ---
@@ -50,9 +51,9 @@ zones:
 
 ```yaml
 steps:
-  - id: dummy-deploy
-    script: ./deploy.sh
-    zone: staging   # not defined in scope config
+    - id: dummy-deploy
+      script: ./deploy.sh
+      zone: staging # not defined in scope config
 ```
 
 **Expected:** Static validation error at load time. The engine refuses to start the execution.
@@ -67,11 +68,11 @@ steps:
 
 ```yaml
 steps:
-  - id: bad-step
-    script: echo $PROD_API_KEY
-    env:
-      PROD_API_KEY: ${{ secrets.PROD_API_KEY }}
-    # no zone declared
+    - id: bad-step
+      script: echo $PROD_API_KEY
+      env:
+          PROD_API_KEY: ${{ secrets.PROD_API_KEY }}
+      # no zone declared
 ```
 
 **Expected:** Static validation error at load time.
@@ -97,6 +98,7 @@ Log line NOT emitted: `[abc1|__zone] production ACTIVE`
 **Setup:** Run the full flow with `run-tests` succeeding.
 
 **Expected:**
+
 1. `run-tests` completes with exit code 0
 2. Attestation file created: `~/.flow-daemon/attestations/abc1-tests-passed.json`
 3. Engine detects all required attestations for zone `production` are satisfied

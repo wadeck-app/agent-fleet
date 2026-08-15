@@ -19,7 +19,9 @@ export function loadYaml(file: string): unknown {
 			process.exit(1);
 		}
 		if (typeof raw !== 'object' || Array.isArray(raw)) {
-			console.error(`Invalid flow: expected a YAML object, got ${Array.isArray(raw) ? 'array' : typeof raw} in ${file}`);
+			console.error(
+				`Invalid flow: expected a YAML object, got ${Array.isArray(raw) ? 'array' : typeof raw} in ${file}`
+			);
 			process.exit(1);
 		}
 		return raw;

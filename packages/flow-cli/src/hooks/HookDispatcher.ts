@@ -104,7 +104,7 @@ export class HookDispatcher {
 		const env: Record<string, string> = {
 			...baseEnv,
 			...payloadEnv,
-			...(hook.env ?? {}),  // explicit hook-declared vars — highest priority
+			...(hook.env ?? {}), // explicit hook-declared vars — highest priority
 		};
 
 		return execFileAsync(hook.command, hook.args, { env, timeout: 10_000 }).then(() => undefined);

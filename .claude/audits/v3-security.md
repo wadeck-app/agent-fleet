@@ -22,7 +22,7 @@ Audited: Secret.ts, SecretProvider.ts, LogMasker.ts, CommandHandler.ts, McpServe
 
 ## HIGH
 
-*(none new — S1/S2/S3 are documented intentional; S4/S6 fixed)*
+_(none new — S1/S2/S3 are documented intentional; S4/S6 fixed)_
 
 ---
 
@@ -34,7 +34,7 @@ Audited: Secret.ts, SecretProvider.ts, LogMasker.ts, CommandHandler.ts, McpServe
 
 `register()` iterates all encoding variants and skips any whose `length < 4`. The first variant returned by `buildVariants` is the raw `value` (plaintext). If `value.length < 4` (e.g. a 3-character PIN), the plaintext variant is skipped entirely, meaning the secret appears unredacted in logs.
 
-The `< 4` heuristic is appropriate for *derived encoding variants* (short base64/hex fragments cause false positives), but must NOT apply to the plaintext itself — the plaintext must always be registered if non-empty.
+The `< 4` heuristic is appropriate for _derived encoding variants_ (short base64/hex fragments cause false positives), but must NOT apply to the plaintext itself — the plaintext must always be registered if non-empty.
 
 **Fix:** Track the index: always register `variants[0]` (plaintext) if non-empty, apply the `< 4` filter only to `variants[1:]` (derived encodings).
 

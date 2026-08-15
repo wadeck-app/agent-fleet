@@ -50,14 +50,14 @@ export class WorkerPool {
 				// HOME: needed by many tools and claude config lookup
 				...(process.env['HOME'] ? { HOME: process.env['HOME'] } : {}),
 				// ANTHROPIC_API_KEY: required for model steps — passed explicitly, not via spread
-				...(process.env['ANTHROPIC_API_KEY']
-					? { ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'] }
-					: {}),
+				...(process.env['ANTHROPIC_API_KEY'] ? { ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'] } : {}),
 				// Windows-specific vars required for subprocess and temp file resolution
 				...(process.platform === 'win32' && process.env['SystemRoot']
-					? { SystemRoot: process.env['SystemRoot'] } : {}),
+					? { SystemRoot: process.env['SystemRoot'] }
+					: {}),
 				...(process.platform === 'win32' && process.env['USERPROFILE']
-					? { USERPROFILE: process.env['USERPROFILE'] } : {}),
+					? { USERPROFILE: process.env['USERPROFILE'] }
+					: {}),
 				...(process.env['TEMP'] ? { TEMP: process.env['TEMP'] } : {}),
 				...(process.env['TMP'] ? { TMP: process.env['TMP'] } : {}),
 			},
@@ -78,7 +78,9 @@ export class WorkerPool {
 		const connectTimeout = setTimeout(() => {
 			this.pendingConnectTimeouts.delete(pid);
 			if (!child.killed) {
-				process.stderr.write(`[worker] pid ${String(pid)} did not connect within ${WORKER_CONNECT_TIMEOUT_MS}ms — killing\n`);
+				process.stderr.write(
+					`[worker] pid ${String(pid)} did not connect within ${WORKER_CONNECT_TIMEOUT_MS}ms — killing\n`
+				);
 				child.kill('SIGKILL');
 			}
 		}, WORKER_CONNECT_TIMEOUT_MS);

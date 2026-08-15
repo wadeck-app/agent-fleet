@@ -26,13 +26,13 @@ ValueProvider (interface)
 
 ## URI schemes
 
-| Scheme | Allowed in vars: | Allowed in secrets: | Notes |
-|---|---|---|---|
-| `env://NAME` | yes | yes | Reads from worker process env at resolve time |
-| `file://./rel/path` | yes | yes | Relative to workspace dir — validated |
-| `file:///abs/path` | yes | yes | Absolute — warning or error (configurable) |
-| `value://literal` | yes | NO | Plaintext in YAML — vars only; warns if file is tracked by git |
-| `input://name` | yes | yes | Reads from flow inputs passed at invocation time |
+| Scheme              | Allowed in vars: | Allowed in secrets: | Notes                                                          |
+| ------------------- | ---------------- | ------------------- | -------------------------------------------------------------- |
+| `env://NAME`        | yes              | yes                 | Reads from worker process env at resolve time                  |
+| `file://./rel/path` | yes              | yes                 | Relative to workspace dir — validated                          |
+| `file:///abs/path`  | yes              | yes                 | Absolute — warning or error (configurable)                     |
+| `value://literal`   | yes              | NO                  | Plaintext in YAML — vars only; warns if file is tracked by git |
+| `input://name`      | yes              | yes                 | Reads from flow inputs passed at invocation time               |
 
 `cmd://` is NOT a supported scheme (removed — shell injection surface, no safe parsing).
 
@@ -42,12 +42,22 @@ Resolved secret values are wrapped in a `Secret` type immediately after resoluti
 
 ```typescript
 class Secret {
-  readonly #value: string;
-  constructor(value: string) { this.#value = value; }
-  use(): string { return this.#value; }          // only call site: subprocess spawn
-  toString(): string { return '[REDACTED]'; }
-  toJSON(): string { return '[REDACTED]'; }
-  [Symbol.for('nodejs.util.inspect.custom')]() { return '[REDACTED]'; }
+	readonly #value: string;
+	constructor(value: string) {
+		this.#value = value;
+	}
+	use(): string {
+		return this.#value;
+	} // only call site: subprocess spawn
+	toString(): string {
+		return '[REDACTED]';
+	}
+	toJSON(): string {
+		return '[REDACTED]';
+	}
+	[Symbol.for('nodejs.util.inspect.custom')]() {
+		return '[REDACTED]';
+	}
 }
 ```
 
@@ -61,12 +71,12 @@ Before any subprocess runs, the worker registers all resolved secret values with
 const raw = Buffer.from(secret.use());
 const b64 = (buf: Buffer) => buf.toString('base64').replace(/=+$/, ''); // strip padding — matches embedded occurrences
 
-masker.register(secret.use());                                                          // raw
-masker.register(b64(raw));                                                              // base64 offset 0
-masker.register(b64(Buffer.concat([Buffer.from([0x00]), raw])).slice(2));               // base64 offset 1 — slice(2) not slice(4)
-masker.register(b64(Buffer.concat([Buffer.from([0x00, 0x00]), raw])).slice(3));         // base64 offset 2 — slice(3) not slice(4)
-masker.register(raw.toString('base64url'));                                             // URL-safe base64 (no padding by spec)
-masker.register(raw.toString('hex'));                                                   // hex
+masker.register(secret.use()); // raw
+masker.register(b64(raw)); // base64 offset 0
+masker.register(b64(Buffer.concat([Buffer.from([0x00]), raw])).slice(2)); // base64 offset 1 — slice(2) not slice(4)
+masker.register(b64(Buffer.concat([Buffer.from([0x00, 0x00]), raw])).slice(3)); // base64 offset 2 — slice(3) not slice(4)
+masker.register(raw.toString('base64url')); // URL-safe base64 (no padding by spec)
+masker.register(raw.toString('hex')); // hex
 ```
 
 **Why no padding:** trailing `=` belongs to the outer encoding when a secret is embedded mid-string. Stripping ensures the masker matches content bytes regardless of context.
@@ -76,10 +86,11 @@ masker.register(raw.toString('hex'));                                           
 **Slice calculation:** offset-1 prepends 1 null byte → `ceil(8/6) = 2` leading base64 chars encode the padding, slice(2) removes them. Offset-2 prepends 2 null bytes → `ceil(16/6) = 3` leading chars, slice(3). Slicing 4 in both cases (prior error) removes a full 3-byte block and cancels the shift entirely.
 
 Masking applies to ALL output paths:
+
 - Claude subprocess stdout/stderr
 - Script subprocess stdout/stderr
 - Worker's own log entries (before WebSocket send)
-- StepOutput before writing to executions/*.json
+- StepOutput before writing to executions/\*.json
 - Any error message that crosses a process or I/O boundary
 
 ## Subprocess env construction
@@ -90,12 +101,12 @@ Steps declare their env explicitly:
 
 ```yaml
 steps:
-  - id: create-pr
-    type: model
-    env:
-      GITHUB_TOKEN: ${{ secrets.github_token }}   # secret mapped to env var
-      NODE_ENV: ${{ vars.NODE_ENV }}              # var mapped to env var
-      CUSTOM: "literal value"                     # inline literal
+    - id: create-pr
+      type: model
+      env:
+          GITHUB_TOKEN: ${{ secrets.github_token }} # secret mapped to env var
+          NODE_ENV: ${{ vars.NODE_ENV }} # var mapped to env var
+          CUSTOM: 'literal value' # inline literal
 ```
 
 The worker constructs `{ GITHUB_TOKEN: secret.use(), NODE_ENV: "production", CUSTOM: "literal value" }` — nothing else. No `PATH`, no `HOME`, no inherited daemon env. If a script needs `PATH`, it must declare it.
@@ -129,6 +140,7 @@ Result: **error** — move to `secrets:` block.
 
 **Pass 2 — Shannon entropy scan (warning):**
 `H = -Σ p(c) × log₂(p(c))`. For values with length ≥ 8:
+
 - Base64 charset entropy > 4.5 → warning
 - Hex charset entropy > 3.5 → warning
 
@@ -144,11 +156,13 @@ Configurable in `~/.flow-config.yaml`:
 
 ```yaml
 secrets:
-  minLength: 8              # default: 8. Secrets shorter than this: masking attempted but warning emitted.
-                            # Industry: GitHub ~4, GitLab 8, CircleCI 4. 8 is the safest default.
-  charset: printable-ascii  # default: printable-ascii (0x20–0x7E, no newlines/control chars)
-                            # strict: alphanumeric-plus (GitLab set: A-Za-z0-9 @ : . ~ = + _ -)
-                            # none: no restriction — warning emitted for values outside printable-ascii
+    minLength:
+        8 # default: 8. Secrets shorter than this: masking attempted but warning emitted.
+        # Industry: GitHub ~4, GitLab 8, CircleCI 4. 8 is the safest default.
+    charset:
+        printable-ascii # default: printable-ascii (0x20–0x7E, no newlines/control chars)
+        # strict: alphanumeric-plus (GitLab set: A-Za-z0-9 @ : . ~ = + _ -)
+        # none: no restriction — warning emitted for values outside printable-ascii
 ```
 
 **Why `minLength: 8`:** short values (≤3 chars) appear naturally in logs, producing false-positive redactions that make output unreadable. 8 chars is the industry-validated threshold.
@@ -163,21 +177,21 @@ In all cases, charset violations at registration time produce **warnings, not er
 
 ## Known residual risks
 
-| Risk | Status | Mitigation |
-|---|---|---|
-| `value://` in secrets | Blocked at validate time | Error, not warning |
-| Absolute `file://` paths | Configurable | `warn` or `error` via `validation.absoluteSecretPath` in `~/.flow-config.yaml` |
-| `file://` path traversal / symlinks | Mitigated | `path.resolve` + `fs.realpath` + workspace prefix check |
-| Claude echoes secret in output | Mitigated | All output masked before storage |
-| Uncaught exception with secret in scope | Mitigated | `Secret` class — `.toString()` returns `[REDACTED]` |
-| git-tracked YAML with `value://` vars | Partial | Warning if workspace is a git repo and file is tracked |
-| base64 byte-shift variants | Mitigated | 3 shifted variants registered (offsets 0/1/2), slice(2)/slice(3) — covers secrets embedded mid-string |
-| `input://` terminal echo | Mitigated | Silent readline (no echo) enforced for input:// in secrets: block |
-| Script temp file with interpolated secret | Mitigated | Secrets forbidden in script text — only env: mapping allowed; enforced at validation |
-| Absolute file:// default | Mitigated | Default is error; warn requires explicit config opt-in |
-| NOTHING default env | By design | Operator must declare PATH and all required vars explicitly; no fallback |
-| Hex-encoded secret in output | Mitigated | Hex variant registered with masker |
-| `vars:` value containing a secret | Mitigated | Entropy scan + prefix scan at validate time; known prefixes → error, high entropy → warning |
-| `charset: none` + multi-line secret | Partial | Masking does NOT work for multi-line values regardless of charset setting — line-based masker cannot match across line boundaries. Warning explicitly states this. |
-| `vars:` resolved values unmasked | Mitigated | `vars:` values sourced via `env://`/`file://`/`input://` are also registered with the masker at worker startup |
-| `input://` secret literal at CLI | Mitigated | CLI rejects literal values for `type: secret` inputs — only URI schemes accepted |
+| Risk                                      | Status                   | Mitigation                                                                                                                                                         |
+| ----------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `value://` in secrets                     | Blocked at validate time | Error, not warning                                                                                                                                                 |
+| Absolute `file://` paths                  | Configurable             | `warn` or `error` via `validation.absoluteSecretPath` in `~/.flow-config.yaml`                                                                                     |
+| `file://` path traversal / symlinks       | Mitigated                | `path.resolve` + `fs.realpath` + workspace prefix check                                                                                                            |
+| Claude echoes secret in output            | Mitigated                | All output masked before storage                                                                                                                                   |
+| Uncaught exception with secret in scope   | Mitigated                | `Secret` class — `.toString()` returns `[REDACTED]`                                                                                                                |
+| git-tracked YAML with `value://` vars     | Partial                  | Warning if workspace is a git repo and file is tracked                                                                                                             |
+| base64 byte-shift variants                | Mitigated                | 3 shifted variants registered (offsets 0/1/2), slice(2)/slice(3) — covers secrets embedded mid-string                                                              |
+| `input://` terminal echo                  | Mitigated                | Silent readline (no echo) enforced for input:// in secrets: block                                                                                                  |
+| Script temp file with interpolated secret | Mitigated                | Secrets forbidden in script text — only env: mapping allowed; enforced at validation                                                                               |
+| Absolute file:// default                  | Mitigated                | Default is error; warn requires explicit config opt-in                                                                                                             |
+| NOTHING default env                       | By design                | Operator must declare PATH and all required vars explicitly; no fallback                                                                                           |
+| Hex-encoded secret in output              | Mitigated                | Hex variant registered with masker                                                                                                                                 |
+| `vars:` value containing a secret         | Mitigated                | Entropy scan + prefix scan at validate time; known prefixes → error, high entropy → warning                                                                        |
+| `charset: none` + multi-line secret       | Partial                  | Masking does NOT work for multi-line values regardless of charset setting — line-based masker cannot match across line boundaries. Warning explicitly states this. |
+| `vars:` resolved values unmasked          | Mitigated                | `vars:` values sourced via `env://`/`file://`/`input://` are also registered with the masker at worker startup                                                     |
+| `input://` secret literal at CLI          | Mitigated                | CLI rejects literal values for `type: secret` inputs — only URI schemes accepted                                                                                   |

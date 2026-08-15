@@ -7,9 +7,11 @@ Audited: Secret.ts, SecretProvider.ts, LogMasker.ts, CommandHandler.ts, McpServe
 ## Status
 
 ### Fixed since V3
+
 - None (S8 String(chunk) was fixed in V3 iteration)
 
 ### Intentional / Documented
+
 - **S1** WebSocket no-auth: v1 loopback, documented
 - **S2** PID self-reported: spawnedPids set mitigates; full OS verification deferred
 - **S3** `...process.env` spread: required for PATH/claude access
@@ -17,6 +19,7 @@ Audited: Secret.ts, SecretProvider.ts, LogMasker.ts, CommandHandler.ts, McpServe
 - **S7** tmpdir 0o600 on Windows: documented limitation
 
 ### Remaining issues
+
 - None actionable for v1 scope
 
 ## Score: 7/10

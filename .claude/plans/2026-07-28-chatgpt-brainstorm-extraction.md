@@ -72,27 +72,32 @@ Tasks, workers, flows (DAG + execution), workspaces, projects, interventions (us
 ### Thematic Iterations
 
 **Iteration 1 — Trusted Steps (governance foundation)**
+
 - Define `TrustedStep` type: source, trust level, modification permissions
 - Allow a flow step to reference a trusted step by ID instead of being defined inline
 - UI: trusted step catalogue per scope (project/workspace)
 - Business value: flows become auditable — "this flow uses only approved steps"
 
 **Iteration 2 — Effect Traceability**
+
 - Every action executed by a step records: what, when, result, who triggered it
 - Link execution traces to flow instances (`flowResult` + `traceChunkStorage` already exist — extend them)
 - Business value: full auditability, rollback possible, production flow debugging
 
 **Iteration 3 — Pull + Push Execution Model**
+
 - Pull: worker polls and picks the next eligible task based on its available flows (partially in place)
 - Push: an incoming event (git push, webhook, timer) triggers a flow without human intervention
 - Business value: real automation — an opened PR triggers a review flow automatically
 
 **Iteration 4 — Minimal Hierarchical Scope**
+
 - Introduce `Organization` and `SubOrg` as containers above `Project`
 - Trusted steps are assigned to a scope and inherited downward
 - Business value: a security team can impose their steps on all projects without touching each flow
 
 **Iteration 5 — Observation Loop (human-gated)**
+
 - Flows can emit `suggestions` (new output type)
 - Suggestions accumulate in a review queue
 - A human validates → the suggestion becomes a flow modification (never automatic)

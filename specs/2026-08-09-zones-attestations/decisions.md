@@ -8,9 +8,9 @@ If `.flows/zones.yml` does not exist and no step declares a zone, the flow runs 
 
 ```yaml
 zones:
-  production:
-    requires:
-      - attestation: tests-passed
+    production:
+        requires:
+            - attestation: tests-passed
 ```
 
 **Why:** Secrets and evidence requirements are governance concerns, not flow concerns. They live in scope config, not in individual flow YAMLs. Keeping secret ownership on the secret (Z5) avoids a redundant dual-declaration that could fall out of sync.
@@ -19,9 +19,9 @@ zones:
 
 ```yaml
 steps:
-  - id: dummy-deploy
-    script: ./deploy.sh
-    zone: production
+    - id: dummy-deploy
+      script: ./deploy.sh
+      zone: production
 ```
 
 **Why:** Explicit per-step declaration is the minimal form. A grouping block syntax (to avoid repetition across multiple steps in the same zone) is deferred to post-V1.
@@ -31,9 +31,11 @@ steps:
 A zone becomes active when all its required attestations are present in the execution state. No explicit zone-entry step required — a zone-entry step type was evaluated and rejected as unnecessary noise in the flow graph.
 
 The engine evaluates zone readiness after each step completion. When all required attestations for a zone are satisfied, the engine emits a structured log line:
+
 ```
 [executionId|__zone] production ACTIVE
 ```
+
 Zone-gated steps become eligible for the ready-step pool at this point.
 
 **Why:** Automatic activation is consistent with the dependency model — the engine already tracks what has completed after each step. The log line makes the transition observable without adding noise to the flow graph.
@@ -53,8 +55,8 @@ Secrets are declared in a catalogue per scope with an associated zone:
 
 ```yaml
 secrets:
-  - id: PROD_API_KEY
-    zone: production
+    - id: PROD_API_KEY
+      zone: production
 ```
 
 A step outside zone `production` that references `PROD_API_KEY` → static validation error at load time. The engine never injects a secret into a context where the active zone does not match.
@@ -69,14 +71,15 @@ A step produces no attestation by default. Attestations are declared explicitly 
 - id: run-tests
   script: npm test -- --coverage --reporter=json
   produces:
-    - attestation: tests-passed
-      from: exit-code
-    - attestation: coverage-report
-      from: { file: coverage/report.json, format: jest }
-      failIfAbsent: false  # optional attestation — default is true
+      - attestation: tests-passed
+        from: exit-code
+      - attestation: coverage-report
+        from: { file: coverage/report.json, format: jest }
+        failIfAbsent: false # optional attestation — default is true
 ```
 
 **Valid sources in V1:**
+
 - `from: exit-code` — exit code 0 produces the attestation. `failIfAbsent` does not apply.
 - `from: { file: <path>, format: <jest|junit|raw> }` — file must exist and be parseable. `raw`: file presence alone is sufficient, no parsing.
 
@@ -91,7 +94,7 @@ A step produces no attestation by default. Attestations are declared explicitly 
 
 The engine validates structure only: exit-code value, file existence and parseability, format validity.
 
-What an attestation *means* — "real tests ran", "nothing was skipped", "coverage is genuine" — is a contract between the step author and the trust authority that certifies the step. This is a business concern, not an engine concern. Trust is relative and scoped (org/sub-org/project) — not a global binary — and semantic validation responsibility follows the trust authority's scope.
+What an attestation _means_ — "real tests ran", "nothing was skipped", "coverage is genuine" — is a contract between the step author and the trust authority that certifies the step. This is a business concern, not an engine concern. Trust is relative and scoped (org/sub-org/project) — not a global binary — and semantic validation responsibility follows the trust authority's scope.
 
 **Why:** The engine has no way to verify intent. A non-trusted step can produce a `tests-passed` attestation from `exit-code` and return 0 without running a single test. Trusted steps (post-V1) exist precisely to provide a guarantee on the semantic contract. The distinction between structural and semantic validation is intentional and permanent.
 
@@ -104,16 +107,17 @@ What an attestation *means* — "real tests ran", "nothing was skipped", "covera
 ```
 
 File structure:
+
 ```json
 {
-  "signature": null,
-  "attestation": {
-    "id": "tests-passed",
-    "executionId": "abc1",
-    "stepId": "run-tests",
-    "issuedAt": "2026-08-09T00:03:00Z",
-    "claims": { "exitCode": 0 }
-  }
+	"signature": null,
+	"attestation": {
+		"id": "tests-passed",
+		"executionId": "abc1",
+		"stepId": "run-tests",
+		"issuedAt": "2026-08-09T00:03:00Z",
+		"claims": { "exitCode": 0 }
+	}
 }
 ```
 

@@ -1,11 +1,12 @@
 #!/usr/bin/env node
+
 /**
  * Builds the Go launcher binaries for flow-cli using the SDK build.sh script.
  * Usage: node scripts/build-launcher.mjs
  */
 import { execFileSync } from 'node:child_process';
-import { createRequire } from 'node:module';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,15 +18,15 @@ const require = createRequire(import.meta.url);
 const sdkPkg = require.resolve('@wadeck/singleton-daemon-kit/package.json');
 const SDK_DIR = path.dirname(sdkPkg);
 const BUILD_SH = path.join(SDK_DIR, 'go-launcher', 'build.sh');
-const CONFIG   = path.join(PACKAGE_DIR, 'launcher.config.json');
-const OUT_DIR  = path.join(PACKAGE_DIR, 'launcher-go', 'dist');
+const CONFIG = path.join(PACKAGE_DIR, 'launcher.config.json');
+const OUT_DIR = path.join(PACKAGE_DIR, 'launcher-go', 'dist');
 
 if (!fs.existsSync(BUILD_SH)) {
-  console.error(`build.sh not found at ${BUILD_SH}`);
-  process.exit(1);
+	console.error(`build.sh not found at ${BUILD_SH}`);
+	process.exit(1);
 }
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
-const toUnix = (p) => p.replace(/\\/g, '/');
+const toUnix = p => p.replace(/\\/g, '/');
 execFileSync('bash', [toUnix(BUILD_SH), toUnix(CONFIG), toUnix(OUT_DIR)], { stdio: 'inherit' });

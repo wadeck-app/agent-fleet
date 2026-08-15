@@ -18,10 +18,10 @@ new FlowCliRunner(projectRoot: string)
 
 ```ts
 interface RunOptions {
-  flowRef: string;          // file path or flow ID
-  flowsFile?: string;       // unused — loadProjectFlows() uses fixed paths
-  inputs?: Record<string, string>;  // default: {}
-  cwd?: string;             // default: process.cwd()
+	flowRef: string; // file path or flow ID
+	flowsFile?: string; // unused — loadProjectFlows() uses fixed paths
+	inputs?: Record<string, string>; // default: {}
+	cwd?: string; // default: process.cwd()
 }
 ```
 

@@ -14,7 +14,7 @@ Audited: Protocol.ts, CommandHandler.ts, StepQueue.ts, WorkerPool.ts, WorkerAdap
 
 ## HIGH
 
-*(none — H2 fixed, H1/H3/H4/H5 are naming/doc issues, elevated to context below)*
+_(none — H2 fixed, H1/H3/H4/H5 are naming/doc issues, elevated to context below)_
 
 ---
 

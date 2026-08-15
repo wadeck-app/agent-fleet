@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { createRequire } from 'module';
 import { Command } from 'commander';
+import { createRequire } from 'module';
 
 import { registerDocsCommand } from './commands/DocsCommand';
 import { registerRunCommand } from './commands/RunCommand';

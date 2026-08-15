@@ -1,8 +1,8 @@
 // CLI-specific flow file validator. Wraps the flow-engine FlowValidator with
 // file I/O, YAML parsing, and CLI-friendly exit codes.
-import type { FlowDefinition } from 'flow-engine/types';
 import { FlowValidator as EngineFlowValidator, ValidationCode } from 'flow-engine';
 import type { ValidationIssue } from 'flow-engine';
+import type { FlowDefinition } from 'flow-engine/types';
 import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
 
@@ -37,7 +37,13 @@ export function validateFlowFile(filePath: string): ValidateResult {
 		if (raw === null || raw === undefined || typeof raw !== 'object' || Array.isArray(raw)) {
 			return {
 				exit: 3,
-				errors: [{ type: 'parse_error', message: `Invalid YAML: expected an object, got ${Array.isArray(raw) ? 'array' : typeof raw}`, path: '' }],
+				errors: [
+					{
+						type: 'parse_error',
+						message: `Invalid YAML: expected an object, got ${Array.isArray(raw) ? 'array' : typeof raw}`,
+						path: '',
+					},
+				],
 			};
 		}
 		flow = raw as FlowDefinition;

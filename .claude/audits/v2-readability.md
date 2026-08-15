@@ -20,6 +20,7 @@ if (!entry) return;   // silent, hides contract violations
 A missing entry means the caller passed a stale or wrong `executionId` — a bug, not a normal path. Per project standard, this must throw.
 
 **Fix:**
+
 ```ts
 const entry = this.executions.get(executionId);
 if (!entry) throw new Error(`No execution entry for id: ${executionId}`);
@@ -126,10 +127,10 @@ await this.stepRunner.executeStep(step as unknown as ScriptFlowStep, ...)
 
 ```ts
 const isEntryPoint =
-    process.argv[1] !== undefined &&
-    (process.argv[1] === fileURLToPath(import.meta.url) ||
-        process.argv[1].endsWith('TaskIndex.js') ||
-        process.argv[1].endsWith('TaskIndex.ts'));
+	process.argv[1] !== undefined &&
+	(process.argv[1] === fileURLToPath(import.meta.url) ||
+		process.argv[1].endsWith('TaskIndex.js') ||
+		process.argv[1].endsWith('TaskIndex.ts'));
 ```
 
 The `fileURLToPath` comparison should be sufficient. The `.endsWith` fallbacks are a workaround for an undocumented tooling scenario. They will false-positive for any file named `TaskIndex.ts` in an unrelated package.
@@ -151,9 +152,10 @@ const COL_DEPENDS = Math.min(36, Math.max(7, ...steps.map((s: FlowStep) => stepD
 Three one-liners with identical `Math.min(cap, Math.max(min, ...spread)) + padding` structure. The nesting makes the shared pattern invisible.
 
 **Fix:**
+
 ```ts
 function clampedWidth(values: number[], min: number, max: number, padding = 2): number {
-    return Math.min(max, Math.max(min, ...values)) + padding;
+	return Math.min(max, Math.max(min, ...values)) + padding;
 }
 ```
 
@@ -231,24 +233,24 @@ The type is asserted without runtime validation. A malformed config silently pro
 
 ## Summary table
 
-| # | Severity | File | Line | Category |
-|---|----------|------|------|----------|
-| 1 | HIGH | StepQueue.ts | 109, 135, 152 | Silent suppression |
-| 2 | HIGH | RunCommand.ts | 35 | Silent suppression |
-| 3 | HIGH | WorkerAdapter.ts | 65, 72 | Silent fallback |
-| 4 | HIGH | CommandHandler.ts | 101-108 | Wrong execution order |
-| 5 | MEDIUM | RunCommand.ts | 138, 149, 164, 173 | Repeated condition |
-| 6 | MEDIUM | RunCommand.ts | 82-187 | Oversized inline callback |
-| 7 | MEDIUM | WorkerAdapter.ts | 54-61 | as any / fragile internals |
-| 8 | MEDIUM | WorkerAdapter.ts | 64, 71 | Type escape hatch |
-| 9 | MEDIUM | TaskIndex.ts | 181-185 | Brittle heuristic |
-| 10 | MEDIUM | ShowCommand.ts | 146-148 | Unreadable nested expression |
-| 11 | MEDIUM | CommandHandler.ts, FlowValidator.ts | 61, 55 | Explicit undefined arg |
-| 12 | MEDIUM | FlowValidator.ts | 1 | Naming convention violation |
-| 13 | LOW | loadYaml.ts | 1 | Inconsistent import prefix |
-| 14 | LOW | RunCommand.ts | 57-68 | Redundant factory pattern |
-| 15 | LOW | ValidateCommand.ts | 16 | Silent JSON success |
-| 16 | LOW | TaskIndex.ts | 31 | Unvalidated cast |
+| #   | Severity | File                                | Line               | Category                     |
+| --- | -------- | ----------------------------------- | ------------------ | ---------------------------- |
+| 1   | HIGH     | StepQueue.ts                        | 109, 135, 152      | Silent suppression           |
+| 2   | HIGH     | RunCommand.ts                       | 35                 | Silent suppression           |
+| 3   | HIGH     | WorkerAdapter.ts                    | 65, 72             | Silent fallback              |
+| 4   | HIGH     | CommandHandler.ts                   | 101-108            | Wrong execution order        |
+| 5   | MEDIUM   | RunCommand.ts                       | 138, 149, 164, 173 | Repeated condition           |
+| 6   | MEDIUM   | RunCommand.ts                       | 82-187             | Oversized inline callback    |
+| 7   | MEDIUM   | WorkerAdapter.ts                    | 54-61              | as any / fragile internals   |
+| 8   | MEDIUM   | WorkerAdapter.ts                    | 64, 71             | Type escape hatch            |
+| 9   | MEDIUM   | TaskIndex.ts                        | 181-185            | Brittle heuristic            |
+| 10  | MEDIUM   | ShowCommand.ts                      | 146-148            | Unreadable nested expression |
+| 11  | MEDIUM   | CommandHandler.ts, FlowValidator.ts | 61, 55             | Explicit undefined arg       |
+| 12  | MEDIUM   | FlowValidator.ts                    | 1                  | Naming convention violation  |
+| 13  | LOW      | loadYaml.ts                         | 1                  | Inconsistent import prefix   |
+| 14  | LOW      | RunCommand.ts                       | 57-68              | Redundant factory pattern    |
+| 15  | LOW      | ValidateCommand.ts                  | 16                 | Silent JSON success          |
+| 16  | LOW      | TaskIndex.ts                        | 31                 | Unvalidated cast             |
 
 ---
 

@@ -54,11 +54,11 @@ Files examined: RunCommand.ts, ValidateCommand.ts, CommandHandler.ts, Daemon.ts,
 
 **IMPLEMENTED** (unchanged since V2)
 
-| File | Line | Call |
-|------|------|------|
-| `RunCommand.ts` | 114 | `yaml.load(..., { schema: yaml.JSON_SCHEMA })` |
-| `CommandHandler.ts` | 50 | `yaml.load(content, { schema: yaml.JSON_SCHEMA })` |
-| `Daemon.ts` | 21 | `yaml.load(..., { schema: yaml.JSON_SCHEMA })` |
+| File                | Line | Call                                               |
+| ------------------- | ---- | -------------------------------------------------- |
+| `RunCommand.ts`     | 114  | `yaml.load(..., { schema: yaml.JSON_SCHEMA })`     |
+| `CommandHandler.ts` | 50   | `yaml.load(content, { schema: yaml.JSON_SCHEMA })` |
+| `Daemon.ts`         | 21   | `yaml.load(..., { schema: yaml.JSON_SCHEMA })`     |
 
 No bare `yaml.load(...)` without schema in audited files.
 
@@ -99,18 +99,18 @@ No bare `yaml.load(...)` without schema in audited files.
 
 ## Summary Table
 
-| Decision | Status | Change from V2 |
-|----------|--------|----------------|
-| D2 async default + --wait | IMPLEMENTED | No change |
-| D3 10m default timeout | IMPLEMENTED | No change |
-| D4 human default, no isTTY | IMPLEMENTED | No change |
-| D5 Commander.js only | IMPLEMENTED | No change |
-| D6 singleton-daemon-kit | IMPLEMENTED | No change |
-| D7 JSON_SCHEMA on all yaml.load | IMPLEMENTED | No change |
-| D8 UNSUPPORTED_STEP_TYPE pre-exec | **FULLY IMPLEMENTED** | **Fixed from PARTIAL** |
-| D12 StepRunner (not StepExecutor) | IMPLEMENTED | No change |
-| D13 WorkspaceManager.allocate() | IMPLEMENTED | No change |
-| D14 types.ts:7 shared-common import | IMPLEMENTED | No change |
+| Decision                            | Status                | Change from V2         |
+| ----------------------------------- | --------------------- | ---------------------- |
+| D2 async default + --wait           | IMPLEMENTED           | No change              |
+| D3 10m default timeout              | IMPLEMENTED           | No change              |
+| D4 human default, no isTTY          | IMPLEMENTED           | No change              |
+| D5 Commander.js only                | IMPLEMENTED           | No change              |
+| D6 singleton-daemon-kit             | IMPLEMENTED           | No change              |
+| D7 JSON_SCHEMA on all yaml.load     | IMPLEMENTED           | No change              |
+| D8 UNSUPPORTED_STEP_TYPE pre-exec   | **FULLY IMPLEMENTED** | **Fixed from PARTIAL** |
+| D12 StepRunner (not StepExecutor)   | IMPLEMENTED           | No change              |
+| D13 WorkspaceManager.allocate()     | IMPLEMENTED           | No change              |
+| D14 types.ts:7 shared-common import | IMPLEMENTED           | No change              |
 
 ## Score: 10/10
 

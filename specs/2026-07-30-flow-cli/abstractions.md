@@ -12,12 +12,13 @@ CLI implementation: throws `UnsupportedOperationError("user_intervention steps a
 
 ```typescript
 interface WorkspaceProvider {
-  prepare(flowDef: FlowDefinition): Promise<string>; // returns workspace directory path
-  cleanup(workspaceDir: string): Promise<void>;
+	prepare(flowDef: FlowDefinition): Promise<string>; // returns workspace directory path
+	cleanup(workspaceDir: string): Promise<void>;
 }
 ```
 
 CLI implementation (`DeclaredWorkspaceProvider`):
+
 - Reads `workspace` field from flow definition or `--workspace` flag
 - If flow declares `mode: isolated` or a git strategy → throws `UnsupportedOperationError`
 - Otherwise returns the declared path as-is
@@ -28,10 +29,10 @@ The full `WorkspaceManager` implementation satisfies this interface for orchestr
 
 ```typescript
 interface ExecutionReporter {
-  onExecutionStarted(executionId: string): void;
-  onLogEntry(executionId: string, entry: LogEntry): void;
-  onExecutionCompleted(executionId: string, result: FlowExecutionResult): void;
-  onExecutionFailed(executionId: string, error: Error): void;
+	onExecutionStarted(executionId: string): void;
+	onLogEntry(executionId: string, entry: LogEntry): void;
+	onExecutionCompleted(executionId: string, result: FlowExecutionResult): void;
+	onExecutionFailed(executionId: string, error: Error): void;
 }
 ```
 

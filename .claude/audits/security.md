@@ -122,22 +122,22 @@
 
 ## Summary Table
 
-| # | Severity | Area | One-liner |
-|---|----------|------|-----------|
-| 1 | CRITICAL | WebSocket | No auth on daemon worker WebSocket |
-| 2 | CRITICAL | WebSocket | PID check uses attacker-controlled value |
-| 3 | HIGH | IPC | Flow file path unrestricted — any file can be run |
-| 4 | HIGH | MCP | Bearer token in URL query string — logged |
-| 5 | HIGH | Process | Workers inherit full daemon env (all secrets) |
-| 6 | MEDIUM | Logging | Short secrets (< 4 chars) silently unmasked |
-| 7 | MEDIUM | Logging | URL-encoded / JSON-escaped secret variants unmasked |
-| 8 | MEDIUM | Storage | Concurrent ExecutionStore writes have no locking |
-| 9 | MEDIUM | MCP | Injected step values (script, workingDir, env) unvalidated |
-| 10 | MEDIUM | MCP | No rate limiting — token holder can flood StepQueue |
-| 11 | MEDIUM | CLI | findProjectRoot traverses to filesystem root |
-| 12 | LOW | WorkerPool | Duplicate markIdle method — compile error |
-| 13 | LOW | Utils | TOCTOU between existsSync and readFileSync in loadYaml |
-| 14 | LOW | MCP | Predictable temp config filename (Date.now suffix) |
+| #   | Severity | Area       | One-liner                                                  |
+| --- | -------- | ---------- | ---------------------------------------------------------- |
+| 1   | CRITICAL | WebSocket  | No auth on daemon worker WebSocket                         |
+| 2   | CRITICAL | WebSocket  | PID check uses attacker-controlled value                   |
+| 3   | HIGH     | IPC        | Flow file path unrestricted — any file can be run          |
+| 4   | HIGH     | MCP        | Bearer token in URL query string — logged                  |
+| 5   | HIGH     | Process    | Workers inherit full daemon env (all secrets)              |
+| 6   | MEDIUM   | Logging    | Short secrets (< 4 chars) silently unmasked                |
+| 7   | MEDIUM   | Logging    | URL-encoded / JSON-escaped secret variants unmasked        |
+| 8   | MEDIUM   | Storage    | Concurrent ExecutionStore writes have no locking           |
+| 9   | MEDIUM   | MCP        | Injected step values (script, workingDir, env) unvalidated |
+| 10  | MEDIUM   | MCP        | No rate limiting — token holder can flood StepQueue        |
+| 11  | MEDIUM   | CLI        | findProjectRoot traverses to filesystem root               |
+| 12  | LOW      | WorkerPool | Duplicate markIdle method — compile error                  |
+| 13  | LOW      | Utils      | TOCTOU between existsSync and readFileSync in loadYaml     |
+| 14  | LOW      | MCP        | Predictable temp config filename (Date.now suffix)         |
 
 ## Score: 4/10
 

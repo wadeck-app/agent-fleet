@@ -38,7 +38,6 @@ export interface FlowMetadata {
 	trigger?: FlowTrigger;
 }
 
-
 export interface Task {
 	id: string;
 	description: string;

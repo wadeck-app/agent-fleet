@@ -55,13 +55,13 @@ The flow CLI manages its own shutdown: when the ready-step queue drains, the com
 
 ```yaml
 queue:
-  concurrency: 1          # max steps executing simultaneously across all flows (D5)
+    concurrency: 1 # max steps executing simultaneously across all flows (D5)
 
 logs:
-  retainDays: 30          # daily log files kept; also controls execution file expiry (D17, D22)
+    retainDays: 30 # daily log files kept; also controls execution file expiry (D17, D22)
 
 worker:
-  reconnectTimeoutMs: 30000   # max time a worker has to reconnect after daemon crash (D24)
-  bufferSpillMs: 15000        # time before in-memory log buffer spills to disk during reconnection (D23)
-  wsPort: <httpPort + 1>      # WebSocket port for worker↔daemon channel (H3); default = HTTP port + 1
+    reconnectTimeoutMs: 30000 # max time a worker has to reconnect after daemon crash (D24)
+    bufferSpillMs: 15000 # time before in-memory log buffer spills to disk during reconnection (D23)
+    wsPort: <httpPort + 1> # WebSocket port for worker↔daemon channel (H3); default = HTTP port + 1
 ```

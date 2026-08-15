@@ -1,12 +1,12 @@
 import { type DaemonHandle, createDaemon } from '@wadeck/singleton-daemon-kit';
+import * as yaml from 'js-yaml';
 import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { WebSocket } from 'ws';
-import * as yaml from 'js-yaml';
 
-import { HookDispatcher, type HookConfig } from '../hooks/HookDispatcher';
+import { type HookConfig, HookDispatcher } from '../hooks/HookDispatcher';
 import type { ClientCommand, WorkerToDaemon } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
@@ -31,7 +31,10 @@ function loadFlowHooks(cwd: string): Record<string, HookConfig[]> {
 	const configPath = path.join(cwd, '.flows', 'config.yml');
 	if (!fs.existsSync(configPath)) return {};
 	try {
-		const raw = yaml.load(fs.readFileSync(configPath, 'utf8'), { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>;
+		const raw = yaml.load(fs.readFileSync(configPath, 'utf8'), { schema: yaml.JSON_SCHEMA }) as Record<
+			string,
+			unknown
+		>;
 		// Top-level hooks: key holds flow lifecycle hooks (onFlowStart, onStepStart, etc.)
 		// tasks.hooks holds task hooks — handled separately in TaskIndex.ts
 		return (raw['hooks'] as Record<string, HookConfig[]> | undefined) ?? {};
@@ -103,8 +106,12 @@ export async function startDaemon(config: FlowConfig = DEFAULT_CONFIG, daemonDir
 				// Pass the same ExecutionStore and LogWriter instances to CommandHandler so that
 				// Daemon and CommandHandler share a single store, avoiding split-write races.
 				commandHandler = new CommandHandler(
-					resolvedDaemonDir, stepQueue, workerPool, undefined,
-					executionStore, logWriter,
+					resolvedDaemonDir,
+					stepQueue,
+					workerPool,
+					undefined,
+					executionStore,
+					logWriter,
 					config.security.allowAbsolutePaths
 				);
 

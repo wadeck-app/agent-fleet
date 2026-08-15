@@ -2,12 +2,12 @@
 
 ## Output format selection
 
-| Condition | Format |
-|---|---|
-| stdout is a TTY | human-readable |
-| stdout is not a TTY | JSON (newline-delimited) |
-| `--json` flag | JSON (forced) |
-| `--quiet` flag | silent (only execution ID printed) |
+| Condition           | Format                             |
+| ------------------- | ---------------------------------- |
+| stdout is a TTY     | human-readable                     |
+| stdout is not a TTY | JSON (newline-delimited)           |
+| `--json` flag       | JSON (forced)                      |
+| `--quiet` flag      | silent (only execution ID printed) |
 
 ## Log line format
 
@@ -38,6 +38,7 @@ Logs are written to disk by the daemon as they arrive from the worker.
 ```
 
 **Rotation policy:**
+
 - Daily files (one file per calendar day)
 - Keep last 30 files (configurable in `~/.flow-config.yaml` -> `logs.retainDays: 30`)
 - Maximum retention: 120 days — fixed safety ceiling, independent of `retainDays`. If `retainDays > 120`, 120 days is enforced.

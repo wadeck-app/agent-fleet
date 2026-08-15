@@ -5952,6 +5952,7 @@ Saying "documented v1 limitation" is not a substitute for analysis. A deferred f
 Findings that touch user-facing logs, env vars, or auth must be treated as HIGH priority regardless of whether they are "local tool". Local tools become CI tools, shared runners, and Docker containers — the threat model changes without the code changing.
 
 Specific rules going forward:
+
 - Never skip a finding with just "v1 decision". Always ask: what is the blast radius if exploited?
 - process.env forwarding to subprocesses = always flag as HIGH if it includes credentials
 - User-visible error messages must never contain path information, env var names, or internal state

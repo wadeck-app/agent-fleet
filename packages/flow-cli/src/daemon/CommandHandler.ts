@@ -1,5 +1,5 @@
-import type { FlowDefinition, FlowStep } from 'flow-engine/types';
 import { FlowValidator, WorkspaceManager } from 'flow-engine';
+import type { FlowDefinition, FlowStep } from 'flow-engine/types';
 import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -31,7 +31,11 @@ export class CommandHandler {
 		this.logWriter = logWriter ?? new LogWriter(path.join(daemonDir, 'logs'));
 	}
 
-	dispatchHook(executionId: string, event: Parameters<HookDispatcher['dispatch']>[0], payload: Record<string, unknown>): void {
+	dispatchHook(
+		executionId: string,
+		event: Parameters<HookDispatcher['dispatch']>[0],
+		payload: Record<string, unknown>
+	): void {
 		const dispatcher = this.executionHooks.get(executionId);
 		void dispatcher?.dispatch(event, payload, err => {
 			this.logWriter.writeExecution('__hook', `Hook '${event}' failed: ${String(err)}`, 'error');
@@ -42,17 +46,17 @@ export class CommandHandler {
 		this.executionHooks.delete(executionId);
 	}
 
-	async handleRun(cmd: Extract<ClientCommand, { type: 'run' }>, hookDispatcher?: HookDispatcher): Promise<DaemonResponse> {
+	async handleRun(
+		cmd: Extract<ClientCommand, { type: 'run' }>,
+		hookDispatcher?: HookDispatcher
+	): Promise<DaemonResponse> {
 		const flowFile = path.isAbsolute(cmd.flowFile) ? cmd.flowFile : path.resolve(cmd.cwd, cmd.flowFile);
 
 		// Path restriction: flow file must be within the project directory or home directory.
 		// Prevents the daemon from being used to read arbitrary filesystem paths.
 		// Override with security.allowAbsolutePaths: true in FlowConfig.
 		if (!this.allowAbsolutePaths) {
-			const allowedRoots = [
-				path.resolve(cmd.cwd),
-				path.resolve(os.homedir()),
-			];
+			const allowedRoots = [path.resolve(cmd.cwd), path.resolve(os.homedir())];
 			// Resolve symlinks before checking containment — prevents symlink escape attacks.
 			// Mirror of SecretProvider.ts:59-71.
 			let realFlowFile: string;
@@ -63,7 +67,11 @@ export class CommandHandler {
 			}
 			const isAllowed = allowedRoots.some(root => {
 				let realRoot: string;
-				try { realRoot = fs.realpathSync(root); } catch { realRoot = root; }
+				try {
+					realRoot = fs.realpathSync(root);
+				} catch {
+					realRoot = root;
+				}
 				const rel = path.relative(realRoot, realFlowFile);
 				return !rel.startsWith('..') && !path.isAbsolute(rel);
 			});
@@ -84,7 +92,11 @@ export class CommandHandler {
 			flow = yaml.load(content, { schema: yaml.JSON_SCHEMA }) as FlowDefinition;
 		} catch (err) {
 			this.logWriter.writeExecution('__parse', `PARSE_ERROR detail: ${String(err)}`, 'error');
-			return { type: 'error', code: 'PARSE_ERROR', message: "Flow file has a YAML syntax error. Run 'flow validate' for details." };
+			return {
+				type: 'error',
+				code: 'PARSE_ERROR',
+				message: "Flow file has a YAML syntax error. Run 'flow validate' for details.",
+			};
 		}
 
 		if (!flow || typeof flow !== 'object') {
@@ -139,7 +151,11 @@ export class CommandHandler {
 			});
 		} catch (err) {
 			this.logWriter.writeExecution('__workspace', `WORKSPACE_ERROR detail: ${String(err)}`, 'error');
-			return { type: 'error', code: 'WORKSPACE_ERROR', message: 'Failed to allocate workspace. Ensure the flow workspace directory is writable.' };
+			return {
+				type: 'error',
+				code: 'WORKSPACE_ERROR',
+				message: 'Failed to allocate workspace. Ensure the flow workspace directory is writable.',
+			};
 		}
 		const workspaceDir = workspace.path;
 

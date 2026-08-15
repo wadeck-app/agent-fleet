@@ -195,18 +195,20 @@ export class ClaudeLauncher {
 			const shouldIsolate = options.isolateEnv !== false; // default true
 			const baseEnvInteractive: NodeJS.ProcessEnv = shouldIsolate
 				? {
-					PATH: process.env['PATH'],
-					HOME: process.env['HOME'],
-					// Claude requires ANTHROPIC_API_KEY — pass it explicitly
-					...(process.env['ANTHROPIC_API_KEY']
-						? { ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'] }
-						: {}),
-					// Windows
-					...(process.platform === 'win32' && process.env['SystemRoot']
-						? { SystemRoot: process.env['SystemRoot'] } : {}),
-					...(process.platform === 'win32' && process.env['USERPROFILE']
-						? { USERPROFILE: process.env['USERPROFILE'] } : {}),
-				}
+						PATH: process.env['PATH'],
+						HOME: process.env['HOME'],
+						// Claude requires ANTHROPIC_API_KEY — pass it explicitly
+						...(process.env['ANTHROPIC_API_KEY']
+							? { ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'] }
+							: {}),
+						// Windows
+						...(process.platform === 'win32' && process.env['SystemRoot']
+							? { SystemRoot: process.env['SystemRoot'] }
+							: {}),
+						...(process.platform === 'win32' && process.env['USERPROFILE']
+							? { USERPROFILE: process.env['USERPROFILE'] }
+							: {}),
+					}
 				: { ...process.env };
 			const rawEnvInteractive = { ...baseEnvInteractive, ...(options.env ?? {}) };
 			const processEnvInteractive: Record<string, string> = {};
@@ -250,18 +252,20 @@ export class ClaudeLauncher {
 			const shouldIsolate = options.isolateEnv !== false; // default true
 			const baseEnvBackground: NodeJS.ProcessEnv = shouldIsolate
 				? {
-					PATH: process.env['PATH'],
-					HOME: process.env['HOME'],
-					// Claude requires ANTHROPIC_API_KEY — pass it explicitly
-					...(process.env['ANTHROPIC_API_KEY']
-						? { ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'] }
-						: {}),
-					// Windows
-					...(process.platform === 'win32' && process.env['SystemRoot']
-						? { SystemRoot: process.env['SystemRoot'] } : {}),
-					...(process.platform === 'win32' && process.env['USERPROFILE']
-						? { USERPROFILE: process.env['USERPROFILE'] } : {}),
-				}
+						PATH: process.env['PATH'],
+						HOME: process.env['HOME'],
+						// Claude requires ANTHROPIC_API_KEY — pass it explicitly
+						...(process.env['ANTHROPIC_API_KEY']
+							? { ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'] }
+							: {}),
+						// Windows
+						...(process.platform === 'win32' && process.env['SystemRoot']
+							? { SystemRoot: process.env['SystemRoot'] }
+							: {}),
+						...(process.platform === 'win32' && process.env['USERPROFILE']
+							? { USERPROFILE: process.env['USERPROFILE'] }
+							: {}),
+					}
 				: { ...process.env };
 			const rawEnvBackground = { ...baseEnvBackground, ...(options.env ?? {}) };
 			const processEnvBackground: Record<string, string> = {};

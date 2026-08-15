@@ -11,12 +11,18 @@ Transport: TCP `127.0.0.1`, plain HTTP/1.1 with JSON bodies. Port discovered fro
 ### CLI → Daemon commands
 
 ```typescript
-type ClientCommand =
-  | { type: 'run'; flowFile: string; flowId?: string; inputs?: Record<string, string>; quiet?: boolean; cwd: string }
-  // cwd: caller's process.cwd() — used by daemon to resolve relative flowFile paths and default workspace
-  // v2 only — not implemented in v1 (crash recovery deferred, D34)
-  // | { type: 'worker-register'; executionId: string; stepId: string; pid: number }
-  // { type: 'stop' } — deferred to v2 (D34)
+type ClientCommand = {
+	type: 'run';
+	flowFile: string;
+	flowId?: string;
+	inputs?: Record<string, string>;
+	quiet?: boolean;
+	cwd: string;
+};
+// cwd: caller's process.cwd() — used by daemon to resolve relative flowFile paths and default workspace
+// v2 only — not implemented in v1 (crash recovery deferred, D34)
+// | { type: 'worker-register'; executionId: string; stepId: string; pid: number }
+// { type: 'stop' } — deferred to v2 (D34)
 ```
 
 **`quiet` field:** client-side only. Controls whether the CLI prints the execution ID to stdout after `flow run`. No server-side effect — the daemon processes the command identically regardless of this flag.
@@ -27,8 +33,8 @@ type ClientCommand =
 
 ```typescript
 type DaemonResponse =
-  | { type: 'execution_started'; executionId: string }
-  | { type: 'error'; message: string; code: string }
+	| { type: 'execution_started'; executionId: string }
+	| { type: 'error'; message: string; code: string };
 ```
 
 **Note:** `attach`, `logs`, and `list` are NOT daemon commands. They are pure file operations (D19, D21) — the CLI reads `~/.flow-daemon/logs/` and `~/.flow-daemon/executions/` directly without contacting the daemon.
@@ -49,23 +55,23 @@ Transport: WebSocket on a separate port from the daemon's HTTP server. Workers c
 
 ```typescript
 type DaemonToWorker =
-  | { type: 'assign'; stepId: string; stepConfig: FlowStep; executionContext: ExecutionContext }
-  // FlowStep = ModelFlowStep | ScriptFlowStep | SubFlowStep from flow-engine/src/types.ts
-  | { type: 'idle' }   // no ready steps right now, worker waits
-  | { type: 'done' }   // no more steps, worker should exit
+	| { type: 'assign'; stepId: string; stepConfig: FlowStep; executionContext: ExecutionContext }
+	// FlowStep = ModelFlowStep | ScriptFlowStep | SubFlowStep from flow-engine/src/types.ts
+	| { type: 'idle' } // no ready steps right now, worker waits
+	| { type: 'done' }; // no more steps, worker should exit
 ```
 
 ### Worker → Daemon messages
 
 ```typescript
 type WorkerToDaemon =
-  | { type: 'ready'; pid: number }   // no executionId — worker is execution-agnostic at spawn (D16)
-  | { type: 'log'; executionId: string; stepId: string; entry: LiveLogEntry }
-  // LiveLogEntry from flow-engine/src/types.ts — NOT LogEntry (that name doesn't exist)
-  | { type: 'step_completed'; executionId: string; stepId: string; output: Record<string, any> }
-  // output: extracted runtime values, e.g. { pr_url: "https://...", branch: "feat/x" }
-  // NOT StepOutput from flow-engine — that is an output schema declaration, not runtime values
-  | { type: 'step_failed'; executionId: string; stepId: string; error: string }
+	| { type: 'ready'; pid: number } // no executionId — worker is execution-agnostic at spawn (D16)
+	| { type: 'log'; executionId: string; stepId: string; entry: LiveLogEntry }
+	// LiveLogEntry from flow-engine/src/types.ts — NOT LogEntry (that name doesn't exist)
+	| { type: 'step_completed'; executionId: string; stepId: string; output: Record<string, any> }
+	// output: extracted runtime values, e.g. { pr_url: "https://...", branch: "feat/x" }
+	// NOT StepOutput from flow-engine — that is an output schema declaration, not runtime values
+	| { type: 'step_failed'; executionId: string; stepId: string; error: string };
 ```
 
 No heartbeat message type — WebSocket connection health is the liveness signal (D3, D23).
@@ -75,9 +81,11 @@ No heartbeat message type — WebSocket connection health is the liveness signal
 ## Shared types
 
 Types from `flow-engine/src/types.ts`:
+
 - `LiveLogEntry` — single log line from a step execution (line 711)
 - `FlowStep` — union `ModelFlowStep | ScriptFlowStep | SubFlowStep` (line 669)
-- `StepOutput` (line 413) is an output *schema* declaration — NOT used in IPC messages
+- `StepOutput` (line 413) is an output _schema_ declaration — NOT used in IPC messages
 
 CLI-specific types (defined in `packages/flow-cli/src/ipc/Protocol.ts`):
+
 - `ExecutionContext` — `{ executionId, inputs, stepOutputs, workspaceDir }` — NOT `FlowExecutionContext` from flow-engine

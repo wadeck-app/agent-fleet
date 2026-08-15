@@ -30,6 +30,7 @@ For `onStepCompleted` and `onStepFailed`, the silent return after execution dele
 For `markStepActive`, the conditional no-op hides cases where `dequeue()` returned a step for a non-existent execution — that would be a programming error.
 
 **Fix:**
+
 - `onStepCompleted`/`onStepFailed`: `if (!entry) { process.stderr.write(...); return; }`
 - `markStepActive`: throw if entry is missing, since callers should only call this after a successful `dequeue()`.
 
@@ -49,6 +50,7 @@ try {
 The comment claims this handles "not ready yet," but `store.read()` throws on JSON parse errors, permission errors, and disk-full conditions — not just missing files. All real errors are silently retried until timeout.
 
 **Fix:** Add an `exists(executionId: string): boolean` method to `ExecutionStore` that checks file existence without parsing. Use it to distinguish "not yet written" from actual errors:
+
 ```ts
 if (!store.exists(executionId)) { await new Promise(r => setTimeout(r, delay)); continue; }
 const state = store.read(executionId);
@@ -69,11 +71,14 @@ If `trace.outputs` is `undefined`, the step returns an empty output map with no 
 The correct behavior depends on whether `trace.outputs === undefined` is a legitimate result from `flow-engine` (e.g. for script steps with no captured output). If it is legitimate, a comment explaining that fact is needed. If it is not legitimate, throw.
 
 **Fix:** Add a comment confirming this is legitimate (or throw with a clear message):
+
 ```ts
 // trace.outputs is undefined for steps with no output capture — empty map is correct
 return (trace.outputs ?? {}) as Record<string, unknown>;
 ```
+
 Or if it should never be undefined:
+
 ```ts
 if (trace.outputs === undefined) throw new Error(`Step ${step.id} produced no output trace`);
 return trace.outputs as Record<string, unknown>;

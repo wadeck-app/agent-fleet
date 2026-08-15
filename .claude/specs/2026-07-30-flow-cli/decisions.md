@@ -15,6 +15,7 @@
 **Context:** `origin/integration` used tsx for development (no build step) + Go launcher for production distribution. `origin/laptop-cli` used esbuild. The unified implementation combines both.
 
 **Decision:** esbuild produces three bundles:
+
 - `dist/flow.cjs` — CJS bundle, entry point for the Go launcher binary
 - `dist/cli/TaskIndex.js` — ESM bundle, for direct node invocation of `task` CLI
 - `dist/worker/Worker.js` — ESM bundle, spawned by WorkerPool

@@ -9,6 +9,7 @@ Implement the Zones & Attestations V1 feature in the `agent-fleet` monorepo. Rea
 - `specs/2026-08-09-zones-attestations/open-questions.md` — what is explicitly out of scope
 
 Cross-cutting constraints from the flow-cli spec:
+
 - `specs/2026-07-30-flow-cli/decisions.md` — D31 (secrets model), D34 (validation error format), D37 (`.flows/config.yml` schema)
 
 ## Existing code to read before writing anything
@@ -43,27 +44,27 @@ Add to `packages/flow-engine/src/types.ts` or a new `packages/flow-engine/src/va
 
 ```typescript
 interface AttestationRequirement {
-  attestation: string;
+	attestation: string;
 }
 
 interface ZoneConfig {
-  requires: AttestationRequirement[];
+	requires: AttestationRequirement[];
 }
 
 interface SecretConfig {
-  id: string;
-  zone: string;
+	id: string;
+	zone: string;
 }
 
 interface ZonesScopeConfig {
-  zones?: Record<string, ZoneConfig>;
-  secrets?: SecretConfig[];
+	zones?: Record<string, ZoneConfig>;
+	secrets?: SecretConfig[];
 }
 
 // Discriminated union — failIfAbsent only exists on file sources
 type AttestationProducer =
-  | { attestation: string; from: 'exit-code' }
-  | { attestation: string; from: { file: string; format: 'jest' | 'junit' | 'raw' }; failIfAbsent?: boolean };
+	| { attestation: string; from: 'exit-code' }
+	| { attestation: string; from: { file: string; format: 'jest' | 'junit' | 'raw' }; failIfAbsent?: boolean };
 ```
 
 `failIfAbsent` defaults to `true` when absent. `from: exit-code` does not have this property.
@@ -98,6 +99,7 @@ Constructor takes `(issueCollector: IssueCollector, scopeConfig: ZonesScopeConfi
 **Check Z4-2:** For each zone `X` referenced by any step — for each attestation `A` in `zone.requires` — if no step in the flow declares `produces` containing `{ attestation: A }` → `ZONE_ATTESTATION_UNSATISFIABLE` error with message: `"Zone '<X>' requires attestation '<A>' but no step produces it"`. Multiple steps producing the same attestation name is allowed (Z4-2 requires at least one). A zone with an empty or absent `requires` array has no unsatisfiable attestations — no error.
 
 **Check Z5:** For each step (all steps, not only zoned steps) — scan all `env` values for secret references matching the pattern above. For each match `<id>`:
+
 - If `<id>` is not found in `scopeConfig.secrets` → `SECRET_ZONE_MISMATCH` error with message: `"Secret '<id>' is not declared in scope config"`
 - If `<id>` is found with `zone: Y` and the step does not declare `zone: Y` → `SECRET_ZONE_MISMATCH` error with message: `"Secret '<id>' requires zone 'Y' but step '<stepId>' is not in zone 'Y'"`
 
@@ -108,6 +110,7 @@ Note: `SecretConfig.zone` is a required field. Every secret in `scopeConfig.secr
 **Check Z5-ext:** For each secret in `scopeConfig.secrets` — if `secret.zone` is not a key in `scopeConfig.zones` → `ZONE_UNDEFINED` error on the secret declaration itself. Also validate that secret `id` values are unique in `scopeConfig.secrets`; duplicates → `DUPLICATE_ID` error (reuse existing code). Also validate that `produces` within a single step has no duplicate `attestation` values; duplicates within the same step → `DUPLICATE_ID` error.
 
 Add new `ValidationCode` values to `ValidationTypes.ts`:
+
 - `ZONE_UNDEFINED` — step or secret references a zone not in scope config
 - `ZONE_ATTESTATION_UNSATISFIABLE` — zone requires an attestation that no step produces
 - `SECRET_ZONE_MISMATCH` — step references a zone-scoped secret without being in that zone
@@ -149,6 +152,7 @@ Zone errors appear in `ValidationResult.issues` (same array as all other validat
 ## Test requirements
 
 Place test files next to implementation:
+
 - `ZonesScopeConfigLoader.test.ts`
 - `ZoneValidator.test.ts`
 

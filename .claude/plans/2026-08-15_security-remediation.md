@@ -10,6 +10,7 @@ Context: 8 security findings identified across audit cycles V1-V4. Each point re
 **Status:** `v` CLOSED — No action — threat model shows no auth can protect same-user actor. See threat-model-ws-auth.md. Threat model written: threat-model-ws-auth.md
 
 ### Todos
+
 - [ ] Analyse les mécanismes d'auth possibles (token, HMAC, mutual TLS, Unix socket)
 - [ ] Évaluer le coût UX de chaque option (impact sur `flow run`, transparence)
 - [ ] Définir le flag `--no-auth` / config pour désactiver
@@ -24,6 +25,7 @@ Context: 8 security findings identified across audit cycles V1-V4. Each point re
 **Status:** `v` CLOSED — Covered by #1 analysis. spawnedPids guard retained as defense-in-depth.
 
 ### Todos
+
 - [ ] Vérifier si le token WS (finding #1) résout aussi #2 (il devrait)
 - [ ] Analyser le scénario de race condition (10s window) en détail
 - [ ] Proposer nonce per-spawn via env var
@@ -36,6 +38,7 @@ Context: 8 security findings identified across audit cycles V1-V4. Each point re
 **Status:** `v` DONE — Path guard + error sanitization implemented. path guard (allowAbsolutePaths config), error messages sanitized, 122→124 tests.
 
 ### Todos
+
 - [ ] Analyser TOUS les chemins où des erreurs sont retournées à l'utilisateur
 - [ ] Séparer logs user-facing (stderr human-friendly) vs logs fichier (détails techniques)
 - [ ] Définir interface LogSink avec deux canaux: `user(message)` et `detail(message, err?)`
@@ -50,6 +53,7 @@ Context: 8 security findings identified across audit cycles V1-V4. Each point re
 **Status:** `v` DONE — isolateEnv opt-out in ScriptExecutor + ClaudeLauncher + WorkerPool allowlist. StepRunner preserved with isolateEnv:false. 124 tests.
 
 ### Todos
+
 - [ ] Vérifier la décision originale (était-ce explicitement demandé de ne PAS passer env?)
 - [ ] Analyser ce dont les workers ont besoin (PATH, HOME, TMPDIR, NODE_PATH minimum)
 - [ ] Définir un PATH minimal dans le worker plutôt qu'hérité
@@ -64,6 +68,7 @@ Context: 8 security findings identified across audit cycles V1-V4. Each point re
 **Status:** `v` DONE — violations rule security/no-raw-err-in-cli created. 6 call sites fixed. 0 violations.
 
 ### Todos
+
 - [ ] Inventaire complet de tous les points de log dans le codebase
 - [ ] Classifier: user-facing stderr | daemon file log | worker stderr
 - [ ] Concevoir la notion de "log sensitivity" (USER / INTERNAL / DEBUG)
@@ -78,6 +83,7 @@ Context: 8 security findings identified across audit cycles V1-V4. Each point re
 **Status:** `v` CLOSED — TM-03 documented: %TEMP% per-user on Windows provides equivalent protection. Not a real risk in scope.
 
 ### Todos
+
 - [ ] Vérifier si c'est un vrai risque dans le contexte de déploiement réel
 - [ ] Analyser: lifetime du fichier, qui peut le lire, quel est le worst case
 - [ ] Si risque réel: proposer alternatives (named pipe, env var, icacls)
@@ -90,6 +96,7 @@ Context: 8 security findings identified across audit cycles V1-V4. Each point re
 **Status:** `v` DONE — LogMasker minVariantLength configurable (default 4). TM-02 documented.
 
 ### Todos
+
 - [ ] Vérifier que le seuil est bien configurable dans le code actuel
 - [ ] Confirmer que c'est une décision de design documentée
 - [ ] Ajouter au threat model comme décision explicite avec justification
@@ -102,6 +109,7 @@ Context: 8 security findings identified across audit cycles V1-V4. Each point re
 **Status:** `v` DONE — Hex regex flag 'gi' — case-insensitive. No regression risk. Test added.
 
 ### Todos
+
 - [ ] Évaluer si le risque est réel dans le contexte actuel
 - [ ] Proposer: flag `i` sur le regex hex vs double registration
 - [ ] Implémenter si le fix est trivial (il l'est)
@@ -112,6 +120,7 @@ Context: 8 security findings identified across audit cycles V1-V4. Each point re
 ## Meta
 
 ### Lessons learned à appliquer
+
 - Chaque finding = risk analysis + cost analysis + proposals avec pros/cons
 - "v1 decision" n'est pas une réponse, c'est un report avec justification
 - Les findings de type log/env/auth = HIGH priority par défaut
@@ -122,18 +131,19 @@ Context: 8 security findings identified across audit cycles V1-V4. Each point re
 
 All 8 findings resolved as of 2026-08-15.
 
-| # | Finding | Disposition | Tests |
-|---|---------|-------------|-------|
-| 1 | WebSocket no auth | CLOSED — threat model shows no fix needed in scope | — |
-| 2 | PID spoofable | CLOSED — resolved by #1 analysis | — |
-| 3 | Path restriction + error leakage | FIXED | 124 pass |
-| 4 | process.env to workers | FIXED | 124 pass |
-| 5 | Log sensitivity | FIXED + violations rule | 0 violations |
-| 6 | 0o600 Windows | CLOSED — not a real risk (%TEMP% per-user) | — |
-| 7 | LogMasker threshold | FIXED | 124 pass |
-| 8 | Hex case-sensitivity | FIXED | 124 pass |
+| #   | Finding                          | Disposition                                        | Tests        |
+| --- | -------------------------------- | -------------------------------------------------- | ------------ |
+| 1   | WebSocket no auth                | CLOSED — threat model shows no fix needed in scope | —            |
+| 2   | PID spoofable                    | CLOSED — resolved by #1 analysis                   | —            |
+| 3   | Path restriction + error leakage | FIXED                                              | 124 pass     |
+| 4   | process.env to workers           | FIXED                                              | 124 pass     |
+| 5   | Log sensitivity                  | FIXED + violations rule                            | 0 violations |
+| 6   | 0o600 Windows                    | CLOSED — not a real risk (%TEMP% per-user)         | —            |
+| 7   | LogMasker threshold              | FIXED                                              | 124 pass     |
+| 8   | Hex case-sensitivity             | FIXED                                              | 124 pass     |
 
 Artifacts produced:
+
 - `.claude/audits/threat-model-ws-auth.md` — threat model for #1/#2/#6
 - `.claude/audits/security-analysis-2026-08-15.md` — full analysis
 - `.violations/rules/no-raw-err-in-cli.ts` — violation rule for #5

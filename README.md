@@ -25,29 +25,29 @@ web-frontend  ──HTTP/WS──>  web-backend  ──embedded──>  orchestr
 
 ### Runtime processes
 
-| Package | Role |
-|---|---|
+| Package                 | Role                                                                                                                                                                                                                                           |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/orchestrator` | Long-running coordinator. Owns task queue, worker pool, WebSocket server for workers (port 3738), REST API (port 3737), intervention routing, and event bridge to web-backend. Can run as a standalone process or embedded inside web-backend. |
-| `packages/worker` | Long-running agent process. Connects to orchestrator via WebSocket, receives task assignments, runs `FlowExecutor` from `flow-engine`, manages Claude subprocess lifecycle, reports results. |
-| `packages/web-backend` | Fastify HTTP/WebSocket server. REST API for the frontend, SSE/WebSocket event broadcasting, auth (JWT), workspace/project/flow/task CRUD, storage. Embeds `orchestrator` in library mode. |
-| `packages/web-frontend` | React SPA (Vite). Dashboard, task management, visual flow editor (`@xyflow/react`), real-time event consumption. |
-| `packages/legacy-cli` | Thin CLI binary (`fleet-task`). Submits tasks to the orchestrator REST API from the command line. No web UI needed. |
+| `packages/worker`       | Long-running agent process. Connects to orchestrator via WebSocket, receives task assignments, runs `FlowExecutor` from `flow-engine`, manages Claude subprocess lifecycle, reports results.                                                   |
+| `packages/web-backend`  | Fastify HTTP/WebSocket server. REST API for the frontend, SSE/WebSocket event broadcasting, auth (JWT), workspace/project/flow/task CRUD, storage. Embeds `orchestrator` in library mode.                                                      |
+| `packages/web-frontend` | React SPA (Vite). Dashboard, task management, visual flow editor (`@xyflow/react`), real-time event consumption.                                                                                                                               |
+| `packages/legacy-cli`   | Thin CLI binary (`fleet-task`). Submits tasks to the orchestrator REST API from the command line. No web UI needed.                                                                                                                            |
 
 ### Libraries
 
-| Package | Role |
-|---|---|
-| `packages/flow-engine` | Pure engine library. Flow YAML parsing, validation (graph, schema, semantic), step execution (`StepRunner`, `FlowExecutor`, `FlowOrchestrator`), Claude process launching, workspace management, flow registry. No process lifecycle — consumed by orchestrator and worker. |
-| `packages/shared-common` | Zero-dependency utilities: WebSocket message serialization protocol, structured logger, port calculator, shutdown interface, error helpers. |
-| `packages/shared-orch-worker` | Contract layer between orchestrator and worker processes. Typed message envelopes (`O2WMessage`, `W2OMessage`), task domain types (`TaskStatus`, `Task`), orchestrator event types, `StateManager`. |
-| `packages/shared-frontend-backend` | HTTP API contract layer between web-backend and web-frontend. Typed API contracts per domain, route-builder helpers, WebSocket/SSE/polling transport protocol types. |
+| Package                            | Role                                                                                                                                                                                                                                                                        |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/flow-engine`             | Pure engine library. Flow YAML parsing, validation (graph, schema, semantic), step execution (`StepRunner`, `FlowExecutor`, `FlowOrchestrator`), Claude process launching, workspace management, flow registry. No process lifecycle — consumed by orchestrator and worker. |
+| `packages/shared-common`           | Zero-dependency utilities: WebSocket message serialization protocol, structured logger, port calculator, shutdown interface, error helpers.                                                                                                                                 |
+| `packages/shared-orch-worker`      | Contract layer between orchestrator and worker processes. Typed message envelopes (`O2WMessage`, `W2OMessage`), task domain types (`TaskStatus`, `Task`), orchestrator event types, `StateManager`.                                                                         |
+| `packages/shared-frontend-backend` | HTTP API contract layer between web-backend and web-frontend. Typed API contracts per domain, route-builder helpers, WebSocket/SSE/polling transport protocol types.                                                                                                        |
 
 ### Test infrastructure
 
-| Package | Role |
-|---|---|
-| `packages/test-utils` | Shared test factories, mock builders, REST API helpers. Dev-only dependency. |
-| `packages/e2e-web` | Playwright end-to-end test suite against the full running web app and Storybook. |
+| Package               | Role                                                                             |
+| --------------------- | -------------------------------------------------------------------------------- |
+| `packages/test-utils` | Shared test factories, mock builders, REST API helpers. Dev-only dependency.     |
+| `packages/e2e-web`    | Playwright end-to-end test suite against the full running web app and Storybook. |
 
 ## Dependency graph
 

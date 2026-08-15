@@ -3,20 +3,25 @@
 ## Findings: 0 HIGH, 5 MED, 4 LOW (across all 6 audits)
 
 ### Security: 0 HIGH, 0 MED, 0 LOW actionable
+
 All v1-scope security issues resolved or documented.
 
 ### Quality: 0 HIGH, 2 MED, 1 LOW
+
 - M2: Duplicate validation logic — deferred
 - M4: StepRunner any cast — blocked on flow-engine
 
 ### Maintenance: 0 HIGH, 2 MED, 1 LOW
+
 - M8: sendToWorker silent failure — deferred
 - M2: Hardcoded worker path — deferred
 
 ### Discoverability: 0 HIGH, 5 MED, 3 LOW
+
 All renaming/structural suggestions — deferred
 
 ### Readability: 0 HIGH, 4 MED, 2 LOW
+
 - #4: Repeated json/human guard — deferred
 - #5: 106-line callback — deferred
 - #6: as any cast — blocked
@@ -49,10 +54,12 @@ All renaming/structural suggestions — deferred
 ## Decision: STOP
 
 All HIGH findings have been resolved. No remaining findings have both:
+
 1. A correctness/safety impact, AND
 2. A viable fix in v1 scope
 
 Remaining issues are:
+
 - MED structural/naming debt (renaming, extract helpers) — v2 maintenance pass
 - MED M8 (sendToWorker silent fail) — requires non-trivial transaction-like rollback
 - All are LOW/INFO with respect to current v1 correctness guarantees

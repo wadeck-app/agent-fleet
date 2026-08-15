@@ -11,16 +11,19 @@ Audited: CommandHandler.ts, Daemon.ts, StepQueue.ts, WorkerPool.ts, WorkerAdapte
 ## Remaining
 
 ### MED M2 — Duplicate validation logic
+
 **Files:** `CommandHandler.ts:59-67`, `FlowValidator.ts:55-63`
 
 Both independently instantiate `FlowValidator(undefined)` and filter `severity === 'error'`. Policy divergence risk. Deferred.
 
 ### MED M4 — StepRunner private config via `any` cast
+
 **File:** `WorkerAdapter.ts:54`
 
 `(this.stepRunner as any).config` — blocked on `flow-engine` exposing `withEnv()`. Runtime guard not yet added.
 
 ### LOW FlowValidator.ts naming
+
 Deferred — acceptable v1 deferral.
 
 ## Score: 8/10

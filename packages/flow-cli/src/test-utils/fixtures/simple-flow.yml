@@ -1,46 +1,46 @@
 id: simple-flow
-version: "1.0.0"
+version: '1.0.0'
 name: Simple Test Flow
 description: A simple flow for unit testing
 
 workspace:
-  mode: manual
-  gitStrategy: any
-  reusePolicy: if-available
+    mode: manual
+    gitStrategy: any
+    reusePolicy: if-available
 
 inputs:
-  message:
-    type: string
-    required: true
+    message:
+        type: string
+        required: true
 
 steps:
-  - id: step-one
-    name: First Script Step
-    type: script
-    script: echo "hello"
-    output:
-      result:
-        type: string
-        from: stdout
+    - id: step-one
+      name: First Script Step
+      type: script
+      script: echo "hello"
+      output:
+          result:
+              type: string
+              from: stdout
 
-  - id: step-two
-    name: Second Model Step
-    type: model
-    model: haiku
-    prompt: "Say hello"
-    depends:
-      - step-one
-    output:
-      reply:
-        type: string
-        from: last_message
+    - id: step-two
+      name: Second Model Step
+      type: model
+      model: haiku
+      prompt: 'Say hello'
+      depends:
+          - step-one
+      output:
+          reply:
+              type: string
+              from: last_message
 
-  - id: step-approve
-    name: Approval Gate
-    type: user_intervention
-    interventionType: approval
-    depends:
-      - step-two
-    approval:
-      title: Approve the result
-      description: Please review
+    - id: step-approve
+      name: Approval Gate
+      type: user_intervention
+      interventionType: approval
+      depends:
+          - step-two
+      approval:
+          title: Approve the result
+          description: Please review

@@ -1,6 +1,7 @@
-import type { ScriptFlowStep, ModelFlowStep, Workspace } from 'flow-engine/types';
 import type { StepRunner } from 'flow-engine';
 import type { TemplateContext } from 'flow-engine/processing/TemplateRenderer';
+import type { ModelFlowStep, ScriptFlowStep, Workspace } from 'flow-engine/types';
+
 import type { AssignableStep, ExecutionContext, InjectedStep, WorkerToDaemon } from '../ipc/Protocol';
 import { McpServer } from './McpServer';
 
@@ -64,7 +65,11 @@ export class WorkerAdapter {
 				return (trace.outputs ?? {}) as Record<string, unknown>;
 			} finally {
 				// Suppress stop errors so they do not shadow the original executeStep error.
-				try { await mcpServer.stop(); } catch { /* ignore cleanup errors */ }
+				try {
+					await mcpServer.stop();
+				} catch {
+					/* ignore cleanup errors */
+				}
 			}
 		}
 

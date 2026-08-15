@@ -17,7 +17,7 @@ export class LogMasker {
 		 * of common short substrings (e.g. "ok", "id", "no").
 		 * Default: 4. See TM-02 in the threat model.
 		 */
-		private readonly minVariantLength: number = 4,
+		private readonly minVariantLength: number = 4
 	) {}
 
 	register(plaintext: string): void {
@@ -52,18 +52,24 @@ export class LogMasker {
 		const buf = Buffer.from(value, 'utf8');
 		const b64 = buf.toString('base64');
 		// offset 1: prepend 1 null byte, encode whole thing, strip 2 leading base64 chars
-		const offset1 = Buffer.concat([Buffer.from([0x00]), buf]).toString('base64').replace(/=+$/, '').slice(2);
+		const offset1 = Buffer.concat([Buffer.from([0x00]), buf])
+			.toString('base64')
+			.replace(/=+$/, '')
+			.slice(2);
 		// offset 2: prepend 2 null bytes, encode whole thing, strip 3 leading base64 chars
-		const offset2 = Buffer.concat([Buffer.from([0x00, 0x00]), buf]).toString('base64').replace(/=+$/, '').slice(3);
+		const offset2 = Buffer.concat([Buffer.from([0x00, 0x00]), buf])
+			.toString('base64')
+			.replace(/=+$/, '')
+			.slice(3);
 		// Padded variants must come before their no-pad counterparts so the longer
 		// pattern is registered first and matched before the shorter one can consume
 		// the body characters, leaving the '==' suffix unmasked.
 		return [
 			value,
-			b64,                        // base64 with padding (= suffix) — registered before no-pad
-			b64.replace(/=+$/, ''),     // base64 without padding
-			offset1,                    // secret embedded at byte offset 1 in a base64-encoded blob
-			offset2,                    // secret embedded at byte offset 2 in a base64-encoded blob
+			b64, // base64 with padding (= suffix) — registered before no-pad
+			b64.replace(/=+$/, ''), // base64 without padding
+			offset1, // secret embedded at byte offset 1 in a base64-encoded blob
+			offset2, // secret embedded at byte offset 2 in a base64-encoded blob
 			buf.toString('base64url'),
 			buf.toString('hex'),
 		];

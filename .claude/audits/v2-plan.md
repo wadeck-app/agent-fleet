@@ -62,11 +62,11 @@ Files examined: RunCommand.ts, ValidateCommand.ts, CommandHandler.ts, Daemon.ts,
 
 **IMPLEMENTED** (all 3 occurrences in provided files)
 
-| File | Line | Call |
-|------|------|------|
-| `RunCommand.ts` | 114 | `yaml.load(..., { schema: yaml.JSON_SCHEMA })` |
-| `CommandHandler.ts` | 50 | `yaml.load(content, { schema: yaml.JSON_SCHEMA })` |
-| `Daemon.ts` | 21 | `yaml.load(..., { schema: yaml.JSON_SCHEMA })` |
+| File                | Line | Call                                               |
+| ------------------- | ---- | -------------------------------------------------- |
+| `RunCommand.ts`     | 114  | `yaml.load(..., { schema: yaml.JSON_SCHEMA })`     |
+| `CommandHandler.ts` | 50   | `yaml.load(content, { schema: yaml.JSON_SCHEMA })` |
+| `Daemon.ts`         | 21   | `yaml.load(..., { schema: yaml.JSON_SCHEMA })`     |
 
 No bare `yaml.load(...)` without schema option found in the audited files.
 
@@ -79,10 +79,10 @@ No bare `yaml.load(...)` without schema option found in the audited files.
 The check and error code are correct, but the placement is wrong:
 
 - `CommandHandler.ts:101–109` — finds `user_intervention` step and returns `{ type: 'error', code: 'UNSUPPORTED_STEP_TYPE', ... }` ✓
-- **Problem**: the check fires at line 101, *after*:
-  - `WorkspaceManager.allocate()` at line 75–80 (workspace already allocated)
-  - `ExecutionStore.create()` at line 86 (execution record already written to disk)
-  - `generateExecutionId()` at line 83 (ID consumed)
+- **Problem**: the check fires at line 101, _after_:
+    - `WorkspaceManager.allocate()` at line 75–80 (workspace already allocated)
+    - `ExecutionStore.create()` at line 86 (execution record already written to disk)
+    - `generateExecutionId()` at line 83 (ID consumed)
 - Those resources are never cleaned up when UNSUPPORTED_STEP_TYPE is returned.
 - The check is before `stepQueue.enqueueExecution()` (line 115), so no actual step execution starts — but the workspace and store entry leak.
 - **Fix needed**: move the `user_intervention` scan to immediately after FlowValidator (before line 75).
@@ -123,17 +123,17 @@ The check and error code are correct, but the placement is wrong:
 
 ## Summary Table
 
-| Decision | Status | Key Evidence |
-|----------|--------|--------------|
-| D2 async default + --wait | IMPLEMENTED | RunCommand.ts:77,148 |
-| D3 10m default timeout | IMPLEMENTED | RunCommand.ts:78 |
-| D4 human default, no isTTY | IMPLEMENTED | RunCommand.ts:80–81, ValidateCommand.ts:8–9 |
-| D5 Commander.js only | IMPLEMENTED | RunCommand.ts:1–2, ValidateCommand.ts:1 |
-| D6 singleton-daemon-kit | IMPLEMENTED | RunCommand.ts:1, Daemon.ts:1 |
-| D7 JSON_SCHEMA on all yaml.load | IMPLEMENTED | RunCommand.ts:114, CommandHandler.ts:50, Daemon.ts:21 |
-| D8 UNSUPPORTED_STEP_TYPE pre-exec | PARTIAL | CommandHandler.ts:101–109 (after allocate/create) |
-| D12 StepRunner (not StepExecutor) | IMPLEMENTED | WorkerAdapter.ts:2,10–13 |
-| D13 WorkspaceManager.allocate() | IMPLEMENTED | CommandHandler.ts:75–80 |
-| D14 types.ts:7 shared-common import | IMPLEMENTED | types.ts:7 |
+| Decision                            | Status      | Key Evidence                                          |
+| ----------------------------------- | ----------- | ----------------------------------------------------- |
+| D2 async default + --wait           | IMPLEMENTED | RunCommand.ts:77,148                                  |
+| D3 10m default timeout              | IMPLEMENTED | RunCommand.ts:78                                      |
+| D4 human default, no isTTY          | IMPLEMENTED | RunCommand.ts:80–81, ValidateCommand.ts:8–9           |
+| D5 Commander.js only                | IMPLEMENTED | RunCommand.ts:1–2, ValidateCommand.ts:1               |
+| D6 singleton-daemon-kit             | IMPLEMENTED | RunCommand.ts:1, Daemon.ts:1                          |
+| D7 JSON_SCHEMA on all yaml.load     | IMPLEMENTED | RunCommand.ts:114, CommandHandler.ts:50, Daemon.ts:21 |
+| D8 UNSUPPORTED_STEP_TYPE pre-exec   | PARTIAL     | CommandHandler.ts:101–109 (after allocate/create)     |
+| D12 StepRunner (not StepExecutor)   | IMPLEMENTED | WorkerAdapter.ts:2,10–13                              |
+| D13 WorkspaceManager.allocate()     | IMPLEMENTED | CommandHandler.ts:75–80                               |
+| D14 types.ts:7 shared-common import | IMPLEMENTED | types.ts:7                                            |
 
 ## Score: 9/10

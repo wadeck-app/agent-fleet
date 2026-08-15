@@ -1,4 +1,5 @@
 import type { Command } from 'commander';
+
 import { validateFlowFile } from '../../validation/FlowFileValidator';
 
 export function registerValidateCommand(program: Command): void {
@@ -13,12 +14,19 @@ export function registerValidateCommand(program: Command): void {
 			if (options.json && !options.human) {
 				// Machine-readable: Repo B contract
 				switch (result.exit) {
-					case 0: process.stdout.write(JSON.stringify({ valid: true }) + '\n'); process.exit(0);
+					case 0:
+						process.stdout.write(JSON.stringify({ valid: true }) + '\n');
+						process.exit(0);
 					case 1:
 						process.stdout.write(JSON.stringify({ valid: false, errors: result.errors }) + '\n');
 						process.exit(1);
 					case 2:
-						process.stdout.write(JSON.stringify({ valid: false, errors: [{ type: 'file_not_found', message: result.message, path: '' }] }) + '\n');
+						process.stdout.write(
+							JSON.stringify({
+								valid: false,
+								errors: [{ type: 'file_not_found', message: result.message, path: '' }],
+							}) + '\n'
+						);
 						process.exit(2);
 					case 3:
 						process.stdout.write(JSON.stringify({ valid: false, errors: result.errors }) + '\n');

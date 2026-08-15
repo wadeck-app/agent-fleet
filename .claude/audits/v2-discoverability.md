@@ -7,6 +7,7 @@
 ## HIGH
 
 ### H1 — InjectedStep name implies validated form; it is explicitly unvalidated
+
 **FILE:LINE:** `src/ipc/Protocol.ts:37-43`
 
 `InjectedStep` carries the doc-comment "Unvalidated wire format" and has `[key: string]: unknown`, yet its name suggests it is a fully-formed step ready for injection. `WorkerToDaemon` at line 50 uses it as `steps: InjectedStep[]`, further reinforcing the false impression that these steps are safe to use. Code reading `inject_steps` handling in `Daemon.ts:156-164` must know to distrust the contents.
@@ -16,6 +17,7 @@
 ---
 
 ### H2 — AssignableStep includes `subflow` but both CommandHandler and WorkerAdapter reject it
+
 **FILE:LINE:** `src/ipc/Protocol.ts:3`
 
 `AssignableStep = Extract<FlowStep, { type: 'model' | 'script' | 'subflow' }>` promises that subflow steps are assignable. `CommandHandler.ts:112` filters only `model | script | subflow` into the queue, and `WorkerAdapter.ts:21-23` throws `"Step type 'subflow' is not supported in v1"` at runtime. The type system advertises support that the implementation does not provide.
@@ -25,6 +27,7 @@
 ---
 
 ### H3 — WorkerAdapter is misnamed; it orchestrates, not adapts
+
 **FILE:LINE:** `src/worker/WorkerAdapter.ts:9`
 
 `WorkerAdapter` is named as an Adapter-pattern class (bridging one interface to another), but it: constructs a full `Workspace` object (workspace management concern), converts `stepOutputs` from `Record` to `Map` (data transformation concern), creates and manages the lifecycle of a `McpServer` (lifecycle management concern), and patches `StepRunner` internals via `any` cast (integration concern). A reader looking for where model steps are executed will search for a class named something like `StepExecutor` or `ModelStepRunner`, not `WorkerAdapter`.
@@ -34,6 +37,7 @@
 ---
 
 ### H4 — generateExecutionId() used to generate task IDs — misleading cross-domain reuse
+
 **FILE:LINE:** `src/task/TaskStore.ts:6, 38`
 
 `TaskStore.create()` calls `generateExecutionId()` imported from `ExecutionStore` to mint task IDs. A reader searching for how task IDs are generated finds only `ExecutionStore.ts`. There is no documented guarantee that task IDs and execution IDs are disjoint — an accidental cross-reference lookup (`executionStore.read(taskId)`) would fail with a confusing "Invalid executionId format" or "Corrupted execution state" error rather than a "wrong domain" error.
@@ -43,6 +47,7 @@
 ---
 
 ### H5 — FlowCommands in RunCommand loses the IPC type contract
+
 **FILE:LINE:** `src/cli/commands/RunCommand.ts:12`
 
 `type FlowCommands = { run: (payload: unknown) => Promise<DaemonResponse> }` types the payload as `unknown`. At line 63 the argument is correctly typed as `ClientCommand`, but the `FlowCommands` interface that governs what the client sends erases it. Any future refactor of `ClientCommand.run` fields produces no compile error at the client boundary.
@@ -54,6 +59,7 @@
 ## MEDIUM
 
 ### M1 — Dead `{ type: 'idle' }` member in DaemonToWorker
+
 **FILE:LINE:** `src/ipc/Protocol.ts:28-29`
 
 `{ type: 'idle' }` is documented as "never sent by the daemon in v1." A new Worker implementation must write a no-op branch for a message that never arrives, and any exhaustive switch must handle a dead variant. The expected worker behavior (no-op) is not documented in the type comment.
@@ -63,6 +69,7 @@
 ---
 
 ### M2 — ExecutionStatus contains unreachable `'re-queued'` value
+
 **FILE:LINE:** `src/ipc/Protocol.ts:52-53`
 
 `'re-queued'` is documented "Unreachable in v1 but kept for backward compat." Any exhaustive switch on `ExecutionStatus` (e.g. in a UI renderer or status filter) must handle a value that can never appear in practice, adding dead branches or causing TypeScript exhaustiveness errors that force developers to add a meaningless case.
@@ -72,6 +79,7 @@
 ---
 
 ### M3 — stepOutputs changes representation between wire and worker silently
+
 **FILE:LINE:** `src/ipc/Protocol.ts:8` and `src/worker/WorkerAdapter.ts:40`
 
 `ExecutionContext.stepOutputs` is typed as `Record<string, Record<string, unknown>>` on the wire. `WorkerAdapter` silently converts it to `Map<string, ...>` before passing to `TemplateContext`. A developer extending `WorkerAdapter` or writing a test for `TemplateContext` inputs will see a `Record` in the type and be confused when the runtime value is a `Map`.
@@ -81,6 +89,7 @@
 ---
 
 ### M4 — registerWorker / removeWorker naming asymmetry
+
 **FILE:LINE:** `src/daemon/WorkerPool.ts:71, 88`
 
 `registerWorker(ws, pid)` pairs with `removeWorker(ws)`. The asymmetry (`register` vs `remove`) suggests they are not counterparts, yet they are. Additionally, `markBusy` and `markIdle` are public methods requiring callers to manage state transitions that logically belong to `WorkerPool`'s own state machine.
@@ -90,6 +99,7 @@
 ---
 
 ### M5 — WorkerPool two-phase lifecycle (spawned vs connected) is undocumented
+
 **FILE:LINE:** `src/daemon/WorkerPool.ts:18-20`
 
 `activeCount` counts spawned child processes; `workers` counts registered WebSocket connections. Between spawn and WebSocket registration, `activeCount > workers.size`. `canSpawn()` uses `activeCount` while `getIdleWorker()` uses `workers`. A caller reasoning about pool capacity must understand both phases and which state variable covers which phase — but this is not documented anywhere.
@@ -99,6 +109,7 @@
 ---
 
 ### M6 — StepQueue.markStepActive is a manual external responsibility
+
 **FILE:LINE:** `src/daemon/StepQueue.ts:152` and `src/daemon/CommandHandler.ts:133`
 
 `enqueueExecution` and `enqueueReady` manage step lifecycle automatically. But after `dequeue()`, the caller (`CommandHandler.tryDispatch`) must manually call `markStepActive` or the same step can be re-enqueued by the next `enqueueReady`. This is an undocumented precondition invisible from `dequeue()`'s signature.
@@ -108,6 +119,7 @@
 ---
 
 ### M7 — ValidateResult uses exit codes as type discriminant — I/O concern in domain type
+
 **FILE:LINE:** `src/validation/FlowValidator.ts:17-20`
 
 `ValidateResult` discriminates on `exit: 0 | 1 | 2 | 3`. Non-CLI consumers (unit tests, programmatic callers) must map numeric codes to understand what happened. Numeric exit codes are a POSIX CLI concern that has leaked into the validation domain type.
@@ -117,6 +129,7 @@
 ---
 
 ### M8 — MISSING_OUTPUT and UNUSED_OUTPUT mapped to `'input'` category
+
 **FILE:LINE:** `src/validation/FlowValidator.ts:97-100`
 
 `MISSING_OUTPUT`, `UNUSED_OUTPUT`, and `UNDEFINED_OUTPUT` are categorised as `'input'`. A caller filtering `type === 'output'` finds nothing; a caller filtering `type === 'input'` receives spurious output errors. The mismatch silently breaks programmatic consumers.
@@ -126,6 +139,7 @@
 ---
 
 ### M9 — sendToDaemon silently auto-starts the daemon — hidden side effect
+
 **FILE:LINE:** `src/cli/commands/RunCommand.ts:52-68`
 
 The function name implies it only sends. On `DaemonNotRunningError` it starts the daemon and retries. The side effect is invisible from the call site at line 132 (`response = await sendToDaemon(cmd, config, daemonDir)`).
@@ -135,6 +149,7 @@ The function name implies it only sends. On `DaemonNotRunningError` it starts th
 ---
 
 ### M10 — daemonDir hardcoded in both Daemon.ts and RunCommand.ts
+
 **FILE:LINE:** `src/daemon/Daemon.ts:43` and `src/cli/commands/RunCommand.ts:91`
 
 `path.join(os.homedir(), '.flow-daemon')` appears in both files independently. A change to the daemon directory requires edits in two unrelated modules with no compile-time link.
@@ -144,6 +159,7 @@ The function name implies it only sends. On `DaemonNotRunningError` it starts th
 ---
 
 ### M11 — ALLOWED_STEP_FIELDS in McpServer is undocumented coupling to Protocol types
+
 **FILE:LINE:** `src/worker/McpServer.ts:50-54`
 
 `ALLOWED_STEP_FIELDS` is a hardcoded `Set<string>` of field names that must mirror the union of all valid fields across `AssignableStep` subtypes. When new fields are added to step types in `Protocol.ts` or `flow-engine`, this set must be updated manually with no type-level enforcement.
@@ -153,6 +169,7 @@ The function name implies it only sends. On `DaemonNotRunningError` it starts th
 ---
 
 ### M12 — McpServer name does not communicate per-execution lifecycle
+
 **FILE:LINE:** `src/worker/McpServer.ts:56`
 
 `McpServer` is named as a generic server, but it is instantiated per model step, lives for the duration of one step execution, and is destroyed in the `finally` block of `WorkerAdapter.execute()`. A reader seeing `McpServer` will expect a long-lived shared service.
@@ -164,6 +181,7 @@ The function name implies it only sends. On `DaemonNotRunningError` it starts th
 ## LOW
 
 ### L1 — FlowValidator.ts filename conflicts with the FlowValidator class imported within it
+
 **FILE:LINE:** `src/validation/FlowValidator.ts:1-5`
 
 The file exports `validateFlowFile()`, not a class, but is named `FlowValidator.ts`. Internally it aliases the engine import as `EngineFlowValidator` to avoid the name collision. The file-level comment acknowledges the issue but defers the fix.
@@ -173,6 +191,7 @@ The file exports `validateFlowFile()`, not a class, but is named `FlowValidator.
 ---
 
 ### L2 — TaskRecord.description is frozen as a copy of title with no update path
+
 **FILE:LINE:** `src/task/TaskStore.ts:42, 67`
 
 `create()` sets `description: title`. `updateStatus()` is the only mutation method and ignores description entirely. The field is permanently identical to title for all records, making it misleading — it implies richer content that is never written.
@@ -182,6 +201,7 @@ The file exports `validateFlowFile()`, not a class, but is named `FlowValidator.
 ---
 
 ### L3 — Human-readable mode collapses exit codes 2 and 3 to exit 1 — undocumented
+
 **FILE:LINE:** `src/cli/commands/ValidateCommand.ts:33-41`
 
 Both `result.exit === 2` (file not found) and `result.exit === 3` (YAML parse error) exit with code 1 in human-readable mode. The distinction available in `--json` mode is silently lost. This is not documented in the command description or help text.
@@ -191,6 +211,7 @@ Both `result.exit === 2` (file not found) and `result.exit === 3` (YAML parse er
 ---
 
 ### L4 — `--json` and `--human` mutual exclusion not enforced by Commander
+
 **FILE:LINE:** `src/cli/commands/RunCommand.ts:82` and `src/cli/commands/ValidateCommand.ts:13`
 
 Both flags can be passed simultaneously. The effective precedence rule (`--human` overrides `--json`) is implicit in the `options.json && !options.human` conditionals scattered across both action handlers.
@@ -200,6 +221,7 @@ Both flags can be passed simultaneously. The effective precedence rule (`--human
 ---
 
 ### L5 — StepState.iterations is undocumented
+
 **FILE:LINE:** `src/ipc/Protocol.ts:60`
 
 `iterations?: number` has no JSDoc or comment. No component in the audited code paths assigns this field (it is set in `ExecutionStore.markStepRunning` as `(state.steps[stepId]?.iterations ?? 0) + 1`). Without a comment, a reader cannot determine what it counts (retries? loop iterations?), when it is populated, or whether it maps to a UI concept.

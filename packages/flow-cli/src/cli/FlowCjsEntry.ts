@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /**
  * CJS-compatible entry point for the Go launcher.
  * FlowIndex.ts uses a top-level `await` which is not supported in CJS output.
@@ -6,8 +7,8 @@
  * `createRequire(__filename)` is used instead of `createRequire(import.meta.url)`
  * since `__filename` is always available in CJS context.
  */
-import { createRequire } from 'module';
 import { Command } from 'commander';
+import { createRequire } from 'module';
 
 import { registerDocsCommand } from './commands/DocsCommand';
 import { registerRunCommand } from './commands/RunCommand';
@@ -27,5 +28,5 @@ registerRunCommand(program);
 
 // Wrap in async IIFE — avoids top-level await (incompatible with CJS output)
 void (async () => {
-    await program.parseAsync(process.argv);
+	await program.parseAsync(process.argv);
 })();

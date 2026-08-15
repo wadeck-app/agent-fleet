@@ -86,6 +86,7 @@ Per D32, hook failures are intentionally ignored (on-failure default: ignore). B
 If `executeStep` throws and then `mcpServer.stop()` also throws, the stop error propagates, hiding the original step failure. The worker sends `step_failed` with the wrong error message.
 
 **Fix:** Wrap in its own try/catch inside `finally`:
+
 ```ts
 } finally {
     try { await mcpServer.stop(); } catch { /* ignore stop errors */ }

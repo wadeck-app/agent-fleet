@@ -31,18 +31,18 @@
 
 ## Findings Summary
 
-| Decision | Status | File | Line |
-|---|---|---|---|
-| D2 async/--wait | ✓ | RunCommand.ts | 77, 148–185 |
-| D3 10min timeout | ✓ | RunCommand.ts | 78, 14–25 |
-| D4 human default/--json/--human | ✓ | RunCommand.ts, ValidateCommand.ts | 80–81, 8–9 |
-| D5 Commander.js | ✓ | All 4 command files | — |
-| D6 singleton-daemon-kit | ✓ | Daemon.ts, RunCommand.ts, Worker.ts | 1, 1, 13 |
-| D7 yaml JSON_SCHEMA | ~ | **TaskIndex.ts raw call** | **29** |
-| D8 user_intervention rejected | ✓ | CommandHandler.ts | 101–109 |
-| D12 WorkerAdapter wraps StepRunner | ✓ | WorkerAdapter.ts, Worker.ts | 2, 21 |
-| D13 WorkspaceManager.allocate() | ✓ | CommandHandler.ts | 75–80 |
-| D14 TaskStatus from shared-common | ✓ | flow-engine/src/types.ts | 7 |
+| Decision                           | Status | File                                | Line        |
+| ---------------------------------- | ------ | ----------------------------------- | ----------- |
+| D2 async/--wait                    | ✓      | RunCommand.ts                       | 77, 148–185 |
+| D3 10min timeout                   | ✓      | RunCommand.ts                       | 78, 14–25   |
+| D4 human default/--json/--human    | ✓      | RunCommand.ts, ValidateCommand.ts   | 80–81, 8–9  |
+| D5 Commander.js                    | ✓      | All 4 command files                 | —           |
+| D6 singleton-daemon-kit            | ✓      | Daemon.ts, RunCommand.ts, Worker.ts | 1, 1, 13    |
+| D7 yaml JSON_SCHEMA                | ~      | **TaskIndex.ts raw call**           | **29**      |
+| D8 user_intervention rejected      | ✓      | CommandHandler.ts                   | 101–109     |
+| D12 WorkerAdapter wraps StepRunner | ✓      | WorkerAdapter.ts, Worker.ts         | 2, 21       |
+| D13 WorkspaceManager.allocate()    | ✓      | CommandHandler.ts                   | 75–80       |
+| D14 TaskStatus from shared-common  | ✓      | flow-engine/src/types.ts            | 7           |
 
 ---
 

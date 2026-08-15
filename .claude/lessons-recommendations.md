@@ -1,6 +1,7 @@
 # Recommendations
 
 <!-- consolidated 2026-07-31 -->
+
 - [ ] **Documentation**: Add an explicit SDK boundary statement to relevant specs before any design work begins — state what the SDK handles and what it does not (e.g., "SDK handles CLI↔daemon only, not worker↔daemon").
 - [ ] **Documentation**: Add a glossary of domain terms (e.g., RE-QUEUED, bufferSpill, reconnectTimeout) to spec files so repeated grep searches are unnecessary during audits.
 - [ ] **Documentation**: Add to CLAUDE.md the criteria for parallel vs. sequential agent delegation — when agents should share findings vs. each reading specs independently.

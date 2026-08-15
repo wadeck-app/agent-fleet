@@ -6,18 +6,18 @@
 
 ```json
 {
-  "executionId": "abc1",
-  "flowFile": "/path/to/my-flow.yml",
-  "flowId": "my-flow",
-  "status": "running",
-  "currentSteps": ["generate-pr"],
-  "workerPid": 1234,
-  "startedAt": "2026-07-30T14:23:00Z",
-  "completedAt": null,
-  "steps": {
-    "generate-pr": { "status": "running", "startedAt": "...", "iterations": 1 },
-    "run-tests": { "status": "pending" }
-  }
+	"executionId": "abc1",
+	"flowFile": "/path/to/my-flow.yml",
+	"flowId": "my-flow",
+	"status": "running",
+	"currentSteps": ["generate-pr"],
+	"workerPid": 1234,
+	"startedAt": "2026-07-30T14:23:00Z",
+	"completedAt": null,
+	"steps": {
+		"generate-pr": { "status": "running", "startedAt": "...", "iterations": 1 },
+		"run-tests": { "status": "pending" }
+	}
 }
 ```
 
@@ -40,18 +40,18 @@ QUEUED → RUNNING → COMPLETED
 
 The daemon owns all execution intelligence. Workers are dumb step executors.
 
-| Responsibility | Owner |
-|---|---|
-| Graph construction and dependency tracking | Daemon |
-| Deciding which steps are ready | Daemon |
-| Global ready-step queue across all executions | Daemon |
-| Assigning a step to a free worker (via WebSocket) | Daemon |
-| Writing execution state to disk | Daemon (single writer) |
-| Executing a step (Claude, script, subflow) | Worker |
-| Streaming log entries | Worker → Daemon (WebSocket) |
-| Reporting step completion/failure | Worker → Daemon (WebSocket) |
-| Liveness signal | WebSocket connection health |
-| Crash detection and idempotency decision | Daemon |
+| Responsibility                                    | Owner                       |
+| ------------------------------------------------- | --------------------------- |
+| Graph construction and dependency tracking        | Daemon                      |
+| Deciding which steps are ready                    | Daemon                      |
+| Global ready-step queue across all executions     | Daemon                      |
+| Assigning a step to a free worker (via WebSocket) | Daemon                      |
+| Writing execution state to disk                   | Daemon (single writer)      |
+| Executing a step (Claude, script, subflow)        | Worker                      |
+| Streaming log entries                             | Worker → Daemon (WebSocket) |
+| Reporting step completion/failure                 | Worker → Daemon (WebSocket) |
+| Liveness signal                                   | WebSocket connection health |
+| Crash detection and idempotency decision          | Daemon                      |
 
 ## Worker pool model
 
@@ -123,12 +123,12 @@ Worker1    Worker2    Worker3    CLI subprocess
 
 Liveness is signaled by WebSocket connection health — no explicit heartbeat messages.
 
-| Scenario | `idempotent` on running step | Action |
-|---|---|---|
-| Worker WebSocket closes unexpectedly | false (default) | mark step + execution FAILED |
-| Worker WebSocket closes unexpectedly | true | SIGKILL worker process, re-queue step |
-| Worker reconnects within window (D24) | any | re-adopt, resume from current step |
-| Worker absent after reconnection window | any | declare dead, apply row 1 or 2 above |
+| Scenario                                | `idempotent` on running step | Action                                |
+| --------------------------------------- | ---------------------------- | ------------------------------------- |
+| Worker WebSocket closes unexpectedly    | false (default)              | mark step + execution FAILED          |
+| Worker WebSocket closes unexpectedly    | true                         | SIGKILL worker process, re-queue step |
+| Worker reconnects within window (D24)   | any                          | re-adopt, resume from current step    |
+| Worker absent after reconnection window | any                          | declare dead, apply row 1 or 2 above  |
 
 ## Graph structure: Directed Graph with bounded cycles
 

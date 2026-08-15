@@ -12,6 +12,7 @@ v1 ships the minimum to execute the scenario: `task new` → elaborate → revie
 ## D1 — One binary, two roles (client and daemon)
 
 The `flow` binary is always the same executable. On invocation, it checks whether a daemon is already running:
+
 - If yes: acts as a thin client, forwards the command to the daemon, exits immediately after receiving the execution ID.
 - If no: calls `createDaemon()` inline — the current process becomes the daemon — then processes the command.
 
@@ -47,7 +48,7 @@ One queue, one concurrency limit. The limit is the worker pool size — number o
 
 ```yaml
 queue:
-  concurrency: 1  # default
+    concurrency: 1 # default
 ```
 
 **Why:** Starting simple. Multiple queues add topology complexity with no demonstrated need.
@@ -102,22 +103,22 @@ D20 is a strict superset of D10, adding the `__execution` reserved step ID and t
 
 **Superseded because:** A new daemon process cannot re-attach to `fork()` IPC channels from a previous process, making crash recovery impossible. WebSocket reconnection works across daemon restarts because workers always initiate the connection.
 
-## D12 — Idempotency is declared per-step, not per-flow *(v2 — deferred)*
+## D12 — Idempotency is declared per-step, not per-flow _(v2 — deferred)_
 
 ```yaml
 steps:
-  - id: generate-pr
-    type: model
-    idempotent: false   # default — creating a PR twice is a side effect
-    onFailure:
-      goto: review-step
-      maxIterations: 3
-    prompt: "..."
+    - id: generate-pr
+      type: model
+      idempotent: false # default — creating a PR twice is a side effect
+      onFailure:
+          goto: review-step
+          maxIterations: 3
+      prompt: '...'
 
-  - id: run-tests
-    type: script
-    idempotent: true    # safe to re-run — tests produce the same result
-    script: npm test
+    - id: run-tests
+      type: script
+      idempotent: true # safe to re-run — tests produce the same result
+      script: npm test
 ```
 
 When the worker WebSocket connection closes unexpectedly mid-step, the daemon inspects the step that was running:
@@ -179,7 +180,7 @@ Rotation: keep last 30 daily files, hard cap at 120 days.
 
 ```yaml
 logs:
-  retainDays: 30  # also controls execution file retention (D22)
+    retainDays: 30 # also controls execution file retention (D22)
 ```
 
 **Why disk over memory-only:** The daemon exits when the queue drains (D13). In-memory logs would be routinely lost before agents can query them.
@@ -190,7 +191,7 @@ logs:
 
 **Impact on current code:** `DAGBuilder` and `DAGValidator` in `flow-engine/src/validation/` are misnamed. Rename to `GraphBuilder` and `GraphValidator` during the refactor. Cycle detection must allow bounded cycles rather than rejecting them.
 
-## D19 — `flow attach`, `flow logs`, and `flow list` are pure file operations *(v2 — deferred)*
+## D19 — `flow attach`, `flow logs`, and `flow list` are pure file operations _(v2 — deferred)_
 
 `flow attach <id>` tails `~/.flow-daemon/logs/*.ndjson` filtered by execution ID, stops on `[id|__execution] COMPLETED|FAILED`.
 `flow logs <id>` greps the same files.
@@ -235,7 +236,7 @@ Every execution state transition is written to `~/.flow-daemon/executions/<execu
 
 Execution files in `~/.flow-daemon/executions/` expire after `logs.retainDays` days (default: 30). One config key controls both — they describe the same event and should expire together.
 
-## D23 — Worker↔daemon communication is WebSocket, independent of the SDK *(v2 — deferred)*
+## D23 — Worker↔daemon communication is WebSocket, independent of the SDK _(v2 — deferred)_
 
 The SDK is only involved in CLI↔daemon communication. Worker↔daemon communication is pure business logic with no SDK dependency.
 
@@ -256,6 +257,7 @@ Daemon                          Worker
 Worker detects daemon loss via WebSocket close. It buffers logs locally (memory first; spills to temp file after `worker.bufferSpillMs` to prevent loss) and calls the CLI binary (`flow worker-register ...`) with exponential backoff. That CLI subprocess either finds an existing daemon or becomes one (D1). Once reachable, worker opens a fresh WebSocket and flushes buffered logs in order.
 
 **Multi-worker crash recovery:**
+
 ```
 Worker1    Worker2    Worker3    CLI subprocess
   |          |          |
@@ -280,7 +282,7 @@ Race resolution: D1 handles it naturally.
 
 **Log buffer spill threshold:** `worker.bufferSpillMs` (default: 15000ms). Independent configuration key — not derived from `reconnectTimeoutMs`.
 
-## D24 — Daemon restart: reconnection window before resuming normal step assignment *(v2 — deferred)*
+## D24 — Daemon restart: reconnection window before resuming normal step assignment _(v2 — deferred)_
 
 On startup, the daemon reads `executions/*.json`, counts steps with `status: running` across all execution files — call this N. It enters a **reconnection window**: holds new step assignments (but accepts `flow run` commands) until either all N workers reconnect or the timeout expires.
 
@@ -291,6 +293,7 @@ Workers reconnecting within the window reclaim their pool slot and resume. Worke
 **Why hold assignments:** Prevents assigning new steps into slots about to be reclaimed by reconnecting workers, which would temporarily exceed `queue.concurrency`.
 
 **Test scenarios required:**
+
 - Worker survives daemon crash, reconnects within window, flushes buffered logs in order — no log loss
 - Multiple workers survive crash, all reconnect — pool correctly restored
 - Worker dies with daemon — not seen in window → D12 applies
@@ -310,7 +313,7 @@ This retry loop is bounded by `maxOutputRetries` per step (default: 3). After ex
 
 **Why multi-shot not immediate failure:** Multi-shot with a correction prompt is consistent with how the current `agent-fleet` handles unexpected output. A single bad response is often recoverable without human intervention.
 
-## D26 — Subflow steps are expanded inline into the parent execution graph *(v2 — deferred)*
+## D26 — Subflow steps are expanded inline into the parent execution graph _(v2 — deferred)_
 
 When the daemon encounters a step of type `subflow`, it loads the referenced flow definition and injects its steps into the current execution's graph under a namespace prefix (e.g. `subflow-generate-pr.run-tests`). No child execution is created.
 
@@ -329,14 +332,14 @@ Input schema is declared in the flow YAML:
 ```yaml
 id: create-pr
 inputs:
-  - name: branch
-    required: true
-  - name: base
-    required: false
-    default: "main"
+    - name: branch
+      required: true
+    - name: base
+      required: false
+      default: 'main'
 steps:
-  - id: generate-pr
-    prompt: "Create a PR for branch ${{ inputs.branch }} targeting ${{ inputs.base }}"
+    - id: generate-pr
+      prompt: 'Create a PR for branch ${{ inputs.branch }} targeting ${{ inputs.base }}'
 ```
 
 Values are passed at invocation time:
@@ -351,11 +354,11 @@ Interpolation syntax is identical to the current agent-fleet: `${{ inputs.<name>
 
 ```yaml
 inputs:
-  - name: branch
-    required: true
-  - name: deploy_key
-    required: true
-    type: secret     # caller must pass a URI (env://, file://) — literal values rejected
+    - name: branch
+      required: true
+    - name: deploy_key
+      required: true
+      type: secret # caller must pass a URI (env://, file://) — literal values rejected
 ```
 
 `type` accepted values: `string` (default), `secret`.
@@ -370,7 +373,7 @@ For `type: secret` inputs: the CLI validates that the value passed via `--input`
 
 **`ClientCommand.run` includes `cwd`:** the CLI passes `process.cwd()` so the daemon can resolve relative `flowFile` paths and use it as the default workspace directory.
 
-## D28 — `flow cancel`: graceful cancellation *(v2 — deferred)*
+## D28 — `flow cancel`: graceful cancellation _(v2 — deferred)_
 
 Deferred to v2 (D34). The following behavior is designed but not implemented in v1.
 
@@ -395,11 +398,13 @@ Flow CLI supports all step types and fields from flow-engine without simplificat
 **Base fields (all steps):** `id`, `name`, `depends`, `when`, `retry`, `onFailure`, `output`, `contract`, `context`
 
 **Approved exceptions (carry over as throws):**
+
 - `user_intervention` → `UnsupportedOperationError` (D8)
 - `workspace.mode: isolated` / git strategies → `UnsupportedOperationError` (D7)
 - `${{ task.* }}` expressions → resolve to undefined (no task concept in CLI); documented behavior, not an error
 
 **New fields added by Flow CLI on top of flow-engine (not in current engine):**
+
 - `idempotent: boolean` (default: false) — crash recovery behavior (D12)
 - `maxCrashRetries: number` (default: 3) — crash retry bound, independent of `maxIterations` (D12)
 
@@ -415,13 +420,13 @@ Flow CLI supports all step types and fields from flow-engine without simplificat
 
 ### URI schemes
 
-| Scheme | vars: | secrets: | Notes |
-|---|---|---|---|
-| `env://NAME` | yes | yes | Reads worker process env at resolve time |
-| `file://./rel/path` | yes | yes | Relative to workspace — validated |
-| `file:///abs/path` | yes | yes | Default: error; configurable to warn |
-| `value://literal` | yes | NO | Plaintext in YAML — vars only |
-| `input://name` | yes | yes | Reads from flow inputs at invocation time |
+| Scheme              | vars: | secrets: | Notes                                     |
+| ------------------- | ----- | -------- | ----------------------------------------- |
+| `env://NAME`        | yes   | yes      | Reads worker process env at resolve time  |
+| `file://./rel/path` | yes   | yes      | Relative to workspace — validated         |
+| `file:///abs/path`  | yes   | yes      | Default: error; configurable to warn      |
+| `value://literal`   | yes   | NO       | Plaintext in YAML — vars only             |
+| `input://name`      | yes   | yes      | Reads from flow inputs at invocation time |
 
 `cmd://` is not supported — shell injection surface with no safe parsing strategy.
 
@@ -441,25 +446,25 @@ Steps receive NOTHING by default. All env vars must be explicitly declared:
 
 ```yaml
 vars:
-  NODE_ENV: production
+    NODE_ENV: production
 
 secrets:
-  github_token: "env://MY_GITHUB_TOKEN"
-  npm_token: "file://./secrets/npm_token"
+    github_token: 'env://MY_GITHUB_TOKEN'
+    npm_token: 'file://./secrets/npm_token'
 
 steps:
-  - id: create-pr
-    type: model
-    env:
-      GITHUB_TOKEN: ${{ secrets.github_token }}   # secret mapped to env var
-      NODE_ENV: ${{ vars.NODE_ENV }}              # var mapped to env var
+    - id: create-pr
+      type: model
+      env:
+          GITHUB_TOKEN: ${{ secrets.github_token }} # secret mapped to env var
+          NODE_ENV: ${{ vars.NODE_ENV }} # var mapped to env var
 
-  - id: run-tests
-    type: script
-    script: npm test
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.npm_token }}
-      PATH: /usr/local/bin:/usr/bin:/bin          # must be explicit — no inheritance
+    - id: run-tests
+      type: script
+      script: npm test
+      env:
+          NODE_AUTH_TOKEN: ${{ secrets.npm_token }}
+          PATH: /usr/local/bin:/usr/bin:/bin # must be explicit — no inheritance
 ```
 
 `vars:` values are available as `${{ vars.name }}` in any step field. Secrets are NOT available via `${{ secrets.name }}` directly in prompt text — only via env: mapping.
@@ -474,7 +479,7 @@ All 6 variants registered per secret: raw, base64 (no padding), base64 byte-offs
 
 Registration is EAGER (at worker startup, before any step runs) — not lazy. This prevents parallel-step TOCTOU races.
 
-Masking applies to every output path: Claude subprocess stdout/stderr, script subprocess stdout/stderr, worker log entries before WebSocket send, StepOutput before writing to executions/*.json, error messages crossing I/O boundaries.
+Masking applies to every output path: Claude subprocess stdout/stderr, script subprocess stdout/stderr, worker log entries before WebSocket send, StepOutput before writing to executions/\*.json, error messages crossing I/O boundaries.
 
 ### Security constraints enforced at validation
 
@@ -493,23 +498,23 @@ Hooks are declared in `.flows/config.yml` as typed objects. A `HookDispatcher` r
 
 ```yaml
 hooks:
-  on-task-created:
-    - type: cli
-      command: flow
-      args: ["run", ".flows/elaborate-task.yml"]
-    - type: http
-      url: https://hooks.slack.com/services/xxx
-  on-status-change:
-    - when: "approved"
-      type: cli
-      command: flow
-      args: ["run", ".flows/implement-task.yml"]
+    on-task-created:
+        - type: cli
+          command: flow
+          args: ['run', '.flows/elaborate-task.yml']
+        - type: http
+          url: https://hooks.slack.com/services/xxx
+    on-status-change:
+        - when: 'approved'
+          type: cli
+          command: flow
+          args: ['run', '.flows/implement-task.yml']
 ```
 
-| type | Behavior |
-|---|---|
-| `cli` | `child_process.execFile(command, args)` — no shell, no injection risk. Task context passed as env vars: `TASK_ID`, `TASK_STATUS`, `TASK_DESCRIPTION`, `TASK_FILE`. |
-| `http` | POST JSON `{ taskId, status, description, taskFile }` to `url`. Supports `http://` and `https://`. |
+| type   | Behavior                                                                                                                                                           |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `cli`  | `child_process.execFile(command, args)` — no shell, no injection risk. Task context passed as env vars: `TASK_ID`, `TASK_STATUS`, `TASK_DESCRIPTION`, `TASK_FILE`. |
+| `http` | POST JSON `{ taskId, status, description, taskFile }` to `url`. Supports `http://` and `https://`.                                                                 |
 
 Multiple listeners per event — array, all called in order. Default on failure: `on-failure: ignore` (configurable per listener to `fail-task`).
 
@@ -520,6 +525,7 @@ Multiple listeners per event — array, all called in order. Default on failure:
 ## D33 — `task` CLI: file-based storage, minimal command surface
 
 Storage layout (project-local):
+
 ```
 .flows/tasks/
   index.json          ← { tasks: [{ id, title, status, createdAt }] }
@@ -527,6 +533,7 @@ Storage layout (project-local):
 ```
 
 Commands:
+
 ```
 task new <description>       # create task, trigger on-task-created hook
 task list                    # read index.json
@@ -552,9 +559,11 @@ Each worker starts a per-execution MCP server upon receiving the `assign` messag
 **`--strict-mcp-config`:** prevents the user's personal MCP servers from interfering with the execution environment.
 
 **v1 tools exposed (minimum for step injection):**
+
 - `provideSteps(steps: Step[])` — inject steps into the running graph
 
 **v2+ tools (not scoped now but the architecture supports them):**
+
 - `logMessage`, `setTodo`, `askUser`, `getFlowState`, `getStepOutput`
 
 **Why this matters beyond step injection:** this is the primary bidirectional interface between Claude and the flow engine. Future tools can expose flow state, user interaction (web UI prompts), and task management without any architectural change.
@@ -577,15 +586,17 @@ All other commands are deferred to v2: `attach`, `logs`, `list` (pure file-tail 
 **`flow validate`:** validates the flow YAML (graph structure, input schema, step schema) without executing. Used by the task elaboration flow's deterministic validation step — calls `flow validate` on the LLM-generated steps before injecting them into the graph. Returns structured errors on failure, exits 0 on success.
 
 **`flow validate` output contract:**
+
 - Exit 0: valid. No output (silent success — consumed by script steps).
 - Exit 1: invalid. Writes JSON to stdout regardless of TTY:
-  ```json
-  { "valid": false, "errors": [{ "type": "string", "message": "string", "path": "string" }] }
-  ```
-  `type` values: `graph`, `input`, `schema`, `cycle`, `template`.
+    ```json
+    { "valid": false, "errors": [{ "type": "string", "message": "string", "path": "string" }] }
+    ```
+    `type` values: `graph`, `input`, `schema`, `cycle`, `template`.
 - Exit 2: file not found or unreadable.
 
 **`flow run` output contract:**
+
 - Exit 0: execution queued. Prints `<executionId>` to stdout (suppressed with `--quiet`).
 - Exit 1: daemon error (prints error JSON to stderr: `{ "code": "string", "message": "string" }`).
 - Exit 2: validation error before queue (same JSON format as `flow validate` exit 1, to stderr).
@@ -609,7 +620,7 @@ type: script
 command: npm test
 parent: implement-feature
 onFailure:
-  goto: implement-feature
+    goto: implement-feature
 ```
 
 **Recursive hierarchy:** sub-steps can themselves have sub-steps. Depth is configurable (`maxChildDepth`, default: 10). Exceeding the limit throws at injection time.
@@ -630,40 +641,40 @@ Full schema for the project-level flow configuration file:
 version: 1
 
 defaults:
-  model: claude-opus-5           # default model for all model steps
+    model: claude-opus-5 # default model for all model steps
 
 execution:
-  maxChildDepth: 10              # max parent/child step nesting depth (D36)
+    maxChildDepth: 10 # max parent/child step nesting depth (D36)
 
 hooks:
-  onFlowStart:
-    - type: cli
-      command: ...
-      args: [...]
-  onFlowEnd:
-    - type: cli
-      command: ...
-  onFlowError:
-    - type: http
-      url: ...
-  onStepStart:
-    - type: cli
-      command: ...
-  onStepEnd:
-    - type: cli
-      command: ...
-  onStepFailed:
-    - type: cli
-      command: ...
+    onFlowStart:
+        - type: cli
+          command: ...
+          args: [...]
+    onFlowEnd:
+        - type: cli
+          command: ...
+    onFlowError:
+        - type: http
+          url: ...
+    onStepStart:
+        - type: cli
+          command: ...
+    onStepEnd:
+        - type: cli
+          command: ...
+    onStepFailed:
+        - type: cli
+          command: ...
 
 tasks:
-  storage:
-    dir: .flows/tasks             # project-local task storage (D33)
-  hooks:
-    onStatusChange:
-      - type: cli
-        command: ...
-        args: [...]
+    storage:
+        dir: .flows/tasks # project-local task storage (D33)
+    hooks:
+        onStatusChange:
+            - type: cli
+              command: ...
+              args: [...]
 ```
 
 Hook listener schema per D32: `type: cli | http`. All hook events accept an array of listeners. Hook events are distinct from task hooks — flow hooks fire on step/flow lifecycle; task hooks fire on status transitions.
@@ -688,20 +699,21 @@ The `provideSteps` tool exposed by the flow MCP server (D35) accepts:
 
 ```typescript
 interface ProvideStepsInput {
-  steps: InjectedStep[];
+	steps: InjectedStep[];
 }
 
 interface InjectedStep {
-  id: string;                    // required — must be unique in the execution graph
-  type: 'model' | 'script' | 'subflow';  // user_intervention not allowed in injected steps
-  parent?: string;               // ID of the step that owns this sub-step (D36)
-  depends?: string[];            // IDs of steps that must complete before this one starts
-  onFailure?: { goto: string };  // creates a bounded cycle (D12 maxIterations applies)
-  // All other standard step fields apply (prompt, command, env, output, etc.)
+	id: string; // required — must be unique in the execution graph
+	type: 'model' | 'script' | 'subflow'; // user_intervention not allowed in injected steps
+	parent?: string; // ID of the step that owns this sub-step (D36)
+	depends?: string[]; // IDs of steps that must complete before this one starts
+	onFailure?: { goto: string }; // creates a bounded cycle (D12 maxIterations applies)
+	// All other standard step fields apply (prompt, command, env, output, etc.)
 }
 ```
 
 **Validation at injection time (throws, returns MCP error to Claude):**
+
 - `id` already exists in the graph → error
 - `parent` references a non-existent step → error
 - `depends` references a non-existent step → error

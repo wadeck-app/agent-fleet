@@ -93,17 +93,19 @@ export class ScriptExecutor {
 		const shouldIsolate = options.isolateEnv !== false; // default true
 		const baseEnv: NodeJS.ProcessEnv = shouldIsolate
 			? {
-				PATH: process.env['PATH'],
-				HOME: process.env['HOME'],
-				TMPDIR: process.env['TMPDIR'],
-				TEMP: process.env['TEMP'],
-				TMP: process.env['TMP'],
-				// Windows
-				...(process.platform === 'win32' && process.env['SystemRoot']
-					? { SystemRoot: process.env['SystemRoot'] } : {}),
-				...(process.platform === 'win32' && process.env['USERPROFILE']
-					? { USERPROFILE: process.env['USERPROFILE'] } : {}),
-			}
+					PATH: process.env['PATH'],
+					HOME: process.env['HOME'],
+					TMPDIR: process.env['TMPDIR'],
+					TEMP: process.env['TEMP'],
+					TMP: process.env['TMP'],
+					// Windows
+					...(process.platform === 'win32' && process.env['SystemRoot']
+						? { SystemRoot: process.env['SystemRoot'] }
+						: {}),
+					...(process.platform === 'win32' && process.env['USERPROFILE']
+						? { USERPROFILE: process.env['USERPROFILE'] }
+						: {}),
+				}
 			: { ...process.env };
 		const rawEnv = { ...baseEnv, ...options.env };
 		const cleanEnv: Record<string, string> = {};

@@ -3,6 +3,7 @@
 ## Proposals must include pros/cons/recommendation
 
 Every time a proposal or option is presented to the user, it MUST include:
+
 - **Pros** — concrete advantages
 - **Cons** — concrete drawbacks
 - **Recommendation** — a clear stance

@@ -14,31 +14,37 @@ Files reviewed: FlowIndex.ts, RunCommand.ts, ShowCommand.ts, CommandHandler.ts, 
 ## Remaining
 
 ### MED #4 — Repeated `options.json && !options.human` guard
+
 **File:** `RunCommand.ts:138, 149, 164, 173`
 
 Four identical expressions. Still present. Deferred.
 
 ### MED #5 — 106-line inline action callback
+
 **File:** `RunCommand.ts:82-188`
 
 Still untestable in isolation. Deferred.
 
 ### MED #6 — `as any` double cast in WorkerAdapter
+
 **File:** `WorkerAdapter.ts:54`
 
 Still present. Blocked on flow-engine.
 
 ### MED #7 — `new FlowValidator(undefined)` explicit undefined
+
 **File:** `CommandHandler.ts:59`, `FlowValidator.ts:55`
 
 `undefined` passed to optional parameter. Should be omitted.
 
 ### LOW #8 — loadYaml.ts missing `node:` prefix
+
 **File:** `loadYaml.ts:1`
 
 Inconsistent with rest of codebase. Trivial fix.
 
 ### LOW #10 — `--json`/`--human` mutual exclusion not enforced
+
 **File:** `RunCommand.ts:80-81`, `ValidateCommand.ts:8-9`
 
 Both flags can be passed simultaneously. Deferred.

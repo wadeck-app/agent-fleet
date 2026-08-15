@@ -48,9 +48,28 @@ interface JsonRpcResponse {
 // Allowed fields for injected steps — unknown fields are rejected to prevent injection of
 // unsupported or dangerous keys.
 const ALLOWED_STEP_FIELDS = new Set([
-	'id', 'type', 'name', 'parent', 'depends', 'prompt', 'model', 'script', 'workingDir',
-	'env', 'captureOutput', 'inputs', 'flowId', 'workspaceStrategy', 'allowRecursion',
-	'output', 'when', 'context', 'retry', 'onFailure', 'contract', 'skipOnLoop',
+	'id',
+	'type',
+	'name',
+	'parent',
+	'depends',
+	'prompt',
+	'model',
+	'script',
+	'workingDir',
+	'env',
+	'captureOutput',
+	'inputs',
+	'flowId',
+	'workspaceStrategy',
+	'allowRecursion',
+	'output',
+	'when',
+	'context',
+	'retry',
+	'onFailure',
+	'contract',
+	'skipOnLoop',
 ]);
 
 export class McpServer {
@@ -220,7 +239,10 @@ export class McpServer {
 				return {
 					jsonrpc: '2.0',
 					id,
-					error: { code: -32602, message: `Step '${String((step as { id?: unknown }).id)}' has unknown fields: ${unknownFields.join(', ')}` },
+					error: {
+						code: -32602,
+						message: `Step '${String((step as { id?: unknown }).id)}' has unknown fields: ${unknownFields.join(', ')}`,
+					},
 				};
 			}
 			if ((step as { type: string }).type === 'user_intervention') {

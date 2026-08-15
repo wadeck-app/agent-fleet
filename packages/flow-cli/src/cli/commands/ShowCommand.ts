@@ -1,11 +1,5 @@
 import type { Command } from 'commander';
-import type {
-	FlowDefinition,
-	FlowStep,
-	ModelFlowStep,
-	SubFlowStep,
-	UserInterventionStep,
-} from 'flow-engine/types';
+import type { FlowDefinition, FlowStep, ModelFlowStep, SubFlowStep, UserInterventionStep } from 'flow-engine/types';
 
 import { loadYaml } from '../../utils/loadYaml';
 

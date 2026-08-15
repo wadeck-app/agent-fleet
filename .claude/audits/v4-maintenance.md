@@ -16,11 +16,13 @@ Audited: Daemon.ts, CommandHandler.ts, WorkerPool.ts, StepQueue.ts, Worker.ts, W
 ## Remaining
 
 ### HIGH H4 — handleWorkerMessage god closure
+
 **File:** `Daemon.ts:89-180`
 
 Still orchestrates all subsystems directly. Structural debt; tracked for v2. Not an active defect.
 
 ### MED M8 — sendToWorker silent failure; step hangs
+
 **File:** `WorkerPool.ts:113-117`
 
 `sendToWorker` does nothing if ws is not OPEN. Step marked running but never executed. Execution hangs.
@@ -28,11 +30,13 @@ Still orchestrates all subsystems directly. Structural debt; tracked for v2. Not
 **Status:** Deferred — requires sendToWorker to return boolean + reverse of markBusy/markStepActive/markStepRunning.
 
 ### MED M2 — Hardcoded worker path
+
 **File:** `WorkerPool.ts:27`
 
 `dist/worker/Worker.js` hardcoded. Low-risk v1 fragility. Deferred.
 
 ### LOW L4 — LogWriter HARD_CAP no warning
+
 **File:** `LogWriter.ts:71`
 
 retainDays > 120 silently capped. Deferred.

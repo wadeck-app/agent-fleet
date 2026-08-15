@@ -112,7 +112,9 @@ export class StepQueue {
 	onStepCompleted(executionId: string, stepId: string, output: Record<string, unknown>): void {
 		const entry = this.executions.get(executionId);
 		if (!entry) {
-			process.stderr.write(`[StepQueue] onStepCompleted: no entry for execution ${executionId} (step ${stepId}) — late message after cleanup\n`);
+			process.stderr.write(
+				`[StepQueue] onStepCompleted: no entry for execution ${executionId} (step ${stepId}) — late message after cleanup\n`
+			);
 			return;
 		}
 
@@ -128,9 +130,7 @@ export class StepQueue {
 		// Check if execution is fully done
 		// Note: failedSteps is NOT checked here — onStepFailed already deletes the execution
 		// before this path can be reached with any failed steps (M5: no dead code needed).
-		const allDone = [...entry.steps.keys()].every(
-			sid => entry.completedSteps.has(sid)
-		);
+		const allDone = [...entry.steps.keys()].every(sid => entry.completedSteps.has(sid));
 		if (allDone) {
 			this.executions.delete(executionId);
 			this.activeExecutions--;
@@ -143,7 +143,9 @@ export class StepQueue {
 	onStepFailed(executionId: string, stepId: string): void {
 		const entry = this.executions.get(executionId);
 		if (!entry) {
-			process.stderr.write(`[StepQueue] onStepFailed: no entry for execution ${executionId} (step ${stepId}) — late message after cleanup\n`);
+			process.stderr.write(
+				`[StepQueue] onStepFailed: no entry for execution ${executionId} (step ${stepId}) — late message after cleanup\n`
+			);
 			return;
 		}
 
@@ -173,7 +175,9 @@ export class StepQueue {
 	markStepActive(executionId: string, stepId: string): void {
 		const entry = this.executions.get(executionId);
 		if (!entry) {
-			throw new Error(`[StepQueue] markStepActive: no entry for execution ${executionId} (step ${stepId}) — dequeue returned a step for an unknown execution`);
+			throw new Error(
+				`[StepQueue] markStepActive: no entry for execution ${executionId} (step ${stepId}) — dequeue returned a step for an unknown execution`
+			);
 		}
 		entry.activeSteps.add(stepId);
 	}

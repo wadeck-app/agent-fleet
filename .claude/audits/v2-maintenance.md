@@ -7,6 +7,7 @@
 ## HIGH
 
 ### H1 — ExecutionStore: read-then-write with no lock (lost-update race)
+
 **FILE:LINE:** `src/storage/ExecutionStore.ts:66-70`
 **CATEGORY:** race
 
@@ -17,6 +18,7 @@ All mutating methods (`markStepRunning`, `markStepCompleted`, `markStepFailed`, 
 ---
 
 ### H2 — Daemon.ts: hookDispatcher is per-run mutable shared state on CommandHandler
+
 **FILE:LINE:** `src/daemon/Daemon.ts:62-63`
 **CATEGORY:** race
 
@@ -27,6 +29,7 @@ Each `run` command calls `commandHandler.setHookDispatcher(new HookDispatcher(fl
 ---
 
 ### H3 — WorkerAdapter: accesses StepRunner private config via `any` cast
+
 **FILE:LINE:** `src/worker/WorkerAdapter.ts:54`
 **CATEGORY:** coupling
 
@@ -37,6 +40,7 @@ Each `run` command calls `commandHandler.setHookDispatcher(new HookDispatcher(fl
 ---
 
 ### H4 — Daemon.ts: handleWorkerMessage is a god closure coupling all subsystems
+
 **FILE:LINE:** `src/daemon/Daemon.ts:88-170`
 **CATEGORY:** coupling
 
@@ -47,6 +51,7 @@ Each `run` command calls `commandHandler.setHookDispatcher(new HookDispatcher(fl
 ---
 
 ### H5 — CommandHandler.handleRun: workspaceManager.allocate() has no error handling
+
 **FILE:LINE:** `src/daemon/CommandHandler.ts:76-80`
 **CATEGORY:** error-handling
 
@@ -59,6 +64,7 @@ Each `run` command calls `commandHandler.setHookDispatcher(new HookDispatcher(fl
 ## MEDIUM
 
 ### M1 — WorkerPool: `child.pid!` non-null assertion on spawn
+
 **FILE:LINE:** `src/daemon/WorkerPool.ts:46`
 **CATEGORY:** error-handling
 
@@ -69,6 +75,7 @@ Each `run` command calls `commandHandler.setHookDispatcher(new HookDispatcher(fl
 ---
 
 ### M2 — WorkerPool: hardcoded path to compiled worker output
+
 **FILE:LINE:** `src/daemon/WorkerPool.ts:27`
 **CATEGORY:** hardcoded
 
@@ -79,6 +86,7 @@ Each `run` command calls `commandHandler.setHookDispatcher(new HookDispatcher(fl
 ---
 
 ### M3 — Worker.ts: JSON parse failure on daemon messages silently swallowed
+
 **FILE:LINE:** `src/worker/Worker.ts:28-30`
 
 **CATEGORY:** error-handling
@@ -90,6 +98,7 @@ Each `run` command calls `commandHandler.setHookDispatcher(new HookDispatcher(fl
 ---
 
 ### M4 — HookDispatcher: inner `.catch(() => {})` makes outer error handler dead code
+
 **FILE:LINE:** `src/hooks/HookDispatcher.ts:41` and `src/daemon/CommandHandler.ts:35-38`
 **CATEGORY:** error-handling
 
@@ -100,6 +109,7 @@ Each `run` command calls `commandHandler.setHookDispatcher(new HookDispatcher(fl
 ---
 
 ### M5 — StepQueue.injectSteps: intra-batch dependency validation is broken
+
 **FILE:LINE:** `src/daemon/StepQueue.ts:62-76`
 **CATEGORY:** error-handling
 
@@ -110,6 +120,7 @@ The dependency validation loop checks `entry.steps.has(dep)` before the batch is
 ---
 
 ### M6 — StepQueue.injectSteps: InjectedStep cast to AssignableStep without field validation
+
 **FILE:LINE:** `src/daemon/StepQueue.ts:80`
 **CATEGORY:** error-handling
 
@@ -120,6 +131,7 @@ The dependency validation loop checks `entry.steps.has(dep)` before the batch is
 ---
 
 ### M7 — CommandHandler.handleRun: duplicate generateExecutionId() calls
+
 **FILE:LINE:** `src/daemon/CommandHandler.ts:77, 83`
 **CATEGORY:** hidden-dep
 
@@ -130,6 +142,7 @@ The dependency validation loop checks `entry.steps.has(dep)` before the batch is
 ---
 
 ### M8 — CommandHandler.tryDispatch: sendToWorker failure is silent; step hangs
+
 **FILE:LINE:** `src/daemon/CommandHandler.ts:138-143`
 **CATEGORY:** error-handling
 
@@ -140,6 +153,7 @@ After `markBusy` and `markStepActive` are called, `workerPool.sendToWorker()` is
 ---
 
 ### M9 — WorkerAdapter: mcpServer.stop() error shadows executeStep error
+
 **FILE:LINE:** `src/worker/WorkerAdapter.ts:63-68`
 **CATEGORY:** error-handling
 
@@ -150,6 +164,7 @@ In the `finally` block, `await mcpServer.stop()` can throw (e.g. already-closed 
 ---
 
 ### M10 — LogWriter.rotate() called synchronously on every write
+
 **FILE:LINE:** `src/storage/LogWriter.ts:43-44, 67-89`
 **CATEGORY:** resource-leak
 
@@ -162,6 +177,7 @@ In the `finally` block, `await mcpServer.stop()` can throw (e.g. already-closed 
 ## LOW
 
 ### L1 — `'__hook'` magic string lacks a named constant
+
 **FILE:LINE:** `src/daemon/CommandHandler.ts:36`
 **CATEGORY:** hardcoded
 
@@ -172,6 +188,7 @@ The literal `'__hook'` is used as a sentinel executionId for hook error log entr
 ---
 
 ### L2 — WORKER_CONNECT_TIMEOUT_MS not configurable
+
 **FILE:LINE:** `src/daemon/WorkerPool.ts:10`
 **CATEGORY:** hardcoded
 
@@ -182,6 +199,7 @@ The 10-second connect timeout is not part of `FlowConfig`. On slow startup machi
 ---
 
 ### L3 — StepQueue.onStepCompleted/onStepFailed silently ignores unknown executionId
+
 **FILE:LINE:** `src/daemon/StepQueue.ts:110`
 **CATEGORY:** error-handling
 
@@ -192,6 +210,7 @@ The 10-second connect timeout is not part of `FlowConfig`. On slow startup machi
 ---
 
 ### L4 — LogWriter: HARD_CAP silently overrides configured retainDays
+
 **FILE:LINE:** `src/storage/LogWriter.ts:5, 71`
 **CATEGORY:** hardcoded
 
@@ -202,6 +221,7 @@ When `retainDays > 120`, the cap is applied without warning. A user configuring 
 ---
 
 ### L5 — ExecutionStore.pruneOldExecutions: readdirSync not wrapped in try/catch
+
 **FILE:LINE:** `src/storage/ExecutionStore.ts:27`
 **CATEGORY:** error-handling
 
@@ -212,6 +232,7 @@ When `retainDays > 120`, the cap is applied without warning. A user configuring 
 ---
 
 ### L6 — WorkerAdapter: workspace mode hardcoded to `'manual'`
+
 **FILE:LINE:** `src/worker/WorkerAdapter.ts:29`
 **CATEGORY:** hardcoded
 

@@ -15,6 +15,7 @@ if (!entry) return;  // silent no-op
 ```
 
 **Better:**
+
 ```ts
 const entry = this.executions.get(executionId);
 if (!entry) throw new Error(`No active execution: ${executionId}`);
@@ -32,7 +33,7 @@ if (!entry) throw new Error(`No active execution: ${executionId}`);
 
 ## 3. [HIGH] `as any` escape hatch without WHY — WorkerAdapter.ts:54–60
 
-**Issue:** Two `as any` casts access `StepRunner`'s private `config` field to patch it. The comment only explains *what* is done (`// Patch StepRunner config with MCP config path via env`), not *why* StepRunner doesn't expose the config, or that this is an acknowledged limitation rather than a mistake.
+**Issue:** Two `as any` casts access `StepRunner`'s private `config` field to patch it. The comment only explains _what_ is done (`// Patch StepRunner config with MCP config path via env`), not _why_ StepRunner doesn't expose the config, or that this is an acknowledged limitation rather than a mistake.
 
 ```ts
 const originalConfig = (this.stepRunner as any).config as any;
@@ -47,9 +48,11 @@ const originalConfig = (this.stepRunner as any).config as any;
 **Issue:** `options.json && !options.human` appears four times in the same handler, with no explanation of why `--human` overrides `--json`. Reading these guards requires mentally reconstructing the precedence rule each time.
 
 **Better:**
+
 ```ts
 const machineReadable = options.json === true && options.human !== true;
 ```
+
 Declare once at the top of the action, use the named variable everywhere.
 
 ---
@@ -64,7 +67,7 @@ Declare once at the top of the action, use the named variable everywhere.
 
 ## 6. [MEDIUM] Unexplained triple-condition entry-point guard — TaskIndex.ts:181–185
 
-**Issue:** The entry-point guard checks `fileURLToPath(import.meta.url)` *and* two `.endsWith()` fallbacks for `.js`/`.ts`. The `fileURLToPath` check is already exact — the two `endsWith` fallbacks are redundant unless they handle a specific edge case (e.g., ts-node path normalization). Without a WHY comment this reads as cargo-cult defensiveness.
+**Issue:** The entry-point guard checks `fileURLToPath(import.meta.url)` _and_ two `.endsWith()` fallbacks for `.js`/`.ts`. The `fileURLToPath` check is already exact — the two `endsWith` fallbacks are redundant unless they handle a specific edge case (e.g., ts-node path normalization). Without a WHY comment this reads as cargo-cult defensiveness.
 
 **Better:** Either remove the `endsWith` fallbacks (they add noise), or add a comment explaining which environment requires them.
 

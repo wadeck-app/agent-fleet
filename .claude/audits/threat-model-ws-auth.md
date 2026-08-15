@@ -1,4 +1,5 @@
 # Threat Model — WebSocket Daemon Authentication
+
 Date: 2026-08-15
 Decision: No authentication implemented in v1. This document explains why.
 
@@ -42,6 +43,7 @@ The WS port is discoverable (httpPort+1, httpPort written to ~/.flow-daemon/ loc
 **No authentication is implemented on the WebSocket channel in v1.**
 
 Rationale:
+
 - A1 is not a realistic incremental risk — a same-user malicious process has more direct and severe attack vectors available.
 - A2 and A3 are outside the stated deployment scope.
 - A4 requires a full redesign when it arrives.

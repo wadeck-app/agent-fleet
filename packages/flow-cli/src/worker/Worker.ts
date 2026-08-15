@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-import { WebSocket } from 'ws';
 import { StepRunner } from 'flow-engine';
 import type { StepRunnerConfig } from 'flow-engine';
+import { WebSocket } from 'ws';
+
 import type { DaemonToWorker, WorkerToDaemon } from '../ipc/Protocol';
 import { WorkerAdapter } from './WorkerAdapter';
 
@@ -28,17 +29,28 @@ const adapter = new WorkerAdapter((mcpConfigPath: string) => {
 	return new StepRunner(config);
 });
 
-ws.on('open', () => { send({ type: 'ready', pid: process.pid }); });
+ws.on('open', () => {
+	send({ type: 'ready', pid: process.pid });
+});
 
 ws.on('message', (data: Buffer) => {
 	let message: DaemonToWorker;
-	try { message = JSON.parse(data.toString()) as DaemonToWorker; }
-	catch (err) { process.stderr.write(`[worker] failed to parse daemon message: ${String(err)}\n`); return; }
+	try {
+		message = JSON.parse(data.toString()) as DaemonToWorker;
+	} catch (err) {
+		process.stderr.write(`[worker] failed to parse daemon message: ${String(err)}\n`);
+		return;
+	}
 	void handleMessage(message);
 });
 
-ws.on('error', (err: Error) => { process.stderr.write(`WebSocket error: ${err.message}\n`); process.exit(1); });
-ws.on('close', () => { process.exit(0); });
+ws.on('error', (err: Error) => {
+	process.stderr.write(`WebSocket error: ${err.message}\n`);
+	process.exit(1);
+});
+ws.on('close', () => {
+	process.exit(0);
+});
 
 async function handleMessage(message: DaemonToWorker): Promise<void> {
 	switch (message.type) {
@@ -54,8 +66,11 @@ async function handleMessage(message: DaemonToWorker): Promise<void> {
 			send({ type: 'ready', pid: process.pid });
 			break;
 		}
-		case 'idle': break;
-		case 'done': ws.close(); break;
+		case 'idle':
+			break;
+		case 'done':
+			ws.close();
+			break;
 		default: {
 			const _exhaustive: never = message;
 			process.stderr.write(`Unknown daemon message: ${JSON.stringify(_exhaustive)}\n`);
