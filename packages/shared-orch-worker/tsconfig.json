@@ -3,12 +3,13 @@
 	"compilerOptions": {
 		"outDir": "dist",
 		"declarationDir": "dist-types",
-		"rootDir": "src"
+		"rootDir": "src",
+		"baseUrl": ".",
+		"paths": {
+			"shared-common/*": ["../shared-common/dist-types/*"]
+		}
 	},
 	"include": ["src"],
 	"exclude": ["dist", "dist-types"],
-	"references": [
-		//
-		{ "path": "../shared-common" }
-	]
+	"references": []
 }

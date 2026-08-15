@@ -450,12 +450,43 @@
     "8207e252-062a-40b2-9f05-95e803bd853f": "skipped:too-short",
     "ef4482c6-3472-401f-a143-004158ef1c95": "skipped:too-short",
     "aad79fcf-fe41-4bdb-b89e-9701dc1d1845": "skipped:too-short",
-    "fce1ed36-6f7d-4411-9378-396aa073eb8e": "skipped:too-short"
+    "fce1ed36-6f7d-4411-9378-396aa073eb8e": "skipped:too-short",
+    "b3d664fc-577b-41b0-9395-6656dfbd4256": {
+      "analyzedAt": "2026-08-15T18:45:09.726Z",
+      "linesAt": 282,
+      "findings": 5,
+      "subagentsAt": {
+        "agent-a80a837910b4513a5.jsonl": 32,
+        "agent-ae50bd9d6dc4068b2.jsonl": 15
+      },
+      "logLinesAt": {
+        "w-command-log": 45,
+        "w-guardrails": 0
+      }
+    },
+    "81bc9b90-4e9e-4010-8154-e49420c7cc14": "skipped:too-short",
+    "f5ca1287-2b09-44b4-99ba-7cb16b28cc7a": {
+      "analyzedAt": "2026-08-15T20:40:23.843Z",
+      "linesAt": 160,
+      "findings": 10,
+      "subagentsAt": {
+        "agent-a0efd297d3988431d.jsonl": 29,
+        "agent-a158c410e0072c7fe.jsonl": 344,
+        "agent-a7092a00a49a07c4a.jsonl": 43,
+        "agent-a99e68823c8adaf09.jsonl": 17
+      },
+      "logLinesAt": {
+        "w-command-log": 194,
+        "w-guardrails": 0
+      }
+    },
+    "4a6762f1-9d8f-4364-8e13-3c22d9c8e88f": "skipped:too-short",
+    "4bc6cb96-8804-49a3-8c3a-eccd6335edd4": "skipped:too-short"
   },
   "last_consolidation": "2026-08-15T16:26:30.411Z",
   "last_analysis_summary": {
-    "sessionId": "0b3d4416-9ce9-4434-8e5b-bb17a4e4b31c",
+    "sessionId": "f5ca1287-2b09-44b4-99ba-7cb16b28cc7a",
     "findings": 10,
-    "at": "2026-08-15T16:26:38.929Z"
+    "at": "2026-08-15T20:40:23.844Z"
   }
 }

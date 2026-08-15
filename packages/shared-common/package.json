@@ -3,6 +3,13 @@
 	"version": "1.0.0",
 	"private": true,
 	"type": "module",
+	"exports": {
+		"./TaskStatus": { "types": "./dist-types/TaskStatus.d.ts" },
+		"./Shutdownable": { "types": "./dist-types/Shutdownable.d.ts" },
+		"./logger": { "types": "./dist-types/logger.d.ts" },
+		"./PortCalculator": { "types": "./dist-types/PortCalculator.d.ts" },
+		"./protocol": { "types": "./dist-types/protocol.d.ts" }
+	},
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
 		"dev": "tsc --build tsconfig.json --watch",

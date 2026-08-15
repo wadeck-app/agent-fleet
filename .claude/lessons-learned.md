@@ -1,8 +1,12 @@
 # Lessons learned
 
-<!-- Last updated: 2026-08-15T16:26:38.926Z -->
+<!-- Last updated: 2026-08-15T20:40:23.842Z -->
 
 ## Recurring feedback
+
+<!-- session f5ca1287 2026-08-15 -->
+- User expects assistant to run tests and fix gaps autonomously ("lance toi" — do it yourself), not ask permission. User reserves manual testing for scenarios that can't be automated.
+- User rejects solutions that require awkward invocation — CLI must be globally callable via `npm link`/bin entry, not `node dist/cli/TaskIndex.js`. If spec requires `bin`, implementation must deliver it.
 
 <!-- session 0b3d4416 2026-06-19 -->
 - User explicitly corrected emoji/unicode in code — cites CLAUDE.md rule "avoid all emojis or special unicode please". Removed all ✅🔲📋✦❓ from plan file after user reminder.
@@ -116,6 +120,15 @@
 - Multiple independent agents (Explore, general-purpose) read identical spec files sequentially without coordination, causing redundant I/O. Agents should receive shared context or hand off findings rather than re-audit.
 
 ## Agent errors
+
+<!-- session f5ca1287 2026-08-15 -->
+- Assistant initially over-asked permission before running agents; user explicitly delegated ("c'est pas mon role"). Treat test execution and refactor work as default autonomous, not asking first.
+- Iterative trial-and-error on shared-orch-worker tsconfig paths (6+ edits with grep/tsc between each) instead of systematic module resolution debugging — should trace tsc --traceResolution output once, understand the full import chain, then fix root cause rather than iterating through configurations.
+
+<!-- session b3d664fc 2026-08-15 -->
+- Agent didn't discover that `TaskIndex.ts` existed and was fully implemented — required user to ask "y a pas de task dans flow-cli ???" to surface it. Should have inventoried all command files before declaring what's available.
+- Agent asked clarifying questions about which SDK layer to use ("Quand tu dis SDK comme pour flow, tu parles de laquelle des deux?") instead of reading the spec at `specs/2026-07-30-flow-cli/decisions.md` first.
+- Agent implemented `task` CLI wiring without first documenting SDK rationale — user had to explicitly say "documente les findings pour SDK !!" to trigger analysis that should have been done upfront.
 
 <!-- session 0b3d4416 2026-06-19 -->
 - GenerateCommand model parameter unsafely cast to union without validation — `as "gpt-4-turbo" | ...` silently accepts any string. Should validate before cast.
@@ -257,6 +270,10 @@
 
 ## Documentation gaps
 
+<!-- session f5ca1287 2026-08-15 -->
+- Configuration inheritance pattern (global `~/.task/config.yml` + project overrides) wasn't documented in spec — user had to clarify it by referencing wdrive pattern. Environment variable injection for hooks (TASK_PROJECT_NAME, TASK_PROJECT_PATH) is essential but wasn't obvious.
+- Module resolution in monorepo with path aliases: reference guide needed showing how to interpret tsc --traceResolution output, when to check node_modules symlinks vs dist-types, expected directory structure for re-exports, and how path aliases are resolved through tsconfig inheritance chain.
+
 <!-- session 0b3d4416 2026-06-19 -->
 - Mock ESM import patterns unclear — multiple attempts to fix mockImplementation/mockReturnValue in vitest tests before settling on correct pattern. Project lacks clear examples for mocking flow-engine exports.
 - Flow skill definition (flow/SKILL.md) required extensive iteration to document generation constraints (model preferences, flow structure rules, output format). This detail wasn't obvious from code alone—consider linking skill docs to architecture docs or constraint definitions.
@@ -387,6 +404,16 @@
 - Extensive Grep searches for domain concepts (RE-QUEUED, bufferSpill, reconnectTimeout, idleTimeout, drainTimeout, heartbeat monitoring, etc.) suggest spec lacks clear glossary or index of key terms. Future audits should define these upfront.
 
 ## Known constraints
+
+<!-- session f5ca1287 2026-08-15 -->
+- Windows ESM loader requires `file://` URL scheme in `--import` flag; relative path calculation from worker to loader is fragile (multiple attempts to get `../../../../` correct).
+- TypeScript composite builds: `paths` in tsconfig doesn't reliably resolve cross-package imports in `--build` mode. Pre-existing `export { TaskStatus }` re-export bug in shared-orch-worker — type isn't locally available for use.
+- Git commit hooks running full test suite cause 30s+ timeouts; user may need `--no-verify` or manual commit to unblock.
+- tsx subprocess spawning requires non-obvious loader path discovery (tsx/cjs vs tsx/dist vs esm hook) — agent spent significant time inspecting node_modules/tsx/ package.json and dist/ structure to find correct require/node --loader invocation.
+
+<!-- session b3d664fc 2026-08-15 -->
+- Unused `package.json` bin entries don't expose CLI commands (TaskIndex.ts existed but wasn't callable until added to `package.json` `bin` section).
+- Flow-cli implementation decisions are spec-driven at `specs/2026-07-30-flow-cli/` — consult before making CLI/launcher design choices.
 
 <!-- session 0b3d4416 2026-06-19 -->
 - flow-cli package NOT included in test-config.js — blocks `run-test` skill, requires manual `npm run test --workspace=flow-cli`. Test infrastructure assumes all packages in specific list.

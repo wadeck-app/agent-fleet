@@ -12,6 +12,7 @@
 		"emitDeclarationOnly": true,
 		"noEmitOnError": true,
 		"stripInternal": true,
+		"baseUrl": ".",
 
 		"paths": {
 			"e2e-web/*": ["./packages/e2e-web/src/*"],

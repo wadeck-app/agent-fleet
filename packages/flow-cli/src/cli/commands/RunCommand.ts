@@ -93,7 +93,7 @@ function validateSecretInputs(flowFilePath: string, inputs: Record<string, strin
 
 	for (const [key, spec] of Object.entries(flow.inputs)) {
 		const inputType = typeof spec === 'string' ? spec : (spec as InputDefinition).type;
-		if (inputType !== 'secret' && inputType !== 'password') continue;
+		if (inputType !== 'password') continue;
 
 		const value = inputs[key];
 		if (value === undefined) continue; // missing optional input — daemon will handle

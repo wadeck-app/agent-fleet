@@ -9,6 +9,7 @@
 	},
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
+		"pretest": "tsc --build tsconfig.json",
 		"build-launcher": "node scripts/build-launcher.mjs",
 		"dev": "tsx src/cli.ts",
 		"test": "vitest run",
@@ -23,10 +24,12 @@
 		"shared-common": "*",
 		"commander": "^12.1.0",
 		"js-yaml": "^4.1.1",
-		"@wadeck/singleton-daemon-kit": "^1.0.0"
+		"@wadeck/singleton-daemon-kit": "^1.0.0",
+		"ws": "^8.0.0"
 	},
 	"devDependencies": {
 		"@types/js-yaml": "^4.0.9",
+		"@types/ws": "^8.0.0",
 		"typescript": "^5.3.3",
 		"vitest": "^4.0.14",
 		"tsx": "^4.7.0"

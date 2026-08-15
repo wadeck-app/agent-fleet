@@ -18,8 +18,8 @@ export class WorkerPool {
 	private readonly spawnedPids = new Set<number>();
 	private activeCount = 0;
 	private readonly workerPath: string;
-
 	private readonly claudePath: string;
+	private readonly tsxLoaderPath: string;
 
 	constructor(
 		private readonly concurrencyLimit: number,
@@ -30,6 +30,10 @@ export class WorkerPool {
 	) {
 		this.workerPath = fileURLToPath(new URL('../../dist/worker/Worker.js', import.meta.url));
 		this.claudePath = claudePath ?? '';
+		// tsx loader for resolving extension-less ESM imports in bundler-mode compiled output
+		// Node.js --import requires a file:// URL (Windows paths not accepted as-is)
+		// dist/daemon/ is 4 levels deep from monorepo root — use ../../../../ to reach root node_modules
+		this.tsxLoaderPath = new URL('../../../../node_modules/tsx/dist/loader.mjs', import.meta.url).href;
 	}
 
 	canSpawn(): boolean {
@@ -38,7 +42,7 @@ export class WorkerPool {
 
 	spawnWorker(): void {
 		this.activeCount++;
-		const child = spawn(process.execPath, [this.workerPath], {
+		const child = spawn(process.execPath, ['--import', this.tsxLoaderPath, this.workerPath], {
 			env: {
 				// IPC: worker needs to know daemon location
 				FLOW_DAEMON_PORT: String(this.httpPort),

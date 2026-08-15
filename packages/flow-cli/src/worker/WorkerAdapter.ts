@@ -23,7 +23,7 @@ export class WorkerAdapter {
 		context: ExecutionContext,
 		sendMessage: SendMessageFn
 	): Promise<Record<string, unknown>> {
-		if (step.type === 'subflow') {
+		if ((step as { type: string }).type === 'subflow') {
 			throw new Error(`Step type 'subflow' is not supported in v1`);
 		}
 
