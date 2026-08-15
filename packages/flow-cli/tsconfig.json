@@ -2,7 +2,9 @@
 	"extends": "../../tsconfig.base.json",
 	"compilerOptions": {
 		"outDir": "dist",
+		"declarationDir": "dist-types",
 		"rootDir": "src",
+		"types": ["vitest/globals", "node"],
 		"baseUrl": ".",
 		"paths": {
 			"flow-engine": ["../flow-engine/src"],
