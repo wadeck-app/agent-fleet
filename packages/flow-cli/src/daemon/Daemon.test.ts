@@ -15,7 +15,9 @@ vi.mock('@wadeck/singleton-daemon-kit', () => ({
 
 vi.mock('./WebSocketServer.js', () => ({
 	WebSocketServer: class MockWebSocketServer {
+		port = 47824;
 		constructor() {}
+		start() { return Promise.resolve(this.port); }
 		close() {}
 	},
 }));

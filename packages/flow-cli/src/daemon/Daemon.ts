@@ -92,7 +92,15 @@ export async function startDaemon(config: FlowConfig = DEFAULT_CONFIG, daemonDir
 				logWriter = new LogWriter(logsDir, config.logs.retainDays);
 				executionStore.pruneOldExecutions();
 				const claudePath = resolveClaudePath();
-				workerPool = new WorkerPool(config.queue.concurrency, port, wsPort, claudePath);
+				wsServer = new WebSocketServer(wsPort, handleWorkerMessage, handleWorkerClose);
+				// Fire-and-forget: start() retries on EADDRINUSE (TIME_WAIT). Workers read port
+				// lazily via getter — they are only spawned after tryDispatch(), which happens
+				// after handleRun(), which happens after this onStart returns. By then start()
+				// has resolved.
+				wsServer.start().catch((err: Error) => {
+					process.stderr.write(`[daemon] WebSocket server failed to start: ${err.message}\n`);
+				});
+				workerPool = new WorkerPool(config.queue.concurrency, port, () => wsServer.port, claudePath);
 				commandHandler = new CommandHandler(
 					resolvedDaemonDir,
 					workerPool,
@@ -101,8 +109,6 @@ export async function startDaemon(config: FlowConfig = DEFAULT_CONFIG, daemonDir
 					logWriter,
 					config.security.allowAbsolutePaths
 				);
-
-				wsServer = new WebSocketServer(wsPort, handleWorkerMessage, handleWorkerClose);
 			},
 		},
 	});

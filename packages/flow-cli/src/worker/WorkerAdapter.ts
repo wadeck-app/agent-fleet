@@ -82,6 +82,20 @@ export class WorkerAdapter {
 			const runner = this.stepRunnerFactory(mcpConfigPath);
 
 			try {
+				// Notify user that the model step has started (before Claude CLI launches)
+				sendMessage({
+					type: 'log',
+					executionId: context.executionId,
+					stepId: step.id,
+					entry: {
+						id: randomUUID(),
+						timestamp: Date.now(),
+						level: 'info',
+						message: `Launching ${(step as unknown as { model?: string }).model ?? 'model'}…`,
+						eventType: 'system',
+					},
+				});
+
 				// Wire onLogEntry for streaming/polling log modes — sends each entry to daemon in real-time
 				const logMode = (step as unknown as { log?: string }).log ?? 'end';
 				const toolLog = (step as unknown as { toolLog?: string }).toolLog ?? 'none';
@@ -94,14 +108,11 @@ export class WorkerAdapter {
 									return;
 								}
 								if (entry.eventType === 'tool_use' && (toolLog === 'name' || toolLog === 'full')) {
-									// For 'name' mode, strip input details from the message
-									const displayEntry =
-										toolLog === 'name'
-											? {
-													...entry,
-													message: `→ ${(entry.metadata as { toolName?: string })?.toolName ?? 'tool'}`,
-												}
-											: { ...entry, message: `→ ${entry.message}` };
+									const base = `→ ${entry.message}`;
+									const displayEntry = {
+										...entry,
+										message: toolLog === 'name' ? base.slice(0, 120) + (base.length > 120 ? '…' : '') : base,
+									};
 									sendMessage({ type: 'log', executionId: context.executionId, stepId: step.id, entry: displayEntry });
 									return;
 								}

@@ -20,7 +20,7 @@
 		"clean": "rimraf dist"
 	},
 	"dependencies": {
-		"@wadeck/singleton-daemon-kit": "^1.20260816125403.54",
+		"@wadeck/singleton-daemon-kit": "^1.20260816131855.56",
 		"commander": "^12.1.0",
 		"flow-engine": "file:../flow-engine",
 		"js-yaml": "^4.1.1",

@@ -715,12 +715,62 @@
     "586bbe68-e8c0-4d95-aa04-202d3eaed0b8": "skipped:too-short",
     "669e7e15-777b-4448-8ec1-9996d1083161": "skipped:too-short",
     "5aee8794-1fca-44bd-8eac-2bbeb7a80264": "skipped:too-short",
-    "08efa22d-6e6e-499a-a100-e3c393318257": "pending"
+    "08efa22d-6e6e-499a-a100-e3c393318257": {
+      "analyzedAt": "2026-08-16T14:33:04.747Z",
+      "linesAt": 55,
+      "findings": 22,
+      "subagentsAt": {},
+      "logLinesAt": {
+        "w-command-log": 1651,
+        "w-guardrails": 0
+      }
+    },
+    "86ef5ab2-30d7-4802-a09c-db0b02bf15a8": "skipped:too-short",
+    "4ec17bf8-511c-46fa-9547-0d4046d67162": "skipped:too-short",
+    "ab611ca1-d5be-4bb5-ada1-82f3d0870a05": "skipped:too-short",
+    "d2172435-d3ac-434f-b0b4-8a0acdf84e1e": "skipped:too-short",
+    "28449c34-5d17-4b7d-85ad-19d59564e8ea": "skipped:too-short",
+    "405b221d-8579-43d0-93df-021aeb36db8c": "skipped:too-short",
+    "53ae965f-b344-47ed-8d0a-ace6050ba286": {
+      "analyzedAt": "2026-08-16T14:37:23.701Z",
+      "linesAt": 55,
+      "findings": 25,
+      "subagentsAt": {},
+      "logLinesAt": {
+        "w-command-log": 1682,
+        "w-guardrails": 0
+      }
+    },
+    "851d29db-b10c-478f-9adc-621400b59993": "skipped:too-short",
+    "fd6b8ef6-3e5f-49af-9926-ffcc886b01da": "skipped:too-short",
+    "e8cb9bfe-e6f4-48fa-9fa3-2d4681e58eb4": "skipped:too-short",
+    "a429ea6c-4ee8-4033-a789-2723ceb075ea": "skipped:too-short",
+    "b86a4a34-314e-4e97-bf86-dfd29d480dd8": "skipped:too-short",
+    "050457d4-7336-4d2d-a4ef-cabc25f0ac43": "skipped:too-short",
+    "7d4fb045-79de-4e57-854d-f1b0aa37f925": {
+      "analyzedAt": "2026-08-16T14:41:44.957Z",
+      "linesAt": 55,
+      "findings": 28,
+      "subagentsAt": {},
+      "logLinesAt": {
+        "w-command-log": 1718,
+        "w-guardrails": 0
+      }
+    },
+    "571d9a6d-f0c3-4f6a-9c08-b292c329c9ed": "skipped:too-short",
+    "01662145-3a98-4c84-af84-72e2b618e32b": "skipped:too-short",
+    "85964260-401d-4908-ba6f-00160d443635": "skipped:too-short",
+    "ee08c29d-af41-4e42-ad14-dc38ef27ffaf": "skipped:too-short",
+    "19454f22-9738-444d-9487-e5bf2aabe8e8": "skipped:too-short",
+    "f3b59f45-9254-4c98-8062-5deb13b298a1": "skipped:too-short",
+    "e453d841-0d1e-4679-85ec-ed5ab5c07a54": "in-progress:2026-08-16T14:57:08.305Z",
+    "fb073790-841d-45a7-abdf-26c90664f038": "skipped:too-short",
+    "5b189cbf-ad6a-4cd4-99c7-3994e39ef164": "skipped:too-short",
+    "1c58787f-9676-4ab3-9571-07b93a976660": "skipped:too-short",
+    "29a23f8f-7ab4-4473-9c61-dec99513f55b": "skipped:too-short",
+    "283fe93f-25bf-454b-a3bf-e4714957ee07": "skipped:too-short",
+    "c7f1ab2e-1100-4cfd-bfef-c452f97ea8ad": "skipped:too-short",
+    "c32dd38e-86dd-4102-9007-ec4d54524031": "skipped:too-short"
   },
-  "last_consolidation": "2026-08-15T16:26:30.411Z",
-  "last_analysis_summary": {
-    "sessionId": "e9472617-fc28-437c-996b-020a46afad4a",
-    "findings": 27,
-    "at": "2026-08-16T14:28:44.113Z"
-  }
+  "last_consolidation": "2026-08-15T16:26:30.411Z"
 }

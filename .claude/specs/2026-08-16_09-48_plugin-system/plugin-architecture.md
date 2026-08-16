@@ -142,7 +142,11 @@ Both syntaxes can coexist in the same project config (one feature uses `use:`, a
 - Each feature section (`workspace`, `tasks`, `secrets`, ...) is resolved independently.
 - If `use:` is present: look up the **instance name** in the global config `instances:` map. If the name is not found: hard error at startup (P-4). Then shallow-merge the project `options:` on top of the instance's options.
 - If `instance:` is present: use it directly, then shallow-merge the project `options:` on top. Global config is not consulted for this section.
-- If neither `use:` nor `instance:` is present for a feature: the CLI fails at startup with an explicit error (P-4). No implicit selection from the global config. Every feature section that needs a provider must explicitly declare `use:` or `instance:`.
+- If neither `use:` nor `instance:` is present for a feature: the behavior depends on whether the feature is **required** or **optional**:
+  - **Required features** (workspace only in v1): hard error at startup if not configured.
+  - **Optional features** (tasks, secrets, approval): error only when the feature is first invoked at runtime. If a flow never uses tasks or secrets, a missing provider is not a startup error.
+  Note: `tasks` and `secrets` will become required once stable implementations ship and are documented as such.
+- If both `use:` and `instance:` are present in the same feature section: hard error at config load time (P-4). A feature section must declare exactly one of the two syntaxes.
 - Options precedence within Syntax 2: if both `instance.options` and the section-level `options:` define the same key, the section-level `options:` wins (it is the project-specific override).
 
 ### Credential validation rules
@@ -152,6 +156,8 @@ Enforced at config load time (hard errors, no silent fallback -- P-4):
 1. `${ENV_VAR}` is resolved from `process.env`. If the variable is missing: error with variable name.
 2. In **all option layers** (global config `instance.options`, project config `instance.options`, and project config section-level `options:`): any option value that is a non-interpolated string AND matches a known sensitive field is a hard error. This applies to both Syntax 1 (`use:` + `options:`) and Syntax 2 (`instance:` + `options:`). A developer cannot bypass the check by placing a literal credential in the section-level `options:` of a committed project config. Known sensitive field list is defined centrally in `@flow/plugin-sdk/src/sensitiveFields.ts` (baseline: `token`, `password`, `secret`, `key`, `apiKey`, `privateKey`, `accessToken`, `bearerToken`). Plugins may extend this list via `sensitiveFields` in their manifest but may not remove baseline entries.
 3. In global config: same rules apply. Global config is also not committed, but defensive validation is still enforced.
+
+**Ordering note:** Plugin-specific `sensitiveFields` extensions (declared in the manifest) cannot be applied during config load time credential validation, because loading the manifest requires the config to already be resolved. Plugin-specific sensitive fields are therefore enforced only by the PLUGIN-007 manifest lint rule. Plugin authors should use baseline field names (`token`, `password`, etc.) where possible. Critical non-baseline fields should be proposed for addition to the baseline in `@flow/plugin-sdk/src/sensitiveFields.ts` rather than relying solely on per-plugin extensions.
 
 ---
 

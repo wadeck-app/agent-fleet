@@ -11,20 +11,44 @@ export type CloseHandler = (ws: WebSocket) => void;
 export class WebSocketServer {
 	private readonly wss: WsServer;
 	private readonly httpServer: http.Server;
+	private _port: number;
 
 	constructor(
-		private readonly port: number,
+		port: number,
 		private readonly onMessage: MessageHandler,
 		private readonly onClose: CloseHandler
 	) {
+		this._port = port;
 		this.httpServer = http.createServer();
 		// maxPayload: 1 MiB — consistent with McpServer.readBody() cap.
 		// The ws default (100 MiB) would allow a rogue local process to exhaust daemon memory.
 		this.wss = new WsServer({ server: this.httpServer, maxPayload: 1024 * 1024 });
 		this.wss.on('connection', (ws: WebSocket) => this.handleConnection(ws));
-		// v1: binds to 127.0.0.1 (loopback-only). Token auth not implemented in v1;
-		// tracked for v2 when multi-user or container scenarios are supported.
-		this.httpServer.listen(port, '127.0.0.1');
+	}
+
+	/** Bind to the requested port, retrying up to 10 increments on EADDRINUSE (e.g. TIME_WAIT). */
+	start(): Promise<number> {
+		return new Promise((resolve, reject) => {
+			const tryBind = (p: number, attemptsLeft: number): void => {
+				this.httpServer.once('error', (err: NodeJS.ErrnoException) => {
+					if (err.code === 'EADDRINUSE' && attemptsLeft > 0) {
+						tryBind(p + 1, attemptsLeft - 1);
+					} else {
+						reject(err);
+					}
+				});
+				this.httpServer.once('listening', () => {
+					this._port = p;
+					resolve(p);
+				});
+				this.httpServer.listen(p, '127.0.0.1');
+			};
+			tryBind(this._port, 10);
+		});
+	}
+
+	get port(): number {
+		return this._port;
 	}
 
 	private handleConnection(ws: WebSocket): void {

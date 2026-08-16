@@ -45,7 +45,13 @@ interface PluginImplementation {
   // TS manifest only:
   provider?: (options: unknown) => unknown;  // factory function: receives merged options, returns provider instance
                                               // zero-option providers use: () => provider
-                                              // TypeScript validates return type against @flow/extension-points interface at build time
+                                              // Type safety note: this field is intentionally (options: unknown) => unknown
+                                              // to be extension-point-agnostic. Build-time enforcement happens at the
+                                              // call site in the plugin source:
+                                              //   import type { WorkspaceProvider } from "@flow/extension-points/workspace/v1";
+                                              //   const myProvider: WorkspaceProvider = createMyProvider; // tsc catches mismatches
+                                              //   export const manifest = { ..., provider: myProvider };
+                                              // PLUGIN-003 verifies tsc --noEmit passes for the plugin package as a whole.
   // JSON manifest only (or TS fallback):
   entrypoint?: string;           // relative path to compiled JS, e.g. "./dist/public.js"
   export?: string;               // named export, e.g. "taskProvider"
@@ -138,9 +144,9 @@ export const manifest: PluginManifest = {
 };
 ```
 
-TypeScript enforces that `publicTaskProvider` satisfies the `TaskProvider` interface for version 1
-at build time (the plugin imports `TaskProvider` from `@flow/extension-points/tasks/v1`).
-No runtime validation needed for the `provider` field.
+TypeScript validates the provider at the call site where it is assigned to a typed interface variable
+imported from `@flow/extension-points` -- not from the manifest field type itself, which is intentionally
+permissive. PLUGIN-003 verifies `tsc --noEmit` passes for the plugin package as a whole.
 
 ## plugin.manifest.json example (JSON -- non-JS plugins and wrappers)
 
@@ -165,7 +171,7 @@ No runtime validation needed for the `provider` field.
 }
 ```
 
-For JSON manifests, validation is performed at CLI startup (config resolution time), not deferred to first use: the `entrypoint` file must exist, the `export` named symbol must be resolvable, and a duck-type check against the declared version's expected interface is performed. Fail-loudly at startup (P-4) -- no deferred errors mid-flow.
+For JSON manifests, validation at CLI startup covers entrypoint file existence and named export resolution. The exact module resolution strategy for entrypoint paths (normalization, allowlist checks) is specified in `plugin-loading.md` § Known constraints. Entrypoint validation is performed at startup once `plugin-loading.md` Q1 is resolved; until then, the validation approach is deferred. Duck-type validation against the declared version's interface shape is also deferred -- see `plugin-loading.md` § Design still needed.
 
 ## Naming convention in config
 

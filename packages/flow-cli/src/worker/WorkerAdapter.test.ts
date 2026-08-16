@@ -127,9 +127,11 @@ describe('WorkerAdapter', () => {
 		const logCalls = (sendMessage as ReturnType<typeof vi.fn>).mock.calls
 			.map(c => c[0])
 			.filter((m: any) => m.type === 'log');
-		expect(logCalls).toHaveLength(1);
-		expect(logCalls[0].entry.message).toBe('Clean answer');
-		expect(logCalls[0].stepId).toBe('model-step');
+		// 1 system entry ("Launching haiku…") + 1 response entry
+		expect(logCalls).toHaveLength(2);
+		const responseLog = logCalls.find((m: any) => m.entry.eventType !== 'system');
+		expect(responseLog.entry.message).toBe('Clean answer');
+		expect(responseLog.stepId).toBe('model-step');
 	});
 
 	it('does not send raw NDJSON from stdout for model step', async () => {
@@ -219,11 +221,15 @@ describe('WorkerAdapter', () => {
 			});
 		};
 
-		it('toolLog: none (default) — only assistant_text sent', async () => {
+		it('toolLog: none (default) — system launch + assistant_text sent, no tool events', async () => {
 			setupStreamingMock();
 			await adapter.execute(makeStreamingModelStep('none'), makeContext(), sendMessage);
 			const logCalls = (sendMessage as any).mock.calls.map((c: any) => c[0]).filter((m: any) => m.type === 'log');
-			expect(logCalls.map((m: any) => m.entry.eventType)).toEqual(['assistant_text']);
+			const types = logCalls.map((m: any) => m.entry.eventType);
+			expect(types).toContain('system');      // "Launching model…"
+			expect(types).toContain('assistant_text');
+			expect(types).not.toContain('tool_use');
+			expect(types).not.toContain('tool_result');
 		});
 
 		it('toolLog: name — assistant_text + tool_use sent, tool_result suppressed', async () => {
@@ -234,9 +240,9 @@ describe('WorkerAdapter', () => {
 			expect(types).toContain('assistant_text');
 			expect(types).toContain('tool_use');
 			expect(types).not.toContain('tool_result');
-			// name mode: message is compact (just → ToolName)
+			// name mode: → Tool: Name(input...) truncated to 80 chars
 			const toolCall = logCalls.find((m: any) => m.entry.eventType === 'tool_use');
-			expect(toolCall.entry.message).toBe('→ Bash');
+			expect(toolCall.entry.message).toMatch(/^→ Tool: Bash/);
 		});
 
 		it('toolLog: full — assistant_text + tool_use + tool_result all sent', async () => {

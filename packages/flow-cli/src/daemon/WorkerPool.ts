@@ -24,7 +24,8 @@ export class WorkerPool {
 	constructor(
 		private readonly concurrencyLimit: number,
 		private readonly httpPort: number,
-		private readonly wsPort: number,
+		/** Port or lazy getter — evaluated at spawn time so async port retry resolves first. */
+		private readonly wsPortOrGetter: number | (() => number),
 		// optional for backward compat — empty string means workers locate claude themselves
 		claudePath?: string
 	) {
@@ -46,7 +47,7 @@ export class WorkerPool {
 			env: {
 				// IPC: worker needs to know daemon location
 				FLOW_DAEMON_PORT: String(this.httpPort),
-				FLOW_WS_PORT: String(this.wsPort),
+				FLOW_WS_PORT: String(typeof this.wsPortOrGetter === 'function' ? this.wsPortOrGetter() : this.wsPortOrGetter),
 				// Claude binary path resolved at daemon startup — avoids PATH dependency in worker
 				...(this.claudePath ? { FLOW_CLAUDE_PATH: this.claudePath } : {}),
 				// PATH: needed for standard tools in script steps and shell resolution

@@ -80,7 +80,7 @@ The manifest must not contain any `${...}` patterns or values matching known sen
 
 **Why:** The manifest is code, not config. Any credentials accidentally placed there would end up committed to the repository.
 
-**Check:** String-scan the manifest file for `${` and for known sensitive field names with non-empty values.
+**Check:** Check for key-value pairs where the **key** matches a known sensitive field name AND the **value** is a non-`${...}` string literal. This is a structural check (key-value pair), not a bare string scan, to avoid false positives on valid `sensitiveFields: ["token", "apiKey"]` array declarations. The `sensitiveFields` array itself is explicitly exempt from this check. Also scan for `${` patterns in all non-`sensitiveFields` values.
 
 ---
 
@@ -104,11 +104,25 @@ Any plugin implementing the `workspace` extension point must validate the `taskI
 
 **Why:** A `taskId` containing path traversal sequences (e.g., `../../etc`) combined with `path.join(baseDir, taskId)` produces a path outside `baseDir`, directly bypassing the T-03 mitigation.
 
-**Check:** A helper function `validateWorkspacePath(taskId: string, baseDir: string)` will be provided in `@flow/plugin-sdk/src/pathValidation.ts`. Workspace provider implementations must call it before any `allocate()` path construction. Lint check: assert the import and call are present in any file that exports a `WorkspaceProvider` implementation.
+**Check:** A helper function `validateWorkspacePath(taskId: string, baseDir: string)` will be provided in `@flow/plugin-sdk/src/pathValidation.ts`. Workspace provider implementations must call it before any `allocate()` path construction. Lint check: assert the import and call are present in any file that exports a `WorkspaceProvider` implementation AND performs path construction with `taskId` (calls `path.join`, `path.resolve`, or equivalent using `taskId`). Implementations that never use `taskId` in path construction (e.g., `plugin-none` which returns `process.cwd()` unconditionally) are exempt -- annotate with `// @plugin-009-exempt: no-taskId-path-construction`.
+
+**Additional check for branch-based workspace providers:** If `taskId` or `prefix` are used to construct a git branch name, both must pass the git ref-name allowlist (`^[a-zA-Z0-9._-]+$`) via `validateTaskIdForBranchName(taskId)` and `validateBranchNamePrefix(prefix)` from `@flow/plugin-sdk/src/pathValidation.ts`. Validating only `taskId` is insufficient -- a `prefix` containing illegal characters (space, `~`, `^`, `:`) would produce an invalid branch name even when `taskId` passes. All git commands must use array-argument APIs (e.g., `execa(['git', 'worktree', 'add', '-b', branchName, path])`), never shell string interpolation.
+
+---
+
+---
+
+### PLUGIN-010: Workspace providers must use SDK baseDir validation
+
+Any plugin implementing the `workspace` extension point must validate `baseDir` before use.
+
+**Why:** A misconfigured `baseDir: /` passes the nested-worktree check while placing worktrees in the filesystem root. Calling `validateWorkspacePath` alone does not help if `baseDir` itself is dangerous.
+
+**Check:** Workspace provider implementations must call `validateBaseDir(baseDir)` from `@flow/plugin-sdk/src/pathValidation.ts` before any `allocate()` call. The function must reject: `/`, well-known system directories (`/etc`, `/usr`, `/bin`, etc.), any path that is an ancestor of the current project root, and any path that resolves to a location already under an active git worktree (git rejects nested worktrees with an opaque error). Lint check: assert the import and call are present alongside `validateWorkspacePath`.
 
 ---
 
 ## Future rules (not yet implemented)
 
-- **PLUGIN-010:** Each implementation name must be unique within an extension point (no two `public` under `tasks`). -- trivially enforced by JSON object keys, but worth an explicit check for clarity.
-- **PLUGIN-011:** Deprecated `version` values should emit a warning (not error) with a migration path.
+- **PLUGIN-011:** Each implementation name must be unique within an extension point (no two `public` under `tasks`). -- trivially enforced by JSON object keys, but worth an explicit check for clarity.
+- **PLUGIN-012:** Deprecated `version` values should emit a warning (not error) with a migration path.

@@ -182,7 +182,7 @@ export class WorkspaceManager {
 			if (config.reusePolicy === 'always' || config.reusePolicy === 'if-available') {
 				const reusableWorkspace = await this.findReusableWorkspace(taskId, config, gitBranch);
 				if (reusableWorkspace) {
-					console.log(`Reusing shared workspace ${reusableWorkspace.id} for task ${taskId}`);
+					console.log(`Reusing shared workspace ${reusableWorkspace.id} for execution ${taskId}`);
 					return reusableWorkspace;
 				}
 
@@ -280,7 +280,7 @@ export class WorkspaceManager {
 		this.workspaces.set(workspaceId, workspace);
 		this.workspacesByTask.set(taskId, workspaceId);
 
-		console.log(`Allocated manual workspace ${workspaceId} for task ${taskId}`);
+		console.log(`Allocated manual workspace ${workspaceId} for execution ${taskId}`);
 		console.log(`  Path: ${workspacePath}`);
 		if (gitState) {
 			console.log(`  Branch: ${gitState.branch}`);
@@ -333,7 +333,7 @@ export class WorkspaceManager {
 		this.workspaces.set(workspaceId, workspace);
 		this.workspacesByTask.set(taskId, workspaceId);
 
-		console.log(`Created shared workspace ${workspaceId} for task ${taskId}`);
+		console.log(`Created shared workspace ${workspaceId} for execution ${taskId}`);
 		return workspace;
 	}
 
@@ -381,7 +381,7 @@ export class WorkspaceManager {
 		this.workspaces.set(workspaceId, workspace);
 		this.workspacesByTask.set(taskId, workspaceId);
 
-		console.log(`Created isolated workspace ${workspaceId} for task ${taskId}`);
+		console.log(`Created isolated workspace ${workspaceId} for execution ${taskId}`);
 		return workspace;
 	}
 

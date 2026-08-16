@@ -16,11 +16,13 @@ Stubs here represent registered IDs in `extension-points.json` pending full desi
 |---|---|---|
 | `workspace` | workspace-provider.md | Approved -- v1 |
 | `approval` | approval-provider.md | v1 (CLI plugin ready; orchestrator plugin has T-06 auth dependency -- see approval-provider.md § Security considerations) |
-| `tasks` | (no dedicated spec file -- TaskProvider interface not yet captured in spec) | Registered as `planned` in extension-points.json (no versions, no interface yet) -- interface spec TODO before implementation |
-
-Note: `tasks` is registered as `planned` (not stable) in `extension-points.json` -- no versions defined, no `v1.ts` yet. A `tasks-provider.md` must be created and the status changed to `stable` before implementing any tasks plugin.
 
 ## Stub extension points (registered as `"status": "planned"` in extension-points.json -- interfaces not yet designed, not safe to implement against)
+
+### `tasks`
+**Purpose:** Provides and manages tasks/tickets (filesystem, Jira, GitHub Issues, Linear, etc.)
+**Status:** Registered in extension-points.json as `planned` (no versions, no interface). Must not be implemented until `tasks-provider.md` is written and status changes to `stable`.
+**Known future implementations:** filesystem, jira, github-issues, linear
 
 ### `agent`
 **Purpose:** Provides agent execution strategies (Claude CLI, OpenAI API, custom subprocess, etc.)

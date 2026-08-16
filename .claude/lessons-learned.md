@@ -1,8 +1,27 @@
 # Lessons learned
 
-<!-- Last updated: 2026-08-16T14:28:44.110Z -->
+<!-- Last updated: 2026-08-16T14:41:44.955Z -->
 
 ## Recurring feedback
+
+<!-- session 7d4fb045 2026-08-16 -->
+- TDD workflow applied consistently across parallel agents (a0bf, a106, ac4e, ac93) for feature implementation — red phase tests followed by implementation.
+- Multiple iterations on `output` vs `outputs` vs `outputs[stepId]` nomenclature across FlowScheduler, ConditionEvaluator, SimulationValidator, and test files — showed unclear migration path for a breaking contract change.
+- Loop/retry failure handling (`hasFailed` flag in loop context) was incomplete — main session debugged 30+ min through execution store, daemon command handling, and step tracking before identifying flag wasn't propagated on step failure; multi-layer coordination gap.
+- User halted agent-browser web fetching — explicit SendMessage "STOP making web fetches, use only local files" (11:10:55). Preference: local-only operations, not browser-based discovery.
+- Verbose mode in model steps is controlled via step config parameter (`log: step`), not CLI flags. Correction given at 13:17:18 during streaming implementation.
+
+<!-- session 53ae965f 2026-08-16 -->
+- Skills "spec" and "run" triggered "NOT YET KNOWN" warnings — agent fell back to bash searches for skill definitions. **Why:** Skills not pre-loaded into context, ToolSearch not automatically invoked. **How to apply:** Pre-load high-value skills or auto-trigger ToolSearch when skill call fails validation.
+- User explicitly told agent to "STOP making it use browser mode" — agent-browser should run headless-only (line 11:10:55: SendMessage warning shows user redirect). This preference needs to be saved to memory and enforced when spawning agent-browser.
+- Multiple spec audit passes (rounds 1-4) with escalating rigor (HIGH → CRITICAL findings) suggests either over-delegation or insufficient quality on first pass — clarify audit entry criteria and first-pass completeness standards.
+- Multiple agent forks launched in rapid succession to fix spec issues ("Fix 4 remaining HIGH", "Fix round 6", "Fix round 7" at 14:24:24, 14:30:30, 14:34:51) suggests spec had cascading problems requiring multiple validation passes — spec may not have been sufficiently reviewed before implementation fork started.
+
+<!-- session 08efa22d 2026-08-16 -->
+- Test-debugging cycle repeats: `npm test | grep FAIL` → read test file → read implementation → Edit test → `npm test` again. Multiple rounds (22:00–22:24 for flow-engine alone). No upfront context about which tests validate what.
+- TDD workflow is strict: write test (red phase), implement, validate with `flow validate`, run full suite. This is the expected dev loop, not optional.
+- Agents should not fetch external resources during task execution; use local files/code first. User sent explicit "STOP" message to agent a8c1 during npm investigation.
+- Verbose mode control moved from CLI flag to flow-step parameter (`log: <stepName>`). Correction sent via SendMessage at 13:17:18. This wasn't retroactively documented in code/comments; note for future model-step changes.
 
 <!-- session e9472617 2026-08-16 -->
 - Multiple fix-retry loops (22:30 build → grep → edit → rebuild; 22:33 grep → retest; 06:31+ TDD × ~10 iterations) suggest fork agents lack upfront design docs — issues discovered by running tests, not prevented upfront.
@@ -192,6 +211,32 @@
 - Multiple independent agents (Explore, general-purpose) read identical spec files sequentially without coordination, causing redundant I/O. Agents should receive shared context or hand off findings rather than re-audit.
 
 ## Agent errors
+
+<!-- session 7d4fb045 2026-08-16 -->
+- Excessive trial-and-error on test fixture setup — WorkerAdapter.ts edited 6 times (lines 22:18:32, 22:18:52, 22:19:42 etc) and multiple grep searches for `workspaceDir` context. Should have read full test fixture pattern once instead of iterating.
+- CommandHandler.ts first pass incomplete — written at 06:40:13, then rewritten at 06:40:24, then edits at 06:40:31/06:40:35/06:44:15/06:44:18. Suggests insufficient planning/design before implementation.
+- Unclear when: condition evaluation contract — assistant had to investigate ConditionEvaluator across flow-engine, then port logic to StepQueue in flow-cli. Multiple fixes needed (06:35:05, 06:37:11, 06:37:18, 06:37:28) suggesting the boundary between engine and daemon scheduling wasn't clear upfront.
+- Parallel agent spawns (a0bf, ac4e) both working on --project-dir and TASK_PROJECT_DIR suggests overlapping scope/requirements — potential duplicate effort or unclear task boundaries between agents.
+- Initial investigation focused on daemon port files and singleton-daemon-kit implementation details when the real issue was step failure handling in loop contexts — misdirected debugging path.
+- When: context refactoring required `outputs[stepId].` keying (not just `output.` or bare `outputs.`), but the full contract wasn't immediately clear to the main session; fork agents (abc9) refactored it, then main session had to reverse-engineer the change through test failures.
+- Assumed verbose mode would be driven by CLI flag (e.g. `--verbose`) when it should be step-based config. Required redirection mid-task.
+- Spec audit ran 8 iterative fix rounds (visible in fork messages: "Fix round 6 CRITICAL+HIGH", "Fix round 7", "Fix round 8 final"). Instead of fixing all issues in one pass, agents spawned sequentially to address batches. Inefficient — suggests either review tool output wasn't parsed completely, or agents weren't coordinating on findings.
+- TypeScript compilation checks repeated 5+ times across ~6 minutes (lines 14:21:56, 14:23:54, 14:24:08, 14:26:32, 14:27:11, 14:27:25, 14:27:47) with incremental edits. Suggests type inference issues weren't straightforward and agent was debugging compiler output iteratively rather than understanding root cause upfront.
+
+<!-- session 53ae965f 2026-08-16 -->
+- FlowScheduler refactoring spawned multiple agents to implement features in parallel (phases 1-4 TDD) but the work scope evolved significantly from initial test-failure fixes → feature audit → major refactor; no explicit user redirect visible, but implicit via sequential agent spawn missions suggests iterative discovery
+- Three parallel agents (a0bf, ac4e, ac93) spawned on overlapping tasks (global env vars, TASK_PROJECT_DIR, jsonpath support) with no visible coordination points — potential for duplicated/conflicting edits or missed dependencies. **Why:** Main session delegated incrementally without waiting for first agent to complete. **How to apply:** When delegating interdependent features, wait for blocking agent to finish or explicitly brief parallel agents on their scope boundaries.
+- Multiple fork agents (a593, abc9, a53e) edited CommandHandler.ts + FlowScheduler.ts in parallel without coordination; main session later had to debug failing tests and revert/fix overlapping changes. SendMessage used as workaround but shows cost of lack of cross-agent communication plan.
+- Multiple attempted calls to undefined skills: `subprocess` (13:00:08, 13:00:11) and `goldfish` (13:00:15) returned "NOT YET KNOWN" warnings. Agent should check skill availability before invoking, not rely on ToolSearch to fail gracefully.
+- Verbose mode driven by `log:` step parameter, not CLI `--verbose` flag (corrected at 13:17:18) — intuition conflicts with implementation; document this design choice prominently.
+- Multiple `tsc --noEmit` attempts (lines 14:21:50 → 14:27:25) without capturing/diagnosing actual error output; escalated to `--force` flag without investigating root cause (likely monorepo path resolution or cache stale issue).
+
+<!-- session 08efa22d 2026-08-16 -->
+- Multiple agent forks investigating same failing tests (FlowRegistry, TemplateValidator, UserInterventionValidation) in parallel — no coordinator to prevent duplicate reads or consolidate findings.
+- Agents reading files then main session re-reading same files to make edits (e.g., FlowRegistry.test.ts read by agent ac7f, then re-read by main before Edit). Lost context between fork completion and main-thread action.
+- Deep investigation into @wadeck/singleton-daemon-kit (reading compiled JS) was needed to understand client/server response handling — library documentation or project integration docs may be incomplete; reverse-engineering from node_modules suggests this pattern should be documented.
+- Model step output handling required 3 separate agent forks (a32b/a3f9/a921) to debug — the contract between StepRunner, WorkerAdapter, and ClaudeLauncher for capturing model outputs wasn't clear upfront.
+- Multiple agents (a3e0, a690, 92cb6ce8, 5b7b2b1a, 576b7d8d, d300bfbf) spawned in parallel on related spec-fix tasks without work partitioning—resulted in redundant file reads/edits of same `.claude/specs/2026-08-16_09-48_plugin-system/` files. When agents target overlapping components, coordinate by file/section to avoid duplicate work.
 
 <!-- session e9472617 2026-08-16 -->
 - Fork agent (afcc) at 06:45:05 tries `check` skill (unknown), falls back to `npm run check` bash. Same pattern at 22:50:12 with `get-timestamp` → bash fallback. Fallbacks succeed, but repeated WARN logs suggest this is discoverable/fixable.
@@ -467,6 +512,31 @@
 
 ## Documentation gaps
 
+<!-- session 7d4fb045 2026-08-16 -->
+- workspaceDir context pattern not obvious — appears in StepQueue.test.ts, WorkerAdapter.test.ts, and CommandHandler.test.ts. Repeated grep searches (22:17:51, 22:30:35, 22:30:38) for `workspaceDir|DeclaredWorkspace|createSharedWorkspace` across files, indicating this is a key test fixture pattern that should be documented centrally.
+- Output extraction configuration (jsonpath, pattern fields) required extensive grep searching (07:57-08:09) rather than being documented in flow docs; multiple search variations suggests unclear naming or documentation structure.
+- Daemon IPC protocol and response structure not documented; extensive investigation (09:10-09:20) into singleton-daemon-kit internals (client.js, health-server.js) to understand how executionId is returned and response is wrapped.
+- RunCommand --inputs flag alias behavior unclear; investigation spans daemon protocol, response handling, and singleton-daemon-kit internals rather than documented usage contract.
+- "When: context must be step-id keyed" design constraint was implicit; took investigation (reading scheduler, tests, validation code) to extract it — not documented upfront for coordination.
+- Skills marked "NOT YET KNOWN" at runtime: subprocess, goldfish (13:00:08/11/15), kill-port (12:55:49) — skills listed as available but not resolvable during session; caused fallback to manual process management (cmd.exe taskkill).
+- How verbose mode is wired in model steps and step runner not clearly documented — led to wrong implementation assumption and correction loop.
+- Workspace metadata (metaDir) changes touched 8+ files across packages (WorkspaceManager.ts, StepRunner.ts, types.ts, Protocol.ts, CommandHandler.ts, WorkerAdapter.ts, factories.ts, multiple .test.ts files). No centralized integration guide — cross-cutting concern left to agent to discover file-by-file.
+
+<!-- session 53ae965f 2026-08-16 -->
+- Template variable syntax `${{ }}` vs alternatives not clearly documented — correction was needed mid-refactoring (line 07:28:29 shows agent correction on format)
+- Daemon response handling and executionId flow is undocumented — agent ac93/a106 traced through compiled singleton-daemon-kit JS, tested Commander option aliases, manually connected client send() to health-server response wrapping. **Why:** Missing docs on how `createDaemonClient().send()` transforms CommandHandler return values into executionId. **How to apply:** Document daemon IPC protocol: what CommandHandler returns → what client receives → what CLI prints.
+- FlowDefinition schema validation rules unclear — multiple greps for "additionalProperties", "unknownKey", "validField" across multiple sessions. **Why:** Agents uncertain whether fields like `env` are allowed, what validation error messages mean. **How to apply:** Document which FlowDefinition fields are allowed vs forbidden; link schema validator to actual Zod/validation implementation.
+- Template context schema changed (removed `task`, renamed `output→outputs`) but changes weren't documented; fork agents had to reverse-engineer the shape via investigation + test runs.
+- Windows daemon port-file location (~/.flow-daemon/config.port) and @wadeck/singleton-daemon-kit internals required extensive Bash exploration; should be documented.
+- Template injection risk in flow model steps — when using multi-line templates with Claude output, must escape special characters or use safe patterns. Lesson added to lessons-learned but pattern not yet formalized in code or schema docs.
+- Model step tool logging documented mid-implementation (new file: `model-step-tool-logging.md` at 13:29:01) — feature underspecified before development; consider upfront spec for model streaming behavior.
+
+<!-- session 08efa22d 2026-08-16 -->
+- singleton-daemon-kit event semantics and interaction with flow-engine state machine required extensive code inspection + test-driven debugging; integration points not well documented
+- npm workspace package shadowing solution (file: protocol in package.json) and undeclared output key validation rules weren't documented pre-incident; both were discovered mid-task and added to lessons-learned.
+- Template injection risk in model step outputs (multiline patterns with user data) only surfaced during integration testing (agent ac3a), suggesting security implications weren't captured in initial spec.
+- Tool logging/streaming path across ScriptExecutor → StreamEventMapper → WorkerAdapter required reverse-engineering via multiple grep/read cycles, then a dedicated doc (`model-step-tool-logging.md`) had to be written. Complex cross-component LLM streaming semantics should be documented upfront in architecture docs.
+
 <!-- session e9472617 2026-08-16 -->
 - Skills (check, get-timestamp, subprocess, SendMessage) marked "NOT YET KNOWN" when first invoked by forked agents, despite being in deferred tool list. Fork agents don't inherit parent session's tool visibility.
 - OutputVariableConfig schema (jsonpath field) not documented in flow docs — agents spent 8+ minutes (08:04-08:13) grepping for output extraction patterns before implementing.
@@ -697,6 +767,35 @@
 - Extensive Grep searches for domain concepts (RE-QUEUED, bufferSpill, reconnectTimeout, idleTimeout, drainTimeout, heartbeat monitoring, etc.) suggest spec lacks clear glossary or index of key terms. Future audits should define these upfront.
 
 ## Known constraints
+
+<!-- session 7d4fb045 2026-08-16 -->
+- StepQueue→FlowScheduler deprecation took multiple iterations (completely replaced at 06:42:42/06:44:31/06:44:38/06:44:44) instead of being clearly stated once. Related: BackoffStrategy type had to be grepped for (06:43:03), not obvious from context.
+- Skill system ("spec", "run") not yet known on first use attempt (07:48, 07:52) — required manual discovery; indicates skill loader may need pre-warming or indexing.
+- Workspace dependency resolution: npm creates shadow copies of workspace packages (flow-engine in flow-cli/node_modules) even with workspace: protocol; requires root package.json `overrides` to suppress — workflow pattern not obvious from package structure alone.
+- npm workspace package shadowing: local workspace packages can silently resolve to registry instead if dependency record exists in wrong context. Fix (file: protocol in package.json) required multi-stage investigation of npm resolution behavior before safe application.
+- Plugin system spec files (`2026-08-16_09-48_plugin-system`) required 4+ iterative audit-fix rounds with CRITICAL/HIGH findings in each round (lines 13:27:46, 13:35:41, 13:40:44, 13:45:43). Pattern suggests either incomplete spec design upfront or validator discovering issues incrementally; worth documenting final stable state for next work.
+- Implementing `metaDir` field required explicit `npm run build` for flow-engine (line 14:28:40) before flow-cli's TypeScript compilation could resolve type changes. Indicates strict composite tsconfig build-order dependency — changes to flow-engine types must be built before dependent packages can compile.
+
+<!-- session 53ae965f 2026-08-16 -->
+- Skills `subprocess`, `check`, `get-timestamp` called but show "NOT YET KNOWN" — verify definitions or correct names in future calls
+- Multiple incremental rebuilds (`npm run build --workspace=flow-cli`) triggered after imports fixed, dependency resolution between packages is fragile. **Why:** flow-cli imports from flow-engine not immediately available after edits; requires rebuild cycle. **How to apply:** Document monorepo build order; consider whether flow-cli should use workspace file paths or built artifacts.
+- Windows npm workspace dependencies can silently resolve to node_modules copies instead of workspace links; requires `overrides` in root package.json to force workspace protocol resolution.
+- Windows flow CLI requires .exe/.cmd binaries for cmd.exe execution; Git Bash shell scripts alone won't work for background daemon invocation.
+- Loop/retry step failure handling has undefined behavior — step_failed event doesn't properly break out of loops; requires debug logging and state tracking via ExecutionStore.markStepCompleted/markStepFailed.
+- npm workspace packages can shadow by installing from registry even when workspace dependency exists. Fix: use `file:` protocol in package.json (e.g., `"flow-engine": "file:../flow-engine"`). Root cause: npm resolves workspace dependencies only when running from monorepo root; relative installs bypass workspace protocol.
+- task-model2.yml used as central validation artifact for multiple independent features (streaming, tool logging, writeOutput) — tightly coupled test; clarify test strategy scope and whether this file should be modularized.
+- Workspace interface change required updates across 7+ files (types.ts, WorkspaceManager.ts, StepRunner.ts, CommandHandler.ts, WorkerAdapter.ts, test factories, test files) — coordination overhead for interface-level changes in monorepo with multiple packages.
+
+<!-- session 08efa22d 2026-08-16 -->
+- Skills invoked but marked NOT YET KNOWN: `check` (06:45:08), `subprocess` (22:53:45), `get-timestamp` (22:50:12), `SendMessage` (07:28:29) — no pre-loading or schema available at call time.
+- Heavy grep-before-edit pattern: searching for test names, variable types, specific assertions (e.g., "rejects.toThrow", "StepOutput", "when condition") before modifying. Suggests test file structure/naming conventions not self-documenting.
+- Daemon state lives in `~/.flow-daemon/` with date-keyed NDJSON logs; multiple agents implementing related features (jsonpath, --project-dir, TASK_PROJECT_DIR, --inputs) in parallel will need coordinated merge strategy to avoid conflicts at daemon integration points.
+- Workspace packages can be shadowed by npm workspace resolution if not explicitly using overrides in root package.json — manifests as silent nested node_modules/flow-engine copies that break CLI imports
+- when: context for conditions must be step-id keyed structure (not flat key-value pairs), else template rendering fails during condition evaluation
+- Flow retry/loop logic depends on proper daemon event flow (step_failed, step_completed) — missing event propagation causes flows to get stuck mid-execution
+- Windows cmd.exe taskkill is unreliable; user retried multiple times (12:55-12:58) — prefer Node.js child_process.execSync for cross-platform reliability.
+- Plugin system spec required 4+ audit-fix rounds (rounds 1–4 visible in 13:27:46 onward). Single-pass spec validation finds HIGH/CRITICAL issues but misses others; either spec complexity is high or audit criteria incomplete—future specs of similar scope may need multi-round validation built in.
+- After modifying exported types in packages/flow-engine, must run `npm run build` before downstream package TS checks will resolve imports — tsc --noEmit alone won't pick up the dist-types updates. Agent discovered this through iterative TS error checking cycles rather than doing it upfront.
 
 <!-- session e9472617 2026-08-16 -->
 - Parallel fork agents used extensively for independent work — session spawns 3+ concurrent forks around 22:17, then again at 06:59 for reviews. Plan-driven refactoring: write plan (10k chars) → next session executes in TDD phases with iterative test/edit cycles.
