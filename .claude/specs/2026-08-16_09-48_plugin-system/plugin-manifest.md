@@ -28,10 +28,10 @@ If neither is found, the plugin fails to load with an explicit error.
 ## PluginManifest schema
 
 ```typescript
-// @flow/plugin-sdk -- PluginManifest type (versioned)
+// @flow/plugin-sdk -- PluginManifest type
 interface PluginManifest {
   pluginId: string;              // must match "plugin-<pluginId>" package name
-  manifestVersion: "1";          // bumped when the schema itself changes
+  manifestVersion: "1";          // bumped when the manifest schema itself changes (rare)
   implementations: {
     [extensionPoint: string]: {  // e.g. "workspace", "tasks", "secrets"
       [implName: string]: PluginImplementation;  // e.g. "public", "private", "default"
@@ -40,13 +40,77 @@ interface PluginManifest {
 }
 
 interface PluginImplementation {
-  interfaceVersion: string;      // e.g. "workspace@1", "tasks@2" -- see versioning
+  version: number;               // interface version: 1, 2, 3...
+                                 // determines which TypeScript type from @flow/extension-points applies
   // TS manifest only:
-  provider?: () => unknown;      // direct function reference (validated at build time)
+  provider?: unknown;            // direct function reference -- TypeScript validates at build time
+                                 // against the imported type from @flow/extension-points
   // JSON manifest only (or TS fallback):
-  entrypoint?: string;           // relative path to compiled JS file, e.g. "./dist/public.js"
-  export?: string;               // named export to use, e.g. "taskProvider"
+  entrypoint?: string;           // relative path to compiled JS, e.g. "./dist/public.js"
+  export?: string;               // named export, e.g. "taskProvider"
 }
+```
+
+**Version encoding rationale:**
+- `version` is a plain integer -- no string parsing, no combined `"tasks@1"` format.
+- The extension point is already known from its position as the parent key in `implementations`.
+- Extension point name + version together identify the exact TypeScript interface to use.
+
+**How version ties build-time to runtime:**
+- Build time: plugin imports the specific versioned type from `@flow/extension-points`:
+  ```typescript
+  import type { TaskProvider } from "@flow/extension-points/tasks/v1";
+  ```
+  TypeScript enforces the contract at compile time.
+- Runtime: CLI reads `version: 1` from the manifest and selects the matching adapter/validator internally.
+- **No bijection between package version and interface version.** A single release of `@flow/extension-points` can expose v1 AND v2 of the same extension point simultaneously. A plugin pins its import to the version it was written against; the package version is irrelevant. Enforced by PLUGIN-005 (version declared in manifest must be a version the CLI knows how to handle).
+
+## Extension points package
+
+Extension point interfaces live in a dedicated package: **`packages/extension-points`** (published as `@flow/extension-points`).
+
+**Why a dedicated package:**
+- Separates the interface contract from both the CLI implementation and the plugin implementations.
+- The CLI, the plugin-sdk, and all plugins depend on `@flow/extension-points` -- none of them own it.
+- Package version and interface versions are independent: bumping the package does not imply bumping an interface version, and a new interface version can be added without breaking existing ones.
+
+**Package structure:**
+```
+packages/extension-points/
+  extension-points.json   -- canonical registry: IDs, descriptions, supported versions, status
+  README.md               -- generated or hand-written doc for each extension point
+  src/
+    workspace/
+      v1.ts     -- hand-written: export interface WorkspaceProvider { ... }
+      v2.ts     -- hand-written: added later, v1 still present and supported
+    tasks/
+      v1.ts     -- hand-written interface
+    secrets/
+      v1.ts
+    agents/
+      v1.ts
+    models/
+      v1.ts
+    scripts/
+      v1.ts
+    approvals/
+      v1.ts
+  index.ts      -- re-exports LATEST version of each extension point as convenience default
+```
+
+**What is and is NOT generated from `extension-points.json`:**
+- The JSON registry is the source of truth for: valid extension point IDs, supported version numbers per ID, descriptions, status (stable/deprecated).
+- PLUGIN-004 reads this JSON at lint time to validate that a plugin manifest only references known IDs and known versions.
+- The `ExtensionPointId` union type (`"workspace" | "tasks" | ...`) can optionally be generated from the JSON -- but it is just a list of strings and can equally be written by hand in sync.
+- **The TypeScript interfaces themselves (`WorkspaceProvider`, `TaskProvider`, etc.) are ALWAYS hand-written.** They are never generated. The JSON does not describe the interface shape -- only its existence and version numbers.
+
+**Import convention for plugin authors:**
+```typescript
+// Pin to a specific version (recommended for plugins):
+import type { TaskProvider } from "@flow/extension-points/tasks/v1";
+
+// Or use the latest (risky -- may break on package update):
+import type { TaskProvider } from "@flow/extension-points";
 ```
 
 ## plugin.config.ts example (TypeScript -- primary)

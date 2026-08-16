@@ -102,10 +102,9 @@ export class StepRunner {
 	}
 
 	/**
-	 * Execute a step with retry logic.
+	 * Execute a step exactly once and return the trace.
+	 * Retry logic is handled by FlowScheduler at the daemon level — StepRunner never retries.
 	 * @param onStepTraceCreated - Called when the StepTrace is created, before execution begins.
-	 *   This allows callers (e.g. FlowOrchestrator) to make the trace visible for real-time updates
-	 *   while the step is still running.
 	 */
 	public async executeStep(
 		step: FlowStep,
@@ -113,79 +112,39 @@ export class StepRunner {
 		context: TemplateContext,
 		onStepTraceCreated?: (stepTrace: StepTrace) => void
 	): Promise<StepTrace> {
-		const maxAttempts = step.retry?.maxAttempts || 1;
-		const backoffStrategy = step.retry?.backoff || 'linear';
+		const stepTrace: StepTrace = {
+			stepId: step.id,
+			stepName: step.name,
+			stepType: step.type,
+			startTime: Date.now(),
+			retries: 0,
+		};
 
-		let lastError: Error | undefined;
-		let attempt = 0;
+		onStepTraceCreated?.(stepTrace);
 
-		while (attempt < maxAttempts) {
-			attempt++;
-
-			const stepTrace: StepTrace = {
-				stepId: step.id,
-				stepName: step.name,
-				stepType: step.type,
-				startTime: Date.now(),
-				retries: attempt - 1,
-			};
-
-			// Notify caller that the trace exists — enables real-time visibility
-			// during execution (e.g. for streaming liveLogEntries)
-			onStepTraceCreated?.(stepTrace);
-
-			try {
-				let result: StepTrace;
-
-				if (step.type === 'script') {
-					result = await this.executeScriptStep(step, workspace, context, stepTrace);
-				} else if (step.type === 'model') {
-					result = await this.executeModelStep(step, workspace, context, stepTrace);
-				} else if (step.type === 'subflow') {
-					result = await this.executeSubFlowStep(step, workspace, context, stepTrace);
-				} else if (step.type === 'user_intervention') {
-					result = await this.executeUserInterventionStep(step, workspace, context, stepTrace);
-				} else {
-					throw new StepExecutionError(
-						`Unknown step type: ${(step as any).type}`,
-						(step as any).id,
-						(step as any).type
-					);
-				}
-
-				// If successful, return immediately
-				if (!result.error) {
-					return result;
-				}
-
-				// If error and we have retries left, continue
-				if (attempt < maxAttempts) {
-					lastError = new Error(result.error);
-					await this.sleep(this.calculateBackoff(attempt, backoffStrategy));
-					continue;
-				}
-
-				// Last attempt failed, return the error
-				return result;
-			} catch (error) {
-				lastError = error instanceof Error ? error : new Error(String(error));
-
-				// If we have retries left, wait and try again
-				if (attempt < maxAttempts) {
-					await this.sleep(this.calculateBackoff(attempt, backoffStrategy));
-					continue;
-				}
-
-				// Last attempt, return error trace
-				stepTrace.endTime = Date.now();
-				stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
-				stepTrace.error = lastError.message;
-				return stepTrace;
+		try {
+			if (step.type === 'script') {
+				return await this.executeScriptStep(step, workspace, context, stepTrace);
+			} else if (step.type === 'model') {
+				return await this.executeModelStep(step, workspace, context, stepTrace);
+			} else if (step.type === 'subflow') {
+				return await this.executeSubFlowStep(step, workspace, context, stepTrace);
+			} else if (step.type === 'user_intervention') {
+				return await this.executeUserInterventionStep(step, workspace, context, stepTrace);
+			} else {
+				throw new StepExecutionError(
+					`Unknown step type: ${(step as any).type}`,
+					(step as any).id,
+					(step as any).type
+				);
 			}
+		} catch (error) {
+			const err = error instanceof Error ? error : new Error(String(error));
+			stepTrace.endTime = Date.now();
+			stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
+			stepTrace.error = err.message;
+			return stepTrace;
 		}
-
-		// Should never reach here, but TypeScript needs it
-		throw lastError || new Error('Unknown error in step execution');
 	}
 
 	/**

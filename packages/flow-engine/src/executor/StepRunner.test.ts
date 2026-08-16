@@ -210,91 +210,51 @@ describe('StepRunner', () => {
 	});
 
 	describe('Retry Logic', () => {
-		it('should retry failed step with linear backoff', async () => {
+		it('executes once and returns error when step fails — retry config is for FlowScheduler, not StepRunner', async () => {
 			const step: ScriptFlowStep = {
 				id: 'retry-step',
 				name: 'Retry Step',
 				type: 'script',
 				script: 'test',
-				retry: {
-					maxAttempts: 3,
-					backoff: 'linear',
-				},
+				retry: { maxAttempts: 3, backoff: 'linear' },
 			};
 
-			const context = {
-				inputs: {},
-				stepOutputs: new Map(),
-				taskMetadata: {},
-			};
+			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {} };
 
 			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('test');
-
-			// Fail twice, then succeed
-			let callCount = 0;
-			vi.mocked(ScriptExecutor.prototype.execute).mockImplementation(async () => {
-				callCount++;
-				if (callCount < 3) {
-					return {
-						success: false,
-						exitCode: 1,
-						stdout: '',
-						stderr: 'Error',
-						durationMs: 10,
-					};
-				}
-				return {
-					success: true,
-					exitCode: 0,
-					stdout: 'Success',
-					stderr: '',
-					durationMs: 10,
-				};
+			vi.mocked(ScriptExecutor.prototype.execute).mockResolvedValue({
+				success: false, exitCode: 1, stdout: 'attempt output', stderr: '', durationMs: 10,
 			});
-
 			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({});
 
 			const trace = await runner.executeStep(step, testWorkspace, context);
 
-			expect(callCount).toBe(3);
-			expect(trace.retries).toBe(2);
-			expect(trace.error).toBeUndefined();
-			expect(ScriptExecutor.prototype.execute).toHaveBeenCalledTimes(3);
+			expect(ScriptExecutor.prototype.execute).toHaveBeenCalledTimes(1);
+			expect(trace.error).toBeDefined();
+			expect(trace.retries).toBe(0);
 		});
 
-		it('should fail after max attempts exceeded', async () => {
+		it('executes once and returns error when step fails with no retry config', async () => {
 			const step: ScriptFlowStep = {
 				id: 'max-retry',
 				name: 'Max Retry',
 				type: 'script',
 				script: 'test',
-				retry: {
-					maxAttempts: 2,
-					backoff: 'exponential',
-				},
 			};
 
-			const context = {
-				inputs: {},
-				stepOutputs: new Map(),
-				taskMetadata: {},
-			};
+			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {} };
 
 			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('test');
 			vi.mocked(ScriptExecutor.prototype.execute).mockResolvedValue({
-				success: false,
-				exitCode: 1,
-				stdout: '',
-				stderr: 'Persistent error',
-				durationMs: 10,
+				success: false, exitCode: 1, stdout: '', stderr: 'Persistent error', durationMs: 10,
 			});
 			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({});
 
 			const trace = await runner.executeStep(step, testWorkspace, context);
 
 			expect(trace.error).toBeDefined();
-			expect(trace.retries).toBe(1);
-			expect(ScriptExecutor.prototype.execute).toHaveBeenCalledTimes(2);
+			expect(trace.retries).toBe(0);
+			expect(ScriptExecutor.prototype.execute).toHaveBeenCalledTimes(1);
 		});
 	});
 
@@ -774,17 +734,14 @@ describe('StepRunner', () => {
 			);
 		});
 
-		it('should retry subflow step on failure', async () => {
+		it('executes subflow exactly once — retry config is for FlowScheduler, not StepRunner', async () => {
 			const step: SubFlowStep = {
 				id: 'subflow-retry',
 				name: 'SubFlow Retry',
 				type: 'subflow',
 				flowId: 'target-flow',
 				inputs: {},
-				retry: {
-					maxAttempts: 3,
-					backoff: 'linear',
-				},
+				retry: { maxAttempts: 3, backoff: 'linear' },
 			};
 
 			const context = {
@@ -794,28 +751,13 @@ describe('StepRunner', () => {
 				taskId: 'test-task',
 			};
 
-			// Fail twice, then succeed
-			let callCount = 0;
-			mockFlowExecutor.execute.mockImplementation(async () => {
-				callCount++;
-				if (callCount < 3) {
-					return {
-						success: false,
-						error: 'Temporary failure',
-					};
-				}
-				return {
-					success: true,
-					outputs: { result: 'Success' },
-				};
-			});
+			mockFlowExecutor.execute.mockResolvedValue({ success: false, error: 'Temporary failure' });
 
 			const trace = await runner.executeStep(step, testWorkspace, context);
 
-			expect(callCount).toBe(3);
-			expect(trace.retries).toBe(2);
-			expect(trace.error).toBeUndefined();
-			expect(trace.outputs).toEqual({ result: 'Success' });
+			expect(mockFlowExecutor.execute).toHaveBeenCalledTimes(1);
+			expect(trace.error).toBeDefined();
+			expect(trace.retries).toBe(0);
 		});
 
 		it('should map subflow outputs using output configuration', async () => {
@@ -946,6 +888,74 @@ describe('StepRunner', () => {
 				step1: { result: 'data1', count: 42 },
 				step2: { message: 'Hello', status: 'ok' },
 			});
+		});
+	});
+
+	describe('executeStep - retry delegation to FlowScheduler', () => {
+		const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {} };
+
+		it('executes exactly once when step fails with retry config — does NOT retry internally', async () => {
+			const step: ScriptFlowStep = {
+				id: 'flaky',
+				name: 'Flaky',
+				type: 'script',
+				script: 'exit 1',
+				retry: { maxAttempts: 3, backoff: 'linear' },
+			};
+
+			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('exit 1');
+			vi.mocked(ScriptExecutor.prototype.execute).mockResolvedValue({
+				success: false, exitCode: 1, stdout: 'attempt output', stderr: '', durationMs: 50,
+			});
+			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({});
+
+			const trace = await runner.executeStep(step, testWorkspace, context);
+
+			// ScriptExecutor called exactly once — FlowScheduler handles retries, not StepRunner
+			expect(ScriptExecutor.prototype.execute).toHaveBeenCalledTimes(1);
+			expect(trace.error).toBeDefined();
+			expect(trace.exitCode).toBe(1);
+		});
+
+		it('executes exactly once when step fails with no retry config', async () => {
+			const step: ScriptFlowStep = {
+				id: 'fail',
+				name: 'Fail',
+				type: 'script',
+				script: 'exit 1',
+			};
+
+			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('exit 1');
+			vi.mocked(ScriptExecutor.prototype.execute).mockResolvedValue({
+				success: false, exitCode: 1, stdout: '', stderr: '', durationMs: 50,
+			});
+			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({});
+
+			const trace = await runner.executeStep(step, testWorkspace, context);
+
+			expect(ScriptExecutor.prototype.execute).toHaveBeenCalledTimes(1);
+			expect(trace.error).toBeDefined();
+		});
+
+		it('executes exactly once when step succeeds', async () => {
+			const step: ScriptFlowStep = {
+				id: 'ok',
+				name: 'OK',
+				type: 'script',
+				script: 'echo hi',
+				retry: { maxAttempts: 3, backoff: 'linear' },
+			};
+
+			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('echo hi');
+			vi.mocked(ScriptExecutor.prototype.execute).mockResolvedValue({
+				success: true, exitCode: 0, stdout: 'hi', stderr: '', durationMs: 50,
+			});
+			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({});
+
+			const trace = await runner.executeStep(step, testWorkspace, context);
+
+			expect(ScriptExecutor.prototype.execute).toHaveBeenCalledTimes(1);
+			expect(trace.error).toBeUndefined();
 		});
 	});
 });

@@ -2,7 +2,7 @@
 
 **Created:** 2026-08-16
 **Version:** v0.1
-**Status:** In Progress -- v0.1 -- 4/10 questions resolved
+**Status:** In Progress -- v0.1 -- 7/10 questions resolved
 **Iteration:** 1
 
 ## Summary
@@ -17,6 +17,9 @@
 | 2 | Config layers: global config (env var or ~/.flow/config.yml) + project config (use + overrides) | Accepted | 2026-08-16 | Project uses "use: plugins.<pluginId>.<implName>" to reference a named instance from global config, OR declares an inline instance directly. Global config defines named plugin instances with credentials via ${ENV_VAR}. FLOW_CONFIG / TASK_CONFIG env var overrides the default user-home path. Multiple instances of same type (e.g. 3 Jira) are supported. Cloud B global config file = v2. Remote config download = v3. |
 | 3a | Hybrid manifest: plugin.config.ts (primary) + plugin.manifest.json (fallback) -- same schema | Accepted | 2026-08-16 | TS is type-safe and enables direct function refs validated at build time. JSON supports non-JS plugins and wrappers. Both follow the PluginManifest schema from @flow/plugin-sdk. |
 | 3b | Plugin violation rules PLUGIN-001 to 008 defined in plugin-violation-rules.md | Accepted | 2026-08-16 | Enforced as local .violations/config.ts rules on all packages/plugin-* packages. |
+| 3c | version field is a plain integer; no bijection with package version; @flow/extension-points exposes multiple interface versions simultaneously | Accepted | 2026-08-16 | Extension point name (manifest key) + version integer together identify the TypeScript interface. Plugin pins its import to the versioned path (e.g. extension-points/tasks/v1). Package version is independent. |
+| 3d | Extension point interfaces live in dedicated package packages/extension-points (@flow/extension-points) | Accepted | 2026-08-16 | Decouples interface contract from CLI impl and plugin impl. CLI, plugins, and plugin-sdk all depend on it; none own it. |
+| 3e | Extension point registry: extension-points.json (IDs, versions, status, descriptions) + hand-written TS interfaces. Nothing is generated. | Accepted | 2026-08-16 | JSON is read by PLUGIN-004/005 at lint time. TS interfaces are always hand-written -- JSON does not describe interface shape, only existence and version numbers. |
 
 ## Open Questions
 
