@@ -337,6 +337,8 @@ export class SimulationValidator {
 	/**
 	 * Validate a single template expression against the whitelist.
 	 * Adds an INVALID_TEMPLATE_SYNTAX error if it does not match.
+	 * Adds an UNDECLARED_OUTPUT_KEY error if the referenced output key is not declared
+	 * on the source step (only when the source step has an explicit `output:` config).
 	 */
 	private validateTemplateExpression(expression: string, step: FlowStep, flow: FlowDefinition): void {
 		if (!SimulationValidator.VALID_TEMPLATE_EXPRESSION.test(expression)) {
@@ -355,6 +357,34 @@ export class SimulationValidator {
 					expected: 'inputs.<id> | steps.<id>.outputs.<id> | flow.<id> | task.<id> | context.<id>',
 				},
 			});
+			return;
+		}
+
+		// Check undeclared output key: steps.<sourceId>.outputs.<key>
+		const stepsRef = /^steps\.([a-zA-Z0-9_-]+)\.outputs\.([a-zA-Z0-9_-]+)$/.exec(expression);
+		if (stepsRef) {
+			const sourceStepId = stepsRef[1]!;
+			const outputKey = stepsRef[2]!;
+			const sourceStep = flow.steps.find(s => s.id === sourceStepId);
+			if (sourceStep?.output && Object.keys(sourceStep.output).length > 0) {
+				if (!(outputKey in sourceStep.output)) {
+					this.issueCollector.addIssue({
+						severity: 'error',
+						code: ValidationCode.UNDECLARED_OUTPUT_KEY,
+						message: `Step '${sourceStepId}' has no declared output '${outputKey}' (declared: ${Object.keys(sourceStep.output).join(', ')})`,
+						location: {
+							stepId: step.id,
+							field: step.type === 'model' ? 'prompt' : 'script',
+							path: `${flow.id}.steps[${step.id}]`,
+						},
+						suggestion: `Use one of the declared outputs: ${Object.keys(sourceStep.output).join(', ')}`,
+						context: {
+							actual: outputKey,
+							expected: Object.keys(sourceStep.output).join(' | '),
+						},
+					});
+				}
+			}
 		}
 	}
 

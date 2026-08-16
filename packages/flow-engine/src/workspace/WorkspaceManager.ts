@@ -257,10 +257,13 @@ export class WorkspaceManager {
 
 		const workspaceId = uuidv4();
 		const gitState = await this.getGitState(workspacePath);
+		const metaDir = workspacePath + '.meta';
+		fs.mkdirSync(path.join(metaDir, 'outputs'), { recursive: true });
 
 		const workspace: Workspace = {
 			id: workspaceId,
 			path: workspacePath,
+			metaDir,
 			mode: 'manual',
 			git: gitState,
 			concurrency: {
@@ -297,10 +300,12 @@ export class WorkspaceManager {
 	): Promise<Workspace> {
 		const workspaceId = uuidv4();
 		const workspacePath = path.join(this.basePath, `shared-${workspaceId}`);
+		const metaDir = workspacePath + '.meta';
 
-		// Create workspace directory
+		// Create workspace directory and metadata directory
 		try {
 			fs.mkdirSync(workspacePath, { recursive: true });
+			fs.mkdirSync(path.join(metaDir, 'outputs'), { recursive: true });
 		} catch (error) {
 			throw new WorkspaceAllocationError(`Failed to create workspace directory: ${error}`);
 		}
@@ -311,6 +316,7 @@ export class WorkspaceManager {
 		const workspace: Workspace = {
 			id: workspaceId,
 			path: workspacePath,
+			metaDir,
 			mode: 'shared',
 			git: gitState,
 			concurrency: {
@@ -342,10 +348,12 @@ export class WorkspaceManager {
 	): Promise<Workspace> {
 		const workspaceId = uuidv4();
 		const workspacePath = path.join(this.basePath, `isolated-${workspaceId}`);
+		const metaDir = workspacePath + '.meta';
 
-		// Create workspace directory
+		// Create workspace directory and metadata directory
 		try {
 			fs.mkdirSync(workspacePath, { recursive: true });
+			fs.mkdirSync(path.join(metaDir, 'outputs'), { recursive: true });
 		} catch (error) {
 			throw new WorkspaceAllocationError(`Failed to create workspace directory: ${error}`);
 		}
@@ -356,6 +364,7 @@ export class WorkspaceManager {
 		const workspace: Workspace = {
 			id: workspaceId,
 			path: workspacePath,
+			metaDir,
 			mode: 'isolated',
 			git: gitState,
 			concurrency: {

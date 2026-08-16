@@ -409,6 +409,14 @@ export interface OutputVariableConfig {
 
 	/** Default value if extraction fails (only for non-required fields) */
 	default?: any;
+
+	/**
+	 * Write the extracted value to a file in the workspace directory.
+	 * Path is relative to workspaceDir (e.g. 'response.txt').
+	 * Prevents shell injection when consuming multi-line model outputs in script steps.
+	 * Use `${{ context.workspaceDir }}/response.txt` to reference the file in subsequent steps.
+	 */
+	writeOutput?: string;
 }
 
 /**
@@ -563,6 +571,24 @@ export interface ModelFlowStep extends BaseFlowStep {
 
 	/** Prompt template with variable interpolation support */
 	prompt: string;
+
+	/**
+	 * Controls when Claude output is sent as log entries.
+	 * - streaming: each assistant text chunk → log entry in real-time
+	 * - end: all entries sent after model completes (default)
+	 * - none: output suppressed from logs
+	 * - polling: entries flushed every 500ms
+	 */
+	log?: 'streaming' | 'end' | 'none' | 'polling';
+
+	/**
+	 * Controls whether tool calls are shown in logs.
+	 * Only applies when log is 'streaming' or 'polling'.
+	 * - none: no tool call events (default)
+	 * - name: show tool name only (→ Bash)
+	 * - full: show tool name + input + result (→ Bash: sleep 5 / ← Bash: ...)
+	 */
+	toolLog?: 'none' | 'name' | 'full';
 }
 
 /**
@@ -879,8 +905,11 @@ export interface Workspace {
 	/** Unique workspace identifier */
 	id: string;
 
-	/** Absolute path to workspace directory */
+	/** Absolute path to workspace directory (where Claude works) */
 	path: string;
+
+	/** Absolute path to workspace metadata directory (engine-generated outputs, never inside workspaceDir) */
+	metaDir: string;
 
 	/** Workspace mode (isolated or shared) */
 	mode: WorkspaceMode;

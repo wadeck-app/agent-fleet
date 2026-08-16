@@ -578,4 +578,54 @@ describe('FlowValidator - SubFlowStep Validation', () => {
 			expect(undefinedFlowError).toBeUndefined();
 		});
 	});
+
+	describe('writeOutput validation', () => {
+		test('accepts valid relative writeOutput path', () => {
+			const flow = createMockFlow({
+				steps: [
+					createMockModelStep({
+						output: {
+							response: { type: 'string', writeOutput: 'response.txt' },
+						},
+					}),
+				],
+			});
+
+			const result = validator.validate(flow);
+			const errors = result.issues.filter(i => i.severity === 'error' && i.message.includes('writeOutput'));
+			expect(errors).toHaveLength(0);
+		});
+
+		test('rejects path traversal in writeOutput', () => {
+			const flow = createMockFlow({
+				steps: [
+					createMockModelStep({
+						output: {
+							response: { type: 'string', writeOutput: '../escape.txt' },
+						},
+					}),
+				],
+			});
+
+			const result = validator.validate(flow);
+			const errors = result.issues.filter(i => i.severity === 'error' && i.message.includes('writeOutput'));
+			expect(errors.length).toBeGreaterThan(0);
+		});
+
+		test('rejects absolute writeOutput path', () => {
+			const flow = createMockFlow({
+				steps: [
+					createMockModelStep({
+						output: {
+							response: { type: 'string', writeOutput: '/etc/passwd' },
+						},
+					}),
+				],
+			});
+
+			const result = validator.validate(flow);
+			const errors = result.issues.filter(i => i.severity === 'error' && i.message.includes('writeOutput'));
+			expect(errors.length).toBeGreaterThan(0);
+		});
+	});
 });

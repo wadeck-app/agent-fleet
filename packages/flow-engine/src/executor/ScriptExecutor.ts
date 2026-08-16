@@ -126,11 +126,13 @@ export class ScriptExecutor {
 			const timestamp = Date.now();
 			const random = Math.random().toString(36).substring(7);
 
-			// Detect `node -e "..."` pattern: cmd.exe cannot handle multi-line quoted strings,
-			// so we extract the JS content and write it to a .js file instead of a .bat file.
-			const nodeEMatch = /^node\s+-e\s+(["'])([\s\S]*?)\1\s*$/.exec(options.script.trim());
+			// Detect `node -e "code"` pattern (no positional args after closing quote):
+			// cmd.exe cannot handle multi-line quoted strings, so extract JS to a .js file.
+			// Only matches when nothing follows the closing quote — avoids greedily consuming
+			// positional args as part of the code (regex backtracking bug with [\s\S]*?).
+			const nodeEMatch = /^node\s+-e\s+"([^"]*)"$/.exec(options.script.trim());
 			if (nodeEMatch) {
-				const jsContent = nodeEMatch[2];
+				const jsContent = nodeEMatch[1];
 				tempFilePath = path.join(tempDir, `agent-fleet-script-${timestamp}-${random}.js`);
 				fs.writeFileSync(tempFilePath, jsContent, 'utf8');
 				// Wrap in quotes to handle paths with spaces

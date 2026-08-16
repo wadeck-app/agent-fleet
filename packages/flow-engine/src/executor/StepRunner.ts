@@ -3,6 +3,8 @@
  *
  * Executes individual flow steps (script, model, subflow, and user_intervention types) with retry logic.
  */
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { ClaudeLauncher } from '../processing/ClaudeLauncher';
 import { OutputExtractor } from '../processing/OutputExtractor';
 import { StreamEventMapper } from '../processing/StreamEventMapper';
@@ -14,6 +16,7 @@ import type {
 	LiveLogEntry,
 	ModelFlowStep,
 	ScriptFlowStep,
+	StepOutput,
 	StepTrace,
 	SubFlowStep,
 	UserInterventionStep,
@@ -110,7 +113,8 @@ export class StepRunner {
 		step: FlowStep,
 		workspace: Workspace,
 		context: TemplateContext,
-		onStepTraceCreated?: (stepTrace: StepTrace) => void
+		onStepTraceCreated?: (stepTrace: StepTrace) => void,
+		onLogEntry?: (entry: LiveLogEntry) => void
 	): Promise<StepTrace> {
 		const stepTrace: StepTrace = {
 			stepId: step.id,
@@ -126,7 +130,7 @@ export class StepRunner {
 			if (step.type === 'script') {
 				return await this.executeScriptStep(step, workspace, context, stepTrace);
 			} else if (step.type === 'model') {
-				return await this.executeModelStep(step, workspace, context, stepTrace);
+				return await this.executeModelStep(step, workspace, context, stepTrace, onLogEntry);
 			} else if (step.type === 'subflow') {
 				return await this.executeSubFlowStep(step, workspace, context, stepTrace);
 			} else if (step.type === 'user_intervention') {
@@ -198,6 +202,7 @@ export class StepRunner {
 		const outputs = this.outputExtractor.extract(result.stdout, step.output, step.id, additionalContext);
 
 		stepTrace.outputs = outputs;
+		this.writeOutputFiles(outputs, step.output, context);
 
 		// Mark as error if script failed
 		if (!result.success) {
@@ -214,7 +219,8 @@ export class StepRunner {
 		step: ModelFlowStep,
 		workspace: Workspace,
 		context: TemplateContext,
-		stepTrace: StepTrace
+		stepTrace: StepTrace,
+		onLogEntry?: (entry: LiveLogEntry) => void
 	): Promise<StepTrace> {
 		// Render prompt with variable interpolation
 		const renderedPrompt = this.templateRenderer.render(step.prompt, context, true);
@@ -232,10 +238,24 @@ export class StepRunner {
 		let finalResultText: string | undefined;
 		const liveLogEntries: LiveLogEntry[] = [];
 		let streamEventMapper: StreamEventMapper | undefined;
+		const logMode = (step as ModelFlowStep).log ?? 'end';
 
+		// log:none — no stream mapper, no liveLogEntries; but we still need result text
 		if (streamJson && !this.config.interactive) {
-			stepTrace.liveLogEntries = liveLogEntries;
-			streamEventMapper = new StreamEventMapper(step.id);
+			if (logMode !== 'none') {
+				stepTrace.liveLogEntries = liveLogEntries;
+				streamEventMapper = new StreamEventMapper(step.id);
+			}
+		}
+
+		// For log:polling, buffer entries and flush periodically
+		let pollingInterval: ReturnType<typeof setInterval> | undefined;
+		let pollingBuffer: LiveLogEntry[] = [];
+		if (logMode === 'polling' && onLogEntry) {
+			pollingInterval = setInterval(() => {
+				const batch = pollingBuffer.splice(0);
+				for (const e of batch) onLogEntry(e);
+			}, 500);
 		}
 
 		const launchOptions = {
@@ -250,15 +270,25 @@ export class StepRunner {
 			skipPermissions,
 			// StepRunner is invoked by the orchestrator which manages its own env strategy
 			isolateEnv: false,
-			onStreamEvent: streamEventMapper
+			// Always provide onStreamEvent when stream-json is active to capture finalResultText
+			onStreamEvent: streamJson && !this.config.interactive
 				? (event: import('../processing/StreamJsonParser').StreamJsonEvent) => {
-						const entry = streamEventMapper!.map(event);
-						if (entry) {
-							liveLogEntries.push(entry);
-						}
-						// Capture the final result text for output extraction
+						// Capture the final result text for output extraction (always)
 						if (event.type === 'result' && event.data.result) {
 							finalResultText = event.data.result;
+						}
+						if (logMode === 'none') return; // suppress log entries
+						const entry = streamEventMapper?.map(event);
+						if (entry) {
+							liveLogEntries.push(entry);
+							// streaming: fire onLogEntry immediately
+							if (logMode === 'streaming' && onLogEntry) {
+								onLogEntry(entry);
+							}
+							// polling: buffer for interval flush
+							if (logMode === 'polling') {
+								pollingBuffer.push(entry);
+							}
 						}
 					}
 				: undefined,
@@ -283,11 +313,19 @@ export class StepRunner {
 				stepTrace.outputs = this.outputExtractor.extract(result.response, step.output, step.id, {
 					response: result.response,
 				});
+				this.writeOutputFiles(stepTrace.outputs ?? {}, step.output, context);
 
 				return stepTrace;
 			} else {
 				// Background mode
 				const result = await this.claudeManager.launchBackground(launchOptions);
+
+				// Flush polling buffer on completion
+				if (pollingInterval) {
+					clearInterval(pollingInterval);
+					const remaining = pollingBuffer.splice(0);
+					if (onLogEntry) for (const e of remaining) onLogEntry(e);
+				}
 
 				// When stream-json is active, use the clean result text instead of raw NDJSON
 				const responseText = streamJson && finalResultText != null ? finalResultText : result.stdout;
@@ -315,10 +353,12 @@ export class StepRunner {
 					stdout: result.stdout,
 					stderr: result.stderr,
 				});
+				this.writeOutputFiles(stepTrace.outputs ?? {}, step.output, context);
 
 				return stepTrace;
 			}
 		} catch (error) {
+			if (pollingInterval) clearInterval(pollingInterval);
 			stepTrace.endTime = Date.now();
 			stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
 			stepTrace.error = error instanceof Error ? error.message : String(error);
@@ -634,6 +674,36 @@ export class StepRunner {
 			stepTrace.error = error instanceof Error ? error.message : String(error);
 			console.error(`[StepRunner] UserInterventionStep ${step.id} error:`, stepTrace.error);
 			return stepTrace;
+		}
+	}
+
+	/**
+	 * Write extracted output values to the metadata outputs directory for any config with writeOutput set.
+	 * Files go to <workspaceDir>.meta/outputs/ — NEVER inside workspaceDir — preventing git pollution
+	 * and ensuring Claude cannot overwrite engine-generated artifacts.
+	 */
+	private writeOutputFiles(
+		outputs: Record<string, unknown>,
+		outputConfig: StepOutput | undefined,
+		context: TemplateContext
+	): void {
+		if (!outputConfig) return;
+		const outputsDir = context.context?.outputsDir;
+		if (!outputsDir) return;
+		for (const [varName, config] of Object.entries(outputConfig)) {
+			if (!config.writeOutput) continue;
+			const relPath = config.writeOutput;
+			// Reject path traversal
+			const normalized = path.normalize(relPath);
+			if (normalized.startsWith('..') || path.isAbsolute(normalized)) {
+				throw new Error(
+					`writeOutput path '${relPath}' is invalid: must be a relative path`
+				);
+			}
+			const filePath = path.join(outputsDir, normalized);
+			const value = outputs[varName];
+			fs.mkdirSync(path.dirname(filePath), { recursive: true });
+			fs.writeFileSync(filePath, value != null ? String(value) : '', 'utf8');
 		}
 	}
 }

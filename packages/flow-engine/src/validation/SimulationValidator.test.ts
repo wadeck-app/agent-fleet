@@ -213,4 +213,91 @@ describe('SimulationValidator', () => {
 			expect(errors[0].severity).toBe('error');
 		});
 	});
+
+	// ---------------------------------------------------------------------------
+	// Undeclared output key validation
+	// ---------------------------------------------------------------------------
+
+	describe('undeclared output key validation', () => {
+		function makeFlowWithOutputRef(outputConfig: Record<string, unknown> | undefined, ref: string): { flow: FlowDefinition; stepIds: Set<string> } {
+			const producer: Record<string, unknown> = {
+				id: 'producer',
+				name: 'Producer',
+				type: 'model',
+				model: 'haiku',
+				prompt: 'Generate something',
+			};
+			if (outputConfig !== undefined) {
+				producer.output = outputConfig;
+			}
+			const consumer: Record<string, unknown> = {
+				id: 'consumer',
+				name: 'Consumer',
+				type: 'model',
+				model: 'haiku',
+				depends: ['producer'],
+				prompt: `Use: ${ref}`,
+			};
+			const flow: FlowDefinition = {
+				id: 'test-flow',
+				version: '1.0.0',
+				name: 'Test',
+				description: 'Test',
+				workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+				inputs: {},
+				steps: [producer, consumer] as unknown as FlowDefinition['steps'],
+			};
+			return { flow, stepIds: new Set(['producer', 'consumer']) };
+		}
+
+		it('accepts declared output key', () => {
+			const { flow, stepIds } = makeFlowWithOutputRef(
+				{ result: { type: 'string' } },
+				'${{ steps.producer.outputs.result }}'
+			);
+			validator.validateSimulation(flow, stepIds);
+			const errors = issueCollector.issues.filter(i => i.code === ValidationCode.UNDECLARED_OUTPUT_KEY);
+			expect(errors).toHaveLength(0);
+		});
+
+		it('rejects undeclared output key when output config is explicit', () => {
+			const { flow, stepIds } = makeFlowWithOutputRef(
+				{ result: { type: 'string' } },
+				'${{ steps.producer.outputs.nonexistent }}'
+			);
+			validator.validateSimulation(flow, stepIds);
+			const errors = issueCollector.issues.filter(i => i.code === ValidationCode.UNDECLARED_OUTPUT_KEY);
+			expect(errors).toHaveLength(1);
+			expect(errors[0].severity).toBe('error');
+		});
+
+		it('accepts any output key when step has no output config', () => {
+			const { flow, stepIds } = makeFlowWithOutputRef(
+				undefined,
+				'${{ steps.producer.outputs.anything }}'
+			);
+			validator.validateSimulation(flow, stepIds);
+			const errors = issueCollector.issues.filter(i => i.code === ValidationCode.UNDECLARED_OUTPUT_KEY);
+			expect(errors).toHaveLength(0);
+		});
+
+		it('rejects undeclared key in script step', () => {
+			const flow: FlowDefinition = {
+				id: 'test-flow',
+				version: '1.0.0',
+				name: 'Test',
+				description: 'Test',
+				workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+				inputs: {},
+				steps: [
+					{ id: 'gen', name: 'Gen', type: 'model', model: 'haiku', prompt: 'Do it', output: { status: { type: 'string' } } },
+					{ id: 'use', name: 'Use', type: 'script', depends: ['gen'], script: 'echo ${{ steps.gen.outputs.missing }}' },
+				] as unknown as FlowDefinition['steps'],
+			};
+			validator.validateSimulation(flow, new Set(['gen', 'use']));
+			const errors = issueCollector.issues.filter(i => i.code === ValidationCode.UNDECLARED_OUTPUT_KEY);
+			expect(errors).toHaveLength(1);
+			expect(errors[0].severity).toBe('error');
+		});
+	});
 });

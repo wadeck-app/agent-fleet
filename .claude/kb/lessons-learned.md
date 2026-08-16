@@ -6101,3 +6101,55 @@ Un package `@mon-scope/flow-engine` ne peut jamais entrer en collision avec un p
 **Prérequis :** posséder ou contrôler le scope npm (`@mon-scope`). `@agent-fleet` n'est pas disponible — choisir un scope maîtrisé avant de migrer.
 
 **Impact du renommage :** tous les `import from 'flow-engine'`, `tsconfig.paths`, `package.json`, et fichiers de config devront être mis à jour. Planifier comme un refactoring dédié.
+
+## Template injection in flow scripts — RCE risk — 2026-08-16
+
+When `${{ steps.X.outputs.Y }}` is embedded directly in a `script:` field, the rendered value is inserted into a bat/shell command verbatim. Multi-line model responses cause subsequent lines to be executed as shell commands.
+
+**NEVER do this:**
+```yaml
+script: echo ${{ steps.generate.outputs.response }}   # RCE if response is multi-line
+```
+Example: if Claude responds "Imagine you have blocks...", cmd.exe executes `Imagine` as a command.
+
+**Safe pattern — write to file via node:**
+```yaml
+script: node -e "require('fs').writeFileSync(process.argv[1], process.argv[2])" "${{ context.workspaceDir }}\out.txt" "${{ steps.generate.outputs.response }}"
+```
+Node receives the response as `process.argv[2]` — never interpreted as shell commands.
+
+**Suggestions to reduce user error:**
+1. Flow validator: warn when `${{ steps.X.outputs.Y }}` is used inline in `script:` and Y is a `string` type — the value could be multi-line
+2. Documentation: add a "Security" section to flow docs explaining this pattern
+3. Future engine enhancement: add a `writeOutput` step type that safely writes a template value to a file without shell involvement
+
+## Workspace vs Workspace Metadata separation — 2026-08-16
+
+### Principle
+The workspace (`workspaceDir`) is where Claude works (code, files, modified content).
+Engine-generated artifacts (outputs, logs, state) are metadata and must NEVER live inside the workspace.
+
+### Rule
+```
+.agent-fleet/workspaces/
+  shared-xxx/          ← workspace: what Claude sees and modifies
+  shared-xxx.meta/     ← metadata: engine-generated only (invisible to Claude, never in git)
+    outputs/
+      response.txt
+```
+
+### Why
+- Claude cannot accidentally overwrite engine outputs
+- No gitignore management needed (metadata is outside the workspace)
+- Lifecycle is obvious: delete workspace → delete its meta dir alongside it
+- `reusePolicy: if-available` won't leak outputs from a previous execution
+
+### Implementation target (pending)
+- `WorkspaceManager` must create `<workspaceDir>.meta/outputs/` when allocating
+- `writeOutput:` writes to `<workspaceDir>.meta/outputs/<filename>`
+- Output type `filepath` value = absolute path to the meta file
+- `TemplateContext` exposes `context.outputsDir` = `<workspaceDir>.meta/outputs/`
+
+### NOT to do
+- `.flow/outputs/` inside workspace → still needs gitignore, Claude can pollute
+- `~/.flow-daemon/executions/<id>/outputs/` → path too long, not co-located with workspace

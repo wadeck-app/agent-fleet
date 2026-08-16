@@ -1,8 +1,78 @@
 # Lessons learned
 
-<!-- Last updated: 2026-08-16T06:25:18.862Z -->
+<!-- Last updated: 2026-08-16T14:28:44.110Z -->
 
 ## Recurring feedback
+
+<!-- session e9472617 2026-08-16 -->
+- Multiple fix-retry loops (22:30 build → grep → edit → rebuild; 22:33 grep → retest; 06:31+ TDD × ~10 iterations) suggest fork agents lack upfront design docs — issues discovered by running tests, not prevented upfront.
+- Test output parsing via grep/tail fragile — multiple attempts with different patterns (tail -20, tail -8, grep -E, head -60) to capture test failures, suggesting no stable test output format.
+- Test flows (task-retry.yml, task-loop.yml) were rewritten 5+ times by main agent after fork creation, without clear convergence toward passing state. Suggests test requirements/expectations were not clearly specified before fork agent created the files.
+- Stop web-fetching in agents when debugging local tooling — investigate code paths and logs directly; don't attempt online npm documentation lookups or external fetches for problems that can be solved locally.
+- Verbose mode is driven by `log: step` param in flow definition, not by `--verbose` CLI flag—agent assumed CLI control but logs show correction at 13:17:18.
+- Workspace metadata refactoring spans types.ts, WorkspaceManager.ts, StepRunner.ts, multiple test files, factories, and CLI packages — indicates need for systematic refactoring checklist or architectural documentation of all affected boundaries.
+
+<!-- session d300bfbf 2026-08-16 -->
+- Skill discovery broken for new/unknown skills — `/spec` and `/run` showed "NOT YET KNOWN" warnings when user tried to invoke them, despite skills existing elsewhere in the system.
+- Heavy fork delegation for parallel work: workspace shadowing fix (a53e), conditional refactor (abc9), template issues (a593), test flows (a6e6) — all running concurrently. Main session focuses on integration/debugging while forks handle isolated subsystems.
+- User preference: investigate using local files only, do not web-fetch external docs (sent 11:10:55 "Stop web fetching, use only local files")
+
+<!-- session bd4052a0 2026-08-16 -->
+- When code review finds variant issues (e.g., Map.get()!), fix ALL variants immediately with TDD — don't report and wait for user to request the fix separately
+- Launch independent forks in parallel by default — don't invent sequential dependencies that don't exist (flow-cli changes don't affect flow-engine)
+- Test thoroughly before handing code to user — manual testing of conditional flows, daemon communication, etc., not just build + lint
+- Agent declared features "ready to test" without manual verification — happened 3+ times (retry logs, model streaming, flow validate). User had to find bugs and re-report.
+- Agent avoided root-cause analysis and over-complicated fixes (port cleanup, npm overrides). User redirects needed: "step back", "pourquoi tu ne te poses pas la vraie question".
+- Test fixture incompleteness cascades across multiple test files — incomplete mocks (missing `exists()`, missing `taskMetadata` field) cause downstream test failures in multiple packages
+- Heavy reliance on agent forks for parallel work — 7+ independent fork directives in single session successfully isolated scope and reduced context
+- Parallel agent spawning at 08:19:29-08:19:35 (forks a0bf, ac4e) on overlapping work (global env vars + TASK_PROJECT_DIR) suggests lack of upfront task decomposition — both agents queried same files independently instead of one delegating to the other
+- Multiple iterations debugging loop/retry flows (11:00–11:07): agent made speculative changes rather than tracing execution path first. Next time: add debug logging, read trace output, then change one thing — observe result before next change
+
+<!-- session 5b7b2b1a 2026-08-16 -->
+- Multiple test debug patterns needed (tail, grep, reporter=verbose, bail flag) to isolate failures — workflow could be standardized for faster debugging
+- Four fork agents spawned within ~9 seconds (08:19:26, 08:19:29, 08:19:35, and implicit TASK_PROJECT_DIR) for parallel feature work — user pattern of delegating multi-feature tasks to agents in parallel.
+- Heavy delegation to agent forks (3 forks for isolated tasks) follows CLAUDE.md guidance, but main agent had to re-investigate forked changes afterward (e.g., checking if violation rule compilation passed), suggesting fork results weren't summarized back to main context—consider tighter handoff protocol.
+- Parallel agent fork delegation pattern (a8c1, ae19, a561, a32b, a3f9, a8a7, ac3a, a921) for independent tasks validated — no corrections observed; this is the expected workflow.
+- User consistently delegated to fork agents for isolated parallel work: streaming fixes (a190), output injection design (aaa8/a9a5), and multi-round spec audits (a3e0/ab24/a928) — indicates preference for decomposing complex tasks across independent agents rather than sequential fixes.
+
+<!-- session 576b7d8d 2026-08-16 -->
+- Multiple test file rewrites fixing auto-discovery paths (TemplateValidator, FlowRegistry) — suggests initial path resolution assumptions were wrong; validation needs explicit setup in test harness early.
+- workspace: protocol and npm override configuration reappeared (10:51–10:53) despite prior fixes — suggests the solution wasn't preserved or validated in CI/build process.
+- User sent message to forked agents to stop web fetching and use only local files — preference for local-only investigation rather than external web calls during agent work.
+
+<!-- session 32c17c8b 2026-08-16 -->
+- When multiple test suites fail after refactoring, first check if test fixtures/mocks are stale vs production types before assuming logic bugs — this is faster than iterative test runs.
+- Loop/retry state handling required many file reads and debug logging iterations (10:58-11:06) to isolate — control flow across FlowScheduler/ExecutionStore/Daemon/CommandHandler is complex; consider refactoring or adding architecture docs for failure/retry paths.
+- Verbose mode is controlled by flow step config `log: step` parameter, not CLI `--verbose` flag. Agent initially assumed control flowed through CLI rather than through flow definition.
+
+<!-- session 92cb6ce8 2026-08-16 -->
+- When multiple agents work in parallel on related code, verify integration points early — parameter passing through IPC/message layers (Protocol.ts → CommandHandler → WorkerAdapter → StepQueue) broke silently across 4 files due to `workspaceDir` context not propagating.
+- Incremental edits across CommandHandler.ts (lines 09:35–09:36), TemplateRenderer context (09:36:53), and ConditionEvaluator (09:49:48+) — template/condition context shape was unclear; agent had to iterate through multiple file edits in sequence rather than one-shot fixes.
+- User has strong preference against web fetching by agents — user explicitly SendMessage'd an agent fork (11:10:55) to stop it. This is environmental constraint, not request-by-request.
+
+<!-- session 543d9d83 2026-08-16 -->
+- Agent correctly parallelized independent work across 3+ fork sessions (FlowRegistry, TemplateValidator, UserInterventionValidation fixes) — validates that user expects multi-agent dispatch when issues are decoupled.
+- TDD (red-green-refactor) pattern successfully applied across 6+ parallel agent tasks (jsonpath, --project-dir, global env, --inputs alias, etc.) — validated approach for this codebase.
+- Loop execution condition (onFailure + hasFailed flag) required multiple debug iterations (09:58:46-11:06:27) to wire failure detection → termination — loop/retry semantics lack clear specification.
+- Parallel fork agents used consistently for independent work (npm research, regression tests, model bug fixes, flow validation) — this pattern reduced context and worked well
+
+<!-- session e65b2ff1 2026-08-16 -->
+- Pre-existing test failures in flow-engine required investigation before new work could proceed — suggests need for baseline test health validation before feature branches
+- RunCommand.ts edited 3 times in 30 seconds (lines 09:01:41/44/47/51/55) suggests first fix attempt was incomplete — agent continued iterating without clear indication what was wrong.
+- Exploratory debugging pattern (run test → same error → run test again) consumed time; hypothesis-driven fix (predict → test once) would have shortened 10:59–11:06 cycle.
+- User explicitly stopped web fetching: "STOP making web requests, use only local files." Document this as a hard constraint for this project.
+
+<!-- session e98523b0 2026-08-16 -->
+- Tried unknown skills (get-timestamp at 22:50:12, check at 06:46:25) — agent did not verify skill availability before calling
+- Multiple parallel agents worked on related features (–project-dir, env vars, output extraction, daemon response handling) across chunks 08:10-08:22 — confirms value of fine-grained task parallelization established in memory.
+- Naming changes across codebase need exhaustive grep before applying (output→outputs, task→removed from context)
+- User (or SendMessage hook) directed agent to stop web fetching and use only local files (11:10:55 warning). This is a pattern worth remembering for future agent behavior.
+
+<!-- session 686db9b5 2026-08-16 -->
+- Parallel agent spawning for independent test fixes (agents ac7f, aecb, ad3e, adae for different failing tests) was effective — coordinate independent work across multi-file refactoring rather than sequential fixes.
+- Multiple sequential vitest runs (08:11-08:13) instead of combining into single check — context-inefficient; should batch test verification
+- agent-browser skill preference not working as expected — user sent explicit "STOP" message (11:10:55) about browser automation behavior; preference should be enforced or documented.
+- Streaming implementation required multiple fix rounds (regex, delays, verbose mode, event mapping) across ScriptExecutor, WorkerAdapter, StepRunner — indicates interdependent complexity; streaming changes should trigger full integration test suite, not unit tests alone.
 
 <!-- session f5ca1287 2026-08-15 -->
 
@@ -122,6 +192,124 @@
 - Multiple independent agents (Explore, general-purpose) read identical spec files sequentially without coordination, causing redundant I/O. Agents should receive shared context or hand off findings rather than re-audit.
 
 ## Agent errors
+
+<!-- session e9472617 2026-08-16 -->
+- Fork agent (afcc) at 06:45:05 tries `check` skill (unknown), falls back to `npm run check` bash. Same pattern at 22:50:12 with `get-timestamp` → bash fallback. Fallbacks succeed, but repeated WARN logs suggest this is discoverable/fixable.
+- Module exports from flow-engine to flow-cli unclear — at 08:06+, agents repeatedly grepped for FlowScheduler/FlowCapabilitiesGenerator exports, checked tsconfig path aliases, read node_modules resolution, suggesting exports were missing or undeclared.
+- When investigating a failure with unknown root cause (loop execution stuck), agent searched reactively through scattered line ranges of the same files (ExecutionStore, Daemon, CommandHandler at 10:58–11:02) rather than forming a hypothesis first. Debug logging added later (11:04–11:05) revealed the issue, suggesting upfront hypothesis-formation would be more efficient.
+- Multiple fork agents spawned for npm workspace shadowing research when they could have been sequenced — parallel agents on interdependent investigation fragments context without acceleration.
+- Two forks (aaa8, a9a5) launched in parallel at 13:24:23 modifying same test files simultaneously (StepRunner.test.ts, types.ts) within 1-2 seconds—Edit calls at 13:28:18, 13:28:39, 13:28:45 create conflict risk despite independent features.
+- Session e9472617 reads all 11 spec files sequentially instead of searching for specific content first — wastes context. Should grep for issue keywords before opening files.
+
+<!-- session d300bfbf 2026-08-16 -->
+- Agents repeatedly verified exports (FlowScheduler, FlowCapabilitiesGenerator) from flow-engine/src/index.ts before using them — suggests unclear contract about what's re-exported vs what's internal-only.
+- Fork agent at 09:30 identified design issue with condition context shape, then fork at 09:48 refactored it — suggests first pass incomplete or required iteration. Pattern: sequential forks on same problem area may indicate incomplete initial scope.
+- Loop/retry execution: step_failed events not propagating correctly after step failure; loops hang instead of continuing. Issue in Daemon.ts → CommandHandler.ts event flow, not just scheduler logic. Debug logging added at 11:04-11:05 suggests ongoing investigation.
+- Fork agent a8c1 web-fetched npm documentation despite problem being locally verifiable; multiple parallel forks spawned (a8c1, ae19, a561, a32b, a3f9, a8a7, ac3a, a921) without coordination, likely inflating context overhead
+- Fork agent initially misunderstood verbose mode behavior at 13:16:13; corrected by SendMessage at 13:17:18 about "verbose mode driven by log: step param, not --verbose flag". Suggests verbose mode parameter location/control flow isn't intuitive.
+- At 13:34:18, agent spawned with type "unknown" instead of a recognized agent type from available-skills list — likely unintended fallback behavior.
+
+<!-- session bd4052a0 2026-08-16 -->
+- Proposed jq workaround instead of implementing the requested jsonpath feature in OutputVariableConfig
+- Declared flow "ready" without testing daemon communication — flow was stuck after step failure due to pending skipped steps
+- Didn't properly verify the `output.status` context design — it merged outputs flat (ambiguous if multiple deps produce same key) instead of explicit `steps['step-id'].outputs.key`
+- Agent opened headed browser windows via agent-browser fork when `headless: true` was required. Fork rule unclear or not checked before delegating.
+- Agent invented `constraints` field in skill frontmatter frontmatter that isn't recognized in official spec. Created noise without validation.
+- Agent applied `file:` fix to flow-cli only, missed 16 other workspace dep references across 13 packages. Required user to catch incomplete scope.
+- `onLogEntry` callback wired in StepRunner but never passed from WorkerAdapter — streaming feature was half-implemented, agent didn't trace the callback chain before declaring done.
+- ScriptExecutor multiline regex backtracks to LAST `"` in string, eating path arguments. Broken for `node -e "..."; claude-mock "path"` patterns.
+- Template resolution context shape for `when:` conditions is non-obvious — conditions use `output.` prefix but template context wasn't passing the right shape, causing condition evaluation failures
+- CommandHandler.onStepFailed ignored retry logic when FlowScheduler.hasFailed() — could cause infinite retries or dropped steps (critical bug)
+- TemplateRenderer/FlowDefinition/FlowStep not exported from flow-engine/index.ts, breaking subpath imports in flow-cli packages
+- Legacy `output[...]` vs new `outputs[...]` naming — had to reconcile condition evaluation (uses `outputs`) separate from prompt templates (uses `task.` metadata)
+- Template syntax support discovered mid-phase: `${{ steps['x'].outputs.y }}` requires both `output.*` and `steps.*` pattern handling in condition evaluator, not obvious upfront.
+- Test helper scope: `makeLoopStep` inside `test()` scope vs top-level affects closure state — moved to top-level after discovering stale scope bugs.
+- Post-refactoring module import resolution broke — multiple retry cycles (08:04:26-08:05:30) checking FlowScheduler exports, dist paths, tsconfig aliases suggest index.ts re-export or path alias misconfiguration was not caught by build step
+- Review agents (forks a034, aaee spawned 06:59:34) produced findings but their output/corrections are not visible in log — fork a183 (07:44:04) was later spawned for same task ("Fix Map.get()! variants with TDD"), suggesting first review agents were ineffective or output was lost
+- Multiple concurrent agents spawned (fork a106, a593, abc9) for partially-overlapping issues: --inputs alias fix, global env template resolution, and when:-context refactoring. Lack of upfront sequencing meant duplicate investigation into ConditionEvaluator and TemplateContext.
+- Agent attempted to web-fetch npm workspace documentation at 11:10:55 when user sent explicit message "STOP making web fetches, use only local files" — agent should prefer local CLAUDE.md, package.json, and existing code over web fetches
+- Agent attempted to use SendMessage (deferred tool) without fetching its schema first
+
+<!-- session 5b7b2b1a 2026-08-16 -->
+- Agent used incorrect template variable syntax during FlowScheduler implementation, later self-corrected to standard ${{ }} format
+- Agent tried to find "generateExecutionId" function (09:14:01) but couldn't locate it — function may not exist or be named differently.
+- Fork at 09:48:52 made major refactoring (renamed `output` → `outputs`, removed `task.` from when: context, added dot-notation conversion) across ConditionEvaluator/FlowScheduler/tests, but no end-to-end feature validation shown—only unit tests passed. Breaking change to evaluation context could silently break existing flows if they reference `task.*` or use `output.` instead of `outputs.`.
+- Loop/retry with `onFailure: goto` debugging session (10:58+) involved tracing failure handling through ScriptExecutor → WorkerAdapter → CommandHandler → Daemon, with multiple debug log additions (11:04:20, 11:05:01, 11:05:08) but no final resolution shown—suggests either issue remains unfixed or session ended before confirmation.
+- Agents attempted web fetching despite implicit requirement for local-only operations — 11:10:55 SendMessage intervention shows user had to explicitly stop this behavior. Agents need clearer scoping docs on network access.
+- Agent a190 misunderstood verbose mode source: assumed `--verbose` CLI flag instead of `log: step` parameter in flow definition — corrected via SendMessage at 13:17:18.
+
+<!-- session 576b7d8d 2026-08-16 -->
+- Agent invoked non-existent skills (get-timestamp, subprocess, check) without first using ToolSearch to load them — caused permission/NOT YET KNOWN warnings.
+- Agent attempted inter-agent SendMessage with malformed context about `${{ }}` format — message failed with NOT YET KNOWN status.
+- Five parallel agents (ac93, a6e4, a0bf, ac4e, a106) working on interdependent features (jsonpath, --project-dir, global env, TASK_PROJECT_DIR) without explicit coordination. Risk of conflicts or duplicate work in FlowDefinition / StepRunner / validation layers.
+- Skill lookup failed for "spec" and "run" (marked "NOT YET KNOWN" at 07:48:57, 07:52:42). User worked around by running bash find/grep to locate skill definitions manually, indicating skill registry may be stale or misconfigured.
+- abc9 fork completely rewrote ConditionEvaluator.test.ts (Write tool) rather than incremental edits — suggests either wholesale test replacement or unfamiliarity with targeted test changes; main session continued debugging the same area (retry/loop) after fork completed, implying fixes were incomplete.
+- Multiple parallel forked agents (a593, abc9, a6e6, a53e) with overlapping scopes created ambiguous state — hard to verify which fork's changes actually fixed what; main session then re-applied fixes to same files afterwards.
+- Skill invocations for `subprocess` (doc-audit, security audit) and `goldfish` returned "*** NOT YET KNOWN ***" — skill registry may not match name+args tuples or skills lack proper registration.
+- Verbose mode is driven by flow step `log: <step>` parameter, not CLI `--log` flag — agent a190 assumed wrong driver after working on streaming features.
+- Multiple parallel agents (aaa8, a9a5, a928) working on spec fixes simultaneously — ran 3 audit/fix rounds iteratively; suggests initial spec had undetected CRITICAL/HIGH issues that required re-audit cycles.
+
+<!-- session 32c17c8b 2026-08-16 -->
+- Multiple test files had stale mock data (workspace context structure, step output types) that didn't match production after types.ts changes — required reading both test AND implementation files to identify mismatch, not fixable by code inspection alone.
+- FlowScheduler extraction assumed changes to flow-engine alone would work in flow-cli; didn't discover until test runs that IPC serialization layer (Protocol.ts) and CommandHandler needed updates — plan cross-package refactors holistically before implementation.
+- Multiple agents launched simultaneously for related features (env vars, --project-dir flag, TASK_PROJECT_DIR, jsonpath extraction) — poor task decomposition; should have been batched under one agent or clearly sequenced.
+- Agent a106 (fix --inputs and flow run UX) spent 16 minutes (08:57–09:13) with repeated grep/read patterns on same files (CommandHandler.ts, daemon.js, client.js) trying to reverse-engineer daemon response protocol — inefficient exploration; suggests protocol docs are missing or agent wasn't given implementation context.
+- Fork agent discovered TemplateRenderer wasn't exported from flow-engine/index.ts (09:54-09:58) — suggests export list may be incomplete or missing refactoring step.
+- When-context shape refactoring (task removed, output→outputs, dot notation added, 09:30-09:51) cascaded through SimulationValidator.test.ts — design coupling across validation suggests these contexts need a shared contract/definition file.
+- Process termination on Windows proved error-prone: agent at 12:55–12:58 mixed POSIX (netstat, grep) with cmd.exe syntax (taskkill /PID /F), requiring 3 attempts to kill port 47824. Clean solution would be the kill-port skill (available but not invoked).
+- Agent fork at 11:12:07 explicitly created to "Save user preference about browser mode to memory" — implies prior agent misunderstood or misapplied browser automation constraints. Investigated agent-browser skill in temp files (11:14:37, 11:18:18), suggesting skill behavior was unclear.
+- Agent incorrectly modeled where flow execution control lives—assumed CLI flags drove verbose logging instead of step-level configuration. Indicates misalignment about execution control architecture.
+
+<!-- session 92cb6ce8 2026-08-16 -->
+- Template variable syntax: agents initially wrote `when: condition` or custom syntax, but the standard format is `when: ${{ condition }}` with mustache-style delimiters — not documented clearly in type definitions.
+- Test assertion pattern: agents wrote `rejects.toThrow()` instead of `expect(...).rejects.toThrow()` — affects multiple test files and requires careful search/replace since the pattern appears similar but is syntactically wrong.
+- Multiple re-reads of same files (FlowRegistry.test.ts read 6+ times) suggest initial misunderstanding of test structure or uncertainty about where to make changes — clearer code organization or example tests might reduce this.
+- Skill resolution delays: `spec` and `run` skills not found on first invoke (07:48:57, 07:52:42); agent worked around with Bash grep to locate skills manually. Suggests skills may be lazily loaded or have discovery latency.
+- Heavy parallelization risk (agents ac93, a835, a0bf, ac4e, a106 running concurrently 08:10–09:00) across related features (jsonpath field, --project-dir, env vars, TASK_PROJECT_DIR, --inputs alias). No visible merge conflicts, but coordination complexity grew. Multiple agents reading/editing CommandHandler and RunCommand simultaneously.
+- Design issue flagged at 09:30:58: "when: context shape must be step-id keyed" — agent fork (a593) surfaced disagreement mid-work via SendMessage, suggesting context shape for conditionals needs clearer specification or documentation.
+- Multiple retries on daemon/port-file discovery (lines 09:25:14+): agent spent ~90 seconds grepping for port file location, readPortFile behavior, config.port format — indicates no single source of truth for singleton-daemon-kit port storage mechanism.
+- Multiple skills called but returned `*** NOT YET KNOWN ***`: `kill-port` (12:55), `subprocess` (12:58, twice), `goldfish` (13:00) — suggests agent didn't fetch skill schemas via ToolSearch before invoking, or agent/harness lost access to deferred tool definitions.
+- Agent attempted SendMessage to communicate verbose mode correction but tool was "NOT YET KNOWN" — verbose logging is driven by `log: step` parameter in flow definition, not CLI flags; agent had to investigate with grep to discover this
+
+<!-- session 543d9d83 2026-08-16 -->
+- Multiple incorrect assumptions about test context — agent re-read workspaceDir/DeclaredWorkspace setup multiple times (22:18:02–22:18:06) to understand correct structure; early reads missed details that forced rework.
+- Agent assumed `${{ }}` template syntax was "legacy"; user corrected mid-work: it's the standard format (line 07:28:29).
+- Exploratory debugging without clear hypothesis: 09:25:14-09:26:10 shows multiple similar grep searches for port-file location and client implementation, indicating guessing rather than following a trace path.
+- Step failure wasn't terminating loops automatically — 10:58:16-11:06:27 shows investigation into markExecutionFailed, step_failed events, and hasFailed flag handling, suggesting failure-loop integration was incomplete or misunderstood.
+- agent-browser skill only supports headless mode, not GUI browser mode — user had to patch skill documentation and restrict usage
+- Agent a190 assumed verbose mode was controlled by CLI flag (`--verbose`), but correction shows it's actually driven by flow `log: step` parameter — indicates confusion between CLI-level vs flow-configuration-level behavior control.
+- Spec audit (subprocess) discovered HIGH-severity issues in multiple files (extension-points, plugin-manifest, provider-types, workspace-provider, approval-provider, plugin-architecture, threat-model), requiring round 2 fixes — suggests specs need validation against threat-model and architecture guidelines before marking complete.
+
+<!-- session e65b2ff1 2026-08-16 -->
+- Context parameter (workspaceDir) not propagated consistently across Protocol.ts, CommandHandler.ts, WorkerAdapter.ts, StepQueue.test.ts — repeated pattern caught piecemeal rather than as single coordinated fix
+- Test path/fixture issues in TemplateValidator and FlowRegistry tests — enableAutoDiscovery parameter and test data setup not robust enough to catch mismatches early; required multiple debug cycles
+- Agents invoked unknown skills (`/spec`, `/run`, `/flow`) that are listed in available skills but not yet resolved by ToolSearch or skill lookup. This caused fallback investigations instead of using the intended tools.
+- --inputs parameter aliasing issue required extensive IPC protocol investigation (lines 08:56-09:20) across daemon, client, and health-server code; unclear if this was a parameter naming problem or response handling problem until deep code inspection.
+- Agent-to-agent communication failed at 09:30:58 — SendMessage to a5931923647f13de1 reported status `*** NOT YET KNOWN ***`, suggesting handoff mechanism issue or message format problem.
+- Two forked agents (a593, abc9) both worked on output.→outputs renaming and context shape fixes in ConditionEvaluator/FlowScheduler — overlapping work not coordinated; led to duplicate edits.
+- Fork agents spent excessive time exploring npm docs/config instead of targeting the root cause directly. Future npm workspace issues: skip WebFetch, check package.json and package-lock.json first.
+- Assumed verbose mode was CLI flag (--verbose); actually driven by `log: step` flow parameter — corrected at 13:17:18 SendMessage
+
+<!-- session e98523b0 2026-08-16 -->
+- Fork agents made 8+ edits to same files (FlowRegistry.test.ts, FlowScheduler.ts) in single session — no root cause analysis before trial-error debugging
+- Multiple test parsing attempts with complex tail/grep filters instead of capturing full test output first; suggests poor test failure triage
+- Fork agent at 07:28:29 attempted SendMessage (not available to forks) — indicates context confusion about agent capabilities
+- Monorepo import resolution (flow-engine in flow-cli, FlowScheduler/FlowCapabilitiesGenerator exports) required extensive debugging (08:04-08:08) — tsconfig/package.json paths were checked repeatedly, suggesting unclear dependency setup or missing re-exports.
+- Initial assumption that task. and taskMetadata objects would be available in when: condition context (they aren't)
+- Loop execution misunderstood as iteration counter; actually requires step-failed flag checking + state reset between iterations
+- Multiple `subprocess` and `goldfish` skill invocations failed as "NOT YET KNOWN" — these skills either don't exist or aren't in the available list. Agent appears to be guessing at skill names rather than checking documentation first.
+- Agent attempted Windows cmd.exe syntax (`taskkill /PID /F`) in Git Bash context — multiple retries with wrong command family before switching to Node.js child_process workaround.
+- Fork a190 was corrected mid-task about verbose mode implementation: it should be driven by flow step config (`log: step` parameter), not a CLI flag. Initial brief was incomplete about design decisions.
+- Multiple concurrent forks (a190, aaa8, a9a5, a3e0) launched in parallel on overlapping concerns (streaming, output validation, tool calls, specs). No clear scope boundaries communicated. Risk of integration issues / test false negatives.
+
+<!-- session 686db9b5 2026-08-16 -->
+- Assistant assumed test pattern structures (e.g., `rejects.toThrow` syntax in FlowRegistry) without first verifying actual test code — led to repeated grep iterations searching for patterns with different syntax variations before finding correct matches.
+- Skill "run" marked "NOT YET KNOWN" (07:52), then Skill "flow" marked "NOT YET KNOWN" (08:04) — skill resolution or registration issue prevented use of available skills
+- Multiple forks (a593, abc9) worked on overlapping when/output/task context changes without clear task boundary — resulted in duplicate work on ConditionEvaluator.ts and FlowScheduler.ts.
+- Fork (a53e) created workspace-shadow violation rule in violations-framework repo while agent-fleet specs being modified in parallel (75a0bd3d) — unclear if both systems needed the rule or if this was coordination gap.
+- npm workspace shadowing repeatedly investigated as root cause (11:08-11:14) despite being documented in project memory — agents should consult lessons-learned.md before deep debugging of dependency resolution.
+- Direct cmd.exe taskkill call (12:58) instead of abstracting through shell or kill-port skill — breaks portability and violates CLAUDE.md requirement to use POSIX in Bash; should have delegated to skill.
+- Multiple concurrent fork agents (a190, aaa8, a9a5, a3e0) modifying shared files (types.ts, validation files, test files) — increases merge complexity and risk of conflicting edits; coordination mechanism needed or sequential ordering.
 
 <!-- session f716f570 2026-08-16 -->
 
@@ -279,6 +467,96 @@
 
 ## Documentation gaps
 
+<!-- session e9472617 2026-08-16 -->
+- Skills (check, get-timestamp, subprocess, SendMessage) marked "NOT YET KNOWN" when first invoked by forked agents, despite being in deferred tool list. Fork agents don't inherit parent session's tool visibility.
+- OutputVariableConfig schema (jsonpath field) not documented in flow docs — agents spent 8+ minutes (08:04-08:13) grepping for output extraction patterns before implementing.
+- Daemon response protocol for executionId undocumented — agents/user spent 20+ minutes (08:57-09:18) reverse-engineering how singleton-daemon-kit wraps responses, investigating CommandHandler return values, reading compiled .js to understand send() contract.
+- Workspace dependency resolution strategy is unclear—evidenced by three consecutive edits to flow-cli/package.json (10:51–10:52) attempting "workspace:" protocol, each followed by npm install. Decision appears to be: use root-level `overrides` to force local resolution. This pattern needs documented guidance.
+- agent-browser skill has undocumented mode constraints (headless-only, custom browser parameters) requiring custom SKILL.md patches; skill definition or help text is incomplete.
+- task-model2.yml rewritten 5+ times across 30 min (13:02:47 → 13:31:09) with different content each time—no clear contract for what this test fixture covers; used as scratch pad for streaming, tool logging, writeOutput tests.
+- Plugin system spec requires 4 audit/fix rounds (audit at 13:32:12, fixes at 13:35:41, 13:40:44, 13:45:43) with fresh HIGH/CRITICAL findings each round—suggests spec was either incomplete at start or audit process lacks upfront rigor to catch issues in one pass.
+- Pattern of test mode changes (`mode: 'manual'` → `mode: 'isolated'`) across multiple files suggests significant configuration change, but unclear if comprehensive or partially applied across codebase.
+
+<!-- session d300bfbf 2026-08-16 -->
+- Daemon response protocol not documented — agent had to reverse-engineer singleton-daemon-kit library code to understand {result: ...} wrapper and executionId handling. Took ~15 min of grepping/reading through compiled JS.
+- Flow schema validation rules unclear — multiple attempts to add `env` field to FlowDefinition, then validator rejections. Allowed/disallowed fields should be explicitly listed.
+- Model step `log` parameter undiscovered until integration testing — no spec/docs explaining it exists and is required; flow validation does not document that undeclared output keys must be caught (only discovered during test failure); skill `kill-port` not recognized ("NOT YET KNOWN"); skills `subprocess`, `goldfish`, `agent-browser` failed with "NOT YET KNOWN" when user tried to invoke them
+
+<!-- session bd4052a0 2026-08-16 -->
+- `--inputs` vs `--input` CLI flag discrepancy: docs claim `--inputs` but CLI only accepts `--input`
+- npm workspace shadowing: no project doc on `file:../` vs scoped packages tradeoff. User had to research industry practice with ChatGPT/Gemini.
+- Skill frontmatter spec unclear — no doc listing valid fields. Agent invented `constraints` without reference.
+- Model step `log: streaming` behavior undocumented. Agent didn't know that Claude in agentique mode (`-p`) emits only final `assistant` event, silencing tool calls.
+- `writeOutput` on step outputs is undocumented — user had to ask how to use the feature
+- Conflated `when:` condition syntax (`outputs.field`) with template rendering (`${{ output[...] }}`) — they use different contexts and interpolation rules
+- JSONPath support for OutputVariableConfig was undocumented — agent had to extensively grep flow docs (08:08:38-08:09:12 lines) to understand expected syntax, eventually requiring implementation of jsonpath field
+- CLI-daemon IPC protocol and singleton-daemon-kit integration not well-documented — user spent 20+ minutes grepping node_modules/.js files, reading .flow-daemon directory structure, and reverse-engineering response/result wrapping to understand how `sendToDaemon()` handles executionId and responses.
+- `when:` condition evaluation context shape and available variables unclear — required refactoring across ConditionEvaluator, FlowScheduler, and SimulationValidator. The distinction between `task.*`, `output.*`, and newly-added `outputs.*` (dot-notation conversion) suggests prior ambiguity about what data should be accessible in conditions.
+- agent-browser skill: user left note preferring headless-only mode (11:12:07) — skill default allows GUI browser, causing friction; should document/gate this
+- System shows deferred tool warnings but doesn't guide users to load them via ToolSearch
+- Provider implementations (workspace-provider, approval-provider, provider-types) appeared across multiple fix rounds, indicating the provider pattern spec was incomplete or unclear initially.
+
+<!-- session 5b7b2b1a 2026-08-16 -->
+- Feature wiring between flow-engine and flow-cli wasn't documented — required explicit audit (grep for: loop, retry, timeout, captureOutput, cancel, skip, iteration) to identify which engine features weren't available in CLI
+- User had to extensively search code (07:57-08:04) to understand how projectDir flows through FlowEngine/FlowCLI — no clear doc on context propagation through the system.
+- Agent made 8+ grep attempts (08:08:46+) searching "flow docs" output for output extraction / jsonpath docs — command structure or docs may be unclear.
+- When: condition evaluation context shape changed significantly (task metadata removed, output field renamed) but no schema or migration guide documented—code readers must grep ConditionEvaluator to understand what's available.
+- npm workspace package shadowing (multiple registry installs shadowing local packages) — extensive investigation cycle needed to isolate root cause in WorkerAdapter. Solution: `file:` protocol in package.json dependencies. Now documented in lessons-learned.
+
+<!-- session 576b7d8d 2026-08-16 -->
+- `workspaceDir` requirement was not consistently documented in type signatures — had to be added retroactively to Protocol.ts, CommandHandler.ts, WorkerAdapter.ts test fixtures after failures.
+- Flow validation rules (depends vs dependsOn, workspace.reusePolicy requirement) caused repeated test failures; constraint is in memory but not enforced early in test setup.
+- Daemon IPC response protocol not documented — agent reversed-engineered node_modules/@wadeck/singleton-daemon-kit to understand result wrapping, handler response structure, and how client extracts execution results. This took multiple rounds of grep/cat through minified dist files.
+- OutputVariableConfig schema and validation rules unclear — extensive searching for pattern/jsonpath field support, where to add new fields, which validators enforce strictness. SchemaValidator checks not obvious.
+- Step failure & loop handling required extensive reads across Daemon.ts, CommandHandler.ts, ExecutionStore.ts, FlowScheduler.ts — flow control state machine semantics not clearly documented; "step_failed" event handling and loop iteration restart conditions were discovered via code archaeology, not docs.
+- Model step logging architecture (onStepLog callbacks, liveLogEntries, tool-call parameter passing through WorkerAdapter → StepRunner → ClaudeLauncher) was not documented; required 40+ commands of code tracing to understand the full flow.
+- Streaming log output and tool-call injection patterns needed significant iteration (claude-mock delays, timestamp tracking) — not adequately documented before agent attempted implementation.
+
+<!-- session 32c17c8b 2026-08-16 -->
+- ConditionContext interface and condition evaluation API not obvious from types.ts — had to trace through ConditionEvaluator.ts to understand how `when:` fields are evaluated; would benefit from example or docstring.
+- workspace context structure (workspaceDir, how it serializes through IPC Protocol, lifecycle) not documented — only discovered via test failures that Protocol.ts message format was wrong.
+- Daemon response handling opaque — how executionId flows from CommandHandler back to RunCommand required extensive investigation; no protocol docs found.
+- Flow validation rules undocumented — multiple validation errors required trial-and-error to determine which fields are allowed in FlowDefinition (env field, jsonpath field); SchemaValidator.ts modified multiple times (lines 08:12:48, 08:20:52).
+- Multiple diagnostic bash commands exploring daemon port files, launcher config, Windows PATH (09:20-09:27) suggest daemon/launcher architecture is underdocumented — future daemon work will need this.
+- At 13:00:08–13:00:15, three skills blocked/unknown in sequence: subprocess (doc-audit), subprocess (security audit), goldfish. Agent fell back to bash file reads instead. Suggests skill availability or permission documentation was unclear to the agents running at that time.
+- Spec audit/fix process required at least 2 rounds (13:27 "Fix HIGH/CRITICAL", then 13:35 "Fix round 2 HIGH"). Suggests either spec consistency rules weren't fully documented upfront, or audit tool reports issues in tiers, causing fixes to cascade.
+
+<!-- session 92cb6ce8 2026-08-16 -->
+- Skill availability discovery: both `get-timestamp` and `subprocess` skills were marked "NOT YET KNOWN" during execution, causing brief blockers. Skills need to be pre-listed or lazy-loaded more transparently.
+- singleton-daemon-kit internals undocumented: agent a106 spent 10+ minutes reverse-engineering `node_modules/@wadeck/singleton-daemon-kit/dist/` to understand response format, spawn behavior, and result wrapping (09:01–09:13). No project docs on daemon client protocol or executionId return timing.
+- CommandHandler `allowAbsolutePaths` configuration option not obvious; discovered via grep + manual instantiation site inspection (09:16–09:16:50). No docstrings or comments explaining when/why to set it.
+- User spent 11:12-11:20 manually reading agent-browser SKILL.md and writing temp analysis files — suggests skill documentation was unclear or agent misapplied it (headless-only mode preference was not being honored).
+- Verbose mode behavior (`log: step` parameter vs CLI flags) wasn't immediately clear — required grep investigation of multiple files to understand; should be documented in flow definition schema or step reference
+
+<!-- session 543d9d83 2026-08-16 -->
+- Skills "check", "subprocess", "get-timestamp" showed NOT YET KNOWN warnings (22:50:07, 22:53:45, 06:46:08), forcing agent to use bash workarounds or re-invoke.
+- Daemon response handling in @wadeck/singleton-daemon-kit required extensive investigation (08:56:37–09:20:04) — reading dist files to understand client.send() response format, executionId return, and result wrapping; type definitions or JSDoc would have saved round-trips.
+- when: context shape underwent major refactoring (task.field → outputs[stepId].field, then task removed entirely) across 5+ test files — abstraction was underspecified and repeatedly refactored.
+- kill-port skill was not available in initial attempt — user had to manually kill process with cmd.exe taskkill /PID
+- Flow-level `log: step` parameter and its effect on verbosity/streaming behavior may not be discoverable or clearly documented in code comments.
+
+<!-- session e65b2ff1 2026-08-16 -->
+- Skills "check", "subprocess", "get-timestamp" requested but marked "NOT YET KNOWN" — discoverability/availability issue with skill definitions
+- Daemon response protocol (how executionId is returned, response wrapping by singleton-daemon-kit) is not documented in project context — agent had to read node_modules code to discover that responses are wrapped with `{ result: {...} }` structure instead of being returned directly.
+- npm workspace shadowing (flow-engine rogue copy in flow-cli/node_modules) required 8-minute investigation; no monorepo troubleshooting docs exist for detecting/preventing nested workspace bundling.
+- Loop/retry execution flow (step failure → cleanup → next iteration vs. exit) unclear; debugging took 7+ minutes with multiple identical test runs to understand state machine.
+- npm workspace package shadowing fix (file: protocol vs workspace protocol) not documented — captured only in lessons-learned.md after the fact. Model step logging requirements (parameter name, mock Claude, log extraction) required investigation; not in FlowCapabilitiesGenerator or flow docs.
+- Verbose mode behavior not clearly documented; mismatch between expected CLI flag and actual `log: step` parameter caused agent misconception
+
+<!-- session e98523b0 2026-08-16 -->
+- Spec files read at start but not used; implementation started without clear TDD plan despite 4-phase FlowScheduler refactoring being complex
+- Daemon IPC protocol (request/response format, executionId return path) not documented — agent a106 reverse-engineered from decompiled singleton-daemon-kit code (09:12-09:15) instead of having a clear contract.
+- TemplateContext available variables undocumented — taskMetadata and task.* should NOT be exposed to condition evaluators
+- agent-browser skill limitation (headless-only mode) discovered mid-session and documented as lesson-learned, suggesting skill docs don't state this constraint upfront.
+- Configuration pattern for flow steps (e.g., `log: step` to enable verbose mode) not obvious enough to fork agents — had to be corrected after work started. Needs clearer design doc link in fork briefs.
+
+<!-- session 686db9b5 2026-08-16 -->
+- Plugin system work requires reading all spec files before answering design questions — user explicitly instructed this at session start, suggesting specs-driven approach is critical for this domain.
+- Daemon IPC response handling required extensive exploration of node_modules/@wadeck/singleton-daemon-kit internals (client.js, health-server.js) to understand how executionId is returned — daemon communication contract undocumented in project
+- CommandHandler's allowAbsolutePaths parameter discovered via code search rather than clear naming/comments — suggests low visibility of this configuration point
+- Skills marked "NOT YET KNOWN" at 13:00 (subprocess, goldfish, kill-port) — skill registration or availability documentation is incomplete or skills aren't discoverable by ToolSearch when agent context is stale.
+- Tool logging feature (model-step-tool-logging.md) newly documented — indicates feature complexity; future work on model steps needs this reference to understand toolLog, request_user_input, streaming interactions.
+
 <!-- session f716f570 2026-08-16 -->
 
 - Plan file mentions "FlowOrchestrator.ts path is contradictory — orchestration/ vs executor/" but contradiction is not resolved in session. File naming/structure expectations should be documented in naming-conventions.md or similar.
@@ -419,6 +697,99 @@
 - Extensive Grep searches for domain concepts (RE-QUEUED, bufferSpill, reconnectTimeout, idleTimeout, drainTimeout, heartbeat monitoring, etc.) suggest spec lacks clear glossary or index of key terms. Future audits should define these upfront.
 
 ## Known constraints
+
+<!-- session e9472617 2026-08-16 -->
+- Parallel fork agents used extensively for independent work — session spawns 3+ concurrent forks around 22:17, then again at 06:59 for reviews. Plan-driven refactoring: write plan (10k chars) → next session executes in TDD phases with iterative test/edit cycles.
+- Skills `/spec` and `/run` marked "NOT YET KNOWN" at 08:04, forcing user to manually create spec folder and investigate run mechanics. Skills appear to resolve later in session.
+- Fork agent (10:53:34) suddenly switched to violations-framework repo (sibling workspace) while main agent continued testing in agent-fleet. Parallel work across repos without explicit sync or shared context may mask integration failures.
+- npm workspace package shadowing — npm will install from registry even when an identically-named workspace package exists at root; workaround: use `"file:../flow-engine"` protocol in package.json to force workspace resolution.
+- Model step output handling in flow-cli has 3 edge cases: streamJson config missing from executionConfig, Claude response undefined when execution fails, OutputExtractor returns empty string instead of failing.
+- Skill discovery broken for subprocess, goldfish, kill-port — tools return "NOT YET KNOWN" instead of loading; registry lookup or ToolSearch may be incomplete.
+- TypeScript cache requires `--force` flag after large refactors; `--noEmit` alone insufficient for full rebuild detection.
+
+<!-- session d300bfbf 2026-08-16 -->
+- CommandHandler requires explicit `allowAbsolutePaths` flag to accept --project-dir arguments. Not obvious from usage, required reading constructor signature.
+- Workspace package shadowing: despite `workspace: flow-engine` in flow-cli/package.json, npm installs duplicate copy in node_modules — fix requires `overrides` in root package.json to pin workspace path (commit 10:52-10:53).
+- Condition context design changed: removed `task` object from when: evaluation context, renamed `output` → `outputs` (plural), added dot notation conversion for template paths. Affects ConditionEvaluator, FlowScheduler, validation, and tests. Step-id keyed context, not flat.
+- npm workspace package shadowing — rogue packages install locally in `node_modules` when running `npm` from a subpackage context (even though workspace protocol should prevent it); ClaudeLauncher requires test mocks (claude-mock.mjs) for model step testing — not straightforward; Windows Git Bash environment uses mixed path formats (POSIX `/c/...` and Windows `C:\...`), can cause subtle command failures
+- Spec audit required four consecutive fix rounds (13:27:46 → 13:35:41 → 13:40:44 → 13:45:43) to resolve HIGH/CRITICAL findings — indicates either systemic issues in spec or iterative audit-fix-reaudit pattern is normal for this project.
+
+<!-- session bd4052a0 2026-08-16 -->
+- Daemon is a separate process (Go launcher + Node child) — TypeScript debug logs added to source won't appear; need to be in built binary or use external logging
+- Retry logic in StepRunner silences attempt #1 logs — logs only visible on final attempt. Architectural mismatch: retry should be in FlowScheduler for full observability.
+- Skipped steps (when: false) remain pending in ExecutionStore and never get marked completed — execution hangs until scheduler/handler explicitly marks them done
+- Windows requires elevation to create symlinks — tests using symlinks fail without conditional logic or alternative approaches
+- npm workspace shadowing occurs when `npm install` runs from inside a subpackage instead of repo root — use `file:` protocol or enforce install-from-root to prevent registry packages shadowing workspace packages
+- Path traversal validation is critical for writeOutput feature — must block `../` patterns to prevent RCE via template injection
+- File deletion not available in this environment — use empty stub files as workaround. Vitest requires at least one test suite per file, so stubs must contain placeholder `describe` blocks.
+- dist-types from flow-engine must be built (`npx tsc --build`) before importing via named exports — use direct path imports as fallback to avoid resolution errors.
+- Memory system guardrail: writes to `~/.claude/projects/.../memory/` are blocked; correct location is project-relative `./.claude/memory/`.
+- Pre-existing test failures (FlowRegistry validation, TemplateValidator auto-discovery) blocked workflow — isolation strategy needed (stubs, skipped tests, parallel agent forks) to avoid cascading fixes.
+- Multiple deferred skills failed to load on first use: "check" (06:45:08), "run" (07:52:42), "flow" (08:04:07), and tool "SendMessage" (07:28:22 ToolSearch) — caused workflow delays; skills should be pre-loaded or error should be more explicit
+- npm workspace package shadowing: workspace protocol doesn't prevent registry install; rogue `packages/flow-cli/node_modules/flow-engine` appears alongside symlink. Workaround: use npm `overrides` field or `file://` protocol to force exclusion. See lessons-learned.md note "npm workspace package shadowing — solution et limitations"
+- Deferred skills (kill-port, subprocess, goldfish) require explicit ToolSearch before use — user attempted them without loading first, forcing fallbacks
+- Large multi-file specs (plugin-system) required security audit and multiple fix rounds (round 2 HIGH, round 3 HIGH/CRITICAL), suggesting upfront peer review would catch clarity/correctness issues earlier than post-creation audits.
+
+<!-- session 5b7b2b1a 2026-08-16 -->
+- flow-engine had pre-existing test failures across multiple files (FlowRegistry, TemplateValidator, UserInterventionValidation) requiring multi-phase investigation and fixes — tests not running in regular CI
+- Daemon response handler doesn't return `executionId` to client (09:13-09:20 shows user debugging this through node_modules/@wadeck/singleton-daemon-kit instead of finding docs). User spent 6+ minutes investigating IPC protocol manually.
+- Step failure handling spans 4 layers (ScriptExecutor exception → WorkerAdapter catch → CommandHandler onStepFailed → Daemon step_failed event), making root-cause debugging require reading multiple files. No integration test covering the full failure→retry→next-step path.
+- Skills `subprocess`, `goldfish`, `kill-port` called but reported "NOT YET KNOWN" in logs (13:00:08, 13:00:11, 13:00:15, 12:55:49). Schema loading lag or availability issue; user continued trying despite warnings.
+- Process cleanup issues: port 47824 hung (likely dev server), required manual `taskkill /PID 27364 /F` (12:58:38-12:58:51). No auto-cleanup or port management observed.
+- Spec audit required 3 rounds of fixes: initial audit found issues → agent a3e0 fixed HIGH/CRITICAL → audit round 2 found more → agent ab24 fixed → audit round 3 found more → agent a928 fixed. Suggests either incomplete initial audit or issues that only surfaced after earlier fixes.
+
+<!-- session 576b7d8d 2026-08-16 -->
+- Test characterization vs unit tests pattern (`FlowScheduler.characterization.test.ts` created separately) — need explicit guidance on when each is used upfront to avoid later refactoring.
+- Recursive condition evaluation in FlowOrchestrator.when tests requires special handling; nested `when:` template scanning was the blocker for several test suites.
+- CommandHandler had `allowAbsolutePaths: false` which blocked absolute flow paths — constraint wasn't obvious; user discovered it via validation failures, then changed to `true`. This should be documented or the default reconsidered.
+- task-retry.yml and task-loop.yml were rewritten 3+ times (10:55, 10:56, 10:57) with small variations, indicating trial-and-error on flow YAML syntax or semantics rather than clear specification.
+- npm workspace package shadowing: bare package names in dependencies can resolve from npm registry instead of workspace packages, even when workspace package exists; mitigation is "file:../path" or "workspace:*" protocol in package.json.
+- Spec auditing uses subprocess skill (doc-audit, goldfish validation) as part of development workflow — comprehensive doc validation is now part of checklist.
+
+<!-- session 32c17c8b 2026-08-16 -->
+- Template interpolation syntax: `${{ }}` is standard, NOT legacy (user correction at 07:28:29) — establish as convention.
+- Workspace shadowing (flow-engine appearing in flow-cli/node_modules despite workspace: protocol) required npm overrides + new violation rule no-workspace-shadow (10:50-10:58) — this is an npm behavior, now systematized but should be documented.
+- User preference: when debugging npm/workspace issues, use only local tools and files — do not web fetch. Blocked an agent fork at 11:10:55 with message "Stop web fetching, use only local files". Preference explicitly saved to memory afterward (11:12:07).
+- Spec files (plugin-manifest.md, plugin-architecture.md, plugin-violation-rules.md, threat-model.md, workspace-provider.md, approval-provider.md, extension-points.md) have cross-file consistency dependencies—edits often span multiple files in coordinated sequences.
+
+<!-- session 92cb6ce8 2026-08-16 -->
+- File path hunting required many grep iterations to locate context-passing layers (workspaceDir definition site). Consider adding a reference doc mapping "where X is passed through the execution chain" for complex multi-layer features.
+- Flow validation schema for `env` field behavior required iterative testing (multiple `flow validate` runs on task-handle-conditional.yml). User was learning rules by trial-and-error rather than from spec.
+- Workspace shadowing problem (lines 10:51:47–10:53:12): flow-engine npm module was incorrectly installed in flow-cli/node_modules despite workspace: protocol. Requires root package.json override + npm install retry cycle — not idempotent without overrides block.
+- Loop/retry step-failure handling required tracing through ExecutionStore, markStepFailed lifecycle, and Daemon state machine (lines 10:58:56–11:06:27) — no clear trace path for how step failure propagates to retry/loop evaluation.
+- subprocess and SendMessage skills showed as "NOT YET KNOWN" early (13:17:18, 13:31:50) but became available later — suggests dynamic tool loading or context initialization delay
+
+<!-- session 543d9d83 2026-08-16 -->
+- FlowScheduler refactoring (4 phases, committed c249bf0) required tight flow-engine/flow-cli coordination with cascading test failures; plan written upfront (2026-08-16_flow-scheduler-refactor.md) but still needed ~20 iterative fixes during execution.
+- CommandHandler.allowAbsolutePaths configuration at daemon instantiation (line 48 in Daemon.ts) gates absolute path support in flows — easy to miss when spawning daemon.
+- npm creates nested copies of flow-engine in flow-cli/node_modules/ despite workspace: protocol — requires explicit overrides in root package.json + no-workspace-shadow violation rule to prevent.
+- npm workspace package shadowing: if package.json specifies `"flow-engine": "^X.Y.Z"` (registry version), npm will install from registry even when it's a workspace package; fix is to use `"flow-engine": "workspace:*"` or `"file:../flow-engine"` protocol
+- Template injection risk in flow scripts: multi-line model outputs can break YAML if not properly escaped/quoted — requires safe pattern documentation
+
+<!-- session e65b2ff1 2026-08-16 -->
+- Multi-package refactoring (FlowScheduler extraction across flow-engine and flow-cli) required coordinated type/import updates in 4+ files across 2 packages to maintain build stability
+- Flow CLI daemon communicates via singleton-daemon-kit IPC with response wrapping; executionId is nested in response structure and must be extracted before returning to user.
+- TemplateRenderer must be exported from flow-engine/index.ts before CommandHandler can import it — discovered via TypeScript error mid-task.
+- Windows: taskkill requires `cmd.exe /c` wrapper; POSIX kill/netstat don't work reliably. Flow validation: undeclared output keys (`steps.X.output` keys not in `outputs:`) should error during validate — was missing, had to add ValidationCode.UNDECLARED_OUTPUT_KEY.
+- Path traversal validation added to writeOutput validation in SchemaValidator (13:28+) — file path safety is a security requirement for output configs
+
+<!-- session e98523b0 2026-08-16 -->
+- Multiple parallel fork agents (ac7f, aecb, adae, ab1c, a25c) working on coordinated refactoring — caused high context overhead and missed consolidation opportunities
+- Skills (spec, run, flow) reported as "NOT YET KNOWN" (07:49, 07:52, 08:04) but agent proceeded anyway — suggests skill resolution may fail silently or skills aren't pre-loaded in subagent context.
+- Loop iteration state requires proper step-flag management (markStepRunning/markStepCompleted reset); flows stuck without it, not just iteration counting
+- when: context shape is step-id keyed, not flat object; task.* and taskMetadata references don't exist and cause silent failures
+- workspace: protocol with file paths requires npm overrides in root package.json to prevent node_modules shadowing of local packages
+- npm workspace package shadowing: when running `npm install` from a subdirectory, npm may fetch a shadowing registry package instead of using the workspace reference. Fix: explicitly use `"file:"` protocol or update package.json from root. Documented as root cause for flow-cli importing wrong flow-engine version.
+- Agent-to-agent communication via SendMessage shown at 13:17:18 as problematic — correction had to be sent mid-execution. Suggests fork agents need better pre-briefing on architectural constraints before starting.
+- Spec files (plugin system, `.claude/specs/2026-08-16_09-48_plugin-system/`) being edited concurrently with code changes in forks (a3e0 made ~20+ edits). Spec/implementation drift risk if spec changes aren't coordinated with code changes.
+
+<!-- session 686db9b5 2026-08-16 -->
+- Multiple tools/skills appear unavailable in agent contexts (subprocess, check, get-timestamp, SendMessage all show "NOT YET KNOWN" warnings) — these are documented skills but not propagated to fork agents.
+- Template interpolation / projectDir context passing required multiple grep passes across TemplateRenderer, FlowOrchestrator, CLI to understand flow — architectural layer boundary unclear
+- npm workspace: protocol in flow-cli/package.json causes resolution to find a stale copy of flow-engine; use overrides in root package.json instead.
+- Loop/retry flows failed repeated re-entry detection; multiple debug iterations (10:55–11:06) added logging but root cause (step state tracking in hasFailed/markStepFailed) not fully resolved in chunk 3.
+- Model step logging requires mock Claude for testing — ClaudeLauncher now supports test-mode injection; pattern established but not documented in architecture.
+- Path traversal validation being added to SchemaValidator (writeOutput feature) — security-critical validation that needs explicit test coverage in FlowValidator.test.ts; future changes to output paths must validate against this rule.
 
 <!-- session f716f570 2026-08-16 -->
 

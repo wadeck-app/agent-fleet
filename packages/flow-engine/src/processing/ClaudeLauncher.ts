@@ -76,6 +76,10 @@ export class ClaudeLauncher {
 	 * Find Claude executable path
 	 */
 	public findClaudePath(): string {
+		// Allow tests to inject a mock Claude binary
+		if (process.env['CLAUDE_MOCK_PATH']) {
+			return process.env['CLAUDE_MOCK_PATH'];
+		}
 		try {
 			if (process.platform === 'win32') {
 				const result = execSync('where claude', { encoding: 'utf8' }).trim();

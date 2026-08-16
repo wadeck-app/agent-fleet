@@ -26,6 +26,7 @@ Priority (highest to lowest):
 
 1. FLOW_CONFIG env var (or TASK_CONFIG for task CLI)
    If set: load the file at that path as the global config
+   If set but the file does not exist at that path: hard error at startup (P-4) -- no fallback to user-home
    If not set: load ~/.flow/config.yml (or ~/.task/config.yml for task CLI)
    If that file is also missing: global config is empty (no named instances available)
 
@@ -43,6 +44,14 @@ Priority (highest to lowest):
 Defines named plugin instances. An instance = a plugin type + its connection/auth config.
 Multiple instances of the same type are supported and named independently.
 
+The `type:` field in global config instances uses the full plugin-implementation reference:
+`plugins.<pluginId>.<implName>` (e.g. `plugins.worktree.default`).
+
+The project config `use:` field uses the **instance name** (the user-chosen key in the global
+config `instances:` block, e.g. `my-worktree` or `jira-work`) -- NOT the type path.
+These are two distinct namespaces: `type:` identifies what a plugin IS; `use:` selects which
+named instance to use.
+
 ```yaml
 # ~/.flow/config.yml  (or file pointed to by FLOW_CONFIG)
 # NEVER commit this file. Credentials use ${ENV_VAR} interpolation only.
@@ -50,30 +59,30 @@ Multiple instances of the same type are supported and named independently.
 plugins:
   instances:
     my-worktree:
-      type: worktree
+      type: plugins.worktree.default
       options:
         baseDir: ~/workspaces
 
     jira-work:
-      type: jira
+      type: plugins.jira.public
       options:
         host: work.atlassian.net
         token: ${JIRA_WORK_TOKEN}
 
     jira-oss:
-      type: jira
+      type: plugins.jira.public
       options:
         host: oss.atlassian.net
         token: ${JIRA_OSS_TOKEN}
 
     jira-personal:
-      type: jira
+      type: plugins.jira.public
       options:
         host: personal.atlassian.net
         token: ${JIRA_PERSONAL_TOKEN}
 
     local-secrets:
-      type: local
+      type: plugins.local.default
 ```
 
 ### Project config structure (v1)
@@ -82,23 +91,23 @@ Safe to commit. Zero credentials. Two syntaxes for each feature section:
 
 **Syntax 1 -- reference (`use:`):** references a named instance from the global config.
 Project provides only project-specific override options (non-sensitive).
-Instance is referenced as `plugins.<pluginId>.<implementationName>`.
+`use:` takes the **instance name** as defined in the global config `instances:` block.
 
 ```yaml
 # <project>/.flow/config.yml  -- reference syntax (normal dev workflow)
 plugins:
   workspace:
-    use: plugins.worktree.default     # pluginId=worktree, implementationName=default
+    use: my-worktree        # instance name from global config
     options:
-      prefix: myproject-
+      prefix: myproject-    # project-specific override
 
   tasks:
-    use: plugins.jira.public          # pluginId=jira, implementationName=public
+    use: jira-work          # selects which Jira instance (could be jira-oss, jira-personal, etc.)
     options:
       project: MYPROJ
 
   secrets:
-    use: plugins.local.default
+    use: local-secrets      # instance name from global config
 ```
 
 **Syntax 2 -- inline instance:** defines the instance directly in the project config.
@@ -131,16 +140,17 @@ Both syntaxes can coexist in the same project config (one feature uses `use:`, a
 ### Merge semantics
 
 - Each feature section (`workspace`, `tasks`, `secrets`, ...) is resolved independently.
-- If `use:` is present: load the named instance from global config, then shallow-merge the project `options:` on top.
+- If `use:` is present: look up the **instance name** in the global config `instances:` map. If the name is not found: hard error at startup (P-4). Then shallow-merge the project `options:` on top of the instance's options.
 - If `instance:` is present: use it directly, then shallow-merge the project `options:` on top. Global config is not consulted for this section.
-- If neither `use:` nor `instance:` is present for a feature: the global config's first matching instance for that feature type is used as-is (future: may require explicit opt-in -- TBD).
+- If neither `use:` nor `instance:` is present for a feature: the CLI fails at startup with an explicit error (P-4). No implicit selection from the global config. Every feature section that needs a provider must explicitly declare `use:` or `instance:`.
+- Options precedence within Syntax 2: if both `instance.options` and the section-level `options:` define the same key, the section-level `options:` wins (it is the project-specific override).
 
 ### Credential validation rules
 
 Enforced at config load time (hard errors, no silent fallback -- P-4):
 
 1. `${ENV_VAR}` is resolved from `process.env`. If the variable is missing: error with variable name.
-2. In inline instances, any option value that is a non-interpolated string AND matches a known sensitive field (token, password, secret, key, apiKey): hard error. Known sensitive field list is maintained per plugin type.
+2. In **all option layers** (global config `instance.options`, project config `instance.options`, and project config section-level `options:`): any option value that is a non-interpolated string AND matches a known sensitive field is a hard error. This applies to both Syntax 1 (`use:` + `options:`) and Syntax 2 (`instance:` + `options:`). A developer cannot bypass the check by placing a literal credential in the section-level `options:` of a committed project config. Known sensitive field list is defined centrally in `@flow/plugin-sdk/src/sensitiveFields.ts` (baseline: `token`, `password`, `secret`, `key`, `apiKey`, `privateKey`, `accessToken`, `bearerToken`). Plugins may extend this list via `sensitiveFields` in their manifest but may not remove baseline entries.
 3. In global config: same rules apply. Global config is also not committed, but defensive validation is still enforced.
 
 ---
@@ -178,5 +188,5 @@ Design deferred. Tag: plugin-inputs-v3.
 ## Security considerations
 
 - T-01 (Information Disclosure): credentials in global config and inline instances must use `${ENV_VAR}` -- enforced at parse time. Literal credential values in known sensitive fields are a hard error.
-- T-02 (Tampering): project config is committed to git. The `instance:` inline syntax combined with the credential validation rule ensures no token can be accidentally committed.
+- T-01 note: project config is committed to git. The `instance:` inline syntax combined with the credential validation rule ensures no token can be accidentally committed.
 - Remote config (v3): introduces Spoofing/Tampering threats on the remote config source -- deferred to v3 threat model update.

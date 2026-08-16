@@ -46,6 +46,7 @@ describe('FlowOrchestrator - when condition', () => {
 			id: 'test-workspace',
 			mode: 'manual',
 			path: process.cwd(),
+			metaDir: process.cwd() + '.meta',
 			concurrency: {
 				key: 'test',
 				activeTasks: new Set(),

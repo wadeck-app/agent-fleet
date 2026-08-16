@@ -27,6 +27,7 @@ describe('StepRunner', () => {
 			id: 'test-workspace',
 			mode: 'isolated',
 			path: '/test/workspace',
+			metaDir: '/test/workspace.meta',
 			concurrency: {
 				key: 'test',
 				activeTasks: new Set(),
@@ -956,6 +957,101 @@ describe('StepRunner', () => {
 
 			expect(ScriptExecutor.prototype.execute).toHaveBeenCalledTimes(1);
 			expect(trace.error).toBeUndefined();
+		});
+	});
+
+	describe('writeOutput — safe multi-line output to file', () => {
+		const fs = require('node:fs');
+		const path = require('node:path');
+		const os = require('node:os');
+
+		it('writes extracted output to metaDir/outputs/, NOT workspaceDir', async () => {
+			const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'writeOutput-'));
+			const metaDir = workspaceDir + '.meta';
+			fs.mkdirSync(path.join(metaDir, 'outputs'), { recursive: true });
+			const wsWithDir = { ...testWorkspace, path: workspaceDir, metaDir };
+
+			const step: ScriptFlowStep = {
+				id: 'write-step', name: 'Write Step', type: 'script', script: 'echo hello',
+				output: { response: { type: 'string', writeOutput: 'response.txt' } },
+			};
+			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {}, context: { cwd: workspaceDir, outputsDir: path.join(metaDir, 'outputs') } };
+
+			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('echo hello');
+			vi.mocked(ScriptExecutor.prototype.execute).mockResolvedValue({ success: true, exitCode: 0, stdout: 'hello', stderr: '', durationMs: 10 });
+			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({ response: 'Line 1\nLine 2' });
+
+			await runner.executeStep(step, wsWithDir, context);
+
+			// Must be in metaDir, NOT workspaceDir
+			expect(fs.existsSync(path.join(metaDir, 'outputs', 'response.txt'))).toBe(true);
+			expect(fs.existsSync(path.join(workspaceDir, 'response.txt'))).toBe(false);
+			expect(fs.readFileSync(path.join(metaDir, 'outputs', 'response.txt'), 'utf8')).toBe('Line 1\nLine 2');
+
+			fs.rmSync(workspaceDir, { recursive: true });
+			fs.rmSync(metaDir, { recursive: true });
+		});
+
+		it('writes extracted output to workspace file when writeOutput is set', async () => {
+			const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'writeOutput-'));
+			const metaDir = workspaceDir + '.meta';
+			fs.mkdirSync(path.join(metaDir, 'outputs'), { recursive: true });
+			const wsWithDir = { ...testWorkspace, path: workspaceDir, metaDir };
+
+			const step: ScriptFlowStep = {
+				id: 'write-step',
+				name: 'Write Step',
+				type: 'script',
+				script: 'echo hello',
+				output: {
+					response: { type: 'string', writeOutput: 'response.txt' },
+				},
+			};
+			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {}, context: { cwd: workspaceDir, outputsDir: path.join(metaDir, 'outputs') } };
+
+			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('echo hello');
+			vi.mocked(ScriptExecutor.prototype.execute).mockResolvedValue({
+				success: true, exitCode: 0, stdout: 'hello', stderr: '', durationMs: 10,
+			});
+			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({
+				response: 'Line 1\nLine 2\nLine 3',
+			});
+
+			await runner.executeStep(step, wsWithDir, context);
+
+			const filePath = path.join(metaDir, 'outputs', 'response.txt');
+			expect(fs.existsSync(filePath)).toBe(true);
+			expect(fs.readFileSync(filePath, 'utf8')).toBe('Line 1\nLine 2\nLine 3');
+
+			fs.rmSync(workspaceDir, { recursive: true });
+			fs.rmSync(metaDir, { recursive: true });
+		});
+
+		it('does not create file when writeOutput is not set', async () => {
+			const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'writeOutput-'));
+			const metaDir = workspaceDir + '.meta';
+			const wsWithDir = { ...testWorkspace, path: workspaceDir, metaDir };
+
+			const step: ScriptFlowStep = {
+				id: 'no-write-step',
+				name: 'No Write Step',
+				type: 'script',
+				script: 'echo hi',
+				output: { response: { type: 'string' } },
+			};
+			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {} };
+
+			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('echo hi');
+			vi.mocked(ScriptExecutor.prototype.execute).mockResolvedValue({
+				success: true, exitCode: 0, stdout: 'hi', stderr: '', durationMs: 10,
+			});
+			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({ response: 'hi' });
+
+			await runner.executeStep(step, wsWithDir, context);
+
+			expect(fs.existsSync(path.join(workspaceDir, 'response.txt'))).toBe(false);
+
+			fs.rmSync(workspaceDir, { recursive: true });
 		});
 	});
 });

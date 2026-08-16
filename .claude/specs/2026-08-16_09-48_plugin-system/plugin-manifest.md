@@ -43,11 +43,14 @@ interface PluginImplementation {
   version: number;               // interface version: 1, 2, 3...
                                  // determines which TypeScript type from @flow/extension-points applies
   // TS manifest only:
-  provider?: unknown;            // direct function reference -- TypeScript validates at build time
-                                 // against the imported type from @flow/extension-points
+  provider?: (options: unknown) => unknown;  // factory function: receives merged options, returns provider instance
+                                              // zero-option providers use: () => provider
+                                              // TypeScript validates return type against @flow/extension-points interface at build time
   // JSON manifest only (or TS fallback):
   entrypoint?: string;           // relative path to compiled JS, e.g. "./dist/public.js"
   export?: string;               // named export, e.g. "taskProvider"
+  sensitiveFields?: string[];    // additional sensitive option field names beyond the baseline in @flow/plugin-sdk
+                                 // merged with baseline during PLUGIN-007 validation; cannot remove baseline entries
 }
 ```
 
@@ -87,14 +90,16 @@ packages/extension-points/
       v1.ts     -- hand-written interface
     secrets/
       v1.ts
-    agents/
+    agent/
       v1.ts
-    models/
+    model/
       v1.ts
-    scripts/
+    script/
       v1.ts
-    approvals/
+    approval/
       v1.ts
+    context/
+      # no vN.ts yet -- planned only
   index.ts      -- re-exports LATEST version of each extension point as convenience default
 ```
 
@@ -126,15 +131,16 @@ export const manifest: PluginManifest = {
   manifestVersion: "1",
   implementations: {
     tasks: {
-      public:  { interfaceVersion: "tasks@1", provider: publicTaskProvider },
-      private: { interfaceVersion: "tasks@1", provider: privateTaskProvider },
+      public:  { version: 1, provider: publicTaskProvider },
+      private: { version: 1, provider: privateTaskProvider },
     }
   }
 };
 ```
 
-TypeScript enforces that `publicTaskProvider` satisfies the `TaskProvider` interface for `tasks@1`
-at build time. No runtime validation needed for the `provider` field.
+TypeScript enforces that `publicTaskProvider` satisfies the `TaskProvider` interface for version 1
+at build time (the plugin imports `TaskProvider` from `@flow/extension-points/tasks/v1`).
+No runtime validation needed for the `provider` field.
 
 ## plugin.manifest.json example (JSON -- non-JS plugins and wrappers)
 
@@ -145,12 +151,12 @@ at build time. No runtime validation needed for the `provider` field.
   "implementations": {
     "tasks": {
       "public": {
-        "interfaceVersion": "tasks@1",
+        "version": 1,
         "entrypoint": "./dist/public.js",
         "export": "taskProvider"
       },
       "private": {
-        "interfaceVersion": "tasks@1",
+        "version": 1,
         "entrypoint": "./dist/private.js",
         "export": "taskProvider"
       }
@@ -159,7 +165,7 @@ at build time. No runtime validation needed for the `provider` field.
 }
 ```
 
-For JSON manifests, runtime validation against the interface is performed at first use (not at load time).
+For JSON manifests, validation is performed at CLI startup (config resolution time), not deferred to first use: the `entrypoint` file must exist, the `export` named symbol must be resolvable, and a duck-type check against the declared version's expected interface is performed. Fail-loudly at startup (P-4) -- no deferred errors mid-flow.
 
 ## Naming convention in config
 
@@ -175,8 +181,7 @@ Examples:
 
 ## Open questions
 
-- 3b: Versioning scheme for interfaces -- how is a mismatch between `interfaceVersion` and CLI handled? (next)
-- 3c: Extension point registry -- who defines the valid extension point IDs and their interface types?
+All manifest-related design questions resolved (Decisions 3a-3e).
 
 ## Security considerations
 

@@ -29,43 +29,33 @@ The `extension-points.json` file is the machine-readable registry used by PLUGIN
     },
     {
       "id": "tasks",
-      "status": "stable",
+      "status": "planned",
       "description": "Provides and manages tasks/tickets (filesystem, Jira, GitHub Issues, etc.)",
-      "versions": [
-        { "version": 1, "status": "stable", "since": "0.1.0" }
-      ]
+      "versions": []
     },
     {
       "id": "secrets",
-      "status": "stable",
+      "status": "planned",
       "description": "Resolves secret values at runtime (local keychain, Vault, env vars, etc.)",
-      "versions": [
-        { "version": 1, "status": "stable", "since": "0.1.0" }
-      ]
+      "versions": []
     },
     {
       "id": "agent",
-      "status": "stable",
+      "status": "planned",
       "description": "Provides agent execution strategies (Claude CLI, OpenAI, custom, etc.)",
-      "versions": [
-        { "version": 1, "status": "stable", "since": "0.1.0" }
-      ]
+      "versions": []
     },
     {
       "id": "model",
-      "status": "stable",
+      "status": "planned",
       "description": "Provides LLM model access (Anthropic, OpenAI, Google, etc.)",
-      "versions": [
-        { "version": 1, "status": "stable", "since": "0.1.0" }
-      ]
+      "versions": []
     },
     {
       "id": "script",
-      "status": "stable",
+      "status": "planned",
       "description": "Provides script execution environments (inline bash, Docker, Lambda, etc.)",
-      "versions": [
-        { "version": 1, "status": "stable", "since": "0.1.0" }
-      ]
+      "versions": []
     },
     {
       "id": "approval",
@@ -74,6 +64,12 @@ The `extension-points.json` file is the machine-readable registry used by PLUGIN
       "versions": [
         { "version": 1, "status": "stable", "since": "0.1.0" }
       ]
+    },
+    {
+      "id": "context",
+      "status": "planned",
+      "description": "Provides and filters context management (storage, retrieval, filtering for agent prompts). Note: context data may contain sensitive information -- interface design must address data scoping before this point can be marked stable.",
+      "versions": []
     }
   ]
 }
@@ -103,6 +99,4 @@ When a version is removed (end of transition window):
 2. Keep the `.ts` file in `src/<id>/` with a deprecation comment pointing to the new version -- do NOT delete it immediately (plugins may still reference the file until they migrate).
 3. PLUGIN-005 will now reject manifests declaring the removed version.
 
-## Open questions
-
-- 3c: RESOLVED -- Option B (JSON registry, hand-written TS interfaces)
+**Transition window:** a deprecated interface version must remain supported for a minimum of 2 minor releases of `@flow/extension-points` before being eligible for removal.

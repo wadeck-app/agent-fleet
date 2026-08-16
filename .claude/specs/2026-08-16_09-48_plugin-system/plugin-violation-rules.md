@@ -35,7 +35,7 @@ The `pluginId` field in the manifest must equal the `<id>` part of the `packages
 ### PLUGIN-003: Every declared implementation must be resolvable
 
 For each implementation declared in the manifest:
-- **TS manifest (`plugin.config.ts`):** the `provider` export must exist and TypeScript must accept it as satisfying the declared `interfaceVersion` type. This is enforced by the build (tsc), so the violation rule checks that the build succeeds without errors.
+- **TS manifest (`plugin.config.ts`):** the `provider` export must exist and TypeScript must accept it as satisfying the interface type for the declared `version` integer. This is enforced by the build (tsc), so the violation rule checks that the build succeeds without errors.
 - **JSON manifest:** `entrypoint` file must exist and `export` must be a named export of that file.
 
 **Why:** A manifest that points to a non-existent or wrongly-typed export will crash the CLI at load time with a cryptic error.
@@ -46,21 +46,21 @@ For each implementation declared in the manifest:
 
 ### PLUGIN-004: All declared extension points must be registered
 
-Every extension point key used in `implementations` (e.g., `"tasks"`, `"workspace"`) must be a known registered extension point in `@flow/plugin-sdk`.
+Every extension point key used in `implementations` (e.g., `"tasks"`, `"workspace"`) must be a known registered extension point in `@flow/extension-points`.
 
 **Why:** A typo in an extension point name (`"task"` instead of `"tasks"`) silently means the implementation is never loaded. Fail at lint time.
 
-**Check:** Read the registered extension point IDs from `@flow/plugin-sdk/extension-points.ts` and assert all keys in the manifest are present in that list.
+**Check:** Read the registered extension point IDs from `packages/extension-points/extension-points.json` (field: `extensionPoints[].id`) and assert all keys in the manifest are present in that list.
 
 ---
 
 ### PLUGIN-005: Interface version must be a supported version
 
-The `interfaceVersion` value for each implementation (e.g., `"tasks@1"`) must be a known version in `@flow/plugin-sdk`.
+The `version` value (integer) for each implementation must be a known version for its extension point in `@flow/extension-points`.
 
 **Why:** An unknown or future interface version declared in the manifest will cause a runtime mismatch error when the CLI tries to call the provider. Catch it earlier.
 
-**Check:** Read supported versions from `@flow/plugin-sdk/interface-versions.ts` and assert all `interfaceVersion` values are present.
+**Check:** Read supported versions from `packages/extension-points/extension-points.json` (field: `extensionPoints[].versions[].version` for the matching extension point ID) and assert all `version` values declared in the manifest are present.
 
 ---
 
@@ -94,7 +94,21 @@ The manifest must not contain any `${...}` patterns or values matching known sen
 
 ---
 
+---
+
+### PLUGIN-009: Workspace providers must use SDK path validation for taskId
+
+Any plugin implementing the `workspace` extension point must validate the `taskId` parameter before using it in filesystem path construction. The validation must:
+1. Reject any `taskId` containing `/`, `\`, or `..` segments.
+2. Assert the fully resolved workspace path starts with the fully resolved `baseDir`.
+
+**Why:** A `taskId` containing path traversal sequences (e.g., `../../etc`) combined with `path.join(baseDir, taskId)` produces a path outside `baseDir`, directly bypassing the T-03 mitigation.
+
+**Check:** A helper function `validateWorkspacePath(taskId: string, baseDir: string)` will be provided in `@flow/plugin-sdk/src/pathValidation.ts`. Workspace provider implementations must call it before any `allocate()` path construction. Lint check: assert the import and call are present in any file that exports a `WorkspaceProvider` implementation.
+
+---
+
 ## Future rules (not yet implemented)
 
-- **PLUGIN-009:** Each implementation name must be unique within an extension point (no two `public` under `tasks`). -- trivially enforced by JSON object keys, but worth an explicit check for clarity.
-- **PLUGIN-010:** Deprecated `interfaceVersion` values should emit a warning (not error) with a migration path.
+- **PLUGIN-010:** Each implementation name must be unique within an extension point (no two `public` under `tasks`). -- trivially enforced by JSON object keys, but worth an explicit check for clarity.
+- **PLUGIN-011:** Deprecated `version` values should emit a warning (not error) with a migration path.

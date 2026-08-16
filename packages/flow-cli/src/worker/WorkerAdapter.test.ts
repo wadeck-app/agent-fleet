@@ -19,6 +19,7 @@ const makeContext = (): ExecutionContext => ({
 	inputs: {},
 	stepOutputs: {},
 	workspaceDir: '/tmp/ws',
+	outputsDir: '/tmp/ws.meta/outputs',
 	cwd: '/tmp/ws',
 });
 
@@ -115,15 +116,48 @@ describe('WorkerAdapter', () => {
 		expect(logCalls).toHaveLength(0);
 	});
 
-	it('sends stdout lines as log messages for model step', async () => {
-		mockExecuteStep.mockResolvedValue({ stdout: 'model output', outputs: {} });
+	it('sends trace.response (not trace.stdout) as log message for model step', async () => {
+		// Regression: before the fix, raw NDJSON from trace.stdout was sent as log noise.
+		mockExecuteStep.mockResolvedValue({
+			response: 'Clean answer',
+			stdout: '{"type":"system","subtype":"init"}\n{"type":"assistant","message":"..."}',
+			outputs: { response: 'Clean answer' },
+		});
 		await adapter.execute(makeModelStep(), makeContext(), sendMessage);
 		const logCalls = (sendMessage as ReturnType<typeof vi.fn>).mock.calls
 			.map(c => c[0])
 			.filter((m: any) => m.type === 'log');
 		expect(logCalls).toHaveLength(1);
-		expect(logCalls[0].entry.message).toBe('model output');
+		expect(logCalls[0].entry.message).toBe('Clean answer');
 		expect(logCalls[0].stepId).toBe('model-step');
+	});
+
+	it('does not send raw NDJSON from stdout for model step', async () => {
+		mockExecuteStep.mockResolvedValue({
+			response: 'Answer',
+			stdout: '{"type":"system"}\n{"type":"assistant"}',
+			outputs: { response: 'Answer' },
+		});
+		await adapter.execute(makeModelStep(), makeContext(), sendMessage);
+		const logCalls = (sendMessage as ReturnType<typeof vi.fn>).mock.calls
+			.map(c => c[0])
+			.filter((m: any) => m.type === 'log');
+		// No raw JSON lines should appear
+		const rawJsonCalls = logCalls.filter((m: any) => m.entry.message.startsWith('{'));
+		expect(rawJsonCalls).toHaveLength(0);
+	});
+
+	it('throws when trace.error is set for model step', async () => {
+		// Regression: before the fix, model step returned normally even when Claude failed.
+		mockExecuteStep.mockResolvedValue({
+			error: 'Claude exited with code 1',
+			response: '',
+			stdout: '',
+			outputs: {},
+		});
+		await expect(adapter.execute(makeModelStep(), makeContext(), sendMessage)).rejects.toThrow(
+			'Claude exited with code 1'
+		);
 	});
 
 	it('returns outputs for a model step and calls McpServer start/stop', async () => {
@@ -134,6 +168,100 @@ describe('WorkerAdapter', () => {
 		expect(mockMcpStop).toHaveBeenCalledTimes(1);
 		// Factory called with MCP config path from McpServer
 		expect(mockFactory).toHaveBeenCalledWith('/tmp/mcp.json');
+	});
+
+	describe('toolLog parameter', () => {
+		const makeStreamingModelStep = (toolLog?: string) =>
+			({
+				id: 'model-step',
+				name: 'Model',
+				type: 'model',
+				model: 'haiku',
+				prompt: 'Say hello',
+				log: 'streaming',
+				...(toolLog !== undefined && { toolLog }),
+			}) as any;
+
+		const toolUseEntry = {
+			id: 'e1',
+			timestamp: 1,
+			level: 'warning',
+			message: 'Tool: Bash(command=sleep 5)',
+			eventType: 'tool_use',
+			metadata: { toolName: 'Bash', input: { command: 'sleep 5' } },
+		};
+
+		const toolResultEntry = {
+			id: 'e2',
+			timestamp: 2,
+			level: 'debug',
+			message: 'Tool result [tu_1]: done',
+			eventType: 'tool_result',
+			metadata: { toolUseId: 'tu_1' },
+		};
+
+		const assistantEntry = {
+			id: 'e3',
+			timestamp: 3,
+			level: 'info',
+			message: 'Claude: Hello!',
+			eventType: 'assistant_text',
+		};
+
+		const setupStreamingMock = () => {
+			mockExecuteStep.mockImplementation(async (_step, _ws, _ctx, _onTrace, onLogEntry) => {
+				if (onLogEntry) {
+					onLogEntry(assistantEntry);
+					onLogEntry(toolUseEntry);
+					onLogEntry(toolResultEntry);
+				}
+				return { response: 'Hello!', outputs: { response: 'Hello!' } };
+			});
+		};
+
+		it('toolLog: none (default) — only assistant_text sent', async () => {
+			setupStreamingMock();
+			await adapter.execute(makeStreamingModelStep('none'), makeContext(), sendMessage);
+			const logCalls = (sendMessage as any).mock.calls.map((c: any) => c[0]).filter((m: any) => m.type === 'log');
+			expect(logCalls.map((m: any) => m.entry.eventType)).toEqual(['assistant_text']);
+		});
+
+		it('toolLog: name — assistant_text + tool_use sent, tool_result suppressed', async () => {
+			setupStreamingMock();
+			await adapter.execute(makeStreamingModelStep('name'), makeContext(), sendMessage);
+			const logCalls = (sendMessage as any).mock.calls.map((c: any) => c[0]).filter((m: any) => m.type === 'log');
+			const types = logCalls.map((m: any) => m.entry.eventType);
+			expect(types).toContain('assistant_text');
+			expect(types).toContain('tool_use');
+			expect(types).not.toContain('tool_result');
+			// name mode: message is compact (just → ToolName)
+			const toolCall = logCalls.find((m: any) => m.entry.eventType === 'tool_use');
+			expect(toolCall.entry.message).toBe('→ Bash');
+		});
+
+		it('toolLog: full — assistant_text + tool_use + tool_result all sent', async () => {
+			setupStreamingMock();
+			await adapter.execute(makeStreamingModelStep('full'), makeContext(), sendMessage);
+			const logCalls = (sendMessage as any).mock.calls.map((c: any) => c[0]).filter((m: any) => m.type === 'log');
+			const types = logCalls.map((m: any) => m.entry.eventType);
+			expect(types).toContain('assistant_text');
+			expect(types).toContain('tool_use');
+			expect(types).toContain('tool_result');
+			// full mode: message has → prefix
+			const toolCall = logCalls.find((m: any) => m.entry.eventType === 'tool_use');
+			expect(toolCall.entry.message).toMatch(/^→ /);
+			const toolResult = logCalls.find((m: any) => m.entry.eventType === 'tool_result');
+			expect(toolResult.entry.message).toMatch(/^← /);
+		});
+
+		it('toolLog omitted (default none) — same as toolLog: none', async () => {
+			setupStreamingMock();
+			await adapter.execute(makeStreamingModelStep(undefined), makeContext(), sendMessage);
+			const logCalls = (sendMessage as any).mock.calls.map((c: any) => c[0]).filter((m: any) => m.type === 'log');
+			const types = logCalls.map((m: any) => m.entry.eventType);
+			expect(types).not.toContain('tool_use');
+			expect(types).not.toContain('tool_result');
+		});
 	});
 
 	it('throws when trace.error is set (script exited with non-zero code)', async () => {

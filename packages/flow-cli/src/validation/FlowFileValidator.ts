@@ -102,6 +102,7 @@ function validationCodeToType(code: ValidationCode): string {
 			return 'cycle';
 		case ValidationCode.INVALID_TEMPLATE_SYNTAX:
 		case ValidationCode.MALFORMED_EXPRESSION:
+		case ValidationCode.UNDECLARED_OUTPUT_KEY:
 			return 'template';
 		case ValidationCode.UNUSED_INPUT:
 		case ValidationCode.UNUSED_OUTPUT:

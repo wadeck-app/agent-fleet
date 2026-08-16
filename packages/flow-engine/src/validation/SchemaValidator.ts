@@ -489,6 +489,25 @@ export class SchemaValidator {
 				});
 			}
 
+			// Validate writeOutput paths (must be relative, no path traversal)
+			if (step.output) {
+				for (const [outputName, outputConfig] of Object.entries(step.output)) {
+					if (typeof outputConfig === 'string' || !outputConfig.writeOutput) continue;
+					{
+						const normalized = outputConfig.writeOutput.replace(/\\/g, '/');
+						if (normalized.includes('..') || normalized.startsWith('/')) {
+							this.issueCollector.addIssue({
+								severity: 'error',
+								code: ValidationCode.INVALID_VALUE,
+								message: `Step '${step.id}' output '${outputName}' writeOutput path '${outputConfig.writeOutput}' is invalid: must be a relative path within the workspace`,
+								location: { stepId: step.id, field: `output.${outputName}.writeOutput` },
+								suggestion: `Use a simple relative path like 'response.txt' or 'subdir/response.txt'`,
+							});
+						}
+					}
+				}
+			}
+
 			// Type-specific validation
 			this.validateStepType(step);
 		}

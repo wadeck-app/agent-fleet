@@ -163,7 +163,7 @@ export class CommandHandler {
 		const flowId = cmd.flowId ?? flow.id;
 		const executionId = generateExecutionId();
 		const workspaceManager = new WorkspaceManager(cmd.cwd);
-		let workspace: { path: string };
+		let workspace: Awaited<ReturnType<typeof workspaceManager.allocate>>;
 		try {
 			workspace = await workspaceManager.allocate({
 				taskId: executionId,
@@ -188,6 +188,7 @@ export class CommandHandler {
 			inputs: cmd.inputs ?? {},
 			stepOutputs: {},
 			workspaceDir,
+			outputsDir: workspace.metaDir + '/outputs',
 			cwd: cmd.cwd,
 		};
 

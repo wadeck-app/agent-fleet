@@ -98,6 +98,7 @@ export function createMockWorkspace(overrides?: Partial<Workspace>): Workspace {
 	return {
 		id: 'workspace-1',
 		path: '/tmp/workspace-1',
+		metaDir: '/tmp/workspace-1.meta',
 		mode: 'isolated' as WorkspaceMode,
 		concurrency: {
 			key: 'test',

@@ -52,6 +52,7 @@ export class WorkerAdapter {
 		const workspace: Workspace = {
 			id: `ws-${context.executionId}`,
 			path: context.workspaceDir,
+			metaDir: context.outputsDir ? context.outputsDir.replace(/[/\\]outputs$/, '') : context.workspaceDir + '.meta',
 			mode: 'manual',
 			concurrency: { key: context.executionId, activeTasks: new Set<string>(), locked: false },
 			createdAt: new Date().toISOString(),
@@ -65,7 +66,7 @@ export class WorkerAdapter {
 			inputs: context.inputs,
 			stepOutputs: new Map(Object.entries(context.stepOutputs)),
 			taskMetadata: {},
-			context: { cwd: context.cwd, projectDir: context.cwd, workspaceDir: context.workspaceDir },
+			context: { cwd: context.cwd, projectDir: context.cwd, workspaceDir: context.workspaceDir, outputsDir: context.outputsDir },
 		};
 
 		// For model steps, wire up the MCP server for provideSteps injection
@@ -81,8 +82,58 @@ export class WorkerAdapter {
 			const runner = this.stepRunnerFactory(mcpConfigPath);
 
 			try {
-				const trace = await runner.executeStep(step as unknown as ModelFlowStep, workspace, templateContext);
-				sendStdoutAsLogs(trace.stdout, context.executionId, step.id, sendMessage);
+				// Wire onLogEntry for streaming/polling log modes — sends each entry to daemon in real-time
+				const logMode = (step as unknown as { log?: string }).log ?? 'end';
+				const toolLog = (step as unknown as { toolLog?: string }).toolLog ?? 'none';
+				const onLogEntry =
+					logMode === 'end' || logMode === 'none'
+						? undefined
+						: (entry: import('flow-engine/types').LiveLogEntry) => {
+								if (entry.eventType === 'assistant_text') {
+									sendMessage({ type: 'log', executionId: context.executionId, stepId: step.id, entry });
+									return;
+								}
+								if (entry.eventType === 'tool_use' && (toolLog === 'name' || toolLog === 'full')) {
+									// For 'name' mode, strip input details from the message
+									const displayEntry =
+										toolLog === 'name'
+											? {
+													...entry,
+													message: `→ ${(entry.metadata as { toolName?: string })?.toolName ?? 'tool'}`,
+												}
+											: { ...entry, message: `→ ${entry.message}` };
+									sendMessage({ type: 'log', executionId: context.executionId, stepId: step.id, entry: displayEntry });
+									return;
+								}
+								if (entry.eventType === 'tool_result' && toolLog === 'full') {
+									sendMessage({
+										type: 'log',
+										executionId: context.executionId,
+										stepId: step.id,
+										entry: { ...entry, message: `← ${entry.message}` },
+									});
+								}
+							};
+
+				const trace = await runner.executeStep(
+					step as unknown as ModelFlowStep,
+					workspace,
+					templateContext,
+					undefined,
+					onLogEntry
+				);
+				// For log:end/none — send response as logs after completion (existing behavior)
+				if (logMode === 'end') {
+					sendStdoutAsLogs(
+						(trace as unknown as { response?: string }).response,
+						context.executionId,
+						step.id,
+						sendMessage
+					);
+				}
+				if (trace.error) {
+					throw new Error(trace.error);
+				}
 				// trace.outputs is undefined for model steps that produce no structured output —
 				// an empty map is the correct representation (no outputs to propagate to dependents).
 				return (trace.outputs ?? {}) as Record<string, unknown>;

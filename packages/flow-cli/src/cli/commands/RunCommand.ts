@@ -81,12 +81,14 @@ async function waitForCompletion(
 	executionId: string,
 	daemonDir: string,
 	timeoutMs: number,
-	onLog?: (stepId: string, message: string) => void
+	onLog?: (stepId: string, message: string) => void,
+	options?: { fastPoll?: boolean }
 ): Promise<ExecutionState> {
 	const store = new ExecutionStore(path.join(daemonDir, 'executions'));
 	const logFile = path.join(daemonDir, 'logs', `${new Date().toISOString().slice(0, 10)}.ndjson`);
 	const deadline = Date.now() + timeoutMs;
-	let delay = 200;
+	// fastPoll: fixed 50ms (streaming/polling log modes). Normal: starts 200ms, grows to 2000ms.
+	let delay = options?.fastPoll ? 50 : 200;
 	let lastByte = 0;
 	while (Date.now() < deadline) {
 		if (onLog) {
@@ -102,7 +104,7 @@ async function waitForCompletion(
 			}
 		}
 		await new Promise(r => setTimeout(r, delay));
-		delay = Math.min(delay * 1.5, 2000);
+		if (!options?.fastPoll) delay = Math.min(delay * 1.5, 2000);
 	}
 	throw new Error(`Execution ${executionId} did not complete within ${timeoutMs}ms`);
 }
@@ -337,11 +339,31 @@ export function registerRunCommand(program: Command): void {
 				const start = Date.now();
 				const logCallback =
 					!options.quiet && !(options.json && !options.human)
-						? (stepId: string, message: string) => process.stdout.write(`[${stepId}] ${message}\n`)
+						? (stepId: string, message: string) => {
+								const ts = new Date().toISOString().slice(11, 23);
+								process.stdout.write(`[${ts}] [${stepId}] ${message}\n`);
+							}
 						: undefined;
+
+				// Use fast 50ms poll when any model step has log:streaming or log:polling
+				const flowYaml = fs.existsSync(flowFile)
+					? (() => {
+							try {
+								return yaml.load(fs.readFileSync(flowFile, 'utf8'), { schema: yaml.JSON_SCHEMA }) as any;
+							} catch {
+								return null;
+							}
+						})()
+					: null;
+				const fastPoll = Array.isArray(flowYaml?.steps)
+					? (flowYaml.steps as any[]).some(
+							(s: any) => s.log === 'streaming' || s.log === 'polling'
+						)
+					: false;
+
 				let finalState: ExecutionState;
 				try {
-					finalState = await waitForCompletion(executionId, daemonDir, timeoutMs, logCallback);
+					finalState = await waitForCompletion(executionId, daemonDir, timeoutMs, logCallback, { fastPoll });
 				} catch (err) {
 					if (options.json && !options.human) {
 						process.stderr.write(JSON.stringify({ error: 'execution_timeout', executionId }) + '\n');

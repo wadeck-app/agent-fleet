@@ -26,6 +26,7 @@ describe('FlowOrchestrator', () => {
 			id: 'test-workspace',
 			mode: 'isolated',
 			path: '/test/workspace',
+			metaDir: '/test/workspace.meta',
 			concurrency: {
 				key: 'test',
 				activeTasks: new Set(),
