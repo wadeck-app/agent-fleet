@@ -544,6 +544,84 @@ steps:
 		expect(handler.hasActiveExecutions()).toBe(false);
 	});
 
+	it('loop (onFailure.goto): step re-dispatched and markExecutionFailed NOT called on first failure', async () => {
+		// Regression: before the fix, markExecutionFailed was called unconditionally in
+		// Daemon.ts step_failed handler, terminating the execution before the loop could continue.
+		const loopYaml = `\
+id: loop-flow
+version: "1.0.0"
+name: Loop Flow
+description: loop test
+workspace:
+  mode: manual
+  gitStrategy: any
+  reusePolicy: if-available
+inputs: {}
+steps:
+  - id: attempt
+    name: Attempt
+    type: script
+    script: echo attempt
+    onFailure:
+      goto: attempt
+      maxIterations: 3
+      resetOnSuccess: true
+      addComment: false
+  - id: done
+    name: Done
+    type: script
+    script: echo done
+    depends: [attempt]
+`;
+		const flowFile = path.join(tmpDir, 'loop.yml');
+		fs.writeFileSync(flowFile, loopYaml);
+
+		const workerPool = createMockWorkerPool();
+		const dispatched: string[] = [];
+		workerPool.getIdleWorker.mockReturnValue({} as never);
+		workerPool.sendToWorker.mockImplementation((_ws, msg) => {
+			dispatched.push((msg as { stepId: string }).stepId);
+			return true;
+		});
+
+		const handler = new CommandHandler(
+			daemonDir,
+			workerPool as never,
+			undefined,
+			mockExecStore as never,
+			mockLogWriter as never
+		);
+		const result = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+		expect(result.type).toBe('execution_started');
+		const { executionId } = result as { executionId: string };
+
+		// attempt dispatched on handleRun
+		expect(dispatched).toContain('attempt');
+		expect(handler.hasActiveExecutions()).toBe(true);
+
+		// First failure — loop should re-queue attempt, NOT terminate execution
+		handler.onStepFailed(executionId, 'attempt', 'not ready yet');
+
+		// Execution must still be active (loop pending)
+		expect(handler.hasActiveExecutions()).toBe(true);
+
+		// markExecutionFailed must NOT have been called (loop in progress)
+		expect(mockExecStore.markExecutionFailed).not.toHaveBeenCalled();
+
+		// attempt must have been re-dispatched (loop re-enqueued it)
+		expect(dispatched.filter(id => id === 'attempt')).toHaveLength(2);
+
+		// Second attempt succeeds — done becomes ready
+		handler.onStepCompleted(executionId, 'attempt', { result: 'ok' });
+		handler.tryDispatch();
+		// done should now be dispatched
+		expect(dispatched).toContain('done');
+
+		// Complete done — execution fully done
+		handler.onStepCompleted(executionId, 'done', {});
+		expect(handler.hasActiveExecutions()).toBe(false);
+	});
+
 	it('transport failure (worker drops): step re-dispatched via tryDispatch, NOT via scheduler.complete()', async () => {
 		const flowFile = path.join(tmpDir, 'valid.yml');
 		fs.writeFileSync(flowFile, VALID_FLOW_YAML);

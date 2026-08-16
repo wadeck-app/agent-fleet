@@ -2,7 +2,7 @@
 
 **Created:** 2026-08-16
 **Version:** v0.1
-**Status:** In Progress -- v0.1 -- 3/10 questions resolved
+**Status:** In Progress -- v0.1 -- 4/10 questions resolved
 **Iteration:** 1
 
 ## Summary
@@ -14,7 +14,9 @@
 | # | Decision | Status | Date | Rationale |
 |---|---|---|---|---|
 | 1 | In-process plugins with explicit capability injection (Option C) | Accepted | 2026-08-16 | Simple to build, clean TypeScript interface contract, easy path to subprocess isolation later via host-side adapter wrapping. Plugins are developer-written, no malicious actor threat. |
-| 2 | Config layers: global config (env var or ~/.flow/config.yml) + project config (use + overrides) | Accepted | 2026-08-16 | Project uses "use: <instance-name>" to reference a named instance from global config, OR declares an inline instance directly. Global config defines named plugin instances with credentials via ${ENV_VAR}. FLOW_CONFIG / TASK_CONFIG env var overrides the default user-home path. Multiple instances of same type (e.g. 3 Jira) are supported. Cloud B global config file = v2. Remote config download = v3. |
+| 2 | Config layers: global config (env var or ~/.flow/config.yml) + project config (use + overrides) | Accepted | 2026-08-16 | Project uses "use: plugins.<pluginId>.<implName>" to reference a named instance from global config, OR declares an inline instance directly. Global config defines named plugin instances with credentials via ${ENV_VAR}. FLOW_CONFIG / TASK_CONFIG env var overrides the default user-home path. Multiple instances of same type (e.g. 3 Jira) are supported. Cloud B global config file = v2. Remote config download = v3. |
+| 3a | Hybrid manifest: plugin.config.ts (primary) + plugin.manifest.json (fallback) -- same schema | Accepted | 2026-08-16 | TS is type-safe and enables direct function refs validated at build time. JSON supports non-JS plugins and wrappers. Both follow the PluginManifest schema from @flow/plugin-sdk. |
+| 3b | Plugin violation rules PLUGIN-001 to 008 defined in plugin-violation-rules.md | Accepted | 2026-08-16 | Enforced as local .violations/config.ts rules on all packages/plugin-* packages. |
 
 ## Open Questions
 
@@ -39,7 +41,9 @@
 | `guiding-principles.md` | Core principles driving all decisions |
 | `out-of-scope.md` | Explicitly excluded items |
 | `threat-model.md` | Security threats and mitigations |
-| `plugin-architecture.md` | Core plugin system design |
+| `plugin-architecture.md` | Core plugin system design, config resolution, use/instance syntax |
+| `plugin-manifest.md` | Manifest file format (plugin.config.ts + plugin.manifest.json) |
+| `plugin-violation-rules.md` | Local violation rules for plugin-* packages (PLUGIN-001 to 008) |
 | `workspace-provider.md` | Workspace provider plugin type |
 | `provider-types.md` | Catalogue of all provider types |
 

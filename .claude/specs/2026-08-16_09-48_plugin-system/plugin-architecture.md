@@ -82,22 +82,23 @@ Safe to commit. Zero credentials. Two syntaxes for each feature section:
 
 **Syntax 1 -- reference (`use:`):** references a named instance from the global config.
 Project provides only project-specific override options (non-sensitive).
+Instance is referenced as `plugins.<pluginId>.<implementationName>`.
 
 ```yaml
 # <project>/.flow/config.yml  -- reference syntax (normal dev workflow)
 plugins:
   workspace:
-    use: my-worktree          # must match an instance name in global config
+    use: plugins.worktree.default     # pluginId=worktree, implementationName=default
     options:
-      prefix: myproject-      # project-specific override, merged on top
+      prefix: myproject-
 
   tasks:
-    use: jira-work
+    use: plugins.jira.public          # pluginId=jira, implementationName=public
     options:
-      project: MYPROJ         # which Jira project -- not sensitive
+      project: MYPROJ
 
   secrets:
-    use: local-secrets
+    use: plugins.local.default
 ```
 
 **Syntax 2 -- inline instance:** defines the instance directly in the project config.
@@ -109,15 +110,15 @@ Used when no global config is available (CI environment without user-home).
 plugins:
   workspace:
     instance:
-      type: worktree
+      type: plugins.worktree.default
       options:
-        baseDir: ${WORKSPACE_DIR}     # env var -- mandatory for any path/credential
+        baseDir: ${WORKSPACE_DIR}
     options:
-      prefix: myproject-              # project-specific, not sensitive
+      prefix: myproject-
 
   tasks:
     instance:
-      type: jira
+      type: plugins.jira.public
       options:
         host: ${JIRA_HOST}
         token: ${JIRA_TOKEN}

@@ -135,4 +135,18 @@ describe('WorkerAdapter', () => {
 		// Factory called with MCP config path from McpServer
 		expect(mockFactory).toHaveBeenCalledWith('/tmp/mcp.json');
 	});
+
+	it('throws when trace.error is set (script exited with non-zero code)', async () => {
+		// Regression: before the fix, execute() returned normally even when the script failed,
+		// causing the worker to send step_completed instead of step_failed.
+		mockExecuteStep.mockResolvedValue({
+			error: 'Script exited with exit code 1',
+			exitCode: 1,
+			stdout: 'failing output',
+			outputs: {},
+		});
+		await expect(adapter.execute(makeScriptStep(), makeContext(), sendMessage)).rejects.toThrow(
+			'Script exited with exit code 1'
+		);
+	});
 });

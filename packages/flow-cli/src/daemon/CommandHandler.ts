@@ -289,9 +289,10 @@ export class CommandHandler {
 					this.readyQueue.splice(i, 1);
 				}
 			}
+			this.executionStore.markExecutionFailed(executionId);
 			this.cleanupExecution(executionId);
 		} else {
-			// Retry in progress — re-enqueue the step returned by the scheduler
+			// Loop/retry in progress — re-enqueue the step returned by the scheduler
 			this.enqueueReadyItems(executionId, newReady, context);
 			this.tryDispatch();
 		}

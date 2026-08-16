@@ -6028,3 +6028,48 @@ Canonical context for `when:` expressions:
 ## Singleton-daemon-kit v2 local fallback — 2026-08-16
 
 New version of `@wadeck/singleton-daemon-kit` (in `packages/flow-cli/node_modules`) adds a local command fallback in `createDaemonClient.send()`: if no daemon is running AND `options.commands[command]` exists, it calls it directly. Do NOT pass a `commands` handler to `createDaemonClient` in `RunCommand.ts` — use `commands: {}` to avoid the local handler being invoked instead of starting the real daemon.
+
+## npm workspace package shadowing — 2026-08-16
+
+### Root cause
+
+When a workspace package (`packages/flow-cli`) lists a sibling workspace package as `"flow-engine": "*"` in its `dependencies`, npm resolves this correctly **when `npm install` is run from the monorepo root** — it deduplicates to the workspace symlink at `node_modules/flow-engine`.
+
+However, if any agent or developer runs `npm install` from **inside** `packages/flow-cli/` (not the root), npm does not operate in workspace mode for that invocation. It treats `"*"` as a normal semver range, hits the registry, finds the public `flow-engine` package (v1.2.0), and installs it locally at `packages/flow-cli/node_modules/flow-engine`. This local copy takes precedence over the root symlink in Node.js module resolution, silently shadowing the workspace package and causing cryptic "export not found" errors.
+
+### The npm-canonical fix: `file:` protocol
+
+**UNCERTAIN:** npm does **not** support `workspace:*` (that protocol is pnpm/Yarn Berry only as of npm v11).
+
+The npm-native solution is to use the `file:` protocol:
+
+```json
+// packages/flow-cli/package.json
+"dependencies": {
+  "flow-engine": "file:../flow-engine"
+}
+```
+
+With `file:` protocol, npm records an explicit path-based reference in `package-lock.json`. When `npm install` is run from inside the sub-package, npm resolves the file path locally and cannot substitute a registry package — the reference is not a semver range at all. **Applied to this project on 2026-08-16.**
+
+### Additional guard: always install from root
+
+Even with `file:`, the rule remains: **always run `npm install` from the monorepo root**, not from inside sub-packages. The root context activates workspace hoisting and deduplication.
+
+To enforce this, add a root `.npmrc`:
+```ini
+; Prevent accidental installs from sub-package directories (no effect at root)
+; workspaces-update=true  (default)
+```
+
+UNCERTAIN: whether npm has a built-in flag to refuse sub-directory installs.
+
+### What major monorepos do
+
+React, Babel, Jest all use `file:` or `link:` protocol for internal cross-package references in npm workspaces, for exactly this reason. The `workspace:` protocol (pnpm) is the cleaner ergonomic alternative but requires switching from npm to pnpm.
+
+## agent-browser: headless only — 2026-08-16
+
+`agent-browser` (Playwright) is acceptable as long as it runs **headless**. Never launch a headed (visible) browser window — it opens on the user's screen and breaks their focus.
+
+Rule: `headless: true` always. Only use headed mode if the user explicitly requests it for a specific reason.

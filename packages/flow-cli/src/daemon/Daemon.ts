@@ -152,10 +152,9 @@ export async function startDaemon(config: FlowConfig = DEFAULT_CONFIG, daemonDir
 					const { executionId, stepId, error } = message;
 					executionStore.markStepFailed(executionId, stepId);
 					commandHandler.onStepFailed(executionId, stepId, error);
-					executionStore.markExecutionFailed(executionId);
+					// markExecutionFailed is now called inside onStepFailed only when the failure is terminal
 					logWriter.writeExecution(executionId, `Step ${stepId} failed: ${error}`, 'error');
 					commandHandler.dispatchHook(executionId, 'onStepFailed', { executionId, stepId, error });
-					commandHandler.removeExecutionHooks(executionId);
 				} catch (err) {
 					process.stderr.write(`[daemon] step_failed handler error: ${String(err)}\n`);
 				}
