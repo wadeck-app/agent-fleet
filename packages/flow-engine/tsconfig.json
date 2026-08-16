@@ -9,6 +9,7 @@
 	"exclude": ["dist", "dist-types"],
 	"references": [
 		//
+		{ "path": "../extension-points" },
 		{ "path": "../shared-common" },
 		{ "path": "../shared-orch-worker" },
 		{ "path": "../test-utils" }

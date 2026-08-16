@@ -15,11 +15,11 @@ intervention delivery mechanism (web UI in orchestrator, CLI in flow-cli).
 
 ## Decisions
 
-*(Local decision numbering. Global Decision Log reference: Decision #5 in _index.md)*
+_(Local decision numbering. Global Decision Log reference: Decision #5 in \_index.md)_
 
-| # | Decision | Rationale | Date |
-|---|---|---|---|
-| 5 | Three distinct methods: requestInput / requestChoice / requestApproval (Option A) | Clean typed signatures, no ambiguity on return types, easier to implement and test per case | 2026-08-16 |
+| #   | Decision                                                                          | Rationale                                                                                   | Date       |
+| --- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------- |
+| 5   | Three distinct methods: requestInput / requestChoice / requestApproval (Option A) | Clean typed signatures, no ambiguity on return types, easier to implement and test per case | 2026-08-16 |
 
 ## Interface (approval/v1.ts)
 
@@ -27,30 +27,30 @@ intervention delivery mechanism (web UI in orchestrator, CLI in flow-cli).
 // packages/extension-points/src/approval/v1.ts
 
 export interface ApprovalProvider {
-  requestInput(req: InputRequest): Promise<string>;
-  requestChoice(req: ChoiceRequest): Promise<string>;      // returns selected choice id
-  requestApproval(req: ApprovalRequest): Promise<boolean>;
+	requestInput(req: InputRequest): Promise<string>;
+	requestChoice(req: ChoiceRequest): Promise<string>; // returns selected choice id
+	requestApproval(req: ApprovalRequest): Promise<boolean>;
 }
 
 export interface InputRequest {
-  taskId: string;
-  stepId: string;
-  prompt: string;
-  hint?: string;
+	taskId: string;
+	stepId: string;
+	prompt: string;
+	hint?: string;
 }
 
 export interface ChoiceRequest {
-  taskId: string;
-  stepId: string;
-  prompt: string;
-  choices: Array<{ id: string; label: string; description?: string }>;
+	taskId: string;
+	stepId: string;
+	prompt: string;
+	choices: Array<{ id: string; label: string; description?: string }>;
 }
 
 export interface ApprovalRequest {
-  taskId: string;
-  stepId: string;
-  prompt: string;
-  context?: string;
+	taskId: string;
+	stepId: string;
+	prompt: string;
+	context?: string;
 }
 ```
 
@@ -61,27 +61,28 @@ Blocks the terminal and prompts the user directly. Used by flow-cli running stan
 ```typescript
 // SAMPLE -- packages/plugin-cli-approval/src/CliApprovalProvider.ts
 export const cliApprovalProvider: ApprovalProvider = {
-  async requestInput(req) {
-    // print req.prompt, read a line from stdin
-    // return the typed string
-  },
-  async requestChoice(req) {
-    // print req.prompt + numbered list of req.choices
-    // read a number, return req.choices[n].id
-  },
-  async requestApproval(req) {
-    // print req.prompt + req.context, read y/n
-    // return true/false
-  },
+	async requestInput(req) {
+		// print req.prompt, read a line from stdin
+		// return the typed string
+	},
+	async requestChoice(req) {
+		// print req.prompt + numbered list of req.choices
+		// read a number, return req.choices[n].id
+	},
+	async requestApproval(req) {
+		// print req.prompt + req.context, read y/n
+		// return true/false
+	},
 };
 ```
 
 Global config example:
+
 ```yaml
 plugins:
-  instances:
-    cli-approval:
-      type: plugins.cli-approval.default
+    instances:
+        cli-approval:
+            type: plugins.cli-approval.default
 ```
 
 ## Sample: `orchestrator` implementation (packages/plugin-orchestrator-approval)
@@ -92,33 +93,34 @@ Used when flow-cli is managed by the orchestrator.
 ```typescript
 // SAMPLE -- packages/plugin-orchestrator-approval/src/OrchestratorApprovalProvider.ts
 export function createOrchestratorApprovalProvider(options: OrchestratorOptions): ApprovalProvider {
-  return {
-    async requestInput(req) {
-      // POST /api/interventions { type: "input", ...req }
-      // poll or websocket-wait for response
-      // return response.value
-    },
-    async requestChoice(req) {
-      // POST /api/interventions { type: "choice", ...req }
-      // wait, return response.choiceId
-    },
-    async requestApproval(req) {
-      // POST /api/interventions { type: "approval", ...req }
-      // wait, return response.approved
-    },
-  };
+	return {
+		async requestInput(req) {
+			// POST /api/interventions { type: "input", ...req }
+			// poll or websocket-wait for response
+			// return response.value
+		},
+		async requestChoice(req) {
+			// POST /api/interventions { type: "choice", ...req }
+			// wait, return response.choiceId
+		},
+		async requestApproval(req) {
+			// POST /api/interventions { type: "approval", ...req }
+			// wait, return response.approved
+		},
+	};
 }
 ```
 
 Global config example:
+
 ```yaml
 plugins:
-  instances:
-    web-approval:
-      type: plugins.orchestrator-approval.default
-      options:
-        apiUrl: ${ORCHESTRATOR_URL}
-        token: ${ORCHESTRATOR_TOKEN}
+    instances:
+        web-approval:
+            type: plugins.orchestrator-approval.default
+            options:
+                apiUrl: ${ORCHESTRATOR_URL}
+                token: ${ORCHESTRATOR_TOKEN}
 ```
 
 Note: the transport mechanism (polling vs WebSocket/SSE) between the orchestrator plugin and the web backend is an open question -- it must be decided before the orchestrator plugin is implemented. See Open Questions #11.
@@ -160,7 +162,7 @@ File to adjust: `packages/flow-engine/src/executor/FlowOrchestrator.ts`
 
 ### 3. Tool-call parsing (`request_user_input`, `request_user_choice`) maps to provider calls
 
-The existing tool-call parsing that detects `<tool_call>{"tool_call": "request_user_input", ...}` 
+The existing tool-call parsing that detects `<tool_call>{"tool_call": "request_user_input", ...}`
 in Claude's output should route to `approvalProvider.requestInput(...)` instead of the current
 `InterventionRequest` creation path.
 
@@ -173,6 +175,7 @@ The web backend API endpoints for interventions are unchanged -- they are now th
 layer for this specific plugin, not a general flow-engine concern.
 
 Files affected:
+
 - `packages/web-backend/src/` -- intervention controller/service stays, becomes plugin internals
 - `packages/web-frontend/src/` -- intervention UI components stay, no change needed
 

@@ -47,6 +47,7 @@ export const baseIgnores = [
 	'**/*.config.mjs',
 	'**/*.config.ts',
 	'**/*.config.js',
+	'**/*.mjs',
 ];
 
 /**
@@ -156,6 +157,7 @@ export default [
 			'**/.agent-fleet/**', // Ignore agent-fleet configuration
 			'**/docs/**', // Ignore documentation
 			'**/build.mjs', // Ignore build scripts
+			'**/testing/*.mjs', // Ignore test utility .mjs files (no tsconfig context)
 		],
 	},
 

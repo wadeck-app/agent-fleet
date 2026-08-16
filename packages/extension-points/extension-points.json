@@ -1,0 +1,52 @@
+{
+	"extensionPoints": [
+		{
+			"id": "workspace",
+			"status": "stable",
+			"description": "Provides and manages isolated workspaces for task execution",
+			"versions": [{ "version": 1, "status": "stable", "since": "0.1.0" }]
+		},
+		{
+			"id": "tasks",
+			"status": "planned",
+			"description": "Provides and manages tasks/tickets (filesystem, Jira, GitHub Issues, etc.)",
+			"versions": []
+		},
+		{
+			"id": "secrets",
+			"status": "planned",
+			"description": "Resolves secret values at runtime (local keychain, Vault, env vars, etc.)",
+			"versions": []
+		},
+		{
+			"id": "agent",
+			"status": "planned",
+			"description": "Provides agent execution strategies (Claude CLI, OpenAI, custom, etc.)",
+			"versions": []
+		},
+		{
+			"id": "model",
+			"status": "planned",
+			"description": "Provides LLM model access (Anthropic, OpenAI, Google, etc.)",
+			"versions": []
+		},
+		{
+			"id": "script",
+			"status": "planned",
+			"description": "Provides script execution environments (inline bash, Docker, Lambda, etc.)",
+			"versions": []
+		},
+		{
+			"id": "approval",
+			"status": "stable",
+			"description": "Provides user intervention and approval flows (CLI prompt, web UI, Slack, etc.)",
+			"versions": [{ "version": 1, "status": "stable", "since": "0.1.0" }]
+		},
+		{
+			"id": "context",
+			"status": "planned",
+			"description": "Provides and filters context management (storage, retrieval, filtering for agent prompts). Note: context data may contain sensitive information -- interface design must address data scoping before this point can be marked stable.",
+			"versions": []
+		}
+	]
+}

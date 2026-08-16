@@ -133,9 +133,12 @@ export class McpServer {
 	}
 
 	private writeConfig(port: number): string {
+		// Claude CLI requires "type": "http" for HTTP MCP servers.
+		// Headers auth is passed via the headers field (supported by Claude CLI HTTP transport).
 		const config = {
 			mcpServers: {
 				flow: {
+					type: 'http',
 					url: `http://127.0.0.1:${port}/mcp`,
 					headers: { Authorization: `Bearer ${this.token}` },
 				},

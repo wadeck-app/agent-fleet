@@ -219,7 +219,10 @@ describe('SimulationValidator', () => {
 	// ---------------------------------------------------------------------------
 
 	describe('undeclared output key validation', () => {
-		function makeFlowWithOutputRef(outputConfig: Record<string, unknown> | undefined, ref: string): { flow: FlowDefinition; stepIds: Set<string> } {
+		function makeFlowWithOutputRef(
+			outputConfig: Record<string, unknown> | undefined,
+			ref: string
+		): { flow: FlowDefinition; stepIds: Set<string> } {
 			const producer: Record<string, unknown> = {
 				id: 'producer',
 				name: 'Producer',
@@ -272,10 +275,7 @@ describe('SimulationValidator', () => {
 		});
 
 		it('accepts any output key when step has no output config', () => {
-			const { flow, stepIds } = makeFlowWithOutputRef(
-				undefined,
-				'${{ steps.producer.outputs.anything }}'
-			);
+			const { flow, stepIds } = makeFlowWithOutputRef(undefined, '${{ steps.producer.outputs.anything }}');
 			validator.validateSimulation(flow, stepIds);
 			const errors = issueCollector.issues.filter(i => i.code === ValidationCode.UNDECLARED_OUTPUT_KEY);
 			expect(errors).toHaveLength(0);
@@ -290,8 +290,21 @@ describe('SimulationValidator', () => {
 				workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
 				inputs: {},
 				steps: [
-					{ id: 'gen', name: 'Gen', type: 'model', model: 'haiku', prompt: 'Do it', output: { status: { type: 'string' } } },
-					{ id: 'use', name: 'Use', type: 'script', depends: ['gen'], script: 'echo ${{ steps.gen.outputs.missing }}' },
+					{
+						id: 'gen',
+						name: 'Gen',
+						type: 'model',
+						model: 'haiku',
+						prompt: 'Do it',
+						output: { status: { type: 'string' } },
+					},
+					{
+						id: 'use',
+						name: 'Use',
+						type: 'script',
+						depends: ['gen'],
+						script: 'echo ${{ steps.gen.outputs.missing }}',
+					},
 				] as unknown as FlowDefinition['steps'],
 			};
 			validator.validateSimulation(flow, new Set(['gen', 'use']));

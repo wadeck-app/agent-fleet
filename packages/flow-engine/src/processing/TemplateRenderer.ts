@@ -122,7 +122,11 @@ export class TemplateRenderer {
 		} else if (root === 'steps') {
 			// ${{ steps.stepId.outputs.varName }} or ${{ steps.stepId.meta.field }}
 			if (parts.length < 4 || (parts[2] !== 'outputs' && parts[2] !== 'meta')) {
-				throw new TemplateRenderError('steps requires format: steps.stepId.outputs.varName or steps.stepId.meta.field', expression, root);
+				throw new TemplateRenderError(
+					'steps requires format: steps.stepId.outputs.varName or steps.stepId.meta.field',
+					expression,
+					root
+				);
 			}
 			const stepId = parts[1];
 			const namespace = parts[2];

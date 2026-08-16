@@ -17,9 +17,11 @@ export function registerValidateCommand(program: Command): void {
 					case 0:
 						process.stdout.write(JSON.stringify({ valid: true }) + '\n');
 						process.exit(0);
+						break;
 					case 1:
 						process.stdout.write(JSON.stringify({ valid: false, errors: result.errors }) + '\n');
 						process.exit(1);
+						break;
 					case 2:
 						process.stdout.write(
 							JSON.stringify({
@@ -28,9 +30,11 @@ export function registerValidateCommand(program: Command): void {
 							}) + '\n'
 						);
 						process.exit(2);
+						break;
 					case 3:
 						process.stdout.write(JSON.stringify({ valid: false, errors: result.errors }) + '\n');
 						process.exit(3);
+						break;
 					default: {
 						const _exhaustive: never = result;
 						throw new Error(`Unexpected result: ${JSON.stringify(_exhaustive)}`);

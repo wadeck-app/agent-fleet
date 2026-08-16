@@ -321,7 +321,9 @@ export function registerRunCommand(program: Command): void {
 
 				const { executionId } = response as { type: 'execution_started'; executionId: string };
 				if (!executionId) {
-					console.error('Error: daemon returned a response without an executionId — try restarting the daemon');
+					console.error(
+						'Error: daemon returned a response without an executionId — try restarting the daemon'
+					);
 					process.exit(1);
 				}
 
@@ -349,16 +351,16 @@ export function registerRunCommand(program: Command): void {
 				const flowYaml = fs.existsSync(flowFile)
 					? (() => {
 							try {
-								return yaml.load(fs.readFileSync(flowFile, 'utf8'), { schema: yaml.JSON_SCHEMA }) as any;
+								return yaml.load(fs.readFileSync(flowFile, 'utf8'), {
+									schema: yaml.JSON_SCHEMA,
+								}) as any;
 							} catch {
 								return null;
 							}
 						})()
 					: null;
 				const fastPoll = Array.isArray(flowYaml?.steps)
-					? (flowYaml.steps as any[]).some(
-							(s: any) => s.log === 'streaming' || s.log === 'polling'
-						)
+					? (flowYaml.steps as any[]).some((s: any) => s.log === 'streaming' || s.log === 'polling')
 					: false;
 
 				let finalState: ExecutionState;

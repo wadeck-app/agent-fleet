@@ -1,0 +1,14 @@
+import { createWorktreeProvider } from './src/WorktreeWorkspaceProvider.js';
+
+export const manifest = {
+	pluginId: 'worktree',
+	manifestVersion: '1',
+	implementations: {
+		workspace: {
+			default: {
+				version: 1,
+				provider: options => createWorktreeProvider(options),
+			},
+		},
+	},
+};

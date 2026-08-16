@@ -1,0 +1,27 @@
+{
+	"name": "plugin-none",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./plugin.config": {
+			"types": "./dist-types/plugin.config.d.ts",
+			"default": "./plugin.config.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc --build tsconfig.json",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"lint": "eslint src",
+		"clean": "rimraf dist dist-types"
+	},
+	"dependencies": {
+		"extension-points": "file:../extension-points"
+	},
+	"devDependencies": {
+		"@types/node": "^22.10.2",
+		"typescript": "^5.3.3",
+		"vitest": "^4.0.14"
+	}
+}

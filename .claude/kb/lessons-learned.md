@@ -6008,7 +6008,8 @@ Never use abbreviations (L1/L2/L3, etc.) that were defined in a previous message
 
 ## Flow ↔ Task coupling = event-based, not core feature — 2026-08-16
 
-Tasks are a useful concept *used with* flows, but they are NOT part of the flow engine core.
+Tasks are a useful concept _used with_ flows, but they are NOT part of the flow engine core.
+
 - `task.*` was removed from the `when:` condition context (`ConditionContext`)
 - Flows and tasks are bound by events (a task moves/creates/deletes → triggers a flow), not by direct dependency
 - If task data is needed inside a flow, it must be passed explicitly as `inputs`
@@ -6017,9 +6018,11 @@ Tasks are a useful concept *used with* flows, but they are NOT part of the flow 
 ## `when:` condition context shape — 2026-08-16
 
 Canonical context for `when:` expressions:
+
 ```
 { steps: { '<stepId>': { outputs: { ... } } }, outputs: { '<stepId>': { ... } }, inputs: { ... } }
 ```
+
 - `steps.X.outputs.Y` — primary form (dot notation; engine normalizes hyphenated IDs to bracket notation)
 - `outputs['X'].Y` — shorthand (flat keyed by step id)
 - Both `${{ expr }}` wrapper and bare expression supported
@@ -6057,6 +6060,7 @@ With `file:` protocol, npm records an explicit path-based reference in `package-
 Even with `file:`, the rule remains: **always run `npm install` from the monorepo root**, not from inside sub-packages. The root context activates workspace hoisting and deduplication.
 
 To enforce this, add a root `.npmrc`:
+
 ```ini
 ; Prevent accidental installs from sub-package directories (no effect at root)
 ; workspaces-update=true  (default)
@@ -6077,25 +6081,34 @@ Rule: `headless: true` always. Only use headed mode if the user explicitly reque
 ## npm workspace package shadowing — solution et limitation — 2026-08-16
 
 ### Problème
+
 Un package npm public portant le même nom qu'un package workspace local peut s'installer dans `node_modules/` d'un sous-package (si `npm install` est lancé depuis ce sous-package). La résolution locale prend alors la priorité sur le symlink workspace racine, provoquant des erreurs d'import.
 
 ### Solution appliquée : `file:`
+
 Tous les packages workspace utilisent maintenant `"file:../package-dir"` au lieu de `"*"` pour leurs dépendances siblings :
+
 ```json
 "flow-engine": "file:../flow-engine"
 ```
+
 npm ne peut pas substituer un package registry à un chemin `file:` explicite.
 
 ### Limitation : pas la pratique industrie
+
 `file:` est un contournement, pas la solution canonique. Deux problèmes :
+
 1. **Fragilité structurelle** — si un package est déplacé, les chemins cassent silencieusement
 2. **Ne scale pas** — à l'extension du framework (nouveaux packages, extraction en sous-monorepos), chaque nouveau package doit penser à utiliser `file:` pour ses dépendances internes
 
 ### Vraie solution : packages scopés
+
 La pratique industrie (Babel, Jest, etc.) est de préfixer tous les packages workspace avec un scope privé :
+
 ```json
 "@mon-scope/flow-engine": "*"
 ```
+
 Un package `@mon-scope/flow-engine` ne peut jamais entrer en collision avec un package public npm — le scope agit comme espace de nommage. `"*"` redevient safe.
 
 **Prérequis :** posséder ou contrôler le scope npm (`@mon-scope`). `@agent-fleet` n'est pas disponible — choisir un scope maîtrisé avant de migrer.
@@ -6107,18 +6120,23 @@ Un package `@mon-scope/flow-engine` ne peut jamais entrer en collision avec un p
 When `${{ steps.X.outputs.Y }}` is embedded directly in a `script:` field, the rendered value is inserted into a bat/shell command verbatim. Multi-line model responses cause subsequent lines to be executed as shell commands.
 
 **NEVER do this:**
+
 ```yaml
-script: echo ${{ steps.generate.outputs.response }}   # RCE if response is multi-line
+script: echo ${{ steps.generate.outputs.response }} # RCE if response is multi-line
 ```
+
 Example: if Claude responds "Imagine you have blocks...", cmd.exe executes `Imagine` as a command.
 
 **Safe pattern — write to file via node:**
+
 ```yaml
 script: node -e "require('fs').writeFileSync(process.argv[1], process.argv[2])" "${{ context.workspaceDir }}\out.txt" "${{ steps.generate.outputs.response }}"
 ```
+
 Node receives the response as `process.argv[2]` — never interpreted as shell commands.
 
 **Suggestions to reduce user error:**
+
 1. Flow validator: warn when `${{ steps.X.outputs.Y }}` is used inline in `script:` and Y is a `string` type — the value could be multi-line
 2. Documentation: add a "Security" section to flow docs explaining this pattern
 3. Future engine enhancement: add a `writeOutput` step type that safely writes a template value to a file without shell involvement
@@ -6126,10 +6144,12 @@ Node receives the response as `process.argv[2]` — never interpreted as shell c
 ## Workspace vs Workspace Metadata separation — 2026-08-16
 
 ### Principle
+
 The workspace (`workspaceDir`) is where Claude works (code, files, modified content).
 Engine-generated artifacts (outputs, logs, state) are metadata and must NEVER live inside the workspace.
 
 ### Rule
+
 ```
 .agent-fleet/workspaces/
   shared-xxx/          ← workspace: what Claude sees and modifies
@@ -6139,17 +6159,65 @@ Engine-generated artifacts (outputs, logs, state) are metadata and must NEVER li
 ```
 
 ### Why
+
 - Claude cannot accidentally overwrite engine outputs
 - No gitignore management needed (metadata is outside the workspace)
 - Lifecycle is obvious: delete workspace → delete its meta dir alongside it
 - `reusePolicy: if-available` won't leak outputs from a previous execution
 
 ### Implementation target (pending)
+
 - `WorkspaceManager` must create `<workspaceDir>.meta/outputs/` when allocating
 - `writeOutput:` writes to `<workspaceDir>.meta/outputs/<filename>`
 - Output type `filepath` value = absolute path to the meta file
 - `TemplateContext` exposes `context.outputsDir` = `<workspaceDir>.meta/outputs/`
 
 ### NOT to do
+
 - `.flow/outputs/` inside workspace → still needs gitignore, Claude can pollute
 - `~/.flow-daemon/executions/<id>/outputs/` → path too long, not co-located with workspace
+
+---
+
+## Plugin System (2026-08-16)
+
+### Package naming
+
+- Plugin implementations: `packages/plugin-<id>/` → `@flow/plugin-<id>` npm name
+- `plugin-sdk` is NOT a plugin — exclude it from PLUGIN-001 scans
+- Extension point interfaces: `packages/extension-points/` → `@flow/extension-points`
+
+### Package exports for Vite/vitest resolution
+
+- The `exports` field in `package.json` overrides `main`
+- For in-source packages used in tests, always include `"default": "./src/index.ts"` in exports alongside `"types"` — Vite needs it to resolve the package at test time
+
+### ES module import cache in tests
+
+- `import()` in Node.js caches by URL — two tests that write different files to the same path and then `import()` that path will get the cached result from the first test
+- Fix: use unique paths per test (e.g. a counter in the temp dir name)
+
+### TypeScript project references
+
+- New packages must be added to root `tsconfig.json` references AND to `tsconfig.shared.json` paths
+- `check-ts.js` only checks hardcoded PACKAGES list — new packages need to be added there too (or built first)
+- Building a package before running `check` avoids "output file has not been built" errors
+
+### Prettier `with` import assertions
+
+- Prettier does not support `import foo from 'file.json' with { type: 'json' }` syntax
+- Use `fs.readFileSync` + `JSON.parse` for JSON imports in tests instead
+
+### `packages/cli/` stale artifact
+
+- `packages/cli/` has no `package.json`, only `dist-types/` — `npm run lint` from there falls back to root ESLint which scans everything and causes false positives
+- Fix: remove `'cli'` from `check-eslint.js` PACKAGES list
+
+### Path traversal pitfall in validateBaseDir on Windows
+
+- Unix paths like `/`, `/etc`, `/usr` resolve differently on Windows (e.g. `C:\` for `/`)
+- Tests that check Unix system directory rejection must be wrapped with `if (!isWindows)`
+
+### PLUGIN-003 scope
+
+- The violation rule checks TS manifests using `tsc --noEmit` for the package; for tests it's sufficient to check that `npm run check` passes for the plugin package as a whole

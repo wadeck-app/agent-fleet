@@ -1,2 +1,3 @@
 // @deprecated Renamed to FlowFileValidator.ts — import from './FlowFileValidator' instead.
-export * from './FlowFileValidator';
+// This file is intentionally empty; the re-export has been removed.
+export {};

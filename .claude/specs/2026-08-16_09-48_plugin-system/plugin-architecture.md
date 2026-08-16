@@ -12,10 +12,10 @@ It does NOT cover individual plugin type contracts (see provider-types.md).
 
 ## Decisions
 
-| # | Decision | Rationale | Date |
-|---|---|---|---|
-| 1 | In-process, capability-injection model | Simple, no IPC, TypeScript interface IS the contract | 2026-08-16 |
-| 2 | Global config defines named instances; project uses "use:" or inline instance | See design section below | 2026-08-16 |
+| #   | Decision                                                                      | Rationale                                            | Date       |
+| --- | ----------------------------------------------------------------------------- | ---------------------------------------------------- | ---------- |
+| 1   | In-process, capability-injection model                                        | Simple, no IPC, TypeScript interface IS the contract | 2026-08-16 |
+| 2   | Global config defines named instances; project uses "use:" or inline instance | See design section below                             | 2026-08-16 |
 
 ## Design
 
@@ -36,8 +36,9 @@ Priority (highest to lowest):
 ```
 
 **Same env var pattern for both CLIs -- consistent by design:**
-- flow CLI:  `FLOW_CONFIG`  -> `~/.flow/config.yml`
-- task CLI:  `TASK_CONFIG`  -> `~/.task/config.yml`
+
+- flow CLI: `FLOW_CONFIG` -> `~/.flow/config.yml`
+- task CLI: `TASK_CONFIG` -> `~/.task/config.yml`
 
 ### Global config structure (v1)
 
@@ -57,32 +58,32 @@ named instance to use.
 # NEVER commit this file. Credentials use ${ENV_VAR} interpolation only.
 
 plugins:
-  instances:
-    my-worktree:
-      type: plugins.worktree.default
-      options:
-        baseDir: ~/workspaces
+    instances:
+        my-worktree:
+            type: plugins.worktree.default
+            options:
+                baseDir: ~/workspaces
 
-    jira-work:
-      type: plugins.jira.public
-      options:
-        host: work.atlassian.net
-        token: ${JIRA_WORK_TOKEN}
+        jira-work:
+            type: plugins.jira.public
+            options:
+                host: work.atlassian.net
+                token: ${JIRA_WORK_TOKEN}
 
-    jira-oss:
-      type: plugins.jira.public
-      options:
-        host: oss.atlassian.net
-        token: ${JIRA_OSS_TOKEN}
+        jira-oss:
+            type: plugins.jira.public
+            options:
+                host: oss.atlassian.net
+                token: ${JIRA_OSS_TOKEN}
 
-    jira-personal:
-      type: plugins.jira.public
-      options:
-        host: personal.atlassian.net
-        token: ${JIRA_PERSONAL_TOKEN}
+        jira-personal:
+            type: plugins.jira.public
+            options:
+                host: personal.atlassian.net
+                token: ${JIRA_PERSONAL_TOKEN}
 
-    local-secrets:
-      type: plugins.local.default
+        local-secrets:
+            type: plugins.local.default
 ```
 
 ### Project config structure (v1)
@@ -96,18 +97,18 @@ Project provides only project-specific override options (non-sensitive).
 ```yaml
 # <project>/.flow/config.yml  -- reference syntax (normal dev workflow)
 plugins:
-  workspace:
-    use: my-worktree        # instance name from global config
-    options:
-      prefix: myproject-    # project-specific override
+    workspace:
+        use: my-worktree # instance name from global config
+        options:
+            prefix: myproject- # project-specific override
 
-  tasks:
-    use: jira-work          # selects which Jira instance (could be jira-oss, jira-personal, etc.)
-    options:
-      project: MYPROJ
+    tasks:
+        use: jira-work # selects which Jira instance (could be jira-oss, jira-personal, etc.)
+        options:
+            project: MYPROJ
 
-  secrets:
-    use: local-secrets      # instance name from global config
+    secrets:
+        use: local-secrets # instance name from global config
 ```
 
 **Syntax 2 -- inline instance:** defines the instance directly in the project config.
@@ -117,22 +118,22 @@ Used when no global config is available (CI environment without user-home).
 ```yaml
 # <project>/.flow/config.yml  -- inline syntax (CI / no user-home)
 plugins:
-  workspace:
-    instance:
-      type: plugins.worktree.default
-      options:
-        baseDir: ${WORKSPACE_DIR}
-    options:
-      prefix: myproject-
+    workspace:
+        instance:
+            type: plugins.worktree.default
+            options:
+                baseDir: ${WORKSPACE_DIR}
+        options:
+            prefix: myproject-
 
-  tasks:
-    instance:
-      type: plugins.jira.public
-      options:
-        host: ${JIRA_HOST}
-        token: ${JIRA_TOKEN}
-    options:
-      project: MYPROJ
+    tasks:
+        instance:
+            type: plugins.jira.public
+            options:
+                host: ${JIRA_HOST}
+                token: ${JIRA_TOKEN}
+        options:
+            project: MYPROJ
 ```
 
 Both syntaxes can coexist in the same project config (one feature uses `use:`, another uses `instance:`).
@@ -143,9 +144,9 @@ Both syntaxes can coexist in the same project config (one feature uses `use:`, a
 - If `use:` is present: look up the **instance name** in the global config `instances:` map. If the name is not found: hard error at startup (P-4). Then shallow-merge the project `options:` on top of the instance's options.
 - If `instance:` is present: use it directly, then shallow-merge the project `options:` on top. Global config is not consulted for this section.
 - If neither `use:` nor `instance:` is present for a feature: the behavior depends on whether the feature is **required** or **optional**:
-  - **Required features** (workspace only in v1): hard error at startup if not configured.
-  - **Optional features** (tasks, secrets, approval): error only when the feature is first invoked at runtime. If a flow never uses tasks or secrets, a missing provider is not a startup error.
-  Note: `tasks` and `secrets` will become required once stable implementations ship and are documented as such.
+    - **Required features** (workspace only in v1): hard error at startup if not configured.
+    - **Optional features** (tasks, secrets, approval): error only when the feature is first invoked at runtime. If a flow never uses tasks or secrets, a missing provider is not a startup error.
+      Note: `tasks` and `secrets` will become required once stable implementations ship and are documented as such.
 - If both `use:` and `instance:` are present in the same feature section: hard error at config load time (P-4). A feature section must declare exactly one of the two syntaxes.
 - Options precedence within Syntax 2: if both `instance.options` and the section-level `options:` define the same key, the section-level `options:` wins (it is the project-specific override).
 
@@ -164,6 +165,7 @@ Enforced at config load time (hard errors, no silent fallback -- P-4):
 ## v2 TODO (documented, not designed)
 
 ### Cloud B: CI/hosted global config file
+
 A CI environment or hosted server may provide a global config file with named instances
 (credentials injected via the CI secrets system as `${ENV_VAR}`).
 The `FLOW_CONFIG` / `TASK_CONFIG` env var already supports this -- pointing it at a file
@@ -174,7 +176,9 @@ The v2 work is: documentation, a `flow config validate` command to verify the fi
 possibly a `flow config init --ci` scaffold command.
 
 ### Remote config download (v3)
+
 A hosted server or team config can live at a remote URL. The CLI would:
+
 1. Download and cache the remote config locally (TTL-based)
 2. Use it as the global layer (same position as FLOW_CONFIG / user-home file)
 3. Support a `FLOW_CONFIG_REMOTE` env var or a `remote:` key in user-home config
@@ -182,6 +186,7 @@ A hosted server or team config can live at a remote URL. The CLI would:
 Design deferred. Introduces new STRIDE surface (Spoofing/Tampering of remote config) -- threat model update required at that point.
 
 ### Plugin input/placeholder schema (v3+)
+
 The global config could declare required "inputs" that a project config must supply
 to finalize an instance (e.g., the global jira instance requires `project` to be set).
 This enforces patterns from the global config onto projects without them needing to know

@@ -183,7 +183,7 @@ export async function startDaemon(config: FlowConfig = DEFAULT_CONFIG, daemonDir
 					const current = executionStore.read(executionId);
 					const newSteps = { ...current.steps };
 					for (const s of steps) {
-						newSteps[s.id] = { status: 'pending' };
+						newSteps[s.id] = { status: 'pending', injected: true };
 					}
 					executionStore.update(executionId, { steps: newSteps });
 					commandHandler.tryDispatch();

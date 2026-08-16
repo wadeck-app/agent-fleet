@@ -46,8 +46,14 @@ function captureOnStreamEvent(): { onStreamEvent: ((...args: any[]) => void) | u
 		captured.onStreamEvent = opts.onStreamEvent;
 		// Simulate 3 streaming assistant events
 		if (opts.onStreamEvent) {
-			opts.onStreamEvent({ type: 'assistant', data: { message: { content: [{ type: 'text', text: 'Hello ' }] } } });
-			opts.onStreamEvent({ type: 'assistant', data: { message: { content: [{ type: 'text', text: 'world' }] } } });
+			opts.onStreamEvent({
+				type: 'assistant',
+				data: { message: { content: [{ type: 'text', text: 'Hello ' }] } },
+			});
+			opts.onStreamEvent({
+				type: 'assistant',
+				data: { message: { content: [{ type: 'text', text: 'world' }] } },
+			});
 			opts.onStreamEvent({ type: 'result', data: { result: 'Hello world', subtype: 'success' } });
 		}
 		return Promise.resolve({ stdout: 'raw-ndjson', stderr: '', exitCode: 0 });
@@ -69,7 +75,10 @@ describe('model step — log: parameter', () => {
 			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation((opts: any) => {
 				// During execution: collect any real-time log entries
 				if (opts.onStreamEvent) {
-					opts.onStreamEvent({ type: 'assistant', data: { message: { content: [{ type: 'text', text: 'Hello world' }] } } });
+					opts.onStreamEvent({
+						type: 'assistant',
+						data: { message: { content: [{ type: 'text', text: 'Hello world' }] } },
+					});
 					opts.onStreamEvent({ type: 'result', data: { result: 'Hello world', subtype: 'success' } });
 				}
 				return Promise.resolve({ stdout: 'raw-ndjson', stderr: '', exitCode: 0 });
@@ -89,7 +98,10 @@ describe('model step — log: parameter', () => {
 		it('populates trace.liveLogEntries after completion', async () => {
 			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation((opts: any) => {
 				if (opts.onStreamEvent) {
-					opts.onStreamEvent({ type: 'assistant', data: { message: { content: [{ type: 'text', text: 'Hi' }] } } });
+					opts.onStreamEvent({
+						type: 'assistant',
+						data: { message: { content: [{ type: 'text', text: 'Hi' }] } },
+					});
 					opts.onStreamEvent({ type: 'result', data: { result: 'Hi', subtype: 'success' } });
 				}
 				return Promise.resolve({ stdout: 'raw', stderr: '', exitCode: 0 });
@@ -111,8 +123,14 @@ describe('model step — log: parameter', () => {
 			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async (opts: any) => {
 				executionStartTime = Date.now();
 				if (opts.onStreamEvent) {
-					opts.onStreamEvent({ type: 'assistant', data: { message: { content: [{ type: 'text', text: 'Hello ' }] } } });
-					opts.onStreamEvent({ type: 'assistant', data: { message: { content: [{ type: 'text', text: 'world' }] } } });
+					opts.onStreamEvent({
+						type: 'assistant',
+						data: { message: { content: [{ type: 'text', text: 'Hello ' }] } },
+					});
+					opts.onStreamEvent({
+						type: 'assistant',
+						data: { message: { content: [{ type: 'text', text: 'world' }] } },
+					});
 					opts.onStreamEvent({ type: 'result', data: { result: 'Hello world', subtype: 'success' } });
 				}
 				return { stdout: 'raw', stderr: '', exitCode: 0 };
@@ -137,10 +155,16 @@ describe('model step — log: parameter', () => {
 				// Simulate streaming: emit 3 chunks with 50ms delays between them
 				if (opts.onStreamEvent) {
 					for (const chunk of ['First chunk. ', 'Second chunk. ', 'Third chunk.']) {
-						opts.onStreamEvent({ type: 'assistant', data: { message: { content: [{ type: 'text', text: chunk }] } } });
+						opts.onStreamEvent({
+							type: 'assistant',
+							data: { message: { content: [{ type: 'text', text: chunk }] } },
+						});
 						await new Promise(r => setTimeout(r, delayMs));
 					}
-					opts.onStreamEvent({ type: 'result', data: { result: 'First chunk. Second chunk. Third chunk.', subtype: 'success' } });
+					opts.onStreamEvent({
+						type: 'result',
+						data: { result: 'First chunk. Second chunk. Third chunk.', subtype: 'success' },
+					});
 				}
 				return { stdout: 'raw', stderr: '', exitCode: 0 };
 			});
@@ -159,7 +183,10 @@ describe('model step — log: parameter', () => {
 		it('passes assistant text content to onLogEntry', async () => {
 			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async (opts: any) => {
 				if (opts.onStreamEvent) {
-					opts.onStreamEvent({ type: 'assistant', data: { message: { content: [{ type: 'text', text: 'A flow orchestrator' }] } } });
+					opts.onStreamEvent({
+						type: 'assistant',
+						data: { message: { content: [{ type: 'text', text: 'A flow orchestrator' }] } },
+					});
 					opts.onStreamEvent({ type: 'result', data: { result: 'A flow orchestrator', subtype: 'success' } });
 				}
 				return { stdout: 'raw', stderr: '', exitCode: 0 };
@@ -179,7 +206,10 @@ describe('model step — log: parameter', () => {
 		it('never calls onLogEntry', async () => {
 			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async (opts: any) => {
 				if (opts.onStreamEvent) {
-					opts.onStreamEvent({ type: 'assistant', data: { message: { content: [{ type: 'text', text: 'Hello' }] } } });
+					opts.onStreamEvent({
+						type: 'assistant',
+						data: { message: { content: [{ type: 'text', text: 'Hello' }] } },
+					});
 					opts.onStreamEvent({ type: 'result', data: { result: 'Hello', subtype: 'success' } });
 				}
 				return { stdout: 'raw', stderr: '', exitCode: 0 };
@@ -196,7 +226,9 @@ describe('model step — log: parameter', () => {
 
 		it('does not populate trace.liveLogEntries', async () => {
 			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockResolvedValue({
-				stdout: 'raw', stderr: '', exitCode: 0,
+				stdout: 'raw',
+				stderr: '',
+				exitCode: 0,
 			});
 
 			const runner = new StepRunner({ interactive: false });
@@ -212,7 +244,10 @@ describe('model step — log: parameter', () => {
 			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async (opts: any) => {
 				if (opts.onStreamEvent) {
 					for (let i = 0; i < 5; i++) {
-						opts.onStreamEvent({ type: 'assistant', data: { message: { content: [{ type: 'text', text: `line ${i}` }] } } });
+						opts.onStreamEvent({
+							type: 'assistant',
+							data: { message: { content: [{ type: 'text', text: `line ${i}` }] } },
+						});
 					}
 					opts.onStreamEvent({ type: 'result', data: { result: 'done', subtype: 'success' } });
 				}
@@ -232,7 +267,11 @@ describe('model step — log: parameter', () => {
 	describe('common behavior', () => {
 		it('all log modes: trace.response contains the clean answer', async () => {
 			const modes: Array<'streaming' | 'end' | 'none' | 'polling' | undefined> = [
-				'streaming', 'end', 'none', 'polling', undefined,
+				'streaming',
+				'end',
+				'none',
+				'polling',
+				undefined,
 			];
 
 			for (const mode of modes) {
@@ -262,7 +301,9 @@ describe('model step — log: parameter', () => {
 				vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('Hello');
 				vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({});
 				vi.mocked(ClaudeLauncher.prototype.launchBackground).mockResolvedValue({
-					stdout: '', stderr: 'error', exitCode: 1,
+					stdout: '',
+					stderr: 'error',
+					exitCode: 1,
 				});
 
 				const runner = new StepRunner({ interactive: false });

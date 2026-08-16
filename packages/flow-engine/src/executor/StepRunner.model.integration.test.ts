@@ -16,9 +16,9 @@
 import { execSync, spawn } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
-import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MOCK_PATH = join(__dirname, '../testing/claude-mock.mjs');
@@ -65,8 +65,12 @@ function runProcess(
 		});
 		let stdout = '';
 		let stderr = '';
-		child.stdout.on('data', (d: Buffer) => { stdout += d.toString(); });
-		child.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
+		child.stdout.on('data', (d: Buffer) => {
+			stdout += d.toString();
+		});
+		child.stderr.on('data', (d: Buffer) => {
+			stderr += d.toString();
+		});
 		child.on('close', code => resolve({ stdout, stderr, exitCode: code ?? 0 }));
 		child.on('error', reject);
 		if (child.stdin) {
@@ -77,7 +81,10 @@ function runProcess(
 }
 
 function parseNdjson(raw: string): Record<string, unknown>[] {
-	return raw.split('\n').filter(l => l.trim()).map(l => JSON.parse(l));
+	return raw
+		.split('\n')
+		.filter(l => l.trim())
+		.map(l => JSON.parse(l));
 }
 
 describe.skipIf(!shouldRunIntegration())('Claude real vs mock compatibility', () => {
@@ -85,105 +92,126 @@ describe.skipIf(!shouldRunIntegration())('Claude real vs mock compatibility', ()
 
 	// Resolve real Claude path once
 	try {
-		realClaudePath = execSync(
-			process.platform === 'win32' ? 'where.exe claude' : 'which claude',
-			{ encoding: 'utf8' }
-		).trim().split('\n')[0].trim();
+		realClaudePath = execSync(process.platform === 'win32' ? 'where.exe claude' : 'which claude', {
+			encoding: 'utf8',
+		})
+			.trim()
+			.split('\n')[0]
+			.trim();
 	} catch {
 		realClaudePath = '';
 	}
 
 	// --- INPUT / PARAMETER TESTS ---
 
-	it('mock accepts same flags as real Claude without error', async () => {
-		// Flags that ClaudeLauncher passes: --dangerously-skip-permissions --output-format stream-json --model <m> -p
-		const flags = ['--dangerously-skip-permissions', '--output-format', 'stream-json', '--model', 'haiku', '-p'];
-		const mock = await runProcess('node', [MOCK_PATH, ...flags], 'hello');
-		expect(mock.exitCode).toBe(0);
-		expect(mock.stdout.length).toBeGreaterThan(0);
+	it(
+		'mock accepts same flags as real Claude without error',
+		async () => {
+			// Flags that ClaudeLauncher passes: --dangerously-skip-permissions --output-format stream-json --model <m> -p
+			const flags = [
+				'--dangerously-skip-permissions',
+				'--output-format',
+				'stream-json',
+				'--model',
+				'haiku',
+				'-p',
+			];
+			const mock = await runProcess('node', [MOCK_PATH, ...flags], 'hello');
+			expect(mock.exitCode).toBe(0);
+			expect(mock.stdout.length).toBeGreaterThan(0);
 
-		if (realClaudePath) {
-			const real = await runProcess(realClaudePath, flags, 'Say: hi');
-			// Real Claude may refuse some flags in test env but should not crash with code 2 (bad args)
-			expect(real.exitCode).not.toBe(2);
-		}
-	}, INTEGRATION_TIMEOUT);
+			if (realClaudePath) {
+				const real = await runProcess(realClaudePath, flags, 'Say: hi');
+				// Real Claude may refuse some flags in test env but should not crash with code 2 (bad args)
+				expect(real.exitCode).not.toBe(2);
+			}
+		},
+		INTEGRATION_TIMEOUT
+	);
 
-	it('mock exits non-zero on CLAUDE_MOCK_EXIT_CODE=1', async () => {
-		const mock = await runProcess('node', [MOCK_PATH, '-p'], 'hello', { CLAUDE_MOCK_EXIT_CODE: '1' });
-		expect(mock.exitCode).toBe(1);
-		// Should still emit a result:error event
-		const events = parseNdjson(mock.stdout);
-		const resultEvent = events.find(e => e['type'] === 'result');
-		expect(resultEvent).toBeDefined();
-		expect(resultEvent!['is_error']).toBe(true);
-	}, INTEGRATION_TIMEOUT);
+	it(
+		'mock exits non-zero on CLAUDE_MOCK_EXIT_CODE=1',
+		async () => {
+			const mock = await runProcess('node', [MOCK_PATH, '-p'], 'hello', { CLAUDE_MOCK_EXIT_CODE: '1' });
+			expect(mock.exitCode).toBe(1);
+			// Should still emit a result:error event
+			const events = parseNdjson(mock.stdout);
+			const resultEvent = events.find(e => e['type'] === 'result');
+			expect(resultEvent).toBeDefined();
+			expect(resultEvent!['is_error']).toBe(true);
+		},
+		INTEGRATION_TIMEOUT
+	);
 
 	// --- OUTPUT / NDJSON STRUCTURE TESTS ---
 
-	it('mock and real Claude emit the same required event types', async () => {
-		if (!realClaudePath) {
-			console.warn('Skipping real Claude check — not found on PATH');
-			return;
-		}
+	it(
+		'mock and real Claude emit the same required event types',
+		async () => {
+			if (!realClaudePath) {
+				console.warn('Skipping real Claude check — not found on PATH');
+				return;
+			}
 
-		const prompt = 'Say only: hello';
+			const prompt = 'Say only: hello';
 
-		const mockResult = await runProcess('node', [MOCK_PATH, '--output-format', 'stream-json', '-p'], prompt);
-		expect(mockResult.exitCode).toBe(0);
-		const mockEvents = parseNdjson(mockResult.stdout);
+			const mockResult = await runProcess('node', [MOCK_PATH, '--output-format', 'stream-json', '-p'], prompt);
+			expect(mockResult.exitCode).toBe(0);
+			const mockEvents = parseNdjson(mockResult.stdout);
 
-		const realResult = await runProcess(
-			realClaudePath,
-			['--dangerously-skip-permissions', '--output-format', 'stream-json', '-p'],
-			prompt
-		);
-		const realEvents = parseNdjson(realResult.stdout);
+			const realResult = await runProcess(
+				realClaudePath,
+				['--dangerously-skip-permissions', '--output-format', 'stream-json', '-p'],
+				prompt
+			);
+			const realEvents = parseNdjson(realResult.stdout);
 
-		// Required event types
-		for (const events of [mockEvents, realEvents]) {
-			const types = events.map(e => e['type']);
-			expect(types).toContain('system');
-			expect(types).toContain('assistant');
-			expect(types).toContain('result');
-		}
+			// Required event types
+			for (const events of [mockEvents, realEvents]) {
+				const types = events.map(e => e['type']);
+				expect(types).toContain('system');
+				expect(types).toContain('assistant');
+				expect(types).toContain('result');
+			}
 
-		// system:init required fields
-		const mockInit = mockEvents.find(e => e['type'] === 'system' && e['subtype'] === 'init');
-		const realInit = realEvents.find(e => e['type'] === 'system' && e['subtype'] === 'init');
-		for (const init of [mockInit, realInit]) {
-			expect(init).toBeDefined();
-			expect(typeof init!['session_id']).toBe('string');
-			expect(typeof init!['cwd']).toBe('string');
-		}
+			// system:init required fields
+			const mockInit = mockEvents.find(e => e['type'] === 'system' && e['subtype'] === 'init');
+			const realInit = realEvents.find(e => e['type'] === 'system' && e['subtype'] === 'init');
+			for (const init of [mockInit, realInit]) {
+				expect(init).toBeDefined();
+				expect(typeof init!['session_id']).toBe('string');
+				expect(typeof init!['cwd']).toBe('string');
+			}
 
-		// assistant event: content array with text block
-		const mockAssistant = mockEvents.find(e => e['type'] === 'assistant') as any;
-		const realAssistant = realEvents.find(e => e['type'] === 'assistant') as any;
-		for (const a of [mockAssistant, realAssistant]) {
-			expect(a).toBeDefined();
-			expect(Array.isArray(a.message?.content)).toBe(true);
-		}
+			// assistant event: content array with text block
+			const mockAssistant = mockEvents.find(e => e['type'] === 'assistant') as any;
+			const realAssistant = realEvents.find(e => e['type'] === 'assistant') as any;
+			for (const a of [mockAssistant, realAssistant]) {
+				expect(a).toBeDefined();
+				expect(Array.isArray(a.message?.content)).toBe(true);
+			}
 
-		// result event: required fields
-		const mockResultEvent = mockEvents.find(e => e['type'] === 'result') as any;
-		const realResultEvent = realEvents.find(e => e['type'] === 'result') as any;
-		for (const r of [mockResultEvent, realResultEvent]) {
-			expect(r).toBeDefined();
-			expect(typeof r['result']).toBe('string');
-			expect(typeof r['session_id']).toBe('string');
-			expect(typeof r['is_error']).toBe('boolean');
-			expect(typeof r['duration_ms']).toBe('number');
-		}
+			// result event: required fields
+			const mockResultEvent = mockEvents.find(e => e['type'] === 'result') as any;
+			const realResultEvent = realEvents.find(e => e['type'] === 'result') as any;
+			for (const r of [mockResultEvent, realResultEvent]) {
+				expect(r).toBeDefined();
+				expect(typeof r['result']).toBe('string');
+				expect(typeof r['session_id']).toBe('string');
+				expect(typeof r['is_error']).toBe('boolean');
+				expect(typeof r['duration_ms']).toBe('number');
+			}
 
-		// Store tested version
-		const version = currentClaudeVersion()!;
-		writeFileSync(
-			VERSION_FILE,
-			JSON.stringify({ testedVersion: version, testedAt: new Date().toISOString().slice(0, 10) }, null, 2)
-		);
-		console.log(`✓ Mock compatible with Claude ${version}`);
-	}, INTEGRATION_TIMEOUT);
+			// Store tested version
+			const version = currentClaudeVersion()!;
+			writeFileSync(
+				VERSION_FILE,
+				JSON.stringify({ testedVersion: version, testedAt: new Date().toISOString().slice(0, 10) }, null, 2)
+			);
+			console.log(`✓ Mock compatible with Claude ${version}`);
+		},
+		INTEGRATION_TIMEOUT
+	);
 
 	// --- VERSION STALENESS CHECK (always runs, warns only) ---
 
@@ -199,7 +227,9 @@ describe.skipIf(!shouldRunIntegration())('Claude real vs mock compatibility', ()
 			return;
 		}
 		if (stored !== current) {
-			console.warn(`⚠  Claude version changed: ${stored} → ${current}. Integration test will auto-run next session.`);
+			console.warn(
+				`⚠  Claude version changed: ${stored} → ${current}. Integration test will auto-run next session.`
+			);
 		} else {
 			console.log(`✓ Mock last verified against Claude ${stored}`);
 		}

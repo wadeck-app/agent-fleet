@@ -220,7 +220,15 @@ export class CommandHandler {
 		const assignable = (
 			resolvedGlobalEnv
 				? flow.steps.map((s: FlowStep) =>
-						s.type === 'script' ? { ...s, env: { ...resolvedGlobalEnv, ...((s as { env?: Record<string, string> }).env ?? {}) } } : s
+						s.type === 'script'
+							? {
+									...s,
+									env: {
+										...resolvedGlobalEnv,
+										...((s as { env?: Record<string, string> }).env ?? {}),
+									},
+								}
+							: s
 					)
 				: flow.steps
 		).filter((s: FlowStep): s is AssignableStep => s.type === 'model' || s.type === 'script');

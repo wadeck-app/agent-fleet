@@ -5,6 +5,7 @@
  * Handles parallel execution, loop logic, and output management.
  * Scheduling logic (dependency resolution, when:, retry, loop) is delegated to FlowScheduler.
  */
+import type { ApprovalProvider } from 'extension-points';
 import { v4 as uuidv4 } from 'uuid';
 
 import { FlowScheduler } from '../orchestration/FlowScheduler';
@@ -38,11 +39,14 @@ export class FlowOrchestrator {
 	private stepRunner: StepRunner;
 	private templateRenderer: TemplateRenderer;
 
-	constructor(stepRunner: StepRunner) {
+	constructor(stepRunner: StepRunner, approvalProvider?: ApprovalProvider) {
 		this.dagBuilder = new DAGBuilder();
 		this.dagValidator = new DAGValidator();
 		this.stepRunner = stepRunner;
 		this.templateRenderer = new TemplateRenderer();
+		if (approvalProvider) {
+			this.stepRunner.setApprovalProvider(approvalProvider);
+		}
 	}
 
 	/**
@@ -164,21 +168,16 @@ export class FlowOrchestrator {
 						resolvedGlobalEnv && rawStep.type === 'script'
 							? { ...rawStep, env: { ...resolvedGlobalEnv, ...(rawStep.env ?? {}) } }
 							: rawStep;
-					return this.stepRunner.executeStep(
-						step,
-						workspace,
-						context,
-						inProgressTrace => {
-							// Add or replace the in-progress trace for real-time visibility
-							const existingIndex = trace.steps.findIndex(t => t.stepId === inProgressTrace.stepId);
-							if (existingIndex >= 0) {
-								trace.steps[existingIndex] = inProgressTrace;
-							} else {
-								trace.steps.push(inProgressTrace);
-							}
-							onTraceUpdate?.(trace);
+					return this.stepRunner.executeStep(step, workspace, context, inProgressTrace => {
+						// Add or replace the in-progress trace for real-time visibility
+						const existingIndex = trace.steps.findIndex(t => t.stepId === inProgressTrace.stepId);
+						if (existingIndex >= 0) {
+							trace.steps[existingIndex] = inProgressTrace;
+						} else {
+							trace.steps.push(inProgressTrace);
 						}
-					);
+						onTraceUpdate?.(trace);
+					});
 				})
 			);
 

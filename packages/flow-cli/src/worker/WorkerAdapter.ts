@@ -52,7 +52,9 @@ export class WorkerAdapter {
 		const workspace: Workspace = {
 			id: `ws-${context.executionId}`,
 			path: context.workspaceDir,
-			metaDir: context.outputsDir ? context.outputsDir.replace(/[/\\]outputs$/, '') : context.workspaceDir + '.meta',
+			metaDir: context.outputsDir
+				? context.outputsDir.replace(/[/\\]outputs$/, '')
+				: context.workspaceDir + '.meta',
 			mode: 'manual',
 			concurrency: { key: context.executionId, activeTasks: new Set<string>(), locked: false },
 			createdAt: new Date().toISOString(),
@@ -67,7 +69,12 @@ export class WorkerAdapter {
 			stepOutputs: new Map(Object.entries(context.stepOutputs)),
 			stepMeta: new Map(Object.entries(context.stepMeta)) as unknown as Map<string, Record<string, unknown>>,
 			taskMetadata: {},
-			context: { cwd: context.cwd, projectDir: context.cwd, workspaceDir: context.workspaceDir, outputsDir: context.outputsDir },
+			context: {
+				cwd: context.cwd,
+				projectDir: context.cwd,
+				workspaceDir: context.workspaceDir,
+				outputsDir: context.outputsDir,
+			},
 		};
 
 		// For model steps, wire up the MCP server for provideSteps injection
@@ -81,6 +88,8 @@ export class WorkerAdapter {
 
 			// Create a runner with MCP config path baked into the factory call
 			const runner = this.stepRunnerFactory(mcpConfigPath);
+			// Wire onInjectSteps for XML <tool_call> provideSteps pattern
+			runner.setOnInjectSteps(steps => onInjectSteps(steps as InjectedStep[]));
 
 			try {
 				// Notify user that the model step has started (before Claude CLI launches)
@@ -105,16 +114,29 @@ export class WorkerAdapter {
 						? undefined
 						: (entry: import('flow-engine/types').LiveLogEntry) => {
 								if (entry.eventType === 'assistant_text') {
-									sendMessage({ type: 'log', executionId: context.executionId, stepId: step.id, entry });
+									sendMessage({
+										type: 'log',
+										executionId: context.executionId,
+										stepId: step.id,
+										entry,
+									});
 									return;
 								}
 								if (entry.eventType === 'tool_use' && (toolLog === 'name' || toolLog === 'full')) {
 									const base = `→ ${entry.message}`;
 									const displayEntry = {
 										...entry,
-										message: toolLog === 'name' ? base.slice(0, 120) + (base.length > 120 ? '…' : '') : base,
+										message:
+											toolLog === 'name'
+												? base.slice(0, 120) + (base.length > 120 ? '…' : '')
+												: base,
 									};
-									sendMessage({ type: 'log', executionId: context.executionId, stepId: step.id, entry: displayEntry });
+									sendMessage({
+										type: 'log',
+										executionId: context.executionId,
+										stepId: step.id,
+										entry: displayEntry,
+									});
 									return;
 								}
 								if (entry.eventType === 'tool_result' && toolLog === 'full') {

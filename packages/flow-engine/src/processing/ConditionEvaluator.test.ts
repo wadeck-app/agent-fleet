@@ -27,9 +27,9 @@ describe('ConditionEvaluator', () => {
 			const context = {
 				outputs: { counter: { count: 10 } },
 			};
-			expect(evaluator.evaluate("outputs.counter.count > 5", context, 'test-step')).toBe(true);
-			expect(evaluator.evaluate("outputs.counter.count < 5", context, 'test-step')).toBe(false);
-			expect(evaluator.evaluate("outputs.counter.count >= 10", context, 'test-step')).toBe(true);
+			expect(evaluator.evaluate('outputs.counter.count > 5', context, 'test-step')).toBe(true);
+			expect(evaluator.evaluate('outputs.counter.count < 5', context, 'test-step')).toBe(false);
+			expect(evaluator.evaluate('outputs.counter.count >= 10', context, 'test-step')).toBe(true);
 		});
 	});
 
@@ -113,7 +113,7 @@ describe('ConditionEvaluator', () => {
 	describe('Error handling', () => {
 		it('throws on non-boolean result', () => {
 			const context = { outputs: { s: { value: 'test' } } };
-			expect(() => evaluator.evaluate("outputs.s.value", context, 'test-step')).toThrow();
+			expect(() => evaluator.evaluate('outputs.s.value', context, 'test-step')).toThrow();
 		});
 
 		it('throws on syntax error', () => {

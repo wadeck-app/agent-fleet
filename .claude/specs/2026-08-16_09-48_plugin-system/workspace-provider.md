@@ -12,9 +12,9 @@ The CLI never sees the underlying mechanism (cwd, worktree, container) -- only t
 
 ## Decisions
 
-| # | Decision | Rationale | Date |
-|---|---|---|---|
-| 4 | Lifecycle model: allocate / release (Option A) | none implements trivially; worktree needs cleanup; extensible to docker/remote | 2026-08-16 |
+| #   | Decision                                       | Rationale                                                                      | Date       |
+| --- | ---------------------------------------------- | ------------------------------------------------------------------------------ | ---------- |
+| 4   | Lifecycle model: allocate / release (Option A) | none implements trivially; worktree needs cleanup; extensible to docker/remote | 2026-08-16 |
 
 ## Interface (workspace/v1.ts)
 
@@ -22,18 +22,18 @@ The CLI never sees the underlying mechanism (cwd, worktree, container) -- only t
 // packages/extension-points/src/workspace/v1.ts
 
 export interface WorkspaceProvider {
-  allocate(request: WorkspaceRequest): Promise<WorkspaceHandle>;
-  release(handle: WorkspaceHandle): Promise<void>;
+	allocate(request: WorkspaceRequest): Promise<WorkspaceHandle>;
+	release(handle: WorkspaceHandle): Promise<void>;
 }
 
 export interface WorkspaceRequest {
-  taskId: string;
-  hint?: string;   // suggested name prefix
+	taskId: string;
+	hint?: string; // suggested name prefix
 }
 
 export interface WorkspaceHandle {
-  path: string;    // absolute path to the allocated working directory
-  id: string;      // opaque identifier used by release()
+	path: string; // absolute path to the allocated working directory
+	id: string; // opaque identifier used by release()
 }
 ```
 
@@ -41,9 +41,10 @@ export interface WorkspaceHandle {
 Failure to release = leaked workspace (worktrees accumulate, containers left running, etc.).
 
 **`release()` failure contract:** If `release()` rejects:
+
 - If no prior flow error exists: propagate the release error as the run error.
 - If a prior flow error exists: log the release error as a warning and propagate the original flow error.
-A leaked workspace (release failed) must always be logged as a warning regardless.
+  A leaked workspace (release failed) must always be logged as a warning regardless.
 
 ---
 
@@ -55,21 +56,22 @@ Used when: no isolation is needed, the task runs directly in the project folder.
 ```typescript
 // SAMPLE -- packages/plugin-none/src/NoneWorkspaceProvider.ts
 export const noneWorkspaceProvider: WorkspaceProvider = {
-  async allocate(request) {
-    return { path: process.cwd(), id: `none:${request.taskId}` };
-  },
-  async release(_handle) {
-    // no-op
-  },
+	async allocate(request) {
+		return { path: process.cwd(), id: `none:${request.taskId}` };
+	},
+	async release(_handle) {
+		// no-op
+	},
 };
 ```
 
 Global config example:
+
 ```yaml
 plugins:
-  instances:
-    no-isolation:
-      type: plugins.none.default
+    instances:
+        no-isolation:
+            type: plugins.none.default
 ```
 
 ---
@@ -80,6 +82,7 @@ Creates a `git worktree` for each task. The worktree is a separate checkout of t
 On release, the worktree is removed.
 
 Options:
+
 - `baseDir` -- where worktrees are created (e.g. `~/workspaces` or `./.worktrees`)
 - `prefix` -- name prefix for the worktree folder
 - `branchStrategy` -- `"new-branch"` only in v1 (task gets its own branch); `"detached"` and other strategies are v2+
@@ -87,34 +90,35 @@ Options:
 ```typescript
 // SAMPLE -- packages/plugin-worktree/src/WorktreeWorkspaceProvider.ts
 export function createWorktreeProvider(options: WorktreeOptions): WorkspaceProvider {
-  return {
-    async allocate(request) {
-      const name = `${options.prefix ?? ""}${request.taskId}`;
-      const worktreePath = path.join(resolveBaseDir(options.baseDir), name);
-      // validateBaseDir(options.baseDir)                     -- required by PLUGIN-010
-      // validateWorkspacePath(request.taskId, resolvedBase)  -- required by PLUGIN-009
-      // validateTaskIdForBranchName(request.taskId)          -- required by PLUGIN-009 (branch strategy)
-      // validateBranchNamePrefix(options.prefix)             -- required by PLUGIN-009 (prefix validation)
-      // git worktree add -b <branchName> <worktreePath>      -- array-argument API, no shell interpolation
-      return { path: worktreePath, id: `worktree:${worktreePath}` };
-    },
-    async release(handle) {
-      // git worktree remove <path> --force
-    },
-  };
+	return {
+		async allocate(request) {
+			const name = `${options.prefix ?? ''}${request.taskId}`;
+			const worktreePath = path.join(resolveBaseDir(options.baseDir), name);
+			// validateBaseDir(options.baseDir)                     -- required by PLUGIN-010
+			// validateWorkspacePath(request.taskId, resolvedBase)  -- required by PLUGIN-009
+			// validateTaskIdForBranchName(request.taskId)          -- required by PLUGIN-009 (branch strategy)
+			// validateBranchNamePrefix(options.prefix)             -- required by PLUGIN-009 (prefix validation)
+			// git worktree add -b <branchName> <worktreePath>      -- array-argument API, no shell interpolation
+			return { path: worktreePath, id: `worktree:${worktreePath}` };
+		},
+		async release(handle) {
+			// git worktree remove <path> --force
+		},
+	};
 }
 ```
 
 Global config example:
+
 ```yaml
 plugins:
-  instances:
-    my-worktree:
-      type: plugins.worktree.default
-      options:
-        baseDir: ~/workspaces
-        prefix: myproject-
-        branchStrategy: new-branch  # default and only supported strategy in v1
+    instances:
+        my-worktree:
+            type: plugins.worktree.default
+            options:
+                baseDir: ~/workspaces
+                prefix: myproject-
+                branchStrategy: new-branch # default and only supported strategy in v1
 ```
 
 ---
@@ -130,15 +134,16 @@ The existing `workspace.mode`, `workspace.gitStrategy`, and `workspace.reusePoli
 **superseded** by the plugin system and removed from the flow YAML schema.
 
 Their replacement:
+
 ```yaml
 # flow YAML -- normal case: inherits workspace provider from global config
 # (no workspace: section needed)
 
 # flow YAML -- explicit override (rare), using the instance name from global config
 workspace:
-  use: my-worktree
-  options:
-    prefix: myflow-
+    use: my-worktree
+    options:
+        prefix: myflow-
 ```
 
 Behaviors like "reuse workspace when possible" or "only run on feature branches" are v2+ plugin
@@ -147,6 +152,7 @@ wrapper concerns -- no TODO, not designed yet.
 ### Config precedence for workspace
 
 Resolution order (highest to lowest):
+
 1. Flow YAML `workspace:` section (per-flow override, rare)
 2. Project config `plugins.workspace:` (project default)
 

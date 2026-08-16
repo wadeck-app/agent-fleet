@@ -35,6 +35,7 @@ The `pluginId` field in the manifest must equal the `<id>` part of the `packages
 ### PLUGIN-003: Every declared implementation must be resolvable
 
 For each implementation declared in the manifest:
+
 - **TS manifest (`plugin.config.ts`):** the `provider` export must exist and TypeScript must accept it as satisfying the interface type for the declared `version` integer. This is enforced by the build (tsc), so the violation rule checks that the build succeeds without errors.
 - **JSON manifest:** `entrypoint` file must exist and `export` must be a named export of that file.
 
@@ -99,6 +100,7 @@ The manifest must not contain any `${...}` patterns or values matching known sen
 ### PLUGIN-009: Workspace providers must use SDK path validation for taskId
 
 Any plugin implementing the `workspace` extension point must validate the `taskId` parameter before using it in filesystem path construction. The validation must:
+
 1. Reject any `taskId` containing `/`, `\`, or `..` segments.
 2. Assert the fully resolved workspace path starts with the fully resolved `baseDir`.
 

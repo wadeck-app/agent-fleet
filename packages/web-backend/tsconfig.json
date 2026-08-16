@@ -16,7 +16,9 @@
 			"shared-common": ["../shared-common/src"],
 			"shared-common/*": ["../shared-common/src/*"],
 			"shared-orch-worker": ["../shared-orch-worker/src"],
-			"shared-orch-worker/*": ["../shared-orch-worker/src/*"]
+			"shared-orch-worker/*": ["../shared-orch-worker/src/*"],
+			"extension-points/workspace/v1": ["../extension-points/src/workspace/v1"],
+			"extension-points/approval/v1": ["../extension-points/src/approval/v1"]
 			//			"@/*": ["./src/*"]
 		}
 	},
@@ -27,6 +29,7 @@
 		{ "path": "../shared-frontend-backend" },
 		{ "path": "../shared-orch-worker" },
 		{ "path": "../flow-engine" },
-		{ "path": "../shared-common" }
+		{ "path": "../shared-common" },
+		{ "path": "../extension-points" }
 	]
 }

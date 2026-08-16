@@ -12,13 +12,14 @@ It does NOT contain credentials or runtime config -- those live in the global/pr
 
 ## Decisions
 
-| # | Decision | Rationale | Date |
-|---|---|---|---|
-| 3a | Hybrid manifest: plugin.config.ts (primary) OR plugin.manifest.json (fallback) | TS is type-safe and enables direct function refs; JSON supports non-JS plugins and wrapped/remote plugins. Both must follow the same schema. | 2026-08-16 |
+| #   | Decision                                                                       | Rationale                                                                                                                                    | Date       |
+| --- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| 3a  | Hybrid manifest: plugin.config.ts (primary) OR plugin.manifest.json (fallback) | TS is type-safe and enables direct function refs; JSON supports non-JS plugins and wrapped/remote plugins. Both must follow the same schema. | 2026-08-16 |
 
 ## Manifest file resolution
 
 The CLI looks for, in order:
+
 1. `plugin.config.ts` (compiled to `plugin.config.js` in `dist/`) -- primary
 2. `plugin.manifest.json` at package root -- fallback (non-JS plugins, wrappers)
 
@@ -30,47 +31,50 @@ If neither is found, the plugin fails to load with an explicit error.
 ```typescript
 // @flow/plugin-sdk -- PluginManifest type
 interface PluginManifest {
-  pluginId: string;              // must match "plugin-<pluginId>" package name
-  manifestVersion: "1";          // bumped when the manifest schema itself changes (rare)
-  implementations: {
-    [extensionPoint: string]: {  // e.g. "workspace", "tasks", "secrets"
-      [implName: string]: PluginImplementation;  // e.g. "public", "private", "default"
-    };
-  };
+	pluginId: string; // must match "plugin-<pluginId>" package name
+	manifestVersion: '1'; // bumped when the manifest schema itself changes (rare)
+	implementations: {
+		[extensionPoint: string]: {
+			// e.g. "workspace", "tasks", "secrets"
+			[implName: string]: PluginImplementation; // e.g. "public", "private", "default"
+		};
+	};
 }
 
 interface PluginImplementation {
-  version: number;               // interface version: 1, 2, 3...
-                                 // determines which TypeScript type from @flow/extension-points applies
-  // TS manifest only:
-  provider?: (options: unknown) => unknown;  // factory function: receives merged options, returns provider instance
-                                              // zero-option providers use: () => provider
-                                              // Type safety note: this field is intentionally (options: unknown) => unknown
-                                              // to be extension-point-agnostic. Build-time enforcement happens at the
-                                              // call site in the plugin source:
-                                              //   import type { WorkspaceProvider } from "@flow/extension-points/workspace/v1";
-                                              //   const myProvider: WorkspaceProvider = createMyProvider; // tsc catches mismatches
-                                              //   export const manifest = { ..., provider: myProvider };
-                                              // PLUGIN-003 verifies tsc --noEmit passes for the plugin package as a whole.
-  // JSON manifest only (or TS fallback):
-  entrypoint?: string;           // relative path to compiled JS, e.g. "./dist/public.js"
-  export?: string;               // named export, e.g. "taskProvider"
-  sensitiveFields?: string[];    // additional sensitive option field names beyond the baseline in @flow/plugin-sdk
-                                 // merged with baseline during PLUGIN-007 validation; cannot remove baseline entries
+	version: number; // interface version: 1, 2, 3...
+	// determines which TypeScript type from @flow/extension-points applies
+	// TS manifest only:
+	provider?: (options: unknown) => unknown; // factory function: receives merged options, returns provider instance
+	// zero-option providers use: () => provider
+	// Type safety note: this field is intentionally (options: unknown) => unknown
+	// to be extension-point-agnostic. Build-time enforcement happens at the
+	// call site in the plugin source:
+	//   import type { WorkspaceProvider } from "@flow/extension-points/workspace/v1";
+	//   const myProvider: WorkspaceProvider = createMyProvider; // tsc catches mismatches
+	//   export const manifest = { ..., provider: myProvider };
+	// PLUGIN-003 verifies tsc --noEmit passes for the plugin package as a whole.
+	// JSON manifest only (or TS fallback):
+	entrypoint?: string; // relative path to compiled JS, e.g. "./dist/public.js"
+	export?: string; // named export, e.g. "taskProvider"
+	sensitiveFields?: string[]; // additional sensitive option field names beyond the baseline in @flow/plugin-sdk
+	// merged with baseline during PLUGIN-007 validation; cannot remove baseline entries
 }
 ```
 
 **Version encoding rationale:**
+
 - `version` is a plain integer -- no string parsing, no combined `"tasks@1"` format.
 - The extension point is already known from its position as the parent key in `implementations`.
 - Extension point name + version together identify the exact TypeScript interface to use.
 
 **How version ties build-time to runtime:**
+
 - Build time: plugin imports the specific versioned type from `@flow/extension-points`:
-  ```typescript
-  import type { TaskProvider } from "@flow/extension-points/tasks/v1";
-  ```
-  TypeScript enforces the contract at compile time.
+    ```typescript
+    import type { TaskProvider } from '@flow/extension-points/tasks/v1';
+    ```
+    TypeScript enforces the contract at compile time.
 - Runtime: CLI reads `version: 1` from the manifest and selects the matching adapter/validator internally.
 - **No bijection between package version and interface version.** A single release of `@flow/extension-points` can expose v1 AND v2 of the same extension point simultaneously. A plugin pins its import to the version it was written against; the package version is irrelevant. Enforced by PLUGIN-005 (version declared in manifest must be a version the CLI knows how to handle).
 
@@ -79,11 +83,13 @@ interface PluginImplementation {
 Extension point interfaces live in a dedicated package: **`packages/extension-points`** (published as `@flow/extension-points`).
 
 **Why a dedicated package:**
+
 - Separates the interface contract from both the CLI implementation and the plugin implementations.
 - The CLI, the plugin-sdk, and all plugins depend on `@flow/extension-points` -- none of them own it.
 - Package version and interface versions are independent: bumping the package does not imply bumping an interface version, and a new interface version can be added without breaking existing ones.
 
 **Package structure:**
+
 ```
 packages/extension-points/
   extension-points.json   -- canonical registry: IDs, descriptions, supported versions, status
@@ -110,12 +116,14 @@ packages/extension-points/
 ```
 
 **What is and is NOT generated from `extension-points.json`:**
+
 - The JSON registry is the source of truth for: valid extension point IDs, supported version numbers per ID, descriptions, status (stable/deprecated).
 - PLUGIN-004 reads this JSON at lint time to validate that a plugin manifest only references known IDs and known versions.
 - The `ExtensionPointId` union type (`"workspace" | "tasks" | ...`) can optionally be generated from the JSON -- but it is just a list of strings and can equally be written by hand in sync.
 - **The TypeScript interfaces themselves (`WorkspaceProvider`, `TaskProvider`, etc.) are ALWAYS hand-written.** They are never generated. The JSON does not describe the interface shape -- only its existence and version numbers.
 
 **Import convention for plugin authors:**
+
 ```typescript
 // Pin to a specific version (recommended for plugins):
 import type { TaskProvider } from "@flow/extension-points/tasks/v1";
@@ -128,19 +136,20 @@ import type { TaskProvider } from "@flow/extension-points";
 
 ```typescript
 // packages/plugin-jira/plugin.config.ts
-import type { PluginManifest } from "@flow/plugin-sdk";
-import { publicTaskProvider } from "./src/PublicTaskProvider";
-import { privateTaskProvider } from "./src/PrivateTaskProvider";
+import type { PluginManifest } from '@flow/plugin-sdk';
+
+import { privateTaskProvider } from './src/PrivateTaskProvider';
+import { publicTaskProvider } from './src/PublicTaskProvider';
 
 export const manifest: PluginManifest = {
-  pluginId: "jira",
-  manifestVersion: "1",
-  implementations: {
-    tasks: {
-      public:  { version: 1, provider: publicTaskProvider },
-      private: { version: 1, provider: privateTaskProvider },
-    }
-  }
+	pluginId: 'jira',
+	manifestVersion: '1',
+	implementations: {
+		tasks: {
+			public: { version: 1, provider: publicTaskProvider },
+			private: { version: 1, provider: privateTaskProvider },
+		},
+	},
 };
 ```
 
@@ -152,22 +161,22 @@ permissive. PLUGIN-003 verifies `tsc --noEmit` passes for the plugin package as 
 
 ```json
 {
-  "pluginId": "jira",
-  "manifestVersion": "1",
-  "implementations": {
-    "tasks": {
-      "public": {
-        "version": 1,
-        "entrypoint": "./dist/public.js",
-        "export": "taskProvider"
-      },
-      "private": {
-        "version": 1,
-        "entrypoint": "./dist/private.js",
-        "export": "taskProvider"
-      }
-    }
-  }
+	"pluginId": "jira",
+	"manifestVersion": "1",
+	"implementations": {
+		"tasks": {
+			"public": {
+				"version": 1,
+				"entrypoint": "./dist/public.js",
+				"export": "taskProvider"
+			},
+			"private": {
+				"version": 1,
+				"entrypoint": "./dist/private.js",
+				"export": "taskProvider"
+			}
+		}
+	}
 }
 ```
 
@@ -176,10 +185,13 @@ For JSON manifests, validation at CLI startup covers entrypoint file existence a
 ## Naming convention in config
 
 A plugin implementation is referenced in config as:
+
 ```
 plugins.<pluginId>.<implementationName>
 ```
+
 Examples:
+
 - `plugins.jira.public`
 - `plugins.jira.private`
 - `plugins.worktree.default`

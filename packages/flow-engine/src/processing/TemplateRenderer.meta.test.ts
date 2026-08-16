@@ -17,7 +17,19 @@ describe('TemplateRenderer - steps.X.meta', () => {
 
 	it('resolves steps.draft.meta.session_id', () => {
 		const ctx = makeContext(
-			new Map([['draft', { session_id: 'sess-abc', duration_ms: 1000, model: 'haiku', session_file: '', ttft_ms: 500, cost: { input_tokens: 10, output_tokens: 5, usd: 0.001 } }]])
+			new Map([
+				[
+					'draft',
+					{
+						session_id: 'sess-abc',
+						duration_ms: 1000,
+						model: 'haiku',
+						session_file: '',
+						ttft_ms: 500,
+						cost: { input_tokens: 10, output_tokens: 5, usd: 0.001 },
+					},
+				],
+			])
 		);
 		const result = renderer.render('${{ steps.draft.meta.session_id }}', ctx);
 		expect(result).toBe('sess-abc');
@@ -25,16 +37,26 @@ describe('TemplateRenderer - steps.X.meta', () => {
 
 	it('resolves steps.draft.meta.cost.usd', () => {
 		const ctx = makeContext(
-			new Map([['draft', { session_id: 'x', duration_ms: 1000, model: 'haiku', session_file: '', ttft_ms: 0, cost: { input_tokens: 10, output_tokens: 5, usd: 0.0025 } }]])
+			new Map([
+				[
+					'draft',
+					{
+						session_id: 'x',
+						duration_ms: 1000,
+						model: 'haiku',
+						session_file: '',
+						ttft_ms: 0,
+						cost: { input_tokens: 10, output_tokens: 5, usd: 0.0025 },
+					},
+				],
+			])
 		);
 		const result = renderer.render('${{ steps.draft.meta.cost.usd }}', ctx);
 		expect(result).toBe('0.0025');
 	});
 
 	it('resolves steps.script.meta.exit_code', () => {
-		const ctx = makeContext(
-			new Map([['script', { exit_code: 0, duration_ms: 50 }]])
-		);
+		const ctx = makeContext(new Map([['script', { exit_code: 0, duration_ms: 50 }]]));
 		const result = renderer.render('${{ steps.script.meta.exit_code }}', ctx);
 		expect(result).toBe('0');
 	});

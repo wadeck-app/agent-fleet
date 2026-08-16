@@ -354,7 +354,8 @@ export class SimulationValidator {
 				suggestion: `Valid forms: \${{ inputs.name }}, \${{ steps.step-id.outputs.varName }}, \${{ steps.step-id.meta.session_id }}, \${{ flow.allLogs }}, \${{ task.priority }}, \${{ context.cwd }}`,
 				context: {
 					actual: expression,
-					expected: 'inputs.<id> | steps.<id>.outputs.<id> | steps.<id>.meta.<field> | flow.<id> | task.<id> | context.<id>',
+					expected:
+						'inputs.<id> | steps.<id>.outputs.<id> | steps.<id>.meta.<field> | flow.<id> | task.<id> | context.<id>',
 				},
 			});
 			return;

@@ -224,7 +224,11 @@ describe('StepRunner', () => {
 
 			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('test');
 			vi.mocked(ScriptExecutor.prototype.execute).mockResolvedValue({
-				success: false, exitCode: 1, stdout: 'attempt output', stderr: '', durationMs: 10,
+				success: false,
+				exitCode: 1,
+				stdout: 'attempt output',
+				stderr: '',
+				durationMs: 10,
 			});
 			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({});
 
@@ -247,7 +251,11 @@ describe('StepRunner', () => {
 
 			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('test');
 			vi.mocked(ScriptExecutor.prototype.execute).mockResolvedValue({
-				success: false, exitCode: 1, stdout: '', stderr: 'Persistent error', durationMs: 10,
+				success: false,
+				exitCode: 1,
+				stdout: '',
+				stderr: 'Persistent error',
+				durationMs: 10,
 			});
 			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({});
 
@@ -906,7 +914,11 @@ describe('StepRunner', () => {
 
 			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('exit 1');
 			vi.mocked(ScriptExecutor.prototype.execute).mockResolvedValue({
-				success: false, exitCode: 1, stdout: 'attempt output', stderr: '', durationMs: 50,
+				success: false,
+				exitCode: 1,
+				stdout: 'attempt output',
+				stderr: '',
+				durationMs: 50,
 			});
 			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({});
 
@@ -928,7 +940,11 @@ describe('StepRunner', () => {
 
 			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('exit 1');
 			vi.mocked(ScriptExecutor.prototype.execute).mockResolvedValue({
-				success: false, exitCode: 1, stdout: '', stderr: '', durationMs: 50,
+				success: false,
+				exitCode: 1,
+				stdout: '',
+				stderr: '',
+				durationMs: 50,
 			});
 			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({});
 
@@ -949,7 +965,11 @@ describe('StepRunner', () => {
 
 			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('echo hi');
 			vi.mocked(ScriptExecutor.prototype.execute).mockResolvedValue({
-				success: true, exitCode: 0, stdout: 'hi', stderr: '', durationMs: 50,
+				success: true,
+				exitCode: 0,
+				stdout: 'hi',
+				stderr: '',
+				durationMs: 50,
 			});
 			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({});
 
@@ -972,13 +992,27 @@ describe('StepRunner', () => {
 			const wsWithDir = { ...testWorkspace, path: workspaceDir, metaDir };
 
 			const step: ScriptFlowStep = {
-				id: 'write-step', name: 'Write Step', type: 'script', script: 'echo hello',
+				id: 'write-step',
+				name: 'Write Step',
+				type: 'script',
+				script: 'echo hello',
 				output: { response: { type: 'string', writeOutput: 'response.txt' } },
 			};
-			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {}, context: { cwd: workspaceDir, outputsDir: path.join(metaDir, 'outputs') } };
+			const context = {
+				inputs: {},
+				stepOutputs: new Map(),
+				taskMetadata: {},
+				context: { cwd: workspaceDir, outputsDir: path.join(metaDir, 'outputs') },
+			};
 
 			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('echo hello');
-			vi.mocked(ScriptExecutor.prototype.execute).mockResolvedValue({ success: true, exitCode: 0, stdout: 'hello', stderr: '', durationMs: 10 });
+			vi.mocked(ScriptExecutor.prototype.execute).mockResolvedValue({
+				success: true,
+				exitCode: 0,
+				stdout: 'hello',
+				stderr: '',
+				durationMs: 10,
+			});
 			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({ response: 'Line 1\nLine 2' });
 
 			await runner.executeStep(step, wsWithDir, context);
@@ -1007,11 +1041,20 @@ describe('StepRunner', () => {
 					response: { type: 'string', writeOutput: 'response.txt' },
 				},
 			};
-			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {}, context: { cwd: workspaceDir, outputsDir: path.join(metaDir, 'outputs') } };
+			const context = {
+				inputs: {},
+				stepOutputs: new Map(),
+				taskMetadata: {},
+				context: { cwd: workspaceDir, outputsDir: path.join(metaDir, 'outputs') },
+			};
 
 			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('echo hello');
 			vi.mocked(ScriptExecutor.prototype.execute).mockResolvedValue({
-				success: true, exitCode: 0, stdout: 'hello', stderr: '', durationMs: 10,
+				success: true,
+				exitCode: 0,
+				stdout: 'hello',
+				stderr: '',
+				durationMs: 10,
 			});
 			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({
 				response: 'Line 1\nLine 2\nLine 3',
@@ -1043,7 +1086,11 @@ describe('StepRunner', () => {
 
 			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('echo hi');
 			vi.mocked(ScriptExecutor.prototype.execute).mockResolvedValue({
-				success: true, exitCode: 0, stdout: 'hi', stderr: '', durationMs: 10,
+				success: true,
+				exitCode: 0,
+				stdout: 'hi',
+				stderr: '',
+				durationMs: 10,
 			});
 			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({ response: 'hi' });
 
@@ -1096,8 +1143,21 @@ describe('StepRunner', () => {
 			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async opts => {
 				// Simulate stream events: system:init with session_id and result with cost
 				if (opts.onStreamEvent) {
-					opts.onStreamEvent({ type: 'system', subtype: 'init', data: { session_id: 'sess-abc123', model: 'haiku' } } as any);
-					opts.onStreamEvent({ type: 'result', subtype: 'result', data: { result: 'hi', cost_usd: 0.001, duration_ms: 1500, modelUsage: { 'haiku': { inputTokens: 10, outputTokens: 5 } } } } as any);
+					opts.onStreamEvent({
+						type: 'system',
+						subtype: 'init',
+						data: { session_id: 'sess-abc123', model: 'haiku' },
+					} as any);
+					opts.onStreamEvent({
+						type: 'result',
+						subtype: 'result',
+						data: {
+							result: 'hi',
+							cost_usd: 0.001,
+							duration_ms: 1500,
+							modelUsage: { haiku: { inputTokens: 10, outputTokens: 5 } },
+						},
+					} as any);
 				}
 				return { stdout: 'hi', stderr: '', exitCode: 0 };
 			});
@@ -1127,14 +1187,19 @@ describe('StepRunner', () => {
 			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async opts => {
 				if (opts.onStreamEvent) {
 					opts.onStreamEvent({
-						type: 'system', subtype: 'init',
+						type: 'system',
+						subtype: 'init',
 						data: {
 							session_id: 'sess-xyz',
 							model: 'haiku',
 							memory_paths: { auto: '/home/user/.claude/projects/my-project/memory/' },
 						},
 					} as any);
-					opts.onStreamEvent({ type: 'result', subtype: 'result', data: { result: 'hi', cost_usd: 0, duration_ms: 100, modelUsage: {} } } as any);
+					opts.onStreamEvent({
+						type: 'result',
+						subtype: 'result',
+						data: { result: 'hi', cost_usd: 0, duration_ms: 100, modelUsage: {} },
+					} as any);
 				}
 				return { stdout: 'hi', stderr: '', exitCode: 0 };
 			});
@@ -1170,7 +1235,17 @@ describe('StepRunner', () => {
 			};
 
 			const stepMetaMap = new Map([
-				['prev', { session_id: parentSessionId, session_file: parentFile, duration_ms: 100, model: 'haiku', ttft_ms: 0, cost: { input_tokens: 1, output_tokens: 1, usd: 0 } }],
+				[
+					'prev',
+					{
+						session_id: parentSessionId,
+						session_file: parentFile,
+						duration_ms: 100,
+						model: 'haiku',
+						ttft_ms: 0,
+						cost: { input_tokens: 1, output_tokens: 1, usd: 0 },
+					},
+				],
 			]);
 			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {}, stepMeta: stepMetaMap };
 			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('Continue.');
@@ -1179,8 +1254,16 @@ describe('StepRunner', () => {
 			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async opts => {
 				capturedResumeId = (opts as any).resumeSessionId;
 				if (opts.onStreamEvent) {
-					opts.onStreamEvent({ type: 'system', subtype: 'init', data: { session_id: capturedResumeId ?? 'fork-id', model: 'haiku' } } as any);
-					opts.onStreamEvent({ type: 'result', subtype: 'result', data: { result: 'ok', cost_usd: 0, duration_ms: 100, modelUsage: {} } } as any);
+					opts.onStreamEvent({
+						type: 'system',
+						subtype: 'init',
+						data: { session_id: capturedResumeId ?? 'fork-id', model: 'haiku' },
+					} as any);
+					opts.onStreamEvent({
+						type: 'result',
+						subtype: 'result',
+						data: { result: 'ok', cost_usd: 0, duration_ms: 100, modelUsage: {} },
+					} as any);
 				}
 				return { stdout: 'ok', stderr: '', exitCode: 0 };
 			});
@@ -1206,7 +1289,17 @@ describe('StepRunner', () => {
 			};
 
 			const stepMetaMap = new Map([
-				['prev', { session_id: 'parent-id', session_file: '', duration_ms: 100, model: 'haiku', ttft_ms: 0, cost: { input_tokens: 1, output_tokens: 1, usd: 0 } }],
+				[
+					'prev',
+					{
+						session_id: 'parent-id',
+						session_file: '',
+						duration_ms: 100,
+						model: 'haiku',
+						ttft_ms: 0,
+						cost: { input_tokens: 1, output_tokens: 1, usd: 0 },
+					},
+				],
 			]);
 			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {}, stepMeta: stepMetaMap };
 			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('Continue.');
@@ -1215,8 +1308,16 @@ describe('StepRunner', () => {
 			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async opts => {
 				capturedResumeId = (opts as any).resumeSessionId;
 				if (opts.onStreamEvent) {
-					opts.onStreamEvent({ type: 'system', subtype: 'init', data: { session_id: 'new-id', model: 'haiku' } } as any);
-					opts.onStreamEvent({ type: 'result', subtype: 'result', data: { result: 'ok', cost_usd: 0, duration_ms: 100, modelUsage: {} } } as any);
+					opts.onStreamEvent({
+						type: 'system',
+						subtype: 'init',
+						data: { session_id: 'new-id', model: 'haiku' },
+					} as any);
+					opts.onStreamEvent({
+						type: 'result',
+						subtype: 'result',
+						data: { result: 'ok', cost_usd: 0, duration_ms: 100, modelUsage: {} },
+					} as any);
 				}
 				return { stdout: 'ok', stderr: '', exitCode: 0 };
 			});

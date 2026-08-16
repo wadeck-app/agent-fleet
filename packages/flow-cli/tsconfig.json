@@ -7,6 +7,7 @@
 		"types": ["vitest/globals", "node"],
 		"baseUrl": ".",
 		"paths": {
+			"extension-points": ["../extension-points/src/index"],
 			"flow-engine": ["../flow-engine/src"],
 			"flow-engine/*": ["../flow-engine/src/*"],
 			"shared-common": ["../shared-common/src"],
@@ -14,5 +15,5 @@
 		}
 	},
 	"include": ["src"],
-	"references": [{ "path": "../flow-engine" }, { "path": "../shared-common" }]
+	"references": [{ "path": "../extension-points" }, { "path": "../flow-engine" }, { "path": "../shared-common" }]
 }

@@ -26,6 +26,7 @@ export function loadYaml(file: string): unknown {
 		}
 		return raw;
 	} catch (err) {
+		// violations-suppress: security/no-raw-err-in-cli YAML parse errors are user-actionable; err.message shows syntax location
 		console.error(`Failed to parse YAML: ${err instanceof Error ? err.message : String(err)}`);
 		process.exit(1);
 	}

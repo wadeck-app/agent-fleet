@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { createRequire } from 'module';
 
 import { registerDocsCommand } from './commands/DocsCommand';
+import { registerHistoryCommand } from './commands/HistoryCommand';
 import { registerRunCommand } from './commands/RunCommand';
 import { registerShowCommand } from './commands/ShowCommand';
 import { registerValidateCommand } from './commands/ValidateCommand';
@@ -18,5 +19,6 @@ registerDocsCommand(program);
 registerShowCommand(program);
 registerValidateCommand(program);
 registerRunCommand(program);
+registerHistoryCommand(program);
 
 await program.parseAsync(process.argv);

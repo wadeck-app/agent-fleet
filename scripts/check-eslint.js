@@ -39,7 +39,6 @@ const PACKAGES = [
 	'flow-engine',
 	'orchestrator',
 	'worker',
-	'cli',
 ];
 
 /**

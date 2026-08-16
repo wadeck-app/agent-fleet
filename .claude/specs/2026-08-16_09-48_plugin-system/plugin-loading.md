@@ -12,7 +12,8 @@ to a loaded TypeScript provider instance. This is the missing piece that links c
 
 ## Status
 
-Open Question #1 (High priority, _index.md). The loading mechanism is required before:
+Open Question #1 (High priority, \_index.md). The loading mechanism is required before:
+
 - Any STRIDE spoofing mitigations can be fully enforced at runtime (threat-model.md § Spoofing)
 - The PLUGIN-002 violation rule (pluginId matches directory name) has runtime enforcement
 - Any plugin can be safely loaded in production

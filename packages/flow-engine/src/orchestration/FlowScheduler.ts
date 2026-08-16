@@ -249,12 +249,7 @@ export class FlowScheduler {
 		}
 
 		try {
-			const evalFn = new Function(
-				'outputs',
-				'inputs',
-				'steps',
-				`"use strict"; return (${condition});`
-			);
+			const evalFn = new Function('outputs', 'inputs', 'steps', `"use strict"; return (${condition});`);
 			const result = evalFn(outputs, this.context.inputs, steps);
 			if (typeof result !== 'boolean') {
 				throw new ConditionEvaluationError(

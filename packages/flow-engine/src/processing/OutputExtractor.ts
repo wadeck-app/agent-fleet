@@ -87,11 +87,7 @@ export class OutputExtractor {
 		let value: any;
 
 		if (config.jsonpath && config.pattern) {
-			throw new OutputExtractionError(
-				`'jsonpath' and 'pattern' are mutually exclusive`,
-				varName,
-				stepId
-			);
+			throw new OutputExtractionError(`'jsonpath' and 'pattern' are mutually exclusive`, varName, stepId);
 		}
 
 		// If 'from' is specified, extract from the specified source path
@@ -181,11 +177,7 @@ export class OutputExtractor {
 		}
 
 		if (!jsonpath.startsWith('$.')) {
-			throw new OutputExtractionError(
-				`Invalid jsonpath '${jsonpath}': must start with '$.'`,
-				varName,
-				stepId
-			);
+			throw new OutputExtractionError(`Invalid jsonpath '${jsonpath}': must start with '$.'`, varName, stepId);
 		}
 
 		const parts = jsonpath.slice(2).split('.');

@@ -1,6 +1,11 @@
 {
 	"files": [],
 	"references": [
+		{ "path": "packages/extension-points" },
+		{ "path": "packages/plugin-sdk" },
+		{ "path": "packages/plugin-none" },
+		{ "path": "packages/plugin-worktree" },
+		{ "path": "packages/plugin-cli-approval" },
 		{ "path": "packages/e2e-web" },
 		{ "path": "packages/flow-cli" },
 		{ "path": "packages/flow-engine" },

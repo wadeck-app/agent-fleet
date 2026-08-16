@@ -45,6 +45,9 @@ export interface ClaudeLaunchOptions {
 	/** Environment variables for Claude */
 	env?: Record<string, string>;
 
+	/** Path to MCP config JSON file — passed as --mcp-config <path> */
+	mcpConfigPath?: string;
+
 	/** Callback when process starts */
 	onProcessStarted?: (process: any) => void;
 
@@ -150,7 +153,10 @@ export class ClaudeLauncher {
 		prompt: string,
 		model: string | undefined,
 		interactive: boolean,
-		options?: Pick<ClaudeLaunchOptions, 'skipPermissions' | 'streamJson' | 'verbose' | 'resumeSessionId' | 'autoCompact'>
+		options?: Pick<
+			ClaudeLaunchOptions,
+			'skipPermissions' | 'streamJson' | 'verbose' | 'resumeSessionId' | 'autoCompact' | 'mcpConfigPath'
+		>
 	): { command: string; args: string[] } {
 		let command: string;
 		let args: string[];
@@ -164,6 +170,10 @@ export class ClaudeLauncher {
 		} else {
 			command = claudePath;
 			args = [];
+		}
+
+		if (options?.mcpConfigPath) {
+			args.push('--mcp-config', options.mcpConfigPath);
 		}
 
 		if (skipPermissions) {

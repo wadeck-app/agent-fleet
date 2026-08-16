@@ -208,10 +208,7 @@ describe('runTaskCommand — --project-dir flag', () => {
 		const created = await runTaskCommand(['new', 'filter test'], projectDir);
 		const task = JSON.parse(created.output) as { id: string };
 
-		const result = await runTaskCommand(
-			['set-status', task.id, 'done', '--project-dir', projectDir],
-			tmpDir
-		);
+		const result = await runTaskCommand(['set-status', task.id, 'done', '--project-dir', projectDir], tmpDir);
 		expect(result.exitCode).toBe(0);
 		const updated = JSON.parse(result.output) as { status: string };
 		expect(updated.status).toBe('done');

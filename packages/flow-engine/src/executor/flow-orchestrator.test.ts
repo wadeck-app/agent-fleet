@@ -510,7 +510,11 @@ describe('FlowOrchestrator', () => {
 		it('passes global env to script step', async () => {
 			vi.mocked(mockStepRunner.executeStep).mockResolvedValue(makeTrace());
 			const flow = makeFlow({ MY_VAR: 'hello' });
-			await orchestrator.orchestrate('t', flow, testWorkspace, { inputs: {}, stepOutputs: new Map(), taskMetadata: {} });
+			await orchestrator.orchestrate('t', flow, testWorkspace, {
+				inputs: {},
+				stepOutputs: new Map(),
+				taskMetadata: {},
+			});
 			const calledStep = vi.mocked(mockStepRunner.executeStep).mock.calls[0]![0] as any;
 			expect(calledStep.env).toMatchObject({ MY_VAR: 'hello' });
 		});
@@ -518,7 +522,11 @@ describe('FlowOrchestrator', () => {
 		it('step-level env overrides global env for same key', async () => {
 			vi.mocked(mockStepRunner.executeStep).mockResolvedValue(makeTrace());
 			const flow = makeFlow({ KEY: 'global', OTHER: 'x' }, { KEY: 'step' });
-			await orchestrator.orchestrate('t', flow, testWorkspace, { inputs: {}, stepOutputs: new Map(), taskMetadata: {} });
+			await orchestrator.orchestrate('t', flow, testWorkspace, {
+				inputs: {},
+				stepOutputs: new Map(),
+				taskMetadata: {},
+			});
 			const calledStep = vi.mocked(mockStepRunner.executeStep).mock.calls[0]![0] as any;
 			expect(calledStep.env).toMatchObject({ KEY: 'step', OTHER: 'x' });
 		});
@@ -535,7 +543,11 @@ describe('FlowOrchestrator', () => {
 		it('does not mutate step when no global env', async () => {
 			vi.mocked(mockStepRunner.executeStep).mockResolvedValue(makeTrace());
 			const flow = makeFlow(undefined, { STEP_ONLY: 'yes' });
-			await orchestrator.orchestrate('t', flow, testWorkspace, { inputs: {}, stepOutputs: new Map(), taskMetadata: {} });
+			await orchestrator.orchestrate('t', flow, testWorkspace, {
+				inputs: {},
+				stepOutputs: new Map(),
+				taskMetadata: {},
+			});
 			const calledStep = vi.mocked(mockStepRunner.executeStep).mock.calls[0]![0] as any;
 			expect(calledStep.env).toEqual({ STEP_ONLY: 'yes' });
 		});

@@ -42,6 +42,7 @@
 		"test:agent:shared": "node scripts/test-agent.js --suite=*Shared*",
 		"------------------------check": "",
 		"check": "node scripts/check-all.js",
+		"violations": "violations check",
 		"check:ts": "node scripts/check-ts.js",
 		"check:eslint": "node scripts/check-eslint.js",
 		"check:format": "node scripts/check-format.js",

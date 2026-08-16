@@ -62,7 +62,7 @@ describe('WorkerAdapter', () => {
 		mockMcpStart.mockResolvedValue({ configPath: '/tmp/mcp.json' });
 		mockMcpStop.mockResolvedValue(undefined);
 		mockExecuteStep = vi.fn().mockResolvedValue({ outputs: { result: 'ok' } });
-		const mockRunner = { executeStep: mockExecuteStep };
+		const mockRunner = { executeStep: mockExecuteStep, setOnInjectSteps: vi.fn() };
 		// Factory returns a fresh mock runner for each call
 		mockFactory = vi.fn().mockReturnValue(mockRunner) as unknown as StepRunnerFactory;
 		adapter = new WorkerAdapter(mockFactory);
@@ -227,7 +227,7 @@ describe('WorkerAdapter', () => {
 			await adapter.execute(makeStreamingModelStep('none'), makeContext(), sendMessage);
 			const logCalls = (sendMessage as any).mock.calls.map((c: any) => c[0]).filter((m: any) => m.type === 'log');
 			const types = logCalls.map((m: any) => m.entry.eventType);
-			expect(types).toContain('system');      // "Launching model…"
+			expect(types).toContain('system'); // "Launching model…"
 			expect(types).toContain('assistant_text');
 			expect(types).not.toContain('tool_use');
 			expect(types).not.toContain('tool_result');

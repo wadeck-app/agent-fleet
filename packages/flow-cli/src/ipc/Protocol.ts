@@ -64,6 +64,8 @@ export interface StepState {
 	status: StepStatus;
 	startedAt?: string;
 	completedAt?: string;
+	/** True when this step was injected dynamically via provideSteps during execution. */
+	injected?: boolean;
 }
 
 export interface ExecutionState {

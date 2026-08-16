@@ -15,6 +15,7 @@
 		"baseUrl": ".",
 
 		"paths": {
+			"extension-points": ["./packages/extension-points/src/index"],
 			"e2e-web/*": ["./packages/e2e-web/src/*"],
 			"flow-cli/*": ["./packages/flow-cli/src/*"],
 			"flow-engine": ["./packages/flow-engine/src/index"],

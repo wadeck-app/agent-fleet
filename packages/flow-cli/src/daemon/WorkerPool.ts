@@ -47,7 +47,9 @@ export class WorkerPool {
 			env: {
 				// IPC: worker needs to know daemon location
 				FLOW_DAEMON_PORT: String(this.httpPort),
-				FLOW_WS_PORT: String(typeof this.wsPortOrGetter === 'function' ? this.wsPortOrGetter() : this.wsPortOrGetter),
+				FLOW_WS_PORT: String(
+					typeof this.wsPortOrGetter === 'function' ? this.wsPortOrGetter() : this.wsPortOrGetter
+				),
 				// Claude binary path resolved at daemon startup — avoids PATH dependency in worker
 				...(this.claudePath ? { FLOW_CLAUDE_PATH: this.claudePath } : {}),
 				// PATH: needed for standard tools in script steps and shell resolution

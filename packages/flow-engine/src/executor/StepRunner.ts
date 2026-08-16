@@ -3,9 +3,11 @@
  *
  * Executes individual flow steps (script, model, subflow, and user_intervention types) with retry logic.
  */
+import type { ApprovalProvider } from 'extension-points';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+
 import { ClaudeLauncher } from '../processing/ClaudeLauncher';
 import { OutputExtractor } from '../processing/OutputExtractor';
 import { StreamEventMapper } from '../processing/StreamEventMapper';
@@ -64,6 +66,12 @@ export interface StepRunnerConfig {
 	/** Intervention handler for user intervention steps (optional, set after construction) */
 	interventionHandler?: InterventionHandler;
 
+	/** Callback for dynamically injecting steps via provideSteps XML tool_call */
+	onInjectSteps?: (steps: unknown[]) => Promise<void>;
+
+	/** Approval provider for user intervention steps — preferred over interventionHandler */
+	approvalProvider?: ApprovalProvider;
+
 	/** Execution configuration for Claude CLI flags */
 	executionConfig?: ExecutionConfig;
 }
@@ -105,6 +113,20 @@ export class StepRunner {
 	 */
 	public setInterventionHandler(interventionHandler: InterventionHandler): void {
 		this.config.interventionHandler = interventionHandler;
+	}
+
+	/**
+	 * Set the approval provider (preferred over interventionHandler for user intervention steps)
+	 */
+	public setApprovalProvider(approvalProvider: ApprovalProvider): void {
+		this.config.approvalProvider = approvalProvider;
+	}
+
+	/**
+	 * Set the inject-steps callback for provideSteps XML tool_call handling
+	 */
+	public setOnInjectSteps(onInjectSteps: (steps: unknown[]) => Promise<void>): void {
+		this.config.onInjectSteps = onInjectSteps;
 	}
 
 	/**
@@ -232,7 +254,16 @@ export class StepRunner {
 		onLogEntry?: (entry: LiveLogEntry) => void
 	): Promise<StepTrace> {
 		// Render prompt with variable interpolation
-		const renderedPrompt = this.templateRenderer.render(step.prompt, context, true);
+		let renderedPrompt = this.templateRenderer.render(step.prompt, context, true);
+
+		// If provideSteps is in step.tools, append the tool description to the prompt
+		const stepTools = (step as ModelFlowStep & { tools?: string[] }).tools ?? [];
+		if (stepTools.includes('provideSteps') && this.config.onInjectSteps) {
+			renderedPrompt +=
+				'\n\n---\nTo dynamically inject workflow steps, output this XML anywhere in your response:\n' +
+				'<tool_call>{"tool_call":"provideSteps","input":{"steps":[{"id":"step-id","type":"script","script":"echo hello"}]}}</tool_call>\n' +
+				'Each step requires at minimum: id (string), type ("script" or "model"). Script steps also need "script". Model steps need "model" and "prompt".';
+		}
 
 		stepTrace.prompt = renderedPrompt;
 		stepTrace.model = step.model;
@@ -268,7 +299,7 @@ export class StepRunner {
 
 		// For log:polling, buffer entries and flush periodically
 		let pollingInterval: ReturnType<typeof setInterval> | undefined;
-		let pollingBuffer: LiveLogEntry[] = [];
+		const pollingBuffer: LiveLogEntry[] = [];
 		if (logMode === 'polling' && onLogEntry) {
 			pollingInterval = setInterval(() => {
 				const batch = pollingBuffer.splice(0);
@@ -310,12 +341,18 @@ export class StepRunner {
 			}
 		}
 
+		// Extract MCP config path from claudeEnv and pass as --mcp-config flag (not env var)
+		const claudeEnvWithoutMcp = { ...this.config.claudeEnv };
+		const mcpConfigPath = claudeEnvWithoutMcp['CLAUDE_MCP_CONFIG'];
+		delete claudeEnvWithoutMcp['CLAUDE_MCP_CONFIG'];
+
 		const launchOptions = {
 			workingDir: workspace.path,
 			prompt: renderedPrompt,
 			stepId: step.id,
 			model: step.model,
-			env: this.config.claudeEnv,
+			env: Object.keys(claudeEnvWithoutMcp).length > 0 ? claudeEnvWithoutMcp : undefined,
+			mcpConfigPath,
 			onProcessStarted: this.config.onClaudeProcessStarted,
 			streamJson: streamJson && !this.config.interactive,
 			verbose: verbose && !this.config.interactive,
@@ -325,47 +362,51 @@ export class StepRunner {
 			// StepRunner is invoked by the orchestrator which manages its own env strategy
 			isolateEnv: false,
 			// Always provide onStreamEvent when stream-json is active to capture finalResultText
-			onStreamEvent: streamJson && !this.config.interactive
-				? (event: import('../processing/StreamJsonParser').StreamJsonEvent) => {
-						// Capture the final result text for output extraction (always)
-						if (event.type === 'result' && event.data.result) {
-							finalResultText = event.data.result;
-						}
-						// Capture meta: session_id + session_file from system:init, cost from result
-						if (event.type === 'system' && event.data.session_id) {
-							capturedSessionId = event.data.session_id as string;
-							capturedTtftMs = Date.now() - modelStartTime;
-							const memoryPathAuto = (event.data.memory_paths as Record<string, string> | undefined)?.auto;
-							if (memoryPathAuto) {
-								const projectDir = memoryPathAuto.replace(/[/\\]memory[/\\]?$/, '');
-								capturedSessionFile = path.join(projectDir, capturedSessionId + '.jsonl');
+			onStreamEvent:
+				streamJson && !this.config.interactive
+					? (event: import('../processing/StreamJsonParser').StreamJsonEvent) => {
+							// Capture the final result text for output extraction (always)
+							if (event.type === 'result' && event.data.result) {
+								finalResultText = event.data.result;
 							}
-						}
-						if (event.type === 'result') {
-							capturedCostUsd = (event.data.cost_usd as number) ?? 0;
-							const usage = event.data.modelUsage as Record<string, { inputTokens?: number; outputTokens?: number }> | undefined;
-							if (usage) {
-								for (const u of Object.values(usage)) {
-									capturedInputTokens += u.inputTokens ?? 0;
-									capturedOutputTokens += u.outputTokens ?? 0;
+							// Capture meta: session_id + session_file from system:init, cost from result
+							if (event.type === 'system' && event.data.session_id) {
+								capturedSessionId = event.data.session_id as string;
+								capturedTtftMs = Date.now() - modelStartTime;
+								const memoryPathAuto = (event.data.memory_paths as Record<string, string> | undefined)
+									?.auto;
+								if (memoryPathAuto) {
+									const projectDir = memoryPathAuto.replace(/[/\\]memory[/\\]?$/, '');
+									capturedSessionFile = path.join(projectDir, capturedSessionId + '.jsonl');
+								}
+							}
+							if (event.type === 'result') {
+								capturedCostUsd = (event.data.cost_usd as number) ?? 0;
+								const usage = event.data.modelUsage as
+									| Record<string, { inputTokens?: number; outputTokens?: number }>
+									| undefined;
+								if (usage) {
+									for (const u of Object.values(usage)) {
+										capturedInputTokens += u.inputTokens ?? 0;
+										capturedOutputTokens += u.outputTokens ?? 0;
+									}
+								}
+							}
+							if (logMode === 'none') return; // suppress log entries
+							const entry = streamEventMapper?.map(event);
+							if (entry) {
+								liveLogEntries.push(entry);
+								// streaming: fire onLogEntry immediately
+								if (logMode === 'streaming' && onLogEntry) {
+									onLogEntry(entry);
+								}
+								// polling: buffer for interval flush
+								if (logMode === 'polling') {
+									pollingBuffer.push(entry);
 								}
 							}
 						}
-						if (logMode === 'none') return; // suppress log entries
-						const entry = streamEventMapper?.map(event);
-						if (entry) {
-							liveLogEntries.push(entry);
-							// streaming: fire onLogEntry immediately
-							if (logMode === 'streaming' && onLogEntry) {
-								onLogEntry(entry);
-							}
-							// polling: buffer for interval flush
-							if (logMode === 'polling') {
-								pollingBuffer.push(entry);
-							}
-						}
-					}
-				: undefined,
+					: undefined,
 		};
 
 		try {
@@ -374,7 +415,8 @@ export class StepRunner {
 				session_id: capturedSessionId,
 				session_file: capturedSessionFile,
 				ttft_ms: capturedTtftMs,
-				duration_ms: stepTrace.durationMs || Math.max(1, (stepTrace.endTime ?? Date.now()) - stepTrace.startTime),
+				duration_ms:
+					stepTrace.durationMs || Math.max(1, (stepTrace.endTime ?? Date.now()) - stepTrace.startTime),
 				cost: {
 					input_tokens: capturedInputTokens,
 					output_tokens: capturedOutputTokens,
@@ -436,12 +478,19 @@ export class StepRunner {
 					return stepTrace;
 				}
 
+				// Parse and process <tool_call> XML blocks from response
+				let cleanResponseText = responseText;
+				if (this.config.onInjectSteps) {
+					cleanResponseText = await this.processToolCalls(responseText, this.config.onInjectSteps);
+				}
+
 				// Extract outputs using clean response text
-				stepTrace.outputs = this.outputExtractor.extract(responseText, step.output, step.id, {
-					response: responseText,
+				stepTrace.outputs = this.outputExtractor.extract(cleanResponseText, step.output, step.id, {
+					response: cleanResponseText,
 					stdout: result.stdout,
 					stderr: result.stderr,
 				});
+				stepTrace.response = cleanResponseText;
 				this.writeOutputFiles(stepTrace.outputs ?? {}, step.output, context);
 
 				return stepTrace;
@@ -453,6 +502,54 @@ export class StepRunner {
 			stepTrace.error = error instanceof Error ? error.message : String(error);
 			return stepTrace;
 		}
+	}
+
+	/**
+	 * Parse <tool_call> XML blocks from response text.
+	 * Extracts provideSteps calls, invokes onInjectSteps, and strips the XML from the text.
+	 */
+	private async processToolCalls(text: string, onInjectSteps: (steps: unknown[]) => Promise<void>): Promise<string> {
+		const pattern = /<tool_call>([\s\S]*?)<\/tool_call>/g;
+		const matches = [...text.matchAll(pattern)];
+		if (matches.length === 0) return text;
+
+		let cleaned = text;
+		for (const match of matches) {
+			const raw = match[1].trim();
+			let parsed: { tool_call: string; input: Record<string, unknown> } | undefined;
+			try {
+				parsed = JSON.parse(raw) as { tool_call: string; input: Record<string, unknown> };
+			} catch {
+				// Invalid JSON — strip the block but skip processing
+				cleaned = cleaned.replace(match[0], '').trim();
+				continue;
+			}
+
+			if (parsed.tool_call === 'provideSteps') {
+				const steps = parsed.input?.steps;
+				if (!Array.isArray(steps)) {
+					process.stderr.write('[StepRunner] provideSteps: input.steps must be an array\n');
+				} else {
+					const invalid = steps.filter(
+						(s: unknown) => typeof (s as any)?.id !== 'string' || typeof (s as any)?.type !== 'string'
+					);
+					if (invalid.length > 0) {
+						process.stderr.write(
+							`[StepRunner] provideSteps: ${invalid.length} step(s) missing id or type — skipping\n`
+						);
+					} else {
+						try {
+							await onInjectSteps(steps);
+						} catch (err) {
+							process.stderr.write(`[StepRunner] provideSteps injection failed: ${String(err)}\n`);
+						}
+					}
+				}
+			}
+			// Strip the tool_call block from the response
+			cleaned = cleaned.replace(match[0], '').trim();
+		}
+		return cleaned;
 	}
 
 	/**
@@ -631,7 +728,7 @@ export class StepRunner {
 	}
 
 	/**
-	 * Execute a user intervention step (request user approval/input)
+	 * Execute a user intervention step via ApprovalProvider (preferred) or InterventionHandler (fallback)
 	 */
 	private async executeUserInterventionStep(
 		step: UserInterventionStep,
@@ -639,13 +736,19 @@ export class StepRunner {
 		context: TemplateContext,
 		stepTrace: StepTrace
 	): Promise<StepTrace> {
-		// Check if intervention handler is configured
-		if (!this.config.interventionHandler) {
-			stepTrace.endTime = Date.now();
-			stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
-			stepTrace.error = 'InterventionHandler not configured in StepRunner';
-			return stepTrace;
+		// Prefer ApprovalProvider over the legacy InterventionHandler
+		if (this.config.approvalProvider) {
+			return this.executeUserInterventionViaApprovalProvider(step, context, stepTrace);
 		}
+
+		// Fallback: legacy InterventionHandler (orchestrator web UI path — deprecated, migrate to ApprovalProvider)
+		if (!this.config.interventionHandler) {
+			throw new Error(
+				'No ApprovalProvider or InterventionHandler configured in StepRunner — cannot execute user_intervention step'
+			);
+		}
+		// Warn: legacy path active. Remove once all callers inject ApprovalProvider.
+		console.warn('[StepRunner] Deprecation: InterventionHandler is active; migrate to ApprovalProvider.');
 
 		// Build intervention request based on step type
 		const config =
@@ -694,10 +797,6 @@ export class StepRunner {
 			timeout: step.timeout,
 		};
 
-		console.log(`[StepRunner] Executing UserInterventionStep: ${step.id}`);
-		console.log(`[StepRunner] Intervention type: ${step.interventionType}`);
-		console.log(`[StepRunner] Blocking: ${interventionRequest.blocking}`);
-
 		stepTrace.interventionType = step.interventionType;
 		stepTrace.interventionBlocking = interventionRequest.blocking;
 
@@ -709,7 +808,6 @@ export class StepRunner {
 			stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
 
 			if (response) {
-				console.log(`[StepRunner] User responded to intervention ${step.id}`);
 				stepTrace.interventionResponse = response;
 
 				// Build additional context with intervention data
@@ -767,6 +865,67 @@ export class StepRunner {
 	}
 
 	/**
+	 * Execute user intervention via the ApprovalProvider interface
+	 */
+	private async executeUserInterventionViaApprovalProvider(
+		step: UserInterventionStep,
+		context: TemplateContext,
+		stepTrace: StepTrace
+	): Promise<StepTrace> {
+		const provider = this.config.approvalProvider!;
+		const taskId = context.taskId || 'unknown';
+
+		stepTrace.interventionType = step.interventionType;
+		stepTrace.interventionBlocking = step.blocking !== false;
+
+		try {
+			let responseValue: unknown;
+
+			if (step.interventionType === 'approval' && step.approval) {
+				const prompt = this.templateRenderer.render(step.approval.title, context, true);
+				const ctx = step.approval.description
+					? this.templateRenderer.render(step.approval.description, context, true)
+					: undefined;
+				responseValue = await provider.requestApproval({ taskId, stepId: step.id, prompt, context: ctx });
+			} else if (step.interventionType === 'question' && step.question) {
+				const prompt = this.templateRenderer.render(step.question.question, context, true);
+				responseValue = await provider.requestInput({ taskId, stepId: step.id, prompt });
+			} else if (step.interventionType === 'choice' && step.choice) {
+				const prompt = this.templateRenderer.render(step.choice.question, context, true);
+				const choices = step.choice.options.map(o => ({
+					id: o.id,
+					label: o.label,
+					description: o.description,
+				}));
+				responseValue = await provider.requestChoice({ taskId, stepId: step.id, prompt, choices });
+			} else {
+				throw new Error(`Missing configuration for intervention type '${step.interventionType}'`);
+			}
+
+			stepTrace.endTime = Date.now();
+			stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
+
+			const rawOutput = responseValue != null ? String(responseValue) : '';
+			const additionalContext = {
+				intervention: {
+					value: responseValue,
+					approved: responseValue === true,
+					rejected: responseValue === false,
+					answer: responseValue,
+					choice: responseValue,
+				},
+			};
+			stepTrace.outputs = this.outputExtractor.extract(rawOutput, step.output, step.id, additionalContext);
+			return stepTrace;
+		} catch (error) {
+			stepTrace.endTime = Date.now();
+			stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
+			stepTrace.error = error instanceof Error ? error.message : String(error);
+			return stepTrace;
+		}
+	}
+
+	/**
 	 * Write extracted output values to the metadata outputs directory for any config with writeOutput set.
 	 * Files go to <workspaceDir>.meta/outputs/ — NEVER inside workspaceDir — preventing git pollution
 	 * and ensuring Claude cannot overwrite engine-generated artifacts.
@@ -785,9 +944,7 @@ export class StepRunner {
 			// Reject path traversal
 			const normalized = path.normalize(relPath);
 			if (normalized.startsWith('..') || path.isAbsolute(normalized)) {
-				throw new Error(
-					`writeOutput path '${relPath}' is invalid: must be a relative path`
-				);
+				throw new Error(`writeOutput path '${relPath}' is invalid: must be a relative path`);
 			}
 			const filePath = path.join(outputsDir, normalized);
 			const value = outputs[varName];
