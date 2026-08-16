@@ -1,7 +1,7 @@
+import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import * as yaml from 'js-yaml';
 
 export interface TaskGlobalConfig {
 	defaults?: {
@@ -54,23 +54,17 @@ export function isProjectInitialized(projectDir?: string): boolean {
 	return fs.existsSync(path.join(dir, '.task'));
 }
 
-export function loadTaskConfig(options?: {
-	configDir?: string;
-	projectDir?: string;
-}): TaskResolvedConfig {
+export function loadTaskConfig(options?: { configDir?: string; projectDir?: string }): TaskResolvedConfig {
 	const globalConfigDir = resolveGlobalConfigDir(options?.configDir);
 	const projectDir = options?.projectDir ?? process.cwd();
 
-	const globalConfig =
-		loadYamlFile<TaskGlobalConfig>(path.join(globalConfigDir, 'config.yml')) ?? {};
-	const projectConfig =
-		loadYamlFile<TaskProjectConfig>(path.join(projectDir, '.task', 'config.yml')) ?? {};
+	const globalConfig = loadYamlFile<TaskGlobalConfig>(path.join(globalConfigDir, 'config.yml')) ?? {};
+	const projectConfig = loadYamlFile<TaskProjectConfig>(path.join(projectDir, '.task', 'config.yml')) ?? {};
 
 	return {
 		statuses: projectConfig.statuses ?? DEFAULT_STATUSES,
 		defaults: {
-			priority:
-				projectConfig.defaults?.priority ?? globalConfig.defaults?.priority ?? DEFAULT_PRIORITY,
+			priority: projectConfig.defaults?.priority ?? globalConfig.defaults?.priority ?? DEFAULT_PRIORITY,
 		},
 		globalHooks: globalConfig.hooks ?? {},
 		projectHooks: projectConfig.hooks ?? {},

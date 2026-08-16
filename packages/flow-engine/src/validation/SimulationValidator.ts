@@ -328,7 +328,7 @@ export class SimulationValidator {
 	 *   inputs.<id>
 	 *   steps.<id>.outputs.<id>
 	 *   flow.<id>
-	 *   task.<id>
+	 *   task.<id>  (prompt template only — task is NOT available in when: conditions)
 	 * Where <id> is [a-zA-Z0-9_-]+
 	 */
 	private static readonly VALID_TEMPLATE_EXPRESSION =

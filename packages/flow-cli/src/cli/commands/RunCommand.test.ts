@@ -1,7 +1,6 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { tailLogFile } from './RunCommand.js';
@@ -54,7 +53,12 @@ describe('tailLogFile', () => {
 	it('filters out __execution lines', () => {
 		const logFile = path.join(tmpDir, 'test.ndjson');
 		writeLog(logFile, [
-			{ prefix: '[abc123|__execution]', timestamp: '2026-08-15T00:00:00Z', level: 'info', message: 'Execution started' },
+			{
+				prefix: '[abc123|__execution]',
+				timestamp: '2026-08-15T00:00:00Z',
+				level: 'info',
+				message: 'Execution started',
+			},
 			{ prefix: '[abc123|greet]', timestamp: '2026-08-15T00:00:01Z', level: 'info', message: 'hello' },
 		]);
 
@@ -77,7 +81,12 @@ describe('tailLogFile', () => {
 		// Append a second line
 		fs.appendFileSync(
 			logFile,
-			JSON.stringify({ prefix: '[abc123|greet]', timestamp: '2026-08-15T00:00:01Z', level: 'info', message: 'second' }) + '\n',
+			JSON.stringify({
+				prefix: '[abc123|greet]',
+				timestamp: '2026-08-15T00:00:01Z',
+				level: 'info',
+				message: 'second',
+			}) + '\n',
 			'utf8'
 		);
 

@@ -1,8 +1,7 @@
 import * as fs from 'node:fs';
+import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createRequire } from 'node:module';
-
 import { describe, expect, it } from 'vitest';
 
 const packageDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');

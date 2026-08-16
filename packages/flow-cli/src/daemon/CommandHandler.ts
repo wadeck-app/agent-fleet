@@ -1,26 +1,53 @@
 import { FlowValidator, WorkspaceManager } from 'flow-engine';
-import type { FlowDefinition, FlowStep } from 'flow-engine/types';
+import { FlowScheduler } from 'flow-engine';
+import type { ReadyItem, SchedulerContext, SchedulerStep } from 'flow-engine';
+import { TemplateRenderer } from 'flow-engine';
+import type { FlowDefinition, FlowStep } from 'flow-engine';
 import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
 import type { HookDispatcher } from '../hooks/HookDispatcher';
-import type { AssignableStep, ClientCommand, DaemonResponse, ExecutionContext } from '../ipc/Protocol';
+import type { AssignableStep, ClientCommand, DaemonResponse, ExecutionContext, InjectedStep } from '../ipc/Protocol';
 import { ExecutionStore, generateExecutionId } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
-import type { StepQueue } from './StepQueue';
 import type { WorkerPool } from './WorkerPool';
+
+// Hard cap on injected steps per execution — prevents a rogue Claude process from accumulating
+// unbounded Map entries via repeated provideSteps calls.
+const MAX_INJECTED_STEPS_PER_EXECUTION = 1000;
+
+interface ReadyStep {
+	stepId: string;
+	stepConfig: AssignableStep;
+	executionContext: ExecutionContext;
+}
+
+interface ParentChildMeta {
+	parentToChildren: Map<string, Set<string>>;
+	childToParent: Map<string, string>;
+}
 
 export class CommandHandler {
 	private readonly executionStore: ExecutionStore;
 	private readonly logWriter: LogWriter;
-	// Per-execution hook dispatchers — prevents concurrent run commands from overwriting each other's hooks.
+	/** Per-execution FlowScheduler instances */
+	private readonly schedulers = new Map<string, FlowScheduler>();
+	/** Per-execution ExecutionContext */
+	private readonly executionContexts = new Map<string, ExecutionContext>();
+	/** Parent-child metadata for UI rendering (not scheduling logic) */
+	private readonly parentChildIndex = new Map<string, ParentChildMeta>();
+	/** Per-execution step counts (initial + injected), for MAX_INJECTED_STEPS limit */
+	private readonly stepCounts = new Map<string, number>();
+	/** Central queue of ready steps across all executions */
+	private readonly readyQueue: ReadyStep[] = [];
+	/** Per-execution hook dispatchers */
 	private readonly executionHooks = new Map<string, HookDispatcher>();
+	private activeExecutionCount = 0;
 
 	constructor(
 		private readonly daemonDir: string,
-		private readonly stepQueue: StepQueue,
 		private readonly workerPool: WorkerPool,
 		private hookDispatcher?: HookDispatcher,
 		executionStore?: ExecutionStore,
@@ -46,19 +73,22 @@ export class CommandHandler {
 		this.executionHooks.delete(executionId);
 	}
 
+	isQueueEmpty(): boolean {
+		return this.readyQueue.length === 0;
+	}
+
+	hasActiveExecutions(): boolean {
+		return this.activeExecutionCount > 0;
+	}
+
 	async handleRun(
 		cmd: Extract<ClientCommand, { type: 'run' }>,
 		hookDispatcher?: HookDispatcher
 	): Promise<DaemonResponse> {
 		const flowFile = path.isAbsolute(cmd.flowFile) ? cmd.flowFile : path.resolve(cmd.cwd, cmd.flowFile);
 
-		// Path restriction: flow file must be within the project directory or home directory.
-		// Prevents the daemon from being used to read arbitrary filesystem paths.
-		// Override with security.allowAbsolutePaths: true in FlowConfig.
 		if (!this.allowAbsolutePaths) {
 			const allowedRoots = [path.resolve(cmd.cwd), path.resolve(os.homedir())];
-			// Resolve symlinks before checking containment — prevents symlink escape attacks.
-			// Mirror of SecretProvider.ts:59-71.
 			let realFlowFile: string;
 			try {
 				realFlowFile = fs.existsSync(flowFile) ? fs.realpathSync(flowFile) : flowFile;
@@ -76,7 +106,6 @@ export class CommandHandler {
 				return !rel.startsWith('..') && !path.isAbsolute(rel);
 			});
 			if (!isAllowed) {
-				// Same message as FLOW_NOT_FOUND — do not confirm whether the file exists outside allowed dirs.
 				return { type: 'error', code: 'FLOW_NOT_FOUND', message: 'Flow file not found.' };
 			}
 		}
@@ -102,8 +131,6 @@ export class CommandHandler {
 		if (!flow || typeof flow !== 'object') {
 			return { type: 'error', code: 'PARSE_ERROR', message: 'Flow file is empty or not a YAML object' };
 		}
-		// PARSE_ERROR / UNSUPPORTED_STEP_TYPE: These error codes are not listed in D34's known
-		// error code table. They are daemon-side extensions. UNSUPPORTED_STEP_TYPE cross-references D8.
 
 		const validator = new FlowValidator(undefined);
 		const result = validator.validate(flow);
@@ -115,7 +142,6 @@ export class CommandHandler {
 			};
 		}
 
-		// D8: user_intervention steps are not supported in v1 — fail fast
 		const interventionStep = flow.steps.find((s: FlowStep) => s.type === 'user_intervention');
 		if (interventionStep) {
 			return {
@@ -125,7 +151,6 @@ export class CommandHandler {
 			};
 		}
 
-		// subflow steps fail silently in WorkerAdapter — reject upfront
 		const subflowStep = flow.steps.find((s: FlowStep) => s.type === 'subflow');
 		if (subflowStep) {
 			return {
@@ -135,11 +160,7 @@ export class CommandHandler {
 			};
 		}
 
-		// Resolve which flow to run (single-flow YAML has no flowId disambiguation needed)
 		const flowId = cmd.flowId ?? flow.id;
-
-		// Resolve workspace directory
-		// H3: generate ONE executionId before allocate so taskId and executionId match
 		const executionId = generateExecutionId();
 		const workspaceManager = new WorkspaceManager(cmd.cwd);
 		let workspace: { path: string };
@@ -160,54 +181,191 @@ export class CommandHandler {
 		const workspaceDir = workspace.path;
 
 		const stepIds = flow.steps.map((s: FlowStep) => s.id);
-
 		this.executionStore.create({ executionId, flowFile, flowId, stepIds });
 
-		// Build ExecutionContext
 		const context: ExecutionContext = {
 			executionId,
 			inputs: cmd.inputs ?? {},
-			// MISSING_INPUT: D34 lists this error code but required-input validation is not implemented
-			// in v1. Required input fields in the flow YAML are not checked here. Tracked for v2.
 			stepOutputs: {},
 			workspaceDir,
 			cwd: cmd.cwd,
 		};
 
-		// Build dependency map
+		const schedulerCtx: SchedulerContext = {
+			inputs: context.inputs,
+			stepOutputs: new Map(),
+		};
+
+		// Resolve global flow env templates (context.* available: cwd, projectDir, workspaceDir)
+		let resolvedGlobalEnv: Record<string, string> | undefined;
+		if (flow.env) {
+			const templateRenderer = new TemplateRenderer();
+			const templateCtx = {
+				inputs: context.inputs,
+				stepOutputs: new Map<string, Record<string, unknown>>(),
+				taskMetadata: {},
+				context: { cwd: cmd.cwd, projectDir: cmd.cwd, workspaceDir },
+			};
+			resolvedGlobalEnv = Object.fromEntries(
+				Object.entries(flow.env as Record<string, string>).map(([k, v]) => [
+					k,
+					templateRenderer.render(v, templateCtx, false),
+				])
+			);
+		}
+
 		const depends = new Map<string, string[]>(flow.steps.map((s: FlowStep) => [s.id, s.depends ?? []]));
+		const assignable = (
+			resolvedGlobalEnv
+				? flow.steps.map((s: FlowStep) =>
+						s.type === 'script' ? { ...s, env: { ...resolvedGlobalEnv, ...((s as { env?: Record<string, string> }).env ?? {}) } } : s
+					)
+				: flow.steps
+		).filter((s: FlowStep): s is AssignableStep => s.type === 'model' || s.type === 'script');
 
-		const assignable = flow.steps.filter(
-			(s: FlowStep): s is AssignableStep => s.type === 'model' || s.type === 'script'
-			// subflow removed: already rejected above by the unsupported check
-		);
+		const scheduler = new FlowScheduler(schedulerCtx);
+		const readyItems = scheduler.start(assignable as unknown as SchedulerStep[], depends);
 
-		// Register the per-execution hook dispatcher so concurrent runs don't share a single mutable field.
+		this.schedulers.set(executionId, scheduler);
+		this.executionContexts.set(executionId, context);
+		this.parentChildIndex.set(executionId, { parentToChildren: new Map(), childToParent: new Map() });
+		this.stepCounts.set(executionId, assignable.length);
+		this.activeExecutionCount++;
+
 		if (hookDispatcher) this.executionHooks.set(executionId, hookDispatcher);
 
-		this.stepQueue.enqueueExecution(context, assignable, depends);
+		this.enqueueReadyItems(executionId, readyItems, context);
 		this.logWriter.writeExecution(executionId, `Execution started for flow ${flowId}`);
 		this.dispatchHook(executionId, 'onFlowStart', { executionId, flowId, flowFile });
 
-		// Try to dispatch immediately
 		this.tryDispatch();
 
 		return { type: 'execution_started', executionId };
 	}
 
+	/** Called by Daemon when a worker reports step_completed. */
+	onStepCompleted(executionId: string, stepId: string, output: Record<string, unknown>): void {
+		const scheduler = this.schedulers.get(executionId);
+		if (!scheduler) {
+			process.stderr.write(
+				`[CommandHandler] onStepCompleted: no scheduler for execution ${executionId} (step ${stepId}) — late message after cleanup\n`
+			);
+			return;
+		}
+
+		// Sync output to ExecutionContext (used by worker for template rendering in next step)
+		const context = this.executionContexts.get(executionId)!;
+		context.stepOutputs[stepId] = output;
+
+		const newReady = scheduler.complete(stepId, { type: 'completed', outputs: output });
+
+		if (scheduler.isTerminal()) {
+			// Mark any steps skipped by the scheduler (still 'pending' in store) as completed
+			// so the daemon's allDone check can detect execution completion.
+			this.markSkippedStepsCompleted(executionId);
+			this.cleanupExecution(executionId);
+		} else {
+			this.enqueueReadyItems(executionId, newReady, context);
+		}
+	}
+
+	/** Called by Daemon when a worker reports step_failed. */
+	onStepFailed(executionId: string, stepId: string, error: string): void {
+		const scheduler = this.schedulers.get(executionId);
+		if (!scheduler) {
+			process.stderr.write(
+				`[CommandHandler] onStepFailed: no scheduler for execution ${executionId} (step ${stepId}) — late message after cleanup\n`
+			);
+			return;
+		}
+
+		const context = this.executionContexts.get(executionId)!;
+		const newReady = scheduler.complete(stepId, { type: 'failed', error });
+
+		if (scheduler.hasFailed()) {
+			// Terminal failure — purge queued steps for this execution and cleanup
+			for (let i = this.readyQueue.length - 1; i >= 0; i--) {
+				if (this.readyQueue[i]!.executionContext.executionId === executionId) {
+					this.readyQueue.splice(i, 1);
+				}
+			}
+			this.cleanupExecution(executionId);
+		} else {
+			// Retry in progress — re-enqueue the step returned by the scheduler
+			this.enqueueReadyItems(executionId, newReady, context);
+			this.tryDispatch();
+		}
+	}
+
+	/** Called by Daemon for inject_steps messages. */
+	injectSteps(executionId: string, injectedSteps: InjectedStep[]): void {
+		const scheduler = this.schedulers.get(executionId);
+		if (!scheduler) {
+			throw new Error(`No active execution found for id: ${executionId}`);
+		}
+
+		const currentCount = this.stepCounts.get(executionId) ?? 0;
+		const totalAfterInject = currentCount + injectedSteps.length;
+		if (totalAfterInject > MAX_INJECTED_STEPS_PER_EXECUTION) {
+			throw new Error(
+				`Execution ${executionId} would exceed the maximum step count (${MAX_INJECTED_STEPS_PER_EXECUTION}) after injection`
+			);
+		}
+
+		// Validate references and track parent-child metadata
+		const meta = this.parentChildIndex.get(executionId)!;
+		const allKnownIds = new Set([...this.getKnownStepIds(executionId), ...injectedSteps.map(s => s.id)]);
+
+		for (const injected of injectedSteps) {
+			if (this.isKnownStepId(executionId, injected.id)) {
+				throw new Error(`Step id '${injected.id}' already exists in execution ${executionId}`);
+			}
+			if (injected.parent !== undefined && !allKnownIds.has(injected.parent)) {
+				throw new Error(`Parent step '${injected.parent}' does not exist in execution ${executionId}`);
+			}
+			if (injected.depends) {
+				for (const dep of injected.depends) {
+					if (!allKnownIds.has(dep)) {
+						throw new Error(`Dependency step '${dep}' does not exist in execution ${executionId}`);
+					}
+				}
+			}
+		}
+
+		// Track parent-child relationships
+		for (const injected of injectedSteps) {
+			if (injected.parent !== undefined) {
+				if (!meta.parentToChildren.has(injected.parent)) {
+					meta.parentToChildren.set(injected.parent, new Set());
+				}
+				meta.parentToChildren.get(injected.parent)!.add(injected.id);
+				meta.childToParent.set(injected.id, injected.parent);
+			}
+		}
+
+		this.stepCounts.set(executionId, totalAfterInject);
+
+		const context = this.executionContexts.get(executionId)!;
+		const newReady = scheduler.inject(injectedSteps as SchedulerStep[]);
+		this.enqueueReadyItems(executionId, newReady, context);
+	}
+
 	tryDispatch(): void {
-		while (!this.stepQueue.isEmpty()) {
+		while (this.readyQueue.length > 0) {
 			const idleWorker = this.workerPool.getIdleWorker();
 			if (idleWorker) {
-				const step = this.stepQueue.dequeue();
-				if (!step) break;
+				const step = this.readyQueue.shift()!;
+				const scheduler = this.schedulers.get(step.executionContext.executionId);
+
 				this.workerPool.markBusy(idleWorker);
-				this.stepQueue.markStepActive(step.executionContext.executionId, step.stepId);
+				// Acknowledge: marks step as in-flight in scheduler to prevent double-dispatch
+				scheduler?.acknowledge(step.stepId);
 				this.executionStore.markStepRunning(step.executionContext.executionId, step.stepId);
 				this.dispatchHook(step.executionContext.executionId, 'onStepStart', {
 					executionId: step.executionContext.executionId,
 					stepId: step.stepId,
 				});
+
 				const sent = this.workerPool.sendToWorker(idleWorker, {
 					type: 'assign',
 					stepId: step.stepId,
@@ -217,17 +375,54 @@ export class CommandHandler {
 				if (!sent) {
 					// Worker disconnected between getIdleWorker() and send — re-queue the step
 					this.workerPool.removeWorker(idleWorker);
-					this.stepQueue.reQueueStep(step);
+					// Transport failure: not a flow-level failure — unacknowledge and put back
+					scheduler?.unacknowledge(step.stepId);
+					this.readyQueue.unshift(step);
 					continue;
 				}
 			} else if (this.workerPool.canSpawn()) {
-				// No idle worker but below concurrency limit — spawn one
-				// The spawned worker will connect, send ready, then get assigned
 				this.workerPool.spawnWorker();
-				break; // break: worker will connect asynchronously and we'll dispatch then
+				break;
 			} else {
-				break; // at capacity, wait for a worker to become idle
+				break;
 			}
 		}
+	}
+
+	private enqueueReadyItems(executionId: string, items: ReadyItem[], context: ExecutionContext): void {
+		for (const item of items) {
+			this.readyQueue.push({
+				stepId: item.stepId,
+				stepConfig: item.step as unknown as AssignableStep,
+				executionContext: context,
+			});
+		}
+	}
+
+	private markSkippedStepsCompleted(executionId: string): void {
+		if (!this.executionStore.exists(executionId)) return;
+		const state = this.executionStore.read(executionId);
+		for (const [sid, stepState] of Object.entries(state.steps)) {
+			if (stepState.status === 'pending') {
+				this.executionStore.markStepCompleted(executionId, sid);
+			}
+		}
+	}
+
+	private cleanupExecution(executionId: string): void {
+		this.schedulers.delete(executionId);
+		this.executionContexts.delete(executionId);
+		this.parentChildIndex.delete(executionId);
+		this.stepCounts.delete(executionId);
+		this.activeExecutionCount--;
+	}
+
+	/** Returns all known step IDs for an execution (initial + injected so far). */
+	private getKnownStepIds(executionId: string): Set<string> {
+		return this.schedulers.get(executionId)?.getStepIds() ?? new Set();
+	}
+
+	private isKnownStepId(executionId: string, stepId: string): boolean {
+		return this.getKnownStepIds(executionId).has(stepId);
 	}
 }

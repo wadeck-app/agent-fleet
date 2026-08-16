@@ -7,7 +7,7 @@
  * Supported expressions:
  * - Comparisons: ===, !==, <, >, <=, >=
  * - Logical: &&, ||, !
- * - Property access: output.field, output.nested.field
+ * - Property access: outputs['step-id'].field, inputs.field
  * - Boolean values: true, false
  * - Numbers: 42, 3.14
  * - Strings: "text", 'text'
@@ -28,17 +28,17 @@ export class ConditionEvaluationError extends Error {
 }
 
 /**
- * Context for condition evaluation
+ * Context for condition evaluation.
+ * `outputs` is keyed by dep step id: { 'dep-id': { field: value } }
+ * `inputs` contains flow-level inputs.
+ * Tasks are coupled to flows by events, not by core feature — no task context here.
  */
 export interface ConditionContext {
-	/** Output variables from the current step */
-	output: Record<string, any>;
+	/** Step outputs keyed by step id */
+	outputs: Record<string, Record<string, unknown>>;
 
 	/** Input variables from the flow */
-	inputs?: Record<string, any>;
-
-	/** Task metadata */
-	task?: Record<string, any>;
+	inputs?: Record<string, unknown>;
 }
 
 /**
@@ -55,19 +55,11 @@ export class ConditionEvaluator {
 	 */
 	public evaluate(condition: string, context: ConditionContext, stepId: string): boolean {
 		try {
-			// Create a safe evaluation context
-			// We use Function constructor with limited scope
-			const safeContext = {
-				output: context.output || {},
-				inputs: context.inputs || {},
-				task: context.task || {},
-			};
+			const safeOutputs = context.outputs || {};
+			const safeInputs = context.inputs || {};
 
-			// Wrap condition in a safe evaluation function
-			// This allows simple expressions like: output.complexity === 'high'
-			const evalFunction = new Function('output', 'inputs', 'task', `"use strict"; return (${condition});`);
-
-			const result = evalFunction(safeContext.output, safeContext.inputs, safeContext.task);
+			const evalFunction = new Function('outputs', 'inputs', `"use strict"; return (${condition});`);
+			const result = evalFunction(safeOutputs, safeInputs);
 
 			if (typeof result !== 'boolean') {
 				throw new ConditionEvaluationError(
@@ -99,8 +91,7 @@ export class ConditionEvaluator {
 	 */
 	public isValid(condition: string): boolean {
 		try {
-			// Try to create the function to check syntax
-			new Function('output', 'inputs', 'task', `"use strict"; return (${condition});`);
+			new Function('outputs', 'inputs', `"use strict"; return (${condition});`);
 			return true;
 		} catch {
 			return false;

@@ -6,6 +6,7 @@
 
 **When the SDK is needed — `flow`**:
 The `flow` CLI drives a long-running daemon (queue of steps, WebSocket workers, executions in progress). The SDK provides:
+
 - Port file → only one daemon instance runs at a time
 - PID liveness + takeover → clean recovery if daemon died without cleanup
 - mtime-based heartbeat → detect zombie daemons without TCP polling
@@ -6004,3 +6005,26 @@ Proven by: WebSocket auth analysis — the "fix" (random token) would not have p
 ## Messages must be self-contained — 2026-08-15
 
 Never use abbreviations (L1/L2/L3, etc.) that were defined in a previous message. Every message with a decision request must be readable standalone. Repeating 3 lines of context is cheaper than forcing the reader to scroll.
+
+## Flow ↔ Task coupling = event-based, not core feature — 2026-08-16
+
+Tasks are a useful concept *used with* flows, but they are NOT part of the flow engine core.
+- `task.*` was removed from the `when:` condition context (`ConditionContext`)
+- Flows and tasks are bound by events (a task moves/creates/deletes → triggers a flow), not by direct dependency
+- If task data is needed inside a flow, it must be passed explicitly as `inputs`
+- `task.*` remains valid in prompt templates (`${{ task.priority }}`) via TemplateRenderer — that's the web-backend binding layer, not the engine core
+
+## `when:` condition context shape — 2026-08-16
+
+Canonical context for `when:` expressions:
+```
+{ steps: { '<stepId>': { outputs: { ... } } }, outputs: { '<stepId>': { ... } }, inputs: { ... } }
+```
+- `steps.X.outputs.Y` — primary form (dot notation; engine normalizes hyphenated IDs to bracket notation)
+- `outputs['X'].Y` — shorthand (flat keyed by step id)
+- Both `${{ expr }}` wrapper and bare expression supported
+- `task` is NOT in this context
+
+## Singleton-daemon-kit v2 local fallback — 2026-08-16
+
+New version of `@wadeck/singleton-daemon-kit` (in `packages/flow-cli/node_modules`) adds a local command fallback in `createDaemonClient.send()`: if no daemon is running AND `options.commands[command]` exists, it calls it directly. Do NOT pass a `commands` handler to `createDaemonClient` in `RunCommand.ts` — use `commands: {}` to avoid the local handler being invoked instead of starting the real daemon.

@@ -13,3 +13,7 @@ export type { FlowGenerationResult, FlowConstraints } from './generation/FlowGen
 export { FlowRecommendationEngine } from './analysis/FlowRecommendationEngine';
 export type { IdeaRequirements } from './analysis/FlowRecommendationEngine';
 export { WorkspaceManager } from './workspace/WorkspaceManager';
+export { FlowScheduler } from './orchestration/FlowScheduler';
+export type { ReadyItem, SchedulerContext, SchedulerStep, StepOutcome } from './orchestration/FlowScheduler';
+export { TemplateRenderer } from './processing/TemplateRenderer';
+export type { FlowDefinition, FlowStep } from './types';

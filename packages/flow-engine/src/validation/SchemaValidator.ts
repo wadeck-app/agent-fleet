@@ -826,7 +826,7 @@ export class SchemaValidator {
 			]);
 
 			for (const [outputName, outputConfig] of Object.entries(step.output)) {
-				// UserIntervention steps should NOT have patterns
+				// UserIntervention steps should NOT have patterns or jsonpath
 				if (outputConfig.pattern) {
 					this.issueCollector.addIssue({
 						severity: 'error',
@@ -834,6 +834,15 @@ export class SchemaValidator {
 						message: `UserIntervention step '${step.id}' output '${outputName}' must not have a pattern`,
 						location: { stepId: step.id, field: `output.${outputName}.pattern` },
 						suggestion: `Remove 'pattern' and use 'from' instead to specify the source explicitly.`,
+					});
+				}
+				if (outputConfig.jsonpath) {
+					this.issueCollector.addIssue({
+						severity: 'error',
+						code: ValidationCode.INVALID_VALUE,
+						message: `UserIntervention step '${step.id}' output '${outputName}' must not have a jsonpath`,
+						location: { stepId: step.id, field: `output.${outputName}.jsonpath` },
+						suggestion: `Remove 'jsonpath' and use 'from' instead to specify the source explicitly.`,
 					});
 				}
 

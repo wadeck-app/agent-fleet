@@ -1,7 +1,7 @@
 // Domain types shared between Orchestrator and Worker
+import { TaskStatus } from 'shared-common/TaskStatus';
 import { z } from 'zod';
 
-import { TaskStatus } from 'shared-common/TaskStatus';
 export { TaskStatus };
 
 // TODO: This is a simplified version. Full FlowMetadata is in flow-engine package

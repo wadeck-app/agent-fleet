@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { createRequire } from 'node:module';
+import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { HookConfig } from '../hooks/HookDispatcher.js';
@@ -85,12 +85,14 @@ function buildHookDispatcher(
 
 function parseArgs(args: string[]): {
 	configDir: string | undefined;
+	projectDir: string | undefined;
 	jsonMode: boolean;
 	command: string | undefined;
 	rest: string[];
 } {
 	let i = 0;
 	let configDir: string | undefined;
+	let projectDir: string | undefined;
 	let jsonMode = false;
 
 	while (i < args.length) {
@@ -106,10 +108,22 @@ function parseArgs(args: string[]): {
 	}
 
 	const command = args[i];
-	const rest = args.slice(i + 1).filter(a => a !== '--json');
-	if (args.slice(i + 1).includes('--json')) jsonMode = true;
+	const trailing = args.slice(i + 1);
 
-	return { configDir, jsonMode, command, rest };
+	// Filter --project-dir <path> and --json from rest args
+	const rest: string[] = [];
+	for (let j = 0; j < trailing.length; j++) {
+		if (trailing[j] === '--project-dir' && trailing[j + 1] !== undefined) {
+			projectDir = trailing[j + 1]!;
+			j++;
+		} else if (trailing[j] === '--json') {
+			jsonMode = true;
+		} else {
+			rest.push(trailing[j]!);
+		}
+	}
+
+	return { configDir, projectDir, jsonMode, command, rest };
 }
 
 export interface CommandResult {
@@ -127,7 +141,9 @@ function errorOutput(jsonMode: boolean, message: string, hint?: string): Command
 }
 
 export async function runTaskCommand(args: string[], cwd: string): Promise<CommandResult> {
-	const { configDir: configDirArg, jsonMode, command, rest } = parseArgs(args);
+	const { configDir: configDirArg, projectDir: projectDirArg, jsonMode, command, rest } = parseArgs(args);
+	const effectiveProjectDir = projectDirArg ?? process.env['TASK_PROJECT_DIR'] ?? process.env['PROJECT_DIR'];
+	const effectiveCwd = effectiveProjectDir ? path.resolve(cwd, effectiveProjectDir) : cwd;
 
 	if (!command || command === '--help') {
 		return {
@@ -143,7 +159,7 @@ export async function runTaskCommand(args: string[], cwd: string): Promise<Comma
 	}
 
 	if (command === 'init') {
-		const taskDir = path.join(cwd, '.task');
+		const taskDir = path.join(effectiveCwd, '.task');
 		if (fs.existsSync(taskDir)) {
 			return { exitCode: 0, output: 'Project already initialized.' };
 		}
@@ -152,18 +168,18 @@ export async function runTaskCommand(args: string[], cwd: string): Promise<Comma
 		return { exitCode: 0, output: `Initialized task project in ${taskDir}` };
 	}
 
-	if (!isProjectInitialized(cwd)) {
+	if (!isProjectInitialized(effectiveCwd)) {
 		return errorOutput(jsonMode, 'project not initialized', 'Run: task init');
 	}
 
-	const config = loadTaskConfig({ configDir: configDirArg, projectDir: cwd });
-	const tasksDir = path.join(cwd, '.task', 'tasks');
+	const config = loadTaskConfig({ configDir: configDirArg, projectDir: effectiveCwd });
+	const tasksDir = path.join(effectiveCwd, '.task', 'tasks');
 	const store = new TaskStore(tasksDir);
 	const hookDispatcher = buildHookDispatcher(config.globalHooks, config.projectHooks);
 
 	const projectEnv = {
-		taskProjectName: path.basename(cwd),
-		taskProjectPath: cwd,
+		taskProjectName: path.basename(effectiveCwd),
+		taskProjectPath: effectiveCwd,
 	};
 
 	switch (command) {
@@ -205,11 +221,7 @@ export async function runTaskCommand(args: string[], cwd: string): Promise<Comma
 			const id = rest[0];
 			const statusArg = rest[1];
 			if (!id || !statusArg) {
-				return errorOutput(
-					jsonMode,
-					'missing arguments',
-					'Usage: task set-status <id> <status>'
-				);
+				return errorOutput(jsonMode, 'missing arguments', 'Usage: task set-status <id> <status>');
 			}
 			if (!config.statuses.includes(statusArg)) {
 				const hint = suggest(statusArg, config.statuses);

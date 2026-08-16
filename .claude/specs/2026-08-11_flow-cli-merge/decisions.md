@@ -22,9 +22,10 @@ One unified `flow` binary (not two). The `task` binary stays as its own separate
 Default timeout for `--wait`: **10 minutes**.
 
 Configurable in `~/.flow-config.yaml`:
+
 ```yaml
 run:
-  waitTimeout: 10m
+    waitTimeout: 10m
 ```
 
 Overridable per invocation: `flow run --wait --timeout 30m`
@@ -42,9 +43,10 @@ Default output is always **human-readable** regardless of context. No TTY detect
 - `flow <command> --human` → force human output (override any config default)
 
 Configurable default in `~/.flow-config.yaml`:
+
 ```yaml
 output:
-  defaultFormat: json   # override default for this machine
+    defaultFormat: json # override default for this machine
 ```
 
 **Rationale:** TTY detection changes behavior silently depending on context (pipe, redirect, CI). This is confusing to debug. An explicit flag is always predictable.
@@ -56,6 +58,7 @@ output:
 ## D5 — Keep `flow show` and `flow docs` from Repo A
 
 Both inspection commands are carried into the unified CLI.
+
 - `flow show <file>` — ASCII table: steps, types, dependencies, outputs
 - `flow docs [-o <file>]` — FlowCapabilitiesGenerator markdown output
 

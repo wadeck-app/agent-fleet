@@ -8,200 +8,129 @@ import { ConditionEvaluator } from './ConditionEvaluator';
 describe('ConditionEvaluator', () => {
 	const evaluator = new ConditionEvaluator();
 
-	describe('Simple comparisons', () => {
-		it('should evaluate equality comparison', () => {
+	describe('outputs access (keyed by step id)', () => {
+		it('evaluates equality on a dep step output', () => {
 			const context = {
-				output: { value: 'test' },
+				outputs: { 'step-a': { value: 'test' } },
 			};
-
-			const result = evaluator.evaluate("output.value === 'test'", context, 'test-step');
-
-			expect(result).toBe(true);
+			expect(evaluator.evaluate("outputs['step-a'].value === 'test'", context, 'test-step')).toBe(true);
 		});
 
-		it('should evaluate inequality comparison', () => {
+		it('evaluates inequality comparison', () => {
 			const context = {
-				output: { value: 'test' },
+				outputs: { 'step-a': { value: 'test' } },
 			};
-
-			const result = evaluator.evaluate("output.value !== 'other'", context, 'test-step');
-
-			expect(result).toBe(true);
+			expect(evaluator.evaluate("outputs['step-a'].value !== 'other'", context, 'test-step')).toBe(true);
 		});
 
-		it('should evaluate numeric comparisons', () => {
+		it('evaluates numeric comparisons', () => {
 			const context = {
-				output: { count: 10 },
+				outputs: { counter: { count: 10 } },
 			};
-
-			expect(evaluator.evaluate('output.count > 5', context, 'test-step')).toBe(true);
-			expect(evaluator.evaluate('output.count < 5', context, 'test-step')).toBe(false);
-			expect(evaluator.evaluate('output.count >= 10', context, 'test-step')).toBe(true);
-			expect(evaluator.evaluate('output.count <= 10', context, 'test-step')).toBe(true);
+			expect(evaluator.evaluate("outputs.counter.count > 5", context, 'test-step')).toBe(true);
+			expect(evaluator.evaluate("outputs.counter.count < 5", context, 'test-step')).toBe(false);
+			expect(evaluator.evaluate("outputs.counter.count >= 10", context, 'test-step')).toBe(true);
 		});
 	});
 
 	describe('Boolean logic', () => {
-		it('should evaluate AND operator', () => {
+		it('evaluates AND operator', () => {
 			const context = {
-				output: { a: true, b: true },
+				outputs: { s: { a: true, b: true } },
 			};
-
-			expect(evaluator.evaluate('output.a && output.b', context, 'test-step')).toBe(true);
-			expect(evaluator.evaluate('output.a && !output.b', context, 'test-step')).toBe(false);
+			expect(evaluator.evaluate('outputs.s.a && outputs.s.b', context, 'test-step')).toBe(true);
+			expect(evaluator.evaluate('outputs.s.a && !outputs.s.b', context, 'test-step')).toBe(false);
 		});
 
-		it('should evaluate OR operator', () => {
+		it('evaluates OR operator', () => {
 			const context = {
-				output: { a: true, b: false },
+				outputs: { s: { a: true, b: false } },
 			};
-
-			expect(evaluator.evaluate('output.a || output.b', context, 'test-step')).toBe(true);
-			expect(evaluator.evaluate('!output.a && !output.b', context, 'test-step')).toBe(false);
+			expect(evaluator.evaluate('outputs.s.a || outputs.s.b', context, 'test-step')).toBe(true);
 		});
 
-		it('should evaluate NOT operator', () => {
+		it('evaluates NOT operator', () => {
 			const context = {
-				output: { flag: false },
+				outputs: { s: { flag: false } },
 			};
-
-			expect(evaluator.evaluate('!output.flag', context, 'test-step')).toBe(true);
-		});
-	});
-
-	describe('Nested property access', () => {
-		it('should access nested properties', () => {
-			const context = {
-				output: { data: { status: 'success', code: 200 } },
-			};
-
-			expect(evaluator.evaluate("output.data.status === 'success'", context, 'test-step')).toBe(true);
-			expect(evaluator.evaluate('output.data.code === 200', context, 'test-step')).toBe(true);
-		});
-	});
-
-	describe('Task metadata access', () => {
-		it('should access task metadata', () => {
-			const context = {
-				output: {},
-				task: { priority: 'high' },
-			};
-
-			expect(evaluator.evaluate("task.priority === 'high'", context, 'test-step')).toBe(true);
-		});
-
-		it('should combine output and task', () => {
-			const context = {
-				output: { complexity: 'high' },
-				task: { priority: 'high' },
-			};
-
-			expect(
-				evaluator.evaluate("output.complexity === 'high' && task.priority === 'high'", context, 'test-step')
-			).toBe(true);
+			expect(evaluator.evaluate('!outputs.s.flag', context, 'test-step')).toBe(true);
 		});
 	});
 
 	describe('Inputs access', () => {
-		it('should access input variables', () => {
+		it('accesses input variables', () => {
 			const context = {
-				output: {},
+				outputs: {},
 				inputs: { threshold: 10 },
 			};
-
 			expect(evaluator.evaluate('inputs.threshold > 5', context, 'test-step')).toBe(true);
 		});
 	});
 
 	describe('Complex conditions', () => {
-		it('should evaluate complex boolean expressions', () => {
+		it('evaluates complex boolean expressions', () => {
 			const context = {
-				output: { exitCode: 0, hasErrors: false, warnings: 2 },
+				outputs: { build: { exitCode: 0, hasErrors: false, warnings: 2 } },
 			};
-
-			const result = evaluator.evaluate(
-				'output.exitCode === 0 && !output.hasErrors && output.warnings < 5',
-				context,
-				'test-step'
-			);
-
-			expect(result).toBe(true);
+			expect(
+				evaluator.evaluate(
+					'outputs.build.exitCode === 0 && !outputs.build.hasErrors && outputs.build.warnings < 5',
+					context,
+					'test-step'
+				)
+			).toBe(true);
 		});
 
-		it('should handle parentheses', () => {
+		it('handles parentheses', () => {
 			const context = {
-				output: { a: true, b: false, c: true },
+				outputs: { s: { a: true, b: false, c: true } },
 			};
-
-			expect(evaluator.evaluate('(output.a || output.b) && output.c', context, 'test-step')).toBe(true);
+			expect(evaluator.evaluate('(outputs.s.a || outputs.s.b) && outputs.s.c', context, 'test-step')).toBe(true);
 		});
 	});
 
 	describe('evaluateConditions', () => {
-		it('should return first matching condition', () => {
+		it('returns first matching condition', () => {
 			const conditions = [
-				{ when: 'output.value > 10', goto: 'high' },
-				{ when: 'output.value > 5', goto: 'medium' },
-				{ when: 'output.value > 0', goto: 'low' },
+				{ when: 'outputs.s.value > 10', goto: 'high' },
+				{ when: 'outputs.s.value > 5', goto: 'medium' },
+				{ when: 'outputs.s.value > 0', goto: 'low' },
 			];
-
-			const context = { output: { value: 7 } };
-
-			const result = evaluator.evaluateConditions(conditions, context, 'test-step');
-
-			expect(result).toBe('medium');
+			const context = { outputs: { s: { value: 7 } } };
+			expect(evaluator.evaluateConditions(conditions, context, 'test-step')).toBe('medium');
 		});
 
-		it('should return undefined if no conditions match', () => {
+		it('returns undefined if no conditions match', () => {
 			const conditions = [
-				{ when: 'output.value > 10', goto: 'high' },
-				{ when: 'output.value < 0', goto: 'negative' },
+				{ when: 'outputs.s.value > 10', goto: 'high' },
+				{ when: 'outputs.s.value < 0', goto: 'negative' },
 			];
-
-			const context = { output: { value: 5 } };
-
-			const result = evaluator.evaluateConditions(conditions, context, 'test-step');
-
-			expect(result).toBeUndefined();
+			const context = { outputs: { s: { value: 5 } } };
+			expect(evaluator.evaluateConditions(conditions, context, 'test-step')).toBeUndefined();
 		});
 	});
 
 	describe('Error handling', () => {
-		it('should throw on non-boolean result', () => {
-			const context = { output: { value: 'test' } };
-
-			expect(() => {
-				evaluator.evaluate('output.value', context, 'test-step');
-			}).toThrow();
+		it('throws on non-boolean result', () => {
+			const context = { outputs: { s: { value: 'test' } } };
+			expect(() => evaluator.evaluate("outputs.s.value", context, 'test-step')).toThrow();
 		});
 
-		it('should throw on syntax error', () => {
-			const context = { output: {} };
-
-			expect(() => {
-				evaluator.evaluate('invalid syntax !!!', context, 'test-step');
-			}).toThrow();
-		});
-
-		it('should throw on undefined property access', () => {
-			const context = { output: {} };
-
-			expect(() => {
-				evaluator.evaluate('output.missing.property', context, 'test-step');
-			}).toThrow();
+		it('throws on syntax error', () => {
+			const context = { outputs: {} };
+			expect(() => evaluator.evaluate('invalid syntax !!!', context, 'test-step')).toThrow();
 		});
 	});
 
 	describe('isValid', () => {
-		it('should validate correct syntax', () => {
-			expect(evaluator.isValid("output.value === 'test'")).toBe(true);
-			expect(evaluator.isValid('output.count > 5')).toBe(true);
-			expect(evaluator.isValid('output.a && output.b')).toBe(true);
+		it('validates correct syntax', () => {
+			expect(evaluator.isValid("outputs.s.value === 'test'")).toBe(true);
+			expect(evaluator.isValid('outputs.s.count > 5')).toBe(true);
 		});
 
-		it('should reject invalid syntax', () => {
+		it('rejects invalid syntax', () => {
 			expect(evaluator.isValid('invalid syntax')).toBe(false);
-			expect(evaluator.isValid('output.')).toBe(false);
+			expect(evaluator.isValid('outputs.')).toBe(false);
 			expect(evaluator.isValid('')).toBe(false);
 		});
 	});

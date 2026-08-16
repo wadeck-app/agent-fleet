@@ -1,0 +1,50 @@
+# Spec: Plugin System for flow/task CLI
+
+**Created:** 2026-08-16
+**Version:** v0.1
+**Status:** In Progress -- v0.1 -- 3/10 questions resolved
+**Iteration:** 1
+
+## Summary
+
+<!-- One paragraph: what this spec covers and why it exists. Fill in after first few decisions. -->
+
+## Decision Log
+
+| # | Decision | Status | Date | Rationale |
+|---|---|---|---|---|
+| 1 | In-process plugins with explicit capability injection (Option C) | Accepted | 2026-08-16 | Simple to build, clean TypeScript interface contract, easy path to subprocess isolation later via host-side adapter wrapping. Plugins are developer-written, no malicious actor threat. |
+| 2 | Config layers: global config (env var or ~/.flow/config.yml) + project config (use + overrides) | Accepted | 2026-08-16 | Project uses "use: <instance-name>" to reference a named instance from global config, OR declares an inline instance directly. Global config defines named plugin instances with credentials via ${ENV_VAR}. FLOW_CONFIG / TASK_CONFIG env var overrides the default user-home path. Multiple instances of same type (e.g. 3 Jira) are supported. Cloud B global config file = v2. Remote config download = v3. |
+
+## Open Questions
+
+| # | Question | Priority | Status |
+|---|---|---|---|
+| 1 | What is the plugin discovery and loading mechanism? | High | Open |
+| - | **RESOLVED:** Plugin isolation model -- in-process with capability injection | - | Resolved |
+| 2 | What is the plugin configuration format and location? | High | Open |
+| 3 | What is the plugin interface contract (how does a plugin declare what it provides)? | High | Open |
+| 4 | How are provider types (workspace, agent, model, etc.) registered and resolved? | High | Open |
+| 5 | What is the lifecycle of a plugin (init, teardown, error handling)? | Medium | Open |
+| 6 | What is the workspace provider interface and the "none" strategy? | High | Open |
+| 7 | What is the worktree workspace provider strategy? | High | Open |
+| 8 | How are secrets/credentials handled within plugins? | High | Open |
+| 9 | What versioning/compatibility contract exists between the CLI and plugins? | Medium | Open |
+| 10 | How is the user intervention/approval provider integrated? | Medium | Open |
+
+## Modules / Sub-files
+
+| File | Contents |
+|---|---|
+| `guiding-principles.md` | Core principles driving all decisions |
+| `out-of-scope.md` | Explicitly excluded items |
+| `threat-model.md` | Security threats and mitigations |
+| `plugin-architecture.md` | Core plugin system design |
+| `workspace-provider.md` | Workspace provider plugin type |
+| `provider-types.md` | Catalogue of all provider types |
+
+## Changelog
+
+| Version | Date | Summary |
+|---|---|---|
+| v0.1 | 2026-08-16 | Initial spec created |

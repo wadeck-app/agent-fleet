@@ -3,12 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import {
-	expandTilde,
-	isProjectInitialized,
-	loadTaskConfig,
-	resolveGlobalConfigDir,
-} from './TaskConfigLoader';
+import { expandTilde, isProjectInitialized, loadTaskConfig, resolveGlobalConfigDir } from './TaskConfigLoader';
 
 describe('TaskConfigLoader', () => {
 	let tmpDir: string;
@@ -80,43 +75,28 @@ describe('TaskConfigLoader', () => {
 		it('project priority overrides global priority', () => {
 			fs.writeFileSync(path.join(tmpDir, 'config.yml'), 'defaults:\n  priority: low\n');
 			fs.mkdirSync(path.join(tmpDir, '.task'), { recursive: true });
-			fs.writeFileSync(
-				path.join(tmpDir, '.task', 'config.yml'),
-				'defaults:\n  priority: critical\n'
-			);
+			fs.writeFileSync(path.join(tmpDir, '.task', 'config.yml'), 'defaults:\n  priority: critical\n');
 			const config = loadTaskConfig({ configDir: tmpDir, projectDir: tmpDir });
 			expect(config.defaults.priority).toBe('critical');
 		});
 
 		it('project statuses replace defaults', () => {
 			fs.mkdirSync(path.join(tmpDir, '.task'), { recursive: true });
-			fs.writeFileSync(
-				path.join(tmpDir, '.task', 'config.yml'),
-				'statuses:\n  - todo\n  - doing\n  - done\n'
-			);
+			fs.writeFileSync(path.join(tmpDir, '.task', 'config.yml'), 'statuses:\n  - todo\n  - doing\n  - done\n');
 			const config = loadTaskConfig({ configDir: tmpDir, projectDir: tmpDir });
 			expect(config.statuses).toEqual(['todo', 'doing', 'done']);
 		});
 
 		it('loads global hooks', () => {
-			fs.writeFileSync(
-				path.join(tmpDir, 'config.yml'),
-				'hooks:\n  onTaskCreated: echo created\n'
-			);
+			fs.writeFileSync(path.join(tmpDir, 'config.yml'), 'hooks:\n  onTaskCreated: echo created\n');
 			const config = loadTaskConfig({ configDir: tmpDir, projectDir: tmpDir });
 			expect(config.globalHooks['onTaskCreated']).toBe('echo created');
 		});
 
 		it('keeps global and project hooks separate', () => {
-			fs.writeFileSync(
-				path.join(tmpDir, 'config.yml'),
-				'hooks:\n  onTaskCreated: echo global\n'
-			);
+			fs.writeFileSync(path.join(tmpDir, 'config.yml'), 'hooks:\n  onTaskCreated: echo global\n');
 			fs.mkdirSync(path.join(tmpDir, '.task'), { recursive: true });
-			fs.writeFileSync(
-				path.join(tmpDir, '.task', 'config.yml'),
-				'hooks:\n  onStatusChange: node notify.js\n'
-			);
+			fs.writeFileSync(path.join(tmpDir, '.task', 'config.yml'), 'hooks:\n  onStatusChange: node notify.js\n');
 			const config = loadTaskConfig({ configDir: tmpDir, projectDir: tmpDir });
 			expect(config.globalHooks['onTaskCreated']).toBe('echo global');
 			expect(config.projectHooks['onStatusChange']).toBe('node notify.js');

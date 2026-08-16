@@ -391,6 +391,9 @@ export interface OutputVariableConfig {
 	/** Optional regex pattern for extraction from text (for script/model steps) */
 	pattern?: string;
 
+	/** JSONPath expression for extracting a value from JSON output (e.g. '$.status'). Mutually exclusive with pattern. */
+	jsonpath?: string;
+
 	/**
 	 * Source path for extraction (for user_intervention steps)
 	 * Examples: 'intervention.approved', 'intervention.comment', 'intervention.answeredBy'
@@ -794,6 +797,9 @@ export interface FlowDefinition {
 
 	/** Optional trigger for automatic flow execution based on events */
 	trigger?: FlowTrigger;
+
+	/** Global environment variables injected into every step (supports ${{ }} templates). Step-level env takes precedence. */
+	env?: Record<string, string>;
 }
 
 /**

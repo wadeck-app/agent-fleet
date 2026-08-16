@@ -10,7 +10,7 @@ import { DEFAULT_CONFIG, startDaemon } from '../../daemon/Daemon';
 import type { ClientCommand, DaemonResponse, ExecutionState } from '../../ipc/Protocol';
 import { ExecutionStore } from '../../storage/ExecutionStore';
 
-type FlowCommands = { run: (payload: unknown) => Promise<DaemonResponse> };
+type FlowCommands = { run?: (payload: unknown) => Promise<DaemonResponse> };
 
 function parseTimeout(value: string): number {
 	const match = /^(\d+)(ms|s|m|h)?$/.exec(value);
@@ -209,7 +209,7 @@ async function sendToDaemon(
 	const makeClient = () =>
 		createDaemonClient<FlowCommands>({
 			configDir: daemonDir,
-			commands: { run: async p => p as DaemonResponse },
+			commands: {},
 		});
 	try {
 		return (await makeClient().send('run', cmd)) as DaemonResponse;
@@ -238,6 +238,15 @@ export function registerRunCommand(program: Command): void {
 			},
 			[] as string[]
 		)
+		.option(
+			'--inputs <key=value>',
+			'Alias for --input (repeatable)',
+			(val: string, acc: string[]) => {
+				acc.push(val);
+				return acc;
+			},
+			[] as string[]
+		)
 		.option('--flow-id <id>', 'Flow ID within a multi-flow YAML')
 		.option('--wait', 'Block until execution completes')
 		.option('--timeout <duration>', 'Timeout for --wait (default: 10m)', '10m')
@@ -249,6 +258,7 @@ export function registerRunCommand(program: Command): void {
 				flowRef: string,
 				options: {
 					input: string[];
+					inputs: string[];
 					flowId?: string;
 					wait?: boolean;
 					timeout: string;
@@ -257,7 +267,7 @@ export function registerRunCommand(program: Command): void {
 					human?: boolean;
 				}
 			) => {
-				const inputs = parseInputArgs(options.input);
+				const inputs = parseInputArgs([...options.input, ...options.inputs]);
 				const cwd = process.cwd();
 				const daemonDir = path.join(os.homedir(), '.flow-daemon');
 
@@ -307,7 +317,11 @@ export function registerRunCommand(program: Command): void {
 					process.exit(response.code === 'VALIDATION_FAILED' ? 2 : 1);
 				}
 
-				const { executionId } = response;
+				const { executionId } = response as { type: 'execution_started'; executionId: string };
+				if (!executionId) {
+					console.error('Error: daemon returned a response without an executionId — try restarting the daemon');
+					process.exit(1);
+				}
 
 				if (!options.wait) {
 					if (options.json && !options.human) {

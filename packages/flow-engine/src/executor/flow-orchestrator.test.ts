@@ -483,4 +483,60 @@ describe('FlowOrchestrator', () => {
 			expect(executionOrder[3]).toBe('end');
 		});
 	});
+
+	describe('Global env', () => {
+		const makeFlow = (globalEnv?: Record<string, string>, stepEnv?: Record<string, string>): FlowDefinition => ({
+			id: 'env-flow',
+			version: '1.0.0',
+			name: 'Env Flow',
+			description: 'Global env test',
+			workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+			inputs: {},
+			env: globalEnv,
+			steps: [{ id: 'step1', name: 'Step 1', type: 'script', script: 'echo hi', env: stepEnv }],
+		});
+
+		const makeTrace = (): StepTrace => ({
+			stepId: 'step1',
+			stepName: 'Step 1',
+			stepType: 'script',
+			startTime: Date.now(),
+			endTime: Date.now() + 10,
+			durationMs: 10,
+			outputs: {},
+		});
+
+		it('passes global env to script step', async () => {
+			vi.mocked(mockStepRunner.executeStep).mockResolvedValue(makeTrace());
+			const flow = makeFlow({ MY_VAR: 'hello' });
+			await orchestrator.orchestrate('t', flow, testWorkspace, { inputs: {}, stepOutputs: new Map(), taskMetadata: {} });
+			const calledStep = vi.mocked(mockStepRunner.executeStep).mock.calls[0]![0] as any;
+			expect(calledStep.env).toMatchObject({ MY_VAR: 'hello' });
+		});
+
+		it('step-level env overrides global env for same key', async () => {
+			vi.mocked(mockStepRunner.executeStep).mockResolvedValue(makeTrace());
+			const flow = makeFlow({ KEY: 'global', OTHER: 'x' }, { KEY: 'step' });
+			await orchestrator.orchestrate('t', flow, testWorkspace, { inputs: {}, stepOutputs: new Map(), taskMetadata: {} });
+			const calledStep = vi.mocked(mockStepRunner.executeStep).mock.calls[0]![0] as any;
+			expect(calledStep.env).toMatchObject({ KEY: 'step', OTHER: 'x' });
+		});
+
+		it('resolves ${{ }} templates in global env values', async () => {
+			vi.mocked(mockStepRunner.executeStep).mockResolvedValue(makeTrace());
+			const flow = makeFlow({ PROJECT: '${{ inputs.dir }}' });
+			const context = { inputs: { dir: '/my/project' }, stepOutputs: new Map(), taskMetadata: {} };
+			await orchestrator.orchestrate('t', flow, testWorkspace, context);
+			const calledStep = vi.mocked(mockStepRunner.executeStep).mock.calls[0]![0] as any;
+			expect(calledStep.env).toMatchObject({ PROJECT: '/my/project' });
+		});
+
+		it('does not mutate step when no global env', async () => {
+			vi.mocked(mockStepRunner.executeStep).mockResolvedValue(makeTrace());
+			const flow = makeFlow(undefined, { STEP_ONLY: 'yes' });
+			await orchestrator.orchestrate('t', flow, testWorkspace, { inputs: {}, stepOutputs: new Map(), taskMetadata: {} });
+			const calledStep = vi.mocked(mockStepRunner.executeStep).mock.calls[0]![0] as any;
+			expect(calledStep.env).toEqual({ STEP_ONLY: 'yes' });
+		});
+	});
 });

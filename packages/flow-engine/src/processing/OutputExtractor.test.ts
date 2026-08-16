@@ -457,4 +457,43 @@ describe('OutputExtractor', () => {
 			expect(output.data).toEqual({ key: 'value' });
 		});
 	});
+
+	describe('JSONPath extraction', () => {
+		it('extracts top-level field via $.field', () => {
+			const config: StepOutput = {
+				status: { type: 'string', jsonpath: '$.status' },
+			};
+			const output = extractor.extract('{"status":"todo","id":"t1"}', config, 'step1');
+			expect(output.status).toBe('todo');
+		});
+
+		it('extracts nested field via $.field.nested', () => {
+			const config: StepOutput = {
+				value: { type: 'string', jsonpath: '$.nested.value' },
+			};
+			const output = extractor.extract('{"nested":{"value":"deep"}}', config, 'step1');
+			expect(output.value).toBe('deep');
+		});
+
+		it('throws OutputExtractionError on invalid JSON', () => {
+			const config: StepOutput = {
+				status: { type: 'string', jsonpath: '$.status', required: true },
+			};
+			expect(() => extractor.extract('not-json', config, 'step1')).toThrow(/JSON/);
+		});
+
+		it('throws OutputExtractionError when path is missing in parsed JSON', () => {
+			const config: StepOutput = {
+				status: { type: 'string', jsonpath: '$.status', required: true },
+			};
+			expect(() => extractor.extract('{"other":"value"}', config, 'step1')).toThrow(/status/);
+		});
+
+		it('throws when both jsonpath and pattern are set', () => {
+			const config: StepOutput = {
+				status: { type: 'string', jsonpath: '$.status', pattern: 'status: (\\w+)', required: true },
+			};
+			expect(() => extractor.extract('{"status":"todo"}', config, 'step1')).toThrow(/mutually exclusive/);
+		});
+	});
 });

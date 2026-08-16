@@ -13,6 +13,7 @@
 - [ ] **Process**: When multiple agents need the same spec files, pass shared context or findings rather than having each agent re-read the same files independently.
 
 <!-- consolidated 2026-08-15 -->
+
 **Documentation**
 
 - [ ] Add a `decisions-index.md` (or TOC block) to each spec directory listing every decision ID (D1, D2…) with a one-line summary and anchor link, so agents can jump directly to a decision instead of grepping across files
@@ -23,7 +24,7 @@
 
 **Process**
 
-- [ ] Run a goldfish validation pass (comprehension → critic → implementation-readiness) *before* finalizing a spec and before generating an implementation prompt — not after repeated editing cycles
+- [ ] Run a goldfish validation pass (comprehension → critic → implementation-readiness) _before_ finalizing a spec and before generating an implementation prompt — not after repeated editing cycles
 - [ ] When delegating parallel spec-audit agents, assign non-overlapping file scopes explicitly in each agent prompt to prevent 4+ agents reading identical files without coordination
 - [ ] Always specify `subagent_type` in every `Agent()` call — never omit it; "Agent unknown" entries indicate missing type and defeat parallelization benefits
 - [ ] Before delegating analysis to sub-agents, read shared context files once in the main agent and pass relevant excerpts in the delegation prompt rather than letting each sub-agent re-read the same files from scratch

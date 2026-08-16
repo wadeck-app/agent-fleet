@@ -466,23 +466,50 @@
     },
     "81bc9b90-4e9e-4010-8154-e49420c7cc14": "skipped:too-short",
     "f5ca1287-2b09-44b4-99ba-7cb16b28cc7a": {
-      "analyzedAt": "2026-08-15T20:40:23.843Z",
-      "linesAt": 160,
-      "findings": 10,
+      "analyzedAt": "2026-08-16T06:25:43.253Z",
+      "linesAt": 1516,
+      "findings": 17,
       "subagentsAt": {
         "agent-a0efd297d3988431d.jsonl": 29,
         "agent-a158c410e0072c7fe.jsonl": 344,
+        "agent-a20266f6484aba2f0.jsonl": 51,
+        "agent-a25c1ff26ee60b7f5.jsonl": 17,
+        "agent-a53eca35f9ba8eef4.jsonl": 24,
+        "agent-a638ad159cfd19241.jsonl": 23,
         "agent-a7092a00a49a07c4a.jsonl": 43,
-        "agent-a99e68823c8adaf09.jsonl": 17
+        "agent-a8eef0722be606d0f.jsonl": 57,
+        "agent-a99e68823c8adaf09.jsonl": 17,
+        "agent-ab1771393c311cc27.jsonl": 29,
+        "agent-ab1cfcdae7bbdd391.jsonl": 18,
+        "agent-abe9f192443ef73c7.jsonl": 7,
+        "agent-ac7f4b36c733b6126.jsonl": 132,
+        "agent-ad3e7f5b304724934.jsonl": 13,
+        "agent-adae239b6b8fb5ace.jsonl": 31,
+        "agent-ae4dd29aa104d1d26.jsonl": 51,
+        "agent-aecbf7ed3f9fb87c1.jsonl": 37
       },
       "logLinesAt": {
-        "w-command-log": 194,
+        "w-command-log": 346,
         "w-guardrails": 0
       }
     },
     "4a6762f1-9d8f-4364-8e13-3c22d9c8e88f": "skipped:too-short",
     "4bc6cb96-8804-49a3-8c3a-eccd6335edd4": "skipped:too-short",
-    "f716f570-a0a8-4002-97d0-3b77ff486d2d": "pending"
+    "f716f570-a0a8-4002-97d0-3b77ff486d2d": {
+      "analyzedAt": "2026-08-16T06:25:18.863Z",
+      "linesAt": 29,
+      "findings": 3,
+      "subagentsAt": {},
+      "logLinesAt": {
+        "w-command-log": 155,
+        "w-guardrails": 0
+      }
+    },
+    "6a277fac-1773-4d70-a476-191584576e32": "skipped:too-short",
+    "6a9801bf-f50c-41c2-9ea1-4d771430ab15": "skipped:too-short",
+    "949b01e8-91ae-4bab-b0c3-b3edecb92e65": "skipped:too-short",
+    "b766cb6d-5b94-48bd-b873-36db68c67999": "skipped:too-short",
+    "b3fa1f09-d383-4806-81e4-1ea06594cad7": "skipped:too-short"
   },
   "last_consolidation": "2026-08-15T16:26:30.411Z"
 }

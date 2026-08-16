@@ -86,6 +86,14 @@ export class OutputExtractor {
 	): any {
 		let value: any;
 
+		if (config.jsonpath && config.pattern) {
+			throw new OutputExtractionError(
+				`'jsonpath' and 'pattern' are mutually exclusive`,
+				varName,
+				stepId
+			);
+		}
+
 		// If 'from' is specified, extract from the specified source path
 		if (config.from) {
 			value = this.extractFromPath(config.from, additionalContext, varName, stepId);
@@ -93,6 +101,10 @@ export class OutputExtractor {
 		// Check if it's in additionalContext (for script steps: exitCode, stderr, etc.)
 		else if (additionalContext && varName in additionalContext) {
 			value = additionalContext[varName];
+		}
+		// Extract using JSONPath expression
+		else if (config.jsonpath) {
+			value = this.extractWithJsonPath(config.jsonpath, rawOutput, varName, stepId);
 		}
 		// Extract using regex pattern
 		else if (config.pattern) {
@@ -148,6 +160,53 @@ export class OutputExtractor {
 			}
 
 			current = current[part];
+		}
+
+		return current;
+	}
+
+	/**
+	 * Extract value from JSON output using a dot-notation JSONPath (e.g. '$.status', '$.nested.field').
+	 */
+	private extractWithJsonPath(jsonpath: string, rawOutput: string, varName: string, stepId: string): unknown {
+		let parsed: unknown;
+		try {
+			parsed = JSON.parse(rawOutput.trim());
+		} catch {
+			throw new OutputExtractionError(
+				`Cannot apply jsonpath '${jsonpath}': output is not valid JSON`,
+				varName,
+				stepId
+			);
+		}
+
+		if (!jsonpath.startsWith('$.')) {
+			throw new OutputExtractionError(
+				`Invalid jsonpath '${jsonpath}': must start with '$.'`,
+				varName,
+				stepId
+			);
+		}
+
+		const parts = jsonpath.slice(2).split('.');
+		let current: unknown = parsed;
+
+		for (const part of parts) {
+			if (current == null || typeof current !== 'object') {
+				throw new OutputExtractionError(
+					`jsonpath '${jsonpath}' failed: reached non-object before '${part}'`,
+					varName,
+					stepId
+				);
+			}
+			if (!(part in (current as Record<string, unknown>))) {
+				throw new OutputExtractionError(
+					`jsonpath '${jsonpath}' failed: key '${part}' not found`,
+					varName,
+					stepId
+				);
+			}
+			current = (current as Record<string, unknown>)[part];
 		}
 
 		return current;
