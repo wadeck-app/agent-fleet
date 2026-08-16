@@ -287,6 +287,11 @@ export class StepRunner {
 				if (typeof prevSessionId === 'string' && prevSessionId) {
 					resumeSessionId = prevSessionId;
 				}
+			} else if (step.session.mode === 'compact') {
+				// Same as append but passes --auto-compact to trigger context compaction
+				if (typeof prevSessionId === 'string' && prevSessionId) {
+					resumeSessionId = prevSessionId;
+				}
 			} else if (step.session.mode === 'fork') {
 				if (prevSessionFile && fs.existsSync(prevSessionFile)) {
 					// Copy session .jsonl to new UUID so this branch is independent
@@ -315,6 +320,7 @@ export class StepRunner {
 			streamJson: streamJson && !this.config.interactive,
 			verbose: verbose && !this.config.interactive,
 			skipPermissions,
+			autoCompact: step.session?.mode === 'compact',
 			resumeSessionId,
 			// StepRunner is invoked by the orchestrator which manages its own env strategy
 			isolateEnv: false,

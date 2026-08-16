@@ -298,6 +298,52 @@ describe('ClaudeLauncher', () => {
 		});
 	});
 
+	describe('compact mode (--auto-compact)', () => {
+		it('includes --auto-compact when autoCompact is true', async () => {
+			const mockProcess = {
+				on: vi.fn((event, callback) => {
+					if (event === 'close') setTimeout(() => callback(0), 10);
+					return mockProcess;
+				}),
+			};
+			vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
+			vi.spyOn(manager, 'findClaudePath').mockReturnValue('/usr/bin/claude');
+
+			await manager.launchInteractive({
+				workingDir: '/test',
+				prompt: 'Continue compacted',
+				stepId: 'test',
+				resumeSessionId: 'sess-xyz',
+				autoCompact: true,
+			});
+
+			const calledArgs = (child_process.spawn as any).mock.calls[0][1] as string[];
+			expect(calledArgs).toContain('--autocompact');
+			expect(calledArgs).toContain('--resume');
+		});
+
+		it('does not include --auto-compact when autoCompact is not set', async () => {
+			const mockProcess = {
+				on: vi.fn((event, callback) => {
+					if (event === 'close') setTimeout(() => callback(0), 10);
+					return mockProcess;
+				}),
+			};
+			vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
+			vi.spyOn(manager, 'findClaudePath').mockReturnValue('/usr/bin/claude');
+
+			await manager.launchInteractive({
+				workingDir: '/test',
+				prompt: 'No compact',
+				stepId: 'test',
+				resumeSessionId: 'sess-xyz',
+			});
+
+			const calledArgs = (child_process.spawn as any).mock.calls[0][1] as string[];
+			expect(calledArgs).not.toContain('--autocompact');
+		});
+	});
+
 	describe('launchBackground', () => {
 		it.skip('should launch claude in background mode and capture output', async () => {
 			const mockStdout = {

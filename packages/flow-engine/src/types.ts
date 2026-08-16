@@ -602,7 +602,7 @@ export interface ModelFlowStep extends BaseFlowStep {
 		 * - 'append': adds a new user message to the existing session (shared history)
 		 * - 'fork': copies the session .jsonl to a new UUID — each fork is independent
 		 */
-		mode: 'append' | 'fork';
+		mode: 'append' | 'fork' | 'compact';
 	};
 }
 

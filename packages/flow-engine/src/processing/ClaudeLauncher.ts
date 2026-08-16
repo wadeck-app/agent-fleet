@@ -60,6 +60,9 @@ export interface ClaudeLaunchOptions {
 	/** Resume a previous Claude session by ID (passes --resume <id> before -p) */
 	resumeSessionId?: string;
 
+	/** Pass --auto-compact to trigger context compaction before the response (compact mode) */
+	autoCompact?: boolean;
+
 	/** Callback for stream-json events (requires streamJson=true) */
 	onStreamEvent?: StreamJsonEventCallback;
 
@@ -147,7 +150,7 @@ export class ClaudeLauncher {
 		prompt: string,
 		model: string | undefined,
 		interactive: boolean,
-		options?: Pick<ClaudeLaunchOptions, 'skipPermissions' | 'streamJson' | 'verbose' | 'resumeSessionId'>
+		options?: Pick<ClaudeLaunchOptions, 'skipPermissions' | 'streamJson' | 'verbose' | 'resumeSessionId' | 'autoCompact'>
 	): { command: string; args: string[] } {
 		let command: string;
 		let args: string[];
@@ -177,6 +180,10 @@ export class ClaudeLauncher {
 
 		if (model) {
 			args.push('--model', model);
+		}
+
+		if (options?.autoCompact) {
+			args.push('--autocompact', 'auto');
 		}
 
 		if (options?.resumeSessionId) {
