@@ -10,7 +10,7 @@
 		"clean": "rimraf dist dist-types"
 	},
 	"dependencies": {
-		"shared-common": "*"
+		"shared-common": "file:../shared-common"
 	},
 	"devDependencies": {
 		"typescript": "^5.3.3",

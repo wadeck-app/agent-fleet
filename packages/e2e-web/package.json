@@ -31,7 +31,7 @@
 		"lint:fix": "eslint . --fix"
 	},
 	"dependencies": {
-		"shared-frontend-backend": "*"
+		"shared-frontend-backend": "file:../shared-frontend-backend"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.57.0",

@@ -15,9 +15,9 @@
 		"clean": "rimraf dist"
 	},
 	"dependencies": {
-		"orchestrator": "*",
-		"shared-common": "*",
-		"shared-orch-worker": "*"
+		"orchestrator": "file:../orchestrator",
+		"shared-common": "file:../shared-common",
+		"shared-orch-worker": "file:../shared-orch-worker"
 	},
 	"devDependencies": {
 		"test-utils": "*",

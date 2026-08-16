@@ -13,7 +13,7 @@
 		"clean": "rimraf dist dist-types"
 	},
 	"dependencies": {
-		"shared-common": "*",
+		"shared-common": "file:../shared-common",
 		"js-yaml": "^4.1.1",
 		"zod": "^4.1.13",
 		"simple-git": "^3.30.0",

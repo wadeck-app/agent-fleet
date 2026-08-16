@@ -24,7 +24,7 @@
 		"commander": "^12.1.0",
 		"flow-engine": "file:../flow-engine",
 		"js-yaml": "^4.1.1",
-		"shared-common": "*",
+		"shared-common": "file:../shared-common",
 		"ws": "^8.0.0"
 	},
 	"devDependencies": {

@@ -6073,3 +6073,31 @@ React, Babel, Jest all use `file:` or `link:` protocol for internal cross-packag
 `agent-browser` (Playwright) is acceptable as long as it runs **headless**. Never launch a headed (visible) browser window — it opens on the user's screen and breaks their focus.
 
 Rule: `headless: true` always. Only use headed mode if the user explicitly requests it for a specific reason.
+
+## npm workspace package shadowing — solution et limitation — 2026-08-16
+
+### Problème
+Un package npm public portant le même nom qu'un package workspace local peut s'installer dans `node_modules/` d'un sous-package (si `npm install` est lancé depuis ce sous-package). La résolution locale prend alors la priorité sur le symlink workspace racine, provoquant des erreurs d'import.
+
+### Solution appliquée : `file:`
+Tous les packages workspace utilisent maintenant `"file:../package-dir"` au lieu de `"*"` pour leurs dépendances siblings :
+```json
+"flow-engine": "file:../flow-engine"
+```
+npm ne peut pas substituer un package registry à un chemin `file:` explicite.
+
+### Limitation : pas la pratique industrie
+`file:` est un contournement, pas la solution canonique. Deux problèmes :
+1. **Fragilité structurelle** — si un package est déplacé, les chemins cassent silencieusement
+2. **Ne scale pas** — à l'extension du framework (nouveaux packages, extraction en sous-monorepos), chaque nouveau package doit penser à utiliser `file:` pour ses dépendances internes
+
+### Vraie solution : packages scopés
+La pratique industrie (Babel, Jest, etc.) est de préfixer tous les packages workspace avec un scope privé :
+```json
+"@mon-scope/flow-engine": "*"
+```
+Un package `@mon-scope/flow-engine` ne peut jamais entrer en collision avec un package public npm — le scope agit comme espace de nommage. `"*"` redevient safe.
+
+**Prérequis :** posséder ou contrôler le scope npm (`@mon-scope`). `@agent-fleet` n'est pas disponible — choisir un scope maîtrisé avant de migrer.
+
+**Impact du renommage :** tous les `import from 'flow-engine'`, `tsconfig.paths`, `package.json`, et fichiers de config devront être mis à jour. Planifier comme un refactoring dédié.
