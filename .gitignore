@@ -63,7 +63,7 @@ nul
 packages/data/
 packages/web-backend/data/
 _results/
-.claude/w-learning/state.json
+.claude/w-learning/locks/
 *.flow-test.yml
 
 _notes.txt

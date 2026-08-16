@@ -763,14 +763,29 @@
     "ee08c29d-af41-4e42-ad14-dc38ef27ffaf": "skipped:too-short",
     "19454f22-9738-444d-9487-e5bf2aabe8e8": "skipped:too-short",
     "f3b59f45-9254-4c98-8062-5deb13b298a1": "skipped:too-short",
-    "e453d841-0d1e-4679-85ec-ed5ab5c07a54": "in-progress:2026-08-16T14:57:08.305Z",
+    "e453d841-0d1e-4679-85ec-ed5ab5c07a54": {
+      "analyzedAt": "2026-08-16T14:58:08.424Z",
+      "linesAt": 55,
+      "findings": 29,
+      "subagentsAt": {},
+      "logLinesAt": {
+        "w-command-log": 1774,
+        "w-guardrails": 0
+      }
+    },
     "fb073790-841d-45a7-abdf-26c90664f038": "skipped:too-short",
     "5b189cbf-ad6a-4cd4-99c7-3994e39ef164": "skipped:too-short",
     "1c58787f-9676-4ab3-9571-07b93a976660": "skipped:too-short",
     "29a23f8f-7ab4-4473-9c61-dec99513f55b": "skipped:too-short",
     "283fe93f-25bf-454b-a3bf-e4714957ee07": "skipped:too-short",
     "c7f1ab2e-1100-4cfd-bfef-c452f97ea8ad": "skipped:too-short",
-    "c32dd38e-86dd-4102-9007-ec4d54524031": "skipped:too-short"
+    "c32dd38e-86dd-4102-9007-ec4d54524031": "skipped:too-short",
+    "9f00967d-2536-4e4f-a488-a0522268352f": "skipped:too-short"
   },
-  "last_consolidation": "2026-08-15T16:26:30.411Z"
+  "last_consolidation": "2026-08-15T16:26:30.411Z",
+  "last_analysis_summary": {
+    "sessionId": "e453d841-0d1e-4679-85ec-ed5ab5c07a54",
+    "findings": 29,
+    "at": "2026-08-16T14:58:08.425Z"
+  }
 }

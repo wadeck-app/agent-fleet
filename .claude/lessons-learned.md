@@ -1,8 +1,14 @@
 # Lessons learned
 
-<!-- Last updated: 2026-08-16T14:41:44.955Z -->
+<!-- Last updated: 2026-08-16T14:58:08.422Z -->
 
 ## Recurring feedback
+
+<!-- session e453d841 2026-08-16 -->
+- Heavy parallel agent forking (fork pattern with ~6 independent agents) appears to be standard workflow here — all independent features (JSONPath, --project-dir, env vars, --inputs alias) spawned as separate agents to reduce context per agent.
+- Multiple test iterations of task-loop.yml with debug logging additions (10:54–11:06) with uncertain resolution — suggests incomplete understanding of the fix before testing began; pattern of add-logging-then-test rather than diagnose-then-fix.
+- User preference: STOP using web fetching/external APIs — use only local files and code inspection (11:10:55 message to agent a8c1)
+- Parallel agents working on independent concerns (spec validation vs implementation) can miss coordinated changes — metaDir refactoring touched both, but fixes weren't synchronized.
 
 <!-- session 7d4fb045 2026-08-16 -->
 - TDD workflow applied consistently across parallel agents (a0bf, a106, ac4e, ac93) for feature implementation — red phase tests followed by implementation.
@@ -211,6 +217,17 @@
 - Multiple independent agents (Explore, general-purpose) read identical spec files sequentially without coordination, causing redundant I/O. Agents should receive shared context or hand off findings rather than re-audit.
 
 ## Agent errors
+
+<!-- session e453d841 2026-08-16 -->
+- Template variable syntax confusion — assistant initially used syntax later corrected to `${{ }}` as the standard format; corrected via agent fork message (2026-08-16 07:28:29)
+- Inconsistent `workspaceDir` parameter naming across context objects (`context.workspaceDir` vs bare `workspaceDir`) without clear naming convention — required multiple edits across files to align
+- Spec and run skills were marked "NOT YET KNOWN" early (07:48:57, 07:52:42) but continued operating without visible failure; unclear if they later loaded or if the warning was a false alarm.
+- Fork a593 received vague design requirement ("when: context shape must be step-id keyed") without clear implementation spec — had to reverse-engineer from code inspection rather than explicit requirements.
+- Used cmd.exe commands in Git Bash (taskkill /PID) instead of POSIX equivalents — violates CLAUDE.md shell guidance. Windows agent should use sh/bash commands or fail explicitly if Windows-only capability required.
+- Called deferred skills (subprocess, kill-port, goldfish) directly without ToolSearch to fetch schemas first — resulted in "NOT YET KNOWN" failures. Must check if skill exists and fetch schema before invoking.
+- Multiple spec validation rounds (6, 7, 8) with repetitive edits suggest agent was applying fixes without verifying they resolved the underlying issues — likely pattern-matching the violation messages rather than understanding root causes.
+- WebSocketServer rewritten completely (Write tool) instead of incremental edits, indicating agent recognized its initial patch approach was inadequate for the architectural issue (port binding/retry logic).
+- Test mock updates lagged behind implementation changes — Daemon.test.ts mock for WebSocketServer.start() signature wasn't adjusted until after test failures surfaced.
 
 <!-- session 7d4fb045 2026-08-16 -->
 - Excessive trial-and-error on test fixture setup — WorkerAdapter.ts edited 6 times (lines 22:18:32, 22:18:52, 22:19:42 etc) and multiple grep searches for `workspaceDir` context. Should have read full test fixture pattern once instead of iterating.
@@ -512,6 +529,17 @@
 
 ## Documentation gaps
 
+<!-- session e453d841 2026-08-16 -->
+- Spec references "Workspace precedence level 3" as undefined concept contradicting other spec sections — refactoring plan relied on undefined precedence semantics
+- Daemon response format (executionId wrapping) required extensive code inspection of singleton-daemon-kit client/health-server to understand — the actual response structure wasn't documented inline or in Protocol.ts, forcing manual investigation of node_modules.
+- OutputVariableConfig field naming (pattern vs jsonpath) wasn't pre-decided; investigation showed only pattern was used, requiring schema extension design mid-implementation.
+- --project-dir flag behavior and execution path resolution (where it's used in flow/task steps) required searching across TaskIndex, StepRunner, FlowOrchestrator — not clearly localized in a single boundary.
+- Workspace package shadowing (rogue transitive deps in workspace subdir node_modules) wasn't prevented by existing tooling; required adding no-workspace-shadow violation rule to separate violations-framework repo as post-hoc fix.
+- npm workspace package shadowing: nested packages can resolve to registry versions instead of workspace siblings when using non-prefixed workspace protocol. Solution: use `"file:../"` prefix in package.json. Root cause: npm installs rogue package when running from nested directory. Added to lessons-learned as fix.
+- Model step `log` parameter behavior undefined — WorkerAdapter needed 3 fixes: pass `streamJson` to ClaudeLauncher, pass `captureOutput: true`, inject `executionConfig` with model config. No prior doc on these requirements.
+- Flow validation missing UNDECLARED_OUTPUT_KEY check — flow steps can output keys not declared in flow.outputs, causing silent data loss. Added ValidationCode + SimulationValidator check.
+- Workspace metadata separation (metaDir field) not obvious from code — agent had to search with grep for "metaDir|outputsDir|path.*workspace" to understand the architectural split.
+
 <!-- session 7d4fb045 2026-08-16 -->
 - workspaceDir context pattern not obvious — appears in StepQueue.test.ts, WorkerAdapter.test.ts, and CommandHandler.test.ts. Repeated grep searches (22:17:51, 22:30:35, 22:30:38) for `workspaceDir|DeclaredWorkspace|createSharedWorkspace` across files, indicating this is a key test fixture pattern that should be documented centrally.
 - Output extraction configuration (jsonpath, pattern fields) required extensive grep searching (07:57-08:09) rather than being documented in flow docs; multiple search variations suggests unclear naming or documentation structure.
@@ -767,6 +795,15 @@
 - Extensive Grep searches for domain concepts (RE-QUEUED, bufferSpill, reconnectTimeout, idleTimeout, drainTimeout, heartbeat monitoring, etc.) suggest spec lacks clear glossary or index of key terms. Future audits should define these upfront.
 
 ## Known constraints
+
+<!-- session e453d841 2026-08-16 -->
+- Skill `get-timestamp` not yet implemented — user worked around it with direct Node.js script (2026-08-15 22:50:07)
+- Skill `subprocess` not yet available — attempted invocation blocked (2026-08-15 22:53:45)
+- Skill `check` not yet available — attempted invocation blocked (2026-08-16 06:45:08)
+- Windows path handling in flow validate command works as-is (C:\Workspace_Tooling\...) despite POSIX shell — no path conversion needed.
+- Daemon client-daemon communication via port files (~/.flow-daemon/config.port, managed by @wadeck/singleton-daemon-kit) is undocumented in flow-cli source; requires inspecting node_modules to understand the mechanism.
+- WebSocketServer port binding fails without retry/backoff — flow execution hangs when daemon can't bind port; requires EADDRINUSE handling in start() method.
+- Workspace interface refactoring (outputsDir → metaDir) is cross-cutting — changes in types.ts require cascading updates across StepRunner.ts, factories.ts, test files, and protocol definitions; agents need coordination to avoid missed references.
 
 <!-- session 7d4fb045 2026-08-16 -->
 - StepQueue→FlowScheduler deprecation took multiple iterations (completely replaced at 06:42:42/06:44:31/06:44:38/06:44:44) instead of being clearly stated once. Related: BackoffStrategy type had to be grepped for (06:43:03), not obvious from context.

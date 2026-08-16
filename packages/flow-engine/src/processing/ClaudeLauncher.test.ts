@@ -250,6 +250,54 @@ describe('ClaudeLauncher', () => {
 		});
 	});
 
+	describe('session continuation (--resume)', () => {
+		it('includes --resume <id> before -p when resumeSessionId is set', async () => {
+			const mockProcess = {
+				on: vi.fn((event, callback) => {
+					if (event === 'close') setTimeout(() => callback(0), 10);
+					return mockProcess;
+				}),
+			};
+			vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
+			vi.spyOn(manager, 'findClaudePath').mockReturnValue('/usr/bin/claude');
+
+			await manager.launchInteractive({
+				workingDir: '/test',
+				prompt: 'Continue the conversation',
+				stepId: 'test',
+				resumeSessionId: 'sess-abc123',
+			});
+
+			const calledArgs = (child_process.spawn as any).mock.calls[0][1] as string[];
+			const resumeIdx = calledArgs.indexOf('--resume');
+			expect(resumeIdx).toBeGreaterThan(-1);
+			expect(calledArgs[resumeIdx + 1]).toBe('sess-abc123');
+			// --resume must appear before -p / prompt
+			const promptIdx = calledArgs.indexOf('Continue the conversation');
+			expect(resumeIdx).toBeLessThan(promptIdx);
+		});
+
+		it('does not include --resume when resumeSessionId is not set', async () => {
+			const mockProcess = {
+				on: vi.fn((event, callback) => {
+					if (event === 'close') setTimeout(() => callback(0), 10);
+					return mockProcess;
+				}),
+			};
+			vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
+			vi.spyOn(manager, 'findClaudePath').mockReturnValue('/usr/bin/claude');
+
+			await manager.launchInteractive({
+				workingDir: '/test',
+				prompt: 'Normal prompt',
+				stepId: 'test',
+			});
+
+			const calledArgs = (child_process.spawn as any).mock.calls[0][1] as string[];
+			expect(calledArgs).not.toContain('--resume');
+		});
+	});
+
 	describe('launchBackground', () => {
 		it.skip('should launch claude in background mode and capture output', async () => {
 			const mockStdout = {

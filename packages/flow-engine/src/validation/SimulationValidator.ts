@@ -332,7 +332,7 @@ export class SimulationValidator {
 	 * Where <id> is [a-zA-Z0-9_-]+
 	 */
 	private static readonly VALID_TEMPLATE_EXPRESSION =
-		/^(inputs\.[a-zA-Z0-9_-]+|steps\.[a-zA-Z0-9_-]+\.outputs\.[a-zA-Z0-9_-]+|flow\.[a-zA-Z0-9_-]+|task\.[a-zA-Z0-9_-]+|context\.[a-zA-Z0-9_-]+)$/;
+		/^(inputs\.[a-zA-Z0-9_-]+|steps\.[a-zA-Z0-9_-]+\.outputs\.[a-zA-Z0-9_.-]+|steps\.[a-zA-Z0-9_-]+\.meta\.[a-zA-Z0-9_.-]+|flow\.[a-zA-Z0-9_-]+|task\.[a-zA-Z0-9_-]+|context\.[a-zA-Z0-9_-]+)$/;
 
 	/**
 	 * Validate a single template expression against the whitelist.
@@ -351,10 +351,10 @@ export class SimulationValidator {
 					field: step.type === 'model' ? 'prompt' : 'script',
 					path: `${flow.id}.steps[${step.id}]`,
 				},
-				suggestion: `Valid forms: \${{ inputs.name }}, \${{ steps.step-id.outputs.varName }}, \${{ flow.allLogs }}, \${{ task.priority }}, \${{ context.cwd }}`,
+				suggestion: `Valid forms: \${{ inputs.name }}, \${{ steps.step-id.outputs.varName }}, \${{ steps.step-id.meta.session_id }}, \${{ flow.allLogs }}, \${{ task.priority }}, \${{ context.cwd }}`,
 				context: {
 					actual: expression,
-					expected: 'inputs.<id> | steps.<id>.outputs.<id> | flow.<id> | task.<id> | context.<id>',
+					expected: 'inputs.<id> | steps.<id>.outputs.<id> | steps.<id>.meta.<field> | flow.<id> | task.<id> | context.<id>',
 				},
 			});
 			return;

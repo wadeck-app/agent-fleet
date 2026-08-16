@@ -43,7 +43,7 @@ export class WorkerAdapter {
 		step: AssignableStep,
 		context: ExecutionContext,
 		sendMessage: SendMessageFn
-	): Promise<Record<string, unknown>> {
+	): Promise<{ output: Record<string, unknown>; meta?: import('flow-engine/types').StepMeta }> {
 		if ((step as { type: string }).type === 'subflow') {
 			throw new Error(`Step type 'subflow' is not supported in v1`);
 		}
@@ -65,6 +65,7 @@ export class WorkerAdapter {
 		const templateContext: TemplateContext = {
 			inputs: context.inputs,
 			stepOutputs: new Map(Object.entries(context.stepOutputs)),
+			stepMeta: new Map(Object.entries(context.stepMeta)) as unknown as Map<string, Record<string, unknown>>,
 			taskMetadata: {},
 			context: { cwd: context.cwd, projectDir: context.cwd, workspaceDir: context.workspaceDir, outputsDir: context.outputsDir },
 		};
@@ -147,7 +148,7 @@ export class WorkerAdapter {
 				}
 				// trace.outputs is undefined for model steps that produce no structured output —
 				// an empty map is the correct representation (no outputs to propagate to dependents).
-				return (trace.outputs ?? {}) as Record<string, unknown>;
+				return { output: (trace.outputs ?? {}) as Record<string, unknown>, meta: trace.meta };
 			} finally {
 				// Suppress stop errors so they do not shadow the original executeStep error.
 				try {
@@ -165,6 +166,6 @@ export class WorkerAdapter {
 			throw new Error(trace.error);
 		}
 		// trace.outputs is undefined for script steps without captureOutput — empty map is correct.
-		return (trace.outputs ?? {}) as Record<string, unknown>;
+		return { output: (trace.outputs ?? {}) as Record<string, unknown>, meta: trace.meta };
 	}
 }

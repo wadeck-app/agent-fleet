@@ -187,6 +187,7 @@ export class CommandHandler {
 			executionId,
 			inputs: cmd.inputs ?? {},
 			stepOutputs: {},
+			stepMeta: {},
 			workspaceDir,
 			outputsDir: workspace.metaDir + '/outputs',
 			cwd: cmd.cwd,
@@ -245,7 +246,12 @@ export class CommandHandler {
 	}
 
 	/** Called by Daemon when a worker reports step_completed. */
-	onStepCompleted(executionId: string, stepId: string, output: Record<string, unknown>): void {
+	onStepCompleted(
+		executionId: string,
+		stepId: string,
+		output: Record<string, unknown>,
+		meta?: import('flow-engine/types').StepMeta
+	): void {
 		const scheduler = this.schedulers.get(executionId);
 		if (!scheduler) {
 			process.stderr.write(
@@ -254,9 +260,10 @@ export class CommandHandler {
 			return;
 		}
 
-		// Sync output to ExecutionContext (used by worker for template rendering in next step)
+		// Sync output and meta to ExecutionContext (used by worker for template rendering in next step)
 		const context = this.executionContexts.get(executionId)!;
 		context.stepOutputs[stepId] = output;
+		if (meta) context.stepMeta[stepId] = meta;
 
 		const newReady = scheduler.complete(stepId, { type: 'completed', outputs: output });
 

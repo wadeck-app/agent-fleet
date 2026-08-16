@@ -168,6 +168,33 @@ export class SemanticValidator {
 					},
 				});
 			}
+
+			// Validate session.continue (model steps only)
+			if (step.type === 'model' && (step as import('../types').ModelFlowStep).session?.continue) {
+				const contId = (step as import('../types').ModelFlowStep).session!.continue;
+				if (!stepIds.has(contId)) {
+					this.issueCollector.addIssue({
+						severity: 'error',
+						code: ValidationCode.UNDEFINED_STEP,
+						message: `Step '${step.id}' has session.continue referencing non-existent step: ${contId}`,
+						location: { stepId: step.id, field: 'session.continue' },
+						suggestion: `Choose an existing step: ${Array.from(stepIds).join(', ')}`,
+						context: { actual: contId, related: Array.from(stepIds) },
+					});
+				} else {
+					const contStep = steps.find(s => s.id === contId);
+					if (contStep && contStep.type !== 'model') {
+						this.issueCollector.addIssue({
+							severity: 'error',
+							code: ValidationCode.INVALID_VALUE,
+							message: `Step '${step.id}' has session.continue pointing to '${contId}' which is not a model step`,
+							location: { stepId: step.id, field: 'session.continue' },
+							suggestion: 'session.continue must reference a model step',
+							context: { actual: contStep.type, expected: 'model' },
+						});
+					}
+				}
+			}
 		}
 	}
 

@@ -123,9 +123,9 @@ export async function startDaemon(config: FlowConfig = DEFAULT_CONFIG, daemonDir
 			}
 			case 'step_completed': {
 				try {
-					const { executionId, stepId, output } = message;
+					const { executionId, stepId, output, meta } = message;
 					executionStore.markStepCompleted(executionId, stepId);
-					commandHandler.onStepCompleted(executionId, stepId, output);
+					commandHandler.onStepCompleted(executionId, stepId, output, meta);
 					logWriter.writeExecution(executionId, `Step ${stepId} completed`);
 					commandHandler.dispatchHook(executionId, 'onStepEnd', { executionId, stepId });
 

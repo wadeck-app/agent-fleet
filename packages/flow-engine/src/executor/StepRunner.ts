@@ -3,6 +3,7 @@
  *
  * Executes individual flow steps (script, model, subflow, and user_intervention types) with retry logic.
  */
+import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { ClaudeLauncher } from '../processing/ClaudeLauncher';
@@ -15,7 +16,9 @@ import type {
 	FlowStep,
 	LiveLogEntry,
 	ModelFlowStep,
+	ModelStepMeta,
 	ScriptFlowStep,
+	ScriptStepMeta,
 	StepOutput,
 	StepTrace,
 	SubFlowStep,
@@ -205,6 +208,12 @@ export class StepRunner {
 		this.writeOutputFiles(outputs, step.output, context);
 
 		// Mark as error if script failed
+		const scriptMeta: ScriptStepMeta = {
+			exit_code: result.exitCode,
+			duration_ms: result.durationMs,
+		};
+		stepTrace.meta = scriptMeta;
+
 		if (!result.success) {
 			stepTrace.error = `Script exited with code ${result.exitCode}`;
 		}
@@ -240,6 +249,15 @@ export class StepRunner {
 		let streamEventMapper: StreamEventMapper | undefined;
 		const logMode = (step as ModelFlowStep).log ?? 'end';
 
+		// Capture meta fields from stream events
+		let capturedSessionId = '';
+		let capturedSessionFile = '';
+		let capturedCostUsd = 0;
+		let capturedInputTokens = 0;
+		let capturedOutputTokens = 0;
+		let capturedTtftMs = 0;
+		const modelStartTime = Date.now();
+
 		// log:none — no stream mapper, no liveLogEntries; but we still need result text
 		if (streamJson && !this.config.interactive) {
 			if (logMode !== 'none') {
@@ -258,6 +276,35 @@ export class StepRunner {
 			}, 500);
 		}
 
+		// Session continuation: resolve session_id from a previous step's meta
+		let resumeSessionId: string | undefined;
+		if (step.session?.continue) {
+			const prevMeta = context.stepMeta?.get(step.session.continue);
+			const prevSessionId = prevMeta?.['session_id'] as string | undefined;
+			const prevSessionFile = prevMeta?.['session_file'] as string | undefined;
+
+			if (step.session.mode === 'append') {
+				if (typeof prevSessionId === 'string' && prevSessionId) {
+					resumeSessionId = prevSessionId;
+				}
+			} else if (step.session.mode === 'fork') {
+				if (prevSessionFile && fs.existsSync(prevSessionFile)) {
+					// Copy session .jsonl to new UUID so this branch is independent
+					const conversationsDir = path.dirname(prevSessionFile);
+					const forkId = randomUUID();
+					const forkFile = path.join(conversationsDir, `${forkId}.jsonl`);
+					fs.copyFileSync(prevSessionFile, forkFile);
+					resumeSessionId = forkId;
+				} else if (typeof prevSessionId === 'string' && prevSessionId) {
+					// session_file not available — fall back to append with a warning
+					process.stderr.write(
+						`[StepRunner] session.mode:fork — session_file not found for step '${step.session.continue}', falling back to append\n`
+					);
+					resumeSessionId = prevSessionId;
+				}
+			}
+		}
+
 		const launchOptions = {
 			workingDir: workspace.path,
 			prompt: renderedPrompt,
@@ -268,6 +315,7 @@ export class StepRunner {
 			streamJson: streamJson && !this.config.interactive,
 			verbose: verbose && !this.config.interactive,
 			skipPermissions,
+			resumeSessionId,
 			// StepRunner is invoked by the orchestrator which manages its own env strategy
 			isolateEnv: false,
 			// Always provide onStreamEvent when stream-json is active to capture finalResultText
@@ -276,6 +324,26 @@ export class StepRunner {
 						// Capture the final result text for output extraction (always)
 						if (event.type === 'result' && event.data.result) {
 							finalResultText = event.data.result;
+						}
+						// Capture meta: session_id + session_file from system:init, cost from result
+						if (event.type === 'system' && event.data.session_id) {
+							capturedSessionId = event.data.session_id as string;
+							capturedTtftMs = Date.now() - modelStartTime;
+							const memoryPathAuto = (event.data.memory_paths as Record<string, string> | undefined)?.auto;
+							if (memoryPathAuto) {
+								const projectDir = memoryPathAuto.replace(/[/\\]memory[/\\]?$/, '');
+								capturedSessionFile = path.join(projectDir, capturedSessionId + '.jsonl');
+							}
+						}
+						if (event.type === 'result') {
+							capturedCostUsd = (event.data.cost_usd as number) ?? 0;
+							const usage = event.data.modelUsage as Record<string, { inputTokens?: number; outputTokens?: number }> | undefined;
+							if (usage) {
+								for (const u of Object.values(usage)) {
+									capturedInputTokens += u.inputTokens ?? 0;
+									capturedOutputTokens += u.outputTokens ?? 0;
+								}
+							}
 						}
 						if (logMode === 'none') return; // suppress log entries
 						const entry = streamEventMapper?.map(event);
@@ -295,6 +363,19 @@ export class StepRunner {
 		};
 
 		try {
+			const buildModelMeta = (): ModelStepMeta => ({
+				model: step.model ?? '',
+				session_id: capturedSessionId,
+				session_file: capturedSessionFile,
+				ttft_ms: capturedTtftMs,
+				duration_ms: stepTrace.durationMs || Math.max(1, (stepTrace.endTime ?? Date.now()) - stepTrace.startTime),
+				cost: {
+					input_tokens: capturedInputTokens,
+					output_tokens: capturedOutputTokens,
+					usd: capturedCostUsd,
+				},
+			});
+
 			if (this.config.interactive) {
 				// Interactive mode
 				const result = await this.claudeManager.launchInteractive(launchOptions);
@@ -303,6 +384,7 @@ export class StepRunner {
 				stepTrace.exitCode = result.exitCode ?? undefined;
 				stepTrace.endTime = Date.now();
 				stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
+				stepTrace.meta = buildModelMeta();
 
 				if (result.exitCode !== 0 && result.exitCode !== 1 && result.exitCode !== null) {
 					stepTrace.error = `Claude exited with code ${result.exitCode}`;
@@ -336,6 +418,7 @@ export class StepRunner {
 				stepTrace.exitCode = result.exitCode;
 				stepTrace.endTime = Date.now();
 				stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
+				stepTrace.meta = buildModelMeta();
 
 				// Cap live log entries to prevent memory issues
 				if (stepTrace.liveLogEntries) {

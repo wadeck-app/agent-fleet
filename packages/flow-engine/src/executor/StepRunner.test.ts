@@ -1054,4 +1054,178 @@ describe('StepRunner', () => {
 			fs.rmSync(workspaceDir, { recursive: true });
 		});
 	});
+
+	describe('step meta', () => {
+		it('script step populates trace.meta with exit_code and duration_ms', async () => {
+			const step: ScriptFlowStep = {
+				id: 'script-step',
+				name: 'Script',
+				type: 'script',
+				script: 'echo hi',
+			};
+			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {} };
+			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('echo hi');
+			vi.mocked(ScriptExecutor.prototype.execute).mockResolvedValue({
+				success: true,
+				exitCode: 0,
+				stdout: '',
+				stderr: '',
+				durationMs: 42,
+			});
+			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({});
+
+			const trace = await runner.executeStep(step, testWorkspace, context);
+
+			expect(trace.meta).toBeDefined();
+			expect((trace.meta as any).exit_code).toBe(0);
+			expect((trace.meta as any).duration_ms).toBe(42);
+		});
+
+		it('model step populates trace.meta with session_id, cost, and duration_ms', async () => {
+			const step: ModelFlowStep = {
+				id: 'model-step',
+				name: 'Model',
+				type: 'model',
+				model: 'haiku',
+				prompt: 'hello',
+			};
+			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {} };
+			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('hello');
+
+			// Background mode mock — stream-json provides session_id and cost via onStreamEvent
+			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async opts => {
+				// Simulate stream events: system:init with session_id and result with cost
+				if (opts.onStreamEvent) {
+					opts.onStreamEvent({ type: 'system', subtype: 'init', data: { session_id: 'sess-abc123', model: 'haiku' } } as any);
+					opts.onStreamEvent({ type: 'result', subtype: 'result', data: { result: 'hi', cost_usd: 0.001, duration_ms: 1500, modelUsage: { 'haiku': { inputTokens: 10, outputTokens: 5 } } } } as any);
+				}
+				return { stdout: 'hi', stderr: '', exitCode: 0 };
+			});
+			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({ response: 'hi' });
+
+			const trace = await runner.executeStep(step, testWorkspace, context);
+
+			expect(trace.meta).toBeDefined();
+			const meta = trace.meta as any;
+			expect(meta.session_id).toBe('sess-abc123');
+			expect(meta.cost.usd).toBe(0.001);
+			expect(meta.duration_ms).toBeGreaterThanOrEqual(1);
+			expect(meta.model).toBe('haiku');
+		});
+
+		it('model step resolves session_file from memory_paths.auto in system:init event', async () => {
+			const step: ModelFlowStep = {
+				id: 'model-step',
+				name: 'Model',
+				type: 'model',
+				model: 'haiku',
+				prompt: 'hello',
+			};
+			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {} };
+			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('hello');
+
+			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async opts => {
+				if (opts.onStreamEvent) {
+					opts.onStreamEvent({
+						type: 'system', subtype: 'init',
+						data: {
+							session_id: 'sess-xyz',
+							model: 'haiku',
+							memory_paths: { auto: '/home/user/.claude/projects/my-project/memory/' },
+						},
+					} as any);
+					opts.onStreamEvent({ type: 'result', subtype: 'result', data: { result: 'hi', cost_usd: 0, duration_ms: 100, modelUsage: {} } } as any);
+				}
+				return { stdout: 'hi', stderr: '', exitCode: 0 };
+			});
+			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({ response: 'hi' });
+
+			const trace = await runner.executeStep(step, testWorkspace, context);
+
+			const meta = trace.meta as any;
+			expect(meta.session_id).toBe('sess-xyz');
+			// session_file should be derived from memory_paths.auto: strip /memory/ → add /conversations/<id>.jsonl
+			expect(meta.session_file).toMatch(/sess-xyz\.jsonl$/);
+			expect(meta.session_file).toContain('my-project');
+		});
+
+		it('session mode:fork copies session file and uses new UUID as resumeSessionId', async () => {
+			const { mkdtempSync, writeFileSync, existsSync } = await import('node:fs');
+			const { join } = await import('node:path');
+			const { tmpdir } = await import('node:os');
+
+			// Create a fake session file
+			const convDir = mkdtempSync(join(tmpdir(), 'fork-test-conv-'));
+			const parentSessionId = 'parent-sess-abc';
+			const parentFile = join(convDir, `${parentSessionId}.jsonl`);
+			writeFileSync(parentFile, '{"type":"system"}\n');
+
+			const step: ModelFlowStep = {
+				id: 'fork-step',
+				name: 'Fork',
+				type: 'model',
+				model: 'haiku',
+				prompt: 'Continue.',
+				session: { continue: 'prev', mode: 'fork' },
+			};
+
+			const stepMetaMap = new Map([
+				['prev', { session_id: parentSessionId, session_file: parentFile, duration_ms: 100, model: 'haiku', ttft_ms: 0, cost: { input_tokens: 1, output_tokens: 1, usd: 0 } }],
+			]);
+			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {}, stepMeta: stepMetaMap };
+			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('Continue.');
+
+			let capturedResumeId: string | undefined;
+			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async opts => {
+				capturedResumeId = (opts as any).resumeSessionId;
+				if (opts.onStreamEvent) {
+					opts.onStreamEvent({ type: 'system', subtype: 'init', data: { session_id: capturedResumeId ?? 'fork-id', model: 'haiku' } } as any);
+					opts.onStreamEvent({ type: 'result', subtype: 'result', data: { result: 'ok', cost_usd: 0, duration_ms: 100, modelUsage: {} } } as any);
+				}
+				return { stdout: 'ok', stderr: '', exitCode: 0 };
+			});
+			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({ response: 'ok' });
+
+			await runner.executeStep(step, testWorkspace, context);
+
+			// Fork must use a DIFFERENT session ID than the parent
+			expect(capturedResumeId).toBeDefined();
+			expect(capturedResumeId).not.toBe(parentSessionId);
+			// The forked file must exist in the same conversations dir
+			expect(existsSync(join(convDir, `${capturedResumeId}.jsonl`))).toBe(true);
+		});
+
+		it('session mode:fork falls back to append when session_file is empty', async () => {
+			const step: ModelFlowStep = {
+				id: 'fork-fallback',
+				name: 'Fork fallback',
+				type: 'model',
+				model: 'haiku',
+				prompt: 'Continue.',
+				session: { continue: 'prev', mode: 'fork' },
+			};
+
+			const stepMetaMap = new Map([
+				['prev', { session_id: 'parent-id', session_file: '', duration_ms: 100, model: 'haiku', ttft_ms: 0, cost: { input_tokens: 1, output_tokens: 1, usd: 0 } }],
+			]);
+			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {}, stepMeta: stepMetaMap };
+			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('Continue.');
+
+			let capturedResumeId: string | undefined;
+			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async opts => {
+				capturedResumeId = (opts as any).resumeSessionId;
+				if (opts.onStreamEvent) {
+					opts.onStreamEvent({ type: 'system', subtype: 'init', data: { session_id: 'new-id', model: 'haiku' } } as any);
+					opts.onStreamEvent({ type: 'result', subtype: 'result', data: { result: 'ok', cost_usd: 0, duration_ms: 100, modelUsage: {} } } as any);
+				}
+				return { stdout: 'ok', stderr: '', exitCode: 0 };
+			});
+			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({ response: 'ok' });
+
+			await runner.executeStep(step, testWorkspace, context);
+
+			// Falls back to parent session_id (append behavior)
+			expect(capturedResumeId).toBe('parent-id');
+		});
+	});
 });

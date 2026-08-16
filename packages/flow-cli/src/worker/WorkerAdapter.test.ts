@@ -18,6 +18,7 @@ const makeContext = (): ExecutionContext => ({
 	executionId: 'testexec',
 	inputs: {},
 	stepOutputs: {},
+	stepMeta: {},
 	workspaceDir: '/tmp/ws',
 	outputsDir: '/tmp/ws.meta/outputs',
 	cwd: '/tmp/ws',
@@ -80,7 +81,7 @@ describe('WorkerAdapter', () => {
 
 	it('returns outputs for a script step', async () => {
 		const result = await adapter.execute(makeScriptStep(), makeContext(), sendMessage);
-		expect(result).toEqual({ result: 'ok' });
+		expect(result.output).toEqual({ result: 'ok' });
 		// Factory called with empty string for non-model steps
 		expect(mockFactory).toHaveBeenCalledWith('');
 	});
@@ -164,7 +165,7 @@ describe('WorkerAdapter', () => {
 
 	it('returns outputs for a model step and calls McpServer start/stop', async () => {
 		const result = await adapter.execute(makeModelStep(), makeContext(), sendMessage);
-		expect(result).toEqual({ result: 'ok' });
+		expect(result.output).toEqual({ result: 'ok' });
 
 		expect(mockMcpStart).toHaveBeenCalledTimes(1);
 		expect(mockMcpStop).toHaveBeenCalledTimes(1);

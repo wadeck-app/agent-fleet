@@ -212,6 +212,21 @@ ${TMPL} steps.<stepId>.outputs.<variableName> }}
 \`\`\`
 Example: \`${TMPL} steps.analyze.outputs.recommendation }}\`
 
+### Accessing step execution metadata
+Every step populates a \`meta\` scope with execution metadata (strongly typed per step type).
+\`\`\`
+${TMPL} steps.<stepId>.meta.<field> }}
+\`\`\`
+
+**Script step meta fields:** \`exit_code\`, \`duration_ms\`
+
+**Model step meta fields:** \`session_id\`, \`session_file\`, \`model\`, \`ttft_ms\`, \`duration_ms\`, \`cost.input_tokens\`, \`cost.output_tokens\`, \`cost.usd\`
+
+Examples:
+- \`${TMPL} steps.generate.meta.session_id }}\` — Claude session ID (for session continuation)
+- \`${TMPL} steps.generate.meta.cost.usd }}\` — cost in USD
+- \`${TMPL} steps.run-tests.meta.exit_code }}\` — script exit code
+
 ### Accessing flow inputs
 \`\`\`
 ${TMPL} inputs.<variableName> }}

@@ -57,6 +57,9 @@ export interface ClaudeLaunchOptions {
 	/** Enable --dangerously-skip-permissions (default: true) */
 	skipPermissions?: boolean;
 
+	/** Resume a previous Claude session by ID (passes --resume <id> before -p) */
+	resumeSessionId?: string;
+
 	/** Callback for stream-json events (requires streamJson=true) */
 	onStreamEvent?: StreamJsonEventCallback;
 
@@ -144,7 +147,7 @@ export class ClaudeLauncher {
 		prompt: string,
 		model: string | undefined,
 		interactive: boolean,
-		options?: Pick<ClaudeLaunchOptions, 'skipPermissions' | 'streamJson' | 'verbose'>
+		options?: Pick<ClaudeLaunchOptions, 'skipPermissions' | 'streamJson' | 'verbose' | 'resumeSessionId'>
 	): { command: string; args: string[] } {
 		let command: string;
 		let args: string[];
@@ -174,6 +177,10 @@ export class ClaudeLauncher {
 
 		if (model) {
 			args.push('--model', model);
+		}
+
+		if (options?.resumeSessionId) {
+			args.push('--resume', options.resumeSessionId);
 		}
 
 		if (interactive) {

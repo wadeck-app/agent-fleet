@@ -57,8 +57,8 @@ async function handleMessage(message: DaemonToWorker): Promise<void> {
 		case 'assign': {
 			const { stepId, stepConfig, executionContext } = message;
 			try {
-				const output = await adapter.execute(stepConfig, executionContext, send);
-				send({ type: 'step_completed', executionId: executionContext.executionId, stepId, output });
+				const { output, meta } = await adapter.execute(stepConfig, executionContext, send);
+				send({ type: 'step_completed', executionId: executionContext.executionId, stepId, output, meta });
 			} catch (err) {
 				const error = err instanceof Error ? err.message : String(err);
 				send({ type: 'step_failed', executionId: executionContext.executionId, stepId, error });

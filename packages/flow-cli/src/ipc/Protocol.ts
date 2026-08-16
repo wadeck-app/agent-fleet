@@ -1,4 +1,4 @@
-import type { FlowStep, LiveLogEntry } from 'flow-engine/types';
+import type { FlowStep, LiveLogEntry, StepMeta } from 'flow-engine/types';
 
 // subflow excluded: not supported in v1 (rejected in CommandHandler before enqueue)
 export type AssignableStep = Extract<FlowStep, { type: 'model' | 'script' }>;
@@ -7,6 +7,8 @@ export interface ExecutionContext {
 	executionId: string;
 	inputs: Record<string, string>;
 	stepOutputs: Record<string, Record<string, unknown>>;
+	/** Execution metadata per step (strongly typed per step type) */
+	stepMeta: Record<string, StepMeta>;
 	workspaceDir: string;
 	/** Engine-generated output files directory (<workspaceDir>.meta/outputs) — never inside workspaceDir */
 	outputsDir: string;
@@ -50,7 +52,7 @@ export interface InjectedStep {
 export type WorkerToDaemon =
 	| { type: 'ready'; pid: number }
 	| { type: 'log'; executionId: string; stepId: string; entry: LiveLogEntry }
-	| { type: 'step_completed'; executionId: string; stepId: string; output: Record<string, unknown> }
+	| { type: 'step_completed'; executionId: string; stepId: string; output: Record<string, unknown>; meta?: StepMeta }
 	| { type: 'step_failed'; executionId: string; stepId: string; error: string }
 	| { type: 'inject_steps'; executionId: string; steps: InjectedStep[] };
 

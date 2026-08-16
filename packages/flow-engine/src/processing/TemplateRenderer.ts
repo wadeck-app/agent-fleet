@@ -18,6 +18,9 @@ export interface TemplateContext {
 	/** Outputs from completed steps (keyed by step ID) */
 	stepOutputs: Map<string, Record<string, any>>;
 
+	/** Execution metadata for completed steps (keyed by step ID) */
+	stepMeta?: Map<string, Record<string, unknown>>;
+
 	/** Task metadata (priority, createdAt, etc.) */
 	taskMetadata: Record<string, any>;
 
@@ -117,11 +120,22 @@ export class TemplateRenderer {
 			const path = parts.slice(1);
 			return this.resolveNested(context.inputs, path, expression);
 		} else if (root === 'steps') {
-			// ${{ steps.stepId.outputs.varName }}
-			if (parts.length < 4 || parts[2] !== 'outputs') {
-				throw new TemplateRenderError('steps requires format: steps.stepId.outputs.varName', expression, root);
+			// ${{ steps.stepId.outputs.varName }} or ${{ steps.stepId.meta.field }}
+			if (parts.length < 4 || (parts[2] !== 'outputs' && parts[2] !== 'meta')) {
+				throw new TemplateRenderError('steps requires format: steps.stepId.outputs.varName or steps.stepId.meta.field', expression, root);
 			}
 			const stepId = parts[1];
+			const namespace = parts[2];
+
+			if (namespace === 'meta') {
+				const meta = context.stepMeta?.get(stepId);
+				if (!meta) {
+					throw new TemplateRenderError(`Step '${stepId}' not found or has no meta`, expression, stepId);
+				}
+				const path = parts.slice(3);
+				return this.resolveNested(meta, path, expression);
+			}
+
 			const stepOutputs = context.stepOutputs.get(stepId);
 			if (!stepOutputs) {
 				throw new TemplateRenderError(`Step '${stepId}' not found or has no outputs`, expression, stepId);

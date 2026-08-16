@@ -589,6 +589,21 @@ export interface ModelFlowStep extends BaseFlowStep {
 	 * - full: show tool name + input + result (→ Bash: sleep 5 / ← Bash: ...)
 	 */
 	toolLog?: 'none' | 'name' | 'full';
+
+	/**
+	 * Session continuation: resume a previous model step's Claude session.
+	 * The new prompt is injected as a user message into the existing conversation.
+	 */
+	session?: {
+		/** Step ID whose Claude session to continue (must be a model step in depends chain) */
+		continue: string;
+		/**
+		 * How to continue:
+		 * - 'append': adds a new user message to the existing session (shared history)
+		 * - 'fork': copies the session .jsonl to a new UUID — each fork is independent
+		 */
+		mode: 'append' | 'fork';
+	};
 }
 
 /**
@@ -930,6 +945,39 @@ export interface Workspace {
 	usageCount: number;
 }
 
+// ─── Step Meta ────────────────────────────────────────────────────────────────
+
+/** Base metadata available on every step type */
+export interface StepMetaBase {
+	duration_ms: number;
+}
+
+/** Metadata specific to script steps */
+export interface ScriptStepMeta extends StepMetaBase {
+	exit_code: number;
+}
+
+/** Metadata specific to model steps */
+export interface ModelStepMeta extends StepMetaBase {
+	/** Actual model used (may differ from config if fallback applied) */
+	model: string;
+	/** Claude session ID from system:init event — used for session continuation */
+	session_id: string;
+	/** Absolute path to the .jsonl session file (empty if not resolvable) */
+	session_file: string;
+	/** Time-to-first-token in ms */
+	ttft_ms: number;
+	cost: {
+		input_tokens: number;
+		output_tokens: number;
+		usd: number;
+	};
+}
+
+export type StepMeta = ScriptStepMeta | ModelStepMeta | StepMetaBase;
+
+// ──────────────────────────────────────────────────────────────────────────────
+
 /**
  * Trace of a single step execution
  */
@@ -1012,6 +1060,9 @@ export interface StepTrace {
 
 	/** Live log entries streamed during model step execution */
 	liveLogEntries?: LiveLogEntry[];
+
+	/** Execution metadata (strongly typed per step type) */
+	meta?: StepMeta;
 }
 
 /**
