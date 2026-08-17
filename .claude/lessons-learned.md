@@ -1,8 +1,12 @@
 # Lessons learned
 
-<!-- Last updated: 2026-08-16T20:20:36.065Z -->
+<!-- Last updated: 2026-08-17T19:48:28.413Z -->
 
 ## Recurring feedback
+
+<!-- session d0c7ba90 2026-08-17 -->
+
+- Parallel fork agents spawned mid-task (Phase 9/10 plugin work + MCP -p mode investigation) suggest context was splitting — better to complete one investigation before branching
 
 <!-- session 5ddbec02 2026-08-16 -->
 
@@ -266,6 +270,16 @@
 - Multiple independent agents (Explore, general-purpose) read identical spec files sequentially without coordination, causing redundant I/O. Agents should receive shared context or hand off findings rather than re-audit.
 
 ## Agent errors
+
+<!-- session 5cc3e4d9 2026-08-17 -->
+
+- MCP tool schema availability is non-deterministic in -p mode: ToolSearch query for "echo" returned "NOT YET KNOWN" even though the tool was invoked successfully, suggesting timing-dependent registration or incomplete schema caching.
+
+<!-- session d0c7ba90 2026-08-17 -->
+
+- Assistant initially uncertain about MCP tool availability — should have checked `.claude/settings.json` MCP config or existing tool registry instead of saying "still connecting, try again later"
+- Multiple overlapping grep searches for PluginResolver/ConfigLoader across separate edit cycles (19:23, 19:35, 19:36) suggest assistant didn't have a clear mental model of plugin wiring before starting edits
+- Aggressive bulk rename via sed (`loadDaemonConfig` → `loadFlowConfig`) across test file without verifying all call sites first — risky refactoring pattern
 
 <!-- session 5ddbec02 2026-08-16 -->
 
@@ -648,6 +662,10 @@
 
 ## Documentation gaps
 
+<!-- session d0c7ba90 2026-08-17 -->
+
+- MCP server capabilities not self-discoverable from Claude Code environment — assistant had to spawn fork agent to research whether `-p` mode supports MCP at all
+
 <!-- session 5ddbec02 2026-08-16 -->
 
 - Daemon response protocol (executionId wrapping, IPC response structure) required extensive investigation into singleton-daemon-kit internals at 08:57–09:20 — multiple reads of generated client.js, daemon.js, health-server.js. Pattern is non-obvious and not documented in project.
@@ -972,6 +990,15 @@
 - Extensive Grep searches for domain concepts (RE-QUEUED, bufferSpill, reconnectTimeout, idleTimeout, drainTimeout, heartbeat monitoring, etc.) suggest spec lacks clear glossary or index of key terms. Future audits should define these upfront.
 
 ## Known constraints
+
+<!-- session 5cc3e4d9 2026-08-17 -->
+
+- Parallel agent sessions with MCP tool calls may have unpredictable schema visibility. Tool schema fetch via ToolSearch does not guarantee immediate availability for tool invocation in the same session.
+- DaemonConfig → FlowConfig bulk refactoring required cascading sed replacements across multiple files (Daemon.ts, CommandHandler.ts, RunCommand.ts, FlowConfig.test.ts) — no upfront verification that all call sites would be found and updated consistently.
+
+<!-- session d0c7ba90 2026-08-17 -->
+
+- Plugin resolver/loader integration points are scattered (RunCommand, Daemon, CommandHandler, ConfigLoader) — configuration wiring path unclear enough to require multiple grep passes and fork investigation
 
 <!-- session 5ddbec02 2026-08-16 -->
 

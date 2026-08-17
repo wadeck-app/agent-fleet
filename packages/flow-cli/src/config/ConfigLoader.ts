@@ -132,6 +132,12 @@ export class ConfigLoader {
 		return result;
 	}
 
+	/** Resolves a standalone feature section against the global config (for per-flow overrides). */
+	async resolveStandaloneSection(featureName: string, section: ProjectFeatureSection): Promise<ResolvedFeature> {
+		const globalConfig = await this.loadGlobalConfig();
+		return this.resolveFeature(featureName, section, globalConfig);
+	}
+
 	private resolveFeature(featureName: string, section: ProjectFeatureSection, global: GlobalConfig): ResolvedFeature {
 		const hasUse = section.use !== undefined;
 		const hasInstance = section.instance !== undefined;
@@ -164,6 +170,7 @@ export class ConfigLoader {
 				type: globalInstance.type,
 				// Shallow merge: section-level options override instance options
 				options: { ...resolvedInstanceOptions, ...resolvedSectionOptions },
+				pluginsDir: globalInstance.pluginsDir,
 			};
 		}
 
@@ -176,6 +183,7 @@ export class ConfigLoader {
 			return {
 				type: inlineInstance.type,
 				options: { ...resolvedInstanceOptions, ...resolvedSectionOptions },
+				pluginsDir: inlineInstance.pluginsDir,
 			};
 		}
 

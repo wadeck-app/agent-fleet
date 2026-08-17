@@ -9,6 +9,7 @@
 	},
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
+		"postbuild": "node -e \"require('fs').copyFileSync('src/worker/mcp-server.cjs','dist/worker/mcp-server.cjs')\"",
 		"pretest": "tsc --build tsconfig.json",
 		"build-launcher": "node scripts/build-launcher.mjs",
 		"dev": "tsx src/cli.ts",
@@ -21,6 +22,9 @@
 	},
 	"dependencies": {
 		"extension-points": "file:../extension-points",
+		"plugin-none": "file:../plugin-none",
+		"plugin-worktree": "file:../plugin-worktree",
+		"plugin-cli-approval": "file:../plugin-cli-approval",
 		"@wadeck/singleton-daemon-kit": "^1.20260816144341.57",
 		"commander": "^12.1.0",
 		"flow-engine": "file:../flow-engine",

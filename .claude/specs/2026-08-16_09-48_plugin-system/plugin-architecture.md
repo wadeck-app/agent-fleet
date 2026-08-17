@@ -53,6 +53,8 @@ config `instances:` block, e.g. `my-worktree` or `jira-work`) -- NOT the type pa
 These are two distinct namespaces: `type:` identifies what a plugin IS; `use:` selects which
 named instance to use.
 
+Instances may optionally declare `pluginsDir` (absolute path) to load the plugin from a custom location instead of `flow-cli`'s npm dependencies. See plugin-loading.md Decision L2.
+
 ```yaml
 # ~/.flow/config.yml  (or file pointed to by FLOW_CONFIG)
 # NEVER commit this file. Credentials use ${ENV_VAR} interpolation only.
@@ -84,6 +86,13 @@ plugins:
 
         local-secrets:
             type: plugins.local.default
+
+        # Custom plugin not distributed via npm - use pluginsDir to point to its location
+        custom-workspace:
+            type: plugins.custom.default
+            pluginsDir: /opt/flow-plugins # absolute path; must contain plugin-custom/plugin.config.js
+            options:
+                baseDir: ~/workspaces
 ```
 
 ### Project config structure (v1)

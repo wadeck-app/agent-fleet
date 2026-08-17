@@ -1,317 +1,147 @@
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
-import * as http from 'node:http';
+import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import type { InjectedStep } from '../ipc/Protocol';
 
-const PROVIDE_STEPS_TOOL = {
-	name: 'provideSteps',
-	description: 'Inject steps into the running flow execution graph',
-	inputSchema: {
-		type: 'object',
-		properties: {
-			steps: {
-				type: 'array',
-				items: {
-					type: 'object',
-					required: ['id', 'type'],
-					properties: {
-						id: { type: 'string' },
-						type: { enum: ['model', 'script', 'subflow'] },
-						parent: { type: 'string' },
-						depends: { type: 'array', items: { type: 'string' } },
-					},
-					additionalProperties: true,
-				},
-			},
-		},
-		required: ['steps'],
-	},
-};
+/** Path to the CJS stdio MCP server script, resolved relative to this module. */
+const MCP_SERVER_CJS = fileURLToPath(new URL('./mcp-server.cjs', import.meta.url));
 
-interface JsonRpcRequest {
-	jsonrpc: '2.0';
-	method: string;
-	params?: unknown;
-	id?: number | string | null;
-}
-
-interface JsonRpcResponse {
-	jsonrpc: '2.0';
-	id: number | string | null;
-	result?: unknown;
-	error?: { code: number; message: string };
-}
-
-// Allowed fields for injected steps — unknown fields are rejected to prevent injection of
-// unsupported or dangerous keys.
-const ALLOWED_STEP_FIELDS = new Set([
-	'id',
-	'type',
-	'name',
-	'parent',
-	'depends',
-	'prompt',
-	'model',
-	'script',
-	'workingDir',
-	'env',
-	'captureOutput',
-	'inputs',
-	'flowId',
-	'workspaceStrategy',
-	'allowRecursion',
-	'output',
-	'when',
-	'context',
-	'retry',
-	'onFailure',
-	'contract',
-	'skipOnLoop',
-]);
-
+/**
+ * McpServer — exposes the `provideSteps` tool to Claude via a stdio-based MCP server.
+ *
+ * Architecture:
+ *  1. This class starts a TCP callback server (on a random port, bound to 127.0.0.1).
+ *  2. It writes an MCP config JSON pointing to `mcp-server.cjs` (stdio transport)
+ *     with FLOW_MCP_CALLBACK_PORT, FLOW_MCP_CALLBACK_TOKEN, and FLOW_EXECUTION_ID.
+ *  3. Claude CLI receives `--mcp-config <path>`, spawns `mcp-server.cjs` as a child
+ *     process, and communicates via stdin/stdout (real MCP protocol).
+ *  4. When Claude calls `provideSteps`, `mcp-server.cjs` opens a TCP connection to
+ *     the callback server and sends { token, executionId, steps } as JSON.
+ *  5. The callback server validates token + executionId before calling `onInjectSteps`.
+ *
+ * Security properties:
+ *  - TCP server bound to 127.0.0.1 only
+ *  - Random callback token prevents other local processes from injecting steps
+ *  - executionId verification prevents cross-execution injection
+ *  - Token shared only via env var to the MCP subprocess (not on any network)
+ */
 export class McpServer {
-	private server: http.Server | null = null;
+	private tcpServer: net.Server | null = null;
 	private configPath: string | null = null;
-	// Bearer token generated at start() — embedded in the MCP config URL so Claude can authenticate.
-	private token: string = '';
+	private callbackToken = '';
 
 	constructor(
 		private readonly executionId: string,
 		private readonly onInjectSteps: (steps: InjectedStep[]) => Promise<void>
 	) {}
 
+	/**
+	 * Start the TCP callback server and write the MCP config file.
+	 * Returns the config file path to pass as `--mcp-config` to Claude.
+	 */
 	async start(): Promise<{ port: number; configPath: string }> {
-		this.token = crypto.randomUUID().replace(/-/g, '');
-		return new Promise((resolve, reject) => {
-			this.server = http.createServer((req, res) => {
-				this.handleRequest(req, res).catch(err => {
-					res.writeHead(500, { 'Content-Type': 'application/json' });
-					res.end(JSON.stringify({ error: String(err) }));
-				});
-			});
-
-			this.server.on('error', reject);
-
-			this.server.listen(0, '127.0.0.1', () => {
-				const address = this.server!.address();
-				if (!address || typeof address === 'string') {
-					reject(new Error('Failed to get server port'));
-					return;
-				}
-				const port = address.port;
-				const configPath = this.writeConfig(port);
-				this.configPath = configPath;
-				resolve({ port, configPath });
-			});
-		});
+		this.callbackToken = crypto.randomUUID().replace(/-/g, '');
+		const callbackPort = await this.startTcpServer();
+		const configPath = this.writeConfig(callbackPort);
+		this.configPath = configPath;
+		return { port: callbackPort, configPath };
 	}
 
 	async stop(): Promise<void> {
+		if (this.configPath) {
+			try {
+				fs.unlinkSync(this.configPath);
+			} catch {
+				/* ignore */
+			}
+			this.configPath = null;
+		}
+		if (!this.tcpServer) return;
 		return new Promise((resolve, reject) => {
-			if (this.configPath) {
-				try {
-					fs.unlinkSync(this.configPath);
-				} catch {
-					// Ignore cleanup errors
-				}
-				this.configPath = null;
-			}
-			if (!this.server) {
-				resolve();
-				return;
-			}
-			const server = this.server;
-			this.server = null; // null immediately so concurrent stop() calls don't double-close
+			const server = this.tcpServer!;
+			this.tcpServer = null;
 			server.close(err => {
-				if (err) reject(err);
-				else resolve();
+				err ? reject(err) : resolve();
 			});
 		});
 	}
 
-	private writeConfig(port: number): string {
-		// Claude CLI requires "type": "http" for HTTP MCP servers.
-		// Headers auth is passed via the headers field (supported by Claude CLI HTTP transport).
+	/** Start a TCP server that receives step payloads from mcp-server.cjs. */
+	private startTcpServer(): Promise<number> {
+		return new Promise((resolve, reject) => {
+			const server = net.createServer(socket => {
+				let buf = '';
+				socket.on('data', chunk => {
+					buf += chunk.toString('utf8');
+					// Fix 4: process ALL newline-delimited JSON objects in the buffer
+					let nl: number;
+					while ((nl = buf.indexOf('\n')) !== -1) {
+						const line = buf.slice(0, nl);
+						buf = buf.slice(nl + 1);
+						if (!line.trim()) continue;
+						let payload: { token: string; executionId: string; steps: InjectedStep[] };
+						try {
+							payload = JSON.parse(line) as typeof payload;
+						} catch {
+							process.stderr.write('[McpServer] TCP: invalid JSON payload\n');
+							continue;
+						}
+						// Fix 2: verify auth token
+						if (payload.token !== this.callbackToken) {
+							process.stderr.write('[McpServer] TCP: rejected — invalid token\n');
+							socket.destroy();
+							return;
+						}
+						// Fix 1: verify executionId
+						if (payload.executionId !== this.executionId) {
+							process.stderr.write(
+								`[McpServer] TCP: rejected — executionId mismatch (got ${payload.executionId}, expected ${this.executionId})\n`
+							);
+							socket.destroy();
+							return;
+						}
+						this.onInjectSteps(payload.steps).catch(err => {
+							process.stderr.write(`[McpServer] onInjectSteps error: ${String(err)}\n`);
+						});
+					}
+				});
+				socket.on('error', err => {
+					process.stderr.write(`[McpServer] TCP socket error: ${err.message}\n`);
+				});
+			});
+			server.once('error', reject);
+			server.listen(0, '127.0.0.1', () => {
+				const addr = server.address();
+				if (!addr || typeof addr === 'string') {
+					reject(new Error('Failed to get TCP server port'));
+					return;
+				}
+				this.tcpServer = server;
+				resolve(addr.port);
+			});
+		});
+	}
+
+	private writeConfig(callbackPort: number): string {
 		const config = {
 			mcpServers: {
 				flow: {
-					type: 'http',
-					url: `http://127.0.0.1:${port}/mcp`,
-					headers: { Authorization: `Bearer ${this.token}` },
+					command: process.execPath,
+					args: [MCP_SERVER_CJS],
+					env: {
+						FLOW_MCP_CALLBACK_PORT: String(callbackPort),
+						FLOW_MCP_CALLBACK_TOKEN: this.callbackToken,
+						FLOW_EXECUTION_ID: this.executionId,
+					},
 				},
 			},
 		};
 		const configPath = path.join(os.tmpdir(), `flow-mcp-${this.executionId}-${Date.now()}.json`);
-		// mode 0o600: owner read/write only — MCP config contains a loopback URL but may
-		// be extended with auth tokens in future versions.
 		fs.writeFileSync(configPath, JSON.stringify(config), { encoding: 'utf8', mode: 0o600 });
 		return configPath;
-	}
-
-	private async handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
-		const url = new URL(req.url ?? '/', `http://127.0.0.1`);
-		if (url.pathname !== '/mcp' || req.method !== 'POST') {
-			res.writeHead(404, { 'Content-Type': 'application/json' });
-			res.end(JSON.stringify({ error: 'Not found' }));
-			return;
-		}
-		const authHeader = req.headers['authorization'];
-		if (!authHeader || authHeader !== `Bearer ${this.token}`) {
-			res.writeHead(401, { 'Content-Type': 'application/json' });
-			res.end(JSON.stringify({ error: 'Unauthorized' }));
-			return;
-		}
-
-		const body = await this.readBody(req);
-		let parsed: JsonRpcRequest;
-		try {
-			parsed = JSON.parse(body) as JsonRpcRequest;
-		} catch {
-			res.writeHead(400, { 'Content-Type': 'application/json' });
-			res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }));
-			return;
-		}
-
-		const response = await this.handleJsonRpc(parsed);
-		res.writeHead(200, { 'Content-Type': 'application/json' });
-		res.end(JSON.stringify(response));
-	}
-
-	private async handleJsonRpc(request: JsonRpcRequest): Promise<JsonRpcResponse | null> {
-		const id = request.id ?? null;
-
-		switch (request.method) {
-			case 'initialize':
-				return {
-					jsonrpc: '2.0',
-					id,
-					result: {
-						protocolVersion: '2024-11-05',
-						capabilities: { tools: {} },
-						serverInfo: { name: 'flow-mcp', version: '1.0.0' },
-					},
-				};
-			case 'initialized':
-				// Notification — no response
-				return null;
-			case 'tools/list':
-				return {
-					jsonrpc: '2.0',
-					id,
-					result: { tools: [PROVIDE_STEPS_TOOL] },
-				};
-			case 'tools/call':
-				return await this.handleToolCall(id, request.params);
-			default:
-				return {
-					jsonrpc: '2.0',
-					id,
-					error: { code: -32601, message: `Method not found: ${request.method}` },
-				};
-		}
-	}
-
-	private async handleToolCall(id: number | string | null, params: unknown): Promise<JsonRpcResponse> {
-		const callParams = params as { name?: string; arguments?: unknown };
-		if (callParams?.name !== 'provideSteps') {
-			return {
-				jsonrpc: '2.0',
-				id,
-				error: { code: -32601, message: `Unknown tool: ${callParams?.name}` },
-			};
-		}
-
-		const args = callParams.arguments as { steps?: unknown };
-		if (!args || !Array.isArray(args.steps)) {
-			return {
-				jsonrpc: '2.0',
-				id,
-				error: { code: -32602, message: 'Invalid arguments: steps must be an array' },
-			};
-		}
-
-		const steps = args.steps as InjectedStep[];
-
-		// Validate each step
-		for (const step of steps) {
-			const unknownFields = Object.keys(step as object).filter(k => !ALLOWED_STEP_FIELDS.has(k));
-			if (unknownFields.length > 0) {
-				return {
-					jsonrpc: '2.0',
-					id,
-					error: {
-						code: -32602,
-						message: `Step '${String((step as { id?: unknown }).id)}' has unknown fields: ${unknownFields.join(', ')}`,
-					},
-				};
-			}
-			if ((step as { type: string }).type === 'user_intervention') {
-				return {
-					jsonrpc: '2.0',
-					id,
-					error: { code: -32603, message: `Step type 'user_intervention' is not supported` },
-				};
-			}
-			if (!step.id || typeof step.id !== 'string') {
-				return {
-					jsonrpc: '2.0',
-					id,
-					error: { code: -32603, message: `Step must have a valid id` },
-				};
-			}
-			if (!step.type || !['model', 'script', 'subflow'].includes(step.type as string)) {
-				return {
-					jsonrpc: '2.0',
-					id,
-					error: { code: -32603, message: `Step '${step.id}' has invalid type: ${String(step.type)}` },
-				};
-			}
-		}
-
-		try {
-			await this.onInjectSteps(steps);
-			const injectedIds = steps.map(s => s.id);
-			return {
-				jsonrpc: '2.0',
-				id,
-				result: {
-					content: [
-						{
-							type: 'text',
-							text: JSON.stringify({ injected: injectedIds }),
-						},
-					],
-				},
-			};
-		} catch (err) {
-			return {
-				jsonrpc: '2.0',
-				id,
-				error: { code: -32603, message: String(err) },
-			};
-		}
-	}
-
-	private readBody(req: http.IncomingMessage): Promise<string> {
-		const MAX_BODY_BYTES = 1024 * 1024; // 1 MiB — protects against unbounded memory growth
-		return new Promise((resolve, reject) => {
-			let body = '';
-			let totalBytes = 0;
-			req.on('data', chunk => {
-				const str = (chunk as Buffer).toString('utf8');
-				totalBytes += Buffer.byteLength(str);
-				if (totalBytes > MAX_BODY_BYTES) {
-					req.destroy();
-					reject(new Error('Request body too large'));
-					return;
-				}
-				body += str;
-			});
-			req.on('end', () => resolve(body));
-			req.on('error', reject);
-		});
 	}
 }

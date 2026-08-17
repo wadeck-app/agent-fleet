@@ -97,7 +97,9 @@ export class ExecutionStore {
 
 	markStepRunning(executionId: string, stepId: string): ExecutionState {
 		const state = this.read(executionId);
+		// Preserve existing fields (e.g. injected: true) when transitioning to running
 		state.steps[stepId] = {
+			...state.steps[stepId],
 			status: 'running',
 			startedAt: new Date().toISOString(),
 		};

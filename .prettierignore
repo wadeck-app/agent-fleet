@@ -60,3 +60,4 @@ packages/web-frontend/src/app/hooks/useAuth.test.ts
 
 # Intentionally broken YAML fixture for parse error tests
 packages/flow-cli/src/test-utils/fixtures/broken.yml
+.violations/.reports/

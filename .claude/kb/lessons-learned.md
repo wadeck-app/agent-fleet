@@ -6221,3 +6221,29 @@ Engine-generated artifacts (outputs, logs, state) are metadata and must NEVER li
 ### PLUGIN-003 scope
 
 - The violation rule checks TS manifests using `tsc --noEmit` for the package; for tests it's sufficient to check that `npm run check` passes for the plugin package as a whole
+
+## Plugin System — Phase 9 Integration Gotchas
+
+### Plugin resolution must happen before createDaemon(), not inside onStart
+
+`createDaemon()` calls `onStart` synchronously. Since `resolvePlugins()` is async, it must be awaited before `createDaemon()` is called. The resolved providers are captured in the closure and passed to `CommandHandler` inside `onStart`.
+
+### Backward compatibility: tryResolvePlugins() vs resolvePlugins()
+
+`resolvePlugins()` throws when no workspace is configured. Wrap it with a guard that checks for config file existence first. If neither `~/.flow/config.yml` nor `.flow/config.yml` nor `FLOW_CONFIG` is set, return empty providers and fall back to legacy `WorkspaceManager`. Never silently swallow config parse errors - only suppress the "no files found" case.
+
+### WorkspaceHandle has no metaDir - derive it
+
+`WorkspaceHandle` from `extension-points` only has `{ path, id }`. `CommandHandler` needs a `metaDir` for `outputsDir`. Derive it as `handle.path + '.meta'` and create the `outputs/` subdirectory explicitly with `fs.mkdirSync`. This matches the convention `WorkspaceManager` already uses.
+
+### Plugin workspace release is fire-and-forget in cleanupExecution
+
+`cleanupExecution()` is synchronous. Release the workspace handle via `provider.release(handle).catch(err => stderr.write(...))`. Do not block cleanup on release - a stuck release must not deadlock the execution store cleanup.
+
+### ApprovalProvider wired to daemon but not to workers yet
+
+`CommandHandler` stores the `ApprovalProvider` but does not pass it to workers. Doing so requires changes to the IPC protocol (`WorkerAssignment` message type) and the worker-side `StepRunner` instantiation. This is a known limitation - HITL flows via plugin approval require completing that IPC wiring.
+
+### PluginResolver tests already cover Phase 9 integration scenarios
+
+`packages/flow-cli/src/config/PluginResolver.test.ts` covers: plugin-none workspace allocation, cli-approval provider, missing workspace config (throw), missing workspace.type (throw). These are the Phase 9 integration tests - no additional test file was needed.

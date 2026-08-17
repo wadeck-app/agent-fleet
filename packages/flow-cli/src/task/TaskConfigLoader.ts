@@ -3,11 +3,14 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+// Task hook value: simple string "command arg1 arg2" or object for advanced options.
+export type TaskHookValue = string | { command: string; debug?: boolean };
+
 export interface TaskGlobalConfig {
 	defaults?: {
 		priority?: string;
 	};
-	hooks?: Record<string, string>;
+	hooks?: Record<string, TaskHookValue>;
 }
 
 export interface TaskProjectConfig {
@@ -16,7 +19,7 @@ export interface TaskProjectConfig {
 	defaults?: {
 		priority?: string;
 	};
-	hooks?: Record<string, string>;
+	hooks?: Record<string, TaskHookValue>;
 }
 
 export interface TaskResolvedConfig {
@@ -24,8 +27,8 @@ export interface TaskResolvedConfig {
 	defaults: {
 		priority: string;
 	};
-	globalHooks: Record<string, string>;
-	projectHooks: Record<string, string>;
+	globalHooks: Record<string, TaskHookValue>;
+	projectHooks: Record<string, TaskHookValue>;
 }
 
 const DEFAULT_STATUSES = ['backlog', 'in-progress', 'done'];

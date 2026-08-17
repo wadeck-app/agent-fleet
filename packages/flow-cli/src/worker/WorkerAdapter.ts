@@ -88,8 +88,6 @@ export class WorkerAdapter {
 
 			// Create a runner with MCP config path baked into the factory call
 			const runner = this.stepRunnerFactory(mcpConfigPath);
-			// Wire onInjectSteps for XML <tool_call> provideSteps pattern
-			runner.setOnInjectSteps(steps => onInjectSteps(steps as InjectedStep[]));
 
 			try {
 				// Notify user that the model step has started (before Claude CLI launches)

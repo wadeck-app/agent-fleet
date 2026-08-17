@@ -1,8 +1,10 @@
+import type { ApprovalProvider, WorkspaceHandle, WorkspaceProvider } from 'extension-points';
+import { releaseWorkspace } from 'extension-points';
 import { FlowValidator, WorkspaceManager } from 'flow-engine';
 import { FlowScheduler } from 'flow-engine';
 import type { ReadyItem, SchedulerContext, SchedulerStep } from 'flow-engine';
 import { TemplateRenderer } from 'flow-engine';
-import type { FlowDefinition, FlowStep } from 'flow-engine';
+import type { FlowDefinition, FlowPluginOverrides, FlowStep } from 'flow-engine';
 import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -14,9 +16,9 @@ import { ExecutionStore, generateExecutionId } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
 import type { WorkerPool } from './WorkerPool';
 
-// Hard cap on injected steps per execution — prevents a rogue Claude process from accumulating
-// unbounded Map entries via repeated provideSteps calls.
-const MAX_INJECTED_STEPS_PER_EXECUTION = 1000;
+// Default limits - overridden by FlowConfig.limits passed to CommandHandler constructor
+const DEFAULT_MAX_INJECTED_STEPS = 20;
+const DEFAULT_MAX_STEPS_PER_EXECUTION = 50;
 
 interface ReadyStep {
 	stepId: string;
@@ -44,6 +46,11 @@ export class CommandHandler {
 	private readonly readyQueue: ReadyStep[] = [];
 	/** Per-execution hook dispatchers */
 	private readonly executionHooks = new Map<string, HookDispatcher>();
+	/** Per-execution plugin workspace handles (only when workspaceProvider is set) */
+	private readonly pluginWorkspaceHandles = new Map<
+		string,
+		{ handle: WorkspaceHandle; provider: WorkspaceProvider }
+	>();
 	private activeExecutionCount = 0;
 
 	constructor(
@@ -52,7 +59,15 @@ export class CommandHandler {
 		private hookDispatcher?: HookDispatcher,
 		executionStore?: ExecutionStore,
 		logWriter?: LogWriter,
-		private readonly allowAbsolutePaths: boolean = false
+		private readonly allowAbsolutePaths: boolean = false,
+		private readonly maxInjectedSteps: number = DEFAULT_MAX_INJECTED_STEPS,
+		private readonly maxStepsPerExecution: number = DEFAULT_MAX_STEPS_PER_EXECUTION,
+		private readonly workspaceProvider?: WorkspaceProvider,
+		// ApprovalProvider stored for future worker injection (requires IPC protocol changes)
+		private readonly approvalProvider?: ApprovalProvider,
+		private readonly resolvePerFlowWorkspaceProvider?: (
+			section: NonNullable<FlowPluginOverrides['workspace']>
+		) => Promise<WorkspaceProvider>
 	) {
 		this.executionStore = executionStore ?? new ExecutionStore(path.join(daemonDir, 'executions'));
 		this.logWriter = logWriter ?? new LogWriter(path.join(daemonDir, 'logs'));
@@ -162,26 +177,94 @@ export class CommandHandler {
 
 		const flowId = cmd.flowId ?? flow.id;
 		const executionId = generateExecutionId();
-		const workspaceManager = new WorkspaceManager(cmd.cwd);
-		let workspace: Awaited<ReturnType<typeof workspaceManager.allocate>>;
-		try {
-			workspace = await workspaceManager.allocate({
-				taskId: executionId,
-				config: flow.workspace,
-				existingPath: cmd.cwd,
-			});
-		} catch (err) {
-			this.logWriter.writeExecution('__workspace', `WORKSPACE_ERROR detail: ${String(err)}`, 'error');
-			return {
-				type: 'error',
-				code: 'WORKSPACE_ERROR',
-				message: 'Failed to allocate workspace. Ensure the flow workspace directory is writable.',
-			};
+
+		let workspaceDir: string;
+		let workspaceMetaDir: string;
+
+		// Tracks the allocated plugin handle so it can be released if setup throws after allocate
+		let pluginHandleEntry: { handle: WorkspaceHandle; provider: WorkspaceProvider } | undefined;
+
+		// Resolve per-flow workspace provider override if the flow declares one
+		let effectiveWorkspaceProvider: WorkspaceProvider | undefined = this.workspaceProvider;
+		if (flow.plugins?.workspace && this.resolvePerFlowWorkspaceProvider) {
+			try {
+				effectiveWorkspaceProvider = await this.resolvePerFlowWorkspaceProvider(flow.plugins.workspace);
+			} catch (err) {
+				this.logWriter.writeExecution('__workspace', `PER_FLOW_WORKSPACE_ERROR: ${String(err)}`, 'error');
+				return {
+					type: 'error',
+					code: 'WORKSPACE_ERROR',
+					message: `Failed to resolve per-flow workspace provider: ${String(err)}`,
+				};
+			}
 		}
-		const workspaceDir = workspace.path;
+
+		if (effectiveWorkspaceProvider) {
+			let pluginHandle: WorkspaceHandle;
+			try {
+				pluginHandle = await effectiveWorkspaceProvider.allocate({ taskId: executionId });
+			} catch (err) {
+				this.logWriter.writeExecution('__workspace', `WORKSPACE_ERROR detail: ${String(err)}`, 'error');
+				return {
+					type: 'error',
+					code: 'WORKSPACE_ERROR',
+					message: 'Failed to allocate workspace via plugin provider.',
+				};
+			}
+			pluginHandleEntry = { handle: pluginHandle, provider: effectiveWorkspaceProvider };
+			workspaceDir = pluginHandle.path;
+			workspaceMetaDir = pluginHandle.path + '.meta';
+			try {
+				fs.mkdirSync(path.join(workspaceMetaDir, 'outputs'), { recursive: true });
+				this.pluginWorkspaceHandles.set(executionId, {
+					handle: pluginHandle,
+					provider: effectiveWorkspaceProvider,
+				});
+			} catch (setupErr) {
+				// Meta dir creation failed - release the handle before propagating
+				void pluginHandleEntry.provider.release(pluginHandleEntry.handle).catch((releaseErr: unknown) => {
+					process.stderr.write(
+						`[CommandHandler] Failed to release plugin workspace after setup error for ${executionId}: ${String(releaseErr)}\n`
+					);
+				});
+				throw setupErr;
+			}
+		} else {
+			const workspaceManager = new WorkspaceManager(cmd.cwd);
+			let workspace: Awaited<ReturnType<typeof workspaceManager.allocate>>;
+			try {
+				workspace = await workspaceManager.allocate({
+					taskId: executionId,
+					config: flow.workspace,
+					existingPath: cmd.cwd,
+				});
+			} catch (err) {
+				this.logWriter.writeExecution('__workspace', `WORKSPACE_ERROR detail: ${String(err)}`, 'error');
+				return {
+					type: 'error',
+					code: 'WORKSPACE_ERROR',
+					message: 'Failed to allocate workspace. Ensure the flow workspace directory is writable.',
+				};
+			}
+			workspaceDir = workspace.path;
+			workspaceMetaDir = workspace.metaDir;
+		}
 
 		const stepIds = flow.steps.map((s: FlowStep) => s.id);
-		this.executionStore.create({ executionId, flowFile, flowId, stepIds });
+		try {
+			this.executionStore.create({ executionId, flowFile, flowId, stepIds });
+		} catch (err) {
+			// Execution setup failed after workspace was allocated - release before propagating
+			if (pluginHandleEntry) {
+				this.pluginWorkspaceHandles.delete(executionId);
+				void pluginHandleEntry.provider.release(pluginHandleEntry.handle).catch((releaseErr: unknown) => {
+					process.stderr.write(
+						`[CommandHandler] Failed to release workspace after setup error for ${executionId}: ${String(releaseErr)}\n`
+					);
+				});
+			}
+			throw err;
+		}
 
 		const context: ExecutionContext = {
 			executionId,
@@ -189,7 +272,7 @@ export class CommandHandler {
 			stepOutputs: {},
 			stepMeta: {},
 			workspaceDir,
-			outputsDir: workspace.metaDir + '/outputs',
+			outputsDir: workspaceMetaDir + '/outputs',
 			cwd: cmd.cwd,
 		};
 
@@ -263,7 +346,7 @@ export class CommandHandler {
 		const scheduler = this.schedulers.get(executionId);
 		if (!scheduler) {
 			process.stderr.write(
-				`[CommandHandler] onStepCompleted: no scheduler for execution ${executionId} (step ${stepId}) — late message after cleanup\n`
+				`[CommandHandler] onStepCompleted: no scheduler for execution ${executionId} (step ${stepId}) - late message after cleanup\n`
 			);
 			return;
 		}
@@ -290,7 +373,7 @@ export class CommandHandler {
 		const scheduler = this.schedulers.get(executionId);
 		if (!scheduler) {
 			process.stderr.write(
-				`[CommandHandler] onStepFailed: no scheduler for execution ${executionId} (step ${stepId}) — late message after cleanup\n`
+				`[CommandHandler] onStepFailed: no scheduler for execution ${executionId} (step ${stepId}) - late message after cleanup\n`
 			);
 			return;
 		}
@@ -299,16 +382,16 @@ export class CommandHandler {
 		const newReady = scheduler.complete(stepId, { type: 'failed', error });
 
 		if (scheduler.hasFailed()) {
-			// Terminal failure — purge queued steps for this execution and cleanup
+			// Terminal failure - purge queued steps for this execution and cleanup
 			for (let i = this.readyQueue.length - 1; i >= 0; i--) {
 				if (this.readyQueue[i]!.executionContext.executionId === executionId) {
 					this.readyQueue.splice(i, 1);
 				}
 			}
 			this.executionStore.markExecutionFailed(executionId);
-			this.cleanupExecution(executionId);
+			this.cleanupExecution(executionId, new Error(error));
 		} else {
-			// Loop/retry in progress — re-enqueue the step returned by the scheduler
+			// Loop/retry in progress - re-enqueue the step returned by the scheduler
 			this.enqueueReadyItems(executionId, newReady, context);
 			this.tryDispatch();
 		}
@@ -323,9 +406,14 @@ export class CommandHandler {
 
 		const currentCount = this.stepCounts.get(executionId) ?? 0;
 		const totalAfterInject = currentCount + injectedSteps.length;
-		if (totalAfterInject > MAX_INJECTED_STEPS_PER_EXECUTION) {
+		if (injectedSteps.length > this.maxInjectedSteps) {
 			throw new Error(
-				`Execution ${executionId} would exceed the maximum step count (${MAX_INJECTED_STEPS_PER_EXECUTION}) after injection`
+				`provideSteps: ${injectedSteps.length} steps exceeds per-call limit of ${this.maxInjectedSteps}`
+			);
+		}
+		if (totalAfterInject > this.maxStepsPerExecution) {
+			throw new Error(
+				`Execution ${executionId} would exceed max steps per execution (${this.maxStepsPerExecution}) after injection`
 			);
 		}
 
@@ -390,9 +478,9 @@ export class CommandHandler {
 					executionContext: step.executionContext,
 				});
 				if (!sent) {
-					// Worker disconnected between getIdleWorker() and send — re-queue the step
+					// Worker disconnected between getIdleWorker() and send - re-queue the step
 					this.workerPool.removeWorker(idleWorker);
-					// Transport failure: not a flow-level failure — unacknowledge and put back
+					// Transport failure: not a flow-level failure - unacknowledge and put back
 					scheduler?.unacknowledge(step.stepId);
 					this.readyQueue.unshift(step);
 					continue;
@@ -426,12 +514,22 @@ export class CommandHandler {
 		}
 	}
 
-	private cleanupExecution(executionId: string): void {
+	private cleanupExecution(executionId: string, priorError?: unknown): void {
 		this.schedulers.delete(executionId);
 		this.executionContexts.delete(executionId);
 		this.parentChildIndex.delete(executionId);
 		this.stepCounts.delete(executionId);
 		this.activeExecutionCount--;
+
+		const pluginWs = this.pluginWorkspaceHandles.get(executionId);
+		if (pluginWs) {
+			this.pluginWorkspaceHandles.delete(executionId);
+			void releaseWorkspace(pluginWs.provider, pluginWs.handle, priorError).catch((err: unknown) => {
+				process.stderr.write(
+					`[CommandHandler] Failed to release plugin workspace for ${executionId}: ${String(err)}\n`
+				);
+			});
+		}
 	}
 
 	/** Returns all known step IDs for an execution (initial + injected so far). */

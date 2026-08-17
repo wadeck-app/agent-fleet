@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import type { HookConfig } from '../hooks/HookDispatcher.js';
 import { HookDispatcher } from '../hooks/HookDispatcher.js';
 import { isProjectInitialized, loadTaskConfig } from '../task/TaskConfigLoader.js';
+import type { TaskHookValue } from '../task/TaskConfigLoader.js';
 import { TaskStore } from '../task/TaskStore.js';
 import type { TaskStatus } from '../task/TaskStore.js';
 
@@ -61,14 +62,19 @@ function suggest(input: string, candidates: string[]): string | undefined {
 	return bestDist <= 3 ? best : undefined;
 }
 
-function parseHookCommand(cmd: string): HookConfig {
-	const parts = cmd.trim().split(/\s+/);
-	return { type: 'cli', command: parts[0]!, args: parts.slice(1) };
+function parseHookCommand(value: TaskHookValue): HookConfig {
+	const raw = typeof value === 'string' ? value : value.command;
+	const debug = typeof value === 'object' ? value.debug : undefined;
+	const parts = raw.trim().split(/\s+/);
+	if (!parts[0]) {
+		throw new Error(`Hook command cannot be empty. Got: "${raw}"`);
+	}
+	return { type: 'cli', command: parts[0], args: parts.slice(1), ...(debug !== undefined && { debug }) };
 }
 
 function buildHookDispatcher(
-	globalHooks: Record<string, string>,
-	projectHooks: Record<string, string>
+	globalHooks: Record<string, TaskHookValue>,
+	projectHooks: Record<string, TaskHookValue>
 ): HookDispatcher {
 	const combined: Record<string, HookConfig[]> = {};
 	const allEvents = new Set([...Object.keys(globalHooks), ...Object.keys(projectHooks)]);
@@ -189,13 +195,17 @@ export async function runTaskCommand(args: string[], cwd: string): Promise<Comma
 				return errorOutput(jsonMode, 'missing description', 'Usage: task new <description>');
 			}
 			const task = store.create(description);
-			await hookDispatcher.dispatch('onTaskCreated', {
-				taskId: task.id,
-				status: task.status,
-				description: task.description,
-				taskFile: path.join(tasksDir, `${task.id}.json`),
-				...projectEnv,
-			});
+			await hookDispatcher.dispatch(
+				'onTaskCreated',
+				{
+					taskId: task.id,
+					status: task.status,
+					description: task.description,
+					taskFile: path.join(tasksDir, `${task.id}.json`),
+					...projectEnv,
+				},
+				() => process.stderr.write(`[task] hook 'onTaskCreated' failed\n`)
+			);
 			return { exitCode: 0, output: JSON.stringify(task, null, 2) };
 		}
 
@@ -243,12 +253,16 @@ export async function runTaskCommand(args: string[], cwd: string): Promise<Comma
 			try {
 				const before = store.findByPrefix(id);
 				const updated = store.updateStatus(before.id, statusArg as TaskStatus);
-				await hookDispatcher.dispatch('onStatusChange', {
-					taskId: updated.id,
-					oldStatus: before.status,
-					newStatus: updated.status,
-					...projectEnv,
-				});
+				await hookDispatcher.dispatch(
+					'onStatusChange',
+					{
+						taskId: updated.id,
+						oldStatus: before.status,
+						newStatus: updated.status,
+						...projectEnv,
+					},
+					() => process.stderr.write(`[task] hook 'onStatusChange' failed\n`)
+				);
 				return { exitCode: 0, output: JSON.stringify(updated, null, 2) };
 			} catch (error) {
 				return errorOutput(jsonMode, (error as Error).message);

@@ -62,7 +62,7 @@ describe('WorkerAdapter', () => {
 		mockMcpStart.mockResolvedValue({ configPath: '/tmp/mcp.json' });
 		mockMcpStop.mockResolvedValue(undefined);
 		mockExecuteStep = vi.fn().mockResolvedValue({ outputs: { result: 'ok' } });
-		const mockRunner = { executeStep: mockExecuteStep, setOnInjectSteps: vi.fn() };
+		const mockRunner = { executeStep: mockExecuteStep };
 		// Factory returns a fresh mock runner for each call
 		mockFactory = vi.fn().mockReturnValue(mockRunner) as unknown as StepRunnerFactory;
 		adapter = new WorkerAdapter(mockFactory);

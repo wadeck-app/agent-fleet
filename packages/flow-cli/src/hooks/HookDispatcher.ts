@@ -1,4 +1,7 @@
-import { execFile } from 'node:child_process';
+// Hook system for flow and task lifecycle events.
+// User-facing documentation, config format, and payload reference: packages/flow-cli/HOOKS.md
+// When adding events, transports, or payload fields here, update HOOKS.md accordingly.
+import { execFile, spawn } from 'node:child_process';
 import * as http from 'node:http';
 import * as https from 'node:https';
 import { promisify } from 'node:util';
@@ -30,6 +33,12 @@ export interface CliHook {
 	 *     MY_TOKEN: "env://MY_TOKEN"    # note: URI resolution is not done here — pass the value directly
 	 */
 	env?: Record<string, string>;
+	/**
+	 * When true, the hook's stdout and stderr are piped directly to the calling terminal.
+	 * Useful for debugging. Do NOT enable in production — output will mix with CLI output.
+	 * Default: false.
+	 */
+	debug?: boolean;
 }
 
 export interface HttpHook {
@@ -107,7 +116,38 @@ export class HookDispatcher {
 			...(hook.env ?? {}), // explicit hook-declared vars — highest priority
 		};
 
+		if (hook.debug) {
+			return this.sendCliHookDebug(hook, env);
+		}
+
 		return execFileAsync(hook.command, hook.args, { env, timeout: 10_000 }).then(() => undefined);
+	}
+
+	// Runs the CLI hook with stdio: 'inherit' so stdout/stderr appear in the calling terminal.
+	// Uses spawn (not execFile) because execFile does not support stdio inheritance.
+	private sendCliHookDebug(hook: CliHook, env: Record<string, string>): Promise<void> {
+		return new Promise((resolve, reject) => {
+			const child = spawn(hook.command, hook.args, { env, stdio: 'inherit' });
+
+			const timer = setTimeout(() => {
+				child.kill();
+				reject(new Error('CLI hook timeout'));
+			}, 10_000);
+
+			child.on('error', err => {
+				clearTimeout(timer);
+				reject(err);
+			});
+
+			child.on('close', code => {
+				clearTimeout(timer);
+				if (code !== 0) {
+					reject(new Error(`Hook exited with code ${String(code)}`));
+				} else {
+					resolve();
+				}
+			});
+		});
 	}
 
 	private async sendHttpHook(hook: HttpHook, payload: Record<string, unknown>): Promise<void> {

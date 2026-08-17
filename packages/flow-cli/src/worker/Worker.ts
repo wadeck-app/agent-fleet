@@ -23,9 +23,8 @@ function send(message: WorkerToDaemon): void {
 const baseConfig: StepRunnerConfig = { interactive: false };
 
 const adapter = new WorkerAdapter((mcpConfigPath: string) => {
-	const config: StepRunnerConfig = mcpConfigPath
-		? { ...baseConfig, claudeEnv: { CLAUDE_MCP_CONFIG: mcpConfigPath } }
-		: baseConfig;
+	// Pass mcpConfigPath directly — StepRunner passes it as --mcp-config to Claude CLI
+	const config: StepRunnerConfig = mcpConfigPath ? { ...baseConfig, mcpConfigPath } : baseConfig;
 	return new StepRunner(config);
 });
 

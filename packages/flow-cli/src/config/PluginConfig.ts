@@ -1,6 +1,7 @@
 export interface GlobalPluginInstance {
 	type: string;
 	options?: Record<string, unknown>;
+	pluginsDir?: string;
 }
 
 export interface GlobalPluginsConfig {
@@ -16,6 +17,7 @@ export interface ProjectFeatureSection {
 	instance?: {
 		type: string;
 		options?: Record<string, unknown>;
+		pluginsDir?: string;
 	};
 	options?: Record<string, unknown>;
 }
@@ -35,6 +37,7 @@ export interface ProjectConfig {
 export interface ResolvedFeature {
 	type: string;
 	options: Record<string, unknown>;
+	pluginsDir?: string;
 }
 
 export interface ResolvedPluginsConfig {

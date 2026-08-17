@@ -1,6 +1,8 @@
 import type { ApprovalProvider, WorkspaceProvider } from 'extension-points';
+import type { FlowPluginOverrides } from 'flow-engine';
 
 import { ConfigLoader } from './ConfigLoader.js';
+import type { ProjectFeatureSection } from './PluginConfig.js';
 import { PluginLoader } from './PluginLoader.js';
 
 export { releaseWorkspace } from 'extension-points';
@@ -15,6 +17,33 @@ interface PluginResolverOptions {
 export interface ResolvedProviders {
 	workspaceProvider?: WorkspaceProvider;
 	approvalProvider?: ApprovalProvider;
+}
+
+/**
+ * Creates a callback that resolves a per-flow workspace provider from a flow's plugins.workspace section.
+ * The callback validates credentials and loads the provider via PluginLoader.
+ */
+export async function createPerFlowWorkspaceResolver(
+	options: PluginResolverOptions = {}
+): Promise<(section: NonNullable<FlowPluginOverrides['workspace']>) => Promise<WorkspaceProvider>> {
+	const configLoader = new ConfigLoader({
+		globalConfigPath: options.globalConfigPath,
+		projectConfigPath: options.projectConfigPath,
+	});
+	const pluginLoader = new PluginLoader({
+		pluginPackagesDir: options.pluginPackagesDir,
+		registryPath: options.registryPath,
+	});
+
+	return async (section: NonNullable<FlowPluginOverrides['workspace']>) => {
+		const resolved = await configLoader.resolveStandaloneSection('workspace', section as ProjectFeatureSection);
+		return pluginLoader.loadProvider(
+			resolved.type,
+			'workspace',
+			resolved.options ?? {},
+			resolved.pluginsDir
+		) as Promise<WorkspaceProvider>;
+	};
 }
 
 export async function resolvePlugins(options: PluginResolverOptions = {}): Promise<ResolvedProviders> {
@@ -41,14 +70,16 @@ export async function resolvePlugins(options: PluginResolverOptions = {}): Promi
 	result.workspaceProvider = (await pluginLoader.loadProvider(
 		config.workspace.type,
 		'workspace',
-		config.workspace.options ?? {}
+		config.workspace.options ?? {},
+		config.workspace.pluginsDir
 	)) as WorkspaceProvider;
 
 	if (config.approval) {
 		result.approvalProvider = (await pluginLoader.loadProvider(
 			config.approval.type,
 			'approval',
-			config.approval.options ?? {}
+			config.approval.options ?? {},
+			config.approval.pluginsDir
 		)) as ApprovalProvider;
 	}
 

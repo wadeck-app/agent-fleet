@@ -841,6 +841,26 @@ export interface FlowDefinition {
 
 	/** Global environment variables injected into every step (supports ${{ }} templates). Step-level env takes precedence. */
 	env?: Record<string, string>;
+
+	/** Optional per-flow plugin overrides. When set, these take precedence over the global startup provider. */
+	plugins?: FlowPluginOverrides;
+}
+
+/**
+ * Per-flow plugin overrides declared in the flow YAML `plugins:` section.
+ * Mirrors the project config syntax: use `use:` to reference a named global instance,
+ * or `instance:` to declare an inline instance (credentials must use ${ENV_VAR}).
+ */
+export interface FlowPluginOverrides {
+	workspace?: {
+		use?: string;
+		instance?: {
+			type: string;
+			options?: Record<string, unknown>;
+			pluginsDir?: string;
+		};
+		options?: Record<string, unknown>;
+	};
 }
 
 /**

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { access } from 'node:fs/promises';
-import { join, relative, resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 interface ExtensionPointVersion {
@@ -53,21 +54,33 @@ function parseTypeRef(typeRef: string): { pluginId: string; implName: string } {
 	return { pluginId: match[1]!, implName: match[2]! };
 }
 
+// Scoped to flow-cli's own node_modules regardless of user's CWD
+const _require = createRequire(import.meta.url);
+
 export class PluginLoader {
-	private pluginPackagesDir: string;
+	private pluginPackagesDir: string | undefined;
 	private registryPath: string;
 	private registryCache: ExtensionPointsRegistry | null = null;
 
 	constructor(options: PluginLoaderOptions = {}) {
-		this.pluginPackagesDir = options.pluginPackagesDir ?? resolve(process.cwd(), 'packages');
-		this.registryPath =
-			options.registryPath ?? resolve(process.cwd(), 'packages', 'extension-points', 'extension-points.json');
+		this.pluginPackagesDir = options.pluginPackagesDir;
+		if (options.registryPath) {
+			this.registryPath = options.registryPath;
+		} else {
+			// Resolve registry via npm - extension-points is a dep of flow-cli
+			this.registryPath = _require.resolve('extension-points/extension-points.json');
+		}
 	}
 
-	async loadProvider(typeRef: string, extensionPoint: string, options: Record<string, unknown>): Promise<unknown> {
+	async loadProvider(
+		typeRef: string,
+		extensionPoint: string,
+		options: Record<string, unknown>,
+		pluginsDir?: string
+	): Promise<unknown> {
 		const { pluginId, implName } = parseTypeRef(typeRef);
 
-		const manifest = await this.loadManifest(pluginId);
+		const manifest = await this.loadManifest(pluginId, pluginsDir);
 
 		// PLUGIN-002 runtime enforcement: pluginId must match
 		if (manifest.pluginId !== pluginId) {
@@ -99,14 +112,14 @@ export class PluginLoader {
 		}
 		this.assertVersionSupported(extensionPoint, impl.version);
 
-		// Instantiate provider - TS manifest path
+		// TS manifest path: provider factory
 		if (impl.provider) {
 			return impl.provider(options);
 		}
 
 		// JSON manifest path: entrypoint + export
 		if (impl.entrypoint !== undefined) {
-			const pluginDir = join(this.pluginPackagesDir, `plugin-${pluginId}`);
+			const pluginDir = await this.resolvePluginDir(pluginId, pluginsDir);
 			const resolvedEntrypoint = resolve(pluginDir, impl.entrypoint);
 			const rel = relative(pluginDir, resolvedEntrypoint);
 			if (rel.startsWith('..') || resolve(rel) === rel) {
@@ -138,8 +151,8 @@ export class PluginLoader {
 		);
 	}
 
-	private async loadManifest(pluginId: string): Promise<PluginManifest> {
-		const pluginDir = join(this.pluginPackagesDir, `plugin-${pluginId}`);
+	private async loadManifest(pluginId: string, pluginsDir?: string): Promise<PluginManifest> {
+		const pluginDir = await this.resolvePluginDir(pluginId, pluginsDir);
 		const jsManifestPath = join(pluginDir, 'plugin.config.js');
 		const jsonManifestPath = join(pluginDir, 'plugin.manifest.json');
 
@@ -171,6 +184,33 @@ export class PluginLoader {
 		throw new Error(
 			`No manifest found for plugin "${pluginId}". Expected "${jsManifestPath}" or "${jsonManifestPath}"`
 		);
+	}
+
+	private async resolvePluginDir(pluginId: string, pluginsDir?: string): Promise<string> {
+		// L2: explicit pluginsDir override - must be absolute
+		if (pluginsDir !== undefined) {
+			if (!isAbsolute(pluginsDir)) {
+				throw new Error(`pluginsDir must be an absolute path, got: "${pluginsDir}"`);
+			}
+			return join(pluginsDir, `plugin-${pluginId}`);
+		}
+
+		// Test/explicit override via constructor
+		if (this.pluginPackagesDir !== undefined) {
+			return join(this.pluginPackagesDir, `plugin-${pluginId}`);
+		}
+
+		// L1: npm resolution - scoped to flow-cli's own node_modules
+		try {
+			const manifestExportPath = _require.resolve(`plugin-${pluginId}/plugin.config`);
+			// manifestExportPath is the plugin.config.js file; its directory is the plugin root
+			return join(manifestExportPath, '..');
+		} catch {
+			throw new Error(
+				`No manifest found for plugin "${pluginId}". ` +
+					`Ensure "plugin-${pluginId}" is installed as a dependency of flow-cli.`
+			);
+		}
 	}
 
 	private assertVersionSupported(extensionPoint: string, version: number): void {

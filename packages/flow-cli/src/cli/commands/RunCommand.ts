@@ -6,7 +6,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { DEFAULT_CONFIG, startDaemon } from '../../daemon/Daemon';
+import { DEFAULT_CONFIG, loadFlowConfig } from '../../config/FlowConfig';
+import { startDaemon } from '../../daemon/Daemon';
 import type { ClientCommand, DaemonResponse, ExecutionState } from '../../ipc/Protocol';
 import { ExecutionStore } from '../../storage/ExecutionStore';
 
@@ -185,23 +186,8 @@ function parseInputArgs(rawInputs: string[]): Record<string, string> {
 	return inputs;
 }
 
-function loadDaemonConfig(configFile: string): typeof DEFAULT_CONFIG {
-	if (!fs.existsSync(configFile)) return DEFAULT_CONFIG;
-	try {
-		const loaded = yaml.load(fs.readFileSync(configFile, 'utf8'), {
-			schema: yaml.JSON_SCHEMA,
-		}) as typeof DEFAULT_CONFIG;
-		return {
-			queue: { ...DEFAULT_CONFIG.queue, ...loaded.queue },
-			logs: { ...DEFAULT_CONFIG.logs, ...loaded.logs },
-			worker: { ...DEFAULT_CONFIG.worker, ...loaded.worker },
-			security: { ...DEFAULT_CONFIG.security, ...loaded.security },
-		};
-	} catch (err) {
-		process.stderr.write('Warning: daemon config could not be parsed, using defaults.\n');
-		return DEFAULT_CONFIG;
-	}
-}
+/** @deprecated Use loadFlowConfig from config/FlowConfig instead. */
+export { loadFlowConfig as loadDaemonConfig };
 
 async function sendToDaemon(
 	cmd: Extract<ClientCommand, { type: 'run' }>,
@@ -291,7 +277,7 @@ export function registerRunCommand(program: Command): void {
 					}
 				}
 
-				const config = loadDaemonConfig(path.join(os.homedir(), '.flow-config.yaml'));
+				const config = loadFlowConfig(path.join(os.homedir(), '.flow-config.yaml'));
 
 				const cmd: Extract<ClientCommand, { type: 'run' }> = {
 					type: 'run',

@@ -1,4 +1,6 @@
 import { type DaemonHandle, createDaemon } from '@wadeck/singleton-daemon-kit';
+import type { ApprovalProvider, WorkspaceProvider } from 'extension-points';
+import { WorkspaceManager } from 'flow-engine';
 import * as yaml from 'js-yaml';
 import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -6,6 +8,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import type { WebSocket } from 'ws';
 
+import { DEFAULT_CONFIG, type FlowConfig, loadFlowConfig } from '../config/FlowConfig';
+import { createPerFlowWorkspaceResolver, resolvePlugins } from '../config/PluginResolver.js';
 import { type HookConfig, HookDispatcher } from '../hooks/HookDispatcher';
 import type { ClientCommand, WorkerToDaemon } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
@@ -41,28 +45,37 @@ function loadFlowHooks(cwd: string): Record<string, HookConfig[]> {
 	}
 }
 
-export interface FlowConfig {
-	queue: { concurrency: number };
-	logs: { retainDays: number };
-	worker: { wsPort: number | null };
-	security: {
-		allowAbsolutePaths: boolean;
-	};
-}
+// FlowConfig and DEFAULT_CONFIG are now in src/config/FlowConfig.ts
+export type { FlowConfig };
+export { DEFAULT_CONFIG, loadFlowConfig };
 
-export const DEFAULT_CONFIG: FlowConfig = {
-	queue: { concurrency: 1 },
-	logs: { retainDays: 30 },
-	worker: { wsPort: null },
-	security: {
-		allowAbsolutePaths: false,
-	},
-};
+/**
+ * Attempts to load plugin config. Returns empty providers when no config files are present
+ * (backward-compatible). Re-throws on config parse errors or plugin load failures.
+ */
+async function tryResolvePlugins(): Promise<{
+	workspaceProvider?: WorkspaceProvider;
+	approvalProvider?: ApprovalProvider;
+}> {
+	const globalConfigPath = path.join(os.homedir(), '.flow', 'config.yml');
+	const projectConfigPath = path.join(process.cwd(), '.flow', 'config.yml');
+	const envOverride = process.env['FLOW_CONFIG'];
+
+	if (!envOverride && !fs.existsSync(globalConfigPath) && !fs.existsSync(projectConfigPath)) {
+		return {};
+	}
+
+	return resolvePlugins();
+}
 
 export async function startDaemon(config: FlowConfig = DEFAULT_CONFIG, daemonDir?: string): Promise<DaemonHandle> {
 	const resolvedDaemonDir = daemonDir ?? path.join(os.homedir(), '.flow-daemon');
 	const executionsDir = path.join(resolvedDaemonDir, 'executions');
 	const logsDir = path.join(resolvedDaemonDir, 'logs');
+
+	// Resolve plugins before createDaemon - onStart is synchronous so async must happen here
+	const pluginProviders = await tryResolvePlugins();
+	const perFlowWorkspaceResolver = await createPerFlowWorkspaceResolver();
 
 	let workerPool: WorkerPool;
 	let wsServer: WebSocketServer;
@@ -91,6 +104,11 @@ export async function startDaemon(config: FlowConfig = DEFAULT_CONFIG, daemonDir
 				executionStore = new ExecutionStore(executionsDir, config.logs.retainDays);
 				logWriter = new LogWriter(logsDir, config.logs.retainDays);
 				executionStore.pruneOldExecutions();
+				WorkspaceManager.pruneOldWorkspaceDir(
+					path.join(process.cwd(), '.agent-fleet', 'workspaces'),
+					config.workspace.retainDays,
+					config.workspace.maxWorkspaces
+				);
 				const claudePath = resolveClaudePath();
 				wsServer = new WebSocketServer(wsPort, handleWorkerMessage, handleWorkerClose);
 				// Fire-and-forget: start() retries on EADDRINUSE (TIME_WAIT). Workers read port
@@ -107,7 +125,12 @@ export async function startDaemon(config: FlowConfig = DEFAULT_CONFIG, daemonDir
 					undefined,
 					executionStore,
 					logWriter,
-					config.security.allowAbsolutePaths
+					config.security.allowAbsolutePaths,
+					config.limits.maxInjectedSteps,
+					config.limits.maxStepsPerExecution,
+					pluginProviders.workspaceProvider,
+					pluginProviders.approvalProvider,
+					perFlowWorkspaceResolver
 				);
 			},
 		},

@@ -458,4 +458,75 @@ describe('WorkspaceManager', () => {
 			expect(manager.getStats().total).toBe(0);
 		});
 	});
+
+	describe('pruneOldWorkspaces', () => {
+		const workspacesDir = path.join(testRoot, '.agent-fleet', 'workspaces');
+
+		function makeWorkspaceDir(name: string, ageMs = 0): string {
+			const dir = path.join(workspacesDir, name);
+			fs.mkdirSync(dir, { recursive: true });
+			if (ageMs > 0) {
+				const oldTime = new Date(Date.now() - ageMs);
+				fs.utimesSync(dir, oldTime, oldTime);
+			}
+			return dir;
+		}
+
+		function makeMetaDir(name: string): string {
+			const dir = path.join(workspacesDir, name + '.meta');
+			fs.mkdirSync(dir, { recursive: true });
+			return dir;
+		}
+
+		it('retainDays:0 deletes all workspace dirs', async () => {
+			makeWorkspaceDir('ws-old-1', 100);
+			makeWorkspaceDir('ws-old-2', 200);
+			await manager.pruneOldWorkspaces({ retainDays: 0, maxWorkspaces: 999 });
+			expect(fs.existsSync(path.join(workspacesDir, 'ws-old-1'))).toBe(false);
+			expect(fs.existsSync(path.join(workspacesDir, 'ws-old-2'))).toBe(false);
+		});
+
+		it('maxWorkspaces:2 keeps only 2 most recent', async () => {
+			makeWorkspaceDir('ws-a', 3000);
+			makeWorkspaceDir('ws-b', 2000);
+			makeWorkspaceDir('ws-c', 1000);
+			await manager.pruneOldWorkspaces({ retainDays: 999, maxWorkspaces: 2 });
+			// ws-a is oldest — should be pruned
+			expect(fs.existsSync(path.join(workspacesDir, 'ws-a'))).toBe(false);
+			// ws-b and ws-c are the 2 most recent — kept
+			expect(fs.existsSync(path.join(workspacesDir, 'ws-b'))).toBe(true);
+			expect(fs.existsSync(path.join(workspacesDir, 'ws-c'))).toBe(true);
+		});
+
+		it('also deletes .meta sibling directories', async () => {
+			makeWorkspaceDir('ws-meta', 100);
+			const metaDir = makeMetaDir('ws-meta');
+			await manager.pruneOldWorkspaces({ retainDays: 0, maxWorkspaces: 999 });
+			expect(fs.existsSync(path.join(workspacesDir, 'ws-meta'))).toBe(false);
+			expect(fs.existsSync(metaDir)).toBe(false);
+		});
+
+		it('retainDays:999 maxWorkspaces:999 deletes nothing', async () => {
+			makeWorkspaceDir('ws-keep', 1000);
+			await manager.pruneOldWorkspaces({ retainDays: 999, maxWorkspaces: 999 });
+			expect(fs.existsSync(path.join(workspacesDir, 'ws-keep'))).toBe(true);
+		});
+
+		it('skips directories that are active in-memory', async () => {
+			// Allocate a workspace so it exists in-memory
+			const config: WorkspaceConfig = {
+				mode: 'shared',
+				gitStrategy: undefined as any,
+				reusePolicy: 'if-available',
+			};
+			const ws = await manager.allocate({ taskId: 'active-task', config });
+			const activePath = ws.path;
+			// Set its mtime to appear old
+			const oldTime = new Date(Date.now() - 999 * 86400000);
+			if (fs.existsSync(activePath)) fs.utimesSync(activePath, oldTime, oldTime);
+			await manager.pruneOldWorkspaces({ retainDays: 0, maxWorkspaces: 999 });
+			// Active workspace should NOT be deleted
+			expect(fs.existsSync(activePath)).toBe(true);
+		});
+	});
 });
