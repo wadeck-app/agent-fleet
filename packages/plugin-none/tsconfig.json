@@ -6,6 +6,6 @@
 		"rootDir": "src"
 	},
 	"include": ["src"],
-	"exclude": ["dist", "dist-types"],
+	"exclude": ["dist", "dist-types", "**/*.test.ts"],
 	"references": [{ "path": "../extension-points" }]
 }
