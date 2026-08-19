@@ -28,6 +28,31 @@ This module defines the `ModelProvider` interface and its implementations (`Clau
 
 ## Design
 
+### Shared types
+
+```ts
+interface McpServer {
+  name: string;
+  command: string[];     // command + args as array
+  env?: Record<string, string>;
+  cwd?: string;
+  enabled?: boolean;
+}
+
+interface LaunchOptions {
+  prompt: string;
+  model?: string;
+  sessionId?: string;
+  skipPermissions?: boolean;
+  streamJson?: boolean;
+  verbose?: boolean;
+  mcpServers?: McpServer[];  // replaces mcpConfigPath entirely
+  env?: Record<string, string>;
+}
+```
+
+`mcpConfigPath: string` is removed from `StepRunnerConfig` and all callers. No migration shim.
+
 ### v1 Interface (thin, DI-injected)
 
 ```ts
@@ -40,6 +65,11 @@ interface ModelProvider {
 
 `ModelStepExecutor` receives a `ModelProvider` via constructor (dependency injection).
 `FlowExecutor` resolves the correct implementation based on `step.provider` or flow-level default.
+
+### MCP serialization per provider
+
+- `ClaudeModelProvider`: writes `mcpServers` to a temp JSON file (Claude format), passes `--mcp-config <tmpfile>`; cleans up after invocation
+- `OpenCodeModelProvider`: serializes `mcpServers` to OpenCode `config.json` format, passes as `OPENCODE_CONFIG_CONTENT` env var
 
 ### v2 Registry (planned)
 

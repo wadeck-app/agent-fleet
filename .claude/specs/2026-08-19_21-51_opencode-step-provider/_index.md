@@ -2,7 +2,7 @@
 
 **Created:** 2026-08-19
 **Version:** v0.1
-**Status:** In Progress -- v0.1 -- 2/7 questions resolved
+**Status:** In Progress -- v0.1 -- 6/7 questions resolved
 **Iteration:** 1
 
 ## Summary
@@ -14,7 +14,10 @@
 | # | Decision | Status | Date | Rationale |
 |---|---|---|---|---|
 | 1 | Provider abstraction: thin `ModelProvider` interface (Option B), provider registry (Option C) planned for v2 | Approved | 2026-08-19 | DI pattern matches existing codebase; clean executors; low cost vs. Option A; Option C deferred until 3+ providers exist |
-| 2 | OpenCode v1.18.18 invocation facts: `opencode run [message]` (positional args, not stdin); `--format json` for structured output; `--auto` for permissions skip; `-m provider/model` for model; no per-invocation MCP config path | Factual | 2026-08-19 | Verified from installed binary help output |
+| 2 | OpenCode v1.18.18 invocation facts: `opencode run [message]` (positional args, not stdin); `--format json` for structured output; `--auto` for permissions skip; `-m provider/model` for model; MCP via `OPENCODE_CONFIG_CONTENT` env var (inline JSON, highest precedence) | Factual | 2026-08-19 | Verified from installed binary + official docs |
+| 3 | `LaunchOptions` carries structured `McpServer[]`; each provider serializes independently; `mcpConfigPath` removed entirely (no migration, no production usage) | Approved | 2026-08-19 | Avoids cross-provider schema coupling; clean interface; Claude's path was an impl detail that leaked |
+| 4 | Provider selection: `provider` field on `ModelFlowStep` (step-level); if omitted defaults to `"claude"` | Approved | 2026-08-19 | Explicit per-step; no ambiguity; supports mixed-provider flows naturally |
+| 5 | Process lifecycle: each `ModelProvider` self-manages via `kill()` (Option B); `ClaudeLifecycleManager` left as-is for v1; generalization to `ProviderLifecycleManager` deferred to v2 (when 3+ providers exist) | Approved | 2026-08-19 | Minimal v1 change; v2 generalization is likely given more providers coming |
 
 ## Open Questions
 
@@ -22,11 +25,11 @@
 |---|---|---|---|
 | 1 | What is the desired scope of provider abstraction? | High | Resolved -> Decision #1 |
 | 2 | Which invocation style does OpenCode support? | High | Resolved -> Decision #2 |
-| 3 | How should flow steps select which provider to use? | High | Open |
-| 4 | How should FlowDesignerAgent and LocalClaudeAgentExecutor be handled? | Medium | Open |
-| 5 | How should MCP config be passed via the ModelProvider interface? | Medium | Open |
-| 6 | How should --dangerously-skip-permissions equivalent be handled? | Medium | Open |
-| 7 | What is the migration / rollout strategy? | Low | Open |
+| 3 | How should flow steps select which provider to use? | High | Resolved -> Decision #4 |
+| 4 | How should FlowDesignerAgent and LocalClaudeAgentExecutor be handled? | Medium | Resolved -> Decision #5 (out of scope v1) |
+| 5 | How should MCP config be passed via the ModelProvider interface? | Medium | Resolved -> Decision #3 |
+| 6 | How should --dangerously-skip-permissions equivalent be handled? | Medium | Resolved -> Decision #6 (factual: `--auto` flag, same `skipPermissions` field) |
+| 7 | What is the migration / rollout strategy? | Low | Resolved -> out of scope (no production) |
 
 ## Modules / Sub-files
 

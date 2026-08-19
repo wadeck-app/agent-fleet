@@ -1,8 +1,11 @@
 # Lessons learned
 
-<!-- Last updated: 2026-08-19T19:51:46.532Z -->
+<!-- Last updated: 2026-08-19T20:41:30.826Z -->
 
 ## Recurring feedback
+
+<!-- session e9704d0a 2026-08-19 -->
+- Investigate external tool capabilities thoroughly (official docs, CLI help, env vars, config schema) BEFORE proposing design questions. Don't design abstractions based on assumed behavior.
 
 <!-- session 4a2fd14d 2026-08-17 -->
 - Review response quality before sending — user complained "t'avais pas reviewé ta reponse (ca commence à faire bcp de fois ce soir !)" multiple times in this chunk when I sent imprecise explanations or wrong examples (echo hook, absolute path requirement not justified). This is repeated feedback indicating a pattern.
@@ -278,6 +281,9 @@
 - Multiple independent agents (Explore, general-purpose) read identical spec files sequentially without coordination, causing redundant I/O. Agents should receive shared context or hand off findings rather than re-audit.
 
 ## Agent errors
+
+<!-- session e9704d0a 2026-08-19 -->
+- Proposed OpenCode invocation design decisions without checking tool's actual flags, MCP config format, or environment variable options upfront. Required user correction to investigate properly.
 
 <!-- session 4a2fd14d 2026-08-17 -->
 - Wrote hook-logger.js in ESM (`import` syntax) without verifying `package.json` has `"type": "module"` — would have crashed at runtime. Should verify file compatibility before writing.
@@ -680,6 +686,9 @@
 
 ## Documentation gaps
 
+<!-- session e9704d0a 2026-08-19 -->
+- `OPENCODE_CONFIG` env var for per-invocation MCP config was missed in initial binary inspection — required guided search (strings extraction + binary scanning) to discover; not surfaced in `--help`.
+
 <!-- session 4a2fd14d 2026-08-17 -->
 - No HOOKS.md existed in codebase — had to create from scratch. Hook event types, payload field names, and config formats had no existing reference docs.
 - CLI distribution spec lacks concrete details for UpdateManager, self-check suite, and CI pipeline — audits flagged these as named in architecture but unspecified. Same pattern: multiple audit reports finding the same architectural gaps suggests spec needs upfront design validation before implementation.
@@ -1017,6 +1026,9 @@
 - Extensive Grep searches for domain concepts (RE-QUEUED, bufferSpill, reconnectTimeout, idleTimeout, drainTimeout, heartbeat monitoring, etc.) suggest spec lacks clear glossary or index of key terms. Future audits should define these upfront.
 
 ## Known constraints
+
+<!-- session e9704d0a 2026-08-19 -->
+- User prefers phased delivery: start with simpler scope (Option B), plan enhancement for v2 (Option C) rather than full-scope implementation upfront.
 
 <!-- session 4a2fd14d 2026-08-17 -->
 - `execFile` captures stdout/stderr by default (not `stdio: 'inherit'`), making hook output invisible in terminal. User explicitly asked for `debug: true` flag to fix visibility. This is a real API limitation that affects testing experience.
