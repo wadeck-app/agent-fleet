@@ -495,5 +495,104 @@ describe('OutputExtractor', () => {
 			};
 			expect(() => extractor.extract('{"status":"todo"}', config, 'step1')).toThrow(/mutually exclusive/);
 		});
+
+		it('extracts array element via bracket notation ($.tags[0])', () => {
+			const config: StepOutput = {
+				first: { type: 'string', jsonpath: '$.tags[0]' },
+			};
+			const output = extractor.extract('{"tags":["alpha","beta"]}', config, 'step1');
+			expect(output.first).toBe('alpha');
+		});
+
+		it('extracts nested array element via bracket notation ($.items[1].name)', () => {
+			const config: StepOutput = {
+				name: { type: 'string', jsonpath: '$.items[1].name' },
+			};
+			const output = extractor.extract('{"items":[{"name":"first"},{"name":"second"}]}', config, 'step1');
+			expect(output.name).toBe('second');
+		});
+
+		it('extracts array element via dot notation ($.tags.0)', () => {
+			const config: StepOutput = {
+				first: { type: 'string', jsonpath: '$.tags.0' },
+			};
+			const output = extractor.extract('{"tags":["alpha","beta"]}', config, 'step1');
+			expect(output.first).toBe('alpha');
+		});
+	});
+
+	describe('Transform: parseYAML', () => {
+		it('parses a simple YAML key-value string into an object', () => {
+			const config: StepOutput = {
+				data: { type: 'object', transform: 'parseYAML' },
+			};
+			const output = extractor.extract('key: value\ncount: 42', config, 'step1');
+			expect(output.data).toEqual({ key: 'value', count: 42 });
+		});
+
+		it('parses a YAML list', () => {
+			const config: StepOutput = {
+				items: { type: 'object', transform: 'parseYAML' },
+			};
+			const output = extractor.extract('- alpha\n- beta\n- gamma', config, 'step1');
+			expect(output.items).toEqual(['alpha', 'beta', 'gamma']);
+		});
+
+		it('throws on invalid YAML', () => {
+			const config: StepOutput = {
+				data: { type: 'object', transform: 'parseYAML', required: true },
+			};
+			expect(() => extractor.extract('key: [unclosed', config, 'step1')).toThrow();
+		});
+	});
+
+	describe('From path extraction (intervention output)', () => {
+		it('extracts intervention.approved boolean via from path', () => {
+			const config: StepOutput = {
+				approved: { type: 'boolean', from: 'intervention.approved' },
+			};
+			const output = extractor.extract('', config, 'step1', {
+				intervention: { approved: true, comment: 'looks good', answeredBy: 'user1' },
+			});
+			expect(output.approved).toBe(true);
+		});
+
+		it('extracts intervention.value string via from path', () => {
+			const config: StepOutput = {
+				answer: { type: 'string', from: 'intervention.value' },
+			};
+			const output = extractor.extract('', config, 'step1', {
+				intervention: { value: 'my answer', answeredBy: 'user1' },
+			});
+			expect(output.answer).toBe('my answer');
+		});
+
+		it('extracts intervention.answeredBy string via from path', () => {
+			const config: StepOutput = {
+				respondent: { type: 'string', from: 'intervention.answeredBy' },
+			};
+			const output = extractor.extract('', config, 'step1', {
+				intervention: { approved: false, answeredBy: 'alice' },
+			});
+			expect(output.respondent).toBe('alice');
+		});
+
+		it('throws when from path does not exist in context', () => {
+			const config: StepOutput = {
+				missing: { type: 'string', from: 'intervention.nonexistent', required: true },
+			};
+			expect(() =>
+				extractor.extract('', config, 'step1', {
+					intervention: { approved: true },
+				})
+			).toThrow(/nonexistent/);
+		});
+
+		it('throws when no additionalContext is provided and from is specified', () => {
+			const config: StepOutput = {
+				approved: { type: 'boolean', from: 'intervention.approved', required: true },
+			};
+			expect(() => extractor.extract('', config, 'step1')).toThrow(/no context available/);
+		});
 	});
 });

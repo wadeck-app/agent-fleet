@@ -18,7 +18,11 @@
 		"test:coverage": "vitest run --coverage",
 		"lint": "eslint src",
 		"lint:fix": "eslint src --fix",
-		"clean": "rimraf dist"
+		"clean": "rimraf dist",
+		"bundle": "tsx scripts/bundle.ts",
+		"bundle-task": "tsx scripts/bundle-task.ts",
+		"bundle-updater": "tsx scripts/bundle-updater.ts",
+		"bundle:all": "npm run bundle && npm run bundle-task && npm run bundle-updater"
 	},
 	"dependencies": {
 		"extension-points": "file:../extension-points",
@@ -35,6 +39,7 @@
 	"devDependencies": {
 		"@types/js-yaml": "^4.0.9",
 		"@types/ws": "^8.0.0",
+		"esbuild": "^0.27.2",
 		"tsx": "^4.7.0",
 		"typescript": "^5.3.3",
 		"vitest": "^4.0.14"

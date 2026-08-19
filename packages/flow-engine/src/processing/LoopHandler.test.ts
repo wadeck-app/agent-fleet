@@ -483,6 +483,56 @@ describe('LoopHandler', () => {
 				expect(result.invalidatedSteps).toContain('step2');
 				expect(completed.has('step2')).toBe(false);
 			});
+
+			it('should skip intermediate step with skipOnLoop=true but still invalidate its downstream', () => {
+				// Chain: step0 (goto target) -> stepB (skipOnLoop) -> stepC (normal)
+				// When loop fires goto step0: stepB skipped, stepC invalidated
+				const stepB: DAGNode = {
+					step: {
+						id: 'stepB',
+						name: 'Intermediate Skip',
+						type: 'script',
+						script: 'echo',
+						skipOnLoop: true,
+					},
+					dependencies: ['step0'],
+					dependents: ['stepC'],
+				};
+				mockDAG.nodes.set('stepB', stepB);
+
+				const stepC: DAGNode = {
+					step: {
+						id: 'stepC',
+						name: 'Downstream Normal',
+						type: 'script',
+						script: 'echo',
+					},
+					dependencies: ['stepB'],
+					dependents: [],
+				};
+				mockDAG.nodes.set('stepC', stepC);
+
+				mockDAGBuilder.getDescendants.mockReturnValue(new Set(['stepB', 'stepC']));
+				completed.add('step0');
+				completed.add('stepB');
+				completed.add('stepC');
+
+				const result = handler.handleLoop(mockStep, 'step0', mockDAG, completed, iterations);
+
+				// stepB is skipped (skipOnLoop=true) — stays in completed
+				expect(result.skippedSteps).toContain('stepB');
+				expect(result.invalidatedSteps).not.toContain('stepB');
+				expect(completed.has('stepB')).toBe(true);
+
+				// stepC is invalidated (normal step) — removed from completed
+				expect(result.invalidatedSteps).toContain('stepC');
+				expect(result.skippedSteps).not.toContain('stepC');
+				expect(completed.has('stepC')).toBe(false);
+
+				// step0 (goto target) is always invalidated
+				expect(result.invalidatedSteps).toContain('step0');
+				expect(completed.has('step0')).toBe(false);
+			});
 		});
 
 		describe('Console logging', () => {

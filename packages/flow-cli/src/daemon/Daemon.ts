@@ -179,7 +179,7 @@ export async function startDaemon(config: FlowConfig = DEFAULT_CONFIG, daemonDir
 			case 'step_failed': {
 				try {
 					const { executionId, stepId, error } = message;
-					executionStore.markStepFailed(executionId, stepId);
+					executionStore.markStepFailed(executionId, stepId, error);
 					commandHandler.onStepFailed(executionId, stepId, error);
 					// markExecutionFailed is now called inside onStepFailed only when the failure is terminal
 					logWriter.writeExecution(executionId, `Step ${stepId} failed: ${error}`, 'error');

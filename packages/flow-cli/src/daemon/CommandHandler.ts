@@ -51,6 +51,11 @@ export class CommandHandler {
 		string,
 		{ handle: WorkspaceHandle; provider: WorkspaceProvider }
 	>();
+	/** Per-execution WorkspaceManager handles for the non-plugin path */
+	private readonly nativeWorkspaceManagers = new Map<
+		string,
+		{ manager: WorkspaceManager; workspaceId: string }
+	>();
 	private activeExecutionCount = 0;
 
 	constructor(
@@ -248,6 +253,7 @@ export class CommandHandler {
 			}
 			workspaceDir = workspace.path;
 			workspaceMetaDir = workspace.metaDir;
+			this.nativeWorkspaceManagers.set(executionId, { manager: workspaceManager, workspaceId: workspace.id });
 		}
 
 		const stepIds = flow.steps.map((s: FlowStep) => s.id);
@@ -527,6 +533,16 @@ export class CommandHandler {
 			void releaseWorkspace(pluginWs.provider, pluginWs.handle, priorError).catch((err: unknown) => {
 				process.stderr.write(
 					`[CommandHandler] Failed to release plugin workspace for ${executionId}: ${String(err)}\n`
+				);
+			});
+		}
+
+		const nativeWs = this.nativeWorkspaceManagers.get(executionId);
+		if (nativeWs) {
+			this.nativeWorkspaceManagers.delete(executionId);
+			void nativeWs.manager.release(nativeWs.workspaceId, executionId).catch((err: unknown) => {
+				process.stderr.write(
+					`[CommandHandler] Failed to release workspace for ${executionId}: ${String(err)}\n`
 				);
 			});
 		}

@@ -66,6 +66,8 @@ export interface StepState {
 	completedAt?: string;
 	/** True when this step was injected dynamically via provideSteps during execution. */
 	injected?: boolean;
+	/** Error message if the step failed. */
+	error?: string;
 }
 
 export interface ExecutionState {
@@ -77,4 +79,6 @@ export interface ExecutionState {
 	startedAt: string;
 	completedAt: string | null;
 	steps: Record<string, StepState>;
+	/** Error message from the last failed step, surfaced to the CLI on flow failure. */
+	lastError?: string;
 }

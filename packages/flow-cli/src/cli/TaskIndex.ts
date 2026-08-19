@@ -4,6 +4,9 @@ import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Injected by esbuild at bundle time; falls back to package.json in dev mode (tsx).
+declare const __TASK_CLI_VERSION__: string;
+
 import type { HookConfig } from '../hooks/HookDispatcher.js';
 import { HookDispatcher } from '../hooks/HookDispatcher.js';
 import { isProjectInitialized, loadTaskConfig } from '../task/TaskConfigLoader.js';
@@ -159,9 +162,14 @@ export async function runTaskCommand(args: string[], cwd: string): Promise<Comma
 	}
 
 	if (command === '--version' || command === '-V') {
-		const require = createRequire(import.meta.url);
-		const pkg = require('../../package.json') as { version: string };
-		return { exitCode: 0, output: pkg.version };
+		let version: string;
+		try {
+			version = __TASK_CLI_VERSION__;
+		} catch {
+			const require = createRequire(import.meta.url);
+			version = (require('../../package.json') as { version: string }).version;
+		}
+		return { exitCode: 0, output: version };
 	}
 
 	if (command === 'init') {

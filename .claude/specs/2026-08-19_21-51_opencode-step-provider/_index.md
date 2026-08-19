@@ -1,13 +1,13 @@
 # Spec: OpenCode Step Provider
 
 **Created:** 2026-08-19
-**Version:** v0.1
-**Status:** In Progress -- v0.1 -- 6/7 questions resolved
+**Version:** v1.0
+**Status:** Approved -- v1.0 -- 2026-08-19
 **Iteration:** 1
 
 ## Summary
 
-<!-- One paragraph: what this spec covers and why it exists. Fill in after first few decisions. -->
+This spec defines how to add OpenCode (v1.18.18) as an alternative AI CLI provider for `"model"` flow steps, alongside the existing Claude Code integration. It introduces a thin `ModelProvider` interface, an `OpenCodeModelProvider` implementation, step-level provider selection, and a clean `McpServer[]` abstraction that replaces the Claude-specific `mcpConfigPath`. Scope is v1 only -- registry pattern and lifecycle manager generalization are explicitly deferred to v2.
 
 ## Decision Log
 
@@ -18,6 +18,7 @@
 | 3 | `LaunchOptions` carries structured `McpServer[]`; each provider serializes independently; `mcpConfigPath` removed entirely (no migration, no production usage) | Approved | 2026-08-19 | Avoids cross-provider schema coupling; clean interface; Claude's path was an impl detail that leaked |
 | 4 | Provider selection: `provider` field on `ModelFlowStep` (step-level); if omitted defaults to `"claude"` | Approved | 2026-08-19 | Explicit per-step; no ambiguity; supports mixed-provider flows naturally |
 | 5 | Process lifecycle: each `ModelProvider` self-manages via `kill()` (Option B); `ClaudeLifecycleManager` left as-is for v1; generalization to `ProviderLifecycleManager` deferred to v2 (when 3+ providers exist) | Approved | 2026-08-19 | Minimal v1 change; v2 generalization is likely given more providers coming |
+| 6 | `StepRunner` builds `Map<string, ModelProvider>` once in constructor; resolves by `step.provider ?? "claude"` per step | Approved | 2026-08-19 | Simplest correct approach; both providers are cheap to construct |
 
 ## Open Questions
 
@@ -46,3 +47,4 @@
 | Version | Date | Summary |
 |---|---|---|
 | v0.1 | 2026-08-19 | Initial spec created |
+| v1.0 | 2026-08-19 | All 7 questions resolved; spec approved |

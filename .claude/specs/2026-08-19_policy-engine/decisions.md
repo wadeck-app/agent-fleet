@@ -1,98 +1,35 @@
-# Policy Engine — Architecture Decisions
+# Policy Engine — Decisions
 
-> Extracted from `.claude/specs/2026-07-30-flow-cli/decisions.md` on 2026-08-19.
+> Spec created 2026-08-19.
 
----
+## D-PE1 — Policy engine is an external autonomous CLI, not a flow step
 
-## D35 — Flow MCP server: per-execution, exposes `provideSteps`
+The policy engine runs independently of the flow graph. It is triggered by events, not scheduled as a step. It can therefore observe and modify any execution without being subject to the same graph constraints.
 
-Each worker starts a per-execution MCP server upon receiving the `assign` message (which provides the `executionId`). The MCP server is started before launching `claude -p` for that step. Workers are execution-agnostic before `assign` — no MCP server exists before that point. Claude is invoked with `--mcp-config <temp_config> --strict-mcp-config` so only the flow engine's tools are available.
+## D-PE2 — Daemon exposes a dedicated HTTP API for step injection and flow control
 
-**Why MCP:** `claude -p` natively supports `--mcp-config`. Claude calls tools via the MCP protocol — the worker's MCP server receives calls and responds. No stream-json interception, no stdin injection needed.
+The daemon runs an HTTP server (`127.0.0.1:<apiPort>`) alongside the existing WebSocket server. The WebSocket remains for control messages between daemon and workers (assign, ready, step_completed, etc.). The HTTP API handles all action calls: inject steps, block execution, read state (v2).
 
-**`--strict-mcp-config`:** prevents the user's personal MCP servers from interfering with the execution environment.
+**Why HTTP and not WebSocket for actions:** HTTP is stateless, standard, and reusable by any caller (worker, policy engine, future tooling). WebSocket messages are an internal implementation detail — exposing them to external tools would couple the external interface to the internal control protocol.
 
-**v1 tools exposed (minimum for step injection):**
-- `provideSteps(steps: Step[])` — inject steps into the running graph
+**Implication:** the current `inject_steps` WebSocket message (Worker → Daemon) must be replaced by `POST /api/executions/:id/steps`. The `McpServer`'s `onInjectSteps` callback makes this HTTP call instead of calling `sendMessage`.
 
-**v2+ tools (not scoped yet, architecture supports them):**
-- `logMessage`, `setTodo`, `askUser`, `getFlowState`, `getStepOutput`
+## D-PE3 — Workers and the policy engine use the same daemon HTTP API
 
-**Why this matters for the policy engine:** this is the primary bidirectional interface between Claude (or a policy step) and the flow engine. All policy enforcement happens through `provideSteps` in v1. Future tools (`getFlowState`, `getStepOutput`) will enable read-before-enforce patterns without any architectural change.
+There is one action interface. `McpServer.onInjectSteps` calls `POST /api/executions/:id/steps`. The policy engine calls the same endpoint. No special protocol per caller type.
 
----
+**Why:** avoids duplicating validation logic (step ID uniqueness, parent resolution, depth check). The daemon validates once, for everyone.
 
-## D36 — Dynamic step injection: `provideSteps` tool, `parent` field, recursive hierarchy
+## D-PE4 — MCP stays for Claude subprocess only
 
-**Injection mechanism:** Model steps (and, by design, any step type including a future `policy` type) call `provideSteps` via the flow MCP server (D35). Any step type can inject steps.
+`McpServer` is a translation layer: Claude calls `tools/call provideSteps` via JSON-RPC, the server translates to `POST /api/executions/:id/steps`. External tools (policy engine) do not speak MCP — they call the HTTP API directly.
 
-**`parent` field:** injected steps declare `parent: "<step-id>"` to become sub-steps of that step. The parent step is not `done` until all its sub-steps are `done`. Without `parent`, the injected step is a regular graph step.
-The `parent` field is valid in both static YAML and in steps injected via `provideSteps`.
+## D-PE5 — Event delivery via existing HookDispatcher (http hook)
 
-```yaml
-# Injected via provideSteps — sub-step of implement-feature
-id: run-tests
-type: script
-command: npm test
-parent: implement-feature
-onFailure:
-  goto: implement-feature
-```
+The policy engine registers as an `http` hook in `.flows/config.yml`. The daemon fires it on each configured event. The payload includes `daemonApiUrl` and `daemonToken` so the policy engine can call back without any separate discovery step.
 
-**Recursive hierarchy:** sub-steps can themselves have sub-steps. Depth is configurable (`maxChildDepth`, default: 10). Exceeding the limit throws at injection time.
+## D-PE6 — Daemon HTTP API requires Bearer token authentication
 
-**`depends` within sub-steps:** governs ordering between siblings. Does not create deadlock with `parent` — `parent` controls completion scope, `depends` controls start order.
+The daemon generates a token at startup (`crypto.randomBytes(32).toString('hex')`). It is distributed to workers via `FLOW_DAEMON_TOKEN` env var and to external hooks via the event payload (`daemonToken` field). All API requests without a valid token return `401`.
 
-**Why unbounded recursion with a limit:** policy engine steps need to inject feedback loops on injected steps (e.g. a security scan injected by a model step may itself inject a remediation step). Capping at 10 prevents runaway recursion without constraining real use cases.
-
-**UI representation:** `parent`/child relationships render as nested sub-steps under the parent, preserving a high-level flow view. Only top-level steps (no `parent`) appear at the root level.
-
-**Policy engine use cases (explicit in spec):**
-- A policy step can inject missing feedback loops (e.g. "no security scan detected → inject one").
-- A policy step can validate that required loops exist before allowing execution to proceed.
-
----
-
-## D39 — `provideSteps` MCP tool: JSON schema
-
-The `provideSteps` tool exposed by the flow MCP server (D35) accepts:
-
-```typescript
-interface ProvideStepsInput {
-  steps: InjectedStep[];
-}
-
-interface InjectedStep {
-  id: string;                    // required — must be unique in the execution graph
-  type: 'model' | 'script' | 'subflow';  // user_intervention not allowed in injected steps
-  parent?: string;               // ID of the step that owns this sub-step (D36)
-  depends?: string[];            // IDs of steps that must complete before this one starts
-  onFailure?: { goto: string };  // creates a bounded cycle (D12 maxIterations applies)
-  // All other standard step fields apply (prompt, command, env, output, etc.)
-}
-```
-
-**Validation at injection time (throws, returns MCP error to Claude):**
-- `id` already exists in the graph → error
-- `parent` references a non-existent step → error
-- `depends` references a non-existent step → error
-- `type: user_intervention` → error
-- `maxChildDepth` exceeded → error (D36)
-
-**On success:** MCP tool returns `{ "injected": ["step-id-1", "step-id-2"] }`. Claude continues.
-
-**Why no `executionId` in the call:** the MCP server is per-execution (started at `assign` — D35). The executionId is implicit in the server instance.
-
----
-
-## D29 — Flow design skill scope (relevant: policy engine excluded from v1 skill)
-
-The global flow design skill at `~/.claude/` teaches the design→validate→approve→execute pattern. It explicitly states **what NOT to do:** no `user_intervention` steps in injected steps. The skill depends on D30 (YAML schema). Policy engine step type (`type: policy`) is not in v1 scope and would not appear in the v1 skill.
-
----
-
-## D30 — YAML step schema: `user_intervention` excluded from injected steps
-
-Flow CLI supports all step types from flow-engine. The `type` field on `InjectedStep` (D39) explicitly excludes `user_intervention` — it cannot be injected dynamically. All other types (`model`, `script`, `subflow`) are allowed.
-
-The policy engine step type is referenced in design notes and open questions but is **not yet a first-class `type` value** in the schema. It currently manifests as `type: model` or `type: script` steps that call `provideSteps`.
+**Why:** the daemon HTTP API mutates execution state. Even on loopback, an unauthenticated endpoint would be callable by any local process.

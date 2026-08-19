@@ -1,0 +1,20 @@
+{
+  "name": "@wadeck/flow-cli",
+  "version": "0.0.0",
+  "private": false,
+  "type": "commonjs",
+  "bin": { "flow": "./bin/flow.js" },
+  "files": ["bin/", "flow.cjs", "flow-updater.cjs", "package.json"],
+  "optionalDependencies": {
+    "@wadeck/flow-cli-win32-x64":    "*",
+    "@wadeck/flow-cli-darwin-arm64": "*",
+    "@wadeck/flow-cli-darwin-x64":   "*",
+    "@wadeck/flow-cli-linux-x64":    "*"
+  },
+  "dependencies": {
+    "semver": "^7.0.0"
+  },
+  "publishConfig": {
+    "@wadeck:registry": "https://gitlab.com/api/v4/projects/84445653/packages/npm/"
+  }
+}

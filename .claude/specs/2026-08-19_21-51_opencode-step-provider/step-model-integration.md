@@ -1,8 +1,8 @@
 # Step Model Integration -- OpenCode Step Provider
 
-**Version:** v0.1
+**Version:** v1.0
 **Last updated:** 2026-08-19
-**Status:** Draft
+**Status:** Approved
 
 ## Overview
 
@@ -35,20 +35,22 @@ steps:
 
 ```ts
 // packages/flow-engine/src/types.ts
-type ModelProvider = "claude" | "opencode";  // extend as providers are added
+type ModelProviderName = "claude" | "opencode";  // distinct from interface ModelProvider
 
 interface ModelFlowStep extends BaseFlowStep {
   type: "model";
-  provider?: ModelProvider;  // default: "claude"
+  provider?: ModelProviderName;  // default: "claude"
   model?: string;
   prompt: string;
   // ...
 }
 ```
 
-### Resolution in FlowExecutor / StepRunner
+### Resolution in StepRunner
 
-`FlowExecutor` builds a `ModelProviderFactory` (or a simple resolver function) that maps `step.provider ?? "claude"` to the correct `ModelProvider` instance. The resolved instance is passed to `ModelStepExecutor` via DI.
+`StepRunner` builds a `Map<string, ModelProvider>` once in its constructor. Per step: `providers.get(step.provider ?? "claude")`. Throws if provider name is unknown (fail fast).
+
+**v1 concurrency constraint:** Each `ModelProvider` instance tracks one active subprocess. Concurrent model steps that resolve to the same provider name share a single instance -- `StepRunner` MUST serialize such steps (queue them, do not execute in parallel). Steps using different provider names may still run concurrently. This avoids kill() ambiguity on shared instances. Tracked as a v2 improvement when `ProviderLifecycleManager` is generalized.
 
 ### `ClaudeLifecycleManager` impact (v1)
 
@@ -56,9 +58,19 @@ interface ModelFlowStep extends BaseFlowStep {
 
 **TODO v2:** Generalize to `ProviderLifecycleManager` tracking N processes when a third provider is added. Decision #5 in `_index.md`.
 
+On `KILL_CLAUDE`, `StepRunner` MUST call `kill()` on ALL provider instances currently executing (not just the most recently started). This covers concurrent model steps in a flow.
+
 ## Open questions
 
 *(none currently open for this module)*
+
+## How to add a provider (v1)
+
+1. Implement `ModelProvider` interface: create `<Name>ModelProvider.ts` in `packages/flow-engine/src/processing/`
+2. Add the provider name to the `ModelProviderName` union type in `packages/flow-engine/src/types.ts`: `type ModelProviderName = "claude" | "opencode" | "<name>"`
+3. Add an entry to the provider map in `StepRunner` constructor: `["<name>", new <Name>ModelProvider()]`
+
+Note: when a third provider is added, evaluate whether `ClaudeLifecycleManager` generalization (deferred in Decision #5) is now warranted.
 
 ## Security considerations
 

@@ -1,100 +1,158 @@
-# Policy Engine — Abstractions and Data Structures
+# Policy Engine — Abstractions
 
-> Extracted from `.claude/specs/2026-07-30-flow-cli/decisions.md` and `abstractions.md` on 2026-08-19.
+> Spec created 2026-08-19.
 
----
+## Daemon HTTP API
 
-## `provideSteps` input schema
+All endpoints are on `127.0.0.1` only. Authentication via `Authorization: Bearer <token>`.
 
-Defined in D39. The payload sent to the `provideSteps` MCP tool:
+### POST `/api/executions/:executionId/steps`
+Inject steps into the running execution graph.
 
-```typescript
-interface ProvideStepsInput {
-  steps: InjectedStep[];
-}
+```
+POST /api/executions/abc123/steps
+Authorization: Bearer <daemon-token>
+Content-Type: application/json
 
-interface InjectedStep {
-  id: string;                             // unique in the execution graph
-  type: 'model' | 'script' | 'subflow';  // user_intervention is NOT allowed
-  parent?: string;                        // ID of parent step — makes this a sub-step
-  depends?: string[];                     // step IDs that must complete first
-  onFailure?: { goto: string };           // bounded cycle; maxIterations from D12 applies
-  // All standard step fields also apply: prompt, command, env, output, etc.
+{
+  "steps": [
+    {
+      "id": "security-scan",
+      "type": "script",
+      "script": "npm run security-check",
+      "parent": "implement-feature"   // optional — makes this a sub-step
+    }
+  ]
 }
 ```
 
-**Return value on success:**
+Response `200`:
 ```json
-{ "injected": ["step-id-1", "step-id-2"] }
+{ "injected": ["security-scan"] }
 ```
 
-**Error cases (MCP tool error returned to caller):**
-- `id` already exists in graph
-- `parent` not found in graph
-- `depends` references non-existent step
-- `type: user_intervention` used
-- `maxChildDepth` exceeded
+Response `409` — step ID already exists:
+```json
+{ "error": "STEP_ALREADY_EXISTS", "stepId": "security-scan" }
+```
+
+Response `422` — validation error (unknown parent, invalid type, depth exceeded, etc.):
+```json
+{ "error": "VALIDATION_ERROR", "message": "..." }
+```
 
 ---
 
-## `parent` field semantics
+### POST `/api/executions/:executionId/block`
+Suspend execution immediately. The execution stays in `blocked` state until explicitly resumed or cancelled.
 
-The `parent` field on `InjectedStep` (and on static YAML steps) creates a parent/child relationship:
+```
+POST /api/executions/abc123/block
+Authorization: Bearer <daemon-token>
+Content-Type: application/json
 
-- Parent step is **not complete** until all its sub-steps reach a terminal state.
-- Sub-steps of step A complete before step B (which `depends: [A]`) can start.
-- `parent` controls completion scope; `depends` (within sibling sub-steps) controls start ordering.
-- `parent`/child hierarchy is recursive — sub-steps can have their own sub-steps.
-- Depth limit: `maxChildDepth` (default: 10, configurable in `.flows/config.yml` → `execution.maxChildDepth`).
-
----
-
-## Flow MCP server — lifecycle and scope
-
-Each worker starts a per-execution MCP server instance when it receives an `assign` message. The server:
-
-- Is bound to a single `executionId` (implicit — not passed in tool calls).
-- Exposes `provideSteps` in v1.
-- Is started before `claude -p` is launched for the step.
-- Uses `--strict-mcp-config` to prevent user's personal MCP servers from interfering.
-
-The server does not exist before the first `assign` message — workers are execution-agnostic at spawn time.
-
----
-
-## `ExecutionContext` — context passed to workers
-
-Defined in `packages/flow-cli/src/ipc/Protocol.ts` (CLI-specific type, distinct from `FlowExecutionContext` in flow-engine):
-
-```typescript
-interface ExecutionContext {
-  executionId: string;
-  inputs: Record<string, string>;
-  stepOutputs: Record<string, Record<string, any>>;
-  workspaceDir: string;
+{
+  "reason": "Required security scan step is missing"
 }
 ```
 
-Workers (and policy steps) receive the full `ExecutionContext` on each `assign` message. This is the data available for a policy step to inspect before deciding what to inject.
+Response `200`:
+```json
+{ "status": "blocked" }
+```
 
 ---
 
-## `InjectedStep` vs `FlowStep` (from flow-engine)
+### GET `/api/executions/:executionId/state` *(v2)*
+Read the current flow graph state: step list with statuses, inputs, outputs.
 
-- `FlowStep` (flow-engine/src/types.ts line 669) — union type `ModelFlowStep | ScriptFlowStep | SubFlowStep`. Used in the static YAML and in `assign` messages.
-- `InjectedStep` (D39) — subset of `FlowStep` fields, passed as the `provideSteps` argument. No `executionId` field (implicit from MCP server instance).
+```
+GET /api/executions/abc123/state
+Authorization: Bearer <daemon-token>
+```
 
-A policy step that injects steps passes `InjectedStep[]` objects. The daemon validates, extends them with runtime metadata, and incorporates them into the live graph as `FlowStep` nodes.
+Response `200`:
+```json
+{
+  "executionId": "abc123",
+  "status": "running",
+  "steps": [
+    { "id": "implement-feature", "type": "model", "status": "running" },
+    { "id": "security-scan",     "type": "script", "status": "pending" }
+  ],
+  "inputs": { "ticket": "Fix login bug" },
+  "outputs": {}
+}
+```
 
 ---
 
-## `.flows/config.yml` — policy-relevant fields
+## Hook event payload
 
-From D37:
+The daemon sends this on each event. `daemonApiUrl` and `daemonToken` are included so the recipient can call back.
+
+```typescript
+interface PolicyHookPayload {
+  event: HookEvent;          // 'onStepEnd', 'onStepStart', etc.
+  executionId: string;
+  daemonApiUrl: string;      // e.g. "http://127.0.0.1:3401"
+  daemonToken: string;       // Bearer token for daemon HTTP API
+  stepId?: string;           // present on step-level events
+  flowState: FlowStateSnapshot;
+}
+
+interface FlowStateSnapshot {
+  steps: Array<{ id: string; type: string; status: string }>;
+  inputs: Record<string, string>;
+  outputs: Record<string, Record<string, unknown>>;
+}
+```
+
+---
+
+## Authentication
+
+The daemon generates a random token at startup (`crypto.randomBytes(32).toString('hex')`).
+
+Distribution:
+- Included in every hook payload (`daemonToken` field) → available to the policy engine
+- Passed to workers as an environment variable (`FLOW_DAEMON_TOKEN`) → available to `McpServer` callback
+
+All requests without a valid `Authorization: Bearer <token>` header return `401`.
+
+---
+
+## Rule schema (policy engine internal)
+
+```typescript
+interface PolicyRule {
+  id: string;
+  on: HookEvent[];           // events that trigger this rule
+  conditions: Condition[];   // ALL must be true (AND semantics)
+  actions: Action[];
+}
+
+type Condition =
+  | { type: 'step_absent';  stepId: string }
+  | { type: 'step_status';  stepId: string; status: string }
+  | { type: 'output_match'; stepId: string; field: string; pattern: string };
+
+type Action =
+  | { type: 'inject'; steps: InjectedStep[] }
+  | { type: 'block';  reason?: string }
+  | { type: 'noop' };
+```
+
+---
+
+## Config registration (`.flows/config.yml`)
 
 ```yaml
-execution:
-  maxChildDepth: 10    # max parent/child nesting depth; policy steps respect this ceiling
+hooks:
+  onStepEnd:
+    - type: http
+      url: http://localhost:3399/policy
+  onFlowStart:
+    - type: http
+      url: http://localhost:3399/policy
 ```
-
-This is the only `.flows/config.yml` field directly relevant to policy engine behavior. All other fields relate to hooks, task storage, and defaults.

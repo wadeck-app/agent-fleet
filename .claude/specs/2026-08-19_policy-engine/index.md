@@ -1,43 +1,55 @@
 # Policy Engine — Spec Index
 
-> Extracted from `.claude/specs/2026-07-30-flow-cli/` on 2026-08-19.
+> Spec created 2026-08-19. Source material: `.claude/specs/2026-07-30-flow-cli/`.
 
 ## What is the policy engine?
 
-The policy engine is a named step type (alongside `model`, `script`, `subflow`) that can programmatically inspect and modify the running flow graph. A policy step does not call Claude to produce output — it enforces rules by:
+The policy engine is an **autonomous external CLI** that enforces rules on running flow executions. It is **not a step inside a flow** — it runs independently, triggered by flow lifecycle events.
 
-1. **Inspecting** the current step graph for missing or required patterns (e.g. "is a security-scan step present?").
-2. **Injecting** missing steps via the `provideSteps` MCP tool when a required pattern is absent.
-3. **Blocking execution** (by not completing, or by failing) when a required condition is not met before the flow can proceed.
+It receives events via the daemon's hook system (`HookDispatcher`) and takes actions by calling the **daemon's HTTP API** — the same API that workers also use for step injection. This makes the interface clean, reusable, and not tied to any Claude-specific protocol.
 
-Example use cases (from D36):
-- "No security scan detected → inject one."
-- "Validate that a required feedback loop exists before allowing execution to proceed."
-- A security scan injected by a model step may itself inject a remediation step (recursive injection, bounded by `maxChildDepth`).
+## Architecture
 
-## How it works
+```
+Daemon
+  ├── WebSocket server (127.0.0.1:<wsPort>)
+  │     └── control messages only: assign / ready / step_completed / step_failed / done
+  │
+  └── HTTP API server (127.0.0.1:<apiPort>)        ← new, shared by workers + policy engine
+        POST /api/executions/:id/steps             ← inject steps
+        POST /api/executions/:id/block             ← block execution
+        GET  /api/executions/:id/state             ← read flow state (v2)
+        Auth: Bearer <daemon-token>
 
-The mechanism is the same for all step types that inject: the flow MCP server (per-execution, started at `assign` time — D35) exposes a `provideSteps` tool. Any step type (model, script, or a future `policy` type) calls `provideSteps` to inject steps into the running graph. Injected steps may carry a `parent` field to become sub-steps of the injecting step (D36).
 
-The policy engine is **not a separate runtime** — it is a usage pattern built on:
-- The `provideSteps` MCP tool (D35, D36, D39)
-- The `parent` field semantics (D36)
-- The recursive sub-step hierarchy with `maxChildDepth` depth limit (D36)
+Worker (StepExecutor)
+  ├── Claude subprocess ── MCP tools/call ──► McpServer (HTTP/JSON-RPC, per-execution)
+  │                                                │
+  │                         onInjectSteps callback │
+  │                                                ▼
+  └────────────────── POST /api/executions/:id/steps ──► Daemon HTTP API
 
-## Scope
 
-In scope for this spec:
-- The `provideSteps` tool interface and validation rules (D39)
-- The `parent`/child step hierarchy enabling policy-controlled sub-step injection (D36)
-- The MCP server infrastructure that exposes `provideSteps` (D35)
-- Open design questions about the policy step type itself
+Policy Engine CLI (external, autonomous)
+  │
+  ├── receives events via HookDispatcher (http hook)
+  │     payload: { event, executionId, daemonApiUrl, daemonToken, flowState, ... }
+  │
+  └── evaluates rules + conditions
+        │
+        └── POST /api/executions/:id/steps   ──► Daemon HTTP API  (same endpoint as workers)
+            POST /api/executions/:id/block   ──► Daemon HTTP API
+```
 
-Out of scope:
-- The broader flow CLI architecture (daemon, workers, log streaming — see `.claude/specs/2026-07-30-flow-cli/`)
-- CLI distribution (see `.claude/specs/2026-08-18_21-01_cli-distribution/`)
+## Key design principles
+
+- **One action interface**: workers and the policy engine both call the same daemon HTTP API. No special protocol per caller.
+- **MCP stays for Claude only**: `McpServer` is a translation layer for Claude subprocess → daemon API. The policy engine does not speak MCP.
+- **Events via hooks**: the `HookDispatcher` delivers events to the policy engine (http hook). The event payload carries `daemonApiUrl` and `daemonToken` so the policy engine can call back.
+- **Authentication**: all daemon HTTP API calls require a `Bearer <token>`. The token is generated at daemon startup and distributed via the hook payload and worker environment.
 
 ## Documents
 
-- [decisions.md](decisions.md) — Architecture decisions relevant to the policy engine
-- [abstractions.md](abstractions.md) — Data structures and interfaces
+- [decisions.md](decisions.md) — Architecture decisions
+- [abstractions.md](abstractions.md) — HTTP API endpoints, auth, rule schema, event payload
 - [open-questions.md](open-questions.md) — Open design questions

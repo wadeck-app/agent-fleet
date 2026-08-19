@@ -374,7 +374,8 @@ export function registerRunCommand(program: Command): void {
 					if (finalState.status === 'completed') {
 						console.log(`Flow completed in ${durationMs}ms`);
 					} else {
-						console.error(`Error:Flow failed`);
+						const reason = finalState.lastError ? ` — ${finalState.lastError}` : '';
+						console.error(`Error:Flow failed${reason}`);
 						process.exit(1);
 					}
 				}

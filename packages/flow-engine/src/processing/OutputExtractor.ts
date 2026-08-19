@@ -9,6 +9,7 @@
  * - Default values
  * - Required field validation
  */
+import { load as yamlLoad } from 'js-yaml';
 import type { OutputVariableConfig, StepOutput, TransformFunction, VariableType } from '../types';
 
 /**
@@ -180,7 +181,9 @@ export class OutputExtractor {
 			throw new OutputExtractionError(`Invalid jsonpath '${jsonpath}': must start with '$.'`, varName, stepId);
 		}
 
-		const parts = jsonpath.slice(2).split('.');
+		// normalize bracket array notation: $.tags[0] → $.tags.0
+		const normalizedPath = jsonpath.replace(/\[(\d+)\]/g, '.$1');
+		const parts = normalizedPath.slice(2).split('.');
 		let current: unknown = parsed;
 
 		for (const part of parts) {
@@ -229,8 +232,7 @@ export class OutputExtractor {
 					return JSON.parse(String(value));
 
 				case 'parseYAML':
-					// For now, simple YAML parsing (would need js-yaml for complex cases)
-					throw new OutputExtractionError('parseYAML not yet implemented', varName, stepId);
+					return yamlLoad(String(value));
 
 				case 'parseInt':
 					const intValue = parseInt(String(value), 10);
