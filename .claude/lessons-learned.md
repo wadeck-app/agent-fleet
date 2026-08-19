@@ -1,8 +1,16 @@
 # Lessons learned
 
-<!-- Last updated: 2026-08-17T19:48:28.413Z -->
+<!-- Last updated: 2026-08-19T19:51:46.532Z -->
 
 ## Recurring feedback
+
+<!-- session 4a2fd14d 2026-08-17 -->
+- Review response quality before sending — user complained "t'avais pas reviewé ta reponse (ca commence à faire bcp de fois ce soir !)" multiple times in this chunk when I sent imprecise explanations or wrong examples (echo hook, absolute path requirement not justified). This is repeated feedback indicating a pattern.
+- User values precision — asked "sois plus précis stp" on vague terms like "payload keys"; prefers concrete field names and examples over abstractions.
+- User wants to TEST, not just understand theory — when given explanations, they immediately asked to adjust configs in `_test-tasks` to actually run and observe hooks working. Skip abstract discussion, go straight to runnable examples.
+- Build artifact synchronization gap: mcp-server.cjs source written to src/worker/ but dist/ copy only discovered missing at 20:06:32; required manual cp + postbuild script addition rather than automatic pipeline.
+- Old test config poisoned new test: `.flow/config.yml` from previous HTTP-transport test remained; agent disabled it (20:00:45) rather than deleting, causing investigation overhead.
+- Formatter issues detected late: multiple re-runs of prettier + ESLint (20:12:06, 20:13:36, 20:14:49) instead of single pass; suggests no pre-commit hook or linter run before committing changes.
 
 <!-- session d0c7ba90 2026-08-17 -->
 
@@ -270,6 +278,16 @@
 - Multiple independent agents (Explore, general-purpose) read identical spec files sequentially without coordination, causing redundant I/O. Agents should receive shared context or hand off findings rather than re-audit.
 
 ## Agent errors
+
+<!-- session 4a2fd14d 2026-08-17 -->
+- Wrote hook-logger.js in ESM (`import` syntax) without verifying `package.json` has `"type": "module"` — would have crashed at runtime. Should verify file compatibility before writing.
+- Provided echo hook example that "ne sert à rien" — redundant/unchosen. Need to think through examples before sending.
+- Task hook error logging was missing (`TaskIndex.ts:192, :246` — `onError` callback not wired up), while Flow hooks already had logging. Silent failures. User caught this with all-caps: "IL FAUT LOGGER".
+- dist-types for flow-engine became stale after TypeScript changes; required explicit rebuild (`npm run build`) before type checking would pass. Type checker consulted stale .d.ts instead of source.
+- Agent attempted to call deferred tools (mcp__test__echo, check, spec) without loading them first via ToolSearch — returned "NOT YET KNOWN" but agent proceeded anyway.
+- Agent spawned with type "Agent unknown" at 20:08:24 instead of named agent type (backend-dev, Explore, etc).
+- Three fork agents (bd4052a0, c898dd1a, 4a2fd14d) working on overlapping plugin/MCP tasks in parallel created duplicate exploration and incomplete coordination; task a620cc73a53a979fd had to be stopped mid-fix.
+- ReportFindings tool called twice without pre-fetching schema; code-review agents should ToolSearch before attempting to use it.
 
 <!-- session 5cc3e4d9 2026-08-17 -->
 
@@ -662,6 +680,15 @@
 
 ## Documentation gaps
 
+<!-- session 4a2fd14d 2026-08-17 -->
+- No HOOKS.md existed in codebase — had to create from scratch. Hook event types, payload field names, and config formats had no existing reference docs.
+- CLI distribution spec lacks concrete details for UpdateManager, self-check suite, and CI pipeline — audits flagged these as named in architecture but unspecified. Same pattern: multiple audit reports finding the same architectural gaps suggests spec needs upfront design validation before implementation.
+- MCP config file format/discovery not documented; agents repeatedly grepped for "mcp-config*", "mcpServers", "url" patterns across codebase.
+- PluginLoader resolution strategy unclear to spec; agents had to write tests (TDD) to validate whether spec decisions (require.resolve vs import.meta.url, pluginsDir override) matched implementation.
+- Plugin documentation (pluginsDir) scattered across multiple READMEs instead of centralized; agents needed grep across plugin-none, plugin-worktree, plugin-cli-approval separately.
+- Workspace configuration (retainDays, maxWorkspaces, basePath) required multi-file discovery (FlowConfig.ts, Daemon.ts, package.json, tsconfig.json) — config structure underdocumented.
+- Violations rule for em-dashes ("shared/no-em-dash") exists but wasn't active in project config until "shared" tag was manually added — no discovery path documented for which rules are active by default vs available
+
 <!-- session d0c7ba90 2026-08-17 -->
 
 - MCP server capabilities not self-discoverable from Claude Code environment — assistant had to spawn fork agent to research whether `-p` mode supports MCP at all
@@ -990,6 +1017,16 @@
 - Extensive Grep searches for domain concepts (RE-QUEUED, bufferSpill, reconnectTimeout, idleTimeout, drainTimeout, heartbeat monitoring, etc.) suggest spec lacks clear glossary or index of key terms. Future audits should define these upfront.
 
 ## Known constraints
+
+<!-- session 4a2fd14d 2026-08-17 -->
+- `execFile` captures stdout/stderr by default (not `stdio: 'inherit'`), making hook output invisible in terminal. User explicitly asked for `debug: true` flag to fix visibility. This is a real API limitation that affects testing experience.
+- Plugin resolution must complete before workspace manager access — wiring order matters. Discovered during Phase 9 implementation when CommandHandler needed to resolve plugins before Daemon uses WorkspaceManager.
+- Hook system has implicit onError callback requirement at all dispatch() call sites — audit found some callers in CommandHandler/Daemon missing error propagation, creating silent failure paths.
+- FlowConfig refactoring (DaemonConfig → FlowConfig) is larger than file rename — impacts config loading merge logic in RunCommand and daemon initialization. Requires coordinated import updates across daemon and CLI layers.
+- Workspace cleanup configuration does not exist; agent had to invent retention/pruning strategy from first principles across multiple files (FlowConfig, WorkspaceManager, Daemon).
+- StepRunner, WorkspaceManager, CommandHandler all spawned parallel refactoring agents in single session — recurring God class scaling issue in codebase.
+- Deferred tools (ReportFindings) and skills (check, run-test, violations) marked NOT YET KNOWN when agents tried direct invocation — auto-fetch or pre-fetch needed.
+- Circular dependency pattern: WorkspaceAllocationError and workspace types must be extracted to separate WorkspaceTypes.ts file to avoid circular imports between WorkspaceManager and WorkspaceGitStrategy
 
 <!-- session 5cc3e4d9 2026-08-17 -->
 
