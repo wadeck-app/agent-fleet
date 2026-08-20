@@ -76,8 +76,10 @@ function buildSpawnParams(
 	// commandParts[1..] are prefix args (e.g. ['node', '/path/mock.mjs'] → command='node', prefix=['mock.mjs'])
 	const args: string[] = [...commandParts.slice(1), 'run'];
 
-	// Prompt as positional arg (background mode only; interactive has no prompt)
-	if (!interactive) {
+	// OpenCode always requires the prompt as a positional arg to `opencode run`.
+	// Unlike Claude (which supports truly prompt-less interactive TUI mode),
+	// OpenCode run always needs a message -- even in interactive/streaming-to-terminal use.
+	if (options.prompt) {
 		args.push(options.prompt);
 	}
 

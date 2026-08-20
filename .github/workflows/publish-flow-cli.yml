@@ -2,7 +2,7 @@ name: Publish @wadeck/flow-cli
 
 on:
     push:
-        branches: [main]
+        branches: [main, integration]
         paths:
             - packages/flow-cli/**
             - packages/flow-cli-dist/**

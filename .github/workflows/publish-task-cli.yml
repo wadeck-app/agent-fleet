@@ -2,7 +2,7 @@ name: Publish @wadeck/task-cli
 
 on:
     push:
-        branches: [main]
+        branches: [main, integration]
         paths:
             - packages/flow-cli/**
             - packages/task-cli-dist/**

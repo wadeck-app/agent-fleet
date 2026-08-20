@@ -56,6 +56,7 @@ FlowExecutor.test.ts
 - <crucial>Never kill processes you didn't create</crucial>
 - Ask user if requirements unclear (AskUserQuestion tool)
 - **BLOCKING:** Changes to `packages/web-frontend/src/**` → delegate to frontend-dev agent (compilation ≠ working code)
+- **Flow integration tests**: Every new model provider must have 1-2 automated flow tests in `packages/flow-engine/src/executor/StepRunner.opencode.integration.test.ts` using mock CLIs (`OPENCODE_MOCK_PATH`/`CLAUDE_MOCK_PATH`). Never use real APIs in automated tests.
 
 ## Communication Style
 

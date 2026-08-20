@@ -76,6 +76,8 @@ export class StepRunner {
 
 	constructor(config: StepRunnerConfig) {
 		this.config = config;
+		// REQUIREMENT: When adding a new provider, add 1-2 flow-level integration tests
+		// in StepRunner.opencode.integration.test.ts using the provider's mock CLI.
 		this.providers =
 			config.providers ??
 			new Map<string, ModelProvider>([

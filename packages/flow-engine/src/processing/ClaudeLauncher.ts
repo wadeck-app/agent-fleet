@@ -167,6 +167,10 @@ export class ClaudeLauncher {
 		if (process.platform === 'win32' && claudePath.endsWith('.cmd')) {
 			command = 'cmd.exe';
 			args = ['/c', claudePath];
+		} else if (claudePath.endsWith('.mjs') || claudePath.endsWith('.js')) {
+			// .mjs/.js files are not directly executable on Windows — run via node
+			command = process.execPath;
+			args = [claudePath];
 		} else {
 			command = claudePath;
 			args = [];
