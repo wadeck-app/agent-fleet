@@ -6247,3 +6247,13 @@ Engine-generated artifacts (outputs, logs, state) are metadata and must NEVER li
 ### PluginResolver tests already cover Phase 9 integration scenarios
 
 `packages/flow-cli/src/config/PluginResolver.test.ts` covers: plugin-none workspace allocation, cli-approval provider, missing workspace config (throw), missing workspace.type (throw). These are the Phase 9 integration tests - no additional test file was needed.
+
+## OpenCodeModelProvider -- Windows Subprocess Gotchas
+
+See `.claude/kb/opencode-provider-windows-gotchas.md` for full details. Key points:
+- Use real `opencode.exe` via `where.exe opencode.cmd` → `node_modules/opencode-ai/bin/opencode.exe` (Chocolatey shim is broken)
+- `stdio: ['ignore', 'pipe', 'pipe']` -- stdin MUST be ignored (prompt is a positional arg)
+- Listen to `exit` event not `close` (backend server keeps pipes open indefinitely)
+- MCP config: `{ mcp: { name: { type: "local", command: [...], environment: {}, enabled: true } } }`
+- Forward PATH/HOME/USERPROFILE/SystemRoot in env or OpenCode can't find its config
+- Unit tests with mocked spawn don't catch subprocess behavior bugs -- run the 3 flows in `C:\Workspace_Tooling\_test-tasks\` to validate

@@ -237,12 +237,17 @@ describe('OpenCodeModelProvider', () => {
 			expect(spawnOpts.env?.['OPENCODE_CONFIG_CONTENT']).toBeDefined();
 
 			const config = JSON.parse(spawnOpts.env!['OPENCODE_CONFIG_CONTENT']!) as {
-				mcp: { servers: Record<string, { type: string; command: string; args: string[] }> };
+				mcp: Record<
+					string,
+					{ type: string; command: string[]; environment?: Record<string, string>; enabled: boolean }
+				>;
 			};
-			expect(config.mcp.servers['flow']).toMatchObject({
-				type: 'stdio',
-				command: 'node',
-				args: ['/path/mcp.js'],
+			// OpenCode config format: mcp.<name>.type="local", command=[...], environment={...}, enabled
+			expect(config.mcp['flow']).toMatchObject({
+				type: 'local',
+				command: ['node', '/path/mcp.js'],
+				environment: { FLOW_PORT: '3000' },
+				enabled: true,
 			});
 		});
 

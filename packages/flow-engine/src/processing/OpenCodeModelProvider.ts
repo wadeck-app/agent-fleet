@@ -35,22 +35,26 @@ const DEFAULT_MAX_INLINE_CONFIG_BYTES = 1024 * 1024; // 1MB
 
 /**
  * Build OpenCode MCP config JSON from McpServer[].
- * OpenCode expects: { mcp: { servers: { name: { type, command, args, env? } } } }
+ * OpenCode format: { mcp: { <name>: { type: "local", command: [...], environment?: {...}, cwd?: "...", enabled: true } } }
+ * Verified against OpenCode v1.18.18 config schema.
  */
 function buildOpenCodeConfig(servers: McpServer[]): Record<string, unknown> {
-	const serversMap: Record<string, unknown> = {};
+	const mcp: Record<string, unknown> = {};
 	for (const s of servers) {
-		const [command, ...args] = s.command;
-		const entry: Record<string, unknown> = { type: 'stdio', command, args };
+		const entry: Record<string, unknown> = {
+			type: 'local',
+			command: s.command,
+			enabled: s.enabled ?? true,
+		};
 		if (s.env && Object.keys(s.env).length > 0) {
-			entry['env'] = s.env;
+			entry['environment'] = s.env;
 		}
 		if (s.cwd) {
 			entry['cwd'] = s.cwd;
 		}
-		serversMap[s.name] = entry;
+		mcp[s.name] = entry;
 	}
-	return { mcp: { servers: serversMap } };
+	return { mcp };
 }
 
 // ---------------------------------------------------------------------------
@@ -101,8 +105,15 @@ function buildSpawnParams(
 		args.push('--resume', options.resumeSessionId);
 	}
 
-	// Env isolation: forward only options.env; never inherit process.env
-	const env: Record<string, string> = { ...(options.env ?? {}) };
+	// Env isolation: forward infrastructure env vars required for any subprocess to function,
+	// plus explicit options.env. Credentials (AWS_*, ANTHROPIC_*) are intentionally NOT
+	// forwarded here -- OpenCode reads them from its own config file (~/.config/opencode/).
+	const infraEnv: Record<string, string> = {};
+	if (process.env['PATH']) infraEnv['PATH'] = process.env['PATH']!;
+	if (process.env['HOME']) infraEnv['HOME'] = process.env['HOME']!;
+	if (process.env['USERPROFILE']) infraEnv['USERPROFILE'] = process.env['USERPROFILE']!;
+	if (process.env['SystemRoot']) infraEnv['SystemRoot'] = process.env['SystemRoot']!;
+	const env: Record<string, string> = { ...infraEnv, ...(options.env ?? {}) };
 
 	// Serialize McpServers
 	let tempFile: string | undefined;
@@ -169,7 +180,8 @@ export class OpenCodeModelProvider implements ModelProvider {
 				this.currentProcess = proc;
 				options.onProcessStarted?.(proc);
 
-				proc.on('close', code => {
+				// 'exit' not 'close' -- same reason as launchBackground (backend server keeps pipes open)
+				proc.on('exit', code => {
 					this.currentProcess = null;
 					resolve({ response: '', exitCode: code });
 				});
@@ -205,7 +217,9 @@ export class OpenCodeModelProvider implements ModelProvider {
 
 				const proc = spawn(command, args, {
 					cwd: options.workingDir,
-					stdio: ['pipe', 'pipe', 'pipe'],
+					// stdin: 'ignore' -- OpenCode takes the prompt as a positional arg,
+					// not stdin. An open stdin pipe causes OpenCode to wait for EOF.
+					stdio: ['ignore', 'pipe', 'pipe'],
 					shell,
 					env,
 				});
@@ -293,7 +307,10 @@ export class OpenCodeModelProvider implements ModelProvider {
 					stderr += data.toString();
 				});
 
-				proc.on('close', code => {
+				// Use 'exit' not 'close': OpenCode spawns a backend server that inherits
+				// the stdio pipes and never closes them. 'exit' fires when the main
+				// opencode-run process exits; 'close' would block until the server dies.
+				proc.on('exit', code => {
 					this.currentProcess = null;
 					// Flush any trailing line not terminated by newline
 					flushLineBuffer();
@@ -353,15 +370,19 @@ export class OpenCodeModelProvider implements ModelProvider {
 			return { parts: [mockPath], needsShell: false };
 		}
 		if (process.platform === 'win32') {
-			// Prefer the .exe directly (T-05: no shell interpolation).
-			// `where.exe opencode.exe` finds the Chocolatey/nvm .exe; falls back to shell:true only if absent.
+			// On Windows, find the real opencode.exe next to opencode.cmd in the npm global bin dir.
+			// shell:true with complex prompts (newlines, backticks) is unreliable on Windows cmd.exe.
 			try {
-				const exePath = execSync('where.exe opencode.exe', { encoding: 'utf8' }).trim().split('\n')[0]!.trim();
-				if (exePath) return { parts: [exePath], needsShell: false };
+				const cmdPath = execSync('where.exe opencode.cmd', { encoding: 'utf8' }).trim().split('\n')[0]!.trim();
+				const dir = path.dirname(cmdPath);
+				const exePath = path.join(dir, 'node_modules', 'opencode-ai', 'bin', 'opencode.exe');
+				if (fs.existsSync(exePath)) {
+					return { parts: [exePath], needsShell: false };
+				}
 			} catch {
-				// .exe not found -- fall through to shell:true fallback
+				// fall through to shell:true fallback
 			}
-			// Accepted risk: shell:true when only .cmd shim is available (documented in out-of-scope.md)
+			// Accepted risk: shell:true fallback (documented in out-of-scope.md)
 			return { parts: ['opencode'], needsShell: true };
 		}
 		try {
