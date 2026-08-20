@@ -2,13 +2,10 @@
 // This module is bundled separately as flow-updater.cjs.
 // It must NOT import any flow runtime modules (FlowExecutor, StepRunner, etc.)
 // Allowed: node:fs, node:path, node:child_process, node:os, semver
-
 import { execFile, execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
-import semver from 'semver';
 
 import { getConfigDir } from './configDir.js';
 
@@ -17,8 +14,28 @@ const execFileAsync = promisify(execFile);
 // Injected by esbuild at bundle time via define; falls back to a dev placeholder.
 declare const __FLOW_CLI_VERSION__: string;
 
-const PKG_NAME = '@wadeck/flow-cli';
+// Package name is injected by the caller via env var so the same bundle serves both flow and task.
+const PKG_NAME = process.env['UPDATER_PKG_NAME'] ?? '@wadeck/flow-cli';
+// Must match versionValidation.ts -- separate bundle, cannot share at runtime.
 const VERSION_RE = /^\d+\.\d+\.\d+([-+][\w.-]+)?$/;
+
+/**
+ * Returns true when `a` <= `b` (semver less-than-or-equal).
+ * Only compares major.minor.patch -- pre-release suffixes are ignored.
+ * Sufficient for the update check use-case (avoids a @types/semver dependency).
+ */
+export function semverLte(a: string, b: string): boolean {
+	const parse = (v: string): [number, number, number] => {
+		const core = v.split(/[-+]/)[0] ?? v;
+		const [maj = '0', min = '0', pat = '0'] = core.split('.');
+		return [parseInt(maj, 10), parseInt(min, 10), parseInt(pat, 10)];
+	};
+	const [aMaj, aMin, aPat] = parse(a);
+	const [bMaj, bMin, bPat] = parse(b);
+	if (aMaj !== bMaj) return aMaj < bMaj;
+	if (aMin !== bMin) return aMin < bMin;
+	return aPat <= bPat;
+}
 
 interface UpdateState {
 	status: 'success' | 'rolled-back' | 'update-failed' | 'applying';
@@ -73,7 +90,7 @@ function writeState(statePath: string, state: UpdateState): void {
 	}
 }
 
-function parseCheckInterval(value: string): number {
+export function parseCheckInterval(value: string): number {
 	const match = /^(\d+)([mhd])$/.exec(value.trim());
 	if (!match) {
 		// Default to 30 minutes if unparseable
@@ -120,7 +137,7 @@ function readConfig(configDir: string): UpdateConfig {
 	}
 }
 
-function tryAcquireLock(lockFile: string): boolean {
+export function tryAcquireLock(lockFile: string): boolean {
 	try {
 		const fd = fs.openSync(lockFile, fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY);
 		fs.writeSync(fd, String(process.pid));
@@ -156,7 +173,7 @@ function tryAcquireLock(lockFile: string): boolean {
 	}
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
 	const configDir = getConfigDir();
 	fs.mkdirSync(configDir, { recursive: true });
 
@@ -168,22 +185,23 @@ async function main(): Promise<void> {
 		// Step 1: Acquire lock
 		lockAcquired = tryAcquireLock(lockFile);
 		if (!lockAcquired) {
-			process.exit(0);
+			return; // another updater running -- finally still executes (lock not held)
 		}
 
 		// Step 2: Read config
 		const config = readConfig(configDir);
 		if (config.disabled) {
-			process.exit(0);
+			return;
 		}
 
-		// Step 3: Check cache
+		// Step 3: Check cache (skip when UPDATER_FORCE=1 -- used by `flow cli update`)
+		const force = process.env['UPDATER_FORCE'] === '1';
 		const cachePath = getCachePath(configDir);
-		if (fs.existsSync(cachePath)) {
+		if (!force && fs.existsSync(cachePath)) {
 			try {
 				const cache = JSON.parse(fs.readFileSync(cachePath, 'utf-8')) as UpdateCache;
 				if (Date.now() - cache.checkedAt < config.checkIntervalMs) {
-					process.exit(0);
+					return;
 				}
 			} catch {
 				// Cache unreadable -- proceed
@@ -201,24 +219,22 @@ async function main(): Promise<void> {
 		const timestamp = new Date().toISOString();
 		let latestVersion: string;
 		try {
-			const { stdout } = await execFileAsync(
-				'npm',
-				['view', PKG_NAME, `dist-tags.${config.channel}`],
-				{ timeout: 15000 }
-			);
+			const { stdout } = await execFileAsync('npm', ['view', PKG_NAME, `dist-tags.${config.channel}`], {
+				timeout: 15000,
+			});
 			latestVersion = stdout.trim();
 		} catch (err: unknown) {
 			const msg = err instanceof Error ? err.message : String(err);
 			const reason = msg.includes('EUNAUTHORIZED') || msg.includes('401') ? 'auth' : 'network';
 			writeState(statePath, { status: 'update-failed', reason, timestamp });
 			appendLog(logFile, `Update check failed: ${msg}`);
-			process.exit(0);
+			return;
 		}
 
 		// Step 5: Validate version string
 		if (!VERSION_RE.test(latestVersion)) {
 			writeState(statePath, { status: 'update-failed', reason: 'invalid-version', timestamp });
-			process.exit(1);
+			return;
 		}
 
 		// Step 6: Compare versions
@@ -227,11 +243,11 @@ async function main(): Promise<void> {
 			currentVersion = __FLOW_CLI_VERSION__;
 		} catch {
 			// Dev mode -- cannot determine current version, skip update
-			process.exit(0);
+			return;
 		}
 
-		if (semver.lte(latestVersion, currentVersion)) {
-			process.exit(0);
+		if (semverLte(latestVersion, currentVersion)) {
+			return;
 		}
 
 		// Step 7: Apply update
@@ -243,34 +259,36 @@ async function main(): Promise<void> {
 		});
 
 		try {
-			await execFileAsync(
-				'npm',
-				['install', '-g', `${PKG_NAME}@${latestVersion}`],
-				{ timeout: 120000 }
-			);
+			await execFileAsync('npm', ['install', '-g', `${PKG_NAME}@${latestVersion}`], { timeout: 120000 });
 		} catch (err: unknown) {
 			const msg = err instanceof Error ? err.message : String(err);
+			const reason = msg.includes('EUNAUTHORIZED') || msg.includes('401') ? 'auth' : 'install-failed';
 			writeState(statePath, {
 				status: 'update-failed',
-				reason: 'install-failed',
+				reason,
 				targetVersion: latestVersion,
 				timestamp,
 			});
 			appendLog(logFile, `Install failed for ${latestVersion}: ${msg}`);
-			process.exit(0);
+			return;
 		}
 
 		// Step 8: Health check
 		try {
-			execFileSync(
-				'npm',
-				['exec', '--package=@wadeck/flow-cli', '--', 'flow', 'cli', 'self-check'],
-				{
-					stdio: 'pipe',
-					timeout: 15000,
-					env: { ...process.env, FLOW_SELF_CHECK_QUIET: '1' },
-				}
-			);
+			// Derive app name and bundle filename from PKG_NAME
+			const appName = PKG_NAME.replace('@wadeck/', ''); // e.g. 'flow-cli' or 'task-cli'
+			const cliName = appName.replace('-cli', ''); // e.g. 'flow' or 'task'
+			const bundleFile = `${cliName}.cjs`; // e.g. 'flow.cjs' or 'task.cjs'
+
+			// Resolve bundle path from global npm root to avoid PATH cache issues
+			const { stdout: npmRootOut } = await execFileAsync('npm', ['root', '-g'], { timeout: 10000 });
+			const globalBundlePath = path.join(npmRootOut.trim(), PKG_NAME, bundleFile);
+
+			execFileSync(process.execPath, [globalBundlePath, 'cli', 'self-check'], {
+				stdio: 'pipe',
+				timeout: 15000,
+				env: { ...process.env, CLI_SELF_CHECK_QUIET: '1' },
+			});
 			// Self-check passed
 			writeState(statePath, {
 				status: 'success',
@@ -282,11 +300,7 @@ async function main(): Promise<void> {
 			// Self-check failed -- roll back
 			const msg = healthErr instanceof Error ? healthErr.message : String(healthErr);
 			try {
-				await execFileAsync(
-					'npm',
-					['install', '-g', `${PKG_NAME}@${currentVersion}`],
-					{ timeout: 120000 }
-				);
+				await execFileAsync('npm', ['install', '-g', `${PKG_NAME}@${currentVersion}`], { timeout: 120000 });
 			} catch {
 				// rollback failure -- we still report the rolled-back state
 			}
@@ -313,7 +327,16 @@ async function main(): Promise<void> {
 	}
 }
 
-// Top-level: run immediately (this is always the entry point)
-main().catch(() => {
-	process.exit(1);
-});
+// Auto-execute only when this is the actual entry point (spawned as detached process).
+// When imported in tests, main() is NOT called automatically.
+const isEntryPoint =
+	process.argv[1] !== undefined &&
+	(process.argv[1].endsWith('UpdaterMain.js') ||
+		process.argv[1].endsWith('UpdaterMain.ts') ||
+		process.argv[1].endsWith('flow-updater.cjs'));
+
+if (isEntryPoint) {
+	main().catch(() => {
+		process.exit(1);
+	});
+}

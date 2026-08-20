@@ -6,17 +6,17 @@
 
 ## Decisions summary
 
-| # | Decision |
-|---|---|
-| D1 | Audience: personal today, public-capable later |
-| D2 | Core pain: mandatory repo checkout -- eliminate it |
-| 1 | Node.js required on machine, never embedded |
-| 2 | GitLab npm registry (@wadeck scope) |
-| 3 | exe-in-npm: Go launcher in platform optionalDeps |
-| 4 | Auto-update: detached post-execution, 30min cache, `flow cli` namespace |
-| 5 | Two separate packages: @wadeck/flow-cli and @wadeck/task-cli |
-| 6 | Path-filtered CI; edge on relevant commit, stable on tag; channel user-configurable |
-| P-9 | Migration order: flow+task first, then violations-cli, then wdrive |
+| #   | Decision                                                                            |
+| --- | ----------------------------------------------------------------------------------- |
+| D1  | Audience: personal today, public-capable later                                      |
+| D2  | Core pain: mandatory repo checkout -- eliminate it                                  |
+| 1   | Node.js required on machine, never embedded                                         |
+| 2   | GitLab npm registry (@wadeck scope)                                                 |
+| 3   | exe-in-npm: Go launcher in platform optionalDeps                                    |
+| 4   | Auto-update: detached post-execution, 30min cache, `flow cli` namespace             |
+| 5   | Two separate packages: @wadeck/flow-cli and @wadeck/task-cli                        |
+| 6   | Path-filtered CI; edge on relevant commit, stable on tag; channel user-configurable |
+| P-9 | Migration order: flow+task first, then violations-cli, then wdrive                  |
 
 ---
 
@@ -121,20 +121,21 @@ Background (detached):
 
 ## `flow cli` commands
 
-| Command | Action |
-|---|---|
-| `flow cli version` | Show installed version + latest available in configured channel |
-| `flow cli update` | Force synchronous update (bypasses 30min cache) |
-| `flow cli rollback` | Restore previousVersion from update-state.json |
-| `flow cli self-check` | Run all health checks (bundle, config, YAML, StepRunner, plugins, TaskStore, hooks, workspace config) |
-| `flow cli update --check` | Show available version without applying |
+| Command                   | Action                                                                                                |
+| ------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `flow cli version`        | Show installed version + latest available in configured channel                                       |
+| `flow cli update`         | Force synchronous update (bypasses 30min cache)                                                       |
+| `flow cli rollback`       | Restore previousVersion from update-state.json                                                        |
+| `flow cli self-check`     | Run all health checks (bundle, config, YAML, StepRunner, plugins, TaskStore, hooks, workspace config) |
+| `flow cli update --check` | Show available version without applying                                                               |
 
 Channel config: `~/.config/flow/config.yml`
+
 ```yaml
 update:
-  channel: edge        # edge | stable (default: edge)
-  checkInterval: 30m   # duration (default: 30m)
-  disabled: false
+    channel: edge # edge | stable (default: edge)
+    checkInterval: 30m # duration (default: 30m)
+    disabled: false
 ```
 
 ---
@@ -143,13 +144,13 @@ update:
 
 ```yaml
 on:
-  push:
-    branches: [main]
-    paths:
-      - packages/flow-cli/**
-      - packages/flow-engine/**  # key dep
-  tags:
-    - 'v*'
+    push:
+        branches: [main]
+        paths:
+            - packages/flow-cli/**
+            - packages/flow-engine/** # key dep
+    tags:
+        - 'v*'
 
 # Steps:
 # 1. npm ci

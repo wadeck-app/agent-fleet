@@ -1,0 +1,83 @@
+name: Publish @wadeck/task-cli
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - packages/flow-cli/**
+            - packages/task-cli-dist/**
+            - packages/task-cli-win32-x64/**
+            - packages/task-cli-darwin-arm64/**
+            - packages/task-cli-darwin-x64/**
+            - packages/task-cli-linux-x64/**
+            - packages/flow-engine/**
+            - packages/shared-common/**
+    workflow_dispatch:
+        inputs:
+            version:
+                description: 'Stable version (e.g. 1.2.0)'
+                required: true
+            breaking:
+                description: 'Breaking change? (true/false)'
+                required: false
+                default: 'false'
+
+jobs:
+    publish:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '22'
+
+            - name: Configure GitLab npm registry
+              run: |
+                  echo "@wadeck:registry=https://gitlab.com/api/v4/packages/npm/" >> ~/.npmrc
+                  echo "//gitlab.com/api/v4/packages/npm/:_authToken=${GITLAB_NPM_WRITE_TOKEN}" >> ~/.npmrc
+              env:
+                  GITLAB_NPM_WRITE_TOKEN: ${{ secrets.GITLAB_NPM_WRITE_TOKEN }}
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Build TypeScript
+              run: npm run build --workspaces --if-present
+
+            - name: Bundle task CLI
+              run: npm run bundle-task --workspace packages/flow-cli
+
+            - name: Bundle updater
+              run: npm run bundle-updater --workspace packages/flow-cli
+
+            - name: Build Go launchers
+              run: npm run build-launcher --workspace packages/flow-cli
+
+            - name: Compute version
+              id: version
+              run: bash ci/scripts/compute-version.sh
+              env:
+                  GITHUB_EVENT_NAME: ${{ github.event_name }}
+                  VERSION_INPUT: ${{ github.event.inputs.version }}
+                  BREAKING_INPUT: ${{ github.event.inputs.breaking }}
+
+            - name: Copy artifacts to platform packages
+              run: bash ci/scripts/copy-binaries.sh task
+
+            - name: Set version in all packages
+              run: |
+                  for pkg in task-cli-dist task-cli-win32-x64 task-cli-darwin-arm64 task-cli-darwin-x64 task-cli-linux-x64; do
+                    npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --workspace "packages/$pkg"
+                  done
+
+            - name: Publish platform packages
+              run: |
+                  for pkg in task-cli-win32-x64 task-cli-darwin-arm64 task-cli-darwin-x64 task-cli-linux-x64; do
+                    npm publish --workspace "packages/$pkg"
+                  done
+
+            - name: Publish main package
+              run: npm publish --workspace packages/task-cli-dist --tag ${{ steps.version.outputs.dist_tag }}

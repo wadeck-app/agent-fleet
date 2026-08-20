@@ -71,7 +71,7 @@ function runProcess(
 		child.stderr.on('data', (d: Buffer) => {
 			stderr += d.toString();
 		});
-		child.on('close', code => resolve({ stdout, stderr, exitCode: code ?? 0 }));
+		child.on('close', code => resolve({ stdout, stderr, exitCode: code ?? -1 }));
 		child.on('error', reject);
 		if (child.stdin) {
 			if (stdinData) child.stdin.write(stdinData);

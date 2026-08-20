@@ -1,0 +1,26 @@
+# Audit Report -- Quality -- CLI Distribution
+
+**Date:** 2026-08-20
+**Spec version:** v0.1
+**Auditor:** Claude (spec mode)
+
+## Scope
+
+Files reviewed: UpdaterMain.ts (323 lines), UpdateManager.ts, configDir.ts, CliCommand.ts (320 lines), TaskCliCommand.ts (288 lines), bundle.ts, bundle-task.ts, bundle-updater.ts, flow.js shim, task.js shim.
+
+## Executive summary
+
+Implementation is functionally sound. Primary quality gaps: zero test coverage for all 5 new modules (violates 70% minimum), health check in the shared updater bundle hardcoded to @wadeck/flow-cli (breaks task-cli update health validation), and a CLAUDE.md switch-default violation in parseCheckInterval.
+
+## Findings
+
+| ID   | Severity | Finding                                                                                                                                                                                                             | File / Section                               | Recommendation                                                                                                                                                                       |
+| ---- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Q-01 | HIGH     | Zero test coverage for 5 new modules: UpdaterMain, UpdateManager, configDir, CliCommand, TaskCliCommand. CLAUDE.md requires >70%.                                                                                   | src/updater/, src/cli/commands/CliCommand.ts | Add tests for getConfigDir, semverLte, parseCheckInterval, tryAcquireLock (stub fs), readAndClearUpdateState, scheduleBackgroundUpdate (stub spawn), and the 8 self-check functions. |
+| Q-02 | HIGH     | Health check in UpdaterMain.ts is hardcoded to @wadeck/flow-cli (line 277) regardless of UPDATER_PKG_NAME. When invoked for task-cli, health check tests the wrong package.                                         | UpdaterMain.ts:277                           | Derive from PKG_NAME: use PKG_NAME.endsWith('/task-cli') ? 'task' : 'flow' for the command name in npm exec.                                                                         |
+| Q-03 | MEDIUM   | parseCheckInterval switch default returns 30m silently instead of throwing. CLAUDE.md rule: unrecognized switch values must throw. The regex makes this unreachable, but the default should still throw explicitly. | UpdaterMain.ts:106-108                       | throw new Error(`Unrecognized interval unit: ${match[2]}`)                                                                                                                           |
+| Q-04 | MEDIUM   | Plugin system self-check (Check 5) always returns passed:true without testing anything. Partial implementation silently reports [ok] for an unimplemented check. Same issue in TaskCliCommand.ts.                   | CliCommand.ts:128-133                        | Either implement the check or mark it [skip] with a reason. Never return passed:true without testing.                                                                                |
+| Q-05 | MEDIUM   | rollback in CliCommand.ts does not wrap fs.unlinkSync in try/catch. If unlink throws after a successful rollback, the user sees a double-rollback message on next run.                                              | CliCommand.ts:303                            | Wrap fs.unlinkSync(stateFile) in try/catch (pattern already used elsewhere in the file).                                                                                             |
+| Q-06 | MEDIUM   | PKG_NAME, VERSION_RE, DEFAULT_CHANNEL, getCurrentVersion(), fetchLatestVersion() are duplicated verbatim between UpdaterMain.ts and CliCommand.ts.                                                                  | Both files                                   | Extract to src/updater/updateConstants.ts. Note: UpdaterMain has import isolation constraints -- only move constants that UpdaterMain actually uses.                                 |
+| Q-07 | INFO     | configDir.ts APPDATA branch does not handle the case where APPDATA is unset on Windows. Falls through to HOME ?? os.homedir(), producing a Linux-style path on a Windows machine.                                   | configDir.ts:9-10                            | Final fallback: path.join(os.homedir(), 'AppData', 'Roaming', 'flow') for the Windows APPDATA-unset case.                                                                            |
+| Q-08 | INFO     | main().catch(() => process.exit(1)) at UpdaterMain.ts:321 swallows the error without logging. If appendLog itself threw, the root cause would be lost.                                                              | UpdaterMain.ts:321                           | Log before exiting: .catch(err => { appendLog(...); process.exit(1); })                                                                                                              |

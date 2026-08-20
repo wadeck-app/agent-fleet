@@ -12,11 +12,11 @@ Edge releases on every relevant push to `main`. Stable releases via `workflow_di
 
 ## Release channels
 
-| Channel | Trigger | Version format | dist-tag |
-|---|---|---|---|
-| `edge` | push to main (path-filtered) | `YYYY.MM.DD-<count>-<sha8>` | `edge` |
-| `breaking-edge` | manual, for breaking changes | Same as edge | `breaking-edge` for 48h, then re-tag to `edge` |
-| `stable` | `workflow_dispatch` with version input | semver (e.g. `1.2.0`) | `latest` |
+| Channel         | Trigger                                | Version format              | dist-tag                                       |
+| --------------- | -------------------------------------- | --------------------------- | ---------------------------------------------- |
+| `edge`          | push to main (path-filtered)           | `YYYY.MM.DD-<count>-<sha8>` | `edge`                                         |
+| `breaking-edge` | manual, for breaking changes           | Same as edge                | `breaking-edge` for 48h, then re-tag to `edge` |
+| `stable`        | `workflow_dispatch` with version input | semver (e.g. `1.2.0`)       | `latest`                                       |
 
 Users configure their preferred channel in `~/.config/flow/config.yml: update: channel: edge|stable`.
 Default: `edge`.
@@ -27,25 +27,25 @@ Default: `edge`.
 
 ```yaml
 on:
-  push:
-    branches: [main]
-    paths:
-      - packages/flow-cli/**
-      - packages/flow-engine/**
-      - packages/extension-points/**
-      - packages/plugin-none/**
-      - packages/plugin-worktree/**
-      - packages/plugin-cli-approval/**
-      - packages/shared-common/**
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Stable version (e.g. 1.2.0)'
-        required: true
-      breaking:
-        description: 'Is this a breaking change? (true/false)'
-        required: false
-        default: 'false'
+    push:
+        branches: [main]
+        paths:
+            - packages/flow-cli/**
+            - packages/flow-engine/**
+            - packages/extension-points/**
+            - packages/plugin-none/**
+            - packages/plugin-worktree/**
+            - packages/plugin-cli-approval/**
+            - packages/shared-common/**
+    workflow_dispatch:
+        inputs:
+            version:
+                description: 'Stable version (e.g. 1.2.0)'
+                required: true
+            breaking:
+                description: 'Is this a breaking change? (true/false)'
+                required: false
+                default: 'false'
 ```
 
 ### Steps (in order)
@@ -70,6 +70,7 @@ on:
 ## Workflow: publish-task-cli.yml
 
 Same structure as `publish-flow-cli.yml` with:
+
 - paths: `packages/task-cli/**` (once task CLI is split into its own package) + all shared dep paths
 - Replaces `flow-cli` with `task-cli` throughout
 
@@ -78,10 +79,12 @@ Same structure as `publish-flow-cli.yml` with:
 Adapted from `C:\Workspace_Tooling\wdrive\ci\scripts\compute-version.sh`.
 
 Outputs to `$GITHUB_OUTPUT`:
+
 - `version` -- version string
 - `dist_tag` -- `edge`, `latest`, or `breaking-edge`
 
 Logic:
+
 - If `workflow_dispatch` with version input and `breaking=true`: `dist_tag=breaking-edge`, `version=YYYY.MM.DD-<count>-<sha8>`
 - If `workflow_dispatch` with version input (non-breaking): `dist_tag=latest`, `version=$INPUT_VERSION`
 - Otherwise (push to main): `dist_tag=edge`, `version=YYYY.MM.DD-$(git rev-list --count HEAD)-$(git rev-parse --short=8 HEAD)`

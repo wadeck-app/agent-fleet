@@ -52,10 +52,7 @@ export class CommandHandler {
 		{ handle: WorkspaceHandle; provider: WorkspaceProvider }
 	>();
 	/** Per-execution WorkspaceManager handles for the non-plugin path */
-	private readonly nativeWorkspaceManagers = new Map<
-		string,
-		{ manager: WorkspaceManager; workspaceId: string }
-	>();
+	private readonly nativeWorkspaceManagers = new Map<string, { manager: WorkspaceManager; workspaceId: string }>();
 	private activeExecutionCount = 0;
 
 	constructor(

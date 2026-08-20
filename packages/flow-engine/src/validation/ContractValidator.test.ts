@@ -33,11 +33,14 @@ describe('ContractValidator', () => {
 	describe('preProcess.validateInputs', () => {
 		it('should not emit issues when validateInputs references a valid flow input', () => {
 			const flow = makeFlow({
-				_autoDiscoveredInputs: { priority: { type: 'string', required: false, source: 'auto-discovered' as const } },
+				_autoDiscoveredInputs: {
+					priority: { type: 'string', required: false, source: 'auto-discovered' as const },
+				},
 				steps: [
 					{
 						id: 'step1',
-						type: 'script', name: 'Test Step',
+						type: 'script',
+						name: 'Test Step',
 						script: 'echo',
 						contract: {
 							preProcess: {
@@ -61,7 +64,8 @@ describe('ContractValidator', () => {
 				steps: [
 					{
 						id: 'step1',
-						type: 'script', name: 'Test Step',
+						type: 'script',
+						name: 'Test Step',
 						script: 'echo',
 						contract: {
 							preProcess: {
@@ -86,13 +90,15 @@ describe('ContractValidator', () => {
 				steps: [
 					{
 						id: 'producer',
-						type: 'script', name: 'Test Step',
+						type: 'script',
+						name: 'Test Step',
 						script: 'echo',
 						output: { result: { type: 'string', pattern: '(.+)' } },
 					},
 					{
 						id: 'consumer',
-						type: 'script', name: 'Test Step',
+						type: 'script',
+						name: 'Test Step',
 						script: 'echo',
 						contract: {
 							preProcess: {
@@ -115,7 +121,8 @@ describe('ContractValidator', () => {
 				steps: [
 					{
 						id: 'step1',
-						type: 'script', name: 'Test Step',
+						type: 'script',
+						name: 'Test Step',
 						script: 'echo',
 						contract: {
 							preProcess: {
@@ -142,7 +149,8 @@ describe('ContractValidator', () => {
 				steps: [
 					{
 						id: 'step1',
-						type: 'script', name: 'Test Step',
+						type: 'script',
+						name: 'Test Step',
 						script: 'echo',
 						contract: {
 							preProcess: {
@@ -172,11 +180,14 @@ describe('ContractValidator', () => {
 
 		it('should emit INVALID_TYPE when rule type is invalid for the variable type', () => {
 			const flow = makeFlow({
-				_autoDiscoveredInputs: { count: { type: 'number', required: false, source: 'auto-discovered' as const } },
+				_autoDiscoveredInputs: {
+					count: { type: 'number', required: false, source: 'auto-discovered' as const },
+				},
 				steps: [
 					{
 						id: 'step1',
-						type: 'script', name: 'Test Step',
+						type: 'script',
+						name: 'Test Step',
 						script: 'echo',
 						contract: {
 							preProcess: {
@@ -196,11 +207,14 @@ describe('ContractValidator', () => {
 
 		it('should emit INVALID_TYPE when pattern rule has non-string value', () => {
 			const flow = makeFlow({
-				_autoDiscoveredInputs: { name: { type: 'string', required: false, source: 'auto-discovered' as const } },
+				_autoDiscoveredInputs: {
+					name: { type: 'string', required: false, source: 'auto-discovered' as const },
+				},
 				steps: [
 					{
 						id: 'step1',
-						type: 'script', name: 'Test Step',
+						type: 'script',
+						name: 'Test Step',
 						script: 'echo',
 						contract: {
 							preProcess: {
@@ -220,11 +234,14 @@ describe('ContractValidator', () => {
 
 		it('should emit INVALID_TYPE when enum rule has non-array value', () => {
 			const flow = makeFlow({
-				_autoDiscoveredInputs: { priority: { type: 'string', required: false, source: 'auto-discovered' as const } },
+				_autoDiscoveredInputs: {
+					priority: { type: 'string', required: false, source: 'auto-discovered' as const },
+				},
 				steps: [
 					{
 						id: 'step1',
-						type: 'script', name: 'Test Step',
+						type: 'script',
+						name: 'Test Step',
 						script: 'echo',
 						contract: {
 							preProcess: {
@@ -246,11 +263,14 @@ describe('ContractValidator', () => {
 	describe('preProcess.required', () => {
 		it('should not emit issues when required lists a valid flow input', () => {
 			const flow = makeFlow({
-				_autoDiscoveredInputs: { priority: { type: 'string', required: false, source: 'auto-discovered' as const } },
+				_autoDiscoveredInputs: {
+					priority: { type: 'string', required: false, source: 'auto-discovered' as const },
+				},
 				steps: [
 					{
 						id: 'step1',
-						type: 'script', name: 'Test Step',
+						type: 'script',
+						name: 'Test Step',
 						script: 'echo',
 						contract: {
 							preProcess: { required: ['priority'] },
@@ -270,7 +290,8 @@ describe('ContractValidator', () => {
 				steps: [
 					{
 						id: 'step1',
-						type: 'script', name: 'Test Step',
+						type: 'script',
+						name: 'Test Step',
 						script: 'echo',
 						contract: {
 							preProcess: { required: ['nonexistent'] },
@@ -291,7 +312,8 @@ describe('ContractValidator', () => {
 				steps: [
 					{
 						id: 'step1',
-						type: 'script', name: 'Test Step',
+						type: 'script',
+						name: 'Test Step',
 						script: 'echo',
 						output: { result: { type: 'string', pattern: '(.+)' } },
 						contract: {
@@ -315,7 +337,8 @@ describe('ContractValidator', () => {
 				steps: [
 					{
 						id: 'step1',
-						type: 'script', name: 'Test Step',
+						type: 'script',
+						name: 'Test Step',
 						script: 'echo',
 						output: { result: { type: 'string', pattern: '(.+)' } },
 						contract: {
@@ -341,7 +364,8 @@ describe('ContractValidator', () => {
 				steps: [
 					{
 						id: 'step1',
-						type: 'script', name: 'Test Step',
+						type: 'script',
+						name: 'Test Step',
 						script: 'echo',
 						contract: {
 							postProcess: {
@@ -364,7 +388,8 @@ describe('ContractValidator', () => {
 				steps: [
 					{
 						id: 'step1',
-						type: 'script', name: 'Test Step',
+						type: 'script',
+						name: 'Test Step',
 						script: 'echo',
 						output: { result: { type: 'string', pattern: '(.+)' } },
 						contract: {
@@ -383,9 +408,7 @@ describe('ContractValidator', () => {
 	describe('no-contract step', () => {
 		it('should not emit issues for steps without a contract', () => {
 			const flow = makeFlow({
-				steps: [
-					{ id: 'step1', type: 'script', name: 'Test Step', script: 'echo' },
-				],
+				steps: [{ id: 'step1', type: 'script', name: 'Test Step', script: 'echo' }],
 			});
 
 			validator.validateContracts(flow, new Set(['step1']));

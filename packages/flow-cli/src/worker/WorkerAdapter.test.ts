@@ -2,10 +2,22 @@ import type { AssignableStep, ExecutionContext } from '../ipc/Protocol';
 import { WorkerAdapter } from './WorkerAdapter';
 import type { SendMessageFn, StepRunnerFactory } from './WorkerAdapter';
 
-const { mockMcpStart, mockMcpStop } = vi.hoisted(() => ({
-	mockMcpStart: vi.fn().mockResolvedValue({ configPath: '/tmp/mcp.json' }),
-	mockMcpStop: vi.fn().mockResolvedValue(undefined),
-}));
+const { mockMcpStart, mockMcpStop, mockMcpServer } = vi.hoisted(() => {
+	const mcpServer = {
+		name: 'flow',
+		command: ['/usr/bin/node', '/path/to/mcp-server.cjs'],
+		env: {
+			FLOW_MCP_CALLBACK_PORT: '54321',
+			FLOW_MCP_CALLBACK_TOKEN: 'testtoken',
+			FLOW_EXECUTION_ID: 'testexec',
+		},
+	};
+	return {
+		mockMcpStart: vi.fn().mockResolvedValue({ port: 54321, mcpServer: mcpServer }),
+		mockMcpStop: vi.fn().mockResolvedValue(undefined),
+		mockMcpServer: mcpServer,
+	};
+});
 
 vi.mock('./McpServer', () => ({
 	McpServer: class MockMcpServer {
@@ -59,7 +71,7 @@ describe('WorkerAdapter', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		// mockReset:true in vitest config resets implementations; restore them here.
-		mockMcpStart.mockResolvedValue({ configPath: '/tmp/mcp.json' });
+		mockMcpStart.mockResolvedValue({ port: 54321, mcpServer: mockMcpServer });
 		mockMcpStop.mockResolvedValue(undefined);
 		mockExecuteStep = vi.fn().mockResolvedValue({ outputs: { result: 'ok' } });
 		const mockRunner = { executeStep: mockExecuteStep };
@@ -82,8 +94,8 @@ describe('WorkerAdapter', () => {
 	it('returns outputs for a script step', async () => {
 		const result = await adapter.execute(makeScriptStep(), makeContext(), sendMessage);
 		expect(result.output).toEqual({ result: 'ok' });
-		// Factory called with empty string for non-model steps
-		expect(mockFactory).toHaveBeenCalledWith('');
+		// Factory called with empty array for non-model steps
+		expect(mockFactory).toHaveBeenCalledWith([]);
 	});
 
 	it('sends stdout lines as log messages for script step', async () => {
@@ -169,8 +181,8 @@ describe('WorkerAdapter', () => {
 
 		expect(mockMcpStart).toHaveBeenCalledTimes(1);
 		expect(mockMcpStop).toHaveBeenCalledTimes(1);
-		// Factory called with MCP config path from McpServer
-		expect(mockFactory).toHaveBeenCalledWith('/tmp/mcp.json');
+		// Factory called with McpServer[] from McpServer.start()
+		expect(mockFactory).toHaveBeenCalledWith([mockMcpServer]);
 	});
 
 	describe('toolLog parameter', () => {

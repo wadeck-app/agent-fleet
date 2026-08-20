@@ -129,6 +129,47 @@ async function checkPackage(packageName) {
 }
 
 /**
+ * Run TypeScript check for a directory at an arbitrary path (not under packages/)
+ */
+function checkDirectory(label, dirPath) {
+	return new Promise((resolve, reject) => {
+		if (!fs.existsSync(dirPath)) {
+			resolve({ package: label, skipped: true, errors: [] });
+			return;
+		}
+		const configPath = path.join(dirPath, 'tsconfig.json');
+		if (!fs.existsSync(configPath)) {
+			resolve({ package: label, skipped: true, errors: [] });
+			return;
+		}
+
+		const command = `npx tsc --noEmit --project tsconfig.json`;
+		const tsc = spawn(command, { cwd: dirPath, shell: true, stdio: ['ignore', 'pipe', 'pipe'] });
+
+		let stdout = '';
+		let stderr = '';
+		tsc.stdout.on('data', data => {
+			stdout += data.toString();
+		});
+		tsc.stderr.on('data', data => {
+			stderr += data.toString();
+		});
+		tsc.on('close', () => {
+			const output = stdout + stderr;
+			const hasErrors = output.includes('error TS');
+			resolve({
+				package: label,
+				skipped: false,
+				errors: hasErrors ? output.split('\n').filter(l => l.trim()) : [],
+			});
+		});
+		tsc.on('error', err => {
+			reject(new Error(`Failed to run TypeScript check for ${label}: ${err.message}`));
+		});
+	});
+}
+
+/**
  * Main execution
  */
 async function main() {
@@ -141,18 +182,29 @@ async function main() {
 		fs.unlinkSync(ERROR_LOG);
 	}
 
+	// Extra directories outside packages/ that also need type-checking
+	const EXTRA_DIRS = [{ label: '.violations', dirPath: path.join(process.cwd(), '.violations') }];
+
 	// Check all packages in parallel
-	console.log(chalk.gray(`Checking ${PACKAGES.join(', ')}...`));
-	const results = await Promise.all(
-		PACKAGES.map(async pkg => {
+	console.log(chalk.gray(`Checking ${PACKAGES.join(', ')}, ${EXTRA_DIRS.map(d => d.label).join(', ')}...`));
+	const results = await Promise.all([
+		...PACKAGES.map(async pkg => {
 			try {
 				return await checkPackage(pkg);
 			} catch (err) {
 				console.error(chalk.red(`Error checking ${pkg}: ${err.message}`));
 				return { package: pkg, skipped: false, errors: [err.message] };
 			}
-		})
-	);
+		}),
+		...EXTRA_DIRS.map(async ({ label, dirPath }) => {
+			try {
+				return await checkDirectory(label, dirPath);
+			} catch (err) {
+				console.error(chalk.red(`Error checking ${label}: ${err.message}`));
+				return { package: label, skipped: false, errors: [err.message] };
+			}
+		}),
+	]);
 
 	// Analyze results
 	const packagesWithErrors = results.filter(r => !r.skipped && r.errors.length > 0);

@@ -1,8 +1,5 @@
-import * as fs from 'node:fs';
 import * as net from 'node:net';
-import * as os from 'node:os';
-import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { InjectedStep } from '../ipc/Protocol';
 import { McpServer } from './McpServer';
@@ -23,43 +20,38 @@ describe('McpServer (stdio transport)', () => {
 		await server.stop().catch(() => {});
 	});
 
-	it('start() returns a config path that exists', async () => {
-		const { configPath } = await server.start();
-		expect(fs.existsSync(configPath)).toBe(true);
-		await server.stop();
-		expect(fs.existsSync(configPath)).toBe(false);
+	it('start() returns an mcpServer config with expected structure', async () => {
+		const { mcpServer, port } = await server.start();
+		// name must be 'flow'
+		expect(mcpServer.name).toBe('flow');
+		// command must be [node, mcp-server.cjs]
+		expect(mcpServer.command).toHaveLength(2);
+		expect(mcpServer.command[1]).toMatch(/mcp-server\.cjs$/);
+		// env must carry the callback port matching the returned port
+		expect(Number(mcpServer.env?.['FLOW_MCP_CALLBACK_PORT'])).toBe(port);
 	});
 
-	it('config file uses stdio transport (command + args)', async () => {
-		const { configPath } = await server.start();
-		const config = JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
-			mcpServers: { flow: { command: string; args: string[]; env: Record<string, string> } };
-		};
-		const flowServer = config.mcpServers.flow;
-		// Must use stdio transport (command/args), NOT HTTP (url)
-		expect(flowServer.command).toBeTruthy();
-		expect(Array.isArray(flowServer.args)).toBe(true);
-		expect(flowServer.args[0]).toMatch(/mcp-server\.cjs$/);
-		expect((config.mcpServers.flow as any).url).toBeUndefined();
+	it('mcpServer uses stdio transport (command array, no url)', async () => {
+		const { mcpServer } = await server.start();
+		expect(Array.isArray(mcpServer.command)).toBe(true);
+		expect(mcpServer.command.length).toBeGreaterThanOrEqual(1);
+		expect(mcpServer.command[1]).toMatch(/mcp-server\.cjs$/);
+		// No url property
+		expect((mcpServer as unknown as Record<string, unknown>)['url']).toBeUndefined();
 	});
 
-	it('config file has FLOW_MCP_CALLBACK_PORT and FLOW_EXECUTION_ID env vars', async () => {
-		const { configPath } = await server.start();
-		const config = JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
-			mcpServers: { flow: { env: Record<string, string> } };
-		};
-		const env = config.mcpServers.flow.env;
-		expect(Number(env.FLOW_MCP_CALLBACK_PORT)).toBeGreaterThan(0);
-		expect(env.FLOW_EXECUTION_ID).toBe('test-exec');
+	it('mcpServer has FLOW_MCP_CALLBACK_PORT and FLOW_EXECUTION_ID env vars', async () => {
+		const { mcpServer } = await server.start();
+		const env = mcpServer.env ?? {};
+		expect(Number(env['FLOW_MCP_CALLBACK_PORT'])).toBeGreaterThan(0);
+		expect(env['FLOW_EXECUTION_ID']).toBe('test-exec');
 	});
 
 	it('TCP callback server receives injected steps and calls onInjectSteps', async () => {
-		const { configPath } = await server.start();
-		const config = JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
-			mcpServers: { flow: { env: Record<string, string> } };
-		};
-		const callbackPort = Number(config.mcpServers.flow.env.FLOW_MCP_CALLBACK_PORT);
-		const token = config.mcpServers.flow.env.FLOW_MCP_CALLBACK_TOKEN;
+		const { mcpServer } = await server.start();
+		const env = mcpServer.env ?? {};
+		const callbackPort = Number(env['FLOW_MCP_CALLBACK_PORT']);
+		const token = env['FLOW_MCP_CALLBACK_TOKEN'];
 
 		const testSteps: InjectedStep[] = [{ id: 'hello', type: 'script', script: 'echo hi' } as InjectedStep];
 
@@ -81,22 +73,17 @@ describe('McpServer (stdio transport)', () => {
 		expect(injectedSteps[0]).toEqual(testSteps);
 	});
 
-	it('config file includes FLOW_MCP_CALLBACK_TOKEN env var', async () => {
-		const { configPath } = await server.start();
-		const config = JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
-			mcpServers: { flow: { env: Record<string, string> } };
-		};
-		const token = config.mcpServers.flow.env.FLOW_MCP_CALLBACK_TOKEN;
+	it('mcpServer includes FLOW_MCP_CALLBACK_TOKEN env var', async () => {
+		const { mcpServer } = await server.start();
+		const token = mcpServer.env?.['FLOW_MCP_CALLBACK_TOKEN'];
 		expect(typeof token).toBe('string');
-		expect(token.length).toBeGreaterThan(16);
+		expect((token as string).length).toBeGreaterThan(16);
 	});
 
 	it('TCP callback: rejects connection with wrong token', async () => {
-		const { configPath } = await server.start();
-		const config = JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
-			mcpServers: { flow: { env: Record<string, string> } };
-		};
-		const callbackPort = Number(config.mcpServers.flow.env.FLOW_MCP_CALLBACK_PORT);
+		const { mcpServer } = await server.start();
+		const env = mcpServer.env ?? {};
+		const callbackPort = Number(env['FLOW_MCP_CALLBACK_PORT']);
 		const testSteps: InjectedStep[] = [{ id: 'bad', type: 'script', script: 'echo bad' } as InjectedStep];
 
 		await new Promise<void>((resolve, reject) => {
@@ -116,12 +103,10 @@ describe('McpServer (stdio transport)', () => {
 	});
 
 	it('TCP callback: rejects connection with wrong executionId', async () => {
-		const { configPath } = await server.start();
-		const config = JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
-			mcpServers: { flow: { env: Record<string, string> } };
-		};
-		const callbackPort = Number(config.mcpServers.flow.env.FLOW_MCP_CALLBACK_PORT);
-		const correctToken = config.mcpServers.flow.env.FLOW_MCP_CALLBACK_TOKEN;
+		const { mcpServer } = await server.start();
+		const env = mcpServer.env ?? {};
+		const callbackPort = Number(env['FLOW_MCP_CALLBACK_PORT']);
+		const correctToken = env['FLOW_MCP_CALLBACK_TOKEN'];
 		const testSteps: InjectedStep[] = [{ id: 'bad', type: 'script', script: 'echo bad' } as InjectedStep];
 
 		await new Promise<void>((resolve, reject) => {
@@ -141,12 +126,10 @@ describe('McpServer (stdio transport)', () => {
 	});
 
 	it('TCP callback: processes multiple JSON lines in one data event', async () => {
-		const { configPath } = await server.start();
-		const config = JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
-			mcpServers: { flow: { env: Record<string, string> } };
-		};
-		const callbackPort = Number(config.mcpServers.flow.env.FLOW_MCP_CALLBACK_PORT);
-		const token = config.mcpServers.flow.env.FLOW_MCP_CALLBACK_TOKEN;
+		const { mcpServer } = await server.start();
+		const env = mcpServer.env ?? {};
+		const callbackPort = Number(env['FLOW_MCP_CALLBACK_PORT']);
+		const token = env['FLOW_MCP_CALLBACK_TOKEN'];
 
 		const steps1: InjectedStep[] = [{ id: 's1', type: 'script', script: 'echo 1' } as InjectedStep];
 		const steps2: InjectedStep[] = [{ id: 's2', type: 'script', script: 'echo 2' } as InjectedStep];
@@ -172,11 +155,9 @@ describe('McpServer (stdio transport)', () => {
 	});
 
 	it('stop() closes the TCP server so no new connections are accepted', async () => {
-		const { configPath } = await server.start();
-		const config = JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
-			mcpServers: { flow: { env: Record<string, string> } };
-		};
-		const callbackPort = Number(config.mcpServers.flow.env.FLOW_MCP_CALLBACK_PORT);
+		const { mcpServer } = await server.start();
+		const env = mcpServer.env ?? {};
+		const callbackPort = Number(env['FLOW_MCP_CALLBACK_PORT']);
 
 		await server.stop();
 

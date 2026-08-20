@@ -12,7 +12,7 @@ function pad(s: string, width: number): string {
 }
 
 function stepType(step: FlowStep): string {
-	if (step.type === 'model') return (step as ModelFlowStep).model;
+	if (step.type === 'model') return (step as ModelFlowStep).model ?? 'model';
 	if (step.type === 'script') return 'script';
 	if (step.type === 'subflow') return `subflow:${(step as SubFlowStep).flowId}`;
 	if (step.type === 'user_intervention') {
@@ -179,7 +179,7 @@ function renderFlow(flow: FlowDefinition): void {
 	// --- Footer summary ---
 	const counts: Record<string, number> = {};
 	for (const step of steps) {
-		const t = step.type === 'model' ? (step as ModelFlowStep).model : step.type;
+		const t = step.type === 'model' ? ((step as ModelFlowStep).model ?? 'model') : step.type;
 		counts[t] = (counts[t] ?? 0) + 1;
 	}
 	const summary = Object.entries(counts)

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import type { ClaudeLauncher } from '../processing/ClaudeLauncher';
+import type { McpServer, ModelProvider } from '../processing/ModelProvider';
 import type { OutputExtractor } from '../processing/OutputExtractor';
 import { StreamEventMapper } from '../processing/StreamEventMapper';
 import type { TemplateContext, TemplateRenderer } from '../processing/TemplateRenderer';
@@ -12,8 +12,9 @@ import { writeOutputFiles } from './ScriptStepExecutor';
 export interface ModelStepConfig {
 	interactive: boolean;
 	claudeEnv?: Record<string, string>;
-	mcpConfigPath?: string;
-	onClaudeProcessStarted?: (process: any) => void;
+	mcpServers?: McpServer[];
+	provider: ModelProvider;
+	onClaudeProcessStarted?: (process: import('node:child_process').ChildProcess) => void;
 	executionConfig?: ExecutionConfig;
 }
 
@@ -25,12 +26,12 @@ export async function executeModelStep(
 	config: ModelStepConfig,
 	services: {
 		templateRenderer: TemplateRenderer;
-		claudeManager: ClaudeLauncher;
 		outputExtractor: OutputExtractor;
 	},
 	onLogEntry?: (entry: LiveLogEntry) => void
 ): Promise<StepTrace> {
-	const { templateRenderer, claudeManager, outputExtractor } = services;
+	const { templateRenderer, outputExtractor } = services;
+	const provider = config.provider;
 
 	const renderedPrompt = templateRenderer.render(step.prompt, context, true);
 	stepTrace.prompt = renderedPrompt;
@@ -39,7 +40,7 @@ export async function executeModelStep(
 	const execConfig = config.executionConfig;
 	const streamJson = execConfig?.streamJson !== false;
 	const verbose = execConfig?.verbose !== false;
-	const skipPermissions = execConfig?.skipPermissions !== false;
+	const skipPermissions = execConfig?.skipPermissions === true;
 
 	let finalResultText: string | undefined;
 	const liveLogEntries: LiveLogEntry[] = [];
@@ -102,18 +103,17 @@ export async function executeModelStep(
 		stepId: step.id,
 		model: step.model,
 		env: config.claudeEnv && Object.keys(config.claudeEnv).length > 0 ? config.claudeEnv : undefined,
-		mcpConfigPath: config.mcpConfigPath,
+		mcpServers: config.mcpServers,
 		onProcessStarted: config.onClaudeProcessStarted,
 		streamJson: streamJson && !config.interactive,
 		verbose: verbose && !config.interactive,
 		skipPermissions,
 		autoCompact: step.session?.mode === 'compact',
 		resumeSessionId,
-		isolateEnv: false,
 		onStreamEvent:
 			streamJson && !config.interactive
 				? (event: import('../processing/StreamJsonParser').StreamJsonEvent) => {
-						if (event.type === 'result' && event.data.result) {
+						if (event.type === 'result' && event.data.result !== undefined && event.data.result !== null) {
 							finalResultText = event.data.result;
 						}
 						if (event.type === 'system' && event.data.session_id) {
@@ -164,7 +164,7 @@ export async function executeModelStep(
 
 	try {
 		if (config.interactive) {
-			const result = await claudeManager.launchInteractive(launchOptions);
+			const result = await provider.launchInteractive(launchOptions);
 
 			stepTrace.response = result.response;
 			stepTrace.exitCode = result.exitCode ?? undefined;
@@ -183,7 +183,7 @@ export async function executeModelStep(
 			writeOutputFiles(stepTrace.outputs ?? {}, step.output, context);
 			return stepTrace;
 		} else {
-			const result = await claudeManager.launchBackground(launchOptions);
+			const result = await provider.launchBackground(launchOptions);
 
 			if (pollingInterval) {
 				clearInterval(pollingInterval);

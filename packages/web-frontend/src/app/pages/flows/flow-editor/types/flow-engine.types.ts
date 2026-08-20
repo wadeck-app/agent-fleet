@@ -3,7 +3,8 @@
  * These are temporary types until we properly configure the imports
  */
 
-export type ModelType = 'sonnet' | 'haiku' | 'opus';
+export type ModelType = 'sonnet' | 'haiku' | 'opus'; // kept for backwards compat
+export type ModelProviderName = 'claude' | 'opencode';
 export type WorkspaceMode = 'isolated' | 'shared' | 'manual';
 export type GitStrategy = 'main-only' | 'feature-branch' | 'any' | 'worktree';
 export type ReusePolicy = 'never' | 'if-available' | 'always';
@@ -110,7 +111,8 @@ export interface BaseFlowStep {
 
 export interface ModelFlowStep extends BaseFlowStep {
 	type: 'model';
-	model: ModelType;
+	model?: string;
+	provider?: ModelProviderName;
 	prompt: string;
 }
 

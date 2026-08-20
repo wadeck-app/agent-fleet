@@ -57,7 +57,7 @@ export interface ClaudeLaunchOptions {
 	/** Enable --verbose flag */
 	verbose?: boolean;
 
-	/** Enable --dangerously-skip-permissions (default: true) */
+	/** Enable --dangerously-skip-permissions (default: false, explicit opt-in required) */
 	skipPermissions?: boolean;
 
 	/** Resume a previous Claude session by ID (passes --resume <id> before -p) */
@@ -161,8 +161,8 @@ export class ClaudeLauncher {
 		let command: string;
 		let args: string[];
 
-		// --dangerously-skip-permissions is enabled by default unless explicitly disabled
-		const skipPermissions = options?.skipPermissions !== false;
+		// --dangerously-skip-permissions requires explicit opt-in (default: false)
+		const skipPermissions = options?.skipPermissions === true;
 
 		if (process.platform === 'win32' && claudePath.endsWith('.cmd')) {
 			command = 'cmd.exe';
@@ -350,7 +350,7 @@ export class ClaudeLauncher {
 				resolve({
 					stdout,
 					stderr,
-					exitCode: code || 0,
+					exitCode: code ?? -1,
 				});
 			});
 

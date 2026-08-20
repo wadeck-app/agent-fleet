@@ -10,9 +10,21 @@ export type TaskStatus = string;
 export type TicketStatus = string;
 
 /**
- * Supported model types for step execution
+ * Supported model types for step execution (kept for backward-compat; new code uses string)
+ * @deprecated Use model?: string on ModelFlowStep instead
  */
 export type ModelType = 'sonnet' | 'haiku' | 'opus';
+
+/**
+ * AI model CLI provider names
+ */
+export type ModelProviderName = 'claude' | 'opencode';
+
+/**
+ * MCP server definition — passed to model providers for tool injection.
+ * Re-exported from ModelProvider for use in flow definitions.
+ */
+export type { McpServer } from './processing/ModelProvider';
 
 /**
  * Workspace modes determine isolation and concurrency behavior
@@ -566,8 +578,11 @@ export interface ModelFlowStep extends BaseFlowStep {
 	/** Step type discriminator */
 	type: 'model';
 
-	/** Model to use for this step */
-	model: ModelType;
+	/** AI CLI provider to use for this step. Defaults to "claude" */
+	provider?: ModelProviderName;
+
+	/** Model to use for this step (e.g. "claude-3-5-haiku", "anthropic/claude-3-5-sonnet") */
+	model?: string;
 
 	/** Prompt template with variable interpolation support */
 	prompt: string;

@@ -4,13 +4,14 @@ import type { LiveLogEntry, ModelFlowStep, ScriptFlowStep, Workspace } from 'flo
 import { randomUUID } from 'node:crypto';
 
 import type { AssignableStep, ExecutionContext, InjectedStep, WorkerToDaemon } from '../ipc/Protocol';
+import type { McpServerConfig } from './McpServer';
 import { McpServer } from './McpServer';
 
 export type SendMessageFn = (msg: WorkerToDaemon) => void;
 
-// Factory that creates a StepRunner configured for the given MCP config path.
-// Pass an empty string when no MCP server is needed (script steps).
-export type StepRunnerFactory = (mcpConfigPath: string) => StepRunner;
+// Factory that creates a StepRunner configured with the given MCP servers.
+// Pass an empty array when no MCP server is needed (script steps).
+export type StepRunnerFactory = (mcpServers: McpServerConfig[]) => StepRunner;
 
 function sendStdoutAsLogs(
 	stdout: string | undefined,
@@ -84,10 +85,10 @@ export class WorkerAdapter {
 			};
 
 			const mcpServer = new McpServer(context.executionId, onInjectSteps);
-			const { configPath: mcpConfigPath } = await mcpServer.start();
+			const { mcpServer: mcpServerConfig } = await mcpServer.start();
 
-			// Create a runner with MCP config path baked into the factory call
-			const runner = this.stepRunnerFactory(mcpConfigPath);
+			// Create a runner with MCP servers baked into the factory call
+			const runner = this.stepRunnerFactory([mcpServerConfig]);
 
 			try {
 				// Notify user that the model step has started (before Claude CLI launches)
@@ -179,7 +180,7 @@ export class WorkerAdapter {
 			}
 		}
 
-		const runner = this.stepRunnerFactory('');
+		const runner = this.stepRunnerFactory([]);
 		const trace = await runner.executeStep(step as unknown as ScriptFlowStep, workspace, templateContext);
 		sendStdoutAsLogs(trace.stdout, context.executionId, step.id, sendMessage);
 		if (trace.error) {

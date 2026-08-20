@@ -19,7 +19,6 @@ import type {
 	InputDefinition,
 	InputSpec,
 	ModelFlowStep,
-	ModelType,
 	NormalizedInputDefinition,
 	ReusePolicy,
 	ScriptFlowStep,
@@ -557,28 +556,19 @@ export class SchemaValidator {
 			});
 		}
 
-		// Validate model
-		const validModels: ModelType[] = ['sonnet', 'haiku', 'opus'];
-		if (!step.model) {
-			this.issueCollector.addIssue({
-				severity: 'error',
-				code: ValidationCode.MISSING_FIELD,
-				message: `Model step '${step.id}' must specify a model`,
-				location: { stepId: step.id, field: 'model' },
-				suggestion: `Choose one of: ${validModels.join(', ')}`,
-				context: { related: validModels },
-			});
-		} else if (!validModels.includes(step.model)) {
+		// Validate model — now a free-form string (provider-specific model identifier)
+		// @formatter:off
+		const modelRegex = /^[a-zA-Z0-9_./:@-]{1,256}$/;
+		// @formatter:on
+		if (step.model !== undefined && !modelRegex.test(step.model)) {
 			this.issueCollector.addIssue({
 				severity: 'error',
 				code: ValidationCode.INVALID_VALUE,
-				message: `Invalid model for step '${step.id}': ${step.model}`,
+				message: `Invalid model for step '${step.id}': '${step.model}'`,
 				location: { stepId: step.id, field: 'model' },
-				suggestion: `Must be one of: ${validModels.join(', ')}`,
+				suggestion: `Model must match ^[a-zA-Z0-9_./:@-]{1,256}$ (e.g. "claude-3-5-haiku", "anthropic/claude-3-5-sonnet")`,
 				context: {
 					actual: step.model,
-					expected: validModels,
-					related: validModels,
 				},
 			});
 		}

@@ -4,7 +4,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ClaudeLauncher } from '../processing/ClaudeLauncher';
+import { ClaudeModelProvider } from '../processing/ClaudeModelProvider';
 import { OutputExtractor } from '../processing/OutputExtractor';
 import { TemplateRenderer } from '../processing/TemplateRenderer';
 import type { LiveLogEntry, ModelFlowStep, Workspace } from '../types';
@@ -12,7 +12,8 @@ import { StepRunner } from './StepRunner';
 
 vi.mock('../processing/TemplateRenderer');
 vi.mock('../processing/OutputExtractor');
-vi.mock('../processing/ClaudeLauncher');
+vi.mock('../processing/ClaudeModelProvider');
+vi.mock('../processing/OpenCodeModelProvider');
 
 const testWorkspace: Workspace = {
 	id: 'ws-test',
@@ -42,7 +43,7 @@ function makeStep(log?: 'streaming' | 'end' | 'none' | 'polling'): ModelFlowStep
 /** Helper: capture onStreamEvent from launchBackground call */
 function captureOnStreamEvent(): { onStreamEvent: ((...args: any[]) => void) | undefined } {
 	const captured: { onStreamEvent: ((...args: any[]) => void) | undefined } = { onStreamEvent: undefined };
-	vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation((opts: any) => {
+	vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockImplementation((opts: any) => {
 		captured.onStreamEvent = opts.onStreamEvent;
 		// Simulate 3 streaming assistant events
 		if (opts.onStreamEvent) {
@@ -72,7 +73,7 @@ describe('model step — log: parameter', () => {
 		it('sends no log entries during execution — only after completion via trace.liveLogEntries', async () => {
 			const logsSentDuring: LiveLogEntry[] = [];
 
-			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation((opts: any) => {
+			vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockImplementation((opts: any) => {
 				// During execution: collect any real-time log entries
 				if (opts.onStreamEvent) {
 					opts.onStreamEvent({
@@ -96,7 +97,7 @@ describe('model step — log: parameter', () => {
 		});
 
 		it('populates trace.liveLogEntries after completion', async () => {
-			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation((opts: any) => {
+			vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockImplementation((opts: any) => {
 				if (opts.onStreamEvent) {
 					opts.onStreamEvent({
 						type: 'assistant',
@@ -120,7 +121,7 @@ describe('model step — log: parameter', () => {
 			const logTimes: number[] = [];
 			let executionStartTime = 0;
 
-			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async (opts: any) => {
+			vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockImplementation(async (opts: any) => {
 				executionStartTime = Date.now();
 				if (opts.onStreamEvent) {
 					opts.onStreamEvent({
@@ -151,7 +152,7 @@ describe('model step — log: parameter', () => {
 			const callTimestamps: number[] = [];
 			const delayMs = 50;
 
-			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async (opts: any) => {
+			vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockImplementation(async (opts: any) => {
 				// Simulate streaming: emit 3 chunks with 50ms delays between them
 				if (opts.onStreamEvent) {
 					for (const chunk of ['First chunk. ', 'Second chunk. ', 'Third chunk.']) {
@@ -181,7 +182,7 @@ describe('model step — log: parameter', () => {
 		});
 
 		it('passes assistant text content to onLogEntry', async () => {
-			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async (opts: any) => {
+			vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockImplementation(async (opts: any) => {
 				if (opts.onStreamEvent) {
 					opts.onStreamEvent({
 						type: 'assistant',
@@ -204,7 +205,7 @@ describe('model step — log: parameter', () => {
 
 	describe('log: none', () => {
 		it('never calls onLogEntry', async () => {
-			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async (opts: any) => {
+			vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockImplementation(async (opts: any) => {
 				if (opts.onStreamEvent) {
 					opts.onStreamEvent({
 						type: 'assistant',
@@ -225,7 +226,7 @@ describe('model step — log: parameter', () => {
 		});
 
 		it('does not populate trace.liveLogEntries', async () => {
-			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockResolvedValue({
+			vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockResolvedValue({
 				stdout: 'raw',
 				stderr: '',
 				exitCode: 0,
@@ -241,7 +242,7 @@ describe('model step — log: parameter', () => {
 
 	describe('log: polling', () => {
 		it('calls onLogEntry with batched entries', async () => {
-			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async (opts: any) => {
+			vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockImplementation(async (opts: any) => {
 				if (opts.onStreamEvent) {
 					for (let i = 0; i < 5; i++) {
 						opts.onStreamEvent({
@@ -278,7 +279,7 @@ describe('model step — log: parameter', () => {
 				vi.clearAllMocks();
 				vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('Hello');
 				vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({ response: 'Clean answer' });
-				vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async (opts: any) => {
+				vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockImplementation(async (opts: any) => {
 					if (opts.onStreamEvent) {
 						opts.onStreamEvent({ type: 'result', data: { result: 'Clean answer', subtype: 'success' } });
 					}
@@ -300,7 +301,7 @@ describe('model step — log: parameter', () => {
 				vi.clearAllMocks();
 				vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('Hello');
 				vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({});
-				vi.mocked(ClaudeLauncher.prototype.launchBackground).mockResolvedValue({
+				vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockResolvedValue({
 					stdout: '',
 					stderr: 'error',
 					exitCode: 1,

@@ -203,7 +203,7 @@ export const rule: Rule<Config> = {
 
 		const registry = await loadRegistry().catch(() => null);
 
-		for (const pluginDir of pluginDirs) {
+		for (const pluginDir of Array.from(pluginDirs)) {
 			const dirName = path.basename(pluginDir);
 			const expectedPluginId = extractPluginId(dirName);
 			if (!expectedPluginId) continue;

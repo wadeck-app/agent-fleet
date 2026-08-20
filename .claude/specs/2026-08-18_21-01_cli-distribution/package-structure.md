@@ -22,33 +22,35 @@ Main packages contain the JS shim + esbuild bundle + optionalDependencies on all
 
 ```json
 {
-  "name": "@wadeck/flow-cli",
-  "version": "0.0.0",
-  "private": false,
-  "type": "commonjs",
-  "bin": { "flow": "./bin/flow.js" },
-  "files": ["bin/", "flow.cjs", "flow-updater.cjs", "package.json"],
-  "optionalDependencies": {
-    "@wadeck/flow-cli-win32-x64":    "*",
-    "@wadeck/flow-cli-darwin-arm64": "*",
-    "@wadeck/flow-cli-darwin-x64":   "*",
-    "@wadeck/flow-cli-linux-x64":    "*"
-  },
-  "dependencies": {
-    "semver": "^7.0.0"
-  },
-  "publishConfig": {
-    "@wadeck:registry": "https://gitlab.com/api/v4/projects/84445653/packages/npm/"
-  }
+	"name": "@wadeck/flow-cli",
+	"version": "0.0.0",
+	"private": false,
+	"type": "commonjs",
+	"bin": { "flow": "./bin/flow.js" },
+	"files": ["bin/", "flow.cjs", "flow-updater.cjs", "package.json"],
+	"optionalDependencies": {
+		"@wadeck/flow-cli-win32-x64": "*",
+		"@wadeck/flow-cli-darwin-arm64": "*",
+		"@wadeck/flow-cli-darwin-x64": "*",
+		"@wadeck/flow-cli-linux-x64": "*"
+	},
+	"dependencies": {
+		"semver": "^7.0.0"
+	},
+	"publishConfig": {
+		"@wadeck:registry": "https://gitlab.com/api/v4/projects/84445653/packages/npm/"
+	}
 }
 ```
 
 **Files included at publish time:**
+
 - `bin/flow.js` -- JS shim (hand-written, committed to repo)
 - `flow.cjs` -- esbuild bundle (copied from `packages/flow-cli/dist-bundle/flow.cjs` by CI)
 - `flow-updater.cjs` -- separate updater bundle (copied from `packages/flow-cli/dist-bundle/flow-updater.cjs` by CI)
 
 **bin/flow.js -- JS shim:**
+
 ```js
 #!/usr/bin/env node
 'use strict';
@@ -57,27 +59,27 @@ const path = require('path');
 const os = require('os');
 
 const PLATFORM_PKG = {
-  'win32-x64':    '@wadeck/flow-cli-win32-x64',
-  'darwin-arm64': '@wadeck/flow-cli-darwin-arm64',
-  'darwin-x64':   '@wadeck/flow-cli-darwin-x64',
-  'linux-x64':    '@wadeck/flow-cli-linux-x64',
+	'win32-x64': '@wadeck/flow-cli-win32-x64',
+	'darwin-arm64': '@wadeck/flow-cli-darwin-arm64',
+	'darwin-x64': '@wadeck/flow-cli-darwin-x64',
+	'linux-x64': '@wadeck/flow-cli-linux-x64',
 };
 
 const arch = os.arch() === 'arm64' ? 'arm64' : 'x64';
 const key = `${process.platform}-${arch}`;
 const pkgName = PLATFORM_PKG[key];
 if (!pkgName) {
-  process.stderr.write(`flow: unsupported platform ${key}\n`);
-  process.exit(1);
+	process.stderr.write(`flow: unsupported platform ${key}\n`);
+	process.exit(1);
 }
 
 const ext = process.platform === 'win32' ? '.exe' : '';
 const launcherPath = require.resolve(`${pkgName}/flow${ext}`);
-const bundlePath   = require.resolve('@wadeck/flow-cli/flow.cjs');
+const bundlePath = require.resolve('@wadeck/flow-cli/flow.cjs');
 
 execFileSync(launcherPath, process.argv.slice(2), {
-  stdio: 'inherit',
-  env: { ...process.env, LAUNCHER_BUNDLE_OVERRIDE: bundlePath },
+	stdio: 'inherit',
+	env: { ...process.env, LAUNCHER_BUNDLE_OVERRIDE: bundlePath },
 });
 ```
 
@@ -91,14 +93,14 @@ Note: `LAUNCHER_BUNDLE_OVERRIDE` overrides `cfg.NodeScript` in the Go launcher (
 
 ```json
 {
-  "name": "@wadeck/flow-cli-win32-x64",
-  "version": "0.0.0",
-  "os": ["win32"],
-  "cpu": ["x64"],
-  "files": ["flow.exe"],
-  "publishConfig": {
-    "@wadeck:registry": "https://gitlab.com/api/v4/projects/84445653/packages/npm/"
-  }
+	"name": "@wadeck/flow-cli-win32-x64",
+	"version": "0.0.0",
+	"os": ["win32"],
+	"cpu": ["x64"],
+	"files": ["flow.exe"],
+	"publishConfig": {
+		"@wadeck:registry": "https://gitlab.com/api/v4/projects/84445653/packages/npm/"
+	}
 }
 ```
 
@@ -111,12 +113,12 @@ Note: `LAUNCHER_BUNDLE_OVERRIDE` overrides `cfg.NodeScript` in the Go launcher (
 
 ```json
 {
-  "name": "@wadeck/flow-cli-darwin-arm64",
-  "version": "0.0.0",
-  "os": ["darwin"],
-  "cpu": ["arm64"],
-  "files": ["flow"],
-  "publishConfig": { "@wadeck:registry": "https://gitlab.com/api/v4/projects/84445653/packages/npm/" }
+	"name": "@wadeck/flow-cli-darwin-arm64",
+	"version": "0.0.0",
+	"os": ["darwin"],
+	"cpu": ["arm64"],
+	"files": ["flow"],
+	"publishConfig": { "@wadeck:registry": "https://gitlab.com/api/v4/projects/84445653/packages/npm/" }
 }
 ```
 
@@ -128,12 +130,12 @@ Binary: `flow` (no extension, chmod +x in CI). Source: `launcher-go/dist/flow_da
 
 ```json
 {
-  "name": "@wadeck/flow-cli-darwin-x64",
-  "version": "0.0.0",
-  "os": ["darwin"],
-  "cpu": ["x64"],
-  "files": ["flow"],
-  "publishConfig": { "@wadeck:registry": "https://gitlab.com/api/v4/projects/84445653/packages/npm/" }
+	"name": "@wadeck/flow-cli-darwin-x64",
+	"version": "0.0.0",
+	"os": ["darwin"],
+	"cpu": ["x64"],
+	"files": ["flow"],
+	"publishConfig": { "@wadeck:registry": "https://gitlab.com/api/v4/projects/84445653/packages/npm/" }
 }
 ```
 
@@ -145,12 +147,12 @@ Binary: `flow`. Source: `launcher-go/dist/flow_darwin_amd64_release`.
 
 ```json
 {
-  "name": "@wadeck/flow-cli-linux-x64",
-  "version": "0.0.0",
-  "os": ["linux"],
-  "cpu": ["x64"],
-  "files": ["flow"],
-  "publishConfig": { "@wadeck:registry": "https://gitlab.com/api/v4/projects/84445653/packages/npm/" }
+	"name": "@wadeck/flow-cli-linux-x64",
+	"version": "0.0.0",
+	"os": ["linux"],
+	"cpu": ["x64"],
+	"files": ["flow"],
+	"publishConfig": { "@wadeck:registry": "https://gitlab.com/api/v4/projects/84445653/packages/npm/" }
 }
 ```
 
@@ -163,6 +165,7 @@ Binary: `flow`. Source: `launcher-go/dist/flow_linux_amd64_release`.
 **Location:** `packages/task-cli-dist/`
 
 Identical structure to `@wadeck/flow-cli` with:
+
 - `bin: { "task": "./bin/task.js" }`
 - `files: ["bin/", "task.cjs", "task-updater.cjs", "package.json"]`
 - `optionalDependencies`: `@wadeck/task-cli-win32-x64` etc.
@@ -187,6 +190,7 @@ All 5 task packages are versioned together independently of flow.
 Flow and task versions are NOT synchronized -- they can diverge.
 
 Publish order (enforced by CI):
+
 1. Platform packages first (all 4)
 2. Main package last
 

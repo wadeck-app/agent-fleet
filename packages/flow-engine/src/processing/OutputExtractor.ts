@@ -10,6 +10,7 @@
  * - Required field validation
  */
 import { load as yamlLoad } from 'js-yaml';
+
 import type { OutputVariableConfig, StepOutput, TransformFunction, VariableType } from '../types';
 
 /**

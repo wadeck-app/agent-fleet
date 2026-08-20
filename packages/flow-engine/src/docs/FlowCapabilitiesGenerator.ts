@@ -63,7 +63,8 @@ prompt: |
 \`\`\`
 
 Key fields:
-- \`model\` (ModelType, required) — which AI model to use: \`sonnet\`, \`haiku\`, or \`opus\`
+- \`model\` (string, optional) — model identifier for the chosen provider (e.g. \`claude-3-5-haiku\`, \`anthropic/claude-3-5-sonnet\`)
+- \`provider\` (string, optional) — AI CLI provider: \`claude\` (default) or \`opencode\`
 - \`prompt\` (string, required) — prompt template with \`${TMPL} }}\` variable interpolation
 
 ### script

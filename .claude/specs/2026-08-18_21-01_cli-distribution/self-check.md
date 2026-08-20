@@ -14,48 +14,53 @@ Respects `FLOW_SELF_CHECK_QUIET=1` env var (suppress output, used internally by 
 ## Checks
 
 ### 1. Bundle integrity
+
 **What:** Import FlowExecutor from the bundle's core module.
 **Mock:** None required.
 **Pass condition:** `import { FlowExecutor } from '../executor/FlowExecutor.js'` does not throw.
 **Fail example:** SyntaxError or module-not-found during import (broken bundle).
 
 ### 2. Config loading
+
 **What:** Load FlowConfig from an empty temp directory (no config file present -- tests defaults).
 **Mock:** None. Use `os.tmpdir()` as cwd.
 **Pass condition:** `FlowConfig.load(os.tmpdir())` returns an object with `workspace.retainDays` defined.
 **Fail example:** FlowConfig throws on missing file instead of returning defaults.
 
 ### 3. YAML flow parsing
+
 **What:** Parse a minimal inline flow definition string.
 **Mock:** None.
 **Input:**
+
 ```yaml
 id: self-check-test
 steps:
-  - id: step1
-    type: script
-    script: echo ok
+    - id: step1
+      type: script
+      script: echo ok
 ```
+
 **Pass condition:** Parser returns an object with `id === 'self-check-test'` and `steps.length === 1`.
 **Fail example:** Parser throws or returns undefined.
 
 ### 4. StepRunner init
-**What:** Instantiate StepRunner with a minimal mock executor.
-**Mock:**
-```ts
-const mockExecutor = { execute: (_step: unknown) => Promise.resolve({ output: 'ok', exitCode: 0 }) };
-```
-**Pass condition:** `new StepRunner({ executor: mockExecutor })` does not throw.
-**Fail example:** Constructor throws due to missing required config field.
 
-### 5. Plugin system (manifest-only)
-**What:** Load the plugin registry in manifest-only mode (no activation).
-**Mock:** None -- reads actual plugin manifests from the bundle.
-**Pass condition:** `PluginRegistry.load({ manifestOnly: true })` returns without throw. Count of loaded manifests >= 0.
-**Fail example:** PluginRegistry throws on malformed manifest.
-**Note:** `manifestOnly: true` must be added to `PluginRegistry.load()` signature before this check can be implemented. Without it, self-check activates plugins with potential side effects.
+**What:** Instantiate StepRunner with minimal config (`executor` is optional in `StepRunnerConfig`).
+**Mock:** None required.
+**Pass condition:** `new StepRunner({ interactive: false })` does not throw.
+**Fail example:** Constructor throws due to a broken import or missing required field added in a future version.
+
+### 5. Plugin system (constructor-only)
+
+**What:** Instantiate `PluginLoader` -- resolves the `extension-points/extension-points.json` path without activating any plugin.
+**Mock:** None.
+**Pass condition:** `new PluginLoader()` does not throw.
+**Fail example:** `extension-points` package not bundled, or `extension-points.json` path cannot be resolved.
+**Note:** `loadProvider()` is NOT called -- no plugin activation, no side effects.
 
 ### 6. TaskStore (temp dir)
+
 **What:** Create, read, and delete a task in an isolated temp directory.
 **Mock:** None. Uses `fs.mkdtempSync('flow-self-check-')`.
 **Pass condition:** `store.create('test task')` returns a task; `store.findByPrefix(task.id.slice(0, 4))` returns the same task; no throw.
@@ -63,12 +68,14 @@ const mockExecutor = { execute: (_step: unknown) => Promise.resolve({ output: 'o
 **Fail example:** TaskStore throws or returns wrong data.
 
 ### 7. HookDispatcher
+
 **What:** Instantiate with empty config and dispatch a no-op event.
 **Mock:** None.
 **Pass condition:** `new HookDispatcher({})` constructs without error; `await dispatcher.dispatch('onTaskCreated', { taskId: 'test' }, () => {})` resolves without throw.
 **Fail example:** Constructor throws on empty config; dispatch rejects.
 
 ### 8. Workspace config schema
+
 **What:** Verify FlowConfig returns valid workspace cleanup defaults.
 **Mock:** None. Uses `FlowConfig.load(os.tmpdir())`.
 **Pass condition:** `config.workspace.retainDays` is a positive number; `config.workspace.maxWorkspaces` is a positive number.
@@ -89,6 +96,7 @@ All checks passed. flow v1.3.0
 ```
 
 On failure:
+
 ```
 [ok] Bundle integrity
 [ok] Config loading

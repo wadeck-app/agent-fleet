@@ -9,7 +9,9 @@
  */
 import type { ApprovalProvider } from 'extension-points';
 
-import { ClaudeLauncher } from '../processing/ClaudeLauncher';
+import { ClaudeModelProvider } from '../processing/ClaudeModelProvider';
+import type { McpServer, ModelProvider } from '../processing/ModelProvider';
+import { OpenCodeModelProvider } from '../processing/OpenCodeModelProvider';
 import { OutputExtractor } from '../processing/OutputExtractor';
 import { type TemplateContext, TemplateRenderer } from '../processing/TemplateRenderer';
 import type { FlowRegistry } from '../registry/FlowRegistry';
@@ -43,14 +45,14 @@ export class StepExecutionError extends Error {
 }
 
 export interface StepRunnerConfig {
-	/** Interactive mode for Claude steps */
+	/** Interactive mode for model steps */
 	interactive: boolean;
-	/** Environment variables for Claude */
+	/** Environment variables forwarded to the model CLI */
 	claudeEnv?: Record<string, string>;
-	/** Path to MCP config JSON file — passed as --mcp-config <path> to Claude CLI */
-	mcpConfigPath?: string;
-	/** Callback when Claude process starts */
-	onClaudeProcessStarted?: (process: any) => void;
+	/** MCP servers to inject into model steps */
+	mcpServers?: McpServer[];
+	/** Callback when model CLI process starts */
+	onClaudeProcessStarted?: (process: import('node:child_process').ChildProcess) => void;
 	/** Flow registry for looking up subflows */
 	flowRegistry?: FlowRegistry;
 	/** Flow executor for recursive subflow execution */
@@ -59,19 +61,34 @@ export interface StepRunnerConfig {
 	interventionHandler?: InterventionHandler;
 	/** Approval provider for user intervention steps (preferred) */
 	approvalProvider?: ApprovalProvider;
-	/** Execution configuration for Claude CLI flags */
+	/** Execution configuration for model CLI flags */
 	executionConfig?: ExecutionConfig;
+	/** Optional provider map override — used in tests to inject mock providers without I/O */
+	providers?: Map<string, ModelProvider>;
 }
 
 export class StepRunner {
 	private readonly templateRenderer = new TemplateRenderer();
 	private readonly scriptExecutor = new ScriptExecutor();
 	private readonly outputExtractor = new OutputExtractor();
-	private readonly claudeManager = new ClaudeLauncher();
+	private readonly providers: Map<string, ModelProvider>;
 	private config: StepRunnerConfig;
 
 	constructor(config: StepRunnerConfig) {
 		this.config = config;
+		this.providers =
+			config.providers ??
+			new Map<string, ModelProvider>([
+				['claude', new ClaudeModelProvider()],
+				['opencode', new OpenCodeModelProvider()],
+			]);
+	}
+
+	/** Kill all currently-executing model providers (called on abort). */
+	public kill(): void {
+		for (const provider of this.providers.values()) {
+			provider.kill();
+		}
 	}
 
 	/** @internal kept for tests that access private API via (runner as any).calculateBackoff */
@@ -114,21 +131,31 @@ export class StepRunner {
 				templateRenderer: this.templateRenderer,
 				scriptExecutor: this.scriptExecutor,
 				outputExtractor: this.outputExtractor,
-				claudeManager: this.claudeManager,
 			};
 
 			if (step.type === 'script') {
 				return await executeScriptStep(step as ScriptFlowStep, workspace.path, context, stepTrace, services);
 			} else if (step.type === 'model') {
+				const modelStep = step as ModelFlowStep;
+				const providerName = modelStep.provider ?? 'claude';
+				const provider = this.providers.get(providerName);
+				if (!provider) {
+					throw new StepExecutionError(
+						`Unknown model provider '${providerName}'. Supported: ${[...this.providers.keys()].join(', ')}`,
+						modelStep.id,
+						'model'
+					);
+				}
 				return await executeModelStep(
-					step as ModelFlowStep,
+					modelStep,
 					workspace.path,
 					context,
 					stepTrace,
 					{
 						interactive: this.config.interactive,
 						claudeEnv: this.config.claudeEnv,
-						mcpConfigPath: this.config.mcpConfigPath,
+						mcpServers: this.config.mcpServers,
+						provider,
 						onClaudeProcessStarted: this.config.onClaudeProcessStarted,
 						executionConfig: this.config.executionConfig,
 					},

@@ -4,8 +4,9 @@ import * as path from 'node:path';
 
 import { CommandHandler } from './CommandHandler';
 
-const { mockAllocate, hoistedState } = vi.hoisted(() => ({
-	mockAllocate: vi.fn().mockResolvedValue({ path: '/tmp/test-workspace' }),
+const { mockAllocate, mockRelease, hoistedState } = vi.hoisted(() => ({
+	mockAllocate: vi.fn().mockResolvedValue({ path: '/tmp/test-workspace', id: 'ws-test-id' }),
+	mockRelease: vi.fn().mockResolvedValue(undefined),
 	hoistedState: { actualHomedir: '' as string },
 }));
 
@@ -24,6 +25,7 @@ vi.mock('flow-engine', async importOriginal => {
 		...actual,
 		WorkspaceManager: class MockWorkspaceManager {
 			allocate = mockAllocate;
+			release = mockRelease;
 		},
 	};
 });
@@ -174,7 +176,8 @@ beforeEach(() => {
 	fs.mkdirSync(daemonDir, { recursive: true });
 	vi.clearAllMocks();
 	vi.mocked(os.homedir).mockReturnValue(hoistedState.actualHomedir);
-	mockAllocate.mockResolvedValue({ path: '/tmp/test-workspace' });
+	mockAllocate.mockResolvedValue({ path: '/tmp/test-workspace', id: 'ws-test-id' });
+	mockRelease.mockResolvedValue(undefined);
 });
 
 afterEach(() => {

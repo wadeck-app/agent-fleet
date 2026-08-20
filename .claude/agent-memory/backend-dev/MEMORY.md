@@ -31,6 +31,15 @@
 - Update `lazy-controller-plugin.ts` switch case to pass the extra service
 - Register new routes in `configureRoutes` using the injected service
 
+**ModelProvider Pattern (flow-engine)**
+
+- `ModelProvider` interface in `packages/flow-engine/src/processing/ModelProvider.ts`
+- `ClaudeModelProvider` wraps ClaudeLauncher + writes McpServer[] → temp file → `--mcp-config`
+- `OpenCodeModelProvider` spawns `opencode run [msg]`; McpServers via `OPENCODE_CONFIG_CONTENT` env var
+- `StepRunnerConfig.mcpConfigPath` is GONE — replaced by `mcpServers?: McpServer[]`
+- `ModelFlowStep.model` is now `string?`; add `provider?: ModelProviderName` for provider selection
+- `flow-cli/McpServer.ts` returns `McpServerConfig` struct (not file path) from `start()`
+
 ### Key Files
 
 - Route injection: `packages/web-backend/src/utils/lazy-controller-plugin.ts` (line ~160 switch statement)

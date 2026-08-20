@@ -1,5 +1,16 @@
 Important: Delegate to sub-agents early and often. It reduces the context size and increases drastically the performance.
 
+## Local setup (one time)
+
+Add to `~/.npmrc` to access `@wadeck` packages from the private GitLab registry:
+
+```
+@wadeck:registry=https://gitlab.com/api/v4/packages/npm/
+//gitlab.com/api/v4/packages/npm/:_authToken=<GitLab personal access token with read_api scope>
+```
+
+Then run `npm install` normally.
+
 ## Code Organization
 
 **File naming**: TypeScript files MUST be PascalCase matching their exported class (e.g., `FlowExecutor.ts` → `class FlowExecutor`). See `.agent-fleet/.claude/docs/naming-conventions.md`

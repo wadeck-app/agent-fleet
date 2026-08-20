@@ -1,11 +1,14 @@
 import * as crypto from 'node:crypto';
-import * as fs from 'node:fs';
 import * as net from 'node:net';
-import * as os from 'node:os';
-import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { InjectedStep } from '../ipc/Protocol';
+
+export interface McpServerConfig {
+	name: string;
+	command: string[];
+	env?: Record<string, string>;
+}
 
 /** Path to the CJS stdio MCP server script, resolved relative to this module. */
 const MCP_SERVER_CJS = fileURLToPath(new URL('./mcp-server.cjs', import.meta.url));
@@ -15,11 +18,11 @@ const MCP_SERVER_CJS = fileURLToPath(new URL('./mcp-server.cjs', import.meta.url
  *
  * Architecture:
  *  1. This class starts a TCP callback server (on a random port, bound to 127.0.0.1).
- *  2. It writes an MCP config JSON pointing to `mcp-server.cjs` (stdio transport)
- *     with FLOW_MCP_CALLBACK_PORT, FLOW_MCP_CALLBACK_TOKEN, and FLOW_EXECUTION_ID.
- *  3. Claude CLI receives `--mcp-config <path>`, spawns `mcp-server.cjs` as a child
- *     process, and communicates via stdin/stdout (real MCP protocol).
- *  4. When Claude calls `provideSteps`, `mcp-server.cjs` opens a TCP connection to
+ *  2. start() returns an McpServer config (name/command/env) — the caller passes it to
+ *     StepRunner as mcpServers[]; the model provider (ClaudeModelProvider) serializes it
+ *     to a temp file and passes --mcp-config to the CLI.
+ *  3. The CLI spawns `mcp-server.cjs` via stdio, which connects back via TCP.
+ *  4. When the CLI calls `provideSteps`, `mcp-server.cjs` opens a TCP connection to
  *     the callback server and sends { token, executionId, steps } as JSON.
  *  5. The callback server validates token + executionId before calling `onInjectSteps`.
  *
@@ -31,7 +34,6 @@ const MCP_SERVER_CJS = fileURLToPath(new URL('./mcp-server.cjs', import.meta.url
  */
 export class McpServer {
 	private tcpServer: net.Server | null = null;
-	private configPath: string | null = null;
 	private callbackToken = '';
 
 	constructor(
@@ -40,26 +42,17 @@ export class McpServer {
 	) {}
 
 	/**
-	 * Start the TCP callback server and write the MCP config file.
-	 * Returns the config file path to pass as `--mcp-config` to Claude.
+	 * Start the TCP callback server.
+	 * Returns the port and the McpServerConfig to pass to StepRunner as mcpServers.
 	 */
-	async start(): Promise<{ port: number; configPath: string }> {
+	async start(): Promise<{ port: number; mcpServer: McpServerConfig }> {
 		this.callbackToken = crypto.randomUUID().replace(/-/g, '');
 		const callbackPort = await this.startTcpServer();
-		const configPath = this.writeConfig(callbackPort);
-		this.configPath = configPath;
-		return { port: callbackPort, configPath };
+		const mcpServer = this.buildMcpServerConfig(callbackPort);
+		return { port: callbackPort, mcpServer };
 	}
 
 	async stop(): Promise<void> {
-		if (this.configPath) {
-			try {
-				fs.unlinkSync(this.configPath);
-			} catch {
-				/* ignore */
-			}
-			this.configPath = null;
-		}
 		if (!this.tcpServer) return;
 		return new Promise((resolve, reject) => {
 			const server = this.tcpServer!;
@@ -126,22 +119,15 @@ export class McpServer {
 		});
 	}
 
-	private writeConfig(callbackPort: number): string {
-		const config = {
-			mcpServers: {
-				flow: {
-					command: process.execPath,
-					args: [MCP_SERVER_CJS],
-					env: {
-						FLOW_MCP_CALLBACK_PORT: String(callbackPort),
-						FLOW_MCP_CALLBACK_TOKEN: this.callbackToken,
-						FLOW_EXECUTION_ID: this.executionId,
-					},
-				},
+	private buildMcpServerConfig(callbackPort: number): McpServerConfig {
+		return {
+			name: 'flow',
+			command: [process.execPath, MCP_SERVER_CJS],
+			env: {
+				FLOW_MCP_CALLBACK_PORT: String(callbackPort),
+				FLOW_MCP_CALLBACK_TOKEN: this.callbackToken,
+				FLOW_EXECUTION_ID: this.executionId,
 			},
 		};
-		const configPath = path.join(os.tmpdir(), `flow-mcp-${this.executionId}-${Date.now()}.json`);
-		fs.writeFileSync(configPath, JSON.stringify(config), { encoding: 'utf8', mode: 0o600 });
-		return configPath;
 	}
 }

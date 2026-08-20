@@ -18,6 +18,10 @@ function resolveJsToTs(): Plugin {
 
 export default defineConfig({
 	plugins: [resolveJsToTs()],
+	// Replace the esbuild bundle-time constant so updater tests see a real version string.
+	define: {
+		__FLOW_CLI_VERSION__: '"1.0.0"',
+	},
 	test: {
 		globals: true,
 		environment: 'node',

@@ -1,10 +1,16 @@
 {
-  "name": "@wadeck/flow-cli-linux-x64",
-  "version": "0.0.0",
-  "os": ["linux"],
-  "cpu": ["x64"],
-  "files": ["flow"],
-  "publishConfig": {
-    "@wadeck:registry": "https://gitlab.com/api/v4/projects/84445653/packages/npm/"
-  }
+	"name": "@wadeck/flow-cli-linux-x64",
+	"version": "0.0.0",
+	"os": [
+		"linux"
+	],
+	"cpu": [
+		"x64"
+	],
+	"files": [
+		"flow"
+	],
+	"publishConfig": {
+		"@wadeck:registry": "https://gitlab.com/api/v4/projects/84445653/packages/npm/"
+	}
 }

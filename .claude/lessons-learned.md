@@ -1,47 +1,97 @@
 # Lessons learned
 
-<!-- Last updated: 2026-08-19T21:28:34.282Z -->
+<!-- Last updated: 2026-08-20T20:46:48.154Z -->
 
 ## Recurring feedback
 
+<!-- session 2157a0f8 2026-08-20 -->
+
+- Subagents (backend-dev, frontend-dev, etc.) cannot invoke Skill tools (`check`, `run-test`, `subprocess`, `write-doc`, `run`) — they return "NOT YET KNOWN". When delegating to subagents, avoid tasks that require these; stick to Read/Edit/Write/Grep/Bash only.
+- Multiple code review + security pentest iterations with subagents running in parallel is a validated pattern — use this approach for complex implementations that need both correctness and security audits.
+
+<!-- session 6d59c129 2026-08-20 -->
+
+- Spawned two parallel backend-dev agents (e9704d0a, 4a2fd14d) working on overlapping code (flow-engine + flow-cli refactoring). Both performed similar edits (ModelStepExecutor, StepRunner, McpServer, Worker) in quick succession — indicates either unclear task partitioning or lack of handoff documentation between forked agents
+- Test file creation repeatedly hit ESM mocking issues (process.exit type mismatches, child_process mock setup) requiring multiple edit cycles — suggests test templates should include documented ESM mocking patterns or examples in comments for common mocks (process.exit, child_process)
+
+<!-- session 0455fbe4 2026-08-20 -->
+
+- process.exit mocking signature too narrow: mockImplementation type changed from `((_code?: number)` to `((_code?: string | number | null)` across multiple test files (CliCommand.test.ts, TaskCliCommand.test.ts, Updater.test.ts). Several sed+test cycles needed to fix all occurrences — indicates type mismatch wasn't caught upfront.
+
+<!-- session 95141215 2026-08-20 -->
+
+- Two agents worked in parallel on related changes — edits to McpServer.ts, Worker.ts, WorkerAdapter.ts happened in coordinated bursts, suggesting agents synchronized or read shared context mid-session.
+- Formatting and check cycles ran 3+ times with incremental fixes across audit reports, test files, and CLI modules — suggests parallel agent writes to multiple files (specs, tests, implementation) created format conflicts. Serial format pass after parallel work may be needed.
+- Test file fixes required repeated grep searches for process.exit patterns across multiple test files with near-identical fixes (CliCommand/TaskCliCommand) — suggests this is a recurring maintenance pattern; consider templated fix or linting rule instead of manual edits
+- Multiple parallel code-review and security-pentest fork agents ran but required 2 iterations to resolve findings — first pass was incomplete; either review agent briefing was incomplete or findings weren't actionable as-is
+
+<!-- session 9ae6da57 2026-08-20 -->
+
+- Multiple TypeScript compilation cycles (repeated `npm run build` with grep filters) suggest agent was making incremental edits without validating scope upfront. Should read all affected files and identify full type chain before starting edits.
+- Test file generation pattern repeated identically for 5+ modules (configDir, versionValidation, UpdateManager, CliCommand, TaskCliCommand) — boilerplate could be templated to reduce redundant writes.
+- Rapid successive edits to same test files (19:36–19:40, multiple process.exit mock changes) suggest thrashing rather than systematic debugging. User may prefer: read full error context once, make targeted fix, verify, move on
+
+<!-- session 6211d754 2026-08-20 -->
+
+- Bulk sed replacement (`sed -i 's/mockImplementation((_code?: number)/mockImplementation((_code?: string | number | null)/g'`) used to fix type compatibility across test files; suggests TypeScript mock/type issues could benefit from earlier architectural validation.
+
+<!-- session a11724af 2026-08-20 -->
+
+- Iterative TypeScript compilation: agents made 5+ sequential edits to `StepRunner.ts`, `ModelStepExecutor.ts`, and `types.ts` in rapid succession (22:01:04–22:01:53), suggesting they discovered validation/type issues during fixes rather than upfront. Pattern repeats across multiple files — fix, recompile, fail, fix again.
+- User enforces a strong pre-commit discipline: `npm run format` followed by `npm run check` before declaring work complete. This appears consistently throughout the session (09:56, 10:01, 19:31, 19:35, etc.).
+- Multi-fork agent strategy works well: spawning 3 parallel audits (quality/security/consistency) at 09:54 completed without interference. User trusts parallel fork agents for independent reviews.
+- Session shows cross-project coordination: agent-fleet work (primary) with parallel updates to singleton-daemon-kit (Go launcher SDK). Pre-version bumps occur in SDK alongside flow-cli feature work.
+- Test failures required iterative debugging (multiple grep/tail loops checking for specific error patterns) rather than failing fast with clear messages. Tests passed/failed multiple times before finding root causes (process.exit typing, file system mock issues).
+
 <!-- session 6c0c8a03 2026-08-19 -->
+
 - Spec documents edited 5+ times in cycle: initial edits (20:49) → goldfish review (21:04) → security audit (21:04) → fixes (21:07-21:09) → re-validation (21:10). Iterative validation pattern suggests upfront design review could reduce multiple passes.
 - Multiple "final" passes on OpenCode Step Provider spec (security pentest v2–v6, goldfish v3–v5) with repeated edit cycles on same files (provider-abstraction.md, out-of-scope.md, step-model-integration.md). Pattern suggests either incremental refinement loops or review criteria not converging—clarify whether these cycles indicate convergence or iterative dissatisfaction.
 
 <!-- session 98c0936a 2026-08-19 -->
+
 - Agent a19e spent time searching for parseYAML implementation, then discovered it already existed (SendMessage at 21:08:46). Reflects implicit redirection mid-task when assumptions prove wrong.
 - Opencode spec underwent 6+ iterations of goldfish + security pentest cycles (v2→v6) with incremental file edits — suggests either: (a) specs need upfront review before automation loops, or (b) iterative refinement is expected pattern for high-security specs and should be formalized/documented.
 
 <!-- session 3f2a20af 2026-08-19 -->
+
 - Heavy use of parallel agents for independent investigations (security audit, completeness audit, consistency audit, feature analysis) — effective for throughput but created redundant grep queries across agents; shared search results or coordinated patterns would reduce waste
 - Sequential agent launches inefficient — fork agents spawned one at a time (21:00:02, 21:00:05, 21:00:07) when parallel launch available; switched to concurrent agents later (21:04:55+) and stayed with pattern. Establish parallel-agent launch as default where tasks are independent.
 
 <!-- session afdd4652 2026-08-19 -->
+
 - Test flow task-output-jsonpath.yml was edited at 20:39:13 immediately after first execution (20:38:55), indicating the run found an issue requiring mid-session fix before re-running. Suggests test flows weren't validated before first run.
 
 <!-- session 66138a84 2026-08-19 -->
+
 - Multiple parallel agents (acc25325, e9704d0a, 4a2fd14d, 55a79144) ran simultaneously across ~90 minutes with heavy overlapping file reads (flow-types.ts, threat-model.md, etc.). Consistent with user's CLAUDE.md "delegate early and often," but verify parallel work doesn't cause file-lock contention on Windows.
 - Multiple re-launch pattern: goldfish coherence review launched at 21:04:12, then "Relaunch" at 21:10:06; security pentest subprocess audit at 21:04:31, then "Relaunch" at 21:10:17 — suggests first runs failed silently or didn't complete, agents not checking status before moving on.
 
 <!-- session da343929 2026-08-19 -->
+
 - User attempted to invoke skills "spec" and "violations" that either don't exist or aren't in the available skills list — suggest verifying skill registry is current with user expectations.
 - Parallel agent forks (a19e, a5c0 both on OutputExtractor) with SendMessage coordination adds overhead; unclear decision criteria for parallelism vs. single-agent approach
 
 <!-- session 55a79144 2026-08-19 -->
+
 - User rejects over-engineered solutions. When multiple architecture options were proposed (IPC vs HTTP vs MCP client), the simplest direct-call option was correct — prefer direct over abstraction layers.
 - Extensive parallelization pattern: 4-5 concurrent session flows (acc25325, 4a2fd14d, 55a79144, e9704d0a, de603161) launching fork agents for independent investigations (DX fixes, test coverage, spec coherence reviews, security audits)
 - Multiple iterative spec reviews — goldfish coherence run twice (21:11:26, 21:14:55), security pentest audit twice (21:11:46, 21:13:12), then final passes (21:15:06). Pattern suggests unclear acceptance criteria or incremental discovery of issues per round.
 
 <!-- session de603161 2026-08-19 -->
+
 - Heavy parallel fork agent pattern with context-efficient output suppression (head/tail pipes) being applied consistently across builds, tests, and spec work to manage token usage.
 
 <!-- session 274a5f98 2026-08-19 -->
+
 - Spec file editing pattern: index.md, provider-abstraction.md, threat-model.md edited 4–8 times each in quick succession with small incremental changes (21:00–21:02, 21:07, 21:13) — suggests spec structure/requirements were unclear upfront; later goldfish/subprocess audits caught inconsistencies that earlier guidance would have prevented.
 
 <!-- session e9704d0a 2026-08-19 -->
+
 - Investigate external tool capabilities thoroughly (official docs, CLI help, env vars, config schema) BEFORE proposing design questions. Don't design abstractions based on assumed behavior.
 
 <!-- session 4a2fd14d 2026-08-17 -->
+
 - Review response quality before sending — user complained "t'avais pas reviewé ta reponse (ca commence à faire bcp de fois ce soir !)" multiple times in this chunk when I sent imprecise explanations or wrong examples (echo hook, absolute path requirement not justified). This is repeated feedback indicating a pattern.
 - User values precision — asked "sois plus précis stp" on vague terms like "payload keys"; prefers concrete field names and examples over abstractions.
 - User wants to TEST, not just understand theory — when given explanations, they immediately asked to adjust configs in `_test-tasks` to actually run and observe hooks working. Skip abstract discussion, go straight to runnable examples.
@@ -316,17 +366,75 @@
 
 ## Agent errors
 
+<!-- session 2157a0f8 2026-08-20 -->
+
+- Two backend-dev agents working in parallel on overlapping files (McpServer.ts, Worker.ts, WorkerAdapter.ts) from ~22:00 onwards — suggests duplicate/concurrent edits on same targets without coordination mechanism.
+- Skills "check" and "run-test" invoked but returned "NOT YET KNOWN" (lines 22:03:37, 22:06:07, 22:09:57) — agent attempted to call before skill schema was loaded, causing fallback behavior.
+- Backend-dev agents performing heavy iteration on McpServer/StepRunnerConfig integration (15+ grep patterns for `mcpConfigPath`, `McpServer`, `configPath` across multiple reads/searches) — suggests unclear/missing type definitions or architectural contracts for how these components wire together.
+- Parallel audit forks (quality/security/consistency) write findings to `.claude/specs/.../audits/YYYY-MM-DD_<type>/report.md` but lack file:line cross-references. Backend-dev agent then manually greps to locate code — consider: audit format should include concrete code locations or the audit agent should draft targeted fixes inline.
+- Test mock type fixes required multiple iterations to find all occurrences of `process.exit` mocking — search comprehensively with grep before bulk replacing, not file-by-file edits. Type signature correction: `(number)` → `(string | number | null)` for process.exit mocks.
+- Agent used multiple targeted grep searches for specific patterns (validateString, validateLaunchOptions, null byte, `\x00`, `code ?? 0`, `exitCode`) — indicates uncertainty about where validation logic should be applied or already existed; had to hunt rather than know from context reading.
+
+<!-- session 6d59c129 2026-08-20 -->
+
+- Used skill syntax with pipe args (`skill=run | args=bash...`) instead of standard tool parameters — unexpected format that doesn't match Skill tool schema
+- Extended debugging cycle with repeated file reads and incremental one-off edits scattered across 8+ files over 15min (22:00–22:15) before committing to refactoring strategy — suggests changes weren't scoped upfront
+- Backend-dev agent attempted to call skills (`check`, `run-test`, `subprocess`, `write-doc`, `run`) that returned "**_ NOT YET KNOWN _**" — suggests agents don't have reliable skill discovery or these particular skills are not accessible to backend-dev agent type, causing WARN logs but forcing fallback to manual Bash commands
+- Test debugging on CliCommand.test.ts and TaskCliCommand.test.ts used trial-and-error (edit, run, repeat) instead of identifying the root issue first. process.exit type signature mismatch (`number` vs `string | number | null`) took multiple iterations to resolve; should have run tests once, read error fully, then fixed once.
+- Security/code review subprocess agents (iterations 1, 2, 3 of pentest + code review) suggest initial findings were incomplete or the review scope wasn't precise enough. Re-running full audits indicates either unclear audit briefs or issues missed in first pass.
+- "Full review iteration 4 - final check" indicates multiple prior iterations; the specific grep patterns (skipPermissions, exitCode, currentProcess = null, providers.\*Map, result !== undefined) suggest earlier iterations missed or incompletely fixed these issues — agent should validate comprehensively in first pass rather than requiring multi-iteration reviews
+
+<!-- session 0455fbe4 2026-08-20 -->
+
+- Repeated "**_ NOT YET KNOWN _**" warnings for skills (check, run-test, write-doc, subprocess at 09:59:33, 09:59:37, 19:26:46, 19:26:49, 19:26:51, 19:33:01, 19:34:05, 19:34:11) — agents lack upfront skill definitions, causing fallback searches and latency spikes.
+- Inefficient partial file reads — backend-dev agents repeatedly Read files with small offsets (50 lines) that didn't capture full context, requiring multiple sequential reads instead of one full read upfront.
+- backend-dev agent attempted unknown skills "check" and "run-test" (20:15:33–35) — skills exist but agent wasn't aware of them, requiring workarounds
+
+<!-- session 95141215 2026-08-20 -->
+
+- Agents repeatedly attempted unavailable skills (`/check`, `/run-test`) at 22:03:37, 22:06:07, 22:09:57, 22:15:50 — skill NOT KNOWN warnings recurred without retry. After blocks, agents pivoted to `npm run build` + grep filtering instead of reengaging the skill.
+- Agents repeatedly attempted to invoke unavailable skills (`check`, `run-test`, `write-doc`, `run`, `subprocess`) with WARN logs; expected availability but weren't loaded in session context. Agents should validate skill availability or fall back to direct tool calls.
+- Test-writing agents created tests with incorrect mock type signatures (`mockImplementation((_code?: number)` vs correct `_code?: string | number | null`); required separate fork agent to fix ESM mocking compatibility. Mock signatures should be validated against actual implementation before committing test files.
+- Backend-dev agent invoked unavailable skills ("check", "run-test") and received WARN instead of graceful error — should pre-check skill availability or handle gracefully in agent setup
+
+<!-- session 9ae6da57 2026-08-20 -->
+
+- Agent invoked deferred skills ("check", "run-test") without calling ToolSearch first to load their schemas—resulted in "NOT YET KNOWN" warnings. Must call ToolSearch("select:check,run-test") before invoking these skills.
+- Backend-dev agent repeatedly tried to invoke skills (`check`, `run-test`, `write-doc`, `subprocess`) without verifying availability first; fell back to Bash/fork-and-bash pattern. Skills should be pre-fetched or agent should use ToolSearch before assuming.
+- Multiple sequential fork agents spawned for parallel audit tasks (quality/security/consistency) succeeded, but earlier backend-dev instances kept creating fresh agents rather than reusing existing ones for related work (e.g., test writing).
+- When fixing process.exit mock signature mismatches in test files, agent made 8+ edits across CliCommand.test.ts and TaskCliCommand.test.ts over ~4 minutes without reading the actual type error. Should have: read the full error once, understood the type mismatch, applied the fix consistently
+- backend-dev agent spawned with code-review/security-pentest work encountered unknown skill "check" and "run-test", then spawned general-purpose agent to investigate. Skills should be pre-verified or fallback should be clearer
+
+<!-- session 6211d754 2026-08-20 -->
+
+- Two backend-dev agents (e9704d0a, 4a2fd14d) worked in parallel on overlapping code areas (McpServer.ts, Worker.ts, types.ts) with repeated Edit operations, causing a long debugging loop (22:05:40–22:14:49) instead of coordinating or deferring to one agent.
+- Agents called `skill=check` and `skill=run-test` multiple times (22:03:37, 22:03:40, 22:06:07, 22:15:50, 22:20:37) but got "NOT YET KNOWN" warnings, then fell back to ad-hoc grep/npm commands instead of asking or using Bash directly first.
+- Backend-dev agents repeatedly tried to use "check" skill which is not available — they worked around it by manually searching for `scripts/check-all.js`. The skill should either be available in the agent definition or documented as unavailable.
+- Multiple agents tried to invoke skills that don't exist (`run-test`, `subprocess`, `write-doc`, `run`) and logged "**_ NOT YET KNOWN _**" — suggests agent definitions haven't been updated to include these skills, or they're not available in the agent context.
+- ContractValidator.test.ts TypeScript errors were silenced by adding `ContractValidator.test.ts` to tsconfig.json exclude list (19:30:51) rather than fixing the actual test file — this hides rather than resolves the issue.
+- Fork agent iterated multiple times on test fixes (CliCommand.test.ts and TaskCliCommand.test.ts) with repeated test runs and edits, suggesting incomplete fixes on first pass.
+
+<!-- session a11724af 2026-08-20 -->
+
+- Backend agents repeatedly attempted to invoke unavailable skills (`check`, `run-test`, `run` as skill vs bash) without graceful fallback — at least 6 failed invocations across timestamps 22:03:37–22:16:51. After each failure, agents retried the same call instead of using alternative approaches.
+- Two backend-dev agents (session ae6b, a839) ran in parallel without visible coordination; both wrote to same files (e.g., `packages/flow-cli/src/cli/commands/CliCommand.ts` at 22:03:05 and 22:08:22, `StepRunner.ts` edited by ae6b multiple times). No merge conflict prevention observed.
+- Agents repeatedly tried to invoke deferred skills (check, run-test, write-doc, subprocess) without first fetching schemas via ToolSearch — resulted in "**_ NOT YET KNOWN _**" warnings. Agents should proactively load skill schemas when attempting to use them, not assume they're available.
+- Fork agent repeatedly fixed `process.exit` mock type signature (number → string | number | null) across multiple edits, suggesting initial type mismatch wasn't caught by TypeScript. Mock setup or test environment doesn't validate mock compatibility with implementation.
+
 <!-- session 6c0c8a03 2026-08-19 -->
+
 - Multiple parallel agents read identical spec files independently without context sharing — e9704d0a re-read opencode-step-provider spec files 6+ times across forks (21:04-21:05, again 21:10) and then after goldfish/security reviews, suggesting no shared state between review cycles or insufficient result caching.
 - backend-dev agent's `check` skill call [21:00:02] with `args=packages/flow-cli` parameter failed ("NOT YET KNOWN"), indicating skill interface mismatch — doesn't accept scoped package arguments or requires different invocation syntax.
 - backend-dev agent attempted to use /run skill with arguments but got "NOT YET KNOWN" warning; fell back to manual bash `npm install` after searching for skill examples via Glob. Indicates skill invocation interface wasn't clear from context.
 
 <!-- session 98c0936a 2026-08-19 -->
+
 - Skill registry incomplete — attempts to invoke "spec" (19:51:32) and "violations" (20:47:34) tools returned "NOT YET KNOWN", requiring ToolSearch to load schemas.
 - Deferred tools (ToolSearch, SendMessage, Skill "goldfish"/"subprocess") fetched during session, not pre-loaded — caused WARN "NOT YET KNOWN" delays at 21:08:40-21:08:46.
 - Backend-dev agent attempted run skill for npm install, received "NOT YET KNOWN", then fell back to Glob/Read searching skill examples — skill availability not guaranteed across agent types; needs context awareness.
 
 <!-- session 1c8332e4 2026-08-19 -->
+
 - At 19:51, agent tried to invoke `/spec` skill which was not yet known; should have handled gracefully or used available tools instead. Same issue at 20:47 with `violations` skill.
 - Extensive grep searching (20:30-20:33) to determine which flow-engine features actually work (statusTransitions, allowRecursion, contract validation, writeOutput, etc.) — suggests agent was uncertain whether features were implemented vs. just declared in types. Thorough investigation, but indicates weak initial mental model of codebase state.
 - Agent invoked deferred tools (AskUserQuestion, SendMessage) without calling ToolSearch first to fetch their schemas — led to "NOT YET KNOWN" warnings and tool failures. Should ToolSearch before using deferred tools.
@@ -335,13 +443,15 @@
 - Multiple fork agents (goldfish + pentest) ran independently without coordinating findings — spec saw 5 cycles of repeated edits to the same files (threat-model.md, provider-abstraction.md, step-model-integration.md) instead of convergent fixes
 
 <!-- session 3f2a20af 2026-08-19 -->
+
 - ToolSearch called for unknown skills ("spec", "violations") before they were available — agent assumed skills were loaded; should check skill availability upfront or fail more gracefully
 - Skill/tool invocations returned "NOT YET KNOWN" (check, goldfish, subprocess, SendMessage) — agent tried to use deferred tools without fetching schemas first via ToolSearch; should use `ToolSearch query="select:skill-name"` before invoking unknown tools.
-- Spec iteration cycle: opencode-step-provider/_index.md edited 12+ times across 8 minutes (20:49 to 21:10), followed by goldfish review + security audit + fixes + relaunch. Initial spec unclear or gaps only surfaced during coherence/security review; frontload specification completeness checks before sending to audits.
+- Spec iteration cycle: opencode-step-provider/\_index.md edited 12+ times across 8 minutes (20:49 to 21:10), followed by goldfish review + security audit + fixes + relaunch. Initial spec unclear or gaps only surfaced during coherence/security review; frontload specification completeness checks before sending to audits.
 - Multiple fork agents (a5e1, a828, a14f, ab5e, a5c1, a92b) reading identical spec files in sequence instead of sharing context or parallelizing — each fork re-reads all 6 files independently, ~36 redundant reads total
-- Backend-dev agent attempted to invoke `/run skill with complex arguments ("npm install from C:\...") which failed with "*** NOT YET KNOWN ***" — agent worked around by using Glob + manual npm install; the skill invocation should validate arguments or document supported input format
+- Backend-dev agent attempted to invoke `/run skill with complex arguments ("npm install from C:\...") which failed with "**_ NOT YET KNOWN _**" — agent worked around by using Glob + manual npm install; the skill invocation should validate arguments or document supported input format
 
 <!-- session afdd4652 2026-08-19 -->
+
 - Attempted skill "spec" at 19:51:32 (NOT YET KNOWN) but assistant silently switched to Agent Explore without notifying user the skill failed to load. Implicit fallback worked but masked a missing feature.
 - Attempted skill "violations" at 20:47:34 (NOT YET KNOWN) — skill is listed in CLAUDE.md as available but failed to load in this session. Unclear if this is config/loading issue or session-specific availability.
 - Repeated "NOT YET KNOWN" warnings for Skill calls: `goldfish`, `subprocess`, `check` (line 21:00:02, 21:03:54, 21:03:58). Agent invoked legitimate tools from skill listing but they failed to load. Also `SendMessage` tool was not yet known when agent tried to send cross-fork status (line 21:08:40).
@@ -349,46 +459,53 @@
 - Initial test file lookup assumed LoopHandler was in `src/orchestration/LoopHandler.test.ts`, but the actual file is in `src/processing/LoopHandler.test.ts`. Path discovery required search after first run failed. File organization or naming conventions documentation may be unclear.
 
 <!-- session 66138a84 2026-08-19 -->
-- Agents launched without knowledge of available skills: "check", "goldfish", "subprocess" are all listed but triggered "*** NOT YET KNOWN ***" warnings at 21:00:02, 21:03:54, 21:03:58 — skill registry/availability issue.
+
+- Agents launched without knowledge of available skills: "check", "goldfish", "subprocess" are all listed but triggered "**_ NOT YET KNOWN _**" warnings at 21:00:02, 21:03:54, 21:03:58 — skill registry/availability issue.
 - Extensive grep-based investigation for `releaseWorkspace`, `LoopHandler`, condition evaluation (20:47-20:52) without clear resolution path before delegating work — weak root-cause debugging discipline, wasted context on searches that didn't yield answers.
 - Inter-agent async messaging (21:08:46): agent a19e sends "parseYAML already implemented, adjust test only" to agent a19e987db154400d7 — indicates agents duplicated work on same feature (parseYAML transform), no shared awareness of parallel tasks before fork.
 - Multiple attempts to locate LoopHandler: first searched in `src/orchestration/LoopHandler*`, then used `find`, then finally located in `src/processing/LoopHandler.test.ts`. Wrong assumption about directory structure — agent expected orchestration module to contain LoopHandler but it's in processing module.
 
 <!-- session da343929 2026-08-19 -->
+
 - Multiple agents performed extensive grep searches with similar pattern variants (statusTransition, trigger, event, contract, validateInput) rather than targeted lookups — indicates weak upfront knowledge of what features are actually implemented vs. documented in the codebase.
 - parseYAML transform already implemented; agent fork sent mid-task update (`SendMessage` at 21:08:46) instead of discovering this upfront before implementing
 - Multiple sequential reads of LoopHandler.test.ts (lines 1-20, 20-30, 30+) suggest incremental line-by-line iteration rather than processing full context at once
 - Test file location assumption: agent searched for `LoopHandler.test.ts` in `src/orchestration/` but file is actually in `src/processing/` (line 42 shows correct path after retry). Test file organization doesn't match intuitive naming.
 
 <!-- session 55a79144 2026-08-19 -->
+
 - Assistant fundamentally misunderstood the policy engine architecture, proposing complex protocols (IPC, MCP client wrappers) when the correct design was simply: policy engine = HTTP endpoint registered as hook, calling flow-engine's HTTP API directly — same as MCP server internals. User had to correct this iteratively across 5+ exchanges.
 - Failed to read source specs from `origin/laptop-cli` branch (2026-07-30-flow-cli). Multiple `git show` / `git ls-tree` commands failed silently; assistant then created new spec files instead of extracting actual content, producing fundamentally wrong material.
 - Attempted to call unavailable skills "violations", "goldfish", "subprocess" without first using ToolSearch to fetch them from deferred tools list — marked as "NOT YET KNOWN" instead of being fetched on demand
 - Attempted to use tool "AskUserQuestion" without it being available/loaded
-- SendMessage tool called without first loading schema via ToolSearch — agent logged "*** NOT YET KNOWN ***" at 21:08:40. Should ToolSearch("select:SendMessage") before calling tool methods not in the initial function list.
+- SendMessage tool called without first loading schema via ToolSearch — agent logged "**_ NOT YET KNOWN _**" at 21:08:40. Should ToolSearch("select:SendMessage") before calling tool methods not in the initial function list.
 - Test file path was guessed wrong — attempted `src/orchestration/LoopHandler.test.ts` at 21:10:20, then had to search and correct to `src/processing/LoopHandler.test.ts` at 21:10:42. No shared documentation on test file locations.
 - sed was used for bulk TypeScript code replacement (lines 21:09:22, 21:09:34) — replaced { type: 'string' } patterns and added `name: 'Test Step'` to test fixtures via sed -i. This bypassed type checking and has no verification trail. Should have used Edit tool with explicit context for type safety.
 
 <!-- session de603161 2026-08-19 -->
+
 - Multiple codebase searches for "statusTransition" returned conflicting results (some tests reference it, worker doesn't use it) — suggests feature partially implemented or abandoned but still in specs, creating dead-end investigations
 - SendMessage tool was attempted for inter-agent communication during parallel fork work but marked "NOT YET KNOWN"; agents adapted by embedding work directly instead of coordinating results.
 - Initially attempted to run tests from `src/orchestration/LoopHandler.test.ts` but file is actually in `src/processing/LoopHandler.test.ts` — directory discovery via ls/find was needed when first path failed
 
 <!-- session 274a5f98 2026-08-19 -->
+
 - At 19:51:32, user invoked non-existent skill "spec"; had to use Agent Explore instead. Skill availability should be validated/documented more clearly.
 - At 20:29:23 and 20:47:34, ToolSearch and violations skill both returned "NOT YET KNOWN" — tool schema loading failed silently; need better error messaging when deferred tools aren't available.
 - Multiple tool unavailability constraints blocked agent work unnecessarily: AskUserQuestion (20:51:01), SendMessage (21:08:46), goldfish (21:03:54), subprocess (21:03:58) — these were invoked but marked "NOT YET KNOWN", forcing fallbacks instead of running proactively.
 - Assumed LoopHandler.test.ts was in src/orchestration/ when it's actually in src/processing/ — required find command to discover correct path
 
 <!-- session e9704d0a 2026-08-19 -->
+
 - Proposed OpenCode invocation design decisions without checking tool's actual flags, MCP config format, or environment variable options upfront. Required user correction to investigate properly.
 
 <!-- session 4a2fd14d 2026-08-17 -->
+
 - Wrote hook-logger.js in ESM (`import` syntax) without verifying `package.json` has `"type": "module"` — would have crashed at runtime. Should verify file compatibility before writing.
 - Provided echo hook example that "ne sert à rien" — redundant/unchosen. Need to think through examples before sending.
 - Task hook error logging was missing (`TaskIndex.ts:192, :246` — `onError` callback not wired up), while Flow hooks already had logging. Silent failures. User caught this with all-caps: "IL FAUT LOGGER".
 - dist-types for flow-engine became stale after TypeScript changes; required explicit rebuild (`npm run build`) before type checking would pass. Type checker consulted stale .d.ts instead of source.
-- Agent attempted to call deferred tools (mcp__test__echo, check, spec) without loading them first via ToolSearch — returned "NOT YET KNOWN" but agent proceeded anyway.
+- Agent attempted to call deferred tools (mcp**test**echo, check, spec) without loading them first via ToolSearch — returned "NOT YET KNOWN" but agent proceeded anyway.
 - Agent spawned with type "Agent unknown" at 20:08:24 instead of named agent type (backend-dev, Explore, etc).
 - Three fork agents (bd4052a0, c898dd1a, 4a2fd14d) working on overlapping plugin/MCP tasks in parallel created duplicate exploration and incomplete coordination; task a620cc73a53a979fd had to be stopped mid-fix.
 - ReportFindings tool called twice without pre-fetching schema; code-review agents should ToolSearch before attempting to use it.
@@ -784,58 +901,112 @@
 
 ## Documentation gaps
 
+<!-- session 2157a0f8 2026-08-20 -->
+
+- CLI command structure unclear — multiple rewrites to CliCommand.ts, TaskCliCommand.ts, ShowCommand.ts and edits to ShowCommand to replace `ModelFlowStep` references indicate the command factory/hierarchy pattern was not self-evident from existing code.
+- Test running patterns for flow-cli (vitest config, path filters, reporters) are embedded in scripts/test-config.js source; no CLAUDE.md guidance. Agents reverse-engineered test syntax from implementation instead of clear documentation.
+- npmrc and npm registry config scattered across 4+ projects (agent-fleet, violations-framework, wdrive, singleton-daemon-kit) — changes to registry URL or token names must be coordinated across all CLAUDE.md files and workflow files simultaneously to avoid inconsistency.
+- Validation entry points (validateString, validateLaunchOptions) are not discoverable from code reading alone — grep searches suggest these are implicit patterns the codebase expects developers to know about or find via search.
+
+<!-- session 6d59c129 2026-08-20 -->
+
+- Cross-repo dependency introduced abruptly at end (singleton-daemon-kit version bump, compute-version.sh copy logic) with no prior context in transcript — missing requirements doc or integration spec
+- Pre-existing TypeScript errors in ContractValidator.test.ts weren't caught until late validation phase — suggests either composite tsconfig.json reference exclusions need review or test files need stricter pre-commit validation (e.g. `tsc --noEmit` on .test.ts files before merge)
+- @wadeck npm registry setup (project .npmrc vs global ~/.npmrc precedence, different auth tokens, registry URL) required multiple corrections across 4 projects. CLAUDE.md mentions it but the complexity of local vs. global config isn't clearly documented — caused extra rounds of verification and updates.
+- Plugin system architecture (PluginRegistry, PluginLoader, executor field in StepRunner) isn't centrally documented. Agent had to grep multiple files to understand CLI self-check #5. Self-check.md was updated but the plugin design pattern should be upfront.
+
+<!-- session 0455fbe4 2026-08-20 -->
+
+- run-test skill syntax unclear — multiple agents tried different vitest flag combinations (--reporter=verbose/dot, --bail, --testPathPattern patterns) before one spawned general-purpose agent to read .claude/skills/run-test/examples.md at 19:34:09.
+- ESM mocking patterns for Node tests not documented — CliCommand.test.ts and TaskCliCommand.test.ts required iteration on process.exit/child_process mocks; agents searched for similar patterns in other test files rather than finding a documented fixture/helper.
+- npm registry configuration scattered across 4 projects (agent-fleet, violations-framework, wdrive, singleton-daemon-kit) with inconsistent .npmrc setup; CLAUDE.md files updated after the fact rather than having clear single source of truth
+
+<!-- session 95141215 2026-08-20 -->
+
+- Skill availability not discoverable upfront — agents had to attempt use to discover whether `/check` and `/run-test` existed, burning attempts on repeated same-skill blocks.
+- CLAUDE.md instruction "After each task: Use the skill 'check'" assumes skill is always available, but session logs show it wasn't known to agents — either skill wasn't loaded or instruction needs conditional guidance.
+- npm @wadeck registry setup required manual CLAUDE.md updates across 4 different projects (agent-fleet, violations-framework, wdrive, singleton-daemon-kit) — no single source of truth; add cross-project setup validation or centralized docs
+- Process.exit mock type signature required trial-and-error to discover (string | number | null) — not documented; add to lessons-learned or TypeScript strictness notes
+
+<!-- session 9ae6da57 2026-08-20 -->
+
+- npm registry setup (@wadeck packages, .npmrc config) is scattered across CLAUDE.md files in multiple projects (agent-fleet, violations-framework, wdrive, singleton-daemon-kit) — should be centralized or linked
+- Relationship between @wadeck SDK registry URL, npm auth tokens, and CI/CD workflow setup is not documented in one place — agent had to investigate across ~/.npmrc, workflows, and multiple CLAUDE.md files to understand the pattern
+
+<!-- session 6211d754 2026-08-20 -->
+
+- No clear documented way for agents to run TypeScript type-checking. Agents attempted grep-based error filtering (`grep "error TS"`) rather than a proper `tsc --noEmit` or build validation step, suggesting the project's check/validation workflow isn't obvious to subagents.
+- OpenCode integration tests require environment variable setup (`OPENCODE_MOCK_PATH`, `OPENCODE_INTEGRATION=1`) but this setup pattern is not documented in visible examples or test setup files.
+- No clear guidance on configuring @wadeck registry URL in .npmrc and verifying package visibility — required manual checks with `npm view` and registry validation.
+
+<!-- session a11724af 2026-08-20 -->
+
+- npm registry configuration for @wadeck packages required manual investigation across .npmrc files and publishConfig in multiple repos (agent-fleet, violations-framework, singleton-daemon-kit). No central docs on registry setup or SDK publishing workflow.
+
 <!-- session 6c0c8a03 2026-08-19 -->
+
 - SendMessage tool invocation [21:08:46] to coordinate between agent forks (`to=a19e987db154400d7`) marked "NOT YET KNOWN", suggesting inter-agent communication mechanism is incomplete or undocumented for this pattern.
 
 <!-- session 98c0936a 2026-08-19 -->
+
 - Feature implementation status unclear — extensive grep searches needed to determine what's actually implemented: statusTransitions, event triggers (event_type), allowRecursion, validateInput/validateOutput, contract validation, preProcess/postProcess, writeOutput cleanup, sub-steps. This signals that feature matrix (planned vs implemented vs stub) is not documented.
 - writeOutput behavior and workspace cleanup expectations not self-evident — agent had to investigate OutputExtractor.ts logic to understand if workspaces/outputs are auto-cleaned or persist.
 - Contract validation UX for missing required inputs — CommandHandler flow doesn't clearly show what error the user sees when required inputs aren't provided; test flow had to be created to discover behavior.
 - No clear inventory of which OutputExtractor transforms are implemented vs. stub — agent had to search/grep to learn parseYAML existed, causing wasted exploration.
 
 <!-- session 1c8332e4 2026-08-19 -->
+
 - OpenCode configuration format not documented locally — agent WebFetched opencode.ai docs at 20:29 to find JSON structure for MCP servers. Config should be documented in project or specs.
 - Flow-engine feature support unclear: investigation required to determine which features (statusTransitions, event triggers, contract validation, writeOutput, etc.) are actually wired and working vs. present in types.
 - Deferred tools and skills require ToolSearch fetch or Skill tool use, but agent context didn't make this obvious — no upfront guidance that certain tools need schema-fetch before calling directly.
 - No template or generator for the 10 new CLI distribution packages (platform-specific binaries); backend-dev had to manually create each package.json and bin wrapper
 
 <!-- session 3f2a20af 2026-08-19 -->
+
 - Extensive parallel grep searches for statusTransition, event triggers, allowRecursion, contract validation, writeOutput — suggests unclear implementation status or scattered/undocumented features. Multiple agents repeated identical searches independently, burning tokens.
 - No clear test flow examples or patterns in codebase — agents had to create `task-*.yml` test flows from scratch (skip-on-loop, output-jsonpath, output-regex, write-output, contract-inputs)
 - Heavy repeated grep patterns for OutputExtractor, JSONPath bracket notation, parseYAML, ContractValidator — suggests implementation details (input discovery, transform handling, contract validation) lack discoverable documentation; developers search multiple times for overlapping concepts across files.
 
 <!-- session afdd4652 2026-08-19 -->
+
 - Spec refinement workflow unclear: goldfish coherence review (line 21:04:12) → security pentest subprocess (line 21:04:24) → fixes applied (line 21:10:06-17) → re-launch goldfish (line 21:10:06). No checklist or completion criteria documented for when spec is done.
 
 <!-- session 66138a84 2026-08-19 -->
+
 - The "spec" skill invoke at 19:51:32 was followed immediately by an Explore agent fork investigating the same question. Unclear whether spec skill was attempted because it wasn't documented as available, or user/agent misconception about its applicability here.
 - Spec work contains French text in questions (21:01:01: "Quels événements déclenchent le policy engine...") despite CLAUDE.md requiring English docs — unclear spec language guidelines or inconsistent enforcement across multi-agent work.
 
 <!-- session da343929 2026-08-19 -->
+
 - Initial user request "Read each of these files in full before answering" was truncated mid-transcript; assistant proceeded anyway with partial context, suggesting requirements weren't fully captured.
 - "Relaunch goldfish/security audit" pattern (three separate runs) indicates unclear initial spec state or multi-pass refinement cycle not front-loaded
 
 <!-- session 55a79144 2026-08-19 -->
+
 - MCP server abstraction relationship to underlying HTTP API not well documented — user had to explain that the MCP server is merely a JSON-RPC wrapper around flow-engine's HTTP API, with no additional protocol layer.
 - Policy engine architectural pattern (HTTP endpoint + hooks) not accessible/documented; required user to explain from first principles in frustration ("PUTAIN NON").
 
 <!-- session de603161 2026-08-19 -->
+
 - OpenCode CLI config path resolution required extensive bash/strings inspection of binary and environment variable exploration — configuration discovery pattern not clearly documented; external WebFetch to opencode.ai/docs needed as fallback
 - Contract validation features (validateInputs, preProcess, postProcess, validateContract) scattered across validation/, executor/, processing/ directories — multiple grep searches across different paths suggests inconsistent naming and unclear feature boundaries
 - Skills `goldfish` and `subprocess` appeared as "NOT YET KNOWN" despite being in available skills list; agents adapted by spawning fork agents instead — unclear if timing/lazy-load issue or availability gating.
 
 <!-- session 274a5f98 2026-08-19 -->
+
 - Feature completeness (statusTransitions, contract validation, event triggers, writeOutput cleanup) required extensive codebase grepping across multiple packages and agents. Spec files should state upfront what's implemented vs pending, not requiring agents to discover this via code search.
 - OpenCode MCP/config format required WebFetch to external docs (opencode.ai/docs/config, opencode.ai/docs/mcp-servers) — should have local reference or link in spec.
 - Heavy exploration of ContractValidator, LoopHandler, parseYAML patterns with repeated greps and reads suggests unclear patterns for: test fixtures (inputs/outputs for NormalizedInputDefinition), transform function implementations (parseYAML location/signature), error-handling convention in CLI execution layer (markStepFailed, error message flow through RunCommand → ExecutionStore).
 
 <!-- session e9704d0a 2026-08-19 -->
+
 - `OPENCODE_CONFIG` env var for per-invocation MCP config was missed in initial binary inspection — required guided search (strings extraction + binary scanning) to discover; not surfaced in `--help`.
 
 <!-- session 4a2fd14d 2026-08-17 -->
+
 - No HOOKS.md existed in codebase — had to create from scratch. Hook event types, payload field names, and config formats had no existing reference docs.
 - CLI distribution spec lacks concrete details for UpdateManager, self-check suite, and CI pipeline — audits flagged these as named in architecture but unspecified. Same pattern: multiple audit reports finding the same architectural gaps suggests spec needs upfront design validation before implementation.
-- MCP config file format/discovery not documented; agents repeatedly grepped for "mcp-config*", "mcpServers", "url" patterns across codebase.
+- MCP config file format/discovery not documented; agents repeatedly grepped for "mcp-config\*", "mcpServers", "url" patterns across codebase.
 - PluginLoader resolution strategy unclear to spec; agents had to write tests (TDD) to validate whether spec decisions (require.resolve vs import.meta.url, pluginsDir override) matched implementation.
 - Plugin documentation (pluginsDir) scattered across multiple READMEs instead of centralized; agents needed grep across plugin-none, plugin-worktree, plugin-cli-approval separately.
 - Workspace configuration (retainDays, maxWorkspaces, basePath) required multi-file discovery (FlowConfig.ts, Daemon.ts, package.json, tsconfig.json) — config structure underdocumented.
@@ -1170,57 +1341,113 @@
 
 ## Known constraints
 
+<!-- session 2157a0f8 2026-08-20 -->
+
+- Project spawned fork agent mid-session (22:01:07) for orthogonal policy-rules work while main backend-dev agents continued — parallel work on unrelated features consumed context without clear dependency tracking.
+- ESM module mocking in Node.js tests: process.exit mocks must accept `string | number | null` (not just `number`) because exit codes can be null on SIGTERM or string on named signals — discovered when writing CliCommand.test.ts, fixed via sed on mock signatures.
+- Composite TypeScript projects (flow-cli → flow-engine references) risk masking type errors if test files aren't excluded from tsconfig build. `npm test` passes but `npm run build` fails until exclusions are fixed — caught after multiple audit runs.
+- StepRunner/executor configuration validation (Check 4/5) in CliCommand.ts is tightly coupled to self-check.md — changes to executor detection logic require updating self-check.md in parallel.
+- Security fix involving null byte injection validation required multiple refinement cycles (test edits → agent review → source edits → format/check); pattern suggests fixes to security validation require careful verification beyond syntax/type checks.
+
+<!-- session 6d59c129 2026-08-20 -->
+
+- "check", "run-test", and "run" skills repeatedly reported as "NOT YET KNOWN" across ~2 minute span — suggests agent attempted to call unavailable skills multiple times without first using ToolSearch to load them
+- Audit-then-fix workflow pattern: fork agents spawn independently for quality/security/consistency audits, then backend-dev agent synthesizes and fixes findings — requires explicit coordination and clear output contracts from audit agents so fixes know what to target
+- CLI distribution self-checks (Check 4: StepRunner, Check 5: PluginLoader) are embedded in CliCommand.ts/TaskCliCommand.ts as comments, not in a discoverable spec. Made it hard for agent to locate and verify checks without grepping.
+- Iterative validation pattern observed: test edits → format/check → fork agent does targeted grep for specific code patterns. This workflow suggests complex validation requirements for this codebase that may benefit from a single comprehensive checklist upfront rather than iterative discovery.
+
+<!-- session 0455fbe4 2026-08-20 -->
+
+- Composite TypeScript references (flow-cli/flow-engine tsconfig setup) requires manual verification — at 19:30:42 and 19:30:51 agent had to check tsconfig.json to exclude test files before builds would pass.
+- PluginLoader/StepRunner integration changes required updates to `.claude/specs/.../self-check.md` (Check 4 & 5) — docs were out of sync with implementation changes, caught during CLI self-check verification (20:30–32)
+
+<!-- session 95141215 2026-08-20 -->
+
+- ModelType and StepRunnerConfig changes required coordinated edits across 8+ interdependent files (types.ts, ModelStepExecutor, StepRunner, Worker, McpServer, WorkerAdapter, FlowCapabilitiesGenerator, SchemaValidator, ValidationRules). Build verification cycles had to filter noise (ContractValidator, test files) to identify real errors.
+- Pre-existing TypeScript errors in `ContractValidator.test.ts` required tsconfig.json exclusion (`exclude: ["**/*.test.ts"]`) rather than fixing the test — composite package test exclusion pattern is now load-bearing for CI.
+- OpenCode subprocess spawn() stdio configuration is security-sensitive (pipe vs inherit) — reviewed in pentest but no final guidance captured on correct pattern
+
+<!-- session 9ae6da57 2026-08-20 -->
+
+- File paths in stdin can have typos unprompted ("ClaudeModelProvider.t" missing .ts)—agent should validate file references exist before proceeding with requests.
+- Cross-repo coordination: agent-fleet tasks triggered updates to singleton-daemon-kit (npm version bumps, CLAUDE.md creation); changes should be isolated or communication explicit when packages are interdependent.
+- OpenCode integration required multiple experimental reads of OpenCodeModelProvider.ts at different line ranges (lines 60-140, 240-290, 313+) suggesting exploratory debugging; actual integration path not immediately obvious from code.
+
+<!-- session 6211d754 2026-08-20 -->
+
+- Multiple agents modifying the same files (Worker.ts, McpServer.ts, WorkerAdapter.ts) within seconds (22:12:08–22:14:54) — parallel agent use on overlapping code paths is inefficient; one coordinating agent would be faster.
+- Test files for CliCommand/TaskCliCommand had type mismatch in process.exit mock (`_code?: number` vs `_code?: string | number | null`). Fixed via sed command (19:34:47) rather than refactored in test files — suggests generated test files may need post-processing validation or there's a pattern mismatch in mocking setup.
+- npm registry configuration (@wadeck:registry URL) requires coordination across multiple projects; agent was delegated to verify consistency.
+
+<!-- session a11724af 2026-08-20 -->
+
+- Skill availability is opaque to agents — no graceful degradation when skills don't exist. Agents don't check availability before invoking; they discover failure via warning logs and retry identical calls.
+- Integration tests require specific environment variable setup: OPENCODE_MOCK_PATH (path to mock script), OPENCODE_INTEGRATION=1 flag, and LAUNCHER_BUNDLE_OVERRIDE for bundle path. These appear repeatedly in test commands and suggest a pattern the team uses.
+- process.exit mock must accept `string | number | null`, not just `number` — affects all CLI test suites. @wadeck npm registry URL configuration needs to be consistent across projects.
+
 <!-- session 6c0c8a03 2026-08-19 -->
+
 - yaml/js-yaml dependency lookup via grep [21:07:43] returned no results; implementation of parseYAML required a workaround instead of using standard library.
 - Parallel agents re-reading spec files independently rather than sharing context (multiple sessions read all 6 OpenCode spec files in full). Good discipline but signals high cognitive load on validation phase—consider whether multiple review passes could be consolidated.
 
 <!-- session 98c0936a 2026-08-19 -->
+
 - Worker.ts daemon does NOT handle statusTransitions — confirmed via code inspection that the flow-cli daemon doesn't wire up statusTransitions at all, despite the type existing.
 - Multiple agents editing `.claude/specs/2026-08-19_21-51_opencode-step-provider/_index.md` concurrently (e9704d0a: 20 edits between 20:49–21:08); no conflicts logged but high coordination overhead.
 - Multiple git show commands accessing origin/laptop-cli branch (Worker.ts, StepExecutor.ts) — undocumented external branch dependency that could break silently if branch is deleted.
 - package.json workspace edits (excluding platform packages, adding new package dirs) trigger full npm reinstall multiple times — workspace config changes have broad side effects requiring verification.
 
 <!-- session 1c8332e4 2026-08-19 -->
+
 - `/spec` and `/violations` skills referenced but not available in this session's skill list — attempted invocation failed gracefully but delayed work.
 - Multiple parallel agents (acc25325, e9704d0a, 4a2fd14d) working simultaneously on specs and code fixes — high concurrency and good context efficiency, but coordination risk if agents edit overlapping files (e.g., multiple edits to opencode-step-provider spec files).
 - Session references `origin/laptop-cli` branch via git show — new CLI packages may depend on code not yet in integration/main branch, blocking eventual npm publish
 
 <!-- session 3f2a20af 2026-08-19 -->
+
 - Multiple concurrent sessions (4+ session IDs active simultaneously) indicate heavy parallel workload; all agents running background tasks without blocking user
 - Spec quality gates require multi-pass audits: security pentest + goldfish coherence review run in parallel forks, each triggering file edits, then both audit types re-run (v2→v3→v4→v5 cycles). Expected pattern but worth documenting as "spec audit loops should batch all findings into single pass if possible"
 
 <!-- session afdd4652 2026-08-19 -->
+
 - Deferred tools require explicit schema loading. ToolSearch itself was initially unknown (20:29:23) before WebFetch calls succeeded (20:29:36/46), suggesting a two-step loading pattern for deferred tools.
 - Heavy reliance on parallel fork agents for independent tasks (spec refinement, security audits, test implementation, bundling). Three concurrent spec documents being edited iteratively (opencode-step-provider, policy-engine, cli-distribution) with goldfish/security reviews → fixes → re-review cycle.
 - Multiple fork agents spawned for spec review (pentest + goldfish audit + fixes applied iteratively). Pattern suggests v2, v3, v4 iterations of same review types within tight timespan (21:13:12–21:18:59), indicating either normal convergence cycle or potential instability in spec validation logic.
 
 <!-- session 66138a84 2026-08-19 -->
-- Multiple tool/skill invocations were attempted without pre-loading their schemas: WebFetch (20:29:23), spec skill (19:51:32), violations skill (20:47:34) all triggered *** NOT YET KNOWN *** warnings. Pre-fetch deferred tools via ToolSearch before calling them, or accept the round-trip.
+
+- Multiple tool/skill invocations were attempted without pre-loading their schemas: WebFetch (20:29:23), spec skill (19:51:32), violations skill (20:47:34) all triggered **_ NOT YET KNOWN _** warnings. Pre-fetch deferred tools via ToolSearch before calling them, or accept the round-trip.
 - Complex cross-repo coordination across agent-fleet, singleton-daemon-kit, violations-framework, laptop-cli branch — multiple agents reading/writing to different projects without clear isolation or sequencing (21:04:55 onwards: multiple sessions reading spec files + origin/laptop-cli branch simultaneously).
 - LoopHandler test file is in `packages/flow-engine/src/processing/LoopHandler.test.ts`, not in an `orchestration/` directory. May indicate unclear naming or documentation about which module owns loop handling.
 
 <!-- session da343929 2026-08-19 -->
+
 - WebFetch was used to fetch external opencode.ai docs to understand MCP config format, implying the project's codebase or local docs don't have clear examples of the configuration structure needed for integration.
 - Skill calls with scoped arguments fail silently (e.g., `skill=check | args=packages/flow-cli` returns "NOT YET KNOWN"); skills may not accept positional args via log interface
 - Multi-stage spec review workflow: pentest fixes → goldfish coherence check → final security audit (lines 21, 24, 32). Each stage re-reads all spec files independently. This is a deliberate review process, not a bug — preserve if user prefers thorough sequential audits over single pass.
 
 <!-- session 55a79144 2026-08-19 -->
-- Spec editing workflow involves repeated single-occurrence replacements across multiple spec files (10+ sequential edits on _index.md, step-model-integration.md, etc.) — consider batching these into fewer, larger writes to reduce edit overhead
+
+- Spec editing workflow involves repeated single-occurrence replacements across multiple spec files (10+ sequential edits on \_index.md, step-model-integration.md, etc.) — consider batching these into fewer, larger writes to reduce edit overhead
 - CLI bundle delivery requires `npm run bundle:all` to combine multiple esbuild outputs (flow.cjs, task.cjs, flow-updater.cjs) — rebuild pattern is: tsc build → bundle:all → verify with node dist-bundle/flow.cjs --version
 
 <!-- session de603161 2026-08-19 -->
+
 - Test flow YAML files created manually and validated only at runtime with `flow run --wait` — no schema validation or IDE tooling catches errors before execution; leads to edit-and-retry cycle
 - Bulk sed updates to test fixtures (adding `source: 'auto-discovered'` and `name:` fields) broke TypeScript types in ContractValidator.test.ts, requiring multiple tsc re-runs and iterations to validate.
 - The `flow-engine` package organizes test files by responsibility/layer (`src/processing/` for loop/output handling) not by concept (`src/orchestration/`). Future sessions should verify actual test locations rather than inferring from class names.
 
 <!-- session 274a5f98 2026-08-19 -->
+
 - Multiple features appear incomplete or scattered: statusTransitions not wired in daemon worker, contract validation fields exist but preProcess/postProcess not called in execution path, event triggers checked but not fully integrated. Should be listed as "pending" or "not yet wired" in architecture docs to avoid misleading audits.
 - Bundle scripts added to flow-cli package.json (bundle, bundle:task, bundle:updater) but test of `npm run bundle:all` at 21:06:51 showed build failures — backend-dev agent created bundles but type errors in ContractValidator.test.ts weren't caught pre-build, delaying validation.
 
 <!-- session e9704d0a 2026-08-19 -->
+
 - User prefers phased delivery: start with simpler scope (Option B), plan enhancement for v2 (Option C) rather than full-scope implementation upfront.
 
 <!-- session 4a2fd14d 2026-08-17 -->
+
 - `execFile` captures stdout/stderr by default (not `stdio: 'inherit'`), making hook output invisible in terminal. User explicitly asked for `debug: true` flag to fix visibility. This is a real API limitation that affects testing experience.
 - Plugin resolution must complete before workspace manager access — wiring order matters. Discovered during Phase 9 implementation when CommandHandler needed to resolve plugins before Daemon uses WorkspaceManager.
 - Hook system has implicit onError callback requirement at all dispatch() call sites — audit found some callers in CommandHandler/Daemon missing error propagation, creating silent failure paths.

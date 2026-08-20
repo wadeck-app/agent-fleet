@@ -94,7 +94,7 @@ describe('ClaudeLauncher', () => {
 			expect(result.response).toBe('');
 			expect(child_process.spawn).toHaveBeenCalledWith(
 				'/usr/bin/claude',
-				['--dangerously-skip-permissions', '--model', 'sonnet', 'Hello Claude'],
+				['--model', 'sonnet', 'Hello Claude'],
 				expect.objectContaining({
 					cwd: '/test',
 					stdio: 'inherit',

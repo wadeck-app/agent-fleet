@@ -17,3 +17,5 @@ export { FlowScheduler } from './orchestration/FlowScheduler';
 export type { ReadyItem, SchedulerContext, SchedulerStep, StepOutcome } from './orchestration/FlowScheduler';
 export { TemplateRenderer } from './processing/TemplateRenderer';
 export type { FlowDefinition, FlowPluginOverrides, FlowStep } from './types';
+export type { McpServer } from './processing/ModelProvider';
+export type { ModelProviderName } from './types';

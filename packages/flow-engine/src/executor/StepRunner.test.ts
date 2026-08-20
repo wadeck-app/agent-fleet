@@ -3,7 +3,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ClaudeLauncher } from '../processing/ClaudeLauncher';
+import { ClaudeModelProvider } from '../processing/ClaudeModelProvider';
 import { OutputExtractor } from '../processing/OutputExtractor';
 import { TemplateRenderer } from '../processing/TemplateRenderer';
 import type { FlowRegistry } from '../registry/FlowRegistry';
@@ -15,7 +15,8 @@ import { StepRunner } from './StepRunner';
 vi.mock('../processing/TemplateRenderer');
 vi.mock('./ScriptExecutor');
 vi.mock('../processing/OutputExtractor');
-vi.mock('../processing/ClaudeLauncher');
+vi.mock('../processing/ClaudeModelProvider');
+vi.mock('../processing/OpenCodeModelProvider');
 
 describe('StepRunner', () => {
 	let runner: StepRunner;
@@ -162,7 +163,7 @@ describe('StepRunner', () => {
 			};
 
 			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('Write a function');
-			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockResolvedValue({
+			vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockResolvedValue({
 				stdout: 'function test() {}',
 				stderr: '',
 				exitCode: 0,
@@ -196,7 +197,7 @@ describe('StepRunner', () => {
 			};
 
 			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('Test');
-			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockResolvedValue({
+			vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockResolvedValue({
 				stdout: '',
 				stderr: 'Claude error',
 				exitCode: 1,
@@ -1140,7 +1141,7 @@ describe('StepRunner', () => {
 			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('hello');
 
 			// Background mode mock — stream-json provides session_id and cost via onStreamEvent
-			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async opts => {
+			vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockImplementation(async opts => {
 				// Simulate stream events: system:init with session_id and result with cost
 				if (opts.onStreamEvent) {
 					opts.onStreamEvent({
@@ -1184,7 +1185,7 @@ describe('StepRunner', () => {
 			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {} };
 			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('hello');
 
-			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async opts => {
+			vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockImplementation(async opts => {
 				if (opts.onStreamEvent) {
 					opts.onStreamEvent({
 						type: 'system',
@@ -1251,7 +1252,7 @@ describe('StepRunner', () => {
 			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('Continue.');
 
 			let capturedResumeId: string | undefined;
-			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async opts => {
+			vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockImplementation(async opts => {
 				capturedResumeId = (opts as any).resumeSessionId;
 				if (opts.onStreamEvent) {
 					opts.onStreamEvent({
@@ -1305,7 +1306,7 @@ describe('StepRunner', () => {
 			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('Continue.');
 
 			let capturedResumeId: string | undefined;
-			vi.mocked(ClaudeLauncher.prototype.launchBackground).mockImplementation(async opts => {
+			vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockImplementation(async opts => {
 				capturedResumeId = (opts as any).resumeSessionId;
 				if (opts.onStreamEvent) {
 					opts.onStreamEvent({

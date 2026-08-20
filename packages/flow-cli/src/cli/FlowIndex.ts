@@ -3,6 +3,8 @@ import { Command } from 'commander';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'node:url';
 
+import { getConfigDir, readAndClearUpdateState, scheduleBackgroundUpdate } from '../updater/UpdateManager.js';
+import { buildCliCommand } from './commands/CliCommand.js';
 import { registerDocsCommand } from './commands/DocsCommand';
 import { registerHistoryCommand } from './commands/HistoryCommand';
 import { registerRunCommand } from './commands/RunCommand';
@@ -13,6 +15,20 @@ import { registerValidateCommand } from './commands/ValidateCommand';
 declare const __FLOW_CLI_VERSION__: string;
 
 async function main(): Promise<void> {
+	// Show update notice from a previous background update run
+	const updateState = readAndClearUpdateState(getConfigDir());
+	if (updateState?.status === 'success') {
+		process.stderr.write(`[flow] Updated to v${updateState.newVersion}\n`);
+	}
+	if (updateState?.status === 'rolled-back') {
+		process.stderr.write(
+			`[flow] Update to v${updateState.targetVersion} failed (self-check failed). Rolled back to v${updateState.previousVersion}. Run: flow cli update --log\n`
+		);
+	}
+	if (updateState?.status === 'update-failed') {
+		process.stderr.write(`[flow] Update check failed (${updateState.reason}). Run: flow cli update\n`);
+	}
+
 	let version: string;
 	try {
 		version = __FLOW_CLI_VERSION__;
@@ -30,8 +46,13 @@ async function main(): Promise<void> {
 	registerValidateCommand(program);
 	registerRunCommand(program);
 	registerHistoryCommand(program);
+	program.addCommand(buildCliCommand());
 
 	await program.parseAsync(process.argv);
+
+	// Schedule background updater after command completes
+	const bundlePath = process.env['LAUNCHER_BUNDLE_OVERRIDE'] ?? fileURLToPath(import.meta.url);
+	scheduleBackgroundUpdate(bundlePath, '@wadeck/flow-cli', 'flow-updater.cjs');
 }
 
 const isEntryPoint =

@@ -4,6 +4,7 @@ import type { StepRunnerConfig } from 'flow-engine';
 import { WebSocket } from 'ws';
 
 import type { DaemonToWorker, WorkerToDaemon } from '../ipc/Protocol';
+import type { McpServerConfig } from './McpServer';
 import { WorkerAdapter } from './WorkerAdapter';
 
 const wsPort = process.env['FLOW_WS_PORT'];
@@ -22,9 +23,10 @@ function send(message: WorkerToDaemon): void {
 
 const baseConfig: StepRunnerConfig = { interactive: false };
 
-const adapter = new WorkerAdapter((mcpConfigPath: string) => {
-	// Pass mcpConfigPath directly — StepRunner passes it as --mcp-config to Claude CLI
-	const config: StepRunnerConfig = mcpConfigPath ? { ...baseConfig, mcpConfigPath } : baseConfig;
+const adapter = new WorkerAdapter((mcpServers: McpServerConfig[]) => {
+	// Pass mcpServers — StepRunner injects them into the model provider on each step
+	// McpServerConfig is structurally identical to flow-engine's McpServer -- cast is safe.
+	const config = (mcpServers.length > 0 ? { ...baseConfig, mcpServers } : baseConfig) as StepRunnerConfig;
 	return new StepRunner(config);
 });
 

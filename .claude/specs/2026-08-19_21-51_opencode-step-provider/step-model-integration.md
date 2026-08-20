@@ -10,9 +10,9 @@ This module covers how the `provider` field on `ModelFlowStep` is declared, vali
 
 ## Decisions
 
-| # | Decision | Rationale | Date |
-|---|---|---|---|
-| 4 | `provider` field on `ModelFlowStep` (step-level); omitted = `"claude"` | Explicit; supports mixed-provider flows; no ambiguity | 2026-08-19 |
+| #   | Decision                                                               | Rationale                                             | Date       |
+| --- | ---------------------------------------------------------------------- | ----------------------------------------------------- | ---------- |
+| 4   | `provider` field on `ModelFlowStep` (step-level); omitted = `"claude"` | Explicit; supports mixed-provider flows; no ambiguity | 2026-08-19 |
 
 ## Design
 
@@ -20,29 +20,29 @@ This module covers how the `provider` field on `ModelFlowStep` is declared, vali
 
 ```yaml
 steps:
-  - id: analyze
-    type: model
-    provider: opencode
-    model: amazon-bedrock/anthropic.claude-sonnet-4-6
-    prompt: "..."
-  - id: summarize
-    type: model
-    # provider omitted -> defaults to "claude"
-    prompt: "..."
+    - id: analyze
+      type: model
+      provider: opencode
+      model: amazon-bedrock/anthropic.claude-sonnet-4-6
+      prompt: '...'
+    - id: summarize
+      type: model
+      # provider omitted -> defaults to "claude"
+      prompt: '...'
 ```
 
 ### Type change
 
 ```ts
 // packages/flow-engine/src/types.ts
-type ModelProviderName = "claude" | "opencode";  // distinct from interface ModelProvider
+type ModelProviderName = 'claude' | 'opencode'; // distinct from interface ModelProvider
 
 interface ModelFlowStep extends BaseFlowStep {
-  type: "model";
-  provider?: ModelProviderName;  // default: "claude"
-  model?: string;
-  prompt: string;
-  // ...
+	type: 'model';
+	provider?: ModelProviderName; // default: "claude"
+	model?: string;
+	prompt: string;
+	// ...
 }
 ```
 
@@ -62,7 +62,7 @@ On `KILL_CLAUDE`, `StepRunner` MUST call `kill()` on ALL provider instances curr
 
 ## Open questions
 
-*(none currently open for this module)*
+_(none currently open for this module)_
 
 ## How to add a provider (v1)
 
