@@ -75,7 +75,8 @@ jobs:
                       200|400) echo "WRITE token: write_package_registry ✓ (probe HTTP ${HTTP_WRITE})" ;;
                       403) echo "::error::GITLAB_NPM_WRITE_TOKEN lacks write_package_registry scope (HTTP 403) -- update the deploy token in GitLab" ; exit 1 ;;
                       404) echo "::error::GITLAB_NPM_WRITE_TOKEN has no visibility to project 84445653 (HTTP 404)" ; exit 1 ;;
-                      *)   echo "::warning::WRITE token probe returned HTTP ${HTTP_WRITE} -- proceeding anyway" ;;
+                      401) echo "::error::GITLAB_NPM_WRITE_TOKEN cannot authenticate to npm registry (HTTP 401) -- token may be invalid, expired, or lack npm registry access" ; exit 1 ;;
+                      *)   echo "::error::GITLAB_NPM_WRITE_TOKEN unexpected HTTP ${HTTP_WRITE}" ; exit 1 ;;
                     esac
                   fi
               env:
