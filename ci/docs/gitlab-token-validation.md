@@ -81,13 +81,32 @@ No bootstrap, no cleanup, no artifacts.
 
 ## Current probe strategy (CI workflows)
 
-Since no non-destructive probe exists for `write_package_registry`:
+1. **READ token**: `GET /packages/npm/@wadeck/singleton-daemon-kit` → 200 OK (no artifact)
+2. **WRITE token**: `POST /packages/pypi` (empty body) → 400 OK (non-destructive, nothing created)
+3. **npmrc**: both READ and WRITE tokens written to the same `.npmrc` local file; WRITE token appended last so it wins on duplicate key
 
-1. **READ token**: validated by `GET /packages/npm/@wadeck/singleton-daemon-kit` → 200 OK
-2. **WRITE token**: probe via `PUT /packages/generic/ci-write-probe/0.0.1/probe.txt` → 201 OK
-   - File is created (harmless, ~5 bytes)
-   - File CANNOT be deleted by the deploy token (requires `api` scope)
-   - Cleanup: manual deletion from GitLab UI when needed
+---
+
+## npmrc configuration pitfalls
+
+### READ + WRITE tokens in different .npmrc files can cause silent failures
+
+**Problem observed:** When the READ token is written to `~/.npmrc` and the WRITE token is written to the local `.npmrc` (repo root), npm may use the READ token for publishing despite the local file having higher priority. Mixing file locations introduces race conditions and npm version-dependent behavior.
+
+**Root cause (confirmed by official npm docs):** npm's per-project `.npmrc` is *"a sibling of `node_modules` and `package.json`"* -- no upward directory traversal. When running `(cd packages/subpkg && npm publish)`, npm looks for `.npmrc` in `packages/subpkg/` (alongside its `package.json`), NOT in the repo root. The repo root `.npmrc` is silently ignored. Only `~/.npmrc` is reliably read regardless of working directory.
+
+**Solution:** Write ALL tokens to the SAME `.npmrc` file (repo root local). Since npm uses the LAST occurrence for duplicate keys in the same file, append READ token first, then WRITE token:
+
+```bash
+# Install step: READ token
+echo "${REGISTRY}:_authToken=${READ_TOKEN}" >> .npmrc
+
+# Publish step (appended after): WRITE token wins
+echo "${REGISTRY}:_authToken=${WRITE_TOKEN}" >> .npmrc
+```
+
+**Pattern that works (violations-framework):** Both steps append to the same file. WRITE token is last → wins.
+**Pattern that fails:** READ in `~/.npmrc` + WRITE in `.npmrc` local → unpredictable which token npm uses for publish.
 
 ---
 

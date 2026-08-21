@@ -298,6 +298,15 @@
 
 - Implementation-prompt required goldfish validation cycle (iter1 → edits → iter2) suggesting specs benefit from validation pass before handoff to implementers
 
+<!-- session 4a2fd14d 2026-08-21 -- debug-ci: GitLab npm registry -->
+
+- **Non-destructive write_package_registry probe:** `POST /api/v4/projects/:id/packages/pypi` (empty body) → 401 unauth / 403 no scope / **400 scope OK** (nothing created). This is the only non-destructive write probe for deploy tokens without `api` scope.
+- **npmrc: always use same file for READ and WRITE tokens.** Splitting READ into `~/.npmrc` and WRITE into `.npmrc` local caused 403 on npm publish even though the WRITE token was valid. Fix: both tokens appended to `.npmrc` local, WRITE token last (last occurrence wins for duplicate keys in same file). Verified against violations-framework pattern.
+- **GitLab deploy token introspection fails without api scope.** `personal_access_tokens/self` → 401, `deploy_tokens/self` → 404. Use indirect probes (read: GET known package, write: POST /packages/pypi).
+- **GitLab validation order for Generic Packages:** auth → format → scope. Invalid version format (e.g. `@@`) returns 400 regardless of write scope -- format validated BEFORE scope. Cannot use format-invalid requests as non-destructive write probes.
+- **Generic Packages DELETE requires api scope.** `write_package_registry` deploy tokens get 404 (security-by-obscurity) on DELETE. Only manual UI deletion or api scope token can delete.
+- **npm "processing" packages:** npm PUT to `/packages/npm/` with empty or malformed body creates a persistent "processing" package. Use PyPI probe instead of npm registry for write validation.
+
 <!-- session 33c79da6 2026-08-08 -->
 
 - User explicitly requested "exact content" without summaries — when analyzing/validating specs, full text matters more than condensed overviews
