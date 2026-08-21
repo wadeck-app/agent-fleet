@@ -39,7 +39,7 @@ jobs:
                     -H "Authorization: Bearer ${READ}" \
                     "https:${GITLAB_NPM_REGISTRY_PATH}@wadeck%2fsingleton-daemon-kit")
                   case "$HTTP_READ" in
-                    200) echo "READ token: read_package_registry ✓" ;;
+                    200) echo "READ token: read_package_registry OK" ;;
                     401) echo "::error::GITLAB_NPM_READ_TOKEN invalid or expired (HTTP 401)" ; exit 1 ;;
                     403) echo "::error::GITLAB_NPM_READ_TOKEN lacks read_package_registry scope (HTTP 403)" ; exit 1 ;;
                     404) echo "::error::GITLAB_NPM_READ_TOKEN has no visibility to project 84445653 (HTTP 404)" ; exit 1 ;;
@@ -63,16 +63,17 @@ jobs:
                     if ! echo "$INTROSPECT" | grep -q 'write_package_registry'; then
                       echo "::error::GITLAB_NPM_WRITE_TOKEN lacks write_package_registry scope. Got: ${INTROSPECT}" ; exit 1
                     fi
-                    echo "WRITE token: write_package_registry ✓ (via introspection)"
+                    echo "WRITE token: write_package_registry OK (via introspection)"
                   else
-                    # Introspection not available -- probe with a malformed PUT (400=write OK, 403=no write)
+                    # Introspection not available -- probe with Generic Packages API (same write_package_registry scope).
+                    # Uses Generic Packages (not npm) to avoid polluting the npm registry.
+                    # DELETE immediately after to leave no trace.
                     HTTP_WRITE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
                       -H "Authorization: Bearer ${WRITE}" \
-                      -H "Content-Type: application/json" \
-                      -d '{}' \
-                      "https://gitlab.com/api/v4/projects/84445653/packages/npm/@wadeck%2f_write_probe")
+                      --data "probe" \
+                      "https://gitlab.com/api/v4/projects/84445653/packages/generic/delete-me-ci-write-probe/0.0.1/probe.txt")
                     case "$HTTP_WRITE" in
-                      200|400) echo "WRITE token: write_package_registry ✓ (probe HTTP ${HTTP_WRITE})" ;;
+                      200|201|400) echo "WRITE token: write_package_registry OK (probe HTTP ${HTTP_WRITE})" ; curl -s -X DELETE -H "Authorization: Bearer ${WRITE}" "https://gitlab.com/api/v4/projects/84445653/packages/generic/delete-me-ci-write-probe/0.0.1/probe.txt" > /dev/null || true ;;
                       403) echo "::error::GITLAB_NPM_WRITE_TOKEN lacks write_package_registry scope (HTTP 403) -- update the deploy token in GitLab" ; exit 1 ;;
                       404) echo "::error::GITLAB_NPM_WRITE_TOKEN has no visibility to project 84445653 (HTTP 404)" ; exit 1 ;;
                       401) echo "::error::GITLAB_NPM_WRITE_TOKEN cannot authenticate to npm registry (HTTP 401) -- token may be invalid, expired, or lack npm registry access" ; exit 1 ;;
