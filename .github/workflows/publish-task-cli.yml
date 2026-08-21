@@ -26,14 +26,58 @@ jobs:
               with:
                   node-version: '22'
 
+            - name: Validate secrets
+              run: |
+                  fail=0
+
+                  # 1. Presence
+                  if [ -z "${GITLAB_NPM_READ_TOKEN}" ]; then
+                    echo "::error::GITLAB_NPM_READ_TOKEN secret is not set or empty"
+                    fail=1
+                  fi
+                  if [ -z "${GITLAB_NPM_WRITE_TOKEN}" ]; then
+                    echo "::error::GITLAB_NPM_WRITE_TOKEN secret is not set or empty"
+                    fail=1
+                  fi
+                  [ "$fail" -eq 1 ] && exit 1
+
+                  # 2. Format (GitLab tokens: glpat- or gldt-)
+                  if ! echo "${GITLAB_NPM_READ_TOKEN}" | grep -qE '^(glpat|gldt)-'; then
+                    echo "::warning::GITLAB_NPM_READ_TOKEN does not match expected GitLab token format (glpat-* or gldt-*)"
+                  fi
+                  if ! echo "${GITLAB_NPM_WRITE_TOKEN}" | grep -qE '^(glpat|gldt)-'; then
+                    echo "::warning::GITLAB_NPM_WRITE_TOKEN does not match expected GitLab token format (glpat-* or gldt-*)"
+                  fi
+
+                  # 3. Scope validation via GitLab token introspection API
+                  check_scopes() {
+                    local token="$1" required_scope="$2" label="$3"
+                    RESPONSE=$(curl -s -H "Authorization: Bearer ${token}" "https://gitlab.com/api/v4/personal_access_tokens/self")
+                    if ! echo "$RESPONSE" | grep -q '"scopes"'; then
+                      RESPONSE=$(curl -s -H "Authorization: Bearer ${token}" "https://gitlab.com/api/v4/deploy_tokens/self")
+                    fi
+                    SCOPES=$(echo "$RESPONSE" | grep -o '"scopes":\[[^]]*\]')
+                    if ! echo "$SCOPES" | grep -q "\"${required_scope}\""; then
+                      echo "::error::${label} is missing scope '${required_scope}'. Got: ${SCOPES:-unable to parse scopes}"
+                      return 1
+                    fi
+                    echo "${label}: '${required_scope}' ✓ (scopes: ${SCOPES})"
+                  }
+                  check_scopes "${GITLAB_NPM_READ_TOKEN}"  "read_package_registry"  "GITLAB_NPM_READ_TOKEN"  || exit 1
+                  check_scopes "${GITLAB_NPM_WRITE_TOKEN}" "write_package_registry" "GITLAB_NPM_WRITE_TOKEN" || exit 1
+                  echo "All secrets validated."
+              env:
+                  GITLAB_NPM_READ_TOKEN: ${{ secrets.GITLAB_NPM_READ_TOKEN }}
+                  GITLAB_NPM_WRITE_TOKEN: ${{ secrets.GITLAB_NPM_WRITE_TOKEN }}
+
             - name: Configure GitLab npm registry
               run: |
                   echo "@wadeck:registry=https://gitlab.com/api/v4/packages/npm/" >> ~/.npmrc
-                  echo "//gitlab.com/api/v4/packages/npm/:_authToken=${GITLAB_NPM_WRITE_TOKEN}" >> ~/.npmrc
-                  echo "//gitlab.com/api/v4/projects/84445653/packages/npm/:_authToken=${GITLAB_NPM_WRITE_TOKEN}" >> ~/.npmrc
+                  echo "//gitlab.com/api/v4/packages/npm/:_authToken=${GITLAB_NPM_READ_TOKEN}" >> ~/.npmrc
+                  echo "//gitlab.com/api/v4/projects/84445653/packages/npm/:_authToken=${GITLAB_NPM_READ_TOKEN}" >> ~/.npmrc
                   echo "auth-type=legacy" >> ~/.npmrc
               env:
-                  GITLAB_NPM_WRITE_TOKEN: ${{ secrets.GITLAB_NPM_WRITE_TOKEN }}
+                  GITLAB_NPM_READ_TOKEN: ${{ secrets.GITLAB_NPM_READ_TOKEN }}
 
             - name: Install dependencies
               run: npm install --prefer-offline
@@ -66,6 +110,13 @@ jobs:
                   for pkg in task-cli-dist task-cli-win32-x64 task-cli-darwin-arm64 task-cli-darwin-x64 task-cli-linux-x64; do
                     npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --workspace "packages/$pkg"
                   done
+
+            - name: Configure GitLab npm registry for publish
+              run: |
+                  echo "//gitlab.com/api/v4/packages/npm/:_authToken=${GITLAB_NPM_WRITE_TOKEN}" >> ~/.npmrc
+                  echo "//gitlab.com/api/v4/projects/84445653/packages/npm/:_authToken=${GITLAB_NPM_WRITE_TOKEN}" >> ~/.npmrc
+              env:
+                  GITLAB_NPM_WRITE_TOKEN: ${{ secrets.GITLAB_NPM_WRITE_TOKEN }}
 
             - name: Publish platform packages
               run: |
