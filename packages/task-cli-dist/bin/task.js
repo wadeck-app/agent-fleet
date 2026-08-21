@@ -23,12 +23,21 @@ let launcherPath;
 try {
 	launcherPath = require.resolve(`${pkgName}/task${ext}`);
 } catch {
-	process.stderr.write(`task: installing platform package ${pkgName}...\n`);
+	process.stderr.write(`task: platform package ${pkgName} missing -- installing...\n`);
+	const { execSync: _execSync } = require('child_process');
 	try {
-		execFileSync('npm', ['install', '-g', pkgName], { stdio: 'inherit' });
+		const out = _execSync(`npm install -g ${pkgName}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+		if (out) process.stdout.write(out);
+	} catch (installErr) {
+		if (installErr.stdout) process.stdout.write(installErr.stdout);
+		if (installErr.stderr) process.stderr.write(installErr.stderr);
+		process.stderr.write(`task: install failed (exit ${installErr.status})\n`);
+		process.exit(1);
+	}
+	try {
 		launcherPath = require.resolve(`${pkgName}/task${ext}`);
 	} catch {
-		process.stderr.write(`task: failed to install ${pkgName}. Run manually: npm install -g ${pkgName}\n`);
+		process.stderr.write(`task: installed ${pkgName} but cannot resolve binary -- try: npm install -g @wadeck/task-cli\n`);
 		process.exit(1);
 	}
 }

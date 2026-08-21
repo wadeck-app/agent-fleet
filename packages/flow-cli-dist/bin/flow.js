@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-const { execFileSync } = require('child_process');
+const { execFileSync, execSync } = require('child_process');
 const os = require('os');
 
 const PLATFORM_PKG = {
@@ -25,12 +25,20 @@ try {
 } catch {
 	// Platform package missing (GitLab npm registry doesn't expose os/cpu in packument,
 	// so npm can't auto-install optionalDependencies by platform). Install it now.
-	process.stderr.write(`flow: installing platform package ${pkgName}...\n`);
+	process.stderr.write(`flow: platform package ${pkgName} missing -- installing...\n`);
 	try {
-		execFileSync('npm', ['install', '-g', pkgName], { stdio: 'inherit' });
+		const out = execSync(`npm install -g ${pkgName}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+		if (out) process.stdout.write(out);
+	} catch (installErr) {
+		if (installErr.stdout) process.stdout.write(installErr.stdout);
+		if (installErr.stderr) process.stderr.write(installErr.stderr);
+		process.stderr.write(`flow: install failed (exit ${installErr.status})\n`);
+		process.exit(1);
+	}
+	try {
 		launcherPath = require.resolve(`${pkgName}/flow${ext}`);
 	} catch {
-		process.stderr.write(`flow: failed to install ${pkgName}. Run manually: npm install -g ${pkgName}\n`);
+		process.stderr.write(`flow: installed ${pkgName} but cannot resolve binary -- try: npm install -g @wadeck/flow-cli\n`);
 		process.exit(1);
 	}
 }
