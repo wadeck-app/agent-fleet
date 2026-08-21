@@ -109,7 +109,7 @@ jobs:
 
             - name: Set version in all packages
               run: |
-                  for pkg in flow-cli-dist flow-cli-win32-x64 flow-cli-darwin-arm64 flow-cli-darwin-x64 flow-cli-linux-x64; do
+                  for pkg in flow-cli-dist flow-cli-win32-x64 flow-cli-darwin-arm64 flow-cli-darwin-x64; do
                     npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --workspace "packages/$pkg"
                   done
 
@@ -122,7 +122,7 @@ jobs:
 
             - name: Publish platform packages
               run: |
-                  for pkg in flow-cli-win32-x64 flow-cli-darwin-arm64 flow-cli-darwin-x64 flow-cli-linux-x64; do
+                  for pkg in flow-cli-win32-x64 flow-cli-darwin-arm64 flow-cli-darwin-x64; do
                     npm publish --workspace "packages/$pkg"
                   done
 

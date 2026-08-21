@@ -7,7 +7,6 @@ const PLATFORM_PKG = {
 	'win32-x64': '@wadeck/flow-cli-win32-x64',
 	'darwin-arm64': '@wadeck/flow-cli-darwin-arm64',
 	'darwin-x64': '@wadeck/flow-cli-darwin-x64',
-	'linux-x64': '@wadeck/flow-cli-linux-x64',
 };
 
 const arch = os.arch() === 'arm64' ? 'arm64' : 'x64';

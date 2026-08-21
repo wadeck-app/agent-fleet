@@ -15,8 +15,7 @@
 	"optionalDependencies": {
 		"@wadeck/flow-cli-win32-x64": "*",
 		"@wadeck/flow-cli-darwin-arm64": "*",
-		"@wadeck/flow-cli-darwin-x64": "*",
-		"@wadeck/flow-cli-linux-x64": "*"
+		"@wadeck/flow-cli-darwin-x64": "*"
 	},
 	"publishConfig": {
 		"@wadeck:registry": "https://gitlab.com/api/v4/projects/84445653/packages/npm/"
