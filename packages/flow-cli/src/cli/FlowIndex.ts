@@ -3,7 +3,7 @@ import { Command } from 'commander';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'node:url';
 
-import { getConfigDir, readAndClearUpdateState, scheduleBackgroundUpdate } from '../updater/UpdateManager.js';
+import { UpdateManager } from 'shared-cli/index';
 import { buildCliCommand } from './commands/CliCommand.js';
 import { registerDocsCommand } from './commands/DocsCommand';
 import { registerHistoryCommand } from './commands/HistoryCommand';
@@ -16,7 +16,8 @@ declare const __FLOW_CLI_VERSION__: string;
 
 async function main(): Promise<void> {
 	// Show update notice from a previous background update run
-	const updateState = readAndClearUpdateState(getConfigDir());
+	const updateManager = new UpdateManager('@wadeck/flow-cli');
+	const updateState = updateManager.readAndClearState();
 	if (updateState?.status === 'success') {
 		process.stderr.write(`[flow] Updated to v${updateState.newVersion}\n`);
 	}
@@ -52,7 +53,7 @@ async function main(): Promise<void> {
 
 	// Schedule background updater after command completes
 	const bundlePath = process.env['LAUNCHER_BUNDLE_OVERRIDE'] ?? fileURLToPath(import.meta.url);
-	scheduleBackgroundUpdate(bundlePath, '@wadeck/flow-cli', 'flow-updater.cjs');
+	updateManager.scheduleBackgroundUpdate(bundlePath, 'flow-updater.cjs');
 }
 
 const isEntryPoint =

@@ -8,9 +8,9 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import type { WebSocket } from 'ws';
 
-import { DEFAULT_CONFIG, type FlowConfig, loadFlowConfig } from '../config/FlowConfig';
-import { createPerFlowWorkspaceResolver, resolvePlugins } from '../config/PluginResolver.js';
-import { type HookConfig, HookDispatcher } from '../hooks/HookDispatcher';
+import { FlowConfigLoader, type FlowConfig } from '../config/FlowConfig';
+import { PluginResolver } from '../config/PluginResolver.js';
+import { type HookConfig, HookDispatcher } from 'shared-cli/HookDispatcher';
 import type { ClientCommand, WorkerToDaemon } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
@@ -45,10 +45,6 @@ function loadFlowHooks(cwd: string): Record<string, HookConfig[]> {
 	}
 }
 
-// FlowConfig and DEFAULT_CONFIG are now in src/config/FlowConfig.ts
-export type { FlowConfig };
-export { DEFAULT_CONFIG, loadFlowConfig };
-
 /**
  * Attempts to load plugin config. Returns empty providers when no config files are present
  * (backward-compatible). Re-throws on config parse errors or plugin load failures.
@@ -65,17 +61,17 @@ async function tryResolvePlugins(): Promise<{
 		return {};
 	}
 
-	return resolvePlugins();
+	return PluginResolver.create().resolveAll();
 }
 
-export async function startDaemon(config: FlowConfig = DEFAULT_CONFIG, daemonDir?: string): Promise<DaemonHandle> {
+async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemonDir?: string): Promise<DaemonHandle> {
 	const resolvedDaemonDir = daemonDir ?? path.join(os.homedir(), '.flow-daemon');
 	const executionsDir = path.join(resolvedDaemonDir, 'executions');
 	const logsDir = path.join(resolvedDaemonDir, 'logs');
 
 	// Resolve plugins before createDaemon - onStart is synchronous so async must happen here
 	const pluginProviders = await tryResolvePlugins();
-	const perFlowWorkspaceResolver = await createPerFlowWorkspaceResolver();
+	const perFlowWorkspaceResolver = await PluginResolver.create().createPerFlowWorkspaceResolver();
 
 	let workerPool: WorkerPool;
 	let wsServer: WebSocketServer;
@@ -236,4 +232,10 @@ export async function startDaemon(config: FlowConfig = DEFAULT_CONFIG, daemonDir
 	}
 
 	return daemonHandle;
+}
+
+export class Daemon {
+	static async start(config: FlowConfig = FlowConfigLoader.DEFAULT, daemonDir?: string): Promise<DaemonHandle> {
+		return startDaemon(config, daemonDir);
+	}
 }

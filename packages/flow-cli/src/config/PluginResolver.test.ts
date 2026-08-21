@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { resolvePlugins } from './PluginResolver.js';
+import { PluginResolver } from './PluginResolver.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 // From packages/flow-cli/src/config/ → packages/extension-points/... (3 up)
@@ -17,7 +17,7 @@ const tmp = join(tmpdir(), `plugin-resolver-test-${Date.now()}`);
 beforeEach(() => mkdirSync(tmp, { recursive: true }));
 afterEach(() => rmSync(tmp, { recursive: true, force: true }));
 
-describe('resolvePlugins - workspace provider', () => {
+describe('PluginResolver.resolveAll - workspace provider', () => {
 	it('resolves plugin-none workspace provider from inline config', async () => {
 		const projectConfig = join(tmp, 'config.yml');
 		writeFileSync(
@@ -31,12 +31,12 @@ plugins:
 			'utf8'
 		);
 
-		const result = await resolvePlugins({
+		const result = await PluginResolver.create({
 			globalConfigPath: join(tmp, 'missing.yml'),
 			projectConfigPath: projectConfig,
 			pluginPackagesDir: PACKAGES_DIR,
 			registryPath: REGISTRY_PATH,
-		});
+		}).resolveAll();
 
 		expect(result.workspaceProvider).toBeDefined();
 		const handle = await result.workspaceProvider!.allocate({ taskId: 'test-task' });
@@ -46,12 +46,12 @@ plugins:
 
 	it('throws when workspace is not configured', async () => {
 		await expect(
-			resolvePlugins({
+			PluginResolver.create({
 				globalConfigPath: join(tmp, 'missing.yml'),
 				projectConfigPath: join(tmp, 'missing-project.yml'),
 				pluginPackagesDir: PACKAGES_DIR,
 				registryPath: REGISTRY_PATH,
-			})
+			}).resolveAll()
 		).rejects.toThrow(/no workspace provider configured/i);
 	});
 
@@ -67,12 +67,12 @@ plugins:
 			'utf8'
 		);
 		await expect(
-			resolvePlugins({
+			PluginResolver.create({
 				globalConfigPath: join(tmp, 'missing.yml'),
 				projectConfigPath: projectConfig,
 				pluginPackagesDir: PACKAGES_DIR,
 				registryPath: REGISTRY_PATH,
-			})
+			}).resolveAll()
 		).rejects.toThrow(/workspace\.type is required/i);
 	});
 });
@@ -84,17 +84,17 @@ plugins:
       type: plugins.none.default
 `;
 
-describe('resolvePlugins - approval provider', () => {
+describe('PluginResolver.resolveAll - approval provider', () => {
 	it('returns undefined approval provider when approval not configured', async () => {
 		const projectConfig = join(tmp, 'config.yml');
 		writeFileSync(projectConfig, WORKSPACE_ONLY_CONFIG, 'utf8');
 
-		const result = await resolvePlugins({
+		const result = await PluginResolver.create({
 			globalConfigPath: join(tmp, 'missing.yml'),
 			projectConfigPath: projectConfig,
 			pluginPackagesDir: PACKAGES_DIR,
 			registryPath: REGISTRY_PATH,
-		});
+		}).resolveAll();
 
 		expect(result.approvalProvider).toBeUndefined();
 	});
@@ -115,12 +115,12 @@ plugins:
 			'utf8'
 		);
 
-		const result = await resolvePlugins({
+		const result = await PluginResolver.create({
 			globalConfigPath: join(tmp, 'missing.yml'),
 			projectConfigPath: projectConfig,
 			pluginPackagesDir: PACKAGES_DIR,
 			registryPath: REGISTRY_PATH,
-		});
+		}).resolveAll();
 
 		expect(result.approvalProvider).toBeDefined();
 		expect(typeof result.approvalProvider?.requestApproval).toBe('function');

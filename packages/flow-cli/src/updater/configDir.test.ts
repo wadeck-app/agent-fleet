@@ -1,9 +1,9 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { getConfigDir } from './configDir';
+import { ConfigDir } from 'shared-cli/ConfigDir';
 
-describe('getConfigDir', () => {
+describe('ConfigDir.get', () => {
 	const originalPlatform = process.platform;
 
 	function setPlatform(p: string): void {
@@ -21,7 +21,7 @@ describe('getConfigDir', () => {
 		vi.stubEnv('XDG_CONFIG_HOME', '');
 		vi.stubEnv('HOME', '/home/testuser');
 
-		expect(getConfigDir()).toBe(path.join('/home/testuser', '.config', 'flow'));
+		expect(ConfigDir.get()).toBe(path.join('/home/testuser', '.config', 'flow'));
 	});
 
 	it('returns XDG_CONFIG_HOME/flow when XDG_CONFIG_HOME is set (takes precedence)', () => {
@@ -29,7 +29,7 @@ describe('getConfigDir', () => {
 		vi.stubEnv('XDG_CONFIG_HOME', '/custom/config');
 		vi.stubEnv('HOME', '/home/testuser');
 
-		expect(getConfigDir()).toBe(path.join('/custom/config', 'flow'));
+		expect(ConfigDir.get()).toBe(path.join('/custom/config', 'flow'));
 	});
 
 	it('returns APPDATA/flow on Windows when process.platform is win32 and APPDATA is set', () => {
@@ -37,7 +37,7 @@ describe('getConfigDir', () => {
 		vi.stubEnv('XDG_CONFIG_HOME', '');
 		vi.stubEnv('APPDATA', 'C:\\Users\\testuser\\AppData\\Roaming');
 
-		expect(getConfigDir()).toBe(path.join('C:\\Users\\testuser\\AppData\\Roaming', 'flow'));
+		expect(ConfigDir.get()).toBe(path.join('C:\\Users\\testuser\\AppData\\Roaming', 'flow'));
 	});
 
 	it('falls back to os.homedir()/.config/flow when HOME env var is not set', () => {
@@ -48,7 +48,7 @@ describe('getConfigDir', () => {
 		delete process.env['HOME'];
 
 		try {
-			const result = getConfigDir();
+			const result = ConfigDir.get();
 			// os.homedir() always returns something; result must end with .config/flow or \flow
 			expect(result).toMatch(/[/\\]\.config[/\\]flow$/);
 		} finally {

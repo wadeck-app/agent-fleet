@@ -17,6 +17,8 @@
 		"noEmitOnError": true,
 
 		"paths": {
+			"cli-shared": ["./packages/cli-shared/src/index"],
+			"cli-shared/*": ["./packages/cli-shared/src/*"],
 			"e2e-web/*": ["./packages/e2e-web/src/*"],
 			"flow-cli/*": ["./packages/flow-cli/src/*"],
 			"flow-engine": ["./packages/flow-engine/src/index"],

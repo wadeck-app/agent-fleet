@@ -30,8 +30,10 @@ vi.mock('node:child_process', () => ({
 	execFileSync: vi.fn(),
 }));
 
-vi.mock('./configDir.js', () => ({
-	getConfigDir: vi.fn(() => '/test/config/dir'),
+vi.mock('shared-cli/ConfigDir', () => ({
+	ConfigDir: {
+		get: vi.fn(() => '/test/config/dir'),
+	},
 }));
 
 // ---------------------------------------------------------------------------
@@ -286,5 +288,46 @@ describe('main', () => {
 		const state = JSON.parse(stateCall![1] as string) as { status: string; reason: string };
 		expect(state.status).toBe('update-failed');
 		expect(state.reason).toBe('auth');
+	});
+
+	it('network error on npm view writes network failure state', async () => {
+		const networkErr = new Error('ETIMEDOUT');
+		mockExecFileError(networkErr);
+
+		await main();
+
+		const calls = vi.mocked(fs.writeFileSync).mock.calls;
+		const stateCalls = calls.filter(c => String(c[0]).endsWith('update-state.json'));
+		const stateCall = stateCalls[stateCalls.length - 1];
+		expect(stateCall).toBeDefined();
+		const state = JSON.parse(stateCall![1] as string) as { status: string; reason: string };
+		expect(state.status).toBe('update-failed');
+		expect(state.reason).toBe('network');
+	});
+
+	it('UPDATER_FORCE bypasses cache check', async () => {
+		// Cache file exists with a very recent timestamp (1 second ago) — would normally short-circuit
+		vi.mocked(fs.existsSync).mockImplementation(p => String(p).endsWith('.update-cache.json'));
+		vi.mocked(fs.readFileSync).mockReturnValue(
+			JSON.stringify({ checkedAt: Date.now() - 1_000 }) as unknown as string
+		);
+		// Force flag set — cache should be ignored
+		process.env['UPDATER_FORCE'] = '1';
+		// npm view returns the current version so no install is triggered
+		mockExecFileSuccess({
+			'npm view @wadeck/flow-cli dist-tags.edge': '1.0.0',
+		});
+
+		try {
+			await main();
+		} finally {
+			delete process.env['UPDATER_FORCE'];
+		}
+
+		// npm view must have been called despite the fresh cache
+		const viewCalls = vi
+			.mocked(execFile)
+			.mock.calls.filter(c => (c[1] as string[] | undefined)?.includes('view'));
+		expect(viewCalls).toHaveLength(1);
 	});
 });

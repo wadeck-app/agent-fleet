@@ -24,6 +24,7 @@
 		"bundle:all": "npm run bundle && npm run bundle-updater"
 	},
 	"dependencies": {
+		"shared-cli": "file:../shared-cli",
 		"extension-points": "file:../extension-points",
 		"plugin-none": "file:../plugin-none",
 		"plugin-worktree": "file:../plugin-worktree",

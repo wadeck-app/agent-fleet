@@ -3,7 +3,7 @@ import * as http from 'node:http';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { HookDispatcher } from './HookDispatcher.js';
+import { HookDispatcher } from 'shared-cli/HookDispatcher';
 
 // Real integration tests — no mocks of execFile or http.request.
 

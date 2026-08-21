@@ -4,7 +4,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { DEFAULT_CONFIG, startDaemon } from '../daemon/Daemon';
+import { Daemon } from '../daemon/Daemon';
 import type { DaemonResponse, ExecutionState } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
 
@@ -20,7 +20,7 @@ export async function startTestDaemon(): Promise<TestDaemonContext> {
 	const daemonDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-e2e-'));
 	let handle: DaemonHandle;
 	try {
-		handle = await startDaemon(DEFAULT_CONFIG, daemonDir);
+		handle = await Daemon.start(undefined, daemonDir);
 	} catch (err) {
 		fs.rmSync(daemonDir, { recursive: true, force: true });
 		throw err;

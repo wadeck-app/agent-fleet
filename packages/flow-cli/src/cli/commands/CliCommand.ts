@@ -10,11 +10,9 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
-import { loadFlowConfig } from '../../config/FlowConfig.js';
+import { FlowConfigLoader } from '../../config/FlowConfig.js';
 import { PluginLoader } from '../../config/PluginLoader.js';
-import { HookDispatcher } from '../../hooks/HookDispatcher.js';
-import { getConfigDir } from '../../updater/configDir.js';
-import { VERSION_RE } from '../../updater/versionValidation.js';
+import { ConfigDir, HookDispatcher, VersionValidation } from 'shared-cli/index';
 
 // Injected by esbuild at bundle time via define; falls back to package.json in dev mode (tsx).
 declare const __FLOW_CLI_VERSION__: string;
@@ -24,7 +22,7 @@ const PKG_NAME = '@wadeck/flow-cli';
 
 function readChannelFromConfig(): string {
 	try {
-		const configFile = path.join(getConfigDir(), 'config.yml');
+		const configFile = path.join(ConfigDir.get(), 'config.yml');
 		if (!fs.existsSync(configFile)) return 'edge';
 		const raw = fs.readFileSync(configFile, 'utf-8');
 		const match = /^\s*channel:\s*['"]?(\S+?)['"]?\s*$/m.exec(raw);
@@ -83,7 +81,7 @@ async function runSelfChecks(): Promise<CheckResult[]> {
 	{
 		const name = 'Config loading';
 		try {
-			const config = loadFlowConfig(path.join(os.tmpdir(), '.flow-self-check-nonexistent-config.yaml'));
+			const config = FlowConfigLoader.load(path.join(os.tmpdir(), '.flow-self-check-nonexistent-config.yaml'));
 			if (config.workspace.retainDays === undefined) {
 				throw new Error('workspace.retainDays is undefined');
 			}
@@ -166,7 +164,7 @@ async function runSelfChecks(): Promise<CheckResult[]> {
 	{
 		const name = 'Workspace config';
 		try {
-			const config = loadFlowConfig(path.join(os.tmpdir(), '.flow-self-check-schema.yaml'));
+			const config = FlowConfigLoader.load(path.join(os.tmpdir(), '.flow-self-check-schema.yaml'));
 			if (typeof config.workspace.retainDays !== 'number' || config.workspace.retainDays <= 0) {
 				throw new Error(`workspace.retainDays is not a positive number: ${config.workspace.retainDays}`);
 			}
@@ -238,7 +236,7 @@ export function buildCliCommand(): Command {
 	updateCmd.option('--log', 'Print the update log');
 	updateCmd.action(async (opts: { check?: boolean; log?: boolean }) => {
 		if (opts.log) {
-			const logFile = path.join(getConfigDir(), 'update-log.txt');
+			const logFile = path.join(ConfigDir.get(), 'update-log.txt');
 			if (fs.existsSync(logFile)) {
 				process.stdout.write(fs.readFileSync(logFile, 'utf-8'));
 			} else {
@@ -275,7 +273,7 @@ export function buildCliCommand(): Command {
 	cli.command('rollback')
 		.description('Restore the previously installed version')
 		.action(() => {
-			const configDir = getConfigDir();
+			const configDir = ConfigDir.get();
 			const stateFile = path.join(configDir, 'update-state.json');
 			if (!fs.existsSync(stateFile)) {
 				process.stderr.write('No update state found. Nothing to roll back.\n');
@@ -291,7 +289,7 @@ export function buildCliCommand(): Command {
 				process.exit(1);
 				return;
 			}
-			if (previousVersion === undefined || !VERSION_RE.test(previousVersion)) {
+			if (previousVersion === undefined || !VersionValidation.VERSION_RE.test(previousVersion)) {
 				process.stderr.write('Invalid or missing previousVersion in update state.\n');
 				process.exit(1);
 				return;

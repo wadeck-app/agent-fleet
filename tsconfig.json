@@ -1,6 +1,7 @@
 {
 	"files": [],
 	"references": [
+		{ "path": "packages/shared-cli" },
 		{ "path": "packages/extension-points" },
 		{ "path": "packages/plugin-none" },
 		{ "path": "packages/plugin-worktree" },

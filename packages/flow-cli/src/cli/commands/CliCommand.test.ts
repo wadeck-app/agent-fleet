@@ -19,10 +19,6 @@ vi.mock('node:child_process', () => ({
 	execFile: vi.fn(),
 	execFileSync: vi.fn(),
 }));
-vi.mock('../../updater/configDir.js', () => ({
-	getConfigDir: vi.fn(() => '/fake/config'),
-}));
-
 // Helper: mount the cli sub-command under a root program and parse asynchronously.
 // Any process.exit() mock throws are caught here so individual tests can assert on exitSpy.
 async function runCliArgs(args: string[]): Promise<void> {

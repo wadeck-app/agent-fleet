@@ -2,7 +2,6 @@ import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-export { getConfigDir } from './configDir.js';
 
 export interface UpdateState {
 	status: 'success' | 'rolled-back' | 'update-failed' | 'applying';

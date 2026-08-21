@@ -32,6 +32,7 @@ export default defineConfig({
 	},
 	resolve: {
 		alias: {
+			'shared-cli': path.resolve(__dirname, '../shared-cli/src'),
 			'flow-engine': path.resolve(__dirname, '../flow-engine/src'),
 			'shared-common': path.resolve(__dirname, '../shared-common/src'),
 		},

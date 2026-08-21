@@ -7,7 +7,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
 
-import { getConfigDir } from './configDir.js';
+import { ConfigDir } from 'shared-cli/ConfigDir';
 
 const execFileAsync = promisify(execFile);
 
@@ -16,7 +16,7 @@ declare const __FLOW_CLI_VERSION__: string;
 
 // Package name is injected by the caller via env var so the same bundle serves both flow and task.
 const PKG_NAME = process.env['UPDATER_PKG_NAME'] ?? '@wadeck/flow-cli';
-// Must match versionValidation.ts -- separate bundle, cannot share at runtime.
+// Duplicate of VersionValidation.VERSION_RE -- kept here because this is a separate bundle (flow-updater.cjs) and cannot share shared-cli at runtime without bundling it in.
 const VERSION_RE = /^\d+\.\d+\.\d+([-+][\w.-]+)?$/;
 
 /**
@@ -174,7 +174,7 @@ export function tryAcquireLock(lockFile: string): boolean {
 }
 
 export async function main(): Promise<void> {
-	const configDir = getConfigDir();
+	const configDir = ConfigDir.get();
 	fs.mkdirSync(configDir, { recursive: true });
 
 	const lockFile = getLockPath(configDir);

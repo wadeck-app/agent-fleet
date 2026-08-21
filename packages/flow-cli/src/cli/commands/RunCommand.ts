@@ -6,8 +6,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { DEFAULT_CONFIG, loadFlowConfig } from '../../config/FlowConfig';
-import { startDaemon } from '../../daemon/Daemon';
+import { FlowConfigLoader, type FlowConfig } from '../../config/FlowConfig';
+import { Daemon } from '../../daemon/Daemon';
 import type { ClientCommand, DaemonResponse, ExecutionState } from '../../ipc/Protocol';
 import { ExecutionStore } from '../../storage/ExecutionStore';
 
@@ -186,12 +186,9 @@ function parseInputArgs(rawInputs: string[]): Record<string, string> {
 	return inputs;
 }
 
-/** @deprecated Use loadFlowConfig from config/FlowConfig instead. */
-export { loadFlowConfig as loadDaemonConfig };
-
 async function sendToDaemon(
 	cmd: Extract<ClientCommand, { type: 'run' }>,
-	config: typeof DEFAULT_CONFIG,
+	config: FlowConfig,
 	daemonDir: string
 ): Promise<DaemonResponse> {
 	const makeClient = () =>
@@ -204,7 +201,7 @@ async function sendToDaemon(
 	} catch (err) {
 		if (!(err instanceof DaemonNotRunningError)) throw err;
 		try {
-			await startDaemon(config);
+			await Daemon.start(config);
 			return (await makeClient().send('run', cmd)) as DaemonResponse;
 		} catch (e2) {
 			console.error('Daemon could not be started:', e2);
@@ -277,7 +274,7 @@ export function registerRunCommand(program: Command): void {
 					}
 				}
 
-				const config = loadFlowConfig(path.join(os.homedir(), '.flow-config.yaml'));
+				const config = FlowConfigLoader.load(path.join(os.homedir(), '.flow-config.yaml'));
 
 				const cmd: Extract<ClientCommand, { type: 'run' }> = {
 					type: 'run',

@@ -25,7 +25,7 @@ vi.mock('./WebSocketServer.js', () => ({
 }));
 
 // Import after mocking
-const { startDaemon } = await import('./Daemon.js');
+const { Daemon } = await import('./Daemon.js');
 
 let tmpDir: string;
 
@@ -43,7 +43,7 @@ afterEach(() => {
 	vi.clearAllMocks();
 });
 
-describe('startDaemon', () => {
+describe('Daemon.start', () => {
 	it('creates daemon dir before calling createDaemon', async () => {
 		const daemonDir = path.join(tmpDir, 'flow-daemon');
 		expect(fs.existsSync(daemonDir)).toBe(false);
@@ -56,13 +56,13 @@ describe('startDaemon', () => {
 			return { port: 9999, stop: vi.fn() };
 		});
 
-		await startDaemon(undefined, daemonDir);
+		await Daemon.start(undefined, daemonDir);
 		expect(dirExistedAtCallTime).toBe(true);
 	});
 
 	it('creates executions/ and logs/ subdirs inside onStart', async () => {
 		const daemonDir = path.join(tmpDir, 'flow-daemon');
-		await startDaemon(undefined, daemonDir);
+		await Daemon.start(undefined, daemonDir);
 		expect(fs.existsSync(path.join(daemonDir, 'executions'))).toBe(true);
 		expect(fs.existsSync(path.join(daemonDir, 'logs'))).toBe(true);
 	});
@@ -70,6 +70,6 @@ describe('startDaemon', () => {
 	it('is idempotent — does not throw if daemon dir already exists', async () => {
 		const daemonDir = path.join(tmpDir, 'flow-daemon');
 		fs.mkdirSync(daemonDir, { recursive: true });
-		await expect(startDaemon(undefined, daemonDir)).resolves.not.toThrow();
+		await expect(Daemon.start(undefined, daemonDir)).resolves.not.toThrow();
 	});
 });

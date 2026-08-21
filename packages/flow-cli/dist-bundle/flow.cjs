@@ -8709,55 +8709,196 @@ var {
 var import_module = require("module");
 var import_node_url4 = require("node:url");
 
-// dist/updater/UpdateManager.js
-var import_node_child_process = require("node:child_process");
-var fs = __toESM(require("node:fs"), 1);
-var path2 = __toESM(require("node:path"), 1);
-
-// dist/updater/configDir.js
+// ../cli-shared/src/ConfigDir.ts
 var os = __toESM(require("node:os"), 1);
 var path = __toESM(require("node:path"), 1);
-function getConfigDir() {
-  const xdg = process.env["XDG_CONFIG_HOME"];
-  if (xdg)
-    return path.join(xdg, "flow");
-  if (process.platform === "win32") {
-    const appData = process.env["APPDATA"];
-    if (appData)
-      return path.join(appData, "flow");
+var ConfigDir = class {
+  static get() {
+    const xdg = process.env["XDG_CONFIG_HOME"];
+    if (xdg) return path.join(xdg, "flow");
+    if (process.platform === "win32") {
+      const appData = process.env["APPDATA"];
+      if (appData) return path.join(appData, "flow");
+    }
+    return path.join(process.env["HOME"] ?? os.homedir(), ".config", "flow");
   }
-  return path.join(process.env["HOME"] ?? os.homedir(), ".config", "flow");
-}
+};
 
-// dist/updater/UpdateManager.js
-function scheduleBackgroundUpdate(bundlePath, pkgName, updaterName = "flow-updater.cjs") {
-  const dir = path2.dirname(bundlePath);
-  const updaterPath = fs.existsSync(path2.join(dir, updaterName)) ? path2.join(dir, updaterName) : fs.existsSync(path2.join(dir, "flow-updater.cjs")) ? path2.join(dir, "flow-updater.cjs") : null;
-  if (!updaterPath)
-    return;
-  const child = (0, import_node_child_process.spawn)(process.execPath, [updaterPath], {
-    detached: true,
-    stdio: "ignore",
-    env: { ...process.env, LAUNCHER_BUNDLE_OVERRIDE: bundlePath, UPDATER_PKG_NAME: pkgName }
-  });
-  child.unref();
-}
-function readAndClearUpdateState(configDir) {
-  const stateFile = path2.join(configDir, "update-state.json");
-  try {
-    const raw = fs.readFileSync(stateFile, "utf-8");
-    const state = JSON.parse(raw);
-    if (state.status !== "applying") {
-      try {
-        fs.unlinkSync(stateFile);
-      } catch {
+// ../cli-shared/src/HookDispatcher.ts
+var import_node_child_process = require("node:child_process");
+var http = __toESM(require("node:http"), 1);
+var https = __toESM(require("node:https"), 1);
+var import_node_util = require("node:util");
+var execFileAsync = (0, import_node_util.promisify)(import_node_child_process.execFile);
+var HookDispatcher = class {
+  constructor(hooks) {
+    this.hooks = hooks;
+  }
+  hooks;
+  async dispatch(event, payload, onError2) {
+    const hookList = this.hooks[event] ?? [];
+    await Promise.all(
+      hookList.map(
+        (hook) => this.runHook(hook, payload).catch((err) => {
+          onError2?.(err);
+        })
+      )
+    );
+  }
+  async runHook(hook, payload) {
+    switch (hook.type) {
+      case "cli":
+        await this.sendCliHook(hook, payload);
+        return;
+      case "http":
+        await this.sendHttpHook(hook, payload);
+        return;
+      default: {
+        const _exhaustive = hook;
+        throw new Error(`Unknown hook type: ${JSON.stringify(_exhaustive)}`);
       }
     }
-    return state;
-  } catch {
-    return null;
   }
-}
+  sendCliHook(hook, payload) {
+    const payloadEnv = {};
+    for (const [key, val] of Object.entries(payload)) {
+      const envKey = key.replace(/([A-Z])/g, "_$1").toUpperCase();
+      payloadEnv[envKey] = val !== null && val !== void 0 ? String(val) : "";
+    }
+    const baseEnv = {};
+    if (process.env["PATH"]) baseEnv["PATH"] = process.env["PATH"];
+    if (process.env["HOME"]) baseEnv["HOME"] = process.env["HOME"];
+    if (process.env["TMPDIR"]) baseEnv["TMPDIR"] = process.env["TMPDIR"];
+    if (process.env["TEMP"]) baseEnv["TEMP"] = process.env["TEMP"];
+    if (process.env["TMP"]) baseEnv["TMP"] = process.env["TMP"];
+    if (process.platform === "win32") {
+      if (process.env["SystemRoot"]) baseEnv["SystemRoot"] = process.env["SystemRoot"];
+      if (process.env["USERPROFILE"]) baseEnv["USERPROFILE"] = process.env["USERPROFILE"];
+    }
+    const env = {
+      ...baseEnv,
+      ...payloadEnv,
+      ...hook.env ?? {}
+      // explicit hook-declared vars — highest priority
+    };
+    if (hook.debug) {
+      return this.sendCliHookDebug(hook, env);
+    }
+    return execFileAsync(hook.command, hook.args, { env, timeout: 1e4 }).then(() => void 0);
+  }
+  // Runs the CLI hook with stdio: 'inherit' so stdout/stderr appear in the calling terminal.
+  // Uses spawn (not execFile) because execFile does not support stdio inheritance.
+  sendCliHookDebug(hook, env) {
+    return new Promise((resolve4, reject) => {
+      const child = (0, import_node_child_process.spawn)(hook.command, hook.args, { env, stdio: "inherit" });
+      const timer = setTimeout(() => {
+        child.kill();
+        reject(new Error("CLI hook timeout"));
+      }, 1e4);
+      child.on("error", (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+      child.on("close", (code) => {
+        clearTimeout(timer);
+        if (code !== 0) {
+          reject(new Error(`Hook exited with code ${String(code)}`));
+        } else {
+          resolve4();
+        }
+      });
+    });
+  }
+  async sendHttpHook(hook, payload) {
+    return new Promise((resolve4, reject) => {
+      let settled = false;
+      const settle = (fn) => {
+        if (!settled) {
+          settled = true;
+          fn();
+        }
+      };
+      const body = JSON.stringify(payload);
+      const url = new URL(hook.url);
+      const options = {
+        hostname: url.hostname,
+        port: url.port || (url.protocol === "https:" ? 443 : 80),
+        path: url.pathname + url.search,
+        method: hook.method ?? "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(body),
+          ...hook.headers
+        }
+      };
+      const transport = url.protocol === "https:" ? https : http;
+      const req = transport.request(options, (res) => {
+        res.on("data", () => {
+        });
+        res.on("end", () => settle(resolve4));
+      });
+      req.on("error", (err) => settle(() => reject(err)));
+      req.setTimeout(1e4, () => {
+        req.destroy();
+        settle(() => reject(new Error("HTTP hook timeout")));
+      });
+      req.write(body);
+      req.end();
+    });
+  }
+};
+
+// ../cli-shared/src/UpdateManager.ts
+var import_node_child_process2 = require("node:child_process");
+var fs = __toESM(require("node:fs"), 1);
+var path2 = __toESM(require("node:path"), 1);
+var UpdateManager = class {
+  configDir;
+  pkgName;
+  constructor(pkgName, configDir) {
+    this.pkgName = pkgName;
+    this.configDir = configDir ?? ConfigDir.get();
+  }
+  // Prefer the named updater; fall back to flow-updater.cjs (shared bundle handles both CLIs via UPDATER_PKG_NAME).
+  scheduleBackgroundUpdate(bundlePath, updaterName = "flow-updater.cjs") {
+    const dir = path2.dirname(bundlePath);
+    const updaterPath = fs.existsSync(path2.join(dir, updaterName)) ? path2.join(dir, updaterName) : fs.existsSync(path2.join(dir, "flow-updater.cjs")) ? path2.join(dir, "flow-updater.cjs") : null;
+    if (!updaterPath) return;
+    const child = (0, import_node_child_process2.spawn)(process.execPath, [updaterPath], {
+      detached: true,
+      stdio: "ignore",
+      env: { ...process.env, LAUNCHER_BUNDLE_OVERRIDE: bundlePath, UPDATER_PKG_NAME: this.pkgName }
+    });
+    child.unref();
+  }
+  readAndClearState() {
+    const stateFile = path2.join(this.configDir, "update-state.json");
+    try {
+      const raw = fs.readFileSync(stateFile, "utf-8");
+      const state = JSON.parse(raw);
+      if (state.status !== "applying") {
+        try {
+          fs.unlinkSync(stateFile);
+        } catch {
+        }
+      }
+      return state;
+    } catch {
+      return null;
+    }
+  }
+};
+
+// ../cli-shared/src/VersionValidation.ts
+var VersionValidation = class _VersionValidation {
+  static VERSION_RE = /^\d+\.\d+\.\d+([-+][\w.-]+)?$/;
+  static validate(v) {
+    if (!_VersionValidation.VERSION_RE.test(v)) {
+      throw new Error(`Invalid version string: "${v}"`);
+    }
+    return v;
+  }
+};
 
 // ../flow-engine/src/docs/FlowCapabilitiesGenerator.ts
 var FlowCapabilitiesGenerator = class {
@@ -16387,7 +16528,7 @@ var ClaudeModelProvider = class {
 };
 
 // ../flow-engine/src/processing/OpenCodeModelProvider.ts
-var import_node_child_process2 = require("node:child_process");
+var import_node_child_process3 = require("node:child_process");
 var crypto4 = __toESM(require("node:crypto"), 1);
 var fs3 = __toESM(require("node:fs"), 1);
 var os3 = __toESM(require("node:os"), 1);
@@ -16471,7 +16612,7 @@ var OpenCodeModelProvider = class {
     );
     try {
       return await new Promise((resolve4, reject) => {
-        const proc = (0, import_node_child_process2.spawn)(command, args, {
+        const proc = (0, import_node_child_process3.spawn)(command, args, {
           cwd: options.workingDir,
           stdio: "inherit",
           shell,
@@ -16508,7 +16649,7 @@ var OpenCodeModelProvider = class {
     try {
       return await new Promise((resolve4, reject) => {
         const launchStartTime = Date.now();
-        const proc = (0, import_node_child_process2.spawn)(command, args, {
+        const proc = (0, import_node_child_process3.spawn)(command, args, {
           cwd: options.workingDir,
           // stdin: 'ignore' -- OpenCode takes the prompt as a positional arg,
           // not stdin. An open stdin pipe causes OpenCode to wait for EOF.
@@ -16643,7 +16784,7 @@ var OpenCodeModelProvider = class {
     }
     if (process.platform === "win32") {
       try {
-        const cmdPath = (0, import_node_child_process2.execSync)("where.exe opencode.cmd", { encoding: "utf8" }).trim().split("\n")[0].trim();
+        const cmdPath = (0, import_node_child_process3.execSync)("where.exe opencode.cmd", { encoding: "utf8" }).trim().split("\n")[0].trim();
         const dir = path4.dirname(cmdPath);
         const exePath = path4.join(dir, "node_modules", "opencode-ai", "bin", "opencode.exe");
         if (fs3.existsSync(exePath)) {
@@ -16654,7 +16795,7 @@ var OpenCodeModelProvider = class {
       return { parts: ["opencode"], needsShell: true };
     }
     try {
-      return { parts: [(0, import_node_child_process2.execSync)("which opencode", { encoding: "utf8" }).trim()], needsShell: false };
+      return { parts: [(0, import_node_child_process3.execSync)("which opencode", { encoding: "utf8" }).trim()], needsShell: false };
     } catch {
       return { parts: ["opencode"], needsShell: false };
     }
@@ -23370,37 +23511,43 @@ var import_node_util2 = require("node:util");
 
 // dist/config/FlowConfig.js
 var fs9 = __toESM(require("node:fs"), 1);
-var DEFAULT_CONFIG = {
-  queue: { concurrency: 1 },
-  logs: { retainDays: 30 },
-  worker: { wsPort: null },
-  security: { allowAbsolutePaths: false },
-  limits: {
-    maxInjectedSteps: 20,
-    maxStepsPerExecution: 50
-  },
-  workspace: { retainDays: 30, maxWorkspaces: 50 }
-};
-function loadFlowConfig(configFile) {
-  if (!fs9.existsSync(configFile))
-    return DEFAULT_CONFIG;
-  try {
-    const loaded = load(fs9.readFileSync(configFile, "utf8"), {
-      schema: JSON_SCHEMA
-    });
-    return {
-      queue: { ...DEFAULT_CONFIG.queue, ...loaded?.queue },
-      logs: { ...DEFAULT_CONFIG.logs, ...loaded?.logs },
-      worker: { ...DEFAULT_CONFIG.worker, ...loaded?.worker },
-      security: { ...DEFAULT_CONFIG.security, ...loaded?.security },
-      limits: { ...DEFAULT_CONFIG.limits, ...loaded?.limits },
-      workspace: { ...DEFAULT_CONFIG.workspace, ...loaded?.workspace }
-    };
-  } catch {
-    process.stderr.write("Warning: daemon config could not be parsed, using defaults.\n");
-    return DEFAULT_CONFIG;
+var FlowConfigLoader = class _FlowConfigLoader {
+  static DEFAULT = {
+    queue: { concurrency: 1 },
+    logs: { retainDays: 30 },
+    worker: { wsPort: null },
+    security: { allowAbsolutePaths: false },
+    limits: {
+      maxInjectedSteps: 20,
+      maxStepsPerExecution: 50
+    },
+    workspace: { retainDays: 30, maxWorkspaces: 50 }
+  };
+  /**
+   * Load and merge user config from the given YAML file with the default config.
+   * Unknown keys are ignored; missing keys fall back to defaults.
+   */
+  static load(configFile) {
+    if (!fs9.existsSync(configFile))
+      return _FlowConfigLoader.DEFAULT;
+    try {
+      const loaded = load(fs9.readFileSync(configFile, "utf8"), {
+        schema: JSON_SCHEMA
+      });
+      return {
+        queue: { ..._FlowConfigLoader.DEFAULT.queue, ...loaded?.queue },
+        logs: { ..._FlowConfigLoader.DEFAULT.logs, ...loaded?.logs },
+        worker: { ..._FlowConfigLoader.DEFAULT.worker, ...loaded?.worker },
+        security: { ..._FlowConfigLoader.DEFAULT.security, ...loaded?.security },
+        limits: { ..._FlowConfigLoader.DEFAULT.limits, ...loaded?.limits },
+        workspace: { ..._FlowConfigLoader.DEFAULT.workspace, ...loaded?.workspace }
+      };
+    } catch {
+      process.stderr.write("Warning: daemon config could not be parsed, using defaults.\n");
+      return _FlowConfigLoader.DEFAULT;
+    }
   }
-}
+};
 
 // dist/config/PluginLoader.js
 var import_node_fs = require("node:fs");
@@ -23536,142 +23683,12 @@ var PluginLoader = class {
   }
 };
 
-// dist/hooks/HookDispatcher.js
-var import_node_child_process3 = require("node:child_process");
-var http = __toESM(require("node:http"), 1);
-var https = __toESM(require("node:https"), 1);
-var import_node_util = require("node:util");
-var execFileAsync = (0, import_node_util.promisify)(import_node_child_process3.execFile);
-var HookDispatcher = class {
-  hooks;
-  constructor(hooks) {
-    this.hooks = hooks;
-  }
-  async dispatch(event, payload, onError2) {
-    const hookList = this.hooks[event] ?? [];
-    await Promise.all(hookList.map((hook) => this.runHook(hook, payload).catch((err) => {
-      onError2?.(err);
-    })));
-  }
-  async runHook(hook, payload) {
-    switch (hook.type) {
-      case "cli":
-        await this.sendCliHook(hook, payload);
-        return;
-      case "http":
-        await this.sendHttpHook(hook, payload);
-        return;
-      default: {
-        const _exhaustive = hook;
-        throw new Error(`Unknown hook type: ${JSON.stringify(_exhaustive)}`);
-      }
-    }
-  }
-  sendCliHook(hook, payload) {
-    const payloadEnv = {};
-    for (const [key, val] of Object.entries(payload)) {
-      const envKey = key.replace(/([A-Z])/g, "_$1").toUpperCase();
-      payloadEnv[envKey] = val !== null && val !== void 0 ? String(val) : "";
-    }
-    const baseEnv = {};
-    if (process.env["PATH"])
-      baseEnv["PATH"] = process.env["PATH"];
-    if (process.env["HOME"])
-      baseEnv["HOME"] = process.env["HOME"];
-    if (process.env["TMPDIR"])
-      baseEnv["TMPDIR"] = process.env["TMPDIR"];
-    if (process.env["TEMP"])
-      baseEnv["TEMP"] = process.env["TEMP"];
-    if (process.env["TMP"])
-      baseEnv["TMP"] = process.env["TMP"];
-    if (process.platform === "win32") {
-      if (process.env["SystemRoot"])
-        baseEnv["SystemRoot"] = process.env["SystemRoot"];
-      if (process.env["USERPROFILE"])
-        baseEnv["USERPROFILE"] = process.env["USERPROFILE"];
-    }
-    const env = {
-      ...baseEnv,
-      ...payloadEnv,
-      ...hook.env ?? {}
-      // explicit hook-declared vars — highest priority
-    };
-    if (hook.debug) {
-      return this.sendCliHookDebug(hook, env);
-    }
-    return execFileAsync(hook.command, hook.args, { env, timeout: 1e4 }).then(() => void 0);
-  }
-  // Runs the CLI hook with stdio: 'inherit' so stdout/stderr appear in the calling terminal.
-  // Uses spawn (not execFile) because execFile does not support stdio inheritance.
-  sendCliHookDebug(hook, env) {
-    return new Promise((resolve4, reject) => {
-      const child = (0, import_node_child_process3.spawn)(hook.command, hook.args, { env, stdio: "inherit" });
-      const timer = setTimeout(() => {
-        child.kill();
-        reject(new Error("CLI hook timeout"));
-      }, 1e4);
-      child.on("error", (err) => {
-        clearTimeout(timer);
-        reject(err);
-      });
-      child.on("close", (code) => {
-        clearTimeout(timer);
-        if (code !== 0) {
-          reject(new Error(`Hook exited with code ${String(code)}`));
-        } else {
-          resolve4();
-        }
-      });
-    });
-  }
-  async sendHttpHook(hook, payload) {
-    return new Promise((resolve4, reject) => {
-      let settled = false;
-      const settle = (fn) => {
-        if (!settled) {
-          settled = true;
-          fn();
-        }
-      };
-      const body = JSON.stringify(payload);
-      const url = new URL(hook.url);
-      const options = {
-        hostname: url.hostname,
-        port: url.port || (url.protocol === "https:" ? 443 : 80),
-        path: url.pathname + url.search,
-        method: hook.method ?? "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Content-Length": Buffer.byteLength(body),
-          ...hook.headers
-        }
-      };
-      const transport = url.protocol === "https:" ? https : http;
-      const req = transport.request(options, (res) => {
-        res.on("data", () => {
-        });
-        res.on("end", () => settle(resolve4));
-      });
-      req.on("error", (err) => settle(() => reject(err)));
-      req.setTimeout(1e4, () => {
-        req.destroy();
-        settle(() => reject(new Error("HTTP hook timeout")));
-      });
-      req.write(body);
-      req.end();
-    });
-  }
-};
-
-// dist/updater/versionValidation.js
-var VERSION_RE = /^\d+\.\d+\.\d+([-+][\w.-]+)?$/;
-
 // dist/cli/commands/CliCommand.js
 var execFileAsync2 = (0, import_node_util2.promisify)(import_node_child_process4.execFile);
 var PKG_NAME = "@wadeck/flow-cli";
 function readChannelFromConfig() {
   try {
-    const configFile = path11.join(getConfigDir(), "config.yml");
+    const configFile = path11.join(ConfigDir.get(), "config.yml");
     if (!fs10.existsSync(configFile))
       return "edge";
     const raw = fs10.readFileSync(configFile, "utf-8");
@@ -23715,7 +23732,7 @@ async function runSelfChecks() {
   {
     const name = "Config loading";
     try {
-      const config = loadFlowConfig(path11.join(os5.tmpdir(), ".flow-self-check-nonexistent-config.yaml"));
+      const config = FlowConfigLoader.load(path11.join(os5.tmpdir(), ".flow-self-check-nonexistent-config.yaml"));
       if (config.workspace.retainDays === void 0) {
         throw new Error("workspace.retainDays is undefined");
       }
@@ -23783,7 +23800,7 @@ async function runSelfChecks() {
   {
     const name = "Workspace config";
     try {
-      const config = loadFlowConfig(path11.join(os5.tmpdir(), ".flow-self-check-schema.yaml"));
+      const config = FlowConfigLoader.load(path11.join(os5.tmpdir(), ".flow-self-check-schema.yaml"));
       if (typeof config.workspace.retainDays !== "number" || config.workspace.retainDays <= 0) {
         throw new Error(`workspace.retainDays is not a positive number: ${config.workspace.retainDays}`);
       }
@@ -23849,7 +23866,7 @@ function buildCliCommand() {
   updateCmd.option("--log", "Print the update log");
   updateCmd.action(async (opts) => {
     if (opts.log) {
-      const logFile = path11.join(getConfigDir(), "update-log.txt");
+      const logFile = path11.join(ConfigDir.get(), "update-log.txt");
       if (fs10.existsSync(logFile)) {
         process.stdout.write(fs10.readFileSync(logFile, "utf-8"));
       } else {
@@ -23883,7 +23900,7 @@ function buildCliCommand() {
   });
   cli.addCommand(updateCmd);
   cli.command("rollback").description("Restore the previously installed version").action(() => {
-    const configDir = getConfigDir();
+    const configDir = ConfigDir.get();
     const stateFile = path11.join(configDir, "update-state.json");
     if (!fs10.existsSync(stateFile)) {
       process.stderr.write("No update state found. Nothing to roll back.\n");
@@ -23900,7 +23917,7 @@ function buildCliCommand() {
       process.exit(1);
       return;
     }
-    if (previousVersion === void 0 || !VERSION_RE.test(previousVersion)) {
+    if (previousVersion === void 0 || !VersionValidation.VERSION_RE.test(previousVersion)) {
       process.stderr.write("Invalid or missing previousVersion in update state.\n");
       process.exit(1);
       return;
@@ -24248,43 +24265,49 @@ var ConfigLoader = class {
 };
 
 // dist/config/PluginResolver.js
-async function createPerFlowWorkspaceResolver(options = {}) {
-  const configLoader = new ConfigLoader({
-    globalConfigPath: options.globalConfigPath,
-    projectConfigPath: options.projectConfigPath
-  });
-  const pluginLoader = new PluginLoader({
-    pluginPackagesDir: options.pluginPackagesDir,
-    registryPath: options.registryPath
-  });
-  return async (section) => {
-    const resolved = await configLoader.resolveStandaloneSection("workspace", section);
-    return pluginLoader.loadProvider(resolved.type, "workspace", resolved.options ?? {}, resolved.pluginsDir);
-  };
-}
-async function resolvePlugins(options = {}) {
-  const configLoader = new ConfigLoader({
-    globalConfigPath: options.globalConfigPath,
-    projectConfigPath: options.projectConfigPath
-  });
-  const pluginLoader = new PluginLoader({
-    pluginPackagesDir: options.pluginPackagesDir,
-    registryPath: options.registryPath
-  });
-  const config = await configLoader.load();
-  const result = {};
-  if (!config.workspace) {
-    throw new Error("No workspace provider configured. Add a plugins.workspace section to .flow/config.yml");
+var PluginResolver = class _PluginResolver {
+  configLoader;
+  pluginLoader;
+  constructor(options = {}) {
+    this.configLoader = new ConfigLoader({
+      globalConfigPath: options.globalConfigPath,
+      projectConfigPath: options.projectConfigPath
+    });
+    this.pluginLoader = new PluginLoader({
+      pluginPackagesDir: options.pluginPackagesDir,
+      registryPath: options.registryPath
+    });
   }
-  if (!config.workspace.type) {
-    throw new Error("workspace.type is required in config. Expected format: plugins.<pluginId>.<implName>");
+  static create(options = {}) {
+    return new _PluginResolver(options);
   }
-  result.workspaceProvider = await pluginLoader.loadProvider(config.workspace.type, "workspace", config.workspace.options ?? {}, config.workspace.pluginsDir);
-  if (config.approval) {
-    result.approvalProvider = await pluginLoader.loadProvider(config.approval.type, "approval", config.approval.options ?? {}, config.approval.pluginsDir);
+  /**
+   * Creates a callback that resolves a per-flow workspace provider from a flow's plugins.workspace section.
+   * The callback validates credentials and loads the provider via PluginLoader.
+   */
+  async createPerFlowWorkspaceResolver() {
+    const { configLoader, pluginLoader } = this;
+    return async (section) => {
+      const resolved = await configLoader.resolveStandaloneSection("workspace", section);
+      return pluginLoader.loadProvider(resolved.type, "workspace", resolved.options ?? {}, resolved.pluginsDir);
+    };
   }
-  return result;
-}
+  async resolveAll() {
+    const config = await this.configLoader.load();
+    const result = {};
+    if (!config.workspace) {
+      throw new Error("No workspace provider configured. Add a plugins.workspace section to .flow/config.yml");
+    }
+    if (!config.workspace.type) {
+      throw new Error("workspace.type is required in config. Expected format: plugins.<pluginId>.<implName>");
+    }
+    result.workspaceProvider = await this.pluginLoader.loadProvider(config.workspace.type, "workspace", config.workspace.options ?? {}, config.workspace.pluginsDir);
+    if (config.approval) {
+      result.approvalProvider = await this.pluginLoader.loadProvider(config.approval.type, "approval", config.approval.options ?? {}, config.approval.pluginsDir);
+    }
+    return result;
+  }
+};
 
 // dist/storage/ExecutionStore.js
 var crypto5 = __toESM(require("node:crypto"), 1);
@@ -25172,14 +25195,14 @@ async function tryResolvePlugins() {
   if (!envOverride && !fs16.existsSync(globalConfigPath) && !fs16.existsSync(projectConfigPath)) {
     return {};
   }
-  return resolvePlugins();
+  return PluginResolver.create().resolveAll();
 }
-async function startDaemon(config = DEFAULT_CONFIG, daemonDir) {
+async function startDaemon(config = FlowConfigLoader.DEFAULT, daemonDir) {
   const resolvedDaemonDir = daemonDir ?? path16.join(os8.homedir(), ".flow-daemon");
   const executionsDir = path16.join(resolvedDaemonDir, "executions");
   const logsDir = path16.join(resolvedDaemonDir, "logs");
   const pluginProviders = await tryResolvePlugins();
-  const perFlowWorkspaceResolver = await createPerFlowWorkspaceResolver();
+  const perFlowWorkspaceResolver = await PluginResolver.create().createPerFlowWorkspaceResolver();
   let workerPool;
   let wsServer;
   let commandHandler;
@@ -25310,6 +25333,11 @@ async function startDaemon(config = DEFAULT_CONFIG, daemonDir) {
   }
   return daemonHandle;
 }
+var Daemon = class {
+  static async start(config = FlowConfigLoader.DEFAULT, daemonDir) {
+    return startDaemon(config, daemonDir);
+  }
+};
 
 // dist/cli/commands/RunCommand.js
 function parseTimeout(value) {
@@ -25458,7 +25486,7 @@ async function sendToDaemon(cmd, config, daemonDir) {
     if (!(err instanceof import_singleton_daemon_kit2.DaemonNotRunningError))
       throw err;
     try {
-      await startDaemon(config);
+      await Daemon.start(config);
       return await makeClient().send("run", cmd);
     } catch (e2) {
       console.error("Daemon could not be started:", e2);
@@ -25491,7 +25519,7 @@ function registerRunCommand(program2) {
         process.exit(2);
       }
     }
-    const config = loadFlowConfig(path17.join(os9.homedir(), ".flow-config.yaml"));
+    const config = FlowConfigLoader.load(path17.join(os9.homedir(), ".flow-config.yaml"));
     const cmd = {
       type: "run",
       flowFile,
@@ -25886,7 +25914,8 @@ function registerValidateCommand(program2) {
 
 // dist/cli/FlowIndex.js
 async function main() {
-  const updateState = readAndClearUpdateState(getConfigDir());
+  const updateManager = new UpdateManager("@wadeck/flow-cli");
+  const updateState = updateManager.readAndClearState();
   if (updateState?.status === "success") {
     process.stderr.write(`[flow] Updated to v${updateState.newVersion}
 `);
@@ -25916,7 +25945,7 @@ async function main() {
   program2.addCommand(buildCliCommand());
   await program2.parseAsync(process.argv);
   const bundlePath = process.env["LAUNCHER_BUNDLE_OVERRIDE"] ?? (0, import_node_url4.fileURLToPath)(__importMetaUrl);
-  scheduleBackgroundUpdate(bundlePath, "@wadeck/flow-cli", "flow-updater.cjs");
+  updateManager.scheduleBackgroundUpdate(bundlePath, "flow-updater.cjs");
 }
 var isEntryPoint = process.argv[1] !== void 0 && (process.argv[1] === (0, import_node_url4.fileURLToPath)(__importMetaUrl) || process.argv[1].endsWith("FlowIndex.js") || process.argv[1].endsWith("FlowIndex.ts"));
 if (isEntryPoint) {
