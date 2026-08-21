@@ -13,9 +13,9 @@
 		"package.json"
 	],
 	"optionalDependencies": {
-		"@wadeck/task-cli-win32-x64": "*",
-		"@wadeck/task-cli-darwin-arm64": "*",
-		"@wadeck/task-cli-darwin-x64": "*"
+		"@wadeck/task-cli-win32-x64": ">=0.0.0-0",
+		"@wadeck/task-cli-darwin-arm64": ">=0.0.0-0",
+		"@wadeck/task-cli-darwin-x64": ">=0.0.0-0"
 	},
 	"publishConfig": {
 		"@wadeck:registry": "https://gitlab.com/api/v4/projects/84445653/packages/npm/"
