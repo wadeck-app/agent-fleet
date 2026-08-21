@@ -35,7 +35,7 @@ jobs:
                   GITLAB_NPM_WRITE_TOKEN: ${{ secrets.GITLAB_NPM_WRITE_TOKEN }}
 
             - name: Install dependencies
-              run: npm ci
+              run: npm install --prefer-offline
 
             - name: Build TypeScript
               run: npm run build --workspaces --if-present
