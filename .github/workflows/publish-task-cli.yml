@@ -113,7 +113,7 @@ jobs:
             - name: Set version in all packages
               run: |
                   for pkg in task-cli-dist task-cli-win32-x64 task-cli-darwin-arm64 task-cli-darwin-x64; do
-                    npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --prefix "packages/$pkg"
+                    (cd "packages/$pkg" && npm version "${{ steps.version.outputs.version }}" --no-git-tag-version)
                   done
 
             - name: Configure GitLab npm registry for publish
@@ -126,7 +126,7 @@ jobs:
             - name: Publish platform packages
               run: |
                   for pkg in task-cli-win32-x64 task-cli-darwin-arm64 task-cli-darwin-x64; do
-                    npm publish --prefix "packages/$pkg"
+                    (cd "packages/$pkg" && npm publish)
                   done
 
             - name: Publish main package
