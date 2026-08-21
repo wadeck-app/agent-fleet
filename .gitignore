@@ -27,7 +27,6 @@ data/knowledge/
 !data/knowledge/.gitkeep
 
 # Logs
-*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -67,3 +66,4 @@ _results/
 *.flow-test.yml
 
 _notes.txt
+*-output.log
