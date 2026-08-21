@@ -123,7 +123,7 @@ jobs:
             - name: Set version in all packages
               run: |
                   for pkg in task-cli-dist task-cli-win32-x64 task-cli-darwin-arm64 task-cli-darwin-x64; do
-                    (cd "packages/$pkg" && npm version "${{ steps.version.outputs.version }}" --no-git-tag-version)
+                    (cd "packages/$pkg" && npm pkg set version="${{ steps.version.outputs.version }}")
                   done
 
             - name: Configure GitLab npm registry (write -- for npm publish)

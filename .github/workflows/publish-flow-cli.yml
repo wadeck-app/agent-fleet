@@ -124,7 +124,7 @@ jobs:
             - name: Set version in all packages
               run: |
                   for pkg in flow-cli-dist flow-cli-win32-x64 flow-cli-darwin-arm64 flow-cli-darwin-x64; do
-                    (cd "packages/$pkg" && npm version "${{ steps.version.outputs.version }}" --no-git-tag-version)
+                    (cd "packages/$pkg" && npm pkg set version="${{ steps.version.outputs.version }}")
                   done
 
             - name: Configure GitLab npm registry (write -- for npm publish)
