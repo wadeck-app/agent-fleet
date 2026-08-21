@@ -132,10 +132,10 @@ jobs:
                     exit 1
                   fi
                   echo "WRITE token: ${TOKEN:0:9}*** (length: ${#TOKEN})"
-                  echo "@wadeck:registry=https:${GITLAB_NPM_REGISTRY_PATH}" >> .npmrc
-                  echo "${GITLAB_NPM_REGISTRY_PATH}:_authToken=${TOKEN}" >> .npmrc
-                  echo "auth-type=legacy" >> .npmrc
-                  echo "=== .npmrc (token masked) ===" && sed 's/_authToken=.*/_authToken=***/' .npmrc
+                  echo "@wadeck:registry=https:${GITLAB_NPM_REGISTRY_PATH}" >> ~/.npmrc
+                  echo "${GITLAB_NPM_REGISTRY_PATH}:_authToken=${TOKEN}" >> ~/.npmrc
+                  echo "auth-type=legacy" >> ~/.npmrc
+                  echo "=== .npmrc (token masked) ===" && sed 's/_authToken=.*/_authToken=***/' ~/.npmrc
                   echo "=== whoami ===" && curl -s "https:${GITLAB_NPM_REGISTRY_PATH}-/whoami" -H "Authorization: Bearer ${TOKEN}"
                   echo ""
               env:
