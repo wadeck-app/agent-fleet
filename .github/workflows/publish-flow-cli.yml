@@ -3,24 +3,12 @@ name: Publish @wadeck/flow-cli
 on:
     push:
         branches: [main, integration]
-        paths:
-            - packages/flow-cli/**
-            - packages/flow-cli-dist/**
-            - packages/flow-cli-win32-x64/**
-            - packages/flow-cli-darwin-arm64/**
-            - packages/flow-cli-darwin-x64/**
-            - packages/flow-cli-linux-x64/**
-            - packages/flow-engine/**
-            - packages/extension-points/**
-            - packages/plugin-none/**
-            - packages/plugin-worktree/**
-            - packages/plugin-cli-approval/**
-            - packages/shared-common/**
     workflow_dispatch:
         inputs:
             version:
                 description: 'Stable version (e.g. 1.2.0)'
-                required: true
+                required: false
+                default: ""
             breaking:
                 description: 'Breaking change? (true/false)'
                 required: false

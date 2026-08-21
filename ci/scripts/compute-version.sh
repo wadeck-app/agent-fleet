@@ -20,13 +20,6 @@ EVENT="${GITHUB_EVENT_NAME:-push}"
 VERSION_INPUT="${VERSION_INPUT:-}"
 BREAKING_INPUT="${BREAKING_INPUT:-false}"
 
-if [[ "$EVENT" == "workflow_dispatch" ]]; then
-  if [[ -z "$VERSION_INPUT" ]]; then
-    echo "ERROR: workflow_dispatch requires a non-empty version input." >&2
-    exit 1
-  fi
-fi
-
 if [[ "$EVENT" == "workflow_dispatch" && -n "$VERSION_INPUT" ]]; then
   VERSION="$VERSION_INPUT"
   if [[ "$BREAKING_INPUT" == "true" ]]; then
