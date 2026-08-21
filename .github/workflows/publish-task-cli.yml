@@ -65,9 +65,9 @@ jobs:
                       -H "Authorization: Bearer ${WRITE}" \
                       -H "Content-Type: application/json" \
                       -d '{}' \
-                      "https://gitlab.com/api/v4/projects/84445653/packages/generic/token-write-probe/0.0.1/test.txt")
+                      "https://gitlab.com/api/v4/projects/84445653/packages/npm/@wadeck%2f_write_probe")
                     case "$HTTP_WRITE" in
-                      400|200) echo "WRITE token: write_package_registry ✓ (probe HTTP ${HTTP_WRITE})" ;;
+                      200|400) echo "WRITE token: write_package_registry ✓ (probe HTTP ${HTTP_WRITE})" ;;
                       403) echo "::error::GITLAB_NPM_WRITE_TOKEN lacks write_package_registry scope (HTTP 403) -- update the deploy token in GitLab" ; exit 1 ;;
                       404) echo "::error::GITLAB_NPM_WRITE_TOKEN has no visibility to project 84445653 (HTTP 404)" ; exit 1 ;;
                       *)   echo "::warning::WRITE token probe returned HTTP ${HTTP_WRITE} -- proceeding anyway" ;;
