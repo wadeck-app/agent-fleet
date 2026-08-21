@@ -110,7 +110,7 @@ jobs:
             - name: Set version in all packages
               run: |
                   for pkg in flow-cli-dist flow-cli-win32-x64 flow-cli-darwin-arm64 flow-cli-darwin-x64; do
-                    npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --workspace "packages/$pkg"
+                    npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --prefix "packages/$pkg"
                   done
 
             - name: Configure GitLab npm registry for publish
@@ -123,7 +123,7 @@ jobs:
             - name: Publish platform packages
               run: |
                   for pkg in flow-cli-win32-x64 flow-cli-darwin-arm64 flow-cli-darwin-x64; do
-                    npm publish --workspace "packages/$pkg"
+                    npm publish --prefix "packages/$pkg"
                   done
 
             - name: Publish main package
