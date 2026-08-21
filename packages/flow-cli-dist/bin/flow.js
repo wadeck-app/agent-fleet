@@ -23,8 +23,16 @@ let launcherPath;
 try {
 	launcherPath = require.resolve(`${pkgName}/flow${ext}`);
 } catch {
-	process.stderr.write(`flow: platform package ${pkgName} is not installed.\nRun: npm install -g @wadeck/flow-cli\n`);
-	process.exit(1);
+	// Platform package missing (GitLab npm registry doesn't expose os/cpu in packument,
+	// so npm can't auto-install optionalDependencies by platform). Install it now.
+	process.stderr.write(`flow: installing platform package ${pkgName}...\n`);
+	try {
+		execFileSync('npm', ['install', '-g', pkgName], { stdio: 'inherit' });
+		launcherPath = require.resolve(`${pkgName}/flow${ext}`);
+	} catch {
+		process.stderr.write(`flow: failed to install ${pkgName}. Run manually: npm install -g ${pkgName}\n`);
+		process.exit(1);
+	}
 }
 
 // Use __dirname so this works both when installed globally and as devDependency.

@@ -23,8 +23,14 @@ let launcherPath;
 try {
 	launcherPath = require.resolve(`${pkgName}/task${ext}`);
 } catch {
-	process.stderr.write(`task: platform package ${pkgName} is not installed.\nRun: npm install -g @wadeck/task-cli\n`);
-	process.exit(1);
+	process.stderr.write(`task: installing platform package ${pkgName}...\n`);
+	try {
+		execFileSync('npm', ['install', '-g', pkgName], { stdio: 'inherit' });
+		launcherPath = require.resolve(`${pkgName}/task${ext}`);
+	} catch {
+		process.stderr.write(`task: failed to install ${pkgName}. Run manually: npm install -g ${pkgName}\n`);
+		process.exit(1);
+	}
 }
 
 // Use __dirname so this works both when installed globally and as devDependency.
