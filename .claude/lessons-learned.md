@@ -1,8 +1,11 @@
 # Lessons learned
 
-<!-- Last updated: 2026-08-20T20:46:48.154Z -->
+<!-- Last updated: 2026-08-21T08:26:59.631Z -->
 
 ## Recurring feedback
+
+<!-- session 1dcbd5b4 2026-08-21 -->
+- npm registry auth blocks duplicated across .github/workflows/publish-flow-cli.yml, publish-task-cli.yml, and found the same pattern in wdrive, violations-framework — DRY opportunity: extract to shared action or script.
 
 <!-- session 2157a0f8 2026-08-20 -->
 
@@ -365,6 +368,10 @@
 - Multiple independent agents (Explore, general-purpose) read identical spec files sequentially without coordination, causing redundant I/O. Agents should receive shared context or hand off findings rather than re-audit.
 
 ## Agent errors
+
+<!-- session 1dcbd5b4 2026-08-21 -->
+- OpenCodeModelProvider subprocess event handling required multiple refinement cycles — stdin closure timing, close vs exit event ordering, and timeout safety weren't immediately clear from code inspection; debugged via iterative edits and test runs before arriving at final pattern (close stdin → wait for close event → timeout fallback).
+- OpenCode executable resolution fell back through multiple paths before finding the right approach — tried direct exe locations, .cmd wrapper, shutil.which — unclear upfront that Windows PATH resolution differs from *nix; settled on fallback chain but discovery was iterative (log lines 22:23:07 → 22:47:56).
 
 <!-- session 2157a0f8 2026-08-20 -->
 
@@ -901,6 +908,10 @@
 
 ## Documentation gaps
 
+<!-- session 1dcbd5b4 2026-08-21 -->
+- Package-lock.json registry URL consistency with CI workflows not initially checked — discovered project-level URLs mixed with group-level URLs; required sed replacement, then full regeneration. Future: verify lockfile URLs match workflow *.npmrc blocks upfront.
+- Subprocess stdin lifecycle for OpenCode on Windows (must close stdin *before* waiting for close event to unblock; use close not exit event) — not previously documented in lessons-learned; prevents future deadlock debugging cycles.
+
 <!-- session 2157a0f8 2026-08-20 -->
 
 - CLI command structure unclear — multiple rewrites to CliCommand.ts, TaskCliCommand.ts, ShowCommand.ts and edits to ShowCommand to replace `ModelFlowStep` references indicate the command factory/hierarchy pattern was not self-evident from existing code.
@@ -1340,6 +1351,9 @@
 - Extensive Grep searches for domain concepts (RE-QUEUED, bufferSpill, reconnectTimeout, idleTimeout, drainTimeout, heartbeat monitoring, etc.) suggest spec lacks clear glossary or index of key terms. Future audits should define these upfront.
 
 ## Known constraints
+
+<!-- session 1dcbd5b4 2026-08-21 -->
+- GitLab npm auth in workflows uses group-level registry (api/v4/packages/npm/) for @wadeck scoped packages, but package-lock.json requires the same — if regenerating lockfile after workflow changes, must rebuild to sync both sources.
 
 <!-- session 2157a0f8 2026-08-20 -->
 
