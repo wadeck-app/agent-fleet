@@ -17,14 +17,9 @@ copy_flow() {
 }
 
 copy_task() {
-  # task launcher: use task-specific binaries if they exist, fall back to flow binaries
-  # (same binary, different config -- to be refined when task gets its own launcher config)
-  cp "$LAUNCHER_DIST/task_windows_release.exe"  packages/task-cli-win32-x64/task.exe 2>/dev/null \
-    || cp "$LAUNCHER_DIST/flow_windows_release.exe"  packages/task-cli-win32-x64/task.exe
-  cp "$LAUNCHER_DIST/task_darwin_arm64_release"  packages/task-cli-darwin-arm64/task 2>/dev/null \
-    || cp "$LAUNCHER_DIST/flow_darwin_arm64_release"  packages/task-cli-darwin-arm64/task
-  cp "$LAUNCHER_DIST/task_darwin_amd64_release"  packages/task-cli-darwin-x64/task 2>/dev/null \
-    || cp "$LAUNCHER_DIST/flow_darwin_amd64_release"  packages/task-cli-darwin-x64/task
+  cp "$LAUNCHER_DIST/task_windows_release.exe"  packages/task-cli-win32-x64/task.exe
+  cp "$LAUNCHER_DIST/task_darwin_arm64_release"  packages/task-cli-darwin-arm64/task
+  cp "$LAUNCHER_DIST/task_darwin_amd64_release"  packages/task-cli-darwin-x64/task
   cp packages/flow-cli/dist-bundle/task.cjs           packages/task-cli-dist/task.cjs
   # Shared updater bundle: flow-updater.cjs also serves task-cli via UPDATER_PKG_NAME env var.
   # Replace with a task-specific bundle when task-cli gets its own Go launcher config.
