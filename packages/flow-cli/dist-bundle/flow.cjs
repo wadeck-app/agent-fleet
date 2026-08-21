@@ -960,8 +960,8 @@ var require_command = __commonJS({
   "../../node_modules/commander/lib/command.js"(exports2) {
     var EventEmitter2 = require("node:events").EventEmitter;
     var childProcess = require("node:child_process");
-    var path19 = require("node:path");
-    var fs21 = require("node:fs");
+    var path18 = require("node:path");
+    var fs20 = require("node:fs");
     var process2 = require("node:process");
     var { Argument: Argument2, humanReadableArgName } = require_argument();
     var { CommanderError: CommanderError2 } = require_error();
@@ -1893,11 +1893,11 @@ Expecting one of '${allowedValues.join("', '")}'`);
         let launchWithNode = false;
         const sourceExt = [".js", ".ts", ".tsx", ".mjs", ".cjs"];
         function findFile(baseDir, baseName) {
-          const localBin = path19.resolve(baseDir, baseName);
-          if (fs21.existsSync(localBin)) return localBin;
-          if (sourceExt.includes(path19.extname(baseName))) return void 0;
+          const localBin = path18.resolve(baseDir, baseName);
+          if (fs20.existsSync(localBin)) return localBin;
+          if (sourceExt.includes(path18.extname(baseName))) return void 0;
           const foundExt = sourceExt.find(
-            (ext) => fs21.existsSync(`${localBin}${ext}`)
+            (ext) => fs20.existsSync(`${localBin}${ext}`)
           );
           if (foundExt) return `${localBin}${foundExt}`;
           return void 0;
@@ -1909,21 +1909,21 @@ Expecting one of '${allowedValues.join("', '")}'`);
         if (this._scriptPath) {
           let resolvedScriptPath;
           try {
-            resolvedScriptPath = fs21.realpathSync(this._scriptPath);
+            resolvedScriptPath = fs20.realpathSync(this._scriptPath);
           } catch (err) {
             resolvedScriptPath = this._scriptPath;
           }
-          executableDir = path19.resolve(
-            path19.dirname(resolvedScriptPath),
+          executableDir = path18.resolve(
+            path18.dirname(resolvedScriptPath),
             executableDir
           );
         }
         if (executableDir) {
           let localFile = findFile(executableDir, executableFile);
           if (!localFile && !subcommand._executableFile && this._scriptPath) {
-            const legacyName = path19.basename(
+            const legacyName = path18.basename(
               this._scriptPath,
-              path19.extname(this._scriptPath)
+              path18.extname(this._scriptPath)
             );
             if (legacyName !== this._name) {
               localFile = findFile(
@@ -1934,7 +1934,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
           }
           executableFile = localFile || executableFile;
         }
-        launchWithNode = sourceExt.includes(path19.extname(executableFile));
+        launchWithNode = sourceExt.includes(path18.extname(executableFile));
         let proc;
         if (process2.platform !== "win32") {
           if (launchWithNode) {
@@ -2774,7 +2774,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @return {Command}
        */
       nameFromFilename(filename) {
-        this._name = path19.basename(filename, path19.extname(filename));
+        this._name = path18.basename(filename, path18.extname(filename));
         return this;
       }
       /**
@@ -2788,9 +2788,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} [path]
        * @return {(string|null|Command)}
        */
-      executableDir(path20) {
-        if (path20 === void 0) return this._executableDir;
-        this._executableDir = path20;
+      executableDir(path19) {
+        if (path19 === void 0) return this._executableDir;
+        this._executableDir = path19;
         return this;
       }
       /**
@@ -3806,10 +3806,10 @@ var require_src2 = __commonJS({
     var fs_1 = require("fs");
     var debug_1 = __importDefault(require_src());
     var log = debug_1.default("@kwsites/file-exists");
-    function check(path19, isFile, isDirectory) {
-      log(`checking %s`, path19);
+    function check(path18, isFile, isDirectory) {
+      log(`checking %s`, path18);
       try {
-        const stat = fs_1.statSync(path19);
+        const stat = fs_1.statSync(path18);
         if (stat.isFile() && isFile) {
           log(`[OK] path represents a file`);
           return true;
@@ -3829,8 +3829,8 @@ var require_src2 = __commonJS({
         throw e;
       }
     }
-    function exists2(path19, type2 = exports2.READABLE) {
-      return check(path19, (type2 & exports2.FILE) > 0, (type2 & exports2.FOLDER) > 0);
+    function exists2(path18, type2 = exports2.READABLE) {
+      return check(path18, (type2 & exports2.FILE) > 0, (type2 & exports2.FOLDER) > 0);
     }
     exports2.exists = exists2;
     exports2.FILE = 1;
@@ -3991,8 +3991,8 @@ var require_port_file = __commonJS({
     exports2.startHeartbeat = startHeartbeat;
     exports2.isFresh = isFresh;
     exports2.deletePortFile = deletePortFile;
-    var fs21 = __importStar(require("fs/promises"));
-    var path19 = __importStar(require("path"));
+    var fs20 = __importStar(require("fs/promises"));
+    var path18 = __importStar(require("path"));
     var PORT_FILE = "config.port";
     var FRESHNESS_MS = 6e4;
     var HEARTBEAT_INTERVAL_MS = 3e4;
@@ -4003,15 +4003,15 @@ var require_port_file = __commonJS({
         pid,
         startedAt: (/* @__PURE__ */ new Date()).toISOString()
       };
-      const filePath = path19.join(configDir, PORT_FILE);
+      const filePath = path18.join(configDir, PORT_FILE);
       const tmpPath = filePath + ".tmp";
-      await fs21.writeFile(tmpPath, JSON.stringify(data), { encoding: "utf8", mode: 384 });
-      await fs21.rename(tmpPath, filePath);
+      await fs20.writeFile(tmpPath, JSON.stringify(data), { encoding: "utf8", mode: 384 });
+      await fs20.rename(tmpPath, filePath);
     }
     async function readPortFile(configDir) {
-      const filePath = path19.join(configDir, PORT_FILE);
+      const filePath = path18.join(configDir, PORT_FILE);
       try {
-        const content = await fs21.readFile(filePath, "utf8");
+        const content = await fs20.readFile(filePath, "utf8");
         const data = JSON.parse(content);
         if (typeof data.port !== "number" || typeof data.pid !== "number")
           return null;
@@ -4021,11 +4021,11 @@ var require_port_file = __commonJS({
       }
     }
     function startHeartbeat(configDir) {
-      const filePath = path19.join(configDir, PORT_FILE);
+      const filePath = path18.join(configDir, PORT_FILE);
       const interval = setInterval(async () => {
         const now = /* @__PURE__ */ new Date();
         try {
-          await fs21.utimes(filePath, now, now);
+          await fs20.utimes(filePath, now, now);
         } catch {
         }
       }, HEARTBEAT_INTERVAL_MS);
@@ -4033,18 +4033,18 @@ var require_port_file = __commonJS({
       return () => clearInterval(interval);
     }
     async function isFresh(configDir) {
-      const filePath = path19.join(configDir, PORT_FILE);
+      const filePath = path18.join(configDir, PORT_FILE);
       try {
-        const stat = await fs21.stat(filePath);
+        const stat = await fs20.stat(filePath);
         return Date.now() - stat.mtimeMs < FRESHNESS_MS;
       } catch {
         return false;
       }
     }
     async function deletePortFile(configDir) {
-      const filePath = path19.join(configDir, PORT_FILE);
+      const filePath = path18.join(configDir, PORT_FILE);
       try {
-        await fs21.unlink(filePath);
+        await fs20.unlink(filePath);
       } catch {
       }
     }
@@ -4120,8 +4120,8 @@ var require_takeover = __commonJS({
     var net = __importStar(require("net"));
     var port_file_js_1 = require_port_file();
     var types_js_1 = require_types();
-    var fs21 = __importStar(require("fs/promises"));
-    var path19 = __importStar(require("path"));
+    var fs20 = __importStar(require("fs/promises"));
+    var path18 = __importStar(require("path"));
     var process_utils_js_1 = require_process_utils();
     async function pollUntilDead(pid, timeoutMs) {
       const deadline = Date.now() + timeoutMs;
@@ -4193,7 +4193,7 @@ var require_takeover = __commonJS({
       }
       let token;
       try {
-        token = (await fs21.readFile(path19.join(configDir, "health_token"), "utf8")).trim();
+        token = (await fs20.readFile(path18.join(configDir, "health_token"), "utf8")).trim();
       } catch {
         token = "";
       }
@@ -4280,8 +4280,8 @@ var require_health_server = __commonJS({
     exports2.startHealthServer = startHealthServer;
     var http3 = __importStar(require("http"));
     var crypto6 = __importStar(require("crypto"));
-    var fs21 = __importStar(require("fs/promises"));
-    var path19 = __importStar(require("path"));
+    var fs20 = __importStar(require("fs/promises"));
+    var path18 = __importStar(require("path"));
     var types_js_1 = require_types();
     var constants_js_1 = require_constants();
     var PACKAGE_VERSION = "1.0.0";
@@ -4338,8 +4338,8 @@ var require_health_server = __commonJS({
       const { configDir, commands, health, versionExtra, appVersion, hooks, onQuit } = options;
       const basePort = options.port ?? 47823;
       const token = crypto6.randomBytes(16).toString("hex");
-      const tokenPath = path19.join(configDir, "health_token");
-      await fs21.writeFile(tokenPath, token, { mode: 384 });
+      const tokenPath = path18.join(configDir, "health_token");
+      await fs20.writeFile(tokenPath, token, { mode: 384 });
       const server = http3.createServer(async (req, res) => {
         const rawUrl = req.url ?? "/";
         const url = new URL(rawUrl, "http://localhost").pathname;
@@ -4591,25 +4591,25 @@ var require_startup_lock = __commonJS({
     })();
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.acquireStartupLock = acquireStartupLock;
-    var fs21 = __importStar(require("fs/promises"));
-    var path19 = __importStar(require("path"));
+    var fs20 = __importStar(require("fs/promises"));
+    var path18 = __importStar(require("path"));
     var types_js_1 = require_types();
     var process_utils_js_1 = require_process_utils();
     var LOCK_RETRY_INTERVAL_MS = 100;
     var LOCK_TIMEOUT_MS = 1e4;
     async function acquireStartupLock(configDir, timeoutMs) {
-      const lockPath = path19.join(configDir, "config.lock");
+      const lockPath = path18.join(configDir, "config.lock");
       const effectiveTimeout = timeoutMs ?? LOCK_TIMEOUT_MS;
       const deadline = Date.now() + effectiveTimeout;
       while (true) {
         try {
-          const fd = await fs21.open(lockPath, "wx");
+          const fd = await fs20.open(lockPath, "wx");
           const data = { pid: process.pid, startedAt: (/* @__PURE__ */ new Date()).toISOString() };
           await fd.writeFile(JSON.stringify(data), "utf8");
           await fd.close();
           return async () => {
             try {
-              await fs21.unlink(lockPath);
+              await fs20.unlink(lockPath);
             } catch {
             }
           };
@@ -4618,11 +4618,11 @@ var require_startup_lock = __commonJS({
           if (e.code !== "EEXIST")
             throw err;
           try {
-            const content = await fs21.readFile(lockPath, "utf8");
+            const content = await fs20.readFile(lockPath, "utf8");
             const { pid } = JSON.parse(content);
             if (!(0, process_utils_js_1.isProcessAlive)(pid)) {
               let unlinkBlocked = false;
-              await fs21.unlink(lockPath).catch((unlinkErr) => {
+              await fs20.unlink(lockPath).catch((unlinkErr) => {
                 const code = unlinkErr.code;
                 if (code !== "ENOENT") {
                   if (Date.now() >= deadline) {
@@ -4774,8 +4774,8 @@ var require_client = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.createDaemonClient = createDaemonClient2;
     var http3 = __importStar(require("http"));
-    var fs21 = __importStar(require("fs/promises"));
-    var path19 = __importStar(require("path"));
+    var fs20 = __importStar(require("fs/promises"));
+    var path18 = __importStar(require("path"));
     var port_file_js_1 = require_port_file();
     var types_js_1 = require_types();
     var process_utils_js_1 = require_process_utils();
@@ -4880,7 +4880,7 @@ var require_client = __commonJS({
           }
           let token;
           try {
-            token = (await fs21.readFile(path19.join(configDir, "health_token"), "utf8")).trim();
+            token = (await fs20.readFile(path18.join(configDir, "health_token"), "utf8")).trim();
           } catch (err) {
             const code = err.code;
             if (code === "ENOENT") {
@@ -4953,13 +4953,13 @@ var require_test_harness = __commonJS({
     exports2.createTestDaemon = createTestDaemon;
     var os10 = __importStar(require("os"));
     var crypto6 = __importStar(require("crypto"));
-    var fs21 = __importStar(require("fs/promises"));
-    var path19 = __importStar(require("path"));
+    var fs20 = __importStar(require("fs/promises"));
+    var path18 = __importStar(require("path"));
     var daemon_js_1 = require_daemon();
     var client_js_1 = require_client();
     async function createTestDaemon(options) {
-      const tmpDir = path19.join(os10.tmpdir(), crypto6.randomUUID());
-      await fs21.mkdir(tmpDir, { recursive: true });
+      const tmpDir = path18.join(os10.tmpdir(), crypto6.randomUUID());
+      await fs20.mkdir(tmpDir, { recursive: true });
       const port = options.port ?? 0;
       const daemon = await (0, daemon_js_1.createDaemon)({
         ...options,
@@ -4978,7 +4978,7 @@ var require_test_harness = __commonJS({
         },
         async [Symbol.asyncDispose]() {
           await daemon.stop("command");
-          await fs21.rm(tmpDir, { recursive: true, force: true });
+          await fs20.rm(tmpDir, { recursive: true, force: true });
         }
       };
       return handle;
@@ -12751,15 +12751,15 @@ var GraphValidator = class {
     }
     if (this.flowRegistry && step.flowId !== currentFlowId) {
       const visited = /* @__PURE__ */ new Set();
-      const path19 = [];
-      if (this.detectCircularSubFlowDependency(step.flowId, currentFlowId, visited, path19)) {
+      const path18 = [];
+      if (this.detectCircularSubFlowDependency(step.flowId, currentFlowId, visited, path18)) {
         this.issueCollector.addIssue({
           severity: "error",
           code: "CIRCULAR_SUBFLOW_REFERENCE" /* CIRCULAR_SUBFLOW_REFERENCE */,
-          message: `SubFlow step '${step.id}' creates circular dependency chain: ${path19.join(" \u2192 ")} \u2192 ${currentFlowId}`,
+          message: `SubFlow step '${step.id}' creates circular dependency chain: ${path18.join(" \u2192 ")} \u2192 ${currentFlowId}`,
           location: { stepId: step.id, field: "flowId" },
           suggestion: "Break the circular chain by restructuring the flow composition",
-          context: { related: path19 }
+          context: { related: path18 }
         });
         return true;
       }
@@ -12812,22 +12812,22 @@ var GraphValidator = class {
   /**
    * DFS for cycle detection
    */
-  detectCycleDFS(stepId, graph, visited, recursionStack, path19) {
+  detectCycleDFS(stepId, graph, visited, recursionStack, path18) {
     visited.add(stepId);
     recursionStack.add(stepId);
-    path19.push(stepId);
+    path18.push(stepId);
     const dependencies = graph.get(stepId) || /* @__PURE__ */ new Set();
     for (const depId of dependencies) {
       if (!visited.has(depId)) {
-        const cycle = this.detectCycleDFS(depId, graph, visited, recursionStack, path19);
+        const cycle = this.detectCycleDFS(depId, graph, visited, recursionStack, path18);
         if (cycle) return cycle;
       } else if (recursionStack.has(depId)) {
-        const cycleStart = path19.indexOf(depId);
-        return path19.slice(cycleStart).concat(depId);
+        const cycleStart = path18.indexOf(depId);
+        return path18.slice(cycleStart).concat(depId);
       }
     }
     recursionStack.delete(stepId);
-    path19.pop();
+    path18.pop();
     return null;
   }
   /**
@@ -12906,7 +12906,7 @@ var GraphValidator = class {
    * @param path - Current path through the flow graph (for error reporting)
    * @returns true if a circular dependency is detected, false otherwise
    */
-  detectCircularSubFlowDependency(flowId, targetFlowId, visited, path19) {
+  detectCircularSubFlowDependency(flowId, targetFlowId, visited, path18) {
     if (visited.has(flowId)) {
       return false;
     }
@@ -12914,7 +12914,7 @@ var GraphValidator = class {
       return true;
     }
     visited.add(flowId);
-    path19.push(flowId);
+    path18.push(flowId);
     if (!this.flowRegistry) {
       return false;
     }
@@ -12926,10 +12926,10 @@ var GraphValidator = class {
       if (step.type === "subflow") {
         const subFlowStep = step;
         const newVisited = new Set(visited);
-        const newPath = [...path19];
+        const newPath = [...path18];
         if (this.detectCircularSubFlowDependency(subFlowStep.flowId, targetFlowId, newVisited, newPath)) {
-          path19.length = 0;
-          path19.push(...newPath);
+          path18.length = 0;
+          path18.push(...newPath);
           return true;
         }
       }
@@ -14399,16 +14399,16 @@ var SimulationValidator = class _SimulationValidator {
     }
     const rootSteps = flow.steps.filter((step) => !step.depends || step.depends.length === 0);
     for (const root of rootSteps) {
-      const path19 = {
+      const path18 = {
         steps: [root.id],
         reachesTerminal: !root.when,
         // Conditional roots may not execute
         producedOutputs: /* @__PURE__ */ new Map()
       };
       if (root.output) {
-        path19.producedOutputs.set(root.id, new Set(Object.keys(root.output)));
+        path18.producedOutputs.set(root.id, new Set(Object.keys(root.output)));
       }
-      paths.push(path19);
+      paths.push(path18);
     }
     return paths;
   }
@@ -15261,8 +15261,8 @@ var TemplateRenderer = class {
       if (parts.length < 2) {
         throw new TemplateRenderError("inputs requires a variable name: inputs.varName", expression, root);
       }
-      const path19 = parts.slice(1);
-      return this.resolveNested(context.inputs, path19, expression);
+      const path18 = parts.slice(1);
+      return this.resolveNested(context.inputs, path18, expression);
     } else if (root === "steps") {
       if (parts.length < 4 || parts[2] !== "outputs" && parts[2] !== "meta") {
         throw new TemplateRenderError(
@@ -15278,27 +15278,27 @@ var TemplateRenderer = class {
         if (!meta) {
           throw new TemplateRenderError(`Step '${stepId}' not found or has no meta`, expression, stepId);
         }
-        const path20 = parts.slice(3);
-        return this.resolveNested(meta, path20, expression);
+        const path19 = parts.slice(3);
+        return this.resolveNested(meta, path19, expression);
       }
       const stepOutputs2 = context.stepOutputs.get(stepId);
       if (!stepOutputs2) {
         throw new TemplateRenderError(`Step '${stepId}' not found or has no outputs`, expression, stepId);
       }
-      const path19 = parts.slice(3);
-      return this.resolveNested(stepOutputs2, path19, expression);
+      const path18 = parts.slice(3);
+      return this.resolveNested(stepOutputs2, path18, expression);
     } else if (root === "task") {
       if (parts.length < 2) {
         throw new TemplateRenderError("task requires a property: task.priority", expression, root);
       }
-      const path19 = parts.slice(1);
-      return this.resolveNested(context.taskMetadata, path19, expression);
+      const path18 = parts.slice(1);
+      return this.resolveNested(context.taskMetadata, path18, expression);
     } else if (root === "context") {
       if (parts.length < 2) {
         throw new TemplateRenderError("context requires a property: context.cwd", expression, root);
       }
-      const path19 = parts.slice(1);
-      return this.resolveNested(context.context ?? {}, path19, expression);
+      const path18 = parts.slice(1);
+      return this.resolveNested(context.context ?? {}, path18, expression);
     } else {
       throw new TemplateRenderError(
         `Unknown root context: '${root}'. Use 'inputs', 'steps', 'task', or 'context'`,
@@ -15315,9 +15315,9 @@ var TemplateRenderer = class {
    * @param fullExpression - Full expression for error messages
    * @returns Resolved value
    */
-  resolveNested(obj, path19, fullExpression) {
+  resolveNested(obj, path18, fullExpression) {
     let current = obj;
-    for (const key of path19) {
+    for (const key of path18) {
       if (current === null || current === void 0) {
         throw new TemplateRenderError(`Cannot access '${key}' on null/undefined`, fullExpression, key);
       }
@@ -15616,22 +15616,22 @@ var DAGValidator = class {
     const visited = /* @__PURE__ */ new Set();
     const visiting = /* @__PURE__ */ new Set();
     const cycles = [];
-    const visit = (stepId, path19) => {
+    const visit = (stepId, path18) => {
       if (visited.has(stepId)) {
         return;
       }
       if (visiting.has(stepId)) {
-        const cycleStartIndex = path19.indexOf(stepId);
-        const cycle = path19.slice(cycleStartIndex);
+        const cycleStartIndex = path18.indexOf(stepId);
+        const cycle = path18.slice(cycleStartIndex);
         cycles.push(cycle);
         return;
       }
       visiting.add(stepId);
-      path19.push(stepId);
+      path18.push(stepId);
       const node = dag.nodes.get(stepId);
       if (node) {
         for (const depId of node.dependencies) {
-          visit(depId, [...path19]);
+          visit(depId, [...path18]);
         }
       }
       visiting.delete(stepId);
@@ -16741,26 +16741,26 @@ var OutputExtractor = class {
   /**
    * Extract value from a path like 'intervention.approved'
    */
-  extractFromPath(path19, additionalContext, varName, stepId) {
+  extractFromPath(path18, additionalContext, varName, stepId) {
     if (!additionalContext) {
       throw new OutputExtractionError(
-        `Cannot extract from path '${path19}': no context available`,
+        `Cannot extract from path '${path18}': no context available`,
         varName,
         stepId
       );
     }
-    const parts = path19.split(".");
+    const parts = path18.split(".");
     let current = additionalContext;
     for (const part of parts) {
       if (current == null || typeof current !== "object") {
         throw new OutputExtractionError(
-          `Cannot navigate path '${path19}': reached non-object at '${part}'`,
+          `Cannot navigate path '${path18}': reached non-object at '${part}'`,
           varName,
           stepId
         );
       }
       if (!(part in current)) {
-        throw new OutputExtractionError(`Path '${path19}' not found: missing '${part}'`, varName, stepId);
+        throw new OutputExtractionError(`Path '${path18}' not found: missing '${part}'`, varName, stepId);
       }
       current = current[part];
     }
@@ -18579,8 +18579,8 @@ function toLinesWithContent(input = "", trimmed2 = true, separator = "\n") {
 function forEachLineWithContent(input, callback) {
   return toLinesWithContent(input, true).map((line) => callback(line));
 }
-function folderExists(path19) {
-  return (0, import_file_exists.exists)(path19, import_file_exists.FOLDER);
+function folderExists(path18) {
+  return (0, import_file_exists.exists)(path18, import_file_exists.FOLDER);
 }
 function append(target, item) {
   if (Array.isArray(target)) {
@@ -18982,8 +18982,8 @@ function checkIsRepoRootTask() {
     commands,
     format: "utf-8",
     onError,
-    parser(path19) {
-      return /^\.(git)?$/.test(path19.trim());
+    parser(path18) {
+      return /^\.(git)?$/.test(path18.trim());
     }
   };
 }
@@ -19417,11 +19417,11 @@ function parseGrep(grep) {
   const paths = /* @__PURE__ */ new Set();
   const results = {};
   forEachLineWithContent(grep, (input) => {
-    const [path19, line, preview] = input.split(NULL);
-    paths.add(path19);
-    (results[path19] = results[path19] || []).push({
+    const [path18, line, preview] = input.split(NULL);
+    paths.add(path18);
+    (results[path18] = results[path18] || []).push({
       line: asNumber(line),
-      path: path19,
+      path: path18,
       preview
     });
   });
@@ -20185,14 +20185,14 @@ var init_hash_object = __esm({
     init_task();
   }
 });
-function parseInit(bare, path19, text) {
+function parseInit(bare, path18, text) {
   const response = String(text).trim();
   let result;
   if (result = initResponseRegex.exec(response)) {
-    return new InitSummary(bare, path19, false, result[1]);
+    return new InitSummary(bare, path18, false, result[1]);
   }
   if (result = reInitResponseRegex.exec(response)) {
-    return new InitSummary(bare, path19, true, result[1]);
+    return new InitSummary(bare, path18, true, result[1]);
   }
   let gitDir = "";
   const tokens = response.split(" ");
@@ -20203,7 +20203,7 @@ function parseInit(bare, path19, text) {
       break;
     }
   }
-  return new InitSummary(bare, path19, /^re/i.test(response), gitDir);
+  return new InitSummary(bare, path18, /^re/i.test(response), gitDir);
 }
 var InitSummary;
 var initResponseRegex;
@@ -20212,9 +20212,9 @@ var init_InitSummary = __esm({
   "src/lib/responses/InitSummary.ts"() {
     "use strict";
     InitSummary = class {
-      constructor(bare, path19, existing, gitDir) {
+      constructor(bare, path18, existing, gitDir) {
         this.bare = bare;
-        this.path = path19;
+        this.path = path18;
         this.existing = existing;
         this.gitDir = gitDir;
       }
@@ -20226,7 +20226,7 @@ var init_InitSummary = __esm({
 function hasBareCommand(command) {
   return command.includes(bareCommand);
 }
-function initTask(bare = false, path19, customArgs) {
+function initTask(bare = false, path18, customArgs) {
   const commands = ["init", ...customArgs];
   if (bare && !hasBareCommand(commands)) {
     commands.splice(1, 0, bareCommand);
@@ -20235,7 +20235,7 @@ function initTask(bare = false, path19, customArgs) {
     commands,
     format: "utf-8",
     parser(text) {
-      return parseInit(commands.includes("--bare"), path19, text);
+      return parseInit(commands.includes("--bare"), path18, text);
     }
   };
 }
@@ -21050,12 +21050,12 @@ var init_FileStatusSummary = __esm({
     "use strict";
     fromPathRegex = /^(.+)\0(.+)$/;
     FileStatusSummary = class {
-      constructor(path19, index, working_dir) {
-        this.path = path19;
+      constructor(path18, index, working_dir) {
+        this.path = path18;
         this.index = index;
         this.working_dir = working_dir;
         if (index === "R" || working_dir === "R") {
-          const detail = fromPathRegex.exec(path19) || [null, path19, path19];
+          const detail = fromPathRegex.exec(path18) || [null, path18, path18];
           this.from = detail[2] || "";
           this.path = detail[1] || "";
         }
@@ -21086,14 +21086,14 @@ function splitLine(result, lineStr) {
     default:
       return;
   }
-  function data(index, workingDir, path19) {
+  function data(index, workingDir, path18) {
     const raw = `${index}${workingDir}`;
     const handler = parsers6.get(raw);
     if (handler) {
-      handler(result, path19);
+      handler(result, path18);
     }
     if (raw !== "##" && raw !== "!!") {
-      result.files.push(new FileStatusSummary(path19, index, workingDir));
+      result.files.push(new FileStatusSummary(path18, index, workingDir));
     }
   }
 }
@@ -21444,9 +21444,9 @@ var init_simple_git_api = __esm({
           next
         );
       }
-      hashObject(path19, write) {
+      hashObject(path18, write) {
         return this._runTask(
-          hashObjectTask(path19, write === true),
+          hashObjectTask(path18, write === true),
           trailingFunctionArgument(arguments)
         );
       }
@@ -21800,8 +21800,8 @@ var init_branch = __esm({
   }
 });
 function toPath(input) {
-  const path19 = input.trim().replace(/^["']|["']$/g, "");
-  return path19 && (0, import_node_path.normalize)(path19);
+  const path18 = input.trim().replace(/^["']|["']$/g, "");
+  return path18 && (0, import_node_path.normalize)(path18);
 }
 var parseCheckIgnore;
 var init_CheckIgnore = __esm({
@@ -22086,8 +22086,8 @@ __export(sub_module_exports, {
   subModuleTask: () => subModuleTask,
   updateSubModuleTask: () => updateSubModuleTask
 });
-function addSubModuleTask(repo, path19) {
-  return subModuleTask(["add", repo, path19]);
+function addSubModuleTask(repo, path18) {
+  return subModuleTask(["add", repo, path18]);
 }
 function initSubModuleTask(customArgs) {
   return subModuleTask(["init", ...customArgs]);
@@ -22401,8 +22401,8 @@ var require_git = __commonJS2({
       }
       return this._runTask(straightThroughStringTask2(command, this._trimmed), next);
     };
-    Git2.prototype.submoduleAdd = function(repo, path19, then) {
-      return this._runTask(addSubModuleTask2(repo, path19), trailingFunctionArgument2(arguments));
+    Git2.prototype.submoduleAdd = function(repo, path18, then) {
+      return this._runTask(addSubModuleTask2(repo, path18), trailingFunctionArgument2(arguments));
     };
     Git2.prototype.submoduleUpdate = function(args, then) {
       return this._runTask(
@@ -23361,10 +23361,10 @@ var WorkspaceManager = class {
 
 // dist/cli/commands/CliCommand.js
 var import_node_child_process4 = require("node:child_process");
-var fs12 = __toESM(require("node:fs"), 1);
+var fs10 = __toESM(require("node:fs"), 1);
 var import_node_module2 = require("node:module");
 var os5 = __toESM(require("node:os"), 1);
-var path13 = __toESM(require("node:path"), 1);
+var path11 = __toESM(require("node:path"), 1);
 var import_node_url2 = require("node:url");
 var import_node_util2 = require("node:util");
 
@@ -23663,258 +23663,6 @@ var HookDispatcher = class {
   }
 };
 
-// dist/task/TaskStore.js
-var fs11 = __toESM(require("node:fs"), 1);
-var path12 = __toESM(require("node:path"), 1);
-
-// dist/storage/ExecutionStore.js
-var crypto5 = __toESM(require("node:crypto"), 1);
-var fs10 = __toESM(require("node:fs"), 1);
-var path11 = __toESM(require("node:path"), 1);
-function generateExecutionId() {
-  const hex = crypto5.randomUUID().replace(/-/g, "");
-  return parseInt(hex.slice(0, 11), 16).toString(36).padStart(8, "0").slice(-8);
-}
-var EXECUTION_ID_RE = /^[a-z0-9]{8}$/;
-function assertExecutionIdSafe(executionId) {
-  if (!EXECUTION_ID_RE.test(executionId)) {
-    throw new Error(`Invalid executionId format: ${JSON.stringify(executionId)}`);
-  }
-}
-var ExecutionStore = class {
-  executionsDir;
-  retainDays;
-  constructor(executionsDir, retainDays = 30) {
-    this.executionsDir = executionsDir;
-    this.retainDays = retainDays;
-  }
-  pruneOldExecutions() {
-    let rawFiles;
-    try {
-      rawFiles = fs10.readdirSync(this.executionsDir);
-    } catch (err) {
-      process.stderr.write(`[ExecutionStore] failed to read executions dir for pruning: ${String(err)}
-`);
-      return;
-    }
-    const files = rawFiles.filter((f) => f.endsWith(".json"));
-    if (files.length === 0)
-      return;
-    const cutoffMs = Date.now() - this.retainDays * 24 * 60 * 60 * 1e3;
-    for (const file of files) {
-      const filePath = path11.join(this.executionsDir, file);
-      try {
-        const content = fs10.readFileSync(filePath, "utf8");
-        const state = JSON.parse(content);
-        const timestamp2 = state.completedAt ?? state.startedAt;
-        const ageMs = new Date(timestamp2).getTime();
-        if (ageMs < cutoffMs) {
-          fs10.unlinkSync(filePath);
-        }
-      } catch {
-        try {
-          const stat = fs10.statSync(filePath);
-          if (stat.mtimeMs < cutoffMs)
-            fs10.unlinkSync(filePath);
-        } catch {
-        }
-      }
-    }
-  }
-  create(params) {
-    assertExecutionIdSafe(params.executionId);
-    const state = {
-      executionId: params.executionId,
-      flowFile: params.flowFile,
-      flowId: params.flowId,
-      status: "queued",
-      currentSteps: [],
-      startedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      completedAt: null,
-      steps: Object.fromEntries(params.stepIds.map((id) => [id, { status: "pending" }]))
-    };
-    this.write(state);
-    return state;
-  }
-  exists(executionId) {
-    assertExecutionIdSafe(executionId);
-    return fs10.existsSync(this.filePath(executionId));
-  }
-  read(executionId) {
-    assertExecutionIdSafe(executionId);
-    const filePath = this.filePath(executionId);
-    try {
-      const content = fs10.readFileSync(filePath, "utf8");
-      return JSON.parse(content);
-    } catch (err) {
-      throw new Error(`Corrupted execution state for ${executionId}: ${String(err)}`);
-    }
-  }
-  update(executionId, patch) {
-    const current = this.read(executionId);
-    const updated = { ...current, ...patch };
-    this.write(updated);
-    return updated;
-  }
-  markStepRunning(executionId, stepId) {
-    const state = this.read(executionId);
-    state.steps[stepId] = {
-      ...state.steps[stepId],
-      status: "running",
-      startedAt: (/* @__PURE__ */ new Date()).toISOString()
-    };
-    if (!state.currentSteps.includes(stepId))
-      state.currentSteps.push(stepId);
-    if (state.status === "queued")
-      state.status = "running";
-    this.write(state);
-    return state;
-  }
-  markStepCompleted(executionId, stepId) {
-    const state = this.read(executionId);
-    const step = state.steps[stepId];
-    if (step) {
-      step.status = "completed";
-      step.completedAt = (/* @__PURE__ */ new Date()).toISOString();
-    }
-    state.currentSteps = state.currentSteps.filter((id) => id !== stepId);
-    this.write(state);
-    return state;
-  }
-  markStepFailed(executionId, stepId, error) {
-    const state = this.read(executionId);
-    const step = state.steps[stepId];
-    if (step) {
-      step.status = "failed";
-      step.completedAt = (/* @__PURE__ */ new Date()).toISOString();
-      if (error !== void 0)
-        step.error = error;
-    }
-    state.currentSteps = state.currentSteps.filter((id) => id !== stepId);
-    if (error !== void 0)
-      state.lastError = error;
-    this.write(state);
-    return state;
-  }
-  markExecutionCompleted(executionId) {
-    return this.update(executionId, {
-      status: "completed",
-      completedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      currentSteps: []
-    });
-  }
-  markExecutionFailed(executionId) {
-    return this.update(executionId, { status: "failed", completedAt: (/* @__PURE__ */ new Date()).toISOString(), currentSteps: [] });
-  }
-  filePath(executionId) {
-    return path11.join(this.executionsDir, `${executionId}.json`);
-  }
-  write(state) {
-    fs10.writeFileSync(this.filePath(state.executionId), JSON.stringify(state, null, 2), "utf8");
-  }
-};
-
-// dist/task/TaskStore.js
-var TaskStore = class {
-  tasksDir;
-  constructor(tasksDir) {
-    this.tasksDir = tasksDir;
-  }
-  create(title) {
-    this.ensureDirectory();
-    const now = (/* @__PURE__ */ new Date()).toISOString();
-    const id = generateExecutionId();
-    const record = {
-      id,
-      title,
-      description: title,
-      status: "created",
-      createdAt: now,
-      updatedAt: now,
-      history: [{ status: "created", timestamp: now }]
-    };
-    fs11.writeFileSync(this.taskFilePath(id), JSON.stringify(record, null, 2), "utf8");
-    this.addToIndex({ id, title, status: "created", createdAt: now });
-    return record;
-  }
-  get(id) {
-    const filePath = this.taskFilePath(id);
-    if (!fs11.existsSync(filePath)) {
-      throw new Error(`Task not found: ${id}`);
-    }
-    try {
-      return JSON.parse(fs11.readFileSync(filePath, "utf8"));
-    } catch (err) {
-      throw new Error(`Corrupted task record for ${id}: ${String(err)}`);
-    }
-  }
-  findByPrefix(prefix) {
-    const lower = prefix.toLowerCase();
-    const matches = this.readIndex().tasks.filter((t2) => t2.id.toLowerCase().startsWith(lower));
-    if (matches.length === 0) {
-      throw new Error(`Task not found: ${prefix}`);
-    }
-    if (matches.length > 1) {
-      throw new Error(`Ambiguous prefix "${prefix}" matches: ${matches.map((t2) => t2.id).join(", ")}`);
-    }
-    return this.get(matches[0].id);
-  }
-  updateStatus(id, status) {
-    const record = this.get(id);
-    if (record.status === status) {
-      throw new Error(`Task "${id}" is already in status "${status}"`);
-    }
-    const now = (/* @__PURE__ */ new Date()).toISOString();
-    record.status = status;
-    record.updatedAt = now;
-    record.history.push({ status, timestamp: now });
-    fs11.writeFileSync(this.taskFilePath(id), JSON.stringify(record, null, 2), "utf8");
-    this.updateIndexEntry(id, status);
-    return record;
-  }
-  list() {
-    const index = this.readIndex();
-    return index.tasks;
-  }
-  ensureDirectory() {
-    fs11.mkdirSync(this.tasksDir, { recursive: true });
-  }
-  taskFilePath(id) {
-    return path12.join(this.tasksDir, `${id}.json`);
-  }
-  indexFilePath() {
-    return path12.join(this.tasksDir, "index.json");
-  }
-  readIndex() {
-    const indexPath = this.indexFilePath();
-    if (!fs11.existsSync(indexPath)) {
-      return { tasks: [] };
-    }
-    try {
-      return JSON.parse(fs11.readFileSync(indexPath, "utf8"));
-    } catch (err) {
-      throw new Error(`Corrupted task index: ${String(err)}`);
-    }
-  }
-  writeIndex(index) {
-    this.ensureDirectory();
-    fs11.writeFileSync(this.indexFilePath(), JSON.stringify(index, null, 2), "utf8");
-  }
-  addToIndex(summary) {
-    const index = this.readIndex();
-    index.tasks.push(summary);
-    this.writeIndex(index);
-  }
-  updateIndexEntry(id, status) {
-    const index = this.readIndex();
-    const entry = index.tasks.find((t2) => t2.id === id);
-    if (entry) {
-      entry.status = status;
-    }
-    this.writeIndex(index);
-  }
-};
-
 // dist/updater/versionValidation.js
 var VERSION_RE = /^\d+\.\d+\.\d+([-+][\w.-]+)?$/;
 
@@ -23923,10 +23671,10 @@ var execFileAsync2 = (0, import_node_util2.promisify)(import_node_child_process4
 var PKG_NAME = "@wadeck/flow-cli";
 function readChannelFromConfig() {
   try {
-    const configFile = path13.join(getConfigDir(), "config.yml");
-    if (!fs12.existsSync(configFile))
+    const configFile = path11.join(getConfigDir(), "config.yml");
+    if (!fs10.existsSync(configFile))
       return "edge";
-    const raw = fs12.readFileSync(configFile, "utf-8");
+    const raw = fs10.readFileSync(configFile, "utf-8");
     const match = /^\s*channel:\s*['"]?(\S+?)['"]?\s*$/m.exec(raw);
     return match?.[1] ?? "edge";
   } catch {
@@ -23947,9 +23695,9 @@ async function fetchLatestVersion(channel) {
 }
 function getUpdaterPath() {
   const bundlePath = process.env["LAUNCHER_BUNDLE_OVERRIDE"] ?? (0, import_node_url2.fileURLToPath)(__importMetaUrl);
-  const dir = path13.dirname(bundlePath);
-  const updaterPath = path13.join(dir, "flow-updater.cjs");
-  return fs12.existsSync(updaterPath) ? updaterPath : null;
+  const dir = path11.dirname(bundlePath);
+  const updaterPath = path11.join(dir, "flow-updater.cjs");
+  return fs10.existsSync(updaterPath) ? updaterPath : null;
 }
 async function runSelfChecks() {
   const results = [];
@@ -23967,7 +23715,7 @@ async function runSelfChecks() {
   {
     const name = "Config loading";
     try {
-      const config = loadFlowConfig(path13.join(os5.tmpdir(), ".flow-self-check-nonexistent-config.yaml"));
+      const config = loadFlowConfig(path11.join(os5.tmpdir(), ".flow-self-check-nonexistent-config.yaml"));
       if (config.workspace.retainDays === void 0) {
         throw new Error("workspace.retainDays is undefined");
       }
@@ -24022,29 +23770,6 @@ async function runSelfChecks() {
     }
   }
   {
-    const name = "TaskStore (temp)";
-    let tmpDir;
-    try {
-      tmpDir = fs12.mkdtempSync(path13.join(os5.tmpdir(), "flow-self-check-"));
-      const store = new TaskStore(tmpDir);
-      const task = store.create("test task");
-      const found = store.findByPrefix(task.id.slice(0, 4));
-      if (found.id !== task.id) {
-        throw new Error(`findByPrefix returned wrong task: expected ${task.id}, got ${found.id}`);
-      }
-      results.push({ name, passed: true });
-    } catch (err) {
-      results.push({ name, passed: false, error: String(err) });
-    } finally {
-      if (tmpDir !== void 0) {
-        try {
-          fs12.rmSync(tmpDir, { recursive: true, force: true });
-        } catch {
-        }
-      }
-    }
-  }
-  {
     const name = "HookDispatcher";
     try {
       const dispatcher = new HookDispatcher({});
@@ -24058,7 +23783,7 @@ async function runSelfChecks() {
   {
     const name = "Workspace config";
     try {
-      const config = loadFlowConfig(path13.join(os5.tmpdir(), ".flow-self-check-schema.yaml"));
+      const config = loadFlowConfig(path11.join(os5.tmpdir(), ".flow-self-check-schema.yaml"));
       if (typeof config.workspace.retainDays !== "number" || config.workspace.retainDays <= 0) {
         throw new Error(`workspace.retainDays is not a positive number: ${config.workspace.retainDays}`);
       }
@@ -24124,9 +23849,9 @@ function buildCliCommand() {
   updateCmd.option("--log", "Print the update log");
   updateCmd.action(async (opts) => {
     if (opts.log) {
-      const logFile = path13.join(getConfigDir(), "update-log.txt");
-      if (fs12.existsSync(logFile)) {
-        process.stdout.write(fs12.readFileSync(logFile, "utf-8"));
+      const logFile = path11.join(getConfigDir(), "update-log.txt");
+      if (fs10.existsSync(logFile)) {
+        process.stdout.write(fs10.readFileSync(logFile, "utf-8"));
       } else {
         process.stdout.write("No update log found.\n");
       }
@@ -24159,15 +23884,15 @@ function buildCliCommand() {
   cli.addCommand(updateCmd);
   cli.command("rollback").description("Restore the previously installed version").action(() => {
     const configDir = getConfigDir();
-    const stateFile = path13.join(configDir, "update-state.json");
-    if (!fs12.existsSync(stateFile)) {
+    const stateFile = path11.join(configDir, "update-state.json");
+    if (!fs10.existsSync(stateFile)) {
       process.stderr.write("No update state found. Nothing to roll back.\n");
       process.exit(1);
       return;
     }
     let previousVersion;
     try {
-      const state = JSON.parse(fs12.readFileSync(stateFile, "utf-8"));
+      const state = JSON.parse(fs10.readFileSync(stateFile, "utf-8"));
       previousVersion = state.previousVersion;
     } catch (err) {
       process.stderr.write(`Failed to read update state: ${String(err)}
@@ -24184,7 +23909,7 @@ function buildCliCommand() {
     process.stdout.write(`Rolled back to v${previousVersion}
 `);
     try {
-      fs12.unlinkSync(stateFile);
+      fs10.unlinkSync(stateFile);
     } catch {
     }
   });
@@ -24198,14 +23923,14 @@ function buildCliCommand() {
 }
 
 // dist/cli/commands/DocsCommand.js
-var fs13 = __toESM(require("fs"), 1);
+var fs11 = __toESM(require("fs"), 1);
 function registerDocsCommand(program2) {
   program2.command("docs").description("Print flow engine capabilities documentation").option("-o, --output <file>", "Write output to a file instead of stdout").action((options) => {
     const generator = new FlowCapabilitiesGenerator();
     const content = generator.generate();
     if (options.output) {
       try {
-        fs13.writeFileSync(options.output, content, "utf-8");
+        fs11.writeFileSync(options.output, content, "utf-8");
       } catch (err) {
         console.error(`Failed to write to ${options.output}.`);
         process.exit(1);
@@ -24218,18 +23943,18 @@ function registerDocsCommand(program2) {
 }
 
 // dist/cli/commands/HistoryCommand.js
-var fs14 = __toESM(require("node:fs"), 1);
+var fs12 = __toESM(require("node:fs"), 1);
 var os6 = __toESM(require("node:os"), 1);
-var path14 = __toESM(require("node:path"), 1);
+var path12 = __toESM(require("node:path"), 1);
 function loadExecutions(dir) {
-  if (!fs14.existsSync(dir))
+  if (!fs12.existsSync(dir))
     return [];
   const results = [];
-  for (const file of fs14.readdirSync(dir)) {
+  for (const file of fs12.readdirSync(dir)) {
     if (!file.endsWith(".json"))
       continue;
     try {
-      const raw = fs14.readFileSync(path14.join(dir, file), "utf8");
+      const raw = fs12.readFileSync(path12.join(dir, file), "utf8");
       const rec = JSON.parse(raw);
       if (rec.executionId)
         results.push(rec);
@@ -24326,8 +24051,8 @@ function buildHistoryTable(execs, opts) {
 }
 function registerHistoryCommand(program2) {
   program2.command("history").description("List past flow executions").option("-n, --limit <n>", "Max number of executions to show (default: 20)", parseInt).option("--offset <n>", "Skip first N executions (for pagination)", parseInt).option("--status <status>", "Filter by status (completed|failed|running|queued)").option("--flow <flowId>", "Filter by flow ID").option("--id <executionId>", "Show detail for a specific execution (steps + injected* markers)").action((opts) => {
-    const daemonDir = path14.join(os6.homedir(), ".flow-daemon");
-    const executionsDir = path14.join(daemonDir, "executions");
+    const daemonDir = path12.join(os6.homedir(), ".flow-daemon");
+    const executionsDir = path12.join(daemonDir, "executions");
     const execs = loadExecutions(executionsDir);
     console.log(buildHistoryTable(execs, opts));
   });
@@ -24335,16 +24060,16 @@ function registerHistoryCommand(program2) {
 
 // dist/cli/commands/RunCommand.js
 var import_singleton_daemon_kit2 = __toESM(require_dist3(), 1);
-var fs18 = __toESM(require("node:fs"), 1);
+var fs17 = __toESM(require("node:fs"), 1);
 var os9 = __toESM(require("node:os"), 1);
-var path18 = __toESM(require("node:path"), 1);
+var path17 = __toESM(require("node:path"), 1);
 
 // dist/daemon/Daemon.js
 var import_singleton_daemon_kit = __toESM(require_dist3(), 1);
 var import_node_child_process6 = require("node:child_process");
-var fs17 = __toESM(require("node:fs"), 1);
+var fs16 = __toESM(require("node:fs"), 1);
 var os8 = __toESM(require("node:os"), 1);
-var path17 = __toESM(require("node:path"), 1);
+var path16 = __toESM(require("node:path"), 1);
 
 // ../extension-points/src/sensitiveFields.ts
 var SENSITIVE_FIELDS = [
@@ -24561,9 +24286,156 @@ async function resolvePlugins(options = {}) {
   return result;
 }
 
+// dist/storage/ExecutionStore.js
+var crypto5 = __toESM(require("node:crypto"), 1);
+var fs13 = __toESM(require("node:fs"), 1);
+var path13 = __toESM(require("node:path"), 1);
+function generateExecutionId() {
+  const hex = crypto5.randomUUID().replace(/-/g, "");
+  return parseInt(hex.slice(0, 11), 16).toString(36).padStart(8, "0").slice(-8);
+}
+var EXECUTION_ID_RE = /^[a-z0-9]{8}$/;
+function assertExecutionIdSafe(executionId) {
+  if (!EXECUTION_ID_RE.test(executionId)) {
+    throw new Error(`Invalid executionId format: ${JSON.stringify(executionId)}`);
+  }
+}
+var ExecutionStore = class {
+  executionsDir;
+  retainDays;
+  constructor(executionsDir, retainDays = 30) {
+    this.executionsDir = executionsDir;
+    this.retainDays = retainDays;
+  }
+  pruneOldExecutions() {
+    let rawFiles;
+    try {
+      rawFiles = fs13.readdirSync(this.executionsDir);
+    } catch (err) {
+      process.stderr.write(`[ExecutionStore] failed to read executions dir for pruning: ${String(err)}
+`);
+      return;
+    }
+    const files = rawFiles.filter((f) => f.endsWith(".json"));
+    if (files.length === 0)
+      return;
+    const cutoffMs = Date.now() - this.retainDays * 24 * 60 * 60 * 1e3;
+    for (const file of files) {
+      const filePath = path13.join(this.executionsDir, file);
+      try {
+        const content = fs13.readFileSync(filePath, "utf8");
+        const state = JSON.parse(content);
+        const timestamp2 = state.completedAt ?? state.startedAt;
+        const ageMs = new Date(timestamp2).getTime();
+        if (ageMs < cutoffMs) {
+          fs13.unlinkSync(filePath);
+        }
+      } catch {
+        try {
+          const stat = fs13.statSync(filePath);
+          if (stat.mtimeMs < cutoffMs)
+            fs13.unlinkSync(filePath);
+        } catch {
+        }
+      }
+    }
+  }
+  create(params) {
+    assertExecutionIdSafe(params.executionId);
+    const state = {
+      executionId: params.executionId,
+      flowFile: params.flowFile,
+      flowId: params.flowId,
+      status: "queued",
+      currentSteps: [],
+      startedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      completedAt: null,
+      steps: Object.fromEntries(params.stepIds.map((id) => [id, { status: "pending" }]))
+    };
+    this.write(state);
+    return state;
+  }
+  exists(executionId) {
+    assertExecutionIdSafe(executionId);
+    return fs13.existsSync(this.filePath(executionId));
+  }
+  read(executionId) {
+    assertExecutionIdSafe(executionId);
+    const filePath = this.filePath(executionId);
+    try {
+      const content = fs13.readFileSync(filePath, "utf8");
+      return JSON.parse(content);
+    } catch (err) {
+      throw new Error(`Corrupted execution state for ${executionId}: ${String(err)}`);
+    }
+  }
+  update(executionId, patch) {
+    const current = this.read(executionId);
+    const updated = { ...current, ...patch };
+    this.write(updated);
+    return updated;
+  }
+  markStepRunning(executionId, stepId) {
+    const state = this.read(executionId);
+    state.steps[stepId] = {
+      ...state.steps[stepId],
+      status: "running",
+      startedAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    if (!state.currentSteps.includes(stepId))
+      state.currentSteps.push(stepId);
+    if (state.status === "queued")
+      state.status = "running";
+    this.write(state);
+    return state;
+  }
+  markStepCompleted(executionId, stepId) {
+    const state = this.read(executionId);
+    const step = state.steps[stepId];
+    if (step) {
+      step.status = "completed";
+      step.completedAt = (/* @__PURE__ */ new Date()).toISOString();
+    }
+    state.currentSteps = state.currentSteps.filter((id) => id !== stepId);
+    this.write(state);
+    return state;
+  }
+  markStepFailed(executionId, stepId, error) {
+    const state = this.read(executionId);
+    const step = state.steps[stepId];
+    if (step) {
+      step.status = "failed";
+      step.completedAt = (/* @__PURE__ */ new Date()).toISOString();
+      if (error !== void 0)
+        step.error = error;
+    }
+    state.currentSteps = state.currentSteps.filter((id) => id !== stepId);
+    if (error !== void 0)
+      state.lastError = error;
+    this.write(state);
+    return state;
+  }
+  markExecutionCompleted(executionId) {
+    return this.update(executionId, {
+      status: "completed",
+      completedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      currentSteps: []
+    });
+  }
+  markExecutionFailed(executionId) {
+    return this.update(executionId, { status: "failed", completedAt: (/* @__PURE__ */ new Date()).toISOString(), currentSteps: [] });
+  }
+  filePath(executionId) {
+    return path13.join(this.executionsDir, `${executionId}.json`);
+  }
+  write(state) {
+    fs13.writeFileSync(this.filePath(state.executionId), JSON.stringify(state, null, 2), "utf8");
+  }
+};
+
 // dist/storage/LogWriter.js
-var fs15 = __toESM(require("node:fs"), 1);
-var path15 = __toESM(require("node:path"), 1);
+var fs14 = __toESM(require("node:fs"), 1);
+var path14 = __toESM(require("node:path"), 1);
 var HARD_CAP = 120;
 var LogWriter = class {
   logsDir;
@@ -24586,9 +24458,9 @@ var LogWriter = class {
       level: entry.level,
       message: entry.message
     };
-    const filePath = path15.join(this.logsDir, `${this.todayDate()}.ndjson`);
+    const filePath = path14.join(this.logsDir, `${this.todayDate()}.ndjson`);
     try {
-      fs15.appendFileSync(filePath, JSON.stringify(line) + "\n", "utf8");
+      fs14.appendFileSync(filePath, JSON.stringify(line) + "\n", "utf8");
     } catch (err) {
       process.stderr.write(`[LogWriter] failed to write log: ${String(err)}
 `);
@@ -24602,9 +24474,9 @@ var LogWriter = class {
       level,
       message
     };
-    const filePath = path15.join(this.logsDir, `${this.todayDate()}.ndjson`);
+    const filePath = path14.join(this.logsDir, `${this.todayDate()}.ndjson`);
     try {
-      fs15.appendFileSync(filePath, JSON.stringify(line) + "\n", "utf8");
+      fs14.appendFileSync(filePath, JSON.stringify(line) + "\n", "utf8");
     } catch (err) {
       process.stderr.write(`[LogWriter] failed to write log: ${String(err)}
 `);
@@ -24621,14 +24493,14 @@ var LogWriter = class {
     const limit = Math.min(this.retainDays, HARD_CAP);
     let files;
     try {
-      files = fs15.readdirSync(this.logsDir).filter((f) => /^\d{4}-\d{2}-\d{2}\.ndjson$/.test(f)).sort();
+      files = fs14.readdirSync(this.logsDir).filter((f) => /^\d{4}-\d{2}-\d{2}\.ndjson$/.test(f)).sort();
     } catch {
       return;
     }
     while (files.length > limit) {
       const oldest = files.shift();
       try {
-        fs15.unlinkSync(path15.join(this.logsDir, oldest));
+        fs14.unlinkSync(path14.join(this.logsDir, oldest));
       } catch {
       }
     }
@@ -24637,9 +24509,9 @@ var LogWriter = class {
 };
 
 // dist/daemon/CommandHandler.js
-var fs16 = __toESM(require("node:fs"), 1);
+var fs15 = __toESM(require("node:fs"), 1);
 var os7 = __toESM(require("node:os"), 1);
-var path16 = __toESM(require("node:path"), 1);
+var path15 = __toESM(require("node:path"), 1);
 var DEFAULT_MAX_INJECTED_STEPS = 20;
 var DEFAULT_MAX_STEPS_PER_EXECUTION = 50;
 var CommandHandler = class {
@@ -24681,8 +24553,8 @@ var CommandHandler = class {
     this.workspaceProvider = workspaceProvider;
     this.approvalProvider = approvalProvider;
     this.resolvePerFlowWorkspaceProvider = resolvePerFlowWorkspaceProvider;
-    this.executionStore = executionStore ?? new ExecutionStore(path16.join(daemonDir, "executions"));
-    this.logWriter = logWriter ?? new LogWriter(path16.join(daemonDir, "logs"));
+    this.executionStore = executionStore ?? new ExecutionStore(path15.join(daemonDir, "executions"));
+    this.logWriter = logWriter ?? new LogWriter(path15.join(daemonDir, "logs"));
   }
   dispatchHook(executionId, event, payload) {
     const dispatcher = this.executionHooks.get(executionId);
@@ -24700,36 +24572,36 @@ var CommandHandler = class {
     return this.activeExecutionCount > 0;
   }
   async handleRun(cmd, hookDispatcher) {
-    const flowFile = path16.isAbsolute(cmd.flowFile) ? cmd.flowFile : path16.resolve(cmd.cwd, cmd.flowFile);
+    const flowFile = path15.isAbsolute(cmd.flowFile) ? cmd.flowFile : path15.resolve(cmd.cwd, cmd.flowFile);
     if (!this.allowAbsolutePaths) {
-      const allowedRoots = [path16.resolve(cmd.cwd), path16.resolve(os7.homedir())];
+      const allowedRoots = [path15.resolve(cmd.cwd), path15.resolve(os7.homedir())];
       let realFlowFile;
       try {
-        realFlowFile = fs16.existsSync(flowFile) ? fs16.realpathSync(flowFile) : flowFile;
+        realFlowFile = fs15.existsSync(flowFile) ? fs15.realpathSync(flowFile) : flowFile;
       } catch {
         realFlowFile = flowFile;
       }
       const isAllowed = allowedRoots.some((root) => {
         let realRoot;
         try {
-          realRoot = fs16.realpathSync(root);
+          realRoot = fs15.realpathSync(root);
         } catch {
           realRoot = root;
         }
-        const rel = path16.relative(realRoot, realFlowFile);
-        return !rel.startsWith("..") && !path16.isAbsolute(rel);
+        const rel = path15.relative(realRoot, realFlowFile);
+        return !rel.startsWith("..") && !path15.isAbsolute(rel);
       });
       if (!isAllowed) {
         return { type: "error", code: "FLOW_NOT_FOUND", message: "Flow file not found." };
       }
     }
-    if (!fs16.existsSync(flowFile)) {
+    if (!fs15.existsSync(flowFile)) {
       this.logWriter.writeExecution("__parse", `FLOW_NOT_FOUND: ${flowFile}`, "info");
       return { type: "error", code: "FLOW_NOT_FOUND", message: "Flow file not found." };
     }
     let flow;
     try {
-      const content = fs16.readFileSync(flowFile, "utf8");
+      const content = fs15.readFileSync(flowFile, "utf8");
       flow = load(content, { schema: JSON_SCHEMA });
     } catch (err) {
       this.logWriter.writeExecution("__parse", `PARSE_ERROR detail: ${String(err)}`, "error");
@@ -24801,7 +24673,7 @@ var CommandHandler = class {
       workspaceDir = pluginHandle.path;
       workspaceMetaDir = pluginHandle.path + ".meta";
       try {
-        fs16.mkdirSync(path16.join(workspaceMetaDir, "outputs"), { recursive: true });
+        fs15.mkdirSync(path15.join(workspaceMetaDir, "outputs"), { recursive: true });
         this.pluginWorkspaceHandles.set(executionId, {
           handle: pluginHandle,
           provider: effectiveWorkspaceProvider
@@ -25281,11 +25153,11 @@ function resolveClaudePath() {
   }
 }
 function loadFlowHooks(cwd) {
-  const configPath = path17.join(cwd, ".flows", "config.yml");
-  if (!fs17.existsSync(configPath))
+  const configPath = path16.join(cwd, ".flows", "config.yml");
+  if (!fs16.existsSync(configPath))
     return {};
   try {
-    const raw = load(fs17.readFileSync(configPath, "utf8"), { schema: JSON_SCHEMA });
+    const raw = load(fs16.readFileSync(configPath, "utf8"), { schema: JSON_SCHEMA });
     return raw["hooks"] ?? {};
   } catch (err) {
     process.stderr.write(`[daemon] Failed to parse .flows/config.yml: ${String(err)}
@@ -25294,18 +25166,18 @@ function loadFlowHooks(cwd) {
   }
 }
 async function tryResolvePlugins() {
-  const globalConfigPath = path17.join(os8.homedir(), ".flow", "config.yml");
-  const projectConfigPath = path17.join(process.cwd(), ".flow", "config.yml");
+  const globalConfigPath = path16.join(os8.homedir(), ".flow", "config.yml");
+  const projectConfigPath = path16.join(process.cwd(), ".flow", "config.yml");
   const envOverride = process.env["FLOW_CONFIG"];
-  if (!envOverride && !fs17.existsSync(globalConfigPath) && !fs17.existsSync(projectConfigPath)) {
+  if (!envOverride && !fs16.existsSync(globalConfigPath) && !fs16.existsSync(projectConfigPath)) {
     return {};
   }
   return resolvePlugins();
 }
 async function startDaemon(config = DEFAULT_CONFIG, daemonDir) {
-  const resolvedDaemonDir = daemonDir ?? path17.join(os8.homedir(), ".flow-daemon");
-  const executionsDir = path17.join(resolvedDaemonDir, "executions");
-  const logsDir = path17.join(resolvedDaemonDir, "logs");
+  const resolvedDaemonDir = daemonDir ?? path16.join(os8.homedir(), ".flow-daemon");
+  const executionsDir = path16.join(resolvedDaemonDir, "executions");
+  const logsDir = path16.join(resolvedDaemonDir, "logs");
   const pluginProviders = await tryResolvePlugins();
   const perFlowWorkspaceResolver = await createPerFlowWorkspaceResolver();
   let workerPool;
@@ -25313,7 +25185,7 @@ async function startDaemon(config = DEFAULT_CONFIG, daemonDir) {
   let commandHandler;
   let executionStore;
   let logWriter;
-  fs17.mkdirSync(resolvedDaemonDir, { recursive: true, mode: 448 });
+  fs16.mkdirSync(resolvedDaemonDir, { recursive: true, mode: 448 });
   const daemonHandle = await (0, import_singleton_daemon_kit.createDaemon)({
     configDir: resolvedDaemonDir,
     idleTimeout: null,
@@ -25326,13 +25198,13 @@ async function startDaemon(config = DEFAULT_CONFIG, daemonDir) {
     },
     hooks: {
       onStart: (port) => {
-        fs17.mkdirSync(executionsDir, { recursive: true, mode: 448 });
-        fs17.mkdirSync(logsDir, { recursive: true, mode: 448 });
+        fs16.mkdirSync(executionsDir, { recursive: true, mode: 448 });
+        fs16.mkdirSync(logsDir, { recursive: true, mode: 448 });
         const wsPort = config.worker.wsPort ?? port + 1;
         executionStore = new ExecutionStore(executionsDir, config.logs.retainDays);
         logWriter = new LogWriter(logsDir, config.logs.retainDays);
         executionStore.pruneOldExecutions();
-        WorkspaceManager.pruneOldWorkspaceDir(path17.join(process.cwd(), ".agent-fleet", "workspaces"), config.workspace.retainDays, config.workspace.maxWorkspaces);
+        WorkspaceManager.pruneOldWorkspaceDir(path16.join(process.cwd(), ".agent-fleet", "workspaces"), config.workspace.retainDays, config.workspace.maxWorkspaces);
         const claudePath = resolveClaudePath();
         wsServer = new WebSocketServer2(wsPort, handleWorkerMessage, handleWorkerClose);
         wsServer.start().catch((err) => {
@@ -25459,15 +25331,15 @@ function parseTimeout(value) {
   }
 }
 function tailLogFile(logFile, executionId, lastByte, onLog) {
-  if (!fs18.existsSync(logFile))
+  if (!fs17.existsSync(logFile))
     return lastByte;
-  const stat = fs18.statSync(logFile);
+  const stat = fs17.statSync(logFile);
   if (stat.size <= lastByte)
     return lastByte;
   const buf = Buffer.alloc(stat.size - lastByte);
-  const fd = fs18.openSync(logFile, "r");
-  fs18.readSync(fd, buf, 0, buf.length, lastByte);
-  fs18.closeSync(fd);
+  const fd = fs17.openSync(logFile, "r");
+  fs17.readSync(fd, buf, 0, buf.length, lastByte);
+  fs17.closeSync(fd);
   const chunk = buf.toString("utf8");
   const lines = chunk.split("\n");
   for (const raw of lines) {
@@ -25491,8 +25363,8 @@ function tailLogFile(logFile, executionId, lastByte, onLog) {
   return stat.size;
 }
 async function waitForCompletion(executionId, daemonDir, timeoutMs, onLog, options) {
-  const store = new ExecutionStore(path18.join(daemonDir, "executions"));
-  const logFile = path18.join(daemonDir, "logs", `${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.ndjson`);
+  const store = new ExecutionStore(path17.join(daemonDir, "executions"));
+  const logFile = path17.join(daemonDir, "logs", `${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.ndjson`);
   const deadline = Date.now() + timeoutMs;
   let delay2 = options?.fastPoll ? 50 : 200;
   let lastByte = 0;
@@ -25515,26 +25387,26 @@ async function waitForCompletion(executionId, daemonDir, timeoutMs, onLog, optio
   throw new Error(`Execution ${executionId} did not complete within ${timeoutMs}ms`);
 }
 function findProjectRoot(startDir) {
-  let dir = path18.resolve(startDir);
-  const { root } = path18.parse(dir);
+  let dir = path17.resolve(startDir);
+  const { root } = path17.parse(dir);
   while (dir !== root) {
-    if (fs18.existsSync(path18.join(dir, ".agent-fleet")))
+    if (fs17.existsSync(path17.join(dir, ".agent-fleet")))
       return dir;
-    dir = path18.dirname(dir);
+    dir = path17.dirname(dir);
   }
   return null;
 }
 function resolveFlowFile(flowRef, cwd) {
-  const resolvedPath = path18.isAbsolute(flowRef) ? flowRef : path18.resolve(cwd, flowRef);
-  if (fs18.existsSync(resolvedPath)) {
+  const resolvedPath = path17.isAbsolute(flowRef) ? flowRef : path17.resolve(cwd, flowRef);
+  if (fs17.existsSync(resolvedPath)) {
     return { found: true, flowFile: resolvedPath };
   }
   const projectRoot = findProjectRoot(cwd);
   if (!projectRoot) {
     return { found: false, error: `Flow '${flowRef}' not found as a file and no .agent-fleet/ directory found.` };
   }
-  const flowsFile = path18.join(projectRoot, ".agent-fleet", "flows.yml");
-  if (!fs18.existsSync(flowsFile)) {
+  const flowsFile = path17.join(projectRoot, ".agent-fleet", "flows.yml");
+  if (!fs17.existsSync(flowsFile)) {
     return { found: false, error: `Flow '${flowRef}' not found and no flows.yml in ${projectRoot}` };
   }
   return { found: true, flowFile: flowsFile, inferredFlowId: flowRef };
@@ -25542,7 +25414,7 @@ function resolveFlowFile(flowRef, cwd) {
 function validateSecretInputs(flowFilePath, inputs) {
   let flow;
   try {
-    const content = fs18.readFileSync(flowFilePath, "utf8");
+    const content = fs17.readFileSync(flowFilePath, "utf8");
     flow = load(content, { schema: JSON_SCHEMA });
   } catch {
     return null;
@@ -25604,7 +25476,7 @@ function registerRunCommand(program2) {
   }, []).option("--flow-id <id>", "Flow ID within a multi-flow YAML").option("--wait", "Block until execution completes").option("--timeout <duration>", "Timeout for --wait (default: 10m)", "10m").option("--quiet", "Suppress output").option("--json", "Machine-readable output").option("--human", "Force human-readable output").action(async (flowRef, options) => {
     const inputs = parseInputArgs([...options.input, ...options.inputs]);
     const cwd = process.cwd();
-    const daemonDir = path18.join(os9.homedir(), ".flow-daemon");
+    const daemonDir = path17.join(os9.homedir(), ".flow-daemon");
     const resolution = resolveFlowFile(flowRef, cwd);
     if (!resolution.found) {
       console.error(resolution.error);
@@ -25612,14 +25484,14 @@ function registerRunCommand(program2) {
     }
     const { flowFile, inferredFlowId } = resolution;
     const flowId = options.flowId ?? inferredFlowId;
-    if (fs18.existsSync(flowFile)) {
+    if (fs17.existsSync(flowFile)) {
       const secretError = validateSecretInputs(flowFile, inputs);
       if (secretError) {
         console.error(`Error:${secretError}`);
         process.exit(2);
       }
     }
-    const config = loadFlowConfig(path18.join(os9.homedir(), ".flow-config.yaml"));
+    const config = loadFlowConfig(path17.join(os9.homedir(), ".flow-config.yaml"));
     const cmd = {
       type: "run",
       flowFile,
@@ -25663,9 +25535,9 @@ function registerRunCommand(program2) {
       process.stdout.write(`[${ts}] [${stepId}] ${message}
 `);
     } : void 0;
-    const flowYaml = fs18.existsSync(flowFile) ? (() => {
+    const flowYaml = fs17.existsSync(flowFile) ? (() => {
       try {
-        return load(fs18.readFileSync(flowFile, "utf8"), {
+        return load(fs17.readFileSync(flowFile, "utf8"), {
           schema: JSON_SCHEMA
         });
       } catch {
@@ -25702,14 +25574,14 @@ function registerRunCommand(program2) {
 }
 
 // dist/utils/loadYaml.js
-var fs19 = __toESM(require("fs"), 1);
+var fs18 = __toESM(require("fs"), 1);
 function loadYaml(file) {
-  if (!fs19.existsSync(file)) {
+  if (!fs18.existsSync(file)) {
     console.error(`File not found: ${file}`);
     process.exit(1);
   }
   try {
-    const content = fs19.readFileSync(file, "utf-8");
+    const content = fs18.readFileSync(file, "utf-8");
     const raw = load(content, { schema: JSON_SCHEMA });
     if (raw === null || raw === void 0) {
       console.error(`File is empty: ${file}`);
@@ -25877,14 +25749,14 @@ function registerShowCommand(program2) {
 }
 
 // dist/validation/FlowFileValidator.js
-var fs20 = __toESM(require("node:fs"), 1);
+var fs19 = __toESM(require("node:fs"), 1);
 function validateFlowFile(filePath) {
-  if (!fs20.existsSync(filePath)) {
+  if (!fs19.existsSync(filePath)) {
     return { exit: 2, message: `File not found: ${filePath}` };
   }
   let content;
   try {
-    content = fs20.readFileSync(filePath, "utf8");
+    content = fs19.readFileSync(filePath, "utf8");
   } catch (err) {
     return { exit: 2, message: "Flow file could not be read." };
   }

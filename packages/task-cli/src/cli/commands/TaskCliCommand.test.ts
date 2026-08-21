@@ -18,7 +18,7 @@ vi.mock('node:child_process', () => ({
 	execFile: vi.fn(),
 	execFileSync: vi.fn(),
 }));
-vi.mock('../../updater/configDir.js', () => ({
+vi.mock('flow-cli/updater/configDir', () => ({
 	getConfigDir: vi.fn(() => '/fake/config'),
 }));
 

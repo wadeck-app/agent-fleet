@@ -2,7 +2,11 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import { generateExecutionId } from '../storage/ExecutionStore';
+// Inlined from flow-cli/storage/ExecutionStore to avoid pulling in flow-specific dependencies.
+function generateExecutionId(): string {
+	const hex = crypto.randomUUID().replace(/-/g, '');
+	return parseInt(hex.slice(0, 11), 16).toString(36).padStart(8, '0').slice(-8);
+}
 
 export type TaskStatus = 'created' | 'elaborating' | 'flow-review' | 'approved' | 'in-progress' | 'failed' | 'done';
 

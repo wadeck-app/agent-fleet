@@ -4,13 +4,7 @@
 	"description": "Multi-agent orchestration system for autonomous development",
 	"private": true,
 	"workspaces": [
-		"packages/*",
-		"!packages/flow-cli-win32-x64",
-		"!packages/flow-cli-darwin-arm64",
-		"!packages/flow-cli-darwin-x64",
-		"!packages/task-cli-win32-x64",
-		"!packages/task-cli-darwin-arm64",
-		"!packages/task-cli-darwin-x64"
+		"packages/*"
 	],
 	"type": "module",
 	"scripts": {

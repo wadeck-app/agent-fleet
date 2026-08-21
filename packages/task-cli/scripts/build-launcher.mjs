@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Builds the Go launcher binaries for flow-cli using the SDK build.sh script.
+ * Builds the Go launcher binaries for task-cli using the SDK build.sh script.
  * Usage: node scripts/build-launcher.mjs
  */
 import { execFileSync } from 'node:child_process';
@@ -18,7 +18,7 @@ const require = createRequire(import.meta.url);
 const sdkPkg = require.resolve('@wadeck/singleton-daemon-kit/package.json');
 const SDK_DIR = path.dirname(sdkPkg);
 const BUILD_SH = path.join(SDK_DIR, 'go-launcher', 'build.sh');
-const FLOW_CONFIG = path.join(PACKAGE_DIR, 'launcher.config.json');
+const TASK_CONFIG = path.join(PACKAGE_DIR, 'launcher-task.config.json');
 const OUT_DIR = path.join(PACKAGE_DIR, 'launcher-go', 'dist');
 
 if (!fs.existsSync(BUILD_SH)) {
@@ -29,5 +29,5 @@ if (!fs.existsSync(BUILD_SH)) {
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
 const toUnix = p => p.replace(/\\/g, '/');
-console.log('Building flow launchers...');
-execFileSync('bash', [toUnix(BUILD_SH), toUnix(FLOW_CONFIG), toUnix(OUT_DIR)], { stdio: 'inherit' });
+console.log('Building task launchers...');
+execFileSync('bash', [toUnix(BUILD_SH), toUnix(TASK_CONFIG), toUnix(OUT_DIR)], { stdio: 'inherit' });

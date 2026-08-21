@@ -8,11 +8,11 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
-import { loadFlowConfig } from '../../config/FlowConfig.js';
-import { HookDispatcher } from '../../hooks/HookDispatcher.js';
+import { loadFlowConfig } from 'flow-cli/config/FlowConfig';
+import { HookDispatcher } from 'flow-cli/hooks/HookDispatcher';
+import { getConfigDir } from 'flow-cli/updater/configDir';
+import { VERSION_RE } from 'flow-cli/updater/versionValidation';
 import { TaskStore } from '../../task/TaskStore.js';
-import { getConfigDir } from '../../updater/configDir.js';
-import { VERSION_RE } from '../../updater/versionValidation.js';
 
 // Injected by esbuild at bundle time via define; falls back to package.json in dev mode (tsx).
 declare const __TASK_CLI_VERSION__: string;

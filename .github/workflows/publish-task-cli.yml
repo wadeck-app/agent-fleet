@@ -98,13 +98,13 @@ jobs:
               run: npm run build --workspaces --if-present
 
             - name: Bundle task CLI
-              run: npm run bundle-task --workspace packages/flow-cli
+              run: npm run bundle --workspace packages/task-cli
 
             - name: Bundle updater
               run: npm run bundle-updater --workspace packages/flow-cli
 
             - name: Build Go launchers
-              run: npm run build-launcher --workspace packages/flow-cli
+              run: npm run build-launcher --workspace packages/task-cli
 
             - name: Compute version
               id: version
@@ -113,6 +113,9 @@ jobs:
                   GITHUB_EVENT_NAME: ${{ github.event_name }}
                   VERSION_INPUT: ${{ github.event.inputs.version }}
                   BREAKING_INPUT: ${{ github.event.inputs.breaking }}
+
+            - name: Generate platform package directories
+              run: bash ci/scripts/generate-platform-packages.sh
 
             - name: Copy artifacts to platform packages
               run: bash ci/scripts/copy-binaries.sh task

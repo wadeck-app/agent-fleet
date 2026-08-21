@@ -33,9 +33,10 @@ await build({
 	plugins: [{
 		name: 'inline-extension-points',
 		setup(pluginBuild) {
-			pluginBuild.onResolve({ filter: /extension-points\/extension-points\.json$/ }, (args) => {
-				const resolved = path.resolve(root, 'node_modules', 'extension-points', 'extension-points.json');
-				return { path: resolved };
+			pluginBuild.onResolve({ filter: /extension-points\/extension-points\.json$/ }, () => {
+				// Use require.resolve to follow Node.js module resolution (handles workspace hoisting).
+				const require = createRequire(import.meta.url);
+				return { path: require.resolve('extension-points/extension-points.json') };
 			});
 		},
 	}],

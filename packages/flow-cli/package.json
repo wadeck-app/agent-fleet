@@ -20,9 +20,8 @@
 		"lint:fix": "eslint src --fix",
 		"clean": "rimraf dist",
 		"bundle": "tsx scripts/bundle.ts",
-		"bundle-task": "tsx scripts/bundle-task.ts",
 		"bundle-updater": "tsx scripts/bundle-updater.ts",
-		"bundle:all": "npm run bundle && npm run bundle-task && npm run bundle-updater"
+		"bundle:all": "npm run bundle && npm run bundle-updater"
 	},
 	"dependencies": {
 		"extension-points": "file:../extension-points",

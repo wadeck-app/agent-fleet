@@ -13,7 +13,6 @@ import { promisify } from 'node:util';
 import { loadFlowConfig } from '../../config/FlowConfig.js';
 import { PluginLoader } from '../../config/PluginLoader.js';
 import { HookDispatcher } from '../../hooks/HookDispatcher.js';
-import { TaskStore } from '../../task/TaskStore.js';
 import { getConfigDir } from '../../updater/configDir.js';
 import { VERSION_RE } from '../../updater/versionValidation.js';
 
@@ -151,33 +150,7 @@ async function runSelfChecks(): Promise<CheckResult[]> {
 		}
 	}
 
-	// Check 6: TaskStore (temp dir) -- create, read, and delete a task in an isolated temp directory
-	{
-		const name = 'TaskStore (temp)';
-		let tmpDir: string | undefined;
-		try {
-			tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-self-check-'));
-			const store = new TaskStore(tmpDir);
-			const task = store.create('test task');
-			const found = store.findByPrefix(task.id.slice(0, 4));
-			if (found.id !== task.id) {
-				throw new Error(`findByPrefix returned wrong task: expected ${task.id}, got ${found.id}`);
-			}
-			results.push({ name, passed: true });
-		} catch (err) {
-			results.push({ name, passed: false, error: String(err) });
-		} finally {
-			if (tmpDir !== undefined) {
-				try {
-					fs.rmSync(tmpDir, { recursive: true, force: true });
-				} catch {
-					// ignore cleanup errors
-				}
-			}
-		}
-	}
-
-	// Check 7: HookDispatcher -- instantiate with empty config and dispatch a no-op event
+	// Check 6: HookDispatcher -- instantiate with empty config and dispatch a no-op event
 	{
 		const name = 'HookDispatcher';
 		try {
@@ -189,7 +162,7 @@ async function runSelfChecks(): Promise<CheckResult[]> {
 		}
 	}
 
-	// Check 8: Workspace config schema -- verify FlowConfig returns valid workspace cleanup defaults
+	// Check 7: Workspace config schema -- verify FlowConfig returns valid workspace cleanup defaults
 	{
 		const name = 'Workspace config';
 		try {
@@ -332,7 +305,7 @@ export function buildCliCommand(): Command {
 			}
 		});
 
-	// flow cli self-check -- run 8 health checks
+	// flow cli self-check -- run health checks
 	cli.command('self-check')
 		.description('Run health checks to verify the CLI bundle is functional')
 		.action(async () => {

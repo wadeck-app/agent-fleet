@@ -1,7 +1,8 @@
 /**
  * Bundles the task CLI into a single CommonJS file.
+ * Bundles directly from TypeScript source (no prior tsc build required).
  * Output: dist-bundle/task.cjs
- * Usage:  npx tsx scripts/bundle-task.ts
+ * Usage:  npx tsx scripts/bundle.ts
  */
 import { build } from 'esbuild';
 import { readFileSync } from 'node:fs';
@@ -11,9 +12,11 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
 const { version } = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf-8')) as { version: string };
+// Resolve flow-cli source for bundling without requiring a prior flow-cli build step
+const flowCliSrc = path.resolve(root, '../flow-cli/src');
 
 await build({
-	entryPoints: [path.join(root, 'dist/cli/TaskIndex.js')],
+	entryPoints: [path.join(root, 'src/cli/TaskIndex.ts')],
 	bundle: true,
 	platform: 'node',
 	target: 'node22',
@@ -27,6 +30,10 @@ await build({
 	},
 	banner: {
 		js: `const __importMetaUrl = require('url').pathToFileURL(__filename).href;`,
+	},
+	// Resolve 'flow-cli' package imports to flow-cli source for standalone bundling
+	alias: {
+		'flow-cli': flowCliSrc,
 	},
 	logLevel: 'warning',
 });

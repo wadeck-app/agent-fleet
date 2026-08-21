@@ -115,6 +115,9 @@ jobs:
                   VERSION_INPUT: ${{ github.event.inputs.version }}
                   BREAKING_INPUT: ${{ github.event.inputs.breaking }}
 
+            - name: Generate platform package directories
+              run: bash ci/scripts/generate-platform-packages.sh
+
             - name: Copy artifacts to platform packages
               run: bash ci/scripts/copy-binaries.sh flow
 

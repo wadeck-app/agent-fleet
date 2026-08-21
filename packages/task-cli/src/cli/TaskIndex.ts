@@ -4,13 +4,13 @@ import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { HookConfig } from '../hooks/HookDispatcher.js';
-import { HookDispatcher } from '../hooks/HookDispatcher.js';
+import type { HookConfig } from 'flow-cli/hooks/HookDispatcher';
+import { HookDispatcher } from 'flow-cli/hooks/HookDispatcher';
+import { getConfigDir, readAndClearUpdateState, scheduleBackgroundUpdate } from 'flow-cli/updater/UpdateManager';
 import { isProjectInitialized, loadTaskConfig } from '../task/TaskConfigLoader.js';
 import type { TaskHookValue } from '../task/TaskConfigLoader.js';
 import { TaskStore } from '../task/TaskStore.js';
 import type { TaskStatus } from '../task/TaskStore.js';
-import { getConfigDir, readAndClearUpdateState, scheduleBackgroundUpdate } from '../updater/UpdateManager.js';
 import {
 	printTaskCliHelp,
 	runTaskCliRollback,

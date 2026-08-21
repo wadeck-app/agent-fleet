@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-const { execFileSync } = require('child_process');
+const { execFileSync, execSync } = require('child_process');
 const os = require('os');
 
 const PLATFORM_PKG = {
@@ -24,9 +24,8 @@ try {
 	launcherPath = require.resolve(`${pkgName}/task${ext}`);
 } catch {
 	process.stderr.write(`task: platform package ${pkgName} missing -- installing...\n`);
-	const { execSync: _execSync } = require('child_process');
 	try {
-		const out = _execSync(`npm install -g ${pkgName}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+		const out = execSync(`npm install -g ${pkgName}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
 		if (out) process.stdout.write(out);
 	} catch (installErr) {
 		if (installErr.stdout) process.stdout.write(installErr.stdout);
