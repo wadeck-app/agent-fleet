@@ -28,6 +28,17 @@ await build({
 	banner: {
 		js: `const __importMetaUrl = require('url').pathToFileURL(__filename).href;`,
 	},
+	// Inline extension-points/extension-points.json so PluginLoader works in standalone installs.
+	// createRequire-based requires are not traced by esbuild; this plugin resolves them explicitly.
+	plugins: [{
+		name: 'inline-extension-points',
+		setup(pluginBuild) {
+			pluginBuild.onResolve({ filter: /extension-points\/extension-points\.json$/ }, (args) => {
+				const resolved = path.resolve(root, 'node_modules', 'extension-points', 'extension-points.json');
+				return { path: resolved };
+			});
+		},
+	}],
 	logLevel: 'warning',
 });
 
