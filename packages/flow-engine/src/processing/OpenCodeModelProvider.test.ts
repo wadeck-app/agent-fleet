@@ -702,6 +702,90 @@ describe('OpenCodeModelProvider', () => {
 	});
 
 	// -------------------------------------------------------------------------
+	// copyGlobalConfig — no-op when no config exists
+	// -------------------------------------------------------------------------
+
+	describe('copyGlobalConfig', () => {
+		it('does not throw when no global opencode config exists (implicitly covered by all launchBackground tests)', async () => {
+			// copyGlobalConfig checks real fs.existsSync against ~/.config/opencode/config.json
+			// and Windows LOCALAPPDATA/APPDATA candidates. In the test environment none of these
+			// paths contain a real opencode config, so the method silently returns. Every
+			// launchBackground call above already exercises this path without error.
+			const resultPromise = provider.launchBackground(makeBaseOptions());
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await expect(resultPromise).resolves.toBeDefined();
+		});
+	});
+
+	// -------------------------------------------------------------------------
+	// buildOpenCodeConfig — Windows path conversion
+	// -------------------------------------------------------------------------
+
+	describe('buildOpenCodeConfig Windows path conversion', () => {
+		it('converts backslash paths to forward slashes in OPENCODE_CONFIG_CONTENT', async () => {
+			const resultPromise = provider.launchBackground(
+				makeBaseOptions({
+					mcpServers: [
+						{
+							name: 'test',
+							command: ['C:\\Windows\\node.exe', 'C:\\scripts\\test.mjs'],
+							cwd: 'C:\\projects\\workspace',
+						},
+					],
+				})
+			);
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const spawnOpts = vi.mocked(child_process.spawn).mock.calls[0][2] as { env?: Record<string, string> };
+			const raw = spawnOpts.env?.['OPENCODE_CONFIG_CONTENT'];
+			expect(raw).toBeDefined();
+
+			const config = JSON.parse(raw!) as {
+				mcp: Record<string, { command: string[]; cwd?: string }>;
+			};
+			// All backslashes must be converted to forward slashes
+			expect(config.mcp['test'].command[0]).toBe('C:/Windows/node.exe');
+			expect(config.mcp['test'].command[1]).toBe('C:/scripts/test.mjs');
+			expect(config.mcp['test'].cwd).toBe('C:/projects/workspace');
+		});
+	});
+
+	// -------------------------------------------------------------------------
+	// launchInteractive — toolHooks injection
+	// -------------------------------------------------------------------------
+
+	describe('launchInteractive', () => {
+		it('injects plugin hook file when toolHooks are provided', async () => {
+			const resultPromise = provider.launchInteractive(
+				makeBaseOptions({
+					toolHooks: [{ timing: 'before', action: { type: 'log' } }],
+				})
+			);
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const spawnOpts = vi.mocked(child_process.spawn).mock.calls[0][2] as { env?: Record<string, string> };
+			const raw = spawnOpts.env?.['OPENCODE_CONFIG_CONTENT'];
+			expect(raw).toBeDefined();
+
+			const config = JSON.parse(raw!) as { plugin?: string[] };
+			expect(config.plugin).toBeDefined();
+			expect(config.plugin).toHaveLength(1);
+			expect(config.plugin![0]).toMatch(/hook\.js$/);
+		});
+
+		it('does not set OPENCODE_CONFIG_CONTENT when no toolHooks and no mcpServers', async () => {
+			const resultPromise = provider.launchInteractive(makeBaseOptions());
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const spawnOpts = vi.mocked(child_process.spawn).mock.calls[0][2] as { env?: Record<string, string> };
+			expect(spawnOpts.env?.['OPENCODE_CONFIG_CONTENT']).toBeUndefined();
+		});
+	});
+
+	// -------------------------------------------------------------------------
 	// Field validation
 	// -------------------------------------------------------------------------
 

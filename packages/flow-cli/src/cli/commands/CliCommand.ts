@@ -22,7 +22,7 @@ const PKG_NAME = '@wadeck/flow-cli';
 
 function readChannelFromConfig(): string {
 	try {
-		const configFile = path.join(ConfigDir.get(), 'config.yml');
+		const configFile = path.join(ConfigDir.get('flow'), 'config.yml');
 		if (!fs.existsSync(configFile)) return 'edge';
 		const raw = fs.readFileSync(configFile, 'utf-8');
 		const match = /^\s*channel:\s*['"]?(\S+?)['"]?\s*$/m.exec(raw);
@@ -212,6 +212,8 @@ function printSelfCheckResults(results: CheckResult[], quiet: boolean, version: 
 }
 
 export function buildCliCommand(): Command {
+	ConfigDir.migrateIfNeeded('flow');
+
 	const cli = new Command('cli');
 	cli.description('Meta-commands for managing the flow CLI itself');
 
@@ -240,7 +242,7 @@ export function buildCliCommand(): Command {
 	updateCmd.option('--log', 'Print the update log');
 	updateCmd.action(async (opts: { check?: boolean; log?: boolean }) => {
 		if (opts.log) {
-			const logFile = path.join(ConfigDir.get(), 'update-log.txt');
+			const logFile = path.join(ConfigDir.get('flow'), 'update-log.txt');
 			if (fs.existsSync(logFile)) {
 				process.stdout.write(fs.readFileSync(logFile, 'utf-8'));
 			} else {
@@ -277,7 +279,7 @@ export function buildCliCommand(): Command {
 	cli.command('rollback')
 		.description('Restore the previously installed version')
 		.action(() => {
-			const configDir = ConfigDir.get();
+			const configDir = ConfigDir.get('flow');
 			const stateFile = path.join(configDir, 'update-state.json');
 			if (!fs.existsSync(stateFile)) {
 				process.stderr.write('No update state found. Nothing to roll back.\n');

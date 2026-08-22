@@ -730,6 +730,57 @@ describe('Flow-level feature tests (mock providers)', () => {
 	);
 
 	it(
+		'flow with provider:claude and toolHooks executes end-to-end via mock',
+		async () => {
+			// Verifies that ClaudeModelProvider correctly writes the settings file, passes
+			// --settings + --include-hook-events to the process, and cleans up on success.
+			// ClaudeModelProvider.test.ts covers the detailed unit behavior (flags, JSON structure,
+			// cleanup on error). This test adds the end-to-end StepRunner integration layer.
+			const prevClaudeMockPath = process.env['CLAUDE_MOCK_PATH'];
+			process.env['CLAUDE_MOCK_PATH'] = CLAUDE_MOCK_FILE;
+
+			try {
+				const step: ModelFlowStep = {
+					id: 'claude-hooks-step',
+					name: 'Claude Hooks Step',
+					type: 'model',
+					provider: 'claude',
+					prompt: 'hello hooks',
+					toolHooks: [
+						{ timing: 'before', action: { type: 'log' } },
+						{ timing: 'after', action: { type: 'log' } },
+					],
+				};
+
+				const runner = new StepRunner({
+					interactive: false,
+					providers: new Map([['claude', new ClaudeModelProvider()]]),
+				});
+
+				const trace = await runner.executeStep(step, makeTestWorkspace(), {
+					inputs: {},
+					stepOutputs: new Map(),
+					taskMetadata: {},
+				});
+
+				// Step must complete without error: settings file was written, process spawned,
+				// and the settings temp file was deleted on exit.
+				expect(trace.error).toBeUndefined();
+				const meta = trace.meta as ModelStepMeta;
+				expect(meta).toBeDefined();
+				expect(meta.session_id.length).toBeGreaterThan(0);
+			} finally {
+				if (prevClaudeMockPath === undefined) {
+					delete process.env['CLAUDE_MOCK_PATH'];
+				} else {
+					process.env['CLAUDE_MOCK_PATH'] = prevClaudeMockPath;
+				}
+			}
+		},
+		FLOW_TEST_TIMEOUT
+	);
+
+	it(
 		'plugin hook injection: OPENCODE_CONFIG_CONTENT includes plugin key with hook.js path',
 		async () => {
 			// The mock echoes OPENCODE_CONFIG_CONTENT back when "echo_config" is in prompt.

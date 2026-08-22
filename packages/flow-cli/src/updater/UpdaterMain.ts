@@ -173,7 +173,8 @@ export function tryAcquireLock(lockFile: string): boolean {
 }
 
 export async function main(): Promise<void> {
-	const configDir = ConfigDir.get();
+	const cliName = PKG_NAME.replace(/^@[^/]+\//, '').replace(/-cli$/, ''); // 'flow' or 'task'
+	const configDir = ConfigDir.get(cliName);
 	fs.mkdirSync(configDir, { recursive: true });
 
 	const lockFile = getLockPath(configDir);
@@ -274,9 +275,7 @@ export async function main(): Promise<void> {
 
 		// Step 8: Health check
 		try {
-			// Derive app name and bundle filename from PKG_NAME
-			const appName = PKG_NAME.replace('@wadeck/', ''); // e.g. 'flow-cli' or 'task-cli'
-			const cliName = appName.replace('-cli', ''); // e.g. 'flow' or 'task'
+			// cliName derived at the top of main(); bundleFile from it
 			const bundleFile = `${cliName}.cjs`; // e.g. 'flow.cjs' or 'task.cjs'
 
 			// Resolve bundle path from global npm root to avoid PATH cache issues

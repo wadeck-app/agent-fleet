@@ -300,6 +300,29 @@ describe('StreamEventMapper', () => {
 			expect(entries[0].eventType).toBe('tool_use');
 		});
 
+		// This test documents the assumed hook_event schema.
+		// The schema has not been verified against a live Claude run with --include-hook-events.
+		it('maps hook_event with assumed schema (PreToolUse)', () => {
+			const mapper = new StreamEventMapper('step-1');
+			const event: StreamJsonEvent = {
+				type: 'hook_event',
+				subtype: 'hook_event',
+				data: {
+					hook: { type: 'PreToolUse', matcher: '*' },
+					tool_name: 'Bash',
+					timing: 'before',
+				},
+			};
+
+			const entries = mapper.map(event);
+
+			expect(entries).toHaveLength(1);
+			expect(entries[0]!.eventType).toBe('hook_event');
+			expect(entries[0]!.level).toBe('debug');
+			expect(entries[0]!.message).toContain('PreToolUse');
+			expect(entries[0]!.message).toContain('Bash');
+		});
+
 		it('should use "unknown" for tool_use events missing the tool name', () => {
 			const mapper = new StreamEventMapper('step-1');
 			const event: StreamJsonEvent = {

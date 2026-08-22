@@ -183,13 +183,21 @@ export class OpenCodeModelProvider implements ModelProvider {
 		fs.mkdirSync(tempDir, { recursive: true });
 		this.copyGlobalConfig(tempDir);
 
+		// Write plugin hook file if hooks are requested (auto-cleaned in finally via tempDir)
+		let pluginPath: string | undefined;
+		if (options.toolHooks && options.toolHooks.length > 0) {
+			pluginPath = path.join(tempDir, 'hook.js');
+			fs.writeFileSync(pluginPath, OpenCodeHookTranslator.toPluginJs(options.toolHooks), { encoding: 'utf8' });
+		}
+
 		const { parts, needsShell } = this.findOpenCodeCommand();
 		const { command, args, env, tempFile, shell } = buildSpawnParams(
 			options,
 			true,
 			parts,
 			needsShell,
-			this.maxInlineConfigBytes
+			this.maxInlineConfigBytes,
+			pluginPath
 		);
 
 		env['XDG_CONFIG_HOME'] = tempDir;

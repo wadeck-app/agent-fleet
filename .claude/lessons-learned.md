@@ -5,6 +5,7 @@
 ## Recurring feedback
 
 <!-- session e76b8d9c 2026-08-21 -->
+
 - Test flows kept appearing in wrong subdirectories (`_flow_already_tested/`, scattered in `_test-tasks/`) — user had to redirect to flat structure at project root for user testing.
 - Agent submission needs pre-validation: run full test suite before handing off implementation. 28 timeout failures from event name mismatch is a detection gap.
 - Unit tests not added automatically when new types/functions created; user had to explicitly request "add unit tests in StepRunner.opencode.integration.test.ts" mid-task, indicating missing pattern/guideline.
@@ -392,6 +393,7 @@
 ## Agent errors
 
 <!-- session e76b8d9c 2026-08-21 -->
+
 - OpenCode `XDG_CONFIG_HOME` isolation wipes auth — subprocess fails immediately because it can't read credentials. Mitigation: copy global `config.json` into tempDir before spawn.
 - Agent made ModelStepExecutor changes without verifying build/tests afterward. Only discovered 29 test failures on manual check.
 - Wrong event name in mock (`emit('close')` vs `emit('exit')`) caused 28 test timeouts. Suggests model provider event contracts aren't documented; mismatch should have been caught before submission.
@@ -959,6 +961,7 @@
 ## Documentation gaps
 
 <!-- session e76b8d9c 2026-08-21 -->
+
 - OpenCode streaming events (`text`, `tool_use`) reach ModelStepExecutor but StreamEventMapper.map() has no cases for them — they don't appear in logs/console. Silent data loss.
 - OpenCode event semantics (`exit` vs `close`) and which events trigger `launchBackground()` resolution aren't clearly recorded. Future model provider integrations will need this.
 - Mock provider scenario format (how to emit NDJSON events) wasn't immediately clear — required multiple reads of existing examples.
@@ -1419,6 +1422,7 @@
 ## Known constraints
 
 <!-- session e76b8d9c 2026-08-21 -->
+
 - `require.resolve()` in PluginLoader is a runtime call that esbuild doesn't resolve into bundles — remains as filesystem lookup that fails in bundled CLI. Workaround: use `_require()` fallback.
 - Bundled flow-cli needs separate worker.cjs bundled + explicit copy to global install. WorkerPool must detect bundled vs. dev mode via file existence check.
 - Model ID format for Bedrock/OpenCode differs from displayed format: `amazon-bedrock/anthropic.claude-haiku-4-5` not `claude-haiku-4-5-20251001-v1:0`. Haiku-4-5 fails; Sonnet/Opus work.

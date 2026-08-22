@@ -15,28 +15,29 @@ describe('ConfigDir.get', () => {
 		Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true });
 	});
 
-	it('returns ~/.config/flow on Linux/macOS when HOME is set and XDG_CONFIG_HOME is not', () => {
+	it('returns ~/.config/flow on Linux/macOS when XDG_CONFIG_HOME is not set', () => {
 		setPlatform('linux');
 		vi.stubEnv('XDG_CONFIG_HOME', '');
-		vi.stubEnv('HOME', '/home/testuser');
 
-		expect(ConfigDir.get()).toBe(path.join('/home/testuser', '.config', 'flow'));
+		const result = ConfigDir.get('flow');
+		// os.homedir() always returns something; verify the path uses .config/flow
+		expect(result).toMatch(/[/\\]\.config[/\\]flow$/);
 	});
 
 	it('returns XDG_CONFIG_HOME/flow when XDG_CONFIG_HOME is set (takes precedence)', () => {
 		setPlatform('linux');
 		vi.stubEnv('XDG_CONFIG_HOME', '/custom/config');
-		vi.stubEnv('HOME', '/home/testuser');
 
-		expect(ConfigDir.get()).toBe(path.join('/custom/config', 'flow'));
+		expect(ConfigDir.get('flow')).toBe(path.join('/custom/config', 'flow'));
 	});
 
-	it('returns APPDATA/flow on Windows when process.platform is win32 and APPDATA is set', () => {
+	it('returns ~/.config/flow on Windows (no APPDATA branch anymore)', () => {
 		setPlatform('win32');
 		vi.stubEnv('XDG_CONFIG_HOME', '');
-		vi.stubEnv('APPDATA', 'C:\\Users\\testuser\\AppData\\Roaming');
 
-		expect(ConfigDir.get()).toBe(path.join('C:\\Users\\testuser\\AppData\\Roaming', 'flow'));
+		const result = ConfigDir.get('flow');
+		// Windows uses os.homedir()/.config/flow just like other platforms
+		expect(result).toMatch(/[/\\]\.config[/\\]flow$/);
 	});
 
 	it('falls back to os.homedir()/.config/flow when HOME env var is not set', () => {
@@ -47,7 +48,7 @@ describe('ConfigDir.get', () => {
 		delete process.env['HOME'];
 
 		try {
-			const result = ConfigDir.get();
+			const result = ConfigDir.get('flow');
 			// os.homedir() always returns something; result must end with .config/flow or \flow
 			expect(result).toMatch(/[/\\]\.config[/\\]flow$/);
 		} finally {

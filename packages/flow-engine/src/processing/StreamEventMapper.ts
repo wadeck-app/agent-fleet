@@ -224,6 +224,7 @@ export class StreamEventMapper {
 		};
 	}
 
+	// Schema assumed from Claude Code source. Verify with --include-hook-events on a real run if behavior is unexpected.
 	private mapHookEvent(event: StreamJsonEvent): LiveLogEntry {
 		const data = event.data;
 		// NOTE: schema is tentative — not verified against a live Claude run.

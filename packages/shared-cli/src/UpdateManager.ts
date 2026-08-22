@@ -19,7 +19,7 @@ export class UpdateManager {
 
 	constructor(pkgName: string, configDir?: string) {
 		this.pkgName = pkgName;
-		this.configDir = configDir ?? ConfigDir.get();
+		this.configDir = configDir ?? ConfigDir.get(pkgName.replace(/^@[^/]+\//, '').replace(/-cli$/, ''));
 	}
 
 	// Prefer the named updater; fall back to flow-updater.cjs (shared bundle handles both CLIs via UPDATER_PKG_NAME).
