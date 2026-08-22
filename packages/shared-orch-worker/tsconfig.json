@@ -11,5 +11,5 @@
 	},
 	"include": ["src"],
 	"exclude": ["dist", "dist-types"],
-	"references": []
+	"references": [{ "path": "../shared-common" }]
 }
