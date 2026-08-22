@@ -49,7 +49,7 @@ script: echo "${HOME}" # Is this a template variable or shell variable?
 **After**: Clear distinction
 
 ```yaml
-script: echo "$HOME"              # Shell variable
+script: echo "$HOME" # Shell variable
 script: echo "${{ inputs.home }}" # Flow variable
 ```
 

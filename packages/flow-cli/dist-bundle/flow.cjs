@@ -8709,7 +8709,7 @@ var {
 var import_module = require("module");
 var import_node_url4 = require("node:url");
 
-// ../cli-shared/src/ConfigDir.ts
+// ../shared-cli/src/ConfigDir.ts
 var os = __toESM(require("node:os"), 1);
 var path = __toESM(require("node:path"), 1);
 var ConfigDir = class {
@@ -8724,7 +8724,7 @@ var ConfigDir = class {
   }
 };
 
-// ../cli-shared/src/HookDispatcher.ts
+// ../shared-cli/src/HookDispatcher.ts
 var import_node_child_process = require("node:child_process");
 var http = __toESM(require("node:http"), 1);
 var https = __toESM(require("node:https"), 1);
@@ -8848,7 +8848,7 @@ var HookDispatcher = class {
   }
 };
 
-// ../cli-shared/src/UpdateManager.ts
+// ../shared-cli/src/UpdateManager.ts
 var import_node_child_process2 = require("node:child_process");
 var fs = __toESM(require("node:fs"), 1);
 var path2 = __toESM(require("node:path"), 1);
@@ -8889,7 +8889,7 @@ var UpdateManager = class {
   }
 };
 
-// ../cli-shared/src/VersionValidation.ts
+// ../shared-cli/src/VersionValidation.ts
 var VersionValidation = class _VersionValidation {
   static VERSION_RE = /^\d+\.\d+\.\d+([-+][\w.-]+)?$/;
   static validate(v) {
@@ -16076,6 +16076,86 @@ var fs2 = __toESM(require("node:fs"), 1);
 var os2 = __toESM(require("node:os"), 1);
 var path3 = __toESM(require("node:path"), 1);
 
+// ../flow-engine/src/processing/ClaudeHookTranslator.ts
+function globToRegexSource(pattern) {
+  return pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
+}
+var ClaudeHookTranslator = class {
+  /**
+   * Convert a ToolHook array to a Claude hook settings object.
+   * Returns null when there are no hooks (caller should skip writing the settings file).
+   */
+  static toSettingsJson(hooks) {
+    if (hooks.length === 0) return null;
+    const preToolUseEntries = [];
+    const postToolUseEntries = [];
+    for (const hook of hooks) {
+      if (hook.action.type === "log") {
+        if (hook.timing === "before") {
+          preToolUseEntries.push({
+            matcher: "*",
+            hooks: [
+              {
+                type: "command",
+                // Log tool name and input to stderr (TOOL_NAME, TOOL_INPUT are set by Claude)
+                command: `node -e "process.stderr.write('[tool-use] '+process.env.TOOL_NAME+' '+process.env.TOOL_INPUT+'\\n')"`
+              }
+            ]
+          });
+        } else {
+          postToolUseEntries.push({
+            matcher: "*",
+            hooks: [
+              {
+                type: "command",
+                // Log tool name and result to stderr (TOOL_RESULT is set by Claude in PostToolUse)
+                command: `node -e "process.stderr.write('[tool-result] '+process.env.TOOL_NAME+' '+process.env.TOOL_RESULT+'\\n')"`
+              }
+            ]
+          });
+        }
+      } else if (hook.action.type === "deny") {
+        if (hook.timing === "before") {
+          const { reason, toolPattern, argsContains } = hook.action;
+          if (argsContains !== void 0) {
+            const argsStr = argsContains.toLowerCase();
+            let condition = `i.toLowerCase().includes('${argsStr}')`;
+            if (toolPattern !== void 0) {
+              const regexSource = globToRegexSource(toolPattern);
+              condition += `&&process.env.CLAUDE_TOOL_NAME&&/^${regexSource}$/.test(process.env.CLAUDE_TOOL_NAME)`;
+            }
+            preToolUseEntries.push({
+              matcher: "*",
+              hooks: [
+                {
+                  type: "command",
+                  command: `node -e "const i=process.env.CLAUDE_TOOL_INPUT||'{}'; if(${condition}){process.stderr.write('Tool denied: ${reason}\\n');process.exit(2)}"`
+                }
+              ]
+            });
+          } else {
+            const matcher = toolPattern ?? "*";
+            preToolUseEntries.push({
+              matcher,
+              hooks: [
+                {
+                  type: "command",
+                  command: `node -e "process.stderr.write('Tool denied: ${reason}\\n');process.exit(2)"`
+                }
+              ]
+            });
+          }
+        }
+      }
+    }
+    if (preToolUseEntries.length === 0 && postToolUseEntries.length === 0) return null;
+    const settingsHooks = {};
+    if (preToolUseEntries.length > 0) settingsHooks["PreToolUse"] = preToolUseEntries;
+    if (postToolUseEntries.length > 0) settingsHooks["PostToolUse"] = postToolUseEntries;
+    return { hooks: settingsHooks };
+  }
+};
+
 // ../flow-engine/src/processing/ClaudeLauncher.ts
 var import_child_process = require("child_process");
 
@@ -16226,6 +16306,10 @@ var ClaudeLauncher = class {
     }
     if (options?.mcpConfigPath) {
       args.push("--mcp-config", options.mcpConfigPath);
+    }
+    if (options?.settingsPath) {
+      args.push("--settings", options.settingsPath);
+      args.push("--include-hook-events");
     }
     if (skipPermissions) {
       args.push("--dangerously-skip-permissions");
@@ -16457,23 +16541,27 @@ var ClaudeModelProvider = class {
   async launchInteractive(options) {
     validateLaunchOptions(options);
     const mcpConfigPath = await this.writeMcpConfig(options.mcpServers);
+    const settingsPath = await this.writeClaudeSettings(options);
     try {
-      return await this.launcher.launchInteractive(this.toClaudeOptions(options, mcpConfigPath));
+      return await this.launcher.launchInteractive(this.toClaudeOptions(options, mcpConfigPath, settingsPath));
     } finally {
       this.kill();
       this.currentProcess = null;
       this.cleanupMcpConfig(mcpConfigPath);
+      this.cleanupClaudeSettings(settingsPath);
     }
   }
   async launchBackground(options) {
     validateLaunchOptions(options);
     const mcpConfigPath = await this.writeMcpConfig(options.mcpServers);
+    const settingsPath = await this.writeClaudeSettings(options);
     try {
-      return await this.launcher.launchBackground(this.toClaudeOptions(options, mcpConfigPath));
+      return await this.launcher.launchBackground(this.toClaudeOptions(options, mcpConfigPath, settingsPath));
     } finally {
       this.kill();
       this.currentProcess = null;
       this.cleanupMcpConfig(mcpConfigPath);
+      this.cleanupClaudeSettings(settingsPath);
     }
   }
   kill() {
@@ -16485,7 +16573,7 @@ var ClaudeModelProvider = class {
       console.warn("[ClaudeModelProvider] kill() failed:", err instanceof Error ? err.message : String(err));
     }
   }
-  toClaudeOptions(options, mcpConfigPath) {
+  toClaudeOptions(options, mcpConfigPath, settingsPath) {
     return {
       workingDir: options.workingDir,
       prompt: options.prompt,
@@ -16493,6 +16581,7 @@ var ClaudeModelProvider = class {
       model: options.model,
       env: options.env,
       mcpConfigPath,
+      settingsPath,
       skipPermissions: options.skipPermissions,
       streamJson: options.streamJson,
       verbose: options.verbose,
@@ -16525,6 +16614,25 @@ var ClaudeModelProvider = class {
     } catch {
     }
   }
+  async writeClaudeSettings(options) {
+    const settings = ClaudeHookTranslator.toSettingsJson(options.toolHooks ?? []);
+    if (!settings) return void 0;
+    const json2 = JSON.stringify(settings, null, 2);
+    const filePath = path3.join(os2.tmpdir(), `claude-settings-${crypto3.randomUUID()}.json`);
+    await fs2.promises.writeFile(filePath, json2, { encoding: "utf8" });
+    try {
+      await fs2.promises.chmod(filePath, 384);
+    } catch {
+    }
+    return filePath;
+  }
+  cleanupClaudeSettings(filePath) {
+    if (!filePath) return;
+    try {
+      fs2.unlinkSync(filePath);
+    } catch {
+    }
+  }
 };
 
 // ../flow-engine/src/processing/OpenCodeModelProvider.ts
@@ -16533,27 +16641,91 @@ var crypto4 = __toESM(require("node:crypto"), 1);
 var fs3 = __toESM(require("node:fs"), 1);
 var os3 = __toESM(require("node:os"), 1);
 var path4 = __toESM(require("node:path"), 1);
+
+// ../flow-engine/src/processing/OpenCodeHookTranslator.ts
+function buildMatchExpression(toolExpression, pattern) {
+  if (pattern === "*") {
+    return "true";
+  }
+  if (!pattern.includes("*")) {
+    return `${toolExpression} === ${JSON.stringify(pattern)}`;
+  }
+  const regexSource = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
+  return `new RegExp(${JSON.stringify(`^${regexSource}$`)}).test(${toolExpression})`;
+}
+var OpenCodeHookTranslator = class {
+  /**
+   * Generate an ESM plugin JS string for OpenCode from a ToolHook array.
+   * Returns a valid plugin module that can be written to a .js file and referenced
+   * via the OpenCode config's `plugin` field.
+   */
+  static toPluginJs(hooks) {
+    const beforeLines = [];
+    const afterLines = [];
+    for (const hook of hooks) {
+      if (hook.action.type === "log") {
+        if (hook.timing === "before") {
+          beforeLines.push(`console.log('[tool-use]', input.tool, JSON.stringify(output.args));`);
+        } else {
+          afterLines.push(`console.log('[tool-result]', input.tool, output.output);`);
+        }
+      } else if (hook.action.type === "deny") {
+        if (hook.timing === "before") {
+          const { reason, toolPattern, argsContains } = hook.action;
+          const errorMessage = `Tool denied: ${reason}`;
+          let condition;
+          if (argsContains !== void 0 && toolPattern !== void 0) {
+            const toolCondition = buildMatchExpression("input.tool", toolPattern);
+            const argsCondition = `JSON.stringify(output.args ?? {}).toLowerCase().includes(${JSON.stringify(argsContains.toLowerCase())})`;
+            condition = `${toolCondition} && ${argsCondition}`;
+          } else if (argsContains !== void 0) {
+            condition = `JSON.stringify(output.args ?? {}).toLowerCase().includes(${JSON.stringify(argsContains.toLowerCase())})`;
+          } else if (toolPattern !== void 0) {
+            condition = buildMatchExpression("input.tool", toolPattern);
+          } else {
+            condition = "true";
+          }
+          beforeLines.push(`if (${condition}) throw new Error(${JSON.stringify(errorMessage)});`);
+        }
+      }
+    }
+    const beforeBody = beforeLines.join(" ");
+    const afterBody = afterLines.join(" ");
+    return `export const Plugin = async (ctx) => ({
+  "tool.execute.before": async (input, output) => { ${beforeBody} },
+  "tool.execute.after":  async (input, output) => { ${afterBody} }
+});
+`;
+  }
+};
+
+// ../flow-engine/src/processing/OpenCodeModelProvider.ts
 var MAX_PROMPT_BYTES = 32 * 1024;
 var DEFAULT_MAX_INLINE_CONFIG_BYTES = 1024 * 1024;
-function buildOpenCodeConfig(servers) {
+function buildOpenCodeConfig(servers, pluginPath) {
   const mcp = {};
   for (const s of servers) {
     const entry = {
       type: "local",
-      command: s.command,
+      // Convert backslashes to forward slashes — backslash paths cause silent server failures on Windows
+      command: s.command.map((cmd) => cmd.replace(/\\/g, "/")),
       enabled: s.enabled ?? true
     };
     if (s.env && Object.keys(s.env).length > 0) {
       entry["environment"] = s.env;
     }
     if (s.cwd) {
-      entry["cwd"] = s.cwd;
+      entry["cwd"] = s.cwd.replace(/\\/g, "/");
     }
     mcp[s.name] = entry;
   }
-  return { mcp };
+  const config = { mcp };
+  if (pluginPath) {
+    config["plugin"] = [pluginPath.replace(/\\/g, "/")];
+  }
+  return config;
 }
-function buildSpawnParams(options, interactive, commandParts, needsShell, maxInlineConfigBytes) {
+function buildSpawnParams(options, interactive, commandParts, needsShell, maxInlineConfigBytes, pluginPath) {
   const command = commandParts[0];
   const args = [...commandParts.slice(1), "run"];
   if (options.prompt) {
@@ -16576,8 +16748,9 @@ function buildSpawnParams(options, interactive, commandParts, needsShell, maxInl
   if (process.env["SystemRoot"]) infraEnv["SystemRoot"] = process.env["SystemRoot"];
   const env = { ...infraEnv, ...options.env ?? {} };
   let tempFile;
-  if (options.mcpServers && options.mcpServers.length > 0) {
-    const config = buildOpenCodeConfig(options.mcpServers);
+  const hasServers = options.mcpServers && options.mcpServers.length > 0;
+  if (hasServers || pluginPath) {
+    const config = buildOpenCodeConfig(options.mcpServers ?? [], pluginPath);
     const json2 = JSON.stringify(config);
     const jsonBytes = Buffer.byteLength(json2, "utf8");
     if (jsonBytes > maxInlineConfigBytes) {
@@ -16602,6 +16775,9 @@ var OpenCodeModelProvider = class {
   }
   async launchInteractive(options) {
     validateLaunchOptions(options);
+    const tempDir = path4.join(os3.tmpdir(), `opencode-run-${crypto4.randomUUID()}`);
+    fs3.mkdirSync(tempDir, { recursive: true });
+    this.copyGlobalConfig(tempDir);
     const { parts, needsShell } = this.findOpenCodeCommand();
     const { command, args, env, tempFile, shell } = buildSpawnParams(
       options,
@@ -16610,6 +16786,7 @@ var OpenCodeModelProvider = class {
       needsShell,
       this.maxInlineConfigBytes
     );
+    env["XDG_CONFIG_HOME"] = tempDir;
     try {
       return await new Promise((resolve4, reject) => {
         const proc = (0, import_node_child_process3.spawn)(command, args, {
@@ -16630,6 +16807,7 @@ var OpenCodeModelProvider = class {
       this.kill();
       this.currentProcess = null;
       this.cleanupTempFile(tempFile);
+      this.cleanupTempDir(tempDir);
     }
   }
   async launchBackground(options) {
@@ -16638,14 +16816,24 @@ var OpenCodeModelProvider = class {
     if (promptBytes > MAX_PROMPT_BYTES) {
       throw new PromptTooLargeError(promptBytes, MAX_PROMPT_BYTES);
     }
+    const tempDir = path4.join(os3.tmpdir(), `opencode-run-${crypto4.randomUUID()}`);
+    fs3.mkdirSync(tempDir, { recursive: true });
+    this.copyGlobalConfig(tempDir);
+    let pluginPath;
+    if (options.toolHooks && options.toolHooks.length > 0) {
+      pluginPath = path4.join(tempDir, "hook.js");
+      fs3.writeFileSync(pluginPath, OpenCodeHookTranslator.toPluginJs(options.toolHooks), { encoding: "utf8" });
+    }
     const { parts, needsShell } = this.findOpenCodeCommand();
     const { command, args, env, tempFile, shell } = buildSpawnParams(
       options,
       false,
       parts,
       needsShell,
-      this.maxInlineConfigBytes
+      this.maxInlineConfigBytes,
+      pluginPath
     );
+    env["XDG_CONFIG_HOME"] = tempDir;
     try {
       return await new Promise((resolve4, reject) => {
         const launchStartTime = Date.now();
@@ -16696,6 +16884,30 @@ var OpenCodeModelProvider = class {
             const text = part?.["text"];
             if (text) {
               responseText += text;
+              if (options.onStreamEvent) {
+                options.onStreamEvent({
+                  type: "text",
+                  subtype: "text",
+                  data: { text }
+                });
+              }
+            }
+          } else if (eventType === "tool_use") {
+            const part = parsed["part"];
+            const state = part?.["state"];
+            if (state && options.onStreamEvent) {
+              const toolEvent = {
+                type: "tool_use",
+                subtype: "tool_use",
+                data: {
+                  tool: part?.["tool"] ?? "",
+                  callID: part?.["callID"] ?? "",
+                  input: state["input"],
+                  output: state["output"] ?? "",
+                  status: state["status"] ?? ""
+                }
+              };
+              options.onStreamEvent(toolEvent);
             }
           } else if (eventType === "step_finish") {
             const part = parsed["part"];
@@ -16759,6 +16971,7 @@ var OpenCodeModelProvider = class {
       this.kill();
       this.currentProcess = null;
       this.cleanupTempFile(tempFile);
+      this.cleanupTempDir(tempDir);
     }
   }
   kill() {
@@ -16806,6 +17019,28 @@ var OpenCodeModelProvider = class {
       fs3.unlinkSync(filePath);
     } catch {
     }
+  }
+  cleanupTempDir(dirPath) {
+    try {
+      fs3.rmSync(dirPath, { recursive: true, force: true });
+    } catch {
+    }
+  }
+  /**
+   * Copy the user's global OpenCode config.json into the isolated tempDir so the subprocess
+   * retains auth and model settings while being isolated from global plugin state.
+   */
+  copyGlobalConfig(tempDir) {
+    const candidates = [
+      path4.join(os3.homedir(), ".config", "opencode", "config.json"),
+      ...process.env["LOCALAPPDATA"] ? [path4.join(process.env["LOCALAPPDATA"], "opencode", "config.json")] : [],
+      ...process.env["APPDATA"] ? [path4.join(process.env["APPDATA"], "opencode", "config.json")] : []
+    ];
+    const src = candidates.find((p2) => fs3.existsSync(p2));
+    if (!src) return;
+    const destDir = path4.join(tempDir, "opencode");
+    fs3.mkdirSync(destDir, { recursive: true });
+    fs3.copyFileSync(src, path4.join(destDir, "config.json"));
   }
 };
 
@@ -17107,21 +17342,79 @@ var StreamEventMapper = class {
     this.stepId = stepId;
   }
   /**
-   * Map a stream event to a LiveLogEntry.
-   * Returns null for events that should be filtered out.
+   * Map a stream event to zero or more LiveLogEntry objects.
+   * Returns an empty array for events that should be filtered out.
+   * Returns multiple entries for OpenCode tool_use events (input + output).
    */
   map(event) {
     switch (event.type) {
-      case "system":
-        return this.mapSystemEvent(event);
-      case "assistant":
-        return this.mapAssistantEvent(event);
-      case "user":
-        return this.mapUserEvent(event);
-      case "result":
-        return this.mapResultEvent(event);
+      case "system": {
+        const e = this.mapSystemEvent(event);
+        return [e];
+      }
+      case "assistant": {
+        const e = this.mapAssistantEvent(event);
+        return e ? [e] : [];
+      }
+      case "user": {
+        const e = this.mapUserEvent(event);
+        return e ? [e] : [];
+      }
+      case "result": {
+        const e = this.mapResultEvent(event);
+        return [e];
+      }
+      // hook events are emitted when --include-hook-events is passed.
+      // NOTE: the exact schema has not been verified against a live Claude run.
+      // Observed structure (tentative): { type: "hook_event", hook: { type, matcher }, tool_name?, timing? }
+      case "hook_event": {
+        const e = this.mapHookEvent(event);
+        return [e];
+      }
+      // OpenCode emits 'text' events for streamed assistant text chunks
+      case "text": {
+        const text = event.data.text;
+        if (!text) return [];
+        return [
+          {
+            id: this.nextId(),
+            timestamp: Date.now(),
+            level: "info",
+            message: text,
+            eventType: "assistant_text"
+          }
+        ];
+      }
+      // OpenCode emits 'tool_use' events after tool completion with both input + output
+      case "tool_use": {
+        const tool = event.data.tool ?? "unknown";
+        const input = event.data.input;
+        const output = event.data.output ?? "";
+        const inputSummary = this.summarizeToolInput(input);
+        const entries = [
+          {
+            id: this.nextId(),
+            timestamp: Date.now(),
+            level: "warning",
+            message: `${tool}(${inputSummary})`,
+            eventType: "tool_use",
+            metadata: { toolName: tool, input }
+          }
+        ];
+        if (output) {
+          entries.push({
+            id: this.nextId(),
+            timestamp: Date.now(),
+            level: "debug",
+            message: output,
+            eventType: "tool_result",
+            metadata: { toolName: tool }
+          });
+        }
+        return entries;
+      }
       default:
-        return null;
+        return [];
     }
   }
   /**
@@ -17221,6 +17514,19 @@ var StreamEventMapper = class {
       message: `Completed: ${numTurns} turns, ${cost} USD, ${durationSeconds}`,
       eventType: "result",
       metadata: { numTurns, cost: data.cost_usd, durationMs: data.duration_ms, resultText }
+    };
+  }
+  mapHookEvent(event) {
+    const data = event.data;
+    const hookType = data["hook"]?.type ?? data["hook_type"] ?? "unknown";
+    const toolName = data["tool_name"] ?? "unknown";
+    return {
+      id: this.nextId(),
+      timestamp: Date.now(),
+      level: "debug",
+      message: `Hook [${hookType}]: ${toolName}`,
+      eventType: "hook_event",
+      metadata: { hookType, toolName, raw: data }
     };
   }
   /**
@@ -17399,7 +17705,9 @@ async function executeModelStep(step, workspacePath, context, stepTrace, config,
     stepId: step.id,
     model: step.model,
     env: config.claudeEnv && Object.keys(config.claudeEnv).length > 0 ? config.claudeEnv : void 0,
-    mcpServers: config.mcpServers,
+    // Merge config-level servers (e.g. the provideSteps daemon server) with step-level servers
+    mcpServers: [...config.mcpServers ?? [], ...step.mcpServers ?? []],
+    toolHooks: step.toolHooks ?? [],
     onProcessStarted: config.onClaudeProcessStarted,
     streamJson: streamJson && !config.interactive,
     verbose: verbose && !config.interactive,
@@ -17430,8 +17738,8 @@ async function executeModelStep(step, workspacePath, context, stepTrace, config,
         }
       }
       if (logMode === "none") return;
-      const entry = streamEventMapper?.map(event);
-      if (entry) {
+      const entries = streamEventMapper?.map(event) ?? [];
+      for (const entry of entries) {
         liveLogEntries.push(entry);
         if (logMode === "streaming" && onLogEntry) onLogEntry(entry);
         if (logMode === "polling") pollingBuffer.push(entry);
@@ -23577,11 +23885,7 @@ var PluginLoader = class {
   registryCache = null;
   constructor(options = {}) {
     this.pluginPackagesDir = options.pluginPackagesDir;
-    if (options.registryPath) {
-      this.registryPath = options.registryPath;
-    } else {
-      this.registryPath = _require.resolve("extension-points/extension-points.json");
-    }
+    this.registryPath = options.registryPath;
   }
   async loadProvider(typeRef, extensionPoint, options, pluginsDir) {
     const { pluginId, implName } = parseTypeRef(typeRef);
@@ -23669,7 +23973,11 @@ var PluginLoader = class {
   }
   assertVersionSupported(extensionPoint, version) {
     if (!this.registryCache) {
-      this.registryCache = loadRegistry(this.registryPath);
+      if (this.registryPath) {
+        this.registryCache = loadRegistry(this.registryPath);
+      } else {
+        this.registryCache = _require("extension-points/extension-points.json");
+      }
     }
     const registry = this.registryCache;
     const epEntry = registry.extensionPoints.find((ep) => ep.id === extensionPoint);
@@ -23780,7 +24088,11 @@ async function runSelfChecks() {
     } catch (err) {
       const msg = String(err);
       if (msg.includes("extension-points") && msg.includes("Cannot find module")) {
-        results.push({ name, passed: true, error: "extension-points not in bundle (plugins disabled in standalone install)" });
+        results.push({
+          name,
+          passed: true,
+          error: "extension-points not in bundle (plugins disabled in standalone install)"
+        });
       } else {
         results.push({ name, passed: false, error: msg });
       }
@@ -25040,6 +25352,7 @@ var WebSocketServer2 = class {
 
 // dist/daemon/WorkerPool.js
 var import_node_child_process5 = require("node:child_process");
+var import_node_fs3 = require("node:fs");
 var import_node_url3 = require("node:url");
 var WORKER_CONNECT_TIMEOUT_MS = 1e4;
 var WorkerPool = class {
@@ -25060,16 +25373,28 @@ var WorkerPool = class {
     this.concurrencyLimit = concurrencyLimit;
     this.httpPort = httpPort;
     this.wsPortOrGetter = wsPortOrGetter;
-    this.workerPath = (0, import_node_url3.fileURLToPath)(new URL("../../dist/worker/Worker.js", __importMetaUrl));
     this.claudePath = claudePath ?? "";
-    this.tsxLoaderPath = new URL("../../../../node_modules/tsx/dist/loader.mjs", __importMetaUrl).href;
+    const devWorkerPath = (0, import_node_url3.fileURLToPath)(new URL("../../dist/worker/Worker.js", __importMetaUrl));
+    const bundledWorkerPath = (0, import_node_url3.fileURLToPath)(new URL("./worker.cjs", __importMetaUrl));
+    if ((0, import_node_fs3.existsSync)(devWorkerPath)) {
+      this.workerPath = devWorkerPath;
+      this.tsxLoaderPath = new URL("../../../../node_modules/tsx/dist/loader.mjs", __importMetaUrl).href;
+    } else if ((0, import_node_fs3.existsSync)(bundledWorkerPath)) {
+      this.workerPath = bundledWorkerPath;
+      this.tsxLoaderPath = null;
+    } else {
+      throw new Error(`Worker not found. Checked:
+  dev:     ${devWorkerPath}
+  bundled: ${bundledWorkerPath}`);
+    }
   }
   canSpawn() {
     return this.activeCount < this.concurrencyLimit;
   }
   spawnWorker() {
     this.activeCount++;
-    const child = (0, import_node_child_process5.spawn)(process.execPath, ["--import", this.tsxLoaderPath, this.workerPath], {
+    const spawnArgs = this.tsxLoaderPath ? ["--import", this.tsxLoaderPath, this.workerPath] : [this.workerPath];
+    const child = (0, import_node_child_process5.spawn)(process.execPath, spawnArgs, {
       env: {
         // IPC: worker needs to know daemon location
         FLOW_DAEMON_PORT: String(this.httpPort),

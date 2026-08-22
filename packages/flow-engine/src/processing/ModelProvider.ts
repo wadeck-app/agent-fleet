@@ -7,6 +7,7 @@
 import type { ChildProcess } from 'node:child_process';
 
 import type { StreamJsonEventCallback } from './StreamJsonParser';
+import type { ToolHook } from './ToolHook';
 
 // ---------------------------------------------------------------------------
 // Core types
@@ -35,6 +36,12 @@ export interface LaunchOptions {
 	autoCompact?: boolean;
 	onProcessStarted?: (process: ChildProcess) => void;
 	onStreamEvent?: StreamJsonEventCallback;
+	/**
+	 * Unified tool hooks — provider-agnostic declarations of what should happen
+	 * before/after tool calls. Each provider translates these into its native format
+	 * (OpenCode ESM plugin JS, Claude settings JSON).
+	 */
+	toolHooks?: ToolHook[];
 }
 
 export interface ModelInteractiveResult {

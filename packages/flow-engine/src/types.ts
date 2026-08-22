@@ -1,3 +1,4 @@
+import type { McpServer } from './processing/ModelProvider';
 import type { ValidationIssue } from './validation/ValidationTypes';
 
 /**
@@ -619,6 +620,19 @@ export interface ModelFlowStep extends BaseFlowStep {
 		 */
 		mode: 'append' | 'fork' | 'compact';
 	};
+
+	/**
+	 * MCP servers to register with the model provider for this step.
+	 * Each entry provides a named external MCP server over stdio.
+	 */
+	mcpServers?: McpServer[];
+
+	/**
+	 * Hooks to intercept tool calls made during this step.
+	 * Applied to both Claude and OpenCode providers.
+	 * @see ToolHook
+	 */
+	toolHooks?: import('./processing/ToolHook').ToolHook[];
 }
 
 /**

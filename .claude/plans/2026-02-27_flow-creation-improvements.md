@@ -158,7 +158,7 @@ Common first-time errors:
 
     # ✅ Correct: match actual script output
     output:
-        value: { type: string }  # Captures entire stdout
+        value: { type: string } # Captures entire stdout
     ```
 
 3. **Using wrong workspace mode**

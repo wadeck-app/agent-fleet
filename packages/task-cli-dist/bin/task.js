@@ -36,7 +36,9 @@ try {
 	try {
 		launcherPath = require.resolve(`${pkgName}/task${ext}`);
 	} catch {
-		process.stderr.write(`task: installed ${pkgName} but cannot resolve binary -- try: npm install -g @wadeck/task-cli\n`);
+		process.stderr.write(
+			`task: installed ${pkgName} but cannot resolve binary -- try: npm install -g @wadeck/task-cli\n`
+		);
 		process.exit(1);
 	}
 }

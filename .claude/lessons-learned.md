@@ -1,10 +1,23 @@
 # Lessons learned
 
-<!-- Last updated: 2026-08-21T08:26:59.631Z -->
+<!-- Last updated: 2026-08-22T13:00:04.698Z -->
 
 ## Recurring feedback
 
+<!-- session e76b8d9c 2026-08-21 -->
+- Test flows kept appearing in wrong subdirectories (`_flow_already_tested/`, scattered in `_test-tasks/`) — user had to redirect to flat structure at project root for user testing.
+- Agent submission needs pre-validation: run full test suite before handing off implementation. 28 timeout failures from event name mismatch is a detection gap.
+- Unit tests not added automatically when new types/functions created; user had to explicitly request "add unit tests in StepRunner.opencode.integration.test.ts" mid-task, indicating missing pattern/guideline.
+- Npm spawning issue (13:22–13:40) solved via multiple hypothesis-test iterations (spawnSync → execFileSync → execSync → shell:true → npm.cmd) rather than identifying root cause upfront. This consumed ~18 min and many round-trips for what may have been a single platform-specific constraint.
+- Package "cli-shared" created without following project naming convention (should be "shared-cli" per existing patterns like "shared-orch-worker"). Renamed late during refactoring (line 19:19+) instead of at creation.
+
+<!-- session acc25325 2026-08-19 -->
+
+- Never document a bug without fixing it — "Documenter" un bug sans le fixer, c'est le laisser en place. User explicitly rejected documenting "not yet implemented" features; must implement/fix instead.
+- Spec validation loop: 6 rounds of goldfish + pentest audits (v1–v6, 21:11–21:28) with multiple edits each round. Suggests spec schema or validation rules were unclear or constantly shifting. Need either clearer spec guidelines or fewer validation rounds (batch fixes).
+
 <!-- session 1dcbd5b4 2026-08-21 -->
+
 - npm registry auth blocks duplicated across .github/workflows/publish-flow-cli.yml, publish-task-cli.yml, and found the same pattern in wdrive, violations-framework — DRY opportunity: extract to shared action or script.
 
 <!-- session 2157a0f8 2026-08-20 -->
@@ -378,7 +391,35 @@
 
 ## Agent errors
 
+<!-- session e76b8d9c 2026-08-21 -->
+- OpenCode `XDG_CONFIG_HOME` isolation wipes auth — subprocess fails immediately because it can't read credentials. Mitigation: copy global `config.json` into tempDir before spawn.
+- Agent made ModelStepExecutor changes without verifying build/tests afterward. Only discovered 29 test failures on manual check.
+- Wrong event name in mock (`emit('close')` vs `emit('exit')`) caused 28 test timeouts. Suggests model provider event contracts aren't documented; mismatch should have been caught before submission.
+- Writing stub translator files (TDD phase) with empty implementations then "tests will fail first" is confusing without explicit framing. Better: explain TDD phase upfront or implement real translators so tests pass immediately.
+- Path calculation errors repeated 3x before finding correct level: assistant miscounted `..` levels from `packages/flow-engine/src/executor/` to `_test-tasks/` — suggests template-based relative path logic fails on deep nesting.
+- JSON.stringify() in shell command generation produces double quotes, breaking grep-in-shell validation — caught late in review rather than at write time.
+- Assistant created StreamEventMapper.test.ts via WRITE instead of checking if existing test file existed to be modified — assumption that new files don't have prior state.
+- Assumed `npm ci` would resolve lockfile issues; actually needed `npm install --prefer-offline` when lockfile contains optional platform-specific packages with unresolved transitive deps.
+- Backend-dev subagent attempted to invoke `parallel-and-todos` and `run-test`/`check` skills (15:11:25, 15:23:42, 15:23:44) that weren't available in its execution context, producing "NOT YET KNOWN" warnings instead of executing. Subagents have restricted skill registries compared to the main environment.
+- backend-dev agent attempted to use `Skill run` with bash command as argument (line 17:13:37) — skills don't take arbitrary commands, only registered skill names. Agent lacks skill discovery mechanism.
+- backend-dev agent encountered "NOT YET KNOWN" for skills `check`, `run-test`, `run` multiple times despite these being in system-reminder available skills list — subagent skill context differs from main context.
+
+<!-- session acc25325 2026-08-19 -->
+
+- Created test files with expected outcomes WITHOUT running them first — assumptions about `flow run` output were wrong. Missing `--wait` flag caused silent exit.
+- JSONPath bracket notation `$.tags[0]` fails silently; must normalize to `$.tags.0` before parsing.
+- Parallel agents modifying same file (OutputExtractor.ts + test) caused concurrent writes — risk of data loss. Coordinate file ownership or serialize.
+- Template validation errors (missing required input "priority") were silently swallowed; error only surfaced via workaround, not fixed DX.
+- Skill "spec" invocation failed with "NOT YET KNOWN" at 2026-08-19 19:51:32 — possible timing issue or skill-loading race condition when user tried to invoke a spec mode.
+- Bulk sed regex replacements on code files (line 21:09:22: `sed -i "s/{ type: 'string' }/...`) are fragile and error-prone; agent should use Edit tool for precision changes instead.
+- Multiple concurrent agents (55a79144, de603161, 274a5f98, e9704d0a) read identical spec folder files (lines 21:04:54–21:05:08) — suggests missed deduplication or poor task coordination when spawning parallel agents.
+- LoopHandler test file lookup: agent searched `src/orchestration/LoopHandler.test.ts` (wrong), then `find` to locate it, then succeeded with `src/processing/LoopHandler.test.ts`. Document the correct location or add a lint rule to catch misplaced test files.
+- Skill invocation failures: backend-dev agent attempted `skill:run` and `skill:check` which were not registered in the deferred tools list at runtime (21:20:51, 21:52:41). When agents try unavailable skills, they WARN but don't fail loudly — this causes silent work gaps. Skill availability should be validated before agent launch or skills should fail hard on unknown names.
+- npm install → workspace config edit → npm install again (21:21:31 → 21:22:21 → 21:22:47). Agent ran install before validating workspace config. Clarify when to validate package.json workspaces array before running npm operations.
+- Spawned second backend-dev agent (4a2fd14d:A:a839) while first one (e9704d0a:A:ae6b) was still running; both performed overlapping greps/reads (StepRunner, UpdaterMain, FlowConfig, PluginRegistry). Wasted context investigating same areas. Should wait for first agent to complete before spawning a second, or explicitly kill the first if abandoning its work.
+
 <!-- session 1dcbd5b4 2026-08-21 -->
+
 - OpenCodeModelProvider subprocess event handling required multiple refinement cycles — stdin closure timing, close vs exit event ordering, and timeout safety weren't immediately clear from code inspection; debugged via iterative edits and test runs before arriving at final pattern (close stdin → wait for close event → timeout fallback).
 - OpenCode executable resolution fell back through multiple paths before finding the right approach — tried direct exe locations, .cmd wrapper, shutil.which — unclear upfront that Windows PATH resolution differs from *nix; settled on fallback chain but discovery was iterative (log lines 22:23:07 → 22:47:56).
 
@@ -395,14 +436,14 @@
 
 - Used skill syntax with pipe args (`skill=run | args=bash...`) instead of standard tool parameters — unexpected format that doesn't match Skill tool schema
 - Extended debugging cycle with repeated file reads and incremental one-off edits scattered across 8+ files over 15min (22:00–22:15) before committing to refactoring strategy — suggests changes weren't scoped upfront
-- Backend-dev agent attempted to call skills (`check`, `run-test`, `subprocess`, `write-doc`, `run`) that returned "**_ NOT YET KNOWN _**" — suggests agents don't have reliable skill discovery or these particular skills are not accessible to backend-dev agent type, causing WARN logs but forcing fallback to manual Bash commands
+- Backend-dev agent attempted to call skills (`check`, `run-test`, `subprocess`, `write-doc`, `run`) that returned "**\_ NOT YET KNOWN _**" — suggests agents don't have reliable skill discovery or these particular skills are not accessible to backend-dev agent type, causing WARN logs but forcing fallback to manual Bash commands
 - Test debugging on CliCommand.test.ts and TaskCliCommand.test.ts used trial-and-error (edit, run, repeat) instead of identifying the root issue first. process.exit type signature mismatch (`number` vs `string | number | null`) took multiple iterations to resolve; should have run tests once, read error fully, then fixed once.
 - Security/code review subprocess agents (iterations 1, 2, 3 of pentest + code review) suggest initial findings were incomplete or the review scope wasn't precise enough. Re-running full audits indicates either unclear audit briefs or issues missed in first pass.
 - "Full review iteration 4 - final check" indicates multiple prior iterations; the specific grep patterns (skipPermissions, exitCode, currentProcess = null, providers.\*Map, result !== undefined) suggest earlier iterations missed or incompletely fixed these issues — agent should validate comprehensively in first pass rather than requiring multi-iteration reviews
 
 <!-- session 0455fbe4 2026-08-20 -->
 
-- Repeated "**_ NOT YET KNOWN _**" warnings for skills (check, run-test, write-doc, subprocess at 09:59:33, 09:59:37, 19:26:46, 19:26:49, 19:26:51, 19:33:01, 19:34:05, 19:34:11) — agents lack upfront skill definitions, causing fallback searches and latency spikes.
+- Repeated "**\_ NOT YET KNOWN _**" warnings for skills (check, run-test, write-doc, subprocess at 09:59:33, 09:59:37, 19:26:46, 19:26:49, 19:26:51, 19:33:01, 19:34:05, 19:34:11) — agents lack upfront skill definitions, causing fallback searches and latency spikes.
 - Inefficient partial file reads — backend-dev agents repeatedly Read files with small offsets (50 lines) that didn't capture full context, requiring multiple sequential reads instead of one full read upfront.
 - backend-dev agent attempted unknown skills "check" and "run-test" (20:15:33–35) — skills exist but agent wasn't aware of them, requiring workarounds
 
@@ -426,7 +467,7 @@
 - Two backend-dev agents (e9704d0a, 4a2fd14d) worked in parallel on overlapping code areas (McpServer.ts, Worker.ts, types.ts) with repeated Edit operations, causing a long debugging loop (22:05:40–22:14:49) instead of coordinating or deferring to one agent.
 - Agents called `skill=check` and `skill=run-test` multiple times (22:03:37, 22:03:40, 22:06:07, 22:15:50, 22:20:37) but got "NOT YET KNOWN" warnings, then fell back to ad-hoc grep/npm commands instead of asking or using Bash directly first.
 - Backend-dev agents repeatedly tried to use "check" skill which is not available — they worked around it by manually searching for `scripts/check-all.js`. The skill should either be available in the agent definition or documented as unavailable.
-- Multiple agents tried to invoke skills that don't exist (`run-test`, `subprocess`, `write-doc`, `run`) and logged "**_ NOT YET KNOWN _**" — suggests agent definitions haven't been updated to include these skills, or they're not available in the agent context.
+- Multiple agents tried to invoke skills that don't exist (`run-test`, `subprocess`, `write-doc`, `run`) and logged "**\_ NOT YET KNOWN _**" — suggests agent definitions haven't been updated to include these skills, or they're not available in the agent context.
 - ContractValidator.test.ts TypeScript errors were silenced by adding `ContractValidator.test.ts` to tsconfig.json exclude list (19:30:51) rather than fixing the actual test file — this hides rather than resolves the issue.
 - Fork agent iterated multiple times on test fixes (CliCommand.test.ts and TaskCliCommand.test.ts) with repeated test runs and edits, suggesting incomplete fixes on first pass.
 
@@ -434,7 +475,7 @@
 
 - Backend agents repeatedly attempted to invoke unavailable skills (`check`, `run-test`, `run` as skill vs bash) without graceful fallback — at least 6 failed invocations across timestamps 22:03:37–22:16:51. After each failure, agents retried the same call instead of using alternative approaches.
 - Two backend-dev agents (session ae6b, a839) ran in parallel without visible coordination; both wrote to same files (e.g., `packages/flow-cli/src/cli/commands/CliCommand.ts` at 22:03:05 and 22:08:22, `StepRunner.ts` edited by ae6b multiple times). No merge conflict prevention observed.
-- Agents repeatedly tried to invoke deferred skills (check, run-test, write-doc, subprocess) without first fetching schemas via ToolSearch — resulted in "**_ NOT YET KNOWN _**" warnings. Agents should proactively load skill schemas when attempting to use them, not assume they're available.
+- Agents repeatedly tried to invoke deferred skills (check, run-test, write-doc, subprocess) without first fetching schemas via ToolSearch — resulted in "**\_ NOT YET KNOWN _**" warnings. Agents should proactively load skill schemas when attempting to use them, not assume they're available.
 - Fork agent repeatedly fixed `process.exit` mock type signature (number → string | number | null) across multiple edits, suggesting initial type mismatch wasn't caught by TypeScript. Mock setup or test environment doesn't validate mock compatibility with implementation.
 
 <!-- session 6c0c8a03 2026-08-19 -->
@@ -464,7 +505,7 @@
 - Skill/tool invocations returned "NOT YET KNOWN" (check, goldfish, subprocess, SendMessage) — agent tried to use deferred tools without fetching schemas first via ToolSearch; should use `ToolSearch query="select:skill-name"` before invoking unknown tools.
 - Spec iteration cycle: opencode-step-provider/\_index.md edited 12+ times across 8 minutes (20:49 to 21:10), followed by goldfish review + security audit + fixes + relaunch. Initial spec unclear or gaps only surfaced during coherence/security review; frontload specification completeness checks before sending to audits.
 - Multiple fork agents (a5e1, a828, a14f, ab5e, a5c1, a92b) reading identical spec files in sequence instead of sharing context or parallelizing — each fork re-reads all 6 files independently, ~36 redundant reads total
-- Backend-dev agent attempted to invoke `/run skill with complex arguments ("npm install from C:\...") which failed with "**_ NOT YET KNOWN _**" — agent worked around by using Glob + manual npm install; the skill invocation should validate arguments or document supported input format
+- Backend-dev agent attempted to invoke `/run skill with complex arguments ("npm install from C:\...") which failed with "**\_ NOT YET KNOWN _**" — agent worked around by using Glob + manual npm install; the skill invocation should validate arguments or document supported input format
 
 <!-- session afdd4652 2026-08-19 -->
 
@@ -476,7 +517,7 @@
 
 <!-- session 66138a84 2026-08-19 -->
 
-- Agents launched without knowledge of available skills: "check", "goldfish", "subprocess" are all listed but triggered "**_ NOT YET KNOWN _**" warnings at 21:00:02, 21:03:54, 21:03:58 — skill registry/availability issue.
+- Agents launched without knowledge of available skills: "check", "goldfish", "subprocess" are all listed but triggered "**\_ NOT YET KNOWN _**" warnings at 21:00:02, 21:03:54, 21:03:58 — skill registry/availability issue.
 - Extensive grep-based investigation for `releaseWorkspace`, `LoopHandler`, condition evaluation (20:47-20:52) without clear resolution path before delegating work — weak root-cause debugging discipline, wasted context on searches that didn't yield answers.
 - Inter-agent async messaging (21:08:46): agent a19e sends "parseYAML already implemented, adjust test only" to agent a19e987db154400d7 — indicates agents duplicated work on same feature (parseYAML transform), no shared awareness of parallel tasks before fork.
 - Multiple attempts to locate LoopHandler: first searched in `src/orchestration/LoopHandler*`, then used `find`, then finally located in `src/processing/LoopHandler.test.ts`. Wrong assumption about directory structure — agent expected orchestration module to contain LoopHandler but it's in processing module.
@@ -494,7 +535,7 @@
 - Failed to read source specs from `origin/laptop-cli` branch (2026-07-30-flow-cli). Multiple `git show` / `git ls-tree` commands failed silently; assistant then created new spec files instead of extracting actual content, producing fundamentally wrong material.
 - Attempted to call unavailable skills "violations", "goldfish", "subprocess" without first using ToolSearch to fetch them from deferred tools list — marked as "NOT YET KNOWN" instead of being fetched on demand
 - Attempted to use tool "AskUserQuestion" without it being available/loaded
-- SendMessage tool called without first loading schema via ToolSearch — agent logged "**_ NOT YET KNOWN _**" at 21:08:40. Should ToolSearch("select:SendMessage") before calling tool methods not in the initial function list.
+- SendMessage tool called without first loading schema via ToolSearch — agent logged "**\_ NOT YET KNOWN _**" at 21:08:40. Should ToolSearch("select:SendMessage") before calling tool methods not in the initial function list.
 - Test file path was guessed wrong — attempted `src/orchestration/LoopHandler.test.ts` at 21:10:20, then had to search and correct to `src/processing/LoopHandler.test.ts` at 21:10:42. No shared documentation on test file locations.
 - sed was used for bulk TypeScript code replacement (lines 21:09:22, 21:09:34) — replaced { type: 'string' } patterns and added `name: 'Test Step'` to test fixtures via sed -i. This bypassed type checking and has no verification trail. Should have used Edit tool with explicit context for type safety.
 
@@ -689,7 +730,7 @@
 - Skill lookup failed for "spec" and "run" (marked "NOT YET KNOWN" at 07:48:57, 07:52:42). User worked around by running bash find/grep to locate skill definitions manually, indicating skill registry may be stale or misconfigured.
 - abc9 fork completely rewrote ConditionEvaluator.test.ts (Write tool) rather than incremental edits — suggests either wholesale test replacement or unfamiliarity with targeted test changes; main session continued debugging the same area (retry/loop) after fork completed, implying fixes were incomplete.
 - Multiple parallel forked agents (a593, abc9, a6e6, a53e) with overlapping scopes created ambiguous state — hard to verify which fork's changes actually fixed what; main session then re-applied fixes to same files afterwards.
-- Skill invocations for `subprocess` (doc-audit, security audit) and `goldfish` returned "**_ NOT YET KNOWN _**" — skill registry may not match name+args tuples or skills lack proper registration.
+- Skill invocations for `subprocess` (doc-audit, security audit) and `goldfish` returned "**\_ NOT YET KNOWN _**" — skill registry may not match name+args tuples or skills lack proper registration.
 - Verbose mode is driven by flow step `log: <step>` parameter, not CLI `--log` flag — agent a190 assumed wrong driver after working on streaming features.
 - Multiple parallel agents (aaa8, a9a5, a928) working on spec fixes simultaneously — ran 3 audit/fix rounds iteratively; suggests initial spec had undetected CRITICAL/HIGH issues that required re-audit cycles.
 
@@ -917,9 +958,25 @@
 
 ## Documentation gaps
 
+<!-- session e76b8d9c 2026-08-21 -->
+- OpenCode streaming events (`text`, `tool_use`) reach ModelStepExecutor but StreamEventMapper.map() has no cases for them — they don't appear in logs/console. Silent data loss.
+- OpenCode event semantics (`exit` vs `close`) and which events trigger `launchBackground()` resolution aren't clearly recorded. Future model provider integrations will need this.
+- Mock provider scenario format (how to emit NDJSON events) wasn't immediately clear — required multiple reads of existing examples.
+- Tool return type change (single `LiveLogEntry` → `LiveLogEntry[]`) created friction across 3 files; type hints for array-based returns could have been clearer.
+- GitLab write token validation in CI workflows — non-obvious that PyPI POST probe (without auth gives 401, with write token gives 201) is the most reliable non-destructive method; initial workflow used destructive test publishes.
+- `ci/scripts/generate-platform-packages.sh` created at 15:41:35 but no context given — appears to be undocumented workaround for platform-specific package generation in CI workflows. Platform package constraints and the exclusion strategy required empirical discovery.
+
+<!-- session acc25325 2026-08-19 -->
+
+- `flow run` behavior unclear: command exits immediately without `--wait`, no obvious indication from help text. Required trial-and-error to discover.
+- Missing 7+ unit tests for core features: JSONPath bracket notation, parseYAML transform, "from" extraction, contract validation, intermediate loop skip, writeOutput cleanup, statusTransitions.
+- OpenCode MCP configuration format required web fetching — assistant didn't have local knowledge of config.json structure for defining MCP servers. Suggests either external docs need to be cached locally or this is a known tool gap.
+- Tools not immediately available require discovery via ToolSearch: AskUserQuestion (21:51:01), SendMessage (21:08:40, for inter-agent comms), violations skill (20:47:34), subprocess skill (21:03:58). Skills list should be pre-loaded.
+
 <!-- session 1dcbd5b4 2026-08-21 -->
+
 - Package-lock.json registry URL consistency with CI workflows not initially checked — discovered project-level URLs mixed with group-level URLs; required sed replacement, then full regeneration. Future: verify lockfile URLs match workflow *.npmrc blocks upfront.
-- Subprocess stdin lifecycle for OpenCode on Windows (must close stdin *before* waiting for close event to unblock; use close not exit event) — not previously documented in lessons-learned; prevents future deadlock debugging cycles.
+- Subprocess stdin lifecycle for OpenCode on Windows (must close stdin _before_ waiting for close event to unblock; use close not exit event) — not previously documented in lessons-learned; prevents future deadlock debugging cycles.
 
 <!-- session 2157a0f8 2026-08-20 -->
 
@@ -1361,7 +1418,31 @@
 
 ## Known constraints
 
+<!-- session e76b8d9c 2026-08-21 -->
+- `require.resolve()` in PluginLoader is a runtime call that esbuild doesn't resolve into bundles — remains as filesystem lookup that fails in bundled CLI. Workaround: use `_require()` fallback.
+- Bundled flow-cli needs separate worker.cjs bundled + explicit copy to global install. WorkerPool must detect bundled vs. dev mode via file existence check.
+- Model ID format for Bedrock/OpenCode differs from displayed format: `amazon-bedrock/anthropic.claude-haiku-4-5` not `claude-haiku-4-5-20251001-v1:0`. Haiku-4-5 fails; Sonnet/Opus work.
+- Launcher binary `flow.exe` configDir prefix is baked at build time (`defaultConfigDir` in config.json) — old installed binary stays out of sync with latest source.
+- Mock-based testing is non-negotiable — user repeatedly enforces "avec opencode mock !" and "behavior must match reality". Real API calls in tests are forbidden; only mocked OpenCode/Claude.
+- Sub-agents (backend-dev fork) frequently lack Bash tool, causing repeated blocked test execution — Bash availability should be listed upfront or alternative verification path provided.
+- Parallel agents (`4a2fd14d` and `e9704d0a`) working simultaneously without explicit message passing — coordinator had to send update during work, suggesting async handoff protocol needs definition.
+- File locks on Windows node_modules (lightningcss binaries) — use `check-parallel-agents` skill to detect if another agent is holding resources before attempting cleanup.
+- npm publish in monorepos: cannot use `npm publish --workspace "packages/$pkg"` (npm 10+ dropped workspace support for publish) — use `(cd "packages/$pkg" && npm publish)` or `npm publish --prefix` instead.
+- Optional dependencies with `"*"` version constraint fail npm registry resolution — use `">=0.0.0-0"` instead; affects platform-specific optional packages.
+- Windows npm spawning requires `npm.cmd` or `shell:true` — bare `npm` fails via spawnSync. Monorepo uses OS/CPU-tagged platform packages (@wadeck scoped CLIs) that cause install failures without workspace exclusions in package.json.
+- Long build gaps (2+ hours between 17:16→19:17 and 19:22→21:37) suggest TypeScript compilation or test suite is blocking; no intermediate status updates during these pauses.
+
+<!-- session acc25325 2026-08-19 -->
+
+- User workflow: test manually first (`flow run --wait <file.yml`), verify actual output, then write test cases. Never assume CLI behavior — verify.
+- Sub-steps (nested steps inside a step) do not exist in flow-engine — not implemented, not in specs, not planned. Confirmed through investigation. Useful to document to avoid feature requests.
+- writeOutput cleanup has a missing release() call for shared workspaces — file persistence is intentional, but workspace lifecycle management is incomplete. Verified bug.
+- Type checking deferred until very end (21:09:49) catches errors only after many edits; should run tsc after each implementation phase to fail fast.
+- Git remote branch references need explicit fetch or commit hash: agent made 5+ attempts to read `origin/laptop-cli:.claude/specs/...` with syntax variations before falling back to `git show 1dd3cd6:...` (commit hash). POSIX shell quote handling and git refspec syntax are error-prone in agent subprocesses — pre-fetch remotes or use explicit commit refs.
+- Two concurrent backend-dev agents with overlapping work indicates context efficiency issue — delegation guidance says "early and often" but not "in parallel on same task."
+
 <!-- session 1dcbd5b4 2026-08-21 -->
+
 - GitLab npm auth in workflows uses group-level registry (api/v4/packages/npm/) for @wadeck scoped packages, but package-lock.json requires the same — if regenerating lockfile after workflow changes, must rebuild to sync both sources.
 
 <!-- session 2157a0f8 2026-08-20 -->
@@ -1439,7 +1520,7 @@
 
 <!-- session 66138a84 2026-08-19 -->
 
-- Multiple tool/skill invocations were attempted without pre-loading their schemas: WebFetch (20:29:23), spec skill (19:51:32), violations skill (20:47:34) all triggered **_ NOT YET KNOWN _** warnings. Pre-fetch deferred tools via ToolSearch before calling them, or accept the round-trip.
+- Multiple tool/skill invocations were attempted without pre-loading their schemas: WebFetch (20:29:23), spec skill (19:51:32), violations skill (20:47:34) all triggered **\_ NOT YET KNOWN _** warnings. Pre-fetch deferred tools via ToolSearch before calling them, or accept the round-trip.
 - Complex cross-repo coordination across agent-fleet, singleton-daemon-kit, violations-framework, laptop-cli branch — multiple agents reading/writing to different projects without clear isolation or sequencing (21:04:55 onwards: multiple sessions reading spec files + origin/laptop-cli branch simultaneously).
 - LoopHandler test file is in `packages/flow-engine/src/processing/LoopHandler.test.ts`, not in an `orchestration/` directory. May indicate unclear naming or documentation about which module owns loop handling.
 

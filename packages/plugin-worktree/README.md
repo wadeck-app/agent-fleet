@@ -17,13 +17,13 @@ plugins:
         my-worktree:
             type: plugins.worktree.default
             options:
-                baseDir: ~/workspaces       # required: absolute or ~ path, outside project root
-                branchPrefix: flow/         # optional: prefix for created branches
+                baseDir: ~/workspaces # required: absolute or ~ path, outside project root
+                branchPrefix: flow/ # optional: prefix for created branches
 
 # .flow/config.yml
 plugins:
     workspace:
         use: my-worktree
         options:
-            branchPrefix: myproject/        # optional project-level override
+            branchPrefix: myproject/ # optional project-level override
 ```

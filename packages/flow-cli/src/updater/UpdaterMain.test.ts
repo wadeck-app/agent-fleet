@@ -325,9 +325,7 @@ describe('main', () => {
 		}
 
 		// npm view must have been called despite the fresh cache
-		const viewCalls = vi
-			.mocked(execFile)
-			.mock.calls.filter(c => (c[1] as string[] | undefined)?.includes('view'));
+		const viewCalls = vi.mocked(execFile).mock.calls.filter(c => (c[1] as string[] | undefined)?.includes('view'));
 		expect(viewCalls).toHaveLength(1);
 	});
 });

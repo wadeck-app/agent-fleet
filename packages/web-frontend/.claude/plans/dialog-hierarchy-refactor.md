@@ -504,7 +504,7 @@ npm run storybook
 - [ ] IngredientDialog
 - [ ] ManagePinnedProjectsDialog
 - [ ] ManageProjectWorkspacesDialog
-- [ ]   - 20 autres fichiers à identifier
+- [ ] - 20 autres fichiers à identifier
 
 ### Fichiers à supprimer
 

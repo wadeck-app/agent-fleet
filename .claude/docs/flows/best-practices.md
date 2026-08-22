@@ -637,14 +637,14 @@ output:
 
 **Common Patterns:**
 
-| Pattern            | Matches          | Example                         |
+| Pattern | Matches | Example |
 | ------------------ | ---------------- | ------------------------------- | ----------------- |
-| `(.*)`             | Everything       | Captures entire line            |
-| `(\d+)`            | Numbers          | `42`, `1234`                    |
-| `(true             | false)`          | Boolean                         | `true` or `false` |
-| `v(\d+\.\d+\.\d+)` | Semantic version | `v1.2.3` → `1.2.3`              |
-| `(\w+)`            | Word characters  | `success`, `error_123`          |
-| `"([^"]+)"`        | Quoted string    | `"hello world"` → `hello world` |
+| `(.*)` | Everything | Captures entire line |
+| `(\d+)` | Numbers | `42`, `1234` |
+| `(true             | false)` | Boolean | `true` or `false` |
+| `v(\d+\.\d+\.\d+)` | Semantic version | `v1.2.3` → `1.2.3` |
+| `(\w+)` | Word characters | `success`, `error_123` |
+| `"([^"]+)"` | Quoted string | `"hello world"` → `hello world` |
 
 ### Transform Functions
 
@@ -935,13 +935,13 @@ steps:
 workspace:
     mode: isolated
     gitStrategy: main-only
-    reusePolicy: never  # ~30-60s per task
+    reusePolicy: never # ~30-60s per task
 
 # ✅ Fast: Reuses workspace across tasks
 workspace:
     mode: isolated
     gitStrategy: main-only
-    reusePolicy: always  # ~2-5s per task (after first)
+    reusePolicy: always # ~2-5s per task (after first)
 ```
 
 **Benchmarks** (typical monorepo):
@@ -1145,13 +1145,13 @@ workspace:
 ```yaml
 # ✅ Good test inputs
 inputs:
-    message: "Hello World"  # Simple string
-    count: 5  # Simple number
-    enabled: true  # Simple boolean
+    message: 'Hello World' # Simple string
+    count: 5 # Simple number
+    enabled: true # Simple boolean
 
 # ❌ Don't start with complex inputs
 inputs:
-    config: { ... }  # Complex object
+    config: { ... } # Complex object
 ```
 
 **Progressive Testing:**

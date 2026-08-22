@@ -750,9 +750,9 @@ prompt: 'Process ${{ inputs.data }}' # ✓ Correct syntax
 
 ```yaml
 # ❌ Various malformed expressions
-prompt: 'Data: ${{ .data }}'  # Missing prefix
-prompt: 'Data: ${{ steps..outputs.data }}'  # Double dot
-prompt: 'Data: ${{ steps.fetch }}'  # Missing .outputs
+prompt: 'Data: ${{ .data }}' # Missing prefix
+prompt: 'Data: ${{ steps..outputs.data }}' # Double dot
+prompt: 'Data: ${{ steps.fetch }}' # Missing .outputs
 ```
 
 **Example (after)**:
@@ -1087,10 +1087,10 @@ Frequently encountered problems with solutions.
 
 ```yaml
 # Exact match
-pattern: 'result=(.+)'  # Matches: result=value123
+pattern: 'result=(.+)' # Matches: result=value123
 
 # Flexible whitespace
-pattern: 'result\s*=\s*(.+)'  # Matches: result = value123
+pattern: 'result\s*=\s*(.+)' # Matches: result = value123
 
 # Multiline (use raw: true)
 pattern: 'BEGIN\n(.*)\nEND'

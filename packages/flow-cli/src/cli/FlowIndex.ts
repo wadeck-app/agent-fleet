@@ -2,8 +2,8 @@
 import { Command } from 'commander';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'node:url';
-
 import { UpdateManager } from 'shared-cli/index';
+
 import { buildCliCommand } from './commands/CliCommand.js';
 import { registerDocsCommand } from './commands/DocsCommand';
 import { registerHistoryCommand } from './commands/HistoryCommand';

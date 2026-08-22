@@ -38,7 +38,9 @@ try {
 	try {
 		launcherPath = require.resolve(`${pkgName}/flow${ext}`);
 	} catch {
-		process.stderr.write(`flow: installed ${pkgName} but cannot resolve binary -- try: npm install -g @wadeck/flow-cli\n`);
+		process.stderr.write(
+			`flow: installed ${pkgName} but cannot resolve binary -- try: npm install -g @wadeck/flow-cli\n`
+		);
 		process.exit(1);
 	}
 }

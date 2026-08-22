@@ -344,6 +344,83 @@ describe('ClaudeLauncher', () => {
 		});
 	});
 
+	describe('hooks (--settings and --include-hook-events)', () => {
+		function makeMockProcessSimple() {
+			return {
+				on: vi.fn((event: string, callback: (code: number) => void) => {
+					if (event === 'close') {
+						setTimeout(() => callback(0), 10);
+					}
+					return makeMockProcessSimple();
+				}),
+			};
+		}
+
+		it('adds --settings and --include-hook-events when settingsPath is set', async () => {
+			const mockProcess = makeMockProcessSimple();
+			vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
+			vi.spyOn(manager, 'findClaudePath').mockReturnValue('/usr/bin/claude');
+
+			await manager.launchInteractive({
+				workingDir: '/test',
+				prompt: 'Test hooks',
+				stepId: 'test',
+				settingsPath: '/tmp/claude-settings-abc.json',
+			});
+
+			const calledArgs = (child_process.spawn as any).mock.calls[0][1] as string[];
+			const settingsIdx = calledArgs.indexOf('--settings');
+			expect(settingsIdx).toBeGreaterThan(-1);
+			expect(calledArgs[settingsIdx + 1]).toBe('/tmp/claude-settings-abc.json');
+			expect(calledArgs).toContain('--include-hook-events');
+		});
+
+		it('does not add --settings or --include-hook-events when settingsPath is not set', async () => {
+			const mockProcess = makeMockProcessSimple();
+			vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
+			vi.spyOn(manager, 'findClaudePath').mockReturnValue('/usr/bin/claude');
+
+			await manager.launchInteractive({
+				workingDir: '/test',
+				prompt: 'No hooks',
+				stepId: 'test',
+			});
+
+			const calledArgs = (child_process.spawn as any).mock.calls[0][1] as string[];
+			expect(calledArgs).not.toContain('--settings');
+			expect(calledArgs).not.toContain('--include-hook-events');
+		});
+
+		it('adds --settings and --include-hook-events in background mode when settingsPath is set', async () => {
+			const mockStdout = { on: vi.fn(() => mockStdout) };
+			const mockStderr = { on: vi.fn(() => mockStderr) };
+			const mockStdin = { write: vi.fn(), end: vi.fn() };
+			const mockProcessBg = {
+				stdout: mockStdout,
+				stderr: mockStderr,
+				stdin: mockStdin,
+				on: vi.fn((event: string, callback: (code: number) => void) => {
+					if (event === 'close') setTimeout(() => callback(0), 10);
+					return mockProcessBg;
+				}),
+			};
+
+			vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcessBg as any);
+			vi.spyOn(manager, 'findClaudePath').mockReturnValue('/usr/bin/claude');
+
+			await manager.launchBackground({
+				workingDir: '/test',
+				prompt: 'bg hooks',
+				stepId: 'test',
+				settingsPath: '/tmp/claude-settings-xyz.json',
+			});
+
+			const calledArgs = (child_process.spawn as any).mock.calls[0][1] as string[];
+			expect(calledArgs).toContain('--settings');
+			expect(calledArgs).toContain('--include-hook-events');
+		});
+	});
+
 	describe('launchBackground', () => {
 		it.skip('should launch claude in background mode and capture output', async () => {
 			const mockStdout = {

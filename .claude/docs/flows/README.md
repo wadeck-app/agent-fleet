@@ -90,9 +90,9 @@ flow-id:
         gitStrategy: main-only|feature-branch|any|worktree
         reusePolicy: never|if-available|always
     inputs:
-        inputName: type  # shorthand
+        inputName: type # shorthand
         # or
-        inputName:       # extended
+        inputName: # extended
             type: string|number|boolean|object
             required: true|false
             default: value

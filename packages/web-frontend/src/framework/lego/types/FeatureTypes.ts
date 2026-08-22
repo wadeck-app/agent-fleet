@@ -164,23 +164,13 @@ export type DataTableFeature =
  * Carousel feature union
  */
 export type CarouselFeature =
-	| 'pagination'
-	| PaginationConfig
-	| AutoplayConfig
-	| 'field-visibility'
-	| FieldVisibilityConfig;
+	'pagination' | PaginationConfig | AutoplayConfig | 'field-visibility' | FieldVisibilityConfig;
 
 /**
  * ItemGrid feature union
  */
 export type ItemGridFeature =
-	| 'search'
-	| SearchConfig
-	| 'pagination'
-	| PaginationConfig
-	| CrudConfig
-	| 'bulk-delete'
-	| BulkDeleteConfig;
+	'search' | SearchConfig | 'pagination' | PaginationConfig | CrudConfig | 'bulk-delete' | BulkDeleteConfig;
 
 /**
  * DetailPanel feature union

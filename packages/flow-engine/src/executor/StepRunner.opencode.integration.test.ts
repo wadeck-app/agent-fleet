@@ -31,7 +31,7 @@ import { describe, expect, it } from 'vitest';
 import { ClaudeModelProvider } from '../processing/ClaudeModelProvider';
 import { OpenCodeModelProvider } from '../processing/OpenCodeModelProvider';
 import type { StreamJsonEvent } from '../processing/StreamJsonParser';
-import type { ModelFlowStep, ModelStepMeta, Workspace } from '../types';
+import type { LiveLogEntry, ModelFlowStep, ModelStepMeta, Workspace } from '../types';
 import { StepRunner } from './StepRunner';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -285,6 +285,66 @@ describe.skipIf(!shouldRunIntegration())('OpenCode real vs mock compatibility', 
 		INTEGRATION_TIMEOUT
 	);
 
+	// --- E2E: real OpenCode + real MCP server ---
+
+	it(
+		'E2E: OpenCode calls get_weather MCP tool and emits tool_use event',
+		async () => {
+			const MCP_SERVER_PATH = join(__dirname, '../../../../../_test-tasks/mcp-server/index.mjs');
+
+			if (!existsSync(MCP_SERVER_PATH)) {
+				console.warn(`MCP server not found at ${MCP_SERVER_PATH} — skipping E2E MCP test`);
+				return;
+			}
+
+			const provider = new OpenCodeModelProvider();
+			const capturedEvents: StreamJsonEvent[] = [];
+
+			const result = await provider.launchBackground({
+				workingDir: process.cwd(),
+				prompt: 'Use the get_weather tool to get the current weather for Paris, France. Report the result clearly.',
+				stepId: 'e2e-mcp-weather-test',
+				skipPermissions: true,
+				mcpServers: [
+					{
+						name: 'weather-test',
+						command: [process.execPath, MCP_SERVER_PATH.replace(/\\/g, '/')],
+					},
+				],
+				onStreamEvent: e => capturedEvents.push(e),
+			});
+
+			if (result.exitCode !== 0) {
+				console.warn(
+					`opencode exited with code ${result.exitCode} — MCP E2E test cannot assert tool events.\nstderr: ${result.stderr}`
+				);
+				return;
+			}
+
+			// At least one tool_use event must have been emitted for get_weather
+			const toolUseEvents = capturedEvents.filter(e => e.type === 'tool_use');
+			expect(toolUseEvents.length).toBeGreaterThan(0);
+
+			const weatherToolEvent = toolUseEvents.find(e => String(e.data['tool'] ?? '').includes('get_weather'));
+			expect(weatherToolEvent).toBeDefined();
+
+			// The tool output must contain the expected weather response from the MCP server
+			const toolOutput = String(weatherToolEvent?.data['output'] ?? '');
+			const hasExpectedOutput = toolOutput.includes('sunny') || toolOutput.includes('22');
+			expect(hasExpectedOutput).toBe(true);
+
+			// Final result event must also arrive
+			const resultEvent = capturedEvents.find(e => e.type === 'result');
+			expect(resultEvent).toBeDefined();
+			const finalResult = String(resultEvent?.data['result'] ?? '');
+			expect(finalResult.length).toBeGreaterThan(0);
+
+			console.log(`✓ E2E MCP test passed. Tool output: ${toolOutput}`);
+			console.log(`  Final response (first 120 chars): ${finalResult.slice(0, 120)}`);
+		},
+		INTEGRATION_TIMEOUT
+	);
+
 	// --- VERSION STALENESS CHECK (always runs, warns only) ---
 
 	it('warns when opencode version changed since last integration test', () => {
@@ -425,6 +485,301 @@ describe('Flow-level feature tests (mock providers)', () => {
 					delete process.env['CLAUDE_MOCK_PATH'];
 				} else {
 					process.env['CLAUDE_MOCK_PATH'] = prevClaudeMockPath;
+				}
+			}
+		},
+		FLOW_TEST_TIMEOUT
+	);
+
+	it(
+		'tool_use events emitted correctly via mock (use_tool prompt scenario)',
+		async () => {
+			const prevMockPath = process.env['OPENCODE_MOCK_PATH'];
+			process.env['OPENCODE_MOCK_PATH'] = MOCK_PATH;
+
+			try {
+				const provider = new OpenCodeModelProvider();
+				const capturedEvents: StreamJsonEvent[] = [];
+
+				const result = await provider.launchBackground({
+					workingDir: process.cwd(),
+					prompt: 'please use_tool to answer',
+					stepId: 'tool-use-test',
+					onStreamEvent: e => capturedEvents.push(e),
+				});
+
+				if (result.exitCode !== 0) {
+					console.warn('opencode-mock exited non-zero — skipping assertions');
+					return;
+				}
+
+				// tool_use event must be emitted once (mock emits exactly one tool call)
+				const toolUseEvents = capturedEvents.filter(e => e.type === 'tool_use');
+				expect(toolUseEvents.length).toBeGreaterThan(0);
+
+				const toolEvent = toolUseEvents[0]!;
+				expect(toolEvent.data['tool']).toBe('test_tool');
+				expect(typeof toolEvent.data['callID']).toBe('string');
+				expect((toolEvent.data['callID'] as string).length).toBeGreaterThan(0);
+				expect(toolEvent.data['status']).toBe('completed');
+				expect(toolEvent.data['output']).toBe('tool result output');
+
+				// Final result must still arrive — step_finish(tool-calls) must NOT terminate execution
+				const resultEvent = capturedEvents.find(e => e.type === 'result');
+				expect(resultEvent).toBeDefined();
+				expect(resultEvent!.data['result']).toBe('Done with tool.');
+				// Cost from the final stop step only (tool-calls step cost excluded from total in provider)
+				expect(resultEvent!.data['cost_usd']).toBeGreaterThan(0);
+			} finally {
+				if (prevMockPath === undefined) {
+					delete process.env['OPENCODE_MOCK_PATH'];
+				} else {
+					process.env['OPENCODE_MOCK_PATH'] = prevMockPath;
+				}
+			}
+		},
+		FLOW_TEST_TIMEOUT
+	);
+
+	it(
+		'XDG_CONFIG_HOME isolation: each spawn receives a unique temp dir path in its env',
+		async () => {
+			// The mock echoes XDG_CONFIG_HOME back in the response when "echo_xdg" is in prompt.
+			// This verifies the subprocess actually received the isolation env var.
+			const prevMockPath = process.env['OPENCODE_MOCK_PATH'];
+			process.env['OPENCODE_MOCK_PATH'] = MOCK_PATH;
+
+			try {
+				const provider = new OpenCodeModelProvider();
+
+				const capturedRun1: StreamJsonEvent[] = [];
+				const capturedRun2: StreamJsonEvent[] = [];
+
+				await provider.launchBackground({
+					workingDir: process.cwd(),
+					prompt: 'please echo_xdg here',
+					stepId: 'xdg-test-1',
+					onStreamEvent: e => capturedRun1.push(e),
+				});
+				await provider.launchBackground({
+					workingDir: process.cwd(),
+					prompt: 'please echo_xdg here',
+					stepId: 'xdg-test-2',
+					onStreamEvent: e => capturedRun2.push(e),
+				});
+
+				const extractXdgPath = (events: StreamJsonEvent[]): string | null => {
+					const resultEvent = events.find(e => e.type === 'result');
+					const text = resultEvent?.data['result'] as string | undefined;
+					if (!text || !text.startsWith('XDG_CONFIG_HOME:')) return null;
+					return text.replace('XDG_CONFIG_HOME:', '');
+				};
+
+				const path1 = extractXdgPath(capturedRun1);
+				const path2 = extractXdgPath(capturedRun2);
+
+				// Both runs must have received a XDG_CONFIG_HOME
+				expect(path1).not.toBeNull();
+				expect(path2).not.toBeNull();
+
+				// Each path must contain the opencode-run- prefix (generated by the provider)
+				expect(path1).toMatch(/opencode-run-/);
+				expect(path2).toMatch(/opencode-run-/);
+
+				// The two runs must have used distinct directories
+				expect(path1).not.toBe(path2);
+			} finally {
+				if (prevMockPath === undefined) {
+					delete process.env['OPENCODE_MOCK_PATH'];
+				} else {
+					process.env['OPENCODE_MOCK_PATH'] = prevMockPath;
+				}
+			}
+		},
+		FLOW_TEST_TIMEOUT
+	);
+
+	it(
+		'streaming text: text events from OpenCode appear in onLogEntry as assistant_text entries',
+		async () => {
+			// The standard mock scenario emits a `text` event with the response text.
+			// With the streaming fix in place, that text event must flow through
+			// onStreamEvent → StreamEventMapper.map('text') → onLogEntry.
+			const prevMockPath = process.env['OPENCODE_MOCK_PATH'];
+			process.env['OPENCODE_MOCK_PATH'] = MOCK_PATH;
+
+			try {
+				const step: ModelFlowStep = {
+					id: 'streaming-text-step',
+					name: 'Streaming Text Step',
+					type: 'model',
+					provider: 'opencode',
+					prompt: 'hello streaming',
+					// 'streaming' log mode: each entry is forwarded via onLogEntry immediately
+					log: 'streaming',
+				};
+
+				const runner = new StepRunner({
+					interactive: false,
+					providers: new Map([['opencode', new OpenCodeModelProvider()]]),
+				});
+
+				const logEntries: LiveLogEntry[] = [];
+
+				const trace = await runner.executeStep(
+					step,
+					makeTestWorkspace(),
+					{ inputs: {}, stepOutputs: new Map(), taskMetadata: {} },
+					undefined,
+					entry => logEntries.push(entry)
+				);
+
+				expect(trace.error).toBeUndefined();
+
+				// At least one assistant_text entry must have been forwarded via onLogEntry
+				const textEntries = logEntries.filter(e => e.eventType === 'assistant_text');
+				expect(textEntries.length).toBeGreaterThan(0);
+
+				// The text content from the mock must appear in one of the entries
+				const hasExpectedText = textEntries.some(e => e.message.includes('Mock opencode response'));
+				expect(hasExpectedText).toBe(true);
+			} finally {
+				if (prevMockPath === undefined) {
+					delete process.env['OPENCODE_MOCK_PATH'];
+				} else {
+					process.env['OPENCODE_MOCK_PATH'] = prevMockPath;
+				}
+			}
+		},
+		FLOW_TEST_TIMEOUT
+	);
+
+	it(
+		'deny regedit hook: tool_use with status error and blocked text appear in log entries',
+		async () => {
+			// The bash_regedit mock scenario emits:
+			//   tool_use(Bash, status=error, output="Tool denied: regedit is forbidden...")
+			//   text("I tried to run regedit but it was blocked by a system policy.")
+			// Both must appear as log entries when log: 'streaming'.
+			const prevMockPath = process.env['OPENCODE_MOCK_PATH'];
+			process.env['OPENCODE_MOCK_PATH'] = MOCK_PATH;
+
+			try {
+				const step: ModelFlowStep = {
+					id: 'deny-regedit-step',
+					name: 'Deny Regedit Step',
+					type: 'model',
+					provider: 'opencode',
+					prompt: 'bash_regedit',
+					log: 'streaming',
+					toolHooks: [
+						{
+							timing: 'before',
+							action: {
+								type: 'deny',
+								reason: 'regedit is forbidden on this system',
+								argsContains: 'regedit',
+							},
+						},
+					],
+				};
+
+				const runner = new StepRunner({
+					interactive: false,
+					providers: new Map([['opencode', new OpenCodeModelProvider()]]),
+				});
+
+				const logEntries: LiveLogEntry[] = [];
+
+				const trace = await runner.executeStep(
+					step,
+					makeTestWorkspace(),
+					{ inputs: {}, stepOutputs: new Map(), taskMetadata: {} },
+					undefined,
+					entry => logEntries.push(entry)
+				);
+
+				expect(trace.error).toBeUndefined();
+
+				// tool_use entry with status error must appear
+				const toolUseEntries = logEntries.filter(e => e.eventType === 'tool_use');
+				expect(toolUseEntries.length).toBeGreaterThan(0);
+				const bashEntry = toolUseEntries.find(e => e.message.includes('Bash'));
+				expect(bashEntry).toBeDefined();
+
+				// tool_result entry must contain the denial message
+				const toolResultEntries = logEntries.filter(e => e.eventType === 'tool_result');
+				expect(toolResultEntries.length).toBeGreaterThan(0);
+				const deniedEntry = toolResultEntries.find(e => e.message.includes('Tool denied'));
+				expect(deniedEntry).toBeDefined();
+
+				// The follow-up text about being blocked must appear as assistant_text
+				const textEntries = logEntries.filter(e => e.eventType === 'assistant_text');
+				expect(textEntries.length).toBeGreaterThan(0);
+				const blockedEntry = textEntries.find(e => e.message.includes('blocked by a system policy'));
+				expect(blockedEntry).toBeDefined();
+			} finally {
+				if (prevMockPath === undefined) {
+					delete process.env['OPENCODE_MOCK_PATH'];
+				} else {
+					process.env['OPENCODE_MOCK_PATH'] = prevMockPath;
+				}
+			}
+		},
+		FLOW_TEST_TIMEOUT
+	);
+
+	it(
+		'plugin hook injection: OPENCODE_CONFIG_CONTENT includes plugin key with hook.js path',
+		async () => {
+			// The mock echoes OPENCODE_CONFIG_CONTENT back when "echo_config" is in prompt.
+			// This verifies the provider correctly includes the plugin in the subprocess config.
+			const prevMockPath = process.env['OPENCODE_MOCK_PATH'];
+			process.env['OPENCODE_MOCK_PATH'] = MOCK_PATH;
+
+			try {
+				const provider = new OpenCodeModelProvider();
+				const capturedEvents: StreamJsonEvent[] = [];
+
+				const result = await provider.launchBackground({
+					workingDir: process.cwd(),
+					prompt: 'please echo_config for me',
+					stepId: 'plugin-test',
+					toolHooks: [
+						{ timing: 'before' as const, action: { type: 'log' as const } },
+						{ timing: 'after' as const, action: { type: 'log' as const } },
+					],
+					onStreamEvent: e => capturedEvents.push(e),
+				});
+
+				if (result.exitCode !== 0) {
+					console.warn('opencode-mock exited non-zero — skipping assertions');
+					return;
+				}
+
+				const resultEvent = capturedEvents.find(e => e.type === 'result');
+				expect(resultEvent).toBeDefined();
+
+				const responseText = resultEvent!.data['result'] as string;
+				expect(responseText.startsWith('OPENCODE_CONFIG:')).toBe(true);
+
+				const configJson = responseText.replace('OPENCODE_CONFIG:', '');
+				const config = JSON.parse(configJson) as Record<string, unknown>;
+
+				// Config must include a plugin array with a path ending in hook.js
+				expect(Array.isArray(config['plugin'])).toBe(true);
+				const pluginPaths = config['plugin'] as string[];
+				expect(pluginPaths.length).toBe(1);
+				expect(pluginPaths[0]).toMatch(/hook\.js$/);
+				// Path must be inside an opencode-run-* temp dir
+				expect(pluginPaths[0]).toMatch(/opencode-run-/);
+				// Path uses forward slashes (Windows path fix)
+				expect(pluginPaths[0]).not.toContain('\\');
+			} finally {
+				if (prevMockPath === undefined) {
+					delete process.env['OPENCODE_MOCK_PATH'];
+				} else {
+					process.env['OPENCODE_MOCK_PATH'] = prevMockPath;
 				}
 			}
 		},

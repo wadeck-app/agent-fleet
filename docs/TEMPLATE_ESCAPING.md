@@ -22,9 +22,9 @@ Notre syntaxe `${{ }}` coexiste naturellement avec:
 
 ```yaml
 # Variables shell préservées telles quelles
-script: echo $HOME                    # ✓ OK
-script: export PATH=$PATH:/new        # ✓ OK
-script: echo ${HOME}/documents        # ✓ OK
+script: echo $HOME # ✓ OK
+script: export PATH=$PATH:/new # ✓ OK
+script: echo ${HOME}/documents # ✓ OK
 ```
 
 #### 2. Accolades simples `{}`
@@ -46,9 +46,9 @@ script: echo "{{ variable }}" # ✓ OK (pas de $)
 
 ```yaml
 # Le meilleur des deux mondes !
-script: echo "${{ inputs.name }}" lives in $HOME              # ✓ OK
-script: cp ${{ inputs.file }} ${HOME}/backup/                 # ✓ OK
-script: USER=${{ inputs.name }} HOME=$HOME ./script.sh        # ✓ OK
+script: echo "${{ inputs.name }}" lives in $HOME # ✓ OK
+script: cp ${{ inputs.file }} ${HOME}/backup/ # ✓ OK
+script: USER=${{ inputs.name }} HOME=$HOME ./script.sh # ✓ OK
 ```
 
 ### ⚠️ Seul pattern interpolé: `${{ expression }}`
@@ -197,8 +197,8 @@ script: echo "$ {{ variable }}"
 script: echo "${DOLLAR}{{ variable }}"
 
 # Les patterns incomplets sont préservés
-script: echo "${{ incomplete"     # Préservé tel quel
-script: echo "{{ no dollar }}"    # Préservé tel quel
+script: echo "${{ incomplete" # Préservé tel quel
+script: echo "{{ no dollar }}" # Préservé tel quel
 ```
 
 ## Tests de Validation
@@ -247,17 +247,17 @@ Exemples:
 ```yaml
 # Clair: mélanger flow et shell
 script: |
-  echo "Flow: ${{ inputs.name }}"
-  echo "Shell: $HOME"
+    echo "Flow: ${{ inputs.name }}"
+    echo "Shell: $HOME"
 
 # Clair: JSON avec interpolation
 script: |
-  cat > config.json << 'EOF'
-  {
-    "user": "${{ inputs.name }}",
-    "path": "$HOME"
-  }
-  EOF
+    cat > config.json << 'EOF'
+    {
+      "user": "${{ inputs.name }}",
+      "path": "$HOME"
+    }
+    EOF
 ```
 
 ### ❌ À Éviter

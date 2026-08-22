@@ -581,22 +581,22 @@ steps:
 
 ```yaml
 # ❌ Wrong: missing context prefix
-prompt: 'Analyze: ${{ task }}'  # Should be inputs.task or task.id
+prompt: 'Analyze: ${{ task }}' # Should be inputs.task or task.id
 
 # ❌ Wrong: missing 'outputs' in step reference
-prompt: 'Result: ${{ steps.analyze.result }}'  # Should be steps.analyze.outputs.result
+prompt: 'Result: ${{ steps.analyze.result }}' # Should be steps.analyze.outputs.result
 
 # ❌ Wrong: trying to do arithmetic in template
-script: echo ${{ inputs.count + 1 }}  # Templates don't evaluate expressions
+script: echo ${{ inputs.count + 1 }} # Templates don't evaluate expressions
 ```
 
 **Solution**: Use correct template syntax:
 
 ```yaml
 # ✅ Correct: proper context prefixes
-prompt: 'Analyze: ${{ inputs.task }}'  # inputs.task
-prompt: 'Priority: ${{ task.priority }}'  # task.priority
-prompt: 'Result: ${{ steps.analyze.outputs.result }}'  # steps.X.outputs.Y
+prompt: 'Analyze: ${{ inputs.task }}' # inputs.task
+prompt: 'Priority: ${{ task.priority }}' # task.priority
+prompt: 'Result: ${{ steps.analyze.outputs.result }}' # steps.X.outputs.Y
 
 # ✅ Correct: do arithmetic in script, not template
 script: |

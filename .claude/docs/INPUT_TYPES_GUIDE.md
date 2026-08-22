@@ -81,13 +81,13 @@ Simple text string.
 
 ```yaml
 inputs:
-  name: string
-  # or extended
-  name:
-    type: string
-    required: true
-    description: 'User name'
-    default: 'Anonymous'
+    name: string
+    # or extended
+    name:
+        type: string
+        required: true
+        description: 'User name'
+        default: 'Anonymous'
 ```
 
 **Use case**: Names, identifiers, short text
@@ -98,15 +98,15 @@ Numeric value (integer or decimal).
 
 ```yaml
 inputs:
-  score: number
-  # or extended
-  score:
-    type: number
-    required: true
-    default: 0
-    options:
-      min: 0
-      max: 100
+    score: number
+    # or extended
+    score:
+        type: number
+        required: true
+        default: 0
+        options:
+            min: 0
+            max: 100
 ```
 
 **Use case**: Counts, measurements, any numeric value
@@ -117,12 +117,12 @@ True/false value.
 
 ```yaml
 inputs:
-  enabled: boolean
-  # or extended
-  enabled:
-    type: boolean
-    required: false
-    default: false
+    enabled: boolean
+    # or extended
+    enabled:
+        type: boolean
+        required: false
+        default: false
 ```
 
 **Use case**: Feature flags, toggles, yes/no questions
@@ -133,12 +133,12 @@ Complex JSON object.
 
 ```yaml
 inputs:
-  config: object
-  # or extended
-  config:
-    type: object
-    required: false
-    default: {}
+    config: object
+    # or extended
+    config:
+        type: object
+        required: false
+        default: {}
 ```
 
 **Use case**: Configuration objects, nested data

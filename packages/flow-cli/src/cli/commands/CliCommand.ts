@@ -9,10 +9,10 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { ConfigDir, HookDispatcher, VersionValidation } from 'shared-cli/index';
 
 import { FlowConfigLoader } from '../../config/FlowConfig.js';
 import { PluginLoader } from '../../config/PluginLoader.js';
-import { ConfigDir, HookDispatcher, VersionValidation } from 'shared-cli/index';
 
 // Injected by esbuild at bundle time via define; falls back to package.json in dev mode (tsx).
 declare const __FLOW_CLI_VERSION__: string;
@@ -141,7 +141,11 @@ async function runSelfChecks(): Promise<CheckResult[]> {
 			// This is a known limitation of the global install -- plugins require local node_modules.
 			// TODO: inline extension-points.json at bundle time via an esbuild plugin.
 			if (msg.includes('extension-points') && msg.includes('Cannot find module')) {
-				results.push({ name, passed: true, error: 'extension-points not in bundle (plugins disabled in standalone install)' });
+				results.push({
+					name,
+					passed: true,
+					error: 'extension-points not in bundle (plugins disabled in standalone install)',
+				});
 			} else {
 				results.push({ name, passed: false, error: msg });
 			}

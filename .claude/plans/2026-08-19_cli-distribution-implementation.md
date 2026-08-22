@@ -427,37 +427,37 @@ Note: GitHub Actions does not support combining `paths` filter with `tags` in a 
 name: Publish flow-cli
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - packages/flow-cli/**
-      - packages/flow-engine/**
-      - packages/extension-points/**
-      - packages/plugin-none/**
-      - packages/plugin-worktree/**
-      - packages/plugin-cli-approval/**
-      - packages/shared-common/**
-  push:
-    tags:
-      - 'v*'
+    push:
+        branches: [main]
+        paths:
+            - packages/flow-cli/**
+            - packages/flow-engine/**
+            - packages/extension-points/**
+            - packages/plugin-none/**
+            - packages/plugin-worktree/**
+            - packages/plugin-cli-approval/**
+            - packages/shared-common/**
+    push:
+        tags:
+            - 'v*'
 ```
 
 Note: duplicate `push` key is invalid YAML. Use this pattern instead:
 
 ```yaml
 on:
-  push:
-    branches: [main]
-    paths:
-      - packages/flow-cli/**
-      - packages/flow-engine/**
-      - packages/extension-points/**
-      - packages/plugin-none/**
-      - packages/plugin-worktree/**
-      - packages/plugin-cli-approval/**
-      - packages/shared-common/**
+    push:
+        branches: [main]
+        paths:
+            - packages/flow-cli/**
+            - packages/flow-engine/**
+            - packages/extension-points/**
+            - packages/plugin-none/**
+            - packages/plugin-worktree/**
+            - packages/plugin-cli-approval/**
+            - packages/shared-common/**
 
-  push:  # second push for tags -- WORKAROUND: use workflow_dispatch for stable
+    push: # second push for tags -- WORKAROUND: use workflow_dispatch for stable
 ```
 
 **Correct pattern for stable releases:** Use `workflow_dispatch` (manual trigger) for stable, not a tag push. This avoids the paths+tags GitHub Actions limitation:

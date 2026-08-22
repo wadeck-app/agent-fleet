@@ -79,7 +79,7 @@ describe('OpenCodeModelProvider', () => {
 	describe('command structure', () => {
 		it('spawns "opencode run" as command', async () => {
 			const resultPromise = provider.launchBackground(makeBaseOptions());
-			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
 
 			const [command, args] = vi.mocked(child_process.spawn).mock.calls[0] as unknown as [string, string[]];
@@ -89,7 +89,7 @@ describe('OpenCodeModelProvider', () => {
 
 		it('passes prompt as positional arg (2nd position)', async () => {
 			const resultPromise = provider.launchBackground(makeBaseOptions({ prompt: 'hello world' }));
-			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
 
 			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
@@ -98,7 +98,7 @@ describe('OpenCodeModelProvider', () => {
 
 		it('always includes --format json', async () => {
 			const resultPromise = provider.launchBackground(makeBaseOptions());
-			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
 
 			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
@@ -109,7 +109,7 @@ describe('OpenCodeModelProvider', () => {
 
 		it('does NOT include --auto when skipPermissions is not set (default: false)', async () => {
 			const resultPromise = provider.launchBackground(makeBaseOptions());
-			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
 
 			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
@@ -118,7 +118,7 @@ describe('OpenCodeModelProvider', () => {
 
 		it('includes --auto when skipPermissions is explicitly true', async () => {
 			const resultPromise = provider.launchBackground(makeBaseOptions({ skipPermissions: true }));
-			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
 
 			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
@@ -127,7 +127,7 @@ describe('OpenCodeModelProvider', () => {
 
 		it('omits --auto when skipPermissions is false', async () => {
 			const resultPromise = provider.launchBackground(makeBaseOptions({ skipPermissions: false }));
-			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
 
 			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
@@ -136,7 +136,7 @@ describe('OpenCodeModelProvider', () => {
 
 		it('passes -m model when model is specified', async () => {
 			const resultPromise = provider.launchBackground(makeBaseOptions({ model: 'anthropic/claude-3-5-haiku' }));
-			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
 
 			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
@@ -153,7 +153,7 @@ describe('OpenCodeModelProvider', () => {
 			vi.mocked(child_process.spawn).mockReturnValue(mockProcess);
 
 			const resultPromise = provider.launchBackground(makeBaseOptions());
-			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
 
 			const opts = vi.mocked(child_process.spawn).mock.calls[0][2] as { shell?: boolean };
@@ -170,7 +170,7 @@ describe('OpenCodeModelProvider', () => {
 				stdout.emit('data', Buffer.from('{"result":"done"}'));
 				const stderr = (mockProcess as unknown as Record<string, EventEmitter>)['stderr'];
 				stderr.emit('data', Buffer.from(''));
-				(mockProcess as EventEmitter).emit('close', 0);
+				(mockProcess as EventEmitter).emit('exit', 0);
 			});
 
 			const result = await resultPromise;
@@ -195,7 +195,7 @@ describe('OpenCodeModelProvider', () => {
 		it('does NOT throw for prompt exactly at 32KB', async () => {
 			const exactPrompt = 'x'.repeat(32 * 1024);
 			const resultPromise = provider.launchBackground(makeBaseOptions({ prompt: exactPrompt }));
-			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await expect(resultPromise).resolves.toBeDefined();
 		});
 
@@ -230,7 +230,7 @@ describe('OpenCodeModelProvider', () => {
 					],
 				})
 			);
-			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
 
 			const spawnOpts = vi.mocked(child_process.spawn).mock.calls[0][2] as { env?: Record<string, string> };
@@ -253,7 +253,7 @@ describe('OpenCodeModelProvider', () => {
 
 		it('does NOT set OPENCODE_CONFIG_CONTENT when mcpServers is empty', async () => {
 			const resultPromise = provider.launchBackground(makeBaseOptions({ mcpServers: [] }));
-			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
 
 			const spawnOpts = vi.mocked(child_process.spawn).mock.calls[0][2] as { env?: Record<string, string> };
@@ -270,7 +270,7 @@ describe('OpenCodeModelProvider', () => {
 					mcpServers: [{ name: 'my-tool', command: ['npx', 'my-mcp-server'] }],
 				})
 			);
-			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
 
 			const spawnOpts = vi.mocked(child_process.spawn).mock.calls[0][2] as { env?: Record<string, string> };
@@ -311,7 +311,7 @@ describe('OpenCodeModelProvider', () => {
 			process.env['SECRET_TOKEN'] = 'should-not-leak';
 
 			const resultPromise = provider.launchBackground(makeBaseOptions());
-			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
 
 			const spawnOpts = vi.mocked(child_process.spawn).mock.calls[0][2] as { env?: Record<string, string> };
@@ -322,7 +322,7 @@ describe('OpenCodeModelProvider', () => {
 
 		it('forwards options.env entries only', async () => {
 			const resultPromise = provider.launchBackground(makeBaseOptions({ env: { MY_CUSTOM: 'val' } }));
-			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
 
 			const spawnOpts = vi.mocked(child_process.spawn).mock.calls[0][2] as { env?: Record<string, string> };
@@ -333,7 +333,7 @@ describe('OpenCodeModelProvider', () => {
 			process.env['ANTHROPIC_API_KEY'] = 'claude-key';
 
 			const resultPromise = provider.launchBackground(makeBaseOptions());
-			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
 
 			const spawnOpts = vi.mocked(child_process.spawn).mock.calls[0][2] as { env?: Record<string, string> };
@@ -361,7 +361,7 @@ describe('OpenCodeModelProvider', () => {
 
 			expect((mockProcess as unknown as Record<string, ReturnType<typeof vi.fn>>)['kill']).toHaveBeenCalled();
 
-			(mockProcess as EventEmitter).emit('close', 1);
+			(mockProcess as EventEmitter).emit('exit', 1);
 			await resultPromise.catch(() => {});
 		});
 
@@ -382,7 +382,7 @@ describe('OpenCodeModelProvider', () => {
 				expect.stringContaining('EPERM')
 			);
 
-			(mockProcess as EventEmitter).emit('close', 1);
+			(mockProcess as EventEmitter).emit('exit', 1);
 			await resultPromise.catch(() => {});
 		});
 	});
@@ -410,7 +410,7 @@ describe('OpenCodeModelProvider', () => {
 						part: { type: 'step-start', messageID: 'm1', sessionID: 'ses_abc123', snapshot: 'x' },
 					}),
 				]);
-				(mockProcess as EventEmitter).emit('close', 0);
+				(mockProcess as EventEmitter).emit('exit', 0);
 			});
 
 			await resultPromise;
@@ -438,7 +438,7 @@ describe('OpenCodeModelProvider', () => {
 						part: { type: 'step-start', messageID: 'm1', sessionID: 'ses_xyz', snapshot: 'x' },
 					}),
 				]);
-				(mockProcess as EventEmitter).emit('close', 0);
+				(mockProcess as EventEmitter).emit('exit', 0);
 			});
 
 			await resultPromise;
@@ -486,7 +486,7 @@ describe('OpenCodeModelProvider', () => {
 						},
 					}),
 				]);
-				(mockProcess as EventEmitter).emit('close', 0);
+				(mockProcess as EventEmitter).emit('exit', 0);
 			});
 
 			await resultPromise;
@@ -522,7 +522,7 @@ describe('OpenCodeModelProvider', () => {
 						},
 					}),
 				]);
-				(mockProcess as EventEmitter).emit('close', 0);
+				(mockProcess as EventEmitter).emit('exit', 0);
 			});
 
 			await resultPromise;
@@ -547,12 +547,13 @@ describe('OpenCodeModelProvider', () => {
 				emitLines([
 					JSON.stringify({ type: 'text', sessionID: 'ses_x', part: { type: 'text', text: 'orphan' } }),
 				]);
-				(mockProcess as EventEmitter).emit('close', 0);
+				(mockProcess as EventEmitter).emit('exit', 0);
 			});
 
 			await resultPromise;
 
-			expect(events).toHaveLength(0);
+			// text events are still emitted, but no result event should fire
+			expect(events.some(e => e.type === 'result')).toBe(false);
 		});
 
 		it('does not fire result event when onStreamEvent is not set', async () => {
@@ -568,7 +569,7 @@ describe('OpenCodeModelProvider', () => {
 						part: { type: 'step-start', sessionID: 'ses_y', messageID: 'm1' },
 					}),
 				]);
-				(mockProcess as EventEmitter).emit('close', 0);
+				(mockProcess as EventEmitter).emit('exit', 0);
 			});
 
 			await expect(resultPromise).resolves.toBeDefined();
@@ -601,7 +602,7 @@ describe('OpenCodeModelProvider', () => {
 						},
 					}),
 				]);
-				(mockProcess as EventEmitter).emit('close', 0);
+				(mockProcess as EventEmitter).emit('exit', 0);
 			});
 
 			await resultPromise;
@@ -651,7 +652,7 @@ describe('OpenCodeModelProvider', () => {
 						},
 					}),
 				]);
-				(mockProcess as EventEmitter).emit('close', 0);
+				(mockProcess as EventEmitter).emit('exit', 0);
 			});
 
 			await resultPromise;
@@ -680,7 +681,7 @@ describe('OpenCodeModelProvider', () => {
 			process.env['OPENCODE_MOCK_PATH'] = '/custom/opencode-mock';
 
 			const resultPromise = provider.launchBackground(makeBaseOptions());
-			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
 
 			const [spawnCommand] = vi.mocked(child_process.spawn).mock.calls[0] as unknown as [string, string[]];
@@ -692,7 +693,7 @@ describe('OpenCodeModelProvider', () => {
 			// child_process is mocked — execSync returns undefined → throws → fallback
 
 			const resultPromise = provider.launchBackground(makeBaseOptions());
-			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
 
 			const [spawnCommand] = vi.mocked(child_process.spawn).mock.calls[0] as unknown as [string, string[]];

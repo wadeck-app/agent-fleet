@@ -3,8 +3,9 @@
  *
  * Responsibilities:
  *  - Serializes McpServer[] to a temp JSON file (Claude format), passes --mcp-config <path>
- *  - Sets file permissions 0o600 (best-effort; non-fatal on Windows)
- *  - Deletes the temp file in finally (even on error)
+ *  - Serializes ClaudeHooks to a temp settings JSON file, passes --settings <path> --include-hook-events
+ *  - Sets file permissions 0o600 on temp files (best-effort; non-fatal on Windows)
+ *  - Deletes temp files in finally (even on error)
  *  - Tracks current ChildProcess for kill()
  *  - Validates all inputs before spawning
  */
@@ -14,6 +15,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+import { ClaudeHookTranslator } from './ClaudeHookTranslator';
 import { ClaudeLauncher } from './ClaudeLauncher';
 import type {
 	LaunchOptions,
@@ -52,12 +54,14 @@ export class ClaudeModelProvider implements ModelProvider {
 		validateLaunchOptions(options);
 
 		const mcpConfigPath = await this.writeMcpConfig(options.mcpServers);
+		const settingsPath = await this.writeClaudeSettings(options);
 		try {
-			return await this.launcher.launchInteractive(this.toClaudeOptions(options, mcpConfigPath));
+			return await this.launcher.launchInteractive(this.toClaudeOptions(options, mcpConfigPath, settingsPath));
 		} finally {
 			this.kill();
 			this.currentProcess = null;
 			this.cleanupMcpConfig(mcpConfigPath);
+			this.cleanupClaudeSettings(settingsPath);
 		}
 	}
 
@@ -65,12 +69,14 @@ export class ClaudeModelProvider implements ModelProvider {
 		validateLaunchOptions(options);
 
 		const mcpConfigPath = await this.writeMcpConfig(options.mcpServers);
+		const settingsPath = await this.writeClaudeSettings(options);
 		try {
-			return await this.launcher.launchBackground(this.toClaudeOptions(options, mcpConfigPath));
+			return await this.launcher.launchBackground(this.toClaudeOptions(options, mcpConfigPath, settingsPath));
 		} finally {
 			this.kill();
 			this.currentProcess = null;
 			this.cleanupMcpConfig(mcpConfigPath);
+			this.cleanupClaudeSettings(settingsPath);
 		}
 	}
 
@@ -84,7 +90,11 @@ export class ClaudeModelProvider implements ModelProvider {
 		}
 	}
 
-	private toClaudeOptions(options: LaunchOptions, mcpConfigPath: string | undefined) {
+	private toClaudeOptions(
+		options: LaunchOptions,
+		mcpConfigPath: string | undefined,
+		settingsPath: string | undefined
+	) {
 		return {
 			workingDir: options.workingDir,
 			prompt: options.prompt,
@@ -92,6 +102,7 @@ export class ClaudeModelProvider implements ModelProvider {
 			model: options.model,
 			env: options.env,
 			mcpConfigPath,
+			settingsPath,
 			skipPermissions: options.skipPermissions,
 			streamJson: options.streamJson,
 			verbose: options.verbose,
@@ -126,6 +137,34 @@ export class ClaudeModelProvider implements ModelProvider {
 	}
 
 	private cleanupMcpConfig(filePath: string | undefined): void {
+		if (!filePath) return;
+		try {
+			fs.unlinkSync(filePath);
+		} catch {
+			// non-fatal
+		}
+	}
+
+	private async writeClaudeSettings(options: LaunchOptions): Promise<string | undefined> {
+		const settings = ClaudeHookTranslator.toSettingsJson(options.toolHooks ?? []);
+		if (!settings) return undefined;
+
+		const json = JSON.stringify(settings, null, 2);
+		const filePath = path.join(os.tmpdir(), `claude-settings-${crypto.randomUUID()}.json`);
+
+		await fs.promises.writeFile(filePath, json, { encoding: 'utf8' });
+
+		// Best-effort: set permissions 0o600 (non-fatal on Windows)
+		try {
+			await fs.promises.chmod(filePath, 0o600);
+		} catch {
+			// non-fatal
+		}
+
+		return filePath;
+	}
+
+	private cleanupClaudeSettings(filePath: string | undefined): void {
 		if (!filePath) return;
 		try {
 			fs.unlinkSync(filePath);

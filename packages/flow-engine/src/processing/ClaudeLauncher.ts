@@ -48,6 +48,9 @@ export interface ClaudeLaunchOptions {
 	/** Path to MCP config JSON file — passed as --mcp-config <path> */
 	mcpConfigPath?: string;
 
+	/** Path to Claude settings JSON file — passed as --settings <path>; also adds --include-hook-events */
+	settingsPath?: string;
+
 	/** Callback when process starts */
 	onProcessStarted?: (process: any) => void;
 
@@ -155,7 +158,13 @@ export class ClaudeLauncher {
 		interactive: boolean,
 		options?: Pick<
 			ClaudeLaunchOptions,
-			'skipPermissions' | 'streamJson' | 'verbose' | 'resumeSessionId' | 'autoCompact' | 'mcpConfigPath'
+			| 'skipPermissions'
+			| 'streamJson'
+			| 'verbose'
+			| 'resumeSessionId'
+			| 'autoCompact'
+			| 'mcpConfigPath'
+			| 'settingsPath'
 		>
 	): { command: string; args: string[] } {
 		let command: string;
@@ -178,6 +187,11 @@ export class ClaudeLauncher {
 
 		if (options?.mcpConfigPath) {
 			args.push('--mcp-config', options.mcpConfigPath);
+		}
+
+		if (options?.settingsPath) {
+			args.push('--settings', options.settingsPath);
+			args.push('--include-hook-events');
 		}
 
 		if (skipPermissions) {

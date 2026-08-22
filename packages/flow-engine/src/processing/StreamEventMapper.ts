@@ -22,21 +22,79 @@ export class StreamEventMapper {
 	}
 
 	/**
-	 * Map a stream event to a LiveLogEntry.
-	 * Returns null for events that should be filtered out.
+	 * Map a stream event to zero or more LiveLogEntry objects.
+	 * Returns an empty array for events that should be filtered out.
+	 * Returns multiple entries for OpenCode tool_use events (input + output).
 	 */
-	map(event: StreamJsonEvent): LiveLogEntry | null {
+	map(event: StreamJsonEvent): LiveLogEntry[] {
 		switch (event.type) {
-			case 'system':
-				return this.mapSystemEvent(event);
-			case 'assistant':
-				return this.mapAssistantEvent(event);
-			case 'user':
-				return this.mapUserEvent(event);
-			case 'result':
-				return this.mapResultEvent(event);
+			case 'system': {
+				const e = this.mapSystemEvent(event);
+				return [e];
+			}
+			case 'assistant': {
+				const e = this.mapAssistantEvent(event);
+				return e ? [e] : [];
+			}
+			case 'user': {
+				const e = this.mapUserEvent(event);
+				return e ? [e] : [];
+			}
+			case 'result': {
+				const e = this.mapResultEvent(event);
+				return [e];
+			}
+			// hook events are emitted when --include-hook-events is passed.
+			// NOTE: the exact schema has not been verified against a live Claude run.
+			// Observed structure (tentative): { type: "hook_event", hook: { type, matcher }, tool_name?, timing? }
+			case 'hook_event': {
+				const e = this.mapHookEvent(event);
+				return [e];
+			}
+			// OpenCode emits 'text' events for streamed assistant text chunks
+			case 'text': {
+				const text = event.data.text as string | undefined;
+				if (!text) return [];
+				return [
+					{
+						id: this.nextId(),
+						timestamp: Date.now(),
+						level: 'info',
+						message: text,
+						eventType: 'assistant_text',
+					},
+				];
+			}
+			// OpenCode emits 'tool_use' events after tool completion with both input + output
+			case 'tool_use': {
+				const tool = (event.data.tool as string | undefined) ?? 'unknown';
+				const input = event.data.input;
+				const output = (event.data.output as string | undefined) ?? '';
+				const inputSummary = this.summarizeToolInput(input);
+				const entries: LiveLogEntry[] = [
+					{
+						id: this.nextId(),
+						timestamp: Date.now(),
+						level: 'warning',
+						message: `${tool}(${inputSummary})`,
+						eventType: 'tool_use',
+						metadata: { toolName: tool, input },
+					},
+				];
+				if (output) {
+					entries.push({
+						id: this.nextId(),
+						timestamp: Date.now(),
+						level: 'debug',
+						message: output,
+						eventType: 'tool_result',
+						metadata: { toolName: tool },
+					});
+				}
+				return entries;
+			}
 			default:
-				return null;
+				return [];
 		}
 	}
 
@@ -163,6 +221,23 @@ export class StreamEventMapper {
 			message: `Completed: ${numTurns} turns, ${cost} USD, ${durationSeconds}`,
 			eventType: 'result',
 			metadata: { numTurns, cost: data.cost_usd, durationMs: data.duration_ms, resultText },
+		};
+	}
+
+	private mapHookEvent(event: StreamJsonEvent): LiveLogEntry {
+		const data = event.data;
+		// NOTE: schema is tentative — not verified against a live Claude run.
+		// data.hook?.type is expected to be 'PreToolUse' or 'PostToolUse'.
+		const hookType: string = data['hook']?.type ?? data['hook_type'] ?? 'unknown';
+		const toolName: string = data['tool_name'] ?? 'unknown';
+
+		return {
+			id: this.nextId(),
+			timestamp: Date.now(),
+			level: 'debug',
+			message: `Hook [${hookType}]: ${toolName}`,
+			eventType: 'hook_event',
+			metadata: { hookType, toolName, raw: data },
 		};
 	}
 

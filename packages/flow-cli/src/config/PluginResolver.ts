@@ -42,7 +42,9 @@ export class PluginResolver {
 	 * Creates a callback that resolves a per-flow workspace provider from a flow's plugins.workspace section.
 	 * The callback validates credentials and loads the provider via PluginLoader.
 	 */
-	async createPerFlowWorkspaceResolver(): Promise<(section: NonNullable<FlowPluginOverrides['workspace']>) => Promise<WorkspaceProvider>> {
+	async createPerFlowWorkspaceResolver(): Promise<
+		(section: NonNullable<FlowPluginOverrides['workspace']>) => Promise<WorkspaceProvider>
+	> {
 		const { configLoader, pluginLoader } = this;
 		return async (section: NonNullable<FlowPluginOverrides['workspace']>) => {
 			const resolved = await configLoader.resolveStandaloneSection('workspace', section as ProjectFeatureSection);
@@ -86,4 +88,3 @@ export class PluginResolver {
 		return result;
 	}
 }
-

@@ -26,8 +26,7 @@ export type ClientCommand = {
 };
 
 export type DaemonResponse =
-	| { type: 'execution_started'; executionId: string }
-	| { type: 'error'; message: string; code: string };
+	{ type: 'execution_started'; executionId: string } | { type: 'error'; message: string; code: string };
 
 export type DaemonToWorker =
 	| { type: 'assign'; stepId: string; stepConfig: AssignableStep; executionContext: ExecutionContext }

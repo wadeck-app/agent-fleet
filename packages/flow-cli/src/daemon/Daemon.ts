@@ -6,11 +6,11 @@ import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { type HookConfig, HookDispatcher } from 'shared-cli/HookDispatcher';
 import type { WebSocket } from 'ws';
 
-import { FlowConfigLoader, type FlowConfig } from '../config/FlowConfig';
+import { type FlowConfig, FlowConfigLoader } from '../config/FlowConfig';
 import { PluginResolver } from '../config/PluginResolver.js';
-import { type HookConfig, HookDispatcher } from 'shared-cli/HookDispatcher';
 import type { ClientCommand, WorkerToDaemon } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';

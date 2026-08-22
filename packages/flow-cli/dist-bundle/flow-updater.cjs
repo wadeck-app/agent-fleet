@@ -6,6 +6,9 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+	for (var name in all) __defProp(target, name, { get: all[name], enumerable: true });
+};
 var __copyProps = (to, from, except, desc) => {
 	if ((from && typeof from === 'object') || typeof from === 'function') {
 		for (let key of __getOwnPropNames(from))
@@ -28,25 +31,36 @@ var __toESM = (mod, isNodeMode, target) => (
 		mod
 	)
 );
+var __toCommonJS = mod => __copyProps(__defProp({}, '__esModule', { value: true }), mod);
 
 // dist/updater/UpdaterMain.js
+var UpdaterMain_exports = {};
+__export(UpdaterMain_exports, {
+	main: () => main,
+	parseCheckInterval: () => parseCheckInterval,
+	semverLte: () => semverLte,
+	tryAcquireLock: () => tryAcquireLock,
+});
+module.exports = __toCommonJS(UpdaterMain_exports);
 var import_node_child_process = require('node:child_process');
 var fs = __toESM(require('node:fs'), 1);
 var path2 = __toESM(require('node:path'), 1);
 var import_node_util = require('node:util');
 
-// dist/updater/configDir.js
+// ../shared-cli/src/ConfigDir.ts
 var os = __toESM(require('node:os'), 1);
 var path = __toESM(require('node:path'), 1);
-function getConfigDir() {
-	const xdg = process.env['XDG_CONFIG_HOME'];
-	if (xdg) return path.join(xdg, 'flow');
-	if (process.platform === 'win32') {
-		const appData = process.env['APPDATA'];
-		if (appData) return path.join(appData, 'flow');
+var ConfigDir = class {
+	static get() {
+		const xdg = process.env['XDG_CONFIG_HOME'];
+		if (xdg) return path.join(xdg, 'flow');
+		if (process.platform === 'win32') {
+			const appData = process.env['APPDATA'];
+			if (appData) return path.join(appData, 'flow');
+		}
+		return path.join(process.env['HOME'] ?? os.homedir(), '.config', 'flow');
 	}
-	return path.join(process.env['HOME'] ?? os.homedir(), '.config', 'flow');
-}
+};
 
 // dist/updater/UpdaterMain.js
 var execFileAsync = (0, import_node_util.promisify)(import_node_child_process.execFile);
@@ -158,7 +172,7 @@ function tryAcquireLock(lockFile) {
 	}
 }
 async function main() {
-	const configDir = getConfigDir();
+	const configDir = ConfigDir.get();
 	fs.mkdirSync(configDir, { recursive: true });
 	const lockFile = getLockPath(configDir);
 	const logFile = getLogPath(configDir);
@@ -275,6 +289,21 @@ async function main() {
 		}
 	}
 }
-main().catch(() => {
-	process.exit(1);
-});
+var isEntryPoint =
+	process.argv[1] !== void 0 &&
+	(process.argv[1].endsWith('UpdaterMain.js') ||
+		process.argv[1].endsWith('UpdaterMain.ts') ||
+		process.argv[1].endsWith('flow-updater.cjs'));
+if (isEntryPoint) {
+	main().catch(() => {
+		process.exit(1);
+	});
+}
+// Annotate the CommonJS export names for ESM import in node:
+0 &&
+	(module.exports = {
+		main,
+		parseCheckInterval,
+		semverLte,
+		tryAcquireLock,
+	});

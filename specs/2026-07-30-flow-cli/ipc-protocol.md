@@ -33,8 +33,7 @@ type ClientCommand = {
 
 ```typescript
 type DaemonResponse =
-	| { type: 'execution_started'; executionId: string }
-	| { type: 'error'; message: string; code: string };
+	{ type: 'execution_started'; executionId: string } | { type: 'error'; message: string; code: string };
 ```
 
 **Note:** `attach`, `logs`, and `list` are NOT daemon commands. They are pure file operations (D19, D21) — the CLI reads `~/.flow-daemon/logs/` and `~/.flow-daemon/executions/` directly without contacting the daemon.

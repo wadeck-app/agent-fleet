@@ -59,17 +59,14 @@ const _require = createRequire(import.meta.url);
 
 export class PluginLoader {
 	private pluginPackagesDir: string | undefined;
-	private registryPath: string;
+	private registryPath: string | undefined;
 	private registryCache: ExtensionPointsRegistry | null = null;
 
 	constructor(options: PluginLoaderOptions = {}) {
 		this.pluginPackagesDir = options.pluginPackagesDir;
-		if (options.registryPath) {
-			this.registryPath = options.registryPath;
-		} else {
-			// Resolve registry via npm - extension-points is a dep of flow-cli
-			this.registryPath = _require.resolve('extension-points/extension-points.json');
-		}
+		// registryPath is optional — when absent, registry is loaded via require() which works
+		// both in dev (normal node_modules) and in bundled mode (inlined by esbuild).
+		this.registryPath = options.registryPath;
 	}
 
 	async loadProvider(
@@ -215,7 +212,12 @@ export class PluginLoader {
 
 	private assertVersionSupported(extensionPoint: string, version: number): void {
 		if (!this.registryCache) {
-			this.registryCache = loadRegistry(this.registryPath);
+			if (this.registryPath) {
+				this.registryCache = loadRegistry(this.registryPath);
+			} else {
+				// Works in dev (node_modules resolution) and bundled mode (inlined by esbuild plugin).
+				this.registryCache = _require('extension-points/extension-points.json') as ExtensionPointsRegistry;
+			}
 		}
 		const registry = this.registryCache;
 		const epEntry = registry.extensionPoints.find(ep => ep.id === extensionPoint);

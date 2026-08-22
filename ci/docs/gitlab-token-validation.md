@@ -11,13 +11,13 @@ Token type tested: Deploy tokens (`gldt-*`) with `read_package_registry` and `wr
 
 Tested with `PUT /api/v4/projects/:id/packages/generic/:name/:version/:filename`:
 
-| Token | Version format | HTTP | Conclusion |
-|---|---|---|---|
-| None | valid | 401 | Auth checked first |
-| None | invalid (`@@`) | 401 | Auth checked first |
-| `read_package_registry` | invalid (`@@`) | **400** | Auth OK, **format validated before scope** |
-| `read_package_registry` | valid | **403** | Auth OK, format OK, scope KO |
-| `write_package_registry` | valid + body | **201** | All OK, file created |
+| Token                    | Version format | HTTP    | Conclusion                                 |
+| ------------------------ | -------------- | ------- | ------------------------------------------ |
+| None                     | valid          | 401     | Auth checked first                         |
+| None                     | invalid (`@@`) | 401     | Auth checked first                         |
+| `read_package_registry`  | invalid (`@@`) | **400** | Auth OK, **format validated before scope** |
+| `read_package_registry`  | valid          | **403** | Auth OK, format OK, scope KO               |
+| `write_package_registry` | valid + body   | **201** | All OK, file created                       |
 
 **Key finding:** GitLab validates **auth → format → scope**. Using invalid version formats bypasses scope checking (returns 400 regardless of scope). There is no non-destructive probe for `write_package_registry` scope.
 
@@ -27,13 +27,13 @@ Tested with `PUT /api/v4/projects/:id/packages/generic/:name/:version/:filename`
 
 Tested with full PUT → GET → DELETE cycle:
 
-| Operation | Endpoint | HTTP | Result |
-|---|---|---|---|
-| PUT file | `/packages/generic/:name/:version/:file` | 201 | File created |
-| GET file | `/packages/generic/:name/:version/:file` | 200 | File readable by same token |
-| DELETE file | `/packages/generic/:name/:version/:file` | **404** | GitLab security-by-obscurity: 404 instead of 403 |
-| GET packages list | `/packages?package_name=...` | 401 | Requires `api` scope |
-| GraphQL package query | `/api/graphql` | 401 | Requires `api` scope |
+| Operation             | Endpoint                                 | HTTP    | Result                                           |
+| --------------------- | ---------------------------------------- | ------- | ------------------------------------------------ |
+| PUT file              | `/packages/generic/:name/:version/:file` | 201     | File created                                     |
+| GET file              | `/packages/generic/:name/:version/:file` | 200     | File readable by same token                      |
+| DELETE file           | `/packages/generic/:name/:version/:file` | **404** | GitLab security-by-obscurity: 404 instead of 403 |
+| GET packages list     | `/packages?package_name=...`             | 401     | Requires `api` scope                             |
+| GraphQL package query | `/api/graphql`                           | 401     | Requires `api` scope                             |
 
 **Key finding:** `write_package_registry` can write AND read Generic Package files, but CANNOT delete them. GitLab returns 404 (not 403) to obscure the authorization failure. There is no accessible endpoint to delete Generic Package files without `api` scope.
 
@@ -45,11 +45,11 @@ Tested with full PUT → GET → DELETE cycle:
 
 ## Introspection endpoints
 
-| Endpoint | `read_package_registry` token | `write_package_registry` token |
-|---|---|---|
-| `GET /api/v4/personal_access_tokens/self` | 401 | 401 |
-| `GET /api/v4/deploy_tokens/self` | 404 | 404 |
-| `GET /api/v4/user` | 401 | 401 |
+| Endpoint                                  | `read_package_registry` token | `write_package_registry` token |
+| ----------------------------------------- | ----------------------------- | ------------------------------ |
+| `GET /api/v4/personal_access_tokens/self` | 401                           | 401                            |
+| `GET /api/v4/deploy_tokens/self`          | 404                           | 404                            |
+| `GET /api/v4/user`                        | 401                           | 401                            |
 
 **Finding:** Neither introspection endpoint works for deploy tokens with only package registry scopes. Both require `api` scope.
 
@@ -61,11 +61,11 @@ Tested with full PUT → GET → DELETE cycle:
 
 GitLab validates `write_package_registry` scope BEFORE validating the request content on the PyPI endpoint:
 
-| Token | HTTP | Meaning | Artifact created? |
-|---|---|---|---|
-| `write_package_registry` | **400** | Scope OK, content missing error | **No** |
-| `read_package_registry` only | **403** | Scope rejected | No |
-| Invalid/expired | 401 | Auth failed | No |
+| Token                        | HTTP    | Meaning                         | Artifact created? |
+| ---------------------------- | ------- | ------------------------------- | ----------------- |
+| `write_package_registry`     | **400** | Scope OK, content missing error | **No**            |
+| `read_package_registry` only | **403** | Scope rejected                  | No                |
+| Invalid/expired              | 401     | Auth failed                     | No                |
 
 ```bash
 HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
@@ -93,7 +93,7 @@ No bootstrap, no cleanup, no artifacts.
 
 **Problem observed:** When the READ token is written to `~/.npmrc` and the WRITE token is written to the local `.npmrc` (repo root), npm may use the READ token for publishing despite the local file having higher priority. Mixing file locations introduces race conditions and npm version-dependent behavior.
 
-**Root cause (confirmed by official npm docs):** npm's per-project `.npmrc` is *"a sibling of `node_modules` and `package.json`"* -- no upward directory traversal. When running `(cd packages/subpkg && npm publish)`, npm looks for `.npmrc` in `packages/subpkg/` (alongside its `package.json`), NOT in the repo root. The repo root `.npmrc` is silently ignored. Only `~/.npmrc` is reliably read regardless of working directory.
+**Root cause (confirmed by official npm docs):** npm's per-project `.npmrc` is _"a sibling of `node_modules` and `package.json`"_ -- no upward directory traversal. When running `(cd packages/subpkg && npm publish)`, npm looks for `.npmrc` in `packages/subpkg/` (alongside its `package.json`), NOT in the repo root. The repo root `.npmrc` is silently ignored. Only `~/.npmrc` is reliably read regardless of working directory.
 
 **Solution:** Write ALL tokens to the SAME `.npmrc` file (repo root local). Since npm uses the LAST occurrence for duplicate keys in the same file, append READ token first, then WRITE token:
 
@@ -113,6 +113,7 @@ echo "${REGISTRY}:_authToken=${WRITE_TOKEN}" >> .npmrc
 ## npm registry endpoint behavior
 
 `PUT /api/v4/projects/:id/packages/npm/@scope%2fpkg-name` with `write_package_registry`:
+
 - With valid npm tarball body → publishes package
 - With malformed body (`{}`) → creates a **broken npm package entry** in the registry that persists
 

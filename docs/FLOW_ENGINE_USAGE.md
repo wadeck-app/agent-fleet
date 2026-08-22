@@ -601,7 +601,7 @@ script: echo "${{ task.priority }}"
 ❌ Bad (won't work):
 
 ```yaml
-script: echo "${{ name }}"          # Missing context
+script: echo "${{ name }}" # Missing context
 script: echo "${{ build.version }}" # Missing 'steps' and 'outputs'
 ```
 

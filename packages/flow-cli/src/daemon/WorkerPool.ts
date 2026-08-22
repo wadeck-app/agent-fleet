@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { WebSocket } from 'ws';
 
@@ -19,7 +20,7 @@ export class WorkerPool {
 	private activeCount = 0;
 	private readonly workerPath: string;
 	private readonly claudePath: string;
-	private readonly tsxLoaderPath: string;
+	private readonly tsxLoaderPath: string | null;
 
 	constructor(
 		private readonly concurrencyLimit: number,
@@ -29,12 +30,24 @@ export class WorkerPool {
 		// optional for backward compat — empty string means workers locate claude themselves
 		claudePath?: string
 	) {
-		this.workerPath = fileURLToPath(new URL('../../dist/worker/Worker.js', import.meta.url));
 		this.claudePath = claudePath ?? '';
-		// tsx loader for resolving extension-less ESM imports in bundler-mode compiled output
-		// Node.js --import requires a file:// URL (Windows paths not accepted as-is)
-		// dist/daemon/ is 4 levels deep from monorepo root — use ../../../../ to reach root node_modules
-		this.tsxLoaderPath = new URL('../../../../node_modules/tsx/dist/loader.mjs', import.meta.url).href;
+
+		// Dev mode: Worker.js + tsx loader (TypeScript source resolution)
+		const devWorkerPath = fileURLToPath(new URL('../../dist/worker/Worker.js', import.meta.url));
+		// Bundled mode: co-located worker.cjs, no tsx needed
+		const bundledWorkerPath = fileURLToPath(new URL('./worker.cjs', import.meta.url));
+
+		if (existsSync(devWorkerPath)) {
+			this.workerPath = devWorkerPath;
+			// tsx loader for resolving extension-less ESM imports in dev compiled output
+			// Node.js --import requires a file:// URL (Windows paths not accepted as-is)
+			this.tsxLoaderPath = new URL('../../../../node_modules/tsx/dist/loader.mjs', import.meta.url).href;
+		} else if (existsSync(bundledWorkerPath)) {
+			this.workerPath = bundledWorkerPath;
+			this.tsxLoaderPath = null;
+		} else {
+			throw new Error(`Worker not found. Checked:\n  dev:     ${devWorkerPath}\n  bundled: ${bundledWorkerPath}`);
+		}
 	}
 
 	canSpawn(): boolean {
@@ -43,7 +56,8 @@ export class WorkerPool {
 
 	spawnWorker(): void {
 		this.activeCount++;
-		const child = spawn(process.execPath, ['--import', this.tsxLoaderPath, this.workerPath], {
+		const spawnArgs = this.tsxLoaderPath ? ['--import', this.tsxLoaderPath, this.workerPath] : [this.workerPath];
+		const child = spawn(process.execPath, spawnArgs, {
 			env: {
 				// IPC: worker needs to know daemon location
 				FLOW_DAEMON_PORT: String(this.httpPort),

@@ -97,8 +97,7 @@ export function HookDataTable<T extends { id: string }>({
 	const paginationFeature = features.find(f => f.type === 'pagination') as PaginationFeatureHook | undefined;
 	const sortingFeature = features.find(f => f.type === 'sorting') as SortingFeatureHook | undefined;
 	const columnVisibilityFeature = features.find(f => f.type === 'column-visibility') as
-		| ColumnVisibilityFeatureHook
-		| undefined;
+		ColumnVisibilityFeatureHook | undefined;
 	const bulkDeleteFeature = features.find(f => f.type === 'bulk-delete') as BulkDeleteFeatureHook | undefined;
 	const crudFeature = features.find(f => f.type === 'crud') as CrudFeatureHook | undefined;
 

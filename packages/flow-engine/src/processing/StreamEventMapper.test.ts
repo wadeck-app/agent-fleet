@@ -20,13 +20,13 @@ describe('StreamEventMapper', () => {
 				},
 			};
 
-			const entry = mapper.map(event);
+			const entries = mapper.map(event);
 
-			expect(entry).not.toBeNull();
-			expect(entry!.level).toBe('debug');
-			expect(entry!.eventType).toBe('system');
-			expect(entry!.message).toBe('Session: claude-sonnet-4-20250514, 3 tools');
-			expect(entry!.metadata?.model).toBe('claude-sonnet-4-20250514');
+			expect(entries).toHaveLength(1);
+			expect(entries[0].level).toBe('debug');
+			expect(entries[0].eventType).toBe('system');
+			expect(entries[0].message).toBe('Session: claude-sonnet-4-20250514, 3 tools');
+			expect(entries[0].metadata?.model).toBe('claude-sonnet-4-20250514');
 		});
 
 		it('should map assistant text events to info level', () => {
@@ -42,12 +42,12 @@ describe('StreamEventMapper', () => {
 				},
 			};
 
-			const entry = mapper.map(event);
+			const entries = mapper.map(event);
 
-			expect(entry).not.toBeNull();
-			expect(entry!.level).toBe('info');
-			expect(entry!.eventType).toBe('assistant_text');
-			expect(entry!.message).toBe('Claude: I will help you with that.');
+			expect(entries).toHaveLength(1);
+			expect(entries[0].level).toBe('info');
+			expect(entries[0].eventType).toBe('assistant_text');
+			expect(entries[0].message).toBe('Claude: I will help you with that.');
 		});
 
 		it('should preserve full assistant text without truncation', () => {
@@ -64,10 +64,10 @@ describe('StreamEventMapper', () => {
 				},
 			};
 
-			const entry = mapper.map(event);
+			const entries = mapper.map(event);
 
-			expect(entry!.message).toBe(`Claude: ${longText}`);
-			expect(entry!.metadata).toBeUndefined();
+			expect(entries[0].message).toBe(`Claude: ${longText}`);
+			expect(entries[0].metadata).toBeUndefined();
 		});
 
 		it('should map assistant tool_use events to warning level', () => {
@@ -89,14 +89,14 @@ describe('StreamEventMapper', () => {
 				},
 			};
 
-			const entry = mapper.map(event);
+			const entries = mapper.map(event);
 
-			expect(entry).not.toBeNull();
-			expect(entry!.level).toBe('warning');
-			expect(entry!.eventType).toBe('tool_use');
-			expect(entry!.message).toContain('Tool: Read');
-			expect(entry!.message).toContain('file_path=/src/index.ts');
-			expect(entry!.metadata?.toolName).toBe('Read');
+			expect(entries).toHaveLength(1);
+			expect(entries[0].level).toBe('warning');
+			expect(entries[0].eventType).toBe('tool_use');
+			expect(entries[0].message).toContain('Tool: Read');
+			expect(entries[0].message).toContain('file_path=/src/index.ts');
+			expect(entries[0].metadata?.toolName).toBe('Read');
 		});
 
 		it('should map user tool_result events to debug level', () => {
@@ -118,13 +118,13 @@ describe('StreamEventMapper', () => {
 				},
 			};
 
-			const entry = mapper.map(event);
+			const entries = mapper.map(event);
 
-			expect(entry).not.toBeNull();
-			expect(entry!.level).toBe('debug');
-			expect(entry!.eventType).toBe('tool_result');
-			expect(entry!.message).toContain('Tool result [toolu_123]');
-			expect(entry!.message).toContain('File contents here...');
+			expect(entries).toHaveLength(1);
+			expect(entries[0].level).toBe('debug');
+			expect(entries[0].eventType).toBe('tool_result');
+			expect(entries[0].message).toContain('Tool result [toolu_123]');
+			expect(entries[0].message).toContain('File contents here...');
 		});
 
 		it('should map result events to info level with cost and turns', () => {
@@ -141,40 +141,40 @@ describe('StreamEventMapper', () => {
 				},
 			};
 
-			const entry = mapper.map(event);
+			const entries = mapper.map(event);
 
-			expect(entry).not.toBeNull();
-			expect(entry!.level).toBe('info');
-			expect(entry!.eventType).toBe('result');
-			expect(entry!.message).toBe('Completed: 5 turns, $0.0523 USD, 30.0s');
-			expect(entry!.metadata?.resultText).toBe('Final output text');
+			expect(entries).toHaveLength(1);
+			expect(entries[0].level).toBe('info');
+			expect(entries[0].eventType).toBe('result');
+			expect(entries[0].message).toBe('Completed: 5 turns, $0.0523 USD, 30.0s');
+			expect(entries[0].metadata?.resultText).toBe('Final output text');
 		});
 
-		it('should return null for unknown event types', () => {
+		it('should return empty array for unknown event types', () => {
 			const mapper = new StreamEventMapper('step-1');
 			const event: StreamJsonEvent = {
 				type: 'unknown_type',
 				data: { type: 'unknown_type' },
 			};
 
-			const entry = mapper.map(event);
+			const entries = mapper.map(event);
 
-			expect(entry).toBeNull();
+			expect(entries).toHaveLength(0);
 		});
 
-		it('should return null for assistant events without content', () => {
+		it('should return empty array for assistant events without content', () => {
 			const mapper = new StreamEventMapper('step-1');
 			const event: StreamJsonEvent = {
 				type: 'assistant',
 				data: { type: 'assistant', message: {} },
 			};
 
-			const entry = mapper.map(event);
+			const entries = mapper.map(event);
 
-			expect(entry).toBeNull();
+			expect(entries).toHaveLength(0);
 		});
 
-		it('should return null for user events without tool_result content', () => {
+		it('should return empty array for user events without tool_result content', () => {
 			const mapper = new StreamEventMapper('step-1');
 			const event: StreamJsonEvent = {
 				type: 'user',
@@ -186,9 +186,9 @@ describe('StreamEventMapper', () => {
 				},
 			};
 
-			const entry = mapper.map(event);
+			const entries = mapper.map(event);
 
-			expect(entry).toBeNull();
+			expect(entries).toHaveLength(0);
 		});
 
 		it('should generate unique IDs per step', () => {
@@ -199,11 +199,123 @@ describe('StreamEventMapper', () => {
 				data: { type: 'system', model: 'test', tools: [] },
 			};
 
-			const entry1 = mapper.map(event);
-			const entry2 = mapper.map(event);
+			const entries1 = mapper.map(event);
+			const entries2 = mapper.map(event);
 
-			expect(entry1!.id).not.toBe(entry2!.id);
-			expect(entry1!.id).toContain('step-1');
+			expect(entries1[0].id).not.toBe(entries2[0].id);
+			expect(entries1[0].id).toContain('step-1');
+		});
+
+		// --- OpenCode-specific event types ---
+
+		it('should map OpenCode text events to info level with raw text as message', () => {
+			const mapper = new StreamEventMapper('step-1');
+			const event: StreamJsonEvent = {
+				type: 'text',
+				subtype: 'text',
+				data: { text: 'Analyzing your request...' },
+			};
+
+			const entries = mapper.map(event);
+
+			expect(entries).toHaveLength(1);
+			expect(entries[0].level).toBe('info');
+			expect(entries[0].eventType).toBe('assistant_text');
+			expect(entries[0].message).toBe('Analyzing your request...');
+		});
+
+		it('should return empty array for text events with empty text', () => {
+			const mapper = new StreamEventMapper('step-1');
+			const event: StreamJsonEvent = {
+				type: 'text',
+				subtype: 'text',
+				data: { text: '' },
+			};
+
+			const entries = mapper.map(event);
+
+			expect(entries).toHaveLength(0);
+		});
+
+		it('should return empty array for text events without text field', () => {
+			const mapper = new StreamEventMapper('step-1');
+			const event: StreamJsonEvent = {
+				type: 'text',
+				subtype: 'text',
+				data: {},
+			};
+
+			const entries = mapper.map(event);
+
+			expect(entries).toHaveLength(0);
+		});
+
+		it('should map OpenCode tool_use events with input and output to two entries', () => {
+			const mapper = new StreamEventMapper('step-1');
+			const event: StreamJsonEvent = {
+				type: 'tool_use',
+				subtype: 'tool_use',
+				data: {
+					tool: 'bash',
+					callID: 'call-123',
+					input: { command: 'ls -la' },
+					output: 'total 0\ndrwxr-xr-x  2 user  staff   64 Aug 22 10:00 .',
+					status: 'done',
+				},
+			};
+
+			const entries = mapper.map(event);
+
+			expect(entries).toHaveLength(2);
+			// First entry: tool call with input summary
+			expect(entries[0].level).toBe('warning');
+			expect(entries[0].eventType).toBe('tool_use');
+			expect(entries[0].message).toContain('bash');
+			expect(entries[0].message).toContain('command=ls -la');
+			expect(entries[0].metadata?.toolName).toBe('bash');
+			// Second entry: tool output
+			expect(entries[1].level).toBe('debug');
+			expect(entries[1].eventType).toBe('tool_result');
+			expect(entries[1].message).toContain('total 0');
+			expect(entries[1].metadata?.toolName).toBe('bash');
+		});
+
+		it('should map OpenCode tool_use events without output to one entry', () => {
+			const mapper = new StreamEventMapper('step-1');
+			const event: StreamJsonEvent = {
+				type: 'tool_use',
+				subtype: 'tool_use',
+				data: {
+					tool: 'bash',
+					callID: 'call-456',
+					input: { command: 'echo hello' },
+					output: '',
+					status: 'done',
+				},
+			};
+
+			const entries = mapper.map(event);
+
+			expect(entries).toHaveLength(1);
+			expect(entries[0].eventType).toBe('tool_use');
+		});
+
+		it('should use "unknown" for tool_use events missing the tool name', () => {
+			const mapper = new StreamEventMapper('step-1');
+			const event: StreamJsonEvent = {
+				type: 'tool_use',
+				subtype: 'tool_use',
+				data: {
+					input: {},
+					output: '',
+					status: 'done',
+				},
+			};
+
+			const entries = mapper.map(event);
+
+			expect(entries).toHaveLength(1);
+			expect(entries[0].message).toContain('unknown');
 		});
 	});
 
@@ -227,8 +339,8 @@ describe('StreamEventMapper', () => {
 				},
 			};
 
-			const entry = mapper.map(event);
-			expect(entry!.message).toBe('Tool: Read(file_path=/src/index.ts)');
+			const entries = mapper.map(event);
+			expect(entries[0].message).toBe('Tool: Read(file_path=/src/index.ts)');
 		});
 
 		it('should never truncate file paths regardless of length', () => {
@@ -252,8 +364,8 @@ describe('StreamEventMapper', () => {
 				},
 			};
 
-			const entry = mapper.map(event);
-			expect(entry!.message).toBe(`Tool: Read(file_path=${longPath})`);
+			const entries = mapper.map(event);
+			expect(entries[0].message).toBe(`Tool: Read(file_path=${longPath})`);
 		});
 
 		it('should not truncate non-path string values under 120 chars', () => {
@@ -275,8 +387,8 @@ describe('StreamEventMapper', () => {
 				},
 			};
 
-			const entry = mapper.map(event);
-			expect(entry!.message).toBe('Tool: Bash(command=npm run build && npm test)');
+			const entries = mapper.map(event);
+			expect(entries[0].message).toBe('Tool: Bash(command=npm run build && npm test)');
 		});
 	});
 

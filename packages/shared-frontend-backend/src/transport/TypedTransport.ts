@@ -48,12 +48,7 @@ export type UnsubscribeFunction = () => void;
  * - manual_downgrade: User manually switched to REST mode
  */
 export type ConnectionState =
-	| 'disconnected'
-	| 'connecting'
-	| 'connected'
-	| 'reconnecting'
-	| 'error'
-	| 'manual_downgrade';
+	'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error' | 'manual_downgrade';
 
 /**
  * Connection State Handler

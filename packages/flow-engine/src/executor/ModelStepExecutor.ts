@@ -103,7 +103,9 @@ export async function executeModelStep(
 		stepId: step.id,
 		model: step.model,
 		env: config.claudeEnv && Object.keys(config.claudeEnv).length > 0 ? config.claudeEnv : undefined,
-		mcpServers: config.mcpServers,
+		// Merge config-level servers (e.g. the provideSteps daemon server) with step-level servers
+		mcpServers: [...(config.mcpServers ?? []), ...(step.mcpServers ?? [])],
+		toolHooks: step.toolHooks ?? [],
 		onProcessStarted: config.onClaudeProcessStarted,
 		streamJson: streamJson && !config.interactive,
 		verbose: verbose && !config.interactive,
@@ -129,8 +131,7 @@ export async function executeModelStep(
 						if (event.type === 'result') {
 							capturedCostUsd = (event.data.cost_usd as number) ?? 0;
 							const usage = event.data.modelUsage as
-								| Record<string, { inputTokens?: number; outputTokens?: number }>
-								| undefined;
+								Record<string, { inputTokens?: number; outputTokens?: number }> | undefined;
 							if (usage) {
 								for (const u of Object.values(usage)) {
 									capturedInputTokens += u.inputTokens ?? 0;
@@ -139,8 +140,8 @@ export async function executeModelStep(
 							}
 						}
 						if (logMode === 'none') return;
-						const entry = streamEventMapper?.map(event);
-						if (entry) {
+						const entries = streamEventMapper?.map(event) ?? [];
+						for (const entry of entries) {
 							liveLogEntries.push(entry);
 							if (logMode === 'streaming' && onLogEntry) onLogEntry(entry);
 							if (logMode === 'polling') pollingBuffer.push(entry);

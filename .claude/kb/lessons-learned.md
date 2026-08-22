@@ -6251,6 +6251,7 @@ Engine-generated artifacts (outputs, logs, state) are metadata and must NEVER li
 ## OpenCodeModelProvider -- Windows Subprocess Gotchas
 
 See `.claude/kb/opencode-provider-windows-gotchas.md` for full details. Key points:
+
 - Use real `opencode.exe` via `where.exe opencode.cmd` → `node_modules/opencode-ai/bin/opencode.exe` (Chocolatey shim is broken)
 - `stdio: ['ignore', 'pipe', 'pipe']` -- stdin MUST be ignored (prompt is a positional arg)
 - Listen to `exit` event not `close` (backend server keeps pipes open indefinitely)

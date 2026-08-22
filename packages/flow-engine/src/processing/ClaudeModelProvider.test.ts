@@ -241,6 +241,118 @@ describe('ClaudeModelProvider', () => {
 	});
 
 	// -------------------------------------------------------------------------
+	// toolHooks settings temp file
+	// -------------------------------------------------------------------------
+
+	describe('toolHooks settings file', () => {
+		it('writes settings temp file with PreToolUse + PostToolUse when log hooks are set', async () => {
+			const resultPromise = provider.launchBackground(
+				makeBaseOptions({
+					toolHooks: [
+						{ timing: 'before', action: { type: 'log' } },
+						{ timing: 'after', action: { type: 'log' } },
+					],
+				})
+			);
+			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			await resultPromise;
+
+			const calls = vi.mocked(fs.promises.writeFile).mock.calls;
+			const settingsCall = calls.find(([p]) => String(p).includes('claude-settings-'));
+			expect(settingsCall).toBeDefined();
+
+			const content = settingsCall![1] as string;
+			const parsed = JSON.parse(content) as {
+				hooks: {
+					PreToolUse?: Array<{ matcher: string; hooks: Array<{ type: string; command: string }> }>;
+					PostToolUse?: Array<{ matcher: string; hooks: Array<{ type: string; command: string }> }>;
+				};
+			};
+			expect(parsed.hooks.PreToolUse).toBeDefined();
+			expect(parsed.hooks.PreToolUse![0].matcher).toBe('*');
+			expect(parsed.hooks.PreToolUse![0].hooks[0].command).toContain('tool-use');
+			expect(parsed.hooks.PostToolUse).toBeDefined();
+			expect(parsed.hooks.PostToolUse![0].hooks[0].command).toContain('tool-result');
+		});
+
+		it('uses toolPattern as matcher for deny hooks', async () => {
+			const resultPromise = provider.launchBackground(
+				makeBaseOptions({
+					toolHooks: [{ timing: 'before', action: { type: 'deny', reason: 'no bash', toolPattern: 'Bash' } }],
+				})
+			);
+			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			await resultPromise;
+
+			const calls = vi.mocked(fs.promises.writeFile).mock.calls;
+			const settingsCall = calls.find(([p]) => String(p).includes('claude-settings-'));
+			expect(settingsCall).toBeDefined();
+
+			const parsed = JSON.parse(settingsCall![1] as string) as {
+				hooks: { PreToolUse: Array<{ matcher: string }> };
+			};
+			expect(parsed.hooks.PreToolUse[0].matcher).toBe('Bash');
+		});
+
+		it('passes --settings flag to spawn args when toolHooks is set', async () => {
+			const resultPromise = provider.launchBackground(
+				makeBaseOptions({
+					toolHooks: [{ timing: 'before', action: { type: 'log' } }],
+				})
+			);
+			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			await resultPromise;
+
+			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+			const settingsIdx = args.indexOf('--settings');
+			expect(settingsIdx).toBeGreaterThan(-1);
+			expect(args[settingsIdx + 1]).toContain(os.tmpdir());
+			expect(args[settingsIdx + 1]).toMatch(/claude-settings-.+\.json/);
+			expect(args).toContain('--include-hook-events');
+		});
+
+		it('does NOT write settings file when toolHooks is not set', async () => {
+			const resultPromise = provider.launchBackground(makeBaseOptions());
+			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			await resultPromise;
+
+			const calls = vi.mocked(fs.promises.writeFile).mock.calls;
+			const settingsCall = calls.find(([p]) => String(p).includes('claude-settings-'));
+			expect(settingsCall).toBeUndefined();
+		});
+
+		it('does NOT write settings file when toolHooks is an empty array', async () => {
+			const resultPromise = provider.launchBackground(makeBaseOptions({ toolHooks: [] }));
+			setImmediate(() => (mockProcess as EventEmitter).emit('close', 0));
+			await resultPromise;
+
+			const calls = vi.mocked(fs.promises.writeFile).mock.calls;
+			const settingsCall = calls.find(([p]) => String(p).includes('claude-settings-'));
+			expect(settingsCall).toBeUndefined();
+		});
+
+		it('deletes settings temp file in finally even when spawn rejects', async () => {
+			vi.mocked(fs.promises.writeFile).mockResolvedValue(undefined);
+
+			const resultPromise = provider.launchBackground(
+				makeBaseOptions({
+					toolHooks: [{ timing: 'before', action: { type: 'log' } }],
+				})
+			);
+
+			setImmediate(() => {
+				(mockProcess as EventEmitter).emit('error', new Error('spawn failed'));
+			});
+
+			await resultPromise.catch(() => {
+				/* expected */
+			});
+
+			expect(fs.unlinkSync).toHaveBeenCalled();
+		});
+	});
+
+	// -------------------------------------------------------------------------
 	// kill()
 	// -------------------------------------------------------------------------
 

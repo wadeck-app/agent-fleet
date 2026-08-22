@@ -18461,7 +18461,7 @@ function configFilePath(filePath) {
 }
 function* configParser(text, requestedKey = null) {
 	const lines = text.split('\0');
-	for (let i = 0, max = lines.length - 1; i < max; ) {
+	for (let i = 0, max = lines.length - 1; i < max;) {
 		const file = configFilePath(lines[i++]);
 		let value = lines[i++];
 		let key = requestedKey;
@@ -20351,7 +20351,7 @@ var init_StatusSummary = __esm({
 		parseStatusSummary = function (text) {
 			const lines = text.split(NULL);
 			const status = new StatusSummary();
-			for (let i = 0, l = lines.length; i < l; ) {
+			for (let i = 0, l = lines.length; i < l;) {
 				let line = lines[i++].trim();
 				if (!line) {
 					continue;

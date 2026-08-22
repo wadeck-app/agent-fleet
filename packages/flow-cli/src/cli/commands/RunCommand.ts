@@ -6,7 +6,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { FlowConfigLoader, type FlowConfig } from '../../config/FlowConfig';
+import { type FlowConfig, FlowConfigLoader } from '../../config/FlowConfig';
 import { Daemon } from '../../daemon/Daemon';
 import type { ClientCommand, DaemonResponse, ExecutionState } from '../../ipc/Protocol';
 import { ExecutionStore } from '../../storage/ExecutionStore';
