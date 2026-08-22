@@ -1,8 +1,16 @@
 # Lessons learned
 
-<!-- Last updated: 2026-08-22T13:00:04.698Z -->
+<!-- Last updated: 2026-08-22T21:41:26.749Z -->
 
 ## Recurring feedback
+
+<!-- session 5565878c 2026-08-22 -->
+
+- User escalates scope mid-task when initial request is underspecified — asked for "commands section" then immediately asks for "thorough codebase summary" with full directory structure, conventions, etc. Incomplete requests force exploratory back-and-forth instead of one comprehensive delivery.
+- Test output is consistently piped through `tail` with varying limits (tail -30, -15, -40, -8) to reduce context — agents are learning the context-efficient output pattern from CLAUDE.md but have to reinvent it per agent spawn.
+- Test configuration required multiple iterations: YAML file edited 5+ times (11:25–11:27) with model ID, format, and provider adjustments before tests passed. Suggests test YAML schema or model ID format documentation is unclear.
+- npm install + npm run check → tail filtering is the standard verification workflow (repeated at 19:45:04, 19:46:41, 19:55:22, 19:57:01, 20:00:26) — context-efficient output pattern should be baked into verification routines.
+- Parallel agent delegation pattern (aefe + abaa working independently on scrappers vs agent-fleet CI errors) — worked well, maintained progress on two fronts simultaneously without context bloat.
 
 <!-- session e76b8d9c 2026-08-21 -->
 
@@ -391,6 +399,21 @@
 - Multiple independent agents (Explore, general-purpose) read identical spec files sequentially without coordination, causing redundant I/O. Agents should receive shared context or hand off findings rather than re-audit.
 
 ## Agent errors
+
+<!-- session 5565878c 2026-08-22 -->
+
+- Asked for approval on incomplete CLAUDE.md instead of completing the full analysis first; user redirected with "actually I need more" rather than approving. For large doc requests, complete the full scope before asking to write.
+- Agents repeatedly call Skill with "check" and "run-test" that are marked "*** NOT YET KNOWN ***" instead of using ToolSearch to load skill schemas first. Pattern: backend-dev tries `Skill run-test` → WARN → later general-purpose reads `.claude\skills\run-test\examples.md` to work around the missing schema. This happens ~8 times across the chunk.
+- Two backend-dev agents spawned in parallel (ac4c at 08:52:20 and ad31 at 08:51:46) work on overlapping files (ModelProvider.ts, ClaudeModelProvider.ts, OpenCodeModelProvider.ts, types.ts) without visible coordination. Both agents edit the same files in sequence — potential for conflicts or wasted work.
+- Agents tried calling unavailable skills without checking first: `check`, `run-test`, `check-parallel-agents` (line 12:34:41, 12:34:43, 12:35:03). These skills were not in the agent's knowledge of available skills.
+- Agent attempted `EnterPlanMode`/`ExitPlanMode` tool calls that don't exist in the deferred tool list (13:31:36, 13:31:41). Tool does not appear to be available in this codebase/session.
+- backend-dev agent tried calling unavailable skills ("check", "run-test") at 14:46:37, 14:47:02, 14:47:04, 14:48:54 with WARN log; agent should handle gracefully or pre-check skill availability
+- Two agents (a762, a430) independently spawned to migrate TypeScript 7 at 16:58:17 and 16:58:31—duplicate parallel work on same task. Agents should check for concurrent execution or use lock mechanism.
+- Initial @types/node version wrong: agent set ^26, SendMessage correction at 16:55:05 to use ^24 instead. Version assumption not validated against Node version compatibility.
+- Skill call at 19:54:11 shows `[ WARN] Skill Skill - *** NOT YET KNOWN *** skill=check` — agent should have used ToolSearch to load the skill schema before invoking it, not attempted direct invocation.
+- Around 19:26-19:27, multiple Grep tool calls with incomplete/malformed patterns (`grep -o` with no actual pattern) — pattern construction for URL regex extraction was failing; should have validated regex before execution.
+- Around 17:17-18, manual bash inspection of @testing-library type definitions through multiple cat/grep commands instead of systematic investigation — indicates agent was working around the actual root cause (tsconfig resolution issue) rather than diagnosing it.
+- Attempted skill invocation with `skill=check` before schema loaded (`*** NOT YET KNOWN ***`), but recovered gracefully; agent waited for subsequent invocation to succeed. Not a blocker, but suggests early skill loading or graceful fallback needed.
 
 <!-- session e76b8d9c 2026-08-21 -->
 
@@ -960,6 +983,15 @@
 
 ## Documentation gaps
 
+<!-- session 5565878c 2026-08-22 -->
+
+- No specification for what CLAUDE.md should contain — assistant had to explore extensively to understand expected sections. Existing CLAUDE.md is incomplete (missing commands section and architectural overview), signaling unenforced standard.
+- Agents don't recognize available project skills (check, run-test) and fall back to manual Glob/Read patterns to locate and execute scripts like `scripts/check-all.js`. No agent initial context indicates where skills live or how to discover them.
+- Agent called SendMessage tool and it returned "NOT YET KNOWN" (12:33:42, 12:35:18). Tool exists but schema was not loaded in agent context at invocation time.
+- CLAUDE.md references "check" skill as directive ("Use the skill 'check' and fix the issues") but skill appears unavailable/unknown to agents, causing failures instead of graceful fallback
+- `write-doc` skill logged as "NOT YET KNOWN" at 16:23:57—tool schema not pre-loaded. Agent attempted invocation without ToolSearch first.
+- @wadeck/shared-cli adoption required creating duplicate `configDir.js` wrapper files in each scrapper package (assurance, whatsapp, chatgpt) — no scaffolding or template pattern documented. Manually replicated same boilerplate 3x.
+
 <!-- session e76b8d9c 2026-08-21 -->
 
 - OpenCode streaming events (`text`, `tool_use`) reach ModelStepExecutor but StreamEventMapper.map() has no cases for them — they don't appear in logs/console. Silent data loss.
@@ -1420,6 +1452,18 @@
 - Extensive Grep searches for domain concepts (RE-QUEUED, bufferSpill, reconnectTimeout, idleTimeout, drainTimeout, heartbeat monitoring, etc.) suggest spec lacks clear glossary or index of key terms. Future audits should define these upfront.
 
 ## Known constraints
+
+<!-- session 5565878c 2026-08-22 -->
+
+- Daemon restart cycle is manual: every code change requires `pkill worker.cjs` + rebuild bundle + restart (observed at 11:22:20, 12:51:16). No hot-reload mechanism; each iteration adds ~2–5 min overhead.
+- ConfigDir.ts refactoring in shared-cli required explicit `npm run build` rebuild step and re-check cycle before downstream packages (flow-cli, task-cli) could resolve updated types — shared package changes trigger compilation dependencies
+- Git unstaging: files (.idea/) staged despite .gitignore update required explicit `git rm --cached -r -f` cleanup, not automatically ignored by git
+- TypeScript 7.0.2 breaks tsconfig: `baseUrl` support removed—forces removal across all tsconfig.json files (shared, base, all packages). Widespread change, not a simple version bump.
+- typescript-eslint peer dependency conflict with TS7: requires npm `legacy-peer-deps` flag in .npmrc AND custom postinstall script (setup-eslint-ts6.cjs) to symlink typescript@6 into typescript-eslint's node_modules for ESLint compatibility (17:08:06, 17:08:16).
+- ts-api-utils hardcodes `Intrinsic` type checks that fail in TS7—workaround is to keep typescript@6 available in a specific location for tools like eslint, not a true fix.
+- TypeScript 7 migration required coordinated tsconfig edits across 6+ packages + npm install cycle (17:22-17:23 → 17:28:50) — complex interdependencies between configs; single file edit rarely resolves all issues.
+- CalVer version extraction from URL requires careful regex (Project ID 84445653 embedded in registry URL) — brittle if URL format changes; hardcoding vs. parametrization trade-off not documented.
+- TypeScript config path resolution changes required cascading edits across 3 separate `tsconfig.json` files (tsconfig.shared.json, tsconfig.build.json, tsconfig.json) to propagate extends/references properly. Fragile point-to-point coupling.
 
 <!-- session e76b8d9c 2026-08-21 -->
 

@@ -1,7 +1,6 @@
 {
 	"extends": "./tsconfig.json",
 	"compilerOptions": {
-		"rootDir": "src",
 		"types": ["vite/client", "node"],
 		"skipLibCheck": true,
 		"composite": false
