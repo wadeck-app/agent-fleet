@@ -8,7 +8,6 @@
 		"skipLibCheck": true,
 		"useDefineForClassFields": true,
 		"verbatimModuleSyntax": true,
-		"baseUrl": ".",
 		"forceConsistentCasingInFileNames": true,
 		"composite": true,
 

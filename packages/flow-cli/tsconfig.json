@@ -5,10 +5,7 @@
 		"declarationDir": "dist-types",
 		"rootDir": "src",
 		"types": ["vitest/globals", "node"],
-		"baseUrl": ".",
 		"paths": {
-			"shared-cli": ["../shared-cli/src/index"],
-			"shared-cli/*": ["../shared-cli/src/*"],
 			"extension-points": ["../extension-points/src/index"],
 			"flow-engine": ["../flow-engine/src"],
 			"flow-engine/*": ["../flow-engine/src/*"],
@@ -17,10 +14,5 @@
 		}
 	},
 	"include": ["src"],
-	"references": [
-		{ "path": "../shared-cli" },
-		{ "path": "../extension-points" },
-		{ "path": "../flow-engine" },
-		{ "path": "../shared-common" }
-	]
+	"references": [{ "path": "../extension-points" }, { "path": "../flow-engine" }, { "path": "../shared-common" }]
 }

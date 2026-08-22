@@ -3,7 +3,8 @@
 	"compilerOptions": {
 		"types": ["vitest/globals"],
 		"noEmit": true,
-		"composite": false
+		"composite": false,
+		"rootDir": ".."
 	},
 	"include": ["src/**/*"],
 	"exclude": ["node_modules", "dist"]

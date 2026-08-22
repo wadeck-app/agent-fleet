@@ -1,4 +1,5 @@
 // flow cli <subcommand> -- meta-commands for managing the flow CLI itself.
+import { ConfigDir, HookDispatcher, VersionValidation } from '@wadeck/shared-cli';
 import { Command } from 'commander';
 import { FlowExecutor, StepRunner } from 'flow-engine';
 import * as yaml from 'js-yaml';
@@ -9,7 +10,6 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { ConfigDir, HookDispatcher, VersionValidation } from 'shared-cli/index';
 
 import { FlowConfigLoader } from '../../config/FlowConfig.js';
 import { PluginLoader } from '../../config/PluginLoader.js';

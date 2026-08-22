@@ -2,7 +2,8 @@
 	"extends": "../tsconfig.base.json",
 	"compilerOptions": {
 		"outDir": ".cache",
-		"rootDir": "."
+		"rootDir": ".",
+		"types": ["node"]
 	},
 	"include": ["**/*.ts"],
 	"exclude": ["node_modules", ".cache"]

@@ -13,7 +13,7 @@
 		"shared-common": "file:../shared-common"
 	},
 	"devDependencies": {
-		"typescript": "^5.3.3",
+		"typescript": "^7.0.0",
 		"vitest": "^4.0.14"
 	}
 }

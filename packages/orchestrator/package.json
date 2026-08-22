@@ -33,7 +33,7 @@
 		"supertest": "^7.1.4",
 		"test-utils": "*",
 		"tsx": "^4.7.0",
-		"typescript": "^5.3.3",
+		"typescript": "^7.0.0",
 		"vitest": "^4.0.14"
 	}
 }

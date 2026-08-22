@@ -21,7 +21,7 @@
 	},
 	"devDependencies": {
 		"test-utils": "*",
-		"typescript": "^5.3.3",
+		"typescript": "^7.0.0",
 		"vitest": "^4.0.14",
 		"tsx": "^4.7.0"
 	}

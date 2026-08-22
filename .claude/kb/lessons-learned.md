@@ -6258,3 +6258,38 @@ See `.claude/kb/opencode-provider-windows-gotchas.md` for full details. Key poin
 - MCP config: `{ mcp: { name: { type: "local", command: [...], environment: {}, enabled: true } } }`
 - Forward PATH/HOME/USERPROFILE/SystemRoot in env or OpenCode can't find its config
 - Unit tests with mocked spawn don't catch subprocess behavior bugs -- run the 3 flows in `C:\Workspace_Tooling\_test-tasks\` to validate
+
+---
+
+## TypeScript 7 + typescript-eslint Workaround (agent-fleet)
+
+**Context**: Migrated to TS7 in August 2026. typescript-eslint does not support TS7 yet (tracking: https://github.com/typescript-eslint/typescript-eslint/issues/10940).
+
+**Workaround**: `typescript-6` alias (`npm:typescript@^6`) in root devDependencies. `scripts/setup-eslint-ts6.cjs` symlinks it into each `@typescript-eslint/*` nested `node_modules/typescript` using Windows junctions (no elevated privileges needed).
+
+**Fragility**: The symlinks break after some `npm install <specific-package>` calls (postinstall doesn't always re-run). **Fix**: `node scripts/setup-eslint-ts6.cjs` -- or just run `npm install` (no args) which triggers postinstall.
+
+**If check fails with "typescript-eslint does not support TS 7.0"**: run `node scripts/setup-eslint-ts6.cjs` then retry check.
+
+**Long-term**: remove `typescript-6` alias + `setup-eslint-ts6.cjs` + `postinstall` script once typescript-eslint officially supports TS7.
+
+---
+
+## GitLab Package Registry — Token Validation
+
+**Context**: CI workflows must validate tokens BEFORE any action (pre-contract). For GitLab npm registry deploy tokens.
+
+**READ token (`read_package_registry`) validation**:
+
+- `GET /api/v4/projects/{id}/packages/pypi/simple/` → **200** valid token, **401** invalid
+- Package-independent — works before first publish, no cross-repo dependency
+- DO NOT use npm registry endpoints (`/-/ping`, `/-/whoami`, `@scope/package`) — GitLab proxies missing packages to npmjs.org with a 302 **regardless of token validity**, making them useless for validation
+
+**WRITE token (`write_package_registry`) validation**:
+
+- `POST /api/v4/projects/{id}/packages/pypi` → **400** has scope (nothing created), **403** missing scope
+- Non-destructive: GitLab validates scope BEFORE content
+
+**npm proxy behavior**: For packages not in the private registry, GitLab always returns 302 → `https://registry.npmjs.org/<package>` without checking the token. Valid and invalid tokens get identical 302 responses.
+
+**Lesson**: Never declare a technical dead-end without exhausting all paths. "There is no solution" requires proof by exhaustion, not 2-3 failed attempts.

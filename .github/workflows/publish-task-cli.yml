@@ -27,21 +27,23 @@ jobs:
 
             - uses: actions/setup-node@v5
               with:
-                  node-version: '22'
+                  node-version: '24'
 
             - name: Validate tokens
               run: |
                   READ=$(echo "${GITLAB_NPM_READ_TOKEN}" | tr -d '[:space:]')
                   [ -z "$READ" ] && echo "::error::GITLAB_NPM_READ_TOKEN is empty" && exit 1
                   echo "READ token: ${READ:0:9}*** (length: ${#READ})"
+                  # PyPI simple index: returns 200 for valid read_package_registry token, 401 for invalid.
+                  # Package-independent. Symmetric with the PyPI POST probe for WRITE validation.
+                  PROJECT_ID=$(echo "${GITLAB_NPM_REGISTRY_PATH}" | sed 's|.*/projects/\([0-9]*\)/.*|\1|')
                   HTTP_READ=$(curl -s -o /dev/null -w "%{http_code}" \
                     -H "Authorization: Bearer ${READ}" \
-                    "https:${GITLAB_NPM_REGISTRY_PATH}@wadeck%2fsingleton-daemon-kit")
+                    "https://gitlab.com/api/v4/projects/${PROJECT_ID}/packages/pypi/simple/")
                   case "$HTTP_READ" in
-                    200) echo "READ token: read_package_registry OK" ;;
+                    200) echo "READ token: read_package_registry OK (PyPI simple index HTTP 200)" ;;
                     401) echo "::error::GITLAB_NPM_READ_TOKEN invalid or expired (HTTP 401)" ; exit 1 ;;
                     403) echo "::error::GITLAB_NPM_READ_TOKEN lacks read_package_registry scope (HTTP 403)" ; exit 1 ;;
-                    404) echo "::error::GITLAB_NPM_READ_TOKEN has no visibility to project 84445653 (HTTP 404)" ; exit 1 ;;
                     *)   echo "::error::GITLAB_NPM_READ_TOKEN unexpected HTTP ${HTTP_READ}" ; exit 1 ;;
                   esac
 

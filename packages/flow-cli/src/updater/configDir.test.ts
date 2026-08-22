@@ -1,6 +1,6 @@
+import { ConfigDir } from '@wadeck/shared-cli/ConfigDir';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { ConfigDir } from 'shared-cli/ConfigDir';
 
 describe('ConfigDir.get', () => {
 	const originalPlatform = process.platform;

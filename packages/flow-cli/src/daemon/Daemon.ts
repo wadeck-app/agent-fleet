@@ -1,3 +1,4 @@
+import { type HookConfig, HookDispatcher } from '@wadeck/shared-cli/HookDispatcher';
 import { type DaemonHandle, createDaemon } from '@wadeck/singleton-daemon-kit';
 import type { ApprovalProvider, WorkspaceProvider } from 'extension-points';
 import { WorkspaceManager } from 'flow-engine';
@@ -6,7 +7,6 @@ import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { type HookConfig, HookDispatcher } from 'shared-cli/HookDispatcher';
 import type { WebSocket } from 'ws';
 
 import { type FlowConfig, FlowConfigLoader } from '../config/FlowConfig';

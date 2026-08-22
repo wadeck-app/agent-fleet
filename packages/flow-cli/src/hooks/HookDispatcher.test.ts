@@ -1,6 +1,6 @@
+import { HookDispatcher } from '@wadeck/shared-cli/HookDispatcher';
 import { execFile } from 'node:child_process';
 import * as http from 'node:http';
-import { HookDispatcher } from 'shared-cli/HookDispatcher';
 
 vi.mock('node:child_process', () => ({ execFile: vi.fn() }));
 vi.mock('node:http', () => ({

@@ -1,7 +1,7 @@
 {
 	"extends": "../../tsconfig.base.json",
 	"compilerOptions": {
-		"baseUrl": ".",
+		"composite": false,
 		"outDir": "./dist",
 		"paths": {
 			//FIXME to be cleaned up with all using @ prefix

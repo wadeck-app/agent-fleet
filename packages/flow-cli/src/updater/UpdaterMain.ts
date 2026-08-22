@@ -2,11 +2,11 @@
 // This module is bundled separately as flow-updater.cjs.
 // It must NOT import any flow runtime modules (FlowExecutor, StepRunner, etc.)
 // Allowed: node:fs, node:path, node:child_process, node:os, semver
+import { ConfigDir } from '@wadeck/shared-cli/ConfigDir';
 import { execFile, execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
-import { ConfigDir } from 'shared-cli/ConfigDir';
 
 const execFileAsync = promisify(execFile);
 

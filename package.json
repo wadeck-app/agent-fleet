@@ -54,7 +54,8 @@
 		"clean": "npm run clean --workspaces --if-present",
 		"clean:all": "npm run clean && rimraf node_modules package-lock.json",
 		"cleanup:e2e": "node scripts/cleanup-e2e-zombies.cjs",
-		"install:all": "npm install"
+		"install:all": "npm install",
+		"postinstall": "node scripts/setup-eslint-ts6.cjs"
 	},
 	"keywords": [
 		"ai",
@@ -67,7 +68,7 @@
 	"devDependencies": {
 		"@eslint/js": "^9.17.0",
 		"@trivago/prettier-plugin-sort-imports": "^4.3.0",
-		"@types/node": "^20.11.0",
+		"@types/node": "^24.0.0",
 		"@vitest/coverage-v8": "^4.0.14",
 		"@wadeck/violations-rules": "^1.20260714224530.22",
 		"chalk": "^5.6.2",
@@ -85,11 +86,13 @@
 		"prettier-plugin-tailwindcss": "^0.6.9",
 		"rimraf": "^6.1.2",
 		"tsx": "^4.7.0",
-		"typescript": "^5.3.3",
+		"typescript": "^7.0.0",
+		"typescript-6": "npm:typescript@^6",
 		"typescript-eslint": "^8.32.1",
 		"vitest": "^4.0.14"
 	},
 	"dependencies": {
+		"@wadeck/singleton-daemon-kit": "^2026.8.22-64-d83b99e3",
 		"embla-carousel-react": "^8.6.0"
 	}
 }

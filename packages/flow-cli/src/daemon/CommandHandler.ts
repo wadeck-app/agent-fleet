@@ -1,3 +1,4 @@
+import type { HookDispatcher } from '@wadeck/shared-cli/HookDispatcher';
 import type { ApprovalProvider, WorkspaceHandle, WorkspaceProvider } from 'extension-points';
 import { releaseWorkspace } from 'extension-points';
 import { FlowValidator, WorkspaceManager } from 'flow-engine';
@@ -9,7 +10,6 @@ import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import type { HookDispatcher } from 'shared-cli/HookDispatcher';
 
 import type { AssignableStep, ClientCommand, DaemonResponse, ExecutionContext, InjectedStep } from '../ipc/Protocol';
 import { ExecutionStore, generateExecutionId } from '../storage/ExecutionStore';

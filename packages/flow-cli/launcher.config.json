@@ -2,6 +2,6 @@
 	"appName": "flow",
 	"displayName": "Flow CLI",
 	"nodeScript": "flow.cjs",
-	"defaultConfigDir": "flow-cli",
+	"defaultConfigDir": "flow",
 	"cliFlags": ["--quit", "--restart", "--queue-status", "--cancel"]
 }
