@@ -1,8 +1,15 @@
 # Lessons learned
 
-<!-- Last updated: 2026-08-22T21:41:26.749Z -->
+<!-- Last updated: 2026-08-23T11:12:54.687Z -->
 
 ## Recurring feedback
+
+<!-- session 539d500a 2026-08-22 -->
+- Session redirected from user's original question ("are task hooks → flow triggers ready and tested?") into extended OpenCode MCP/plugin research; unclear if this was intentional scope change or agent misunderstanding of the requirements.
+- Manual build→bundle→deploy cycle repeated 8+ times: `npm run build && npm run bundle && cp dist-bundle/flow.cjs "C:/App/nvm/..."` suggests this workflow needs automation or a helper script.
+- Backend-dev agent calls skill:check/run-test repeatedly even after failures, then manually invokes `node scripts/check-all.js` directly as fallback. Pattern suggests agents don't know when/how to fail gracefully vs retry.
+- CI workflow files (publish.yml, publish-flow-cli.yml, publish-task-cli.yml) edited 3+ times with repeated "Replace all/single occurrences" — token/registry setup was fragile and incremental rather than finalized upfront. Test validation scripts created (.claude/temp) but no log shows they were actually run for verification.
+- Multiple rounds of `npm install` and `npm run check` to validate dependency resolution, indicating cascading version issues weren't caught until after integration — consider running full install+check cycle before publishing @wadeck packages as a gate.
 
 <!-- session 5565878c 2026-08-22 -->
 
@@ -399,6 +406,20 @@
 - Multiple independent agents (Explore, general-purpose) read identical spec files sequentially without coordination, causing redundant I/O. Agents should receive shared context or hand off findings rather than re-audit.
 
 ## Agent errors
+
+<!-- session 539d500a 2026-08-22 -->
+- Multiple forked agents ran redundant research on identical queries (e.g., `curl https://opencode.ai/config.json`, checking `claude --help` flags) without coordination — parallel execution without deduplication wasted effort and found no clear resolution for OpenCode plugin/hook system.
+- Multiple backend-dev agents attempt to invoke unknown skills and proceed with bash workarounds rather than proactively using ToolSearch to resolve schemas before calling Skill tool.
+- Multiple backend-dev agent delegations at end (13:40:01, 13:40:27) appear to be checking/testing work in parallel, but no results shown — suggests uncertainty about test coverage completeness or uncoordinated parallel verification.
+- Agents repeatedly attempt skill calls without discovery — `skill=check` (5 times), `skill=run-test` (2x), `skill=init`, `skill=spec` all trigger "NOT YET KNOWN" warnings. Agents should use ToolSearch before skill invocation, not guess.
+- Multiple agents edit shared package (shared-cli: ConfigDir.ts, UpdateManager.ts) in parallel without coordination. Changes propagate to both flow-cli and task-cli consumers, but verification is scattered across multiple test runs and format checks.
+- ToolSearch called with "select:Write" before tool schema was available (15:24:44 WARN). Agent should verify tool readiness or use fallback approach rather than assuming schema is loaded.
+- write-doc skill invoked but marked as "NOT YET KNOWN" (15:42:16 WARN). Agent attempted to use skill without verifying availability; should fall back to direct Write tool when skills aren't ready.
+- Agents attempted to use undiscoverable tools/skills (write-doc, SendMessage, AskUserQuestion) without first calling ToolSearch — they needed to discover these deferred tools before invocation.
+- Multiple `npm install` runs with repeated config edits to package.json (legacy-peer-deps, overrides, postinstall script tweaks) — suggests trial-and-error approach rather than upfront diagnosis of peer dependency resolution. Consider running npm explain before modifying flags.
+- @testing-library/dom transitive dependency issue required manual export in web-frontend/package.json — the agent searched extensively but didn't surface that @testing-library/react depends on @testing-library/dom, and npm couldn't resolve it due to hoisting. Needed explicit re-export to fix.
+- Three tasks spawned in parallel at 20:24 (T4/T5/T7) labeled "Agent unknown" — general-purpose agents were launched for violations-migration, XDG support, and wdrive dead code without clear upfront scoping or coordination. Resulted in overlapping reads of same files (e.g., launcher.go, bundle.ts, package.json).
+- Skill "check" was not available initially (reported as "*** NOT YET KNOWN ***") but was used successfully later — suggests deferred tool loading or skill discovery issue mid-session.
 
 <!-- session 5565878c 2026-08-22 -->
 
@@ -983,6 +1004,12 @@
 
 ## Documentation gaps
 
+<!-- session 539d500a 2026-08-22 -->
+- OpenCode hook/plugin system appears undocumented: agents searched extensively for "hooks", "interceptor", "before_tool", "after_tool" in config schema and docs but found no definitive answer about hook support or plugin loading from custom directories.
+- Skill discovery: "check", "run-test", "parallel-and-todos" reported as "NOT YET KNOWN" repeatedly across multiple backend-dev agents — suggests skill registration or schema-loading documentation is incomplete or skills require ToolSearch before use.
+- No clear project-specific skill registry exposed to agents. Skills exist but agents don't know how to discover them — causing blind attempts and fallbacks to raw Bash/scripts.
+- TypeScript config fixes cascaded across multiple files (tsconfig.shared.json → web-frontend/tsconfig.build.json → shared-orch-worker/tsconfig.json → legacy-cli/tsconfig.json) suggesting a single root-cause documentation or config pattern that wasn't self-evident.
+
 <!-- session 5565878c 2026-08-22 -->
 
 - No specification for what CLAUDE.md should contain — assistant had to explore extensively to understand expected sections. Existing CLAUDE.md is incomplete (missing commands section and architectural overview), signaling unenforced standard.
@@ -1452,6 +1479,22 @@
 - Extensive Grep searches for domain concepts (RE-QUEUED, bufferSpill, reconnectTimeout, idleTimeout, drainTimeout, heartbeat monitoring, etc.) suggest spec lacks clear glossary or index of key terms. Future audits should define these upfront.
 
 ## Known constraints
+
+<!-- session 539d500a 2026-08-22 -->
+- OpenCode plugins require npm package format (not raw JS); plugin discovery from OPENCODE_CONFIG_DIR is unclear; Windows path handling (forward slashes vs backslashes in Node.js) caused extra test iterations.
+- FlowsService.getFlowByIdFromFile only reads flows.yml, NOT flows-custom.yml — must inject FlowRegistry instance and use registry.getFlow(flowId) as fallback (confirmed in memory as active issue).
+- Windows OpenCode plugin path handling requires POSIX translation + XDG_CONFIG_HOME isolation + temp directory management — gotchas documented in .claude/kb/opencode-provider-windows-gotchas.md.
+- tsx resolution is non-obvious: searched in `node_modules` at nvm root (10:37:52), at version-specific path (10:38:30/38:39), and in bundler config — constraint isn't documented clearly.
+- ConfigDir resolution has multiple fallback paths: `$USERPROFILE/.config/opencode/`, `$LOCALAPPDATA/opencode/`, `.flow-cli/` — unclear which is authoritative; investigated multiple times (11:26:18, 13:39+).
+- Daemon requires manual `pkill -f "worker.cjs"` between runs for bundle changes to take effect — not automatic reload (11:22:20, 12:51:16).
+- Flow test configuration has model-ID sensitivity — multiple edits to test files swapping between model IDs and checking OpenCode config (11:26+) — suggests model routing/fallback logic is fragile.
+- Iterative audit cycle pattern: run audits → collect findings → fix spec → re-audit. Multiple fork agents working in parallel on independent audits (security, completeness, consistency, architecture) across 3+ rounds. No clear convergence criteria documented.
+- TypeScript 7 removed `baseUrl` and `pkgRoot` support in tsconfig — migration requires adding `rootDir` to each package's tsconfig.json or using path-based config references.
+- @types/node version must strictly match Node.js runtime version (e.g., ^24.0.0 for Node 24) — mismatches cause type resolution failures; agent had to correct ^26 to ^24.
+- npm peer dependency resolution with TypeScript 7 + typescript-eslint requires adding npm `overrides` in root package.json to force compatible versions.
+- CalVer format migration scattered across repos (singleton-daemon-kit → consumers in agent-fleet, wdrive, violations-framework) without consolidated checklist — multiple npm installs and check runs later, tsconfig.json references to shared-cli still needed cleanup (flow-cli, task-cli). No central tracking of what needs updating where.
+- Multiple @wadeck packages require published versions before dependent monorepos can install them — scrappers couldn't resolve @wadeck/shared-cli until agent-fleet published and updated lockfiles first.
+- Parallel agents working across different projects (violations-framework, scrappers, agent-fleet, wdrive, singleton-daemon-kit) simultaneously with git state mutations — context fragmentation and potential for conflicting edits (fork agent on task hooks while main agent on CI fixes).
 
 <!-- session 5565878c 2026-08-22 -->
 

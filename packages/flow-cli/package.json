@@ -24,15 +24,15 @@
 		"bundle:all": "npm run bundle && npm run bundle-updater"
 	},
 	"dependencies": {
-		"@wadeck/shared-cli": "^2026.8.22-5-d3140e53",
-		"extension-points": "file:../extension-points",
-		"plugin-none": "file:../plugin-none",
-		"plugin-worktree": "file:../plugin-worktree",
-		"plugin-cli-approval": "file:../plugin-cli-approval",
-		"@wadeck/singleton-daemon-kit": ">=0.0.0-0",
+		"@wadeck/shared-cli": "^2026.8.23-006-2d3e15d6",
+		"@wadeck/singleton-daemon-kit": "^2026.8.23-067-33331611",
 		"commander": "^12.1.0",
+		"extension-points": "file:../extension-points",
 		"flow-engine": "file:../flow-engine",
 		"js-yaml": "^4.1.1",
+		"plugin-cli-approval": "file:../plugin-cli-approval",
+		"plugin-none": "file:../plugin-none",
+		"plugin-worktree": "file:../plugin-worktree",
 		"shared-common": "file:../shared-common",
 		"ws": "^8.0.0"
 	},
