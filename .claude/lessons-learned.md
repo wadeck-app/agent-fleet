@@ -5,6 +5,7 @@
 ## Recurring feedback
 
 <!-- session 539d500a 2026-08-22 -->
+
 - Session redirected from user's original question ("are task hooks → flow triggers ready and tested?") into extended OpenCode MCP/plugin research; unclear if this was intentional scope change or agent misunderstanding of the requirements.
 - Manual build→bundle→deploy cycle repeated 8+ times: `npm run build && npm run bundle && cp dist-bundle/flow.cjs "C:/App/nvm/..."` suggests this workflow needs automation or a helper script.
 - Backend-dev agent calls skill:check/run-test repeatedly even after failures, then manually invokes `node scripts/check-all.js` directly as fallback. Pattern suggests agents don't know when/how to fail gracefully vs retry.
@@ -408,6 +409,7 @@
 ## Agent errors
 
 <!-- session 539d500a 2026-08-22 -->
+
 - Multiple forked agents ran redundant research on identical queries (e.g., `curl https://opencode.ai/config.json`, checking `claude --help` flags) without coordination — parallel execution without deduplication wasted effort and found no clear resolution for OpenCode plugin/hook system.
 - Multiple backend-dev agents attempt to invoke unknown skills and proceed with bash workarounds rather than proactively using ToolSearch to resolve schemas before calling Skill tool.
 - Multiple backend-dev agent delegations at end (13:40:01, 13:40:27) appear to be checking/testing work in parallel, but no results shown — suggests uncertainty about test coverage completeness or uncoordinated parallel verification.
@@ -1005,6 +1007,7 @@
 ## Documentation gaps
 
 <!-- session 539d500a 2026-08-22 -->
+
 - OpenCode hook/plugin system appears undocumented: agents searched extensively for "hooks", "interceptor", "before_tool", "after_tool" in config schema and docs but found no definitive answer about hook support or plugin loading from custom directories.
 - Skill discovery: "check", "run-test", "parallel-and-todos" reported as "NOT YET KNOWN" repeatedly across multiple backend-dev agents — suggests skill registration or schema-loading documentation is incomplete or skills require ToolSearch before use.
 - No clear project-specific skill registry exposed to agents. Skills exist but agents don't know how to discover them — causing blind attempts and fallbacks to raw Bash/scripts.
@@ -1481,6 +1484,7 @@
 ## Known constraints
 
 <!-- session 539d500a 2026-08-22 -->
+
 - OpenCode plugins require npm package format (not raw JS); plugin discovery from OPENCODE_CONFIG_DIR is unclear; Windows path handling (forward slashes vs backslashes in Node.js) caused extra test iterations.
 - FlowsService.getFlowByIdFromFile only reads flows.yml, NOT flows-custom.yml — must inject FlowRegistry instance and use registry.getFlow(flowId) as fallback (confirmed in memory as active issue).
 - Windows OpenCode plugin path handling requires POSIX translation + XDG_CONFIG_HOME isolation + temp directory management — gotchas documented in .claude/kb/opencode-provider-windows-gotchas.md.

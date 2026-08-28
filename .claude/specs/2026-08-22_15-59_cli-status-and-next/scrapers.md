@@ -6,15 +6,15 @@
 
 ## Overview
 
-The scrapers (assurance-scrapper, whatsapp-scrapper, chatgpt-scrapper) are local automation scripts running via Windows Scheduled Task. They are NOT distributed CLIs. They live in the monorepo at `C:\Workspace_Tooling\scrappers`. Distribution via npm is out of scope.
+The scrapers (assurance-scraper, whatsapp-scraper, chatgpt-scraper) are local automation scripts running via Windows Scheduled Task. They are NOT distributed CLIs. They live in the monorepo at `C:\Workspace_Tooling\scrapers`. Distribution via npm is out of scope.
 
 ## Decisions
 
 | #    | Decision                                                                                                                                                         | Rationale                                                                                      | Date       |
 | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ---------- |
-| D-6  | Scrapers consolidated into monorepo at `C:\Workspace_Tooling\scrappers`; shared logic in `@wadeck/shared-scrapper`                                               | DRY violation -- identical code across 3 projects; plain JS CommonJS, no TypeScript            | 2026-08-22 |
-| D-14 | `@wadeck/shared-scrapper` not published to registry; workspace resolution only                                                                                   | No external consumers; YAGNI; less attack surface                                              | 2026-08-22 |
-| D-15 | Scrapers depend on `@wadeck/shared-cli` (published) in addition to `@wadeck/shared-scrapper`                                                                     | Normalize shared infrastructure across all tools; avoid reimplementing ConfigDir/UpdateManager | 2026-08-22 |
+| D-6  | Scrapers consolidated into monorepo at `C:\Workspace_Tooling\scrapers`; shared logic in `@wadeck/shared-scraper`                                                 | DRY violation -- identical code across 3 projects; plain JS CommonJS, no TypeScript            | 2026-08-22 |
+| D-14 | `@wadeck/shared-scraper` not published to registry; workspace resolution only                                                                                    | No external consumers; YAGNI; less attack surface                                              | 2026-08-22 |
+| D-15 | Scrapers depend on `@wadeck/shared-cli` (published) in addition to `@wadeck/shared-scraper`                                                                      | Normalize shared infrastructure across all tools; avoid reimplementing ConfigDir/UpdateManager | 2026-08-22 |
 | D-16 | Config in `~/.config/<scraper-name>/config.yml`; data in `~/.config/<scraper-name>/data/` by default; configurable via `--data-dir`; runnable from any directory | XDG semantics respected; scraper runnable from any directory                                   | 2026-08-22 |
 
 ## Design
@@ -22,26 +22,26 @@ The scrapers (assurance-scrapper, whatsapp-scrapper, chatgpt-scrapper) are local
 ### Package layout
 
 ```
-packages/shared-scrapper/    -- @wadeck/shared-scrapper (workspace only, not published)
+packages/shared-scraper/    -- @wadeck/shared-scraper (workspace only, not published)
   src/WindowsTask.js
   src/VbsLauncher.js
   src/ProcessLock.js
   src/RotatingLogger.js
   src/TrayNotifier.js
 
-packages/assurance-scrapper/  -- depends on shared-scrapper + @wadeck/shared-cli
-packages/whatsapp-scrapper/
-packages/chatgpt-scrapper/
+packages/assurance-scraper/  -- depends on shared-scraper + @wadeck/shared-cli
+packages/whatsapp-scraper/
+packages/chatgpt-scraper/
 ```
 
-Note: package names use double-p (`shared-scrapper`, `assurance-scrapper`, etc.) -- this is intentional and must not be changed. Prose in documentation uses the single-p spelling "scraper" for the generic concept.
+Note: package names use single-p (`shared-scraper`, `assurance-scraper`, etc.).
 
 ### Config and data directories
 
 Each scraper uses `ConfigDir` from `@wadeck/shared-cli`:
 
 ```
-~/.config/assurance-scrapper/
+~/.config/assurance-scraper/
   config.yml           -- user config (sync interval, filters, etc.)
   data/                -- scraped data (default location, configurable via --data-dir)
   logs/                -- log rotation (RotatingLogger)
@@ -49,10 +49,10 @@ Each scraper uses `ConfigDir` from `@wadeck/shared-cli`:
 
 ### Data migration (manual)
 
-`migrateIfNeeded('assurance-scrapper')` handles:
+`migrateIfNeeded('assurance-scraper')` handles:
 
-- `%APPDATA%\assurance-scrapper` -> `~/.config/assurance-scrapper` (Windows legacy)
-- `~/.assurance-scrapper` -> `~/.config/assurance-scrapper` (dot-dir legacy)
+- `%APPDATA%\assurance-scraper` -> `~/.config/assurance-scraper` (Windows legacy)
+- `~/.assurance-scraper` -> `~/.config/assurance-scraper` (dot-dir legacy)
 
 It does NOT migrate project-local `./data/` -- this is intentional. Existing project-local data must be moved manually by the user.
 
@@ -89,6 +89,6 @@ Q-10: Should scrapers warn when running as root/admin? (pending decision)
 
 D-15 introduces `@wadeck/shared-cli` as a supply chain dependency in scrapers. The scrapers use `schtasks.exe` for OS persistence. A compromised shared-cli version would be installed on machines with scheduled tasks. Mitigated by same CI-only WRITE token controls as other packages (T-01). This risk is tracked in `threat-model.md` T-06.
 
-> **Note (FP-3 / SEC-R3-03 audited):** Supply chain compromise via shared-cli + OS persistence via schtasks.exe. Accepted: same mitigations as all other CLIs (T-01, D-19). shared-scrapper is not published (D-14), reducing attack surface.
+> **Note (FP-3 / SEC-R3-03 audited):** Supply chain compromise via shared-cli + OS persistence via schtasks.exe. Accepted: same mitigations as all other CLIs (T-01, D-19). shared-scraper is not published (D-14), reducing attack surface.
 
-T-08: VbsLauncher.write() parameters (nodePath, scriptPath, args) must be sanitized before interpolation into VBScript. Implementation responsibility: `@wadeck/shared-scrapper` must enforce this before any scraper adopts VbsLauncher.
+T-08: VbsLauncher.write() parameters (nodePath, scriptPath, args) must be sanitized before interpolation into VBScript. Implementation responsibility: `@wadeck/shared-scraper` must enforce this before any scraper adopts VbsLauncher.
