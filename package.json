@@ -95,6 +95,6 @@
 		"embla-carousel-react": "^8.6.0"
 	},
 	"optionalDependencies": {
-		"@wadeck-app/violations-rules": "npm:@wadeck/violations-rules@^1.20260714224530.22"
+		"@wadeck-app/violations-rules": "^2026.8.28-037-e3acea40"
 	}
 }
