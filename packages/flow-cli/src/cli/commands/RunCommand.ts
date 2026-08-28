@@ -1,4 +1,4 @@
-import { DaemonNotRunningError, createDaemonClient } from '@wadeck/singleton-daemon-kit';
+import { DaemonNotRunningError, createDaemonClient } from '@wadeck-app/singleton-daemon-kit';
 import type { Command } from 'commander';
 import type { FlowDefinition, InputDefinition } from 'flow-engine/types';
 import * as yaml from 'js-yaml';

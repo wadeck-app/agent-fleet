@@ -1,4 +1,4 @@
-import { HookDispatcher } from '@wadeck/shared-cli/HookDispatcher';
+import { HookDispatcher } from '@wadeck-app/shared-cli/HookDispatcher';
 import * as fs from 'node:fs';
 import * as http from 'node:http';
 import * as os from 'node:os';

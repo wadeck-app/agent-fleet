@@ -1,4 +1,4 @@
-import type { Rule, Violation } from '@wadeck/violations-rules';
+import type { Rule, Violation } from '@wadeck-app/violations-rules';
 import * as fs from 'node:fs/promises';
 
 export type Config = Record<never, never>;

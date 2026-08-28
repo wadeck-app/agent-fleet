@@ -1,7 +1,4 @@
-name: Publish @wadeck/flow-cli
-
-env:
-    GITLAB_NPM_REGISTRY_PATH: //gitlab.com/api/v4/projects/84445653/packages/npm/
+name: Publish @wadeck-app/flow-cli
 
 on:
     push:
@@ -17,8 +14,12 @@ on:
                 required: false
                 default: 'false'
 
+permissions:
+    contents: read
+    packages: write
+
 jobs:
-    publish:
+    build-and-test:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v5
@@ -28,77 +29,13 @@ jobs:
             - uses: actions/setup-node@v5
               with:
                   node-version: '24'
-
-            - name: Validate tokens
-              run: |
-                  # --- READ token ---
-                  READ=$(echo "${GITLAB_NPM_READ_TOKEN}" | tr -d '[:space:]')
-                  [ -z "$READ" ] && echo "::error::GITLAB_NPM_READ_TOKEN is empty" && exit 1
-                  echo "READ token: ${READ:0:9}*** (length: ${#READ})"
-                  # PyPI simple index: returns 200 for valid read_package_registry token, 401 for invalid.
-                  # Package-independent. Symmetric with the PyPI POST probe for WRITE validation.
-                  PROJECT_ID=$(echo "${GITLAB_NPM_REGISTRY_PATH}" | sed 's|.*/projects/\([0-9]*\)/.*|\1|')
-                  HTTP_READ=$(curl -s -o /dev/null -w "%{http_code}" \
-                    -H "Authorization: Bearer ${READ}" \
-                    "https://gitlab.com/api/v4/projects/${PROJECT_ID}/packages/pypi/simple/")
-                  case "$HTTP_READ" in
-                    200) echo "READ token: read_package_registry OK (PyPI simple index HTTP 200)" ;;
-                    401) echo "::error::GITLAB_NPM_READ_TOKEN invalid or expired (HTTP 401)" ; exit 1 ;;
-                    403) echo "::error::GITLAB_NPM_READ_TOKEN lacks read_package_registry scope (HTTP 403)" ; exit 1 ;;
-                    *)   echo "::error::GITLAB_NPM_READ_TOKEN unexpected HTTP ${HTTP_READ}" ; exit 1 ;;
-                  esac
-
-                  # --- WRITE token ---
-                  WRITE=$(echo "${GITLAB_NPM_WRITE_TOKEN}" | tr -d '[:space:]')
-                  [ -z "$WRITE" ] && echo "::error::GITLAB_NPM_WRITE_TOKEN is empty" && exit 1
-                  echo "WRITE token: ${WRITE:0:9}*** (length: ${#WRITE})"
-
-                  # Try introspection endpoints (PAT then deploy token)
-                  INTROSPECT=$(curl -s -H "Authorization: Bearer ${WRITE}" "https://gitlab.com/api/v4/personal_access_tokens/self")
-                  if ! echo "$INTROSPECT" | grep -q '"scopes"'; then
-                    INTROSPECT=$(curl -s -H "Authorization: Bearer ${WRITE}" "https://gitlab.com/api/v4/deploy_tokens/self")
-                  fi
-                  echo "WRITE token introspection: ${INTROSPECT}"
-
-                  # If introspection gave us scopes, validate write_package_registry
-                  if echo "$INTROSPECT" | grep -q '"scopes"'; then
-                    if ! echo "$INTROSPECT" | grep -q 'write_package_registry'; then
-                      echo "::error::GITLAB_NPM_WRITE_TOKEN lacks write_package_registry scope. Got: ${INTROSPECT}" ; exit 1
-                    fi
-                    echo "WRITE token: write_package_registry OK (via introspection)"
-                  else
-                    # PyPI POST probe: GitLab validates scope BEFORE content.
-                    # 400 = write_package_registry OK (content missing error, nothing written)
-                    # 403 = lacks write_package_registry
-                    # Non-destructive: nothing is ever created in the registry.
-                    HTTP_WRITE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 -X POST \
-                      -H "Authorization: Bearer ${WRITE}" \
-                      "https://gitlab.com/api/v4/projects/84445653/packages/pypi")
-                    case "$HTTP_WRITE" in
-                      400) echo "WRITE token: write_package_registry OK (PyPI probe HTTP 400 -- nothing created)" ;;
-                      403) echo "::error::GITLAB_NPM_WRITE_TOKEN lacks write_package_registry scope (HTTP 403) -- update deploy token in GitLab" ; exit 1 ;;
-                      404) echo "::error::GITLAB_NPM_WRITE_TOKEN has no visibility to project 84445653 (HTTP 404)" ; exit 1 ;;
-                      401) echo "::error::GITLAB_NPM_WRITE_TOKEN invalid or expired (HTTP 401)" ; exit 1 ;;
-                      *)   echo "::error::GITLAB_NPM_WRITE_TOKEN unexpected HTTP ${HTTP_WRITE}" ; exit 1 ;;
-                    esac
-                  fi
-              env:
-                  GITLAB_NPM_READ_TOKEN: ${{ secrets.GITLAB_NPM_READ_TOKEN }}
-                  GITLAB_NPM_WRITE_TOKEN: ${{ secrets.GITLAB_NPM_WRITE_TOKEN }}
-
-            - name: Configure GitLab npm registry (read -- for npm install)
-              run: |
-                  TOKEN=$(echo "${GITLAB_NPM_READ_TOKEN}" | tr -d '[:space:]')
-                  echo "@wadeck:registry=https:${GITLAB_NPM_REGISTRY_PATH}" >> ~/.npmrc
-                  echo "${GITLAB_NPM_REGISTRY_PATH}:_authToken=${TOKEN}" >> ~/.npmrc
-                  echo "auth-type=legacy" >> ~/.npmrc
-                  echo "=== whoami ===" && curl -s "https:${GITLAB_NPM_REGISTRY_PATH}-/whoami" -H "Authorization: Bearer ${TOKEN}"
-                  echo ""
-              env:
-                  GITLAB_NPM_READ_TOKEN: ${{ secrets.GITLAB_NPM_READ_TOKEN }}
+                  registry-url: 'https://npm.pkg.github.com'
+                  scope: '@wadeck-app'
 
             - name: Install dependencies
-              run: npm install --prefer-offline
+              run: npm ci
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Build TypeScript
               run: npm run build --workspaces --if-present
@@ -131,29 +68,41 @@ jobs:
                     (cd "packages/$pkg" && npm pkg set version="${{ steps.version.outputs.version }}")
                   done
 
-            - name: Configure GitLab npm registry (write -- for npm publish)
-              run: |
-                  TOKEN=$(echo "${GITLAB_NPM_WRITE_TOKEN}" | tr -d '[:space:]')
-                  if [ -z "$TOKEN" ]; then
-                    echo "::error::GITLAB_NPM_WRITE_TOKEN is empty"
-                    exit 1
-                  fi
-                  echo "WRITE token: ${TOKEN:0:9}*** (length: ${#TOKEN})"
-                  echo "@wadeck:registry=https:${GITLAB_NPM_REGISTRY_PATH}" >> ~/.npmrc
-                  echo "${GITLAB_NPM_REGISTRY_PATH}:_authToken=${TOKEN}" >> ~/.npmrc
-                  echo "auth-type=legacy" >> ~/.npmrc
-                  echo "=== .npmrc (token masked) ===" && sed 's/_authToken=.*/_authToken=***/' ~/.npmrc
-                  echo "=== whoami ===" && curl -s "https:${GITLAB_NPM_REGISTRY_PATH}-/whoami" -H "Authorization: Bearer ${TOKEN}"
-                  echo ""
-              env:
-                  GITLAB_NPM_WRITE_TOKEN: ${{ secrets.GITLAB_NPM_WRITE_TOKEN }}
+            - name: Upload artifacts
+              uses: actions/upload-artifact@v4
+              with:
+                  name: flow-cli-packages
+                  path: packages/flow-cli-*
+                  retention-days: 1
+
+    publish:
+        needs: build-and-test
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v5
+
+            - uses: actions/setup-node@v5
+              with:
+                  node-version: '24'
+                  registry-url: 'https://npm.pkg.github.com'
+                  scope: '@wadeck-app'
+
+            - name: Download artifacts
+              uses: actions/download-artifact@v4
+              with:
+                  name: flow-cli-packages
+                  path: packages
 
             - name: Publish platform packages
               run: |
                   for pkg in flow-cli-win32-x64 flow-cli-darwin-arm64 flow-cli-darwin-x64; do
-                    (cd "packages/$pkg" && npm publish --tag ${{ steps.version.outputs.dist_tag }})
+                    (cd "packages/$pkg" && npm publish --tag ${{ needs.build-and-test.outputs.dist_tag }})
                   done
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Publish main package
               working-directory: packages/flow-cli-dist
-              run: npm publish --tag ${{ steps.version.outputs.dist_tag }}
+              run: npm publish --tag ${{ needs.build-and-test.outputs.dist_tag }}
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

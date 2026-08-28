@@ -122,9 +122,13 @@ describe('cli rollback', () => {
 
 		await runCliArgs(['rollback']);
 
-		expect(vi.mocked(cp.execFileSync)).toHaveBeenCalledWith('npm', ['install', '-g', '@wadeck/flow-cli@1.2.3'], {
-			stdio: 'inherit',
-		});
+		expect(vi.mocked(cp.execFileSync)).toHaveBeenCalledWith(
+			'npm',
+			['install', '-g', '@wadeck-app/flow-cli@1.2.3'],
+			{
+				stdio: 'inherit',
+			}
+		);
 		expect(stdoutSpy).toHaveBeenCalledWith('Rolled back to v1.2.3\n');
 		expect(exitSpy).not.toHaveBeenCalled();
 	});

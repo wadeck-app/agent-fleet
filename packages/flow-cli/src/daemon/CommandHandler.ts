@@ -1,4 +1,4 @@
-import type { HookDispatcher } from '@wadeck/shared-cli/HookDispatcher';
+import type { HookDispatcher } from '@wadeck-app/shared-cli/HookDispatcher';
 import type { ApprovalProvider, WorkspaceHandle, WorkspaceProvider } from 'extension-points';
 import { releaseWorkspace } from 'extension-points';
 import { FlowValidator, WorkspaceManager } from 'flow-engine';

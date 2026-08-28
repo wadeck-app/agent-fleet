@@ -8,7 +8,7 @@ const { mockCreateDaemon } = vi.hoisted(() => ({
 	mockCreateDaemon: vi.fn(),
 }));
 
-vi.mock('@wadeck/singleton-daemon-kit', () => ({
+vi.mock('@wadeck-app/singleton-daemon-kit', () => ({
 	createDaemon: mockCreateDaemon,
 	DaemonNotRunningError: class DaemonNotRunningError extends Error {},
 }));

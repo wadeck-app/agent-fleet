@@ -2,7 +2,7 @@
 // This module is bundled separately as flow-updater.cjs.
 // It must NOT import any flow runtime modules (FlowExecutor, StepRunner, etc.)
 // Allowed: node:fs, node:path, node:child_process, node:os, semver
-import { ConfigDir } from '@wadeck/shared-cli/ConfigDir';
+import { ConfigDir } from '@wadeck-app/shared-cli/ConfigDir';
 import { execFile, execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -14,7 +14,7 @@ const execFileAsync = promisify(execFile);
 declare const __FLOW_CLI_VERSION__: string;
 
 // Package name is injected by the caller via env var so the same bundle serves both flow and task.
-const PKG_NAME = process.env['UPDATER_PKG_NAME'] ?? '@wadeck/flow-cli';
+const PKG_NAME = process.env['UPDATER_PKG_NAME'] ?? '@wadeck-app/flow-cli';
 // Duplicate of VersionValidation.VERSION_RE -- kept here because this is a separate bundle (flow-updater.cjs) and cannot share shared-cli at runtime without bundling it in.
 const VERSION_RE = /^\d+\.\d+\.\d+([-+][\w.-]+)?$/;
 

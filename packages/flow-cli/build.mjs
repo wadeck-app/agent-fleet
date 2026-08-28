@@ -13,7 +13,7 @@ const shared = {
 	target: 'node20',
 	format: 'esm',
 	sourcemap: true,
-	external: ['ws', '@wadeck/singleton-daemon-kit', 'js-yaml'],
+	external: ['ws', '@wadeck-app/singleton-daemon-kit', 'js-yaml'],
 };
 
 await esbuild.build({

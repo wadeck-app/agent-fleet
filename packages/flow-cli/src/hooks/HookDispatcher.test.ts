@@ -1,4 +1,4 @@
-import { HookDispatcher } from '@wadeck/shared-cli/HookDispatcher';
+import { HookDispatcher } from '@wadeck-app/shared-cli/HookDispatcher';
 import { execFile } from 'node:child_process';
 import * as http from 'node:http';
 

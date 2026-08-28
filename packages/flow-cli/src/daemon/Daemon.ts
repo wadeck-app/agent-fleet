@@ -1,5 +1,5 @@
-import { type HookConfig, HookDispatcher } from '@wadeck/shared-cli/HookDispatcher';
-import { type DaemonHandle, createDaemon } from '@wadeck/singleton-daemon-kit';
+import { type HookConfig, HookDispatcher } from '@wadeck-app/shared-cli/HookDispatcher';
+import { type DaemonHandle, createDaemon } from '@wadeck-app/singleton-daemon-kit';
 import type { ApprovalProvider, WorkspaceProvider } from 'extension-points';
 import { WorkspaceManager } from 'flow-engine';
 import * as yaml from 'js-yaml';

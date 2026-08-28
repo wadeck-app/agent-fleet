@@ -1,5 +1,5 @@
 // flow cli <subcommand> -- meta-commands for managing the flow CLI itself.
-import { ConfigDir, HookDispatcher, VersionValidation } from '@wadeck/shared-cli';
+import { ConfigDir, HookDispatcher, VersionValidation } from '@wadeck-app/shared-cli';
 import { Command } from 'commander';
 import { FlowExecutor, StepRunner } from 'flow-engine';
 import * as yaml from 'js-yaml';
@@ -18,7 +18,7 @@ import { PluginLoader } from '../../config/PluginLoader.js';
 declare const __FLOW_CLI_VERSION__: string;
 
 const execFileAsync = promisify(execFile);
-const PKG_NAME = '@wadeck/flow-cli';
+const PKG_NAME = '@wadeck-app/flow-cli';
 
 function readChannelFromConfig(): string {
 	try {

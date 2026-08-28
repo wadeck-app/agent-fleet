@@ -2,11 +2,11 @@ Important: Delegate to sub-agents early and often. It reduces the context size a
 
 ## Local setup (one time)
 
-Add to `~/.npmrc` to access `@wadeck` packages from the private GitLab registry:
+Add to `~/.npmrc` to access `@wadeck-app` packages from GitHub Packages:
 
 ```
-@wadeck:registry=https://gitlab.com/api/v4/packages/npm/
-//gitlab.com/api/v4/packages/npm/:_authToken=<GitLab personal access token with read_api scope>
+@wadeck-app:registry=https://npm.pkg.github.com/
+//npm.pkg.github.com/:_authToken=<GitHub personal access token with read:packages scope>
 ```
 
 Then run `npm install` normally.

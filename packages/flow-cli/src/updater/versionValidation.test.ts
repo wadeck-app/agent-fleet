@@ -1,4 +1,4 @@
-import { VersionValidation } from '@wadeck/shared-cli/VersionValidation';
+import { VersionValidation } from '@wadeck-app/shared-cli/VersionValidation';
 
 describe('VersionValidation', () => {
 	describe('VERSION_RE', () => {

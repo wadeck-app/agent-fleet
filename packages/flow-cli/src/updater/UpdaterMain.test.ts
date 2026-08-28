@@ -219,7 +219,7 @@ describe('main', () => {
 	it('already up to date exits without installing', async () => {
 		// npm view returns '1.0.0' which equals __FLOW_CLI_VERSION__ ('1.0.0' from vitest define)
 		mockExecFileSuccess({
-			'npm view @wadeck/flow-cli dist-tags.edge': '1.0.0',
+			'npm view @wadeck-app/flow-cli dist-tags.edge': '1.0.0',
 		});
 
 		await main();
@@ -233,8 +233,8 @@ describe('main', () => {
 
 	it('new version found → installs and writes success state', async () => {
 		mockExecFileSuccess({
-			'npm view @wadeck/flow-cli dist-tags.edge': '9.9.9',
-			'npm install -g @wadeck/flow-cli@9.9.9': '',
+			'npm view @wadeck-app/flow-cli dist-tags.edge': '9.9.9',
+			'npm install -g @wadeck-app/flow-cli@9.9.9': '',
 			'npm root -g': '/usr/local/lib/node_modules',
 		});
 		// Health check (execFileSync) succeeds
@@ -254,10 +254,10 @@ describe('main', () => {
 
 	it('health check fails → rolls back and writes rolled-back state', async () => {
 		mockExecFileSuccess({
-			'npm view @wadeck/flow-cli dist-tags.edge': '9.9.9',
-			'npm install -g @wadeck/flow-cli@9.9.9': '',
+			'npm view @wadeck-app/flow-cli dist-tags.edge': '9.9.9',
+			'npm install -g @wadeck-app/flow-cli@9.9.9': '',
 			// Rollback install also succeeds
-			'npm install -g @wadeck/flow-cli@1.0.0': '',
+			'npm install -g @wadeck-app/flow-cli@1.0.0': '',
 			'npm root -g': '/usr/local/lib/node_modules',
 		});
 		// Health check throws → self-check failed
@@ -315,7 +315,7 @@ describe('main', () => {
 		process.env['UPDATER_FORCE'] = '1';
 		// npm view returns the current version so no install is triggered
 		mockExecFileSuccess({
-			'npm view @wadeck/flow-cli dist-tags.edge': '1.0.0',
+			'npm view @wadeck-app/flow-cli dist-tags.edge': '1.0.0',
 		});
 
 		try {

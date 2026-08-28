@@ -1,3 +1,5 @@
+> **LEGACY — do not extend or maintain. This package is pending removal.**
+
 # legacy-cli
 
 Thin CLI binary (`fleet-task`) for submitting tasks to the orchestrator from the command line.

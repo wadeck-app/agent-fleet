@@ -1,4 +1,4 @@
-import { ConfigDir } from '@wadeck/shared-cli/ConfigDir';
+import { ConfigDir } from '@wadeck-app/shared-cli/ConfigDir';
 import * as os from 'node:os';
 import * as path from 'node:path';
 

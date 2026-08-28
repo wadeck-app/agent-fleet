@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { UpdateManager } from '@wadeck/shared-cli';
-import { createDaemonClient, readPortFile } from '@wadeck/singleton-daemon-kit';
+import { UpdateManager } from '@wadeck-app/shared-cli';
+import { createDaemonClient, readPortFile } from '@wadeck-app/singleton-daemon-kit';
 import { Command } from 'commander';
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -145,7 +145,7 @@ async function main(): Promise<void> {
 	}
 
 	// Show update notice from a previous background update run
-	const updateManager = new UpdateManager('@wadeck/flow-cli');
+	const updateManager = new UpdateManager('@wadeck-app/flow-cli');
 	const updateState = updateManager.readAndClearState();
 	if (updateState?.status === 'success') {
 		process.stderr.write(`[flow] Updated to v${updateState.newVersion}\n`);

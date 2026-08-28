@@ -23,8 +23,8 @@
 		"bundle": "tsx ci/scripts/bundle.ts"
 	},
 	"dependencies": {
-		"@wadeck/shared-cli": "^2026.8.23-006-2d3e15d6",
-		"@wadeck/singleton-daemon-kit": "^2026.8.28-068-4a52b84c",
+		"@wadeck-app/shared-cli": "^2026.8.28-008-4d997192",
+		"@wadeck-app/singleton-daemon-kit": "^2026.8.28-068-4a52b84c",
 		"commander": "^12.1.0",
 		"extension-points": "file:../extension-points",
 		"flow-engine": "file:../flow-engine",
