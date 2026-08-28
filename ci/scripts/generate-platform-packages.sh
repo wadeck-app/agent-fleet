@@ -40,7 +40,7 @@ generate_dist() {
   mkdir -p "$dir/bin"
 
   # Generate bin/${cli}.js from template
-  sed "s/{{CLI_NAME}}/${cli}/g" ci/templates/bin-launcher.js.tmpl > "$dir/bin/${cli}.js"
+  sed -e "s/{{CLI_NAME}}/${cli}/g" -e "s/{{PKG_PREFIX}}/${cli}-cli/g" ci/templates/bin-launcher.js.tmpl > "$dir/bin/${cli}.js"
   chmod +x "$dir/bin/${cli}.js"
   echo "generated $dir/bin/${cli}.js"
 
