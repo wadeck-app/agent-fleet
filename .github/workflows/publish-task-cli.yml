@@ -111,9 +111,7 @@ jobs:
                   BREAKING_INPUT: ${{ github.event.inputs.breaking }}
 
             - name: Bundle
-              run: |
-                  npm run bundle --workspace packages/task-cli
-                  npm run bundle --workspace packages/flow-cli
+              run: npm run bundle --workspace packages/task-cli
               env:
                   BUNDLE_VERSION: ${{ steps.version.outputs.version }}
 

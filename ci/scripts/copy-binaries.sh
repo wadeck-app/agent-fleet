@@ -24,8 +24,7 @@ copy_task() {
   cp "$TASK_LAUNCHER_DIST/task_darwin_amd64_release"  packages/task-cli-darwin-x64/task
   chmod +x packages/task-cli-darwin-arm64/task packages/task-cli-darwin-x64/task
   cp packages/task-cli/dist-bundle/task.cjs           packages/task-cli-dist/task.cjs
-  # task-updater.cjs: shared updater bundle served via UPDATER_PKG_NAME env var.
-  cp packages/flow-cli/dist-bundle/flow-updater.cjs   packages/task-cli-dist/task-updater.cjs
+  cp packages/task-cli/dist-bundle/task-updater.cjs   packages/task-cli-dist/task-updater.cjs
   echo "task artifacts copied"
 }
 
