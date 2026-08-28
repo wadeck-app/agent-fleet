@@ -99,12 +99,6 @@ jobs:
             - name: Build TypeScript
               run: npm run build --workspaces --if-present
 
-            - name: Bundle task CLI
-              run: npm run bundle --workspace packages/task-cli
-
-            - name: Bundle updater
-              run: npm run bundle-updater --workspace packages/flow-cli
-
             - name: Build Go launchers
               run: npm run build-launcher --workspace packages/task-cli
 
@@ -115,6 +109,16 @@ jobs:
                   GITHUB_EVENT_NAME: ${{ github.event_name }}
                   VERSION_INPUT: ${{ github.event.inputs.version }}
                   BREAKING_INPUT: ${{ github.event.inputs.breaking }}
+
+            - name: Bundle task CLI
+              run: npm run bundle --workspace packages/task-cli
+              env:
+                  BUNDLE_VERSION: ${{ steps.version.outputs.version }}
+
+            - name: Bundle updater
+              run: npm run bundle-updater --workspace packages/flow-cli
+              env:
+                  BUNDLE_VERSION: ${{ steps.version.outputs.version }}
 
             - name: Generate platform package directories
               run: bash ci/scripts/generate-platform-packages.sh

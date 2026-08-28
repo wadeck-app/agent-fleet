@@ -11,7 +11,7 @@
 		"build": "tsc --build tsconfig.json",
 		"postbuild": "node -e \"require('fs').copyFileSync('src/worker/mcp-server.cjs','dist/worker/mcp-server.cjs')\"",
 		"pretest": "tsc --build tsconfig.json",
-		"build-launcher": "node scripts/build-launcher.mjs",
+		"build-launcher": "node ci/scripts/build-launcher.mjs",
 		"dev": "tsx src/cli.ts",
 		"test": "vitest run",
 		"test:watch": "vitest",
@@ -19,8 +19,8 @@
 		"lint": "eslint src",
 		"lint:fix": "eslint src --fix",
 		"clean": "rimraf dist",
-		"bundle": "tsx scripts/bundle.ts",
-		"bundle-updater": "tsx scripts/bundle-updater.ts",
+		"bundle": "tsx ci/scripts/bundle.ts",
+		"bundle-updater": "tsx ci/scripts/bundle-updater.ts",
 		"bundle:all": "npm run bundle && npm run bundle-updater"
 	},
 	"dependencies": {
