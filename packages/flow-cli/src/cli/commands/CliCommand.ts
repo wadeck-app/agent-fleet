@@ -319,5 +319,55 @@ export function buildCliCommand(): Command {
 			printSelfCheckResults(results, quiet, version);
 		});
 
+	// flow cli logs [--follow] -- read or tail today's NDJSON log
+	cli.command('logs')
+		.description("Print today's NDJSON log from the flow daemon log directory")
+		.option('--follow', 'Follow the log file (tail -f style)')
+		.action((opts: { follow?: boolean }) => {
+			const logsDir = path.join(ConfigDir.get('flow'), '..', '.flow-daemon', 'logs');
+			const today = new Date().toISOString().slice(0, 10);
+			const logFile = path.join(logsDir, `${today}.ndjson`);
+
+			if (!fs.existsSync(logFile)) {
+				process.stderr.write(`[flow] No log file for today: ${logFile}\n`);
+				return;
+			}
+
+			if (!opts.follow) {
+				process.stdout.write(fs.readFileSync(logFile, 'utf-8'));
+				return;
+			}
+
+			// --follow: print existing content then watch for new bytes
+			process.stderr.write(`[flow] Following ${logFile}\n`);
+			let offset = 0;
+
+			function readNewBytes(): void {
+				try {
+					const stat = fs.statSync(logFile);
+					if (stat.size <= offset) return;
+					const buf = Buffer.alloc(stat.size - offset);
+					const fd = fs.openSync(logFile, 'r');
+					fs.readSync(fd, buf, 0, buf.length, offset);
+					fs.closeSync(fd);
+					offset = stat.size;
+					process.stdout.write(buf.toString('utf-8'));
+				} catch {
+					// ignore transient read errors
+				}
+			}
+
+			// Drain existing content first
+			readNewBytes();
+
+			const watcher = fs.watch(logFile, () => {
+				readNewBytes();
+			});
+			watcher.on('error', err => {
+				process.stderr.write(`[flow] Watch error: ${String(err)}\n`);
+			});
+			// Keep the process alive — user terminates with Ctrl-C
+		});
+
 	return cli;
 }

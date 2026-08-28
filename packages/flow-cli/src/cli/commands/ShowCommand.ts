@@ -197,13 +197,19 @@ export function registerShowCommand(program: Command): void {
 	program
 		.command('show <file>')
 		.description('Display a summary of a flow YAML file')
-		.action((file: string) => {
+		.option('--json', 'Machine-readable JSON output')
+		.action((file: string, opts: { json?: boolean }) => {
 			const raw = loadYaml(file);
 
 			const flow = raw as FlowDefinition;
 			if (!Array.isArray(flow.steps) || !flow.workspace) {
 				console.error(`Invalid flow: missing required fields 'steps' or 'workspace' in ${file}`);
 				process.exit(1);
+			}
+
+			if (opts.json) {
+				process.stdout.write(JSON.stringify(flow) + '\n');
+				return;
 			}
 
 			renderFlow(flow);

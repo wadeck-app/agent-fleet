@@ -161,10 +161,38 @@ export function registerHistoryCommand(program: Command): void {
 		.option('--status <status>', 'Filter by status (completed|failed|running|queued)')
 		.option('--flow <flowId>', 'Filter by flow ID')
 		.option('--id <executionId>', 'Show detail for a specific execution (steps + injected* markers)')
-		.action((opts: { limit?: number; offset?: number; status?: string; flow?: string; id?: string }) => {
-			const daemonDir = path.join(os.homedir(), '.flow-daemon');
-			const executionsDir = path.join(daemonDir, 'executions');
-			const execs = loadExecutions(executionsDir);
-			console.log(buildHistoryTable(execs, opts));
-		});
+		.option('--json', 'Machine-readable JSON output')
+		.action(
+			(opts: {
+				limit?: number;
+				offset?: number;
+				status?: string;
+				flow?: string;
+				id?: string;
+				json?: boolean;
+			}) => {
+				const daemonDir = path.join(os.homedir(), '.flow-daemon');
+				const executionsDir = path.join(daemonDir, 'executions');
+				const execs = loadExecutions(executionsDir);
+
+				if (opts.json) {
+					// Apply same filters as the table view, but output raw records
+					let filtered = execs;
+					if (opts.status) filtered = filtered.filter(e => e.status === opts.status);
+					if (opts.flow) filtered = filtered.filter(e => e.flowId === opts.flow);
+					if (opts.id) {
+						const matches = filtered.filter(e => e.executionId.startsWith(opts.id!));
+						process.stdout.write(JSON.stringify(matches.length === 1 ? matches[0] : matches) + '\n');
+						return;
+					}
+					const limit = opts.limit ?? 20;
+					const offset = opts.offset ?? 0;
+					filtered = filtered.slice(offset, offset + limit);
+					process.stdout.write(JSON.stringify(filtered) + '\n');
+					return;
+				}
+
+				console.log(buildHistoryTable(execs, opts));
+			}
+		);
 }

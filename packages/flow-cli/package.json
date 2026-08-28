@@ -18,7 +18,8 @@
 		"test:coverage": "vitest run --coverage",
 		"lint": "eslint src",
 		"lint:fix": "eslint src --fix",
-		"clean": "rimraf dist",
+		"preversion": "node -e \"if (!process.env.CI) { process.exit(1); }\"",
+		"clean": "rimraf dist dist-bundle",
 		"bundle": "tsx ci/scripts/bundle.ts"
 	},
 	"dependencies": {
