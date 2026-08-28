@@ -71,3 +71,4 @@ _notes.txt
 # Generated entirely by CI — do not commit
 packages/flow-cli-dist/
 packages/task-cli-dist/
+packages/*/dist-bundle/
