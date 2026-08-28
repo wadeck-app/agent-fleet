@@ -67,3 +67,7 @@ _results/
 
 _notes.txt
 *-output.log
+
+# Generated entirely by CI — do not commit
+packages/flow-cli-dist/
+packages/task-cli-dist/

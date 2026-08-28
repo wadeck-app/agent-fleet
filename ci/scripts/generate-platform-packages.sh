@@ -31,3 +31,47 @@ generate "flow-cli-darwin-x64"   "darwin" "x64"   "flow"
 generate "task-cli-win32-x64"    "win32"  "x64"   "task.exe"
 generate "task-cli-darwin-arm64" "darwin" "arm64" "task"
 generate "task-cli-darwin-x64"   "darwin" "x64"   "task"
+
+# Generates the -dist wrapper package (bin launcher + package.json) for a CLI.
+# The .cjs bundles are copied by copy-binaries.sh; this only creates the scaffolding.
+generate_dist() {
+  local cli="$1"
+  local dir="packages/${cli}-cli-dist"
+  mkdir -p "$dir/bin"
+
+  # Generate bin/${cli}.js from template
+  sed "s/{{CLI_NAME}}/${cli}/g" ci/templates/bin-launcher.js.tmpl > "$dir/bin/${cli}.js"
+  chmod +x "$dir/bin/${cli}.js"
+  echo "generated $dir/bin/${cli}.js"
+
+  # Generate package.json (preserves optionalDependencies, files, publishConfig)
+  cat > "$dir/package.json" <<EOF
+{
+	"name": "@wadeck/${cli}-cli",
+	"version": "0.0.0",
+	"private": false,
+	"type": "commonjs",
+	"bin": {
+		"${cli}": "./bin/${cli}.js"
+	},
+	"files": [
+		"bin/",
+		"${cli}.cjs",
+		"${cli}-updater.cjs",
+		"package.json"
+	],
+	"optionalDependencies": {
+		"@wadeck/${cli}-cli-win32-x64": ">=0.0.0-0",
+		"@wadeck/${cli}-cli-darwin-arm64": ">=0.0.0-0",
+		"@wadeck/${cli}-cli-darwin-x64": ">=0.0.0-0"
+	},
+	"publishConfig": {
+		"@wadeck:registry": "${REGISTRY}"
+	}
+}
+EOF
+  echo "generated $dir/package.json"
+}
+
+generate_dist "flow"
+generate_dist "task"
