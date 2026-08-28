@@ -19,9 +19,7 @@
 		"lint": "eslint src",
 		"lint:fix": "eslint src --fix",
 		"clean": "rimraf dist",
-		"bundle": "tsx ci/scripts/bundle.ts",
-		"bundle-updater": "tsx ci/scripts/bundle-updater.ts",
-		"bundle:all": "npm run bundle && npm run bundle-updater"
+		"bundle": "tsx ci/scripts/bundle.ts"
 	},
 	"dependencies": {
 		"@wadeck/shared-cli": "^2026.8.23-006-2d3e15d6",
