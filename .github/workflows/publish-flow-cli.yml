@@ -21,6 +21,9 @@ permissions:
 jobs:
     build-and-test:
         runs-on: ubuntu-latest
+        outputs:
+            dist_tag: ${{ steps.version.outputs.dist_tag }}
+            version: ${{ steps.version.outputs.version }}
         steps:
             - uses: actions/checkout@v5
               with:
