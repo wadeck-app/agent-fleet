@@ -57,7 +57,7 @@ function runFlow(args: string[], extraEnv: Record<string, string> = {}): ReturnT
 describe('flow cli self-check -- no duplicate output', () => {
 	it('each [ok] line appears exactly once in combined stdout+stderr', () => {
 		const result = runFlow(['cli', 'self-check']);
-		const combined = (String(result.stdout ?? '')) + (String(result.stderr ?? ''));
+		const combined = String(result.stdout ?? '') + String(result.stderr ?? '');
 		const lines = combined.split('\n').filter((l: string) => l.trim().length > 0);
 
 		// Count occurrences of each non-empty line
@@ -99,7 +99,10 @@ describe('flow cli update -- produces output', () => {
 			});
 			const combined = (result.stdout ?? '') + (result.stderr ?? '');
 			// Must produce at least one line of output
-			expect(combined.trim().length, `Expected output from updater but got none. stdout: "${result.stdout}" stderr: "${result.stderr}"`).toBeGreaterThan(0);
+			expect(
+				combined.trim().length,
+				`Expected output from updater but got none. stdout: "${result.stdout}" stderr: "${result.stderr}"`
+			).toBeGreaterThan(0);
 		} finally {
 			try {
 				fs.rmSync(tmpDir, { recursive: true, force: true });

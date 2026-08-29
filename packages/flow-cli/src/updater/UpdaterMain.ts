@@ -316,7 +316,9 @@ export async function main(): Promise<void> {
 			// Self-check failed -- roll back
 			const msg = healthErr instanceof Error ? healthErr.message : String(healthErr);
 			if (force) {
-				process.stderr.write(`[flow] Update to v${latestVersion} failed (self-check failed). Rolling back...\n`);
+				process.stderr.write(
+					`[flow] Update to v${latestVersion} failed (self-check failed). Rolling back...\n`
+				);
 			}
 			try {
 				await execFileAsync('npm', ['install', '-g', `${PKG_NAME}@${currentVersion}`], { timeout: 120000 });

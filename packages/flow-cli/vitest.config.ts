@@ -27,8 +27,14 @@ export default defineConfig({
 		environment: 'node',
 		include: ['src/**/*.test.ts'],
 		exclude: ['**/node_modules/**', '**/dist/**'],
-		mockReset: true, // implies clearMocks — no need to set both
+		mockReset: true,
 		restoreMocks: true,
+		server: {
+			deps: {
+				// Inline @wadeck-app/shared-cli so vi.mock('node:child_process') penetrates it
+				inline: ['@wadeck-app/shared-cli'],
+			},
+		},
 	},
 	resolve: {
 		alias: {
