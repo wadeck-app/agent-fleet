@@ -190,6 +190,13 @@ async function main(): Promise<void> {
 	program.addCommand(buildCliCommand());
 	await registerDaemonCommands(program);
 
+	// Catch unknown top-level commands (must be registered after all addCommand calls, before parseAsync)
+	program.on('command:*', (operands: string[]) => {
+		process.stderr.write(`[flow] Unknown command: ${(operands as string[]).join(' ')}\n`);
+		process.stderr.write(`       Run: flow --help\n`);
+		process.exit(1);
+	});
+
 	// Schedule background updater even when a command throws
 	const bundlePath = process.env['LAUNCHER_BUNDLE_OVERRIDE'] ?? fileURLToPath(import.meta.url);
 	try {

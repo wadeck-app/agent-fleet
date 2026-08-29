@@ -226,6 +226,9 @@ export async function main(): Promise<void> {
 		} catch (err: unknown) {
 			const msg = err instanceof Error ? err.message : String(err);
 			const reason = msg.includes('EUNAUTHORIZED') || msg.includes('401') ? 'auth' : 'network';
+			if (force) {
+				process.stderr.write(`[flow] Update check failed (${reason}). Run: flow cli update --log\n`);
+			}
 			writeState(statePath, { status: 'update-failed', reason, timestamp });
 			appendLog(logFile, `Update check failed: ${msg}`);
 			return;
@@ -233,6 +236,9 @@ export async function main(): Promise<void> {
 
 		// Step 5: Validate version string
 		if (!VERSION_RE.test(latestVersion)) {
+			if (force) {
+				process.stderr.write(`[flow] Update check failed (invalid-version). Run: flow cli update --log\n`);
+			}
 			writeState(statePath, { status: 'update-failed', reason: 'invalid-version', timestamp });
 			return;
 		}
@@ -247,10 +253,16 @@ export async function main(): Promise<void> {
 		}
 
 		if (semverLte(latestVersion, currentVersion)) {
+			if (force) {
+				process.stdout.write(`[flow] Already up to date (v${currentVersion})\n`);
+			}
 			return;
 		}
 
 		// Step 7: Apply update
+		if (force) {
+			process.stdout.write(`[flow] Updating from v${currentVersion} to v${latestVersion}...\n`);
+		}
 		writeState(statePath, {
 			status: 'applying',
 			previousVersion: currentVersion,
@@ -263,6 +275,9 @@ export async function main(): Promise<void> {
 		} catch (err: unknown) {
 			const msg = err instanceof Error ? err.message : String(err);
 			const reason = msg.includes('EUNAUTHORIZED') || msg.includes('401') ? 'auth' : 'install-failed';
+			if (force) {
+				process.stderr.write(`[flow] Update to v${latestVersion} failed: ${reason}\n`);
+			}
 			writeState(statePath, {
 				status: 'update-failed',
 				reason,
@@ -288,6 +303,9 @@ export async function main(): Promise<void> {
 				env: { ...process.env, CLI_SELF_CHECK_QUIET: '1' },
 			});
 			// Self-check passed
+			if (force) {
+				process.stdout.write(`[flow] Updated to v${latestVersion}\n`);
+			}
 			writeState(statePath, {
 				status: 'success',
 				newVersion: latestVersion,
@@ -297,6 +315,9 @@ export async function main(): Promise<void> {
 		} catch (healthErr: unknown) {
 			// Self-check failed -- roll back
 			const msg = healthErr instanceof Error ? healthErr.message : String(healthErr);
+			if (force) {
+				process.stderr.write(`[flow] Update to v${latestVersion} failed (self-check failed). Rolling back...\n`);
+			}
 			try {
 				await execFileAsync('npm', ['install', '-g', `${PKG_NAME}@${currentVersion}`], { timeout: 120000 });
 			} catch {

@@ -188,14 +188,10 @@ function printSelfCheckResults(results: CheckResult[], quiet: boolean, version: 
 	if (!quiet) {
 		for (const result of results) {
 			if (result.passed) {
-				// Write to both stdout and stderr so output is visible even when the Go launcher
-				// is compiled with -H windowsgui and stdout is not connected to a terminal.
 				process.stdout.write(`[ok] ${result.name}\n`);
-				process.stderr.write(`[ok] ${result.name}\n`);
 			} else {
 				const line = `[fail] ${result.name}${result.error !== undefined ? ` -- ${result.error}` : ''}\n`;
 				process.stdout.write(line);
-				process.stderr.write(line);
 			}
 		}
 	}
@@ -203,13 +199,11 @@ function printSelfCheckResults(results: CheckResult[], quiet: boolean, version: 
 	if (failedCount === 0) {
 		if (!quiet) {
 			process.stdout.write(`All checks passed. flow v${version}\n`);
-			process.stderr.write(`All checks passed. flow v${version}\n`);
 		}
 	} else {
 		if (!quiet) {
 			const summary = `Self-check failed (${failedCount}/${results.length} checks failed). Run: flow cli update --log\n`;
 			process.stdout.write(summary);
-			process.stderr.write(summary);
 		}
 		process.exit(1);
 	}
