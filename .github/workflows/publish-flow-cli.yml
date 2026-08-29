@@ -115,7 +115,7 @@ jobs:
                   VER="${{ needs.build-and-test.outputs.version }}"
                   for pkg in flow-cli-win32-x64 flow-cli-darwin-arm64 flow-cli-darwin-x64 flow-cli-dist; do
                     PKG=$(node -e "process.stdout.write(require('./packages/${pkg}/package.json').name)")
-                    npm dist-tag add "${PKG}@${VER}" latest
+                    npm dist-tag add "${PKG}@${VER}" latest --registry https://npm.pkg.github.com/
                   done
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
