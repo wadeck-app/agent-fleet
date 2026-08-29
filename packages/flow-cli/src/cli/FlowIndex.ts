@@ -164,9 +164,9 @@ async function main(): Promise<void> {
 		return;
 	}
 
-	// Log every CLI invocation to today's NDJSON so all commands are traceable
+	// Log every CLI invocation to ~/.config/flow/logs/YYYY-MM-DD.ndjson
 	try {
-		const logsDir = path.join(DAEMON_DIR, 'logs');
+		const logsDir = path.join(ConfigDir.get('flow'), 'logs');
 		const args = process.argv.slice(2);
 		writeDaemonLog(logsDir, 'info', `cmd: flow ${args.join(' ')}`);
 	} catch {
@@ -208,7 +208,7 @@ async function main(): Promise<void> {
 		.description("Alias for: flow cli logs  (print today's daemon log)")
 		.option('--follow', 'Follow the log file (tail -f style)')
 		.action((opts: { follow?: boolean }) => {
-			const logsDir = path.join(ConfigDir.get('flow'), '..', '.flow-daemon', 'logs');
+			const logsDir = path.join(ConfigDir.get('flow'), 'logs');
 			const today = new Date().toISOString().slice(0, 10);
 			const logFile = path.join(logsDir, `${today}.ndjson`);
 

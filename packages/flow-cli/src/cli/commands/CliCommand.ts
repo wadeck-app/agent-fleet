@@ -322,7 +322,7 @@ export function buildCliCommand(): Command {
 		.description("Print today's NDJSON log from the flow daemon log directory")
 		.option('--follow', 'Follow the log file (tail -f style)')
 		.action((opts: { follow?: boolean }) => {
-			const logsDir = path.join(ConfigDir.get('flow'), '..', '.flow-daemon', 'logs');
+			const logsDir = path.join(ConfigDir.get('flow'), 'logs');
 			const today = new Date().toISOString().slice(0, 10);
 			const logFile = path.join(logsDir, `${today}.ndjson`);
 
