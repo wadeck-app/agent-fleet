@@ -20,6 +20,11 @@ Raising an excluded item as a requirement is a change-of-scope conversation, not
 **Reason:** violations-framework does not listen to `beforeStepEnd` directly. That is the policy-engine's role -- it decides whether to inject a violations-check step. violations-framework is a tool that runs when invoked, not a queue subscriber.
 **Decision:** Clarified during inventory session 2026-08-28.
 
+### Authentication between producers and daemon
+
+**Reason:** All processes run as the same local OS user. If a process has local access, it has access to everything regardless -- same threat surface as wdrive, flow-cli daemon, orchestrator. No token or auth mechanism needed.
+**Decision:** Threat model decision 2026-08-28.
+
 ### Web UI for hook/subscription management
 
 **Reason:** Out of scope for v1. Subscriptions are configured via config files, not a UI.
