@@ -22,6 +22,8 @@ export function readBaseVersion(): string {
 	return `${date}-${time}-${count}-${hash}`;
 }
 
-// In CI this file is replaced before bundling with generated constants:
-//   export const VERSION = '2026.08.28-356-c3418bea';
-export const VERSION: string = readBaseVersion();
+// Injected by esbuild at bundle time via define; falls back to readBaseVersion() in dev mode (tsx).
+declare const __FLOW_CLI_VERSION__: string | undefined;
+
+export const VERSION: string =
+	typeof __FLOW_CLI_VERSION__ !== 'undefined' && __FLOW_CLI_VERSION__ ? __FLOW_CLI_VERSION__ : readBaseVersion();
