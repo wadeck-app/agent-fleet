@@ -44,7 +44,7 @@ type ExecFileCb = (err: Error | null, result?: { stdout: string; stderr: string 
 function mockExecFileSuccess(stdoutByKey: Record<string, string>): void {
 	vi.mocked(execFile).mockImplementation(((...args: unknown[]) => {
 		const cb = args.at(-1) as ExecFileCb;
-		const cmd = args[0] as string;
+		const cmd = (args[0] as string).replace(/\.cmd$/, ''); // normalize npm.cmd → npm on Windows
 		const argv = (args[1] as string[] | undefined) ?? [];
 		const key = [cmd, ...argv].join(' ');
 		const stdout = stdoutByKey[key] ?? stdoutByKey['*'] ?? '';
