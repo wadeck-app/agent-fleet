@@ -191,7 +191,7 @@ function printSelfCheckResults(results: CheckResult[], quiet: boolean, version: 
 				process.stdout.write(`[ok] ${result.name}\n`);
 			} else {
 				process.stdout.write(
-					`[FAIL] ${result.name}${result.error !== undefined ? ` -- ${result.error}` : ''}\n`
+					`[fail] ${result.name}${result.error !== undefined ? ` -- ${result.error}` : ''}\n`
 				);
 			}
 		}
