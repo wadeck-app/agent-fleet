@@ -31,12 +31,12 @@ function execNpm(args: string[], opts: { timeout: number }): Promise<{ stdout: s
 function readChannelFromConfig(): string {
 	try {
 		const configFile = path.join(ConfigDir.get('flow'), 'config.yml');
-		if (!fs.existsSync(configFile)) return 'edge';
+		if (!fs.existsSync(configFile)) return 'latest';
 		const raw = fs.readFileSync(configFile, 'utf-8');
 		const match = /^\s*channel:\s*['"]?(\S+?)['"]?\s*$/m.exec(raw);
-		return match?.[1] ?? 'edge';
+		return match?.[1] ?? 'latest';
 	} catch {
-		return 'edge';
+		return 'latest';
 	}
 }
 

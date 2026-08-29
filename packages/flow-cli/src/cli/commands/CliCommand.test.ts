@@ -62,13 +62,13 @@ describe('readChannelFromConfig (via cli update --check)', () => {
 		vi.restoreAllMocks();
 	});
 
-	it('returns edge when config file does not exist', async () => {
+	it('returns latest when config file does not exist', async () => {
 		vi.mocked(fs.existsSync).mockReturnValue(false);
 		mockExecFileSuccess('9.9.9\n');
 
 		await runCliArgs(['update', '--check']);
 
-		expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('Available (edge):'));
+		expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('Available (latest):'));
 		expect(exitSpy).not.toHaveBeenCalled();
 	});
 
@@ -83,7 +83,7 @@ describe('readChannelFromConfig (via cli update --check)', () => {
 		expect(exitSpy).not.toHaveBeenCalled();
 	});
 
-	it('returns edge on readFileSync error', async () => {
+	it('returns latest on readFileSync error', async () => {
 		vi.mocked(fs.existsSync).mockReturnValue(true);
 		vi.mocked(fs.readFileSync).mockImplementation(() => {
 			throw new Error('permission denied');
@@ -92,7 +92,7 @@ describe('readChannelFromConfig (via cli update --check)', () => {
 
 		await runCliArgs(['update', '--check']);
 
-		expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('Available (edge):'));
+		expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('Available (latest):'));
 		expect(exitSpy).not.toHaveBeenCalled();
 	});
 });
