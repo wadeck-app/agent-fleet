@@ -1,6 +1,6 @@
 import { execSync } from 'node:child_process';
 
-function readBaseVersion(): string {
+export function readBaseVersion(): string {
 	const now = new Date();
 	const pad2 = (n: number) => String(n).padStart(2, '0');
 	const date = `${now.getFullYear()}.${pad2(now.getMonth() + 1)}.${pad2(now.getDate())}`;
@@ -8,12 +8,14 @@ function readBaseVersion(): string {
 	let count = '0';
 	let hash = 'DEV';
 	try {
-		count = execSync('git rev-list --count HEAD', { encoding: 'utf8' }).trim();
+		// stdio: pipe suppresses git's "fatal: not a git repository" from reaching the user's stderr
+		count = execSync('git rev-list --count HEAD', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
 	} catch {
 		/* not a git repo */
 	}
 	try {
-		hash = execSync('git rev-parse --short=8 HEAD', { encoding: 'utf8' }).trim();
+		// stdio: pipe suppresses git's "fatal: not a git repository" from reaching the user's stderr
+		hash = execSync('git rev-parse --short=8 HEAD', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
 	} catch {
 		/* not a git repo */
 	}

@@ -135,12 +135,29 @@ async function registerDaemonCommands(program: Command): Promise<void> {
 		});
 }
 
+async function printDaemonPid(): Promise<void> {
+	const client = createDaemonClient({ configDir: DAEMON_DIR, commands: {} });
+	try {
+		const info = await client.version();
+		process.stdout.write(`pid=${info.pid}\n`);
+	} catch {
+		process.stdout.write('[fail] daemon not running\n');
+		process.exit(2);
+	}
+}
+
 async function main(): Promise<void> {
 	// Daemon-only mode: spawned by `flow start`, keeps the daemon running without any CLI command.
 	if (process.env['FLOW_DAEMON_MODE'] === '1') {
 		const config = FlowConfigLoader.load(path.join(os.homedir(), '.flow-config.yaml'));
 		await Daemon.start(config, DAEMON_DIR);
 		// Event loop drains naturally when the daemon shuts down (via /quit or SIGTERM).
+		return;
+	}
+
+	// Handle --pid before Commander parsing: exit early with daemon PID
+	if (process.argv.slice(2).includes('--pid')) {
+		await printDaemonPid();
 		return;
 	}
 
@@ -161,6 +178,8 @@ async function main(): Promise<void> {
 
 	const program = new Command();
 	program.name('flow').version(VERSION).description('CLI for running and validating agent flows');
+	// Register --pid as a documented option (handled before parseAsync above)
+	program.option('--pid', 'Show the daemon PID and exit');
 	program.addHelpText('after', EXIT_CODES_TEXT);
 
 	registerDocsCommand(program);

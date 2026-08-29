@@ -192,4 +192,25 @@ describe('cli self-check', () => {
 		expect(stdoutSpy).not.toHaveBeenCalled();
 		expect(exitSpy).not.toHaveBeenCalled();
 	});
+
+	it('writes [ok] lines to both stdout and stderr so output is visible through the Go launcher', async () => {
+		const stdoutLines: string[] = [];
+		const stderrLines: string[] = [];
+		vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+			stdoutLines.push(String(chunk));
+			return true;
+		});
+		vi.spyOn(process.stderr, 'write').mockImplementation((chunk: unknown) => {
+			stderrLines.push(String(chunk));
+			return true;
+		});
+
+		await runCliArgs(['self-check']);
+
+		const stdoutHasOk = stdoutLines.some(l => l.includes('[ok]'));
+		const stderrHasOk = stderrLines.some(l => l.includes('[ok]'));
+		expect(stdoutHasOk).toBe(true);
+		expect(stderrHasOk).toBe(true);
+		expect(exitSpy).not.toHaveBeenCalled();
+	});
 });
