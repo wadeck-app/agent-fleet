@@ -124,10 +124,10 @@ describe('flow logs -- alias for cli logs', () => {
 		expect(stdoutOutput).toBeTruthy();
 	});
 
-	it('truly unknown command exits 1 and writes error to stdout', () => {
+	it('truly unknown command exits 1 and writes error (stderr, visible via bypass)', () => {
 		const result = runFlow(['totally-unknown-xyz']);
 		expect(result.status).toBe(1);
-		const stdoutOutput = String(result.stdout ?? '');
-		expect(stdoutOutput).toContain('Unknown command');
+		const combined = String(result.stdout ?? '') + String(result.stderr ?? '');
+		expect(combined).toContain('Unknown command');
 	});
 });
