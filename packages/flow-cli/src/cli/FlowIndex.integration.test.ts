@@ -113,12 +113,21 @@ describe('flow cli update -- produces output', () => {
 	});
 });
 
-describe('flow logs -- unknown command error', () => {
-	it('exits with code 1 and reports Unknown command on stderr', () => {
+describe('flow logs -- alias for cli logs', () => {
+	it('exits 0 and reports log file status on stdout (no longer unknown command)', () => {
+		// 'flow logs' is now a registered top-level alias for 'flow cli logs'.
+		// It exits 0 regardless of whether a log file exists.
 		const result = runFlow(['logs']);
+		expect(result.status).toBe(0);
+		const stdoutOutput = String(result.stdout ?? '');
+		// Either shows log content or "No log file for today" message
+		expect(stdoutOutput).toBeTruthy();
+	});
+
+	it('truly unknown command exits 1 and writes error to stdout', () => {
+		const result = runFlow(['totally-unknown-xyz']);
 		expect(result.status).toBe(1);
-		const stderrOutput = result.stderr ?? '';
-		expect(stderrOutput).toContain('Unknown command');
-		expect(stderrOutput).toContain('logs');
+		const stdoutOutput = String(result.stdout ?? '');
+		expect(stdoutOutput).toContain('Unknown command');
 	});
 });
