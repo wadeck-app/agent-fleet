@@ -10,7 +10,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { FlowConfigLoader } from '../config/FlowConfig.js';
-import { Daemon } from '../daemon/Daemon.js';
+import { Daemon, writeDaemonLog } from '../daemon/Daemon.js';
 import { buildCliCommand } from './commands/CliCommand.js';
 import { registerDocsCommand } from './commands/DocsCommand';
 import { registerHistoryCommand } from './commands/HistoryCommand';
@@ -162,6 +162,15 @@ async function main(): Promise<void> {
 	if (process.argv.slice(2).includes('--pid')) {
 		await printDaemonPid();
 		return;
+	}
+
+	// Log every CLI invocation to today's NDJSON so all commands are traceable
+	try {
+		const logsDir = path.join(DAEMON_DIR, 'logs');
+		const args = process.argv.slice(2);
+		writeDaemonLog(logsDir, 'info', `cmd: flow ${args.join(' ')}`);
+	} catch {
+		// never block the CLI on logging failure
 	}
 
 	// Show update notice from a previous background update run
