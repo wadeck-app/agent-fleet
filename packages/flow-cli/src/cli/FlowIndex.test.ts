@@ -37,7 +37,9 @@ describe('unknown command handler', () => {
 			timeout: 30000,
 			env: { ...process.env },
 		});
-		expect(result.stdout).toContain('[flow] Unknown command: totally-unknown-xyz');
+		// Unknown command error goes to stderr (bin-launcher bypass ensures stderr reaches terminal)
+		const combined = (result.stdout ?? '') + (result.stderr ?? '');
+		expect(combined).toContain('[flow] Unknown command: totally-unknown-xyz');
 		expect(result.status).toBe(1);
 	});
 
