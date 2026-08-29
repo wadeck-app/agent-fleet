@@ -20,6 +20,13 @@ declare const __FLOW_CLI_VERSION__: string;
 const execFileAsync = promisify(execFile);
 const PKG_NAME = '@wadeck-app/flow-cli';
 
+const NPM_CLI_JS = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+const USE_NPM_CLI = fs.existsSync(NPM_CLI_JS);
+function execNpm(args: string[], opts: { timeout: number }): Promise<{ stdout: string }> {
+	if (USE_NPM_CLI) return execFileAsync(process.execPath, [NPM_CLI_JS, ...args], opts);
+	return execFileAsync('npm', args, opts);
+}
+
 function readChannelFromConfig(): string {
 	try {
 		const configFile = path.join(ConfigDir.get('flow'), 'config.yml');
@@ -42,7 +49,7 @@ function getCurrentVersion(): string {
 }
 
 async function fetchLatestVersion(channel: string): Promise<string> {
-	const { stdout } = await execFileAsync('npm', ['view', PKG_NAME, `dist-tags.${channel}`], { timeout: 15000 });
+	const { stdout } = await execNpm(['view', PKG_NAME, `dist-tags.${channel}`], { timeout: 15000 });
 	return stdout.trim();
 }
 
@@ -298,7 +305,7 @@ export function buildCliCommand(): Command {
 				process.exit(1);
 				return;
 			}
-			execFileSync('npm', ['install', '-g', `${PKG_NAME}@${previousVersion}`], { stdio: 'inherit' });
+			execFileSync(USE_NPM_CLI ? process.execPath : 'npm', USE_NPM_CLI ? [NPM_CLI_JS, 'install', '-g', `${PKG_NAME}@${previousVersion}`] : ['install', '-g', `${PKG_NAME}@${previousVersion}`], { stdio: 'inherit' });
 			process.stdout.write(`Rolled back to v${previousVersion}\n`);
 			try {
 				fs.unlinkSync(stateFile);
@@ -320,7 +327,7 @@ export function buildCliCommand(): Command {
 	// flow cli logs [--follow] -- read or tail today's NDJSON log
 	cli.command('logs')
 		.description("Print today's NDJSON log from the flow daemon log directory")
-		.option('--follow', 'Follow the log file (tail -f style)')
+		.option('-f, --follow', 'Follow the log file (tail -f style)')
 		.action((opts: { follow?: boolean }) => {
 			const logsDir = path.join(ConfigDir.get('flow'), 'logs');
 			const today = new Date().toISOString().slice(0, 10);
