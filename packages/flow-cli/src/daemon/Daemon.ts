@@ -18,6 +18,19 @@ import { CommandHandler } from './CommandHandler';
 import { WebSocketServer } from './WebSocketServer';
 import { WorkerPool } from './WorkerPool';
 
+// Exported for testing. Writes a single NDJSON daemon lifecycle entry to logsDir.
+export function writeDaemonLog(logsDir: string, level: 'info' | 'error', msg: string): void {
+	const today = new Date().toISOString().slice(0, 10);
+	const line = JSON.stringify({ ts: new Date().toISOString(), level, msg }) + '\n';
+	const filePath = path.join(logsDir, `${today}.ndjson`);
+	try {
+		fs.mkdirSync(logsDir, { recursive: true });
+		fs.appendFileSync(filePath, line, 'utf8');
+	} catch (err) {
+		process.stderr.write(`[daemon] Failed to write daemon log: ${String(err)}\n`);
+	}
+}
+
 function resolveClaudePath(): string {
 	try {
 		const cmd = process.platform === 'win32' ? 'where.exe claude' : 'which claude';
@@ -95,6 +108,7 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 			onStart: (port: number) => {
 				fs.mkdirSync(executionsDir, { recursive: true, mode: 0o700 });
 				fs.mkdirSync(logsDir, { recursive: true, mode: 0o700 });
+				writeDaemonLog(logsDir, 'info', 'Daemon started');
 
 				const wsPort = config.worker.wsPort ?? port + 1;
 				executionStore = new ExecutionStore(executionsDir, config.logs.retainDays);
@@ -106,6 +120,9 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 					config.workspace.maxWorkspaces
 				);
 				const claudePath = resolveClaudePath();
+				if (!claudePath) {
+					writeDaemonLog(logsDir, 'error', 'claude binary not found on PATH - model steps may fail');
+				}
 				wsServer = new WebSocketServer(wsPort, handleWorkerMessage, handleWorkerClose);
 				// Fire-and-forget: start() retries on EADDRINUSE (TIME_WAIT). Workers read port
 				// lazily via getter — they are only spawned after tryDispatch(), which happens
@@ -169,6 +186,7 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 					commandHandler.tryDispatch();
 				} catch (err) {
 					process.stderr.write(`[daemon] step_completed handler error: ${String(err)}\n`);
+					writeDaemonLog(logsDir, 'error', `step_completed handler error: ${String(err)}`);
 				}
 				break;
 			}
@@ -182,6 +200,7 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 					commandHandler.dispatchHook(executionId, 'onStepFailed', { executionId, stepId, error });
 				} catch (err) {
 					process.stderr.write(`[daemon] step_failed handler error: ${String(err)}\n`);
+					writeDaemonLog(logsDir, 'error', `step_failed handler error: ${String(err)}`);
 				}
 				break;
 			}
@@ -227,6 +246,7 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 		if (commandHandler.isQueueEmpty() && !commandHandler.hasActiveExecutions() && !workerPool.hasActiveWorkers()) {
 			workerPool.broadcastDone();
 			wsServer.close();
+			writeDaemonLog(logsDir, 'info', 'Daemon stopped (idle)');
 			void daemonHandle.stop('idle');
 		}
 	}

@@ -24,6 +24,43 @@ function resolveTsx(): string | undefined {
 	}
 }
 
+describe('unknown command handler', () => {
+	it('unknown command writes to stdout', () => {
+		const tsxPath = resolveTsx();
+		if (!tsxPath) {
+			console.warn('tsx not found — skipping unknown command integration test');
+			return;
+		}
+
+		const result = spawnSync(process.execPath, [tsxPath, flowIndexPath, 'totally-unknown-xyz'], {
+			encoding: 'utf8',
+			timeout: 30000,
+			env: { ...process.env },
+		});
+		expect(result.stdout).toContain('[flow] Unknown command: totally-unknown-xyz');
+		expect(result.status).toBe(1);
+	});
+
+	it('flow logs command exists and writes to stdout (not silence)', () => {
+		const tsxPath = resolveTsx();
+		if (!tsxPath) {
+			console.warn('tsx not found — skipping flow logs integration test');
+			return;
+		}
+
+		// flow logs with no log file should write SOMETHING to stdout (not silence)
+		const result = spawnSync(process.execPath, [tsxPath, flowIndexPath, 'logs'], {
+			encoding: 'utf8',
+			timeout: 30000,
+			env: { ...process.env },
+		});
+		// The "no log file" message should appear on stdout (not just stderr)
+		expect(result.stdout).toContain('[flow]');
+		// Should NOT exit with code 1 (unknown command)
+		expect(result.status).not.toBe(1);
+	});
+});
+
 describe('flow --pid', () => {
 	it('does not crash with "unknown option --pid"', () => {
 		const tsxPath = resolveTsx();

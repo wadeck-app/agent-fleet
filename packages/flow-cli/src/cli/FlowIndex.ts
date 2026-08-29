@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { UpdateManager } from '@wadeck-app/shared-cli';
+import { ConfigDir, UpdateManager } from '@wadeck-app/shared-cli';
 import { createDaemonClient, readPortFile } from '@wadeck-app/singleton-daemon-kit';
 import { Command } from 'commander';
 import { spawn } from 'node:child_process';
@@ -26,7 +26,10 @@ Exit codes:
   2  daemon not running
   3  not found`;
 
-const DAEMON_DIR = path.join(os.homedir(), '.flow-daemon');
+// NOTE: Path changed from ~/.flow-daemon to ~/.config/.flow-daemon to match what
+// `flow cli logs` reads (via ConfigDir.get('flow') + '../.flow-daemon').
+// Existing users who had logs in ~/.flow-daemon will need to move them manually.
+const DAEMON_DIR = path.join(os.homedir(), '.config', '.flow-daemon');
 
 // ---------------------------------------------------------------------------
 // Daemon lifecycle commands
@@ -190,10 +193,60 @@ async function main(): Promise<void> {
 	program.addCommand(buildCliCommand());
 	await registerDaemonCommands(program);
 
+	// Top-level alias for `flow cli logs`
+	program
+		.command('logs')
+		.description("Alias for: flow cli logs  (print today's daemon log)")
+		.option('--follow', 'Follow the log file (tail -f style)')
+		.action((opts: { follow?: boolean }) => {
+			const logsDir = path.join(ConfigDir.get('flow'), '..', '.flow-daemon', 'logs');
+			const today = new Date().toISOString().slice(0, 10);
+			const logFile = path.join(logsDir, `${today}.ndjson`);
+
+			if (!fs.existsSync(logFile)) {
+				// Write to stdout (not just stderr) so it's visible through -H windowsgui launchers
+				process.stdout.write(`[flow] No log file for today: ${logFile}\n`);
+				return;
+			}
+
+			if (!opts.follow) {
+				process.stdout.write(fs.readFileSync(logFile, 'utf-8'));
+				return;
+			}
+
+			process.stderr.write(`[flow] Following ${logFile}\n`);
+			let offset = 0;
+
+			function readNewBytes(): void {
+				try {
+					const stat = fs.statSync(logFile);
+					if (stat.size <= offset) return;
+					const buf = Buffer.alloc(stat.size - offset);
+					const fd = fs.openSync(logFile, 'r');
+					fs.readSync(fd, buf, 0, buf.length, offset);
+					fs.closeSync(fd);
+					offset = stat.size;
+					process.stdout.write(buf.toString('utf-8'));
+				} catch {
+					// ignore transient read errors
+				}
+			}
+
+			readNewBytes();
+
+			const watcher = fs.watch(logFile, () => {
+				readNewBytes();
+			});
+			watcher.on('error', (err: Error) => {
+				process.stderr.write(`[flow] Watch error: ${String(err)}\n`);
+			});
+		});
+
 	// Catch unknown top-level commands (must be registered after all addCommand calls, before parseAsync)
 	program.on('command:*', (operands: string[]) => {
-		process.stderr.write(`[flow] Unknown command: ${(operands as string[]).join(' ')}\n`);
-		process.stderr.write(`       Run: flow --help\n`);
+		const msg = `[flow] Unknown command: ${(operands as string[]).join(' ')}\n       Run: flow --help\n`;
+		process.stderr.write(msg);
+		process.stdout.write(msg);
 		process.exit(1);
 	});
 
