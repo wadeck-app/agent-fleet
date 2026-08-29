@@ -9,10 +9,10 @@ import * as path from 'node:path';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
-// On Windows, npm is a .cmd script -- execFile without shell:true cannot find it.
-const NPM_CMD = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-// On Windows, .cmd scripts also need shell:true to be invoked via CreateProcess.
-const NPM_SHELL = process.platform === 'win32' ? { shell: true as const } : {};
+// Use node + npm-cli.js directly to avoid DEP0190 deprecation warning (shell:true + args).
+// npm-cli.js is co-located with node.exe in the npm global installation.
+const NPM_CLI_JS = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+const USE_NPM_CLI = fs.existsSync(NPM_CLI_JS);
 
 // Injected by esbuild at bundle time via define; falls back to a dev placeholder.
 declare const __FLOW_CLI_VERSION__: string;
@@ -176,6 +176,13 @@ export function tryAcquireLock(lockFile: string): boolean {
 	}
 }
 
+function execNpm(args: string[], opts: { timeout: number }): Promise<{ stdout: string }> {
+	if (USE_NPM_CLI) {
+		return execFileAsync(process.execPath, [NPM_CLI_JS, ...args], opts);
+	}
+	return execFileAsync('npm', args, opts);
+}
+
 export async function main(): Promise<void> {
 	const cliName = PKG_NAME.replace(/^@[^/]+\//, '').replace(/-cli$/, ''); // 'flow' or 'task'
 	const configDir = ConfigDir.get(cliName);
@@ -223,9 +230,7 @@ export async function main(): Promise<void> {
 		const timestamp = new Date().toISOString();
 		let latestVersion: string;
 		try {
-			const { stdout } = await execFileAsync(NPM_CMD,['view', PKG_NAME, `dist-tags.${config.channel}`], {
-				timeout: 15000, ...NPM_SHELL,
-			});
+			const { stdout } = await execNpm(['view', PKG_NAME, `dist-tags.${config.channel}`], { timeout: 15000 });
 			latestVersion = stdout.trim();
 		} catch (err: unknown) {
 			const msg = err instanceof Error ? err.message : String(err);
@@ -275,7 +280,7 @@ export async function main(): Promise<void> {
 		});
 
 		try {
-			await execFileAsync(NPM_CMD,['install', '-g', `${PKG_NAME}@${latestVersion}`], { timeout: 120000, ...NPM_SHELL });
+			await execNpm(['install', '-g', `${PKG_NAME}@${latestVersion}`], { timeout: 120000 });
 		} catch (err: unknown) {
 			const msg = err instanceof Error ? err.message : String(err);
 			const reason = msg.includes('EUNAUTHORIZED') || msg.includes('401') ? 'auth' : 'install-failed';
@@ -298,7 +303,7 @@ export async function main(): Promise<void> {
 			const bundleFile = `${cliName}.cjs`; // e.g. 'flow.cjs' or 'task.cjs'
 
 			// Resolve bundle path from global npm root to avoid PATH cache issues
-			const { stdout: npmRootOut } = await execFileAsync(NPM_CMD,['root', '-g'], { timeout: 10000, ...NPM_SHELL });
+			const { stdout: npmRootOut } = await execNpm(['root', '-g'], { timeout: 10000 });
 			const globalBundlePath = path.join(npmRootOut.trim(), PKG_NAME, bundleFile);
 
 			execFileSync(process.execPath, [globalBundlePath, 'cli', 'self-check'], {
@@ -325,7 +330,7 @@ export async function main(): Promise<void> {
 				);
 			}
 			try {
-				await execFileAsync(NPM_CMD,['install', '-g', `${PKG_NAME}@${currentVersion}`], { timeout: 120000, ...NPM_SHELL });
+				await execNpm(['install', '-g', `${PKG_NAME}@${currentVersion}`], { timeout: 120000 });
 			} catch {
 				// rollback failure -- we still report the rolled-back state
 			}
