@@ -179,7 +179,7 @@ async function main(): Promise<void> {
 	const updateManager = new UpdateManager('@wadeck-app/flow-cli');
 	const updateState = updateManager.readAndClearState();
 	if (updateState?.status === 'success') {
-		process.stderr.write(`[flow] Updated to v${updateState.newVersion}\n`);
+		process.stderr.write(`[flow] Updated to v${updateState.targetVersion ?? updateState.newVersion}\n`);
 	}
 	if (updateState?.status === 'rolled-back') {
 		process.stderr.write(
