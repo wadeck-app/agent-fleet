@@ -51,6 +51,7 @@ async function registerDaemonCommands(program: Command): Promise<void> {
 			const child = spawn(process.execPath, [bundlePath], {
 				detached: true,
 				stdio: 'ignore',
+				windowsHide: true,
 				env: { ...process.env, FLOW_DAEMON_MODE: '1' },
 			});
 			child.unref();
