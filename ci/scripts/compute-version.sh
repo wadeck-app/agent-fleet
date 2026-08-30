@@ -40,7 +40,7 @@ else
   SHA=$(git -C "$REPO_ROOT" rev-parse --short=8 HEAD)
   VERSION="${DATE}-${BUILD}-${SHA}"
   DIST_TAG="latest"
-  IS_PRERELEASE="true"
+  IS_PRERELEASE="false"
 fi
 
 TAG="v${VERSION}"
