@@ -9,13 +9,13 @@ export function readBaseVersion(): string {
 	let hash = 'DEV';
 	try {
 		// stdio: pipe suppresses git's "fatal: not a git repository" from reaching the user's stderr
-		count = execSync('git rev-list --count HEAD', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+		count = execSync('git rev-list --count HEAD', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }).trim();
 	} catch {
 		/* not a git repo */
 	}
 	try {
 		// stdio: pipe suppresses git's "fatal: not a git repository" from reaching the user's stderr
-		hash = execSync('git rev-parse --short=8 HEAD', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+		hash = execSync('git rev-parse --short=8 HEAD', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }).trim();
 	} catch {
 		/* not a git repo */
 	}
