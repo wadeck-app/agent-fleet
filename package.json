@@ -91,7 +91,7 @@
 		"vitest": "^4.0.14"
 	},
 	"dependencies": {
-		"@wadeck-app/singleton-daemon-kit": "^2026.8.28-072-ecbe4ec3",
+		"@wadeck-app/singleton-daemon-kit": "2026.8.30-082-8c02b26d",
 		"embla-carousel-react": "^8.6.0"
 	},
 	"optionalDependencies": {
