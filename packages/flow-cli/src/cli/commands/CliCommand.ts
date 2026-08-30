@@ -1,15 +1,15 @@
 // flow cli <subcommand> -- meta-commands for managing the flow CLI itself.
-import { ConfigDir, HookDispatcher, VersionValidation } from '@wadeck-app/shared-cli';
+import { ConfigDir, HookDispatcher } from '@wadeck-app/shared-cli';
+import { cliLogsCommand, cliRollbackCommand, cliUpdateCommand, cliVersionCommand, warnUnknownArgs } from '@wadeck-app/shared-cli/CliMetaCommands';
+import { readChannelFromConfig } from '@wadeck-app/shared-cli/ChannelConfig';
 import { Command } from 'commander';
 import { FlowExecutor, StepRunner } from 'flow-engine';
 import * as yaml from 'js-yaml';
-import { execFile, execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
 
 import { FlowConfigLoader } from '../../config/FlowConfig.js';
 import { PluginLoader } from '../../config/PluginLoader.js';
@@ -17,28 +17,7 @@ import { PluginLoader } from '../../config/PluginLoader.js';
 // Injected by esbuild at bundle time via define; falls back to package.json in dev mode (tsx).
 declare const __FLOW_CLI_VERSION__: string;
 
-const execFileAsync = promisify(execFile);
 const PKG_NAME = '@wadeck-app/flow-cli';
-
-const NPM_CLI_JS = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
-const USE_NPM_CLI = fs.existsSync(NPM_CLI_JS);
-function execNpm(args: string[], opts: { timeout: number }): Promise<{ stdout: string }> {
-	const winHide = process.platform === 'win32' ? { windowsHide: true } : {};
-	if (USE_NPM_CLI) return execFileAsync(process.execPath, [NPM_CLI_JS, ...args], { ...opts, ...winHide });
-	return execFileAsync('npm', args, { ...opts, ...winHide });
-}
-
-function readChannelFromConfig(): string {
-	try {
-		const configFile = path.join(ConfigDir.get('flow'), 'config.yml');
-		if (!fs.existsSync(configFile)) return 'latest';
-		const raw = fs.readFileSync(configFile, 'utf-8');
-		const match = /^\s*channel:\s*['"]?(\S+?)['"]?\s*$/m.exec(raw);
-		return match?.[1] ?? 'latest';
-	} catch {
-		return 'latest';
-	}
-}
 
 function getCurrentVersion(): string {
 	try {
@@ -47,11 +26,6 @@ function getCurrentVersion(): string {
 		const require = createRequire(import.meta.url);
 		return (require('../../../package.json') as { version: string }).version;
 	}
-}
-
-async function fetchLatestVersion(channel: string): Promise<string> {
-	const { stdout } = await execNpm(['view', PKG_NAME, `dist-tags.${channel}`], { timeout: 15000 });
-	return stdout.trim();
 }
 
 function getUpdaterPath(): string | null {
@@ -228,17 +202,8 @@ export function buildCliCommand(): Command {
 		.description('Show installed and available version')
 		.action(async () => {
 			const current = getCurrentVersion();
-			const channel = readChannelFromConfig();
-			process.stdout.write(`flow v${current} (installed)\n`);
-			try {
-				const latest = await fetchLatestVersion(channel);
-				process.stdout.write(`Latest (${channel}): v${latest}\n`);
-				if (current === latest) {
-					process.stdout.write('Up to date.\n');
-				}
-			} catch (err) {
-				process.stderr.write(`Could not fetch latest version: ${String(err)}\n`);
-			}
+			const channel = readChannelFromConfig(ConfigDir.get('flow'));
+			await cliVersionCommand(PKG_NAME, current, channel);
 		});
 
 	// flow cli update [--check] [--log]
@@ -246,7 +211,10 @@ export function buildCliCommand(): Command {
 	updateCmd.description('Update the flow CLI, or check/inspect update status');
 	updateCmd.option('--check', 'Show available version without installing');
 	updateCmd.option('--log', 'Print the update log');
-	updateCmd.action(async (opts: { check?: boolean; log?: boolean }) => {
+	updateCmd.allowUnknownOption(false);
+	updateCmd.action(async (opts: { check?: boolean; log?: boolean }, cmd: Command) => {
+		const rawArgs = cmd.args;
+		warnUnknownArgs(rawArgs.filter(a => a.startsWith('-')), ['--check', '--log'], 'flow cli update');
 		if (opts.log) {
 			const logFile = path.join(ConfigDir.get('flow'), 'update-log.txt');
 			if (fs.existsSync(logFile)) {
@@ -257,62 +225,26 @@ export function buildCliCommand(): Command {
 			return;
 		}
 		if (opts.check) {
-			const channel = readChannelFromConfig();
-			try {
-				const latest = await fetchLatestVersion(channel);
-				process.stdout.write(`Available (${channel}): v${latest}\n`);
-			} catch (err) {
-				process.stderr.write(`Could not check for updates: ${String(err)}\n`);
-				process.exit(1);
-			}
+			const current = getCurrentVersion();
+			const channel = readChannelFromConfig(ConfigDir.get('flow'));
+			await cliVersionCommand(PKG_NAME, current, channel);
 			return;
 		}
-		// Default: run the updater synchronously with UPDATER_FORCE=1 to bypass the cache check
 		const updaterPath = getUpdaterPath();
 		if (!updaterPath) {
 			process.stderr.write('Updater bundle not found (dev mode or missing build).\n');
 			process.exit(1);
 			return;
 		}
-		execFileSync(process.execPath, [updaterPath], {
-			stdio: 'inherit',
-			env: { ...process.env, UPDATER_FORCE: '1', UPDATER_PKG_NAME: PKG_NAME },
-		});
+		await cliUpdateCommand(updaterPath, PKG_NAME);
 	});
 	cli.addCommand(updateCmd);
 
 	// flow cli rollback -- restore previous version
 	cli.command('rollback')
 		.description('Restore the previously installed version')
-		.action(() => {
-			const configDir = ConfigDir.get('flow');
-			const stateFile = path.join(configDir, 'update-state.json');
-			if (!fs.existsSync(stateFile)) {
-				process.stderr.write('No update state found. Nothing to roll back.\n');
-				process.exit(1);
-				return;
-			}
-			let previousVersion: string | undefined;
-			try {
-				const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8')) as { previousVersion?: string };
-				previousVersion = state.previousVersion;
-			} catch (err) {
-				process.stderr.write(`Failed to read update state: ${String(err)}\n`);
-				process.exit(1);
-				return;
-			}
-			if (previousVersion === undefined || !VersionValidation.VERSION_RE.test(previousVersion)) {
-				process.stderr.write('Invalid or missing previousVersion in update state.\n');
-				process.exit(1);
-				return;
-			}
-			execFileSync(USE_NPM_CLI ? process.execPath : 'npm', USE_NPM_CLI ? [NPM_CLI_JS, 'install', '-g', `${PKG_NAME}@${previousVersion}`] : ['install', '-g', `${PKG_NAME}@${previousVersion}`], { stdio: 'inherit' });
-			process.stdout.write(`Rolled back to v${previousVersion}\n`);
-			try {
-				fs.unlinkSync(stateFile);
-			} catch {
-				// ignore
-			}
+		.action(async () => {
+			await cliRollbackCommand(PKG_NAME, ConfigDir.get('flow'));
 		});
 
 	// flow cli self-check -- run health checks
@@ -329,50 +261,8 @@ export function buildCliCommand(): Command {
 	cli.command('logs')
 		.description("Print today's NDJSON log from the flow daemon log directory")
 		.option('-f, --follow', 'Follow the log file (tail -f style)')
-		.action((opts: { follow?: boolean }) => {
-			const logsDir = path.join(ConfigDir.get('flow'), 'logs');
-			const today = new Date().toISOString().slice(0, 10);
-			const logFile = path.join(logsDir, `${today}.ndjson`);
-
-			if (!fs.existsSync(logFile)) {
-				process.stderr.write(`[flow] No log file for today: ${logFile}\n`);
-				return;
-			}
-
-			if (!opts.follow) {
-				process.stdout.write(fs.readFileSync(logFile, 'utf-8'));
-				return;
-			}
-
-			// --follow: print existing content then watch for new bytes
-			process.stderr.write(`[flow] Following ${logFile}\n`);
-			let offset = 0;
-
-			function readNewBytes(): void {
-				try {
-					const stat = fs.statSync(logFile);
-					if (stat.size <= offset) return;
-					const buf = Buffer.alloc(stat.size - offset);
-					const fd = fs.openSync(logFile, 'r');
-					fs.readSync(fd, buf, 0, buf.length, offset);
-					fs.closeSync(fd);
-					offset = stat.size;
-					process.stdout.write(buf.toString('utf-8'));
-				} catch {
-					// ignore transient read errors
-				}
-			}
-
-			// Drain existing content first
-			readNewBytes();
-
-			const watcher = fs.watch(logFile, () => {
-				readNewBytes();
-			});
-			watcher.on('error', err => {
-				process.stderr.write(`[flow] Watch error: ${String(err)}\n`);
-			});
-			// Keep the process alive — user terminates with Ctrl-C
+		.action(async (opts: { follow?: boolean }) => {
+			await cliLogsCommand(ConfigDir.get('flow'), { follow: opts.follow ?? false });
 		});
 
 	return cli;

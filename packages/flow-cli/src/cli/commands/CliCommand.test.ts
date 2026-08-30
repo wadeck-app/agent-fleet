@@ -1,5 +1,4 @@
 import { Command } from 'commander';
-import * as cp from 'node:child_process';
 import * as fs from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -9,21 +8,26 @@ vi.mock('node:fs', async () => {
 	const real = await vi.importActual<typeof import('node:fs')>('node:fs');
 	return {
 		...real,
-		// Wrap as vi.fn() so tests can override with mockReturnValue; default to real behavior.
 		existsSync: vi.fn().mockImplementation(real.existsSync),
 		readFileSync: vi.fn().mockImplementation(real.readFileSync),
 		unlinkSync: vi.fn().mockImplementation(real.unlinkSync),
 	};
 });
-vi.mock('node:child_process', () => ({
-	execFile: vi.fn(),
-	execFileSync: vi.fn(),
+
+vi.mock('@wadeck-app/shared-cli/CliMetaCommands', () => ({
+	cliVersionCommand: vi.fn().mockResolvedValue(undefined),
+	cliUpdateCommand: vi.fn().mockResolvedValue(undefined),
+	cliRollbackCommand: vi.fn().mockResolvedValue(undefined),
+	cliLogsCommand: vi.fn().mockResolvedValue(undefined),
+	warnUnknownArgs: vi.fn(),
 }));
-// Helper: mount the cli sub-command under a root program and parse asynchronously.
-// Any process.exit() mock throws are caught here so individual tests can assert on exitSpy.
+
+vi.mock('@wadeck-app/shared-cli/ChannelConfig', () => ({
+	readChannelFromConfig: vi.fn().mockReturnValue('latest'),
+}));
+
 async function runCliArgs(args: string[]): Promise<void> {
 	const program = new Command();
-	// Prevent Commander from calling process.exit on --help / unknown options
 	program.exitOverride();
 	program.addCommand(buildCliCommand());
 	try {
@@ -33,74 +37,52 @@ async function runCliArgs(args: string[]): Promise<void> {
 	}
 }
 
-// Simulate a successful npm view response so execFileAsync resolves.
-// util.promisify expects cb(err, value) -- pass {stdout,stderr} as the single value
-// so `const { stdout } = await execFileAsync(...)` destructures correctly.
-function mockExecFileSuccess(stdout = '1.2.3\n'): void {
-	vi.mocked(cp.execFile).mockImplementation((...args: unknown[]) => {
-		const cb = args[args.length - 1] as (err: null, result: { stdout: string; stderr: string }) => void;
-		cb(null, { stdout, stderr: '' });
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		return {} as any;
+describe('cli version', () => {
+	afterEach(() => { vi.restoreAllMocks(); });
+
+	it('calls cliVersionCommand with pkgName and channel', async () => {
+		const { cliVersionCommand } = await import('@wadeck-app/shared-cli/CliMetaCommands');
+		const { readChannelFromConfig } = await import('@wadeck-app/shared-cli/ChannelConfig');
+		vi.mocked(readChannelFromConfig).mockReturnValue('edge');
+
+		await runCliArgs(['version']);
+
+		expect(cliVersionCommand).toHaveBeenCalledWith('@wadeck-app/flow-cli', expect.any(String), 'edge');
 	});
-}
+});
 
-describe('readChannelFromConfig (via cli update --check)', () => {
-	let exitSpy: ReturnType<typeof vi.spyOn>;
-	let stdoutSpy: ReturnType<typeof vi.spyOn>;
+describe('cli update --check', () => {
+	afterEach(() => { vi.restoreAllMocks(); });
 
-	beforeEach(() => {
-		exitSpy = vi.spyOn(process, 'exit').mockImplementation((_code?: string | number | null) => {
-			throw new Error(`process.exit(${_code})`);
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		}) as any;
-		stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-		vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+	it('calls cliVersionCommand when --check is passed', async () => {
+		const { cliVersionCommand } = await import('@wadeck-app/shared-cli/CliMetaCommands');
+		await runCliArgs(['update', '--check']);
+		expect(cliVersionCommand).toHaveBeenCalled();
 	});
 
-	afterEach(() => {
-		vi.restoreAllMocks();
+	it('reads update-log.txt when --log is passed', async () => {
+		vi.mocked(fs.existsSync).mockReturnValue(true);
+		vi.mocked(fs.readFileSync).mockReturnValue('log content\n');
+		const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+		await runCliArgs(['update', '--log']);
+
+		expect(stdoutSpy).toHaveBeenCalledWith('log content\n');
 	});
 
-	it('returns latest when config file does not exist', async () => {
+	it('shows "No update log found" when log file is missing', async () => {
 		vi.mocked(fs.existsSync).mockReturnValue(false);
-		mockExecFileSuccess('9.9.9\n');
+		const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
-		await runCliArgs(['update', '--check']);
+		await runCliArgs(['update', '--log']);
 
-		expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('Available (latest):'));
-		expect(exitSpy).not.toHaveBeenCalled();
-	});
-
-	it('returns channel value from config.yml when channel: stable is set', async () => {
-		vi.mocked(fs.existsSync).mockReturnValue(true);
-		vi.mocked(fs.readFileSync).mockReturnValue('channel: stable\n');
-		mockExecFileSuccess('2.0.0\n');
-
-		await runCliArgs(['update', '--check']);
-
-		expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('Available (stable):'));
-		expect(exitSpy).not.toHaveBeenCalled();
-	});
-
-	it('returns latest on readFileSync error', async () => {
-		vi.mocked(fs.existsSync).mockReturnValue(true);
-		vi.mocked(fs.readFileSync).mockImplementation(() => {
-			throw new Error('permission denied');
-		});
-		mockExecFileSuccess('3.0.0\n');
-
-		await runCliArgs(['update', '--check']);
-
-		expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('Available (latest):'));
-		expect(exitSpy).not.toHaveBeenCalled();
+		expect(stdoutSpy).toHaveBeenCalledWith('No update log found.\n');
 	});
 });
 
 describe('cli rollback', () => {
 	let exitSpy: ReturnType<typeof vi.spyOn>;
 	let stderrSpy: ReturnType<typeof vi.spyOn>;
-	let stdoutSpy: ReturnType<typeof vi.spyOn>;
 
 	beforeEach(() => {
 		exitSpy = vi.spyOn(process, 'exit').mockImplementation((_code?: string | number | null) => {
@@ -108,48 +90,16 @@ describe('cli rollback', () => {
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		}) as any;
 		stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
-		stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 	});
 
-	afterEach(() => {
-		vi.restoreAllMocks();
-	});
+	afterEach(() => { vi.restoreAllMocks(); });
 
-	it('calls npm install with the previous version when state file is valid', async () => {
-		vi.mocked(fs.existsSync).mockReturnValue(true);
-		vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ previousVersion: '1.2.3' }));
-		vi.mocked(fs.unlinkSync).mockImplementation(() => {});
-
+	it('delegates to cliRollbackCommand', async () => {
+		const { cliRollbackCommand } = await import('@wadeck-app/shared-cli/CliMetaCommands');
 		await runCliArgs(['rollback']);
-
-		const call = vi.mocked(cp.execFileSync).mock.calls[0];
-		expect(call).toBeDefined();
-		const argsJoined = (call as unknown[]).flat().join(' ');
-		expect(argsJoined).toContain('install');
-		expect(argsJoined).toContain('@wadeck-app/flow-cli@1.2.3');
-		expect(stdoutSpy).toHaveBeenCalledWith('Rolled back to v1.2.3\n');
+		expect(cliRollbackCommand).toHaveBeenCalledWith('@wadeck-app/flow-cli', expect.any(String));
 		expect(exitSpy).not.toHaveBeenCalled();
-	});
-
-	it('exits with error when previousVersion is not a valid semver string', async () => {
-		vi.mocked(fs.existsSync).mockReturnValue(true);
-		vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ previousVersion: 'not-a-version' }));
-
-		await runCliArgs(['rollback']);
-
-		expect(exitSpy).toHaveBeenCalledWith(1);
-		expect(vi.mocked(cp.execFileSync)).not.toHaveBeenCalled();
-		expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid or missing previousVersion'));
-	});
-
-	it('exits with error when state file is missing', async () => {
-		vi.mocked(fs.existsSync).mockReturnValue(false);
-
-		await runCliArgs(['rollback']);
-
-		expect(exitSpy).toHaveBeenCalledWith(1);
-		expect(vi.mocked(cp.execFileSync)).not.toHaveBeenCalled();
-		expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining('No update state found'));
+		expect(stderrSpy).not.toHaveBeenCalled();
 	});
 });
 
@@ -157,8 +107,6 @@ describe('cli self-check', () => {
 	let exitSpy: ReturnType<typeof vi.spyOn>;
 
 	beforeEach(async () => {
-		// Restore real fs behavior -- previous tests may have called vi.restoreAllMocks()
-		// which strips the mockImplementation from the module-level vi.fn() wrappers.
 		const realFs = await vi.importActual<typeof import('node:fs')>('node:fs');
 		vi.mocked(fs.existsSync).mockImplementation(realFs.existsSync);
 		vi.mocked(fs.readFileSync).mockImplementation(realFs.readFileSync);
@@ -177,7 +125,6 @@ describe('cli self-check', () => {
 
 	it('runs all checks and does not call process.exit when all pass', async () => {
 		await runCliArgs(['self-check']);
-
 		expect(exitSpy).not.toHaveBeenCalled();
 	});
 
@@ -206,9 +153,7 @@ describe('cli self-check', () => {
 		await runCliArgs(['self-check']);
 
 		const stdoutHasOk = stdoutLines.some(l => l.includes('[ok]'));
-		// [ok] lines must appear on stdout
 		expect(stdoutHasOk).toBe(true);
-		// [ok] lines must NOT appear on stderr (no duplicate output)
 		const stderrHasOk = stderrLines.some(l => l.includes('[ok]'));
 		expect(stderrHasOk).toBe(false);
 		expect(exitSpy).not.toHaveBeenCalled();

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { ConfigDir, UpdateManager } from '@wadeck-app/shared-cli';
+import { cliLogsCommand } from '@wadeck-app/shared-cli/CliMetaCommands';
 import { createDaemonClient, readPortFile } from '@wadeck-app/singleton-daemon-kit';
 import { Command } from 'commander';
 import { spawn } from 'node:child_process';
@@ -207,48 +208,8 @@ async function main(): Promise<void> {
 		.command('logs')
 		.description("Alias for: flow cli logs  (print today's daemon log)")
 		.option('--follow', 'Follow the log file (tail -f style)')
-		.action((opts: { follow?: boolean }) => {
-			const logsDir = path.join(ConfigDir.get('flow'), 'logs');
-			const today = new Date().toISOString().slice(0, 10);
-			const logFile = path.join(logsDir, `${today}.ndjson`);
-
-			if (!fs.existsSync(logFile)) {
-				// Write to stdout (not just stderr) so it's visible through -H windowsgui launchers
-				process.stdout.write(`[flow] No log file for today: ${logFile}\n`);
-				return;
-			}
-
-			if (!opts.follow) {
-				process.stdout.write(fs.readFileSync(logFile, 'utf-8'));
-				return;
-			}
-
-			process.stderr.write(`[flow] Following ${logFile}\n`);
-			let offset = 0;
-
-			function readNewBytes(): void {
-				try {
-					const stat = fs.statSync(logFile);
-					if (stat.size <= offset) return;
-					const buf = Buffer.alloc(stat.size - offset);
-					const fd = fs.openSync(logFile, 'r');
-					fs.readSync(fd, buf, 0, buf.length, offset);
-					fs.closeSync(fd);
-					offset = stat.size;
-					process.stdout.write(buf.toString('utf-8'));
-				} catch {
-					// ignore transient read errors
-				}
-			}
-
-			readNewBytes();
-
-			const watcher = fs.watch(logFile, () => {
-				readNewBytes();
-			});
-			watcher.on('error', (err: Error) => {
-				process.stderr.write(`[flow] Watch error: ${String(err)}\n`);
-			});
+		.action(async (opts: { follow?: boolean }) => {
+			await cliLogsCommand(ConfigDir.get('flow'), { follow: opts.follow ?? false });
 		});
 
 	// Catch unknown top-level commands (must be registered after all addCommand calls, before parseAsync)

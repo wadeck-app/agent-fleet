@@ -72,7 +72,7 @@ await Promise.all([
 		logLevel: 'warning',
 	}),
 	build({
-		entryPoints: [path.join(root, 'dist/updater/UpdaterMain.js')],
+		entryPoints: [path.join(root, 'dist/updater/entry.js')],
 		bundle: true,
 		platform: 'node',
 		target: 'node22',
