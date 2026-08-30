@@ -34,13 +34,15 @@ generate "task-cli-darwin-x64"   "darwin" "x64"   "task"
 
 # Generates the -dist wrapper package (bin launcher + package.json) for a CLI.
 # The .cjs bundles are copied by copy-binaries.sh; this only creates the scaffolding.
+# Extra args (3+): additional filenames to include in the files array (e.g. "worker.cjs").
 generate_dist() {
   local cli="$1"
-  # flow-cli bundles a separate worker.cjs used by WorkerPool for flow execution
-  local worker_entry=""
-  if [[ "$cli" == "flow" ]]; then
-    worker_entry='"worker.cjs",'
-  fi
+  shift
+  # Build extra_files_json from remaining args: '"foo.cjs",' for each
+  local extra_files_json=""
+  for f in "$@"; do
+    extra_files_json+="		\"${f}\","$'\n'
+  done
   local dir="packages/${cli}-cli-dist"
   mkdir -p "$dir/bin"
 
@@ -63,8 +65,7 @@ generate_dist() {
 		"bin/",
 		"${cli}.cjs",
 		"${cli}-updater.cjs",
-		${worker_entry}
-		"package.json"
+${extra_files_json}		"package.json"
 	],
 	"optionalDependencies": {
 		"@wadeck-app/${cli}-cli-win32-x64": ">=0.0.0-0",
@@ -79,5 +80,5 @@ EOF
   echo "generated $dir/package.json"
 }
 
-generate_dist "flow"
+generate_dist "flow" "worker.cjs"
 generate_dist "task"
