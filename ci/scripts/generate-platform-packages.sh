@@ -36,6 +36,11 @@ generate "task-cli-darwin-x64"   "darwin" "x64"   "task"
 # The .cjs bundles are copied by copy-binaries.sh; this only creates the scaffolding.
 generate_dist() {
   local cli="$1"
+  # flow-cli bundles a separate worker.cjs used by WorkerPool for flow execution
+  local worker_entry=""
+  if [[ "$cli" == "flow" ]]; then
+    worker_entry='"worker.cjs",'
+  fi
   local dir="packages/${cli}-cli-dist"
   mkdir -p "$dir/bin"
 
@@ -58,6 +63,7 @@ generate_dist() {
 		"bin/",
 		"${cli}.cjs",
 		"${cli}-updater.cjs",
+		${worker_entry}
 		"package.json"
 	],
 	"optionalDependencies": {
