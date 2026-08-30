@@ -34,7 +34,7 @@ export function writeDaemonLog(logsDir: string, level: 'info' | 'error', msg: st
 function resolveClaudePath(): string {
 	try {
 		const cmd = process.platform === 'win32' ? 'where.exe claude' : 'which claude';
-		const result = execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+		const result = execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
 		return result.trim().split('\n')[0]?.trim() ?? '';
 	} catch {
 		// Claude not found on PATH — workers will need to locate it themselves
