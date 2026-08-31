@@ -104,6 +104,10 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 				return commandHandler.handleRun(cmd, new HookDispatcher(flowHooks));
 			},
 		},
+		health: () => ({
+			status: 'ok' as const,
+			running_executions: workerPool?.runningCount ?? 0,
+		}),
 		hooks: {
 			onStart: (port: number) => {
 				fs.mkdirSync(executionsDir, { recursive: true, mode: 0o700 });

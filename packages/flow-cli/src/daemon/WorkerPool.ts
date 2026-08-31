@@ -18,6 +18,8 @@ export class WorkerPool {
 	// PIDs of processes spawned by this pool. Used to reject registration from external processes.
 	private readonly spawnedPids = new Set<number>();
 	private activeCount = 0;
+
+	get runningCount(): number { return this.activeCount; }
 	private readonly workerPath: string;
 	private readonly claudePath: string;
 	private readonly tsxLoaderPath: string | null;
