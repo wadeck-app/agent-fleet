@@ -1,5 +1,5 @@
 // flow cli <subcommand> -- meta-commands for managing the flow CLI itself.
-import { ConfigDir, HookDispatcher } from '@wadeck-app/shared-cli';
+import { ConfigDir, HookDispatcher, runSelfCheck } from '@wadeck-app/shared-cli';
 import { cliLogsCommand, cliRollbackCommand, cliUpdateCommand, cliVersionCommand, warnUnknownArgs } from '@wadeck-app/shared-cli/CliMetaCommands';
 import { readChannelFromConfig } from '@wadeck-app/shared-cli/ChannelConfig';
 import { Command } from 'commander';
@@ -37,159 +37,7 @@ function getUpdaterPath(): string | null {
 
 // ---- Self-check ----
 
-interface CheckResult {
-	name: string;
-	passed: boolean;
-	error?: string;
-}
-
-async function runSelfChecks(): Promise<CheckResult[]> {
-	const results: CheckResult[] = [];
-
-	// Check 1: Bundle integrity -- verify FlowExecutor is accessible from flow-engine
-	{
-		const name = 'Bundle integrity';
-		try {
-			if (typeof FlowExecutor !== 'function') {
-				throw new Error('FlowExecutor is not a constructor');
-			}
-			results.push({ name, passed: true });
-		} catch (err) {
-			results.push({ name, passed: false, error: String(err) });
-		}
-	}
-
-	// Check 2: Config loading -- load FlowConfig from a non-existent path (tests default fallback)
-	{
-		const name = 'Config loading';
-		try {
-			const config = FlowConfigLoader.load(path.join(os.tmpdir(), '.flow-self-check-nonexistent-config.yaml'));
-			if (config.workspace.retainDays === undefined) {
-				throw new Error('workspace.retainDays is undefined');
-			}
-			results.push({ name, passed: true });
-		} catch (err) {
-			results.push({ name, passed: false, error: String(err) });
-		}
-	}
-
-	// Check 3: YAML flow parsing -- parse a minimal inline flow definition string
-	{
-		const name = 'YAML flow parsing';
-		try {
-			const input = [
-				'id: self-check-test',
-				'steps:',
-				'  - id: step1',
-				'    type: script',
-				'    script: echo ok',
-			].join('\n');
-			const parsed = yaml.load(input) as { id?: string; steps?: unknown[] };
-			if (parsed?.id !== 'self-check-test') {
-				throw new Error(`Expected id 'self-check-test', got '${String(parsed?.id)}'`);
-			}
-			if (!Array.isArray(parsed?.steps) || parsed.steps.length !== 1) {
-				throw new Error(
-					`Expected 1 step, got ${Array.isArray(parsed?.steps) ? parsed.steps.length : 'non-array'}`
-				);
-			}
-			results.push({ name, passed: true });
-		} catch (err) {
-			results.push({ name, passed: false, error: String(err) });
-		}
-	}
-
-	// Check 4: StepRunner init -- instantiate StepRunner with minimal config
-	{
-		const name = 'StepRunner init';
-		try {
-			new StepRunner({ interactive: false });
-			results.push({ name, passed: true });
-		} catch (err) {
-			results.push({ name, passed: false, error: String(err) });
-		}
-	}
-
-	// Check 5: Plugin system -- verify PluginLoader constructs and resolves the registry path.
-	// Does NOT call loadProvider() -- no plugin activation, no side effects.
-	{
-		const name = 'Plugin system';
-		try {
-			new PluginLoader();
-			results.push({ name, passed: true });
-		} catch (err) {
-			const msg = String(err);
-			// extension-points/extension-points.json is not bundled by esbuild (createRequire is not statically traced).
-			// This is a known limitation of the global install -- plugins require local node_modules.
-			// TODO: inline extension-points.json at bundle time via an esbuild plugin.
-			if (msg.includes('extension-points') && msg.includes('Cannot find module')) {
-				results.push({
-					name,
-					passed: true,
-					error: 'extension-points not in bundle (plugins disabled in standalone install)',
-				});
-			} else {
-				results.push({ name, passed: false, error: msg });
-			}
-		}
-	}
-
-	// Check 6: HookDispatcher -- instantiate with empty config and dispatch a no-op event
-	{
-		const name = 'HookDispatcher';
-		try {
-			const dispatcher = new HookDispatcher({});
-			await dispatcher.dispatch('onTaskCreated', { taskId: 'test' }, () => {});
-			results.push({ name, passed: true });
-		} catch (err) {
-			results.push({ name, passed: false, error: String(err) });
-		}
-	}
-
-	// Check 7: Workspace config schema -- verify FlowConfig returns valid workspace cleanup defaults
-	{
-		const name = 'Workspace config';
-		try {
-			const config = FlowConfigLoader.load(path.join(os.tmpdir(), '.flow-self-check-schema.yaml'));
-			if (typeof config.workspace.retainDays !== 'number' || config.workspace.retainDays <= 0) {
-				throw new Error(`workspace.retainDays is not a positive number: ${config.workspace.retainDays}`);
-			}
-			if (typeof config.workspace.maxWorkspaces !== 'number' || config.workspace.maxWorkspaces <= 0) {
-				throw new Error(`workspace.maxWorkspaces is not a positive number: ${config.workspace.maxWorkspaces}`);
-			}
-			results.push({ name, passed: true });
-		} catch (err) {
-			results.push({ name, passed: false, error: String(err) });
-		}
-	}
-
-	return results;
-}
-
-function printSelfCheckResults(results: CheckResult[], quiet: boolean, version: string): void {
-	if (!quiet) {
-		for (const result of results) {
-			if (result.passed) {
-				process.stdout.write(`[ok] ${result.name}\n`);
-			} else {
-				const line = `[fail] ${result.name}${result.error !== undefined ? ` -- ${result.error}` : ''}\n`;
-				process.stdout.write(line);
-			}
-		}
-	}
-	const failedCount = results.filter(r => !r.passed).length;
-	if (failedCount === 0) {
-		if (!quiet) {
-			process.stdout.write(`All checks passed. flow v${version}\n`);
-		}
-	} else {
-		if (!quiet) {
-			const summary = `Self-check failed (${failedCount}/${results.length} checks failed). Run: flow cli update --log\n`;
-			process.stdout.write(summary);
-		}
-		process.exit(1);
-	}
-}
+// Checks are defined inline in the self-check command action below.
 
 export function buildCliCommand(): Command {
 	ConfigDir.migrateIfNeeded('flow');
@@ -251,10 +99,92 @@ export function buildCliCommand(): Command {
 	cli.command('self-check')
 		.description('Run health checks to verify the CLI bundle is functional')
 		.action(async () => {
-			const quiet = process.env['CLI_SELF_CHECK_QUIET'] === '1';
-			const version = getCurrentVersion();
-			const results = await runSelfChecks();
-			printSelfCheckResults(results, quiet, version);
+			await runSelfCheck([
+				// Check 1: Bundle integrity -- verify FlowExecutor is accessible from flow-engine
+				async () => {
+					try {
+						if (typeof FlowExecutor !== 'function') throw new Error('FlowExecutor is not a constructor');
+						return { name: 'Bundle integrity', ok: true };
+					} catch (err) {
+						return { name: 'Bundle integrity', ok: false, detail: String(err) };
+					}
+				},
+				// Check 2: Config loading -- load FlowConfig from a non-existent path (tests default fallback)
+				async () => {
+					try {
+						const config = FlowConfigLoader.load(path.join(os.tmpdir(), '.flow-self-check-nonexistent-config.yaml'));
+						if (config.workspace.retainDays === undefined) throw new Error('workspace.retainDays is undefined');
+						return { name: 'Config loading', ok: true };
+					} catch (err) {
+						return { name: 'Config loading', ok: false, detail: String(err) };
+					}
+				},
+				// Check 3: YAML flow parsing -- parse a minimal inline flow definition string
+				async () => {
+					try {
+						const input = ['id: self-check-test', 'steps:', '  - id: step1', '    type: script', '    script: echo ok'].join('\n');
+						const parsed = yaml.load(input) as { id?: string; steps?: unknown[] };
+						if (parsed?.id !== 'self-check-test') throw new Error(`Expected id 'self-check-test', got '${String(parsed?.id)}'`);
+						if (!Array.isArray(parsed?.steps) || parsed.steps.length !== 1) {
+							throw new Error(`Expected 1 step, got ${Array.isArray(parsed?.steps) ? parsed.steps.length : 'non-array'}`);
+						}
+						return { name: 'YAML flow parsing', ok: true };
+					} catch (err) {
+						return { name: 'YAML flow parsing', ok: false, detail: String(err) };
+					}
+				},
+				// Check 4: StepRunner init -- instantiate StepRunner with minimal config
+				async () => {
+					try {
+						new StepRunner({ interactive: false });
+						return { name: 'StepRunner init', ok: true };
+					} catch (err) {
+						return { name: 'StepRunner init', ok: false, detail: String(err) };
+					}
+				},
+				// Check 5: Plugin system -- verify PluginLoader constructs and resolves the registry path.
+				// Does NOT call loadProvider() -- no plugin activation, no side effects.
+				async () => {
+					try {
+						new PluginLoader();
+						return { name: 'Plugin system', ok: true };
+					} catch (err) {
+						const msg = String(err);
+						// extension-points/extension-points.json is not bundled by esbuild (createRequire is not statically traced).
+						// This is a known limitation of the global install -- plugins require local node_modules.
+						// TODO: inline extension-points.json at bundle time via an esbuild plugin.
+						if (msg.includes('extension-points') && msg.includes('Cannot find module')) {
+							return { name: 'Plugin system', ok: true, detail: 'extension-points not in bundle (plugins disabled in standalone install)' };
+						}
+						return { name: 'Plugin system', ok: false, detail: msg };
+					}
+				},
+				// Check 6: HookDispatcher -- instantiate with empty config and dispatch a no-op event
+				async () => {
+					try {
+						const dispatcher = new HookDispatcher({});
+						await dispatcher.dispatch('onTaskCreated', { taskId: 'test' }, () => {});
+						return { name: 'HookDispatcher', ok: true };
+					} catch (err) {
+						return { name: 'HookDispatcher', ok: false, detail: String(err) };
+					}
+				},
+				// Check 7: Workspace config schema -- verify FlowConfig returns valid workspace cleanup defaults
+				async () => {
+					try {
+						const config = FlowConfigLoader.load(path.join(os.tmpdir(), '.flow-self-check-schema.yaml'));
+						if (typeof config.workspace.retainDays !== 'number' || config.workspace.retainDays <= 0) {
+							throw new Error(`workspace.retainDays is not a positive number: ${config.workspace.retainDays}`);
+						}
+						if (typeof config.workspace.maxWorkspaces !== 'number' || config.workspace.maxWorkspaces <= 0) {
+							throw new Error(`workspace.maxWorkspaces is not a positive number: ${config.workspace.maxWorkspaces}`);
+						}
+						return { name: 'Workspace config', ok: true };
+					} catch (err) {
+						return { name: 'Workspace config', ok: false, detail: String(err) };
+					}
+				},
+			]);
 		});
 
 	// flow cli logs [--follow] -- read or tail today's NDJSON log

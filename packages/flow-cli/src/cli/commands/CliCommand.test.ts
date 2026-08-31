@@ -128,17 +128,17 @@ describe('cli self-check', () => {
 		expect(exitSpy).not.toHaveBeenCalled();
 	});
 
-	it('suppresses stdout output when CLI_SELF_CHECK_QUIET=1', async () => {
+	it('suppresses stderr output when CLI_SELF_CHECK_QUIET=1', async () => {
 		process.env['CLI_SELF_CHECK_QUIET'] = '1';
-		const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+		const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 
 		await runCliArgs(['self-check']);
 
-		expect(stdoutSpy).not.toHaveBeenCalled();
+		expect(stderrSpy).not.toHaveBeenCalled();
 		expect(exitSpy).not.toHaveBeenCalled();
 	});
 
-	it('writes [ok] lines to stdout only (no duplicate output on stderr)', async () => {
+	it('writes [ok] lines to stderr only (no duplicate output on stdout)', async () => {
 		const stdoutLines: string[] = [];
 		const stderrLines: string[] = [];
 		vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
@@ -153,9 +153,9 @@ describe('cli self-check', () => {
 		await runCliArgs(['self-check']);
 
 		const stdoutHasOk = stdoutLines.some(l => l.includes('[ok]'));
-		expect(stdoutHasOk).toBe(true);
+		expect(stdoutHasOk).toBe(false);
 		const stderrHasOk = stderrLines.some(l => l.includes('[ok]'));
-		expect(stderrHasOk).toBe(false);
+		expect(stderrHasOk).toBe(true);
 		expect(exitSpy).not.toHaveBeenCalled();
 	});
 });
