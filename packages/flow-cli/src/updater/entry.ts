@@ -15,7 +15,9 @@ const currentVersion = typeof __FLOW_CLI_VERSION__ !== 'undefined' ? __FLOW_CLI_
 try {
 	const npmRoot = execNpm(['root', '-g'], { timeout: 10_000 }).trim();
 	const selfCheckCmd = `${process.execPath} ${join(npmRoot, PKG_NAME, 'flow.cjs')} cli self-check`;
-	process.env['UPDATER_SELF_CHECK_CMD'] = selfCheckCmd;
+	if (!process.env['UPDATER_SELF_CHECK_CMD']) {
+		process.env['UPDATER_SELF_CHECK_CMD'] = selfCheckCmd;
+	}
 } catch {
 	// Skip self-check if npm root unavailable.
 }
