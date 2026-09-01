@@ -266,7 +266,8 @@ export const Interactive: Story = {
 
 		return (
 			<>
-				<button onClick={() => setOpen(true)} className="rounded bg-blue-500 px-4 py-2 text-white">
+				// violations-suppress: react/no-raw-button story fixture
+				<button onClick={() => setOpen(true)} className="rounded bg-info px-4 py-2 text-background">
 					Open Dialog
 				</button>
 

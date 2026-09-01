@@ -4,6 +4,9 @@ import { Button } from '@framework/components/primitives/Button';
 import { cn } from '@framework/lib/utils';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
+const collapsibleToggleCls =
+	'flex flex-1 items-center justify-start gap-2 px-3 py-2 text-sm font-medium hover:bg-muted/50 rounded-tl-md rounded-bl-md';
+
 interface CollapsibleSectionProps {
 	title: string;
 	defaultOpen?: boolean;
@@ -37,7 +40,7 @@ export function CollapsibleSection({
 					type="button"
 					variant="ghost"
 					onClick={() => setOpen(v => !v)}
-					className="flex flex-1 items-center justify-start gap-2 px-3 py-2 text-sm font-medium hover:bg-muted/50 rounded-tl-md rounded-bl-md"
+					className={collapsibleToggleCls}
 					aria-expanded={open}
 				>
 					{open ? <ChevronDown className="size-4 shrink-0" /> : <ChevronRight className="size-4 shrink-0" />}

@@ -23,13 +23,16 @@ vi.mock('../../pages/ingredients/IngredientForm', () => ({
 			<div data-testid="form-mode">{initialData ? 'edit' : 'create'}</div>
 			<div data-testid="form-submit-label">{submitLabel}</div>
 			<div data-testid="form-initial-data">{initialData ? JSON.stringify(initialData) : 'none'}</div>
+			// violations-suppress: react/no-raw-button test fixture
 			<button data-testid="form-submit" onClick={() => onSubmit({} as CreateIngredient)}>
 				Submit
 			</button>
+			// violations-suppress: react/no-raw-button test fixture
 			<button data-testid="form-cancel" onClick={onCancel}>
 				Cancel
 			</button>
 			{onRefresh && (
+				// violations-suppress: react/no-raw-button test fixture
 				<button data-testid="form-refresh" onClick={onRefresh}>
 					Refresh
 				</button>

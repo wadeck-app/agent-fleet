@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { Input } from '@framework/components/forms/Input';
+import { Button } from '@framework/components/primitives/Button';
 import { cn } from '@framework/lib/utils';
 import { Loader2, X } from 'lucide-react';
 
@@ -81,9 +82,10 @@ export function SearchInput({
 				</div>
 			)}
 			{!loading && internalValue && internalValue.length > 0 && !disabled && (
-				// eslint-disable-next-line no-restricted-syntax
-				<button
+				<Button
 					type="button"
+					variant="ghost"
+					size="icon-xs"
 					onClick={handleClear}
 					disabled={disabled}
 					aria-label="Clear search"
@@ -91,13 +93,11 @@ export function SearchInput({
 						'absolute top-1/2 right-2 -translate-y-1/2',
 						'flex h-5 w-5 items-center justify-center rounded-md',
 						'text-muted-foreground transition-colors',
-						'hover:bg-muted hover:text-foreground',
-						'focus:ring-2 focus:ring-ring focus:ring-offset-1 focus:outline-none',
-						'disabled:pointer-events-none disabled:opacity-50'
+						'hover:bg-muted hover:text-foreground'
 					)}
 				>
 					<X className="h-4 w-4" />
-				</button>
+				</Button>
 			)}
 		</div>
 	);

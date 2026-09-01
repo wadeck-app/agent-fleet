@@ -25,6 +25,7 @@ describe('EmptyState', () => {
 	describe('icon', () => {
 		it('should render icon when provided', () => {
 			const icon = (
+				// violations-suppress: react/no-inline-svg test fixture
 				<svg data-testid="custom-icon">
 					<circle cx="12" cy="12" r="10" />
 				</svg>
@@ -40,6 +41,7 @@ describe('EmptyState', () => {
 		});
 
 		it('should style icon with muted color', () => {
+			// violations-suppress: react/no-inline-svg test fixture
 			const icon = <svg data-testid="custom-icon" />;
 			const { container } = render(<EmptyState title="No items" icon={icon} />);
 			const iconContainer = container.querySelector('.text-muted-foreground');
@@ -140,6 +142,7 @@ describe('EmptyState', () => {
 
 	describe('layout spacing', () => {
 		it('should space icon from title', () => {
+			// violations-suppress: react/no-inline-svg test fixture
 			const icon = <svg data-testid="custom-icon" />;
 			const { container } = render(<EmptyState title="No items" icon={icon} />);
 			const iconContainer = container.querySelector('.mb-4');
@@ -168,6 +171,7 @@ describe('EmptyState', () => {
 
 	describe('complete scenarios', () => {
 		it('should render with all props', () => {
+			// violations-suppress: react/no-inline-svg test fixture
 			const icon = <svg data-testid="custom-icon" />;
 			const action = {
 				label: 'Create New',

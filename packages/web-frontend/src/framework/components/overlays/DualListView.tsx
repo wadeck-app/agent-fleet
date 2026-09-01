@@ -1,6 +1,9 @@
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 
+const emptyListCls =
+	'flex items-center justify-center rounded border border-dashed py-8 text-sm text-muted-foreground';
+
 import {
 	DndContext,
 	type DragEndEvent,
@@ -210,7 +213,7 @@ export function DualListView<T>({
 				{/* Items (with DnD) */}
 				{leftItems.length === 0 ? (
 					leftEmptyState || (
-						<div className="flex items-center justify-center rounded border border-dashed py-8 text-sm text-muted-foreground">
+						<div className={emptyListCls}>
 							No items
 						</div>
 					)
@@ -265,7 +268,7 @@ export function DualListView<T>({
 				{/* Items */}
 				{filteredRightItems.length === 0 ? (
 					rightEmptyState || (
-						<div className="flex items-center justify-center rounded border border-dashed py-8 text-sm text-muted-foreground">
+						<div className={emptyListCls}>
 							{searchQuery ? 'No results' : 'No items'}
 						</div>
 					)

@@ -120,7 +120,7 @@ export function LogEntry({ log, onExpand, isSelected = false, onClick }: LogEntr
 						return (
 							<code
 								className={`
-        rounded bg-muted/70 px-1 py-0.5 text-[0.85em] text-orange-300
+        rounded bg-muted/70 px-1 py-0.5 text-[0.85em] text-warning
       `}
 							>
 								{children}

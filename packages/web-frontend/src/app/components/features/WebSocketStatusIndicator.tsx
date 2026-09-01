@@ -38,7 +38,7 @@ export const WebSocketStatusIndicator: FC<WebSocketStatusIndicatorProps> = ({
 	showLabel = false,
 	className,
 }) => {
-	const statusColor = isConnected ? 'text-green-500' : 'text-red-500';
+	const statusColor = isConnected ? 'text-success' : 'text-danger';
 	const statusText = isConnected ? 'Connected' : 'Disconnected';
 	const statusDescription = isConnected ? 'Real-time updates active' : 'Using polling fallback';
 

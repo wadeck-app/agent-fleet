@@ -22,6 +22,7 @@ export const Success: Story = {
 		return show ? (
 			<Toast message="Operation completed successfully!" type="success" onClose={() => setShow(false)} />
 		) : (
+			// violations-suppress: react/no-raw-button story fixture
 			<button onClick={() => setShow(true)}>Show Toast</button>
 		);
 	},
@@ -33,6 +34,7 @@ export const Error: Story = {
 		return show ? (
 			<Toast message="An error occurred. Please try again." type="error" onClose={() => setShow(false)} />
 		) : (
+			// violations-suppress: react/no-raw-button story fixture
 			<button onClick={() => setShow(true)}>Show Toast</button>
 		);
 	},
@@ -44,6 +46,7 @@ export const Info: Story = {
 		return show ? (
 			<Toast message="Your changes have been saved." type="info" onClose={() => setShow(false)} />
 		) : (
+			// violations-suppress: react/no-raw-button story fixture
 			<button onClick={() => setShow(true)}>Show Toast</button>
 		);
 	},
@@ -59,6 +62,7 @@ export const Warning: Story = {
 				onClose={() => setShow(false)}
 			/>
 		) : (
+			// violations-suppress: react/no-raw-button story fixture
 			<button onClick={() => setShow(true)}>Show Toast</button>
 		);
 	},
@@ -74,6 +78,7 @@ export const LongMessage: Story = {
 				onClose={() => setShow(false)}
 			/>
 		) : (
+			// violations-suppress: react/no-raw-button story fixture
 			<button onClick={() => setShow(true)}>Show Toast</button>
 		);
 	},

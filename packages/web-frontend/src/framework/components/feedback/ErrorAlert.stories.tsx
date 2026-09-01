@@ -106,6 +106,7 @@ export const InFormContext: Story = {
 			<form className="space-y-4">
 				<div>
 					<label className="mb-1 block text-sm font-medium">Email</label>
+					// violations-suppress: react/no-raw-input story fixture
 					<input
 						type="email"
 						className="w-full rounded-md border border-input px-3 py-2"
@@ -114,12 +115,14 @@ export const InFormContext: Story = {
 				</div>
 				<div>
 					<label className="mb-1 block text-sm font-medium">Password</label>
+					// violations-suppress: react/no-raw-input story fixture
 					<input
 						type="password"
 						className="w-full rounded-md border border-input px-3 py-2"
 						placeholder="••••••••"
 					/>
 				</div>
+				// violations-suppress: react/no-raw-button story fixture
 				<button type="submit" className={`w-full rounded-md bg-primary px-4 py-2 text-primary-foreground`}>
 					Create Account
 				</button>

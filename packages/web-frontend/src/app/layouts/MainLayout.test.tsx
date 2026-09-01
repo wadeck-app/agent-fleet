@@ -87,6 +87,7 @@ describe('MainLayout', () => {
 				const { setInfoPanelContent } = useInfoPanel();
 				return (
 					<div>
+						// violations-suppress: react/no-raw-button test fixture
 						<button onClick={() => setInfoPanelContent(<div>Panel Content</div>)}>Show Panel</button>
 					</div>
 				);
@@ -267,6 +268,7 @@ describe('MainLayout', () => {
 				const { setInfoPanelContent } = useInfoPanel();
 				return (
 					<div>
+						// violations-suppress: react/no-raw-button test fixture
 						<button onClick={() => setInfoPanelContent(<div>Panel Content</div>)}>Show Panel</button>
 					</div>
 				);

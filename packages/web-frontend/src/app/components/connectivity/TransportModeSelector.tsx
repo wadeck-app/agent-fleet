@@ -92,8 +92,7 @@ export function TransportModeSelector({ className }: TransportModeSelectorProps)
 					<span className="text-xs text-muted-foreground">Connection ID:</span>
 					<span
 						className={`
-        font-mono text-xs font-semibold text-yellow-600
-        dark:text-yellow-400
+        font-mono text-xs font-semibold text-warning
       `}
 					>
 						{connId ? connId.substring(0, 8) : 'N/A'}
@@ -109,10 +108,7 @@ export function TransportModeSelector({ className }: TransportModeSelectorProps)
 						{subscriptions.map(topic => (
 							<span
 								key={topic}
-								className={`
-          rounded bg-blue-100 px-2 py-0.5 font-mono text-xs text-blue-700
-          dark:bg-blue-900 dark:text-blue-300
-        `}
+								className="rounded bg-info/10 px-2 py-0.5 font-mono text-xs text-info"
 							>
 								{topic}
 							</span>

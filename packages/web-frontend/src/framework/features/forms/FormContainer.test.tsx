@@ -164,6 +164,7 @@ describe('FormContainerLegacy', () => {
 					onCancel={() => {}}
 					submitLabel="Create"
 				>
+					// violations-suppress: react/no-raw-input test fixture
 					<input
 						type="text"
 						value={formData.name}

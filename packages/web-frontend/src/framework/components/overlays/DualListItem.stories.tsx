@@ -86,7 +86,7 @@ export const AvailableWithIconAndBadge: Story = {
 	args: {
 		itemId: 'item-4',
 		variant: 'available',
-		icon: <Folder className="h-4 w-4 text-blue-500" />,
+		icon: <Folder className="h-4 w-4 text-info" />,
 		label: 'Complete Example',
 		badge: (
 			<Badge variant="secondary" className="text-xs">
@@ -102,7 +102,7 @@ export const AvailableLoading: Story = {
 	args: {
 		itemId: 'item-5',
 		variant: 'available',
-		icon: <Folder className="h-4 w-4 text-blue-500" />,
+		icon: <Folder className="h-4 w-4 text-info" />,
 		label: 'Loading Item',
 		badge: (
 			<Badge variant="secondary" className="text-xs">
@@ -162,7 +162,7 @@ export const SortableWithIconAndBadge: Story = {
 	args: {
 		itemId: 'item-9',
 		variant: 'sortable',
-		icon: <Folder className="h-4 w-4 text-green-500" />,
+		icon: <Folder className="h-4 w-4 text-success" />,
 		label: 'Complete Example',
 		badge: (
 			<Badge variant="secondary" className="text-xs">
@@ -178,7 +178,7 @@ export const SortableLoading: Story = {
 	args: {
 		itemId: 'item-10',
 		variant: 'sortable',
-		icon: <Folder className="h-4 w-4 text-green-500" />,
+		icon: <Folder className="h-4 w-4 text-success" />,
 		label: 'Loading Item',
 		badge: (
 			<Badge variant="secondary" className="text-xs">
@@ -195,7 +195,7 @@ export const SortableReordering: Story = {
 	args: {
 		itemId: 'item-11',
 		variant: 'sortable',
-		icon: <Folder className="h-4 w-4 text-purple-500" />,
+		icon: <Folder className="h-4 w-4 text-special" />,
 		label: 'Reordering Item',
 		badge: (
 			<Badge variant="secondary" className="text-xs">
@@ -218,7 +218,7 @@ export const ComparisonView: Story = {
 					<DualListItem
 						itemId="avail-1"
 						variant="available"
-						icon={<Folder className="h-4 w-4 text-blue-500" />}
+						icon={<Folder className="h-4 w-4 text-info" />}
 						label="Available Item 1"
 						badge={
 							<Badge variant="secondary" className="text-xs">
@@ -232,7 +232,7 @@ export const ComparisonView: Story = {
 					<DualListItem
 						itemId="avail-2"
 						variant="available"
-						icon={<Folder className="h-4 w-4 text-green-500" />}
+						icon={<Folder className="h-4 w-4 text-success" />}
 						label="Available Item 2"
 						badge={
 							<Badge variant="secondary" className="text-xs">
@@ -252,7 +252,7 @@ export const ComparisonView: Story = {
 					<DualListItem
 						itemId="sort-1"
 						variant="sortable"
-						icon={<Folder className="h-4 w-4 text-red-500" />}
+						icon={<Folder className="h-4 w-4 text-danger" />}
 						label="Sortable Item 1"
 						badge={
 							<Badge variant="secondary" className="text-xs">
@@ -266,7 +266,7 @@ export const ComparisonView: Story = {
 					<DualListItem
 						itemId="sort-2"
 						variant="sortable"
-						icon={<Folder className="h-4 w-4 text-purple-500" />}
+						icon={<Folder className="h-4 w-4 text-special" />}
 						label="Sortable Item 2"
 						badge={
 							<Badge variant="secondary" className="text-xs">

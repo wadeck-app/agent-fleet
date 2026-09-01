@@ -21,26 +21,11 @@ const statusIndicatorVariants = cva(
 	{
 		variants: {
 			status: {
-				success: `
-      text-green-600
-      dark:text-green-400
-    `,
-				error: `
-      text-red-600
-      dark:text-red-400
-    `,
-				warning: `
-      text-yellow-600
-      dark:text-yellow-400
-    `,
-				info: `
-      text-blue-600
-      dark:text-blue-400
-    `,
-				purple: `
-      text-purple-600
-      dark:text-purple-400
-    `,
+				success: `text-success`,
+				error: `text-danger`,
+				warning: `text-warning`,
+				info: `text-info`,
+				purple: `text-special`,
 				// @formatter:off
 				muted: `text-muted-foreground`,
 				// @formatter:on

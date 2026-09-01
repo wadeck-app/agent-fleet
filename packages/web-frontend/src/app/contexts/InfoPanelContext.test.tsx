@@ -11,8 +11,11 @@ function TestComponent() {
 
 	return (
 		<div>
+			// violations-suppress: react/no-raw-button test fixture
 			<button onClick={() => setInfoPanelContent(<div>Panel Content</div>)}>Show Panel</button>
+			// violations-suppress: react/no-raw-button test fixture
 			<button onClick={() => setInfoPanelContent(null)}>Clear Panel</button>
+			// violations-suppress: react/no-raw-button test fixture
 			<button onClick={() => setInfoPanelContent(<div>Updated Content</div>)}>Update Panel</button>
 			{infoPanelContent && <div data-testid="panel-content">{infoPanelContent}</div>}
 		</div>

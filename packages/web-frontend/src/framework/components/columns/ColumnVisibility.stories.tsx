@@ -236,6 +236,7 @@ export const Interactive: Story = {
 				<div className="rounded-md border border-border bg-card p-4">
 					<div className="mb-3 flex items-center justify-between">
 						<span className="text-sm font-medium">Event Log</span>
+						// violations-suppress: react/no-raw-button story fixture
 						<button
 							onClick={() => setLog([])}
 							className={`
@@ -539,6 +540,7 @@ export const InteractiveWithModifiedState: Story = {
 				<div className="rounded-md border border-border bg-card p-4">
 					<div className="mb-3 flex items-center justify-between">
 						<span className="text-sm font-medium">Event Log</span>
+						// violations-suppress: react/no-raw-button story fixture
 						<button
 							onClick={() => setLog([])}
 							className={`

@@ -26,6 +26,9 @@ import { useTickets } from './useTickets';
 /**
  * Status badge variant mapping - keyed by status id, falls back to 'secondary' for unknown statuses
  */
+const ticketItemCls =
+	'cursor-pointer rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent';
+
 const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'info' | 'success' | 'warning' | 'destructive'> = {
 	backlog: 'secondary',
 	todo: 'default',
@@ -225,7 +228,7 @@ export function TicketsPage() {
 							{localTickets.map(ticket => (
 								<SortableItem key={ticket.id} id={ticket.id}>
 									<div
-										className="cursor-pointer rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent"
+										className={ticketItemCls}
 										onClick={() => handleTicketClick(ticket)}
 									>
 										<h3 className="font-medium text-foreground">{ticket.title}</h3>

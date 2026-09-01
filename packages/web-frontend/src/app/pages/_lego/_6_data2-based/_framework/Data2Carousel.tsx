@@ -22,6 +22,9 @@ import type { QueryResultDisplayerProps } from '@framework/types/QueryResultDisp
  * ===========================================================================================
  */
 
+const errorBannerCls =
+	'rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive';
+
 export interface Data2CarouselProps<T> extends QueryResultDisplayerProps<T> {
 	columns: Table2Column<T>[];
 	getItemId: (item: T) => string;
@@ -35,7 +38,7 @@ export function Data2Carousel<T>({ data, isLoading, error, pagination, columns, 
 	return (
 		<div className="space-y-4">
 			{error && !isLoading && (
-				<div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+				<div className={errorBannerCls}>
 					<strong>Error:</strong> {error}
 				</div>
 			)}

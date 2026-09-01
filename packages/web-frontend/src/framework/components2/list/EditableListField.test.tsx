@@ -168,6 +168,7 @@ describe('EditableListField', () => {
 			const renderWithUpdate = vi.fn((item: TestItem, _index: number, actions: ItemActions<TestItem>) => (
 				<div>
 					<span>{item.name}</span>
+					// violations-suppress: react/no-raw-button test fixture
 					<button onClick={() => actions.update({ name: 'Updated' })}>Update</button>
 				</div>
 			));
@@ -199,6 +200,7 @@ describe('EditableListField', () => {
 			const renderWithRemove = vi.fn((item: TestItem, _index: number, actions: ItemActions<TestItem>) => (
 				<div>
 					<span>{item.name}</span>
+					// violations-suppress: react/no-raw-button test fixture
 					<button onClick={actions.remove}>Remove</button>
 				</div>
 			));

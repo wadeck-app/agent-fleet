@@ -170,6 +170,7 @@ export const WithPaginationContext: Story = {
 							Page {currentPage} of {totalPages}
 						</div>
 						<div className="flex gap-1">
+							// violations-suppress: react/no-raw-button story fixture
 							<button
 								onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
 								disabled={currentPage === 1}
@@ -180,6 +181,7 @@ export const WithPaginationContext: Story = {
 							>
 								Previous
 							</button>
+							// violations-suppress: react/no-raw-button story fixture
 							<button
 								onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
 								disabled={currentPage === totalPages}

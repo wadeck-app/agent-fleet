@@ -46,11 +46,11 @@ export const Desktop: Story = {
 		const PageContent = () => (
 			<div className="rounded-lg bg-white p-6">
 				<h2 className="mb-4 text-2xl font-bold">Ingrédients Page</h2>
-				<p className="text-gray-600">
+				<p className="text-muted-foreground">
 					This is the main content area. In the real application, this would be rendered via {'<Outlet />'}{' '}
 					from React Router.
 				</p>
-				<p className="mt-4 text-sm text-gray-500">
+				<p className="mt-4 text-sm text-muted-foreground">
 					Desktop layout shows: Sidebar (250px) + Content (flex) + Info Panel (if active)
 				</p>
 			</div>
@@ -117,7 +117,7 @@ export const DesktopWithInfoPanel: Story = {
 			return (
 				<div className="rounded-lg bg-white p-6">
 					<h2 className="mb-4 text-2xl font-bold">Ingrédients Page</h2>
-					<p className="mb-4 text-gray-600">
+					<p className="mb-4 text-muted-foreground">
 						The info panel can be used to show contextual information, help text, or additional details.
 					</p>
 					<div className="flex gap-2">
@@ -157,10 +157,10 @@ export const Mobile: Story = {
 		const MobileContent = () => (
 			<div className="rounded-lg bg-white p-4">
 				<h2 className="mb-3 text-xl font-bold">Ingrédients Page</h2>
-				<p className="text-sm text-gray-600">
+				<p className="text-sm text-muted-foreground">
 					On mobile, the navigation is hidden behind a menu button (☰) in the top bar.
 				</p>
-				<p className="mt-3 text-sm text-gray-500">
+				<p className="mt-3 text-sm text-muted-foreground">
 					Mobile layout shows: Top Menu (60px) + Collapsible Nav + Content
 				</p>
 			</div>
@@ -190,10 +190,10 @@ export const MobileWithMenuOpen: Story = {
 		const MobileMenuContent = () => (
 			<div className="rounded-lg bg-white p-4">
 				<h2 className="mb-3 text-xl font-bold">Mobile Menu Example</h2>
-				<p className="text-sm text-gray-600">
+				<p className="text-sm text-muted-foreground">
 					Click the menu button (☰) in the top bar to toggle the navigation menu.
 				</p>
-				<p className="mt-3 text-sm text-gray-500">
+				<p className="mt-3 text-sm text-muted-foreground">
 					The mobile menu slides in below the top bar with all navigation links.
 				</p>
 			</div>
@@ -218,7 +218,7 @@ export const WithMultipleRoutes: Story = {
 		const RecipesContent = () => (
 			<div className="rounded-lg bg-white p-6">
 				<h2 className="mb-4 text-2xl font-bold">Recettes Page</h2>
-				<p className="text-gray-600">Notice how "Recettes" is highlighted in the sidebar navigation.</p>
+				<p className="text-muted-foreground">Notice how "Recettes" is highlighted in the sidebar navigation.</p>
 			</div>
 		);
 

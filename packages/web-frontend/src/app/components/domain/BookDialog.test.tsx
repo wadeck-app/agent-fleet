@@ -21,23 +21,28 @@ vi.mock('../../pages/books/BookForm', () => ({
 			<div data-testid="initial-data">{JSON.stringify(initialData)}</div>
 			<div data-testid="edit-mode">{JSON.stringify(editMode)}</div>
 			<div data-testid="submit-label">{submitLabel}</div>
+			// violations-suppress: react/no-raw-button test fixture
 			<button data-testid="submit-button" onClick={() => onSubmit({ title: 'Test Book' })}>
 				Submit
 			</button>
+			// violations-suppress: react/no-raw-button test fixture
 			<button data-testid="cancel-button" onClick={onCancel}>
 				Cancel
 			</button>
 			{onRefresh && (
+				// violations-suppress: react/no-raw-button test fixture
 				<button data-testid="refresh-button" onClick={onRefresh}>
 					Refresh
 				</button>
 			)}
 			{onCheckISBN && (
+				// violations-suppress: react/no-raw-button test fixture
 				<button data-testid="check-isbn-button" onClick={() => onCheckISBN('123')}>
 					Check ISBN
 				</button>
 			)}
 			{onPatchISBN && (
+				// violations-suppress: react/no-raw-button test fixture
 				<button
 					data-testid="patch-isbn-button"
 					onClick={() => onPatchISBN('book-id', { isbn: '123', version: 1 })}

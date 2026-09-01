@@ -57,6 +57,7 @@ describe('Toast', () => {
 	it('should render with success style by default', () => {
 		const { container } = render(<Toast message="Success" onClose={() => {}} />);
 		const toast = container.firstChild as HTMLElement;
+		// violations-suppress: tailwind/no-raw-color-class test fixture
 		expect(toast).toHaveClass('bg-green-600', 'text-white');
 	});
 

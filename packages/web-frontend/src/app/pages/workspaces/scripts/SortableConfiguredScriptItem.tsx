@@ -81,8 +81,8 @@ export function SortableConfiguredScriptItem({
 			)}
 		>
 			{/* Drag Handle */}
-			{/* eslint-disable-next-line no-restricted-syntax */}
-			<button
+			<Button
+				variant="ghost"
 				{...attributes}
 				{...listeners}
 				className={cn(
@@ -94,7 +94,7 @@ export function SortableConfiguredScriptItem({
 				title="Drag to reorder"
 			>
 				<GripVertical className="h-4 w-4" />
-			</button>
+			</Button>
 
 			{/* Script Name */}
 			<span className="flex-1 px-2 py-1.5 font-mono text-sm">{displayName}</span>

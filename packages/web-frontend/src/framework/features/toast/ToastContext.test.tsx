@@ -11,8 +11,11 @@ function TestComponent() {
 
 	return (
 		<div>
+			// violations-suppress: react/no-raw-button test fixture
 			<button onClick={() => showToast('Success message', 'success')}>Show Success</button>
+			// violations-suppress: react/no-raw-button test fixture
 			<button onClick={() => showToast('Error message', 'error')}>Show Error</button>
+			// violations-suppress: react/no-raw-button test fixture
 			<button onClick={() => showToast('Info message', 'info')}>Show Info</button>
 		</div>
 	);
@@ -97,6 +100,7 @@ describe('ToastContext', () => {
 	it('should default to success type', async () => {
 		function DefaultTypeComponent() {
 			const { showToast } = useToast();
+			// violations-suppress: react/no-raw-button test fixture
 			return <button onClick={() => showToast('Default message')}>Show</button>;
 		}
 
@@ -113,6 +117,7 @@ describe('ToastContext', () => {
 
 		await waitFor(() => {
 			const toast = screen.getByText('Default message').closest('div')!.parentElement;
+			// violations-suppress: tailwind/no-raw-color-class test fixture
 			expect(toast).toHaveClass('bg-green-600');
 		});
 	});

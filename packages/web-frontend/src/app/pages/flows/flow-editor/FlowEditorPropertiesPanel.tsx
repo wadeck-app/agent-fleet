@@ -58,16 +58,16 @@ function FieldValidationMessage({ issues }: { issues: ValidationIssue[] }) {
 					issue.severity === 'error' ? AlertCircle : issue.severity === 'warning' ? AlertTriangle : Info;
 				const bgColor =
 					issue.severity === 'error'
-						? 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800'
+						? 'bg-danger/10 border-danger/30'
 						: issue.severity === 'warning'
-							? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800'
-							: 'bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800';
+							? 'bg-warning/10 border-warning/30'
+							: 'bg-info/10 border-info/30';
 				const textColor =
 					issue.severity === 'error'
-						? 'text-red-800 dark:text-red-200'
+						? 'text-danger'
 						: issue.severity === 'warning'
-							? 'text-yellow-800 dark:text-yellow-200'
-							: 'text-blue-800 dark:text-blue-200';
+							? 'text-warning'
+							: 'text-info';
 
 				return (
 					<div

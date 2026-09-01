@@ -42,6 +42,7 @@ vi.mock('../workspaces/CreateWorkspaceDialog', () => ({
 	CreateWorkspaceDialog: ({ open, onSuccess }: { open: boolean; onSuccess: (w: Workspace) => void }) => {
 		if (!open) return null;
 		return (
+			// violations-suppress: react/no-raw-button test fixture
 			<button data-testid="mock-create-workspace-submit" onClick={() => onSuccess(mockCreatedWorkspace)}>
 				Submit Mock
 			</button>

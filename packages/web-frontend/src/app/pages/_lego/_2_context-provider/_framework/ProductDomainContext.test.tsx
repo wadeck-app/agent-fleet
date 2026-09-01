@@ -117,8 +117,11 @@ function TestActionsConsumer() {
 			<div data-testid="items-count">{items.length}</div>
 			<div data-testid="search-value">{query.search}</div>
 			<div data-testid="page-value">{query.page}</div>
+			// violations-suppress: react/no-raw-button test fixture
 			<button onClick={() => actions.setQuery({ page: 2 })}>Go to Page 2</button>
+			// violations-suppress: react/no-raw-button test fixture
 			<button onClick={() => actions.setQuery({ search: 'laptop' })}>Search Laptop</button>
+			// violations-suppress: react/no-raw-button test fixture
 			<button onClick={() => actions.refresh()}>Refresh</button>
 			{items.map(item => (
 				<div key={item.id}>{item.name}</div>

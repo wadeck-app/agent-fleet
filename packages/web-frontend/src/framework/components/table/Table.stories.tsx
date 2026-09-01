@@ -90,6 +90,7 @@ export const WithSelection: Story = {
 						</span>
 					)}
 					{selectedIds.size > 0 && (
+						// violations-suppress: react/no-raw-button story fixture
 						<button
 							onClick={() => setSelectedIds(new Set())}
 							className={`
@@ -219,12 +220,12 @@ export const WithCustomRowClasses: Story = {
 						className={
 							item.status === 'Active'
 								? `
-          text-green-600
-          dark:text-green-400
+          text-success
+          dark:text-success
         `
 								: `
-          text-red-600
-          dark:text-red-400
+          text-danger
+          dark:text-danger
         `
 						}
 					>

@@ -85,6 +85,7 @@ export const CreateIngredient: Story = {
 			<div className="space-y-4">
 				<div>
 					<label className="block text-sm font-medium">Name</label>
+					// violations-suppress: react/no-raw-input story fixture
 					<input
 						type="text"
 						className={`
@@ -95,6 +96,7 @@ export const CreateIngredient: Story = {
 				</div>
 				<div>
 					<label className="block text-sm font-medium">Category</label>
+					// violations-suppress: react/no-raw-input story fixture
 					<input
 						type="text"
 						className={`
@@ -124,6 +126,7 @@ export const EditIngredient: Story = {
 			<div className="space-y-4">
 				<div>
 					<label className="block text-sm font-medium">Name</label>
+					// violations-suppress: react/no-raw-input story fixture
 					<input
 						type="text"
 						className={`
@@ -134,6 +137,7 @@ export const EditIngredient: Story = {
 				</div>
 				<div>
 					<label className="block text-sm font-medium">Category</label>
+					// violations-suppress: react/no-raw-input story fixture
 					<input
 						type="text"
 						className={`
@@ -159,6 +163,7 @@ export const CreateBook: Story = {
 			<div className="space-y-4">
 				<div>
 					<label className="block text-sm font-medium">Title</label>
+					// violations-suppress: react/no-raw-input story fixture
 					<input
 						type="text"
 						className={`
@@ -169,6 +174,7 @@ export const CreateBook: Story = {
 				</div>
 				<div>
 					<label className="block text-sm font-medium">Author</label>
+					// violations-suppress: react/no-raw-input story fixture
 					<input
 						type="text"
 						className={`
@@ -179,6 +185,7 @@ export const CreateBook: Story = {
 				</div>
 				<div>
 					<label className="block text-sm font-medium">ISBN</label>
+					// violations-suppress: react/no-raw-input story fixture
 					<input
 						type="text"
 						className={`
@@ -217,6 +224,7 @@ export const MediumSize: Story = {
 			<div className="space-y-4">
 				<div>
 					<label className="block text-sm font-medium">Name</label>
+					// violations-suppress: react/no-raw-input story fixture
 					<input
 						type="text"
 						className={`
@@ -241,6 +249,7 @@ export const LargeSize: Story = {
 			<div className="space-y-4">
 				<div>
 					<label className="block text-sm font-medium">Field 1</label>
+					// violations-suppress: react/no-raw-input story fixture
 					<input
 						type="text"
 						className={`
@@ -250,6 +259,7 @@ export const LargeSize: Story = {
 				</div>
 				<div>
 					<label className="block text-sm font-medium">Field 2</label>
+					// violations-suppress: react/no-raw-input story fixture
 					<input
 						type="text"
 						className={`
@@ -300,6 +310,7 @@ export const ComplexContent: Story = {
 				<div className="space-y-4">
 					<div>
 						<label className="block text-sm font-medium">Name</label>
+						// violations-suppress: react/no-raw-input story fixture
 						<input
 							type="text"
 							className={`

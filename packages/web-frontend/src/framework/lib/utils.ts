@@ -13,7 +13,7 @@ import { twMerge } from 'tailwind-merge';
  * @example
  * ```ts
  * cn('px-2 py-1', 'px-4') // => 'py-1 px-4'
- * cn('text-red-500', condition && 'text-blue-500') // conditional classes
+ * cn('text-danger', condition && 'text-info') // conditional classes
  * ```
  */
 export function cn(...inputs: ClassValue[]) {

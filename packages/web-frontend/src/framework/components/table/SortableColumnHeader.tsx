@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 
+import { Button } from '@framework/components/primitives/Button';
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
 
 import { type SortDirection } from './useTableSorting';
@@ -34,8 +35,8 @@ export function SortableColumnHeader({
 	};
 
 	return (
-		// eslint-disable-next-line no-restricted-syntax
-		<button
+		<Button
+			variant="ghost"
 			onClick={handleClick}
 			className={`
      flex cursor-pointer items-center gap-1 transition-colors
@@ -55,6 +56,6 @@ export function SortableColumnHeader({
 				{getSortIcon()}
 				{priority && <span className="text-xs font-semibold text-primary">{priority}</span>}
 			</span>
-		</button>
+		</Button>
 	);
 }

@@ -5,6 +5,7 @@ import { cn } from '@framework/lib/utils';
 function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
 	return (
 		// eslint-disable-next-line no-restricted-syntax
+		// violations-suppress: react/no-raw-input primitive wrapper implementation
 		<input
 			type={type}
 			data-slot="input"

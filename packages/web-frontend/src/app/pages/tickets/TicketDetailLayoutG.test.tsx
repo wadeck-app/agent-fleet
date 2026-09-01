@@ -140,6 +140,7 @@ vi.mock('@framework/components/primitives/TabsWithUrlState', () => ({
 	),
 	TabsList: ({ children }: any) => <div role="tablist">{children}</div>,
 	TabsTrigger: ({ children, value }: any) => (
+		// violations-suppress: react/no-raw-button test fixture
 		<button role="tab" data-value={value}>
 			{children}
 		</button>

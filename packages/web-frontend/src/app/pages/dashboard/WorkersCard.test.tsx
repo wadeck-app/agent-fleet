@@ -65,6 +65,7 @@ describe('WorkersCard', () => {
 
 			// Find the idle count element
 			const idleElement = screen.getByText('3');
+			// violations-suppress: tailwind/no-raw-color-class test fixture
 			expect(idleElement.className).toContain('text-green-600');
 		});
 
@@ -73,6 +74,7 @@ describe('WorkersCard', () => {
 
 			// Find the busy count element
 			const busyElement = screen.getByText('2');
+			// violations-suppress: tailwind/no-raw-color-class test fixture
 			expect(busyElement.className).toContain('text-orange-600');
 		});
 	});

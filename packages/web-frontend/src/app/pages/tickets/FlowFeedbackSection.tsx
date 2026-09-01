@@ -497,6 +497,9 @@ function FlowFeedbackForm({ initialValues, onSubmit, onCancel }: FlowFeedbackFor
 }
 
 // ---------------------------------------------------------------------------
+const retroToggleCls =
+	'flex w-full items-center justify-start gap-2 px-3 py-2 text-sm font-medium hover:bg-muted/50';
+
 // RetrospectiveCard — fetches and displays retrospective
 // ---------------------------------------------------------------------------
 
@@ -560,7 +563,7 @@ function RetrospectiveCard({ ticketId }: RetrospectiveCardProps) {
 				type="button"
 				variant="ghost"
 				onClick={() => setOpen(v => !v)}
-				className="flex w-full items-center justify-start gap-2 px-3 py-2 text-sm font-medium hover:bg-muted/50"
+				className={retroToggleCls}
 			>
 				{open ? <ChevronDown className="size-4 shrink-0" /> : <ChevronRight className="size-4 shrink-0" />}
 				Agent Retrospective

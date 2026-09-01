@@ -54,12 +54,12 @@ function formatDuration(milliseconds: number): string {
  */
 function getSuccessRateColor(rate: number): string {
 	if (rate >= 90) {
-		return 'text-green-600 dark:text-green-400';
+		return 'text-success';
 	}
 	if (rate >= 70) {
-		return 'text-orange-600 dark:text-orange-400';
+		return 'text-warning';
 	}
-	return 'text-red-600 dark:text-red-400';
+	return 'text-danger';
 }
 
 export function ThroughputCard({ tasksPerHour, successRate, avgTaskDuration }: ThroughputCardProps) {

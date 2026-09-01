@@ -362,6 +362,7 @@ describe('Table2', () => {
 	describe('Actions', () => {
 		it('renders action column when renderActions provided', () => {
 			const props = createBaseProps();
+			// violations-suppress: react/no-raw-button test fixture
 			const renderActions = vi.fn(() => <button type="button">Edit</button>);
 
 			render(

@@ -52,9 +52,9 @@ export function TasksCard({ total, active, review, done, blocked, failed }: Task
 							icon={<Activity />}
 							label="Active"
 							value={active}
-							iconClassName="size-4 text-blue-600 dark:text-blue-400"
+							iconClassName="size-4 text-info"
 							labelClassName="text-xs text-muted-foreground"
-							valueClassName="text-base font-semibold text-blue-600 dark:text-blue-400"
+							valueClassName="text-base font-semibold text-info"
 						/>
 
 						{/* Review Tasks */}
@@ -62,9 +62,9 @@ export function TasksCard({ total, active, review, done, blocked, failed }: Task
 							icon={<Eye />}
 							label="Review"
 							value={review}
-							iconClassName="size-4 text-purple-600 dark:text-purple-400"
+							iconClassName="size-4 text-info"
 							labelClassName="text-xs text-muted-foreground"
-							valueClassName="text-base font-semibold text-purple-600 dark:text-purple-400"
+							valueClassName="text-base font-semibold text-info"
 						/>
 
 						{/* Done Tasks */}
@@ -72,9 +72,9 @@ export function TasksCard({ total, active, review, done, blocked, failed }: Task
 							icon={<CheckCircle2 />}
 							label="Done"
 							value={done}
-							iconClassName="size-4 text-green-600 dark:text-green-400"
+							iconClassName="size-4 text-success"
 							labelClassName="text-xs text-muted-foreground"
-							valueClassName="text-base font-semibold text-green-600 dark:text-green-400"
+							valueClassName="text-base font-semibold text-success"
 						/>
 
 						{/* Blocked Tasks */}
@@ -82,9 +82,9 @@ export function TasksCard({ total, active, review, done, blocked, failed }: Task
 							icon={<AlertCircle />}
 							label="Blocked"
 							value={blocked}
-							iconClassName="size-4 text-orange-600 dark:text-orange-400"
+							iconClassName="size-4 text-warning"
 							labelClassName="text-xs text-muted-foreground"
-							valueClassName="text-base font-semibold text-orange-600 dark:text-orange-400"
+							valueClassName="text-base font-semibold text-warning"
 						/>
 
 						{/* Failed Tasks */}
@@ -92,9 +92,9 @@ export function TasksCard({ total, active, review, done, blocked, failed }: Task
 							icon={<XCircle />}
 							label="Failed"
 							value={failed}
-							iconClassName="size-4 text-red-600 dark:text-red-400"
+							iconClassName="size-4 text-danger"
 							labelClassName="text-xs text-muted-foreground"
-							valueClassName="text-base font-semibold text-red-600 dark:text-red-400"
+							valueClassName="text-base font-semibold text-danger"
 						/>
 					</div>
 				</div>

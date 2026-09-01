@@ -46,28 +46,20 @@ const badgeVariants = cva(
       hover:underline
     `,
 				success: `
-      bg-green-600 text-white
-      dark:bg-green-700
-      [a]:hover:bg-green-700
-      dark:[a]:hover:bg-green-800
+      bg-success text-success-foreground
+      [a]:hover:bg-success/80
     `,
 				warning: `
-      bg-yellow-600 text-white
-      dark:bg-yellow-700
-      [a]:hover:bg-yellow-700
-      dark:[a]:hover:bg-yellow-800
+      bg-warning text-warning-foreground
+      [a]:hover:bg-warning/80
     `,
 				info: `
-      bg-blue-600 text-white
-      dark:bg-blue-700
-      [a]:hover:bg-blue-700
-      dark:[a]:hover:bg-blue-800
+      bg-info text-info-foreground
+      [a]:hover:bg-info/80
     `,
 				alert: `
-      bg-orange-600 text-white
-      dark:bg-orange-700
-      [a]:hover:bg-orange-700
-      dark:[a]:hover:bg-orange-800
+      bg-warning text-warning-foreground
+      [a]:hover:bg-warning/80
     `,
 			},
 		},

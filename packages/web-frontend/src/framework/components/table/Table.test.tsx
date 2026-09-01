@@ -134,6 +134,7 @@ describe('Table', () => {
 				data={mockData}
 				columns={mockColumns}
 				getItemId={item => item.id}
+				// violations-suppress: react/no-raw-button test fixture
 				renderActions={item => <button>Edit {item.name}</button>}
 			/>
 		);

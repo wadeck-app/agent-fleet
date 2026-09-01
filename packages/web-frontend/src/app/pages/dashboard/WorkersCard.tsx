@@ -51,8 +51,8 @@ export function WorkersCard({ connected, idle, busy }: WorkersCardProps) {
 							icon={<UserCheck />}
 							label="Idle"
 							value={idle}
-							iconClassName="size-5 text-green-600 dark:text-green-400"
-							valueClassName="text-xl font-semibold text-green-600 dark:text-green-400"
+							iconClassName="size-5 text-success"
+							valueClassName="text-xl font-semibold text-success"
 						/>
 
 						{/* Busy Workers */}
@@ -60,8 +60,8 @@ export function WorkersCard({ connected, idle, busy }: WorkersCardProps) {
 							icon={<UserX />}
 							label="Busy"
 							value={busy}
-							iconClassName="size-5 text-orange-600 dark:text-orange-400"
-							valueClassName="text-xl font-semibold text-orange-600 dark:text-orange-400"
+							iconClassName="size-5 text-warning"
+							valueClassName="text-xl font-semibold text-warning"
 						/>
 					</div>
 				</div>

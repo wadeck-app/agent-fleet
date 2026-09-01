@@ -85,8 +85,8 @@ export function SortableColumnItem({
 			)}
 		>
 			{/* Drag Handle */}
-			{/* eslint-disable-next-line no-restricted-syntax */}
-			<button
+			<Button
+				variant="ghost"
 				{...attributes}
 				{...(canReorder ? listeners : {})}
 				className={cn(
@@ -104,7 +104,7 @@ export function SortableColumnItem({
 				disabled={!canReorder}
 			>
 				<GripVertical className="h-4 w-4" />
-			</button>
+			</Button>
 
 			{/* H2 fix: Checkbox + Label with explicit htmlFor/id for accessibility */}
 			{/* eslint-disable-next-line no-restricted-syntax */}

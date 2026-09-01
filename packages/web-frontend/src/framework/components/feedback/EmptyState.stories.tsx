@@ -33,6 +33,7 @@ type Story = StoryObj<typeof meta>;
 
 // Icon component for stories
 const BoxIcon = () => (
+	// violations-suppress: react/no-inline-svg story fixture
 	<svg className="size-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
 		<path
 			strokeLinecap="round"
@@ -43,6 +44,7 @@ const BoxIcon = () => (
 );
 
 const BookIcon = () => (
+	// violations-suppress: react/no-inline-svg story fixture
 	<svg className="size-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
 		<path
 			strokeLinecap="round"
@@ -53,6 +55,7 @@ const BookIcon = () => (
 );
 
 const SearchIcon = () => (
+	// violations-suppress: react/no-inline-svg story fixture
 	<svg className="size-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
 		<path
 			strokeLinecap="round"

@@ -257,7 +257,7 @@ export const InteractiveCreateMode: Story = {
 		return (
 			<div>
 				{submitted && (
-					<div className="mb-4 rounded-md bg-green-100 p-4 text-green-900">Book submitted successfully!</div>
+					<div className="mb-4 rounded-md bg-success p-4 text-success">Book submitted successfully!</div>
 				)}
 				<BookDialog
 					open={open}
@@ -309,9 +309,9 @@ export const InteractiveEditMode: Story = {
 		return (
 			<div>
 				{submitted && (
-					<div className="mb-4 rounded-md bg-green-100 p-4 text-green-900">Book updated successfully!</div>
+					<div className="mb-4 rounded-md bg-success p-4 text-success">Book updated successfully!</div>
 				)}
-				<div className="mb-4 rounded-md bg-blue-50 p-4">
+				<div className="mb-4 rounded-md bg-info p-4">
 					<h3 className="font-semibold">Current Book Data:</h3>
 					<pre className="mt-2 text-xs">{JSON.stringify(currentBook, null, 2)}</pre>
 				</div>

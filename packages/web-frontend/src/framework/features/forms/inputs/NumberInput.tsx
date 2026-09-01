@@ -45,6 +45,7 @@ export function NumberInput({
 
 	return (
 		// eslint-disable-next-line no-restricted-syntax
+		// violations-suppress: react/no-raw-input primitive wrapper implementation
 		<input
 			id={id}
 			type="number"

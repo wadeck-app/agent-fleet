@@ -179,6 +179,7 @@ export const InContext: Story = {
 					<h1 className="text-2xl font-bold">Book Library</h1>
 					<p className="text-muted-foreground">Manage your book collection</p>
 				</div>
+				// violations-suppress: react/no-raw-button story fixture
 				<button
 					className={`
        rounded-md bg-primary px-4 py-2 text-sm font-medium

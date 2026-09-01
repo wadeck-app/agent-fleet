@@ -105,11 +105,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 	private getSeverityStyles(severity: ErrorSeverity): string {
 		switch (severity) {
 			case ErrorSeverity.LOW:
-				return 'border-blue-500 bg-blue-50 dark:bg-blue-950';
+				return 'border-info bg-info/10';
 			case ErrorSeverity.MEDIUM:
-				return 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950';
+				return 'border-warning bg-warning/10';
 			case ErrorSeverity.HIGH:
-				return 'border-orange-500 bg-orange-50 dark:bg-orange-950';
+				return 'border-warning bg-warning/10';
 			case ErrorSeverity.CRITICAL:
 				return 'border-destructive bg-destructive/10';
 			default:

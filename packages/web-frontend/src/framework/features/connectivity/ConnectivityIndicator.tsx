@@ -1,4 +1,5 @@
 import { Badge } from '@framework/components/primitives/Badge';
+import { Button } from '@framework/components/primitives/Button';
 import { cn } from '@framework/lib/utils';
 
 import { type ConnectivityStatus, useConnectivity } from './ConnectivityContext';
@@ -67,8 +68,9 @@ export function ConnectivityIndicator({ showWhenConnected = false, className }: 
 					{queueSize > 0 && (
 						<span className="ml-1 rounded-full bg-current/20 px-1.5 py-0.5 text-xs">{queueSize}</span>
 					)}
-					{/* eslint-disable-next-line no-restricted-syntax */}
-					<button
+					<Button
+						variant="ghost"
+						size="icon-xs"
 						onClick={e => {
 							e.stopPropagation();
 							forceRetry();
@@ -81,7 +83,7 @@ export function ConnectivityIndicator({ showWhenConnected = false, className }: 
 						aria-label="Retry connection now"
 					>
 						↻
-					</button>
+					</Button>
 				</>
 			)}
 		</Badge>

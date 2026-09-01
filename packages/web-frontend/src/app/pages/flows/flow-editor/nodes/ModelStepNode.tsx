@@ -51,8 +51,8 @@ export const ModelStepNode = memo(({ data, selected }: ModelStepNodeProps) => {
 					id={port.id}
 					className={cn(
 						// eslint-disable-next-line no-restricted-syntax -- Flow editor uses specific colors for port types (blue=input, green=output, yellow=warning)
-						'!h-3 !w-3 !bg-blue-500',
-						port.uncertain && '!border-2 !border-yellow-500'
+						'!h-3 !w-3 !bg-info',
+						port.uncertain && '!border-2 !border-warning'
 					)}
 					style={{
 						top: `${20 + index * 24}px`,
@@ -121,7 +121,7 @@ export const ModelStepNode = memo(({ data, selected }: ModelStepNodeProps) => {
 					position={Position.Right}
 					id={port.id}
 					// eslint-disable-next-line no-restricted-syntax -- Flow editor uses specific colors for port types (blue=input, green=output, yellow=warning)
-					className="!h-3 !w-3 !bg-green-500"
+					className="!h-3 !w-3 !bg-success"
 					style={{
 						top: `${20 + index * 24}px`,
 					}}

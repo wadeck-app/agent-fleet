@@ -579,6 +579,7 @@ function VisualizeFlowDialog({ proposal }: VisualizeFlowDialogProps) {
 	return (
 		<Dialog>
 			<DialogTrigger asChild>
+				{/* violations-suppress: tailwind/no-button-classname-style-override no matching compact variant */}
 				<Button variant="outline" size="sm" className="h-auto py-1 text-xs">
 					Visualize
 				</Button>
@@ -980,6 +981,9 @@ function ProposalView({
  *
  * ===========================================================================================
  */
+const redesigningBannerCls =
+	'flex items-center gap-3 rounded-md border border-warning/50 bg-warning/10 px-4 py-3';
+
 export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalSectionProps) {
 	const { proposals, currentProposal, isLoading, error, refresh, refreshSilent } = useFlowProposals(ticketId);
 	const { showToast } = useToast();
@@ -1122,7 +1126,7 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 		<div ref={proposalsSectionRef} className="space-y-6 py-2">
 			{/* Redesigning banner -- shown after rejection until WS event clears it (r1 fix) */}
 			{isRedesigning && (
-				<div className="flex items-center gap-3 rounded-md border border-warning/50 bg-warning/10 px-4 py-3">
+				<div className={redesigningBannerCls}>
 					<Loader2 className="size-4 shrink-0 animate-spin text-warning" />
 					<p className="text-sm text-warning">Rejection submitted. AI is redesigning the flow...</p>
 				</div>

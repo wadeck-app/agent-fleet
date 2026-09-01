@@ -136,6 +136,7 @@ describe('DataTableContext (Approach 4)', () => {
 			return (
 				<div>
 					<div data-testid="current-page">{ctx.page}</div>
+					// violations-suppress: react/no-raw-button test fixture
 					<button onClick={() => ctx.setPage(2)}>Next Page</button>
 				</div>
 			);

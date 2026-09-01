@@ -161,6 +161,7 @@ export const WithDisabledOption: Story = {
 					required={true}
 					error={error}
 				/>
+				// violations-suppress: react/no-raw-button story fixture
 				<button
 					type="submit"
 					className={`
@@ -272,6 +273,7 @@ export const WithDisabledOption: Story = {
 					required={true}
 				/>
 
+				// violations-suppress: react/no-raw-button story fixture
 				<button
 					type="submit"
 					className={`
@@ -376,6 +378,7 @@ export const LongLabels: Story = {
 					error={error}
 				/>
 
+				// violations-suppress: react/no-raw-button story fixture
 				<button
 					className={`
        w-full rounded-md bg-primary px-4 py-2 text-primary-foreground

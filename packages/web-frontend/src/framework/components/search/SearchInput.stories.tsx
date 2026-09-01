@@ -145,6 +145,7 @@ export const Interactive: Story = {
 					<div className="rounded-md border border-border bg-muted p-3">
 						<div className="mb-2 flex items-center justify-between">
 							<span className="text-sm font-medium">Event Log</span>
+							// violations-suppress: react/no-raw-button story fixture
 							<button
 								onClick={() => setLog([])}
 								className={`

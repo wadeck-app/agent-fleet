@@ -174,6 +174,7 @@ export const WithDescriptionAndError: Story = {
 					/>
 				</div>
 
+				// violations-suppress: react/no-raw-button story fixture
 				<button
 					className={`
        w-full rounded-md bg-primary px-4 py-2 text-primary-foreground
@@ -282,6 +283,7 @@ export const WithDescriptionAndError: Story = {
 
 				{error && <p className="text-sm text-destructive">{error}</p>}
 
+				// violations-suppress: react/no-raw-button story fixture
 				<button
 					type="submit"
 					className={`
@@ -393,6 +395,7 @@ export const WithDescriptionAndError: Story = {
 					/>
 				</div>
 
+				// violations-suppress: react/no-raw-button story fixture
 				<button
 					className={`
        w-full rounded-md bg-primary px-4 py-2 text-primary-foreground

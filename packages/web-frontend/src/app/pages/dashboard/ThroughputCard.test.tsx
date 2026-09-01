@@ -32,6 +32,7 @@ describe('ThroughputCard', () => {
 		render(<ThroughputCard tasksPerHour={10} successRate={95} avgTaskDuration={180000} />);
 
 		const successRateText = screen.getByText('95%');
+		// violations-suppress: tailwind/no-raw-color-class test fixture
 		expect(successRateText).toHaveClass('text-green-600');
 	});
 
@@ -39,6 +40,7 @@ describe('ThroughputCard', () => {
 		render(<ThroughputCard tasksPerHour={10} successRate={75} avgTaskDuration={180000} />);
 
 		const successRateText = screen.getByText('75%');
+		// violations-suppress: tailwind/no-raw-color-class test fixture
 		expect(successRateText).toHaveClass('text-orange-600');
 	});
 
@@ -46,6 +48,7 @@ describe('ThroughputCard', () => {
 		render(<ThroughputCard tasksPerHour={10} successRate={50} avgTaskDuration={180000} />);
 
 		const successRateText = screen.getByText('50%');
+		// violations-suppress: tailwind/no-raw-color-class test fixture
 		expect(successRateText).toHaveClass('text-red-600');
 	});
 
