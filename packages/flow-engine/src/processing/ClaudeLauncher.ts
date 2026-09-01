@@ -94,7 +94,7 @@ export class ClaudeLauncher {
 		}
 		try {
 			if (process.platform === 'win32') {
-				const result = execSync('where claude', { encoding: 'utf8' }).trim();
+				const result = execSync('where claude', { encoding: 'utf8', windowsHide: true }).trim();
 				const paths = result.split('\n').map(p => p.trim());
 				const cmdPath = paths.find(p => p.endsWith('.cmd'));
 				if (cmdPath) return cmdPath;
@@ -102,7 +102,7 @@ export class ClaudeLauncher {
 				if (batPath) return batPath;
 				return paths[0];
 			} else {
-				return execSync('which claude', { encoding: 'utf8' }).trim();
+				return execSync('which claude', { encoding: 'utf8', windowsHide: true }).trim();
 			}
 		} catch (error) {
 			console.warn('Could not find claude in PATH, using "claude" as fallback');

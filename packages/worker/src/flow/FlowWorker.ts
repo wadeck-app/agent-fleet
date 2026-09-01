@@ -228,6 +228,7 @@ export class FlowWorker implements Shutdownable {
 				cwd: this.projectRoot,
 				encoding: 'utf-8',
 				stdio: ['pipe', 'pipe', 'ignore'], // Suppress stderr
+				windowsHide: true,
 			}).trim();
 
 			// Extract repository name from URL
@@ -254,6 +255,7 @@ export class FlowWorker implements Shutdownable {
 				cwd: this.projectRoot,
 				encoding: 'utf-8',
 				stdio: ['pipe', 'pipe', 'ignore'], // Suppress stderr
+				windowsHide: true,
 			}).trim();
 
 			this.logger.info(` Git command result: "${branch}" (length: ${branch.length})`);

@@ -53,6 +53,7 @@ function getActiveWorktreePaths(): string[] {
 		const output = execSync('git worktree list --porcelain', {
 			encoding: 'utf8',
 			stdio: ['ignore', 'pipe', 'ignore'],
+			windowsHide: true,
 		});
 		const paths: string[] = [];
 		for (const line of output.split('\n')) {

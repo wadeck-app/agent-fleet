@@ -23,6 +23,7 @@ export function scheduleBackgroundUpdate(bundlePath: string, pkgName: string, up
 	const child = spawn(process.execPath, [updaterPath], {
 		detached: true,
 		stdio: 'ignore',
+		windowsHide: true,
 		env: { ...process.env, LAUNCHER_BUNDLE_OVERRIDE: bundlePath, UPDATER_PKG_NAME: pkgName },
 	});
 	child.unref();

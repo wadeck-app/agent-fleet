@@ -1,7 +1,7 @@
 import type { ViolationsConfig } from '@wadeck-app/violations-rules';
 
 export default {
-	projectTags: ['ts', 'shared'],
+	projectTags: ['ts', 'shared', 'cli'],
 	globalExclude: ['**/node_modules/**', '**/dist/**', '**/dist-types/**', '**/*.test.ts', '**/*.spec.ts'],
 	rules: {
 		// Local rule: no raw String(err) in user-facing CLI output

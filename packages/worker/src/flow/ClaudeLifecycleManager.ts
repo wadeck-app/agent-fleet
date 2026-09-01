@@ -149,7 +149,7 @@ export class ClaudeLifecycleManager {
 					try {
 						execSync(`taskkill /PID ${pid} /T /F`, {
 							stdio: 'inherit',
-							windowsHide: false,
+							windowsHide: true,
 						});
 						this.logger.info(` Process killed successfully`);
 					} catch (killError: any) {

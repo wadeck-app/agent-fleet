@@ -452,7 +452,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 			// On Windows, find the real opencode.exe next to opencode.cmd in the npm global bin dir.
 			// shell:true with complex prompts (newlines, backticks) is unreliable on Windows cmd.exe.
 			try {
-				const cmdPath = execSync('where.exe opencode.cmd', { encoding: 'utf8' }).trim().split('\n')[0]!.trim();
+				const cmdPath = execSync('where.exe opencode.cmd', { encoding: 'utf8', windowsHide: true }).trim().split('\n')[0]!.trim();
 				const dir = path.dirname(cmdPath);
 				const exePath = path.join(dir, 'node_modules', 'opencode-ai', 'bin', 'opencode.exe');
 				if (fs.existsSync(exePath)) {
@@ -465,7 +465,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 			return { parts: ['opencode'], needsShell: true };
 		}
 		try {
-			return { parts: [execSync('which opencode', { encoding: 'utf8' }).trim()], needsShell: false };
+			return { parts: [execSync('which opencode', { encoding: 'utf8', windowsHide: true }).trim()], needsShell: false };
 		} catch {
 			return { parts: ['opencode'], needsShell: false };
 		}

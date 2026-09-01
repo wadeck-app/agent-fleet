@@ -88,11 +88,11 @@ export class FlowDesignerAgent {
 	private findClaudePath(): string {
 		try {
 			if (process.platform === 'win32') {
-				const result = execSync('where claude', { encoding: 'utf8' }).trim();
+				const result = execSync('where claude', { encoding: 'utf8', windowsHide: true }).trim();
 				const paths = result.split('\n').map(p => p.trim());
 				return paths.find(p => p.endsWith('.cmd')) ?? paths[0] ?? 'claude';
 			} else {
-				return execSync('which claude', { encoding: 'utf8' }).trim();
+				return execSync('which claude', { encoding: 'utf8', windowsHide: true }).trim();
 			}
 		} catch {
 			return 'claude';

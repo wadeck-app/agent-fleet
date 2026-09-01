@@ -5,6 +5,7 @@ try {
 		cwd: 'C:\\Workspace_Tooling\\agent-fleet',
 		encoding: 'utf-8',
 		stdio: 'pipe',
+		windowsHide: true,
 	});
 	console.log(result);
 } catch (error) {
