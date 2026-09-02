@@ -27,10 +27,7 @@ Exit codes:
   2  daemon not running
   3  not found`;
 
-// NOTE: Path changed from ~/.flow-daemon to ~/.config/.flow-daemon to match what
-// `flow cli logs` reads (via ConfigDir.get('flow') + '../.flow-daemon').
-// Existing users who had logs in ~/.flow-daemon will need to move them manually.
-const DAEMON_DIR = path.join(os.homedir(), '.config', '.flow-daemon');
+const DAEMON_DIR = ConfigDir.get('flow');
 
 // ---------------------------------------------------------------------------
 // Daemon lifecycle commands

@@ -1,6 +1,6 @@
+import { ConfigDir } from '@wadeck-app/shared-cli';
 import type { Command } from 'commander';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 
 export interface StepStateRecord {
@@ -171,7 +171,7 @@ export function registerHistoryCommand(program: Command): void {
 				id?: string;
 				json?: boolean;
 			}) => {
-				const daemonDir = path.join(os.homedir(), '.flow-daemon');
+				const daemonDir = ConfigDir.get('flow');
 				const executionsDir = path.join(daemonDir, 'executions');
 				const execs = loadExecutions(executionsDir);
 

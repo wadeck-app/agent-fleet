@@ -1,4 +1,5 @@
 import { type HookConfig, HookDispatcher } from '@wadeck-app/shared-cli/HookDispatcher';
+import { ConfigDir } from '@wadeck-app/shared-cli';
 import { type DaemonHandle, createDaemon } from '@wadeck-app/singleton-daemon-kit';
 import type { ApprovalProvider, WorkspaceProvider } from 'extension-points';
 import { WorkspaceManager } from 'flow-engine';
@@ -78,7 +79,7 @@ async function tryResolvePlugins(): Promise<{
 }
 
 async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemonDir?: string): Promise<DaemonHandle> {
-	const resolvedDaemonDir = daemonDir ?? path.join(os.homedir(), '.flow-daemon');
+	const resolvedDaemonDir = daemonDir ?? ConfigDir.get('flow');
 	const executionsDir = path.join(resolvedDaemonDir, 'executions');
 	const logsDir = path.join(resolvedDaemonDir, 'logs');
 

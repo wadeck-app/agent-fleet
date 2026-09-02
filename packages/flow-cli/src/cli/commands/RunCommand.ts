@@ -1,4 +1,5 @@
 import { DaemonNotRunningError, createDaemonClient } from '@wadeck-app/singleton-daemon-kit';
+import { ConfigDir } from '@wadeck-app/shared-cli';
 import type { Command } from 'commander';
 import type { FlowDefinition, InputDefinition } from 'flow-engine/types';
 import * as yaml from 'js-yaml';
@@ -254,7 +255,7 @@ export function registerRunCommand(program: Command): void {
 			) => {
 				const inputs = parseInputArgs([...options.input, ...options.inputs]);
 				const cwd = process.cwd();
-				const daemonDir = path.join(os.homedir(), '.flow-daemon');
+				const daemonDir = ConfigDir.get('flow');
 
 				const resolution = resolveFlowFile(flowRef, cwd);
 				if (!resolution.found) {
