@@ -272,6 +272,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 					// not stdin. An open stdin pipe causes OpenCode to wait for EOF.
 					stdio: ['ignore', 'pipe', 'pipe'],
 					shell,
+					windowsHide: true,
 					env,
 				});
 				this.currentProcess = proc;
