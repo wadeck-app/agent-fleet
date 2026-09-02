@@ -34,5 +34,6 @@ if (!tsx) {
 
 const child = spawn(process.execPath, [tsx, cli, ...process.argv.slice(2)], {
 	stdio: 'inherit',
+	windowsHide: true,
 });
 child.on('exit', (code, signal) => process.exit(code ?? (signal ? 1 : 0)));
