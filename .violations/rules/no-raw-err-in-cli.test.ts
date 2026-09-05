@@ -23,7 +23,7 @@ describe('no-raw-err-in-cli', () => {
         process.stderr.write('Error: ' + String(err));
       }
     `, async (file) => {
-      const violations = await rule.check([file]);
+      const violations = await rule.check([file], {});
       assert.ok(violations.length > 0, 'expected at least one violation');
       assert.ok(violations[0]!.message.includes('Raw error'), 'message should mention raw error');
     });
@@ -35,7 +35,7 @@ describe('no-raw-err-in-cli', () => {
         console.error(\`Failed: \${err}\`);
       }
     `, async (file) => {
-      const violations = await rule.check([file]);
+      const violations = await rule.check([file], {});
       assert.ok(violations.length > 0, 'expected at least one violation');
     });
   });
@@ -46,7 +46,7 @@ describe('no-raw-err-in-cli', () => {
         process.stderr.write('Something went wrong\\n');
       }
     `, async (file) => {
-      const violations = await rule.check([file]);
+      const violations = await rule.check([file], {});
       assert.strictEqual(violations.length, 0, 'should not flag hardcoded messages');
     });
   });
@@ -60,7 +60,7 @@ describe('no-raw-err-in-cli', () => {
     `, async (file) => {
       // suppression comment is on the line before, not on the output line,
       // so the suppression mechanism in the violations framework handles it
-      const violations = await rule.check([file]);
+      const violations = await rule.check([file], {});
       // The rule itself doesn't parse suppression — violations framework does.
       // Just confirm the rule finds the issue (framework suppresses it separately).
       assert.ok(Array.isArray(violations));
@@ -71,7 +71,7 @@ describe('no-raw-err-in-cli', () => {
     await withTempFile('cmd.ts', `
       // console.error(\`Error: \${err}\`);
     `, async (file) => {
-      const violations = await rule.check([file]);
+      const violations = await rule.check([file], {});
       assert.strictEqual(violations.length, 0);
     });
   });

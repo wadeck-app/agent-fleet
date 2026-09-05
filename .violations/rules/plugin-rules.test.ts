@@ -31,7 +31,7 @@ export default {
   token: '\${process.env.TOKEN}',
 };
     `, async (dir, file) => {
-      const violations = await rule.check([file]);
+      const violations = await rule.check([file], {});
       const envVarViolation = violations.find(v => v.message.includes('PLUGIN-007'));
       assert.ok(envVarViolation, 'should flag env var interpolation (PLUGIN-007)');
     });
@@ -44,7 +44,7 @@ export default {
   manifestVersion: '1',
 };
     `, async (dir, file) => {
-      const violations = await rule.check([file]);
+      const violations = await rule.check([file], {});
       // PLUGIN-001 won't fire because the file exists in this dir.
       // PLUGIN-004 may fire if registry not found — that's OK, just check no PLUGIN-007.
       const plugin007 = violations.filter(v => v.message.includes('PLUGIN-007'));
@@ -53,7 +53,7 @@ export default {
   });
 
   it('returns array (smoke test — no crash on empty files list)', async () => {
-    const violations = await rule.check([]);
+    const violations = await rule.check([], {});
     assert.ok(Array.isArray(violations));
   });
 });
