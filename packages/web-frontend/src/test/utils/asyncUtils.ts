@@ -2,8 +2,7 @@ import type { PaginatedLogsResponse } from '@shared/api/tasks.contract';
 import { vi } from 'vitest';
 
 /**
- * TODO translate
- * Cree une promise controlable pour tester les race conditions
+ * Creates a controllable promise for testing race conditions.
  */
 export function createControlledPromise<T>() {
 	let resolveFunc: (value: T) => void;
@@ -22,8 +21,7 @@ export function createControlledPromise<T>() {
 }
 
 /**
- * TODO translate
- * Mock API avec timing controle
+ * Mock API with controlled timing.
  */
 export function createMockTasksApi() {
 	const pendingCalls: Array<{ resolve: Function; reject: Function }> = [];

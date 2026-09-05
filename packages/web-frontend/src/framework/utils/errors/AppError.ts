@@ -73,7 +73,7 @@ export class AppError extends Error {
 			| ErrorCode
 			| string
 			| {
-					code?: ErrorCode | string;
+					code?: ErrorCode | string; // violations-suppress: ts/no-union-with-string accepts unknown error codes from external sources
 					severity?: ErrorSeverity;
 					statusCode?: number;
 					originalError?: Error;

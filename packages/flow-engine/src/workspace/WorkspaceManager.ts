@@ -163,7 +163,7 @@ export class WorkspaceManager {
 		pruneWorkspaceDirAtStartup(basePath, retainDays, maxWorkspaces);
 	}
 
-	// ── private helpers ──────────────────────────────────────────────────────
+	// private helpers
 
 	private async findReusable(
 		taskId: string,

@@ -146,7 +146,7 @@ export function ColumnVisibility({
 	};
 
 	// @formatter:off
-	// Determine si une colonne est modifiee par rapport a la configuration par defaut
+	// Determines if a column has been modified from the default configuration
 	const isColumnModified = (columnId: string): boolean => {
 		// Check visibility modification (use hook if provided, otherwise fallback)
 		let visibilityModified = false;
@@ -172,7 +172,7 @@ export function ColumnVisibility({
 		return visibilityModified || orderModified;
 	};
 
-	// Reinitialise une colonne individuelle a sa valeur par defaut
+	// Resets an individual column to its default value
 	const handleResetColumn = (columnId: string) => {
 		// Reset visibility (use hook if provided, otherwise fallback)
 		if (onResetColumn) {

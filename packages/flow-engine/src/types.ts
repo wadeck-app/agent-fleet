@@ -417,9 +417,8 @@ export interface OutputVariableConfig {
 	/** Whether this field is required (checked in post-process) */
 	required?: boolean;
 
-	// violations-suppress: ts/no-union-with-string string is a named transform function reference, not a free-form string
-	/** Optional transform function to apply after extraction */
-	transform?: TransformFunction | string;
+		/** Optional transform function to apply after extraction */
+	transform?: TransformFunction | string; // violations-suppress: ts/no-union-with-string string is a named transform function reference
 
 	/** Default value if extraction fails (only for non-required fields) */
 	default?: any;
@@ -1026,7 +1025,7 @@ export interface ModelStepMeta extends StepMetaBase {
 
 export type StepMeta = ScriptStepMeta | ModelStepMeta | StepMetaBase;
 
-// ──────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 
 /**
  * Trace of a single step execution

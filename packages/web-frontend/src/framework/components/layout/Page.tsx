@@ -8,13 +8,13 @@ export interface PageProps {
 }
 
 /**
- * Page - Container exterieur de page avec max-width et padding
+ * Page - Outer page container with max-width and padding
  *
- * Fournit le container standard pour les pages de l'application avec:
- * - Container responsive centre
- * - Max-width de 7xl (80rem / 1280px) par defaut
- * - Padding uniforme de 1.5rem (p-6)
- * - Option fullWidth pour enlever la contrainte de largeur
+ * Provides the standard container for application pages with:
+ * - Responsive centered container
+ * - Max-width of 7xl (80rem / 1280px) by default
+ * - Uniform padding of 1.5rem (p-6)
+ * - fullWidth option to remove width constraint
  *
  * @example
  * ```tsx
