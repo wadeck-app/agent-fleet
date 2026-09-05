@@ -46,23 +46,23 @@ export function registerValidateCommand(program: Command): void {
 
 			// Human-readable: Repo A contract
 			if (result.exit === 2) {
-				console.error(`✗ ${result.message}`);
+				console.error(`[fail] ${result.message}`);
 				process.exit(1);
 			}
 			if (result.exit === 3) {
-				console.error(`✗ Parse error: ${result.errors[0]?.message ?? 'unknown'}`);
+				console.error(`[fail] Parse error: ${result.errors[0]?.message ?? 'unknown'}`);
 				process.exit(1);
 			}
 			if (result.exit === 1) {
-				console.error(`✗ Flow has ${result.errors.length} error${result.errors.length > 1 ? 's' : ''}`);
+				console.error(`[fail] Flow has ${result.errors.length} error${result.errors.length > 1 ? 's' : ''}`);
 				for (const err of result.errors) {
 					const loc = err.path ? ` [${err.path}]` : '';
-					const msg = err.message ?? String(err);
+					const msg = (err != null && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') ? (err as { message: string }).message : String(err);
 					console.error(`  - ${msg}${loc}`);
 				}
 				process.exit(1);
 			}
-			console.log('✓ Flow is valid');
+			console.log('[ok] Flow is valid');
 			process.exit(0);
 		});
 }

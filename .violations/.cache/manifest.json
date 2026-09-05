@@ -2,7 +2,7 @@
   "frameworkVersion": "2026.9.1-093-f2480599",
   "files": {
     "C:\\Workspace_Tooling\\agent-fleet\\.violations\\config.ts": {
-      "mtimeMs": 1788633310227.7942,
+      "mtimeMs": 1788635943207.548,
       "compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\config.js"
     },
     "C:\\Workspace_Tooling\\agent-fleet\\.violations\\rules\\no-raw-err-in-cli.ts": {
