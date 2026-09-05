@@ -271,7 +271,7 @@ export class ScriptExecutor {
 				// Clean up temp file if created
 				cleanupTempFile();
 
-				reject(new ScriptExecutionError(`Failed to execute script: ${(error instanceof Error ? error.message : String(error))}`, -1, stdout, stderr));
+				reject(new ScriptExecutionError(`Failed to execute script: ${String(error)}`, -1, stdout, stderr));
 			});
 		});
 	}

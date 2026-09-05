@@ -1,15 +1,15 @@
 import type { Page } from '@playwright/test';
 
 /**
- * API Helpers pour creer des donnees via l'API au lieu de l'UI
- * Utilises pour le setup des tests, PAS pour tester la creation elle-meme
+ * API Helpers for creating test data via the API instead of the UI.
+ * Used for test setup, NOT for testing the creation itself.
  */
 
 /**
- * Creer un ingredient via l'API
- * @param page - Page Playwright
- * @param ingredient - Donnees de l'ingredient
- * @returns L'ingredient cree avec son ID
+ * Creates an ingredient via the API.
+ * @param page - Playwright Page
+ * @param ingredient - Ingredient data
+ * @returns The created ingredient with its ID
  */
 export async function createIngredientViaAPI(
 	page: Page,
@@ -37,11 +37,11 @@ export async function createIngredientViaAPI(
 }
 
 /**
- * Creer plusieurs ingredients via l'API en parallele
- * Plus rapide que de les creer un par un
- * @param page - Page Playwright
- * @param ingredients - Tableau d'ingredients a creer
- * @returns Les ingredients crees avec leurs IDs
+ * Creates multiple ingredients via the API in parallel.
+ * Faster than creating them one by one.
+ * @param page - Playwright Page
+ * @param ingredients - Array of ingredients to create
+ * @returns The created ingredients with their IDs
  */
 export async function createIngredientsViaAPI(
 	page: Page,
@@ -59,10 +59,10 @@ export async function createIngredientsViaAPI(
 }
 
 /**
- * Creer une recette via l'API
- * @param page - Page Playwright
- * @param recipe - Donnees de la recette
- * @returns La recette creee avec son ID
+ * Creates a recipe via the API.
+ * @param page - Playwright Page
+ * @param recipe - Recipe data
+ * @returns The created recipe with its ID
  */
 export async function createRecipeViaAPI(
 	page: Page,
@@ -88,10 +88,10 @@ export async function createRecipeViaAPI(
 }
 
 /**
- * Creer plusieurs recettes via l'API en parallele
- * @param page - Page Playwright
- * @param recipes - Tableau de recettes a creer
- * @returns Les recettes creees avec leurs IDs
+ * Creates multiple recipes via the API in parallel.
+ * @param page - Playwright Page
+ * @param recipes - Array of recipes to create
+ * @returns The created recipes with their IDs
  */
 export async function createRecipesViaAPI(
 	page: Page,
@@ -107,11 +107,11 @@ export async function createRecipesViaAPI(
 }
 
 /**
- * Modifier un ingredient via l'API
- * @param page - Page Playwright
- * @param id - ID de l'ingredient
- * @param updates - Donnees a mettre a jour
- * @returns L'ingredient mis a jour
+ * Updates an ingredient via the API.
+ * @param page - Playwright Page
+ * @param id - Ingredient ID
+ * @param updates - Data to update
+ * @returns The updated ingredient
  */
 export async function updateIngredientViaAPI(
 	page: Page,
@@ -140,9 +140,9 @@ export async function updateIngredientViaAPI(
 }
 
 /**
- * Supprimer un ingredient via l'API
- * @param page - Page Playwright
- * @param id - ID de l'ingredient
+ * Deletes an ingredient via the API.
+ * @param page - Playwright Page
+ * @param id - Ingredient ID
  */
 export async function deleteIngredientViaAPI(page: Page, id: string) {
 	const backendPort = (page as any).backendPort || 3000;
@@ -156,9 +156,9 @@ export async function deleteIngredientViaAPI(page: Page, id: string) {
 }
 
 /**
- * Supprimer une recette via l'API
- * @param page - Page Playwright
- * @param id - ID de la recette
+ * Deletes a recipe via the API.
+ * @param page - Playwright Page
+ * @param id - Recipe ID
  */
 export async function deleteRecipeViaAPI(page: Page, id: string) {
 	const backendPort = (page as any).backendPort || 3000;
@@ -172,9 +172,9 @@ export async function deleteRecipeViaAPI(page: Page, id: string) {
 }
 
 /**
- * Recuperer tous les ingredients via l'API
- * @param page - Page Playwright
- * @returns La liste des ingredients
+ * Retrieves all ingredients via the API.
+ * @param page - Playwright Page
+ * @returns The list of ingredients
  */
 export async function getIngredientsViaAPI(page: Page) {
 	const backendPort = (page as any).backendPort || 3000;
@@ -190,9 +190,9 @@ export async function getIngredientsViaAPI(page: Page) {
 }
 
 /**
- * Recuperer toutes les recettes via l'API
- * @param page - Page Playwright
- * @returns La liste des recettes
+ * Retrieves all recipes via the API.
+ * @param page - Playwright Page
+ * @returns The list of recipes
  */
 export async function getRecipesViaAPI(page: Page) {
 	const backendPort = (page as any).backendPort || 3000;
@@ -208,11 +208,11 @@ export async function getRecipesViaAPI(page: Page) {
 }
 
 /**
- * Envoyer un message de chat via l'API
- * @param page - Page Playwright
- * @param message - Message a envoyer
- * @param conversationId - ID de la conversation (optionnel)
- * @returns La reponse du chat avec conversationId et message
+ * Sends a chat message via the API.
+ * @param page - Playwright Page
+ * @param message - Message to send
+ * @param conversationId - Conversation ID (optional)
+ * @returns The chat response with conversationId and message
  */
 export async function sendChatMessageViaAPI(page: Page, message: string, conversationId?: string) {
 	const backendPort = (page as any).backendPort || 3000;
@@ -230,9 +230,9 @@ export async function sendChatMessageViaAPI(page: Page, message: string, convers
 }
 
 /**
- * Recuperer toutes les conversations via l'API
- * @param page - Page Playwright
- * @returns La liste des conversations
+ * Retrieves all conversations via the API.
+ * @param page - Playwright Page
+ * @returns The list of conversations
  */
 export async function getConversationsViaAPI(page: Page) {
 	const backendPort = (page as any).backendPort || 3000;
@@ -248,10 +248,10 @@ export async function getConversationsViaAPI(page: Page) {
 }
 
 /**
- * Recuperer une conversation specifique via l'API
- * @param page - Page Playwright
- * @param conversationId - ID de la conversation
- * @returns La conversation avec ses messages
+ * Retrieves a specific conversation via the API.
+ * @param page - Playwright Page
+ * @param conversationId - Conversation ID
+ * @returns The conversation with its messages
  */
 export async function getConversationViaAPI(page: Page, conversationId: string) {
 	const backendPort = (page as any).backendPort || 3000;
@@ -270,9 +270,9 @@ export async function getConversationViaAPI(page: Page, conversationId: string) 
 }
 
 /**
- * Supprimer une conversation via l'API
- * @param page - Page Playwright
- * @param conversationId - ID de la conversation
+ * Deletes a conversation via the API.
+ * @param page - Playwright Page
+ * @param conversationId - Conversation ID
  */
 export async function deleteConversationViaAPI(page: Page, conversationId: string) {
 	const backendPort = (page as any).backendPort || 3000;
@@ -289,11 +289,11 @@ export async function deleteConversationViaAPI(page: Page, conversationId: strin
 }
 
 /**
- * Creer une conversation via l'API
- * @param page - Page Playwright
- * @param title - Titre de la conversation (optionnel)
- * @param type - Type de conversation (optionnel)
- * @returns La conversation creee
+ * Creates a conversation via the API.
+ * @param page - Playwright Page
+ * @param title - Conversation title (optional)
+ * @param type - Conversation type (optional)
+ * @returns The created conversation
  */
 export async function createConversationViaAPI(page: Page, title?: string, type: 'general' | 'contextual' = 'general') {
 	const backendPort = (page as any).backendPort || 3000;
@@ -311,13 +311,13 @@ export async function createConversationViaAPI(page: Page, title?: string, type:
 }
 
 /**
- * Sauvegarder une memoire via l'API
- * @param page - Page Playwright
- * @param conversationId - ID de la conversation
- * @param key - Cle de la memoire
- * @param value - Valeur de la memoire
- * @param category - Categorie de la memoire
- * @returns La memoire creee
+ * Saves a memory via the API.
+ * @param page - Playwright Page
+ * @param conversationId - Conversation ID
+ * @param key - Memory key
+ * @param value - Memory value
+ * @param category - Memory category
+ * @returns The created memory
  */
 export async function saveMemoryViaAPI(
 	page: Page,
@@ -344,10 +344,10 @@ export async function saveMemoryViaAPI(
 }
 
 /**
- * Recuperer toutes les memoires d'une conversation via l'API
- * @param page - Page Playwright
- * @param conversationId - ID de la conversation
- * @returns La liste des memoires
+ * Retrieves all memories for a conversation via the API.
+ * @param page - Playwright Page
+ * @param conversationId - Conversation ID
+ * @returns The list of memories
  */
 export async function getMemoriesViaAPI(page: Page, conversationId: string) {
 	const backendPort = (page as any).backendPort || 3000;
@@ -367,9 +367,9 @@ export async function getMemoriesViaAPI(page: Page, conversationId: string) {
 }
 
 /**
- * Supprimer une memoire via l'API
- * @param page - Page Playwright
- * @param memoryId - ID de la memoire
+ * Deletes a memory via the API.
+ * @param page - Playwright Page
+ * @param memoryId - Memory ID
  */
 export async function deleteMemoryViaAPI(page: Page, memoryId: string) {
 	const backendPort = (page as any).backendPort || 3000;
@@ -383,9 +383,9 @@ export async function deleteMemoryViaAPI(page: Page, memoryId: string) {
 }
 
 /**
- * Supprimer toutes les memoires d'une conversation via l'API
- * @param page - Page Playwright
- * @param conversationId - ID de la conversation
+ * Deletes all memories for a conversation via the API.
+ * @param page - Playwright Page
+ * @param conversationId - Conversation ID
  */
 export async function deleteAllMemoriesViaAPI(page: Page, conversationId: string) {
 	const memories = await getMemoriesViaAPI(page, conversationId);

@@ -60,7 +60,7 @@ export async function executeSubFlowStep(
 		} catch (error) {
 			stepTrace.endTime = Date.now();
 			stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
-			stepTrace.error = `Failed to render input '${key}': ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`;
+			stepTrace.error = `Failed to render input '${key}': ${error instanceof Error ? String(error) : String(error)}`;
 			return stepTrace;
 		}
 	}
@@ -103,7 +103,7 @@ export async function executeSubFlowStep(
 						try {
 							extractedOutputs[outputKey] = templateRenderer.render(template, outputContext, true);
 						} catch (error) {
-							stepTrace.error = `Failed to render output '${outputKey}': ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`;
+							stepTrace.error = `Failed to render output '${outputKey}': ${error instanceof Error ? String(error) : String(error)}`;
 							return stepTrace;
 						}
 					} else {
@@ -125,7 +125,7 @@ export async function executeSubFlowStep(
 	} catch (error) {
 		stepTrace.endTime = Date.now();
 		stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
-		stepTrace.error = error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error);
+		stepTrace.error = error instanceof Error ? String(error) : String(error);
 		console.error(`[StepRunner] SubFlowStep ${step.id} error:`, stepTrace.error);
 		return stepTrace;
 	}

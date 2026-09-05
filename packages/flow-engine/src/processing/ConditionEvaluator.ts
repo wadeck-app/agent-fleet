@@ -76,7 +76,7 @@ export class ConditionEvaluator {
 			}
 
 			throw new ConditionEvaluationError(
-				`Failed to evaluate condition: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`,
+				`Failed to evaluate condition: ${error instanceof Error ? String(error) : String(error)}`,
 				condition,
 				stepId
 			);

@@ -995,7 +995,7 @@ export interface Workspace {
 	usageCount: number;
 }
 
-// ─── Step Meta ────────────────────────────────────────────────────────────────
+// Step Meta
 
 /** Base metadata available on every step type */
 export interface StepMetaBase {

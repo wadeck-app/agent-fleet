@@ -1,14 +1,6 @@
 {
   "frameworkVersion": "2026.9.1-093-f2480599",
   "files": {
-    "C:\\Workspace_Tooling\\agent-fleet\\.violations\\rules\\no-spawn-without-windows-hide.ts": {
-      "mtimeMs": 1788386171734.3076,
-      "compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\rules\\no-spawn-without-windows-hide.js"
-    },
-    "C:\\Workspace_Tooling\\agent-fleet\\.violations\\rules\\no-spawn-without-windows-hide.test.ts": {
-      "mtimeMs": 1788386194563.7104,
-      "compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\rules\\no-spawn-without-windows-hide.test.test.js"
-    },
     "C:\\Workspace_Tooling\\agent-fleet\\.violations\\config.ts": {
       "mtimeMs": 1788633310227.7942,
       "compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\config.js"
@@ -20,14 +12,6 @@
     "C:\\Workspace_Tooling\\agent-fleet\\.violations\\rules\\plugin-rules.ts": {
       "mtimeMs": 1787955439993.2568,
       "compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\rules\\plugin-rules.js"
-    },
-    "C:\\Workspace_Tooling\\agent-fleet\\.violations\\rules\\no-raw-err-in-cli.test.ts": {
-      "mtimeMs": 1788630595026.0662,
-      "compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\rules\\no-raw-err-in-cli.test.test.js"
-    },
-    "C:\\Workspace_Tooling\\agent-fleet\\.violations\\rules\\plugin-rules.test.ts": {
-      "mtimeMs": 1788630605149.9773,
-      "compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\rules\\plugin-rules.test.test.js"
     }
   }
 }

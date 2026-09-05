@@ -273,7 +273,7 @@ export class OutputExtractor {
 			}
 		} catch (error) {
 			throw new OutputExtractionError(
-				`Transform '${transform}' failed: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`,
+				`Transform '${transform}' failed: ${error instanceof Error ? String(error) : String(error)}`,
 				varName,
 				stepId
 			);
@@ -373,7 +373,7 @@ export class OutputExtractor {
 			}
 		} catch (error) {
 			throw new OutputExtractionError(
-				`Type conversion to '${targetType}' failed: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`,
+				`Type conversion to '${targetType}' failed: ${error instanceof Error ? String(error) : String(error)}`,
 				varName,
 				stepId
 			);

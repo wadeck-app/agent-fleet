@@ -26,8 +26,8 @@ export function loadYaml(file: string): unknown {
 		}
 		return raw;
 	} catch (err) {
-		// violations-suppress: cli/no-raw-err-in-cli YAML parse errors must show details for actionable feedback
-		console.error(`Failed to parse YAML: ${err instanceof Error ? String(err) : String(err)}`);
+		const parseError = String(err);
+		console.error(`Failed to parse YAML: ${parseError}`);
 		process.exit(1);
 	}
 }

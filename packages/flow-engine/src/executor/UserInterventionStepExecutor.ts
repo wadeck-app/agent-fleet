@@ -83,7 +83,7 @@ async function executeViaApprovalProvider(
 	} catch (error) {
 		stepTrace.endTime = Date.now();
 		stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
-		stepTrace.error = error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error);
+		stepTrace.error = error instanceof Error ? String(error) : String(error);
 		return stepTrace;
 	}
 }
@@ -172,7 +172,7 @@ async function executeViaInterventionHandler(
 	} catch (error) {
 		stepTrace.endTime = Date.now();
 		stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
-		stepTrace.error = error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error);
+		stepTrace.error = error instanceof Error ? String(error) : String(error);
 		console.error(`[StepRunner] UserInterventionStep ${step.id} error:`, stepTrace.error);
 		return stepTrace;
 	}

@@ -249,7 +249,7 @@ export class FlowRegistry {
 					// Parsing errors still prevent loading (can't create FlowDefinition)
 					console.error(
 						`\n Failed to parse flow '${id}':`,
-						error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)
+						error instanceof Error ? String(error) : String(error)
 					);
 					console.error(`    This flow will NOT be loaded.\n`);
 				}
@@ -545,7 +545,7 @@ export class FlowRegistry {
 				} catch (error) {
 					console.error(
 						`\n Failed to parse flow '${id}' from ${filePath}:`,
-						error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)
+						error instanceof Error ? String(error) : String(error)
 					);
 				}
 			}

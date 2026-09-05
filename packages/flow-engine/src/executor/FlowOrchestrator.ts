@@ -79,7 +79,7 @@ export class FlowOrchestrator {
 			const validation = this.dagValidator.validate(dag);
 
 			if (!validation.valid) {
-				const errorMessages = validation.errors.map(e => (e instanceof Error ? e.message : String(e))).join('; ');
+				const errorMessages = validation.errors.map(e => String(e)).join('; ');
 				throw new OrchestrationError(`DAG validation failed: ${errorMessages}`, flow.id);
 			}
 
@@ -99,7 +99,7 @@ export class FlowOrchestrator {
 			trace.status = 'failed';
 			trace.endTime = Date.now();
 
-			const errorMessage = error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error);
+			const errorMessage = error instanceof Error ? String(error) : String(error);
 
 			return {
 				success: false,
@@ -269,7 +269,7 @@ export class FlowOrchestrator {
 			.padStart(2, '0')}.${endDate.getMilliseconds().toString().padStart(3, '0')}`;
 
 		const duration = ((endTime - startTime) / 1000).toFixed(3);
-		console.log(`   ⏱  [${endTimeStr}] Completed in ${duration}s`);
+		console.log(`   [${endTimeStr}] Completed in ${duration}s`);
 	}
 
 	/**

@@ -57,8 +57,8 @@ export function registerValidateCommand(program: Command): void {
 				console.error(` Flow has ${result.errors.length} error${result.errors.length > 1 ? 's' : ''}`);
 				for (const err of result.errors) {
 					const loc = err.path ? ` [${err.path}]` : '';
-					// violations-suppress: cli/no-raw-err-in-cli validation errors are intentionally shown to users
-					console.error(`  - ${String(err)}${loc}`);
+					const msg = String(err);
+					console.error(`  - ${msg}${loc}`);
 				}
 				process.exit(1);
 			}

@@ -13,7 +13,7 @@
 | A2  | context-provider | Domain context provider + view components             |
 | A3  | feature-hooks    | Composable feature hooks passed to a data table       |
 | A4  | context-children | Compound component pattern (DataTable.\* slots)       |
-| A5  | query-pipeline   | Query-modifier pipeline (pure function transforms)    |
+| A5  | query-pipeline   | Query-modify pipeline (pure function transforms)    |
 | A6  | data2-based      | Data2 render-prop orchestrator + Table2 + hooks2      |
 
 ---
@@ -22,13 +22,13 @@
 
 _How well does each approach absorb new scenarios without requiring framework changes?_
 
-| Approach | Framework churn (commits) | New scenario = new page only?         | Architecture type           | Score (1-5) |
+| Approach | Framework churn (commits) | New scenario = new page only?         | Architecture Type           | Score (1-5) |
 | -------- | ------------------------- | ------------------------------------- | --------------------------- | ----------- |
 | A1       | 3                         | Mostly yes; S_WS uses shared hooks    | Widget-isolated + event bus | 4           |
 | A2       | 4                         | Yes, with provider wrapper            | Context-based domain view   | 4           |
 | A3       | 5                         | Yes, feature hooks are stable         | Feature-hook composition    | 4           |
 | A4       | 4                         | Yes, children context is lean         | Context-children pattern    | 4           |
-| A5       | 1                         | Yes, 100% page-only                   | Query-modifier pipeline     | 5           |
+| A5       | 1                         | Yes, 100% page-only                   | Query-modify pipeline     | 5           |
 | A6       | 2                         | Mostly yes; minor post-launch adapter | Data2-based adapter         | 4           |
 
 ### Key Findings
@@ -44,7 +44,7 @@ refinement commits during the experimental phase, not caused by scenario additio
 genesis and A6's post-launch `adaptCol` addition both prove that new scenarios never forced framework
 refactoring.
 
-S_WS (WebSocket) exemplifies open architecture: in all approaches, the scenario added
+S_WS (WebSocket) exemplifies open Architecture: in all approaches, the scenario added
 `useProductsWebSocket` in `_shared/api/`, not inside any `_framework/` folder. Zero framework
 modifications despite introducing a fundamentally new data source.
 
@@ -52,7 +52,7 @@ modifications despite introducing a fundamentally new data source.
 
 - A1 framework: 12 files; A2: 13; A3: 15 (inc. 7 feature hooks); A4: 7; A5: 16; A6: 7
 - S_FORK_FEAT across all approaches: imports only existing framework exports, zero framework modifications
-- A5: `git log --oneline -- _5_query-pipeline/_framework/` = 1 commit (initial creation); no follow-up churn
+- A5: `git log --oneline -- _5_query-pipeline/_framework/` = 1 commit (initial Creation); no follow-up churn
 - A6 post-launch: only `adaptCol.ts` added (pure adapter, no modification to Data2/Table2)
 
 ---
@@ -80,11 +80,11 @@ but requires 6 mocks and hoisted initialization to avoid "Cannot access before i
 **A4, A5, and A6 are most testable** (Score 4). All three avoid module-level mocking entirely, using
 direct mock functions passed via props or service injection. A4 stands out for testing loading state
 transitions in detail using deferred promises, verifying both "loading" to "not-loading" state changes
-and catching potential state management regressions. A5 tests modifier sequencing and composition, a
+and catching potential state management regressions. A5 tests modify sequencing and composition, a
 unique concern for pipeline architectures.
 
 **Concurrency gaps exist across all approaches.** No approach tests abort signals or race conditions
-(concurrent request resolution ordering). A4 comes closest with deferred promise isolation. This is
+(concurrent request reSolution ordering). A4 comes closest with deferred promise isolation. This is
 acceptable for list/detail patterns but would be a risk in real-time collaboration contexts.
 
 ### Evidence
@@ -108,11 +108,11 @@ deferred.resolve({ items: mockProducts, pagination: { ... } });
 // verify not-loading state
 ```
 
-A5 modifier sequencing test verifies `custom1: 'overridden'` (last modifier wins).
+A5 modify sequencing test verifies `custom1: 'overridden'` (last modify wins).
 
 ---
 
-## Axis 3 -- Simplicite des pages
+## Axis 3 -- Simplicite of the pages
 
 _How simple is it to write a new page: few lines, few concepts, copy-paste friendly?_
 
@@ -130,10 +130,10 @@ _How simple is it to write a new page: few lines, few concepts, copy-paste frien
 **A1 is the clear winner for page simplicity.** Its purely declarative configuration model keeps pages
 minimal. A junior developer can copy `S1Page.tsx`, change the columns array and service reference, and
 have a working page. The features array is self-documenting:
-`['search', 'pagination', { type: 'crud', dialog: ProductDialogAdapter }]` reads like natural intent.
+`['search', 'pagination', { Type: 'crud', dialog: ProductDialogAdapter }]` reads like natural intent.
 
 **A2 and A5 offer usable trade-offs.** A2 adds one setup concept (provider wrap) but maintains A1's
-simplicity gain. A5 stays compact even with features (15 lines for S3 vs 17 for A1), and the modifier
+simplicity gain. A5 stays compact even with features (15 lines for S3 vs 17 for A1), and the modify
 composition pattern is learnable. Both are copy-paste friendly for basic scenarios.
 
 **A3 degrades copy-paste friendliness significantly.** S3Page requires explicitly importing and calling
@@ -224,12 +224,12 @@ _To add a brand-new feature, must the framework be modified, or can it be added 
 **A1 and A2 are closed architectures.** A1's `WidgetDataTable` is a closed unit -- supporting
 cross-widget communication via event bus required baking `EventBus`, `useOptionalEventBus`, and
 `GlobalEventContext` directly into the framework. Every new interaction pattern requires framework
-extension. A2 is similarly rigid: the `ProductProvider` must be expanded when new state (selection,
-detail fetching, navigation) is needed.
+extension. A2 is similarly rigid: the `ProductProvider` must be expanded when new state (Selection,
+detail fetching, Navigation) is needed.
 
 **A3-A6 allow most new features to be composed at the page level.** S_WS pages in these approaches
 use `useProductsWebSocket` + raw `<Table>` components directly, requiring zero framework changes. The
-pattern holds for S_BUS: page-level state (selectedId, URL sync, keyboard navigation) is managed by
+pattern holds for S_BUS: page-level state (selectedId, URL sync, keyboard Navigation) is managed by
 the page, not by framework abstractions.
 
 **A5 (pipeline) achieves the best extensibility.** New filters, sorting strategies, or transformations
@@ -286,7 +286,7 @@ occurrences) bypass error handling, making silent production failures difficult 
 features requires expanding the provider's surface area, coupling all views to the provider state.
 
 **A5's state override complexity** is a subtle maintainability risk: the pipeline's `searchOverride`,
-`pageOverride`, `pageSizeOverride` layers shadow modifier values, requiring developers to understand
+`pageOverride`, `pageSizeOverride` layers shadow modify values, requiring developers to understand
 both modifiers AND overrides when debugging query behavior.
 
 ### Evidence
@@ -312,7 +312,7 @@ _When an LLM coding agent writes a new page or adds a feature, how likely is it 
 | A2       | Medium            | Yes (structural test)      | Partial      | Medium (missing provider)     | 3.5         |
 | A3       | Low               | Yes (structural test)      | No           | High (missing hook -> silent) | 2.5         |
 | A4       | Low               | Yes (structural test)      | No           | High (missing slot -> silent) | 2.0         |
-| A5       | Low               | Partial (inline style gap) | No           | Medium-high (modifier order)  | 2.5         |
+| A5       | Low               | Partial (inline style gap) | No           | Medium-high (modify order)  | 2.5         |
 | A6       | High              | Yes (structural test)      | Yes          | Low-medium (stale closures)   | 4.0         |
 
 **API surface complexity (concept count required):**
@@ -323,7 +323,7 @@ _When an LLM coding agent writes a new page or adds a feature, how likely is it 
 | A2       | 2 (features array + provider wrap)           |
 | A3       | 7 (6 feature hooks + composition pattern)    |
 | A4       | 5 (5+ compound component slots)              |
-| A5       | 4 (modifier factories + composition)         |
+| A5       | 4 (modify factories + composition)         |
 | A6       | 3 (Data2 + adaptCol + hooks2)                |
 
 ### Key Findings
@@ -353,11 +353,11 @@ A1 self-limiting API -- LLM cannot pass invalid props:
 // Cannot pass onSearch, onPaginate -- the widget API doesn't accept them
 ```
 
-A3 silent failure -- hook type extraction returns `undefined` without error:
+A3 silent failure -- hook Type extraction returns `undefined` without error:
 
 ```typescript
 // HookDataTable.tsx:
-features.find(f => f.type === 'search'); // undefined if not present; feature silently absent
+features.find(f => f.Type === 'search'); // undefined if not present; feature silently absent
 ```
 
 A5 structural gap -- S3Page.tsx passes the className test but violates intent:
@@ -375,7 +375,7 @@ A5 structural gap -- S3Page.tsx passes the className test but violates intent:
 | ---------------------------- | -------- | -------- | -------- | -------- | -------- | -------- |
 | 1. Antifragilite             | 4        | 4        | 4        | 4        | **5**    | 4        |
 | 2. Testabilite               | 3        | 2        | 4        | 4        | 4        | 4        |
-| 3. Simplicite des pages      | **5**    | 4        | 2        | 3        | 4        | 1        |
+| 3. Simplicite of the pages      | **5**    | 4        | 2        | 3        | 4        | 1        |
 | 4. Coherence                 | **5**    | **5**    | 3        | 3        | 3        | 3        |
 | 5. New feature extensibility | 1        | 2        | 3        | 3        | 4        | 3        |
 | 6. Maintenabilite            | 4        | 3        | 3        | 2        | 3        | **5**    |
@@ -392,7 +392,7 @@ A5 structural gap -- S3Page.tsx passes the className test but violates intent:
 | **LLM agent generating code**              | A1          | Self-limiting API, declarative features, no silent failure modes             |
 | **Testability-first team**                 | A5 or A4    | Minimal mocks, pure function modifiers (A5) or deferred state checks (A4)    |
 | **Long-term maintainability**              | A6          | No god components, no anti-patterns, lowest global refactor cost             |
-| **Maximum new feature extensibility**      | A5          | Modifier pattern is open by design; pipeline grows without framework changes |
+| **Maximum new feature extensibility**      | A5          | modify pattern is open by design; pipeline grows without framework changes |
 | **Pattern uniformity across a large team** | A1 or A2    | Single blessed path, zero structural drift, all pages look identical         |
 | **Senior developer, complex scenarios**    | A5          | Pipeline modifiers are powerful and composable; testable pure functions      |
 
@@ -405,7 +405,7 @@ A5 structural gap -- S3Page.tsx passes the className test but violates intent:
 main weakness is extensibility -- new interaction patterns (WebSocket, event bus) require
 framework-level investment upfront.
 
-**A5 (query-pipeline)** is the best architecture for growing systems. Perfect antifragilite
+**A5 (query-pipeline)** is the best Architecture for growing systems. Perfect antifragilite
 (Score 5), strong testability, and open extensibility make it the most durable choice. Its higher
 learning curve and inconsistent page structure are trade-offs that pay off at scale.
 

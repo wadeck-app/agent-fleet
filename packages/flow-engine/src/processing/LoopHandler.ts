@@ -167,7 +167,7 @@ export class LoopHandler {
 		);
 		console.log(`    Invalidated ${invalidatedSteps.length} step(s): ${invalidatedSteps.join(', ')}`);
 		if (skippedSteps.length > 0) {
-			console.log(`   ⏭  Skipped ${skippedSteps.length} step(s) (skipOnLoop=true): ${skippedSteps.join(', ')}`);
+			console.log(`   Skipped ${skippedSteps.length} step(s) (skipOnLoop=true): ${skippedSteps.join(', ')}`);
 		}
 
 		return {

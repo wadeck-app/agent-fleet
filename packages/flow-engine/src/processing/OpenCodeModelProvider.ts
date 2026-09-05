@@ -432,7 +432,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 				this.currentProcess.kill();
 			}
 		} catch (err) {
-			console.warn('[OpenCodeModelProvider] kill() failed:', err instanceof Error ? (err instanceof Error ? err.message : String(err)) : String(err));
+			console.warn('[OpenCodeModelProvider] kill() failed:', err instanceof Error ? String(err) : String(err));
 		}
 	}
 

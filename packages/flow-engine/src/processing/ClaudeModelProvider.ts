@@ -86,7 +86,7 @@ export class ClaudeModelProvider implements ModelProvider {
 				this.currentProcess.kill();
 			}
 		} catch (err) {
-			console.warn('[ClaudeModelProvider] kill() failed:', err instanceof Error ? (err instanceof Error ? err.message : String(err)) : String(err));
+			console.warn('[ClaudeModelProvider] kill() failed:', err instanceof Error ? String(err) : String(err));
 		}
 	}
 

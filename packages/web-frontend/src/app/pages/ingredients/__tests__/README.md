@@ -1,8 +1,8 @@
  Tests Iso-Fonctionnels Ingredients v/v
 
-  Objectif
+  Objective
 
-Valider que Ingredients v (Data-based) et Ingredients v (useCrudPage-based) ont le meme comportement fonctionnel malgre des implementations differentes.
+Valider that Ingredients v (Data-based) and Ingredients v (useCrudPage-based) ont the meme comportement fonctionnel malgre of the implementations differentes.
 
   Resultats
 
@@ -12,12 +12,12 @@ Valider que Ingredients v (Data-based) et Ingredients v (useCrudPage-based) ont 
    scenarios ×  versions =  tests
 ```
 
-  Categories de Tests
+  Categories of Tests
 
  . Initial Data Load ( tests ×  =  tests)
 
 -  Fetch data from API on mount
--  Display fetched ingredient data
+-  Display fetched Ingredient data
 -  Pass pagination parameters to API
 
  . Search ( tests ×  =  tests)
@@ -33,7 +33,7 @@ Valider que Ingredients v (Data-based) et Ingredients v (useCrudPage-based) ont 
  . Row Selection ( tests ×  =  tests)
 
 -  Have selectable rows
--  Enable selection of multiple rows
+-  Enable Selection of multiple rows
 
  . Pagination ( test ×  =  tests)
 

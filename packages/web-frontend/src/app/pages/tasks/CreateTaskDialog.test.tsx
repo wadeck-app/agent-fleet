@@ -64,8 +64,8 @@ describe('CreateTaskDialog', () => {
 		render(<CreateTaskDialog {...defaultProps} />);
 
 		// Check for section titles
-		expect(screen.getByText('Informations de base')).toBeInTheDocument();
-		expect(screen.getByText('Configuration du flow')).toBeInTheDocument();
+		expect(screen.getByText('Informations of base')).toBeInTheDocument();
+		expect(screen.getByText('Configuration of the flow')).toBeInTheDocument();
 
 		// Check for basic fields in left column
 		expect(screen.getByLabelText(/Description/i)).toBeInTheDocument();
@@ -88,18 +88,18 @@ describe('CreateTaskDialog', () => {
 		// This test verifies the structure is in place
 	});
 
-	it('renders dialog with correct title and description', () => {
+	it('renders dialog with correct title and Description', () => {
 		render(<CreateTaskDialog {...defaultProps} />);
 
-		expect(screen.getByText('Creer une tache')).toBeInTheDocument();
-		expect(screen.getByText('Remplissez les details pour creer une nouvelle tache')).toBeInTheDocument();
+		expect(screen.getByText('Create a task')).toBeInTheDocument();
+		expect(screen.getByText('Fill in the details to create a new task')).toBeInTheDocument();
 	});
 
 	it('renders action buttons', () => {
 		render(<CreateTaskDialog {...defaultProps} />);
 
-		expect(screen.getByRole('button', { name: /Creer tache/i })).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: /Annuler/i })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /create tache/i })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /Cancel/i })).toBeInTheDocument();
 	});
 
 	it('calls onOpenChange when cancel button is clicked', async () => {
@@ -108,7 +108,7 @@ describe('CreateTaskDialog', () => {
 
 		render(<CreateTaskDialog {...defaultProps} onOpenChange={onOpenChange} />);
 
-		const cancelButton = screen.getByRole('button', { name: /Annuler/i });
+		const cancelButton = screen.getByRole('button', { name: /Cancel/i });
 		await user.click(cancelButton);
 
 		expect(onOpenChange).toHaveBeenCalledWith(false);
@@ -130,7 +130,7 @@ describe('CreateTaskDialog', () => {
 		const onSuccess = vi.fn();
 		const onOpenChange = vi.fn();
 
-		// Mock workers to provide a valid worker for selection
+		// Mock workers to provide a valid worker for Selection
 		mockUseWorkers.mockReturnValue({
 			data: {
 				workers: [{ workerId: 'worker-1', connected: true, state: 'idle' as const }],
@@ -143,7 +143,7 @@ describe('CreateTaskDialog', () => {
 
 		render(<CreateTaskDialog {...defaultProps} onSuccess={onSuccess} onOpenChange={onOpenChange} />);
 
-		// Fill in required description field using fireEvent (faster than user.type per-character)
+		// Fill in required Description field using fireEvent (faster than user.Type per-character)
 		const descriptionField = screen.getByLabelText(/Description/i);
 		fireEvent.change(descriptionField, { target: { value: 'Test' } });
 
@@ -163,7 +163,7 @@ describe('CreateTaskDialog', () => {
 		});
 
 		// Regression: onSuccess/onOpenChange must NOT be called --
-		// they trigger setSearchParams({ replace: true }) which overrides the navigation
+		// they trigger setSearchParams({ replace: true }) which overrides the Navigation
 		expect(onSuccess).not.toHaveBeenCalled();
 		expect(onOpenChange).not.toHaveBeenCalled();
 	});
