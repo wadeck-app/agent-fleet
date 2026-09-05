@@ -6293,3 +6293,25 @@ See `.claude/kb/opencode-provider-windows-gotchas.md` for full details. Key poin
 **npm proxy behavior**: For packages not in the private registry, GitLab always returns 302 → `https://registry.npmjs.org/<package>` without checking the token. Valid and invalid tokens get identical 302 responses.
 
 **Lesson**: Never declare a technical dead-end without exhausting all paths. "There is no solution" requires proof by exhaustion, not 2-3 failed attempts.
+
+---
+
+## Windows Terminal Default Terminal: preventing visible terminal tabs in background pipelines
+
+### Problem
+Background Node.js pipelines (daemon → worker → script step) cause visible Windows Terminal tabs when the Default Terminal feature is active.
+
+### Root cause (confirmed via atomic PoCs)
+`windowsHide:true` (CREATE_NO_WINDOW) **removes the console handle** from the spawned process ("the console handle for the application is not set" — MSDN). When cmd.exe or any other CONSOLE app is spawned consoleless, its first external child process cannot inherit a console → it calls AllocConsole() → Windows Terminal intercepts → visible tab. Shell builtins (echo, dir, exit) never spawn child processes so they produce 0 terminals even from a consoleless parent.
+
+### Fix (d032e7e + b2bca73)
+Two-part fix:
+1. **Daemon startup** (`spawnDaemonBackground`, `flow start`): spawn daemon via `wscript.exe` (SUBSYSTEM:WINDOWS GUI) with `detached:true` on wscript + `oShell.Run SW_HIDE`. This escapes the Job Object (CREATE_BREAKAWAY_FROM_JOB from detached:true on wscript) while giving the daemon a hidden WT console (not visible, created by WT for the oShell.Run process).
+2. **Workers + ScriptExecutor + ClaudeLauncher**: remove `windowsHide:true`. Workers inherit the daemon's hidden WT console. cmd.exe (ScriptExecutor) inherits workers' console. All external child processes inherit cmd.exe's console. No new consoles → no WT tabs.
+
+### Key rules
+- `detached:true` sets DETACHED_PROCESS + CREATE_BREAKAWAY_FROM_JOB. Use it ONLY on the wscript.exe launcher to escape Job Objects.
+- `windowsHide:true` (CREATE_NO_WINDOW) must NOT be used on workers or script executors — it breaks console inheritance.
+- node.exe with pipe/NUL handles does not call AllocConsole; only console-app children spawned from a consoleless parent trigger WT.
+- Job Objects (from Claude Code, orch daemon, etc.) kill non-detached children. Use wscript.exe + detached:true to escape; all subsequent spawns can be non-detached.
+- Validate with atomic PoCs via queue dispatch: `cmd /c exit 0` = 0 terminal; `cmd /c node --version` = 1 terminal (before fix), 0 terminal (after fix).
