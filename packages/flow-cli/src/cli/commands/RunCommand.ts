@@ -206,7 +206,6 @@ async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Pro
 	})();
 
 	const child = spawn(process.execPath, [resolvedBundle], {
-		detached: true,
 		stdio: 'ignore',
 		windowsHide: true,
 		env: { ...process.env, FLOW_DAEMON_MODE: '1' },
