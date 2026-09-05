@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 
 import { Button } from '@framework/components/primitives/Button';
-import { col } from '@framework/lego';
-import type { ColumnDef } from '@framework/lego';
+import { col } from '@framework/lego/helpers/col';
+import type { ColumnDef } from '@framework/lego/types/ColTypes';
 import type { Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 import { Star } from 'lucide-react';
@@ -10,13 +10,9 @@ import { Star } from 'lucide-react';
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
 import { PageLayout } from '../_framework/PageLayout';
-import { PipelineBody } from '../_framework/PipelineBody';
-import { PipelineContent } from '../_framework/PipelineContent';
-import { usePipelineContext } from '../_framework/PipelineContext';
 import { PipelineDataTable } from '../_framework/PipelineDataTable';
-import { PipelineSearch } from '../_framework/PipelineSearch';
-import { PipelineToolbar } from '../_framework/PipelineToolbar';
 import { withPagination, withSearch } from '../_framework/PipelineTypes';
+import { SForkFeatContent } from './SForkFeatContent';
 
 /**
  * ===========================================================================================
@@ -62,25 +58,6 @@ function saveBookmarks(bookmarks: Set<string>) {
 	localStorage.setItem(BOOKMARK_STORAGE_KEY, JSON.stringify(Array.from(bookmarks)));
 }
 
-function SForkFeatContent({ bookmarks }: { bookmarks: Set<string> }) {
-	const { items } = usePipelineContext<Product>();
-
-	const bookmarkCount = Array.from(items).filter(item => bookmarks.has(item.id)).length;
-
-	return (
-		<PipelineContent>
-			<PipelineToolbar>
-				<PipelineSearch />
-				<div className="flex items-center gap-2">
-					<span className="text-sm text-muted-foreground">
-						<Star className="inline-block size-4" /> {bookmarkCount} bookmarked
-					</span>
-				</div>
-			</PipelineToolbar>
-			<PipelineBody showPagination />
-		</PipelineContent>
-	);
-}
 
 export function SForkFeatPage() {
 	const [showBookmarked, setShowBookmarked] = useState(false);

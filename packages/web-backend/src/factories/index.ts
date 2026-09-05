@@ -1,5 +1,1 @@
-/**
- * Factory layer exports
- */
-
-export { DataStoreFactory } from './DataStoreFactory';
+// Barrel removed — import directly from the source modules.

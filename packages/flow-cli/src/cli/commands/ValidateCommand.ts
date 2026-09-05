@@ -5,7 +5,8 @@ import { validateFlowFile } from '../../validation/FlowFileValidator';
 export function registerValidateCommand(program: Command): void {
 	program
 		.command('validate <file>')
-		.description('Validate a flow YAML file')
+		.description('Validate a flow YAML file (schema + step references, no daemon needed)\n' +
+			'  --json   Machine-readable: { valid: bool, errors?: [...] }')
 		.option('--json', 'Output JSON (machine-readable, exit codes 0/1/2/3)')
 		.option('--human', 'Force human-readable output')
 		.action((file: string, options: { json?: boolean; human?: boolean }) => {

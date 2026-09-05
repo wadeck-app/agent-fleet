@@ -1,6 +1,6 @@
 import { Table } from '@framework/components/table/Table';
 import type { TableColumn } from '@framework/components/table/Table';
-import { renderColumnValue } from '@framework/lego';
+import { renderColumnValue } from '@framework/lego/helpers/renderColumnValue';
 
 import { usePipelineContext } from './PipelineContext';
 

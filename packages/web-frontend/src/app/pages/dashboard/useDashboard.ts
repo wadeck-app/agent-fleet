@@ -6,7 +6,7 @@ import type { DashboardData } from '@shared/api/dashboard.contract';
 import { B2F_TASKS_UPDATED, B2F_WORKERS_UPDATED } from '@shared/transport';
 
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
-import { useTransport } from '@/transport';
+import { useTransport } from '@/transport/useTransport';
 
 import { dashboardService } from './DashboardService';
 

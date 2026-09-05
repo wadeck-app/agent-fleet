@@ -5,8 +5,8 @@ import { Button } from '@framework/components/primitives/Button';
 import { SearchInput } from '@framework/components/search/SearchInput';
 import { Table } from '@framework/components/table/Table';
 import type { TableColumn } from '@framework/components/table/Table';
-import type { ColumnDef } from '@framework/lego';
-import { renderColumnValue } from '@framework/lego';
+import type { ColumnDef } from '@framework/lego/types/ColTypes';
+import { renderColumnValue } from '@framework/lego/helpers/renderColumnValue';
 import { Edit, Plus, Trash2 } from 'lucide-react';
 
 import { useWidgetDataFetch } from '@app/pages/_lego/_1_widget-isolated/_framework/useWidgetDataFetch';

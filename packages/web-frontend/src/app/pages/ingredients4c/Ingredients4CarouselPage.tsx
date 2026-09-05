@@ -35,7 +35,8 @@ import type { ComposedQuery } from '@framework/utils2/buildQuery';
 import type { CreateIngredient, Ingredient } from '@shared/api/ingredients.contract';
 import { Plus, Trash2, X } from 'lucide-react';
 
-import { BulkDeleteWorkflow, IngredientDialog } from '@app/components/domain';
+import { BulkDeleteWorkflow } from '@app/components/domain/BulkDeleteWorkflow';
+import { IngredientDialog } from '@app/components/domain/IngredientDialog';
 
 import { ingredientsService } from '../ingredients/IngredientsService';
 import { useIngredientsCrud } from '../ingredients/useIngredientsCrud';

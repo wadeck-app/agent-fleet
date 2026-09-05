@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Input } from '@framework/components/forms/Input';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
-import type { ColumnDef } from '@framework/lego';
+import type { ColumnDef } from '@framework/lego/types/ColTypes';
 import { Check, Edit, Save, X } from 'lucide-react';
 
 /**

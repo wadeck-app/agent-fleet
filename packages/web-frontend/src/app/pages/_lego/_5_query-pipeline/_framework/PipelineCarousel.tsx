@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { Button } from '@framework/components/primitives/Button';
-import { renderColumnValue } from '@framework/lego';
+import { renderColumnValue } from '@framework/lego/helpers/renderColumnValue';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { usePipelineContext } from './PipelineContext';

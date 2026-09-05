@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react';
 
-import type { ColumnDef } from '@framework/lego';
+import type { ColumnDef } from '@framework/lego/types/ColTypes';
 
 /**
  * ===========================================================================================

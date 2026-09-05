@@ -7,7 +7,7 @@ import type { TicketHistoryEntry } from '@shared/api/tickets.contract';
 import { B2F_TASKS_UPDATED, B2F_TICKET_COMMENT_ADDED, B2F_TICKET_UPDATED } from '@shared/transport';
 import { Loader2 } from 'lucide-react';
 
-import { useTransport } from '@/transport';
+import { useTransport } from '@/transport/useTransport';
 
 import { ticketsApi } from './tickets.api';
 

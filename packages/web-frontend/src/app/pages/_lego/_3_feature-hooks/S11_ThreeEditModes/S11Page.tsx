@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { PageContainer } from '@framework/components/layout/PageContainer';
 import { Button } from '@framework/components/primitives/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
-import { col } from '@framework/lego';
+import { col } from '@framework/lego/helpers/col';
 import type { Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 

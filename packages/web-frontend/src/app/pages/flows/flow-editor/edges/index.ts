@@ -1,13 +1,1 @@
-import { ConditionalEdge } from './ConditionalEdge';
-import { DataFlowEdge } from './DataFlowEdge';
-import { DependencyEdge } from './DependencyEdge';
-import { LoopEdge } from './LoopEdge';
-
-export { ConditionalEdge, DataFlowEdge, DependencyEdge, LoopEdge };
-
-export const edgeTypes = {
-	dependency: DependencyEdge,
-	loop: LoopEdge,
-	conditional: ConditionalEdge,
-	dataflow: DataFlowEdge,
-};
+// Barrel removed — import directly from the source modules.

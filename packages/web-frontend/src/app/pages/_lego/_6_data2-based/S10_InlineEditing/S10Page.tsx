@@ -9,7 +9,7 @@ import type { FetchDataResult } from '@framework/hooks2/data/useDataFetch';
 import { usePagination2 } from '@framework/hooks2/data/usePagination2';
 import { useSimpleSearch } from '@framework/hooks2/data/useSimpleSearch';
 import { useSorting2 } from '@framework/hooks2/data/useSorting2';
-import { col } from '@framework/lego';
+import { col } from '@framework/lego/helpers/col';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
 import type { CreateProduct, Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';

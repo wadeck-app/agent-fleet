@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { defaultStorage } from '@framework/storage/LocalStorageAdapter';
 import type { StorageAdapter } from '@framework/storage/StorageAdapter';
 import type { FeatureContract } from '@framework/types/FeatureContract';
-import type { SortConfig, SortDirection } from '@framework/types/contracts';
+import type { SortConfig, SortDirection } from '@framework/types/contracts/SortingContract';
 
 /**
  * ===========================================================================================

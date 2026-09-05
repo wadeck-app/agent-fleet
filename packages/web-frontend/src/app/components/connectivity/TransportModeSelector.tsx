@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { Label } from '@framework/components/forms/Label';
 import { RadioGroup, RadioGroupItem } from '@framework/components/forms/RadioGroup';
 
-import { useConnId, useTransport } from '@/transport';
+import { useConnId, useTransport } from '@/transport/useTransport';
 
 export type TransportMode = 'auto' | 'websocket' | 'sse' | 'long-polling' | 'http-polling';
 

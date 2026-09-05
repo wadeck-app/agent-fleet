@@ -15,7 +15,7 @@
  */
 import { MemoryRouter } from 'react-router-dom';
 
-import type { ColumnDef } from '@framework/lego';
+import type { ColumnDef } from '@framework/lego/types/ColTypes';
 import { createDeferredPromise } from '@framework/test-utils/deferredPromise';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';

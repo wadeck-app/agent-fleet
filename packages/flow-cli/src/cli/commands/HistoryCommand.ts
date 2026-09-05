@@ -155,7 +155,12 @@ export function buildHistoryTable(execs: ExecutionRecord[], opts: HistoryOptions
 export function registerHistoryCommand(program: Command): void {
 	program
 		.command('history')
-		.description('List past flow executions')
+		.description('List past flow executions\n' +
+			'  --limit N      Max results (default: 20)\n' +
+			'  --offset N     Skip first N (pagination)\n' +
+			'  --status s     Filter: completed|failed|running|queued\n' +
+			'  --flow <id>    Filter by flow ID\n' +
+			'  --id <execId>  Show step detail for one execution')
 		.option('-n, --limit <n>', 'Max number of executions to show (default: 20)', parseInt)
 		.option('--offset <n>', 'Skip first N executions (for pagination)', parseInt)
 		.option('--status <status>', 'Filter by status (completed|failed|running|queued)')

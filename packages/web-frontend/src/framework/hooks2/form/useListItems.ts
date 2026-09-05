@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 
-import type { FeatureFormContract } from '@framework/types/contracts';
+import type { FeatureFormContract } from '@framework/types/contracts/FeatureFormContract';
 
 /**
  * ===========================================================================================

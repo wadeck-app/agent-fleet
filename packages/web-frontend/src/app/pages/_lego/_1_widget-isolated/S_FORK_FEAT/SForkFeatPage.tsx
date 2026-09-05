@@ -20,8 +20,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
-import { col } from '@framework/lego';
-import type { ColumnDef } from '@framework/lego';
+import { col } from '@framework/lego/helpers/col';
+import type { ColumnDef } from '@framework/lego/types/ColTypes';
 import type { Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 import { Star } from 'lucide-react';

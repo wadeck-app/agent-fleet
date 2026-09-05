@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 
-import { useTransport } from '@/transport';
+import { useTransport } from '@/transport/useTransport';
 
 /**
  * Reusable hook for subscribing to real-time events and triggering refreshes

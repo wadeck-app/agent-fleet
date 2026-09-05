@@ -25,7 +25,7 @@ import { XCircle } from 'lucide-react';
 
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
-import { BulkDeleteWorkflow } from '@app/components/domain';
+import { BulkDeleteWorkflow } from '@app/components/domain/BulkDeleteWorkflow';
 
 import { InterventionFilters } from './InterventionFilters';
 import { InterventionsTable } from './InterventionsTable';

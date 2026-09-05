@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Button } from '@framework/components/primitives/Button';
 import { Activity, ChevronDown, ChevronUp } from 'lucide-react';
 
-import { useTransport } from '@/transport';
+import { useTransport } from '@/transport/useTransport';
 
 /**
  * EventDebugWidget - Shows active WebSocket subscriptions

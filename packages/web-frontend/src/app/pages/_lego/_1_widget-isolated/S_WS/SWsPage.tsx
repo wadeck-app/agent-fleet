@@ -21,9 +21,9 @@ import { useMemo, useState } from 'react';
 import { Badge } from '@framework/components/primitives/Badge';
 import { SearchInput } from '@framework/components/search/SearchInput';
 import { Table, type TableColumn } from '@framework/components/table/Table';
-import { col } from '@framework/lego';
-import { renderColumnValue } from '@framework/lego';
-import type { ColumnDef } from '@framework/lego';
+import { col } from '@framework/lego/helpers/col';
+import { renderColumnValue } from '@framework/lego/helpers/renderColumnValue';
+import type { ColumnDef } from '@framework/lego/types/ColTypes';
 import type { Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 

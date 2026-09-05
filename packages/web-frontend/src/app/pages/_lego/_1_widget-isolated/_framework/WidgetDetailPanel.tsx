@@ -3,8 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
-import type { ColumnDef, DetailPanelFeature } from '@framework/lego';
-import { resolveFeature } from '@framework/lego';
+import type { ColumnDef } from '@framework/lego/types/ColTypes';
+import { type DetailPanelFeature, resolveFeature } from '@framework/lego/types/FeatureTypes';
 import { Check, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 import { useGlobalPageEventsOptional } from './GlobalEventContext';

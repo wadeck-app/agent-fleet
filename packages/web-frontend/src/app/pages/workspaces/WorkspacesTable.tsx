@@ -7,25 +7,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@frame
 import type { Workspace } from '@shared/api/workspaces.contract';
 import { ListTodo, Pencil } from 'lucide-react';
 
-import { useWorkspaceProject } from '@/hooks/useWorkspaceProject';
-
 import { CreateTaskDialog } from '../tasks/CreateTaskDialog';
 import { workspacesApi } from '../workspaces/workspaces.api';
 import { EditWorkspaceDialog } from './EditWorkspaceDialog';
+import { ProjectName } from './ProjectName';
 import { useCanCreateTaskFromWorkspace } from './useCanCreateTaskFromWorkspace';
-
-/**
- * Component to display project name for a workspace
- */
-function ProjectName({ workspaceId }: { workspaceId: string }) {
-	const { project, isLoading } = useWorkspaceProject(workspaceId);
-
-	if (isLoading) {
-		return <span className="text-sm text-muted-foreground">Loading...</span>;
-	}
-
-	return <span className="text-sm">{project?.name || '-'}</span>;
-}
 
 /**
  * Workspaces table column definitions

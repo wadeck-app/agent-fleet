@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import type { CrudDialogProps } from '@framework/lego';
+import type { CrudDialogProps } from '@framework/lego/types/FeatureTypes';
 import type { CreateProduct, Product } from '@shared/api/products.contract';
 
 import { ProductDialog } from './ProductDialog';

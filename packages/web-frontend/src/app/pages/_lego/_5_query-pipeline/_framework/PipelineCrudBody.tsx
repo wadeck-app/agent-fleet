@@ -1,7 +1,7 @@
 import { Button } from '@framework/components/primitives/Button';
 import { Table } from '@framework/components/table/Table';
 import type { TableColumn } from '@framework/components/table/Table';
-import { renderColumnValue } from '@framework/lego';
+import { renderColumnValue } from '@framework/lego/helpers/renderColumnValue';
 import { Edit, Trash2 } from 'lucide-react';
 
 import { usePipelineContext } from './PipelineContext';

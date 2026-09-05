@@ -9,7 +9,7 @@ import { B2F_TASKS_UPDATED, B2F_TICKET_COMMENT_ADDED, B2F_TICKET_UPDATED } from 
 import { Loader2 } from 'lucide-react';
 import remarkGfm from 'remark-gfm';
 
-import { useTransport } from '@/transport';
+import { useTransport } from '@/transport/useTransport';
 
 import { ticketsApi } from './tickets.api';
 

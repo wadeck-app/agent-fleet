@@ -26,7 +26,8 @@ import { extractCanHideConstraints } from '@framework/utils/table/ColumnConfig';
 import type { Ingredient } from '@shared/api/ingredients.contract';
 import { Plus, Trash2, Utensils } from 'lucide-react';
 
-import { BulkDeleteWorkflow, IngredientDialog } from '@app/components/domain';
+import { BulkDeleteWorkflow } from '@app/components/domain/BulkDeleteWorkflow';
+import { IngredientDialog } from '@app/components/domain/IngredientDialog';
 
 import { INGREDIENT_TABLE_COLUMNS, IngredientTable } from './IngredientTable';
 import { useIngredients } from './useIngredients';

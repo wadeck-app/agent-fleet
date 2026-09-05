@@ -1,4 +1,4 @@
-import { CrudTable, type CrudTableConfig } from '@framework/components/advanced';
+import { CrudTable, type CrudTableConfig } from '@framework/components/advanced/CrudTable';
 import { type TablePaginationConfig } from '@framework/components/table/Table';
 import { type TableSortingConfig } from '@framework/components/table/Table';
 import { ColumnHelpers } from '@framework/utils/table/ColumnHelpers';

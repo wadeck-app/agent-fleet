@@ -13,7 +13,8 @@ import { useCrudPage } from '@framework/hooks/useCrudPage';
 import { toColumnVisibilityDefs } from '@framework/utils/table/ColumnConfig';
 import { Plus, Trash2, Utensils } from 'lucide-react';
 
-import { BulkDeleteWorkflow, IngredientDialog } from '@app/components/domain';
+import { BulkDeleteWorkflow } from '@app/components/domain/BulkDeleteWorkflow';
+import { IngredientDialog } from '@app/components/domain/IngredientDialog';
 
 import { INGREDIENT_TABLE_COLUMNS, IngredientTable } from '../ingredients/IngredientTable';
 import { useIngredientSearch } from './useIngredientSearch';

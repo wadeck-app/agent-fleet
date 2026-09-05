@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 
-import type { ITransportClient } from '@/transport';
+import type { ITransportClient } from '@/transport/ITransportClient';
 
 export class TransportMockFactory {
 	static create(overrides: Partial<ITransportClient> = {}): ITransportClient {

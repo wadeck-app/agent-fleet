@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { EditableListField } from '@framework/components2/list/EditableListField';
 import { type KeyValueItem, KeyValueItemRenderer } from '@framework/components2/list/renderers/KeyValueItemRenderer';
@@ -24,9 +24,10 @@ import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import { Separator } from '@framework/components/primitives/Separator';
 import { useListItems } from '@framework/hooks2/form/useListItems';
-import type { ValidationIssue } from 'flow-engine/validation/ValidationTypes';
-import { AlertCircle, AlertTriangle, ChevronDown, Info, Trash2 } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Trash2 } from 'lucide-react';
 
+import { FieldValidationMessage } from './FieldValidationMessage';
+import { ReadOnlyFieldLabel } from './ReadOnlyFieldLabel';
 import type { ConstantNodeData } from './nodes/ConstantNode';
 import type { FlowNode } from './types';
 import { isConstantNodeData, isStepNodeData } from './types';
@@ -45,61 +46,6 @@ interface FlowEditorPropertiesPanelProps {
 	readOnly?: boolean;
 }
 
-/**
- * Component to display field-specific validation messages inline
- */
-function FieldValidationMessage({ issues }: { issues: ValidationIssue[] }) {
-	if (issues.length === 0) return null;
-
-	return (
-		<div className="mt-2 space-y-2">
-			{issues.map((issue, idx) => {
-				const Icon =
-					issue.severity === 'error' ? AlertCircle : issue.severity === 'warning' ? AlertTriangle : Info;
-				const bgColor =
-					issue.severity === 'error'
-						? 'bg-danger/10 border-danger/30'
-						: issue.severity === 'warning'
-							? 'bg-warning/10 border-warning/30'
-							: 'bg-info/10 border-info/30';
-				const textColor =
-					issue.severity === 'error'
-						? 'text-danger'
-						: issue.severity === 'warning'
-							? 'text-warning'
-							: 'text-info';
-
-				return (
-					<div
-						key={idx}
-						className={`
-        rounded-md border p-3
-        ${bgColor}
-      `}
-					>
-						<div
-							className={`
-         flex items-start gap-2 text-xs
-         ${textColor}
-       `}
-						>
-							<Icon className="mt-0.5 size-4 flex-shrink-0" />
-							<div className="flex-1">
-								<div className="font-medium">{issue.message}</div>
-								{issue.suggestion && <div className="mt-1 text-xs opacity-80">{issue.suggestion}</div>}
-							</div>
-						</div>
-					</div>
-				);
-			})}
-		</div>
-	);
-}
-
-/** Renders a small muted label for readOnly mode */
-function ReadOnlyFieldLabel({ children }: { children: ReactNode }) {
-	return <p className="text-xs font-medium text-muted-foreground">{children}</p>;
-}
 
 export function FlowEditorPropertiesPanel({
 	selectedNode,

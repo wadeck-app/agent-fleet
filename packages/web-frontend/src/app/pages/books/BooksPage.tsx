@@ -26,7 +26,8 @@ import { extractCanHideConstraints } from '@framework/utils/table/ColumnConfig';
 import type { Book } from '@shared/api/books.contract';
 import { BookOpen, Plus, Trash2 } from 'lucide-react';
 
-import { BookDialog, BulkDeleteWorkflow } from '@app/components/domain';
+import { BookDialog } from '@app/components/domain/BookDialog';
+import { BulkDeleteWorkflow } from '@app/components/domain/BulkDeleteWorkflow';
 
 import { BOOK_TABLE_COLUMNS, BookTable } from './BookTable';
 import { useBookSearch } from './useBookSearch';

@@ -6,7 +6,7 @@ import { Pagination } from '@framework/components/pagination/Pagination';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import { SearchInput } from '@framework/components/search/SearchInput';
-import type { ColumnDef } from '@framework/lego';
+import type { ColumnDef } from '@framework/lego/types/ColTypes';
 import { Check, Edit, Plus, Trash2, X } from 'lucide-react';
 
 import { useWidgetDataFetch } from '@app/pages/_lego/_1_widget-isolated/_framework/useWidgetDataFetch';

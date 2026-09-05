@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Table2, type Table2Column } from '@framework/components2/table/Table2';
 import { Badge } from '@framework/components/primitives/Badge';
 import { SearchInput } from '@framework/components/search/SearchInput';
-import { col } from '@framework/lego';
+import { col } from '@framework/lego/helpers/col';
 import type { Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 

@@ -14,7 +14,8 @@
  */
 import { MemoryRouter } from 'react-router-dom';
 
-import type { ColumnDef, DataTableFeature } from '@framework/lego';
+import type { ColumnDef } from '@framework/lego/types/ColTypes';
+import type { DataTableFeature } from '@framework/lego/types/FeatureTypes';
 import { createDeferredPromise } from '@framework/test-utils/deferredPromise';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';

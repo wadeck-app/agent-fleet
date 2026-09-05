@@ -16,7 +16,7 @@ import { B2F_TICKET_COMMENT_ADDED } from '@shared/transport/B2FEventConstants';
 import { Loader2, Send } from 'lucide-react';
 import remarkGfm from 'remark-gfm';
 
-import { useTransport } from '@/transport';
+import { useTransport } from '@/transport/useTransport';
 
 import { TicketAuditLogSection } from './TicketAuditLogSection';
 import { TriggeredTasksSection } from './TriggeredTasksSection';

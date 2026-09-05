@@ -11,8 +11,8 @@ import { Button } from '@framework/components/primitives/Button';
 import { SearchInput } from '@framework/components/search/SearchInput';
 import type { TableColumn } from '@framework/components/table/Table';
 import { Table } from '@framework/components/table/Table';
-import type { ColumnDef } from '@framework/lego';
-import { renderColumnValue } from '@framework/lego';
+import type { ColumnDef } from '@framework/lego/types/ColTypes';
+import { renderColumnValue } from '@framework/lego/helpers/renderColumnValue';
 import { Check, ChevronLeft, ChevronRight, Edit, Plus, Trash2, X } from 'lucide-react';
 
 import { DataTableContext } from './DataTableContext';

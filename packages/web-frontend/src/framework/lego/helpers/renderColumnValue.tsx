@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { Badge } from '@framework/components/primitives/Badge';
-import type { ColumnDef } from '@framework/lego';
+import type { ColumnDef } from '../types/ColTypes';
 import { Check, X } from 'lucide-react';
 
 /**

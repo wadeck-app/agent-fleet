@@ -14,8 +14,8 @@ import {
 	useReactFlow,
 } from '@xyflow/react';
 
-import { edgeTypes } from './edges';
-import { nodeTypes } from './nodes';
+import { edgeTypes } from './edges/EdgeTypes';
+import { nodeTypes } from './nodes/NodeTypes';
 import type { FlowEdge, FlowNode } from './types';
 
 interface FlowEditorCanvasProps {

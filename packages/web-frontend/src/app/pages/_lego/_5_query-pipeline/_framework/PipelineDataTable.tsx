@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import type { ColumnDef } from '@framework/lego';
+import type { ColumnDef } from '@framework/lego/types/ColTypes';
 
 import { PipelineProvider } from './PipelineContext';
 import type { QueryModifier } from './PipelineTypes';

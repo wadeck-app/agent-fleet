@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import { useLocalStorageState } from '@framework/hooks2/utility/useLocalStorageState';
-import { col } from '@framework/lego';
+import { col } from '@framework/lego/helpers/col';
 import type { Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 import { Star } from 'lucide-react';

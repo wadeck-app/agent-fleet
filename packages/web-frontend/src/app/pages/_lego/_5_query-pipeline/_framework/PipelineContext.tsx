@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext } from 'react';
 
-import type { ColumnDef } from '@framework/lego';
+import type { ColumnDef } from '@framework/lego/types/ColTypes';
 
 import type { BaseQuery, QueryModifier } from './PipelineTypes';
 import type { PipelineService } from './usePipeline';

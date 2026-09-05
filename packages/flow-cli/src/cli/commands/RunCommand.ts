@@ -274,7 +274,12 @@ async function sendToDaemon(
 export function registerRunCommand(program: Command): void {
 	program
 		.command('run <flowRef>')
-		.description('Run a flow by file path or flow ID')
+		.description('Run a flow by file path or flow ID (requires daemon)\n' +
+			'  <flowRef>  Path to .yaml file or flow ID\n' +
+			'  -i key=value  Pass input (repeatable); e.g. -i name=Alice -i count=3\n' +
+			'  --wait        Block until execution completes (default: fire-and-forget)\n' +
+			'  --timeout     Timeout for --wait, e.g. 30s, 5m, 1h (default: 10m)\n' +
+			'  --flow-id     Select a specific flow ID when YAML contains multiple flows')
 		.option(
 			'-i, --input <key=value>',
 			'Input key=value (repeatable)',

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
-import type { ColumnDef } from '@framework/lego';
-import { renderColumnValue } from '@framework/lego';
+import type { ColumnDef } from '@framework/lego/types/ColTypes';
+import { renderColumnValue } from '@framework/lego/helpers/renderColumnValue';
 
 import { useDataTable } from './DataTableContext';
 

@@ -5,15 +5,15 @@ import { Pagination } from '@framework/components/pagination/Pagination';
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import { SearchInput } from '@framework/components/search/SearchInput';
+import type { ColumnDef } from '@framework/lego/types/ColTypes';
 import type {
 	BulkDeleteConfig,
-	ColumnDef,
 	CrudConfig,
 	ItemGridFeature,
 	PaginationConfig,
 	SearchConfig,
-} from '@framework/lego';
-import { resolveFeature } from '@framework/lego';
+} from '@framework/lego/types/FeatureTypes';
+import { resolveFeature } from '@framework/lego/types/FeatureTypes';
 import { Check, Edit, Plus, Trash2, X } from 'lucide-react';
 
 import { useWidgetDataFetch } from './useWidgetDataFetch';

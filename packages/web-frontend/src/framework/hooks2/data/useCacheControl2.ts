@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import type { CacheControlContract } from '@framework/types/contracts';
+import type { CacheControlContract } from '@framework/types/contracts/CacheControlContract';
 
 /**
  * ===========================================================================================

@@ -26,7 +26,7 @@ import { Plus, Trash2 } from 'lucide-react';
 
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
-import { BulkDeleteWorkflow } from '@app/components/domain';
+import { BulkDeleteWorkflow } from '@app/components/domain/BulkDeleteWorkflow';
 
 import { CreateTaskDialog } from './CreateTaskDialog';
 import { TaskFilters } from './TaskFilters';

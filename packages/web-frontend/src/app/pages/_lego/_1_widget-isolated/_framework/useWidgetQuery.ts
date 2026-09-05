@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
 
-import type { PaginationConfig } from '@framework/lego';
-import { resolveFeature } from '@framework/lego';
+import { type PaginationConfig, resolveFeature } from '@framework/lego/types/FeatureTypes';
 
 /**
  * ===========================================================================================

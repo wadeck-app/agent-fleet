@@ -16,7 +16,7 @@ import {
 import { Button } from '@framework/components/primitives/Button';
 import { ChevronDown, LogOut, Moon, Network, Settings, Sun, User } from 'lucide-react';
 
-import { useTransport } from '@/transport';
+import { useTransport } from '@/transport/useTransport';
 
 import type { TransportMode } from '@app/components/connectivity/TransportModeSelector';
 import { WorkspaceIndicator } from '@app/features/workspace/WorkspaceIndicator';

@@ -1,13 +1,12 @@
-import { col } from '@framework/lego';
+import { col } from '@framework/lego/helpers/col';
 import type { Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 
-import { ProductDialogAdapter } from '@app/pages/_lego/_shared/ProductDialogAdapter';
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
 import { DataTable } from '../_framework/DataTable';
-import { useDataTable } from '../_framework/DataTableContext';
 import { PageLayout } from '../_framework/PageLayout';
+import { S3Content } from './S3Content';
 
 /**
  * ===========================================================================================
@@ -39,43 +38,6 @@ const columns = [
 	col.date<Product>('createdAt', 'Created'),
 ];
 
-function S3Content() {
-	const ctx = useDataTable<Product>();
-
-	const handleSave = async (data: unknown) => {
-		if (ctx.editingItem) {
-			await ctx.service.updateProduct?.(ctx.editingItem.id, data);
-		} else {
-			await ctx.service.createProduct?.(data);
-		}
-		ctx.setDialogOpen(false);
-		ctx.refresh();
-	};
-
-	return (
-		<>
-			<DataTable.Content>
-				<DataTable.Toolbar>
-					<DataTable.Search />
-					<DataTable.ColumnVisibility />
-					<DataTable.CreateButton dialog={ProductDialogAdapter} />
-				</DataTable.Toolbar>
-				<DataTable.BulkBar />
-				<DataTable.Body />
-				<DataTable.Footer>
-					<DataTable.Pagination defaultSize={10} pageSizes={[10, 20, 50]} />
-				</DataTable.Footer>
-			</DataTable.Content>
-			{ctx.dialogOpen && (
-				<ProductDialogAdapter
-					item={ctx.editingItem}
-					onSave={handleSave}
-					onClose={() => ctx.setDialogOpen(false)}
-				/>
-			)}
-		</>
-	);
-}
 
 export function S3Page() {
 	return (

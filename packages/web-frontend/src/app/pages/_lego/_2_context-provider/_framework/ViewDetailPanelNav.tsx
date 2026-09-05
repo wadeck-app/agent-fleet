@@ -1,6 +1,6 @@
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
-import type { ColumnDef } from '@framework/lego';
+import type { ColumnDef } from '@framework/lego/types/ColTypes';
 import { Check, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 import { useProductDomain } from './ProductDomainContext';

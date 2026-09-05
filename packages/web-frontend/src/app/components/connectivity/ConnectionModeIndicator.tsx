@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 
 import { Button } from '@framework/components/primitives/Button';
 
-import { useTransport } from '@/transport';
+import { useTransport } from '@/transport/useTransport';
 
 import { StatusBadge, type StatusBadgeVariant } from '@app/components/common/StatusBadge';
 

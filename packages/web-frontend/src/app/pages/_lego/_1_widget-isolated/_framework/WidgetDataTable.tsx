@@ -5,17 +5,18 @@ import { ColumnVisibility } from '@framework/components/columns/ColumnVisibility
 import { Button } from '@framework/components/primitives/Button';
 import { SearchInput } from '@framework/components/search/SearchInput';
 import { Table, type TableColumn } from '@framework/components/table/Table';
+import type { ColumnDef } from '@framework/lego/types/ColTypes';
 import type {
 	BulkDeleteConfig,
-	ColumnDef,
 	ColumnVisibilityConfig,
 	CrudConfig,
 	DataTableFeature,
 	PaginationConfig,
 	SearchConfig,
 	SortingConfig,
-} from '@framework/lego';
-import { renderColumnValue, resolveFeature } from '@framework/lego';
+} from '@framework/lego/types/FeatureTypes';
+import { renderColumnValue } from '@framework/lego/helpers/renderColumnValue';
+import { resolveFeature } from '@framework/lego/types/FeatureTypes';
 import { Edit, Plus, Trash2 } from 'lucide-react';
 
 import { useGlobalPageEventsOptional } from './GlobalEventContext';

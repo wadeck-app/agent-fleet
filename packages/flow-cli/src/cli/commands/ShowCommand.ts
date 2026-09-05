@@ -196,7 +196,9 @@ function renderFlow(flow: FlowDefinition): void {
 export function registerShowCommand(program: Command): void {
 	program
 		.command('show <file>')
-		.description('Display a summary of a flow YAML file')
+		.description('Display a summary of a flow YAML file (steps, inputs, outputs)\n' +
+			'  <file>   Path to .yaml file\n' +
+			'  --json   Machine-readable output')
 		.option('--json', 'Machine-readable JSON output')
 		.action((file: string, opts: { json?: boolean }) => {
 			const raw = loadYaml(file);

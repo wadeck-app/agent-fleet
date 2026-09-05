@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { Badge } from '@framework/components/primitives/Badge';
-import type { ColumnDef } from '@framework/lego';
+import type { ColumnDef } from '@framework/lego/types/ColTypes';
 import { Check, X } from 'lucide-react';
 
 import type { PipelineService } from './usePipeline';

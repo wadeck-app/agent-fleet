@@ -4,8 +4,8 @@ import { Badge } from '@framework/components/primitives/Badge';
 import { SearchInput } from '@framework/components/search/SearchInput';
 import { Table } from '@framework/components/table/Table';
 import type { TableColumn } from '@framework/components/table/Table';
-import { col } from '@framework/lego';
-import { renderColumnValue } from '@framework/lego';
+import { col } from '@framework/lego/helpers/col';
+import { renderColumnValue } from '@framework/lego/helpers/renderColumnValue';
 import type { Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 

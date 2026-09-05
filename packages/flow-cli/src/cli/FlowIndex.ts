@@ -20,12 +20,30 @@ import { registerShowCommand } from './commands/ShowCommand';
 import { registerValidateCommand } from './commands/ValidateCommand';
 import { VERSION } from './version.js';
 
+const CONCEPTS_TEXT = `
+Concepts:
+  flow      A YAML file defining a sequence of steps (model, script, subflow, user_intervention)
+  flow ID   The "id:" field at the top of a flow YAML file; used to run/show/history a flow
+  daemon    Background service that executes flows; required for "run", "start", "stop", "status"
+  config    ~/.config/flow/config.yaml  (XDG_CONFIG_HOME overrides ~/.config)
+`;
+
 const EXIT_CODES_TEXT = `
 Exit codes:
   0  success
   1  error
   2  daemon not running
-  3  not found`;
+  3  not found
+
+Status --json fields (flow status --json):
+  { running: boolean, version?: string, pid?: number }
+
+Environment variables:
+  XDG_CONFIG_HOME   Override base config directory (default: ~/.config)
+  FLOW_DAEMON_MODE  Internal — set to "1" by "flow start" to launch daemon mode
+
+Daemon-required commands: run, start, stop, status
+Standalone commands:      show, validate, history, docs, logs, cli`;
 
 const DAEMON_DIR = ConfigDir.get('flow');
 
@@ -208,6 +226,7 @@ async function main(): Promise<void> {
 	program.name('flow').version(VERSION).description('CLI for running and validating agent flows');
 	// Register --pid as a documented option (handled before parseAsync above)
 	program.option('--pid', 'Show the daemon PID and exit');
+	program.addHelpText('before', CONCEPTS_TEXT);
 	program.addHelpText('after', EXIT_CODES_TEXT);
 
 	registerDocsCommand(program);

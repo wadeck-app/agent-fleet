@@ -8,7 +8,7 @@ import type { Task, TaskStatus } from '@shared/api/tasks.contract';
 import { B2F_TASKS_UPDATED } from '@shared/transport';
 import { Loader2 } from 'lucide-react';
 
-import { useTransport } from '@/transport';
+import { useTransport } from '@/transport/useTransport';
 
 import { tasksApi } from '../tasks/tasks.api';
 

@@ -1,6 +1,6 @@
 import { Pagination } from '@framework/components/pagination/Pagination';
 import { Button } from '@framework/components/primitives/Button';
-import { renderColumnValue } from '@framework/lego';
+import { renderColumnValue } from '@framework/lego/helpers/renderColumnValue';
 import { Edit, Trash2 } from 'lucide-react';
 
 import { usePipelineContext } from './PipelineContext';
