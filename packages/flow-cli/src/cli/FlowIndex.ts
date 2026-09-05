@@ -148,7 +148,7 @@ async function registerDaemonCommands(program: Command): Promise<void> {
 				if (useJson) {
 					process.stdout.write(JSON.stringify({ running: true, version: null, pid: null }) + '\n');
 				} else {
-					process.stdout.write(`[flow] running (version query failed: ${String(err)})\n`);
+					process.stdout.write('[flow] running (version query failed)\n');
 				}
 			}
 		});
