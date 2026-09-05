@@ -261,6 +261,7 @@ export class ClaudeLauncher {
 			for (const [k, v] of Object.entries(rawEnvInteractive)) {
 				if (v !== undefined) processEnvInteractive[k] = v;
 			}
+			// violations-suppress: cli/no-spawn-without-windows-hide interactive Claude session -- terminal forwarded intentionally
 			const claudeProcess = spawn(command, args, {
 				cwd: options.workingDir,
 				stdio: 'inherit',
@@ -323,6 +324,7 @@ export class ClaudeLauncher {
 				stdio: ['pipe', 'pipe', 'pipe'],
 				shell: false,
 				windowsHide: true,
+				detached: true,
 				env: processEnvBackground,
 			});
 

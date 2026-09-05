@@ -85,7 +85,7 @@ export class WorkerPool {
 				...(process.env['TEMP'] ? { TEMP: process.env['TEMP'] } : {}),
 				...(process.env['TMP'] ? { TMP: process.env['TMP'] } : {}),
 			},
-			detached: false,
+			detached: true,
 			stdio: ['ignore', 'ignore', 'pipe'],
 		});
 
