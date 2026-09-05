@@ -4,7 +4,7 @@
 //  * Monitors flow execution using event-driven approach.
 //  * Listens to FlowOrchestrator events and emits UI update events.
 //  */
-// import { EventEmitter } from 'node:events';
+// import { EventEmitter } from 'events';
 // import type { Task } from 'shared-orch-worker/domain-types';
 //
 // /**
