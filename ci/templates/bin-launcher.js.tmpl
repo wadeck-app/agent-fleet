@@ -53,9 +53,15 @@ const PASSTHROUGH_FLAGS = ['--version', '-v', '--pid', '--help', '-h'];
 const _args = process.argv.slice(2);
 
 function _runWithExit(bin, binArgs) {
+  // For 'start': use stdio:'ignore' (NUL handles) to prevent PIPE handles inherited from
+  // CliTransport flowing through flow.exe (SUBSYSTEM:WINDOWS, GUI) into node flow.cjs.
+  // A GUI parent with PIPE stdio causes libuv to call AllocConsole() in child processes,
+  // producing visible terminal windows during daemon worker execution.
+  // For all other commands: stdio:'inherit' so output reaches the terminal.
+  var _stdio = (process.platform === 'win32' && binArgs[0] === 'start') ? 'ignore' : 'inherit';
   try {
     execFileSync(bin, binArgs, {
-      stdio: 'inherit',
+      stdio: _stdio,
       windowsHide: true,
       env: { ...process.env, LAUNCHER_BUNDLE_OVERRIDE: bundlePath },
     });
