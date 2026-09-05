@@ -205,6 +205,10 @@ async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Pro
 		catch { return process.argv[1]!; }
 	})();
 
+	// Remove stale port file before spawning so the poll below only resolves on a fresh write
+	const portFile = path.join(daemonDir, 'config.port');
+	try { fs.unlinkSync(portFile); } catch { /* file may not exist */ }
+
 	const child = spawn(process.execPath, [resolvedBundle], {
 		stdio: 'ignore',
 		windowsHide: true,
@@ -212,8 +216,7 @@ async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Pro
 	});
 	child.unref();
 
-	// Poll for port file
-	const portFile = path.join(daemonDir, 'config.port');
+	// Poll for port file written by the freshly-spawned daemon
 	const deadline = Date.now() + timeoutMs;
 	while (Date.now() < deadline) {
 		if (fs.existsSync(portFile)) return;
