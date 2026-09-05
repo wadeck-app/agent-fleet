@@ -214,9 +214,9 @@ export async function clickWithRetry(
 		} catch (error: any) {
 			if (
 				attempt < maxRetries - 1 &&
-				((error instanceof Error ? error.message : String(error))?.includes('not attached') ||
-					(error instanceof Error ? error.message : String(error))?.includes('detached') ||
-					(error instanceof Error ? error.message : String(error))?.includes('not visible'))
+				(String(error)?.includes('not attached') ||
+					String(error)?.includes('detached') ||
+					String(error)?.includes('not visible'))
 			) {
 				await delay(500);
 				continue;

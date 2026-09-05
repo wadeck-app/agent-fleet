@@ -33,7 +33,7 @@ export class KnowledgeStorage {
 			await this.ensureDirectoryExists(KNOWLEDGE_DIR);
 		} catch (error) {
 			log.error('Failed to initialize directories:', error);
-			throw new Error(`Failed to initialize storage: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`);
+			throw new Error(`Failed to initialize storage: ${error instanceof Error ? String(error) : String(error)}`);
 		}
 	}
 
@@ -51,7 +51,7 @@ export class KnowledgeStorage {
 		} catch (error) {
 			log.error(`Failed to add knowledge to ${category}:`, error);
 			throw new Error(
-				`Failed to add knowledge to ${category}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
+				`Failed to add knowledge to ${category}: ${error instanceof Error ? String(error) : String(error)}`
 			);
 		}
 	}
@@ -70,7 +70,7 @@ export class KnowledgeStorage {
 			}
 			log.error(`Failed to read knowledge from ${category}:`, error);
 			throw new Error(
-				`Failed to read knowledge from ${category}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
+				`Failed to read knowledge from ${category}: ${error instanceof Error ? String(error) : String(error)}`
 			);
 		}
 	}
@@ -83,7 +83,7 @@ export class KnowledgeStorage {
 		} catch (error) {
 			log.error(`Failed to get context directory for task ${taskId}:`, error);
 			throw new Error(
-				`Failed to get context directory for task ${taskId}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
+				`Failed to get context directory for task ${taskId}: ${error instanceof Error ? String(error) : String(error)}`
 			);
 		}
 	}

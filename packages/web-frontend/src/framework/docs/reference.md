@@ -1,34 +1,34 @@
-# Reference
+ Reference
 
 _Moved from README -- see [README](../README.md) for the overview._
 
-│   ├── forms/           # Complete form system with field components
-│   ├── connectivity/    # Network connectivity & circuit breaker
-│   ├── toast/           # Toast notification system
-│   └── theme/           # Theme management
-│
-├── hooks/               # Custom React hooks
-│   ├── useMediaQuery    # Responsive design
-│   ├── useDocumentTitle # Document title management
-│   ├── useAsyncData     # Async data fetching
-│   └── useAbortableEffect # Effect with cleanup
-│
-├── utils/               # Utility functions
-│   ├── errors/          # Error handling (AppError, ErrorLogger)
-│   ├── validation/      # Validation utilities
-│   ├── formatting/      # Formatters (DateFormat)
-│   ├── export/          # Export utilities (CSV, JSON)
-│   └── table/           # Table utilities
-│
-├── api/                 # API client utilities
-├── storage/             # Storage abstractions
-├── tests/               # Test utilities
-└── lib/                 # Third-party utilities (cn helper)
+    forms/            Complete form system with field components
+    connectivity/     Network connectivity & circuit breaker
+    toast/            Toast notification system
+    theme/            Theme management
+
+ hooks/                Custom React hooks
+    useMediaQuery     Responsive design
+    useDocumentTitle  Document title management
+    useAsyncData      Async data fetching
+    useAbortableEffect  Effect with cleanup
+
+ utils/                Utility functions
+    errors/           Error handling (AppError, ErrorLogger)
+    validation/       Validation utilities
+    formatting/       Formatters (DateFormat)
+    export/           Export utilities (CSV, JSON)
+    table/            Table utilities
+
+ api/                  API client utilities
+ storage/              Storage abstractions
+ tests/                Test utilities
+ lib/                  Third-party utilities (cn helper)
 ```
 
-## Core Concepts
+ Core Concepts
 
-### 1. Dependency Injection
+ . Dependency Injection
 
 Framework components accept configuration via props, not hard-coded values:
 
@@ -41,7 +41,7 @@ export const circuitBreakerService = createCircuitBreaker({
 });
 ```
 
-### 2. Composability
+ . Composability
 
 Components are designed to be composed together:
 
@@ -62,7 +62,7 @@ import { Button } from '@framework/components/primitives/Button';
 </Card>
 ```
 
-### 3. Type Safety
+ . Type Safety
 
 Full TypeScript support with comprehensive types:
 
@@ -71,9 +71,9 @@ import type { ToastType } from '@framework/features/toast';
 import type { ValidationResult, Validator } from '@framework/utils/validation';
 ```
 
-## Key Features
+ Key Features
 
-### Forms System
+ Forms System
 
 Complete form system with field components:
 
@@ -87,7 +87,7 @@ import { TextField, SelectField, CheckboxField } from '@framework/features/forms
 />
 ```
 
-### Connectivity Management
+ Connectivity Management
 
 Network connectivity with circuit breaker pattern:
 
@@ -99,7 +99,7 @@ import { ConnectivityProvider, useConnectivity } from '@framework/features/conne
 </ConnectivityProvider>
 ```
 
-### Toast Notifications
+ Toast Notifications
 
 Centralized toast notification system:
 
@@ -110,7 +110,7 @@ const { showToast } = useToast();
 showToast('Success!', 'success');
 ```
 
-### Theme Management
+ Theme Management
 
 Dark/light theme support:
 
@@ -120,7 +120,7 @@ import { ThemeToggle, useTheme } from '@framework/features/theme';
 const { theme, toggleTheme } = useTheme();
 ```
 
-## Testing
+ Testing
 
 The framework includes test utilities:
 
@@ -132,9 +132,9 @@ const { fn, resolve } = createControllablePromise<[Book], void>();
 const book = withMetadata({ title: 'Test', author: 'Author' });
 ```
 
-## Best Practices
+ Best Practices
 
-### Import Patterns
+ Import Patterns
 
 ```typescript
 //  Good - Direct file imports
@@ -145,15 +145,15 @@ import { useAsyncData } from '@framework/hooks/useAsyncData';
 // import { Button, useAsyncData } from '@framework';
 ```
 
-### Component Guidelines
+ Component Guidelines
 
-1. **Single Responsibility**: Each component has one clear purpose
-2. **Prop-based Configuration**: No hard-coded values
-3. **Accessibility**: Follow ARIA guidelines
-4. **Responsive**: Mobile-first design
-5. **Type Safety**: Full TypeScript types
+. Single Responsibility: Each component has one clear purpose
+. Prop-based Configuration: No hard-coded values
+. Accessibility: Follow ARIA guidelines
+. Responsive: Mobile-first design
+. Type Safety: Full TypeScript types
 
-### Error Handling
+ Error Handling
 
 ```typescript
 import { AppError } from '@framework/utils/errors/AppError';
@@ -168,22 +168,22 @@ try {
 }
 ```
 
-## Migration Plan
+ Migration Plan
 
 This framework is designed to eventually be extracted into a standalone package for reuse across multiple applications.
 
 For detailed migration planning and phases, see: [Framework Migration Plan](../../../.claude/plans/framework-migration.md)
 
-## Contributing
+ Contributing
 
 When contributing to the framework:
 
-1. **Keep it generic**: No app-specific logic
-2. **Document thoroughly**: JSDoc for all public APIs
-3. **Test comprehensively**: Unit + integration tests
-4. **Follow patterns**: Match existing architecture
-5. **Update examples**: Keep documentation current
+. Keep it generic: No app-specific logic
+. Document thoroughly: JSDoc for all public APIs
+. Test comprehensively: Unit + integration tests
+. Follow patterns: Match existing architecture
+. Update examples: Keep documentation current
 
-## License
+ License
 
 Internal use only. Not for public distribution.

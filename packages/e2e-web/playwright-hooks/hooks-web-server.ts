@@ -185,7 +185,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 		});
 		page.on('pageerror', error => {
 			if (!silentLogs) {
-				console.log(`[Frontend:${backendPort}] ${(error instanceof Error ? error.message : String(error))}`);
+				console.log(`[Frontend:${backendPort}] ${String(error)}`);
 			}
 		});
 

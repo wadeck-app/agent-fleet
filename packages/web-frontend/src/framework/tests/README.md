@@ -1,34 +1,34 @@
-# Test Utilities
+ Test Utilities
 
-## Controllable Promise Pattern
+ Controllable Promise Pattern
 
-### Problem
+ Problem
 
 Using `setTimeout` in tests creates flaky and inefficient tests:
 
 ```typescript
 //  FLAKY: Race conditions and arbitrary delays
-const onSubmit = vi.fn<[CreateBook], Promise<void>>(() => new Promise(resolve => setTimeout(resolve, 100)));
+const onSubmit = vi.fn<[CreateBook], Promise<void>>(() => new Promise(resolve => setTimeout(resolve, )));
 
 fireEvent.click(submitButton);
 
-// Problem 1: May check too early if system is slow
+// Problem : May check too early if system is slow
 expect(screen.getByText(/saving.../i)).toBeInTheDocument();
 
-// Problem 2: Wastes 100ms even if promise could resolve instantly
+// Problem : Wastes ms even if promise could resolve instantly
 await waitFor(() => {
 	expect(screen.queryByText(/saving.../i)).not.toBeInTheDocument();
 });
 ```
 
-**Issues:**
+Issues:
 
-1. ⏰ **Too fast**: Test may check before loading state appears
-2. ⏰ **Too slow**: Wastes 100ms+ per test execution
-3.  **Non-deterministic**: Timing depends on system load
-4.  **False positives**: Tests may pass despite bugs in timing logic
+.  Too fast: Test may check before loading state appears
+.  Too slow: Wastes ms+ per test execution
+.  Non-deterministic: Timing depends on system load
+.  False positives: Tests may pass despite bugs in timing logic
 
-### Solution: `createControllablePromise`
+ Solution: `createControllablePromise`
 
 Complete control over async timeline - resolve promises exactly when you're ready:
 

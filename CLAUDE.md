@@ -77,7 +77,7 @@ FlowExecutor.test.ts
 
 **Example:**
 
--  "Vous avez raison! Je n'ai pas verifie..."
+-  "You are right! I have not verified..."
 -  "Let me verify if the event is actually sent. Adding logs to trace the flow."
 
 If the user is wrong, say it. If you disagree, explain why. Act as a peer, not a servant.

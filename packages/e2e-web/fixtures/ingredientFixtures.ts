@@ -1,12 +1,11 @@
 import type { CreateIngredient } from 'shared-frontend-backend/src/api/ingredients.contract';
 
-/**
- * Fixtures pour les tests d'ingredients
+/** Fixtures for tests d'ingredients
  */
 
 export const validIngredients: Record<string, CreateIngredient> = {
 	chicken: {
-		name: 'Poulet',
+		name: 'Chicken',
 		calories: 165,
 		protein: 31.0,
 		carbs: 0.0,
@@ -62,7 +61,7 @@ export const validIngredients: Record<string, CreateIngredient> = {
 		servingSize: 100,
 	},
 	tomato: {
-		name: 'Tomate',
+		name: 'Tomato',
 		calories: 18,
 		protein: 0.9,
 		carbs: 3.9,

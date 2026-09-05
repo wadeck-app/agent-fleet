@@ -104,7 +104,8 @@ export function ViewDetailPanel<T extends Product = Product>({ columns, features
 		if (col.type === 'number') {
 			const prefix = col.prefix ?? '';
 			const suffix = col.suffix ?? '';
-			return `${prefix}${Number(value).toLocaleString()}${suffix}`;
+			// violations-suppress: ts/no-locale-date toLocaleString() is on a Number, not a Date
+return `${prefix}${Number(value).toLocaleString()}${suffix}`;
 		}
 
 		if (col.type === 'enum' && col.badge) {

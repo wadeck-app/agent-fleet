@@ -38,7 +38,7 @@ const errorHandlerHook: FastifyPluginAsync = async fastify => {
 
 		// Log ALL 400 errors with full context for debugging
 		if (statusCode === 400) {
-			log.error(`[400] ${request.method} ${request.url} - ${error.constructor.name}: ${(error instanceof Error ? error.message : String(error))}`, {
+			log.error(`[400] ${request.method} ${request.url} - ${error.constructor.name}: ${String(error)}`, {
 				query: request.query,
 				body: request.body,
 			});
@@ -50,7 +50,7 @@ const errorHandlerHook: FastifyPluginAsync = async fastify => {
 
 		if (shouldLogDetails) {
 			const errorCode = 'code' in error ? error.code : 'UNKNOWN_ERROR';
-			log.error(`Error handling ${request.method} ${request.url} - ${statusCode} ${errorCode}: ${(error instanceof Error ? error.message : String(error))}`);
+			log.error(`Error handling ${request.method} ${request.url} - ${statusCode} ${errorCode}: ${String(error)}`);
 
 			// Log stack trace for 5xx errors
 			if (statusCode >= 500 && error.stack) {
@@ -66,7 +66,7 @@ const errorHandlerHook: FastifyPluginAsync = async fastify => {
 		// Handle custom HttpException (with error codes)
 		if (error instanceof HttpException) {
 			const response: ErrorResponse = {
-				error: (error instanceof Error ? error.message : String(error)),
+				error: String(error),
 				code: error.code,
 				statusCode: error.statusCode,
 				timestamp,
@@ -90,7 +90,7 @@ const errorHandlerHook: FastifyPluginAsync = async fastify => {
 				timestamp,
 				details: error.issues.map(e => ({
 					field: e.path.join('.'),
-					message: (e instanceof Error ? e.message : String(e)),
+					message: String(e),
 					code: e.code,
 					received: 'received' in e ? e.received : undefined,
 				})),
@@ -120,7 +120,7 @@ const errorHandlerHook: FastifyPluginAsync = async fastify => {
 		const message =
 			process.env.NODE_ENV === 'production' && statusCode === 500
 				? 'Internal Server Error'
-				: (error instanceof Error ? error.message : String(error)) || 'Internal Server Error';
+				: String(error) || 'Internal Server Error';
 
 		if (onlyUnexpectedErrorLogged) {
 			log.error('Unexpected error', error);

@@ -1,17 +1,17 @@
-/**
- * Global Setup for Playwright
- * Starts one backend server per worker for complete isolation
- *
- * SAFETY FEATURES:
- * - Uses dedicated port range (4000+) to avoid conflicts with dev servers
- * - Detects port availability before spawning
- * - Verifies test mode via /api/test/health endpoint
- * - Retries with next port if one is occupied
- */
+/
+  Global Setup for Playwright
+  Starts one backend server per worker for complete isolation
+ 
+  SAFETY FEATURES:
+  - Uses dedicated port range (+) to avoid conflicts with dev servers
+  - Detects port availability before spawning
+  - Verifies test mode via /api/test/health endpoint
+  - Retries with next port if one is occupied
+ /
 import type { FullConfig } from '@playwright/test';
 import { ChildProcess, exec, spawn } from 'node:child_process';
 import { readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises';
-import * as net from 'node:net';
+import  as net from 'node:net';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -25,26 +25,26 @@ interface ServerInfo {
 }
 
 const projectRoot = path.resolve(__dirname, '../../..');
-const tempFolder = path.resolve(projectRoot, 'packages/e2e-web/temp');
+const tempFolder = path.resolve(projectRoot, 'packages/ee-web/temp');
 
 const debug = true;
 
-/**
- * Kill a process and all its children (process tree)
- * CRITICAL: spawn('npm run ...', {shell: true}) creates:
- * - Parent process: npm (PID 12345)
- * - Child process: Node.js backend (PID 67890)
- *
- * proc.kill() only kills npm, leaving the backend as a zombie!
- * This function kills the entire process tree to prevent leaks.
- */
+/
+  Kill a process and all its children (process tree)
+  CRITICAL: spawn('npm run ...', {shell: true}) creates:
+  - Parent process: npm (PID )
+  - Child process: Node.js backend (PID )
+ 
+  proc.kill() only kills npm, leaving the backend as a zombie!
+  This function kills the entire process tree to prevent leaks.
+ /
 async function killProcessTree(proc: ChildProcess, backendPid?: number): Promise<void> {
 	if (!proc.pid) {
 		return;
 	}
 
 	try {
-		if (process.platform === 'win32') {
+		if (process.platform === 'win') {
 			// Windows: Use /T (tree) flag to kill all child processes
 			await execAsync(`taskkill /PID ${proc.pid} /T /F`);
 			debug && console.log(`       Killed process tree for PID ${proc.pid}`);
@@ -83,19 +83,19 @@ async function killProcessTree(proc: ChildProcess, backendPid?: number): Promise
 	}
 }
 
-/**
- * Check if a port is available
- * Fast check with 2-second timeout
- */
+/
+  Check if a port is available
+  Fast check with -second timeout
+ /
 async function isPortAvailable(port: number): Promise<boolean> {
 	return new Promise(resolve => {
 		const server = net.createServer();
 
-		// Timeout after 2 seconds (should be instant)
+		// Timeout after  seconds (should be instant)
 		const timeout = setTimeout(() => {
 			server.close();
 			resolve(false);
-		}, 2000);
+		}, );
 
 		server.once('error', (err: NodeJS.ErrnoException) => {
 			clearTimeout(timeout);
@@ -112,32 +112,32 @@ async function isPortAvailable(port: number): Promise<boolean> {
 			resolve(true);
 		});
 
-		server.listen(port, '0.0.0.0');
+		server.listen(port, '...');
 	});
 }
 
-/**
- * Start a backend server on an available port
- * Tries multiple ports if needed
- * Waits for stdout confirmation that the server successfully bound to the port
- * This avoids fetchs that could contact a backend from another terminal
- */
+/
+  Start a backend server on an available port
+  Tries multiple ports if needed
+  Waits for stdout confirmation that the server successfully bound to the port
+  This avoids fetchs that could contact a backend from another terminal
+ /
 async function startServerOnAvailablePort(
 	startPort: number,
 	workspaceId: number,
 	workerId: number,
 	expectedRunId: string,
-	maxPortAttempts: number = 100
+	maxPortAttempts: number = 
 ): Promise<{ port: number; actualPid: number; process: ChildProcess }> {
 	debug &&
 		console.log(
-			` Searching for available port in range ${startPort}-${startPort + maxPortAttempts - 1} (RUN_ID: ${expectedRunId})`
+			` Searching for available port in range ${startPort}-${startPort + maxPortAttempts - } (RUN_ID: ${expectedRunId})`
 		);
 
-	for (let portOffset = 0; portOffset < maxPortAttempts; portOffset++) {
+	for (let portOffset = ; portOffset < maxPortAttempts; portOffset++) {
 		const port = startPort + portOffset;
 
-		debug && console.log(`  [${portOffset + 1}/${maxPortAttempts}] Trying port ${port}...`);
+		debug && console.log(`  [${portOffset + }/${maxPortAttempts}] Trying port ${port}...`);
 
 		// Check if port is available BEFORE spawning
 		const available = await isPortAvailable(port);
@@ -149,22 +149,22 @@ async function startServerOnAvailablePort(
 		debug && console.log(`      Port ${port} is available, spawning backend process...`);
 		debug && console.log(`      Worker ID: ${workerId}, PROJECT_ID will be: ${workerId}`);
 
-		const command = 'npm run start:only-for-e2e --workspace=web-backend';
+		const command = 'npm run start:only-for-ee --workspace=web-backend';
 		const serverProcess = spawn(command, {
 			env: {
 				...process.env,
 				PORT: port.toString(),
 				NODE_ENV: 'development',
-				E2E_MODE: 'true',
+				EE_MODE: 'true',
 				// Explicitly ensure production mode is OFF (safe by default)
 				USE_PRODUCTION_DB: 'false',
 				// Set WORKSPACE_ID to match test suite expectation
 				// This ensures spawned backend servers use the same workspace ID as the test setup
 				WORKSPACE_ID: workspaceId.toString(),
 				// Set PROJECT_ID (should remain fixed for the project)
-				PROJECT_ID: process.env.PROJECT_ID || '0',
-				// Set unique WORKER_ID per E2E worker to ensure each gets its own Orchestrator WebSocket port
-				// Worker 0 → WORKER_ID=0 → Orch WS port 3701, Worker 1 → WORKER_ID=1 → Orch WS port 3703, etc.
+				PROJECT_ID: process.env.PROJECT_ID || '',
+				// Set unique WORKER_ID per EE worker to ensure each gets its own Orchestrator WebSocket port
+				// Worker  → WORKER_ID= → Orch WS port , Worker  → WORKER_ID= → Orch WS port , etc.
 				WORKER_ID: workerId.toString(),
 				// Pass RUN_ID to backend so it can identify which test run it belongs to
 				RUN_ID: process.env.RUN_ID || 'unknown',
@@ -176,8 +176,8 @@ async function startServerOnAvailablePort(
 		});
 
 		// Wait for server to confirm it successfully bound to the port
-		// We listen to stdout for the E2E_BACKEND_READY message instead of doing fetchs
-		const silentLogs = process.env.E2E_SILENT_LOGS === 'true';
+		// We listen to stdout for the EE_BACKEND_READY message instead of doing fetchs
+		const silentLogs = process.env.EE_SILENT_LOGS === 'true';
 
 		const serverReady = new Promise<{ actualPort: number; actualPid: number }>((resolve, reject) => {
 			let alreadyResolved = false;
@@ -186,7 +186,7 @@ async function startServerOnAvailablePort(
 			let stdoutReceived = false;
 
 			// Debug: Uncomment to see startup progress
-			// console.log(`     ⏳ Waiting for E2E_BACKEND_READY message from port ${port}...`);
+			// console.log(`      Waiting for EE_BACKEND_READY message from port ${port}...`);
 
 			// Monitor stderr for EADDRINUSE errors
 			serverProcess.stderr?.on('data', data => {
@@ -216,7 +216,7 @@ async function startServerOnAvailablePort(
 				}
 			});
 
-			// Monitor stdout for success message: "E2E_BACKEND_READY port=4000 pid=12345 runId=..."
+			// Monitor stdout for success message: "EE_BACKEND_READY port= pid= runId=..."
 			serverProcess.stdout?.on('data', data => {
 				const text = data.toString();
 				stdoutReceived = true;
@@ -231,15 +231,15 @@ async function startServerOnAvailablePort(
 				}
 
 				// Check for ready message
-				const match = text.match(/E2E_BACKEND_READY port=(\d+) pid=(\d+) runId=(\S+)/);
+				const match = text.match(/EE_BACKEND_READY port=(\d+) pid=(\d+) runId=(\S+)/);
 				if (match) {
-					const actualPort = parseInt(match[1], 10);
-					const actualPid = parseInt(match[2], 10);
-					const actualRunId = match[3];
+					const actualPort = parseInt(match[], );
+					const actualPid = parseInt(match[], );
+					const actualRunId = match[];
 
 					debug &&
 						console.log(
-							`      Received E2E_BACKEND_READY: port=${actualPort}, pid=${actualPid}, runId=${actualRunId}`
+							`      Received EE_BACKEND_READY: port=${actualPort}, pid=${actualPid}, runId=${actualRunId}`
 						);
 					debug && console.log(`      Expected: port=${port}, runId=${expectedRunId}`);
 
@@ -285,15 +285,15 @@ async function startServerOnAvailablePort(
 				}
 			});
 
-			// Timeout after 10s: compiled backend starts in <2s, 10s covers slow machines
+			// Timeout after s: compiled backend starts in <s, s covers slow machines
 			setTimeout(() => {
 				if (!serverExited && !alreadyResolved) {
-					const msg = `Server startup timeout (10s) on port ${port}. Stdout received: ${stdoutReceived}. PID: ${serverProcess.pid}`;
+					const msg = `Server startup timeout (s) on port ${port}. Stdout received: ${stdoutReceived}. PID: ${serverProcess.pid}`;
 					// ALWAYS log timeouts
 					console.error(`      ${msg}`);
 					reject(new Error(msg));
 				}
-			}, 10_000);
+			}, _);
 		});
 
 		try {
@@ -308,7 +308,7 @@ async function startServerOnAvailablePort(
 			debug && console.log(`       Killing failed process on port ${port}...`);
 			await killProcessTree(serverProcess);
 
-			if (error instanceof Error && (error instanceof Error ? error.message : String(error)) === 'PORT_IN_USE') {
+			if (error instanceof Error && String(error) === 'PORT_IN_USE') {
 				debug && console.log(`       Port ${port} is in use, will try next port`);
 				continue;
 			}
@@ -316,7 +316,7 @@ async function startServerOnAvailablePort(
 			// Other errors (timeout, mismatch, etc.) - also retry
 			debug &&
 				console.log(
-					`       Server failed on port ${port}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : error}. Will try next port`
+					`       Server failed on port ${port}: ${error instanceof Error ? String(error) : error}. Will try next port`
 				);
 			continue;
 		}
@@ -328,21 +328,21 @@ async function startServerOnAvailablePort(
 	);
 }
 
-/**
- * Detects if this is a single test case run (e.g., from IntelliJ)
- * Only detects explicit single test targeting, not file-level runs
- */
+/
+  Detects if this is a single test case run (e.g., from IntelliJ)
+  Only detects explicit single test targeting, not file-level runs
+ /
 function isSingleTestRun(config: FullConfig): boolean {
-	const args = process.argv.slice(2);
+	const args = process.argv.slice();
 
-	// Heuristic 1: Line number specified (e.g., file.spec.ts:42)
+	// Heuristic : Line number specified (e.g., file.spec.ts:)
 	// This definitively means a single test case
 	const hasLineNumber = args.some(arg => arg.match(/\.spec\.ts:\d+/));
 	if (hasLineNumber) {
 		return true;
 	}
 
-	// Heuristic 2: --grep flag explicitly passed in CLI
+	// Heuristic : --grep flag explicitly passed in CLI
 	// IDEs use --grep to target specific test cases
 	const hasGrepFlag = args.some(arg => arg === '--grep' || arg.startsWith('--grep='));
 	if (hasGrepFlag) {
@@ -355,17 +355,17 @@ function isSingleTestRun(config: FullConfig): boolean {
 	return false;
 }
 
-/**
- * Kills backend servers from any previous test run that didn't clean up properly.
- * Reads all .test-servers-*.json files (regardless of age) and kills their PIDs.
- * This prevents EADDRINUSE cascades when a run is interrupted without teardown.
- */
+/
+  Kills backend servers from any previous test run that didn't clean up properly.
+  Reads all .test-servers-.json files (regardless of age) and kills their PIDs.
+  This prevents EADDRINUSE cascades when a run is interrupted without teardown.
+ /
 async function killStaleServers(): Promise<void> {
 	try {
 		const files = await readdir(tempFolder);
 		const serverFiles = files.filter(f => f.startsWith('.test-servers-'));
 
-		if (serverFiles.length === 0) {
+		if (serverFiles.length === ) {
 			return;
 		}
 
@@ -374,12 +374,12 @@ async function killStaleServers(): Promise<void> {
 		for (const filename of serverFiles) {
 			const filePath = path.join(tempFolder, filename);
 			try {
-				const data = await readFile(filePath, 'utf-8');
+				const data = await readFile(filePath, 'utf-');
 				const servers: ServerInfo[] = JSON.parse(data);
 
 				for (const server of servers) {
 					try {
-						if (process.platform === 'win32') {
+						if (process.platform === 'win') {
 							await execAsync(`taskkill /PID ${server.pid} /T /F`);
 						} else {
 							process.kill(server.pid, 'SIGKILL');
@@ -400,14 +400,14 @@ async function killStaleServers(): Promise<void> {
 	}
 }
 
-/**
- * Cleans up orphaned port files from previous test runs
- * Removes files older than 1 hour based on both:
- * - Timestamp in filename (RUN_ID format: timestamp-pid)
- * - File modification time (fallback if filename parsing fails)
- */
+/
+  Cleans up orphaned port files from previous test runs
+  Removes files older than  hour based on both:
+  - Timestamp in filename (RUN_ID format: timestamp-pid)
+  - File modification time (fallback if filename parsing fails)
+ /
 async function cleanupOrphanedFiles(): Promise<void> {
-	const oneHourAgo = Date.now() - 60 * 60 * 1000;
+	const oneHourAgo = Date.now() -     ;
 
 	try {
 		const files = await readdir(tempFolder);
@@ -415,22 +415,22 @@ async function cleanupOrphanedFiles(): Promise<void> {
 			f => f.startsWith('.test-servers-') || f.startsWith('.webapp-port-') || f.startsWith('.storybook-port-')
 		);
 
-		if (portFiles.length === 0) {
+		if (portFiles.length === ) {
 			return;
 		}
 
-		let cleanedCount = 0;
+		let cleanedCount = ;
 		for (const filename of portFiles) {
 			const filePath = path.join(tempFolder, filename);
 
 			try {
 				// Extract timestamp from RUN_ID in filename (format: .xxx-port-TIMESTAMP-PID.json)
-				const match = filename.match(/(\d{13})-\d+\.json$/);
+				const match = filename.match(/(\d{})-\d+\.json$/);
 				let isOld = false;
 
 				if (match) {
 					// Check timestamp from filename
-					const fileTimestamp = parseInt(match[1], 10);
+					const fileTimestamp = parseInt(match[], );
 					isOld = fileTimestamp < oneHourAgo;
 				} else {
 					// Fallback: check file modification time
@@ -447,48 +447,48 @@ async function cleanupOrphanedFiles(): Promise<void> {
 			}
 		}
 
-		if (cleanedCount > 0) {
-			console.log(` Cleaned up ${cleanedCount} orphaned port file(s) older than 1 hour`);
+		if (cleanedCount > ) {
+			console.log(` Cleaned up ${cleanedCount} orphaned port file(s) older than  hour`);
 		}
 	} catch (err) {
 		// Directory read failed, not critical - continue with test setup
 	}
 }
 
-/**
- * Analyzes server output to distinguish real crashes from clean teardown
- * Returns true if this appears to be a real crash (should be logged as error)
- * Returns false if this appears to be a normal teardown (suppress error)
- *
- * Detection is based on actual observed pattern from successful test completions:
- * - Exit code 1 (npm killed)
- * - HTTP request logs in output
- * - npm lifecycle error message (expected when process is killed)
- */
+/
+  Analyzes server output to distinguish real crashes from clean teardown
+  Returns true if this appears to be a real crash (should be logged as error)
+  Returns false if this appears to be a normal teardown (suppress error)
+ 
+  Detection is based on actual observed pattern from successful test completions:
+  - Exit code  (npm killed)
+  - HTTP request logs in output
+  - npm lifecycle error message (expected when process is killed)
+ /
 function analyzeServerCrash(serverOutput: string, exitCode: number): boolean {
 	if (!serverOutput) {
 		// No output - likely a crash during startup
 		return true;
 	}
 
-	// PATTERN 1: Normal teardown after successful tests
+	// PATTERN : Normal teardown after successful tests
 	// Check for the exact pattern observed in user logs:
-	// 1. HTTP requests in logs (server was working)
-	// 2. npm lifecycle script error (expected when killed)
+	// . HTTP requests in logs (server was working)
+	// . npm lifecycle script error (expected when killed)
 	// Note: Logs have format "[timestamp] [ INFO] GET /api/..." with space inside brackets
 	const httpRequestPattern =
-		/\[\s*(INFO|WARN|ERROR)\s*\]\s+(GET|POST|PUT|DELETE|PATCH|OPTIONS)\s+\/\S+\s+\d{3}\s+\d+ms/;
+		/\[\s(INFO|WARN|ERROR)\s\]\s+(GET|POST|PUT|DELETE|PATCH|OPTIONS)\s+\/\S+\s+\d{}\s+\d+ms/;
 	const hasHttpLogs = httpRequestPattern.test(serverOutput);
-	// Note: Use includes() without the backticks to match both `start:only-for-e2e` and 'start:only-for-e2e'
+	// Note: Use includes() without the backticks to match both `start:only-for-ee` and 'start:only-for-ee'
 	const hasNpmLifecycleError =
-		serverOutput.includes('npm error Lifecycle script') && serverOutput.includes('start:only-for-e2e');
+		serverOutput.includes('npm error Lifecycle script') && serverOutput.includes('start:only-for-ee');
 
-	if (exitCode === 1 && hasHttpLogs && hasNpmLifecycleError) {
+	if (exitCode ===  && hasHttpLogs && hasNpmLifecycleError) {
 		// This is the exact pattern from normal test completion
 		return false; // Not a crash - normal teardown
 	}
 
-	// PATTERN 2: Check for actual application errors
+	// PATTERN : Check for actual application errors
 	const lowerOutput = serverOutput.toLowerCase();
 	const crashIndicators = [
 		' fatal', // Fatal errors from our app
@@ -504,8 +504,8 @@ function analyzeServerCrash(serverOutput: string, exitCode: number): boolean {
 		}
 	}
 
-	// PATTERN 3: npm killed but no HTTP logs = startup failure
-	if (exitCode === 1 && !hasHttpLogs && hasNpmLifecycleError) {
+	// PATTERN : npm killed but no HTTP logs = startup failure
+	if (exitCode ===  && !hasHttpLogs && hasNpmLifecycleError) {
 		return true; // Server never started serving requests
 	}
 
@@ -526,19 +526,19 @@ async function globalSetupWebServer(config: FullConfig) {
 	// Kill any servers left over from a previous run that didn't clean up (interrupted, crashed, etc.)
 	await killStaleServers();
 
-	// Clean up orphaned port files from interrupted test runs (> 1 hour old)
+	// Clean up orphaned port files from interrupted test runs (>  hour old)
 	await cleanupOrphanedFiles();
 
 	// Detect if this is likely a single test run (e.g., from IntelliJ)
 	const isSingleTest = isSingleTestRun(config);
 
-	// Adjust workers: use 1 for single test, configured amount for full suite
+	// Adjust workers: use  for single test, configured amount for full suite
 	const configuredWorkers = config.workers;
-	const numWorkers = isSingleTest ? 1 : configuredWorkers;
+	const numWorkers = isSingleTest ?  : configuredWorkers;
 	const projectCount = config.projects.length;
 
 	// Only show startup banner if not in silent mode
-	if (process.env.E2E_SILENT_LOGS !== 'true') {
+	if (process.env.EE_SILENT_LOGS !== 'true') {
 		console.log('\n === STARTING BACKEND SERVERS FOR PARALLEL TESTING ===');
 		console.log(` RUN_ID: ${runId}`);
 		console.log(` Projects: ${projectCount} (${config.projects.map(p => p.name).join(', ')})`);
@@ -547,39 +547,39 @@ async function globalSetupWebServer(config: FullConfig) {
 			console.log(` Single test detected → Starting one backend server`);
 		} else {
 			console.log(` Backend servers to start: ${numWorkers}`);
-			if (projectCount > 1) {
-				console.log(`ℹ  Workers from multiple projects will share backend servers (safe with in-memory DB)`);
+			if (projectCount > ) {
+				console.log(`  Workers from multiple projects will share backend servers (safe with in-memory DB)`);
 			}
 		}
 		console.log('');
 	}
 
-	// Build backend once before spawning all workers (avoids 5× parallel tsx compilations)
-	console.log(' Building backend for E2E (once for all workers)...');
-	await execAsync('npm run build:for-e2e --workspace=web-backend', { cwd: projectRoot });
+	// Build backend once before spawning all workers (avoids × parallel tsx compilations)
+	console.log(' Building backend for EE (once for all workers)...');
+	await execAsync('npm run build:for-ee --workspace=web-backend', { cwd: projectRoot });
 	console.log(' Backend built successfully (dist/server-test)');
 
 	// Calculate base port from WORKSPACE_ID for parallel testing across workspaces
-	// WORKSPACE_ID=0 → 4000-4999, WORKSPACE_ID=1 → 5000-5999, WORKSPACE_ID=2 → 6000-6999, etc.
-	const workspaceId = parseInt(process.env.WORKSPACE_ID || '0', 10);
-	const basePort = 4000 + workspaceId * 1000;
+	// WORKSPACE_ID= → -, WORKSPACE_ID= → -, WORKSPACE_ID= → -, etc.
+	const workspaceId = parseInt(process.env.WORKSPACE_ID || '', );
+	const basePort =  + workspaceId  ;
 
 	const processes: ChildProcess[] = [];
 	const reservedPorts = new Set<number>();
 
 	// Start all servers in parallel with individual retry logic
 	const serverPromises = Array.from({ length: numWorkers }, async (_, i) => {
-		debug && console.log(`\n Setting up backend server ${i + 1}/${numWorkers}...`);
+		debug && console.log(`\n Setting up backend server ${i + }/${numWorkers}...`);
 
-		let retryCount = 0;
-		const maxRetries = 5; // Reduced from 100 to avoid infinite loops
+		let retryCount = ;
+		const maxRetries = ; // Reduced from  to avoid infinite loops
 
 		while (retryCount < maxRetries) {
 			try {
-				debug && console.log(`   Attempt ${retryCount + 1}/${maxRetries} for worker ${i + 1}`);
+				debug && console.log(`   Attempt ${retryCount + }/${maxRetries} for worker ${i + }`);
 
 				// Calculate port with offset to reduce collisions
-				const startPort = basePort + i * 10 + retryCount;
+				const startPort = basePort + i   + retryCount;
 
 				// Skip already reserved ports
 				if (reservedPorts.has(startPort)) {
@@ -592,14 +592,14 @@ async function globalSetupWebServer(config: FullConfig) {
 				reservedPorts.add(startPort);
 
 				// Try to start server on this port
-				// startServerOnAvailablePort will wait for E2E_BACKEND_READY message in stdout
+				// startServerOnAvailablePort will wait for EE_BACKEND_READY message in stdout
 				// This prevents false positives when another terminal's backend is already on this port
 				const expectedRunId = process.env.RUN_ID || 'unknown';
 				const {
 					port,
 					actualPid,
 					process: serverProcess,
-				} = await startServerOnAvailablePort(startPort, workspaceId, i, expectedRunId, 100); // Increased to 100 to handle leftover processes
+				} = await startServerOnAvailablePort(startPort, workspaceId, i, expectedRunId, ); // Increased to  to handle leftover processes
 
 				processes.push(serverProcess);
 
@@ -613,7 +613,7 @@ async function globalSetupWebServer(config: FullConfig) {
 				});
 
 				serverProcess.on('exit', code => {
-					if (code !== 0 && code !== null) {
+					if (code !==  && code !== null) {
 						// Analyze server output to determine if this is a real crash
 						const isRealCrash = analyzeServerCrash(serverOutput, code);
 
@@ -622,9 +622,9 @@ async function globalSetupWebServer(config: FullConfig) {
 							console.error(`   PID: ${serverProcess.pid}`);
 							console.error(`   RUN_ID: ${runId}`);
 							if (serverOutput) {
-								console.error(`   Last 20 lines of output:`);
+								console.error(`   Last  lines of output:`);
 								const lines = serverOutput.split('\n').filter(line => line.trim());
-								const lastLines = lines.slice(-20);
+								const lastLines = lines.slice(-);
 								lastLines.forEach(line => console.error(`     ${line}`));
 							}
 							console.error('');
@@ -632,33 +632,33 @@ async function globalSetupWebServer(config: FullConfig) {
 					}
 				});
 
-				debug && console.log(` Worker ${i + 1} successfully started on port ${port}`);
+				debug && console.log(` Worker ${i + } successfully started on port ${port}`);
 
-				// CRITICAL: Use actualPid (from E2E_BACKEND_READY), not serverProcess.pid
+				// CRITICAL: Use actualPid (from EE_BACKEND_READY), not serverProcess.pid
 				// serverProcess.pid is npm's PID, actualPid is the Node.js backend's PID
 				// This ensures SIGINT is sent to the actual server process, not npm
 				return { port, pid: actualPid, npmPid: serverProcess.pid! };
 			} catch (error) {
 				debug &&
 					console.log(
-						`    Worker ${i + 1} failed on attempt ${retryCount + 1}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : error}`
+						`    Worker ${i + } failed on attempt ${retryCount + }: ${error instanceof Error ? String(error) : error}`
 					);
 				retryCount++;
 
 				// If this is the last retry, give up on this worker
 				if (retryCount >= maxRetries) {
-					const msg = `Worker ${i + 1} failed to start after ${maxRetries} attempts. Last error: ${error}`;
+					const msg = `Worker ${i + } failed to start after ${maxRetries} attempts. Last error: ${error}`;
 					console.error(`\n FATAL: ${msg}\n`);
 					throw new Error(msg);
 				}
 
 				// Small delay before retry to avoid hammering
-				debug && console.log(`   ⏳ Waiting 500ms before retry...`);
-				await sleep(500);
+				debug && console.log(`    Waiting ms before retry...`);
+				await sleep();
 			}
 		}
 
-		throw new Error(`Worker ${i + 1} exhausted all retries`);
+		throw new Error(`Worker ${i + } exhausted all retries`);
 	});
 
 	// Use allSettled to collect both successful and failed server starts
@@ -672,20 +672,20 @@ async function globalSetupWebServer(config: FullConfig) {
 		if (result.status === 'fulfilled') {
 			servers.push(result.value);
 		} else {
-			errors.push(`Worker ${index + 1}: ${result.reason}`);
+			errors.push(`Worker ${index + }: ${result.reason}`);
 		}
 	});
 
 	// ALWAYS write .test-servers-${RUN_ID}.json, even if some workers failed
 	// This allows teardown to clean up any servers that did start
 	// RUN_ID ensures multiple parallel runs don't interfere with each other
-	if (servers.length > 0) {
+	if (servers.length > ) {
 		const filename = path.resolve(tempFolder, `.test-servers-${runId}.json`);
 		// const filename = `.test-servers-${runId}.json`;
 		mkdirSync(tempFolder, { recursive: true });
-		await writeFile(filename, JSON.stringify(servers, null, 2));
+		await writeFile(filename, JSON.stringify(servers, null, ));
 
-		// ALWAYS log allocated ports for debugging parallel runs (even with E2E_SILENT_LOGS)
+		// ALWAYS log allocated ports for debugging parallel runs (even with EE_SILENT_LOGS)
 		console.log(`\n Backend servers allocated for RUN_ID ${runId}:`);
 		servers.forEach((server, index) => {
 			console.log(`   [${index}] Port ${server.port} (PID: ${server.pid})`);
@@ -694,7 +694,7 @@ async function globalSetupWebServer(config: FullConfig) {
 	}
 
 	// If any workers failed, kill all servers and throw error
-	if (errors.length > 0) {
+	if (errors.length > ) {
 		console.error(`\n FATAL ERROR: ${errors.length}/${results.length} workers failed to start\n`);
 		errors.forEach(err => console.error(`  - ${err}`));
 
@@ -711,16 +711,16 @@ async function globalSetupWebServer(config: FullConfig) {
 	}
 
 	// All workers succeeded - Give them a moment to stabilize
-	await sleep(1000);
+	await sleep();
 
-	if (process.env.E2E_SILENT_LOGS !== 'true') {
+	if (process.env.EE_SILENT_LOGS !== 'true') {
 		console.log('\n All backend servers are ready and verified!\n');
 		console.log(' Server mapping:');
 		servers.forEach((server, index) => {
 			console.log(`   Worker ${index} → http://localhost:${server.port} (PID: ${server.pid})`);
 		});
 		console.log(' All servers verified to be in test mode with in-memory DB');
-		console.log('⏱  Servers have been stable for 1 second');
+		console.log('  Servers have been stable for  second');
 		console.log('');
 	}
 }

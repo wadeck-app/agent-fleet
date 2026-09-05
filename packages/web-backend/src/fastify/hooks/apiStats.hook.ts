@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { type FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 
+// violations-suppress: ts/no-deep-relative no @/ alias available in web-backend tsconfig
 import { apiStatsManager } from '../../utils/apiStats';
 
 /**

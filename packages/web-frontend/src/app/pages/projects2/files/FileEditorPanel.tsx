@@ -75,7 +75,7 @@ export function FileEditorPanel({ workspaceId, filePath, selectedLines, onLineSe
 	if (error && filePath === displayedPath) {
 		return (
 			<div className="flex h-full items-center justify-center">
-				<p className="text-destructive">Error loading file: {(error instanceof Error ? error.message : String(error))}</p>
+				<p className="text-destructive">Error loading file: {String(error)}</p>
 			</div>
 		);
 	}

@@ -128,7 +128,7 @@ class ErrorLoggerService {
 		// Use appropriate console method based on severity
 		const consoleMethod = this.getConsoleMethod(error.severity);
 
-		consoleMethod(`[${error.severity}] ${error.code}: ${(error instanceof Error ? error.message : String(error))}`, {
+		consoleMethod(`[${error.severity}] ${error.code}: ${String(error)}`, {
 			timestamp: entry.timestamp,
 			error: error.toJSON(),
 			context,

@@ -1,4 +1,4 @@
-# Reference
+ Reference
 
 _Moved from README -- see [README](../README.md) for the overview._
 
@@ -10,14 +10,14 @@ await waitFor(() => {
 });
 ```
 
-### Benefits
+ Benefits
 
-1. ** Deterministic**: Tests execute the same way every time
-2. ** Fast**: No artificial delays - tests run at maximum speed
-3. ** Precise**: Test exactly what you want, when you want
-4. ** Reliable**: Eliminates race conditions
+.  Deterministic: Tests execute the same way every time
+.  Fast: No artificial delays - tests run at maximum speed
+.  Precise: Test exactly what you want, when you want
+.  Reliable: Eliminates race conditions
 
-### API
+ API
 
 ```typescript
 interface ControllablePromise<TArgs extends unknown[], TReturn> {
@@ -38,9 +38,9 @@ interface ControllablePromise<TArgs extends unknown[], TReturn> {
 }
 ```
 
-### Usage Examples
+ Usage Examples
 
-#### Basic async function testing
+ Basic async function testing
 
 ```typescript
 const { fn: onSubmit, resolve } = createControllablePromise<[CreateBook], void>();
@@ -62,7 +62,7 @@ await waitFor(() => {
 });
 ```
 
-#### Testing error handling
+ Testing error handling
 
 ```typescript
 const { fn: onSubmit, reject } = createControllablePromise<[CreateBook], void>();
@@ -83,7 +83,7 @@ await waitFor(() => {
 });
 ```
 
-#### Checking function arguments
+ Checking function arguments
 
 ```typescript
 const { fn: onSubmit, lastCall, resolve } = createControllablePromise<[CreateBook], void>();
@@ -103,7 +103,7 @@ expect(lastCall()).toEqual([{
 resolve();
 ```
 
-#### Using with `vi.fn()` compatibility
+ Using with `vi.fn()` compatibility
 
 ```typescript
 // Works with vitest's mock system
@@ -117,7 +117,7 @@ expect(mockSubmit).toHaveBeenCalledOnce();
 resolve();
 ```
 
-### When to Use
+ When to Use
 
 Use `createControllablePromise` when:
 
@@ -132,15 +132,15 @@ Don't use when:
 -  Don't care about intermediate states
 -  Testing synchronous code
 
-### Migration Guide
+ Migration Guide
 
-**Before:**
+Before:
 
 ```typescript
-const mockOnSubmit = vi.fn<[CreateBook], Promise<void>>(() => new Promise(resolve => setTimeout(resolve, 100)));
+const mockOnSubmit = vi.fn<[CreateBook], Promise<void>>(() => new Promise(resolve => setTimeout(resolve, )));
 ```
 
-**After:**
+After:
 
 ```typescript
 const { fn: onSubmit, resolve } = createControllablePromise<[CreateBook], void>();
@@ -149,11 +149,11 @@ const { fn: onSubmit, resolve } = createControllablePromise<[CreateBook], void>(
 // Call resolve() when you want the promise to complete
 ```
 
-### Real-World Examples
+ Real-World Examples
 
-#### Integration Tests (Recommended)
+ Integration Tests (Recommended)
 
-See `packages/frontend/src/features/form/FormContainer.test.tsx:143-259` for the canonical example of testing `FormContainer` + `useFormState` integration with minimal context:
+See `packages/frontend/src/features/form/FormContainer.test.tsx:-` for the canonical example of testing `FormContainer` + `useFormState` integration with minimal context:
 
 ```typescript
 function TestForm({ onSubmit }) {
@@ -182,9 +182,9 @@ render(<TestForm onSubmit={onSubmit} />);
 // ... test loading states with full control
 ```
 
-#### Hook Unit Tests
+ Hook Unit Tests
 
-See `packages/frontend/src/features/form/useFormState.test.ts:213-251` for testing the hook in isolation:
+See `packages/frontend/src/features/form/useFormState.test.ts:-` for testing the hook in isolation:
 
 ```typescript
 const { fn: controllableSubmit, resolve } = createControllablePromise<[TestFormData], void>();
@@ -192,29 +192,29 @@ mockOnSubmit.mockImplementation(controllableSubmit);
 // ... test isSubmitting flag transitions
 ```
 
-### Test Architecture
+ Test Architecture
 
 Tests should be organized by level:
 
 ```
-1. Unit Tests
-   ├─ packages/frontend/src/features/form/FormContainer.test.tsx → UI states (isSubmitting prop)
-   ├─ packages/frontend/src/features/form/useFormState.test.ts → Hook logic
-   └─ packages/frontend/src/features/form/BookForm.test.tsx → Component wiring
+. Unit Tests
+    packages/frontend/src/features/form/FormContainer.test.tsx → UI states (isSubmitting prop)
+    packages/frontend/src/features/form/useFormState.test.ts → Hook logic
+    packages/frontend/src/features/form/BookForm.test.tsx → Component wiring
 
-2. Integration Tests  (Use createControllablePromise here)
-   └─ packages/frontend/src/features/form/FormContainer.test.tsx → FormContainer + useFormState
-       ├─ Loading state transitions
-       ├─ Error handling
-       └─ Button state management
+. Integration Tests  (Use createControllablePromise here)
+    packages/frontend/src/features/form/FormContainer.test.tsx → FormContainer + useFormState
+        Loading state transitions
+        Error handling
+        Button state management
 
-3. Feature Tests
-   └─ packages/frontend/src/features/form/BookForm.test.tsx → Data flow verification
+. Feature Tests
+    packages/frontend/src/features/form/BookForm.test.tsx → Data flow verification
 ```
 
-**Key principle**: Test at the lowest possible level. Integration tests for `FormContainer` + `useFormState` are more valuable than testing through `BookForm` because they prove the generic pattern works.
+Key principle: Test at the lowest possible level. Integration tests for `FormContainer` + `useFormState` are more valuable than testing through `BookForm` because they prove the generic pattern works.
 
 ---
 
-**Location**: `packages/frontend/src/test/createControllablePromise.ts`
-**Tests**: `packages/frontend/src/test/createControllablePromise.test.ts`
+Location: `packages/frontend/src/test/createControllablePromise.ts`
+Tests: `packages/frontend/src/test/createControllablePromise.test.ts`

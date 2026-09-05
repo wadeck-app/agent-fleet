@@ -64,7 +64,7 @@ function loadYamlFile<T>(filePath: string): T | null {
 	try {
 		return parseYaml(content) as T;
 	} catch (err: unknown) {
-		const message = err instanceof Error ? (err instanceof Error ? err.message : String(err)) : String(err);
+		const message = err instanceof Error ? String(err) : String(err);
 		throw new Error(`Failed to parse YAML config at "${filePath}": ${message}`);
 	}
 }

@@ -1,66 +1,66 @@
-/**
- * ===========================================================================================
- * INGREDIENT CAROUSEL4C - Infinite Scroll Carousel Display Component
- * ===========================================================================================
- *
- * A pure presentation carousel component with infinite scroll support.
- * Displays ingredients as cards in a horizontal carousel that progressively loads data.
- *
- * Displays ingredients as cards in a carousel with:
- * - 3 cards visible at a time (responsive: mobile 1, tablet 2, desktop 3)
- * - Arrow navigation (previous/next)
- * - Infinite scroll - loads next page automatically when approaching end
- * - Full CRUD support with cards
- * - NO pagination UI (no page numbers, no page size selector)
- *
- * Features:
- * - Data display using IngredientCard4
- * - Embla Carousel integration via useCarousel hook
- * - Sort controls with dropdown selector
- * - Loading state with skeleton cards AND arrows
- * - Empty and error states
- * - Refreshing state with blur effect
- * - Loading indicator at end when fetching more
- *
- * Usage:
- * ```tsx
- * const carousel = useCarousel({ itemsPerView: 3 });
- * const {data, isLoading, isLoadingMore, hasMore} = useInfiniteCarousel({...});
- *
- * <IngredientCarousel4c
- *   data={data}
- *   isLoading={isLoading}
- *   isLoadingMore={isLoadingMore}
- *   hasMore={hasMore}
- *   carousel={carousel}
- *   onEdit={handleEdit}
- *   onDelete={handleDelete}
- * />
- * ```
- *
- * ===========================================================================================
- */
-import type { Table2Column } from '@framework/components2/table/Table2';
+/
+  ===========================================================================================
+  INGREDIENT CAROUSELC - Infinite Scroll Carousel Display Component
+  ===========================================================================================
+ 
+  A pure presentation carousel component with infinite scroll support.
+  Displays ingredients as cards in a horizontal carousel that progressively loads data.
+ 
+  Displays ingredients as cards in a carousel with:
+  -  cards visible at a time (responsive: mobile , tablet , desktop )
+  - Arrow navigation (previous/next)
+  - Infinite scroll - loads next page automatically when approaching end
+  - Full CRUD support with cards
+  - NO pagination UI (no page numbers, no page size selector)
+ 
+  Features:
+  - Data display using IngredientCard
+  - Embla Carousel integration via useCarousel hook
+  - Sort controls with dropdown selector
+  - Loading state with skeleton cards AND arrows
+  - Empty and error states
+  - Refreshing state with blur effect
+  - Loading indicator at end when fetching more
+ 
+  Usage:
+  ```tsx
+  const carousel = useCarousel({ itemsPerView:  });
+  const {data, isLoading, isLoadingMore, hasMore} = useInfiniteCarousel({...});
+ 
+  <IngredientCarouselc
+    data={data}
+    isLoading={isLoading}
+    isLoadingMore={isLoadingMore}
+    hasMore={hasMore}
+    carousel={carousel}
+    onEdit={handleEdit}
+    onDelete={handleDelete}
+  />
+  ```
+ 
+  ===========================================================================================
+ /
+import type { TableColumn } from '@framework/components/table/Table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
 import { Button } from '@framework/components/primitives/Button';
 import { Card, CardContent, CardFooter, CardHeader } from '@framework/components/primitives/Card';
-import type { SortingContract } from '@framework/hooks2/data/useSorting2';
+import type { SortingContract } from '@framework/hooks/data/useSorting';
 import { cn } from '@framework/lib/utils';
 import { formatDate } from '@framework/utils/formatting/DateFormat';
 import type { Ingredient } from '@shared/api/ingredients.contract';
-import { AlertCircle, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, LayoutGrid, Loader2 } from 'lucide-react';
+import { AlertCircle, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, LayoutGrid, Loader } from 'lucide-react';
 
-import { IngredientCard4 } from './IngredientCard4';
+import { IngredientCard } from './IngredientCard';
 import type { CarouselContract } from './useCarousel';
 
-/**
- * Field definitions for ingredient carousel (same as grid for consistency)
- * Exported as single source of truth for field configuration
- *
- * Note: 'name' field is NOT included here because it's always displayed in the card header
- * and cannot be hidden or reordered
- */
-export const INGREDIENT_CAROUSEL_FIELDS: Table2Column<Ingredient>[] = [
+/
+  Field definitions for ingredient carousel (same as grid for consistency)
+  Exported as single source of truth for field configuration
+ 
+  Note: 'name' field is NOT included here because it's always displayed in the card header
+  and cannot be hidden or reordered
+ /
+export const INGREDIENT_CAROUSEL_FIELDS: TableColumn<Ingredient>[] = [
 	// ID field
 	{
 		key: 'id',
@@ -131,49 +131,49 @@ export const INGREDIENT_CAROUSEL_FIELDS: Table2Column<Ingredient>[] = [
 	},
 ];
 
-/**
- * Props for IngredientCarousel4c
- * Simplified from v4b - no QueryResultDisplayerProps (not using Data2)
- */
-export interface IngredientCarousel4cProps {
-	/** Data items to display */
+/
+  Props for IngredientCarouselc
+  Simplified from vb - no QueryResultDisplayerProps (not using Data)
+ /
+export interface IngredientCarouselcProps {
+	/ Data items to display /
 	data: Ingredient[];
-	/** Initial loading state (first page) */
+	/ Initial loading state (first page) /
 	isLoading?: boolean;
-	/** Loading more pages (subsequent pages) */
+	/ Loading more pages (subsequent pages) /
 	isLoadingMore?: boolean;
-	/** Has more pages to load */
+	/ Has more pages to load /
 	hasMore?: boolean;
-	/** Error message */
+	/ Error message /
 	error?: string | null;
-	/** Sorting contract (optional) */
+	/ Sorting contract (optional) /
 	sorting?: SortingContract;
-	/** Search query (optional, for empty state message) */
+	/ Search query (optional, for empty state message) /
 	searchQuery?: string;
-	/** Carousel feature contract (required) */
+	/ Carousel feature contract (required) /
 	carousel: CarouselContract;
-	/** Optional field configuration override (for visibility/ordering feature) */
-	fields?: Table2Column<Ingredient>[];
-	/** Optional edit callback */
+	/ Optional field configuration override (for visibility/ordering feature) /
+	fields?: TableColumn<Ingredient>[];
+	/ Optional edit callback /
 	onEdit?: (ingredient: Ingredient) => void;
-	/** Optional delete callback */
+	/ Optional delete callback /
 	onDelete?: (id: string) => void;
-	/** Optional refreshing state */
+	/ Optional refreshing state /
 	refreshing?: boolean;
-	/** Optional deleting state - for bulk delete blur effect */
+	/ Optional deleting state - for bulk delete blur effect /
 	deleting?: boolean;
-	/** IDs of items being deleted - for strike-through effect */
+	/ IDs of items being deleted - for strike-through effect /
 	_deletingIds?: Set<string>;
-	/** Selection toggle callback */
+	/ Selection toggle callback /
 	onSelectionToggle?: (id: string) => void;
-	/** Selected IDs */
+	/ Selected IDs /
 	selectedIds?: Set<string>;
 }
 
-/**
- * IngredientCarousel4c - Infinite scroll carousel display component
- */
-export function IngredientCarousel4c({
+/
+  IngredientCarouselc - Infinite scroll carousel display component
+ /
+export function IngredientCarouselc({
 	data = [],
 	isLoading = false,
 	isLoadingMore = false,
@@ -190,10 +190,10 @@ export function IngredientCarousel4c({
 	onDelete,
 	onSelectionToggle,
 	selectedIds = new Set(),
-}: IngredientCarousel4cProps) {
+}: IngredientCarouselcProps) {
 	// Add comment above the target line, not at the end
 	// Log render with blur state
-	console.log('[CAROUSEL4C] Render', {
+	console.log('[CAROUSELC] Render', {
 		dataLength: data.length,
 		isLoading,
 		isLoadingMore,
@@ -207,15 +207,15 @@ export function IngredientCarousel4c({
 	// Selection state
 	const hasSelection = !!onSelectionToggle;
 
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// 
 	// ERROR STATE
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// 
 
 	if (error && !isLoading) {
 		return (
-			<div className={`rounded-lg border border-destructive/50 bg-destructive/10 p-4`}>
-				<div className="flex items-center gap-2">
-					<AlertCircle className="h-5 w-5 text-destructive" />
+			<div className={`rounded-lg border border-destructive/ bg-destructive/ p-`}>
+				<div className="flex items-center gap-">
+					<AlertCircle className="h- w- text-destructive" />
 					<strong className="text-sm font-semibold text-destructive">Error:</strong>
 					<span className="text-sm text-destructive">{error}</span>
 				</div>
@@ -223,22 +223,22 @@ export function IngredientCarousel4c({
 		);
 	}
 
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// 
 	// SORT CONTROLS
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// 
 
 	const sortControl = sorting && (
-		<div className="mb-4 flex items-center gap-2">
+		<div className="mb- flex items-center gap-">
 			<span className="text-sm font-medium">Sort by:</span>
 			<Select
-				value={sorting.fstate.sortConfigs[0]?.key ?? ''}
+				value={sorting.fstate.sortConfigs[]?.key ?? ''}
 				onValueChange={(key: string) => {
 					if (key) {
 						sorting.actions.onSortChange(key, false);
 					}
 				}}
 			>
-				<SelectTrigger className="w-48">
+				<SelectTrigger className="w-">
 					<SelectValue placeholder="Choose field..." />
 				</SelectTrigger>
 				<SelectContent>
@@ -253,123 +253,123 @@ export function IngredientCarousel4c({
 				</SelectContent>
 			</Select>
 
-			{/* Direction toggle button */}
-			{sorting.fstate.sortConfigs.length > 0 && (
+			{/ Direction toggle button /}
+			{sorting.fstate.sortConfigs.length >  && (
 				<Button
 					variant="outline"
 					size="sm"
 					onClick={() => {
-						const current = sorting.fstate.sortConfigs[0];
+						const current = sorting.fstate.sortConfigs[];
 						if (current) {
 							// Toggle direction by clicking again
 							sorting.actions.onSortChange(current.key, false);
 						}
 					}}
-					title={`Sort direction: ${sorting.fstate.sortConfigs[0]?.direction === 'asc' ? 'Ascending' : 'Descending'}`}
+					title={`Sort direction: ${sorting.fstate.sortConfigs[]?.direction === 'asc' ? 'Ascending' : 'Descending'}`}
 				>
-					{sorting.fstate.sortConfigs[0]?.direction === 'asc' ? (
-						<ArrowUp className="h-4 w-4" />
+					{sorting.fstate.sortConfigs[]?.direction === 'asc' ? (
+						<ArrowUp className="h- w-" />
 					) : (
-						<ArrowDown className="h-4 w-4" />
+						<ArrowDown className="h- w-" />
 					)}
 				</Button>
 			)}
 		</div>
 	);
 
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// 
 	// LOADING STATE - Skeleton Cards WITH ARROWS
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// 
 
-	if (isLoading && data.length === 0) {
+	if (isLoading && data.length === ) {
 		// Use itemsPerView from carousel
 		const skeletonCount = carousel.fstate.itemsPerView;
 		return (
 			<div>
 				{sortControl}
 
-				{/* Carousel Container with arrows */}
-				<div className="relative px-12">
-					{/* Skeleton grid */}
+				{/ Carousel Container with arrows /}
+				<div className="relative px-">
+					{/ Skeleton grid /}
 					<div
 						className={`
-        grid grid-cols-1 gap-6
-        md:grid-cols-2
-        lg:grid-cols-3
+        grid grid-cols- gap-
+        md:grid-cols-
+        lg:grid-cols-
       `}
 					>
 						{Array.from({ length: skeletonCount }).map((_, idx) => (
 							<Card key={idx} className="animate-pulse">
 								<CardHeader>
-									<div className="h-6 w-3/4 rounded bg-muted" />
-									<div className="h-4 w-1/2 rounded bg-muted" />
+									<div className="h- w-/ rounded bg-muted" />
+									<div className="h- w-/ rounded bg-muted" />
 								</CardHeader>
 								<CardContent>
-									<div className="grid grid-cols-2 gap-3">
-										{Array.from({ length: 4 }).map((_, i) => (
-											<div key={i} className="space-y-2">
-												<div className="h-3 w-16 rounded bg-muted" />
-												<div className="h-5 w-12 rounded bg-muted" />
+									<div className="grid grid-cols- gap-">
+										{Array.from({ length:  }).map((_, i) => (
+											<div key={i} className="space-y-">
+												<div className="h- w- rounded bg-muted" />
+												<div className="h- w- rounded bg-muted" />
 											</div>
 										))}
 									</div>
-									<div className="mt-4 space-y-2 border-t pt-3">
-										<div className="h-3 w-full rounded bg-muted" />
-										<div className="h-3 w-full rounded bg-muted" />
-										<div className="h-3 w-full rounded bg-muted" />
+									<div className="mt- space-y- border-t pt-">
+										<div className="h- w-full rounded bg-muted" />
+										<div className="h- w-full rounded bg-muted" />
+										<div className="h- w-full rounded bg-muted" />
 									</div>
 								</CardContent>
 								<CardFooter>
-									<div className="h-9 flex-1 rounded bg-muted" />
-									<div className="h-9 flex-1 rounded bg-muted" />
+									<div className="h- flex- rounded bg-muted" />
+									<div className="h- flex- rounded bg-muted" />
 								</CardFooter>
 							</Card>
 						))}
 					</div>
 
-					{/* Navigation Arrows - VISIBLE from skeleton state (disabled) */}
+					{/ Navigation Arrows - VISIBLE from skeleton state (disabled) /}
 					<Button
 						variant="outline"
 						size="icon"
 						className={`
-        absolute top-1/2 left-0 z-50 -translate-y-1/2 bg-background shadow-lg
+        absolute top-/ left- z- -translate-y-/ bg-background shadow-lg
         hover:bg-accent
       `}
 						disabled
 						aria-label="Previous slide"
 					>
-						<ChevronLeft className="h-5 w-5" />
+						<ChevronLeft className="h- w-" />
 					</Button>
 					<Button
 						variant="outline"
 						size="icon"
 						className={`
-        absolute top-1/2 right-0 z-50 -translate-y-1/2 bg-background shadow-lg
+        absolute top-/ right- z- -translate-y-/ bg-background shadow-lg
         hover:bg-accent
       `}
 						disabled
 						aria-label="Next slide"
 					>
-						<ChevronRight className="h-5 w-5" />
+						<ChevronRight className="h- w-" />
 					</Button>
 				</div>
 			</div>
 		);
 	}
 
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// 
 	// EMPTY STATE
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// 
 
-	if (data.length === 0 && !isLoading) {
+	if (data.length ===  && !isLoading) {
 		return (
 			<div>
 				{sortControl}
-				<div className="flex flex-col items-center justify-center py-12 text-center">
-					<div className="mb-4 rounded-full bg-muted p-4">
-						<LayoutGrid className="h-8 w-8 text-muted-foreground" />
+				<div className="flex flex-col items-center justify-center py- text-center">
+					<div className="mb- rounded-full bg-muted p-">
+						<LayoutGrid className="h- w- text-muted-foreground" />
 					</div>
-					<h3 className="mb-2 text-lg font-semibold">No ingredients found</h3>
+					<h className="mb- text-lg font-semibold">No ingredients found</h>
 					<p className="text-sm text-muted-foreground">
 						{searchQuery ? `No results for "${searchQuery}"` : 'Add your first ingredient to get started'}
 					</p>
@@ -378,37 +378,37 @@ export function IngredientCarousel4c({
 		);
 	}
 
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// 
 	// MAIN CAROUSEL DISPLAY (Infinite Scroll)
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// 
 
 	return (
 		<div>
-			{/* Sort Controls */}
+			{/ Sort Controls /}
 			{sortControl}
 
-			{/* Carousel Container */}
-			<div className="relative px-12">
-				{/* Embla Carousel Viewport - overflow-hidden to clip slides */}
+			{/ Carousel Container /}
+			<div className="relative px-">
+				{/ Embla Carousel Viewport - overflow-hidden to clip slides /}
 				<div className="overflow-hidden" ref={carousel.fstate.emblaRef}>
-					{/* Embla Container - flex with gap for spacing */}
+					{/ Embla Container - flex with gap for spacing /}
 					<div
 						className={cn(
 							'flex touch-pan-y',
-							(refreshing || deleting) && 'pointer-events-none opacity-50 blur-sm'
+							(refreshing || deleting) && 'pointer-events-none opacity- blur-sm'
 						)}
-						style={{ marginLeft: '-1rem' }}
+						style={{ marginLeft: '-rem' }}
 					>
-						{/* Embla Slides - each slide has fixed width for 3 visible cards */}
+						{/ Embla Slides - each slide has fixed width for  visible cards /}
 						{data.map(ingredient => (
 							<div
 								key={ingredient.id}
-								className="flex-[0_0_33.333%] pl-4"
+								className="flex-[__.%] pl-"
 								style={{
-									minWidth: 0,
+									minWidth: ,
 								}}
 							>
-								<IngredientCard4
+								<IngredientCard
 									ingredient={ingredient}
 									fields={fields}
 									onEdit={onEdit}
@@ -420,12 +420,12 @@ export function IngredientCarousel4c({
 							</div>
 						))}
 
-						{/* Loading indicator at end when fetching more */}
+						{/ Loading indicator at end when fetching more /}
 						{isLoadingMore && (
-							<div className="flex-[0_0_33.333%] pl-4">
+							<div className="flex-[__.%] pl-">
 								<Card className="flex h-full items-center justify-center">
-									<CardContent className="flex flex-col items-center gap-2 py-8">
-										<Loader2 className="h-8 w-8 animate-spin text-primary" />
+									<CardContent className="flex flex-col items-center gap- py-">
+										<Loader className="h- w- animate-spin text-primary" />
 										<p className="text-sm text-muted-foreground">Loading more...</p>
 									</CardContent>
 								</Card>
@@ -434,25 +434,25 @@ export function IngredientCarousel4c({
 					</div>
 				</div>
 
-				{/* Navigation Arrows - higher z-index, outside carousel viewport */}
+				{/ Navigation Arrows - higher z-index, outside carousel viewport /}
 				<Button
 					variant="outline"
 					size="icon"
 					className={`
-       absolute top-1/2 left-0 z-50 -translate-y-1/2 bg-background shadow-lg
+       absolute top-/ left- z- -translate-y-/ bg-background shadow-lg
        hover:bg-accent
      `}
 					onClick={carousel.actions.scrollPrev}
 					disabled={!carousel.fstate.canScrollPrev}
 					aria-label="Previous slide"
 				>
-					<ChevronLeft className="h-5 w-5" />
+					<ChevronLeft className="h- w-" />
 				</Button>
 				<Button
 					variant="outline"
 					size="icon"
 					className={`
-       absolute top-1/2 right-0 z-50 -translate-y-1/2 bg-background shadow-lg
+       absolute top-/ right- z- -translate-y-/ bg-background shadow-lg
        hover:bg-accent
      `}
 					onClick={carousel.actions.scrollNext}
@@ -460,12 +460,12 @@ export function IngredientCarousel4c({
 					disabled={!carousel.fstate.canScrollNext && !hasMore}
 					aria-label="Next slide"
 				>
-					<ChevronRight className="h-5 w-5" />
+					<ChevronRight className="h- w-" />
 				</Button>
 			</div>
 
-			{/* V4C: NO Pagination Controls (infinite scroll) */}
-			{/* V4C: NO Dot Indicators (infinite scroll) */}
+			{/ VC: NO Pagination Controls (infinite scroll) /}
+			{/ VC: NO Dot Indicators (infinite scroll) /}
 		</div>
 	);
 }

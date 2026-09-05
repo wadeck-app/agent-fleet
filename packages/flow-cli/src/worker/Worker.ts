@@ -46,7 +46,7 @@ ws.on('message', (data: Buffer) => {
 });
 
 ws.on('error', (err: Error) => {
-	process.stderr.write(`WebSocket error: ${(err instanceof Error ? err.message : String(err))}\n`);
+	process.stderr.write(`WebSocket error: ${String(err)}\n`);
 	process.exit(1);
 });
 ws.on('close', () => {
@@ -61,7 +61,7 @@ async function handleMessage(message: DaemonToWorker): Promise<void> {
 				const { output, meta } = await adapter.execute(stepConfig, executionContext, send);
 				send({ type: 'step_completed', executionId: executionContext.executionId, stepId, output, meta });
 			} catch (err) {
-				const error = err instanceof Error ? (err instanceof Error ? err.message : String(err)) : String(err);
+				const error = err instanceof Error ? String(err) : String(err);
 				send({ type: 'step_failed', executionId: executionContext.executionId, stepId, error });
 			}
 			send({ type: 'ready', pid: process.pid });

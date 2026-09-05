@@ -1,6 +1,7 @@
 import type { Command } from 'commander';
 import type { FlowDefinition, FlowStep, ModelFlowStep, SubFlowStep, UserInterventionStep } from 'flow-engine/types';
 
+// violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { loadYaml } from '../../utils/loadYaml';
 
 // ---------------------------------------------------------------------------

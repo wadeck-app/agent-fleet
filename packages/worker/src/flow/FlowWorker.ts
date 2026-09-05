@@ -167,7 +167,7 @@ export class FlowWorker implements Shutdownable {
 					const message = parseMessage(data.toString()) as O2WMessage;
 					this.handleMessage(message);
 				} catch (error) {
-					this.logger.error(` Error parsing message:`, (error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)));
+					this.logger.error(` Error parsing message:`, (error instanceof Error ? String(error) : String(error)));
 				}
 			});
 
@@ -262,7 +262,7 @@ export class FlowWorker implements Shutdownable {
 			return branch || null;
 		} catch (error) {
 			// Not in a git repository or git command failed
-			this.logger.error(` Git detection failed:`, (error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)));
+			this.logger.error(` Git detection failed:`, (error instanceof Error ? String(error) : String(error)));
 			return null;
 		}
 	}
@@ -522,7 +522,7 @@ export class FlowWorker implements Shutdownable {
 			await this.executeTask(this.currentTask);
 		} catch (error) {
 			this.logger.error(` Task execution error:`, error);
-			this.sendTaskFailed((error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)));
+			this.sendTaskFailed((error instanceof Error ? String(error) : String(error)));
 		}
 	}
 
@@ -569,7 +569,7 @@ export class FlowWorker implements Shutdownable {
 					requestId,
 					flowId,
 					flowDefinition: null,
-					error: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error',
+					error: error instanceof Error ? String(error) : 'Unknown error',
 				})
 			);
 		}
@@ -644,7 +644,7 @@ export class FlowWorker implements Shutdownable {
 					requestId,
 					flowId,
 					success: false,
-					error: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error',
+					error: error instanceof Error ? String(error) : 'Unknown error',
 				})
 			);
 		}
@@ -1056,12 +1056,12 @@ export class FlowWorker implements Shutdownable {
 			// Store error in task
 			task.flowResult = {
 				status: 'failed',
-				error: (error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)),
+				error: (error instanceof Error ? String(error) : String(error)),
 			};
 
 			// Send failure with configured status
 			this.sendTaskFailed(
-				(error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)),
+				(error instanceof Error ? String(error) : String(error)),
 				failureStatus,
 				this.currentTask?.ticketId,
 				failureTicketStatus
@@ -1319,7 +1319,7 @@ export class FlowWorker implements Shutdownable {
 			return 'Host not found';
 		}
 		// For other errors, show just the message
-		return (error instanceof Error ? error.message : String(error)) || String(error);
+		return String(error) || String(error);
 	}
 
 	/**
@@ -1419,7 +1419,7 @@ if (isMainModule) {
 			entryLog.info('Worker started and connected');
 		})
 		.catch(error => {
-			entryLog.error('Initial connection failed:', (error instanceof Error ? error.message : String(error)));
+			entryLog.error('Initial connection failed:', String(error));
 			entryLog.info('Will keep retrying to connect to orchestrator...');
 			// Don't exit - the worker will automatically retry with exponential backoff
 		});

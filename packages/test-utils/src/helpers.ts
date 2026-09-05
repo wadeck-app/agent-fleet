@@ -189,8 +189,8 @@ export async function assertThrowsAsync(fn: () => Promise<any>, messagePattern?:
 		if (error instanceof Error) {
 			if (messagePattern) {
 				const pattern = typeof messagePattern === 'string' ? new RegExp(messagePattern) : messagePattern;
-				if (!pattern.test((error instanceof Error ? error.message : String(error)))) {
-					throw new Error(`Expected error message to match ${pattern}, but got: ${(error instanceof Error ? error.message : String(error))}`);
+				if (!pattern.test(String(error))) {
+					throw new Error(`Expected error message to match ${pattern}, but got: ${String(error)}`);
 				}
 			}
 			return error;

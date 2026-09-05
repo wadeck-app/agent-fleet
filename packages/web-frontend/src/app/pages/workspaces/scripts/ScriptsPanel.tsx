@@ -87,7 +87,7 @@ export function ScriptsPanel({ workspaceId }: ScriptsPanelProps) {
 				<div className="text-center">
 					<div className="mb-2 text-4xl"></div>
 					<p className="text-sm text-destructive">Failed to load scripts</p>
-					<p className="text-xs text-muted-foreground">{(error instanceof Error ? error.message : String(error))}</p>
+					<p className="text-xs text-muted-foreground">{String(error)}</p>
 					<Button variant="outline" size="sm" onClick={refetch} className="mt-3">
 						Retry
 					</Button>

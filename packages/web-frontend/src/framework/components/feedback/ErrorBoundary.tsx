@@ -174,7 +174,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 								<div className="mt-2 space-y-2">
 									<div>
 										<strong className="text-xs">Message:</strong>
-										<pre className="mt-1 overflow-auto text-xs">{(error instanceof Error ? error.message : String(error))}</pre>
+										<pre className="mt-1 overflow-auto text-xs">{String(error)}</pre>
 									</div>
 									<div>
 										<strong className="text-xs">Severity:</strong>

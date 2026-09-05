@@ -1,56 +1,56 @@
-# Security Architecture
+ Security Architecture
 
-## Table of Contents
+ Table of Contents
 
-1. [Security Overview](#security-overview)
-2. [Cookie Security](#cookie-security)
-3. [Token Management](#token-management)
-4. [Session Isolation](#session-isolation)
-5. [CSRF Protection](#csrf-protection)
-6. [XSS Protection](#xss-protection)
-7. [Best Practices](#best-practices)
-8. [Security Audit Checklist](#security-audit-checklist)
-9. [Threat Model](#threat-model)
+. [Security Overview](security-overview)
+. [Cookie Security](cookie-security)
+. [Token Management](token-management)
+. [Session Isolation](session-isolation)
+. [CSRF Protection](csrf-protection)
+. [XSS Protection](xss-protection)
+. [Best Practices](best-practices)
+. [Security Audit Checklist](security-audit-checklist)
+. [Threat Model](threat-model)
 
 ---
 
-## Security Overview
+ Security Overview
 
 The transport layer implements a defense-in-depth security model with multiple layers:
 
 ```
-┌─────────────────────────────────────────────────┐
-│ Layer 1: HTTP-ONLY Cookies (XSS Protection)    │
-├─────────────────────────────────────────────────┤
-│ Layer 2: SameSite=strict (CSRF Protection)     │
-├─────────────────────────────────────────────────┤
-│ Layer 3: HTTPS Only (Production)               │
-├─────────────────────────────────────────────────┤
-│ Layer 4: JWT Signature Verification            │
-├─────────────────────────────────────────────────┤
-│ Layer 5: Session Expiration                    │
-├─────────────────────────────────────────────────┤
-│ Layer 6: Server-Side Session Tracking          │
-└─────────────────────────────────────────────────┘
+
+ Layer : HTTP-ONLY Cookies (XSS Protection)    
+
+ Layer : SameSite=strict (CSRF Protection)     
+
+ Layer : HTTPS Only (Production)               
+
+ Layer : JWT Signature Verification            
+
+ Layer : Session Expiration                    
+
+ Layer : Server-Side Session Tracking          
+
 ```
 
-### Key Security Principles
+ Key Security Principles
 
-1. **Zero Trust**: Never trust client-provided tokens
-2. **Defense in Depth**: Multiple layers of security
-3. **Least Privilege**: Minimal access rights
-4. **Secure by Default**: Security settings enforced in production
-5. **Fail Securely**: Deny access on error
+. Zero Trust: Never trust client-provided tokens
+. Defense in Depth: Multiple layers of security
+. Least Privilege: Minimal access rights
+. Secure by Default: Security settings enforced in production
+. Fail Securely: Deny access on error
 
 ---
 
-## Cookie Security
+ Cookie Security
 
-### HTTP-ONLY Cookies
+ HTTP-ONLY Cookies
 
 Tokens are stored in HTTP-ONLY cookies, making them inaccessible to JavaScript.
 
-**Implementation:**
+Implementation:
 
 ```typescript
 reply.setCookie('access_token', accessToken, {
@@ -58,18 +58,18 @@ reply.setCookie('access_token', accessToken, {
 	secure: isProduction, // HTTPS only in production
 	sameSite: 'strict', // CSRF protection
 	path: '/',
-	maxAge: 300, // 5 minutes
+	maxAge: , //  minutes
 });
 ```
 
-**Why HTTP-ONLY?**
+Why HTTP-ONLY?
 
 - Prevents XSS attacks from stealing tokens
 - Cannot be read by malicious JavaScript
 - Automatically managed by browser
 - Sent with every request to origin
 
-### Cookie Attributes Explained
+ Cookie Attributes Explained
 
 | Attribute  | Value         | Purpose                                     |
 | ---------- | ------------- | ------------------------------------------- |
@@ -77,9 +77,9 @@ reply.setCookie('access_token', accessToken, {
 | `secure`   | `true` (prod) | HTTPS only (man-in-the-middle protection)   |
 | `sameSite` | `'strict'`    | CSRF protection (only sent to same origin)  |
 | `path`     | `'/'`         | Cookie available for all paths              |
-| `maxAge`   | `300` (5m)    | Automatic expiration                        |
+| `maxAge`   | `` (m)    | Automatic expiration                        |
 
-### Cookie Paths
+ Cookie Paths
 
 Different cookies for different purposes:
 
@@ -87,45 +87,45 @@ Different cookies for different purposes:
 // Access token: Available everywhere
 reply.setCookie('access_token', token, {
 	path: '/',
-	maxAge: 300, // 5 minutes
+	maxAge: , //  minutes
 });
 
 // Refresh token: Only for refresh endpoint
 reply.setCookie('refresh_token', token, {
 	path: '/api/auth/refresh', // Restricted path
-	maxAge: 604800, // 7 days
+	maxAge: , //  days
 });
 ```
 
-**Why restrict refresh token path?**
+Why restrict refresh token path?
 
 - Limits exposure surface
 - Only refresh endpoint needs it
 - Reduces risk if other endpoints compromised
 
-### Cookie Security Risks
+ Cookie Security Risks
 
 | Risk                 | Mitigation                                     |
 | -------------------- | ---------------------------------------------- |
 | XSS stealing cookies | HTTP-ONLY flag prevents JavaScript access      |
 | CSRF attacks         | SameSite=strict prevents cross-origin requests |
 | Man-in-the-middle    | Secure flag requires HTTPS in production       |
-| Cookie theft         | Short expiration (5 minutes) limits damage     |
+| Cookie theft         | Short expiration ( minutes) limits damage     |
 
 ---
 
-## Token Management
+ Token Management
 
-### Access Token
+ Access Token
 
-**Properties:**
+Properties:
 
-- Short-lived (5 minutes)
+- Short-lived ( minutes)
 - Used for API authentication
 - Stored in HTTP-ONLY cookie
 - Automatically refreshed
 
-**JWT Structure:**
+JWT Structure:
 
 ```typescript
 {
@@ -135,7 +135,7 @@ reply.setCookie('refresh_token', token, {
 }
 ```
 
-**Verification:**
+Verification:
 
 ```typescript
 async verifyAccessToken(token: string): Promise<TokenPayload> {
@@ -143,7 +143,7 @@ async verifyAccessToken(token: string): Promise<TokenPayload> {
     const decoded = jwt.verify(token, this.jwtSecret) as any;
     return {
       userId: decoded.userId,
-      expiresAt: decoded.exp * 1000  // Convert to milliseconds
+      expiresAt: decoded.exp    // Convert to milliseconds
     };
   } catch (error) {
     throw new Error('Invalid or expired token');
@@ -151,23 +151,23 @@ async verifyAccessToken(token: string): Promise<TokenPayload> {
 }
 ```
 
-### Refresh Token
+ Refresh Token
 
-**Properties:**
+Properties:
 
-- Long-lived (7 days)
+- Long-lived ( days)
 - Used only for token refresh
 - Stored in HTTP-ONLY cookie with restricted path
 - Single-use in production (should be rotated)
 
-**Security Considerations:**
+Security Considerations:
 
 - Never sent to regular API endpoints
 - Only sent to `/api/auth/refresh`
 - Should be rotated on each use (TODO for production)
 - Blacklisted on logout
 
-### Token Refresh Flow
+ Token Refresh Flow
 
 ```mermaid
 sequenceDiagram
@@ -175,7 +175,7 @@ sequenceDiagram
     participant Backend
     participant SessionMgr
 
-    Note over Client: Access token expiring (2 min warning)
+    Note over Client: Access token expiring ( min warning)
     Client->>Backend: POST /api/auth/refresh (with refresh_token cookie)
     Backend->>Backend: Verify refresh token
     Backend->>Backend: Generate new access token
@@ -184,7 +184,7 @@ sequenceDiagram
     Note over Client,SessionMgr: All WebSocket sessions updated
 ```
 
-**CRITICAL:** When access token is refreshed, ALL WebSocket sessions for that user are updated:
+CRITICAL: When access token is refreshed, ALL WebSocket sessions for that user are updated:
 
 ```typescript
 // AuthController.ts
@@ -193,26 +193,26 @@ await this.sessionManager.refreshSessionToken(userId, newAccessToken);
 
 This ensures multi-device support: refresh on one device updates all devices.
 
-### Token Expiration
+ Token Expiration
 
-**Access Token:**
+Access Token:
 
-- Expires after 5 minutes
-- Warning sent 2 minutes before expiration
+- Expires after  minutes
+- Warning sent  minutes before expiration
 - Frontend automatically refreshes
 - WebSocket closed if expired and not refreshed
 
-**Refresh Token:**
+Refresh Token:
 
-- Expires after 7 days
+- Expires after  days
 - User must re-authenticate after expiration
 - Cannot be refreshed (must login again)
 
 ---
 
-## Session Isolation
+ Session Isolation
 
-### Server-Side Session Management
+ Server-Side Session Management
 
 Each WebSocket connection has an isolated session tracked server-side:
 
@@ -228,29 +228,29 @@ interface WebSocketSession {
 }
 ```
 
-**Session Lifecycle:**
+Session Lifecycle:
 
-1. **Creation**: On WebSocket upgrade with valid cookies
-2. **Validation**: Fast check on each message (expiry only)
-3. **Update**: Token refreshed via HTTP updates all sessions
-4. **Cleanup**: Automatic removal of expired sessions (every 60s)
-5. **Destruction**: On disconnect or token expiration
+. Creation: On WebSocket upgrade with valid cookies
+. Validation: Fast check on each message (expiry only)
+. Update: Token refreshed via HTTP updates all sessions
+. Cleanup: Automatic removal of expired sessions (every s)
+. Destruction: On disconnect or token expiration
 
-### Multi-Device Support
+ Multi-Device Support
 
 One user can have multiple sessions (devices):
 
 ```
-User: user-123
-├── Session 1: client_abc (desktop)
-│   └── Subscribed: ['task:created', 'task:updated']
-├── Session 2: client_def (mobile)
-│   └── Subscribed: ['task:created']
-└── Session 3: client_ghi (tablet)
-    └── Subscribed: ['worker:heartbeat']
+User: user-
+ Session : client_abc (desktop)
+    Subscribed: ['task:created', 'task:updated']
+ Session : client_def (mobile)
+    Subscribed: ['task:created']
+ Session : client_ghi (tablet)
+     Subscribed: ['worker:heartbeat']
 ```
 
-**Token refresh updates ALL sessions:**
+Token refresh updates ALL sessions:
 
 ```typescript
 async refreshSessionToken(userId: string, newAccessToken: string) {
@@ -263,31 +263,31 @@ async refreshSessionToken(userId: string, newAccessToken: string) {
 }
 ```
 
-### Session Security
+ Session Security
 
-**Isolation:**
+Isolation:
 
 - Each session has own client ID
 - Sessions cannot access each other's data
 - User can only see their own sessions
 
-**Cleanup:**
+Cleanup:
 
-- Expired sessions removed every 60 seconds
+- Expired sessions removed every  seconds
 - Disconnected sessions removed immediately
 - Memory leaks prevented
 
-**Monitoring:**
+Monitoring:
 
 - Track session count per user
-- Alert on suspicious activity (>5 sessions)
+- Alert on suspicious activity (> sessions)
 - Log session creation/destruction
 
 ---
 
-## CSRF Protection
+ CSRF Protection
 
-### SameSite Cookie Attribute
+ SameSite Cookie Attribute
 
 Primary CSRF defense:
 
@@ -297,15 +297,15 @@ reply.setCookie('access_token', token, {
 });
 ```
 
-**How it works:**
+How it works:
 
 - Cookies only sent to requests from same origin
 - Cross-origin requests do NOT include cookies
 - Attackers cannot trigger authenticated requests
 
-### CSRF Attack Prevention
+ CSRF Attack Prevention
 
-**Scenario: Attacker's website tries to make request**
+Scenario: Attacker's website tries to make request
 
 ```html
 <!-- attacker.com -->
@@ -313,29 +313,29 @@ reply.setCookie('access_token', token, {
 	<input name="name" value="Malicious task" />
 </form>
 <script>
-	document.forms[0].submit();
+	document.forms[].submit();
 </script>
 ```
 
-**Result:** Request fails because:
+Result: Request fails because:
 
-1. Request is cross-origin (attacker.com → yourapp.com)
-2. Browser doesn't send cookies due to sameSite=strict
-3. Backend rejects unauthenticated request
+. Request is cross-origin (attacker.com → yourapp.com)
+. Browser doesn't send cookies due to sameSite=strict
+. Backend rejects unauthenticated request
 
-### WebSocket CSRF Protection
+ WebSocket CSRF Protection
 
 WebSocket connections also protected:
 
-1. Cookies sent during WebSocket upgrade
-2. Same-origin policy applies
-3. Cross-origin WebSocket connections blocked by browser
+. Cookies sent during WebSocket upgrade
+. Same-origin policy applies
+. Cross-origin WebSocket connections blocked by browser
 
 ---
 
-## XSS Protection
+ XSS Protection
 
-### HTTP-ONLY Cookies
+ HTTP-ONLY Cookies
 
 Primary XSS defense:
 
@@ -345,7 +345,7 @@ reply.setCookie('access_token', token, {
 });
 ```
 
-**Attack Scenario:**
+Attack Scenario:
 
 ```html
 <!-- Attacker injects malicious script -->
@@ -359,9 +359,9 @@ reply.setCookie('access_token', token, {
 </script>
 ```
 
-**Result:** Attack fails because JavaScript cannot access tokens.
+Result: Attack fails because JavaScript cannot access tokens.
 
-### Input Sanitization
+ Input Sanitization
 
 All input sanitized using Zod schemas:
 
@@ -372,16 +372,16 @@ export const CreateTaskSchema = z.object({
 });
 ```
 
-**sanitizedString removes:**
+sanitizedString removes:
 
 - HTML tags
 - JavaScript code
 - SQL injection attempts
 - Special characters
 
-### Content Security Policy (CSP)
+ Content Security Policy (CSP)
 
-**Recommended CSP header:**
+Recommended CSP header:
 
 ```typescript
 reply.header(
@@ -400,7 +400,7 @@ reply.header(
 );
 ```
 
-### XSS Attack Vectors
+ XSS Attack Vectors
 
 | Vector           | Protection                        |
 | ---------------- | --------------------------------- |
@@ -412,9 +412,9 @@ reply.header(
 
 ---
 
-## Best Practices
+ Best Practices
 
-### 1. Always Use HTTPS in Production
+ . Always Use HTTPS in Production
 
 ```typescript
 const isProduction = process.env.NODE_ENV === 'production';
@@ -424,7 +424,7 @@ reply.setCookie('access_token', token, {
 });
 ```
 
-### 2. Never Log Sensitive Data
+ . Never Log Sensitive Data
 
 ```typescript
 //  BAD: Logs token
@@ -434,7 +434,7 @@ console.log('User logged in:', { userId, accessToken });
 console.log('User logged in:', { userId });
 ```
 
-### 3. Validate All Input
+ . Validate All Input
 
 ```typescript
 //  Use Zod schemas
@@ -447,7 +447,7 @@ const CreateTaskSchema = z.object({
 const { name } = request.body; // Unsafe!
 ```
 
-### 4. Handle Errors Securely
+ . Handle Errors Securely
 
 ```typescript
 //  BAD: Leaks implementation details
@@ -462,18 +462,18 @@ catch (error) {
 }
 ```
 
-### 5. Rate Limiting
+ . Rate Limiting
 
-**TODO for production:**
+TODO for production:
 
 ```typescript
 await fastify.register(require('@fastify/rate-limit'), {
-	max: 100, // 100 requests
-	timeWindow: '1 minute', // per minute per IP
+	max: , //  requests
+	timeWindow: ' minute', // per minute per IP
 });
 ```
 
-### 6. Security Headers
+ . Security Headers
 
 ```typescript
 // Helmet.js for security headers
@@ -487,34 +487,34 @@ await fastify.register(require('@fastify/helmet'), {
 		},
 	},
 	hsts: {
-		maxAge: 31536000,
+		maxAge: ,
 		includeSubDomains: true,
 	},
 });
 ```
 
-### 7. Secure Password Storage
+ . Secure Password Storage
 
 ```typescript
 import bcrypt from 'bcrypt';
 
 // Hash password with salt
-const hashedPassword = await bcrypt.hash(password, 10);
+const hashedPassword = await bcrypt.hash(password, );
 
 // Verify password
 const isValid = await bcrypt.compare(password, hashedPassword);
 ```
 
-### 8. Monitor Failed Authentication
+ . Monitor Failed Authentication
 
 ```typescript
 // Track failed attempts
 const failedAttempts = new Map<string, number>();
 
 async login(email: string, password: string) {
-  const attempts = failedAttempts.get(email) || 0;
+  const attempts = failedAttempts.get(email) || ;
 
-  if (attempts >= 5) {
+  if (attempts >= ) {
     throw new Error('Too many failed attempts. Try again later.');
   }
 
@@ -523,7 +523,7 @@ async login(email: string, password: string) {
     failedAttempts.delete(email);  // Reset on success
     return user;
   } catch (error) {
-    failedAttempts.set(email, attempts + 1);
+    failedAttempts.set(email, attempts + );
     throw error;
   }
 }
@@ -531,20 +531,20 @@ async login(email: string, password: string) {
 
 ---
 
-## Security Audit Checklist
+ Security Audit Checklist
 
-### Authentication & Authorization
+ Authentication & Authorization
 
 - [ ] HTTP-ONLY cookies enabled
 - [ ] Secure flag enabled in production
 - [ ] SameSite=strict enabled
-- [ ] Access tokens expire after 5 minutes
-- [ ] Refresh tokens expire after 7 days
+- [ ] Access tokens expire after  minutes
+- [ ] Refresh tokens expire after  days
 - [ ] JWT secret strong and rotated regularly
-- [ ] Password hashing with bcrypt (10+ rounds)
+- [ ] Password hashing with bcrypt (+ rounds)
 - [ ] Failed login attempts tracked and limited
 
-### Network Security
+ Network Security
 
 - [ ] HTTPS enforced in production
 - [ ] CORS properly configured
@@ -552,7 +552,7 @@ async login(email: string, password: string) {
 - [ ] Rate limiting implemented
 - [ ] DDoS protection in place (CDN/WAF)
 
-### Input Validation
+ Input Validation
 
 - [ ] All input validated with Zod schemas
 - [ ] HTML sanitization enabled
@@ -560,7 +560,7 @@ async login(email: string, password: string) {
 - [ ] Path traversal prevented
 - [ ] File upload validation (if applicable)
 
-### Session Management
+ Session Management
 
 - [ ] Server-side session tracking
 - [ ] Expired sessions cleaned up automatically
@@ -568,7 +568,7 @@ async login(email: string, password: string) {
 - [ ] Multi-device support working
 - [ ] Session timeout implemented
 
-### XSS Protection
+ XSS Protection
 
 - [ ] HTTP-ONLY cookies prevent token theft
 - [ ] Input sanitization (sanitizedString)
@@ -576,20 +576,20 @@ async login(email: string, password: string) {
 - [ ] Content Security Policy configured
 - [ ] No inline scripts in production
 
-### CSRF Protection
+ CSRF Protection
 
 - [ ] SameSite=strict on all cookies
 - [ ] CSRF tokens for state-changing operations (optional)
 - [ ] Origin header validation
 
-### Error Handling
+ Error Handling
 
 - [ ] No sensitive data in error messages
 - [ ] Errors logged server-side
 - [ ] Generic errors to client
 - [ ] Stack traces hidden in production
 
-### Logging & Monitoring
+ Logging & Monitoring
 
 - [ ] Authentication events logged
 - [ ] Failed login attempts logged
@@ -597,7 +597,7 @@ async login(email: string, password: string) {
 - [ ] Session creation/destruction logged
 - [ ] No sensitive data in logs
 
-### Dependencies
+ Dependencies
 
 - [ ] All dependencies up to date
 - [ ] No known vulnerabilities (npm audit)
@@ -606,22 +606,22 @@ async login(email: string, password: string) {
 
 ---
 
-## Threat Model
+ Threat Model
 
-### Threats We Protect Against
+ Threats We Protect Against
 
 | Threat            | Protection            | Risk Level |
 | ----------------- | --------------------- | ---------- |
 | XSS token theft   | HTTP-ONLY cookies     | HIGH       |
 | CSRF attacks      | SameSite=strict       | HIGH       |
 | Man-in-the-middle | HTTPS + Secure flag   | HIGH       |
-| Token replay      | Short expiration (5m) | MEDIUM     |
+| Token replay      | Short expiration (m) | MEDIUM     |
 | Brute force login | Rate limiting (TODO)  | MEDIUM     |
 | Session fixation  | Server-side sessions  | MEDIUM     |
 | SQL injection     | Input validation      | LOW        |
 | Path traversal    | Input validation      | LOW        |
 
-### Threats NOT Protected Against
+ Threats NOT Protected Against
 
 | Threat          | Reason                  | Mitigation         |
 | --------------- | ----------------------- | ------------------ |
@@ -631,11 +631,11 @@ async login(email: string, password: string) {
 | Insider threats | Out of scope            | Access controls    |
 | DDoS attacks    | Requires infrastructure | CDN/WAF            |
 
-### Attack Scenarios
+ Attack Scenarios
 
-#### Scenario 1: XSS Attack
+ Scenario : XSS Attack
 
-**Attack:**
+Attack:
 
 ```html
 <script>
@@ -643,17 +643,17 @@ async login(email: string, password: string) {
 </script>
 ```
 
-**Defense:**
+Defense:
 
 - HTTP-ONLY cookies prevent document.cookie access
 - CSP blocks unauthorized fetch
 - Input sanitization prevents script injection
 
-**Result:** Attack fails
+Result: Attack fails
 
-#### Scenario 2: CSRF Attack
+ Scenario : CSRF Attack
 
-**Attack:**
+Attack:
 
 ```html
 <!-- attacker.com -->
@@ -661,93 +661,93 @@ async login(email: string, password: string) {
 	<input name="name" value="Malicious" />
 </form>
 <script>
-	document.forms[0].submit();
+	document.forms[].submit();
 </script>
 ```
 
-**Defense:**
+Defense:
 
 - SameSite=strict prevents cookies being sent
 - Request rejected (no authentication)
 
-**Result:** Attack fails
+Result: Attack fails
 
-#### Scenario 3: Man-in-the-Middle
+ Scenario : Man-in-the-Middle
 
-**Attack:** Intercept HTTP traffic to steal tokens
+Attack: Intercept HTTP traffic to steal tokens
 
-**Defense:**
+Defense:
 
 - HTTPS encrypts all traffic
 - Secure flag prevents cookies over HTTP
 - HSTS forces HTTPS
 
-**Result:** Attack fails (if HTTPS properly configured)
+Result: Attack fails (if HTTPS properly configured)
 
 ---
 
-## Environment Variables
+ Environment Variables
 
-**CRITICAL Security Variables:**
+CRITICAL Security Variables:
 
 ```bash
-# JWT Secret: Use strong random key, rotate regularly
-JWT_SECRET=your-very-strong-secret-key-here-use-32-chars-minimum
+ JWT Secret: Use strong random key, rotate regularly
+JWT_SECRET=your-very-strong-secret-key-here-use--chars-minimum
 
-# Cookie Secret: Use different key than JWT
+ Cookie Secret: Use different key than JWT
 COOKIE_SECRET=your-cookie-secret-key-different-from-jwt
 
-# Environment
-NODE_ENV=production  # Enables secure cookies
+ Environment
+NODE_ENV=production   Enables secure cookies
 
-# HTTPS (production)
+ HTTPS (production)
 FORCE_HTTPS=true
 ```
 
-**Generating Secrets:**
+Generating Secrets:
 
 ```bash
-# Generate secure random secret
-openssl rand -base64 32
+ Generate secure random secret
+openssl rand -base 
 ```
 
-**Secret Rotation:**
+Secret Rotation:
 
-- Rotate JWT_SECRET every 90 days
-- Keep old secret for 24 hours (grace period)
+- Rotate JWT_SECRET every  days
+- Keep old secret for  hours (grace period)
 - Update all sessions after rotation
 
 ---
 
-## Security Updates
+ Security Updates
 
 Stay informed about security vulnerabilities:
 
-1. Subscribe to security advisories
-2. Run `npm audit` regularly
-3. Update dependencies monthly
-4. Review security logs weekly
-5. Conduct security audits quarterly
+. Subscribe to security advisories
+. Run `npm audit` regularly
+. Update dependencies monthly
+. Review security logs weekly
+. Conduct security audits quarterly
 
-**Useful Commands:**
+Useful Commands:
 
 ```bash
-# Check for vulnerabilities
+ Check for vulnerabilities
 npm audit
 
-# Fix vulnerabilities
+ Fix vulnerabilities
 npm audit fix
 
-# Check outdated packages
+ Check outdated packages
 npm outdated
 ```
 
 ---
 
-## References
+ References
 
-- [OWASP Top 10](https://owasp.org/www-project-top-ten/)
-- [JWT Best Practices](https://tools.ietf.org/html/rfc8725)
+- [OWASP Top ](https://owasp.org/www-project-top-ten/)
+- [JWT Best Practices](https://tools.ietf.org/html/rfc)
 - [Cookie Security](https://owasp.org/www-community/controls/SecureFlag)
 - [Content Security Policy](https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP)
 - [Transport Layer Documentation](./TRANSPORT_LAYER.md)

@@ -1,90 +1,90 @@
-# Deployment Guide
+ Deployment Guide
 
-## Table of Contents
+ Table of Contents
 
-1. [Environment Variables](#environment-variables)
-2. [Production Configuration](#production-configuration)
-3. [HTTPS Requirements](#https-requirements)
-4. [CORS Configuration](#cors-configuration)
-5. [Scaling Considerations](#scaling-considerations)
-6. [Monitoring and Alerting](#monitoring-and-alerting)
-7. [Troubleshooting](#troubleshooting)
-8. [Deployment Checklist](#deployment-checklist)
+. [Environment Variables](environment-variables)
+. [Production Configuration](production-configuration)
+. [HTTPS Requirements](https-requirements)
+. [CORS Configuration](cors-configuration)
+. [Scaling Considerations](scaling-considerations)
+. [Monitoring and Alerting](monitoring-and-alerting)
+. [Troubleshooting](troubleshooting)
+. [Deployment Checklist](deployment-checklist)
 
 ---
 
-## Environment Variables
+ Environment Variables
 
-### Required Variables
+ Required Variables
 
 These variables MUST be set in production:
 
 ```bash
-# JWT Authentication
-JWT_SECRET=your-very-strong-secret-key-minimum-32-characters
+ JWT Authentication
+JWT_SECRET=your-very-strong-secret-key-minimum--characters
 COOKIE_SECRET=your-cookie-secret-different-from-jwt-secret
 
-# Environment
+ Environment
 NODE_ENV=production
 
-# Server
-PORT=3000
-HOST=0.0.0.0
+ Server
+PORT=
+HOST=...
 
-# Frontend URL (for CORS)
+ Frontend URL (for CORS)
 FRONTEND_URL=https://yourdomain.com
 
-# Database (if applicable)
-DATABASE_URL=postgresql://user:password@localhost:5432/dbname
+ Database (if applicable)
+DATABASE_URL=postgresql://user:password@localhost:/dbname
 ```
 
-### Optional Variables
+ Optional Variables
 
 ```bash
-# WebSocket Configuration
-WS_HEARTBEAT_INTERVAL=30000      # Heartbeat interval (ms)
-SESSION_CLEANUP_INTERVAL=60000   # Session cleanup interval (ms)
+ WebSocket Configuration
+WS_HEARTBEAT_INTERVAL=       Heartbeat interval (ms)
+SESSION_CLEANUP_INTERVAL=    Session cleanup interval (ms)
 
-# Token Configuration
-TOKEN_EXPIRY=300                 # Access token expiry (seconds, 5 min)
-REFRESH_TOKEN_EXPIRY=604800      # Refresh token expiry (seconds, 7 days)
+ Token Configuration
+TOKEN_EXPIRY=                  Access token expiry (seconds,  min)
+REFRESH_TOKEN_EXPIRY=       Refresh token expiry (seconds,  days)
 
-# Logging
-LOG_LEVEL=info                   # Log level (error, warn, info, debug)
+ Logging
+LOG_LEVEL=info                    Log level (error, warn, info, debug)
 
-# Rate Limiting
-RATE_LIMIT_MAX=100               # Max requests per window
-RATE_LIMIT_WINDOW=60000          # Time window (ms)
+ Rate Limiting
+RATE_LIMIT_MAX=                Max requests per window
+RATE_LIMIT_WINDOW=           Time window (ms)
 
-# HTTPS
-FORCE_HTTPS=true                 # Force HTTPS in production
+ HTTPS
+FORCE_HTTPS=true                  Force HTTPS in production
 ```
 
-### Generating Secrets
+ Generating Secrets
 
-**CRITICAL:** Never use weak or default secrets in production!
+CRITICAL: Never use weak or default secrets in production!
 
 ```bash
-# Generate JWT secret (32+ characters)
-openssl rand -base64 32
+ Generate JWT secret (+ characters)
+openssl rand -base 
 
-# Generate cookie secret (different from JWT)
-openssl rand -base64 32
+ Generate cookie secret (different from JWT)
+openssl rand -base 
 ```
 
-**Best Practices:**
+Best Practices:
 
 - Use different secrets for JWT and cookies
-- Rotate secrets every 90 days
+- Rotate secrets every  days
 - Store secrets in environment variables or secret management service
 - Never commit secrets to version control
-- Use strong random values (32+ characters)
+- Use strong random values (+ characters)
 
 ---
 
-## Production Configuration
+ Production Configuration
 
-### Server Configuration
+ Server Configuration
 
 ```typescript
 // server.ts
@@ -128,14 +128,14 @@ await fastify.register(require('@fastify/cors'), {
 });
 
 // Start server
-const port = parseInt(process.env.PORT || '3000', 10);
-const host = process.env.HOST || '0.0.0.0';
+const port = parseInt(process.env.PORT || '', );
+const host = process.env.HOST || '...';
 
 await fastify.listen({ port, host });
 console.log(`Server listening on ${host}:${port}`);
 ```
 
-### Cookie Configuration
+ Cookie Configuration
 
 Production cookies MUST have secure flags:
 
@@ -147,11 +147,11 @@ reply.setCookie('access_token', token, {
 	secure: isProduction, // HTTPS only in production
 	sameSite: 'strict', // CSRF protection
 	path: '/',
-	maxAge: 300, // 5 minutes
+	maxAge: , //  minutes
 });
 ```
 
-### Database Connection
+ Database Connection
 
 Use connection pooling in production:
 
@@ -160,44 +160,44 @@ import { Pool } from 'pg';
 
 const pool = new Pool({
 	connectionString: process.env.DATABASE_URL,
-	max: 20, // Maximum pool size
-	idleTimeoutMillis: 30000, // Close idle connections
-	connectionTimeoutMillis: 2000,
+	max: , // Maximum pool size
+	idleTimeoutMillis: , // Close idle connections
+	connectionTimeoutMillis: ,
 });
 ```
 
 ---
 
-## HTTPS Requirements
+ HTTPS Requirements
 
-### Why HTTPS is Required
+ Why HTTPS is Required
 
-1. Cookies with `secure` flag only sent over HTTPS
-2. WebSocket upgrades require secure connections (wss://)
-3. Prevents man-in-the-middle attacks
-4. Required for modern browser features
+. Cookies with `secure` flag only sent over HTTPS
+. WebSocket upgrades require secure connections (wss://)
+. Prevents man-in-the-middle attacks
+. Required for modern browser features
 
-### Certificate Setup
+ Certificate Setup
 
-**Option 1: Let's Encrypt (Free)**
+Option : Let's Encrypt (Free)
 
 ```bash
-# Install certbot
+ Install certbot
 sudo apt-get install certbot
 
-# Generate certificate
+ Generate certificate
 sudo certbot certonly --standalone -d yourdomain.com
 
-# Certificate files:
-# /etc/letsencrypt/live/yourdomain.com/fullchain.pem
-# /etc/letsencrypt/live/yourdomain.com/privkey.pem
+ Certificate files:
+ /etc/letsencrypt/live/yourdomain.com/fullchain.pem
+ /etc/letsencrypt/live/yourdomain.com/privkey.pem
 ```
 
-**Option 2: Commercial Certificate**
+Option : Commercial Certificate
 
 Purchase from certificate authority (CA) and follow their instructions.
 
-### Fastify HTTPS Configuration
+ Fastify HTTPS Configuration
 
 ```typescript
 import Fastify from 'fastify';
@@ -211,37 +211,37 @@ const fastify = Fastify({
 });
 ```
 
-### Reverse Proxy (Nginx)
+ Reverse Proxy (Nginx)
 
-**Recommended:** Use Nginx as reverse proxy for HTTPS termination.
+Recommended: Use Nginx as reverse proxy for HTTPS termination.
 
 ```nginx
-# /etc/nginx/sites-available/yourdomain.com
+ /etc/nginx/sites-available/yourdomain.com
 
 server {
-    listen 80;
-    listen [::]:80;
+    listen ;
+    listen [::]:;
     server_name yourdomain.com;
 
-    # Redirect HTTP to HTTPS
-    return 301 https://$server_name$request_uri;
+     Redirect HTTP to HTTPS
+    return  https://$server_name$request_uri;
 }
 
 server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
+    listen  ssl http;
+    listen [::]: ssl http;
     server_name yourdomain.com;
 
-    # SSL configuration
+     SSL configuration
     ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_protocols TLSv. TLSv.;
+    ssl_ciphers HIGH:!aNULL:!MD;
 
-    # WebSocket upgrade support
+     WebSocket upgrade support
     location /ws {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
+        proxy_pass http://localhost:;
+        proxy_http_version .;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
@@ -249,20 +249,20 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # WebSocket timeout
-        proxy_read_timeout 86400;
+         WebSocket timeout
+        proxy_read_timeout ;
     }
 
-    # API endpoints
+     API endpoints
     location /api {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://localhost:;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # Frontend (if serving from same domain)
+     Frontend (if serving from same domain)
     location / {
         root /var/www/yourdomain.com;
         try_files $uri $uri/ /index.html;
@@ -270,7 +270,7 @@ server {
 }
 ```
 
-**Enable configuration:**
+Enable configuration:
 
 ```bash
 sudo ln -s /etc/nginx/sites-available/yourdomain.com /etc/nginx/sites-enabled/
@@ -280,11 +280,11 @@ sudo systemctl reload nginx
 
 ---
 
-## CORS Configuration
+ CORS Configuration
 
-### Same-Origin Deployment
+ Same-Origin Deployment
 
-**Recommended:** Deploy frontend and backend on same domain.
+Recommended: Deploy frontend and backend on same domain.
 
 ```
 Frontend: https://yourdomain.com
@@ -292,7 +292,7 @@ Backend:  https://yourdomain.com/api
 WebSocket: wss://yourdomain.com/ws
 ```
 
-**CORS Configuration:**
+CORS Configuration:
 
 ```typescript
 await fastify.register(require('@fastify/cors'), {
@@ -301,7 +301,7 @@ await fastify.register(require('@fastify/cors'), {
 });
 ```
 
-### Cross-Origin Deployment
+ Cross-Origin Deployment
 
 If frontend and backend on different domains:
 
@@ -310,7 +310,7 @@ Frontend: https://app.yourdomain.com
 Backend:  https://api.yourdomain.com
 ```
 
-**CORS Configuration:**
+CORS Configuration:
 
 ```typescript
 await fastify.register(require('@fastify/cors'), {
@@ -319,11 +319,11 @@ await fastify.register(require('@fastify/cors'), {
 	methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
 	allowedHeaders: ['Content-Type', 'Authorization'],
 	exposedHeaders: ['Content-Range', 'X-Content-Range'],
-	maxAge: 86400, // Cache preflight requests for 24h
+	maxAge: , // Cache preflight requests for h
 });
 ```
 
-**Cookie SameSite Configuration:**
+Cookie SameSite Configuration:
 
 For cross-origin, cookies must use `sameSite: 'none'`:
 
@@ -333,73 +333,73 @@ reply.setCookie('access_token', token, {
 	secure: true, // REQUIRED with sameSite: 'none'
 	sameSite: 'none', // Allow cross-origin
 	path: '/',
-	maxAge: 300,
+	maxAge: ,
 });
 ```
 
-**WARNING:** `sameSite: 'none'` reduces CSRF protection. Consider using `sameSite: 'lax'` or deploy on same domain.
+WARNING: `sameSite: 'none'` reduces CSRF protection. Consider using `sameSite: 'lax'` or deploy on same domain.
 
 ---
 
-## Scaling Considerations
+ Scaling Considerations
 
-### Single Instance
+ Single Instance
 
 Simplest deployment, suitable for small to medium traffic:
 
 ```
-┌──────────────┐
-│   Nginx      │
-│  (HTTPS)     │
-└──────┬───────┘
-       │
-┌──────▼───────┐
-│   Node.js    │
-│  (Fastify)   │
-└──────────────┘
+
+   Nginx      
+  (HTTPS)     
+
+       
+
+   Node.js    
+  (Fastify)   
+
 ```
 
-### Multiple Instances
+ Multiple Instances
 
 For higher traffic, use multiple instances behind load balancer:
 
 ```
-                ┌──────────────┐
-                │ Load Balancer│
-                │   (Nginx)    │
-                └──────┬───────┘
-                       │
-         ┌─────────────┼─────────────┐
-         │             │             │
-    ┌────▼────┐   ┌────▼────┐   ┌────▼────┐
-    │ Node.js │   │ Node.js │   │ Node.js │
-    │ (Port   │   │ (Port   │   │ (Port   │
-    │  3000)  │   │  3001)  │   │  3002)  │
-    └─────────┘   └─────────┘   └─────────┘
+                
+                 Load Balancer
+                   (Nginx)    
+                
+                       
+         
+                                   
+          
+     Node.js     Node.js     Node.js 
+     (Port       (Port       (Port   
+      )       )       )  
+          
 ```
 
-**Load Balancer Configuration (Nginx):**
+Load Balancer Configuration (Nginx):
 
 ```nginx
 upstream backend {
-    # IP hash ensures same user goes to same server
-    # Important for WebSocket sticky sessions
+     IP hash ensures same user goes to same server
+     Important for WebSocket sticky sessions
     ip_hash;
 
-    server localhost:3000;
-    server localhost:3001;
-    server localhost:3002;
+    server localhost:;
+    server localhost:;
+    server localhost:;
 }
 
 server {
-    listen 443 ssl http2;
+    listen  ssl http;
     server_name yourdomain.com;
 
-    # ... SSL configuration ...
+     ... SSL configuration ...
 
     location / {
         proxy_pass http://backend;
-        proxy_http_version 1.1;
+        proxy_http_version .;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
@@ -410,13 +410,13 @@ server {
 }
 ```
 
-### Scaling Challenges
+ Scaling Challenges
 
-**Problem 1: WebSocket sessions not shared**
+Problem : WebSocket sessions not shared
 
-Each Node.js instance has its own in-memory sessions. User on instance 1 won't receive events from instance 2.
+Each Node.js instance has its own in-memory sessions. User on instance  won't receive events from instance .
 
-**Solution: Redis-backed session storage**
+Solution: Redis-backed session storage
 
 ```typescript
 // TODO: Implement Redis-backed TransportSessionManager
@@ -428,17 +428,17 @@ const redis = new Redis(process.env.REDIS_URL);
 // All instances share same session data
 ```
 
-**Problem 2: Event broadcasting only within instance**
+Problem : Event broadcasting only within instance
 
-Events broadcast on instance 1 won't reach clients on instance 2.
+Events broadcast on instance  won't reach clients on instance .
 
-**Solution: Redis pub/sub for event broadcasting**
+Solution: Redis pub/sub for event broadcasting
 
 ```typescript
 // TODO: Implement Redis pub/sub for events
 const redis = new Redis(process.env.REDIS_URL);
 
-// Instance 1: Publish event
+// Instance : Publish event
 redis.publish(
 	'events',
 	JSON.stringify({
@@ -447,7 +447,7 @@ redis.publish(
 	})
 );
 
-// Instance 2: Subscribe and broadcast locally
+// Instance : Subscribe and broadcast locally
 redis.subscribe('events');
 redis.on('message', (channel, message) => {
 	const event = JSON.parse(message);
@@ -455,22 +455,22 @@ redis.on('message', (channel, message) => {
 });
 ```
 
-### Process Manager (PM2)
+ Process Manager (PM)
 
-Use PM2 to manage multiple instances:
+Use PM to manage multiple instances:
 
 ```bash
-# Install PM2
-npm install -g pm2
+ Install PM
+npm install -g pm
 
-# Start with multiple instances
-pm2 start dist/server.js -i 4  # 4 instances
+ Start with multiple instances
+pm start dist/server.js -i     instances
 
-# Or use ecosystem file
-pm2 start ecosystem.config.js
+ Or use ecosystem file
+pm start ecosystem.config.js
 ```
 
-**ecosystem.config.js:**
+ecosystem.config.js:
 
 ```javascript
 module.exports = {
@@ -478,126 +478,126 @@ module.exports = {
 		{
 			name: 'api-server',
 			script: './dist/server',
-			instances: 4, // Number of instances
+			instances: , // Number of instances
 			exec_mode: 'cluster', // Cluster mode
 			env: {
 				NODE_ENV: 'production',
-				PORT: 3000,
+				PORT: ,
 			},
 		},
 	],
 };
 ```
 
-**PM2 Commands:**
+PM Commands:
 
 ```bash
-# List processes
-pm2 list
+ List processes
+pm list
 
-# Monitor
-pm2 monit
+ Monitor
+pm monit
 
-# Logs
-pm2 logs
+ Logs
+pm logs
 
-# Restart
-pm2 restart api-server
+ Restart
+pm restart api-server
 
-# Stop
-pm2 stop api-server
+ Stop
+pm stop api-server
 
-# Delete
-pm2 delete api-server
+ Delete
+pm delete api-server
 ```
 
 ---
 
-## Monitoring and Alerting
+ Monitoring and Alerting
 
-### Health Checks
+ Health Checks
 
-**Endpoint:** `GET /api/monitoring/transport/health`
+Endpoint: `GET /api/monitoring/transport/health`
 
 ```bash
-# Basic health check
+ Basic health check
 curl https://yourdomain.com/api/monitoring/transport/health
 ```
 
-**Response:**
+Response:
 
 ```json
 {
 	"transport": "ok",
 	"auth": "ok",
-	"connectedClients": 42,
-	"uptime": 3600000,
-	"timestamp": 1234567890000
+	"connectedClients": ,
+	"uptime": ,
+	"timestamp": 
 }
 ```
 
-**Load Balancer Integration:**
+Load Balancer Integration:
 
 ```nginx
 upstream backend {
-    server localhost:3000;
-    server localhost:3001;
-    server localhost:3002;
+    server localhost:;
+    server localhost:;
+    server localhost:;
 
-    # Health check
-    check interval=10000 rise=2 fall=3 timeout=5000;
-    check_http_send "GET /api/monitoring/transport/health HTTP/1.0\r\n\r\n";
-    check_http_expect_alive http_2xx http_3xx;
+     Health check
+    check interval= rise= fall= timeout=;
+    check_http_send "GET /api/monitoring/transport/health HTTP/.\r\n\r\n";
+    check_http_expect_alive http_xx http_xx;
 }
 ```
 
-### Metrics Collection
+ Metrics Collection
 
-**Endpoint:** `GET /api/monitoring/transport/stats`
+Endpoint: `GET /api/monitoring/transport/stats`
 
-**Recommended Tools:**
+Recommended Tools:
 
 - Prometheus + Grafana
 - DataDog
 - New Relic
 - Custom monitoring script
 
-**Example Monitoring Script:**
+Example Monitoring Script:
 
 ```bash
-#!/bin/bash
+!/bin/bash
 
-# Monitor script - run every minute via cron
+ Monitor script - run every minute via cron
 HEALTH_URL="https://yourdomain.com/api/monitoring/transport/health"
 STATS_URL="https://yourdomain.com/api/monitoring/transport/stats"
 
-# Check health
+ Check health
 HEALTH=$(curl -s $HEALTH_URL | jq -r '.transport')
 
 if [ "$HEALTH" != "ok" ]; then
     echo "ALERT: Transport health check failed"
-    # Send alert (email, Slack, PagerDuty, etc.)
+     Send alert (email, Slack, PagerDuty, etc.)
 fi
 
-# Check connected clients
+ Check connected clients
 CLIENTS=$(curl -s $STATS_URL | jq -r '.connectedClients')
 
-if [ $CLIENTS -gt 1000 ]; then
+if [ $CLIENTS -gt  ]; then
     echo "WARNING: High number of connected clients: $CLIENTS"
 fi
 
-# Check sessions per user
+ Check sessions per user
 AVG_SESSIONS=$(curl -s $STATS_URL | jq -r '.avgSessionsPerUser')
 
-if (( $(echo "$AVG_SESSIONS > 5" | bc -l) )); then
+if (( $(echo "$AVG_SESSIONS > " | bc -l) )); then
     echo "WARNING: High average sessions per user: $AVG_SESSIONS"
     echo "Possible bot activity or session leak"
 fi
 ```
 
-### Logging
+ Logging
 
-**Structured Logging with Pino:**
+Structured Logging with Pino:
 
 ```typescript
 const logger = pino({
@@ -613,7 +613,7 @@ logger.info({ userId, action: 'login' }, 'User logged in');
 logger.error({ error, taskId }, 'Failed to create task');
 ```
 
-**Log Aggregation:**
+Log Aggregation:
 
 Use centralized logging:
 
@@ -622,46 +622,46 @@ Use centralized logging:
 - CloudWatch Logs (AWS)
 - Google Cloud Logging
 
-### Alerts
+ Alerts
 
 Set up alerts for:
 
 | Metric                    | Threshold              | Action                                |
 | ------------------------- | ---------------------- | ------------------------------------- |
-| Health check failing      | 2 consecutive failures | Page on-call engineer                 |
-| Connected clients         | >1000                  | Investigate, prepare to scale         |
-| CPU usage                 | >80% for 5min          | Scale up instances                    |
-| Memory usage              | >85%                   | Investigate memory leak               |
-| Failed logins             | >10 per minute         | Possible attack, enable rate limiting |
-| Average sessions per user | >5                     | Possible bot or session leak          |
+| Health check failing      |  consecutive failures | Page on-call engineer                 |
+| Connected clients         | >                  | Investigate, prepare to scale         |
+| CPU usage                 | >% for min          | Scale up instances                    |
+| Memory usage              | >%                   | Investigate memory leak               |
+| Failed logins             | > per minute         | Possible attack, enable rate limiting |
+| Average sessions per user | >                     | Possible bot or session leak          |
 
 ---
 
-## Troubleshooting
+ Troubleshooting
 
-### Problem: WebSocket connections failing
+ Problem: WebSocket connections failing
 
-**Symptoms:**
+Symptoms:
 
 - "Authentication failed" errors
 - Connections immediately close
 
-**Check:**
+Check:
 
 ```bash
-# 1. Verify cookies are set
+ . Verify cookies are set
 curl -c cookies.txt https://yourdomain.com/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"password"}'
 
-# 2. Check cookies
+ . Check cookies
 cat cookies.txt
 
-# 3. Test WebSocket with cookies
+ . Test WebSocket with cookies
 wscat -c wss://yourdomain.com/ws --header "Cookie: access_token=..."
 ```
 
-**Common Causes:**
+Common Causes:
 
 - CORS not allowing credentials
 - Secure flag but not using HTTPS
@@ -670,32 +670,32 @@ wscat -c wss://yourdomain.com/ws --header "Cookie: access_token=..."
 
 ---
 
-### Problem: High memory usage
+ Problem: High memory usage
 
-**Symptoms:**
+Symptoms:
 
 - Memory usage grows over time
 - Out of memory errors
 
-**Check:**
+Check:
 
 ```bash
-# 1. Check session count
+ . Check session count
 curl https://yourdomain.com/api/monitoring/transport/stats | jq
 
-# 2. Heap snapshot
+ . Heap snapshot
 node --inspect dist/server.js
-# Chrome DevTools → Memory → Take snapshot
+ Chrome DevTools → Memory → Take snapshot
 ```
 
-**Common Causes:**
+Common Causes:
 
 - Expired sessions not cleaned up
 - Event listener memory leaks
 - Unsubscribed event handlers
 - Large objects in session storage
 
-**Fix:**
+Fix:
 
 - Verify cleanup interval running
 - Check session expiration logic
@@ -704,25 +704,25 @@ node --inspect dist/server.js
 
 ---
 
-### Problem: Events not received
+ Problem: Events not received
 
-**Symptoms:**
+Symptoms:
 
 - Frontend not updating in real-time
 - Some clients receive events, others don't
 
-**Check:**
+Check:
 
 ```bash
-# 1. Check subscriptions
+ . Check subscriptions
 curl https://yourdomain.com/api/monitoring/transport/sessions \
   --cookie "access_token=..." | jq
 
-# 2. Check broadcast code
-grep "eventBroadcaster.broadcast" src/**/*.ts
+ . Check broadcast code
+grep "eventBroadcaster.broadcast" src//.ts
 ```
 
-**Common Causes:**
+Common Causes:
 
 - Client not subscribed to event type
 - Event type mismatch (typo)
@@ -731,29 +731,29 @@ grep "eventBroadcaster.broadcast" src/**/*.ts
 
 ---
 
-### Problem: Token expired immediately
+ Problem: Token expired immediately
 
-**Symptoms:**
+Symptoms:
 
 - Login succeeds but token expires instantly
 - "Access token expired" errors
 
-**Check:**
+Check:
 
 ```bash
-# 1. Check system time
+ . Check system time
 date
 
-# 2. Check token expiration
+ . Check token expiration
 curl https://yourdomain.com/api/auth/session \
   --cookie "access_token=..." | jq '.expiresAt'
 
-# 3. Compare timestamps
-echo "Server time: $(date +%s)000"
+ . Compare timestamps
+echo "Server time: $(date +%s)"
 echo "Token expires: <expiresAt from above>"
 ```
 
-**Common Causes:**
+Common Causes:
 
 - Clock skew between frontend/backend
 - Incorrect timezone
@@ -762,9 +762,9 @@ echo "Token expires: <expiresAt from above>"
 
 ---
 
-## Deployment Checklist
+ Deployment Checklist
 
-### Pre-Deployment
+ Pre-Deployment
 
 - [ ] All environment variables set
 - [ ] Secrets generated and stored securely
@@ -775,7 +775,7 @@ echo "Token expires: <expiresAt from above>"
 - [ ] Tests passing (`npm test`)
 - [ ] Security audit passed (`npm audit`)
 
-### Deployment
+ Deployment
 
 - [ ] Code deployed to server
 - [ ] Dependencies installed (`npm ci --production`)
@@ -785,7 +785,7 @@ echo "Token expires: <expiresAt from above>"
 - [ ] Health check passing
 - [ ] WebSocket connections working
 
-### Post-Deployment
+ Post-Deployment
 
 - [ ] Monitor logs for errors
 - [ ] Check metrics (CPU, memory, connections)
@@ -794,60 +794,60 @@ echo "Token expires: <expiresAt from above>"
 - [ ] Verify HTTPS certificate
 - [ ] Test from different devices
 - [ ] Check browser console for errors
-- [ ] Monitor for 24 hours
+- [ ] Monitor for  hours
 
-### Rollback Plan
+ Rollback Plan
 
 If deployment fails:
 
-1. Stop new server
-2. Revert to previous version
-3. Restart old server
-4. Verify functionality
-5. Investigate issue
-6. Fix and redeploy
+. Stop new server
+. Revert to previous version
+. Restart old server
+. Verify functionality
+. Investigate issue
+. Fix and redeploy
 
 ---
 
-## Docker Deployment
+ Docker Deployment
 
-**Dockerfile:**
+Dockerfile:
 
 ```dockerfile
-FROM node:18-alpine
+FROM node:-alpine
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+ Copy package files
+COPY package.json ./
 
-# Install dependencies
+ Install dependencies
 RUN npm ci --production
 
-# Copy built files
+ Copy built files
 COPY dist ./dist
 
-# Expose port
-EXPOSE 3000
+ Expose port
+EXPOSE 
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s \
-  CMD node -e "require('http').get('http://localhost:3000/api/monitoring/transport/health',(r)=>{process.exit(r.statusCode===200?0:1)})"
+ Health check
+HEALTHCHECK --interval=s --timeout=s --start-period=s \
+  CMD node -e "require('http').get('http://localhost:/api/monitoring/transport/health',(r)=>{process.exit(r.statusCode===?:)})"
 
-# Start server
+ Start server
 CMD ["node", "dist/server.js"]
 ```
 
-**docker-compose.yml:**
+docker-compose.yml:
 
 ```yaml
-version: '3.8'
+version: '.'
 
 services:
     api:
         build: .
         ports:
-            - '3000:3000'
+            - ':'
         environment:
             - NODE_ENV=production
             - JWT_SECRET=${JWT_SECRET}
@@ -855,16 +855,16 @@ services:
             - DATABASE_URL=${DATABASE_URL}
         restart: unless-stopped
         healthcheck:
-            test: ['CMD', 'curl', '-f', 'http://localhost:3000/api/monitoring/transport/health']
-            interval: 30s
-            timeout: 3s
-            retries: 3
+            test: ['CMD', 'curl', '-f', 'http://localhost:/api/monitoring/transport/health']
+            interval: s
+            timeout: s
+            retries: 
 
     nginx:
         image: nginx:alpine
         ports:
-            - '80:80'
-            - '443:443'
+            - ':'
+            - ':'
         volumes:
             - ./nginx.conf:/etc/nginx/nginx.conf:ro
             - /etc/letsencrypt:/etc/letsencrypt:ro
@@ -875,11 +875,11 @@ services:
 
 ---
 
-## References
+ References
 
 - [Security Guide](./SECURITY.md)
 - [Transport Layer Documentation](./TRANSPORT_LAYER.md)
 - [API Reference](../../shared-frontend-backend/docs/API_REFERENCE.md)
 - [Nginx Documentation](https://nginx.org/en/docs/)
-- [PM2 Documentation](https://pm2.keymetrics.io/)
+- [PM Documentation](https://pm.keymetrics.io/)
 - [Docker Documentation](https://docs.docker.com/)

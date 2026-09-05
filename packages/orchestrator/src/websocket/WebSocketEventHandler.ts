@@ -293,7 +293,7 @@ export class WebSocketEventHandler {
 				this.connectionManager.sendMessage(
 					worker.socket,
 					createO2WMessage(O2WMessageType.ERROR, {
-						error: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Failed to create intervention',
+						error: error instanceof Error ? String(error) : 'Failed to create intervention',
 					})
 				);
 			}

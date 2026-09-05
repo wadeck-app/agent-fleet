@@ -1,3 +1,4 @@
+// violations-suppress: ts/no-inline-subcomponent tightly-coupled primitive sub-parts belong in the same file
 import * as React from 'react';
 
 import { cn } from '@framework/lib/utils';

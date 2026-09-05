@@ -58,7 +58,7 @@ async function clearDataHandler(request: FastifyRequest, reply: FastifyReply) {
 		logger.error('Error clearing in-memory data:', error);
 		return reply.status(500).send({
 			error: 'Failed to clear in-memory data',
-			details: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error',
+			details: error instanceof Error ? String(error) : 'Unknown error',
 		});
 	}
 }

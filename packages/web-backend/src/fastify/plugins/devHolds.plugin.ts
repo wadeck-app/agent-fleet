@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 
+// violations-suppress: ts/no-deep-relative no @/ alias available in web-backend tsconfig
 import { DevHoldService } from '../../services/DevHoldService';
 
 /**

@@ -349,7 +349,7 @@ export class TransportRouter {
 				status: err.statusCode || 500,
 				error: {
 					code: err.code || 'INTERNAL_ERROR',
-					message: (err instanceof Error ? err.message : String(err)) || 'Internal server error',
+					message: String(err) || 'Internal server error',
 					details: err.details,
 				},
 				timestamp: Date.now(),

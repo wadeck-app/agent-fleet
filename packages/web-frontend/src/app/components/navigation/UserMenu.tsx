@@ -253,6 +253,7 @@ export function UserMenu({
 				);
 
 			case 'icon':
+			// violations-suppress: ts/no-switch-default-break default returns a valid React element, not a silent fallback
 			default:
 				return (
 					<Button variant="ghost" size="icon" className={className}>

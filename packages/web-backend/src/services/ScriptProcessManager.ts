@@ -164,7 +164,7 @@ export class ScriptProcessManager {
 				id: this.generateLogId(),
 				timestamp: Date.now(),
 				level: 'error',
-				message: `Process error: ${(err instanceof Error ? err.message : String(err))}`,
+				message: `Process error: ${String(err)}`,
 			};
 
 			if (onLog) {

@@ -236,7 +236,7 @@ export class InterventionsRepository {
 			} catch (error) {
 				failed.push({
 					id,
-					error: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error',
+					error: error instanceof Error ? String(error) : 'Unknown error',
 				});
 			}
 		}

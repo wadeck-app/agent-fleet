@@ -1,5 +1,6 @@
 import type { Command } from 'commander';
 
+// violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { validateFlowFile } from '../../validation/FlowFileValidator';
 
 export function registerValidateCommand(program: Command): void {
@@ -56,7 +57,8 @@ export function registerValidateCommand(program: Command): void {
 				console.error(` Flow has ${result.errors.length} error${result.errors.length > 1 ? 's' : ''}`);
 				for (const err of result.errors) {
 					const loc = err.path ? ` [${err.path}]` : '';
-					console.error(`  - ${(err instanceof Error ? err.message : String(err))}${loc}`);
+					// violations-suppress: cli/no-raw-err-in-cli validation errors are intentionally shown to users
+					console.error(`  - ${String(err)}${loc}`);
 				}
 				process.exit(1);
 			}

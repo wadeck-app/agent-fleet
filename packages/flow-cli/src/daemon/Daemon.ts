@@ -134,7 +134,7 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 				// after handleRun(), which happens after this onStart returns. By then start()
 				// has resolved.
 				wsServer.start().catch((err: Error) => {
-					process.stderr.write(`[daemon] WebSocket server failed to start: ${(err instanceof Error ? err.message : String(err))}\n`);
+					process.stderr.write(`[daemon] WebSocket server failed to start: ${String(err)}\n`);
 				});
 				workerPool = new WorkerPool(config.queue.concurrency, port, () => wsServer.port, claudePath);
 				commandHandler = new CommandHandler(

@@ -1,34 +1,34 @@
-/**
- * ===========================================================================================
- * INGREDIENT GRID3 - Grid Display Component
- * ===========================================================================================
- *
- * A pure presentation grid component implementing QueryResultDisplayerProps<Ingredient>.
- * Designed for use with the Data2 shell in the headless composable architecture.
- *
- * Displays ingredients as cards in a responsive 3-column grid:
- * - Mobile (< 768px): 1 column
- * - Tablet (768px - 1024px): 2 columns
- * - Desktop (≥ 1024px): 3 columns
- *
- * Features:
- * - Data display using IngredientCard3
- * - Sort controls with dropdown selector
- * - Pagination controls (if pagination feature enabled)
- * - Loading state with skeleton cards
- * - Empty and error states
- * - Refreshing state with blur effect
- *
- * Usage:
- * ```tsx
- * <Data2 fetchData={fetchIngredients} pagination={pagination} sorting={sorting} search={search} cache={cache}>
- *   <IngredientGrid3 onEdit={handleEdit} onDelete={handleDelete} />
- * </Data2>
- * ```
- *
- * ===========================================================================================
- */
-import type { Table2Column } from '@framework/components2/table/Table2';
+/
+  ===========================================================================================
+  INGREDIENT GRID - Grid Display Component
+  ===========================================================================================
+ 
+  A pure presentation grid component implementing QueryResultDisplayerProps<Ingredient>.
+  Designed for use with the Data shell in the headless composable architecture.
+ 
+  Displays ingredients as cards in a responsive -column grid:
+  - Mobile (< px):  column
+  - Tablet (px - px):  columns
+  - Desktop (≥ px):  columns
+ 
+  Features:
+  - Data display using IngredientCard
+  - Sort controls with dropdown selector
+  - Pagination controls (if pagination feature enabled)
+  - Loading state with skeleton cards
+  - Empty and error states
+  - Refreshing state with blur effect
+ 
+  Usage:
+  ```tsx
+  <Data fetchData={fetchIngredients} pagination={pagination} sorting={sorting} search={search} cache={cache}>
+    <IngredientGrid onEdit={handleEdit} onDelete={handleDelete} />
+  </Data>
+  ```
+ 
+  ===========================================================================================
+ /
+import type { TableColumn } from '@framework/components/table/Table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@framework/components/forms/Select';
 import { PageSizeSelector } from '@framework/components/pagination/PageSizeSelector';
 import { Pagination } from '@framework/components/pagination/Pagination';
@@ -40,16 +40,16 @@ import { formatDate } from '@framework/utils/formatting/DateFormat';
 import type { Ingredient } from '@shared/api/ingredients.contract';
 import { AlertCircle, ArrowDown, ArrowUp, LayoutGrid } from 'lucide-react';
 
-import { IngredientCard3 } from './IngredientCard3';
+import { IngredientCard } from './IngredientCard';
 
-/**
- * Field definitions for ingredient grid (reusing Table2Column interface for compatibility)
- * Exported as single source of truth for field configuration
- *
- * Note: 'name' field is NOT included here because it's always displayed in the card header
- * and cannot be hidden or reordered
- */
-export const INGREDIENT_GRID_FIELDS: Table2Column<Ingredient>[] = [
+/
+  Field definitions for ingredient grid (reusing TableColumn interface for compatibility)
+  Exported as single source of truth for field configuration
+ 
+  Note: 'name' field is NOT included here because it's always displayed in the card header
+  and cannot be hidden or reordered
+ /
+export const INGREDIENT_GRID_FIELDS: TableColumn<Ingredient>[] = [
 	// ID field
 	{
 		key: 'id',
@@ -120,35 +120,35 @@ export const INGREDIENT_GRID_FIELDS: Table2Column<Ingredient>[] = [
 	},
 ];
 
-/**
- * Props for IngredientGrid3
- * Extends QueryResultDisplayerProps to receive injected state from Data2
- */
-export interface IngredientGrid3Props extends Partial<QueryResultDisplayerProps<Ingredient>> {
-	/** Optional field configuration override (for visibility/ordering feature) */
-	fields?: Table2Column<Ingredient>[];
-	/** Optional edit callback */
+/
+  Props for IngredientGrid
+  Extends QueryResultDisplayerProps to receive injected state from Data
+ /
+export interface IngredientGridProps extends Partial<QueryResultDisplayerProps<Ingredient>> {
+	/ Optional field configuration override (for visibility/ordering feature) /
+	fields?: TableColumn<Ingredient>[];
+	/ Optional edit callback /
 	onEdit?: (ingredient: Ingredient) => void;
-	/** Optional delete callback */
+	/ Optional delete callback /
 	onDelete?: (id: string) => void;
-	/** Optional refreshing state - from Data2 */
+	/ Optional refreshing state - from Data /
 	refreshing?: boolean;
-	/** Optional deleting state - for bulk delete blur effect */
+	/ Optional deleting state - for bulk delete blur effect /
 	deleting?: boolean;
-	/** IDs of items being deleted - for strike-through effect */
+	/ IDs of items being deleted - for strike-through effect /
 	_deletingIds?: Set<string>;
-	/** Selection toggle callback */
+	/ Selection toggle callback /
 	onSelectionToggle?: (id: string) => void;
-	/** Select all callback */
+	/ Select all callback /
 	_onSelectAll?: (ids: string[]) => void;
 }
 
-/**
- * IngredientGrid3 - Grid display component for ingredients
- *
- * Implements QueryResultDisplayerProps<Ingredient> contract for Data2 integration.
- */
-export function IngredientGrid3({
+/
+  IngredientGrid - Grid display component for ingredients
+ 
+  Implements QueryResultDisplayerProps<Ingredient> contract for Data integration.
+ /
+export function IngredientGrid({
 	data = [],
 	isLoading = false,
 	error = null,
@@ -163,7 +163,7 @@ export function IngredientGrid3({
 	onDelete,
 	onSelectionToggle,
 	_onSelectAll,
-}: IngredientGrid3Props) {
+}: IngredientGridProps) {
 	// Log render with blur state
 	console.log('[GRID] Render', {
 		refreshing,
@@ -177,15 +177,15 @@ export function IngredientGrid3({
 	const hasSelection = !!selection && !!onSelectionToggle;
 	const selectedIds = selection?.selectedIds || new Set<string>();
 
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// 
 	// ERROR STATE
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// 
 
 	if (error && !isLoading) {
 		return (
-			<div className={`rounded-lg border border-destructive/50 bg-destructive/10 p-4`}>
-				<div className="flex items-center gap-2">
-					<AlertCircle className="h-5 w-5 text-destructive" />
+			<div className={`rounded-lg border border-destructive/ bg-destructive/ p-`}>
+				<div className="flex items-center gap-">
+					<AlertCircle className="h- w- text-destructive" />
 					<strong className="text-sm font-semibold text-destructive">Error:</strong>
 					<span className="text-sm text-destructive">{error}</span>
 				</div>
@@ -193,22 +193,22 @@ export function IngredientGrid3({
 		);
 	}
 
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// 
 	// SORT CONTROLS
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// 
 
 	const sortControl = sorting && (
-		<div className="mb-4 flex items-center gap-2">
+		<div className="mb- flex items-center gap-">
 			<span className="text-sm font-medium">Sort by:</span>
 			<Select
-				value={sorting.sortConfigs[0]?.key ?? ''}
+				value={sorting.sortConfigs[]?.key ?? ''}
 				onValueChange={(key: string) => {
 					if (key) {
 						sorting.onSortChange(key, false);
 					}
 				}}
 			>
-				<SelectTrigger className="w-48">
+				<SelectTrigger className="w-">
 					<SelectValue placeholder="Choose field..." />
 				</SelectTrigger>
 				<SelectContent>
@@ -223,71 +223,71 @@ export function IngredientGrid3({
 				</SelectContent>
 			</Select>
 
-			{/* Direction toggle button */}
-			{sorting.sortConfigs.length > 0 && (
+			{/ Direction toggle button /}
+			{sorting.sortConfigs.length >  && (
 				<Button
 					variant="outline"
 					size="sm"
 					onClick={() => {
-						const current = sorting.sortConfigs[0];
+						const current = sorting.sortConfigs[];
 						if (current) {
 							// Toggle direction by clicking again
 							sorting.onSortChange(current.key, false);
 						}
 					}}
-					title={`Sort direction: ${sorting.sortConfigs[0]?.direction === 'asc' ? 'Ascending' : 'Descending'}`}
+					title={`Sort direction: ${sorting.sortConfigs[]?.direction === 'asc' ? 'Ascending' : 'Descending'}`}
 				>
-					{sorting.sortConfigs[0]?.direction === 'asc' ? (
-						<ArrowUp className="h-4 w-4" />
+					{sorting.sortConfigs[]?.direction === 'asc' ? (
+						<ArrowUp className="h- w-" />
 					) : (
-						<ArrowDown className="h-4 w-4" />
+						<ArrowDown className="h- w-" />
 					)}
 				</Button>
 			)}
 		</div>
 	);
 
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// 
 	// LOADING STATE - Skeleton Cards
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// 
 
-	if (isLoading && data.length === 0) {
+	if (isLoading && data.length === ) {
 		// Use pageSize from injected pagination (now always available via usePropsInjection)
-		const skeletonCount = pagination?.pageSize ?? 9;
+		const skeletonCount = pagination?.pageSize ?? ;
 		return (
 			<div>
 				{sortControl}
 				<div
 					className={`
-       grid grid-cols-1 gap-6
-       md:grid-cols-2
-       lg:grid-cols-3
+       grid grid-cols- gap-
+       md:grid-cols-
+       lg:grid-cols-
      `}
 				>
 					{Array.from({ length: skeletonCount }).map((_, idx) => (
 						<Card key={idx} className="animate-pulse">
 							<CardHeader>
-								<div className="h-6 w-3/4 rounded bg-muted" />
-								<div className="h-4 w-1/2 rounded bg-muted" />
+								<div className="h- w-/ rounded bg-muted" />
+								<div className="h- w-/ rounded bg-muted" />
 							</CardHeader>
 							<CardContent>
-								<div className="grid grid-cols-2 gap-3">
-									{Array.from({ length: 4 }).map((_, i) => (
-										<div key={i} className="space-y-2">
-											<div className="h-3 w-16 rounded bg-muted" />
-											<div className="h-5 w-12 rounded bg-muted" />
+								<div className="grid grid-cols- gap-">
+									{Array.from({ length:  }).map((_, i) => (
+										<div key={i} className="space-y-">
+											<div className="h- w- rounded bg-muted" />
+											<div className="h- w- rounded bg-muted" />
 										</div>
 									))}
 								</div>
-								<div className="mt-4 space-y-2 border-t pt-3">
-									<div className="h-3 w-full rounded bg-muted" />
-									<div className="h-3 w-full rounded bg-muted" />
-									<div className="h-3 w-full rounded bg-muted" />
+								<div className="mt- space-y- border-t pt-">
+									<div className="h- w-full rounded bg-muted" />
+									<div className="h- w-full rounded bg-muted" />
+									<div className="h- w-full rounded bg-muted" />
 								</div>
 							</CardContent>
 							<CardFooter>
-								<div className="h-9 flex-1 rounded bg-muted" />
-								<div className="h-9 flex-1 rounded bg-muted" />
+								<div className="h- flex- rounded bg-muted" />
+								<div className="h- flex- rounded bg-muted" />
 							</CardFooter>
 						</Card>
 					))}
@@ -296,19 +296,19 @@ export function IngredientGrid3({
 		);
 	}
 
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// 
 	// EMPTY STATE
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// 
 
-	if (data.length === 0 && !isLoading) {
+	if (data.length ===  && !isLoading) {
 		return (
 			<div>
 				{sortControl}
-				<div className="flex flex-col items-center justify-center py-12 text-center">
-					<div className="mb-4 rounded-full bg-muted p-4">
-						<LayoutGrid className="h-8 w-8 text-muted-foreground" />
+				<div className="flex flex-col items-center justify-center py- text-center">
+					<div className="mb- rounded-full bg-muted p-">
+						<LayoutGrid className="h- w- text-muted-foreground" />
 					</div>
-					<h3 className="mb-2 text-lg font-semibold">No ingredients found</h3>
+					<h className="mb- text-lg font-semibold">No ingredients found</h>
 					<p className="text-sm text-muted-foreground">
 						{features?.search?.query
 							? `No results for "${features.search.query}"`
@@ -319,28 +319,28 @@ export function IngredientGrid3({
 		);
 	}
 
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// 
 	// MAIN GRID DISPLAY
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// 
 
 	return (
 		<div>
-			{/* Sort Controls */}
+			{/ Sort Controls /}
 			{sortControl}
 
-			{/* Grid with refreshing/deleting blur effect */}
+			{/ Grid with refreshing/deleting blur effect /}
 			<div
 				className={cn(
 					`
-       grid grid-cols-1 gap-6 transition-all duration-200
-       md:grid-cols-2
-       lg:grid-cols-3
+       grid grid-cols- gap- transition-all duration-
+       md:grid-cols-
+       lg:grid-cols-
      `,
-					(refreshing || deleting) && 'pointer-events-none opacity-50 blur-sm'
+					(refreshing || deleting) && 'pointer-events-none opacity- blur-sm'
 				)}
 			>
 				{data.map(ingredient => (
-					<IngredientCard3
+					<IngredientCard
 						key={ingredient.id}
 						ingredient={ingredient}
 						fields={fields}
@@ -353,18 +353,18 @@ export function IngredientGrid3({
 				))}
 			</div>
 
-			{/* Pagination Controls */}
+			{/ Pagination Controls /}
 			{pagination && (
-				<div className="mt-6 flex items-center justify-between">
-					{/* Items count */}
+				<div className="mt- flex items-center justify-between">
+					{/ Items count /}
 					<div className="text-sm text-muted-foreground">
-						Showing {(pagination.currentPage - 1) * pagination.pageSize + 1} to{' '}
-						{Math.min(pagination.currentPage * pagination.pageSize, pagination.totalItems)} of{' '}
+						Showing {(pagination.currentPage - )  pagination.pageSize + } to{' '}
+						{Math.min(pagination.currentPage  pagination.pageSize, pagination.totalItems)} of{' '}
 						{pagination.totalItems} items
 					</div>
 
-					{/* Controls */}
-					<div className="flex items-center gap-4">
+					{/ Controls /}
+					<div className="flex items-center gap-">
 						<PageSizeSelector
 							value={pagination.pageSize}
 							onChange={pagination.onPageSizeChange}

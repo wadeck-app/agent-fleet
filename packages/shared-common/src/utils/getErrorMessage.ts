@@ -11,7 +11,7 @@ export function isError(err: unknown): err is Error {
  */
 export function getErrorMessage(err: unknown): string {
 	if (isError(err)) {
-		return (err instanceof Error ? err.message : String(err));
+		return String(err);
 	}
 	if (typeof err === 'string') {
 		return err;

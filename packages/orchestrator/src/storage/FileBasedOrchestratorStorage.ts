@@ -33,7 +33,7 @@ export class FileBasedOrchestratorStorage implements IOrchestratorStorage {
 		} catch (error) {
 			log.error(`Failed to save task ${task.id}:`, error);
 			throw new Error(
-				`Failed to save task ${task.id}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
+				`Failed to save task ${task.id}: ${error instanceof Error ? String(error) : String(error)}`
 			);
 		}
 	}
@@ -48,7 +48,7 @@ export class FileBasedOrchestratorStorage implements IOrchestratorStorage {
 				return null;
 			}
 			log.error(`Failed to load task ${taskId}:`, error);
-			throw new Error(`Failed to load task ${taskId}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`);
+			throw new Error(`Failed to load task ${taskId}: ${error instanceof Error ? String(error) : String(error)}`);
 		}
 	}
 
@@ -66,7 +66,7 @@ export class FileBasedOrchestratorStorage implements IOrchestratorStorage {
 			);
 		} catch (error) {
 			log.error('Failed to list tasks:', error);
-			throw new Error(`Failed to list tasks: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`);
+			throw new Error(`Failed to list tasks: ${error instanceof Error ? String(error) : String(error)}`);
 		}
 	}
 
@@ -80,7 +80,7 @@ export class FileBasedOrchestratorStorage implements IOrchestratorStorage {
 			}
 			log.error(`Failed to delete task ${taskId}:`, error);
 			throw new Error(
-				`Failed to delete task ${taskId}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
+				`Failed to delete task ${taskId}: ${error instanceof Error ? String(error) : String(error)}`
 			);
 		}
 	}
@@ -103,7 +103,7 @@ export class FileBasedOrchestratorStorage implements IOrchestratorStorage {
 			return jsonFiles.length;
 		} catch (error) {
 			log.error('Failed to clear all tasks:', error);
-			throw new Error(`Failed to clear all tasks: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`);
+			throw new Error(`Failed to clear all tasks: ${error instanceof Error ? String(error) : String(error)}`);
 		}
 	}
 
@@ -115,7 +115,7 @@ export class FileBasedOrchestratorStorage implements IOrchestratorStorage {
 		} catch (error) {
 			log.error(`Failed to save intervention ${intervention.id}:`, error);
 			throw new Error(
-				`Failed to save intervention ${intervention.id}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
+				`Failed to save intervention ${intervention.id}: ${error instanceof Error ? String(error) : String(error)}`
 			);
 		}
 	}
@@ -131,7 +131,7 @@ export class FileBasedOrchestratorStorage implements IOrchestratorStorage {
 			}
 			log.error(`Failed to load intervention ${id}:`, error);
 			throw new Error(
-				`Failed to load intervention ${id}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
+				`Failed to load intervention ${id}: ${error instanceof Error ? String(error) : String(error)}`
 			);
 		}
 	}
@@ -150,7 +150,7 @@ export class FileBasedOrchestratorStorage implements IOrchestratorStorage {
 			);
 		} catch (error) {
 			log.error('Failed to list interventions:', error);
-			throw new Error(`Failed to list interventions: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`);
+			throw new Error(`Failed to list interventions: ${error instanceof Error ? String(error) : String(error)}`);
 		}
 	}
 
@@ -164,7 +164,7 @@ export class FileBasedOrchestratorStorage implements IOrchestratorStorage {
 			}
 			log.error(`Failed to delete intervention ${id}:`, error);
 			throw new Error(
-				`Failed to delete intervention ${id}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
+				`Failed to delete intervention ${id}: ${error instanceof Error ? String(error) : String(error)}`
 			);
 		}
 	}

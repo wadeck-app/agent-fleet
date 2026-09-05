@@ -43,7 +43,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 		} catch (error) {
 			log.error(`Failed to save task ${task.id}:`, error);
 			throw new Error(
-				`Failed to save task ${task.id}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
+				`Failed to save task ${task.id}: ${error instanceof Error ? String(error) : String(error)}`
 			);
 		}
 	}
@@ -60,7 +60,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 			return task as Task;
 		} catch (error) {
 			log.error(`Failed to load task ${taskId}:`, error);
-			throw new Error(`Failed to load task ${taskId}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`);
+			throw new Error(`Failed to load task ${taskId}: ${error instanceof Error ? String(error) : String(error)}`);
 		}
 	}
 
@@ -71,7 +71,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 			return entities.map(({ version: _v, ...task }) => task as Task);
 		} catch (error) {
 			log.error('Failed to list tasks:', error);
-			throw new Error(`Failed to list tasks: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`);
+			throw new Error(`Failed to list tasks: ${error instanceof Error ? String(error) : String(error)}`);
 		}
 	}
 
@@ -80,12 +80,12 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 			await this.storage.delete(TASKS_TABLE, taskId);
 		} catch (error: any) {
 			// Ignore "not found" errors
-			if ((error instanceof Error ? error.message : String(error))?.includes('not found')) {
+			if (String(error)?.includes('not found')) {
 				return;
 			}
 			log.error(`Failed to delete task ${taskId}:`, error);
 			throw new Error(
-				`Failed to delete task ${taskId}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
+				`Failed to delete task ${taskId}: ${error instanceof Error ? String(error) : String(error)}`
 			);
 		}
 	}
@@ -119,7 +119,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 		} catch (error) {
 			log.error(`Failed to save intervention ${intervention.id}:`, error);
 			throw new Error(
-				`Failed to save intervention ${intervention.id}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
+				`Failed to save intervention ${intervention.id}: ${error instanceof Error ? String(error) : String(error)}`
 			);
 		}
 	}
@@ -136,7 +136,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 		} catch (error) {
 			log.error(`Failed to load intervention ${id}:`, error);
 			throw new Error(
-				`Failed to load intervention ${id}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
+				`Failed to load intervention ${id}: ${error instanceof Error ? String(error) : String(error)}`
 			);
 		}
 	}
@@ -148,7 +148,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 			return entities.map(({ version: _v, ...intervention }) => intervention as Intervention);
 		} catch (error) {
 			log.error('Failed to list interventions:', error);
-			throw new Error(`Failed to list interventions: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`);
+			throw new Error(`Failed to list interventions: ${error instanceof Error ? String(error) : String(error)}`);
 		}
 	}
 
@@ -157,12 +157,12 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 			await this.storage.delete(INTERVENTIONS_TABLE, id);
 		} catch (error: any) {
 			// Ignore "not found" errors
-			if ((error instanceof Error ? error.message : String(error))?.includes('not found')) {
+			if (String(error)?.includes('not found')) {
 				return;
 			}
 			log.error(`Failed to delete intervention ${id}:`, error);
 			throw new Error(
-				`Failed to delete intervention ${id}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
+				`Failed to delete intervention ${id}: ${error instanceof Error ? String(error) : String(error)}`
 			);
 		}
 	}

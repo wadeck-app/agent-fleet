@@ -182,7 +182,7 @@ export class RestTransportClient implements ITransportClient {
 				const error = await response.json().catch(() => ({}));
 				throw {
 					status: response.status,
-					message: (error instanceof Error ? error.message : String(error)) || response.statusText,
+					message: String(error) || response.statusText,
 					code: error.code || 'HTTP_ERROR',
 					details: error.details,
 				};

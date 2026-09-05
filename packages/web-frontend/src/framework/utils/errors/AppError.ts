@@ -319,7 +319,7 @@ export const toAppError = (error: unknown): AppError => {
 
 	// Standard Error
 	if (error instanceof Error) {
-		return new AppError((error instanceof Error ? error.message : String(error)), ErrorCode.UNKNOWN_ERROR, {
+		return new AppError(String(error), ErrorCode.UNKNOWN_ERROR, {
 			originalError: error,
 		});
 	}

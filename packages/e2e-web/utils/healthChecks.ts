@@ -1,7 +1,7 @@
-/**
- * Health Checks for E2E Tests
- * Utilities to verify services are available before tests
- */
+/
+  Health Checks for EE Tests
+  Utilities to verify services are available before tests
+ /
 
 export interface HealthCheckResult {
 	success: boolean;
@@ -10,18 +10,18 @@ export interface HealthCheckResult {
 	responseTime?: number;
 }
 
-/**
- * Check if a URL is accessible
- * @param url - The URL to check
- * @param maxRetries - Maximum number of attempts (default: 10)
- * @param retryDelay - Delay between attempts in ms (default: 1000)
- */
+/
+  Check if a URL is accessible
+  @param url - The URL to check
+  @param maxRetries - Maximum number of attempts (default: )
+  @param retryDelay - Delay between attempts in ms (default: )
+ /
 export async function waitForService(
 	url: string,
-	maxRetries: number = 10,
-	retryDelay: number = 1000
+	maxRetries: number = ,
+	retryDelay: number = 
 ): Promise<HealthCheckResult> {
-	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+	for (let attempt = ; attempt <= maxRetries; attempt++) {
 		try {
 			const startTime = Date.now();
 			const response = await fetch(url);
@@ -38,7 +38,7 @@ export async function waitForService(
 
 			console.log(`  Service returned ${response.status} at ${url} (attempt ${attempt}/${maxRetries})`);
 		} catch (error) {
-			console.log(`⏳ Waiting for service at ${url} (attempt ${attempt}/${maxRetries})`);
+			console.log(` Waiting for service at ${url} (attempt ${attempt}/${maxRetries})`);
 		}
 
 		// Don't wait after last attempt
@@ -56,40 +56,40 @@ export async function waitForService(
 	};
 }
 
-/**
- * Check if Storybook is accessible
- * @param port - Storybook server port (default: 6100)
- */
-export async function waitForStorybook(port: number = 6100): Promise<HealthCheckResult> {
+/
+  Check if Storybook is accessible
+  @param port - Storybook server port (default: )
+ /
+export async function waitForStorybook(port: number = ): Promise<HealthCheckResult> {
 	const url = `http://localhost:${port}`;
 	console.log(` Checking Storybook health at ${url}...`);
 	return waitForService(url);
 }
 
-/**
- * Check if frontend is accessible
- * @param port - Frontend server port (default: 5200)
- */
-export async function waitForFrontend(port: number = 5200): Promise<HealthCheckResult> {
+/
+  Check if frontend is accessible
+  @param port - Frontend server port (default: )
+ /
+export async function waitForFrontend(port: number = ): Promise<HealthCheckResult> {
 	const url = `http://localhost:${port}`;
 	console.log(` Checking Frontend health at ${url}...`);
 	return waitForService(url);
 }
 
-/**
- * Check if backend is accessible
- * @param port - Backend server port (default: 3001)
- */
-export async function waitForBackend(port: number = 3001): Promise<HealthCheckResult> {
+/
+  Check if backend is accessible
+  @param port - Backend server port (default: )
+ /
+export async function waitForBackend(port: number = ): Promise<HealthCheckResult> {
 	const url = `http://localhost:${port}/health`;
 	console.log(` Checking Backend health at ${url}...`);
 	return waitForService(url);
 }
 
-/**
- * Check all services in parallel
- * Fails if at least one service is not accessible
- */
+/
+  Check all services in parallel
+  Fails if at least one service is not accessible
+ /
 export async function waitForAllServices(services: {
 	storybook?: number;
 	frontend?: number;

@@ -4,14 +4,14 @@ import { cn } from '@framework/lib/utils';
 
 import { type ConnectivityStatus, useConnectivity } from './ConnectivityContext';
 
-/**
- * Connectivity Indicator - Discrete UI Component
- *
- * Displays connection status with backend:
- * - Connected: Green badge (hidden by default, optional visibility)
- * - Degraded: Yellow badge with retry countdown
- * - Disconnected: Red badge with retry countdown and queue size
- */
+/
+  Connectivity Indicator - Discrete UI Component
+ 
+  Displays connection status with backend:
+  - Connected: Green badge (hidden by default, optional visibility)
+  - Degraded: Yellow badge with retry countdown
+  - Disconnected: Red badge with retry countdown and queue size
+ /
 
 interface ConnectivityIndicatorProps {
 	showWhenConnected?: boolean; // Show green badge when connected (default: false)
@@ -28,18 +28,18 @@ export function ConnectivityIndicator({ showWhenConnected = false, className }: 
 
 	// Format retry time
 	const formatRetryTime = (ms: number): string => {
-		if (ms < 1000) return '<1s';
-		const seconds = Math.ceil(ms / 1000);
-		if (seconds < 60) return `${seconds}s`;
-		const minutes = Math.floor(seconds / 60);
+		if (ms < ) return '<s';
+		const seconds = Math.ceil(ms / );
+		if (seconds < ) return `${seconds}s`;
+		const minutes = Math.floor(seconds / );
 		return `${minutes}m`;
 	};
 
 	// Status icons
 	const icons: Record<ConnectivityStatus, string> = {
-		connected: '●',
-		degraded: '◐',
-		disconnected: '○',
+		connected: '',
+		degraded: '',
+		disconnected: '',
 	};
 
 	// Badge variants
@@ -50,7 +50,7 @@ export function ConnectivityIndicator({ showWhenConnected = false, className }: 
 	};
 
 	return (
-		<Badge variant={badgeVariants[status]} className={cn('gap-1', className)}>
+		<Badge variant={badgeVariants[status]} className={cn('gap-', className)}>
 			<span className="text-sm" aria-hidden="true">
 				{icons[status]}
 			</span>
@@ -58,15 +58,15 @@ export function ConnectivityIndicator({ showWhenConnected = false, className }: 
 			{status === 'degraded' && (
 				<>
 					<span>Reconnecting</span>
-					{retryIn > 0 && <span className="text-xs opacity-75">({formatRetryTime(retryIn)})</span>}
+					{retryIn >  && <span className="text-xs opacity-">({formatRetryTime(retryIn)})</span>}
 				</>
 			)}
 			{status === 'disconnected' && (
 				<>
 					<span>Offline</span>
-					<span className="text-xs opacity-75">(retry in {formatRetryTime(retryIn)})</span>
-					{queueSize > 0 && (
-						<span className="ml-1 rounded-full bg-current/20 px-1.5 py-0.5 text-xs">{queueSize}</span>
+					<span className="text-xs opacity-">(retry in {formatRetryTime(retryIn)})</span>
+					{queueSize >  && (
+						<span className="ml- rounded-full bg-current/ px-. py-. text-xs">{queueSize}</span>
 					)}
 					<Button
 						variant="ghost"
@@ -76,8 +76,8 @@ export function ConnectivityIndicator({ showWhenConnected = false, className }: 
 							forceRetry();
 						}}
 						className={`
-        ml-1 cursor-pointer transition-opacity
-        hover:opacity-70
+        ml- cursor-pointer transition-opacity
+        hover:opacity-
       `}
 						title="Retry now"
 						aria-label="Retry connection now"

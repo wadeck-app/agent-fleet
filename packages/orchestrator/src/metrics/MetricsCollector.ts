@@ -101,7 +101,7 @@ export class MetricsCollector {
 		} catch (error) {
 			log.error(
 				'MetricsCollector',
-				`Failed to collect metrics: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
+				`Failed to collect metrics: ${error instanceof Error ? String(error) : String(error)}`
 			);
 		}
 	}

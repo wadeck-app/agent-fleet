@@ -1,21 +1,21 @@
-# Execution Model
+ Execution Model
 
-## Execution state file
+ Execution state file
 
-`~/.flow-daemon/executions/<executionId>.json` -- written by the daemon on every state transition. Workers never write to this file directly (single writer rule, D21).
+`~/.flow-daemon/executions/<executionId>.json` -- written by the daemon on every state transition. Workers never write to this file directly (single writer rule, D).
 
 ```json
 {
-	"executionId": "abc1",
+	"executionId": "abc",
 	"flowFile": "/path/to/my-flow.yml",
 	"flowId": "my-flow",
 	"status": "running",
 	"currentSteps": ["generate-pr"],
-	"workerPid": 1234,
-	"startedAt": "2026-07-30T14:23:00Z",
+	"workerPid": ,
+	"startedAt": "--T::Z",
 	"completedAt": null,
 	"steps": {
-		"generate-pr": { "status": "running", "startedAt": "...", "iterations": 1 },
+		"generate-pr": { "status": "running", "startedAt": "...", "iterations":  },
 		"run-tests": { "status": "pending" }
 	}
 }
@@ -25,18 +25,18 @@
 
 `currentSteps` is an array to support parallel step execution. Contains the IDs of all steps currently in `"running"` state.
 
-**Execution ID format:** 8-character alphanumeric strings (base36). The `|` separator in log prefixes is safe because execution IDs never contain it.
+Execution ID format: -character alphanumeric strings (base). The `|` separator in log prefixes is safe because execution IDs never contain it.
 
-## Execution states
+ Execution states
 
 ```
 QUEUED → RUNNING → COMPLETED
                  → FAILED
-         RUNNING → FAILED     (worker WebSocket closed, non-idempotent step -- D12)
-         RUNNING → RE-QUEUED  (worker WebSocket closed, idempotent step -- D12, same execution ID, step re-queued)
+         RUNNING → FAILED     (worker WebSocket closed, non-idempotent step -- D)
+         RUNNING → RE-QUEUED  (worker WebSocket closed, idempotent step -- D, same execution ID, step re-queued)
 ```
 
-## Responsibility split
+ Responsibility split
 
 The daemon owns all execution intelligence. Workers are dumb step executors.
 
@@ -53,65 +53,65 @@ The daemon owns all execution intelligence. Workers are dumb step executors.
 | Liveness signal                                   | WebSocket connection health |
 | Crash detection and idempotency decision          | Daemon                      |
 
-## Worker pool model
+ Worker pool model
 
 `queue.concurrency` in `~/.flow-config.yaml` defines the global worker pool size. Workers are not bound to a flow -- they pull from a shared ready-step queue fed by all active executions.
 
 ```
-Active flows:  FlowA (steps: s1 s2 s3)   FlowB (steps: t1 t2)
+Active flows:  FlowA (steps: s s s)   FlowB (steps: t t)
                                   |                  |
-                         Global ready-step queue: [ s2, s3, t1, t2 ]
+                         Global ready-step queue: [ s, s, t, t ]
                                          |
-                              Worker pool (concurrency=3)
-                              W1: s2   W2: s3   W3: t1   [ t2 waiting ]
+                              Worker pool (concurrency=)
+                              W: s   W: s   W: t   [ t waiting ]
                                                              |
                                             first free worker picks this up
 ```
 
-## Worker lifecycle (per step)
+ Worker lifecycle (per step)
 
-Workers communicate with the daemon via WebSocket (D23). The daemon pushes assignments; the worker pushes logs and results.
+Workers communicate with the daemon via WebSocket (D). The daemon pushes assignments; the worker pushes logs and results.
 
-Workers are execution-agnostic at spawn time -- no execution ID is passed as a spawn argument. The worker receives the execution ID in the first `assign` message (D16).
+Workers are execution-agnostic at spawn time -- no execution ID is passed as a spawn argument. The worker receives the execution ID in the first `assign` message (D).
 
 Daemon spawns workers via: `child_process.spawn('node', ['worker.js'], { env: { FLOW_DAEMON_PORT, FLOW_WS_PORT } })`
 
 ```
 Daemon                              Worker (child process)
   |                                       |
-  +- spawn(worker) ─────────────────────> |  (env: FLOW_DAEMON_PORT, FLOW_WS_PORT)
+  +- spawn(worker) > |  (env: FLOW_DAEMON_PORT, FLOW_WS_PORT)
   |                                       +- connect WebSocket to daemon
-  |  <── ready { pid } ─────────────────  |
+  |  < ready { pid }   |
   |                                       |
   +- assign(stepId, stepConfig,           |  (via WebSocket)
-  |          executionContext) ─────────> |  ← first message carries executionId
+  |          executionContext) > |  ← first message carries executionId
   |                                       +- execute step
-  |  <── log entry ─────────────────────  |
-  |  <── log entry ─────────────────────  |
-  |  <── step_completed(stepId, output) ─  |
+  |  < log entry   |
+  |  < log entry   |
+  |  < step_completed(stepId, output)   |
   |                                       |
   +- [graph: update state, find next      |
   |    ready steps across all executions] |
   |                                       |
-  +- assign(nextStep) ─────────────────> |  or idle / done
-  |                                       +- exit(0) on done
+  +- assign(nextStep) > |  or idle / done
+  |                                       +- exit() on done
   |
-  +- update executions/abc1.json
+  +- update executions/abc.json
 ```
 
-## Worker reconnection after daemon crash
+ Worker reconnection after daemon crash
 
-WebSocket close is detected immediately by both sides. Workers buffer logs locally and call the CLI binary to re-establish contact (D23, D24).
+WebSocket close is detected immediately by both sides. Workers buffer logs locally and call the CLI binary to re-establish contact (D, D).
 
 ```
-Worker1    Worker2    Worker3    CLI subprocess
+Worker    Worker    Worker    CLI subprocess
   |          |          |
   [all WebSocket connections drop simultaneously]
   |          |          |
   +- buffer  +- buffer  +- buffer  (memory; spill to disk after bufferSpillMs)
-  +- call CLI binary ──────────────────────────> |
-  |          +- call CLI ─────────────────────── | (finds daemon starting)
-  |          |          +- call CLI ──────────── | (finds daemon up)
+  +- call CLI binary > |
+  |          +- call CLI  | (finds daemon starting)
+  |          |          +- call CLI  | (finds daemon up)
   |          |          |    first: createDaemon() inline → this process is the daemon
   |          |          |
   +- WS reconnect + flush buffered logs (in order)
@@ -119,7 +119,7 @@ Worker1    Worker2    Worker3    CLI subprocess
                         +- WS reconnect + flush buffered logs
 ```
 
-## Heartbeat failure handling
+ Heartbeat failure handling
 
 Liveness is signaled by WebSocket connection health -- no explicit heartbeat messages.
 
@@ -127,17 +127,17 @@ Liveness is signaled by WebSocket connection health -- no explicit heartbeat mes
 | --------------------------------------- | ---------------------------- | ------------------------------------- |
 | Worker WebSocket closes unexpectedly    | false (default)              | mark step + execution FAILED          |
 | Worker WebSocket closes unexpectedly    | true                         | SIGKILL worker process, re-queue step |
-| Worker reconnects within window (D24)   | any                          | re-adopt, resume from current step    |
-| Worker absent after reconnection window | any                          | declare dead, apply row 1 or 2 above  |
+| Worker reconnects within window (D)   | any                          | re-adopt, resume from current step    |
+| Worker absent after reconnection window | any                          | declare dead, apply row  or  above  |
 
-## Graph structure: Directed Graph with bounded cycles
+ Graph structure: Directed Graph with bounded cycles
 
-The flow step graph is a **Directed Graph**, not a DAG. `onFailure.goto` introduces cycles (feedback loops). Cycles are valid but bounded by `maxIterations` per step (default: 3) to prevent infinite loops.
+The flow step graph is a Directed Graph, not a DAG. `onFailure.goto` introduces cycles (feedback loops). Cycles are valid but bounded by `maxIterations` per step (default: ) to prevent infinite loops.
 
-The existing `DAGBuilder` / `DAGValidator` names in `flow-engine/src/validation/` are incorrect and will be renamed to `GraphBuilder` / `GraphValidator` during the refactor (D18).
+The existing `DAGBuilder` / `DAGValidator` names in `flow-engine/src/validation/` are incorrect and will be renamed to `GraphBuilder` / `GraphValidator` during the refactor (D).
 
-## Queue behavior
+ Queue behavior
 
 - FIFO queue of ready steps, global across all active executions
 - `queue.concurrency` controls max simultaneously executing steps (not flows)
-- `flow list` reads `executions/*.json` directly -- no daemon contact needed (D19, D21)
+- `flow list` reads `executions/.json` directly -- no daemon contact needed (D, D)

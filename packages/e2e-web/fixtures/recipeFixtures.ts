@@ -7,7 +7,7 @@ export const validRecipes = {
 		name: 'Poulet avec Riz',
 		servings: 2,
 		ingredients: [
-			{ name: 'Poulet', quantity: 200 },
+			{ name: 'Chicken', quantity: 200 },
 			{ name: 'Riz blanc', quantity: 150 },
 			{ name: 'Brocoli', quantity: 100 },
 		],
@@ -19,7 +19,7 @@ export const validRecipes = {
 		ingredients: [
 			{ name: 'Saumon', quantity: 250 },
 			{ name: 'Pates', quantity: 300 },
-			{ name: 'Tomate', quantity: 100 },
+			{ name: 'Tomato', quantity: 100 },
 			{ name: "Huile d'olive", quantity: 15 },
 		],
 		instructions: "Cuire les pates. Griller le saumon. Preparer la sauce tomate avec l'huile d'olive.",
@@ -29,7 +29,7 @@ export const validRecipes = {
 		servings: 1,
 		ingredients: [
 			{ name: 'Œufs', quantity: 150 },
-			{ name: 'Tomate', quantity: 50 },
+			{ name: 'Tomato', quantity: 50 },
 		],
 		instructions: "Battre les œufs. Couper les tomates. Cuire l'omelette.",
 	},

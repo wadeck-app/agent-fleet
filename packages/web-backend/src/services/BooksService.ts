@@ -224,7 +224,7 @@ export class BooksService {
 				} else {
 					failed.push({
 						id,
-						reason: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error',
+						reason: error instanceof Error ? String(error) : 'Unknown error',
 						code: ERROR_CODES.INTERNAL_SERVER_ERROR,
 					});
 				}

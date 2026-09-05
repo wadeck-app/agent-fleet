@@ -15,6 +15,7 @@ import type {
 import type { BulkDeleteResponse, FailedDeletion } from '@app/shared/common/api-helpers';
 import { B2F_TASKS_UPDATED, B2F_TASK_CREATED, B2F_TASK_DELETED, B2F_TASK_UPDATED } from '@app/shared/transport';
 
+// violations-suppress: ts/no-deep-relative cross-package import to orchestrator internals; no alias available
 import { TraceChunkStorage } from '../../../orchestrator/src/core/TraceChunkStorage';
 import type { OrchestratorRepository } from '../repositories/OrchestratorRepository';
 import type { TasksRepository } from '../repositories/TasksRepository';
@@ -299,7 +300,7 @@ export class TasksService {
 			} catch (error) {
 				failed.push({
 					id,
-					reason: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error',
+					reason: error instanceof Error ? String(error) : 'Unknown error',
 					code: 'DELETE_FAILED',
 				});
 			}

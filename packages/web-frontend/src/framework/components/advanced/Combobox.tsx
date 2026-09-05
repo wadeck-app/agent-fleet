@@ -1,3 +1,4 @@
+// violations-suppress: ts/no-inline-subcomponent tightly-coupled primitive sub-parts belong in the same file
 'use client';
 
 import * as React from 'react';

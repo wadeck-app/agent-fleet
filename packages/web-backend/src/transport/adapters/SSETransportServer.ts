@@ -227,7 +227,7 @@ export class SSETransportServer implements ITransportServer {
 			});
 
 			this.sendSSEEvent(reply, 'auth_error', {
-				message: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Authentication failed',
+				message: error instanceof Error ? String(error) : 'Authentication failed',
 			});
 
 			reply.raw.end();

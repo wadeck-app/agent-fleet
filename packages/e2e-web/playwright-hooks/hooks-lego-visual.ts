@@ -40,7 +40,7 @@ export const test = base.extend<TestFixtures>({
 			}
 		});
 		page.on('pageerror', error => {
-			console.log(`[Browser:pageerror] ${(error instanceof Error ? error.message : String(error))}`);
+			console.log(`[Browser:pageerror] ${String(error)}`);
 		});
 		await use(page);
 	},

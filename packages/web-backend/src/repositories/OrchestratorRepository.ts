@@ -103,7 +103,7 @@ export class OrchestratorRepository {
 
 			// No cache available, propagate error
 			throw new Error(
-				`Failed to fetch orchestrator stats: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error'}`
+				`Failed to fetch orchestrator stats: ${error instanceof Error ? String(error) : 'Unknown error'}`
 			);
 		}
 	}
@@ -136,7 +136,7 @@ export class OrchestratorRepository {
 			return Array.isArray(tasks) ? tasks : [];
 		} catch (error) {
 			throw new Error(
-				`Failed to fetch orchestrator tasks: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error'}`
+				`Failed to fetch orchestrator tasks: ${error instanceof Error ? String(error) : 'Unknown error'}`
 			);
 		}
 	}
@@ -261,7 +261,7 @@ export class OrchestratorRepository {
 			return (await response.json()) as Task;
 		} catch (error) {
 			throw new Error(
-				`Failed to update task status: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error'}`
+				`Failed to update task status: ${error instanceof Error ? String(error) : 'Unknown error'}`
 			);
 		}
 	}

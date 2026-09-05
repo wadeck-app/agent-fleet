@@ -346,7 +346,7 @@ export class FlowProposalsService {
 			log.error('Async redesign failed after rejection', {
 				ticketId,
 				rejectedProposalId,
-				error: err instanceof Error ? (err instanceof Error ? err.message : String(err)) : String(err),
+				error: err instanceof Error ? String(err) : String(err),
 			});
 		}
 	}

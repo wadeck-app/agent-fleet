@@ -20,10 +20,10 @@ const MockConnectivityProvider = ({
 	const _mockValue = { status, retryIn, queueSize };
 
 	return (
-		<div style={{ padding: '20px' }}>
-			{/* We can't easily mock useContext in Storybook, so we'll document the states */}
+		<div style={{ padding: 'px' }}>
+			{/ We can't easily mock useContext in Storybook, so we'll document the states /}
 			{children}
-			<div style={{ marginTop: '20px', fontSize: '12px', color: '#666' }}>
+			<div style={{ marginTop: 'px', fontSize: 'px', color: '' }}>
 				<strong>Mock State:</strong> {status} | Retry in: {retryIn}ms | Queue: {queueSize}
 			</div>
 		</div>
@@ -69,7 +69,7 @@ export const ConnectedHidden: Story = {
 		<ConnectivityProvider circuitBreakerService={mockCircuitBreaker}>
 			<div>
 				<ConnectivityIndicator {...args} />
-				<p style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
+				<p style={{ marginTop: 'px', fontSize: 'px', color: '' }}>
 					(Indicator is hidden when connected by default)
 				</p>
 			</div>
@@ -81,29 +81,29 @@ export const ConnectedHidden: Story = {
 // inject mock context values in Storybook
 export const Degraded: Story = {
 	render: () => (
-		<MockConnectivityProvider status="degraded" retryIn={2000} queueSize={0}>
-			<div style={{ padding: '20px', border: '1px dashed #ccc', borderRadius: '8px' }}>
-				<p style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#666' }}>
+		<MockConnectivityProvider status="degraded" retryIn={} queueSize={}>
+			<div style={{ padding: 'px', border: 'px dashed ccc', borderRadius: 'px' }}>
+				<p style={{ margin: '  px ', fontSize: 'px', color: '' }}>
 					This is a visual representation. In the real app, this state occurs when the circuit breaker is
 					testing backend recovery.
 				</p>
-				{/* Mock visual representation */}
+				{/ Mock visual representation /}
 				<div
 					style={{
 						display: 'inline-flex',
 						alignItems: 'center',
-						gap: '4px',
-						padding: '4px 8px',
-						borderRadius: '16px',
-						backgroundColor: '#fef3c7',
-						color: '#92400e',
-						fontSize: '12px',
-						fontWeight: 500,
+						gap: 'px',
+						padding: 'px px',
+						borderRadius: 'px',
+						backgroundColor: 'fefc',
+						color: 'e',
+						fontSize: 'px',
+						fontWeight: ,
 					}}
 				>
-					<span>◐</span>
+					<span></span>
 					<span>Reconnecting</span>
-					<span style={{ opacity: 0.75, fontSize: '11px' }}>(2s)</span>
+					<span style={{ opacity: ., fontSize: 'px' }}>(s)</span>
 				</div>
 			</div>
 		</MockConnectivityProvider>
@@ -112,39 +112,39 @@ export const Degraded: Story = {
 
 export const Disconnected: Story = {
 	render: () => (
-		<MockConnectivityProvider status="disconnected" retryIn={5000} queueSize={3}>
-			<div style={{ padding: '20px', border: '1px dashed #ccc', borderRadius: '8px' }}>
-				<p style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#666' }}>
+		<MockConnectivityProvider status="disconnected" retryIn={} queueSize={}>
+			<div style={{ padding: 'px', border: 'px dashed ccc', borderRadius: 'px' }}>
+				<p style={{ margin: '  px ', fontSize: 'px', color: '' }}>
 					This is a visual representation. In the real app, this state occurs when the backend is unreachable
 					and requests are queued.
 				</p>
-				{/* Mock visual representation */}
+				{/ Mock visual representation /}
 				<div
 					style={{
 						display: 'inline-flex',
 						alignItems: 'center',
-						gap: '4px',
-						padding: '4px 8px',
-						borderRadius: '16px',
-						backgroundColor: '#fee2e2',
-						color: '#991b1b',
-						fontSize: '12px',
-						fontWeight: 500,
+						gap: 'px',
+						padding: 'px px',
+						borderRadius: 'px',
+						backgroundColor: 'feee',
+						color: 'bb',
+						fontSize: 'px',
+						fontWeight: ,
 					}}
 				>
-					<span>○</span>
+					<span></span>
 					<span>Offline</span>
-					<span style={{ opacity: 0.75, fontSize: '11px' }}>(retry in 5s)</span>
+					<span style={{ opacity: ., fontSize: 'px' }}>(retry in s)</span>
 					<span
 						style={{
-							marginLeft: '4px',
-							borderRadius: '9999px',
-							backgroundColor: 'rgba(153, 27, 27, 0.2)',
-							padding: '2px 6px',
-							fontSize: '11px',
+							marginLeft: 'px',
+							borderRadius: 'px',
+							backgroundColor: 'rgba(, , , .)',
+							padding: 'px px',
+							fontSize: 'px',
 						}}
 					>
-						3
+						
 					</span>
 				</div>
 			</div>
@@ -154,38 +154,38 @@ export const Disconnected: Story = {
 
 export const DisconnectedLongRetry: Story = {
 	render: () => (
-		<MockConnectivityProvider status="disconnected" retryIn={30000} queueSize={15}>
-			<div style={{ padding: '20px', border: '1px dashed #ccc', borderRadius: '8px' }}>
-				<p style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#666' }}>
+		<MockConnectivityProvider status="disconnected" retryIn={} queueSize={}>
+			<div style={{ padding: 'px', border: 'px dashed ccc', borderRadius: 'px' }}>
+				<p style={{ margin: '  px ', fontSize: 'px', color: '' }}>
 					After multiple failed retries, the delay increases (exponential backoff).
 				</p>
-				{/* Mock visual representation */}
+				{/ Mock visual representation /}
 				<div
 					style={{
 						display: 'inline-flex',
 						alignItems: 'center',
-						gap: '4px',
-						padding: '4px 8px',
-						borderRadius: '16px',
-						backgroundColor: '#fee2e2',
-						color: '#991b1b',
-						fontSize: '12px',
-						fontWeight: 500,
+						gap: 'px',
+						padding: 'px px',
+						borderRadius: 'px',
+						backgroundColor: 'feee',
+						color: 'bb',
+						fontSize: 'px',
+						fontWeight: ,
 					}}
 				>
-					<span>○</span>
+					<span></span>
 					<span>Offline</span>
-					<span style={{ opacity: 0.75, fontSize: '11px' }}>(retry in 30s)</span>
+					<span style={{ opacity: ., fontSize: 'px' }}>(retry in s)</span>
 					<span
 						style={{
-							marginLeft: '4px',
-							borderRadius: '9999px',
-							backgroundColor: 'rgba(153, 27, 27, 0.2)',
-							padding: '2px 6px',
-							fontSize: '11px',
+							marginLeft: 'px',
+							borderRadius: 'px',
+							backgroundColor: 'rgba(, , , .)',
+							padding: 'px px',
+							fontSize: 'px',
 						}}
 					>
-						15
+						
 					</span>
 				</div>
 			</div>

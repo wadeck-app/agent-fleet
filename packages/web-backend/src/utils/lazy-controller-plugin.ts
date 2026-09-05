@@ -326,7 +326,7 @@ function createLazyControllerPlugin<Routes = any>(
 						message: 'Invalid request data',
 						details: error.issues.map(e => ({
 							path: e.path.join('.'),
-							message: (e instanceof Error ? e.message : String(e)),
+							message: String(e),
 						})),
 						statusCode: 400,
 					});

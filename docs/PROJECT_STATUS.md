@@ -1,57 +1,57 @@
-# Project Status - Agent Fleet
+ Project Status - Agent Fleet
 
-**Last Updated**: 2025-11-30
+Last Updated: --
 
-## Current State: Phase 5 Complete 
+ Current State: Phase  Complete 
 
-**Major Achievement**: Enhanced Monitoring & UI with real-time flow and workspace tracking!
+Major Achievement: Enhanced Monitoring & UI with real-time flow and workspace tracking!
 
-###  Completed (Phases 1, 2, 3, 4 & 5)
+  Completed (Phases , , ,  & )
 
-#### Core Flow Engine
+ Core Flow Engine
 
-- **Type System** (`src/flow/types.ts`)
+- Type System (`src/flow/types.ts`)
     - Discriminated union types for FlowStep (ModelFlowStep | ScriptFlowStep)
     - Complete type definitions for flows, workspaces, execution
 
-- **Flow Registry** (`src/flow/flow-registry.ts`)
+- Flow Registry (`src/flow/flow-registry.ts`)
     - YAML flow definition loading
     - Flow validation with clear error messages
     - Default flows: 'simple-qa', 'dev-full'
 
-- **Template Renderer** (`src/flow/template-renderer.ts`)
-    - **GitHub Actions syntax**: `${{ expression }}`
-    - Three contexts: `inputs`, `steps.*.outputs`, `task`
+- Template Renderer (`src/flow/template-renderer.ts`)
+    - GitHub Actions syntax: `${{ expression }}`
+    - Three contexts: `inputs`, `steps..outputs`, `task`
     - Natural coexistence with shell vars, JSON, etc.
-    - 14 escape tests passing
+    -  escape tests passing
 
-- **Script Executor** (`src/flow/script-executor.ts`)
+- Script Executor (`src/flow/script-executor.ts`)
     - Shell command execution with stdout/stderr capture
     - Working directory and environment variable support
     - Cross-platform compatibility (Windows/Unix)
 
-- **Output Extractor** (`src/flow/output-extractor.ts`)
+- Output Extractor (`src/flow/output-extractor.ts`)
     - Regex pattern matching
     - Type conversion (string, number, boolean, object)
     - Transforms: parseInt, parseFloat, parseBoolean, parseJSON, etc.
     - Default values and optional fields
-    - 21 tests passing
+    -  tests passing
 
-- **Condition Evaluator** (`src/flow/condition-evaluator.ts`)
+- Condition Evaluator (`src/flow/condition-evaluator.ts`)
     - JavaScript expression evaluation
     - Access to inputs, outputs, task metadata
     - Safe evaluation with clear error messages
-    - 19 tests passing
+    -  tests passing
 
-- **Flow Executor** (`src/flow/flow-executor.ts`)
+- Flow Executor (`src/flow/flow-executor.ts`)
     - Step-by-step execution with state management
     - Conditional transitions (branching logic)
     - Retry logic (linear and exponential backoff)
     - Complete execution traces
-    - 8 flow executor tests + 4 integration tests passing
+    -  flow executor tests +  integration tests passing
 
-- **Workspace Manager** (`src/flow/workspace-manager.ts`)
-    - **Complete Phase 3 implementation** 
+- Workspace Manager (`src/flow/workspace-manager.ts`)
+    - Complete Phase  implementation 
     - All workspace modes: isolated, shared, manual
     - All git strategies: main-only, feature-branch, any, worktree
     - All reuse policies: never, if-available, always
@@ -60,63 +60,63 @@
     - Concurrency management with locks
     - Workspace pooling by concurrency key
     - Smart cleanup (preserves manual/shared, removes isolated)
-    - Branch naming: `fleet/task-{4chars}-{slug}`
-    - 19 workspace tests passing
+    - Branch naming: `fleet/task-{chars}-{slug}`
+    -  workspace tests passing
 
-#### Testing
+ Testing
 
-- **220 tests total** (all passing )
-    - 21 output extraction tests
-    - 19 condition evaluation tests
-    - 8 flow executor tests
-    - 4 integration tests
-    - 14 escape/literal character tests
-    - 25 flow validator tests
-    - 19 workspace manager tests
-    - 110 compiled JavaScript tests (dist/)
+-  tests total (all passing )
+    -  output extraction tests
+    -  condition evaluation tests
+    -  flow executor tests
+    -  integration tests
+    -  escape/literal character tests
+    -  flow validator tests
+    -  workspace manager tests
+    -  compiled JavaScript tests (dist/)
 
-#### Documentation
+ Documentation
 
-- **WORKFLOW_SYSTEM_DESIGN.md** - Complete architecture
-- **FLOW_ENGINE_USAGE.md** - Comprehensive usage guide
-- **GITHUB_ACTIONS_SYNTAX_MIGRATION.md** - Syntax migration doc
-- **TEMPLATE_ESCAPING.md** - Escaping and literal characters
-- **PROJECT_STATUS.md** (this file)
+- WORKFLOW_SYSTEM_DESIGN.md - Complete architecture
+- FLOW_ENGINE_USAGE.md - Comprehensive usage guide
+- GITHUB_ACTIONS_SYNTAX_MIGRATION.md - Syntax migration doc
+- TEMPLATE_ESCAPING.md - Escaping and literal characters
+- PROJECT_STATUS.md (this file)
 
-#### Examples & Demos
+ Examples & Demos
 
-- **examples/flow-demo.ts** - 5 working demos
-- **examples/run-demo.ts** - Demo runner
+- examples/flow-demo.ts -  working demos
+- examples/run-demo.ts - Demo runner
 - Run with: `npx tsx examples/run-demo.ts`
 
-#### Orchestrator Integration (Phase 4)
+ Orchestrator Integration (Phase )
 
-- **FlowWorker** (`src/workers/flow-worker.ts`)  NEW
+- FlowWorker (`src/workers/flow-worker.ts`)  NEW
     - Executes flows via FlowExecutor
     - Integrates WorkspaceManager for workspace allocation
     - Full lifecycle management (allocate → execute → release)
     - Automatic workspace cleanup on completion
 
-- **Enhanced Task Type** (`src/shared/types.ts`)
+- Enhanced Task Type (`src/shared/types.ts`)
     - `flowId`: Optional flow identifier for flow-based tasks
     - `flowInputs`: Input variables for the flow
     - `flowResult`: Stores execution results (outputs, trace, errors)
 
-- **REST API Extensions** (`src/orchestrator/rest-api.ts`)
+- REST API Extensions (`src/orchestrator/rest-api.ts`)
     - POST `/tasks` - Create tasks with optional flowId and flowInputs
     - GET `/flows` - List all available flows
     - GET `/flows/:id` - Get specific flow definition
 
-- **Orchestrator with FlowRegistry** (`src/orchestrator/index.ts`)
+- Orchestrator with FlowRegistry (`src/orchestrator/index.ts`)
     - FlowRegistry integrated at startup
     - Loads project flows automatically
     - Passes FlowRegistry to REST API
 
-###  Next Steps (Phase 5+)
+  Next Steps (Phase +)
 
-#### Phase 3: Complete WorkspaceManager  COMPLETED
+ Phase : Complete WorkspaceManager  COMPLETED
 
-**Files**: `src/flow/workspace-manager.ts`, `src/flow/workspace-manager.test.ts`
+Files: `src/flow/workspace-manager.ts`, `src/flow/workspace-manager.test.ts`
 
 Completed features:
 
@@ -127,12 +127,12 @@ Completed features:
 - [x] Workspace reuse policies (never, if-available, always)
 - [x] Git strategies (main-only, feature-branch, any, worktree)
 - [x] Manual workspace mode for user-managed directories
-- [x] Smart branch naming: `fleet/task-{4chars}-{slug}`
-- [x] 19 comprehensive tests covering all modes and strategies
+- [x] Smart branch naming: `fleet/task-{chars}-{slug}`
+- [x]  comprehensive tests covering all modes and strategies
 
-#### Phase 4: Orchestrator Integration  COMPLETED
+ Phase : Orchestrator Integration  COMPLETED
 
-**Files**: `src/workers/flow-worker.ts`, `src/orchestrator/rest-api.ts`, `src/orchestrator/index.ts`
+Files: `src/workers/flow-worker.ts`, `src/orchestrator/rest-api.ts`, `src/orchestrator/index.ts`
 
 Completed features:
 
@@ -143,9 +143,9 @@ Completed features:
 - [x] WorkspaceManager integration via FlowWorker
 - [x] Full execution lifecycle with proper cleanup
 
-#### Phase 5: Enhanced Monitoring & UI  COMPLETED
+ Phase : Enhanced Monitoring & UI  COMPLETED
 
-**Files**: `src/orchestrator/rest-api.ts`, `src/orchestrator/ui.tsx`, `src/orchestrator/websocket-server.ts`, `src/shared/types.ts`
+Files: `src/orchestrator/rest-api.ts`, `src/orchestrator/ui.tsx`, `src/orchestrator/websocket-server.ts`, `src/shared/types.ts`
 
 Completed features:
 
@@ -160,10 +160,10 @@ Completed features:
 - [x] Flow result display (completed/failed status)
 - [x] Recent task comments displayed in UI
 
-#### Phase 6: CLI Interface
+ Phase : CLI Interface
 
-**Priority**: Medium
-**Files**: New - `src/cli/`
+Priority: Medium
+Files: New - `src/cli/`
 
 Commands:
 
@@ -172,10 +172,10 @@ Commands:
 - [ ] `agent-fleet flows` - List flows
 - [ ] `agent-fleet workers` - Manage workers
 
-#### Phase 7: Dashboard UI
+ Phase : Dashboard UI
 
-**Priority**: Low
-**Files**: New - `src/dashboard/`
+Priority: Low
+Files: New - `src/dashboard/`
 
 Features:
 
@@ -184,159 +184,159 @@ Features:
 - [ ] Workspace status overview
 - [ ] Flow management interface
 
-## Key Technical Decisions
+ Key Technical Decisions
 
-### 1. GitHub Actions Syntax
+ . GitHub Actions Syntax
 
-**Decision**: Use `${{ expression }}` instead of `${expression}`
+Decision: Use `${{ expression }}` instead of `${expression}`
 
-**Rationale**:
+Rationale:
 
 - Clear distinction from shell variables
 - Explicit context naming (inputs, steps, task)
 - Industry standard syntax
 - Better IDE support potential
 
-**Migration Complete**: All tests passing 
+Migration Complete: All tests passing 
 
-### 2. Discriminated Union Types
+ . Discriminated Union Types
 
-**Decision**: `type FlowStep = ModelFlowStep | ScriptFlowStep`
+Decision: `type FlowStep = ModelFlowStep | ScriptFlowStep`
 
-**Rationale**:
+Rationale:
 
 - Type safety with TypeScript discriminated unions
 - Clear separation of concerns
 - Better autocomplete and error checking
 
-### 3. Script Steps for Testing
+ . Script Steps for Testing
 
-**Decision**: Support script execution without AI models
+Decision: Support script execution without AI models
 
-**Rationale**:
+Rationale:
 
 - Deterministic testing
 - Faster test execution
 - Cross-platform compatibility
 
-### 4. Task Metadata Separation
+ . Task Metadata Separation
 
-**Decision**: Priority and metadata separate from flow inputs
+Decision: Priority and metadata separate from flow inputs
 
-**Rationale**:
+Rationale:
 
 - Flows are reusable definitions
 - Tasks are runtime instances with metadata
 - Cleaner separation of concerns
 
-## Running the Project
+ Running the Project
 
-### Install Dependencies
+ Install Dependencies
 
 ```bash
 npm install
 ```
 
-### Run Tests
+ Run Tests
 
 ```bash
-npm test                    # All tests
-npm test -- flow-executor   # Specific suite
-npm test -- escape          # Escape tests
+npm test                     All tests
+npm test -- flow-executor    Specific suite
+npm test -- escape           Escape tests
 ```
 
-### Run Demos
+ Run Demos
 
 ```bash
 npx tsx examples/run-demo.ts
 ```
 
-### Build
+ Build
 
 ```bash
 npm run build
 ```
 
-### Development
+ Development
 
 ```bash
-npm run dev    # Watch mode with multiple workers
+npm run dev     Watch mode with multiple workers
 ```
 
-## File Structure
+ File Structure
 
 ```
 agent-fleet/
-├── src/
-│   ├── flow/                    # Flow engine (Phase 1 & 2) 
-│   │   ├── types.ts
-│   │   ├── flow-registry.ts
-│   │   ├── template-renderer.ts
-│   │   ├── script-executor.ts
-│   │   ├── output-extractor.ts
-│   │   ├── condition-evaluator.ts
-│   │   ├── flow-executor.ts
-│   │   ├── workspace-manager.ts  # Basic only
-│   │   └── *.test.ts            # 118 tests
-│   ├── orchestrator/            # Phase 4 (TODO)
-│   ├── api/                     # Phase 5 (TODO)
-│   ├── cli/                     # Phase 6 (TODO)
-│   └── dashboard/               # Phase 7 (TODO)
-├── examples/
-│   ├── flow-demo.ts             # Working demos 
-│   └── run-demo.ts
-├── docs/
-│   ├── WORKFLOW_SYSTEM_DESIGN.md
-│   ├── FLOW_ENGINE_USAGE.md
-│   ├── GITHUB_ACTIONS_SYNTAX_MIGRATION.md
-│   ├── TEMPLATE_ESCAPING.md
-│   └── PROJECT_STATUS.md (this file)
-└── dist/                        # Compiled output
+ src/
+    flow/                     Flow engine (Phase  & ) 
+       types.ts
+       flow-registry.ts
+       template-renderer.ts
+       script-executor.ts
+       output-extractor.ts
+       condition-evaluator.ts
+       flow-executor.ts
+       workspace-manager.ts   Basic only
+       .test.ts              tests
+    orchestrator/             Phase  (TODO)
+    api/                      Phase  (TODO)
+    cli/                      Phase  (TODO)
+    dashboard/                Phase  (TODO)
+ examples/
+    flow-demo.ts              Working demos 
+    run-demo.ts
+ docs/
+    WORKFLOW_SYSTEM_DESIGN.md
+    FLOW_ENGINE_USAGE.md
+    GITHUB_ACTIONS_SYNTAX_MIGRATION.md
+    TEMPLATE_ESCAPING.md
+    PROJECT_STATUS.md (this file)
+ dist/                         Compiled output
 ```
 
-## Known Issues / Limitations
+ Known Issues / Limitations
 
-### Current Limitations
+ Current Limitations
 
-1. **WorkspaceManager**: Only basic structure, no git operations yet
-2. **No Orchestrator**: Can't run multiple tasks concurrently yet
-3. **No API**: Only programmatic usage currently
-4. **No CLI**: Must use TypeScript/JavaScript to run flows
-5. **Backslash escaping**: `\${{` doesn't escape (not needed in practice)
+. WorkspaceManager: Only basic structure, no git operations yet
+. No Orchestrator: Can't run multiple tasks concurrently yet
+. No API: Only programmatic usage currently
+. No CLI: Must use TypeScript/JavaScript to run flows
+. Backslash escaping: `\${{` doesn't escape (not needed in practice)
 
-### None Blocking
+ None Blocking
 
 - All core flow engine features working
-- 118 tests passing
+-  tests passing
 - Demos running successfully
 - Documentation complete
 
-## Quick Start After Context Clear
+ Quick Start After Context Clear
 
-1. **Review this file**: `docs/PROJECT_STATUS.md`
-2. **Check design**: `docs/WORKFLOW_SYSTEM_DESIGN.md`
-3. **Run tests**: `npm test` (should see 118 passing)
-4. **Run demos**: `npx tsx examples/run-demo.ts`
-5. **Next phase**: Implement WorkspaceManager (Phase 3)
+. Review this file: `docs/PROJECT_STATUS.md`
+. Check design: `docs/WORKFLOW_SYSTEM_DESIGN.md`
+. Run tests: `npm test` (should see  passing)
+. Run demos: `npx tsx examples/run-demo.ts`
+. Next phase: Implement WorkspaceManager (Phase )
 
-## Git Status
+ Git Status
 
 ```
 Branch: master
 Status: Clean (all changes committed)
 
 Recent commits:
-- bcc5612 Add nicer UI for orchestrator + plan for flow engine
-- 3499018 Use welcome message to assign id to worker
-- fba4752 First version with orchestration working
+- bcc Add nicer UI for orchestrator + plan for flow engine
+-  Use welcome message to assign id to worker
+- fba First version with orchestration working
 ```
 
-## Summary
+ Summary
 
-**Current**: Flow Engine + Orchestrator + Enhanced Monitoring complete 
-**Next**: CLI interface and Dashboard UI
-**Progress**: ~70% of total system (5/7 phases)
-**Quality**: 220/220 tests passing (100%), full documentation, production-ready system
+Current: Flow Engine + Orchestrator + Enhanced Monitoring complete 
+Next: CLI interface and Dashboard UI
+Progress: ~% of total system (/ phases)
+Quality: / tests passing (%), full documentation, production-ready system
 
 The core system with monitoring is complete and operational! You can now:
 

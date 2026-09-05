@@ -161,7 +161,7 @@ export class WorkerCoordinator {
 			});
 		} catch (error) {
 			log.error(
-				`[WorkerCoordinator] Failed to send task ${task.id} to worker ${workerId}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
+				`[WorkerCoordinator] Failed to send task ${task.id} to worker ${workerId}: ${error instanceof Error ? String(error) : String(error)}`
 			);
 			// Re-enqueue task
 			this.globalBacklog.unshift(task);

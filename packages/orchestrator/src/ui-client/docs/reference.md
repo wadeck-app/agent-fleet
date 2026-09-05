@@ -1,4 +1,4 @@
-# Reference
+ Reference
 
 _Moved from README -- see [README](../README.md) for the overview._
 
@@ -7,7 +7,7 @@ _Moved from README -- see [README](../README.md) for the overview._
 - Relay to connected UI clients
 - Provide methods for sending responses to UI
 
-**Usage:**
+Usage:
 
 ```typescript
 // In Orchestrator
@@ -21,58 +21,58 @@ hook.on('state_update', update => {
 });
 
 // Send command result
-hook.sendCommandResult('req-123', true, { taskId: 'task-456' });
+hook.sendCommandResult('req-', true, { taskId: 'task-' });
 ```
 
-## Protocol Design
+ Protocol Design
 
-### Separation from Worker Protocol
+ Separation from Worker Protocol
 
-**Worker Protocol** (`src/shared/types.ts`):
+Worker Protocol (`src/shared/types.ts`):
 
 - `MessageType`: WORKER_READY, TASK_STARTED, etc.
-- Used by: Workers ↔ Orchestrator
+- Used by: Workers  Orchestrator
 
-**UI Protocol** (`src/orchestrator/ui-client/types.ts`):
+UI Protocol (`src/orchestrator/ui-client/types.ts`):
 
 - `UIMessageType`: UI_CONNECT, UI_START_FLOW, etc.
-- Used by: UI ↔ Orchestrator
+- Used by: UI  Orchestrator
 
-**No shared types, no mixing, full type safety.**
+No shared types, no mixing, full type safety.
 
-### Message Flow
+ Message Flow
 
 ```
-┌─────────┐                                    ┌──────────────┐
-│   UI    │                                    │ Orchestrator │
-│ Backend │                                    │    Core      │
-└────┬────┘                                    └──────┬───────┘
-     │                                                │
-     │ UIConnectMessage                              │
-     ├───────────────────────────────────────────────►
-     │                                                │
-     │                        UIConnectedMessage     │
-     │◄───────────────────────────────────────────────┤
-     │                                                │
-     │ UIRequestSnapshotMessage                      │
-     ├───────────────────────────────────────────────►
-     │                                                │
-     │                         UISnapshotMessage      │
-     │◄───────────────────────────────────────────────┤
-     │                                                │
-     │ UIStartFlowMessage                            │
-     ├───────────────────────────────────────────────►
-     │                                                │
-     │                    UICommandResultMessage      │
-     │◄───────────────────────────────────────────────┤
-     │                                                │
-     │                    UIStateUpdateMessage        │
-     │◄───────────────────────────────────────────────┤
-     │                    (real-time events)          │
-     │                                                │
+                                    
+   UI                                         Orchestrator 
+ Backend                                         Core      
+                                    
+                                                     
+      UIConnectMessage                              
+     
+                                                     
+                             UIConnectedMessage     
+     
+                                                     
+      UIRequestSnapshotMessage                      
+     
+                                                     
+                              UISnapshotMessage      
+     
+                                                     
+      UIStartFlowMessage                            
+     
+                                                     
+                         UICommandResultMessage      
+     
+                                                     
+                         UIStateUpdateMessage        
+     
+                         (real-time events)          
+                                                     
 ```
 
-## Configuration
+ Configuration
 
 Enable UI client hook in orchestrator:
 
@@ -86,36 +86,36 @@ Or in `.env`:
 UI_CLIENT_ENABLED=true
 ```
 
-## Next Steps
+ Next Steps
 
 When implementing the UI:
 
-1. **Create Web UI Backend** (Express + WebSocket server)
+. Create Web UI Backend (Express + WebSocket server)
     - Import types from `src/orchestrator/ui-client/types.ts`
     - Use `UIMessageType` for all communication
     - Strong typing throughout
 
-2. **Implement UIConnectionManager** (in orchestrator)
+. Implement UIConnectionManager (in orchestrator)
     - Connect to UI backend as WebSocket client
     - Listen to `UIClientHook` events
     - Send/receive using UI protocol
 
-3. **Implement Authentication**
+. Implement Authentication
     - Token-based auth in `UIConnectMessage`
     - Command signing (HMAC)
     - Rate limiting
 
-4. **Create Frontend** (React/Vue/Svelte)
+. Create Frontend (React/Vue/Svelte)
     - Connect to UI backend
     - Real-time dashboard
     - Flow visualization
 
-## Type Reusability
+ Type Reusability
 
 The types in `types.ts` are designed to be imported by both:
 
-- **Orchestrator** (this codebase)
-- **UI Backend Server** (future separate project)
+- Orchestrator (this codebase)
+- UI Backend Server (future separate project)
 
 Example:
 
@@ -136,7 +136,7 @@ import {
 } from './protocol/types'; // Copied from orchestrator
 ```
 
-## Testing
+ Testing
 
 Unit tests for this module should cover:
 

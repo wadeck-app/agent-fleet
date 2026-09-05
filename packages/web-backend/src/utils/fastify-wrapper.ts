@@ -113,7 +113,7 @@ function handleZodError(error: ZodError, reply: FastifyReply) {
 		error: 'Validation failed',
 		details: error.issues.map(e => ({
 			path: e.path.join('.'),
-			message: (e instanceof Error ? e.message : String(e)),
+			message: String(e),
 		})),
 	});
 }

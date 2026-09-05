@@ -62,7 +62,7 @@ export async function ensureStoryExists(page: Page, storyId: string, timeout: nu
 			// Story not found in index - throw immediately (don't retry)
 			throw new Error(`Story '${storyId}' not found in index.json`);
 		} catch (error: any) {
-			if ((error instanceof Error ? error.message : String(error)).includes('not found in index.json')) {
+			if (String(error).includes('not found in index.json')) {
 				// Story genuinely doesn't exist - throw helpful error
 				throw new Error(
 					`
