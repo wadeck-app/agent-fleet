@@ -129,7 +129,7 @@ export function DataInfinite<T>({
 				currentPage: infinitePagination.fstate.currentPage,
 				page: infinitePagination.fstate.currentPage,
 				pageSize: infinitePagination.fstate.pageSize,
-				canGoPrevious: infinitePagination.fstate.currentPage > ,
+				canGoPrevious: infinitePagination.fstate.currentPage > 1,
 				canGoNext: () => infinitePagination.fstate.hasMore,
 			},
 			actions: {
