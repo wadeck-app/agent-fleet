@@ -1,3 +1,4 @@
+// violations-suppress: ts/no-barrel-index orchestrator entry-point module, not a re-export barrel
 import { Orchestrator } from 'orchestrator/core/Orchestrator';
 import { createLogger } from 'shared-common/logger';
 

@@ -14,6 +14,7 @@
  * @see packages/shared-frontend-backend/.claude/plans/transport-front-back_prop4.md
  */
 
+// violations-suppress: ts/no-barrel-index public API entry point for shared-frontend-backend transport — 8 import sites
 //FIXME remove index.ts
 
 // Transport Protocol - Core protocol types
