@@ -4,9 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { CrudDialog } from '@framework/components/overlays/CrudDialog';
 import { DialogBody, DialogFooter } from '@framework/components/overlays/Dialog';
 import { Badge } from '@framework/components/primitives/Badge';
-import { Type FormAction, FormActions } from '@framework/features/forms/FormActions';
+import { type FormAction, FormActions } from '@framework/features/forms/FormActions';
 import { ArrayField } from '@framework/features/forms/fields/ArrayField';
-import { ComboboxField, Type ComboboxOption } from '@framework/features/forms/fields/ComboboxField';
+import { ComboboxField, type ComboboxOption } from '@framework/features/forms/fields/ComboboxField';
 import { DateField } from '@framework/features/forms/fields/DateField';
 import { DateTimeField } from '@framework/features/forms/fields/DateTimeField';
 import { EnhancedNumberField } from '@framework/features/forms/fields/EnhancedNumberField';
@@ -26,8 +26,8 @@ import { UrlField } from '@framework/features/forms/fields/UrlField';
 import { useFormState } from '@framework/features/forms/useFormState';
 import { useToast } from '@framework/features/toast/ToastContext';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
-import Type { FlowMetadata, NormalizedInputDefinition } from '@shared/api/flows.contract';
-import Type { CreateTask } from '@shared/api/tasks.contract';
+import type { FlowMetadata, NormalizedInputDefinition } from '@shared/api/flows.contract';
+import type { CreateTask } from '@shared/api/tasks.contract';
 import { AlertTriangle, GripVertical } from 'lucide-react';
 
 import { projectsApi } from '../projects/projects.api';
@@ -52,7 +52,7 @@ interface CreateTaskDialogProps {
 
 // Flat form data structure for useFormState compatibility
 interface CreateTaskFormData {
-	Description: string;
+	description: string;
 	priority: string;
 	workerId: string;
 	projectId: string;
@@ -60,7 +60,7 @@ interface CreateTaskFormData {
 }
 
 const defaultFormData: CreateTaskFormData = {
-	Description: '',
+	description: '',
 	priority: 'medium',
 	workerId: '',
 	projectId: '',
@@ -109,8 +109,8 @@ export function CreateTaskDialog({
 		validator: data => {
 			const errors: Record<string, string> = {};
 
-			if (!data.Description?.trim()) {
-				errors.Description = 'Description is required';
+			if (!data.description?.trim()) {
+				errors.description = 'Description is required';
 			}
 
 			if (!data.priority) {
@@ -140,15 +140,15 @@ export function CreateTaskDialog({
 			};
 		},
 		errorFieldMapping: {
-			'Description is required': 'Description',
+			'Description is required': 'description',
 			'Priority is required': 'priority',
 			'Worker assignment is required': 'workerId',
 		},
 		onSubmit: async data => {
 			// Transform flat form data to nested CreateTask structure
-			// Important: Empty strings must be undefined for Zod validation
+			// IMPORTANT: Empty strings must be undefined for Zod validation
 			const createTaskData: CreateTask = {
-				Description: data.Description,
+				description: data.description,
 				priority: data.priority as CreateTask['priority'],
 				assignedTo: { workerId: data.workerId },
 				projectId: data.projectId?.trim() || undefined,
@@ -215,23 +215,23 @@ export function CreateTaskDialog({
 		}
 	}, [isDragging, handleMouseMove, handleMouseUp]);
 
-	// Render field based on input Type
+	// Render field based on input type
 	const renderField = (inputName: string, inputDef: NormalizedInputDefinition) => {
 		const value = flowInputs[inputName] || '';
 		const error = formState.validationErrors[`input_${inputName}`];
 		const placeholder = inputDef.default !== undefined ? `Default: ${inputDef.default}` : `Enter ${inputName}...`;
 
 		const commonProps = {
-			label: inputDef.Description || inputName,
+			label: inputDef.description || inputName,
 			value,
 			onChange: (val: string) => setFlowInputs(prev => ({ ...prev, [inputName]: val })),
 			required: inputDef.required,
 			placeholder,
 			error,
-			Description: inputDef.Description,
+			description: inputDef.description,
 		};
 
-		switch (inputDef.Type) {
+		switch (inputDef.type) {
 			case 'text':
 				return <TextAreaField {...commonProps} rows={4} />;
 			case 'url':
@@ -241,7 +241,7 @@ export function CreateTaskDialog({
 			case 'integer':
 			case 'percentage':
 			case 'duration':
-				return <EnhancedNumberField {...commonProps} Type={inputDef.Type} options={inputDef.options} />;
+				return <EnhancedNumberField {...commonProps} type={inputDef.type} options={inputDef.options} />;
 			case 'enum':
 				return <EnumField {...commonProps} options={inputDef.options} />;
 			case 'multi-enum':
@@ -265,12 +265,12 @@ export function CreateTaskDialog({
 			case 'priority':
 				return <PriorityField {...commonProps} />;
 			case 'number':
-				return <EnhancedNumberField {...commonProps} Type="number" options={inputDef.options} />;
+				return <EnhancedNumberField {...commonProps} type="number" options={inputDef.options} />;
 			case 'string':
 			case 'boolean':
 			case 'object':
 			default:
-				throw new Error(`Unexpected switch value`);
+				return <TextField {...commonProps} />;
 		}
 	};
 
@@ -352,7 +352,7 @@ export function CreateTaskDialog({
 		value: flow.id,
 		label: flow.isValid
 			? flow.name || flow.id
-			: `${flow.name || flow.id}  Invalid (${flow.validationErrors?.length || 0} errors)`,
+			: `${flow.name || flow.id} ❌ Invalid (${flow.validationErrors?.length || 0} errors)`,
 		disabled: !flow.isValid, // Disable invalid flows
 	}));
 
@@ -394,7 +394,7 @@ export function CreateTaskDialog({
 
 		// Transform flat form data to nested CreateTask structure
 		const createTaskData: CreateTask = {
-			Description: formState.formData.Description,
+			description: formState.formData.description,
 			priority: formState.formData.priority as CreateTask['priority'],
 			assignedTo: { workerId: formState.formData.workerId },
 			projectId: formState.formData.projectId?.trim() || undefined,
@@ -405,8 +405,8 @@ export function CreateTaskDialog({
 		try {
 			const createdTask = await tasksService.createTask(createTaskData);
 			showToast('Task created successfully', 'success');
-			// Only navigate -- do NOT call onSuccess/onOpenChange as they use
-			// setSearchParams({ replace: true }) which overrides the Navigation
+			// Only navigate — do NOT call onSuccess/onOpenChange as they use
+			// setSearchParams({ replace: true }) which overrides the navigation
 			navigate(`/tasks/${createdTask.id}`);
 		} catch (error) {
 			showToast(getErrorMessage(error), 'error');
@@ -417,20 +417,20 @@ export function CreateTaskDialog({
 	// Define form actions
 	const formActions: FormAction[] = [
 		{
-			label: formState.isSubmitting ? 'Saving...' : 'create tache',
-			Type: 'submit',
+			label: formState.isSubmitting ? 'Saving...' : 'Créer tâche',
+			type: 'submit',
 			formId: FORM_ID,
 			disabled: formState.isSubmitting,
 		},
 		{
 			label: 'Create and open',
-			Type: 'button',
+			type: 'button',
 			onClick: handleCreateAndOpen,
 			disabled: formState.isSubmitting,
 		},
 		{
-			label: 'Cancel',
-			Type: 'button',
+			label: 'Annuler',
+			type: 'button',
 			variant: 'outline',
 			onClick: () => onOpenChange(false),
 			disabled: formState.isSubmitting,
@@ -441,8 +441,8 @@ export function CreateTaskDialog({
 		<CrudDialog
 			open={open}
 			onOpenChange={onOpenChange}
-			title="Create a task"
-			Description="Fill in the details to create a new task"
+			title="Créer une tâche"
+			description="Remplissez les détails pour créer une nouvelle tâche"
 			maxWidth="4xl"
 			preventOutsideClick={true}
 		>
@@ -452,16 +452,16 @@ export function CreateTaskDialog({
 					<div ref={containerRef} className="flex min-h-[500px] gap-0">
 						{/* Left Column - Basic Information */}
 						<div className="flex flex-col space-y-4 pr-3 pb-6" style={{ width: `${leftWidth}%` }}>
-							<h3 className="text-sm font-semibold text-foreground">Informations of base</h3>
+							<h3 className="text-sm font-semibold text-foreground">Informations de base</h3>
 
 							<TextAreaField
 								label="Description"
-								value={formState.formData.Description}
-								onChange={value => formState.updateField('Description', value)}
-								placeholder="Enter task Description..."
+								value={formState.formData.description}
+								onChange={value => formState.updateField('description', value)}
+								placeholder="Enter task description..."
 								required
 								rows={4}
-								error={formState.validationErrors.Description}
+								error={formState.validationErrors.description}
 							/>
 
 							<SelectField
@@ -566,7 +566,7 @@ export function CreateTaskDialog({
 
 						{/* Right Column - Flow Configuration */}
 						<div className="flex flex-col space-y-4 pl-3 pb-6" style={{ width: `${100 - leftWidth}%` }}>
-							<h3 className="text-sm font-semibold text-foreground">Configuration of the flow</h3>
+							<h3 className="text-sm font-semibold text-foreground">Configuration du flow</h3>
 
 							<ComboboxField
 								label="Flow (Optional)"
@@ -612,7 +612,7 @@ export function CreateTaskDialog({
 							{/* Dynamic Flow Inputs Section */}
 							{selectedFlow?.inputs && Object.keys(selectedFlow.inputs).length > 0 && (
 								<div className="space-y-4">
-									<h4 className="text-sm font-semibold text-foreground">Parametres</h4>
+									<h4 className="text-sm font-semibold text-foreground">Paramètres</h4>
 									<div className="space-y-3">
 										{Object.entries(selectedFlow.inputs).map(([inputName, inputDef]) => (
 											<div key={inputName} className="flex items-start gap-2">

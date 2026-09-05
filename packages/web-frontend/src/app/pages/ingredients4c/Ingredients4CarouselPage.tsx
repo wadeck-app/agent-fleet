@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { DataInfinite } from '@framework/components/data/DataInfinite';
+import { Data2Infinite } from '@framework/components2/data/Data2Infinite';
 import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
 import { ColumnVisibility } from '@framework/components/columns/ColumnVisibility';
 import { useColumnOrder } from '@framework/components/columns/useColumnOrder';
@@ -12,10 +12,10 @@ import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
 import { Button } from '@framework/components/primitives/Button';
-import { useInfinitePagination } from '@framework/hooks/data/useInfinitePagination';
-import { useSorting } from '@framework/hooks/data/useSorting';
-import { useDebounce } from '@framework/hooks/utility/useDebounce';
-import { useMultiSelect } from '@framework/hooks/utility/useMultiSelect';
+import { useInfinitePagination } from '@framework/hooks2/data/useInfinitePagination';
+import { useSorting2 } from '@framework/hooks2/data/useSorting2';
+import { useDebounce } from '@framework/hooks2/utility/useDebounce';
+import { useMultiSelect2 } from '@framework/hooks2/utility/useMultiSelect2';
 import { useBulkDeleteState } from '@framework/hooks/useBulkDeleteState';
 import { useCrudSuccessToast } from '@framework/hooks/useCrudSuccessToast';
 import { useDeleteConfirmation } from '@framework/hooks/useDeleteConfirmation';
@@ -30,32 +30,31 @@ import {
 	extractColumnIds,
 	extractDefaultVisible,
 	toColumnVisibilityDefs,
-} from '@framework/utils/TableColumnConfig';
-import type { ComposedQuery } from '@framework/utils/buildQuery';
+} from '@framework/utils2/Table2ColumnConfig';
+import type { ComposedQuery } from '@framework/utils2/buildQuery';
 import type { CreateIngredient, Ingredient } from '@shared/api/ingredients.contract';
-import { Plus, Trash, X } from 'lucide-react';
+import { Plus, Trash2, X } from 'lucide-react';
 
-import { BulkDeleteWorkflow } from '@app/components/domain/BulkDeleteWorkflow';
-import { IngredientDialog } from '@app/components/domain/IngredientDialog';
+import { BulkDeleteWorkflow, IngredientDialog } from '@app/components/domain';
 
 import { ingredientsService } from '../ingredients/IngredientsService';
 import { useIngredientsCrud } from '../ingredients/useIngredientsCrud';
-import { INGREDIENT_CAROUSEL_FIELDS, IngredientCarouselc } from './IngredientCarouselc';
+import { INGREDIENT_CAROUSEL_FIELDS, IngredientCarousel4c } from './IngredientCarousel4c';
 import { useCarousel } from './useCarousel';
 
-const STORAGE_ID = 'ingredientsc' as const;
-const PAGE_SIZE = ; // Fetch  items per page, show  at a time
+const STORAGE_ID = 'ingredients4c' as const;
+const PAGE_SIZE = 12; // Fetch 12 items per page, show 3 at a time
 
-export function IngredientsCarouselPage() {
+export function Ingredients4CarouselPage() {
 	const navigate = useNavigate();
 	const { id, mode } = useParams<{ id?: string; mode?: 'new' | 'edit' }>();
 
-	// 
+	// ═══════════════════════════════════════════════════════════════════════════════════════
 	// HEADLESS FEATURES - Each is independent and composable
-	// 
+	// ═══════════════════════════════════════════════════════════════════════════════════════
 
 	// Sorting feature: manages multi-column sort and converts to backend query
-	const sorting = useSorting({
+	const sorting = useSorting2({
 		storageId: STORAGE_ID,
 		defaultSort: [{ key: 'name', direction: 'asc' }],
 	});
@@ -65,14 +64,14 @@ export function IngredientsCarouselPage() {
 
 	// Add comment above the target line, not at the end
 	// Debounced search query for SearchContract compatibility
-	const debouncedSearchQuery = useDebounce(searchQuery, );
+	const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
 	// Multi-selection feature: manages selection state
-	const selection = useMultiSelect();
+	const selection = useMultiSelect2();
 
 	// Carousel feature: manages Embla Carousel state
-	// Show  cards at a time, infinite scroll for data loading
-	const carousel = useCarousel({ itemsPerView:  });
+	// Show 3 cards at a time, infinite scroll for data loading
+	const carousel = useCarousel({ itemsPerView: 3 });
 
 	// Field visibility feature: manages visible fields with localStorage persistence
 	const fieldVisibility = useColumnVisibility(extractColumnIds(INGREDIENT_CAROUSEL_FIELDS), {
@@ -96,13 +95,13 @@ export function IngredientsCarouselPage() {
 		return fields;
 	}, [fieldVisibility.visibleColumns, fieldOrder.columnOrder]);
 
-	// 
-	// DATA FETCHING - Infinite Scroll with DataInfinite
-	// 
+	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// DATA FETCHING - Infinite Scroll with Data2Infinite
+	// ═══════════════════════════════════════════════════════════════════════════════════════
 
-	/
-	  Fetch ingredients wrapper for DataInfinite
-	 /
+	/**
+	 * Fetch ingredients wrapper for Data2Infinite
+	 */
 	const fetchIngredients = useCallback(async (query: ComposedQuery) => {
 		const response = await ingredientsService.getIngredients({
 			page: query.page as number,
@@ -159,9 +158,9 @@ export function IngredientsCarouselPage() {
 		infinitePagination.actions.reset();
 	}, [infinitePagination]);
 
-	// 
+	// ═══════════════════════════════════════════════════════════════════════════════════════
 	// ACTIONS - Domain-specific operations
-	// 
+	// ═══════════════════════════════════════════════════════════════════════════════════════
 
 	// Use CRUD hook
 	const {
@@ -180,13 +179,13 @@ export function IngredientsCarouselPage() {
 	// Success toast helper
 	const successToast = useCrudSuccessToast('ingredient');
 
-	// Bulk delete state management (centralized hook eliminates ~ lines of boilerplate)
+	// Bulk delete state management (centralized hook eliminates ~60 lines of boilerplate)
 	const bulkDelete = useBulkDeleteState();
 
-	// Track ingredients and totalItems for dialog/UI (will be synced with DataInfinite)
+	// Track ingredients and totalItems for dialog/UI (will be synced with Data2Infinite)
 	const ingredientsRef = useRef<Ingredient[]>([]);
-	const totalItemsRef = useRef();
-	// Track loading state for UI outside of DataInfinite render props
+	const totalItemsRef = useRef(0);
+	// Track loading state for UI outside of Data2Infinite render props
 	const [isLoading, setIsLoading] = useState(false);
 
 	// Dialog state management using URL routing
@@ -195,10 +194,10 @@ export function IngredientsCarouselPage() {
 		id,
 		items: ingredientsRef.current,
 		findItem: (items, id) => items.find(i => i.id === id),
-		onNavigateBack: () => navigate('/ingredientsc'),
+		onNavigateBack: () => navigate('/ingredients4c'),
 	});
 
-	// Delete confirmation dialog (centralized hook eliminates ~ lines of boilerplate)
+	// Delete confirmation dialog (centralized hook eliminates ~30 lines of boilerplate)
 	const deleteConfirmation = useDeleteConfirmation({
 		onConfirm: async id => {
 			// Mark as deleting for strike-through effect
@@ -223,11 +222,11 @@ export function IngredientsCarouselPage() {
 	const [isDialogRefreshing, setIsDialogRefreshing] = useState(false);
 
 	const handleEdit = (ingredient: Ingredient) => {
-		navigate(`/ingredientsc/${ingredient.id}/edit`);
+		navigate(`/ingredients4c/${ingredient.id}/edit`);
 	};
 
 	const handleCreateNew = () => {
-		navigate('/ingredientsc/new');
+		navigate('/ingredients4c/new');
 	};
 
 	const handleSubmit = async (data: CreateIngredient) => {
@@ -243,9 +242,9 @@ export function IngredientsCarouselPage() {
 				await createIngredient(data);
 			}
 
-			// Reset infinite scroll to refresh from page 
+			// Reset infinite scroll to refresh from page 1
 			resetInfiniteScroll();
-			navigate('/ingredientsc');
+			navigate('/ingredients4c');
 
 			// Show success toast
 			if (isEditing) {
@@ -274,7 +273,7 @@ export function IngredientsCarouselPage() {
 	};
 
 	const handleManualRefresh = () => {
-		// Reset infinite scroll to page 
+		// Reset infinite scroll to page 1
 		resetInfiniteScroll();
 	};
 
@@ -299,14 +298,14 @@ export function IngredientsCarouselPage() {
 		}
 	};
 
-	// 
+	// ═══════════════════════════════════════════════════════════════════════════════════════
 	// RENDER
-	// 
+	// ═══════════════════════════════════════════════════════════════════════════════════════
 
 	return (
 		<Page>
 			<PageHeader
-				title="Ingredients v carousel"
+				title="Ingredients v4 carousel"
 				onRefresh={handleManualRefresh}
 				isRefreshing={isLoading}
 				action={
@@ -339,10 +338,10 @@ export function IngredientsCarouselPage() {
 				}
 			/>
 
-			{/ Search Bar /}
-			<div className="mb- flex flex-col gap-">
+			{/* Search Bar */}
+			<div className="mb-4 flex flex-col gap-4">
 				<div className="relative">
-					<div className="mb- text-xs font-medium text-muted-foreground">Search</div>
+					<div className="mb-2 text-xs font-medium text-muted-foreground">Search</div>
 					<Input
 						type="text"
 						value={searchQuery}
@@ -354,16 +353,16 @@ export function IngredientsCarouselPage() {
 							onClick={() => setSearchQuery('')}
 							variant="ghost"
 							size="sm"
-							className="absolute top- right- h- w- -translate-y-/ p-"
+							className="absolute top-9 right-2 h-6 w-6 -translate-y-1/2 p-0"
 							aria-label="Clear search"
 						>
-							<X className="h- w-" />
+							<X className="h-4 w-4" />
 						</Button>
 					)}
 				</div>
 			</div>
 
-			{/ Feature Info (for demo purposes) /}
+			{/* Feature Info (for demo purposes) */}
 			<ActiveFeaturesPanel
 				features={[
 					{ label: 'Search', value: searchQuery || 'none' },
@@ -374,7 +373,7 @@ export function IngredientsCarouselPage() {
 					{ label: 'Loaded', value: `${ingredientsRef.current.length} items` },
 					{
 						label: 'Viewing',
-						value: `${carousel.fstate.currentIndex + }-${Math.min(
+						value: `${carousel.fstate.currentIndex + 1}-${Math.min(
 							carousel.fstate.currentIndex + carousel.fstate.itemsPerView,
 							totalItemsRef.current
 						)} of ${totalItemsRef.current}`,
@@ -382,7 +381,7 @@ export function IngredientsCarouselPage() {
 				]}
 			/>
 
-			{/ Bulk Action Bar /}
+			{/* Bulk Action Bar */}
 			{!selection.fstate.isEmpty && (
 				<BulkActionBar
 					selectionCount={selection.fstate.count}
@@ -391,14 +390,14 @@ export function IngredientsCarouselPage() {
 					variant="light"
 				>
 					<Button onClick={handleBulkDelete} variant="destructive" size="sm">
-						<Trash className="mr- size-" />
+						<Trash2 className="mr-2 size-4" />
 						Delete
 					</Button>
 				</BulkActionBar>
 			)}
 
-			{/ Carousel Component with DataInfinite /}
-			<DataInfinite
+			{/* Carousel Component with Data2Infinite */}
+			<Data2Infinite
 				fetchData={fetchIngredients}
 				infinitePagination={infinitePagination}
 				sorting={sorting}
@@ -418,10 +417,10 @@ export function IngredientsCarouselPage() {
 					}
 
 					return (
-						<IngredientCarouselc
+						<IngredientCarousel4c
 							data={props.data}
 							isLoading={props.isLoading}
-							isLoadingMore={false} // TODO: derive from Data
+							isLoadingMore={false} // TODO: derive from Data2
 							hasMore={hasMore}
 							error={props.error}
 							sorting={sorting}
@@ -438,9 +437,9 @@ export function IngredientsCarouselPage() {
 						/>
 					);
 				}}
-			</DataInfinite>
+			</Data2Infinite>
 
-			{/ Bulk Delete Workflow /}
+			{/* Bulk Delete Workflow */}
 			<BulkDeleteWorkflow
 				open={bulkDelete.state.showDialog}
 				onOpenChange={bulkDelete.actions.setShowDialog}
@@ -454,7 +453,7 @@ export function IngredientsCarouselPage() {
 				}}
 				itemTypeName="ingredient"
 				onDeletingChange={ids => {
-					if (ids.size > ) {
+					if (ids.size > 0) {
 						bulkDelete.actions.setDeletingIds(ids);
 					}
 				}}
@@ -466,17 +465,17 @@ export function IngredientsCarouselPage() {
 				}}
 			/>
 
-			{/ Ingredient Dialog for Create/Edit /}
+			{/* Ingredient Dialog for Create/Edit */}
 			<IngredientDialog
 				open={isOpen}
-				onClose={() => navigate('/ingredientsc')}
+				onClose={() => navigate('/ingredients4c')}
 				ingredient={editingIngredient}
 				onSubmit={handleSubmit}
 				onRefresh={handleRefresh}
 				isRefreshing={isDialogRefreshing}
 			/>
 
-			{/ Delete Confirmation Dialog /}
+			{/* Delete Confirmation Dialog */}
 			<AlertDialogWrapper
 				open={deleteConfirmation.isOpen}
 				onOpenChange={deleteConfirmation.setOpen}
