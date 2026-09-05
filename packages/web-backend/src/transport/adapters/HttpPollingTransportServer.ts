@@ -177,7 +177,7 @@ export class HttpPollingTransportServer implements ITransportServer {
 			log.error('Authentication failed:', error);
 			reply.code(401).send({
 				error: 'Authentication failed',
-				message: error instanceof Error ? error.message : 'Unauthorized',
+				message: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unauthorized',
 			});
 		}
 	}

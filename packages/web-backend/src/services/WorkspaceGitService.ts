@@ -1,5 +1,5 @@
-import { mkdir } from 'fs/promises';
-import { dirname } from 'path';
+import { mkdir } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { createLogger } from 'shared-common/logger';
 import simpleGit from 'simple-git';
 
@@ -71,7 +71,7 @@ export class WorkspaceGitService {
 			return gitState;
 		} catch (error) {
 			log.error('Failed to clone repository', { repoUrl, targetPath, error });
-			throw new Error(`Failed to clone repository: ${error instanceof Error ? error.message : String(error)}`);
+			throw new Error(`Failed to clone repository: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`);
 		}
 	}
 
@@ -126,7 +126,7 @@ export class WorkspaceGitService {
 			return gitState;
 		} catch (error) {
 			log.error('Failed to create worktree', { sourceWorkspacePath, targetPath, branch, error });
-			throw new Error(`Failed to create git worktree: ${error instanceof Error ? error.message : String(error)}`);
+			throw new Error(`Failed to create git worktree: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`);
 		}
 	}
 

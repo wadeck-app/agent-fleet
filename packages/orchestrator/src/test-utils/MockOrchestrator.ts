@@ -27,7 +27,7 @@
  *
  * ===========================================================================================
  */
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 import type { Task, WorkerInfo } from 'shared-orch-worker/domain-types';
 import { TaskStatus } from 'shared-orch-worker/domain-types';
 

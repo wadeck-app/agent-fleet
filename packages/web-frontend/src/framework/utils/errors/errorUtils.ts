@@ -28,7 +28,7 @@ export function getErrorMessage(err: unknown): string {
 	if (isError(err)) {
 		// Check if the message contains Zod validation errors (array format)
 		try {
-			const parsed = JSON.parse(err.message);
+			const parsed = JSON.parse((err instanceof Error ? err.message : String(err)));
 			if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].message) {
 				// Extract first error message from Zod array
 				return parsed[0].message;
@@ -36,7 +36,7 @@ export function getErrorMessage(err: unknown): string {
 		} catch {
 			// Not JSON or invalid format, use original message
 		}
-		return err.message;
+		return (err instanceof Error ? err.message : String(err));
 	}
 	if (typeof err === 'string') {
 		// Check if the string is a Zod error array

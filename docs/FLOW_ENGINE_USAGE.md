@@ -1,18 +1,18 @@
 # Flow Engine Usage Guide
 
-## 🆕 New to Flows? Start Here
+##  New to Flows? Start Here
 
 If you're creating flows for the first time, start with the **[Quick Start Guide](../.claude/docs/flows/quick-start-guide.md)** (15 minutes).
 
 **Complete Documentation Suite**:
 
-- 📚 **[Documentation Index](../.claude/docs/flows/README.md)** - All flow documentation
-- 🚀 **[Quick Start Guide](../.claude/docs/flows/quick-start-guide.md)** - Create your first flow
-- 📖 **[Schema Reference](../.claude/docs/flows/schema-reference.md)** - Complete field documentation
-- 🎨 **[Pattern Catalog](../.claude/docs/flows/pattern-catalog.md)** - Annotated examples by use case
-- ✅ **[Best Practices](../.claude/docs/flows/best-practices.md)** - Optimization and design patterns
-- 🔧 **[Troubleshooting](../.claude/docs/flows/troubleshooting.md)** - Error reference and debugging
-- 📝 **[Input Types Guide](../.claude/docs/INPUT_TYPES_GUIDE.md)** - Complete reference for 21 input types
+-  **[Documentation Index](../.claude/docs/flows/README.md)** - All flow documentation
+-  **[Quick Start Guide](../.claude/docs/flows/quick-start-guide.md)** - Create your first flow
+-  **[Schema Reference](../.claude/docs/flows/schema-reference.md)** - Complete field documentation
+-  **[Pattern Catalog](../.claude/docs/flows/pattern-catalog.md)** - Annotated examples by use case
+-  **[Best Practices](../.claude/docs/flows/best-practices.md)** - Optimization and design patterns
+-  **[Troubleshooting](../.claude/docs/flows/troubleshooting.md)** - Error reference and debugging
+-  **[Input Types Guide](../.claude/docs/INPUT_TYPES_GUIDE.md)** - Complete reference for 21 input types
 
 ## Overview
 
@@ -590,7 +590,7 @@ steps:
 
 ### 1. Use Explicit Contexts
 
-✅ Good:
+ Good:
 
 ```yaml
 script: echo "${{ inputs.name }}"
@@ -598,7 +598,7 @@ script: echo "${{ steps.build.outputs.version }}"
 script: echo "${{ task.priority }}"
 ```
 
-❌ Bad (won't work):
+ Bad (won't work):
 
 ```yaml
 script: echo "${{ name }}" # Missing context

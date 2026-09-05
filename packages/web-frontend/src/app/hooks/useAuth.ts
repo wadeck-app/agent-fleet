@@ -158,7 +158,7 @@ export function useAuth(): UseAuthReturn {
 
 				if (!response.ok) {
 					const error = await response.json().catch(() => ({ message: 'Login failed' }));
-					throw new Error(error.message || `Login failed: ${response.status}`);
+					throw new Error((error instanceof Error ? error.message : String(error)) || `Login failed: ${response.status}`);
 				}
 
 				const data = await response.json();

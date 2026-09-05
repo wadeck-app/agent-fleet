@@ -24,7 +24,7 @@ const sharedDefine = {
 	'import.meta.url': '__importMetaUrl',
 	__FLOW_CLI_VERSION__: JSON.stringify(version),
 };
-const sharedBanner = { js: `const __importMetaUrl = require('url').pathToFileURL(__filename).href;` };
+const sharedBanner = { js: `const __importMetaUrl = require('node:url').pathToFileURL(__filename).href;` };
 
 // Inline extension-points/extension-points.json so PluginLoader works in standalone installs.
 // createRequire-based requires are not traced by esbuild; this plugin resolves them explicitly.

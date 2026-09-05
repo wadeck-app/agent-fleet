@@ -7,7 +7,7 @@
 Using `setTimeout` in tests creates flaky and inefficient tests:
 
 ```typescript
-// ❌ FLAKY: Race conditions and arbitrary delays
+//  FLAKY: Race conditions and arbitrary delays
 const onSubmit = vi.fn<[CreateBook], Promise<void>>(() => new Promise(resolve => setTimeout(resolve, 100)));
 
 fireEvent.click(submitButton);
@@ -25,15 +25,15 @@ await waitFor(() => {
 
 1. ⏰ **Too fast**: Test may check before loading state appears
 2. ⏰ **Too slow**: Wastes 100ms+ per test execution
-3. 🎲 **Non-deterministic**: Timing depends on system load
-4. 🐛 **False positives**: Tests may pass despite bugs in timing logic
+3.  **Non-deterministic**: Timing depends on system load
+4.  **False positives**: Tests may pass despite bugs in timing logic
 
 ### Solution: `createControllablePromise`
 
 Complete control over async timeline - resolve promises exactly when you're ready:
 
 ```typescript
-// ✅ DETERMINISTIC: Full control over timing
+//  DETERMINISTIC: Full control over timing
 const { fn: onSubmit, resolve } = createControllablePromise<[CreateBook], void>();
 
 render(<BookForm onSubmit={onSubmit} />);

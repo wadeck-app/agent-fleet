@@ -349,7 +349,7 @@ export class SSETransportClient implements ITransportClient {
 	/**
 	 * Make a type-safe request
 	 *
-	 * ⚠️ NOT SUPPORTED by SSE (unidirectional transport)
+	 *  NOT SUPPORTED by SSE (unidirectional transport)
 	 * Use REST API for requests instead.
 	 *
 	 * @throws Error Always throws - SSE does not support requests

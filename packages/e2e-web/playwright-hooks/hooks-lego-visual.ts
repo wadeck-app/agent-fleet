@@ -1,6 +1,6 @@
 import { test as base } from '@playwright/test';
-import { readFileSync } from 'fs';
-import path from 'path';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 const projectRoot = path.resolve(__dirname, '../../..');
 const tempFolder = path.resolve(projectRoot, 'packages/e2e-web/temp');
@@ -40,7 +40,7 @@ export const test = base.extend<TestFixtures>({
 			}
 		});
 		page.on('pageerror', error => {
-			console.log(`[Browser:pageerror] ${error.message}`);
+			console.log(`[Browser:pageerror] ${(error instanceof Error ? error.message : String(error))}`);
 		});
 		await use(page);
 	},

@@ -1,9 +1,9 @@
 import express, { type Express, type Request, type Response } from 'express';
 import type { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
-import { readFileSync } from 'fs';
-import type { Server as HttpServer, IncomingMessage } from 'http';
+import { readFileSync } from 'node:fs';
+import type { Server as HttpServer, IncomingMessage } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import path from 'path';
+import path from 'node:path';
 import { createLogger } from 'shared-common/logger';
 import type { TaskStatus } from 'shared-orch-worker/domain-types';
 

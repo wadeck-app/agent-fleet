@@ -299,7 +299,7 @@ export class TasksService {
 			} catch (error) {
 				failed.push({
 					id,
-					reason: error instanceof Error ? error.message : 'Unknown error',
+					reason: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error',
 					code: 'DELETE_FAILED',
 				});
 			}

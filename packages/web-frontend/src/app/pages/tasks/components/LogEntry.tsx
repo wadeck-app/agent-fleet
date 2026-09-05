@@ -21,12 +21,7 @@ const MESSAGE_TRUNCATE_LENGTH = 500;
  */
 export function LogEntry({ log, onExpand, isSelected = false, onClick }: LogEntryProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
-	const timestamp = new Date(log.timestamp).toLocaleTimeString('en-US', {
-		hour: '2-digit',
-		minute: '2-digit',
-		second: '2-digit',
-		hour12: false,
-	});
+	const timestamp = new Date(log.timestamp).toISOString().slice(11, 19);
 
 	// Detect stream-json event types
 	const eventType = log.metadata?.eventType as string | undefined;

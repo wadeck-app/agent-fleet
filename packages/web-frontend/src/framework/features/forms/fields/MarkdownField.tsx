@@ -48,7 +48,7 @@ export function MarkdownField({
 	const inputId = generateFieldId(label, id);
 	const [showPreview, setShowPreview] = useState(false);
 
-	// ⚠️ WARNING -- FIX ME (XSS)
+	//  WARNING -- FIX ME (XSS)
 	// renderMarkdownPreview injects regex-substituted HTML via dangerouslySetInnerHTML
 	// without escaping $1 capture groups first. A value containing e.g.
 	//   **<img onerror=alert(1)>**

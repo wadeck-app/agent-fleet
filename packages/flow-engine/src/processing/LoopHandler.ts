@@ -163,11 +163,11 @@ export class LoopHandler {
 		// Log loop information
 		const maxIterations = step.onFailure?.maxIterations ?? 3;
 		console.log(
-			`\n🔄 [LOOP] Step '${step.id}' failed - returning to '${targetStepId}' (iteration ${currentIteration}/${maxIterations})`
+			`\n [LOOP] Step '${step.id}' failed - returning to '${targetStepId}' (iteration ${currentIteration}/${maxIterations})`
 		);
-		console.log(`   📝 Invalidated ${invalidatedSteps.length} step(s): ${invalidatedSteps.join(', ')}`);
+		console.log(`    Invalidated ${invalidatedSteps.length} step(s): ${invalidatedSteps.join(', ')}`);
 		if (skippedSteps.length > 0) {
-			console.log(`   ⏭️  Skipped ${skippedSteps.length} step(s) (skipOnLoop=true): ${skippedSteps.join(', ')}`);
+			console.log(`   ⏭  Skipped ${skippedSteps.length} step(s) (skipOnLoop=true): ${skippedSteps.join(', ')}`);
 		}
 
 		return {
@@ -235,7 +235,7 @@ export class LoopHandler {
 				if (oldCount > 0) {
 					iterations.delete(step.id);
 					console.log(
-						`   🔄 Reset iteration counter for '${step.id}' (was ${oldCount}) due to resetOnSuccess`
+						`    Reset iteration counter for '${step.id}' (was ${oldCount}) due to resetOnSuccess`
 					);
 				}
 			}

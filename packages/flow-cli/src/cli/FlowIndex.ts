@@ -40,7 +40,7 @@ Status --json fields (flow status --json):
 
 Environment variables:
   XDG_CONFIG_HOME   Override base config directory (default: ~/.config)
-  FLOW_DAEMON_MODE  Internal — set to "1" by "flow start" to launch daemon mode
+  FLOW_DAEMON_MODE  Internal - set to "1" by "flow start" to launch daemon mode
 
 Daemon-required commands: run, start, stop, status
 Standalone commands:      show, validate, history, docs, logs, cli`;

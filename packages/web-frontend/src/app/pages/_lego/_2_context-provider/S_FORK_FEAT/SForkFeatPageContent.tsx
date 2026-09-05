@@ -58,7 +58,7 @@ export function SForkFeatPageContent() {
 		() => [
 			{
 				key: '__bookmark__' as keyof Product & string,
-				label: '⭐',
+				label: '',
 				type: 'custom',
 				render: (item: Product) => (
 					<Button
@@ -87,7 +87,7 @@ export function SForkFeatPageContent() {
 					<Button variant={!showOnlyBookmarked ? 'default' : 'outline'} onClick={() => setShowOnlyBookmarked(false)}>All</Button>
 					<Button variant={showOnlyBookmarked ? 'default' : 'outline'} onClick={() => setShowOnlyBookmarked(true)}>Bookmarked</Button>
 				</div>
-				<Badge variant="secondary">⭐ {bookmarkedIds.size} bookmarked</Badge>
+				<Badge variant="secondary"> {bookmarkedIds.size} bookmarked</Badge>
 			</div>
 
 			<PageLayout>

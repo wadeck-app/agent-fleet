@@ -93,9 +93,9 @@ describe('ProjectsV2Page', () => {
 			// Step 3: BUG: URL reverts back to jz52yz1uq instead of staying on wwuypfn8p
 			//
 			// Expected console logs (from agent-browser):
-			// ✅ FLUSHING: projectId=wwuypfn8p
-			// ❌ FLUSHING: projectId=jz52yz1uq&workspaceId=... (STALE CLOSURE BUG!)
-			// ❌ External URL change detected {urlValue: jz52yz1uq, lastSynced: wwuypfn8p}
+			//  FLUSHING: projectId=wwuypfn8p
+			//  FLUSHING: projectId=jz52yz1uq&workspaceId=... (STALE CLOSURE BUG!)
+			//  External URL change detected {urlValue: jz52yz1uq, lastSynced: wwuypfn8p}
 
 			const projects: Project[] = [
 				{

@@ -79,13 +79,13 @@ export class FlowOrchestrator {
 			const validation = this.dagValidator.validate(dag);
 
 			if (!validation.valid) {
-				const errorMessages = validation.errors.map(e => e.message).join('; ');
+				const errorMessages = validation.errors.map(e => (e instanceof Error ? e.message : String(e))).join('; ');
 				throw new OrchestrationError(`DAG validation failed: ${errorMessages}`, flow.id);
 			}
 
 			// Log warnings if any
 			if (validation.warnings.length > 0) {
-				console.warn(`⚠️  DAG validation warnings for flow '${flow.id}':`);
+				console.warn(`  DAG validation warnings for flow '${flow.id}':`);
 				for (const warning of validation.warnings) {
 					console.warn(`   - ${warning.message}`);
 				}
@@ -99,7 +99,7 @@ export class FlowOrchestrator {
 			trace.status = 'failed';
 			trace.endTime = Date.now();
 
-			const errorMessage = error instanceof Error ? error.message : String(error);
+			const errorMessage = error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error);
 
 			return {
 				success: false,
@@ -228,7 +228,7 @@ export class FlowOrchestrator {
 		trace.status = 'completed';
 		trace.endTime = Date.now();
 
-		console.log(`\n✅ Flow '${flow.id}' completed successfully! Executed ${trace.steps.length} steps.`);
+		console.log(`\n Flow '${flow.id}' completed successfully! Executed ${trace.steps.length} steps.`);
 
 		return {
 			success: true,
@@ -251,7 +251,7 @@ export class FlowOrchestrator {
 			.padStart(2, '0')}.${startDate.getMilliseconds().toString().padStart(3, '0')}`;
 
 		console.log(
-			`\n▶️  [${startTimeStr}] Executing ${ready.length} step(s) in parallel: ${ready.map(s => s.id).join(', ')}`
+			`\n  [${startTimeStr}] Executing ${ready.length} step(s) in parallel: ${ready.map(s => s.id).join(', ')}`
 		);
 	}
 
@@ -269,7 +269,7 @@ export class FlowOrchestrator {
 			.padStart(2, '0')}.${endDate.getMilliseconds().toString().padStart(3, '0')}`;
 
 		const duration = ((endTime - startTime) / 1000).toFixed(3);
-		console.log(`   ⏱️  [${endTimeStr}] Completed in ${duration}s`);
+		console.log(`   ⏱  [${endTimeStr}] Completed in ${duration}s`);
 	}
 
 	/**

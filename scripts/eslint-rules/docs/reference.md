@@ -3,7 +3,7 @@
 _Moved from README -- see [README](../README.md) for the overview._
 
 ```typescript
-// ❌ BAD - Will be flagged
+//  BAD - Will be flagged
 try {
 	await loadProjects();
 } catch (error) {
@@ -14,7 +14,7 @@ try {
 **Solution**:
 
 ```typescript
-// ✅ GOOD
+//  GOOD
 try {
 	await loadProjects();
 } catch (error) {
@@ -39,7 +39,7 @@ try {
 **Detects**:
 
 ```typescript
-// ❌ BAD - Will be flagged
+//  BAD - Will be flagged
 const response = await api.getProjects();
 const ids = response.items.map(p => p.id); // Crashes if items is undefined
 ```
@@ -47,7 +47,7 @@ const ids = response.items.map(p => p.id); // Crashes if items is undefined
 **Solution**:
 
 ```typescript
-// ✅ GOOD
+//  GOOD
 const response = await api.getProjects();
 const ids = (response.items || []).map(p => p.id); // Safe
 ```

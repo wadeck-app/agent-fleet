@@ -195,7 +195,7 @@ export function WorkspacePanel({ workspace, projectId, activeView, onViewChange 
 								) : (
 									<div className="flex h-full items-center justify-center">
 										<div className="text-center">
-											<div className="mb-2 text-4xl text-muted-foreground">📋</div>
+											<div className="mb-2 text-4xl text-muted-foreground"></div>
 											<p className="text-sm text-muted-foreground">No tasks in this workspace</p>
 										</div>
 									</div>

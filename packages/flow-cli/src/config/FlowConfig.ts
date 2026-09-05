@@ -4,7 +4,7 @@
  * Source of truth for all defaults and user-overridable values.
  * User config file: ~/.flow-config.yaml
  *
- * ⚠️  RULE: Adding a new config value requires ALL of the following steps:
+ *   RULE: Adding a new config value requires ALL of the following steps:
  *   1. Add to FlowConfigData interface with JSDoc.
  *   2. Add to FlowConfig.DEFAULT with the default value.
  *   3. Add to FlowConfig.load() merge (spread the new section).

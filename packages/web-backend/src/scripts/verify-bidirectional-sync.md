@@ -94,13 +94,13 @@ The `workspaceIds` array should now contain the workspace UUID!
 
 The test file `WorkspacesService.bidirectional-sync.test.ts` covers:
 
-1. ✅ Adding workspace to project (setting projectId)
-2. ✅ Removing workspace from project (setting projectId to null)
-3. ✅ Reassigning workspace between projects
-4. ✅ Using canonical UUID instead of hash-based ID
-5. ✅ Handling non-existent projects gracefully
-6. ✅ Emitting B2F_PROJECT_UPDATED events
-7. ✅ Not triggering sync when projectId doesn't change
+1.  Adding workspace to project (setting projectId)
+2.  Removing workspace from project (setting projectId to null)
+3.  Reassigning workspace between projects
+4.  Using canonical UUID instead of hash-based ID
+5.  Handling non-existent projects gracefully
+6.  Emitting B2F_PROJECT_UPDATED events
+7.  Not triggering sync when projectId doesn't change
 
 ## Files Changed
 
@@ -113,8 +113,8 @@ The test file `WorkspacesService.bidirectional-sync.test.ts` covers:
 
 ## Success Criteria
 
-- ✅ TypeScript compiles without errors
-- ✅ Tests pass
-- ✅ Manual verification shows workspace appearing in project
-- ✅ Workspace count on tab badge shows "1"
-- ✅ Workspace persists after page refresh
+-  TypeScript compiles without errors
+-  Tests pass
+-  Manual verification shows workspace appearing in project
+-  Workspace count on tab badge shows "1"
+-  Workspace persists after page refresh

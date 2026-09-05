@@ -98,11 +98,11 @@ export class WebSocketConnectionManager {
 			log.info(`[WS] Registered ${availableFlows.length} flows for worker ${workerId} (project: ${projectId})`);
 		} catch (error) {
 			if (error instanceof FlowVersionMismatchError) {
-				log.error(`[WS] Flow version mismatch for worker ${workerId}: ${error.message}`);
+				log.error(`[WS] Flow version mismatch for worker ${workerId}: ${(error instanceof Error ? error.message : String(error))}`);
 				this.sendMessage(
 					socket,
 					createO2WMessage(O2WMessageType.ERROR, {
-						error: error.message,
+						error: (error instanceof Error ? error.message : String(error)),
 					})
 				);
 				socket.close();
@@ -353,18 +353,18 @@ export class WebSocketConnectionManager {
 			}
 		} catch (error) {
 			if (error instanceof FlowVersionMismatchError) {
-				log.error(`[WS] Flow version mismatch for worker ${workerId}: ${error.message}`);
+				log.error(`[WS] Flow version mismatch for worker ${workerId}: ${(error instanceof Error ? error.message : String(error))}`);
 				const worker = this.workers.get(workerId);
 				if (worker) {
 					this.sendMessage(
 						worker.socket,
 						createO2WMessage(O2WMessageType.ERROR, {
-							error: error.message,
+							error: (error instanceof Error ? error.message : String(error)),
 						})
 					);
 				}
 			} else {
-				log.error(`[WS] Error updating flows for worker ${workerId}: ${(error as Error).message}`);
+				log.error(`[WS] Error updating flows for worker ${workerId}: ${(error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error))}`);
 			}
 		}
 	}

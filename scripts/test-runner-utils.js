@@ -7,10 +7,10 @@
 // Track all spawned processes for cleanup
 // Windows: Use taskkill with /T (tree) and /F (force)
 // /T kills the entire process tree (npm → node → backend)
-import { exec } from 'child_process';
-import fs from 'fs';
+import { exec } from 'node:child_process';
+import fs from 'node:fs';
 import { globSync } from 'glob';
-import path from 'path';
+import path from 'node:path';
 
 const spawnedProcesses = new Set();
 let isShuttingDown = false;
@@ -74,7 +74,7 @@ async function cleanupOrphanedBackendServers() {
 					try {
 						// Check if process is still running
 						if (process.platform === 'win32') {
-							const { exec } = require('child_process');
+							const { exec } = require('node:child_process');
 							exec(`taskkill /PID ${server.pid} /T /F`, () => {
 								// Ignore errors - process might already be dead
 							});

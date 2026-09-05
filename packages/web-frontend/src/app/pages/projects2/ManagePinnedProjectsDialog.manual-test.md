@@ -32,9 +32,9 @@ const handlePin = async (projectId: string) => {
 
 **Current Bug:**
 
-- Project appears in left panel immediately ✅
-- NO loading state visible ❌
-- After API, project jumps to different position ❌
+- Project appears in left panel immediately 
+- NO loading state visible 
+- After API, project jumps to different position 
 
 ### Scenario 2: UNPIN with Delay
 
@@ -48,7 +48,7 @@ const handlePin = async (projectId: string) => {
 
 **Current Behavior:**
 
-- Works correctly ✅
+- Works correctly 
 
 ### Scenario 3: REORDER with Delay
 
@@ -62,8 +62,8 @@ const handlePin = async (projectId: string) => {
 
 **Current Bug:**
 
-- Projects reorder immediately ✅
-- NO reordering state visible ❌
+- Projects reorder immediately 
+- NO reordering state visible 
 
 ## Debug Checklist
 

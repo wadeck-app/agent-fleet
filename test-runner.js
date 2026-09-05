@@ -1,4 +1,4 @@
-const { execSync } = require('child_process');
+const { execSync } = require('node:child_process');
 
 try {
 	const result = execSync('npm test -- usePanelLayout.test.tsx', {

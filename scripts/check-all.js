@@ -10,9 +10,9 @@
  * - Shows combined results from all checks
  */
 import chalk from 'chalk';
-import { spawn } from 'child_process';
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { spawn } from 'node:child_process';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

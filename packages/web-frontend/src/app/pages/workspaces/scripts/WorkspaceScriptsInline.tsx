@@ -23,7 +23,7 @@ interface WorkspaceScriptsInlineProps {
  * - Control buttons (Start/Stop/Restart) based on status
  *
  * Example:
- * Scripts: • backend(:3001) [Stop][Restart]  • frontend(:3000) [Stop][Restart]  ⚠ typecheck [Start]  ○ test [Start]
+ * Scripts: • backend(:3001) [Stop][Restart]  • frontend(:3000) [Stop][Restart]   typecheck [Start]  ○ test [Start]
  */
 export function WorkspaceScriptsInline({ workspaceId, onScriptClick }: WorkspaceScriptsInlineProps) {
 	const { scripts, loading, error } = useWorkspaceScripts({ workspaceId });

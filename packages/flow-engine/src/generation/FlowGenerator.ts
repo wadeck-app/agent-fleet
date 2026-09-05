@@ -135,7 +135,7 @@ export class FlowGenerator {
 			: { valid: true, issues: [], summary: { errors: 0, warnings: 0, info: 0 } };
 
 		if (!validationResult.valid) {
-			notes.push(`⚠ Generated flow has ${validationResult.summary.errors} validation errors`);
+			notes.push(` Generated flow has ${validationResult.summary.errors} validation errors`);
 		}
 
 		return {
@@ -272,7 +272,7 @@ export class FlowGenerator {
 			case 'conditional':
 				return this.generateConditionalSteps(requirements, constraints);
 			default:
-				return this.generateLinearPipelineSteps(requirements, constraints);
+				throw new Error(`Unexpected switch value`);
 		}
 	}
 

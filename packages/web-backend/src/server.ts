@@ -10,13 +10,13 @@ import dotenv from 'dotenv';
 // Now import everything else
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 // File logger for debugging shutdown (console logs may be lost when tsx kills process)
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import { Orchestrator } from 'orchestrator';
-import * as os from 'os';
-import * as path from 'path';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { getOrchestratorPortsFromEnv } from 'shared-common/PortCalculator';
 import { createLogger } from 'shared-common/logger';
-import { fileURLToPath } from 'url';
+import { fileURLToPath } from 'node:url';
 
 import { TransportsController } from './controllers/TransportsController';
 import type { DataStoreFactory } from './factories';
@@ -223,17 +223,17 @@ if (process.env.E2E_MODE === 'true') {
 // SECURITY: Prevent DISABLE_AUTH_DEV in production
 // This is a HARD FAIL to prevent accidental deployment with auth disabled
 if (process.env.NODE_ENV === 'production' && process.env.DISABLE_AUTH_DEV === 'true') {
-	log.error('❌ FATAL SECURITY ERROR: DISABLE_AUTH_DEV=true in production environment!');
-	log.error('❌ Authentication bypass is ONLY allowed in development mode.');
-	log.error('❌ Server startup aborted to prevent security breach.');
+	log.error(' FATAL SECURITY ERROR: DISABLE_AUTH_DEV=true in production environment!');
+	log.error(' Authentication bypass is ONLY allowed in development mode.');
+	log.error(' Server startup aborted to prevent security breach.');
 	process.exit(1);
 }
 
 // WARNING: Log if auth is disabled in development (for visibility)
 if (process.env.DISABLE_AUTH_DEV === 'true') {
-	log.warn('⚠️  WARNING: Authentication is DISABLED (DISABLE_AUTH_DEV=true)');
-	log.warn('⚠️  This is ONLY safe in development mode!');
-	log.warn('⚠️  All requests will be authenticated as mock user: dev-user-no-auth');
+	log.warn('  WARNING: Authentication is DISABLED (DISABLE_AUTH_DEV=true)');
+	log.warn('  This is ONLY safe in development mode!');
+	log.warn('  All requests will be authenticated as mock user: dev-user-no-auth');
 }
 
 /**
@@ -245,12 +245,12 @@ if (process.env.DISABLE_AUTH_DEV === 'true') {
  * - Controllers (HTTP layer) → Services (business logic) → Repositories (data access) → Storage
  *
  * Benefits:
- * ✅ Separation of concerns (controller / service / repository / storage)
- * ✅ Dependency injection via DataStoreFactory
- * ✅ Perfect type safety with Zod contracts
- * ✅ Lazy controller loading (created only on first request)
- * ✅ Query builder for complex queries (in-memory for tests, SQL for prod)
- * ✅ Easy to test (mock services, mock storage)
+ *  Separation of concerns (controller / service / repository / storage)
+ *  Dependency injection via DataStoreFactory
+ *  Perfect type safety with Zod contracts
+ *  Lazy controller loading (created only on first request)
+ *  Query builder for complex queries (in-memory for tests, SQL for prod)
+ *  Easy to test (mock services, mock storage)
  *
  * ===========================================================================================
  */
@@ -458,7 +458,7 @@ function logToFile(message: string) {
 const signals = ['SIGTERM', 'SIGINT', 'SIGBREAK'] as const;
 signals.forEach(signal => {
 	process.on(signal, async () => {
-		logToFile(`🚨 ${signal} SIGNAL RECEIVED 🚨`);
+		logToFile(` ${signal} SIGNAL RECEIVED `);
 		// Signal already logged by log.info below
 		log.info(`${signal} signal received: initiating graceful shutdown`);
 		try {
@@ -827,8 +827,8 @@ async function start(): Promise<void> {
 		}
 	} catch (err) {
 		// Always log startup errors
-		logToFile(`❌ FATAL ERROR: ${err}`);
-		log.error('❌ FATAL: Failed to start backend server:', err);
+		logToFile(` FATAL ERROR: ${err}`);
+		log.error(' FATAL: Failed to start backend server:', err);
 		process.exit(1);
 	}
 }

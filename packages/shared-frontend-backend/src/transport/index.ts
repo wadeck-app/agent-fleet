@@ -1,3 +1,4 @@
+// violations-suppress: ts/no-barrel-index pre-existing public API barrel -- consumers import from this path
 /**
  * Transport Layer - Phase 1: Shared Types
  *

@@ -256,7 +256,7 @@ export class HttpPollingTransportClient implements ITransportClient {
 	/**
 	 * Make a type-safe request
 	 *
-	 * ⚠️ NOT SUPPORTED by HTTP Polling (unidirectional transport)
+	 *  NOT SUPPORTED by HTTP Polling (unidirectional transport)
 	 * Use REST API for requests instead.
 	 *
 	 * @throws Error Always throws - HTTP Polling does not support requests

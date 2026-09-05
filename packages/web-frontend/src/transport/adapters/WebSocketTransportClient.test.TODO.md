@@ -152,8 +152,8 @@ The mock needs to properly simulate WebSocket behavior:
 
 ### DO NOT Include
 
-- ❌ `waitForOpen()` method - Causes timing issues
-- ❌ `queueMicrotask` for async operations - Use `setTimeout(fn, 0)` instead
+-  `waitForOpen()` method - Causes timing issues
+-  `queueMicrotask` for async operations - Use `setTimeout(fn, 0)` instead
 
 ---
 

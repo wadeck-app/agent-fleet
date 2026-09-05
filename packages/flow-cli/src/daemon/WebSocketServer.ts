@@ -63,7 +63,7 @@ export class WebSocketServer {
 		});
 		ws.on('close', () => this.onClose(ws));
 		ws.on('error', (err: Error) => {
-			process.stderr.write(`[WebSocketServer] connection error: ${err.message}\n`);
+			process.stderr.write(`[WebSocketServer] connection error: ${(err instanceof Error ? err.message : String(err))}\n`);
 			ws.terminate();
 		});
 	}

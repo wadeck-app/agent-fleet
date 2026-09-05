@@ -46,7 +46,7 @@ FlowExecutor.test.ts
 - All documentation, code, and tests in English
 - Keep docs concise - reference actual code instead of excerpts
 - Examples must link to existing codebase files
-- **Context-efficient:** Success = minimal signal (✓), Failure = full context. See https://www.humanlayer.dev/blog/context-efficient-backpressure
+- **Context-efficient:** Success = minimal signal (), Failure = full context. See https://www.humanlayer.dev/blog/context-efficient-backpressure
 
 ## Requirements
 
@@ -77,8 +77,8 @@ FlowExecutor.test.ts
 
 **Example:**
 
-- ❌ "Vous avez raison! Je n'ai pas vérifié..."
-- ✅ "Let me verify if the event is actually sent. Adding logs to trace the flow."
+-  "Vous avez raison! Je n'ai pas verifie..."
+-  "Let me verify if the event is actually sent. Adding logs to trace the flow."
 
 If the user is wrong, say it. If you disagree, explain why. Act as a peer, not a servant.
 

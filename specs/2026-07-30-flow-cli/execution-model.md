@@ -58,7 +58,7 @@ The daemon owns all execution intelligence. Workers are dumb step executors.
 `queue.concurrency` in `~/.flow-config.yaml` defines the global worker pool size. Workers are not bound to a flow -- they pull from a shared ready-step queue fed by all active executions.
 
 ```
-Active flows:  FlowA (steps: s1✓ s2 s3)   FlowB (steps: t1 t2)
+Active flows:  FlowA (steps: s1 s2 s3)   FlowB (steps: t1 t2)
                                   |                  |
                          Global ready-step queue: [ s2, s3, t1, t2 ]
                                          |

@@ -30,7 +30,7 @@ async function createTask(request: CreateTaskRequest): Promise<void> {
 		}
 
 		const task = (await response.json()) as Task;
-		console.log('✅ Task created successfully:');
+		console.log(' Task created successfully:');
 		console.log(`   ID: ${task.id}`);
 		console.log(`   Description: ${task.description}`);
 		console.log(`   Status: ${task.status}`);
@@ -42,7 +42,7 @@ async function createTask(request: CreateTaskRequest): Promise<void> {
 			}
 		}
 	} catch (error) {
-		console.error('❌ Error creating task:', (error as Error).message);
+		console.error(' Error creating task:', (error as Error).message);
 		process.exit(1);
 	}
 }
@@ -62,7 +62,7 @@ async function listTasks(): Promise<void> {
 			return;
 		}
 
-		console.log(`\n📋 Tasks (${tasks.length} total):\n`);
+		console.log(`\n Tasks (${tasks.length} total):\n`);
 		tasks.forEach(task => {
 			console.log(
 				`  [${task.status}] ${task.id.substring(0, 8)}... - ${task.description.substring(0, 60)}${task.description.length > 60 ? '...' : ''}`
@@ -70,7 +70,7 @@ async function listTasks(): Promise<void> {
 		});
 		console.log();
 	} catch (error) {
-		console.error('❌ Error listing tasks:', (error as Error).message);
+		console.error(' Error listing tasks:', (error as Error).message);
 		process.exit(1);
 	}
 }
@@ -91,7 +91,7 @@ async function showStats(): Promise<void> {
 			tasks: { total: number; byStatus: Record<string, number> };
 		};
 
-		console.log('\n📊 Orchestrator Statistics:\n');
+		console.log('\n Orchestrator Statistics:\n');
 		console.log(`  REST Port: ${stats.restPort}`);
 		console.log(`  WebSocket Port: ${stats.wsPort}`);
 		console.log(`  Workers: ${stats.workers}`);
@@ -112,7 +112,7 @@ async function showStats(): Promise<void> {
 			console.log();
 		}
 	} catch (error) {
-		console.error('❌ Error fetching stats:', (error as Error).message);
+		console.error(' Error fetching stats:', (error as Error).message);
 		process.exit(1);
 	}
 }
@@ -133,7 +133,7 @@ async function resolvePartialTaskId(partialId: string): Promise<string> {
 	}
 
 	if (matches.length > 1) {
-		console.error(`❌ Ambiguous task ID "${partialId}". Multiple matches found:`);
+		console.error(` Ambiguous task ID "${partialId}". Multiple matches found:`);
 		matches.forEach(task => {
 			console.error(
 				`   ${task.id} - ${task.description.substring(0, 60)}${task.description.length > 60 ? '...' : ''}`
@@ -160,9 +160,9 @@ async function deleteTask(taskId: string): Promise<void> {
 			throw new Error(error.error || 'Failed to delete task');
 		}
 
-		console.log(`✅ Task ${fullTaskId.substring(0, 8)}... deleted successfully`);
+		console.log(` Task ${fullTaskId.substring(0, 8)}... deleted successfully`);
 	} catch (error) {
-		console.error('❌ Error deleting task:', (error as Error).message);
+		console.error(' Error deleting task:', (error as Error).message);
 		process.exit(1);
 	}
 }
@@ -178,9 +178,9 @@ async function clearAllTasks(): Promise<void> {
 		}
 
 		const result = (await response.json()) as { message: string };
-		console.log(`✅ ${result.message}`);
+		console.log(` ${result.message}`);
 	} catch (error) {
-		console.error('❌ Error clearing tasks:', (error as Error).message);
+		console.error(' Error clearing tasks:', (error as Error).message);
 		process.exit(1);
 	}
 }
@@ -219,7 +219,7 @@ if (!command) {
 switch (command) {
 	case 'create': {
 		if (!args[1]) {
-			console.error('❌ Error: Description is required');
+			console.error(' Error: Description is required');
 			console.log(
 				'Usage: npm run add-task -- create <description> [priority] [flowId] [--workspace <path>] [-i:key=value]'
 			);
@@ -280,7 +280,7 @@ switch (command) {
 
 	case 'delete':
 		if (!args[1]) {
-			console.error('❌ Error: Task ID is required');
+			console.error(' Error: Task ID is required');
 			console.log('Usage: npm run add-task -- delete <taskId>');
 			console.log('Note: You can use a partial ID (e.g., first 6-8 characters)');
 			process.exit(1);
@@ -293,7 +293,7 @@ switch (command) {
 		break;
 
 	default:
-		console.error(`❌ Unknown command: ${command}`);
+		console.error(` Unknown command: ${command}`);
 		console.log('Available commands: create, list, stats, delete, clear');
 		process.exit(1);
 }

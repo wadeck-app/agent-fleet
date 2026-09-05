@@ -1,7 +1,7 @@
-import { copyFile, mkdir, readFile, readdir, writeFile } from 'fs/promises';
-import { dirname, join } from 'path';
+import { copyFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { createLogger } from 'shared-common/logger';
-import { fileURLToPath } from 'url';
+import { fileURLToPath } from 'node:url';
 
 import type { Task as BackendTask } from '@app/shared/api/tasks.contract';
 

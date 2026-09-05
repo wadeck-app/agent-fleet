@@ -1,5 +1,5 @@
-import { mkdir, readFile, writeFile } from 'fs/promises';
-import { dirname, join } from 'path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { createLogger } from 'shared-common/logger';
 
 import type { BaseEntity } from '@app/shared/common/base-entity';

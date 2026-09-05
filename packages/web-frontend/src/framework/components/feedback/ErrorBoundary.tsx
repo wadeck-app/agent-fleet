@@ -113,7 +113,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 			case ErrorSeverity.CRITICAL:
 				return 'border-destructive bg-destructive/10';
 			default:
-				return 'border-destructive bg-destructive/10';
+				throw new Error(`Unexpected switch value`);
 		}
 	}
 
@@ -131,7 +131,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 			case ErrorSeverity.CRITICAL:
 				return AlertCircle;
 			default:
-				return AlertTriangle;
+				throw new Error(`Unexpected switch value`);
 		}
 	}
 
@@ -174,7 +174,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 								<div className="mt-2 space-y-2">
 									<div>
 										<strong className="text-xs">Message:</strong>
-										<pre className="mt-1 overflow-auto text-xs">{error.message}</pre>
+										<pre className="mt-1 overflow-auto text-xs">{(error instanceof Error ? error.message : String(error))}</pre>
 									</div>
 									<div>
 										<strong className="text-xs">Severity:</strong>

@@ -11,8 +11,10 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { FlowConfigLoader } from '../../config/FlowConfig.js';
 import { PluginLoader } from '../../config/PluginLoader.js';
+// violations-suppress-end: ts/no-deep-relative
 
 // Injected by esbuild at bundle time via define; falls back to package.json in dev mode (tsx).
 declare const __FLOW_CLI_VERSION__: string;

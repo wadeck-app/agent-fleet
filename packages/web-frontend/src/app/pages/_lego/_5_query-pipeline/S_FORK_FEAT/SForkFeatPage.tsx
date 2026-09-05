@@ -26,10 +26,10 @@ import { SForkFeatContent } from './SForkFeatContent';
  * - Search (via PipelineSearch)
  * - Pagination (10 items per page)
  * - Sorting (via column headers)
- * - Bookmark button (⭐) per row
+ * - Bookmark button () per row
  * - Bookmarked IDs stored in localStorage (key: lego-bookmarks-a5)
  * - Toolbar toggle: "All" | "Bookmarked only"
- * - Bookmark count: "⭐ X bookmarked"
+ * - Bookmark count: " X bookmarked"
  *
  * Architecture:
  * - PipelineDataTable provides base context with search/pagination

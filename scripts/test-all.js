@@ -6,9 +6,9 @@
  * Runs all test types (unit + E2E) and displays a clean summary
  */
 import chalk from 'chalk';
-import { spawn } from 'child_process';
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { spawn } from 'node:child_process';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { testSuiteType_E2E_FUNC, testSuiteType_UNIT, testSuiteType_VISUAL, testSuites } from './test-config.js';
 import { cleanupAllProcesses, registerCleanupHandlers, trackProcess } from './test-runner-utils.js';

@@ -1,4 +1,4 @@
-import { execSync, spawn } from 'child_process';
+import { execSync, spawn } from 'node:child_process';
 import { FlowCapabilitiesGenerator, type FlowRegistry } from 'flow-engine';
 import type { FlowDefinition } from 'flow-engine/src/types';
 import * as yaml from 'js-yaml';

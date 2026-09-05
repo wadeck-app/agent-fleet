@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Resolve tsx and TaskIndex.ts relative to this file so the binary works globally via npm link
-import { spawn } from 'child_process';
-import { existsSync } from 'fs';
-import { createRequire } from 'module';
-import { dirname, join, resolve } from 'path';
-import { fileURLToPath } from 'url';
+import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const packageDir = resolve(__dirname, '..');

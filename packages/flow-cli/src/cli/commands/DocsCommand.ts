@@ -1,6 +1,6 @@
 import type { Command } from 'commander';
 import { FlowCapabilitiesGenerator } from 'flow-engine';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 
 export function registerDocsCommand(program: Command): void {
 	program
@@ -18,7 +18,7 @@ export function registerDocsCommand(program: Command): void {
 					console.error(`Failed to write to ${options.output}.`);
 					process.exit(1);
 				}
-				console.log(`✓ Docs written to ${options.output}`);
+				console.log(` Docs written to ${options.output}`);
 			} else {
 				process.stdout.write(content + '\n');
 			}

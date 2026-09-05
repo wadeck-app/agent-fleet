@@ -5,7 +5,7 @@ _Moved from README -- see [README](../README.md) for the overview._
 ├── FlowEditorPage.tsx              # Page principale
 ├── FlowEditorCanvas.tsx            # Canvas Xyflow
 ├── FlowEditorToolbar.tsx           # Barre d'outils
-├── FlowEditorPropertiesPanel.tsx  # Panneau de propriétés
+├── FlowEditorPropertiesPanel.tsx  # Panneau de proprietes
 ├── FlowEditorValidationPanel.tsx  # Panneau de validation
 ├── types.ts                        # Types TypeScript
 ├── nodes/
@@ -14,7 +14,7 @@ _Moved from README -- see [README](../README.md) for the overview._
 │   ├── SubFlowStepNode.tsx        # Node pour subflow step
 │   └── index.ts                   # Export des node types
 ├── edges/
-│   ├── DependencyEdge.tsx         # Edge pour dépendances
+│   ├── DependencyEdge.tsx         # Edge pour dependances
 │   ├── LoopEdge.tsx               # Edge pour loops
 │   └── index.ts                   # Export des edge types
 ├── hooks/
@@ -22,35 +22,35 @@ _Moved from README -- see [README](../README.md) for the overview._
 │   ├── useFlowValidation.ts       # Hook de validation
 │   └── index.ts
 ├── utils/
-│   ├── flowToReactFlow.ts         # Sérialisation YAML → Xyflow
-│   ├── reactFlowToFlow.ts         # Sérialisation Xyflow → YAML
+│   ├── flowToReactFlow.ts         # Serialisation YAML → Xyflow
+│   ├── reactFlowToFlow.ts         # Serialisation Xyflow → YAML
 │   ├── layoutAlgorithms.ts        # Algorithmes de layout
 │   └── cn.ts                      # Utilitaire classnames
 └── README.md                       # Cette documentation
 ```
 
-## 🔧 Technologies
+##  Technologies
 
-- **Xyflow v12** - Bibliothèque de graphs interactifs
+- **Xyflow v12** - Bibliotheque de graphs interactifs
 - **Dagre** - Algorithme de layout hierarchique
 - **Radix UI** - Composants UI accessibles
 - **Tailwind CSS** - Styling
 - **React 19** - Framework
 
-## 📝 Routes
+##  Routes
 
-- `/flows/new` - Créer un nouveau flow
-- `/flows/:flowId/edit` - Éditer un flow existant
+- `/flows/new` - Creer un nouveau flow
+- `/flows/:flowId/edit` - Editer un flow existant
 
-## 🎨 Composants Visuels
+##  Composants Visuels
 
 ### Nodes
 
 Chaque type de step a son propre composant visual :
 
-- **ModelStepNode** : Icône 🧠, badge model (sonnet/haiku/opus)
-- **ScriptStepNode** : Icône ⌨️, badge "script"
-- **SubFlowStepNode** : Icône 🔄, badge flowId
+- **ModelStepNode** : Icone , badge model (sonnet/haiku/opus)
+- **ScriptStepNode** : Icone , badge "script"
+- **SubFlowStepNode** : Icone , badge flowId
 
 Tous les nodes affichent :
 
@@ -61,16 +61,16 @@ Tous les nodes affichent :
 
 ### Edges
 
-- **DependencyEdge** : Ligne pleine pour dépendances (`depends`)
-- **LoopEdge** : Ligne pointillée animée pour loops (`onFailure.goto`)
+- **DependencyEdge** : Ligne pleine pour dependances (`depends`)
+- **LoopEdge** : Ligne pointillee animee pour loops (`onFailure.goto`)
 
-## 🚦 États de Validation
+##  Etats de Validation
 
-- ✅ **Vert** : Pas d'erreur
-- ⚠️ **Orange** : Warnings
-- ❌ **Rouge** : Erreurs critiques
+-  **Vert** : Pas d'erreur
+-  **Orange** : Warnings
+-  **Rouge** : Erreurs critiques
 
-## 💾 Sérialisation
+##  Serialisation
 
 ### FlowDefinition → React Flow
 
@@ -79,7 +79,7 @@ const { nodes, edges } = flowDefinitionToReactFlow(flowDefinition);
 ```
 
 - Convertit les `steps[]` en nodes Xyflow
-- Convertit les `depends[]` en edges de dépendance
+- Convertit les `depends[]` en edges de dependance
 - Convertit les `onFailure.goto` en edges de loop
 - Calcule les positions automatiquement
 
@@ -93,36 +93,36 @@ const flowDefinition = reactFlowToFlowDefinition(nodes, edges, metadata);
 - Reconstruit les `depends[]` depuis les edges
 - Reconstruit les `onFailure.goto` depuis les loop edges
 
-## 🎯 Prochaines Étapes
+##  Prochaines Etapes
 
-### Phase 2 (Améliorations)
+### Phase 2 (Ameliorations)
 
-- [ ] Améliorer le drag & drop (preview pendant le drag)
+- [ ] Ameliorer le drag & drop (preview pendant le drag)
 - [ ] Ajouter minimap interactive
 - [ ] Ajouter undo/redo
 - [ ] Exporter en image (PNG/SVG)
 - [ ] Mode YAML split view (visual + code)
 
-### Phase 3 (Features avancées)
+### Phase 3 (Features avancees)
 
-- [ ] Exécution de flow depuis l'éditeur
-- [ ] Visualisation de l'exécution en temps réel
+- [ ] Execution de flow depuis l'editeur
+- [ ] Visualisation de l'execution en temps reel
 - [ ] Historique des versions
 - [ ] Templates de flows
 - [ ] Snippets de steps
 
-## 📚 Références
+##  References
 
 - [Xyflow Documentation](https://xyflow.com/react)
 - [Dagre Documentation](https://github.com/dagrejs/dagre)
 - [FlowValidator API](../../../../../flow-engine/src/validation/FlowValidator.ts)
 - [Flow Types](../../../../../flow-engine/src/types.ts)
 
-## 🐛 Problèmes Connus
+##  Problemes Connus
 
 ### Imports flow-engine
 
-Les imports depuis `flow-engine` nécessitent une configuration TypeScript appropriée. Actuellement, des chemins relatifs sont utilisés. Pour une meilleure maintenabilité, ajouter un alias dans `tsconfig.json` :
+Les imports depuis `flow-engine` necessitent une configuration TypeScript appropriee. Actuellement, des chemins relatifs sont utilises. Pour une meilleure maintenabilite, ajouter un alias dans `tsconfig.json` :
 
 ```json
 {
@@ -136,17 +136,17 @@ Les imports depuis `flow-engine` nécessitent une configuration TypeScript appro
 
 ### Types Xyflow
 
-Quelques incompatibilités mineures de types avec Xyflow nécessitent des `as any` temporaires. Ces types peuvent être affinés avec des génériques plus précis.
+Quelques incompatibilites mineures de types avec Xyflow necessitent des `as any` temporaires. Ces types peuvent etre affines avec des generiques plus precis.
 
-## 👨‍💻 Développement
+## ‍ Developpement
 
-### Démarrer le dev server
+### Demarrer le dev server
 
 ```bash
 npm run dev
 ```
 
-### Accéder à l'éditeur
+### Acceder a l'editeur
 
 ```
 http://localhost:5173/flows/new
@@ -167,7 +167,7 @@ npm run test:coverage        # Coverage report
 npm run build
 ```
 
-## ✨ Exemple d'Utilisation
+##  Exemple d'Utilisation
 
 ```typescript
 import { FlowEditorPage } from '@app/pages/flows/flow-editor';
@@ -177,16 +177,16 @@ import { FlowEditorPage } from '@app/pages/flows/flow-editor';
 <Route path="/flows/new" element={<FlowEditorPage />} />
 ```
 
-Le composant gère automatiquement :
+Le composant gere automatiquement :
 
 - Chargement du flow depuis l'URL
-- Sérialisation bidirectionnelle
-- Validation en temps réel
+- Serialisation bidirectionnelle
+- Validation en temps reel
 - Sauvegarde avec dirty tracking
 
-## 🙏 Crédits
+##  Credits
 
-Implémentation basée sur :
+Implementation basee sur :
 
 - [Xyflow Examples](https://reactflow.dev/examples)
 - [BPMN.io](https://bpmn.io/) pour l'inspiration UX

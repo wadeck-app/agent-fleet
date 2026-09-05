@@ -30,7 +30,7 @@ import { useSortingFeature } from '../_framework/useSortingFeature';
  *
  * Features:
  * - All S3 features: pagination, search, sorting
- * - Bookmark button (⭐) per row
+ * - Bookmark button () per row
  * - Bookmarked IDs stored in localStorage (key: lego-bookmarks-a3)
  * - Toolbar toggle: "All" | "Bookmarked only"
  * - Bookmarked count shown
@@ -96,7 +96,7 @@ export function SForkFeatPage() {
 		() => [
 			{
 				key: '__bookmark__' as keyof Product,
-				label: '⭐',
+				label: '',
 				type: 'text' as const,
 				render: (item: Product) => (
 					<Button
@@ -136,7 +136,7 @@ export function SForkFeatPage() {
 						Bookmarked
 					</Button>
 				</div>
-				<Badge variant="secondary">⭐ {bookmarkedIds.length} bookmarked</Badge>
+				<Badge variant="secondary"> {bookmarkedIds.length} bookmarked</Badge>
 			</div>
 
 			<PageLayout>

@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import type { FlowRegistry } from 'flow-engine';
 import type { FlowDefinition } from 'flow-engine/src/types';
 import { createLogger } from 'shared-common/logger';
@@ -346,7 +346,7 @@ export class FlowProposalsService {
 			log.error('Async redesign failed after rejection', {
 				ticketId,
 				rejectedProposalId,
-				error: err instanceof Error ? err.message : String(err),
+				error: err instanceof Error ? (err instanceof Error ? err.message : String(err)) : String(err),
 			});
 		}
 	}

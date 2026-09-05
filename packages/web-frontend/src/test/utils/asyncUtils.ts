@@ -3,7 +3,7 @@ import { vi } from 'vitest';
 
 /**
  * TODO translate
- * Crée une promise contrôlable pour tester les race conditions
+ * Cree une promise controlable pour tester les race conditions
  */
 export function createControlledPromise<T>() {
 	let resolveFunc: (value: T) => void;
@@ -23,7 +23,7 @@ export function createControlledPromise<T>() {
 
 /**
  * TODO translate
- * Mock API avec timing contrôlé
+ * Mock API avec timing controle
  */
 export function createMockTasksApi() {
 	const pendingCalls: Array<{ resolve: Function; reject: Function }> = [];

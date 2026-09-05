@@ -22,7 +22,7 @@
 
 **Open: `provideSteps` schema** -- exact fields needed to describe an injected step and how it attaches to the running graph. What does a `provideSteps` call look like?
 
-**Open: injection scope sémantique** -- "sub-tasks of A" model needs daemon implementation design.
+**Open: injection scope semantique** -- "sub-tasks of A" model needs daemon implementation design.
 
 ## ~~Q28~~ -- `.flows/config.yml` schema: RESOLVED → D37
 

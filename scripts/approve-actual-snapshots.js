@@ -1,6 +1,6 @@
-import fs from 'fs';
+import fs from 'node:fs';
 import { globSync } from 'glob';
-import path from 'path';
+import path from 'node:path';
 
 const projectRoot = process.cwd();
 const actualPattern = path.join(projectRoot, 'test-results', '**', '*-actual.png');

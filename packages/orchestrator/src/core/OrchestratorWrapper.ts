@@ -17,10 +17,10 @@
  *
  * ===========================================================================================
  */
-import { readFileSync } from 'fs';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { Orchestrator } from 'orchestrator/core/Orchestrator';
-import path from 'path';
+import path from 'node:path';
 import { createLogger } from 'shared-common/logger';
 import { StateEvent } from 'shared-orch-worker/StateManager';
 import type { OrchestratorStats, Task, WorkerInfo } from 'shared-orch-worker/domain-types';

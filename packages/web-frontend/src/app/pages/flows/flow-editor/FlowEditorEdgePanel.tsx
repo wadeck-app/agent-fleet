@@ -27,7 +27,7 @@ function getTypeColor(type?: VariableType): string {
 		case 'object':
 			return '#8b5cf6'; // purple-500
 		default:
-			return '#6b7280'; // gray-500
+			throw new Error(`Unexpected switch value`); // gray-500
 	}
 }
 

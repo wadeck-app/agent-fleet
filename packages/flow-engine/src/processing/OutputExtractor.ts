@@ -226,6 +226,7 @@ export class OutputExtractor {
 	/**
 	 * Apply transform function
 	 */
+	// violations-suppress: ts/no-union-with-string string is a named transform function reference, not a free-form string
 	private applyTransform(transform: TransformFunction | string, value: any, varName: string, stepId: string): any {
 		try {
 			switch (transform) {
@@ -272,7 +273,7 @@ export class OutputExtractor {
 			}
 		} catch (error) {
 			throw new OutputExtractionError(
-				`Transform '${transform}' failed: ${error instanceof Error ? error.message : String(error)}`,
+				`Transform '${transform}' failed: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`,
 				varName,
 				stepId
 			);
@@ -368,11 +369,11 @@ export class OutputExtractor {
 					return String(value);
 
 				default:
-					return value;
+					throw new Error(`Unexpected switch value`);
 			}
 		} catch (error) {
 			throw new OutputExtractionError(
-				`Type conversion to '${targetType}' failed: ${error instanceof Error ? error.message : String(error)}`,
+				`Type conversion to '${targetType}' failed: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`,
 				varName,
 				stepId
 			);

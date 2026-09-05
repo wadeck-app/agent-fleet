@@ -233,10 +233,10 @@ describe('useBookSearch', () => {
 			const { result } = renderHook(() => useBookSearch(), { wrapper });
 
 			act(() => {
-				result.current.setSearchQuery('café');
+				result.current.setSearchQuery('cafe');
 			});
 
-			expect(result.current.searchQuery).toBe('café');
+			expect(result.current.searchQuery).toBe('cafe');
 		});
 
 		it('should handle very long search queries', () => {

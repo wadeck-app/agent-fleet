@@ -22,14 +22,7 @@ export function WorkerInfoPanel({ worker, onRename }: WorkerInfoPanelProps) {
 	const [isSavingName, setIsSavingName] = useState(false);
 
 	const formatDate = (isoString: string) => {
-		return new Date(isoString).toLocaleString('en-US', {
-			month: 'short',
-			day: 'numeric',
-			year: 'numeric',
-			hour: '2-digit',
-			minute: '2-digit',
-			second: '2-digit',
-		});
+		return new Date(isoString).toISOString().replace('T', ' ').slice(0, 19);
 	};
 
 	const handleRenameWorker = async (newName: string) => {

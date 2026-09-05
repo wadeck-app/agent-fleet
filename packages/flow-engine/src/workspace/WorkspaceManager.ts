@@ -5,8 +5,8 @@
  * Git operations are delegated to WorkspaceGitStrategy.
  * Disk pruning is delegated to WorkspacePruner.
  */
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
 
 import type { Workspace, WorkspaceConfig } from '../types';
@@ -191,8 +191,8 @@ export class WorkspaceManager {
 			throw new WorkspaceAllocationError(`Manual workspace path does not exist: ${workspacePath}`);
 		const gitState = await this.git.getGitState(workspacePath);
 		if (gitState && !gitState.isClean)
-			console.warn(`⚠️  Manual workspace has uncommitted changes: ${workspacePath}`);
-		if (!gitState) console.warn(`⚠️  Manual workspace is not a git repository: ${workspacePath}`);
+			console.warn(`  Manual workspace has uncommitted changes: ${workspacePath}`);
+		if (!gitState) console.warn(`  Manual workspace is not a git repository: ${workspacePath}`);
 		const id = uuidv4();
 		const metaDir = workspacePath + '.meta';
 		fs.mkdirSync(path.join(metaDir, 'outputs'), { recursive: true });

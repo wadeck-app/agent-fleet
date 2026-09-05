@@ -286,7 +286,7 @@ export class LongPollingTransportClient implements ITransportClient {
 	/**
 	 * Make a type-safe request
 	 *
-	 * ⚠️ NOT SUPPORTED by Long Polling (unidirectional transport)
+	 *  NOT SUPPORTED by Long Polling (unidirectional transport)
 	 * Use REST API for requests instead.
 	 *
 	 * @throws Error Always throws - Long Polling does not support requests

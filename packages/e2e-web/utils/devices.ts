@@ -2,7 +2,7 @@
  * Device configurations for screenshots and E2E testing
  * Centralizes viewport and user agent settings to avoid duplication
  *
- * ⚠️ IMPORTANT: After modifying this file, update e2e/utils/devices.js to keep them in sync!
+ *  IMPORTANT: After modifying this file, update e2e/utils/devices.js to keep them in sync!
  */
 
 export interface DeviceConfig {

@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { type FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 

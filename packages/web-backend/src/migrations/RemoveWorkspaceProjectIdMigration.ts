@@ -1,6 +1,6 @@
-import { existsSync } from 'fs';
-import { readFile, writeFile } from 'fs/promises';
-import { join } from 'path';
+import { existsSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { createLogger } from 'shared-common/logger';
 
 import type { ProjectsRepository } from '../repositories/ProjectsRepository';

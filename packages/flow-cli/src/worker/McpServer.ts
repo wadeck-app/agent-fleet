@@ -103,7 +103,7 @@ export class McpServer {
 					}
 				});
 				socket.on('error', err => {
-					process.stderr.write(`[McpServer] TCP socket error: ${err.message}\n`);
+					process.stderr.write(`[McpServer] TCP socket error: ${(err instanceof Error ? err.message : String(err))}\n`);
 				});
 			});
 			server.once('error', reject);

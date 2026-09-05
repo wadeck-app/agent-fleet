@@ -212,8 +212,8 @@ export type EventTypes = ResourceEvent<'task', Task> &
  * All valid event type strings
  *
  * @example
- * const eventType: EventType = 'task:created'; // ✅ Valid
- * const eventType: EventType = 'invalid:event'; // ❌ Type error
+ * const eventType: EventType = 'task:created'; //  Valid
+ * const eventType: EventType = 'invalid:event'; //  Type error
  */
 export type EventType = keyof EventTypes;
 

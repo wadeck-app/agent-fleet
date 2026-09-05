@@ -24,10 +24,10 @@ import { PageLayout } from '../_framework/PageLayout';
  *
  * Features:
  * - All S3 features: search, pagination, sorting (multi), column-visibility, bulk-delete, crud
- * - Bookmark button (⭐) per row (FIRST column)
+ * - Bookmark button () per row (FIRST column)
  * - Bookmarked IDs stored in localStorage (key: lego-bookmarks-a4)
  * - Toolbar toggle: "All" | "Bookmarked"
- * - Bookmarked count shown as Badge: "⭐ X bookmarked"
+ * - Bookmarked count shown as Badge: " X bookmarked"
  *
  * Columns: __bookmark__ (star icon), name, price, category, status, featured, stock, rating, created (9 columns)
  *
@@ -83,7 +83,7 @@ export function SForkFeatPage() {
 		() => [
 			{
 				key: '__bookmark__' as keyof Product,
-				label: '⭐',
+				label: '',
 				type: 'custom' as const,
 				render: (item: Product) => (
 					<Button
@@ -131,7 +131,7 @@ export function SForkFeatPage() {
 								Bookmarked
 							</Button>
 						</div>
-						<Badge variant="secondary">⭐ {bookmarkedIds.length} bookmarked</Badge>
+						<Badge variant="secondary"> {bookmarkedIds.length} bookmarked</Badge>
 					</div>
 					<DataTable.Content>
 						<DataTable.Toolbar>

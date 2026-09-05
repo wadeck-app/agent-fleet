@@ -164,7 +164,7 @@ export function validateWithMode<T>(
 				result.error && typeof result.error === 'object' && 'issues' in result.error
 					? (result.error as { issues: unknown }).issues
 					: result.error;
-			console.warn(`⚠️ ${message}`, errorDetails);
+			console.warn(` ${message}`, errorDetails);
 			return data as T;
 		}
 	}

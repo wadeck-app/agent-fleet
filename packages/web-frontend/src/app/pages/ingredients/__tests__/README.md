@@ -1,48 +1,48 @@
 # Tests Iso-Fonctionnels Ingredients v2/v5
 
-## 🎯 Objectif
+##  Objectif
 
-Valider que **Ingredients v2** (Data2-based) et **Ingredients v5** (useCrudPage-based) ont le **même comportement fonctionnel** malgré des implémentations différentes.
+Valider que **Ingredients v2** (Data2-based) et **Ingredients v5** (useCrudPage-based) ont le **meme comportement fonctionnel** malgre des implementations differentes.
 
-## ✅ Résultats
+##  Resultats
 
 ```
-✅ 36 tests PASSING (100%)
-⏱️  ~12 secondes d'exécution
-📝  18 scénarios × 2 versions = 36 tests
+ 36 tests PASSING (100%)
+⏱  ~12 secondes d'execution
+  18 scenarios × 2 versions = 36 tests
 ```
 
-## 📋 Catégories de Tests
+##  Categories de Tests
 
 ### 1. Initial Data Load (3 tests × 2 = 6 tests)
 
-- ✅ Fetch data from API on mount
-- ✅ Display fetched ingredient data
-- ✅ Pass pagination parameters to API
+-  Fetch data from API on mount
+-  Display fetched ingredient data
+-  Pass pagination parameters to API
 
 ### 2. Search (2 tests × 2 = 4 tests)
 
-- ✅ Have search capability
-- ✅ Accept search input
+-  Have search capability
+-  Accept search input
 
 ### 3. Sorting (2 tests × 2 = 4 tests)
 
-- ✅ Have sortable columns
-- ✅ Have clickable column headers
+-  Have sortable columns
+-  Have clickable column headers
 
 ### 4. Row Selection (2 tests × 2 = 4 tests)
 
-- ✅ Have selectable rows
-- ✅ Enable selection of multiple rows
+-  Have selectable rows
+-  Enable selection of multiple rows
 
 ### 5. Pagination (1 test × 2 = 2 tests)
 
-- ✅ Have page size controls
+-  Have page size controls
 
 ### 6. CRUD Actions (3 tests × 2 = 6 tests)
 
-- ✅ Have create action available
-- ✅ Have edit actions for each row
+-  Have create action available
+-  Have edit actions for each row
 
 ---
 

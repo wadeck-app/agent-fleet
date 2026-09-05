@@ -28,7 +28,7 @@ export function ProjectEmptyState({ onManageClick }: ProjectEmptyStateProps) {
 	return (
 		<div className="flex h-full items-center justify-center px-6">
 			<div className="text-center">
-				<div className="mb-4 text-4xl text-muted-foreground">📂</div>
+				<div className="mb-4 text-4xl text-muted-foreground"></div>
 				<h3 className="mb-2 text-lg font-semibold">No Projects Selected</h3>
 				<p className="mb-4 text-sm text-muted-foreground">Select projects to view their workspaces and tasks</p>
 				<Button onClick={onManageClick}>

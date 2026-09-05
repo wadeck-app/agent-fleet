@@ -69,7 +69,7 @@ export function ScriptsPanel({ workspaceId }: ScriptsPanelProps) {
 			case 'grid':
 				return 'grid grid-cols-2 grid-rows-2 gap-4';
 			default:
-				return 'grid grid-cols-1 gap-4';
+				throw new Error(`Unexpected switch value`);
 		}
 	};
 
@@ -85,9 +85,9 @@ export function ScriptsPanel({ workspaceId }: ScriptsPanelProps) {
 		return (
 			<div className="flex h-full items-center justify-center">
 				<div className="text-center">
-					<div className="mb-2 text-4xl">⚠️</div>
+					<div className="mb-2 text-4xl"></div>
 					<p className="text-sm text-destructive">Failed to load scripts</p>
-					<p className="text-xs text-muted-foreground">{error.message}</p>
+					<p className="text-xs text-muted-foreground">{(error instanceof Error ? error.message : String(error))}</p>
 					<Button variant="outline" size="sm" onClick={refetch} className="mt-3">
 						Retry
 					</Button>
@@ -126,7 +126,7 @@ export function ScriptsPanel({ workspaceId }: ScriptsPanelProps) {
 				{scripts.length === 0 ? (
 					<div className="flex h-full items-center justify-center">
 						<div className="text-center">
-							<div className="mb-2 text-4xl">📜</div>
+							<div className="mb-2 text-4xl"></div>
 							<p className="mb-1 text-sm font-medium">No scripts configured</p>
 							<p className="mb-3 text-xs text-muted-foreground">
 								Click "Configure Scripts" to add npm scripts from package.json

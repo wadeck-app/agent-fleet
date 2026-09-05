@@ -3,13 +3,13 @@
  * Starts Storybook with automatic port retry on conflicts
  * Uses try-fail-retry to avoid TOCTOU race conditions
  */
-const { spawn, exec } = require('child_process');
-const { writeFileSync } = require('fs');
-const path = require('path');
-const net = require('net');
-const { performance } = require('perf_hooks');
+const { spawn, exec } = require('node:child_process');
+const { writeFileSync } = require('node:fs');
+const path = require('node:path');
+const net = require('node:net');
+const { performance } = require('node:perf_hooks');
 const { mkdirSync } = require('node:fs');
-const { promisify } = require('util');
+const { promisify } = require('node:util');
 
 const execAsync = promisify(exec);
 

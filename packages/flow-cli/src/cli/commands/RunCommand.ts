@@ -9,10 +9,12 @@ import * as path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
+// violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { type FlowConfig, FlowConfigLoader } from '../../config/FlowConfig';
 import { Daemon } from '../../daemon/Daemon';
 import type { ClientCommand, DaemonResponse, ExecutionState } from '../../ipc/Protocol';
 import { ExecutionStore } from '../../storage/ExecutionStore';
+// violations-suppress-end: ts/no-deep-relative
 
 type FlowCommands = { run?: (payload: unknown) => Promise<DaemonResponse> };
 

@@ -4,10 +4,10 @@
  * Executes shell scripts/commands and captures output.
  * Simple wrapper around child_process for flow steps.
  */
-import { spawn } from 'child_process';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
+import { spawn } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 
 /**
  * Result of script execution
@@ -271,7 +271,7 @@ export class ScriptExecutor {
 				// Clean up temp file if created
 				cleanupTempFile();
 
-				reject(new ScriptExecutionError(`Failed to execute script: ${error.message}`, -1, stdout, stderr));
+				reject(new ScriptExecutionError(`Failed to execute script: ${(error instanceof Error ? error.message : String(error))}`, -1, stdout, stderr));
 			});
 		});
 	}

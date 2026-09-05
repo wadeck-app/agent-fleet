@@ -102,7 +102,7 @@ export const PROJECTS_TABLE_COLUMNS: Table2Column<Project>[] = [
 		key: 'createdAt',
 		label: 'Created',
 		render: (project: Project) => (
-			<span className="text-xs text-muted-foreground" title={new Date(project.createdAt).toLocaleString()}>
+			<span className="text-xs text-muted-foreground" title={new Date(project.createdAt).toISOString().replace('T', ' ').slice(0, 19)}>
 				{formatDateShort(project.createdAt)}
 			</span>
 		),

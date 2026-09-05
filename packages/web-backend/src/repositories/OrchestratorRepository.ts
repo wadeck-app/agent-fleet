@@ -35,6 +35,7 @@ export class OrchestratorRepository {
 	private orchestratorUrl?: string;
 	private cacheTtlMs: number;
 
+	// violations-suppress: ts/no-union-with-string string is a URL alternative to the wrapper object - intentional overload
 	constructor(orchestratorWrapperOrUrl: OrchestratorWrapper | string, cacheTtlMs: number = 5000) {
 		if (typeof orchestratorWrapperOrUrl === 'string') {
 			// HTTP mode
@@ -102,7 +103,7 @@ export class OrchestratorRepository {
 
 			// No cache available, propagate error
 			throw new Error(
-				`Failed to fetch orchestrator stats: ${error instanceof Error ? error.message : 'Unknown error'}`
+				`Failed to fetch orchestrator stats: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error'}`
 			);
 		}
 	}
@@ -135,7 +136,7 @@ export class OrchestratorRepository {
 			return Array.isArray(tasks) ? tasks : [];
 		} catch (error) {
 			throw new Error(
-				`Failed to fetch orchestrator tasks: ${error instanceof Error ? error.message : 'Unknown error'}`
+				`Failed to fetch orchestrator tasks: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error'}`
 			);
 		}
 	}
@@ -260,7 +261,7 @@ export class OrchestratorRepository {
 			return (await response.json()) as Task;
 		} catch (error) {
 			throw new Error(
-				`Failed to update task status: ${error instanceof Error ? error.message : 'Unknown error'}`
+				`Failed to update task status: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error'}`
 			);
 		}
 	}

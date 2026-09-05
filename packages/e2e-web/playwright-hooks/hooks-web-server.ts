@@ -12,8 +12,8 @@
  * DEFENSE-IN-DEPTH: Verifies workspace ID matches before running tests
  */
 import { test as base } from '@playwright/test';
-import { readFileSync } from 'fs';
-import path from 'path';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 interface ServerInfo {
 	port: number;
@@ -48,14 +48,14 @@ async function verifyWorkspaceId(backendPort: number): Promise<void> {
 		const controller = new AbortController();
 		const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-		debug && console.log(`🔍 Verifying backend at ${healthUrl}...`);
+		debug && console.log(` Verifying backend at ${healthUrl}...`);
 		const response = await fetch(healthUrl, {
 			signal: controller.signal,
 		});
 		clearTimeout(timeoutId);
 
 		if (!response.ok) {
-			console.error(`❌ Health check failed: ${healthUrl} returned ${response.status}`);
+			console.error(` Health check failed: ${healthUrl} returned ${response.status}`);
 			const text = await response.text().catch(() => 'Could not read response body');
 			debug && console.error(`   Response body: ${text.substring(0, 200)}`);
 			throw new Error(`Test health endpoint returned ${response.status} at ${healthUrl}`);
@@ -65,7 +65,7 @@ async function verifyWorkspaceId(backendPort: number): Promise<void> {
 
 		if (data.workspaceId !== expectedWorkspaceId) {
 			throw new Error(
-				`❌ WORKSPACE ID MISMATCH!\n` +
+				` WORKSPACE ID MISMATCH!\n` +
 					`   Expected: ${expectedWorkspaceId}\n` +
 					`   Server: ${data.workspaceId}\n` +
 					`   This test is trying to connect to a server from a different workspace.\n` +
@@ -75,7 +75,7 @@ async function verifyWorkspaceId(backendPort: number): Promise<void> {
 
 		if (data.runId !== expectedRunId) {
 			throw new Error(
-				`❌ RUN_ID MISMATCH!\n` +
+				` RUN_ID MISMATCH!\n` +
 					`   Expected: ${expectedRunId}\n` +
 					`   Server: ${data.runId}\n` +
 					`   This backend belongs to a different test run (different terminal).\n` +
@@ -84,9 +84,9 @@ async function verifyWorkspaceId(backendPort: number): Promise<void> {
 		}
 
 		// Success - workspace ID and RUN_ID match
-		//console.log(`✅ Workspace ID and RUN_ID verified: ${data.workspaceId}, ${data.runId}`);
+		//console.log(` Workspace ID and RUN_ID verified: ${data.workspaceId}, ${data.runId}`);
 	} catch (error) {
-		console.error(`❌ Workspace verification failed:`, error);
+		console.error(` Workspace verification failed:`, error);
 		throw error;
 	}
 }
@@ -107,7 +107,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 				if (process.env.E2E_SILENT_LOGS !== 'true') {
 					debug &&
 						console.log(
-							`📋 Worker ${workerInfo.workerIndex} loaded ${servers.length} server configs from ${filename}`
+							` Worker ${workerInfo.workerIndex} loaded ${servers.length} server configs from ${filename}`
 						);
 					debug && console.log(`   Available backend indices: 0-${servers.length - 1}`);
 				}
@@ -130,7 +130,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 			const data = readFileSync(filename, 'utf-8');
 			const port = JSON.parse(data).port;
 			const url = `http://localhost:${port}`;
-			debug && console.log(`🎯 [Fixture] Using webapp URL: ${url} (RUN_ID: ${runId})`);
+			debug && console.log(` [Fixture] Using webapp URL: ${url} (RUN_ID: ${runId})`);
 			await use(url);
 		} catch {
 			throw new Error('Port file not found, filename=' + filename);
@@ -138,7 +138,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 			// const workspaceId = parseInt(process.env.WORKSPACE_ID || '0', 10);
 			// const port = 5050 + (workspaceId * 100);
 			// const url = `http://localhost:${port}`;
-			// console.log(`⚠️  [Fixture] Webapp port file not found, using fallback: ${url}`);
+			// console.log(`  [Fixture] Webapp port file not found, using fallback: ${url}`);
 			// await use(url);
 		}
 	},
@@ -148,11 +148,11 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 		const workerIndex = testInfo.parallelIndex;
 		const projectName = testInfo.project.name;
 
-		// console.log(`🔧 Worker ${workerIndex} (project: ${projectName}) requesting backend...`);
+		// console.log(` Worker ${workerIndex} (project: ${projectName}) requesting backend...`);
 
 		if (servers.length === 0) {
 			throw new Error(
-				`❌ FATAL: No backend servers available!\n` + `   This should never happen. Check globalSetup.`
+				` FATAL: No backend servers available!\n` + `   This should never happen. Check globalSetup.`
 			);
 		}
 
@@ -162,7 +162,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 		const backendIndex = workerIndex % servers.length;
 		const backendPort = servers[backendIndex].port;
 
-		debug && console.log(`   ✅ Assigned backend #${backendIndex} (port ${backendPort})`);
+		debug && console.log(`    Assigned backend #${backendIndex} (port ${backendPort})`);
 
 		// Store backend port in page context for use by helper functions
 		(page as any).backendPort = backendPort;
@@ -177,7 +177,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 			const text = msg.text();
 			// // Only log our debug messages (with emoji prefixes)
 			// if (text.includes('[STATE CHANGE]') || text.includes('[EDIT]') || text.includes('[SUBMIT]')) {
-			//   console.log(`🖥️  BROWSER: ${text}`);
+			//   console.log(`  BROWSER: ${text}`);
 			// }
 			if (!silentLogs) {
 				console.log(`[Frontend:${backendPort}] ${text}`);
@@ -185,7 +185,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 		});
 		page.on('pageerror', error => {
 			if (!silentLogs) {
-				console.log(`[Frontend:${backendPort}] ${error.message}`);
+				console.log(`[Frontend:${backendPort}] ${(error instanceof Error ? error.message : String(error))}`);
 			}
 		});
 

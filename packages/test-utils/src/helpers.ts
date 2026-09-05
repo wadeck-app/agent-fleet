@@ -3,9 +3,9 @@
  *
  * Helper functions for common test setup and operations.
  */
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { vi } from 'vitest';
 
 /**
@@ -189,8 +189,8 @@ export async function assertThrowsAsync(fn: () => Promise<any>, messagePattern?:
 		if (error instanceof Error) {
 			if (messagePattern) {
 				const pattern = typeof messagePattern === 'string' ? new RegExp(messagePattern) : messagePattern;
-				if (!pattern.test(error.message)) {
-					throw new Error(`Expected error message to match ${pattern}, but got: ${error.message}`);
+				if (!pattern.test((error instanceof Error ? error.message : String(error)))) {
+					throw new Error(`Expected error message to match ${pattern}, but got: ${(error instanceof Error ? error.message : String(error))}`);
 				}
 			}
 			return error;

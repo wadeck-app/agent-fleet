@@ -71,7 +71,7 @@ export const LoopEdge = memo(
          text-destructive-foreground
        `}
 						>
-							⚠️ on failure, retry (max: {data.loopConfig.maxIterations || 3})
+							 on failure, retry (max: {data.loopConfig.maxIterations || 3})
 						</div>
 					</EdgeLabelRenderer>
 				)}

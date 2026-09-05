@@ -1,4 +1,4 @@
-import { execSync, spawn } from 'child_process';
+import { execSync, spawn } from 'node:child_process';
 import { createLogger } from 'shared-common/logger';
 
 import type { TicketAnalysisPlan } from '@app/shared/api/tickets.contract';

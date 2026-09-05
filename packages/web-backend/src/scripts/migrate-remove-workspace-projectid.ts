@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-import { resolve } from 'path';
+import { resolve } from 'node:path';
 import { createLogger } from 'shared-common/logger';
 
 import type { Project } from '@app/shared/api/projects.contract';

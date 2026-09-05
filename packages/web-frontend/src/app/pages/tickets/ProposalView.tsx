@@ -158,7 +158,7 @@ export function ProposalView({
 					</TooltipProvider>
 				)}
 				<span className="ml-auto text-xs text-muted-foreground">
-					Proposed {new Date(proposal.proposedAt).toLocaleString()}
+					Proposed {new Date(proposal.proposedAt).toISOString().replace('T', ' ').slice(0, 19)}
 				</span>
 			</div>
 
@@ -294,8 +294,8 @@ export function ProposalView({
 				<div className="border-t pt-4">
 					<p className="text-sm text-muted-foreground">
 						{proposal.status === 'approved'
-							? `Approved at ${proposal.approvedAt ? new Date(proposal.approvedAt).toLocaleString() : 'unknown date'}`
-							: `Rejected at ${proposal.rejectedAt ? new Date(proposal.rejectedAt).toLocaleString() : 'unknown date'}`}
+							? `Approved at ${proposal.approvedAt ? new Date(proposal.approvedAt).toISOString().replace('T', ' ').slice(0, 19) : 'unknown date'}`
+							: `Rejected at ${proposal.rejectedAt ? new Date(proposal.rejectedAt).toISOString().replace('T', ' ').slice(0, 19) : 'unknown date'}`}
 					</p>
 				</div>
 			)}

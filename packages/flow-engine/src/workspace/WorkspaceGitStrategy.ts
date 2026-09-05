@@ -2,7 +2,7 @@
  * WorkspaceGitStrategy -- git operations for workspace setup.
  * Handles clone, feature-branch, worktree, and state inspection.
  */
-import * as path from 'path';
+import * as path from 'node:path';
 import { type SimpleGit, simpleGit } from 'simple-git';
 
 import type { GitStrategy, WorkspaceGitState } from '../types';

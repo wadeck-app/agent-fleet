@@ -75,7 +75,7 @@ export function RetrospectiveCard({ ticketId }: RetrospectiveCardProps) {
 				{open ? <ChevronDown className="size-4 shrink-0" /> : <ChevronRight className="size-4 shrink-0" />}
 				Agent Retrospective
 				<span className="ml-auto text-xs font-normal text-muted-foreground">
-					{new Date(retro.generatedAt).toLocaleString()}
+					{new Date(retro.generatedAt).toISOString().replace('T', ' ').slice(0, 19)}
 				</span>
 			</Button>
 

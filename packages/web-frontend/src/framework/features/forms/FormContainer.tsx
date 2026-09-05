@@ -104,12 +104,12 @@ export interface FormContainerLegacyProps {
  * ```
  *
  * Migrated components:
- * - CreateProjectDialog ✓
- * - EditProjectDialog ✓
- * - CreateWorkspaceDialog ✓
- * - EditWorkspaceDialog ✓
- * - BookForm ✓
- * - IngredientForm ✓
+ * - CreateProjectDialog 
+ * - EditProjectDialog 
+ * - CreateWorkspaceDialog 
+ * - EditWorkspaceDialog 
+ * - BookForm 
+ * - IngredientForm 
  */
 export function FormContainerLegacy({
 	isSubmitting,

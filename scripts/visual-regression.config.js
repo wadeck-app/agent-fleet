@@ -4,9 +4,9 @@
  * This file contains all configuration options for generating visual regression tests.
  * Customize these settings to match your project's needs.
  */
-import path from 'path';
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
+import path from 'node:path';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

@@ -168,7 +168,7 @@ export function FeedbackCard({
 							/>
 						))}
 					</div>
-					<span className="text-xs text-muted-foreground">{new Date(item.submittedAt).toLocaleString()}</span>
+					<span className="text-xs text-muted-foreground">{new Date(item.submittedAt).toISOString().replace('T', ' ').slice(0, 19)}</span>
 					<div className="ml-auto flex items-center gap-1">
 						<Button
 							variant="ghost"

@@ -262,7 +262,7 @@ export class FlowScheduler {
 		} catch (err) {
 			if (err instanceof ConditionEvaluationError) throw err;
 			throw new ConditionEvaluationError(
-				`Failed to evaluate condition: ${err instanceof Error ? err.message : String(err)}`,
+				`Failed to evaluate condition: ${err instanceof Error ? (err instanceof Error ? err.message : String(err)) : String(err)}`,
 				condition,
 				stepId
 			);

@@ -1,8 +1,8 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { defineConfig } from 'vite';
 import type { Plugin } from 'vite';
 
@@ -114,12 +114,12 @@ export default defineConfig(({ mode }) => {
 					const protocol = server.config.server.https ? 'https' : 'http';
 					const port = server.config.server.port || 5173;
 
-					console.log(`\n  ➜  Local:   ${protocol}://localhost:${port}/`);
+					console.log(`\n    Local:   ${protocol}://localhost:${port}/`);
 					addresses.forEach(address => {
-						console.log(`  ➜  Network: ${protocol}://${address}:${port}/`);
+						console.log(`    Network: ${protocol}://${address}:${port}/`);
 					});
-					console.log(`  ➜  Backend: ${backendApiUrl}`);
-					console.log('  ➜  press h + enter to show help\n');
+					console.log(`    Backend: ${backendApiUrl}`);
+					console.log('    press h + enter to show help\n');
 				};
 			},
 		};

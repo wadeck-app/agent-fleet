@@ -55,7 +55,7 @@ export class TaskManager {
 			await this.loadTasks();
 			this.initialized = true;
 		} catch (error) {
-			log.info(`[TaskManager] Failed to initialize: ${error instanceof Error ? error.message : String(error)}`);
+			log.info(`[TaskManager] Failed to initialize: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`);
 			throw error;
 		}
 	}
@@ -138,7 +138,7 @@ export class TaskManager {
 		} catch (error) {
 			// Rollback in-memory change if storage fails
 			this.tasks.delete(task.id);
-			log.info(`[TaskManager] Failed to create task: ${error instanceof Error ? error.message : String(error)}`);
+			log.info(`[TaskManager] Failed to create task: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`);
 			throw error;
 		}
 
@@ -176,7 +176,7 @@ export class TaskManager {
 			// Rollback in-memory change if storage fails
 			this.tasks.set(task.id, oldTask);
 			log.info(
-				`[TaskManager] Failed to update task ${task.id}: ${error instanceof Error ? error.message : String(error)}`
+				`[TaskManager] Failed to update task ${task.id}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
 			);
 			throw error;
 		}
@@ -227,7 +227,7 @@ export class TaskManager {
 			task.completedAt = oldCompletedAt;
 			task.history = oldHistory;
 			log.info(
-				`[TaskManager] Failed to update task ${taskId} status: ${error instanceof Error ? error.message : String(error)}`
+				`[TaskManager] Failed to update task ${taskId} status: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
 			);
 			throw error;
 		}
@@ -264,7 +264,7 @@ export class TaskManager {
 			task.assignedTo = oldAssignment;
 			task.history = oldHistory;
 			log.info(
-				`[TaskManager] Failed to assign task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
+				`[TaskManager] Failed to assign task ${taskId}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
 			);
 			throw error;
 		}
@@ -300,7 +300,7 @@ export class TaskManager {
 			task.assignedTo = oldAssignment;
 			task.history = oldHistory;
 			log.info(
-				`[TaskManager] Failed to unassign task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
+				`[TaskManager] Failed to unassign task ${taskId}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
 			);
 			throw error;
 		}
@@ -334,7 +334,7 @@ export class TaskManager {
 			// Rollback in-memory changes if storage fails
 			task.comments = oldComments;
 			log.info(
-				`[TaskManager] Failed to add comment to task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
+				`[TaskManager] Failed to add comment to task ${taskId}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
 			);
 			throw error;
 		}
@@ -412,7 +412,7 @@ export class TaskManager {
 					task.history = oldHistory;
 					workerQueue.unshift(task); // Put back at front of queue
 					log.error(
-						`[TaskManager] Failed to start pre-assigned task ${task.id}: ${error instanceof Error ? error.message : String(error)}`
+						`[TaskManager] Failed to start pre-assigned task ${task.id}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
 					);
 					throw error;
 				}
@@ -462,7 +462,7 @@ export class TaskManager {
 			task.startedAt = oldStartedAt;
 			task.history = oldHistory;
 			log.info(
-				`[TaskManager] Failed to atomically assign task ${task.id}: ${error instanceof Error ? error.message : String(error)}`
+				`[TaskManager] Failed to atomically assign task ${task.id}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
 			);
 			throw error;
 		}
@@ -510,7 +510,7 @@ export class TaskManager {
 			return true;
 		} catch (error) {
 			log.info(
-				`[TaskManager] Failed to delete task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
+				`[TaskManager] Failed to delete task ${taskId}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
 			);
 			throw error;
 		}
@@ -537,7 +537,7 @@ export class TaskManager {
 			return count;
 		} catch (error) {
 			log.info(
-				`[TaskManager] Failed to clear all tasks: ${error instanceof Error ? error.message : String(error)}`
+				`[TaskManager] Failed to clear all tasks: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
 			);
 			throw error;
 		}
@@ -680,7 +680,7 @@ export class TaskManager {
 			task.interventionHistory = oldInterventionHistory;
 			task.history = oldHistory;
 			log.info(
-				`[TaskManager] Failed to set intervention for task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
+				`[TaskManager] Failed to set intervention for task ${taskId}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
 			);
 			throw error;
 		}
@@ -725,7 +725,7 @@ export class TaskManager {
 			task.activeInterventionId = oldActiveInterventionId;
 			task.history = oldHistory;
 			log.info(
-				`[TaskManager] Failed to clear intervention for task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
+				`[TaskManager] Failed to clear intervention for task ${taskId}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)}`
 			);
 			throw error;
 		}

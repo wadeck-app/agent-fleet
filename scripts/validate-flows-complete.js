@@ -14,9 +14,9 @@
  * 7. ContractValidator - Pre/post conditions
  * 8. SimulationValidator - Arithmetic detection, execution paths
  */
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import * as yaml from 'js-yaml';
-import * as path from 'path';
+import * as path from 'node:path';
 
 const REQUIRED_FIELDS = ['version', 'name', 'description', 'workspace', 'steps'];
 const VALID_MODES = ['isolated', 'shared', 'manual'];

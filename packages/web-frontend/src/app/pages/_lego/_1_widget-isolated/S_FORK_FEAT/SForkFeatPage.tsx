@@ -11,7 +11,7 @@
  * - Bookmark feature: star/bookmark button per row
  * - Bookmarked IDs stored in localStorage
  * - Toolbar toggle: "All" | "Bookmarked" (shows only bookmarked items when active)
- * - Bookmarked count shown in toolbar: "⭐ 3 bookmarked"
+ * - Bookmarked count shown in toolbar: " 3 bookmarked"
  * - No changes to existing framework -- all in page
  *
  * ===========================================================================================
@@ -79,7 +79,7 @@ export function SForkFeatPage() {
 	const columns: ColumnDef<Product>[] = [
 		{
 			key: '__bookmark__' as keyof Product & string,
-			label: '⭐',
+			label: '',
 			type: 'custom',
 			render: (item: Product) => (
 				<Button
@@ -148,7 +148,7 @@ export function SForkFeatPage() {
 						Bookmarked
 					</Button>
 				</div>
-				<Badge variant="secondary">⭐ {bookmarkedIds.size} bookmarked</Badge>
+				<Badge variant="secondary"> {bookmarkedIds.size} bookmarked</Badge>
 			</div>
 
 			<PageLayout>

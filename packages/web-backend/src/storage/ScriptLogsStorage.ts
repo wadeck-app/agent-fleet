@@ -1,5 +1,5 @@
 import { TraceChunkStorage } from 'orchestrator';
-import { join } from 'path';
+import { join } from 'node:path';
 import { createLogger } from 'shared-common/logger';
 
 import type { ScriptLogEntry } from '@app/shared/api/workspaceScripts.contract';

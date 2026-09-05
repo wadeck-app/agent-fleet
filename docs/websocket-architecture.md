@@ -511,10 +511,10 @@ export class TasksService {
 1. **Always use factory functions** for message creation:
 
     ```typescript
-    // ✅ Good
+    //  Good
     const msg = createW2OMessage('w2o:task_completed', { ... });
 
-    // ❌ Bad - no type safety
+    //  Bad - no type safety
     const msg = { type: 'w2o:task_completed', ... };
     ```
 
@@ -570,14 +570,14 @@ export class TasksService {
 4. **Batch subscriptions when possible**:
 
     ```typescript
-    // ✅ Good - single call
+    //  Good - single call
     transport.batchSubscribe([
       'b2f:task:created',
       'b2f:task:updated',
       'b2f:task:deleted'
     ]);
 
-    // ❌ Less efficient - multiple calls
+    //  Less efficient - multiple calls
     transport.subscribe('b2f:task:created', ...);
     transport.subscribe('b2f:task:updated', ...);
     transport.subscribe('b2f:task:deleted', ...);

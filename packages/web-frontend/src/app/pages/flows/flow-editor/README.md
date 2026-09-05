@@ -1,45 +1,45 @@
 # Flow Visual Editor
 
-Éditeur visuel de flows pour agent-fleet utilisant Xyflow v12.
+Editeur visuel de flows pour agent-fleet utilisant Xyflow v12.
 
-## 🚀 Fonctionnalités
+##  Fonctionnalites
 
-✅ **Édition visuelle complète**
+ **Edition visuelle complete**
 
 - Ajout/suppression de steps par drag & drop
-- Connexions visuelles entre steps (dépendances, loops)
+- Connexions visuelles entre steps (dependances, loops)
 - Repositionnement libre des nodes
 
-✅ **Types de steps supportés**
+ **Types de steps supportes**
 
-- 🧠 Model Steps (sonnet, haiku, opus)
-- ⌨️ Script Steps (shell scripts)
-- 🔄 SubFlow Steps (composition de flows)
+-  Model Steps (sonnet, haiku, opus)
+-  Script Steps (shell scripts)
+-  SubFlow Steps (composition de flows)
 
-✅ **Validation en temps réel**
+ **Validation en temps reel**
 
-- Intégration avec FlowValidator
+- Integration avec FlowValidator
 - Affichage des erreurs sur les nodes
-- Panel de validation détaillé
+- Panel de validation detaille
 
-✅ **Panneau de propriétés**
+ **Panneau de proprietes**
 
-- Édition de tous les champs step par step
-- Formulaires adaptés au type de step
-- Options avancées (when, retry, onFailure)
+- Edition de tous les champs step par step
+- Formulaires adaptes au type de step
+- Options avancees (when, retry, onFailure)
 
-✅ **Auto-layout**
+ **Auto-layout**
 
 - Algorithme hierarchique avec dagre
-- Layout automatique optimisé
+- Layout automatique optimise
 
-✅ **Actions**
+ **Actions**
 
 - Save (sauvegarde du flow)
 - Validate (validation manuelle)
-- Auto Layout (réorganisation)
+- Auto Layout (reorganisation)
 
-## 📁 Structure
+##  Structure
 
 ```
 flow-editor/

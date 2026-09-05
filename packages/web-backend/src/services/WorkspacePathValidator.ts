@@ -1,5 +1,5 @@
-import { access, constants, lstat } from 'fs/promises';
-import { isAbsolute, normalize, resolve, sep } from 'path';
+import { access, constants, lstat } from 'node:fs/promises';
+import { isAbsolute, normalize, resolve, sep } from 'node:path';
 import { createLogger } from 'shared-common/logger';
 
 const log = createLogger('WorkspacePathValidator');

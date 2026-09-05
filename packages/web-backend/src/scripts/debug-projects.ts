@@ -14,8 +14,8 @@
  *
  * ===========================================================================================
  */
-import { readFile } from 'fs/promises';
-import { join } from 'path';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { createLogger } from 'shared-common/logger';
 
 const log = createLogger('DebugProjects');
@@ -75,7 +75,7 @@ async function debugProjects() {
 		log.info('');
 
 		if (emptyWorkspaceProjects.length > 0) {
-			log.warn('⚠️  ISSUE FOUND: Projects have empty workspaceIds arrays');
+			log.warn('  ISSUE FOUND: Projects have empty workspaceIds arrays');
 			log.info('');
 			log.info('POSSIBLE CAUSES:');
 			log.info('1. No workspaces are connected (no workers running)');
@@ -88,7 +88,7 @@ async function debugProjects() {
 			log.info('3. Associate workspaces using the arrow buttons in the dialog');
 			log.info('4. Check backend logs for any errors during association');
 		} else {
-			log.info('✅ All projects have workspaces associated');
+			log.info(' All projects have workspaces associated');
 		}
 
 		// Check for undefined fields (pre-migration data)
@@ -104,7 +104,7 @@ async function debugProjects() {
 		if (projectsWithUndefined.length > 0) {
 			log.warn('');
 			log.warn(
-				`⚠️  WARNING: ${projectsWithUndefined.length} projects have undefined fields (pre-migration data)`
+				`  WARNING: ${projectsWithUndefined.length} projects have undefined fields (pre-migration data)`
 			);
 			projectsWithUndefined.forEach((p: any) => {
 				log.warn(`  - ${p.name} (${p.id})`);

@@ -8,7 +8,7 @@
  * since `__filename` is always available in CJS context.
  */
 import { Command } from 'commander';
-import { createRequire } from 'module';
+import { createRequire } from 'node:module';
 
 import { registerDocsCommand } from './commands/DocsCommand';
 import { registerRunCommand } from './commands/RunCommand';

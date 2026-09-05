@@ -195,7 +195,7 @@ export class StepRunner {
 			const err = error instanceof Error ? error : new Error(String(error));
 			stepTrace.endTime = Date.now();
 			stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
-			stepTrace.error = err.message;
+			stepTrace.error = (err instanceof Error ? err.message : String(err));
 			return stepTrace;
 		}
 	}

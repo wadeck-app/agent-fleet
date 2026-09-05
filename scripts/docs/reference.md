@@ -21,7 +21,7 @@ Example summary:
 ================================================================================
   Overall: 5 suites passed, 0 suites failed
 ================================================================================
-  ✓ ALL TESTS PASSED!
+   ALL TESTS PASSED!
 ```
 
 ### Exit Codes
@@ -82,16 +82,16 @@ node scripts/validate-flows-complete.js --all
 
 All validations from FlowWorker:
 
-- ✅ Schema (required fields, types, workspace settings)
-- ✅ Circular dependencies
-- ✅ Undefined step/output references
-- ✅ Template arithmetic/logical operators (not supported)
-- ✅ Dependency order (step uses output without depending on it)
-- ✅ Greedy regex patterns (`.*` vs `.*?`)
-- ✅ UserIntervention output 'from' values
-- ✅ Default value type mismatches
-- ✅ Required inputs with default values
-- ✅ Recursive SubFlow steps
+-  Schema (required fields, types, workspace settings)
+-  Circular dependencies
+-  Undefined step/output references
+-  Template arithmetic/logical operators (not supported)
+-  Dependency order (step uses output without depending on it)
+-  Greedy regex patterns (`.*` vs `.*?`)
+-  UserIntervention output 'from' values
+-  Default value type mismatches
+-  Required inputs with default values
+-  Recursive SubFlow steps
 
 **Exit codes:**
 
@@ -120,42 +120,42 @@ node scripts/validate-example-flows.js --all
 
 **What it validates:**
 
-- ✅ Required fields: `version`, `name`, `description`, `workspace`, `steps`
-- ✅ Workspace settings: valid `mode`, `gitStrategy`, `reusePolicy`
-- ✅ Input types: all 21 supported types
-- ✅ Default value types match declared types (integer, priority, regex, etc.)
-- ✅ Step structure: each step has `id` and `type`
+-  Required fields: `version`, `name`, `description`, `workspace`, `steps`
+-  Workspace settings: valid `mode`, `gitStrategy`, `reusePolicy`
+-  Input types: all 21 supported types
+-  Default value types match declared types (integer, priority, regex, etc.)
+-  Step structure: each step has `id` and `type`
 
 **What it DOES NOT validate:**
 
-- ❌ Step dependencies (circular dependencies, undefined steps)
-- ❌ Template expressions (`${{ }}` syntax)
-- ❌ Output references (undefined outputs)
-- ❌ SubFlow references (non-existent flows)
-- ❌ Complex type constraints
+-  Step dependencies (circular dependencies, undefined steps)
+-  Template expressions (`${{ }}` syntax)
+-  Output references (undefined outputs)
+-  SubFlow references (non-existent flows)
+-  Complex type constraints
 
 **For complete validation**, start the FlowWorker - it will perform full validation using the FlowRegistry and show detailed errors in the console.
 
 **Output:**
 
 ```
-🔍 Validating example flows...
-📝 Found 34 flows total (10 example flows)
+ Validating example flows...
+ Found 34 flows total (10 example flows)
 
 Validating 10 flows...
 
-  ✅ example-blog-post
-  ✅ example-performance-metrics
-  ❌ example-broken-flow
+   example-blog-post
+   example-performance-metrics
+   example-broken-flow
      ERROR: Invalid workspace.reusePolicy: prefer
      ERROR: Invalid input type for 'count': invalidType
      ERROR: Default value for 'priority' must be one of: low, medium, high, critical (type: priority), got: 'normal'
 
-📊 Summary:
+ Summary:
    Valid: 9
    Invalid: 1
 
-⚠️  Note: This script performs basic validation only.
+  Note: This script performs basic validation only.
    For complete validation, start the FlowWorker to see full results.
 ```
 
@@ -183,7 +183,7 @@ node scripts/test-flows-service.js
 **Output:**
 
 ```
-✅ Loaded 35 flows:
+ Loaded 35 flows:
   - simple-qa: Simple Question & Answer (1.0.0)
   - example-blog-post: Example: Blog Post Generator (1.0.0)
   ...

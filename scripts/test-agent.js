@@ -8,9 +8,9 @@
  * - Errors logged to file (test-errors.log) on failure
  * - Clean summary format for agent parsing
  */
-import { spawn } from 'child_process';
-import fs from 'fs';
-import path from 'path';
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 
 import { testSuiteType_E2E_FUNC, testSuiteType_UNIT, testSuites } from './test-config.js';
 import { cleanupAllProcesses, registerCleanupHandlers, trackProcess } from './test-runner-utils.js';

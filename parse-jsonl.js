@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { readFileSync } from 'node:fs';
 
 const path = process.argv[2];
 const lines = readFileSync(path, 'utf8').split('\n');

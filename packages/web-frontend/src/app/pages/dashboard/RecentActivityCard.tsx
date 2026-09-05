@@ -51,7 +51,7 @@ function getActivityIcon(type: ActivityType) {
 		case 'worker_disconnected':
 			return <StatusIndicatorIcon status="error" icon={StatusIcons.userX} />;
 		default:
-			return <StatusIndicatorIcon status="muted" icon={StatusIcons.alertCircle} />;
+			throw new Error(`Unexpected switch value`);
 	}
 }
 

@@ -264,7 +264,7 @@ export const WithCallbacks: Story = {
 		const [logs, setLogs] = useState<string[]>([]);
 
 		const addLog = (message: string) => {
-			setLogs(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
+			setLogs(prev => [...prev, `${new Date().toISOString().slice(11, 19)}: ${message}`]);
 		};
 
 		return (

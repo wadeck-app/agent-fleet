@@ -4,10 +4,10 @@
  * Manages flow definitions, loading, validation, and lookup.
  * Provides default flows and supports project-specific flow configurations.
  */
-import * as crypto from 'crypto';
-import * as fs from 'fs';
+import * as crypto from 'node:crypto';
+import * as fs from 'node:fs';
 import * as yaml from 'js-yaml';
-import * as path from 'path';
+import * as path from 'node:path';
 
 import type {
 	FlowDefinition,
@@ -210,7 +210,7 @@ export class FlowRegistry {
 
 					// Log validation status
 					if (!validationResult.valid) {
-						console.error(`\n⚠️  Flow '${id}' has validation errors (loading anyway for editing):`);
+						console.error(`\n  Flow '${id}' has validation errors (loading anyway for editing):`);
 						console.error(`  Errors: ${validationResult.summary.errors}`);
 						console.error(`  Warnings: ${validationResult.summary.warnings}\n`);
 
@@ -237,7 +237,7 @@ export class FlowRegistry {
 								}
 							}
 						}
-						console.log(`✓ Loaded flow: ${id}`);
+						console.log(` Loaded flow: ${id}`);
 					}
 
 					// ALWAYS store the flow (valid or invalid)
@@ -248,8 +248,8 @@ export class FlowRegistry {
 				} catch (error) {
 					// Parsing errors still prevent loading (can't create FlowDefinition)
 					console.error(
-						`\n❌ Failed to parse flow '${id}':`,
-						error instanceof Error ? error.message : String(error)
+						`\n Failed to parse flow '${id}':`,
+						error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)
 					);
 					console.error(`    This flow will NOT be loaded.\n`);
 				}
@@ -263,11 +263,11 @@ export class FlowRegistry {
 
 			if (invalidFlows.length > 0) {
 				console.warn(
-					`\n⚠️  Loaded ${totalFlows} flows (${invalidFlows.length} invalid, ${totalFlows - invalidFlows.length} valid)`
+					`\n  Loaded ${totalFlows} flows (${invalidFlows.length} invalid, ${totalFlows - invalidFlows.length} valid)`
 				);
 				console.warn(`   Invalid flows can be edited in the UI but cannot be executed.\n`);
 			} else {
-				console.log(`\n✓ All ${totalFlows} flows loaded successfully\n`);
+				console.log(`\n All ${totalFlows} flows loaded successfully\n`);
 			}
 		} catch (error) {
 			throw new Error(`Failed to load flows from ${this.configPath}: ${error}`);
@@ -529,7 +529,7 @@ export class FlowRegistry {
 
 					if (!validationResult.valid) {
 						console.error(
-							`\n⚠️  Flow '${id}' (from ${filePath}) has validation errors (loading anyway for editing):`
+							`\n  Flow '${id}' (from ${filePath}) has validation errors (loading anyway for editing):`
 						);
 						for (const issue of validationResult.issues) {
 							if (issue.severity === 'error') {
@@ -537,15 +537,15 @@ export class FlowRegistry {
 							}
 						}
 					} else {
-						console.log(`✓ Loaded flow: ${id} (from ${filePath})`);
+						console.log(` Loaded flow: ${id} (from ${filePath})`);
 					}
 
 					this.flows.set(id, flow);
 					this.flowValidationResults.set(id, validationResult);
 				} catch (error) {
 					console.error(
-						`\n❌ Failed to parse flow '${id}' from ${filePath}:`,
-						error instanceof Error ? error.message : String(error)
+						`\n Failed to parse flow '${id}' from ${filePath}:`,
+						error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)
 					);
 				}
 			}

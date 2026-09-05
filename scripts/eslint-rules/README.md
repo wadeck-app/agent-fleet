@@ -11,7 +11,7 @@ Custom ESLint rules to enforce best practices for error handling in the frontend
 **Detects**:
 
 ```typescript
-// ❌ BAD - Will be flagged
+//  BAD - Will be flagged
 catch (error) {
   const message = error.message; // ESLint error here
   showToast(message, 'error');
@@ -21,7 +21,7 @@ catch (error) {
 **Solution**:
 
 ```typescript
-// ✅ GOOD
+//  GOOD
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 
 catch (error) {

@@ -149,7 +149,7 @@ export class InMemoryQueryBuilder<T extends BaseEntity> implements QueryBuilder<
 						fieldValue.toLowerCase().includes(value.toLowerCase())
 					);
 				default:
-					return false;
+					throw new Error(`Unexpected switch value`);
 			}
 		};
 	}

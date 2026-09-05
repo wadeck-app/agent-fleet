@@ -89,7 +89,7 @@ export function SWsPage() {
 			case 'error':
 				return 'destructive';
 			default:
-				return 'secondary';
+				throw new Error(`Unexpected switch value`);
 		}
 	};
 
@@ -104,7 +104,7 @@ export function SWsPage() {
 			case 'error':
 				return 'Error';
 			default:
-				return status;
+				throw new Error(`Unexpected switch value`);
 		}
 	};
 

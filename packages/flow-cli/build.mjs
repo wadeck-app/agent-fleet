@@ -1,7 +1,7 @@
 import * as esbuild from 'esbuild';
-import * as fs from 'fs';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -43,7 +43,7 @@ await esbuild.build({
 	// Shim import.meta.url for CJS: inject a banner variable, then replace all references.
 	// esbuild define only accepts entity names (not expressions), so we use banner + define.
 	// @formatter:off
-	banner: { js: 'const __importMetaUrl = require("url").pathToFileURL(__filename).href;' },
+	banner: { js: 'const __importMetaUrl = require("node:url").pathToFileURL(__filename).href;' },
 	define: { 'import.meta.url': '__importMetaUrl' },
 	// @formatter:on
 	entryPoints: {

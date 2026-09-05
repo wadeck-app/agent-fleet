@@ -64,10 +64,10 @@ export function ViewDetailPanelNav<T extends { id: string }>({ columns }: ViewDe
 
 		if (col.type === 'date') {
 			if (value instanceof Date) {
-				return value.toLocaleDateString();
+				return value.toISOString().slice(0, 10);
 			}
 			if (typeof value === 'string') {
-				return new Date(value).toLocaleDateString();
+				return new Date(value).toISOString().slice(0, 10);
 			}
 		}
 

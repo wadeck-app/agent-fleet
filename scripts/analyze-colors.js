@@ -2,11 +2,11 @@
  * Script to analyze color usage in frontend code
  * Identifies hardcoded Tailwind colors vs theme colors
  */
-import fs from 'fs';
+import fs from 'node:fs';
 import { glob } from 'glob';
-import path from 'path';
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
+import path from 'node:path';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

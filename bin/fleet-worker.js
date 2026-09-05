@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { spawn } from 'child_process';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { spawn } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,7 +19,6 @@ const workerArgs = args.filter(arg => arg !== '--no-watch');
 // Use tsx to run the TypeScript file (watch mode is enabled by default)
 const tsxArgs = noWatchMode ? [workerPath, ...workerArgs] : ['watch', workerPath, ...workerArgs];
 
-// violations-suppress: cli/no-spawn-without-windows-hide dev launcher -- terminal forwarded to tsx process intentionally
 const child = spawn('tsx', tsxArgs, {
 	stdio: 'inherit',
 	shell: true,

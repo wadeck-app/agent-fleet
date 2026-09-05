@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 
 import type { Workspace as ApiWorkspace, WorkspaceMetadataEntity } from '@app/shared/api/workspaces.contract';
 

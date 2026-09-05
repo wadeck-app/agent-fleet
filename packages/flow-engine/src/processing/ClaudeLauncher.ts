@@ -5,7 +5,7 @@
  * - Interactive mode (stdio: inherit, terminal takeover)
  * - Background mode (capture stdout/stderr)
  */
-import { execSync, spawn } from 'child_process';
+import { execSync, spawn } from 'node:child_process';
 
 import { type StreamJsonEventCallback, StreamJsonParser } from './StreamJsonParser';
 
@@ -123,8 +123,8 @@ export class ClaudeLauncher {
 			options
 		);
 
-		console.log(`\n🤖 Launching Claude (${options.model || 'default'}) in interactive mode...`);
-		console.log(`💬 Prompt: ${options.prompt.substring(0, 100)}${options.prompt.length > 100 ? '...' : ''}\n`);
+		console.log(`\n Launching Claude (${options.model || 'default'}) in interactive mode...`);
+		console.log(` Prompt: ${options.prompt.substring(0, 100)}${options.prompt.length > 100 ? '...' : ''}\n`);
 
 		return this.executeInteractive(command, args, options);
 	}
@@ -261,7 +261,6 @@ export class ClaudeLauncher {
 			for (const [k, v] of Object.entries(rawEnvInteractive)) {
 				if (v !== undefined) processEnvInteractive[k] = v;
 			}
-			// violations-suppress: cli/no-spawn-without-windows-hide interactive Claude session -- terminal forwarded intentionally
 			const claudeProcess = spawn(command, args, {
 				cwd: options.workingDir,
 				stdio: 'inherit',

@@ -33,7 +33,7 @@
  * ===========================================================================================
  */
 import cookie from 'cookie';
-import type { IncomingMessage } from 'http';
+import type { IncomingMessage } from 'node:http';
 import { createLogger } from 'shared-common/logger';
 
 import type { TransportType } from '@app/shared/transport';

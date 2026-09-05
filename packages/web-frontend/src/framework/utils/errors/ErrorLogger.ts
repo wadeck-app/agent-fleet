@@ -128,7 +128,7 @@ class ErrorLoggerService {
 		// Use appropriate console method based on severity
 		const consoleMethod = this.getConsoleMethod(error.severity);
 
-		consoleMethod(`[${error.severity}] ${error.code}: ${error.message}`, {
+		consoleMethod(`[${error.severity}] ${error.code}: ${(error instanceof Error ? error.message : String(error))}`, {
 			timestamp: entry.timestamp,
 			error: error.toJSON(),
 			context,
@@ -150,7 +150,7 @@ class ErrorLoggerService {
 			case ErrorSeverity.CRITICAL:
 				return console.error;
 			default:
-				return console.log;
+				throw new Error(`Unexpected switch value`);
 		}
 	}
 

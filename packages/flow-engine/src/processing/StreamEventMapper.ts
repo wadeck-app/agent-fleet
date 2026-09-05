@@ -94,7 +94,7 @@ export class StreamEventMapper {
 				return entries;
 			}
 			default:
-				return [];
+				throw new Error(`Unexpected switch value`);
 		}
 	}
 

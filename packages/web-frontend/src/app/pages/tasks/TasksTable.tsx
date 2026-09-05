@@ -11,11 +11,7 @@ import { Trash2 } from 'lucide-react';
  */
 function formatDate(isoString: string): string {
 	const date = new Date(isoString);
-	return date.toLocaleDateString('en-US', {
-		month: 'short',
-		day: 'numeric',
-		year: 'numeric',
-	});
+	return date.toISOString().slice(0, 10);
 }
 
 /**
@@ -38,7 +34,7 @@ function getStatusVariant(status: Task['status']): 'default' | 'secondary' | 'su
 		case 'changes_requested':
 			return 'warning';
 		default:
-			return 'secondary';
+			throw new Error(`Unexpected switch value`);
 	}
 }
 
@@ -56,7 +52,7 @@ function getPriorityVariant(priority: Task['priority']): 'default' | 'secondary'
 		case 'low':
 			return 'secondary';
 		default:
-			return 'secondary';
+			throw new Error(`Unexpected switch value`);
 	}
 }
 
@@ -118,7 +114,7 @@ export const TASKS_TABLE_COLUMNS: Table2Column<Task>[] = [
 		key: 'createdAt',
 		label: 'Created',
 		render: (t: Task) => (
-			<span className="text-xs text-muted-foreground" title={new Date(t.createdAt).toLocaleString()}>
+			<span className="text-xs text-muted-foreground" title={new Date(t.createdAt).toISOString().replace('T', ' ').slice(0, 19)}>
 				{formatDate(t.createdAt)}
 			</span>
 		),

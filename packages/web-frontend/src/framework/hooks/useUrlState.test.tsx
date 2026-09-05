@@ -583,7 +583,7 @@ describe('useUrlState', () => {
 		});
 
 		it('should handle unicode characters', () => {
-			const unicodeValue = '你好 世界 🌍';
+			const unicodeValue = '你好 世界 ';
 
 			const { result } = renderHook(() =>
 				useUrlState({

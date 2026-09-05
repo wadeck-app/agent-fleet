@@ -60,7 +60,7 @@ export function IngredientsPage() {
 	const { id, mode } = useParams<{ id?: string; mode?: string }>();
 	const navigate = useNavigate();
 
-	// 🧩 Composable hooks - each feature is independent!
+	//  Composable hooks - each feature is independent!
 	const storageId = 'ingredients-table';
 	const pagination = usePagination({ pageSize: 10, storageId: 'ingredients' });
 	const sorting = useSorting({ storageId });

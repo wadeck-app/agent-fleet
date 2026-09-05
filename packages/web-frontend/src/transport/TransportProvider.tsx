@@ -92,7 +92,7 @@ function extractPort(url: string): number {
 			case 'wss:':
 				return 443;
 			default:
-				return 3030; // Fallback
+				throw new Error(`Unexpected switch value`); // Fallback
 		}
 	} catch (error) {
 		console.warn('[TransportProvider] Failed to extract port from URL:', url, error);

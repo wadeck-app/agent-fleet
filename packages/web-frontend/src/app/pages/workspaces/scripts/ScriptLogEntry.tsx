@@ -13,12 +13,7 @@ interface ScriptLogEntryProps {
  * Adapted from LogEntry for script process logs
  */
 export function ScriptLogEntry({ log, onExpand }: ScriptLogEntryProps) {
-	const timestamp = new Date(log.timestamp).toLocaleTimeString('en-US', {
-		hour: '2-digit',
-		minute: '2-digit',
-		second: '2-digit',
-		hour12: false,
-	});
+	const timestamp = new Date(log.timestamp).toISOString().slice(11, 19);
 
 	// Color coding by log level
 	const levelColors = {

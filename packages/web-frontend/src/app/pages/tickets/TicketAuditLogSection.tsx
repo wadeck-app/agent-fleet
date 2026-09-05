@@ -218,7 +218,7 @@ function getAuditEntryData(
 			};
 		}
 		default:
-			return { label: entry.event, content: null };
+			throw new Error(`Unexpected switch value`);
 	}
 }
 

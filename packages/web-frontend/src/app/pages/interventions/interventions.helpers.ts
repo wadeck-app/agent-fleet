@@ -16,7 +16,7 @@ export function getInterventionStatusVariant(status: InterventionStatus): BadgeP
 		case 'cancelled':
 			return 'secondary'; // Neutral - gray
 		default:
-			return 'secondary';
+			throw new Error(`Unexpected switch value`);
 	}
 }
 
@@ -32,6 +32,6 @@ export function getInterventionTypeVariant(type: InterventionType): BadgeProps['
 		case 'choice':
 			return 'warning'; // Yellow/Orange
 		default:
-			return 'secondary';
+			throw new Error(`Unexpected switch value`);
 	}
 }

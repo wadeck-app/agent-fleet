@@ -32,10 +32,10 @@ import { adaptCol } from '../_framework/adaptCol';
  * - Search (debounced)
  * - Pagination (10 items per page)
  * - Sorting (multi-column)
- * - Bookmark button (⭐) per row
+ * - Bookmark button () per row
  * - Bookmarked IDs stored in localStorage (key: lego-bookmarks-a6)
  * - Toolbar toggle: "All" | "Bookmarked only"
- * - Bookmark count: "⭐ X bookmarked"
+ * - Bookmark count: " X bookmarked"
  *
  * Architecture:
  * - Data2 + Table2 with feature hooks

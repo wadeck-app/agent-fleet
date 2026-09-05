@@ -35,7 +35,7 @@ export const UserInterventionNode = memo(({ data, selected }: UserInterventionNo
 			case 'choice':
 				return 'Choice';
 			default:
-				return 'Intervention';
+				throw new Error(`Unexpected switch value`);
 		}
 	};
 
@@ -49,7 +49,7 @@ export const UserInterventionNode = memo(({ data, selected }: UserInterventionNo
 			case 'choice':
 				return HelpCircle;
 			default:
-				return User;
+				throw new Error(`Unexpected switch value`);
 		}
 	};
 

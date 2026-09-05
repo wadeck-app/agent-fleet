@@ -83,7 +83,7 @@ export function registerControllerWithCheck(baseUrl: string, loader: () => Promi
 
 		if (conflictingPath) {
 			log.warn(`
-⚠️  WARNING: Route ordering issue detected!
+  WARNING: Route ordering issue detected!
     Already registered: "${conflictingPath}" (will catch all requests)
     Trying to register: "${baseUrl}" (will NEVER be reached!)
 
@@ -326,7 +326,7 @@ function createLazyControllerPlugin<Routes = any>(
 						message: 'Invalid request data',
 						details: error.issues.map(e => ({
 							path: e.path.join('.'),
-							message: e.message,
+							message: (e instanceof Error ? e.message : String(e)),
 						})),
 						statusCode: 400,
 					});

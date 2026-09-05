@@ -164,7 +164,7 @@ export const Interactive: Story = {
 		const [log, setLog] = useState<string[]>([]);
 
 		const addLog = (message: string) => {
-			setLog(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
+			setLog(prev => [...prev, `${new Date().toISOString().slice(11, 19)}: ${message}`]);
 		};
 
 		const handleToggle = (columnId: string) => {
@@ -433,7 +433,7 @@ export const InteractiveWithModifiedState: Story = {
 		const [log, setLog] = useState<string[]>([]);
 
 		const addLog = (message: string) => {
-			setLog(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
+			setLog(prev => [...prev, `${new Date().toISOString().slice(11, 19)}: ${message}`]);
 		};
 
 		const handleToggle = (columnId: string) => {

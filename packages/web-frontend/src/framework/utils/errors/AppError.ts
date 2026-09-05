@@ -68,6 +68,7 @@ export class AppError extends Error {
 
 	constructor(
 		message: string,
+		// violations-suppress: ts/no-union-with-string string fallback for unknown error codes from external APIs
 		codeOrOptions?:
 			| ErrorCode
 			| string
@@ -148,7 +149,7 @@ export class AppError extends Error {
 				return ErrorSeverity.CRITICAL;
 
 			default:
-				return ErrorSeverity.MEDIUM;
+				throw new Error(`Unexpected switch value`);
 		}
 	}
 
@@ -196,7 +197,7 @@ export class AppError extends Error {
 			case ErrorCode.PARSE_ERROR:
 				return 'Failed to process the server response.';
 			default:
-				return 'An unexpected error occurred. Please try again.';
+				throw new Error(`Unexpected switch value`);
 		}
 	}
 
@@ -318,7 +319,7 @@ export const toAppError = (error: unknown): AppError => {
 
 	// Standard Error
 	if (error instanceof Error) {
-		return new AppError(error.message, ErrorCode.UNKNOWN_ERROR, {
+		return new AppError((error instanceof Error ? error.message : String(error)), ErrorCode.UNKNOWN_ERROR, {
 			originalError: error,
 		});
 	}

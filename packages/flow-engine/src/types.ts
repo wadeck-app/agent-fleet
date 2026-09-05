@@ -417,6 +417,7 @@ export interface OutputVariableConfig {
 	/** Whether this field is required (checked in post-process) */
 	required?: boolean;
 
+	// violations-suppress: ts/no-union-with-string string is a named transform function reference, not a free-form string
 	/** Optional transform function to apply after extraction */
 	transform?: TransformFunction | string;
 

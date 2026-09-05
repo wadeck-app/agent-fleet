@@ -1,4 +1,4 @@
-import { mkdir, rm } from 'fs/promises';
+import { mkdir, rm } from 'node:fs/promises';
 import { createLogger } from 'shared-common/logger';
 
 import type { CreateWorkspaceDto } from '@app/shared/api/workspaces.contract';

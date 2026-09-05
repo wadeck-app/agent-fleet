@@ -342,7 +342,7 @@ export class ProjectsService {
 				const errorCode = error instanceof HttpException ? error.code : ERROR_CODES.INTERNAL_SERVER_ERROR;
 				failed.push({
 					id,
-					reason: error instanceof Error ? error.message : 'Unknown error',
+					reason: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error',
 					code: errorCode,
 				});
 			}

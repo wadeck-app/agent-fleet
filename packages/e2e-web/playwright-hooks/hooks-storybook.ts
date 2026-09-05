@@ -3,8 +3,8 @@
  * Provides baseURL override to read dynamic port from file
  */
 import { test as base } from '@playwright/test';
-import { readFileSync } from 'fs';
-import path from 'path';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 interface TestFixtures {
 	// Override baseURL dynamically from file
@@ -29,7 +29,7 @@ export const test = base.extend<TestFixtures>({
 			const dataJson = JSON.parse(data);
 			const port = dataJson.port;
 			const url = `http://localhost:${port}`;
-			debug && console.log(`🎯 [Storybook Fixture] Using Storybook URL: ${url} (RUN_ID: ${runId})`);
+			debug && console.log(` [Storybook Fixture] Using Storybook URL: ${url} (RUN_ID: ${runId})`);
 			await use(url);
 		} catch {
 			throw new Error('Port file not found, filename=' + filename);
@@ -37,7 +37,7 @@ export const test = base.extend<TestFixtures>({
 			// const workspaceId = parseInt(process.env.WORKSPACE_ID || '0', 10);
 			// const port = 6100 + (workspaceId * 1000);
 			// const url = `http://localhost:${port}`;
-			// console.log(`⚠️  [Storybook Fixture] Port file not found, using fallback: ${url}`);
+			// console.log(`  [Storybook Fixture] Port file not found, using fallback: ${url}`);
 			// await use(url);
 		}
 	},

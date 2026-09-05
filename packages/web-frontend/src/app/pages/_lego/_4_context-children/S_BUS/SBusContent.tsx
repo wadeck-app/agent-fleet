@@ -76,7 +76,7 @@ export function SBusContent() {
 			return <Badge variant="secondary">{String(value)}</Badge>;
 		}
 		if (col.type === 'date' && typeof value === 'string') {
-			return new Date(value).toLocaleDateString();
+			return new Date(value).toISOString().slice(0, 10);
 		}
 		return String(value || '');
 	};

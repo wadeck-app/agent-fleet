@@ -1,7 +1,7 @@
 import type { CreateIngredient } from 'shared-frontend-backend/src/api/ingredients.contract';
 
 /**
- * Fixtures pour les tests d'ingrédients
+ * Fixtures pour les tests d'ingredients
  */
 
 export const validIngredients: Record<string, CreateIngredient> = {
@@ -54,7 +54,7 @@ export const validIngredients: Record<string, CreateIngredient> = {
 		servingSize: 100,
 	},
 	pasta: {
-		name: 'Pâtes',
+		name: 'Pates',
 		calories: 371,
 		protein: 13.0,
 		carbs: 75.0,
@@ -81,7 +81,7 @@ export const invalidIngredients = {
 		servingSize: 100,
 	},
 	negativeCalories: {
-		name: 'Ingrédient négatif',
+		name: 'Ingredient negatif',
 		calories: -100,
 		protein: 10.0,
 		carbs: 20.0,
@@ -89,7 +89,7 @@ export const invalidIngredients = {
 		servingSize: 100,
 	},
 	negativeProtein: {
-		name: 'Protéines négatives',
+		name: 'Proteines negatives',
 		calories: 100,
 		protein: -10.0,
 		carbs: 20.0,
@@ -97,7 +97,7 @@ export const invalidIngredients = {
 		servingSize: 100,
 	},
 	zeroServingSize: {
-		name: 'Portion zéro',
+		name: 'Portion zero',
 		calories: 100,
 		protein: 10.0,
 		carbs: 20.0,

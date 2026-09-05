@@ -9,9 +9,9 @@
  * - Clean summary format for agent parsing
  * - Checks all packages in monorepo: shared, backend, frontend
  */
-import { spawn } from 'child_process';
-import fs from 'fs';
-import path from 'path';
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 
 // Use chalk if available, otherwise fallback to plain text
 let chalk;

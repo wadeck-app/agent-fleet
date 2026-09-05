@@ -84,7 +84,7 @@ export function assertValidRoutes(routes: Record<string, any>, name: string = 'A
 		const errorMessages = result.errors.map(err => `  - ${err.error}`).join('\n');
 
 		throw new Error(
-			`\n❌ Route validation failed for ${name}:\n${errorMessages}\n\n` +
+			`\n Route validation failed for ${name}:\n${errorMessages}\n\n` +
 				`Routes must follow the trailing slash convention:\n` +
 				`  • Collection routes (no params): /api/books/\n` +
 				`  • Item routes (with params): /api/books/:id\n`
@@ -102,7 +102,7 @@ export function warnInvalidRoutes(routes: Record<string, any>, name: string = 'A
 	const result = validateRoutes(routes, name);
 
 	if (!result.valid) {
-		console.warn(`\n⚠️  Route validation warnings for ${name}:`);
+		console.warn(`\n  Route validation warnings for ${name}:`);
 		result.errors.forEach(err => {
 			console.warn(`  - ${err.error}`);
 		});

@@ -42,7 +42,7 @@ function getStatusVariant(status: OrchestratorStatus): 'default' | 'secondary' |
 		case 'offline':
 			return 'destructive';
 		default:
-			return 'outline';
+			throw new Error(`Unexpected switch value`);
 	}
 }
 

@@ -137,11 +137,11 @@ const book = withMetadata({ title: 'Test', author: 'Author' });
 ### Import Patterns
 
 ```typescript
-// ✅ Good - Direct file imports
+//  Good - Direct file imports
 import { Button } from '@framework/components/primitives/Button';
 import { useAsyncData } from '@framework/hooks/useAsyncData';
 
-// ❌ Avoid - Barrel exports are forbidden in this project
+//  Avoid - Barrel exports are forbidden in this project
 // import { Button, useAsyncData } from '@framework';
 ```
 

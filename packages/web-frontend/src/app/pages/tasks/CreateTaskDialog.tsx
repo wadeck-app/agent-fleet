@@ -270,7 +270,7 @@ export function CreateTaskDialog({
 			case 'boolean':
 			case 'object':
 			default:
-				return <TextField {...commonProps} />;
+				throw new Error(`Unexpected switch value`);
 		}
 	};
 
@@ -352,7 +352,7 @@ export function CreateTaskDialog({
 		value: flow.id,
 		label: flow.isValid
 			? flow.name || flow.id
-			: `${flow.name || flow.id} ❌ Invalid (${flow.validationErrors?.length || 0} errors)`,
+			: `${flow.name || flow.id}  Invalid (${flow.validationErrors?.length || 0} errors)`,
 		disabled: !flow.isValid, // Disable invalid flows
 	}));
 
@@ -417,7 +417,7 @@ export function CreateTaskDialog({
 	// Define form actions
 	const formActions: FormAction[] = [
 		{
-			label: formState.isSubmitting ? 'Saving...' : 'Créer tâche',
+			label: formState.isSubmitting ? 'Saving...' : 'Creer tache',
 			type: 'submit',
 			formId: FORM_ID,
 			disabled: formState.isSubmitting,
@@ -441,8 +441,8 @@ export function CreateTaskDialog({
 		<CrudDialog
 			open={open}
 			onOpenChange={onOpenChange}
-			title="Créer une tâche"
-			description="Remplissez les détails pour créer une nouvelle tâche"
+			title="Creer une tache"
+			description="Remplissez les details pour creer une nouvelle tache"
 			maxWidth="4xl"
 			preventOutsideClick={true}
 		>
@@ -612,7 +612,7 @@ export function CreateTaskDialog({
 							{/* Dynamic Flow Inputs Section */}
 							{selectedFlow?.inputs && Object.keys(selectedFlow.inputs).length > 0 && (
 								<div className="space-y-4">
-									<h4 className="text-sm font-semibold text-foreground">Paramètres</h4>
+									<h4 className="text-sm font-semibold text-foreground">Parametres</h4>
 									<div className="space-y-3">
 										{Object.entries(selectedFlow.inputs).map(([inputName, inputDef]) => (
 											<div key={inputName} className="flex items-start gap-2">

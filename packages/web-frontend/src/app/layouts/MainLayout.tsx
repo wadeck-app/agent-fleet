@@ -21,7 +21,7 @@ export default function MainLayout() {
 	}, [location.pathname, setInfoPanelContent]);
 
 	const navItems = [
-		{ path: '/ingredients', label: 'Ingrédients', icon: Salad },
+		{ path: '/ingredients', label: 'Ingredients', icon: Salad },
 		{ path: '/recipes', label: 'Recettes', icon: BookOpen },
 		{ path: '/tracking', label: 'Suivi Quotidien', icon: BarChart3 },
 		{ path: '/chat', label: 'Chat IA', icon: MessageCircle },

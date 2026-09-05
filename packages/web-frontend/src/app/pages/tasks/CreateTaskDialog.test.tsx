@@ -91,14 +91,14 @@ describe('CreateTaskDialog', () => {
 	it('renders dialog with correct title and description', () => {
 		render(<CreateTaskDialog {...defaultProps} />);
 
-		expect(screen.getByText('Créer une tâche')).toBeInTheDocument();
-		expect(screen.getByText('Remplissez les détails pour créer une nouvelle tâche')).toBeInTheDocument();
+		expect(screen.getByText('Creer une tache')).toBeInTheDocument();
+		expect(screen.getByText('Remplissez les details pour creer une nouvelle tache')).toBeInTheDocument();
 	});
 
 	it('renders action buttons', () => {
 		render(<CreateTaskDialog {...defaultProps} />);
 
-		expect(screen.getByRole('button', { name: /Créer tâche/i })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /Creer tache/i })).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: /Annuler/i })).toBeInTheDocument();
 	});
 

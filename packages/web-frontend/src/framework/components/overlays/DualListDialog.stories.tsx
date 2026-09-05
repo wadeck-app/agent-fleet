@@ -126,14 +126,14 @@ export const CustomEmptyStates: Story = {
 		rightItems: [],
 		leftEmptyState: (
 			<div className="flex flex-col items-center justify-center py-8 text-center">
-				<div className="mb-2 text-4xl">🎯</div>
+				<div className="mb-2 text-4xl"></div>
 				<p className="text-sm font-semibold text-muted-foreground">No associated items</p>
 				<p className="text-xs text-muted-foreground">Start by adding items from the right</p>
 			</div>
 		),
 		rightEmptyState: (
 			<div className="flex flex-col items-center justify-center py-8 text-center">
-				<div className="mb-2 text-4xl">🎉</div>
+				<div className="mb-2 text-4xl"></div>
 				<p className="text-sm font-semibold text-muted-foreground">All done!</p>
 				<p className="text-xs text-muted-foreground">Everything has been associated</p>
 			</div>

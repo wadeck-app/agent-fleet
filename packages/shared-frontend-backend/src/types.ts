@@ -207,8 +207,8 @@ export type RouteResponse<
  * Use this type to ensure URL paths in backend routing are valid API paths.
  *
  * Usage in backend/src/routes.ts:
- *   const path: ApiPath = '/api/books';  // ✅ Valid
- *   const path: ApiPath = '/api/invalid'; // ❌ Type error
+ *   const path: ApiPath = '/api/books';  //  Valid
+ *   const path: ApiPath = '/api/invalid'; //  Type error
  *
  * ===========================================================================================
  */

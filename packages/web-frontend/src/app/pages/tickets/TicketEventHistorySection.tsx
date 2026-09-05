@@ -53,7 +53,7 @@ function renderEventDescription(entry: TicketHistoryEntry): string {
 			return 'Ticket updated';
 		}
 		default:
-			return entry.event;
+			throw new Error(`Unexpected switch value`);
 	}
 }
 

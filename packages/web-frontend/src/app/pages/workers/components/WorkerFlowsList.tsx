@@ -58,7 +58,7 @@ export function WorkerFlowsList({ workerId }: WorkerFlowsListProps) {
 							<ul className="list-inside list-disc space-y-1">
 								{flow.validationErrors.map((err, idx) => (
 									<li key={idx} className="text-xs text-destructive">
-										{err.message}
+										{(err instanceof Error ? err.message : String(err))}
 									</li>
 								))}
 							</ul>

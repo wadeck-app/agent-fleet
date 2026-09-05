@@ -62,17 +62,17 @@ export async function ensureStoryExists(page: Page, storyId: string, timeout: nu
 			// Story not found in index - throw immediately (don't retry)
 			throw new Error(`Story '${storyId}' not found in index.json`);
 		} catch (error: any) {
-			if (error.message.includes('not found in index.json')) {
+			if ((error instanceof Error ? error.message : String(error)).includes('not found in index.json')) {
 				// Story genuinely doesn't exist - throw helpful error
 				throw new Error(
 					`
-❌ STORYBOOK: Story not found!
+ STORYBOOK: Story not found!
 
 Story ID: ${storyId}
 
 The story does not exist in Storybook's story index.
 
-✅ FIX:
+ FIX:
 1. Check if the story exists in your *.stories.tsx files
 2. Verify the story export name matches the test
 3. Re-generate visual tests: npm run test:visual:generate
@@ -86,7 +86,7 @@ The story does not exist in Storybook's story index.
 	// Timeout or persistent error
 	throw new Error(
 		`
-❌ STORYBOOK: Failed to verify story!
+ STORYBOOK: Failed to verify story!
 
 Story ID: ${storyId}
 Error: ${lastError?.message || 'Unknown error'}

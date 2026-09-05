@@ -13,8 +13,8 @@
  *
  * ===========================================================================================
  */
-import { existsSync, readFileSync, writeFileSync } from 'fs';
-import { resolve } from 'path';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { createLogger } from 'shared-common/logger';
 
 const log = createLogger('MigrateProjects');
@@ -79,7 +79,7 @@ function readJsonFile<T>(filePath: string): T | null {
 function writeJsonFile<T>(filePath: string, data: T): void {
 	try {
 		writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
-		log.info(`✓ Written to ${filePath}`);
+		log.info(` Written to ${filePath}`);
 	} catch (error) {
 		log.error(`Error writing file ${filePath}:`, error);
 		throw error;
@@ -112,7 +112,7 @@ async function migrate() {
 			updatedAt: now,
 		};
 		projectsData.projects.push(defaultProject);
-		log.info('  ✓ Created default project "Unassigned"');
+		log.info('   Created default project "Unassigned"');
 	}
 
 	// Step 2: Scan orchestrator tasks and assign to default project
@@ -129,7 +129,7 @@ async function migrate() {
 	log.info('\nStep 3: Saving projects.json...');
 	writeJsonFile(projectsFilePath, projectsData);
 
-	log.info('\n✓ Migration completed successfully!');
+	log.info('\n Migration completed successfully!');
 	log.info('\nSummary:');
 	log.info(`  - Projects: ${projectsData.projects.length}`);
 	log.info(`  - Default project ID: ${DEFAULT_PROJECT.id}`);

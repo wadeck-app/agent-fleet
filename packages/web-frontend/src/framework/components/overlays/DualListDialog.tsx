@@ -50,7 +50,7 @@ import { CrudDialog } from './CrudDialog';
  *     leftItemRenderer={(item, actions) => (
  *       <SortableItem item={item} onRemove={handleRemove} {...actions} />
  *     )}
- *     leftEmptyState={<EmptyState icon="🔗" message="No items" />}
+ *     leftEmptyState={<EmptyState icon="" message="No items" />}
  *     onReorder={handleReorder}
  *     rightTitle="Available Items"
  *     rightItems={availableItems}
@@ -58,7 +58,7 @@ import { CrudDialog } from './CrudDialog';
  *     rightItemRenderer={(item, actions) => (
  *       <AvailableItem item={item} onAdd={handleAdd} {...actions} />
  *     )}
- *     rightEmptyState={<EmptyState icon="✨" message="All items added" />}
+ *     rightEmptyState={<EmptyState icon="" message="All items added" />}
  *     searchPlaceholder="Search items..."
  *     searchFilter={(item, query) => item.name.includes(query)}
  *     loadingItems={loadingItems}
@@ -196,7 +196,7 @@ export function DualListDialog<TLeft, TRight>({
 	// Default empty states
 	const defaultLeftEmptyState = (
 		<div className="flex flex-col items-center justify-center py-8 text-center">
-			<div className="mb-2 text-3xl text-muted-foreground">📋</div>
+			<div className="mb-2 text-3xl text-muted-foreground"></div>
 			<p className="text-sm text-muted-foreground">No items</p>
 			<p className="text-xs text-muted-foreground">Add items from the right panel</p>
 		</div>
@@ -204,14 +204,14 @@ export function DualListDialog<TLeft, TRight>({
 
 	const defaultRightEmptyState = (
 		<div className="flex flex-col items-center justify-center py-8 text-center">
-			<div className="mb-2 text-3xl text-muted-foreground">✨</div>
+			<div className="mb-2 text-3xl text-muted-foreground"></div>
 			<p className="text-sm text-muted-foreground">All items are added</p>
 		</div>
 	);
 
 	const defaultRightEmptySearchState = (
 		<div className="flex flex-col items-center justify-center py-8 text-center">
-			<div className="mb-2 text-3xl text-muted-foreground">🔍</div>
+			<div className="mb-2 text-3xl text-muted-foreground"></div>
 			<p className="text-sm text-muted-foreground">No items match your search</p>
 		</div>
 	);

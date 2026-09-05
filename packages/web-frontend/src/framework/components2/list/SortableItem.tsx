@@ -29,6 +29,7 @@ import { DragHandle } from '@framework/components2/primitives/DragHandle';
  */
 
 export interface SortableItemProps {
+	// violations-suppress: ts/no-union-with-string DnD-kit requires string | number union for item IDs
 	/** Unique identifier for the item (usually the array index) */
 	id: number | string;
 	/** Whether dragging is disabled */

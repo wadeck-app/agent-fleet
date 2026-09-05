@@ -38,7 +38,7 @@ describe('MainLayout', () => {
 			);
 
 			expect(screen.getByText('Assistant')).toBeInTheDocument();
-			expect(screen.getByText('Ingrédients')).toBeInTheDocument();
+			expect(screen.getByText('Ingredients')).toBeInTheDocument();
 			expect(screen.getByText('Recettes')).toBeInTheDocument();
 			expect(screen.getByText('Suivi Quotidien')).toBeInTheDocument();
 			expect(screen.getByText('Chat IA')).toBeInTheDocument();
@@ -144,7 +144,7 @@ describe('MainLayout', () => {
 				</MemoryRouter>
 			);
 
-			expect(screen.getByText('Ingrédients')).toBeInTheDocument();
+			expect(screen.getByText('Ingredients')).toBeInTheDocument();
 		});
 
 		it('should render workspace indicator in top menu', () => {
@@ -312,7 +312,7 @@ describe('MainLayout', () => {
 				</MemoryRouter>
 			);
 
-			expect(mockUseDocumentTitle).toHaveBeenCalledWith('Ingrédients');
+			expect(mockUseDocumentTitle).toHaveBeenCalledWith('Ingredients');
 		});
 
 		it('should call useDocumentTitle with default title for unknown route', async () => {

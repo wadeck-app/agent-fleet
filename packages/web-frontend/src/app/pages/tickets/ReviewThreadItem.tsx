@@ -192,14 +192,16 @@ export function ReviewThreadItem({ thread, ticketId, proposalId, onResolved, onD
 			) : (
 				<div className="flex items-center gap-2">
 					<span className="font-mono text-xs text-muted-foreground">
-						Lines {localSelector.startLine}{'–'}{localSelector.endLine}
+						Lines {localSelector.startLine}{'-'}{localSelector.endLine}
 					</span>
 					<Badge variant={thread.status === 'open' ? 'warning' : 'success'} className="text-xs">{thread.status}</Badge>
 					{localSelector.selectedText && (
 						<code className="max-w-[200px] truncate rounded bg-muted px-1 py-0.5 font-mono text-xs">{localSelector.selectedText}</code>
 					)}
 					<div className="ml-auto flex items-center gap-1">
+						{/* violations-suppress: tailwind/no-button-classname-style-override contextual icon-only colors have no matching variant */}
 						<Button variant="ghost" size="icon-xs" className="text-muted-foreground" onClick={handleOpenEditSelector} title="Edit line range"><Pencil /></Button>
+						{/* violations-suppress: tailwind/no-button-classname-style-override contextual icon-only colors have no matching variant */}
 						<Button variant="ghost" size="icon-xs" className="text-muted-foreground hover:text-destructive" onClick={handleDeleteThread} title="Delete thread"><Trash2 /></Button>
 					</div>
 				</div>
@@ -214,7 +216,7 @@ export function ReviewThreadItem({ thread, ticketId, proposalId, onResolved, onD
 						<div key={comment.id} className={`rounded border-l-2 border-muted-foreground/30 pl-3 transition-opacity${isPendingCommentDelete ? ' opacity-50 line-through pointer-events-none' : ''}`}>
 							<div className="flex items-center gap-2 mb-1">
 								<Badge variant="outline" className="text-xs">{comment.author}</Badge>
-								<span className="text-xs text-muted-foreground">{new Date(comment.createdAt).toLocaleString()}</span>
+								<span className="text-xs text-muted-foreground">{new Date(comment.createdAt).toISOString().replace('T', ' ').slice(0, 19)}</span>
 								<div className="ml-auto flex items-center gap-1">
 									<Button variant="ghost" size="icon-xs" className="text-muted-foreground" onClick={() => handleStartEditComment(comment.id, displayContent)} title="Edit comment"><Pencil /></Button>
 									<Button variant="ghost" size="icon-xs" className="text-muted-foreground hover:text-destructive" onClick={() => handleDeleteComment(comment.id)} title="Delete comment"><Trash2 /></Button>

@@ -137,7 +137,7 @@ export function TicketActivitySection({ ticketId, sortOrder }: TicketActivitySec
 							{item.type === 'comment' ? (
 								<MessageSquare className="size-4 text-muted-foreground" />
 							) : item.type === 'feedback' ? (
-								<span className="text-xs font-bold text-success">★</span>
+								<span className="text-xs font-bold text-success"></span>
 							) : (
 								<Zap className="size-4 text-accent-foreground" />
 							)}

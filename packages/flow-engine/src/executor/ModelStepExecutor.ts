@@ -224,7 +224,7 @@ export async function executeModelStep(
 		if (pollingInterval) clearInterval(pollingInterval);
 		stepTrace.endTime = Date.now();
 		stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
-		stepTrace.error = error instanceof Error ? error.message : String(error);
+		stepTrace.error = error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error);
 		return stepTrace;
 	}
 }

@@ -61,7 +61,7 @@ export function BooksPage() {
 	const { id, mode } = useParams<{ id?: string; mode?: string }>();
 	const navigate = useNavigate();
 
-	// 🧩 Composable hooks - each feature is independent!
+	//  Composable hooks - each feature is independent!
 	const storageId = 'books-table';
 	const pagination = usePagination({ pageSize: 10, storageId: 'books' });
 	const sorting = useSorting({ storageId });

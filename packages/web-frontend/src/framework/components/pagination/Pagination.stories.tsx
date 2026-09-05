@@ -115,10 +115,10 @@ export const CustomLabels: Story = {
 					currentPage={currentPage}
 					totalPages={10}
 					onPageChange={setCurrentPage}
-					firstLabel="⏮️ First"
-					previousLabel="⬅️ Prev"
-					nextLabel="Next ➡️"
-					lastLabel="Last ⏭️"
+					firstLabel="⏮ First"
+					previousLabel=" Prev"
+					nextLabel="Next "
+					lastLabel="Last ⏭"
 				/>
 			</div>
 		);

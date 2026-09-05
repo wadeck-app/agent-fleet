@@ -12,10 +12,10 @@ await waitFor(() => {
 
 ### Benefits
 
-1. **🎯 Deterministic**: Tests execute the same way every time
-2. **⚡ Fast**: No artificial delays - tests run at maximum speed
-3. **🔍 Precise**: Test exactly what you want, when you want
-4. **🛡️ Reliable**: Eliminates race conditions
+1. ** Deterministic**: Tests execute the same way every time
+2. ** Fast**: No artificial delays - tests run at maximum speed
+3. ** Precise**: Test exactly what you want, when you want
+4. ** Reliable**: Eliminates race conditions
 
 ### API
 
@@ -121,16 +121,16 @@ resolve();
 
 Use `createControllablePromise` when:
 
-- ✅ Testing async UI states (loading, success, error)
-- ✅ Verifying state transitions at specific moments
-- ✅ Testing race conditions or concurrent operations
-- ✅ Need precise control over when promises resolve
+-  Testing async UI states (loading, success, error)
+-  Verifying state transitions at specific moments
+-  Testing race conditions or concurrent operations
+-  Need precise control over when promises resolve
 
 Don't use when:
 
-- ❌ Promise resolves immediately (use `mockResolvedValue`)
-- ❌ Don't care about intermediate states
-- ❌ Testing synchronous code
+-  Promise resolves immediately (use `mockResolvedValue`)
+-  Don't care about intermediate states
+-  Testing synchronous code
 
 ### Migration Guide
 
@@ -202,7 +202,7 @@ Tests should be organized by level:
    ├─ packages/frontend/src/features/form/useFormState.test.ts → Hook logic
    └─ packages/frontend/src/features/form/BookForm.test.tsx → Component wiring
 
-2. Integration Tests ⭐ (Use createControllablePromise here)
+2. Integration Tests  (Use createControllablePromise here)
    └─ packages/frontend/src/features/form/FormContainer.test.tsx → FormContainer + useFormState
        ├─ Loading state transitions
        ├─ Error handling

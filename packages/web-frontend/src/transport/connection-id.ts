@@ -5,8 +5,8 @@
  *
  * Why window.name instead of sessionStorage?
  * - sessionStorage is COPIED when duplicating tabs → same connId → bug!
- * - window.name is NOT copied when duplicating tabs → unique connId ✓
- * - window.name persists across page refresh → same connId after F5 ✓
+ * - window.name is NOT copied when duplicating tabs → unique connId 
+ * - window.name persists across page refresh → same connId after F5 
  *
  * Architecture:
  * - Single source of truth for connId management

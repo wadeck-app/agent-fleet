@@ -46,12 +46,7 @@ export function parseInputKey(key: string): { name: string; defaultValue?: strin
  */
 export function TaskInfoCard({ task, collapsible = true, defaultOpen: _defaultOpen = true }: TaskInfoCardProps) {
 	const formatDate = (isoString: string) => {
-		return new Date(isoString).toLocaleString('en-US', {
-			month: 'short',
-			day: 'numeric',
-			hour: '2-digit',
-			minute: '2-digit',
-		});
+		return new Date(isoString).toISOString().replace('T', ' ').slice(0, 19);
 	};
 
 	const getStatusVariant = (status: Task['status']) => {

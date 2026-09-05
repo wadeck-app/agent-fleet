@@ -1,8 +1,8 @@
 import { FlowRegistry } from 'flow-engine';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import type { Orchestrator } from 'orchestrator';
 import { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
-import * as path from 'path';
+import * as path from 'node:path';
 import { getOrchestratorRestUrl } from 'shared-common/PortCalculator';
 import { createLogger } from 'shared-common/logger';
 

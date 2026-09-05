@@ -14,11 +14,11 @@
  *
  * @version 1.0.0
  */
-import fs from 'fs';
-import path from 'path';
-import { dirname } from 'path';
-import { performance } from 'perf_hooks';
-import { fileURLToPath } from 'url';
+import fs from 'node:fs';
+import path from 'node:path';
+import { dirname } from 'node:path';
+import { performance } from 'node:perf_hooks';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -329,8 +329,8 @@ function generateTestFile(stories) {
 	// // To regenerate: npm run test:visual:generate
 	// // Documentation: See scripts/generate-visual-regression-tests.js for configuration
 	//
-	// import fs from 'fs';
-	// import path from 'path';
+	// import fs from 'node:fs';
+	// import path from 'node:path';
 	// import { test, expect } from '@playwright/test';
 	//
 	// const STORYBOOK_URL = '${CONFIG.storybookUrl}';

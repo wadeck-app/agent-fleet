@@ -28,7 +28,7 @@ export async function waitForService(
 			const responseTime = Date.now() - startTime;
 
 			if (response.ok) {
-				console.log(`✅ Service ready at ${url} (attempt ${attempt}/${maxRetries}, ${responseTime}ms)`);
+				console.log(` Service ready at ${url} (attempt ${attempt}/${maxRetries}, ${responseTime}ms)`);
 				return {
 					success: true,
 					url,
@@ -36,7 +36,7 @@ export async function waitForService(
 				};
 			}
 
-			console.log(`⚠️  Service returned ${response.status} at ${url} (attempt ${attempt}/${maxRetries})`);
+			console.log(`  Service returned ${response.status} at ${url} (attempt ${attempt}/${maxRetries})`);
 		} catch (error) {
 			console.log(`⏳ Waiting for service at ${url} (attempt ${attempt}/${maxRetries})`);
 		}
@@ -48,7 +48,7 @@ export async function waitForService(
 	}
 
 	const errorMessage = `Failed to connect to ${url} after ${maxRetries} attempts`;
-	console.error(`❌ ${errorMessage}`);
+	console.error(` ${errorMessage}`);
 	return {
 		success: false,
 		url,
@@ -62,7 +62,7 @@ export async function waitForService(
  */
 export async function waitForStorybook(port: number = 6100): Promise<HealthCheckResult> {
 	const url = `http://localhost:${port}`;
-	console.log(`🔍 Checking Storybook health at ${url}...`);
+	console.log(` Checking Storybook health at ${url}...`);
 	return waitForService(url);
 }
 
@@ -72,7 +72,7 @@ export async function waitForStorybook(port: number = 6100): Promise<HealthCheck
  */
 export async function waitForFrontend(port: number = 5200): Promise<HealthCheckResult> {
 	const url = `http://localhost:${port}`;
-	console.log(`🔍 Checking Frontend health at ${url}...`);
+	console.log(` Checking Frontend health at ${url}...`);
 	return waitForService(url);
 }
 
@@ -82,7 +82,7 @@ export async function waitForFrontend(port: number = 5200): Promise<HealthCheckR
  */
 export async function waitForBackend(port: number = 3001): Promise<HealthCheckResult> {
 	const url = `http://localhost:${port}/health`;
-	console.log(`🔍 Checking Backend health at ${url}...`);
+	console.log(` Checking Backend health at ${url}...`);
 	return waitForService(url);
 }
 
@@ -120,9 +120,9 @@ export async function waitForAllServices(services: {
 	const allSuccess = results.every(([_, result]) => result.success);
 
 	if (allSuccess) {
-		console.log('✅ All services are healthy');
+		console.log(' All services are healthy');
 	} else {
-		console.error('❌ Some services failed health checks');
+		console.error(' Some services failed health checks');
 		results.forEach(([name, result]) => {
 			if (!result.success) {
 				console.error(`  - ${name}: ${result.error}`);

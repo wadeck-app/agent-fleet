@@ -175,7 +175,7 @@ export class WebSocketTransportServer implements ITransportServer {
 				if (socket && socket.readyState === 1) {
 					this.sendMessage(socket, {
 						type: 'auth_error',
-						message: error.message || 'Authentication failed',
+						message: (error instanceof Error ? error.message : String(error)) || 'Authentication failed',
 					});
 				}
 
@@ -280,7 +280,7 @@ export class WebSocketTransportServer implements ITransportServer {
 			log.error('Request handling error:', error);
 
 			// Check if token expired
-			if (error.message === 'Access token expired') {
+			if ((error instanceof Error ? error.message : String(error)) === 'Access token expired') {
 				this.sendMessage(socket, {
 					type: 'token_expired',
 					message: 'Access token expired, please refresh',
@@ -297,7 +297,7 @@ export class WebSocketTransportServer implements ITransportServer {
 				status: 500,
 				error: {
 					code: 'INTERNAL_ERROR',
-					message: error.message || 'Internal server error',
+					message: (error instanceof Error ? error.message : String(error)) || 'Internal server error',
 				},
 				timestamp: Date.now(),
 			});

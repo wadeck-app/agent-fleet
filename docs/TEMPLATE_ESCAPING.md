@@ -2,11 +2,11 @@
 
 ## Question
 
-Comment gérer les caractères littéraux `$`, `{`, `}` dans les scripts ? Faut-il les échapper ?
+Comment gerer les caracteres litteraux `$`, `{`, `}` dans les scripts ? Faut-il les echapper ?
 
-## Réponse Courte
+## Reponse Courte
 
-**Non, pas besoin d'échappement dans la plupart des cas !**
+**Non, pas besoin d'echappement dans la plupart des cas !**
 
 Notre syntaxe `${{ }}` coexiste naturellement avec:
 
@@ -16,44 +16,44 @@ Notre syntaxe `${{ }}` coexiste naturellement avec:
 
 ## Comportement Actuel
 
-### ✅ Cas qui fonctionnent sans échappement
+###  Cas qui fonctionnent sans echappement
 
 #### 1. Variables Shell (single `$`)
 
 ```yaml
-# Variables shell préservées telles quelles
-script: echo $HOME # ✓ OK
-script: export PATH=$PATH:/new # ✓ OK
-script: echo ${HOME}/documents # ✓ OK
+# Variables shell preservees telles quelles
+script: echo $HOME #  OK
+script: export PATH=$PATH:/new #  OK
+script: echo ${HOME}/documents #  OK
 ```
 
 #### 2. Accolades simples `{}`
 
 ```yaml
-# JSON et autres syntaxes préservés
-script: echo '{ "key": "value" }'     # ✓ OK
-script: awk '{ print $1 }'            # ✓ OK
+# JSON et autres syntaxes preserves
+script: echo '{ "key": "value" }'     #  OK
+script: awk '{ print $1 }'            #  OK
 ```
 
 #### 3. Doubles accolades sans `$`
 
 ```yaml
-# Syntaxes comme Mustache préservées
-script: echo "{{ variable }}" # ✓ OK (pas de $)
+# Syntaxes comme Mustache preservees
+script: echo "{{ variable }}" #  OK (pas de $)
 ```
 
-#### 4. Mélange de flow et shell variables
+#### 4. Melange de flow et shell variables
 
 ```yaml
 # Le meilleur des deux mondes !
-script: echo "${{ inputs.name }}" lives in $HOME # ✓ OK
-script: cp ${{ inputs.file }} ${HOME}/backup/ # ✓ OK
-script: USER=${{ inputs.name }} HOME=$HOME ./script.sh # ✓ OK
+script: echo "${{ inputs.name }}" lives in $HOME #  OK
+script: cp ${{ inputs.file }} ${HOME}/backup/ #  OK
+script: USER=${{ inputs.name }} HOME=$HOME ./script.sh #  OK
 ```
 
-### ⚠️ Seul pattern interpolé: `${{ expression }}`
+###  Seul pattern interpole: `${{ expression }}`
 
-Le pattern exact qui déclenche l'interpolation:
+Le pattern exact qui declenche l'interpolation:
 
 ```
 ${{ expression }}
@@ -82,12 +82,12 @@ script: |
     HOME_DIR=$HOME
     CONFIG=${HOME}/.config
 
-    # Mélange
+    # Melange
     echo "User $USER at $HOME_DIR"
     mkdir -p ${CONFIG}/${{ inputs.appName }}
 ```
 
-**Résultat après interpolation:**
+**Resultat apres interpolation:**
 
 ```bash
 #!/bin/bash
@@ -98,7 +98,7 @@ USER=alice
 HOME_DIR=$HOME
 CONFIG=${HOME}/.config
 
-# Mélange
+# Melange
 echo "User alice at $HOME_DIR"
 mkdir -p ${CONFIG}/myapp
 ```
@@ -116,7 +116,7 @@ script: |
     EOF
 ```
 
-**Résultat:**
+**Resultat:**
 
 ```json
 {
@@ -137,7 +137,7 @@ script: |
     }' ${{ inputs.inputFile }}
 ```
 
-## Comment Afficher `${{` Littéralement ?
+## Comment Afficher `${{` Litteralement ?
 
 Si vous voulez vraiment afficher `${{` dans la sortie (rare), cassez le pattern:
 
@@ -158,94 +158,94 @@ script: |
 # Output: "${{ inputs.var }}"
 ```
 
-### Option 3: Échappement dans le string
+### Option 3: Echappement dans le string
 
 ```yaml
 script: echo 'Literal: ${{ not.interpolated }}'
-# Les quotes simples dans echo empêchent l'interpolation shell
-# Mais notre renderer va quand même interpoler !
+# Les quotes simples dans echo empechent l'interpolation shell
+# Mais notre renderer va quand meme interpoler !
 ```
 
-⚠️ **Note**: Actuellement, on ne supporte pas l'échappement avec `\` (contrairement à GHA).
+ **Note**: Actuellement, on ne supporte pas l'echappement avec `\` (contrairement a GHA).
 
 ## Comparaison avec GitHub Actions
 
 ### GitHub Actions
 
-GHA offre plusieurs méthodes d'échappement:
+GHA offre plusieurs methodes d'echappement:
 
 ```yaml
-# Méthode 1: Expression vide
+# Methode 1: Expression vide
 run: echo "${{ '{' }}"
 
-# Méthode 2: fromJSON
+# Methode 2: fromJSON
 run: echo "${{ fromJSON('{"literal":"${{}}"}') }}"
 
-# Méthode 3: Casser le pattern
+# Methode 3: Casser le pattern
 run: echo "$ {{ variable }}"
 ```
 
-### Notre Implémentation
+### Notre Implementation
 
 Actuellement plus simple:
 
 ```yaml
-# Méthode 1: Casser le pattern avec espace
+# Methode 1: Casser le pattern avec espace
 script: echo "$ {{ variable }}"
 
-# Méthode 2: Utiliser variables shell
+# Methode 2: Utiliser variables shell
 script: echo "${DOLLAR}{{ variable }}"
 
-# Les patterns incomplets sont préservés
-script: echo "${{ incomplete" # Préservé tel quel
-script: echo "{{ no dollar }}" # Préservé tel quel
+# Les patterns incomplets sont preserves
+script: echo "${{ incomplete" # Preserve tel quel
+script: echo "{{ no dollar }}" # Preserve tel quel
 ```
 
 ## Tests de Validation
 
-Tous ces cas sont testés dans `template-renderer.escape.test.ts`:
+Tous ces cas sont testes dans `template-renderer.escape.test.ts`:
 
 ```typescript
-✓ Shell variables like $HOME preserved
-✓ Shell variable expansion ${VAR} preserved
-✓ Mix flow and shell variables
-✓ Single curly braces { } preserved
-✓ Double {{ }} without $ preserved
-✓ Incomplete ${{ patterns preserved
-✓ Bash scripts with mixed syntax
-✓ JSON with flow variables
-✓ AWK scripts with $ references
+ Shell variables like $HOME preserved
+ Shell variable expansion ${VAR} preserved
+ Mix flow and shell variables
+ Single curly braces { } preserved
+ Double {{ }} without $ preserved
+ Incomplete ${{ patterns preserved
+ Bash scripts with mixed syntax
+ JSON with flow variables
+ AWK scripts with $ references
 ```
 
 ## Cas Limite: Backslash `\`
 
-⚠️ Actuellement, `\` n'échappe PAS les variables:
+ Actuellement, `\` n'echappe PAS les variables:
 
 ```yaml
 script: echo "\${{ inputs.name }}"
-# Output: "\alice" (backslash préservé, variable interpolée)
+# Output: "\alice" (backslash preserve, variable interpolee)
 ```
 
-Si besoin d'échappement avec `\`, ce serait une future amélioration.
+Si besoin d'echappement avec `\`, ce serait une future amelioration.
 
-## Règle Simple
+## Regle Simple
 
-**Si ça n'a pas exactement la forme `${{ expression }}`, ça ne sera pas interpolé.**
+**Si ca n'a pas exactement la forme `${{ expression }}`, ca ne sera pas interpole.**
 
 Exemples:
 
-- `$HOME` → ✓ préservé (manque `{{`)
-- `${VAR}` → ✓ préservé (manque deuxième `{`)
-- `{{ x }}` → ✓ préservé (manque `$`)
-- `$ {{ x }}` → ✓ préservé (espace casse le pattern)
-- `${{ x }}` → ✗ interpolé !
+- `$HOME` →  preserve (manque `{{`)
+- `${VAR}` →  preserve (manque deuxieme `{`)
+- `{{ x }}` →  preserve (manque `$`)
+- `$ {{ x }}` →  preserve (espace casse le pattern)
+- `${{ x }}` →  interpole !
 
 ## Recommandations
 
-### ✅ Bonnes Pratiques
+###  Bonnes Pratiques
 
 ```yaml
-# Clair: mélanger flow et shell
+# Clair: melanger flow et shell
 script: |
     echo "Flow: ${{ inputs.name }}"
     echo "Shell: $HOME"
@@ -260,25 +260,25 @@ script: |
     EOF
 ```
 
-### ❌ À Éviter
+###  A Eviter
 
 ```yaml
 # Confusant: trop de $ et {}
 script: echo "${${{ inputs.var }}}"
 
-# Peu clair: échappement complexe
+# Peu clair: echappement complexe
 script: echo "\\${{ inputs.var }}"
 ```
 
-## Résumé
+## Resume
 
 | Pattern        | Comportement | Exemple                     |
 | -------------- | ------------ | --------------------------- |
-| `${{` ... `}}` | ✗ Interpolé  | `${{ inputs.x }}` → `value` |
-| `$VAR`         | ✓ Préservé   | `$HOME` → `$HOME`           |
-| `${VAR}`       | ✓ Préservé   | `${HOME}` → `${HOME}`       |
-| `{ }`          | ✓ Préservé   | `{ "a": 1 }` → `{ "a": 1 }` |
-| `{{ }}`        | ✓ Préservé   | `{{ x }}` → `{{ x }}`       |
-| `$ {{ }}`      | ✓ Préservé   | `$ {{ x }}` → `$ {{ x }}`   |
+| `${{` ... `}}` |  Interpole  | `${{ inputs.x }}` → `value` |
+| `$VAR`         |  Preserve   | `$HOME` → `$HOME`           |
+| `${VAR}`       |  Preserve   | `${HOME}` → `${HOME}`       |
+| `{ }`          |  Preserve   | `{ "a": 1 }` → `{ "a": 1 }` |
+| `{{ }}`        |  Preserve   | `{{ x }}` → `{{ x }}`       |
+| `$ {{ }}`      |  Preserve   | `$ {{ x }}` → `$ {{ x }}`   |
 
-**Conclusion**: La syntaxe `${{ }}` est suffisamment distinctive pour coexister naturellement avec les syntaxes shell, JSON, et autres. Pas besoin d'échappement dans 99% des cas !
+**Conclusion**: La syntaxe `${{ }}` est suffisamment distinctive pour coexister naturellement avec les syntaxes shell, JSON, et autres. Pas besoin d'echappement dans 99% des cas !

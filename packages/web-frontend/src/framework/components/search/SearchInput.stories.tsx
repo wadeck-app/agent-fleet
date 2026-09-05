@@ -128,11 +128,11 @@ export const Interactive: Story = {
 
 		const handleChange = (newValue: string) => {
 			setValue(newValue);
-			setLog(prev => [...prev, `onChange: "${newValue}" at ${new Date().toLocaleTimeString()}`]);
+			setLog(prev => [...prev, `onChange: "${newValue}" at ${new Date().toISOString().slice(11, 19)}`]);
 		};
 
 		const handleClear = () => {
-			setLog(prev => [...prev, `onClear called at ${new Date().toLocaleTimeString()}`]);
+			setLog(prev => [...prev, `onClear called at ${new Date().toISOString().slice(11, 19)}`]);
 		};
 
 		return (

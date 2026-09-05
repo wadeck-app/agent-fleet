@@ -11,10 +11,10 @@
  *   node scripts/sync-workspace.js --verify              - Check consistency
  *   node scripts/sync-workspace.js --verify 2            - Check all are set to 2
  */
-import fs from 'fs';
-import path from 'path';
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
+import fs from 'node:fs';
+import path from 'node:path';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

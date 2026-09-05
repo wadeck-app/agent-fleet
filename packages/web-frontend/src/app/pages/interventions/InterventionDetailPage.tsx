@@ -237,7 +237,7 @@ export function InterventionDetailPage() {
 								className="flex-1"
 								size="lg"
 							>
-								✅ Approve
+								 Approve
 							</Button>
 							<Button
 								onClick={() => handleRespond(false)}
@@ -246,7 +246,7 @@ export function InterventionDetailPage() {
 								className="flex-1"
 								size="lg"
 							>
-								❌ Reject
+								 Reject
 							</Button>
 						</div>
 					</CardContent>

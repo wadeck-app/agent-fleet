@@ -1,4 +1,4 @@
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import * as yaml from 'js-yaml';
 
 /**
@@ -26,8 +26,7 @@ export function loadYaml(file: string): unknown {
 		}
 		return raw;
 	} catch (err) {
-		// violations-suppress: security/no-raw-err-in-cli YAML parse errors are user-actionable; err.message shows syntax location
-		console.error(`Failed to parse YAML: ${err instanceof Error ? err.message : String(err)}`);
+		console.error(`Failed to parse YAML: ${err instanceof Error ? (err instanceof Error ? err.message : String(err)) : String(err)}`);
 		process.exit(1);
 	}
 }

@@ -1,8 +1,8 @@
 import type { FlowRegistry } from 'flow-engine';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import * as yaml from 'js-yaml';
 import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
-import * as path from 'path';
+import * as path from 'node:path';
 import { createLogger } from 'shared-common/logger';
 
 import type { FlowDefinition, FlowListItem, FlowMetadata, FlowsByProject } from '@app/shared/api/flows.contract';

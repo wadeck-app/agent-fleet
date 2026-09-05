@@ -58,10 +58,10 @@ script: echo "${{ inputs.home }}" # Flow variable
 The new syntax enables compile-time validation:
 
 ```yaml
-${{ inputs.varName }}              # ✓ Valid
-${{ steps.stepId.outputs.var }}    # ✓ Valid
-${{ task.priority }}               # ✓ Valid
-${{ unknownContext.var }}          # ✗ Error: Unknown context
+${{ inputs.varName }}              #  Valid
+${{ steps.stepId.outputs.var }}    #  Valid
+${{ task.priority }}               #  Valid
+${{ unknownContext.var }}          #  Error: Unknown context
 ```
 
 ### 4. Better IDE Support
@@ -90,11 +90,11 @@ The explicit context structure enables:
 
 All 104 tests passing:
 
-- ✓ 21 tests: Output extraction
-- ✓ 19 tests: Condition evaluation
-- ✓ 8 tests: Flow execution
-- ✓ 4 tests: Integration tests
-- ✓ 52 tests: Compiled JavaScript versions
+-  21 tests: Output extraction
+-  19 tests: Condition evaluation
+-  8 tests: Flow execution
+-  4 tests: Integration tests
+-  52 tests: Compiled JavaScript versions
 
 ## Context Types
 
@@ -284,14 +284,14 @@ await executor.execute({
 
 To migrate existing flows:
 
-1. ✓ Update all `${...}` to `${{ ... }}`
-2. ✓ Add explicit context prefixes:
+1.  Update all `${...}` to `${{ ... }}`
+2.  Add explicit context prefixes:
     - `${var}` → `${{ inputs.var }}`
     - `${step.var}` → `${{ steps.step.outputs.var }}`
     - `${task.prop}` → `${{ task.prop }}`
-3. ✓ Update conditional expressions if needed
-4. ✓ Test all flows
-5. ✓ Update documentation
+3.  Update conditional expressions if needed
+4.  Test all flows
+5.  Update documentation
 
 ## Testing
 
@@ -334,11 +334,11 @@ Demonstrates:
 
 The GitHub Actions syntax migration provides:
 
-- ✓ Clearer variable scoping
-- ✓ Better error messages
-- ✓ No shell conflicts
-- ✓ Enhanced type safety
-- ✓ Improved IDE support
-- ✓ Industry-standard syntax
+-  Clearer variable scoping
+-  Better error messages
+-  No shell conflicts
+-  Enhanced type safety
+-  Improved IDE support
+-  Industry-standard syntax
 
 All tests passing and demos working successfully confirm the migration is complete and stable.

@@ -204,7 +204,6 @@ export class OpenCodeModelProvider implements ModelProvider {
 
 		try {
 			return await new Promise<ModelInteractiveResult>((resolve, reject) => {
-				// violations-suppress: cli/no-spawn-without-windows-hide interactive OpenCode session -- terminal forwarded intentionally
 				const proc = spawn(command, args, {
 					cwd: options.workingDir,
 					stdio: 'inherit',
@@ -433,7 +432,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 				this.currentProcess.kill();
 			}
 		} catch (err) {
-			console.warn('[OpenCodeModelProvider] kill() failed:', err instanceof Error ? err.message : String(err));
+			console.warn('[OpenCodeModelProvider] kill() failed:', err instanceof Error ? (err instanceof Error ? err.message : String(err)) : String(err));
 		}
 	}
 

@@ -34,7 +34,7 @@ function getTypeIcon(type: VariableType) {
 		case 'object':
 			return <span className="font-mono text-xs">{'{}'}</span>;
 		default:
-			return null;
+			throw new Error(`Unexpected switch value`);
 	}
 }
 

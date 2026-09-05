@@ -3,7 +3,7 @@
  * the gutter icon on tests in this directory.
  */
 import { defineConfig } from '@playwright/test';
-import * as path from 'path';
+import * as path from 'node:path';
 
 import baseConfig from '../playwright.config.storybook';
 

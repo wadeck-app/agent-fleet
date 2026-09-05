@@ -12,13 +12,7 @@ interface TaskInfoPanelProps {
  */
 export function TaskInfoPanel({ task }: TaskInfoPanelProps) {
 	const formatDate = (isoString: string) => {
-		return new Date(isoString).toLocaleString('en-US', {
-			month: 'short',
-			day: 'numeric',
-			year: 'numeric',
-			hour: '2-digit',
-			minute: '2-digit',
-		});
+		return new Date(isoString).toISOString().replace('T', ' ').slice(0, 19);
 	};
 
 	const getStatusVariant = (status: Task['status']) => {

@@ -2,8 +2,8 @@
  * WorkspacePruner -- disk-level workspace directory pruning.
  * Handles age-based and count-based removal of workspace directories.
  */
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 import type { Workspace } from '../types';
 

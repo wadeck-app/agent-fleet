@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import path from 'path';
+import path from 'node:path';
 
 const runId = process.env.RUN_ID || `${Date.now()}-${process.pid}`;
 process.env.RUN_ID = runId;

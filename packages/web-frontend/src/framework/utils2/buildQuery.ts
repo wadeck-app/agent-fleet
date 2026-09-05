@@ -34,11 +34,11 @@ import { BaseListQuerySchema } from '@shared/common/api-helpers';
  *
  * Why fillQuery instead of toQuery?
  * ```typescript
- * // ❌ Old pattern (loses type safety on keys):
+ * //  Old pattern (loses type safety on keys):
  * const query = buildQuery<IngredientsListQuery>(pagination, sorting, search);
  * // IngredientsListQuery could have any shape
  *
- * // ✅ New pattern (enforces BaseListQuerySchema):
+ * //  New pattern (enforces BaseListQuerySchema):
  * const query = buildQuery(pagination, sorting, search);
  * // Each feature fills query.page, query.search, etc. with type safety
  * // TypeScript knows exactly which properties exist

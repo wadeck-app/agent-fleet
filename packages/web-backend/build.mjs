@@ -1,6 +1,6 @@
 import * as esbuild from 'esbuild';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // Get __dirname equivalent in ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -127,7 +127,7 @@ try {
 		// In ESM bundles, require is undefined. This banner injects a require shim so
 		// esbuild's __require wrapper can call native Node.js modules at runtime.
 		banner: {
-			js: "import { createRequire } from 'module';\nconst require = createRequire(import.meta.url);",
+			js: "import { createRequire } from 'node:module';\nconst require = createRequire(import.meta.url);",
 		},
 
 		// ====================================================================

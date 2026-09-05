@@ -120,7 +120,7 @@ export function ViewDetailPanel<T extends Product = Product>({ columns, features
 		}
 
 		if (col.type === 'date') {
-			return value ? new Date(value as string | number | Date).toLocaleDateString() : '-';
+			return value ? new Date(value as string | number | Date).toISOString().slice(0, 10) : '-';
 		}
 
 		return String(value ?? '');
