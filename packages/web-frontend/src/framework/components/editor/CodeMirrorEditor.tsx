@@ -9,21 +9,21 @@ import { tags } from '@lezer/highlight';
 import type { CodeEditorProps, LineSelection } from './CodeEditorTypes';
 import { getLanguageExtension } from './languageDetection';
 
-//  Theme factory 
+// ── Theme factory ─────────────────────────────────────────────────────────
 // Creates editor theme per mode. CSS variables handle backgrounds/foreground.
 // Line number colors are hardcoded per mode to match GitHub exactly.
 
 function createAppTheme(isDark: boolean) {
 	// GitHub-exact line number colors
-	const lineNumberColor = isDark ? 'f' : 'c';
-	const lineNumberHover = isDark ? 'be' : 'f';
-	const lineNumberActive = isDark ? 'c' : 'b';
-	const activeLineBg = isDark ? 'rgba(,,,.)' : 'rgba(,,,.)';
+	const lineNumberColor = isDark ? '#484f58' : '#636c76';
+	const lineNumberHover = isDark ? '#8b949e' : '#24292f';
+	const lineNumberActive = isDark ? '#636c76' : '#4b5563';
+	const activeLineBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)';
 
 	return EditorView.theme({
 		'&': {
-			height: '%',
-			fontSize: 'px',
+			height: '100%',
+			fontSize: '13px',
 			backgroundColor: 'var(--background)',
 			color: 'var(--foreground)',
 		},
@@ -37,10 +37,10 @@ function createAppTheme(isDark: boolean) {
 			borderLeftColor: 'var(--foreground)',
 		},
 		'&.cm-focused .cm-selectionBackground, ::selection': {
-			backgroundColor: 'color-mix(in srgb, var(--primary) %, transparent)',
+			backgroundColor: 'color-mix(in srgb, var(--primary) 25%, transparent)',
 		},
 		'.cm-selectionBackground': {
-			backgroundColor: 'color-mix(in srgb, var(--primary) %, transparent)',
+			backgroundColor: 'color-mix(in srgb, var(--primary) 12%, transparent)',
 		},
 
 		'.cm-activeLine': {
@@ -54,11 +54,11 @@ function createAppTheme(isDark: boolean) {
 			border: 'none',
 		},
 		'.cm-lineNumbers .cm-gutterElement': {
-			paddingLeft: 'px',
-			paddingRight: 'px',
+			paddingLeft: '12px',
+			paddingRight: '16px',
 			cursor: 'pointer',
-			minWidth: 'ch',
-			transition: 'color .s',
+			minWidth: '3ch',
+			transition: 'color 0.15s',
 		},
 		'.cm-lineNumbers .cm-gutterElement:hover': {
 			color: lineNumberHover,
@@ -70,124 +70,124 @@ function createAppTheme(isDark: boolean) {
 
 		// Line selection highlight (GitHub-style)
 		'.cm-selectedLine': {
-			backgroundColor: 'color-mix(in srgb, var(--primary) %, transparent)',
+			backgroundColor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
 		},
 
 		// Matching brackets
 		'&.cm-focused .cm-matchingBracket': {
-			backgroundColor: 'color-mix(in srgb, var(--primary) %, transparent)',
-			outline: 'px solid color-mix(in srgb, var(--primary) %, transparent)',
+			backgroundColor: 'color-mix(in srgb, var(--primary) 20%, transparent)',
+			outline: '1px solid color-mix(in srgb, var(--primary) 40%, transparent)',
 		},
 
 		// Tooltip / autocomplete
 		'.cm-tooltip': {
 			backgroundColor: 'var(--popover)',
 			color: 'var(--popover-foreground)',
-			border: 'px solid var(--border)',
+			border: '1px solid var(--border)',
 		},
 	});
 }
 
-//  Syntax highlighting 
+// ── Syntax highlighting ──────────────────────────────────────────────────
 // Two palettes: GitHub-light for light mode, GitHub-dark for dark mode.
 
 // @formatter:off
 const lightHighlightStyle = HighlightStyle.define([
-	{ tag: tags.keyword, color: 'cfe' },
-	{ tag: tags.controlKeyword, color: 'cfe' },
-	{ tag: tags.operatorKeyword, color: 'cfe' },
-	{ tag: tags.definitionKeyword, color: 'cfe' },
-	{ tag: tags.moduleKeyword, color: 'cfe' },
+	{ tag: tags.keyword, color: '#cf222e' },
+	{ tag: tags.controlKeyword, color: '#cf222e' },
+	{ tag: tags.operatorKeyword, color: '#cf222e' },
+	{ tag: tags.definitionKeyword, color: '#cf222e' },
+	{ tag: tags.moduleKeyword, color: '#cf222e' },
 
-	{ tag: tags.name, color: 'f' },
-	{ tag: tags.variableName, color: 'f' },
-	{ tag: [tags.definition(tags.variableName)], color: '' },
-	{ tag: [tags.function(tags.variableName)], color: 'df' },
-	{ tag: tags.propertyName, color: 'ae' },
-	{ tag: [tags.definition(tags.propertyName)], color: 'ae' },
+	{ tag: tags.name, color: '#24292f' },
+	{ tag: tags.variableName, color: '#24292f' },
+	{ tag: [tags.definition(tags.variableName)], color: '#953800' },
+	{ tag: [tags.function(tags.variableName)], color: '#8250df' },
+	{ tag: tags.propertyName, color: '#0550ae' },
+	{ tag: [tags.definition(tags.propertyName)], color: '#0550ae' },
 
-	{ tag: tags.typeName, color: '' },
-	{ tag: tags.className, color: '' },
-	{ tag: tags.labelName, color: 'ae' },
-	{ tag: tags.namespace, color: '' },
+	{ tag: tags.typeName, color: '#953800' },
+	{ tag: tags.className, color: '#953800' },
+	{ tag: tags.labelName, color: '#0550ae' },
+	{ tag: tags.namespace, color: '#953800' },
 
-	{ tag: tags.string, color: 'a' },
-	{ tag: tags.special(tags.string), color: 'a' },
-	{ tag: tags.number, color: 'ae' },
-	{ tag: tags.bool, color: 'ae' },
-	{ tag: tags.null, color: 'ae' },
+	{ tag: tags.string, color: '#0a3069' },
+	{ tag: tags.special(tags.string), color: '#0a3069' },
+	{ tag: tags.number, color: '#0550ae' },
+	{ tag: tags.bool, color: '#0550ae' },
+	{ tag: tags.null, color: '#0550ae' },
 
-	{ tag: tags.comment, color: 'e', fontStyle: 'italic' },
-	{ tag: tags.docComment, color: 'e', fontStyle: 'italic' },
+	{ tag: tags.comment, color: '#6e7781', fontStyle: 'italic' },
+	{ tag: tags.docComment, color: '#6e7781', fontStyle: 'italic' },
 
-	{ tag: tags.operator, color: 'cfe' },
-	{ tag: tags.derefOperator, color: 'f' },
-	{ tag: tags.punctuation, color: 'f' },
-	{ tag: tags.bracket, color: 'f' },
-	{ tag: tags.separator, color: 'f' },
+	{ tag: tags.operator, color: '#cf222e' },
+	{ tag: tags.derefOperator, color: '#24292f' },
+	{ tag: tags.punctuation, color: '#24292f' },
+	{ tag: tags.bracket, color: '#24292f' },
+	{ tag: tags.separator, color: '#24292f' },
 
-	{ tag: tags.tagName, color: '' },
-	{ tag: tags.attributeName, color: 'ae' },
-	{ tag: tags.attributeValue, color: 'a' },
+	{ tag: tags.tagName, color: '#116329' },
+	{ tag: tags.attributeName, color: '#0550ae' },
+	{ tag: tags.attributeValue, color: '#0a3069' },
 
-	{ tag: tags.meta, color: 'e' },
-	{ tag: tags.processingInstruction, color: 'e' },
-	{ tag: tags.heading, color: 'ae', fontWeight: 'bold' },
+	{ tag: tags.meta, color: '#6e7781' },
+	{ tag: tags.processingInstruction, color: '#6e7781' },
+	{ tag: tags.heading, color: '#0550ae', fontWeight: 'bold' },
 	{ tag: tags.emphasis, fontStyle: 'italic' },
 	{ tag: tags.strong, fontWeight: 'bold' },
-	{ tag: tags.link, color: 'ae', textDecoration: 'underline' },
-	{ tag: tags.invalid, color: 'cfe' },
+	{ tag: tags.link, color: '#0550ae', textDecoration: 'underline' },
+	{ tag: tags.invalid, color: '#cf222e' },
 ]);
 
 const darkHighlightStyle = HighlightStyle.define([
-	{ tag: tags.keyword, color: 'ffb' },
-	{ tag: tags.controlKeyword, color: 'ffb' },
-	{ tag: tags.operatorKeyword, color: 'ffb' },
-	{ tag: tags.definitionKeyword, color: 'ffb' },
-	{ tag: tags.moduleKeyword, color: 'ffb' },
+	{ tag: tags.keyword, color: '#ff7b72' },
+	{ tag: tags.controlKeyword, color: '#ff7b72' },
+	{ tag: tags.operatorKeyword, color: '#ff7b72' },
+	{ tag: tags.definitionKeyword, color: '#ff7b72' },
+	{ tag: tags.moduleKeyword, color: '#ff7b72' },
 
-	{ tag: tags.name, color: 'cdd' },
-	{ tag: tags.variableName, color: 'cdd' },
-	{ tag: [tags.definition(tags.variableName)], color: 'ffa' },
-	{ tag: [tags.function(tags.variableName)], color: 'daff' },
-	{ tag: tags.propertyName, color: 'cff' },
-	{ tag: [tags.definition(tags.propertyName)], color: 'cff' },
+	{ tag: tags.name, color: '#c9d1d9' },
+	{ tag: tags.variableName, color: '#c9d1d9' },
+	{ tag: [tags.definition(tags.variableName)], color: '#ffa657' },
+	{ tag: [tags.function(tags.variableName)], color: '#d2a8ff' },
+	{ tag: tags.propertyName, color: '#79c0ff' },
+	{ tag: [tags.definition(tags.propertyName)], color: '#79c0ff' },
 
-	{ tag: tags.typeName, color: 'ffa' },
-	{ tag: tags.className, color: 'ffa' },
-	{ tag: tags.labelName, color: 'cff' },
-	{ tag: tags.namespace, color: 'ffa' },
+	{ tag: tags.typeName, color: '#ffa657' },
+	{ tag: tags.className, color: '#ffa657' },
+	{ tag: tags.labelName, color: '#79c0ff' },
+	{ tag: tags.namespace, color: '#ffa657' },
 
-	{ tag: tags.string, color: 'adff' },
-	{ tag: tags.special(tags.string), color: 'adff' },
-	{ tag: tags.number, color: 'cff' },
-	{ tag: tags.bool, color: 'cff' },
-	{ tag: tags.null, color: 'cff' },
+	{ tag: tags.string, color: '#a5d6ff' },
+	{ tag: tags.special(tags.string), color: '#a5d6ff' },
+	{ tag: tags.number, color: '#79c0ff' },
+	{ tag: tags.bool, color: '#79c0ff' },
+	{ tag: tags.null, color: '#79c0ff' },
 
-	{ tag: tags.comment, color: 'be', fontStyle: 'italic' },
-	{ tag: tags.docComment, color: 'be', fontStyle: 'italic' },
+	{ tag: tags.comment, color: '#8b949e', fontStyle: 'italic' },
+	{ tag: tags.docComment, color: '#8b949e', fontStyle: 'italic' },
 
-	{ tag: tags.operator, color: 'ffb' },
-	{ tag: tags.derefOperator, color: 'cdd' },
-	{ tag: tags.punctuation, color: 'cdd' },
-	{ tag: tags.bracket, color: 'cdd' },
-	{ tag: tags.separator, color: 'cdd' },
+	{ tag: tags.operator, color: '#ff7b72' },
+	{ tag: tags.derefOperator, color: '#c9d1d9' },
+	{ tag: tags.punctuation, color: '#c9d1d9' },
+	{ tag: tags.bracket, color: '#c9d1d9' },
+	{ tag: tags.separator, color: '#c9d1d9' },
 
-	{ tag: tags.tagName, color: 'ee' },
-	{ tag: tags.attributeName, color: 'cff' },
-	{ tag: tags.attributeValue, color: 'adff' },
+	{ tag: tags.tagName, color: '#7ee787' },
+	{ tag: tags.attributeName, color: '#79c0ff' },
+	{ tag: tags.attributeValue, color: '#a5d6ff' },
 
-	{ tag: tags.meta, color: 'be' },
-	{ tag: tags.processingInstruction, color: 'be' },
-	{ tag: tags.heading, color: 'cff', fontWeight: 'bold' },
+	{ tag: tags.meta, color: '#8b949e' },
+	{ tag: tags.processingInstruction, color: '#8b949e' },
+	{ tag: tags.heading, color: '#79c0ff', fontWeight: 'bold' },
 	{ tag: tags.emphasis, fontStyle: 'italic' },
 	{ tag: tags.strong, fontWeight: 'bold' },
-	{ tag: tags.link, color: 'adff', textDecoration: 'underline' },
-	{ tag: tags.invalid, color: 'f' },
+	{ tag: tags.link, color: '#a5d6ff', textDecoration: 'underline' },
+	{ tag: tags.invalid, color: '#f85149' },
 ]);
 // @formatter:on
 
-//  Dark mode detection (reactive) 
+// ── Dark mode detection (reactive) ───────────────────────────────────────
 
 function useDarkMode(): boolean {
 	const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
@@ -206,7 +206,7 @@ function useDarkMode(): boolean {
 	return isDark;
 }
 
-//  Line selection state management 
+// ── Line selection state management ──────────────────────────────────────
 
 const setSelectedLinesEffect = StateEffect.define<LineSelection | null>();
 
@@ -216,7 +216,7 @@ function buildLineDecorations(state: EditorState, selection: LineSelection | nul
 	if (!selection) return Decoration.none;
 	const decorations = [];
 	for (let line = selection.from; line <= selection.to; line++) {
-		if (line >=  && line <= state.doc.lines) {
+		if (line >= 1 && line <= state.doc.lines) {
 			decorations.push(lineHighlightDecoration.range(state.doc.line(line).from));
 		}
 	}
@@ -238,15 +238,15 @@ const selectedLinesField = StateField.define<DecorationSet>({
 	provide: f => EditorView.decorations.from(f),
 });
 
-//  Component 
+// ── Component ────────────────────────────────────────────────────────────
 
-/
-  CodeMirror  editor implementation.
- 
-  Reactively adapts to light/dark mode changes (MutationObserver on <html>).
-  Uses GitHub-light and GitHub-dark syntax palettes respectively.
-  Line numbers use hardcoded GitHub-exact colors per mode.
- /
+/**
+ * CodeMirror 6 editor implementation.
+ *
+ * Reactively adapts to light/dark mode changes (MutationObserver on <html>).
+ * Uses GitHub-light and GitHub-dark syntax palettes respectively.
+ * Line numbers use hardcoded GitHub-exact colors per mode.
+ */
 export function CodeMirrorEditor({
 	value,
 	onChange,
@@ -275,7 +275,7 @@ export function CodeMirrorEditor({
 		onLineSelectRef.current = onLineSelect;
 	}, [onLineSelect]);
 
-	//  Editor initialisation 
+	// ── Editor initialisation ────────────────────────────────────────────────
 
 	useEffect(() => {
 		if (!editorRef.current) return;
@@ -345,7 +345,7 @@ export function CodeMirrorEditor({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isDark, language, readOnly, showLineNumbers, onChange]);
 
-	//  Sync content from prop 
+	// ── Sync content from prop ───────────────────────────────────────────────
 
 	useEffect(() => {
 		const view = viewRef.current;
@@ -354,12 +354,12 @@ export function CodeMirrorEditor({
 		const currentValue = view.state.doc.toString();
 		if (currentValue !== value) {
 			view.dispatch({
-				changes: { from: , to: currentValue.length, insert: value },
+				changes: { from: 0, to: currentValue.length, insert: value },
 			});
 		}
 	}, [value]);
 
-	//  Sync line selection from prop 
+	// ── Sync line selection from prop ────────────────────────────────────────
 
 	const selectedFrom = selectedLines?.from ?? null;
 	const selectedTo = selectedLines?.to ?? null;
@@ -381,7 +381,7 @@ export function CodeMirrorEditor({
 		if (
 			!isUserClickRef.current &&
 			key !== scrolledToRef.current &&
-			selection.from >=  &&
+			selection.from >= 1 &&
 			selection.from <= view.state.doc.lines
 		) {
 			view.dispatch({

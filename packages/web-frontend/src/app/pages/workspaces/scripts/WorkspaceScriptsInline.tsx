@@ -12,19 +12,19 @@ interface WorkspaceScriptsInlineProps {
 	onScriptClick: (scriptName: string) => void;
 }
 
-/
-  Displays workspace scripts horizontally inline in the workspace panel header
- 
-  Features:
-  - Horizontal compact display of all scripts
-  - Status indicators (running, crashed, stopped)
-  - Clickable script names (opens Scripts tab)
-  - Clickable URLs (opens in new tab)
-  - Control buttons (Start/Stop/Restart) based on status
- 
-  Example:
-  Scripts: • backend(:) [Stop][Restart]  • frontend(:) [Stop][Restart]   typecheck [Start]   test [Start]
- /
+/**
+ * Displays workspace scripts horizontally inline in the workspace panel header
+ *
+ * Features:
+ * - Horizontal compact display of all scripts
+ * - Status indicators (running, crashed, stopped)
+ * - Clickable script names (opens Scripts tab)
+ * - Clickable URLs (opens in new tab)
+ * - Control buttons (Start/Stop/Restart) based on status
+ *
+ * Example:
+ * Scripts: • backend(:3001) [Stop][Restart]  • frontend(:3000) [Stop][Restart]  ⚠ typecheck [Start]  ○ test [Start]
+ */
 export function WorkspaceScriptsInline({ workspaceId, onScriptClick }: WorkspaceScriptsInlineProps) {
 	const { scripts, loading, error } = useWorkspaceScripts({ workspaceId });
 
@@ -61,13 +61,13 @@ export function WorkspaceScriptsInline({ workspaceId, onScriptClick }: Workspace
 		switch (status) {
 			case 'running':
 			case 'starting':
-				return <Circle className="h- w- fill-success text-success" />;
+				return <Circle className="h-3 w-3 fill-success text-success" />;
 			case 'error':
 			case 'crashed':
-				return <AlertTriangle className="h- w- text-warning" />;
+				return <AlertTriangle className="h-3 w-3 text-warning" />;
 			case 'stopped':
 			case 'stopping':
-				return <Circle className="h- w- text-muted-foreground" />;
+				return <Circle className="h-3 w-3 text-muted-foreground" />;
 			default:
 				throw new Error(`Unknown script status: ${status as string}`);
 		}
@@ -79,7 +79,7 @@ export function WorkspaceScriptsInline({ workspaceId, onScriptClick }: Workspace
 			return null;
 		}
 		const match = url.match(/:(\d+)/);
-		return match ? `:${match[]}` : null;
+		return match ? `:${match[1]}` : null;
 	};
 
 	// Determine if script is running
@@ -92,14 +92,14 @@ export function WorkspaceScriptsInline({ workspaceId, onScriptClick }: Workspace
 		return [...scripts].sort((a, b) => a.script.order - b.script.order);
 	}, [scripts]);
 
-	if (loading || error || scripts.length === ) {
+	if (loading || error || scripts.length === 0) {
 		return null;
 	}
 
 	return (
 		<div
 			className={`
-    flex flex- flex-wrap items-start gap-x- gap-y-. text-xs
+    flex flex-1 flex-wrap items-start gap-x-3 gap-y-1.5 text-xs
     text-muted-foreground
   `}
 		>
@@ -111,11 +111,11 @@ export function WorkspaceScriptsInline({ workspaceId, onScriptClick }: Workspace
 				const displayName = script.displayName || script.scriptName;
 
 				return (
-					<div key={script.id} className="flex items-center gap-.">
-						{/ Status Icon /}
+					<div key={script.id} className="flex items-center gap-1.5">
+						{/* Status Icon */}
 						{getStatusIcon(status)}
 
-						{/ Script Name (clickable) /}
+						{/* Script Name (clickable) */}
 						<Button
 							onClick={e => {
 								e.preventDefault();
@@ -124,51 +124,51 @@ export function WorkspaceScriptsInline({ workspaceId, onScriptClick }: Workspace
 							}}
 							variant="link"
 							className={`
-         h-auto cursor-pointer p- underline-offset-
+         h-auto cursor-pointer p-0 underline-offset-2
          hover:underline
        `}
 						>
 							{displayName}
 						</Button>
 
-						{/ URL/Port (clickable if present) /}
+						{/* URL/Port (clickable if present) */}
 						{script.url && urlInfo && (
 							<a
 								href={script.url}
 								target="_blank"
 								rel="noopener noreferrer"
 								className={`
-          flex items-center gap-. text-primary
+          flex items-center gap-0.5 text-primary
           hover:underline
         `}
 								onClick={e => e.stopPropagation()}
 							>
 								<span>({urlInfo})</span>
-								<ExternalLink className="h- w-" />
+								<ExternalLink className="h-3 w-3" />
 							</a>
 						)}
 
-						{/ Control Buttons /}
-						<div className="flex items-center gap-">
+						{/* Control Buttons */}
+						<div className="flex items-center gap-1">
 							{running ? (
 								<>
 									<Button
 										variant="ghost"
 										size="sm"
 										onClick={e => handleStop(script.id, e)}
-										className="h- px-. text-xs"
+										className="h-5 px-1.5 text-xs"
 										title="Stop"
 									>
-										<Square className="h- w-" />
+										<Square className="h-3 w-3" />
 									</Button>
 									<Button
 										variant="ghost"
 										size="sm"
 										onClick={e => handleRestart(script.id, e)}
-										className="h- px-. text-xs"
+										className="h-5 px-1.5 text-xs"
 										title="Restart"
 									>
-										<RefreshCw className="h- w-" />
+										<RefreshCw className="h-3 w-3" />
 									</Button>
 								</>
 							) : (
@@ -176,10 +176,10 @@ export function WorkspaceScriptsInline({ workspaceId, onScriptClick }: Workspace
 									variant="ghost"
 									size="sm"
 									onClick={e => handleStart(script.id, e)}
-									className="h- px-. text-xs"
+									className="h-5 px-1.5 text-xs"
 									title="Start"
 								>
-									<Play className="h- w-" />
+									<Play className="h-3 w-3" />
 								</Button>
 							)}
 						</div>

@@ -3,45 +3,45 @@ import { type UseDualListStateProps, useDualListState } from '@framework/hooks/u
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './Dialog';
 import { DualListView, type DualListViewProps } from './DualListView';
 
-/
-  ===========================================================================================
-  OPTIMISTIC DUAL LIST DIALOG (COMPOSITION LAYER)
-  ===========================================================================================
- 
-  High-level dialog that combines:
-  - Logic layer: useDualListState hook (handles optimistic updates, loading states)
-  - Presentation layer: DualListView component (pure UI)
-  - Dialog wrapper: Radix UI Dialog (modal behavior)
- 
-  This component simply wires everything together - no business logic or visual logic here.
- 
-  Architecture:
-  ```
-  OptimisticDualListDialog (composition)
-     Dialog (Radix UI - modal wrapper)
-     useDualListState (logic hook - optimistic updates)
-     DualListView (pure view - rendering)
-  ```
- 
-  Usage:
-    <OptimisticDualListDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Manage Items"
-      allItems={items}
-      associatedIds={new Set(associatedIds)}
-      itemKey={item => item.id}
-      leftTitle="Associated"
-      rightTitle="Available"
-      renderItem={(item, side, state) => <MyItemComponent {...} />}
-      searchFilter={(item, query) => item.name.includes(query)}
-      onAssociate={handleAssociate}
-      onDissociate={handleDissociate}
-      onReorder={handleReorder}
-    />
- 
-  ===========================================================================================
- /
+/**
+ * ===========================================================================================
+ * OPTIMISTIC DUAL LIST DIALOG (COMPOSITION LAYER)
+ * ===========================================================================================
+ *
+ * High-level dialog that combines:
+ * - Logic layer: useDualListState hook (handles optimistic updates, loading states)
+ * - Presentation layer: DualListView component (pure UI)
+ * - Dialog wrapper: Radix UI Dialog (modal behavior)
+ *
+ * This component simply wires everything together - no business logic or visual logic here.
+ *
+ * Architecture:
+ * ```
+ * OptimisticDualListDialog (composition)
+ *   ├─ Dialog (Radix UI - modal wrapper)
+ *   ├─ useDualListState (logic hook - optimistic updates)
+ *   └─ DualListView (pure view - rendering)
+ * ```
+ *
+ * Usage:
+ *   <OptimisticDualListDialog
+ *     open={open}
+ *     onOpenChange={onOpenChange}
+ *     title="Manage Items"
+ *     allItems={items}
+ *     associatedIds={new Set(associatedIds)}
+ *     itemKey={item => item.id}
+ *     leftTitle="Associated"
+ *     rightTitle="Available"
+ *     renderItem={(item, side, state) => <MyItemComponent {...} />}
+ *     searchFilter={(item, query) => item.name.includes(query)}
+ *     onAssociate={handleAssociate}
+ *     onDissociate={handleDissociate}
+ *     onReorder={handleReorder}
+ *   />
+ *
+ * ===========================================================================================
+ */
 
 export interface OptimisticDualListDialogProps<T>
 	extends
@@ -57,14 +57,14 @@ export interface OptimisticDualListDialogProps<T>
 			| 'onReorder'
 		> {
 	// Dialog props
-	/ Whether the dialog is open /
+	/** Whether the dialog is open */
 	open: boolean;
-	/ Callback when dialog open state changes /
+	/** Callback when dialog open state changes */
 	onOpenChange: (open: boolean) => void;
-	/ Dialog title /
+	/** Dialog title */
 	title: string;
-	/ Max width of dialog /
-	maxWidth?: 'xl' | 'xl';
+	/** Max width of dialog */
+	maxWidth?: '4xl' | '5xl';
 }
 
 export function OptimisticDualListDialog<T>({
@@ -72,7 +72,7 @@ export function OptimisticDualListDialog<T>({
 	open,
 	onOpenChange,
 	title,
-	maxWidth = 'xl',
+	maxWidth = '4xl',
 
 	// Hook props (logic)
 	allItems,
@@ -114,14 +114,14 @@ export function OptimisticDualListDialog<T>({
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent
-				className={maxWidth === 'xl' ? 'sm:max-w-xl' : 'sm:max-w-xl'}
+				className={maxWidth === '5xl' ? 'sm:max-w-5xl' : 'sm:max-w-4xl'}
 				aria-describedby={undefined}
 			>
 				<DialogHeader>
 					<DialogTitle>{title}</DialogTitle>
 				</DialogHeader>
 
-				{/ PRESENTATION LAYER (DualListView) /}
+				{/* PRESENTATION LAYER (DualListView) */}
 				<DualListView
 					// Data from hook
 					leftItems={leftItems}
