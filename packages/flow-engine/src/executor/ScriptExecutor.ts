@@ -167,8 +167,6 @@ export class ScriptExecutor {
 				cwd: workingDir,
 				env: cleanEnv,
 				shell,
-				windowsHide: true,
-				detached: true,
 				stdio: ['ignore', 'pipe', 'pipe'], // stdin ignored, capture stdout/stderr
 			});
 

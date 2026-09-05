@@ -60,7 +60,6 @@ export class WorkerPool {
 		this.activeCount++;
 		const spawnArgs = this.tsxLoaderPath ? ['--import', this.tsxLoaderPath, this.workerPath] : [this.workerPath];
 		const child = spawn(process.execPath, spawnArgs, {
-			windowsHide: true,
 			env: {
 				// IPC: worker needs to know daemon location
 				FLOW_DAEMON_PORT: String(this.httpPort),

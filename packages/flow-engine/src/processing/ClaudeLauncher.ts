@@ -323,7 +323,6 @@ export class ClaudeLauncher {
 				cwd: options.workingDir,
 				stdio: ['pipe', 'pipe', 'pipe'],
 				shell: false,
-				windowsHide: true,
 				env: processEnvBackground,
 			});
 
