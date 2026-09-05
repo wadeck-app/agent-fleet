@@ -56,6 +56,7 @@ function _runWithExit(bin, binArgs) {
   try {
     execFileSync(bin, binArgs, {
       stdio: 'inherit',
+      windowsHide: true,
       env: { ...process.env, LAUNCHER_BUNDLE_OVERRIDE: bundlePath },
     });
   } catch (err) {
