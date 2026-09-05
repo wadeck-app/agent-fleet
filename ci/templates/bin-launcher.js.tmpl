@@ -25,7 +25,7 @@ try {
 } catch {
   process.stderr.write(`{{CLI_NAME}}: platform package ${pkgName} missing -- installing...\n`);
   try {
-    const out = execSync(`npm install -g ${pkgName}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+    const out = execSync(`npm install -g ${pkgName}`, { encoding: 'utf8', windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
     if (out) process.stdout.write(out);
   } catch (installErr) {
     if (installErr.stdout) process.stdout.write(installErr.stdout);
