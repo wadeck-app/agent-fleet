@@ -1,4 +1,4 @@
-> **LEGACY — do not extend or maintain. This package is pending removal.**
+> **LEGACY -- do not extend or maintain. This package is pending removal.**
 
 # legacy-cli
 
@@ -16,9 +16,9 @@ Provides a minimal command-line interface for sending tasks to a running orchest
 
 ## Does NOT own
 
-- Task execution — that's worker
-- Orchestrator logic — that's orchestrator
-- Flow definitions — that's flow-engine
+- Task execution -- that's worker
+- Orchestrator logic -- that's orchestrator
+- Flow definitions -- that's flow-engine
 
 ## Dependencies on local packages
 
@@ -28,7 +28,7 @@ Provides a minimal command-line interface for sending tasks to a running orchest
 
 ## Consumers
 
-None — end-user binary, invoked directly from a terminal.
+None -- end-user binary, invoked directly from a terminal.
 
 ## Entry point type
 
@@ -36,4 +36,4 @@ CLI binary (`fleet-task`).
 
 ## Key files
 
-- `src/entry-point.ts` — single-file implementation: argument parsing, HTTP call, output
+- `src/entry-point.ts` -- single-file implementation: argument parsing, HTTP call, output

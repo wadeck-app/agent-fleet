@@ -24,7 +24,7 @@ export async function executeUserInterventionStep(
 
 	if (!config.interventionHandler) {
 		throw new Error(
-			'No ApprovalProvider or InterventionHandler configured in StepRunner — cannot execute user_intervention step'
+			'No ApprovalProvider or InterventionHandler configured in StepRunner -- cannot execute user_intervention step'
 		);
 	}
 	console.warn('[StepRunner] Deprecation: InterventionHandler is active; migrate to ApprovalProvider.');

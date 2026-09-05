@@ -64,7 +64,7 @@ export class PluginLoader {
 
 	constructor(options: PluginLoaderOptions = {}) {
 		this.pluginPackagesDir = options.pluginPackagesDir;
-		// registryPath is optional — when absent, registry is loaded via require() which works
+		// registryPath is optional -- when absent, registry is loaded via require() which works
 		// both in dev (normal node_modules) and in bundled mode (inlined by esbuild).
 		this.registryPath = options.registryPath;
 	}

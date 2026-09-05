@@ -24,7 +24,7 @@ function send(message: WorkerToDaemon): void {
 const baseConfig: StepRunnerConfig = { interactive: false };
 
 const adapter = new WorkerAdapter((mcpServers: McpServerConfig[]) => {
-	// Pass mcpServers — StepRunner injects them into the model provider on each step
+	// Pass mcpServers -- StepRunner injects them into the model provider on each step
 	// McpServerConfig is structurally identical to flow-engine's McpServer -- cast is safe.
 	const config = (mcpServers.length > 0 ? { ...baseConfig, mcpServers } : baseConfig) as StepRunnerConfig;
 	return new StepRunner(config);

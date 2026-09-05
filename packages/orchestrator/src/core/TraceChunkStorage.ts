@@ -75,7 +75,7 @@ export class TraceChunkStorage {
 		const newSteps = steps.slice(existingCount);
 
 		if (newSteps.length === 0) {
-			// No new steps — but existing steps may have been updated (e.g. liveLogEntries growing)
+			// No new steps -- but existing steps may have been updated (e.g. liveLogEntries growing)
 			// Check if the last step has changed and needs to be rewritten
 			if (steps.length > 0) {
 				await this.updateLastStepIfChanged(taskId, steps);

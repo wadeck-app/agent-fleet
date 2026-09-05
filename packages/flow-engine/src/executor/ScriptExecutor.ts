@@ -128,7 +128,7 @@ export class ScriptExecutor {
 
 			// Detect `node -e "code"` pattern (no positional args after closing quote):
 			// cmd.exe cannot handle multi-line quoted strings, so extract JS to a .js file.
-			// Only matches when nothing follows the closing quote — avoids greedily consuming
+			// Only matches when nothing follows the closing quote -- avoids greedily consuming
 			// positional args as part of the code (regex backtracking bug with [\s\S]*?).
 			const nodeEMatch = /^node\s+-e\s+"([^"]*)"$/.exec(options.script.trim());
 			if (nodeEMatch) {

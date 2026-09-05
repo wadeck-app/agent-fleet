@@ -98,7 +98,7 @@ async function waitForCompletion(
 		if (onLog) {
 			lastByte = tailLogFile(logFile, executionId, lastByte, onLog);
 		}
-		// Only read once the file exists — avoids swallowing real I/O errors (disk-full, bad JSON)
+		// Only read once the file exists -- avoids swallowing real I/O errors (disk-full, bad JSON)
 		// by conflating them with the normal "not yet written" case.
 		if (store.exists(executionId)) {
 			const state = store.read(executionId);
@@ -123,7 +123,7 @@ function findProjectRoot(startDir: string): string | null {
 	return null;
 }
 
-// Result type for flow file resolution — either found with an optional inferred flow ID,
+// Result type for flow file resolution -- either found with an optional inferred flow ID,
 // or not found with an error message for the caller to surface.
 type FlowResolution = { found: true; flowFile: string; inferredFlowId?: string } | { found: false; error: string };
 
@@ -132,7 +132,7 @@ function resolveFlowFile(flowRef: string, cwd: string): FlowResolution {
 	if (fs.existsSync(resolvedPath)) {
 		return { found: true, flowFile: resolvedPath };
 	}
-	// Treat as registry ID — use .agent-fleet/flows.yml lookup
+	// Treat as registry ID -- use .agent-fleet/flows.yml lookup
 	const projectRoot = findProjectRoot(cwd);
 	if (!projectRoot) {
 		return { found: false, error: `Flow '${flowRef}' not found as a file and no .agent-fleet/ directory found.` };
@@ -144,7 +144,7 @@ function resolveFlowFile(flowRef: string, cwd: string): FlowResolution {
 	return { found: true, flowFile: flowsFile, inferredFlowId: flowRef };
 }
 
-// D27: Validate secret/password inputs at CLI time — literal values are rejected with exit code 2
+// D27: Validate secret/password inputs at CLI time -- literal values are rejected with exit code 2
 function validateSecretInputs(flowFilePath: string, inputs: Record<string, string>): string | null {
 	// Only validate if the flow file exists and is readable
 	let flow: FlowDefinition;
@@ -162,7 +162,7 @@ function validateSecretInputs(flowFilePath: string, inputs: Record<string, strin
 		if (inputType !== 'password') continue;
 
 		const value = inputs[key];
-		if (value === undefined) continue; // missing optional input — daemon will handle
+		if (value === undefined) continue; // missing optional input -- daemon will handle
 
 		// Validate that the value is a URI scheme, not a literal
 		const isUriScheme = value.startsWith('env://') || value.startsWith('file://') || value.startsWith('input://');
@@ -191,7 +191,7 @@ function parseInputArgs(rawInputs: string[]): Record<string, string> {
 
 /**
  * Spawn the daemon as a detached background process (like `flow start` does) and wait
- * for its port file to appear — avoids the WebSocket race condition of the in-process path.
+ * for its port file to appear -- avoids the WebSocket race condition of the in-process path.
  */
 async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Promise<void> {
 	const bundlePath = process.env['LAUNCHER_BUNDLE_OVERRIDE'] ?? fileURLToPath(import.meta.url).replace(/\/cli\/commands\/RunCommand\.[jt]s$/, '');
@@ -366,7 +366,7 @@ export function registerRunCommand(program: Command): void {
 				const { executionId } = response as { type: 'execution_started'; executionId: string };
 				if (!executionId) {
 					console.error(
-						'Error: daemon returned a response without an executionId — try restarting the daemon'
+						'Error: daemon returned a response without an executionId -- try restarting the daemon'
 					);
 					process.exit(1);
 				}
@@ -421,7 +421,7 @@ export function registerRunCommand(program: Command): void {
 
 				const durationMs = Date.now() - start;
 				if (options.json && !options.human) {
-					// v1: step outputs are not persisted in ExecutionStore — only step status is tracked.
+					// v1: step outputs are not persisted in ExecutionStore -- only step status is tracked.
 					// The outputs map is always empty in --wait --json mode. Tracked for v2.
 					const stepOutputs: Record<string, Record<string, unknown>> = {};
 					process.stdout.write(
@@ -432,7 +432,7 @@ export function registerRunCommand(program: Command): void {
 					if (finalState.status === 'completed') {
 						console.log(`Flow completed in ${durationMs}ms`);
 					} else {
-						const reason = finalState.lastError ? ` — ${finalState.lastError}` : '';
+						const reason = finalState.lastError ? ` -- ${finalState.lastError}` : '';
 						console.error(`Error:Flow failed${reason}`);
 						process.exit(1);
 					}

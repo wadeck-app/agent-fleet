@@ -1,4 +1,4 @@
-// violations-suppress: ts/no-barrel-index public API entry point for workspace package — 11 import sites
+// violations-suppress: ts/no-barrel-index public API entry point for workspace package -- 11 import sites
 /**
  * Main export for orchestrator package
  *

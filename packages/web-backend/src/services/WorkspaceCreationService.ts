@@ -28,7 +28,7 @@ export interface WorkspaceCreationResult {
  * 3. Executes git operations (clone/worktree/none)
  * 4. Returns { path, gitBranch }
  *
- * Metadata persistence is NOT handled here — that responsibility
+ * Metadata persistence is NOT handled here -- that responsibility
  * belongs to WorkspacesService which uses the centralized repository.
  *
  * ===========================================================================================
@@ -45,7 +45,7 @@ export class WorkspaceCreationService {
 	/**
 	 * Create a new workspace directory with optional git initialization
 	 *
-	 * @returns { path, gitBranch } — filesystem result only
+	 * @returns { path, gitBranch } -- filesystem result only
 	 * @throws Error if creation fails (with user-friendly message)
 	 */
 	async createWorkspace(

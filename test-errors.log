@@ -1,0 +1,502 @@
+# Test Errors Report
+Generated: 2026-09-05T17:48:02.498Z
+================================================================================
+
+## Frontend Unit Tests
+Exit Code: 1
+Duration: 80.8s
+
+### STDERR:
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vite.config.ts:144:23). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+[2m19:46:33[22m [33m[1m[vite][22m[39m [33mwarning: `esbuild` option was specified by "vite:react-babel" plugin. This option is deprecated, please use `oxc` instead.[39m
+[2m19:46:33[22m [33m[1m[vite][22m[39m [33mwarning: `optimizeDeps.esbuildOptions` option was specified by "vite:react-babel" plugin. This option is deprecated, please use `optimizeDeps.rolldownOptions` instead.[39m
+[33mBoth esbuild and oxc options were set. oxc options will be used and esbuild options will be ignored.[39m The following esbuild options were set: `{ jsx: 'automatic', jsxImportSource: undefined }`
+Error: Not implemented: navigation (except hash changes)
+    at module.exports (C:\Workspace_Tooling\agent-fleet\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at navigateFetch (C:\Workspace_Tooling\agent-fleet\node_modules\jsdom\lib\jsdom\living\window\navigation.js:77:3)
+    at exports.navigate (C:\Workspace_Tooling\agent-fleet\node_modules\jsdom\lib\jsdom\living\window\navigation.js:55:3)
+    at Timeout._onTimeout (C:\Workspace_Tooling\agent-fleet\node_modules\jsdom\lib\jsdom\living\nodes\HTMLHyperlinkElementUtils-impl.js:81:7)
+    at listOnTimeout (node:internal/timers:605:17)
+    at processTimers (node:internal/timers:541:7) undefined
+Error: Not implemented: navigation (except hash changes)
+    at module.exports (C:\Workspace_Tooling\agent-fleet\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at navigateFetch (C:\Workspace_Tooling\agent-fleet\node_modules\jsdom\lib\jsdom\living\window\navigation.js:77:3)
+    at exports.navigate (C:\Workspace_Tooling\agent-fleet\node_modules\jsdom\lib\jsdom\living\window\navigation.js:55:3)
+    at Timeout._onTimeout (C:\Workspace_Tooling\agent-fleet\node_modules\jsdom\lib\jsdom\living\nodes\HTMLHyperlinkElementUtils-impl.js:81:7)
+    at listOnTimeout (node:internal/timers:605:17)
+    at processTimers (node:internal/timers:541:7) undefined
+Error: Not implemented: navigation (except hash changes)
+    at module.exports (C:\Workspace_Tooling\agent-fleet\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at navigateFetch (C:\Workspace_Tooling\agent-fleet\node_modules\jsdom\lib\jsdom\living\window\navigation.js:77:3)
+    at exports.navigate (C:\Workspace_Tooling\agent-fleet\node_modules\jsdom\lib\jsdom\living\window\navigation.js:55:3)
+    at Timeout._onTimeout (C:\Workspace_Tooling\agent-fleet\node_modules\jsdom\lib\jsdom\living\nodes\HTMLHyperlinkElementUtils-impl.js:81:7)
+    at listOnTimeout (node:internal/timers:605:17)
+    at processTimers (node:internal/timers:541:7) undefined
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/app/pages/dashboard/TasksCard.test.tsx > TasksCard > color coding > should apply blue color to active tasks
+AssertionError: expected 'text-base font-semibold text-info' to contain 'text-blue-600'
+
+Expected: "text-blue-600"
+Received: "text-base font-semibold text-info"
+
+ ❯ src/app/pages/dashboard/TasksCard.test.tsx:68:36
+     66|    const activeElement = screen.getByText('5');
+     67|    // violations-suppress: tailwind/no-raw-color-class test fixture
+     68|    expect(activeElement.className).toContain('text-blue-600');
+       |                                    ^
+     69|   });
+     70|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/12]⎯
+
+ FAIL  src/app/pages/dashboard/TasksCard.test.tsx > TasksCard > color coding > should apply purple color to review tasks
+AssertionError: expected 'text-base font-semibold text-info' to contain 'text-purple-600'
+
+Expected: "text-purple-600"
+Received: "text-base font-semibold text-info"
+
+ ❯ src/app/pages/dashboard/TasksCard.test.tsx:76:36
+     74|    const reviewElement = screen.getByText('3');
+     75|    // violations-suppress: tailwind/no-raw-color-class test fixture
+     76|    expect(reviewElement.className).toContain('text-purple-600');
+       |                                    ^
+     77|   });
+     78|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/12]⎯
+
+ FAIL  src/app/pages/dashboard/TasksCard.test.tsx > TasksCard > color coding > should apply green color to done tasks
+AssertionError: expected 'text-base font-semibold text-success' to contain 'text-green-600'
+
+Expected: "text-green-600"
+Received: "text-base font-semibold text-success"
+
+ ❯ src/app/pages/dashboard/TasksCard.test.tsx:84:34
+     82|    const doneElement = screen.getByText('10');
+     83|    // violations-suppress: tailwind/no-raw-color-class test fixture
+     84|    expect(doneElement.className).toContain('text-green-600');
+       |                                  ^
+     85|   });
+     86|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/12]⎯
+
+ FAIL  src/app/pages/dashboard/TasksCard.test.tsx > TasksCard > color coding > should apply orange color to blocked tasks
+AssertionError: expected 'text-base font-semibold text-warning' to contain 'text-orange-600'
+
+Expected: "text-orange-600"
+Received: "text-base font-semibold text-warning"
+
+ ❯ src/app/pages/dashboard/TasksCard.test.tsx:92:37
+     90|    const blockedElement = screen.getByText('1');
+     91|    // violations-suppress: tailwind/no-raw-color-class test fixture
+     92|    expect(blockedElement.className).toContain('text-orange-600');
+       |                                     ^
+     93|   });
+     94|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/12]⎯
+
+ FAIL  src/app/pages/dashboard/TasksCard.test.tsx > TasksCard > color coding > should apply red color to failed tasks
+AssertionError: expected 'text-base font-semibold text-danger' to contain 'text-red-600'
+
+Expected: "text-red-600"
+Received: "text-base font-semibold text-danger"
+
+ ❯ src/app/pages/dashboard/TasksCard.test.tsx:100:36
+     98|    const failedElement = screen.getByText('1');
+     99|    // violations-suppress: tailwind/no-raw-color-class test fixture
+    100|    expect(failedElement.className).toContain('text-red-600');
+       |                                    ^
+    101|   });
+    102|  });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/12]⎯
+
+ FAIL  src/app/pages/dashboard/ThroughputCard.test.tsx > ThroughputCard > should color success rate green when >= 90%
+Error: [2mexpect([22m[31melement[39m[2m).toHaveClass([22m[32m[32m"text-green-600"[32m[39m[2m)[22m
+
+Expected the element to have class:
+[32m  text-green-600[39m
+Received:
+[31m  text-xl font-semibold text-success[39m
+ ❯ src/app/pages/dashboard/ThroughputCard.test.tsx:36:27
+     34|   const successRateText = screen.getByText('95%');
+     35|   // violations-suppress: tailwind/no-raw-color-class test fixture
+     36|   expect(successRateText).toHaveClass('text-green-600');
+       |                           ^
+     37|  });
+     38|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/12]⎯
+
+ FAIL  src/app/pages/dashboard/ThroughputCard.test.tsx > ThroughputCard > should color success rate orange when >= 70% and < 90%
+Error: [2mexpect([22m[31melement[39m[2m).toHaveClass([22m[32m[32m"text-orange-600"[32m[39m[2m)[22m
+
+Expected the element to have class:
+[32m  text-orange-600[39m
+Received:
+[31m  text-xl font-semibold text-warning[39m
+ ❯ src/app/pages/dashboard/ThroughputCard.test.tsx:44:27
+     42|   const successRateText = screen.getByText('75%');
+     43|   // violations-suppress: tailwind/no-raw-color-class test fixture
+     44|   expect(successRateText).toHaveClass('text-orange-600');
+       |                           ^
+     45|  });
+     46|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/12]⎯
+
+ FAIL  src/app/pages/dashboard/ThroughputCard.test.tsx > ThroughputCard > should color success rate red when < 70%
+Error: [2mexpect([22m[31melement[39m[2m).toHaveClass([22m[32m[32m"text-red-600"[32m[39m[2m)[22m
+
+Expected the element to have class:
+[32m  text-red-600[39m
+Received:
+[31m  text-xl font-semibold text-danger[39m
+ ❯ src/app/pages/dashboard/ThroughputCard.test.tsx:52:27
+     50|   const successRateText = screen.getByText('50%');
+     51|   // violations-suppress: tailwind/no-raw-color-class test fixture
+     52|   expect(successRateText).toHaveClass('text-red-600');
+       |                           ^
+     53|  });
+     54|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/12]⎯
+
+ FAIL  src/app/pages/dashboard/WorkersCard.test.tsx > WorkersCard > color coding > should apply green color to idle workers
+AssertionError: expected 'text-xl font-semibold text-success' to contain 'text-green-600'
+
+Expected: "text-green-600"
+Received: "text-xl font-semibold text-success"
+
+ ❯ src/app/pages/dashboard/WorkersCard.test.tsx:69:34
+     67|    const idleElement = screen.getByText('3');
+     68|    // violations-suppress: tailwind/no-raw-color-class test fixture
+     69|    expect(idleElement.className).toContain('text-green-600');
+       |                                  ^
+     70|   });
+     71|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/12]⎯
+
+ FAIL  src/app/pages/dashboard/WorkersCard.test.tsx > WorkersCard > color coding > should apply orange color to busy workers
+AssertionError: expected 'text-xl font-semibold text-warning' to contain 'text-orange-600'
+
+Expected: "text-orange-600"
+Received: "text-xl font-semibold text-warning"
+
+ ❯ src/app/pages/dashboard/WorkersCard.test.tsx:78:34
+     76|    const busyElement = screen.getByText('2');
+     77|    // violations-suppress: tailwind/no-raw-color-class test fixture
+     78|    expect(busyElement.className).toContain('text-orange-600');
+       |                                  ^
+     79|   });
+     80|  });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/12]⎯
+
+ FAIL  src/framework/components/feedback/Toast.test.tsx > Toast > should render with success style by default
+Error: [2mexpect([22m[31melement[39m[2m).toHaveClass([22m[32m[32m"bg-green-600 text-white"[32m[39m[2m)[22m
+
+Expected the element to have class:
+[32m  bg-green-600 text-white[39m
+Received:
+[31m  pointer-events-auto max-w-[500px] min-w-[300px] animate-[toast-slide-in_0.3s_ease-out] rounded-lg px-6 py-4 shadow-lg bg-success text-success-foreground[39m
+ ❯ src/framework/components/feedback/Toast.test.tsx:61:17
+     59|   const toast = container.firstChild as HTMLElement;
+     60|   // violations-suppress: tailwind/no-raw-color-class test fixture
+     61|   expect(toast).toHaveClass('bg-green-600', 'text-white');
+       |                 ^
+     62|  });
+     63|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/12]⎯
+
+ FAIL  src/framework/features/toast/ToastContext.test.tsx > ToastContext > should default to success type
+Error: [2mexpect([22m[31melement[39m[2m).toHaveClass([22m[32m[32m"bg-green-600"[32m[39m[2m)[22m
+
+Expected the element to have class:
+[32m  bg-green-600[39m
+Received:
+[31m  pointer-events-auto max-w-[500px] min-w-[300px] animate-[toast-slide-in_0.3s_ease-out] rounded-lg px-6 py-4 shadow-lg bg-success text-success-foreground[39m
+
+Ignored nodes: comments, script, style
+[36m<html>[39m
+  [36m<head />[39m
+  [36m<body>[39m
+    [36m<div>[39m
+      [36m<button>[39m
+        [0mShow[0m
+      [36m</button>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"
+      pointer-events-none fixed right-6 bottom-6 z-[9999] flex flex-col gap-2
+      max-md:inset-x-4 max-md:bottom-4
+    "[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"pointer-events-auto max-w-[500px] min-w-[300px] animate-[toast-slide-in_0.3s_ease-out] rounded-lg px-6 py-4 shadow-lg bg-success text-success-foreground"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex items-start justify-between gap-4"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"text-sm font-medium"[39m
+            [36m>[39m
+              [0mDefault message[0m
+            [36m</span>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Close toast"[39m
+              [33mclass[39m=[32m"group/button inline-flex shrink-0 cursor-pointer items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50 size-6 hover:bg-transparent hover:opacity-70"[39m
+              [33mdata-size[39m=[32m"icon"[39m
+              [33mdata-slot[39m=[32m"button"[39m
+              [33mdata-variant[39m=[32m"ghost"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [36m<svg[39m
+                [33maria-hidden[39m=[32m"true"[39m
+                [33mclass[39m=[32m"lucide lucide-x size-4"[39m
+                [33mfill[39m=[32m"none"[39m
+                [33mheight[39m=[32m"24"[39m
+                [33mstroke[39m=[32m"currentColor"[39m
+                [33mstroke-linecap[39m=[32m"round"[39m
+                [33mstroke-linejoin[39m=[32m"round"[39m
+                [33mstroke-width[39m=[32m"2"[39m
+                [33mviewBox[39m=[32m"0 0 24 24"[39m
+                [33mwidth[39m=[32m"24"[39m
+                [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+              [36m>[39m
+                [36m<path[39m
+                  [33md[39m=[32m"M18 6 6 18"[39m
+                [36m/>[39m
+                [36m<path[39m
+                  [33md[39m=[32m"m6 6 12 12"[39m
+                [36m/>[39m
+              [36m</svg>[39m
+            [36m</button>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+    [36m</div>[39m
+  [36m</body>[39m
+[36m</html>[39m
+ ❯ src/framework/features/toast/ToastContext.test.tsx:121:18
+    119|    const toast = screen.getByText('Default message').closest('div')!.p…
+    120|    // violations-suppress: tailwind/no-raw-color-class test fixture
+    121|    expect(toast).toHaveClass('bg-green-600');
+       |                  ^
+    122|   });
+    123|  });
+ ❯ runWithExpensiveErrorDiagnosticsDisabled ../../node_modules/@testing-library/dom/dist/config.js:47:12
+ ❯ checkCallback ../../node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ❯ Timeout.checkRealTimersCallback ../../node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/12]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path C:\Workspace_Tooling\agent-fleet\packages\web-frontend
+npm error workspace web-frontend@1.0.0
+npm error location C:\Workspace_Tooling\agent-fleet\packages\web-frontend
+npm error command failed
+npm error command C:\Windows\system32\cmd.exe /d /s /c vitest run
+
+
+### STDOUT:
+
+> web-frontend@1.0.0 test
+> vitest run
+
+
+ RUN  v4.1.11 C:/Workspace_Tooling/agent-fleet/packages/web-frontend
+
+ ❯ src/app/pages/dashboard/ThroughputCard.test.tsx (7 tests | 3 failed) 88ms
+     × should color success rate green when >= 90% 12ms
+     × should color success rate orange when >= 70% and < 90% 4ms
+     × should color success rate red when < 70% 3ms
+ ❯ src/app/pages/dashboard/WorkersCard.test.tsx (8 tests | 2 failed) 118ms
+       × should apply green color to idle workers 16ms
+       × should apply orange color to busy workers 7ms
+ ❯ src/app/pages/dashboard/TasksCard.test.tsx (10 tests | 5 failed) 181ms
+       × should apply blue color to active tasks 14ms
+       × should apply purple color to review tasks 6ms
+       × should apply green color to done tasks 7ms
+       × should apply orange color to blocked tasks 5ms
+       × should apply red color to failed tasks 7ms
+ ❯ src/framework/features/toast/ToastContext.test.tsx (5 tests | 1 failed) 1117ms
+     × should default to success type 1024ms
+ ❯ src/framework/components/feedback/Toast.test.tsx (9 tests | 1 failed) 61ms
+     × should render with success style by default 5ms
+
+ Test Files  5 failed | 169 passed | 1 skipped (175)
+      Tests  12 failed | 2686 passed | 18 skipped (2716)
+   Start at  19:46:33
+   Duration  79.55s (transform 24.24s, setup 28.23s, import 47.70s, tests 120.50s, environment 97.66s)
+
+
+
+--------------------------------------------------------------------------------
+
+## Orchestrator Unit Tests
+Exit Code: 1
+Duration: 1.5s
+
+### STDERR:
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:36:37). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+[33mBoth esbuild and oxc options were set. oxc options will be used and esbuild options will be ignored.[39m The following esbuild options were set: `{ target: 'es2022' }`
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 17 ⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/BackendEventBridge.test.ts [ src/core/BackendEventBridge.test.ts ]
+ FAIL  src/core/Orchestrator.test.ts [ src/core/Orchestrator.test.ts ]
+ FAIL  src/core/RestAPI.test.ts [ src/core/RestAPI.test.ts ]
+ FAIL  src/core/Storage.test.ts [ src/core/Storage.test.ts ]
+ FAIL  src/core/TaskManager.test.ts [ src/core/TaskManager.test.ts ]
+ FAIL  src/core/TraceChunkStorage.test.ts [ src/core/TraceChunkStorage.test.ts ]
+ FAIL  src/core/WorkerCoordinator.test.ts [ src/core/WorkerCoordinator.test.ts ]
+ FAIL  src/registry/FlowDiscoveryRegistry.test.ts [ src/registry/FlowDiscoveryRegistry.test.ts ]
+ FAIL  src/metrics/MetricsCollector.test.ts [ src/metrics/MetricsCollector.test.ts ]
+ FAIL  src/storage/InMemoryOrchestratorStorage.test.ts [ src/storage/InMemoryOrchestratorStorage.test.ts ]
+ FAIL  src/state/StateSnapshotService.test.ts [ src/state/StateSnapshotService.test.ts ]
+ FAIL  src/ui-client/types.test.ts [ src/ui-client/types.test.ts ]
+ FAIL  src/websocket/InterventionFlow.test.ts [ src/websocket/InterventionFlow.test.ts ]
+ FAIL  src/websocket/WebSocketConnectionManager.test.ts [ src/websocket/WebSocketConnectionManager.test.ts ]
+ FAIL  src/websocket/WebSocketEventHandler.test.ts [ src/websocket/WebSocketEventHandler.test.ts ]
+ FAIL  src/websocket/WebSocketMessageRouter.test.ts [ src/websocket/WebSocketMessageRouter.test.ts ]
+ FAIL  src/websocket/WorkerWebSocketServer.test.ts [ src/websocket/WorkerWebSocketServer.test.ts ]
+Error: Transform failed with 1 error:
+
+[31m[TSCONFIG_ERROR] [0mFailed to load tsconfig '../shared-cli': Tsconfig not found
+
+  Plugin: vite:oxc
+  File: C:/Workspace_Tooling/agent-fleet/packages/orchestrator/test/setup.ts
+ ❯ transformWithOxc ../../node_modules/vite/dist/node/chunks/node.js:4103:19
+ ❯ TransformPluginContext.transform ../../node_modules/vite/dist/node/chunks/node.js:4174:26
+ ❯ EnvironmentPluginContainer.transform ../../node_modules/vite/dist/node/chunks/node.js:30932:51
+ ❯ loadAndTransform ../../node_modules/vite/dist/node/chunks/node.js:20671:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/17]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path C:\Workspace_Tooling\agent-fleet\packages\orchestrator
+npm error workspace orchestrator@1.0.0
+npm error location C:\Workspace_Tooling\agent-fleet\packages\orchestrator
+npm error command failed
+npm error command C:\Windows\system32\cmd.exe /d /s /c vitest run
+
+
+### STDOUT:
+
+> orchestrator@1.0.0 test
+> vitest run
+
+
+ RUN  v4.1.11 C:/Workspace_Tooling/agent-fleet/packages/orchestrator
+
+ ❯ src/core/RestAPI.test.ts (0 test)
+ ❯ src/core/BackendEventBridge.test.ts (0 test)
+ ❯ src/core/Orchestrator.test.ts (0 test)
+ ❯ src/core/Storage.test.ts (0 test)
+ ❯ src/metrics/MetricsCollector.test.ts (0 test)
+ ❯ src/registry/FlowDiscoveryRegistry.test.ts (0 test)
+ ❯ src/core/WorkerCoordinator.test.ts (0 test)
+ ❯ src/ui-client/types.test.ts (0 test)
+ ❯ src/core/TraceChunkStorage.test.ts (0 test)
+ ❯ src/storage/InMemoryOrchestratorStorage.test.ts (0 test)
+ ❯ src/state/StateSnapshotService.test.ts (0 test)
+ ❯ src/websocket/InterventionFlow.test.ts (0 test)
+ ❯ src/core/TaskManager.test.ts (0 test)
+ ❯ src/websocket/WebSocketConnectionManager.test.ts (0 test)
+ ❯ src/websocket/WebSocketMessageRouter.test.ts (0 test)
+ ❯ src/websocket/WebSocketEventHandler.test.ts (0 test)
+ ❯ src/websocket/WorkerWebSocketServer.test.ts (0 test)
+
+ Test Files  17 failed (17)
+      Tests  no tests
+   Start at  19:47:56
+   Duration  608ms (transform 0ms, setup 0ms, import 0ms, tests 0ms, environment 2ms)
+
+
+
+--------------------------------------------------------------------------------
+
+## Flow CLI Unit Tests
+Exit Code: 1
+Duration: 4.2s
+
+### STDERR:
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:41:31). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+[33mBoth esbuild and oxc options were set. oxc options will be used and esbuild options will be ignored.[39m The following esbuild options were set: `{ target: 'es2022' }`
+Warning: daemon config could not be parsed, using defaults.
+[McpServer] TCP: rejected — invalid token
+[McpServer] TCP: rejected — executionId mismatch (got WRONG_EXEC_ID, expected test-exec)
+[WorkerPool] rejected registration from unknown PID 9999
+[ok]  Bundle integrity
+[ok]  Config loading
+[ok]  YAML flow parsing
+[ok]  StepRunner init
+[ok]  Plugin system
+[ok]  HookDispatcher
+[ok]  Workspace config
+[CommandHandler] onStepFailed: no scheduler for execution nonexistent-id (step s1) - late message after cleanup
+[CommandHandler] Failed to release plugin workspace for gyi3uusa: Error: step error
+(node:39636) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/FlowIndex.integration.test.ts > flow cli update -- produces output > writes at least one line to stdout when UPDATER_FORCE=1
+AssertionError: Expected output from updater but got none. stdout: "" stderr: "": expected 0 to be greater than 0
+ ❯ src/cli/FlowIndex.integration.test.ts:105:6
+    103|     combined.trim().length,
+    104|     `Expected output from updater but got none. stdout: "${result.stdo…
+    105|    ).toBeGreaterThan(0);
+       |      ^
+    106|   } finally {
+    107|    try {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path C:\Workspace_Tooling\agent-fleet\packages\flow-cli
+npm error workspace flow-cli@1.0.0
+npm error location C:\Workspace_Tooling\agent-fleet\packages\flow-cli
+npm error command failed
+npm error command C:\Windows\system32\cmd.exe /d /s /c vitest run
+
+
+### STDOUT:
+
+> flow-cli@1.0.0 pretest
+> tsc --build tsconfig.json
+
+
+> flow-cli@1.0.0 test
+> vitest run
+
+
+ RUN  v4.1.11 C:/Workspace_Tooling/agent-fleet/packages/flow-cli
+
+ ❯ src/cli/FlowIndex.integration.test.ts (4 tests | 1 failed) 1748ms
+     × writes at least one line to stdout when UPDATER_FORCE=1 173ms
+
+ Test Files  1 failed | 33 passed | 1 skipped (35)
+      Tests  1 failed | 274 passed | 1 todo (276)
+   Start at  19:48:00
+   Duration  2.11s (transform 4.22s, setup 0ms, import 7.70s, tests 7.38s, environment 3ms)
+
+
+
+--------------------------------------------------------------------------------
+

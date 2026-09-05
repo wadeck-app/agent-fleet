@@ -19,6 +19,7 @@ const workerArgs = args.filter(arg => arg !== '--no-watch');
 // Use tsx to run the TypeScript file (watch mode is enabled by default)
 const tsxArgs = noWatchMode ? [workerPath, ...workerArgs] : ['watch', workerPath, ...workerArgs];
 
+// violations-suppress: cli/no-spawn-without-windows-hide dev launcher -- terminal forwarded to tsx process intentionally
 const child = spawn('tsx', tsxArgs, {
 	stdio: 'inherit',
 	shell: true,

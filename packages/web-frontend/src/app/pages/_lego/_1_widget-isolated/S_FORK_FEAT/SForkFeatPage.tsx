@@ -12,7 +12,7 @@
  * - Bookmarked IDs stored in localStorage
  * - Toolbar toggle: "All" | "Bookmarked" (shows only bookmarked items when active)
  * - Bookmarked count shown in toolbar: "⭐ 3 bookmarked"
- * - No changes to existing framework — all in page
+ * - No changes to existing framework -- all in page
  *
  * ===========================================================================================
  */

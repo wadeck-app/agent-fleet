@@ -19,9 +19,9 @@ Central coordinator: accepts tasks, assigns them to workers, tracks state, and e
 
 ## Does NOT own
 
-- Flow execution logic — that's flow-engine
-- UI or HTTP clients — that's web-frontend
-- Per-task Claude subprocess management — that's worker
+- Flow execution logic -- that's flow-engine
+- UI or HTTP clients -- that's web-frontend
+- Per-task Claude subprocess management -- that's worker
 
 ## Deployment modes
 
@@ -43,8 +43,6 @@ Long-running process (also usable as embedded library).
 
 ## Key files
 
-- `src/TaskManager.ts` — task queue: enqueue, dequeue, status tracking
-- `src/WorkerCoordinator.ts` — worker registration and task dispatch
-- `src/InterventionManager.ts` — routes human intervention requests to the right worker
-- `src/FlowDiscoveryRegistry.ts` — discovers available flows and surfaces them via API
-- `src/BackendEventBridge.ts` — forwards orchestrator events to web-backend for client broadcasting
+---
+
+_Reference content moved to [docs/reference.md](docs/reference.md)._

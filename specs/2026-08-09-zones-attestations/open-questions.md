@@ -10,7 +10,7 @@ Certificate management: stored in the secrets catalogue per scope. Rotation does
 
 ### Trusted step catalogue
 
-Trusted steps are defined at org/sub-org/project scope. The flow author references them by id only — attestation declarations come from the catalogue, not the flow YAML. An ordinary step declares its attestations inline in the flow.
+Trusted steps are defined at org/sub-org/project scope. The flow author references them by id only -- attestation declarations come from the catalogue, not the flow YAML. An ordinary step declares its attestations inline in the flow.
 
 ### Attestation thresholds
 
@@ -18,11 +18,11 @@ Deferred to post-V1. Thresholds allow zones to require specific claim values (e.
 
 ### Zone grouping block syntax
 
-Multiple steps sharing the same zone can be grouped to avoid repetition. Deferred — per-step declaration covers V1 needs.
+Multiple steps sharing the same zone can be grouped to avoid repetition. Deferred -- per-step declaration covers V1 needs.
 
 ### Nested zones
 
-`production` ⊃ `production.critical-data` — entry into the inner zone requires a second attestation on top of the outer one.
+`production` ⊃ `production.critical-data` -- entry into the inner zone requires a second attestation on top of the outer one.
 
 ### Attestation expiration mid-execution
 
@@ -38,4 +38,4 @@ Whether a subflow inherits attestations produced by its parent flow, or must re-
 
 ### Zone restriction on step types
 
-A zone declaring `allows: step-types: [script]` would forbid `model` steps inside it — enforcing determinism in critical zones.
+A zone declaring `allows: step-types: [script]` would forbid `model` steps inside it -- enforcing determinism in critical zones.

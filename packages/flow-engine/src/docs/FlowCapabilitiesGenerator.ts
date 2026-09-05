@@ -5,7 +5,7 @@
  * Used as context injected into an AI agent prompt (FlowDesignerAgent) so it
  * understands what the flow engine supports.
  *
- * No runtime reflection — structure is hardcoded mirroring types.ts.
+ * No runtime reflection -- structure is hardcoded mirroring types.ts.
  */
 export class FlowCapabilitiesGenerator {
 	/**
@@ -39,16 +39,16 @@ Use it to design valid flows when responding to user requests.`;
 		return `## Section 1: Step Types
 
 Each step has a \`type\` discriminator and inherits base fields from \`BaseFlowStep\`:
-- \`id\` (string, required) — unique identifier within the flow
-- \`name\` (string, required) — human-readable label
-- \`context\` — optional: \`files\` (glob patterns), \`previousOutputs\` (step IDs), \`taskMetadata\` (keys)
-- \`output\` — map of variable names to extraction configs (pattern, from, transform, default)
-- \`depends\` — list of step IDs that must complete before this step runs
-- \`when\` — conditional expression (evaluated to boolean); step is skipped if false
-- \`skipOnLoop\` — skip this step when a feedback loop is triggered (useful for one-time setup)
-- \`retry\` — \`{ maxAttempts, backoff: 'linear' | 'exponential' }\`
-- \`onFailure\` — feedback loop config: \`{ goto, maxIterations, resetOnSuccess, addComment }\`
-- \`contract\` — \`{ preProcess: { validateInputs, required }, postProcess: { validateOutputs, required } }\`
+- \`id\` (string, required) -- unique identifier within the flow
+- \`name\` (string, required) -- human-readable label
+- \`context\` -- optional: \`files\` (glob patterns), \`previousOutputs\` (step IDs), \`taskMetadata\` (keys)
+- \`output\` -- map of variable names to extraction configs (pattern, from, transform, default)
+- \`depends\` -- list of step IDs that must complete before this step runs
+- \`when\` -- conditional expression (evaluated to boolean); step is skipped if false
+- \`skipOnLoop\` -- skip this step when a feedback loop is triggered (useful for one-time setup)
+- \`retry\` -- \`{ maxAttempts, backoff: 'linear' | 'exponential' }\`
+- \`onFailure\` -- feedback loop config: \`{ goto, maxIterations, resetOnSuccess, addComment }\`
+- \`contract\` -- \`{ preProcess: { validateInputs, required }, postProcess: { validateOutputs, required } }\`
 
 ### model
 
@@ -63,9 +63,9 @@ prompt: |
 \`\`\`
 
 Key fields:
-- \`model\` (string, optional) — model identifier for the chosen provider (e.g. \`claude-3-5-haiku\`, \`anthropic/claude-3-5-sonnet\`)
-- \`provider\` (string, optional) — AI CLI provider: \`claude\` (default) or \`opencode\`
-- \`prompt\` (string, required) — prompt template with \`${TMPL} }}\` variable interpolation
+- \`model\` (string, optional) -- model identifier for the chosen provider (e.g. \`claude-3-5-haiku\`, \`anthropic/claude-3-5-sonnet\`)
+- \`provider\` (string, optional) -- AI CLI provider: \`claude\` (default) or \`opencode\`
+- \`prompt\` (string, required) -- prompt template with \`${TMPL} }}\` variable interpolation
 
 ### script
 
@@ -83,10 +83,10 @@ captureOutput: true
 \`\`\`
 
 Key fields:
-- \`script\` (string, required) — shell command(s) to execute
-- \`workingDir\` (string, optional) — working directory for execution
-- \`env\` (Record<string, string>, optional) — environment variables
-- \`captureOutput\` (boolean, optional) — whether to capture stdout/stderr
+- \`script\` (string, required) -- shell command(s) to execute
+- \`workingDir\` (string, optional) -- working directory for execution
+- \`env\` (Record<string, string>, optional) -- environment variables
+- \`captureOutput\` (boolean, optional) -- whether to capture stdout/stderr
 
 ### subflow
 
@@ -103,11 +103,11 @@ allowRecursion: false
 \`\`\`
 
 Key fields:
-- \`flowId\` (string, required) — ID of the flow to execute
-- \`inputs\` (Record<string, string>, required) — template inputs passed to the subflow
-- \`workspaceStrategy\` (\`'inherit' | 'separate'\`, optional, default: \`inherit\`) — whether to share workspace
-- \`output\` — map of variable names to template strings extracting from subflow outputs
-- \`allowRecursion\` (boolean, optional) — must be explicitly \`true\` to allow a flow calling itself
+- \`flowId\` (string, required) -- ID of the flow to execute
+- \`inputs\` (Record<string, string>, required) -- template inputs passed to the subflow
+- \`workspaceStrategy\` (\`'inherit' | 'separate'\`, optional, default: \`inherit\`) -- whether to share workspace
+- \`output\` -- map of variable names to template strings extracting from subflow outputs
+- \`allowRecursion\` (boolean, optional) -- must be explicitly \`true\` to allow a flow calling itself
 
 ### user_intervention
 
@@ -124,12 +124,12 @@ timeout:
 \`\`\`
 
 Key fields:
-- \`interventionType\` (required) — \`approval\`, \`question\`, or \`choice\`
-- \`blocking\` (boolean, default: \`true\`) — whether to pause flow until user responds
-- \`timeout\` — optional: \`{ minutes, onTimeout: 'fail' | 'continue' | 'default', defaultValue }\`
-- \`approval\` — config for approval type: \`{ title, description, allowReject }\`
-- \`question\` — config for question type: \`{ question, responseType: 'text' | 'number' | 'boolean', validation }\`
-- \`choice\` — config for choice type: \`{ question, options: [{ id, label, description }], allowMultiple }\``;
+- \`interventionType\` (required) -- \`approval\`, \`question\`, or \`choice\`
+- \`blocking\` (boolean, default: \`true\`) -- whether to pause flow until user responds
+- \`timeout\` -- optional: \`{ minutes, onTimeout: 'fail' | 'continue' | 'default', defaultValue }\`
+- \`approval\` -- config for approval type: \`{ title, description, allowReject }\`
+- \`question\` -- config for question type: \`{ question, responseType: 'text' | 'number' | 'boolean', validation }\`
+- \`choice\` -- config for choice type: \`{ question, options: [{ id, label, description }], allowMultiple }\``;
 		// @formatter:on
 	}
 
@@ -224,9 +224,9 @@ ${TMPL} steps.<stepId>.meta.<field> }}
 **Model step meta fields:** \`session_id\`, \`session_file\`, \`model\`, \`ttft_ms\`, \`duration_ms\`, \`cost.input_tokens\`, \`cost.output_tokens\`, \`cost.usd\`
 
 Examples:
-- \`${TMPL} steps.generate.meta.session_id }}\` — Claude session ID (for session continuation)
-- \`${TMPL} steps.generate.meta.cost.usd }}\` — cost in USD
-- \`${TMPL} steps.run-tests.meta.exit_code }}\` — script exit code
+- \`${TMPL} steps.generate.meta.session_id }}\` -- Claude session ID (for session continuation)
+- \`${TMPL} steps.generate.meta.cost.usd }}\` -- cost in USD
+- \`${TMPL} steps.run-tests.meta.exit_code }}\` -- script exit code
 
 ### Accessing flow inputs
 \`\`\`
@@ -245,21 +245,21 @@ Examples:
 
 ### Built-in transform functions (for output extraction)
 Applied via the \`transform\` field in \`OutputVariableConfig\`:
-- \`parseJSON\` — parse JSON string to object
-- \`parseYAML\` — parse YAML string to object
-- \`parseInt\` — parse integer
-- \`parseFloat\` — parse float
-- \`parseBoolean\` — parse boolean
-- \`trim\` — strip whitespace
-- \`toLowerCase\` / \`toUpperCase\` — case conversion
-- \`split\` — split string to array
+- \`parseJSON\` -- parse JSON string to object
+- \`parseYAML\` -- parse YAML string to object
+- \`parseInt\` -- parse integer
+- \`parseFloat\` -- parse float
+- \`parseBoolean\` -- parse boolean
+- \`trim\` -- strip whitespace
+- \`toLowerCase\` / \`toUpperCase\` -- case conversion
+- \`split\` -- split string to array
 
 ### Output extraction from user intervention responses
 Use the \`from\` field to reference intervention response fields:
-- \`from: intervention.approved\` — whether the user approved
-- \`from: intervention.comment\` — optional comment from user
-- \`from: intervention.answeredBy\` — user who responded
-- \`from: intervention.value\` — the answer value (for question/choice types)`;
+- \`from: intervention.approved\` -- whether the user approved
+- \`from: intervention.comment\` -- optional comment from user
+- \`from: intervention.answeredBy\` -- user who responded
+- \`from: intervention.value\` -- the answer value (for question/choice types)`;
 		// @formatter:on
 	}
 

@@ -22,9 +22,9 @@ import type { NavItem } from './SidebarNav';
  * Single source of truth for all navigation items.
  *
  * Menu groups:
- * 1. Main views — user-facing screens with rich UI (dashboard, projects, interventions, flows)
- * 2. Data management — CRUD-oriented views that mirror the database (workers, tasks, projects list, workspaces)
- * 3. Sandbox — experimental/prototype pages (ingredients, books)
+ * 1. Main views -- user-facing screens with rich UI (dashboard, projects, interventions, flows)
+ * 2. Data management -- CRUD-oriented views that mirror the database (workers, tasks, projects list, workspaces)
+ * 3. Sandbox -- experimental/prototype pages (ingredients, books)
  */
 export const navigationItems: NavItem[] = [
 	// Main views
@@ -51,7 +51,7 @@ export const navigationItems: NavItem[] = [
 	{
 		type: 'separator',
 	},
-	// Data management — CRUD views that mirror the database (hierarchical order)
+	// Data management -- CRUD views that mirror the database (hierarchical order)
 	{
 		path: '/projects',
 		label: 'Projects list',
@@ -80,7 +80,7 @@ export const navigationItems: NavItem[] = [
 	{
 		type: 'separator',
 	},
-	// Sandbox — experimental/prototype pages
+	// Sandbox -- experimental/prototype pages
 	{
 		path: '/ingredients2',
 		label: 'Ingredients v2 table',
@@ -109,10 +109,10 @@ export const navigationItems: NavItem[] = [
 	{
 		type: 'separator',
 	},
-	// Lego Experiments — Framework architecture patterns
+	// Lego Experiments -- Framework architecture patterns
 	{
 		type: 'group',
-		label: 'Lego — Widget Isolated',
+		label: 'Lego -- Widget Isolated',
 		icon: Boxes,
 		items: [
 			{ path: '/lego/1/s1', label: 'S1: Simple Table', icon: Table2 },
@@ -134,7 +134,7 @@ export const navigationItems: NavItem[] = [
 	},
 	{
 		type: 'group',
-		label: 'Lego — Context Provider',
+		label: 'Lego -- Context Provider',
 		icon: Boxes,
 		items: [
 			{ path: '/lego/2/s1', label: 'S1: Simple Table', icon: Table2 },
@@ -156,7 +156,7 @@ export const navigationItems: NavItem[] = [
 	},
 	{
 		type: 'group',
-		label: 'Lego — Feature Hooks',
+		label: 'Lego -- Feature Hooks',
 		icon: Boxes,
 		items: [
 			{ path: '/lego/3/s1', label: 'S1: Simple Table', icon: Table2 },
@@ -178,7 +178,7 @@ export const navigationItems: NavItem[] = [
 	},
 	{
 		type: 'group',
-		label: 'Lego — Context Children',
+		label: 'Lego -- Context Children',
 		icon: Boxes,
 		items: [
 			{ path: '/lego/4/s1', label: 'S1: Simple Table', icon: Table2 },
@@ -200,7 +200,7 @@ export const navigationItems: NavItem[] = [
 	},
 	{
 		type: 'group',
-		label: 'Lego — Query Pipeline',
+		label: 'Lego -- Query Pipeline',
 		icon: Boxes,
 		items: [
 			{ path: '/lego/5/s1', label: 'S1: Simple Table', icon: Table2 },
@@ -222,7 +222,7 @@ export const navigationItems: NavItem[] = [
 	},
 	{
 		type: 'group',
-		label: 'Lego — Data2 Based',
+		label: 'Lego -- Data2 Based',
 		icon: Boxes,
 		items: [
 			{ path: '/lego/6/s1', label: 'S1: Simple Table', icon: Table2 },

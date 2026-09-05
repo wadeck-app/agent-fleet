@@ -63,7 +63,7 @@ const mockColumns: ColumnDef<(typeof mockProductList)[0]>[] = [
 ];
 
 // Test wrapper component that uses hooks and passes them to HookDataTable
-// Hooks must always be called unconditionally — included in features based on props
+// Hooks must always be called unconditionally -- included in features based on props
 function TestWrapper({ withPagination = false, withSearch = false }) {
 	const searchFeature = useSearchFeature({ placeholder: 'Search products...' });
 	const paginationFeature = usePaginationFeature({ defaultSize: 10, pageSizes: [10, 20, 50] });

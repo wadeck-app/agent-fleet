@@ -1,11 +1,11 @@
 /**
- * Step Runner — thin orchestrator that delegates to type-specific executors.
+ * Step Runner -- thin orchestrator that delegates to type-specific executors.
  *
  * Each step type has its own module:
- *   - ScriptStepExecutor.ts  — script steps
- *   - ModelStepExecutor.ts   — model (Claude) steps
- *   - SubflowStepExecutor.ts — subflow composition steps
- *   - UserInterventionStepExecutor.ts — human-in-the-loop steps
+ *   - ScriptStepExecutor.ts  -- script steps
+ *   - ModelStepExecutor.ts   -- model (Claude) steps
+ *   - SubflowStepExecutor.ts -- subflow composition steps
+ *   - UserInterventionStepExecutor.ts -- human-in-the-loop steps
  */
 import type { ApprovalProvider } from 'extension-points';
 
@@ -63,7 +63,7 @@ export interface StepRunnerConfig {
 	approvalProvider?: ApprovalProvider;
 	/** Execution configuration for model CLI flags */
 	executionConfig?: ExecutionConfig;
-	/** Optional provider map override — used in tests to inject mock providers without I/O */
+	/** Optional provider map override -- used in tests to inject mock providers without I/O */
 	providers?: Map<string, ModelProvider>;
 }
 

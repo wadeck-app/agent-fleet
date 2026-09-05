@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { useAbortableEffect } from '@framework/hooks/useAbortableEffect';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { Ticket, TicketsQuery } from '@shared/api/tickets.contract';
-// B2F_TICKETS_UPDATED — list-level signal: ticket created, deleted, reordered, or a
+// B2F_TICKETS_UPDATED -- list-level signal: ticket created, deleted, reordered, or a
 // list-visible field (title/status/labels) changed. Subscribe here so the list
 // stays in sync without the page needing to know about individual ticket events.
 import { B2F_TICKETS_UPDATED } from '@shared/transport';
@@ -67,7 +67,7 @@ export function useTickets(query?: TicketsQuery): UseTicketsResult {
 			const response = await ticketsApi.getTicketsList(query);
 			setTickets(response.items);
 		} catch {
-			// silent – stale data stays visible
+			// silent - stale data stays visible
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [queryKey]);

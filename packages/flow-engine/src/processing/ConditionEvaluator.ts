@@ -31,7 +31,7 @@ export class ConditionEvaluationError extends Error {
  * Context for condition evaluation.
  * `outputs` is keyed by dep step id: { 'dep-id': { field: value } }
  * `inputs` contains flow-level inputs.
- * Tasks are coupled to flows by events, not by core feature — no task context here.
+ * Tasks are coupled to flows by events, not by core feature -- no task context here.
  */
 export interface ConditionContext {
 	/** Step outputs keyed by step id */

@@ -19,11 +19,11 @@ import { ViewDetailPanel } from '../_framework/ViewDetailPanel';
  * - Table: pagination
  * - Detail Panel: inline-edit
  *
- * No events needed — both views share the same ProductProvider context.
+ * No events needed -- both views share the same ProductProvider context.
  * When table row is clicked, it calls context.actions.selectItem(), and the detail panel
  * automatically reacts to context.selectedItem changes.
  *
- * Zero className, zero inline styles, zero hooks, zero state — pure composition.
+ * Zero className, zero inline styles, zero hooks, zero state -- pure composition.
  *
  * ===========================================================================================
  */

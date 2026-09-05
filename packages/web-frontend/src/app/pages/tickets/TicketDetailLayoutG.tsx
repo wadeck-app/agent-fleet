@@ -138,7 +138,7 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 	// Tracks the original key of each item by ID (undefined = newly added row)
 	const [originalKeys, setOriginalKeys] = useState<Record<string, string>>({});
 
-	// Tab counts — real-time via WS-aware hooks
+	// Tab counts -- real-time via WS-aware hooks
 	const { count: commentsCount, loading: commentsCountLoading } = useTicketCommentsCount(ticketId);
 	const { count: tasksCount, loading: tasksCountLoading } = useTriggeredTasksCount(ticketId);
 	const { count: auditCount, loading: auditCountLoading } = useTicketAuditCount(ticketId);
@@ -147,7 +147,7 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 		ticket.currentFlowProposalId,
 		ticketId
 	);
-	// Eager fetch for the Flow Design tab count badge — mirrors the pattern of other tab count hooks.
+	// Eager fetch for the Flow Design tab count badge -- mirrors the pattern of other tab count hooks.
 	// FlowProposalSection fetches its own data independently when it first mounts.
 	const flowProposals = useFlowProposals(ticketId);
 
@@ -162,7 +162,7 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	// Sync local state with ticket — only reset fields that have no pending dirty changes
+	// Sync local state with ticket -- only reset fields that have no pending dirty changes
 	useEffect(() => {
 		setLocalStatus(ticket.status);
 		// Only reset labels if the user has no pending changes (prevents overwriting in-progress edits)
@@ -504,7 +504,7 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 				</TabsWithUrlState>
 			</div>
 
-			{/* Right sidebar (25%): Status + Labels + Custom Fields — stacked layout */}
+			{/* Right sidebar (25%): Status + Labels + Custom Fields -- stacked layout */}
 			<div className="col-span-1">
 				<div className="flex flex-col gap-4">
 					{/* Status */}
@@ -526,7 +526,7 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 										{s.label}
 									</SelectItem>
 								))}
-								{/* Fallback: show raw status value when config hasn't loaded yet — bug #5 */}
+								{/* Fallback: show raw status value when config hasn't loaded yet -- bug #5 */}
 								{!statusConfig.statuses.find(s => s.id === localStatus) && (
 									<SelectItem value={localStatus}>{localStatus}</SelectItem>
 								)}

@@ -1,5 +1,5 @@
 /**
- * ClaudeHookTranslator — converts ToolHook[] into Claude hook settings JSON.
+ * ClaudeHookTranslator -- converts ToolHook[] into Claude hook settings JSON.
  *
  * Claude CLI expects: { hooks: { PreToolUse: [...], PostToolUse: [...] } }
  * Each entry: { matcher: "<glob>", hooks: [{ type: "command", command: "<shell cmd>" }] }
@@ -114,7 +114,7 @@ export class ClaudeHookTranslator {
 						});
 					}
 				}
-				// deny timing='after' is not meaningful — tool already executed
+				// deny timing='after' is not meaningful -- tool already executed
 			}
 		}
 

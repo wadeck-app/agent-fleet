@@ -283,7 +283,7 @@ describe('TicketCreateDialog', () => {
 			(projectsApi.getProjectsList as any).mockImplementation(
 				() =>
 					new Promise(() => {
-						// Never resolves — simulates a pending API call
+						// Never resolves -- simulates a pending API call
 					})
 			);
 
@@ -293,12 +293,12 @@ describe('TicketCreateDialog', () => {
 			expect(screen.getByText('Loading projects...')).toBeInTheDocument();
 		});
 
-		it('should show "Creating..." text in button while creating, not Sparkles animation — bug #2', async () => {
+		it('should show "Creating..." text in button while creating, not Sparkles animation -- bug #2', async () => {
 			// Simulate a never-resolving create call to capture the loading state
 			(ticketsApi.createWithAiTitle as any).mockImplementation(
 				() =>
 					new Promise(() => {
-						// Never resolves — captures the creating state
+						// Never resolves -- captures the creating state
 					})
 			);
 

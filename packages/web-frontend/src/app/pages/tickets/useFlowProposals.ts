@@ -23,10 +23,10 @@ export interface UseFlowProposalsResult {
 	currentProposal: FlowProposal | null;
 	isLoading: boolean;
 	error: Error | null;
-	/** Full refresh — shows loading indicator, replaces all proposals. */
+	/** Full refresh -- shows loading indicator, replaces all proposals. */
 	refresh: () => void;
 	/**
-	 * Silent refresh — re-fetches proposals in the background without
+	 * Silent refresh -- re-fetches proposals in the background without
 	 * triggering isLoading=true. Preserves scroll position after review-thread
 	 * updates (item O fix).
 	 */
@@ -83,7 +83,7 @@ export function useFlowProposals(ticketId: string): UseFlowProposalsResult {
 		setRefreshCounter(prev => prev + 1);
 	}, []);
 
-	// Stable filter object — prevents useRealtimeRefresh from re-subscribing on every render
+	// Stable filter object -- prevents useRealtimeRefresh from re-subscribing on every render
 	const ticketFilter = useMemo(() => ({ ticketId }), [ticketId]);
 
 	// Subscribe to proposal updates so the tab count badge refreshes automatically

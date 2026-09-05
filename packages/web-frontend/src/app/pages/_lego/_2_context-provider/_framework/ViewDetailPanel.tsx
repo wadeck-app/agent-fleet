@@ -25,7 +25,7 @@ import { useProductDomain } from './ProductDomainContext';
  * Features:
  * - inline-edit: Toggle between read-only and edit mode
  *
- * Reads context.selectedItem (no listens prop needed — reacts to context changes).
+ * Reads context.selectedItem (no listens prop needed -- reacts to context changes).
  * When the table calls actions.select(), this panel automatically updates.
  *
  * ===========================================================================================
@@ -120,7 +120,7 @@ export function ViewDetailPanel<T extends Product = Product>({ columns, features
 		}
 
 		if (col.type === 'date') {
-			return value ? new Date(value as string | number | Date).toLocaleDateString() : '–';
+			return value ? new Date(value as string | number | Date).toLocaleDateString() : '-';
 		}
 
 		return String(value ?? '');

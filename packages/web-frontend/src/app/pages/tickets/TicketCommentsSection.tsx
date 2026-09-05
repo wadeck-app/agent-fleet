@@ -15,7 +15,7 @@ import { useTransport } from '@/transport';
 import { CommentPermalink } from './components/CommentPermalink';
 import { ticketsApi } from './tickets.api';
 
-// Stable reference — defined outside component to prevent ReactMarkdown from
+// Stable reference -- defined outside component to prevent ReactMarkdown from
 // unmounting/remounting every time the parent re-renders. An inline object literal
 // creates a new reference on every render, which ReactMarkdown treats as a config
 // change and fully re-renders the markdown DOM (visible as content "flickering").
@@ -204,7 +204,7 @@ export function TicketCommentsSection({ ticketId, sortOrder = 'asc', showLabel =
 
 			{/* Add comment form - always visible */}
 			<div className="mt-4 space-y-2">
-				{/* htmlFor links label to textarea for accessibility — bug #6 fix */}
+				{/* htmlFor links label to textarea for accessibility -- bug #6 fix */}
 				<Label htmlFor="add-comment-textarea">Add a comment</Label>
 				<Textarea
 					id="add-comment-textarea"

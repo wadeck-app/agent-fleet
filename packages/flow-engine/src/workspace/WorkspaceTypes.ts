@@ -1,4 +1,4 @@
-/** Shared workspace types — imported by WorkspaceManager, WorkspaceGitStrategy, WorkspacePruner. */
+/** Shared workspace types -- imported by WorkspaceManager, WorkspaceGitStrategy, WorkspacePruner. */
 
 export class WorkspaceAllocationError extends Error {
 	constructor(message: string) {

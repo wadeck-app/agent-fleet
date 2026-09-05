@@ -16,9 +16,9 @@ Executes assigned tasks by invoking flow-engine and managing the Claude subproce
 
 ## Does NOT own
 
-- Task queuing or scheduling — that's orchestrator
-- Flow graph construction or YAML parsing — that's flow-engine
-- Human intervention routing — that's orchestrator
+- Task queuing or scheduling -- that's orchestrator
+- Flow graph construction or YAML parsing -- that's flow-engine
+- Human intervention routing -- that's orchestrator
 
 ## Dependencies on local packages
 
@@ -28,7 +28,7 @@ Executes assigned tasks by invoking flow-engine and managing the Claude subproce
 
 ## Consumers
 
-None — standalone process spawned by the orchestrator or by the user directly.
+None -- standalone process spawned by the orchestrator or by the user directly.
 
 ## Entry point type
 
@@ -36,6 +36,6 @@ Long-running process.
 
 ## Key files
 
-- `src/WorkerAgent.ts` — main process entry: connects to orchestrator, handles task lifecycle
-- `src/ClaudeLifecycleManager.ts` — manages Claude subprocess start, output streaming, and termination
-- `src/TaskExecutor.ts` — bridges task assignment to flow-engine execution
+- `src/WorkerAgent.ts` -- main process entry: connects to orchestrator, handles task lifecycle
+- `src/ClaudeLifecycleManager.ts` -- manages Claude subprocess start, output streaming, and termination
+- `src/TaskExecutor.ts` -- bridges task assignment to flow-engine execution

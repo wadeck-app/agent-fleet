@@ -655,7 +655,7 @@ describe('ProjectsV2Page', () => {
 				wrapper: ({ children }) => wrapper({ children, initialUrl: '/?projectId=proj-bg&workspaceId=ws-bg' }),
 			});
 
-			// WorkspacePanel must be mounted — h2 heading visible, not replaced by skeleton
+			// WorkspacePanel must be mounted -- h2 heading visible, not replaced by skeleton
 			// (name also appears in WorkspaceTabs, so we scope to heading role)
 			expect(screen.getByRole('heading', { name: 'Background Workspace' })).toBeInTheDocument();
 		});
@@ -719,7 +719,7 @@ describe('ProjectsV2Page', () => {
 
 			rerender(<ProjectsV2Page />);
 
-			// Dialog must still be open — WorkspacePanel must NOT have been unmounted
+			// Dialog must still be open -- WorkspacePanel must NOT have been unmounted
 			expect(screen.getByText('Edit Workspace')).toBeInTheDocument();
 		});
 	});

@@ -9,7 +9,7 @@ import type { ReactNode } from 'react';
  * Left column: main content (table, grid, etc.)
  * Right column: detail panel or secondary content
  *
- * In approach 3, there's no event bus — communication happens via callbacks and props.
+ * In approach 3, there's no event bus -- communication happens via callbacks and props.
  *
  * Features:
  * - Configurable right panel width

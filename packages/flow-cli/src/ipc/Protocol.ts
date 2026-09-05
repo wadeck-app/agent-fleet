@@ -10,9 +10,9 @@ export interface ExecutionContext {
 	/** Execution metadata per step (strongly typed per step type) */
 	stepMeta: Record<string, StepMeta>;
 	workspaceDir: string;
-	/** Engine-generated output files directory (<workspaceDir>.meta/outputs) — never inside workspaceDir */
+	/** Engine-generated output files directory (<workspaceDir>.meta/outputs) -- never inside workspaceDir */
 	outputsDir: string;
-	/** Original CWD from which `flow run` was invoked — used as ${{ context.cwd }} in templates */
+	/** Original CWD from which `flow run` was invoked -- used as ${{ context.cwd }} in templates */
 	cwd: string;
 }
 

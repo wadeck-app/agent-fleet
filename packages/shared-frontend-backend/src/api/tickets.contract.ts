@@ -13,7 +13,7 @@ import {
 // Enums
 // ---------------------------------------------------------------------------
 
-// Status is project-configurable — accept any string value.
+// Status is project-configurable -- accept any string value.
 export const TicketStatusSchema = z.string();
 
 // ---------------------------------------------------------------------------
@@ -128,7 +128,7 @@ export const CreateTicketSchema = z.object({
 	fields: z.record(z.string(), z.string()).default({}),
 	parentId: z.string().optional(),
 	flowId: z.string().optional(),
-	/** Initial order value — defaults to 1000 * (sibling count + 1) if omitted */
+	/** Initial order value -- defaults to 1000 * (sibling count + 1) if omitted */
 	order: z.number().optional(),
 });
 
@@ -208,7 +208,7 @@ export const TicketAnalysisPlanSchema = z.object({
 export const CreateFromPlanSchema = z.object({
 	projectId: z.string().min(1),
 	plan: TicketAnalysisPlanSchema,
-	/** Original user description — used as parent ticket description instead of AI analysis */
+	/** Original user description -- used as parent ticket description instead of AI analysis */
 	originalDescription: z.string().optional(),
 });
 

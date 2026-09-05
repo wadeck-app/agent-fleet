@@ -23,16 +23,16 @@ interface FlowFeedbackSectionProps {
 	ticketId: string;
 	/** If set, a retrospective exists */
 	flowRetrospectiveId?: string;
-	/** The current flow proposal ID — used as flowId in the feedback body and to fetch submitted feedback */
+	/** The current flow proposal ID -- used as flowId in the feedback body and to fetch submitted feedback */
 	currentFlowProposalId?: string;
 	/** Called after feedback is successfully submitted */
 	onFeedbackSubmitted?: () => void;
-	/** Sort order for feedback items — matches the global sort toggle */
+	/** Sort order for feedback items -- matches the global sort toggle */
 	sortOrder?: 'asc' | 'desc';
 }
 
 // ---------------------------------------------------------------------------
-// ArrayFieldInput — add/remove/edit list of strings inline
+// ArrayFieldInput -- add/remove/edit list of strings inline
 // ---------------------------------------------------------------------------
 
 interface ArrayFieldInputProps {
@@ -114,7 +114,7 @@ function ArrayFieldInput({ label, items, onChange, placeholder, required }: Arra
 }
 
 // ---------------------------------------------------------------------------
-// RatingInput — star/number buttons 1-5
+// RatingInput -- star/number buttons 1-5
 // ---------------------------------------------------------------------------
 
 interface RatingInputProps {
@@ -143,7 +143,7 @@ function RatingInput({ value, onChange }: RatingInputProps) {
 }
 
 // ---------------------------------------------------------------------------
-// FeedbackCard — displays a single submitted feedback item with edit/delete
+// FeedbackCard -- displays a single submitted feedback item with edit/delete
 // ---------------------------------------------------------------------------
 
 interface FeedbackItemWithOptimistic extends FlowFeedback {
@@ -181,7 +181,7 @@ function FeedbackCard({
 	const [isEditing, setIsEditing] = useState(false);
 	const [deleteOpen, setDeleteOpen] = useState(false);
 
-	// Edit form state — initialised from item when entering edit mode
+	// Edit form state -- initialised from item when entering edit mode
 	const [editRating, setEditRating] = useState(item.rating);
 	const [editWentWell, setEditWentWell] = useState<string[]>(item.wentWell);
 	const [editWentWrong, setEditWentWrong] = useState<string[]>(item.wentWrong);
@@ -249,7 +249,7 @@ function FeedbackCard({
 		}
 	};
 
-	// Edit mode — inline form pre-filled with current values
+	// Edit mode -- inline form pre-filled with current values
 	if (isEditing) {
 		return (
 			<div
@@ -321,7 +321,7 @@ function FeedbackCard({
 					<span className="text-xs text-muted-foreground">{new Date(item.submittedAt).toLocaleString()}</span>
 					{/* e2-icons: standard icon buttons using Button variant="ghost" size="icon-sm" */}
 					<div className="ml-auto flex items-center gap-1">
-						{/* Edit button — pencil icon, neutral */}
+						{/* Edit button -- pencil icon, neutral */}
 						<Button
 							variant="ghost"
 							size="icon-sm"
@@ -331,7 +331,7 @@ function FeedbackCard({
 						>
 							<Pencil className="size-4" />
 						</Button>
-						{/* Delete button — RED (destructive), use RemoveItemButton */}
+						{/* Delete button -- RED (destructive), use RemoveItemButton */}
 						<RemoveItemButton
 							onRemove={() => setDeleteOpen(true)}
 							title="Delete feedback"
@@ -339,7 +339,7 @@ function FeedbackCard({
 						/>
 					</div>
 				</div>
-				{/* What went well — always shown, with "Nothing noted" placeholder when empty */}
+				{/* What went well -- always shown, with "Nothing noted" placeholder when empty */}
 				<div className="space-y-1">
 					<p className="text-xs font-medium text-muted-foreground tracking-wide">What went well</p>
 					{item.wentWell.length > 0 ? (
@@ -354,7 +354,7 @@ function FeedbackCard({
 						<p className="text-sm text-muted-foreground italic">Nothing noted</p>
 					)}
 				</div>
-				{/* What went wrong — always shown, with "Nothing noted" placeholder when empty */}
+				{/* What went wrong -- always shown, with "Nothing noted" placeholder when empty */}
 				<div className="space-y-1">
 					<p className="text-xs font-medium text-muted-foreground tracking-wide">What went wrong</p>
 					{item.wentWrong.length > 0 ? (
@@ -369,7 +369,7 @@ function FeedbackCard({
 						<p className="text-sm text-muted-foreground italic">Nothing noted</p>
 					)}
 				</div>
-				{/* Suggestions — always shown, with "Nothing noted" placeholder when empty */}
+				{/* Suggestions -- always shown, with "Nothing noted" placeholder when empty */}
 				<div className="space-y-1">
 					<p className="text-xs font-medium text-muted-foreground tracking-wide">Suggestions</p>
 					{item.suggestions && item.suggestions.length > 0 ? (
@@ -402,7 +402,7 @@ function FeedbackCard({
 }
 
 // ---------------------------------------------------------------------------
-// FlowFeedbackForm — collects feedback values and calls onSubmit
+// FlowFeedbackForm -- collects feedback values and calls onSubmit
 // ---------------------------------------------------------------------------
 
 interface FormValues {
@@ -415,7 +415,7 @@ interface FormValues {
 interface FlowFeedbackFormProps {
 	initialValues?: FormValues;
 	onSubmit: (values: FormValues) => Promise<void>;
-	/** Optional cancel handler — shown only when a previous feedback already exists */
+	/** Optional cancel handler -- shown only when a previous feedback already exists */
 	onCancel?: () => void;
 }
 
@@ -476,7 +476,7 @@ function FlowFeedbackForm({ initialValues, onSubmit, onCancel }: FlowFeedbackFor
 						{isSubmitting ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
 						Submit Feedback
 					</Button>
-					{/* Cancel button — only when re-adding (a previous feedback already exists) */}
+					{/* Cancel button -- only when re-adding (a previous feedback already exists) */}
 					{onCancel && (
 						<Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
 							Cancel
@@ -500,7 +500,7 @@ function FlowFeedbackForm({ initialValues, onSubmit, onCancel }: FlowFeedbackFor
 const retroToggleCls =
 	'flex w-full items-center justify-start gap-2 px-3 py-2 text-sm font-medium hover:bg-muted/50';
 
-// RetrospectiveCard — fetches and displays retrospective
+// RetrospectiveCard -- fetches and displays retrospective
 // ---------------------------------------------------------------------------
 
 interface RetrospectiveCardProps {
@@ -628,7 +628,7 @@ function RetrospectiveCard({ ticketId }: RetrospectiveCardProps) {
 }
 
 // ---------------------------------------------------------------------------
-// FlowFeedbackSection — main export
+// FlowFeedbackSection -- main export
 // ---------------------------------------------------------------------------
 
 /**
@@ -664,7 +664,7 @@ export function FlowFeedbackSection({
 
 	// gf: absorb-counter for B2F_TICKET_FEEDBACK_SUBMITTED events we know are ours.
 	// Incremented before each submitFeedback call. Decremented by the WS subscriber when it
-	// absorbs the event (not in finally) — this is correct because the HTTP response always
+	// absorbs the event (not in finally) -- this is correct because the HTTP response always
 	// arrives before the WS event, so a finally-based decrement would reach 0 too early.
 	// On API error the server never sends the WS event, so we decrement in catch instead.
 	const expectedWsEvents = useRef(0);
@@ -680,7 +680,7 @@ export function FlowFeedbackSection({
 			const data = await feedbackApi.getFeedbackByFlow(currentFlowProposalId);
 			setFeedbackItems(data.items);
 		} catch {
-			// non-fatal — show empty state
+			// non-fatal -- show empty state
 		} finally {
 			setLoading(false);
 		}
@@ -691,7 +691,7 @@ export function FlowFeedbackSection({
 	}, [fetchFeedback]);
 
 	// W3 fix: subscribe to B2F_TICKET_FEEDBACK_SUBMITTED so external submissions are reflected
-	// gf: absorb events we know are ours — decrement the counter here, not in the mutation.
+	// gf: absorb events we know are ours -- decrement the counter here, not in the mutation.
 	useEffect(() => {
 		const unsub = transport.subscribe(B2F_TICKET_FEEDBACK_SUBMITTED, () => {
 			if (expectedWsEvents.current > 0) {
@@ -737,7 +737,7 @@ export function FlowFeedbackSection({
 		setShowNewForm(false);
 		setRestoredValues(undefined);
 
-		// gf: expect one WS event from this submission — decremented by subscriber on absorb.
+		// gf: expect one WS event from this submission -- decremented by subscriber on absorb.
 		// If the API errors, no WS event will arrive, so we decrement in catch instead.
 		expectedWsEvents.current++;
 		try {
@@ -747,7 +747,7 @@ export function FlowFeedbackSection({
 			setFeedbackItems(prev => [...prev, created]);
 			onFeedbackSubmitted?.();
 		} catch (err) {
-			// d fix: on error — remove optimistic card, restore form with entered values
+			// d fix: on error -- remove optimistic card, restore form with entered values
 			expectedWsEvents.current--; // no WS event coming from server
 			setOptimisticItem(null);
 			setRestoredValues(values);
@@ -761,12 +761,12 @@ export function FlowFeedbackSection({
 		setFeedbackItems(prev => prev.map(item => (item.id === updated.id ? updated : item)));
 	};
 
-	// e2-save: on API success — remove isSaving flag (use server-returned values)
+	// e2-save: on API success -- remove isSaving flag (use server-returned values)
 	const handleSaveSuccess = (updated: FlowFeedback) => {
 		setFeedbackItems(prev => prev.map(item => (item.id === updated.id ? { ...updated } : item)));
 	};
 
-	// e2-save: on API error — rollback to original item values
+	// e2-save: on API error -- rollback to original item values
 	const handleSaveError = (originalItem: FlowFeedback) => {
 		setFeedbackItems(prev => prev.map(item => (item.id === originalItem.id ? { ...originalItem } : item)));
 	};
@@ -776,12 +776,12 @@ export function FlowFeedbackSection({
 		setFeedbackItems(prev => prev.map(item => (item.id === feedbackId ? { ...item, isDeleting: true } : item)));
 	};
 
-	// e2-delete-confirmed: on API success — remove item from list
+	// e2-delete-confirmed: on API success -- remove item from list
 	const handleDeleteSuccess = (feedbackId: string) => {
 		setFeedbackItems(prev => prev.filter(item => item.id !== feedbackId));
 	};
 
-	// e2-delete-confirmed: on API error — rollback isDeleting mark
+	// e2-delete-confirmed: on API error -- rollback isDeleting mark
 	const handleDeleteError = (feedbackId: string) => {
 		setFeedbackItems(prev => prev.map(item => (item.id === feedbackId ? { ...item, isDeleting: false } : item)));
 	};
@@ -813,7 +813,7 @@ export function FlowFeedbackSection({
 				</div>
 			)}
 
-			{/* d fix: optimistic pending card — shown while API call is in flight */}
+			{/* d fix: optimistic pending card -- shown while API call is in flight */}
 			{optimisticItem && (
 				<div className="relative opacity-60">
 					<FeedbackCard
@@ -831,7 +831,7 @@ export function FlowFeedbackSection({
 				</div>
 			)}
 
-			{/* B2 fix: removed "Submitted" banner — list already shows items; keep "Add another" button */}
+			{/* B2 fix: removed "Submitted" banner -- list already shows items; keep "Add another" button */}
 			{hasFeedback && !showNewForm && !optimisticItem && (
 				<div className="space-y-3">
 					<div className="flex justify-end">
@@ -856,7 +856,7 @@ export function FlowFeedbackSection({
 				</div>
 			)}
 
-			{/* Feedback form — shown when no feedback yet, or when adding another */}
+			{/* Feedback form -- shown when no feedback yet, or when adding another */}
 			{showForm && (
 				<FlowFeedbackForm
 					initialValues={restoredValues}

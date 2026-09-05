@@ -89,7 +89,7 @@ export function TicketCreateDialog({ open, onOpenChange, onSuccess }: TicketCrea
 			setCreating(true);
 
 			if (!title.trim()) {
-				// Create immediately — title will be generated asynchronously by the backend
+				// Create immediately -- title will be generated asynchronously by the backend
 				await ticketsApi.createWithAiTitle({
 					projectId: selectedProjectId,
 					description,

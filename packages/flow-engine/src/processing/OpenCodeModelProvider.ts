@@ -1,10 +1,10 @@
 /**
- * OpenCodeModelProvider — implements ModelProvider for the OpenCode CLI.
+ * OpenCodeModelProvider -- implements ModelProvider for the OpenCode CLI.
  *
  * Invocation: opencode run [message] --format json [--auto] [-m model]
  * MCP config: OPENCODE_CONFIG_CONTENT (inline JSON ≤1MB) or OPENCODE_CONFIG (temp file >1MB)
  * Env isolation: only options.env is forwarded; process.env is never inherited.
- * Prompt limit: 32KB — throws PromptTooLargeError if exceeded.
+ * Prompt limit: 32KB -- throws PromptTooLargeError if exceeded.
  * XDG isolation: each subprocess gets a unique XDG_CONFIG_HOME so it never reads ~/.config/opencode/.
  */
 import { type ChildProcess, execSync, spawn } from 'node:child_process';
@@ -48,7 +48,7 @@ function buildOpenCodeConfig(servers: McpServer[], pluginPath?: string): Record<
 	for (const s of servers) {
 		const entry: Record<string, unknown> = {
 			type: 'local',
-			// Convert backslashes to forward slashes — backslash paths cause silent server failures on Windows
+			// Convert backslashes to forward slashes -- backslash paths cause silent server failures on Windows
 			command: s.command.map(cmd => cmd.replace(/\\/g, '/')),
 			enabled: s.enabled ?? true,
 		};
@@ -204,6 +204,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 
 		try {
 			return await new Promise<ModelInteractiveResult>((resolve, reject) => {
+				// violations-suppress: cli/no-spawn-without-windows-hide interactive OpenCode session -- terminal forwarded intentionally
 				const proc = spawn(command, args, {
 					cwd: options.workingDir,
 					stdio: 'inherit',
@@ -349,7 +350,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 						}
 					} else if (eventType === 'step_finish') {
 						const part = parsed['part'] as Record<string, unknown> | undefined;
-						// Only accumulate cost/tokens on final stop — tool-calls finish means more steps follow
+						// Only accumulate cost/tokens on final stop -- tool-calls finish means more steps follow
 						if (part?.['reason'] === 'stop') {
 							costUsd += (part['cost'] as number | undefined) ?? 0;
 							const tokens = part['tokens'] as Record<string, unknown> | undefined;
@@ -438,7 +439,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 
 	/**
 	 * Resolve the opencode binary path.
-	 * OPENCODE_MOCK_PATH env var overrides path resolution — used in tests.
+	 * OPENCODE_MOCK_PATH env var overrides path resolution -- used in tests.
 	 */
 	private findOpenCodeCommand(): { parts: string[]; needsShell: boolean } {
 		const mockPath = process.env['OPENCODE_MOCK_PATH'];

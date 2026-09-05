@@ -70,7 +70,7 @@ export function usePipeline<T>(modifiers: QueryModifier[], service: PipelineServ
 		total: 0,
 		totalPages: 0,
 	});
-	// Interactive overrides — applied after modifiers, reset page when search changes
+	// Interactive overrides -- applied after modifiers, reset page when search changes
 	const [searchOverride, setSearchOverride] = useState<string | undefined>(undefined);
 	const [pageOverride, setPageOverride] = useState<number | undefined>(undefined);
 	const [pageSizeOverride, setPageSizeOverride] = useState<number | undefined>(undefined);

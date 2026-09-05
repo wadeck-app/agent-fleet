@@ -18,7 +18,7 @@ import { ViewDataTable } from '../_framework/ViewDataTable';
  * Features: search, pagination, multi-column sorting, column visibility, bulk delete, CRUD
  * Columns: name, price, category, status, rating, stock, featured, createdAt
  *
- * Zero className, zero inline styles, zero hooks, zero state — pure composition.
+ * Zero className, zero inline styles, zero hooks, zero state -- pure composition.
  *
  * ===========================================================================================
  */

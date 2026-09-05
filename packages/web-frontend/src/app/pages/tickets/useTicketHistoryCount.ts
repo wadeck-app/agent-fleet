@@ -22,7 +22,7 @@ export function useTicketHistoryCount(ticketId: string): UseTicketHistoryCountSt
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<Error | null>(null);
 
-	// Stable filter object — prevents useRealtimeRefresh from re-subscribing on every render
+	// Stable filter object -- prevents useRealtimeRefresh from re-subscribing on every render
 	const ticketFilter = useMemo(() => ({ ticketId }), [ticketId]);
 
 	// Fetch history count

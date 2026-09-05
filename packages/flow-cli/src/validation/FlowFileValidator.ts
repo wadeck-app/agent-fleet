@@ -27,7 +27,7 @@ export function validateFlowFile(filePath: string): ValidateResult {
 	try {
 		content = fs.readFileSync(filePath, 'utf8');
 	} catch (err) {
-		// Raw OS error detail (path, permission code) suppressed — not exposed to terminal.
+		// Raw OS error detail (path, permission code) suppressed -- not exposed to terminal.
 		return { exit: 2, message: 'Flow file could not be read.' };
 	}
 
@@ -56,7 +56,7 @@ export function validateFlowFile(filePath: string): ValidateResult {
 		// Use 'flow validate' for detailed output.
 		return {
 			exit: 3,
-			errors: [{ type: 'parse_error', message: `YAML parse error — run 'flow validate' for details.`, path: '' }],
+			errors: [{ type: 'parse_error', message: `YAML parse error -- run 'flow validate' for details.`, path: '' }],
 		};
 	}
 

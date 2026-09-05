@@ -1,6 +1,6 @@
 # web-backend
 
-Fastify HTTP/WebSocket server — the backend of the agent-fleet web application.
+Fastify HTTP/WebSocket server -- the backend of the agent-fleet web application.
 
 ## Purpose
 
@@ -18,9 +18,9 @@ Serves the REST API and real-time event streams consumed by the web frontend, wh
 
 ## Does NOT own
 
-- UI rendering — that's web-frontend
-- Flow execution — that's flow-engine (via embedded orchestrator)
-- Worker process management — that's orchestrator (embedded)
+- UI rendering -- that's web-frontend
+- Flow execution -- that's flow-engine (via embedded orchestrator)
+- Worker process management -- that's orchestrator (embedded)
 
 ## Dependencies on local packages
 
@@ -39,8 +39,8 @@ Long-running process.
 
 ## Key files
 
-- `src/server.ts` — Fastify server setup, plugin registration, startup
-- `src/controllers/` — route handlers per domain (tasks, flows, workspaces, etc.)
-- `src/services/` — business logic layer between controllers and repositories
-- `src/repositories/` — data access (file-based and in-memory)
-- `src/events/EventBroadcaster.ts` — dispatches backend events to connected clients via SSE/WS/polling
+- `src/server.ts` -- Fastify server setup, plugin registration, startup
+- `src/controllers/` -- route handlers per domain (tasks, flows, workspaces, etc.)
+- `src/services/` -- business logic layer between controllers and repositories
+- `src/repositories/` -- data access (file-based and in-memory)
+- `src/events/EventBroadcaster.ts` -- dispatches backend events to connected clients via SSE/WS/polling

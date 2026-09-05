@@ -14,11 +14,11 @@ export interface McpServerConfig {
 const MCP_SERVER_CJS = fileURLToPath(new URL('./mcp-server.cjs', import.meta.url));
 
 /**
- * McpServer — exposes the `provideSteps` tool to Claude via a stdio-based MCP server.
+ * McpServer -- exposes the `provideSteps` tool to Claude via a stdio-based MCP server.
  *
  * Architecture:
  *  1. This class starts a TCP callback server (on a random port, bound to 127.0.0.1).
- *  2. start() returns an McpServer config (name/command/env) — the caller passes it to
+ *  2. start() returns an McpServer config (name/command/env) -- the caller passes it to
  *     StepRunner as mcpServers[]; the model provider (ClaudeModelProvider) serializes it
  *     to a temp file and passes --mcp-config to the CLI.
  *  3. The CLI spawns `mcp-server.cjs` via stdio, which connects back via TCP.
@@ -85,14 +85,14 @@ export class McpServer {
 						}
 						// Fix 2: verify auth token
 						if (payload.token !== this.callbackToken) {
-							process.stderr.write('[McpServer] TCP: rejected — invalid token\n');
+							process.stderr.write('[McpServer] TCP: rejected -- invalid token\n');
 							socket.destroy();
 							return;
 						}
 						// Fix 1: verify executionId
 						if (payload.executionId !== this.executionId) {
 							process.stderr.write(
-								`[McpServer] TCP: rejected — executionId mismatch (got ${payload.executionId}, expected ${this.executionId})\n`
+								`[McpServer] TCP: rejected -- executionId mismatch (got ${payload.executionId}, expected ${this.executionId})\n`
 							);
 							socket.destroy();
 							return;

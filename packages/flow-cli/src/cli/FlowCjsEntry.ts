@@ -26,7 +26,7 @@ registerShowCommand(program);
 registerValidateCommand(program);
 registerRunCommand(program);
 
-// Wrap in async IIFE — avoids top-level await (incompatible with CJS output)
+// Wrap in async IIFE -- avoids top-level await (incompatible with CJS output)
 void (async () => {
 	await program.parseAsync(process.argv);
 })();

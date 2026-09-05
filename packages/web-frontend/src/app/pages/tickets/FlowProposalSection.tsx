@@ -304,7 +304,7 @@ function ReviewThreadItem({ thread, ticketId, proposalId, onResolved, onDeleted,
 							{localSelector.selectedText}
 						</code>
 					)}
-					{/* Thread-level edit/delete buttons — always visible */}
+					{/* Thread-level edit/delete buttons -- always visible */}
 					<div className="ml-auto flex items-center gap-1">
 						<Button
 							variant="ghost"
@@ -347,7 +347,7 @@ function ReviewThreadItem({ thread, ticketId, proposalId, onResolved, onDeleted,
 								<span className="text-xs text-muted-foreground">
 									{new Date(comment.createdAt).toLocaleString()}
 								</span>
-								{/* Per-comment action icons — always visible */}
+								{/* Per-comment action icons -- always visible */}
 								<div className="ml-auto flex items-center gap-1">
 									<Button
 										variant="ghost"
@@ -548,7 +548,7 @@ function AddReviewThreadForm({ ticketId, proposalId, onAdded, onCancel }: AddRev
 }
 
 // ---------------------------------------------------------------------------
-// VisualizeFlowDialog — read-only ReactFlow graph for a proposed flow
+// VisualizeFlowDialog -- read-only ReactFlow graph for a proposed flow
 // ---------------------------------------------------------------------------
 
 interface VisualizeFlowDialogProps {
@@ -645,7 +645,7 @@ interface ProposalViewProps {
 	onReviewUpdated: () => void;
 	/** Called after successful rejection so the parent can show the redesigning banner */
 	onRejected: () => void;
-	/** Answers filled in the "Questions from the AI" section — forwarded to the parent for re-design context */
+	/** Answers filled in the "Questions from the AI" section -- forwarded to the parent for re-design context */
 	onQuestionAnswersChange: (answers: Record<number, string>) => void;
 }
 
@@ -709,7 +709,7 @@ function ProposalView({
 		}
 	};
 
-	/** B7 fix: handleToggleRejectForm only opens the form — closing is done by the Cancel button inside */
+	/** B7 fix: handleToggleRejectForm only opens the form -- closing is done by the Cancel button inside */
 	const handleToggleRejectForm = () => {
 		// Prepend filled question answers to the rejection reason textarea
 		setShowRejectForm(true);
@@ -753,7 +753,7 @@ function ProposalView({
 									Confidence: {Math.round(proposal.confidenceScore)}%
 								</span>
 							</TooltipTrigger>
-							{/* c fix: tooltip shows generic description only — open questions moved to inline section */}
+							{/* c fix: tooltip shows generic description only -- open questions moved to inline section */}
 							<TooltipContent className="max-w-[300px] text-xs">
 								<p>
 									Confidence reflects how well the flow agent understood the ticket requirements.
@@ -769,7 +769,7 @@ function ProposalView({
 				</span>
 			</div>
 
-			{/* Adaptations — only on redesigns (version > 1), not on first design (ba/ce fix) */}
+			{/* Adaptations -- only on redesigns (version > 1), not on first design (ba/ce fix) */}
 			{proposal.adaptations && proposal.adaptations.length > 0 && proposal.version > 1 && (
 				<div className="space-y-1">
 					<p className="text-xs font-medium text-muted-foreground tracking-wide">Adaptations</p>
@@ -783,7 +783,7 @@ function ProposalView({
 				</div>
 			)}
 
-			{/* W5 fix: Questions from the AI — uses CollapsibleSection instead of manual chevron toggle */}
+			{/* W5 fix: Questions from the AI -- uses CollapsibleSection instead of manual chevron toggle */}
 			{openQuestions.length > 0 && (
 				<CollapsibleSection
 					title="Questions from the AI"
@@ -909,7 +909,7 @@ function ProposalView({
 						Approve
 					</Button>
 
-					{/* B7 fix: toggle button is always "Reject..." (destructive) — no longer toggles to "Cancel".
+					{/* B7 fix: toggle button is always "Reject..." (destructive) -- no longer toggles to "Cancel".
 					    Cancel is now inside the reject form. */}
 					<Button
 						variant="destructive"
@@ -955,7 +955,7 @@ function ProposalView({
 				</div>
 			)}
 
-			{/* B4 fix: terminal state shows timestamp only — "Request new design" button removed.
+			{/* B4 fix: terminal state shows timestamp only -- "Request new design" button removed.
 			    The re-request form at the bottom of the page is the only entry point. */}
 			{isTerminal && (
 				<div className="border-t pt-4">

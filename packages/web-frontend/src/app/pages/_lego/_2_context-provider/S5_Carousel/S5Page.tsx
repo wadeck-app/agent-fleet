@@ -17,7 +17,7 @@ import { ViewCarousel } from '../_framework/ViewCarousel';
  * Features: field-visibility, pagination
  * Columns: name, price, category, status, featured, rating
  *
- * Zero className, zero inline styles, zero hooks, zero state — pure composition.
+ * Zero className, zero inline styles, zero hooks, zero state -- pure composition.
  *
  * ===========================================================================================
  */

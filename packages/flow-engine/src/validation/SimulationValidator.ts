@@ -313,7 +313,7 @@ export class SimulationValidator {
 		}
 
 		// 'when' is a JavaScript condition expression evaluated by ConditionEvaluator,
-		// not a template interpolation — do not validate its ${{ }} content with the whitelist.
+		// not a template interpolation -- do not validate its ${{ }} content with the whitelist.
 
 		if (step.onFailure?.addComment) {
 			text += step.onFailure.addComment;
@@ -328,7 +328,7 @@ export class SimulationValidator {
 	 *   inputs.<id>
 	 *   steps.<id>.outputs.<id>
 	 *   flow.<id>
-	 *   task.<id>  (prompt template only — task is NOT available in when: conditions)
+	 *   task.<id>  (prompt template only -- task is NOT available in when: conditions)
 	 * Where <id> is [a-zA-Z0-9_-]+
 	 */
 	private static readonly VALID_TEMPLATE_EXPRESSION =

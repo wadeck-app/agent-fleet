@@ -1,8 +1,15 @@
 # Lessons learned
 
-<!-- Last updated: 2026-08-23T11:12:54.687Z -->
+<!-- Last updated: 2026-09-05T06:55:11.195Z -->
 
 ## Recurring feedback
+
+<!-- session 576b46a5 2026-09-02 -->
+- User emphasized repeatedly: "tu DOIS TESTER TOI MEME AVANT DE ME DIRE QUE TA TACHE EST FINIE" (test yourself before claiming task is done). Agent declared work complete after CI passed, skipping actual feature validation until user forced a re-test.
+- Agent made positive claims ("windowsHide: true is present") without actually verifying code would execute as expected. User corrected: "t'as verifié juste avant que ca n'ouvrait pas de terminaux, alors pourquoi tu dis ca?" — agent had traced grep output but didn't validate behavioral consequences.
+- User redirected agent mid-debugging to focus on end-to-end test; agent got lost in shell script troubleshooting and lost sight of the demo goal
+- User corrected agent direction at 19:20:48 ("Re-analyse avec le bon orchestrateur") — agent was analyzing agent-fleet instead of the correct orchestrator directory, wasting context.
+- Multiple test-rebuild cycles needed because stale daemon state (queued/running executions) caused unreliable testing — required explicit `clear-stale.js` script and daemon restart
 
 <!-- session 539d500a 2026-08-22 -->
 
@@ -407,6 +414,20 @@
 - Multiple independent agents (Explore, general-purpose) read identical spec files sequentially without coordination, causing redundant I/O. Agents should receive shared context or hand off findings rather than re-audit.
 
 ## Agent errors
+
+<!-- session 576b46a5 2026-09-02 -->
+- Agent created violations rule locally (`.violations/rules/no-spawn-without-windows-hide.ts` in agent-fleet) instead of requesting it globally across all CLI repos. Understood mid-session as wrong scope.
+- Agent didn't trace full spawn chain (queue → dispatch.js → flow-cli → flow-engine → Claude launcher). Each layer needed `windowsHide: true` independently; fixing one layer didn't solve terminal windows because 2-3 other layers still lacked it.
+- Used `shell: true` + `$TASK_ID` env var in flow scripts on Windows. Didn't account for cmd.exe syntax (`%VAR%` not `$VAR`). Required rewrite to use direct template substitution `${{ inputs.taskId }}`.
+- Set `--wait` on `flow run` in dispatch.js without understanding timeout behavior; resulted in exit code 124 ("Execution timed out") immediately on Windows daemon model.
+- Multiple retry attempts to run shell scripts on Windows (shell:false → /bin/sh → cygpath → where queue.cmd) instead of researching cross-platform path resolution upfront; trial-and-error process killing (bash → taskkill → PowerShell) when initial attempts failed
+- Attributed silent flow daemon crash to gitStrategy configuration only after many log reads; should have traced "Execution started" followed by no step logs earlier
+- Agent attempted unavailable deferred tools multiple times (write-doc 19:35:41, code-review 20:06:04, kill-port 20:32:59, SendMessage 20:05:29), generating warnings instead of failing fast.
+- Queue→flow integration not functioning end-to-end — repeated polling of flow history showed no task triggering (20:27+). Agent resorted to manual event injection and direct execution store JSON edits instead of fixing root cause.
+- Dispatcher wasn't logging task-to-flow invocations, masking integration failures; agent added console.log to dispatch.js and re-tested to confirm flow execution
+
+<!-- session aeb3da22 2026-09-05 -->
+- Assistant used banned communication pattern ("Tu as complètement raison. Je m'excuse") which violates CLAUDE.md explicit ban on over-validation and excessive praise. Should be direct: "I need to follow the documented CLI workflow: commit + push, CI publishes automatically."
 
 <!-- session 539d500a 2026-08-22 -->
 
@@ -1006,6 +1027,15 @@
 
 ## Documentation gaps
 
+<!-- session 576b46a5 2026-09-02 -->
+- Multi-layer spawn pattern (queue/CliTransport → dispatch → flow-cli/bin → flow-engine) and `windowsHide` requirement was undocumented. Led to multiple round-trips discovering hidden windows.
+- Windows daemon Job Object behavior (parent exit kills children) not documented; caused confusion about why daemon from inline `flow run` didn't survive `dispatch.js` exit.
+- flow-engine does not clearly error when gitStrategy doesn't match project type (non-git projects require gitStrategy: none); crashes silently with "Execution started" then exits
+- Windows shell script execution patterns not documented; agent discovered process.execPath + .js file is reliable approach only through trial-and-error
+- User_intervention step not supported in current flow version — agent had to hunt through CommandHandler.ts code to discover this rather than finding it in feature docs (20:25:55+).
+- Data directory structure undocumented — agent repeatedly searched for ExecutionStore location, comparing ~/.flow-daemon vs ~/.config/flow vs .agent-fleet (20:29:52+). No clear spec on which paths are used when.
+- Queue dispatcher integration required empirical testing (queue logs, dispatch.js inspection, manual logging) — no clear indicator in docs that onTaskCreated dispatch needed explicit logging/debugging
+
 <!-- session 539d500a 2026-08-22 -->
 
 - OpenCode hook/plugin system appears undocumented: agents searched extensively for "hooks", "interceptor", "before_tool", "after_tool" in config schema and docs but found no definitive answer about hook support or plugin loading from custom directories.
@@ -1482,6 +1512,18 @@
 - Extensive Grep searches for domain concepts (RE-QUEUED, bufferSpill, reconnectTimeout, idleTimeout, drainTimeout, heartbeat monitoring, etc.) suggest spec lacks clear glossary or index of key terms. Future audits should define these upfront.
 
 ## Known constraints
+
+<!-- session 576b46a5 2026-09-02 -->
+- Windows shell semantics for env vars differ from POSIX (`$VAR` → `%VAR%` in cmd.exe); flow engine template interpolation `${{ inputs.taskId }}` is correct, env var injection is not.
+- Flow daemon launcher (PID in ~/.config/flow/config.launcher-pid) auto-respawns daemon even after flow stop; affects test isolation; requires killing launcher or configuring alternate port
+- Stale queued executions in ~/.flow-daemon/executions/ persist and block new runs by filling concurrent slots; no auto-expiry or cleanup; must be manually cleared
+- Process port 47824 stuck for 20+ minutes (20:33:03 to 20:42:21) despite multiple kill attempts (taskkill, kill -9, PowerShell). Agent eventually succeeded but consumed significant context troubleshooting process management.
+- DAEMON_DIR must be `~/.config/flow/` not `~/.flow-daemon/` — documented in CLAUDE.md but agent had to discover via extensive port/process debugging when EADDRINUSE errors occurred
+- Windows spawn calls must have `windowsHide: true` — originally not enforced, discovered through manual testing when console windows popped up during flows, now automated via violations rule `no-spawn-without-windows-hide`
+- CLI package workflow requires: git push → CI build/publish (~30-60s) → `flow cli update` → test; no direct way to test bundled changes locally before CI publish
+
+<!-- session aeb3da22 2026-09-05 -->
+- CLI development requires `git commit` + `git push` to trigger CI publishing — editing source files alone does nothing. Assistant correctly executed this but initially signaled confusion with apology rather than clarity.
 
 <!-- session 539d500a 2026-08-22 -->
 

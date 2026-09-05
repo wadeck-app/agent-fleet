@@ -14,7 +14,7 @@
  * - Products sorted by createdAt desc
  * - 5 items per page
  *
- * The two tables share NO state — completely independent queries/pagination/search.
+ * The two tables share NO state -- completely independent queries/pagination/search.
  *
  * ===========================================================================================
  */

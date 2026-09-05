@@ -149,7 +149,7 @@ describe('TaskInfoCard', () => {
 		expect(screen.getByText('Flow Inputs')).toBeInTheDocument();
 
 		// Should render em dash for empty values
-		const emDashes = screen.getAllByText('—');
+		const emDashes = screen.getAllByText('--');
 		expect(emDashes.length).toBeGreaterThan(0);
 	});
 
@@ -286,6 +286,6 @@ describe('TaskInfoCard', () => {
 
 		// Empty value should show em dash
 		expect(screen.getByText('emptyKey')).toBeInTheDocument();
-		expect(screen.getByText('—')).toBeInTheDocument();
+		expect(screen.getByText('--')).toBeInTheDocument();
 	});
 });

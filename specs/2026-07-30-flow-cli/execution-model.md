@@ -2,7 +2,7 @@
 
 ## Execution state file
 
-`~/.flow-daemon/executions/<executionId>.json` — written by the daemon on every state transition. Workers never write to this file directly (single writer rule, D21).
+`~/.flow-daemon/executions/<executionId>.json` -- written by the daemon on every state transition. Workers never write to this file directly (single writer rule, D21).
 
 ```json
 {
@@ -32,8 +32,8 @@
 ```
 QUEUED → RUNNING → COMPLETED
                  → FAILED
-         RUNNING → FAILED     (worker WebSocket closed, non-idempotent step — D12)
-         RUNNING → RE-QUEUED  (worker WebSocket closed, idempotent step — D12, same execution ID, step re-queued)
+         RUNNING → FAILED     (worker WebSocket closed, non-idempotent step -- D12)
+         RUNNING → RE-QUEUED  (worker WebSocket closed, idempotent step -- D12, same execution ID, step re-queued)
 ```
 
 ## Responsibility split
@@ -55,7 +55,7 @@ The daemon owns all execution intelligence. Workers are dumb step executors.
 
 ## Worker pool model
 
-`queue.concurrency` in `~/.flow-config.yaml` defines the global worker pool size. Workers are not bound to a flow — they pull from a shared ready-step queue fed by all active executions.
+`queue.concurrency` in `~/.flow-config.yaml` defines the global worker pool size. Workers are not bound to a flow -- they pull from a shared ready-step queue fed by all active executions.
 
 ```
 Active flows:  FlowA (steps: s1✓ s2 s3)   FlowB (steps: t1 t2)
@@ -72,7 +72,7 @@ Active flows:  FlowA (steps: s1✓ s2 s3)   FlowB (steps: t1 t2)
 
 Workers communicate with the daemon via WebSocket (D23). The daemon pushes assignments; the worker pushes logs and results.
 
-Workers are execution-agnostic at spawn time — no execution ID is passed as a spawn argument. The worker receives the execution ID in the first `assign` message (D16).
+Workers are execution-agnostic at spawn time -- no execution ID is passed as a spawn argument. The worker receives the execution ID in the first `assign` message (D16).
 
 Daemon spawns workers via: `child_process.spawn('node', ['worker.js'], { env: { FLOW_DAEMON_PORT, FLOW_WS_PORT } })`
 
@@ -121,7 +121,7 @@ Worker1    Worker2    Worker3    CLI subprocess
 
 ## Heartbeat failure handling
 
-Liveness is signaled by WebSocket connection health — no explicit heartbeat messages.
+Liveness is signaled by WebSocket connection health -- no explicit heartbeat messages.
 
 | Scenario                                | `idempotent` on running step | Action                                |
 | --------------------------------------- | ---------------------------- | ------------------------------------- |
@@ -140,4 +140,4 @@ The existing `DAGBuilder` / `DAGValidator` names in `flow-engine/src/validation/
 
 - FIFO queue of ready steps, global across all active executions
 - `queue.concurrency` controls max simultaneously executing steps (not flows)
-- `flow list` reads `executions/*.json` directly — no daemon contact needed (D19, D21)
+- `flow list` reads `executions/*.json` directly -- no daemon contact needed (D19, D21)

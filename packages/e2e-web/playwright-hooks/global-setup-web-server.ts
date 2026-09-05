@@ -172,6 +172,7 @@ async function startServerOnAvailablePort(
 			stdio: 'pipe',
 			shell: true,
 			cwd: projectRoot,
+			windowsHide: true,
 		});
 
 		// Wait for server to confirm it successfully bound to the port
@@ -201,14 +202,14 @@ async function startServerOnAvailablePort(
 
 				if (message.includes('EADDRINUSE') || message.includes('port already in use')) {
 					if (message.includes(port.toString())) {
-						// HTTP port conflict — this is a real problem for this worker
+						// HTTP port conflict -- this is a real problem for this worker
 						portBindError = true;
 						console.error(
 							`     ❌ Port ${port} binding failed (EADDRINUSE detected) (alreadyResolved=${alreadyResolved})`
 						);
 						reject(new Error('PORT_IN_USE'));
 					} else {
-						// Internal port conflict (e.g. Orchestrator WS port) — not our HTTP port
+						// Internal port conflict (e.g. Orchestrator WS port) -- not our HTTP port
 						// Log as warning but don't reject: server may still start successfully
 						console.warn(`     ⚠️  Internal EADDRINUSE (not HTTP port ${port}): ${message.trim()}`);
 					}
@@ -368,7 +369,7 @@ async function killStaleServers(): Promise<void> {
 			return;
 		}
 
-		console.log(`🧹 Found ${serverFiles.length} stale server file(s) — killing leftover processes...`);
+		console.log(`🧹 Found ${serverFiles.length} stale server file(s) -- killing leftover processes...`);
 
 		for (const filename of serverFiles) {
 			const filePath = path.join(tempFolder, filename);
@@ -385,7 +386,7 @@ async function killStaleServers(): Promise<void> {
 						}
 						console.log(`   🗑️  Killed stale server PID ${server.pid} (port ${server.port})`);
 					} catch {
-						// Process already dead — that's fine
+						// Process already dead -- that's fine
 					}
 				}
 
@@ -395,7 +396,7 @@ async function killStaleServers(): Promise<void> {
 			}
 		}
 	} catch {
-		// Temp folder doesn't exist yet — nothing to clean up
+		// Temp folder doesn't exist yet -- nothing to clean up
 	}
 }
 

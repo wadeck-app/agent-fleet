@@ -88,7 +88,7 @@ describe('FlowFeedbackSection', () => {
 				/>
 			);
 
-			// B2 fix: the "Submitted" banner is gone — the list of feedback cards is shown instead
+			// B2 fix: the "Submitted" banner is gone -- the list of feedback cards is shown instead
 			await waitFor(() => {
 				expect(screen.getByRole('button', { name: /Add another feedback/i })).toBeInTheDocument();
 			});
@@ -305,7 +305,7 @@ describe('FlowFeedbackSection', () => {
 			await user.click(screen.getByRole('button', { name: /Add another feedback/i }));
 			await user.click(screen.getByRole('button', { name: /Cancel/i }));
 
-			// B2 fix: after cancelling, the list state is restored —
+			// B2 fix: after cancelling, the list state is restored --
 			// the "Add another feedback" button is back and the form is hidden
 			await waitFor(() => {
 				expect(screen.getByRole('button', { name: /Add another feedback/i })).toBeInTheDocument();
@@ -375,7 +375,7 @@ describe('FlowFeedbackSection', () => {
 	// ---------------------------------------------------------------------------
 	// e2-icons: Edit and Delete icon buttons
 	// ---------------------------------------------------------------------------
-	describe('e2-icons — edit and delete icon buttons', () => {
+	describe('e2-icons -- edit and delete icon buttons', () => {
 		it('should show Edit and Delete icon buttons on each feedback card', async () => {
 			vi.mocked(feedbackApi.getFeedbackByFlow).mockResolvedValue({
 				items: [SAMPLE_FEEDBACK_ITEM],
@@ -422,7 +422,7 @@ describe('FlowFeedbackSection', () => {
 	// ---------------------------------------------------------------------------
 	// e2-save: optimistic update on save
 	// ---------------------------------------------------------------------------
-	describe('e2-save — optimistic update on save', () => {
+	describe('e2-save -- optimistic update on save', () => {
 		it('should call updateFeedback and show success toast on save', async () => {
 			const user = userEvent.setup();
 			const updatedItem = { ...SAMPLE_FEEDBACK_ITEM, rating: 5 };
@@ -490,7 +490,7 @@ describe('FlowFeedbackSection', () => {
 	// ---------------------------------------------------------------------------
 	// e2-delete-confirmed: optimistic delete
 	// ---------------------------------------------------------------------------
-	describe('e2-delete-confirmed — optimistic delete', () => {
+	describe('e2-delete-confirmed -- optimistic delete', () => {
 		it('should call deleteFeedback and show success toast on delete confirm', async () => {
 			const user = userEvent.setup();
 			vi.mocked(feedbackApi.getFeedbackByFlow).mockResolvedValue({
@@ -527,9 +527,9 @@ describe('FlowFeedbackSection', () => {
 	});
 
 	// ---------------------------------------------------------------------------
-	// gf: WS re-fetch guard — pendingMutations counter
+	// gf: WS re-fetch guard -- pendingMutations counter
 	// ---------------------------------------------------------------------------
-	describe('gf — WS re-fetch suppressed while local mutation is in flight', () => {
+	describe('gf -- WS re-fetch suppressed while local mutation is in flight', () => {
 		it('should NOT call getFeedbackByFlow when WS event fires during a pending submit', async () => {
 			const user = userEvent.setup();
 
@@ -574,7 +574,7 @@ describe('FlowFeedbackSection', () => {
 			expect(capturedWsHandler).not.toBeNull();
 			capturedWsHandler!();
 
-			// WS guard should suppress the re-fetch — call count must not increase
+			// WS guard should suppress the re-fetch -- call count must not increase
 			expect(vi.mocked(feedbackApi.getFeedbackByFlow).mock.calls.length).toBe(initialCallCount);
 
 			// Resolve the submit so the mutation completes
@@ -592,7 +592,7 @@ describe('FlowFeedbackSection', () => {
 
 			// After the mutation finishes, a new WS event from another user SHOULD trigger re-fetch
 			await waitFor(() => {
-				// pendingMutations is back to 0 — firing WS event now should call getFeedbackByFlow
+				// pendingMutations is back to 0 -- firing WS event now should call getFeedbackByFlow
 				capturedWsHandler!();
 				expect(vi.mocked(feedbackApi.getFeedbackByFlow).mock.calls.length).toBeGreaterThan(initialCallCount);
 			});

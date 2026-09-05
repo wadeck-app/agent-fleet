@@ -45,10 +45,10 @@ export interface ClaudeLaunchOptions {
 	/** Environment variables for Claude */
 	env?: Record<string, string>;
 
-	/** Path to MCP config JSON file — passed as --mcp-config <path> */
+	/** Path to MCP config JSON file -- passed as --mcp-config <path> */
 	mcpConfigPath?: string;
 
-	/** Path to Claude settings JSON file — passed as --settings <path>; also adds --include-hook-events */
+	/** Path to Claude settings JSON file -- passed as --settings <path>; also adds --include-hook-events */
 	settingsPath?: string;
 
 	/** Callback when process starts */
@@ -177,7 +177,7 @@ export class ClaudeLauncher {
 			command = 'cmd.exe';
 			args = ['/c', claudePath];
 		} else if (claudePath.endsWith('.mjs') || claudePath.endsWith('.js')) {
-			// .mjs/.js files are not directly executable on Windows — run via node
+			// .mjs/.js files are not directly executable on Windows -- run via node
 			command = process.execPath;
 			args = [claudePath];
 		} else {
@@ -243,7 +243,7 @@ export class ClaudeLauncher {
 				? {
 						PATH: process.env['PATH'],
 						HOME: process.env['HOME'],
-						// Claude requires ANTHROPIC_API_KEY — pass it explicitly
+						// Claude requires ANTHROPIC_API_KEY -- pass it explicitly
 						...(process.env['ANTHROPIC_API_KEY']
 							? { ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'] }
 							: {}),
@@ -301,7 +301,7 @@ export class ClaudeLauncher {
 				? {
 						PATH: process.env['PATH'],
 						HOME: process.env['HOME'],
-						// Claude requires ANTHROPIC_API_KEY — pass it explicitly
+						// Claude requires ANTHROPIC_API_KEY -- pass it explicitly
 						...(process.env['ANTHROPIC_API_KEY']
 							? { ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'] }
 							: {}),

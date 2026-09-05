@@ -82,7 +82,7 @@ export class FlowKnowledgeService {
 		]);
 
 		// Build flow summaries from FlowListItem
-		// FlowListItem has id, name, description, version — no metadata.reusable field available here.
+		// FlowListItem has id, name, description, version -- no metadata.reusable field available here.
 		// Mark all as non-reusable for now; a future enhancement can check flow definitions.
 		const availableFlows: FlowSummary[] = flowsList.map(f => ({
 			id: f.id,
@@ -107,7 +107,7 @@ export class FlowKnowledgeService {
 				const retro = await this.feedbackService.getRetrospective(ticket.id);
 				recentRetrospectives.push(retro);
 			} catch {
-				// Ignore — retrospective may not exist despite flowRetrospectiveId being set
+				// Ignore -- retrospective may not exist despite flowRetrospectiveId being set
 			}
 		}
 

@@ -107,7 +107,7 @@ export class WorkspaceGitService {
 			await mkdir(dirname(targetPath), { recursive: true });
 
 			if (branchExists) {
-				// Branch exists — use it directly
+				// Branch exists -- use it directly
 				await git.raw(['worktree', 'add', targetPath, branch]);
 			} else {
 				// Create new branch and worktree in one step (avoids checking out in source repo)

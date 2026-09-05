@@ -104,7 +104,7 @@ function getAuditEntryData(
 									const fromValue = change.from;
 									// Use JSON.stringify for objects/arrays, String() for primitives
 									const serialize = (v: unknown): string => {
-										if (v == null) return '—';
+										if (v == null) return '--';
 										if (typeof v === 'object') return JSON.stringify(v, null, 2);
 										return String(v);
 									};
@@ -256,7 +256,7 @@ export function TicketAuditLogSection({
 	};
 
 	// Sort entries based on sortOrder, filtering out ticket.updated when it only covers status
-	// (status change is already represented by ticket.transitioned — avoid duplicates)
+	// (status change is already represented by ticket.transitioned -- avoid duplicates)
 	const sortedEntries = useMemo(() => {
 		if (!entries) return [];
 		const filtered = entries.filter(entry => {
@@ -272,7 +272,7 @@ export function TicketAuditLogSection({
 				const nonVersionFields = fields.filter(f => f !== 'version' && f !== 'status');
 				if (nonVersionFields.length === 0) return false;
 			}
-			// No structured changes at all — skip
+			// No structured changes at all -- skip
 			if (!changes && !fields) return false;
 			return true;
 		});

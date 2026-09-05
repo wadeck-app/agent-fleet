@@ -19,7 +19,7 @@ export function useTicketAuditCount(ticketId: string): UseTicketAuditCountState 
 	const [count, setCount] = useState(0);
 	const [loading, setLoading] = useState(true);
 
-	// Stable filter object — prevents useRealtimeRefresh from re-subscribing on every render
+	// Stable filter object -- prevents useRealtimeRefresh from re-subscribing on every render
 	const ticketFilter = useMemo(() => ({ ticketId }), [ticketId]);
 
 	const refresh = useCallback(async () => {

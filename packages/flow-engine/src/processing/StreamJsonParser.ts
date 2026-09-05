@@ -104,7 +104,7 @@ export class StreamJsonParser {
 		if (type === 'system') {
 			subtype = 'init';
 			// TODO(flow-cli): data.session_id must be captured here and returned to the caller.
-			// /resume requires --resume <sessionId> — without it, retries start a fresh conversation
+			// /resume requires --resume <sessionId> -- without it, retries start a fresh conversation
 			// and the correction prompt has no context. See D25.
 		}
 

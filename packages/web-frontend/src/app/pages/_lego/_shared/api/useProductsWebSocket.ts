@@ -10,10 +10,10 @@ import type { Product } from '@shared/api/products.contract';
  * Connects to the backend WebSocket endpoint and maintains a live list of products.
  *
  * Protocol (server → client):
- * - products:snapshot — Initial list of all products (sent on connect)
- * - product:created   — New product created
- * - product:updated   — Existing product updated
- * - product:deleted   — Product deleted by id
+ * - products:snapshot -- Initial list of all products (sent on connect)
+ * - product:created   -- New product created
+ * - product:updated   -- Existing product updated
+ * - product:deleted   -- Product deleted by id
  *
  * Protocol (client → server):
  * - ping → pong (keepalive)
@@ -87,10 +87,10 @@ export function useProductsWebSocket(): UseProductsWebSocketResult {
 						setProducts(prev => prev.filter(p => p.id !== data.id));
 						break;
 					case 'pong':
-						// Keepalive acknowledged — no action needed
+						// Keepalive acknowledged -- no action needed
 						break;
 					default:
-						// Unknown event type — fail fast in development
+						// Unknown event type -- fail fast in development
 						if (import.meta.env.DEV) {
 							throw new Error(`Unknown WebSocket event type: ${JSON.stringify(data)}`);
 						}

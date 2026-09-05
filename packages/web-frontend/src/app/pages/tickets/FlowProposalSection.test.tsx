@@ -35,7 +35,7 @@ vi.mock('@framework/features/toast/ToastContext', () => ({
 	useToast: () => ({ showToast: mockShowToast }),
 }));
 
-// Mock useTransport — FlowProposalSection subscribes to B2F_TICKET_UPDATED (r2 fix)
+// Mock useTransport -- FlowProposalSection subscribes to B2F_TICKET_UPDATED (r2 fix)
 vi.mock('@/transport', () => ({
 	useTransport: () => ({
 		transport: {
@@ -308,7 +308,7 @@ describe('FlowProposalSection', () => {
 
 			await user.click(screen.getByRole('button', { name: /Add review thread/i }));
 
-			// There are two number inputs with placeholder "1" — first is startLine, second is endLine
+			// There are two number inputs with placeholder "1" -- first is startLine, second is endLine
 			const numberInputs = screen.getAllByPlaceholderText('1');
 			await user.clear(numberInputs[0]);
 			await user.type(numberInputs[0], '2');
@@ -369,7 +369,7 @@ describe('FlowProposalSection', () => {
 				</MemoryRouter>
 			);
 
-			// The approved timestamp is displayed via toLocaleString() — just check "Approved at" label exists
+			// The approved timestamp is displayed via toLocaleString() -- just check "Approved at" label exists
 			expect(screen.getByText(/Approved at/i)).toBeInTheDocument();
 		});
 
@@ -395,7 +395,7 @@ describe('FlowProposalSection', () => {
 	// ---------------------------------------------------------------------------
 	// G1 fix: form stays visible with blur overlay when requesting
 	// ---------------------------------------------------------------------------
-	describe('g1 — request form blur during isRequesting', () => {
+	describe('g1 -- request form blur during isRequesting', () => {
 		it('form wrapper has opacity-50 class while request is in-flight', async () => {
 			const user = userEvent.setup();
 			let resolveRequest!: () => void;
@@ -425,7 +425,7 @@ describe('FlowProposalSection', () => {
 	// ---------------------------------------------------------------------------
 	// P fix: reject button uses ChevronRight, not ▾
 	// ---------------------------------------------------------------------------
-	describe('p — reject button icon pattern', () => {
+	describe('p -- reject button icon pattern', () => {
 		it('reject button does not contain ▾ character', () => {
 			vi.mocked(useFlowProposals).mockReturnValue({
 				...defaultHookResult,
@@ -447,7 +447,7 @@ describe('FlowProposalSection', () => {
 	// ---------------------------------------------------------------------------
 	// R1 fix: redesigning banner shown after rejection
 	// ---------------------------------------------------------------------------
-	describe('r1 — redesigning banner after rejection', () => {
+	describe('r1 -- redesigning banner after rejection', () => {
 		it('shows "AI is redesigning" banner after rejection is confirmed', async () => {
 			const user = userEvent.setup();
 			const mockRefresh = vi.fn();
@@ -482,7 +482,7 @@ describe('FlowProposalSection', () => {
 	// ---------------------------------------------------------------------------
 	// BA fix: adaptations hidden on first design (version === 1, no reusedFromFlowId)
 	// ---------------------------------------------------------------------------
-	describe('ba — adaptations section visibility', () => {
+	describe('ba -- adaptations section visibility', () => {
 		it('does NOT render adaptations section for first design (version=1, no reusedFromFlowId)', () => {
 			const firstDesignWithAdaptations: FlowProposal = {
 				...mockProposal,
@@ -527,7 +527,7 @@ describe('FlowProposalSection', () => {
 		});
 
 		it('does NOT render adaptations section when reusedFromFlowId is set but version=1 (ba/ce fix: version must be > 1)', () => {
-			// ba/ce fix: reusedFromFlowId alone is not enough — version must be > 1
+			// ba/ce fix: reusedFromFlowId alone is not enough -- version must be > 1
 			const reusedV1WithAdaptations: FlowProposal = {
 				...mockProposal,
 				version: 1,
@@ -553,7 +553,7 @@ describe('FlowProposalSection', () => {
 	// ---------------------------------------------------------------------------
 	// C fix: open questions moved from tooltip to inline "Questions from the AI" section
 	// ---------------------------------------------------------------------------
-	describe('c — open questions inline section', () => {
+	describe('c -- open questions inline section', () => {
 		it('confidence trigger is present without showing tooltip open questions', () => {
 			const proposalWithClearReasoning: FlowProposal = {
 				...mockProposal,
@@ -651,9 +651,9 @@ describe('FlowProposalSection', () => {
 	});
 
 	// ---------------------------------------------------------------------------
-	// K fix: Open in Flow Editor — disabled for non-approved, active link when approved
+	// K fix: Open in Flow Editor -- disabled for non-approved, active link when approved
 	// ---------------------------------------------------------------------------
-	describe('k — open in flow editor link', () => {
+	describe('k -- open in flow editor link', () => {
 		it('shows enabled "Visualize" button (not a link) for non-approved proposals', () => {
 			// D2 fix: pending_review proposals show a "Visualize" Dialog trigger; "Open in Flow Editor"
 			// link is only shown when the proposal is approved (flow registered in registry)

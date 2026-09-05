@@ -1,4 +1,4 @@
-// violations-suppress: ts/no-barrel-index public API entry point for workspace package — 27 import sites
+// violations-suppress: ts/no-barrel-index public API entry point for workspace package -- 27 import sites
 // Convenience re-export of latest extension point interfaces per spec.
 export type { WorkspaceProvider, WorkspaceRequest, WorkspaceHandle } from './workspace/v1.js';
 export type { ApprovalProvider, InputRequest, ChoiceRequest, ApprovalRequest } from './approval/v1.js';

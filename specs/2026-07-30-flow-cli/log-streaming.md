@@ -11,7 +11,7 @@
 
 ## Log line format
 
-Every log line is prefixed `[executionId|stepId]` — always, including in the on-disk files. This makes all filtering a pure grep with no index or daemon query.
+Every log line is prefixed `[executionId|stepId]` -- always, including in the on-disk files. This makes all filtering a pure grep with no index or daemon query.
 
 ```
 [abc1|generate-pr] prompt sent to claude
@@ -41,13 +41,13 @@ Logs are written to disk by the daemon as they arrive from the worker.
 
 - Daily files (one file per calendar day)
 - Keep last 30 files (configurable in `~/.flow-config.yaml` -> `logs.retainDays: 30`)
-- Maximum retention: 120 days — fixed safety ceiling, independent of `retainDays`. If `retainDays > 120`, 120 days is enforced.
+- Maximum retention: 120 days -- fixed safety ceiling, independent of `retainDays`. If `retainDays > 120`, 120 days is enforced.
 
 **Why daily rotation + 30 files:** Bounded by default, survives daemon restarts, no manual cleanup needed. 120-day cap prevents unbounded accumulation on long-lived machines.
 
 ## Filtering
 
-Pure file grep — no daemon interaction needed:
+Pure file grep -- no daemon interaction needed:
 
 ```
 flow logs abc1              # grep [abc1| across log files
@@ -69,4 +69,4 @@ flow attach abc1
 
 **Midnight boundary:** If an execution spans midnight, `flow attach` scans both the current and previous day's log file to ensure no lines are missed.
 
-**Why:** Logs are on disk (D17), prefixed by execution ID (D20). The terminal state is written as a log line — no daemon query needed to know when to stop tailing. Works after daemon exit. Zero daemon load for observation commands.
+**Why:** Logs are on disk (D17), prefixed by execution ID (D20). The terminal state is written as a log line -- no daemon query needed to know when to stop tailing. Works after daemon exit. Zero daemon load for observation commands.

@@ -238,7 +238,7 @@ describe('TicketDetailLayoutG', () => {
 		});
 	});
 
-	describe('bug #3 — comments count real-time via hooks', () => {
+	describe('bug #3 -- comments count real-time via hooks', () => {
 		it('should use useTicketCommentsCount hook for comments tab badge', () => {
 			render(<TicketDetailLayoutG {...defaultProps} />);
 			expect(useTicketCommentsCount).toHaveBeenCalledWith('ticket-1');
@@ -258,7 +258,7 @@ describe('TicketDetailLayoutG', () => {
 			});
 
 			render(<TicketDetailLayoutG {...defaultProps} />);
-			// Tab trigger is present; spinner is shown inline — check the tab button exists
+			// Tab trigger is present; spinner is shown inline -- check the tab button exists
 			expect(screen.getByRole('tab', { name: /Comments/i })).toBeInTheDocument();
 		});
 
@@ -318,7 +318,7 @@ describe('TicketDetailLayoutG', () => {
 		});
 	});
 
-	describe('ca — feedback tab loading spinner', () => {
+	describe('ca -- feedback tab loading spinner', () => {
 		it('should show the feedback tab trigger when currentFlowProposalId is set', () => {
 			const ticket = { ...mockTicket, currentFlowProposalId: 'prop-1' };
 			render(<TicketDetailLayoutG {...defaultProps} ticket={ticket} />);
@@ -364,7 +364,7 @@ describe('TicketDetailLayoutG', () => {
 		});
 	});
 
-	describe('cb — flow design tab count from API (eager fetch)', () => {
+	describe('cb -- flow design tab count from API (eager fetch)', () => {
 		it('should call useFlowProposals with ticketId immediately on mount', () => {
 			// Eager fetch: always called with ticketId regardless of which tab is active
 			render(<TicketDetailLayoutG {...defaultProps} />);
@@ -414,7 +414,7 @@ describe('TicketDetailLayoutG', () => {
 		});
 	});
 
-	describe('bug #5 — status select fallback when config loading', () => {
+	describe('bug #5 -- status select fallback when config loading', () => {
 		it('should show the raw status value in select when no matching config label is available', () => {
 			// Config has no statuses (or statuses don't include the ticket's status)
 			mockUseProjectStatusConfig.mockReturnValue({

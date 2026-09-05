@@ -556,7 +556,7 @@ export class SchemaValidator {
 			});
 		}
 
-		// Validate model — now a free-form string (provider-specific model identifier)
+		// Validate model -- now a free-form string (provider-specific model identifier)
 		// @formatter:off
 		const modelRegex = /^[a-zA-Z0-9_./:@-]{1,256}$/;
 		// @formatter:on

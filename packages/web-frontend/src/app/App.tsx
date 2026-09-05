@@ -9,7 +9,7 @@ import { TransportProvider } from '@transport/TransportProvider';
 import { API_BASE_URL } from '@app/api/config';
 import { DesktopSidebar } from '@app/components/navigation/DesktopSidebar';
 import { MobileSidebar } from '@app/components/navigation/MobileSidebar';
-// Lego Approach 1 — Widget Isolated
+// Lego Approach 1 -- Widget Isolated
 import { S1Page as LegoA1S1Page } from '@app/pages/_lego/_1_widget-isolated/S1_SimpleTable/S1Page';
 import { S2Page as LegoA1S2Page } from '@app/pages/_lego/_1_widget-isolated/S2_TablePagination/S2Page';
 import { S3Page as LegoA1S3Page } from '@app/pages/_lego/_1_widget-isolated/S3_FullFeatured/S3Page';
@@ -25,7 +25,7 @@ import { SBusPage as LegoA1SBusPage } from '@app/pages/_lego/_1_widget-isolated/
 import { SEditPage as LegoA1SEditPage } from '@app/pages/_lego/_1_widget-isolated/S_EDIT/SEditPage';
 import { SForkFeatPage as LegoA1SForkFeatPage } from '@app/pages/_lego/_1_widget-isolated/S_FORK_FEAT/SForkFeatPage';
 import { SWsPage as LegoA1SWsPage } from '@app/pages/_lego/_1_widget-isolated/S_WS/SWsPage';
-// Lego Approach 2 — Context Provider
+// Lego Approach 2 -- Context Provider
 import { S1Page as LegoA2S1Page } from '@app/pages/_lego/_2_context-provider/S1_SimpleTable/S1Page';
 import { S2Page as LegoA2S2Page } from '@app/pages/_lego/_2_context-provider/S2_TablePagination/S2Page';
 import { S3Page as LegoA2S3Page } from '@app/pages/_lego/_2_context-provider/S3_FullFeatured/S3Page';
@@ -41,7 +41,7 @@ import { SBusPage as LegoA2SBusPage } from '@app/pages/_lego/_2_context-provider
 import { SEditPage as LegoA2SEditPage } from '@app/pages/_lego/_2_context-provider/S_EDIT/SEditPage';
 import { SForkFeatPage as LegoA2SForkFeatPage } from '@app/pages/_lego/_2_context-provider/S_FORK_FEAT/SForkFeatPage';
 import { SWsPage as LegoA2SWsPage } from '@app/pages/_lego/_2_context-provider/S_WS/SWsPage';
-// Lego Approach 3 — Feature Hooks
+// Lego Approach 3 -- Feature Hooks
 import { S1Page as LegoA3S1Page } from '@app/pages/_lego/_3_feature-hooks/S1_SimpleTable/S1Page';
 import { S2Page as LegoA3S2Page } from '@app/pages/_lego/_3_feature-hooks/S2_TablePagination/S2Page';
 import { S3Page as LegoA3S3Page } from '@app/pages/_lego/_3_feature-hooks/S3_FullFeatured/S3Page';
@@ -57,7 +57,7 @@ import { SBusPage as LegoA3SBusPage } from '@app/pages/_lego/_3_feature-hooks/S_
 import { SEditPage as LegoA3SEditPage } from '@app/pages/_lego/_3_feature-hooks/S_EDIT/SEditPage';
 import { SForkFeatPage as LegoA3SForkFeatPage } from '@app/pages/_lego/_3_feature-hooks/S_FORK_FEAT/SForkFeatPage';
 import { SWsPage as LegoA3SWsPage } from '@app/pages/_lego/_3_feature-hooks/S_WS/SWsPage';
-// Lego Approach 4 — Context Children
+// Lego Approach 4 -- Context Children
 import { S1Page as LegoA4S1Page } from '@app/pages/_lego/_4_context-children/S1_SimpleTable/S1Page';
 import { S2Page as LegoA4S2Page } from '@app/pages/_lego/_4_context-children/S2_TablePagination/S2Page';
 import { S3Page as LegoA4S3Page } from '@app/pages/_lego/_4_context-children/S3_FullFeatured/S3Page';
@@ -73,7 +73,7 @@ import { SBusPage as LegoA4SBusPage } from '@app/pages/_lego/_4_context-children
 import { SEditPage as LegoA4SEditPage } from '@app/pages/_lego/_4_context-children/S_EDIT/SEditPage';
 import { SForkFeatPage as LegoA4SForkFeatPage } from '@app/pages/_lego/_4_context-children/S_FORK_FEAT/SForkFeatPage';
 import { SWsPage as LegoA4SWsPage } from '@app/pages/_lego/_4_context-children/S_WS/SWsPage';
-// Lego Approach 5 — Query Pipeline
+// Lego Approach 5 -- Query Pipeline
 import { S1Page as LegoA5S1Page } from '@app/pages/_lego/_5_query-pipeline/S1_SimpleTable/S1Page';
 import { S2Page as LegoA5S2Page } from '@app/pages/_lego/_5_query-pipeline/S2_TablePagination/S2Page';
 import { S3Page as LegoA5S3Page } from '@app/pages/_lego/_5_query-pipeline/S3_FullFeatured/S3Page';
@@ -89,7 +89,7 @@ import { SBusPage as LegoA5SBusPage } from '@app/pages/_lego/_5_query-pipeline/S
 import { SEditPage as LegoA5SEditPage } from '@app/pages/_lego/_5_query-pipeline/S_EDIT/SEditPage';
 import { SForkFeatPage as LegoA5SForkFeatPage } from '@app/pages/_lego/_5_query-pipeline/S_FORK_FEAT/SForkFeatPage';
 import { SWsPage as LegoA5SWsPage } from '@app/pages/_lego/_5_query-pipeline/S_WS/SWsPage';
-// Lego Approach 6 — Data2-Based
+// Lego Approach 6 -- Data2-Based
 import { S1Page as LegoA6S1Page } from '@app/pages/_lego/_6_data2-based/S1_SimpleTable/S1Page';
 import { S2Page as LegoA6S2Page } from '@app/pages/_lego/_6_data2-based/S2_TablePagination/S2Page';
 import { S3Page as LegoA6S3Page } from '@app/pages/_lego/_6_data2-based/S3_FullFeatured/S3Page';
@@ -185,7 +185,7 @@ function Layout() {
 						<Route path="/books/:id/:mode" element={<BooksPage />} />
 						<Route path="/flows/new" element={<FlowEditorPage />} />
 						<Route path="/flows/:flowId/edit" element={<FlowEditorPage />} />
-						{/* Lego Approach 1 — Widget Isolated */}
+						{/* Lego Approach 1 -- Widget Isolated */}
 						<Route path="/lego/1/s1" element={<LegoA1S1Page />} />
 						<Route path="/lego/1/s2" element={<LegoA1S2Page />} />
 						<Route path="/lego/1/s3" element={<LegoA1S3Page />} />
@@ -201,7 +201,7 @@ function Layout() {
 						<Route path="/lego/1/s_edit" element={<LegoA1SEditPage />} />
 						<Route path="/lego/1/s_fork_feat" element={<LegoA1SForkFeatPage />} />
 						<Route path="/lego/1/s_ws" element={<LegoA1SWsPage />} />
-						{/* Lego Approach 2 — Context Provider */}
+						{/* Lego Approach 2 -- Context Provider */}
 						<Route path="/lego/2/s1" element={<LegoA2S1Page />} />
 						<Route path="/lego/2/s2" element={<LegoA2S2Page />} />
 						<Route path="/lego/2/s3" element={<LegoA2S3Page />} />
@@ -217,7 +217,7 @@ function Layout() {
 						<Route path="/lego/2/s_edit" element={<LegoA2SEditPage />} />
 						<Route path="/lego/2/s_fork_feat" element={<LegoA2SForkFeatPage />} />
 						<Route path="/lego/2/s_ws" element={<LegoA2SWsPage />} />
-						{/* Lego Approach 3 — Feature Hooks */}
+						{/* Lego Approach 3 -- Feature Hooks */}
 						<Route path="/lego/3/s1" element={<LegoA3S1Page />} />
 						<Route path="/lego/3/s2" element={<LegoA3S2Page />} />
 						<Route path="/lego/3/s3" element={<LegoA3S3Page />} />
@@ -233,7 +233,7 @@ function Layout() {
 						<Route path="/lego/3/s_edit" element={<LegoA3SEditPage />} />
 						<Route path="/lego/3/s_fork_feat" element={<LegoA3SForkFeatPage />} />
 						<Route path="/lego/3/s_ws" element={<LegoA3SWsPage />} />
-						{/* Lego Approach 4 — Context Children */}
+						{/* Lego Approach 4 -- Context Children */}
 						<Route path="/lego/4/s1" element={<LegoA4S1Page />} />
 						<Route path="/lego/4/s2" element={<LegoA4S2Page />} />
 						<Route path="/lego/4/s3" element={<LegoA4S3Page />} />
@@ -249,7 +249,7 @@ function Layout() {
 						<Route path="/lego/4/s_edit" element={<LegoA4SEditPage />} />
 						<Route path="/lego/4/s_fork_feat" element={<LegoA4SForkFeatPage />} />
 						<Route path="/lego/4/s_ws" element={<LegoA4SWsPage />} />
-						{/* Lego Approach 5 — Query Pipeline */}
+						{/* Lego Approach 5 -- Query Pipeline */}
 						<Route path="/lego/5/s1" element={<LegoA5S1Page />} />
 						<Route path="/lego/5/s2" element={<LegoA5S2Page />} />
 						<Route path="/lego/5/s3" element={<LegoA5S3Page />} />
@@ -265,7 +265,7 @@ function Layout() {
 						<Route path="/lego/5/s_edit" element={<LegoA5SEditPage />} />
 						<Route path="/lego/5/s_fork_feat" element={<LegoA5SForkFeatPage />} />
 						<Route path="/lego/5/s_ws" element={<LegoA5SWsPage />} />
-						{/* Lego Approach 6 — Data2-Based */}
+						{/* Lego Approach 6 -- Data2-Based */}
 						<Route path="/lego/6/s1" element={<LegoA6S1Page />} />
 						<Route path="/lego/6/s2" element={<LegoA6S2Page />} />
 						<Route path="/lego/6/s3" element={<LegoA6S3Page />} />

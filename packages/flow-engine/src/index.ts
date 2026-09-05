@@ -1,4 +1,4 @@
-// violations-suppress: ts/no-barrel-index public API entry point for workspace package — 26 import sites
+// violations-suppress: ts/no-barrel-index public API entry point for workspace package -- 26 import sites
 export { FlowCapabilitiesGenerator } from './docs/FlowCapabilitiesGenerator';
 export { FlowRegistry } from './registry/FlowRegistry';
 export { FlowExecutor } from './executor/FlowExecutor';

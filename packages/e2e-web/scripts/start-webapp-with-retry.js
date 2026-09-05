@@ -126,6 +126,7 @@ function tryStartWebapp(port) {
 			stdio: ['inherit', 'pipe', 'pipe'],
 			// Use shell on Windows to resolve npm
 			shell: isWindows,
+			windowsHide: true,
 		});
 
 		let output = '';

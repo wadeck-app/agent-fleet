@@ -191,7 +191,7 @@ export const ProjectSchema = z.object({
 	order: z.number().int().min(0),
 	gitRepositoryUrl: z.string().url().optional(),
 	gitDefaultBranch: z.string().optional(),
-	// Stored separately from the core project fields — optional for backward compatibility
+	// Stored separately from the core project fields -- optional for backward compatibility
 	statusConfig: ProjectStatusConfigSchema.optional(),
 	createdAt: z.string(), // ISO 8601
 	updatedAt: z.string(), // ISO 8601

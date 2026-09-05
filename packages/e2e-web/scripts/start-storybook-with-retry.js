@@ -126,6 +126,7 @@ function tryStartStorybook(port) {
 			stdio: ['inherit', 'pipe', 'pipe'],
 			// Use shell on Windows to resolve npm
 			shell: isWindows,
+			windowsHide: true,
 		});
 
 		let output = '';
@@ -230,7 +231,7 @@ function tryStartStorybook(port) {
 			// If startupComplete is true, this is intentional exit (Playwright killed it)
 		});
 
-		// Safety net for genuine crashes — static server starts in <1s, 5s covers slow machines
+		// Safety net for genuine crashes -- static server starts in <1s, 5s covers slow machines
 		setTimeout(() => {
 			if (!startupComplete && !hasError) {
 				killProcessTree(storybookProcess);

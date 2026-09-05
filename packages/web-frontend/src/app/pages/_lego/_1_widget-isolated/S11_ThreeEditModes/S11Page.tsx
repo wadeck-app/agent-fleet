@@ -66,7 +66,7 @@ export function S11Page() {
 		}
 	};
 
-	// Note: inline-edit as DataTableFeature is not implemented — 'inline' falls back to dialog
+	// Note: inline-edit as DataTableFeature is not implemented -- 'inline' falls back to dialog
 	const features = ((): DataTableFeature[] => {
 		if (editMode === 'below') {
 			return ['search', 'pagination', { type: 'sorting', multi: true }, 'column-visibility', 'bulk-delete'];

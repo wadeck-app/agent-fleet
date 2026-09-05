@@ -350,7 +350,7 @@ export class WorkersService {
 		try {
 			const orchestrator = this.orchestratorWrapper.getOrchestrator();
 			const registry = orchestrator.getEventSubscriptionRegistry();
-			// Strip undefined filter values — orchestrator uses undefined as wildcard,
+			// Strip undefined filter values -- orchestrator uses undefined as wildcard,
 			// but the API contract only exposes concrete string key=value pairs
 			const subscriptions = registry.getAll().map(sub => ({
 				...sub,

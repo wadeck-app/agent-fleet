@@ -140,7 +140,7 @@ describe('usePipeline (Approach 5)', () => {
 			initialProps: { mods: initialModifiers },
 		});
 
-		// Initial fetch — wait for both the call and the state update
+		// Initial fetch -- wait for both the call and the state update
 		await waitFor(() => {
 			expect(mockGetProducts).toHaveBeenCalledTimes(1);
 			expect(result.current.items).toHaveLength(2);

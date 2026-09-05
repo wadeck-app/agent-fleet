@@ -27,9 +27,9 @@ export class WorkerPool {
 	constructor(
 		private readonly concurrencyLimit: number,
 		private readonly httpPort: number,
-		/** Port or lazy getter — evaluated at spawn time so async port retry resolves first. */
+		/** Port or lazy getter -- evaluated at spawn time so async port retry resolves first. */
 		private readonly wsPortOrGetter: number | (() => number),
-		// optional for backward compat — empty string means workers locate claude themselves
+		// optional for backward compat -- empty string means workers locate claude themselves
 		claudePath?: string
 	) {
 		this.claudePath = claudePath ?? '';
@@ -66,13 +66,13 @@ export class WorkerPool {
 				FLOW_WS_PORT: String(
 					typeof this.wsPortOrGetter === 'function' ? this.wsPortOrGetter() : this.wsPortOrGetter
 				),
-				// Claude binary path resolved at daemon startup — avoids PATH dependency in worker
+				// Claude binary path resolved at daemon startup -- avoids PATH dependency in worker
 				...(this.claudePath ? { FLOW_CLAUDE_PATH: this.claudePath } : {}),
 				// PATH: needed for standard tools in script steps and shell resolution
 				...(process.env['PATH'] ? { PATH: process.env['PATH'] } : {}),
 				// HOME: needed by many tools and claude config lookup
 				...(process.env['HOME'] ? { HOME: process.env['HOME'] } : {}),
-				// ANTHROPIC_API_KEY: required for model steps — passed explicitly, not via spread
+				// ANTHROPIC_API_KEY: required for model steps -- passed explicitly, not via spread
 				...(process.env['ANTHROPIC_API_KEY'] ? { ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'] } : {}),
 				// Windows-specific vars required for subprocess and temp file resolution
 				...(process.platform === 'win32' && process.env['SystemRoot']
@@ -89,7 +89,7 @@ export class WorkerPool {
 
 		if (child.pid === undefined) {
 			this.activeCount--;
-			process.stderr.write('[WorkerPool] spawn produced no PID — aborting worker\n');
+			process.stderr.write('[WorkerPool] spawn produced no PID -- aborting worker\n');
 			return;
 		}
 		const pid = child.pid;
@@ -101,7 +101,7 @@ export class WorkerPool {
 			this.pendingConnectTimeouts.delete(pid);
 			if (!child.killed) {
 				process.stderr.write(
-					`[worker] pid ${String(pid)} did not connect within ${WORKER_CONNECT_TIMEOUT_MS}ms — killing\n`
+					`[worker] pid ${String(pid)} did not connect within ${WORKER_CONNECT_TIMEOUT_MS}ms -- killing\n`
 				);
 				child.kill('SIGKILL');
 			}
@@ -127,7 +127,7 @@ export class WorkerPool {
 			ws.terminate();
 			return;
 		}
-		// Cancel the connect timeout — this worker connected successfully.
+		// Cancel the connect timeout -- this worker connected successfully.
 		const timer = this.pendingConnectTimeouts.get(pid);
 		if (timer !== undefined) {
 			clearTimeout(timer);

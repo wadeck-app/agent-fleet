@@ -38,7 +38,7 @@ interface ExecutionReporter {
 
 CLI implementation: formats and writes to stdout based on TTY detection and `--json`/`--quiet`/`--no-prefix` flags.
 
-**Role clarification:** `ExecutionReporter` is used by `flow attach` (the tailing process) to format and emit log output. It is not used by the CLI process that sends `flow run` — that process exits immediately after receiving the execution ID (D2).
+**Role clarification:** `ExecutionReporter` is used by `flow attach` (the tailing process) to format and emit log output. It is not used by the CLI process that sends `flow run` -- that process exits immediately after receiving the execution ID (D2).
 
 ## QueueStrategy (future)
 

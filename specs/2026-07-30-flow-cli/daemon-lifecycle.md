@@ -8,11 +8,11 @@
 - Auth token generation and rotation (`health_token`)
 - Idle timer with drain window (`idleTimeout` + `drainTimeout`)
 - Lifecycle hooks: `onStart`, `onShutdown`, `onCommand`, `onCommandError`
-- Shutdown via `DaemonHandle.stop(reason)` — cleans up port file, closes HTTP server
+- Shutdown via `DaemonHandle.stop(reason)` -- cleans up port file, closes HTTP server
 
 ## What the flow CLI builds on top
 
-Queue management, execution worker spawning, WebSocket server (worker channel), and log persistence (writing worker log entries to disk) — none of these are in singleton-daemon-kit. They live in flow CLI's command handlers.
+Queue management, execution worker spawning, WebSocket server (worker channel), and log persistence (writing worker log entries to disk) -- none of these are in singleton-daemon-kit. They live in flow CLI's command handlers.
 
 ## Startup sequence
 
@@ -34,7 +34,7 @@ flow run ./my-flow.yml
 
 ## Shutdown
 
-The daemon has `idleTimeout: null` — it does NOT use singleton-daemon-kit's idle timer.
+The daemon has `idleTimeout: null` -- it does NOT use singleton-daemon-kit's idle timer.
 The flow CLI manages its own shutdown: when the ready-step queue drains, the command handler calls `daemonHandle.stop('idle')`.
 
 `flow stop` is deferred to v2 (D34). In v1, the daemon exits automatically when the ready-step queue drains (D13).
@@ -51,7 +51,7 @@ The flow CLI manages its own shutdown: when the ready-step queue drains, the com
 
 ## Complete configuration reference
 
-`~/.flow-config.yaml` — all keys are optional, defaults shown:
+`~/.flow-config.yaml` -- all keys are optional, defaults shown:
 
 ```yaml
 queue:

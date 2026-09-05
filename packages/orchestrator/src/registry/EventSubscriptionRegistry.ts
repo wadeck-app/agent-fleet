@@ -8,7 +8,7 @@ const log = createLogger('EventSubscriptionRegistry');
 export interface EventSubscription {
 	/** The event name to listen for (e.g., 'ticket.status.changed') */
 	event: string;
-	/** Optional filter — all specified keys must match payload values */
+	/** Optional filter -- all specified keys must match payload values */
 	filter?: Record<string, string | undefined>;
 	/** Worker that registered this subscription */
 	workerId: string;

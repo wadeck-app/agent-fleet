@@ -186,7 +186,7 @@ export interface FlowTrigger {
 }
 
 /**
- * Ticket status — project-configurable string (no longer a fixed enum).
+ * Ticket status -- project-configurable string (no longer a fixed enum).
  * Use DEFAULT_TICKET_STATUSES for the built-in set.
  */
 export type TicketStatus = string;

@@ -369,7 +369,7 @@ export class DataStoreFactory {
 	}
 
 	/**
-	 * Get or create FlowRegistry (shared instance — used by both FlowProposalsService and FlowsService)
+	 * Get or create FlowRegistry (shared instance -- used by both FlowProposalsService and FlowsService)
 	 */
 	private getFlowRegistry(): FlowRegistry {
 		if (!this.flowRegistry) {
@@ -736,7 +736,7 @@ export class DataStoreFactory {
 		// Wire EventBus → EventSubscriptionRegistry → TaskManager → WorkerCoordinator
 		this.eventBus.on('ticket.status.changed', async payload => {
 			const registry = this.orchestrator.getEventSubscriptionRegistry();
-			// NOTE: projectId is intentionally omitted — worker uses package.json name ("agent-fleet")
+			// NOTE: projectId is intentionally omitted -- worker uses package.json name ("agent-fleet")
 			// while payload uses DB project ID ("9zonezaue"). Single-project-per-server
 			// architecture means there is no cross-project leakage risk here.
 			const matches = registry.findMatching({
@@ -761,7 +761,7 @@ export class DataStoreFactory {
 
 		this.eventBus.on('ticket.created', async payload => {
 			const registry = this.orchestrator.getEventSubscriptionRegistry();
-			// NOTE: projectId omitted — see ticket.status.changed comment above
+			// NOTE: projectId omitted -- see ticket.status.changed comment above
 			const matches = registry.findMatching({
 				event: 'ticket.created',
 				payload: {},
@@ -1891,7 +1891,7 @@ export class DataStoreFactory {
 			{
 				id: '7',
 				name: 'Smart Home Hub',
-				description: 'Central hub for smart home devices — supports Zigbee, Z-Wave, and Wi-Fi.',
+				description: 'Central hub for smart home devices -- supports Zigbee, Z-Wave, and Wi-Fi.',
 				category: 'home',
 				price: 79.99,
 				stock: 33,

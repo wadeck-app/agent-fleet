@@ -38,7 +38,7 @@ function resolveClaudePath(): string {
 		const result = execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
 		return result.trim().split('\n')[0]?.trim() ?? '';
 	} catch {
-		// Claude not found on PATH — workers will need to locate it themselves
+		// Claude not found on PATH -- workers will need to locate it themselves
 		process.stderr.write('[daemon] Warning: claude binary not found on PATH. Model steps may fail.\n');
 		return '';
 	}
@@ -130,7 +130,7 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 				}
 				wsServer = new WebSocketServer(wsPort, handleWorkerMessage, handleWorkerClose);
 				// Fire-and-forget: start() retries on EADDRINUSE (TIME_WAIT). Workers read port
-				// lazily via getter — they are only spawned after tryDispatch(), which happens
+				// lazily via getter -- they are only spawned after tryDispatch(), which happens
 				// after handleRun(), which happens after this onStart returns. By then start()
 				// has resolved.
 				wsServer.start().catch((err: Error) => {

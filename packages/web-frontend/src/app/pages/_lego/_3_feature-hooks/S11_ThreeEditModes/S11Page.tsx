@@ -78,7 +78,7 @@ export function S11Page() {
 		}
 	};
 
-	// Note: inline-edit is not implemented as a feature hook — all modes use dialog
+	// Note: inline-edit is not implemented as a feature hook -- all modes use dialog
 	const features = [search, pagination, sorting, columnVisibility, bulkDelete, crud];
 
 	return (

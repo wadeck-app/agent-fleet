@@ -366,7 +366,7 @@ export function TicketDetailLayoutE({ ticket, ticketId, onUpdate, onRefresh }: T
 									</SelectItem>
 								))}
 
-								{/* Fallback: show raw status value when config hasn't loaded yet — bug #5 */}
+								{/* Fallback: show raw status value when config hasn't loaded yet -- bug #5 */}
 								{!statusConfig.statuses.find(s => s.id === localStatus) && (
 									<SelectItem value={localStatus}>{localStatus}</SelectItem>
 								)}

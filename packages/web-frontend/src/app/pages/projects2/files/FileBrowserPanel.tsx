@@ -137,7 +137,7 @@ export function FileBrowserPanel({ workspaceId }: FileBrowserPanelProps) {
 				/>
 			</div>
 
-			{/* Editor — negative margin overlaps the resize handle to eliminate visual gap */}
+			{/* Editor -- negative margin overlaps the resize handle to eliminate visual gap */}
 			<div className="z-10 -ml-1.5 flex-1 overflow-hidden bg-background">
 				{selectedFilePath ? (
 					<FileEditorPanel

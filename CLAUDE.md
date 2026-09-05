@@ -82,7 +82,28 @@ FlowExecutor.test.ts
 
 If the user is wrong, say it. If you disagree, explain why. Act as a peer, not a servant.
 
+## CLI Development Workflow
+
+`flow-cli` and `task-cli` are installed globally via CI (GitHub Packages). Source edits alone do nothing -- the binary in PATH is the published version.
+
+**To deploy a local change:**
+1. `git commit` + `git push` → CI builds and publishes automatically
+2. `flow cli update` or `task cli update` to install the new version locally
+
+**Never patch `node_modules` manually** -- it gets overwritten on the next install.
+
+**flow-cli daemonDir:** All daemon-related code (`flow run`, `flow history`, `Daemon.startDaemon`, `DAEMON_DIR`) must use `ConfigDir.get('flow')` = `~/.config/flow/`. Using `~/.flow-daemon/` or `~/.config/.flow-daemon/` causes `EADDRINUSE` because commands can't find the running daemon and try to start a new one on an occupied port.
+
 ## Additional references (only consult when needed)
 
 - `.claude/kb/lessons-learned.md` - Project-specific gotchas and solutions. **Important**: Append it with what you are learning!
 - `.claude/docs/collaboration-rules.md` - **Always apply**: proposals must include pros/cons/recommendation
+
+## Agent reference docs
+
+| Doc | Description |
+|---|---|
+| `.claude/guiding-principles.md` | Non-negotiable design rules + behavioral lessons from past sessions |
+| `.claude/out-of-scope.md` | What this project explicitly does not cover |
+| `.claude/product-vision.md` | Roadmap: plugin v2/v3, CLI harmonisation, policy engine |
+| `.claude/threat-model.md` | Security threats with status (open/mitigated) |

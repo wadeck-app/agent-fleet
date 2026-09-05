@@ -164,7 +164,7 @@ ${input}
 			return best;
 		}
 
-		// All candidates are too long — retry once with an explicit shorten request
+		// All candidates are too long -- retry once with an explicit shorten request
 		const tooLong = output
 			.split('\n')
 			.map(l => l.trim())

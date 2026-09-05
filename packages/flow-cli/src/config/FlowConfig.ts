@@ -1,5 +1,5 @@
 /**
- * DaemonConfig — centralised configuration management for the flow daemon.
+ * DaemonConfig -- centralised configuration management for the flow daemon.
  *
  * Source of truth for all defaults and user-overridable values.
  * User config file: ~/.flow-config.yaml
@@ -8,7 +8,7 @@
  *   1. Add to FlowConfigData interface with JSDoc.
  *   2. Add to FlowConfig.DEFAULT with the default value.
  *   3. Add to FlowConfig.load() merge (spread the new section).
- *   4. Add to ~/.flow-config.yaml (commented, showing the default) — MANDATORY.
+ *   4. Add to ~/.flow-config.yaml (commented, showing the default) -- MANDATORY.
  *   5. Add a test in FlowConfig.test.ts covering the override.
  *
  * Skipping step 4 means the user cannot discover or override the value.

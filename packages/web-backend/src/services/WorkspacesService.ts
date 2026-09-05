@@ -33,7 +33,7 @@ const log = createLogger('WorkspacesService');
  * Key behaviors:
  * - All workspaces are always visible (idle when no worker connected, active when connected)
  * - Lazy migration: unknown worker paths auto-register from legacy metadata files
- * - No more FS watchers — centralized persistence via BaseRepository
+ * - No more FS watchers -- centralized persistence via BaseRepository
  *
  * ===========================================================================================
  */
@@ -104,7 +104,7 @@ export class WorkspacesService {
 						mode: legacyData.mode,
 					});
 				} else {
-					// No legacy file — create with defaults
+					// No legacy file -- create with defaults
 					await this.metadataRepository.ensureByPath(workerPath);
 				}
 			} catch (error) {
@@ -116,7 +116,7 @@ export class WorkspacesService {
 	/**
 	 * Merge recently created workspaces into the result if not already present.
 	 * Cleans up entries once the centralized store tracks them.
-	 * Interim safety net — will be removed when DB migration lands.
+	 * Interim safety net -- will be removed when DB migration lands.
 	 */
 	private mergeRecentlyCreated(knownPaths: Set<string>, workspaces: Workspace[]): Workspace[] {
 		// Clean up entries that the store already tracks

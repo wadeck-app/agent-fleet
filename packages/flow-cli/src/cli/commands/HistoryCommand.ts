@@ -95,17 +95,17 @@ function renderDetailView(exec: ExecutionRecord): string {
 export function buildHistoryTable(execs: ExecutionRecord[], opts: HistoryOptions): string {
 	// Detail view
 	if (opts.id) {
-		// Prefix matching: "6u84" matches "6u84r8gf" — lenient like task ID resolution
+		// Prefix matching: "6u84" matches "6u84r8gf" -- lenient like task ID resolution
 		const matches = execs.filter(e => e.executionId.startsWith(opts.id!));
 		if (matches.length > 1) {
-			return `Ambiguous execution ID prefix "${opts.id}" — matches: ${matches.map(e => e.executionId).join(', ')}`;
+			return `Ambiguous execution ID prefix "${opts.id}" -- matches: ${matches.map(e => e.executionId).join(', ')}`;
 		}
 		const exec = matches[0];
 		if (!exec) return `Execution '${opts.id}' not found.`;
 		return renderDetailView(exec);
 	}
 
-	// List view — apply filters
+	// List view -- apply filters
 	let filtered = execs;
 	if (opts.status) filtered = filtered.filter(e => e.status === opts.status);
 	if (opts.flow) filtered = filtered.filter(e => e.flowId === opts.flow);
@@ -143,10 +143,10 @@ export function buildHistoryTable(execs: ExecutionRecord[], opts: HistoryOptions
 	// Pagination footer
 	if (total > offset + limit) {
 		lines.push(
-			`\n  Showing ${offset + 1}–${offset + filtered.length} of ${total}. Use --offset ${offset + limit} for next page.`
+			`\n  Showing ${offset + 1}-${offset + filtered.length} of ${total}. Use --offset ${offset + limit} for next page.`
 		);
 	} else if (offset > 0) {
-		lines.push(`\n  Showing ${offset + 1}–${offset + filtered.length} of ${total}.`);
+		lines.push(`\n  Showing ${offset + 1}-${offset + filtered.length} of ${total}.`);
 	}
 
 	return lines.join('\n');

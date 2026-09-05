@@ -30,7 +30,7 @@ export const FlowReviewThreadSchema = z.object({
 	resolvedAt: z.string().optional(),
 });
 
-// FlowDefinition as stored in proposal — store as z.record(z.string(), z.unknown()) to avoid
+// FlowDefinition as stored in proposal -- store as z.record(z.string(), z.unknown()) to avoid
 // circular type dependency with flow-engine. The backend will validate with FlowValidator separately.
 export const StoredFlowDefinitionSchema = z.record(z.string(), z.unknown());
 

@@ -1,4 +1,4 @@
-// flow-updater entry point — bundled separately as flow-updater.cjs.
+// flow-updater entry point -- bundled separately as flow-updater.cjs.
 // Must NOT import any flow runtime modules.
 import { runUpdater, execNpm } from '@wadeck-app/shared-updater';
 import { ConfigDir } from '@wadeck-app/shared-cli/ConfigDir';
@@ -74,7 +74,7 @@ runUpdater({
 				typeof health['running_executions'] === 'number' &&
 				health['running_executions'] > 0
 			) {
-				// A flow execution is in progress — defer the update to avoid disruption.
+				// A flow execution is in progress -- defer the update to avoid disruption.
 				return { defer: true, retryIn: 2 * 60_000 };
 			}
 		} catch {

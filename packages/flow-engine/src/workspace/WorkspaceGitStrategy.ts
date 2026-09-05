@@ -1,5 +1,5 @@
 /**
- * WorkspaceGitStrategy — git operations for workspace setup.
+ * WorkspaceGitStrategy -- git operations for workspace setup.
  * Handles clone, feature-branch, worktree, and state inspection.
  */
 import * as path from 'path';

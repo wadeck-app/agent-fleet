@@ -121,7 +121,7 @@ describe.each(scenarios)('Lego Products $name - CRUD Flows', ({ name: _name, Pag
 	beforeEach(() => {
 		vi.clearAllMocks();
 		localStorage.clear();
-		// Both approaches use window.confirm() for delete confirmation — mock it
+		// Both approaches use window.confirm() for delete confirmation -- mock it
 		vi.spyOn(window, 'confirm').mockReturnValue(true);
 
 		// Configure mock implementations
@@ -166,7 +166,7 @@ describe.each(scenarios)('Lego Products $name - CRUD Flows', ({ name: _name, Pag
 			})
 		);
 
-		// Validator passes by default — override per-test for validation failure scenarios
+		// Validator passes by default -- override per-test for validation failure scenarios
 		mocks.validateProductData.mockReturnValue({ valid: true, errors: [] });
 	});
 
@@ -580,7 +580,7 @@ describe.each(scenarios)('Lego Products $name - CRUD Flows', ({ name: _name, Pag
 			// Clear initial getProducts calls before triggering bulk delete
 			mocks.getProducts.mockClear();
 
-			// Find bulk delete button — text varies by approach ("Delete" or "Delete Selected")
+			// Find bulk delete button -- text varies by approach ("Delete" or "Delete Selected")
 			const bulkDeleteButton = screen.getByRole('button', { name: /delete/i });
 			await user.click(bulkDeleteButton);
 
@@ -602,7 +602,7 @@ describe.each(scenarios)('Lego Products $name - CRUD Flows', ({ name: _name, Pag
 			// Wait for initial load
 			await screen.findByText('Gaming Laptop');
 
-			// Find header checkbox (first checkbox — Radix Checkbox renders as role="checkbox")
+			// Find header checkbox (first checkbox -- Radix Checkbox renders as role="checkbox")
 			const checkboxes = screen.getAllByRole('checkbox');
 			const headerCheckbox = checkboxes[0];
 

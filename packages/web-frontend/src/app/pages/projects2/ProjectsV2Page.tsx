@@ -222,7 +222,7 @@ export function ProjectsV2Page() {
 
 	const activeWorkspace = projectWorkspaces.find(w => w.id === workspaceId);
 	// Only show loading skeleton on initial load (no data yet).
-	// Background WebSocket refreshes must not unmount WorkspacePanel — doing so loses URL state
+	// Background WebSocket refreshes must not unmount WorkspacePanel -- doing so loses URL state
 	// mid-close (e.g. dialog=edit-workspace not cleaned up) causing dialogs to re-open.
 	const loading = (projectsLoading && projects.length === 0) || (workspacesLoading && workspaces.length === 0);
 

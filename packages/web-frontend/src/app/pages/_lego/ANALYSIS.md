@@ -1,6 +1,6 @@
-# Lego Architecture — Multi-Axis Analysis
+# Lego Architecture -- Multi-Axis Analysis
 
-> Generated 2026-03-06 by 7 independent Haiku sub-agents analyzing A1–A6 across 7 dimensions.
+> Generated 2026-03-06 by 7 independent Haiku sub-agents analyzing A1-A6 across 7 dimensions.
 > Each approach implements the same 15 scenarios using a different architectural pattern.
 
 ---
@@ -18,7 +18,7 @@
 
 ---
 
-## Axis 1 — Antifragilite
+## Axis 1 -- Antifragilite
 
 _How well does each approach absorb new scenarios without requiring framework changes?_
 
@@ -57,7 +57,7 @@ modifications despite introducing a fundamentally new data source.
 
 ---
 
-## Axis 2 — Testabilite
+## Axis 2 -- Testabilite
 
 _How easy is it to write complete, isolated unit tests for each approach?_
 
@@ -112,7 +112,7 @@ A5 modifier sequencing test verifies `custom1: 'overridden'` (last modifier wins
 
 ---
 
-## Axis 3 — Simplicite des pages
+## Axis 3 -- Simplicite des pages
 
 _How simple is it to write a new page: few lines, few concepts, copy-paste friendly?_
 
@@ -164,7 +164,7 @@ A6 S3Page exceeds A1 by 25 lines due to imperative hook composition.
 
 ---
 
-## Axis 4 — Coherence
+## Axis 4 -- Coherence
 
 _How uniform is each approach's pattern across all 15 scenarios?_
 
@@ -185,7 +185,7 @@ internally; pages only configure. A2 is equally rigid: pages wrap everything in 
 and delegate to context-aware components. No page in either approach implements custom logic or takes
 a different structural route.
 
-**A3, A4, A5, and A6 tolerate structural variation.** These approaches allow — or even encourage —
+**A3, A4, A5, and A6 tolerate structural variation.** These approaches allow -- or even encourage --
 page-level customization. Simple pages are minimal, but complex pages add custom state, effects, or
 event handlers, diverging significantly from the simple page structure. A4's `S3Page` extracts a
 nested `S3Content` function calling `useDataTable()` context, a pattern entirely absent from `S1Page`.
@@ -200,13 +200,13 @@ abstraction boundary.
 
 - A1 S_BUS (11 lines): identical pattern to S7, purely declarative with `emits`/`listens` props
 - A3 S_BUS (63 lines): adds `useState` for items, `useRef` for container, custom `handleKeyDown`
-  and `handleRowSelect` logic — structurally unrecognizable vs S1 (7 lines)
+  and `handleRowSelect` logic -- structurally unrecognizable vs S1 (7 lines)
 - A4 S3Page: extracts nested `S3Content` component calling `useDataTable()` + `handleSave` logic,
   pattern absent from S1
 
 ---
 
-## Axis 5 — New Feature Extensibility
+## Axis 5 -- New Feature Extensibility
 
 _To add a brand-new feature, must the framework be modified, or can it be added at the page level only?_
 
@@ -221,7 +221,7 @@ _To add a brand-new feature, must the framework be modified, or can it be added 
 
 ### Key Findings
 
-**A1 and A2 are closed architectures.** A1's `WidgetDataTable` is a closed unit — supporting
+**A1 and A2 are closed architectures.** A1's `WidgetDataTable` is a closed unit -- supporting
 cross-widget communication via event bus required baking `EventBus`, `useOptionalEventBus`, and
 `GlobalEventContext` directly into the framework. Every new interaction pattern requires framework
 extension. A2 is similarly rigid: the `ProductProvider` must be expanded when new state (selection,
@@ -233,7 +233,7 @@ pattern holds for S_BUS: page-level state (selectedId, URL sync, keyboard naviga
 the page, not by framework abstractions.
 
 **A5 (pipeline) achieves the best extensibility.** New filters, sorting strategies, or transformations
-are added as pure `QueryModifier` functions passed to `usePipeline` — zero modification to the hook
+are added as pure `QueryModifier` functions passed to `usePipeline` -- zero modification to the hook
 itself. A6 introduced `adaptCol` as a composable adapter without altering either `Data2` or `Table2`.
 
 ### Evidence
@@ -241,13 +241,13 @@ itself. A6 introduced `adaptCol` as a composable adapter without altering either
 - A1 S_BUS: EventBus infrastructure (`EventBus.ts`, `PageEventContext.tsx`, `useOptionalEventBus.ts`,
   `GlobalEventContext.tsx`) had to be built into the framework first
 - A3/A5/A6 S_WS: all use `useProductsWebSocket()` + raw table component, zero framework modifications
-- A5 S_BUS: `modifiers={[withPagination(1, 10)]}`, row-click handler at page level — framework
+- A5 S_BUS: `modifiers={[withPagination(1, 10)]}`, row-click handler at page level -- framework
   provides optional abstractions that pages can ignore
 - A6 `adaptCol.ts`: pure 40-line adapter, bridges two component systems without touching either
 
 ---
 
-## Axis 6 — Maintenabilite
+## Axis 6 -- Maintenabilite
 
 _Code quality, anti-pattern count, and cost of a global refactor._
 
@@ -278,7 +278,7 @@ orchestrator, not scattered across display components.
 
 **A4 suffers from a critical maintainability trap**: `DataTable.tsx` at 640 lines violates the
 400-line threshold and mixes concerns (state management, UI composition, CRUD logic, pagination UI).
-The compound pattern creates a frozen extension point — new slots must be added as static properties
+The compound pattern creates a frozen extension point -- new slots must be added as static properties
 on the component, preventing external customization. With 12 `any` types, the cognitive load is high.
 
 **A2 introduces compounding technical debt**: `void loadItem(id)` fire-and-forget patterns (4
@@ -302,7 +302,7 @@ Pagination refactoring cost (make `defaultPageSize` a global constant):
 
 ---
 
-## Axis 7 — Error Avoidance (LLM Agent Friendliness)
+## Axis 7 -- Error Avoidance (LLM Agent Friendliness)
 
 _When an LLM coding agent writes a new page or adds a feature, how likely is it to make mistakes?_
 
@@ -330,13 +330,13 @@ _When an LLM coding agent writes a new page or adds a feature, how likely is it 
 
 **A1 and A6 are the most LLM-friendly approaches.** A1 succeeds because pages are simple, APIs are
 fixed, and features are declarative. The widget either renders correctly or throws a compile-time
-error — no silent failures. The features array is self-limiting: an LLM cannot accidentally pass
+error -- no silent failures. The features array is self-limiting: an LLM cannot accidentally pass
 invalid callbacks because the API doesn't accept them. A6 succeeds because it uses generic,
 well-understood primitives (hooks, render props, adapters) with a clear three-step pattern.
 
 **A3 and A4 are most error-prone.** A3 requires knowledge of 6 feature hooks and their correct
 composition order. If an LLM forgets `useCrudFeature(ProductDialogAdapter)`, the page compiles and
-renders correctly — it simply lacks CRUD with no error or warning. A4 has the "slot proliferation"
+renders correctly -- it simply lacks CRUD with no error or warning. A4 has the "slot proliferation"
 problem: forgetting `<DataTable.Pagination>` produces an incomplete UI with no compile-time warning.
 
 **A5 has an incomplete structural guard.** The `no-classname-in-pages.test.ts` test passes for A5,
@@ -346,21 +346,21 @@ to style drift via JS-style attributes.
 
 ### Evidence
 
-A1 self-limiting API — LLM cannot pass invalid props:
+A1 self-limiting API -- LLM cannot pass invalid props:
 
 ```tsx
 <WidgetDataTable service={productsService} columns={columns} features={[]} />
-// Cannot pass onSearch, onPaginate — the widget API doesn't accept them
+// Cannot pass onSearch, onPaginate -- the widget API doesn't accept them
 ```
 
-A3 silent failure — hook type extraction returns `undefined` without error:
+A3 silent failure -- hook type extraction returns `undefined` without error:
 
 ```typescript
 // HookDataTable.tsx:
 features.find(f => f.type === 'search'); // undefined if not present; feature silently absent
 ```
 
-A5 structural gap — S3Page.tsx passes the className test but violates intent:
+A5 structural gap -- S3Page.tsx passes the className test but violates intent:
 
 ```tsx
 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -402,7 +402,7 @@ A5 structural gap — S3Page.tsx passes the className test but violates intent:
 
 **A1 (widget-isolated)** is the most practical approach for most teams. It scores highest overall
 (26.5), leads on page simplicity and consistency, and is the safest for LLM code generation. Its
-main weakness is extensibility — new interaction patterns (WebSocket, event bus) require
+main weakness is extensibility -- new interaction patterns (WebSocket, event bus) require
 framework-level investment upfront.
 
 **A5 (query-pipeline)** is the best architecture for growing systems. Perfect antifragilite

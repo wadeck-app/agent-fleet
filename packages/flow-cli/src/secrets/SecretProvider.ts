@@ -14,10 +14,10 @@ export class SecretResolutionError extends Error {
  * Resolves secret URI schemes to Secret objects.
  *
  * Supported schemes:
- *   env://NAME        — reads process.env[NAME] at resolve time
- *   file://./rel      — reads file relative to workspaceDir
- *   file:///abs       — reads absolute path (forbidden by default)
- *   input://name      — reads from flow inputs
+ *   env://NAME        -- reads process.env[NAME] at resolve time
+ *   file://./rel      -- reads file relative to workspaceDir
+ *   file:///abs       -- reads absolute path (forbidden by default)
+ *   input://name      -- reads from flow inputs
  *
  * value:// is forbidden in secrets (validated before reaching here).
  */
@@ -83,7 +83,7 @@ export class SecretProvider {
 
 		if (uri.startsWith('value://')) {
 			throw new SecretResolutionError(
-				`value:// is forbidden in secrets — use env://, file://, or input:// instead`
+				`value:// is forbidden in secrets -- use env://, file://, or input:// instead`
 			);
 		}
 

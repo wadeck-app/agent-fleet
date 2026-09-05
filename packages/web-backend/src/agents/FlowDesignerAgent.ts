@@ -46,7 +46,7 @@ export interface FlowDesignInput {
 	/** Optional extra context from user */
 	userContext?: string;
 	/**
-	 * Existing ticket comments — used to inject the action plan from worker-ai:ticket-intake
+	 * Existing ticket comments -- used to inject the action plan from worker-ai:ticket-intake
 	 * into the prompt so the LLM knows what was planned during ticket intake.
 	 */
 	ticketComments?: TicketComment[];
@@ -67,12 +67,12 @@ type EvaluationAxis = 'completeness' | 'feasibility' | 'coherence' | 'feedback_c
  * rich knowledge context (available flows, past feedback, similar tickets).
  *
  * After Claude returns a JSON response, the proposedFlow is validated via FlowRegistry.
- * Throws on invalid JSON or validation failure — callers should handle gracefully.
+ * Throws on invalid JSON or validation failure -- callers should handle gracefully.
  *
  * ===========================================================================================
  */
 export class FlowDesignerAgent {
-	private static readonly TIMEOUT_MS = 120_000; // 120s — flow design is complex
+	private static readonly TIMEOUT_MS = 120_000; // 120s -- flow design is complex
 
 	private readonly model: string;
 
@@ -184,7 +184,7 @@ ${input.ticket.description}
 			const intakeText = intakeComments.map(c => c.content).join('\n\n');
 			sections.push(`## Existing Action Plan (from ticket intake)
 
-The following content was produced during ticket intake analysis. Use it as authoritative context for the flow design — the steps described here should map directly to flow steps where applicable.
+The following content was produced during ticket intake analysis. Use it as authoritative context for the flow design -- the steps described here should map directly to flow steps where applicable.
 
 ${intakeText}`);
 		}
@@ -192,7 +192,7 @@ ${intakeText}`);
 		// 4. Knowledge context
 		const flowsListText =
 			ctx.availableFlows.length > 0
-				? ctx.availableFlows.map(f => `- **${f.id}**: ${f.name} — ${f.description}`).join('\n')
+				? ctx.availableFlows.map(f => `- **${f.id}**: ${f.name} -- ${f.description}`).join('\n')
 				: '(no flows available)';
 
 		const reusableText =
@@ -257,7 +257,7 @@ ${similarTicketsText}`);
 					? `The ONLY sections you are allowed to modify are those explicitly referenced in the review threads:\n${threadScopes.map(s => `  - ${s}`).join('\n')}`
 					: 'Address the review thread comments above.';
 
-			sections.push(`## Previous Proposal (REJECTED — redesign required)
+			sections.push(`## Previous Proposal (REJECTED -- redesign required)
 
 ### Previous Reasoning
 ${previousProposal.reasoning}
@@ -287,7 +287,7 @@ ${input.userContext}`);
 		// 7. Instructions
 		sections.push(`## Instructions
 
-FORMATTING RULES (apply to ALL text fields — reasoning, step names, descriptions, prompts):
+FORMATTING RULES (apply to ALL text fields -- reasoning, step names, descriptions, prompts):
 - Do NOT use em-dashes (\u2014). Use a regular hyphen (-) or a comma or a period instead.
 - Do NOT use en-dashes (\u2013). Use a regular hyphen (-) instead.
 - Use plain ASCII punctuation only.
@@ -301,32 +301,32 @@ Rules:
 - Address ALL review thread comments if this is a redesign
 - Give an honest confidence score (0-100)
 
-- PRESERVATION RULE — When adapting an existing flow based on user feedback:
+- PRESERVATION RULE -- When adapting an existing flow based on user feedback:
   - Preserve ALL existing steps, configuration, and structure that the user did NOT explicitly mention in their feedback.
-  - Only modify exactly what the user requested. Do not "improve" or "clean up" parts the user didn't mention — even if you think the changes would be beneficial.
+  - Only modify exactly what the user requested. Do not "improve" or "clean up" parts the user didn't mention -- even if you think the changes would be beneficial.
   - If you're unsure whether to modify something, keep the existing version.
 - KEEP THE FLOW CONCISE: maximum 5 steps total, each step prompt/command under 80 words
-- Keep the total JSON output under 3000 characters — omit optional fields if needed
-- CRITICAL depends rule: if step B uses \`\${{ steps.A.outputs.result }}\`, step B MUST include \`"depends": ["A"]\`. The field is \`"depends"\` (NOT "dependsOn"). This is MANDATORY — the validator will reject the flow otherwise. Example:
+- Keep the total JSON output under 3000 characters -- omit optional fields if needed
+- CRITICAL depends rule: if step B uses \`\${{ steps.A.outputs.result }}\`, step B MUST include \`"depends": ["A"]\`. The field is \`"depends"\` (NOT "dependsOn"). This is MANDATORY -- the validator will reject the flow otherwise. Example:
   step A: \`{ "id": "analyze", "type": "model", ... }\`
   step B: \`{ "id": "implement", "type": "model", "depends": ["analyze"], "prompt": "Based on \${{ steps.analyze.outputs.result }}..." }\`
 - workspace MUST include \`"reusePolicy": "never"\` (or \`"if-available"\` or \`"always"\`)
-- Steps of type "model" MUST include a "model" field: one of sonnet | haiku | opus (REQUIRED — no default value)
+- Steps of type "model" MUST include a "model" field: one of sonnet | haiku | opus (REQUIRED -- no default value)
 - workspace.gitStrategy is REQUIRED: one of main-only | feature-branch | any | worktree (REQUIRED)
-- Do NOT include \`statusTransitions\` — omit it entirely, the defaults are fine
-- Do NOT use \`condition\` fields on any step — keep all steps unconditional
-- For \`model\` steps: do NOT include an \`output\` configuration — the model response is captured automatically as the step result
+- Do NOT include \`statusTransitions\` -- omit it entirely, the defaults are fine
+- Do NOT use \`condition\` fields on any step -- keep all steps unconditional
+- For \`model\` steps: do NOT include an \`output\` configuration -- the model response is captured automatically as the step result
 - For \`script\` steps: if you include \`output.X.pattern\`, the pattern MUST contain a capture group \`(...)\` to extract the value. Example: \`"pattern": "(.*)"\` captures the full line, \`"pattern": "result: (\\\\w+)"\` captures a word after "result: ". A pattern without \`(...)\` will fail validation.
-- When in doubt, omit \`output\` entirely — the step result is always accessible via \`\${{ steps.X.outputs.result }}\`
+- When in doubt, omit \`output\` entirely -- the step result is always accessible via \`\${{ steps.X.outputs.result }}\`
 
 You MUST output ONLY a JSON object wrapped in \`\`\`json ... \`\`\` markers.
 The JSON must have exactly these fields:
-- "proposedFlow": a complete FlowDefinition object (not YAML — a JSON object with id, version, name, description, workspace, inputs, steps)
+- "proposedFlow": a complete FlowDefinition object (not YAML -- a JSON object with id, version, name, description, workspace, inputs, steps)
 - "reasoning": string explaining your design choices and why you chose specific steps/flows
-- "reusedFromFlowId": optional string — ID of an existing flow you based this on
-- "reusedSubFlows": optional array of strings — IDs of flows used as subflows
+- "reusedFromFlowId": optional string -- ID of an existing flow you based this on
+- "reusedSubFlows": optional array of strings -- IDs of flows used as subflows
 - "adaptations": ONLY fill if this is a redesign (you received a ## Previous Proposal section) OR if you explicitly reused an existing flow as a base. Leave as [] if designing from scratch.
-- "openQuestions": optional array of strings — specific questions or concerns about the ticket that lower your confidence. Examples: "What is the expected data volume?", "Is OAuth2 or simple auth required?", "Should failure retry or stop the flow?". Fill this ONLY when confidenceScore < 85. Leave empty (or omit) when confidence is 85 or higher.
+- "openQuestions": optional array of strings -- specific questions or concerns about the ticket that lower your confidence. Examples: "What is the expected data volume?", "Is OAuth2 or simple auth required?", "Should failure retry or stop the flow?". Fill this ONLY when confidenceScore < 85. Leave empty (or omit) when confidence is 85 or higher.
 
 The "proposedFlow.id" must be a lowercase-kebab-case string derived from the ticket title.
 The "proposedFlow.version" must be "1.0.0".
@@ -394,7 +394,7 @@ Output ONLY the \`\`\`json block, nothing else.`);
 	/**
 	 * Compare step IDs/count in the redesigned flow against the original proposal.
 	 * Logs a warning if any step was removed or renamed without being explicitly referenced
-	 * in a review thread. Does NOT throw — warnings only (to avoid infinite retry loops).
+	 * in a review thread. Does NOT throw -- warnings only (to avoid infinite retry loops).
 	 */
 	private auditRedesignPreservation(
 		result: FlowDesignOutput,
@@ -454,7 +454,7 @@ Output ONLY the \`\`\`json block, nothing else.`);
 
 	/**
 	 * Run a single evaluator call for one axis. Returns a score 0-100.
-	 * On any error, logs a warning and returns 50 (neutral fallback — never fails the whole design).
+	 * On any error, logs a warning and returns 50 (neutral fallback -- never fails the whole design).
 	 */
 	private async evaluateProposal(params: {
 		ticket: { title: string; description: string };
@@ -471,7 +471,7 @@ Output ONLY the \`\`\`json block, nothing else.`);
 
 		const prompt = `You are an expert flow design evaluator. Score the following flow proposal on ${axisDescription}.
 
-Ticket: ${params.ticket.title} — ${params.ticket.description}
+Ticket: ${params.ticket.title} -- ${params.ticket.description}
 
 Proposed flow (YAML):
 ${params.proposedFlowYaml}
@@ -501,7 +501,7 @@ Score 0 = completely fails on this axis, 100 = perfectly satisfies this axis.`;
 			// Clamp to [0, 100]
 			return Math.max(0, Math.min(100, Math.round(score)));
 		} catch (err) {
-			log.warn(`Evaluator for axis "${params.axis}" failed — using neutral fallback score 50`, { err });
+			log.warn(`Evaluator for axis "${params.axis}" failed -- using neutral fallback score 50`, { err });
 			return 50;
 		}
 	}

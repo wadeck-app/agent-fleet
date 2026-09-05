@@ -31,7 +31,7 @@ const log = createLogger('OrchestratorWrapper');
 // @formatter:off
 // Read version from package.json
 // Path resolution uses import.meta.url which points to the source file in dev mode
-// but to the bundle file in compiled mode — use a fallback to avoid crashing the server
+// but to the bundle file in compiled mode -- use a fallback to avoid crashing the server
 let ORCHESTRATOR_VERSION = 'unknown';
 try {
 	const __filename = fileURLToPath(import.meta.url);

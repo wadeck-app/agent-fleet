@@ -405,7 +405,7 @@ export function CreateTaskDialog({
 		try {
 			const createdTask = await tasksService.createTask(createTaskData);
 			showToast('Task created successfully', 'success');
-			// Only navigate — do NOT call onSuccess/onOpenChange as they use
+			// Only navigate -- do NOT call onSuccess/onOpenChange as they use
 			// setSearchParams({ replace: true }) which overrides the navigation
 			navigate(`/tasks/${createdTask.id}`);
 		} catch (error) {

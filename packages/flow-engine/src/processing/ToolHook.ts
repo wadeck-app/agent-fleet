@@ -1,5 +1,5 @@
 /**
- * ToolHook — unified hook abstraction for tool interception across model providers.
+ * ToolHook -- unified hook abstraction for tool interception across model providers.
  *
  * Business logic (what to do) is defined here, independent of provider-specific formats.
  * Provider translators (OpenCodeHookTranslator, ClaudeHookTranslator) convert these
@@ -21,7 +21,7 @@ export type ToolHookAction =
 	| {
 			type: 'deny';
 			reason: string;
-			/** Glob pattern matched against tool name. Optional — if omitted, matches all tools. */
+			/** Glob pattern matched against tool name. Optional -- if omitted, matches all tools. */
 			toolPattern?: string;
 			/** String that must appear in JSON-serialized tool arguments to trigger denial. Case-insensitive. */
 			argsContains?: string;

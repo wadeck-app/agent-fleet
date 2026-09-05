@@ -1,5 +1,5 @@
 /**
- * ClaudeModelProvider — implements ModelProvider by wrapping ClaudeLauncher.
+ * ClaudeModelProvider -- implements ModelProvider by wrapping ClaudeLauncher.
  *
  * Responsibilities:
  *  - Serializes McpServer[] to a temp JSON file (Claude format), passes --mcp-config <path>

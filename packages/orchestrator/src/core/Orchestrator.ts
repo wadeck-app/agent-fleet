@@ -89,7 +89,7 @@ export class Orchestrator implements Shutdownable {
 		await this.interventionManager.loadPendingInterventions();
 		log.info('Orchestrator', 'InterventionManager initialized');
 
-		// Create WebSocket server — pass eventSubscriptionRegistry at construction so
+		// Create WebSocket server -- pass eventSubscriptionRegistry at construction so
 		// subscriptions are registered even for workers that connect during startup
 		this.wsServer = new WorkerWebSocketServer(
 			this.workerCoordinator,

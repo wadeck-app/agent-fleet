@@ -74,7 +74,7 @@ export class FlowOrchestrator {
 		const stepOutputs = context.stepOutputs;
 
 		try {
-			// Build and validate DAG (upfront validation only — scheduling is FlowScheduler's job)
+			// Build and validate DAG (upfront validation only -- scheduling is FlowScheduler's job)
 			const dag = this.dagBuilder.buildDAG(flow.steps);
 			const validation = this.dagValidator.validate(dag);
 
@@ -183,7 +183,7 @@ export class FlowOrchestrator {
 
 			this.logStepCompletion(startTime, Date.now());
 
-			// Process results — stop on first failure or loop
+			// Process results -- stop on first failure or loop
 			let nextReady: ReadyItem[] = [];
 
 			for (let i = 0; i < readyItems.length; i++) {

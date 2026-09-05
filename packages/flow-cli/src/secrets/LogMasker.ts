@@ -4,7 +4,7 @@ import { REDACTED } from './Secret';
  * Registers all 6 encoding variants of each secret value and applies masking
  * to any string that might contain them.
  *
- * Masking is EAGER — all variants registered at worker startup before any step runs,
+ * Masking is EAGER -- all variants registered at worker startup before any step runs,
  * preventing parallel-step TOCTOU races.
  */
 export class LogMasker {
@@ -24,12 +24,12 @@ export class LogMasker {
 		if (!plaintext) return;
 		const variants = this.buildVariants(plaintext);
 		for (const variant of variants) {
-			// Skip variants shorter than minVariantLength (default: 4) — prevents false-positive
+			// Skip variants shorter than minVariantLength (default: 4) -- prevents false-positive
 			// redaction of common short substrings ("ok", "id", "no"). Encoded variants (base64,
 			// hex) of short secrets still pass this threshold and ARE masked.
 			// See TM-02 in threat-model-ws-auth.md for full rationale.
 			if (variant.length < this.minVariantLength) continue;
-			// Hex variants use case-insensitive matching — some log sources (OpenSSL-style output,
+			// Hex variants use case-insensitive matching -- some log sources (OpenSSL-style output,
 			// user scripts) may emit hex in uppercase. Pure hex [0-9a-f] contains no regex
 			// metacharacters, so the 'i' flag has no unintended widening effect.
 			const flags = /^[0-9a-f]+$/i.test(variant) ? 'gi' : 'g';
@@ -66,7 +66,7 @@ export class LogMasker {
 		// the body characters, leaving the '==' suffix unmasked.
 		return [
 			value,
-			b64, // base64 with padding (= suffix) — registered before no-pad
+			b64, // base64 with padding (= suffix) -- registered before no-pad
 			b64.replace(/=+$/, ''), // base64 without padding
 			offset1, // secret embedded at byte offset 1 in a base64-encoded blob
 			offset2, // secret embedded at byte offset 2 in a base64-encoded blob

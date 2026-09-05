@@ -1,5 +1,5 @@
 /**
- * WorkspacePruner — disk-level workspace directory pruning.
+ * WorkspacePruner -- disk-level workspace directory pruning.
  * Handles age-based and count-based removal of workspace directories.
  */
 import * as fs from 'fs';
@@ -71,7 +71,7 @@ export async function pruneWorkspaces(
 }
 
 /**
- * Static startup pruning (no in-memory state yet — safe to prune anything).
+ * Static startup pruning (no in-memory state yet -- safe to prune anything).
  */
 export function pruneWorkspaceDirAtStartup(basePath: string, retainDays: number, maxWorkspaces: number): void {
 	if (!fs.existsSync(basePath)) return;

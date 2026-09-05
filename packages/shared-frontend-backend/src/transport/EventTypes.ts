@@ -173,7 +173,7 @@ export interface BusinessEvents {
 	/** Tickets list updated (aggregate) */
 	'b2f:tickets:updated': Record<string, never>;
 
-	/** Comment added to a ticket — carries the full comment so subscribers can append without re-fetching */
+	/** Comment added to a ticket -- carries the full comment so subscribers can append without re-fetching */
 	'b2f:ticket:comment_added': TicketComment;
 
 	/** Flow feedback submitted for a ticket */

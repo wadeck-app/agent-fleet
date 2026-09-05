@@ -110,7 +110,7 @@ export function EventSubscriptionsPanel() {
 								</td>
 								<td className="py-3 pr-4">
 									{!sub.filter || Object.keys(sub.filter).length === 0 ? (
-										<span className="text-sm text-muted-foreground">—</span>
+										<span className="text-sm text-muted-foreground">--</span>
 									) : (
 										<div className="flex flex-wrap gap-1">
 											{Object.entries(sub.filter).map(([key, value]) => (

@@ -230,7 +230,7 @@ async function main(): Promise<void> {
 	// Catch unknown top-level commands (must be registered after all addCommand calls, before parseAsync)
 	program.on('command:*', (operands: string[]) => {
 		const msg = `[flow] Unknown command: ${(operands as string[]).join(' ')}\n       Run: flow --help\n`;
-		// Write to stderr only — the bin-launcher bypass ensures stderr reaches the terminal.
+		// Write to stderr only -- the bin-launcher bypass ensures stderr reaches the terminal.
 		process.stderr.write(msg);
 		process.exit(1);
 	});

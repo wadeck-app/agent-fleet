@@ -91,7 +91,7 @@ export interface DataTableRootProps<T extends { id: string }> {
 	enableCrud?: boolean;
 }
 
-// Root component — creates context, fetches data
+// Root component -- creates context, fetches data
 function DataTableRoot<T extends { id: string }>({
 	service,
 	columns,
@@ -119,7 +119,7 @@ function DataTableRoot<T extends { id: string }>({
 		setSortOrder(order);
 	}, []);
 
-	// Stable references — prevent infinite refetch loops
+	// Stable references -- prevent infinite refetch loops
 	const query = useMemo(
 		() => ({ search, page, pageSize, sortBy, sortOrder }),
 		[search, page, pageSize, sortBy, sortOrder]
@@ -218,12 +218,12 @@ function DataTableRoot<T extends { id: string }>({
 	);
 }
 
-// Main content layout — vertical flex column with gaps (flex h-full flex-col gap-4)
+// Main content layout -- vertical flex column with gaps (flex h-full flex-col gap-4)
 DataTableRoot.Content = function Content({ children }: { children: ReactNode }) {
 	return <div className="flex h-full flex-col gap-4">{children}</div>;
 };
 
-// List content layout — vertical stack with spacing (space-y-4)
+// List content layout -- vertical stack with spacing (space-y-4)
 DataTableRoot.ContentList = function ContentList({ children }: { children: ReactNode }) {
 	return <div className="space-y-4">{children}</div>;
 };
@@ -311,7 +311,7 @@ DataTableRoot.BulkBar = function BulkBar() {
 	);
 };
 
-// Grid body — renders items as CSS grid of cards (for S4 Grid Popup scenario)
+// Grid body -- renders items as CSS grid of cards (for S4 Grid Popup scenario)
 DataTableRoot.Grid = function Grid() {
 	const ctx = useDataTable();
 
@@ -372,7 +372,7 @@ DataTableRoot.Grid = function Grid() {
 	);
 };
 
-// Grid footer — matches WidgetItemGrid's "Page X of Y + Pagination" layout
+// Grid footer -- matches WidgetItemGrid's "Page X of Y + Pagination" layout
 DataTableRoot.GridFooter = function GridFooter() {
 	const ctx = useDataTable();
 	return (

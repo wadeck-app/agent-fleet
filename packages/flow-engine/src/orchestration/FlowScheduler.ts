@@ -24,7 +24,7 @@ export type StepOutcome = { type: 'completed'; outputs: Record<string, unknown> 
 
 export class FlowScheduler {
 	private readonly steps = new Map<string, SchedulerStep>();
-	/** Original dep set per step — used when rebuilding after loop invalidation */
+	/** Original dep set per step -- used when rebuilding after loop invalidation */
 	private readonly originalDeps = new Map<string, Set<string>>();
 	/** stepId → set of stepIds that depend on it */
 	private readonly reverseDeps = new Map<string, Set<string>>();
@@ -75,7 +75,7 @@ export class FlowScheduler {
 	 * Returns [] if the step was invalidated by a loop before this call arrived (stale result).
 	 */
 	complete(stepId: string, outcome: StepOutcome): ReadyItem[] {
-		// Stale result: step was invalidated by a loop while in-flight — discard
+		// Stale result: step was invalidated by a loop while in-flight -- discard
 		if (this.pendingDeps.has(stepId)) {
 			this.inFlightSteps.delete(stepId);
 			return [];
@@ -92,7 +92,7 @@ export class FlowScheduler {
 			return this.collectReady();
 		}
 
-		// Failed — check retry first
+		// Failed -- check retry first
 		const step = this.steps.get(stepId);
 		if (!step) throw new Error(`FlowScheduler: unknown stepId "${stepId}" in complete()`);
 		const retry = step.retry as RetryConfig | undefined;
@@ -117,7 +117,7 @@ export class FlowScheduler {
 	}
 
 	/**
-	 * Reverse of acknowledge(). Called when transport dispatch failed — the step was never sent.
+	 * Reverse of acknowledge(). Called when transport dispatch failed -- the step was never sent.
 	 * Consumer is responsible for re-queuing it externally. FlowScheduler removes it from in-flight.
 	 */
 	unacknowledge(stepId: string): void {
@@ -211,9 +211,9 @@ export class FlowScheduler {
 	 * Evaluate a step's when: condition.
 	 *
 	 * Context exposed to the expression:
-	 *   outputs  — step outputs keyed by dep step id: { 'dep-id': { field: value } }
-	 *   inputs   — flow-level inputs
-	 *   steps    — same data in GitHub Actions shape: { 'dep-id': { outputs: { field: value } } }
+	 *   outputs  -- step outputs keyed by dep step id: { 'dep-id': { field: value } }
+	 *   inputs   -- flow-level inputs
+	 *   steps    -- same data in GitHub Actions shape: { 'dep-id': { outputs: { field: value } } }
 	 *              (available in both bare and ${{ }} forms)
 	 *
 	 * Dot-notation for hyphenated IDs is supported transparently:

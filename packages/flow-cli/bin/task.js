@@ -28,7 +28,7 @@ try {
 	}
 }
 if (!tsx) {
-	console.error('task: cannot locate tsx — run npm install in the monorepo root');
+	console.error('task: cannot locate tsx -- run npm install in the monorepo root');
 	process.exit(1);
 }
 

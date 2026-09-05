@@ -12,6 +12,7 @@ const cliPath = path.join(__dirname, '..', 'src', 'cli', 'entry-point.ts');
 // Pass all arguments to the CLI
 const args = process.argv.slice(2);
 
+// violations-suppress: cli/no-spawn-without-windows-hide dev launcher -- terminal forwarded to tsx process intentionally
 const child = spawn('tsx', [cliPath, ...args], {
 	stdio: 'inherit',
 	shell: true,

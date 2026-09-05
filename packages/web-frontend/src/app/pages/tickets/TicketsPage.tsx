@@ -129,7 +129,7 @@ export function TicketsPage() {
 					order: newOrder,
 					version: movedTicket.version,
 				});
-				// Silent background sync — no loading flash
+				// Silent background sync -- no loading flash
 				void refresh();
 			} catch (err) {
 				console.error('Failed to reorder ticket:', getErrorMessage(err));

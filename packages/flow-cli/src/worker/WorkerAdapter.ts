@@ -105,7 +105,7 @@ export class WorkerAdapter {
 					},
 				});
 
-				// Wire onLogEntry for streaming/polling log modes — sends each entry to daemon in real-time
+				// Wire onLogEntry for streaming/polling log modes -- sends each entry to daemon in real-time
 				const logMode = (step as unknown as { log?: string }).log ?? 'end';
 				const toolLog = (step as unknown as { toolLog?: string }).toolLog ?? 'none';
 				const onLogEntry =
@@ -155,7 +155,7 @@ export class WorkerAdapter {
 					undefined,
 					onLogEntry
 				);
-				// For log:end/none — send response as logs after completion (existing behavior)
+				// For log:end/none -- send response as logs after completion (existing behavior)
 				if (logMode === 'end') {
 					sendStdoutAsLogs(
 						(trace as unknown as { response?: string }).response,
@@ -167,7 +167,7 @@ export class WorkerAdapter {
 				if (trace.error) {
 					throw new Error(trace.error);
 				}
-				// trace.outputs is undefined for model steps that produce no structured output —
+				// trace.outputs is undefined for model steps that produce no structured output --
 				// an empty map is the correct representation (no outputs to propagate to dependents).
 				return { output: (trace.outputs ?? {}) as Record<string, unknown>, meta: trace.meta };
 			} finally {
@@ -186,7 +186,7 @@ export class WorkerAdapter {
 		if (trace.error) {
 			throw new Error(trace.error);
 		}
-		// trace.outputs is undefined for script steps without captureOutput — empty map is correct.
+		// trace.outputs is undefined for script steps without captureOutput -- empty map is correct.
 		return { output: (trace.outputs ?? {}) as Record<string, unknown>, meta: trace.meta };
 	}
 }

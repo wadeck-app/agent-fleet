@@ -9,7 +9,7 @@ Owns everything required to load a flow definition from YAML and execute it step
 ## Responsibility
 
 - Flow YAML parsing and schema validation
-- Graph validation — flows support bounded cycles via `onFailure.goto`; the graph is NOT required to be a strict DAG
+- Graph validation -- flows support bounded cycles via `onFailure.goto`; the graph is NOT required to be a strict DAG
 - Step execution: StepRunner drives individual steps, FlowExecutor runs a full flow, FlowOrchestrator coordinates multi-flow scenarios
 - Claude process launching via ClaudeLauncher
 - Workspace management (per-flow working directories) via WorkspaceManager
@@ -19,9 +19,9 @@ Owns everything required to load a flow definition from YAML and execute it step
 
 ## Does NOT own
 
-- Process lifecycle (starting/stopping worker processes) — that's worker
-- WebSocket servers or clients — that's orchestrator and worker
-- Task queuing and scheduling — that's orchestrator
+- Process lifecycle (starting/stopping worker processes) -- that's worker
+- WebSocket servers or clients -- that's orchestrator and worker
+- Task queuing and scheduling -- that's orchestrator
 
 ## Dependencies on local packages
 
@@ -38,8 +38,8 @@ Library.
 
 ## Key files
 
-- `src/FlowExecutor.ts` — executes a single flow end-to-end
-- `src/StepRunner.ts` — executes one step within a flow
-- `src/FlowOrchestrator.ts` — coordinates execution across multiple flows
-- `src/ClaudeLauncher.ts` — spawns and manages Claude subprocess per step
-- `src/FlowRegistry.ts` — auto-discovers and registers available flows from disk
+- `src/FlowExecutor.ts` -- executes a single flow end-to-end
+- `src/StepRunner.ts` -- executes one step within a flow
+- `src/FlowOrchestrator.ts` -- coordinates execution across multiple flows
+- `src/ClaudeLauncher.ts` -- spawns and manages Claude subprocess per step
+- `src/FlowRegistry.ts` -- auto-discovers and registers available flows from disk

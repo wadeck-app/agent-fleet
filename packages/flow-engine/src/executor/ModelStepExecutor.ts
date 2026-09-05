@@ -90,7 +90,7 @@ export async function executeModelStep(
 				resumeSessionId = forkId;
 			} else if (typeof prevSessionId === 'string' && prevSessionId) {
 				process.stderr.write(
-					`[ModelStepExecutor] session.mode:fork — session_file not found for step '${step.session.continue}', falling back to append\n`
+					`[ModelStepExecutor] session.mode:fork -- session_file not found for step '${step.session.continue}', falling back to append\n`
 				);
 				resumeSessionId = prevSessionId;
 			}

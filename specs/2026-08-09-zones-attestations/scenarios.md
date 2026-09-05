@@ -45,7 +45,7 @@ zones:
 
 ---
 
-## Scenario 1a — Unknown zone reference
+## Scenario 1a -- Unknown zone reference
 
 **Setup:** A flow where a step declares `zone: staging` but no zone `staging` is defined in any scope config.
 
@@ -58,11 +58,11 @@ steps:
 
 **Expected:** Static validation error at load time. The engine refuses to start the execution.
 
-**What is validated:** Z4 case 1 — a step references an undefined zone.
+**What is validated:** Z4 case 1 -- a step references an undefined zone.
 
 ---
 
-## Scenario 1b — Secret used outside its zone
+## Scenario 1b -- Secret used outside its zone
 
 **Setup:** A flow where a step references `PROD_API_KEY` (declared `zone: production`) but the step has no `zone: production`.
 
@@ -77,11 +77,11 @@ steps:
 
 **Expected:** Static validation error at load time.
 
-**What is validated:** Z5 — a zone-scoped secret cannot be referenced outside its zone.
+**What is validated:** Z5 -- a zone-scoped secret cannot be referenced outside its zone.
 
 ---
 
-## Scenario 2 — Zone entry blocked by missing attestation
+## Scenario 2 -- Zone entry blocked by missing attestation
 
 **Setup:** Run the full flow but make `run-tests` fail (exit code non-zero).
 
@@ -93,7 +93,7 @@ Log line NOT emitted: `[abc1|__zone] production ACTIVE`
 
 ---
 
-## Scenario 3 — Full happy path
+## Scenario 3 -- Full happy path
 
 **Setup:** Run the full flow with `run-tests` succeeding.
 
@@ -107,4 +107,4 @@ Log line NOT emitted: `[abc1|__zone] production ACTIVE`
 6. `dummy-deploy` script finds `$PROD_API_KEY` set → exits 0 → prints "OK"
 7. Execution completes: `[abc1|__execution] COMPLETED`
 
-**What is validated:** Full zone lifecycle — attestation production, zone activation, secret injection, step execution.
+**What is validated:** Full zone lifecycle -- attestation production, zone activation, secret injection, step execution.

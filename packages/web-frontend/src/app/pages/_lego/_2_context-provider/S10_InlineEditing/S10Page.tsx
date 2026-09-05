@@ -56,7 +56,7 @@ export function S10Page() {
 						{ type: 'sorting', multi: true },
 						'column-visibility',
 						'bulk-delete',
-						// Note: inline-edit is not a DataTableFeature — using dialog-based crud as the edit mechanism
+						// Note: inline-edit is not a DataTableFeature -- using dialog-based crud as the edit mechanism
 						{ type: 'crud', dialog: ProductDialogAdapter },
 					]}
 				/>

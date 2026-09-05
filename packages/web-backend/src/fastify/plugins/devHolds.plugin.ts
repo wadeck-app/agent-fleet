@@ -26,7 +26,7 @@ export async function registerDevHoldsPlugin(fastify: FastifyInstance): Promise<
 		}
 	});
 
-	// POST /dev/hold — register a hold
+	// POST /dev/hold -- register a hold
 	fastify.post<{ Body: { pattern: string } }>('/dev/hold', async (request, reply) => {
 		const { pattern } = request.body;
 		if (!pattern) {
@@ -36,13 +36,13 @@ export async function registerDevHoldsPlugin(fastify: FastifyInstance): Promise<
 		return reply.status(201).send({ holdId });
 	});
 
-	// DELETE /dev/hold/:id — release a hold
+	// DELETE /dev/hold/:id -- release a hold
 	fastify.delete<{ Params: { id: string } }>('/dev/hold/:id', async (request, reply) => {
 		const released = service.release(request.params.id);
 		return reply.send({ released });
 	});
 
-	// GET /dev/holds — list active holds
+	// GET /dev/holds -- list active holds
 	fastify.get('/dev/holds', async (_request, reply) => {
 		return reply.send({ holds: service.list() });
 	});

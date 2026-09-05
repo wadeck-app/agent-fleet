@@ -20,7 +20,7 @@ export class WebSocketServer {
 	) {
 		this._port = port;
 		this.httpServer = http.createServer();
-		// maxPayload: 1 MiB — consistent with McpServer.readBody() cap.
+		// maxPayload: 1 MiB -- consistent with McpServer.readBody() cap.
 		// The ws default (100 MiB) would allow a rogue local process to exhaust daemon memory.
 		this.wss = new WsServer({ server: this.httpServer, maxPayload: 1024 * 1024 });
 		this.wss.on('connection', (ws: WebSocket) => this.handleConnection(ws));

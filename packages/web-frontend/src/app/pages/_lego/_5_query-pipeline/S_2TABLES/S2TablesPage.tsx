@@ -22,7 +22,7 @@ import { withPagination, withSearch } from '../_framework/PipelineTypes';
  * Two separate PipelineDataTable instances on the same page with different configurations.
  *
  * Table 1 (top): All products with pagination (10 per page) + search
- * Table 2 (bottom): "Recent Products" — products sorted by createdAt desc, pagination (5 per page)
+ * Table 2 (bottom): "Recent Products" -- products sorted by createdAt desc, pagination (5 per page)
  *
  * The tables are INDEPENDENT:
  * - Each has its own PipelineContext (separate data fetching)

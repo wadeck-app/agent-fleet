@@ -119,7 +119,7 @@ export class StreamEventMapper {
 			return [...nonDebugEntries, ...keptDebug].sort((a, b) => a.timestamp - b.timestamp);
 		}
 
-		// Even non-debug exceeds cap — keep most recent entries
+		// Even non-debug exceeds cap -- keep most recent entries
 		return entries.slice(-MAX_LIVE_LOG_ENTRIES);
 	}
 
@@ -227,7 +227,7 @@ export class StreamEventMapper {
 	// Schema assumed from Claude Code source. Verify with --include-hook-events on a real run if behavior is unexpected.
 	private mapHookEvent(event: StreamJsonEvent): LiveLogEntry {
 		const data = event.data;
-		// NOTE: schema is tentative — not verified against a live Claude run.
+		// NOTE: schema is tentative -- not verified against a live Claude run.
 		// data.hook?.type is expected to be 'PreToolUse' or 'PostToolUse'.
 		const hookType: string = data['hook']?.type ?? data['hook_type'] ?? 'unknown';
 		const toolName: string = data['tool_name'] ?? 'unknown';
@@ -287,10 +287,10 @@ export class StreamEventMapper {
 
 	/**
 	 * Truncate a value for display.
-	 * File paths are never truncated — they're critical for understanding what happened.
+	 * File paths are never truncated -- they're critical for understanding what happened.
 	 */
 	private truncateValue(key: string, value: string): string {
-		// Never truncate file paths — the full path is essential context
+		// Never truncate file paths -- the full path is essential context
 		const isPathKey = /path|file|dir/i.test(key);
 		if (isPathKey) {
 			return value;

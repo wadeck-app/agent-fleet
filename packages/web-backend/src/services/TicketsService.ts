@@ -77,7 +77,7 @@ export class TicketsService {
 	 * Fields whose values are rendered in the tickets list view.
 	 * Only changes to these fields warrant broadcasting B2F_TICKETS_UPDATED.
 	 * Other fields (description, fields, flowId, taskIds, parentId, order) are
-	 * detail-only — their changes only need B2F_TICKET_UPDATED.
+	 * detail-only -- their changes only need B2F_TICKET_UPDATED.
 	 */
 	private static readonly LIST_VISIBLE_FIELDS: ReadonlySet<string> = new Set(['title', 'status', 'labels']);
 
@@ -179,7 +179,7 @@ export class TicketsService {
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast(B2F_TICKETS_UPDATED, {} as any);
 
-			// Emit internal event for worker flow triggers — skipped when title is a placeholder
+			// Emit internal event for worker flow triggers -- skipped when title is a placeholder
 			// (AI async flow: deferred to generateAndUpdateTitle once the real title is ready)
 			if (emitInternalCreatedEvent) {
 				this.eventBus?.emit('ticket.created', {
@@ -261,12 +261,12 @@ export class TicketsService {
 				}
 			}
 
-			// B2F_TICKET_UPDATED — always broadcast for detail page subscribers.
+			// B2F_TICKET_UPDATED -- always broadcast for detail page subscribers.
 			// Use { ticketId } as server-side filter so only the open detail page for this ticket receives it.
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast(B2F_TICKET_UPDATED, { ticketId: id } as any);
 
-			// B2F_TICKETS_UPDATED — only broadcast when a list-visible field actually changed
+			// B2F_TICKETS_UPDATED -- only broadcast when a list-visible field actually changed
 			// (title, status, labels). Avoids unnecessary list refreshes for description/fields/etc.
 			const listNeedsRefresh = changedFields.some(f => TicketsService.LIST_VISIBLE_FIELDS.has(f));
 			if (listNeedsRefresh) {
@@ -297,7 +297,7 @@ export class TicketsService {
 
 			// If status changed, emit status change events
 			if (data.status && data.status !== currentTicket.status) {
-				// B2F_TICKET_STATUS_CHANGED — targeted event for kanban boards and flow triggers
+				// B2F_TICKET_STATUS_CHANGED -- targeted event for kanban boards and flow triggers
 				// that only care about status transitions (not all ticket updates).
 				this.eventBroadcaster.broadcast(B2F_TICKET_STATUS_CHANGED, {
 					ticketId: id,
@@ -441,7 +441,7 @@ export class TicketsService {
 				version: currentTicket.version + 1,
 			});
 
-			// B2F_TICKETS_UPDATED only — order affects list sorting but is not shown in the detail page.
+			// B2F_TICKETS_UPDATED only -- order affects list sorting but is not shown in the detail page.
 			// B2F_TICKET_UPDATED is intentionally NOT broadcast here.
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast(B2F_TICKETS_UPDATED, {} as any);
@@ -486,7 +486,7 @@ export class TicketsService {
 	async createFromPlan(data: CreateFromPlan): Promise<CreateFromPlanResponse> {
 		const { plan, projectId, originalDescription } = data;
 
-		// Create parent ticket — use original description if provided, fall back to AI analysis
+		// Create parent ticket -- use original description if provided, fall back to AI analysis
 		const parentTicket = await this.createTicket({
 			projectId,
 			title: plan.title,
@@ -555,7 +555,7 @@ export class TicketsService {
 			comment.author
 		);
 
-		// Emit internal event for flow triggers — all comments including worker-ai
+		// Emit internal event for flow triggers -- all comments including worker-ai
 		// (loop prevention is the flow/worker's responsibility, not the event bus)
 		this.eventBus?.emit('ticket.comment_created', {
 			ticketId,
@@ -610,7 +610,7 @@ export class TicketsService {
 		// updateTicket() already broadcasts:
 		//   B2F_TICKET_UPDATED (with ticketId, for the detail page)
 		//   B2F_TICKETS_UPDATED (because title is a list-visible field)
-		// No B2F_TICKET_CREATED here — it was already sent at initial creation.
+		// No B2F_TICKET_CREATED here -- it was already sent at initial creation.
 
 		// Now that the ticket has a real title, emit the internal 'ticket.created' event.
 		// This was deliberately deferred from createTicket() so that flow triggers and

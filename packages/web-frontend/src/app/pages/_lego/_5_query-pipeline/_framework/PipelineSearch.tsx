@@ -8,7 +8,7 @@ import { usePipelineContext } from './PipelineContext';
  * ===========================================================================================
  *
  * Interactive search input for pipeline data table.
- * Calls setSearch from context — triggers modifier override and re-fetch.
+ * Calls setSearch from context -- triggers modifier override and re-fetch.
  *
  * ===========================================================================================
  */

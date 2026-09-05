@@ -28,7 +28,7 @@ import { usePaginationFeature } from '../_framework/usePaginationFeature';
  * - Page manages selected ID state
  * - Table calls onRowSelect callback
  * - Detail panel receives selectedId prop
- * - No event bus needed — direct prop/callback communication
+ * - No event bus needed -- direct prop/callback communication
  *
  * ===========================================================================================
  */

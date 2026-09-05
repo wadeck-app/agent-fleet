@@ -172,7 +172,7 @@ describe('TicketCommentsSection', () => {
 		});
 	});
 
-	describe('accessibility — bug #6', () => {
+	describe('accessibility -- bug #6', () => {
 		it('should have the "Add a comment" label linked to the textarea via htmlFor', async () => {
 			(ticketsApi.getComments as any).mockResolvedValue({ comments: [] });
 
@@ -200,7 +200,7 @@ describe('TicketCommentsSection', () => {
 				expect(ticketsApi.getComments).toHaveBeenCalled();
 			});
 
-			// Comments are rendered via ReactMarkdown — verify the content appears
+			// Comments are rendered via ReactMarkdown -- verify the content appears
 			expect(screen.getByText(/Third comment with multiline/)).toBeInTheDocument();
 		});
 	});

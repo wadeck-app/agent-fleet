@@ -18,7 +18,7 @@ import { ViewItemGrid } from '../_framework/ViewItemGrid';
  * Features: search, pagination, CRUD dialog
  * Columns: name, price, category, status, rating
  *
- * Zero className, zero inline styles, zero hooks, zero state — pure composition.
+ * Zero className, zero inline styles, zero hooks, zero state -- pure composition.
  *
  * ===========================================================================================
  */

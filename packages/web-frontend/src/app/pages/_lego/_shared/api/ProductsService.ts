@@ -63,7 +63,7 @@ export class ProductsService {
 		stock: nonNegative('Stock'),
 		status: required('Status'),
 		rating: range(0, 5, 'Rating'),
-		// Boolean is always valid — no validation needed
+		// Boolean is always valid -- no validation needed
 		featured: () => null,
 	});
 

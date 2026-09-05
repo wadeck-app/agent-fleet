@@ -1,8 +1,8 @@
 /**
- * OpenCodeHookTranslator — converts ToolHook[] into an OpenCode ESM plugin JS string.
+ * OpenCodeHookTranslator -- converts ToolHook[] into an OpenCode ESM plugin JS string.
  *
  * The generated file is written to a temp dir and referenced via plugin: ["<path>"] in the
- * OpenCode config. No package.json is created — that would trigger a background npm install.
+ * OpenCode config. No package.json is created -- that would trigger a background npm install.
  */
 import type { ToolHook } from './ToolHook';
 
@@ -15,11 +15,11 @@ import type { ToolHook } from './ToolHook';
  * a given tool name expression matches a glob/exact pattern.
  *
  * Supported patterns:
- * - "*"         — matches any tool
- * - "exact"     — matches only that exact tool name
- * - "prefix*"   — matches tool names starting with "prefix"
- * - "*suffix"   — matches tool names ending with "suffix"
- * - "pre*suf"   — matches tool names matching the glob
+ * - "*"         -- matches any tool
+ * - "exact"     -- matches only that exact tool name
+ * - "prefix*"   -- matches tool names starting with "prefix"
+ * - "*suffix"   -- matches tool names ending with "suffix"
+ * - "pre*suf"   -- matches tool names matching the glob
  */
 function buildMatchExpression(toolExpression: string, pattern: string): string {
 	if (pattern === '*') {
@@ -65,18 +65,18 @@ export class OpenCodeHookTranslator {
 						const argsCondition = `JSON.stringify(output.args ?? {}).toLowerCase().includes(${JSON.stringify(argsContains.toLowerCase())})`;
 						condition = `${toolCondition} && ${argsCondition}`;
 					} else if (argsContains !== undefined) {
-						// Args check only — any tool whose args JSON contains the string
+						// Args check only -- any tool whose args JSON contains the string
 						condition = `JSON.stringify(output.args ?? {}).toLowerCase().includes(${JSON.stringify(argsContains.toLowerCase())})`;
 					} else if (toolPattern !== undefined) {
 						// Tool name check only (original behavior)
 						condition = buildMatchExpression('input.tool', toolPattern);
 					} else {
-						// Neither set — matches all tools
+						// Neither set -- matches all tools
 						condition = 'true';
 					}
 					beforeLines.push(`if (${condition}) throw new Error(${JSON.stringify(errorMessage)});`);
 				}
-				// deny timing='after' is not meaningful — tool already executed
+				// deny timing='after' is not meaningful -- tool already executed
 			}
 		}
 

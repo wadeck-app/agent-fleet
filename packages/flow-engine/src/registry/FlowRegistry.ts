@@ -508,7 +508,7 @@ export class FlowRegistry {
 			const content = fs.readFileSync(absolutePath, 'utf-8');
 			const parsedInclude = yaml.load(content) as Record<string, any>;
 
-			// null = empty file or comments-only — valid, just no flows to load
+			// null = empty file or comments-only -- valid, just no flows to load
 			if (parsedInclude === null || parsedInclude === undefined) {
 				this.trackExternalFile(absolutePath);
 				return;

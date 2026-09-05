@@ -19,7 +19,7 @@ function renderSelectWithSpinner(loading: boolean, value = 'option1') {
 }
 
 describe('SelectWithSpinner', () => {
-	describe('spinner placement — bug #1', () => {
+	describe('spinner placement -- bug #1', () => {
 		it('should not render spinner when not loading', () => {
 			renderSelectWithSpinner(false);
 			expect(document.querySelector('[data-testid="select-spinner"]')).toBeNull();
@@ -53,7 +53,7 @@ describe('SelectWithSpinner', () => {
 		});
 	});
 
-	describe('container layout — bug #7', () => {
+	describe('container layout -- bug #7', () => {
 		it('should use a flex container so spinner sits beside the select', () => {
 			const { container } = renderSelectWithSpinner(true);
 			// The outermost wrapper should be a flex container

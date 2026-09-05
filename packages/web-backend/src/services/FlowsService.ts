@@ -106,7 +106,7 @@ export class FlowsService {
 	/**
 	 * Merge a file-based flow list with flows from the registry that are not yet in the list.
 	 * Custom flows approved at runtime are registered in the FlowRegistry in memory but may
-	 * not yet be present in flows.yml — this prevents 404s on GET /api/flows/:flowId.
+	 * not yet be present in flows.yml -- this prevents 404s on GET /api/flows/:flowId.
 	 */
 	private mergeWithRegistryFlows(fileFlows: FlowListItem[]): FlowListItem[] {
 		if (!this.registry) {
@@ -222,7 +222,7 @@ export class FlowsService {
 			}
 		}
 
-		// Flow not found via orchestrator — fall back to local flows.yml then registry
+		// Flow not found via orchestrator -- fall back to local flows.yml then registry
 		log.warn(`Flow ${flowId} not found in any project, falling back to local file`);
 		const fromFile = this.getFlowByIdFromFile(flowId);
 		if (fromFile) {

@@ -253,7 +253,7 @@ export class FlowProposalsService {
 
 		log.info('Proposal rejected, triggering async redesign', { ticketId, proposalId });
 
-		// Fire the redesign asynchronously — do not block the HTTP response
+		// Fire the redesign asynchronously -- do not block the HTTP response
 		void this.triggerRedesignAsync(ticketId, proposalId, proposal, ticket);
 
 		return rejectedProposal;
@@ -338,7 +338,7 @@ export class FlowProposalsService {
 			// Notify the ticket detail page that the ticket changed (e.g. currentFlowProposalId updated)
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast(B2F_TICKET_UPDATED, { ticketId } as any);
-			// Notify flow-proposal subscribers specifically — allows the UI to refresh ONLY the
+			// Notify flow-proposal subscribers specifically -- allows the UI to refresh ONLY the
 			// Flow Design tab content without refreshing on unrelated ticket updates (cc fix).
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast(B2F_FLOW_PROPOSAL_UPDATED, { ticketId } as any);
@@ -540,10 +540,10 @@ export class FlowProposalsService {
 		}
 
 		if (thread.comments.length === 1) {
-			// Last comment — delete the whole thread
+			// Last comment -- delete the whole thread
 			const updatedThreads = proposal.reviewThreads.filter(t => t.id !== threadId);
 			await this.proposalsRepository.update(proposalId, { reviewThreads: updatedThreads });
-			log.info('Last comment deleted — thread removed', { ticketId, proposalId, threadId, commentId });
+			log.info('Last comment deleted -- thread removed', { ticketId, proposalId, threadId, commentId });
 			return { success: true, threadDeleted: true };
 		}
 

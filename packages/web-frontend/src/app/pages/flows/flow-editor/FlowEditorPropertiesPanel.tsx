@@ -779,7 +779,7 @@ export function FlowEditorPropertiesPanel({
 							{readOnly ? (
 								step.timeout?.minutes ? (
 									<p className="text-sm">
-										{step.timeout.minutes} min — on timeout:{' '}
+										{step.timeout.minutes} min -- on timeout:{' '}
 										<span className="font-mono">{step.timeout.onTimeout || 'fail'}</span>
 									</p>
 								) : (
@@ -1106,7 +1106,7 @@ export function FlowEditorPropertiesPanel({
 
 				<Separator />
 
-				{/* Advanced Options — hidden in readOnly mode */}
+				{/* Advanced Options -- hidden in readOnly mode */}
 				{!readOnly && (
 					<div>
 						<Button
@@ -1184,7 +1184,7 @@ export function FlowEditorPropertiesPanel({
 
 				{!readOnly && <Separator />}
 
-				{/* Actions — hidden in readOnly mode */}
+				{/* Actions -- hidden in readOnly mode */}
 				{!readOnly && (
 					<AlertDialog>
 						<AlertDialogTrigger asChild>

@@ -14,7 +14,7 @@ import { WorkspaceGitStrategy } from './WorkspaceGitStrategy';
 import { pruneWorkspaceDirAtStartup, pruneWorkspaces } from './WorkspacePruner';
 import { WorkspaceAllocationError } from './WorkspaceTypes';
 
-// Re-exported for backward compatibility — definition lives in WorkspaceTypes.ts
+// Re-exported for backward compatibility -- definition lives in WorkspaceTypes.ts
 export { WorkspaceAllocationError };
 
 export interface WorkspaceAllocationOptions {
@@ -158,7 +158,7 @@ export class WorkspaceManager {
 		};
 	}
 
-	/** Static startup pruning — no active workspaces in memory yet. */
+	/** Static startup pruning -- no active workspaces in memory yet. */
 	public static pruneOldWorkspaceDir(basePath: string, retainDays: number, maxWorkspaces: number): void {
 		pruneWorkspaceDirAtStartup(basePath, retainDays, maxWorkspaces);
 	}

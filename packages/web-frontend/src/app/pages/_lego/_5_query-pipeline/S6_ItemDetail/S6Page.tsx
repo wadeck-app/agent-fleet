@@ -23,7 +23,7 @@ import { SplitLayout } from '../_framework/SplitLayout';
  * Right: detail panel (receives selectedId prop)
  *
  * Architecture:
- * - No event bus — page-level state coordinates table + detail
+ * - No event bus -- page-level state coordinates table + detail
  * - PipelineBody's onRowClick prop sets selectedId state
  * - PipelineDetailPanel receives selectedId and fetches item
  *

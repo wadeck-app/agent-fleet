@@ -606,7 +606,7 @@ export class TasksService {
 		try {
 			const existing = await this.tasksRepository.findById(orchestratorTask.id);
 			if (existing) {
-				// Already synced — skip
+				// Already synced -- skip
 				return;
 			}
 
@@ -635,7 +635,7 @@ export class TasksService {
 			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
 		} catch (error) {
 			log.error(`[syncFromOrchestratorTask] Failed to sync task ${orchestratorTask.id}:`, error);
-			// Don't throw — sync failure should not block task execution
+			// Don't throw -- sync failure should not block task execution
 		}
 	}
 

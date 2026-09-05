@@ -22,7 +22,7 @@ export type ModelType = 'sonnet' | 'haiku' | 'opus';
 export type ModelProviderName = 'claude' | 'opencode';
 
 /**
- * MCP server definition — passed to model providers for tool injection.
+ * MCP server definition -- passed to model providers for tool injection.
  * Re-exported from ModelProvider for use in flow definitions.
  */
 export type { McpServer } from './processing/ModelProvider';
@@ -616,7 +616,7 @@ export interface ModelFlowStep extends BaseFlowStep {
 		/**
 		 * How to continue:
 		 * - 'append': adds a new user message to the existing session (shared history)
-		 * - 'fork': copies the session .jsonl to a new UUID — each fork is independent
+		 * - 'fork': copies the session .jsonl to a new UUID -- each fork is independent
 		 */
 		mode: 'append' | 'fork' | 'compact';
 	};
@@ -1010,7 +1010,7 @@ export interface ScriptStepMeta extends StepMetaBase {
 export interface ModelStepMeta extends StepMetaBase {
 	/** Actual model used (may differ from config if fallback applied) */
 	model: string;
-	/** Claude session ID from system:init event — used for session continuation */
+	/** Claude session ID from system:init event -- used for session continuation */
 	session_id: string;
 	/** Absolute path to the .jsonl session file (empty if not resolvable) */
 	session_file: string;

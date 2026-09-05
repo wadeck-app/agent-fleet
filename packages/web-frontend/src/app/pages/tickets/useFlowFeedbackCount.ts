@@ -25,7 +25,7 @@ export function useFlowFeedbackCount(
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<Error | null>(null);
 
-	// WS event payload has ticketId, not flowId — filter by ticketId for correct matching
+	// WS event payload has ticketId, not flowId -- filter by ticketId for correct matching
 	const filter = useMemo(() => (ticketId ? { ticketId } : {}), [ticketId]);
 
 	const refresh = useCallback(async () => {

@@ -1,5 +1,5 @@
 /**
- * ModelProvider — shared interface and types for AI model CLI providers.
+ * ModelProvider -- shared interface and types for AI model CLI providers.
  *
  * Both ClaudeModelProvider and OpenCodeModelProvider implement this interface.
  * Validation utilities are also exported here so each provider can reuse them.
@@ -37,7 +37,7 @@ export interface LaunchOptions {
 	onProcessStarted?: (process: ChildProcess) => void;
 	onStreamEvent?: StreamJsonEventCallback;
 	/**
-	 * Unified tool hooks — provider-agnostic declarations of what should happen
+	 * Unified tool hooks -- provider-agnostic declarations of what should happen
 	 * before/after tool calls. Each provider translates these into its native format
 	 * (OpenCode ESM plugin JS, Claude settings JSON).
 	 */

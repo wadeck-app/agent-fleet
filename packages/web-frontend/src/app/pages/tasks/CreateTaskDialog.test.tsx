@@ -162,7 +162,7 @@ describe('CreateTaskDialog', () => {
 			expect(mockNavigate).toHaveBeenCalledWith('/tasks/task-123');
 		});
 
-		// Regression: onSuccess/onOpenChange must NOT be called —
+		// Regression: onSuccess/onOpenChange must NOT be called --
 		// they trigger setSearchParams({ replace: true }) which overrides the navigation
 		expect(onSuccess).not.toHaveBeenCalled();
 		expect(onOpenChange).not.toHaveBeenCalled();

@@ -26,7 +26,7 @@ import { SplitLayout } from '../_framework/SplitLayout';
  * - PipelineDataTable provides context for left panel
  * - PipelineBody handles row click and sets selectedId
  * - PipelineDetailPanel receives selectedId and fetches item
- * - No event bus — page-level state coordinates table + detail
+ * - No event bus -- page-level state coordinates table + detail
  *
  * Features:
  * - Split-panel responsive layout

@@ -168,7 +168,7 @@ export function TaskInfoCard({ task, collapsible = true, defaultOpen: _defaultOp
 										</td>
 										<td className="py-1.5 text-sm text-foreground">
 											{isEmpty ? (
-												<span className="text-muted-foreground/40">—</span>
+												<span className="text-muted-foreground/40">--</span>
 											) : (
 												<div className="break-words whitespace-pre-wrap">{renderedValue}</div>
 											)}

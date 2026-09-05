@@ -15,9 +15,9 @@ Single source of truth for the shape of every HTTP request/response, WebSocket m
 
 ## Does NOT own
 
-- Runtime HTTP handling — that's web-backend
-- UI rendering — that's web-frontend
-- Business logic — that's web-backend services
+- Runtime HTTP handling -- that's web-backend
+- UI rendering -- that's web-frontend
+- Business logic -- that's web-backend services
 
 ## Dependencies on local packages
 
@@ -33,8 +33,8 @@ Library.
 
 ## Key files
 
-- `src/contracts/tasks.ts` — task API request/response types
-- `src/contracts/flows.ts` — flow API request/response types
-- `src/transport/` — WebSocket/SSE/polling protocol type definitions
-- `src/events/` — backend-to-frontend event name constants and payload types
-- `src/routes/` — route-builder helpers for type-safe path construction
+- `src/contracts/tasks.ts` -- task API request/response types
+- `src/contracts/flows.ts` -- flow API request/response types
+- `src/transport/` -- WebSocket/SSE/polling protocol type definitions
+- `src/events/` -- backend-to-frontend event name constants and payload types
+- `src/routes/` -- route-builder helpers for type-safe path construction

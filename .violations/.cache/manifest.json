@@ -1,25 +1,33 @@
 {
-	"frameworkVersion": "1.20260714213531.21",
-	"files": {
-		"C:\\Workspace_Tooling\\agent-fleet_cli-v2\\.violations\\config.ts": {
-			"mtimeMs": 1786799275206.8958,
-			"compiledPath": "C:\\Workspace_Tooling\\agent-fleet_cli-v2\\.violations\\.cache\\config.js"
-		},
-		"C:\\Workspace_Tooling\\agent-fleet_cli-v2\\.violations\\rules\\no-raw-err-in-cli.ts": {
-			"mtimeMs": 1786799289454.127,
-			"compiledPath": "C:\\Workspace_Tooling\\agent-fleet_cli-v2\\.violations\\.cache\\rules\\no-raw-err-in-cli.js"
-		},
-		"C:\\Workspace_Tooling\\agent-fleet\\.violations\\config.ts": {
-			"mtimeMs": 1787002801910.8926,
-			"compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\config.js"
-		},
-		"C:\\Workspace_Tooling\\agent-fleet\\.violations\\rules\\plugin-rules.ts": {
-			"mtimeMs": 1786911921565.9297,
-			"compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\rules\\plugin-rules.js"
-		},
-		"C:\\Workspace_Tooling\\agent-fleet\\.violations\\rules\\no-raw-err-in-cli.ts": {
-			"mtimeMs": 1786811076015.8054,
-			"compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\rules\\no-raw-err-in-cli.js"
-		}
-	}
+  "frameworkVersion": "2026.9.1-093-f2480599",
+  "files": {
+    "C:\\Workspace_Tooling\\agent-fleet\\.violations\\rules\\no-spawn-without-windows-hide.ts": {
+      "mtimeMs": 1788386171734.3076,
+      "compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\rules\\no-spawn-without-windows-hide.js"
+    },
+    "C:\\Workspace_Tooling\\agent-fleet\\.violations\\rules\\no-spawn-without-windows-hide.test.ts": {
+      "mtimeMs": 1788386194563.7104,
+      "compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\rules\\no-spawn-without-windows-hide.test.test.js"
+    },
+    "C:\\Workspace_Tooling\\agent-fleet\\.violations\\config.ts": {
+      "mtimeMs": 1788417055683.5542,
+      "compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\config.js"
+    },
+    "C:\\Workspace_Tooling\\agent-fleet\\.violations\\rules\\no-raw-err-in-cli.ts": {
+      "mtimeMs": 1787955437314.7837,
+      "compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\rules\\no-raw-err-in-cli.js"
+    },
+    "C:\\Workspace_Tooling\\agent-fleet\\.violations\\rules\\plugin-rules.ts": {
+      "mtimeMs": 1787955439993.2568,
+      "compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\rules\\plugin-rules.js"
+    },
+    "C:\\Workspace_Tooling\\agent-fleet\\.violations\\rules\\no-raw-err-in-cli.test.ts": {
+      "mtimeMs": 1788630595026.0662,
+      "compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\rules\\no-raw-err-in-cli.test.test.js"
+    },
+    "C:\\Workspace_Tooling\\agent-fleet\\.violations\\rules\\plugin-rules.test.ts": {
+      "mtimeMs": 1788630605149.9773,
+      "compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\rules\\plugin-rules.test.test.js"
+    }
+  }
 }
