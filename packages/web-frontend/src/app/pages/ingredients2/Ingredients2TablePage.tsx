@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { Data } from '@framework/components/data/Data';
+import { Data2 } from '@framework/components2/data/Data2';
 import { BulkActionBar } from '@framework/components/advanced/BulkActionBar';
 import { ColumnVisibility } from '@framework/components/columns/ColumnVisibility';
 import { useColumnOrder } from '@framework/components/columns/useColumnOrder';
@@ -12,11 +12,11 @@ import { Page } from '@framework/components/layout/Page';
 import { PageHeader } from '@framework/components/layout/PageHeader';
 import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
 import { Button } from '@framework/components/primitives/Button';
-import { useCacheControl } from '@framework/hooks/data/useCacheControl';
-import { usePagination } from '@framework/hooks/data/usePagination';
-import { useSimpleSearch } from '@framework/hooks/data/useSimpleSearch';
-import { useSorting } from '@framework/hooks/data/useSorting';
-import { useMultiSelect } from '@framework/hooks/utility/useMultiSelect';
+import { useCacheControl2 } from '@framework/hooks2/data/useCacheControl2';
+import { usePagination2 } from '@framework/hooks2/data/usePagination2';
+import { useSimpleSearch } from '@framework/hooks2/data/useSimpleSearch';
+import { useSorting2 } from '@framework/hooks2/data/useSorting2';
+import { useMultiSelect2 } from '@framework/hooks2/utility/useMultiSelect2';
 import { useBulkDeleteState } from '@framework/hooks/useBulkDeleteState';
 import { useCrudSuccessToast } from '@framework/hooks/useCrudSuccessToast';
 import { useDeleteConfirmation } from '@framework/hooks/useDeleteConfirmation';
@@ -31,36 +31,35 @@ import {
 	extractColumnIds,
 	extractDefaultVisible,
 	toColumnVisibilityDefs,
-} from '@framework/utils/TableColumnConfig';
+} from '@framework/utils2/Table2ColumnConfig';
 import type { CreateIngredient, Ingredient, IngredientsListQuery } from '@shared/api/ingredients.contract';
-import { Plus, Trash, X } from 'lucide-react';
+import { Plus, Trash2, X } from 'lucide-react';
 
-import { BulkDeleteWorkflow } from '@app/components/domain/BulkDeleteWorkflow';
-import { IngredientDialog } from '@app/components/domain/IngredientDialog';
+import { BulkDeleteWorkflow, IngredientDialog } from '@app/components/domain';
 
 import { ingredientsService } from '../ingredients/IngredientsService';
 import { useIngredientsCrud } from '../ingredients/useIngredientsCrud';
-import { INGREDIENT_TABLE_COLUMNS, IngredientTable } from './IngredientTable';
+import { INGREDIENT_TABLE2_COLUMNS, IngredientTable2 } from './IngredientTable2';
 
-const STORAGE_ID = 'ingredients' as const;
+const STORAGE_ID = 'ingredients2' as const;
 
-export function IngredientsTablePage() {
+export function Ingredients2TablePage() {
 	const navigate = useNavigate();
 	const { id, mode } = useParams<{ id?: string; mode?: 'new' | 'edit' }>();
 
-	// 
+	// ═══════════════════════════════════════════════════════════════════════════════════════
 	// HEADLESS FEATURES - Each is independent and composable
-	// 
+	// ═══════════════════════════════════════════════════════════════════════════════════════
 
 	// Pagination feature: manages page state and converts to backend query
-	const pagination = usePagination({
-		pageSize: ,
+	const pagination = usePagination2({
+		pageSize: 10,
 		storageId: STORAGE_ID,
-		initialPage: ,
+		initialPage: 1,
 	});
 
 	// Sorting feature: manages multi-column sort and converts to backend query
-	const sorting = useSorting({
+	const sorting = useSorting2({
 		storageId: STORAGE_ID,
 		defaultSort: [{ key: 'name', direction: 'asc' }],
 	});
@@ -74,42 +73,42 @@ export function IngredientsTablePage() {
 	});
 
 	// Cache control feature: explicit cache busting and refresh management
-	const cache = useCacheControl({ enabled: true });
+	const cache = useCacheControl2({ enabled: true });
 
 	// Multi-selection feature: manages selection state
-	const selection = useMultiSelect();
+	const selection = useMultiSelect2();
 
 	// Column visibility feature: manages visible columns with localStorage persistence
-	const columnVisibility = useColumnVisibility(extractColumnIds(INGREDIENT_TABLE_COLUMNS), {
+	const columnVisibility = useColumnVisibility(extractColumnIds(INGREDIENT_TABLE2_COLUMNS), {
 		storageId: STORAGE_ID,
-		defaultVisible: extractDefaultVisible(INGREDIENT_TABLE_COLUMNS),
-		constraints: extractCanHideConstraints(INGREDIENT_TABLE_COLUMNS),
+		defaultVisible: extractDefaultVisible(INGREDIENT_TABLE2_COLUMNS),
+		constraints: extractCanHideConstraints(INGREDIENT_TABLE2_COLUMNS),
 	});
 
 	// Column ordering feature: manages column order with drag & drop
 	const columnOrder = useColumnOrder({
 		storageId: STORAGE_ID,
-		defaultOrder: extractColumnIds(INGREDIENT_TABLE_COLUMNS),
-		constraints: extractCanReorderConstraints(INGREDIENT_TABLE_COLUMNS),
+		defaultOrder: extractColumnIds(INGREDIENT_TABLE2_COLUMNS),
+		constraints: extractCanReorderConstraints(INGREDIENT_TABLE2_COLUMNS),
 	});
 
 	// Apply visibility + ordering to columns
 	const visibleOrderedColumns = useMemo(() => {
-		let cols = INGREDIENT_TABLE_COLUMNS;
+		let cols = INGREDIENT_TABLE2_COLUMNS;
 		cols = applyColumnVisibility(cols, columnVisibility.visibleColumns);
 		cols = applyColumnOrder(cols, columnOrder.columnOrder);
 		return cols;
 	}, [columnVisibility.visibleColumns, columnOrder.columnOrder]);
 
-	// 
+	// ═══════════════════════════════════════════════════════════════════════════════════════
 	// DATA FETCHING - Wrapper around existing service
-	// 
+	// ═══════════════════════════════════════════════════════════════════════════════════════
 
-	/
-	  Fetch ingredients using the composed query from all features.
-	  Data will call this function whenever feature states change.
-	  CRITICAL: Wrapped with useCallback to prevent infinite loops in Data useEffect
-	 /
+	/**
+	 * Fetch ingredients using the composed query from all features.
+	 * Data2 will call this function whenever feature states change.
+	 * CRITICAL: Wrapped with useCallback to prevent infinite loops in Data2 useEffect
+	 */
 	const fetchIngredients = useCallback(
 		async (query: IngredientsListQuery) => {
 			const response = await ingredientsService.getIngredients({
@@ -138,9 +137,9 @@ export function IngredientsTablePage() {
 		[] // No dependencies - ingredientsService and setIngredients are stable
 	);
 
-	// 
+	// ═══════════════════════════════════════════════════════════════════════════════════════
 	// ACTIONS - Domain-specific operations
-	// 
+	// ═══════════════════════════════════════════════════════════════════════════════════════
 
 	// Store fetched ingredients for dialog and version lookups
 	const [ingredients, setIngredients] = useState<Ingredient[]>([]);
@@ -162,7 +161,7 @@ export function IngredientsTablePage() {
 	// Success toast helper
 	const successToast = useCrudSuccessToast('ingredient');
 
-	// Bulk delete state management (centralized hook eliminates ~ lines of boilerplate)
+	// Bulk delete state management (centralized hook eliminates ~60 lines of boilerplate)
 	const bulkDelete = useBulkDeleteState();
 
 	// Dialog state management using URL routing
@@ -171,10 +170,10 @@ export function IngredientsTablePage() {
 		id,
 		items: ingredients,
 		findItem: (items, id) => items.find(i => i.id === id),
-		onNavigateBack: () => navigate('/ingredients'),
+		onNavigateBack: () => navigate('/ingredients2'),
 	});
 
-	// Delete confirmation dialog (centralized hook eliminates ~ lines of boilerplate)
+	// Delete confirmation dialog (centralized hook eliminates ~30 lines of boilerplate)
 	const deleteConfirmation = useDeleteConfirmation({
 		onConfirm: async id => {
 			// Mark as deleting for strike-through effect
@@ -193,7 +192,7 @@ export function IngredientsTablePage() {
 		},
 	});
 
-	// Automatic cleanup after mutation completes (eliminates ~ lines of useEffect boilerplate)
+	// Automatic cleanup after mutation completes (eliminates ~10 lines of useEffect boilerplate)
 	useMutationCleanup({
 		data: ingredients,
 		isMutating: bulkDelete.state.isMutating,
@@ -204,11 +203,11 @@ export function IngredientsTablePage() {
 	const [isDialogRefreshing, setIsDialogRefreshing] = useState(false);
 
 	const handleEdit = (ingredient: Ingredient) => {
-		navigate(`/ingredients/${ingredient.id}/edit`);
+		navigate(`/ingredients2/${ingredient.id}/edit`);
 	};
 
 	const handleCreateNew = () => {
-		navigate('/ingredients/new');
+		navigate('/ingredients2/new');
 	};
 
 	const handleSubmit = async (data: CreateIngredient) => {
@@ -223,9 +222,9 @@ export function IngredientsTablePage() {
 			} else {
 				await createIngredient(data);
 			}
-			// Trigger Data refresh via cache control
+			// Trigger Data2 refresh via cache control
 			await cache.actions.refresh();
-			navigate('/ingredients');
+			navigate('/ingredients2');
 
 			// Show success toast
 			if (isEditing) {
@@ -276,22 +275,22 @@ export function IngredientsTablePage() {
 		}
 	};
 
-	// 
+	// ═══════════════════════════════════════════════════════════════════════════════════════
 	// RENDER
-	// 
+	// ═══════════════════════════════════════════════════════════════════════════════════════
 
 	return (
 		<Page>
 			<PageHeader
-				title="Ingredients v table"
+				title="Ingredients v2 table"
 				onRefresh={cache.actions.refresh}
 				isRefreshing={cache.fstate.isRefreshing}
 				action={
 					<>
 						<ColumnVisibility
-							columns={toColumnVisibilityDefs(INGREDIENT_TABLE_COLUMNS)}
+							columns={toColumnVisibilityDefs(INGREDIENT_TABLE2_COLUMNS)}
 							visibleColumns={columnVisibility.visibleColumns}
-							defaultVisible={new Set(extractDefaultVisible(INGREDIENT_TABLE_COLUMNS))}
+							defaultVisible={new Set(extractDefaultVisible(INGREDIENT_TABLE2_COLUMNS))}
 							onToggle={columnVisibility.toggleColumn}
 							onReset={() => {
 								columnVisibility.resetColumns();
@@ -302,7 +301,7 @@ export function IngredientsTablePage() {
 							isColumnModified={columnVisibility.isColumnModified}
 							onResetColumn={columnVisibility.resetColumn}
 							columnOrder={columnOrder.columnOrder}
-							defaultOrder={extractColumnIds(INGREDIENT_TABLE_COLUMNS)}
+							defaultOrder={extractColumnIds(INGREDIENT_TABLE2_COLUMNS)}
 							onReorderColumns={columnOrder.reorderColumns}
 							isColumnModifiedOrder={columnOrder.isColumnModified}
 							onResetColumnOrder={columnOrder.resetColumn}
@@ -315,10 +314,10 @@ export function IngredientsTablePage() {
 				}
 			/>
 
-			{/ Search Bar /}
-			<div className="mb- flex flex-col gap-">
+			{/* Search Bar */}
+			<div className="mb-4 flex flex-col gap-4">
 				<div className="relative">
-					<div className="mb- text-xs font-medium text-muted-foreground">Search</div>
+					<div className="mb-2 text-xs font-medium text-muted-foreground">Search</div>
 					<Input
 						type="text"
 						value={search.fstate.query}
@@ -330,16 +329,16 @@ export function IngredientsTablePage() {
 							onClick={search.actions.clearQuery}
 							variant="ghost"
 							size="sm"
-							className="absolute top- right- h- w- -translate-y-/ p-"
+							className="absolute top-9 right-2 h-6 w-6 -translate-y-1/2 p-0"
 							aria-label="Clear search"
 						>
-							<X className="h- w-" />
+							<X className="h-4 w-4" />
 						</Button>
 					)}
 				</div>
 			</div>
 
-			{/ Feature Info (for demo purposes - remove in production) /}
+			{/* Feature Info (for demo purposes - remove in production) */}
 			<ActiveFeaturesPanel
 				title="Active Features (UI / Debounced)"
 				features={[
@@ -357,7 +356,7 @@ export function IngredientsTablePage() {
 				]}
 			/>
 
-			{/ Bulk Action Bar /}
+			{/* Bulk Action Bar */}
 			{!selection.fstate.isEmpty && (
 				<BulkActionBar
 					selectionCount={selection.fstate.count}
@@ -366,14 +365,14 @@ export function IngredientsTablePage() {
 					variant="light"
 				>
 					<Button onClick={handleBulkDelete} variant="destructive" size="sm">
-						<Trash className="mr- size-" />
+						<Trash2 className="mr-2 size-4" />
 						Delete
 					</Button>
 				</BulkActionBar>
 			)}
 
-			{/ Data Shell + Table /}
-			<Data
+			{/* Data Shell + Table */}
+			<Data2
 				fetchData={fetchIngredients}
 				pagination={pagination}
 				sorting={sorting}
@@ -383,7 +382,7 @@ export function IngredientsTablePage() {
 				delegateLoadingToChildren={true}
 			>
 				{injectedProps => (
-					<IngredientTable
+					<IngredientTable2
 						{...injectedProps}
 						columns={visibleOrderedColumns}
 						onEdit={handleEdit}
@@ -395,9 +394,9 @@ export function IngredientsTablePage() {
 						onSelectAll={handleSelectAll}
 					/>
 				)}
-			</Data>
+			</Data2>
 
-			{/ Bulk Delete Workflow /}
+			{/* Bulk Delete Workflow */}
 			<BulkDeleteWorkflow
 				open={bulkDelete.state.showDialog}
 				onOpenChange={bulkDelete.actions.setShowDialog}
@@ -408,7 +407,7 @@ export function IngredientsTablePage() {
 				itemTypeName="ingredient"
 				onDeletingChange={ids => {
 					// Only set deletingIds if non-empty (ignore clear - let useMutationCleanup do it)
-					if (ids.size > ) {
+					if (ids.size > 0) {
 						bulkDelete.actions.setDeletingIds(ids);
 					}
 				}}
@@ -421,17 +420,17 @@ export function IngredientsTablePage() {
 				}}
 			/>
 
-			{/ Ingredient Dialog for Create/Edit /}
+			{/* Ingredient Dialog for Create/Edit */}
 			<IngredientDialog
 				open={isOpen}
-				onClose={() => navigate('/ingredients')}
+				onClose={() => navigate('/ingredients2')}
 				ingredient={editingIngredient}
 				onSubmit={handleSubmit}
 				onRefresh={handleRefresh}
 				isRefreshing={isDialogRefreshing}
 			/>
 
-			{/ Delete Confirmation Dialog /}
+			{/* Delete Confirmation Dialog */}
 			<AlertDialogWrapper
 				open={deleteConfirmation.isOpen}
 				onOpenChange={deleteConfirmation.setOpen}
