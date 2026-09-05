@@ -6,6 +6,8 @@ import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 import { type FlowConfig, FlowConfigLoader } from '../../config/FlowConfig';
 import { Daemon } from '../../daemon/Daemon';
@@ -187,6 +189,40 @@ function parseInputArgs(rawInputs: string[]): Record<string, string> {
 	return inputs;
 }
 
+/**
+ * Spawn the daemon as a detached background process (like `flow start` does) and wait
+ * for its port file to appear — avoids the WebSocket race condition of the in-process path.
+ */
+async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Promise<void> {
+	const bundlePath = process.env['LAUNCHER_BUNDLE_OVERRIDE'] ?? fileURLToPath(import.meta.url).replace(/\/cli\/commands\/RunCommand\.[jt]s$/, '');
+	// Resolve the .cjs bundle from the launcher override or the installed bundle location
+	const resolvedBundle = (() => {
+		const override = process.env['LAUNCHER_BUNDLE_OVERRIDE'];
+		if (override) return override;
+		// In the installed binary, __filename points to the flow.cjs bundle.
+		// In dev mode (tsx), we approximate via import.meta.url.
+		try { return fileURLToPath(import.meta.url).replace(/\/cli\/commands\/RunCommand\.[jt]s$/, '/../../flow.cjs'); }
+		catch { return process.argv[1]!; }
+	})();
+
+	const child = spawn(process.execPath, [resolvedBundle], {
+		detached: true,
+		stdio: 'ignore',
+		windowsHide: true,
+		env: { ...process.env, FLOW_DAEMON_MODE: '1' },
+	});
+	child.unref();
+
+	// Poll for port file
+	const portFile = path.join(daemonDir, 'config.port');
+	const deadline = Date.now() + timeoutMs;
+	while (Date.now() < deadline) {
+		if (fs.existsSync(portFile)) return;
+		await new Promise(r => setTimeout(r, 50));
+	}
+	throw new Error(`Daemon did not start within ${timeoutMs}ms (port file not found: ${portFile})`);
+}
+
 async function sendToDaemon(
 	cmd: Extract<ClientCommand, { type: 'run' }>,
 	config: FlowConfig,
@@ -202,7 +238,7 @@ async function sendToDaemon(
 	} catch (err) {
 		if (!(err instanceof DaemonNotRunningError)) throw err;
 		try {
-			await Daemon.start(config);
+			await spawnDaemonBackground(daemonDir);
 			return (await makeClient().send('run', cmd)) as DaemonResponse;
 		} catch (e2) {
 			console.error('Daemon could not be started:', e2);
