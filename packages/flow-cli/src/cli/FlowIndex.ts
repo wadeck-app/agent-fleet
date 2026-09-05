@@ -46,7 +46,6 @@ async function registerDaemonCommands(program: Command): Promise<void> {
 			}
 			const bundlePath = process.env['LAUNCHER_BUNDLE_OVERRIDE'] ?? fileURLToPath(import.meta.url);
 			const child = spawn(process.execPath, [bundlePath], {
-				detached: true,
 				stdio: 'ignore',
 				windowsHide: true,
 				env: { ...process.env, FLOW_DAEMON_MODE: '1' },
