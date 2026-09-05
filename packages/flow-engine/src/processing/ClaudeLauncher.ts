@@ -324,7 +324,6 @@ export class ClaudeLauncher {
 				stdio: ['pipe', 'pipe', 'pipe'],
 				shell: false,
 				windowsHide: true,
-				detached: true,
 				env: processEnvBackground,
 			});
 
