@@ -209,12 +209,34 @@ async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Pro
 	const portFile = path.join(daemonDir, 'config.port');
 	try { fs.unlinkSync(portFile); } catch { /* file may not exist */ }
 
-	const child = spawn(process.execPath, [resolvedBundle], {
-		stdio: 'ignore',
-		windowsHide: true,
-		env: { ...process.env, FLOW_DAEMON_MODE: '1' },
-	});
-	child.unref();
+	if (process.platform === 'win32') {
+		const vbsPath = path.join(os.tmpdir(), `flow-daemon-run-${Date.now()}.vbs`);
+		const safeNode = process.execPath.replace(/"/g, '""');
+		const safeBundle = resolvedBundle.replace(/"/g, '""');
+		const overrideLines = process.env['LAUNCHER_BUNDLE_OVERRIDE']
+			? [`oShell.Environment("Process")("LAUNCHER_BUNDLE_OVERRIDE") = "${process.env['LAUNCHER_BUNDLE_OVERRIDE'].replace(/"/g, '""')}"`]
+			: [];
+		fs.writeFileSync(vbsPath, [
+			'Dim oShell',
+			'Set oShell = CreateObject("WScript.Shell")',
+			'oShell.Environment("Process")("FLOW_DAEMON_MODE") = "1"',
+			...overrideLines,
+			`oShell.Run """${safeNode}"" ""${safeBundle}""", 0, False`,
+		].join('\r\n'));
+		const wscript = spawn('wscript.exe', [vbsPath], {
+			detached: true,
+			stdio: 'ignore',
+			windowsHide: true,
+			env: { ...process.env, FLOW_DAEMON_MODE: '1' },
+		});
+		wscript.unref();
+	} else {
+		const child = spawn(process.execPath, [resolvedBundle], {
+			stdio: 'ignore',
+			env: { ...process.env, FLOW_DAEMON_MODE: '1' },
+		});
+		child.unref();
+	}
 
 	// Poll for port file written by the freshly-spawned daemon
 	const deadline = Date.now() + timeoutMs;

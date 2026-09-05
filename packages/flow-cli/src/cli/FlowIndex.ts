@@ -45,12 +45,30 @@ async function registerDaemonCommands(program: Command): Promise<void> {
 				return;
 			}
 			const bundlePath = process.env['LAUNCHER_BUNDLE_OVERRIDE'] ?? fileURLToPath(import.meta.url);
-			const child = spawn(process.execPath, [bundlePath], {
-				stdio: 'ignore',
-				windowsHide: true,
-				env: { ...process.env, FLOW_DAEMON_MODE: '1' },
-			});
-			child.unref();
+			if (process.platform === 'win32') {
+				const vbsPath = path.join(os.tmpdir(), `flow-daemon-start-${Date.now()}.vbs`);
+				const safeNode = process.execPath.replace(/"/g, '""');
+				const safeBundle = bundlePath.replace(/"/g, '""');
+				fs.writeFileSync(vbsPath, [
+					'Dim oShell',
+					'Set oShell = CreateObject("WScript.Shell")',
+					'oShell.Environment("Process")("FLOW_DAEMON_MODE") = "1"',
+					`oShell.Run """${safeNode}"" ""${safeBundle}""", 0, False`,
+				].join('\r\n'));
+				const wscript = spawn('wscript.exe', [vbsPath], {
+					detached: true,
+					stdio: 'ignore',
+					windowsHide: true,
+					env: { ...process.env, FLOW_DAEMON_MODE: '1' },
+				});
+				wscript.unref();
+			} else {
+				const child = spawn(process.execPath, [bundlePath], {
+					stdio: 'ignore',
+					env: { ...process.env, FLOW_DAEMON_MODE: '1' },
+				});
+				child.unref();
+			}
 			process.stdout.write('[ok] daemon starting\n');
 		});
 
