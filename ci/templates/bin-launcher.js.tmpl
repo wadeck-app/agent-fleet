@@ -50,15 +50,30 @@ const bundlePath = require('path').join(__dirname, '..', '{{CLI_NAME}}.cjs');
 // redirected to NUL and swallowing all output. Bypass the launcher for short-lived
 // read-only commands so their output reaches the terminal.
 const PASSTHROUGH_FLAGS = ['--version', '-v', '--pid', '--help', '-h'];
-const _args = process.argv.slice(2);
+const _rawArgs = process.argv.slice(2);
+
+// --cli-background / --cli-foreground: explicit stdio override flags.
+// Strip them before passing args to the underlying command.
+// Last flag wins when both are present.
+var _hasBackground = _rawArgs.includes('--cli-background');
+var _hasForeground = _rawArgs.includes('--cli-foreground');
+var _args = _rawArgs.filter(function(a) { return a !== '--cli-background' && a !== '--cli-foreground'; });
+
+var _stdio;
+if (!_hasBackground && !_hasForeground) {
+  // Auto-detect: pipe context (non-TTY) → NUL handles to prevent AllocConsole()
+  // from libuv when a GUI-parent (flow.exe SUBSYSTEM:WINDOWS) passes PIPE handles.
+  _stdio = process.stdin.isTTY ? 'inherit' : 'ignore';
+} else {
+  // Last flag wins
+  _stdio = 'ignore';
+  for (var _i = 0; _i < _rawArgs.length; _i++) {
+    if (_rawArgs[_i] === '--cli-background') _stdio = 'ignore';
+    if (_rawArgs[_i] === '--cli-foreground') _stdio = 'inherit';
+  }
+}
 
 function _runWithExit(bin, binArgs) {
-  // For 'start': use stdio:'ignore' (NUL handles) to prevent PIPE handles inherited from
-  // CliTransport flowing through flow.exe (SUBSYSTEM:WINDOWS, GUI) into node flow.cjs.
-  // A GUI parent with PIPE stdio causes libuv to call AllocConsole() in child processes,
-  // producing visible terminal windows during daemon worker execution.
-  // For all other commands: stdio:'inherit' so output reaches the terminal.
-  var _stdio = (process.platform === 'win32' && binArgs[0] === 'start') ? 'ignore' : 'inherit';
   try {
     execFileSync(bin, binArgs, {
       stdio: _stdio,
