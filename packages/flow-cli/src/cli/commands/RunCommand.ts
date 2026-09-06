@@ -1,12 +1,12 @@
-import { DaemonNotRunningError, createDaemonClient } from '@wadeck-app/singleton-daemon-kit';
 import { ConfigDir } from '@wadeck-app/shared-cli';
+import { DaemonNotRunningError, createDaemonClient } from '@wadeck-app/singleton-daemon-kit';
 import type { Command } from 'commander';
 import type { FlowDefinition, InputDefinition } from 'flow-engine/types';
 import * as yaml from 'js-yaml';
+import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
@@ -14,6 +14,7 @@ import { type FlowConfig, FlowConfigLoader } from '../../config/FlowConfig';
 import { Daemon } from '../../daemon/Daemon';
 import type { ClientCommand, DaemonResponse, ExecutionState } from '../../ipc/Protocol';
 import { ExecutionStore } from '../../storage/ExecutionStore';
+
 // violations-suppress-end: ts/no-deep-relative
 
 type FlowCommands = { run?: (payload: unknown) => Promise<DaemonResponse> };
@@ -196,35 +197,49 @@ function parseInputArgs(rawInputs: string[]): Record<string, string> {
  * for its port file to appear -- avoids the WebSocket race condition of the in-process path.
  */
 async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Promise<void> {
-	const bundlePath = process.env['LAUNCHER_BUNDLE_OVERRIDE'] ?? fileURLToPath(import.meta.url).replace(/\/cli\/commands\/RunCommand\.[jt]s$/, '');
+	const bundlePath =
+		process.env['LAUNCHER_BUNDLE_OVERRIDE'] ??
+		fileURLToPath(import.meta.url).replace(/\/cli\/commands\/RunCommand\.[jt]s$/, '');
 	// Resolve the .cjs bundle from the launcher override or the installed bundle location
 	const resolvedBundle = (() => {
 		const override = process.env['LAUNCHER_BUNDLE_OVERRIDE'];
 		if (override) return override;
 		// In the installed binary, __filename points to the flow.cjs bundle.
 		// In dev mode (tsx), we approximate via import.meta.url.
-		try { return fileURLToPath(import.meta.url).replace(/\/cli\/commands\/RunCommand\.[jt]s$/, '/../../flow.cjs'); }
-		catch { return process.argv[1]!; }
+		try {
+			return fileURLToPath(import.meta.url).replace(/\/cli\/commands\/RunCommand\.[jt]s$/, '/../../flow.cjs');
+		} catch {
+			return process.argv[1]!;
+		}
 	})();
 
 	// Remove stale port file before spawning so the poll below only resolves on a fresh write
 	const portFile = path.join(daemonDir, 'config.port');
-	try { fs.unlinkSync(portFile); } catch { /* file may not exist */ }
+	try {
+		fs.unlinkSync(portFile);
+	} catch {
+		/* file may not exist */
+	}
 
 	if (process.platform === 'win32') {
 		const vbsPath = path.join(os.tmpdir(), `flow-daemon-run-${Date.now()}.vbs`);
 		const safeNode = process.execPath.replace(/"/g, '""');
 		const safeBundle = resolvedBundle.replace(/"/g, '""');
 		const overrideLines = process.env['LAUNCHER_BUNDLE_OVERRIDE']
-			? [`oShell.Environment("Process")("LAUNCHER_BUNDLE_OVERRIDE") = "${process.env['LAUNCHER_BUNDLE_OVERRIDE'].replace(/"/g, '""')}"`]
+			? [
+					`oShell.Environment("Process")("LAUNCHER_BUNDLE_OVERRIDE") = "${process.env['LAUNCHER_BUNDLE_OVERRIDE'].replace(/"/g, '""')}"`,
+				]
 			: [];
-		fs.writeFileSync(vbsPath, [
-			'Dim oShell',
-			'Set oShell = CreateObject("WScript.Shell")',
-			'oShell.Environment("Process")("FLOW_DAEMON_MODE") = "1"',
-			...overrideLines,
-			`oShell.Run """${safeNode}"" ""${safeBundle}""", 0, False`,
-		].join('\r\n'));
+		fs.writeFileSync(
+			vbsPath,
+			[
+				'Dim oShell',
+				'Set oShell = CreateObject("WScript.Shell")',
+				'oShell.Environment("Process")("FLOW_DAEMON_MODE") = "1"',
+				...overrideLines,
+				`oShell.Run """${safeNode}"" ""${safeBundle}""", 0, False`,
+			].join('\r\n')
+		);
 		const wscript = spawn('wscript.exe', [vbsPath], {
 			detached: true,
 			stdio: 'ignore',
@@ -265,7 +280,20 @@ async function sendToDaemon(
 		if (!(err instanceof DaemonNotRunningError)) throw err;
 		try {
 			await spawnDaemonBackground(daemonDir);
-			return (await makeClient().send('run', cmd)) as DaemonResponse;
+			// On Windows the daemon writes the port file before the TCP server is ready.
+			// Retry with backoff until the server accepts connections.
+			let lastErr: unknown;
+			for (let attempt = 0; attempt < 8; attempt++) {
+				try {
+					return (await makeClient().send('run', cmd)) as DaemonResponse;
+				} catch (eRetry) {
+					const code = (eRetry as NodeJS.ErrnoException).code;
+					if (code !== 'ECONNRESET' && !(eRetry instanceof DaemonNotRunningError)) throw eRetry;
+					lastErr = eRetry;
+					await new Promise(r => setTimeout(r, 150 * (attempt + 1)));
+				}
+			}
+			throw lastErr;
 		} catch (e2) {
 			console.error('Daemon could not be started:', e2);
 			process.exit(3); // D34: exit 3 = daemon start failed
@@ -276,12 +304,14 @@ async function sendToDaemon(
 export function registerRunCommand(program: Command): void {
 	program
 		.command('run <flowRef>')
-		.description('Run a flow by file path or flow ID (requires daemon)\n' +
-			'  <flowRef>  Path to .yaml file or flow ID\n' +
-			'  -i key=value  Pass input (repeatable); e.g. -i name=Alice -i count=3\n' +
-			'  --wait        Block until execution completes (default: fire-and-forget)\n' +
-			'  --timeout     Timeout for --wait, e.g. 30s, 5m, 1h (default: 10m)\n' +
-			'  --flow-id     Select a specific flow ID when YAML contains multiple flows')
+		.description(
+			'Run a flow by file path or flow ID (requires daemon)\n' +
+				'  <flowRef>  Path to .yaml file or flow ID\n' +
+				'  -i key=value  Pass input (repeatable); e.g. -i name=Alice -i count=3\n' +
+				'  --wait        Block until execution completes (default: fire-and-forget)\n' +
+				'  --timeout     Timeout for --wait, e.g. 30s, 5m, 1h (default: 10m)\n' +
+				'  --flow-id     Select a specific flow ID when YAML contains multiple flows'
+		)
 		.option(
 			'-i, --input <key=value>',
 			'Input key=value (repeatable)',
