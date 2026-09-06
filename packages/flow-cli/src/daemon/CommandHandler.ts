@@ -297,7 +297,13 @@ export class CommandHandler {
 			);
 		}
 
-		const depends = new Map<string, string[]>(flow.steps.map((s: FlowStep) => [s.id, s.depends ?? []]));
+		// parent implicitly depends on the parent step
+		const depends = new Map<string, string[]>(
+			flow.steps.map((s: FlowStep) => {
+				const explicit = s.depends ?? [];
+				return [s.id, s.parent && !explicit.includes(s.parent) ? [...explicit, s.parent] : explicit];
+			})
+		);
 		const assignable = (
 			resolvedGlobalEnv
 				? flow.steps.map((s: FlowStep) =>
