@@ -316,7 +316,12 @@ export class OutputExtractor {
 	/**
 	 * Convert value to target type
 	 */
-	private convertType(value: any, targetType: VariableType, varName: string, stepId: string): any {
+	private convertType(value: any, targetType: VariableType | undefined, varName: string, stepId: string): any {
+		// No type declared — return value as-is
+		if (!targetType) {
+			return value;
+		}
+
 		// If value is already the right type, return as-is
 		if (typeof value === targetType) {
 			return value;
