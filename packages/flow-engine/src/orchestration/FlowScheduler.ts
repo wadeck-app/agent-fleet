@@ -400,7 +400,9 @@ export class FlowScheduler {
 	inject(steps: SchedulerStep[]): ReadyItem[] {
 		for (const step of steps) {
 			this.steps.set(step.id, step);
-			const deps = step.depends ?? [];
+			// parent implicitly depends on the parent step
+			const explicit = step.depends ?? [];
+			const deps = step.parent && !explicit.includes(step.parent) ? [...explicit, step.parent] : explicit;
 			this.originalDeps.set(step.id, new Set(deps));
 			// Only wait on deps not already completed
 			const remaining = new Set(deps.filter(d => !this.completedSteps.has(d)));
