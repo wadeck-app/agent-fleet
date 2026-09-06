@@ -69,7 +69,7 @@ export class SemanticValidator {
 					this.issueCollector.addIssue({
 						severity: 'error',
 						code: ValidationCode.INVALID_VALUE,
-						message: `Step '${step.id}' declares both parent='${parentId}' and depends=['${parentId}', ...] — parent already implies dependency; remove '${parentId}' from depends`,
+						message: `Step '${step.id}' declares both parent='${parentId}' and depends=['${parentId}', ...] - parent already implies dependency; remove '${parentId}' from depends`,
 						location: { stepId: step.id, field: 'depends' },
 						suggestion: `Remove '${parentId}' from the depends array; parent='${parentId}' already establishes the dependency`,
 					});
