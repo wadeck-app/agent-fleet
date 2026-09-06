@@ -185,7 +185,14 @@ export class FlowScheduler {
 				);
 				if (hasPending) {
 					this.deferredOutcomes.set(stepId, { type: 'completed', outputs: outcome.outputs });
-					return [];
+					// Release only sub-step dependents (children that depend on this step).
+					// Non-sub-step dependents (e.g. handoff) stay blocked until parent fully completes.
+					for (const [depId, depDeps] of this.pendingDeps) {
+						if (depDeps.has(stepId) && this.childToParent.get(depId) === stepId) {
+							depDeps.delete(stepId);
+						}
+					}
+					return this.collectReady();
 				}
 			}
 
