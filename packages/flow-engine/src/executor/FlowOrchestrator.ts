@@ -121,7 +121,13 @@ export class FlowOrchestrator {
 		stepOutputs: Map<string, Record<string, any>>,
 		onTraceUpdate?: (trace: FlowTrace) => void
 	): Promise<FlowExecutionResult> {
-		const depends = new Map<string, string[]>(flow.steps.map((s: FlowStep) => [s.id, s.depends ?? []]));
+		// parent implicitly depends on the parent step; auto-inject to avoid redundant YAML declarations
+		const depends = new Map<string, string[]>(
+			flow.steps.map((s: FlowStep) => {
+				const explicit = s.depends ?? [];
+				return [s.id, s.parent && !explicit.includes(s.parent) ? [...explicit, s.parent] : explicit];
+			})
+		);
 
 		// Resolve global env templates once; step-level env merges on top
 		const resolvedGlobalEnv: Record<string, string> | undefined = flow.env

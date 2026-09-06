@@ -44,9 +44,12 @@ export class DAGBuilder {
 				throw new DAGBuildError(`Duplicate step ID: ${step.id}`, step.id);
 			}
 
+			// parent implicitly depends on the parent step completing first
+			const explicitDeps = step.depends || [];
+			const parentDep = step.parent && !explicitDeps.includes(step.parent) ? [step.parent] : [];
 			nodes.set(step.id, {
 				step,
-				dependencies: step.depends || [],
+				dependencies: [...explicitDeps, ...parentDep],
 				dependents: [],
 			});
 		}
