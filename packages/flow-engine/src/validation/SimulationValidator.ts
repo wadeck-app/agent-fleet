@@ -367,7 +367,9 @@ export class SimulationValidator {
 			const sourceStepId = stepsRef[1]!;
 			const outputKey = stepsRef[2]!;
 			const sourceStep = flow.steps.find(s => s.id === sourceStepId);
-			if (sourceStep?.output && Object.keys(sourceStep.output).length > 0) {
+			// rawOutput, stdout, stderr are always available regardless of output: config
+			const implicitKeys = new Set(['rawOutput', 'response', 'stdout', 'stderr', 'exitCode', 'success']);
+			if (sourceStep?.output && Object.keys(sourceStep.output).length > 0 && !implicitKeys.has(outputKey)) {
 				if (!(outputKey in sourceStep.output)) {
 					this.issueCollector.addIssue({
 						severity: 'error',
