@@ -61,9 +61,10 @@ var _args = _rawArgs.filter(function(a) { return a !== '--cli-background' && a !
 
 var _stdio;
 if (!_hasBackground && !_hasForeground) {
-  // Auto-detect: pipe context (non-TTY) → NUL handles to prevent AllocConsole()
-  // from libuv when a GUI-parent (flow.exe SUBSYSTEM:WINDOWS) passes PIPE handles.
-  _stdio = process.stdin.isTTY ? 'inherit' : 'ignore';
+  // TTY detection disabled: always inherit so subprocess output (e.g. task type list | grep)
+  // reaches the pipe rather than being discarded by 'ignore'.
+  // _stdio = process.stdin.isTTY ? 'inherit' : 'ignore';
+  _stdio = 'inherit';
 } else {
   // Last flag wins
   _stdio = 'ignore';
