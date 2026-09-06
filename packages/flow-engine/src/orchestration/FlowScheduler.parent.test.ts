@@ -338,3 +338,123 @@ describe('FlowScheduler — parent-blocking sub-steps', () => {
 		});
 	});
 });
+
+// ─── Static child re-queue on parent restart ──────────────────────────────────
+
+describe('FlowScheduler — static child re-queue on parent restart', () => {
+	it('re-queues a static child after the parent is restarted due to child failure', () => {
+		const ctx = makeContext();
+		const scheduler = new FlowScheduler(ctx);
+
+		// Static child declared at start(), explicitly depends on parent
+		const steps: SchedulerStep[] = [makeStep('parent'), makeStep('child', ['parent'], { parent: 'parent' })];
+		const depends = new Map<string, string[]>([
+			['parent', []],
+			['child', ['parent']],
+		]);
+		scheduler.start(steps, depends);
+
+		// Run 1: parent dispatched, completes (deferred since child is pending)
+		scheduler.acknowledge('parent');
+		const afterParent1 = succeed(scheduler, 'parent');
+		// child's dep on parent is released → child becomes ready
+		expect(afterParent1.some(r => r.stepId === 'child')).toBe(true);
+
+		// Child fails → restart-on-first-failure → parent re-queued, child re-queued
+		scheduler.acknowledge('child');
+		const afterChildFail = fail(scheduler, 'child', 'validation error');
+		expect(scheduler.hasFailed()).toBe(false);
+		expect(afterChildFail.some(r => r.stepId === 'parent')).toBe(true);
+
+		// Run 2: parent dispatched again, completes (deferred), static child re-queued
+		scheduler.acknowledge('parent');
+		const afterParent2 = succeed(scheduler, 'parent');
+		expect(afterParent2.some(r => r.stepId === 'child')).toBe(true);
+
+		// Child succeeds on second run → tryFireDeferredParent → flow completes
+		scheduler.acknowledge('child');
+		succeed(scheduler, 'child');
+		expect(scheduler.isTerminal()).toBe(true);
+	});
+
+	it('re-queues both static children (chain: write → check) after parent restart', () => {
+		const ctx = makeContext();
+		const scheduler = new FlowScheduler(ctx);
+
+		// Two static children: write (depends on parent), check (depends on parent + write)
+		const steps: SchedulerStep[] = [
+			makeStep('parent'),
+			makeStep('write', ['parent'], { parent: 'parent' }),
+			makeStep('check', ['parent', 'write'], { parent: 'parent' }),
+		];
+		const depends = new Map<string, string[]>([
+			['parent', []],
+			['write', ['parent']],
+			['check', ['parent', 'write']],
+		]);
+		scheduler.start(steps, depends);
+
+		// Run 1: parent → (write becomes ready, check still waits on write)
+		scheduler.acknowledge('parent');
+		const r1 = succeed(scheduler, 'parent');
+		expect(r1.some(ri => ri.stepId === 'write')).toBe(true);
+		expect(r1.some(ri => ri.stepId === 'check')).toBe(false);
+
+		// write completes → check becomes ready
+		scheduler.acknowledge('write');
+		const r2 = succeed(scheduler, 'write');
+		expect(r2.some(ri => ri.stepId === 'check')).toBe(true);
+
+		// check fails → restart (restart-on-first-failure)
+		scheduler.acknowledge('check');
+		const afterCheckFail = fail(scheduler, 'check', 'taskid-error');
+		expect(scheduler.hasFailed()).toBe(false);
+		expect(afterCheckFail.some(ri => ri.stepId === 'parent')).toBe(true);
+
+		// Run 2: parent re-runs → write re-queued → check re-queued (both static)
+		scheduler.acknowledge('parent');
+		const r3 = succeed(scheduler, 'parent');
+		expect(r3.some(ri => ri.stepId === 'write')).toBe(true);
+		expect(r3.some(ri => ri.stepId === 'check')).toBe(false);
+
+		scheduler.acknowledge('write');
+		const r4 = succeed(scheduler, 'write');
+		expect(r4.some(ri => ri.stepId === 'check')).toBe(true);
+
+		scheduler.acknowledge('check');
+		succeed(scheduler, 'check');
+		expect(scheduler.isTerminal()).toBe(true);
+	});
+
+	it('fails parent terminally after maxSubStepIterations with static child', () => {
+		const ctx = makeContext();
+		const scheduler = new FlowScheduler(ctx);
+
+		const steps: SchedulerStep[] = [
+			makeStep('parent', [], { maxSubStepIterations: 1 }),
+			makeStep('child', ['parent'], { parent: 'parent' }),
+		];
+		const depends = new Map<string, string[]>([
+			['parent', []],
+			['child', ['parent']],
+		]);
+		scheduler.start(steps, depends);
+
+		// Run 1: child fails → iterations=1, maxIterations=1 → still re-queued (1 <= 1)
+		scheduler.acknowledge('parent');
+		succeed(scheduler, 'parent');
+		scheduler.acknowledge('child');
+		const r1 = fail(scheduler, 'child', 'err1');
+		expect(scheduler.hasFailed()).toBe(false);
+		expect(r1.some(ri => ri.stepId === 'parent')).toBe(true);
+
+		// Run 2: child fails again → iterations=2 > maxIterations=1 → terminal failure
+		scheduler.acknowledge('parent');
+		succeed(scheduler, 'parent');
+		scheduler.acknowledge('child');
+		fail(scheduler, 'child', 'err2');
+
+		expect(scheduler.hasFailed()).toBe(true);
+		expect(scheduler.isTerminal()).toBe(true);
+	});
+});

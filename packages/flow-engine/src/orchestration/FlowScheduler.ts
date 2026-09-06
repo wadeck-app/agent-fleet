@@ -105,6 +105,13 @@ export class FlowScheduler {
 	 * Used to populate context.subSteps for the next parent execution.
 	 */
 	private readonly subStepFailedOutputs = new Map<string, Map<string, Record<string, unknown>>>();
+	/**
+	 * Static children declared at flow start (via start()). On parent restart these are
+	 * re-queued automatically so the sub-step validates the fresh parent output.
+	 * Dynamic children (injected via inject()) are NOT tracked here — callers re-inject
+	 * them after each parent run as needed (e.g., MCP provideSteps pattern).
+	 */
+	private readonly staticChildren = new Map<string, Set<string>>();
 	/** Registered sub-step strategies, keyed by strategy name. */
 	private readonly strategies: Map<string, SubStepStrategy>;
 
@@ -140,6 +147,11 @@ export class FlowScheduler {
 		// Register parent-child relationships declared in the initial step set
 		for (const step of steps) {
 			if (step.parent) {
+				// Track as a static child so it gets re-queued when the parent restarts
+				if (!this.staticChildren.has(step.parent)) {
+					this.staticChildren.set(step.parent, new Set());
+				}
+				this.staticChildren.get(step.parent)!.add(step.id);
 				this.registerParentChild(step.id, step.parent);
 			}
 		}
@@ -337,10 +349,9 @@ export class FlowScheduler {
 			}
 			this.context.subSteps = subStepsMap;
 
-			// Clear parent's children tracking so re-run starts with an empty child set.
-			// Old children (from this run) may still be in-flight; they complete harmlessly
-			// since tryFireDeferredParent checks the new (empty/updated) children set.
-			this.parentToChildren.set(parentId, new Set());
+			// Re-queue static children for the next run so they validate the fresh parent
+			// output. Dynamic (inject()-based) children are re-injected by the caller.
+			this.requeueChildrenForParent(parentId);
 
 			// Clear parent's previous outputs — it must re-execute to produce new ones
 			this.outputs.delete(parentId);
@@ -678,11 +689,52 @@ export class FlowScheduler {
 		}
 		this.context.subSteps = subStepsMap;
 
-		this.parentToChildren.set(parentId, new Set());
+		// Re-queue static children for the next run so they validate the fresh parent output.
+		this.requeueChildrenForParent(parentId);
 		this.outputs.delete(parentId);
 		this.context.stepOutputs.delete(parentId);
 		this.pendingDeps.set(parentId, new Set());
 		return this.collectReady();
+	}
+
+	/**
+	 * Re-queue static children (declared at start()) for the next run of a restarted parent.
+	 * Two-phase: first clear all static children from terminal sets, then rebuild their
+	 * pendingDeps (always waiting for the parent dep, plus any sibling deps that haven't
+	 * completed yet). Dynamic children (inject()-based) are not touched — callers
+	 * re-inject them after each parent run as needed.
+	 */
+	private requeueChildrenForParent(parentId: string): void {
+		const staticChildIds = this.staticChildren.get(parentId);
+		const newChildrenSet = new Set<string>();
+
+		if (staticChildIds && staticChildIds.size > 0) {
+			// Phase 1: remove all static children from terminal sets so they can re-run
+			for (const childId of staticChildIds) {
+				this.supersededSteps.delete(childId);
+				this.completedSteps.delete(childId);
+				this.inFlightSteps.delete(childId);
+				this.outputs.delete(childId);
+				this.context.stepOutputs.delete(childId);
+				newChildrenSet.add(childId);
+			}
+
+			// Phase 2: rebuild pendingDeps after all children are cleared (order-independent)
+			for (const childId of staticChildIds) {
+				const origDeps = this.originalDeps.get(childId) ?? new Set<string>();
+				const pendingForChild = new Set<string>();
+				for (const dep of origDeps) {
+					// Always wait for parent (being re-run); keep other unmet deps
+					if (dep === parentId || !this.completedSteps.has(dep)) {
+						pendingForChild.add(dep);
+					}
+				}
+				this.pendingDeps.set(childId, pendingForChild);
+			}
+		}
+
+		// Reset parentToChildren: static children only (dynamic will be re-injected by caller)
+		this.parentToChildren.set(parentId, newChildrenSet);
 	}
 
 	private handleLoop(failedStepId: string, onFailure: FailureConfig): ReadyItem[] {

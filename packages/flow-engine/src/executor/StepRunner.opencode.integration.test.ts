@@ -22,16 +22,19 @@
  * See also: StepRunner.model.integration.test.ts for the Claude equivalent.
  */
 import { execSync, spawn } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ClaudeModelProvider } from '../processing/ClaudeModelProvider';
 import { OpenCodeModelProvider } from '../processing/OpenCodeModelProvider';
 import type { StreamJsonEvent } from '../processing/StreamJsonParser';
-import type { LiveLogEntry, ModelFlowStep, ModelStepMeta, Workspace } from '../types';
+import type { TemplateContext } from '../processing/TemplateRenderer';
+import type { FlowDefinition, LiveLogEntry, ModelFlowStep, ModelStepMeta, Workspace } from '../types';
+import { FlowOrchestrator } from './FlowOrchestrator';
 import { StepRunner } from './StepRunner';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -835,5 +838,358 @@ describe('Flow-level feature tests (mock providers)', () => {
 			}
 		},
 		FLOW_TEST_TIMEOUT
+	);
+});
+
+// ─── Helpers for sub-step retry integration tests ────────────────────────────
+
+/**
+ * Build a counter-based multi-response mock .mjs script.
+ * The script tracks call count via a file and returns successive responses from the array.
+ * Paths and responses are embedded directly so no extra env vars are needed in the subprocess.
+ */
+function buildMultiResponseMock(responses: string[], counterFilePath: string): string {
+	// Forward-slash paths work in node on all platforms
+	const safeCounter = counterFilePath.replace(/\\/g, '/');
+	return `#!/usr/bin/env node
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+
+const COUNTER_FILE = ${JSON.stringify(safeCounter)};
+const RESPONSES = ${JSON.stringify(responses)};
+
+const n = existsSync(COUNTER_FILE) ? parseInt(readFileSync(COUNTER_FILE, 'utf8').trim() || '0', 10) : 0;
+const response = RESPONSES[Math.min(n, RESPONSES.length - 1)] ?? 'fallback-response';
+writeFileSync(COUNTER_FILE, String(n + 1));
+
+const sessionId = 'mock-session-' + Math.random().toString(36).slice(2, 10);
+const messageId = 'msg-' + Math.random().toString(36).slice(2, 10);
+const now = Date.now();
+const emit = (obj) => process.stdout.write(JSON.stringify(obj) + '\\n');
+emit({ type: 'step_start', timestamp: now, sessionID: sessionId, part: { type: 'step-start', messageID: messageId, sessionID: sessionId, snapshot: 'mock' } });
+emit({ type: 'text', timestamp: now + 10, sessionID: sessionId, part: { type: 'text', text: response, time: { start: now + 10, end: now + 50 } } });
+emit({ type: 'step_finish', timestamp: now + 60, sessionID: sessionId, part: { type: 'step-finish', reason: 'stop', messageID: messageId, sessionID: sessionId, tokens: { total: 100, input: 10, output: 5, reasoning: 0, cache: { write: 85, read: 0 } }, cost: 0.001 } });
+process.exit(0);
+`;
+}
+
+function makeOrchestratorWorkspace(): Workspace {
+	return {
+		id: 'substep-test-ws',
+		path: process.cwd(),
+		metaDir: process.cwd(),
+		mode: 'shared',
+		concurrency: { key: 'substep-test', activeTasks: new Set(), locked: false },
+		createdAt: new Date().toISOString(),
+		lastUsedAt: new Date().toISOString(),
+		usageCount: 0,
+	};
+}
+
+function makeOrchestrator(): FlowOrchestrator {
+	const runner = new StepRunner({
+		interactive: false,
+		providers: new Map([['opencode', new OpenCodeModelProvider()]]),
+	});
+	return new FlowOrchestrator(runner);
+}
+
+// ─── Sub-step retry loop: classify validation (01_triage concept) ────────────
+
+describe('Sub-step retry loop: classify validation (01_triage concept)', () => {
+	const SUBSTEP_TIMEOUT = 60_000;
+
+	let tmpDir: string;
+	let mockPath: string;
+	let counterFile: string;
+	let prevMockPath: string | undefined;
+
+	beforeEach(() => {
+		tmpDir = mkdtempSync(join(tmpdir(), 'flow-substep-classify-'));
+		mockPath = join(tmpDir, 'multi-mock.mjs');
+		counterFile = join(tmpDir, 'counter.txt');
+		prevMockPath = process.env['OPENCODE_MOCK_PATH'];
+	});
+
+	afterEach(() => {
+		if (prevMockPath === undefined) {
+			delete process.env['OPENCODE_MOCK_PATH'];
+		} else {
+			process.env['OPENCODE_MOCK_PATH'] = prevMockPath;
+		}
+		rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	function makeClassifyFlow(maxSubStepIterations: number): FlowDefinition {
+		return {
+			id: 'test-classify-retry',
+			version: '1.0.0',
+			name: 'Test Classify Retry',
+			description: 'Tests sub-step retry loop with validation',
+			workspace: { mode: 'shared', gitStrategy: 'any', reusePolicy: 'always' },
+			inputs: { description: 'string' },
+			steps: [
+				{
+					id: 'classify',
+					name: 'Classify',
+					type: 'model',
+					provider: 'opencode',
+					// On first run subSteps is absent → {% if %} evaluates to false (non-strict condition)
+					// On re-runs subSteps.classify_validate.status.failed is true → ERROR block included
+					prompt: 'Classify: ${{ inputs.description }} {% if subSteps.classify_validate.status.failed %}ERROR: ${{ subSteps.classify_validate.outputs.stderr }}{% endif %}',
+					output: {
+						// No 'from' → uses rawOutput (the full model response text), trimmed
+						taskType: { type: 'string', transform: 'trim' },
+					},
+					maxSubStepIterations,
+				} as ModelFlowStep,
+				{
+					id: 'classify_validate',
+					name: 'Validate Classification',
+					type: 'script',
+					// parent auto-injects classify as a dependency via FlowOrchestrator
+					parent: 'classify',
+					script: [
+						// Template renders ${{ steps.classify.outputs.taskType }} before bash runs
+						'TASK_TYPE="${{ steps.classify.outputs.taskType }}"',
+						'if [ "$TASK_TYPE" = "bug" ] || [ "$TASK_TYPE" = "feature" ]; then',
+						'  echo "valid: $TASK_TYPE"',
+						'else',
+						'  printf "Invalid task type: %s. Must be one of: bug, feature" "$TASK_TYPE" >&2',
+						'  exit 1',
+						'fi',
+					].join('\n'),
+				},
+			],
+		};
+	}
+
+	it(
+		'Scenario A (happy path): mock returns "bug" → classify_validate passes → taskType = "bug"',
+		async () => {
+			writeFileSync(mockPath, buildMultiResponseMock(['bug'], counterFile));
+			process.env['OPENCODE_MOCK_PATH'] = mockPath;
+
+			const orchestrator = makeOrchestrator();
+			const context: TemplateContext = {
+				inputs: { description: 'fix login crash' },
+				stepOutputs: new Map(),
+				taskMetadata: {},
+			};
+
+			const result = await orchestrator.orchestrate(
+				'test-task-classify-a',
+				makeClassifyFlow(3),
+				makeOrchestratorWorkspace(),
+				context
+			);
+
+			expect(result.success).toBe(true);
+			expect(result.outputs['classify']?.['taskType']).toBe('bug');
+			// Only one model call (no retry needed)
+			expect(readFileSync(counterFile, 'utf8').trim()).toBe('1');
+		},
+		SUBSTEP_TIMEOUT
+	);
+
+	it(
+		'Scenario B (retry): mock returns "invalid_type" then "feature" → classify_validate triggers retry → taskType = "feature"',
+		async () => {
+			writeFileSync(mockPath, buildMultiResponseMock(['invalid_type', 'feature'], counterFile));
+			process.env['OPENCODE_MOCK_PATH'] = mockPath;
+
+			const orchestrator = makeOrchestrator();
+			const context: TemplateContext = {
+				inputs: { description: 'add search feature' },
+				stepOutputs: new Map(),
+				taskMetadata: {},
+			};
+
+			const result = await orchestrator.orchestrate(
+				'test-task-classify-b',
+				makeClassifyFlow(3),
+				makeOrchestratorWorkspace(),
+				context
+			);
+
+			expect(result.success).toBe(true);
+			expect(result.outputs['classify']?.['taskType']).toBe('feature');
+			// Two model calls: first returned invalid_type, second returned feature
+			expect(readFileSync(counterFile, 'utf8').trim()).toBe('2');
+		},
+		SUBSTEP_TIMEOUT
+	);
+
+	it(
+		'Scenario C (max iterations exceeded): mock always returns "garbage" → all retries fail → flow fails',
+		async () => {
+			// maxSubStepIterations: 2 → 3 total classify calls, all produce garbage
+			writeFileSync(mockPath, buildMultiResponseMock(['garbage', 'garbage', 'garbage'], counterFile));
+			process.env['OPENCODE_MOCK_PATH'] = mockPath;
+
+			const orchestrator = makeOrchestrator();
+			const context: TemplateContext = {
+				inputs: { description: 'unknown request' },
+				stepOutputs: new Map(),
+				taskMetadata: {},
+			};
+
+			const result = await orchestrator.orchestrate(
+				'test-task-classify-c',
+				makeClassifyFlow(2),
+				makeOrchestratorWorkspace(),
+				context
+			);
+
+			expect(result.success).toBe(false);
+			expect(result.error).toMatch(/classify_validate.*failed|failed.*classify/i);
+			// Three model calls attempted (initial + 2 restarts = 3)
+			expect(readFileSync(counterFile, 'utf8').trim()).toBe('3');
+		},
+		SUBSTEP_TIMEOUT
+	);
+});
+
+// ─── Sub-step retry loop: generate-flow check-taskid (02_refine concept) ────
+
+describe('Sub-step retry loop: generate-flow check-taskid (02_refine concept)', () => {
+	const SUBSTEP_TIMEOUT = 60_000;
+
+	let tmpDir: string;
+	let mockPath: string;
+	let counterFile: string;
+	let outputFile: string;
+	let prevMockPath: string | undefined;
+
+	beforeEach(() => {
+		tmpDir = mkdtempSync(join(tmpdir(), 'flow-substep-genflow-'));
+		mockPath = join(tmpDir, 'multi-mock.mjs');
+		counterFile = join(tmpDir, 'counter.txt');
+		// Use forward slashes for cross-platform compatibility in bash scripts
+		outputFile = join(tmpDir, 'generated.yml').replace(/\\/g, '/');
+		prevMockPath = process.env['OPENCODE_MOCK_PATH'];
+	});
+
+	afterEach(() => {
+		if (prevMockPath === undefined) {
+			delete process.env['OPENCODE_MOCK_PATH'];
+		} else {
+			process.env['OPENCODE_MOCK_PATH'] = prevMockPath;
+		}
+		rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	function makeGenerateFlowFlow(): FlowDefinition {
+		// outputFile is captured in closure — safe for inline flow definition
+		const safeOutputFile = outputFile;
+		return {
+			id: 'test-generate-flow-retry',
+			version: '1.0.0',
+			name: 'Test Generate Flow Retry',
+			description: 'Tests sub-step chain: write model output to file, check for hardcoded task ID',
+			workspace: { mode: 'shared', gitStrategy: 'any', reusePolicy: 'always' },
+			inputs: {},
+			steps: [
+				{
+					id: 'generate-flow',
+					name: 'Generate Flow',
+					type: 'model',
+					provider: 'opencode',
+					prompt: 'Generate flow {% if subSteps.generate-flow_check-taskid.status.failed %}TASKID_ERROR: ${{ subSteps.generate-flow_check-taskid.outputs.stderr }}{% endif %}',
+					maxSubStepIterations: 3,
+				} as ModelFlowStep,
+				{
+					// Writes model rawOutput to a temp file via node (cross-platform, avoids shell quoting)
+					id: 'generate-flow_write',
+					name: 'Write Generated Flow',
+					type: 'script',
+					parent: 'generate-flow',
+					env: {
+						// Template renders rawOutput at step execution time; passed as env var to avoid
+						// bash quoting issues with multiline/special-char content
+						FLOW_CONTENT: '${{ steps.generate-flow.outputs.rawOutput }}',
+					},
+					script: [
+						'# write model output to file',
+						`node -e "require('fs').writeFileSync('${safeOutputFile}', process.env.FLOW_CONTENT)"`,
+					].join('\n'),
+				},
+				{
+					// Checks the written file does NOT contain a literal hardcoded task ID ("test123")
+					id: 'generate-flow_check-taskid',
+					name: 'Check Task ID',
+					type: 'script',
+					parent: 'generate-flow',
+					// Explicit dep on write sibling (auto-dep on parent is also injected by orchestrator)
+					depends: ['generate-flow_write'],
+					script: [
+						'# verify no hardcoded task ID in generated flow',
+						`node -e "const c=require('fs').readFileSync('${safeOutputFile}','utf8');if(c.includes('test123')){process.stderr.write('Hardcoded task ID test123 found in generated flow\\n');process.exit(1);}console.log('OK: no hardcoded task ID');"`,
+					].join('\n'),
+				},
+			],
+		};
+	}
+
+	it(
+		'Scenario A (happy path): mock output has no hardcoded ID → check-taskid passes → flow succeeds',
+		async () => {
+			// Mock returns YAML without "test123"
+			writeFileSync(mockPath, buildMultiResponseMock(['id: test-flow\nsteps: []'], counterFile));
+			process.env['OPENCODE_MOCK_PATH'] = mockPath;
+
+			const orchestrator = makeOrchestrator();
+			const context: TemplateContext = {
+				inputs: {},
+				stepOutputs: new Map(),
+				taskMetadata: {},
+			};
+
+			const result = await orchestrator.orchestrate(
+				'test-task-genflow-a',
+				makeGenerateFlowFlow(),
+				makeOrchestratorWorkspace(),
+				context
+			);
+
+			expect(result.success).toBe(true);
+			// Only one model call
+			expect(readFileSync(counterFile, 'utf8').trim()).toBe('1');
+		},
+		SUBSTEP_TIMEOUT
+	);
+
+	it(
+		'Scenario B (retry): mock first output contains "test123" → check-taskid fails → parent restarts with error context → second output clean → check-taskid passes',
+		async () => {
+			// First call: YAML with hardcoded task ID → check-taskid fails
+			// Second call: clean YAML → check-taskid passes
+			writeFileSync(
+				mockPath,
+				buildMultiResponseMock(
+					['id: test-flow\ntaskId: test123\nsteps: []', 'id: test-flow\ntaskId: INPUT_VALUE\nsteps: []'],
+					counterFile
+				)
+			);
+			process.env['OPENCODE_MOCK_PATH'] = mockPath;
+
+			const orchestrator = makeOrchestrator();
+			const context: TemplateContext = {
+				inputs: {},
+				stepOutputs: new Map(),
+				taskMetadata: {},
+			};
+
+			const result = await orchestrator.orchestrate(
+				'test-task-genflow-b',
+				makeGenerateFlowFlow(),
+				makeOrchestratorWorkspace(),
+				context
+			);
+
+			expect(result.success).toBe(true);
+			// Two model calls: first had hardcoded ID, second was clean
+			expect(readFileSync(counterFile, 'utf8').trim()).toBe('2');
+		},
+		SUBSTEP_TIMEOUT
 	);
 });

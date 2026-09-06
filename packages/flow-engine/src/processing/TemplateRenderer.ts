@@ -121,10 +121,11 @@ export class TemplateRenderer {
 			let condValue: unknown;
 			try {
 				condValue = this.resolveVariable(expr.trim(), context);
-			} catch (error) {
-				if (strict) {
-					throw error;
-				}
+			} catch {
+				// Condition evaluation failure is always treated as falsy regardless of strict mode.
+				// This allows {% if subSteps.xxx.status.failed %} blocks to work gracefully on
+				// the first parent run before any sub-step has executed (subSteps absent from context).
+				// The strict parameter still governs ${{ }} interpolation errors below.
 				condValue = false;
 			}
 			const isTruthy =
