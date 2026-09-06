@@ -15,7 +15,17 @@ export { FlowRecommendationEngine } from './analysis/FlowRecommendationEngine';
 export type { IdeaRequirements } from './analysis/FlowRecommendationEngine';
 export { WorkspaceManager } from './workspace/WorkspaceManager';
 export { FlowScheduler } from './orchestration/FlowScheduler';
-export type { ReadyItem, SchedulerContext, SchedulerStep, StepOutcome } from './orchestration/FlowScheduler';
+export type {
+	FlowSchedulerOptions,
+	ReadyItem,
+	SchedulerContext,
+	SchedulerStep,
+	StepOutcome,
+	SubStepAction,
+	SubStepStrategy,
+	SubStepStrategyContext,
+} from './orchestration/FlowScheduler';
+export { RestartOnFirstFailure, WaitAll } from './orchestration/FlowScheduler.subStepStrategies';
 export { TemplateRenderer } from './processing/TemplateRenderer';
 export type { FlowDefinition, FlowPluginOverrides, FlowStep } from './types';
 export type { McpServer } from './processing/ModelProvider';

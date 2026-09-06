@@ -14,6 +14,12 @@ export interface ExecutionContext {
 	outputsDir: string;
 	/** Original CWD from which `flow run` was invoked -- used as ${{ context.cwd }} in templates */
 	cwd: string;
+	/**
+	 * Sub-step error history per parent step. Populated by the daemon when a child step fails
+	 * and the parent is re-queued. Exposes the last error as ${{ context.lastSubStepError }}
+	 * and all accumulated errors as ${{ context.subStepErrors }} in the parent's prompt template.
+	 */
+	subStepErrors?: Record<string, string[]>;
 }
 
 export type ClientCommand = {

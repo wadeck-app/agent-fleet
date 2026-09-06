@@ -1,6 +1,6 @@
 // flow cli <subcommand> -- meta-commands for managing the flow CLI itself.
 import { ConfigDir, HookDispatcher, runSelfCheck } from '@wadeck-app/shared-cli';
-import { cliLogsCommand, cliRollbackCommand, cliUpdateCommand, cliVersionCommand, warnUnknownArgs } from '@wadeck-app/shared-cli/CliMetaCommands';
+import { cliRollbackCommand, cliUpdateCommand, cliVersionCommand, warnUnknownArgs } from '@wadeck-app/shared-cli/CliMetaCommands';
 import { readChannelFromConfig } from '@wadeck-app/shared-cli/ChannelConfig';
 import { Command } from 'commander';
 import { FlowExecutor, StepRunner } from 'flow-engine';
@@ -18,6 +18,158 @@ import { PluginLoader } from '../../config/PluginLoader.js';
 
 // Injected by esbuild at bundle time via define; falls back to package.json in dev mode (tsx).
 declare const __FLOW_CLI_VERSION__: string;
+
+// ---- Human-readable log formatter ----
+
+type DaemonLogEntry = { ts: string; level?: string; msg: string };
+type StepLogEntry = { prefix: string; timestamp: string; level?: string; message: string };
+
+function isStepLogEntry(obj: Record<string, unknown>): obj is StepLogEntry {
+	return typeof obj['prefix'] === 'string' && typeof obj['timestamp'] === 'string' && typeof obj['message'] === 'string';
+}
+
+function isDaemonLogEntry(obj: Record<string, unknown>): obj is DaemonLogEntry {
+	return typeof obj['ts'] === 'string' && typeof obj['msg'] === 'string';
+}
+
+function formatLogTime(iso: string): string {
+	const d = new Date(iso);
+	const h = String(d.getHours()).padStart(2, '0');
+	const m = String(d.getMinutes()).padStart(2, '0');
+	const s = String(d.getSeconds()).padStart(2, '0');
+	const ms = String(d.getMilliseconds()).padStart(3, '0');
+	return `${h}:${m}:${s}.${ms}`;
+}
+
+function padLogLevel(level: string): string {
+	// Pad to 5 chars (e.g. "INFO ", "ERROR", "WARN ")
+	return level.toUpperCase().padEnd(5, ' ').slice(0, 5);
+}
+
+function formatLogLine(raw: string): string {
+	const trimmed = raw.trim();
+	if (!trimmed) return '';
+
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(trimmed);
+	} catch {
+		// Not valid JSON — return as-is
+		return raw;
+	}
+
+	if (typeof parsed !== 'object' || parsed === null) return raw;
+	const obj = parsed as Record<string, unknown>;
+
+	if (isStepLogEntry(obj)) {
+		const time = formatLogTime(obj.timestamp);
+		const level = padLogLevel(typeof obj.level === 'string' ? obj.level : 'info');
+		return `${time} [${level}] ${obj.prefix} ${obj.message}`;
+	}
+
+	if (isDaemonLogEntry(obj)) {
+		const time = formatLogTime(obj.ts);
+		const level = padLogLevel(typeof obj.level === 'string' ? obj.level : 'info');
+		return `${time} [${level}] ${obj.msg}`;
+	}
+
+	// Unknown shape — return raw
+	return raw;
+}
+
+function writeFormattedLines(content: string): void {
+	for (const line of content.split('\n')) {
+		const formatted = formatLogLine(line);
+		if (formatted) process.stdout.write(formatted + '\n');
+	}
+}
+
+/**
+ * Returns the last N non-empty lines of content joined by newline.
+ * When n <= 0, returns the original content unchanged.
+ */
+function tailLines(content: string, n: number): string {
+	if (n <= 0) return content;
+	// Split preserving trailing empty string from final newline; filter blank trailing entry
+	const lines = content.split('\n');
+	// Remove a single trailing empty element produced by a terminal newline
+	if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+	const sliced = lines.slice(-n);
+	return sliced.length > 0 ? sliced.join('\n') + '\n' : '';
+}
+
+async function cliLogsHumanCommand(configDir: string, opts: { follow?: boolean; lines: number }): Promise<void> {
+	const today = new Date().toISOString().slice(0, 10);
+	const logFile = path.join(configDir, 'logs', `${today}.ndjson`);
+
+	if (!fs.existsSync(logFile)) {
+		process.stdout.write(`No log file for today: ${logFile}\n`);
+		if (!opts.follow) return;
+	}
+
+	let offset = 0;
+	if (fs.existsSync(logFile)) {
+		const content = fs.readFileSync(logFile, 'utf8');
+		writeFormattedLines(tailLines(content, opts.lines));
+		offset = Buffer.byteLength(content, 'utf8');
+	}
+
+	if (!opts.follow) return;
+
+	await new Promise<void>(resolve => {
+		fs.watchFile(logFile, { interval: 250 }, () => {
+			if (!fs.existsSync(logFile)) return;
+			const size = fs.statSync(logFile).size;
+			if (size <= offset) return;
+			const buf = Buffer.alloc(size - offset);
+			const fd = fs.openSync(logFile, 'r');
+			fs.readSync(fd, buf, 0, buf.length, offset);
+			fs.closeSync(fd);
+			offset = size;
+			writeFormattedLines(buf.toString('utf8'));
+		});
+		process.on('SIGINT', () => { fs.unwatchFile(logFile); resolve(); });
+	});
+}
+
+/**
+ * Raw NDJSON variant of the logs command with lines-limit support.
+ * The external cliLogsCommand cannot be modified, so this inline version
+ * handles --lines for both static and follow modes.
+ */
+async function cliLogsRawCommand(configDir: string, opts: { follow?: boolean; lines: number }): Promise<void> {
+	const today = new Date().toISOString().slice(0, 10);
+	const logFile = path.join(configDir, 'logs', `${today}.ndjson`);
+
+	if (!fs.existsSync(logFile)) {
+		process.stdout.write(`No log file for today: ${logFile}\n`);
+		if (!opts.follow) return;
+	}
+
+	let offset = 0;
+	if (fs.existsSync(logFile)) {
+		const content = fs.readFileSync(logFile, 'utf8');
+		process.stdout.write(tailLines(content, opts.lines));
+		offset = Buffer.byteLength(content, 'utf8');
+	}
+
+	if (!opts.follow) return;
+
+	await new Promise<void>(resolve => {
+		fs.watchFile(logFile, { interval: 250 }, () => {
+			if (!fs.existsSync(logFile)) return;
+			const size = fs.statSync(logFile).size;
+			if (size <= offset) return;
+			const buf = Buffer.alloc(size - offset);
+			const fd = fs.openSync(logFile, 'r');
+			fs.readSync(fd, buf, 0, buf.length, offset);
+			fs.closeSync(fd);
+			offset = size;
+			process.stdout.write(buf.toString('utf8'));
+		});
+		process.on('SIGINT', () => { fs.unwatchFile(logFile); resolve(); });
+	});
+}
 
 const PKG_NAME = '@wadeck-app/flow-cli';
 
@@ -86,7 +238,10 @@ export function buildCliCommand(): Command {
 			process.exit(1);
 			return;
 		}
+		// Flag manual invocation so the updater bypasses autoUpdate:false in config
+		process.env['UPDATER_MANUAL'] = '1';
 		await cliUpdateCommand(updaterPath, PKG_NAME);
+		delete process.env['UPDATER_MANUAL'];
 	});
 	cli.addCommand(updateCmd);
 
@@ -189,12 +344,19 @@ export function buildCliCommand(): Command {
 			]);
 		});
 
-	// flow cli logs [--follow] -- read or tail today's NDJSON log
+	// flow cli logs [--follow] [--human] [-n <lines>] -- read or tail today's NDJSON log
 	cli.command('logs')
 		.description("Print today's NDJSON log from the flow daemon log directory")
 		.option('-f, --follow', 'Follow the log file (tail -f style)')
-		.action(async (opts: { follow?: boolean }) => {
-			await cliLogsCommand(ConfigDir.get('flow'), { follow: opts.follow ?? false });
+		.option('-H, --human', 'Format log lines as human-readable (HH:mm:ss.SSS [LEVEL] message) instead of raw NDJSON')
+		.option('-n, --lines <n>', 'Limit output to the last N lines (0 or negative = no limit)', '50')
+		.action(async (opts: { follow?: boolean; human?: boolean; lines?: string }) => {
+			const lines = parseInt(opts.lines ?? '50', 10);
+			if (opts.human) {
+				await cliLogsHumanCommand(ConfigDir.get('flow'), { follow: opts.follow ?? false, lines });
+			} else {
+				await cliLogsRawCommand(ConfigDir.get('flow'), { follow: opts.follow ?? false, lines });
+			}
 		});
 
 	return cli;

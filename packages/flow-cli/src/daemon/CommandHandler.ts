@@ -26,11 +26,6 @@ interface ReadyStep {
 	executionContext: ExecutionContext;
 }
 
-interface ParentChildMeta {
-	parentToChildren: Map<string, Set<string>>;
-	childToParent: Map<string, string>;
-}
-
 export class CommandHandler {
 	private readonly executionStore: ExecutionStore;
 	private readonly logWriter: LogWriter;
@@ -38,8 +33,6 @@ export class CommandHandler {
 	private readonly schedulers = new Map<string, FlowScheduler>();
 	/** Per-execution ExecutionContext */
 	private readonly executionContexts = new Map<string, ExecutionContext>();
-	/** Parent-child metadata for UI rendering (not scheduling logic) */
-	private readonly parentChildIndex = new Map<string, ParentChildMeta>();
 	/** Per-execution step counts (initial + injected), for MAX_INJECTED_STEPS limit */
 	private readonly stepCounts = new Map<string, number>();
 	/** Central queue of ready steps across all executions */
@@ -282,6 +275,7 @@ export class CommandHandler {
 		const schedulerCtx: SchedulerContext = {
 			inputs: context.inputs,
 			stepOutputs: new Map(),
+			subStepErrors: new Map(),
 		};
 
 		// Resolve global flow env templates (context.* available: cwd, projectDir, workspaceDir)
@@ -324,7 +318,6 @@ export class CommandHandler {
 
 		this.schedulers.set(executionId, scheduler);
 		this.executionContexts.set(executionId, context);
-		this.parentChildIndex.set(executionId, { parentToChildren: new Map(), childToParent: new Map() });
 		this.stepCounts.set(executionId, assignable.length);
 		this.activeExecutionCount++;
 
@@ -359,6 +352,8 @@ export class CommandHandler {
 		context.stepOutputs[stepId] = output;
 		if (meta) context.stepMeta[stepId] = meta;
 
+		// Parent-blocking and deferral logic is handled inside FlowScheduler.complete().
+		// It returns [] while children are pending; fires deferred completion when all children settle.
 		const newReady = scheduler.complete(stepId, { type: 'completed', outputs: output });
 
 		if (scheduler.isTerminal()) {
@@ -368,6 +363,7 @@ export class CommandHandler {
 			this.cleanupExecution(executionId);
 		} else {
 			this.enqueueReadyItems(executionId, newReady, context);
+			// Note: tryDispatch() is called by Daemon after onStepCompleted returns
 		}
 	}
 
@@ -382,6 +378,11 @@ export class CommandHandler {
 		}
 
 		const context = this.executionContexts.get(executionId)!;
+
+		// FlowScheduler.complete() handles child-failure propagation internally:
+		// - If the failed step is a child and the parent is deferred, the parent is re-queued
+		//   (with error recorded in subStepErrors) up to maxSubStepIterations times.
+		// - After max iterations the parent is failed terminally, hasFailed() returns true.
 		const newReady = scheduler.complete(stepId, { type: 'failed', error });
 
 		if (scheduler.hasFailed()) {
@@ -394,7 +395,7 @@ export class CommandHandler {
 			this.executionStore.markExecutionFailed(executionId);
 			this.cleanupExecution(executionId, new Error(error));
 		} else {
-			// Loop/retry in progress - re-enqueue the step returned by the scheduler
+			// Loop/retry/sub-step-re-run in progress - re-enqueue steps returned by the scheduler
 			this.enqueueReadyItems(executionId, newReady, context);
 			this.tryDispatch();
 		}
@@ -407,26 +408,27 @@ export class CommandHandler {
 			throw new Error(`No active execution found for id: ${executionId}`);
 		}
 
-		const currentCount = this.stepCounts.get(executionId) ?? 0;
-		const totalAfterInject = currentCount + injectedSteps.length;
+		// Per-call limit check applies to the full requested batch (before dedup)
 		if (injectedSteps.length > this.maxInjectedSteps) {
 			throw new Error(
 				`provideSteps: ${injectedSteps.length} steps exceeds per-call limit of ${this.maxInjectedSteps}`
 			);
 		}
-		if (totalAfterInject > this.maxStepsPerExecution) {
-			throw new Error(
-				`Execution ${executionId} would exceed max steps per execution (${this.maxStepsPerExecution}) after injection`
-			);
-		}
 
-		// Validate references and track parent-child metadata
-		const meta = this.parentChildIndex.get(executionId)!;
 		const allKnownIds = new Set([...this.getKnownStepIds(executionId), ...injectedSteps.map(s => s.id)]);
 
+		// Separate steps into those to skip (existing non-in-flight) and those to inject.
+		// Idempotent: a step that already exists and is not in-flight is a no-op (loop re-run scenario).
+		const stepsToInject: InjectedStep[] = [];
 		for (const injected of injectedSteps) {
 			if (this.isKnownStepId(executionId, injected.id)) {
-				throw new Error(`Step id '${injected.id}' already exists in execution ${executionId}`);
+				if (scheduler.isInFlight(injected.id)) {
+					throw new Error(
+						`Step id '${injected.id}' is currently in-flight in execution ${executionId} and cannot be re-injected`
+					);
+				}
+				// Non-in-flight existing step: treat as no-op (idempotent re-injection after loop reset)
+				continue;
 			}
 			if (injected.parent !== undefined && !allKnownIds.has(injected.parent)) {
 				throw new Error(`Parent step '${injected.parent}' does not exist in execution ${executionId}`);
@@ -438,23 +440,25 @@ export class CommandHandler {
 					}
 				}
 			}
+			stepsToInject.push(injected);
 		}
 
-		// Track parent-child relationships
-		for (const injected of injectedSteps) {
-			if (injected.parent !== undefined) {
-				if (!meta.parentToChildren.has(injected.parent)) {
-					meta.parentToChildren.set(injected.parent, new Set());
-				}
-				meta.parentToChildren.get(injected.parent)!.add(injected.id);
-				meta.childToParent.set(injected.id, injected.parent);
-			}
+		// Limit check uses only genuinely new steps
+		const currentCount = this.stepCounts.get(executionId) ?? 0;
+		const totalAfterInject = currentCount + stepsToInject.length;
+		if (totalAfterInject > this.maxStepsPerExecution) {
+			throw new Error(
+				`Execution ${executionId} would exceed max steps per execution (${this.maxStepsPerExecution}) after injection`
+			);
 		}
 
 		this.stepCounts.set(executionId, totalAfterInject);
 
+		if (stepsToInject.length === 0) return;
+
 		const context = this.executionContexts.get(executionId)!;
-		const newReady = scheduler.inject(injectedSteps as SchedulerStep[]);
+		// Pass `parent` through — FlowScheduler.inject() registers parent-child relationships natively
+		const newReady = scheduler.inject(stepsToInject as SchedulerStep[]);
 		this.enqueueReadyItems(executionId, newReady, context);
 	}
 
@@ -464,6 +468,18 @@ export class CommandHandler {
 			if (idleWorker) {
 				const step = this.readyQueue.shift()!;
 				const scheduler = this.schedulers.get(step.executionContext.executionId);
+
+				// Before dispatching, sync any accumulated sub-step errors from the scheduler
+				// into ExecutionContext so the worker can expose them via ${{ context.lastSubStepError }}
+				if (scheduler) {
+					const errors = scheduler.getSubStepErrors(step.stepId);
+					if (errors.length > 0) {
+						if (!step.executionContext.subStepErrors) {
+							step.executionContext.subStepErrors = {};
+						}
+						step.executionContext.subStepErrors[step.stepId] = errors;
+					}
+				}
 
 				this.workerPool.markBusy(idleWorker);
 				// Acknowledge: marks step as in-flight in scheduler to prevent double-dispatch
@@ -520,7 +536,6 @@ export class CommandHandler {
 	private cleanupExecution(executionId: string, priorError?: unknown): void {
 		this.schedulers.delete(executionId);
 		this.executionContexts.delete(executionId);
-		this.parentChildIndex.delete(executionId);
 		this.stepCounts.delete(executionId);
 		this.activeExecutionCount--;
 

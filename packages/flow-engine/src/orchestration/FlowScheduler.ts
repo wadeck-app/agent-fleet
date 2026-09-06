@@ -1,5 +1,16 @@
 import { ConditionEvaluationError } from '../processing/ConditionEvaluator';
 import type { FailureConfig, RetryConfig } from '../types';
+import {
+	RestartOnFirstFailure,
+	WaitAll,
+} from './FlowScheduler.subStepStrategies';
+import type {
+	SubStepAction,
+	SubStepStrategy,
+	SubStepStrategyContext,
+} from './FlowScheduler.subStepStrategies';
+
+export type { SubStepAction, SubStepStrategy, SubStepStrategyContext };
 
 export interface SchedulerStep {
 	id: string;
@@ -7,12 +18,41 @@ export interface SchedulerStep {
 	when?: string;
 	retry?: RetryConfig;
 	onFailure?: FailureConfig;
+	/** Declares this step as a sub-step of the named parent. Parent completion is blocked until all children reach terminal state. */
+	parent?: string;
+	/**
+	 * Maximum number of times the parent is re-queued when a child sub-step fails.
+	 * Defaults to 3. After exhausting attempts the parent is failed terminally.
+	 * Configurable on the parent step declaration.
+	 */
+	maxSubStepIterations?: number;
+	/**
+	 * Name of the sub-step failure strategy to use on this parent step.
+	 * Built-in values: 'restart-on-first-failure' (default), 'wait-all'.
+	 * Custom strategies can be registered via FlowSchedulerOptions.extraStrategies.
+	 */
+	subStepStrategy?: string;
 	[key: string]: unknown;
+}
+
+export interface FlowSchedulerOptions {
+	/**
+	 * Additional sub-step strategies beyond the two built-ins
+	 * ('restart-on-first-failure' and 'wait-all'). Duplicate names override built-ins.
+	 */
+	extraStrategies?: SubStepStrategy[];
 }
 
 export interface SchedulerContext {
 	inputs: Record<string, unknown>;
 	stepOutputs: Map<string, Record<string, unknown>>;
+	/**
+	 * Sub-step error history per parent step. Populated by FlowScheduler when a child fails
+	 * and the parent is re-queued. Used by CommandHandler to surface errors in the worker's
+	 * template context (${{ context.lastSubStepError }}).
+	 * Optional: callers that do not need sub-step re-run can omit it (FlowScheduler initialises lazily).
+	 */
+	subStepErrors?: Map<string, string[]>;
 }
 
 export interface ReadyItem {
@@ -39,7 +79,40 @@ export class FlowScheduler {
 	private readonly outputs = new Map<string, Record<string, unknown>>();
 	private started = false;
 
-	constructor(private readonly context: SchedulerContext) {}
+	/** parentId → set of child stepIds (current-run children only, reset when parent is re-queued) */
+	private readonly parentToChildren = new Map<string, Set<string>>();
+	/** childId → parentId */
+	private readonly childToParent = new Map<string, string>();
+	/** Stores outcome for parent steps whose completion is deferred waiting for children to settle. */
+	private readonly deferredOutcomes = new Map<string, { type: 'completed'; outputs: Record<string, unknown> }>();
+	/** Number of times a parent step has been re-queued due to child failure. */
+	private readonly subStepLoopIterations = new Map<string, number>();
+	/**
+	 * Child steps that failed but were superseded by a parent re-run.
+	 * They are neither in completedSteps (didn't succeed) nor in failedSteps (not a terminal flow failure).
+	 * Counted alongside completedSteps for isTerminal() purposes.
+	 */
+	private readonly supersededSteps = new Set<string>();
+	/**
+	 * Per-parent tracking of children that failed during the current run.
+	 * Reset whenever the parent is restarted. Used to build SubStepStrategyContext.failedChildren.
+	 */
+	private readonly subStepFailedChildren = new Map<string, Map<string, string>>();
+	/** Registered sub-step strategies, keyed by strategy name. */
+	private readonly strategies: Map<string, SubStepStrategy>;
+
+	constructor(
+		private readonly context: SchedulerContext,
+		options?: FlowSchedulerOptions,
+	) {
+		this.strategies = new Map<string, SubStepStrategy>([
+			[RestartOnFirstFailure.name, RestartOnFirstFailure],
+			[WaitAll.name, WaitAll],
+		]);
+		for (const s of options?.extraStrategies ?? []) {
+			this.strategies.set(s.name, s);
+		}
+	}
 
 	/**
 	 * Load all steps. Returns initially ready items.
@@ -57,6 +130,12 @@ export class FlowScheduler {
 				this.reverseDeps.get(dep)!.add(step.id);
 			}
 		}
+		// Register parent-child relationships declared in the initial step set
+		for (const step of steps) {
+			if (step.parent) {
+				this.registerParentChild(step.id, step.parent);
+			}
+		}
 		return this.collectReady();
 	}
 
@@ -70,9 +149,16 @@ export class FlowScheduler {
 
 	/**
 	 * Mark a step as finished. Returns newly ready items.
+	 *
 	 * Handles retry: if outcome is 'failed' and retry config allows, re-enqueues the step.
 	 * If a loop (onFailure.goto) triggers, invalidates target and descendants and re-enqueues them.
 	 * Returns [] if the step was invalidated by a loop before this call arrived (stale result).
+	 *
+	 * Parent-blocking:
+	 * - If the completed step has pending children, completion is deferred until all children settle.
+	 * - If a child fails: parent is re-queued for re-execution (with error recorded in
+	 *   context.subStepErrors). Repeats up to step.maxSubStepIterations (default 3) times,
+	 *   then the parent is failed terminally.
 	 */
 	complete(stepId: string, outcome: StepOutcome): ReadyItem[] {
 		// Stale result: step was invalidated by a loop while in-flight -- discard
@@ -84,12 +170,36 @@ export class FlowScheduler {
 		this.inFlightSteps.delete(stepId);
 
 		if (outcome.type === 'completed') {
+			// Store outputs immediately so children can use them for template rendering
 			this.outputs.set(stepId, outcome.outputs);
 			this.context.stepOutputs.set(stepId, outcome.outputs);
+
+			// Check if this step has pending children — defer completion until they all settle
+			const children = this.parentToChildren.get(stepId);
+			if (children && children.size > 0) {
+				const hasPending = [...children].some(
+					c =>
+						!this.completedSteps.has(c) &&
+						!this.failedSteps.has(c) &&
+						!this.supersededSteps.has(c)
+				);
+				if (hasPending) {
+					this.deferredOutcomes.set(stepId, { type: 'completed', outputs: outcome.outputs });
+					return [];
+				}
+			}
+
 			this.completedSteps.add(stepId);
+			// Reset sub-step loop counter on successful parent completion
+			this.subStepLoopIterations.delete(stepId);
 			this.propagateCompletion(stepId);
 			this.handleLoopResetOnSuccess(stepId);
-			return this.collectReady();
+			const ready = this.collectReady();
+
+			// If this step is a child, try to fire its deferred parent
+			const parentId = this.childToParent.get(stepId);
+			const parentReady = parentId !== undefined ? this.tryFireDeferredParent(parentId) : [];
+			return [...ready, ...parentReady];
 		}
 
 		// Failed -- check retry first
@@ -112,6 +222,110 @@ export class FlowScheduler {
 			return this.handleLoop(stepId, onFailure);
 		}
 
+		// If this failed step is a child of a deferred parent, delegate to the configured
+		// sub-step strategy to decide whether to restart the parent, wait for more children,
+		// or fail the parent terminally.
+		// IMPORTANT: checked before failedSteps.add() so hasFailed() stays false during re-run cycles.
+		const parentId = this.childToParent.get(stepId);
+		if (parentId !== undefined && this.deferredOutcomes.has(parentId)) {
+			const parentStep = this.steps.get(parentId);
+			const strategyName = parentStep?.subStepStrategy ?? 'restart-on-first-failure';
+			const strategy = this.strategies.get(strategyName);
+			if (!strategy) {
+				throw new Error(
+					`FlowScheduler: unknown sub-step strategy "${strategyName}" on step "${parentId}"`,
+				);
+			}
+
+			// Track this failure for strategy context (persists until parent restarts)
+			const failedChildren = this.subStepFailedChildren.get(parentId) ?? new Map<string, string>();
+			failedChildren.set(stepId, outcome.error);
+			this.subStepFailedChildren.set(parentId, failedChildren);
+
+			const children = this.parentToChildren.get(parentId) ?? new Set<string>();
+			// pendingChildren: not yet terminal, excluding the current failing child
+			const pendingChildren = new Set<string>(
+				[...children].filter(
+					c =>
+						c !== stepId &&
+						!this.completedSteps.has(c) &&
+						!this.failedSteps.has(c) &&
+						!this.supersededSteps.has(c),
+				),
+			);
+			const completedChildren = new Set<string>([...children].filter(c => this.completedSteps.has(c)));
+
+			const ctx: SubStepStrategyContext = {
+				parentId,
+				failedChildId: stepId,
+				error: outcome.error,
+				pendingChildren,
+				failedChildren,
+				completedChildren,
+			};
+
+			const action = strategy.onChildFailure(ctx);
+
+			if (action.type === 'wait') {
+				// Strategy wants to wait for remaining children before acting
+				this.supersededSteps.add(stepId);
+				return [];
+			}
+
+			if (action.type === 'fail-parent') {
+				this.failedSteps.add(stepId);
+				this.deferredOutcomes.delete(parentId);
+				return this.complete(parentId, { type: 'failed', error: action.error });
+			}
+
+			// action.type === 'restart-parent': check iteration budget before committing
+			const iterations = (this.subStepLoopIterations.get(parentId) ?? 0) + 1;
+			const maxIterations = parentStep?.maxSubStepIterations ?? 3;
+
+			if (iterations > maxIterations) {
+				// Budget exhausted — fail child and parent terminally
+				this.failedSteps.add(stepId);
+				this.deferredOutcomes.delete(parentId);
+				return this.complete(parentId, {
+					type: 'failed',
+					error: `Sub-step '${stepId}' failed after ${maxIterations} re-run(s): ${outcome.error}`,
+				});
+			}
+
+			// Mark child as superseded (not a terminal flow failure — parent will address it)
+			this.supersededSteps.add(stepId);
+
+			// Record errors so the parent's next execution can reference them via
+			// ${{ context.lastSubStepError }} in its prompt template
+			const subStepErrors = this.ensureSubStepErrors();
+			const accumulated = subStepErrors.get(parentId) ?? [];
+			for (const e of action.errors) {
+				accumulated.push(e);
+			}
+			subStepErrors.set(parentId, accumulated);
+
+			// Remove the deferred outcome — parent will re-run
+			this.deferredOutcomes.delete(parentId);
+			this.subStepLoopIterations.set(parentId, iterations);
+			// Reset per-run failure tracking for the next parent run
+			this.subStepFailedChildren.delete(parentId);
+
+			// Clear parent's children tracking so re-run starts with an empty child set.
+			// Old children (from this run) may still be in-flight; they complete harmlessly
+			// since tryFireDeferredParent checks the new (empty/updated) children set.
+			this.parentToChildren.set(parentId, new Set());
+
+			// Clear parent's previous outputs — it must re-execute to produce new ones
+			this.outputs.delete(parentId);
+			this.context.stepOutputs.delete(parentId);
+
+			// Re-queue the parent: restore to pendingDeps with no remaining deps (all its
+			// original deps were already met when it was first dispatched)
+			this.pendingDeps.set(parentId, new Set());
+			return this.collectReady();
+		}
+
+		// No parent re-run — mark step as failed terminally
 		this.failedSteps.add(stepId);
 		return [];
 	}
@@ -134,6 +348,19 @@ export class FlowScheduler {
 		return new Set(this.steps.keys());
 	}
 
+	/** True when the step has been acknowledged (dispatched) but not yet completed. */
+	isInFlight(stepId: string): boolean {
+		return this.inFlightSteps.has(stepId);
+	}
+
+	/**
+	 * Returns the accumulated sub-step error history for the given parent step.
+	 * Used by CommandHandler to populate ExecutionContext.subStepErrors before dispatching.
+	 */
+	getSubStepErrors(stepId: string): string[] {
+		return this.context.subStepErrors?.get(stepId) ?? [];
+	}
+
 	/** Inject steps dynamically (MCP provideSteps). Returns newly ready items. */
 	inject(steps: SchedulerStep[]): ReadyItem[] {
 		for (const step of steps) {
@@ -147,17 +374,44 @@ export class FlowScheduler {
 				if (!this.reverseDeps.has(dep)) this.reverseDeps.set(dep, new Set());
 				this.reverseDeps.get(dep)!.add(step.id);
 			}
+			// Register parent-child relationship if declared
+			if (step.parent) {
+				this.registerParentChild(step.id, step.parent);
+			}
 		}
 		return this.collectReady();
 	}
 
-	/** True when no steps remain pending (all completed, skipped, or failed-terminal). Returns false before start() is called. */
+	/**
+	 * Register a parent-child relationship.
+	 * Public so external callers (tests, CommandHandler) can register relationships explicitly.
+	 * Emits a warning to stderr if the parent is already completed — the sub-step is still registered
+	 * but will not re-defer the parent.
+	 */
+	registerParentChild(childId: string, parentId: string): void {
+		if (!this.parentToChildren.has(parentId)) {
+			this.parentToChildren.set(parentId, new Set());
+		}
+		this.parentToChildren.get(parentId)!.add(childId);
+		this.childToParent.set(childId, parentId);
+		if (this.completedSteps.has(parentId)) {
+			process.stderr.write(
+				`[FlowScheduler] warning: parent step '${parentId}' is already completed; sub-step '${childId}' registered but parent completion will not be re-deferred\n`
+			);
+		}
+	}
+
+	/** True when no steps remain pending (all completed, skipped, superseded, or failed-terminal). Returns false before start() is called. */
 	isTerminal(): boolean {
 		if (!this.started) return false;
 		if (this.hasFailed()) return true;
-		// All steps must be settled (in completedSteps) and none in-flight or pending
+		// All steps must be settled and none in-flight, pending, or deferred.
+		// supersededSteps counts alongside completedSteps: they ran but were superseded by a parent re-run.
 		return (
-			this.completedSteps.size === this.steps.size && this.inFlightSteps.size === 0 && this.pendingDeps.size === 0
+			this.completedSteps.size + this.supersededSteps.size === this.steps.size &&
+			this.inFlightSteps.size === 0 &&
+			this.pendingDeps.size === 0 &&
+			this.deferredOutcomes.size === 0
 		);
 	}
 
@@ -169,6 +423,13 @@ export class FlowScheduler {
 	/** Current step outputs map (read-only snapshot). Used by CommandHandler to sync ExecutionContext. */
 	getOutputs(): Map<string, Record<string, unknown>> {
 		return new Map(this.outputs);
+	}
+
+	private ensureSubStepErrors(): Map<string, string[]> {
+		if (!this.context.subStepErrors) {
+			this.context.subStepErrors = new Map();
+		}
+		return this.context.subStepErrors;
 	}
 
 	private collectReady(): ReadyItem[] {
@@ -295,6 +556,88 @@ export class FlowScheduler {
 		}
 	}
 
+	/**
+	 * Fire the deferred completion for a parent step if all its current-run children have settled.
+	 * Delegates to the configured sub-step strategy's onAllChildrenTerminal() to decide whether to
+	 * proceed with normal completion, restart the parent, or fail it terminally.
+	 * Returns newly ready items, or [] if not all children are terminal yet.
+	 */
+	private tryFireDeferredParent(parentId: string): ReadyItem[] {
+		if (!this.deferredOutcomes.has(parentId)) return [];
+		const children = this.parentToChildren.get(parentId) ?? new Set<string>();
+		const allTerminal = [...children].every(
+			c =>
+				this.completedSteps.has(c) ||
+				this.failedSteps.has(c) ||
+				this.supersededSteps.has(c),
+		);
+		if (!allTerminal) return [];
+
+		const parentStep = this.steps.get(parentId);
+		const strategyName = parentStep?.subStepStrategy ?? 'restart-on-first-failure';
+		const strategy = this.strategies.get(strategyName);
+		if (!strategy) {
+			throw new Error(
+				`FlowScheduler: unknown sub-step strategy "${strategyName}" on step "${parentId}"`,
+			);
+		}
+
+		const failedChildren = this.subStepFailedChildren.get(parentId) ?? new Map<string, string>();
+		const completedChildren = new Set<string>([...children].filter(c => this.completedSteps.has(c)));
+
+		const ctx: Omit<SubStepStrategyContext, 'failedChildId' | 'error'> = {
+			parentId,
+			// All children are terminal at this point
+			pendingChildren: new Set(),
+			failedChildren,
+			completedChildren,
+		};
+
+		const action = strategy.onAllChildrenTerminal(ctx);
+
+		if (action.type === 'wait') {
+			// Proceed with normal deferred completion
+			const outcome = this.deferredOutcomes.get(parentId)!;
+			// Delete before recursing to prevent infinite loop
+			this.deferredOutcomes.delete(parentId);
+			return this.complete(parentId, outcome);
+		}
+
+		if (action.type === 'fail-parent') {
+			this.deferredOutcomes.delete(parentId);
+			return this.complete(parentId, { type: 'failed', error: action.error });
+		}
+
+		// action.type === 'restart-parent': check iteration budget
+		const iterations = (this.subStepLoopIterations.get(parentId) ?? 0) + 1;
+		const maxIterations = parentStep?.maxSubStepIterations ?? 3;
+
+		if (iterations > maxIterations) {
+			this.deferredOutcomes.delete(parentId);
+			return this.complete(parentId, {
+				type: 'failed',
+				error: `Sub-steps of '${parentId}' failed after ${maxIterations} re-run(s): ${action.errors.join(', ')}`,
+			});
+		}
+
+		// Record errors in context for the next parent run
+		const subStepErrors = this.ensureSubStepErrors();
+		const accumulated = subStepErrors.get(parentId) ?? [];
+		for (const e of action.errors) {
+			accumulated.push(e);
+		}
+		subStepErrors.set(parentId, accumulated);
+
+		this.deferredOutcomes.delete(parentId);
+		this.subStepLoopIterations.set(parentId, iterations);
+		this.subStepFailedChildren.delete(parentId);
+		this.parentToChildren.set(parentId, new Set());
+		this.outputs.delete(parentId);
+		this.context.stepOutputs.delete(parentId);
+		this.pendingDeps.set(parentId, new Set());
+		return this.collectReady();
+	}
+
 	private handleLoop(failedStepId: string, onFailure: FailureConfig): ReadyItem[] {
 		const targetStepId = onFailure.goto!;
 		const maxIterations = onFailure.maxIterations ?? 3;
@@ -330,6 +673,11 @@ export class FlowScheduler {
 			this.inFlightSteps.delete(invId);
 			this.outputs.delete(invId);
 			this.context.stepOutputs.delete(invId);
+			// Clear any deferred, sub-step, or superseded state for invalidated steps
+			this.deferredOutcomes.delete(invId);
+			this.subStepLoopIterations.delete(invId);
+			this.supersededSteps.delete(invId);
+			this.subStepFailedChildren.delete(invId);
 
 			// Rebuild pending deps: original deps minus currently completed
 			const origDeps = this.originalDeps.get(invId) ?? new Set();

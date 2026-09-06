@@ -3,13 +3,33 @@
 import { runUpdater, execNpm } from '@wadeck-app/shared-updater';
 import { ConfigDir } from '@wadeck-app/shared-cli/ConfigDir';
 import { join } from 'node:path';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, cpSync, writeFileSync, readFileSync } from 'node:fs';
+import * as os from 'node:os';
 import * as http from 'node:http';
 
 declare const __FLOW_CLI_VERSION__: string;
 
 const PKG_NAME = '@wadeck-app/flow-cli';
-const configDir = process.env['FLOW_CONFIG_DIR'] ?? ConfigDir.get('flow');
+const baseConfigDir = process.env['FLOW_CONFIG_DIR'] ?? ConfigDir.get('flow');
+
+// When UPDATER_MANUAL=1 (explicit `flow cli update`), bypass autoUpdate:false by
+// running the updater against a temp config copy with the flag removed.
+const configDir = (() => {
+	if (!process.env['UPDATER_MANUAL']) return baseConfigDir;
+	try {
+		const configFile = join(baseConfigDir, 'config.yml');
+		const content = readFileSync(configFile, 'utf8');
+		if (!/^autoUpdate:\s*false/m.test(content)) return baseConfigDir;
+		const tempDir = join(os.tmpdir(), `flow-update-manual-${Date.now()}`);
+		mkdirSync(tempDir, { recursive: true });
+		cpSync(baseConfigDir, tempDir, { recursive: true });
+		writeFileSync(join(tempDir, 'config.yml'), content.replace(/^autoUpdate:\s*false/m, 'autoUpdate: true'));
+		return tempDir;
+	} catch {
+		return baseConfigDir;
+	}
+})();
+
 const currentVersion = typeof __FLOW_CLI_VERSION__ !== 'undefined' ? __FLOW_CLI_VERSION__ : '0.0.0-dev';
 
 try {
