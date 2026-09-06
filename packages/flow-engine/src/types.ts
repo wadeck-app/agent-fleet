@@ -570,6 +570,15 @@ export interface BaseFlowStep {
 
 	/** Input/output validation contract */
 	contract?: StepContract;
+
+	/** Declares this step as a sub-step of the named parent step. */
+	parent?: string;
+
+	/** Max times the parent is re-queued when this sub-step fails (default: 3). */
+	maxSubStepIterations?: number;
+
+	/** Sub-step failure strategy name ('restart-on-first-failure' or 'wait-all'). */
+	subStepStrategy?: string;
 }
 
 /**
