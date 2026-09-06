@@ -430,6 +430,12 @@ export interface OutputVariableConfig {
 	 * Use `${{ context.workspaceDir }}/response.txt` to reference the file in subsequent steps.
 	 */
 	writeOutput?: string;
+
+	/**
+	 * If set and non-empty, the extracted value (as string) must be one of these values.
+	 * Throws an OutputExtractionError if the value is not in the list.
+	 */
+	allowedValues?: string[];
 }
 
 /**
@@ -879,6 +885,9 @@ export interface FlowDefinition {
 
 	/** Global environment variables injected into every step (supports ${{ }} templates). Step-level env takes precedence. */
 	env?: Record<string, string>;
+
+	/** Default working directory for script steps. Step-level workingDir takes precedence. */
+	workingDir?: string;
 
 	/** Optional per-flow plugin overrides. When set, these take precedence over the global startup provider. */
 	plugins?: FlowPluginOverrides;

@@ -49,7 +49,7 @@ export async function executeScriptStep(
 		? Object.fromEntries(Object.entries(step.env).map(([k, v]) => [k, templateRenderer.render(v, context, true)]))
 		: undefined;
 
-	const workingDir = step.workingDir || workspacePath;
+	const workingDir = step.workingDir ?? context.context?.['workingDir'] ?? workspacePath;
 	const result = await scriptExecutor.execute({
 		script: renderedScript,
 		workingDir,

@@ -20,6 +20,9 @@ export interface ExecutionContext {
 	 * and all accumulated errors as ${{ context.subStepErrors }} in the parent's prompt template.
 	 */
 	subStepErrors?: Record<string, string[]>;
+
+	/** Default working directory from the flow definition (FlowDefinition.workingDir). */
+	flowWorkingDir?: string;
 }
 
 export type ClientCommand = {

@@ -75,6 +75,7 @@ export class WorkerAdapter {
 				projectDir: context.cwd,
 				workspaceDir: context.workspaceDir,
 				outputsDir: context.outputsDir,
+				...(context.flowWorkingDir ? { workingDir: context.flowWorkingDir } : {}),
 				// Sub-step re-run error context: parent model step can reference these in its prompt
 				// via ${{ context.lastSubStepError }} or ${{ context.subStepErrors }}
 				lastSubStepError: (context.subStepErrors?.[step.id] ?? []).at(-1) ?? '',
