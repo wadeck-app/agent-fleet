@@ -121,6 +121,18 @@ export class OutputExtractor {
 		// Type conversion
 		value = this.convertType(value, config.type, varName, stepId);
 
+		// Allowed values validation
+		if (config.allowedValues && config.allowedValues.length > 0) {
+			const strValue = String(value);
+			if (!config.allowedValues.includes(strValue)) {
+				throw new OutputExtractionError(
+					`Value "${strValue}" is not allowed. Valid values: ${config.allowedValues.join(', ')}`,
+					varName,
+					stepId
+				);
+			}
+		}
+
 		return value;
 	}
 

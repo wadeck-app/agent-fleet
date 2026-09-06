@@ -62,6 +62,20 @@ export class SemanticValidator {
 	 */
 	private validateStepReferences(steps: FlowStep[], stepIds: Set<string>): void {
 		for (const step of steps) {
+			// Validate parent+depends redundancy: parent already implies dependency
+			if (step.parent && step.depends) {
+				const parentId = step.parent;
+				if (step.depends.includes(parentId)) {
+					this.issueCollector.addIssue({
+						severity: 'error',
+						code: ValidationCode.INVALID_VALUE,
+						message: `Step '${step.id}' declares both parent='${parentId}' and depends=['${parentId}', ...] — parent already implies dependency; remove '${parentId}' from depends`,
+						location: { stepId: step.id, field: 'depends' },
+						suggestion: `Remove '${parentId}' from the depends array; parent='${parentId}' already establishes the dependency`,
+					});
+				}
+			}
+
 			// Validate depends
 			if (step.depends) {
 				for (let i = 0; i < step.depends.length; i++) {

@@ -179,6 +179,7 @@ export async function executeModelStep(
 			}
 
 			stepTrace.outputs = outputExtractor.extract(result.response, step.output, step.id, {
+				rawOutput: result.response,
 				response: result.response,
 			});
 			writeOutputFiles(stepTrace.outputs ?? {}, step.output, context);
@@ -212,6 +213,7 @@ export async function executeModelStep(
 			}
 
 			stepTrace.outputs = outputExtractor.extract(responseText, step.output, step.id, {
+				rawOutput: responseText,
 				response: responseText,
 				stdout: result.stdout,
 				stderr: result.stderr,

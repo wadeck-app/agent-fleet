@@ -135,12 +135,15 @@ describe('FlowScheduler — wait-all strategy', () => {
 		// maxSubStepIterations: 1 → fails after 1 restart attempt
 		scheduler.start(
 			[makeStep('parent', [], { subStepStrategy: 'wait-all', maxSubStepIterations: 1 })],
-			new Map([['parent', []]]),
+			new Map([['parent', []]])
 		);
 
 		// First cycle: both children fail → restart (iterations = 1 <= 1)
 		scheduler.acknowledge('parent');
-		scheduler.inject([makeStep('child-a0', [], { parent: 'parent' }), makeStep('child-b0', [], { parent: 'parent' })]);
+		scheduler.inject([
+			makeStep('child-a0', [], { parent: 'parent' }),
+			makeStep('child-b0', [], { parent: 'parent' }),
+		]);
 		scheduler.acknowledge('child-a0');
 		scheduler.acknowledge('child-b0');
 		succeed(scheduler, 'parent');
@@ -151,7 +154,10 @@ describe('FlowScheduler — wait-all strategy', () => {
 
 		// Second cycle: both children fail → iterations = 2 > 1 → parent fails terminally
 		scheduler.acknowledge('parent');
-		scheduler.inject([makeStep('child-a1', [], { parent: 'parent' }), makeStep('child-b1', [], { parent: 'parent' })]);
+		scheduler.inject([
+			makeStep('child-a1', [], { parent: 'parent' }),
+			makeStep('child-b1', [], { parent: 'parent' }),
+		]);
 		scheduler.acknowledge('child-a1');
 		scheduler.acknowledge('child-b1');
 		succeed(scheduler, 'parent');
@@ -171,7 +177,10 @@ describe('FlowScheduler — restart-on-first-failure strategy (default)', () => 
 		scheduler.start([makeStep('parent')], new Map([['parent', []]]));
 
 		scheduler.acknowledge('parent');
-		scheduler.inject([makeStep('child-a', [], { parent: 'parent' }), makeStep('child-b', [], { parent: 'parent' })]);
+		scheduler.inject([
+			makeStep('child-a', [], { parent: 'parent' }),
+			makeStep('child-b', [], { parent: 'parent' }),
+		]);
 		scheduler.acknowledge('child-a');
 		scheduler.acknowledge('child-b');
 
@@ -192,7 +201,10 @@ describe('FlowScheduler — restart-on-first-failure strategy (default)', () => 
 		scheduler.start([makeStep('parent')], new Map([['parent', []]]));
 
 		scheduler.acknowledge('parent');
-		scheduler.inject([makeStep('child-a', [], { parent: 'parent' }), makeStep('child-b', [], { parent: 'parent' })]);
+		scheduler.inject([
+			makeStep('child-a', [], { parent: 'parent' }),
+			makeStep('child-b', [], { parent: 'parent' }),
+		]);
 		scheduler.acknowledge('child-a');
 		scheduler.acknowledge('child-b');
 
@@ -224,10 +236,7 @@ describe('FlowScheduler — custom strategy via extraStrategies', () => {
 		};
 
 		const scheduler = new FlowScheduler(makeContext(), { extraStrategies: [alwaysFailParent] });
-		scheduler.start(
-			[makeStep('parent', [], { subStepStrategy: 'always-fail-parent' })],
-			new Map([['parent', []]]),
-		);
+		scheduler.start([makeStep('parent', [], { subStepStrategy: 'always-fail-parent' })], new Map([['parent', []]]));
 
 		scheduler.acknowledge('parent');
 		scheduler.inject([makeStep('child-x', [], { parent: 'parent' })]);
@@ -244,10 +253,7 @@ describe('FlowScheduler — custom strategy via extraStrategies', () => {
 
 	it('throws when referencing an unknown strategy name', () => {
 		const scheduler = new FlowScheduler(makeContext());
-		scheduler.start(
-			[makeStep('parent', [], { subStepStrategy: 'nonexistent' })],
-			new Map([['parent', []]]),
-		);
+		scheduler.start([makeStep('parent', [], { subStepStrategy: 'nonexistent' })], new Map([['parent', []]]));
 
 		scheduler.acknowledge('parent');
 		scheduler.inject([makeStep('child-x', [], { parent: 'parent' })]);
@@ -255,9 +261,7 @@ describe('FlowScheduler — custom strategy via extraStrategies', () => {
 
 		succeed(scheduler, 'parent');
 
-		expect(() => fail(scheduler, 'child-x', 'err')).toThrow(
-			'unknown sub-step strategy "nonexistent"',
-		);
+		expect(() => fail(scheduler, 'child-x', 'err')).toThrow('unknown sub-step strategy "nonexistent"');
 	});
 
 	it('custom strategy overrides a built-in when same name is provided', () => {

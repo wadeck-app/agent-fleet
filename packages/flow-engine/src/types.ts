@@ -666,8 +666,8 @@ export interface ScriptFlowStep extends BaseFlowStep {
 	/** Optional environment variables */
 	env?: Record<string, string>;
 
-	/** Whether to capture stdout/stderr */
-	captureOutput?: boolean;
+	/** Named stdout output variable (e.g. 'stdout' → steps.x.outputs.stdout), or true for default capture */
+	captureOutput?: string | boolean;
 }
 
 /**

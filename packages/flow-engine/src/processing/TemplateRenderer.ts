@@ -6,6 +6,9 @@
  * - ${{ inputs.varName }} - variables from flow inputs
  * - ${{ steps.stepId.outputs.varName }} - outputs from previous steps
  * - ${{ task.metadata.key }} - task metadata access
+ * - ${{ subSteps.stepId.outputs.varName }} - outputs from a failed sub-step (parent restart)
+ * - ${{ subSteps.stepId.status.failed }} - whether a sub-step failed (boolean as string)
+ * - {% if expr %}...{% endif %} / {% if expr %}...{% else %}...{% endif %} - conditional blocks
  */
 
 /**
@@ -42,6 +45,9 @@ export interface TemplateContext {
 	/** Execution context variables (e.g. cwd) accessible via ${{ context.* }} */
 	context?: Record<string, string>;
 
+	/** Sub-step results accessible by sub-step ID when parent step is restarting */
+	subSteps?: Map<string, { outputs: Record<string, any>; status: string }>;
+
 	/** Callback when Claude process starts */
 	onClaudeProcessStarted?: (process: any) => void;
 }
@@ -73,15 +79,19 @@ export class TemplateRenderer {
 	 * @returns Rendered string
 	 */
 	public render(template: string, context: TemplateContext, strict: boolean = true): string {
+		// Process {% if/else/endif %} blocks before interpolation so discarded branches
+		// do not trigger errors for missing variables.
+		let result = this.processBlocks(template, context, strict);
+
 		// Find all ${{ ... }} patterns (GitHub Actions syntax)
 		const pattern = /\$\{\{\s*([^}]+?)\s*\}\}/g;
-		let result = template;
 		let match: RegExpExecArray | null;
+		const after = result;
 
 		// Reset lastIndex for global regex
 		pattern.lastIndex = 0;
 
-		while ((match = pattern.exec(template)) !== null) {
+		while ((match = pattern.exec(after)) !== null) {
 			const placeholder = match[0]; // e.g., "${{ foo.bar }}"
 			const expression = match[1].trim(); // e.g., "foo.bar"
 
@@ -99,6 +109,35 @@ export class TemplateRenderer {
 		}
 
 		return result;
+	}
+
+	/**
+	 * Process {% if expr %}...{% else %}...{% endif %} block conditionals.
+	 * Evaluated before ${{ }} interpolation so discarded branches are not parsed.
+	 */
+	private processBlocks(template: string, context: TemplateContext, strict: boolean): string {
+		const blockPattern = /\{%\s*if\s+(.+?)\s*%\}([\s\S]*?)(?:\{%\s*else\s*%\}([\s\S]*?))?\{%\s*endif\s*%\}/g;
+		return template.replace(blockPattern, (_, expr: string, ifContent: string, elseContent?: string) => {
+			let condValue: unknown;
+			try {
+				condValue = this.resolveVariable(expr.trim(), context);
+			} catch (error) {
+				if (strict) {
+					throw error;
+				}
+				condValue = false;
+			}
+			const isTruthy =
+				condValue !== false &&
+				condValue !== 'false' &&
+				condValue !== '' &&
+				condValue !== null &&
+				condValue !== undefined &&
+				condValue !== 0;
+			const content = isTruthy ? ifContent : (elseContent ?? '');
+			// Trim one leading/trailing newline from block content
+			return content.replace(/^\n/, '').replace(/\n$/, '');
+		});
 	}
 
 	/**
@@ -160,9 +199,45 @@ export class TemplateRenderer {
 			}
 			const path = parts.slice(1);
 			return this.resolveNested(context.context ?? {}, path, expression);
+		} else if (root === 'subSteps') {
+			// ${{ subSteps.stepId.outputs.varName }} or ${{ subSteps.stepId.status.failed }}
+			if (parts.length < 4 || (parts[2] !== 'outputs' && parts[2] !== 'status')) {
+				throw new TemplateRenderError(
+					'subSteps requires format: subSteps.stepId.outputs.varName or subSteps.stepId.status.failed',
+					expression,
+					root
+				);
+			}
+			const stepId = parts[1]!;
+			const namespace = parts[2]!;
+			const subStep = context.subSteps?.get(stepId);
+			if (!subStep) {
+				throw new TemplateRenderError(`Sub-step '${stepId}' not found in subSteps context`, expression, stepId);
+			}
+			if (namespace === 'outputs') {
+				const varName = parts[3]!;
+				if (!(varName in subStep.outputs)) {
+					throw new TemplateRenderError(
+						`Output '${varName}' not found in sub-step '${stepId}'`,
+						expression,
+						varName
+					);
+				}
+				return subStep.outputs[varName];
+			} else {
+				// namespace === 'status'
+				if (parts[3] !== 'failed') {
+					throw new TemplateRenderError(
+						`Unknown status property '${parts[3]}'. Only 'failed' is supported`,
+						expression,
+						parts[3]!
+					);
+				}
+				return subStep.status === 'failed';
+			}
 		} else {
 			throw new TemplateRenderError(
-				`Unknown root context: '${root}'. Use 'inputs', 'steps', 'task', or 'context'`,
+				`Unknown root context: '${root}'. Use 'inputs', 'steps', 'task', 'context', or 'subSteps'`,
 				expression,
 				root
 			);

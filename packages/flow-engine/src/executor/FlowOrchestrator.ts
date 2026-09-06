@@ -197,10 +197,14 @@ export class FlowOrchestrator {
 				onTraceUpdate?.(trace);
 
 				const outcome: StepOutcome = stepTrace.error
-					? { type: 'failed', error: stepTrace.error }
+					? { type: 'failed', error: stepTrace.error, outputs: stepTrace.outputs ?? {} }
 					: { type: 'completed', outputs: stepTrace.outputs ?? {} };
 
 				const newReady = scheduler.complete(item.stepId, outcome);
+
+				// Sync sub-step results into TemplateContext so the parent's next render
+				// can use ${{ subSteps.stepId.outputs.* }} and ${{ subSteps.stepId.status.failed }}
+				context.subSteps = scheduler.getSubSteps();
 
 				if (scheduler.hasFailed()) {
 					trace.status = 'failed';

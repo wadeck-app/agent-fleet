@@ -37,11 +37,11 @@ function fail(scheduler: FlowScheduler, stepId: string, error = 'step-error'): R
 /** Start a two-step flow: parent (no deps), child (parent: 'parent'). */
 function startParentChildFlow(scheduler: FlowScheduler): void {
 	// Both are in the initial step set with parent declared
-	const steps: SchedulerStep[] = [
-		makeStep('parent'),
-		makeStep('child', [], { parent: 'parent' }),
-	];
-	const depends = new Map<string, string[]>([['parent', []], ['child', []]]);
+	const steps: SchedulerStep[] = [makeStep('parent'), makeStep('child', [], { parent: 'parent' })];
+	const depends = new Map<string, string[]>([
+		['parent', []],
+		['child', []],
+	]);
 	scheduler.start(steps, depends);
 }
 
@@ -154,9 +154,7 @@ describe('FlowScheduler — parent-blocking sub-steps', () => {
 			succeed(scheduler, 'parent');
 
 			// Should not throw
-			expect(() =>
-				scheduler.inject([makeStep('child-late', [], { parent: 'parent' })])
-			).not.toThrow();
+			expect(() => scheduler.inject([makeStep('child-late', [], { parent: 'parent' })])).not.toThrow();
 
 			vi.restoreAllMocks();
 		});

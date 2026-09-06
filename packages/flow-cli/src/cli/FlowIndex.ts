@@ -67,12 +67,15 @@ async function registerDaemonCommands(program: Command): Promise<void> {
 				const vbsPath = path.join(os.tmpdir(), `flow-daemon-start-${Date.now()}.vbs`);
 				const safeNode = process.execPath.replace(/"/g, '""');
 				const safeBundle = bundlePath.replace(/"/g, '""');
-				fs.writeFileSync(vbsPath, [
-					'Dim oShell',
-					'Set oShell = CreateObject("WScript.Shell")',
-					'oShell.Environment("Process")("FLOW_DAEMON_MODE") = "1"',
-					`oShell.Run """${safeNode}"" ""${safeBundle}""", 0, False`,
-				].join('\r\n'));
+				fs.writeFileSync(
+					vbsPath,
+					[
+						'Dim oShell',
+						'Set oShell = CreateObject("WScript.Shell")',
+						'oShell.Environment("Process")("FLOW_DAEMON_MODE") = "1"',
+						`oShell.Run """${safeNode}"" ""${safeBundle}""", 0, False`,
+					].join('\r\n')
+				);
 				const wscript = spawn('wscript.exe', [vbsPath], {
 					detached: true,
 					stdio: 'ignore',
@@ -134,7 +137,8 @@ async function registerDaemonCommands(program: Command): Promise<void> {
 		.description('Show the current daemon status')
 		.option('--json', 'Machine-readable JSON output')
 		.action(async (opts: { json?: boolean }) => {
-			const useJson = opts.json === true || !process.stdout.isTTY;
+			// TTY detection disabled: always use human-readable format unless --json is passed
+			const useJson = opts.json === true; /* || !process.stdout.isTTY */
 			const client = createDaemonClient({ configDir: DAEMON_DIR, commands: {} });
 
 			let running: boolean;

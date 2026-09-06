@@ -1,14 +1,7 @@
 import { ConditionEvaluationError } from '../processing/ConditionEvaluator';
 import type { FailureConfig, RetryConfig } from '../types';
-import {
-	RestartOnFirstFailure,
-	WaitAll,
-} from './FlowScheduler.subStepStrategies';
-import type {
-	SubStepAction,
-	SubStepStrategy,
-	SubStepStrategyContext,
-} from './FlowScheduler.subStepStrategies';
+import { RestartOnFirstFailure, WaitAll } from './FlowScheduler.subStepStrategies';
+import type { SubStepAction, SubStepStrategy, SubStepStrategyContext } from './FlowScheduler.subStepStrategies';
 
 export type { SubStepAction, SubStepStrategy, SubStepStrategyContext };
 
@@ -53,6 +46,12 @@ export interface SchedulerContext {
 	 * Optional: callers that do not need sub-step re-run can omit it (FlowScheduler initialises lazily).
 	 */
 	subStepErrors?: Map<string, string[]>;
+	/**
+	 * Sub-step results for the most recent failed iteration, keyed by parent step ID then child step ID.
+	 * Populated when a parent is re-queued due to child failure.
+	 * Consumed by TemplateRenderer via ${{ subSteps.stepId.outputs.* }} and ${{ subSteps.stepId.status.failed }}.
+	 */
+	subSteps?: Map<string, { outputs: Record<string, unknown>; status: string }>;
 }
 
 export interface ReadyItem {
@@ -60,7 +59,9 @@ export interface ReadyItem {
 	step: SchedulerStep;
 }
 
-export type StepOutcome = { type: 'completed'; outputs: Record<string, unknown> } | { type: 'failed'; error: string };
+export type StepOutcome =
+	| { type: 'completed'; outputs: Record<string, unknown> }
+	| { type: 'failed'; error: string; outputs?: Record<string, unknown> };
 
 export class FlowScheduler {
 	private readonly steps = new Map<string, SchedulerStep>();
@@ -98,12 +99,18 @@ export class FlowScheduler {
 	 * Reset whenever the parent is restarted. Used to build SubStepStrategyContext.failedChildren.
 	 */
 	private readonly subStepFailedChildren = new Map<string, Map<string, string>>();
+	/**
+	 * Per-parent tracking of outputs from failed children during the current run.
+	 * Parallel to subStepFailedChildren. Reset whenever the parent is restarted.
+	 * Used to populate context.subSteps for the next parent execution.
+	 */
+	private readonly subStepFailedOutputs = new Map<string, Map<string, Record<string, unknown>>>();
 	/** Registered sub-step strategies, keyed by strategy name. */
 	private readonly strategies: Map<string, SubStepStrategy>;
 
 	constructor(
 		private readonly context: SchedulerContext,
-		options?: FlowSchedulerOptions,
+		options?: FlowSchedulerOptions
 	) {
 		this.strategies = new Map<string, SubStepStrategy>([
 			[RestartOnFirstFailure.name, RestartOnFirstFailure],
@@ -178,10 +185,7 @@ export class FlowScheduler {
 			const children = this.parentToChildren.get(stepId);
 			if (children && children.size > 0) {
 				const hasPending = [...children].some(
-					c =>
-						!this.completedSteps.has(c) &&
-						!this.failedSteps.has(c) &&
-						!this.supersededSteps.has(c)
+					c => !this.completedSteps.has(c) && !this.failedSteps.has(c) && !this.supersededSteps.has(c)
 				);
 				if (hasPending) {
 					this.deferredOutcomes.set(stepId, { type: 'completed', outputs: outcome.outputs });
@@ -239,15 +243,17 @@ export class FlowScheduler {
 			const strategyName = parentStep?.subStepStrategy ?? 'restart-on-first-failure';
 			const strategy = this.strategies.get(strategyName);
 			if (!strategy) {
-				throw new Error(
-					`FlowScheduler: unknown sub-step strategy "${strategyName}" on step "${parentId}"`,
-				);
+				throw new Error(`FlowScheduler: unknown sub-step strategy "${strategyName}" on step "${parentId}"`);
 			}
 
 			// Track this failure for strategy context (persists until parent restarts)
 			const failedChildren = this.subStepFailedChildren.get(parentId) ?? new Map<string, string>();
 			failedChildren.set(stepId, outcome.error);
 			this.subStepFailedChildren.set(parentId, failedChildren);
+
+			const failedOutputs = this.subStepFailedOutputs.get(parentId) ?? new Map<string, Record<string, unknown>>();
+			failedOutputs.set(stepId, outcome.outputs ?? {});
+			this.subStepFailedOutputs.set(parentId, failedOutputs);
 
 			const children = this.parentToChildren.get(parentId) ?? new Set<string>();
 			// pendingChildren: not yet terminal, excluding the current failing child
@@ -257,8 +263,8 @@ export class FlowScheduler {
 						c !== stepId &&
 						!this.completedSteps.has(c) &&
 						!this.failedSteps.has(c) &&
-						!this.supersededSteps.has(c),
-				),
+						!this.supersededSteps.has(c)
+				)
 			);
 			const completedChildren = new Set<string>([...children].filter(c => this.completedSteps.has(c)));
 
@@ -315,7 +321,21 @@ export class FlowScheduler {
 			this.deferredOutcomes.delete(parentId);
 			this.subStepLoopIterations.set(parentId, iterations);
 			// Reset per-run failure tracking for the next parent run
+			const failedChildrenSnapshot = this.subStepFailedChildren.get(parentId) ?? new Map<string, string>();
+			const failedOutputsSnapshot =
+				this.subStepFailedOutputs.get(parentId) ?? new Map<string, Record<string, unknown>>();
 			this.subStepFailedChildren.delete(parentId);
+			this.subStepFailedOutputs.delete(parentId);
+
+			// Populate context.subSteps so the parent prompt can reference sub-step data
+			const subStepsMap = new Map<string, { outputs: Record<string, unknown>; status: string }>();
+			for (const [childId] of failedChildrenSnapshot) {
+				subStepsMap.set(childId, {
+					outputs: failedOutputsSnapshot.get(childId) ?? {},
+					status: 'failed',
+				});
+			}
+			this.context.subSteps = subStepsMap;
 
 			// Clear parent's children tracking so re-run starts with an empty child set.
 			// Old children (from this run) may still be in-flight; they complete harmlessly
@@ -366,6 +386,14 @@ export class FlowScheduler {
 	 */
 	getSubStepErrors(stepId: string): string[] {
 		return this.context.subStepErrors?.get(stepId) ?? [];
+	}
+
+	/**
+	 * Returns the current subSteps map, populated when a parent step is re-queued after child failure.
+	 * Used by FlowOrchestrator to sync into TemplateContext before rendering the next parent execution.
+	 */
+	getSubSteps(): Map<string, { outputs: Record<string, unknown>; status: string }> | undefined {
+		return this.context.subSteps;
 	}
 
 	/** Inject steps dynamically (MCP provideSteps). Returns newly ready items. */
@@ -573,10 +601,7 @@ export class FlowScheduler {
 		if (!this.deferredOutcomes.has(parentId)) return [];
 		const children = this.parentToChildren.get(parentId) ?? new Set<string>();
 		const allTerminal = [...children].every(
-			c =>
-				this.completedSteps.has(c) ||
-				this.failedSteps.has(c) ||
-				this.supersededSteps.has(c),
+			c => this.completedSteps.has(c) || this.failedSteps.has(c) || this.supersededSteps.has(c)
 		);
 		if (!allTerminal) return [];
 
@@ -584,9 +609,7 @@ export class FlowScheduler {
 		const strategyName = parentStep?.subStepStrategy ?? 'restart-on-first-failure';
 		const strategy = this.strategies.get(strategyName);
 		if (!strategy) {
-			throw new Error(
-				`FlowScheduler: unknown sub-step strategy "${strategyName}" on step "${parentId}"`,
-			);
+			throw new Error(`FlowScheduler: unknown sub-step strategy "${strategyName}" on step "${parentId}"`);
 		}
 
 		const failedChildren = this.subStepFailedChildren.get(parentId) ?? new Map<string, string>();
@@ -637,7 +660,22 @@ export class FlowScheduler {
 
 		this.deferredOutcomes.delete(parentId);
 		this.subStepLoopIterations.set(parentId, iterations);
+		const failedChildrenSnapshot = this.subStepFailedChildren.get(parentId) ?? new Map<string, string>();
+		const failedOutputsSnapshot =
+			this.subStepFailedOutputs.get(parentId) ?? new Map<string, Record<string, unknown>>();
 		this.subStepFailedChildren.delete(parentId);
+		this.subStepFailedOutputs.delete(parentId);
+
+		// Populate context.subSteps so the parent prompt can reference sub-step data
+		const subStepsMap = new Map<string, { outputs: Record<string, unknown>; status: string }>();
+		for (const [childId] of failedChildrenSnapshot) {
+			subStepsMap.set(childId, {
+				outputs: failedOutputsSnapshot.get(childId) ?? {},
+				status: 'failed',
+			});
+		}
+		this.context.subSteps = subStepsMap;
+
 		this.parentToChildren.set(parentId, new Set());
 		this.outputs.delete(parentId);
 		this.context.stepOutputs.delete(parentId);
