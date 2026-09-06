@@ -126,23 +126,55 @@ export class ScriptExecutor {
 			const timestamp = Date.now();
 			const random = Math.random().toString(36).substring(7);
 
-			// Detect `node -e "code"` pattern (no positional args after closing quote):
-			// cmd.exe cannot handle multi-line quoted strings, so extract JS to a .js file.
-			// Only matches when nothing follows the closing quote -- avoids greedily consuming
-			// positional args as part of the code (regex backtracking bug with [\s\S]*?).
+			// Detect `node -e "code"` pattern: extract to a .js file.
 			const nodeEMatch = /^node\s+-e\s+"([^"]*)"$/.exec(options.script.trim());
 			if (nodeEMatch) {
 				const jsContent = nodeEMatch[1];
 				tempFilePath = path.join(tempDir, `agent-fleet-script-${timestamp}-${random}.js`);
 				fs.writeFileSync(tempFilePath, jsContent, 'utf8');
-				// Wrap in quotes to handle paths with spaces
 				scriptToExecute = `node "${tempFilePath}"`;
 			} else {
-				// Generic multiline shell script: write to a .bat file
-				// This is necessary because cmd.exe via spawn() only executes the first line
-				tempFilePath = path.join(tempDir, `agent-fleet-script-${timestamp}-${random}.bat`);
-				fs.writeFileSync(tempFilePath, `@echo off\r\n${options.script}`, 'utf8');
-				scriptToExecute = tempFilePath;
+				// Write to a .sh file and execute with bash.
+				// Bash is available on Windows via Git Bash / MSYS2 and is already on PATH
+				// (confirmed by the MSYS2 PATH entries in process.env.PATH on this system).
+				// This avoids cmd.exe which doesn't support bash syntax ($VAR, pipes, etc.).
+				tempFilePath = path.join(tempDir, `agent-fleet-script-${timestamp}-${random}.sh`);
+				fs.writeFileSync(tempFilePath, options.script, { encoding: 'utf8' });
+				// Use forward slashes — MSYS2 bash handles them correctly
+				const posixPath = tempFilePath.replace(/\\/g, '/').replace(/^([A-Za-z]):/, '/cifs/$1');
+				// shell: false so we control the binary explicitly
+				return new Promise<ScriptExecutionResult>((innerResolve, innerReject) => {
+					let stdout = '';
+					let stderr = '';
+					let killed = false;
+					const cleanupSh = () => {
+						try { fs.unlinkSync(tempFilePath!); } catch { /* ignore */ }
+					};
+					const child = spawn('bash', [tempFilePath!], {
+						cwd: workingDir,
+						env: cleanEnv,
+						stdio: ['ignore', 'pipe', 'pipe'],
+						windowsHide: true,
+					});
+					child.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
+					child.stderr?.on('data', (d: Buffer) => { stderr += d.toString(); });
+					child.on('close', (code: number | null) => {
+						cleanupSh();
+						const exitCode = code ?? 1;
+						const durationMs = Date.now() - startTime;
+						innerResolve({ stdout, stderr, exitCode, durationMs, success: exitCode === 0 });
+					});
+					child.on('error', (err: Error) => { cleanupSh(); innerReject(err); });
+					if (options.timeout) {
+						setTimeout(() => {
+							killed = true;
+							child.kill();
+							cleanupSh();
+							innerResolve({ stdout, stderr, exitCode: -1, durationMs: Date.now() - startTime, success: false });
+						}, options.timeout);
+					}
+					void killed; // suppress unused warning
+				});
 			}
 		}
 
