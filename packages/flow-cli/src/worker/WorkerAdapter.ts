@@ -81,6 +81,10 @@ export class WorkerAdapter {
 				lastSubStepError: (context.subStepErrors?.[step.id] ?? []).at(-1) ?? '',
 				subStepErrors: JSON.stringify(context.subStepErrors?.[step.id] ?? []),
 			},
+			// Sub-step outputs for ${{ subSteps.stepId.outputs.* }} and {% if subSteps.stepId.status.failed %}
+			subSteps: context.subSteps
+				? new Map(Object.entries(context.subSteps))
+				: undefined,
 		};
 
 		// For model steps, wire up the MCP server for provideSteps injection

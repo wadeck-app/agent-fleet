@@ -476,8 +476,9 @@ export class CommandHandler {
 				const step = this.readyQueue.shift()!;
 				const scheduler = this.schedulers.get(step.executionContext.executionId);
 
-				// Before dispatching, sync any accumulated sub-step errors from the scheduler
-				// into ExecutionContext so the worker can expose them via ${{ context.lastSubStepError }}
+				// Before dispatching, sync sub-step errors and sub-step outputs from the scheduler
+				// into ExecutionContext so the worker can render ${{ context.lastSubStepError }},
+				// ${{ subSteps.stepId.outputs.stderr }}, and {% if subSteps.stepId.status.failed %}
 				if (scheduler) {
 					const errors = scheduler.getSubStepErrors(step.stepId);
 					if (errors.length > 0) {
@@ -485,6 +486,10 @@ export class CommandHandler {
 							step.executionContext.subStepErrors = {};
 						}
 						step.executionContext.subStepErrors[step.stepId] = errors;
+					}
+					const subStepsMap = scheduler.getSubSteps();
+					if (subStepsMap && subStepsMap.size > 0) {
+						step.executionContext.subSteps = Object.fromEntries(subStepsMap);
 					}
 				}
 

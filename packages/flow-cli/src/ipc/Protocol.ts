@@ -21,6 +21,14 @@ export interface ExecutionContext {
 	 */
 	subStepErrors?: Record<string, string[]>;
 
+	/**
+	 * Sub-step results for the most recent failed iteration, keyed by child step ID.
+	 * Populated by the daemon when a parent is re-queued due to child failure.
+	 * Consumed by TemplateRenderer via ${{ subSteps.stepId.outputs.* }} and
+	 * ${{ subSteps.stepId.status.failed }}, and {% if subSteps.stepId.status.failed %} blocks.
+	 */
+	subSteps?: Record<string, { outputs: Record<string, unknown>; status: string }>;
+
 	/** Default working directory from the flow definition (FlowDefinition.workingDir). */
 	flowWorkingDir?: string;
 }
