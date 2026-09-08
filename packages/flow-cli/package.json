@@ -25,7 +25,7 @@
 	"dependencies": {
 		"@wadeck-app/shared-cli": "^2026.8.31-022-55ef14e0",
 		"@wadeck-app/shared-updater": "^2026.8.31-006-6811218a",
-		"@wadeck-app/singleton-daemon-kit": "2026.8.30-082-8c02b26d",
+		"@wadeck-app/singleton-daemon-kit": "2026.9.8-087-d25cfbb4",
 		"commander": "^12.1.0",
 		"extension-points": "file:../extension-points",
 		"flow-engine": "file:../flow-engine",
