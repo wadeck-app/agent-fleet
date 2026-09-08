@@ -62,7 +62,8 @@ async function handleMessage(message: DaemonToWorker): Promise<void> {
 				send({ type: 'step_completed', executionId: executionContext.executionId, stepId, output, meta });
 			} catch (err) {
 				const error = err instanceof Error ? String(err) : String(err);
-				send({ type: 'step_failed', executionId: executionContext.executionId, stepId, error });
+				const output = (err as { stepOutputs?: Record<string, unknown> }).stepOutputs;
+				send({ type: 'step_failed', executionId: executionContext.executionId, stepId, error, output });
 			}
 			send({ type: 'ready', pid: process.pid });
 			break;

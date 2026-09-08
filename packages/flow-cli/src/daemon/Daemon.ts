@@ -197,9 +197,9 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 			}
 			case 'step_failed': {
 				try {
-					const { executionId, stepId, error } = message;
+					const { executionId, stepId, error, output } = message;
 					executionStore.markStepFailed(executionId, stepId, error);
-					commandHandler.onStepFailed(executionId, stepId, error);
+					commandHandler.onStepFailed(executionId, stepId, error, output);
 					// markExecutionFailed is now called inside onStepFailed only when the failure is terminal
 					logWriter.writeExecution(executionId, `Step ${stepId} failed: ${error}`, 'error');
 					commandHandler.dispatchHook(executionId, 'onStepFailed', { executionId, stepId, error });

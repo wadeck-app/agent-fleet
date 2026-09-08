@@ -193,7 +193,13 @@ export class WorkerAdapter {
 		const trace = await runner.executeStep(step as unknown as ScriptFlowStep, workspace, templateContext);
 		sendStdoutAsLogs(trace.stdout, context.executionId, step.id, sendMessage);
 		if (trace.error) {
-			throw new Error(trace.error);
+			// Include captured outputs (stdout/stderr) in the error so the daemon can forward them
+			// to the scheduler for ${{ subSteps.xxx.outputs.stderr }} in parent prompts.
+			// violations-suppress: ts/no-unsafe-type-cast same pattern as step_completed output cast below
+			const err = Object.assign(new Error(trace.error), {
+				stepOutputs: (trace.outputs ?? {}) as Record<string, unknown>,
+			});
+			throw err;
 		}
 		// trace.outputs is undefined for script steps without captureOutput -- empty map is correct.
 		return { output: (trace.outputs ?? {}) as Record<string, unknown>, meta: trace.meta };

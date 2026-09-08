@@ -375,7 +375,7 @@ export class CommandHandler {
 	}
 
 	/** Called by Daemon when a worker reports step_failed. */
-	onStepFailed(executionId: string, stepId: string, error: string): void {
+	onStepFailed(executionId: string, stepId: string, error: string, outputs?: Record<string, unknown>): void {
 		const scheduler = this.schedulers.get(executionId);
 		if (!scheduler) {
 			process.stderr.write(
@@ -390,7 +390,7 @@ export class CommandHandler {
 		// - If the failed step is a child and the parent is deferred, the parent is re-queued
 		//   (with error recorded in subStepErrors) up to maxSubStepIterations times.
 		// - After max iterations the parent is failed terminally, hasFailed() returns true.
-		const newReady = scheduler.complete(stepId, { type: 'failed', error });
+		const newReady = scheduler.complete(stepId, { type: 'failed', error, outputs });
 
 		if (scheduler.hasFailed()) {
 			// Terminal failure - purge queued steps for this execution and cleanup

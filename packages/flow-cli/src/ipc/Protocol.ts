@@ -69,7 +69,7 @@ export type WorkerToDaemon =
 	| { type: 'ready'; pid: number }
 	| { type: 'log'; executionId: string; stepId: string; entry: LiveLogEntry }
 	| { type: 'step_completed'; executionId: string; stepId: string; output: Record<string, unknown>; meta?: StepMeta }
-	| { type: 'step_failed'; executionId: string; stepId: string; error: string }
+	| { type: 'step_failed'; executionId: string; stepId: string; error: string; output?: Record<string, unknown> }
 	| { type: 'inject_steps'; executionId: string; steps: InjectedStep[] };
 
 // 're-queued' is reserved for v2 crash recovery. Unreachable in v1 but kept for backward compat.

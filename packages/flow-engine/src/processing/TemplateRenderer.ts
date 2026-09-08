@@ -213,18 +213,13 @@ export class TemplateRenderer {
 			const namespace = parts[2]!;
 			const subStep = context.subSteps?.get(stepId);
 			if (!subStep) {
-				throw new TemplateRenderError(`Sub-step '${stepId}' not found in subSteps context`, expression, stepId);
+				// Sub-step not in context (first run or no failure yet) — return neutral values
+				return namespace === 'status' ? false : '';
 			}
 			if (namespace === 'outputs') {
 				const varName = parts[3]!;
-				if (!(varName in subStep.outputs)) {
-					throw new TemplateRenderError(
-						`Output '${varName}' not found in sub-step '${stepId}'`,
-						expression,
-						varName
-					);
-				}
-				return subStep.outputs[varName];
+				// Missing output key — return empty string rather than crashing the parent
+				return varName in subStep.outputs ? subStep.outputs[varName] : '';
 			} else {
 				// namespace === 'status'
 				if (parts[3] !== 'failed') {
