@@ -24,6 +24,9 @@ export class WebSocketServer {
 		// The ws default (100 MiB) would allow a rogue local process to exhaust daemon memory.
 		this.wss = new WsServer({ server: this.httpServer, maxPayload: 1024 * 1024 });
 		this.wss.on('connection', (ws: WebSocket) => this.handleConnection(ws));
+		// ws re-emits httpServer errors; without a handler Node.js throws unhandled 'error'
+		// and crashes the daemon. EADDRINUSE during port scan is handled by tryBind — suppress here.
+		this.wss.on('error', () => {});
 	}
 
 	/** Bind to the requested port, retrying up to 10 increments on EADDRINUSE (e.g. TIME_WAIT). */
