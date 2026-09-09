@@ -65,6 +65,8 @@ export interface StepRunnerConfig {
 	executionConfig?: ExecutionConfig;
 	/** Optional provider map override -- used in tests to inject mock providers without I/O */
 	providers?: Map<string, ModelProvider>;
+	/** Called with the rendered prompt before the model CLI launches. Use for debug logging. */
+	onRenderedPrompt?: (prompt: string) => void;
 }
 
 export class StepRunner {
@@ -110,6 +112,10 @@ export class StepRunner {
 	}
 	public setApprovalProvider(approvalProvider: ApprovalProvider): void {
 		this.config.approvalProvider = approvalProvider;
+	}
+
+	public setOnRenderedPrompt(cb: (prompt: string) => void): void {
+		this.config.onRenderedPrompt = cb;
 	}
 
 	public async executeStep(
@@ -160,6 +166,7 @@ export class StepRunner {
 						provider,
 						onClaudeProcessStarted: this.config.onClaudeProcessStarted,
 						executionConfig: this.config.executionConfig,
+						onRenderedPrompt: this.config.onRenderedPrompt,
 					},
 					services,
 					onLogEntry

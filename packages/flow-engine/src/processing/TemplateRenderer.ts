@@ -79,11 +79,22 @@ export class TemplateRenderer {
 	 * @returns Rendered string
 	 */
 	public render(template: string, context: TemplateContext, strict: boolean = true): string {
-		// Process {% if/else/endif %} blocks before interpolation so discarded branches
-		// do not trigger errors for missing variables.
-		let result = this.processBlocks(template, context, strict);
+		// 1. Replace $${{ ... }} with null-byte placeholders so they survive template
+		//    processing unchanged. After all ${{ }} expressions are resolved, each
+		//    placeholder is restored as a literal ${{ ... }} in the output.
+		//    This lets users write $${{ inputs.taskId }} to produce ${{ inputs.taskId }}.
+		const escapedLiterals: string[] = [];
+		const escapedTemplate = template.replace(/\$\$\{\{(.*?)\}\}/g, (_, inner: string) => {
+			const index = escapedLiterals.length;
+			escapedLiterals.push(`\${{${inner}}}`);
+			return `\x00ESCAPED_EXPR_${index}\x00`;
+		});
 
-		// Find all ${{ ... }} patterns (GitHub Actions syntax)
+		// 2. Process {% if/else/endif %} blocks before interpolation so discarded branches
+		//    do not trigger errors for missing variables.
+		let result = this.processBlocks(escapedTemplate, context, strict);
+
+		// 3. Find all ${{ ... }} patterns (GitHub Actions syntax)
 		const pattern = /\$\{\{\s*([^}]+?)\s*\}\}/g;
 		let match: RegExpExecArray | null;
 		const after = result;
@@ -106,6 +117,11 @@ export class TemplateRenderer {
 					console.warn(`Failed to resolve ${placeholder}:`, error);
 				}
 			}
+		}
+
+		// 4. Restore escaped literals as their literal ${{ ... }} form
+		for (let i = 0; i < escapedLiterals.length; i++) {
+			result = result.replace(`\x00ESCAPED_EXPR_${i}\x00`, escapedLiterals[i]!);
 		}
 
 		return result;

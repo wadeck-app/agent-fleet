@@ -82,9 +82,7 @@ export class WorkerAdapter {
 				subStepErrors: JSON.stringify(context.subStepErrors?.[step.id] ?? []),
 			},
 			// Sub-step outputs for ${{ subSteps.stepId.outputs.* }} and {% if subSteps.stepId.status.failed %}
-			subSteps: context.subSteps
-				? new Map(Object.entries(context.subSteps))
-				: undefined,
+			subSteps: context.subSteps ? new Map(Object.entries(context.subSteps)) : undefined,
 		};
 
 		// For model steps, wire up the MCP server for provideSteps injection
@@ -98,6 +96,19 @@ export class WorkerAdapter {
 
 			// Create a runner with MCP servers baked into the factory call
 			const runner = this.stepRunnerFactory([mcpServerConfig]);
+
+			// Log the rendered prompt to the daemon execution log before launching the model.
+			// This appears in `flow cli logs -f` and is invaluable for debugging prompt issues.
+			runner.setOnRenderedPrompt((prompt: string) => {
+				const entry: LiveLogEntry = {
+					id: randomUUID(),
+					timestamp: Date.now(),
+					level: 'debug',
+					message: `[rendered prompt]\n${prompt}`,
+					eventType: 'system',
+				};
+				sendMessage({ type: 'log', executionId: context.executionId, stepId: step.id, entry });
+			});
 
 			try {
 				// Notify user that the model step has started (before Claude CLI launches)

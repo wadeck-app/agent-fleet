@@ -16,6 +16,8 @@ export interface ModelStepConfig {
 	provider: ModelProvider;
 	onClaudeProcessStarted?: (process: import('node:child_process').ChildProcess) => void;
 	executionConfig?: ExecutionConfig;
+	/** Called with the fully-rendered prompt before the model CLI is launched. Use for debug logging. */
+	onRenderedPrompt?: (prompt: string) => void;
 }
 
 export async function executeModelStep(
@@ -36,6 +38,10 @@ export async function executeModelStep(
 	const renderedPrompt = templateRenderer.render(step.prompt, context, true);
 	stepTrace.prompt = renderedPrompt;
 	stepTrace.model = step.model;
+
+	// Emit the rendered prompt before launching the model so callers can forward it
+	// to the execution log. The format starts with "[rendered prompt]\n" for easy filtering.
+	config.onRenderedPrompt?.(renderedPrompt);
 
 	const execConfig = config.executionConfig;
 	const streamJson = execConfig?.streamJson !== false;

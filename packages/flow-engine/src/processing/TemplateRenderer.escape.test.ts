@@ -100,6 +100,62 @@ describe('TemplateRenderer - Escape & Literal Characters', () => {
 		});
 	});
 
+	describe('Double-dollar escape syntax ($${{ ... }})', () => {
+		it('should render $${{ inputs.foo }} as literal ${{ inputs.foo }}', () => {
+			const template = 'task set-status $${{ inputs.name }} done';
+			const result = renderer.render(template, mockContext);
+			expect(result).toBe('task set-status ${{ inputs.name }} done');
+		});
+
+		it('should preserve inner whitespace in the escaped literal', () => {
+			const template = '$${{ inputs.value }}';
+			const result = renderer.render(template, mockContext);
+			expect(result).toBe('${{ inputs.value }}');
+		});
+
+		it('should mix regular ${{ }} interpolation and $${{ }} literals', () => {
+			const template = 'Hello ${{ inputs.name }}, use $${{ inputs.name }} as a template variable';
+			const result = renderer.render(template, mockContext);
+			expect(result).toBe('Hello Alice, use ${{ inputs.name }} as a template variable');
+		});
+
+		it('should handle multiple $${{ }} escapes in the same template', () => {
+			const template = 'cmd $${{ inputs.name }} and $${{ inputs.value }}';
+			const result = renderer.render(template, mockContext);
+			expect(result).toBe('cmd ${{ inputs.name }} and ${{ inputs.value }}');
+		});
+
+		it('should not throw for unknown variable in $${{ }} (it is not resolved)', () => {
+			const template = '$${{ inputs.nonexistent }}';
+			expect(() => renderer.render(template, mockContext)).not.toThrow();
+			expect(renderer.render(template, mockContext)).toBe('${{ inputs.nonexistent }}');
+		});
+
+		it('should handle $${{ }} inside {% if %} block content', () => {
+			const template = '{% if inputs.name %}use $${{ inputs.name }} here{% endif %}';
+			const result = renderer.render(template, mockContext);
+			expect(result).toBe('use ${{ inputs.name }} here');
+		});
+
+		it('should expand regular variables in the same template as $${{ }} escapes', () => {
+			const template = [
+				'# Flow template',
+				'Run: ${{ inputs.name }}',
+				'# Literal for downstream YAML:',
+				'prompt: $${{ steps.prior.outputs.result }}',
+			].join('\n');
+			const result = renderer.render(template, mockContext);
+			expect(result).toBe(
+				[
+					'# Flow template',
+					'Run: Alice',
+					'# Literal for downstream YAML:',
+					'prompt: ${{ steps.prior.outputs.result }}',
+				].join('\n')
+			);
+		});
+	});
+
 	describe('Complex real-world examples', () => {
 		it('should handle bash script with mixed syntax', () => {
 			// Use string concatenation to avoid TS template literal parsing

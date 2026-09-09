@@ -351,7 +351,9 @@ export class SimulationValidator {
 					field: step.type === 'model' ? 'prompt' : 'script',
 					path: `${flow.id}.steps[${step.id}]`,
 				},
-				suggestion: `Valid forms: \${{ inputs.name }}, \${{ steps.step-id.outputs.varName }}, \${{ subSteps.step-id.outputs.stderr }}, \${{ subSteps.step-id.status.failed }}, \${{ context.cwd }}`,
+				suggestion:
+					'Valid forms: ${{ inputs.name }}, ${{ steps.step-id.outputs.varName }}, ${{ subSteps.step-id.outputs.stderr }}, ${{ subSteps.step-id.status.failed }}, ${{ context.cwd }}.' +
+					' To write a literal (not evaluated), prefix with an extra dollar sign: double-dollar then braces.',
 				context: {
 					actual: expression,
 					expected:
