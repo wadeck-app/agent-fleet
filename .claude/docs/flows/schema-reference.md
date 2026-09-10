@@ -1213,12 +1213,66 @@ Templates can be used in:
 - Step `approval.description` (UserInterventionStep)
 - Output `from` paths (when using templates in SubFlowStep)
 
+### Block Conditionals
+
+`{% if expr %}...{% endif %}` renders a block only when the condition is truthy. The expression uses the same resolution rules as `${{ }}`. Discarded branches are not evaluated — missing variables in a false branch never throw.
+
+```yaml
+prompt: |
+  {% if subSteps.validate.status.failed %}
+  Previous attempt failed:
+  ${{ subSteps.validate.outputs.stderr }}
+  {% endif %}
+  Generate a flow for: ${{ inputs.description }}
+```
+
+`{% if expr %}...{% else %}...{% endif %}` is also supported.
+
+### Sub-Step Context (`subSteps.*`)
+
+When a sub-step fails and its parent model step restarts, the failed sub-step's results are available under `subSteps`:
+
+| Expression | Value |
+|---|---|
+| `${{ subSteps.stepId.outputs.stderr }}` | stderr captured from the failed script |
+| `${{ subSteps.stepId.outputs.stdout }}` | stdout captured from the failed script |
+| `${{ subSteps.stepId.status.failed }}` | `true` when status is `failed`, else `false` |
+
+`subSteps` is absent on the first run — the `{% if subSteps.stepId.status.failed %}` block evaluates to false cleanly.
+
+### Escape Syntax (`$${{ }}`)
+
+`$${{ expr }}` outputs a **literal** `${{ expr }}` without substitution. Use this when a step generates content that will itself be interpreted as a flow template (e.g., a model step that generates a YAML flow).
+
+```yaml
+# In a prompt — model receives the literal string ${{ inputs.taskId }}
+script: |
+  task set-status $${{ inputs.taskId }} done
+```
+
+After rendering: `task set-status ${{ inputs.taskId }} done` (not the current task ID value).
+
+**Rule of thumb:** `$${{ }}` is only needed in meta-flows that generate other flows. Normal flows never need it.
+
+**Bash scripts**: `$${{ expr }}` renders to `${{ expr }}` before bash runs, and bash will try to evaluate `${{ }}` as a parameter expansion (which fails). Use the DOLLAR trick instead for bash scripts that need to output `${{ }}` at runtime:
+
+```yaml
+script: |
+  DOLLAR='$'
+  echo "Use ${DOLLAR}{{ inputs.taskId }} in your script"
+```
+
+### Rendered Prompt Logging
+
+The fully-rendered prompt is emitted as a `[rendered prompt]` debug log entry before the model CLI launches, visible in `flow cli logs -f -H`. Use this to verify that `$${{ }}` escaping and `{% if %}` blocks resolved as expected.
+
 ### Common Mistakes
 
 1. **Missing Dependencies**: Using `${{ steps.stepId.outputs.var }}` without `depends: [stepId]`
 2. **Typos**: Misspelling variable names (`${{ intpus.task }}` instead of `${{ inputs.task }}`)
 3. **Type Mismatches**: Interpolating objects directly without transforms
 4. **Undefined Variables**: Referencing variables not declared in inputs or outputs
+5. **`$${{ }}` in bash scripts**: Renders to `${{ }}` which bash fails to expand — use the DOLLAR trick (see above)
 
 ---
 
