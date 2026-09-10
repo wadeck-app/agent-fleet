@@ -293,11 +293,10 @@ describe.skipIf(!shouldRunIntegration())('OpenCode real vs mock compatibility', 
 	it(
 		'E2E: OpenCode calls get_weather MCP tool and emits tool_use event',
 		async () => {
-			const MCP_SERVER_PATH = join(__dirname, '../../../../../_test-tasks/mcp-server/index.mjs');
+			const MCP_SERVER_PATH = join(__dirname, '../test-utils/fixtures/mcp-weather-server.mjs');
 
 			if (!existsSync(MCP_SERVER_PATH)) {
-				console.warn(`MCP server not found at ${MCP_SERVER_PATH} — skipping E2E MCP test`);
-				return;
+				throw new Error(`MCP server fixture missing: ${MCP_SERVER_PATH}`);
 			}
 
 			const provider = new OpenCodeModelProvider();
