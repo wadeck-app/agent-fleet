@@ -518,7 +518,8 @@ export class CommandHandler {
 				}
 			} else if (this.workerPool.canSpawn()) {
 				this.workerPool.spawnWorker();
-				break;
+				// continue so we spawn one worker per queued step (up to concurrencyLimit)
+				continue;
 			} else {
 				break;
 			}
