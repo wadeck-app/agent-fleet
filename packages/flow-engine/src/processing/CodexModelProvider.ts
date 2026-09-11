@@ -94,6 +94,9 @@ function buildSpawnParams(
 	// --json flag (codex uses --json instead of --format json)
 	args.push('--json');
 
+	// Always skip git repo check -- flow can be run from any directory
+	args.push('--skip-git-repo-check');
+
 	// --auto enables auto-approval of permissions
 	if (options.skipPermissions === true) {
 		args.push('--auto');
