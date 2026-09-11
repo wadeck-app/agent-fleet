@@ -30,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ClaudeModelProvider } from '../processing/ClaudeModelProvider';
+import { CodexModelProvider } from '../processing/CodexModelProvider';
 import { OpenCodeModelProvider } from '../processing/OpenCodeModelProvider';
 import type { StreamJsonEvent } from '../processing/StreamJsonParser';
 import type { TemplateContext } from '../processing/TemplateRenderer';
@@ -40,6 +41,7 @@ import { StepRunner } from './StepRunner';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MOCK_PATH = join(__dirname, '../testing/opencode-mock.mjs');
 const CLAUDE_MOCK_FILE = join(__dirname, '../testing/claude-mock.mjs');
+const CODEX_MOCK_FILE = join(__dirname, '../testing/codex-mock.mjs');
 const VERSION_FILE = join(__dirname, '../../../../../.claude/opencode-version-tested.json');
 const INTEGRATION_TIMEOUT = 60_000;
 
@@ -772,6 +774,130 @@ describe('Flow-level feature tests (mock providers)', () => {
 				expect(meta).toBeDefined();
 				expect(meta.session_id.length).toBeGreaterThan(0);
 			} finally {
+				if (prevClaudeMockPath === undefined) {
+					delete process.env['CLAUDE_MOCK_PATH'];
+				} else {
+					process.env['CLAUDE_MOCK_PATH'] = prevClaudeMockPath;
+				}
+			}
+		},
+		FLOW_TEST_TIMEOUT
+	);
+
+	it(
+		'flow with provider:codex executes end-to-end via mock',
+		async () => {
+			const prevMockPath = process.env['CODEX_MOCK_PATH'];
+			process.env['CODEX_MOCK_PATH'] = CODEX_MOCK_FILE;
+
+			try {
+				const step: ModelFlowStep = {
+					id: 'codex-step',
+					name: 'Codex Step',
+					type: 'model',
+					provider: 'codex',
+					prompt: 'hello codex',
+				};
+
+				const runner = new StepRunner({
+					interactive: false,
+					providers: new Map([['codex', new CodexModelProvider()]]),
+				});
+
+				const trace = await runner.executeStep(step, makeTestWorkspace(), {
+					inputs: {},
+					stepOutputs: new Map(),
+					taskMetadata: {},
+				});
+
+				expect(trace.error).toBeUndefined();
+				const meta = trace.meta as ModelStepMeta;
+				expect(meta).toBeDefined();
+				expect(meta.session_id.length).toBeGreaterThan(0);
+				expect(meta.cost.usd).toBeGreaterThan(0);
+			} finally {
+				if (prevMockPath === undefined) {
+					delete process.env['CODEX_MOCK_PATH'];
+				} else {
+					process.env['CODEX_MOCK_PATH'] = prevMockPath;
+				}
+			}
+		},
+		FLOW_TEST_TIMEOUT
+	);
+
+	it(
+		'flow with mixed providers (opencode + codex + claude) all execute via mocks',
+		async () => {
+			const prevOcMockPath = process.env['OPENCODE_MOCK_PATH'];
+			const prevCodexMockPath = process.env['CODEX_MOCK_PATH'];
+			const prevClaudeMockPath = process.env['CLAUDE_MOCK_PATH'];
+			process.env['OPENCODE_MOCK_PATH'] = MOCK_PATH;
+			process.env['CODEX_MOCK_PATH'] = CODEX_MOCK_FILE;
+			process.env['CLAUDE_MOCK_PATH'] = CLAUDE_MOCK_FILE;
+
+			try {
+				const opencodeStep: ModelFlowStep = {
+					id: 'step-opencode',
+					name: 'OpenCode Step',
+					type: 'model',
+					provider: 'opencode',
+					prompt: 'hello from opencode',
+				};
+				const codexStep: ModelFlowStep = {
+					id: 'step-codex',
+					name: 'Codex Step',
+					type: 'model',
+					provider: 'codex',
+					prompt: 'hello from codex',
+				};
+				const claudeStep: ModelFlowStep = {
+					id: 'step-claude',
+					name: 'Claude Step',
+					type: 'model',
+					provider: 'claude',
+					prompt: 'hello from claude',
+				};
+
+				const runner = new StepRunner({
+					interactive: false,
+					providers: new Map([
+						['opencode', new OpenCodeModelProvider()],
+						['codex', new CodexModelProvider()],
+						['claude', new ClaudeModelProvider()],
+					]),
+				});
+
+				const workspace = makeTestWorkspace();
+				const context = {
+					inputs: {},
+					stepOutputs: new Map<string, Record<string, unknown>>(),
+					taskMetadata: {},
+				};
+
+				const traceOc = await runner.executeStep(opencodeStep, workspace, context);
+				const traceCx = await runner.executeStep(codexStep, workspace, context);
+				const traceCl = await runner.executeStep(claudeStep, workspace, context);
+
+				expect(traceOc.error).toBeUndefined();
+				expect((traceOc.meta as ModelStepMeta).session_id.length).toBeGreaterThan(0);
+
+				expect(traceCx.error).toBeUndefined();
+				expect((traceCx.meta as ModelStepMeta).session_id.length).toBeGreaterThan(0);
+
+				expect(traceCl.error).toBeUndefined();
+				expect((traceCl.meta as ModelStepMeta).session_id.length).toBeGreaterThan(0);
+			} finally {
+				if (prevOcMockPath === undefined) {
+					delete process.env['OPENCODE_MOCK_PATH'];
+				} else {
+					process.env['OPENCODE_MOCK_PATH'] = prevOcMockPath;
+				}
+				if (prevCodexMockPath === undefined) {
+					delete process.env['CODEX_MOCK_PATH'];
+				} else {
+					process.env['CODEX_MOCK_PATH'] = prevCodexMockPath;
+				}
 				if (prevClaudeMockPath === undefined) {
 					delete process.env['CLAUDE_MOCK_PATH'];
 				} else {

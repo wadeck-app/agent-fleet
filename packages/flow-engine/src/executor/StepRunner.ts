@@ -10,6 +10,7 @@
 import type { ApprovalProvider } from 'extension-points';
 
 import { ClaudeModelProvider } from '../processing/ClaudeModelProvider';
+import { CodexModelProvider } from '../processing/CodexModelProvider';
 import type { McpServer, ModelProvider } from '../processing/ModelProvider';
 import { OpenCodeModelProvider } from '../processing/OpenCodeModelProvider';
 import { OutputExtractor } from '../processing/OutputExtractor';
@@ -85,6 +86,7 @@ export class StepRunner {
 			new Map<string, ModelProvider>([
 				['claude', new ClaudeModelProvider()],
 				['opencode', new OpenCodeModelProvider()],
+				['codex', new CodexModelProvider()],
 			]);
 	}
 

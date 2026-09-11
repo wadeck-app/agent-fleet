@@ -4,7 +4,7 @@
  */
 
 export type ModelType = 'sonnet' | 'haiku' | 'opus'; // kept for backwards compat
-export type ModelProviderName = 'claude' | 'opencode';
+export type ModelProviderName = 'claude' | 'opencode' | 'codex';
 export type WorkspaceMode = 'isolated' | 'shared' | 'manual';
 export type GitStrategy = 'main-only' | 'feature-branch' | 'any' | 'worktree';
 export type ReusePolicy = 'never' | 'if-available' | 'always';
@@ -72,7 +72,7 @@ export interface OutputVariableConfig {
 	/** Whether this field is required (checked in post-process) */
 	required?: boolean;
 
-		/** Optional transform function to apply after extraction */
+	/** Optional transform function to apply after extraction */
 	transform?: TransformFunction | string; // violations-suppress: ts/no-union-with-string string is a named transform function reference
 
 	/** Default value if extraction fails (only for non-required fields) */

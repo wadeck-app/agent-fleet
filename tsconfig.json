@@ -1,7 +1,7 @@
 {
 	"files": [],
 	"references": [
-		{ "path": "packages/shared-cli" },
+		// { "path": "packages/shared-cli" },  // external package @wadeck-app/shared-cli in node_modules
 		{ "path": "packages/extension-points" },
 		{ "path": "packages/plugin-none" },
 		{ "path": "packages/plugin-worktree" },

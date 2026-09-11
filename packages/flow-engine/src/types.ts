@@ -19,7 +19,7 @@ export type ModelType = 'sonnet' | 'haiku' | 'opus';
 /**
  * AI model CLI provider names
  */
-export type ModelProviderName = 'claude' | 'opencode';
+export type ModelProviderName = 'claude' | 'opencode' | 'codex';
 
 /**
  * MCP server definition -- passed to model providers for tool injection.
@@ -417,7 +417,7 @@ export interface OutputVariableConfig {
 	/** Whether this field is required (checked in post-process) */
 	required?: boolean;
 
-		/** Optional transform function to apply after extraction */
+	/** Optional transform function to apply after extraction */
 	transform?: TransformFunction | string; // violations-suppress: ts/no-union-with-string string is a named transform function reference
 
 	/** Default value if extraction fails (only for non-required fields) */
