@@ -600,6 +600,9 @@ export interface ModelFlowStep extends BaseFlowStep {
 	/** Model to use for this step (e.g. "claude-3-5-haiku", "anthropic/claude-3-5-sonnet") */
 	model?: string;
 
+	/** Environment variables forwarded to the model CLI subprocess. */
+	env?: Record<string, string>;
+
 	/** Prompt template with variable interpolation support */
 	prompt: string;
 

@@ -108,7 +108,10 @@ export async function executeModelStep(
 		prompt: renderedPrompt,
 		stepId: step.id,
 		model: step.model,
-		env: config.claudeEnv && Object.keys(config.claudeEnv).length > 0 ? config.claudeEnv : undefined,
+		env: (() => {
+			const merged = { ...(config.claudeEnv ?? {}), ...(step.env ?? {}) };
+			return Object.keys(merged).length > 0 ? merged : undefined;
+		})(),
 		// Merge config-level servers (e.g. the provideSteps daemon server) with step-level servers
 		mcpServers: [...(config.mcpServers ?? []), ...(step.mcpServers ?? [])],
 		toolHooks: step.toolHooks ?? [],
