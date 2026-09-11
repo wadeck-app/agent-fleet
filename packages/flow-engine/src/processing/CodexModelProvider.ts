@@ -424,16 +424,17 @@ export class CodexModelProvider implements ModelProvider {
 			return { parts: [mockPath], needsShell: false };
 		}
 		if (process.platform === 'win32') {
-			// On Windows, find the real codex.exe
+			// On Windows, codex.cmd is a Node.js wrapper: node @openai/codex/bin/codex.js
+			// Spawn node + codex.js directly to avoid shell-splitting the prompt args
 			try {
 				const cmdPath = execSync('where.exe codex.cmd', { encoding: 'utf8', windowsHide: true })
 					.trim()
 					.split('\n')[0]!
 					.trim();
 				const dir = path.dirname(cmdPath);
-				const exePath = path.join(dir, 'node_modules', 'codex-ai', 'bin', 'codex.exe');
-				if (fs.existsSync(exePath)) {
-					return { parts: [exePath], needsShell: false };
+				const codexJs = path.join(dir, 'node_modules', '@openai', 'codex', 'bin', 'codex.js');
+				if (fs.existsSync(codexJs)) {
+					return { parts: [process.execPath, codexJs], needsShell: false };
 				}
 			} catch {
 				// fall through to shell:true fallback
