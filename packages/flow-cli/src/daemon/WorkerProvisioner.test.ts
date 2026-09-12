@@ -102,8 +102,42 @@ function denyAll(reason = 'bad token') {
 function sourceCaps(caps: Record<string, number>) {
 	return {
 		find: (sourceId: string) => (caps[sourceId] === undefined ? undefined : { maxWorkers: caps[sourceId] }),
+		list: () => Object.keys(caps).map(sourceId => ({ sourceId, maxWorkers: caps[sourceId]! })),
 	};
 }
+
+describe('WorkerProvisioner - provisioning plan (S8)', () => {
+	it('offers the S8 provider the room left under the concurrency limit', () => {
+		const registry = new WorkerRegistry();
+		const provisioner = makeProvisioner(3, registry, fakeSource());
+		registry.register(fakeWorker(), { pid: 1 });
+
+		expect(provisioner.planProvisioning(5, 0).fork).toBe(2);
+	});
+
+	it('asks for nothing when the limit is already committed', () => {
+		const registry = new WorkerRegistry();
+		const provisioner = makeProvisioner(1, registry, fakeSource());
+		registry.register(fakeWorker(), { pid: 1 });
+
+		expect(provisioner.planProvisioning(5, 10_000).fork).toBe(0);
+	});
+
+	// The declared sources are what the default implementation waits for, so they have to
+	// reach it -- a plan built without them would fork instantly and never use them.
+	it('passes the declared sources through to the decision', () => {
+		const provisioner = makeProvisioner(
+			4,
+			new WorkerRegistry(),
+			fakeSource(),
+			allowAll(),
+			sourceCaps({ laptop: 1 })
+		);
+
+		expect(provisioner.planProvisioning(1, 0).fork).toBe(0);
+		expect(provisioner.planProvisioning(1, 60_000).warning).toContain('laptop');
+	});
+});
 
 describe('WorkerProvisioner - externally launched workers (Phase 2a)', () => {
 	it('admits a worker it did not spawn when authentication succeeds', () => {

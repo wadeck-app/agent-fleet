@@ -13,6 +13,7 @@ import { FlowConfigLoader } from '../../config/FlowConfig';
 import type { AssignmentScopedMessage, DaemonToWorker, WorkerSummary, WorkerToDaemon } from '../../ipc/Protocol';
 import type { McpServerConfig } from '../../worker/McpServer';
 import { WorkerAdapter } from '../../worker/WorkerAdapter';
+import { WorkerDisplay } from '../../worker/WorkerDisplay';
 import { buildRegistration, reconnectDelayMs, resolveDaemonWsUrl, resolveWorkerToken } from '../../worker/WorkerLaunch';
 
 // violations-suppress-end: ts/no-deep-relative
@@ -22,6 +23,7 @@ interface WorkerOptions {
 	token?: string;
 	project?: string[];
 	labels?: string;
+	verbose?: boolean;
 }
 
 function parseLabels(raw: string | undefined): string[] {
@@ -69,6 +71,7 @@ export function registerWorkerCommand(worker: Command): void {
 			(value: string, previous: string[] = []) => [...previous, value]
 		)
 		.option('--labels <labels>', 'Comma-separated labels advertised to the daemon', '')
+		.option('--verbose', 'Also print the raw output each step produces, not just its lifecycle')
 		.action((options: WorkerOptions) => {
 			try {
 				runWorker(options);
@@ -125,7 +128,18 @@ function registerListCommand(worker: Command): void {
 					console.log('No daemon running, so no workers are connected. Start one with "flow start".');
 					return;
 				}
-				report('[fail]', normalizeError(err).message);
+				const message = normalizeError(err).message;
+				if (/unknown command/i.test(message)) {
+					// The daemon is a long-lived process, so it can predate the CLI asking it
+					// something new. Saying "unknown command" alone sends the user looking for a
+					// typo in their own command line.
+					report(
+						'[fail]',
+						'The running daemon does not support "flow worker list" -- it started before this command existed. Restart it with "flow stop" then "flow start", or run "flow cli update" first if its version is older than this CLI.'
+					);
+					process.exit(1);
+				}
+				report('[fail]', message);
 				process.exit(1);
 			}
 		});
@@ -155,8 +169,12 @@ function runWorker(options: WorkerOptions): void {
 	console.log(`     projects   : ${(registration.attachedProjects ?? []).join(', ')}`);
 	console.log(`     interactive: ${String(registration.hasUserInterface)}`);
 	console.log('     Waiting for steps. This worker stays alive across daemon restarts; Ctrl-C to stop.');
+	if (options.verbose !== true) {
+		console.log('     Run with --verbose to also see the raw output each step produces.');
+	}
 
-	connect(daemonDir, config.worker.wsPort, registration, 0);
+	const display = new WorkerDisplay(options.verbose === true ? 'verbose' : 'summary');
+	connect(daemonDir, config.worker.wsPort, registration, 0, display);
 }
 
 /**
@@ -169,7 +187,8 @@ function connect(
 	daemonDir: string,
 	configuredWsPort: number | null,
 	registration: Omit<import('../../ipc/Protocol').WorkerReady, 'type'>,
-	attempt: number
+	attempt: number,
+	display: WorkerDisplay
 ): void {
 	let wsUrl: string;
 	try {
@@ -177,7 +196,7 @@ function connect(
 	} catch (err) {
 		// The daemon may simply not be up yet; report and keep waiting rather than exiting.
 		report('[wait]', normalizeError(err).message);
-		scheduleReconnect(daemonDir, configuredWsPort, registration, attempt + 1);
+		scheduleReconnect(daemonDir, configuredWsPort, registration, attempt + 1, display);
 		return;
 	}
 
@@ -204,7 +223,7 @@ function connect(
 			report('[warn]', `ignored an unparseable daemon message: ${String(err)}`);
 			return;
 		}
-		void handleMessage(message, adapter, send, registration);
+		void handleMessage(message, adapter, send, registration, display);
 	});
 
 	ws.on('error', (err: Error) => {
@@ -214,7 +233,7 @@ function connect(
 
 	ws.on('close', () => {
 		console.log('[wait] daemon connection closed; waiting to re-register');
-		scheduleReconnect(daemonDir, configuredWsPort, registration, attempt + 1);
+		scheduleReconnect(daemonDir, configuredWsPort, registration, attempt + 1, display);
 	});
 }
 
@@ -222,11 +241,12 @@ function scheduleReconnect(
 	daemonDir: string,
 	configuredWsPort: number | null,
 	registration: Omit<import('../../ipc/Protocol').WorkerReady, 'type'>,
-	attempt: number
+	attempt: number,
+	display: WorkerDisplay
 ): void {
 	const delay = reconnectDelayMs(attempt);
 	setTimeout(() => {
-		connect(daemonDir, configuredWsPort, registration, attempt);
+		connect(daemonDir, configuredWsPort, registration, attempt, display);
 	}, delay).unref?.();
 }
 
@@ -234,16 +254,21 @@ async function handleMessage(
 	message: DaemonToWorker,
 	adapter: WorkerAdapter,
 	send: (message: WorkerToDaemon) => void,
-	registration: Omit<import('../../ipc/Protocol').WorkerReady, 'type'>
+	registration: Omit<import('../../ipc/Protocol').WorkerReady, 'type'>,
+	display: WorkerDisplay
 ): Promise<void> {
 	switch (message.type) {
 		case 'assign': {
 			const { assignmentId, stepId, stepConfig, executionContext } = message;
 			// Bound to this assignment so step execution cannot report against another.
+			// Also where this terminal sees the step's own output: the worker produces those
+			// lines, so showing them here costs nothing (D#31).
 			const sendForAssignment = (scoped: AssignmentScopedMessage): void => {
+				if (scoped.type === 'log') display.stepLog(stepId, scoped.entry);
 				send({ ...scoped, assignmentId } as WorkerToDaemon);
 			};
-			console.log(`[run ] ${stepId}`);
+			display.stepStarted(stepId);
+			const startedAt = Date.now();
 			// Announced before the first side effect: after this the daemon treats a
 			// disconnect as a failure rather than replaying the step (D#65). Closing this
 			// terminal before a step starts therefore costs the flow nothing.
@@ -257,7 +282,7 @@ async function handleMessage(
 					output,
 					meta,
 				});
-				console.log(`[ok  ] ${stepId}`);
+				display.stepCompleted(stepId, Date.now() - startedAt);
 			} catch (err) {
 				const error = normalizeError(err).message;
 				const output = (err as { stepOutputs?: Record<string, unknown> }).stepOutputs;
@@ -268,7 +293,7 @@ async function handleMessage(
 					error,
 					output,
 				});
-				console.error(`[fail] ${stepId}: ${error}`);
+				display.stepFailed(stepId, error);
 			}
 			send({ type: 'ready', ...registration });
 			break;

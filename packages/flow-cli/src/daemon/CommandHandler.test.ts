@@ -66,6 +66,7 @@ function createMockWorkerPool() {
 		register: vi.fn(),
 		// WorkerProvisioner surface
 		canProvision: vi.fn().mockReturnValue(false),
+		planProvisioning: vi.fn().mockReturnValue({ fork: 0 }),
 		provision: vi.fn().mockResolvedValue(undefined),
 		registerWorker: vi.fn().mockReturnValue(true),
 	};
@@ -1002,6 +1003,80 @@ steps:
 		expect((result as { type: string }).type).toBe('error');
 		expect(JSON.stringify(result)).toMatch(/labels/i);
 		expect(dispatched).toEqual([]);
+	});
+});
+
+describe('CommandHandler — covering unmet demand (S8, D#25)', () => {
+	async function runWithNoWorker(plan: { fork: number; warning?: string }) {
+		const flowFile = path.join(tmpDir, 'demand.yml');
+		fs.writeFileSync(flowFile, VALID_FLOW_YAML);
+
+		const workerPool = createMockWorkerPool();
+		workerPool.listIdle.mockReturnValue([]);
+		workerPool.planProvisioning.mockReturnValue(plan);
+
+		const handler = new CommandHandler(
+			daemonDir,
+			workerPool as never,
+			workerPool as never,
+			undefined,
+			mockExecStore as never,
+			mockLogWriter as never
+		);
+		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+		return { handler, workerPool };
+	}
+
+	it('asks S8 how much unmet demand there is', async () => {
+		const { workerPool } = await runWithNoWorker({ fork: 0 });
+
+		expect(workerPool.planProvisioning).toHaveBeenCalled();
+		expect(workerPool.planProvisioning.mock.calls[0]![0]).toBe(1);
+	});
+
+	// Waiting is expressed as forking nothing, so nothing may be created on that pass.
+	it('creates no worker while S8 is still waiting', async () => {
+		const { workerPool } = await runWithNoWorker({ fork: 0 });
+
+		expect(workerPool.provision).not.toHaveBeenCalled();
+	});
+
+	it('obtains exactly as many workers as S8 asked for', async () => {
+		const { workerPool } = await runWithNoWorker({ fork: 2 });
+
+		expect(workerPool.provision).toHaveBeenCalledTimes(2);
+	});
+
+	// A violated preference must be visible, or the user never learns their declared
+	// capacity went unused (D#25).
+	it('reports the S8 warning', async () => {
+		const write = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+
+		await runWithNoWorker({ fork: 1, warning: 'source "laptop" produced nothing' });
+
+		expect(write.mock.calls.map(call => String(call[0])).join(' ')).toContain('laptop');
+		write.mockRestore();
+	});
+
+	it('does not consult S8 when every step was placed', async () => {
+		const flowFile = path.join(tmpDir, 'placed.yml');
+		fs.writeFileSync(flowFile, VALID_FLOW_YAML);
+
+		const workerPool = createMockWorkerPool();
+		workerPool.getIdle.mockReturnValue({} as never);
+		workerPool.send.mockReturnValue(true);
+
+		const handler = new CommandHandler(
+			daemonDir,
+			workerPool as never,
+			workerPool as never,
+			undefined,
+			mockExecStore as never,
+			mockLogWriter as never
+		);
+		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(workerPool.planProvisioning).not.toHaveBeenCalled();
 	});
 });
 

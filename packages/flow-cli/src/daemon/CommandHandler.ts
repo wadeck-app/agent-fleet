@@ -32,6 +32,14 @@ import type { WorkerRegistry } from './WorkerRegistry.js';
  */
 const MAX_REDISPATCHES = 3;
 
+/**
+ * How often dispatch is retried while S8 is waiting for a declared source.
+ *
+ * Needed because with no live worker there is no `ready` message coming and no other event
+ * to re-run dispatch: without this the wait would never end and the queue would sit still.
+ */
+const DEMAND_RECHECK_MS = 250;
+
 const DEFAULT_MAX_INJECTED_STEPS = 20;
 const DEFAULT_MAX_STEPS_PER_EXECUTION = 50;
 
@@ -72,6 +80,10 @@ export class CommandHandler {
 	private readonly executionProjects = new Map<string, string>();
 	/** Chooses which live worker a step goes to (S3, S4) */
 	private readonly router = new StepRouter();
+	/** When the current episode of unserved demand began, for the S8 wait (D#25) */
+	private unmetDemandSince: number | undefined;
+	/** Pending re-run of dispatch while S8 waits; nothing else would trigger one */
+	private demandRecheck: ReturnType<typeof setTimeout> | undefined;
 	/** Per-execution hook dispatchers */
 	private readonly executionHooks = new Map<string, HookDispatcher>();
 	/** Per-execution plugin workspace handles (only when workspaceProvider is set) */
@@ -726,21 +738,74 @@ export class CommandHandler {
 					continue;
 				}
 			} else {
-				// Nothing live can take it. Ask for a worker if we are allowed one -- obtaining
-				// it is asynchronous by contract (D#66) and dispatch resumes when it registers,
-				// so this is deliberately not awaited. One request per queued step, up to the
-				// limit. A failure is reported rather than swallowed: the queue would otherwise
-				// stall silently.
-				if (this.provisioner.canProvision()) {
-					void this.provisioner.provision().catch((err: unknown) => {
-						process.stderr.write(`[CommandHandler] failed to obtain a worker: ${getErrorMessage(err)}\n`);
-					});
-				}
 				unplaced.push(step);
 			}
 		}
 
 		this.readyQueue.unshift(...unplaced);
+		this.coverUnmetDemand(unplaced.length);
+	}
+
+	/**
+	 * Acts on steps nothing could take, per the provisioning extension point (S8).
+	 *
+	 * The daemon owns the clock here and hands S8 how long the demand has gone unserved, so
+	 * the default can wait briefly for a declared source without anything blocking (D#25,
+	 * D#66). Waiting is expressed as forking nothing yet, and the next pass asks again --
+	 * either when a worker registers or when the next step becomes ready.
+	 *
+	 * The re-check timer matters: with no live worker there is no `ready` message coming, so
+	 * nothing else would ever re-run dispatch and the wait would never end.
+	 */
+	private coverUnmetDemand(unmetDemand: number): void {
+		if (unmetDemand === 0) {
+			this.unmetDemandSince = undefined;
+			this.clearDemandRecheck();
+			return;
+		}
+
+		const now = Date.now();
+		this.unmetDemandSince ??= now;
+		const plan = this.provisioner.planProvisioning(unmetDemand, now - this.unmetDemandSince);
+
+		if (plan.fork === 0) {
+			this.scheduleDemandRecheck();
+			return;
+		}
+
+		if (plan.warning !== undefined) {
+			process.stderr.write(`[CommandHandler] ${plan.warning}\n`);
+		}
+		this.clearDemandRecheck();
+		// The demand is now covered as far as this pass can tell; a new episode starts its
+		// own wait rather than inheriting this one's elapsed time.
+		this.unmetDemandSince = undefined;
+
+		for (let i = 0; i < plan.fork; i++) {
+			// Obtaining a worker is asynchronous by contract (D#66) and dispatch resumes when
+			// it registers, so this is deliberately not awaited. A failure is reported rather
+			// than swallowed: the queue would otherwise stall with no explanation.
+			void this.provisioner.provision().catch((err: unknown) => {
+				process.stderr.write(`[CommandHandler] failed to obtain a worker: ${getErrorMessage(err)}\n`);
+			});
+		}
+	}
+
+	/** Re-runs dispatch once the S8 wait can have elapsed, since nothing else would. */
+	private scheduleDemandRecheck(): void {
+		if (this.demandRecheck !== undefined) return;
+		this.demandRecheck = setTimeout(() => {
+			this.demandRecheck = undefined;
+			this.tryDispatch();
+		}, DEMAND_RECHECK_MS);
+		// Never the reason the daemon stays up: idle shutdown is decided elsewhere (D#51).
+		this.demandRecheck.unref?.();
+	}
+
+	private clearDemandRecheck(): void {
+		if (this.demandRecheck === undefined) return;
+		clearTimeout(this.demandRecheck);
+		this.demandRecheck = undefined;
 	}
 
 	/**

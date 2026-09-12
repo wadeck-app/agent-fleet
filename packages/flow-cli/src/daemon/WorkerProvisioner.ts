@@ -1,7 +1,8 @@
-import type { AuthenticationProvider } from 'extension-points';
+import type { AuthenticationProvider, ProvisioningDecision, ProvisioningProvider } from 'extension-points';
 import type { WebSocket } from 'ws';
 
 import type { WorkerReady } from '../ipc/Protocol';
+import { DefaultProvisioning } from './DefaultProvisioning.js';
 import type { ForkWorkerSource } from './ForkWorkerSource.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
 import type { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
@@ -21,7 +22,8 @@ export class WorkerProvisioner {
 		private readonly registry: WorkerRegistry,
 		private readonly forkSource: ForkWorkerSource,
 		private readonly authenticator: AuthenticationProvider,
-		private readonly sources: Pick<WorkerSourceRegistry, 'find'>
+		private readonly sources: Pick<WorkerSourceRegistry, 'find' | 'list'>,
+		private readonly provisioning: ProvisioningProvider = new DefaultProvisioning()
 	) {}
 
 	/** Workers connected or already requested. */
@@ -31,6 +33,33 @@ export class WorkerProvisioner {
 
 	canProvision(): boolean {
 		return this.committedCount < this.concurrencyLimit;
+	}
+
+	/**
+	 * Asks S8 what to do about steps no connected worker can run.
+	 *
+	 * @param unmetDemand - queued steps nothing can currently take
+	 * @param waitingMs - how long that demand has gone unserved. Passed in because the
+	 *        daemon owns the clock: the provider decides, it never sleeps (see S8).
+	 */
+	planProvisioning(unmetDemand: number, waitingMs: number): ProvisioningDecision {
+		const allowance = Math.max(this.concurrencyLimit - this.committedCount, 0);
+		const decision = this.provisioning.decide({
+			unmetDemand,
+			waitingMs,
+			declaredSources: this.sources.list().map(source => source.sourceId),
+			allowance,
+		});
+		// The limit is the daemon's to enforce, not the plugin's to respect: an
+		// implementation asking for more must not be able to exceed the configured
+		// concurrency, and silently honouring it would make the limit meaningless.
+		if (decision.fork > allowance) {
+			process.stderr.write(
+				`[WorkerProvisioner] the provisioning plugin asked for ${String(decision.fork)} workers but only ${String(allowance)} are allowed under the concurrency limit; capping it.\n`
+			);
+			return { ...decision, fork: allowance };
+		}
+		return decision;
 	}
 
 	/**

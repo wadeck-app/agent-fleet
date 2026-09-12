@@ -49,6 +49,12 @@
 			"versions": [{ "version": 1, "status": "stable", "since": "0.1.0" }]
 		},
 		{
+			"id": "provisioning",
+			"status": "stable",
+			"description": "Decides what to do about demand no live worker can serve: wait for a declared source, create capacity locally, or neither. A synchronous decision, never a blocking action.",
+			"versions": [{ "version": 1, "status": "stable", "since": "0.1.0" }]
+		},
+		{
 			"id": "worker-acceptance",
 			"status": "stable",
 			"description": "Decides whether a worker may run a step (project attachment, labels, interactivity). Routing only, never an authorization boundary.",

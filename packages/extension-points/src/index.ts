@@ -12,6 +12,7 @@ export type {
 	StepPlacement,
 } from './worker-acceptance/v1.js';
 export type { StepDistributionProvider } from './step-distribution/v1.js';
+export type { ProvisioningProvider, ProvisioningRequest, ProvisioningDecision } from './provisioning/v1.js';
 export type { PluginManifest, PluginImplementation } from './manifest.js';
 export { SENSITIVE_FIELDS } from './sensitiveFields.js';
 export {

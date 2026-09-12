@@ -163,6 +163,7 @@ const UNRESOLVED_PLUGIN_POINTS: Record<string, string> = {
 	authentication: 'the built-in shared-token authenticator',
 	workerAcceptance: 'the built-in permissive acceptance rules',
 	stepDistribution: 'the built-in registered-workers-first order',
+	provisioning: 'the built-in bounded-wait-then-fork policy',
 };
 
 /** Names the unresolved plugin sections a config file declares, if any. */

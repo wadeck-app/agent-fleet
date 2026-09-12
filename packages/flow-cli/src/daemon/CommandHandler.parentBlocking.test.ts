@@ -55,6 +55,7 @@ function createMockWorkerPool() {
 		register: vi.fn(),
 		// WorkerProvisioner surface
 		canProvision: vi.fn().mockReturnValue(false),
+		planProvisioning: vi.fn().mockReturnValue({ fork: 0 }),
 		provision: vi.fn().mockResolvedValue(undefined),
 		registerWorker: vi.fn().mockReturnValue(true),
 	};
