@@ -18,8 +18,10 @@ import type { ClientCommand, WorkerToDaemon } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
 import { CommandHandler } from './CommandHandler';
+import { ForkWorkerSource } from './ForkWorkerSource.js';
 import { WebSocketServer } from './WebSocketServer';
-import { WorkerPool } from './WorkerPool';
+import { WorkerProvisioner } from './WorkerProvisioner.js';
+import { WorkerRegistry } from './WorkerRegistry.js';
 
 // Exported for testing. Writes a single NDJSON daemon lifecycle entry to logsDir.
 export function writeDaemonLog(logsDir: string, level: 'info' | 'error', msg: string): void {
@@ -166,7 +168,8 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 	const pluginProviders = await tryResolvePlugins();
 	const perFlowWorkspaceResolver = await PluginResolver.create().createPerFlowWorkspaceResolver();
 
-	let workerPool: WorkerPool;
+	let workerRegistry: WorkerRegistry;
+	let workerProvisioner: WorkerProvisioner;
 	let wsServer: WebSocketServer;
 	let commandHandler: CommandHandler;
 	let executionStore: ExecutionStore;
@@ -187,7 +190,7 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 		},
 		health: () => ({
 			status: 'ok' as const,
-			running_executions: workerPool?.runningCount ?? 0,
+			running_executions: workerRegistry?.liveCount ?? 0,
 		}),
 		hooks: {
 			onStart: (port: number) => {
@@ -214,10 +217,13 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 				wsServer.start().catch((err: Error) => {
 					process.stderr.write(`[daemon] WebSocket server failed to start: ${String(err)}\n`);
 				});
-				workerPool = new WorkerPool(config.queue.concurrency, port, () => wsServer.port, claudePath);
+				workerRegistry = new WorkerRegistry();
+				const forkSource = new ForkWorkerSource(port, () => wsServer.port, claudePath);
+				workerProvisioner = new WorkerProvisioner(config.queue.concurrency, workerRegistry, forkSource);
 				commandHandler = new CommandHandler(
 					resolvedDaemonDir,
-					workerPool,
+					workerRegistry,
+					workerProvisioner,
 					undefined,
 					executionStore,
 					logWriter,
@@ -235,7 +241,9 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 	function handleWorkerMessage(ws: WebSocket, message: WorkerToDaemon): void {
 		switch (message.type) {
 			case 'ready': {
-				workerPool.registerWorker(ws, message.pid);
+				// Refused registrations are already reported and the socket terminated;
+				// dispatching afterwards would target a worker that was rejected.
+				if (!workerProvisioner.registerWorker(ws, message)) break;
 				commandHandler.tryDispatch();
 				checkShutdown();
 				break;
@@ -334,13 +342,17 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 		// outstanding would let a reconnecting socket be matched against stale work.
 		// Classifying and re-dispatching the interrupted step is Phase 2b (D#65).
 		commandHandler.revokeWorkerAssignments(ws);
-		workerPool.removeWorker(ws);
+		workerRegistry.remove(ws);
 		checkShutdown();
 	}
 
 	function checkShutdown(): void {
-		if (commandHandler.isQueueEmpty() && !commandHandler.hasActiveExecutions() && !workerPool.hasActiveWorkers()) {
-			workerPool.broadcastDone();
+		if (
+			commandHandler.isQueueEmpty() &&
+			!commandHandler.hasActiveExecutions() &&
+			!workerRegistry.hasBusyWorkers()
+		) {
+			workerRegistry.broadcast({ type: 'done' });
 			wsServer.close();
 			writeDaemonLog(logsDir, 'info', 'Daemon stopped (idle)');
 			void daemonHandle.stop('idle');

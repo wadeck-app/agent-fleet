@@ -19,17 +19,22 @@ vi.mock('flow-engine', async importOriginal => {
 	};
 });
 
+/** Stands in for both WorkerRegistry and WorkerProvisioner, which CommandHandler now takes. */
 function createMockWorkerPool() {
 	return {
-		canSpawn: vi.fn().mockReturnValue(false),
-		spawnWorker: vi.fn(),
-		registerWorker: vi.fn(),
-		removeWorker: vi.fn(),
-		getIdleWorker: vi.fn().mockReturnValue(undefined),
+		// WorkerRegistry surface
+		remove: vi.fn(),
+		getIdle: vi.fn().mockReturnValue(undefined),
 		markBusy: vi.fn(),
-		hasActiveWorkers: vi.fn().mockReturnValue(false),
-		sendToWorker: vi.fn().mockReturnValue(true),
-		broadcastDone: vi.fn(),
+		markIdle: vi.fn(),
+		hasBusyWorkers: vi.fn().mockReturnValue(false),
+		send: vi.fn().mockReturnValue(true),
+		broadcast: vi.fn(),
+		register: vi.fn(),
+		// WorkerProvisioner surface
+		canProvision: vi.fn().mockReturnValue(false),
+		provision: vi.fn().mockResolvedValue(undefined),
+		registerWorker: vi.fn().mockReturnValue(true),
 	};
 }
 
@@ -88,6 +93,7 @@ afterEach(() => {
 function makeHandler(workerPool = createMockWorkerPool()): CommandHandler {
 	return new CommandHandler(
 		daemonDir,
+		workerPool as never,
 		workerPool as never,
 		undefined,
 		mockExecStore as never,

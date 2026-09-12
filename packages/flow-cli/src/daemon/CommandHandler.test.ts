@@ -30,17 +30,22 @@ vi.mock('flow-engine', async importOriginal => {
 	};
 });
 
+/** Stands in for both WorkerRegistry and WorkerProvisioner, which CommandHandler now takes. */
 function createMockWorkerPool() {
 	return {
-		canSpawn: vi.fn().mockReturnValue(false),
-		spawnWorker: vi.fn(),
-		registerWorker: vi.fn(),
-		removeWorker: vi.fn(),
-		getIdleWorker: vi.fn().mockReturnValue(undefined),
+		// WorkerRegistry surface
+		remove: vi.fn(),
+		getIdle: vi.fn().mockReturnValue(undefined),
 		markBusy: vi.fn(),
-		hasActiveWorkers: vi.fn().mockReturnValue(false),
-		sendToWorker: vi.fn(),
-		broadcastDone: vi.fn(),
+		markIdle: vi.fn(),
+		hasBusyWorkers: vi.fn().mockReturnValue(false),
+		send: vi.fn(),
+		broadcast: vi.fn(),
+		register: vi.fn(),
+		// WorkerProvisioner surface
+		canProvision: vi.fn().mockReturnValue(false),
+		provision: vi.fn().mockResolvedValue(undefined),
+		registerWorker: vi.fn().mockReturnValue(true),
 	};
 }
 
@@ -189,6 +194,7 @@ function makeHandler(workerPool = createMockWorkerPool()): CommandHandler {
 	return new CommandHandler(
 		daemonDir,
 		workerPool as never,
+		workerPool as never,
 		undefined,
 		mockExecStore as never,
 		mockLogWriter as never
@@ -284,7 +290,7 @@ describe('handleRun path restriction', () => {
 		const flowFile = path.join(outsideDir, 'test.yml');
 		fs.writeFileSync(flowFile, 'id: test\n');
 
-		const handler = new CommandHandler(tmpDir, createMockWorkerPool() as never);
+		const handler = new CommandHandler(tmpDir, createMockWorkerPool() as never, createMockWorkerPool() as never);
 		const result = await handler.handleRun({
 			type: 'run',
 			flowFile,
@@ -306,6 +312,7 @@ describe('handleRun path restriction', () => {
 
 		const handler = new CommandHandler(
 			tmpDir,
+			createMockWorkerPool() as never,
 			createMockWorkerPool() as never,
 			undefined,
 			mockExecStore as never,
@@ -331,6 +338,7 @@ describe('handleRun path restriction', () => {
 
 		const handler = new CommandHandler(
 			tmpDir,
+			createMockWorkerPool() as never,
 			createMockWorkerPool() as never,
 			undefined,
 			mockExecStore as never,
@@ -375,14 +383,15 @@ describe('CommandHandler — scheduling via FlowScheduler', () => {
 
 		const workerPool = createMockWorkerPool();
 		const dispatchedSteps: string[] = [];
-		workerPool.getIdleWorker.mockReturnValue({} as never);
-		workerPool.sendToWorker.mockImplementation((_ws, msg) => {
+		workerPool.getIdle.mockReturnValue({} as never);
+		workerPool.send.mockImplementation((_ws: unknown, msg: unknown) => {
 			dispatchedSteps.push((msg as { stepId: string }).stepId);
 			return true;
 		});
 
 		const handler = new CommandHandler(
 			daemonDir,
+			workerPool as never,
 			workerPool as never,
 			undefined,
 			mockExecStore as never,
@@ -433,14 +442,15 @@ steps:
 
 		const workerPool = createMockWorkerPool();
 		const dispatched: string[] = [];
-		workerPool.getIdleWorker.mockReturnValue({} as never);
-		workerPool.sendToWorker.mockImplementation((_ws, msg) => {
+		workerPool.getIdle.mockReturnValue({} as never);
+		workerPool.send.mockImplementation((_ws: unknown, msg: unknown) => {
 			dispatched.push((msg as { stepId: string }).stepId);
 			return true;
 		});
 
 		const handler = new CommandHandler(
 			daemonDir,
+			workerPool as never,
 			workerPool as never,
 			undefined,
 			mockExecStore as never,
@@ -486,11 +496,12 @@ steps:
 		// Worker pool: idle only for FIRST dispatch, not subsequent
 		const workerPool = createMockWorkerPool();
 		let dispatchCount = 0;
-		workerPool.getIdleWorker.mockImplementation(() => (dispatchCount++ < 1 ? {} : undefined));
-		workerPool.sendToWorker.mockReturnValue(true);
+		workerPool.getIdle.mockImplementation(() => (dispatchCount++ < 1 ? {} : undefined));
+		workerPool.send.mockReturnValue(true);
 
 		const handler = new CommandHandler(
 			daemonDir,
+			workerPool as never,
 			workerPool as never,
 			undefined,
 			mockExecStore as never,
@@ -512,14 +523,15 @@ steps:
 
 		const workerPool = createMockWorkerPool();
 		const dispatched: string[] = [];
-		workerPool.getIdleWorker.mockReturnValue({} as never);
-		workerPool.sendToWorker.mockImplementation((_ws, msg) => {
+		workerPool.getIdle.mockReturnValue({} as never);
+		workerPool.send.mockImplementation((_ws: unknown, msg: unknown) => {
 			dispatched.push((msg as { stepId: string }).stepId);
 			return true;
 		});
 
 		const handler = new CommandHandler(
 			daemonDir,
+			workerPool as never,
 			workerPool as never,
 			undefined,
 			mockExecStore as never,
@@ -581,14 +593,15 @@ steps:
 
 		const workerPool = createMockWorkerPool();
 		const dispatched: string[] = [];
-		workerPool.getIdleWorker.mockReturnValue({} as never);
-		workerPool.sendToWorker.mockImplementation((_ws, msg) => {
+		workerPool.getIdle.mockReturnValue({} as never);
+		workerPool.send.mockImplementation((_ws: unknown, msg: unknown) => {
 			dispatched.push((msg as { stepId: string }).stepId);
 			return true;
 		});
 
 		const handler = new CommandHandler(
 			daemonDir,
+			workerPool as never,
 			workerPool as never,
 			undefined,
 			mockExecStore as never,
@@ -631,13 +644,14 @@ steps:
 
 		const workerPool = createMockWorkerPool();
 		// First send fails, second succeeds
-		workerPool.getIdleWorker.mockReturnValue({} as never);
-		workerPool.sendToWorker
+		workerPool.getIdle.mockReturnValue({} as never);
+		workerPool.send
 			.mockReturnValueOnce(false) // first attempt: transport failure
 			.mockReturnValue(true); // subsequent: success
 
 		const handler = new CommandHandler(
 			daemonDir,
+			workerPool as never,
 			workerPool as never,
 			undefined,
 			mockExecStore as never,
@@ -701,6 +715,7 @@ steps:
 	): CommandHandler {
 		return new CommandHandler(
 			daemonDir,
+			createMockWorkerPool() as never,
 			createMockWorkerPool() as never,
 			undefined,
 			mockExecStore as never,
@@ -794,6 +809,7 @@ describe('CommandHandler — plugin workspace provider', () => {
 	}): CommandHandler {
 		return new CommandHandler(
 			daemonDir,
+			createMockWorkerPool() as never,
 			createMockWorkerPool() as never,
 			undefined,
 			mockExecStore as never,

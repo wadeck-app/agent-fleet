@@ -1,18 +1,18 @@
 /**
- * Windows console inheritance tests for WorkerPool.
+ * Windows console inheritance tests for ForkWorkerSource.
  *
  * CREATE_NO_WINDOW (windowsHide:true) removes the console handle from the spawned
  * process, breaking the inheritance chain. Children of consoleless workers call
  * AllocConsole() → Windows Terminal shows a visible tab (regression).
  *
- * spawnWorker() must NOT set windowsHide so workers inherit the daemon's hidden
+ * obtainWorker() must NOT set windowsHide so workers inherit the daemon's hidden
  * WT console (created via wscript.exe SW_HIDE in spawnDaemonBackground).
  */
 import { type ChildProcess, spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { existsSync } from 'node:fs';
 
-import { WorkerPool } from './WorkerPool';
+import { ForkWorkerSource } from './ForkWorkerSource.js';
 
 vi.mock('node:fs', async importOriginal => {
 	const actual = await importOriginal<typeof import('node:fs')>();
@@ -34,7 +34,9 @@ function makeMockChild(): ChildProcess {
 	return child;
 }
 
-describe('WorkerPool — Windows console inheritance (no windowsHide on workers)', () => {
+const request = { daemonEndpoint: 'loopback', sourceId: 'built-in:fork', projects: [] };
+
+describe('ForkWorkerSource — Windows console inheritance (no windowsHide on workers)', () => {
 	beforeEach(() => {
 		vi.mocked(existsSync).mockReturnValue(true);
 		vi.mocked(spawn).mockImplementation(() => makeMockChild());
@@ -44,12 +46,12 @@ describe('WorkerPool — Windows console inheritance (no windowsHide on workers)
 		vi.restoreAllMocks();
 	});
 
-	it('spawnWorker() does NOT set windowsHide:true — workers must inherit daemon console', () => {
+	it('obtainWorker() does NOT set windowsHide:true — workers must inherit daemon console', async () => {
 		vi.useFakeTimers();
 		try {
 			vi.mocked(existsSync).mockReturnValueOnce(true); // dev mode
-			const pool = new WorkerPool(3, 3000, 3001);
-			pool.spawnWorker();
+			const source = new ForkWorkerSource(3000, 3001);
+			await source.obtainWorker(request);
 
 			expect(spawn).toHaveBeenCalledOnce();
 			const opts = vi.mocked(spawn).mock.calls[0]![2] as Record<string, unknown>;
@@ -64,12 +66,12 @@ describe('WorkerPool — Windows console inheritance (no windowsHide on workers)
 		}
 	});
 
-	it('spawnWorker() does NOT set detached:true — DETACHED_PROCESS removes the console handle', () => {
+	it('obtainWorker() does NOT set detached:true — DETACHED_PROCESS removes the console handle', async () => {
 		vi.useFakeTimers();
 		try {
 			vi.mocked(existsSync).mockReturnValueOnce(true);
-			const pool = new WorkerPool(3, 3000, 3001);
-			pool.spawnWorker();
+			const source = new ForkWorkerSource(3000, 3001);
+			await source.obtainWorker(request);
 
 			const opts = vi.mocked(spawn).mock.calls[0]![2] as Record<string, unknown>;
 			expect(opts['detached']).not.toBe(true);

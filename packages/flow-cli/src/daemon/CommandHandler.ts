@@ -10,13 +10,15 @@ import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 import type { WebSocket } from 'ws';
 
 import type { AssignableStep, ClientCommand, DaemonResponse, ExecutionContext, InjectedStep } from '../ipc/Protocol';
 import { ExecutionStore, generateExecutionId } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
 import { AssignmentLedger } from './AssignmentLedger.js';
-import type { WorkerPool } from './WorkerPool';
+import type { WorkerProvisioner } from './WorkerProvisioner.js';
+import type { WorkerRegistry } from './WorkerRegistry.js';
 
 // Default limits - overridden by FlowConfig.limits passed to CommandHandler constructor
 const DEFAULT_MAX_INJECTED_STEPS = 20;
@@ -54,7 +56,8 @@ export class CommandHandler {
 
 	constructor(
 		private readonly daemonDir: string,
-		private readonly workerPool: WorkerPool,
+		private readonly registry: WorkerRegistry,
+		private readonly provisioner: WorkerProvisioner,
 		private hookDispatcher?: HookDispatcher,
 		executionStore?: ExecutionStore,
 		logWriter?: LogWriter,
@@ -511,7 +514,7 @@ export class CommandHandler {
 
 	tryDispatch(): void {
 		while (this.readyQueue.length > 0) {
-			const idleWorker = this.workerPool.getIdleWorker();
+			const idleWorker = this.registry.getIdle();
 			if (idleWorker) {
 				const step = this.readyQueue.shift()!;
 				const scheduler = this.schedulers.get(step.executionContext.executionId);
@@ -533,7 +536,7 @@ export class CommandHandler {
 					}
 				}
 
-				this.workerPool.markBusy(idleWorker);
+				this.registry.markBusy(idleWorker);
 				// Acknowledge: marks step as in-flight in scheduler to prevent double-dispatch
 				scheduler?.acknowledge(step.stepId);
 				this.executionStore.markStepRunning(step.executionContext.executionId, step.stepId);
@@ -543,7 +546,7 @@ export class CommandHandler {
 				});
 
 				const assignment = this.assignments.issue(idleWorker, step.executionContext.executionId, step.stepId);
-				const sent = this.workerPool.sendToWorker(idleWorker, {
+				const sent = this.registry.send(idleWorker, {
 					type: 'assign',
 					assignmentId: assignment.assignmentId,
 					stepId: step.stepId,
@@ -554,15 +557,20 @@ export class CommandHandler {
 					// Never handed over, so the assignment must not stay outstanding.
 					this.assignments.settle(assignment.assignmentId);
 					// Worker disconnected between getIdleWorker() and send - re-queue the step
-					this.workerPool.removeWorker(idleWorker);
+					this.registry.remove(idleWorker);
 					// Transport failure: not a flow-level failure - unacknowledge and put back
 					scheduler?.unacknowledge(step.stepId);
 					this.readyQueue.unshift(step);
 					continue;
 				}
-			} else if (this.workerPool.canSpawn()) {
-				this.workerPool.spawnWorker();
-				// continue so we spawn one worker per queued step (up to concurrencyLimit)
+			} else if (this.provisioner.canProvision()) {
+				// Obtaining a worker is asynchronous by contract (D#66), and dispatch resumes
+				// when it registers -- so this is deliberately not awaited. A failure is
+				// reported rather than swallowed: the queue would otherwise stall silently.
+				void this.provisioner.provision().catch((err: unknown) => {
+					process.stderr.write(`[CommandHandler] failed to obtain a worker: ${getErrorMessage(err)}\n`);
+				});
+				// continue so we request one worker per queued step (up to the limit)
 				continue;
 			} else {
 				break;

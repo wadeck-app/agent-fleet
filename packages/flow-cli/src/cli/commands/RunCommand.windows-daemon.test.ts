@@ -66,11 +66,12 @@ describe('Daemon spawn — Windows wscript.exe approach', () => {
 });
 
 describe('Worker spawn — no windowsHide (console inheritance)', () => {
-	it('WorkerPool source does not set windowsHide:true in spawnWorker()', () => {
-		const workerPoolSrc = fs.readFileSync(path.join(import.meta.dirname, '../../daemon/WorkerPool.ts'), 'utf8');
-		// Extract the spawnWorker function body
-		const spawnWorkerStart = workerPoolSrc.indexOf('spawnWorker()');
-		const spawnCall = workerPoolSrc.slice(spawnWorkerStart, spawnWorkerStart + 600);
+	it('ForkWorkerSource does not set windowsHide:true in obtainWorker()', () => {
+		const sourceText = fs.readFileSync(path.join(import.meta.dirname, '../../daemon/ForkWorkerSource.ts'), 'utf8');
+		// Extract the obtainWorker function body
+		const start = sourceText.indexOf('obtainWorker(');
+		expect(start).toBeGreaterThan(-1);
+		const spawnCall = sourceText.slice(start, start + 600);
 		expect(spawnCall).not.toContain('windowsHide: true');
 		expect(spawnCall).not.toContain('detached: true');
 	});
