@@ -166,6 +166,14 @@ export interface StepState {
 	injected?: boolean;
 	/** Error message if the step failed. */
 	error?: string;
+	/**
+	 * Which source supplied the worker that ran this step, and which worker it was
+	 * (T-06). Without this, a step's outcome cannot be attributed to the machine that
+	 * produced it: once workers arrive from terminals and other hosts, "it ran
+	 * somewhere" is not an auditable answer. Absent for steps that never started.
+	 */
+	sourceId?: string;
+	workerId?: string;
 }
 
 export interface ExecutionState {
@@ -179,4 +187,12 @@ export interface ExecutionState {
 	steps: Record<string, StepState>;
 	/** Error message from the last failed step, surfaced to the CLI on flow failure. */
 	lastError?: string;
+	/**
+	 * Project this run belongs to, so the projects with active runs can be listed (D#10).
+	 *
+	 * The daemon is a per-user machine-wide singleton serving every project at once, so
+	 * without recording it per execution there is no way to answer "what is running, and
+	 * where" -- the daemon's own cwd says nothing.
+	 */
+	projectRoot?: string;
 }

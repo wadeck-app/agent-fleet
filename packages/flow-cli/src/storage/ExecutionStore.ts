@@ -56,12 +56,20 @@ export class ExecutionStore {
 		}
 	}
 
-	create(params: { executionId: string; flowFile: string; flowId: string; stepIds: string[] }): ExecutionState {
+	create(params: {
+		executionId: string;
+		flowFile: string;
+		flowId: string;
+		stepIds: string[];
+		/** Project this run belongs to, so active projects can be listed (D#10). */
+		projectRoot?: string;
+	}): ExecutionState {
 		assertExecutionIdSafe(params.executionId);
 		const state: ExecutionState = {
 			executionId: params.executionId,
 			flowFile: params.flowFile,
 			flowId: params.flowId,
+			...(params.projectRoot !== undefined ? { projectRoot: params.projectRoot } : {}),
 			status: 'queued',
 			currentSteps: [],
 			startedAt: new Date().toISOString(),
@@ -95,13 +103,23 @@ export class ExecutionStore {
 		return updated;
 	}
 
-	markStepRunning(executionId: string, stepId: string): ExecutionState {
+	/**
+	 * @param provenance - which source and worker took the step (T-06). Recorded at
+	 *        dispatch, because that is the only moment the daemon knows both.
+	 */
+	markStepRunning(
+		executionId: string,
+		stepId: string,
+		provenance?: { sourceId?: string; workerId?: string }
+	): ExecutionState {
 		const state = this.read(executionId);
 		// Preserve existing fields (e.g. injected: true) when transitioning to running
 		state.steps[stepId] = {
 			...state.steps[stepId],
 			status: 'running',
 			startedAt: new Date().toISOString(),
+			...(provenance?.sourceId !== undefined ? { sourceId: provenance.sourceId } : {}),
+			...(provenance?.workerId !== undefined ? { workerId: provenance.workerId } : {}),
 		};
 		if (!state.currentSteps.includes(stepId)) state.currentSteps.push(stepId);
 		if (state.status === 'queued') state.status = 'running';

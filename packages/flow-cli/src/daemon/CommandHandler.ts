@@ -13,6 +13,7 @@ import * as path from 'node:path';
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 import type { WebSocket } from 'ws';
 
+import { DefaultProjectResolver } from '../config/DefaultProjectResolver.js';
 import type { AssignableStep, ClientCommand, DaemonResponse, ExecutionContext, InjectedStep } from '../ipc/Protocol';
 import { ExecutionStore, generateExecutionId } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
@@ -255,7 +256,20 @@ export class CommandHandler {
 
 		const stepIds = flow.steps.map((s: FlowStep) => s.id);
 		try {
-			this.executionStore.create({ executionId, flowFile, flowId, stepIds });
+			// Each run records its project so the projects with active runs can be listed
+			// (D#10). Not fatal when the run comes from outside any project: the run itself
+			// is still valid, it simply cannot be attributed to one.
+			let projectRoot: string | undefined;
+			try {
+				projectRoot = new DefaultProjectResolver().resolve(cmd.cwd).projectRoot;
+			} catch (err) {
+				this.logWriter.writeExecution(
+					executionId,
+					`Run not attributed to a project: ${getErrorMessage(err)}`,
+					'info'
+				);
+			}
+			this.executionStore.create({ executionId, flowFile, flowId, stepIds, projectRoot });
 		} catch (err) {
 			// Execution setup failed after workspace was allocated - release before propagating
 			if (pluginHandleEntry) {
@@ -539,7 +553,13 @@ export class CommandHandler {
 				this.registry.markBusy(idleWorker);
 				// Acknowledge: marks step as in-flight in scheduler to prevent double-dispatch
 				scheduler?.acknowledge(step.stepId);
-				this.executionStore.markStepRunning(step.executionContext.executionId, step.stepId);
+				// Provenance recorded at dispatch: this is the only moment both the source
+				// and the worker identity are known (T-06).
+				const worker = this.registry.describe(idleWorker);
+				this.executionStore.markStepRunning(step.executionContext.executionId, step.stepId, {
+					sourceId: worker?.sourceId,
+					workerId: worker?.workerId,
+				});
 				this.dispatchHook(step.executionContext.executionId, 'onStepStart', {
 					executionId: step.executionContext.executionId,
 					stepId: step.stepId,

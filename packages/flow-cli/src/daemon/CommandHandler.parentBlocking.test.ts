@@ -23,6 +23,7 @@ vi.mock('flow-engine', async importOriginal => {
 function createMockWorkerPool() {
 	return {
 		// WorkerRegistry surface
+		describe: vi.fn().mockReturnValue({ workerId: 'w-test', sourceId: 'built-in:fork' }),
 		remove: vi.fn(),
 		getIdle: vi.fn().mockReturnValue(undefined),
 		markBusy: vi.fn(),

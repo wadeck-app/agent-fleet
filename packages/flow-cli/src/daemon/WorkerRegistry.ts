@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
 
 import type { DaemonToWorker, WorkerReady } from '../ipc/Protocol';
@@ -7,6 +8,12 @@ type WorkerState = 'idle' | 'busy';
 /** What a registered worker told the daemon about itself, plus its dispatch state. */
 export interface RegisteredWorker {
 	state: WorkerState;
+	/**
+	 * Daemon-assigned identity for this connection, recorded against every step it runs
+	 * so an outcome is attributable to a specific worker (T-06). Assigned here rather
+	 * than reported by the worker: a self-declared id could collide or be forged.
+	 */
+	workerId: string;
 	pid: number;
 	sourceId?: string;
 	/** Routing labels only -- never an authorization decision (T-07). */
@@ -46,8 +53,12 @@ export class WorkerRegistry {
 	 * connection is normal: a forked worker sends `ready` again after each step.
 	 */
 	register(ws: WebSocket, registration: Omit<WorkerReady, 'type'>): void {
+		// A re-registering connection keeps its id, so provenance stays stable across the
+		// `ready` a forked worker sends after every step.
+		const workerId = this.workers.get(ws)?.workerId ?? randomUUID();
 		this.workers.set(ws, {
 			state: 'idle',
+			workerId,
 			pid: registration.pid,
 			sourceId: registration.sourceId,
 			// Documented defaults rather than inference: a worker that claims nothing is
