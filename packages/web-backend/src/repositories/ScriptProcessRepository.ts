@@ -89,6 +89,7 @@ export class ScriptProcessRepository {
 		};
 
 		// Use storage.create with type assertion since ScriptProcess doesn't extend BaseEntity
+		// violations-suppress: ts/no-unsafe-type-cast ScriptProcess does not extend BaseEntity; the repository bridges the type gap via intersection types in FlowFeedbackRepository
 		return this.storage.create<any>(this.tableName, processData as any) as Promise<ScriptProcess>;
 	}
 

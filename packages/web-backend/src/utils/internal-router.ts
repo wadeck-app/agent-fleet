@@ -72,10 +72,12 @@ export class InternalRouter<Routes> {
 		// @formatter:off
 		// New structure: iterate over paths first, then methods
 		// @formatter:on
+		// violations-suppress: ts/no-unsafe-type-cast ALL_API_ROUTES is a deeply-nested route map; no index type available to iterate it safely
 		for (const [fullPath, methods] of Object.entries(routes as any)) {
 			// Skip internal properties (e.g., __baseUrl)
 			if (fullPath.startsWith('__')) continue;
 
+			// violations-suppress: ts/no-unsafe-type-cast methods is a nested contract map; no index type available to iterate it safely
 			for (const [method, contract] of Object.entries(methods as any)) {
 				// Convert full path to relative path
 				const relativePath = this.toRelativePath(fullPath);

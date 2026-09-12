@@ -170,6 +170,7 @@ export class FileBasedStorage implements DataStorage {
 		const tableData = await this.getTable<T>(table);
 
 		// Extract id if provided in data (for syncing from external sources with explicit IDs)
+		// violations-suppress: ts/no-unsafe-type-cast data is Omit<T, keyof BaseEntity> which excludes 'id'; callers may pass 'id' for sync from external sources -- widening to access it
 		const dataAsAny = data as any;
 		const entityId = dataAsAny.id ? dataAsAny.id : this.generateId();
 		const { id: _removed, ...dataWithoutId } = dataAsAny;

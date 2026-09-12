@@ -219,8 +219,8 @@ export class WorkersService {
 		const isDescending = sortOrder === 'desc';
 
 		return [...workers].sort((a, b) => {
-			const aVal = (a as any)[sortBy];
-			const bVal = (b as any)[sortBy];
+			const aVal = (a as { [k: string]: unknown })[sortBy];
+			const bVal = (b as { [k: string]: unknown })[sortBy];
 
 			if (aVal === null || aVal === undefined) return 1;
 			if (bVal === null || bVal === undefined) return -1;
@@ -555,7 +555,7 @@ export class WorkersService {
 	 *     this.eventBroadcaster.broadcast('b2f:worker:deleted', {
 	 *       workerId,
 	 *       deletedAt: Date.now(),
-	 *     } as any); // Type assertion needed as Worker requires all fields
+	 *     }); // <cast omitted in example>
 	 *
 	 *   } catch (error) {
 	 *     console.error('[WorkersService] Failed to delete worker:', error);

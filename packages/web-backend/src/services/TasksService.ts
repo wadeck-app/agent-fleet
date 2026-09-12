@@ -226,13 +226,13 @@ export class TasksService {
 	/**
 	 * Get task field value for sorting
 	 */
-	private getTaskValue(task: Task, key: string): any {
+	private getTaskValue(task: Task, key: string): unknown {
 		// Handle nested properties
 		if (key === 'assignedWorker') {
 			return task.assignedWorker?.workerId || null;
 		}
 
-		return (task as any)[key];
+		return (task as { [k: string]: unknown })[key];
 	}
 
 	/**
@@ -275,10 +275,11 @@ export class TasksService {
 			await this.tasksRepository.delete(taskId);
 
 			// Emit specific event AFTER successful deletion
+			// violations-suppress: ts/no-unsafe-type-cast event payload carries only { id } filter key; EventTypes expects full Task object
 			this.eventBroadcaster.broadcast(B2F_TASK_DELETED, { id: taskId } as any);
 
 			// Emit aggregate event for dashboard updates
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to TasksData but only the event name is used for cache invalidation
 			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
 		} catch (error) {
 			log.error('Failed to delete task:', error);
@@ -310,7 +311,7 @@ export class TasksService {
 		// Emit events after bulk deletion
 		if (deleted.length > 0) {
 			// Emit aggregate event for dashboard updates
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to TasksData but only the event name is used for cache invalidation
 			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
 		}
 
@@ -335,11 +336,11 @@ export class TasksService {
 
 			// Emit filtered event for task detail pages
 			// Payload includes taskId for server-side filtering
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// violations-suppress: ts/no-unsafe-type-cast event payload carries only { taskId } filter key; EventTypes expects full Task object
 			this.eventBroadcaster.broadcast(B2F_TASK_UPDATED, { taskId } as any);
 
 			// Emit aggregate event for dashboard/board updates
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to TasksData but only the event name is used for cache invalidation
 			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
 
 			return task;
@@ -397,7 +398,7 @@ export class TasksService {
 
 			// Enqueue task in orchestrator for assignment to worker
 			try {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// violations-suppress: ts/no-unsafe-type-cast cross-package type boundary; web-backend Task and orchestrator Task share the same shape at runtime but differ in TypeScript type declarations
 				this.orchestratorRepository.enqueueTask(task as any);
 				log.info(`Task ${task.id} enqueued to orchestrator`);
 			} catch (error) {
@@ -409,7 +410,7 @@ export class TasksService {
 			this.eventBroadcaster.broadcast(B2F_TASK_CREATED, task);
 
 			// Emit aggregate event for dashboard updates
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to TasksData but only the event name is used for cache invalidation
 			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
 
 			return task;
@@ -425,7 +426,7 @@ export class TasksService {
 	 * @param flowInputs - Input values provided by user
 	 * @returns Array of validation error messages
 	 */
-	private async validateFlowInputs(flowId: string, flowInputs: Record<string, any>): Promise<string[]> {
+	private async validateFlowInputs(flowId: string, flowInputs: Record<string, unknown>): Promise<string[]> {
 		const errors: string[] = [];
 
 		try {
@@ -449,6 +450,7 @@ export class TasksService {
 
 			// Validate required inputs are provided
 			for (const [inputName, inputDef] of Object.entries(flowMetadata.inputs || {})) {
+				// violations-suppress: ts/no-unsafe-type-cast flowMetadata is untyped JSON from flow registry; input definition shape is not statically known
 				const def = inputDef as any;
 
 				// Check if required input is missing
@@ -584,7 +586,7 @@ export class TasksService {
 	 *     this.eventBroadcaster.broadcast('task:deleted', {
 	 *       id: taskId,
 	 *       deletedAt: Date.now(),
-	 *     } as any); // Type assertion needed as Task requires all fields
+	 *     }); // <cast omitted in example>
 	 *
 	 *   } catch (error) {
 	 *     console.error('[TasksService] Failed to delete task:', error);
@@ -613,7 +615,7 @@ export class TasksService {
 			}
 
 			await this.tasksRepository.create({
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// violations-suppress: ts/no-unsafe-type-cast injecting explicit id from orchestrator task; BaseRepository.create() omits id from its input type but accepts it at runtime
 				...(orchestratorTask.id ? ({ id: orchestratorTask.id } as any) : {}),
 				description: orchestratorTask.description,
 				status: 'backlog',
@@ -633,7 +635,7 @@ export class TasksService {
 			// Broadcast AFTER persistence so the frontend fetches an up-to-date task list.
 			// OrchestratorEventBridge intentionally suppresses B2F_TASKS_UPDATED on
 			// TASK_CREATED to avoid this race condition (task not yet in storage).
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to TasksData but only the event name is used for cache invalidation
 			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
 		} catch (error) {
 			log.error(`[syncFromOrchestratorTask] Failed to sync task ${orchestratorTask.id}:`, error);

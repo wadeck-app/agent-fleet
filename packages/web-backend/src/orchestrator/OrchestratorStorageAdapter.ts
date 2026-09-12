@@ -39,6 +39,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 				await this.storage.update<any>(TASKS_TABLE, task.id, task);
 			} else {
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// violations-suppress: ts/no-unsafe-type-cast orchestrator Task type does not extend BaseEntity; the storage adapter bridges the type gap at runtime
 				await this.storage.create<any>(TASKS_TABLE, task as any);
 			}
 		} catch (error) {
@@ -111,6 +112,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 				await this.storage.update<any>(INTERVENTIONS_TABLE, intervention.id, intervention);
 			} else {
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// violations-suppress: ts/no-unsafe-type-cast orchestrator Intervention type does not extend BaseEntity; the storage adapter bridges the type gap at runtime
 				await this.storage.create<any>(INTERVENTIONS_TABLE, intervention as any);
 			}
 		} catch (error) {

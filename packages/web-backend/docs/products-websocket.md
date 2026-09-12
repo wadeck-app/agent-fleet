@@ -222,23 +222,23 @@ setInterval(() => {
 
 ```
 Client connects
-    ↓
+    |
 Server accepts connection
-    ↓
+    |
 ProductsWebSocketService.addConnection()
-    ↓
+    |
 Send products:snapshot
-    ↓
+    |
 Client receives all products
-    ↓
+    |
 [User performs action]
-    ↓
+    |
 ProductsService.create/update/delete()
-    ↓
+    |
 Repository mutation
-    ↓
+    |
 ProductsWebSocketService.broadcast()
-    ↓
+    |
 All connected clients receive event
 ```
 

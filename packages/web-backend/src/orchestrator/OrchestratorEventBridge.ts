@@ -92,11 +92,11 @@ export class OrchestratorEventBridge {
 				this.eventBroadcaster.broadcast(B2F_WORKER_CONNECTED, worker);
 
 				// Emit aggregate event for dashboard (used as invalidation signal by frontend)
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to WorkersData but only the event name is used for cache invalidation
 				this.eventBroadcaster.broadcast(B2F_WORKERS_UPDATED, {} as any);
 
 				// Emit workspaces updated event (new worker = new workspace potentially)
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to Workspace[] but only the event name is used for cache invalidation
 				this.eventBroadcaster.broadcast(B2F_WORKSPACES_UPDATED, {} as any);
 			});
 
@@ -105,15 +105,15 @@ export class OrchestratorEventBridge {
 				log.info('WORKER_DISCONNECTED:', data.workerId);
 
 				// Emit specific event
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// violations-suppress: ts/no-unsafe-type-cast event payload carries only workerId; EventTypes expects full Worker object for this event
 				this.eventBroadcaster.broadcast(B2F_WORKER_DISCONNECTED, { workerId: data.workerId } as any);
 
 				// Emit aggregate event for dashboard (used as invalidation signal by frontend)
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to WorkersData but only the event name is used for cache invalidation
 				this.eventBroadcaster.broadcast(B2F_WORKERS_UPDATED, {} as any);
 
 				// Emit workspaces updated event (worker disconnected = workspace may disappear)
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to Workspace[] but only the event name is used for cache invalidation
 				this.eventBroadcaster.broadcast(B2F_WORKSPACES_UPDATED, {} as any);
 			});
 
@@ -122,7 +122,7 @@ export class OrchestratorEventBridge {
 				log.debug('WORKER_TASK_ASSIGNED:', data.workerId, data.taskId);
 
 				// Emit aggregate event - dashboard needs to know worker states changed (invalidation signal)
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to WorkersData but only the event name is used for cache invalidation
 				this.eventBroadcaster.broadcast(B2F_WORKERS_UPDATED, {} as any);
 			});
 
@@ -137,13 +137,13 @@ export class OrchestratorEventBridge {
 
 			stateManager.on(StateEvent.TASK_UPDATED, () => {
 				log.debug('TASK_UPDATED');
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to TasksData but only the event name is used for cache invalidation
 				this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
 			});
 
 			stateManager.on(StateEvent.TASK_DELETED, () => {
 				log.debug('TASK_DELETED');
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to TasksData but only the event name is used for cache invalidation
 				this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
 			});
 
@@ -152,9 +152,8 @@ export class OrchestratorEventBridge {
 			// Filtered by taskId on subscription to avoid spamming all clients
 			stateManager.on(StateEvent.TASK_TRACE_UPDATED, (eventData: { taskId: string; stepsCount: number }) => {
 				log.debug('TASK_TRACE_UPDATED:', eventData.taskId, eventData.stepsCount);
-				// Broadcast with taskId for filtering
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				this.eventBroadcaster.broadcast(B2F_TASK_TRACE_UPDATED, eventData as any);
+				// Broadcast with taskId for filtering; eventData type matches EventTypes['b2f:task:trace_updated']
+				this.eventBroadcaster.broadcast(B2F_TASK_TRACE_UPDATED, eventData);
 			});
 
 			// Intervention events
@@ -170,11 +169,11 @@ export class OrchestratorEventBridge {
 				};
 
 				// Emit specific event
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// violations-suppress: ts/no-unsafe-type-cast transformedIntervention has extra fields (version, updatedAt) not in Intervention; superset is safe for broadcast consumers
 				this.eventBroadcaster.broadcast(B2F_INTERVENTION_CREATED, transformedIntervention as any);
 
 				// Emit aggregate event (invalidation signal for frontend)
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to Intervention[] but only the event name is used for cache invalidation
 				this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, {} as any);
 			});
 			// @formatter:on

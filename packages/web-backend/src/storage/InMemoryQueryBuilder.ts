@@ -141,6 +141,7 @@ export class InMemoryQueryBuilder<T extends BaseEntity> implements QueryBuilder<
 				case '<=':
 					return fieldValue <= value;
 				case 'in':
+					// violations-suppress: ts/no-unsafe-type-cast 'in' operator checks array membership; fieldValue type is generic T[keyof T] which Array.includes does not accept without widening
 					return Array.isArray(value) && value.includes(fieldValue as any);
 				case 'contains':
 					return (

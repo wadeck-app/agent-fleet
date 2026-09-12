@@ -501,6 +501,7 @@ export class TransportSessionManager {
 
 		// Check each filter - ALL must match
 		for (const [key, expectedValue] of Object.entries(filters)) {
+			// violations-suppress: ts/no-unsafe-type-cast eventData is typed as EventData<E> (event-specific); indexing by filter key string requires widening to a map type
 			const actualValue = (eventData as any)[key];
 
 			// Deep equality check for primitives

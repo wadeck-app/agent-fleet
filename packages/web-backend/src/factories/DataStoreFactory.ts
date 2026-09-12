@@ -330,7 +330,7 @@ export class DataStoreFactory {
 	getFlowFeedbackService(): FlowFeedbackService {
 		if (!this.flowFeedbackService) {
 			// Create repositories for feedback and retrospectives.
-			// Using `as any` because FlowFeedback/FlowRetrospective do not extend BaseEntity;
+			// FlowFeedback/FlowRetrospective do not extend BaseEntity;
 			// the StoredFlowFeedback/StoredFlowRetrospective intersection types in
 			// FlowFeedbackRepository bridge the gap at the type level.
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -48,6 +48,7 @@ export class InMemoryStorage implements DataStorage {
 		const tableData = this.getTable<T>(table);
 
 		// Extract id if provided in data (for testing with explicit IDs)
+		// violations-suppress: ts/no-unsafe-type-cast data is Omit<T, keyof BaseEntity> which excludes 'id'; callers may pass 'id' for testing with explicit IDs -- widening to access it
 		const dataAsAny = data as any;
 		const providedId = dataAsAny.id;
 		const entityId = providedId ? providedId : this.generateId();

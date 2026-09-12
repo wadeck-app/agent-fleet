@@ -129,7 +129,7 @@ export class FlowProposalsService {
 		});
 
 		// Notify flow-proposal subscribers so the UI refreshes without page reload (dj fix)
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		// violations-suppress: ts/no-unsafe-type-cast event payload carries only { ticketId } filter key; EventTypes expects this exact shape and it matches at runtime
 		this.eventBroadcaster.broadcast(B2F_FLOW_PROPOSAL_UPDATED, { ticketId } as any);
 
 		log.info('Flow proposal created', { ticketId, proposalId: created.id });
@@ -187,6 +187,7 @@ export class FlowProposalsService {
 		// Save flow to registry
 		await this.registry.saveCustomFlow(proposal.proposedFlow as unknown as FlowDefinition);
 
+		// violations-suppress: ts/no-unsafe-type-cast proposedFlow is stored as opaque JSON; accessing .id requires casting to a map type
 		const flowId = (proposal.proposedFlow as Record<string, unknown>).id as string | undefined;
 		if (!flowId) {
 			throw new Error(`Proposal ${proposalId} proposedFlow is missing an 'id' field`);
@@ -293,6 +294,7 @@ export class FlowProposalsService {
 				ticketComments,
 				previousProposal: {
 					proposedFlowYaml: FlowDesignerAgent.serializeFlowToYaml(
+						// violations-suppress: ts/no-unsafe-type-cast proposedFlow is stored as opaque JSON; serializeFlowToYaml accepts the widened map type
 						rejectedProposal.proposedFlow as Record<string, unknown>
 					),
 					reasoning: rejectedProposal.reasoning,
@@ -337,11 +339,11 @@ export class FlowProposalsService {
 			});
 
 			// Notify the ticket detail page that the ticket changed (e.g. currentFlowProposalId updated)
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// violations-suppress: ts/no-unsafe-type-cast event payload carries only { ticketId } filter key; EventTypes expects full Ticket object
 			this.eventBroadcaster.broadcast(B2F_TICKET_UPDATED, { ticketId } as any);
 			// Notify flow-proposal subscribers specifically -- allows the UI to refresh ONLY the
 			// Flow Design tab content without refreshing on unrelated ticket updates (cc fix).
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// violations-suppress: ts/no-unsafe-type-cast event payload carries only { ticketId } filter key; EventTypes expects this exact shape at runtime
 			this.eventBroadcaster.broadcast(B2F_FLOW_PROPOSAL_UPDATED, { ticketId } as any);
 		} catch (err) {
 			log.error('Async redesign failed after rejection', {

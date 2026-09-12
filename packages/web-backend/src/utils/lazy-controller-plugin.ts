@@ -195,6 +195,7 @@ function createLazyControllerPlugin<Routes = any>(
 			const scriptProcessService = factory.getScriptProcessService();
 			const scriptLogsStorage = factory.getScriptLogsStorage();
 			const workspaceFileService = factory.getWorkspaceFileService();
+			// violations-suppress: ts/no-unsafe-type-cast dynamic controller instantiation; ControllerClass is a union of concrete classes with different constructor signatures
 			controllerInstance = new (ControllerClass as any)(
 				workspacesService,
 				workspaceScriptsService,

@@ -269,6 +269,7 @@ export class WebSocketTransportServer implements ITransportServer {
 			const { userId } = this.sessionManager.validateSession(clientId);
 
 			// Add userId to request context
+			// violations-suppress: ts/no-unsafe-type-cast attaching userId to request at the WebSocket authentication point; not exposed in the generic request interface
 			(request as any).userId = userId;
 
 			// Route request through TransportRouter

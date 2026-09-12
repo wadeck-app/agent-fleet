@@ -366,6 +366,7 @@ Output ONLY the \`\`\`json block, nothing else.`);
 			throw new Error('Claude response JSON is not an object');
 		}
 
+		// violations-suppress: ts/no-unsafe-type-cast parsed is the result of JSON.parse -- unknown at compile time; widening to a map type to access named fields
 		const obj = parsed as Record<string, unknown>;
 
 		if (typeof obj['proposedFlow'] !== 'object' || obj['proposedFlow'] === null) {
@@ -376,6 +377,7 @@ Output ONLY the \`\`\`json block, nothing else.`);
 		}
 
 		return {
+			// violations-suppress: ts/no-unsafe-type-cast obj['proposedFlow'] is validated to be an object above; widening to map type for structured access
 			proposedFlow: obj['proposedFlow'] as Record<string, unknown>,
 			reasoning: obj['reasoning'] as string,
 			reusedFromFlowId: typeof obj['reusedFromFlowId'] === 'string' ? obj['reusedFromFlowId'] : undefined,
@@ -400,6 +402,7 @@ Output ONLY the \`\`\`json block, nothing else.`);
 		result: FlowDesignOutput,
 		previousProposal: NonNullable<FlowDesignInput['previousProposal']>
 	): void {
+		// violations-suppress: ts/no-unsafe-type-cast result.proposedFlow is stored as opaque JSON; widening to map type to access steps array
 		const newFlow = result.proposedFlow as Record<string, unknown>;
 		const newSteps = Array.isArray(newFlow['steps']) ? (newFlow['steps'] as Array<Record<string, unknown>>) : [];
 		const newStepIds = new Set(newSteps.map(s => String(s['id'] ?? '')).filter(Boolean));
@@ -490,6 +493,7 @@ Score 0 = completely fails on this axis, 100 = perfectly satisfies this axis.`;
 				jsonText = blockMatch[1].trim();
 			}
 
+			// violations-suppress: ts/no-unsafe-type-cast JSON.parse returns unknown; widening to map type to access score field
 			const parsed = JSON.parse(jsonText) as Record<string, unknown>;
 			const score = typeof parsed['score'] === 'number' ? parsed['score'] : NaN;
 
@@ -625,6 +629,7 @@ Score 0 = completely fails on this axis, 100 = perfectly satisfies this axis.`;
 		result.confidenceScore = evaluatedConfidence;
 
 		log.info('Flow design validated successfully', {
+			// violations-suppress: ts/no-unsafe-type-cast result.proposedFlow is opaque JSON; accessing ['id'] for logging only requires widening
 			flowId: (result.proposedFlow as Record<string, unknown>)['id'],
 			confidenceScore: evaluatedConfidence,
 		});

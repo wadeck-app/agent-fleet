@@ -120,7 +120,7 @@ export class TicketsRepository {
 		};
 
 		const existing = ticket.comments ?? [];
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		// violations-suppress: ts/no-unsafe-type-cast BaseRepository.update() is public but not exposed on the TicketsRepository interface; widening to call it directly
 		await (this.base as any).update(ticketId, { comments: [...existing, comment] });
 
 		return comment;
@@ -161,7 +161,7 @@ export class TicketsRepository {
 		};
 
 		const existing = ticket.history ?? [];
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		// violations-suppress: ts/no-unsafe-type-cast BaseRepository.update() is public but not exposed on the TicketsRepository interface; widening to call it directly
 		await (this.base as any).update(ticketId, { history: [...existing, entry] });
 
 		return entry;

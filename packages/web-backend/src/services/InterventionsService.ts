@@ -152,7 +152,7 @@ export class InterventionsService {
 			try {
 				this.eventBroadcaster.broadcast(B2F_INTERVENTION_CREATED, intervention);
 				// @formatter:off
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to Intervention[] but only the event name is used for cache invalidation
 				this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, {} as any);
 				// @formatter:on
 			} catch (broadcastError) {

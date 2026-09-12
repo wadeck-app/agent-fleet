@@ -131,7 +131,7 @@ export class InterventionsRepository {
 		// Access the underlying storage to add the intervention
 		// This is a temporary workaround until we add createWithId() to DataStorage interface
 		// @formatter:off
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		// violations-suppress: ts/no-unsafe-type-cast accessing internal storage field on BaseRepository to inject a record with a specific ID; workaround until createWithId() is added to DataStorage interface
 		const storage = (this.base as any).storage;
 		// @formatter:on
 		const tableName = this.base.getTableName();

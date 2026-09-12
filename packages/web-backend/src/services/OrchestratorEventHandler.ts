@@ -159,7 +159,7 @@ export class OrchestratorEventHandler {
 	 */
 	private async handleTaskAssigned(data: { taskId: string; workerId: string }): Promise<void> {
 		try {
-			log.info(`Task assigned: ${data.taskId} → ${data.workerId}`);
+			log.info(`Task assigned: ${data.taskId} -> ${data.workerId}`);
 
 			// Use TasksService method if available, otherwise direct repository access
 			// Note: TasksService doesn't have markAssigned method, so we'll use updateTaskStatus
@@ -252,7 +252,7 @@ export class OrchestratorEventHandler {
 			// Update linked ticket status if provided
 			if (data.ticketId && data.ticketStatus && this.ticketsService) {
 				try {
-					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					// violations-suppress: ts/no-unsafe-type-cast data.ticketStatus is string from untyped orchestrator event; TicketStatus is a string union - equivalent at runtime
 					await this.ticketsService.updateTicketStatusById(data.ticketId, data.ticketStatus as any);
 					log.info(`Ticket ${data.ticketId} status updated to ${data.ticketStatus}`);
 				} catch (error) {

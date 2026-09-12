@@ -51,7 +51,7 @@ export class WorkspaceMetadataRepository {
   async findAll(): Promise<WorkspaceMetadataEntity[]>
   async findById(id: string): Promise<WorkspaceMetadataEntity | null>
   async findByPath(path: string): Promise<WorkspaceMetadataEntity | null>
-    // base.query().where('path', '=', path) → first or null
+    // base.query().where('path', '=', path) -> first or null
   async findByPaths(paths: string[]): Promise<Map<string, WorkspaceMetadataEntity>>
     // findAll() + filter, return Map<path, entity>
   async create(data: Omit<WorkspaceMetadataEntity, BaseEntity fields>): Promise<WorkspaceMetadataEntity>
@@ -59,9 +59,9 @@ export class WorkspaceMetadataRepository {
   async update(id: string, data: Partial<{name, description, color, mode}>): Promise<WorkspaceMetadataEntity>
   async delete(id: string): Promise<void>
   async upsertByPath(path, data): Promise<WorkspaceMetadataEntity>
-    // find by path → update if exists, create if not
+    // find by path -> update if exists, create if not
   async ensureByPath(path: string): Promise<WorkspaceMetadataEntity>
-    // find by path → return if exists, create with defaults if not
+    // find by path -> return if exists, create with defaults if not
 ```
 
 ### 1.4 Write `WorkspaceMetadataRepository.test.ts`
@@ -91,10 +91,10 @@ static mapEntityToApi(
 - `status` = workerInfo ? `'active'` : `'idle'`
 - `activeWorkerId` = `workerInfo?.workerId`
 - `gitBranch` = `workerInfo?.gitBranch`
-- Keep `extractWorkspaceName()` (private → used by new method too)
+- Keep `extractWorkspaceName()` (private -> used by new method too)
 - Keep `generateIdFromPath()` for potential backward compat but it's no longer the primary ID source
 
-Old methods (`mapWorkerWorkspaceToApi`, `mapWorkerWorkspacesToApi`, `mapPathToWorkspace`) → remove after full migration.
+Old methods (`mapWorkerWorkspaceToApi`, `mapWorkerWorkspacesToApi`, `mapPathToWorkspace`) -> remove after full migration.
 
 ### 2.2 Refactor `WorkspacesService`
 
@@ -110,12 +110,12 @@ Old methods (`mapWorkerWorkspaceToApi`, `mapWorkerWorkspacesToApi`, `mapPathToWo
 1. Fetch ALL workspaces from `metadataRepository.findAll()`
 2. Fetch connected workers from orchestrator (for enrichment only)
 3. Build `workerByPath: Map<string, WorkerInfo>` from orchestrator data
-4. Auto-register unknown worker paths: for each worker path not in centralized store →
+4. Auto-register unknown worker paths: for each worker path not in centralized store ->
     - Try reading legacy `.agent-fleet/workspace-metadata.json` via `WorkspaceMetadataFile.read(path)` (preserves existing name/color/mode)
-    - If legacy file exists → `metadataRepository.create(legacyData)`
-    - If no legacy file → `metadataRepository.ensureByPath(path)` (creates with defaults)
+    - If legacy file exists -> `metadataRepository.create(legacyData)`
+    - If no legacy file -> `metadataRepository.ensureByPath(path)` (creates with defaults)
     - This handles migration of the 2 existing workspaces transparently
-5. Map each entity → `WorkspaceMapper.mapEntityToApi(entity, workerByPath.get(entity.path), projectId)`
+5. Map each entity -> `WorkspaceMapper.mapEntityToApi(entity, workerByPath.get(entity.path), projectId)`
 6. All workspaces visible — those without workers get `status: 'idle'`
 
 **`createWorkspace()`:**
@@ -132,7 +132,7 @@ Old methods (`mapWorkerWorkspaceToApi`, `mapWorkerWorkspacesToApi`, `mapPathToWo
 
 **`resolveWorkspacePath()`:**
 
-1. `metadataRepository.findById(id)` → return `entity.path`
+1. `metadataRepository.findById(id)` -> return `entity.path`
 
 **Remove:** `deduplicateWorkspaces()` (enrichment handles this), all `startWatching()` calls.
 
@@ -165,9 +165,9 @@ Remove `WorkspaceMetadataFile` import. Also clean up `getProjectsService()` if i
 
 ### 3.1 Remove/deprecate old files
 
-- `WorkspaceMetadataFile.ts` → keep `read()` only (used for lazy migration of legacy files), remove `write()`/`ensureFile()`. Mark as deprecated.
-- `WorkspaceMetadataFile.test.ts` → trim to cover only `read()`
-- Old `WorkspaceMetadata` interface from the old repository → replaced by entity type
+- `WorkspaceMetadataFile.ts` -> keep `read()` only (used for lazy migration of legacy files), remove `write()`/`ensureFile()`. Mark as deprecated.
+- `WorkspaceMetadataFile.test.ts` -> trim to cover only `read()`
+- Old `WorkspaceMetadata` interface from the old repository -> replaced by entity type
 
 ### 3.2 Clean up dead code in `ProjectsService`
 
@@ -206,7 +206,7 @@ Remove `WorkspaceMetadataFile` import. Also clean up `getProjectsService()` if i
 
 1. `npm run check` — TypeScript + ESLint pass
 2. `npm run test:agent` — all backend tests pass
-3. Manual: create a workspace via UI → appears in list with `active` status (if worker connected) or `idle` (if not)
-4. Manual: update workspace name/color → persists after refresh
+3. Manual: create a workspace via UI -> appears in list with `active` status (if worker connected) or `idle` (if not)
+4. Manual: update workspace name/color -> persists after refresh
 5. Verify `data/workspaces.json` is created with correct structure
 6. Verify `.agent-fleet/workspace-metadata.json` is no longer written anywhere

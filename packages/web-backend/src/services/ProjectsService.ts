@@ -227,7 +227,7 @@ export class ProjectsService {
 			this.eventBroadcaster.broadcast('b2f:project:created', normalizedProject);
 
 			// Emit aggregate event
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to ProjectsData but only the event name is used for cache invalidation
 			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as any);
 
 			return normalizedProject;
@@ -268,7 +268,7 @@ export class ProjectsService {
 			this.eventBroadcaster.broadcast('b2f:project:updated', normalizedProject);
 
 			// Emit aggregate event
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to ProjectsData but only the event name is used for cache invalidation
 			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as any);
 
 			return normalizedProject;
@@ -305,10 +305,11 @@ export class ProjectsService {
 			await this.repository.delete(id);
 
 			// Emit event AFTER successful deletion
+			// violations-suppress: ts/no-unsafe-type-cast event payload carries only { id } filter key; EventTypes expects full Project object
 			this.eventBroadcaster.broadcast('b2f:project:deleted', { id } as any);
 
 			// Emit aggregate event
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to ProjectsData but only the event name is used for cache invalidation
 			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as any);
 		} catch (error) {
 			log.error(' Failed to delete project:', error);
@@ -378,7 +379,7 @@ export class ProjectsService {
 			this.eventBroadcaster.broadcast('b2f:project:updated', normalizedProject);
 
 			// Emit aggregate event
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to ProjectsData but only the event name is used for cache invalidation
 			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as any);
 
 			return normalizedProject;
@@ -489,7 +490,7 @@ export class ProjectsService {
 			await this.repository.updateTaskCount(projectId, 1);
 
 			// Emit aggregate event
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to ProjectsData but only the event name is used for cache invalidation
 			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as any);
 		} catch (error) {
 			log.error(' Failed to increment task count:', error);
@@ -506,7 +507,7 @@ export class ProjectsService {
 			await this.repository.updateTaskCount(projectId, -1);
 
 			// Emit aggregate event
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to ProjectsData but only the event name is used for cache invalidation
 			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as any);
 		} catch (error) {
 			log.error(' Failed to decrement task count:', error);

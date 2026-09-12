@@ -769,7 +769,7 @@ async function start(): Promise<void> {
 			if (transportServer) {
 				// Get WebSocketTransportServer and close all connections
 				// @formatter:off
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// violations-suppress: ts/no-unsafe-type-cast ITransportServer does not expose .wss; accessing internal WebSocketServer for graceful shutdown
 				const wsServer = (transportServer as any).wss;
 				// @formatter:on
 				if (wsServer?.clients) {

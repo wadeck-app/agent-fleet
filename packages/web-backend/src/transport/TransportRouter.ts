@@ -84,6 +84,7 @@ export class TransportRouter {
 
 		// Register each route
 		Object.entries(routes).forEach(([path, methods]) => {
+			// violations-suppress: ts/no-unsafe-type-cast methods is a nested route contract map; no mapped index type available for runtime iteration
 			Object.keys(methods as any).forEach((method: string) => {
 				const httpMethod = method as HttpMethod;
 
@@ -259,8 +260,10 @@ export class TransportRouter {
 					params: request.params || {},
 					body: request.body,
 					headers: request.headers || {},
+					// violations-suppress: ts/no-unsafe-type-cast request.cookies is set at runtime by transport adapters; not present in the generic request type
 					cookies: (request as any).cookies || {},
 					// Add userId from request context (set by WebSocketTransportServer)
+					// violations-suppress: ts/no-unsafe-type-cast request.userId is set at runtime by WebSocketTransportServer authentication; not present in the generic request type
 					userId: (request as any).userId,
 				};
 
@@ -288,6 +291,7 @@ export class TransportRouter {
 		};
 
 		// Call configureRoutes to set up the route
+		// violations-suppress: ts/no-unsafe-type-cast add is a mock RouteWrapperFunc typed to the test request shape; RouteWrapperFunc generic is not directly compatible with the mock
 		controller.configureRoutes(add as any);
 
 		// Wait for handler to complete (if async)

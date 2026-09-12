@@ -151,6 +151,7 @@ export function createRouteWrapper<Routes>(fastify: FastifyInstance, routes: Rou
 		// @formatter:off
 		// Access pattern changed: routes[path][method] instead of routes[method][path]
 		// @formatter:on
+		// violations-suppress: ts/no-unsafe-type-cast ALL_API_ROUTES uses path/method as dynamic keys; no mapped type available to index by string path and method
 		const contract = (routes as any)[path]?.[method];
 
 		if (!contract) {
@@ -168,6 +169,7 @@ export function createRouteWrapper<Routes>(fastify: FastifyInstance, routes: Rou
 					body: {},
 					reply,
 					request: req,
+					// violations-suppress: ts/no-unsafe-type-cast Fastify does not expose cookies on FastifyRequest without the cookie plugin type declaration
 					cookies: (req as any).cookies || {},
 					connId,
 				};

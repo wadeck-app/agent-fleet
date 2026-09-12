@@ -221,6 +221,7 @@ export class LongPollingTransportServer implements ITransportServer {
 				const eventType = isNewSession ? '__initial_response__' : '__keep_alive__';
 				const responseEvent: TransportEvent = {
 					id: this.generateEventId(),
+					// violations-suppress: ts/no-unsafe-type-cast internal pseudo-event types not in EventType union; used for transport control signalling only
 					type: eventType as any,
 					data: {
 						authenticated: true,

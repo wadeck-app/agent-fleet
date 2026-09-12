@@ -340,7 +340,7 @@ export class WorkspacesService {
 			this.recentlyCreatedWorkspaces.set(workspace.path, workspace);
 
 			// Broadcast event
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to Workspace[] but only the event name is used for cache invalidation
 			this.eventBroadcaster.broadcast(B2F_WORKSPACES_UPDATED, {} as any);
 
 			log.info('Successfully created workspace', { id: workspace.id });
@@ -429,8 +429,8 @@ export class WorkspacesService {
 		const isDescending = sortOrder === 'desc';
 
 		return [...workspaces].sort((a, b) => {
-			const aVal = (a as any)[sortBy];
-			const bVal = (b as any)[sortBy];
+			const aVal = (a as { [k: string]: unknown })[sortBy];
+			const bVal = (b as { [k: string]: unknown })[sortBy];
 
 			if (aVal === null || aVal === undefined) return 1;
 			if (bVal === null || bVal === undefined) return -1;

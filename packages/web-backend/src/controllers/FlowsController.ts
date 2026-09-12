@@ -71,7 +71,7 @@ export default class FlowsController implements LazyController<typeof FLOWS_API_
 		add('PUT', '/api/flows/:flowId', async request => {
 			const flowId = (request.params as { flowId: string }).flowId;
 			// @formatter:off
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// violations-suppress: ts/no-unsafe-type-cast flow definition payload is arbitrary YAML-derived JSON; no shared FlowDefinition Zod schema available for body validation at this route
 			const flowDefinition = request.body as any;
 			// @formatter:on
 

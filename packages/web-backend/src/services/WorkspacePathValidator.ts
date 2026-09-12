@@ -10,10 +10,15 @@ const log = createLogger('WorkspacePathValidator');
 export class WorkspacePathValidator {
 	// System directories that should never be used as workspace paths
 	private readonly FORBIDDEN_PATHS_WINDOWS = [
+		// violations-suppress: shared/no-out-of-repo-path these paths are listed to FORBID workspace creation inside system directories; they are matched against user input, not resolved
 		'C:\\Windows',
+		// violations-suppress: shared/no-out-of-repo-path these paths are listed to FORBID workspace creation inside system directories; they are matched against user input, not resolved
 		'C:\\Program Files',
+		// violations-suppress: shared/no-out-of-repo-path these paths are listed to FORBID workspace creation inside system directories; they are matched against user input, not resolved
 		'C:\\Program Files (x86)',
+		// violations-suppress: shared/no-out-of-repo-path these paths are listed to FORBID workspace creation inside system directories; they are matched against user input, not resolved
 		'C:\\ProgramData',
+		// violations-suppress: shared/no-out-of-repo-path these paths are listed to FORBID workspace creation inside system directories; they are matched against user input, not resolved
 		'C:\\System',
 	];
 

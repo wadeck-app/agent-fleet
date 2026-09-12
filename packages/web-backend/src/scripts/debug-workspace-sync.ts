@@ -1,6 +1,7 @@
 import { WorkspaceMapper } from '../services/WorkspaceMapper';
 
 // Get the workspace path from .flow
+// violations-suppress: shared/no-out-of-repo-path debug script with a hardcoded local path for manual testing only; not used in production code
 const workspacePath = 'C:\\Workspace_Tooling\\agent-fleet';
 
 // Generate hash-based ID from path

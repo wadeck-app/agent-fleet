@@ -184,12 +184,12 @@ export class FlowFeedbackService {
 			await this.ticketsRepository.update(existing.ticketId, { flowFeedbackId: undefined });
 		}
 
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		this.eventBroadcaster.broadcast(B2F_TICKET_FEEDBACK_SUBMITTED, {
 			ticketId: existing.ticketId,
 			feedbackId: existing.id,
 			rating: existing.rating,
 			deleted: true,
+			// violations-suppress: ts/no-unsafe-type-cast event payload has extra 'deleted' field not in EventTypes definition; consumers read all fields at runtime
 		} as any);
 
 		log.info(`Flow feedback ${feedbackId} deleted`);

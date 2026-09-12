@@ -231,7 +231,7 @@ export class OrchestratorRepository {
 			const taskManager = orchestrator.getTaskManager();
 
 			// @formatter:off
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// violations-suppress: ts/no-unsafe-type-cast newStatus is a string; TaskStatus is a string enum -- equivalent at runtime, cast bridges the TypeScript mismatch
 			await taskManager.updateTaskStatus(taskId, newStatus as any);
 			// @formatter:on
 			const task = taskManager.getTask(taskId);
