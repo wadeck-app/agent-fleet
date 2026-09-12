@@ -28,12 +28,16 @@ export function resolveDaemonWsUrl(daemonDir: string, configuredWsPort: number |
 	try {
 		raw = readFileSync(portFile, 'utf8');
 	} catch {
-		// Distinguish "no daemon" from "daemon still binding": the first needs a command,
-		// the second only needs a moment, and telling the user to start a daemon that is
-		// already running would send them the wrong way.
+		// Distinguish "no daemon at all" from "a daemon wrote a port file": the first needs a
+		// command, and telling the user to start a daemon that is already running would send
+		// them the wrong way.
+		//
+		// `config.port` existing is not proof one is alive, though -- a daemon that crashed
+		// leaves the file behind. So this names both possibilities rather than asserting the
+		// happy one, because the two need different actions and the caller retries either way.
 		if (existsSync(join(daemonDir, 'config.port'))) {
 			throw new Error(
-				`The flow daemon is running but not accepting workers yet (no "${portFile}"). It publishes that file once its worker listener is bound.`
+				`The flow daemon is not accepting workers yet (no "${portFile}"). It publishes that file once its worker listener is bound. If this does not clear within a few seconds, a previous daemon may have exited without cleaning up -- run "flow stop" then "flow start".`
 			);
 		}
 		throw new Error(

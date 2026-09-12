@@ -37,7 +37,7 @@ import type { WorkerRegistry } from './WorkerRegistry.js';
  * Each re-dispatch is free by design (D#43), so without a bound a step that every worker
  * drops before starting would be requeued forever and the flow would never finish or fail.
  */
-const MAX_REDISPATCHES = 3;
+export const MAX_REDISPATCHES = 3;
 
 /**
  * How often dispatch is retried while S8 is waiting for a declared source.
@@ -484,6 +484,10 @@ export class CommandHandler {
 			return;
 		}
 		this.assignments.markStarted(assignmentId);
+		// The re-dispatch budget counts hand-offs that never began. This one did, so the
+		// step's earlier aborted hand-offs must not still be held against it: a later retry
+		// would otherwise start part-way through a budget it never spent.
+		this.redispatchCounts.delete(`${executionId}:${stepId}`);
 		this.logWriter.writeExecution(executionId, `Step ${stepId} started executing`, 'info');
 	}
 
@@ -922,9 +926,14 @@ export class CommandHandler {
 		this.stepCounts.delete(executionId);
 		this.executionProjects.delete(executionId);
 		this.activeExecutionCount--;
-		// Per-step re-dispatch budgets die with the execution they were counted for.
+		// Per-step bookkeeping dies with the execution it was kept for. Both maps are keyed
+		// by execution and step, so nothing else would ever remove these entries and a
+		// long-lived daemon would accumulate one per step it has ever run.
 		for (const key of this.redispatchCounts.keys()) {
 			if (key.startsWith(`${executionId}:`)) this.redispatchCounts.delete(key);
+		}
+		for (const key of this.interactiveWaitSince.keys()) {
+			if (key.startsWith(`${executionId}:`)) this.interactiveWaitSince.delete(key);
 		}
 
 		const pluginWs = this.pluginWorkspaceHandles.get(executionId);

@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { CommandHandler } from './CommandHandler';
+import { CommandHandler, MAX_REDISPATCHES } from './CommandHandler';
 
 const { mockAllocate, mockRelease, hoistedState } = vi.hoisted(() => ({
 	mockAllocate: vi.fn().mockResolvedValue({ path: '/tmp/test-workspace', id: 'ws-test-id' }),
@@ -1137,11 +1137,47 @@ describe('CommandHandler — covering unmet demand (S8, D#25)', () => {
 		return { handler, workerPool };
 	}
 
-	it('asks S8 how much unmet demand there is', async () => {
+	it('asks S8 how much unmet demand there is, and how long it has gone unserved', async () => {
 		const { workerPool } = await runWithNoWorker({ fork: 0 });
 
 		expect(workerPool.planProvisioning).toHaveBeenCalled();
-		expect(workerPool.planProvisioning.mock.calls[0]![0]).toBe(1);
+		const [unmetDemand, waitingMs] = workerPool.planProvisioning.mock.calls[0]! as [number, number];
+		expect(unmetDemand).toBe(1);
+		expect(waitingMs).toBe(0);
+	});
+
+	// The wait is only bounded because dispatch re-runs itself while nothing can be placed.
+	// Without that timer there is no `ready` message coming and no other event to resume on,
+	// so "wait" would mean "wait forever" -- this is the test that would catch it.
+	it('re-runs dispatch while waiting, so the wait actually ends', async () => {
+		vi.useFakeTimers();
+		try {
+			const { workerPool } = await runWithNoWorker({ fork: 0 });
+			const callsBefore = workerPool.planProvisioning.mock.calls.length;
+
+			await vi.advanceTimersByTimeAsync(1_000);
+
+			expect(workerPool.planProvisioning.mock.calls.length).toBeGreaterThan(callsBefore);
+			// Later calls report a growing wait, which is what lets a policy time out at all.
+			const lastCall = workerPool.planProvisioning.mock.calls.at(-1)! as [number, number];
+			expect(lastCall[1]).toBeGreaterThan(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('stops re-running dispatch once it has obtained what S8 asked for', async () => {
+		vi.useFakeTimers();
+		try {
+			const { workerPool } = await runWithNoWorker({ fork: 1 });
+			const callsBefore = workerPool.planProvisioning.mock.calls.length;
+
+			await vi.advanceTimersByTimeAsync(1_000);
+
+			expect(workerPool.planProvisioning.mock.calls.length).toBe(callsBefore);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	// Waiting is expressed as forking nothing, so nothing may be created on that pass.
@@ -1256,19 +1292,55 @@ describe('CommandHandler — mid-step disconnect (D#62, D#65)', () => {
 		expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
 	});
 
-	// Otherwise a step nobody ever starts is re-dispatched forever (D#62).
-	it('fails the step once the re-dispatch bound is exhausted, saying why', async () => {
+	// Otherwise a step nobody ever starts is re-dispatched forever (D#62). Pinned to the
+	// constant and to the exact boundary: asserting only "fewer than ten" would pass just as
+	// happily if the bound were raised to nine.
+	it('spends exactly the re-dispatch budget before giving up', async () => {
 		const { handler, worker, sent } = await dispatchOneStep();
 
-		for (let i = 0; i < 10; i++) {
+		for (let i = 0; i < MAX_REDISPATCHES; i++) {
 			handler.handleWorkerDisconnect(worker);
 			handler.tryDispatch();
 		}
 
-		expect(sent.length).toBeLessThan(11);
+		// One original hand-off plus one per allowed re-dispatch, and still not failed.
+		expect(sent).toHaveLength(MAX_REDISPATCHES + 1);
+		expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
+	});
+
+	it('fails the step on the next disconnect, saying what to check', async () => {
+		const { handler, worker, sent } = await dispatchOneStep();
+
+		for (let i = 0; i <= MAX_REDISPATCHES; i++) {
+			handler.handleWorkerDisconnect(worker);
+			handler.tryDispatch();
+		}
+
+		expect(sent).toHaveLength(MAX_REDISPATCHES + 1);
 		expect(mockExecStore.markStepFailed).toHaveBeenCalled();
 		const reason = String(mockExecStore.markStepFailed.mock.calls.at(-1)?.[2] ?? '');
 		expect(reason).toMatch(/disconnect/i);
+		expect(reason).toContain('flow worker list');
+	});
+
+	// The budget counts hand-offs that never began. Once a step has run, its earlier aborted
+	// hand-offs must not still be held against it -- a retry would start part-way through a
+	// budget it never spent.
+	it('forgets earlier aborted hand-offs once the step has actually started', async () => {
+		const { handler, worker, sent, executionId } = await dispatchOneStep();
+
+		for (let i = 0; i < MAX_REDISPATCHES; i++) {
+			handler.handleWorkerDisconnect(worker);
+			handler.tryDispatch();
+		}
+		handler.onStepStarted(worker, sent.at(-1)!.assignmentId, executionId, 's1');
+		// Budget reset, so this disconnect is a failure of a started step rather than an
+		// exhausted budget -- and a fresh not-started disconnect would be re-dispatched again.
+		handler.handleWorkerDisconnect(worker);
+		handler.tryDispatch();
+
+		const reason = String(mockExecStore.markStepFailed.mock.calls.at(-1)?.[2] ?? '');
+		expect(reason).toMatch(/while it was executing/i);
 	});
 
 	it('does nothing for a worker that held no assignment', async () => {
