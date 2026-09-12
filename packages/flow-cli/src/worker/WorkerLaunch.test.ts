@@ -18,14 +18,17 @@ afterEach(() => {
 });
 
 describe('resolveDaemonWsUrl', () => {
-	it('derives the ws port from the daemon http port', () => {
+	// The daemon's listener retries upward on EADDRINUSE, so the bound port is not
+	// reliably httpPort+1. Only the port the daemon published is trustworthy.
+	it('uses the port the daemon published', () => {
 		writeFileSync(join(dir, 'config.port'), JSON.stringify({ port: 4100 }), 'utf8');
+		writeFileSync(join(dir, 'worker.port'), JSON.stringify({ port: 4107 }), 'utf8');
 
-		expect(resolveDaemonWsUrl(dir, null)).toBe('ws://127.0.0.1:4101');
+		expect(resolveDaemonWsUrl(dir, null)).toBe('ws://127.0.0.1:4107');
 	});
 
 	it('prefers an explicitly configured ws port', () => {
-		writeFileSync(join(dir, 'config.port'), JSON.stringify({ port: 4100 }), 'utf8');
+		writeFileSync(join(dir, 'worker.port'), JSON.stringify({ port: 4101 }), 'utf8');
 
 		expect(resolveDaemonWsUrl(dir, 9999)).toBe('ws://127.0.0.1:9999');
 	});
@@ -36,10 +39,18 @@ describe('resolveDaemonWsUrl', () => {
 		expect(() => resolveDaemonWsUrl(dir, null)).toThrow(/flow start/);
 	});
 
-	it('fails loudly when the port file is unreadable rather than guessing', () => {
-		writeFileSync(join(dir, 'config.port'), 'not json', 'utf8');
+	// Never guessed from the http port: dialling a port nothing published means dialling
+	// whatever else happens to hold it.
+	it('fails while the daemon is up but its listener is not bound yet', () => {
+		writeFileSync(join(dir, 'config.port'), JSON.stringify({ port: 4100 }), 'utf8');
 
-		expect(() => resolveDaemonWsUrl(dir, null)).toThrow(/config\.port/);
+		expect(() => resolveDaemonWsUrl(dir, null)).toThrow(/not accepting workers yet/i);
+	});
+
+	it('fails loudly when the port file is unreadable rather than guessing', () => {
+		writeFileSync(join(dir, 'worker.port'), 'not json', 'utf8');
+
+		expect(() => resolveDaemonWsUrl(dir, null)).toThrow(/worker\.port/);
 	});
 });
 

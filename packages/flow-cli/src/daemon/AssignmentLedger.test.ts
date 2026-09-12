@@ -165,3 +165,43 @@ describe('AssignmentLedger - settling', () => {
 		expect(() => ledger.settle('never-issued')).not.toThrow();
 	});
 });
+
+describe('AssignmentLedger - execution start (D#65)', () => {
+	it('treats a fresh assignment as not started', () => {
+		const ledger = new AssignmentLedger();
+		const worker = fakeWorker('w1');
+		ledger.issue(worker, 'exec-1', 'step-a');
+
+		expect(ledger.outstandingFor(worker)[0]!.started).toBe(false);
+	});
+
+	// The classification a mid-step disconnect needs: only the worker knows whether it
+	// had begun executing, so it says so while it is still connected.
+	it('records that the worker began executing', () => {
+		const ledger = new AssignmentLedger();
+		const worker = fakeWorker('w1');
+		const issued = ledger.issue(worker, 'exec-1', 'step-a');
+
+		ledger.markStarted(issued.assignmentId);
+
+		expect(ledger.outstandingFor(worker)[0]!.started).toBe(true);
+	});
+
+	it('carries the started flag through revocation, which is where it is read', () => {
+		const ledger = new AssignmentLedger();
+		const worker = fakeWorker('w1');
+		const running = ledger.issue(worker, 'exec-1', 'step-a');
+		ledger.issue(worker, 'exec-1', 'step-b');
+		ledger.markStarted(running.assignmentId);
+
+		const revoked = ledger.revokeWorker(worker);
+
+		expect(revoked.find(a => a.stepId === 'step-a')!.started).toBe(true);
+		expect(revoked.find(a => a.stepId === 'step-b')!.started).toBe(false);
+	});
+
+	it('marking an unknown id is not an error (the message may follow a settle)', () => {
+		const ledger = new AssignmentLedger();
+		expect(() => ledger.markStarted('never-issued')).not.toThrow();
+	});
+});

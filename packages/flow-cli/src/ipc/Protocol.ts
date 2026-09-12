@@ -140,6 +140,15 @@ export interface WorkerReady {
 export type WorkerToDaemon =
 	| WorkerReady
 	| { type: 'log'; assignmentId: string; executionId: string; stepId: string; entry: LiveLogEntry }
+	/**
+	 * Sent the moment the worker begins executing, before any side effect (D#65).
+	 *
+	 * Its only purpose is to tell the daemon how to treat a disconnect: after this, the
+	 * step may have changed something, so it is a failure rather than free work to
+	 * re-dispatch. It is reported up front precisely because a dead worker cannot answer
+	 * questions later.
+	 */
+	| { type: 'step_started'; assignmentId: string; executionId: string; stepId: string }
 	| {
 			type: 'step_completed';
 			assignmentId: string;
@@ -169,6 +178,7 @@ export type WorkerToDaemon =
  */
 export type AssignmentScopedMessage =
 	| Omit<Extract<WorkerToDaemon, { type: 'log' }>, 'assignmentId'>
+	| Omit<Extract<WorkerToDaemon, { type: 'step_started' }>, 'assignmentId'>
 	| Omit<Extract<WorkerToDaemon, { type: 'step_completed' }>, 'assignmentId'>
 	| Omit<Extract<WorkerToDaemon, { type: 'step_failed' }>, 'assignmentId'>
 	| Omit<Extract<WorkerToDaemon, { type: 'inject_steps' }>, 'assignmentId'>;

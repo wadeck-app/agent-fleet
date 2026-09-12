@@ -26,6 +26,29 @@ import { WorkerRegistry } from './WorkerRegistry.js';
 import { contactDeclaredSources } from './WorkerSourceContact.js';
 import { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
 
+/** Name of the file the daemon publishes its bound WebSocket port in. */
+export const WORKER_PORT_FILE = 'worker.port';
+
+/**
+ * Records the port workers must dial.
+ *
+ * Necessary because the WebSocket server retries upward on EADDRINUSE, so the bound port
+ * is not reliably `httpPort + 1`. A client computing the offset itself would dial whatever
+ * else holds that port -- failing obscurely, or joining something unrelated.
+ */
+export function publishWorkerPort(daemonDir: string, port: number): void {
+	const filePath = path.join(daemonDir, WORKER_PORT_FILE);
+	try {
+		fs.writeFileSync(filePath, JSON.stringify({ port }), { encoding: 'utf8', mode: 0o600 });
+	} catch (err) {
+		// Not fatal for forked workers, which read the port in-process, but every externally
+		// launched worker now has nothing to dial -- so say so rather than continue quietly.
+		process.stderr.write(
+			`[daemon] Failed to publish the worker port to "${filePath}": ${getErrorMessage(err)}. Externally launched workers will not be able to connect.\n`
+		);
+	}
+}
+
 // Exported for testing. Writes a single NDJSON daemon lifecycle entry to logsDir.
 export function writeDaemonLog(logsDir: string, level: 'info' | 'error', msg: string): void {
 	const today = new Date().toISOString().slice(0, 10);
@@ -251,9 +274,18 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 				// lazily via getter -- they are only spawned after tryDispatch(), which happens
 				// after handleRun(), which happens after this onStart returns. By then start()
 				// has resolved.
-				wsServer.start().catch((err: Error) => {
-					process.stderr.write(`[daemon] WebSocket server failed to start: ${String(err)}\n`);
-				});
+				wsServer
+					.start()
+					.then(boundPort => {
+						// Published because the retry above means the bound port is not always
+						// `httpPort + 1`. A client that assumed the offset would dial whatever
+						// else holds that port, so the real one is written down for them.
+						publishWorkerPort(resolvedDaemonDir, boundPort);
+						contactSources(boundPort);
+					})
+					.catch((err: Error) => {
+						process.stderr.write(`[daemon] WebSocket server failed to start: ${String(err)}\n`);
+					});
 				workerRegistry = new WorkerRegistry();
 				const forkSource = new ForkWorkerSource(port, () => wsServer.port, claudePath);
 				const sourceRegistry = new WorkerSourceRegistry(resolvedDaemonDir);
@@ -283,16 +315,21 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 				// worker never polls. Fire-and-forget on purpose -- nothing waits for a worker
 				// to appear (D#51, D#66), and dispatch only ever targets a live connection
 				// (D#4), so a source that produces nothing simply has no capacity here.
-				void contactDeclaredSources(
-					sourceRegistry.list(),
-					`ws://127.0.0.1:${String(wsServer.port)}`,
-					message => {
-						process.stderr.write(`[daemon] ${message}\n`);
-						writeDaemonLog(logsDir, 'error', message);
-					}
-				).catch((err: unknown) => {
-					process.stderr.write(`[daemon] contacting worker sources failed: ${getErrorMessage(err)}\n`);
-				});
+				//
+				// Runs only once the listener is bound (see start() above): a source told to
+				// dial a port nothing is listening on produces a worker that cannot join.
+				function contactSources(boundPort: number): void {
+					void contactDeclaredSources(
+						sourceRegistry.list(),
+						`ws://127.0.0.1:${String(boundPort)}`,
+						message => {
+							process.stderr.write(`[daemon] ${message}\n`);
+							writeDaemonLog(logsDir, 'error', message);
+						}
+					).catch((err: unknown) => {
+						process.stderr.write(`[daemon] contacting worker sources failed: ${getErrorMessage(err)}\n`);
+					});
+				}
 			},
 		},
 	});
@@ -371,6 +408,12 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 				}
 				break;
 			}
+			case 'step_started': {
+				// Only changes how a later disconnect is classified (D#65); nothing else acts on it.
+				const { assignmentId, executionId, stepId } = message;
+				commandHandler.onStepStarted(ws, assignmentId, executionId, stepId);
+				break;
+			}
 			case 'inject_steps': {
 				const { assignmentId, executionId, steps } = message;
 				if (!commandHandler.verifyAssignmentScope(ws, assignmentId, executionId)) break;
@@ -399,9 +442,12 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 	function handleWorkerClose(ws: WebSocket): void {
 		// A disconnected worker can no longer report on its assignments; leaving them
 		// outstanding would let a reconnecting socket be matched against stale work.
-		// Classifying and re-dispatching the interrupted step is Phase 2b (D#65).
-		commandHandler.revokeWorkerAssignments(ws);
+		// Classifies each interrupted step and re-queues the ones that never started (D#65).
+		commandHandler.handleWorkerDisconnect(ws);
+		// Only dispatch once this socket is out of the registry, or a re-queued step could
+		// go straight back to the worker that just vanished.
 		workerRegistry.remove(ws);
+		commandHandler.tryDispatch();
 		checkShutdown();
 	}
 

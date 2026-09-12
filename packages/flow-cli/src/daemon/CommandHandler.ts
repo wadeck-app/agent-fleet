@@ -22,6 +22,14 @@ import type { WorkerProvisioner } from './WorkerProvisioner.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
 
 // Default limits - overridden by FlowConfig.limits passed to CommandHandler constructor
+/**
+ * How many times a step may be re-dispatched after a worker vanished before it started.
+ *
+ * Each re-dispatch is free by design (D#43), so without a bound a step that every worker
+ * drops before starting would be requeued forever and the flow would never finish or fail.
+ */
+const MAX_REDISPATCHES = 3;
+
 const DEFAULT_MAX_INJECTED_STEPS = 20;
 const DEFAULT_MAX_STEPS_PER_EXECUTION = 50;
 
@@ -44,6 +52,15 @@ export class CommandHandler {
 	private readonly readyQueue: ReadyStep[] = [];
 	/** Work actually handed to each worker, so results can be bound to it (T-05) */
 	private readonly assignments = new AssignmentLedger();
+	/**
+	 * What was handed to a worker, kept until the assignment settles.
+	 *
+	 * A disconnect has to re-dispatch the *payload*, and the assignment record only names
+	 * the step -- the rendered config and context are not recoverable from it (D#62).
+	 */
+	private readonly dispatched = new Map<string, ReadyStep>();
+	/** Re-dispatches spent per step, so a step nobody ever starts cannot loop forever (D#62) */
+	private readonly redispatchCounts = new Map<string, number>();
 	/** Per-execution hook dispatchers */
 	private readonly executionHooks = new Map<string, HookDispatcher>();
 	/** Per-execution plugin workspace handles (only when workspaceProvider is set) */
@@ -390,11 +407,81 @@ export class CommandHandler {
 	/** Closes an assignment once its outcome has been accepted. */
 	settleAssignment(assignmentId: string): void {
 		this.assignments.settle(assignmentId);
+		// The payload was only kept for a possible re-dispatch, which can no longer happen.
+		this.dispatched.delete(assignmentId);
 	}
 
-	/** Drops a disconnected worker's outstanding assignments. */
-	revokeWorkerAssignments(worker: WebSocket): void {
-		this.assignments.revokeWorker(worker);
+	/**
+	 * Records that a worker has begun executing an assigned step (D#65).
+	 *
+	 * Verified like any other result message: a worker must not be able to change how
+	 * another worker's disconnect is classified (T-05).
+	 */
+	onStepStarted(worker: WebSocket, assignmentId: string, executionId: string, stepId: string): void {
+		const verified = this.assignments.verify(worker, assignmentId, executionId, stepId);
+		if (!verified.ok) {
+			process.stderr.write(`[CommandHandler] rejected step_started: ${verified.reason}\n`);
+			return;
+		}
+		this.assignments.markStarted(assignmentId);
+		this.logWriter.writeExecution(executionId, `Step ${stepId} started executing`, 'info');
+	}
+
+	/**
+	 * Decides what happens to the steps a disconnected worker was holding (D#65).
+	 *
+	 * Deliberately does **not** dispatch: the caller removes the worker from the registry
+	 * afterwards, so dispatching here could hand the requeued step straight back to the
+	 * socket that just died. `Daemon` calls `tryDispatch()` once the removal is done.
+	 */
+	handleWorkerDisconnect(worker: WebSocket): void {
+		for (const assignment of this.assignments.revokeWorker(worker)) {
+			const { executionId, stepId, assignmentId, started } = assignment;
+			const step = this.dispatched.get(assignmentId);
+			this.dispatched.delete(assignmentId);
+
+			if (started) {
+				// It may already have changed something, so the author's retry/onFailure
+				// decides rather than us silently replaying a half-run step.
+				this.failInterruptedStep(
+					executionId,
+					stepId,
+					`the worker running this step disconnected while it was executing. It was not retried automatically because it may have already had an effect; re-run the flow, or declare "retry" on the step if it is safe to repeat.`
+				);
+				continue;
+			}
+
+			const key = `${executionId}:${stepId}`;
+			const spent = (this.redispatchCounts.get(key) ?? 0) + 1;
+			if (step === undefined) {
+				// Nothing to re-send, so waiting for this step would hang the execution.
+				this.failInterruptedStep(
+					executionId,
+					stepId,
+					`the worker holding this step disconnected before starting it, and the daemon no longer has the assignment to re-send. Please report this.`
+				);
+				continue;
+			}
+			if (spent > MAX_REDISPATCHES) {
+				this.failInterruptedStep(
+					executionId,
+					stepId,
+					`no worker started this step: it was handed out ${String(MAX_REDISPATCHES + 1)} times and every worker disconnected first. Check that a worker stays connected ("flow worker list") and that it serves this project.`
+				);
+				continue;
+			}
+
+			this.redispatchCounts.set(key, spent);
+			// The step was never sent as far as the flow is concerned, which is exactly
+			// what unacknowledge means -- so no retry attempt is consumed (D#43).
+			this.schedulers.get(executionId)?.unacknowledge(stepId);
+			this.readyQueue.unshift(step);
+			this.logWriter.writeExecution(
+				executionId,
+				`Worker disconnected before starting ${stepId}; re-queued (attempt ${String(spent)} of ${String(MAX_REDISPATCHES)})`,
+				'info'
+			);
+		}
 	}
 
 	/** Called by Daemon when a worker reports step_completed. */
@@ -464,6 +551,20 @@ export class CommandHandler {
 			this.enqueueReadyItems(executionId, newReady, context);
 			this.tryDispatch();
 		}
+	}
+
+	/**
+	 * Fails a step whose worker vanished, with the same treatment a reported failure gets.
+	 *
+	 * The store write and the hook are not optional extras: a step left `running` in the
+	 * execution store shows up in `flow history` as still running forever, and a hook that
+	 * fires for a script failure but not for a lost worker is a gap the author cannot see.
+	 */
+	private failInterruptedStep(executionId: string, stepId: string, reason: string): void {
+		this.executionStore.markStepFailed(executionId, stepId, reason);
+		this.logWriter.writeExecution(executionId, `Step ${stepId} failed: ${reason}`, 'error');
+		this.onStepFailed(executionId, stepId, reason);
+		this.dispatchHook(executionId, 'onStepFailed', { executionId, stepId, error: reason });
 	}
 
 	/** Called by Daemon for inject_steps messages. */
@@ -567,6 +668,8 @@ export class CommandHandler {
 				});
 
 				const assignment = this.assignments.issue(idleWorker, step.executionContext.executionId, step.stepId);
+				// Kept so a disconnect can re-send this exact payload (D#62).
+				this.dispatched.set(assignment.assignmentId, step);
 				const sent = this.registry.send(idleWorker, {
 					type: 'assign',
 					assignmentId: assignment.assignmentId,
@@ -577,6 +680,7 @@ export class CommandHandler {
 				if (!sent) {
 					// Never handed over, so the assignment must not stay outstanding.
 					this.assignments.settle(assignment.assignmentId);
+					this.dispatched.delete(assignment.assignmentId);
 					// Worker disconnected between getIdleWorker() and send - re-queue the step
 					this.registry.remove(idleWorker);
 					// Transport failure: not a flow-level failure - unacknowledge and put back
@@ -624,6 +728,10 @@ export class CommandHandler {
 		this.executionContexts.delete(executionId);
 		this.stepCounts.delete(executionId);
 		this.activeExecutionCount--;
+		// Per-step re-dispatch budgets die with the execution they were counted for.
+		for (const key of this.redispatchCounts.keys()) {
+			if (key.startsWith(`${executionId}:`)) this.redispatchCounts.delete(key);
+		}
 
 		const pluginWs = this.pluginWorkspaceHandles.get(executionId);
 		if (pluginWs) {

@@ -244,6 +244,10 @@ async function handleMessage(
 				send({ ...scoped, assignmentId } as WorkerToDaemon);
 			};
 			console.log(`[run ] ${stepId}`);
+			// Announced before the first side effect: after this the daemon treats a
+			// disconnect as a failure rather than replaying the step (D#65). Closing this
+			// terminal before a step starts therefore costs the flow nothing.
+			sendForAssignment({ type: 'step_started', executionId: executionContext.executionId, stepId });
 			try {
 				const { output, meta } = await adapter.execute(stepConfig, executionContext, sendForAssignment);
 				sendForAssignment({

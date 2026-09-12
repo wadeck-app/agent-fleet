@@ -890,3 +890,92 @@ describe('CommandHandler — plugin workspace provider', () => {
 		warnSpy.mockRestore();
 	});
 });
+
+describe('CommandHandler — mid-step disconnect (D#62, D#65)', () => {
+	/** Runs the one-step flow to the point where s1 sits with the worker. */
+	async function dispatchOneStep() {
+		const flowFile = path.join(tmpDir, 'disconnect.yml');
+		fs.writeFileSync(flowFile, VALID_FLOW_YAML);
+
+		const workerPool = createMockWorkerPool();
+		const worker = {} as never;
+		const sent: { stepId: string; assignmentId: string }[] = [];
+		workerPool.getIdle.mockReturnValue(worker);
+		workerPool.send.mockImplementation((_ws: unknown, msg: unknown) => {
+			const m = msg as { stepId: string; assignmentId: string };
+			sent.push({ stepId: m.stepId, assignmentId: m.assignmentId });
+			return true;
+		});
+
+		const handler = new CommandHandler(
+			daemonDir,
+			workerPool as never,
+			workerPool as never,
+			undefined,
+			mockExecStore as never,
+			mockLogWriter as never
+		);
+		const result = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+		const { executionId } = result as { executionId: string };
+
+		return { handler, workerPool, worker, sent, executionId };
+	}
+
+	// Closing a terminal before the step ran costs nothing, so it must not be charged to
+	// the author's retry budget (D#43) -- the step goes back on the queue untouched.
+	it('re-dispatches a step that never started, without failing it', async () => {
+		const { handler, worker, sent } = await dispatchOneStep();
+		expect(sent).toHaveLength(1);
+
+		handler.handleWorkerDisconnect(worker);
+		handler.tryDispatch();
+
+		expect(sent.map(s => s.stepId)).toEqual(['s1', 's1']);
+		expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
+	});
+
+	// A step that had begun may have changed something. Replaying it silently is worse
+	// than failing it, so the author's declared retry/onFailure decides (D#65).
+	it('fails a step that had begun executing instead of replaying it', async () => {
+		const { handler, worker, sent, executionId } = await dispatchOneStep();
+		handler.onStepStarted(worker, sent[0]!.assignmentId, executionId, 's1');
+
+		handler.handleWorkerDisconnect(worker);
+		handler.tryDispatch();
+
+		expect(sent).toHaveLength(1);
+		expect(mockExecStore.markStepFailed).toHaveBeenCalled();
+	});
+
+	it('ignores a step_started that names an assignment issued to another worker', async () => {
+		const { handler, sent, executionId } = await dispatchOneStep();
+
+		handler.onStepStarted({} as never, sent[0]!.assignmentId, executionId, 's1');
+		// Still classified as not started, so it is re-dispatched rather than failed.
+		handler.handleWorkerDisconnect({} as never);
+
+		expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
+	});
+
+	// Otherwise a step nobody ever starts is re-dispatched forever (D#62).
+	it('fails the step once the re-dispatch bound is exhausted, saying why', async () => {
+		const { handler, worker, sent } = await dispatchOneStep();
+
+		for (let i = 0; i < 10; i++) {
+			handler.handleWorkerDisconnect(worker);
+			handler.tryDispatch();
+		}
+
+		expect(sent.length).toBeLessThan(11);
+		expect(mockExecStore.markStepFailed).toHaveBeenCalled();
+		const reason = String(mockExecStore.markStepFailed.mock.calls.at(-1)?.[2] ?? '');
+		expect(reason).toMatch(/disconnect/i);
+	});
+
+	it('does nothing for a worker that held no assignment', async () => {
+		const { handler } = await dispatchOneStep();
+
+		expect(() => handler.handleWorkerDisconnect({} as never)).not.toThrow();
+		expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
+	});
+});

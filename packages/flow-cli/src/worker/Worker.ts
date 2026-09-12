@@ -62,6 +62,9 @@ async function handleMessage(message: DaemonToWorker): Promise<void> {
 			const sendForAssignment = (scoped: AssignmentScopedMessage): void => {
 				send({ ...scoped, assignmentId } as WorkerToDaemon);
 			};
+			// Announced before the first side effect: after this the daemon treats a
+			// disconnect as a failure rather than replaying the step (D#65).
+			sendForAssignment({ type: 'step_started', executionId: executionContext.executionId, stepId });
 			try {
 				const { output, meta } = await adapter.execute(stepConfig, executionContext, sendForAssignment);
 				sendForAssignment({

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { WorkerReady } from '../ipc/Protocol';
@@ -10,23 +10,34 @@ const BASE_RECONNECT_DELAY_MS = 500;
 /**
  * WebSocket endpoint of the running daemon.
  *
- * The port is discovered from the daemon's own `config.port`, never guessed: a worker
- * that invented a port would either fail obscurely or, worse, join something else.
+ * Read from `worker.port`, which the daemon writes once its listener is actually bound --
+ * never derived from the HTTP port. The listener retries upward on EADDRINUSE, so the
+ * usual `httpPort + 1` is only the first attempt: computing it here would dial whatever
+ * else holds that port, failing obscurely or joining something unrelated.
  *
- * @throws when the daemon is not running, naming the command that starts it.
+ * @throws when the daemon is not running or is not yet accepting workers, in both cases
+ *         naming what to do about it. `flow worker` treats this as "wait and retry".
  */
 export function resolveDaemonWsUrl(daemonDir: string, configuredWsPort: number | null): string {
 	if (configuredWsPort !== null) {
 		return `ws://127.0.0.1:${String(configuredWsPort)}`;
 	}
 
-	const portFile = join(daemonDir, 'config.port');
+	const portFile = join(daemonDir, 'worker.port');
 	let raw: string;
 	try {
 		raw = readFileSync(portFile, 'utf8');
 	} catch {
+		// Distinguish "no daemon" from "daemon still binding": the first needs a command,
+		// the second only needs a moment, and telling the user to start a daemon that is
+		// already running would send them the wrong way.
+		if (existsSync(join(daemonDir, 'config.port'))) {
+			throw new Error(
+				`The flow daemon is running but not accepting workers yet (no "${portFile}"). It publishes that file once its worker listener is bound.`
+			);
+		}
 		throw new Error(
-			`No running flow daemon found (no "${portFile}"). Start one with "flow start", then run "flow worker" again.`
+			`No running flow daemon found (no "${join(daemonDir, 'config.port')}"). Start one with "flow start", then run "flow worker" again.`
 		);
 	}
 
@@ -40,8 +51,7 @@ export function resolveDaemonWsUrl(daemonDir: string, configuredWsPort: number |
 		throw new Error(`"${portFile}" does not contain a numeric "port"`);
 	}
 
-	// The daemon defaults its WebSocket port to the HTTP port plus one.
-	return `ws://127.0.0.1:${String(parsed.port + 1)}`;
+	return `ws://127.0.0.1:${String(parsed.port)}`;
 }
 
 /**

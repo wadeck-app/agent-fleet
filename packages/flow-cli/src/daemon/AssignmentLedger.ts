@@ -6,6 +6,15 @@ export interface Assignment {
 	assignmentId: string;
 	executionId: string;
 	stepId: string;
+	/**
+	 * Whether the worker had begun executing the step (D#65).
+	 *
+	 * Set from the worker's own `step_started`, because the worker is the only party that
+	 * knows it. It decides how a mid-step disconnect is treated: a step that never started
+	 * is re-dispatched for free, while one already running is a step failure so a half-run
+	 * script is not silently replayed.
+	 */
+	started: boolean;
 }
 
 /** Why a reported result could not be bound to an issued assignment. */
@@ -28,7 +37,7 @@ export class AssignmentLedger {
 
 	/** Records an assignment about to be sent to `worker`. */
 	issue(worker: WebSocket, executionId: string, stepId: string): Assignment {
-		const assignment: Assignment = { assignmentId: randomUUID(), executionId, stepId };
+		const assignment: Assignment = { assignmentId: randomUUID(), executionId, stepId, started: false };
 		this.outstanding.set(assignment.assignmentId, { ...assignment, worker });
 		return assignment;
 	}
@@ -93,6 +102,18 @@ export class AssignmentLedger {
 	 */
 	settle(assignmentId: string): void {
 		this.outstanding.delete(assignmentId);
+	}
+
+	/**
+	 * Records that the worker has begun executing the assigned step (D#65).
+	 *
+	 * Unknown ids are ignored for the same reason as `settle`: the message may cross a
+	 * settle or a revocation. Callers verify the report first, so an id reaching here is
+	 * one this ledger issued to that connection.
+	 */
+	markStarted(assignmentId: string): void {
+		const found = this.outstanding.get(assignmentId);
+		if (found !== undefined) found.started = true;
 	}
 
 	/** Assignments still outstanding for a worker, in issue order. */
