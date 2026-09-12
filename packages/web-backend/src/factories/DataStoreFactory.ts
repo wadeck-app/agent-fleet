@@ -1891,7 +1891,7 @@ export class DataStoreFactory {
 			{
 				id: '7',
 				name: 'Smart Home Hub',
-				description: 'Central hub for smart home devices — supports Zigbee, Z-Wave, and Wi-Fi.',
+				description: 'Central hub for smart home devices -- supports Zigbee, Z-Wave, and Wi-Fi.',
 				category: 'home',
 				price: 79.99,
 				stock: 33,

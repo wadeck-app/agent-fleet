@@ -395,7 +395,7 @@ describe('FlowProposalSection', () => {
 	// ---------------------------------------------------------------------------
 	// G1 fix: form stays visible with blur overlay when requesting
 	// ---------------------------------------------------------------------------
-	describe('g1 — request form blur during isRequesting', () => {
+	describe('g1 -- request form blur during isRequesting', () => {
 		it('form wrapper has opacity-50 class while request is in-flight', async () => {
 			const user = userEvent.setup();
 			let resolveRequest!: () => void;
@@ -425,7 +425,7 @@ describe('FlowProposalSection', () => {
 	// ---------------------------------------------------------------------------
 	// P fix: reject button uses ChevronRight, not ▾
 	// ---------------------------------------------------------------------------
-	describe('p — reject button icon pattern', () => {
+	describe('p -- reject button icon pattern', () => {
 		it('reject button does not contain ▾ character', () => {
 			vi.mocked(useFlowProposals).mockReturnValue({
 				...defaultHookResult,
@@ -447,7 +447,7 @@ describe('FlowProposalSection', () => {
 	// ---------------------------------------------------------------------------
 	// R1 fix: redesigning banner shown after rejection
 	// ---------------------------------------------------------------------------
-	describe('r1 — redesigning banner after rejection', () => {
+	describe('r1 -- redesigning banner after rejection', () => {
 		it('shows "AI is redesigning" banner after rejection is confirmed', async () => {
 			const user = userEvent.setup();
 			const mockRefresh = vi.fn();
@@ -482,7 +482,7 @@ describe('FlowProposalSection', () => {
 	// ---------------------------------------------------------------------------
 	// BA fix: adaptations hidden on first design (version === 1, no reusedFromFlowId)
 	// ---------------------------------------------------------------------------
-	describe('ba — adaptations section visibility', () => {
+	describe('ba -- adaptations section visibility', () => {
 		it('does NOT render adaptations section for first design (version=1, no reusedFromFlowId)', () => {
 			const firstDesignWithAdaptations: FlowProposal = {
 				...mockProposal,
@@ -553,7 +553,7 @@ describe('FlowProposalSection', () => {
 	// ---------------------------------------------------------------------------
 	// C fix: open questions moved from tooltip to inline "Questions from the AI" section
 	// ---------------------------------------------------------------------------
-	describe('c — open questions inline section', () => {
+	describe('c -- open questions inline section', () => {
 		it('confidence trigger is present without showing tooltip open questions', () => {
 			const proposalWithClearReasoning: FlowProposal = {
 				...mockProposal,
@@ -653,7 +653,7 @@ describe('FlowProposalSection', () => {
 	// ---------------------------------------------------------------------------
 	// K fix: Open in Flow Editor -- disabled for non-approved, active link when approved
 	// ---------------------------------------------------------------------------
-	describe('k — open in flow editor link', () => {
+	describe('k -- open in flow editor link', () => {
 		it('shows enabled "Visualize" button (not a link) for non-approved proposals', () => {
 			// D2 fix: pending_review proposals show a "Visualize" Dialog trigger; "Open in Flow Editor"
 			// link is only shown when the proposal is approved (flow registered in registry)

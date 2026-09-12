@@ -43,8 +43,6 @@ fireEvent.click(submitButton);
 expect(screen.getByText(/saving.../i)).toBeInTheDocument();
 
 // Complete the promise when YOU decide (not after arbitrary timeout)
-
----
+```
 
 _Reference content moved to [docs/reference.md](docs/reference.md)._
-```

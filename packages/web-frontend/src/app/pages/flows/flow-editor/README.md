@@ -43,8 +43,6 @@ Visual flow editor for agent-fleet using Xyflow v12.
 
 ```
 flow-editor/
-
----
+```
 
 _Reference content moved to [docs/reference.md](docs/reference.md)._
-```

@@ -80,6 +80,7 @@ export class ForkWorkerSource implements WorkerSourceProvider {
 	// eslint-disable-next-line @typescript-eslint/require-await -- async by interface contract
 	async obtainWorker(_request: WorkerRequest): Promise<void> {
 		const spawnArgs = this.tsxLoaderPath ? ['--import', this.tsxLoaderPath, this.workerPath] : [this.workerPath];
+		// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, so the worker's own children allocate a visible console; the worker must inherit the daemon's hidden console (d032e7e). Guarded by ForkWorkerSource.windows-console.test.ts
 		const child = spawn(process.execPath, spawnArgs, {
 			env: this.buildEnv(),
 			stdio: ['ignore', 'ignore', 'pipe'],

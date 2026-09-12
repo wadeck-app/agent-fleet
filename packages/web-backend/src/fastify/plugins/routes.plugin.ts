@@ -2,9 +2,12 @@ import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 
+// violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in web-backend (tsconfig paths only cover cross-package refs)
 import routes from '../../routes';
 import { CONTROLLER_REGISTRY } from '../../utils/controller-registry';
 import { registerControllerWithCheck } from '../../utils/lazy-controller-plugin';
+
+// violations-suppress-end: ts/no-deep-relative
 
 // /**
 //  * Route module definition for lazy loading

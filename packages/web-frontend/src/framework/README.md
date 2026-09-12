@@ -43,8 +43,6 @@ framework/
     advanced/         Advanced composites (Field, InputGroup, BulkActionBar)
 
  features/             Feature-level abstractions
-
----
+```
 
 _Reference content moved to [docs/reference.md](docs/reference.md)._
-```
