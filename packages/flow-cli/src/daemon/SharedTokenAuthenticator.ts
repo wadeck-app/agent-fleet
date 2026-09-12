@@ -52,7 +52,7 @@ export class SharedTokenAuthenticator implements AuthenticationProvider {
 		if (!request.loopback) {
 			return {
 				ok: false,
-				reason: 'a non-loopback worker must name the source it belongs to and present that source\'s registration token; the daemon token is only accepted over loopback',
+				reason: "a non-loopback worker must name the source it belongs to and present that source's registration token; the daemon token is only accepted over loopback",
 			};
 		}
 

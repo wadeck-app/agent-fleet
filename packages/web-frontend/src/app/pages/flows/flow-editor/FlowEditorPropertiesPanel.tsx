@@ -759,7 +759,7 @@ export function FlowEditorPropertiesPanel({
 													? {
 															...step.timeout,
 															// violations-suppress: ts/no-unsafe-type-cast Select.onValueChange returns string; options are constrained to 'fail'|'continue'|'default' in the JSX above
-													onTimeout: value as 'fail' | 'continue' | 'default',
+															onTimeout: value as 'fail' | 'continue' | 'default',
 														}
 													: undefined,
 											} as Partial<FlowStep>)
@@ -928,7 +928,7 @@ export function FlowEditorPropertiesPanel({
 													question: {
 														...step.question,
 														// violations-suppress: ts/no-unsafe-type-cast Select.onValueChange returns string; options are constrained to 'text'|'number'|'boolean' in the JSX above
-												responseType: value as 'text' | 'number' | 'boolean',
+														responseType: value as 'text' | 'number' | 'boolean',
 													},
 												} as Partial<FlowStep>)
 											}
@@ -1040,7 +1040,8 @@ export function FlowEditorPropertiesPanel({
 													onUpdateNode(selectedNode.id, {
 														choice: {
 															...step.choice,
-															allowMultiple: typeof checked === 'boolean' ? checked : false,
+															allowMultiple:
+																typeof checked === 'boolean' ? checked : false,
 														},
 													} as Partial<FlowStep>)
 												}

@@ -170,7 +170,7 @@ export class MockTransportServer implements ITransportServer {
 				headers: {
 					cookie: `access_token=${accessToken}`,
 				},
-			// violations-suppress: ts/no-unsafe-type-cast mock request object only implements the subset of fields needed for auth; full type not required here
+				// violations-suppress: ts/no-unsafe-type-cast mock request object only implements the subset of fields needed for auth; full type not required here
 			} as any;
 
 			// Authenticate the connection

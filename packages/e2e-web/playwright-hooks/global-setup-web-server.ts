@@ -10,9 +10,9 @@
  */
 import type { FullConfig } from '@playwright/test';
 import { ChildProcess, exec, spawn } from 'node:child_process';
+import { mkdirSync } from 'node:fs';
 import { readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises';
 import * as net from 'node:net';
-import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
@@ -552,7 +552,9 @@ async function globalSetupWebServer(config: FullConfig) {
 		} else {
 			console.log(` Backend servers to start: ${numWorkers}`);
 			if (projectCount > 1) {
-				console.log(`[info]  Workers from multiple projects will share backend servers (safe with in-memory DB)`);
+				console.log(
+					`[info]  Workers from multiple projects will share backend servers (safe with in-memory DB)`
+				);
 			}
 		}
 		console.log('');

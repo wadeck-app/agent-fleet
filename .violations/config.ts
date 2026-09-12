@@ -28,11 +28,5 @@ export default {
 		'ts/no-unsafe-type-cast': { $severity: 'warning' },
 		// ReviewThreadItem uses icon-only ghost buttons requiring muted/destructive tokens without matching variant
 		'tailwind/no-button-classname-style-override': { $exclude: ['**/tickets/ReviewThreadItem.tsx'] },
-		// NOTE: shared/no-out-of-repo-path fires at runtime but is absent from the
-		// ViolationsConfig type in the installed @wadeck-app/violations-rules, so it cannot
-		// be configured here without a type error. Its 19 hits are legitimate --
-		// WorkspacePathValidator names system paths in order to forbid them, and the CLI
-		// config loaders resolve ~/.config where their config lives -- and stay unsuppressed
-		// until the rule is exported in the config type.
 	},
 } satisfies ViolationsConfig;

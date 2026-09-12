@@ -87,13 +87,10 @@ export function useQueryComposition({
 		// ComposedQuery has [key: string]: unknown so no cast needed
 		const sortedQuery = Object.keys(query)
 			.sort()
-			.reduce<Record<string, unknown>>(
-				(acc, key) => {
-					acc[key] = query[key];
-					return acc;
-				},
-				{}
-			);
+			.reduce<Record<string, unknown>>((acc, key) => {
+				acc[key] = query[key];
+				return acc;
+			}, {});
 		return JSON.stringify(sortedQuery);
 	}, [query]);
 

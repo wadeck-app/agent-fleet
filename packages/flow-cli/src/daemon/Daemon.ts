@@ -21,9 +21,9 @@ import { CommandHandler } from './CommandHandler';
 import { ForkWorkerSource } from './ForkWorkerSource.js';
 import { SharedTokenAuthenticator } from './SharedTokenAuthenticator.js';
 import { WebSocketServer } from './WebSocketServer';
-import { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
 import { WorkerProvisioner } from './WorkerProvisioner.js';
 import { WorkerRegistry } from './WorkerRegistry.js';
+import { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
 
 // Exported for testing. Writes a single NDJSON daemon lifecycle entry to logsDir.
 export function writeDaemonLog(logsDir: string, level: 'info' | 'error', msg: string): void {

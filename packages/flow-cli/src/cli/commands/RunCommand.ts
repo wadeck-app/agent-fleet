@@ -441,8 +441,7 @@ export function registerRunCommand(program: Command): void {
 							}
 						})()
 					: null;
-				const fastPoll =
-					flowYaml?.steps?.some(s => s.log === 'streaming' || s.log === 'polling') ?? false;
+				const fastPoll = flowYaml?.steps?.some(s => s.log === 'streaming' || s.log === 'polling') ?? false;
 
 				let finalState: ExecutionState;
 				try {

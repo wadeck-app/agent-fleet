@@ -45,7 +45,7 @@ export function TableRow<T>({
 				// violations-suppress: ts/no-unsafe-type-cast window.event is typed as Event; MouseEvent cast needed to access shiftKey property
 				shiftKey: (window.event as MouseEvent)?.shiftKey || false,
 			}),
-		// violations-suppress: ts/no-unsafe-type-cast synthetic partial event object; onToggleSelection only reads nativeEvent.shiftKey from this shape
+			// violations-suppress: ts/no-unsafe-type-cast synthetic partial event object; onToggleSelection only reads nativeEvent.shiftKey from this shape
 		} as unknown as React.ChangeEvent<HTMLInputElement>;
 		onToggleSelection(itemId, index, syntheticEvent);
 	};
