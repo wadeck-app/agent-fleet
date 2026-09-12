@@ -17,6 +17,9 @@
  */
 import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
 import { createLogger } from 'shared-common/logger';
+// normalizeError(...).message yields the bare message. Wrapping with getErrorMessage()
+// would inline "Error: " into an already-prefixed sentence, double-prefixing it.
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { type OrchestratorStats, OrchestratorStatsSchema, type Task } from 'shared-orch-worker/domain-types';
 
 const log = createLogger('OrchestratorRepository');
@@ -103,7 +106,7 @@ export class OrchestratorRepository {
 
 			// No cache available, propagate error
 			throw new Error(
-				`Failed to fetch orchestrator stats: ${error instanceof Error ? String(error) : 'Unknown error'}`
+				`Failed to fetch orchestrator stats: ${error instanceof Error ? normalizeError(error).message : 'Unknown error'}`
 			);
 		}
 	}
@@ -136,7 +139,7 @@ export class OrchestratorRepository {
 			return Array.isArray(tasks) ? tasks : [];
 		} catch (error) {
 			throw new Error(
-				`Failed to fetch orchestrator tasks: ${error instanceof Error ? String(error) : 'Unknown error'}`
+				`Failed to fetch orchestrator tasks: ${error instanceof Error ? normalizeError(error).message : 'Unknown error'}`
 			);
 		}
 	}
@@ -261,7 +264,7 @@ export class OrchestratorRepository {
 			return (await response.json()) as Task;
 		} catch (error) {
 			throw new Error(
-				`Failed to update task status: ${error instanceof Error ? String(error) : 'Unknown error'}`
+				`Failed to update task status: ${error instanceof Error ? normalizeError(error).message : 'Unknown error'}`
 			);
 		}
 	}

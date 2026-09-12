@@ -100,7 +100,7 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 	if (error) {
 		return (
 			<div className="py-4">
-				<p className="text-sm text-destructive">Failed to load proposals: {String(error)}</p>
+				<p className="text-sm text-destructive">Failed to load proposals: {getErrorMessage(error)}</p>
 				<Button variant="outline" size="sm" onClick={refresh} className="mt-2">
 					Retry
 				</Button>

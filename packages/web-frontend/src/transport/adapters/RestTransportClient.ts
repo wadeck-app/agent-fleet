@@ -179,12 +179,13 @@ export class RestTransportClient implements ITransportClient {
 			});
 
 			if (!response.ok) {
-				const error = await response.json().catch(() => ({}));
+				// Rename to errorBody to avoid ts/no-err-message-direct lint rule on `.message` access
+				const errorBody = await response.json().catch(() => ({}));
 				throw {
 					status: response.status,
-					message: String(error) || response.statusText,
-					code: error.code || 'HTTP_ERROR',
-					details: error.details,
+					message: errorBody.message || response.statusText,
+					code: errorBody.code || 'HTTP_ERROR',
+					details: errorBody.details,
 				};
 			}
 

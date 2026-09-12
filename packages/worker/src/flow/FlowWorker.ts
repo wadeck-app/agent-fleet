@@ -21,6 +21,8 @@ import type { FlowMetadata, Workspace } from 'flow-engine/types';
 import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
 import * as yaml from 'js-yaml';
 import type { ChildProcess } from 'node:child_process';
+// normalizeError(...).message yields the bare message; String(error) would prefix it with "Error: ".
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -169,7 +171,7 @@ export class FlowWorker implements Shutdownable {
 				} catch (error) {
 					this.logger.error(
 						` Error parsing message:`,
-						error instanceof Error ? String(error) : String(error)
+						normalizeError(error).message
 					);
 				}
 			});
@@ -265,7 +267,7 @@ export class FlowWorker implements Shutdownable {
 			return branch || null;
 		} catch (error) {
 			// Not in a git repository or git command failed
-			this.logger.error(` Git detection failed:`, error instanceof Error ? String(error) : String(error));
+			this.logger.error(` Git detection failed:`, normalizeError(error).message);
 			return null;
 		}
 	}
@@ -525,7 +527,7 @@ export class FlowWorker implements Shutdownable {
 			await this.executeTask(this.currentTask);
 		} catch (error) {
 			this.logger.error(` Task execution error:`, error);
-			this.sendTaskFailed(error instanceof Error ? String(error) : String(error));
+			this.sendTaskFailed(normalizeError(error).message);
 		}
 	}
 
@@ -572,7 +574,7 @@ export class FlowWorker implements Shutdownable {
 					requestId,
 					flowId,
 					flowDefinition: null,
-					error: error instanceof Error ? String(error) : 'Unknown error',
+					error: error instanceof Error ? normalizeError(error).message : 'Unknown error',
 				})
 			);
 		}
@@ -647,7 +649,7 @@ export class FlowWorker implements Shutdownable {
 					requestId,
 					flowId,
 					success: false,
-					error: error instanceof Error ? String(error) : 'Unknown error',
+					error: error instanceof Error ? normalizeError(error).message : 'Unknown error',
 				})
 			);
 		}
@@ -1059,12 +1061,12 @@ export class FlowWorker implements Shutdownable {
 			// Store error in task
 			task.flowResult = {
 				status: 'failed',
-				error: error instanceof Error ? String(error) : String(error),
+				error: normalizeError(error).message,
 			};
 
 			// Send failure with configured status
 			this.sendTaskFailed(
-				error instanceof Error ? String(error) : String(error),
+				normalizeError(error).message,
 				failureStatus,
 				this.currentTask?.ticketId,
 				failureTicketStatus

@@ -1,6 +1,9 @@
 import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { createLogger } from 'shared-common/logger';
+// normalizeError(...).message yields the bare message. Wrapping with getErrorMessage()
+// would inline "Error: " into an already-prefixed sentence, double-prefixing it.
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import simpleGit from 'simple-git';
 
 const log = createLogger('WorkspaceGitService');
@@ -71,7 +74,7 @@ export class WorkspaceGitService {
 			return gitState;
 		} catch (error) {
 			log.error('Failed to clone repository', { repoUrl, targetPath, error });
-			throw new Error(`Failed to clone repository: ${error instanceof Error ? String(error) : String(error)}`);
+			throw new Error(`Failed to clone repository: ${normalizeError(error).message}`);
 		}
 	}
 
@@ -126,7 +129,7 @@ export class WorkspaceGitService {
 			return gitState;
 		} catch (error) {
 			log.error('Failed to create worktree', { sourceWorkspacePath, targetPath, branch, error });
-			throw new Error(`Failed to create git worktree: ${error instanceof Error ? String(error) : String(error)}`);
+			throw new Error(`Failed to create git worktree: ${normalizeError(error).message}`);
 		}
 	}
 

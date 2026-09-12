@@ -11,6 +11,7 @@
  *
  * ===========================================================================================
  */
+import { normalizeError } from './errorUtils';
 
 /**
  * Error codes for different error scenarios
@@ -132,16 +133,22 @@ export class AppError extends Error {
 			case ErrorCode.TIMEOUT:
 			case ErrorCode.CONNECTION_REFUSED:
 			case ErrorCode.SERVER_ERROR:
+			case ErrorCode.OPERATION_FAILED:
 				return ErrorSeverity.HIGH;
 
 			case ErrorCode.UNAUTHORIZED:
 			case ErrorCode.FORBIDDEN:
+			case ErrorCode.API_ERROR:
 				return ErrorSeverity.MEDIUM;
 
 			case ErrorCode.VALIDATION_ERROR:
 			case ErrorCode.INVALID_INPUT:
 			case ErrorCode.REQUIRED_FIELD:
 			case ErrorCode.NOT_FOUND:
+			case ErrorCode.CONFLICT:
+			case ErrorCode.UNPROCESSABLE_ENTITY:
+			case ErrorCode.DUPLICATE_ENTRY:
+			case ErrorCode.RESOURCE_NOT_FOUND:
 				return ErrorSeverity.LOW;
 
 			case ErrorCode.UNKNOWN_ERROR:
@@ -196,6 +203,10 @@ export class AppError extends Error {
 				return 'The operation could not be completed.';
 			case ErrorCode.PARSE_ERROR:
 				return 'Failed to process the server response.';
+			case ErrorCode.API_ERROR:
+				return 'An API error occurred. Please try again.';
+			case ErrorCode.UNKNOWN_ERROR:
+				return 'An unknown error occurred. Please try again.';
 			default:
 				throw new Error(`Unexpected switch value`);
 		}
@@ -317,9 +328,10 @@ export const toAppError = (error: unknown): AppError => {
 		return error;
 	}
 
-	// Standard Error
+	// Standard Error — use normalizeError(error).message to get the bare message
+	// (String(error) would produce "Error: <msg>", double-prefixing when displayed)
 	if (error instanceof Error) {
-		return new AppError(String(error), ErrorCode.UNKNOWN_ERROR, {
+		return new AppError(normalizeError(error).message, ErrorCode.UNKNOWN_ERROR, {
 			originalError: error,
 		});
 	}
