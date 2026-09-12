@@ -417,7 +417,7 @@ export function CreateTaskDialog({
 	// Define form actions
 	const formActions: FormAction[] = [
 		{
-			label: formState.isSubmitting ? 'Saving...' : 'Créer tâche',
+			label: formState.isSubmitting ? 'Saving...' : 'Create task',
 			type: 'submit',
 			formId: FORM_ID,
 			disabled: formState.isSubmitting,
@@ -429,7 +429,7 @@ export function CreateTaskDialog({
 			disabled: formState.isSubmitting,
 		},
 		{
-			label: 'Annuler',
+			label: 'Cancel',
 			type: 'button',
 			variant: 'outline',
 			onClick: () => onOpenChange(false),
@@ -441,8 +441,8 @@ export function CreateTaskDialog({
 		<CrudDialog
 			open={open}
 			onOpenChange={onOpenChange}
-			title="Créer une tâche"
-			description="Remplissez les détails pour créer une nouvelle tâche"
+			title="Create a task"
+			description="Fill in the details to create a new task"
 			maxWidth="4xl"
 			preventOutsideClick={true}
 		>
@@ -452,7 +452,7 @@ export function CreateTaskDialog({
 					<div ref={containerRef} className="flex min-h-[500px] gap-0">
 						{/* Left Column - Basic Information */}
 						<div className="flex flex-col space-y-4 pr-3 pb-6" style={{ width: `${leftWidth}%` }}>
-							<h3 className="text-sm font-semibold text-foreground">Informations de base</h3>
+							<h3 className="text-sm font-semibold text-foreground">Basic information</h3>
 
 							<TextAreaField
 								label="Description"
@@ -566,7 +566,7 @@ export function CreateTaskDialog({
 
 						{/* Right Column - Flow Configuration */}
 						<div className="flex flex-col space-y-4 pl-3 pb-6" style={{ width: `${100 - leftWidth}%` }}>
-							<h3 className="text-sm font-semibold text-foreground">Configuration du flow</h3>
+							<h3 className="text-sm font-semibold text-foreground">Flow configuration</h3>
 
 							<ComboboxField
 								label="Flow (Optional)"

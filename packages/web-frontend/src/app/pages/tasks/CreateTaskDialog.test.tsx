@@ -64,8 +64,8 @@ describe('CreateTaskDialog', () => {
 		render(<CreateTaskDialog {...defaultProps} />);
 
 		// Check for section titles
-		expect(screen.getByText('Informations of base')).toBeInTheDocument();
-		expect(screen.getByText('Configuration of the flow')).toBeInTheDocument();
+		expect(screen.getByText('Basic information')).toBeInTheDocument();
+		expect(screen.getByText('Flow configuration')).toBeInTheDocument();
 
 		// Check for basic fields in left column
 		expect(screen.getByLabelText(/Description/i)).toBeInTheDocument();
@@ -98,7 +98,7 @@ describe('CreateTaskDialog', () => {
 	it('renders action buttons', () => {
 		render(<CreateTaskDialog {...defaultProps} />);
 
-		expect(screen.getByRole('button', { name: /create tache/i })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /create task/i })).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: /Cancel/i })).toBeInTheDocument();
 	});
 
