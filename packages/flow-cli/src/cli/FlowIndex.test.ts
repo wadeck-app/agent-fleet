@@ -24,13 +24,22 @@ function resolveTsx(): string | undefined {
 	}
 }
 
+/**
+ * Fails rather than returning early when tsx is missing.
+ *
+ * These tests used to `console.warn` and return, which reports success for a CLI they
+ * never launched -- the mechanism that let a startup failure sit green for a whole day.
+ */
+function requireTsx(tsxPath: string | undefined): asserts tsxPath is string {
+	if (tsxPath === undefined) {
+		throw new Error('tsx not found, so the CLI could not be launched. Run npm install in the monorepo root.');
+	}
+}
+
 describe('unknown command handler', () => {
 	it('unknown command writes to stdout', () => {
 		const tsxPath = resolveTsx();
-		if (!tsxPath) {
-			console.warn('tsx not found — skipping unknown command integration test');
-			return;
-		}
+		requireTsx(tsxPath);
 
 		const result = spawnSync(process.execPath, [tsxPath, flowIndexPath, 'totally-unknown-xyz'], {
 			encoding: 'utf8',
@@ -45,10 +54,7 @@ describe('unknown command handler', () => {
 
 	it('flow logs command exists and writes to stdout (not silence)', () => {
 		const tsxPath = resolveTsx();
-		if (!tsxPath) {
-			console.warn('tsx not found — skipping flow logs integration test');
-			return;
-		}
+		requireTsx(tsxPath);
 
 		// flow logs with no log file should write SOMETHING to stdout (not silence)
 		const result = spawnSync(process.execPath, [tsxPath, flowIndexPath, 'logs'], {
@@ -68,10 +74,7 @@ describe('unknown command handler', () => {
 describe('flow --pid', () => {
 	it('does not crash with "unknown option --pid"', () => {
 		const tsxPath = resolveTsx();
-		if (!tsxPath) {
-			console.warn('tsx not found — skipping --pid integration test');
-			return;
-		}
+		requireTsx(tsxPath);
 
 		const result = spawnSync(process.execPath, [tsxPath, flowIndexPath, '--pid'], {
 			encoding: 'utf8',

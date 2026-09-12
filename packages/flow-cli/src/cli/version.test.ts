@@ -38,11 +38,9 @@ describe('version -- non-git directory', () => {
 			}
 		}
 
-		if (!tsxPath) {
-			// Skip gracefully if tsx is not found (should not happen in CI)
-			console.warn('tsx not found — skipping non-git stderr test');
-			return;
-		}
+		// Fails rather than returning: a test that quietly does nothing reports success for
+		// a CLI it never ran, which is how a startup failure stayed green for a whole day.
+		if (!tsxPath) throw new Error('tsx not found, so the CLI could not be launched. Run npm install.');
 
 		const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-version-test-'));
 		try {
