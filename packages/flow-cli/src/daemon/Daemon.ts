@@ -23,6 +23,7 @@ import { SharedTokenAuthenticator } from './SharedTokenAuthenticator.js';
 import { WebSocketServer } from './WebSocketServer';
 import { WorkerProvisioner } from './WorkerProvisioner.js';
 import { WorkerRegistry } from './WorkerRegistry.js';
+import { contactDeclaredSources } from './WorkerSourceContact.js';
 import { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
 
 // Exported for testing. Writes a single NDJSON daemon lifecycle entry to logsDir.
@@ -277,6 +278,21 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 					pluginProviders.approvalProvider,
 					perFlowWorkspaceResolver
 				);
+
+				// D#54: ask each declared source to produce a worker. The daemon pushes; a
+				// worker never polls. Fire-and-forget on purpose -- nothing waits for a worker
+				// to appear (D#51, D#66), and dispatch only ever targets a live connection
+				// (D#4), so a source that produces nothing simply has no capacity here.
+				void contactDeclaredSources(
+					sourceRegistry.list(),
+					`ws://127.0.0.1:${String(wsServer.port)}`,
+					message => {
+						process.stderr.write(`[daemon] ${message}\n`);
+						writeDaemonLog(logsDir, 'error', message);
+					}
+				).catch((err: unknown) => {
+					process.stderr.write(`[daemon] contacting worker sources failed: ${getErrorMessage(err)}\n`);
+				});
 			},
 		},
 	});

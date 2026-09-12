@@ -48,6 +48,12 @@ function report(prefix: '[fail]' | '[wait]' | '[warn]', message: string): void {
  * idle down or restart freely (D#51), and this worker waits and re-registers, so the
  * terminal the user opened keeps serving steps. Because it has a TTY, it is also the
  * only kind of worker that can serve an interactive step (D#32).
+ *
+ * PRIVILEGE NOTE (T-08). A forked worker receives an allow-listed environment; this one
+ * inherits the whole shell it was launched from -- PATH, credentials, agent sockets,
+ * everything. That is intentional, and is what makes a human's own tools usable from a
+ * step, but it means **a step dispatched here runs with the reach of this terminal**.
+ * Launch it where you would be willing to run the flow's commands yourself.
  */
 export function registerWorkerCommand(worker: Command): void {
 	registerListCommand(worker);
