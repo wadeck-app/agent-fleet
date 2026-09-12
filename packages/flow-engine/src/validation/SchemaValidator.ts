@@ -507,11 +507,59 @@ export class SchemaValidator {
 				}
 			}
 
+			this.validateStepLabels(step);
+
 			// Type-specific validation
 			this.validateStepType(step);
 		}
 
 		return stepIds;
+	}
+
+	/**
+	 * Validates `labels`, which route a step to a worker carrying all of them (AND).
+	 *
+	 * Reported at validation time rather than at dispatch so an unsupported form fails
+	 * before the flow starts. A bare string is rejected instead of being read as a
+	 * single label: accepting `"a || b"` would silently AND its atoms and run the step
+	 * somewhere the author did not intend.
+	 */
+	private validateStepLabels(step: FlowStep): void {
+		const labels = (step as { labels?: unknown }).labels;
+		if (labels === undefined) return;
+
+		if (!Array.isArray(labels)) {
+			this.issueCollector.addIssue({
+				severity: 'error',
+				code: ValidationCode.INVALID_TYPE,
+				message: `Step '${step.id}' labels must be a list, got ${typeof labels}: ${JSON.stringify(labels)}`,
+				location: { stepId: step.id, field: 'labels' },
+				suggestion: `Write labels as a list, e.g. labels: ["gpu", "linux"] -- every entry must match (AND). Expressions such as "a || b" are not supported.`,
+			});
+			return;
+		}
+
+		for (const label of labels) {
+			if (typeof label !== 'string') {
+				this.issueCollector.addIssue({
+					severity: 'error',
+					code: ValidationCode.INVALID_TYPE,
+					message: `Step '${step.id}' labels must all be strings, got ${typeof label}: ${JSON.stringify(label)}`,
+					location: { stepId: step.id, field: 'labels' },
+					suggestion: `Use plain strings, e.g. labels: ["gpu"]`,
+				});
+				continue;
+			}
+			if (label.trim() === '') {
+				this.issueCollector.addIssue({
+					severity: 'error',
+					code: ValidationCode.INVALID_VALUE,
+					message: `Step '${step.id}' has a blank label`,
+					location: { stepId: step.id, field: 'labels' },
+					suggestion: `Remove the blank entry -- omitting labels already means the step runs on any worker.`,
+				});
+			}
+		}
 	}
 
 	/**

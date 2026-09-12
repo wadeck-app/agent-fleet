@@ -562,6 +562,21 @@ export interface BaseFlowStep {
 	/** Step IDs this step depends on (must complete before this step runs) */
 	depends?: string[];
 
+	/**
+	 * Labels a worker must carry for this step to be eligible to run on it.
+	 *
+	 * Matched as AND: every label listed must be present on the worker. A step never
+	 * names a pool, a host or a process -- labels are the only coupling between a step
+	 * and a worker, so the flow stays portable when the topology changes.
+	 *
+	 * Routing only, never authorization: a label restricts where a step goes, it grants
+	 * no privilege, and it must never be used to make an access-control decision.
+	 *
+	 * A bare string is rejected rather than treated as a single label, because
+	 * accepting one would silently mis-execute an expression such as "a || b".
+	 */
+	labels?: string[];
+
 	/** Conditional execution expression (evaluated to boolean) */
 	when?: string;
 
