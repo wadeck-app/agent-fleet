@@ -283,7 +283,10 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 				if (!claudePath) {
 					writeDaemonLog(logsDir, 'error', 'claude binary not found on PATH - model steps may fail');
 				}
-				wsServer = new WebSocketServer(wsPort, handleWorkerMessage, handleWorkerClose);
+				wsServer = new WebSocketServer(wsPort, handleWorkerMessage, handleWorkerClose, {
+					bindAddress: config.worker.bindAddress,
+					tls: config.worker.tls,
+				});
 				// Fire-and-forget: start() retries on EADDRINUSE (TIME_WAIT). Workers read port
 				// lazily via getter -- they are only spawned after tryDispatch(), which happens
 				// after handleRun(), which happens after this onStart returns. By then start()

@@ -38,6 +38,42 @@ describe('FlowConfigLoader.load', () => {
 		expect(FlowConfigLoader.load(file).queue.concurrency).toBe(4);
 	});
 
+	// Loopback by default: becoming reachable from the network is a decision to take, never
+	// one to inherit from an upgrade (P-5).
+	it('defaults the worker listener to loopback with no TLS', () => {
+		const config = FlowConfigLoader.load(path.join(tmpDir, 'nonexistent.yaml'));
+
+		expect(config.worker.bindAddress).toBe('127.0.0.1');
+		expect(config.worker.tls).toBeNull();
+	});
+
+	it('overrides worker.bindAddress', () => {
+		const file = writeConfig('bind.yaml', 'worker:\n  bindAddress: 0.0.0.0\n');
+		expect(FlowConfigLoader.load(file).worker.bindAddress).toBe('0.0.0.0');
+	});
+
+	it('reads worker.tls as certificate and key paths', () => {
+		const file = writeConfig(
+			'tls.yaml',
+			'worker:\n  tls:\n    cert: /etc/flow/cert.pem\n    key: /etc/flow/key.pem\n'
+		);
+
+		expect(FlowConfigLoader.load(file).worker.tls).toEqual({
+			cert: '/etc/flow/cert.pem',
+			key: '/etc/flow/key.pem',
+		});
+	});
+
+	// Overriding one worker setting must not silently drop the others -- losing bindAddress
+	// here would mean losing the loopback default.
+	it('keeps the other worker defaults when one is overridden', () => {
+		const file = writeConfig('partial.yaml', 'worker:\n  wsPort: 5000\n');
+		const config = FlowConfigLoader.load(file);
+
+		expect(config.worker.wsPort).toBe(5000);
+		expect(config.worker.bindAddress).toBe('127.0.0.1');
+	});
+
 	it('overrides logs.retainDays', () => {
 		const file = writeConfig('cfg.yaml', 'logs:\n  retainDays: 7\n');
 		expect(FlowConfigLoader.load(file).logs.retainDays).toBe(7);

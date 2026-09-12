@@ -1,25 +1,53 @@
+import { readFileSync } from 'node:fs';
 import * as http from 'node:http';
+import * as https from 'node:https';
 import { type WebSocket, WebSocketServer as WsServer } from 'ws';
 
 import type { WorkerToDaemon } from '../ipc/Protocol';
+import { admitTransport, resolveBindAddress } from './TransportPolicy.js';
 
 export type MessageHandler = (ws: WebSocket, message: WorkerToDaemon) => void;
 export type CloseHandler = (ws: WebSocket) => void;
 
-// v1: no token auth on worker WebSocket. Binds to 127.0.0.1 (loopback-only).
-// Tracked for v2 in multi-user/container environments.
+export interface WebSocketServerOptions {
+	/** Address to bind. Loopback when omitted. */
+	bindAddress?: string;
+	/** Paths to the PEM certificate and key that make this listener TLS. */
+	tls?: { cert: string; key: string } | null;
+}
+
+/**
+ * The daemon's worker listener.
+ *
+ * Plaintext on loopback, TLS when configured, and it **refuses** any unencrypted connection
+ * from a non-loopback peer rather than serving it (P-5). Authentication of the peer itself is
+ * separate and happens on `ready` (S7); this is only about the channel.
+ */
 export class WebSocketServer {
 	private readonly wss: WsServer;
-	private readonly httpServer: http.Server;
+	private readonly httpServer: http.Server | https.Server;
+	private readonly bindAddress: string;
 	private _port: number;
 
 	constructor(
 		port: number,
 		private readonly onMessage: MessageHandler,
-		private readonly onClose: CloseHandler
+		private readonly onClose: CloseHandler,
+		options: WebSocketServerOptions = {}
 	) {
 		this._port = port;
-		this.httpServer = http.createServer();
+		// Resolved before anything binds, so a wide address with no certificate fails at
+		// startup instead of opening a port that refuses every peer it accepts.
+		this.bindAddress = resolveBindAddress(options.bindAddress, { hasTls: options.tls != null });
+		this.httpServer =
+			options.tls != null
+				? https.createServer({
+						// Read here rather than accepted inline: a key pasted into config is a key
+						// committed to version control.
+						cert: readFileSync(options.tls.cert, 'utf8'),
+						key: readFileSync(options.tls.key, 'utf8'),
+					})
+				: http.createServer();
 		// maxPayload: 1 MiB -- consistent with McpServer.readBody() cap.
 		// The ws default (100 MiB) would allow a rogue local process to exhaust daemon memory.
 		this.wss = new WsServer({ server: this.httpServer, maxPayload: 1024 * 1024 });
@@ -44,7 +72,7 @@ export class WebSocketServer {
 					this._port = p;
 					resolve(p);
 				});
-				this.httpServer.listen(p, '127.0.0.1');
+				this.httpServer.listen(p, this.bindAddress);
 			};
 			tryBind(this._port, 10);
 		});
@@ -55,6 +83,20 @@ export class WebSocketServer {
 	}
 
 	private handleConnection(ws: WebSocket): void {
+		// P-5, checked before a single message is read: an unencrypted peer that is not on this
+		// machine is closed, not warned about. Nothing it sent is acted on, because the first
+		// thing it would send is a credential.
+		const socket = (ws as unknown as { _socket?: { remoteAddress?: string; encrypted?: boolean } })._socket;
+		const decision = admitTransport({
+			...(socket?.remoteAddress !== undefined ? { remoteAddress: socket.remoteAddress } : {}),
+			encrypted: socket?.encrypted === true,
+		});
+		if (!decision.ok) {
+			process.stderr.write(`[WebSocketServer] ${decision.reason}\n`);
+			ws.terminate();
+			return;
+		}
+
 		ws.on('message', (data: Buffer) => {
 			let message: WorkerToDaemon;
 			try {

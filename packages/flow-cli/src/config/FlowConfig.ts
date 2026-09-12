@@ -28,6 +28,20 @@ export interface FlowConfigData {
 	worker: {
 		/** WebSocket port for worker<->daemon communication. null = auto (httpPort+1). Default: null. */
 		wsPort: number | null;
+		/**
+		 * Address the worker listener binds. Default: '127.0.0.1'.
+		 *
+		 * Anything wider makes the daemon reachable from the network and therefore requires
+		 * `worker.tls`: every non-loopback connection must be encrypted, and the daemon refuses
+		 * rather than warns. Binding wide without TLS is a startup error, not a silent downgrade.
+		 */
+		bindAddress: string;
+		/**
+		 * PEM certificate and key for the worker listener. Default: null (plaintext, loopback only).
+		 *
+		 * Paths, not inline material -- a key pasted into config is a key in version control.
+		 */
+		tls: { cert: string; key: string } | null;
 	};
 	security: {
 		/** Allow flow files outside cwd / home directory. Default: false. */
@@ -54,7 +68,7 @@ export class FlowConfigLoader {
 	static readonly DEFAULT: FlowConfigData = {
 		queue: { concurrency: 1 },
 		logs: { retainDays: 30 },
-		worker: { wsPort: null },
+		worker: { wsPort: null, bindAddress: '127.0.0.1', tls: null },
 		security: { allowAbsolutePaths: false },
 		limits: {
 			maxInjectedSteps: 20,
