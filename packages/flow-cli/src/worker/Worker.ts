@@ -4,7 +4,7 @@ import type { StepRunnerConfig } from 'flow-engine';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { WebSocket } from 'ws';
 
-import type { DaemonToWorker, WorkerToDaemon } from '../ipc/Protocol';
+import type { AssignmentScopedMessage, DaemonToWorker, WorkerToDaemon } from '../ipc/Protocol';
 import type { McpServerConfig } from './McpServer';
 import { WorkerAdapter } from './WorkerAdapter';
 
@@ -57,14 +57,30 @@ ws.on('close', () => {
 async function handleMessage(message: DaemonToWorker): Promise<void> {
 	switch (message.type) {
 		case 'assign': {
-			const { stepId, stepConfig, executionContext } = message;
+			const { assignmentId, stepId, stepConfig, executionContext } = message;
+			// Bound to this assignment, so step execution cannot report against another.
+			const sendForAssignment = (scoped: AssignmentScopedMessage): void => {
+				send({ ...scoped, assignmentId } as WorkerToDaemon);
+			};
 			try {
-				const { output, meta } = await adapter.execute(stepConfig, executionContext, send);
-				send({ type: 'step_completed', executionId: executionContext.executionId, stepId, output, meta });
+				const { output, meta } = await adapter.execute(stepConfig, executionContext, sendForAssignment);
+				sendForAssignment({
+					type: 'step_completed',
+					executionId: executionContext.executionId,
+					stepId,
+					output,
+					meta,
+				});
 			} catch (err) {
 				const error = normalizeError(err).message;
 				const output = (err as { stepOutputs?: Record<string, unknown> }).stepOutputs;
-				send({ type: 'step_failed', executionId: executionContext.executionId, stepId, error, output });
+				sendForAssignment({
+					type: 'step_failed',
+					executionId: executionContext.executionId,
+					stepId,
+					error,
+					output,
+				});
 			}
 			send({ type: 'ready', pid: process.pid });
 			break;

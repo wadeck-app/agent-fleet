@@ -242,7 +242,11 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 			}
 			case 'step_completed': {
 				try {
-					const { executionId, stepId, output, meta } = message;
+					const { assignmentId, executionId, stepId, output, meta } = message;
+					if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) break;
+					// The outcome is accepted from here on, so the assignment is closed and
+					// the same result cannot be replayed.
+					commandHandler.settleAssignment(assignmentId);
 					executionStore.markStepCompleted(executionId, stepId);
 					commandHandler.onStepCompleted(executionId, stepId, output, meta);
 					logWriter.writeExecution(executionId, `Step ${stepId} completed`);
@@ -275,7 +279,9 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 			}
 			case 'step_failed': {
 				try {
-					const { executionId, stepId, error, output } = message;
+					const { assignmentId, executionId, stepId, error, output } = message;
+					if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) break;
+					commandHandler.settleAssignment(assignmentId);
 					executionStore.markStepFailed(executionId, stepId, error);
 					commandHandler.onStepFailed(executionId, stepId, error, output);
 					// markExecutionFailed is now called inside onStepFailed only when the failure is terminal
@@ -289,7 +295,9 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 			}
 			case 'log': {
 				try {
-					const { executionId, stepId, entry } = message;
+					const { assignmentId, executionId, stepId, entry } = message;
+					// Logs are bound too: they land in another execution's log file otherwise.
+					if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) break;
 					logWriter.write(executionId, stepId, entry);
 				} catch (err) {
 					process.stderr.write(`[daemon] log handler error: ${String(err)}\n`);
@@ -297,7 +305,8 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 				break;
 			}
 			case 'inject_steps': {
-				const { executionId, steps } = message;
+				const { assignmentId, executionId, steps } = message;
+				if (!commandHandler.verifyAssignmentScope(ws, assignmentId, executionId)) break;
 				try {
 					commandHandler.injectSteps(executionId, steps);
 					// H1: also register injected step IDs in ExecutionStore so the allDone check is accurate
@@ -321,6 +330,10 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 	}
 
 	function handleWorkerClose(ws: WebSocket): void {
+		// A disconnected worker can no longer report on its assignments; leaving them
+		// outstanding would let a reconnecting socket be matched against stale work.
+		// Classifying and re-dispatching the interrupted step is Phase 2b (D#65).
+		commandHandler.revokeWorkerAssignments(ws);
 		workerPool.removeWorker(ws);
 		checkShutdown();
 	}

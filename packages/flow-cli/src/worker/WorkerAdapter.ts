@@ -3,11 +3,15 @@ import type { TemplateContext } from 'flow-engine/processing/TemplateRenderer';
 import type { LiveLogEntry, ModelFlowStep, ScriptFlowStep, Workspace } from 'flow-engine/types';
 import { randomUUID } from 'node:crypto';
 
-import type { AssignableStep, ExecutionContext, InjectedStep, WorkerToDaemon } from '../ipc/Protocol';
+import type { AssignableStep, AssignmentScopedMessage, ExecutionContext, InjectedStep } from '../ipc/Protocol';
 import type { McpServerConfig } from './McpServer';
 import { McpServer } from './McpServer';
 
-export type SendMessageFn = (msg: WorkerToDaemon) => void;
+/**
+ * Sends a message about the step being executed. Already bound to the current
+ * assignment by the caller, so nothing here handles assignment ids.
+ */
+export type SendMessageFn = (msg: AssignmentScopedMessage) => void;
 
 // Factory that creates a StepRunner configured with the given MCP servers.
 // Pass an empty array when no MCP server is needed (script steps).

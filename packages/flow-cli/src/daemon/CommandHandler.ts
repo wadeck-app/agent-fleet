@@ -10,10 +10,12 @@ import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import type { WebSocket } from 'ws';
 
 import type { AssignableStep, ClientCommand, DaemonResponse, ExecutionContext, InjectedStep } from '../ipc/Protocol';
 import { ExecutionStore, generateExecutionId } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
+import { AssignmentLedger } from './AssignmentLedger.js';
 import type { WorkerPool } from './WorkerPool';
 
 // Default limits - overridden by FlowConfig.limits passed to CommandHandler constructor
@@ -37,6 +39,8 @@ export class CommandHandler {
 	private readonly stepCounts = new Map<string, number>();
 	/** Central queue of ready steps across all executions */
 	private readonly readyQueue: ReadyStep[] = [];
+	/** Work actually handed to each worker, so results can be bound to it (T-05) */
+	private readonly assignments = new AssignmentLedger();
 	/** Per-execution hook dispatchers */
 	private readonly executionHooks = new Map<string, HookDispatcher>();
 	/** Per-execution plugin workspace handles (only when workspaceProvider is set) */
@@ -339,6 +343,42 @@ export class CommandHandler {
 		return { type: 'execution_started', executionId };
 	}
 
+	/**
+	 * Confirms a worker is reporting against work this daemon actually gave it (T-05).
+	 *
+	 * Returns false when the report cannot be bound to an outstanding assignment, having
+	 * already logged why. The caller must then drop the message: accepting it would let
+	 * one worker write another execution's step outputs.
+	 */
+	verifyAssignment(worker: WebSocket, assignmentId: string, executionId: string, stepId: string): boolean {
+		const result = this.assignments.verify(worker, assignmentId, executionId, stepId);
+		if (!result.ok) {
+			process.stderr.write(`[CommandHandler] rejected worker report: ${result.reason}\n`);
+			return false;
+		}
+		return true;
+	}
+
+	/** As {@link verifyAssignment}, for messages that name no step (inject_steps). */
+	verifyAssignmentScope(worker: WebSocket, assignmentId: string, executionId: string): boolean {
+		const result = this.assignments.verifyScope(worker, assignmentId, executionId);
+		if (!result.ok) {
+			process.stderr.write(`[CommandHandler] rejected worker report: ${result.reason}\n`);
+			return false;
+		}
+		return true;
+	}
+
+	/** Closes an assignment once its outcome has been accepted. */
+	settleAssignment(assignmentId: string): void {
+		this.assignments.settle(assignmentId);
+	}
+
+	/** Drops a disconnected worker's outstanding assignments. */
+	revokeWorkerAssignments(worker: WebSocket): void {
+		this.assignments.revokeWorker(worker);
+	}
+
 	/** Called by Daemon when a worker reports step_completed. */
 	onStepCompleted(
 		executionId: string,
@@ -502,13 +542,17 @@ export class CommandHandler {
 					stepId: step.stepId,
 				});
 
+				const assignment = this.assignments.issue(idleWorker, step.executionContext.executionId, step.stepId);
 				const sent = this.workerPool.sendToWorker(idleWorker, {
 					type: 'assign',
+					assignmentId: assignment.assignmentId,
 					stepId: step.stepId,
 					stepConfig: step.stepConfig,
 					executionContext: step.executionContext,
 				});
 				if (!sent) {
+					// Never handed over, so the assignment must not stay outstanding.
+					this.assignments.settle(assignment.assignmentId);
 					// Worker disconnected between getIdleWorker() and send - re-queue the step
 					this.workerPool.removeWorker(idleWorker);
 					// Transport failure: not a flow-level failure - unacknowledge and put back

@@ -1,7 +1,13 @@
 import type { FlowStep, LiveLogEntry, StepMeta } from 'flow-engine/types';
 
-// subflow excluded: not supported in v1 (rejected in CommandHandler before enqueue)
-export type AssignableStep = Extract<FlowStep, { type: 'model' | 'script' }>;
+/**
+ * Steps the daemon can hand to a worker.
+ *
+ * `user_intervention` is included because an interactive worker can serve it (D#37);
+ * the gate that still rejects it lives in CommandHandler and is lifted in Phase 3.
+ * `subflow` stays excluded -- a v1 scope line, not an architectural limit.
+ */
+export type AssignableStep = Extract<FlowStep, { type: 'model' | 'script' | 'user_intervention' }>;
 
 export interface ExecutionContext {
 	executionId: string;
@@ -46,7 +52,17 @@ export type DaemonResponse =
 	{ type: 'execution_started'; executionId: string } | { type: 'error'; message: string; code: string };
 
 export type DaemonToWorker =
-	| { type: 'assign'; stepId: string; stepConfig: AssignableStep; executionContext: ExecutionContext }
+	| {
+			type: 'assign';
+			/**
+			 * Identifies this specific handout. The worker echoes it on every message about
+			 * the step so the daemon can bind the result to work it actually issued (T-05).
+			 */
+			assignmentId: string;
+			stepId: string;
+			stepConfig: AssignableStep;
+			executionContext: ExecutionContext;
+	  }
 	// { type: 'idle' } is never sent by the daemon in v1 but is kept for forward compatibility.
 	// Worker handles it as a no-op.
 	| { type: 'idle' }
@@ -65,12 +81,78 @@ export interface InjectedStep {
 	[key: string]: unknown;
 }
 
+/**
+ * A worker announcing itself to the daemon.
+ *
+ * Every field beyond `pid` is optional so a forked worker, which has none of them,
+ * stays valid. They are populated by inbound workers from Phase 2a onward; the daemon
+ * applies documented defaults rather than inferring anything.
+ */
+export interface WorkerReady {
+	type: 'ready';
+	/**
+	 * Process id of the worker. Retained for forked workers, whose connect timeout is
+	 * keyed on it. **Not an authentication signal** -- a worker the daemon did not spawn
+	 * has no PID the daemon can recognise, which is why `authToken` exists (T-01).
+	 */
+	pid: number;
+	/** Credential presented by the worker. Verified by the S7 implementation (Phase 2a). */
+	authToken?: string;
+	/** The WorkerSource that produced this worker, for provenance in the audit trail (T-06). */
+	sourceId?: string;
+	/**
+	 * Routing labels, inherited from the source (D#30). **Routing only, never
+	 * authorization** (T-07): a label restricts which steps reach a worker, it grants
+	 * no privilege and must never be used as an access-control decision.
+	 */
+	labels?: string[];
+	/**
+	 * Absolute project roots this worker will serve. Defaults to the single project it
+	 * was launched in; serving others is explicit opt-in (D#9).
+	 */
+	attachedProjects?: string[];
+	/**
+	 * Whether a human can interact with this worker. The worker alone decides this
+	 * (D#33, D#36) -- the daemon cannot observe the far side's TTY. Defaults to false.
+	 */
+	hasUserInterface?: boolean;
+}
+
 export type WorkerToDaemon =
-	| { type: 'ready'; pid: number }
-	| { type: 'log'; executionId: string; stepId: string; entry: LiveLogEntry }
-	| { type: 'step_completed'; executionId: string; stepId: string; output: Record<string, unknown>; meta?: StepMeta }
-	| { type: 'step_failed'; executionId: string; stepId: string; error: string; output?: Record<string, unknown> }
-	| { type: 'inject_steps'; executionId: string; steps: InjectedStep[] };
+	| WorkerReady
+	| { type: 'log'; assignmentId: string; executionId: string; stepId: string; entry: LiveLogEntry }
+	| {
+			type: 'step_completed';
+			assignmentId: string;
+			executionId: string;
+			stepId: string;
+			output: Record<string, unknown>;
+			meta?: StepMeta;
+	  }
+	| {
+			type: 'step_failed';
+			assignmentId: string;
+			executionId: string;
+			stepId: string;
+			error: string;
+			output?: Record<string, unknown>;
+	  }
+	| { type: 'inject_steps'; assignmentId: string; executionId: string; steps: InjectedStep[] };
+
+/**
+ * A worker-to-daemon message about the step currently being executed, before its
+ * assignment id is attached.
+ *
+ * The worker binds a sender to one assignment and hands that down to the step
+ * execution code, which therefore never sees the id. No call site can forget it or
+ * attach the wrong one -- the alternative, passing the id to every log and result
+ * call, gets exactly that wrong the first time a new message type is added.
+ */
+export type AssignmentScopedMessage =
+	| Omit<Extract<WorkerToDaemon, { type: 'log' }>, 'assignmentId'>
+	| Omit<Extract<WorkerToDaemon, { type: 'step_completed' }>, 'assignmentId'>
+	| Omit<Extract<WorkerToDaemon, { type: 'step_failed' }>, 'assignmentId'>
+	| Omit<Extract<WorkerToDaemon, { type: 'inject_steps' }>, 'assignmentId'>;
 
 // 're-queued' is reserved for v2 crash recovery. Unreachable in v1 but kept for backward compat.
 export type ExecutionStatus = 'queued' | 'running' | 'completed' | 'failed' | 're-queued';
