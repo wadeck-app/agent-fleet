@@ -205,12 +205,12 @@ export async function assertThrowsAsync(fn: () => Promise<any>, messagePattern?:
 export function spyOnModule<T extends object>(module: T, method: keyof T, implementation?: (...args: any[]) => any) {
 	const original = module[method];
 	const spy = vi.fn(implementation);
-	(module as any)[method] = spy;
+	module[method] = spy as T[keyof T];
 
 	return {
 		spy,
 		restore: () => {
-			(module as any)[method] = original;
+			module[method] = original;
 		},
 	};
 }
@@ -317,7 +317,7 @@ export function createTrackedMock<T extends (...args: any[]) => any = any>() {
 		error?: Error;
 	}> = [];
 
-	const mock = vi.fn((...args: any[]) => {
+	const trackedFn = vi.fn((...args: any[]) => {
 		const call = {
 			args,
 			timestamp: Date.now(),
@@ -331,7 +331,8 @@ export function createTrackedMock<T extends (...args: any[]) => any = any>() {
 			calls.push({ ...call, error: error as Error });
 			throw error;
 		}
-	}) as any as T;
+	});
+	const mock = trackedFn as any as T;
 
 	return {
 		mock,
@@ -341,7 +342,7 @@ export function createTrackedMock<T extends (...args: any[]) => any = any>() {
 		getCallArgs: (index: number) => calls[index]?.args,
 		reset: () => {
 			calls.length = 0;
-			(mock as any).mockClear();
+			trackedFn.mockClear();
 		},
 	};
 }

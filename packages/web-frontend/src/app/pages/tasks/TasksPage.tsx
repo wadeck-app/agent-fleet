@@ -155,7 +155,7 @@ export function TasksPage() {
 			page: query.page,
 			pageSize: query.pageSize,
 			sortBy: query.sortBy,
-			// violations-suppress-start: ts/no-unsafe-type-cast ComposedQuery index signature types extra fields as unknown; casts assert the expected types set by task filter hooks
+			// violations-suppress-start: ts/no-unsafe-type-cast ComposedQuery index signature widens extra fields to unknown type; casts assert the expected types set by task filter hooks
 			sortOrder: query.sortOrder as 'asc' | 'desc' | undefined,
 			search: query.search,
 			status: query.status as any,

@@ -71,7 +71,7 @@ export async function executeSubFlowStep(
 	stepTrace.workspaceStrategy = strategy;
 	stepTrace.nestingDepth = nestingDepth;
 
-	console.log(`[StepRunner] Executing SubFlowStep: ${step.id} → ${step.flowId}`);
+	console.log(`[StepRunner] Executing SubFlowStep: ${step.id} -> ${step.flowId}`);
 	console.log(`[StepRunner] Nesting depth: ${nestingDepth}`);
 	console.log(`[StepRunner] Inputs:`, renderedInputs);
 

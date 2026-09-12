@@ -9,37 +9,37 @@ Resultats
 ```
   tests PASSING (%)
   ~ secondes d'execution
-   scenarios ×  versions =  tests
+   scenarios x  versions =  tests
 ```
 
 Categories of Tests
 
-. Initial Data Load ( tests × = tests)
+. Initial Data Load ( tests x = tests)
 
 - Fetch data from API on mount
 - Display fetched Ingredient data
 - Pass pagination parameters to API
 
-. Search ( tests × = tests)
+. Search ( tests x = tests)
 
 - Have search capability
 - Accept search input
 
-. Sorting ( tests × = tests)
+. Sorting ( tests x = tests)
 
 - Have sortable columns
 - Have clickable column headers
 
-. Row Selection ( tests × = tests)
+. Row Selection ( tests x = tests)
 
 - Have selectable rows
 - Enable Selection of multiple rows
 
-. Pagination ( test × = tests)
+. Pagination ( test x = tests)
 
 - Have page size controls
 
-. CRUD Actions ( tests × = tests)
+. CRUD Actions ( tests x = tests)
 
 - Have create action available
 - Have edit actions for each row

@@ -28,7 +28,7 @@ import { adaptCol } from '../_framework/adaptCol';
  * Features:
  * - Click row -> select item -> detail panel shows item details
  * - Selected item ID synced to URL: ?id=xxx
- * - Keyboard ↑/↓ arrows: navigate selection
+ * - Keyboard ^/v arrows: navigate selection
  * - Re-clicking already selected row refreshes detail panel
  *
  * Architecture:

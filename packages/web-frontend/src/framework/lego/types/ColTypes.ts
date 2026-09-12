@@ -66,9 +66,11 @@ export interface ColumnDef<T> {
 	 */
 	type?: 'text' | 'number' | 'enum' | 'boolean' | 'date' | 'custom';
 
+	// violations-suppress-start: shared/no-emoji euro sign is currency content in JSDoc example, not a decorative icon
 	/**
 	 * Prefix for number columns (e.g., '$', '€')
 	 */
+	// violations-suppress-end: shared/no-emoji
 	prefix?: string;
 
 	/**

@@ -33,6 +33,18 @@ const MAX_PROMPT_BYTES = 32 * 1024; // 32KB
 const DEFAULT_MAX_INLINE_CONFIG_BYTES = 1024 * 1024; // 1MB
 
 // ---------------------------------------------------------------------------
+// Runtime type guards for untyped JSON boundaries
+// ---------------------------------------------------------------------------
+
+/**
+ * Narrow an unknown JSON value to a plain object.
+ * Arrays and null are rejected -- they never carry the keys we read.
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+// ---------------------------------------------------------------------------
 // MCP config builder (reuse OpenCode format)
 // ---------------------------------------------------------------------------
 
@@ -196,6 +208,7 @@ export class CodexModelProvider implements ModelProvider {
 
 		try {
 			return await new Promise<ModelInteractiveResult>((resolve, reject) => {
+				// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, so grandchildren (the codex CLI's own child processes) allocate a visible console; this stdio:'inherit' spawn must inherit the daemon's hidden console (d032e7e)
 				const proc = spawn(command, args, {
 					cwd: options.workingDir,
 					stdio: 'inherit',
@@ -276,12 +289,17 @@ export class CodexModelProvider implements ModelProvider {
 				let firstStepStartFired = false;
 
 				const processLine = (line: string): void => {
-					let parsed: Record<string, unknown>;
+					let raw: unknown;
 					try {
-						parsed = JSON.parse(line) as Record<string, unknown>;
+						raw = JSON.parse(line);
 					} catch {
 						return;
 					}
+					// Non-object JSON lines (arrays, numbers, strings) carry none of the event keys we read
+					if (!isRecord(raw)) {
+						return;
+					}
+					const parsed = raw;
 
 					const eventType = parsed['type'] as string | undefined;
 					const sessionID = parsed['sessionID'] as string | undefined;
@@ -303,7 +321,8 @@ export class CodexModelProvider implements ModelProvider {
 						};
 						options.onStreamEvent?.(initEvent);
 					} else if (eventType === 'text') {
-						const part = parsed['part'] as Record<string, unknown> | undefined;
+						const partValue = parsed['part'];
+						const part = isRecord(partValue) ? partValue : undefined;
 						const text = part?.['text'] as string | undefined;
 						if (text) {
 							responseText += text;
@@ -316,8 +335,10 @@ export class CodexModelProvider implements ModelProvider {
 							}
 						}
 					} else if (eventType === 'tool_use') {
-						const part = parsed['part'] as Record<string, unknown> | undefined;
-						const state = part?.['state'] as Record<string, unknown> | undefined;
+						const partValue = parsed['part'];
+						const part = isRecord(partValue) ? partValue : undefined;
+						const stateValue = part?.['state'];
+						const state = isRecord(stateValue) ? stateValue : undefined;
 						if (state && options.onStreamEvent) {
 							const toolEvent: StreamJsonEvent = {
 								type: 'tool_use',
@@ -333,10 +354,12 @@ export class CodexModelProvider implements ModelProvider {
 							options.onStreamEvent(toolEvent);
 						}
 					} else if (eventType === 'step_finish') {
-						const part = parsed['part'] as Record<string, unknown> | undefined;
+						const partValue = parsed['part'];
+						const part = isRecord(partValue) ? partValue : undefined;
 						if (part?.['reason'] === 'stop') {
 							costUsd += (part['cost'] as number | undefined) ?? 0;
-							const tokens = part['tokens'] as Record<string, unknown> | undefined;
+							const tokensValue = part['tokens'];
+							const tokens = isRecord(tokensValue) ? tokensValue : undefined;
 							inputTokens += (tokens?.['input'] as number | undefined) ?? 0;
 							outputTokens += (tokens?.['output'] as number | undefined) ?? 0;
 						}
@@ -478,7 +501,9 @@ export class CodexModelProvider implements ModelProvider {
 	 */
 	private copyGlobalConfig(tempDir: string): void {
 		const candidates = [
+			// violations-suppress: shared/no-out-of-repo-path reads the codex CLI's own global config under the user's home; that path is owned by the external CLI, not by this repo
 			path.join(os.homedir(), '.config', 'codex', 'config.json'),
+			// violations-suppress: shared/no-out-of-repo-path falls back to the opencode CLI's global config under the user's home; that path is owned by the external CLI, not by this repo
 			path.join(os.homedir(), '.config', 'opencode', 'config.json'),
 			...(process.env['LOCALAPPDATA'] ? [path.join(process.env['LOCALAPPDATA'], 'codex', 'config.json')] : []),
 			...(process.env['APPDATA'] ? [path.join(process.env['APPDATA'], 'codex', 'config.json')] : []),

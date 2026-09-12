@@ -4,15 +4,15 @@ _Moved from README -- see [README](../README.md) for the overview._
 
 - Have delete actions for each row
 
-. Data Refresh ( test × = tests)
+. Data Refresh ( test x = tests)
 
 - Be able to refresh data
 
-. Empty State ( test × = tests)
+. Empty State ( test x = tests)
 
 - Handle empty data without crashing
 
-. Loading States ( tests × = tests) NOUVEAU !
+. Loading States ( tests x = tests) NOUVEAU !
 
 - Handle delayed data loading gracefully
 - Handle search during loading

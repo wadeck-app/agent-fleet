@@ -303,7 +303,7 @@ workspace:
 		return `## Section 5: Status Transitions
 
 Configured via the optional \`statusTransitions\` field of a \`FlowDefinition\`.
-Defaults: \`onSuccess → review\`, \`onFailure → changes_requested\`.
+Defaults: \`onSuccess -> review\`, \`onFailure -> changes_requested\`.
 
 \`\`\`yaml
 statusTransitions:

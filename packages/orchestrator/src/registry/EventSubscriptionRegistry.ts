@@ -81,7 +81,7 @@ export class EventSubscriptionRegistry {
 			list.push(subscription);
 		}
 		log.debug(
-			`Registered event subscription: ${subscription.event} → ${subscription.flowId} (worker: ${subscription.workerId})`
+			`Registered event subscription: ${subscription.event} -> ${subscription.flowId} (worker: ${subscription.workerId})`
 		);
 	}
 

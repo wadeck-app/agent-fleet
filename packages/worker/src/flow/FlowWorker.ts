@@ -36,9 +36,12 @@ import { type Task, TaskStatus } from 'shared-orch-worker/domain-types';
 import {
 	type AssignTaskMessage,
 	type ErrorMessage,
+	type InterventionResponseMessage,
 	type KillClaudeMessage,
 	type O2WMessage,
 	O2WMessageType,
+	type RequestFlowDefinitionMessage,
+	type SaveFlowDefinitionMessage,
 	type WorkerWelcomeMessage,
 } from 'shared-orch-worker/orchestrator-messages';
 import { type W2OMessage, W2OMessageType, createW2OMessage } from 'shared-orch-worker/worker-messages';
@@ -338,6 +341,9 @@ export class FlowWorker implements Shutdownable {
 	 * Handle incoming message from orchestrator
 	 */
 	private handleMessage(message: O2WMessage): void {
+		// Kept before the switch: inside the default branch `message` is narrowed to `never`
+		const messageType: string = message.type;
+
 		switch (message.type) {
 			case O2WMessageType.ACK:
 				// Acknowledgment received
@@ -371,15 +377,15 @@ export class FlowWorker implements Shutdownable {
 				break;
 
 			case O2WMessageType.REQUEST_FLOW_DEFINITION:
-				this.handleRequestFlowDefinition(message as any);
+				this.handleRequestFlowDefinition(message);
 				break;
 
 			case O2WMessageType.SAVE_FLOW_DEFINITION:
-				this.handleSaveFlowDefinition(message as any);
+				this.handleSaveFlowDefinition(message);
 				break;
 
 			case O2WMessageType.INTERVENTION_RESPONSE:
-				this.handleInterventionResponse(message as any);
+				this.handleInterventionResponse(message);
 				break;
 
 			case O2WMessageType.ERROR:
@@ -387,7 +393,7 @@ export class FlowWorker implements Shutdownable {
 				break;
 
 			default:
-				this.logger.warn(` Unknown message type: ${(message as any).type}`);
+				this.logger.warn(` Unknown message type: ${messageType}`);
 		}
 	}
 
@@ -478,7 +484,7 @@ export class FlowWorker implements Shutdownable {
 	/**
 	 * Handle INTERVENTION_RESPONSE message
 	 */
-	private handleInterventionResponse(message: any): void {
+	private handleInterventionResponse(message: InterventionResponseMessage): void {
 		const { taskId, interventionId, response, timedOut, cancelled } = message;
 
 		this.logger.info(` Received intervention response for ${interventionId}`);
@@ -539,7 +545,7 @@ export class FlowWorker implements Shutdownable {
 	/**
 	 * Handle REQUEST_FLOW_DEFINITION message
 	 */
-	private handleRequestFlowDefinition(message: any): void {
+	private handleRequestFlowDefinition(message: RequestFlowDefinitionMessage): void {
 		const { flowId, requestId } = message;
 		this.logger.info(` Received REQUEST_FLOW_DEFINITION for ${flowId}`);
 
@@ -580,7 +586,7 @@ export class FlowWorker implements Shutdownable {
 	/**
 	 * Handle SAVE_FLOW_DEFINITION message
 	 */
-	private async handleSaveFlowDefinition(message: any): Promise<void> {
+	private async handleSaveFlowDefinition(message: SaveFlowDefinitionMessage): Promise<void> {
 		const { flowId, flowDefinition, requestId } = message;
 		this.logger.info(` Received SAVE_FLOW_DEFINITION for ${flowId}`);
 
@@ -712,7 +718,7 @@ export class FlowWorker implements Shutdownable {
 	 */
 	private setupFlowHotReload(): void {
 		// Store initial flow state with hashes to detect content changes
-		let lastFlowState = new Map<string, string>(); // flowId → hash
+		let lastFlowState = new Map<string, string>(); // flowId -> hash
 		this.buildFlowMetadata().forEach(flow => {
 			lastFlowState.set(flow.id, flow.hash);
 		});

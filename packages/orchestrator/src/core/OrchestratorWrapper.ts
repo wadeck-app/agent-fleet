@@ -25,8 +25,17 @@ import { createLogger } from 'shared-common/logger';
 import { StateEvent } from 'shared-orch-worker/StateManager';
 import type { OrchestratorStats, Task, WorkerInfo } from 'shared-orch-worker/domain-types';
 import type { O2BEventData, O2BEventType } from 'shared-orch-worker/orchestrator-events';
+import { O2WMessageType, createO2WMessage } from 'shared-orch-worker/orchestrator-messages';
 
 const log = createLogger('OrchestratorWrapper');
+
+/**
+ * Shape of a Task coming from the web-backend, which names the assignment field `assignedWorker`
+ * while the orchestrator uses `assignedTo`. Structural supertype of Task: any Task is assignable.
+ */
+interface BackendTask extends Task {
+	assignedWorker?: { workerId: string } | null;
+}
 
 // @formatter:off
 // Read version from package.json
@@ -447,12 +456,10 @@ export class OrchestratorWrapper {
 			throw new Error(`Worker ${workerId} not found`);
 		}
 
-		connectionManager.sendMessage(worker.socket, {
-			type: 'o2w:flow:request_definition',
-			flowId,
-			requestId,
-			timestamp: Date.now(),
-		} as any);
+		connectionManager.sendMessage(
+			worker.socket,
+			createO2WMessage(O2WMessageType.REQUEST_FLOW_DEFINITION, { flowId, requestId })
+		);
 
 		return responsePromise;
 	}
@@ -504,13 +511,10 @@ export class OrchestratorWrapper {
 			throw new Error(`Worker ${workerId} not found`);
 		}
 
-		connectionManager.sendMessage(worker.socket, {
-			type: 'o2w:flow:save_definition',
-			flowId,
-			flowDefinition,
-			requestId,
-			timestamp: Date.now(),
-		} as any);
+		connectionManager.sendMessage(
+			worker.socket,
+			createO2WMessage(O2WMessageType.SAVE_FLOW_DEFINITION, { flowId, flowDefinition, requestId })
+		);
 
 		return responsePromise;
 	}
@@ -529,9 +533,10 @@ export class OrchestratorWrapper {
 
 		// Map backend Task format to orchestrator Task format if needed
 		// Backend uses assignedWorker, orchestrator uses assignedTo
+		const backendTask: BackendTask = task;
 		const orchestratorTask: Task = {
 			...task,
-			assignedTo: (task as any).assignedWorker || task.assignedTo,
+			assignedTo: backendTask.assignedWorker || task.assignedTo,
 			comments: task.comments || [],
 			metadata: task.metadata || {},
 			history: task.history || [],
@@ -539,7 +544,7 @@ export class OrchestratorWrapper {
 
 		// Register task in TaskManager's in-memory store (needed for interventions and status tracking)
 		// We don't save to orchestrator's storage because task is already persisted in backend
-		(taskManager as any).tasks.set(orchestratorTask.id, orchestratorTask);
+		taskManager.registerExternallyPersistedTask(orchestratorTask);
 
 		// Enqueue task for worker assignment
 		workerCoordinator.enqueueTask(orchestratorTask);

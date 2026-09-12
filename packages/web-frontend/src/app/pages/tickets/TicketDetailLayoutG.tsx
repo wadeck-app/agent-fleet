@@ -483,7 +483,7 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 												<span className="font-medium text-primary">+{addedCount}</span>
 											)}
 											{removedCount > 0 && (
-												<span className="font-medium text-destructive">−{removedCount}</span>
+												<span className="font-medium text-destructive">-{removedCount}</span>
 											)}
 										</span>
 									);
@@ -567,7 +567,7 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 												<span className="font-medium text-foreground">~{modified}</span>
 											)}
 											{removed > 0 && (
-												<span className="font-medium text-destructive">−{removed}</span>
+												<span className="font-medium text-destructive">-{removed}</span>
 											)}
 										</span>
 									);

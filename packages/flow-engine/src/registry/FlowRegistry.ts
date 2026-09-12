@@ -71,7 +71,7 @@ const DEFAULT_FLOWS: Record<string, FlowDefinition> = {
 		id: 'dev-full',
 		version: '1.0.0',
 		name: 'Full Development Cycle',
-		description: 'Analysis → Validation → Implementation → Quality → Review',
+		description: 'Analysis -> Validation -> Implementation -> Quality -> Review',
 		workspace: {
 			mode: 'isolated',
 			gitStrategy: 'feature-branch',

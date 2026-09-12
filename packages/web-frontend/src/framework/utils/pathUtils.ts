@@ -11,6 +11,7 @@
  * ===========================================================================================
  */
 
+// violations-suppress-start: shared/no-out-of-repo-path Windows path below is a JSDoc @example documentation sample only, not a hardcoded runtime path
 /**
  * Extracts the basename (last segment) from a file path.
  * Works with both Unix-style (/) and Windows-style (\) path separators.
@@ -24,6 +25,7 @@
  * getBasename('/home/user/project/') // => 'project'
  * getBasename('simple-path') // => 'simple-path'
  */
+// violations-suppress-end: shared/no-out-of-repo-path
 export function getBasename(path: string): string {
 	// Handle empty string
 	if (!path) {

@@ -84,14 +84,15 @@ export function useQueryComposition({
 	// Convert query to stable URL string for change detection
 	// Sort keys for consistent ordering: { a: 1, b: 2 } === { b: 2, a: 1 }
 	const queryUrl = useMemo(() => {
-		const sortedQuery = Object.keys(query as Record<string, unknown>)
+		// ComposedQuery has [key: string]: unknown so no cast needed
+		const sortedQuery = Object.keys(query)
 			.sort()
-			.reduce(
-				(acc: Record<string, unknown>, key) => {
-					acc[key] = (query as Record<string, unknown>)[key];
+			.reduce<Record<string, unknown>>(
+				(acc, key) => {
+					acc[key] = query[key];
 					return acc;
 				},
-				{} as Record<string, unknown>
+				{}
 			);
 		return JSON.stringify(sortedQuery);
 	}, [query]);

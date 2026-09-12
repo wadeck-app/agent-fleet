@@ -126,7 +126,7 @@ export function defineRoutes<const T extends ApiRoutes>(routes: T): T & { __base
 		if (problematicRoute) {
 			throw new Error(
 				`Route ordering issue in defineRoutes!\n` +
-					`First route: "${paths[0]}" → baseUrl: "${baseUrl}"\n` +
+					`First route: "${paths[0]}" -> baseUrl: "${baseUrl}"\n` +
 					`Found shorter route: "${problematicRoute}"\n` +
 					`Fix: Ensure the base route (without params) is listed first.`
 			);

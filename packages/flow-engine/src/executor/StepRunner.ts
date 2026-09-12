@@ -70,6 +70,15 @@ export interface StepRunnerConfig {
 	onRenderedPrompt?: (prompt: string) => void;
 }
 
+/**
+ * Minimal shape used to report a step whose `type` discriminant is none of the
+ * supported FlowStep variants (possible when a flow comes from unvalidated YAML).
+ */
+interface UnrecognizedFlowStep {
+	id: string;
+	type: string;
+}
+
 export class StepRunner {
 	private readonly templateRenderer = new TemplateRenderer();
 	private readonly scriptExecutor = new ScriptExecutor();
@@ -97,7 +106,7 @@ export class StepRunner {
 		}
 	}
 
-	/** @internal kept for tests that access private API via (runner as any).calculateBackoff */
+	/** @internal kept for tests that reach the private `calculateBackoff` member by index access */
 	private calculateBackoff(attempt: number, strategy: 'linear' | 'exponential'): number {
 		const baseDelay = 1000;
 		return strategy === 'exponential' ? baseDelay * Math.pow(2, attempt - 1) : baseDelay * attempt;
@@ -194,10 +203,13 @@ export class StepRunner {
 					services
 				);
 			} else {
+				// All FlowStep variants are handled above, so `step` is `never` here; widening it
+				// keeps the actual runtime values available for the error message.
+				const unrecognizedStep: UnrecognizedFlowStep = step;
 				throw new StepExecutionError(
-					`Unknown step type: ${(step as any).type}`,
-					(step as any).id,
-					(step as any).type
+					`Unknown step type: ${unrecognizedStep.type}`,
+					unrecognizedStep.id,
+					unrecognizedStep.type
 				);
 			}
 		} catch (error) {

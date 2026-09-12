@@ -96,6 +96,7 @@ export function Data2DetailPanel<T>({
 				{item && !isLoading && (
 					<div className="space-y-3">
 						{columns.map(column => {
+							// violations-suppress: ts/no-unsafe-type-cast T is generic with no key constraint; column.key is a dynamic string accessor that cannot be typed at this render boundary
 							const value = column.render ? column.render(item) : String((item as any)[column.key] ?? '');
 
 							return (

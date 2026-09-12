@@ -19,9 +19,10 @@ interface VisualizeFlowDialogProps {
 export function VisualizeFlowDialog({ proposal }: VisualizeFlowDialogProps) {
 	const [selectedNode, setSelectedNode] = useState<FlowNode | null>(null);
 
+	// proposedFlow is typed as Record<string, unknown> (from StoredFlowDefinitionSchema = z.record)
 	const flowName =
-		typeof (proposal.proposedFlow as Record<string, unknown>)['name'] === 'string'
-			? String((proposal.proposedFlow as Record<string, unknown>)['name'])
+		typeof proposal.proposedFlow['name'] === 'string'
+			? String(proposal.proposedFlow['name'])
 			: 'Flow preview';
 
 	let nodes: FlowNode[] = [];

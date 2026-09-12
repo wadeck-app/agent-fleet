@@ -247,6 +247,12 @@ export type SubscriptionOptions<T extends B2FEvent> = B2FEventFilters[T] extends
 	: { filter: B2FEventFilters[T] }; // Filter required
 
 /**
+ * Union of every concrete filter shape declared above. Each member has a distinct discriminating
+ * property, so an `in` check narrows to exactly one of them.
+ */
+type AnyEventFilter = TaskFilter | WorkerFilter | WorkspaceFilter | InterventionFilter | ScriptFilter;
+
+/**
  * Helper to match event payload against subscription filter
  * Returns true if payload matches filter criteria
  */
@@ -260,32 +266,34 @@ export function matchesFilter<T extends B2FEvent>(
 		return true;
 	}
 
-	// Type guard helpers - use unknown as intermediate step for type safety
-	const filterObj = filter as unknown as Record<string, unknown>;
+	// B2FEventFilters[T] is a generic indexed access over a mapped type whose members are either
+	// NoFilter (void) or one of the concrete filter interfaces. Viewing it as the union of the
+	// concrete interfaces lets the `in` checks below narrow without any further cast.
+	const filterObj = filter as unknown as AnyEventFilter;
 
 	// Task filter
 	if ('taskId' in filterObj) {
-		return payload.taskId === (filterObj as unknown as TaskFilter).taskId;
+		return payload.taskId === filterObj.taskId;
 	}
 
 	// Worker filter
 	if ('workerId' in filterObj) {
-		return payload.workerId === (filterObj as unknown as WorkerFilter).workerId;
+		return payload.workerId === filterObj.workerId;
 	}
 
 	// Workspace filter
 	if ('workspaceId' in filterObj) {
-		return payload.workspaceId === (filterObj as unknown as WorkspaceFilter).workspaceId;
+		return payload.workspaceId === filterObj.workspaceId;
 	}
 
 	// Intervention filter
 	if ('interventionId' in filterObj) {
-		return payload.interventionId === (filterObj as unknown as InterventionFilter).interventionId;
+		return payload.interventionId === filterObj.interventionId;
 	}
 
 	// Script filter
 	if ('scriptId' in filterObj) {
-		return payload.scriptId === (filterObj as unknown as ScriptFilter).scriptId;
+		return payload.scriptId === filterObj.scriptId;
 	}
 
 	// Unknown filter type = no match (fail safe)

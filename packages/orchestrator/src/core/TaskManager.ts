@@ -159,6 +159,18 @@ export class TaskManager {
 	}
 
 	/**
+	 * Register a task whose persistence is owned by another component (e.g. the web-backend
+	 * storage in library mode) into the in-memory store only.
+	 *
+	 * Deliberately does NOT write to orchestrator storage and does NOT emit events: the task is
+	 * already persisted and announced by its owner. Needed so interventions and status tracking
+	 * can resolve the task by id.
+	 */
+	registerExternallyPersistedTask(task: Task): void {
+		this.tasks.set(task.id, task);
+	}
+
+	/**
 	 * Update an existing task in memory and storage
 	 * Useful when task properties are modified externally (e.g., adding flowInputs in RestAPI)
 	 */
@@ -229,7 +241,7 @@ export class TaskManager {
 			throw error;
 		}
 
-		log.info(`[TaskManager] Task ${taskId} status: ${oldStatus} → ${newStatus}`);
+		log.info(`[TaskManager] Task ${taskId} status: ${oldStatus} -> ${newStatus}`);
 		this.stateManager.emitTaskUpdated(task);
 	}
 

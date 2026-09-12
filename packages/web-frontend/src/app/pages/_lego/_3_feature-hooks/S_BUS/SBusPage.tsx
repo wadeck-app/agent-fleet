@@ -24,7 +24,7 @@ import { usePaginationFeature } from '../_framework/usePaginationFeature';
  * Features:
  * - Click row to select item
  * - Selected item ID synced to URL (?id=xxx)
- * - Keyboard navigation (↑/↓ arrows) within current page
+ * - Keyboard navigation (^/v arrows) within current page
  * - Re-clicking selected row reloads the detail panel
  *
  * Architecture:

@@ -86,7 +86,7 @@ export class GraphValidator {
 				this.issueCollector.addIssue({
 					severity: 'error',
 					code: ValidationCode.CIRCULAR_SUBFLOW_REFERENCE,
-					message: `SubFlow step '${step.id}' creates circular dependency chain: ${path.join(' → ')} → ${currentFlowId}`,
+					message: `SubFlow step '${step.id}' creates circular dependency chain: ${path.join(' -> ')} -> ${currentFlowId}`,
 					location: { stepId: step.id, field: 'flowId' },
 					suggestion: 'Break the circular chain by restructuring the flow composition',
 					context: { related: path },
@@ -116,7 +116,7 @@ export class GraphValidator {
 					this.issueCollector.addIssue({
 						severity: 'error',
 						code: ValidationCode.CIRCULAR_DEPENDENCY,
-						message: `Circular dependency detected: ${cycle.join(' → ')}`,
+						message: `Circular dependency detected: ${cycle.join(' -> ')}`,
 						location: { stepId: cycle[0] },
 						suggestion: 'Remove or modify dependencies to break the cycle',
 						context: { related: cycle },

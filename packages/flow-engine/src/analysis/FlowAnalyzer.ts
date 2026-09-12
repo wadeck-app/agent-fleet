@@ -16,14 +16,14 @@ import type { FlowDefinition, FlowStep, InputSpec, NormalizedInputDefinition, Va
  * Flow pattern types
  */
 export type FlowPattern =
-	| 'linear-pipeline' // A → B → C (sequential)
-	| 'diamond' // A → {B,C} → D (fork-join)
-	| 'fan-out' // A → {B,C,D} (parallel, no join)
-	| 'fan-out-fan-in' // A → {B,C,D} → E (parallel with aggregation)
-	| 'conditional' // A → B if X, C if Y (branching)
-	| 'retry-loop' // A → B → fail → A (feedback loop)
-	| 'etl-pipeline' // Extract → Transform → Load
-	| 'build-pipeline' // checkout → build → test → deploy
+	| 'linear-pipeline' // A -> B -> C (sequential)
+	| 'diamond' // A -> {B,C} -> D (fork-join)
+	| 'fan-out' // A -> {B,C,D} (parallel, no join)
+	| 'fan-out-fan-in' // A -> {B,C,D} -> E (parallel with aggregation)
+	| 'conditional' // A -> B if X, C if Y (branching)
+	| 'retry-loop' // A -> B -> fail -> A (feedback loop)
+	| 'etl-pipeline' // Extract -> Transform -> Load
+	| 'build-pipeline' // checkout -> build -> test -> deploy
 	| 'subflow-composition' // Uses subflows as building blocks
 	| 'recursive' // Flow calls itself
 	| 'user-intervention'; // Contains approval/question steps

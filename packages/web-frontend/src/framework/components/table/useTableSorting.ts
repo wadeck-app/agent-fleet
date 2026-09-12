@@ -125,7 +125,9 @@ export function useTableSorting<T>({ data, initialSort = [] }: UseTableSortingPr
 		sorted.sort((a, b) => {
 			// Apply each sort config in order (priority)
 			for (const config of sortConfigs) {
+				// violations-suppress: ts/no-unsafe-type-cast T is unconstrained generic; dynamic string key access requires this cast at the sort comparator boundary
 				const aValue = (a as Record<string, unknown>)[config.key];
+				// violations-suppress: ts/no-unsafe-type-cast T is unconstrained generic; dynamic string key access requires this cast at the sort comparator boundary
 				const bValue = (b as Record<string, unknown>)[config.key];
 				const result = compareValues(aValue, bValue, config.direction);
 

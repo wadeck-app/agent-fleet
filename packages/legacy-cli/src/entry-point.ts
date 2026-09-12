@@ -247,7 +247,7 @@ switch (command) {
 
 		const taskRequest: CreateTaskRequest = {
 			description: args[1],
-			priority: (args[2] as any) || 'medium',
+			priority: (args[2] as CreateTaskRequest['priority']) || 'medium',
 		};
 
 		if (args[3] && !args[3].startsWith('--') && !args[3].startsWith('-i:')) {

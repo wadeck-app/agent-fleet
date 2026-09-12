@@ -279,8 +279,11 @@ export class InterventionManager {
 				case 'fail':
 					// Fail the intervention (no response)
 					break;
-				default:
-					throw new Error(`Unrecognized onTimeout value: ${(intervention.timeout as any).onTimeout}`);
+				default: {
+					// Exhaustiveness check: a new onTimeout variant makes this assignment fail to compile
+					const unrecognized: never = intervention.timeout.onTimeout;
+					throw new Error(`Unrecognized onTimeout value: ${String(unrecognized)}`);
+				}
 			}
 		}
 

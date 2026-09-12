@@ -2,7 +2,7 @@
  * OpenCodeModelProvider -- implements ModelProvider for the OpenCode CLI.
  *
  * Invocation: opencode run [message] --format json [--auto] [-m model]
- * MCP config: OPENCODE_CONFIG_CONTENT (inline JSON ≤1MB) or OPENCODE_CONFIG (temp file >1MB)
+ * MCP config: OPENCODE_CONFIG_CONTENT (inline JSON <=1MB) or OPENCODE_CONFIG (temp file >1MB)
  * Multi-config: OPENCODE_CONFIG env var can specify multiple config files (comma or colon-separated)
  *               that will be merged before being passed to opencode. Example:
  *               OPENCODE_CONFIG="~/.config/opencode/config_claude.json:~/.config/opencode/config_codex.json"
@@ -34,6 +34,18 @@ import type { StreamJsonEvent } from './StreamJsonParser';
 
 const MAX_PROMPT_BYTES = 32 * 1024; // 32KB
 const DEFAULT_MAX_INLINE_CONFIG_BYTES = 1024 * 1024; // 1MB
+
+// ---------------------------------------------------------------------------
+// Runtime type guards for untyped JSON boundaries
+// ---------------------------------------------------------------------------
+
+/**
+ * Narrow an unknown JSON value to a plain object.
+ * Arrays and null are rejected -- they never carry the keys we read.
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 // ---------------------------------------------------------------------------
 // MCP config builder
@@ -208,6 +220,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 
 		try {
 			return await new Promise<ModelInteractiveResult>((resolve, reject) => {
+				// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, so grandchildren (the opencode backend server) allocate a visible console; this stdio:'inherit' spawn must inherit the daemon's hidden console (d032e7e)
 				const proc = spawn(command, args, {
 					cwd: options.workingDir,
 					stdio: 'inherit',
@@ -293,12 +306,17 @@ export class OpenCodeModelProvider implements ModelProvider {
 				let firstStepStartFired = false;
 
 				const processLine = (line: string): void => {
-					let parsed: Record<string, unknown>;
+					let raw: unknown;
 					try {
-						parsed = JSON.parse(line) as Record<string, unknown>;
+						raw = JSON.parse(line);
 					} catch {
 						return;
 					}
+					// Non-object JSON lines (arrays, numbers, strings) carry none of the event keys we read
+					if (!isRecord(raw)) {
+						return;
+					}
+					const parsed = raw;
 
 					const eventType = parsed['type'] as string | undefined;
 					const sessionID = parsed['sessionID'] as string | undefined;
@@ -320,7 +338,8 @@ export class OpenCodeModelProvider implements ModelProvider {
 						};
 						options.onStreamEvent?.(initEvent);
 					} else if (eventType === 'text') {
-						const part = parsed['part'] as Record<string, unknown> | undefined;
+						const partValue = parsed['part'];
+						const part = isRecord(partValue) ? partValue : undefined;
 						const text = part?.['text'] as string | undefined;
 						if (text) {
 							responseText += text;
@@ -335,8 +354,10 @@ export class OpenCodeModelProvider implements ModelProvider {
 						}
 					} else if (eventType === 'tool_use') {
 						// tool_use events carry tool call details in part.state
-						const part = parsed['part'] as Record<string, unknown> | undefined;
-						const state = part?.['state'] as Record<string, unknown> | undefined;
+						const partValue = parsed['part'];
+						const part = isRecord(partValue) ? partValue : undefined;
+						const stateValue = part?.['state'];
+						const state = isRecord(stateValue) ? stateValue : undefined;
 						if (state && options.onStreamEvent) {
 							const toolEvent: StreamJsonEvent = {
 								type: 'tool_use',
@@ -352,11 +373,13 @@ export class OpenCodeModelProvider implements ModelProvider {
 							options.onStreamEvent(toolEvent);
 						}
 					} else if (eventType === 'step_finish') {
-						const part = parsed['part'] as Record<string, unknown> | undefined;
+						const partValue = parsed['part'];
+						const part = isRecord(partValue) ? partValue : undefined;
 						// Only accumulate cost/tokens on final stop -- tool-calls finish means more steps follow
 						if (part?.['reason'] === 'stop') {
 							costUsd += (part['cost'] as number | undefined) ?? 0;
-							const tokens = part['tokens'] as Record<string, unknown> | undefined;
+							const tokensValue = part['tokens'];
+							const tokens = isRecord(tokensValue) ? tokensValue : undefined;
 							inputTokens += (tokens?.['input'] as number | undefined) ?? 0;
 							outputTokens += (tokens?.['output'] as number | undefined) ?? 0;
 						}
@@ -507,6 +530,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 	private loadAndMergeConfigs(configPaths: string[]): Record<string, unknown> {
 		let merged: Record<string, unknown> = {};
 		for (const configPath of configPaths) {
+			// violations-suppress: shared/no-out-of-repo-path expands the leading ~ of an OPENCODE_CONFIG entry to the opencode CLI's own config store under the user's home; that path is owned by the external CLI, not by this repo
 			const resolvedPath = configPath.replace(/^~/, os.homedir());
 			if (!fs.existsSync(resolvedPath)) {
 				console.warn(`[OpenCodeModelProvider] Config file not found: ${resolvedPath}`);
@@ -514,7 +538,11 @@ export class OpenCodeModelProvider implements ModelProvider {
 			}
 			try {
 				const content = fs.readFileSync(resolvedPath, 'utf8');
-				const config = JSON.parse(content) as Record<string, unknown>;
+				const config: unknown = JSON.parse(content);
+				if (!isRecord(config)) {
+					console.warn(`[OpenCodeModelProvider] Config file is not a JSON object, ignored: ${resolvedPath}`);
+					continue;
+				}
 				merged = this.deepMerge(merged, config);
 			} catch (err) {
 				console.warn(
@@ -533,15 +561,10 @@ export class OpenCodeModelProvider implements ModelProvider {
 	private deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
 		const result = { ...target };
 		for (const [key, value] of Object.entries(source)) {
-			if (
-				value &&
-				typeof value === 'object' &&
-				!Array.isArray(value) &&
-				result[key] &&
-				typeof result[key] === 'object' &&
-				!Array.isArray(result[key])
-			) {
-				result[key] = this.deepMerge(result[key] as Record<string, unknown>, value as Record<string, unknown>);
+			const existing = result[key];
+			// Merge only when both sides are plain objects; arrays and primitives are replaced
+			if (isRecord(value) && isRecord(existing)) {
+				result[key] = this.deepMerge(existing, value);
 			} else {
 				result[key] = value;
 			}
@@ -574,6 +597,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 		// Fallback to single global config if no multi-config or merge failed
 		if (!config || Object.keys(config).length === 0) {
 			const candidates = [
+				// violations-suppress: shared/no-out-of-repo-path reads the opencode CLI's own global config under the user's home; that path is owned by the external CLI, not by this repo
 				path.join(os.homedir(), '.config', 'opencode', 'config.json'),
 				...(process.env['LOCALAPPDATA']
 					? [path.join(process.env['LOCALAPPDATA'], 'opencode', 'config.json')]
@@ -584,7 +608,12 @@ export class OpenCodeModelProvider implements ModelProvider {
 			if (!src) return;
 			try {
 				const content = fs.readFileSync(src, 'utf8');
-				config = JSON.parse(content) as Record<string, unknown>;
+				const parsedConfig: unknown = JSON.parse(content);
+				if (!isRecord(parsedConfig)) {
+					console.warn(`[OpenCodeModelProvider] Global config is not a JSON object, ignored: ${src}`);
+					return;
+				}
+				config = parsedConfig;
 			} catch (err) {
 				console.warn(`[OpenCodeModelProvider] Failed to load global config:`, normalizeError(err).message);
 				return;

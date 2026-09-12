@@ -111,7 +111,7 @@ export class WebSocketMessageRouter {
 				break;
 
 			default:
-				log.warn(`[WS] Unknown message type: ${(message as unknown as any).type}`);
+				log.warn(`[WS] Unknown message type: ${message.type}`);
 		}
 	}
 }

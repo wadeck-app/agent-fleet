@@ -46,7 +46,7 @@ export function FlowDiffViewer({ lines, summary }: FlowDiffViewerProps) {
 					<Plus className="size-3" />+{summary.additions}
 				</span>
 				<span className="flex items-center gap-1 text-destructive">
-					<Minus className="size-3" />−{summary.deletions}
+					<Minus className="size-3" />-{summary.deletions}
 				</span>
 				<span className="flex items-center gap-1 text-warning">~{summary.modifications}</span>
 			</div>

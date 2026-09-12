@@ -32,6 +32,15 @@ import type { IssueCollector } from './ValidationTypes';
 import { ValidationCode } from './ValidationTypes';
 
 /**
+ * Minimal shape used to report a step whose `type` discriminant is none of the
+ * supported FlowStep variants (possible when a flow comes from unvalidated YAML).
+ */
+interface UnrecognizedFlowStep {
+	id: string;
+	type: string;
+}
+
+/**
  * Schema Validator
  */
 export class SchemaValidator {
@@ -575,14 +584,17 @@ export class SchemaValidator {
 		} else if (step.type === 'user_intervention') {
 			this.validateUserInterventionStep(step as UserInterventionStep);
 		} else {
+			// All FlowStep variants are handled above, so `step` is `never` here; widening it
+			// keeps the actual runtime values available for the reported issue.
+			const unrecognizedStep: UnrecognizedFlowStep = step;
 			this.issueCollector.addIssue({
 				severity: 'error',
 				code: ValidationCode.INVALID_VALUE,
-				message: `Invalid step type: ${(step as any).type}`,
-				location: { stepId: (step as any).id, field: 'type' },
+				message: `Invalid step type: ${unrecognizedStep.type}`,
+				location: { stepId: unrecognizedStep.id, field: 'type' },
 				suggestion: 'Type must be either "model", "script", "subflow", or "user_intervention"',
 				context: {
-					actual: (step as any).type,
+					actual: unrecognizedStep.type,
 					expected: ['model', 'script', 'subflow', 'user_intervention'],
 				},
 			});

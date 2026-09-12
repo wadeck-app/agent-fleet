@@ -233,6 +233,15 @@ export interface TransportConfig {
 }
 
 /**
+ * Runtime view of ALL_API_ROUTES for existence checks: path -> method -> contract.
+ * The compile-time types (PathsForMethod, RouteParams, ...) stay derived from the literal shape.
+ *
+ * Note: defineRoutes() also attaches a top-level `__baseUrl: string` to each routes object, so the
+ * real value is not exactly this shape. The lookups below are only reached with real API paths.
+ */
+type RouteLookup = Record<string, Record<string, unknown>>;
+
+/**
  * Type guard to check if a path is valid for a given method
  *
  * @template M - HTTP method
@@ -241,7 +250,7 @@ export interface TransportConfig {
  * @returns True if path is valid for the method
  */
 export function isValidPath<M extends HttpMethod>(method: M, path: string): path is PathsForMethod<M> {
-	const routes = ALL_API_ROUTES as any;
+	const routes = ALL_API_ROUTES as unknown as RouteLookup;
 	return path in routes && method in routes[path];
 }
 
@@ -252,7 +261,7 @@ export function isValidPath<M extends HttpMethod>(method: M, path: string): path
  * @returns Array of available HTTP methods
  */
 export function getAvailableMethods(path: string): HttpMethod[] {
-	const routes = ALL_API_ROUTES as any;
+	const routes = ALL_API_ROUTES as unknown as RouteLookup;
 	if (!(path in routes)) {
 		return [];
 	}

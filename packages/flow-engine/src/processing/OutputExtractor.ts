@@ -29,6 +29,15 @@ export class OutputExtractionError extends Error {
 }
 
 /**
+ * Type guard for a value that can be traversed by string key.
+ * Mirrors the historical runtime check `value != null && typeof value === 'object'`,
+ * so arrays are accepted (jsonpath supports `$.tags[0]` -> `$.tags.0`).
+ */
+function isIndexableObject(value: unknown): value is Record<string, unknown> {
+	return value !== null && value !== undefined && typeof value === 'object';
+}
+
+/**
  * Output Extractor class
  */
 export class OutputExtractor {
@@ -201,21 +210,21 @@ export class OutputExtractor {
 		let current: unknown = parsed;
 
 		for (const part of parts) {
-			if (current == null || typeof current !== 'object') {
+			if (!isIndexableObject(current)) {
 				throw new OutputExtractionError(
 					`jsonpath '${jsonpath}' failed: reached non-object before '${part}'`,
 					varName,
 					stepId
 				);
 			}
-			if (!(part in (current as Record<string, unknown>))) {
+			if (!(part in current)) {
 				throw new OutputExtractionError(
 					`jsonpath '${jsonpath}' failed: key '${part}' not found`,
 					varName,
 					stepId
 				);
 			}
-			current = (current as Record<string, unknown>)[part];
+			current = current[part];
 		}
 
 		return current;

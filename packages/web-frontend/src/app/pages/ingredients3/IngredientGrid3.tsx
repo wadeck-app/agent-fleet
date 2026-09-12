@@ -9,7 +9,7 @@
  * Displays ingredients as cards in a responsive 3-column grid:
  * - Mobile (< 768px): 1 column
  * - Tablet (768px - 1024px): 2 columns
- * - Desktop (≥ 1024px): 3 columns
+ * - Desktop (>= 1024px): 3 columns
  *
  * Features:
  * - Data display using IngredientCard3
