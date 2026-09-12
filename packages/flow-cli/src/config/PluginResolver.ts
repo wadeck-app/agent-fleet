@@ -57,6 +57,38 @@ export class PluginResolver {
 		};
 	}
 
+	/**
+	 * Builds only the approval provider, for a worker (D#35).
+	 *
+	 * Separate from {@link resolveAll} because a worker must not need a workspace provider:
+	 * allocating a workspace is the daemon's job, and requiring one here would stop a
+	 * machine that only runs workers from running one at all.
+	 *
+	 * This exists because a provider object cannot cross a process boundary -- only its
+	 * construction can be relocated. `plugin-cli-approval` reads its *own* `process.stdin`,
+	 * so it has to be built in the process that has the human in front of it (D#34).
+	 *
+	 * @returns undefined when no approval plugin is configured, which is normal -- a worker
+	 *          that serves no interactive step needs none.
+	 * @throws when a plugin *is* configured and cannot be loaded. Continuing without it
+	 *         would surface much later as a `user_intervention` step failing for a reason
+	 *         unrelated to what actually broke.
+	 */
+	async resolveApproval(): Promise<ApprovalProvider | undefined> {
+		const config = await this.configLoader.load();
+		if (!config.approval) return undefined;
+		if (!config.approval.type) {
+			throw new Error('approval.type is required in config. Expected format: plugins.<pluginId>.<implName>');
+		}
+
+		return (await this.pluginLoader.loadProvider(
+			config.approval.type,
+			'approval',
+			config.approval.options ?? {},
+			config.approval.pluginsDir
+		)) as ApprovalProvider;
+	}
+
 	async resolveAll(): Promise<ResolvedProviders> {
 		const config = await this.configLoader.load();
 		const result: ResolvedProviders = {};

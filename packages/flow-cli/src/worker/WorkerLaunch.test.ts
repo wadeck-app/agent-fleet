@@ -84,7 +84,7 @@ describe('resolveWorkerToken', () => {
 
 describe('buildRegistration', () => {
 	it('attaches the launch project by default (D#9)', () => {
-		const reg = buildRegistration({ projectRoot: 'C:/proj', isTty: false, pid: 7 });
+		const reg = buildRegistration({ projectRoot: 'C:/proj', isTty: false, canPrompt: false, pid: 7 });
 
 		expect(reg.attachedProjects).toEqual(['C:/proj']);
 	});
@@ -94,6 +94,7 @@ describe('buildRegistration', () => {
 			projectRoot: 'C:/proj',
 			extraProjects: ['C:/other'],
 			isTty: false,
+			canPrompt: false,
 			pid: 7,
 		});
 
@@ -105,6 +106,7 @@ describe('buildRegistration', () => {
 			projectRoot: 'C:/proj',
 			extraProjects: ['C:/proj'],
 			isTty: false,
+			canPrompt: false,
 			pid: 7,
 		});
 
@@ -112,15 +114,32 @@ describe('buildRegistration', () => {
 	});
 
 	// D#33/D#36: only the worker can know whether a human is attached.
-	it('reports a user interface exactly when stdout is a TTY', () => {
-		expect(buildRegistration({ projectRoot: 'C:/p', isTty: true, pid: 1 }).hasUserInterface).toBe(true);
-		expect(buildRegistration({ projectRoot: 'C:/p', isTty: false, pid: 1 }).hasUserInterface).toBe(false);
+	it('reports a user interface when there is a TTY and a way to prompt', () => {
+		const reg = buildRegistration({ projectRoot: 'C:/p', isTty: true, canPrompt: true, pid: 1 });
+
+		expect(reg.hasUserInterface).toBe(true);
+	});
+
+	it('reports none without a TTY, whatever else is available', () => {
+		const reg = buildRegistration({ projectRoot: 'C:/p', isTty: false, canPrompt: true, pid: 1 });
+
+		expect(reg.hasUserInterface).toBe(false);
+	});
+
+	// A TTY alone is not enough: without an approval provider the worker would attract an
+	// interactive step and then fail it with "No ApprovalProvider configured". Declaring a
+	// capability it cannot honour is worse than declaring none.
+	it('reports none when there is nobody to ask, even at a terminal', () => {
+		const reg = buildRegistration({ projectRoot: 'C:/p', isTty: true, canPrompt: false, pid: 1 });
+
+		expect(reg.hasUserInterface).toBe(false);
 	});
 
 	it('passes labels and source through', () => {
 		const reg = buildRegistration({
 			projectRoot: 'C:/p',
 			isTty: false,
+			canPrompt: false,
 			pid: 1,
 			sourceId: 'laptop',
 			labels: ['gpu', 'linux'],
@@ -133,9 +152,9 @@ describe('buildRegistration', () => {
 	});
 
 	it('rejects a blank label rather than sending something unmatchable', () => {
-		expect(() => buildRegistration({ projectRoot: 'C:/p', isTty: false, pid: 1, labels: ['  '] })).toThrow(
-			/empty/i
-		);
+		expect(() =>
+			buildRegistration({ projectRoot: 'C:/p', isTty: false, canPrompt: false, pid: 1, labels: ['  '] })
+		).toThrow(/empty/i);
 	});
 });
 

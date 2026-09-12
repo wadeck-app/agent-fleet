@@ -64,6 +64,7 @@ function createMockWorkerPool() {
 		send: vi.fn(),
 		broadcast: vi.fn(),
 		register: vi.fn(),
+		summarize: vi.fn().mockReturnValue([]),
 		// WorkerProvisioner surface
 		canProvision: vi.fn().mockReturnValue(false),
 		planProvisioning: vi.fn().mockReturnValue({ fork: 0 }),
@@ -271,7 +272,10 @@ describe('CommandHandler.handleRun', () => {
 		expect((result as { code: string }).code).toBe('VALIDATION_FAILED');
 	});
 
-	it('returns UNSUPPORTED_STEP_TYPE when the flow contains a user_intervention step', async () => {
+	// The v1 refusal is gone (D#37): such a flow now starts, and the step is routed to a
+	// worker that declared a user interface. What happens when none is connected is S9's
+	// call -- see the interactive-steps suite below.
+	it('accepts a flow containing a user_intervention step', async () => {
 		const flowFile = path.join(tmpDir, 'intervention.yml');
 		fs.writeFileSync(flowFile, USER_INTERVENTION_FLOW_YAML);
 
@@ -282,9 +286,7 @@ describe('CommandHandler.handleRun', () => {
 			cwd: tmpDir,
 		} as never);
 
-		expect(result.type).toBe('error');
-		if (result.type !== 'error') throw new Error('Expected error response');
-		expect((result as { code: string }).code).toBe('UNSUPPORTED_STEP_TYPE');
+		expect(result.type).toBe('execution_started');
 	});
 
 	it('returns execution_started with a valid executionId for a successful flow', async () => {
@@ -1003,6 +1005,114 @@ steps:
 		expect((result as { type: string }).type).toBe('error');
 		expect(JSON.stringify(result)).toMatch(/labels/i);
 		expect(dispatched).toEqual([]);
+	});
+});
+
+describe('CommandHandler — interactive steps (D#37, D#39, D#61)', () => {
+	const INTERVENTION_FLOW_YAML = `\
+id: intervention-flow
+version: "1.0.0"
+name: Intervention Flow
+description: needs a human
+workspace:
+  mode: manual
+  gitStrategy: any
+  reusePolicy: if-available
+inputs: {}
+steps:
+  - id: confirm
+    name: Confirm
+    type: user_intervention
+    interventionType: approval
+    approval:
+      title: Ship it?
+`;
+
+	function handlerWith(idle: unknown[]) {
+		const flowFile = path.join(tmpDir, 'intervention.yml');
+		fs.writeFileSync(flowFile, INTERVENTION_FLOW_YAML);
+
+		const workerPool = createMockWorkerPool();
+		const dispatched: string[] = [];
+		workerPool.listIdle.mockReturnValue(idle);
+		workerPool.summarize.mockReturnValue(
+			idle.map(candidate => (candidate as { worker: { hasUserInterface: boolean } }).worker)
+		);
+		workerPool.send.mockImplementation((_ws: unknown, msg: unknown) => {
+			dispatched.push((msg as { stepId: string }).stepId);
+			return true;
+		});
+
+		const handler = new CommandHandler(
+			daemonDir,
+			workerPool as never,
+			workerPool as never,
+			undefined,
+			mockExecStore as never,
+			mockLogWriter as never
+		);
+		return { handler, dispatched, flowFile };
+	}
+
+	// The v1 block is lifted (D#37): the capability exists now, so refusing the flow would
+	// ship a declaration nothing consumes.
+	it('accepts a flow containing a user_intervention step', async () => {
+		const interactive = forkedWorker({});
+		interactive.worker.hasUserInterface = true;
+		const { handler, flowFile } = handlerWith([interactive]);
+
+		const result = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect((result as { type: string }).type).toBe('execution_started');
+	});
+
+	it('dispatches it to a worker that declared a user interface', async () => {
+		const interactive = forkedWorker({});
+		interactive.worker.hasUserInterface = true;
+		const { handler, dispatched, flowFile } = handlerWith([interactive]);
+
+		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(dispatched).toContain('confirm');
+	});
+
+	// No amount of provisioning fixes this -- a forked worker has no terminal -- so leaving
+	// the step queued would stall the flow with nothing to act on (D#39).
+	it('fails the step when only headless workers are connected', async () => {
+		const headless = forkedWorker({});
+		const { handler, dispatched, flowFile } = handlerWith([headless]);
+
+		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(dispatched).not.toContain('confirm');
+		expect(mockExecStore.markStepFailed).toHaveBeenCalled();
+	});
+
+	it('says how to make the step runnable rather than just refusing it', async () => {
+		const { handler, flowFile } = handlerWith([]);
+
+		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		const reason = String(mockExecStore.markStepFailed.mock.calls.at(-1)?.[2] ?? '');
+		expect(reason).toContain('flow worker');
+		expect(reason).toContain('confirm');
+	});
+
+	// A separate v1 scope line, not the same limitation -- lifting one must not lift both.
+	it('still refuses a subflow step', async () => {
+		const flowFile = path.join(tmpDir, 'subflow.yml');
+		fs.writeFileSync(
+			flowFile,
+			INTERVENTION_FLOW_YAML.replace(
+				/  - id: confirm[\s\S]*$/,
+				'  - id: nested\n    name: Nested\n    type: subflow\n    flowId: other-flow\n    inputs: {}\n'
+			)
+		);
+		const { handler } = handlerWith([]);
+
+		const result = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(JSON.stringify(result)).toMatch(/subflow/);
 	});
 });
 

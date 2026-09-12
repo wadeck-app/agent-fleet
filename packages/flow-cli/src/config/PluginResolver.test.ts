@@ -126,3 +126,63 @@ plugins:
 		expect(typeof result.approvalProvider?.requestApproval).toBe('function');
 	});
 });
+
+describe("PluginResolver.resolveApproval - the worker's own resolution (D#35)", () => {
+	function resolverFor(configBody: string | undefined) {
+		const projectConfig = join(tmp, 'worker-config.yml');
+		if (configBody !== undefined) writeFileSync(projectConfig, configBody, 'utf8');
+		return PluginResolver.create({
+			globalConfigPath: join(tmp, 'missing.yml'),
+			projectConfigPath: configBody === undefined ? join(tmp, 'missing-project.yml') : projectConfig,
+			pluginPackagesDir: PACKAGES_DIR,
+			registryPath: REGISTRY_PATH,
+		});
+	}
+
+	// The whole reason this exists separately from resolveAll: a worker never allocates a
+	// workspace -- that is the daemon's job -- so requiring one would stop every worker from
+	// starting on a machine that only runs workers.
+	it('resolves approval without a workspace provider configured', async () => {
+		const provider = await resolverFor(`
+plugins:
+  approval:
+    instance:
+      type: plugins.cli-approval.default
+`).resolveApproval();
+
+		expect(typeof provider?.requestApproval).toBe('function');
+	});
+
+	it('returns nothing when no approval plugin is configured', async () => {
+		expect(await resolverFor(undefined).resolveApproval()).toBeUndefined();
+	});
+
+	// Silently running without the configured provider would mean a user_intervention step
+	// fails much later, deep in a flow, for a reason unrelated to what actually broke.
+	it('fails loudly when the configured approval plugin cannot be loaded', async () => {
+		await expect(
+			resolverFor(`
+plugins:
+  approval:
+    instance:
+      type: plugins.no-such-approval.default
+`).resolveApproval()
+		).rejects.toThrow(/no-such-approval/);
+	});
+
+	it('does not build a workspace provider even when one is configured', async () => {
+		// A worker that instantiated the workspace plugin could allocate or release a
+		// workspace the daemon owns.
+		const provider = await resolverFor(`
+plugins:
+  workspace:
+    instance:
+      type: plugins.none.default
+  approval:
+    instance:
+      type: plugins.cli-approval.default
+`).resolveApproval();
+
+		expect(typeof provider?.requestApproval).toBe('function');
+	});
+});

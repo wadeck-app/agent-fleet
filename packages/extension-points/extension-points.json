@@ -49,6 +49,12 @@
 			"versions": [{ "version": 1, "status": "stable", "since": "0.1.0" }]
 		},
 		{
+			"id": "interactivity-policy",
+			"status": "stable",
+			"description": "Decides what happens to a user_intervention step when no connected worker has a user interface. Scoped to that step type: interactivity is a worker property, so a model step on a headless worker simply runs headless.",
+			"versions": [{ "version": 1, "status": "stable", "since": "0.1.0" }]
+		},
+		{
 			"id": "provisioning",
 			"status": "stable",
 			"description": "Decides what to do about demand no live worker can serve: wait for a declared source, create capacity locally, or neither. A synchronous decision, never a blocking action.",

@@ -1,5 +1,11 @@
 import type { HookDispatcher } from '@wadeck-app/shared-cli/HookDispatcher';
-import type { ApprovalProvider, StepPlacement, WorkspaceHandle, WorkspaceProvider } from 'extension-points';
+import type {
+	ApprovalProvider,
+	InteractivityPolicyProvider,
+	StepPlacement,
+	WorkspaceHandle,
+	WorkspaceProvider,
+} from 'extension-points';
 import { releaseWorkspace } from 'extension-points';
 import { FlowValidator, WorkspaceManager } from 'flow-engine';
 import { FlowScheduler } from 'flow-engine';
@@ -18,6 +24,7 @@ import type { AssignableStep, ClientCommand, DaemonResponse, ExecutionContext, I
 import { ExecutionStore, generateExecutionId } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
 import { AssignmentLedger } from './AssignmentLedger.js';
+import { DefaultInteractivityPolicy } from './DefaultInteractivityPolicy.js';
 import { assertStepLabels } from './LabelMatcher.js';
 import { StepRouter } from './StepRouter.js';
 import type { WorkerProvisioner } from './WorkerProvisioner.js';
@@ -39,6 +46,24 @@ const MAX_REDISPATCHES = 3;
  * to re-run dispatch: without this the wait would never end and the queue would sit still.
  */
 const DEMAND_RECHECK_MS = 250;
+
+/**
+ * Confirms a step is one the daemon can hand to a worker.
+ *
+ * This used to be a `.filter()` keeping `model` and `script`, which meant a
+ * `user_intervention` step was **dropped**: the execution ran, reported success, and simply
+ * never asked the question. That was survivable only while such a flow was refused outright
+ * (D#37 has since lifted that), and it is the kind of silence a filter invites -- so an
+ * unexpected type now throws, and `handleRun` turns it into a refused run.
+ */
+function assertAssignable(step: FlowStep): AssignableStep {
+	if (step.type === 'model' || step.type === 'script' || step.type === 'user_intervention') {
+		return step as AssignableStep;
+	}
+	throw new Error(
+		`Step "${step.id}" is of type "${step.type}", which the daemon cannot dispatch. Supported types: model, script, user_intervention.`
+	);
+}
 
 const DEFAULT_MAX_INJECTED_STEPS = 20;
 const DEFAULT_MAX_STEPS_PER_EXECUTION = 50;
@@ -80,6 +105,10 @@ export class CommandHandler {
 	private readonly executionProjects = new Map<string, string>();
 	/** Chooses which live worker a step goes to (S3, S4) */
 	private readonly router = new StepRouter();
+	/** Decides the fate of a step needing a human when nothing can host one (S9) */
+	private readonly interactivityPolicy: InteractivityPolicyProvider = new DefaultInteractivityPolicy();
+	/** When each interactive step started waiting, so an S9 policy can bound its own wait */
+	private readonly interactiveWaitSince = new Map<string, number>();
 	/** When the current episode of unserved demand began, for the S8 wait (D#25) */
 	private unmetDemandSince: number | undefined;
 	/** Pending re-run of dispatch while S8 waits; nothing else would trigger one */
@@ -106,8 +135,17 @@ export class CommandHandler {
 		private readonly maxInjectedSteps: number = DEFAULT_MAX_INJECTED_STEPS,
 		private readonly maxStepsPerExecution: number = DEFAULT_MAX_STEPS_PER_EXECUTION,
 		private readonly workspaceProvider?: WorkspaceProvider,
-		// ApprovalProvider stored for future worker injection (requires IPC protocol changes)
-		private readonly approvalProvider?: ApprovalProvider,
+		/**
+		 * Accepted and unused, on purpose.
+		 *
+		 * It was held here for "future worker injection", which cannot happen: a provider
+		 * object does not cross a process boundary, and the CLI approval plugin reads its own
+		 * `process.stdin` while the daemon runs detached with `stdio: 'ignore'` -- so a
+		 * daemon-side instance could never reach a human (D#34). The worker builds its own
+		 * (`WorkerCommand`). The parameter stays only so the daemon's existing call site keeps
+		 * its shape; nothing here may start using it.
+		 */
+		private readonly daemonSideApprovalProviderUnused?: ApprovalProvider,
 		private readonly resolvePerFlowWorkspaceProvider?: (
 			section: NonNullable<FlowPluginOverrides['workspace']>
 		) => Promise<WorkspaceProvider>
@@ -201,15 +239,11 @@ export class CommandHandler {
 			};
 		}
 
-		const interventionStep = flow.steps.find((s: FlowStep) => s.type === 'user_intervention');
-		if (interventionStep) {
-			return {
-				type: 'error',
-				code: 'UNSUPPORTED_STEP_TYPE',
-				message: `Step '${interventionStep.id}' is of type 'user_intervention' which is not supported in v1.`,
-			};
-		}
-
+		// `user_intervention` used to be refused here alongside `subflow`. It is supported now
+		// (D#37): a worker with a terminal owns an approval provider and can put the question
+		// to the person in front of it (D#34), and routing only ever sends such a step to a
+		// worker that declared the capability (S4). `subflow` stays refused -- that is a
+		// separate v1 scope line, not the same limitation.
 		const subflowStep = flow.steps.find((s: FlowStep) => s.type === 'subflow');
 		if (subflowStep) {
 			return {
@@ -383,7 +417,7 @@ export class CommandHandler {
 							: s
 					)
 				: flow.steps
-		).filter((s: FlowStep): s is AssignableStep => s.type === 'model' || s.type === 'script');
+		).map((s: FlowStep) => assertAssignable(s));
 
 		const scheduler = new FlowScheduler(schedulerCtx);
 		const readyItems = scheduler.start(assignable as unknown as SchedulerStep[], depends);
@@ -681,6 +715,9 @@ export class CommandHandler {
 			}
 
 			const idleWorker = this.router.select(placement, this.registry.listIdle());
+			if (idleWorker === undefined && placement.requiresUserInterface && this.failIfNobodyCanAnswer(step)) {
+				continue;
+			}
 			if (idleWorker) {
 				const scheduler = this.schedulers.get(step.executionContext.executionId);
 
@@ -744,6 +781,33 @@ export class CommandHandler {
 
 		this.readyQueue.unshift(...unplaced);
 		this.coverUnmetDemand(unplaced.length);
+	}
+
+	/**
+	 * Asks S9 what to do about a step needing a human that nothing can host (D#39, D#61).
+	 *
+	 * Kept out of the provisioning path on purpose: no amount of provisioning helps here. A
+	 * forked worker has no terminal, so the daemon cannot create its way out of this, and
+	 * treating it as ordinary unmet demand would leave the step queued forever.
+	 *
+	 * @returns true when the step was failed and must not be re-queued.
+	 */
+	private failIfNobodyCanAnswer(step: ReadyStep): boolean {
+		const key = `${step.executionContext.executionId}:${step.stepId}`;
+		const since = this.interactiveWaitSince.get(key) ?? Date.now();
+		this.interactiveWaitSince.set(key, since);
+
+		const interactiveWorkers = this.registry.summarize().filter(worker => worker.hasUserInterface).length;
+		const decision = this.interactivityPolicy.decide({
+			stepId: step.stepId,
+			waitingMs: Date.now() - since,
+			interactiveWorkers,
+		});
+		if (decision.action === 'wait') return false;
+
+		this.interactiveWaitSince.delete(key);
+		this.failStep(step.executionContext.executionId, step.stepId, decision.reason);
+		return true;
 	}
 
 	/**

@@ -91,6 +91,11 @@ export function buildRegistration(params: {
 	projectRoot: string;
 	extraProjects?: string[];
 	isTty: boolean;
+	/**
+	 * Whether this worker has an approval provider, i.e. something that can actually put a
+	 * question to the human at that terminal.
+	 */
+	canPrompt: boolean;
 	pid: number;
 	sourceId?: string;
 	labels?: string[];
@@ -116,8 +121,10 @@ export function buildRegistration(params: {
 		...(params.sourceId !== undefined ? { sourceId: params.sourceId } : {}),
 		labels: params.labels ?? [],
 		attachedProjects,
-		// Only this process can see whether a human is attached (D#33, D#36).
-		hasUserInterface: params.isTty,
+		// Only this process can see whether a human is attached (D#33, D#36) -- and a TTY
+		// alone is not the capability. Without an approval provider the worker would attract
+		// an interactive step and then fail it, so both halves are required.
+		hasUserInterface: params.isTty && params.canPrompt,
 	};
 }
 

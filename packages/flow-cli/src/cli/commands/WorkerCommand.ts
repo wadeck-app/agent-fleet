@@ -1,6 +1,7 @@
 import { ConfigDir } from '@wadeck-app/shared-cli';
 import { DaemonNotRunningError, createDaemonClient } from '@wadeck-app/singleton-daemon-kit';
 import type { Command } from 'commander';
+import type { ApprovalProvider } from 'extension-points';
 import { StepRunner } from 'flow-engine';
 import type { StepRunnerConfig } from 'flow-engine';
 import { join } from 'node:path';
@@ -10,6 +11,7 @@ import { WebSocket } from 'ws';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { DefaultProjectResolver } from '../../config/DefaultProjectResolver';
 import { FlowConfigLoader } from '../../config/FlowConfig';
+import { PluginResolver } from '../../config/PluginResolver';
 import type { AssignmentScopedMessage, DaemonToWorker, WorkerSummary, WorkerToDaemon } from '../../ipc/Protocol';
 import type { McpServerConfig } from '../../worker/McpServer';
 import { WorkerAdapter } from '../../worker/WorkerAdapter';
@@ -72,9 +74,9 @@ export function registerWorkerCommand(worker: Command): void {
 		)
 		.option('--labels <labels>', 'Comma-separated labels advertised to the daemon', '')
 		.option('--verbose', 'Also print the raw output each step produces, not just its lifecycle')
-		.action((options: WorkerOptions) => {
+		.action(async (options: WorkerOptions) => {
 			try {
-				runWorker(options);
+				await runWorker(options);
 			} catch (err) {
 				report('[fail]', normalizeError(err).message);
 				process.exit(1);
@@ -145,17 +147,24 @@ function registerListCommand(worker: Command): void {
 		});
 }
 
-function runWorker(options: WorkerOptions): void {
+async function runWorker(options: WorkerOptions): Promise<void> {
 	const daemonDir = ConfigDir.get('flow');
 	// Same file the daemon reads, so a configured wsPort is honoured here too.
 	const config = FlowConfigLoader.load(join(daemonDir, 'config.yml'));
 	const { projectRoot } = new DefaultProjectResolver().resolve(process.cwd());
+
+	// Built here, in the process with the human in front of it (D#34): the CLI approval
+	// plugin reads its own stdin, so a daemon-side instance could never reach anybody. A
+	// failure to load a *configured* plugin stops the worker rather than letting it register
+	// as interactive and fail the first question it is asked.
+	const approvalProvider = await PluginResolver.create().resolveApproval();
 
 	const token = resolveWorkerToken({ token: options.token, sourceId: options.source }, daemonDir);
 	const registration = buildRegistration({
 		projectRoot,
 		extraProjects: options.project,
 		isTty: process.stdout.isTTY === true,
+		canPrompt: approvalProvider !== undefined,
 		pid: process.pid,
 		...(options.source !== undefined ? { sourceId: options.source } : {}),
 		labels: parseLabels(options.labels),
@@ -167,14 +176,30 @@ function runWorker(options: WorkerOptions): void {
 		console.log(`     labels     : ${registration.labels.join(', ')}`);
 	}
 	console.log(`     projects   : ${(registration.attachedProjects ?? []).join(', ')}`);
-	console.log(`     interactive: ${String(registration.hasUserInterface)}`);
+	console.log(
+		`     interactive: ${String(registration.hasUserInterface)}${explainInteractivity(registration.hasUserInterface === true, approvalProvider !== undefined)}`
+	);
 	console.log('     Waiting for steps. This worker stays alive across daemon restarts; Ctrl-C to stop.');
 	if (options.verbose !== true) {
 		console.log('     Run with --verbose to also see the raw output each step produces.');
 	}
 
 	const display = new WorkerDisplay(options.verbose === true ? 'verbose' : 'summary');
-	connect(daemonDir, config.worker.wsPort, registration, 0, display);
+	connect(daemonDir, config.worker.wsPort, registration, 0, display, approvalProvider);
+}
+
+/**
+ * Says *why* a worker is not interactive, since the reason decides what to do about it.
+ *
+ * "interactive: false" on its own leaves the user guessing between a missing terminal and a
+ * missing plugin, and only one of those is fixed by editing config.
+ */
+function explainInteractivity(interactive: boolean, hasApproval: boolean): string {
+	if (interactive) return '';
+	if (!hasApproval) {
+		return ' (no approval plugin configured, so no user_intervention step can run here)';
+	}
+	return ' (not a terminal, so no user_intervention step can run here)';
 }
 
 /**
@@ -188,7 +213,8 @@ function connect(
 	configuredWsPort: number | null,
 	registration: Omit<import('../../ipc/Protocol').WorkerReady, 'type'>,
 	attempt: number,
-	display: WorkerDisplay
+	display: WorkerDisplay,
+	approvalProvider: ApprovalProvider | undefined
 ): void {
 	let wsUrl: string;
 	try {
@@ -196,13 +222,18 @@ function connect(
 	} catch (err) {
 		// The daemon may simply not be up yet; report and keep waiting rather than exiting.
 		report('[wait]', normalizeError(err).message);
-		scheduleReconnect(daemonDir, configuredWsPort, registration, attempt + 1, display);
+		scheduleReconnect(daemonDir, configuredWsPort, registration, attempt + 1, display, approvalProvider);
 		return;
 	}
 
 	const ws = new WebSocket(wsUrl);
 	const adapter = new WorkerAdapter((mcpServers: McpServerConfig[]) => {
-		const base: StepRunnerConfig = { interactive: registration.hasUserInterface === true };
+		const base: StepRunnerConfig = {
+			interactive: registration.hasUserInterface === true,
+			// The provider lives in this process, so a user_intervention step reaches the human
+			// at this terminal (D#34).
+			...(approvalProvider !== undefined ? { approvalProvider } : {}),
+		};
 		const runnerConfig = (mcpServers.length > 0 ? { ...base, mcpServers } : base) as StepRunnerConfig;
 		return new StepRunner(runnerConfig);
 	});
@@ -233,7 +264,7 @@ function connect(
 
 	ws.on('close', () => {
 		console.log('[wait] daemon connection closed; waiting to re-register');
-		scheduleReconnect(daemonDir, configuredWsPort, registration, attempt + 1, display);
+		scheduleReconnect(daemonDir, configuredWsPort, registration, attempt + 1, display, approvalProvider);
 	});
 }
 
@@ -242,11 +273,12 @@ function scheduleReconnect(
 	configuredWsPort: number | null,
 	registration: Omit<import('../../ipc/Protocol').WorkerReady, 'type'>,
 	attempt: number,
-	display: WorkerDisplay
+	display: WorkerDisplay,
+	approvalProvider: ApprovalProvider | undefined
 ): void {
 	const delay = reconnectDelayMs(attempt);
 	setTimeout(() => {
-		connect(daemonDir, configuredWsPort, registration, attempt, display);
+		connect(daemonDir, configuredWsPort, registration, attempt, display, approvalProvider);
 	}, delay).unref?.();
 }
 
