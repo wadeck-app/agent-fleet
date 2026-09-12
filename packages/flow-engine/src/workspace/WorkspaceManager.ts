@@ -190,8 +190,7 @@ export class WorkspaceManager {
 		if (!fs.existsSync(workspacePath))
 			throw new WorkspaceAllocationError(`Manual workspace path does not exist: ${workspacePath}`);
 		const gitState = await this.git.getGitState(workspacePath);
-		if (gitState && !gitState.isClean)
-			console.warn(`  Manual workspace has uncommitted changes: ${workspacePath}`);
+		if (gitState && !gitState.isClean) console.warn(`  Manual workspace has uncommitted changes: ${workspacePath}`);
 		if (!gitState) console.warn(`  Manual workspace is not a git repository: ${workspacePath}`);
 		const id = uuidv4();
 		const metaDir = workspacePath + '.meta';

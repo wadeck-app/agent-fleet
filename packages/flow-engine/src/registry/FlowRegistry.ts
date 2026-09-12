@@ -4,9 +4,9 @@
  * Manages flow definitions, loading, validation, and lookup.
  * Provides default flows and supports project-specific flow configurations.
  */
+import * as yaml from 'js-yaml';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
-import * as yaml from 'js-yaml';
 import * as path from 'node:path';
 
 import type {

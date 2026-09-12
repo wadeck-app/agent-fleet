@@ -9,7 +9,11 @@ vi.mock('flow-engine', async importOriginal => {
 	return {
 		...actual,
 		WorkspaceManager: class MockWorkspaceManager {
-			allocate = vi.fn().mockResolvedValue({ path: '/tmp/test-workspace', metaDir: '/tmp/test-workspace.meta', id: 'ws-test-id' });
+			allocate = vi.fn().mockResolvedValue({
+				path: '/tmp/test-workspace',
+				metaDir: '/tmp/test-workspace.meta',
+				id: 'ws-test-id',
+			});
 			release = vi.fn().mockResolvedValue(undefined);
 		},
 	};

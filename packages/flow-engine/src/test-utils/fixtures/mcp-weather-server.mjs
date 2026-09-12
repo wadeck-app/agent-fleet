@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /**
  * Minimal MCP server fixture for integration tests.
  *
@@ -16,7 +17,7 @@ function send(msg) {
 	process.stdout.write(JSON.stringify(msg) + '\n');
 }
 
-rl.on('line', (line) => {
+rl.on('line', line => {
 	const trimmed = line.trim();
 	if (!trimmed) return;
 

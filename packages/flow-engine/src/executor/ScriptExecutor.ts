@@ -148,7 +148,11 @@ export class ScriptExecutor {
 					let stderr = '';
 					let killed = false;
 					const cleanupSh = () => {
-						try { fs.unlinkSync(tempFilePath!); } catch { /* ignore */ }
+						try {
+							fs.unlinkSync(tempFilePath!);
+						} catch {
+							/* ignore */
+						}
 					};
 					const child = spawn('bash', [tempFilePath!], {
 						cwd: workingDir,
@@ -156,21 +160,34 @@ export class ScriptExecutor {
 						stdio: ['ignore', 'pipe', 'pipe'],
 						windowsHide: true,
 					});
-					child.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
-					child.stderr?.on('data', (d: Buffer) => { stderr += d.toString(); });
+					child.stdout?.on('data', (d: Buffer) => {
+						stdout += d.toString();
+					});
+					child.stderr?.on('data', (d: Buffer) => {
+						stderr += d.toString();
+					});
 					child.on('close', (code: number | null) => {
 						cleanupSh();
 						const exitCode = code ?? 1;
 						const durationMs = Date.now() - startTime;
 						innerResolve({ stdout, stderr, exitCode, durationMs, success: exitCode === 0 });
 					});
-					child.on('error', (err: Error) => { cleanupSh(); innerReject(err); });
+					child.on('error', (err: Error) => {
+						cleanupSh();
+						innerReject(err);
+					});
 					if (options.timeout) {
 						setTimeout(() => {
 							killed = true;
 							child.kill();
 							cleanupSh();
-							innerResolve({ stdout, stderr, exitCode: -1, durationMs: Date.now() - startTime, success: false });
+							innerResolve({
+								stdout,
+								stderr,
+								exitCode: -1,
+								durationMs: Date.now() - startTime,
+								success: false,
+							});
 						}, options.timeout);
 					}
 					void killed; // suppress unused warning

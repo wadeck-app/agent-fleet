@@ -234,9 +234,7 @@ export class LoopHandler {
 				const oldCount = iterations.get(step.id) || 0;
 				if (oldCount > 0) {
 					iterations.delete(step.id);
-					console.log(
-						`    Reset iteration counter for '${step.id}' (was ${oldCount}) due to resetOnSuccess`
-					);
+					console.log(`    Reset iteration counter for '${step.id}' (was ${oldCount}) due to resetOnSuccess`);
 				}
 			}
 		}

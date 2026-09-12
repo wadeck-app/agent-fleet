@@ -1,5 +1,5 @@
-import { type HookConfig, HookDispatcher } from '@wadeck-app/shared-cli/HookDispatcher';
 import { ConfigDir } from '@wadeck-app/shared-cli';
+import { type HookConfig, HookDispatcher } from '@wadeck-app/shared-cli/HookDispatcher';
 import { type DaemonHandle, createDaemon } from '@wadeck-app/singleton-daemon-kit';
 import type { ApprovalProvider, WorkspaceProvider } from 'extension-points';
 import { WorkspaceManager } from 'flow-engine';

@@ -19,7 +19,9 @@ export class WorkerPool {
 	private readonly spawnedPids = new Set<number>();
 	private activeCount = 0;
 
-	get runningCount(): number { return this.activeCount; }
+	get runningCount(): number {
+		return this.activeCount;
+	}
 	private readonly workerPath: string;
 	private readonly claudePath: string;
 	private readonly tsxLoaderPath: string | null;

@@ -3,6 +3,9 @@
  *
  * Invocation: opencode run [message] --format json [--auto] [-m model]
  * MCP config: OPENCODE_CONFIG_CONTENT (inline JSON ≤1MB) or OPENCODE_CONFIG (temp file >1MB)
+ * Multi-config: OPENCODE_CONFIG env var can specify multiple config files (comma or colon-separated)
+ *               that will be merged before being passed to opencode. Example:
+ *               OPENCODE_CONFIG="~/.config/opencode/config_claude.json:~/.config/opencode/config_codex.json"
  * Env isolation: only options.env is forwarded; process.env is never inherited.
  * Prompt limit: 32KB -- throws PromptTooLargeError if exceeded.
  * XDG isolation: each subprocess gets a unique XDG_CONFIG_HOME so it never reads ~/.config/opencode/.
@@ -453,7 +456,10 @@ export class OpenCodeModelProvider implements ModelProvider {
 			// On Windows, find the real opencode.exe next to opencode.cmd in the npm global bin dir.
 			// shell:true with complex prompts (newlines, backticks) is unreliable on Windows cmd.exe.
 			try {
-				const cmdPath = execSync('where.exe opencode.cmd', { encoding: 'utf8', windowsHide: true }).trim().split('\n')[0]!.trim();
+				const cmdPath = execSync('where.exe opencode.cmd', { encoding: 'utf8', windowsHide: true })
+					.trim()
+					.split('\n')[0]!
+					.trim();
 				const dir = path.dirname(cmdPath);
 				const exePath = path.join(dir, 'node_modules', 'opencode-ai', 'bin', 'opencode.exe');
 				if (fs.existsSync(exePath)) {
@@ -466,7 +472,10 @@ export class OpenCodeModelProvider implements ModelProvider {
 			return { parts: ['opencode'], needsShell: true };
 		}
 		try {
-			return { parts: [execSync('which opencode', { encoding: 'utf8', windowsHide: true }).trim()], needsShell: false };
+			return {
+				parts: [execSync('which opencode', { encoding: 'utf8', windowsHide: true }).trim()],
+				needsShell: false,
+			};
 		} catch {
 			return { parts: ['opencode'], needsShell: false };
 		}
@@ -490,20 +499,105 @@ export class OpenCodeModelProvider implements ModelProvider {
 	}
 
 	/**
+	 * Load and merge multiple OpenCode config files from OPENCODE_CONFIG env var.
+	 * Format: comma or colon-separated paths. Returns merged config object.
+	 * Later configs override earlier ones (deep merge for objects, replace for primitives).
+	 */
+	private loadAndMergeConfigs(configPaths: string[]): Record<string, unknown> {
+		let merged: Record<string, unknown> = {};
+		for (const configPath of configPaths) {
+			const resolvedPath = configPath.replace(/^~/, os.homedir());
+			if (!fs.existsSync(resolvedPath)) {
+				console.warn(`[OpenCodeModelProvider] Config file not found: ${resolvedPath}`);
+				continue;
+			}
+			try {
+				const content = fs.readFileSync(resolvedPath, 'utf8');
+				const config = JSON.parse(content) as Record<string, unknown>;
+				merged = this.deepMerge(merged, config);
+			} catch (err) {
+				console.warn(
+					`[OpenCodeModelProvider] Failed to load config ${resolvedPath}:`,
+					err instanceof Error ? err.message : String(err)
+				);
+			}
+		}
+		return merged;
+	}
+
+	/**
+	 * Deep merge two objects. Later object overrides earlier one.
+	 * Arrays are replaced, not merged.
+	 */
+	private deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+		const result = { ...target };
+		for (const [key, value] of Object.entries(source)) {
+			if (
+				value &&
+				typeof value === 'object' &&
+				!Array.isArray(value) &&
+				result[key] &&
+				typeof result[key] === 'object' &&
+				!Array.isArray(result[key])
+			) {
+				result[key] = this.deepMerge(result[key] as Record<string, unknown>, value as Record<string, unknown>);
+			} else {
+				result[key] = value;
+			}
+		}
+		return result;
+	}
+
+	/**
 	 * Copy the user's global OpenCode config.json into the isolated tempDir so the subprocess
 	 * retains auth and model settings while being isolated from global plugin state.
+	 * If OPENCODE_CONFIG env var is set, merge multiple config files before copying.
 	 */
 	private copyGlobalConfig(tempDir: string): void {
-		// Candidate locations for the user's OpenCode config (checked in order)
-		const candidates = [
-			path.join(os.homedir(), '.config', 'opencode', 'config.json'),
-			...(process.env['LOCALAPPDATA'] ? [path.join(process.env['LOCALAPPDATA'], 'opencode', 'config.json')] : []),
-			...(process.env['APPDATA'] ? [path.join(process.env['APPDATA'], 'opencode', 'config.json')] : []),
-		];
-		const src = candidates.find(p => fs.existsSync(p));
-		if (!src) return;
-		const destDir = path.join(tempDir, 'opencode');
-		fs.mkdirSync(destDir, { recursive: true });
-		fs.copyFileSync(src, path.join(destDir, 'config.json'));
+		let config: Record<string, unknown> | null = null;
+
+		// Check for multi-config via OPENCODE_CONFIG env var
+		const multiConfigEnv = process.env['OPENCODE_CONFIG'];
+		if (multiConfigEnv) {
+			// Split by comma or colon (colon for Unix paths, comma for Windows)
+			const separator = multiConfigEnv.includes(',') ? ',' : ':';
+			const configPaths = multiConfigEnv
+				.split(separator)
+				.map(p => p.trim())
+				.filter(Boolean);
+			if (configPaths.length > 0) {
+				config = this.loadAndMergeConfigs(configPaths);
+			}
+		}
+
+		// Fallback to single global config if no multi-config or merge failed
+		if (!config || Object.keys(config).length === 0) {
+			const candidates = [
+				path.join(os.homedir(), '.config', 'opencode', 'config.json'),
+				...(process.env['LOCALAPPDATA']
+					? [path.join(process.env['LOCALAPPDATA'], 'opencode', 'config.json')]
+					: []),
+				...(process.env['APPDATA'] ? [path.join(process.env['APPDATA'], 'opencode', 'config.json')] : []),
+			];
+			const src = candidates.find(p => fs.existsSync(p));
+			if (!src) return;
+			try {
+				const content = fs.readFileSync(src, 'utf8');
+				config = JSON.parse(content) as Record<string, unknown>;
+			} catch (err) {
+				console.warn(
+					`[OpenCodeModelProvider] Failed to load global config:`,
+					err instanceof Error ? err.message : String(err)
+				);
+				return;
+			}
+		}
+
+		// Write merged config to temp dir
+		if (config && Object.keys(config).length > 0) {
+			const destDir = path.join(tempDir, 'opencode');
+			fs.mkdirSync(destDir, { recursive: true });
+			fs.writeFileSync(path.join(destDir, 'config.json'), JSON.stringify(config, null, 2), { encoding: 'utf8' });
+		}
 	}
 }
