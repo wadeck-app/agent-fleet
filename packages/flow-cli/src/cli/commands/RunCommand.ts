@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
+import { DefaultProjectResolver } from '../../config/DefaultProjectResolver';
 import { type FlowConfig, FlowConfigLoader } from '../../config/FlowConfig';
 import { Daemon } from '../../daemon/Daemon';
 import type { ClientCommand, DaemonResponse, ExecutionState } from '../../ipc/Protocol';
@@ -116,16 +117,6 @@ async function waitForCompletion(
 	throw new Error(`Execution ${executionId} did not complete within ${timeoutMs}ms`);
 }
 
-function findProjectRoot(startDir: string): string | null {
-	let dir = path.resolve(startDir);
-	const { root } = path.parse(dir);
-	while (dir !== root) {
-		if (fs.existsSync(path.join(dir, '.agent-fleet'))) return dir;
-		dir = path.dirname(dir);
-	}
-	return null;
-}
-
 // Result type for flow file resolution -- either found with an optional inferred flow ID,
 // or not found with an error message for the caller to surface.
 type FlowResolution = { found: true; flowFile: string; inferredFlowId?: string } | { found: false; error: string };
@@ -135,14 +126,22 @@ function resolveFlowFile(flowRef: string, cwd: string): FlowResolution {
 	if (fs.existsSync(resolvedPath)) {
 		return { found: true, flowFile: resolvedPath };
 	}
-	// Treat as registry ID -- use .agent-fleet/flows.yml lookup
-	const projectRoot = findProjectRoot(cwd);
-	if (!projectRoot) {
-		return { found: false, error: `Flow '${flowRef}' not found as a file and no .agent-fleet/ directory found.` };
+	// Treat as registry ID -- use .flow/flows.yml lookup
+	let projectRoot: string;
+	try {
+		projectRoot = new DefaultProjectResolver().resolve(cwd).projectRoot;
+	} catch (err) {
+		// The resolver's message already names the markers it looked for, or the
+		// legacy files to move -- surface it rather than replacing it.
+		const detail = err instanceof Error ? err.message : String(err);
+		return { found: false, error: `Flow '${flowRef}' not found as a file.\n${detail}` };
 	}
-	const flowsFile = path.join(projectRoot, '.agent-fleet', 'flows.yml');
+	const flowsFile = path.join(projectRoot, '.flow', 'flows.yml');
 	if (!fs.existsSync(flowsFile)) {
-		return { found: false, error: `Flow '${flowRef}' not found and no flows.yml in ${projectRoot}` };
+		return {
+			found: false,
+			error: `Flow '${flowRef}' not found as a file, and the flow registry "${flowsFile}" does not exist.`,
+		};
 	}
 	return { found: true, flowFile: flowsFile, inferredFlowId: flowRef };
 }

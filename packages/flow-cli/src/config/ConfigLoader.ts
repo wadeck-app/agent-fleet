@@ -1,10 +1,11 @@
+import { ConfigDir } from '@wadeck-app/shared-cli';
 import { SENSITIVE_FIELDS } from 'extension-points';
 import { load as parseYaml } from 'js-yaml';
 import { readFileSync } from 'node:fs';
 import { access } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 
+import { DefaultProjectResolver } from './DefaultProjectResolver.js';
 import type {
 	GlobalConfig,
 	ProjectConfig,
@@ -71,13 +72,15 @@ function loadYamlFile<T>(filePath: string): T | null {
 
 export class ConfigLoader {
 	private globalConfigPath: string;
-	private projectConfigPath: string;
+	private projectConfigPathOverride: string | undefined;
 	private envVarOverride: string | undefined;
 
 	constructor(options: ConfigLoaderOptions = {}) {
 		this.envVarOverride = process.env['FLOW_CONFIG'];
-		this.globalConfigPath = options.globalConfigPath ?? join(homedir(), '.flow', 'config.yml');
-		this.projectConfigPath = options.projectConfigPath ?? join(process.cwd(), '.flow', 'config.yml');
+		this.globalConfigPath = options.globalConfigPath ?? join(ConfigDir.get('flow'), 'config.yml');
+		// Resolved lazily: the project root depends on a filesystem walk that must
+		// not run (nor fail) merely because a ConfigLoader was constructed.
+		this.projectConfigPathOverride = options.projectConfigPath;
 	}
 
 	async load(): Promise<ResolvedPluginsConfig> {
@@ -114,9 +117,33 @@ export class ConfigLoader {
 		}
 	}
 
+	/**
+	 * Resolves the project config path, or null when the working directory
+	 * belongs to no project.
+	 *
+	 * Uses the project resolver rather than a literal `process.cwd()` so that
+	 * running from a subdirectory still finds the project's config (Q#23).
+	 */
+	private resolveProjectConfigPath(): string | null {
+		if (this.projectConfigPathOverride !== undefined) {
+			return this.projectConfigPathOverride;
+		}
+		try {
+			const { projectRoot } = new DefaultProjectResolver().resolve(process.cwd());
+			return join(projectRoot, '.flow', 'config.yml');
+		} catch (err) {
+			// Not a silent fallback: no project means no project config, but the
+			// reason is reported instead of the config vanishing without trace.
+			const detail = err instanceof Error ? err.message : String(err);
+			process.stderr.write(`[flow] No project plugin config loaded. ${detail}\n`);
+			return null;
+		}
+	}
+
 	private loadProjectConfig(): ProjectConfig {
-		const config = loadYamlFile<ProjectConfig>(this.projectConfigPath);
-		return config ?? {};
+		const projectConfigPath = this.resolveProjectConfigPath();
+		if (projectConfigPath === null) return {};
+		return loadYamlFile<ProjectConfig>(projectConfigPath) ?? {};
 	}
 
 	private merge(global: GlobalConfig, project: ProjectConfig): ResolvedPluginsConfig {

@@ -2,6 +2,7 @@
 // Convenience re-export of latest extension point interfaces per spec.
 export type { WorkspaceProvider, WorkspaceRequest, WorkspaceHandle } from './workspace/v1.js';
 export type { ApprovalProvider, InputRequest, ChoiceRequest, ApprovalRequest } from './approval/v1.js';
+export type { ProjectResolutionProvider, ProjectResolution } from './project-resolution/v1.js';
 export type { PluginManifest, PluginImplementation } from './manifest.js';
 export { SENSITIVE_FIELDS } from './sensitiveFields.js';
 export {
