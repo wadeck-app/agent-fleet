@@ -2,7 +2,16 @@ import type { ViolationsConfig } from '@wadeck-app/violations-rules';
 
 export default {
 	projectTags: ['ts', 'cli', 'react', 'tailwind'],
-	globalExclude: ['**/node_modules/**', '**/dist/**', '**/dist-types/**', '**/*.test.ts', '**/*.spec.ts', '**/*.stories.ts', '**/*.stories.tsx', 'suppress-unsafe-casts.*'],
+	globalExclude: [
+		'**/node_modules/**',
+		'**/dist/**',
+		'**/dist-types/**',
+		'**/*.test.ts',
+		'**/*.spec.ts',
+		'**/*.stories.ts',
+		'**/*.stories.tsx',
+		'suppress-unsafe-casts.*',
+	],
 	rules: {
 		// Local rule: no raw String(err) in user-facing CLI output
 		'./.violations/rules/no-raw-err-in-cli.ts': true,

@@ -1219,11 +1219,11 @@ Templates can be used in:
 
 ```yaml
 prompt: |
-  {% if subSteps.validate.status.failed %}
-  Previous attempt failed:
-  ${{ subSteps.validate.outputs.stderr }}
-  {% endif %}
-  Generate a flow for: ${{ inputs.description }}
+    {% if subSteps.validate.status.failed %}
+    Previous attempt failed:
+    ${{ subSteps.validate.outputs.stderr }}
+    {% endif %}
+    Generate a flow for: ${{ inputs.description }}
 ```
 
 `{% if expr %}...{% else %}...{% endif %}` is also supported.
@@ -1232,11 +1232,11 @@ prompt: |
 
 When a sub-step fails and its parent model step restarts, the failed sub-step's results are available under `subSteps`:
 
-| Expression | Value |
-|---|---|
-| `${{ subSteps.stepId.outputs.stderr }}` | stderr captured from the failed script |
-| `${{ subSteps.stepId.outputs.stdout }}` | stdout captured from the failed script |
-| `${{ subSteps.stepId.status.failed }}` | `true` when status is `failed`, else `false` |
+| Expression                              | Value                                        |
+| --------------------------------------- | -------------------------------------------- |
+| `${{ subSteps.stepId.outputs.stderr }}` | stderr captured from the failed script       |
+| `${{ subSteps.stepId.outputs.stdout }}` | stdout captured from the failed script       |
+| `${{ subSteps.stepId.status.failed }}`  | `true` when status is `failed`, else `false` |
 
 `subSteps` is absent on the first run — the `{% if subSteps.stepId.status.failed %}` block evaluates to false cleanly.
 
@@ -1247,7 +1247,7 @@ When a sub-step fails and its parent model step restarts, the failed sub-step's 
 ```yaml
 # In a prompt — model receives the literal string ${{ inputs.taskId }}
 script: |
-  task set-status $${{ inputs.taskId }} done
+    task set-status $${{ inputs.taskId }} done
 ```
 
 After rendering: `task set-status ${{ inputs.taskId }} done` (not the current task ID value).
@@ -1258,8 +1258,8 @@ After rendering: `task set-status ${{ inputs.taskId }} done` (not the current ta
 
 ```yaml
 script: |
-  DOLLAR='$'
-  echo "Use ${DOLLAR}{{ inputs.taskId }} in your script"
+    DOLLAR='$'
+    echo "Use ${DOLLAR}{{ inputs.taskId }} in your script"
 ```
 
 ### Rendered Prompt Logging

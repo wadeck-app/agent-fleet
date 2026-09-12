@@ -1,6 +1,6 @@
- Security Architecture
+Security Architecture
 
- Table of Contents
+Table of Contents
 
 . [Security Overview](security-overview)
 . [Cookie Security](cookie-security)
@@ -14,27 +14,27 @@
 
 ---
 
- Security Overview
+Security Overview
 
 The transport layer implements a defense-in-depth security model with multiple layers:
 
 ```
 
- Layer : HTTP-ONLY Cookies (XSS Protection)    
+ Layer : HTTP-ONLY Cookies (XSS Protection)
 
- Layer : SameSite=strict (CSRF Protection)     
+ Layer : SameSite=strict (CSRF Protection)
 
- Layer : HTTPS Only (Production)               
+ Layer : HTTPS Only (Production)
 
- Layer : JWT Signature Verification            
+ Layer : JWT Signature Verification
 
- Layer : Session Expiration                    
+ Layer : Session Expiration
 
- Layer : Server-Side Session Tracking          
+ Layer : Server-Side Session Tracking
 
 ```
 
- Key Security Principles
+Key Security Principles
 
 . Zero Trust: Never trust client-provided tokens
 . Defense in Depth: Multiple layers of security
@@ -44,9 +44,9 @@ The transport layer implements a defense-in-depth security model with multiple l
 
 ---
 
- Cookie Security
+Cookie Security
 
- HTTP-ONLY Cookies
+HTTP-ONLY Cookies
 
 Tokens are stored in HTTP-ONLY cookies, making them inaccessible to JavaScript.
 
@@ -69,7 +69,7 @@ Why HTTP-ONLY?
 - Automatically managed by browser
 - Sent with every request to origin
 
- Cookie Attributes Explained
+Cookie Attributes Explained
 
 | Attribute  | Value         | Purpose                                     |
 | ---------- | ------------- | ------------------------------------------- |
@@ -77,9 +77,9 @@ Why HTTP-ONLY?
 | `secure`   | `true` (prod) | HTTPS only (man-in-the-middle protection)   |
 | `sameSite` | `'strict'`    | CSRF protection (only sent to same origin)  |
 | `path`     | `'/'`         | Cookie available for all paths              |
-| `maxAge`   | `` (m)    | Automatic expiration                        |
+| `maxAge`   | `` (m)        | Automatic expiration                        |
 
- Cookie Paths
+Cookie Paths
 
 Different cookies for different purposes:
 
@@ -103,20 +103,20 @@ Why restrict refresh token path?
 - Only refresh endpoint needs it
 - Reduces risk if other endpoints compromised
 
- Cookie Security Risks
+Cookie Security Risks
 
 | Risk                 | Mitigation                                     |
 | -------------------- | ---------------------------------------------- |
 | XSS stealing cookies | HTTP-ONLY flag prevents JavaScript access      |
 | CSRF attacks         | SameSite=strict prevents cross-origin requests |
 | Man-in-the-middle    | Secure flag requires HTTPS in production       |
-| Cookie theft         | Short expiration ( minutes) limits damage     |
+| Cookie theft         | Short expiration ( minutes) limits damage      |
 
 ---
 
- Token Management
+Token Management
 
- Access Token
+Access Token
 
 Properties:
 
@@ -151,7 +151,7 @@ async verifyAccessToken(token: string): Promise<TokenPayload> {
 }
 ```
 
- Refresh Token
+Refresh Token
 
 Properties:
 
@@ -167,7 +167,7 @@ Security Considerations:
 - Should be rotated on each use (TODO for production)
 - Blacklisted on logout
 
- Token Refresh Flow
+Token Refresh Flow
 
 ```mermaid
 sequenceDiagram
@@ -193,26 +193,26 @@ await this.sessionManager.refreshSessionToken(userId, newAccessToken);
 
 This ensures multi-device support: refresh on one device updates all devices.
 
- Token Expiration
+Token Expiration
 
 Access Token:
 
-- Expires after  minutes
-- Warning sent  minutes before expiration
+- Expires after minutes
+- Warning sent minutes before expiration
 - Frontend automatically refreshes
 - WebSocket closed if expired and not refreshed
 
 Refresh Token:
 
-- Expires after  days
+- Expires after days
 - User must re-authenticate after expiration
 - Cannot be refreshed (must login again)
 
 ---
 
- Session Isolation
+Session Isolation
 
- Server-Side Session Management
+Server-Side Session Management
 
 Each WebSocket connection has an isolated session tracked server-side:
 
@@ -236,7 +236,7 @@ Session Lifecycle:
 . Cleanup: Automatic removal of expired sessions (every s)
 . Destruction: On disconnect or token expiration
 
- Multi-Device Support
+Multi-Device Support
 
 One user can have multiple sessions (devices):
 
@@ -263,7 +263,7 @@ async refreshSessionToken(userId: string, newAccessToken: string) {
 }
 ```
 
- Session Security
+Session Security
 
 Isolation:
 
@@ -273,7 +273,7 @@ Isolation:
 
 Cleanup:
 
-- Expired sessions removed every  seconds
+- Expired sessions removed every seconds
 - Disconnected sessions removed immediately
 - Memory leaks prevented
 
@@ -285,9 +285,9 @@ Monitoring:
 
 ---
 
- CSRF Protection
+CSRF Protection
 
- SameSite Cookie Attribute
+SameSite Cookie Attribute
 
 Primary CSRF defense:
 
@@ -303,7 +303,7 @@ How it works:
 - Cross-origin requests do NOT include cookies
 - Attackers cannot trigger authenticated requests
 
- CSRF Attack Prevention
+CSRF Attack Prevention
 
 Scenario: Attacker's website tries to make request
 
@@ -323,7 +323,7 @@ Result: Request fails because:
 . Browser doesn't send cookies due to sameSite=strict
 . Backend rejects unauthenticated request
 
- WebSocket CSRF Protection
+WebSocket CSRF Protection
 
 WebSocket connections also protected:
 
@@ -333,9 +333,9 @@ WebSocket connections also protected:
 
 ---
 
- XSS Protection
+XSS Protection
 
- HTTP-ONLY Cookies
+HTTP-ONLY Cookies
 
 Primary XSS defense:
 
@@ -361,7 +361,7 @@ Attack Scenario:
 
 Result: Attack fails because JavaScript cannot access tokens.
 
- Input Sanitization
+Input Sanitization
 
 All input sanitized using Zod schemas:
 
@@ -379,7 +379,7 @@ sanitizedString removes:
 - SQL injection attempts
 - Special characters
 
- Content Security Policy (CSP)
+Content Security Policy (CSP)
 
 Recommended CSP header:
 
@@ -400,7 +400,7 @@ reply.header(
 );
 ```
 
- XSS Attack Vectors
+XSS Attack Vectors
 
 | Vector           | Protection                        |
 | ---------------- | --------------------------------- |
@@ -412,9 +412,9 @@ reply.header(
 
 ---
 
- Best Practices
+Best Practices
 
- . Always Use HTTPS in Production
+. Always Use HTTPS in Production
 
 ```typescript
 const isProduction = process.env.NODE_ENV === 'production';
@@ -424,7 +424,7 @@ reply.setCookie('access_token', token, {
 });
 ```
 
- . Never Log Sensitive Data
+. Never Log Sensitive Data
 
 ```typescript
 //  BAD: Logs token
@@ -434,7 +434,7 @@ console.log('User logged in:', { userId, accessToken });
 console.log('User logged in:', { userId });
 ```
 
- . Validate All Input
+. Validate All Input
 
 ```typescript
 //  Use Zod schemas
@@ -447,7 +447,7 @@ const CreateTaskSchema = z.object({
 const { name } = request.body; // Unsafe!
 ```
 
- . Handle Errors Securely
+. Handle Errors Securely
 
 ```typescript
 //  BAD: Leaks implementation details
@@ -462,7 +462,7 @@ catch (error) {
 }
 ```
 
- . Rate Limiting
+. Rate Limiting
 
 TODO for production:
 
@@ -473,7 +473,7 @@ await fastify.register(require('@fastify/rate-limit'), {
 });
 ```
 
- . Security Headers
+. Security Headers
 
 ```typescript
 // Helmet.js for security headers
@@ -493,19 +493,19 @@ await fastify.register(require('@fastify/helmet'), {
 });
 ```
 
- . Secure Password Storage
+. Secure Password Storage
 
 ```typescript
 import bcrypt from 'bcrypt';
 
 // Hash password with salt
-const hashedPassword = await bcrypt.hash(password, );
+const hashedPassword = await bcrypt.hash(password);
 
 // Verify password
 const isValid = await bcrypt.compare(password, hashedPassword);
 ```
 
- . Monitor Failed Authentication
+. Monitor Failed Authentication
 
 ```typescript
 // Track failed attempts
@@ -531,20 +531,20 @@ async login(email: string, password: string) {
 
 ---
 
- Security Audit Checklist
+Security Audit Checklist
 
- Authentication & Authorization
+Authentication & Authorization
 
 - [ ] HTTP-ONLY cookies enabled
 - [ ] Secure flag enabled in production
 - [ ] SameSite=strict enabled
-- [ ] Access tokens expire after  minutes
-- [ ] Refresh tokens expire after  days
+- [ ] Access tokens expire after minutes
+- [ ] Refresh tokens expire after days
 - [ ] JWT secret strong and rotated regularly
 - [ ] Password hashing with bcrypt (+ rounds)
 - [ ] Failed login attempts tracked and limited
 
- Network Security
+Network Security
 
 - [ ] HTTPS enforced in production
 - [ ] CORS properly configured
@@ -552,7 +552,7 @@ async login(email: string, password: string) {
 - [ ] Rate limiting implemented
 - [ ] DDoS protection in place (CDN/WAF)
 
- Input Validation
+Input Validation
 
 - [ ] All input validated with Zod schemas
 - [ ] HTML sanitization enabled
@@ -560,7 +560,7 @@ async login(email: string, password: string) {
 - [ ] Path traversal prevented
 - [ ] File upload validation (if applicable)
 
- Session Management
+Session Management
 
 - [ ] Server-side session tracking
 - [ ] Expired sessions cleaned up automatically
@@ -568,7 +568,7 @@ async login(email: string, password: string) {
 - [ ] Multi-device support working
 - [ ] Session timeout implemented
 
- XSS Protection
+XSS Protection
 
 - [ ] HTTP-ONLY cookies prevent token theft
 - [ ] Input sanitization (sanitizedString)
@@ -576,20 +576,20 @@ async login(email: string, password: string) {
 - [ ] Content Security Policy configured
 - [ ] No inline scripts in production
 
- CSRF Protection
+CSRF Protection
 
 - [ ] SameSite=strict on all cookies
 - [ ] CSRF tokens for state-changing operations (optional)
 - [ ] Origin header validation
 
- Error Handling
+Error Handling
 
 - [ ] No sensitive data in error messages
 - [ ] Errors logged server-side
 - [ ] Generic errors to client
 - [ ] Stack traces hidden in production
 
- Logging & Monitoring
+Logging & Monitoring
 
 - [ ] Authentication events logged
 - [ ] Failed login attempts logged
@@ -597,7 +597,7 @@ async login(email: string, password: string) {
 - [ ] Session creation/destruction logged
 - [ ] No sensitive data in logs
 
- Dependencies
+Dependencies
 
 - [ ] All dependencies up to date
 - [ ] No known vulnerabilities (npm audit)
@@ -606,22 +606,22 @@ async login(email: string, password: string) {
 
 ---
 
- Threat Model
+Threat Model
 
- Threats We Protect Against
+Threats We Protect Against
 
-| Threat            | Protection            | Risk Level |
-| ----------------- | --------------------- | ---------- |
-| XSS token theft   | HTTP-ONLY cookies     | HIGH       |
-| CSRF attacks      | SameSite=strict       | HIGH       |
-| Man-in-the-middle | HTTPS + Secure flag   | HIGH       |
+| Threat            | Protection           | Risk Level |
+| ----------------- | -------------------- | ---------- |
+| XSS token theft   | HTTP-ONLY cookies    | HIGH       |
+| CSRF attacks      | SameSite=strict      | HIGH       |
+| Man-in-the-middle | HTTPS + Secure flag  | HIGH       |
 | Token replay      | Short expiration (m) | MEDIUM     |
-| Brute force login | Rate limiting (TODO)  | MEDIUM     |
-| Session fixation  | Server-side sessions  | MEDIUM     |
-| SQL injection     | Input validation      | LOW        |
-| Path traversal    | Input validation      | LOW        |
+| Brute force login | Rate limiting (TODO) | MEDIUM     |
+| Session fixation  | Server-side sessions | MEDIUM     |
+| SQL injection     | Input validation     | LOW        |
+| Path traversal    | Input validation     | LOW        |
 
- Threats NOT Protected Against
+Threats NOT Protected Against
 
 | Threat          | Reason                  | Mitigation         |
 | --------------- | ----------------------- | ------------------ |
@@ -631,9 +631,9 @@ async login(email: string, password: string) {
 | Insider threats | Out of scope            | Access controls    |
 | DDoS attacks    | Requires infrastructure | CDN/WAF            |
 
- Attack Scenarios
+Attack Scenarios
 
- Scenario : XSS Attack
+Scenario : XSS Attack
 
 Attack:
 
@@ -651,7 +651,7 @@ Defense:
 
 Result: Attack fails
 
- Scenario : CSRF Attack
+Scenario : CSRF Attack
 
 Attack:
 
@@ -672,7 +672,7 @@ Defense:
 
 Result: Attack fails
 
- Scenario : Man-in-the-Middle
+Scenario : Man-in-the-Middle
 
 Attack: Intercept HTTP traffic to steal tokens
 
@@ -686,7 +686,7 @@ Result: Attack fails (if HTTPS properly configured)
 
 ---
 
- Environment Variables
+Environment Variables
 
 CRITICAL Security Variables:
 
@@ -708,18 +708,18 @@ Generating Secrets:
 
 ```bash
  Generate secure random secret
-openssl rand -base 
+openssl rand -base
 ```
 
 Secret Rotation:
 
-- Rotate JWT_SECRET every  days
-- Keep old secret for  hours (grace period)
+- Rotate JWT_SECRET every days
+- Keep old secret for hours (grace period)
 - Update all sessions after rotation
 
 ---
 
- Security Updates
+Security Updates
 
 Stay informed about security vulnerabilities:
 
@@ -744,7 +744,7 @@ npm outdated
 
 ---
 
- References
+References
 
 - [OWASP Top ](https://owasp.org/www-project-top-ten/)
 - [JWT Best Practices](https://tools.ietf.org/html/rfc)

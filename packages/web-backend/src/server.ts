@@ -11,12 +11,12 @@ import dotenv from 'dotenv';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 // File logger for debugging shutdown (console logs may be lost when tsx kills process)
 import * as fs from 'node:fs';
-import { Orchestrator } from 'orchestrator';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { Orchestrator } from 'orchestrator';
 import { getOrchestratorPortsFromEnv } from 'shared-common/PortCalculator';
 import { createLogger } from 'shared-common/logger';
-import { fileURLToPath } from 'node:url';
 
 import { TransportsController } from './controllers/TransportsController';
 import type { DataStoreFactory } from './factories';

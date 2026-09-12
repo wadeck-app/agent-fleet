@@ -77,8 +77,8 @@ FlowExecutor.test.ts
 
 **Example:**
 
--  "You are right! I have not verified..."
--  "Let me verify if the event is actually sent. Adding logs to trace the flow."
+- "You are right! I have not verified..."
+- "Let me verify if the event is actually sent. Adding logs to trace the flow."
 
 If the user is wrong, say it. If you disagree, explain why. Act as a peer, not a servant.
 
@@ -87,6 +87,7 @@ If the user is wrong, say it. If you disagree, explain why. Act as a peer, not a
 `flow-cli` and `task-cli` are installed globally via CI (GitHub Packages). Source edits alone do nothing -- the binary in PATH is the published version.
 
 **To deploy a local change:**
+
 1. `git commit` + `git push` → CI builds and publishes automatically
 2. `flow cli update` or `task cli update` to install the new version locally
 
@@ -101,9 +102,9 @@ If the user is wrong, say it. If you disagree, explain why. Act as a peer, not a
 
 ## Agent reference docs
 
-| Doc | Description |
-|---|---|
+| Doc                             | Description                                                         |
+| ------------------------------- | ------------------------------------------------------------------- |
 | `.claude/guiding-principles.md` | Non-negotiable design rules + behavioral lessons from past sessions |
-| `.claude/out-of-scope.md` | What this project explicitly does not cover |
-| `.claude/product-vision.md` | Roadmap: plugin v2/v3, CLI harmonisation, policy engine |
-| `.claude/threat-model.md` | Security threats with status (open/mitigated) |
+| `.claude/out-of-scope.md`       | What this project explicitly does not cover                         |
+| `.claude/product-vision.md`     | Roadmap: plugin v2/v3, CLI harmonisation, policy engine             |
+| `.claude/threat-model.md`       | Security threats with status (open/mitigated)                       |

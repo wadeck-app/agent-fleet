@@ -90,11 +90,11 @@ The explicit context structure enables:
 
 All 104 tests passing:
 
--  21 tests: Output extraction
--  19 tests: Condition evaluation
--  8 tests: Flow execution
--  4 tests: Integration tests
--  52 tests: Compiled JavaScript versions
+- 21 tests: Output extraction
+- 19 tests: Condition evaluation
+- 8 tests: Flow execution
+- 4 tests: Integration tests
+- 52 tests: Compiled JavaScript versions
 
 ## Context Types
 
@@ -334,11 +334,11 @@ Demonstrates:
 
 The GitHub Actions syntax migration provides:
 
--  Clearer variable scoping
--  Better error messages
--  No shell conflicts
--  Enhanced type safety
--  Improved IDE support
--  Industry-standard syntax
+- Clearer variable scoping
+- Better error messages
+- No shell conflicts
+- Enhanced type safety
+- Improved IDE support
+- Industry-standard syntax
 
 All tests passing and demos working successfully confirm the migration is complete and stable.

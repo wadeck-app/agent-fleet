@@ -1,4 +1,4 @@
- Reference
+Reference
 
 _Moved from README -- see [README](../README.md) for the overview._
 
@@ -7,24 +7,25 @@ _Moved from README -- see [README](../README.md) for the overview._
     toast/            Toast notification system
     theme/            Theme management
 
- hooks/                Custom React hooks
-    useMediaQuery     Responsive design
-    useDocumentTitle  Document title management
-    useAsyncData      Async data fetching
-    useAbortableEffect  Effect with cleanup
+hooks/ Custom React hooks
+useMediaQuery Responsive design
+useDocumentTitle Document title management
+useAsyncData Async data fetching
+useAbortableEffect Effect with cleanup
 
- utils/                Utility functions
-    errors/           Error handling (AppError, ErrorLogger)
-    validation/       Validation utilities
-    formatting/       Formatters (DateFormat)
-    export/           Export utilities (CSV, JSON)
-    table/            Table utilities
+utils/ Utility functions
+errors/ Error handling (AppError, ErrorLogger)
+validation/ Validation utilities
+formatting/ Formatters (DateFormat)
+export/ Export utilities (CSV, JSON)
+table/ Table utilities
 
- api/                  API client utilities
- storage/              Storage abstractions
- tests/                Test utilities
- lib/                  Third-party utilities (cn helper)
-```
+api/ API client utilities
+storage/ Storage abstractions
+tests/ Test utilities
+lib/ Third-party utilities (cn helper)
+
+````
 
  Core Concepts
 
@@ -39,9 +40,9 @@ import { createCircuitBreaker } from '@framework/features/connectivity/CircuitBr
 export const circuitBreakerService = createCircuitBreaker({
 	healthCheckEndpoint: `${API_BASE_URL}/health`,
 });
-```
+````
 
- . Composability
+. Composability
 
 Components are designed to be composed together:
 
@@ -62,7 +63,7 @@ import { Button } from '@framework/components/primitives/Button';
 </Card>
 ```
 
- . Type Safety
+. Type Safety
 
 Full TypeScript support with comprehensive types:
 
@@ -71,9 +72,9 @@ import type { ToastType } from '@framework/features/toast';
 import type { ValidationResult, Validator } from '@framework/utils/validation';
 ```
 
- Key Features
+Key Features
 
- Forms System
+Forms System
 
 Complete form system with field components:
 
@@ -87,7 +88,7 @@ import { TextField, SelectField, CheckboxField } from '@framework/features/forms
 />
 ```
 
- Connectivity Management
+Connectivity Management
 
 Network connectivity with circuit breaker pattern:
 
@@ -99,7 +100,7 @@ import { ConnectivityProvider, useConnectivity } from '@framework/features/conne
 </ConnectivityProvider>
 ```
 
- Toast Notifications
+Toast Notifications
 
 Centralized toast notification system:
 
@@ -110,7 +111,7 @@ const { showToast } = useToast();
 showToast('Success!', 'success');
 ```
 
- Theme Management
+Theme Management
 
 Dark/light theme support:
 
@@ -120,7 +121,7 @@ import { ThemeToggle, useTheme } from '@framework/features/theme';
 const { theme, toggleTheme } = useTheme();
 ```
 
- Testing
+Testing
 
 The framework includes test utilities:
 
@@ -132,9 +133,9 @@ const { fn, resolve } = createControllablePromise<[Book], void>();
 const book = withMetadata({ title: 'Test', author: 'Author' });
 ```
 
- Best Practices
+Best Practices
 
- Import Patterns
+Import Patterns
 
 ```typescript
 //  Good - Direct file imports
@@ -145,7 +146,7 @@ import { useAsyncData } from '@framework/hooks/useAsyncData';
 // import { Button, useAsyncData } from '@framework';
 ```
 
- Component Guidelines
+Component Guidelines
 
 . Single Responsibility: Each component has one clear purpose
 . Prop-based Configuration: No hard-coded values
@@ -153,7 +154,7 @@ import { useAsyncData } from '@framework/hooks/useAsyncData';
 . Responsive: Mobile-first design
 . Type Safety: Full TypeScript types
 
- Error Handling
+Error Handling
 
 ```typescript
 import { AppError } from '@framework/utils/errors/AppError';
@@ -168,13 +169,13 @@ try {
 }
 ```
 
- Migration Plan
+Migration Plan
 
 This framework is designed to eventually be extracted into a standalone package for reuse across multiple applications.
 
 For detailed migration planning and phases, see: [Framework Migration Plan](../../../.claude/plans/framework-migration.md)
 
- Contributing
+Contributing
 
 When contributing to the framework:
 
@@ -184,6 +185,6 @@ When contributing to the framework:
 . Follow patterns: Match existing architecture
 . Update examples: Keep documentation current
 
- License
+License
 
 Internal use only. Not for public distribution.

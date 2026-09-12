@@ -1,6 +1,6 @@
- Architecture Decisions
+Architecture Decisions
 
- V scope
+V scope
 
 v ships the minimum to execute the scenario: `task new` → elaborate → review → execute.
 
@@ -9,7 +9,7 @@ Deferred to v: D (crash recovery), D (observation commands), D-D (worker reconne
 
 ---
 
- D -- One binary, two roles (client and daemon)
+D -- One binary, two roles (client and daemon)
 
 The `flow` binary is always the same executable. On invocation, it checks whether a daemon is already running:
 
@@ -18,7 +18,7 @@ The `flow` binary is always the same executable. On invocation, it checks whethe
 
 Why: No separate install, no daemon management ceremony. Same pattern as `ssh-agent`, Bazel, Buck.
 
- D -- CLI exits immediately after sending command
+D -- CLI exits immediately after sending command
 
 The CLI sends the command to the daemon, receives an execution ID, and exits. It does not stay alive to stream logs.
 
@@ -26,13 +26,13 @@ Why: The daemon owns the execution. The caller's lifetime must not affect flow e
 
 To observe a running execution: `flow attach <execution-id>` -- pure file tail, no daemon connection needed (D). Deferred to v (D).
 
- D -- Worker liveness is signaled by WebSocket connection health, not heartbeats
+D -- Worker liveness is signaled by WebSocket connection health, not heartbeats
 
 The daemon detects worker failure via WebSocket connection close events. No separate heartbeat messages are sent. The CLI sends no heartbeats -- it exits immediately after sending a command (D).
 
 Why: D (WebSocket workerdaemon channel) makes explicit heartbeats redundant. Connection close = immediate liveness signal, faster and simpler than a heartbeat timeout.
 
- D -- Execution workers are child processes, not threads
+D -- Execution workers are child processes, not threads
 
 Workers are independent OS processes spawned by the daemon via `child_process.spawn()`.
 
@@ -40,7 +40,7 @@ Why: A thread cannot be cleanly killed if the Claude subprocess it owns hangs. A
 
 This is not configurable. Threads are a footgun under Claude subprocess timeout scenarios.
 
- D -- Single queue, concurrency configured globally
+D -- Single queue, concurrency configured globally
 
 One queue, one concurrency limit. The limit is the worker pool size -- number of steps that can run simultaneously across all active flow executions.
 
@@ -48,12 +48,12 @@ Configuration: `~/.flow-config.yaml`
 
 ```yaml
 queue:
-    concurrency:   default
+    concurrency: default
 ```
 
 Why: Starting simple. Multiple queues add topology complexity with no demonstrated need.
 
- D -- Flow file is passed explicitly at invocation time
+D -- Flow file is passed explicitly at invocation time
 
 No discovery, no registry, no daemon-side file watching.
 
@@ -66,7 +66,7 @@ The client passes the file path (and optional ID) to the daemon. The daemon read
 
 Why: Explicit over implicit. The daemon holds no file state. Any invocation is fully self-described.
 
- D -- WorkspaceProvider is an abstracted interface
+D -- WorkspaceProvider is an abstracted interface
 
 `WorkspaceProvider` is an interface with `prepare(flowDef): workspaceDir` and `cleanup()`.
 
@@ -74,7 +74,7 @@ The CLI ships a `DeclaredWorkspaceProvider` that resolves the workspace from the
 
 Why: The flow YAML controls where the agent executes, not the directory from which the CLI was invoked. CWD is irrelevant to execution. The abstraction allows a full `WorkspaceManager` implementation to be plugged in later without changing the engine.
 
- D -- InterventionHandler is an abstracted interface
+D -- InterventionHandler is an abstracted interface
 
 `InterventionHandler` already exists in `flow-engine/src/executor/InterventionHandler.ts`.
 
@@ -82,7 +82,7 @@ The CLI implementation throws `UnsupportedOperationError` for any intervention r
 
 Why: `user_intervention` steps require a UI or interactive channel. The CLI has neither. Fail fast rather than silently skipping blocking interventions.
 
- D -- Log output format is context-aware
+D -- Log output format is context-aware
 
 - TTY detected → human-readable
 - No TTY (piped, agent) → JSON
@@ -91,19 +91,19 @@ Why: `user_intervention` steps require a UI or interactive channel. The CLI has 
 
 Why: Same binary serves humans and agents. Output format should require no explicit flag in the common case.
 
- D -- Log lines prefixed `[executionId|stepId]` -- superseded by D
+D -- Log lines prefixed `[executionId|stepId]` -- superseded by D
 
 See D.
 
 D is a strict superset of D, adding the `__execution` reserved step ID and terminal-state-as-log-line behavior. No contradiction.
 
- D -- ~~Execution workers model: child process with fork() IPC and heartbeat~~
+D -- ~~Execution workers model: child process with fork() IPC and heartbeat~~
 
 Superseded by D. Original design: workers spawned via `child_process.fork()`, communicating over Node.js IPC channels, with explicit heartbeat messages to detect liveness.
 
 Superseded because: A new daemon process cannot re-attach to `fork()` IPC channels from a previous process, making crash recovery impossible. WebSocket reconnection works across daemon restarts because workers always initiate the connection.
 
- D -- Idempotency is declared per-step, not per-flow _(v -- deferred)_
+D -- Idempotency is declared per-step, not per-flow _(v -- deferred)_
 
 ```yaml
 steps:
@@ -112,7 +112,7 @@ steps:
       idempotent: false  default -- creating a PR twice is a side effect
       onFailure:
           goto: review-step
-          maxIterations: 
+          maxIterations:
       prompt: '...'
 
     - id: run-tests
@@ -136,7 +136,7 @@ Why per-step: A flow has steps with different safety profiles. `run-tests` is sa
 
 Why `idempotent: false` is default: Failing safe. Undecorated steps that get silently retried could produce duplicate side effects (double commits, double API calls).
 
- D -- Daemon self-exits when ready-step queue drains
+D -- Daemon self-exits when ready-step queue drains
 
 When all executions are in terminal state (COMPLETED or FAILED) and the ready-step queue is empty, the daemon exits cleanly.
 
@@ -144,7 +144,7 @@ Exception: During the D reconnection window, executions with `status: running` a
 
 Why: The daemon has no persistent state to maintain -- disk is the source of truth (D). Keeping the process alive serves no purpose. Next `flow run` spawns a fresh daemon.
 
- D -- CLIdaemon transport: loopback TCP HTTP/. (singleton-daemon-kit)
+D -- CLIdaemon transport: loopback TCP HTTP/. (singleton-daemon-kit)
 
 `singleton-daemon-kit` uses TCP `...` exclusively for CLIdaemon communication. No Unix sockets, no named pipes.
 
@@ -154,7 +154,7 @@ Daemon detection: port file at `~/.flow-daemon/config.port`. No socket probe.
 
 Note: This applies only to CLIdaemon. Workerdaemon uses WebSocket (D), which is a separate channel on the daemon's own WebSocket server.
 
- D -- singleton-daemon-kit handles daemon lifecycle primitives; flow CLI owns the queue
+D -- singleton-daemon-kit handles daemon lifecycle primitives; flow CLI owns the queue
 
 The kit provides: port file management, PID liveness detection, mtime-based heartbeat (file utimes), auth token, single-instance enforcement (takeover), idle timer hooks, and lifecycle callbacks.
 
@@ -162,7 +162,7 @@ The kit does NOT provide: queue management, execution worker spawning, WebSocket
 
 Why: The kit is intentionally minimal -- a bootstrapping and coordination layer, not an execution framework.
 
- D -- Daemon owns graph intelligence; worker is a dumb per-step executor
+D -- Daemon owns graph intelligence; worker is a dumb per-step executor
 
 The daemon constructs the step graph, tracks dependencies, maintains the global ready-step queue across all active executions, and assigns steps to free workers via WebSocket. Each worker executes one step at a time, streams logs, reports completion/failure, then receives the next assignment (or exits).
 
@@ -172,26 +172,26 @@ Why: Full daemon visibility at all times -- necessary for crash recovery (D). Wo
 
 Impact on current code: `FlowOrchestrator` currently runs inside what would be the worker process. It moves to the daemon. The worker becomes a thin executor receiving serialized step configs and returning outputs.
 
- D -- Log persistence: daily rotation, -day retention
+D -- Log persistence: daily rotation, -day retention
 
 Logs written to `~/.flow-daemon/logs/<YYYY-MM-DD>.ndjson` (daily files, all executions multiplexed).
 
-Rotation: keep last  daily files, hard cap at  days.
+Rotation: keep last daily files, hard cap at days.
 
 ```yaml
 logs:
-    retainDays:   also controls execution file retention (D)
+    retainDays: also controls execution file retention (D)
 ```
 
 Why disk over memory-only: The daemon exits when the queue drains (D). In-memory logs would be routinely lost before agents can query them.
 
- D -- The step graph is a Directed Graph with bounded cycles, not a DAG
+D -- The step graph is a Directed Graph with bounded cycles, not a DAG
 
 `onFailure.goto` introduces cycles. The graph is a Directed Graph, not a Directed Acyclic Graph. Cycles are bounded by `maxIterations` per step (default: ).
 
 Impact on current code: `DAGBuilder` and `DAGValidator` in `flow-engine/src/validation/` are misnamed. Rename to `GraphBuilder` and `GraphValidator` during the refactor. Cycle detection must allow bounded cycles rather than rejecting them.
 
- D -- `flow attach`, `flow logs`, and `flow list` are pure file operations _(v -- deferred)_
+D -- `flow attach`, `flow logs`, and `flow list` are pure file operations _(v -- deferred)_
 
 `flow attach <id>` tails `~/.flow-daemon/logs/.ndjson` filtered by execution ID, stops on `[id|__execution] COMPLETED|FAILED`.
 `flow logs <id>` greps the same files.
@@ -201,14 +201,14 @@ No daemon connection needed for any observation command. All work after daemon e
 
 Why: D (logs on disk) + D (prefixed log lines with terminal state as log line) + D (execution files on disk) eliminate all need for daemon involvement in observation.
 
- D -- Log lines prefixed `[executionId|stepId]` in all files and on stdout
+D -- Log lines prefixed `[executionId|stepId]` in all files and on stdout
 
 Every log line carries a `[executionId|stepId]` prefix. `__execution` is a reserved step ID for lifecycle events. Terminal state is written as a log line:
 
 ```
 [abc|generate-pr] prompt sent to claude
 [abc|generate-pr] output received ( tokens)
-[abc|run-tests] npm test exited 
+[abc|run-tests] npm test exited
 [abc|__execution] COMPLETED
 [abc|__execution] FAILED: run-tests exceeded maxIterations
 ```
@@ -217,7 +217,7 @@ Every log line carries a `[executionId|stepId]` prefix. `__execution` is a reser
 
 Why: All filtering becomes a pure grep. No index file, no daemon metadata query, no streaming protocol.
 
- D -- All execution state is persisted to disk; daemon is not a state store
+D -- All execution state is persisted to disk; daemon is not a state store
 
 Every execution state transition is written to `~/.flow-daemon/executions/<executionId>.json` immediately by the daemon. Workers report state via WebSocket; the daemon writes to disk -- workers never write directly (single writer, no race conditions).
 
@@ -232,11 +232,11 @@ Every execution state transition is written to `~/.flow-daemon/executions/<execu
 
 Why: Disk is the single source of truth. Daemon crash loses nothing observable. History preserved across restarts.
 
- D -- Execution file retention tied to log retention
+D -- Execution file retention tied to log retention
 
 Execution files in `~/.flow-daemon/executions/` expire after `logs.retainDays` days (default: ). One config key controls both -- they describe the same event and should expire together.
 
- D -- Workerdaemon communication is WebSocket, independent of the SDK _(v -- deferred)_
+D -- Workerdaemon communication is WebSocket, independent of the SDK _(v -- deferred)_
 
 The SDK is only involved in CLIdaemon communication. Workerdaemon communication is pure business logic with no SDK dependency.
 
@@ -282,7 +282,7 @@ Why CLI binary not custom HTTP client: Reuses D. Workers use the same daemon dis
 
 Log buffer spill threshold: `worker.bufferSpillMs` (default: ms). Independent configuration key -- not derived from `reconnectTimeoutMs`.
 
- D -- Daemon restart: reconnection window before resuming normal step assignment _(v -- deferred)_
+D -- Daemon restart: reconnection window before resuming normal step assignment _(v -- deferred)_
 
 On startup, the daemon reads `executions/.json`, counts steps with `status: running` across all execution files -- call this N. It enters a reconnection window: holds new step assignments (but accepts `flow run` commands) until either all N workers reconnect or the timeout expires.
 
@@ -298,10 +298,10 @@ Test scenarios required:
 - Multiple workers survive crash, all reconnect -- pool correctly restored
 - Worker dies with daemon -- not seen in window → D applies
 - Worker reconnects after window expires -- treated as new, slot granted if available
-- Daemon restarts with  running steps -- no window, immediate normal operation
+- Daemon restarts with running steps -- no window, immediate normal operation
 - Two workers call CLI simultaneously on crash -- D ensures only one becomes daemon
 
- D -- Step output extraction is the worker's responsibility; failed extraction triggers multi-shot retry
+D -- Step output extraction is the worker's responsibility; failed extraction triggers multi-shot retry
 
 After Claude responds, the worker applies the `output:` extraction config from the step YAML. If the expected format is not present, the worker injects a correction prompt into the Claude conversation and calls `/resume` -- it does not immediately fail the step.
 
@@ -313,11 +313,11 @@ Why worker, not daemon: The extraction and retry loop is tightly coupled to the 
 
 Why multi-shot not immediate failure: Multi-shot with a correction prompt is consistent with how the current `agent-fleet` handles unexpected output. A single bad response is often recoverable without human intervention.
 
- D -- Subflow steps are expanded inline into the parent execution graph _(v -- deferred)_
+D -- Subflow steps are expanded inline into the parent execution graph _(v -- deferred)_
 
 When the daemon encounters a step of type `subflow`, it loads the referenced flow definition and injects its steps into the current execution's graph under a namespace prefix (e.g. `subflow-generate-pr.run-tests`). No child execution is created.
 
-Why not a blocking worker: A worker holding a pool slot while waiting for a nested execution would starve the pool (e.g. if subflow has  steps and pool size is , the waiting slot would never free). Inline expansion means subflow steps compete fairly for workers alongside parent steps.
+Why not a blocking worker: A worker holding a pool slot while waiting for a nested execution would starve the pool (e.g. if subflow has steps and pool size is , the waiting slot would never free). Inline expansion means subflow steps compete fairly for workers alongside parent steps.
 
 Why not a non-blocking child execution: Requiring the flow author to explicitly `depends` on a subflow-status step would break the natural expectation that the next step runs after the subflow completes. Inline expansion preserves sequential semantics automatically.
 
@@ -325,7 +325,7 @@ Namespace prefix: Subflow step IDs in logs and execution state appear as `<subfl
 
 Recursive subflows: Depth-limited. Maximum nesting depth is configurable (`queue.maxSubflowDepth`, default: ). Exceeding depth → step fails immediately.
 
- D -- Flow inputs: schema in YAML, values via CLI, validation in daemon
+D -- Flow inputs: schema in YAML, values via CLI, validation in daemon
 
 Input schema is declared in the flow YAML:
 
@@ -373,7 +373,7 @@ Why this exception: a literal secret value would travel through the CLI→daemon
 
 `ClientCommand.run` includes `cwd`: the CLI passes `process.cwd()` so the daemon can resolve relative `flowFile` paths and use it as the default workspace directory.
 
- D -- `flow cancel`: graceful cancellation _(v -- deferred)_
+D -- `flow cancel`: graceful cancellation _(v -- deferred)_
 
 Deferred to v (D). The following behavior is designed but not implemented in v.
 
@@ -383,13 +383,13 @@ Deferred to v (D). The following behavior is designed but not implemented in v.
 
 The daemon idle-exit check (D) treats `CANCELLED` as a terminal state.
 
- D -- Flow design skill: global, user-home scope
+D -- Flow design skill: global, user-home scope
 
 A Claude skill installed at `~/.claude/` teaches any agent in any project the design→validate→approve→execute pattern for Flow CLI. Not project-scoped -- no assumptions about workspace paths or project config.
 
 Content depends on the YAML schema (D). The skill will include: step type reference, the two-phase interaction pattern (design+validate before execute), a minimal working template, and what NOT to do (no execution without user approval, no `user_intervention` steps).
 
- D -- YAML step schema: full flow-engine feature set, no removals
+D -- YAML step schema: full flow-engine feature set, no removals
 
 Flow CLI supports all step types and fields from flow-engine without simplification. The rule: if flow-engine implements it, flow-cli supports it. Removals require explicit justification and user approval.
 
@@ -410,29 +410,29 @@ New fields added by Flow CLI on top of flow-engine (not in current engine):
 
 Note on `context:` field: `StepContext` (`files`, `previousOutputs`, `taskMetadata`) is schema-only in current flow-engine -- no runtime effect. `previousOutputs` has referential validation only. Flow CLI carries this behavior as-is.
 
- D -- Env vars and secrets: declaration model, provider hierarchy, security constraints
+D -- Env vars and secrets: declaration model, provider hierarchy, security constraints
 
- `vars:` and `secrets:` are distinct features
+`vars:` and `secrets:` are distinct features
 
 `vars:` -- non-sensitive flow-level configuration. Accessible via `${{ vars.name }}`. Inherited by all steps unless overridden.
 
 `secrets:` -- sensitive values. Never in plaintext in YAML (except `value://` which is blocked). Accessible only when a step explicitly maps them to an env var. Resolved by the worker, never by the daemon.
 
- URI schemes
+URI schemes
 
 | Scheme              | vars: | secrets: | Notes                                     |
 | ------------------- | ----- | -------- | ----------------------------------------- |
 | `env://NAME`        | yes   | yes      | Reads worker process env at resolve time  |
-| `file://./rel/path` | yes   | yes      | Relative to workspace -- validated         |
+| `file://./rel/path` | yes   | yes      | Relative to workspace -- validated        |
 | `file:///abs/path`  | yes   | yes      | Default: error; configurable to warn      |
-| `value://literal`   | yes   | NO       | Plaintext in YAML -- vars only             |
+| `value://literal`   | yes   | NO       | Plaintext in YAML -- vars only            |
 | `input://name`      | yes   | yes      | Reads from flow inputs at invocation time |
 
 `cmd://` is not supported -- shell injection surface with no safe parsing strategy.
 
 `value://` is forbidden in `secrets:` -- error at `flow validate` time.
 
- Provider hierarchy
+Provider hierarchy
 
 ```
 ValueProvider (interface)
@@ -440,7 +440,7 @@ ValueProvider (interface)
    SecretsProvider -- resolves secrets: block; rejects value:// at construction
 ```
 
- Step env construction
+Step env construction
 
 Steps receive NOTHING by default. All env vars must be explicitly declared:
 
@@ -469,30 +469,30 @@ steps:
 
 `vars:` values are available as `${{ vars.name }}` in any step field. Secrets are NOT available via `${{ secrets.name }}` directly in prompt text -- only via env: mapping.
 
- Secret object model
+Secret object model
 
 Resolved secret values are wrapped in a `Secret` class that overrides all serialization methods to return `[REDACTED]`. Plaintext is accessed via `.use()` only at subprocess env construction. The `Secret` object must never appear in error messages, log entries, or IPC messages.
 
- Masking
+Masking
 
-All  variants registered per secret: raw, base (no padding), base byte-offset- (slice()), base byte-offset- (slice()), URL-safe base, hex.
+All variants registered per secret: raw, base (no padding), base byte-offset- (slice()), base byte-offset- (slice()), URL-safe base, hex.
 
 Registration is EAGER (at worker startup, before any step runs) -- not lazy. This prevents parallel-step TOCTOU races.
 
 Masking applies to every output path: Claude subprocess stdout/stderr, script subprocess stdout/stderr, worker log entries before WebSocket send, StepOutput before writing to executions/\.json, error messages crossing I/O boundaries.
 
- Security constraints enforced at validation
+Security constraints enforced at validation
 
 - `value://` in `secrets:` → error
 - Absolute `file:///` paths → error by default (configurable to warn via `validation.absoluteSecretPath: warn`)
 - `${{ secrets.x }}` in script text → error (secrets only via env: mapping, never interpolated into script content)
 - `input://` in `secrets:` → caller must pass a URI scheme (`env://`, `file://`) via `--input name=env://X` at invocation time; literal values rejected at CLI validation
 
- What the operator is responsible for
+What the operator is responsible for
 
 The subprocess env is empty by default -- no `PATH`, no `HOME`, no `TMPDIR`. Scripts that call system binaries must declare `PATH` explicitly. This is by design: silent env inheritance is the source of CI/local divergence.
 
- D -- Hook system: typed objects with protocol-based dispatch
+D -- Hook system: typed objects with protocol-based dispatch
 
 Hooks are declared in `.flows/config.yml` as typed objects. A `HookDispatcher` routes by `type` field to the appropriate resolver.
 
@@ -511,10 +511,10 @@ hooks:
           args: ['run', '.flows/implement-task.yml']
 ```
 
-| type   | Behavior                                                                                                                                                           |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| type   | Behavior                                                                                                                                                            |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `cli`  | `child_process.execFile(command, args)` -- no shell, no injection risk. Task context passed as env vars: `TASK_ID`, `TASK_STATUS`, `TASK_DESCRIPTION`, `TASK_FILE`. |
-| `http` | POST JSON `{ taskId, status, description, taskFile }` to `url`. Supports `http://` and `https://`.                                                                 |
+| `http` | POST JSON `{ taskId, status, description, taskFile }` to `url`. Supports `http://` and `https://`.                                                                  |
 
 Multiple listeners per event -- array, all called in order. Default on failure: `on-failure: ignore` (configurable per listener to `fail-task`).
 
@@ -522,7 +522,7 @@ Why typed objects not URI strings: `cli://flow run .flows/foo.yml` embeds shell 
 
 Why `execFile` not `exec`: `exec` spawns a shell, enabling command injection via untrusted args. `execFile` passes args as an array directly to the OS -- no shell interpretation.
 
- D -- `task` CLI: file-based storage, minimal command surface
+D -- `task` CLI: file-based storage, minimal command surface
 
 Storage layout (project-local):
 
@@ -550,7 +550,7 @@ Why one file per task: enables per-task history (all status transitions, generat
 
 Why `.flows/tasks/` not `~`: tasks are project-specific. Global task storage would mix concerns across projects. `.flows/tasks/` should be gitignored by default.
 
- D -- Flow MCP server: tool interface between Claude subprocess and flow engine
+D -- Flow MCP server: tool interface between Claude subprocess and flow engine
 
 Each worker starts a per-execution MCP server upon receiving the `assign` message (which provides the executionId). The MCP server is started before launching `claude -p` for that step. Workers are execution-agnostic before `assign` -- no MCP server exists before that point. Claude is invoked with `--mcp-config <temp_config> --strict-mcp-config` so only the flow engine's tools are available.
 
@@ -570,7 +570,7 @@ Why this matters beyond step injection: this is the primary bidirectional interf
 
 ---
 
- D -- v command surface: `flow run` and `flow validate` only
+D -- v command surface: `flow run` and `flow validate` only
 
 v ships exactly two user-facing commands:
 
@@ -583,7 +583,7 @@ All other commands are deferred to v: `attach`, `logs`, `list` (pure file-tail o
 
 `flow run`: triggers daemon startup if needed (D), queues the execution, returns execution ID and exits (D).
 
-`flow validate`: validates the flow YAML (graph structure, input schema, step schema) without executing. Used by the task elaboration flow's deterministic validation step -- calls `flow validate` on the LLM-generated steps before injecting them into the graph. Returns structured errors on failure, exits  on success.
+`flow validate`: validates the flow YAML (graph structure, input schema, step schema) without executing. Used by the task elaboration flow's deterministic validation step -- calls `flow validate` on the LLM-generated steps before injecting them into the graph. Returns structured errors on failure, exits on success.
 
 `flow validate` output contract:
 
@@ -606,7 +606,7 @@ Known error codes: `VALIDATION_FAILED`, `DAEMON_START_FAILED`, `PORT_CONFLICT`, 
 
 Why only two: the v scenario (`task new` → elaborate → review → execute) requires only `flow run` (called by hooks) and `flow validate` (called by the deterministic validation step). Observation commands and lifecycle management are v concerns.
 
- D -- Dynamic step injection: `provideSteps` tool, `parent` field, recursive hierarchy
+D -- Dynamic step injection: `provideSteps` tool, `parent` field, recursive hierarchy
 
 Injection mechanism: model steps call `provideSteps` via the flow MCP server (D). Any step type can inject steps.
 
@@ -627,24 +627,24 @@ Recursive hierarchy: sub-steps can themselves have sub-steps. Depth is configura
 
 `depends` within sub-steps: governs ordering between siblings. Does not create deadlock with `parent` -- `parent` controls completion scope, `depends` controls start order.
 
-Why unbounded recursion with a limit: policy engine steps need to inject feedback loops on injected steps (e.g. a security scan injected by a model step may itself inject a remediation step). Capping at  prevents runaway recursion without constraining real use cases.
+Why unbounded recursion with a limit: policy engine steps need to inject feedback loops on injected steps (e.g. a security scan injected by a model step may itself inject a remediation step). Capping at prevents runaway recursion without constraining real use cases.
 
 UI representation: `parent`/child relationships render as nested sub-steps under the parent, preserving a high-level flow view. Only top-level steps (no `parent`) appear at the root level.
 
 Policy engine use cases: a policy step can inject missing feedback loops (e.g. "no security scan detected → inject one"), or validate that required loops exist before allowing execution to proceed.
 
- D -- `.flows/config.yml` schema
+D -- `.flows/config.yml` schema
 
 Full schema for the project-level flow configuration file:
 
 ```yaml
-version: 
+version:
 
 defaults:
     model: claude-opus-  default model for all model steps
 
 execution:
-    maxChildDepth:   max parent/child step nesting depth (D)
+    maxChildDepth: max parent/child step nesting depth (D)
 
 hooks:
     onFlowStart:
@@ -683,7 +683,7 @@ Why `defaults.model` here: avoids repeating the model on every model step. Step-
 
 Why `execution.maxChildDepth` here: configurable safety ceiling per D, applies per project. Global default () is overridable here.
 
- D -- First implementation milestone
+D -- First implementation milestone
 
 Smallest working slice: a single `script` step flow, no model, no MCP. Validates the full plumbing: daemon startup → `/run` → queue → worker spawn → WebSocket `assign` → step executes → WebSocket `result` → execution file written → daemon idle exit.
 
@@ -693,7 +693,7 @@ No web frontend in v: the scenario is fully CLI-driven (`task` + `flow` + hooks)
 
 Tests: flow-engine unit tests for `GraphValidator`, `OutputExtractor`, `TemplateRenderer`, `StreamJsonParser` are reusable as-is. `FlowExecutor`/`FlowOrchestrator` tests test the in-process runner -- rewrite for the daemon+worker+WebSocket model.
 
- D -- `provideSteps` MCP tool: JSON schema
+D -- `provideSteps` MCP tool: JSON schema
 
 The `provideSteps` tool exposed by the flow MCP server (D) accepts:
 

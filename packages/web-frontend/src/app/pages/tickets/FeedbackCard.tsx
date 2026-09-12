@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { RemoveItemButton } from '@framework/components2/list/RemoveItemButton';
+import { Label } from '@framework/components/forms/Label';
 import { AlertDialogWrapper } from '@framework/components/overlays/AlertDialogWrapper';
 import { Button } from '@framework/components/primitives/Button';
 import { useToast } from '@framework/features/toast/ToastContext';
@@ -9,7 +10,6 @@ import type { FlowFeedback } from '@shared/api/flow-feedback.contract';
 import { Loader2, Pencil, Star, Trash2 } from 'lucide-react';
 
 import { ArrayFieldInput } from './ArrayFieldInput';
-import { Label } from '@framework/components/forms/Label';
 import { RatingInput } from './RatingInput';
 import { feedbackApi } from './feedbackApi';
 
@@ -168,7 +168,9 @@ export function FeedbackCard({
 							/>
 						))}
 					</div>
-					<span className="text-xs text-muted-foreground">{new Date(item.submittedAt).toISOString().replace('T', ' ').slice(0, 19)}</span>
+					<span className="text-xs text-muted-foreground">
+						{new Date(item.submittedAt).toISOString().replace('T', ' ').slice(0, 19)}
+					</span>
 					<div className="ml-auto flex items-center gap-1">
 						<Button
 							variant="ghost"

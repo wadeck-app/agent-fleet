@@ -1,5 +1,5 @@
-import { AlertCircle, AlertTriangle, Info } from 'lucide-react';
 import type { ValidationIssue } from 'flow-engine/validation/ValidationTypes';
+import { AlertCircle, AlertTriangle, Info } from 'lucide-react';
 
 /**
  * Component to display field-specific validation messages inline

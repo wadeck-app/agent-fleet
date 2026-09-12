@@ -1,5 +1,5 @@
-import * as fs from 'node:fs';
 import * as yaml from 'js-yaml';
+import * as fs from 'node:fs';
 
 /**
  * Load and parse a YAML file for CLI commands.

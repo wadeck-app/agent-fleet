@@ -1,17 +1,17 @@
 {
-  "frameworkVersion": "2026.9.1-093-f2480599",
-  "files": {
-    "C:\\Workspace_Tooling\\agent-fleet\\.violations\\config.ts": {
-      "mtimeMs": 1788635943207.548,
-      "compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\config.js"
-    },
-    "C:\\Workspace_Tooling\\agent-fleet\\.violations\\rules\\no-raw-err-in-cli.ts": {
-      "mtimeMs": 1787955437314.7837,
-      "compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\rules\\no-raw-err-in-cli.js"
-    },
-    "C:\\Workspace_Tooling\\agent-fleet\\.violations\\rules\\plugin-rules.ts": {
-      "mtimeMs": 1787955439993.2568,
-      "compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\rules\\plugin-rules.js"
-    }
-  }
+	"frameworkVersion": "2026.9.6-102-aeffad86",
+	"files": {
+		"C:\\Workspace_Tooling\\agent-fleet\\.violations\\config.ts": {
+			"mtimeMs": 1788635943207.548,
+			"compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\config.js"
+		},
+		"C:\\Workspace_Tooling\\agent-fleet\\.violations\\rules\\no-raw-err-in-cli.ts": {
+			"mtimeMs": 1787955437314.7837,
+			"compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\rules\\no-raw-err-in-cli.js"
+		},
+		"C:\\Workspace_Tooling\\agent-fleet\\.violations\\rules\\plugin-rules.ts": {
+			"mtimeMs": 1787955439993.2568,
+			"compiledPath": "C:\\Workspace_Tooling\\agent-fleet\\.violations\\.cache\\rules\\plugin-rules.js"
+		}
+	}
 }

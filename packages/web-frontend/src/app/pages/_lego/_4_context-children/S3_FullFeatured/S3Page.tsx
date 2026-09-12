@@ -38,7 +38,6 @@ const columns = [
 	col.date<Product>('createdAt', 'Created'),
 ];
 
-
 export function S3Page() {
 	return (
 		<PageLayout>

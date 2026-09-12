@@ -1,7 +1,12 @@
 // flow cli <subcommand> -- meta-commands for managing the flow CLI itself.
 import { ConfigDir, HookDispatcher, runSelfCheck } from '@wadeck-app/shared-cli';
-import { cliRollbackCommand, cliUpdateCommand, cliVersionCommand, warnUnknownArgs } from '@wadeck-app/shared-cli/CliMetaCommands';
 import { readChannelFromConfig } from '@wadeck-app/shared-cli/ChannelConfig';
+import {
+	cliRollbackCommand,
+	cliUpdateCommand,
+	cliVersionCommand,
+	warnUnknownArgs,
+} from '@wadeck-app/shared-cli/CliMetaCommands';
 import { Command } from 'commander';
 import { FlowExecutor, StepRunner } from 'flow-engine';
 import * as yaml from 'js-yaml';
@@ -14,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { FlowConfigLoader } from '../../config/FlowConfig.js';
 import { PluginLoader } from '../../config/PluginLoader.js';
+
 // violations-suppress-end: ts/no-deep-relative
 
 // Injected by esbuild at bundle time via define; falls back to package.json in dev mode (tsx).
@@ -25,7 +31,9 @@ type DaemonLogEntry = { ts: string; level?: string; msg: string };
 type StepLogEntry = { prefix: string; timestamp: string; level?: string; message: string };
 
 function isStepLogEntry(obj: Record<string, unknown>): obj is StepLogEntry {
-	return typeof obj['prefix'] === 'string' && typeof obj['timestamp'] === 'string' && typeof obj['message'] === 'string';
+	return (
+		typeof obj['prefix'] === 'string' && typeof obj['timestamp'] === 'string' && typeof obj['message'] === 'string'
+	);
 }
 
 function isDaemonLogEntry(obj: Record<string, unknown>): obj is DaemonLogEntry {
@@ -128,7 +136,10 @@ async function cliLogsHumanCommand(configDir: string, opts: { follow?: boolean; 
 			offset = size;
 			writeFormattedLines(buf.toString('utf8'));
 		});
-		process.on('SIGINT', () => { fs.unwatchFile(logFile); resolve(); });
+		process.on('SIGINT', () => {
+			fs.unwatchFile(logFile);
+			resolve();
+		});
 	});
 }
 
@@ -167,7 +178,10 @@ async function cliLogsRawCommand(configDir: string, opts: { follow?: boolean; li
 			offset = size;
 			process.stdout.write(buf.toString('utf8'));
 		});
-		process.on('SIGINT', () => { fs.unwatchFile(logFile); resolve(); });
+		process.on('SIGINT', () => {
+			fs.unwatchFile(logFile);
+			resolve();
+		});
 	});
 }
 
@@ -216,7 +230,11 @@ export function buildCliCommand(): Command {
 	updateCmd.allowUnknownOption(false);
 	updateCmd.action(async (opts: { check?: boolean; log?: boolean }, cmd: Command) => {
 		const rawArgs = cmd.args;
-		warnUnknownArgs(rawArgs.filter(a => a.startsWith('-')), ['--check', '--log'], 'flow cli update');
+		warnUnknownArgs(
+			rawArgs.filter(a => a.startsWith('-')),
+			['--check', '--log'],
+			'flow cli update'
+		);
 		if (opts.log) {
 			const logFile = path.join(ConfigDir.get('flow'), 'update-log.txt');
 			if (fs.existsSync(logFile)) {
@@ -269,8 +287,11 @@ export function buildCliCommand(): Command {
 				// Check 2: Config loading -- load FlowConfig from a non-existent path (tests default fallback)
 				async () => {
 					try {
-						const config = FlowConfigLoader.load(path.join(os.tmpdir(), '.flow-self-check-nonexistent-config.yaml'));
-						if (config.workspace.retainDays === undefined) throw new Error('workspace.retainDays is undefined');
+						const config = FlowConfigLoader.load(
+							path.join(os.tmpdir(), '.flow-self-check-nonexistent-config.yaml')
+						);
+						if (config.workspace.retainDays === undefined)
+							throw new Error('workspace.retainDays is undefined');
 						return { name: 'Config loading', ok: true };
 					} catch (err) {
 						return { name: 'Config loading', ok: false, detail: String(err) };
@@ -279,11 +300,20 @@ export function buildCliCommand(): Command {
 				// Check 3: YAML flow parsing -- parse a minimal inline flow definition string
 				async () => {
 					try {
-						const input = ['id: self-check-test', 'steps:', '  - id: step1', '    type: script', '    script: echo ok'].join('\n');
+						const input = [
+							'id: self-check-test',
+							'steps:',
+							'  - id: step1',
+							'    type: script',
+							'    script: echo ok',
+						].join('\n');
 						const parsed = yaml.load(input) as { id?: string; steps?: unknown[] };
-						if (parsed?.id !== 'self-check-test') throw new Error(`Expected id 'self-check-test', got '${String(parsed?.id)}'`);
+						if (parsed?.id !== 'self-check-test')
+							throw new Error(`Expected id 'self-check-test', got '${String(parsed?.id)}'`);
 						if (!Array.isArray(parsed?.steps) || parsed.steps.length !== 1) {
-							throw new Error(`Expected 1 step, got ${Array.isArray(parsed?.steps) ? parsed.steps.length : 'non-array'}`);
+							throw new Error(
+								`Expected 1 step, got ${Array.isArray(parsed?.steps) ? parsed.steps.length : 'non-array'}`
+							);
 						}
 						return { name: 'YAML flow parsing', ok: true };
 					} catch (err) {
@@ -311,7 +341,11 @@ export function buildCliCommand(): Command {
 						// This is a known limitation of the global install -- plugins require local node_modules.
 						// TODO: inline extension-points.json at bundle time via an esbuild plugin.
 						if (msg.includes('extension-points') && msg.includes('Cannot find module')) {
-							return { name: 'Plugin system', ok: true, detail: 'extension-points not in bundle (plugins disabled in standalone install)' };
+							return {
+								name: 'Plugin system',
+								ok: true,
+								detail: 'extension-points not in bundle (plugins disabled in standalone install)',
+							};
 						}
 						return { name: 'Plugin system', ok: false, detail: msg };
 					}
@@ -331,10 +365,14 @@ export function buildCliCommand(): Command {
 					try {
 						const config = FlowConfigLoader.load(path.join(os.tmpdir(), '.flow-self-check-schema.yaml'));
 						if (typeof config.workspace.retainDays !== 'number' || config.workspace.retainDays <= 0) {
-							throw new Error(`workspace.retainDays is not a positive number: ${config.workspace.retainDays}`);
+							throw new Error(
+								`workspace.retainDays is not a positive number: ${config.workspace.retainDays}`
+							);
 						}
 						if (typeof config.workspace.maxWorkspaces !== 'number' || config.workspace.maxWorkspaces <= 0) {
-							throw new Error(`workspace.maxWorkspaces is not a positive number: ${config.workspace.maxWorkspaces}`);
+							throw new Error(
+								`workspace.maxWorkspaces is not a positive number: ${config.workspace.maxWorkspaces}`
+							);
 						}
 						return { name: 'Workspace config', ok: true };
 					} catch (err) {
@@ -348,7 +386,10 @@ export function buildCliCommand(): Command {
 	cli.command('logs')
 		.description("Print today's NDJSON log from the flow daemon log directory")
 		.option('-f, --follow', 'Follow the log file (tail -f style)')
-		.option('-H, --human', 'Format log lines as human-readable (HH:mm:ss.SSS [LEVEL] message) instead of raw NDJSON')
+		.option(
+			'-H, --human',
+			'Format log lines as human-readable (HH:mm:ss.SSS [LEVEL] message) instead of raw NDJSON'
+		)
 		.option('-n, --lines <n>', 'Limit output to the last N lines (0 or negative = no limit)', '50')
 		.action(async (opts: { follow?: boolean; human?: boolean; lines?: string }) => {
 			const lines = parseInt(opts.lines ?? '50', 10);

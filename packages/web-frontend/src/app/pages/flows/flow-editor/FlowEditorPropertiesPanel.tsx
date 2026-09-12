@@ -46,7 +46,6 @@ interface FlowEditorPropertiesPanelProps {
 	readOnly?: boolean;
 }
 
-
 export function FlowEditorPropertiesPanel({
 	selectedNode,
 	onUpdateNode,

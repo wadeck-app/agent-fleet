@@ -155,7 +155,7 @@ function CreateTaskForm() {
 	return (
 		<form onSubmit={handleSubmit}>
 			// violations-suppress: react/no-raw-input test fixture
-		<input
+			<input
 				type="text"
 				value={description}
 				onChange={e => setDescription(e.target.value)}
@@ -163,7 +163,7 @@ function CreateTaskForm() {
 				disabled={submitting}
 			/>
 			// violations-suppress: react/no-raw-button test fixture
-		<button type="submit" disabled={submitting}>
+			<button type="submit" disabled={submitting}>
 				{submitting ? 'Creating...' : 'Create Task'}
 			</button>
 			{result && <div data-testid="result">{result}</div>}

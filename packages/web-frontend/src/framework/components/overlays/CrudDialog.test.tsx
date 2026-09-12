@@ -196,9 +196,9 @@ describe('CrudDialog', () => {
 				<CrudDialog open={true} onOpenChange={vi.fn()} title="Create Item" description="Fill in the form">
 					<form>
 						// violations-suppress: react/no-raw-input test fixture
-					<input data-testid="name-input" type="text" />
+						<input data-testid="name-input" type="text" />
 						// violations-suppress: react/no-raw-button test fixture
-					<button data-testid="submit-button" type="submit">
+						<button data-testid="submit-button" type="submit">
 							Submit
 						</button>
 					</form>

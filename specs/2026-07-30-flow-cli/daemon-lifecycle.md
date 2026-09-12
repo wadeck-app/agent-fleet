@@ -1,6 +1,6 @@
- Daemon Lifecycle
+Daemon Lifecycle
 
- What singleton-daemon-kit handles automatically
+What singleton-daemon-kit handles automatically
 
 - Daemon detection via `~/.flow-daemon/config.port` (JSON: `{ sdkVersion, port, pid, startedAt }`)
 - PID liveness check + mtime freshness check (heartbeat every s via `fs.utimes`)
@@ -10,20 +10,20 @@
 - Lifecycle hooks: `onStart`, `onShutdown`, `onCommand`, `onCommandError`
 - Shutdown via `DaemonHandle.stop(reason)` -- cleans up port file, closes HTTP server
 
- What the flow CLI builds on top
+What the flow CLI builds on top
 
 Queue management, execution worker spawning, WebSocket server (worker channel), and log persistence (writing worker log entries to disk) -- none of these are in singleton-daemon-kit. They live in flow CLI's command handlers.
 
- Startup sequence
+Startup sequence
 
 ```
 flow run ./my-flow.yml
-  
+
    read ~/.flow-daemon/config.port
    check PID alive + mtime fresh
-  
+
    YES → POST /run to daemon, receive execution-id, exit
-  
+
    NO  → call createDaemon({ configDir: ~/.flow-daemon, commands, idleTimeout: null })
                daemon binds TCP port on ...
                writes config.port + health_token
@@ -32,14 +32,14 @@ flow run ./my-flow.yml
                enters HTTP event loop
 ```
 
- Shutdown
+Shutdown
 
 The daemon has `idleTimeout: null` -- it does NOT use singleton-daemon-kit's idle timer.
 The flow CLI manages its own shutdown: when the ready-step queue drains, the command handler calls `daemonHandle.stop('idle')`.
 
 `flow stop` is deferred to v (D). In v, the daemon exits automatically when the ready-step queue drains (D).
 
- Config directory
+Config directory
 
 ```
 ~/.flow-daemon/
@@ -49,19 +49,19 @@ The flow CLI manages its own shutdown: when the ready-step queue drains, the com
 
 `~/.flow-daemon/` must exist before first run. The CLI creates it on first invocation if absent.
 
- Complete configuration reference
+Complete configuration reference
 
 `~/.flow-config.yaml` -- all keys are optional, defaults shown:
 
 ```yaml
 queue:
-    concurrency:   max steps executing simultaneously across all flows (D)
+    concurrency: max steps executing simultaneously across all flows (D)
 
 logs:
-    retainDays:   daily log files kept; also controls execution file expiry (D, D)
+    retainDays: daily log files kept; also controls execution file expiry (D, D)
 
 worker:
-    reconnectTimeoutMs:   max time a worker has to reconnect after daemon crash (D)
-    bufferSpillMs:   time before in-memory log buffer spills to disk during reconnection (D)
-    wsPort: <httpPort + >  WebSocket port for workerdaemon channel (H); default = HTTP port + 
+    reconnectTimeoutMs: max time a worker has to reconnect after daemon crash (D)
+    bufferSpillMs: time before in-memory log buffer spills to disk during reconnection (D)
+    wsPort: <httpPort + >  WebSocket port for workerdaemon channel (H); default = HTTP port +
 ```

@@ -7,21 +7,22 @@ import { ProductProvider } from './_framework/ProductDomainContext';
 import { ViewDataTable } from './_framework/ViewDataTable';
 
 const columns = [
-	col.text('name', 'Name', { sortable: true }),
-	col.number('price', 'Price', { prefix: '$' }),
-	col.enum('category', 'Category', PRODUCT_CATEGORIES, { badge: true }),
+col.text('name', 'Name', { sortable: true }),
+col.number('price', 'Price', { prefix: '$' }),
+col.enum('category', 'Category', PRODUCT_CATEGORIES, { badge: true }),
 ];
 
 export function MyPage() {
-	return (
-		<ProductProvider>
-			<PageLayout>
-				<ViewDataTable columns={columns} features={['search', 'pagination']} />
-			</PageLayout>
-		</ProductProvider>
-	);
+return (
+<ProductProvider>
+<PageLayout>
+<ViewDataTable columns={columns} features={['search', 'pagination']} />
+</PageLayout>
+</ProductProvider>
+);
 }
-```
+
+````
 
 ## Benefits
 
@@ -48,7 +49,7 @@ Run type checks:
 
 ```bash
 npm run check:ts
-```
+````
 
 Build verification:
 

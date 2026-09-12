@@ -1,9 +1,9 @@
- WebSocket Architecture
+WebSocket Architecture
 
 Last Updated: --
 Status: Production-ready
 
- Table of Contents
+Table of Contents
 
 - [Overview](overview)
 - [Architecture Layers](architecture-layers)
@@ -18,7 +18,7 @@ Status: Production-ready
 
 ---
 
- Overview
+Overview
 
 Agent Fleet uses two distinct WebSocket systems for different purposes:
 
@@ -28,30 +28,30 @@ Agent Fleet uses two distinct WebSocket systems for different purposes:
 These systems are independent, use different message structures, and serve different architectural needs.
 
 ```
-                                      
-  Worker   WO/OW  Orchestrator                     Frontend 
-  Nodes      (Port )                                       Client  
-                                      
-                                                                       
-                                                         
-                                         Backend    
-                                                  (Fastify)  
-                                                 
-                                                       
+
+  Worker   WO/OW  Orchestrator                     Frontend
+  Nodes      (Port )                                       Client
+
+
+
+                                         Backend
+                                                  (Fastify)
+
+
                                                        BF Events
                                                   (Multi-transport)
 ```
 
 ---
 
- Architecture Layers
+Architecture Layers
 
- Layer : Worker  Orchestrator (WO/OW)
+Layer : Worker Orchestrator (WO/OW)
 
 Purpose: Task distribution and execution coordination
 Protocol: Custom binary-safe protocol with typed messages
 Transport: WebSocket only (single, reliable connection)
-Port:  (configurable)
+Port: (configurable)
 
 Key Components:
 
@@ -60,7 +60,7 @@ Key Components:
 - `WebSocketMessageRouter` - Routes messages to handlers
 - `WorkerCoordinator` - Coordinates task assignment
 
- Layer : Backend  Frontend (BF)
+Layer : Backend Frontend (BF)
 
 Purpose: Real-time state updates to web UI
 Protocol: JSON-based event system with type-safe events
@@ -76,20 +76,20 @@ Key Components:
 
 ---
 
- Worker WebSocket System (WO/OW)
+Worker WebSocket System (WO/OW)
 
- Overview
+Overview
 
 Worker WebSocket enables bidirectional communication between worker nodes and the orchestrator for task distribution and execution.
 
- Message Prefixes
+Message Prefixes
 
 - WO (Worker-to-Orchestrator): Messages from workers to orchestrator
 - OW (Orchestrator-to-Worker): Messages from orchestrator to workers
 
- Message Types
+Message Types
 
- Worker-to-Orchestrator (WO)
+Worker-to-Orchestrator (WO)
 
 ```typescript
 wo: worker_ready; // Worker announces availability
@@ -101,7 +101,7 @@ wo: flows_updated; // Worker's available flows changed
 wo: intervention_request; // Worker needs human intervention
 ```
 
- Orchestrator-to-Worker (OW)
+Orchestrator-to-Worker (OW)
 
 ```typescript
 ow: worker_welcome; // Welcome message with assigned ID
@@ -111,45 +111,45 @@ ow: intervention_response; // Response to intervention request
 ow: error; // Error notification
 ```
 
- Connection Flow
+Connection Flow
 
 ```
-                           
- Worker                              Orchestrator 
-                           
-                                            
-       . Connect to ws://localhost:   
-       >  
-                                            
-       . Send wo:worker_ready            
-       {preferredId, projectId, flows}     
-       >  
-                                            
-       . Receive ow:worker_welcome       
-       {workerId}                           
-       <  
-                                            
-       . Request or receive tasks         
-         
-                                            
-       . Execute and report results       
-         
-                                            
+
+ Worker                              Orchestrator
+
+
+       . Connect to ws://localhost:
+       >
+
+       . Send wo:worker_ready
+       {preferredId, projectId, flows}
+       >
+
+       . Receive ow:worker_welcome
+       {workerId}
+       <
+
+       . Request or receive tasks
+
+
+       . Execute and report results
+
+
 ```
 
- Message Structure
+Message Structure
 
 All messages follow this structure:
 
 ```typescript
 interface ProtocolMessage<T extends string> {
 	type: T;
-	timestamp: string; // ISO 
+	timestamp: string; // ISO
 	// Message-specific fields...
 }
 ```
 
- Serialization
+Serialization
 
 ```typescript
 import { parseMessage, serializeMessage } from 'shared-common/protocol';
@@ -168,7 +168,7 @@ socket.on('message', data => {
 });
 ```
 
- Worker Registration Example
+Worker Registration Example
 
 ```typescript
 // Worker side
@@ -186,13 +186,13 @@ const message = createWOMessage('wo:worker_ready', {
 
 ---
 
- Frontend WebSocket System (BF)
+Frontend WebSocket System (BF)
 
- Overview
+Overview
 
 Frontend WebSocket provides real-time updates to web UI clients using a multi-transport event broadcasting system.
 
- Event Prefixes
+Event Prefixes
 
 All frontend events use the `bf:` prefix (Backend-to-Frontend):
 
@@ -204,7 +204,7 @@ bf: workspace: created; // Workspace created
 // ... + event types
 ```
 
- Multi-Transport Support
+Multi-Transport Support
 
 The BF system supports multiple transports for maximum compatibility:
 
@@ -219,39 +219,39 @@ eventBroadcaster.broadcast('bf:task:created', taskData);
 // → Automatically sent via all active transports
 ```
 
- Connection Flow
+Connection Flow
 
 ```
-                      
- Frontend                        Backend 
-                      
-                                      
-       . HTTP: Login & get cookies  
-       POST /api/auth/login           
-        
-        access_token  
-                                      
-       . WebSocket: Connect          
-       GET /api/transports/ws         
-       (with cookies)                 
-        
-                                      
-       . Receive 'connected'         
-       {userId, tokenExpiresAt}       
-        
-                                      
-       . Subscribe to events         
-       {type: 'subscription',         
-        action: 'subscribe',          
-        events: ['bf:task:created']} 
-        
-                                      
-       . Receive real-time events    
-        
-                                      
+
+ Frontend                        Backend
+
+
+       . HTTP: Login & get cookies
+       POST /api/auth/login
+
+        access_token
+
+       . WebSocket: Connect
+       GET /api/transports/ws
+       (with cookies)
+
+
+       . Receive 'connected'
+       {userId, tokenExpiresAt}
+
+
+       . Subscribe to events
+       {type: 'subscription',
+        action: 'subscribe',
+        events: ['bf:task:created']}
+
+
+       . Receive real-time events
+
+
 ```
 
- Subscription Management
+Subscription Management
 
 Frontend clients subscribe to specific events:
 
@@ -275,7 +275,7 @@ transport.subscribe(
 );
 ```
 
- Server-Side Event Broadcasting
+Server-Side Event Broadcasting
 
 ```typescript
 // Backend: Broadcast events
@@ -293,7 +293,7 @@ class TasksService {
 }
 ```
 
- Event Structure
+Event Structure
 
 ```typescript
 interface TransportEvent<E extends EventType> {
@@ -304,83 +304,83 @@ interface TransportEvent<E extends EventType> {
 }
 ```
 
- Orchestrator Event Bridge
+Orchestrator Event Bridge
 
 The `OrchestratorEventBridge` translates orchestrator events to BF events:
 
 ```
-              
+
  Orchestrator        OrchestratorEvent             EventBroadcaster
- (OB events)   Bridge                   (BF events)    
-        - worker.connected           
-                       - worker.disconnected                 
-                       - task.updated                        
-                             
-                                                        All Transports  
-                                                        (WS/SSE/Poll)   
-                                                       
+ (OB events)   Bridge                   (BF events)
+        - worker.connected
+                       - worker.disconnected
+                       - task.updated
+
+                                                        All Transports
+                                                        (WS/SSE/Poll)
+
 ```
 
 ---
 
- Event Flow Diagrams
+Event Flow Diagrams
 
- Task Creation Flow
-
-```
-                
-Frontend      Backend      Orchestrator      Worker              Frontend 
- (User)       Service                                            (Others) 
-                
-                                                                           
-       POST /api/tasks                                                    
-                                                         
-                                                                           
-                     createTask()                                          
-                                                      
-                                                                           
-                                     ow:task_assigned                     
-                                                     
-                                                                           
-                     broadcast                                             
-                     bf:task:created                                       
-                     
-                                                                           
-        Created                                                         
-                                                         
-                                                                           
-```
-
- Worker Connection Flow
+Task Creation Flow
 
 ```
-            
- Worker      Orchestrator      Backend      Frontend 
-            
-                                                    
-      wo:worker_ready                              
-                                    
-                                                    
-                      OB: worker.connected         
-                                    
-                                                    
+
+Frontend      Backend      Orchestrator      Worker              Frontend
+ (User)       Service                                            (Others)
+
+
+       POST /api/tasks
+
+
+                     createTask()
+
+
+                                     ow:task_assigned
+
+
+                     broadcast
+                     bf:task:created
+
+
+        Created
+
+
+```
+
+Worker Connection Flow
+
+```
+
+ Worker      Orchestrator      Backend      Frontend
+
+
+      wo:worker_ready
+
+
+                      OB: worker.connected
+
+
                                         bf:worker:connected
-                                        
-                                                    
-      ow:worker_welcome                            
-                                    
-                                                    
+
+
+      ow:worker_welcome
+
+
 ```
 
 ---
 
- Message Types
+Message Types
 
- WO/OW Message Types Reference
+WO/OW Message Types Reference
 
 See `packages/shared-orch-worker/worker-messages.ts` and `orchestrator-messages.ts` for complete type definitions.
 
- BF Event Types Reference
+BF Event Types Reference
 
 See `packages/shared-frontend-backend/src/transport/BFEventConstants.ts` for all + event types.
 
@@ -394,9 +394,9 @@ Categories:
 
 ---
 
- Usage Examples
+Usage Examples
 
- Example : Worker Sending Task Completion
+Example : Worker Sending Task Completion
 
 ```typescript
 // packages/worker/src/flow/FlowWorker.ts
@@ -431,7 +431,7 @@ class FlowWorker {
 }
 ```
 
- Example : Frontend Real-time Updates
+Example : Frontend Real-time Updates
 
 ```typescript
 // packages/web-frontend/src/hooks/useRealtimeRefresh.ts
@@ -469,7 +469,7 @@ function TaskDetailPage({ taskId }: { taskId: string }) {
 }
 ```
 
- Example : Backend Broadcasting Events
+Example : Backend Broadcasting Events
 
 ```typescript
 // packages/web-backend/src/services/TasksService.ts
@@ -504,9 +504,9 @@ export class TasksService {
 
 ---
 
- Best Practices
+Best Practices
 
- Worker WebSocket (WO/OW)
+Worker WebSocket (WO/OW)
 
 . Always use factory functions for message creation:
 
@@ -528,16 +528,16 @@ export class TasksService {
     ```
 
 . Validate messages before processing:
-    ```typescript
+`typescript
     try {
     	const message = parseMessage<WOMessage>(data.toString());
     	// Process message
     } catch (error) {
     	log.error('Invalid message format:', error);
     }
-    ```
+    `
 
- Frontend WebSocket (BF)
+Frontend WebSocket (BF)
 
 . Subscribe early, unsubscribe on cleanup:
 
@@ -585,15 +585,15 @@ export class TasksService {
 
 ---
 
- Security
+Security
 
- Worker WebSocket
+Worker WebSocket
 
 - No authentication - Workers are trusted internal nodes
 - Private network - Should not be exposed to public internet
-- Port security - Use firewall rules to restrict access to port 
+- Port security - Use firewall rules to restrict access to port
 
- Frontend WebSocket
+Frontend WebSocket
 
 - Cookie-based authentication - HTTP_ONLY cookies prevent XSS attacks
 - Token validation - Every connection authenticated via AuthService
@@ -601,7 +601,7 @@ export class TasksService {
 - CORS protection - Fastify CORS plugin with whitelist
 - Rate limiting - Applied at HTTP layer (future: WebSocket-specific)
 
- Security Checklist
+Security Checklist
 
 - [ ] Worker WebSocket port () not exposed to internet
 - [ ] Frontend WebSocket requires valid authentication
@@ -612,14 +612,14 @@ export class TasksService {
 
 ---
 
- Troubleshooting
+Troubleshooting
 
- Worker Won't Connect
+Worker Won't Connect
 
 . Check WebSocket server is running:
 
     ```bash
-    netstat -an | grep 
+    netstat -an | grep
     ```
 
 . Verify worker configuration:
@@ -639,12 +639,9 @@ export class TasksService {
     grep "WebSocket" logs/worker.log
     ```
 
- Frontend Not Receiving Events
+Frontend Not Receiving Events
 
-. Verify authentication:
-    - Check cookies are being sent
-    - Verify token hasn't expired
-    - Check session exists: `GET /api/transports/status`
+. Verify authentication: - Check cookies are being sent - Verify token hasn't expired - Check session exists: `GET /api/transports/status`
 
 . Check subscription:
 
@@ -661,14 +658,14 @@ export class TasksService {
     ```
 
 . Check filters:
-    ```typescript
+`typescript
     // If using filters, ensure they match the event data
     transport.subscribe('bf:task:updated', handler, {
     	filters: { taskId: 'task-' }, // Must match task.id
     });
-    ```
+    `
 
- Message Parsing Errors
+Message Parsing Errors
 
 ```typescript
 // WO/OW: Use parseMessage for better errors
@@ -692,22 +689,22 @@ try {
 
 ---
 
- Performance Considerations
+Performance Considerations
 
- Worker WebSocket
+Worker WebSocket
 
 - Keep messages small - Serialize only necessary data
 - Batch updates - Combine multiple small updates when possible
 - Use binary for large payloads - Consider msgpack for large data
 
- Frontend WebSocket
+Frontend WebSocket
 
 - Server-side filtering - Use filters to reduce client bandwidth
 - Subscription management - Unsubscribe from unused events
 - Debounce rapid updates - Use frontend debouncing for high-frequency events
 - Transport fallback - HTTP polling is least efficient, WebSocket is best
 
- Monitoring
+Monitoring
 
 Key metrics to track:
 
@@ -719,9 +716,9 @@ Key metrics to track:
 
 ---
 
- Future Improvements
+Future Improvements
 
- Potential Enhancements
+Potential Enhancements
 
 . Message compression - gzip or brotli for large messages
 . Binary protocol - Use msgpack or protobuf instead of JSON
@@ -730,7 +727,7 @@ Key metrics to track:
 . Metrics dashboard - Real-time monitoring of WebSocket health
 . Replay capability - Event sourcing for missed messages
 
- Known Limitations
+Known Limitations
 
 . Single orchestrator - No horizontal scaling yet
 . In-memory sessions - Sessions lost on server restart
@@ -739,9 +736,9 @@ Key metrics to track:
 
 ---
 
- References
+References
 
- Key Files
+Key Files
 
 Worker WebSocket:
 
@@ -760,7 +757,7 @@ Frontend WebSocket:
 - `packages/web-frontend/src/transport/adapters/WebSocketTransportClient.ts`
 - `packages/shared-frontend-backend/src/transport/BFEventConstants.ts`
 
- Related Documentation
+Related Documentation
 
 - [Transport Layer Documentation](../packages/web-backend/docs/TRANSPORT_LAYER.md)
 - [Backend Architecture](../packages/web-backend/docs/ARCHITECTURE.md)

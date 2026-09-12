@@ -5,6 +5,7 @@ import { ColumnVisibility } from '@framework/components/columns/ColumnVisibility
 import { Button } from '@framework/components/primitives/Button';
 import { SearchInput } from '@framework/components/search/SearchInput';
 import { Table, type TableColumn } from '@framework/components/table/Table';
+import { renderColumnValue } from '@framework/lego/helpers/renderColumnValue';
 import type { ColumnDef } from '@framework/lego/types/ColTypes';
 import type {
 	BulkDeleteConfig,
@@ -15,7 +16,6 @@ import type {
 	SearchConfig,
 	SortingConfig,
 } from '@framework/lego/types/FeatureTypes';
-import { renderColumnValue } from '@framework/lego/helpers/renderColumnValue';
 import { resolveFeature } from '@framework/lego/types/FeatureTypes';
 import { Edit, Plus, Trash2 } from 'lucide-react';
 

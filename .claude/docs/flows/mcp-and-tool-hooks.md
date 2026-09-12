@@ -6,29 +6,30 @@ Both `ClaudeModelProvider` and `OpenCodeModelProvider` accept the same `McpServe
 
 ```yaml
 steps:
-  - id: analyze
-    type: model
-    model: sonnet
-    mcpServers:
-      - name: my-tool
-        command: [node, /absolute/path/to/server.mjs]
-        env:
-          API_KEY: ${{ inputs.apiKey }}   # optional
-        cwd: /working/dir                  # optional
-    prompt: Use the my-tool MCP tool to analyze ${{ inputs.target }}
+    - id: analyze
+      type: model
+      model: sonnet
+      mcpServers:
+          - name: my-tool
+            command: [node, /absolute/path/to/server.mjs]
+            env:
+                API_KEY: ${{ inputs.apiKey }} # optional
+            cwd: /working/dir # optional
+      prompt: Use the my-tool MCP tool to analyze ${{ inputs.target }}
 ```
 
 ### `McpServer` fields
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `name` | `string` | yes | `^[a-zA-Z0-9_-]+$` — used as the server key in both providers |
-| `command` | `string[]` | yes | First element is the executable; rest are args |
-| `env` | `Record<string,string>` | no | Keys must be `^[A-Z_][A-Z0-9_]*$` |
-| `cwd` | `string` | no | Working directory for the MCP process |
-| `enabled` | `boolean` | no | Defaults to `true` |
+| Field     | Type                    | Required | Notes                                                         |
+| --------- | ----------------------- | -------- | ------------------------------------------------------------- |
+| `name`    | `string`                | yes      | `^[a-zA-Z0-9_-]+$` — used as the server key in both providers |
+| `command` | `string[]`              | yes      | First element is the executable; rest are args                |
+| `env`     | `Record<string,string>` | no       | Keys must be `^[A-Z_][A-Z0-9_]*$`                             |
+| `cwd`     | `string`                | no       | Working directory for the MCP process                         |
+| `enabled` | `boolean`               | no       | Defaults to `true`                                            |
 
 **Provider translation:**
+
 - **Claude**: serialised to `{ mcpServers: { name: { command, args, env?, cwd? } } }` and passed via `--mcp-config <tmpfile>`
 - **OpenCode**: merged into the OpenCode JSON config under `mcpServers` before launch
 
@@ -42,31 +43,31 @@ Tool hooks intercept the model's tool calls without modifying the MCP server. Us
 
 ```yaml
 steps:
-  - id: run
-    type: model
-    model: sonnet
-    toolHooks:
-      - timing: before
-        action:
-          type: log              # logs tool name + args to stderr before each call
-      - timing: before
-        action:
-          type: deny
-          reason: "filesystem writes not allowed in this step"
-          toolPattern: "write_*" # glob; omit to deny all tools
-          argsContains: "/etc"   # optional: only deny when args contain this string
-    prompt: ...
+    - id: run
+      type: model
+      model: sonnet
+      toolHooks:
+          - timing: before
+            action:
+                type: log # logs tool name + args to stderr before each call
+          - timing: before
+            action:
+                type: deny
+                reason: 'filesystem writes not allowed in this step'
+                toolPattern: 'write_*' # glob; omit to deny all tools
+                argsContains: '/etc' # optional: only deny when args contain this string
+      prompt: ...
 ```
 
 ### `ToolHook` fields
 
-| Field | Type | Values |
-|---|---|---|
-| `timing` | `'before' \| 'after'` | When the hook fires |
-| `action.type` | `'log' \| 'deny'` | What to do |
-| `action.reason` | `string` | Required for `deny`; shown to the model |
-| `action.toolPattern` | `string` | Glob against tool name; omit to match all |
-| `action.argsContains` | `string` | Case-insensitive substring match on JSON-serialised args |
+| Field                 | Type                  | Values                                                   |
+| --------------------- | --------------------- | -------------------------------------------------------- |
+| `timing`              | `'before' \| 'after'` | When the hook fires                                      |
+| `action.type`         | `'log' \| 'deny'`     | What to do                                               |
+| `action.reason`       | `string`              | Required for `deny`; shown to the model                  |
+| `action.toolPattern`  | `string`              | Glob against tool name; omit to match all                |
+| `action.argsContains` | `string`              | Case-insensitive substring match on JSON-serialised args |
 
 `deny` only applies with `timing: before`. Both `toolPattern` and `argsContains` must match when both are set (AND logic).
 
@@ -79,16 +80,16 @@ steps:
   type: model
   model: haiku
   mcpServers:
-    - name: search
-      command: [node, search-server.mjs]
+      - name: search
+        command: [node, search-server.mjs]
   toolHooks:
-    - timing: before
-      action: { type: log }
-    - timing: before
-      action:
-        type: deny
-        reason: "only search tool allowed"
-        toolPattern: "!search"   # deny everything that is NOT search
+      - timing: before
+        action: { type: log }
+      - timing: before
+        action:
+            type: deny
+            reason: 'only search tool allowed'
+            toolPattern: '!search' # deny everything that is NOT search
   prompt: Search for ${{ inputs.query }}
 ```
 
@@ -102,19 +103,19 @@ Set `provider: opencode` or `provider: claude` on the step (defaults to `claude`
   provider: opencode
   model: amazon-bedrock/anthropic.claude-sonnet-4-6
   mcpServers:
-    - name: fs
-      command: [npx, -y, "@modelcontextprotocol/server-filesystem", /tmp]
+      - name: fs
+        command: [npx, -y, '@modelcontextprotocol/server-filesystem', /tmp]
   prompt: List the files in /tmp
 ```
 
 ## Relevant source files
 
-| File | Purpose |
-|---|---|
-| `processing/ModelProvider.ts` | `McpServer` and `LaunchOptions` types |
-| `processing/ToolHook.ts` | `ToolHook` type |
-| `processing/ClaudeModelProvider.ts` | Claude translation (`--mcp-config`, settings JSON) |
-| `processing/OpenCodeModelProvider.ts` | OpenCode translation (JSON config, ESM plugin) |
-| `processing/ClaudeHookTranslator.ts` | Claude hook → settings JSON |
-| `processing/OpenCodeHookTranslator.ts` | OpenCode hook → ESM plugin JS |
-| `test-utils/fixtures/mcp-weather-server.mjs` | Minimal MCP server fixture for tests |
+| File                                         | Purpose                                            |
+| -------------------------------------------- | -------------------------------------------------- |
+| `processing/ModelProvider.ts`                | `McpServer` and `LaunchOptions` types              |
+| `processing/ToolHook.ts`                     | `ToolHook` type                                    |
+| `processing/ClaudeModelProvider.ts`          | Claude translation (`--mcp-config`, settings JSON) |
+| `processing/OpenCodeModelProvider.ts`        | OpenCode translation (JSON config, ESM plugin)     |
+| `processing/ClaudeHookTranslator.ts`         | Claude hook → settings JSON                        |
+| `processing/OpenCodeHookTranslator.ts`       | OpenCode hook → ESM plugin JS                      |
+| `test-utils/fixtures/mcp-weather-server.mjs` | Minimal MCP server fixture for tests               |

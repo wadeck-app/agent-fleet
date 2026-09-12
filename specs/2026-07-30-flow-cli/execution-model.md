@@ -1,6 +1,6 @@
- Execution Model
+Execution Model
 
- Execution state file
+Execution state file
 
 `~/.flow-daemon/executions/<executionId>.json` -- written by the daemon on every state transition. Workers never write to this file directly (single writer rule, D).
 
@@ -27,7 +27,7 @@
 
 Execution ID format: -character alphanumeric strings (base). The `|` separator in log prefixes is safe because execution IDs never contain it.
 
- Execution states
+Execution states
 
 ```
 QUEUED → RUNNING → COMPLETED
@@ -36,7 +36,7 @@ QUEUED → RUNNING → COMPLETED
          RUNNING → RE-QUEUED  (worker WebSocket closed, idempotent step -- D, same execution ID, step re-queued)
 ```
 
- Responsibility split
+Responsibility split
 
 The daemon owns all execution intelligence. Workers are dumb step executors.
 
@@ -53,7 +53,7 @@ The daemon owns all execution intelligence. Workers are dumb step executors.
 | Liveness signal                                   | WebSocket connection health |
 | Crash detection and idempotency decision          | Daemon                      |
 
- Worker pool model
+Worker pool model
 
 `queue.concurrency` in `~/.flow-config.yaml` defines the global worker pool size. Workers are not bound to a flow -- they pull from a shared ready-step queue fed by all active executions.
 
@@ -68,7 +68,7 @@ Active flows:  FlowA (steps: s s s)   FlowB (steps: t t)
                                             first free worker picks this up
 ```
 
- Worker lifecycle (per step)
+Worker lifecycle (per step)
 
 Workers communicate with the daemon via WebSocket (D). The daemon pushes assignments; the worker pushes logs and results.
 
@@ -99,7 +99,7 @@ Daemon                              Worker (child process)
   +- update executions/abc.json
 ```
 
- Worker reconnection after daemon crash
+Worker reconnection after daemon crash
 
 WebSocket close is detected immediately by both sides. Workers buffer logs locally and call the CLI binary to re-establish contact (D, D).
 
@@ -119,7 +119,7 @@ Worker    Worker    Worker    CLI subprocess
                         +- WS reconnect + flush buffered logs
 ```
 
- Heartbeat failure handling
+Heartbeat failure handling
 
 Liveness is signaled by WebSocket connection health -- no explicit heartbeat messages.
 
@@ -127,16 +127,16 @@ Liveness is signaled by WebSocket connection health -- no explicit heartbeat mes
 | --------------------------------------- | ---------------------------- | ------------------------------------- |
 | Worker WebSocket closes unexpectedly    | false (default)              | mark step + execution FAILED          |
 | Worker WebSocket closes unexpectedly    | true                         | SIGKILL worker process, re-queue step |
-| Worker reconnects within window (D)   | any                          | re-adopt, resume from current step    |
-| Worker absent after reconnection window | any                          | declare dead, apply row  or  above  |
+| Worker reconnects within window (D)     | any                          | re-adopt, resume from current step    |
+| Worker absent after reconnection window | any                          | declare dead, apply row or above      |
 
- Graph structure: Directed Graph with bounded cycles
+Graph structure: Directed Graph with bounded cycles
 
 The flow step graph is a Directed Graph, not a DAG. `onFailure.goto` introduces cycles (feedback loops). Cycles are valid but bounded by `maxIterations` per step (default: ) to prevent infinite loops.
 
 The existing `DAGBuilder` / `DAGValidator` names in `flow-engine/src/validation/` are incorrect and will be renamed to `GraphBuilder` / `GraphValidator` during the refactor (D).
 
- Queue behavior
+Queue behavior
 
 - FIFO queue of ready steps, global across all active executions
 - `queue.concurrency` controls max simultaneously executing steps (not flows)

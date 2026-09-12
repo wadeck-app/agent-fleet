@@ -1,6 +1,6 @@
- Deployment Guide
+Deployment Guide
 
- Table of Contents
+Table of Contents
 
 . [Environment Variables](environment-variables)
 . [Production Configuration](production-configuration)
@@ -13,9 +13,9 @@
 
 ---
 
- Environment Variables
+Environment Variables
 
- Required Variables
+Required Variables
 
 These variables MUST be set in production:
 
@@ -38,7 +38,7 @@ FRONTEND_URL=https://yourdomain.com
 DATABASE_URL=postgresql://user:password@localhost:/dbname
 ```
 
- Optional Variables
+Optional Variables
 
 ```bash
  WebSocket Configuration
@@ -60,31 +60,31 @@ RATE_LIMIT_WINDOW=           Time window (ms)
 FORCE_HTTPS=true                  Force HTTPS in production
 ```
 
- Generating Secrets
+Generating Secrets
 
 CRITICAL: Never use weak or default secrets in production!
 
 ```bash
  Generate JWT secret (+ characters)
-openssl rand -base 
+openssl rand -base
 
  Generate cookie secret (different from JWT)
-openssl rand -base 
+openssl rand -base
 ```
 
 Best Practices:
 
 - Use different secrets for JWT and cookies
-- Rotate secrets every  days
+- Rotate secrets every days
 - Store secrets in environment variables or secret management service
 - Never commit secrets to version control
 - Use strong random values (+ characters)
 
 ---
 
- Production Configuration
+Production Configuration
 
- Server Configuration
+Server Configuration
 
 ```typescript
 // server.ts
@@ -128,14 +128,14 @@ await fastify.register(require('@fastify/cors'), {
 });
 
 // Start server
-const port = parseInt(process.env.PORT || '', );
+const port = parseInt(process.env.PORT || '');
 const host = process.env.HOST || '...';
 
 await fastify.listen({ port, host });
 console.log(`Server listening on ${host}:${port}`);
 ```
 
- Cookie Configuration
+Cookie Configuration
 
 Production cookies MUST have secure flags:
 
@@ -151,7 +151,7 @@ reply.setCookie('access_token', token, {
 });
 ```
 
- Database Connection
+Database Connection
 
 Use connection pooling in production:
 
@@ -168,16 +168,16 @@ const pool = new Pool({
 
 ---
 
- HTTPS Requirements
+HTTPS Requirements
 
- Why HTTPS is Required
+Why HTTPS is Required
 
 . Cookies with `secure` flag only sent over HTTPS
 . WebSocket upgrades require secure connections (wss://)
 . Prevents man-in-the-middle attacks
 . Required for modern browser features
 
- Certificate Setup
+Certificate Setup
 
 Option : Let's Encrypt (Free)
 
@@ -197,7 +197,7 @@ Option : Commercial Certificate
 
 Purchase from certificate authority (CA) and follow their instructions.
 
- Fastify HTTPS Configuration
+Fastify HTTPS Configuration
 
 ```typescript
 import Fastify from 'fastify';
@@ -211,7 +211,7 @@ const fastify = Fastify({
 });
 ```
 
- Reverse Proxy (Nginx)
+Reverse Proxy (Nginx)
 
 Recommended: Use Nginx as reverse proxy for HTTPS termination.
 
@@ -280,9 +280,9 @@ sudo systemctl reload nginx
 
 ---
 
- CORS Configuration
+CORS Configuration
 
- Same-Origin Deployment
+Same-Origin Deployment
 
 Recommended: Deploy frontend and backend on same domain.
 
@@ -301,7 +301,7 @@ await fastify.register(require('@fastify/cors'), {
 });
 ```
 
- Cross-Origin Deployment
+Cross-Origin Deployment
 
 If frontend and backend on different domains:
 
@@ -341,41 +341,41 @@ WARNING: `sameSite: 'none'` reduces CSRF protection. Consider using `sameSite: '
 
 ---
 
- Scaling Considerations
+Scaling Considerations
 
- Single Instance
+Single Instance
 
 Simplest deployment, suitable for small to medium traffic:
 
 ```
 
-   Nginx      
-  (HTTPS)     
+   Nginx
+  (HTTPS)
 
-       
 
-   Node.js    
-  (Fastify)   
+
+   Node.js
+  (Fastify)
 
 ```
 
- Multiple Instances
+Multiple Instances
 
 For higher traffic, use multiple instances behind load balancer:
 
 ```
-                
+
                  Load Balancer
-                   (Nginx)    
-                
-                       
-         
-                                   
-          
-     Node.js     Node.js     Node.js 
-     (Port       (Port       (Port   
-      )       )       )  
-          
+                   (Nginx)
+
+
+
+
+
+     Node.js     Node.js     Node.js
+     (Port       (Port       (Port
+      )       )       )
+
 ```
 
 Load Balancer Configuration (Nginx):
@@ -410,11 +410,11 @@ server {
 }
 ```
 
- Scaling Challenges
+Scaling Challenges
 
 Problem : WebSocket sessions not shared
 
-Each Node.js instance has its own in-memory sessions. User on instance  won't receive events from instance .
+Each Node.js instance has its own in-memory sessions. User on instance won't receive events from instance .
 
 Solution: Redis-backed session storage
 
@@ -430,7 +430,7 @@ const redis = new Redis(process.env.REDIS_URL);
 
 Problem : Event broadcasting only within instance
 
-Events broadcast on instance  won't reach clients on instance .
+Events broadcast on instance won't reach clients on instance .
 
 Solution: Redis pub/sub for event broadcasting
 
@@ -455,7 +455,7 @@ redis.on('message', (channel, message) => {
 });
 ```
 
- Process Manager (PM)
+Process Manager (PM)
 
 Use PM to manage multiple instances:
 
@@ -513,9 +513,9 @@ pm delete api-server
 
 ---
 
- Monitoring and Alerting
+Monitoring and Alerting
 
- Health Checks
+Health Checks
 
 Endpoint: `GET /api/monitoring/transport/health`
 
@@ -532,7 +532,7 @@ Response:
 	"auth": "ok",
 	"connectedClients": ,
 	"uptime": ,
-	"timestamp": 
+	"timestamp":
 }
 ```
 
@@ -551,7 +551,7 @@ upstream backend {
 }
 ```
 
- Metrics Collection
+Metrics Collection
 
 Endpoint: `GET /api/monitoring/transport/stats`
 
@@ -595,7 +595,7 @@ if (( $(echo "$AVG_SESSIONS > " | bc -l) )); then
 fi
 ```
 
- Logging
+Logging
 
 Structured Logging with Pino:
 
@@ -622,24 +622,24 @@ Use centralized logging:
 - CloudWatch Logs (AWS)
 - Google Cloud Logging
 
- Alerts
+Alerts
 
 Set up alerts for:
 
-| Metric                    | Threshold              | Action                                |
-| ------------------------- | ---------------------- | ------------------------------------- |
-| Health check failing      |  consecutive failures | Page on-call engineer                 |
-| Connected clients         | >                  | Investigate, prepare to scale         |
-| CPU usage                 | >% for min          | Scale up instances                    |
+| Metric                    | Threshold            | Action                                |
+| ------------------------- | -------------------- | ------------------------------------- |
+| Health check failing      | consecutive failures | Page on-call engineer                 |
+| Connected clients         | >                    | Investigate, prepare to scale         |
+| CPU usage                 | >% for min           | Scale up instances                    |
 | Memory usage              | >%                   | Investigate memory leak               |
 | Failed logins             | > per minute         | Possible attack, enable rate limiting |
-| Average sessions per user | >                     | Possible bot or session leak          |
+| Average sessions per user | >                    | Possible bot or session leak          |
 
 ---
 
- Troubleshooting
+Troubleshooting
 
- Problem: WebSocket connections failing
+Problem: WebSocket connections failing
 
 Symptoms:
 
@@ -670,7 +670,7 @@ Common Causes:
 
 ---
 
- Problem: High memory usage
+Problem: High memory usage
 
 Symptoms:
 
@@ -704,7 +704,7 @@ Fix:
 
 ---
 
- Problem: Events not received
+Problem: Events not received
 
 Symptoms:
 
@@ -731,7 +731,7 @@ Common Causes:
 
 ---
 
- Problem: Token expired immediately
+Problem: Token expired immediately
 
 Symptoms:
 
@@ -762,9 +762,9 @@ Common Causes:
 
 ---
 
- Deployment Checklist
+Deployment Checklist
 
- Pre-Deployment
+Pre-Deployment
 
 - [ ] All environment variables set
 - [ ] Secrets generated and stored securely
@@ -775,7 +775,7 @@ Common Causes:
 - [ ] Tests passing (`npm test`)
 - [ ] Security audit passed (`npm audit`)
 
- Deployment
+Deployment
 
 - [ ] Code deployed to server
 - [ ] Dependencies installed (`npm ci --production`)
@@ -785,7 +785,7 @@ Common Causes:
 - [ ] Health check passing
 - [ ] WebSocket connections working
 
- Post-Deployment
+Post-Deployment
 
 - [ ] Monitor logs for errors
 - [ ] Check metrics (CPU, memory, connections)
@@ -794,9 +794,9 @@ Common Causes:
 - [ ] Verify HTTPS certificate
 - [ ] Test from different devices
 - [ ] Check browser console for errors
-- [ ] Monitor for  hours
+- [ ] Monitor for hours
 
- Rollback Plan
+Rollback Plan
 
 If deployment fails:
 
@@ -809,7 +809,7 @@ If deployment fails:
 
 ---
 
- Docker Deployment
+Docker Deployment
 
 Dockerfile:
 
@@ -828,7 +828,7 @@ RUN npm ci --production
 COPY dist ./dist
 
  Expose port
-EXPOSE 
+EXPOSE
 
  Health check
 HEALTHCHECK --interval=s --timeout=s --start-period=s \
@@ -858,7 +858,7 @@ services:
             test: ['CMD', 'curl', '-f', 'http://localhost:/api/monitoring/transport/health']
             interval: s
             timeout: s
-            retries: 
+            retries:
 
     nginx:
         image: nginx:alpine
@@ -875,7 +875,7 @@ services:
 
 ---
 
- References
+References
 
 - [Security Guide](./SECURITY.md)
 - [Transport Layer Documentation](./TRANSPORT_LAYER.md)

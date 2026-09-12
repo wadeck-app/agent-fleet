@@ -9,8 +9,6 @@
  * - Task assignment and execution coordination
  * - Flow execution orchestration
  */
-import type { ChildProcess } from 'node:child_process';
-import { execSync } from 'node:child_process';
 import dotenv from 'dotenv';
 import { type FlowExecutionOptions, FlowExecutor } from 'flow-engine/executor/FlowExecutor';
 import type {
@@ -21,10 +19,13 @@ import type {
 import { FlowRegistry } from 'flow-engine/registry/FlowRegistry';
 import type { FlowMetadata, Workspace } from 'flow-engine/types';
 import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import * as yaml from 'js-yaml';
+import type { ChildProcess } from 'node:child_process';
+import { execSync } from 'node:child_process';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getOrchestratorWsUrl } from 'shared-common/PortCalculator';
 import type { Shutdownable } from 'shared-common/Shutdownable';
 import { type Logger, createLogger } from 'shared-common/logger';
@@ -39,7 +40,6 @@ import {
 	type WorkerWelcomeMessage,
 } from 'shared-orch-worker/orchestrator-messages';
 import { type W2OMessage, W2OMessageType, createW2OMessage } from 'shared-orch-worker/worker-messages';
-import { fileURLToPath } from 'node:url';
 import WebSocket from 'ws';
 
 import { ClaudeLifecycleManager } from './ClaudeLifecycleManager';
@@ -167,7 +167,10 @@ export class FlowWorker implements Shutdownable {
 					const message = parseMessage(data.toString()) as O2WMessage;
 					this.handleMessage(message);
 				} catch (error) {
-					this.logger.error(` Error parsing message:`, (error instanceof Error ? String(error) : String(error)));
+					this.logger.error(
+						` Error parsing message:`,
+						error instanceof Error ? String(error) : String(error)
+					);
 				}
 			});
 
@@ -262,7 +265,7 @@ export class FlowWorker implements Shutdownable {
 			return branch || null;
 		} catch (error) {
 			// Not in a git repository or git command failed
-			this.logger.error(` Git detection failed:`, (error instanceof Error ? String(error) : String(error)));
+			this.logger.error(` Git detection failed:`, error instanceof Error ? String(error) : String(error));
 			return null;
 		}
 	}
@@ -522,7 +525,7 @@ export class FlowWorker implements Shutdownable {
 			await this.executeTask(this.currentTask);
 		} catch (error) {
 			this.logger.error(` Task execution error:`, error);
-			this.sendTaskFailed((error instanceof Error ? String(error) : String(error)));
+			this.sendTaskFailed(error instanceof Error ? String(error) : String(error));
 		}
 	}
 
@@ -1056,12 +1059,12 @@ export class FlowWorker implements Shutdownable {
 			// Store error in task
 			task.flowResult = {
 				status: 'failed',
-				error: (error instanceof Error ? String(error) : String(error)),
+				error: error instanceof Error ? String(error) : String(error),
 			};
 
 			// Send failure with configured status
 			this.sendTaskFailed(
-				(error instanceof Error ? String(error) : String(error)),
+				error instanceof Error ? String(error) : String(error),
 				failureStatus,
 				this.currentTask?.ticketId,
 				failureTicketStatus

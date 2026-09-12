@@ -246,9 +246,7 @@ export const WithDisabledOption: Story = {
 		return (
 			<form className="w-96 space-y-6 rounded-lg border border-border p-6">
 				<h3 className="text-lg font-medium">Product Options</h3>
-
 				<RadioGroupField label="Size" value={size} onChange={setSize} options={sizeOptions} required={true} />
-
 				<RadioGroupField
 					label="Color"
 					value={color}
@@ -261,7 +259,6 @@ export const WithDisabledOption: Story = {
 					orientation="horizontal"
 					required={true}
 				/>
-
 				<RadioGroupField
 					label="Delivery"
 					value={delivery}
@@ -272,7 +269,6 @@ export const WithDisabledOption: Story = {
 					]}
 					required={true}
 				/>
-
 				// violations-suppress: react/no-raw-button story fixture
 				<button
 					type="submit"
@@ -362,7 +358,6 @@ export const LongLabels: Story = {
 					<h3 className="text-lg font-medium">Appearance</h3>
 					<p className="text-sm text-muted-foreground">Customize how the app looks on your device</p>
 				</div>
-
 				<RadioGroupField
 					label="Theme"
 					value={theme}
@@ -377,7 +372,6 @@ export const LongLabels: Story = {
 					]}
 					error={error}
 				/>
-
 				// violations-suppress: react/no-raw-button story fixture
 				<button
 					className={`

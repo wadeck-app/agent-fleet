@@ -13,7 +13,7 @@
 | A2  | context-provider | Domain context provider + view components             |
 | A3  | feature-hooks    | Composable feature hooks passed to a data table       |
 | A4  | context-children | Compound component pattern (DataTable.\* slots)       |
-| A5  | query-pipeline   | Query-modify pipeline (pure function transforms)    |
+| A5  | query-pipeline   | Query-modify pipeline (pure function transforms)      |
 | A6  | data2-based      | Data2 render-prop orchestrator + Table2 + hooks2      |
 
 ---
@@ -28,7 +28,7 @@ _How well does each approach absorb new scenarios without requiring framework ch
 | A2       | 4                         | Yes, with provider wrapper            | Context-based domain view   | 4           |
 | A3       | 5                         | Yes, feature hooks are stable         | Feature-hook composition    | 4           |
 | A4       | 4                         | Yes, children context is lean         | Context-children pattern    | 4           |
-| A5       | 1                         | Yes, 100% page-only                   | Query-modify pipeline     | 5           |
+| A5       | 1                         | Yes, 100% page-only                   | Query-modify pipeline       | 5           |
 | A6       | 2                         | Mostly yes; minor post-launch adapter | Data2-based adapter         | 4           |
 
 ### Key Findings
@@ -312,7 +312,7 @@ _When an LLM coding agent writes a new page or adds a feature, how likely is it 
 | A2       | Medium            | Yes (structural test)      | Partial      | Medium (missing provider)     | 3.5         |
 | A3       | Low               | Yes (structural test)      | No           | High (missing hook -> silent) | 2.5         |
 | A4       | Low               | Yes (structural test)      | No           | High (missing slot -> silent) | 2.0         |
-| A5       | Low               | Partial (inline style gap) | No           | Medium-high (modify order)  | 2.5         |
+| A5       | Low               | Partial (inline style gap) | No           | Medium-high (modify order)    | 2.5         |
 | A6       | High              | Yes (structural test)      | Yes          | Low-medium (stale closures)   | 4.0         |
 
 **API surface complexity (concept count required):**
@@ -323,7 +323,7 @@ _When an LLM coding agent writes a new page or adds a feature, how likely is it 
 | A2       | 2 (features array + provider wrap)           |
 | A3       | 7 (6 feature hooks + composition pattern)    |
 | A4       | 5 (5+ compound component slots)              |
-| A5       | 4 (modify factories + composition)         |
+| A5       | 4 (modify factories + composition)           |
 | A6       | 3 (Data2 + adaptCol + hooks2)                |
 
 ### Key Findings
@@ -375,7 +375,7 @@ A5 structural gap -- S3Page.tsx passes the className test but violates intent:
 | ---------------------------- | -------- | -------- | -------- | -------- | -------- | -------- |
 | 1. Antifragilite             | 4        | 4        | 4        | 4        | **5**    | 4        |
 | 2. Testabilite               | 3        | 2        | 4        | 4        | 4        | 4        |
-| 3. Simplicite of the pages      | **5**    | 4        | 2        | 3        | 4        | 1        |
+| 3. Simplicite of the pages   | **5**    | 4        | 2        | 3        | 4        | 1        |
 | 4. Coherence                 | **5**    | **5**    | 3        | 3        | 3        | 3        |
 | 5. New feature extensibility | 1        | 2        | 3        | 3        | 4        | 3        |
 | 6. Maintenabilite            | 4        | 3        | 3        | 2        | 3        | **5**    |
@@ -386,15 +386,15 @@ A5 structural gap -- S3Page.tsx passes the className test but violates intent:
 
 ## Recommended Approach by Use Case
 
-| Use case                                   | Recommended | Rationale                                                                    |
-| ------------------------------------------ | ----------- | ---------------------------------------------------------------------------- |
-| **Junior developer writing new pages**     | A1          | Pure config, 1 concept, copy-paste friendly, impossible to misuse            |
-| **LLM agent generating code**              | A1          | Self-limiting API, declarative features, no silent failure modes             |
-| **Testability-first team**                 | A5 or A4    | Minimal mocks, pure function modifiers (A5) or deferred state checks (A4)    |
-| **Long-term maintainability**              | A6          | No god components, no anti-patterns, lowest global refactor cost             |
+| Use case                                   | Recommended | Rationale                                                                  |
+| ------------------------------------------ | ----------- | -------------------------------------------------------------------------- |
+| **Junior developer writing new pages**     | A1          | Pure config, 1 concept, copy-paste friendly, impossible to misuse          |
+| **LLM agent generating code**              | A1          | Self-limiting API, declarative features, no silent failure modes           |
+| **Testability-first team**                 | A5 or A4    | Minimal mocks, pure function modifiers (A5) or deferred state checks (A4)  |
+| **Long-term maintainability**              | A6          | No god components, no anti-patterns, lowest global refactor cost           |
 | **Maximum new feature extensibility**      | A5          | modify pattern is open by design; pipeline grows without framework changes |
-| **Pattern uniformity across a large team** | A1 or A2    | Single blessed path, zero structural drift, all pages look identical         |
-| **Senior developer, complex scenarios**    | A5          | Pipeline modifiers are powerful and composable; testable pure functions      |
+| **Pattern uniformity across a large team** | A1 or A2    | Single blessed path, zero structural drift, all pages look identical       |
+| **Senior developer, complex scenarios**    | A5          | Pipeline modifiers are powerful and composable; testable pure functions    |
 
 ---
 

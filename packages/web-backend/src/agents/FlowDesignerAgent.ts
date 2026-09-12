@@ -1,7 +1,7 @@
-import { execSync, spawn } from 'node:child_process';
 import { FlowCapabilitiesGenerator, type FlowRegistry } from 'flow-engine';
 import type { FlowDefinition } from 'flow-engine/src/types';
 import * as yaml from 'js-yaml';
+import { execSync, spawn } from 'node:child_process';
 import { createLogger } from 'shared-common/logger';
 
 import type { FlowReviewThread } from '@app/shared/api/flow-proposals.contract';

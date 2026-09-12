@@ -23,7 +23,14 @@ interface ReviewThreadItemProps {
 	onUpdated: () => void;
 }
 
-export function ReviewThreadItem({ thread, ticketId, proposalId, onResolved, onDeleted, onUpdated }: ReviewThreadItemProps) {
+export function ReviewThreadItem({
+	thread,
+	ticketId,
+	proposalId,
+	onResolved,
+	onDeleted,
+	onUpdated,
+}: ReviewThreadItemProps) {
 	const { showToast } = useToast();
 	const [replyText, setReplyText] = useState('');
 	const [showReplyForm, setShowReplyForm] = useState(false);
@@ -98,7 +105,12 @@ export function ReviewThreadItem({ thread, ticketId, proposalId, onResolved, onD
 			return;
 		}
 		const prevSelector = localSelector;
-		const newSelector = { ...localSelector, startLine: start, endLine: end, selectedText: editSelectedText || undefined };
+		const newSelector = {
+			...localSelector,
+			startLine: start,
+			endLine: end,
+			selectedText: editSelectedText || undefined,
+		};
 		setLocalSelector(newSelector);
 		setIsEditingSelector(false);
 		setIsSavingSelector(true);
@@ -143,7 +155,8 @@ export function ReviewThreadItem({ thread, ticketId, proposalId, onResolved, onD
 		if (!editingCommentId || !editCommentContent.trim()) return;
 		const commentId = editingCommentId;
 		const newContent = editCommentContent.trim();
-		const prevContent = localCommentContent[commentId] ?? thread.comments.find(c => c.id === commentId)?.content ?? '';
+		const prevContent =
+			localCommentContent[commentId] ?? thread.comments.find(c => c.id === commentId)?.content ?? '';
 		setLocalCommentContent(prev => ({ ...prev, [commentId]: newContent }));
 		setEditingCommentId(null);
 		setIsSavingComment(true);
@@ -169,16 +182,42 @@ export function ReviewThreadItem({ thread, ticketId, proposalId, onResolved, onD
 					<p className="text-xs font-medium text-muted-foreground">Edit line range</p>
 					<div className="flex gap-2">
 						<div className="flex-1 space-y-1">
-							<Label htmlFor={`edit-start-${thread.id}`} className="text-xs text-muted-foreground">Start line</Label>
-							<Input id={`edit-start-${thread.id}`} type="number" min={1} value={editStartLine} onChange={e => setEditStartLine(e.target.value)} className="h-7 text-xs" />
+							<Label htmlFor={`edit-start-${thread.id}`} className="text-xs text-muted-foreground">
+								Start line
+							</Label>
+							<Input
+								id={`edit-start-${thread.id}`}
+								type="number"
+								min={1}
+								value={editStartLine}
+								onChange={e => setEditStartLine(e.target.value)}
+								className="h-7 text-xs"
+							/>
 						</div>
 						<div className="flex-1 space-y-1">
-							<Label htmlFor={`edit-end-${thread.id}`} className="text-xs text-muted-foreground">End line</Label>
-							<Input id={`edit-end-${thread.id}`} type="number" min={1} value={editEndLine} onChange={e => setEditEndLine(e.target.value)} className="h-7 text-xs" />
+							<Label htmlFor={`edit-end-${thread.id}`} className="text-xs text-muted-foreground">
+								End line
+							</Label>
+							<Input
+								id={`edit-end-${thread.id}`}
+								type="number"
+								min={1}
+								value={editEndLine}
+								onChange={e => setEditEndLine(e.target.value)}
+								className="h-7 text-xs"
+							/>
 						</div>
 						<div className="flex-[2] space-y-1">
-							<Label htmlFor={`edit-text-${thread.id}`} className="text-xs text-muted-foreground">Selected text (optional)</Label>
-							<Input id={`edit-text-${thread.id}`} type="text" value={editSelectedText} onChange={e => setEditSelectedText(e.target.value)} className="h-7 text-xs" />
+							<Label htmlFor={`edit-text-${thread.id}`} className="text-xs text-muted-foreground">
+								Selected text (optional)
+							</Label>
+							<Input
+								id={`edit-text-${thread.id}`}
+								type="text"
+								value={editSelectedText}
+								onChange={e => setEditSelectedText(e.target.value)}
+								className="h-7 text-xs"
+							/>
 						</div>
 					</div>
 					<div className="flex gap-2">
@@ -186,23 +225,52 @@ export function ReviewThreadItem({ thread, ticketId, proposalId, onResolved, onD
 							{isSavingSelector ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
 							Save
 						</Button>
-						<Button variant="ghost" size="sm" onClick={() => setIsEditingSelector(false)} disabled={isSavingSelector}>Cancel</Button>
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={() => setIsEditingSelector(false)}
+							disabled={isSavingSelector}
+						>
+							Cancel
+						</Button>
 					</div>
 				</div>
 			) : (
 				<div className="flex items-center gap-2">
 					<span className="font-mono text-xs text-muted-foreground">
-						Lines {localSelector.startLine}{'-'}{localSelector.endLine}
+						Lines {localSelector.startLine}
+						{'-'}
+						{localSelector.endLine}
 					</span>
-					<Badge variant={thread.status === 'open' ? 'warning' : 'success'} className="text-xs">{thread.status}</Badge>
+					<Badge variant={thread.status === 'open' ? 'warning' : 'success'} className="text-xs">
+						{thread.status}
+					</Badge>
 					{localSelector.selectedText && (
-						<code className="max-w-[200px] truncate rounded bg-muted px-1 py-0.5 font-mono text-xs">{localSelector.selectedText}</code>
+						<code className="max-w-[200px] truncate rounded bg-muted px-1 py-0.5 font-mono text-xs">
+							{localSelector.selectedText}
+						</code>
 					)}
 					<div className="ml-auto flex items-center gap-1">
 						{/* violations-suppress: tailwind/no-button-classname-style-override contextual icon-only colors have no matching variant */}
-						<Button variant="ghost" size="icon-xs" className="text-muted-foreground" onClick={handleOpenEditSelector} title="Edit line range"><Pencil /></Button>
+						<Button
+							variant="ghost"
+							size="icon-xs"
+							className="text-muted-foreground"
+							onClick={handleOpenEditSelector}
+							title="Edit line range"
+						>
+							<Pencil />
+						</Button>
 						{/* violations-suppress: tailwind/no-button-classname-style-override contextual icon-only colors have no matching variant */}
-						<Button variant="ghost" size="icon-xs" className="text-muted-foreground hover:text-destructive" onClick={handleDeleteThread} title="Delete thread"><Trash2 /></Button>
+						<Button
+							variant="ghost"
+							size="icon-xs"
+							className="text-muted-foreground hover:text-destructive"
+							onClick={handleDeleteThread}
+							title="Delete thread"
+						>
+							<Trash2 />
+						</Button>
 					</div>
 				</div>
 			)}
@@ -213,24 +281,63 @@ export function ReviewThreadItem({ thread, ticketId, proposalId, onResolved, onD
 					const isEditingThis = editingCommentId === comment.id;
 					const displayContent = localCommentContent[comment.id] ?? comment.content;
 					return (
-						<div key={comment.id} className={`rounded border-l-2 border-muted-foreground/30 pl-3 transition-opacity${isPendingCommentDelete ? ' opacity-50 line-through pointer-events-none' : ''}`}>
+						<div
+							key={comment.id}
+							className={`rounded border-l-2 border-muted-foreground/30 pl-3 transition-opacity${isPendingCommentDelete ? ' opacity-50 line-through pointer-events-none' : ''}`}
+						>
 							<div className="flex items-center gap-2 mb-1">
-								<Badge variant="outline" className="text-xs">{comment.author}</Badge>
-								<span className="text-xs text-muted-foreground">{new Date(comment.createdAt).toISOString().replace('T', ' ').slice(0, 19)}</span>
+								<Badge variant="outline" className="text-xs">
+									{comment.author}
+								</Badge>
+								<span className="text-xs text-muted-foreground">
+									{new Date(comment.createdAt).toISOString().replace('T', ' ').slice(0, 19)}
+								</span>
 								<div className="ml-auto flex items-center gap-1">
-									<Button variant="ghost" size="icon-xs" className="text-muted-foreground" onClick={() => handleStartEditComment(comment.id, displayContent)} title="Edit comment"><Pencil /></Button>
-									<Button variant="ghost" size="icon-xs" className="text-muted-foreground hover:text-destructive" onClick={() => handleDeleteComment(comment.id)} title="Delete comment"><Trash2 /></Button>
+									<Button
+										variant="ghost"
+										size="icon-xs"
+										className="text-muted-foreground"
+										onClick={() => handleStartEditComment(comment.id, displayContent)}
+										title="Edit comment"
+									>
+										<Pencil />
+									</Button>
+									<Button
+										variant="ghost"
+										size="icon-xs"
+										className="text-muted-foreground hover:text-destructive"
+										onClick={() => handleDeleteComment(comment.id)}
+										title="Delete comment"
+									>
+										<Trash2 />
+									</Button>
 								</div>
 							</div>
 							{isEditingThis ? (
 								<div className="space-y-2 mt-1">
-									<Textarea value={editCommentContent} onChange={e => setEditCommentContent(e.target.value)} className="text-sm" rows={3} />
+									<Textarea
+										value={editCommentContent}
+										onChange={e => setEditCommentContent(e.target.value)}
+										className="text-sm"
+										rows={3}
+									/>
 									<div className="flex gap-2">
-										<Button size="sm" onClick={handleSaveComment} disabled={isSavingComment || !editCommentContent.trim()}>
+										<Button
+											size="sm"
+											onClick={handleSaveComment}
+											disabled={isSavingComment || !editCommentContent.trim()}
+										>
 											{isSavingComment ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
 											Save
 										</Button>
-										<Button variant="ghost" size="sm" onClick={() => setEditingCommentId(null)} disabled={isSavingComment}>Cancel</Button>
+										<Button
+											variant="ghost"
+											size="sm"
+											onClick={() => setEditingCommentId(null)}
+											disabled={isSavingComment}
+										>
+											Cancel
+										</Button>
 									</div>
 								</div>
 							) : (
@@ -244,7 +351,14 @@ export function ReviewThreadItem({ thread, ticketId, proposalId, onResolved, onD
 			<div className="flex items-center gap-2">
 				{thread.status === 'open' && (
 					<>
-						<Button variant="outline" size="sm" onClick={() => setShowReplyForm(v => !v)} disabled={isReplying || isResolving}>Add reply</Button>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => setShowReplyForm(v => !v)}
+							disabled={isReplying || isResolving}
+						>
+							Add reply
+						</Button>
 						<Button variant="ghost" size="sm" onClick={handleResolve} disabled={isResolving || isReplying}>
 							{isResolving ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
 							Resolve
@@ -255,13 +369,27 @@ export function ReviewThreadItem({ thread, ticketId, proposalId, onResolved, onD
 
 			{showReplyForm && (
 				<div className="space-y-2">
-					<Textarea value={replyText} onChange={e => setReplyText(e.target.value)} placeholder="Write a reply..." className="text-sm" />
+					<Textarea
+						value={replyText}
+						onChange={e => setReplyText(e.target.value)}
+						placeholder="Write a reply..."
+						className="text-sm"
+					/>
 					<div className="flex gap-2">
 						<Button size="sm" onClick={handleReply} disabled={isReplying || !replyText.trim()}>
 							{isReplying ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
 							Submit reply
 						</Button>
-						<Button variant="ghost" size="sm" onClick={() => { setShowReplyForm(false); setReplyText(''); }}>Cancel</Button>
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={() => {
+								setShowReplyForm(false);
+								setReplyText('');
+							}}
+						>
+							Cancel
+						</Button>
 					</div>
 				</div>
 			)}

@@ -113,8 +113,8 @@ The test file `WorkspacesService.bidirectional-sync.test.ts` covers:
 
 ## Success Criteria
 
--  TypeScript compiles without errors
--  Tests pass
--  Manual verification shows workspace appearing in project
--  Workspace count on tab badge shows "1"
--  Workspace persists after page refresh
+- TypeScript compiles without errors
+- Tests pass
+- Manual verification shows workspace appearing in project
+- Workspace count on tab badge shows "1"
+- Workspace persists after page refresh

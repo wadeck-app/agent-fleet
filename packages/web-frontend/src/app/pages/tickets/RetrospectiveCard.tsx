@@ -7,8 +7,7 @@ import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 
 import { feedbackApi } from './feedbackApi';
 
-const retroToggleCls =
-	'flex w-full items-center justify-start gap-2 px-3 py-2 text-sm font-medium hover:bg-muted/50';
+const retroToggleCls = 'flex w-full items-center justify-start gap-2 px-3 py-2 text-sm font-medium hover:bg-muted/50';
 
 interface RetrospectiveCardProps {
 	ticketId: string;
@@ -66,12 +65,7 @@ export function RetrospectiveCard({ ticketId }: RetrospectiveCardProps) {
 
 	return (
 		<div className="rounded-md border">
-			<Button
-				type="button"
-				variant="ghost"
-				onClick={() => setOpen(v => !v)}
-				className={retroToggleCls}
-			>
+			<Button type="button" variant="ghost" onClick={() => setOpen(v => !v)} className={retroToggleCls}>
 				{open ? <ChevronDown className="size-4 shrink-0" /> : <ChevronRight className="size-4 shrink-0" />}
 				Agent Retrospective
 				<span className="ml-auto text-xs font-normal text-muted-foreground">

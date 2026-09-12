@@ -3,8 +3,8 @@ import { useState } from 'react';
 import { PageContainer } from '@framework/components/layout/PageContainer';
 import { Button } from '@framework/components/primitives/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
-import type { DataTableFeature } from '@framework/lego/types/FeatureTypes';
 import { col } from '@framework/lego/helpers/col';
+import type { DataTableFeature } from '@framework/lego/types/FeatureTypes';
 import type { Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 
@@ -61,9 +61,24 @@ export function S11Content() {
 				</CardHeader>
 				<CardContent>
 					<div style={{ display: 'flex', gap: '0.5rem' }}>
-						<Button variant={editMode === 'dialog' ? 'default' : 'outline'} onClick={() => setEditMode('dialog')}>Dialog</Button>
-						<Button variant={editMode === 'inline' ? 'default' : 'outline'} onClick={() => setEditMode('inline')}>Inline</Button>
-						<Button variant={editMode === 'below' ? 'default' : 'outline'} onClick={() => setEditMode('below')}>Below Form</Button>
+						<Button
+							variant={editMode === 'dialog' ? 'default' : 'outline'}
+							onClick={() => setEditMode('dialog')}
+						>
+							Dialog
+						</Button>
+						<Button
+							variant={editMode === 'inline' ? 'default' : 'outline'}
+							onClick={() => setEditMode('inline')}
+						>
+							Inline
+						</Button>
+						<Button
+							variant={editMode === 'below' ? 'default' : 'outline'}
+							onClick={() => setEditMode('below')}
+						>
+							Below Form
+						</Button>
 					</div>
 				</CardContent>
 			</Card>

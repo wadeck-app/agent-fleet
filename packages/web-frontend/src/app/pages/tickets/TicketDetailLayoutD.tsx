@@ -44,7 +44,6 @@ function formatStatus(status: TicketStatus): string {
 	return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
-
 interface TicketDetailLayoutDProps {
 	ticket: Ticket;
 	ticketId: string;

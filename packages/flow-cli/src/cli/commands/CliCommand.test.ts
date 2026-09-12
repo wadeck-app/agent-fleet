@@ -38,7 +38,9 @@ async function runCliArgs(args: string[]): Promise<void> {
 }
 
 describe('cli version', () => {
-	afterEach(() => { vi.restoreAllMocks(); });
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
 
 	it('calls cliVersionCommand with pkgName and channel', async () => {
 		const { cliVersionCommand } = await import('@wadeck-app/shared-cli/CliMetaCommands');
@@ -52,7 +54,9 @@ describe('cli version', () => {
 });
 
 describe('cli update --check', () => {
-	afterEach(() => { vi.restoreAllMocks(); });
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
 
 	it('calls cliVersionCommand when --check is passed', async () => {
 		const { cliVersionCommand } = await import('@wadeck-app/shared-cli/CliMetaCommands');
@@ -92,7 +96,9 @@ describe('cli rollback', () => {
 		stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 	});
 
-	afterEach(() => { vi.restoreAllMocks(); });
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
 
 	it('delegates to cliRollbackCommand', async () => {
 		const { cliRollbackCommand } = await import('@wadeck-app/shared-cli/CliMetaCommands');

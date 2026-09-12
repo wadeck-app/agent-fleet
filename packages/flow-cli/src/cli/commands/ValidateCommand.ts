@@ -6,8 +6,10 @@ import { validateFlowFile } from '../../validation/FlowFileValidator';
 export function registerValidateCommand(program: Command): void {
 	program
 		.command('validate <file>')
-		.description('Validate a flow YAML file (schema + step references, no daemon needed)\n' +
-			'  --json   Machine-readable: { valid: bool, errors?: [...] }')
+		.description(
+			'Validate a flow YAML file (schema + step references, no daemon needed)\n' +
+				'  --json   Machine-readable: { valid: bool, errors?: [...] }'
+		)
 		.option('--json', 'Output JSON (machine-readable, exit codes 0/1/2/3)')
 		.option('--human', 'Force human-readable output')
 		.action((file: string, options: { json?: boolean; human?: boolean }) => {
@@ -57,7 +59,13 @@ export function registerValidateCommand(program: Command): void {
 				console.error(`[fail] Flow has ${result.errors.length} error${result.errors.length > 1 ? 's' : ''}`);
 				for (const err of result.errors) {
 					const loc = err.path ? ` [${err.path}]` : '';
-					const msg = (err != null && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') ? (err as { message: string }).message : String(err);
+					const msg =
+						err != null &&
+						typeof err === 'object' &&
+						'message' in err &&
+						typeof (err as { message: unknown }).message === 'string'
+							? (err as { message: string }).message
+							: String(err);
 					console.error(`  - ${msg}${loc}`);
 				}
 				process.exit(1);

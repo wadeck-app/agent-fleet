@@ -58,7 +58,6 @@ function saveBookmarks(bookmarks: Set<string>) {
 	localStorage.setItem(BOOKMARK_STORAGE_KEY, JSON.stringify(Array.from(bookmarks)));
 }
 
-
 export function SForkFeatPage() {
 	const [showBookmarked, setShowBookmarked] = useState(false);
 	const [bookmarks, setBookmarks] = useState<Set<string>>(loadBookmarks);

@@ -19,8 +19,7 @@ interface FlowProposalSectionProps {
 	onTicketRefresh?: () => void;
 }
 
-const redesigningBannerCls =
-	'flex items-center gap-3 rounded-md border border-warning/50 bg-warning/10 px-4 py-3';
+const redesigningBannerCls = 'flex items-center gap-3 rounded-md border border-warning/50 bg-warning/10 px-4 py-3';
 
 /**
  * ===========================================================================================
@@ -123,17 +122,24 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 						</div>
 					)}
 					<div className="mt-4 space-y-2">
-						<Label htmlFor="context-input" className="text-sm font-medium">Additional context (optional)</Label>
+						<Label htmlFor="context-input" className="text-sm font-medium">
+							Additional context (optional)
+						</Label>
 						<Textarea
 							value={context}
-							onChange={e => { setContext(e.target.value); setRequestError(null); }}
+							onChange={e => {
+								setContext(e.target.value);
+								setRequestError(null);
+							}}
 							id="context-input"
 							placeholder="Provide extra context or constraints for the AI flow designer..."
 							className="text-sm"
 						/>
 					</div>
 					<div className="mt-4">
-						<Button onClick={handleRequestDesign} disabled={isRequesting}>Request Flow Design</Button>
+						<Button onClick={handleRequestDesign} disabled={isRequesting}>
+							Request Flow Design
+						</Button>
 					</div>
 				</div>
 				{isRequesting && (
@@ -161,16 +167,25 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 				<ProposalView
 					proposal={currentProposal}
 					ticketId={ticketId}
-					onRefresh={() => { refresh(); onTicketRefresh?.(); }}
-					onReviewUpdated={() => { refreshSilent(); }}
-					onRejected={() => { setIsRedesigning(true); }}
+					onRefresh={() => {
+						refresh();
+						onTicketRefresh?.();
+					}}
+					onReviewUpdated={() => {
+						refreshSilent();
+					}}
+					onRejected={() => {
+						setIsRedesigning(true);
+					}}
 					onQuestionAnswersChange={setCurrentQuestionAnswers}
 				/>
 			)}
 
 			{currentProposal && currentProposal.status !== 'pending_review' && !isRedesigning && (
 				<div className="border-t pt-4 space-y-3">
-					<Label htmlFor="new-design-context" className="text-sm font-medium">Request a new flow design</Label>
+					<Label htmlFor="new-design-context" className="text-sm font-medium">
+						Request a new flow design
+					</Label>
 					<div className={isRequesting ? 'pointer-events-none opacity-50' : ''}>
 						<Textarea
 							value={context}

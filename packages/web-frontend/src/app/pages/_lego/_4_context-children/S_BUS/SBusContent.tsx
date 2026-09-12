@@ -2,11 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { Badge } from '@framework/components/primitives/Badge';
+import { col } from '@framework/lego/helpers/col';
 import type { Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 import { Check, X } from 'lucide-react';
-
-import { col } from '@framework/lego/helpers/col';
 
 import { DataTable } from '../_framework/DataTable';
 import { useDataTable } from '../_framework/DataTableContext';
@@ -70,7 +69,13 @@ export function SBusContent() {
 			return value ? <Check className="size-4 text-primary" /> : <X className="size-4 text-muted-foreground" />;
 		}
 		if (col.type === 'number' && typeof value === 'number') {
-			return <span>{col.prefix}{value.toFixed(2)}{col.suffix}</span>;
+			return (
+				<span>
+					{col.prefix}
+					{value.toFixed(2)}
+					{col.suffix}
+				</span>
+			);
 		}
 		if (col.type === 'enum' && col.badge) {
 			return <Badge variant="secondary">{String(value)}</Badge>;
@@ -82,7 +87,13 @@ export function SBusContent() {
 	};
 
 	return (
-		<div ref={containerRef} tabIndex={0} onKeyDown={handleKeyDown} style={{ outline: 'none', height: '100%' }} onClick={() => containerRef.current?.focus()}>
+		<div
+			ref={containerRef}
+			tabIndex={0}
+			onKeyDown={handleKeyDown}
+			style={{ outline: 'none', height: '100%' }}
+			onClick={() => containerRef.current?.focus()}
+		>
 			<SplitLayout
 				left={
 					<DataTable.Content>
@@ -96,7 +107,10 @@ export function SBusContent() {
 					ctx.selectedItemLoading ? (
 						<div className="flex h-full items-center justify-center">Loading...</div>
 					) : ctx.selectedItem ? (
-						<div className="flex h-full flex-col gap-4 rounded-lg border border-border bg-card p-4" key={reloadKey}>
+						<div
+							className="flex h-full flex-col gap-4 rounded-lg border border-border bg-card p-4"
+							key={reloadKey}
+						>
 							<h2 className="text-lg font-semibold">Details</h2>
 							<div className="space-y-3">
 								{detailColumns.map(col => (

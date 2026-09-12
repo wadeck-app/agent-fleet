@@ -106,10 +106,7 @@ export function TransportModeSelector({ className }: TransportModeSelectorProps)
 				{subscriptions.length > 0 ? (
 					<div className="flex flex-wrap gap-1">
 						{subscriptions.map(topic => (
-							<span
-								key={topic}
-								className="rounded bg-info/10 px-2 py-0.5 font-mono text-xs text-info"
-							>
+							<span key={topic} className="rounded bg-info/10 px-2 py-0.5 font-mono text-xs text-info">
 								{topic}
 							</span>
 						))}

@@ -56,7 +56,9 @@ export function validateFlowFile(filePath: string): ValidateResult {
 		// Use 'flow validate' for detailed output.
 		return {
 			exit: 3,
-			errors: [{ type: 'parse_error', message: `YAML parse error -- run 'flow validate' for details.`, path: '' }],
+			errors: [
+				{ type: 'parse_error', message: `YAML parse error -- run 'flow validate' for details.`, path: '' },
+			],
 		};
 	}
 

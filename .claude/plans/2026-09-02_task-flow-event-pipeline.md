@@ -31,6 +31,7 @@ task new "fix JWT bug"
 ```
 
 Key invariants:
+
 - All events go through queue — no direct hook dispatch.
 - `task set-status` and `task set-type` are the only bridges from flow → task state. Flows call them as script steps.
 - Approval steps are zero or more — a property of the flow, not of the task schema.
@@ -42,10 +43,10 @@ Key invariants:
 
 Queue already supports two config layers, merged at runtime (`ConfigLoader.ts`):
 
-| Layer | Path | Scope |
-|---|---|---|
-| Global | `~/.config/queue/subscribers.yml` | System-wide subscribers (retry infra, etc.) |
-| Project | `<project-root>/.queue/subscribers.yml` | Project-specific routing |
+| Layer   | Path                                    | Scope                                       |
+| ------- | --------------------------------------- | ------------------------------------------- |
+| Global  | `~/.config/queue/subscribers.yml`       | System-wide subscribers (retry infra, etc.) |
+| Project | `<project-root>/.queue/subscribers.yml` | Project-specific routing                    |
 
 `ConfigLoader` walks up the directory tree from `cwd` to find `.queue/subscribers.yml`. **No changes needed to queue.**
 
@@ -54,17 +55,17 @@ Project routing example:
 ```yaml
 # <project-root>/.queue/subscribers.yml
 subscribers:
-  onTaskCreated:
-    - type: cli
-      command: flow run .agent-fleet/flows/triage.yml --inputs taskId=$TASK_ID description=$TASK_DESCRIPTION
+    onTaskCreated:
+        - type: cli
+          command: flow run .agent-fleet/flows/triage.yml --inputs taskId=$TASK_ID description=$TASK_DESCRIPTION
 
-  onStatusChange:
-    - type: cli
-      when: "$.status == 'todo' && $.type == 'bug'"
-      command: flow run .agent-fleet/flows/fix-bug.yml --inputs taskId=$TASK_ID
-    - type: cli
-      when: "$.status == 'todo' && $.type == 'feature'"
-      command: flow run .agent-fleet/flows/implement-feature.yml --inputs taskId=$TASK_ID
+    onStatusChange:
+        - type: cli
+          when: "$.status == 'todo' && $.type == 'bug'"
+          command: flow run .agent-fleet/flows/fix-bug.yml --inputs taskId=$TASK_ID
+        - type: cli
+          when: "$.status == 'todo' && $.type == 'feature'"
+          command: flow run .agent-fleet/flows/implement-feature.yml --inputs taskId=$TASK_ID
 ```
 
 ---
@@ -77,12 +78,12 @@ The triage flow classifies the task and writes metadata onto it. Queue subscribe
 
 Required primitives in task-cli:
 
-| Command | Purpose |
-|---|---|
-| `task set-type <id> <type>` | Set the task type (freeform string: bug / feature / question / ...) |
-| `task add-label <id> <label>` | Add a label (multiple allowed) |
-| `task remove-label <id> <label>` | Remove a label |
-| `task set-meta <id> <key> <value>` | Generic key/value metadata |
+| Command                            | Purpose                                                             |
+| ---------------------------------- | ------------------------------------------------------------------- |
+| `task set-type <id> <type>`        | Set the task type (freeform string: bug / feature / question / ...) |
+| `task add-label <id> <label>`      | Add a label (multiple allowed)                                      |
+| `task remove-label <id> <label>`   | Remove a label                                                      |
+| `task set-meta <id> <key> <value>` | Generic key/value metadata                                          |
 
 Types and labels are project-defined — task-cli enforces no enum.
 

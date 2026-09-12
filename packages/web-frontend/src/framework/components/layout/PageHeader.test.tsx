@@ -61,9 +61,9 @@ describe('PageHeader', () => {
 				action={
 					<>
 						// violations-suppress: react/no-raw-button test fixture
-				<button>Edit</button>
+						<button>Edit</button>
 						// violations-suppress: react/no-raw-button test fixture
-				<button>Delete</button>
+						<button>Delete</button>
 					</>
 				}
 			/>
@@ -92,7 +92,7 @@ describe('PageHeader', () => {
 	it('should render complete example with all props', () => {
 		const { getByRole, getByText, container } = render(
 			// violations-suppress: react/no-raw-button test fixture
-		<PageHeader title="Books" badge={150} action={<button>Add Book</button>} className={`border-b`} />
+			<PageHeader title="Books" badge={150} action={<button>Add Book</button>} className={`border-b`} />
 		);
 
 		expect(getByRole('heading', { level: 1 })).toHaveTextContent('Books');

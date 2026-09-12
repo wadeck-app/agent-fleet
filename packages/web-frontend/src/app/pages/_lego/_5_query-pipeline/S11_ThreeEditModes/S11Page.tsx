@@ -38,9 +38,24 @@ export function S11Page() {
 				</CardHeader>
 				<CardContent>
 					<div className="flex gap-2">
-						<Button variant={editMode === 'dialog' ? 'default' : 'outline'} onClick={() => setEditMode('dialog')}>Dialog</Button>
-						<Button variant={editMode === 'inline' ? 'default' : 'outline'} onClick={() => setEditMode('inline')}>Inline</Button>
-						<Button variant={editMode === 'below' ? 'default' : 'outline'} onClick={() => setEditMode('below')}>Below Form</Button>
+						<Button
+							variant={editMode === 'dialog' ? 'default' : 'outline'}
+							onClick={() => setEditMode('dialog')}
+						>
+							Dialog
+						</Button>
+						<Button
+							variant={editMode === 'inline' ? 'default' : 'outline'}
+							onClick={() => setEditMode('inline')}
+						>
+							Inline
+						</Button>
+						<Button
+							variant={editMode === 'below' ? 'default' : 'outline'}
+							onClick={() => setEditMode('below')}
+						>
+							Below Form
+						</Button>
 					</div>
 				</CardContent>
 			</Card>

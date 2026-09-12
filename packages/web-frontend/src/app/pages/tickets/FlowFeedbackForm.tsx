@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
-import { Button } from '@framework/components/primitives/Button';
 import { Label } from '@framework/components/forms/Label';
+import { Button } from '@framework/components/primitives/Button';
 import { Loader2 } from 'lucide-react';
 
 import { ArrayFieldInput } from './ArrayFieldInput';

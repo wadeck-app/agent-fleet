@@ -364,7 +364,9 @@ export class WebSocketConnectionManager {
 					);
 				}
 			} else {
-				log.error(`[WS] Error updating flows for worker ${workerId}: ${(error instanceof Error ? String(error) : String(error))}`);
+				log.error(
+					`[WS] Error updating flows for worker ${workerId}: ${error instanceof Error ? String(error) : String(error)}`
+				);
 			}
 		}
 	}

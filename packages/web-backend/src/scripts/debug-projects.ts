@@ -103,9 +103,7 @@ async function debugProjects() {
 
 		if (projectsWithUndefined.length > 0) {
 			log.warn('');
-			log.warn(
-				`  WARNING: ${projectsWithUndefined.length} projects have undefined fields (pre-migration data)`
-			);
+			log.warn(`  WARNING: ${projectsWithUndefined.length} projects have undefined fields (pre-migration data)`);
 			projectsWithUndefined.forEach((p: any) => {
 				log.warn(`  - ${p.name} (${p.id})`);
 				if (p.workspaceIds === undefined) log.warn('    - workspaceIds is undefined');

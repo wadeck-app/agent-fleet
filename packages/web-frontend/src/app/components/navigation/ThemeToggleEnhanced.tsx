@@ -99,4 +99,3 @@ export function ThemeToggleEnhanced({ theme, onToggle, className, variant = 'ico
 		</Button>
 	);
 }
-

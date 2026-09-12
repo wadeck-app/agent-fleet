@@ -1,33 +1,34 @@
- Reference
+Reference
 
 _Moved from README -- see [README](../README.md) for the overview._
 
- FlowEditorPage.tsx               Pain page
- FlowEditorCanvas.tsx             Canvas Xyflow
- FlowEditorToolbar.tsx            Toolbar
- FlowEditorPropertiesPanel.tsx   Properties panel
- FlowEditorValidationPanel.tsx   Validation panel
- types.ts                         TypeScript types
- nodes/
-    ModelStepNode.tsx           Node for model step
-    ScriptStepNode.tsx          Node for script step
-    SubFlowStepNode.tsx         Node for subflow step
-    index.ts                    Export node types
- edges/
-    DependencyEdge.tsx          Edge for dependances
-    LoopEdge.tsx                Edge for loops
-    index.ts                    Export edge types
- hooks/
-    useFlowEditor.ts            Main hook
-    useFlowValidation.ts        Validation hook
-    index.ts
- utils/
-    flowToReactFlow.ts          Serialization YAML → Xyflow
-    reactFlowToFlow.ts          Serialization Xyflow → YAML
-    layoutAlgorithms.ts         Layout algorithms
-    cn.ts                       Classnames utility
- README.md                        This documentation
-```
+FlowEditorPage.tsx Pain page
+FlowEditorCanvas.tsx Canvas Xyflow
+FlowEditorToolbar.tsx Toolbar
+FlowEditorPropertiesPanel.tsx Properties panel
+FlowEditorValidationPanel.tsx Validation panel
+types.ts TypeScript types
+nodes/
+ModelStepNode.tsx Node for model step
+ScriptStepNode.tsx Node for script step
+SubFlowStepNode.tsx Node for subflow step
+index.ts Export node types
+edges/
+DependencyEdge.tsx Edge for dependances
+LoopEdge.tsx Edge for loops
+index.ts Export edge types
+hooks/
+useFlowEditor.ts Main hook
+useFlowValidation.ts Validation hook
+index.ts
+utils/
+flowToReactFlow.ts Serialization YAML → Xyflow
+reactFlowToFlow.ts Serialization Xyflow → YAML
+layoutAlgorithms.ts Layout algorithms
+cn.ts Classnames utility
+README.md This documentation
+
+````
 
   Technologies
 
@@ -76,14 +77,14 @@ All nodes display :
 
 ```typescript
 const { nodes, edges } = flowDefinitionToReactFlow(flowDefinition);
-```
+````
 
 - Converts `steps[]` to Xyflow nodes
 - Converts `depends[]` to dependency edges
 - Converts `onFailure.goto` to loop edges
 - Automatically calculates positions
 
- React Flow → FlowDefinition
+React Flow → FlowDefinition
 
 ```typescript
 const flowDefinition = reactFlowToFlowDefinition(nodes, edges, metadata);
@@ -93,9 +94,9 @@ const flowDefinition = reactFlowToFlowDefinition(nodes, edges, metadata);
 - Reconstruit the `depends[]` depuis the edges
 - Reconstruit the `onFailure.goto` depuis the loop edges
 
-  Prochaines Etapes
+    Prochaines Etapes
 
- Phase  (Ameliorations)
+Phase (Ameliorations)
 
 - [ ] Ameliorer the drag & drop (preview pendant the drag)
 - [ ] add minimap interactive
@@ -103,7 +104,7 @@ const flowDefinition = reactFlowToFlowDefinition(nodes, edges, metadata);
 - [ ] Exporter en image (PNG/SVG)
 - [ ] Mode YAML split view (visual + code)
 
- Phase  (Features avancees)
+Phase (Features avancees)
 
 - [ ] Execution of flow depuis l'editeur
 - [ ] Visualisation of l'execution en temps reel
@@ -111,16 +112,16 @@ const flowDefinition = reactFlowToFlowDefinition(nodes, edges, metadata);
 - [ ] Templates of flows
 - [ ] Snippets of steps
 
-  References
+    References
 
 - [Xyflow Documentation](https://xyflow.com/react)
 - [Dagre Documentation](https://github.com/dagrejs/dagre)
 - [FlowValidator API](../../../../../flow-engine/src/validation/FlowValidator.ts)
 - [Flow Types](../../../../../flow-engine/src/types.ts)
 
-  Problemes Connus
+    Problemes Connus
 
- Imports flow-engine
+Imports flow-engine
 
 Imports from `flow-engine` require proper TypeScript configuration. Currently, relative paths are used. For better maintainability, add an alias in `tsconfig.json`:
 
@@ -134,26 +135,26 @@ Imports from `flow-engine` require proper TypeScript configuration. Currently, r
 }
 ```
 
- Types Xyflow
+Types Xyflow
 
 Quelques incompatibilites mineures of types with Xyflow necessitent of the `as any` temporaires. Ces types peuvent etre affines with of the generiques more precis.
 
- ‍ Developpement
+‍ Developpement
 
- Demarrer the dev server
+Demarrer the dev server
 
 ```bash
 npm run dev
 ```
 
- Acceder a l'editeur
+Acceder a l'editeur
 
 ```
 http://localhost:/flows/new
 http://localhost:/flows/test-diamond/edit
 ```
 
- Tests
+Tests
 
 ```bash
 npm run test                  Unit tests
@@ -161,13 +162,13 @@ npm run test:watch            Watch mode
 npm run test:coverage         Coverage report
 ```
 
- Build
+Build
 
 ```bash
 npm run build
 ```
 
-  Examples d'Usage
+Examples d'Usage
 
 ```typescript
 import { FlowEditorPage } from '@app/pages/flows/flow-editor';
@@ -184,7 +185,7 @@ The component gere automatiquement :
 - Validation en temps reel
 - Sauvegarde with dirty tracking
 
-  Credits
+    Credits
 
 Implementation basee on :
 

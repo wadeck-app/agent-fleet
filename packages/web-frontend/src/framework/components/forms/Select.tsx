@@ -7,6 +7,10 @@ import { cn } from '@framework/lib/utils';
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 
+// violations-suppress: ts/no-inline-subcomponent tightly-coupled primitive sub-parts belong in the same file
+
+// violations-suppress: ts/no-inline-subcomponent tightly-coupled primitive sub-parts belong in the same file
+
 function Select({ ...props }: React.ComponentProps<typeof SelectPrimitive.Root>) {
 	return <SelectPrimitive.Root data-slot="select" {...props} />;
 }

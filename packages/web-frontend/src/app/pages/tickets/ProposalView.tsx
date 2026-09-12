@@ -11,8 +11,8 @@ import type { FlowProposal, FlowProposalStatus } from '@shared/api/flow-proposal
 import * as yaml from 'js-yaml';
 import { Loader2 } from 'lucide-react';
 
-import { CollapsibleSection } from './CollapsibleSection';
 import { AddReviewThreadForm } from './AddReviewThreadForm';
+import { CollapsibleSection } from './CollapsibleSection';
 import { ReviewThreadItem } from './ReviewThreadItem';
 import { VisualizeFlowDialog } from './VisualizeFlowDialog';
 import { flowProposalsApi } from './flowProposalsApi';
@@ -137,7 +137,9 @@ export function ProposalView({
 	return (
 		<div className="space-y-4">
 			<div className="flex flex-wrap items-center gap-2">
-				<Badge variant="outline" className="font-mono text-xs">v{proposal.version}</Badge>
+				<Badge variant="outline" className="font-mono text-xs">
+					v{proposal.version}
+				</Badge>
 				<Badge variant={getStatusBadgeVariant(proposal.status)}>{getStatusLabel(proposal.status)}</Badge>
 				{proposal.confidenceScore !== undefined && (
 					<TooltipProvider>
@@ -166,7 +168,11 @@ export function ProposalView({
 				<div className="space-y-1">
 					<p className="text-xs font-medium text-muted-foreground tracking-wide">Adaptations</p>
 					<ul className="list-disc list-inside space-y-0.5">
-						{proposal.adaptations.map((a, i) => <li key={i} className="text-sm">{a}</li>)}
+						{proposal.adaptations.map((a, i) => (
+							<li key={i} className="text-sm">
+								{a}
+							</li>
+						))}
 					</ul>
 				</div>
 			)}
@@ -188,7 +194,9 @@ export function ProposalView({
 						</p>
 						{openQuestions.map((question, i) => (
 							<div key={i} className="space-y-1">
-								<Label htmlFor={`question-answer-${i}`} className="text-sm font-medium">{question}</Label>
+								<Label htmlFor={`question-answer-${i}`} className="text-sm font-medium">
+									{question}
+								</Label>
 								<Textarea
 									id={`question-answer-${i}`}
 									value={questionAnswers[i] ?? ''}
@@ -206,7 +214,11 @@ export function ProposalView({
 			<CollapsibleSection title="Reasoning" defaultOpen={false}>
 				{reasoningSentences.length > 1 ? (
 					<ul className="list-disc list-inside space-y-1">
-						{reasoningSentences.map((sentence, i) => <li key={i} className="text-sm">{sentence.trim().replace(/\.$/, '')}</li>)}
+						{reasoningSentences.map((sentence, i) => (
+							<li key={i} className="text-sm">
+								{sentence.trim().replace(/\.$/, '')}
+							</li>
+						))}
 					</ul>
 				) : (
 					<p className="text-sm whitespace-pre-wrap">{proposal.reasoning}</p>
@@ -218,7 +230,12 @@ export function ProposalView({
 				defaultOpen={false}
 				headerRight={
 					proposal.status === 'approved' && proposedFlowId ? (
-						<a href={`/flows/${proposedFlowId}/edit`} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
+						<a
+							href={`/flows/${proposedFlowId}/edit`}
+							target="_blank"
+							rel="noopener noreferrer"
+							className="text-xs text-primary hover:underline"
+						>
 							Open in Flow Editor
 						</a>
 					) : (
@@ -226,7 +243,9 @@ export function ProposalView({
 					)
 				}
 			>
-				<pre className="overflow-x-auto rounded-md bg-muted p-4 text-xs font-mono leading-relaxed">{proposalYaml}</pre>
+				<pre className="overflow-x-auto rounded-md bg-muted p-4 text-xs font-mono leading-relaxed">
+					{proposalYaml}
+				</pre>
 			</CollapsibleSection>
 
 			{proposal.reviewThreads.length > 0 && (
@@ -254,11 +273,16 @@ export function ProposalView({
 						<AddReviewThreadForm
 							ticketId={ticketId}
 							proposalId={proposal.id}
-							onAdded={() => { setShowAddThread(false); onReviewUpdated(); }}
+							onAdded={() => {
+								setShowAddThread(false);
+								onReviewUpdated();
+							}}
 							onCancel={() => setShowAddThread(false)}
 						/>
 					) : (
-						<Button variant="outline" size="sm" onClick={() => setShowAddThread(true)}>Add review thread</Button>
+						<Button variant="outline" size="sm" onClick={() => setShowAddThread(true)}>
+							Add review thread
+						</Button>
 					)}
 				</div>
 			)}
@@ -269,19 +293,38 @@ export function ProposalView({
 						{isApproving ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
 						Approve
 					</Button>
-					<Button variant="destructive" onClick={handleToggleRejectForm} disabled={isApproving || isRejecting || showRejectForm}>
+					<Button
+						variant="destructive"
+						onClick={handleToggleRejectForm}
+						disabled={isApproving || isRejecting || showRejectForm}
+					>
 						Reject...
 					</Button>
 					{showRejectForm && (
 						<div ref={rejectFormRef} className="w-full space-y-2">
-							<Label htmlFor="reject-reason" className="text-sm font-medium">Rejection reason</Label>
-							<Textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} id="reject-reason" placeholder="Reason for rejection (optional)..." className="text-sm" />
+							<Label htmlFor="reject-reason" className="text-sm font-medium">
+								Rejection reason
+							</Label>
+							<Textarea
+								value={rejectReason}
+								onChange={e => setRejectReason(e.target.value)}
+								id="reject-reason"
+								placeholder="Reason for rejection (optional)..."
+								className="text-sm"
+							/>
 							<div className="flex gap-2">
 								<Button variant="destructive" onClick={handleReject} disabled={isRejecting}>
 									{isRejecting ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
 									Confirm rejection
 								</Button>
-								<Button variant="outline" onClick={() => { setShowRejectForm(false); setRejectReason(''); }} disabled={isRejecting}>
+								<Button
+									variant="outline"
+									onClick={() => {
+										setShowRejectForm(false);
+										setRejectReason('');
+									}}
+									disabled={isRejecting}
+								>
 									Cancel
 								</Button>
 							</div>

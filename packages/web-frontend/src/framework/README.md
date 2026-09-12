@@ -1,8 +1,8 @@
- UI Framework
+UI Framework
 
 A comprehensive, reusable UI framework for building modern React applications.
 
- Overview
+Overview
 
 This framework provides a well-organized collection of:
 
@@ -14,7 +14,7 @@ This framework provides a well-organized collection of:
 - Storage: Storage abstractions (LocalStorage, Cookies)
 - Tests: Test utilities for better testing
 
- Quick Start
+Quick Start
 
 ```typescript
 // Import components directly from their files
@@ -23,9 +23,9 @@ import { Card } from '@framework/components/primitives/Card';
 import { useAsyncData } from '@framework/hooks/useAsyncData';
 ```
 
- Architecture
+Architecture
 
- Directory Structure
+Directory Structure
 
 ```
 framework/
@@ -47,3 +47,4 @@ framework/
 ---
 
 _Reference content moved to [docs/reference.md](docs/reference.md)._
+```

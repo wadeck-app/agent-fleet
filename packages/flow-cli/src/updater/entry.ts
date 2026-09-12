@@ -1,11 +1,11 @@
 // flow-updater entry point -- bundled separately as flow-updater.cjs.
 // Must NOT import any flow runtime modules.
-import { runUpdater, execNpm } from '@wadeck-app/shared-updater';
 import { ConfigDir } from '@wadeck-app/shared-cli/ConfigDir';
-import { join } from 'node:path';
-import { mkdirSync, cpSync, writeFileSync, readFileSync } from 'node:fs';
-import * as os from 'node:os';
+import { execNpm, runUpdater } from '@wadeck-app/shared-updater';
+import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import * as http from 'node:http';
+import * as os from 'node:os';
+import { join } from 'node:path';
 
 declare const __FLOW_CLI_VERSION__: string;
 
@@ -47,7 +47,7 @@ try {
  * the daemon is unreachable, the request times out, or the response is not valid JSON.
  */
 function queryDaemonHealth(port: number, token: string, timeoutMs: number): Promise<Record<string, unknown> | null> {
-	return new Promise((resolve) => {
+	return new Promise(resolve => {
 		const req = http.get(
 			{
 				hostname: '127.0.0.1',
@@ -56,7 +56,7 @@ function queryDaemonHealth(port: number, token: string, timeoutMs: number): Prom
 				headers: { Authorization: `Bearer ${token}` },
 				timeout: timeoutMs,
 			},
-			(res) => {
+			res => {
 				let body = '';
 				res.on('data', (chunk: Buffer) => {
 					body += chunk.toString();
@@ -68,7 +68,7 @@ function queryDaemonHealth(port: number, token: string, timeoutMs: number): Prom
 						resolve(null);
 					}
 				});
-			},
+			}
 		);
 		req.on('error', () => resolve(null));
 		req.on('timeout', () => {

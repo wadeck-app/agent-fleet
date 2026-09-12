@@ -1,10 +1,139 @@
 # Lessons learned
 
-<!-- Last updated: 2026-09-05T06:55:11.195Z -->
+<!-- Last updated: 2026-09-12T09:30:03.806Z -->
 
 ## Recurring feedback
 
+<!-- session 593bf65e 2026-09-12 -->
+- User redirected fork agent twice via SendMessage (07:51:52 "STOP — ne lance pas les 5 runs"; 07:52:15 "Reprends. Luna...") — batch test assumptions not validated before execution
+- Test-driven debugging in agent aa7a: 60+ second sleep-then-check loops checking daemon.log / ndjson after each blueprint run; suggests either daemon startup lag or need for sync/polling documentation.
+
+<!-- session 9caf4d67 2026-09-12 -->
+- User stopped fork agent mid-task at 07:51:52 (French message: "STOP — ne lance pas les 5 runs. Luna est censé être le plus rapide...") — agent was running unnecessary parallel iterations when Luna performance could be verified faster. Suggests: validate cold-start vs. warm assumptions before running full batch benchmarks.
+- E2E fork (aa7a) ran blueprints with cascading failures on mark_done steps, then entered long debug loop with sleep/retry/log-grep cycles rather than fixing root cause upfront before re-running.
+
+<!-- session 16f5edc1 2026-09-12 -->
+- Multiple agents spawned for overlapping scope at 08:30+ (fleet-analysis + general-purpose agents both exploring lessons/CLAUDE.md across projects) — suggests unclear parallelization boundaries or delegation instructions.
+- Fork agent uses sleep + polling loop for async flow execution checks instead of blocking wait — pattern repeated 3× with 30-60s sleeps, suggesting no known blocking API or poor discoverability.
+
+<!-- session 883cfed0 2026-09-12 -->
+- Extended polling with manual sleep+check (14+ separate `sleep N && cat ~/.config/flow/executions/ID.json` sequences). Consider exposing flow event stream or WebSocket subscription to replace polling.
+- E2E test agent added multiple 30-60 second sleeps polling for flow execution completion — suggests either execution timing is unpredictable or completion signaling is unclear (should instrument daemon logs to detect actual completion signals).
+- Task status transitions required multiple iterations to get idempotent (set-status reset logic at 09:21:47). Original blueprint approach didn't survive validation; pattern suggests status state machine constraints aren't clearly documented.
+
+<!-- session 996bdab4 2026-09-12 -->
+- User redirected fork agent mid-batch at 07:51:52 with SendMessage "STOP — ne lance pas les 5 runs. Luna est…cold-start ponctuel" after diagnosing false slowness; resumed at 07:52:15 with corrected context
+- Blueprint/flow template generation requires iterative fixes (CLI command corrections, schema validation errors, removed invalid fields)—suggests templates need tighter specification or generation should validate against canonical schema upfront.
+
+<!-- session 93994a1d 2026-09-12 -->
+- Backend-dev agent made core edits (types.ts, ModelStepExecutor.ts, FlowRegistry.ts) and committed, but main session then took over for builds, testing, and verifying results—unclear if this was planned scope completion or user intervention mid-task; suggests need for explicit handoff or clearer agent boundaries
+
+<!-- session d902be89 2026-09-12 -->
+- User halted agent fork at 22:51:52 ("STOP — ne lance pas les 5 runs") when Luna model omitted from batch, then resumed with explicit correction — incomplete test setup wasted time.
+
+<!-- session c40b9bc0 2026-09-12 -->
+- User interrupted running fork agent (07:51:52) with SendMessage to redirect strategy — was running 5 sequential benchmark iterations when Luna cold-start was misdiagnosed as slow. Corrected interpretation, re-included Luna in batch (07:52:15). Pattern: agent over-commits to sequential work without user input on early results.
+
+<!-- session 2cdf86c5 2026-09-12 -->
+- User stopped fork agent mid-execution (07:51:52) because Luna performance assumption (slow) was wrong; agent had guessed ~120-193s latency without baseline testing first
+
+<!-- session 5bf60bfb 2026-09-12 -->
+- Session demonstrates proper commit hygiene (check git status, stage files, descriptive messages) but also shows context-efficient polling pattern (read execution JSON, grep results) that could scale better with ScheduleWakeup instead of inline sleeps across multiple agents.
+
+<!-- session 89a22b61 2026-09-11 -->
+- Always test artifacts before providing them (flow YAML, CLI commands) — don't just generate and assume correctness. User had to repeat this 3x after flag errors, timing failures, and YAML syntax issues.
+- Read logs when debugging fails rather than declaring "I can't debug further" — user had to say "tu as acces a tout" to push assistant toward ~/.config/flow/logs where the real errors were.
+- User kept validating parallel execution worked (visual confirmation in execution logs, timings), not just code review — deploy-then-verify cycle repeated 3x.
+- User redirected benchmarking task 3+ times (speed tests → effort levels → luna inclusion → full batch) — suggests shifting requirements or unclear initial scope; agent should have asked for full scope upfront.
+- Multiple rewrites of flow YAML test file (18:35, 18:37, 18:39, 18:41, 18:45) suggest trial-and-error discovery of capabilities and syntax
+
+<!-- session bb55048d 2026-09-12 -->
+- Polling pattern repeated throughout: multiple sleep+cat commands (22:04:43, 22:07:38, 22:09:55) waiting for flow execution results; suggests notification/wait mechanism may need documentation or batching strategy
+
+<!-- session 057b11bc 2026-09-12 -->
+- User stopped batch run when performance benchmarking took unexpectedly long, then approved continuation with clarification (Luna cold-start vs actual speed); indicates need for iterative validation during long-running tasks rather than fire-and-forget batch execution
+
+<!-- session 14a03272 2026-09-12 -->
+- User corrected assumption about Luna model performance (120-193s seemed slow, but was coldstart; actual performance 3.5s). Agent should investigate performance anomalies before accepting them as baseline.
+
+<!-- session 200a2e2e 2026-09-12 -->
+- Output format must be strict — user corrected initial response that mixed invalid patterns into required format (one pattern per line, no extras).
+
+<!-- session 437fdfa3 2026-09-12 -->
+- User redirected agent mid-batch (07:51:52: "STOP — ne lance pas les 5 runs") when observing unexpected Luna latency, then resumed with new context (07:52:15: "Reprends. Luna est rapide"). Batch iteration logic didn't detect the intervention and continued original plan instead of pausing and revalidating.
+
+<!-- session b85bfc17 2026-09-12 -->
+- Extensive environment variable configuration (OPENCODE_CONFIG, CLAUDE_MOCK_PATH, etc.) needed for testing different provider configurations — brittle and requires manual setup for each test variant.
+
+<!-- session 5e5878de 2026-09-12 -->
+- Multiple mid-task agent redirections (SendMessage STOP/resume to fork agent at timestamps 07:51:52 and 07:52:15) suggest upfront scoping of batch tasks would prevent context fragmentation.
+
+<!-- session aaade9a7 2026-09-12 -->
+- When testing model configurations across providers (opencode/codex/anthropic), assistant manually ran each combination instead of automating via flow file or batch script; future: encode config permutations in a single automated test.
+
+<!-- session 9a25e477 2026-09-12 -->
+- User interrupted fork agent multiple times mid-execution with STOP messages + course corrections (e.g., "don't run 5 batches, Luna is fast—focus on luna perf instead"). Pattern: agent over-committed to plan without user veto.
+
+<!-- session 5327a9b8 2026-09-12 -->
+- Multiple long sequential waits (sleep 60/70/90) with status polling — inefficient; should batch independent checks or use event-based notification instead.
+
+<!-- session 7c3ab573 2026-09-12 -->
+- User explicitly stopped agent mid-task (07:51:52) redirecting 5-run batch strategy, then resumed with corrected parameters (07:52:15). Indicates agents sometimes pursue wrong strategy; mid-task redirection pattern suggests need for iterative feedback loops.
+
+<!-- session 3a6c3982 2026-09-11 -->
+- Multiple parallel agent forks launched (a29f, a621) for concurrent debugging (CI push vs worker config fixes) — suggests session context was fragmented mid-flow
+
+<!-- session 4fc1343c 2026-09-11 -->
+- Long feedback cycles on build validation (16:19–16:24 multiple clean/build/test retries) — early type-check feedback missing before long build attempt.
+
+<!-- session fd73774c 2026-09-11 -->
+- Flow execution tests (18:19–18:42) created test flows but provided no actionable error output — spent time grepping daemon logs instead of checking flow schema validation or mock provider behavior first.
+
+<!-- session 42960b0a 2026-09-11 -->
+- Manual sleep-based polling used (18:35:56, 18:36:58) instead of built-in mechanisms. For async flows, establish how to wait properly rather than polling with sleep+grep.
+
+<!-- session 98cef303 2026-09-11 -->
+- User prefers hands-on testing over delegation when validating critical features—took over multiple test/build cycles rather than waiting on agent
+
+<!-- session c99ba2fe 2026-09-05 -->
+
+- User clarified "sub-steps" meaning twice: first explaining they're validation steps, then correcting assistant's misunderstanding that injected steps should be "deleted" — they should be reset/reinitialized per spec.
+- User repeatedly reminded assistant: "tu dois tester toi même les binaires" (you must test binaries yourself) — assistant was relying on CI logs instead of actually running the published CLI
+- User explicitly forbade manual file manipulation: instead of deleting .task files by hand, assistant should implement `task delete` command first
+- User corrected binary invocation multiple times: use `flow`/`task` commands directly, not node script paths like `node /c/App/nodejs/.../flow.js`
+- User demanded `task set-type` in triage flow 4+ times; assistant wrote flows using bug/feature values without testing `task set-type` acceptance first — methodology: validate CLI behavior before writing flows that depend on it
+- User rejected pragmatic workarounds — "c'est une demo que ca marche, pas un PoC" — end-to-end flow must work now, not theoretically later; require full test + violations pass before reporting done
+- User stated output postprocessing should be easily usable "in a word or almost" (via plugins), not requiring multi-line `tr` chains. Classification output must be single clean line, not space-padded or case-mixed variants.
+- User strongly prefers hands-on testing over agent delegation when validating critical features — "tu devrais le faire toi !" when confidence matters; delegate exploratory/parallel work, not validation.
+- User wants concise status updates, not verbose explanations — multiple "status?" queries suggest impatience with verbose agent-in-progress messages.
+- Always invoke /poll-ci skill instead of manually polling CI status—it's built for this and reduces context waste.
+- Don't use pragmatic workarounds (e.g., sed injection); fix the root cause properly instead.
+- User checks testing completeness with "tu as tout testé ?" — assistant should run end-to-end e2e tests before declaring work done, especially after moving fixtures or making infrastructure changes.
+- Prompt for generated flows required iteration: first forgot to pass `${{ inputs.taskId }}` variable substitution, then pipe-to-head in shell scripts failed due to pipefail exit 255. Prompts instructing LLM to write flows need explicit guidance on variable syntax and SIGPIPE-safe shell patterns.
+- Core behavior correction: child failure should re-run parent (not immediately fail) with error injected to template context — contradicts initial implementation approach
+- User attempted flow-cli update with multiple flag combinations (--check, --force, UPDATER_FORCE=1, cleared config) — suggests update mechanism behavior is not obvious; no clear "which flag to use" documentation.
+- Manual testing pattern repeated 8+ times: edit subscribers.yml, queue push, check result — suggests missing automation or test harness for this workflow.
+- Extended investigation into OpenCode execution flow (21:20 onward) suggests unclear execution path for model steps — user had to grep through ModelStepExecutor, StepRunner, protocol files, and WorkerAdapter to understand how steps complete and parent-child relationships work
+
+<!-- session 044bdb7c 2026-09-11 -->
+
+- User repeatedly emphasized "tu dois tester toi même les binaires" (must test binaries locally) — assistant was relying on CI logs/published versions instead of running locally, contrasting with CLAUDE.md directive to test in same conditions as user
+
+<!-- session 0adb1ff3 2026-09-11 -->
+
+- User clarified "sub-steps" concept twice — assistant misunderstood that injected steps should be kept/modified, not deleted. Indicates ambiguous terminology or incomplete mental model in codebase.
+
+<!-- session 78ac970b 2026-08-28 -->
+
+- User's frustration "purée la qualité de merde... TDD !!!" reveals bugs should be caught by automated tests, not manual CLI testing. Multiple `--version` and `execFileSync` failures suggest insufficient test coverage before bundling.
+- Template/script alignment across three repos (queue-cli, agent-fleet, wdrive) needed parallel fixes — I did them sequentially. User explicitly said "revenons sur les scenarios de tests" implying tooling fixes should finish faster.
+- Permission bypass script invoked manually 5 times (10:44–10:54): `request-bypass.js` pattern suggests skill write operations frequently blocked or integration gap with permission system.
+- Multiple agents independently read the same reference files (UpdateManager.ts, bundle.ts, build-launcher.mjs, publish workflows) across tasks — inefficient. Consider upfront summary document or shared context pass-through when delegating sequential phases to agents.
+- Bundle script location shifted twice: packages/_/scripts/ → packages/_/ci/scripts/ → merged bundle-updater into bundle.ts, indicating final architecture wasn't predefined; consumed multiple round-trips to stabilize.
+- Cross-project pattern replication (queue-cli, flow-cli, task-cli updaters all needed same T8 sentinel changes) executed manually per-repo — no unified approach or template mentioned.
+
 <!-- session 576b46a5 2026-09-02 -->
+
 - User emphasized repeatedly: "tu DOIS TESTER TOI MEME AVANT DE ME DIRE QUE TA TACHE EST FINIE" (test yourself before claiming task is done). Agent declared work complete after CI passed, skipping actual feature validation until user forced a re-test.
 - Agent made positive claims ("windowsHide: true is present") without actually verifying code would execute as expected. User corrected: "t'as verifié juste avant que ca n'ouvrait pas de terminaux, alors pourquoi tu dis ca?" — agent had traced grep output but didn't validate behavioral consequences.
 - User redirected agent mid-debugging to focus on end-to-end test; agent got lost in shell script troubleshooting and lost sight of the demo goal
@@ -415,7 +544,267 @@
 
 ## Agent errors
 
+<!-- session 593bf65e 2026-09-12 -->
+- Fork agent (a152:fork) at 07:51:52 started 5-run batch without confirming Luna model inclusion — user had to SendMessage to STOP and redirect; agent assumed test scope instead of validating parameters
+- Flow CLI syntax misunderstanding: Agent aa7a tried `flow show me5eibob` (treating execution ID as flow name), then `flow show --execution me5eibob`, then `flow show -e me5eibob` — none existed; should have been `flow history --id` or similar from the start.
+- Blueprint generator wrote incorrect task CLI commands: agent a2b1 generated `task cli show`, `task cli comment` which don't exist; required post-hoc sed corrections to change to bare `task show`, `task comment` commands across all blueprints.
+- Input parameter syntax misunderstood: Blueprints included `description: text` lines under input declarations; agent aa7a had to remove these via sed before validation would pass — suggests template/example wasn't clear on input-only vs. step-parameter distinction.
+- Multiple blueprint files had identical schema issues (task comment → set-meta, set-status missing done parameter, wrong dependencies) discovered incrementally rather than pattern-matched upfront — batch fixes would have been faster.
+
+<!-- session 9caf4d67 2026-09-12 -->
+- Agent attempted to use "check" skill without pre-fetching schema (22:02:01); also attempted write-doc, ToolSearch, and MCP tools without loading schemas first. Pattern: should call ToolSearch/load skills before first use in a task, not mid-action.
+- Flaky test debugging spent 1+ hour on vitest output parsing (--pool, --sequence.shuffle, various grep patterns) instead of reading test file to identify root cause (race conditions or timing).
+- Agent called deferred tools before they were registered (`session-history`, `write-doc`, `goldfish` marked "NOT YET KNOWN"). No graceful fallback; agent had to work around.
+- Flow step dependency validation is weak — `commit_fix` depends on `form_hypotheses` but should depend on `verify_fix`. Caught only during runtime testing, not validation.
+
+<!-- session 16f5edc1 2026-09-12 -->
+- Deferred tools invoked without prior schema fetch — check (22:01:02), write-doc (08:26:27), ToolSearch (08:30:58) all show "*** NOT YET KNOWN ***" warnings. Agents must call ToolSearch("select:<tool_name>") before invoking.
+- When deferred tool fails, agent performs manual workarounds (grep for check-all.js, search package.json) instead of fetching/using the tool correctly — indicates workflow misunderstanding in agent instruction context.
+- Blueprints generated with `task cli show` / `task cli comment` commands that don't exist; corrected to `task show` / `task comment`. Agent lacks reference for valid task CLI commands.
+- Multiple invocations of unknown skills (`write-doc`, `check-parallel-agents`, `goldfish`) — skill registry or availability not transparent to agents before calling.
+
+<!-- session 883cfed0 2026-09-12 -->
+- Skill tools (`check`, `write-doc`) and MCP tools (`actions_list`) invoked without ToolSearch preload, resulting in "*** NOT YET KNOWN ***" warnings. Agents should call ToolSearch({query: "select:<tool_name>"}) before invoking deferred tools.
+- backend-dev agent misread scope: attempted to launch 5 full batch speed tests (lines 07:50:53–07:54:26) before user interrupted. Should have clarified testing strategy first rather than assuming.
+- Agent assumed Luna model was slow (120–193s range) without distinguishing cold-start from steady-state. Made optimization decisions on incomplete data; user corrected: "Luna est rapide (~3.5s), le slow était un cold-start ponctuel."
+- Unknown skills (write-doc, goldfish, check-parallel-agents, session-history) marked "NOT YET KNOWN" at runtime, forcing delays or skipping — skills should be pre-loaded or agent should attempt skill load proactively.
+- Blueprint input declaration format (description: text) was invalid but not caught during YAML validation — downstream steps silently failed, requiring trial-and-error fixes.
+- Parallel agents from same session (ac7a, ad56 from 67e3f019) redundantly read same .claude/**/*.md directories — indicates subagent parallelization strategy duplicated work instead of partitioning it.
+- Dependency graph errors in bp-debug: commit_fix originally depended on form_hypotheses but should depend on verify_fix (09:28:03). Initial blueprint validation didn't catch this logical ordering issue.
+
+<!-- session 996bdab4 2026-09-12 -->
+- Backend-dev agent tried to use unavailable skills ("check" at 22:01:02, "write-doc" at 08:26:27) — subagent context doesn't auto-include project skills; must be fetched via ToolSearch or preloaded
+- MCP tools returned "NOT YET KNOWN" warnings (mcp__github-wadeck-app__actions_list at 22:05:02, 22:06:11) — schema fetching delayed for subagents
+- Generated incorrect task CLI commands in blueprints (e.g., "task cli show" instead of "task show", "mark_done" command doesn't exist). Required multiple roundtrips to fix and re-validate.
+- Added invalid blueprint input schema fields ("inputs.description: text") that broke validation and required removal and re-validation.
+- Multiple blueprint fixes during iteration: set_in_review, mark_done, write_lessons exit code 2, bp-debug dependency chain. Suggests blueprint validation or schema gaps.
+
+<!-- session 93994a1d 2026-09-12 -->
+- Backend-dev agent tried using `skill=check` and `skill=write-doc` without pre-loading them via ToolSearch—caused WARN entries rather than failures, but subagents should explicitly fetch deferred tools before invoking them
+- Subagent called GitHub MCP tools (mcp__github-wadeck-app__actions_list) that were not pre-loaded—showed "NOT YET KNOWN" warnings; agents using GitHub MCP should call ToolSearch to load schemas upfront
+- Attempted to invoke deferred tools (write-doc, session-history, goldfish, claude-api) without first fetching their schemas via ToolSearch. Tools showed "*** NOT YET KNOWN ***" warnings. ToolSearch must be called before invoking any deferred tool.
+- When goldfish skill failed to load as "*** NOT YET KNOWN ***", agent worked around it by spawning isolated claude CLI process directly via Bash — correct workaround but indicates the skill loading failure wasn't caught early enough.
+
+<!-- session d902be89 2026-09-12 -->
+- Skill "check" marked as "NOT YET KNOWN" at 22:01:02 despite being available — agent fell back to manual Glob/Grep/bash verification instead of using proper tool.
+- Multiple backend-dev agents spawned across session (22:00:40, 22:50:41 fork, 22:58:43 fork) for related work rather than single coordinated agent — fragmented context and effort.
+- MCP tool `mcp__github-wadeck-app__actions_list` marked "NOT YET KNOWN" at 22:05:02 and 22:06:11 — schema loading issues with deferred tools.
+- write-doc skill invoked at 08:33:50 but shows "NOT YET KNOWN"; agent bypassed it and wrote plan file directly instead, violating user instruction "Always invoke the `write-doc` skill before writing any documentation"
+- goldfish skill invoked at 08:35:33 but shows "NOT YET KNOWN"; agent worked around by calling `claude --print` directly to validate spec
+
+<!-- session c40b9bc0 2026-09-12 -->
+- Backend-dev agent attempted to invoke skill "check" which was not yet known (22:01:02). Agent should validate skill availability before attempting invocation, or CLAUDE.md should explicitly list unavailable skills.
+- Agents attempting to invoke deferred skills (write-doc, goldfish) marked "*** NOT YET KNOWN ***" without using ToolSearch first to load schemas. Resulted in WARN logs but workarounds applied (e.g., manual file write instead of write-doc, Bash claude --print instead of goldfish skill).
+
+<!-- session 2cdf86c5 2026-09-12 -->
+- write-doc skill marked "NOT YET KNOWN" (08:26:27) but agent proceeded to write documentation anyway at 08:26:48 without calling it, violating CLAUDE.md project rule requiring it before all .md files
+
+<!-- session b7a5391d 2026-09-12 -->
+- Backend-dev agent attempted to invoke `check` skill and later attempted MCP tools that returned "*** NOT YET KNOWN ***" — agents spawned via Agent tool must use ToolSearch to pre-load tool/skill schemas before attempting to call them; otherwise face "NOT YET KNOWN" failures that halt execution.
+- Agent started batch benchmark runs but didn't distinguish between cold-start latency (Luna ~120-193s first call) vs steady-state performance (~3.5s). User had to manually stop and redirect midway: "STOP — ne lance pas les 5 runs…Luna est censé être le plus rapide" → "Reprends…Luna est rapide (~3.5s), le slow était un cold-start ponctuel."
+
+<!-- session 08d9f6bc 2026-09-12 -->
+- backend-dev agent proceeded with work despite skill schema issues, using bash alternatives (git commit, direct writes) instead of Skill tool — recovery worked but suggests skills should be fetched upfront when delegating.
+
+<!-- session 5bf60bfb 2026-09-12 -->
+- Backend-dev agent invoked unavailable skill "check" (22:01:02) without pre-checking availability via ToolSearch. Later, main session attempted "write-doc" skill with same pattern (08:26:27). Agents should ToolSearch deferred tools before invoking, not discover unavailability at execution time.
+- Fork agent spawned for batch benchmark runs (a152, a3cd) used extensive polling loops with hardcoded sleeps (sleep 5, sleep 20, sleep 25, sleep 60) instead of ScheduleWakeup. This burns tokens and context repeatedly for operations that could self-pace or yield back control with a single wakeup.
+
+<!-- session 89a22b61 2026-09-11 -->
+- Fabricated non-existent CLI flags (`--verbose` for flow run) instead of checking `flow run --help` first.
+- Labeled tsconfig resolution failure as "pre-existing noise" without investigating the root cause; user corrected: "tsconfig => shared-cli n'est pas dans le workspace c'est abusé que tu n'aies jamais remonté ce probleme AVANT"
+- Abandoned sequential-execution debugging mid-investigation, claiming inability to proceed, when logs and code were accessible.
+- Agent added `env` field to ModelFlowStep but didn't update FlowRegistry.parseFlowStep() to forward it — side effect discovered only after commit.
+- Agent ran performance benchmarks but omitted Claude CLI models (haiku/sonnet/opus) despite user explicitly requesting them in flow test requirements.
+- When asked to implement features, agent explored excessively (20+ reads) before starting code — should bias toward reading architecture once, then implementing directly rather than validate-then-code cycles.
+- Agent assumed SchemaValidator had `env` field validation logic already; discovered mid-work it needed adding — indicates insufficient upfront scoping of what's already implemented vs. what needs creation.
+- When implementing Codex provider, agent initially searched for non-existent `/provider/` directory — false assumption about codebase layout; eventual discovery was correct (`/processing/`).
+- Multi-config OpenCode feature attempted without confirming OPENCODE_CONFIG env var handling was actually needed — agent explored Codex help/config files extensively but didn't verify the actual requirement was to support *selecting* configs vs. *loading single* config.
+- GitHub MCP tools (mcp__github-wadeck-app__actions_list) showed repeated "NOT YET KNOWN" warnings when agent fork attempted CI polling; tools failed to load/recognize despite being listed
+- Multiple backend-dev agent prep reads (lines 21:58:09-21:58:50) scanning types.ts, ModelStepExecutor, FlowRegistry, SchemaValidator, parseFlowStep separately—suggests agent was over-exploring instead of getting directed context (env field already visible in types.ts at target line).
+
+<!-- session bb55048d 2026-09-12 -->
+- Agent (backend-dev) attempted to use undefined skill "check" at 22:01:02; should have used ToolSearch to load schema before calling
+- Agent (backend-dev) called MCP tools (mcp__github-wadeck-app__actions_list) without pre-loading schemas via ToolSearch; tool calls failed with "NOT YET KNOWN"
+- Agent (fork) spawned for batch speed test received STOP message at 07:51:52 from main session with instruction "ne lance pas les 5 runs" — agent had wrong assumptions about scope or task pacing and needed course correction
+
+<!-- session 057b11bc 2026-09-12 -->
+- Agent attempted batch benchmarking (5 full flow runs via fork agent) but user stopped it mid-execution with "STOP" message (07:51:52), indicating the approach was too slow; agent then switched to individual CLI command timing
+
+<!-- session 14a03272 2026-09-12 -->
+- Fork agent continued executing benchmark runs after receiving stop signal ("STOP — ne lance pas les 5 runs") without pausing — user had to redirect mid-execution. Agents should pause immediately when told to stop batch operations.
+- Backend-dev agent performed extensive grepping/reading to determine which fields need forwarding in FlowRegistry.parseFlowStep (provider, env, log, mcpServers, toolHooks, session) — suggests this data flow pattern should be documented explicitly.
+
+<!-- session 200a2e2e 2026-09-12 -->
+- Fork agent launched 5-run batch test but was explicitly stopped mid-execution — assistant did not anticipate that Luna model would be fast (~3.5s), so planned slow batch runs. User redirected with performance context before full batch completed.
+
+<!-- session 437fdfa3 2026-09-12 -->
+- Fork agent (a152) did not respect mid-stream SendMessage STOP at 07:51:52 (user questioned Luna performance); agent continued running iterations 3, 4, 5 despite the redirect. After user's resume message at 07:52:15, agent should have restarted strategy, not resumed the same loop.
+
+<!-- session b85bfc17 2026-09-12 -->
+- Backend-dev agent attempted to use "check" skill at 22:01:02 but it was marked "NOT YET KNOWN", forcing a fallback search for check-all.js. Agents should verify skill availability or handle gracefully when skills are unavailable.
+- GitHub MCP tools (mcp__github-wadeck-app__actions_list) returned "NOT YET KNOWN" at 22:06:05 and 22:06:11 when agent attempted to use them. MCP tools should be fetched/initialized before agent execution or error should be more informative.
+
+<!-- session 2f104296 2026-09-12 -->
+- Backend-dev agent searched package.json and scripts to find "check" skill after initial call failed (marked NOT YET KNOWN); skill should be pre-registered or documented in setup.
+- GitHub MCP tools attempted but marked as NOT YET KNOWN (actions_list) — tools weren't pre-loaded in agent's session context.
+
+<!-- session 5e5878de 2026-09-12 -->
+- Attempted to call skill `check` and MCP tools `mcp__github-wadeck-app__actions_list` without pre-loading via ToolSearch; both marked "*** NOT YET KNOWN ***" in logs.
+
+<!-- session 59c9e04c 2026-09-12 -->
+- Backend-dev agent attempted to call `check` skill without first fetching schema via ToolSearch — resulted in "*** NOT YET KNOWN ***" warning. Same pattern repeated with multiple MCP tools (mcp__github-wadeck-app__actions_list).
+
+<!-- session 5e5bdefa 2026-09-12 -->
+- Fork agent (session a152) spawned at 07:50:41 to run batch speed tests — main session attempted SendMessage redirect at 07:51:52 ("STOP — ne lance pas les 5 runs") but no verification of whether the fork's final output was reviewed before proceeding
+- Backend-dev agent attempted to call "check" skill without pre-fetching schema via ToolSearch — received "NOT YET KNOWN" warning at 22:01:02; should have fetched tool definitions before invoking unfamiliar skills
+- MCP tool `github-wadeck-app__actions_list` called at 22:02:05 without pre-fetching schema — got "NOT YET KNOWN" warning; ToolSearch should precede unfamiliar MCP tool invocations
+
+<!-- session 33028d90 2026-09-12 -->
+- Called deferred tools without fetching first: "check" skill at 22:01:02 and "mcp__github-wadeck-app__actions_list" at 22:05:02 were invoked with `*** NOT YET KNOWN ***` warnings. Always use ToolSearch before calling deferred tools.
+- Fork agent spawned at 22:50:41 to run 5-iteration speed benchmark was interrupted mid-execution at 22:51:52 when parent context shifted (Luna cold-start discovery invalidated baseline). Fork tasks need completion verification gates or must document external dependencies before launch.
+
+<!-- session aaade9a7 2026-09-12 -->
+- Assistant attempted to invoke 'check' skill before it was available in the skill list; should verify skill availability via ToolSearch or directly attempt with graceful fallback to raw tool calls.
+- MCP tools `mcp__github-wadeck-app__actions_list` were called without fetching their schemas first with ToolSearch—resulted in "NOT YET KNOWN" warnings; MCP tools always require `ToolSearch(query: "select:<tool_name>")` before invocation.
+- Fork agent spawned for batch test runs (line 07:50:41) was interrupted mid-execution via SendMessage without coordinating completion or verifying results—parent should either let agent finish or use proper stop signal, not context-switch mid-task.
+
+<!-- session ea6b7ae4 2026-09-12 -->
+- Debugged flow cli update silence without checking autoUpdate flag in config first — should read ~/.flow-config.yaml and provider configs (OPENCODE_CONFIG) upfront before testing.
+- Launched 5-run batch performance test without validating model availability/speed inline first — should quick-test individual models before committing to long-running batches.
+
+<!-- session 9a25e477 2026-09-12 -->
+- backend-dev agent attempted unavailable skills/tools: `skill=check` and `mcp__github-wadeck-app__actions_list` (appeared twice) — neither was loaded despite being declared available in system-reminder.
+- backend-dev agent made multiple grep searches to locate where `env` field should be added (options.env, LaunchOptions interface, model step types) — suggests insufficient documentation on ModelFlowStep schema or weak signal from existing code patterns.
+
+<!-- session 5327a9b8 2026-09-12 -->
+- Backend-dev agent ran inefficient batch speed tests (5 full runs) when focused testing would suffice — user had to stop and redirect to narrower scope (Luna only). Indicates agent lacks heuristic for test batching efficiency.
+- Skill "check" was not yet known in schema when backend-dev tried to invoke it — agent then had to manually search for check-ts.js and scripts/check-all.js, adding extra round-trips.
+
+<!-- session 7c3ab573 2026-09-12 -->
+- Backend-dev agent called unavailable skill 'check' without verification (22:01:02 "NOT YET KNOWN"). Should query available skills or use fallback validation.
+
+<!-- session 9927252f 2026-09-12 -->
+- Backend-dev agent attempted skill "check" which returned "NOT YET KNOWN" despite the skill being available — agent then manually searched for check-ts.js as workaround. Skill discovery for agents may be incomplete or not provided to subagents.
+- Fork subagent ran speed-test with incorrect latency assumptions (expected 120-193s for Luna model when actual is ~3.5s), wasted time until user sent STOP message mid-execution.
+
+<!-- session 9f1cac6c 2026-09-12 -->
+- backend-dev agent invoked skill "check" without verifying availability; should call ToolSearch first or gracefully handle missing skills instead of silently falling back to manual script discovery.
+- backend-dev agent attempted MCP tools (mcp__github-wadeck-app__actions_list) marked "NOT YET KNOWN" — tools weren't pre-loaded with ToolSearch before calling; agent should load tool schemas before attempting invocation.
+
+<!-- session 0c2755c7 2026-09-11 -->
+- Backend-dev agent spawned at 16:07:08 to implement Codex provider; main agent then spawned same agent again at 16:20:04 to "fix build system and run tests." Suggests first agent's work wasn't verified before proceeding, or completion was assumed without testing.
+- MCP tools (github-wadeck-app__actions_list/actions_run_trigger) repeatedly return "NOT YET KNOWN" in fork agents despite multiple retries. Fork agents retry these calls 4+ times with no resolution, suggesting tools either aren't available or agent needs explicit ToolSearch before use.
+
+<!-- session 3a6c3982 2026-09-11 -->
+- backend-dev agent hit build failures (tsconfig path resolution for @shared-cli) requiring manual tsconfig.json edits + clean/rebuild cycle — path aliases should auto-inject or fail loudly during agent init
+
+<!-- session 862108ad 2026-09-11 -->
+- Flaky test debugging spent 1+ hour on vitest output parsing (various grep patterns, --pool flags, --sequence.shuffle) instead of reading test file to identify race conditions or timing issues.
+
+<!-- session 4fc1343c 2026-09-11 -->
+- Backend-dev agent launched twice (16:07:08 then 16:20:04) for same feature — first run incomplete, second corrects to "Fix build system" phase. Agent should validate tests/builds pass before returning, not defer to second invocation.
+- Skills invoked before loading — `write-doc` (08:51:08), `check` (16:12:15), `run-test` (16:12:18) marked NOT YET KNOWN. Agents should call ToolSearch proactively or document when skill unavailable, not proceed blindly.
+
+<!-- session fd73774c 2026-09-11 -->
+- Agents invoked `Skill` tool for write-doc, check, run-test, and run without ToolSearch preload, resulting in "*** NOT YET KNOWN ***" warnings. Agents need to call `ToolSearch({query: "select:<skill-name>"})` before using deferred skills.
+- Backend-dev agent was spawned twice (16:07:08 and 16:20:04) within same session. Second spawn at 16:20 suggests first did not complete or resolve issues — no verification that first agent's changes were correct before re-delegating.
+
+<!-- session 6879035b 2026-09-11 -->
+- Skills called directly without prior ToolSearch schema fetch show "*** NOT YET KNOWN ***" warnings (write-doc, check, run-test, run) — agents should fetch schemas before invoking deferred tools
+- Agents spawned for implementation tasks (backend-dev) encountered build failures when new exports weren't added to barrel files — agents should verify index.ts exports after adding new modules
+
+<!-- session 42960b0a 2026-09-11 -->
+- Backend-dev agent spawned twice (16:07:08, then 16:20:04) — first pass had build/test failures that required a second run. Check should verify agent deliverables before reporting success.
+
+<!-- session 98cef303 2026-09-11 -->
+- Backend-dev agent launched but session shows user directly running npm commands (check, build, test) instead—suggests agent didn't complete or user needed to take over for diagnosis
+
+<!-- session 931a4bc5 2026-09-11 -->
+- Backend-dev agent attempted to invoke skills (check, run-test) that returned "*** NOT YET KNOWN ***" — agents must verify skill/tool availability before use, or ToolSearch must pre-load deferred tool schemas before agents call SendMessage/AskUserQuestion.
+- SendMessage tool used by agent (16:05:34) without prior ToolSearch schema load — deferred tools require explicit `ToolSearch(query: "select:<name>")` before invocation or they fail with InputValidationError.
+
+<!-- session cb919191 2026-09-11 -->
+- Backend-dev agent implemented CodexModelProvider + tests but didn't verify build success or catch/report root cause — session escalated to manual debugging (npm clean → npm install → tsc --force → per-package builds) instead of agent identifying blockers early.
+
+<!-- session 083a136f 2026-09-11 -->
+- Backend-dev agent invoked unavailable skills (check, run-test) without detecting or reporting their unavailability first, leading to skill execution warnings rather than investigation.
+- First backend-dev delegation (16:07:08) for Codex provider implementation did not catch build failures; required second delegation (16:20:04) specifically to "fix build system". Implementation was incomplete/untested before handoff completed.
+
+<!-- session ee29c8cd 2026-09-11 -->
+- backend-dev agent attempted to use unavailable skills — "check" and "run-test" skills reported as "NOT YET KNOWN" when agent tried to invoke them; skills must be explicitly available or loadable before agent execution
+
+<!-- session 9d09b1bb 2026-09-11 -->
+
+- Assistant misunderstood "sub-steps" — initially thought they should be deleted from injected steps, but they are actually validation steps that must be preserved
+
+<!-- session c99ba2fe 2026-09-05 -->
+
+- Assistant misarchitected parent-blocking logic in CommandHandler instead of FlowScheduler; suggested deleting injected steps when spec requires resetting them; refactored mid-stream after user correction.
+- Assistant spent ~1 hour debugging a pre-existing `taskType` output extraction bug across multiple versions instead of recognizing it as pre-existing and pivoting to workaround (direct variable access via `${{ steps.X.outputs.stdout }}`)
+- Assistant got stuck in root-cause investigation (grep, diff, regex tests) instead of recognizing the solution: `output:` pattern doesn't work — use direct template variable access instead
+- Assistant lost focus on user's core requirement (sub-step injection + task type setting in flows) while chasing tangential bugs
+- Delegated to sub-agent without verifying directory structure — flow-temp created at repo root instead of demo_02/; must check file layout before reporting success
+- Assistant removed `depends: [classify]` from `classify_validate`, assuming `parent` field would automatically create execution dependency. Testing revealed `parent` is context-only; scheduler treats it separately from `depends` ordering. DAGBuilder must inject parent into dependencies.
+- Test agent spawned diagnostic VBS scripts as side effects while debugging daemon spawning — created unintended popups that disrupted the session; avoid generating files/scripts as part of investigation.
+- Multiple misdirected hypotheses about daemon failure (cold-start race → port exhaustion → HTTP fallback) before finding root cause (process.kill(pid, 0) returns ESRCH on MSYS2 for VBScript-spawned processes); better to instrument directly early rather than speculate.
+- Used relative path `../../../../../_test-tasks/mcp-server/index.mjs` that exits git repo and will fail silently in CI.
+- Implemented `$${{ }}` escape syntax without first documenting the constraint it solves: template expressions `${{ }}` are evaluated in ALL YAML fields, not just prompts, causing confusion with bash `${}`.
+- Assistant debugs in compiled binaries (grep on flow.cjs, worker.cjs) instead of reading source code first — this creates brittle chains and wastes time; should check source repo before exploring installed bundles.
+- Assistant proposes changes to `shared-cli` without verifying it's external first — should grep `.claude/docs` or check `packages/` directory structure before suggesting modifications to unknown packages.
+- When debugging "Property 'taskType' not found" error, assistant took multiple unfocused grep rounds (outputExtractor, rawOutput, step.output) before locating OutputExtractor. Direct search for "convertType" or "OutputVariableConfig" would have found root cause (missing `type` field required in output config) faster.
+- Repeated same `flow run` command 5+ times with varying wait durations before discovering root cause was startup race condition. Should have checked `netstat`/process liveness earlier instead of iterating on sleep times.
+- Injected steps in handleLoop must NOT be deleted on parent restart — they are part of scheduler state and should be re-queued. User explicitly corrected: "STOP sur la suppression des steps injectés dans handleLoop — c'est une erreur de conception."
+- When fixing multiple stale execution states (e.g., status: "running" → "failed"), batch all fixes in one multi-file sed operation, not one-by-one. Improves efficiency and reduces test iteration time.
+- Spent multiple round-trips debugging flow cli update silence without immediately checking the config file for autoUpdate flag — should read system config before diving into log traces.
+- Initial placement of parent-blocking logic in CommandHandler instead of FlowScheduler — coordinator corrected mid-implementation, required major refactoring of multiple files
+- Added redundant `tryDispatch()` call in `onStepCompleted` that wasn't in original code; discovered and removed during cleanup
+- Missed design constraint: adding child to `failedSteps` prematurely makes `hasFailed()` return true before parent re-run. Required adding `supersededSteps` set to track re-queued children
+- Fork agents spawned at 10:06:05 and 11:21:59 without verifying results before proceeding — main agent continued independent work (updating flow-cli, editing templates) without checking what the forks discovered or delivered.
+- Forked agents (a815, a0cf) fixed `detached: true` in ClaudeLauncher/WorkerPool but main agent later discovered same pattern needed fixing in RunCommand and spawnDaemonBackground—incomplete coverage on first agent pass, required follow-up.
+- Multiple forked agents (wscript, windowsHide, research) spawned while main session continues testing simultaneously; parallel uncoordinated work on same codebase may waste context or cause merge conflicts
+- Multiple parallel agents created custom scripts (parse-em-dash-files.cjs, fix-em-dash.cjs, fix-readme-length.cjs) to parse and fix violations instead of using violations CLI directly — suggests agent hallucinated CLI interface or misunderstood available commands.
+- Heavy grep-based parsing of violations output (17:45:07, 17:47:46, 17:48:12 etc.) indicates agent tried to manually understand violation structure by repeated bash queries instead of consulting violations rule definitions or documentation.
+- Multiple violation-fixing strategies spawned in parallel (4+ fork agents, multiple .cjs scripts) instead of a single coordinated approach — suggests agent lacked unified violation remediation strategy upfront.
+- frontend-dev agent attempted to invoke "check", "run", "violations" skills marked "*** NOT YET KNOWN ***" before falling back to direct Bash — skill discovery/loading failed silently or lazily.
+- Bulk find-and-replace operations across TypeScript files (sed with multiple patterns) introduced syntax errors — grep patterns like `{/ ` and `^/$` later detected corruption. Agent should verify individual replacements before batching.
+- backend-dev agent attempted to invoke `check` skill but got "NOT YET KNOWN" warning; agent continued anyway without verifying the skill loaded
+
+<!-- session 23b499fd 2026-09-11 -->
+
+- Delegated sub-agent file creation without verifying output directory structure — resulted in files created at wrong location (repo root vs. demo_02/); must validate file layout before reporting completion
+
+<!-- session 044bdb7c 2026-09-11 -->
+
+- Attempted to call `write-doc` skill without first fetching schema via ToolSearch — resulted in "NOT YET KNOWN" warning before being able to use it
+
+<!-- session 3a7433de 2026-09-11 -->
+
+- Assistant used `import.meta.url` (ESM syntax) in CommonJS context—need to validate module system or use `__filename` for CJS files.
+
+<!-- session 78ac970b 2026-08-28 -->
+
+- When user said "ETC exprès pour que tu ANALYSE / EXPLORE" — I failed to recognize the hint to find ALL similar patterns. Should have grepped for all untracked dist/* directories first, not just deleted what was explicitly mentioned.
+- Assumed `@wadeck/queue-cli` was unpublished when it had already been published by CI — conflicted with user's statement "j'ai pushé j'ai dit, donc queue-cli est dispo depuis NPM !!!". Verify actual state before proposing workarounds.
+- `git rm --cached` cleanup left files on disk — user had to explicitly tell me "tu pourrias nettoyer queue-cli aussi?" with screenshot showing files still present. This pattern (git tracking removal != filesystem cleanup) needs explicit two-step follow-through.
+- Used sequential test steps when user asked "pas moyen de faire l'étape 3 en cli directement?" — should have proactively offered the YAML workaround instead of defaulting to "feature not in CLI".
+- Assistant wrote `import.meta.url` in CommonJS context instead of `__filename` — requires wrapping awaits in IIFEs or fixing CJS imports. CJS files cannot use ESM syntax; validate tsconfig.json module setting before choosing path utilities.
+- `.gitignore` pattern `/scripts/` in package-level .gitignore was too broad and caught `ci/scripts/` unintentionally — required `git check-ignore` debugging to diagnose. Use precise patterns anchored to directory structure.
+- Over-explored wdrive repository checking for bundle scripts that don't exist (scripts/ only contains visual-test helpers, no build logic) — wasted time before confirming absence. When told "all content you need is provided," respect that boundary.
+- Multiple Zod type inference issues during ConfigLoader.ts creation required 3+ iterations to resolve (explicit interface definitions, casting, type guards). Zod's inferred types from `.parse()` may not match explicit interfaces — define schema shapes explicitly upfront.
+- Parallel sub-agents made inconsistent choices: assurance-scraper agent changed tsconfig to `module: ESNext` (for `import.meta.url`), while chatgpt/whatsapp agents kept `CommonJS` — required post-hoc realignment by main agent.
+- Sub-agents created files but did not run distribution scripts (bundle, bundle-updater) — main agent verified and ran them afterward; agents should execute full workflow, not stop at file creation.
+- Skill invocation without ToolSearch preload: at 09:27:26 agent attempted `Skill check` resulting in `*** NOT YET KNOWN ***` warning; recurred at 10:30:10 with `get-timestamp`. Agents worked around by invoking underlying scripts directly (bash npm run / node scripts).
+- Spec audit delegated as 4 separate fork agents (security, completeness, consistency, architecture) at 10:22:12–10:22:30, then separate fix passes at 10:25:07 and 10:32:51 — could consolidate to single audit + fix cycle to reduce I/O.
+- SendMessage and AskUserQuestion tools returned "*** NOT YET KNOWN ***" when agents tried to use them without first loading schemas via ToolSearch — blocked async communication and user queries mid-task. Agents should request tool schemas before attempting deferred tools.
+- SendMessage tool invoked before schema was fetched via ToolSearch; agents encountered "*** NOT YET KNOWN ***" warnings when attempting direct calls — pattern suggests agents are not pre-loading deferred tool schemas.
+- Three parallel agents (a21a, a1b0, a933) performed near-identical packaging work for three scrapers without a shared template or reusable utility — inefficient despite good parallelization.
+- Flaky test debugging spent 1+ hour on vitest output parsing (various grep patterns, --pool flags, --sequence.shuffle) instead of reading test file to identify race conditions or timing dependencies — suggests missing flaky-test debugging methodology.
+- ToolSearch had to be invoked separately to load SendMessage schema; agent attempted direct call first and failed with InputValidationError — deferred tool schemas should be auto-fetched on first access attempt.
+- Attempted skill "check-npm-published" which was not yet available; agent fell back to bash npm commands without issue.
+
 <!-- session 576b46a5 2026-09-02 -->
+
 - Agent created violations rule locally (`.violations/rules/no-spawn-without-windows-hide.ts` in agent-fleet) instead of requesting it globally across all CLI repos. Understood mid-session as wrong scope.
 - Agent didn't trace full spawn chain (queue → dispatch.js → flow-cli → flow-engine → Claude launcher). Each layer needed `windowsHide: true` independently; fixing one layer didn't solve terminal windows because 2-3 other layers still lacked it.
 - Used `shell: true` + `$TASK_ID` env var in flow scripts on Windows. Didn't account for cmd.exe syntax (`%VAR%` not `$VAR`). Required rewrite to use direct template substitution `${{ inputs.taskId }}`.
@@ -427,6 +816,7 @@
 - Dispatcher wasn't logging task-to-flow invocations, masking integration failures; agent added console.log to dispatch.js and re-tested to confirm flow execution
 
 <!-- session aeb3da22 2026-09-05 -->
+
 - Assistant used banned communication pattern ("Tu as complètement raison. Je m'excuse") which violates CLAUDE.md explicit ban on over-validation and excessive praise. Should be direct: "I need to follow the documented CLI workflow: commit + push, CI publishes automatically."
 
 <!-- session 539d500a 2026-08-22 -->
@@ -1027,7 +1417,187 @@
 
 ## Documentation gaps
 
+<!-- session 593bf65e 2026-09-12 -->
+- w-guardrails bypass mechanism opaque: Session 2a0e99f3 spent ~30min exploring request-bypass.js, session validation logic, category definitions with multiple grep passes and edits to checks.js — indicates bypass categories, session-ID matching, and allowed-category list not documented.
+- Flow execution vs. flow history distinction absent: `flow show` command name led agent aa7a to assume it retrieves execution details; had to probe `--help` and discover `flow history --id` is the correct tool. Naming ambiguity.
+- Spec reading pattern shows multiple reads of separate .claude/specs/*.md files (guiding-principles, out-of-scope, threat-model, strategies, pool-architecture, existing-machinery) — suggests they could be consolidated into a single reference or better indexed.
+
+<!-- session 9caf4d67 2026-09-12 -->
+- Flow submission/parsing path not obvious — agent spent time grepping through RunCommand, CommandHandler, FlowRegistry, loadYaml to understand how `.flow.yml` gets parsed and submitted. No clear entry-point doc found.
+- Task CLI commands were misnamed in blueprints (`task cli show`, `task cli comment` instead of `task show`, `task comment`). Agent created them incorrectly, only discovered during execution after fix-and-retry cycles.
+- Schema migration from `task comment` to `task set-meta` applied across blueprints with no formal spec or changelog. Implicit change, not documented in flow schema reference.
+
+<!-- session 16f5edc1 2026-09-12 -->
+- write-doc skill requirement (per CLAUDE.md: "Always invoke before writing .md files") not surfaced to agent — agent wrote markdown file directly (08:26:48) bypassing the skill.
+- Blueprint input schema unclear — repeated iterations removing `description: text` from input declarations, suggesting input syntax not well documented.
+- Schema change "task comment" → "task set-meta" required bulk sed fixes across test blueprints; API breaking changes not surfaced upfront
+- Shell script exit codes in blueprints only validated at runtime; write_lessons exit code 2 required manual local simulation to diagnose
+
+<!-- session 883cfed0 2026-09-12 -->
+- `env` field addition to ModelFlowStep not clearly specified in schema docs. Agent searched multiple files (types.ts, ModelStepExecutor.ts, schema-reference.md) to find where to add it.
+- Flow schema forwarding (provider/env/log/mcpServers/toolHooks in parseFlowStep) required code reading rather than schema documentation; agent only discovered pattern after analyzing existing registry code.
+- Blueprint authors used wrong task CLI command syntax (task cli show → task show) requiring mass find-and-replace; no validation or docs caught this upfront.
+- Exit code diagnostics (exit code 2 from write_lessons at 09:26:22): user had to simulate step locally to diagnose. No clear error message about why step failed — required grep + simulation workflow.
+
+<!-- session 996bdab4 2026-09-12 -->
+- Task CLI command reference incomplete or not well-known to agent — spent multiple attempts querying valid commands (comment, set-status, add-comment, set-meta) instead of having canonical reference.
+- Exit code 2 from write_lessons script required local simulation to diagnose. Flow script error handling patterns not documented.
+
+<!-- session 93994a1d 2026-09-12 -->
+- Benchmark documentation (providers-benchmark.md) was written via Write tool instead of using the project's `write-doc` skill, despite the skill being defined in CLAUDE.md as required for .md files—agent/user didn't follow the documented pattern
+
+<!-- session d902be89 2026-09-12 -->
+- Schema-reference.md not updated in parallel with `env` field implementation — agent had to read code/tests to discover how per-step env vars work instead of finding it in docs.
+- goldfish (spec quality evaluator) unavailability delayed validation until AFTER plan was written; spec evaluation should happen during planning phase, not post-hoc
+
+<!-- session c40b9bc0 2026-09-12 -->
+- Multiple failed attempts to find correct Claude CLI model name syntax (07:56:57–07:58:43: "claude-haiku-4-5", "claude-haiku-4-5-20251001", "claude-3-5-haiku" all tried). Claude models available to opencode/codex are not documented in .claude/docs/flows/.
+- write-doc and goldfish skills appear in deferred tools list but agents don't automatically fetch their schemas via ToolSearch before calling them—should be automatic or documented as requiring explicit ToolSearch call.
+
+<!-- session 2cdf86c5 2026-09-12 -->
+- Claude CLI model argument format not documented — agent trial-and-errored through multiple formats (claude-haiku-4-5, claude-3-5-haiku, haiku) before finding working syntax
+
+<!-- session b7a5391d 2026-09-12 -->
+- Agent attempted to write providers-benchmark.md directly with Write tool instead of invoking write-doc skill first, violating project instruction in CLAUDE.md: "Always invoke the `write-doc` skill before writing any documentation."
+
+<!-- session 08d9f6bc 2026-09-12 -->
+- No documented pattern for when to ToolSearch-fetch skill schemas before delegating to subagents; unclear whether skill availability is expected to be automatic or manual in agent contexts.
+
+<!-- session 89a22b61 2026-09-11 -->
+- Flow output syntax unclear — initially tried invalid steps like logging via template variables without verifying model step output structure.
+- Claude model naming inconsistent — used `claude-3-5-haiku` (invalid) instead of checking installed provider configs first.
+- Multi-config OpenCode setup (config_claude.json vs config_codex.json) and OPENCODE_CONFIG env var required for different provider/terminal pairs not documented.
+- No written guide on provider architecture (where providers live, how they're registered, how ModelStepExecutor chooses them, how tests mock them) — forced agent into exploratory reads instead of direct implementation path.
+- Flow daemon concurrency limits configured in ~/.config/flow/config.yml but not documented in code or CLI help; user had to manually edit config to set queue.concurrency
+- Flow YAML syntax for capturing model step outputs / responses unclear; user had to grep test files to discover correct field names and structure
+- Config file location ambiguity: users seeing both ~/.flow-config.yaml and ~/.config/flow/config.yml referenced; unclear which is authoritative and where to place user config.
+- After git push + CI publish, npm.pkg.github.com lag means `flow cli update` doesn't immediately fetch latest version—users retry multiple times thinking update failed when they should just wait longer.
+
+<!-- session 057b11bc 2026-09-12 -->
+- No clear fallback documented for when poll-ci and GitHub MCP tools fail with "NOT YET KNOWN"; agent should know to switch to manual polling or communicate the blocker explicitly
+
+<!-- session b85bfc17 2026-09-12 -->
+- No agent-facing documentation on which skills/tools are available in which agent contexts — agent (89a22b61) had to work around unavailable tools rather than failing fast with clear guidance.
+
+<!-- session 2f104296 2026-09-12 -->
+- Claude CLI model naming format unclear — main agent tried multiple variants (claude-haiku-4-5, claude-haiku-4-5-20251001, claude-3-5-haiku, haiku-4-5) before finding correct one(s).
+
+<!-- session 5e5878de 2026-09-12 -->
+- `poll-ci` skill existence not obvious during polling loops; unclear when ToolSearch must precede deferred tool use vs. automatic loading.
+
+<!-- session 59c9e04c 2026-09-12 -->
+- Deferred tools require explicit ToolSearch fetch before use; error message doesn't guide user to this requirement, leading to silent "NOT YET KNOWN" failures instead of actionable diagnostics.
+
+<!-- session 33028d90 2026-09-12 -->
+- Flow step execution results unclear—agent resorted to manual isolated CLI tests (22:07:44 onwards) rather than trusting flow JSON output. Schema/status field semantics for model steps need clarification.
+
+<!-- session 5327a9b8 2026-09-12 -->
+- Environment variable configuration for model providers (e.g., OPENCODE_CONFIG="C:/Users/Wadeck/.config/opencode/config_claude.json") not discoverable — multiple tests had to set this manually with different config files.
+- Model naming format inconsistencies across tools: amazon-bedrock/anthropic.claude-haiku-4-5 vs openai.gpt-5.6-luna vs claude CLI flags differ — causes trial-and-error when testing new models.
+
+<!-- session 7c3ab573 2026-09-12 -->
+- Agent spent multiple rounds searching for validation approach (check-ts.js, check-all.js, npm run build) rather than following documented validation workflow. Project validation/check command discovery unclear.
+- Environment variable management for model testing fragmented across multiple configs (OPENCODE_CONFIG, separate config_claude.json vs config_codex.json). No unified config documentation for per-provider testing.
+
+<!-- session 9927252f 2026-09-12 -->
+- OpenCode model path syntax is inconsistent (requires `amazon-bedrock/anthropic.claude-haiku-4-5` prefix in some contexts, plain `anthropic.claude-haiku-4-5` in others) — required multiple environment variable attempts to discover correct pattern.
+- Interactive approval flow through daemon → runner → executor → step-handler chain required extensive code tracing (20+ file reads/greps) to understand. The approval provider capability propagation is not documented.
+
+<!-- session 0c2755c7 2026-09-11 -->
+- Worker concurrency configuration and its effect on step parallelism is not well-documented. Agent spent 15+ minutes reverse-engineering behavior from code, config, and logs, searching for "Promise.all", "concurrent", WorkerPool implementation to understand why steps weren't running in parallel.
+
+<!-- session 3a6c3982 2026-09-11 -->
+- Codex provider integration required 30+ min exploratory reads across ModelProvider/ClaudeModelProvider/OpenCodeModelProvider before implementation — no integration spec or template docs for new model providers
+
+<!-- session 862108ad 2026-09-11 -->
+- Skills `check`, `run-test`, `run`, `poll-ci` flagged as "NOT YET KNOWN" at runtime; MCP tools `mcp__github-wadeck-app__actions_list` and related also unavailable when needed (agent fallback attempts at 18:45 failed repeatedly).
+
+<!-- session 4fc1343c 2026-09-11 -->
+- Flow execution model-provider integration undocumented — multiple manual attempts with timeouts (18:34+), daemon log diving (18:40+) needed to debug execution failures. Expected behavior/error modes for `flow run` unclear.
+
+<!-- session fd73774c 2026-09-11 -->
+- Build system issues (tsconfig.json shared-cli path reference) took ~2 hours to diagnose (16:15 → 18:16). Root cause: tsconfig.json had invalid path mapping that wasn't caught until manual review. No build-troubleshooting guide in .claude docs.
+
+<!-- session 6879035b 2026-09-11 -->
+- ModelFlowStep output/response handling and how to reference previous step outputs in flow YAML not clearly documented — session spent multiple rounds grepping for examples
+
+<!-- session 42960b0a 2026-09-11 -->
+- Skills check/run-test showed as "NOT YET KNOWN" in backend-dev context (16:12:15, 16:12:18) — unclear if skills are unavailable in subagent context or failed to load. Document skill availability in agent contexts.
+
+<!-- session 98cef303 2026-09-11 -->
+- Skills marked "NOT YET KNOWN" in logs (write-doc, check, run-test at 08:51, 16:12)—skill registry or definitions may not be available to agents
+
+<!-- session 931a4bc5 2026-09-11 -->
+- No guidance in agent context about when/how to ToolSearch for deferred tools (SendMessage, AskUserQuestion) vs. when they're available by default — agents hallucinate availability.
+
+<!-- session cb919191 2026-09-11 -->
+- Type file sync: flow-engine.types.ts in web-frontend requires manual updates when adding new providers — no automatic type generation from packages/flow-engine/src/types.ts, suggesting missing build step or undocumented synchronization requirement.
+
+<!-- session 083a136f 2026-09-11 -->
+- Skill availability/loading model unclear to agents — agents assume skills exist without verifying. No documented way for agents to check skill availability before invoking.
+
+<!-- session 9d09b1bb 2026-09-11 -->
+
+- MCP servers and tool hooks documentation required extensive codebase investigation (5+ grep/read cycles) before writing — codebase structure for these features was not obvious or documented
+
+<!-- session c99ba2fe 2026-09-05 -->
+
+- `--cli-foreground` flag behavior (forces `stdio: 'inherit'` when stdin.isTTY is false) not discoverable — user had to infer it from reading source. MCP `provideSteps` injection capability underdocumented in code comments.
+- Proper way to access step outputs in flow templates: `${{ steps.stepId.outputs.stdout }}` works, but `output: { pattern }` extraction doesn't (or has preconditions not documented)
+- `task set-type` validation rules and accepted values not documented; assistant assumed bug/feature were valid without testing
+- LLM output extraction via regex breaks without structured delimiters — required XML or clear boundary markers in prompts for reliable parsing
+- `parent` vs `depends` semantics for sub-steps were unclear — required live testing to discover they are independent concepts (context vs execution order).
+- MSYS2/Windows-specific behavior: `process.kill(pid, 0)` returns ESRCH for processes spawned via VBScript (not just permission denied) — not documented, caused lengthy investigation.
+- Daemon HTTP health check logic not clearly separated from startup-lock acquisition — confusion about whether ECONNREFUSED on first port check means daemon is dead or just slow to bind.
+- Template syntax section was incomplete: missing `$${{ }}` escape, block conditionals, `subSteps` context injection, and prompt logging feature.
+- No guide existed for adding MCP servers to the flow engine — user had to request "documentation claire pour les prochains agents sur comment ajouter un MCP Server".
+- Flow validation error messages don't explain which outputs are available/expected — "Step 'classify' has no declared output 'rawOutput' (declared: taskType)" is unhelpful without listing valid choices.
+- OutputVariableConfig `type` field is required but error message only says "Property 'taskType' not found", masking the actual issue. YAML schema or error message should clarify requirement.
+- Flow-engine tests not registered in centralized test-config.js suites — must run directly via workspace `npm test`, not via skill:run-test.
+- Generated flow file location (`flow-temp/`) and its naming convention (`generated-<taskId>.yml`) not immediately obvious — user had to search multiple directories. Should document the temp directory convention in CLAUDE.md or flow config.
+- Parent-blocking scheduling architectural pattern not documented (FlowScheduler vs CommandHandler ownership)
+- No central reference documenting why bin-launcher.js.tmpl exists in agent-fleet, orchestrator, and queue repos, or sync strategy when fixes (stdio:ignore) must be applied to all three.
+- npm package availability delay after CI publish has no documented sync mechanism—CLI `update --check` and version polling require manual retry loops; add explicit "wait N minutes post-push before update available locally" guidance.
+- Integration test location/pattern unclear — session creates 20+ ad-hoc poc-_.js and flow-_.yml test files instead of using existing framework; CLAUDE.md requires "1-2 automated flow tests" but doesn't specify where or how
+- Violations skill was repeatedly invoked but remained unknown (17:45:55, 17:50:08, etc.). Agent should have used ToolSearch to fetch skill schema before calling it.
+- French character handling (accents in code/docs) required multiple fix iterations (fix-french-v2, fix-french-comprehensive) and cache clears, indicating rule expectations or examples were unclear.
+- violations rule names (no-raw-err-in-cli, no-unsafe-type-cast, plugin-rules, no-dead-suppress) are similar and not clearly explained in error output — agent had to grep config.ts and rule files to understand which rules applied where.
+- Sub-step injection / MCP step provision spec required Explore agent search to locate (.claude/specs/2026-08-21*); feature appears to be missing or poorly indexed in searchable docs
+
+<!-- session 23b499fd 2026-09-11 -->
+
+- Multiple grep searches for mcpServers/toolHooks patterns across the codebase suggest fragmented or undiscovered documentation; research phase could benefit from centralized index of flow-related docs
+
+<!-- session 044bdb7c 2026-09-11 -->
+
+- MCP servers and tool hooks lacked clear documentation — assistant spent multiple grep/read rounds exploring codebase to understand concepts before writing new docs to `mcp-and-tool-hooks.md`
+
+<!-- session 3a7433de 2026-09-11 -->
+
+- MCP server and tool hook configuration required multiple targeted greps across separate files (types.ts, ModelProvider.ts, ToolHook.ts)—suggests fragmented or undocumented API surface.
+
+<!-- session 0adb1ff3 2026-09-11 -->
+
+- MCP servers and tool hooks lacked formal documentation; assistant needed multiple grep searches with varying patterns (mcpServers, mcp_servers, ToolHook, etc.) to locate interfaces, triggering creation of `mcp-and-tool-hooks.md`.
+
+<!-- session 78ac970b 2026-08-28 -->
+
+- `{{PKG_PREFIX}}` pattern needed across all three repo templates but wasn't discoverable — no central place documenting why some CLIs need `-cli` in package name and others don't (queue-cli vs wdrive).
+- User had to explicitly state "Do NOT read any files except those explicitly listed" — indicates assistant defaults to broad codebase exploration even when scope is constrained. Accept scope limits in task briefings.
+- Bundle output size verification is implicit pattern (queue.cjs ~55KB, queue-updater.cjs ~11.2KB under 500KB guard) — no explicit sizing guidance docs exist; causes uncertainty on "is this reasonable?"
+- Plan file organization uncertain: fork agent at 10:39:22 explicitly searched "where plans are stored relative to specs in recent projects", suggesting convention was unclear or inconsistent across projects.
+- Project configuration value `<QUEUE_CLI_PROJECT_ID>` was a hardcoded placeholder in generated workflow file — required manual sed substitution at end. Should be templated or documented as a post-generation step.
+- CalVer version computation logic scattered across multiple bundle scripts (assurance-scraper, chatgpt-scraper, whatsapp-scraper, queue-cli, flow-cli, task-cli) with iterative fixes, indicating no centralized versioning documentation or shared utility.
+- "T8 sentinel flow" pattern (replacing direct npm install in updaters) not documented — agent had to grep across wdrive/singleton-daemon-kit/scrapers to infer the pattern.
+- launcher.config.json format for sentinel flow IPC unclear — agent discovered it via Go launcher source inspection and singleton-daemon-kit node_modules inspection.
+- Agent spent extensive time investigating build scripts (generate-platform-packages.sh, bin-launcher.js templates) and singleton-daemon-kit across repos to understand CLI versioning, package naming conventions, and launcher mechanisms — suggests missing cross-repo documentation on naming patterns and build consistency.
+
+<!-- session d93f4c3d 2026-09-11 -->
+
+- MCP server and tool hooks integration required 7+ targeted greps across flow-engine to understand structure before creating `mcp-and-tool-hooks.md` — suggests complex/underdocumented coupling between types and implementations
+
 <!-- session 576b46a5 2026-09-02 -->
+
 - Multi-layer spawn pattern (queue/CliTransport → dispatch → flow-cli/bin → flow-engine) and `windowsHide` requirement was undocumented. Led to multiple round-trips discovering hidden windows.
 - Windows daemon Job Object behavior (parent exit kills children) not documented; caused confusion about why daemon from inline `flow run` didn't survive `dispatch.js` exit.
 - flow-engine does not clearly error when gitStrategy doesn't match project type (non-git projects require gitStrategy: none); crashes silently with "Execution started" then exits
@@ -1513,7 +2083,242 @@
 
 ## Known constraints
 
+<!-- session 593bf65e 2026-09-12 -->
+- Skills `check` and `write-doc` marked "NOT YET KNOWN" at 22:01:02 and 08:26:27 but used in normal project workflow — backend-dev agent worked around by running `npm build` directly instead of delegating to skill; benchmark doc written manually instead of via write-doc despite CLAUDE.md requiring it
+- GitHub MCP tools marked "NOT YET KNOWN" at 22:05:02 (`actions_list` method=list_workflow_runs) and 22:06:11 (method=list_workflow_jobs) — CI polling blocked, agent fell back to `sleep 60` instead of using MCP
+- Multiple skills marked "NOT YET KNOWN" late in chunk: write-doc (08:33:50), goldfish (08:35:33), AskUserQuestion (08:52:24), check-parallel-agents (09:00:29) — skill loader delays or versioning issues.
+- Blueprint validation errors don't surface upfront — debugging requires log grepping (~/.config/flow/logs/YYYY-MM-DD.ndjson) and `flow history --id` polling with sleep delays, suggesting sync/blocking steps need better progress reporting.
+
+<!-- session 9caf4d67 2026-09-12 -->
+- Flow daemon async pattern unclear — session repeatedly uses `sleep X && cat ~/.config/flow/executions/ID.json` to poll results (5+ instances). No documented way to await or stream execution results, forcing manual polling loops.
+- w-guardrails bypass system shows repeated session validation failures and complex debugging loops (60+ lines of grep/sed on request-bypass.js, multiple "does not match the current session" rejections, manual category testing). Suggests the session matching logic is fragile or underdocumented.
+- Task status transitions require preceding state reset to "backlog" — `set-status` is not idempotent across state machine positions. Blueprint tests reset all task statuses before running transitions.
+- Script exit codes in blueprints must use explicit non-zero codes to signal step failure — `write_lessons` exited 2 and was debugged via local simulation, revealing undocumented convention for error propagation.
+
+<!-- session 16f5edc1 2026-09-12 -->
+- Guardrails bypass system requires session ID validation; ~5min debugging just to understand bypass state format and category validation, suggesting system is fragile and underdocumented.
+- Flow execution is async; no blocking completion API; user repeatedly used sleep + grep logs pattern to poll for flow completion
+- Blueprint dependency semantics (commit_fix depends on verify_fix) validated through execution logs after initial failures, not caught by parse-time validation
+
+<!-- session 883cfed0 2026-09-12 -->
+- `flow-cli` binary requires `flow cli update` after git commit to load new version; source edits do nothing. This caused multiple debug cycles where agent thought changes weren't applied.
+- OPENCODE_CONFIG environment variable must be explicitly set to switch between configs (config_claude.json vs config_codex.json); not discoverable from CLI help.
+- Guardrails session validation fails across parallel agents (67e3f019 vs 2a0e99f3) — same category requires separate bypass requests per session, not global. Multi-agent work triggers repeated permission prompts.
+- Model downgrade mid-session (sonnet → haiku) at 09:20:08 — Sonnet failing on flows, Haiku succeeded. Consider documenting model compatibility for flow blueprints.
+- Sleep-based polling pattern (sleep 90 → flow history) appears repeatedly (09:18:20, 09:19:54, 09:21:56, 09:23:30, 09:24:47, 09:25:59). Suggests either no async notification mechanism or user unaware of it. Consider documenting async wait patterns.
+
+<!-- session 996bdab4 2026-09-12 -->
+- Subagents cannot call arbitrary project skills without explicit schema availability; fork agents can receive user redirections via SendMessage but need tool schemas preloaded to avoid "NOT YET KNOWN" errors on first use
+- Multiple deferred tools (session-history, write-doc, goldfish, check-parallel-agents, AskUserQuestion) require ToolSearch before calling; agent attempted direct invocation and hit "NOT YET KNOWN" errors.
+- Parallel agents working with gardrails/bypass system: significant time spent investigating session IDs, bypass state files, guardrails plugin internals—complexity suggests future work should pre-stage bypass or run in same session to avoid session validation friction.
+- Flow execution polling uses repeated sleep+grep (60-120s cycles). No blocking/streaming wait mechanism observed; inefficient for test loops.
+
+<!-- session 93994a1d 2026-09-12 -->
+- Multiple main sessions (2a0e99f3, 89a22b61) ran concurrently on overlapping .claude/specs/* files without visible coordination mechanism—worked here but creates conflict risk in future parallel sessions
+- write-doc skill must be invoked before writing documentation per project CLAUDE.md, but the skill was not yet loaded when attempted. Agent should use ToolSearch first.
+
+<!-- session d902be89 2026-09-12 -->
+- Flow-cli requires manual `flow cli update` after commits to pick up new binary (22:06:19) — not automatic, causes stale daemon state on cold restarts.
+- Skills listed as available in system-reminder appear to have startup/load delays — showing "NOT YET KNOWN" when invoked, requiring workarounds or direct CLI fallbacks instead of skill execution path
+
+<!-- session c40b9bc0 2026-09-12 -->
+- OPENCODE_CONFIG environment variable requires different config files per provider (config_claude.json vs config_codex.json). Not documented in schema-reference.md or best-practices.md; discovered only through trial-and-error testing.
+- Model naming is inconsistent across providers: `anthropic.claude-haiku-4-5` vs `openai.gpt-5.6-luna` vs `amazon-bedrock/...`. Centralizing provider+model syntax in schema-reference under a "Model naming" section would prevent repeated lookup errors.
+- Multiple agents running in parallel (67e3f019 and 2a0e99f3) in same session; general-purpose agent reads CLAUDE.md from 8+ unrelated projects (orchestrator, dsl-view, gemini-generator, violations-framework) during planning—overly broad exploration for single-task focus.
+
+<!-- session 2cdf86c5 2026-09-12 -->
+- Skill availability warnings ("NOT YET KNOWN" for `check`, `write-doc`) appear during execution but behavior on how agent should handle unavailable skills is unclear — appears to continue silently rather than block/retry
+
+<!-- session 08d9f6bc 2026-09-12 -->
+- Skills (write-doc, check) and MCP tools (mcp__github-wadeck-app__actions_list) logged as "NOT YET KNOWN" when subagents invoke them — schemas must be fetched via ToolSearch before calling, or skill/MCP definitions aren't auto-loaded in subagent contexts.
+
+<!-- session 5bf60bfb 2026-09-12 -->
+- Interactive SendMessage to running fork agents works (07:51:52 "STOP — ne lance pas les 5 runs..."), enabling mid-execution redirects. Fork agents accept instructions and restart procedures. Document this capability since it's non-obvious.
+
+<!-- session 89a22b61 2026-09-11 -->
+- flow-cli installed globally uses published version from CI; local code changes require push → rebuild → `flow cli update` before CLI sees them (Codex provider unknown until deployed).
+- Worker concurrency defaults to 1 — parallel steps don't actually run in parallel without config adjustment; timing analysis requires understanding execution model limits, not just YAML syntax.
+- Config file location: daemon reads `~/.flow-config.yaml`, not `~/.config/flow/config.yml`. Wrong location causes `concurrency: 1` default silently.
+- Windows shell spawning: `shell: true` with multi-word args breaks with `cmd.exe /d /s /c` concatenation. Must spawn node+script directly.
+- AWS Bedrock Claude models restricted by whitelist in OpenCode config — `claude-haiku-4-5` / `claude-sonnet-4-5` fail even with valid syntax; `claude-sonnet-4-6` / `claude-opus-5` work.
+- git-commit-push bypass script: session ID extraction was convoluted (grep logs, check bypass-state.json, etc.). User eventually approved dialog directly instead.
+- Skills (check, run-test, write-doc) reported as "NOT YET KNOWN" mid-session — suggests skill loader or cache issue; didn't block work but added friction.
+- TypeScript build fails due to non-existent `shared-cli` package reference—requires tsconfig.json alias workaround (shared-cli → @wadeck-app/shared-cli); affects test and build pipelines
+- Parallel execution verification requires manual inspection of ~/.config/flow/executions/*.json files and daemon logs; no built-in CLI command to observe timing/parallelism
+- flow-cli daemon does not load ~/.flow-config.yaml automatically—user must check if config is being picked up when daemon fails to parallelize; ConfigDir.get('flow') path enforcement is real but silent failure is confusing.
+
+<!-- session bb55048d 2026-09-12 -->
+- write-doc skill requirement violated — documentation file (.claude/specs/2026-09-11_worker-availability-cli/strategies.md) created via Write tool at 22:00:04 without invoking write-doc skill first, despite explicit CLAUDE.md requirement
+
+<!-- session 057b11bc 2026-09-12 -->
+- poll-ci skill and MCP GitHub actions tools return "*** NOT YET KNOWN ***" state; agent falls back to manual `sleep + cat ~/.config/flow/executions/` polling loops instead of automated status monitoring
+
+<!-- session 14a03272 2026-09-12 -->
+- Coldstart latency affects provider benchmarking — first run of a provider takes 2-3x longer than subsequent runs; performance tests must account for or eliminate coldstart artifact.
+- flow-cli daemon must use `~/.config/flow/` as daemon directory (ConfigDir.get('flow')) — using alternative paths like `~/.flow-daemon/` causes EADDRINUSE because commands can't find existing daemon and spawn duplicate.
+
+<!-- session 200a2e2e 2026-09-12 -->
+- Model naming across providers is inconsistent (anthropic.*, amazon-bedrock/anthropic.*, openai.*, claude-*, us.anthropic.*) and requires testing to discover correct format per provider. OPENCODE_CONFIG and provider-specific env vars needed for cross-provider testing.
+
+<!-- session 437fdfa3 2026-09-12 -->
+- Skill `check` not yet available in this session (WARN at 22:01:02); MCP `mcp__github-wadeck-app__actions_list` not yet known (WARNs at 07:47:18). These prevent automated type-checking and CI status polling mid-investigation.
+
+<!-- session b85bfc17 2026-09-12 -->
+- flow-cli daemon requires careful port management — multiple `flow stop` + restart cycles suggest daemon state or EADDRINUSE issues; agents should verify daemon stopped before launching new ones.
+
+<!-- session 2f104296 2026-09-12 -->
+- Backend-dev added env field to ModelFlowStep but didn't update FlowRegistry.parseFlowStep to forward provider/env/log/mcpServers/toolHooks/session — main agent discovered and fixed this post-commit.
+- Fork agent interrupted mid-batch-test with French SendMessage from main agent redirecting work scope — model selection being re-evaluated during execution.
+
+<!-- session 5e5878de 2026-09-12 -->
+- Manual polling pattern (sleep + cat execution file) used repeatedly instead of `poll-ci` skill for monitoring flow runs; context indicates polling is the expected pattern but skill exists in system.
+
+<!-- session 59c9e04c 2026-09-12 -->
+- Flow execution has significant polling overhead — multiple 60+ second sleeps with manual JSON parsing (`cat ~/.config/flow/executions/[id].json`). No built-in await mechanism; requires batch sleep+poll loops.
+
+<!-- session 5e5bdefa 2026-09-12 -->
+- Polling loop pattern: multiple `sleep` commands (60s, 70s, 50s, 25s intervals) used for status checks instead of ScheduleWakeup — inefficient for long-running operations; should reserve sleep only for short delays under 270s when cache-warm polling is acceptable
+
+<!-- session aaade9a7 2026-09-12 -->
+- Flow execution polling uses manual JSON file reads + grep instead of automated wait strategy; should use `poll-ci` skill or structured await loops for flow runs to reduce manual sleep cycles (60–90s waits observed).
+
+<!-- session ea6b7ae4 2026-09-12 -->
+- flow-cli requires "flow cli update" after git push (CI rebuilds binary); editing source does nothing until published. DAEMON_DIR must be ~/.config/flow/ exactly to avoid EADDRINUSE when multiple daemons try to start.
+
+<!-- session 9a25e477 2026-09-12 -->
+- flow-cli and task-cli binaries in PATH are published versions; local source edits require `git push` + `flow cli update` to take effect—modifying node_modules directly doesn't persist.
+- All flow daemon code (history, config, socket) must use `ConfigDir.get('flow')` = `~/.config/flow/`; using other paths like `~/.flow-daemon/` causes daemon restart loops (EADDRINUSE).
+
+<!-- session 5327a9b8 2026-09-12 -->
+- Luna model shows severe cold-start penalty (120-193s vs 3.5s warm) — not flagged upfront, led to false "slowness" diagnosis and unnecessary test reruns before user clarified.
+
+<!-- session 7c3ab573 2026-09-12 -->
+- Flow execution requires manual polling with sleep loops (60-90s repeats). No async notification mechanism. Cold-start penalty for first codex-luna invocation (~120-193s vs typical ~3.5s) causes test result skew; requires warm-up run or separate baseline.
+
+<!-- session 9927252f 2026-09-12 -->
+- Flow execution results only accessible via polling JSON files (`~/.config/flow/executions/<id>.json`) — caused repetitive `sleep + cat` patterns throughout session.
+- CLI binaries (flow-cli, codex, opencode) require explicit `update` after source changes published via CI — developers must remember this step or changes appear to not take effect.
+
+<!-- session 9f1cac6c 2026-09-12 -->
+- flow-cli update cycle: code changes require git push → CI build → `flow cli update` before local testing; this adds ~1-2 minute latency between code edits and testable binary (agent correctly waited, but worth noting for planning).
+- OPENCODE_CONFIG requires explicit file paths for multi-provider testing (config_claude.json vs config_codex.json); agent had to iterate multiple times discovering the correct env var and path combination.
+
+<!-- session 0c2755c7 2026-09-11 -->
+- On MSYS2/Git Bash Windows, daemon spawn-to-listen race is significant: port file appears before TCP server is ready. Session shows multiple sleeps (5s, 15s, 20s) + retries to work around timing; single sleeps insufficient.
+
+<!-- session 3a6c3982 2026-09-11 -->
+- write-doc skill invoked at 08:51:08 but marked "NOT YET KNOWN" — documentation work (MCP and tool hooks) proceeded manually afterward
+- check and run-test skills marked "NOT YET KNOWN" at 16:12:15/16:12:18 — agent proceeded with manual build verification and log inspection instead
+- Worker pool concurrency behavior required extensive daemon/log debugging (flow history, execution traces) — no clear docs on how parallel step dispatch works or why single-threaded execution was observed
+- MCP tools (mcp__github-wadeck-app__actions_list, etc.) marked "NOT YET KNOWN" at 18:45:35+ when agents tried to use them — schema not preloaded
+
+<!-- session 862108ad 2026-09-11 -->
+- Tsconfig.json path aliasing issue (missing `shared-cli` mapping) caused build failures; required manual config fix before tests could run. Fork agents attempted to trigger/poll CI but lacked MCP tool access.
+
+<!-- session 4fc1343c 2026-09-11 -->
+- tsconfig path aliases cause silent failures — searching for non-existent `shared-cli` package (18:15:40), then required manual tsconfig fix (18:16:06). Paths should be validated or error loudly on first load.
+
+<!-- session fd73774c 2026-09-11 -->
+- Web-frontend types file modified (flow-engine.types.ts at 16:12:11) but no delegation to frontend-dev agent per CLAUDE.md requirement. Agent modified shared types directly instead of delegating UI compilation risk.
+
+<!-- session 6879035b 2026-09-11 -->
+- Shared package path resolution requires explicit tsconfig.json path mappings; vitest.config.ts may need special handling for shared packages in monorepos
+- Flow daemon execution logs are NDJSON format in ~/.config/flow/logs/ with date-based filenames (e.g., 2026-09-11.ndjson), not traditional text logs — requires grep/JSON parsing to extract errors
+
+<!-- session 42960b0a 2026-09-11 -->
+- tsconfig.json path mapping must include cross-package imports (e.g., shared-cli) or build fails with "Cannot find module". When new providers reference shared packages, update tsconfig.json paths immediately.
+
+<!-- session 98cef303 2026-09-11 -->
+- Build system required tsconfig.json shared-cli path fix (18:16:06); vitest.config.ts path issue in flow-engine (18:15:49)
+
+<!-- session 931a4bc5 2026-09-11 -->
+- tsconfig.json path aliases (e.g., shared-cli) must match repo structure; after restructuring, explicit tsconfig edits required (18:16:06) — document this in onboarding.
+
+<!-- session cb919191 2026-09-11 -->
+- Skills (write-doc, check, run-test) logged as "NOT YET KNOWN" when invoked — schema may need fetching via ToolSearch before calling, or skill definitions aren't available to the agent type used.
+- Multi-package monorepo with shared types needs aggressive cache clearing: incremental builds hide stale type definitions in dist-types/ — escalation pattern (npm run build → npm run check → npm run clean && npm install && tsc --force) indicates cache invalidation necessary for cross-package type changes.
+
+<!-- session 083a136f 2026-09-11 -->
+- Build system requires full clean cycle (npm run clean → npm install → tsc --force) when adding new type exports to packages/flow-engine/src/types.ts; incremental rebuild misses dist-types generation, breaking downstream imports.
+
+<!-- session ee29c8cd 2026-09-11 -->
+- write-doc skill requirement ignored — documentation file (.claude/docs/flows/mcp-and-tool-hooks.md) created without invoking write-doc skill first, violating explicit CLAUDE.md req
+- Monorepo build fragility — session required multiple clean/rebuild cycles (npm clean, npm install, tsc --build --force, per-package builds) suggesting TypeScript or tsconfig configuration issues that should be investigated
+
+<!-- session 9d09b1bb 2026-09-11 -->
+
+- write-doc skill showed WARN "not yet known" at 08:51:08 but assistant proceeded with documentation writing anyway
+
+<!-- session c99ba2fe 2026-09-05 -->
+
+- CLI commands silently fail when not in terminal (stdin.isTTY=false); task-cli only accepts `backlog`/`in-progress`/`done` statuses (not `refined`/`approved`); Amazon Bedrock/OpenCode can hang indefinitely; OpenCode requires `skipPermissions: true` + `--auto` together; `taskkill //PID` (Windows cmd syntax) doesn't parse in Git Bash — needs `/PID` with single slash.
+- Pre-existing bugs should be flagged quickly and worked around; avoid multi-hour root-cause dives unless directly blocking the task
+- User has specific expectations for sub-step behavior that were not being addressed while assistant debugged infrastructure
+- Non-TTY task commands require `--cli-foreground` flag; omitting it causes exit 1 with no error message
+- Never edit daemon config files directly (e.g., config.port) — causes port mismatch; let daemon manage its own state
+- On Windows, YAML script blocks MUST use block scalar `|` format to trigger bash execution. Single-line scripts or scripts without `|` default to cmd.exe/batch, causing bash variables like `$RAW_TYPE` to expand literally and pipes/redirects to fail.
+- `git push` with bypass mode times out after ~4 hours, requiring re-request; commit message was crafted but push was blocked mid-session.
+- Daemon auto-shutdown on idle + HTTP health checks have race conditions on slow systems — test timeout expectations need headroom for TCP socket timing variance.
+- Silent test skipping (existsSync guard) is worse than failing loudly—invisible failures hide CI breakage.
+- Daemon's `subSteps` context wasn't initially passed through CommandHandler → WorkerAdapter → Worker chain; required protocol changes across three files.
+- CLI flag convention: `-h` reserved for help (Commander.js standard) — must use `-H` or other flags; this wasn't documented and caused extra round-trip.
+- On MSYS2/Git Bash Windows, daemon spawn-to-listen race is significant: port file appears before TCP server is ready. Single sleeps insufficient; requires retry with exponential backoff.
+- VBScript-spawned daemon exhibits cold-start race: process starts and exits within ~300ms when no flows queued, before `flow run` can connect. This blocks e2e testing without daemon lifecycle fixes or pre-queued flows.
+- Daemon port file (`~/.config/flow/config.port`) can become stale with incorrect PID/port. Connection failures may indicate port mismatch — verify actual daemon is listening on the port in file before assuming daemon is down.
+- MSYS2 bash `process.kill(pid, 0)` check fails for daemon processes spawned via Windows VBScript (`SW_HIDE`), causing liveness detection to incorrectly report dead processes — affects daemon restart loops and port reuse logic. Additionally, grep piped to `head` exits 255 on SIGPIPE, breaking generated flow validation steps — shell scripts in flow prompts need `set +o pipefail` or use `head -c` instead.
+- Pre-existing vitest/tsconfig environment issue blocks flow-engine tests: crashes with TSCONFIG_ERROR before test code loads (references shared-cli); multiple test-run attempts failed
+- autoUpdate: false must be set independently in ~/.config/flow/, ~/.config/task/, and ~/.config/orchestrator/ to suppress update windows — not documented as a coordinated config requirement.
+- Go launcher (flow start) creates visible console windows on Windows when child process stdio is not explicitly ignored — fix requires stdio:ignore in bin-launcher.js.tmpl across multiple repos.
+- On Windows + WindowsTerminal, `spawn(..., {detached: true, windowsHide: true})` still allocates console window due to AllocConsole via TTY; fix is `detached: false` + `windowsHide: true` only (not both).
+- Repeated manual polling pattern (sleep XX followed by status checks) instead of proper async notification; `poll-ci` skill exists but not effectively used in this session
+- Config toggling pattern: `~/.config/flow/config.yml` edited 8+ times in test cycles; suggests tests should auto-configure or documentation on conditional test setup is missing
+- Violations rules triggered during agent work requiring bypass requests (line 16:15:39); suggests project rules may not align with changes being applied or rules need clarification
+- Frontend changes require delegation to frontend-dev agent per CLAUDE.md, but agent parallelized multiple sub-agents (a537, a37b, ae2a, a135) without clear coordination between violation types (em-dash vs barrel-index vs readme-length) — could have been more efficient with upfront scope planning.
+- `violations cache clear` was necessary multiple times mid-session for accurate results — violations checker has stale-cache issues requiring explicit workaround.
+- no-union-with-string and no-deep-relative violations appeared in flow-engine/types.ts after what agents believed were fixed commits — suggests violations state tracking across commits is fragile or suppression comments get lost.
+- Forked agents (a7ed) start without MCP tool schemas loaded from parent context — multiple "NOT YET KNOWN" warnings for `mcp__github-wadeck-app__*` tools required ToolSearch to fetch schemas, adding round-trips.
+- When restoring files from git HEAD wholesale (commit 897326e) as recovery from bulk edits, the entire file history for that file is lost in the working tree — a more surgical approach (manual diff review) would preserve intent when possible.
+- poll-ci skill invocations failed multiple times with "NOT YET KNOWN" state; user fell back to manual sleep+polling pattern instead
+- MCP tools (mcp__github-wadeck-app__actions_list, get_job_logs) returned "NOT YET KNOWN" warnings on first use; ToolSearch required to fetch SendMessage schema before agent communication
+
+<!-- session 23b499fd 2026-09-11 -->
+
+- write-doc skill showed "NOT YET KNOWN" warning during invocation — skill availability timing issue or initialization latency
+
+<!-- session 3a7433de 2026-09-11 -->
+
+- write-doc skill initially unavailable ("NOT YET KNOWN") during session; may need pre-warming or registration.
+- 18-minute pause between Write and next bash command, followed by truncated log output—unclear if command blocked or session interrupted.
+
+<!-- session 0adb1ff3 2026-09-11 -->
+
+- write-doc skill showed as "NOT YET KNOWN" at session start — potential skill initialization/loading issue during early tool invocation.
+
+<!-- session 78ac970b 2026-08-28 -->
+
+- Git commit operations trigger bypass request flow (`request-bypass.js`) — automation hooks gate destructive operations. Plan for approval latency in workflows involving commits.
+- Vitest 4 uses `--bail=1` (not `--bail`); earlier versions differ — version-specific CLI syntax causes test runs to fail silently if not matched exactly.
+- Vitest picks up compiled test files from `dist/` alongside source tests, causing duplicates — requires explicit `include: ['src/**/*.test.ts']` in config to restrict to source.
+- Vitest spy leakage between tests unless config includes `restoreMocks: true` — mocks persist across test boundaries, breaking isolated test assumptions.
+- Standalone repos (outside git) cannot compute semver from history → versioning falls back to `0.1.0` hardcoded — users may expect dynamic versioning from CI.
+- Extensive npm package polling for wdrive publication: 10+ `sleep + npm view dist-tags` commands across 45 minutes (starting 09:26:54), indicating no CI/publish webhook integration to notify on completion.
+- dist/ directories in scrapers repo were tracked in git but shouldn't be — required manual .gitignore addition and `git rm --cached` to clean up. Pattern may repeat with other build artifacts across monorepos.
+- Bundle scripts require IIFE wrapping or specific tsconfig to avoid top-level await issues — agents discovered this through trial and error rather than clear guidance in build setup docs.
+- ci/scripts/ directories created but initially hidden by gitignore rules, forcing agents to create per-package .gitignore entries to make them trackable; caused confusion about whether directories existed.
+- Platform package generation relies on sed templating and specific directory structures (ci/scripts/generate-platform-packages.sh, ci/templates/bin-launcher.js.tmpl) — changes scattered across multiple files, easy to miss one.
+- Multiple sed operations required to rename packages from "wdrive-_" to "wdrive-cli-_" across build files in both wdrive and agent-fleet repos — package naming convention changes require manual updates across distributed build scripts and templates.
+
+<!-- session d93f4c3d 2026-09-11 -->
+
+- write-doc skill invoked but marked "NOT YET KNOWN" — subsequent documentation work proceeded manually after code exploration
+
+<!-- session b19a1fb8 2026-09-11 -->
+
+- write-doc skill requirement ignored — documentation file (.claude/docs/flows/mcp-and-tool-hooks.md) created without invoking write-doc skill first, violating explicit CLAUDE.md requirement "Always invoke the write-doc skill before writing any documentation"
+- check skill not run before commit — CLAUDE.md requires "After each task: Use the skill 'check' and fix the issues" but session ends with git commit without running check
+
 <!-- session 576b46a5 2026-09-02 -->
+
 - Windows shell semantics for env vars differ from POSIX (`$VAR` → `%VAR%` in cmd.exe); flow engine template interpolation `${{ inputs.taskId }}` is correct, env var injection is not.
 - Flow daemon launcher (PID in ~/.config/flow/config.launcher-pid) auto-respawns daemon even after flow stop; affects test isolation; requires killing launcher or configuring alternate port
 - Stale queued executions in ~/.flow-daemon/executions/ persist and block new runs by filling concurrent slots; no auto-expiry or cleanup; must be manually cleared
@@ -1523,6 +2328,7 @@
 - CLI package workflow requires: git push → CI build/publish (~30-60s) → `flow cli update` → test; no direct way to test bundled changes locally before CI publish
 
 <!-- session aeb3da22 2026-09-05 -->
+
 - CLI development requires `git commit` + `git push` to trigger CI publishing — editing source files alone does nothing. Assistant correctly executed this but initially signaled confusion with apology rather than clarity.
 
 <!-- session 539d500a 2026-08-22 -->
@@ -2027,3 +2833,27 @@
 
 - For independent evaluations (code review, coherence audit), user prefers subprocess model (`claude --print` via Bash) over Agent tool subagents — subprocess gets fresh context, no harness inertia
 - User wrote parse-jsonl.js workaround to parse JSONL logs (multiple edits 15:08–15:09), suggesting built-in tools don't handle JSONL parsing — future sessions may need this capability.
+
+## LLM prompt design: delimit dynamic input sections with XML-style tags
+
+When injecting dynamic content (like error context) into a model prompt using template variables, wrap the injected section in clear delimiters so the LLM can unambiguously distinguish the injected value from the static instructions.
+
+**Bad:**
+
+```
+Previous validation error (empty = first attempt): ${{ context.lastSubStepError }}
+
+If there is a validation error above, fix it.
+```
+
+**Good:**
+
+```
+<previous_validation_error>
+${{ context.lastSubStepError }}
+</previous_validation_error>
+
+If the tag above is non-empty, fix the reported issues before regenerating.
+```
+
+This applies to any dynamic value injected into a prompt: error messages, previous outputs, context from other steps. XML-style tags are well-understood by all major LLMs and reduce ambiguity about what is static instruction vs dynamic input.

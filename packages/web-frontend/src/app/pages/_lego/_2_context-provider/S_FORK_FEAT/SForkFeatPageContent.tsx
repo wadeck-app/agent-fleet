@@ -84,8 +84,18 @@ export function SForkFeatPageContent() {
 		<div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
 			<div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
 				<div style={{ display: 'flex', gap: '0.5rem' }}>
-					<Button variant={!showOnlyBookmarked ? 'default' : 'outline'} onClick={() => setShowOnlyBookmarked(false)}>All</Button>
-					<Button variant={showOnlyBookmarked ? 'default' : 'outline'} onClick={() => setShowOnlyBookmarked(true)}>Bookmarked</Button>
+					<Button
+						variant={!showOnlyBookmarked ? 'default' : 'outline'}
+						onClick={() => setShowOnlyBookmarked(false)}
+					>
+						All
+					</Button>
+					<Button
+						variant={showOnlyBookmarked ? 'default' : 'outline'}
+						onClick={() => setShowOnlyBookmarked(true)}
+					>
+						Bookmarked
+					</Button>
 				</div>
 				<Badge variant="secondary"> {bookmarkedIds.size} bookmarked</Badge>
 			</div>

@@ -1,10 +1,10 @@
- Orchestrator + Flow Engine Integration Guide
+Orchestrator + Flow Engine Integration Guide
 
-Status: Phase  Complete 
+Status: Phase Complete
 
 This document explains how to use the integrated Orchestrator + Flow Engine system.
 
- Overview
+Overview
 
 The Flow Engine is now fully integrated with the Orchestrator, allowing you to:
 
@@ -13,31 +13,31 @@ The Flow Engine is now fully integrated with the Orchestrator, allowing you to:
 - Manage workspaces with full git integration
 - Track execution with detailed traces
 
- Architecture
+Architecture
 
 ```
 
-                      Orchestrator                           
-        
-    TaskManager      FlowRegistry     REST API       
-        
+                      Orchestrator
 
-                              
-                              
-                    
-                       FlowWorker     
-                        
-                      FlowExecutor  
-                        
-                        
-                      WorkspaceM.   
-                        
-                    
+    TaskManager      FlowRegistry     REST API
+
+
+
+
+
+                       FlowWorker
+
+                      FlowExecutor
+
+
+                      WorkspaceM.
+
+
 ```
 
- Quick Start
+Quick Start
 
- . Start the Orchestrator
+. Start the Orchestrator
 
 ```bash
 npm run dev
@@ -46,11 +46,11 @@ npm run dev
 This starts:
 
 - TaskManager: Manages tasks and their lifecycle
-- WebSocket Server: Port  for worker connections
-- REST API: Port  for task creation and queries
+- WebSocket Server: Port for worker connections
+- REST API: Port for task creation and queries
 - FlowRegistry: Loads flows from `.agent-fleet/flows.yaml`
 
- . Launch a FlowWorker
+. Launch a FlowWorker
 
 In a separate terminal:
 
@@ -64,7 +64,7 @@ The FlowWorker:
 - Loads available flows from FlowRegistry
 - Waits for flow-based tasks to execute
 
- . Create a Flow-Based Task
+. Create a Flow-Based Task
 
 Using the REST API:
 
@@ -98,7 +98,7 @@ Response:
 }
 ```
 
- . Monitor Task Execution
+. Monitor Task Execution
 
 Get task status:
 
@@ -113,7 +113,7 @@ The task will go through these states:
 . `review` - Flow completed successfully
 . (or) `failed` - Flow execution failed
 
- . View Results
+. View Results
 
 When completed, the task will have `flowResult`:
 
@@ -142,33 +142,27 @@ When completed, the task will have `flowResult`:
 }
 ```
 
- Available Flows
+Available Flows
 
- List All Flows
+List All Flows
 
 ```bash
 curl http://localhost:/flows
 ```
 
- Get Flow Details
+Get Flow Details
 
 ```bash
 curl http://localhost:/flows/simple-qa
 ```
 
- Default Flows
+Default Flows
 
-. simple-qa - Simple question & answer
-    - Input: `question` (string)
-    - Output: Answer from codebase
-    - Workspace: shared, main-only, always reuse
+. simple-qa - Simple question & answer - Input: `question` (string) - Output: Answer from codebase - Workspace: shared, main-only, always reuse
 
-. dev-full - Full development cycle
-    - Input: `taskDescription` (string)
-    - Output: Implementation with tests
-    - Workspace: isolated, feature-branch, never reuse
+. dev-full - Full development cycle - Input: `taskDescription` (string) - Output: Implementation with tests - Workspace: isolated, feature-branch, never reuse
 
- Creating Custom Flows
+Creating Custom Flows
 
 Create `.agent-fleet/flows.yaml` in your project:
 
@@ -207,17 +201,17 @@ my-custom-flow:
               exitCode: { type: number }
 ```
 
- Task Type Fields
+Task Type Fields
 
- flowId (optional)
+flowId (optional)
 
 The ID of the flow to execute. If not provided, the task is treated as a regular (non-flow) task.
 
- flowInputs (optional)
+flowInputs (optional)
 
 Input variables for the flow. Must match the flow's `inputs` definition.
 
- flowResult (populated after execution)
+flowResult (populated after execution)
 
 Contains:
 
@@ -226,7 +220,7 @@ Contains:
 - `error`: Error message if failed
 - `trace`: Detailed execution trace
 
- Workspace Management
+Workspace Management
 
 FlowWorker automatically:
 
@@ -248,9 +242,9 @@ Git strategies:
 - any: Allow any branch
 - worktree: Use git worktrees for isolation
 
- REST API Endpoints
+REST API Endpoints
 
- Tasks
+Tasks
 
 - `POST /tasks` - Create task (with optional flowId, flowInputs)
 - `GET /tasks` - List all tasks
@@ -259,18 +253,18 @@ Git strategies:
 - `DELETE /tasks/:id` - Delete task
 - `POST /tasks/:id/comments` - Add comment
 
- Flows
+Flows
 
 - `GET /flows` - List all flows
 - `GET /flows/:id` - Get flow definition
 
- System
+System
 
 - `GET /health` - Health check
 - `GET /stats` - System statistics
 - `GET /workers` - List connected workers
 
- Testing the Integration
+Testing the Integration
 
 Run existing tests:
 
@@ -278,15 +272,15 @@ Run existing tests:
 npm test
 ```
 
-All  tests should pass, including:
+All tests should pass, including:
 
 - Flow Engine tests (output extraction, conditions, templates, etc.)
 - Workspace Manager tests
 - Flow Executor tests
 
- Example Usage Scenarios
+Example Usage Scenarios
 
- Scenario : Answer a Question
+Scenario : Answer a Question
 
 ```bash
  Create task
@@ -299,13 +293,13 @@ TASK_ID=$(curl -s -X POST http://localhost:/tasks \
   }' | jq -r '.id')
 
  Wait a few seconds for execution
-sleep 
+sleep
 
  Check result
 curl http://localhost:/tasks/$TASK_ID | jq '.flowResult'
 ```
 
- Scenario : Full Development Task
+Scenario : Full Development Task
 
 ```bash
 curl -X POST http://localhost:/tasks \
@@ -320,36 +314,36 @@ curl -X POST http://localhost:/tasks \
   }'
 ```
 
- Troubleshooting
+Troubleshooting
 
- FlowWorker not picking up tasks
+FlowWorker not picking up tasks
 
 - Check that FlowWorker is connected: `GET /workers`
 - Verify task has `flowId` set
 - Check orchestrator logs for errors
 
- Flow not found
+Flow not found
 
 - List available flows: `GET /flows`
 - Check `.agent-fleet/flows.yaml` exists and is valid
 - Restart orchestrator to reload flows
 
- Workspace allocation fails
+Workspace allocation fails
 
 - Check disk space
 - Verify git is installed and accessible
 - Check project root has `.git` directory
 
- Next Steps
+Next Steps
 
-Phase  will add:
+Phase will add:
 
 - Enhanced UI showing flow execution progress
 - Real-time step updates via WebSocket
 - Workspace status visualization
 - Detailed execution trace viewer
 
-Phase  will add:
+Phase will add:
 
 - CLI interface for easier task submission
 - Interactive flow execution

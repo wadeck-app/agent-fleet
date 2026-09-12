@@ -24,8 +24,7 @@ import type { QueryResultDisplayerProps } from '@framework/types/QueryResultDisp
  * ===========================================================================================
  */
 
-const errorBannerCls =
-	'rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive';
+const errorBannerCls = 'rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive';
 
 export interface Data2ItemGridProps<T> extends QueryResultDisplayerProps<T> {
 	columns: Table2Column<T>[];

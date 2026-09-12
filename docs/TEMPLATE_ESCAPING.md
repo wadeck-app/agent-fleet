@@ -120,9 +120,9 @@ script: |
 
 ```json
 {
-  "user": "alice",
-  "count": 42,
-  "home": "$HOME"
+	"user": "alice",
+	"count": 42,
+	"home": "$HOME"
 }
 ```
 
@@ -154,6 +154,7 @@ script: echo "Usage: $ {{ inputs.var }}"
 script: |
     DOLLAR='$'
     echo "${DOLLAR}{{ inputs.var }}"
+
 # Output: "${{ inputs.var }}"
 ```
 
@@ -271,8 +272,8 @@ script: echo "\\${{ inputs.var }}"
 
 ## Summary
 
-| Pattern        | Behavior     | Example                     |
-| -------------- | ------------ | --------------------------- |
+| Pattern        | Behavior     | Example                      |
+| -------------- | ------------ | ---------------------------- |
 | `${{` ... `}}` | Interpolated | `${{ inputs.x }}` -> `value` |
 | `$VAR`         | Preserved    | `$HOME` -> `$HOME`           |
 | `${VAR}`       | Preserved    | `${HOME}` -> `${HOME}`       |

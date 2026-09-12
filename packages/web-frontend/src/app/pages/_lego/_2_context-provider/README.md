@@ -46,3 +46,4 @@ import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contr
 ---
 
 _Reference content moved to [docs/reference.md](docs/reference.md)._
+```

@@ -56,21 +56,46 @@ export function AddReviewThreadForm({ ticketId, proposalId, onAdded, onCancel }:
 			<p className="text-sm font-medium">Add review thread</p>
 			<div className="flex gap-2">
 				<div className="flex-1 space-y-1">
-					<Label htmlFor="review-start-line" className="text-xs text-muted-foreground">Start line</Label>
-					<Input id="review-start-line" type="number" min={1} value={startLine} onChange={e => setStartLine(e.target.value)} placeholder="1" />
+					<Label htmlFor="review-start-line" className="text-xs text-muted-foreground">
+						Start line
+					</Label>
+					<Input
+						id="review-start-line"
+						type="number"
+						min={1}
+						value={startLine}
+						onChange={e => setStartLine(e.target.value)}
+						placeholder="1"
+					/>
 				</div>
 				<div className="flex-1 space-y-1">
-					<Label htmlFor="review-end-line" className="text-xs text-muted-foreground">End line</Label>
-					<Input id="review-end-line" type="number" min={1} value={endLine} onChange={e => setEndLine(e.target.value)} placeholder="1" />
+					<Label htmlFor="review-end-line" className="text-xs text-muted-foreground">
+						End line
+					</Label>
+					<Input
+						id="review-end-line"
+						type="number"
+						min={1}
+						value={endLine}
+						onChange={e => setEndLine(e.target.value)}
+						placeholder="1"
+					/>
 				</div>
 			</div>
-			<Textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Write your review comment..." className="text-sm" />
+			<Textarea
+				value={comment}
+				onChange={e => setComment(e.target.value)}
+				placeholder="Write your review comment..."
+				className="text-sm"
+			/>
 			<div className="flex gap-2">
 				<Button size="sm" onClick={handleSubmit} disabled={isSubmitting}>
 					{isSubmitting ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
 					Add thread
 				</Button>
-				<Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
+				<Button variant="ghost" size="sm" onClick={onCancel}>
+					Cancel
+				</Button>
 			</div>
 		</div>
 	);

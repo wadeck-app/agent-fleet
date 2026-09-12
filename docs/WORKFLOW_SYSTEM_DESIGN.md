@@ -1,15 +1,15 @@
- Workflow System Design - Agent Fleet
+Workflow System Design - Agent Fleet
 
- Context & Objectives
+Context & Objectives
 
- Current State
+Current State
 
 - Workers are typed (PM, PO, DEV, REVIEWER) with fixed behavior
 - Tasks follow a linear status flow
 - No workspace isolation concept
 - Workers share the same codebase directory
 
- Goals
+Goals
 
 . Generic Workers: Workers should be able to execute any type of flow without being typed
 . Configurable Flows: Flows should be defined per-project via DSL (YAML/JSON)
@@ -20,48 +20,48 @@
 
 ---
 
- Architecture Overview
+Architecture Overview
 
- Core Components
+Core Components
 
 ```
 
-                      Orchestrator                           
-             
-   TaskManager     FlowRegistry      Workers           
-             
-                                                          
-                       
-                                                            
-                                                            
-                         
-               FlowExecutor                                
-           - Execute flow steps                            
-           - Variable interpolation                        
-           - Context gathering                             
-           - Model invocation                              
-                         
-                                                            
-                          
-                                                          
-             
-    Workspace       Execution        Storage           
-    Manager         Tracer                             
-             
+                      Orchestrator
 
-                             
-                             
-                    
-                      Claude API     
-                      (Sonnet/Haiku) 
-                    
+   TaskManager     FlowRegistry      Workers
+
+
+
+
+
+
+               FlowExecutor
+           - Execute flow steps
+           - Variable interpolation
+           - Context gathering
+           - Model invocation
+
+
+
+
+
+    Workspace       Execution        Storage
+    Manager         Tracer
+
+
+
+
+
+                      Claude API
+                      (Sonnet/Haiku)
+
 ```
 
 ---
 
- Flow DSL Specification
+Flow DSL Specification
 
- Flow Definition Schema
+Flow Definition Schema
 
 ```typescript
 interface FlowDefinition {
@@ -138,9 +138,9 @@ interface FlowStep {
 }
 ```
 
- Example Flow Configurations
+Example Flow Configurations
 
- Simple Q&A Flow
+Simple Q&A Flow
 
 ```yaml
 simple-qa:
@@ -165,7 +165,7 @@ simple-qa:
               files: ['/.md', '/.ts']
 ```
 
- Full Development Flow
+Full Development Flow
 
 ```yaml
 dev-full:
@@ -272,7 +272,7 @@ dev-full:
           prompt: 'Summarize work done'
 ```
 
- PR Review Flow
+PR Review Flow
 
 ```yaml
 review-pr:
@@ -319,7 +319,7 @@ review-pr:
           prompt: 'Post review to PR ${prNumber}: ${review.comments}'
 ```
 
- Brainstorming Flow
+Brainstorming Flow
 
 ```yaml
 brainstorm:
@@ -390,11 +390,11 @@ brainstorm:
 
 ---
 
- Workspace Management
+Workspace Management
 
- Workspace Types
+Workspace Types
 
- Isolated Workspace
+Isolated Workspace
 
 - Use case: Development tasks requiring file modifications
 - Characteristics:
@@ -404,7 +404,7 @@ brainstorm:
     - Cleaned up after task completion
 - Example: `dev-full`, `bugfix`
 
- Shared Workspace
+Shared Workspace
 
 - Use case: Read-only analysis, questions, reviews
 - Characteristics:
@@ -414,45 +414,45 @@ brainstorm:
     - Grouped by concurrencyKey
 - Example: `simple-qa`, `brainstorm`, `review-pr`
 
- Workspace Lifecycle
+Workspace Lifecycle
 
 ```
 
- Task Created 
+ Task Created
 
-       
-       
 
- Allocate Workspace       
- - Check reuse policy     
- - Find compatible or     
- - Create new             
 
-       
-       
 
- Setup Git State          
- - Clone/checkout branch  
- - Verify clean state     
+ Allocate Workspace
+ - Check reuse policy
+ - Find compatible or
+ - Create new
 
-       
-       
 
- Execute Flow             
- - Run steps              
- - Track usage            
 
-       
-       
 
- Release Workspace        
- - Remove from active     
- - Cleanup if isolated    
- - Persist if shared      
+ Setup Git State
+ - Clone/checkout branch
+ - Verify clean state
+
+
+
+
+ Execute Flow
+ - Run steps
+ - Track usage
+
+
+
+
+ Release Workspace
+ - Remove from active
+ - Cleanup if isolated
+ - Persist if shared
 
 ```
 
- Concurrency Management
+Concurrency Management
 
 ```typescript
 interface Workspace {
@@ -487,9 +487,9 @@ Allocation Rules:
 
 ---
 
- Execution Tracing
+Execution Tracing
 
- Trace Structure
+Trace Structure
 
 ```typescript
 interface FlowTrace {
@@ -518,14 +518,14 @@ interface StepTrace {
 }
 ```
 
- Trace Storage
+Trace Storage
 
 - Traces saved to `.agent-fleet/traces/{traceId}.json`
 - Indexed by task ID for easy lookup
 - Queryable via REST API
 - Used for debugging and flow optimization
 
- Observability Features
+Observability Features
 
 . Real-time monitoring: WebSocket updates on step progress
 . Historical analysis: Query past executions
@@ -535,11 +535,11 @@ interface StepTrace {
 
 ---
 
- Implementation Plan
+Implementation Plan
 
- Phase : Foundation
+Phase : Foundation
 
- . Type Definitions
+. Type Definitions
 
 - [ ] Create `src/flow/types.ts` with core interfaces
     - `FlowDefinition`
@@ -548,7 +548,7 @@ interface StepTrace {
     - `FlowTrace`
     - `FlowExecutionContext`
 
- . Flow Registry
+. Flow Registry
 
 - [ ] Implement `src/flow/flow-registry.ts`
     - Load flows from `.agent-fleet/flows.yaml`
@@ -556,7 +556,7 @@ interface StepTrace {
     - Default flows (simple-qa, dev-full)
     - Flow lookup and caching
 
- . Workspace Manager (Basic)
+. Workspace Manager (Basic)
 
 - [ ] Create `src/flow/workspace-manager.ts`
     - Workspace creation (directory structure)
@@ -564,9 +564,9 @@ interface StepTrace {
     - Cleanup on release
     - Simple tracking (Map-based)
 
- Phase : Flow Execution Engine
+Phase : Flow Execution Engine
 
- . Template Renderer
+. Template Renderer
 
 - [ ] Implement `src/flow/template-renderer.ts`
     - Variable interpolation: `${varName}`
@@ -574,7 +574,7 @@ interface StepTrace {
     - Task metadata: `${task.metadata.key}`
     - Escape handling
 
- . Context Gatherer
+. Context Gatherer
 
 - [ ] Create `src/flow/context-gatherer.ts`
     - File loading by glob patterns
@@ -582,7 +582,7 @@ interface StepTrace {
     - Task metadata extraction
     - Context size optimization
 
- . Output Extractor
+. Output Extractor
 
 - [ ] Implement `src/flow/output-extractor.ts`
     - Regex-based extraction
@@ -590,7 +590,7 @@ interface StepTrace {
     - Validation (required fields)
     - Error handling
 
- . Flow Executor (Core)
+. Flow Executor (Core)
 
 - [ ] Create `src/flow/flow-executor.ts`
     - Step-by-step execution
@@ -598,9 +598,9 @@ interface StepTrace {
     - Retry logic with backoff
     - Error propagation
 
- Phase : Claude Integration
+Phase : Claude Integration
 
- . Model Adapter
+. Model Adapter
 
 - [ ] Create `src/flow/model-adapter.ts`
     - Abstract interface for model calls
@@ -608,7 +608,7 @@ interface StepTrace {
     - Context formatting (files + outputs)
     - Response parsing
 
- . Worker Integration
+. Worker Integration
 
 - [ ] Update `src/worker/worker.ts`
     - Replace typed behavior with flow execution
@@ -616,7 +616,7 @@ interface StepTrace {
     - Progress reporting via WebSocket
     - Error handling and reporting
 
- . Task Manager Integration
+. Task Manager Integration
 
 - [ ] Update `src/orchestrator/task-manager.ts`
     - Add `flowId` to Task type
@@ -624,9 +624,9 @@ interface StepTrace {
     - Flow selection logic
     - Workspace tracking
 
- Phase : Advanced Workspace Management
+Phase : Advanced Workspace Management
 
- . Shared Workspaces
+. Shared Workspaces
 
 - [ ] Extend `workspace-manager.ts`
     - Workspace pooling by concurrencyKey
@@ -634,7 +634,7 @@ interface StepTrace {
     - Concurrent access tracking
     - Locking mechanism for writes
 
- . Git Integration
+. Git Integration
 
 - [ ] Create `src/flow/git-manager.ts`
     - Clone repositories
@@ -642,16 +642,16 @@ interface StepTrace {
     - Status checking (clean/dirty)
     - Commit/push support (optional)
 
- . Workspace Persistence
+. Workspace Persistence
 
 - [ ] Implement workspace state storage
     - Save/load workspace metadata
     - Track usage statistics
     - Cleanup policies (LRU, time-based)
 
- Phase : Observability & Tracing
+Phase : Observability & Tracing
 
- . Execution Tracer
+. Execution Tracer
 
 - [ ] Create `src/flow/execution-tracer.ts`
     - Trace lifecycle management
@@ -659,7 +659,7 @@ interface StepTrace {
     - Prompt/response logging
     - Error capture
 
- . Storage Layer
+. Storage Layer
 
 - [ ] Implement trace storage
     - JSON file storage
@@ -667,7 +667,7 @@ interface StepTrace {
     - Query interface
     - Cleanup old traces
 
- . API Endpoints
+. API Endpoints
 
 - [ ] Add REST endpoints
     - `GET /api/traces/:traceId`
@@ -675,7 +675,7 @@ interface StepTrace {
     - `GET /api/flows`
     - `GET /api/workspaces`
 
- . UI Integration
+. UI Integration
 
 - [ ] Update `src/orchestrator/ui.tsx`
     - Flow execution visualization
@@ -683,9 +683,9 @@ interface StepTrace {
     - Workspace status panel
     - Trace viewer
 
- Phase : Configuration & Documentation
+Phase : Configuration & Documentation
 
- . Flow Configuration
+. Flow Configuration
 
 - [ ] Create default flows library
     - `flows/simple-qa.yaml`
@@ -693,7 +693,7 @@ interface StepTrace {
     - `flows/review-pr.yaml`
     - `flows/brainstorm.yaml`
 
- . Project Setup
+. Project Setup
 
 - [ ] Implement project initialization
     - `agent-fleet init` command
@@ -701,7 +701,7 @@ interface StepTrace {
     - Template flows.yaml
     - Configuration wizard
 
- . Documentation
+. Documentation
 
 - [ ] Write user documentation
     - Flow DSL reference
@@ -710,7 +710,7 @@ interface StepTrace {
     - Best practices
     - Troubleshooting guide
 
- . Testing
+. Testing
 
 - [ ] Comprehensive test suite
     - Unit tests for each component
@@ -718,16 +718,16 @@ interface StepTrace {
     - EE tests with real Claude API
     - Performance benchmarks
 
- Phase : Polish & Launch (Week )
+Phase : Polish & Launch (Week )
 
- . Migration Path
+. Migration Path
 
 - [ ] Backward compatibility
     - Support old WorkerType system
     - Auto-convert to flows
     - Deprecation warnings
 
- . Performance Optimization
+. Performance Optimization
 
 - [ ] Optimize critical paths
     - Workspace allocation caching
@@ -735,7 +735,7 @@ interface StepTrace {
     - Context gathering parallelization
     - Trace storage batching
 
- . Error Handling
+. Error Handling
 
 - [ ] Robust error recovery
     - Step retry mechanisms
@@ -743,7 +743,7 @@ interface StepTrace {
     - Detailed error messages
     - User-friendly error reporting
 
- . Beta Testing
+. Beta Testing
 
 - [ ] Internal testing
     - Test with real projects
@@ -753,9 +753,9 @@ interface StepTrace {
 
 ---
 
- Technical Decisions
+Technical Decisions
 
- . Flow Definition Format: YAML vs JSON
+. Flow Definition Format: YAML vs JSON
 
 Decision: YAML (with JSON support)
 
@@ -764,7 +764,7 @@ Decision: YAML (with JSON support)
 - Comments support
 - JSON parsing fallback for tooling
 
- . Variable Interpolation: Template String vs AST
+. Variable Interpolation: Template String vs AST
 
 Decision: Simple template string
 
@@ -773,7 +773,7 @@ Decision: Simple template string
 - Sufficient for % of use cases
 - Can evolve to AST if needed
 
- . Model Invocation: Direct API vs CLI Wrapper
+. Model Invocation: Direct API vs CLI Wrapper
 
 Decision: Direct API (future), CLI wrapper (MVP)
 
@@ -782,7 +782,7 @@ Decision: Direct API (future), CLI wrapper (MVP)
 - Allows custom system prompts
 - Better streaming support
 
- . Workspace Storage: In-memory vs Persistent
+. Workspace Storage: In-memory vs Persistent
 
 Decision: Persistent with in-memory cache
 
@@ -791,7 +791,7 @@ Decision: Persistent with in-memory cache
 - Better debugging capabilities
 - Minimal performance impact
 
- . Concurrency Model: Locks vs Optimistic
+. Concurrency Model: Locks vs Optimistic
 
 Decision: Lock-based for isolated, optimistic for shared
 
@@ -800,7 +800,7 @@ Decision: Lock-based for isolated, optimistic for shared
 - Simpler reasoning model
 - Easier to implement correctly
 
- . Trace Format: Structured vs Free-form
+. Trace Format: Structured vs Free-form
 
 Decision: Structured JSON
 
@@ -811,9 +811,9 @@ Decision: Structured JSON
 
 ---
 
- Success Metrics
+Success Metrics
 
- Functional Goals
+Functional Goals
 
 - [ ] Workers execute any flow without code changes
 - [ ] Multiple workspace types work correctly
@@ -821,21 +821,21 @@ Decision: Structured JSON
 - [ ] Full tracing and observability
 - [ ] Git integration works (main + feature branches)
 
- Performance Goals
+Performance Goals
 
 - [ ] Flow execution overhead < ms per step
 - [ ] Workspace allocation < s for shared, < s for isolated
 - [ ] Trace storage < ms per step
 - [ ] System handles + concurrent workers
 
- Quality Goals
+Quality Goals
 
 - [ ] %+ test coverage
 - [ ] Zero data loss (tasks, traces)
 - [ ] Graceful degradation on errors
 - [ ] Clear error messages
 
- UX Goals
+UX Goals
 
 - [ ] Flows easy to write (< min for new flow)
 - [ ] Debugging easy (traces + logs)
@@ -844,86 +844,53 @@ Decision: Structured JSON
 
 ---
 
- Future Enhancements
+Future Enhancements
 
- Post-Launch (Prioritized)
+Post-Launch (Prioritized)
 
-. Flow Composition
-    - Reusable sub-flows
-    - Flow templates/inheritance
-    - Conditional flow selection
+. Flow Composition - Reusable sub-flows - Flow templates/inheritance - Conditional flow selection
 
-. Advanced Git Features
-    - Auto-commit during steps
-    - Branch creation from flow
-    - PR creation integration
-    - Merge conflict resolution
+. Advanced Git Features - Auto-commit during steps - Branch creation from flow - PR creation integration - Merge conflict resolution
 
-. Parallel Steps
-    - Execute independent steps concurrently
-    - Fan-out/fan-in patterns
-    - Step dependencies graph
+. Parallel Steps - Execute independent steps concurrently - Fan-out/fan-in patterns - Step dependencies graph
 
-. Human-in-the-Loop
-    - Pause for user input
-    - Approval gates
-    - Interactive refinement
+. Human-in-the-Loop - Pause for user input - Approval gates - Interactive refinement
 
-. Flow Analytics
-    - Success/failure rates
-    - Duration statistics
-    - Bottleneck identification
-    - Cost optimization
+. Flow Analytics - Success/failure rates - Duration statistics - Bottleneck identification - Cost optimization
 
-. Multi-Model Support
-    - GPT-, Gemini, etc.
-    - Model routing by step type
-    - Cost/quality tradeoffs
+. Multi-Model Support - GPT-, Gemini, etc. - Model routing by step type - Cost/quality tradeoffs
 
-. Workspace Snapshots
-    - Save/restore workspace state
-    - Time travel debugging
-    - Rollback on failure
+. Workspace Snapshots - Save/restore workspace state - Time travel debugging - Rollback on failure
 
-. Flow Marketplace
-    - Share flows across projects
-    - Community templates
-    - Best practices library
+. Flow Marketplace - Share flows across projects - Community templates - Best practices library
 
 ---
 
- Risk Assessment
+Risk Assessment
 
- High Risks
+High Risks
 
-. Complexity: Flow DSL might become too complex
-    - Mitigation: Start simple, iterate based on feedback
+. Complexity: Flow DSL might become too complex - Mitigation: Start simple, iterate based on feedback
 
-. Performance: Workspace operations might be slow
-    - Mitigation: Benchmark early, optimize hot paths
+. Performance: Workspace operations might be slow - Mitigation: Benchmark early, optimize hot paths
 
-. Claude API Limits: Rate limiting could block flows
-    - Mitigation: Queue management, backoff, retries
+. Claude API Limits: Rate limiting could block flows - Mitigation: Queue management, backoff, retries
 
- Medium Risks
+Medium Risks
 
-. Git Conflicts: Concurrent workspace operations
-    - Mitigation: Lock management, clear policies
+. Git Conflicts: Concurrent workspace operations - Mitigation: Lock management, clear policies
 
-. Storage Growth: Traces accumulate quickly
-    - Mitigation: Retention policies, compression
+. Storage Growth: Traces accumulate quickly - Mitigation: Retention policies, compression
 
- Low Risks
+Low Risks
 
-. Migration: Existing users need migration path
-    - Mitigation: Backward compatibility layer
+. Migration: Existing users need migration path - Mitigation: Backward compatibility layer
 
-. Documentation: Learning curve for new users
-    - Mitigation: Examples, tutorials, wizards
+. Documentation: Learning curve for new users - Mitigation: Examples, tutorials, wizards
 
 ---
 
- Conclusion
+Conclusion
 
 This design provides a flexible, scalable foundation for executing AI agent workflows with:
 
@@ -935,4 +902,4 @@ This design provides a flexible, scalable foundation for executing AI agent work
 
 The phased implementation plan allows for incremental delivery and validation at each stage.
 
-Next step: Begin Phase  - Foundation implementation.
+Next step: Begin Phase - Foundation implementation.

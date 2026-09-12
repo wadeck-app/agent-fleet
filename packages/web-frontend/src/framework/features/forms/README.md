@@ -1,8 +1,8 @@
- Form Feature
+Form Feature
 
 A comprehensive, type-safe form system with specialized field components.
 
- Architecture
+Architecture
 
 The form system is organized in three layers:
 
@@ -35,9 +35,9 @@ framework/features/forms/
  README.md                       This file
 ```
 
- Components
+Components
 
- FormContainer
+FormContainer
 
 Generic form layout with:
 

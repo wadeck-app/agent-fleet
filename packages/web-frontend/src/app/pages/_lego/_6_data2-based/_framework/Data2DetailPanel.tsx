@@ -21,8 +21,7 @@ import { getErrorMessage } from '@framework/utils/errors/errorUtils';
  * ===========================================================================================
  */
 
-const errorBannerCls =
-	'rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive';
+const errorBannerCls = 'rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive';
 
 export interface Data2DetailPanelProps<T> {
 	service: {

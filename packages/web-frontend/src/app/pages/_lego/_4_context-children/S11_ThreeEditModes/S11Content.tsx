@@ -47,9 +47,24 @@ export function S11Content() {
 				</CardHeader>
 				<CardContent>
 					<div style={{ display: 'flex', gap: '0.5rem' }}>
-						<Button variant={editMode === 'dialog' ? 'default' : 'outline'} onClick={() => setEditMode('dialog')}>Dialog</Button>
-						<Button variant={editMode === 'inline' ? 'default' : 'outline'} onClick={() => setEditMode('inline')}>Inline</Button>
-						<Button variant={editMode === 'below' ? 'default' : 'outline'} onClick={() => setEditMode('below')}>Below Form</Button>
+						<Button
+							variant={editMode === 'dialog' ? 'default' : 'outline'}
+							onClick={() => setEditMode('dialog')}
+						>
+							Dialog
+						</Button>
+						<Button
+							variant={editMode === 'inline' ? 'default' : 'outline'}
+							onClick={() => setEditMode('inline')}
+						>
+							Inline
+						</Button>
+						<Button
+							variant={editMode === 'below' ? 'default' : 'outline'}
+							onClick={() => setEditMode('below')}
+						>
+							Below Form
+						</Button>
 					</div>
 				</CardContent>
 			</Card>

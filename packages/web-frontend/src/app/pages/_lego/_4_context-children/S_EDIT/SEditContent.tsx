@@ -47,9 +47,24 @@ export function SEditContent() {
 				</CardHeader>
 				<CardContent>
 					<div style={{ display: 'flex', gap: '0.5rem' }}>
-						<Button variant={editMode === 'dialog' ? 'default' : 'outline'} onClick={() => setEditMode('dialog')}>Dialog</Button>
-						<Button variant={editMode === 'inline' ? 'default' : 'outline'} onClick={() => setEditMode('inline')}>Inline Actions</Button>
-						<Button variant={editMode === 'below' ? 'default' : 'outline'} onClick={() => setEditMode('below')}>Form Below</Button>
+						<Button
+							variant={editMode === 'dialog' ? 'default' : 'outline'}
+							onClick={() => setEditMode('dialog')}
+						>
+							Dialog
+						</Button>
+						<Button
+							variant={editMode === 'inline' ? 'default' : 'outline'}
+							onClick={() => setEditMode('inline')}
+						>
+							Inline Actions
+						</Button>
+						<Button
+							variant={editMode === 'below' ? 'default' : 'outline'}
+							onClick={() => setEditMode('below')}
+						>
+							Form Below
+						</Button>
 					</div>
 				</CardContent>
 			</Card>

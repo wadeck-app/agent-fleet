@@ -19,15 +19,9 @@ import { describe, expect, it } from 'vitest';
 // and cannot be exercised in a unit test. Inspecting the source is the reliable way
 // to guard against accidental regressions (windowsHide removed from wscript spawn,
 // wscript replaced with direct node spawn, etc.).
-const RUN_COMMAND_SRC = fs.readFileSync(
-	path.join(import.meta.dirname, 'RunCommand.ts'),
-	'utf8'
-);
+const RUN_COMMAND_SRC = fs.readFileSync(path.join(import.meta.dirname, 'RunCommand.ts'), 'utf8');
 
-const FLOW_INDEX_SRC = fs.readFileSync(
-	path.join(import.meta.dirname, '../FlowIndex.ts'),
-	'utf8'
-);
+const FLOW_INDEX_SRC = fs.readFileSync(path.join(import.meta.dirname, '../FlowIndex.ts'), 'utf8');
 
 describe('Daemon spawn — Windows wscript.exe approach', () => {
 	it('spawnDaemonBackground() uses wscript.exe on Windows (not direct node spawn)', () => {
@@ -73,10 +67,7 @@ describe('Daemon spawn — Windows wscript.exe approach', () => {
 
 describe('Worker spawn — no windowsHide (console inheritance)', () => {
 	it('WorkerPool source does not set windowsHide:true in spawnWorker()', () => {
-		const workerPoolSrc = fs.readFileSync(
-			path.join(import.meta.dirname, '../../daemon/WorkerPool.ts'),
-			'utf8'
-		);
+		const workerPoolSrc = fs.readFileSync(path.join(import.meta.dirname, '../../daemon/WorkerPool.ts'), 'utf8');
 		// Extract the spawnWorker function body
 		const spawnWorkerStart = workerPoolSrc.indexOf('spawnWorker()');
 		const spawnCall = workerPoolSrc.slice(spawnWorkerStart, spawnWorkerStart + 600);

@@ -42,6 +42,7 @@
 - [ ] Pre-load deferred tools (ToolSearch, WebFetch, ReportFindings) at session start for any session that does spec authoring or goldfish review — call `ToolSearch select:<tool>` before the first agent delegation that may need them
 
 <!-- consolidated 2026-09-02 -->
+
 - [ ] Document the singleton-daemon-kit IPC protocol (request/response format, `executionId` wrapping, `result:` nesting) in `.claude/docs/` so agents stop reverse-engineering `node_modules` dist files
 - [ ] Document the `when:` condition evaluation context shape (step-id keyed, `outputs.*` only, no `task.*`) in a single reference file linked from `ConditionEvaluator.ts`
 - [ ] Document that verbose/logging in model steps is controlled by the flow step's `log:` parameter, NOT a CLI `--verbose` flag — add this to the flow schema reference
@@ -73,6 +74,7 @@
 - [ ] Add `process.exit` mock type signature (`string | number | null`) as a shared test helper or documented pattern in `.claude/docs/` — agents re-discover this repeatedly across test files
 
 <!-- consolidated 2026-09-02 -->
+
 ## Documentation
 
 - [ ] Document the daemon IPC protocol (singleton-daemon-kit response wrapping, `executionId` extraction, `CommandHandler` return → client receive) in `.claude/docs/` so agents stop reverse-engineering `node_modules` compiled JS every session.

@@ -114,7 +114,10 @@ export const TASKS_TABLE_COLUMNS: Table2Column<Task>[] = [
 		key: 'createdAt',
 		label: 'Created',
 		render: (t: Task) => (
-			<span className="text-xs text-muted-foreground" title={new Date(t.createdAt).toISOString().replace('T', ' ').slice(0, 19)}>
+			<span
+				className="text-xs text-muted-foreground"
+				title={new Date(t.createdAt).toISOString().replace('T', ' ').slice(0, 19)}
+			>
 				{formatDate(t.createdAt)}
 			</span>
 		),

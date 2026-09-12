@@ -32,12 +32,12 @@
 
 | Decision | Summary                                                                                                                                                                                 |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1-D24   | See `decisions.md` -- all decided and audited (4 rounds)                                                                                                                                 |
+| D1-D24   | See `decisions.md` -- all decided and audited (4 rounds)                                                                                                                                |
 | D25      | Worker extracts step output; `maxOutputRetries` retry loop before `step_failed`                                                                                                         |
 | D26      | Subflow steps expand inline into parent graph; namespace-prefixed IDs; depth limited                                                                                                    |
 | D27      | Input schema in flow YAML; values via `--input key=value`; interpolation `${{ inputs.x }}` / `${{ steps.x.outputs.y }}`; daemon validates before queuing                                |
 | D28      | `flow cancel`: graceful by default (waits for current step), `--force` for immediate SIGKILL; `CANCELLED` is a distinct terminal state; interrupted step marked `interrupted`, no retry |
-| D29      | Flow design skill lives at `~/.claude/` -- global, any-project scope. Teaches design→validate→approve→execute pattern. Content depends on D30 (YAML schema).                             |
+| D29      | Flow design skill lives at `~/.claude/` -- global, any-project scope. Teaches design→validate→approve→execute pattern. Content depends on D30 (YAML schema).                            |
 | D30      | Flow CLI supports all step types and fields from flow-engine without simplification; `user_intervention` and unsupported workspace modes throw `UnsupportedOperationError`              |
 | D31      | vars:/secrets: distinct features; URI schemes (env://, file://, value://, input://); eager masking (6 variants); NOTHING default env; Secret class with [REDACTED] serialization        |
 | D32      | Hook system: typed objects (`cli`, `http`) with protocol-based dispatch via `HookDispatcher`; declared in `.flows/config.yml`                                                           |

@@ -8,6 +8,10 @@ import { cn } from '@framework/lib/utils';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { XIcon } from 'lucide-react';
 
+// violations-suppress: ts/no-inline-subcomponent tightly-coupled primitive sub-parts belong in the same file
+
+// violations-suppress: ts/no-inline-subcomponent tightly-coupled primitive sub-parts belong in the same file
+
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
 	return <DialogPrimitive.Root data-slot="dialog" {...props} />;
 }

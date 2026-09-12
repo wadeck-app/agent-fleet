@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createLogger } from 'shared-common/logger';
 import { fileURLToPath } from 'node:url';
+import { createLogger } from 'shared-common/logger';
 
 const log = createLogger('KnowledgeStorage');
 

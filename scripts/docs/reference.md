@@ -82,16 +82,16 @@ node scripts/validate-flows-complete.js --all
 
 All validations from FlowWorker:
 
--  Schema (required fields, types, workspace settings)
--  Circular dependencies
--  Undefined step/output references
--  Template arithmetic/logical operators (not supported)
--  Dependency order (step uses output without depending on it)
--  Greedy regex patterns (`.*` vs `.*?`)
--  UserIntervention output 'from' values
--  Default value type mismatches
--  Required inputs with default values
--  Recursive SubFlow steps
+- Schema (required fields, types, workspace settings)
+- Circular dependencies
+- Undefined step/output references
+- Template arithmetic/logical operators (not supported)
+- Dependency order (step uses output without depending on it)
+- Greedy regex patterns (`.*` vs `.*?`)
+- UserIntervention output 'from' values
+- Default value type mismatches
+- Required inputs with default values
+- Recursive SubFlow steps
 
 **Exit codes:**
 
@@ -120,19 +120,19 @@ node scripts/validate-example-flows.js --all
 
 **What it validates:**
 
--  Required fields: `version`, `name`, `description`, `workspace`, `steps`
--  Workspace settings: valid `mode`, `gitStrategy`, `reusePolicy`
--  Input types: all 21 supported types
--  Default value types match declared types (integer, priority, regex, etc.)
--  Step structure: each step has `id` and `type`
+- Required fields: `version`, `name`, `description`, `workspace`, `steps`
+- Workspace settings: valid `mode`, `gitStrategy`, `reusePolicy`
+- Input types: all 21 supported types
+- Default value types match declared types (integer, priority, regex, etc.)
+- Step structure: each step has `id` and `type`
 
 **What it DOES NOT validate:**
 
--  Step dependencies (circular dependencies, undefined steps)
--  Template expressions (`${{ }}` syntax)
--  Output references (undefined outputs)
--  SubFlow references (non-existent flows)
--  Complex type constraints
+- Step dependencies (circular dependencies, undefined steps)
+- Template expressions (`${{ }}` syntax)
+- Output references (undefined outputs)
+- SubFlow references (non-existent flows)
+- Complex type constraints
 
 **For complete validation**, start the FlowWorker - it will perform full validation using the FlowRegistry and show detailed errors in the console.
 

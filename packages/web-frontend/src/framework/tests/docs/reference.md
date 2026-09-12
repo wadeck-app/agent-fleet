@@ -1,4 +1,4 @@
- Reference
+Reference
 
 _Moved from README -- see [README](../README.md) for the overview._
 
@@ -6,9 +6,10 @@ resolve();
 
 // Check loading state clears
 await waitFor(() => {
-  expect(screen.queryByText(/saving.../i)).not.toBeInTheDocument();
+expect(screen.queryByText(/saving.../i)).not.toBeInTheDocument();
 });
-```
+
+````
 
  Benefits
 
@@ -36,11 +37,11 @@ interface ControllablePromise<TArgs extends unknown[], TReturn> {
 	// Check if function was called
 	wasCalled: () => boolean;
 }
-```
+````
 
- Usage Examples
+Usage Examples
 
- Basic async function testing
+Basic async function testing
 
 ```typescript
 const { fn: onSubmit, resolve } = createControllablePromise<[CreateBook], void>();
@@ -62,7 +63,7 @@ await waitFor(() => {
 });
 ```
 
- Testing error handling
+Testing error handling
 
 ```typescript
 const { fn: onSubmit, reject } = createControllablePromise<[CreateBook], void>();
@@ -83,7 +84,7 @@ await waitFor(() => {
 });
 ```
 
- Checking function arguments
+Checking function arguments
 
 ```typescript
 const { fn: onSubmit, lastCall, resolve } = createControllablePromise<[CreateBook], void>();
@@ -103,7 +104,7 @@ expect(lastCall()).toEqual([{
 resolve();
 ```
 
- Using with `vi.fn()` compatibility
+Using with `vi.fn()` compatibility
 
 ```typescript
 // Works with vitest's mock system
@@ -117,27 +118,27 @@ expect(mockSubmit).toHaveBeenCalledOnce();
 resolve();
 ```
 
- When to Use
+When to Use
 
 Use `createControllablePromise` when:
 
--  Testing async UI states (loading, success, error)
--  Verifying state transitions at specific moments
--  Testing race conditions or concurrent operations
--  Need precise control over when promises resolve
+- Testing async UI states (loading, success, error)
+- Verifying state transitions at specific moments
+- Testing race conditions or concurrent operations
+- Need precise control over when promises resolve
 
 Don't use when:
 
--  Promise resolves immediately (use `mockResolvedValue`)
--  Don't care about intermediate states
--  Testing synchronous code
+- Promise resolves immediately (use `mockResolvedValue`)
+- Don't care about intermediate states
+- Testing synchronous code
 
- Migration Guide
+Migration Guide
 
 Before:
 
 ```typescript
-const mockOnSubmit = vi.fn<[CreateBook], Promise<void>>(() => new Promise(resolve => setTimeout(resolve, )));
+const mockOnSubmit = vi.fn<[CreateBook], Promise<void>>(() => new Promise(resolve => setTimeout(resolve)));
 ```
 
 After:
@@ -149,9 +150,9 @@ const { fn: onSubmit, resolve } = createControllablePromise<[CreateBook], void>(
 // Call resolve() when you want the promise to complete
 ```
 
- Real-World Examples
+Real-World Examples
 
- Integration Tests (Recommended)
+Integration Tests (Recommended)
 
 See `packages/frontend/src/features/form/FormContainer.test.tsx:-` for the canonical example of testing `FormContainer` + `useFormState` integration with minimal context:
 
@@ -182,7 +183,7 @@ render(<TestForm onSubmit={onSubmit} />);
 // ... test loading states with full control
 ```
 
- Hook Unit Tests
+Hook Unit Tests
 
 See `packages/frontend/src/features/form/useFormState.test.ts:-` for testing the hook in isolation:
 
@@ -192,7 +193,7 @@ mockOnSubmit.mockImplementation(controllableSubmit);
 // ... test isSubmitting flag transitions
 ```
 
- Test Architecture
+Test Architecture
 
 Tests should be organized by level:
 

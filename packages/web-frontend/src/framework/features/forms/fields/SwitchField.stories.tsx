@@ -143,7 +143,6 @@ export const WithDescriptionAndError: Story = {
 		return (
 			<div className="w-96 space-y-6 rounded-lg border border-border p-6">
 				<h3 className="text-lg font-medium">Email Preferences</h3>
-
 				<div className="space-y-4">
 					<SwitchField
 						label="Email notifications"
@@ -173,7 +172,6 @@ export const WithDescriptionAndError: Story = {
 						description="Be the first to know about new features"
 					/>
 				</div>
-
 				// violations-suppress: react/no-raw-button story fixture
 				<button
 					className={`
@@ -254,7 +252,6 @@ export const WithDescriptionAndError: Story = {
 		return (
 			<form onSubmit={handleSubmit} className={`w-96 space-y-6 rounded-lg border border-border p-6`}>
 				<h3 className="text-lg font-medium">Create Account</h3>
-
 				<div className="space-y-4">
 					<SwitchField
 						label="Accept terms and conditions"
@@ -280,9 +277,7 @@ export const WithDescriptionAndError: Story = {
 						error={!acceptPrivacy && error ? 'Required' : undefined}
 					/>
 				</div>
-
 				{error && <p className="text-sm text-destructive">{error}</p>}
-
 				// violations-suppress: react/no-raw-button story fixture
 				<button
 					type="submit"
@@ -370,7 +365,6 @@ export const WithDescriptionAndError: Story = {
 					<h3 className="text-lg font-medium">Security</h3>
 					<p className="text-sm text-muted-foreground">Protect your account</p>
 				</div>
-
 				<div className="space-y-4">
 					<SwitchField
 						label="Two-factor authentication"
@@ -394,7 +388,6 @@ export const WithDescriptionAndError: Story = {
 						description="Automatically sign out after 30 minutes of inactivity"
 					/>
 				</div>
-
 				// violations-suppress: react/no-raw-button story fixture
 				<button
 					className={`

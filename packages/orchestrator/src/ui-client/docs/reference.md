@@ -1,7 +1,6 @@
- Reference
+Reference
 
 _Moved from README -- see [README](../README.md) for the overview._
-
 
 - Listen to all StateManager events
 - Relay to connected UI clients
@@ -24,55 +23,55 @@ hook.on('state_update', update => {
 hook.sendCommandResult('req-', true, { taskId: 'task-' });
 ```
 
- Protocol Design
+Protocol Design
 
- Separation from Worker Protocol
+Separation from Worker Protocol
 
 Worker Protocol (`src/shared/types.ts`):
 
 - `MessageType`: WORKER_READY, TASK_STARTED, etc.
-- Used by: Workers  Orchestrator
+- Used by: Workers Orchestrator
 
 UI Protocol (`src/orchestrator/ui-client/types.ts`):
 
 - `UIMessageType`: UI_CONNECT, UI_START_FLOW, etc.
-- Used by: UI  Orchestrator
+- Used by: UI Orchestrator
 
 No shared types, no mixing, full type safety.
 
- Message Flow
+Message Flow
 
 ```
-                                    
-   UI                                         Orchestrator 
- Backend                                         Core      
-                                    
-                                                     
-      UIConnectMessage                              
-     
-                                                     
-                             UIConnectedMessage     
-     
-                                                     
-      UIRequestSnapshotMessage                      
-     
-                                                     
-                              UISnapshotMessage      
-     
-                                                     
-      UIStartFlowMessage                            
-     
-                                                     
-                         UICommandResultMessage      
-     
-                                                     
-                         UIStateUpdateMessage        
-     
-                         (real-time events)          
-                                                     
+
+   UI                                         Orchestrator
+ Backend                                         Core
+
+
+      UIConnectMessage
+
+
+                             UIConnectedMessage
+
+
+      UIRequestSnapshotMessage
+
+
+                              UISnapshotMessage
+
+
+      UIStartFlowMessage
+
+
+                         UICommandResultMessage
+
+
+                         UIStateUpdateMessage
+
+                         (real-time events)
+
 ```
 
- Configuration
+Configuration
 
 Enable UI client hook in orchestrator:
 
@@ -86,31 +85,19 @@ Or in `.env`:
 UI_CLIENT_ENABLED=true
 ```
 
- Next Steps
+Next Steps
 
 When implementing the UI:
 
-. Create Web UI Backend (Express + WebSocket server)
-    - Import types from `src/orchestrator/ui-client/types.ts`
-    - Use `UIMessageType` for all communication
-    - Strong typing throughout
+. Create Web UI Backend (Express + WebSocket server) - Import types from `src/orchestrator/ui-client/types.ts` - Use `UIMessageType` for all communication - Strong typing throughout
 
-. Implement UIConnectionManager (in orchestrator)
-    - Connect to UI backend as WebSocket client
-    - Listen to `UIClientHook` events
-    - Send/receive using UI protocol
+. Implement UIConnectionManager (in orchestrator) - Connect to UI backend as WebSocket client - Listen to `UIClientHook` events - Send/receive using UI protocol
 
-. Implement Authentication
-    - Token-based auth in `UIConnectMessage`
-    - Command signing (HMAC)
-    - Rate limiting
+. Implement Authentication - Token-based auth in `UIConnectMessage` - Command signing (HMAC) - Rate limiting
 
-. Create Frontend (React/Vue/Svelte)
-    - Connect to UI backend
-    - Real-time dashboard
-    - Flow visualization
+. Create Frontend (React/Vue/Svelte) - Connect to UI backend - Real-time dashboard - Flow visualization
 
- Type Reusability
+Type Reusability
 
 The types in `types.ts` are designed to be imported by both:
 
@@ -136,7 +123,7 @@ import {
 } from './protocol/types'; // Copied from orchestrator
 ```
 
- Testing
+Testing
 
 Unit tests for this module should cover:
 
