@@ -16,6 +16,8 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
+import { messageOf } from '../utils/errorMessage';
+
 const sleep = promisify(setTimeout);
 const execAsync = promisify(exec);
 
@@ -31,7 +33,7 @@ const debug = true;
 
 /**
  * Kill a process and all its children (process tree)
- * CRITICAL: spawn('npm run ...', {shell: true}) creates:
+ * CRITICAL: spawning `npm run ...` with shell:true creates:
  * - Parent process: npm (PID 12345)
  * - Child process: Node.js backend (PID 67890)
  *
@@ -151,6 +153,9 @@ async function startServerOnAvailablePort(
 
 		const command = 'npm run start:only-for-e2e --workspace=web-backend';
 		const serverProcess = spawn(command, {
+			// Kept next to the call: the lint rule only scans a few lines past it, and this
+			// flag previously sat far enough below to look absent.
+			windowsHide: true,
 			env: {
 				...process.env,
 				PORT: port.toString(),
@@ -164,7 +169,7 @@ async function startServerOnAvailablePort(
 				// Set PROJECT_ID (should remain fixed for the project)
 				PROJECT_ID: process.env.PROJECT_ID || '0',
 				// Set unique WORKER_ID per E2E worker to ensure each gets its own Orchestrator WebSocket port
-				// Worker 0 → WORKER_ID=0 → Orch WS port 3701, Worker 1 → WORKER_ID=1 → Orch WS port 3703, etc.
+				// Worker 0 -> WORKER_ID=0 -> Orch WS port 3701, Worker 1 -> WORKER_ID=1 -> Orch WS port 3703, etc.
 				WORKER_ID: workerId.toString(),
 				// Pass RUN_ID to backend so it can identify which test run it belongs to
 				RUN_ID: process.env.RUN_ID || 'unknown',
@@ -172,7 +177,6 @@ async function startServerOnAvailablePort(
 			stdio: 'pipe',
 			shell: true,
 			cwd: projectRoot,
-			windowsHide: true,
 		});
 
 		// Wait for server to confirm it successfully bound to the port
@@ -186,7 +190,7 @@ async function startServerOnAvailablePort(
 			let stdoutReceived = false;
 
 			// Debug: Uncomment to see startup progress
-			// console.log(`     ⏳ Waiting for E2E_BACKEND_READY message from port ${port}...`);
+			// console.log(`     [wait] Waiting for E2E_BACKEND_READY message from port ${port}...`);
 
 			// Monitor stderr for EADDRINUSE errors
 			serverProcess.stderr?.on('data', data => {
@@ -252,7 +256,7 @@ async function startServerOnAvailablePort(
 						);
 						return;
 					}
-					// NOTE: We don't check PID because spawn('npm') creates a parent process,
+					// NOTE: We don't check PID because spawning npm creates a parent process,
 					// and the actual backend runs in a child process with a different PID
 					if (actualRunId !== expectedRunId) {
 						reject(
@@ -308,7 +312,7 @@ async function startServerOnAvailablePort(
 			debug && console.log(`       Killing failed process on port ${port}...`);
 			await killProcessTree(serverProcess);
 
-			if (error instanceof Error && (error instanceof Error ? error.message : String(error)) === 'PORT_IN_USE') {
+			if (error instanceof Error && messageOf(error) === 'PORT_IN_USE') {
 				debug && console.log(`       Port ${port} is in use, will try next port`);
 				continue;
 			}
@@ -316,7 +320,7 @@ async function startServerOnAvailablePort(
 			// Other errors (timeout, mismatch, etc.) - also retry
 			debug &&
 				console.log(
-					`       Server failed on port ${port}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : error}. Will try next port`
+					`       Server failed on port ${port}: ${error instanceof Error ? messageOf(error) : error}. Will try next port`
 				);
 			continue;
 		}
@@ -544,23 +548,23 @@ async function globalSetupWebServer(config: FullConfig) {
 		console.log(` Projects: ${projectCount} (${config.projects.map(p => p.name).join(', ')})`);
 		console.log(` Configured workers: ${configuredWorkers}`);
 		if (isSingleTest) {
-			console.log(` Single test detected → Starting one backend server`);
+			console.log(` Single test detected -> Starting one backend server`);
 		} else {
 			console.log(` Backend servers to start: ${numWorkers}`);
 			if (projectCount > 1) {
-				console.log(`ℹ  Workers from multiple projects will share backend servers (safe with in-memory DB)`);
+				console.log(`[info]  Workers from multiple projects will share backend servers (safe with in-memory DB)`);
 			}
 		}
 		console.log('');
 	}
 
-	// Build backend once before spawning all workers (avoids 5× parallel tsx compilations)
+	// Build backend once before spawning all workers (avoids 5x parallel tsx compilations)
 	console.log(' Building backend for E2E (once for all workers)...');
 	await execAsync('npm run build:for-e2e --workspace=web-backend', { cwd: projectRoot });
 	console.log(' Backend built successfully (dist/server-test)');
 
 	// Calculate base port from WORKSPACE_ID for parallel testing across workspaces
-	// WORKSPACE_ID=0 → 4000-4999, WORKSPACE_ID=1 → 5000-5999, WORKSPACE_ID=2 → 6000-6999, etc.
+	// WORKSPACE_ID=0 -> 4000-4999, WORKSPACE_ID=1 -> 5000-5999, WORKSPACE_ID=2 -> 6000-6999, etc.
 	const workspaceId = parseInt(process.env.WORKSPACE_ID || '0', 10);
 	const basePort = 4000 + workspaceId * 1000;
 
@@ -641,7 +645,7 @@ async function globalSetupWebServer(config: FullConfig) {
 			} catch (error) {
 				debug &&
 					console.log(
-						`    Worker ${i + 1} failed on attempt ${retryCount + 1}: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : error}`
+						`    Worker ${i + 1} failed on attempt ${retryCount + 1}: ${error instanceof Error ? messageOf(error) : error}`
 					);
 				retryCount++;
 
@@ -653,7 +657,7 @@ async function globalSetupWebServer(config: FullConfig) {
 				}
 
 				// Small delay before retry to avoid hammering
-				debug && console.log(`   ⏳ Waiting 500ms before retry...`);
+				debug && console.log(`   [wait] Waiting 500ms before retry...`);
 				await sleep(500);
 			}
 		}
@@ -717,10 +721,10 @@ async function globalSetupWebServer(config: FullConfig) {
 		console.log('\n All backend servers are ready and verified!\n');
 		console.log(' Server mapping:');
 		servers.forEach((server, index) => {
-			console.log(`   Worker ${index} → http://localhost:${server.port} (PID: ${server.pid})`);
+			console.log(`   Worker ${index} -> http://localhost:${server.port} (PID: ${server.pid})`);
 		});
 		console.log(' All servers verified to be in test mode with in-memory DB');
-		console.log('⏱  Servers have been stable for 1 second');
+		console.log('[time]  Servers have been stable for 1 second');
 		console.log('');
 	}
 }

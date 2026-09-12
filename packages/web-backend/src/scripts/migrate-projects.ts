@@ -102,7 +102,7 @@ async function migrate() {
 	// Check if default project already exists
 	const existingDefaultProject = projectsData.projects.find(p => p.id === 'default');
 	if (existingDefaultProject) {
-		log.info('  ℹ Default project already exists');
+		log.info('  [info] Default project already exists');
 	} else {
 		// Create default project
 		const now = new Date().toISOString();
@@ -122,8 +122,8 @@ async function migrate() {
 	// we'll need to handle this differently. For now, we'll just create the default project.
 	// The orchestrator will need to be updated separately to handle projectId.
 
-	log.info('  ℹ Task migration is handled by the orchestrator');
-	log.info('  ℹ New tasks will require projectId on creation');
+	log.info('  [info] Task migration is handled by the orchestrator');
+	log.info('  [info] New tasks will require projectId on creation');
 
 	// Step 3: Save projects.json
 	log.info('\nStep 3: Saving projects.json...');

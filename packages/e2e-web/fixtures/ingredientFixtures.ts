@@ -1,7 +1,7 @@
 import type { CreateIngredient } from 'shared-frontend-backend/src/api/ingredients.contract';
 
 /**
- * Fixtures pour les tests d'ingredients
+ * Fixtures for ingredient tests
  */
 
 export const validIngredients: Record<string, CreateIngredient> = {
@@ -38,7 +38,7 @@ export const validIngredients: Record<string, CreateIngredient> = {
 		servingSize: 100,
 	},
 	eggs: {
-		name: 'Œufs',
+		name: 'Eggs',
 		calories: 155,
 		protein: 13.0,
 		carbs: 1.1,

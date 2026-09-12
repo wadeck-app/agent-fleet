@@ -80,7 +80,7 @@ export class WorkerProvisioner {
 		if (sourceId === undefined || sourceId === '') {
 			return this.refuse(
 				ws,
-				`refused a worker this daemon did not spawn (pid ${String(registration.pid)}): it named no source. Declare one with "flow worker source add" and pass its id.`
+				`refused a worker this daemon did not create, pid ${String(registration.pid)}: it named no source. Declare one with "flow worker source add" and pass its id.`
 			);
 		}
 

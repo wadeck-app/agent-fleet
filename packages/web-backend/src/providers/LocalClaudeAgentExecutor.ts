@@ -32,7 +32,7 @@ export class LocalClaudeAgentExecutor implements AgentExecutor {
 
 	/**
 	 * Invoke the Claude CLI with the given prompt and return its stdout.
-	 * Uses async spawn (NOT spawnSync) so the Node.js event loop is never blocked.
+	 * Spawns asynchronously (never the sync variant) so the event loop is not blocked.
 	 * Rejects after 30s timeout.
 	 */
 	private callClaude(prompt: string): Promise<string> {

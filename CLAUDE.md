@@ -13,7 +13,7 @@ Then run `npm install` normally.
 
 ## Code Organization
 
-**File naming**: TypeScript files MUST be PascalCase matching their exported class (e.g., `FlowExecutor.ts` → `class FlowExecutor`). See `.agent-fleet/.claude/docs/naming-conventions.md`
+**File naming**: TypeScript files MUST be PascalCase matching their exported class (e.g., `FlowExecutor.ts` -> `class FlowExecutor`). See `.agent-fleet/.claude/docs/naming-conventions.md`
 
 **Required:**
 
@@ -25,11 +25,11 @@ Then run `npm install` normally.
 
 **Avoid:**
 
-- God classes (>500 lines → refactor at 400+)
+- God classes (>500 lines -> refactor at 400+)
 - Circular dependencies
-- Generic names (`manager.ts` → `TaskManager.ts`)
+- Generic names (`manager.ts` -> `TaskManager.ts`)
 - Kebab-case for class files
-- Fallback for unrecognized value, you must fail fast (e.g. switch default case → throw)
+- Fallback for unrecognized value, you must fail fast (e.g. switch default case -> throw)
 
 **After each task:**
 Use the skill "check" and fix the issues
@@ -55,7 +55,7 @@ FlowExecutor.test.ts
 - Document in .claude/temp folder if needed
 - <crucial>Never kill processes you didn't create</crucial>
 - Ask user if requirements unclear (AskUserQuestion tool)
-- **BLOCKING:** Changes to `packages/web-frontend/src/**` → delegate to frontend-dev agent (compilation ≠ working code)
+- **BLOCKING:** Changes to `packages/web-frontend/src/**` -> delegate to frontend-dev agent (compilation != working code)
 - **Flow integration tests**: Every new model provider must have 1-2 automated flow tests in `packages/flow-engine/src/executor/StepRunner.opencode.integration.test.ts` using mock CLIs (`OPENCODE_MOCK_PATH`/`CLAUDE_MOCK_PATH`). Never use real APIs in automated tests.
 
 ## Communication Style
@@ -88,7 +88,7 @@ If the user is wrong, say it. If you disagree, explain why. Act as a peer, not a
 
 **To deploy a local change:**
 
-1. `git commit` + `git push` → CI builds and publishes automatically
+1. `git commit` + `git push` -> CI builds and publishes automatically
 2. `flow cli update` or `task cli update` to install the new version locally
 
 **Never patch `node_modules` manually** -- it gets overwritten on the next install.

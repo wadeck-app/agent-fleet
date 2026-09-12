@@ -25,7 +25,7 @@ interface ProcessInfo {
  * SCRIPT PROCESS MANAGER
  * ===========================================================================================
  *
- * Manages script process lifecycle using child_process.spawn().
+ * Manages script process lifecycle using child_process spawning.
  * Cross-platform support for Windows and Unix systems.
  *
  * Features:
@@ -95,6 +95,10 @@ export class ScriptProcessManager {
 
 		// Spawn process
 		const childProcess = spawn(command, args, {
+			// No console for a background server's children: output is streamed to the UI,
+			// so a visible terminal window would only flash on screen. web-backend is not
+			// part of the flow daemon's console-inheritance chain.
+			windowsHide: true,
 			cwd: workingDir,
 			env: { ...process.env },
 			// Don't use shell: true because we're already using cmd.exe or sh
@@ -333,6 +337,7 @@ export class ScriptProcessManager {
 	private async execCommand(command: string): Promise<void> {
 		return new Promise((resolve, reject) => {
 			const childProcess = spawn(command, {
+				windowsHide: true,
 				shell: true,
 			});
 
