@@ -23,9 +23,9 @@
 		"bundle": "tsx ci/scripts/bundle.ts"
 	},
 	"dependencies": {
-		"@wadeck-app/shared-cli": "^2026.9.1-028-247c1709",
-		"@wadeck-app/shared-updater": "^2026.9.1-014-558289d8",
-		"@wadeck-app/singleton-daemon-kit": "2026.9.8-088-fb2501fa",
+		"@wadeck-app/shared-cli": "latest",
+		"@wadeck-app/shared-updater": "latest",
+		"@wadeck-app/singleton-daemon-kit": "latest",
 		"commander": "^12.1.0",
 		"extension-points": "file:../extension-points",
 		"flow-engine": "file:../flow-engine",
