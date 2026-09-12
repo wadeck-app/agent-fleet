@@ -45,7 +45,7 @@ export class FlowsService {
 				const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 				if (packageJson.workspaces) {
 					// Found monorepo root
-					this.flowsFilePath = path.join(currentDir, '.agent-fleet', 'flows.yml');
+					this.flowsFilePath = path.join(currentDir, '.flow', 'flows.yml');
 					log.info(' Using flows file:', this.flowsFilePath);
 					return;
 				}
@@ -54,7 +54,7 @@ export class FlowsService {
 		}
 
 		// Fallback: use process.cwd()
-		this.flowsFilePath = path.join(process.cwd(), '.agent-fleet', 'flows.yml');
+		this.flowsFilePath = path.join(process.cwd(), '.flow', 'flows.yml');
 		log.info(' Fallback - using flows file:', this.flowsFilePath);
 	}
 

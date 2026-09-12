@@ -1,6 +1,6 @@
 import { WorkspaceMapper } from '../services/WorkspaceMapper';
 
-// Get the workspace path from .agent-fleet
+// Get the workspace path from .flow
 const workspacePath = 'C:\\Workspace_Tooling\\agent-fleet';
 
 // Generate hash-based ID from path

@@ -155,7 +155,7 @@ export class FlowRegistry {
 	 * @param projectRoot - Root directory of the project
 	 */
 	constructor(projectRoot: string) {
-		this.configPath = path.join(projectRoot, '.agent-fleet', 'flows.yml');
+		this.configPath = path.join(projectRoot, '.flow', 'flows.yml');
 		this.validator = new FlowValidator(this);
 		this.loadDefaultFlows();
 	}
@@ -949,7 +949,7 @@ export class FlowRegistry {
 	}
 
 	/**
-	 * Save a custom flow to .agent-fleet/flows-custom.yml and register it in memory.
+	 * Save a custom flow to .flow/flows-custom.yml and register it in memory.
 	 * Creates the file if it doesn't exist.
 	 * Uses simple atomic write (write to temp file, rename) to avoid partial writes.
 	 * @param flow - Flow definition to save

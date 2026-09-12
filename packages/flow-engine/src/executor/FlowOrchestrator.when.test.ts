@@ -27,7 +27,7 @@ describe('FlowOrchestrator - when condition', () => {
 	beforeEach(() => {
 		// Create temp directory for registry
 		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-test-'));
-		const flowsDir = path.join(tempDir, '.agent-fleet');
+		const flowsDir = path.join(tempDir, '.flow');
 		fs.mkdirSync(flowsDir, { recursive: true });
 		fs.writeFileSync(path.join(flowsDir, 'flows.yml'), '');
 

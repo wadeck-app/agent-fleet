@@ -23,7 +23,7 @@ describe('SemanticValidator', () => {
 	beforeEach(() => {
 		// Create a temporary directory for test flows
 		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'semantic-validator-test-'));
-		const flowsDir = path.join(tempDir, '.agent-fleet');
+		const flowsDir = path.join(tempDir, '.flow');
 		fs.mkdirSync(flowsDir, { recursive: true });
 
 		// Create empty flows.yml to avoid warnings

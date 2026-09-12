@@ -34,7 +34,7 @@ export class WorkspaceManager {
 	private git: WorkspaceGitStrategy;
 
 	constructor(private readonly projectRoot: string) {
-		this.basePath = path.join(projectRoot, '.agent-fleet', 'workspaces');
+		this.basePath = path.join(projectRoot, '.flow', 'workspaces');
 		this.git = new WorkspaceGitStrategy(projectRoot);
 		if (!fs.existsSync(this.basePath)) {
 			fs.mkdirSync(this.basePath, { recursive: true });

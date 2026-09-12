@@ -10,6 +10,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import type { WebSocket } from 'ws';
 
+import { DefaultProjectResolver } from '../config/DefaultProjectResolver.js';
 import { type FlowConfig, FlowConfigLoader } from '../config/FlowConfig';
 import { PluginResolver } from '../config/PluginResolver.js';
 import type { ClientCommand, WorkerToDaemon } from '../ipc/Protocol';
@@ -44,34 +45,113 @@ function resolveClaudePath(): string {
 	}
 }
 
-function loadFlowHooks(cwd: string): Record<string, HookConfig[]> {
-	const configPath = path.join(cwd, '.flows', 'config.yml');
-	if (!fs.existsSync(configPath)) return {};
+/**
+ * Prunes the workspaces of the project a run belongs to.
+ *
+ * Keyed on the requesting client's cwd, never on the daemon's own: the daemon is
+ * a per-user machine-wide singleton serving every project concurrently, so its
+ * launch directory would prune an unrelated project's workspaces (Q#22).
+ */
+function pruneProjectWorkspaces(cwd: string, config: FlowConfig): void {
+	let projectRoot: string;
 	try {
-		const raw = yaml.load(fs.readFileSync(configPath, 'utf8'), { schema: yaml.JSON_SCHEMA }) as Record<
-			string,
-			unknown
-		>;
-		return (raw['hooks'] as Record<string, HookConfig[]> | undefined) ?? {};
+		projectRoot = new DefaultProjectResolver().resolve(cwd).projectRoot;
 	} catch (err) {
-		process.stderr.write(`[daemon] Failed to parse .flows/config.yml: ${String(err)}\n`);
-		return {};
+		process.stderr.write(
+			`[daemon] Skipped workspace pruning: ${err instanceof Error ? err.message : String(err)}\n`
+		);
+		return;
 	}
+	WorkspaceManager.pruneOldWorkspaceDir(
+		path.join(projectRoot, '.flow', 'workspaces'),
+		config.workspace.retainDays,
+		config.workspace.maxWorkspaces
+	);
 }
 
 /**
- * Attempts to load plugin config. Returns empty providers when no config files are present
- * (backward-compatible). Re-throws on config parse errors or plugin load failures.
+ * Reads the `hooks:` section of the project's `.flow/config.yml`.
+ *
+ * Resolves the project root from `cwd` rather than reading `<cwd>/.flow/config.yml`
+ * directly, so a run started from a subdirectory still picks up the project's hooks.
+ */
+export function loadFlowHooks(cwd: string): Record<string, HookConfig[]> {
+	let projectRoot: string;
+	try {
+		projectRoot = new DefaultProjectResolver().resolve(cwd).projectRoot;
+	} catch (err) {
+		process.stderr.write(`[daemon] No flow hooks loaded: ${err instanceof Error ? err.message : String(err)}\n`);
+		return {};
+	}
+	const configPath = path.join(projectRoot, '.flow', 'config.yml');
+	if (!fs.existsSync(configPath)) return {};
+	let raw: Record<string, unknown> | null;
+	try {
+		raw = yaml.load(fs.readFileSync(configPath, 'utf8'), { schema: yaml.JSON_SCHEMA }) as Record<
+			string,
+			unknown
+		> | null;
+	} catch (err) {
+		// Fails rather than running the flow with no hooks: silently dropping every
+		// hook because of a typo is worse than refusing to start.
+		throw new Error(`Failed to parse flow config at "${configPath}": ${String(err)}`);
+	}
+	return (raw?.['hooks'] as Record<string, HookConfig[]> | undefined) ?? {};
+}
+
+/**
+ * True when a config file actually declares a `plugins:` section.
+ *
+ * Tested instead of mere file existence because the global config now lives at
+ * `~/.config/flow/config.yml` (D#58) -- the same file that carries daemon
+ * settings such as `queue:` and `autoUpdate:`. Keying on existence would make
+ * every user who has ever set `queue.concurrency` fail with "No workspace
+ * provider configured", since `resolveAll()` requires one by design (P-4).
+ */
+export function declaresPlugins(configPath: string): boolean {
+	if (!fs.existsSync(configPath)) return false;
+	let raw: Record<string, unknown> | null;
+	try {
+		raw = yaml.load(fs.readFileSync(configPath, 'utf8'), { schema: yaml.JSON_SCHEMA }) as Record<
+			string,
+			unknown
+		> | null;
+	} catch (err) {
+		// A config file that cannot be parsed is a hard error: guessing either way
+		// would either hide the typo or blame a missing workspace provider for it.
+		throw new Error(`Failed to parse flow config at "${configPath}": ${String(err)}`);
+	}
+	return raw?.['plugins'] !== undefined;
+}
+
+/**
+ * Attempts to load plugin config. Returns empty providers when no config file declares
+ * a `plugins:` section (backward-compatible). Re-throws on config parse errors or
+ * plugin load failures.
  */
 async function tryResolvePlugins(): Promise<{
 	workspaceProvider?: WorkspaceProvider;
 	approvalProvider?: ApprovalProvider;
 }> {
-	const globalConfigPath = path.join(os.homedir(), '.flow', 'config.yml');
-	const projectConfigPath = path.join(process.cwd(), '.flow', 'config.yml');
+	const globalConfigPath = path.join(ConfigDir.get('flow'), 'config.yml');
 	const envOverride = process.env['FLOW_CONFIG'];
 
-	if (!envOverride && !fs.existsSync(globalConfigPath) && !fs.existsSync(projectConfigPath)) {
+	// The daemon is a per-user machine-wide singleton, so it has no single project.
+	// Resolve the project from the launching cwd instead of reading `<cwd>/.flow/`
+	// literally; absence is not an error here because a global config alone is enough.
+	let projectConfigPath: string | null = null;
+	try {
+		const { projectRoot } = new DefaultProjectResolver().resolve(process.cwd());
+		projectConfigPath = path.join(projectRoot, '.flow', 'config.yml');
+	} catch {
+		// No project at the launch directory -- global config still applies.
+	}
+
+	if (
+		!envOverride &&
+		!declaresPlugins(globalConfigPath) &&
+		(projectConfigPath === null || !declaresPlugins(projectConfigPath))
+	) {
 		return {};
 	}
 
@@ -101,6 +181,7 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 		commands: {
 			run: async (payload: unknown): Promise<unknown> => {
 				const cmd = payload as Extract<ClientCommand, { type: 'run' }>;
+				pruneProjectWorkspaces(cmd.cwd, config);
 				const flowHooks = loadFlowHooks(cmd.cwd);
 				return commandHandler.handleRun(cmd, new HookDispatcher(flowHooks));
 			},
@@ -119,11 +200,9 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 				executionStore = new ExecutionStore(executionsDir, config.logs.retainDays);
 				logWriter = new LogWriter(logsDir, config.logs.retainDays);
 				executionStore.pruneOldExecutions();
-				WorkspaceManager.pruneOldWorkspaceDir(
-					path.join(process.cwd(), '.agent-fleet', 'workspaces'),
-					config.workspace.retainDays,
-					config.workspace.maxWorkspaces
-				);
+				// Workspace pruning is per-project and so runs per request, not here:
+				// this daemon is shared across projects and its launch directory says
+				// nothing about whose workspaces should be pruned.
 				const claudePath = resolveClaudePath();
 				if (!claudePath) {
 					writeDaemonLog(logsDir, 'error', 'claude binary not found on PATH - model steps may fail');

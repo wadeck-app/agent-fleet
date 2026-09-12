@@ -460,7 +460,7 @@ describe('WorkspaceManager', () => {
 	});
 
 	describe('pruneOldWorkspaces', () => {
-		const workspacesDir = path.join(testRoot, '.agent-fleet', 'workspaces');
+		const workspacesDir = path.join(testRoot, '.flow', 'workspaces');
 
 		function makeWorkspaceDir(name: string, ageMs = 0): string {
 			const dir = path.join(workspacesDir, name);

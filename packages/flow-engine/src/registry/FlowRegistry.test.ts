@@ -16,7 +16,7 @@ vi.mock('js-yaml');
 describe('FlowRegistry', () => {
 	let registry: FlowRegistry;
 	const projectRoot = '/test/project';
-	const configPath = '/test/project/.agent-fleet/flows.yml';
+	const configPath = '/test/project/.flow/flows.yml';
 
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -685,7 +685,7 @@ custom-flow:
 			expect(fs.watch).toHaveBeenCalled();
 			const callArgs = vi.mocked(fs.watch).mock.calls[0];
 			// Check that the path ends with the expected path (normalize for Windows vs Unix)
-			expect(callArgs[0]).toContain('.agent-fleet');
+			expect(callArgs[0]).toContain('.flow');
 			expect(callArgs[0]).toContain('flows.yml');
 			expect(callArgs[1]).toBeInstanceOf(Function);
 		});
