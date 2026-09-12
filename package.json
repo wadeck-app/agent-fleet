@@ -91,10 +91,10 @@
 		"vitest": "^4.0.14"
 	},
 	"dependencies": {
-		"@wadeck-app/singleton-daemon-kit": "2026.8.30-082-8c02b26d",
+		"@wadeck-app/singleton-daemon-kit": "2026.9.8-088-fb2501fa",
 		"embla-carousel-react": "^8.6.0"
 	},
 	"optionalDependencies": {
-		"@wadeck-app/violations-rules": "^2026.8.28-037-e3acea40"
+		"@wadeck-app/violations-rules": "^2026.9.10-104-db0bb684"
 	}
 }
