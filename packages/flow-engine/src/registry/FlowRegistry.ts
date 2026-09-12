@@ -676,8 +676,15 @@ export class FlowRegistry {
 			return {
 				...baseStep,
 				type: 'model',
+				provider: data.provider,
 				model: data.model || 'haiku',
 				prompt: data.prompt || '',
+				env: data.env,
+				log: data.log,
+				toolLog: data.toolLog,
+				mcpServers: data.mcpServers,
+				toolHooks: data.toolHooks,
+				session: data.session,
 			};
 		} else if (stepType === 'script') {
 			// Script step
