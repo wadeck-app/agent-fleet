@@ -1,8 +1,8 @@
 // flow-updater entry point -- bundled separately as flow-updater.cjs.
 // Must NOT import any flow runtime modules.
 import { ConfigDir } from '@wadeck-app/shared-cli/ConfigDir';
-import { execNpm, runUpdater } from '@wadeck-app/shared-updater';
-import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execNpm, readUpdateConfig, runUpdater } from '@wadeck-app/shared-updater';
+import { cpSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import * as http from 'node:http';
 import * as os from 'node:os';
 import { join } from 'node:path';
@@ -78,6 +78,71 @@ function queryDaemonHealth(port: number, token: string, timeoutMs: number): Prom
 	});
 }
 
+// UPDATER_FORCE=1 means the user asked for this explicitly (`flow cli update`), so the run
+// must never be silent. shared-updater reports every outcome to its NDJSON log file only, so
+// we mirror the entries this run produced onto stdout/stderr instead of duplicating its
+// decision logic here. New updater messages surface automatically.
+const force = process.env['UPDATER_FORCE'] === '1';
+
+/** Path of the shared-updater NDJSON log for today (mirrors shared-updater's appendLog). */
+function updaterLogPath(): string {
+	return join(configDir, 'logs', `${new Date().toISOString().slice(0, 10)}.ndjson`);
+}
+
+function logSize(file: string): number {
+	return existsSync(file) ? statSync(file).size : 0;
+}
+
+/**
+ * Echo every log entry appended during this run. Returns the number of entries echoed so the
+ * caller can report an explicit reason when the updater produced nothing at all.
+ */
+function echoUpdaterLog(startPath: string, startSize: number): number {
+	const endPath = updaterLogPath();
+	// A run straddling midnight rolls over to a new file, which must be read from the start.
+	const offset = endPath === startPath ? startSize : 0;
+	if (!existsSync(endPath)) return 0;
+	const appended = readFileSync(endPath, 'utf8').slice(offset);
+	let count = 0;
+	for (const line of appended.split('\n')) {
+		if (line.trim() === '') continue;
+		let level = 'info';
+		let msg = line;
+		try {
+			const entry = JSON.parse(line) as { level?: string; msg?: string };
+			if (typeof entry.msg === 'string') msg = entry.msg;
+			if (typeof entry.level === 'string') level = entry.level;
+		} catch {
+			// Not valid NDJSON: still surface the raw line rather than hiding it.
+		}
+		const stream = level === 'warn' || level === 'error' ? process.stderr : process.stdout;
+		stream.write(`[flow-updater] ${msg}\n`);
+		count += 1;
+	}
+	return count;
+}
+
+/**
+ * Explains the one outcome shared-updater exits on without logging anything: autoUpdate is
+ * disabled in config.yml and UPDATER_MANUAL was not set to bypass it.
+ */
+function reportSilentOutcome(): void {
+	if (readUpdateConfig(configDir).disabled) {
+		process.stderr.write(
+			`[flow-updater] Update skipped: autoUpdate is disabled in ${join(configDir, 'config.yml')}.\n` +
+				`[flow-updater] Run \`flow cli update\` to update anyway, or set \`autoUpdate: true\` in that file.\n`
+		);
+		return;
+	}
+	process.stderr.write(
+		`[flow-updater] Update check produced no result and no log entry. This is unexpected.\n` +
+			`[flow-updater] Inspect ${updaterLogPath()} and report it.\n`
+	);
+}
+
+const logPathBeforeRun = updaterLogPath();
+const logSizeBeforeRun = logSize(logPathBeforeRun);
+
 runUpdater({
 	pkgName: PKG_NAME,
 	configDir,
@@ -102,7 +167,14 @@ runUpdater({
 		}
 		return 'apply-now';
 	},
-}).catch(err => {
-	process.stderr.write(`[flow-updater] fatal: ${err}\n`);
-	process.exit(1);
-});
+})
+	.then(() => {
+		if (!force) return;
+		if (echoUpdaterLog(logPathBeforeRun, logSizeBeforeRun) === 0) reportSilentOutcome();
+	})
+	.catch(err => {
+		// Surface whatever the updater managed to log before failing, then the failure itself.
+		if (force) echoUpdaterLog(logPathBeforeRun, logSizeBeforeRun);
+		process.stderr.write(`[flow-updater] fatal: ${err}\n`);
+		process.exit(1);
+	});

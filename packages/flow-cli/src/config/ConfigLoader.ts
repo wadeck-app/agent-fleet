@@ -4,6 +4,7 @@ import { load as parseYaml } from 'js-yaml';
 import { readFileSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { join } from 'node:path';
+import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 
 import { DefaultProjectResolver } from './DefaultProjectResolver.js';
 import type {
@@ -134,8 +135,7 @@ export class ConfigLoader {
 		} catch (err) {
 			// Not a silent fallback: no project means no project config, but the
 			// reason is reported instead of the config vanishing without trace.
-			const detail = err instanceof Error ? err.message : String(err);
-			process.stderr.write(`[flow] No project plugin config loaded. ${detail}\n`);
+			process.stderr.write(`[flow] No project plugin config loaded. ${getErrorMessage(err)}\n`);
 			return null;
 		}
 	}

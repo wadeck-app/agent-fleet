@@ -8,6 +8,7 @@ import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 import type { WebSocket } from 'ws';
 
 import { DefaultProjectResolver } from '../config/DefaultProjectResolver.js';
@@ -57,9 +58,7 @@ function pruneProjectWorkspaces(cwd: string, config: FlowConfig): void {
 	try {
 		projectRoot = new DefaultProjectResolver().resolve(cwd).projectRoot;
 	} catch (err) {
-		process.stderr.write(
-			`[daemon] Skipped workspace pruning: ${err instanceof Error ? err.message : String(err)}\n`
-		);
+		process.stderr.write(`[daemon] Skipped workspace pruning: ${getErrorMessage(err)}\n`);
 		return;
 	}
 	WorkspaceManager.pruneOldWorkspaceDir(
@@ -80,7 +79,7 @@ export function loadFlowHooks(cwd: string): Record<string, HookConfig[]> {
 	try {
 		projectRoot = new DefaultProjectResolver().resolve(cwd).projectRoot;
 	} catch (err) {
-		process.stderr.write(`[daemon] No flow hooks loaded: ${err instanceof Error ? err.message : String(err)}\n`);
+		process.stderr.write(`[daemon] No flow hooks loaded: ${getErrorMessage(err)}\n`);
 		return {};
 	}
 	const configPath = path.join(projectRoot, '.flow', 'config.yml');

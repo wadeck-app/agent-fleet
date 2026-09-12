@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { DefaultProjectResolver } from '../../config/DefaultProjectResolver';
@@ -133,8 +134,7 @@ function resolveFlowFile(flowRef: string, cwd: string): FlowResolution {
 	} catch (err) {
 		// The resolver's message already names the markers it looked for, or the
 		// legacy files to move -- surface it rather than replacing it.
-		const detail = err instanceof Error ? err.message : String(err);
-		return { found: false, error: `Flow '${flowRef}' not found as a file.\n${detail}` };
+		return { found: false, error: `Flow '${flowRef}' not found as a file.\n${getErrorMessage(err)}` };
 	}
 	const flowsFile = path.join(projectRoot, '.flow', 'flows.yml');
 	if (!fs.existsSync(flowsFile)) {
