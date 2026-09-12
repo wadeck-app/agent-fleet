@@ -261,6 +261,7 @@ export class ClaudeLauncher {
 			for (const [k, v] of Object.entries(rawEnvInteractive)) {
 				if (v !== undefined) processEnvInteractive[k] = v;
 			}
+			// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, so grandchildren allocate a visible console; this spawn must inherit the daemon's hidden console (d032e7e). Guarded by ClaudeLauncher.windows-console.test.ts
 			const claudeProcess = spawn(command, args, {
 				cwd: options.workingDir,
 				stdio: 'inherit',
@@ -318,6 +319,7 @@ export class ClaudeLauncher {
 			for (const [k, v] of Object.entries(rawEnvBackground)) {
 				if (v !== undefined) processEnvBackground[k] = v;
 			}
+			// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, so grandchildren allocate a visible console; this spawn must inherit the daemon's hidden console (d032e7e). Guarded by ClaudeLauncher.windows-console.test.ts
 			const claudeProcess = spawn(command, args, {
 				cwd: options.workingDir,
 				stdio: ['pipe', 'pipe', 'pipe'],

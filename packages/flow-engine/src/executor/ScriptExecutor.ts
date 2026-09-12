@@ -140,8 +140,6 @@ export class ScriptExecutor {
 				// This avoids cmd.exe which doesn't support bash syntax ($VAR, pipes, etc.).
 				tempFilePath = path.join(tempDir, `agent-fleet-script-${timestamp}-${random}.sh`);
 				fs.writeFileSync(tempFilePath, options.script, { encoding: 'utf8' });
-				// Use forward slashes — MSYS2 bash handles them correctly
-				const posixPath = tempFilePath.replace(/\\/g, '/').replace(/^([A-Za-z]):/, '/cifs/$1');
 				// shell: false so we control the binary explicitly
 				return new Promise<ScriptExecutionResult>((innerResolve, innerReject) => {
 					let stdout = '';
@@ -154,11 +152,14 @@ export class ScriptExecutor {
 							/* ignore */
 						}
 					};
+					// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, making grandchildren allocate a visible console -- see d032e7e
 					const child = spawn('bash', [tempFilePath!], {
 						cwd: workingDir,
 						env: cleanEnv,
+						// No windowsHide / detached: CREATE_NO_WINDOW and DETACHED_PROCESS strip the
+						// console handle, so grandchildren allocate a visible console. The script
+						// must inherit the daemon's hidden console instead (see d032e7e).
 						stdio: ['ignore', 'pipe', 'pipe'],
-						windowsHide: true,
 					});
 					child.stdout?.on('data', (d: Buffer) => {
 						stdout += d.toString();
@@ -170,7 +171,14 @@ export class ScriptExecutor {
 						cleanupSh();
 						const exitCode = code ?? 1;
 						const durationMs = Date.now() - startTime;
-						innerResolve({ stdout, stderr, exitCode, durationMs, success: exitCode === 0 });
+						// Trim to keep the same contract as the non-bash path below
+						innerResolve({
+							stdout: stdout.trim(),
+							stderr: stderr.trim(),
+							exitCode,
+							durationMs,
+							success: exitCode === 0,
+						});
 					});
 					child.on('error', (err: Error) => {
 						cleanupSh();
@@ -212,6 +220,7 @@ export class ScriptExecutor {
 			};
 
 			// Spawn process
+			// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, so grandchildren allocate a visible console; the script must inherit the daemon's hidden console (d032e7e). Guarded by ScriptExecutor.windows-console.test.ts
 			const child = spawn(scriptToExecute, [], {
 				cwd: workingDir,
 				env: cleanEnv,

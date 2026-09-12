@@ -16,9 +16,22 @@ const MAX_LIVE_LOG_ENTRIES = 1000;
 export class StreamEventMapper {
 	private counter = 0;
 	private readonly stepId: string;
+	/** Unknown event types already reported, so one new type cannot flood the log. */
+	private readonly warnedUnknownTypes = new Set<string>();
 
 	constructor(stepId: string) {
 		this.stepId = stepId;
+	}
+
+	/** Reports an unrecognized stream event type once per type. */
+	private warnUnknownEventTypeOnce(eventType: string): void {
+		if (this.warnedUnknownTypes.has(eventType)) {
+			return;
+		}
+		this.warnedUnknownTypes.add(eventType);
+		console.warn(
+			`[StreamEventMapper] Unknown stream event type "${eventType}" for step "${this.stepId}" -- not displayable, filtered out. The CLI stream-json schema may have changed.`
+		);
 	}
 
 	/**
@@ -93,8 +106,16 @@ export class StreamEventMapper {
 				}
 				return entries;
 			}
+			// Deliberate exception to the "switch default must throw" rule: event.type comes from
+			// the Claude/OpenCode CLI stream-json output, i.e. an external schema we do not own.
+			// New event types appear as those CLIs evolve. Throwing would kill the stdout handler
+			// in ModelStepExecutor (which does not wrap map() in a try/catch) and abort the step,
+			// so an unknown type is filtered out instead -- but never silently: it is reported
+			// once per type so a schema change is visible rather than swallowed.
+			// violations-suppress: ts/no-switch-default-break event.type is external CLI data; an unknown type is reported and filtered, not fatal
 			default:
-				throw new Error(`Unexpected switch value`);
+				this.warnUnknownEventTypeOnce(event.type);
+				return [];
 		}
 	}
 
