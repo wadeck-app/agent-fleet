@@ -18,6 +18,7 @@ import { registerHistoryCommand } from './commands/HistoryCommand';
 import { registerRunCommand } from './commands/RunCommand';
 import { registerShowCommand } from './commands/ShowCommand';
 import { registerValidateCommand } from './commands/ValidateCommand';
+import { registerWorkerCommand } from './commands/WorkerCommand';
 import { registerWorkerSourceCommand } from './commands/WorkerSourceCommand';
 import { VERSION } from './version.js';
 
@@ -241,7 +242,7 @@ async function main(): Promise<void> {
 	registerValidateCommand(program);
 	registerRunCommand(program);
 	registerHistoryCommand(program);
-	registerWorkerSourceCommand(program);
+	registerWorkerCommand(registerWorkerSourceCommand(program));
 	program.addCommand(buildCliCommand());
 	await registerDaemonCommands(program);
 

@@ -210,7 +210,6 @@ export class WorkerAdapter {
 		if (trace.error) {
 			// Include captured outputs (stdout/stderr) in the error so the daemon can forward them
 			// to the scheduler for ${{ subSteps.xxx.outputs.stderr }} in parent prompts.
-			// violations-suppress: ts/no-unsafe-type-cast same pattern as step_completed output cast below
 			const err = Object.assign(new Error(trace.error), {
 				stepOutputs: trace.outputs ?? {},
 			});

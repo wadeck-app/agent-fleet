@@ -127,6 +127,25 @@ export function declaresPlugins(configPath: string): boolean {
 	return raw?.['plugins'] !== undefined;
 }
 
+/** True when a config file declares a `plugins.authentication` section. */
+function declaresAuthenticationPlugin(configPath: string): boolean {
+	if (!fs.existsSync(configPath)) return false;
+	let raw: Record<string, unknown> | null;
+	try {
+		raw = yaml.load(fs.readFileSync(configPath, 'utf8'), { schema: yaml.JSON_SCHEMA }) as Record<
+			string,
+			unknown
+		> | null;
+	} catch {
+		// declaresPlugins already reports a parse failure with the path; do not double-report.
+		return false;
+	}
+	const plugins = raw?.['plugins'];
+	if (typeof plugins !== 'object' || plugins === null) return false;
+	// violations-suppress: ts/no-unsafe-type-cast parsed YAML has no static shape; the plugins key is checked before use
+	return (plugins as Record<string, unknown>)['authentication'] !== undefined;
+}
+
 /**
  * Attempts to load plugin config. Returns empty providers when no config file declares
  * a `plugins:` section (backward-compatible). Re-throws on config parse errors or
@@ -156,6 +175,18 @@ async function tryResolvePlugins(): Promise<{
 		(projectConfigPath === null || !declaresPlugins(projectConfigPath))
 	) {
 		return {};
+	}
+
+	// The authentication point is declared but has no resolution path yet: the daemon
+	// constructs the built-in shared-token implementation directly. Saying so is required
+	// -- loading a plugin section and ignoring it would leave the user believing their own
+	// authenticator was in force when it never ran.
+	for (const configPath of [globalConfigPath, projectConfigPath]) {
+		if (configPath !== null && declaresAuthenticationPlugin(configPath)) {
+			throw new Error(
+				`"${configPath}" configures plugins.authentication, but the daemon does not load an authentication plugin yet -- it uses the built-in shared-token implementation. Remove that section, or track the work to make it pluggable, rather than assuming it is active.`
+			);
+		}
 	}
 
 	return PluginResolver.create().resolveAll();
@@ -361,10 +392,15 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 			!commandHandler.hasActiveExecutions() &&
 			!workerRegistry.hasBusyWorkers()
 		) {
-			// Only the workers this daemon forked. A worker the user launched in a terminal
-			// must survive an idle period: it is registered, not owned (D#51), and telling
-			// it to exit here is what made `flow worker` unusable (D#48).
+			// Only the workers this daemon forked are told to exit. A worker the user
+			// launched in a terminal must survive an idle period: it is registered, not
+			// owned (D#51), and telling it to exit is what made `flow worker` unusable
+			// (D#48).
 			workerRegistry.broadcastToEphemeral({ type: 'done' });
+			// Their sockets are still closed, or the daemon could never exit: an open
+			// WebSocket keeps the event loop alive, leaving an orphan process holding no
+			// port file. The worker re-registers once a daemon is available again.
+			workerRegistry.disconnectExternal();
 			wsServer.close();
 			writeDaemonLog(logsDir, 'info', 'Daemon stopped (idle)');
 			void daemonHandle.stop('idle');

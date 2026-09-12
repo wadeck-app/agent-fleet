@@ -60,9 +60,8 @@ export class WorkerRegistry {
 
 	/**
 	 * Adds a worker as idle, or refreshes an existing one. Re-registering the same
-	 * connection is normal: a forked worker sends `ready` again after each step.
-	 */
-	/**
+	 * connection is normal: a worker sends `ready` again after each step.
+	 *
 	 * @param options.ephemeral - whether this daemon created the worker. Defaults to the
 	 *        value already recorded, then to false: an unrecognised worker is never
 	 *        treated as disposable, because being wrong in that direction kills a
@@ -133,21 +132,35 @@ export class WorkerRegistry {
 		return true;
 	}
 
-	broadcast(message: DaemonToWorker): void {
-		for (const ws of this.workers.keys()) {
-			this.send(ws, message);
-		}
-	}
-
 	/**
 	 * Sends only to workers this daemon created.
 	 *
 	 * Used for the idle shutdown notice. A worker launched in a terminal must not receive
 	 * it: it would exit, and the user would have to relaunch it after every idle period.
+	 *
+	 * There is deliberately no send-to-everyone counterpart. Broadcasting `done` to every
+	 * connection is precisely what made `flow worker` unusable (D#48), so the capability
+	 * is not offered.
 	 */
 	broadcastToEphemeral(message: DaemonToWorker): void {
 		for (const [ws, worker] of this.workers) {
 			if (worker.ephemeral) this.send(ws, message);
+		}
+	}
+
+	/**
+	 * Closes the sockets of workers this daemon did not create, without telling them to
+	 * exit.
+	 *
+	 * Needed for the daemon to be able to shut down at all: an open WebSocket is a
+	 * referenced handle, so leaving these connected keeps the process alive after it has
+	 * deleted its port file and stopped serving commands -- an invisible orphan, while the
+	 * next `flow run` starts a second daemon. Closing the socket is not the same as
+	 * shutting the worker down: it re-registers when a daemon is available again (D#51).
+	 */
+	disconnectExternal(): void {
+		for (const [ws, worker] of this.workers) {
+			if (!worker.ephemeral) ws.close();
 		}
 	}
 

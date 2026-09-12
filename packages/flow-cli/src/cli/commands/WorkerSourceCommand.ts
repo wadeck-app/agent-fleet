@@ -46,8 +46,8 @@ function parseLabels(raw: string | undefined): string[] {
  * Without this the `command` S1 implementation is unreachable: nothing else can put an
  * entry in the registry (D#63).
  */
-export function registerWorkerSourceCommand(program: Command): void {
-	const worker = program.command('worker').description('Manage workers and worker sources');
+export function registerWorkerSourceCommand(program: Command): Command {
+	const worker = program.command('worker').description('Run a worker, and manage worker sources');
 
 	const source = worker.command('source').description('Declare and inspect the sources that can supply workers');
 
@@ -133,4 +133,7 @@ export function registerWorkerSourceCommand(program: Command): void {
 				fail(err);
 			}
 		});
+
+	// Returned so `flow worker start` can be attached to the same group.
+	return worker;
 }

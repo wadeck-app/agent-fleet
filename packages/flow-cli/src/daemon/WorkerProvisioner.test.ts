@@ -201,6 +201,110 @@ describe('WorkerProvisioner - externally launched workers (Phase 2a)', () => {
 	});
 });
 
+describe('WorkerProvisioner - re-registration', () => {
+	// A worker sends `ready` again after every step. Counting it against its own source
+	// cap refuses it the moment it finishes one, destroying the worker the user launched.
+	it('allows a capped source to re-register the same connection', () => {
+		const registry = new WorkerRegistry();
+		const provisioner = makeProvisioner(
+			10,
+			registry,
+			fakeSource({ hasSpawned: () => false }),
+			allowAll() as never,
+			sourceCaps({ capped: 1 }) as never
+		);
+		const ws = fakeWorker();
+
+		expect(provisioner.registerWorker(ws, { pid: 1, sourceId: 'capped', authToken: 't' })).toBe(true);
+		// Second `ready` from the same socket, as sent after each completed step.
+		expect(provisioner.registerWorker(ws, { pid: 1, sourceId: 'capped', authToken: 't' })).toBe(true);
+		expect(ws.terminate).not.toHaveBeenCalled();
+		expect(registry.liveCount).toBe(1);
+	});
+
+	it('keeps the ephemeral flag across re-registration', () => {
+		const registry = new WorkerRegistry();
+		const provisioner = makeProvisioner(10, registry, fakeSource({ hasSpawned: () => true }));
+		const ws = fakeWorker();
+
+		provisioner.registerWorker(ws, { pid: 42 });
+		provisioner.registerWorker(ws, { pid: 42 });
+
+		expect(registry.describe(ws)?.ephemeral).toBe(true);
+	});
+
+	it('does not re-authenticate a connection already admitted', () => {
+		const registry = new WorkerRegistry();
+		const authenticator = allowAll();
+		const provisioner = makeProvisioner(
+			10,
+			registry,
+			fakeSource({ hasSpawned: () => false }),
+			authenticator as never,
+			sourceCaps({ laptop: 1 }) as never
+		);
+		const ws = fakeWorker();
+
+		provisioner.registerWorker(ws, { pid: 1, sourceId: 'laptop', authToken: 't' });
+		provisioner.registerWorker(ws, { pid: 1, sourceId: 'laptop', authToken: 't' });
+
+		expect(authenticator.authenticate).toHaveBeenCalledTimes(1);
+	});
+
+	// A different socket for the same one-slot source must still be refused.
+	it('still enforces the cap for a second distinct connection', () => {
+		const registry = new WorkerRegistry();
+		const provisioner = makeProvisioner(
+			10,
+			registry,
+			fakeSource({ hasSpawned: () => false }),
+			allowAll() as never,
+			sourceCaps({ capped: 1 }) as never
+		);
+		const first = fakeWorker();
+		const second = fakeWorker();
+
+		provisioner.registerWorker(first, { pid: 1, sourceId: 'capped', authToken: 't' });
+
+		expect(provisioner.registerWorker(second, { pid: 2, sourceId: 'capped', authToken: 't' })).toBe(false);
+		expect(second.terminate).toHaveBeenCalled();
+	});
+});
+
+describe('WorkerProvisioner - worker naming no source', () => {
+	// The zero-config path for `flow worker`: a loopback worker presenting the daemon
+	// token needs no declared source, or the core deliverable would require setup first.
+	it('admits a loopback worker with no source when the credential is accepted', () => {
+		const registry = new WorkerRegistry();
+		const provisioner = makeProvisioner(
+			2,
+			registry,
+			fakeSource({ hasSpawned: () => false }),
+			allowAll() as never,
+			sourceCaps({}) as never
+		);
+		const ws = fakeWorker();
+
+		expect(provisioner.registerWorker(ws, { pid: 999, authToken: 'daemon-token' })).toBe(true);
+		expect(registry.describe(ws)?.ephemeral).toBe(false);
+	});
+
+	it('still refuses it when the credential is rejected', () => {
+		const registry = new WorkerRegistry();
+		const provisioner = makeProvisioner(
+			2,
+			registry,
+			fakeSource({ hasSpawned: () => false }),
+			denyAll('no credential') as never,
+			sourceCaps({}) as never
+		);
+		const ws = fakeWorker();
+
+		expect(provisioner.registerWorker(ws, { pid: 999 })).toBe(false);
+		expect(ws.terminate).toHaveBeenCalled();
+	});
+});
+
 describe('WorkerProvisioner - registration admission', () => {
 	it('admits a worker this daemon spawned', () => {
 		const registry = new WorkerRegistry();
@@ -213,9 +317,16 @@ describe('WorkerProvisioner - registration admission', () => {
 
 	// Until token authentication lands, provenance is the only signal available -- an
 	// unrecognised process could otherwise cancel a real worker's connect timeout.
-	it('refuses and terminates a worker it did not spawn', () => {
+	// Not spawning it is no longer grounds for refusal on its own -- that is the whole
+	// point of S7. What matters is whether its credential is accepted.
+	it('refuses and terminates a worker it did not spawn when the credential fails', () => {
 		const registry = new WorkerRegistry();
-		const provisioner = makeProvisioner(1, registry, fakeSource({ hasSpawned: () => false }));
+		const provisioner = makeProvisioner(
+			1,
+			registry,
+			fakeSource({ hasSpawned: () => false }),
+			denyAll('worker presented no credential') as never
+		);
 		const ws = fakeWorker();
 
 		expect(provisioner.registerWorker(ws, { pid: 999 })).toBe(false);

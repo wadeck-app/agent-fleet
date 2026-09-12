@@ -50,14 +50,24 @@ export class WorkerProvisioner {
 	/**
 	 * Admits a worker into the registry, or refuses it.
 	 *
-	 * Admission is still provenance-based: only a process this daemon spawned is
-	 * recognised. That is deliberately unchanged until the `authentication` extension
-	 * point ships (Phase 2a) -- accepting an unverified `authToken` in the meantime would
-	 * open the daemon to any local process, since nothing yet checks the value. An
-	 * unrecognised registrant could otherwise cancel a real worker's connect timeout or
-	 * receive a dispatched step.
+	 * Three routes, in order: a connection already admitted is simply refreshed; a process
+	 * this daemon forked is recognised by provenance; anything else must satisfy the
+	 * `authentication` extension point and its source's cap.
+	 *
+	 * @returns false when the worker was refused, having already logged why and closed the
+	 *          socket -- the caller must not go on to dispatch to it.
 	 */
 	registerWorker(ws: WebSocket, registration: Omit<WorkerReady, 'type'>): boolean {
+		// A worker announces `ready` again after every step, so most registrations are
+		// refreshes of a connection already admitted. Re-running admission on those would
+		// count the worker against its own source cap and refuse it the moment it finished
+		// a step -- destroying the worker the user launched, which is the failure D#48
+		// exists to prevent. The socket was authenticated when it first joined.
+		if (this.registry.describe(ws) !== undefined) {
+			this.registry.register(ws, registration);
+			return true;
+		}
+
 		// A worker this daemon forked is recognised by provenance and needs no credential:
 		// it is a loopback child the daemon created (D#27).
 		if (this.forkSource.hasSpawned(registration.pid)) {
@@ -77,38 +87,37 @@ export class WorkerProvisioner {
 	 */
 	private admitExternalWorker(ws: WebSocket, registration: Omit<WorkerReady, 'type'>): boolean {
 		const { sourceId } = registration;
-		if (sourceId === undefined || sourceId === '') {
-			return this.refuse(
-				ws,
-				`refused a worker this daemon did not create, pid ${String(registration.pid)}: it named no source. Declare one with "flow worker source add" and pass its id.`
-			);
-		}
-
-		const source = this.sources.find(sourceId);
-		if (source === undefined) {
-			return this.refuse(
-				ws,
-				`refused a worker for source "${sourceId}": that source is not declared. Run "flow worker source add ${sourceId} --provider <provider>".`
-			);
-		}
+		const describeWorker = sourceId ? `worker for source "${sourceId}"` : 'worker naming no source';
 
 		const auth = this.authenticator.authenticate({
 			token: registration.authToken,
 			sourceId,
-			// Loopback is the only transport in v1; encryption for remote peers is Phase 4a.
-			loopback: true,
+			loopback: isLoopbackPeer(ws),
 		});
 		if (!auth.ok) {
-			return this.refuse(ws, `refused a worker for source "${sourceId}": ${auth.reason}`);
+			return this.refuse(ws, `refused a ${describeWorker}: ${auth.reason}`);
 		}
 
-		// D#64 / T-03: without a per-source cap one registrant could absorb every step.
-		const liveForSource = this.registry.countForSource(sourceId);
-		if (liveForSource >= source.maxWorkers) {
-			return this.refuse(
-				ws,
-				`refused a worker for source "${sourceId}": it already has ${String(liveForSource)} of ${String(source.maxWorkers)} allowed workers connected. Raise maxWorkers on the source to allow more.`
-			);
+		// A worker naming no source is the zero-config path: `flow worker` in a terminal,
+		// authenticated with the daemon's own token over loopback. Caps apply per declared
+		// source, so there is nothing to count for it.
+		if (sourceId !== undefined && sourceId !== '') {
+			const source = this.sources.find(sourceId);
+			if (source === undefined) {
+				return this.refuse(
+					ws,
+					`refused a worker for source "${sourceId}": that source is not declared. Run "flow worker source add ${sourceId} --provider <provider>".`
+				);
+			}
+
+			// D#64 / T-03: without a per-source cap one registrant could absorb every step.
+			const liveForSource = this.registry.countForSource(sourceId);
+			if (liveForSource >= source.maxWorkers) {
+				return this.refuse(
+					ws,
+					`refused a worker for source "${sourceId}": it already has ${String(liveForSource)} of ${String(source.maxWorkers)} allowed workers connected. Raise maxWorkers on the source to allow more.`
+				);
+			}
 		}
 
 		this.registry.register(ws, registration, { ephemeral: false });
@@ -120,4 +129,21 @@ export class WorkerProvisioner {
 		ws.terminate();
 		return false;
 	}
+}
+
+const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+
+/**
+ * Whether the peer connected over loopback.
+ *
+ * Derived from the socket rather than assumed, even though v1 only binds loopback: an
+ * assumed `true` would silently grant loopback-only trust to remote peers the moment a
+ * non-loopback transport lands (Phase 4a). Unknown addresses are treated as non-loopback,
+ * so the failure direction is refusal rather than over-trust.
+ */
+function isLoopbackPeer(ws: WebSocket): boolean {
+	// violations-suppress: ts/no-unsafe-type-cast ws exposes no public accessor for the underlying socket, and the remote address is the only way to tell a loopback peer from a remote one
+	const address = (ws as unknown as { _socket?: { remoteAddress?: string } })._socket?.remoteAddress;
+	if (address === undefined) return false;
+	return LOOPBACK_ADDRESSES.has(address);
 }
