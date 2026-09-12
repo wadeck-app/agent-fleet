@@ -51,6 +51,12 @@ const testSuites = [
 		args: ['run', 'test', '--workspace=flow-cli'],
 		type: testSuiteType_UNIT,
 	},
+	{
+		name: 'Flow Engine Unit Tests',
+		command: 'npm',
+		args: ['run', 'test', '--workspace=flow-engine'],
+		type: testSuiteType_UNIT,
+	},
 	// Disabled: setup cost (~14s build + servers) not amortized by only 3 tests.
 	// Re-enable when the test suite grows. Run individually: npm run test:app --workspace=e2e-web
 	// {
